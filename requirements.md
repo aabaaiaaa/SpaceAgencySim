@@ -21,7 +21,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-003: Part Definitions System
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-001
 - **Description**: Build the extensible parts data structure in `/src/data/parts.js`. Each part definition is a plain object with fields: `id` (string), `name` (string), `type` (enum: COMMAND_MODULE, COMPUTER_MODULE, SERVICE_MODULE, FUEL_TANK, ENGINE, SOLID_ROCKET_BOOSTER, STACK_DECOUPLER, RADIAL_DECOUPLER, LANDING_LEGS, PARACHUTE, SATELLITE), `mass` (kg, dry), `cost` (dollars), `width` (px at base scale), `height` (px at base scale), `snapPoints` (array of objects: `{ side: 'top'|'bottom'|'left'|'right', offsetX, offsetY, accepts: [type array] }`), `animationStates` (array of state name strings, e.g. `['idle', 'firing', 'deployed']`), `activatable` (boolean), `activationBehaviour` (string enum), `properties` (object for type-specific values like thrust, fuelCapacity, dragCoefficient, heatTolerance, etc.). The system must make it straightforward to add new parts later by adding entries to this file only.

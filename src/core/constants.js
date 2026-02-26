@@ -20,16 +20,30 @@ export const PartType = Object.freeze({
   FUEL_TANK: 'FUEL_TANK',
   /** Houses the crew and mission payload. Required on crewed flights. */
   COMMAND_MODULE: 'COMMAND_MODULE',
+  /** Uncrewed avionics pod; controls the rocket without a crew seat. */
+  COMPUTER_MODULE: 'COMPUTER_MODULE',
+  /** Science instrument, comms relay, or auxiliary service bay. */
+  SERVICE_MODULE: 'SERVICE_MODULE',
   /** Slows descent for safe recovery. Required for crew return. */
   PARACHUTE: 'PARACHUTE',
   /** Absorbs heat on atmospheric re-entry. */
   HEAT_SHIELD: 'HEAT_SHIELD',
   /** Cushions landing impact on solid surfaces. */
   LANDING_LEG: 'LANDING_LEG',
+  /** Extendable landing supports (plural leg assembly, e.g. a 4-leg unit). */
+  LANDING_LEGS: 'LANDING_LEGS',
   /** Carries science instruments or cargo. */
   PAYLOAD: 'PAYLOAD',
-  /** Connects stages and provides separation events. */
+  /** Deployable satellite or probe payload released in flight. */
+  SATELLITE: 'SATELLITE',
+  /** Connects stages and provides axial (in-line) separation events. */
   DECOUPLER: 'DECOUPLER',
+  /** Separates stages along the vertical (top/bottom) stack axis. */
+  STACK_DECOUPLER: 'STACK_DECOUPLER',
+  /** Mounts to the side of a stack and separates a radially-attached part. */
+  RADIAL_DECOUPLER: 'RADIAL_DECOUPLER',
+  /** Pre-loaded with solid propellant; not throttleable; burns until empty. */
+  SOLID_ROCKET_BOOSTER: 'SOLID_ROCKET_BOOSTER',
   /** Provides attitude control and small orbital adjustments. */
   RCS_THRUSTER: 'RCS_THRUSTER',
   /** Generates electricity for systems with no atmosphere. */
