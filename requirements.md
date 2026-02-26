@@ -13,7 +13,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-002: Core Game State & Data Models
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-001
 - **Description**: Define the central in-memory game state object and all data model types (via JSDoc or TypeScript). State includes: `money` (number), `loan` (object: balance, interestRate), `crew` (array of astronaut records), `missions` (object: available, accepted, completed arrays), `rockets` (array of saved rocket designs), `parts` (array of unlocked part IDs), `flightHistory` (array of flight result records), `playTimeSeconds` (number), `currentFlight` (nullable flight state object). All game systems read from and write to this single state object. Define enums/constants for part types, mission states, and crew statuses.
