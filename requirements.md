@@ -5,7 +5,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-001: Project Setup & Architecture
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: none
 - **Description**: Set up the browser project structure. Use Vite as the build tool for ES module support and fast dev iteration. Separate core game logic (plain JavaScript modules, no DOM/canvas dependency) from the rendering layer so that logic can be unit tested headlessly. Use PixiJS for 2D canvas rendering. Structure directories as: `/src/core/` for game logic, `/src/render/` for PixiJS rendering, `/src/ui/` for HTML overlay UI, `/src/data/` for part and mission definitions, `/src/tests/` for all test files. Entry point is `index.html`. Include a `package.json` with dev and build scripts.
