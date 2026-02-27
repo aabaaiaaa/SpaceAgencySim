@@ -338,7 +338,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-035: Mission Completion & Rewards
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-034, TASK-005, TASK-012
 - **Description**: Triggered when the player returns to the space agency from post-flight. Process in order: (1) For each completed mission, call `finance.earn(mission.reward)` and mark mission status as 'completed'. (2) Unlock new missions per each completed mission's `unlocksAfter` field — set their status to 'available'. (3) Unlock new parts per each completed mission's `unlockedParts` field — add to `state.parts`. (4) Add recovered part value to cash. (5) Apply interest on loan for each newly completed mission: one interest application per mission completed this flight. (6) Apply any death fines (if not already applied mid-flight). (7) Increment total flights counter. (8) Show a "Return Results" summary overlay on the hub screen listing: missions completed and their rewards, parts unlocked, interest charged, net change in cash. Dismiss to return to normal hub.

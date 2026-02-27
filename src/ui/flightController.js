@@ -29,6 +29,7 @@ import { saveGame, listSaves } from '../core/saveload.js';
 import { ATMOSPHERE_TOP, isReentryCondition } from '../core/atmosphere.js';
 import { getPartById } from '../data/parts.js';
 import { PartType, DEATH_FINE_PER_ASTRONAUT } from '../core/constants.js';
+import { processFlightReturn } from '../core/flightReturn.js';
 
 // ---------------------------------------------------------------------------
 // Module state
@@ -1137,9 +1138,17 @@ function _showPostFlightSummary(ps, assembly, flightState, state, onFlightEnd) {
   returnBtn.className   = 'pf-btn pf-btn-primary';
   returnBtn.textContent = '← Return to Space Agency';
   returnBtn.addEventListener('click', () => {
+    // Process all end-of-flight game-state changes (mission completion,
+    // part recovery, loan interest, death fines, flight history) and collect
+    // the summary for the "Return Results" overlay shown on the hub.
+    let returnResults = null;
+    if (state && flightState) {
+      returnResults = processFlightReturn(state, flightState, ps, assembly);
+    }
+
     overlay.remove();
     stopFlightScene();
-    if (onFlightEnd) onFlightEnd(state);
+    if (onFlightEnd) onFlightEnd(state, returnResults);
   });
   buttonsEl.appendChild(returnBtn);
 

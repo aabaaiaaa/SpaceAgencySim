@@ -65,6 +65,7 @@ import {
   SAVE_SLOT_COUNT,
 } from '../core/saveload.js';
 import { startFlightScene } from './flightController.js';
+import { showReturnResultsOverlay } from './hub.js';
 
 // ---------------------------------------------------------------------------
 // Module-level state (VAB session)
@@ -2377,11 +2378,19 @@ function _doLaunch(crewIds) {
       _assembly,
       _stagingConfig,
       _gameState.currentFlight,
-      () => {
+      (_state, returnResults) => {
         // Flight ended — restore the #vab-root and invoke the back callback
         // (which navigates to the hub).
         if (vabRoot) vabRoot.style.display = '';
         _onBack?.();
+
+        // If the player chose "Return to Space Agency" (as opposed to
+        // "Restart"), returnResults will be set.  Show the Return Results
+        // summary overlay on top of the newly-mounted hub screen.
+        if (returnResults) {
+          const uiOverlay = container;
+          showReturnResultsOverlay(uiOverlay, returnResults);
+        }
       },
     );
   }
