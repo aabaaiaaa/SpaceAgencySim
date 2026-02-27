@@ -402,7 +402,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-043: E2E — App Load & New Game Flow
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-007, TASK-008, TASK-036
 - **Description**: Write Playwright tests in `/e2e/newgame.spec.js`. Tests: (1) Navigating to the app root loads the page without console errors. (2) With no saves present, the New Game screen is shown (not the load screen). (3) Entering an agency name and clicking "New Game" navigates to the space agency hub. (4) The hub shows the correct starting cash (`$2,000,000`) in the top bar. (5) The hub shows all four clickable buildings (text labels: "Launch Pad", "Vehicle Assembly Building", "Mission Control Centre", "Crew Administration"). (6) With a save present in localStorage, the app shows the load screen by default and lists the save's stats. All tests must pass with `playwright test`.

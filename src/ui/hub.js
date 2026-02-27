@@ -35,6 +35,41 @@ const HUB_STYLES = `
   font-family: 'Segoe UI', system-ui, sans-serif;
 }
 
+/* ── Hub top bar ──────────────────────────────────────────────────────────── */
+#hub-topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 16px;
+  background: rgba(5, 8, 15, 0.72);
+  border-bottom: 1px solid rgba(100,160,220,0.18);
+  pointer-events: auto;
+  z-index: 20;
+  box-sizing: border-box;
+}
+
+#hub-topbar-agency {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #cce4f8;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#hub-cash {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #5ddb50;
+  letter-spacing: 0.02em;
+}
+
 /* ── Building hit areas ───────────────────────────────────────────────────── */
 .hub-building {
   position: absolute;
@@ -168,7 +203,7 @@ let _overlay = null;
  *   Possible destination values: 'vab', 'mission-control', 'crew-admin',
  *   'launch-pad'.
  */
-export function initHubUI(container, _state, onNavigate) {
+export function initHubUI(container, state, onNavigate) {
   // Inject styles once.
   if (!document.getElementById('hub-styles')) {
     const styleEl = document.createElement('style');
@@ -181,6 +216,7 @@ export function initHubUI(container, _state, onNavigate) {
   _overlay.id = 'hub-overlay';
   container.appendChild(_overlay);
 
+  _renderTopBar(state);
   _renderBuildings(onNavigate);
 
   // Show the PixiJS background.
@@ -205,6 +241,30 @@ export function destroyHubUI() {
 // ---------------------------------------------------------------------------
 // Private
 // ---------------------------------------------------------------------------
+
+/**
+ * Create and append the top bar (agency name + cash readout) to the overlay.
+ *
+ * @param {import('../core/gameState.js').GameState} state
+ */
+function _renderTopBar(state) {
+  if (!_overlay) return;
+
+  const bar = document.createElement('div');
+  bar.id = 'hub-topbar';
+
+  const agency = document.createElement('span');
+  agency.id = 'hub-topbar-agency';
+  agency.textContent = state.agencyName || 'Space Agency';
+
+  const cash = document.createElement('span');
+  cash.id = 'hub-cash';
+  cash.textContent = '$' + Math.round(state.money ?? 0).toLocaleString('en-US');
+
+  bar.appendChild(agency);
+  bar.appendChild(cash);
+  _overlay.appendChild(bar);
+}
 
 /**
  * Create and append one `<div>` per building inside the overlay.
