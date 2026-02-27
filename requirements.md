@@ -218,7 +218,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-020: Flight Physics Engine
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-002, TASK-004
 - **Description**: Implement the physics simulation in `/src/core/physics.js`. Use a fixed timestep integration loop (dt = 1/60s, scaled by time warp). Each tick: (1) Calculate total rocket mass (sum of all connected part masses including remaining fuel). (2) Calculate net thrust: sum of thrust from all currently firing engines/SRBs, multiplied by current throttle (SRBs ignore throttle). Simplified symmetric thrust — all thrust treated as acting along the rocket's current orientation axis regardless of engine placement. (3) Apply gravity: 9.81 m/s² downward, constant (simplified — no orbital gravity model needed until LEO objective detection). (4) Apply atmospheric drag: `dragForce = 0.5 * airDensity(altitude) * velocity² * dragCoefficient * crossSectionalArea`. Drag opposes velocity direction. (5) Integrate: `acceleration = (thrustVector + dragVector + gravityVector) / totalMass`. Update velocity and position. (6) For steering: A/D keys apply a rotation rate to the rocket's orientation (slow turn, always available without RCS). In vacuum (altitude > 70,000m), if the rocket has RCS-capable command modules, turn rate is increased by a fixed multiplier (×2.5). RCS is simplified — no directionality or placement needed. (7) Throttle controlled by W/S keys (or Up/Down arrows), range 0–100%, adjusts in 5% increments per keypress. Spacebar fires next stage.
