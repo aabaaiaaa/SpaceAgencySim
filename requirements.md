@@ -242,7 +242,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-023: Flight Staging & Decoupler Logic
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-022, TASK-018
 - **Description**: Implement in `/src/core/staging.js`. The rocket maintains a `currentStage` index. Pressing spacebar calls `activateCurrentStage()`: iterate through all parts assigned to the current stage and activate each. Activation behaviour by type: ENGINE — set to firing state (begins consuming fuel). DECOUPLER (stack) — remove the edge in the rocket graph between the two parts it connects; all parts on the disconnected side become a new "debris" object in the physics simulation (they continue to fall under gravity and drag, but the player has no control). DECOUPLER (radial) — same but severs a radial attachment. PARACHUTE — set to deploying state. SRB — set to firing (same as engine). After activation, `currentStage` increments to the next stage. The active rocket graph is recomputed after each decoupler fires to determine which parts are still connected to a command module. Parts disconnected from all command modules are moved to a separate debris list and continue to be simulated physically (rendered, fall, possibly crash) but accept no player input.

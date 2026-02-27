@@ -44,8 +44,7 @@
  */
 
 import { getPartById } from '../data/parts.js';
-import { PartType, FuelType } from './constants.js';
-import { fireStagingStep } from './rocketbuilder.js';
+import { PartType } from './constants.js';
 import {
   airDensity,
   ATMOSPHERE_TOP,
@@ -53,6 +52,7 @@ import {
   updateHeat,
 } from './atmosphere.js';
 import { tickFuelSystem } from './fuelsystem.js';
+import { activateCurrentStage, tickDebris } from './staging.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -117,6 +117,9 @@ const DEFAULT_SAFE_LANDING_SPEED = 10;
  * @property {boolean}         grounded      True while still sitting on the launch pad.
  * @property {Map<string,number>} heatMap      Accumulated reentry heat per part (heat units).
  *                                             Keyed by instance ID; initialised to 0.
+ * @property {import('./staging.js').DebrisState[]} debris  Jettisoned stage
+ *   fragments that continue to be simulated independently.  New entries are
+ *   appended whenever a decoupler fires via {@link fireNextStage}.
  * @property {Set<string>}     _heldKeys     Keys currently held down (for continuous steering).
  * @property {number}          _accumulator  Leftover simulation time from the previous frame.
  */
@@ -167,6 +170,7 @@ export function createPhysicsState(assembly, flightState) {
     activeParts: new Set(assembly.parts.keys()),
     deployedParts: new Set(),
     heatMap: new Map(),
+    debris: [],
     landed: false,
     crashed: false,
     grounded: true,
@@ -207,6 +211,11 @@ export function tick(ps, assembly, stagingConfig, flightState, realDeltaTime, ti
     ps._accumulator -= FIXED_DT;
     _integrate(ps, assembly, flightState);
     flightState.timeElapsed += FIXED_DT;
+
+    // Advance all debris fragments by the same fixed timestep.
+    for (const debris of ps.debris) {
+      tickDebris(debris, assembly, FIXED_DT);
+    }
 
     // Stop integrating if the flight has ended this step.
     if (ps.landed || ps.crashed) break;
@@ -273,8 +282,11 @@ export function handleKeyUp(ps, key) {
 /**
  * Fire the next stage (called when the player presses Spacebar).
  *
- * Delegates to {@link fireStagingStep} to advance `stagingConfig.currentStageIdx`
- * and activates each part in the just-fired stage.
+ * Delegates to {@link activateCurrentStage} (staging.js) which activates each
+ * part in the current stage and creates {@link DebrisState} objects for any
+ * rocket sections that become disconnected after a decoupler fires.  Newly
+ * created debris fragments are appended to `ps.debris` so they are simulated
+ * on every subsequent {@link tick}.
  *
  * @param {PhysicsState}                                 ps
  * @param {import('./rocketbuilder.js').RocketAssembly}  assembly
@@ -284,11 +296,8 @@ export function handleKeyUp(ps, key) {
 export function fireNextStage(ps, assembly, stagingConfig, flightState) {
   if (ps.landed || ps.crashed || flightState.aborted) return;
 
-  const { instanceIds } = fireStagingStep(stagingConfig);
-
-  for (const instanceId of instanceIds) {
-    _activatePart(ps, assembly, stagingConfig, flightState, instanceId);
-  }
+  const newDebris = activateCurrentStage(ps, assembly, stagingConfig, flightState);
+  ps.debris.push(...newDebris);
 }
 
 // ---------------------------------------------------------------------------
@@ -569,182 +578,6 @@ function _hasRcs(ps, assembly) {
     if (def && def.properties?.hasRcs === true) return true;
   }
   return false;
-}
-
-// ---------------------------------------------------------------------------
-// Part activation (private)
-// ---------------------------------------------------------------------------
-
-/**
- * Activate a part based on its `activationBehaviour`.
- *
- * - IGNITE     → add to firing engines.
- * - SEPARATE   → fire decoupler; jettison unreachable parts.
- * - DEPLOY     → mark as deployed (chute/legs); emit PART_ACTIVATED event.
- * - EJECT      → emit CREW_EJECTED event.
- * - RELEASE    → emit SATELLITE_RELEASED event.
- * - COLLECT_SCIENCE → emit PART_ACTIVATED event (science module).
- *
- * @param {PhysicsState}                                ps
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @param {import('./rocketbuilder.js').StagingConfig}  stagingConfig
- * @param {import('./gameState.js').FlightState}        flightState
- * @param {string} instanceId
- */
-function _activatePart(ps, assembly, stagingConfig, flightState, instanceId) {
-  if (!ps.activeParts.has(instanceId)) return;
-
-  const placed = assembly.parts.get(instanceId);
-  const def    = placed ? getPartById(placed.partId) : null;
-  if (!def) return;
-
-  const behaviour = def.activationBehaviour;
-  const time      = flightState.timeElapsed;
-  const altitude  = Math.max(0, ps.posY);
-
-  switch (behaviour) {
-    case 'IGNITE':
-      ps.firingEngines.add(instanceId);
-      _emitEvent(flightState, {
-        type: 'PART_ACTIVATED',
-        time,
-        partType: def.type,
-        description: `${def.name} ignited.`,
-      });
-      break;
-
-    case 'SEPARATE':
-      _emitEvent(flightState, {
-        type: 'PART_ACTIVATED',
-        time,
-        partType: def.type,
-        description: `${def.name} fired — stage separation.`,
-      });
-      _separateParts(ps, assembly, instanceId);
-      break;
-
-    case 'DEPLOY':
-      ps.deployedParts.add(instanceId);
-      _emitEvent(flightState, {
-        type: 'PART_ACTIVATED',
-        time,
-        partType: def.type,
-        description: `${def.name} deployed at ${altitude.toFixed(0)} m.`,
-      });
-      break;
-
-    case 'EJECT':
-      _emitEvent(flightState, {
-        type: 'CREW_EJECTED',
-        time,
-        altitude,
-        description: `Crew ejected at ${altitude.toFixed(0)} m.`,
-      });
-      break;
-
-    case 'RELEASE':
-      _emitEvent(flightState, {
-        type: 'SATELLITE_RELEASED',
-        time,
-        altitude,
-        description: `Satellite released at ${altitude.toFixed(0)} m.`,
-      });
-      break;
-
-    case 'COLLECT_SCIENCE':
-      _emitEvent(flightState, {
-        type: 'PART_ACTIVATED',
-        time,
-        partType: def.type,
-        description: `${def.name} collecting science data.`,
-      });
-      // Science collected event fires immediately for simplicity.
-      _emitEvent(flightState, {
-        type: 'SCIENCE_COLLECTED',
-        time,
-        description: `Science data collected at ${altitude.toFixed(0)} m.`,
-      });
-      break;
-
-    default:
-      break;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Stage separation (private)
-// ---------------------------------------------------------------------------
-
-/**
- * Fire a decoupler and jettison all parts no longer reachable from the root.
- *
- * Uses BFS from the rocket root (first COMMAND_MODULE or COMPUTER_MODULE
- * found among active parts, or the first active part as fallback) excluding
- * the fired decoupler.  Parts not reachable are removed from `ps.activeParts`
- * and `ps.firingEngines`.
- *
- * @param {PhysicsState}                               ps
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @param {string} decouplerInstanceId
- */
-function _separateParts(ps, assembly, decouplerInstanceId) {
-  const rootId = _findRoot(ps, assembly);
-  if (!rootId) return;
-
-  // BFS from root, never crossing the decoupler.
-  const reachable = new Set();
-  const queue     = [rootId];
-
-  while (queue.length > 0) {
-    const id = queue.shift();
-    if (reachable.has(id) || id === decouplerInstanceId) continue;
-    if (!ps.activeParts.has(id)) continue;
-    reachable.add(id);
-
-    for (const conn of assembly.connections) {
-      if (conn.fromInstanceId === id) queue.push(conn.toInstanceId);
-      if (conn.toInstanceId   === id) queue.push(conn.fromInstanceId);
-    }
-  }
-
-  // Jettison all parts not reachable from root (including the decoupler).
-  for (const id of [...ps.activeParts]) {
-    if (!reachable.has(id)) {
-      ps.activeParts.delete(id);
-      ps.firingEngines.delete(id);
-    }
-  }
-  // Ensure the decoupler itself is removed.
-  ps.activeParts.delete(decouplerInstanceId);
-  ps.firingEngines.delete(decouplerInstanceId);
-}
-
-/**
- * Return the instance ID of the rocket's root part (command/computer module,
- * or the first active part if none is found).
- *
- * @param {PhysicsState}                               ps
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @returns {string|null}
- */
-function _findRoot(ps, assembly) {
-  // Prefer a command/computer module.
-  for (const instanceId of ps.activeParts) {
-    const placed = assembly.parts.get(instanceId);
-    const def    = placed ? getPartById(placed.partId) : null;
-    if (!def) continue;
-    if (
-      def.type === PartType.COMMAND_MODULE ||
-      def.type === PartType.COMPUTER_MODULE
-    ) {
-      return instanceId;
-    }
-  }
-  // Fallback: first active part.
-  for (const instanceId of ps.activeParts) {
-    return instanceId;
-  }
-  return null;
 }
 
 // ---------------------------------------------------------------------------
