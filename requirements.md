@@ -346,7 +346,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-036: Test Infrastructure Setup
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-001
 - **Description**: Configure two test runners. (1) **Vitest** for unit tests: install as a dev dependency, configure to run in a Node environment (not jsdom) so all `/src/core/` and `/src/data/` modules are importable without PixiJS or DOM dependencies. Add `test:unit` script to `package.json`: `vitest run`. (2) **Playwright** for e2e tests: install `@playwright/test` as a dev dependency, run `playwright install` to download Chromium. Configure `playwright.config.js` with: `baseURL` pointing to the Vite dev server (`http://localhost:5173`), a `webServer` block that starts `vite` before tests run and waits for it to be ready, a single `chromium` project for the desktop browser. Add `test:e2e` script: `playwright test`. Add a `test` script that runs both in sequence: `vitest run && playwright test`. Create `/src/tests/` for unit tests and `/e2e/` for Playwright test files. Create a `setup.js` placeholder for Vitest global helpers. All subsequent test tasks depend on this task completing first.

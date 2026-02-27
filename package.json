@@ -7,13 +7,16 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "vitest run && playwright test",
+    "test:unit": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "pixi.js": "^8.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "vite": "^6.0.0",
     "vitest": "^3.0.0"
   }
