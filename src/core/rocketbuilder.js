@@ -263,3 +263,221 @@ function _snapOccupied(assembly, instanceId, snapIndex) {
       (c.toInstanceId   === instanceId && c.toSnapIndex   === snapIndex),
   );
 }
+
+// ---------------------------------------------------------------------------
+// Staging Configuration
+// ---------------------------------------------------------------------------
+
+/**
+ * One stage in a staging configuration.
+ * @typedef {Object} StageData
+ * @property {string[]} instanceIds  Instance IDs of activatable parts assigned here.
+ */
+
+/**
+ * Staging configuration for a rocket assembly.
+ *
+ * stages[0] = Stage 1 (fires first).
+ * stages[n-1] = Stage n (fires last).
+ * Visually, Stage 1 is at the bottom; higher stages are above it.
+ *
+ * @typedef {Object} StagingConfig
+ * @property {StageData[]} stages           Ordered stage slots. Index 0 = Stage 1.
+ * @property {string[]}    unstaged         Instance IDs of activatable parts not yet staged.
+ * @property {number}      currentStageIdx  0-based index of the next stage to fire (used in flight).
+ */
+
+/**
+ * Create a fresh staging configuration with one empty stage.
+ * @returns {StagingConfig}
+ */
+export function createStagingConfig() {
+  return {
+    stages:          [{ instanceIds: [] }],
+    unstaged:        [],
+    currentStageIdx: 0,
+  };
+}
+
+/**
+ * Synchronise a staging config with the current rocket assembly.
+ *
+ * - Activatable parts newly added to the assembly are pushed into `unstaged`.
+ * - References to removed parts are pruned from all stage slots and `unstaged`.
+ *
+ * Call this after every {@link addPartToAssembly} or {@link removePartFromAssembly}.
+ *
+ * @param {RocketAssembly} assembly
+ * @param {StagingConfig}  config
+ */
+export function syncStagingWithAssembly(assembly, config) {
+  const live = new Set(assembly.parts.keys());
+
+  // All IDs currently tracked by staging.
+  const tracked = new Set([
+    ...config.unstaged,
+    ...config.stages.flatMap((s) => s.instanceIds),
+  ]);
+
+  // New activatable parts → push into unstaged pool.
+  for (const id of live) {
+    if (!tracked.has(id)) {
+      const placed = assembly.parts.get(id);
+      const def    = placed ? getPartById(placed.partId) : null;
+      if (def && def.activatable) {
+        config.unstaged.push(id);
+      }
+    }
+  }
+
+  // Prune removed parts from unstaged pool.
+  config.unstaged = config.unstaged.filter((id) => live.has(id));
+
+  // Prune removed parts from all stages.
+  for (const stage of config.stages) {
+    stage.instanceIds = stage.instanceIds.filter((id) => live.has(id));
+  }
+}
+
+/**
+ * Add a new empty stage at the top (highest number, fires last).
+ * @param {StagingConfig} config
+ * @returns {number}  1-based number of the new stage.
+ */
+export function addStageToConfig(config) {
+  config.stages.push({ instanceIds: [] });
+  return config.stages.length;
+}
+
+/**
+ * Remove an empty stage by its 0-based array index.
+ * Refuses if the stage contains parts or is the last remaining stage.
+ *
+ * @param {StagingConfig} config
+ * @param {number}        stageIndex  0-based index (0 = Stage 1).
+ * @returns {boolean}  True if removed; false otherwise.
+ */
+export function removeStageFromConfig(config, stageIndex) {
+  if (stageIndex < 0 || stageIndex >= config.stages.length) return false;
+  if (config.stages.length <= 1)                              return false;
+  if (config.stages[stageIndex].instanceIds.length > 0)      return false;
+  config.stages.splice(stageIndex, 1);
+  config.currentStageIdx = Math.min(config.currentStageIdx, config.stages.length - 1);
+  return true;
+}
+
+/**
+ * Move a part from the unstaged pool into a specific stage.
+ * @param {StagingConfig} config
+ * @param {string}        instanceId
+ * @param {number}        stageIndex  0-based target stage.
+ * @returns {boolean}  True if moved.
+ */
+export function assignPartToStage(config, instanceId, stageIndex) {
+  if (stageIndex < 0 || stageIndex >= config.stages.length) return false;
+  const pos = config.unstaged.indexOf(instanceId);
+  if (pos === -1) return false;
+  config.unstaged.splice(pos, 1);
+  config.stages[stageIndex].instanceIds.push(instanceId);
+  return true;
+}
+
+/**
+ * Move a part from one stage to another.
+ * @param {StagingConfig} config
+ * @param {string}        instanceId
+ * @param {number}        fromIndex
+ * @param {number}        toIndex
+ * @returns {boolean}
+ */
+export function movePartBetweenStages(config, instanceId, fromIndex, toIndex) {
+  if (fromIndex === toIndex)                               return false;
+  if (fromIndex < 0 || fromIndex >= config.stages.length) return false;
+  if (toIndex   < 0 || toIndex   >= config.stages.length) return false;
+  const from = config.stages[fromIndex];
+  const pos  = from.instanceIds.indexOf(instanceId);
+  if (pos === -1) return false;
+  from.instanceIds.splice(pos, 1);
+  config.stages[toIndex].instanceIds.push(instanceId);
+  return true;
+}
+
+/**
+ * Return a staged part to the unstaged pool.
+ * @param {StagingConfig} config
+ * @param {string}        instanceId
+ * @returns {boolean}
+ */
+export function returnPartToUnstaged(config, instanceId) {
+  for (const stage of config.stages) {
+    const pos = stage.instanceIds.indexOf(instanceId);
+    if (pos !== -1) {
+      stage.instanceIds.splice(pos, 1);
+      config.unstaged.push(instanceId);
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Validate the staging configuration and return warning messages.
+ *
+ * Current check: when activatable parts exist in the assembly, Stage 1 must
+ * contain at least one part with IGNITE behaviour (an engine or SRB) or the
+ * rocket will not lift off.
+ *
+ * @param {RocketAssembly} assembly
+ * @param {StagingConfig}  config
+ * @returns {string[]}  Warning strings, or an empty array when all clear.
+ */
+export function validateStagingConfig(assembly, config) {
+  const warnings = [];
+
+  // Only warn if there are activatable parts in the assembly.
+  let hasActivatable = false;
+  for (const placed of assembly.parts.values()) {
+    const def = getPartById(placed.partId);
+    if (def && def.activatable) { hasActivatable = true; break; }
+  }
+  if (!hasActivatable) return warnings;
+
+  const stage1 = config.stages[0];
+  if (stage1) {
+    const hasIgnition = stage1.instanceIds.some((id) => {
+      const placed = assembly.parts.get(id);
+      const def    = placed ? getPartById(placed.partId) : null;
+      return def && def.activationBehaviour === 'IGNITE';
+    });
+    if (!hasIgnition) {
+      warnings.push('Stage 1 has no engine or SRB — rocket will not lift off!');
+    }
+  }
+
+  return warnings;
+}
+
+/**
+ * Advance to the next stage. Called by the flight system when the player
+ * presses Spacebar.
+ *
+ * @param {StagingConfig} config
+ * @returns {{
+ *   firedStageIndex: number,
+ *   nextStageIndex:  number | null,
+ *   instanceIds:     string[]
+ * }}
+ *   `firedStageIndex` — 0-based index of the stage that was just activated.
+ *   `nextStageIndex`  — 0-based index of the next stage, or null when all stages spent.
+ *   `instanceIds`     — Parts from the fired stage to activate in the physics sim.
+ */
+export function fireStagingStep(config) {
+  const firedStageIndex = config.currentStageIdx;
+  const instanceIds     = [...(config.stages[firedStageIndex]?.instanceIds ?? [])];
+  const nextStageIndex  =
+    firedStageIndex + 1 < config.stages.length ? firedStageIndex + 1 : null;
+  if (nextStageIndex !== null) {
+    config.currentStageIdx = nextStageIndex;
+  }
+  return { firedStageIndex, nextStageIndex, instanceIds };
+}

@@ -202,7 +202,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-018: Rocket Builder — Staging Configuration
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-016
 - **Description**: A staging panel in the VAB showing numbered stages (Stage 1 is fired first, higher numbers later). Activatable parts placed on the rocket (engines, SRBs, decouplers, parachutes) appear in an "Unstaged Parts" pool. The player drags parts from the pool into stage slots to assign them. Parts can be moved between stages. A "+" button adds a new stage. An empty stage can be deleted. The staging order visually shows Stage 1 at the bottom (first to fire) and higher stages above. In flight, pressing spacebar fires the current stage and advances to the next. Stage configuration is saved with the rocket design. Validate that at least one engine or SRB is in Stage 1 (warn if not — it won't lift off).

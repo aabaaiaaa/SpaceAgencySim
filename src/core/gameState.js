@@ -80,15 +80,26 @@ import {
  */
 
 /**
+ * Serialisable staging data stored alongside a saved rocket design.
+ * Each inner array holds the 0-based indices (into `RocketDesign.parts`) of
+ * the parts assigned to that stage.  Index 0 = Stage 1 (fires first).
+ *
+ * @typedef {Object} StagingDesign
+ * @property {number[][]} stages    Ordered stage slots; each is an array of part indices.
+ * @property {number[]}   unstaged  Indices of activatable parts not assigned to any stage.
+ */
+
+/**
  * A saved rocket design (blueprint).
  * @typedef {Object} RocketDesign
- * @property {string}       id           - Unique identifier.
- * @property {string}       name         - Player-assigned name.
- * @property {RocketPart[]} parts        - Ordered list of placed components.
- * @property {number}       totalMass    - Computed dry mass (kg).
- * @property {number}       totalThrust  - Computed sea-level thrust (kN).
- * @property {string}       createdDate  - ISO 8601 creation date.
- * @property {string}       updatedDate  - ISO 8601 last-modified date.
+ * @property {string}        id           - Unique identifier.
+ * @property {string}        name         - Player-assigned name.
+ * @property {RocketPart[]}  parts        - Ordered list of placed components.
+ * @property {StagingDesign} staging      - Staging configuration for this design.
+ * @property {number}        totalMass    - Computed dry mass (kg).
+ * @property {number}        totalThrust  - Computed sea-level thrust (kN).
+ * @property {string}        createdDate  - ISO 8601 creation date.
+ * @property {string}        updatedDate  - ISO 8601 last-modified date.
  */
 
 /**
@@ -255,17 +266,26 @@ export function createMission({
  *   id: string,
  *   name: string,
  *   parts?: RocketPart[],
+ *   staging?: StagingDesign,
  *   totalMass?: number,
  *   totalThrust?: number
  * }} opts
  * @returns {RocketDesign}
  */
-export function createRocketDesign({ id, name, parts = [], totalMass = 0, totalThrust = 0 }) {
+export function createRocketDesign({
+  id,
+  name,
+  parts = [],
+  staging = { stages: [[]], unstaged: [] },
+  totalMass = 0,
+  totalThrust = 0,
+}) {
   const now = new Date().toISOString();
   return {
     id,
     name,
     parts,
+    staging,
     totalMass,
     totalThrust,
     createdDate: now,

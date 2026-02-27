@@ -44,6 +44,15 @@ import {
   connectParts,
   disconnectPart,
   findSnapCandidates,
+  createStagingConfig,
+  syncStagingWithAssembly,
+  addStageToConfig,
+  removeStageFromConfig,
+  assignPartToStage,
+  movePartBetweenStages,
+  returnPartToUnstaged,
+  validateStagingConfig,
+  fireStagingStep,
 } from '../core/rocketbuilder.js';
 
 // ---------------------------------------------------------------------------
@@ -67,6 +76,12 @@ let _dragState = null;
 
 /** Context-menu DOM element (created once, re-used). @type {HTMLElement | null} */
 let _ctxMenu = null;
+
+/** Staging configuration for the current VAB session. @type {import('../core/rocketbuilder.js').StagingConfig | null} */
+let _stagingConfig = null;
+
+/** True while a flight is in progress — enables Spacebar staging. */
+let _flightActive = false;
 
 // ---------------------------------------------------------------------------
 // Part-type display helpers
@@ -478,6 +493,138 @@ const VAB_CSS = `
   line-height: 1.75;
 }
 
+/* ── Staging panel ───────────────────────────────────────────────────── */
+.vab-staging-body {
+  padding: 0;
+  overflow-y: auto;
+}
+
+.vab-staging-section {
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid #0e1e30;
+}
+
+.vab-staging-section-hdr {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  color: #2e5878;
+  margin-bottom: 6px;
+}
+
+.vab-staging-stage {
+  padding: 8px 12px 6px;
+  border-bottom: 1px solid #0a1826;
+}
+
+.vab-staging-stage-first {
+  background: rgba(0, 12, 6, 0.35);
+}
+
+.vab-staging-stage-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  font-weight: 700;
+  color: #5a8aaa;
+  margin-bottom: 6px;
+  padding: 2px 0;
+}
+
+.vab-staging-stage-first .vab-staging-stage-hdr {
+  color: #42cc74;
+}
+
+.vab-staging-stage-current .vab-staging-stage-hdr {
+  color: #e8b840;
+}
+
+.vab-staging-del {
+  background: none;
+  border: none;
+  color: #2a4060;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0 3px;
+  font-family: inherit;
+  line-height: 1;
+}
+.vab-staging-del:hover { color: #d06060; }
+
+.vab-staging-zone {
+  min-height: 32px;
+  background: rgba(4, 10, 26, 0.6);
+  border: 1px dashed #162c48;
+  border-radius: 2px;
+  padding: 5px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: flex-start;
+  align-content: flex-start;
+  transition: border-color .1s, background .1s;
+  margin-bottom: 2px;
+}
+
+.vab-staging-zone.drag-over {
+  border-color: #4890e0;
+  background: rgba(16, 44, 100, 0.65);
+}
+
+.vab-staging-zone-empty {
+  font-size: 9px;
+  color: #1e3a54;
+  text-align: center;
+  line-height: 1.5;
+  padding: 2px 0;
+  width: 100%;
+}
+
+.vab-stage-chip {
+  background: rgba(14, 36, 72, 0.9);
+  border: 1px solid #1e3e68;
+  border-radius: 2px;
+  padding: 3px 8px;
+  font-size: 10px;
+  color: #88b8d8;
+  cursor: grab;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  user-select: none;
+  line-height: 1.4;
+}
+.vab-stage-chip:hover {
+  border-color: #3870b8;
+  color: #b8d8f0;
+}
+.vab-stage-chip:active { cursor: grabbing; }
+.vab-stage-chip.dragging { opacity: 0.35; }
+
+.vab-staging-controls {
+  padding: 10px 12px;
+  border-bottom: 1px solid #0e1e30;
+  display: flex;
+  gap: 8px;
+}
+
+.vab-staging-warnings {
+  padding: 10px 12px;
+}
+
+.vab-staging-warn {
+  font-size: 10px;
+  color: #d0a030;
+  background: rgba(48, 24, 0, 0.45);
+  border: 1px solid #583010;
+  border-radius: 2px;
+  padding: 7px 9px;
+  line-height: 1.5;
+}
+
 /* ── Context menu ────────────────────────────────────────────────────── */
 #vab-ctx-menu {
   position: fixed;
@@ -809,6 +956,8 @@ function _onDragEnd(e) {
         bestCandidate.targetInstanceId, bestCandidate.targetSnapIndex,
       );
     }
+    // Sync staging — new activatable part may need to appear in unstaged pool.
+    _syncAndRenderStaging();
   }
 
   vabRenderParts();
@@ -864,6 +1013,8 @@ function _showPartContextMenu(placed, clientX, clientY) {
       vabUpdateCash(_gameState);
     }
     removePartFromAssembly(_assembly, placed.instanceId);
+    // Sync staging — removed part must be pruned from its stage/unstaged slot.
+    _syncAndRenderStaging();
     vabRenderParts();
   }, { once: true });
 }
@@ -977,13 +1128,20 @@ function _setupPanelDrag(partsPanel) {
 function _bindButtons(root) {
   const missionsPanel = /** @type {HTMLElement} */ (root.querySelector('#vab-missions-panel'));
   const engineerPanel = /** @type {HTMLElement} */ (root.querySelector('#vab-engineer-panel'));
+  const stagingPanel  = /** @type {HTMLElement} */ (root.querySelector('#vab-staging-panel'));
+
+  /** Close all side panels. */
+  const _closeAllPanels = () => {
+    missionsPanel?.setAttribute('hidden', '');
+    engineerPanel?.setAttribute('hidden', '');
+    stagingPanel?.setAttribute('hidden', '');
+  };
 
   // ── "View Accepted Missions" toggle ──────────────────────────────────────
   root.querySelector('#vab-btn-missions')?.addEventListener('click', () => {
     const willOpen = missionsPanel.hasAttribute('hidden');
-    engineerPanel?.setAttribute('hidden', '');
+    _closeAllPanels();
     if (willOpen) missionsPanel.removeAttribute('hidden');
-    else          missionsPanel.setAttribute('hidden', '');
   });
 
   root.querySelector('#vab-missions-close')?.addEventListener('click', () => {
@@ -993,18 +1151,248 @@ function _bindButtons(root) {
   // ── "Rocket Engineer" toggle ─────────────────────────────────────────────
   root.querySelector('#vab-btn-engineer')?.addEventListener('click', () => {
     const willOpen = engineerPanel.hasAttribute('hidden');
-    missionsPanel?.setAttribute('hidden', '');
+    _closeAllPanels();
     if (willOpen) engineerPanel.removeAttribute('hidden');
-    else          engineerPanel.setAttribute('hidden', '');
   });
 
   root.querySelector('#vab-engineer-close')?.addEventListener('click', () => {
     engineerPanel?.setAttribute('hidden', '');
   });
 
+  // ── "Staging" toggle ─────────────────────────────────────────────────────
+  root.querySelector('#vab-btn-staging')?.addEventListener('click', () => {
+    const willOpen = stagingPanel.hasAttribute('hidden');
+    _closeAllPanels();
+    if (willOpen) {
+      stagingPanel.removeAttribute('hidden');
+      _renderStagingPanel(); // Refresh on open so it reflects latest assembly state.
+    }
+  });
+
+  root.querySelector('#vab-staging-close')?.addEventListener('click', () => {
+    stagingPanel?.setAttribute('hidden', '');
+  });
+
   // ── Launch (disabled; wired in later flight tasks) ───────────────────────
   root.querySelector('#vab-btn-launch')?.addEventListener('click', () => {
     console.log('[VAB] Launch requested — not yet implemented');
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Staging panel
+// ---------------------------------------------------------------------------
+
+/**
+ * Sync staging config with the current assembly and re-render the staging panel.
+ * Call after any part add or remove operation.
+ */
+function _syncAndRenderStaging() {
+  if (_assembly && _stagingConfig) {
+    syncStagingWithAssembly(_assembly, _stagingConfig);
+    _renderStagingPanel();
+  }
+}
+
+/**
+ * Build and inject the staging panel's inner HTML from the current
+ * `_stagingConfig` and `_assembly` state.
+ */
+function _renderStagingPanel() {
+  const body = /** @type {HTMLElement|null} */ (document.getElementById('vab-staging-body'));
+  if (!body) return;
+
+  if (!_stagingConfig || !_assembly) {
+    body.innerHTML = '<p class="vab-side-empty">No rocket assembly loaded.</p>';
+    return;
+  }
+
+  const warnings  = validateStagingConfig(_assembly, _stagingConfig);
+  const numStages = _stagingConfig.stages.length;
+  const html      = [];
+
+  // ── Unstaged parts ────────────────────────────────────────────────────────
+  html.push('<div class="vab-staging-section">');
+  html.push('<div class="vab-staging-section-hdr">Unstaged Parts</div>');
+  html.push('<div class="vab-staging-zone" data-drop-zone="unstaged">');
+  if (_stagingConfig.unstaged.length === 0) {
+    html.push('<div class="vab-staging-zone-empty">All activatable parts staged.</div>');
+  } else {
+    for (const id of _stagingConfig.unstaged) {
+      const placed = _assembly.parts.get(id);
+      const def    = placed ? getPartById(placed.partId) : null;
+      if (!def) continue;
+      html.push(
+        `<div class="vab-stage-chip" draggable="true" ` +
+        `data-instance-id="${id}" data-source="unstaged" ` +
+        `title="${def.name}">${def.name}</div>`,
+      );
+    }
+  }
+  html.push('</div>');  // zone
+  html.push('</div>');  // section
+
+  // ── Stages (highest number at top, Stage 1 at bottom) ────────────────────
+  for (let i = numStages - 1; i >= 0; i--) {
+    const stageNum = i + 1;
+    const stage    = _stagingConfig.stages[i];
+    const isEmpty  = stage.instanceIds.length === 0;
+    const isFirst  = i === 0;
+    const isCurrent = i === _stagingConfig.currentStageIdx;
+
+    const stageClasses = [
+      'vab-staging-stage',
+      isFirst   ? 'vab-staging-stage-first'   : '',
+      isCurrent ? 'vab-staging-stage-current' : '',
+    ].filter(Boolean).join(' ');
+
+    html.push(`<div class="${stageClasses}">`);
+
+    // Stage header.
+    html.push('<div class="vab-staging-stage-hdr">');
+    const label = isFirst
+      ? `Stage ${stageNum} \u2014 FIRES FIRST`
+      : `Stage ${stageNum}`;
+    html.push(`<span>${label}</span>`);
+    // Delete button: only for empty stages when there's more than one stage.
+    if (isEmpty && numStages > 1) {
+      html.push(
+        `<button class="vab-staging-del" data-stage-index="${i}" ` +
+        `type="button" title="Remove empty stage">&#x2715;</button>`,
+      );
+    }
+    html.push('</div>');  // stage-hdr
+
+    // Parts drop zone.
+    html.push(`<div class="vab-staging-zone" data-drop-zone="stage-${i}">`);
+    if (isEmpty) {
+      html.push('<div class="vab-staging-zone-empty">Drop parts here</div>');
+    } else {
+      for (const id of stage.instanceIds) {
+        const placed = _assembly.parts.get(id);
+        const def    = placed ? getPartById(placed.partId) : null;
+        if (!def) continue;
+        html.push(
+          `<div class="vab-stage-chip" draggable="true" ` +
+          `data-instance-id="${id}" data-source="stage-${i}" ` +
+          `title="${def.name}">${def.name}</div>`,
+        );
+      }
+    }
+    html.push('</div>');  // zone
+    html.push('</div>');  // stage
+  }
+
+  // ── Controls ─────────────────────────────────────────────────────────────
+  html.push('<div class="vab-staging-controls">');
+  html.push(
+    '<button class="vab-btn" id="vab-staging-add" type="button">' +
+    '+ Add Stage</button>',
+  );
+  html.push('</div>');
+
+  // ── Validation warnings ───────────────────────────────────────────────────
+  if (warnings.length > 0) {
+    html.push('<div class="vab-staging-warnings">');
+    for (const w of warnings) {
+      html.push(`<div class="vab-staging-warn">\u26a0 ${w}</div>`);
+    }
+    html.push('</div>');
+  }
+
+  body.innerHTML = html.join('');
+
+  // Re-attach button listeners (replaced by innerHTML).
+  body.querySelector('#vab-staging-add')?.addEventListener('click', () => {
+    addStageToConfig(_stagingConfig);
+    _renderStagingPanel();
+  });
+  body.querySelectorAll('.vab-staging-del').forEach((btn) => {
+    const el = /** @type {HTMLElement} */ (btn);
+    el.addEventListener('click', () => {
+      const idx = parseInt(el.dataset.stageIndex ?? '0', 10);
+      removeStageFromConfig(_stagingConfig, idx);
+      _renderStagingPanel();
+    });
+  });
+}
+
+/**
+ * Set up HTML5 drag-and-drop event delegation on the staging panel body.
+ * Uses event delegation — call once; survives innerHTML re-renders.
+ * @param {HTMLElement} panelBody
+ */
+function _setupStagingDnD(panelBody) {
+  // dragstart: fired on chip elements.
+  panelBody.addEventListener('dragstart', (e) => {
+    const chip = /** @type {HTMLElement} */ (
+      /** @type {Element} */ (e.target).closest?.('.vab-stage-chip')
+    );
+    if (!chip) return;
+    const instanceId = chip.dataset.instanceId ?? '';
+    const source     = chip.dataset.source     ?? '';
+    e.dataTransfer.setData('text/plain', `${instanceId}|${source}`);
+    e.dataTransfer.effectAllowed = 'move';
+    chip.classList.add('dragging');
+  });
+
+  // dragend: clean up dragging class.
+  panelBody.addEventListener('dragend', (e) => {
+    const chip = /** @type {Element} */ (e.target).closest?.('.vab-stage-chip');
+    if (chip) chip.classList.remove('dragging');
+    panelBody.querySelectorAll('.drag-over').forEach((el) => el.classList.remove('drag-over'));
+  });
+
+  // dragover: highlight the target zone.
+  panelBody.addEventListener('dragover', (e) => {
+    const zone = /** @type {Element} */ (e.target).closest?.('.vab-staging-zone');
+    if (!zone) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    zone.classList.add('drag-over');
+  });
+
+  // dragleave: remove highlight only when truly leaving the zone.
+  panelBody.addEventListener('dragleave', (e) => {
+    const zone = /** @type {Element} */ (e.target).closest?.('.vab-staging-zone');
+    if (!zone) return;
+    if (!zone.contains(/** @type {Node} */ (e.relatedTarget))) {
+      zone.classList.remove('drag-over');
+    }
+  });
+
+  // drop: update staging config and re-render.
+  panelBody.addEventListener('drop', (e) => {
+    const zone = /** @type {HTMLElement} */ (
+      /** @type {Element} */ (e.target).closest?.('.vab-staging-zone')
+    );
+    if (!zone || !_stagingConfig) return;
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+
+    const raw = e.dataTransfer.getData('text/plain');
+    if (!raw) return;
+
+    const pipeIdx    = raw.indexOf('|');
+    const instanceId = raw.slice(0, pipeIdx);
+    const source     = raw.slice(pipeIdx + 1);
+    const target     = zone.dataset.dropZone ?? '';
+
+    if (target === source) return;   // Same zone — no-op.
+
+    if (target === 'unstaged') {
+      returnPartToUnstaged(_stagingConfig, instanceId);
+    } else if (target.startsWith('stage-')) {
+      const toIdx = parseInt(target.slice(6), 10);
+      if (source === 'unstaged') {
+        assignPartToStage(_stagingConfig, instanceId, toIdx);
+      } else if (source.startsWith('stage-')) {
+        const fromIdx = parseInt(source.slice(6), 10);
+        movePartBetweenStages(_stagingConfig, instanceId, fromIdx, toIdx);
+      }
+    }
+
+    _renderStagingPanel();
   });
 }
 
@@ -1044,6 +1432,9 @@ export function initVabUI(container, state) {
         <button class="vab-btn" id="vab-btn-engineer" type="button">
           Rocket Engineer
         </button>
+        <button class="vab-btn" id="vab-btn-staging" type="button">
+          Staging
+        </button>
         <button class="vab-btn vab-btn-launch" id="vab-btn-launch" type="button" disabled>
           Launch
         </button>
@@ -1078,6 +1469,15 @@ export function initVabUI(container, state) {
         <div class="vab-side-body" id="vab-missions-body">
           ${_buildMissionsHTML(state)}
         </div>
+      </div>
+
+      <!-- Staging side panel -->
+      <div class="vab-side-panel" id="vab-staging-panel" hidden>
+        <div class="vab-side-hdr">
+          <span>Staging</span>
+          <button class="vab-side-close" id="vab-staging-close" type="button">&#x2715;</button>
+        </div>
+        <div class="vab-side-body vab-staging-body" id="vab-staging-body"></div>
       </div>
 
       <!-- Rocket Engineer side panel (stub — full logic in TASK-019) -->
@@ -1117,6 +1517,31 @@ export function initVabUI(container, state) {
   _assembly  = createRocketAssembly();
   _gameState = state;
   vabSetAssembly(_assembly);
+
+  // ── Staging configuration ──────────────────────────────────────────────────
+  _stagingConfig = createStagingConfig();
+  const stagingBody = /** @type {HTMLElement} */ (root.querySelector('#vab-staging-body'));
+  if (stagingBody) {
+    _setupStagingDnD(stagingBody);  // Set up DnD once (event delegation survives re-renders).
+    _renderStagingPanel();          // Initial render (empty assembly — shows one empty stage).
+  }
+
+  // ── Spacebar: fire next stage during flight ────────────────────────────────
+  // _flightActive is set to true by the flight system (implemented in a later task).
+  // When active, each Spacebar press fires the current stage and advances to the next.
+  window.addEventListener('keydown', (e) => {
+    if (e.code !== 'Space' || !_flightActive || !_stagingConfig) return;
+    e.preventDefault();
+    const result = fireStagingStep(_stagingConfig);
+    console.log(
+      `[Flight] Stage ${result.firedStageIndex + 1} fired. ` +
+      `Parts activated: [${result.instanceIds.join(', ')}]. ` +
+      (result.nextStageIndex !== null
+        ? `Next: Stage ${result.nextStageIndex + 1}`
+        : 'All stages spent.'),
+    );
+    _renderStagingPanel();   // Update current-stage highlight.
+  });
 
   // ── Canvas interactions (pan / pick-up placed parts / right-click) ─────────
   _setupCanvas(canvasArea);
