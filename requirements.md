@@ -178,7 +178,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-015: Rocket Builder — Layout & Parts Panel
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-001, TASK-004
 - **Description**: Implement the VAB (Vehicle Assembly Building) screen. Layout: a scrollable main build canvas occupying most of the screen, a parts panel on the right side, and a toolbar at the top. The parts panel lists all unlocked parts grouped by type, each shown as a small labelled rectangle with part name, mass, and cost. The toolbar shows: current cash, a "View Accepted Missions" button (opens a side panel listing active mission objectives), a "Rocket Engineer" button (opens the validation panel from TASK-019), and a "Launch" button (disabled until validation passes). A vertical scale bar is rendered on the left side of the build canvas showing metres, calculated from the actual part dimensions at the current zoom level (1 pixel = 0.05 metres at default zoom). The canvas background is a grid with subtle lines.
