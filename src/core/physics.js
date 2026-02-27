@@ -64,6 +64,7 @@ import {
   countDeployedLegs,
   LegState,
 } from './legs.js';
+import { initEjectorStates } from './ejector.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -131,6 +132,14 @@ const DEFAULT_SAFE_LANDING_SPEED = 10;
  *                                           Detailed lifecycle state for each LANDING_LEGS /
  *                                           LANDING_LEG part (retracted / deploying / deployed),
  *                                           managed by legs.js.  Keyed by instance ID.
+ * @property {Map<string, string>} ejectorStates
+ *                                           Armed/activated state for each COMMAND_MODULE part
+ *                                           with an ejector seat (`hasEjectorSeat = true`),
+ *                                           managed by ejector.js.  Keyed by instance ID.
+ *                                           Values are EjectorState enum strings.
+ * @property {Set<string>}     ejectedCrewIds  IDs of crew members who have safely ejected
+ *                                           via the ejector seat system during this flight.
+ *                                           Populated by `activateEjectorSeat()`.
  * @property {boolean}         landed        True after a successful soft touchdown.
  * @property {boolean}         crashed       True after a fatal impact.
  * @property {boolean}         grounded      True while still sitting on the launch pad.
@@ -190,6 +199,8 @@ export function createPhysicsState(assembly, flightState) {
     deployedParts: new Set(),
     parachuteStates: new Map(),
     legStates: new Map(),
+    ejectorStates: new Map(),
+    ejectedCrewIds: new Set(),
     heatMap: new Map(),
     debris: [],
     landed: false,
@@ -204,6 +215,9 @@ export function createPhysicsState(assembly, flightState) {
 
   // Initialise the landing leg state machine for all LANDING_LEGS/LANDING_LEG parts.
   initLegStates(ps, assembly);
+
+  // Initialise the ejector seat state machine for all crewed COMMAND_MODULE parts.
+  initEjectorStates(ps, assembly);
 
   return ps;
 }

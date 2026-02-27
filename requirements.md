@@ -266,7 +266,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-026: Ejector Seat
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-010, TASK-020
 - **Description**: Crewed command modules (Mk1 Command Module) have an ejector seat system. Activated via context menu ("Activate Ejector Seat"). On activation: all astronauts assigned to this command module are marked as safely ejected (status remains 'active', mission count does not increment for this flight, but they survive). The command module continues to exist physically — ejection does not destroy it. A mission objective of type `EJECT_CREW` is completed when ejector seat is activated above the required altitude (200m for the tutorial mission). If a crewed command module is destroyed (heat, crash) and the ejector seat was NOT activated before destruction, all astronauts in that module are marked KIA and the $500,000 fine per astronaut is applied via the finance system.

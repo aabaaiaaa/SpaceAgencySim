@@ -47,6 +47,7 @@ import { airDensity, SEA_LEVEL_DENSITY } from './atmosphere.js';
 import { tickFuelSystem }           from './fuelsystem.js';
 import { deployParachute, getChuteMultiplier } from './parachute.js';
 import { deployLandingLeg } from './legs.js';
+import { activateEjectorSeat } from './ejector.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -231,12 +232,9 @@ export function activateCurrentStage(ps, assembly, stagingConfig, flightState) {
 
       case 'EJECT':
         // COMMAND_MODULE ejector seat — emergency crew escape.
-        _emitEvent(flightState, {
-          type:        'CREW_EJECTED',
-          time,
-          altitude,
-          description: `Crew ejected at ${altitude.toFixed(0)} m.`,
-        });
+        // Delegates to ejector.js which tracks activation state, records
+        // ejected crew, and emits the CREW_EJECTED event.
+        activateEjectorSeat(ps, assembly, flightState, instanceId);
         break;
 
       case 'RELEASE':
