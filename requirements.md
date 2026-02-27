@@ -144,7 +144,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-013: Tutorial Mission Set (Desert R&D)
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-012, TASK-004
 - **Description**: Define all tutorial missions in `/src/data/missions.js`. Missions are gated so only the first is available at game start. Each subsequent mission or group unlocks after its prerequisites. Mission list with rewards and unlocks:
