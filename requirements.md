@@ -362,7 +362,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-038: Fuel & Staging System Tests
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-022, TASK-023, TASK-036
 - **Description**: Write unit tests in `/src/tests/fuelsystem.test.js` and `/src/tests/staging.test.js` covering: (1) Engine fuel consumption depletes connected tank at expected rate given thrust and Isp. (2) Engine stops producing thrust when connected tank is empty. (3) Cross-feed isolation: engine below a decoupler cannot draw fuel from a tank above the decoupler. (4) SRB burns at fixed rate regardless of throttle setting. (5) Part mass decreases as fuel drains (affects total rocket mass correctly). (6) Multiple connected tanks drain evenly. (7) Staging activation fires correct parts for the current stage. (8) Decoupler fires correctly: part graph is split, disconnected parts become debris. (9) Parts below a fired decoupler are no longer in the active rocket graph. (10) Stage index increments after each spacebar press. All tests must pass with `vitest run`.

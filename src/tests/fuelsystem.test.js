@@ -492,3 +492,167 @@ describe('tickFuelSystem() — detached parts retain fuel state', () => {
     expect(ps.firingEngines.has(engineId)).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// tickFuelSystem() — exact depletion rate (scenario 1)
+// ---------------------------------------------------------------------------
+
+describe('tickFuelSystem() — exact depletion rate matches thrust/Isp formula', () => {
+  it('tank drains by exactly flowRate × dt per tick at full throttle, sea level', () => {
+    const { assembly, tankId, engineId } = makeSimpleRocket();
+    const ps = makePS(assembly);
+
+    const engineDef = getPartById('engine-spark');
+    const dt = 1 / 60;
+
+    // Expected drain: flow = F / (Isp × g₀) at sea level, full throttle.
+    const expectedRate  = computeEngineFlowRate(engineDef, 1.0, SEA_LEVEL_DENSITY);
+    const expectedDrain = expectedRate * dt;
+
+    const fuelBefore = ps.fuelStore.get(tankId);
+    ps.throttle = 1.0;
+    ps.firingEngines.add(engineId);
+    tickFuelSystem(ps, assembly, dt, SEA_LEVEL_DENSITY);
+
+    const actualDrain = fuelBefore - ps.fuelStore.get(tankId);
+    expect(actualDrain).toBeCloseTo(expectedDrain, 5);
+  });
+
+  it('tank drains by half the rate at 50 % throttle', () => {
+    const { assembly, tankId, engineId } = makeSimpleRocket();
+    const ps = makePS(assembly);
+
+    const engineDef = getPartById('engine-spark');
+    const dt = 1 / 60;
+
+    const rateHalf  = computeEngineFlowRate(engineDef, 0.5, SEA_LEVEL_DENSITY);
+    const rateFull  = computeEngineFlowRate(engineDef, 1.0, SEA_LEVEL_DENSITY);
+
+    const fuelBefore = ps.fuelStore.get(tankId);
+    ps.throttle = 0.5;
+    ps.firingEngines.add(engineId);
+    tickFuelSystem(ps, assembly, dt, SEA_LEVEL_DENSITY);
+
+    const actualDrain = fuelBefore - ps.fuelStore.get(tankId);
+    expect(actualDrain).toBeCloseTo(rateHalf * dt, 5);
+    expect(actualDrain).toBeCloseTo(rateFull * dt * 0.5, 5);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// tickFuelSystem() — cross-feed isolation (scenario 3)
+// ---------------------------------------------------------------------------
+
+/**
+ * Rocket with tanks on BOTH sides of a decoupler:
+ *   Upper Tank → Probe Core → Decoupler → Lower Tank → Spark Engine
+ *
+ * The engine is in the lower segment; it must only draw from the lower tank.
+ * The upper tank (across the decoupler boundary) must never be drained.
+ */
+function makeRocketWithTanksAboveAndBelowDecoupler() {
+  const assembly = createRocketAssembly();
+  const staging  = createStagingConfig();
+
+  const upperTankId = addPartToAssembly(assembly, 'tank-small',           0, 140);
+  const probeId     = addPartToAssembly(assembly, 'probe-core-mk1',       0,  80);
+  const decId       = addPartToAssembly(assembly, 'decoupler-stack-tr18', 0,  40);
+  const lowerTankId = addPartToAssembly(assembly, 'tank-small',           0, -20);
+  const engineId    = addPartToAssembly(assembly, 'engine-spark',         0, -75);
+
+  connectParts(assembly, upperTankId, 1, probeId,     0);
+  connectParts(assembly, probeId,     1, decId,       0);
+  connectParts(assembly, decId,       1, lowerTankId, 0);
+  connectParts(assembly, lowerTankId, 1, engineId,    0);
+
+  syncStagingWithAssembly(assembly, staging);
+  assignPartToStage(staging, engineId, 0);
+
+  return { assembly, staging, probeId, decId, upperTankId, lowerTankId, engineId };
+}
+
+describe('tickFuelSystem() — cross-feed isolation across decoupler', () => {
+  it('engine only drains the tank in its own segment (below the decoupler)', () => {
+    const { assembly, lowerTankId, engineId } = makeRocketWithTanksAboveAndBelowDecoupler();
+    const ps = makePS(assembly);
+
+    const lowerFuelBefore = ps.fuelStore.get(lowerTankId);
+    ps.firingEngines.add(engineId);
+    tickFuelSystem(ps, assembly, 1 / 60, SEA_LEVEL_DENSITY);
+
+    expect(ps.fuelStore.get(lowerTankId)).toBeLessThan(lowerFuelBefore);
+  });
+
+  it('tank above decoupler is not drained when engine fires below the decoupler', () => {
+    const { assembly, upperTankId, engineId } = makeRocketWithTanksAboveAndBelowDecoupler();
+    const ps = makePS(assembly);
+
+    const upperFuelBefore = ps.fuelStore.get(upperTankId);
+    ps.firingEngines.add(engineId);
+    tickFuelSystem(ps, assembly, 1 / 60, SEA_LEVEL_DENSITY);
+
+    // Upper tank must remain completely unchanged — cross-feed must not occur.
+    expect(ps.fuelStore.get(upperTankId)).toBe(upperFuelBefore);
+  });
+
+  it('getConnectedTanks confirms upper tank is outside the engine segment', () => {
+    const { assembly, upperTankId, lowerTankId, engineId } =
+      makeRocketWithTanksAboveAndBelowDecoupler();
+    const ps = makePS(assembly);
+
+    const tanks = getConnectedTanks(engineId, assembly, ps.activeParts);
+    expect(tanks).toContain(lowerTankId);
+    expect(tanks).not.toContain(upperTankId);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Part mass tracking — fuel drain reduces total propellant mass (scenario 5)
+// ---------------------------------------------------------------------------
+
+describe('part mass tracking — fuel drain decreases total rocket mass', () => {
+  it('total propellant in fuelStore decreases as the engine fires', () => {
+    const { assembly, engineId } = makeSimpleRocket();
+    const ps = makePS(assembly);
+
+    const sumFuel = () =>
+      [...ps.fuelStore.values()].reduce((acc, v) => acc + v, 0);
+
+    const initialFuelMass = sumFuel();
+
+    ps.firingEngines.add(engineId);
+    // Run for 5 simulated seconds (300 ticks at 1/60 s each).
+    for (let i = 0; i < 300 && ps.firingEngines.size > 0; i++) {
+      tickFuelSystem(ps, assembly, 1 / 60, SEA_LEVEL_DENSITY);
+    }
+
+    const finalFuelMass = sumFuel();
+    // Fuel mass must have decreased — and therefore total rocket mass has decreased.
+    expect(finalFuelMass).toBeLessThan(initialFuelMass);
+  });
+
+  it('fuelStore decreases by flowRate × dt per tick (fuel mass = rocket mass delta)', () => {
+    const { assembly, tankId, engineId } = makeSimpleRocket();
+    const ps = makePS(assembly);
+
+    const engineDef = getPartById('engine-spark');
+    const dt        = 1 / 60;
+
+    // Force a known fuel level well above what one tick can drain.
+    ps.fuelStore.set(tankId, 400);
+
+    const sumFuelBefore = [...ps.fuelStore.values()].reduce((a, b) => a + b, 0);
+
+    ps.throttle = 1.0;
+    ps.firingEngines.add(engineId);
+    tickFuelSystem(ps, assembly, dt, SEA_LEVEL_DENSITY);
+
+    const sumFuelAfter = [...ps.fuelStore.values()].reduce((a, b) => a + b, 0);
+
+    const expectedRate  = computeEngineFlowRate(engineDef, 1.0, SEA_LEVEL_DENSITY);
+    const expectedDelta = expectedRate * dt;
+
+    // The drop in total fuelStore = the drop in total rocket propellant mass.
+    expect(sumFuelBefore - sumFuelAfter).toBeCloseTo(expectedDelta, 5);
+  });
+});
