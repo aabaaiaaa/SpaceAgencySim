@@ -52,6 +52,7 @@ import {
   SEA_LEVEL_DENSITY,
   updateHeat,
 } from './atmosphere.js';
+import { tickFuelSystem } from './fuelsystem.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -309,7 +310,7 @@ function _integrate(ps, assembly, flightState) {
   const totalMass = _computeTotalMass(ps, assembly);
 
   // --- 2. Thrust vector ----------------------------------------------------
-  const { thrustX, thrustY, srbFlows, liquidFlow } = _computeThrust(ps, assembly, density);
+  const { thrustX, thrustY } = _computeThrust(ps, assembly, density);
 
   // --- 3. Gravity force (constant downward) --------------------------------
   const gravFX = 0;
@@ -347,23 +348,21 @@ function _integrate(ps, assembly, flightState) {
   // --- 7. Continuous steering ----------------------------------------------
   _applySteering(ps, assembly, altitude, FIXED_DT);
 
-  // --- 8. Fuel consumption -------------------------------------------------
-  _consumeFuel(ps, assembly, srbFlows, liquidFlow, FIXED_DT);
+  // --- 8. Fuel consumption (segment-aware, via fuelsystem.js) -------------
+  tickFuelSystem(ps, assembly, FIXED_DT, density);
 
-  // --- 8b. Remove any SRBs that just exhausted their fuel ------------------
-  _removeExhaustedSRBs(ps, assembly);
-
-  // --- 8c. Reentry heat model ----------------------------------------------
+  // --- 9. Reentry heat model -----------------------------------------------
+  // (renumbered; step 8 is fuel consumption above)
   if (!ps.grounded) {
     updateHeat(ps, assembly, flightState, speed, altitude, density);
   }
 
-  // --- 9. Liftoff detection ------------------------------------------------
+  // --- 10. Liftoff detection -----------------------------------------------
   if (ps.grounded && ps.posY > 0) {
     ps.grounded = false;
   }
 
-  // --- 10. Ground clamping and landing detection ---------------------------
+  // --- 11. Ground clamping and landing detection ---------------------------
   if (!ps.grounded && ps.posY <= 0) {
     ps.posY = 0;
     _handleGroundContact(ps, assembly, flightState);
@@ -413,27 +412,26 @@ function _computeTotalMass(ps, assembly) {
 // ---------------------------------------------------------------------------
 
 /**
- * Compute the thrust force vector and the fuel mass-flow rates for this step.
+ * Compute the thrust force vector for the current integration step.
  *
  * Thrust is treated as acting purely along the rocket's orientation axis
  * (simplified symmetric thrust — no engine placement offsets).
  *
+ * Fuel consumption is handled separately by tickFuelSystem (fuelsystem.js),
+ * which runs after this function each step.  The only fuel check performed
+ * here is a cheap guard against SRBs that were already empty at the start
+ * of the step.
+ *
  * @param {PhysicsState}                               ps
  * @param {import('./rocketbuilder.js').RocketAssembly} assembly
  * @param {number} density  Current atmospheric density (kg/m³).
- * @returns {{ thrustX: number, thrustY: number,
- *             srbFlows: Map<string,number>, liquidFlow: number }}
- *   `srbFlows`   — Map<instanceId, kg/s> for SRBs burning this tick.
- *   `liquidFlow` — Total liquid-fuel mass-flow rate (kg/s) for all liquid engines.
+ * @returns {{ thrustX: number, thrustY: number }}
  */
 function _computeThrust(ps, assembly, density) {
   const densityRatio = density / SEA_LEVEL_DENSITY; // 0 in vacuum, 1 at sea level
 
   let totalThrustN = 0;
-  const srbFlows   = new Map();
-  let liquidFlow   = 0;
-
-  const exhausted = [];
+  const exhausted  = [];
 
   for (const instanceId of ps.firingEngines) {
     // Skip parts that have been jettisoned.
@@ -451,7 +449,7 @@ function _computeThrust(ps, assembly, density) {
     const props = def.properties ?? {};
     const isSRB = def.type === PartType.SOLID_ROCKET_BOOSTER;
 
-    // SRBs flame-out when their own integral fuel is spent.
+    // Guard: SRBs that already have no fuel produce no thrust this step.
     if (isSRB) {
       const fuelLeft = ps.fuelStore.get(instanceId) ?? 0;
       if (fuelLeft <= 0) {
@@ -460,32 +458,19 @@ function _computeThrust(ps, assembly, density) {
       }
     }
 
-    // Interpolate thrust and Isp between sea-level and vacuum values.
-    const thrustSL  = (props.thrust    ?? 0) * 1_000; // kN → N
-    const thrustVac = (props.thrustVac ?? props.thrust ?? 0) * 1_000;
+    // Interpolate thrust between sea-level and vacuum values.
+    const thrustSL   = (props.thrust    ?? 0) * 1_000; // kN → N
+    const thrustVac  = (props.thrustVac ?? props.thrust ?? 0) * 1_000;
     const rawThrustN = densityRatio * thrustSL + (1 - densityRatio) * thrustVac;
 
-    const ispSL  = props.isp    ?? 300;
-    const ispVac = props.ispVac ?? props.isp ?? 300;
-    const isp    = densityRatio * ispSL + (1 - densityRatio) * ispVac;
-
     // Throttle: SRBs always at 100 %; liquid engines use current setting.
-    const throttleMult  = isSRB ? 1.0 : ps.throttle;
+    const throttleMult     = isSRB ? 1.0 : ps.throttle;
     const effectiveThrustN = rawThrustN * throttleMult;
 
-    // Mass-flow rate (Tsiolkovsky):  ṁ = F / (Isp × g₀)
-    const massFlow = isp > 0 ? effectiveThrustN / (isp * G0) : 0;
-
     totalThrustN += effectiveThrustN;
-
-    if (isSRB) {
-      srbFlows.set(instanceId, massFlow);
-    } else {
-      liquidFlow += massFlow;
-    }
   }
 
-  // Remove exhausted engines from the firing set.
+  // Remove already-exhausted engines from the firing set.
   for (const id of exhausted) {
     ps.firingEngines.delete(id);
   }
@@ -494,7 +479,7 @@ function _computeThrust(ps, assembly, density) {
   const thrustX = totalThrustN * Math.sin(ps.angle);
   const thrustY = totalThrustN * Math.cos(ps.angle);
 
-  return { thrustX, thrustY, srbFlows, liquidFlow };
+  return { thrustX, thrustY };
 }
 
 // ---------------------------------------------------------------------------
@@ -538,68 +523,6 @@ function _computeDragForce(ps, assembly, density, speed) {
   }
 
   return 0.5 * density * speed * speed * totalCdA;
-}
-
-// ---------------------------------------------------------------------------
-// Fuel consumption (private)
-// ---------------------------------------------------------------------------
-
-/**
- * Drain propellant from tanks/SRBs for the current integration step.
- *
- * SRBs drain from their own integral `fuelStore` entry.
- * Liquid engines drain proportionally from all active FUEL_TANK parts.
- *
- * When liquid tanks run dry, the affected engines flame-out and are removed
- * from `ps.firingEngines`.
- *
- * @param {PhysicsState}                               ps
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @param {Map<string,number>} srbFlows    SRB mass-flow rates (kg/s).
- * @param {number}             liquidFlow  Total liquid engine mass-flow (kg/s).
- * @param {number}             dt          Integration timestep (seconds).
- */
-function _consumeFuel(ps, assembly, srbFlows, liquidFlow, dt) {
-  // --- SRB fuel ---
-  for (const [id, flowRate] of srbFlows) {
-    const current = ps.fuelStore.get(id) ?? 0;
-    ps.fuelStore.set(id, Math.max(0, current - flowRate * dt));
-  }
-
-  // --- Liquid fuel ---
-  const liquidConsumed = liquidFlow * dt;
-  if (liquidConsumed <= 0) return;
-
-  // Gather all active liquid fuel tanks with remaining propellant.
-  const tanks      = [];
-  let   totalAvail = 0;
-
-  for (const [id, fuelLeft] of ps.fuelStore) {
-    if (!ps.activeParts.has(id) || fuelLeft <= 0) continue;
-    const placed = assembly.parts.get(id);
-    const def    = placed ? getPartById(placed.partId) : null;
-    if (!def || def.type !== PartType.FUEL_TANK) continue;
-    tanks.push({ id, fuelLeft });
-    totalAvail += fuelLeft;
-  }
-
-  if (totalAvail <= 0) {
-    // No liquid fuel — flame out all liquid engines.
-    for (const instanceId of [...ps.firingEngines]) {
-      const placed = assembly.parts.get(instanceId);
-      const def    = placed ? getPartById(placed.partId) : null;
-      if (def && def.type !== PartType.SOLID_ROCKET_BOOSTER) {
-        ps.firingEngines.delete(instanceId);
-      }
-    }
-    return;
-  }
-
-  // Drain proportionally from each tank so they empty at the same rate.
-  const drainFraction = Math.min(1, liquidConsumed / totalAvail);
-  for (const { id, fuelLeft } of tanks) {
-    ps.fuelStore.set(id, fuelLeft * (1 - drainFraction));
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -958,32 +881,6 @@ function _estimateDeltaV(ps, assembly) {
 
   const avgIsp = totalMdot > 0 ? totalIspTimesMdot / totalMdot : 300;
   return avgIsp * G0 * Math.log(wetMass / dryMass);
-}
-
-// ---------------------------------------------------------------------------
-// SRB exhaustion check (private)
-// ---------------------------------------------------------------------------
-
-/**
- * Remove any Solid Rocket Boosters whose integral fuel has reached zero from
- * the `firingEngines` set.
- *
- * Called after `_consumeFuel` each integration step so that a just-emptied
- * SRB does not linger in `firingEngines` until the next tick.
- *
- * @param {PhysicsState}                               ps
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- */
-function _removeExhaustedSRBs(ps, assembly) {
-  for (const instanceId of [...ps.firingEngines]) {
-    const placed = assembly.parts.get(instanceId);
-    const def    = placed ? getPartById(placed.partId) : null;
-    if (!def || def.type !== PartType.SOLID_ROCKET_BOOSTER) continue;
-    const fuelLeft = ps.fuelStore.get(instanceId) ?? 0;
-    if (fuelLeft <= 0) {
-      ps.firingEngines.delete(instanceId);
-    }
-  }
 }
 
 // ---------------------------------------------------------------------------

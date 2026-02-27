@@ -234,7 +234,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-022: Fuel System & Engine Thrust
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-020, TASK-004
 - **Description**: Implement in `/src/core/fuelsystem.js`. Each tank part in the rocket graph tracks `remainingFuel` (kg). Engines draw from tanks connected to them in the same segment (same side of all decouplers as the engine). Implement `getConnectedTanks(enginePartId, rocketGraph)` which traverses the part graph upward from the engine, stopping at any decoupler — only tanks in this traversal are fuel sources. Fuel consumption rate per engine: `fuelFlowRate = (thrust * throttle) / (Isp * 9.81)` kg/s. Each tick, deduct `fuelFlowRate * dt` from connected tanks (drain evenly across multiple connected tanks). When a tank reaches 0, it stops contributing. When all connected tanks are empty, the engine produces 0 thrust. Part mass is updated live as fuel drains: `partMass = dryMass + remainingFuel`. SRBs have a fixed `burnRate` (kg/s) regardless of throttle — they fire at full thrust until empty. When an SRB empties, it stops firing. Detached parts (after decoupler fires) retain their fuel state but are no longer simulated for thrust.
