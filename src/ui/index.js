@@ -14,6 +14,8 @@ import { initTopBar, destroyTopBar } from './topbar.js';
 import { showVabScene, hideVabScene } from '../render/vab.js';
 import { showHubScene } from '../render/hub.js';
 
+export { initFlightHud, destroyFlightHud } from './flightHud.js';
+
 // ---------------------------------------------------------------------------
 // Screen routing state
 // ---------------------------------------------------------------------------

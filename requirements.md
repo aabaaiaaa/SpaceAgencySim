@@ -282,7 +282,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-028: Flight HUD
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-027, TASK-022
 - **Description**: HTML overlay HUD rendered on top of the flight canvas. Displays: Altitude (m, formatted with thousands separator), Vertical Speed (m/s, positive = ascending), Horizontal Speed (m/s), Current Throttle (0–100% shown as a vertical bar on the left edge), Current Stage number and name, Apoapsis estimate (highest point of current trajectory, calculated from current velocity and altitude), a list of accepted mission objectives with completion indicators (checkmark when met, pending indicator otherwise), and per-tank-group fuel remaining (mass in kg). The throttle bar is keyboard-controlled: W or Up Arrow increases throttle by 5%, S or Down Arrow decreases by 5%, X sets throttle to 0%, Z sets to 100%. Throttle changes are shown immediately on the bar.

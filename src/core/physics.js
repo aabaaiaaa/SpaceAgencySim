@@ -301,6 +301,14 @@ export function handleKeyDown(ps, assembly, key) {
     case 'ArrowDown':
       ps.throttle = Math.max(0, ps.throttle - THROTTLE_STEP);
       break;
+    case 'x':
+    case 'X':
+      ps.throttle = 0;
+      break;
+    case 'z':
+    case 'Z':
+      ps.throttle = 1;
+      break;
     // A/D and ArrowLeft/ArrowRight are handled continuously in _integrate.
     default:
       break;
