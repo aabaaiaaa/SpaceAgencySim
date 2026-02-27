@@ -290,7 +290,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-029: Engine Trails
-- **Status**: pending
+- **Status**: done
 - **Priority**: low
 - **Dependencies**: TASK-027, TASK-021
 - **Description**: Visual exhaust trail rendered behind each firing engine while atmospheric density > 0.01 kg/m³ (below ~50,000m). Implement as a PixiJS particle emitter or a manually managed trail of fading rectangles/ellipses. Each trail segment is a small elongated shape positioned at the engine nozzle, emitted each tick the engine is firing. Segments fade in opacity over 0.5 seconds and shrink slightly. Trail colour: bright yellow-white at origin fading to orange then transparent. SRBs produce wider, brighter trails than regular engines. No trails in vacuum. Trail rendering is purely visual and has no physics effect.

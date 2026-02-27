@@ -32,6 +32,7 @@ import * as PIXI from 'pixi.js';
 import { getApp }      from './index.js';
 import { getPartById } from '../data/parts.js';
 import { PartType }    from '../core/constants.js';
+import { airDensity }  from '../core/atmosphere.js';
 
 // ---------------------------------------------------------------------------
 // Scale constants
@@ -88,6 +89,22 @@ const STAR_FADE_FULL  = 70_000;
 
 /** Total number of star dots pre-generated for the star field. */
 const STAR_COUNT = 200;
+
+// ---------------------------------------------------------------------------
+// Engine trail constants
+// ---------------------------------------------------------------------------
+
+/** Lifetime of a single trail segment (seconds). */
+const TRAIL_MAX_AGE = 0.5;
+
+/**
+ * Air density threshold (kg/m³) below which engine trails are suppressed.
+ * Corresponds to approximately 50 000 m altitude.
+ */
+const TRAIL_DENSITY_THRESHOLD = 0.01;
+
+/** Speed (m/s) at which trail segments drift away from the engine nozzle. */
+const TRAIL_DRIFT_SPEED = 45;
 
 // ---------------------------------------------------------------------------
 // Part-type fill colours (identical palette to vab.js for visual consistency)
@@ -147,6 +164,9 @@ let _groundGraphics = null;
 /** Container for all debris-fragment part rectangles + labels. */
 let _debrisContainer = null;
 
+/** Container for all engine-trail segment graphics (above debris, below rocket). */
+let _trailContainer = null;
+
 /** Container for the active rocket's part rectangles + labels. */
 let _rocketContainer = null;
 
@@ -156,6 +176,28 @@ let _rocketContainer = null;
 
 /** @type {Array<{ nx: number, ny: number, r: number }>} */
 let _stars = [];
+
+// ---------------------------------------------------------------------------
+// Engine trail state
+// ---------------------------------------------------------------------------
+
+/**
+ * @typedef {object} TrailSegment
+ * @property {number}  worldX   World-space X position (metres).
+ * @property {number}  worldY   World-space Y position (metres).
+ * @property {number}  vx       Drift velocity X (m/s).
+ * @property {number}  vy       Drift velocity Y (m/s).
+ * @property {number}  age      Time elapsed since emission (seconds).
+ * @property {number}  baseW    Emitted width in pixels.
+ * @property {number}  baseH    Emitted height in pixels.
+ * @property {boolean} isSRB   True when emitted from a solid-rocket booster.
+ */
+
+/** @type {TrailSegment[]} */
+let _trailSegments = [];
+
+/** `performance.now()` value at the start of the previous frame (ms). */
+let _lastTrailTime = null;
 
 // ---------------------------------------------------------------------------
 // Camera state — world-space centre of the viewport
@@ -623,6 +665,154 @@ function _renderDebris(debrisList, assembly, w, h) {
 }
 
 // ---------------------------------------------------------------------------
+// Engine trail helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute the world-space position of an engine's nozzle exit.
+ *
+ * The nozzle sits at the "bottom" of the engine part (lowest VAB Y value).
+ * The body-to-world transform for a rocket at angle α (0 = nose pointing up):
+ *   world_x = origin_x + bx·cos(α) + by·sin(α)
+ *   world_y = origin_y − bx·sin(α) + by·cos(α)
+ * where bx/by are the body-frame offsets in metres (1 VAB pixel = SCALE_M_PER_PX m).
+ *
+ * @param {import('../core/physics.js').PhysicsState}         ps
+ * @param {import('../core/rocketbuilder.js').PlacedPart}     placed
+ * @param {import('../data/parts.js').PartDef}                def
+ * @returns {{ x: number, y: number }}  Nozzle world position in metres.
+ */
+function _nozzleWorldPos(ps, placed, def) {
+  const bx   = placed.x * SCALE_M_PER_PX;
+  const by   = (placed.y - (def.height ?? 20) / 2) * SCALE_M_PER_PX;
+  const cosA = Math.cos(ps.angle);
+  const sinA = Math.sin(ps.angle);
+  return {
+    x: ps.posX + bx * cosA + by * sinA,
+    y: ps.posY - bx * sinA + by * cosA,
+  };
+}
+
+/**
+ * Emit one trail segment per currently-firing engine that is inside the
+ * atmosphere (density > TRAIL_DENSITY_THRESHOLD).
+ *
+ * SRBs produce wider, brighter segments than liquid engines.
+ *
+ * @param {import('../core/physics.js').PhysicsState}           ps
+ * @param {import('../core/rocketbuilder.js').RocketAssembly}   assembly
+ * @param {number}                                              density  Current air density (kg/m³).
+ */
+function _emitTrailSegments(ps, assembly, density) {
+  if (density <= TRAIL_DENSITY_THRESHOLD) return;
+  if (!ps.firingEngines || ps.firingEngines.size === 0) return;
+
+  // Exhaust drifts opposite to the thrust direction.
+  const exVx = -Math.sin(ps.angle) * TRAIL_DRIFT_SPEED;
+  const exVy = -Math.cos(ps.angle) * TRAIL_DRIFT_SPEED;
+
+  for (const instanceId of ps.firingEngines) {
+    if (!ps.activeParts.has(instanceId)) continue;
+
+    const placed = assembly.parts.get(instanceId);
+    const def    = placed ? getPartById(placed.partId) : null;
+    if (!def) continue;
+
+    const isSRB  = def.type === PartType.SOLID_ROCKET_BOOSTER;
+    const nozzle = _nozzleWorldPos(ps, placed, def);
+
+    _trailSegments.push({
+      worldX: nozzle.x,
+      worldY: nozzle.y,
+      vx:     exVx,
+      vy:     exVy,
+      age:    0,
+      baseW:  isSRB ? 12 : 6,
+      baseH:  isSRB ? 26 : 14,
+      isSRB,
+    });
+  }
+}
+
+/**
+ * Advance every trail segment by `dt` seconds and discard expired ones.
+ *
+ * @param {number} dt  Elapsed time in seconds.
+ */
+function _updateTrails(dt) {
+  for (const seg of _trailSegments) {
+    seg.age    += dt;
+    seg.worldX += seg.vx * dt;
+    seg.worldY += seg.vy * dt;
+  }
+  // Compact array in place — avoids allocation of a filtered copy.
+  let write = 0;
+  for (let i = 0; i < _trailSegments.length; i++) {
+    if (_trailSegments[i].age < TRAIL_MAX_AGE) {
+      _trailSegments[write++] = _trailSegments[i];
+    }
+  }
+  _trailSegments.length = write;
+}
+
+/**
+ * Draw all live trail segments into `_trailContainer`.
+ *
+ * Colour gradient over normalised lifetime t ∈ [0, 1]:
+ *   0.0–0.4  bright yellow-white → orange        (SRBs start at pure white)
+ *   0.4–1.0  orange → dark red-orange, alpha → 0
+ *
+ * Size shrinks to 50 % width and 70 % height over the segment's lifetime.
+ *
+ * @param {number} w  Canvas width in pixels.
+ * @param {number} h  Canvas height in pixels.
+ */
+function _renderTrails(w, h) {
+  if (!_trailContainer) return;
+  while (_trailContainer.children.length) _trailContainer.removeChildAt(0);
+  if (_trailSegments.length === 0) return;
+
+  const g = new PIXI.Graphics();
+  _trailContainer.addChild(g);
+
+  for (const seg of _trailSegments) {
+    const t     = seg.age / TRAIL_MAX_AGE;
+    const alpha = Math.max(0, 1 - t);
+
+    // Colour: bright at birth → orange → dark red at death.
+    const birthColor = seg.isSRB ? 0xffffff : 0xffff80;
+    const color = t < 0.4
+      ? _lerpColor(birthColor, 0xff8800, t / 0.4)
+      : _lerpColor(0xff8800, 0xff2000, (t - 0.4) / 0.6);
+
+    // Radius shrinks as the segment ages.
+    const rx = Math.max(0.5, (seg.baseW * (1 - t * 0.5)) / 2);
+    const ry = Math.max(0.5, (seg.baseH * (1 - t * 0.3)) / 2);
+
+    const { sx, sy } = _worldToScreen(seg.worldX, seg.worldY, w, h);
+    g.ellipse(sx, sy, rx, ry);
+    g.fill({ color, alpha });
+  }
+}
+
+/**
+ * Compute elapsed seconds since the last call, advancing `_lastTrailTime`.
+ * Returns 0 on the very first call.  Output is capped at 50 ms (20 fps floor).
+ *
+ * @returns {number}
+ */
+function _trailDt() {
+  const now = performance.now();
+  if (_lastTrailTime === null) {
+    _lastTrailTime = now;
+    return 0;
+  }
+  const dt       = Math.min((now - _lastTrailTime) / 1000, 0.05);
+  _lastTrailTime = now;
+  return dt;
+}
+
+// ---------------------------------------------------------------------------
 // Zoom input handlers (private)
 // ---------------------------------------------------------------------------
 
@@ -687,21 +877,27 @@ export function initFlightRenderer() {
   app.stage.removeChildren();
 
   // Layer order (bottom → top):
-  //   sky  →  stars  →  ground  →  debris  →  active rocket
+  //   sky  →  stars  →  ground  →  debris  →  engine trails  →  active rocket
   _skyGraphics     = new PIXI.Graphics();
   _starsContainer  = new PIXI.Container();
   _groundGraphics  = new PIXI.Graphics();
   _debrisContainer = new PIXI.Container();
+  _trailContainer  = new PIXI.Container();
   _rocketContainer = new PIXI.Container();
 
   app.stage.addChild(_skyGraphics);
   app.stage.addChild(_starsContainer);
   app.stage.addChild(_groundGraphics);
   app.stage.addChild(_debrisContainer);
+  app.stage.addChild(_trailContainer);
   app.stage.addChild(_rocketContainer);
 
   // Pre-generate the deterministic star field.
   _generateStars();
+
+  // Reset trail state.
+  _trailSegments = [];
+  _lastTrailTime = null;
 
   // Reset camera to launch-pad origin.
   _camWorldX = 0;
@@ -752,7 +948,15 @@ export function renderFlightFrame(ps, assembly) {
   //    the command module, which is handled by _updateCamera above).
   _renderDebris(ps.debris, assembly, w, h);
 
-  // 6. Active rocket — full opacity, camera centred here (normally).
+  // 6. Engine trails — fading exhaust segments behind each firing engine.
+  //    Suppressed above ~50 000 m where atmospheric density drops below threshold.
+  const trailDensity = airDensity(altitude);
+  const dt           = _trailDt();
+  _emitTrailSegments(ps, assembly, trailDensity);
+  _updateTrails(dt);
+  _renderTrails(w, h);
+
+  // 7. Active rocket — full opacity, camera centred here (normally).
   _renderRocket(ps, assembly, w, h);
 }
 
@@ -771,8 +975,11 @@ export function destroyFlightRenderer() {
   _starsContainer  = null;
   _groundGraphics  = null;
   _debrisContainer = null;
+  _trailContainer  = null;
   _rocketContainer = null;
   _stars           = [];
+  _trailSegments   = [];
+  _lastTrailTime   = null;
 
   _camWorldX = 0;
   _camWorldY = 0;
