@@ -226,7 +226,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-021: Atmosphere & Reentry Heat Model
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-020
 - **Description**: Implement in `/src/core/atmosphere.js`. Air density curve (approximate): sea level = 1.225 kg/m³, decreasing exponentially. Use: `density(alt) = 1.225 * exp(-alt / 8500)`. Effective vacuum above 70,000m (density < 0.0001 kg/m³). Terminal velocity at any altitude: `vTerminal = sqrt(2 * mass * g / (density * Cd * area))` — used as a soft speed cap when descending (drag automatically enforces this; no hard clamp needed). Reentry heat: when altitude < 70,000m and speed > 1,500 m/s, apply heat to parts. Heat rate per tick: `heatRate = (speed - 1500) * density * 0.01`. Each part has a `currentHeat` value that accumulates. Parts have a `heatTolerance` property (default 1200 units for structural parts, 3000 for heat shields if added later). When `currentHeat` exceeds `heatTolerance`, the part is destroyed (removed from the rocket graph). Heat is applied primarily to the part at the leading face of travel. Heat dissipates slowly when conditions ease: `currentHeat -= 5 per tick` when not in reentry conditions.

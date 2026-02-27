@@ -46,6 +46,12 @@
 import { getPartById } from '../data/parts.js';
 import { PartType, FuelType } from './constants.js';
 import { fireStagingStep } from './rocketbuilder.js';
+import {
+  airDensity,
+  ATMOSPHERE_TOP,
+  SEA_LEVEL_DENSITY,
+  updateHeat,
+} from './atmosphere.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -56,12 +62,6 @@ const G0 = 9.81;
 
 /** Fixed physics timestep (seconds). */
 const FIXED_DT = 1 / 60;
-
-/** Altitude above which the atmosphere is effectively zero (metres). */
-const ATMOSPHERE_TOP = 70_000;
-
-/** Air density at sea level (kg/m³). */
-const SEA_LEVEL_DENSITY = 1.225;
 
 /** Scale factor: metres per pixel at default 1× zoom. */
 const SCALE_M_PER_PX = 0.05;
@@ -86,24 +86,6 @@ const CHUTE_DRAG_MULTIPLIER = 80;
 
 /** Landing speed below which a contact is considered "safe" (m/s). */
 const DEFAULT_SAFE_LANDING_SPEED = 10;
-
-// ---------------------------------------------------------------------------
-// Atmosphere model
-// ---------------------------------------------------------------------------
-
-/**
- * Exponential atmosphere model.
- * Returns air density (kg/m³) at the given altitude (metres).
- * Density reaches 0 at ATMOSPHERE_TOP and beyond.
- *
- * @param {number} altitude  Metres above sea level.
- * @returns {number}
- */
-function airDensity(altitude) {
-  if (altitude >= ATMOSPHERE_TOP) return 0;
-  const clamped = Math.max(0, altitude);
-  return SEA_LEVEL_DENSITY * Math.exp(-clamped / 8500);
-}
 
 // ---------------------------------------------------------------------------
 // Type Definitions (JSDoc)
@@ -132,6 +114,8 @@ function airDensity(altitude) {
  * @property {boolean}         landed        True after a successful soft touchdown.
  * @property {boolean}         crashed       True after a fatal impact.
  * @property {boolean}         grounded      True while still sitting on the launch pad.
+ * @property {Map<string,number>} heatMap      Accumulated reentry heat per part (heat units).
+ *                                             Keyed by instance ID; initialised to 0.
  * @property {Set<string>}     _heldKeys     Keys currently held down (for continuous steering).
  * @property {number}          _accumulator  Leftover simulation time from the previous frame.
  */
@@ -181,6 +165,7 @@ export function createPhysicsState(assembly, flightState) {
     fuelStore,
     activeParts: new Set(assembly.parts.keys()),
     deployedParts: new Set(),
+    heatMap: new Map(),
     landed: false,
     crashed: false,
     grounded: true,
@@ -367,6 +352,11 @@ function _integrate(ps, assembly, flightState) {
 
   // --- 8b. Remove any SRBs that just exhausted their fuel ------------------
   _removeExhaustedSRBs(ps, assembly);
+
+  // --- 8c. Reentry heat model ----------------------------------------------
+  if (!ps.grounded) {
+    updateHeat(ps, assembly, flightState, speed, altitude, density);
+  }
 
   // --- 9. Liftoff detection ------------------------------------------------
   if (ps.grounded && ps.posY > 0) {
