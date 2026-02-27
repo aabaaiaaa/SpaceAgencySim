@@ -386,7 +386,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-041: Rocket Builder Logic Tests
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-016, TASK-019, TASK-036
 - **Description**: Write unit tests in `/src/tests/rocketbuilder.test.js` covering: (1) A command module connected to a fuel tank and engine forms a valid rocket graph. (2) TWR calculation: given known total mass and Stage 1 thrust, verify calculated TWR matches expected value. (3) A rocket with TWR < 1 fails validation. (4) A rocket with no command module fails validation. (5) A rocket where an engine is in Stage 1 but has no connected fuel tank warns appropriately (no fuel = 0 thrust = TWR < 1). (6) Adding a valid snap connection stores the correct edge in the part graph. (7) Attempting to snap an incompatible part type to a snap point is rejected (returns false). (8) Removing a part from the graph also removes all its edges. (9) A part isolated from all command modules after a simulated decoupler fire is correctly identified as disconnected. All tests must pass with `vitest run`.
