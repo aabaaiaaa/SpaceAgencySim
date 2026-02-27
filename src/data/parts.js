@@ -823,7 +823,9 @@ export const PARTS = [
     properties: {
       maxSafeMass: 1_200,
       maxLandingSpeed: 10,
-      dragCoefficient: 0.05,
+      dragCoefficient: 0.05,   // stowed drag coefficient
+      deployedDiameter: 20,    // m — fully-deployed canopy diameter (~314 m² area)
+      deployedCd: 0.75,        // hemispherical canopy Cd when fully deployed
       heatTolerance: 1200,
     },
   },
@@ -853,7 +855,9 @@ export const PARTS = [
     properties: {
       maxSafeMass: 4_000,
       maxLandingSpeed: 10,
-      dragCoefficient: 0.05,
+      dragCoefficient: 0.05,   // stowed drag coefficient
+      deployedDiameter: 35,    // m — fully-deployed canopy diameter (~962 m² area)
+      deployedCd: 0.75,        // hemispherical canopy Cd when fully deployed
       heatTolerance: 1200,
     },
   },

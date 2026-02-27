@@ -33,6 +33,7 @@ import { getApp }      from './index.js';
 import { getPartById } from '../data/parts.js';
 import { PartType }    from '../core/constants.js';
 import { airDensity }  from '../core/atmosphere.js';
+import { DEPLOY_DURATION } from '../core/parachute.js';
 
 // ---------------------------------------------------------------------------
 // Scale constants
@@ -572,6 +573,82 @@ function _makePartLabel(placed, def, alpha = 1) {
 }
 
 // ---------------------------------------------------------------------------
+// Parachute canopy rendering
+// ---------------------------------------------------------------------------
+
+/**
+ * Draw a deployed-canopy placeholder above every deploying or deployed
+ * PARACHUTE part currently in the rocket.
+ *
+ * The canopy is a filled ellipse whose width interpolates from the stowed
+ * part width up to `deployedDiameter / SCALE_M_PER_PX` as the deployment
+ * animation progresses (0 → 1).  Two thin rigging lines connect the stowed
+ * chute top to the canopy edges for visual clarity.
+ *
+ * All coordinates are in the container's local pixel space (1 px = SCALE_M_PER_PX m).
+ *
+ * @param {PIXI.Graphics}                                      g
+ * @param {import('../core/physics.js').PhysicsState}          ps
+ * @param {import('../core/rocketbuilder.js').RocketAssembly}  assembly
+ */
+function _drawParachuteCanopies(g, ps, assembly) {
+  for (const instanceId of ps.activeParts) {
+    const placed = assembly.parts.get(instanceId);
+    const def    = placed ? getPartById(placed.partId) : null;
+    if (!def || def.type !== PartType.PARACHUTE) continue;
+
+    const entry = ps.parachuteStates?.get(instanceId);
+    if (!entry || entry.state === 'packed' || entry.state === 'failed') continue;
+
+    // Deployment progress 0 → 1.
+    const progress = entry.state === 'deployed'
+      ? 1
+      : Math.max(0, Math.min(1, 1 - entry.deployTimer / DEPLOY_DURATION));
+
+    if (progress <= 0) continue;
+
+    const props = def.properties ?? {};
+
+    // Stowed width (local pixels) → deployed diameter (local pixels).
+    const stowedW    = def.width ?? 20;
+    const deployedW  = (props.deployedDiameter ?? 10) / SCALE_M_PER_PX;
+    const currentW   = stowedW + (deployedW - stowedW) * progress;
+    const halfW      = currentW / 2;
+
+    // Canopy dome height is 35 % of its width — flat hemispherical profile.
+    const halfH = halfW * 0.35;
+
+    // Top of the stowed chute body in local Y (screen Y increases downward,
+    // placed.y is world-up, so the stowed top is at screen Y = -(placed.y + halfStowedH)).
+    const stowedHalfH  = (def.height ?? 10) / 2;
+    const stowedTopY   = -(placed.y + stowedHalfH);
+
+    // Canopy centre sits one canopy half-height above the stowed top.
+    const canopyCentreX = placed.x;
+    const canopyCentreY = stowedTopY - halfH;
+
+    const alpha = Math.min(1, progress);
+
+    // Filled canopy ellipse.
+    g.ellipse(canopyCentreX, canopyCentreY, halfW, halfH);
+    g.fill({ color: 0x6020a8, alpha: 0.55 * alpha });
+    g.stroke({ color: 0xc070ff, width: 1, alpha: 0.85 * alpha });
+
+    // Rigging lines from the stowed chute's upper corners to the canopy edges.
+    const cordAlpha  = 0.6 * alpha;
+    const cordInset  = stowedW * 0.25; // lines start slightly inward from stowed edges
+
+    g.moveTo(canopyCentreX - cordInset, stowedTopY);
+    g.lineTo(canopyCentreX - halfW,     canopyCentreY + halfH);
+    g.stroke({ color: 0xc070ff, width: 0.8, alpha: cordAlpha });
+
+    g.moveTo(canopyCentreX + cordInset, stowedTopY);
+    g.lineTo(canopyCentreX + halfW,     canopyCentreY + halfH);
+    g.stroke({ color: 0xc070ff, width: 0.8, alpha: cordAlpha });
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Rocket rendering
 // ---------------------------------------------------------------------------
 
@@ -626,6 +703,9 @@ function _renderRocket(ps, assembly, w, h) {
     if (!def) continue;
     _drawPartRect(g, placed, def, 0.9);
   }
+
+  // Draw deployed parachute canopies above the stowed part rectangles.
+  _drawParachuteCanopies(g, ps, assembly);
 
   // Add text labels as separate child objects (labels are part of the rotated
   // container, so they tilt with the rocket — acceptable for a simple renderer).

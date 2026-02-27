@@ -47,7 +47,7 @@ import { getPartById }              from '../data/parts.js';
 import { PartType }                 from './constants.js';
 import { airDensity, SEA_LEVEL_DENSITY } from './atmosphere.js';
 import { tickFuelSystem }           from './fuelsystem.js';
-import { deployParachute, getChuteMultiplier } from './parachute.js';
+import { deployParachute, DEPLOY_DURATION, LOW_DENSITY_THRESHOLD } from './parachute.js';
 import { deployLandingLeg } from './legs.js';
 import { activateEjectorSeat } from './ejector.js';
 import { activateScienceModule } from './sciencemodule.js';
@@ -61,12 +61,6 @@ const G0 = 9.81;
 
 /** Scale factor: metres per pixel at default 1× zoom. */
 const SCALE_M_PER_PX = 0.05;
-
-/**
- * Drag coefficient multiplier for a deployed parachute.
- * An open chute is modelled as having 80× its stowed Cd.
- */
-const CHUTE_DRAG_MULTIPLIER = 80;
 
 /** Landing speed below which ground contact is considered safe (m/s). */
 const DEFAULT_SAFE_LANDING_SPEED = 10;
@@ -782,6 +776,27 @@ function _debrisMass(debris, assembly) {
  * @param {number} speed    Fragment speed (m/s).
  * @returns {number}  Drag force in Newtons.
  */
+/**
+ * Return the deployment progress for a parachute on a debris fragment.
+ * Mirrors the same helper in physics.js but uses the debris's own parachuteStates.
+ * Falls back to the binary deployedParts set for older debris objects.
+ *
+ * @param {DebrisState} debris
+ * @param {string}      instanceId
+ * @returns {number}  0 = packed, 0→1 = deploying, 1 = deployed.
+ */
+function _getDebrisChuteDeployProgress(debris, instanceId) {
+  const entry = debris.parachuteStates?.get(instanceId);
+  if (!entry) {
+    return debris.deployedParts?.has(instanceId) ? 1 : 0;
+  }
+  switch (entry.state) {
+    case 'deployed':  return 1;
+    case 'deploying': return Math.max(0, Math.min(1, 1 - entry.deployTimer / DEPLOY_DURATION));
+    default:          return 0;
+  }
+}
+
 function _debrisDrag(debris, assembly, density, speed) {
   if (density <= 0 || speed <= 0) return 0;
 
@@ -792,18 +807,21 @@ function _debrisDrag(debris, assembly, density, speed) {
     const def    = placed ? getPartById(placed.partId) : null;
     if (!def) continue;
 
-    const props    = def.properties ?? {};
-    const cd       = props.dragCoefficient ?? 0.2;
-    const widthM   = (def.width ?? 40) * SCALE_M_PER_PX;
-    const area     = Math.PI * (widthM / 2) ** 2; // circular cross-section
+    const props  = def.properties ?? {};
+    const widthM = (def.width ?? 40) * SCALE_M_PER_PX;
+    const area   = Math.PI * (widthM / 2) ** 2; // stowed circular cross-section
 
-    // Parachutes use the state-machine multiplier (density-scaled);
-    // all other parts have a multiplier of 1.
-    const cdMult = def.type === PartType.PARACHUTE
-      ? getChuteMultiplier(debris, id, density)
-      : 1;
-
-    totalCdA += cd * area * cdMult;
+    if (def.type === PartType.PARACHUTE) {
+      const stowedCdA   = (props.dragCoefficient ?? 0.05) * area;
+      const deployedR   = (props.deployedDiameter ?? 10) / 2;
+      const deployedCd  = props.deployedCd ?? 0.75;
+      const deployedCdA = deployedCd * Math.PI * deployedR * deployedR;
+      const progress     = _getDebrisChuteDeployProgress(debris, id);
+      const densityScale = Math.min(1, density / LOW_DENSITY_THRESHOLD);
+      totalCdA += stowedCdA + (deployedCdA - stowedCdA) * progress * densityScale;
+    } else {
+      totalCdA += (props.dragCoefficient ?? 0.2) * area;
+    }
   }
 
   return 0.5 * density * speed * speed * totalCdA;

@@ -56,7 +56,8 @@ import { activateCurrentStage, tickDebris } from './staging.js';
 import {
   initParachuteStates,
   tickParachutes,
-  getChuteMultiplier,
+  DEPLOY_DURATION,
+  LOW_DENSITY_THRESHOLD,
 } from './parachute.js';
 import {
   initLegStates,
@@ -586,11 +587,33 @@ function _computeThrust(ps, assembly, density) {
 // ---------------------------------------------------------------------------
 
 /**
+ * Return the deployment progress for a parachute: 0 = packed/failed,
+ * 0→1 during the deploying animation, 1 = fully deployed.
+ *
+ * @param {PhysicsState} ps
+ * @param {string}       instanceId
+ * @returns {number}
+ */
+function _getChuteDeployProgress(ps, instanceId) {
+  const entry = ps.parachuteStates?.get(instanceId);
+  if (!entry) return 0;
+  switch (entry.state) {
+    case 'deployed':  return 1;
+    case 'deploying': return Math.max(0, Math.min(1, 1 - entry.deployTimer / DEPLOY_DURATION));
+    default:          return 0;
+  }
+}
+
+/**
  * Compute the aerodynamic drag force magnitude (Newtons).
  *
  * dragForce = 0.5 × ρ × v² × Cd × A  (summed over all active parts)
  *
- * Open parachutes contribute dramatically increased drag (×80 Cd).
+ * For PARACHUTE parts, CdA is interpolated between the small stowed profile
+ * and the large deployed canopy area (from `properties.deployedDiameter` and
+ * `properties.deployedCd`) based on the deployment state machine progress.
+ * Both ends are scaled by atmospheric density so chutes are ineffective in
+ * near-vacuum conditions.
  *
  * @param {PhysicsState}                               ps
  * @param {import('./rocketbuilder.js').RocketAssembly} assembly
@@ -609,18 +632,27 @@ function _computeDragForce(ps, assembly, density, speed) {
     const def = getPartById(placed.partId);
     if (!def) continue;
 
-    const props    = def.properties ?? {};
-    const cd       = props.dragCoefficient ?? 0.2;
-    const widthM   = (def.width ?? 40) * SCALE_M_PER_PX;
-    const area     = Math.PI * (widthM / 2) ** 2; // circular cross-section
+    const props  = def.properties ?? {};
+    const widthM = (def.width ?? 40) * SCALE_M_PER_PX;
+    const area   = Math.PI * (widthM / 2) ** 2; // stowed circular cross-section
 
-    // Parachutes use a density-scaled, state-machine-driven multiplier;
-    // all other parts have a fixed multiplier of 1.
-    const cdMultiplier = def.type === PartType.PARACHUTE
-      ? getChuteMultiplier(ps, instanceId, density)
-      : 1;
+    if (def.type === PartType.PARACHUTE) {
+      // Stowed CdA — used when packed or failed.
+      const stowedCdA = (props.dragCoefficient ?? 0.05) * area;
 
-    totalCdA += cd * area * cdMultiplier;
+      // Deployed CdA — uses the real canopy diameter, not the stowed profile.
+      const deployedR   = (props.deployedDiameter ?? 10) / 2;
+      const deployedCd  = props.deployedCd ?? 0.75;
+      const deployedCdA = deployedCd * Math.PI * deployedR * deployedR;
+
+      // Linearly interpolate from stowed → deployed as the canopy opens.
+      // Scale by atmospheric density so chutes are ineffective near vacuum.
+      const progress     = _getChuteDeployProgress(ps, instanceId);
+      const densityScale = Math.min(1, density / LOW_DENSITY_THRESHOLD);
+      totalCdA += stowedCdA + (deployedCdA - stowedCdA) * progress * densityScale;
+    } else {
+      totalCdA += (props.dragCoefficient ?? 0.2) * area;
+    }
   }
 
   return 0.5 * density * speed * speed * totalCdA;
