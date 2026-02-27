@@ -17,7 +17,7 @@
  * to src/render/vab.js.
  */
 
-import { PARTS } from '../data/parts.js';
+import { PARTS, getPartById } from '../data/parts.js';
 import { PartType } from '../core/constants.js';
 import {
   VAB_TOOLBAR_HEIGHT,
@@ -27,7 +27,46 @@ import {
   vabPanCamera,
   vabSetZoom,
   vabGetCamera,
+  vabScreenToWorld,
+  vabSetAssembly,
+  vabRenderParts,
+  vabSetDragGhost,
+  vabMoveDragGhost,
+  vabClearDragGhost,
+  vabShowSnapHighlights,
+  vabClearSnapHighlights,
 } from '../render/vab.js';
+import {
+  createRocketAssembly,
+  addPartToAssembly,
+  removePartFromAssembly,
+  movePlacedPart,
+  connectParts,
+  disconnectPart,
+  findSnapCandidates,
+} from '../core/rocketbuilder.js';
+
+// ---------------------------------------------------------------------------
+// Module-level state (VAB session)
+// ---------------------------------------------------------------------------
+
+/** The live rocket assembly being edited. @type {import('../core/rocketbuilder.js').RocketAssembly | null} */
+let _assembly = null;
+
+/** Reference to game state for cost refunds and cash updates. @type {import('../core/gameState.js').GameState | null} */
+let _gameState = null;
+
+/**
+ * Active drag operation, or null when nothing is being dragged.
+ * @type {{
+ *   partId:     string,
+ *   instanceId: string | null,  // null = dragging a new part from the panel
+ * } | null}
+ */
+let _dragState = null;
+
+/** Context-menu DOM element (created once, re-used). @type {HTMLElement | null} */
+let _ctxMenu = null;
 
 // ---------------------------------------------------------------------------
 // Part-type display helpers
@@ -438,6 +477,46 @@ const VAB_CSS = `
   text-align: center;
   line-height: 1.75;
 }
+
+/* ── Context menu ────────────────────────────────────────────────────── */
+#vab-ctx-menu {
+  position: fixed;
+  z-index: 200;
+  background: rgba(4, 8, 22, 0.98);
+  border: 1px solid #1e3a5c;
+  border-radius: 2px;
+  padding: 2px 0;
+  box-shadow: 2px 4px 18px rgba(0,0,0,.85);
+  min-width: 140px;
+}
+#vab-ctx-menu[hidden] {
+  display: none;
+}
+.vab-ctx-item {
+  display: block;
+  width: 100%;
+  padding: 6px 14px;
+  font-size: 11px;
+  font-family: 'Courier New', Courier, monospace;
+  color: #a8c8e8;
+  cursor: pointer;
+  background: none;
+  border: none;
+  text-align: left;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+.vab-ctx-item:hover {
+  background: rgba(14, 38, 74, 0.8);
+  color: #c8e4ff;
+}
+.vab-ctx-item-danger {
+  color: #e09090;
+}
+.vab-ctx-item-danger:hover {
+  background: rgba(50, 8, 8, 0.8);
+  color: #ffb0b0;
+}
 `;
 
 // ---------------------------------------------------------------------------
@@ -577,21 +656,252 @@ function _buildMissionsHTML(state) {
 }
 
 // ---------------------------------------------------------------------------
-// Canvas panning & zooming
+// Hit-testing helpers
 // ---------------------------------------------------------------------------
 
 /**
- * Attach pointer-drag (pan) and wheel (zoom) listeners to the build-canvas
- * overlay div.
+ * Find the topmost placed part whose bounding rectangle contains worldX/Y.
+ * Returns the PlacedPart (with its partId) or null.
+ * @param {number} worldX
+ * @param {number} worldY
+ * @returns {import('../core/rocketbuilder.js').PlacedPart | null}
+ */
+function _hitTestPlacedPart(worldX, worldY) {
+  if (!_assembly) return null;
+  // Iterate in reverse insertion order so newer parts are hit first.
+  const all = [..._assembly.parts.values()];
+  for (let i = all.length - 1; i >= 0; i--) {
+    const placed = all[i];
+    const def = getPartById(placed.partId);
+    if (!def) continue;
+    const hw = def.width  / 2;
+    const hh = def.height / 2;
+    if (
+      worldX >= placed.x - hw && worldX <= placed.x + hw &&
+      worldY >= placed.y - hh && worldY <= placed.y + hh
+    ) {
+      return placed;
+    }
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Drag lifecycle
+// ---------------------------------------------------------------------------
+
+/**
+ * Begin dragging a part (from panel or by picking up a placed part).
+ * Adds global pointermove/pointerup listeners that are cleaned up in _endDrag.
+ * @param {string}      partId      Part catalog ID.
+ * @param {string|null} instanceId  Existing instance (null = from panel).
+ * @param {number}      clientX
+ * @param {number}      clientY
+ */
+function _startDrag(partId, instanceId, clientX, clientY) {
+  _dragState = { partId, instanceId };
+  vabSetDragGhost(partId, clientX, clientY);
+  window.addEventListener('pointermove',  _onDragMove,   { capture: true });
+  window.addEventListener('pointerup',    _onDragEnd,    { capture: true });
+  window.addEventListener('pointercancel', _cancelDrag,  { capture: true });
+}
+
+/**
+ * Cancel an in-progress drag (e.g. pointer captured by browser).
+ * If the part was picked up (instanceId != null), put it back.
+ */
+function _cancelDrag() {
+  if (!_dragState) return;
+  window.removeEventListener('pointermove',  _onDragMove,  { capture: true });
+  window.removeEventListener('pointerup',    _onDragEnd,   { capture: true });
+  window.removeEventListener('pointercancel', _cancelDrag, { capture: true });
+
+  const { instanceId } = _dragState;
+  _dragState = null;
+  vabClearDragGhost();
+  vabClearSnapHighlights();
+
+  // If a placed part was picked up but not re-dropped, its position was already
+  // preserved in the assembly (it was disconnected but not removed). It will
+  // remain at its last world position — acceptable fallback.
+  if (instanceId !== null) {
+    vabRenderParts();
+  }
+}
+
+/**
+ * Global pointermove handler during a drag.
+ * @param {PointerEvent} e
+ */
+function _onDragMove(e) {
+  if (!_dragState) return;
+
+  vabMoveDragGhost(e.clientX, e.clientY);
+
+  // Find snap candidates relative to current cursor world position.
+  const { worldX, worldY } = vabScreenToWorld(e.clientX, e.clientY);
+  const { zoom } = vabGetCamera();
+  const candidates = findSnapCandidates(
+    _assembly, _dragState.partId, worldX, worldY, zoom,
+  );
+
+  if (candidates.length > 0) {
+    vabShowSnapHighlights(candidates);
+  } else {
+    vabClearSnapHighlights();
+  }
+}
+
+/**
+ * Global pointerup handler — drop the part.
+ * @param {PointerEvent} e
+ */
+function _onDragEnd(e) {
+  if (!_dragState) return;
+
+  window.removeEventListener('pointermove',  _onDragMove,  { capture: true });
+  window.removeEventListener('pointerup',    _onDragEnd,   { capture: true });
+  window.removeEventListener('pointercancel', _cancelDrag, { capture: true });
+
+  const { partId, instanceId } = _dragState;
+  _dragState = null;
+
+  vabClearDragGhost();
+  vabClearSnapHighlights();
+
+  // Determine world drop position.
+  const { worldX, worldY } = vabScreenToWorld(e.clientX, e.clientY);
+  const { zoom } = vabGetCamera();
+
+  const candidates = findSnapCandidates(_assembly, partId, worldX, worldY, zoom);
+  let finalX = worldX;
+  let finalY = worldY;
+  let bestCandidate = null;
+
+  if (candidates.length > 0) {
+    bestCandidate = candidates[0];
+    finalX = bestCandidate.snapWorldX;
+    finalY = bestCandidate.snapWorldY;
+  }
+
+  if (instanceId !== null) {
+    // Re-place an already-placed part at new position.
+    movePlacedPart(_assembly, instanceId, finalX, finalY);
+    if (bestCandidate) {
+      connectParts(
+        _assembly,
+        instanceId,                 bestCandidate.dragSnapIndex,
+        bestCandidate.targetInstanceId, bestCandidate.targetSnapIndex,
+      );
+    }
+  } else {
+    // New part from the panel — deduct cost, add to assembly.
+    const def = getPartById(partId);
+    if (def && _gameState) {
+      _gameState.money -= def.cost;
+      vabUpdateCash(_gameState);
+    }
+    const newId = addPartToAssembly(_assembly, partId, finalX, finalY);
+    if (bestCandidate) {
+      connectParts(
+        _assembly,
+        newId,                          bestCandidate.dragSnapIndex,
+        bestCandidate.targetInstanceId, bestCandidate.targetSnapIndex,
+      );
+    }
+  }
+
+  vabRenderParts();
+}
+
+// ---------------------------------------------------------------------------
+// Context menu
+// ---------------------------------------------------------------------------
+
+/**
+ * Initialise the right-click context menu DOM element (created once).
+ */
+function _initContextMenu() {
+  _ctxMenu = document.createElement('div');
+  _ctxMenu.id = 'vab-ctx-menu';
+  _ctxMenu.setAttribute('hidden', '');
+  document.body.appendChild(_ctxMenu);
+
+  // Clicking anywhere outside the menu dismisses it.
+  document.addEventListener('pointerdown', (e) => {
+    if (_ctxMenu && !_ctxMenu.contains(e.target)) {
+      _ctxMenu.setAttribute('hidden', '');
+    }
+  }, { capture: true });
+}
+
+/**
+ * Show the context menu for a placed part.
+ * @param {import('../core/rocketbuilder.js').PlacedPart} placed
+ * @param {number} clientX
+ * @param {number} clientY
+ */
+function _showPartContextMenu(placed, clientX, clientY) {
+  if (!_ctxMenu) return;
+
+  const def = getPartById(placed.partId);
+  const costLabel = def ? ` (+${fmt$(def.cost)})` : '';
+
+  _ctxMenu.innerHTML =
+    `<button class="vab-ctx-item vab-ctx-item-danger" id="vab-ctx-remove">` +
+      `Remove Part${costLabel}` +
+    `</button>`;
+
+  _ctxMenu.style.left = `${clientX}px`;
+  _ctxMenu.style.top  = `${clientY}px`;
+  _ctxMenu.removeAttribute('hidden');
+
+  _ctxMenu.querySelector('#vab-ctx-remove')?.addEventListener('click', () => {
+    _ctxMenu.setAttribute('hidden', '');
+    // Refund cost.
+    if (def && _gameState) {
+      _gameState.money += def.cost;
+      vabUpdateCash(_gameState);
+    }
+    removePartFromAssembly(_assembly, placed.instanceId);
+    vabRenderParts();
+  }, { once: true });
+}
+
+// ---------------------------------------------------------------------------
+// Canvas panning, zooming, part drag & context menu
+// ---------------------------------------------------------------------------
+
+/**
+ * Attach all pointer interactions to the build-canvas overlay div:
+ *   - Left-button drag on empty space → pan camera.
+ *   - Left-button drag on a placed part → pick it up.
+ *   - Right-click on a placed part → context menu (Remove Part).
+ *   - Scroll wheel → zoom.
  * @param {HTMLElement} canvasArea
  */
-function _setupPan(canvasArea) {
-  let dragging = false;
+function _setupCanvas(canvasArea) {
+  let panning = false;
   let lastX = 0;
   let lastY = 0;
 
   canvasArea.addEventListener('pointerdown', (e) => {
-    dragging = true;
+    if (e.button !== 0) return;  // only left-button for drag/pan
+
+    const { worldX, worldY } = vabScreenToWorld(e.clientX, e.clientY);
+    const hit = _hitTestPlacedPart(worldX, worldY);
+
+    if (hit) {
+      // Pick up the placed part: disconnect it from the graph, start dragging.
+      disconnectPart(_assembly, hit.instanceId);
+      _startDrag(hit.partId, hit.instanceId, e.clientX, e.clientY);
+      // Consume event so panning doesn't also start.
+      e.stopPropagation();
+      return;
+    }
+
+    // No hit — start camera pan.
+    panning = true;
     lastX = e.clientX;
     lastY = e.clientY;
     canvasArea.setPointerCapture(e.pointerId);
@@ -599,7 +909,7 @@ function _setupPan(canvasArea) {
   });
 
   canvasArea.addEventListener('pointermove', (e) => {
-    if (!dragging) return;
+    if (!panning) return;
     const dx = e.clientX - lastX;
     const dy = e.clientY - lastY;
     lastX = e.clientX;
@@ -608,14 +918,24 @@ function _setupPan(canvasArea) {
     _drawScaleTicks();
   });
 
-  const _stopDrag = () => {
-    dragging = false;
+  const _stopPan = () => {
+    panning = false;
     canvasArea.classList.remove('panning');
   };
-  canvasArea.addEventListener('pointerup',     _stopDrag);
-  canvasArea.addEventListener('pointercancel', _stopDrag);
+  canvasArea.addEventListener('pointerup',     _stopPan);
+  canvasArea.addEventListener('pointercancel', _stopPan);
 
-  // Scroll-wheel zoom centred on the cursor.
+  // Right-click → context menu for placed parts.
+  canvasArea.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    const { worldX, worldY } = vabScreenToWorld(e.clientX, e.clientY);
+    const hit = _hitTestPlacedPart(worldX, worldY);
+    if (hit) {
+      _showPartContextMenu(hit, e.clientX, e.clientY);
+    }
+  });
+
+  // Scroll-wheel zoom.
   canvasArea.addEventListener('wheel', (e) => {
     e.preventDefault();
     const factor = e.deltaY < 0 ? 1.1 : 0.9;
@@ -623,6 +943,28 @@ function _setupPan(canvasArea) {
     vabSetZoom(zoom * factor);
     _drawScaleTicks();
   }, { passive: false });
+}
+
+// ---------------------------------------------------------------------------
+// Panel drag (new parts from the parts panel)
+// ---------------------------------------------------------------------------
+
+/**
+ * Attach pointerdown listeners to the parts panel so clicking a part card
+ * initiates a drag.
+ * @param {HTMLElement} partsPanel
+ */
+function _setupPanelDrag(partsPanel) {
+  partsPanel.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    const card = /** @type {HTMLElement} */ (e.target)?.closest?.('.vab-part-card');
+    if (!card) return;
+    const partId = card.dataset.partId;
+    if (!partId) return;
+
+    e.preventDefault();
+    _startDrag(partId, null, e.clientX, e.clientY);
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -771,8 +1113,20 @@ export function initVabUI(container, state) {
   _buildAreaHeight = Math.max(1, window.innerHeight - VAB_TOOLBAR_HEIGHT);
   _drawScaleTicks();
 
-  // ── Canvas panning & zooming ───────────────────────────────────────────────
-  _setupPan(canvasArea);
+  // ── Rocket assembly (part graph) ──────────────────────────────────────────
+  _assembly  = createRocketAssembly();
+  _gameState = state;
+  vabSetAssembly(_assembly);
+
+  // ── Canvas interactions (pan / pick-up placed parts / right-click) ─────────
+  _setupCanvas(canvasArea);
+
+  // ── Panel drag (new parts → canvas) ───────────────────────────────────────
+  const partsPanel = /** @type {HTMLElement} */ (root.querySelector('#vab-parts-panel'));
+  _setupPanelDrag(partsPanel);
+
+  // ── Context menu ───────────────────────────────────────────────────────────
+  _initContextMenu();
 
   // ── Toolbar buttons ────────────────────────────────────────────────────────
   _bindButtons(root);

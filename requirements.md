@@ -186,7 +186,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-016: Rocket Builder — Drag & Drop & Snap System
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-015, TASK-003
 - **Description**: Implement part placement in `/src/core/rocketbuilder.js` and `/src/render/vab.js`. Clicking a part in the parts panel starts a drag. While dragging, the part follows the cursor as a labelled rectangle. Valid snap targets on already-placed parts are highlighted when the dragged part is within snapping distance (30px). Snap points are defined per part in TASK-003 — a top snap point accepts connections from a bottom snap point of a compatible part, and vice versa. Radial snap points on the sides accept radially-attachable parts. On drop near a valid snap point, the part snaps into position and a connection is registered in the rocket's part graph. Parts already placed can be picked up and moved. Right-clicking a placed part while in builder offers "Remove Part" (refunds cost). The rocket is stored as a directed graph of connected parts with each edge storing the snap point pairing.
