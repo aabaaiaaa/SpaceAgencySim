@@ -18,6 +18,8 @@ async function main() {
 
   // ── Game state ─────────────────────────────────────────────────────────
   const state = createGameState();
+  // Expose for e2e testing (Playwright can read/verify game state)
+  window.__gameState = state;
 
   // Seed the mission board with tutorial missions.
   initializeMissions(state);

@@ -466,6 +466,8 @@ export function initVabRenderer() {
 
   _partsContainer = new PIXI.Container();
   app.stage.addChild(_partsContainer);
+  // Expose for e2e testing (Playwright can query placed-part text labels)
+  window.__vabPartsContainer = _partsContainer;
 
   _snapContainer = new PIXI.Container();
   app.stage.addChild(_snapContainer);

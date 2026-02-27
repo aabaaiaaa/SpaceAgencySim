@@ -24,6 +24,9 @@ export async function initRenderer(canvas) {
     autoDensity: true,
   });
 
+  // Expose for e2e testing (Playwright can access PIXI stage via window.__pixiApp)
+  window.__pixiApp = app;
+
   console.log('[Renderer] PixiJS initialized', PIXI.VERSION);
 }
 

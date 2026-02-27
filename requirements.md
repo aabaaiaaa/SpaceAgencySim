@@ -426,7 +426,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-046: E2E — Rocket Builder Flow
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-015, TASK-016, TASK-018, TASK-019, TASK-036
 - **Description**: Write Playwright tests in `/e2e/rocketbuilder.spec.js`. Seed a fresh game state with starter parts unlocked. Tests: (1) Opening the VAB shows the parts panel with at least one part listed per category (command modules, engines, fuel tanks). (2) The scale bar is visible on the build canvas. (3) Dragging a command module part to the canvas places it (the part label is visible on the canvas). (4) Placing a fuel tank below the command module and an engine below the tank produces a connected rocket. (5) The staging panel shows the placed engine in the unstaged parts pool. (6) Moving the engine into Stage 1 shows it in the Stage 1 slot. (7) The Rocket Engineer panel shows a failing TWR when no engine is staged. (8) After a valid rocket is built (command module + tank + engine in Stage 1, TWR > 1), the Launch button becomes enabled. (9) The current cash display in the VAB updates when parts are placed (cost deducted). All tests must pass with `playwright test`.

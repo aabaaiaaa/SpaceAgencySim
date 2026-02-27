@@ -2002,6 +2002,10 @@ export function initVabUI(container, state) {
 
   // ── Staging configuration ──────────────────────────────────────────────────
   _stagingConfig = createStagingConfig();
+
+  // Expose internals for e2e testing (Playwright can verify assembly/staging state)
+  window.__vabAssembly      = _assembly;
+  window.__vabStagingConfig = _stagingConfig;
   const stagingBody = /** @type {HTMLElement} */ (root.querySelector('#vab-staging-body'));
   if (stagingBody) {
     _setupStagingDnD(stagingBody);  // Set up DnD once (event delegation survives re-renders).
