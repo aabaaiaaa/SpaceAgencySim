@@ -1,0 +1,345 @@
+/**
+ * rocketvalidator.js — Rocket Engineer validation checks.
+ *
+ * Pure core module: no DOM or canvas dependencies.
+ * Call `runValidation()` after every assembly or staging change to get an
+ * up-to-date ValidationResult that drives the Launch button and the Rocket
+ * Engineer panel UI.
+ *
+ * VALIDATION CHECKS (in order)
+ * =============================
+ *  1. Command/Computer module present          (blocking)
+ *  2. All parts connected to root              (blocking)
+ *  3. Stage 1 has at least one engine or SRB   (blocking)
+ *  4. Stage 1 TWR > 1.0                        (blocking, shows TWR value)
+ *  5. Crewed mission with only computer module (warning — non-blocking)
+ */
+
+import { getPartById } from '../data/parts.js';
+import { ActivationBehaviour } from '../data/parts.js';
+import { PartType } from './constants.js';
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+/** Standard gravity (m/s²) used for TWR calculation. */
+const G = 9.81;
+
+// ---------------------------------------------------------------------------
+// Type Definitions (JSDoc)
+// ---------------------------------------------------------------------------
+
+/**
+ * One check's result within a ValidationResult.
+ *
+ * @typedef {Object} ValidationCheck
+ * @property {string}  id        Unique check identifier (stable string key).
+ * @property {string}  label     Short heading shown in the Rocket Engineer panel.
+ * @property {boolean} pass      Whether this check passed.
+ * @property {boolean} warn      If true, a failure is a warning and does NOT block launch.
+ * @property {string}  message   Human-readable result message (1–2 sentences).
+ */
+
+/**
+ * Complete result returned by {@link runValidation}.
+ *
+ * @typedef {Object} ValidationResult
+ * @property {ValidationCheck[]} checks        All performed checks in display order.
+ * @property {boolean}           canLaunch     True when every blocking check passes.
+ * @property {number}            totalMassKg   Wet mass of the rocket in kg (dry + fuel).
+ * @property {number}            stage1Thrust  Sea-level thrust of Stage-1 engines (kN).
+ * @property {number}            twr           Stage-1 thrust-to-weight ratio.
+ */
+
+// ---------------------------------------------------------------------------
+// Mass / thrust helpers (exported for display in the UI and for tests)
+// ---------------------------------------------------------------------------
+
+/**
+ * Calculate the total wet mass of all parts in a rocket assembly.
+ *
+ * For every placed part the wet mass is: `def.mass + (def.properties.fuelMass ?? 0)`.
+ * Fuel tanks and SRBs carry `fuelMass` in their `properties` object; engines and
+ * structural parts do not, so they contribute only their dry `mass`.
+ *
+ * @param {import('./rocketbuilder.js').RocketAssembly} assembly
+ * @returns {number}  Total wet mass in kg.
+ */
+export function getTotalMass(assembly) {
+  let total = 0;
+  for (const placed of assembly.parts.values()) {
+    const def = getPartById(placed.partId);
+    if (!def) continue;
+    total += def.mass + (def.properties?.fuelMass ?? 0);
+  }
+  return total;
+}
+
+/**
+ * Calculate the combined sea-level thrust of all Stage-1 IGNITE parts.
+ *
+ * Only parts assigned to `stagingConfig.stages[0]` with
+ * `activationBehaviour === ActivationBehaviour.IGNITE` contribute.
+ *
+ * @param {import('./rocketbuilder.js').RocketAssembly}  assembly
+ * @param {import('./rocketbuilder.js').StagingConfig}   stagingConfig
+ * @returns {number}  Total sea-level thrust in kN.
+ */
+export function getStage1Thrust(assembly, stagingConfig) {
+  const stage1 = stagingConfig.stages[0];
+  if (!stage1) return 0;
+
+  let total = 0;
+  for (const id of stage1.instanceIds) {
+    const placed = assembly.parts.get(id);
+    const def = placed ? getPartById(placed.partId) : null;
+    if (!def || def.activationBehaviour !== ActivationBehaviour.IGNITE) continue;
+    total += def.properties?.thrust ?? 0;
+  }
+  return total;
+}
+
+/**
+ * Compute the Stage-1 thrust-to-weight ratio.
+ *
+ * TWR = (stage1Thrust_kN × 1000) / (totalMass_kg × G)
+ *
+ * Returns 0 when totalMass is 0 (empty assembly).
+ *
+ * @param {import('./rocketbuilder.js').RocketAssembly}  assembly
+ * @param {import('./rocketbuilder.js').StagingConfig}   stagingConfig
+ * @returns {number}  Dimensionless TWR value.
+ */
+export function calculateTWR(assembly, stagingConfig) {
+  const totalMass = getTotalMass(assembly);
+  if (totalMass === 0) return 0;
+  const thrust = getStage1Thrust(assembly, stagingConfig);
+  return (thrust * 1000) / (totalMass * G);
+}
+
+// ---------------------------------------------------------------------------
+// Private helper — undirected connectivity BFS
+// ---------------------------------------------------------------------------
+
+/**
+ * Build an undirected adjacency map from the assembly's connection list.
+ *
+ * Every connection edge `fromInstanceId ↔ toInstanceId` is stored in both
+ * directions so the BFS can traverse the graph regardless of how the edge
+ * was registered.
+ *
+ * @param {import('./rocketbuilder.js').RocketAssembly} assembly
+ * @returns {Map<string, Set<string>>}
+ */
+function _buildAdjacency(assembly) {
+  /** @type {Map<string, Set<string>>} */
+  const adj = new Map();
+
+  // Pre-populate every known node with an empty neighbour set.
+  for (const id of assembly.parts.keys()) {
+    adj.set(id, new Set());
+  }
+
+  for (const conn of assembly.connections) {
+    adj.get(conn.fromInstanceId)?.add(conn.toInstanceId);
+    adj.get(conn.toInstanceId)?.add(conn.fromInstanceId);
+  }
+
+  return adj;
+}
+
+/**
+ * BFS from `startId` through `adjacency`.
+ *
+ * @param {string}                         startId
+ * @param {Map<string, Set<string>>}       adjacency
+ * @returns {Set<string>}  IDs of all reachable nodes (including startId).
+ */
+function _bfsReachable(startId, adjacency) {
+  const visited = new Set([startId]);
+  const queue   = [startId];
+
+  while (queue.length > 0) {
+    const current = /** @type {string} */ (queue.shift());
+    for (const neighbour of (adjacency.get(current) ?? [])) {
+      if (!visited.has(neighbour)) {
+        visited.add(neighbour);
+        queue.push(neighbour);
+      }
+    }
+  }
+
+  return visited;
+}
+
+// ---------------------------------------------------------------------------
+// Main export
+// ---------------------------------------------------------------------------
+
+/**
+ * Run all validation checks against the current rocket assembly and staging
+ * configuration, returning a {@link ValidationResult}.
+ *
+ * This function has no side-effects and may be called as frequently as needed
+ * (e.g. after every part add/remove or staging change).
+ *
+ * @param {import('./rocketbuilder.js').RocketAssembly}  assembly
+ * @param {import('./rocketbuilder.js').StagingConfig}   stagingConfig
+ * @param {import('./gameState.js').GameState}            gameState
+ * @returns {ValidationResult}
+ */
+export function runValidation(assembly, stagingConfig, gameState) {
+  /** @type {ValidationCheck[]} */
+  const checks = [];
+
+  // ── Pre-scan assembly for part types ──────────────────────────────────────
+  let hasCrewedModule   = false; // COMMAND_MODULE with seats > 0
+  let hasComputerModule = false; // COMPUTER_MODULE
+  let commandModuleId   = null;  // First COMMAND_MODULE instance ID (root for connectivity)
+  let computerModuleId  = null;  // First COMPUTER_MODULE instance ID (fallback root)
+
+  for (const placed of assembly.parts.values()) {
+    const def = getPartById(placed.partId);
+    if (!def) continue;
+
+    if (def.type === PartType.COMMAND_MODULE) {
+      hasCrewedModule = true;
+      if (commandModuleId === null) commandModuleId = placed.instanceId;
+    }
+    if (def.type === PartType.COMPUTER_MODULE) {
+      hasComputerModule = true;
+      if (computerModuleId === null) computerModuleId = placed.instanceId;
+    }
+  }
+
+  const hasCommandModule = hasCrewedModule || hasComputerModule;
+  // True when the assembly has a computer module but NO crewed command module.
+  const onlyComputer = hasComputerModule && !hasCrewedModule;
+
+  // ── CHECK 1: Command / Computer module present ────────────────────────────
+  checks.push({
+    id:      'command-module',
+    label:   'Command Module',
+    pass:    hasCommandModule,
+    warn:    false,
+    message: hasCommandModule
+      ? (hasCrewedModule
+          ? 'Crewed command module present.'
+          : 'Computer (probe) module present.')
+      : 'No command or computer module in assembly.',
+  });
+
+  // ── CHECK 2: All parts connected to root (no floating parts) ─────────────
+  const allIds     = new Set(assembly.parts.keys());
+  const totalParts = allIds.size;
+  let check2Pass   = false;
+  let check2Msg    = '';
+
+  if (totalParts === 0) {
+    check2Pass = false;
+    check2Msg  = 'Assembly is empty — add parts to build a rocket.';
+  } else if (totalParts === 1) {
+    // A single part is trivially connected to itself.
+    check2Pass = true;
+    check2Msg  = '1 part in assembly — no connections required.';
+  } else {
+    // Pick root: prefer COMMAND_MODULE, fallback COMPUTER_MODULE, then first part.
+    const rootId = commandModuleId ?? computerModuleId ?? [...allIds][0];
+
+    const adj      = _buildAdjacency(assembly);
+    const reachable = _bfsReachable(rootId, adj);
+
+    const floatingCount = totalParts - reachable.size;
+    if (floatingCount === 0) {
+      check2Pass = true;
+      check2Msg  = `All ${totalParts} parts connected to root.`;
+    } else {
+      check2Pass = false;
+      check2Msg  = `${floatingCount} floating part${floatingCount > 1 ? 's' : ''} not connected to root.`;
+    }
+  }
+
+  checks.push({
+    id:      'connectivity',
+    label:   'Part Connectivity',
+    pass:    check2Pass,
+    warn:    false,
+    message: check2Msg,
+  });
+
+  // ── CHECK 3: Stage 1 has at least one engine or SRB ──────────────────────
+  const stage1 = stagingConfig.stages[0];
+  const hasIgniteInStage1 = stage1
+    ? stage1.instanceIds.some((id) => {
+        const placed = assembly.parts.get(id);
+        const def    = placed ? getPartById(placed.partId) : null;
+        return def?.activationBehaviour === ActivationBehaviour.IGNITE;
+      })
+    : false;
+
+  checks.push({
+    id:      'stage1-engine',
+    label:   'Stage 1 Engine',
+    pass:    hasIgniteInStage1,
+    warn:    false,
+    message: hasIgniteInStage1
+      ? 'Stage 1 has at least one engine or SRB.'
+      : 'Stage 1 has no engine or SRB — assign one in the Staging panel.',
+  });
+
+  // ── CHECK 4: Stage 1 TWR > 1.0 ────────────────────────────────────────────
+  const totalMassKg  = getTotalMass(assembly);
+  const stage1Thrust = getStage1Thrust(assembly, stagingConfig); // kN
+  const twr          = calculateTWR(assembly, stagingConfig);
+  const twrPass      = twr > 1.0;
+
+  let twrMsg;
+  if (totalMassKg === 0) {
+    twrMsg = 'Assembly is empty.';
+  } else if (stage1Thrust === 0) {
+    twrMsg = 'TWR: 0.00 — no Stage 1 thrust.';
+  } else {
+    const twrLabel = twr.toFixed(2);
+    twrMsg = twrPass
+      ? `TWR: ${twrLabel} — sufficient to lift off.`
+      : `TWR: ${twrLabel} — too low (need > 1.0 to lift off).`;
+  }
+
+  checks.push({
+    id:      'twr',
+    label:   'Thrust-to-Weight (Stage 1)',
+    pass:    twrPass,
+    warn:    false,
+    message: twrMsg,
+  });
+
+  // ── WARNING 5: Crewed mission accepted but only computer module present ────
+  // This is informational only and does not block launch.
+  if (hasCommandModule) {
+    const hasAcceptedCrewedMission = gameState.missions.accepted.some(
+      (m) => (m.requirements?.minCrewCount ?? 0) > 0,
+    );
+
+    if (hasAcceptedCrewedMission && onlyComputer) {
+      checks.push({
+        id:      'crew-module-warn',
+        label:   'Crew Warning',
+        pass:    false,
+        warn:    true, // non-blocking
+        message: 'An accepted mission requires crew, but this rocket has no crewed command module.',
+      });
+    }
+  }
+
+  // A launch is possible when all blocking checks pass.
+  const canLaunch = checks.every((c) => c.pass || c.warn);
+
+  return {
+    checks,
+    canLaunch,
+    totalMassKg,
+    stage1Thrust,
+    twr,
+  };
+}

@@ -19,6 +19,8 @@
 
 import { PARTS, getPartById } from '../data/parts.js';
 import { PartType } from '../core/constants.js';
+import { runValidation } from '../core/rocketvalidator.js';
+import { getActiveCrew } from '../core/crew.js';
 import {
   VAB_TOOLBAR_HEIGHT,
   VAB_PARTS_PANEL_WIDTH,
@@ -82,6 +84,9 @@ let _stagingConfig = null;
 
 /** True while a flight is in progress — enables Spacebar staging. */
 let _flightActive = false;
+
+/** Result of the last validation run, or null before the first run. @type {import('../core/rocketvalidator.js').ValidationResult | null} */
+let _lastValidation = null;
 
 // ---------------------------------------------------------------------------
 // Part-type display helpers
@@ -664,6 +669,195 @@ const VAB_CSS = `
   background: rgba(50, 8, 8, 0.8);
   color: #ffb0b0;
 }
+
+/* ── Rocket Engineer validation panel ───────────────────────────────── */
+.vab-val-stats {
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid #0e1e30;
+}
+
+.vab-val-stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 10px;
+  padding: 3px 0;
+}
+
+.vab-val-stat-label { color: #3a6080; }
+.vab-val-stat-value { color: #88b8d8; font-weight: 700; letter-spacing: .02em; }
+.vab-val-stat-good  { color: #42cc74 !important; }
+.vab-val-stat-bad   { color: #e06060 !important; }
+
+.vab-val-checks {
+  padding: 4px 12px;
+}
+
+.vab-val-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid #0a1826;
+}
+.vab-val-check:last-child { border-bottom: none; }
+
+.vab-val-icon {
+  flex-shrink: 0;
+  font-size: 12px;
+  width: 14px;
+  text-align: center;
+  margin-top: 1px;
+}
+.vab-val-icon-pass { color: #42cc74; }
+.vab-val-icon-warn { color: #d0a030; }
+.vab-val-icon-fail { color: #e06060; }
+
+.vab-val-text  { flex: 1; min-width: 0; }
+
+.vab-val-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .10em;
+  color: #4878a0;
+  margin-bottom: 2px;
+}
+
+.vab-val-msg {
+  font-size: 10px;
+  line-height: 1.45;
+  color: #4a7898;
+}
+.vab-val-msg-pass { color: #3a9858; }
+.vab-val-msg-warn { color: #b07820; }
+.vab-val-msg-fail { color: #a84040; }
+
+.vab-val-status {
+  margin: 8px 12px 10px;
+  padding: 7px 10px;
+  border-radius: 2px;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: .04em;
+}
+.vab-val-status-ready   { background: rgba(4,30,12,0.7); border: 1px solid #1a4c26; color: #42cc74; }
+.vab-val-status-blocked { background: rgba(30,4,4,0.7);  border: 1px solid #4c1a1a; color: #d06060; }
+
+/* ── Crew selection dialog ───────────────────────────────────────────── */
+#vab-crew-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.72);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#vab-crew-dialog {
+  background: rgba(4, 8, 22, 0.99);
+  border: 1px solid #1e3a5c;
+  border-radius: 3px;
+  box-shadow: 0 8px 48px rgba(0,0,0,.9);
+  width: 340px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.vab-crew-dlg-hdr {
+  padding: 12px 16px;
+  border-bottom: 1px solid #0e1e30;
+  font-size: 12px;
+  font-weight: 700;
+  color: #88b4d0;
+  flex-shrink: 0;
+}
+
+.vab-crew-dlg-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+  scrollbar-width: thin;
+  scrollbar-color: #152a44 transparent;
+}
+.vab-crew-dlg-body::-webkit-scrollbar { width: 4px; }
+.vab-crew-dlg-body::-webkit-scrollbar-thumb { background: #152a44; border-radius: 2px; }
+
+.vab-crew-seat-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid #0a1826;
+}
+.vab-crew-seat-row:last-child { border-bottom: none; }
+
+.vab-crew-seat-label {
+  font-size: 10px;
+  color: #5a88a8;
+  flex-shrink: 0;
+  min-width: 50px;
+}
+
+.vab-crew-seat-select {
+  flex: 1;
+  background: rgba(8,18,40,0.9);
+  border: 1px solid #1a3050;
+  color: #a0c4e0;
+  font-family: inherit;
+  font-size: 10px;
+  padding: 4px 6px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+.vab-crew-seat-select:focus { outline: none; border-color: #3470a8; }
+
+.vab-crew-dlg-footer {
+  display: flex;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid #0e1e30;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+/* ── Launch banner ───────────────────────────────────────────────────── */
+#vab-launch-banner {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.85);
+  z-index: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.vab-launch-msg {
+  text-align: center;
+  padding: 32px 40px;
+  background: rgba(4,8,22,0.98);
+  border: 1px solid #1e3a5c;
+  border-radius: 3px;
+  box-shadow: 0 8px 48px rgba(0,0,0,.9);
+}
+
+.vab-launch-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #42cc74;
+  letter-spacing: .06em;
+  margin-bottom: 8px;
+}
+.vab-launch-sub {
+  font-size: 11px;
+  color: #3a6080;
+  line-height: 1.7;
+}
 `;
 
 // ---------------------------------------------------------------------------
@@ -1152,7 +1346,10 @@ function _bindButtons(root) {
   root.querySelector('#vab-btn-engineer')?.addEventListener('click', () => {
     const willOpen = engineerPanel.hasAttribute('hidden');
     _closeAllPanels();
-    if (willOpen) engineerPanel.removeAttribute('hidden');
+    if (willOpen) {
+      engineerPanel.removeAttribute('hidden');
+      _renderEngineerPanel(); // Populate with current validation result.
+    }
   });
 
   root.querySelector('#vab-engineer-close')?.addEventListener('click', () => {
@@ -1173,9 +1370,10 @@ function _bindButtons(root) {
     stagingPanel?.setAttribute('hidden', '');
   });
 
-  // ── Launch (disabled; wired in later flight tasks) ───────────────────────
+  // ── Launch — enabled only when validation passes ──────────────────────────
   root.querySelector('#vab-btn-launch')?.addEventListener('click', () => {
-    console.log('[VAB] Launch requested — not yet implemented');
+    if (!_lastValidation?.canLaunch) return; // Guard: button should be disabled anyway.
+    _handleLaunchClicked();
   });
 }
 
@@ -1191,6 +1389,7 @@ function _syncAndRenderStaging() {
   if (_assembly && _stagingConfig) {
     syncStagingWithAssembly(_assembly, _stagingConfig);
     _renderStagingPanel();
+    _runAndRenderValidation();
   }
 }
 
@@ -1393,6 +1592,292 @@ function _setupStagingDnD(panelBody) {
     }
 
     _renderStagingPanel();
+    _runAndRenderValidation(); // Stage assignment affects TWR and Stage 1 engine checks.
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Rocket Engineer validation panel
+// ---------------------------------------------------------------------------
+
+/**
+ * Populate the Rocket Engineer side panel with the latest validation result.
+ * Call after `_runAndRenderValidation()` or when the panel is opened.
+ */
+function _renderEngineerPanel() {
+  const body = /** @type {HTMLElement|null} */ (document.getElementById('vab-engineer-body'));
+  if (!body) return;
+
+  if (!_assembly || !_stagingConfig || !_gameState) {
+    body.innerHTML = '<p class="vab-side-empty">No rocket assembly loaded.</p>';
+    return;
+  }
+
+  const result = _lastValidation ?? runValidation(_assembly, _stagingConfig, _gameState);
+  const html   = [];
+
+  // ── Stats ─────────────────────────────────────────────────────────────────
+  html.push('<div class="vab-val-stats">');
+  html.push(
+    `<div class="vab-val-stat-row">` +
+      `<span class="vab-val-stat-label">Total Mass</span>` +
+      `<span class="vab-val-stat-value">${result.totalMassKg.toLocaleString('en-US')} kg</span>` +
+    `</div>`,
+  );
+  html.push(
+    `<div class="vab-val-stat-row">` +
+      `<span class="vab-val-stat-label">Stage 1 Thrust</span>` +
+      `<span class="vab-val-stat-value">${result.stage1Thrust.toFixed(0)} kN</span>` +
+    `</div>`,
+  );
+  const twrGoodClass = result.twr > 1.0 ? 'vab-val-stat-good' : 'vab-val-stat-bad';
+  html.push(
+    `<div class="vab-val-stat-row">` +
+      `<span class="vab-val-stat-label">TWR (Stage 1)</span>` +
+      `<span class="vab-val-stat-value ${twrGoodClass}">${result.twr.toFixed(2)}</span>` +
+    `</div>`,
+  );
+  html.push('</div>'); // stats
+
+  // ── Checks ────────────────────────────────────────────────────────────────
+  html.push('<div class="vab-val-checks">');
+  for (const check of result.checks) {
+    let iconClass, iconChar, msgClass;
+    if (check.pass) {
+      iconClass = 'vab-val-icon-pass';
+      iconChar  = '&#x2713;'; // ✓
+      msgClass  = 'vab-val-msg-pass';
+    } else if (check.warn) {
+      iconClass = 'vab-val-icon-warn';
+      iconChar  = '&#x26a0;'; // ⚠
+      msgClass  = 'vab-val-msg-warn';
+    } else {
+      iconClass = 'vab-val-icon-fail';
+      iconChar  = '&#x2717;'; // ✗
+      msgClass  = 'vab-val-msg-fail';
+    }
+    html.push(
+      `<div class="vab-val-check">` +
+        `<div class="vab-val-icon ${iconClass}">${iconChar}</div>` +
+        `<div class="vab-val-text">` +
+          `<div class="vab-val-label">${check.label}</div>` +
+          `<div class="vab-val-msg ${msgClass}">${check.message}</div>` +
+        `</div>` +
+      `</div>`,
+    );
+  }
+  html.push('</div>'); // checks
+
+  // ── Launch status summary ─────────────────────────────────────────────────
+  const statusClass = result.canLaunch ? 'vab-val-status-ready' : 'vab-val-status-blocked';
+  const statusText  = result.canLaunch ? 'Ready for launch.' : 'Resolve failures to enable launch.';
+  html.push(`<div class="vab-val-status ${statusClass}">${statusText}</div>`);
+
+  body.innerHTML = html.join('');
+}
+
+/**
+ * Run the rocket validation, cache the result, update the Launch button, and
+ * refresh the Rocket Engineer panel if it is currently visible.
+ *
+ * Call this after every assembly change (add / remove part) or staging change.
+ */
+function _runAndRenderValidation() {
+  if (!_assembly || !_stagingConfig || !_gameState) {
+    vabSetLaunchEnabled(false);
+    return;
+  }
+
+  _lastValidation = runValidation(_assembly, _stagingConfig, _gameState);
+  vabSetLaunchEnabled(_lastValidation.canLaunch);
+
+  // Refresh the Rocket Engineer panel only when it is open (no wasted work).
+  const panel = document.getElementById('vab-engineer-panel');
+  if (panel && !panel.hasAttribute('hidden')) {
+    _renderEngineerPanel();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Launch sequence — crew dialog & flight state
+// ---------------------------------------------------------------------------
+
+/**
+ * Entry point called when the enabled Launch button is clicked.
+ * If the rocket has crewed command modules, shows the crew assignment dialog.
+ * Otherwise launches uncrewed immediately.
+ */
+function _handleLaunchClicked() {
+  if (!_assembly || !_gameState || !_lastValidation?.canLaunch) return;
+
+  // Count total available crew seats across all crewed command modules.
+  let totalSeats = 0;
+  for (const placed of _assembly.parts.values()) {
+    const def = getPartById(placed.partId);
+    if (def?.type === PartType.COMMAND_MODULE) {
+      totalSeats += def.properties?.seats ?? 0;
+    }
+  }
+
+  if (totalSeats > 0) {
+    _showCrewDialog(totalSeats);
+  } else {
+    // Uncrewed rocket — no dialog needed.
+    _doLaunch([]);
+  }
+}
+
+/**
+ * Show the crew assignment modal.
+ * Each seat gets a select dropdown listing all active crew members.
+ * Duplicate selections across seats are ignored on confirm.
+ *
+ * @param {number} totalSeats  Number of seats to display.
+ */
+function _showCrewDialog(totalSeats) {
+  if (!_gameState) return;
+
+  const activeCrew = getActiveCrew(_gameState);
+
+  // Build crew option HTML (reused for every seat select).
+  const crewOpts = activeCrew.map(
+    (c) => `<option value="${c.id}">${c.name}</option>`,
+  ).join('');
+
+  // Build one row per seat.
+  const seatRows = [];
+  for (let i = 0; i < totalSeats; i++) {
+    seatRows.push(
+      `<div class="vab-crew-seat-row">` +
+        `<span class="vab-crew-seat-label">Seat ${i + 1}</span>` +
+        `<select class="vab-crew-seat-select" data-seat="${i}">` +
+          `<option value="">— Empty —</option>` +
+          crewOpts +
+        `</select>` +
+      `</div>`,
+    );
+  }
+
+  const infoMsg = activeCrew.length === 0
+    ? `<p style="font-size:10px;color:#c07030;margin-bottom:10px;line-height:1.6;">` +
+      `No active crew to assign.<br>Seats will launch empty.</p>`
+    : `<p style="font-size:10px;color:#3a6080;margin-bottom:12px;line-height:1.6;">` +
+      `Assign crew to seats before launch.<br>Seats may be left empty.</p>`;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'vab-crew-overlay';
+  overlay.innerHTML =
+    `<div id="vab-crew-dialog">` +
+      `<div class="vab-crew-dlg-hdr">Crew Assignment</div>` +
+      `<div class="vab-crew-dlg-body">` +
+        infoMsg +
+        seatRows.join('') +
+      `</div>` +
+      `<div class="vab-crew-dlg-footer">` +
+        `<button class="vab-btn" id="vab-crew-cancel" type="button">Cancel</button>` +
+        `<button class="vab-btn vab-btn-launch" id="vab-crew-confirm" type="button">Launch</button>` +
+      `</div>` +
+    `</div>`;
+
+  document.body.appendChild(overlay);
+
+  // Close on backdrop click.
+  overlay.addEventListener('pointerdown', (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+
+  overlay.querySelector('#vab-crew-cancel')?.addEventListener('click', () => {
+    overlay.remove();
+  });
+
+  overlay.querySelector('#vab-crew-confirm')?.addEventListener('click', () => {
+    // Collect unique, non-empty crew IDs from the seat selects.
+    const selects  = overlay.querySelectorAll('.vab-crew-seat-select');
+    const crewIds  = [];
+    const seen     = new Set();
+    for (const sel of selects) {
+      const id = /** @type {HTMLSelectElement} */ (sel).value;
+      if (id && !seen.has(id)) {
+        crewIds.push(id);
+        seen.add(id);
+      }
+    }
+    overlay.remove();
+    _doLaunch(crewIds);
+  });
+}
+
+/**
+ * Create the initial FlightState, store it in game state, and transition to
+ * the flight scene.  The actual flight renderer is implemented in TASK-027;
+ * for now a transient overlay confirms the launch.
+ *
+ * @param {string[]} crewIds  IDs of crew members assigned to this launch.
+ */
+function _doLaunch(crewIds) {
+  if (!_gameState || !_assembly) return;
+
+  // Associate with the first accepted mission if one exists.
+  const missionId = _gameState.missions.accepted[0]?.id ?? '';
+
+  // Sum up initial fuel load across all parts.
+  let totalFuel = 0;
+  for (const placed of _assembly.parts.values()) {
+    const def = getPartById(placed.partId);
+    if (def) totalFuel += def.properties?.fuelMass ?? 0;
+  }
+
+  // Write the live flight state into game state.
+  _gameState.currentFlight = {
+    missionId,
+    rocketId:        'vab-session', // Saved rocket designs added in a later task.
+    crewIds,
+    timeElapsed:     0,
+    altitude:        0,
+    velocity:        0,
+    fuelRemaining:   totalFuel,
+    deltaVRemaining: 0,
+    events:          [],
+    aborted:         false,
+  };
+
+  console.log('[VAB] Launch initiated', {
+    missionId:    missionId || '(none)',
+    crewCount:    crewIds.length,
+    crewIds,
+    totalMassKg:  _lastValidation?.totalMassKg ?? 0,
+    stage1Thrust: _lastValidation?.stage1Thrust ?? 0,
+    twr:          (_lastValidation?.twr ?? 0).toFixed(2),
+  });
+
+  // TODO (TASK-027): Transition to the flight scene renderer.
+  _showLaunchInitiatedOverlay();
+}
+
+/**
+ * Display a temporary "launch initiated" overlay until the flight scene
+ * renderer is implemented in TASK-027.
+ */
+function _showLaunchInitiatedOverlay() {
+  const banner = document.createElement('div');
+  banner.id = 'vab-launch-banner';
+  banner.innerHTML =
+    `<div class="vab-launch-msg">` +
+      `<div class="vab-launch-title">Launch Initiated</div>` +
+      `<div class="vab-launch-sub">` +
+        `Crew aboard: ${_gameState?.currentFlight?.crewIds?.length ?? 0}<br>` +
+        `TWR: ${(_lastValidation?.twr ?? 0).toFixed(2)}<br>` +
+        `<br>Flight scene coming in a later build.` +
+      `</div>` +
+      `<button class="vab-btn" id="vab-launch-dismiss" type="button" ` +
+              `style="margin-top:14px">Return to VAB</button>` +
+    `</div>`;
+
+  document.body.appendChild(banner);
+
+  banner.querySelector('#vab-launch-dismiss')?.addEventListener('click', () => {
+    if (_gameState) _gameState.currentFlight = null;
+    banner.remove();
   });
 }
 
@@ -1480,17 +1965,14 @@ export function initVabUI(container, state) {
         <div class="vab-side-body vab-staging-body" id="vab-staging-body"></div>
       </div>
 
-      <!-- Rocket Engineer side panel (stub — full logic in TASK-019) -->
+      <!-- Rocket Engineer side panel -->
       <div class="vab-side-panel" id="vab-engineer-panel" hidden>
         <div class="vab-side-hdr">
           <span>Rocket Engineer</span>
           <button class="vab-side-close" id="vab-engineer-close" type="button">&#x2715;</button>
         </div>
-        <div class="vab-side-body">
-          <p class="vab-side-empty">
-            Place parts on the build canvas<br>to validate your rocket.
-          </p>
-          <div id="vab-validation-results"></div>
+        <div class="vab-side-body" id="vab-engineer-body">
+          <p class="vab-side-empty">Add parts to validate your rocket.</p>
         </div>
       </div>
 
@@ -1555,6 +2037,9 @@ export function initVabUI(container, state) {
 
   // ── Toolbar buttons ────────────────────────────────────────────────────────
   _bindButtons(root);
+
+  // ── Initial validation run (empty assembly — all checks fail) ─────────────
+  _runAndRenderValidation();
 
   console.log('[VAB UI] Initialized');
 }

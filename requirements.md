@@ -210,7 +210,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-019: Rocket Builder — Validation & Launch
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-018, TASK-005
 - **Description**: Implement the Rocket Engineer validation panel in `/src/core/rocketvalidator.js`. Checks performed: (1) At least one command module (crewed or computer) is connected. (2) All parts are connected to the root command module via the part graph (no floating parts). (3) At least one engine or SRB is in Stage 1. (4) Stage 1 TWR > 1.0: calculate total mass of all parts (dry mass + fuel mass) and total Stage 1 thrust, divide to get TWR. Display the TWR value numerically. (5) Warn (not block) if a crewed mission is accepted but only a computer module is present. Display each check as pass/fail with a short message. The Launch button is enabled only when checks 1–4 pass. On launch, if the rocket has any crewed command modules with empty seats, show a crew selection dialog listing available active crew. Each seat can be assigned an astronaut or left empty. Confirm launches the flight scene.
