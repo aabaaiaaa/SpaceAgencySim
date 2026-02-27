@@ -218,6 +218,7 @@ export function completeMission(state, id) {
 
   const [mission] = state.missions.accepted.splice(idx, 1);
   mission.status = MissionStatus.COMPLETED;
+  mission.completedDate = new Date().toISOString();
   state.missions.completed.push(mission);
 
   // Award the cash reward.

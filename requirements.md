@@ -170,7 +170,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-014: Mission Control UI
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-012, TASK-008
 - **Description**: UI screen for the Mission Control Centre building. Three tabs: Available, Accepted, Completed. Available tab lists all missions with status 'available': shows title, description, reward, and an "Accept" button. During the early tutorial (missions 1–4), only one mission can be accepted at a time — the Accept button is disabled for other missions if one is already active. After mission 4 is completed, multiple missions can be accepted simultaneously. Accepted tab lists currently accepted missions with their objectives, showing each objective description and a checkmark or pending indicator. Completed tab lists all completed missions with date completed and reward received. Mission unlock state is recalculated each time this screen is opened.

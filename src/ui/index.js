@@ -8,6 +8,7 @@ import { initMainMenu } from './mainmenu.js';
 import { initHubUI, destroyHubUI } from './hub.js';
 import { initVabUI } from './vab.js';
 import { initCrewAdminUI, destroyCrewAdminUI } from './crewAdmin.js';
+import { initMissionControlUI, destroyMissionControlUI } from './missionControl.js';
 import { initTopBar, destroyTopBar } from './topbar.js';
 import { showVabScene } from '../render/vab.js';
 import { showHubScene } from '../render/hub.js';
@@ -28,6 +29,12 @@ let _vabInitialized = false;
  * Used to guard against double-mounting.
  */
 let _crewAdminOpen = false;
+
+/**
+ * True while the Mission Control screen is open.
+ * Used to guard against double-mounting.
+ */
+let _missionControlOpen = false;
 
 /**
  * The #ui-overlay container, stored so _handleExitToMenu can re-mount the
@@ -68,8 +75,9 @@ export function showMainMenu(container, onGameReady) {
  */
 export function initUI(container, state) {
   _container = container;
-  _vabInitialized = false;
-  _crewAdminOpen  = false;
+  _vabInitialized     = false;
+  _crewAdminOpen      = false;
+  _missionControlOpen = false;
 
   // Mount the persistent top bar — visible on all in-game screens.
   initTopBar(container, state, {
@@ -98,6 +106,10 @@ function _handleExitToMenu() {
   if (_crewAdminOpen) {
     destroyCrewAdminUI();
     _crewAdminOpen = false;
+  }
+  if (_missionControlOpen) {
+    destroyMissionControlUI();
+    _missionControlOpen = false;
   }
 
   // Wipe any remaining screen overlays from the container.
@@ -169,6 +181,29 @@ function _handleNavigation(container, state, destination) {
     return;
   }
 
-  // Other building screens are not yet implemented (TASK-014, etc.).
+  if (destination === 'mission-control') {
+    // Tear down the hub overlay and show the Mission Control screen.
+    destroyHubUI();
+
+    if (!_missionControlOpen) {
+      initMissionControlUI(container, state, {
+        onBack: () => {
+          // Mission Control has already destroyed itself; re-show the hub.
+          _missionControlOpen = false;
+          showHubScene();
+          initHubUI(container, state, (dest) => {
+            _handleNavigation(container, state, dest);
+          });
+          console.log('[UI] Returned to hub from Mission Control');
+        },
+      });
+      _missionControlOpen = true;
+    }
+
+    console.log('[UI] Navigated to Mission Control');
+    return;
+  }
+
+  // Other building screens are not yet implemented.
   console.log(`[UI] Navigation to '${destination}' is not yet implemented.`);
 }
