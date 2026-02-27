@@ -434,7 +434,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-047: E2E — Flight Launch & Basic Flight
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-019, TASK-027, TASK-028, TASK-036
 - **Description**: Write Playwright tests in `/e2e/flight.spec.js`. Seed a game state with a pre-built valid rocket (command module + medium tank + Spark engine, engine in Stage 1). Tests: (1) Clicking Launch from the VAB loads the flight scene. (2) The flight HUD is visible with altitude, vertical speed, and throttle elements present. (3) At launch (before any input), the rocket sits on the launch pad with altitude near 0m. (4) Pressing spacebar activates Stage 1 — the altitude reading in the HUD begins increasing within 2 seconds. (5) The throttle display reflects keyboard throttle changes (W key increases, S key decreases). (6) The HUD mission objectives panel is visible and shows the "First Flight" objective (if it was accepted). (7) Opening the in-flight menu (hamburger button) shows Save Game, Load Game, and Return to Space Agency options. (8) Clicking "Return to Space Agency" from the menu brings up the post-flight summary screen. All tests must pass with `playwright test`.

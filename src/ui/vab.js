@@ -64,6 +64,7 @@ import {
   saveGame,
   SAVE_SLOT_COUNT,
 } from '../core/saveload.js';
+import { startFlightScene } from './flightController.js';
 
 // ---------------------------------------------------------------------------
 // Module-level state (VAB session)
@@ -74,6 +75,9 @@ let _assembly = null;
 
 /** Reference to game state for cost refunds and cash updates. @type {import('../core/gameState.js').GameState | null} */
 let _gameState = null;
+
+/** The #ui-overlay container stored so _doLaunch can pass it to the flight scene. @type {HTMLElement | null} */
+let _container = null;
 
 /**
  * Active drag operation, or null when nothing is being dragged.
@@ -2360,8 +2364,27 @@ function _doLaunch(crewIds) {
     twr:          (_lastValidation?.twr ?? 0).toFixed(2),
   });
 
-  // TODO (TASK-027): Transition to the flight scene renderer.
-  _showLaunchInitiatedOverlay();
+  // Hide the VAB DOM overlay so it does not sit on top of the flight scene.
+  const vabRoot = document.getElementById('vab-root');
+  if (vabRoot) vabRoot.style.display = 'none';
+
+  // Transition to the flight scene.
+  const container = _container ?? document.getElementById('ui-overlay');
+  if (container) {
+    startFlightScene(
+      container,
+      _gameState,
+      _assembly,
+      _stagingConfig,
+      _gameState.currentFlight,
+      () => {
+        // Flight ended — restore the #vab-root and invoke the back callback
+        // (which navigates to the hub).
+        if (vabRoot) vabRoot.style.display = '';
+        _onBack?.();
+      },
+    );
+  }
 }
 
 /**
@@ -2402,7 +2425,8 @@ function _showLaunchInitiatedOverlay() {
  * @param {import('../core/gameState.js').GameState} state
  */
 export function initVabUI(container, state, { onBack } = {}) {
-  _onBack = onBack ?? null;
+  _onBack    = onBack ?? null;
+  _container = container;
 
   // Inject styles once.
   if (!document.getElementById('vab-css')) {
