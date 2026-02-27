@@ -849,7 +849,7 @@ function _emitTrailSegments(ps, assembly, density) {
     if (!isEngine) continue;
 
     const isFiring  = ps.firingEngines && ps.firingEngines.has(instanceId);
-    const effectiveThrottle = isSRB ? (isFiring ? 1 : 0) : throttle;
+    const effectiveThrottle = isFiring ? (isSRB ? 1 : throttle) : 0;
 
     // Only emit if firing OR always emit residual smoke (heat trail) regardless.
     if (!isFiring && effectiveThrottle === 0) {
