@@ -88,7 +88,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-006: Save/Load System
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-002
 - **Description**: Implement save/load in `/src/core/saveload.js`. Support up to 5 named save slots in localStorage (keys: `spaceAgencySave_0` through `spaceAgencySave_4`). Each slot stores full serialised game state as JSON. Functions: `saveGame(slotIndex, saveName)`, `loadGame(slotIndex)` returns full state object, `deleteSave(slotIndex)`, `listSaves()` returns array of slot summaries. Each slot summary includes: saveName, timestamp, missionsCompleted, money, acceptedMissionCount, totalFlights, crewCount, crewKIA, playTimeSeconds. Also implement `exportSave(slotIndex)` (download JSON file) and `importSave(jsonString, slotIndex)` (parse and validate before writing). Track `playTimeSeconds` by recording session start time and accumulating on each save.
