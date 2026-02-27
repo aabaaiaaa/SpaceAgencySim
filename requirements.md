@@ -29,7 +29,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-004: Initial Parts Library
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-003
 - **Description**: Define all starting parts in `/src/data/parts.js` using the schema from TASK-003. All parts render as labelled rectangles until artwork is provided. Part list and properties:

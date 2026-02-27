@@ -33,7 +33,7 @@
  * 40 px wide.  Use this as a guide when sizing new parts.
  */
 
-import { PartType } from '../core/constants.js';
+import { PartType, FuelType } from '../core/constants.js';
 
 // ---------------------------------------------------------------------------
 // Activation Behaviour Enum
@@ -233,9 +233,640 @@ export function makeSnapPoint(side, offsetX, offsetY, accepts) {
  * @type {PartDef[]}
  */
 export const PARTS = [
-  // Parts are populated in TASK-004.
-  // This array is intentionally empty here so the schema and utilities can be
-  // tested and imported before the full catalog is ready.
+
+  // =========================================================================
+  // COMMAND MODULES (crewed)
+  // =========================================================================
+
+  /**
+   * Mk1 Command Module — single-seat crewed capsule.
+   * Top is the nose (parachute may mount here); structural stack attaches below.
+   * Built-in RCS lets the player orient the capsule for re-entry.
+   * Ejector seat fires the crew clear in an emergency.
+   */
+  {
+    id: 'cmd-mk1',
+    name: 'Mk1 Command Module',
+    type: PartType.COMMAND_MODULE,
+    mass: 840,
+    cost: 8_000,
+    width: 40,   // 2 m diameter
+    height: 40,  // 2 m tall
+    snapPoints: [
+      // Nose — only a parachute may sit here.
+      makeSnapPoint('top',    0, -20, [PartType.PARACHUTE]),
+      // Underside — tanks, decouplers, etc. attach below.
+      makeSnapPoint('bottom', 0,  20, STACK_TYPES),
+      // Side radial sockets — parachutes, service modules, etc.
+      makeSnapPoint('left',  -20,  0, RADIAL_TYPES),
+      makeSnapPoint('right',  20,  0, RADIAL_TYPES),
+    ],
+    animationStates: ['idle', 'ejecting'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.EJECT,
+    properties: {
+      seats: 1,
+      hasRcs: true,
+      hasEjectorSeat: true,
+      dragCoefficient: 0.2,
+      heatTolerance: 2000,
+    },
+  },
+
+  // =========================================================================
+  // COMPUTER COMMAND MODULES (uncrewed)
+  // =========================================================================
+
+  /**
+   * Probe Core Mk1 — lightweight avionics pod for uncrewed flights.
+   * Mounts on top of the stack; nothing sits above it (no parachute socket).
+   */
+  {
+    id: 'probe-core-mk1',
+    name: 'Probe Core Mk1',
+    type: PartType.COMPUTER_MODULE,
+    mass: 50,
+    cost: 5_000,
+    width: 20,  // 1 m
+    height: 10, // 0.5 m
+    snapPoints: [
+      // Top nose — parachutes can mount here.
+      makeSnapPoint('top',    0, -5, [PartType.PARACHUTE]),
+      // Bottom face — stack parts attach below.
+      makeSnapPoint('bottom', 0,  5, STACK_TYPES),
+    ],
+    animationStates: ['idle'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      hasRcs: false,
+      dragCoefficient: 0.1,
+      heatTolerance: 1500,
+    },
+  },
+
+  // =========================================================================
+  // SERVICE MODULES
+  // =========================================================================
+
+  /**
+   * Science Module Mk1 — carries experiments that collect data in flight.
+   * Can be stacked axially (top/bottom) or mounted radially on the side of
+   * the rocket for compact designs.  Activate to begin the timed experiment.
+   */
+  {
+    id: 'science-module-mk1',
+    name: 'Science Module Mk1',
+    type: PartType.SERVICE_MODULE,
+    mass: 200,
+    cost: 12_000,
+    width: 30,  // 1.5 m
+    height: 20, // 1 m
+    snapPoints: [
+      makeSnapPoint('top',    0, -10, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  10, STACK_TYPES),
+      makeSnapPoint('left',  -15,  0, RADIAL_TYPES),
+      makeSnapPoint('right',  15,  0, RADIAL_TYPES),
+    ],
+    animationStates: ['idle', 'collecting'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.COLLECT_SCIENCE,
+    properties: {
+      experimentDuration: 30, // seconds
+      dragCoefficient: 0.1,
+      heatTolerance: 1500,
+    },
+  },
+
+  // =========================================================================
+  // FUEL TANKS
+  // =========================================================================
+
+  /**
+   * Small Tank — starter liquid propellant tank.
+   * Left/right radial sockets accept SRBs, landing legs, parachutes, etc.
+   */
+  {
+    id: 'tank-small',
+    name: 'Small Tank',
+    type: PartType.FUEL_TANK,
+    mass: 50,    // empty (dry) mass
+    cost: 800,
+    width: 20,   // 1 m
+    height: 40,  // 2 m
+    snapPoints: [
+      makeSnapPoint('top',    0, -20, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  20, STACK_TYPES),
+      makeSnapPoint('left',  -10,  0, RADIAL_TYPES),
+      makeSnapPoint('right',  10,  0, RADIAL_TYPES),
+    ],
+    animationStates: ['idle', 'empty'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      fuelMass: 400,
+      fuelType: FuelType.LIQUID,
+      dragCoefficient: 0.05,
+      heatTolerance: 1500,
+    },
+  },
+
+  /**
+   * Medium Tank — mid-tier liquid propellant tank.
+   */
+  {
+    id: 'tank-medium',
+    name: 'Medium Tank',
+    type: PartType.FUEL_TANK,
+    mass: 100,
+    cost: 1_600,
+    width: 30,   // 1.5 m
+    height: 60,  // 3 m
+    snapPoints: [
+      makeSnapPoint('top',    0, -30, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  30, STACK_TYPES),
+      makeSnapPoint('left',  -15,  0, RADIAL_TYPES),
+      makeSnapPoint('right',  15,  0, RADIAL_TYPES),
+    ],
+    animationStates: ['idle', 'empty'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      fuelMass: 1_800,
+      fuelType: FuelType.LIQUID,
+      dragCoefficient: 0.05,
+      heatTolerance: 1500,
+    },
+  },
+
+  /**
+   * Large Tank — high-capacity liquid propellant tank for heavy rockets.
+   */
+  {
+    id: 'tank-large',
+    name: 'Large Tank',
+    type: PartType.FUEL_TANK,
+    mass: 200,
+    cost: 3_200,
+    width: 40,   // 2 m
+    height: 100, // 5 m
+    snapPoints: [
+      makeSnapPoint('top',    0, -50, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  50, STACK_TYPES),
+      makeSnapPoint('left',  -20,  0, RADIAL_TYPES),
+      makeSnapPoint('right',  20,  0, RADIAL_TYPES),
+    ],
+    animationStates: ['idle', 'empty'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      fuelMass: 8_000,
+      fuelType: FuelType.LIQUID,
+      dragCoefficient: 0.05,
+      heatTolerance: 1500,
+    },
+  },
+
+  // =========================================================================
+  // ENGINES — atmospheric / general purpose
+  // =========================================================================
+
+  /**
+   * Spark Engine — small, lightweight first-stage engine.
+   * Bottom snap point accepts only a stack decoupler, enforcing that it sits
+   * at the bottom of a stage (nothing structural below the nozzle).
+   */
+  {
+    id: 'engine-spark',
+    name: 'Spark Engine',
+    type: PartType.ENGINE,
+    mass: 120,
+    cost: 6_000,
+    width: 20,  // 1 m
+    height: 30, // 1.5 m
+    snapPoints: [
+      makeSnapPoint('top',    0, -15, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  15, [PartType.STACK_DECOUPLER]),
+    ],
+    animationStates: ['idle', 'firing', 'burnt-out'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.IGNITE,
+    properties: {
+      thrust: 60,
+      thrustVac: 72,
+      isp: 290,
+      ispVac: 320,
+      throttleable: true,
+      fuelType: FuelType.LIQUID,
+      dragCoefficient: 0.1,
+      heatTolerance: 2000,
+    },
+  },
+
+  /**
+   * Reliant Engine — large atmospheric workhorse engine.
+   * Higher thrust than the Spark; bottom accepts full STACK_TYPES for
+   * flexibility in multi-stage designs.
+   */
+  {
+    id: 'engine-reliant',
+    name: 'Reliant Engine',
+    type: PartType.ENGINE,
+    mass: 500,
+    cost: 12_000,
+    width: 30,  // 1.5 m
+    height: 40, // 2 m
+    snapPoints: [
+      makeSnapPoint('top',    0, -20, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  20, STACK_TYPES),
+    ],
+    animationStates: ['idle', 'firing', 'burnt-out'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.IGNITE,
+    properties: {
+      thrust: 240,
+      thrustVac: 270,
+      isp: 310,
+      ispVac: 345,
+      throttleable: true,
+      fuelType: FuelType.LIQUID,
+      dragCoefficient: 0.1,
+      heatTolerance: 2000,
+    },
+  },
+
+  // =========================================================================
+  // ENGINES — upper-stage / low atmosphere
+  // =========================================================================
+
+  /**
+   * Poodle Engine — high-efficiency upper-stage engine.
+   * Better ISP than the Reliant; trades raw thrust for fuel economy at
+   * altitude where atmospheric drag is minimal.
+   */
+  {
+    id: 'engine-poodle',
+    name: 'Poodle Engine',
+    type: PartType.ENGINE,
+    mass: 180,
+    cost: 9_000,
+    width: 30,  // 1.5 m
+    height: 30, // 1.5 m
+    snapPoints: [
+      makeSnapPoint('top',    0, -15, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  15, STACK_TYPES),
+    ],
+    animationStates: ['idle', 'firing', 'burnt-out'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.IGNITE,
+    properties: {
+      thrust: 64,
+      thrustVac: 90,
+      isp: 350,
+      ispVac: 420,
+      throttleable: true,
+      fuelType: FuelType.LIQUID,
+      dragCoefficient: 0.1,
+      heatTolerance: 2000,
+    },
+  },
+
+  // =========================================================================
+  // ENGINES — vacuum optimised
+  // =========================================================================
+
+  /**
+   * Nerv Vacuum Engine — extreme ISP for deep-space / orbital manoeuvring.
+   * Sea-level and vacuum ISP are identical (nozzle is fully optimised for
+   * vacuum; performance degrades at sea level but not modelled separately).
+   */
+  {
+    id: 'engine-nerv',
+    name: 'Nerv Vacuum Engine',
+    type: PartType.ENGINE,
+    mass: 250,
+    cost: 15_000,
+    width: 20,  // 1 m
+    height: 40, // 2 m
+    snapPoints: [
+      makeSnapPoint('top',    0, -20, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  20, STACK_TYPES),
+    ],
+    animationStates: ['idle', 'firing', 'burnt-out'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.IGNITE,
+    properties: {
+      thrust: 60,
+      thrustVac: 60,
+      isp: 800,
+      ispVac: 800,
+      throttleable: true,
+      fuelType: FuelType.LIQUID,
+      dragCoefficient: 0.1,
+      heatTolerance: 2000,
+    },
+  },
+
+  // =========================================================================
+  // SOLID ROCKET BOOSTERS
+  // =========================================================================
+
+  /**
+   * SRB Small — compact solid booster for the first stage.
+   * Attaches radially to the side of the main stack via left/right snap
+   * points.  Not throttleable — burns at a fixed rate until empty.
+   * The top snap point allows a nose fairing or small part to be mounted
+   * directly above the booster.
+   */
+  {
+    id: 'srb-small',
+    name: 'SRB Small',
+    type: PartType.SOLID_ROCKET_BOOSTER,
+    mass: 180,    // empty (dry) mass
+    cost: 3_000,
+    width: 20,   // 1 m diameter
+    height: 80,  // 4 m tall
+    snapPoints: [
+      // Top of the booster (nose) — accepts lightweight stack parts above.
+      makeSnapPoint('top',    0, -40, STACK_TYPES),
+      // Radial attachment points — one for each side of the parent stack.
+      // accepts: [] because nothing is dragged TO the SRB's radial face;
+      // the parent stack's snap point accepts the SRB type instead.
+      makeSnapPoint('right',  10,   0, []),
+      makeSnapPoint('left',  -10,   0, []),
+    ],
+    animationStates: ['idle', 'firing', 'burnt-out'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.IGNITE,
+    properties: {
+      thrust: 180,
+      thrustVac: 195,
+      isp: 175,
+      ispVac: 190,
+      throttleable: false,
+      fuelMass: 900,
+      fuelType: FuelType.SOLID,
+      dragCoefficient: 0.15,
+      heatTolerance: 2000,
+    },
+  },
+
+  /**
+   * SRB Large — heavy solid booster for heavier first-stage lifts.
+   */
+  {
+    id: 'srb-large',
+    name: 'SRB Large',
+    type: PartType.SOLID_ROCKET_BOOSTER,
+    mass: 360,
+    cost: 6_000,
+    width: 30,   // 1.5 m diameter
+    height: 120, // 6 m tall
+    snapPoints: [
+      makeSnapPoint('top',    0, -60, STACK_TYPES),
+      makeSnapPoint('right',  15,   0, []),
+      makeSnapPoint('left',  -15,   0, []),
+    ],
+    animationStates: ['idle', 'firing', 'burnt-out'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.IGNITE,
+    properties: {
+      thrust: 360,
+      thrustVac: 390,
+      isp: 175,
+      ispVac: 190,
+      throttleable: false,
+      fuelMass: 3_600,
+      fuelType: FuelType.SOLID,
+      dragCoefficient: 0.15,
+      heatTolerance: 2000,
+    },
+  },
+
+  // =========================================================================
+  // DECOUPLERS
+  // =========================================================================
+
+  /**
+   * Stack Decoupler TR-18 — in-line stage separation ring.
+   * Sits between two stack sections and fires a one-shot separation charge
+   * when the player activates staging.  Wide profile (40 px) to match a
+   * standard 2 m rocket body.
+   */
+  {
+    id: 'decoupler-stack-tr18',
+    name: 'Stack Decoupler TR-18',
+    type: PartType.STACK_DECOUPLER,
+    mass: 50,
+    cost: 400,
+    width: 40,  // 2 m — matches standard tank/capsule diameter
+    height: 10, // 0.5 m (thin ring)
+    snapPoints: [
+      makeSnapPoint('top',    0,  -5, STACK_TYPES),
+      makeSnapPoint('bottom', 0,   5, STACK_TYPES),
+    ],
+    animationStates: ['idle', 'separated'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.SEPARATE,
+    properties: {
+      dragCoefficient: 0.05,
+      heatTolerance: 1500,
+    },
+  },
+
+  /**
+   * Radial Decoupler — bracket that mounts a radial part (SRB, landing leg)
+   * to the side of the main stack and separates it on command.
+   *
+   * Snap point layout:
+   *   left  — outer face: holds the attached radial part (SRB, etc.).
+   *   right — inner face: attaches to the parent stack's radial socket.
+   *
+   * When placed on the LEFT of the main stack:
+   *   parent.LEFT ↔ decoupler.RIGHT  (inner face to stack)
+   *   decoupler.LEFT ↔ radial-part.RIGHT  (outer face to SRB etc.)
+   */
+  {
+    id: 'decoupler-radial',
+    name: 'Radial Decoupler',
+    type: PartType.RADIAL_DECOUPLER,
+    mass: 30,
+    cost: 600,
+    width: 10,  // 0.5 m
+    height: 10, // 0.5 m
+    snapPoints: [
+      // Inner face — connects to the parent stack's radial snap point.
+      // Nothing is ever dragged onto this face (stack accepts the decoupler),
+      // so accepts is empty.
+      makeSnapPoint('right',   5,  0, []),
+      // Outer face — the radial part (SRB, leg, etc.) attaches here.
+      makeSnapPoint('left',   -5,  0, RADIAL_TYPES),
+    ],
+    animationStates: ['idle', 'separated'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.SEPARATE,
+    properties: {
+      dragCoefficient: 0.05,
+      heatTolerance: 1500,
+    },
+  },
+
+  // =========================================================================
+  // LANDING LEGS
+  // =========================================================================
+
+  /**
+   * Small Landing Leg — lightweight retractable landing support.
+   * Attaches radially; safe for rockets up to 2,000 kg total mass at landing.
+   */
+  {
+    id: 'landing-legs-small',
+    name: 'Small Landing Leg',
+    type: PartType.LANDING_LEGS,
+    mass: 80,
+    cost: 1_200,
+    width: 10,  // 0.5 m
+    height: 20, // 1 m
+    snapPoints: [
+      // Inner face — connects to parent stack's radial snap point.
+      makeSnapPoint('right',   5,  0, []),
+      makeSnapPoint('left',   -5,  0, []),
+    ],
+    animationStates: ['stowed', 'deployed'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.DEPLOY,
+    properties: {
+      maxSafeMass: 2_000,
+      maxLandingSpeed: 10,
+      dragCoefficient: 0.1,
+      heatTolerance: 1200,
+    },
+  },
+
+  /**
+   * Large Landing Leg — heavy-duty retractable landing support.
+   * Safe for rockets up to 8,000 kg total mass at landing.
+   */
+  {
+    id: 'landing-legs-large',
+    name: 'Large Landing Leg',
+    type: PartType.LANDING_LEGS,
+    mass: 180,
+    cost: 2_000,
+    width: 15,  // 0.75 m
+    height: 30, // 1.5 m
+    snapPoints: [
+      makeSnapPoint('right',   7,  0, []),
+      makeSnapPoint('left',   -7,  0, []),
+    ],
+    animationStates: ['stowed', 'deployed'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.DEPLOY,
+    properties: {
+      maxSafeMass: 8_000,
+      maxLandingSpeed: 10,
+      dragCoefficient: 0.1,
+      heatTolerance: 1200,
+    },
+  },
+
+  // =========================================================================
+  // PARACHUTES
+  // =========================================================================
+
+  /**
+   * Mk1 Parachute — light recovery chute for small capsules.
+   * Can mount on top of a stack part (bottom face → capsule's top face) or
+   * radially on the side of the rocket for symmetrical deployment.
+   * Safe for re-entry masses up to 1,200 kg.
+   */
+  {
+    id: 'parachute-mk1',
+    name: 'Mk1 Parachute',
+    type: PartType.PARACHUTE,
+    mass: 100,
+    cost: 400,
+    width: 20,  // 1 m
+    height: 10, // 0.5 m (stowed profile)
+    snapPoints: [
+      // Top — nothing mounts above the chute.
+      makeSnapPoint('top',     0,  -5, []),
+      // Bottom — mounts on top of a capsule or tank.
+      makeSnapPoint('bottom',  0,   5, STACK_TYPES),
+      // Side radial sockets — the chute's side connects to the stack.
+      makeSnapPoint('right',  10,   0, []),
+      makeSnapPoint('left',  -10,   0, []),
+    ],
+    animationStates: ['stowed', 'deploying', 'deployed'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.DEPLOY,
+    properties: {
+      maxSafeMass: 1_200,
+      maxLandingSpeed: 10,
+      dragCoefficient: 0.05,
+      heatTolerance: 1200,
+    },
+  },
+
+  /**
+   * Mk2 Parachute — heavy-duty recovery chute.
+   * Safe for re-entry masses up to 4,000 kg.
+   */
+  {
+    id: 'parachute-mk2',
+    name: 'Mk2 Parachute',
+    type: PartType.PARACHUTE,
+    mass: 250,
+    cost: 800,
+    width: 30,  // 1.5 m
+    height: 15, // 0.75 m (stowed)
+    snapPoints: [
+      makeSnapPoint('top',     0,  -7, []),
+      makeSnapPoint('bottom',  0,   7, STACK_TYPES),
+      makeSnapPoint('right',  15,   0, []),
+      makeSnapPoint('left',  -15,   0, []),
+    ],
+    animationStates: ['stowed', 'deploying', 'deployed'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.DEPLOY,
+    properties: {
+      maxSafeMass: 4_000,
+      maxLandingSpeed: 10,
+      dragCoefficient: 0.05,
+      heatTolerance: 1200,
+    },
+  },
+
+  // =========================================================================
+  // SATELLITE PAYLOADS
+  // =========================================================================
+
+  /**
+   * Satellite Mk1 — deployable satellite payload.
+   * Stack-mounted; activate RELEASE to separate it into independent flight
+   * (mission objective for satellite deployment missions).
+   */
+  {
+    id: 'satellite-mk1',
+    name: 'Satellite Mk1',
+    type: PartType.SATELLITE,
+    mass: 300,
+    cost: 20_000,
+    width: 30,  // 1.5 m
+    height: 20, // 1 m
+    snapPoints: [
+      makeSnapPoint('top',    0, -10, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  10, STACK_TYPES),
+    ],
+    animationStates: ['stowed', 'deployed'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.RELEASE,
+    properties: {
+      dragCoefficient: 0.1,
+      heatTolerance: 1500,
+    },
+  },
+
 ];
 
 // ---------------------------------------------------------------------------
