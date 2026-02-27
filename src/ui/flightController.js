@@ -113,7 +113,7 @@ const FLIGHT_CTRL_CSS = `
   inset: 44px 0 0;
   pointer-events: none;
   z-index: 200;
-  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-family: system-ui, sans-serif;
 }
 
 /* ── Hamburger / menu button — centred at the top ──────────────────────── */
@@ -195,7 +195,7 @@ const FLIGHT_CTRL_CSS = `
   display: flex;
   flex-direction: column;
   align-items: center;
-  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-family: system-ui, sans-serif;
   color: #d0e0f0;
   pointer-events: auto;
   overflow: hidden;

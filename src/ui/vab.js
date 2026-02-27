@@ -199,7 +199,7 @@ const VAB_CSS = `
   display: flex;
   flex-direction: column;
   pointer-events: none;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: system-ui, sans-serif;
   color: #c0d4ec;
   user-select: none;
   overflow: hidden;
@@ -840,7 +840,7 @@ const VAB_CSS = `
   width: 100%;
   padding: 6px 14px;
   font-size: 11px;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: system-ui, sans-serif;
   color: #a8c8e8;
   cursor: pointer;
   background: none;
@@ -956,7 +956,7 @@ const VAB_CSS = `
   max-height: 80vh;
   display: flex;
   flex-direction: column;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: system-ui, sans-serif;
 }
 
 .vab-crew-dlg-hdr {
@@ -1025,7 +1025,7 @@ const VAB_CSS = `
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: system-ui, sans-serif;
 }
 
 .vab-launch-msg {
@@ -1069,7 +1069,7 @@ const VAB_CSS = `
   width: 100%;
   padding: 8px 16px;
   font-size: 11px;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: system-ui, sans-serif;
   color: #a8c8e8;
   cursor: pointer;
   background: none;
@@ -1104,7 +1104,7 @@ const VAB_CSS = `
   box-shadow: 0 8px 48px rgba(0,0,0,.9);
   width: 480px;
   max-width: 95vw;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: system-ui, sans-serif;
 }
 .vab-save-dlg-hdr {
   padding: 12px 16px;
@@ -1131,7 +1131,7 @@ const VAB_CSS = `
   border-radius: 3px;
   padding: 10px 12px;
   color: #5a88a8;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: system-ui, sans-serif;
   font-size: 10px;
   cursor: pointer;
   text-align: left;
@@ -1177,7 +1177,7 @@ const VAB_CSS = `
   border: 1px solid #1a3050;
   border-radius: 2px;
   padding: 7px 10px;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: system-ui, sans-serif;
   font-size: 11px;
   color: #a8c8e8;
   outline: none;

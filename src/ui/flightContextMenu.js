@@ -50,7 +50,7 @@ const CTX_MENU_CSS = `
   min-width: 210px;
   max-width: 280px;
   z-index: 350;
-  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-family: system-ui, sans-serif;
 }
 
 #flight-part-ctx-menu[hidden] {

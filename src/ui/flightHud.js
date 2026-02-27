@@ -59,7 +59,7 @@ const FLIGHT_HUD_STYLES = `
   inset: 44px 0 0;
   pointer-events: none;
   z-index: 100;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: system-ui, sans-serif;
   color: #a8e8c0;
   user-select: none;
 }
@@ -172,7 +172,7 @@ const FLIGHT_HUD_STYLES = `
   border-radius: 3px;
   color: #70a880;
   font-size: 9px;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: system-ui, sans-serif;
   cursor: pointer;
   transition: background 0.1s, border-color 0.1s;
 }
@@ -401,7 +401,7 @@ const FLIGHT_HUD_STYLES = `
   border-radius: 3px;
   color: #70a880;
   font-size: 10px;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: system-ui, sans-serif;
   cursor: pointer;
   transition: background 0.1s, border-color 0.1s, color 0.1s;
   min-width: 30px;

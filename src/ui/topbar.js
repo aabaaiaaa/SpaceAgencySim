@@ -73,7 +73,7 @@ const TOPBAR_STYLES = `
   pointer-events: auto;
   z-index: 100;
   box-sizing: border-box;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: system-ui, sans-serif;
   user-select: none;
 }
 
@@ -209,7 +209,7 @@ const TOPBAR_STYLES = `
   overflow-y: auto;
   box-sizing: border-box;
   pointer-events: auto;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: system-ui, sans-serif;
   color: #cce4f8;
 }
 

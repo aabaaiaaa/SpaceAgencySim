@@ -31,7 +31,7 @@ const CREW_ADMIN_STYLES = `
   display: flex;
   flex-direction: column;
   pointer-events: auto;
-  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-family: system-ui, sans-serif;
   color: #e8e8e8;
   /* leave room for the persistent top bar (approx 44px) */
   padding-top: 44px;

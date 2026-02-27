@@ -119,7 +119,7 @@ const MENU_STYLES = `
   align-items: center;
   overflow-y: auto;
   pointer-events: auto;
-  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-family: system-ui, sans-serif;
   color: #d0dce8;
 }
 
