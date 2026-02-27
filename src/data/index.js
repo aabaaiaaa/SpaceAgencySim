@@ -6,4 +6,4 @@
 //   missions.js  — mission templates with objectives, rewards, and requirements
 
 export * from './parts.js';
-// export * from './missions.js';  // populated in TASK-012
+export * from './missions.js';

@@ -136,7 +136,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-012: Mission Data Model & Unlock Tree
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-002
 - **Description**: Define the mission data structure in `/src/data/missions.js`. Each mission: `id` (string), `title` (string), `description` (string), `location` ('desert'), `objectives` (array of objective objects), `reward` (dollars), `unlocksAfter` (array of mission IDs that must be completed before this appears as available), `unlockedParts` (array of part IDs unlocked upon completion), `status` ('locked' | 'available' | 'accepted' | 'completed'). Each objective: `id` (string), `type` (enum: REACH_ALTITUDE, REACH_SPEED, SAFE_LANDING, ACTIVATE_PART, HOLD_ALTITUDE, RETURN_SCIENCE_DATA, CONTROLLED_CRASH, EJECT_CREW, RELEASE_SATELLITE, REACH_ORBIT), `target` (type-specific value object), `completed` (boolean), `description` (string). Implement in `/src/core/missions.js`: `getAvailableMissions()`, `acceptMission(id)`, `checkObjectiveCompletion(flightState)` called each physics tick, `completeMission(id)`, `getUnlockedMissions()`, `getUnlockedParts()`.

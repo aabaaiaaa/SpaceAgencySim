@@ -19,3 +19,4 @@ export * from './gameState.js';
 export * from './finance.js';
 export * from './saveload.js';
 export * from './crew.js';
+export * from './missions.js';
