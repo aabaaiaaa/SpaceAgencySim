@@ -120,7 +120,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-010: Crew Data Model & History
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-002
 - **Description**: Define the astronaut data model in `/src/core/crew.js`. Each astronaut record: `id` (UUID), `name` (string), `hireDate` (ISO string), `status` ('active' | 'fired' | 'kia'), `missionsFlown` (number), `flightsFlown` (number), `deathDate` (nullable ISO string), `deathCause` (nullable string). Functions: `hireCrew(name)` (costs $50,000, deducted via finance system, adds to state.crew), `fireCrew(id)` (sets status to 'fired', no cost), `recordKIA(id, cause)` (sets status to 'kia', records date/cause, triggers $500,000 fine via finance system), `assignToCrew(astronautId, rocketId)`, `unassignCrew(astronautId)`, `getActiveCrew()`, `getFullHistory()`. All records are persisted in game state — KIA and fired crew remain in history permanently.

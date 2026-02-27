@@ -76,6 +76,21 @@ export const MissionState = Object.freeze({
 // ---------------------------------------------------------------------------
 
 /**
+ * Career / employment status of an astronaut.
+ * Distinct from the operational CrewStatus below; tracks the astronaut's
+ * permanent career arc rather than their current activity within a mission.
+ * @enum {string}
+ */
+export const AstronautStatus = Object.freeze({
+  /** Currently employed and available (alive, not fired). */
+  ACTIVE: 'active',
+  /** Employment terminated by the player; no longer takes missions. */
+  FIRED: 'fired',
+  /** Killed in action; record is retained permanently in history. */
+  KIA: 'kia',
+});
+
+/**
  * What a crew member is currently doing.
  * @enum {string}
  */
@@ -141,6 +156,9 @@ export const DEFAULT_LOAN_INTEREST_RATE = 0.03;
 
 /** Fine per astronaut killed in action (deducted from cash). */
 export const DEATH_FINE_PER_ASTRONAUT = 500_000;
+
+/** Cost to hire a new astronaut. */
+export const HIRE_COST = 50_000;
 
 /** Maximum cumulative loan balance the player may carry. */
 export const MAX_LOAN_BALANCE = 10_000_000;
