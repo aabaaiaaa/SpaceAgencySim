@@ -27,6 +27,8 @@ import { initFlightHud, destroyFlightHud, setHudTimeWarp, lockTimeWarp } from '.
 import { initFlightContextMenu, destroyFlightContextMenu } from './flightContextMenu.js';
 import { saveGame, listSaves } from '../core/saveload.js';
 import { ATMOSPHERE_TOP, isReentryCondition } from '../core/atmosphere.js';
+import { getPartById } from '../data/parts.js';
+import { PartType, DEATH_FINE_PER_ASTRONAUT } from '../core/constants.js';
 
 // ---------------------------------------------------------------------------
 // Module state
@@ -67,6 +69,13 @@ let _keyupHandler = null;
 
 /** The in-flight control overlay DOM element. @type {HTMLElement|null} */
 let _flightOverlay = null;
+
+/**
+ * True while the post-flight summary overlay is visible.
+ * Prevents the overlay from being shown twice (e.g. crash auto-trigger
+ * firing on the same frame that the player clicks "Return to Agency").
+ */
+let _summaryShown = false;
 
 // ---------------------------------------------------------------------------
 // Time-warp state
@@ -184,20 +193,193 @@ const FLIGHT_CTRL_CSS = `
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   font-family: 'Segoe UI', system-ui, sans-serif;
   color: #d0e0f0;
   pointer-events: auto;
+  overflow: hidden;
+}
+
+.pf-content {
+  width: 100%;
+  max-width: 700px;
+  padding: 32px 24px 40px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 #post-flight-summary h1 {
   font-size: 2rem;
   font-weight: 700;
-  margin-bottom: 28px;
-  color: #80c8ff;
+  margin: 0 0 28px;
   letter-spacing: 0.04em;
 }
 
+.pf-section {
+  width: 100%;
+  margin-bottom: 28px;
+}
+
+.pf-section h2 {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #5880a0;
+  margin: 0 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.pf-section-danger h2 {
+  color: #b06060;
+}
+
+/* Mission objectives */
+.pf-obj-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.pf-obj-list li {
+  padding: 5px 0;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  line-height: 1.4;
+}
+
+.pf-obj-check {
+  flex-shrink: 0;
+  font-size: 0.9rem;
+}
+
+.pf-obj-complete {
+  color: #50d870;
+}
+
+.pf-obj-incomplete {
+  color: #907070;
+}
+
+/* Recovery table */
+.pf-recovery-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.pf-recovery-table th {
+  text-align: left;
+  padding: 6px 10px;
+  color: #5880a0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.pf-recovery-table th:last-child {
+  text-align: right;
+}
+
+.pf-recovery-table td {
+  padding: 5px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  color: #c0d8f0;
+}
+
+.pf-recovery-table td:last-child {
+  text-align: right;
+  color: #60d890;
+  font-variant-numeric: tabular-nums;
+}
+
+.pf-recovery-total td {
+  padding-top: 8px;
+  color: #80e0a0 !important;
+  font-weight: 700;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  border-bottom: none;
+}
+
+/* KIA list */
+.pf-kia-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 6px;
+}
+
+.pf-kia-list li {
+  padding: 5px 0;
+  font-size: 0.95rem;
+  color: #e08888;
+  display: flex;
+  justify-content: space-between;
+}
+
+.pf-kia-fine {
+  color: #ff9999;
+  font-variant-numeric: tabular-nums;
+}
+
+.pf-kia-total {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #ff8080;
+  text-align: right;
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 100, 100, 0.2);
+}
+
+/* Action buttons */
+.pf-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 12px;
+  width: 100%;
+}
+
+.pf-btn {
+  padding: 11px 22px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.pf-btn-primary {
+  background: #1a4070;
+  border-color: #4080b0;
+  color: #c8e8ff;
+}
+
+.pf-btn-primary:hover {
+  background: #235a90;
+}
+
+.pf-btn-secondary {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #b0c8e0;
+}
+
+.pf-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.13);
+}
+
+/* Keep old stat-row styles for backward compatibility */
 .pf-stat-row {
   display: flex;
   gap: 14px;
@@ -217,6 +399,7 @@ const FLIGHT_CTRL_CSS = `
   font-weight: 600;
 }
 
+/* Legacy single-button style kept for tests that may target it */
 #post-flight-return-btn {
   margin-top: 36px;
   padding: 12px 36px;
@@ -276,11 +459,12 @@ export function startFlightScene(
     document.head.appendChild(styleEl);
   }
 
-  // Reset time-warp state.
-  _timeWarp           = 1;
+  // Reset time-warp and summary state.
+  _timeWarp            = 1;
   _stagingLockoutUntil = 0;
   _prevAltitude        = 0;
   _prevInSpace         = false;
+  _summaryShown        = false;
 
   // Create the physics state from the assembly and initial flight state.
   _ps = createPhysicsState(assembly, flightState);
@@ -368,6 +552,8 @@ export function stopFlightScene() {
   _prevAltitude        = 0;
   _prevInSpace         = false;
 
+  _summaryShown = false;
+
   console.log('[Flight Controller] Flight scene stopped');
 }
 
@@ -395,10 +581,54 @@ function _loop(timestamp) {
   // Render the flight scene.
   renderFlightFrame(_ps, _assembly);
 
+  // Auto-trigger the post-flight summary when the rocket crashes or all
+  // command modules are destroyed (the rocket becomes uncontrollable).
+  if (!_summaryShown && !_ps.grounded) {
+    const shouldAutoTrigger = _ps.crashed || _allCommandModulesDestroyed();
+    if (shouldAutoTrigger) {
+      _summaryShown = true;
+      _showPostFlightSummary(
+        _ps, _assembly, _flightState, _state, _onFlightEnd,
+      );
+    }
+  }
+
   // Reschedule unless the loop was cancelled.
   if (_rafId !== null) {
     _rafId = requestAnimationFrame(_loop);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Private — auto-trigger helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns true when the assembly contains at least one COMMAND_MODULE part
+ * and ALL of them have been removed from `_ps.activeParts` (destroyed or
+ * separated).  Returns false while the rocket is still on the launch pad
+ * or if no command modules were ever present.
+ *
+ * @returns {boolean}
+ */
+function _allCommandModulesDestroyed() {
+  if (!_assembly || !_ps) return false;
+
+  let hadCommandModule = false;
+
+  for (const [instanceId, placed] of _assembly.parts) {
+    const def = getPartById(placed.partId);
+    if (!def || def.type !== PartType.COMMAND_MODULE) continue;
+
+    hadCommandModule = true;
+    if (_ps.activeParts.has(instanceId)) {
+      // At least one command module is still active — not all destroyed.
+      return false;
+    }
+  }
+
+  // Return true only if we had at least one command module and none remain.
+  return hadCommandModule;
 }
 
 // ---------------------------------------------------------------------------
@@ -621,21 +851,15 @@ function _handleSaveGame() {
 }
 
 /**
- * End the flight and show the post-flight summary screen.
+ * Show the post-flight summary screen.
  * Called when the player chooses "Return to Space Agency" from the menu.
+ * Does NOT tear down the flight scene immediately — the summary's action
+ * buttons handle that so the player can choose "Continue Flying" if landed.
  */
 function _handleReturnToAgency() {
-  // Capture stats before tearing down (references are cleared in stopFlightScene).
-  const maxAlt  = _flightState ? Math.max(0, _flightState.altitude) : 0;
-  const elapsed = _flightState ? _flightState.timeElapsed           : 0;
-  const state   = _state;
-  const onEnd   = _onFlightEnd;
-
-  // Tear down the active flight.
-  stopFlightScene();
-
-  // Present the post-flight summary.
-  _showPostFlightSummary(maxAlt, elapsed, state, onEnd);
+  if (_summaryShown) return; // Already showing — ignore duplicate calls.
+  _summaryShown = true;
+  _showPostFlightSummary(_ps, _assembly, _flightState, _state, _onFlightEnd);
 }
 
 // ---------------------------------------------------------------------------
@@ -645,54 +869,304 @@ function _handleReturnToAgency() {
 /**
  * Build and display the post-flight summary overlay.
  *
- * @param {number}   maxAlt   Maximum altitude reached during flight (m).
- * @param {number}   elapsed  Total flight duration (s).
- * @param {object}   state    GameState.
- * @param {Function} onEnd    Callback invoked when the player returns to hub.
+ * Shows:
+ *  1. Flight outcome (destroyed / landed safely / mission in progress).
+ *  2. Mission objectives completed this flight.
+ *  3. Part recovery table (landed safely only).
+ *  4. Crew KIA with fines.
+ *  5. Action buttons: Restart from Launch, Continue Flying (if landed),
+ *     Return to Space Agency.
+ *
+ * The flight scene is NOT torn down before this is called — the action
+ * buttons handle teardown so the player may choose "Continue Flying".
+ *
+ * @param {import('../core/physics.js').PhysicsState|null}           ps
+ * @param {import('../core/rocketbuilder.js').RocketAssembly|null}   assembly
+ * @param {import('../core/gameState.js').FlightState|null}          flightState
+ * @param {import('../core/gameState.js').GameState|null}            state
+ * @param {((state: any) => void)|null}                              onFlightEnd
  */
-function _showPostFlightSummary(maxAlt, elapsed, state, onEnd) {
+function _showPostFlightSummary(ps, assembly, flightState, state, onFlightEnd) {
   // Use the #ui-overlay container; fall back to document.body.
   const host = document.getElementById('ui-overlay') ?? document.body;
 
+  // Remove any stale summary overlay.
+  const existing = document.getElementById('post-flight-summary');
+  if (existing) existing.remove();
+
+  // ── Determine outcome ────────────────────────────────────────────────────
+  const isLanded    = !!(ps && ps.landed && !ps.crashed);
+  const isCrashed   = !!(ps && ps.crashed);
+  // "Mission in progress" covers mid-flight abort and launch-pad exit.
+
+  // ── Root overlay ─────────────────────────────────────────────────────────
   const overlay = document.createElement('div');
   overlay.id = 'post-flight-summary';
 
-  // Heading.
+  // Scrollable content wrapper.
+  const content = document.createElement('div');
+  content.className = 'pf-content';
+  overlay.appendChild(content);
+
+  // ── 1. Flight outcome heading ─────────────────────────────────────────────
   const heading = document.createElement('h1');
-  heading.textContent = 'Flight Complete';
-  overlay.appendChild(heading);
+  if (isCrashed) {
+    heading.textContent  = 'Rocket Destroyed';
+    heading.style.color  = '#ff6040';
+  } else if (isLanded) {
+    heading.textContent  = 'Landed Safely';
+    heading.style.color  = '#40e060';
+  } else {
+    heading.textContent  = 'Mission In Progress';
+    heading.style.color  = '#80c8ff';
+  }
+  content.appendChild(heading);
 
-  // Stat helper.
-  function addStat(label, value) {
-    const row = document.createElement('div');
-    row.className = 'pf-stat-row';
+  // ── 2. Mission objectives ─────────────────────────────────────────────────
+  if (flightState && flightState.missionId && state) {
+    const missionId = flightState.missionId;
+    const allMissions = [
+      ...(state.missions?.accepted  ?? []),
+      ...(state.missions?.completed ?? []),
+    ];
+    const mission = allMissions.find((m) => m.id === missionId);
 
-    const lbl = document.createElement('span');
-    lbl.className   = 'pf-stat-label';
-    lbl.textContent = label;
+    if (mission && Array.isArray(mission.objectives) && mission.objectives.length > 0) {
+      const section = document.createElement('div');
+      section.className = 'pf-section';
 
-    const val = document.createElement('span');
-    val.className   = 'pf-stat-value';
-    val.textContent = value;
+      const sectionTitle = document.createElement('h2');
+      sectionTitle.textContent = `Mission: ${mission.title}`;
+      section.appendChild(sectionTitle);
 
-    row.appendChild(lbl);
-    row.appendChild(val);
-    overlay.appendChild(row);
+      const objList = document.createElement('ul');
+      objList.className = 'pf-obj-list';
+
+      for (const obj of mission.objectives) {
+        const li = document.createElement('li');
+        li.className = obj.completed ? 'pf-obj-complete' : 'pf-obj-incomplete';
+
+        const check = document.createElement('span');
+        check.className = 'pf-obj-check';
+        check.textContent = obj.completed ? '✓' : '✗';
+
+        const desc = document.createElement('span');
+        desc.textContent = obj.description ?? String(obj.type);
+
+        li.appendChild(check);
+        li.appendChild(desc);
+        objList.appendChild(li);
+      }
+
+      section.appendChild(objList);
+      content.appendChild(section);
+    }
   }
 
-  addStat('Max Altitude:',    `${Math.round(maxAlt).toLocaleString('en-US')} m`);
-  addStat('Flight Duration:', `${elapsed.toFixed(1)} s`);
-  addStat('Agency:',          state?.agencyName ?? '—');
+  // ── 3. Part recovery table (landed safely only) ───────────────────────────
+  if (isLanded && assembly && ps) {
+    const section = document.createElement('div');
+    section.className = 'pf-section';
 
-  // Return button.
+    const sectionTitle = document.createElement('h2');
+    sectionTitle.textContent = 'Part Recovery (60 % of cost)';
+    section.appendChild(sectionTitle);
+
+    const table = document.createElement('table');
+    table.className = 'pf-recovery-table';
+
+    // Header row.
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    ['Part', 'Recovery Value'].forEach((text) => {
+      const th = document.createElement('th');
+      th.textContent = text;
+      headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    // Body rows.
+    const tbody = document.createElement('tbody');
+    let totalRecovery = 0;
+
+    for (const [instanceId, placed] of assembly.parts) {
+      if (!ps.activeParts.has(instanceId)) continue;
+      const def = getPartById(placed.partId);
+      if (!def) continue;
+
+      const recoveryValue = Math.round((def.cost ?? 0) * 0.6);
+      totalRecovery += recoveryValue;
+
+      const row = document.createElement('tr');
+
+      const nameTd = document.createElement('td');
+      nameTd.textContent = def.name;
+
+      const valueTd = document.createElement('td');
+      valueTd.textContent = `$${recoveryValue.toLocaleString('en-US')}`;
+
+      row.appendChild(nameTd);
+      row.appendChild(valueTd);
+      tbody.appendChild(row);
+    }
+
+    // Total row.
+    const totalRow = document.createElement('tr');
+    totalRow.className = 'pf-recovery-total';
+
+    const totalLabelTd = document.createElement('td');
+    totalLabelTd.textContent = 'Total Recovery';
+
+    const totalValueTd = document.createElement('td');
+    totalValueTd.textContent = `$${totalRecovery.toLocaleString('en-US')}`;
+
+    totalRow.appendChild(totalLabelTd);
+    totalRow.appendChild(totalValueTd);
+    tbody.appendChild(totalRow);
+
+    table.appendChild(tbody);
+    section.appendChild(table);
+    content.appendChild(section);
+  }
+
+  // ── 4. Crew KIA with fines ────────────────────────────────────────────────
+  if (flightState && Array.isArray(flightState.crewIds) && flightState.crewIds.length > 0 && state) {
+    // Crew are KIA if the rocket crashed and they did not safely eject.
+    const ejectedIds = ps?.ejectedCrewIds ?? new Set();
+    const kiaMembers = [];
+
+    if (isCrashed || _allCommandModulesDestroyedFor(ps, assembly)) {
+      for (const crewId of flightState.crewIds) {
+        if (ejectedIds.has(crewId)) continue; // Ejected safely — not KIA.
+        const member = (state.crew ?? []).find((c) => c.id === crewId);
+        if (member) kiaMembers.push(member);
+      }
+    }
+
+    if (kiaMembers.length > 0) {
+      const section = document.createElement('div');
+      section.className = 'pf-section pf-section-danger';
+
+      const sectionTitle = document.createElement('h2');
+      sectionTitle.textContent = 'Crew KIA';
+      section.appendChild(sectionTitle);
+
+      const kiaList = document.createElement('ul');
+      kiaList.className = 'pf-kia-list';
+
+      for (const member of kiaMembers) {
+        const li = document.createElement('li');
+
+        const nameSp = document.createElement('span');
+        nameSp.textContent = member.name;
+
+        const fineSp = document.createElement('span');
+        fineSp.className = 'pf-kia-fine';
+        fineSp.textContent = `−$${DEATH_FINE_PER_ASTRONAUT.toLocaleString('en-US')} fine`;
+
+        li.appendChild(nameSp);
+        li.appendChild(fineSp);
+        kiaList.appendChild(li);
+      }
+
+      section.appendChild(kiaList);
+
+      const totalFine = kiaMembers.length * DEATH_FINE_PER_ASTRONAUT;
+      const totalEl = document.createElement('div');
+      totalEl.className = 'pf-kia-total';
+      totalEl.textContent = `Total fines: −$${totalFine.toLocaleString('en-US')}`;
+      section.appendChild(totalEl);
+
+      content.appendChild(section);
+    }
+  }
+
+  // ── 5. Action buttons ─────────────────────────────────────────────────────
+
+  // Calculate the replacement cost of parts that were lost (not in activeParts).
+  let lostPartsCost = 0;
+  if (assembly && ps) {
+    for (const [instanceId, placed] of assembly.parts) {
+      if (!ps.activeParts.has(instanceId)) {
+        const def = getPartById(placed.partId);
+        if (def) lostPartsCost += def.cost ?? 0;
+      }
+    }
+  }
+
+  const buttonsEl = document.createElement('div');
+  buttonsEl.className = 'pf-buttons';
+
+  // ── "Restart from Launch" button ──────────────────────────────────────────
+  const restartBtn = document.createElement('button');
+  restartBtn.id        = 'post-flight-restart-btn';
+  restartBtn.className = 'pf-btn pf-btn-secondary';
+  restartBtn.textContent = lostPartsCost > 0
+    ? `↩ Restart from Launch  (−$${lostPartsCost.toLocaleString('en-US')})`
+    : '↩ Restart from Launch';
+
+  restartBtn.addEventListener('click', () => {
+    // Deduct the cost of lost parts immediately.
+    if (lostPartsCost > 0 && state) {
+      state.money = (state.money ?? 0) - lostPartsCost;
+    }
+    overlay.remove();
+    stopFlightScene();
+    if (onFlightEnd) onFlightEnd(state);
+  });
+  buttonsEl.appendChild(restartBtn);
+
+  // ── "Continue Flying" button — only if the rocket landed intact ───────────
+  if (isLanded) {
+    const continueBtn = document.createElement('button');
+    continueBtn.id        = 'post-flight-continue-btn';
+    continueBtn.className = 'pf-btn pf-btn-primary';
+    continueBtn.textContent = '▶ Continue Flying';
+    continueBtn.addEventListener('click', () => {
+      // The flight scene is still running — simply close the summary.
+      _summaryShown = false;
+      overlay.remove();
+    });
+    buttonsEl.appendChild(continueBtn);
+  }
+
+  // ── "Return to Space Agency" button ───────────────────────────────────────
   const returnBtn = document.createElement('button');
   returnBtn.id          = 'post-flight-return-btn';
+  returnBtn.className   = 'pf-btn pf-btn-primary';
   returnBtn.textContent = '← Return to Space Agency';
   returnBtn.addEventListener('click', () => {
     overlay.remove();
-    if (onEnd) onEnd(state);
+    stopFlightScene();
+    if (onFlightEnd) onFlightEnd(state);
   });
-  overlay.appendChild(returnBtn);
+  buttonsEl.appendChild(returnBtn);
 
+  content.appendChild(buttonsEl);
   host.appendChild(overlay);
+}
+
+/**
+ * Pure helper (no module state): returns true when all COMMAND_MODULE parts
+ * in the given assembly are absent from `ps.activeParts`.
+ *
+ * Separated from `_allCommandModulesDestroyed()` so `_showPostFlightSummary`
+ * can call it without touching module-level state.
+ *
+ * @param {import('../core/physics.js').PhysicsState|null} ps
+ * @param {import('../core/rocketbuilder.js').RocketAssembly|null} assembly
+ * @returns {boolean}
+ */
+function _allCommandModulesDestroyedFor(ps, assembly) {
+  if (!assembly || !ps) return false;
+
+  let hadCommandModule = false;
+  for (const [instanceId, placed] of assembly.parts) {
+    const def = getPartById(placed.partId);
+    if (!def || def.type !== PartType.COMMAND_MODULE) continue;
+    hadCommandModule = true;
+    if (ps.activeParts.has(instanceId)) return false;
+  }
+  return hadCommandModule;
 }

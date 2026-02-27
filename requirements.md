@@ -330,7 +330,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-034: Post-Flight Summary Screen
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-027, TASK-010, TASK-005
 - **Description**: Shown when: (a) the active rocket's only command module is destroyed, or (b) the player opens the game menu and selects "Return to Space Agency" during flight, or (c) the rocket lands safely and the player confirms they are done. The summary screen shows: (1) Flight outcome (destroyed / landed safely / mission in progress). (2) Mission objectives completed this flight (listed by mission name and objective). (3) If landed safely: a table of parts that landed safely with their individual recovery value (60% of part cost each), and total recovery value. (4) Any crew KIA this flight with fines. (5) Three action buttons: "Restart from Launch" (return to pre-launch crew selection; costs the total part cost of any parts not recovered — deducted from cash immediately), "Continue Flying" (only available if rocket is intact and landed; returns to flight view — player can re-ignite if fuel remains or use menu to exit later), "Return to Space Agency" (triggers TASK-035 to apply all rewards and penalties, then shows the hub).
