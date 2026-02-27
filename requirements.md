@@ -370,7 +370,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-039: Financial System Tests
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-005, TASK-036
 - **Description**: Write unit tests in `/src/tests/finance.test.js` covering: (1) Starting state: cash = $2,000,000, loan balance = $2,000,000. (2) `earn(amount)` increases cash correctly. (3) `spend(amount)` decreases cash; returns false and makes no change if amount > cash. (4) `applyInterest()` increases loan balance by 3% of current balance (rounded to nearest cent). (5) Interest compounds correctly over multiple calls (not simple interest). (6) `payDownLoan(amount)` reduces both cash and loan balance, capped at available cash and outstanding balance. (7) `borrowMore(amount)` increases both cash and loan balance, capped at max borrow limit. (8) `applyDeathFine()` deducts $500,000 per call from cash. (9) Cash cannot go below $0 via spend (returns false before deducting). All tests must pass with `vitest run`.
