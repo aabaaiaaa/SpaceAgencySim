@@ -65,6 +65,11 @@ import {
   LegState,
 } from './legs.js';
 import { initEjectorStates } from './ejector.js';
+import {
+  initScienceModuleStates,
+  tickScienceModules,
+  onSafeLanding,
+} from './sciencemodule.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -140,6 +145,11 @@ const DEFAULT_SAFE_LANDING_SPEED = 10;
  * @property {Set<string>}     ejectedCrewIds  IDs of crew members who have safely ejected
  *                                           via the ejector seat system during this flight.
  *                                           Populated by `activateEjectorSeat()`.
+ * @property {Map<string, import('./sciencemodule.js').ScienceModuleEntry>} scienceModuleStates
+ *                                           Experiment lifecycle state for each SERVICE_MODULE
+ *                                           part with `COLLECT_SCIENCE` activation behaviour,
+ *                                           managed by sciencemodule.js.  Keyed by instance ID.
+ *                                           States: idle → running → complete → data_returned.
  * @property {boolean}         landed        True after a successful soft touchdown.
  * @property {boolean}         crashed       True after a fatal impact.
  * @property {boolean}         grounded      True while still sitting on the launch pad.
@@ -201,6 +211,7 @@ export function createPhysicsState(assembly, flightState) {
     legStates: new Map(),
     ejectorStates: new Map(),
     ejectedCrewIds: new Set(),
+    scienceModuleStates: new Map(),
     heatMap: new Map(),
     debris: [],
     landed: false,
@@ -218,6 +229,17 @@ export function createPhysicsState(assembly, flightState) {
 
   // Initialise the ejector seat state machine for all crewed COMMAND_MODULE parts.
   initEjectorStates(ps, assembly);
+
+  // Initialise the science module state machine for all SERVICE_MODULE parts
+  // with COLLECT_SCIENCE activation behaviour.
+  initScienceModuleStates(ps, assembly);
+
+  // Flag on flightState so mission objective checking knows whether science
+  // modules are present (used to gate HOLD_ALTITUDE time accumulation).
+  if (flightState) {
+    flightState.hasScienceModules = ps.scienceModuleStates.size > 0;
+    flightState.scienceModuleRunning = false;
+  }
 
   return ps;
 }
@@ -423,6 +445,11 @@ function _integrate(ps, assembly, flightState) {
   if (!ps.grounded) {
     tickLegs(ps, assembly, flightState, FIXED_DT);
   }
+
+  // --- 9c. Science module experiment timers --------------------------------
+  // Decrement running experiment countdowns; emit SCIENCE_COLLECTED on
+  // completion; update flightState.scienceModuleRunning.
+  tickScienceModules(ps, assembly, flightState, FIXED_DT);
 
   // --- 10. Reentry heat model ----------------------------------------------
   if (!ps.grounded) {
@@ -713,6 +740,8 @@ function _handleGroundContact(ps, assembly, flightState) {
       legsDestroyed: false,
       description: `Controlled landing at ${impactSpeed.toFixed(1)} m/s.`,
     });
+    // Recover any complete science data modules that are still attached.
+    onSafeLanding(ps, assembly, flightState);
     return;
   }
 
@@ -741,6 +770,8 @@ function _handleGroundContact(ps, assembly, flightState) {
       legsDestroyed: false,
       description: `Landed at ${impactSpeed.toFixed(1)} m/s.`,
     });
+    // Recover any complete science data modules that are still attached.
+    onSafeLanding(ps, assembly, flightState);
     return;
   }
 

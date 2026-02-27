@@ -15,7 +15,9 @@
  *   PARACHUTE / LANDING_LEGS (DEPLOY)       → added to ps.deployedParts
  *   EJECT   (EJECT)                         → CREW_EJECTED event emitted
  *   RELEASE (RELEASE)                       → SATELLITE_RELEASED event emitted
- *   COLLECT_SCIENCE                         → SCIENCE_COLLECTED event emitted
+ *   COLLECT_SCIENCE                         → delegates to sciencemodule.js;
+ *                                              starts timed experiment (idle→running);
+ *                                              SCIENCE_COLLECTED fires when timer expires
  *
  * DEBRIS SIMULATION
  *   Jettisoned stage sections continue to be simulated independently.  They
@@ -48,6 +50,7 @@ import { tickFuelSystem }           from './fuelsystem.js';
 import { deployParachute, getChuteMultiplier } from './parachute.js';
 import { deployLandingLeg } from './legs.js';
 import { activateEjectorSeat } from './ejector.js';
+import { activateScienceModule } from './sciencemodule.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -248,18 +251,11 @@ export function activateCurrentStage(ps, assembly, stagingConfig, flightState) {
         break;
 
       case 'COLLECT_SCIENCE':
-        // SERVICE_MODULE science instrument — collect experiment data.
-        _emitEvent(flightState, {
-          type:        'PART_ACTIVATED',
-          time,
-          partType:    def.type,
-          description: `${def.name} collecting science data.`,
-        });
-        _emitEvent(flightState, {
-          type:        'SCIENCE_COLLECTED',
-          time,
-          description: `Science data collected at ${altitude.toFixed(0)} m.`,
-        });
+        // SERVICE_MODULE science instrument — start the timed experiment.
+        // The SCIENCE_COLLECTED event fires later (when the timer expires in
+        // sciencemodule.tickScienceModules).  PART_ACTIVATED is emitted by
+        // activateScienceModule itself when the experiment begins.
+        activateScienceModule(ps, assembly, flightState, instanceId);
         break;
 
       default:
@@ -374,21 +370,11 @@ export function activatePartDirect(ps, assembly, flightState, instanceId) {
       break;
 
     case 'COLLECT_SCIENCE':
-      // SERVICE_MODULE science instrument — collect experiment data.
-      _emitEvent(flightState, {
-        type:        'PART_ACTIVATED',
-        time,
-        instanceId,
-        partType:    def.type,
-        description: `${def.name} collecting science data.`,
-      });
-      _emitEvent(flightState, {
-        type:        'SCIENCE_COLLECTED',
-        time,
-        instanceId,
-        altitude,
-        description: `Science data collected at ${altitude.toFixed(0)} m.`,
-      });
+      // SERVICE_MODULE science instrument — start the timed experiment.
+      // The SCIENCE_COLLECTED event fires later (when the timer expires in
+      // sciencemodule.tickScienceModules).  PART_ACTIVATED is emitted by
+      // activateScienceModule itself when the experiment begins.
+      activateScienceModule(ps, assembly, flightState, instanceId);
       break;
 
     default:

@@ -29,6 +29,11 @@ import { deployParachute, getParachuteStatus, ParachuteState } from '../core/par
 import { deployLandingLeg, getLegStatus, LegState, retractLandingLeg } from '../core/legs.js';
 import { activateEjectorSeat, getEjectorSeatStatus, EjectorState } from '../core/ejector.js';
 import { activatePartDirect }                                 from '../core/staging.js';
+import {
+  getScienceModuleStatus,
+  getScienceModuleTimer,
+  ScienceModuleState,
+}                                                             from '../core/sciencemodule.js';
 
 // ---------------------------------------------------------------------------
 // CSS
@@ -265,20 +270,40 @@ function _showMenu(instanceId, def, ps, assembly, flightState, clientX, clientY)
     hasItems = true;
   }
 
-  // ── SERVICE MODULE: experiment activation ────────────────────────────────
+  // ── SERVICE MODULE: experiment state machine ─────────────────────────────
   if (def.type === PartType.SERVICE_MODULE) {
-    const activated = _isExperimentActivated(instanceId, flightState);
-    if (!activated) {
-      _menu.appendChild(_makeButton('Activate Experiment', () => {
-        const debris = activatePartDirect(ps, assembly, flightState, instanceId);
-        // Append any newly created debris fragments to the physics state.
-        for (const frag of debris) {
-          ps.debris.push(frag);
-        }
-        _hideMenu();
-      }));
-    } else {
-      _menu.appendChild(_makeReadOnly('Experiment Status: Complete'));
+    const sciState = getScienceModuleStatus(ps, instanceId);
+
+    switch (sciState) {
+      case ScienceModuleState.IDLE:
+        _menu.appendChild(_makeButton('Activate Experiment', () => {
+          const debris = activatePartDirect(ps, assembly, flightState, instanceId);
+          for (const frag of debris) {
+            ps.debris.push(frag);
+          }
+          _hideMenu();
+        }));
+        break;
+
+      case ScienceModuleState.RUNNING: {
+        const remaining = getScienceModuleTimer(ps, instanceId);
+        _menu.appendChild(_makeReadOnly(
+          `Experiment Running — ${remaining.toFixed(1)} s remaining`,
+        ));
+        break;
+      }
+
+      case ScienceModuleState.COMPLETE:
+        _menu.appendChild(_makeReadOnly('Experiment Complete — data aboard'));
+        break;
+
+      case ScienceModuleState.DATA_RETURNED:
+        _menu.appendChild(_makeReadOnly('Data Returned — mission success!'));
+        break;
+
+      default:
+        _menu.appendChild(_makeReadOnly(`Experiment: ${sciState}`));
+        break;
     }
     hasItems = true;
   }
@@ -439,30 +464,6 @@ function _makeReadOnly(text) {
 // ---------------------------------------------------------------------------
 // Private — activation state helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Return true if a service module's experiment has already been activated.
- *
- * Checks `flightState.events` for a SCIENCE_COLLECTED event that matches the
- * given instanceId (emitted by `activatePartDirect`) OR for a SCIENCE_COLLECTED
- * event without instanceId (emitted by the staging system's `activateCurrentStage`
- * when the part was assigned to a stage and fired via Spacebar).
- *
- * @param {string} instanceId
- * @param {import('../core/gameState.js').FlightState} flightState
- * @returns {boolean}
- */
-function _isExperimentActivated(instanceId, flightState) {
-  if (!flightState?.events) return false;
-  return flightState.events.some((e) => {
-    if (e.type !== 'SCIENCE_COLLECTED') return false;
-    // activatePartDirect emits with instanceId; activateCurrentStage does not.
-    if (e.instanceId !== undefined) return e.instanceId === instanceId;
-    // No instanceId in legacy events — assume this service module was activated
-    // if any SCIENCE_COLLECTED event exists (conservatively shows "Complete").
-    return true;
-  });
-}
 
 /**
  * Return true if a generic activatable part has already been activated and

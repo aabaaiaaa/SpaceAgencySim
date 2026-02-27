@@ -314,7 +314,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-032: Science Module Mechanics
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-022, TASK-031
 - **Description**: Implement in `/src/core/sciencemodule.js`. Service module experiment states: `idle`, `running`, `complete`, `data_returned`. Activation (via context menu or stage) sets state to `running` and starts a countdown timer (30 seconds for Science Module Mk1). Each physics tick decrements the timer by dt. When timer reaches 0, state becomes `complete` — the module has collected data. Data is only "returned" when the module is still attached to the rocket AND the rocket lands safely (ground contact speed < landing threshold). On safe landing, if the module is in `complete` state, it transitions to `data_returned`. Mission objectives of type `RETURN_SCIENCE_DATA` check for `data_returned` state on landing. If the module is destroyed (heat, crash) while in `complete` state, the data is lost. The `HOLD_ALTITUDE` objective type tracks whether the rocket stayed within the target altitude band for the required duration while the experiment was running.

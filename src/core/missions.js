@@ -325,7 +325,15 @@ export function checkObjectiveCompletion(state, flightState) {
           flightState.altitude >= obj.target.minAltitude &&
           flightState.altitude <= obj.target.maxAltitude;
 
-        if (inRange) {
+        // When the rocket carries science modules, altitude hold time only
+        // accumulates while an experiment is actively running.  If there are
+        // no science modules on this flight (`hasScienceModules` is falsy),
+        // the experiment gate is bypassed and the hold is always valid.
+        const experimentOk =
+          !flightState.hasScienceModules ||
+          flightState.scienceModuleRunning === true;
+
+        if (inRange && experimentOk) {
           if (obj._holdEnteredAt == null) {
             // Rocket just entered the altitude band — start timing.
             obj._holdEnteredAt = flightState.timeElapsed;
@@ -333,7 +341,7 @@ export function checkObjectiveCompletion(state, flightState) {
             obj.completed = true;
           }
         } else {
-          // Rocket left the band — reset the timer.
+          // Outside the altitude band, or experiment not running — reset timer.
           obj._holdEnteredAt = null;
         }
         break;
@@ -341,12 +349,14 @@ export function checkObjectiveCompletion(state, flightState) {
 
       // ------------------------------------------------------------------
       case ObjectiveType.RETURN_SCIENCE_DATA: {
-        const scienceCollected = flightState.events.some((e) => e.type === 'SCIENCE_COLLECTED');
-        // Safe landing: impact speed must be <= 10 m/s.
-        const safeLanding = flightState.events.some(
-          (e) => e.type === 'LANDING' && typeof e.speed === 'number' && e.speed <= 10,
+        // The science module state machine emits SCIENCE_DATA_RETURNED once
+        // the experiment is complete AND the rocket has made a safe landing
+        // with the module still attached.  Checking for this event is the
+        // authoritative way to detect successful science data recovery.
+        const dataReturned = flightState.events.some(
+          (e) => e.type === 'SCIENCE_DATA_RETURNED',
         );
-        if (scienceCollected && safeLanding) obj.completed = true;
+        if (dataReturned) obj.completed = true;
         break;
       }
 
