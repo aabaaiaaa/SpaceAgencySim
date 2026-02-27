@@ -276,6 +276,129 @@ export function activateCurrentStage(ps, assembly, stagingConfig, flightState) {
 }
 
 // ---------------------------------------------------------------------------
+// Public API — activatePartDirect
+// ---------------------------------------------------------------------------
+
+/**
+ * Activate a single part immediately, bypassing the stage queue.
+ *
+ * Fires the same activation logic as {@link activateCurrentStage} but for a
+ * specific part instance selected from outside the staging system (e.g. a
+ * flight-scene right-click context menu).  Only activatable parts that are
+ * currently in `ps.activeParts` can be activated this way.
+ *
+ * Returned debris fragments (from SEPARATE activations) should be appended to
+ * `ps.debris` by the caller.
+ *
+ * @param {import('./physics.js').PhysicsState}             ps
+ * @param {import('./rocketbuilder.js').RocketAssembly}     assembly
+ * @param {import('./gameState.js').FlightState}            flightState
+ * @param {string}                                          instanceId
+ * @returns {DebrisState[]}  Newly created debris fragments, or an empty array.
+ */
+export function activatePartDirect(ps, assembly, flightState, instanceId) {
+  if (!ps.activeParts.has(instanceId)) return [];
+
+  const placed = assembly.parts.get(instanceId);
+  const def    = placed ? getPartById(placed.partId) : null;
+  if (!def || !def.activatable) return [];
+
+  const behaviour = def.activationBehaviour;
+  const time      = flightState.timeElapsed;
+  const altitude  = Math.max(0, ps.posY);
+  const newDebris = [];
+
+  switch (behaviour) {
+    case 'IGNITE':
+      // ENGINE or SRB — begin producing thrust.
+      ps.firingEngines.add(instanceId);
+      _emitEvent(flightState, {
+        type:        'PART_ACTIVATED',
+        time,
+        instanceId,
+        partType:    def.type,
+        description: `${def.name} ignited.`,
+      });
+      break;
+
+    case 'SEPARATE': {
+      // DECOUPLER — fire one-shot separation charge.
+      _emitEvent(flightState, {
+        type:        'PART_ACTIVATED',
+        time,
+        instanceId,
+        partType:    def.type,
+        description: `${def.name} fired — stage separation.`,
+      });
+      ps.activeParts.delete(instanceId);
+      ps.firingEngines.delete(instanceId);
+      const fragments = recomputeActiveGraph(ps, assembly);
+      newDebris.push(...fragments);
+      break;
+    }
+
+    case 'DEPLOY':
+      // PARACHUTE or LANDING_LEGS — deploy / extend.
+      ps.deployedParts.add(instanceId);
+      if (def.type === PartType.PARACHUTE) {
+        deployParachute(ps, instanceId);
+      } else if (
+        def.type === PartType.LANDING_LEGS ||
+        def.type === PartType.LANDING_LEG
+      ) {
+        deployLandingLeg(ps, instanceId);
+      }
+      _emitEvent(flightState, {
+        type:        'PART_ACTIVATED',
+        time,
+        instanceId,
+        partType:    def.type,
+        description: `${def.name} deployed at ${altitude.toFixed(0)} m.`,
+      });
+      break;
+
+    case 'EJECT':
+      // COMMAND_MODULE ejector seat — emergency crew escape.
+      activateEjectorSeat(ps, assembly, flightState, instanceId);
+      break;
+
+    case 'RELEASE':
+      // SATELLITE or payload bay — release into free flight.
+      _emitEvent(flightState, {
+        type:        'SATELLITE_RELEASED',
+        time,
+        instanceId,
+        altitude,
+        description: `Satellite released at ${altitude.toFixed(0)} m.`,
+      });
+      break;
+
+    case 'COLLECT_SCIENCE':
+      // SERVICE_MODULE science instrument — collect experiment data.
+      _emitEvent(flightState, {
+        type:        'PART_ACTIVATED',
+        time,
+        instanceId,
+        partType:    def.type,
+        description: `${def.name} collecting science data.`,
+      });
+      _emitEvent(flightState, {
+        type:        'SCIENCE_COLLECTED',
+        time,
+        instanceId,
+        altitude,
+        description: `Science data collected at ${altitude.toFixed(0)} m.`,
+      });
+      break;
+
+    default:
+      break;
+  }
+
+  return newDebris;
+}
+
+// ---------------------------------------------------------------------------
 // Public API — recomputeActiveGraph
 // ---------------------------------------------------------------------------
 

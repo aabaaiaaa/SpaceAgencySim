@@ -248,6 +248,32 @@ export function countDeployedLegs(ps) {
 }
 
 // ---------------------------------------------------------------------------
+// Retraction trigger
+// ---------------------------------------------------------------------------
+
+/**
+ * Retract a previously-deployed landing leg, returning it to the stowed position.
+ *
+ * Transitions the leg from `deployed` → `retracted`.  This allows the player
+ * to reposition legs before final touchdown.  If the leg is already retracted
+ * or still deploying this function is a no-op.
+ *
+ * @param {{ legStates: Map<string, LegEntry> }} ps
+ * @param {string} instanceId  Instance ID of the LANDING_LEGS/LANDING_LEG part.
+ */
+export function retractLandingLeg(ps, instanceId) {
+  if (!ps.legStates) return;
+
+  const entry = ps.legStates.get(instanceId);
+  if (!entry) return;
+
+  if (entry.state !== LegState.DEPLOYED) return;
+
+  entry.state       = LegState.RETRACTED;
+  entry.deployTimer = 0;
+}
+
+// ---------------------------------------------------------------------------
 // Context menu helpers
 // ---------------------------------------------------------------------------
 

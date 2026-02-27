@@ -306,7 +306,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-031: Part Context Menus
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-027
 - **Description**: Right-clicking any part in the flight view (when the part is on the active rocket, not debris) shows a context menu. Menu items shown by part type: ALL activatable parts → "Activate [Part Name]" (fires the same activation logic as staging). FUEL TANKS → "Fuel: X kg remaining" (read-only, no action). SERVICE MODULE → "Activate Experiment" (if not yet activated), "Experiment Status: [state]" (if active or complete). LANDING LEGS → "Deploy Legs" (if retracted), "Retract Legs" (if deployed, for repositioning). PARACHUTE → "Deploy Parachute". COMMAND MODULE (crewed) → "Activate Ejector Seat". The context menu closes on any click outside it. Parts that have already been activated (and activation is one-time, like decouplers) show "Already Activated" greyed out.

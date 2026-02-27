@@ -24,6 +24,7 @@ import {
   fireNextStage,
 } from '../core/physics.js';
 import { initFlightHud, destroyFlightHud, setHudTimeWarp, lockTimeWarp } from './flightHud.js';
+import { initFlightContextMenu, destroyFlightContextMenu } from './flightContextMenu.js';
 import { saveGame, listSaves } from '../core/saveload.js';
 import { ATMOSPHERE_TOP, isReentryCondition } from '../core/atmosphere.js';
 
@@ -298,6 +299,13 @@ export function startFlightScene(
   // Build the in-flight control overlay (hamburger button + dropdown menu).
   _buildFlightOverlay(container);
 
+  // Initialise the right-click part context menu.
+  initFlightContextMenu(
+    () => _ps,
+    () => _assembly,
+    () => _flightState,
+  );
+
   // Bind keyboard handlers.
   _keydownHandler = _onKeyDown;
   _keyupHandler   = _onKeyUp;
@@ -333,6 +341,7 @@ export function stopFlightScene() {
   }
 
   destroyFlightHud();
+  destroyFlightContextMenu();
   destroyFlightRenderer();
 
   if (_flightOverlay) {

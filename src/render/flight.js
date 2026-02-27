@@ -811,6 +811,66 @@ export function getZoomLevel() {
 }
 
 /**
+ * Hit-test a screen-space pointer position against all active parts on the
+ * main rocket (not debris), returning the instance ID of the topmost part
+ * whose bounding rectangle contains the pointer, or `null` if no part was hit.
+ *
+ * The test accounts for the rocket container's translation and rotation.
+ * Parts are NOT visually scaled with zoom (the container is not scaled, only
+ * positioned), so the hit test is performed entirely in container-local pixel
+ * space by rotating the offset vector by the inverse of `ps.angle`.
+ *
+ * @param {number}                                              screenX  CSS pixel X.
+ * @param {number}                                              screenY  CSS pixel Y.
+ * @param {import('../core/physics.js').PhysicsState}           ps
+ * @param {import('../core/rocketbuilder.js').RocketAssembly}   assembly
+ * @returns {string|null}  The hit part's instanceId, or null.
+ */
+export function hitTestFlightPart(screenX, screenY, ps, assembly) {
+  if (!ps || !assembly) return null;
+
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+
+  // Screen position of the rocket container's origin (ps.posX, ps.posY in world space).
+  const { sx, sy } = _worldToScreen(ps.posX, ps.posY, w, h);
+
+  // Offset of the click from the container origin, in screen pixels.
+  const dx = screenX - sx;
+  const dy = screenY - sy;
+
+  // Rotate by the inverse of the container rotation to get container-local space.
+  const cosNeg = Math.cos(-ps.angle);
+  const sinNeg = Math.sin(-ps.angle);
+  const localX = dx * cosNeg - dy * sinNeg;
+  const localY = dx * sinNeg + dy * cosNeg;
+
+  // Test each active part in reverse insertion order (topmost rendered last).
+  const activeIds = [...ps.activeParts];
+  for (let i = activeIds.length - 1; i >= 0; i--) {
+    const instanceId = activeIds[i];
+    const placed = assembly.parts.get(instanceId);
+    const def    = placed ? getPartById(placed.partId) : null;
+    if (!def) continue;
+
+    const pw = def.width  ?? 40;
+    const ph = def.height ?? 20;
+    // Part centre in container local space: (placed.x, -placed.y)
+    const partCX = placed.x;
+    const partCY = -placed.y;
+
+    if (
+      localX >= partCX - pw / 2 && localX <= partCX + pw / 2 &&
+      localY >= partCY - ph / 2 && localY <= partCY + ph / 2
+    ) {
+      return instanceId;
+    }
+  }
+
+  return null;
+}
+
+/**
  * Programmatically set the zoom level, clamped to [MIN_ZOOM, MAX_ZOOM].
  *
  * @param {number} zoom  Desired zoom level.
