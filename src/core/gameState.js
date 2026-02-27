@@ -26,9 +26,11 @@ import {
 
 /**
  * @typedef {Object} Loan
- * @property {number} balance       - Outstanding principal owed (dollars).
- * @property {number} interestRate  - Annual interest rate expressed as a
- *                                    decimal (e.g. 0.05 = 5 %).
+ * @property {number} balance               - Outstanding principal owed (dollars).
+ * @property {number} interestRate          - Per-mission interest rate expressed as a
+ *                                            decimal (e.g. 0.03 = 3 %).
+ * @property {number} totalInterestAccrued  - Running total of all interest charges
+ *                                            applied via applyInterest() (dollars).
  */
 
 /**
@@ -176,6 +178,7 @@ export function createGameState() {
     loan: {
       balance: STARTING_LOAN_BALANCE,
       interestRate: DEFAULT_LOAN_INTEREST_RATE,
+      totalInterestAccrued: 0,
     },
 
     crew: [],

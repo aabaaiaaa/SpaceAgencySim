@@ -33,7 +33,9 @@ import {
  * @returns {void}
  */
 export function applyInterest(state) {
-  state.loan.balance *= (1 + state.loan.interestRate);
+  const interest = state.loan.balance * state.loan.interestRate;
+  state.loan.balance += interest;
+  state.loan.totalInterestAccrued = (state.loan.totalInterestAccrued ?? 0) + interest;
 }
 
 // ---------------------------------------------------------------------------

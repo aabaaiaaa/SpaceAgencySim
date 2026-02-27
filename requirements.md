@@ -112,7 +112,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-009: Top Bar & Loan Modal
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-005, TASK-008
 - **Description**: HTML overlay top bar visible on all screens (hub, VAB, mission control, crew admin, flight). Left side: agency name. Centre: current cash displayed as `$X,XXX,XXX`. Right side: hamburger menu button. Clicking the cash amount opens the loan modal. The loan modal shows: outstanding loan balance, current interest rate (3% per mission), estimated interest on next mission completion, total interest paid to date. Two action buttons: "Pay Down Loan" (input field for amount, validates against available cash) and "Borrow More" (input field, validates against max borrow limit). The menu button opens a dropdown: Save Game (opens save slot picker), Load Game (goes to load screen), Exit to Menu (returns to load/menu screen after confirming unsaved progress warning).

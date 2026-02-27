@@ -154,7 +154,10 @@ const VAB_CSS = `
 /* ── VAB root ───────────────────────────────────────────────────────── */
 #vab-root {
   position: absolute;
-  inset: 0;
+  top: 44px; /* leave room for the global top bar (src/ui/topbar.js) */
+  left: 0;
+  right: 0;
+  bottom: 0;
   display: flex;
   flex-direction: column;
   pointer-events: none;
