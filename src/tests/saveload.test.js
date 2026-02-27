@@ -88,6 +88,151 @@ function minimalEnvelopeJSON(overrides = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// Round-trip — complex state
+// ---------------------------------------------------------------------------
+
+describe('Round-trip: save and load a complex state', () => {
+  it('deep-equals original state with multiple crew, missions, and rockets', () => {
+    const state = freshState();
+
+    // Multiple crew members with varying statuses.
+    state.crew = [
+      {
+        id: 'crew-1',
+        name: 'Alice',
+        status: CrewStatus.IDLE,
+        skills: { piloting: 75, engineering: 40, science: 60 },
+        salary: 5000,
+        hiredDate: '2025-01-01T00:00:00.000Z',
+        injuryEnds: null,
+      },
+      {
+        id: 'crew-2',
+        name: 'Bob',
+        status: CrewStatus.ON_MISSION,
+        skills: { piloting: 20, engineering: 90, science: 30 },
+        salary: 6000,
+        hiredDate: '2025-03-15T00:00:00.000Z',
+        injuryEnds: '2025-04-01T00:00:00.000Z',
+      },
+      {
+        id: 'crew-3',
+        name: 'Carol',
+        status: CrewStatus.DEAD,
+        skills: { piloting: 55, engineering: 55, science: 55 },
+        salary: 5500,
+        hiredDate: '2024-06-01T00:00:00.000Z',
+        injuryEnds: null,
+      },
+    ];
+
+    // Several missions distributed across the three buckets.
+    state.missions.available = [
+      { id: 'mission-avail-1', title: 'Sub-orbital test', reward: 10000 },
+      { id: 'mission-avail-2', title: 'Weather sat', reward: 25000 },
+    ];
+    state.missions.accepted = [
+      { id: 'mission-acc-1', title: 'Orbital insertion', reward: 50000 },
+    ];
+    state.missions.completed = [
+      { id: 'mission-comp-1', title: 'First flight', reward: 5000 },
+      { id: 'mission-comp-2', title: 'Science drop', reward: 8000 },
+    ];
+
+    // Multiple rocket designs with nested staging.
+    state.rockets = [
+      {
+        id: 'rocket-1',
+        name: 'Explorer I',
+        parts: [
+          { partId: 'command_pod_mk1', position: { x: 0, y: 0 } },
+          { partId: 'engine_liquid_1', position: { x: 0, y: -1 } },
+          { partId: 'fuel_tank_small', position: { x: 0, y: -2 } },
+        ],
+        staging: { stages: [[1, 2]], unstaged: [] },
+        totalMass: 3500,
+        totalThrust: 180,
+        createdDate: '2025-01-10T00:00:00.000Z',
+        updatedDate: '2025-01-12T00:00:00.000Z',
+      },
+      {
+        id: 'rocket-2',
+        name: 'Heavy Lifter',
+        parts: [
+          { partId: 'command_pod_mk2', position: { x: 0, y: 0 } },
+          { partId: 'engine_liquid_2', position: { x: 0, y: -1 } },
+          { partId: 'fuel_tank_large', position: { x: 0, y: -2 } },
+          { partId: 'decoupler_1', position: { x: 0, y: -3 } },
+          { partId: 'booster_srb', position: { x: 0, y: -4 } },
+        ],
+        staging: { stages: [[1, 2], [3, 4]], unstaged: [] },
+        totalMass: 12000,
+        totalThrust: 540,
+        createdDate: '2025-02-01T00:00:00.000Z',
+        updatedDate: '2025-02-14T00:00:00.000Z',
+      },
+    ];
+
+    // Flight history.
+    state.flightHistory = [
+      {
+        id: 'flight-1',
+        missionId: 'mission-comp-1',
+        rocketId: 'rocket-1',
+        crewIds: ['crew-1'],
+        launchDate: '2025-03-01T12:00:00.000Z',
+        outcome: 'SUCCESS',
+        deltaVUsed: 1800,
+        revenue: 5000,
+        notes: 'Perfect flight.',
+      },
+    ];
+
+    state.money = 123_456;
+    state.loan.balance = 80_000;
+    state.loan.interestRate = 0.05;
+    state.parts = ['command_pod_mk1', 'engine_liquid_1', 'fuel_tank_small'];
+    state.playTimeSeconds = 300;
+
+    saveGame(state, 0, 'Complex Save');
+    const restored = loadGame(0);
+
+    // Top-level scalar fields.
+    expect(restored.money).toBe(state.money);
+    expect(restored.loan.balance).toBe(80_000);
+    expect(restored.loan.interestRate).toBe(0.05);
+    expect(restored.parts).toEqual(state.parts);
+
+    // Crew — count and individual records.
+    expect(restored.crew).toHaveLength(3);
+    expect(restored.crew[0].name).toBe('Alice');
+    expect(restored.crew[0].skills.piloting).toBe(75);
+    expect(restored.crew[1].status).toBe(CrewStatus.ON_MISSION);
+    expect(restored.crew[1].injuryEnds).toBe('2025-04-01T00:00:00.000Z');
+    expect(restored.crew[2].status).toBe(CrewStatus.DEAD);
+
+    // Missions — all three buckets.
+    expect(restored.missions.available).toHaveLength(2);
+    expect(restored.missions.accepted).toHaveLength(1);
+    expect(restored.missions.completed).toHaveLength(2);
+    expect(restored.missions.available[1].id).toBe('mission-avail-2');
+    expect(restored.missions.accepted[0].reward).toBe(50000);
+
+    // Rockets — nested staging and parts arrays.
+    expect(restored.rockets).toHaveLength(2);
+    expect(restored.rockets[0].name).toBe('Explorer I');
+    expect(restored.rockets[0].parts).toHaveLength(3);
+    expect(restored.rockets[0].staging.stages[0]).toEqual([1, 2]);
+    expect(restored.rockets[1].staging.stages).toHaveLength(2);
+    expect(restored.rockets[1].totalMass).toBe(12000);
+
+    // Flight history.
+    expect(restored.flightHistory).toHaveLength(1);
+    expect(restored.flightHistory[0].crewIds).toEqual(['crew-1']);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Slot index validation
 // ---------------------------------------------------------------------------
 
@@ -238,6 +383,30 @@ describe('saveGame()', () => {
     const summary = saveGame(freshState(), 0, 42);
     expect(summary.saveName).toBe('42');
   });
+
+  it('saving to slot 2 does not overwrite slot 0', () => {
+    const stateA = freshState();
+    stateA.money = 111_111;
+    saveGame(stateA, 0, 'Slot Zero');
+
+    const stateB = freshState();
+    stateB.money = 222_222;
+    saveGame(stateB, 2, 'Slot Two');
+
+    // Slot 0 must still contain the original save.
+    const restoredA = loadGame(0);
+    expect(restoredA.money).toBe(111_111);
+
+    // Slot 2 must contain the new save.
+    const restoredB = loadGame(2);
+    expect(restoredB.money).toBe(222_222);
+
+    // Slots 1, 3, 4 must remain empty.
+    const saves = listSaves();
+    expect(saves[1]).toBeNull();
+    expect(saves[3]).toBeNull();
+    expect(saves[4]).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -387,6 +556,30 @@ describe('importSave()', () => {
     expect(() => importSave('{{not json', 0)).toThrow(/not valid JSON/i);
   });
 
+  it('does not write to the slot when JSON is malformed', () => {
+    // Pre-populate the slot so we can confirm it was not overwritten.
+    saveGame(freshState(), 2, 'original');
+    const before = localStorage.getItem('spaceAgencySave_2');
+
+    expect(() => importSave('{broken json}}', 2)).toThrow();
+
+    // The slot must still contain the original data.
+    const after = localStorage.getItem('spaceAgencySave_2');
+    expect(after).toBe(before);
+  });
+
+  it('does not write to the slot when the envelope is structurally invalid', () => {
+    saveGame(freshState(), 3, 'keep me');
+    const before = localStorage.getItem('spaceAgencySave_3');
+
+    // Missing the required "state" field.
+    const badEnvelope = JSON.stringify({ saveName: 'Bad', timestamp: 'T' });
+    expect(() => importSave(badEnvelope, 3)).toThrow();
+
+    const after = localStorage.getItem('spaceAgencySave_3');
+    expect(after).toBe(before);
+  });
+
   it('throws when root is not an object', () => {
     expect(() => importSave('"just a string"', 0)).toThrow(/plain object/i);
   });
@@ -511,5 +704,75 @@ describe('exportSave()', () => {
 
   it('throws RangeError for an out-of-bounds slot', () => {
     expect(() => exportSave(-1)).toThrow(RangeError);
+  });
+
+  it('the data stored for export is a valid JSON string containing the full state', () => {
+    // exportSave() reads the raw JSON from localStorage and sends it to the
+    // user as a file. Verify that the underlying storage contains well-formed
+    // JSON whose envelope.state matches the state that was saved.
+    const state = freshState();
+    state.money = 987_654;
+    state.crew = [{ id: 'c1', status: CrewStatus.IDLE, name: 'Dana' }];
+    state.missions.completed = [{ id: 'm1', title: 'First orbit' }];
+    saveGame(state, 0, 'Export Test');
+
+    // Read what exportSave would send to the browser.
+    const raw = localStorage.getItem('spaceAgencySave_0');
+    expect(typeof raw).toBe('string');
+
+    // Must be parseable JSON.
+    let envelope;
+    expect(() => { envelope = JSON.parse(raw); }).not.toThrow();
+
+    // Must contain all top-level envelope fields.
+    expect(envelope).toHaveProperty('saveName', 'Export Test');
+    expect(envelope).toHaveProperty('timestamp');
+    expect(envelope).toHaveProperty('state');
+
+    // The embedded state must include the full game data.
+    expect(envelope.state.money).toBe(987_654);
+    expect(envelope.state.crew[0].name).toBe('Dana');
+    expect(envelope.state.missions.completed[0].title).toBe('First orbit');
+  });
+
+  it('the exported JSON from a browser-mocked environment is parseable and contains full state', () => {
+    // Mock the minimum browser APIs needed to exercise the DOM code path.
+    const state = freshState();
+    state.money = 555_000;
+    state.rockets = [{ id: 'r1', name: 'Mock Rocket', parts: [], staging: { stages: [[]], unstaged: [] }, totalMass: 100, totalThrust: 50 }];
+    saveGame(state, 1, 'Browser Export');
+
+    // Capture what Blob is constructed with.
+    let capturedBlobContent = null;
+    const MockBlob = class {
+      constructor(parts) { capturedBlobContent = parts.join(''); }
+    };
+    const mockCreateObjectURL = vi.fn().mockReturnValue('blob:mock-url');
+    const mockRevokeObjectURL = vi.fn();
+    const mockAnchor = {
+      href: null, download: null,
+      click: vi.fn(),
+    };
+    const mockDocument = {
+      createElement: vi.fn().mockReturnValue(mockAnchor),
+      body: { appendChild: vi.fn(), removeChild: vi.fn() },
+    };
+    vi.stubGlobal('document', mockDocument);
+    vi.stubGlobal('Blob', MockBlob);
+    vi.stubGlobal('URL', { createObjectURL: mockCreateObjectURL, revokeObjectURL: mockRevokeObjectURL });
+
+    expect(() => exportSave(1)).not.toThrow();
+
+    // The Blob was built from the raw JSON string.
+    expect(capturedBlobContent).not.toBeNull();
+    let parsed;
+    expect(() => { parsed = JSON.parse(capturedBlobContent); }).not.toThrow();
+    expect(parsed.state.money).toBe(555_000);
+    expect(parsed.state.rockets[0].name).toBe('Mock Rocket');
+
+    // Clean up extra stubs.
+    vi.unstubAllGlobals();
+    // Re-apply the localStorage mock so afterEach() cleanup works.
+    vi.stubGlobal('localStorage', mockStorage);
   });
 });

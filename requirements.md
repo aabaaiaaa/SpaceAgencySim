@@ -394,7 +394,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-042: Save/Load System Tests
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-006, TASK-036
 - **Description**: Write unit tests in `/src/tests/saveload.test.js`. Mock localStorage for the Node test environment. Tests cover: (1) `saveGame` writes serialised state to the correct localStorage key. (2) `loadGame` deserialises and returns a state object that deep-equals the original saved state. (3) Round-trip: save a complex state (multiple crew, missions, rockets), load it, verify all nested fields match. (4) `listSaves` returns correct slot summaries including all stat fields. (5) Saving to slot 2 does not overwrite slot 0. (6) `deleteSave` removes the correct slot and leaves others intact. (7) `exportSave` returns a valid JSON string containing the full state. (8) `importSave` with valid JSON writes to the specified slot. (9) `importSave` with malformed JSON throws an error and does not write to the slot. All tests must pass with `vitest run`.
