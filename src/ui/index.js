@@ -9,8 +9,9 @@ import { initHubUI, destroyHubUI } from './hub.js';
 import { initVabUI } from './vab.js';
 import { initCrewAdminUI, destroyCrewAdminUI } from './crewAdmin.js';
 import { initMissionControlUI, destroyMissionControlUI } from './missionControl.js';
+import { initLaunchPadUI, destroyLaunchPadUI } from './launchPad.js';
 import { initTopBar, destroyTopBar } from './topbar.js';
-import { showVabScene } from '../render/vab.js';
+import { showVabScene, hideVabScene } from '../render/vab.js';
 import { showHubScene } from '../render/hub.js';
 
 // ---------------------------------------------------------------------------
@@ -35,6 +36,12 @@ let _crewAdminOpen = false;
  * Used to guard against double-mounting.
  */
 let _missionControlOpen = false;
+
+/**
+ * True while the Launch Pad screen is open.
+ * Used to guard against double-mounting.
+ */
+let _launchPadOpen = false;
 
 /**
  * The #ui-overlay container, stored so _handleExitToMenu can re-mount the
@@ -78,6 +85,7 @@ export function initUI(container, state) {
   _vabInitialized     = false;
   _crewAdminOpen      = false;
   _missionControlOpen = false;
+  _launchPadOpen      = false;
 
   // Mount the persistent top bar — visible on all in-game screens.
   initTopBar(container, state, {
@@ -110,6 +118,10 @@ function _handleExitToMenu() {
   if (_missionControlOpen) {
     destroyMissionControlUI();
     _missionControlOpen = false;
+  }
+  if (_launchPadOpen) {
+    destroyLaunchPadUI();
+    _launchPadOpen = false;
   }
 
   // Wipe any remaining screen overlays from the container.
@@ -150,7 +162,20 @@ function _handleNavigation(container, state, destination) {
     showVabScene();
 
     if (!_vabInitialized) {
-      initVabUI(container, state);
+      initVabUI(container, state, {
+        onBack: () => {
+          // Remove the VAB overlay and return to the hub.
+          const vabRoot = document.getElementById('vab-root');
+          if (vabRoot) vabRoot.remove();
+          _vabInitialized = false;
+          hideVabScene();
+          showHubScene();
+          initHubUI(container, state, (dest) => {
+            _handleNavigation(container, state, dest);
+          });
+          console.log('[UI] Returned to hub from VAB');
+        },
+      });
       _vabInitialized = true;
     }
 
@@ -201,6 +226,29 @@ function _handleNavigation(container, state, destination) {
     }
 
     console.log('[UI] Navigated to Mission Control');
+    return;
+  }
+
+  if (destination === 'launch-pad') {
+    // Tear down the hub overlay and show the Launch Pad screen.
+    destroyHubUI();
+
+    if (!_launchPadOpen) {
+      initLaunchPadUI(container, state, {
+        onBack: () => {
+          // Launch Pad has already destroyed itself; re-show the hub.
+          _launchPadOpen = false;
+          showHubScene();
+          initHubUI(container, state, (dest) => {
+            _handleNavigation(container, state, dest);
+          });
+          console.log('[UI] Returned to hub from Launch Pad');
+        },
+      });
+      _launchPadOpen = true;
+    }
+
+    console.log('[UI] Navigated to Launch Pad');
     return;
   }
 

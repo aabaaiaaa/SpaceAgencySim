@@ -410,7 +410,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-044: E2E — Hub Navigation
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-008, TASK-011, TASK-014, TASK-015, TASK-036
 - **Description**: Write Playwright tests in `/e2e/hub-navigation.spec.js`. Each test starts from the hub (seed a new game state in localStorage before navigating). Tests: (1) Clicking "Vehicle Assembly Building" loads the VAB screen (parts panel is visible). (2) Clicking "Mission Control Centre" loads the mission control screen (at least one mission is listed as available). (3) Clicking "Crew Administration" loads the crew admin screen (tabs for Active Crew, Hire, History are present). (4) Clicking "Launch Pad" loads the launch pad screen. (5) Each building screen has a back/return button that returns to the hub. (6) The top bar showing cash is visible on each building screen. All tests must pass with `playwright test`.

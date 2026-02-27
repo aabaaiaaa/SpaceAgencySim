@@ -84,10 +84,10 @@ test.describe('App Load & New Game Flow', () => {
   // ── (4) Hub top bar shows correct starting cash ──────────────────────────
 
   test('(4) the hub shows the correct starting cash ($2,000,000) in the top bar', async () => {
-    await expect(page.locator('#hub-topbar')).toBeVisible();
+    await expect(page.locator('#game-topbar')).toBeVisible();
 
     // Cash readout must contain "2,000,000" (formatted with commas).
-    await expect(page.locator('#hub-cash')).toContainText('2,000,000');
+    await expect(page.locator('#topbar-cash')).toContainText('2,000,000');
   });
 
   // ── (5) Hub shows all four clickable buildings ───────────────────────────

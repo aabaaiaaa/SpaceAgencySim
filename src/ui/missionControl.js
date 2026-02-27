@@ -447,8 +447,9 @@ function _renderShell() {
   backBtn.id = 'mission-control-back-btn';
   backBtn.textContent = '← Hub';
   backBtn.addEventListener('click', () => {
+    const onBack = _onBack; // capture before destroy nulls it
     destroyMissionControlUI();
-    if (_onBack) _onBack();
+    if (onBack) onBack();
   });
   header.appendChild(backBtn);
 

@@ -497,8 +497,9 @@ function _renderShell() {
   backBtn.id = 'crew-admin-back-btn';
   backBtn.textContent = '← Hub';
   backBtn.addEventListener('click', () => {
+    const onBack = _onBack; // capture before destroy nulls it
     destroyCrewAdminUI();
-    if (_onBack) _onBack();
+    if (onBack) onBack();
   });
   header.appendChild(backBtn);
 

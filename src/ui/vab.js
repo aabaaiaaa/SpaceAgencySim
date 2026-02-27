@@ -93,6 +93,9 @@ let _flightActive = false;
 /** Result of the last validation run, or null before the first run. @type {import('../core/rocketvalidator.js').ValidationResult | null} */
 let _lastValidation = null;
 
+/** Optional callback invoked when the player clicks "← Hub". @type {(() => void) | null} */
+let _onBack = null;
+
 // ---------------------------------------------------------------------------
 // Part-type display helpers
 // ---------------------------------------------------------------------------
@@ -1712,6 +1715,11 @@ function _bindButtons(root) {
     stagingPanel?.setAttribute('hidden', '');
   };
 
+  // ── "← Hub" button — return to the space agency hub ──────────────────────
+  root.querySelector('#vab-back-btn')?.addEventListener('click', () => {
+    if (_onBack) _onBack();
+  });
+
   // ── "Menu" button — opens game menu dropdown ─────────────────────────────
   root.querySelector('#vab-btn-menu')?.addEventListener('click', (e) => {
     _toggleGameMenu(/** @type {HTMLElement} */ (e.currentTarget));
@@ -2277,7 +2285,9 @@ function _showLaunchInitiatedOverlay() {
  * @param {HTMLElement} container  The #ui-overlay div from index.html.
  * @param {import('../core/gameState.js').GameState} state
  */
-export function initVabUI(container, state) {
+export function initVabUI(container, state, { onBack } = {}) {
+  _onBack = onBack ?? null;
+
   // Inject styles once.
   if (!document.getElementById('vab-css')) {
     const styleEl = document.createElement('style');
@@ -2297,6 +2307,7 @@ export function initVabUI(container, state) {
         <span class="vab-cash-value" id="vab-cash">${fmt$(state.money)}</span>
       </div>
       <div class="vab-toolbar-btns">
+        <button class="vab-btn" id="vab-back-btn" type="button">&#8592; Hub</button>
         <button class="vab-btn" id="vab-btn-menu" type="button">
           Menu
         </button>
