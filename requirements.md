@@ -442,7 +442,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-048: E2E — Crew Administration Flow
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-011, TASK-036
 - **Description**: Write Playwright tests in `/e2e/crew.spec.js`. Seed a fresh game state (no crew). Tests: (1) The Active Crew tab shows an empty state message when no crew are hired. (2) The Hire tab shows the hire cost ($50,000) and a name field. (3) Clicking "Hire Astronaut" with a name entered deducts $50,000 from cash (visible in top bar) and adds the astronaut to the Active Crew tab. (4) The newly hired astronaut appears with 0 missions flown and status "active". (5) Clicking "Fire" on an active astronaut moves them out of the Active Crew list. (6) Fired astronauts appear in the History tab with status "fired". (7) Attempting to hire when cash is below $50,000 (seeded state) shows an error or the hire button is disabled. All tests must pass with `playwright test`.

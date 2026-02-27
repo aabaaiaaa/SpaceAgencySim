@@ -15,6 +15,7 @@
 
 import { hireCrew, fireCrew, getActiveCrew, getFullHistory } from '../core/crew.js';
 import { AstronautStatus, HIRE_COST } from '../core/constants.js';
+import { refreshTopBar } from './topbar.js';
 
 // ---------------------------------------------------------------------------
 // CSS
@@ -723,6 +724,8 @@ function _renderHireTab() {
       feedback.className = 'hire-feedback success';
       feedback.textContent = `${result.astronaut.name} has joined the crew!`;
       nameInput.value = '';
+      // Sync the persistent top bar cash display.
+      refreshTopBar();
       // Refresh cash display and button state.
       _renderHireTab();
       // Show the success message again after re-render.
