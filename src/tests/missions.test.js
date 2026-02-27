@@ -98,12 +98,20 @@ function makeFlightState(missionId, overrides = {}) {
 // mutating the live export between test files.
 // ---------------------------------------------------------------------------
 
-/** Splice `defs` into MISSIONS and return a cleanup function. */
+/**
+ * Temporarily replace the entire MISSIONS catalog with `defs` and return a
+ * cleanup function that restores the original contents.
+ *
+ * Using a full replacement (rather than an append) ensures that the real
+ * catalog missions (e.g. mission-001 with unlocksAfter: []) do not bleed
+ * into tests that inject synthetic missions.
+ */
 function withMissions(...defs) {
-  const origLen = MISSIONS.length;
+  const saved = MISSIONS.splice(0, MISSIONS.length); // save & clear
   MISSIONS.push(...defs);
   return () => {
-    MISSIONS.splice(origLen, MISSIONS.length - origLen);
+    MISSIONS.splice(0, MISSIONS.length); // clear injected
+    MISSIONS.push(...saved);             // restore original
   };
 }
 
@@ -1041,6 +1049,299 @@ describe('checkObjectiveCompletion() — REACH_ORBIT', () => {
     const fs = makeFlightState('m1', { altitude: 100_000, velocity: 8_000 });
     checkObjectiveCompletion(state, fs);
     expect(state.missions.accepted[0].objectives[0].completed).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Catalog Integration Tests — using the real MISSIONS catalog data
+//
+// These tests verify the ten specific behaviours called out in TASK-040:
+//   (1)  At game start, only Mission 1 (First Flight) is available.
+//   (2)  Completing Mission 1 makes Mission 2 available.
+//   (3)  Completing Mission 4 makes Missions 5, 6, and 7 simultaneously available.
+//   (4)  A mission with two prerequisites only unlocks after BOTH are completed.
+//   (5)  acceptMission sets mission status to 'accepted'.
+//   (6)  During early tutorial, accepting one mission prevents accepting a second.
+//   (7)  After early tutorial, multiple missions can be accepted simultaneously.
+//   (8)  checkObjectiveCompletion at 100m marks the REACH_ALTITUDE 100m objective done.
+//   (9)  Completing all objectives then calling completeMission marks the mission done.
+//   (10) getUnlockedParts returns correct part IDs after specific missions complete.
+// ---------------------------------------------------------------------------
+
+describe('Catalog (1): only Mission 1 is available at game start', () => {
+  it('initializeMissions seeds exactly one mission from the real catalog', () => {
+    const state = freshState();
+    initializeMissions(state);
+    expect(state.missions.available).toHaveLength(1);
+    expect(state.missions.available[0].id).toBe('mission-001');
+    expect(state.missions.available[0].title).toBe('First Flight');
+  });
+
+  it('missions 2–17 are all locked at game start', () => {
+    const state = freshState();
+    initializeMissions(state);
+    const ids = state.missions.available.map((m) => m.id);
+    for (let i = 2; i <= 17; i++) {
+      expect(ids).not.toContain(`mission-${String(i).padStart(3, '0')}`);
+    }
+  });
+});
+
+describe('Catalog (2): completing Mission 1 makes Mission 2 available', () => {
+  it('mission-002 appears in available after completing mission-001', () => {
+    const state = freshState();
+    initializeMissions(state);
+    acceptMission(state, 'mission-001');
+    completeMission(state, 'mission-001');
+    const ids = state.missions.available.map((m) => m.id);
+    expect(ids).toContain('mission-002');
+    expect(ids).not.toContain('mission-001');
+  });
+
+  it('mission-002 is the only newly available mission after completing mission-001', () => {
+    const state = freshState();
+    initializeMissions(state);
+    acceptMission(state, 'mission-001');
+    completeMission(state, 'mission-001');
+    expect(state.missions.available).toHaveLength(1);
+    expect(state.missions.available[0].id).toBe('mission-002');
+  });
+});
+
+describe('Catalog (3): completing Mission 4 unlocks Missions 5, 6, and 7 simultaneously', () => {
+  /** Helper: advance through the linear tutorial chain up to and including `targetId`. */
+  function completeTutorialChainTo(state, targetId) {
+    const chain = ['mission-001', 'mission-002', 'mission-003', 'mission-004'];
+    for (const id of chain) {
+      acceptMission(state, id);
+      completeMission(state, id);
+      if (id === targetId) break;
+    }
+  }
+
+  it('exactly missions 5, 6, and 7 become available after mission-004 is completed', () => {
+    const state = freshState();
+    initializeMissions(state);
+    completeTutorialChainTo(state, 'mission-004');
+    const ids = state.missions.available.map((m) => m.id);
+    expect(ids).toContain('mission-005');
+    expect(ids).toContain('mission-006');
+    expect(ids).toContain('mission-007');
+    expect(ids).toHaveLength(3);
+  });
+
+  it('missions 5, 6, and 7 are not available after only mission-003 is completed', () => {
+    const state = freshState();
+    initializeMissions(state);
+    completeTutorialChainTo(state, 'mission-003');
+    const ids = state.missions.available.map((m) => m.id);
+    expect(ids).not.toContain('mission-005');
+    expect(ids).not.toContain('mission-006');
+    expect(ids).not.toContain('mission-007');
+  });
+});
+
+describe('Catalog (4): two-prerequisite mission only unlocks when both prereqs are complete', () => {
+  // mission-011 ("Emergency Systems Verified") requires mission-008 AND mission-009.
+
+  it('mission-011 does not unlock when only mission-008 is completed', () => {
+    const state = freshState();
+    state.missions.completed.push({ id: 'mission-008', status: MissionStatus.COMPLETED });
+    const unlocked = getUnlockedMissions(state);
+    expect(unlocked.map((m) => m.id)).not.toContain('mission-011');
+  });
+
+  it('mission-011 does not unlock when only mission-009 is completed', () => {
+    const state = freshState();
+    state.missions.completed.push({ id: 'mission-009', status: MissionStatus.COMPLETED });
+    const unlocked = getUnlockedMissions(state);
+    expect(unlocked.map((m) => m.id)).not.toContain('mission-011');
+  });
+
+  it('mission-011 unlocks once both mission-008 and mission-009 are completed', () => {
+    const state = freshState();
+    state.missions.completed.push({ id: 'mission-008', status: MissionStatus.COMPLETED });
+    state.missions.completed.push({ id: 'mission-009', status: MissionStatus.COMPLETED });
+    const unlocked = getUnlockedMissions(state);
+    expect(unlocked.map((m) => m.id)).toContain('mission-011');
+  });
+});
+
+describe('Catalog (5): acceptMission sets mission status to accepted', () => {
+  it('mission-001 status becomes "accepted" after acceptMission is called', () => {
+    const state = freshState();
+    initializeMissions(state);
+    acceptMission(state, 'mission-001');
+    expect(state.missions.accepted[0].status).toBe(MissionStatus.ACCEPTED);
+    expect(state.missions.accepted[0].id).toBe('mission-001');
+  });
+});
+
+describe('Catalog (6): early tutorial allows only one accepted mission at a time', () => {
+  it('attempting to accept a second mission during early tutorial returns { success: false }', () => {
+    const state = freshState();
+    initializeMissions(state);
+    // Accept the only available mission (mission-001).
+    acceptMission(state, 'mission-001');
+    // mission-002 is still locked — not yet in the available bucket.
+    const result = acceptMission(state, 'mission-002');
+    expect(result.success).toBe(false);
+    expect(typeof result.error).toBe('string');
+    // Only the first accept succeeded.
+    expect(state.missions.accepted).toHaveLength(1);
+  });
+
+  it('available bucket is empty after accepting the sole early-tutorial mission', () => {
+    const state = freshState();
+    initializeMissions(state);
+    acceptMission(state, 'mission-001');
+    expect(state.missions.available).toHaveLength(0);
+  });
+});
+
+describe('Catalog (7): after early tutorial, multiple missions can be accepted simultaneously', () => {
+  /** Complete the linear chain so that missions 5, 6, 7 are all available. */
+  function completeTutorialChain(state) {
+    for (const id of ['mission-001', 'mission-002', 'mission-003', 'mission-004']) {
+      acceptMission(state, id);
+      completeMission(state, id);
+    }
+  }
+
+  it('missions 5, 6, and 7 can all be accepted at the same time', () => {
+    const state = freshState();
+    initializeMissions(state);
+    completeTutorialChain(state);
+
+    const r5 = acceptMission(state, 'mission-005');
+    const r6 = acceptMission(state, 'mission-006');
+    const r7 = acceptMission(state, 'mission-007');
+
+    expect(r5.success).toBe(true);
+    expect(r6.success).toBe(true);
+    expect(r7.success).toBe(true);
+    expect(state.missions.accepted).toHaveLength(3);
+    const acceptedIds = state.missions.accepted.map((m) => m.id);
+    expect(acceptedIds).toContain('mission-005');
+    expect(acceptedIds).toContain('mission-006');
+    expect(acceptedIds).toContain('mission-007');
+  });
+});
+
+describe('Catalog (8): checkObjectiveCompletion at 100 m marks mission-001 objective complete', () => {
+  let state;
+
+  beforeEach(() => {
+    state = freshState();
+    initializeMissions(state);
+    acceptMission(state, 'mission-001');
+  });
+
+  it('REACH_ALTITUDE objective is completed when altitude equals 100 m', () => {
+    checkObjectiveCompletion(state, makeFlightState('mission-001', { altitude: 100 }));
+    const obj = state.missions.accepted[0].objectives[0];
+    expect(obj.type).toBe(ObjectiveType.REACH_ALTITUDE);
+    expect(obj.target.altitude).toBe(100);
+    expect(obj.completed).toBe(true);
+  });
+
+  it('REACH_ALTITUDE objective is completed when altitude exceeds 100 m', () => {
+    checkObjectiveCompletion(state, makeFlightState('mission-001', { altitude: 500 }));
+    expect(state.missions.accepted[0].objectives[0].completed).toBe(true);
+  });
+
+  it('REACH_ALTITUDE objective is NOT completed when altitude is 99 m', () => {
+    checkObjectiveCompletion(state, makeFlightState('mission-001', { altitude: 99 }));
+    expect(state.missions.accepted[0].objectives[0].completed).toBe(false);
+  });
+});
+
+describe('Catalog (9): completing all objectives then calling completeMission marks mission done', () => {
+  it('mission-001 moves to completed after its altitude objective is met and completeMission is called', () => {
+    const state = freshState();
+    initializeMissions(state);
+    acceptMission(state, 'mission-001');
+
+    // Drive the sole objective to completion via checkObjectiveCompletion.
+    checkObjectiveCompletion(state, makeFlightState('mission-001', { altitude: 100 }));
+    const obj = state.missions.accepted[0].objectives[0];
+    expect(obj.completed).toBe(true); // sanity-check: objective really is done
+
+    // Now formally complete the mission.
+    const result = completeMission(state, 'mission-001');
+    expect(result.success).toBe(true);
+    expect(state.missions.accepted).toHaveLength(0);
+    expect(state.missions.completed).toHaveLength(1);
+    expect(state.missions.completed[0].id).toBe('mission-001');
+    expect(state.missions.completed[0].status).toBe(MissionStatus.COMPLETED);
+  });
+
+  it('all objective flags remain true on the completed mission instance', () => {
+    const state = freshState();
+    initializeMissions(state);
+    acceptMission(state, 'mission-001');
+    checkObjectiveCompletion(state, makeFlightState('mission-001', { altitude: 100 }));
+    completeMission(state, 'mission-001');
+    const completedObjs = state.missions.completed[0].objectives;
+    expect(completedObjs.every((o) => o.completed)).toBe(true);
+  });
+});
+
+describe('Catalog (10): getUnlockedParts returns correct part IDs after catalog missions complete', () => {
+  it('returns parachute-mk2 after mission-005 is completed', () => {
+    const state = freshState();
+    state.missions.completed.push({ id: 'mission-005', status: MissionStatus.COMPLETED });
+    expect(getUnlockedParts(state)).toContain('parachute-mk2');
+  });
+
+  it('returns landing-legs-small after mission-006 is completed', () => {
+    const state = freshState();
+    state.missions.completed.push({ id: 'mission-006', status: MissionStatus.COMPLETED });
+    expect(getUnlockedParts(state)).toContain('landing-legs-small');
+  });
+
+  it('returns landing-legs-large after mission-007 is completed', () => {
+    const state = freshState();
+    state.missions.completed.push({ id: 'mission-007', status: MissionStatus.COMPLETED });
+    expect(getUnlockedParts(state)).toContain('landing-legs-large');
+  });
+
+  it('returns engine-poodle after mission-010 is completed', () => {
+    const state = freshState();
+    state.missions.completed.push({ id: 'mission-010', status: MissionStatus.COMPLETED });
+    expect(getUnlockedParts(state)).toContain('engine-poodle');
+  });
+
+  it('returns engine-reliant and srb-small after mission-012 is completed', () => {
+    const state = freshState();
+    state.missions.completed.push({ id: 'mission-012', status: MissionStatus.COMPLETED });
+    const parts = getUnlockedParts(state);
+    expect(parts).toContain('engine-reliant');
+    expect(parts).toContain('srb-small');
+  });
+
+  it('accumulates parts from multiple completed missions without duplicates', () => {
+    const state = freshState();
+    state.missions.completed.push({ id: 'mission-005', status: MissionStatus.COMPLETED });
+    state.missions.completed.push({ id: 'mission-006', status: MissionStatus.COMPLETED });
+    state.missions.completed.push({ id: 'mission-007', status: MissionStatus.COMPLETED });
+    const parts = getUnlockedParts(state);
+    expect(parts).toContain('parachute-mk2');
+    expect(parts).toContain('landing-legs-small');
+    expect(parts).toContain('landing-legs-large');
+    // Each part ID appears exactly once.
+    expect(parts.filter((p) => p === 'parachute-mk2')).toHaveLength(1);
+    expect(parts.filter((p) => p === 'landing-legs-small')).toHaveLength(1);
+    expect(parts.filter((p) => p === 'landing-legs-large')).toHaveLength(1);
+  });
+
+  it('includes starting state.parts alongside mission-unlocked parts', () => {
+    const state = freshState();
+    state.parts = ['starter-engine'];
+    state.missions.completed.push({ id: 'mission-005', status: MissionStatus.COMPLETED });
+    const parts = getUnlockedParts(state);
+    expect(parts).toContain('starter-engine');
+    expect(parts).toContain('parachute-mk2');
   });
 });
 

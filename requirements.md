@@ -378,7 +378,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-040: Mission System Tests
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-012, TASK-013, TASK-036
 - **Description**: Write unit tests in `/src/tests/missions.test.js` covering: (1) At game start, only Mission 1 (First Flight) is available. (2) Completing Mission 1 makes Mission 2 available. (3) Completing Mission 4 makes Missions 5, 6, and 7 simultaneously available. (4) A mission with two prerequisites only becomes available after both prerequisites are completed. (5) `acceptMission` sets mission status to 'accepted'. (6) During early tutorial phase (missions 1–4 not all complete), accepting one mission prevents accepting a second (returns false). (7) After early tutorial, multiple missions can be accepted simultaneously. (8) `checkObjectiveCompletion` with a flight state at 100m altitude marks the REACH_ALTITUDE 100m objective as complete. (9) Completing all objectives of a mission marks the mission as completed. (10) `getUnlockedParts` returns correct part IDs after specific missions are completed. All tests must pass with `vitest run`.
