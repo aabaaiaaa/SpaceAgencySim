@@ -354,7 +354,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-037: Physics Engine Tests
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-020, TASK-036
 - **Description**: Write unit tests in `/src/tests/physics.test.js` covering: (1) Net force calculation with known mass, thrust, and drag inputs — verify correct acceleration. (2) Velocity and position integration over multiple ticks — verify expected trajectory for a simple ballistic case. (3) Gravity-only freefall — verify position matches `0.5 * g * t²` formula. (4) Atmospheric drag at sea level vs vacuum — verify drag force is non-zero at sea level and zero in vacuum. (5) TWR > 1 produces upward acceleration from rest. (6) TWR < 1 does not lift off (net force downward). (7) Steering: applying a left/right input changes rocket orientation. (8) Time warp scaling: running 10 ticks at 5× warp produces same final state as 50 ticks at 1× warp. All tests must pass with `vitest run`.

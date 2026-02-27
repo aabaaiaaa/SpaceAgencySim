@@ -771,3 +771,362 @@ describe('deltaV estimate', () => {
     expect(fs.deltaVRemaining).toBeGreaterThan(0);
   });
 });
+
+// ===========================================================================
+// TASK-037: Physics Engine Tests — precision scenarios
+// ===========================================================================
+
+/**
+ * Physics constants mirrored from physics.js / atmosphere.js for test
+ * calculations.  These match the values used by the engine exactly.
+ */
+const G0         = 9.81;          // Standard gravity (m/s²)
+const FIXED_DT   = 1 / 60;        // Physics timestep (s)
+const VAC_ALT    = 80_000;        // Above ATMOSPHERE_TOP (70 000 m) — zero drag
+
+// ---------------------------------------------------------------------------
+// 1. Net force calculation
+// ---------------------------------------------------------------------------
+
+describe('TASK-037: net force — known thrust/mass/drag inputs produce correct acceleration', () => {
+  /**
+   * In vacuum (altitude > 70 000 m) the drag term is zero.
+   * With the Spark Engine at full throttle (angle = 0):
+   *   thrustY = thrustVac = 72 000 N
+   *   gravFY  = -G0 × totalMass = -9.81 × 620 = -6 082.2 N
+   *   netFY   = 65 917.8 N  →  accY = 65 917.8 / 620 ≈ 106.32 m/s²
+   *   velY after 1 fixed step = accY × FIXED_DT ≈ 1.772 m/s
+   */
+  it('verifies velY after 1 fixed step matches (thrust-gravity)/mass × dt in vacuum', () => {
+    const { assembly, staging } = makeSimpleRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    // Place the rocket in vacuum so drag = 0.
+    ps.posY     = VAC_ALT;
+    ps.velY     = 0;
+    ps.grounded = false;
+
+    // Ignite stage 1 (Spark Engine).
+    fireNextStage(ps, assembly, staging, fs);
+
+    // Run exactly one physics step.
+    tick(ps, assembly, staging, fs, FIXED_DT, 1);
+
+    // Expected acceleration:
+    //   thrust_vac = 72 kN = 72 000 N (throttle 100 %, angle 0, vacuum)
+    //   total mass = probe(50) + tank_dry(50) + tank_fuel(400) + engine(120) = 620 kg
+    const thrustVacN  = 72_000;
+    const totalMassKg = 620;
+    const expectedAccY  = (thrustVacN - G0 * totalMassKg) / totalMassKg;
+    const expectedVelY  = expectedAccY * FIXED_DT;
+
+    expect(ps.velY).toBeCloseTo(expectedVelY, 2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 2. Velocity and position integration over multiple ticks
+// ---------------------------------------------------------------------------
+
+describe('TASK-037: ballistic trajectory — integration over multiple ticks', () => {
+  /**
+   * In vacuum with a known upward initial velocity and no engine:
+   *   v(t) = v0 − g×t        (exact for Euler with constant acceleration)
+   *   y(t) ≈ y0 + v0×t − ½g×t²  (Euler error ≈ g×dt×t/2 ≈ 0.08 m at t=1 s)
+   */
+  it('velocity matches v0 − g×t exactly after 60 fixed steps in vacuum', () => {
+    const { assembly, staging } = makeSimpleRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    const v0Y = 50; // m/s upward
+    ps.posY     = VAC_ALT;
+    ps.velY     = v0Y;
+    ps.grounded = false;
+
+    // Run exactly 60 individual fixed steps (each tick = 1 FIXED_DT, guaranteed
+    // to execute exactly 1 physics step regardless of floating-point precision).
+    for (let i = 0; i < 60; i++) {
+      tick(ps, assembly, staging, fs, FIXED_DT, 1);
+    }
+
+    // Euler velocity is exact for constant acceleration: v = v0 − G0 × t.
+    const expectedVelY = v0Y - G0 * 1.0; // 50 − 9.81 = 40.19 m/s
+    expect(ps.velY).toBeCloseTo(expectedVelY, 3);
+  });
+
+  it('position approximates y0 + v0×t − ½g×t² after 60 fixed steps in vacuum', () => {
+    const { assembly, staging } = makeSimpleRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    const startY = VAC_ALT;
+    const v0Y    = 50;
+    ps.posY     = startY;
+    ps.velY     = v0Y;
+    ps.grounded = false;
+
+    // Exactly 60 fixed steps (symplectic Euler overshoots the continuous
+    // formula by ≈ 0.08 m for t=1 s; precision 0 gives ±0.5 m slack).
+    for (let i = 0; i < 60; i++) {
+      tick(ps, assembly, staging, fs, FIXED_DT, 1);
+    }
+
+    const expectedPosY = startY + v0Y * 1.0 - 0.5 * G0 * 1.0 * 1.0;
+    expect(ps.posY).toBeCloseTo(expectedPosY, 0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 3. Gravity-only freefall — verify position matches 0.5 × g × t²
+// ---------------------------------------------------------------------------
+
+describe('TASK-037: gravity freefall — position matches 0.5 × g × t²', () => {
+  it('freefall drop from rest over 1 second in vacuum approximates ½g×t²', () => {
+    const { assembly, staging } = makeSimpleRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    const startY = VAC_ALT;
+    ps.posY     = startY;
+    ps.velY     = 0;
+    ps.velX     = 0;
+    ps.grounded = false;
+    // No engine — pure freefall under gravity.
+
+    tick(ps, assembly, staging, fs, 1.0, 1);
+
+    const elapsed      = 1.0;
+    const formulaDrop  = 0.5 * G0 * elapsed * elapsed; // 4.905 m
+    const actualDrop   = startY - ps.posY;
+
+    // Euler integration error ≈ 0.08 m; allow ±0.5 m (precision 0).
+    expect(actualDrop).toBeCloseTo(formulaDrop, 0);
+  });
+
+  it('freefall velocity after 60 fixed steps equals −g × t exactly', () => {
+    const { assembly, staging } = makeSimpleRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    ps.posY     = VAC_ALT;
+    ps.velY     = 0;
+    ps.grounded = false;
+
+    // Exactly 60 fixed steps → t = 60 × FIXED_DT = 1 s.
+    // Euler velocity is exact for constant acceleration (no integration error).
+    for (let i = 0; i < 60; i++) {
+      tick(ps, assembly, staging, fs, FIXED_DT, 1);
+    }
+
+    expect(ps.velY).toBeCloseTo(-G0 * 1.0, 3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 4. Atmospheric drag — sea level vs vacuum
+// ---------------------------------------------------------------------------
+
+describe('TASK-037: atmospheric drag — sea level vs vacuum', () => {
+  it('rocket falls slower at sea level than in vacuum (drag retards fall)', () => {
+    // Two identical rockets with the same initial downward velocity.
+    // One is at low altitude (air present), the other high above the atmosphere.
+    const { assembly, staging } = makeSimpleRocket();
+    const fsLow = makeFlightState();
+    const fsVac = makeFlightState();
+    const psLow = createPhysicsState(assembly, fsLow); // sea-level
+    const psVac = createPhysicsState(assembly, fsVac); // vacuum
+
+    // Sea-level starting condition (altitude ~100 m — plenty of atmosphere).
+    psLow.posY     = 100;
+    psLow.velY     = -50;
+    psLow.grounded = false;
+
+    // Vacuum starting condition (above atmosphere top).
+    psVac.posY     = VAC_ALT;
+    psVac.velY     = -50;
+    psVac.grounded = false;
+
+    // Simulate 1 second of free fall (no engine).
+    tick(psLow, assembly, staging, fsLow, 1.0, 1);
+    tick(psVac, assembly, staging, fsVac, 1.0, 1);
+
+    // Drag acts upward on the sea-level rocket → its velY is less negative
+    // (it has fallen more slowly) than the vacuum rocket.
+    expect(psLow.velY).toBeGreaterThan(psVac.velY);
+  });
+
+  it('velocity change in vacuum exactly matches pure gravity (no drag)', () => {
+    const { assembly, staging } = makeSimpleRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    ps.posY     = VAC_ALT;
+    ps.velY     = -50;
+    ps.grounded = false;
+
+    // Run exactly one fixed step.
+    tick(ps, assembly, staging, fs, FIXED_DT, 1);
+
+    // In vacuum: drag = 0, thrust = 0 → accY = -G0
+    // velY after 1 step = -50 − G0 × FIXED_DT
+    const expectedVelY = -50 - G0 * FIXED_DT;
+    expect(ps.velY).toBeCloseTo(expectedVelY, 4);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5. TWR > 1 — produces upward acceleration from rest
+// ---------------------------------------------------------------------------
+
+describe('TASK-037: TWR > 1 — produces upward acceleration from rest', () => {
+  /**
+   * makeSimpleRocket() uses:
+   *   Spark Engine: 60 kN sea-level thrust
+   *   Wet mass    : 620 kg
+   *   TWR         : 60 000 / (620 × 9.81) ≈ 9.9  — well above 1
+   */
+  it('rocket with TWR ≈ 9.9 lifts off and gains positive altitude', () => {
+    const { assembly, staging } = makeSimpleRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    expect(ps.grounded).toBe(true);
+    expect(ps.posY).toBe(0);
+
+    fireNextStage(ps, assembly, staging, fs);
+    tick(ps, assembly, staging, fs, 0.5, 1);
+
+    expect(ps.posY).toBeGreaterThan(0);
+    expect(ps.velY).toBeGreaterThan(0);
+    expect(ps.grounded).toBe(false);
+  });
+
+  it('net accY from rest is positive when TWR > 1', () => {
+    const { assembly, staging } = makeSimpleRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    // Verify by checking velY after one fixed step from the pad.
+    fireNextStage(ps, assembly, staging, fs);
+    tick(ps, assembly, staging, fs, FIXED_DT, 1);
+
+    // With TWR ≈ 9.9, velY must be positive after the first step.
+    expect(ps.velY).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 6. TWR < 1 — does not lift off
+// ---------------------------------------------------------------------------
+
+describe('TASK-037: TWR < 1 — does not lift off', () => {
+  it('rocket with TWR < 1 stays on the ground even with engine firing', () => {
+    const { assembly, staging, tankId } = makeSimpleRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    // Inflate fuel mass so that total rocket mass >> thrust / g.
+    // Spark engine sea-level thrust = 60 000 N.
+    // For TWR < 1 we need mass > 60 000 / 9.81 ≈ 6 116 kg.
+    // Setting tank "fuel" to 100 000 kg gives mass ≈ 100 220 kg → TWR ≈ 0.06.
+    ps.fuelStore.set(tankId, 100_000);
+
+    fireNextStage(ps, assembly, staging, fs);
+    tick(ps, assembly, staging, fs, 1.0, 1);
+
+    // Ground reaction prevents downward acceleration; rocket must not lift off.
+    expect(ps.posY).toBe(0);
+    expect(ps.grounded).toBe(true);
+    expect(ps.velY).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 7. Steering — applying left/right input changes rocket orientation
+// ---------------------------------------------------------------------------
+
+describe('TASK-037: steering — left/right input changes rocket orientation', () => {
+  it('holding the A key rotates the rocket counter-clockwise (negative angle)', () => {
+    const { assembly, staging } = makeSimpleRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    ps.posY     = 1_000;
+    ps.grounded = false;
+
+    handleKeyDown(ps, assembly, 'a');
+    tick(ps, assembly, staging, fs, 0.5, 1);
+
+    expect(ps.angle).toBeLessThan(0);
+  });
+
+  it('holding the D key rotates the rocket clockwise (positive angle)', () => {
+    const { assembly, staging } = makeSimpleRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    ps.posY     = 1_000;
+    ps.grounded = false;
+
+    handleKeyDown(ps, assembly, 'd');
+    tick(ps, assembly, staging, fs, 0.5, 1);
+
+    expect(ps.angle).toBeGreaterThan(0);
+  });
+
+  it('angle change is proportional to hold duration', () => {
+    const { assembly, staging } = makeSimpleRocket();
+    const fs1 = makeFlightState();
+    const fs2 = makeFlightState();
+    const ps1 = createPhysicsState(assembly, fs1);
+    const ps2 = createPhysicsState(assembly, fs2);
+
+    ps1.posY = 1_000; ps1.grounded = false;
+    ps2.posY = 1_000; ps2.grounded = false;
+
+    // Hold D for 0.5 s vs 1.0 s — longer hold → larger angle.
+    handleKeyDown(ps1, assembly, 'd');
+    tick(ps1, assembly, staging, fs1, 0.5, 1);
+
+    handleKeyDown(ps2, assembly, 'd');
+    tick(ps2, assembly, staging, fs2, 1.0, 1);
+
+    expect(ps2.angle).toBeGreaterThan(ps1.angle);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 8. Time warp scaling — 10 ticks at 5× warp = 50 ticks at 1× warp
+// ---------------------------------------------------------------------------
+
+describe('TASK-037: time warp scaling — 10×5× warp equals 50×1× warp', () => {
+  it('produces identical final posY, velY and timeElapsed', () => {
+    const { assembly, staging } = makeSimpleRocket();
+
+    const fs5x = makeFlightState();
+    const fs1x = makeFlightState();
+    const ps5x = createPhysicsState(assembly, fs5x);
+    const ps1x = createPhysicsState(assembly, fs1x);
+
+    const startY = 10_000;
+    ps5x.posY = startY; ps5x.grounded = false;
+    ps1x.posY = startY; ps1x.grounded = false;
+
+    // Scenario A: 10 real frames, each advancing 5 fixed steps (5× warp).
+    for (let i = 0; i < 10; i++) {
+      tick(ps5x, assembly, staging, fs5x, FIXED_DT, 5);
+    }
+
+    // Scenario B: 50 real frames, each advancing 1 fixed step (1× warp).
+    for (let i = 0; i < 50; i++) {
+      tick(ps1x, assembly, staging, fs1x, FIXED_DT, 1);
+    }
+
+    // Both scenarios execute exactly 50 fixed steps → identical physics.
+    expect(ps5x.posY).toBeCloseTo(ps1x.posY, 6);
+    expect(ps5x.velY).toBeCloseTo(ps1x.velY, 6);
+    expect(fs5x.timeElapsed).toBeCloseTo(fs1x.timeElapsed, 6);
+  });
+});
