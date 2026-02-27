@@ -23,8 +23,9 @@ import {
   handleKeyUp,
   fireNextStage,
 } from '../core/physics.js';
-import { initFlightHud, destroyFlightHud } from './flightHud.js';
+import { initFlightHud, destroyFlightHud, setHudTimeWarp, lockTimeWarp } from './flightHud.js';
 import { saveGame, listSaves } from '../core/saveload.js';
+import { ATMOSPHERE_TOP, isReentryCondition } from '../core/atmosphere.js';
 
 // ---------------------------------------------------------------------------
 // Module state
@@ -65,6 +66,29 @@ let _keyupHandler = null;
 
 /** The in-flight control overlay DOM element. @type {HTMLElement|null} */
 let _flightOverlay = null;
+
+// ---------------------------------------------------------------------------
+// Time-warp state
+// ---------------------------------------------------------------------------
+
+/**
+ * Current time-warp multiplier applied to the physics dt each frame.
+ * 1 = real-time; 2 = 2× speed; up to 50×.
+ */
+let _timeWarp = 1;
+
+/**
+ * Performance.now() timestamp (ms) at which the staging lockout expires.
+ * While performance.now() < _stagingLockoutUntil the warp buttons are disabled
+ * and the warp level is forced to 1×.
+ */
+let _stagingLockoutUntil = 0;
+
+/** Altitude (m) at the previous frame — used to detect atmosphere re-entry. */
+let _prevAltitude = 0;
+
+/** Whether the rocket was in space (above ATMOSPHERE_TOP) on the previous frame. */
+let _prevInSpace = false;
 
 // ---------------------------------------------------------------------------
 // CSS
@@ -251,6 +275,12 @@ export function startFlightScene(
     document.head.appendChild(styleEl);
   }
 
+  // Reset time-warp state.
+  _timeWarp           = 1;
+  _stagingLockoutUntil = 0;
+  _prevAltitude        = 0;
+  _prevInSpace         = false;
+
   // Create the physics state from the assembly and initial flight state.
   _ps = createPhysicsState(assembly, flightState);
 
@@ -263,7 +293,7 @@ export function startFlightScene(
   initFlightRenderer();
 
   // Mount the HUD overlay.
-  initFlightHud(container, _ps, assembly, stagingConfig, flightState, state);
+  initFlightHud(container, _ps, assembly, stagingConfig, flightState, state, _onTimeWarpButtonClick);
 
   // Build the in-flight control overlay (hamburger button + dropdown menu).
   _buildFlightOverlay(container);
@@ -323,6 +353,12 @@ export function stopFlightScene() {
   _onFlightEnd   = null;
   _lastTs        = null;
 
+  // Reset time-warp state.
+  _timeWarp            = 1;
+  _stagingLockoutUntil = 0;
+  _prevAltitude        = 0;
+  _prevInSpace         = false;
+
   console.log('[Flight Controller] Flight scene stopped');
 }
 
@@ -341,8 +377,11 @@ function _loop(timestamp) {
   const realDt = Math.min((timestamp - _lastTs) / 1000, 0.1);
   _lastTs = timestamp;
 
-  // Advance physics simulation.
-  tick(_ps, _assembly, _stagingConfig, _flightState, realDt);
+  // Evaluate time-warp reset conditions before advancing physics.
+  _checkTimeWarpResets(timestamp);
+
+  // Advance physics simulation with the current warp multiplier.
+  tick(_ps, _assembly, _stagingConfig, _flightState, realDt, _timeWarp);
 
   // Render the flight scene.
   renderFlightFrame(_ps, _assembly);
@@ -351,6 +390,74 @@ function _loop(timestamp) {
   if (_rafId !== null) {
     _rafId = requestAnimationFrame(_loop);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Private — time-warp helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Called once per frame to check whether any automatic time-warp reset
+ * condition has been triggered (landing, reentry) and whether the staging
+ * lockout has expired.
+ *
+ * @param {number} timestamp  Current performance.now() value from rAF.
+ */
+function _checkTimeWarpResets(timestamp) {
+  if (!_ps || !_flightState) return;
+
+  // Manage staging lockout expiry.
+  if (_stagingLockoutUntil > 0 && timestamp >= _stagingLockoutUntil) {
+    _stagingLockoutUntil = 0;
+    lockTimeWarp(false);
+  }
+
+  // No automatic resets needed if we're already at 1×.
+  if (_timeWarp === 1) {
+    _prevAltitude = Math.max(0, _ps.posY);
+    _prevInSpace  = _prevAltitude >= ATMOSPHERE_TOP;
+    return;
+  }
+
+  const altitude = Math.max(0, _ps.posY);
+  const speed    = Math.hypot(_ps.velX, _ps.velY);
+  const inSpace  = altitude >= ATMOSPHERE_TOP;
+
+  // Reset on successful landing or crash.
+  if (_ps.landed || _ps.crashed) {
+    _applyTimeWarp(1);
+  }
+  // Reset on reentry: rocket was in space last frame, now below atmosphere
+  // top AND travelling at high speed (> 500 m/s indicates ballistic descent).
+  else if (_prevInSpace && !inSpace && speed > 500) {
+    _applyTimeWarp(1);
+  }
+
+  _prevAltitude = altitude;
+  _prevInSpace  = inSpace;
+}
+
+/**
+ * Apply a new time-warp multiplier: update internal state and synchronise the
+ * HUD button highlight.
+ *
+ * @param {number} level  Desired warp multiplier (1, 2, 5, 10, or 50).
+ */
+function _applyTimeWarp(level) {
+  _timeWarp = level;
+  setHudTimeWarp(level);
+}
+
+/**
+ * Callback passed to `initFlightHud`: invoked when the player clicks a
+ * time-warp button in the HUD.
+ *
+ * @param {number} level  Requested warp level.
+ */
+function _onTimeWarpButtonClick(level) {
+  // Prevent warp changes during the staging lockout window.
+  if (_stagingLockoutUntil > 0 && performance.now() < _stagingLockoutUntil) return;
+  _applyTimeWarp(level);
 }
 
 // ---------------------------------------------------------------------------
@@ -363,6 +470,13 @@ function _onKeyDown(e) {
 
   if (e.code === 'Space') {
     e.preventDefault();
+
+    // Reset time warp to 1× and lock it out for 2 seconds so the player
+    // cannot accidentally time-warp during a staging sequence.
+    _applyTimeWarp(1);
+    _stagingLockoutUntil = performance.now() + 2_000;
+    lockTimeWarp(true);
+
     fireNextStage(_ps, _assembly, _stagingConfig, _flightState);
     return;
   }

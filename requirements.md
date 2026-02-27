@@ -298,7 +298,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-030: Zoom & Time Warp
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-027
 - **Description**: Mouse wheel zooms the PixiJS camera in and out. Zoom range: 0.1× (very zoomed out, see large portion of trajectory) to 5× (very close up). Zoom is centred on the cursor position. Time warp control: a set of buttons in the HUD showing warp levels: 1×, 2×, 5×, 10×, 50×. Selecting a warp level multiplies `dt` in the physics loop by that factor. All physics systems (fuel consumption, drag, gravity, heat) are scaled by the same `dt` — the simulation is physically correct at any warp level. The HUD stats (altitude, speed) display real physics values and update at the warp-adjusted rate, so they will appear to change faster at higher warp. Time warp resets to 1× if: the rocket enters atmosphere from above at high speed (reentry), staging is activated, or the rocket lands. Cannot time-warp during active staging sequences.

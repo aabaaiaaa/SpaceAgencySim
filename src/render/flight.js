@@ -38,7 +38,7 @@ import { PartType }    from '../core/constants.js';
 // ---------------------------------------------------------------------------
 
 /**
- * Screen pixels per metre in the flight view.
+ * Screen pixels per metre in the flight view at zoom 1×.
  * Matches the VAB default zoom (VAB_PIXELS_PER_METRE = 20) so part sizes
  * look the same in both scenes at their respective default views.
  */
@@ -49,6 +49,12 @@ const FLIGHT_PIXELS_PER_METRE = 20;
  * Converts placed.x / placed.y (world units) → metres for physics alignment.
  */
 const SCALE_M_PER_PX = 0.05;
+
+/** Minimum zoom level (very zoomed out — see large portion of trajectory). */
+const MIN_ZOOM = 0.1;
+
+/** Maximum zoom level (very close up). */
+const MAX_ZOOM = 5.0;
 
 // ---------------------------------------------------------------------------
 // Sky colours
@@ -162,6 +168,25 @@ let _camWorldX = 0;
 let _camWorldY = 0;
 
 // ---------------------------------------------------------------------------
+// Zoom state
+// ---------------------------------------------------------------------------
+
+/** Current zoom level. 1.0 = default; range [MIN_ZOOM, MAX_ZOOM]. */
+let _zoomLevel = 1.0;
+
+/** Last known mouse X position (CSS pixels), for cursor-centred zoom. */
+let _mouseX = 0;
+
+/** Last known mouse Y position (CSS pixels), for cursor-centred zoom. */
+let _mouseY = 0;
+
+/** Bound wheel event handler, stored for removal on destroy. @type {((e: WheelEvent) => void)|null} */
+let _wheelHandler = null;
+
+/** Bound mousemove event handler, stored for removal on destroy. @type {((e: MouseEvent) => void)|null} */
+let _mouseMoveHandler = null;
+
+// ---------------------------------------------------------------------------
 // Colour utilities
 // ---------------------------------------------------------------------------
 
@@ -206,6 +231,14 @@ function _skyColor(altitude) {
 // ---------------------------------------------------------------------------
 
 /**
+ * Return the effective pixels-per-metre for the current zoom level.
+ * @returns {number}
+ */
+function _ppm() {
+  return FLIGHT_PIXELS_PER_METRE * _zoomLevel;
+}
+
+/**
  * Convert a world-space position (metres, Y-up) to canvas pixels (Y-down).
  *
  * @param {number} worldX   World X in metres.
@@ -215,9 +248,10 @@ function _skyColor(altitude) {
  * @returns {{ sx: number, sy: number }}  Canvas pixel coordinates.
  */
 function _worldToScreen(worldX, worldY, screenW, screenH) {
+  const ppm = _ppm();
   return {
-    sx: screenW / 2 + (worldX - _camWorldX) * FLIGHT_PIXELS_PER_METRE,
-    sy: screenH / 2 - (worldY - _camWorldY) * FLIGHT_PIXELS_PER_METRE,
+    sx: screenW / 2 + (worldX - _camWorldX) * ppm,
+    sy: screenH / 2 - (worldY - _camWorldY) * ppm,
   };
 }
 
@@ -419,7 +453,7 @@ function _renderGround(w, h) {
   _groundGraphics.clear();
 
   // Screen Y coordinate of world Y = 0.
-  const groundScreenY = h / 2 + _camWorldY * FLIGHT_PIXELS_PER_METRE;
+  const groundScreenY = h / 2 + _camWorldY * _ppm();
 
   // Only draw if the ground line is above the canvas bottom edge.
   if (groundScreenY >= h) return;
@@ -589,6 +623,52 @@ function _renderDebris(debrisList, assembly, w, h) {
 }
 
 // ---------------------------------------------------------------------------
+// Zoom input handlers (private)
+// ---------------------------------------------------------------------------
+
+/**
+ * Track the current mouse position so the wheel handler can compute the
+ * world coordinate under the cursor.
+ *
+ * @param {MouseEvent} e
+ */
+function _onMouseMove(e) {
+  _mouseX = e.clientX;
+  _mouseY = e.clientY;
+}
+
+/**
+ * Handle mouse-wheel scroll to zoom the camera in / out.
+ *
+ * Zooming is centred on the cursor: the world-space coordinate currently
+ * under the pointer stays at the same screen position after the zoom change.
+ * The camera then re-snaps to the rocket on the next frame via _updateCamera,
+ * so persistent camera drift is avoided.
+ *
+ * @param {WheelEvent} e
+ */
+function _onWheel(e) {
+  e.preventDefault();
+
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  const ppm = _ppm();
+
+  // World coordinate currently under the cursor.
+  const cursorWorldX = _camWorldX + (_mouseX - w / 2) / ppm;
+  const cursorWorldY = _camWorldY - (_mouseY - h / 2) / ppm;
+
+  // Scroll up (deltaY < 0) = zoom in; scroll down = zoom out.
+  const factor = e.deltaY < 0 ? 1.2 : 1 / 1.2;
+  _zoomLevel = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, _zoomLevel * factor));
+
+  // Reposition the camera so the cursor world-point stays at the same pixel.
+  const newPpm = _ppm();
+  _camWorldX = cursorWorldX - (_mouseX - w / 2) / newPpm;
+  _camWorldY = cursorWorldY + (_mouseY - h / 2) / newPpm;
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -626,6 +706,17 @@ export function initFlightRenderer() {
   // Reset camera to launch-pad origin.
   _camWorldX = 0;
   _camWorldY = 0;
+
+  // Reset zoom and initialise mouse tracking.
+  _zoomLevel = 1.0;
+  _mouseX    = window.innerWidth  / 2;
+  _mouseY    = window.innerHeight / 2;
+
+  // Register zoom input handlers.
+  _wheelHandler     = _onWheel;
+  _mouseMoveHandler = _onMouseMove;
+  window.addEventListener('wheel',     _wheelHandler,     { passive: false });
+  window.addEventListener('mousemove', _mouseMoveHandler);
 
   console.log('[Flight Renderer] Initialized');
 }
@@ -686,6 +777,17 @@ export function destroyFlightRenderer() {
   _camWorldX = 0;
   _camWorldY = 0;
 
+  // Remove zoom input handlers.
+  if (_wheelHandler) {
+    window.removeEventListener('wheel', _wheelHandler);
+    _wheelHandler = null;
+  }
+  if (_mouseMoveHandler) {
+    window.removeEventListener('mousemove', _mouseMoveHandler);
+    _mouseMoveHandler = null;
+  }
+  _zoomLevel = 1.0;
+
   console.log('[Flight Renderer] Destroyed');
 }
 
@@ -697,4 +799,22 @@ export function destroyFlightRenderer() {
  */
 export function flightGetCamera() {
   return { x: _camWorldX, y: _camWorldY };
+}
+
+/**
+ * Get the current zoom level (1.0 = default, 0.1 = fully zoomed out, 5.0 = fully zoomed in).
+ *
+ * @returns {number}
+ */
+export function getZoomLevel() {
+  return _zoomLevel;
+}
+
+/**
+ * Programmatically set the zoom level, clamped to [MIN_ZOOM, MAX_ZOOM].
+ *
+ * @param {number} zoom  Desired zoom level.
+ */
+export function setZoomLevel(zoom) {
+  _zoomLevel = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
 }

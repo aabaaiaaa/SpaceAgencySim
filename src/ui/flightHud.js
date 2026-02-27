@@ -259,6 +259,65 @@ const FLIGHT_HUD_STYLES = `
   color: #405840;
   font-size: 10px;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Time warp panel — bottom-centre
+   ═══════════════════════════════════════════════════════════════════════════ */
+#flight-hud-timewarp {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 8, 0, 0.68);
+  border: 1px solid #284828;
+  border-radius: 4px;
+  padding: 5px 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: auto;
+  white-space: nowrap;
+}
+
+.hud-warp-label {
+  font-size: 9px;
+  color: #507860;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-right: 2px;
+}
+
+.hud-warp-btn {
+  padding: 3px 7px;
+  background: rgba(0, 16, 0, 0.8);
+  border: 1px solid #305030;
+  border-radius: 3px;
+  color: #70a880;
+  font-size: 10px;
+  font-family: 'Courier New', Courier, monospace;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s, color 0.1s;
+  min-width: 30px;
+  text-align: center;
+}
+
+.hud-warp-btn:hover:not(:disabled) {
+  background: rgba(0, 36, 0, 0.9);
+  border-color: #407840;
+  color: #a0d8b0;
+}
+
+.hud-warp-btn.active {
+  background: rgba(16, 72, 16, 0.9);
+  border-color: #60c060;
+  color: #c0ffd8;
+  font-weight: bold;
+}
+
+.hud-warp-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
 `;
 
 // ---------------------------------------------------------------------------
@@ -281,6 +340,18 @@ let _state         = null;
 /** Keyboard handler for X/Z throttle cut/full. @type {((e: KeyboardEvent) => void)|null} */
 let _keyHandler = null;
 
+/** Callback invoked with the chosen warp level when a warp button is clicked. @type {((level: number) => void)|null} */
+let _onTimeWarpChange = null;
+
+/** Current active time warp level (1, 2, 5, 10, or 50). */
+let _timeWarp = 1;
+
+/** Whether the warp buttons are locked out (e.g. during a staging sequence). */
+let _warpLocked = false;
+
+/** Array of warp-level button DOM elements (kept for highlight updates). @type {HTMLButtonElement[]} */
+let _warpButtons = [];
+
 // DOM nodes updated on every frame:
 let _elThrottleFill = null;
 let _elThrottlePct  = null;
@@ -302,19 +373,25 @@ let _elFuelList     = null;
  * Holds live references to the mutable sim objects — no data is copied.
  * All DOM updates read the live object state on each animation frame.
  *
- * @param {HTMLElement}                                             container     #ui-overlay div.
+ * @param {HTMLElement}                                             container       #ui-overlay div.
  * @param {import('../core/physics.js').PhysicsState}               ps
  * @param {import('../core/rocketbuilder.js').RocketAssembly}       assembly
  * @param {import('../core/rocketbuilder.js').StagingConfig}        stagingConfig
  * @param {import('../core/gameState.js').FlightState}              flightState
  * @param {import('../core/gameState.js').GameState}                state
+ * @param {((level: number) => void)|null}                          [onTimeWarpChange]
+ *   Called with the new warp level whenever the player clicks a time-warp button.
  */
-export function initFlightHud(container, ps, assembly, stagingConfig, flightState, state) {
-  _ps            = ps;
-  _assembly      = assembly;
-  _stagingConfig = stagingConfig;
-  _flightState   = flightState;
-  _state         = state;
+export function initFlightHud(container, ps, assembly, stagingConfig, flightState, state, onTimeWarpChange) {
+  _ps               = ps;
+  _assembly         = assembly;
+  _stagingConfig    = stagingConfig;
+  _flightState      = flightState;
+  _state            = state;
+  _onTimeWarpChange = onTimeWarpChange ?? null;
+  _timeWarp         = 1;
+  _warpLocked       = false;
+  _warpButtons      = [];
 
   // Inject stylesheet once per page load.
   if (!document.getElementById('flight-hud-styles')) {
@@ -333,6 +410,7 @@ export function initFlightHud(container, ps, assembly, stagingConfig, flightStat
   _buildTelemPanel();
   _buildObjectivesPanel();
   _buildFuelPanel();
+  _buildTimeWarpPanel();
 
   // X → throttle 0 %, Z → throttle 100 %.
   // W/S/ArrowUp/ArrowDown are handled by physics.js handleKeyDown when the
@@ -375,11 +453,15 @@ export function destroyFlightHud() {
   }
 
   // Clear all refs.
-  _ps            = null;
-  _assembly      = null;
-  _stagingConfig = null;
-  _flightState   = null;
-  _state         = null;
+  _ps               = null;
+  _assembly         = null;
+  _stagingConfig    = null;
+  _flightState      = null;
+  _state            = null;
+  _onTimeWarpChange = null;
+  _timeWarp         = 1;
+  _warpLocked       = false;
+  _warpButtons      = [];
 
   _elThrottleFill = null;
   _elThrottlePct  = null;
@@ -392,6 +474,40 @@ export function destroyFlightHud() {
   _elFuelList     = null;
 
   console.log('[Flight HUD] Destroyed');
+}
+
+// ---------------------------------------------------------------------------
+// Public API — time warp control
+// ---------------------------------------------------------------------------
+
+/**
+ * Update the active-button highlight and internal warp state to match `level`.
+ * Call this from the flight controller when the warp level changes for any
+ * reason (button click, automatic reset, etc.).
+ *
+ * @param {number} level  New warp multiplier (1, 2, 5, 10, or 50).
+ */
+export function setHudTimeWarp(level) {
+  _timeWarp = level;
+  for (const btn of _warpButtons) {
+    const btnLevel = parseInt(btn.dataset.warp ?? '1', 10);
+    btn.classList.toggle('active', btnLevel === level);
+  }
+}
+
+/**
+ * Lock or unlock the time-warp buttons.
+ *
+ * While locked (e.g. during an active staging sequence) the buttons are
+ * rendered as disabled so the player cannot change the warp level.
+ *
+ * @param {boolean} locked  true = lock; false = unlock.
+ */
+export function lockTimeWarp(locked) {
+  _warpLocked = locked;
+  for (const btn of _warpButtons) {
+    btn.disabled = locked;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -484,6 +600,40 @@ function _buildObjectivesPanel() {
   _elObjList = document.createElement('div');
   _elObjList.id = 'flight-hud-obj-list';
   panel.appendChild(_elObjList);
+
+  _hud.appendChild(panel);
+}
+
+/**
+ * Build the time-warp control panel (bottom-centre).
+ *
+ * Renders a row of buttons labelled 1×, 2×, 5×, 10×, 50×.  Clicking a button
+ * invokes `_onTimeWarpChange(level)` so the flight controller can apply the
+ * new warp multiplier to the physics loop.
+ */
+function _buildTimeWarpPanel() {
+  const panel = document.createElement('div');
+  panel.id = 'flight-hud-timewarp';
+
+  const label = document.createElement('span');
+  label.className = 'hud-warp-label';
+  label.textContent = 'Warp:';
+  panel.appendChild(label);
+
+  const WARP_LEVELS = [1, 2, 5, 10, 50];
+  for (const level of WARP_LEVELS) {
+    const btn = /** @type {HTMLButtonElement} */ (document.createElement('button'));
+    btn.className       = 'hud-warp-btn' + (level === 1 ? ' active' : '');
+    btn.textContent     = `${level}×`;
+    btn.dataset.warp    = String(level);
+    btn.setAttribute('aria-label', `Time warp ${level}×`);
+    btn.addEventListener('click', () => {
+      if (_warpLocked) return;
+      if (_onTimeWarpChange) _onTimeWarpChange(level);
+    });
+    _warpButtons.push(btn);
+    panel.appendChild(btn);
+  }
 
   _hud.appendChild(panel);
 }
