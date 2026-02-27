@@ -274,7 +274,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-027: Flight Renderer & Camera
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-020, TASK-004
 - **Description**: Implement the flight scene renderer in `/src/render/flight.js` using PixiJS. The rocket is rendered as a vertical stack of labelled rectangles, each rectangle representing a part. Part dimensions come from the part definition (width × height in pixels, scaled). Each part rectangle displays its name label. The rocket's position and rotation are applied as a PixiJS container transform. The ground is a horizontal coloured band at y=0 (world coordinates): desert sandy tan below, sky above. Sky colour transitions from light blue (`#87CEEB`) at sea level to dark blue (`#1a1a4e`) at 30,000m to near-black (`#000005`) above 70,000m — interpolated by altitude. The camera follows the rocket's centre of mass, keeping it near the centre of the viewport. When the rocket separates, the camera continues following the piece that contains the primary command module. Debris objects are rendered but not followed. Stars become visible above 50,000m altitude (simple white dots on the dark sky).
