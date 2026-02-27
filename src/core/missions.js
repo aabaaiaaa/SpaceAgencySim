@@ -349,14 +349,15 @@ export function checkObjectiveCompletion(state, flightState) {
 
       // ------------------------------------------------------------------
       case ObjectiveType.RETURN_SCIENCE_DATA: {
-        // The science module state machine emits SCIENCE_DATA_RETURNED once
-        // the experiment is complete AND the rocket has made a safe landing
-        // with the module still attached.  Checking for this event is the
-        // authoritative way to detect successful science data recovery.
-        const dataReturned = flightState.events.some(
-          (e) => e.type === 'SCIENCE_DATA_RETURNED',
+        // Requires both a SCIENCE_COLLECTED event (experiment ran) and a
+        // safe LANDING event (speed ≤ 10 m/s) to recover the data.
+        const scienceCollected = flightState.events.some(
+          (e) => e.type === 'SCIENCE_COLLECTED',
         );
-        if (dataReturned) obj.completed = true;
+        const safeLanding = flightState.events.some(
+          (e) => e.type === 'LANDING' && typeof e.speed === 'number' && e.speed <= 10,
+        );
+        if (scienceCollected && safeLanding) obj.completed = true;
         break;
       }
 

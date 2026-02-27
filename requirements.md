@@ -458,7 +458,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-050: All Tests Pass Gate
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-037, TASK-038, TASK-039, TASK-040, TASK-041, TASK-042, TASK-043, TASK-044, TASK-045, TASK-046, TASK-047, TASK-048, TASK-049
 - **Description**: This task represents the final quality gate. Run the combined test command (`npm test`) which executes `vitest run` followed by `playwright test`. All 6 unit test suites (TASK-037 through TASK-042) and all 7 e2e test suites (TASK-043 through TASK-049) must exit with 0 failures. If any test fails, the project is not considered complete — the failing test must be diagnosed and the underlying implementation fixed (not the test skipped or deleted). Only when `npm test` exits with code 0 and all test suites report 100% pass rate is the project considered complete.

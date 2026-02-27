@@ -148,18 +148,25 @@ export function activateScienceModule(ps, assembly, flightState, instanceId) {
   const def    = placed ? getPartById(placed.partId) : null;
   if (!def) return false;
 
-  const duration = def.properties?.experimentDuration ?? 30;
-
-  entry.state = ScienceModuleState.RUNNING;
-  entry.timer = duration;
-
   const altitude = Math.max(0, ps.posY);
+
+  entry.state = ScienceModuleState.COMPLETE;
+  entry.timer = 0;
+
   flightState.events.push({
     type:        'PART_ACTIVATED',
     time:        flightState.timeElapsed,
     instanceId,
     partType:    def.type,
-    description: `${def.name} experiment started — collecting data for ${duration} s at ${altitude.toFixed(0)} m.`,
+    description: `${def.name} experiment started at ${altitude.toFixed(0)} m.`,
+  });
+
+  flightState.events.push({
+    type:        'SCIENCE_COLLECTED',
+    time:        flightState.timeElapsed,
+    instanceId,
+    altitude,
+    description: `${def.name} experiment complete — data ready for recovery at ${altitude.toFixed(0)} m.`,
   });
 
   return true;

@@ -895,6 +895,10 @@ function _showPostFlightSummary(ps, assembly, flightState, state, onFlightEnd) {
   const existing = document.getElementById('post-flight-summary');
   if (existing) existing.remove();
 
+  // Hide the flight HUD while the summary is displayed.
+  const hudEl = document.getElementById('flight-hud');
+  if (hudEl) hudEl.style.display = 'none';
+
   // ── Determine outcome ────────────────────────────────────────────────────
   const isLanded    = !!(ps && ps.landed && !ps.crashed);
   const isCrashed   = !!(ps && ps.crashed);
@@ -1125,9 +1129,11 @@ function _showPostFlightSummary(ps, assembly, flightState, state, onFlightEnd) {
     continueBtn.className = 'pf-btn pf-btn-primary';
     continueBtn.textContent = '▶ Continue Flying';
     continueBtn.addEventListener('click', () => {
-      // The flight scene is still running — simply close the summary.
+      // The flight scene is still running — close the summary and restore HUD.
       _summaryShown = false;
       overlay.remove();
+      const hud = document.getElementById('flight-hud');
+      if (hud) hud.style.display = '';
     });
     buttonsEl.appendChild(continueBtn);
   }
