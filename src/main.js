@@ -5,6 +5,7 @@
 
 import { initRenderer } from './render/index.js';
 import { initVabRenderer } from './render/vab.js';
+import { initHubRenderer } from './render/hub.js';
 import { showMainMenu, initUI } from './ui/index.js';
 
 async function main() {
@@ -17,9 +18,12 @@ async function main() {
   // Initialize PixiJS (async — creates WebGL context).
   await initRenderer(canvas);
 
-  // Initialize the VAB scene (grid, camera) — canvas is ready but hidden
-  // behind the main menu until the player starts or loads a game.
+  // Initialize the VAB scene (grid, camera) — hidden behind the hub until
+  // the player navigates to the Vehicle Assembly Building.
   initVabRenderer();
+
+  // Initialize the hub scene — shown when a game starts or is loaded.
+  initHubRenderer();
 
   // ── Main menu ──────────────────────────────────────────────────────────
   // Show the load screen / new-game screen.  The menu calls onGameReady

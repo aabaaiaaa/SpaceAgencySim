@@ -104,7 +104,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-008: Space Agency Hub View
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-001, TASK-002
 - **Description**: Render the space agency hub as a 2D side-on scene using PixiJS. The scene is a fixed-width landscape: a horizontal ground line with a flat desert-coloured ground below and a blue sky above. Four placeholder rectangle buildings sit on the ground, spaced apart, each with a descriptive label: "Launch Pad", "Vehicle Assembly Building", "Mission Control Centre", "Crew Administration". Each building is clickable and navigates to its corresponding game screen. The top bar (TASK-009) is rendered as an HTML overlay at the top of the viewport. No scrolling needed for the hub view — all buildings fit in one screen. Desert ground colour: sandy tan (`#C2A165`). Sky colour: light blue (`#87CEEB`).

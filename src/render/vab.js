@@ -83,6 +83,14 @@ const _camera = { x: 0, y: 0, zoom: 1 };
 // PixiJS objects
 // ---------------------------------------------------------------------------
 
+/**
+ * Root container wrapping all VAB layers.  Toggling its visibility with
+ * showVabScene() / hideVabScene() lets the hub background show through
+ * without destroying the VAB session.
+ * @type {PIXI.Container | null}
+ */
+let _vabRoot = null;
+
 /** @type {PIXI.Graphics | null} */
 let _grid = null;
 
@@ -460,20 +468,25 @@ export function vabRedrawGrid() {
 export function initVabRenderer() {
   const app = getApp();
 
+  // Root container — hidden until the player navigates to the VAB.
+  _vabRoot = new PIXI.Container();
+  _vabRoot.visible = false;
+  app.stage.addChild(_vabRoot);
+
   // Layer order (bottom → top): grid, placed parts, snap highlights, drag ghost.
   _grid = new PIXI.Graphics();
-  app.stage.addChild(_grid);
+  _vabRoot.addChild(_grid);
 
   _partsContainer = new PIXI.Container();
-  app.stage.addChild(_partsContainer);
+  _vabRoot.addChild(_partsContainer);
   // Expose for e2e testing (Playwright can query placed-part text labels)
   window.__vabPartsContainer = _partsContainer;
 
   _snapContainer = new PIXI.Container();
-  app.stage.addChild(_snapContainer);
+  _vabRoot.addChild(_snapContainer);
 
   _ghostContainer = new PIXI.Container();
-  app.stage.addChild(_ghostContainer);
+  _vabRoot.addChild(_ghostContainer);
 
   // Default camera: rocket origin sits 85 % down the build area.
   const area = getBuildArea();
@@ -491,6 +504,22 @@ export function initVabRenderer() {
   });
 
   console.log('[VAB Renderer] Initialized');
+}
+
+/**
+ * Make the VAB scene visible.
+ * Call this when the player navigates to the Vehicle Assembly Building.
+ */
+export function showVabScene() {
+  if (_vabRoot) _vabRoot.visible = true;
+}
+
+/**
+ * Hide the VAB scene.
+ * Call this when the player leaves the VAB (e.g. returns to the hub).
+ */
+export function hideVabScene() {
+  if (_vabRoot) _vabRoot.visible = false;
 }
 
 /**

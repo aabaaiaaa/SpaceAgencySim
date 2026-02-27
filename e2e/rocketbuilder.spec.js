@@ -85,7 +85,21 @@ test.describe('VAB — Rocket Builder Flow', () => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await page.goto('/');
 
-    // Wait for the VAB toolbar to appear (signals UI is mounted)
+    // Fresh context — no saves — the New Game screen is shown.
+    await page.waitForSelector('#mm-agency-name-input', {
+      state: 'visible',
+      timeout: 15_000,
+    });
+    await page.fill('#mm-agency-name-input', 'Test Agency');
+    await page.click('#mm-start-btn');
+
+    // After starting a new game the hub is shown first.
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
+
+    // Navigate from the hub to the Vehicle Assembly Building.
+    await page.click('[data-building-id="vab"]');
+
+    // Wait for the VAB toolbar to appear (signals VAB UI is mounted).
     await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 15_000 });
 
     // Wait for game globals to be injected by main.js / vab.js

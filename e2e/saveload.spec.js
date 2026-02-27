@@ -45,7 +45,13 @@ test.describe('Save & Load Flow', () => {
     await page.fill('#mm-agency-name-input', AGENCY_NAME);
     await page.click('#mm-start-btn');
 
-    // Wait for the VAB to load (main game screen).
+    // After starting a new game the hub is shown first.
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
+
+    // Navigate from the hub to the Vehicle Assembly Building.
+    await page.click('[data-building-id="vab"]');
+
+    // Wait for the VAB to load.
     await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 15_000 });
     await page.waitForFunction(
       () => typeof window.__gameState !== 'undefined',
@@ -175,8 +181,8 @@ test.describe('Save & Load Flow', () => {
     // Click Load on slot 0.
     await page.click('[data-action="load"][data-slot="0"]');
 
-    // Wait for the VAB to be ready again.
-    await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 15_000 });
+    // Loading a game returns to the hub first (not directly to VAB).
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
     await page.waitForFunction(
       () => typeof window.__gameState !== 'undefined',
       { timeout: 15_000 },
@@ -189,6 +195,10 @@ test.describe('Save & Load Flow', () => {
     // Money must match starting balance ($2,000,000).
     const money = await page.evaluate(() => window.__gameState?.money);
     expect(money).toBe(STARTING_MONEY);
+
+    // Navigate to the VAB so test (5) can use the save/menu controls there.
+    await page.click('[data-building-id="vab"]');
+    await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 15_000 });
   });
 
   // ── (5) Deleting a save slot removes it from the load screen list ───────────
