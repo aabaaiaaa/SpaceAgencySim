@@ -418,7 +418,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-045: E2E — Mission Control Flow
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-014, TASK-036
 - **Description**: Write Playwright tests in `/e2e/missions.spec.js`. Seed a fresh game state before each test. Tests: (1) The Available tab lists "First Flight" as the only available mission at game start. (2) Clicking "Accept" on "First Flight" moves it to the Accepted tab. (3) The Accepted tab shows the mission's objectives. (4) Accepting a mission deducts nothing from cash (missions are free to accept). (5) When "First Flight" is accepted, no other missions are shown as available (early tutorial one-at-a-time rule). (6) The Completed tab is empty at game start. (7) Simulating mission completion (via seeded completed state) shows the mission in the Completed tab with its reward amount. All tests must pass with `playwright test`.
