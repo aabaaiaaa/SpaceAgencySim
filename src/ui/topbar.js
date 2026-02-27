@@ -42,6 +42,13 @@ let _state = null;
 /** Callback invoked when the player wants to exit to the main menu. @type {(() => void) | null} */
 let _onExitToMenu = null;
 
+/**
+ * Optional flight-specific menu items injected by the flight controller.
+ * Each entry: { label: string, onClick: () => void, title?: string }
+ * @type {Array<{ label: string, onClick: () => void, title?: string }>}
+ */
+let _flightMenuItems = [];
+
 // ---------------------------------------------------------------------------
 // CSS
 // ---------------------------------------------------------------------------
@@ -552,6 +559,24 @@ export function refreshTopBar() {
   }
 }
 
+/**
+ * Register flight-specific items to be shown at the top of the topbar
+ * dropdown while a flight is in progress. Call `clearTopBarFlightItems()`
+ * to remove them when the flight ends.
+ *
+ * @param {Array<{ label: string, onClick: () => void, title?: string }>} items
+ */
+export function setTopBarFlightItems(items) {
+  _flightMenuItems = items ?? [];
+}
+
+/**
+ * Remove all flight-specific items previously added via `setTopBarFlightItems`.
+ */
+export function clearTopBarFlightItems() {
+  _flightMenuItems = [];
+}
+
 // ---------------------------------------------------------------------------
 // Dropdown
 // ---------------------------------------------------------------------------
@@ -569,6 +594,26 @@ function _openDropdown() {
   const menu = document.createElement('div');
   menu.id = 'topbar-dropdown';
   menu.setAttribute('role', 'menu');
+
+  // Inject flight-specific items (e.g. "Return to Space Agency") when in flight.
+  if (_flightMenuItems.length > 0) {
+    for (const item of _flightMenuItems) {
+      const btn = document.createElement('button');
+      btn.className = 'topbar-dropdown-item';
+      btn.setAttribute('role', 'menuitem');
+      btn.textContent = item.label;
+      if (item.title) btn.title = item.title;
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        _closeDropdown();
+        item.onClick();
+      });
+      menu.appendChild(btn);
+    }
+    const sep = document.createElement('hr');
+    sep.className = 'topbar-dropdown-sep';
+    menu.appendChild(sep);
+  }
 
   const items = [
     { label: 'Save Game',    action: _openSaveSlotPicker },

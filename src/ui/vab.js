@@ -64,6 +64,7 @@ import {
   saveGame,
   SAVE_SLOT_COUNT,
 } from '../core/saveload.js';
+import { createRocketDesign } from '../core/gameState.js';
 import { startFlightScene } from './flightController.js';
 import { showReturnResultsOverlay } from './hub.js';
 
@@ -83,8 +84,11 @@ let _container = null;
 /**
  * Active drag operation, or null when nothing is being dragged.
  * @type {{
- *   partId:     string,
- *   instanceId: string | null,  // null = dragging a new part from the panel
+ *   partId:      string,
+ *   instanceId:  string | null,  // null = dragging a new part from the panel
+ *   startX:      number,
+ *   startY:      number,
+ *   hasMoved:    boolean,
  * } | null}
  */
 let _dragState = null;
@@ -111,6 +115,21 @@ let _onBack = null;
  * Defaults to true — the most common workflow for SRBs, legs, etc.
  */
 let _symmetryMode = true;
+
+/** Currently selected placed part instance ID (for delete + hover detail). @type {string | null} */
+let _selectedInstanceId = null;
+
+/** Set of currently open panel IDs (missions | staging | engineer). @type {Set<string>} */
+const _openPanels = new Set();
+
+/** The #vab-canvas-area element (stored for panel offset calculations). @type {HTMLElement | null} */
+let _canvasArea = null;
+
+/** Pending canvas pickup (pointer down on part but hasn't moved yet). @type {{ hit: any, startX: number, startY: number } | null} */
+let _pendingPickup = null;
+
+/** The panel width for each side panel. */
+const SIDE_PANEL_WIDTH = 300;
 
 // ---------------------------------------------------------------------------
 // Part-type display helpers
@@ -192,7 +211,7 @@ const VAB_CSS = `
   min-height: ${VAB_TOOLBAR_HEIGHT}px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   padding: 0 14px;
   background: rgba(4, 8, 20, 0.97);
   border-bottom: 1px solid #162c48;
@@ -225,6 +244,11 @@ const VAB_CSS = `
   display: flex;
   gap: 8px;
   align-items: center;
+  flex: 1;
+}
+
+#vab-btn-launch {
+  margin-left: auto;
 }
 
 .vab-btn {
@@ -469,7 +493,103 @@ const VAB_CSS = `
   line-height: 1.75;
 }
 
-/* ── Side panels ─────────────────────────────────────────────────────── */
+/* ── Part detail panel (bottom of parts list) ────────────────────────── */
+#vab-part-detail {
+  flex-shrink: 0;
+  border-top: 1px solid #0e1e30;
+  background: rgba(2, 4, 14, 0.98);
+  padding: 10px 12px;
+  max-height: 220px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #152a44 transparent;
+}
+#vab-part-detail[hidden] { display: none; }
+.vab-detail-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: #a8c8e8;
+  margin-bottom: 3px;
+}
+.vab-detail-type {
+  font-size: 9px;
+  color: #3a6080;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  margin-bottom: 7px;
+}
+.vab-detail-desc {
+  font-size: 10px;
+  color: #608890;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+.vab-detail-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.vab-detail-stat {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+}
+.vab-detail-stat-label { color: #3a6080; }
+.vab-detail-stat-value { color: #7ab0d0; font-weight: 700; }
+
+/* ── Part selection highlight on canvas ──────────────────────────────── */
+#vab-selection-highlight {
+  position: absolute;
+  pointer-events: none;
+  border: 2px solid #60d0ff;
+  box-shadow: 0 0 8px rgba(96,208,255,0.4);
+  border-radius: 1px;
+  z-index: 30;
+}
+#vab-selection-highlight[hidden] { display: none; }
+
+/* ── Off-screen part indicator arrows ────────────────────────────────── */
+.vab-offscreen-indicator {
+  position: absolute;
+  pointer-events: auto;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 60, 100, 0.85);
+  border: 1px solid #2a6090;
+  border-radius: 3px;
+  font-size: 11px;
+  color: #80c0e8;
+  cursor: default;
+  z-index: 50;
+  transition: background .1s;
+}
+.vab-offscreen-indicator:hover {
+  background: rgba(30, 80, 130, 0.95);
+}
+
+/* ── VAB status bar (parts count + cost) ─────────────────────────────── */
+#vab-status-bar {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 0 14px;
+  height: 22px;
+  min-height: 22px;
+  background: rgba(2, 4, 14, 0.97);
+  border-bottom: 1px solid #0a1826;
+  font-size: 9px;
+  color: #3a6080;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+.vab-status-item { display: flex; gap: 5px; }
+.vab-status-label { color: #224050; text-transform: uppercase; letter-spacing: .08em; }
+.vab-status-value { color: #6a9ab8; font-weight: 700; }
+
+/* ── Side panels — stackable ─────────────────────────────────────────── */
 .vab-side-panel {
   position: absolute;
   top: 0;
@@ -1115,12 +1235,16 @@ function _drawScaleTicks() {
   const frags = [];
   let idx = 0;
 
+  // Always show 0m tick if it's on screen.
+  const zeroBarY = camY; // 0m world = camY screen offset
+  const zeroVisible = zeroBarY >= 0 && zeroBarY <= h;
+
   for (let m = startM; m <= endM; m += tickM, idx++) {
     // barY: screen-Y offset from the top of the scale bar.
     const barY = camY - m * pxPerMetre;
     if (barY < 0 || barY > h) continue;
 
-    const isMajor = idx % majorEvery === 0;
+    const isMajor = m === 0 || idx % majorEvery === 0;
     frags.push(
       `<div class="vab-tick ${isMajor ? 'vab-tick-major' : 'vab-tick-minor'}" ` +
         `style="top:${barY.toFixed(1)}px">` +
@@ -1129,7 +1253,86 @@ function _drawScaleTicks() {
     );
   }
 
+  // If 0m wasn't hit by the regular loop but is visible, add it explicitly.
+  if (zeroVisible && (startM > 0 || endM < 0)) {
+    frags.push(
+      `<div class="vab-tick vab-tick-major" style="top:${zeroBarY.toFixed(1)}px">` +
+        `<span class="vab-tick-label">0m</span>` +
+      `</div>`,
+    );
+  }
+
   _scaleTicks.innerHTML = frags.join('');
+
+  // Draw rocket extent markers.
+  _updateScaleBarExtents();
+}
+
+/**
+ * Draw 'Top' and 'Bottom' extent markers on the scale bar based on placed parts.
+ * Also draws a mid-point bracket label showing total rocket height.
+ */
+function _updateScaleBarExtents() {
+  // Remove existing extent elements.
+  const existingExtents = _scaleTicks?.querySelectorAll('.vab-tick-extent');
+  existingExtents?.forEach((el) => el.remove());
+
+  if (!_scaleTicks || _buildAreaHeight === 0 || !_assembly || _assembly.parts.size === 0) return;
+
+  const { zoom, y: camY } = vabGetCamera();
+  const pxPerMetre = VAB_PIXELS_PER_METRE * zoom;
+  const h = _buildAreaHeight;
+
+  // Find the world-Y extent of all placed parts.
+  let maxWorldY = -Infinity;
+  let minWorldY = Infinity;
+
+  for (const placed of _assembly.parts.values()) {
+    const def = getPartById(placed.partId);
+    if (!def) continue;
+    const top    = placed.y + def.height / 2;
+    const bottom = placed.y - def.height / 2;
+    if (top    > maxWorldY) maxWorldY = top;
+    if (bottom < minWorldY) minWorldY = bottom;
+  }
+
+  if (!isFinite(maxWorldY) || !isFinite(minWorldY)) return;
+
+  // Convert world Y to screen Y in the scale bar.
+  // World Y is in px (VAB world units, 20px = 1m). Screen Y: 0 = top of bar.
+  const topBarY    = camY - maxWorldY;
+  const bottomBarY = camY - minWorldY;
+  const midBarY    = (topBarY + bottomBarY) / 2;
+  const heightM    = (maxWorldY - minWorldY) / VAB_PIXELS_PER_METRE;
+
+  // Add Top marker if on screen.
+  if (topBarY >= 0 && topBarY <= h) {
+    const el = document.createElement('div');
+    el.className = 'vab-tick vab-tick-extent';
+    el.style.top = `${topBarY.toFixed(1)}px`;
+    el.innerHTML = `<span class="vab-tick-label" style="color:#4ab870">Top</span>` +
+      `<span style="position:absolute;right:0;width:16px;height:1px;background:#4ab870;top:0"></span>`;
+    _scaleTicks.appendChild(el);
+  }
+
+  // Add Bottom marker if on screen.
+  if (bottomBarY >= 0 && bottomBarY <= h) {
+    const el = document.createElement('div');
+    el.className = 'vab-tick vab-tick-extent';
+    el.style.top = `${bottomBarY.toFixed(1)}px`;
+    el.innerHTML = `<span class="vab-tick-label" style="color:#4ab870">Bot</span>` +
+      `<span style="position:absolute;right:0;width:16px;height:1px;background:#4ab870;top:0"></span>`;
+    _scaleTicks.appendChild(el);
+  }
+
+  // Add mid-point height label if both markers are on screen.
+  if (midBarY >= 0 && midBarY <= h && topBarY >= 0 && bottomBarY <= h) {
+    const el = document.createElement('div');
+    el.className = 'vab-tick vab-tick-extent';
+    el.style.top = `${midBarY.toFixed(1)}px`;
+    el.innerHTML = `<span class="vab-tick-label" style="color:#c0a040;font-size:7px">&#x21D5;${heightM.toFixed(1)}m</span>`;
+    _scaleTicks.appendChild(el);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1252,8 +1455,12 @@ function _hitTestPlacedPart(worldX, worldY) {
  * @param {number}      clientY
  */
 function _startDrag(partId, instanceId, clientX, clientY) {
-  _dragState = { partId, instanceId };
-  vabSetDragGhost(partId, clientX, clientY);
+  _dragState = { partId, instanceId, startX: clientX, startY: clientY, hasMoved: false };
+  // For new parts (from panel), wait for movement before showing ghost.
+  // For existing parts already picked up, show ghost immediately.
+  if (instanceId !== null) {
+    vabSetDragGhost(partId, clientX, clientY);
+  }
   window.addEventListener('pointermove',  _onDragMove,   { capture: true });
   window.addEventListener('pointerup',    _onDragEnd,    { capture: true });
   window.addEventListener('pointercancel', _cancelDrag,  { capture: true });
@@ -1264,13 +1471,14 @@ function _startDrag(partId, instanceId, clientX, clientY) {
  * If the part was picked up (instanceId != null), put it back.
  */
 function _cancelDrag() {
-  if (!_dragState) return;
+  if (!_dragState && !_pendingPickup) return;
   window.removeEventListener('pointermove',  _onDragMove,  { capture: true });
   window.removeEventListener('pointerup',    _onDragEnd,   { capture: true });
   window.removeEventListener('pointercancel', _cancelDrag, { capture: true });
 
-  const { instanceId } = _dragState;
+  const instanceId = _dragState ? _dragState.instanceId : null;
   _dragState = null;
+  _pendingPickup = null;
   vabClearDragGhost();
   vabClearSnapHighlights();
 
@@ -1288,6 +1496,18 @@ function _cancelDrag() {
  */
 function _onDragMove(e) {
   if (!_dragState) return;
+
+  // Check if the pointer has moved enough to count as a real drag.
+  if (!_dragState.hasMoved) {
+    const dx = e.clientX - _dragState.startX;
+    const dy = e.clientY - _dragState.startY;
+    if (Math.hypot(dx, dy) < 8) return; // Not moved enough yet.
+    _dragState.hasMoved = true;
+    // Now show the ghost for new parts (existing parts already have it).
+    if (_dragState.instanceId === null) {
+      vabSetDragGhost(_dragState.partId, e.clientX, e.clientY);
+    }
+  }
 
   vabMoveDragGhost(e.clientX, e.clientY);
 
@@ -1316,11 +1536,22 @@ function _onDragEnd(e) {
   window.removeEventListener('pointerup',    _onDragEnd,   { capture: true });
   window.removeEventListener('pointercancel', _cancelDrag, { capture: true });
 
-  const { partId, instanceId } = _dragState;
+  const { partId, instanceId, hasMoved } = _dragState;
   _dragState = null;
 
   vabClearDragGhost();
   vabClearSnapHighlights();
+
+  // If pointer didn't move enough, treat as a click rather than a drag.
+  if (!hasMoved) {
+    if (instanceId === null) {
+      // Click on a part card → show detail panel.
+      _showPartDetail(partId);
+    }
+    // For existing placed parts clicked on the canvas, the selection is handled
+    // by _pendingPickup logic in _setupCanvas, not here.
+    return;
+  }
 
   // Determine world drop position.
   const { worldX, worldY } = vabScreenToWorld(e.clientX, e.clientY);
@@ -1406,6 +1637,229 @@ function _onDragEnd(e) {
   }
 
   vabRenderParts();
+  _updateStatusBar();
+  _updateScaleBarExtents();
+  _updateOffscreenIndicators();
+}
+
+// ---------------------------------------------------------------------------
+// Part detail panel
+// ---------------------------------------------------------------------------
+
+/**
+ * Show part details in the detail panel at the bottom of the parts list.
+ * @param {string} partId
+ */
+function _showPartDetail(partId) {
+  const detailEl = document.getElementById('vab-part-detail');
+  if (!detailEl) return;
+
+  const def = getPartById(partId);
+  if (!def) {
+    detailEl.setAttribute('hidden', '');
+    return;
+  }
+
+  const TYPE_LABEL = {
+    command_module: 'Command Module', computer_module: 'Computer Module',
+    service_module: 'Service Module', fuel_tank: 'Fuel Tank',
+    engine: 'Engine', solid_rocket_booster: 'Solid Rocket Booster',
+    stack_decoupler: 'Stack Decoupler', radial_decoupler: 'Radial Decoupler',
+    landing_legs: 'Landing Legs', parachute: 'Parachute', satellite: 'Satellite',
+  };
+
+  const typeLbl = TYPE_LABEL[def.type] ?? def.type;
+  const stats = [
+    ['Mass',  `${def.mass.toLocaleString('en-US')} kg`],
+    ['Cost',  fmt$(def.cost)],
+  ];
+
+  // Type-specific stats.
+  const p = def.properties ?? {};
+  if (p.thrust      !== undefined) stats.push(['Thrust (atm)', `${p.thrust} kN`]);
+  if (p.thrustVac   !== undefined) stats.push(['Thrust (vac)', `${p.thrustVac} kN`]);
+  if (p.isp         !== undefined) stats.push(['Isp (atm)', `${p.isp} s`]);
+  if (p.ispVac      !== undefined) stats.push(['Isp (vac)', `${p.ispVac} s`]);
+  if (p.throttleable !== undefined) stats.push(['Throttle', p.throttleable ? 'Yes' : 'No (SRB)']);
+  if (p.fuelMass     !== undefined) stats.push(['Fuel mass', `${p.fuelMass.toLocaleString('en-US')} kg`]);
+  if (p.maxSafeMass  !== undefined) stats.push(['Max safe mass', `${p.maxSafeMass.toLocaleString('en-US')} kg`]);
+  if (p.maxLandingSpeed !== undefined) stats.push(['Max landing speed', `${p.maxLandingSpeed} m/s`]);
+  if (p.seats !== undefined) stats.push(['Crew seats', String(p.seats)]);
+  if (p.experimentDuration !== undefined) stats.push(['Experiment time', `${p.experimentDuration} s`]);
+
+  detailEl.innerHTML =
+    `<div class="vab-detail-name">${def.name}</div>` +
+    `<div class="vab-detail-type">${typeLbl}</div>` +
+    (def.description ? `<div class="vab-detail-desc">${def.description}</div>` : '') +
+    `<div class="vab-detail-stats">` +
+      stats.map(([lbl, val]) =>
+        `<div class="vab-detail-stat">` +
+          `<span class="vab-detail-stat-label">${lbl}</span>` +
+          `<span class="vab-detail-stat-value">${val}</span>` +
+        `</div>`
+      ).join('') +
+    `</div>`;
+
+  detailEl.removeAttribute('hidden');
+}
+
+// ---------------------------------------------------------------------------
+// Selection highlight
+// ---------------------------------------------------------------------------
+
+/**
+ * Select or deselect a placed part by instanceId.
+ * @param {string | null} instanceId
+ */
+function _setSelectedPart(instanceId) {
+  _selectedInstanceId = instanceId;
+  const highlight = document.getElementById('vab-selection-highlight');
+  if (!highlight) return;
+
+  if (!instanceId || !_assembly) {
+    highlight.setAttribute('hidden', '');
+    // Also hide the detail panel if it was showing a schematic-part detail.
+    return;
+  }
+
+  const placed = _assembly.parts.get(instanceId);
+  const def = placed ? getPartById(placed.partId) : null;
+  if (!placed || !def) {
+    highlight.setAttribute('hidden', '');
+    return;
+  }
+
+  _updateSelectionHighlight(placed, def, highlight);
+  highlight.removeAttribute('hidden');
+
+  // Show detail for the selected part.
+  _showPartDetail(placed.partId);
+}
+
+/**
+ * Reposition the selection highlight div over the selected part.
+ * @param {import('../core/rocketbuilder.js').PlacedPart} placed
+ * @param {import('../data/parts.js').PartDef} def
+ * @param {HTMLElement} highlight
+ */
+function _updateSelectionHighlight(placed, def, highlight) {
+  const { zoom, x: camX, y: camY } = vabGetCamera();
+  const pxPerUnit = zoom;
+
+  // Canvas area left offset (scale bar + open panels).
+  const canvasLeft = VAB_SCALE_BAR_WIDTH + _openPanels.size * SIDE_PANEL_WIDTH;
+
+  // World to screen: The VAB world x=0 is centred in canvas, y increases upward.
+  // Canvas origin (screen coords) = canvasLeft + canvasWidth/2 + camX, toolbarBottom - camY
+  const canvasArea = _canvasArea;
+  if (!canvasArea) return;
+  const canvasW = canvasArea.offsetWidth;
+  const canvasH = canvasArea.offsetHeight;
+  const toolbarH = VAB_TOOLBAR_HEIGHT + 22; // include status bar
+
+  const screenX = (canvasLeft + canvasW / 2) + (placed.x + (canvasArea.getBoundingClientRect().left - canvasLeft - canvasW/2)/zoom) * pxPerUnit;
+  // Simpler: use vabScreenToWorld in reverse via known camera values from vabGetCamera.
+  // The render vab module uses: screenX = (worldX - camX) * zoom + canvasW/2 + VAB_SCALE_BAR_WIDTH + openPanelsWidth
+  // => screenX = placed.x * zoom + canvasW/2 + canvasLeft - camX * zoom (approximately)
+  const sx = (placed.x * zoom) + (canvasW / 2) + canvasLeft - (camX * zoom);
+  // For Y: screenY = VAB_TOOLBAR_HEIGHT + 22 + canvasH/2 - (placed.y * zoom) + (camY * zoom - canvasH/2)
+  // Actually: screenY = toolbarH + (camY - placed.y) * zoom (where camY is pixels from bottom=0)
+  // Using: barY = camY - m * pxPerMetre in scale bar → placed.y is already in world px units
+  const sy = toolbarH + (camY - placed.y) * pxPerUnit;
+
+  const w = def.width  * pxPerUnit;
+  const h = def.height * pxPerUnit;
+
+  highlight.style.left   = `${(sx - w / 2).toFixed(1)}px`;
+  highlight.style.top    = `${(sy - h / 2).toFixed(1)}px`;
+  highlight.style.width  = `${w.toFixed(1)}px`;
+  highlight.style.height = `${h.toFixed(1)}px`;
+}
+
+// ---------------------------------------------------------------------------
+// Status bar (part count + cost)
+// ---------------------------------------------------------------------------
+
+/**
+ * Update the parts count and cost readout in the status bar.
+ */
+function _updateStatusBar() {
+  const partsEl = document.getElementById('vab-status-parts');
+  const costEl  = document.getElementById('vab-status-cost');
+  if (!partsEl || !costEl || !_assembly) return;
+
+  const count = _assembly.parts.size;
+  let totalCost = 0;
+  for (const placed of _assembly.parts.values()) {
+    const def = getPartById(placed.partId);
+    if (def) totalCost += def.cost;
+  }
+
+  partsEl.textContent = String(count);
+  costEl.textContent  = fmt$(totalCost);
+}
+
+// ---------------------------------------------------------------------------
+// Off-screen part indicators
+// ---------------------------------------------------------------------------
+
+/**
+ * Update the arrow indicators for any placed parts outside the visible canvas.
+ */
+function _updateOffscreenIndicators() {
+  if (!_canvasArea || !_assembly) return;
+
+  // Remove existing indicators.
+  const existing = _canvasArea.querySelectorAll('.vab-offscreen-indicator');
+  existing.forEach((el) => el.remove());
+
+  const { zoom, x: camX, y: camY } = vabGetCamera();
+  const canvasW = _canvasArea.offsetWidth;
+  const canvasH = _canvasArea.offsetHeight;
+
+  for (const placed of _assembly.parts.values()) {
+    const def = getPartById(placed.partId);
+    if (!def) continue;
+
+    // World → canvas-local screen coords.
+    const sx = placed.x * zoom + canvasW / 2 - camX * zoom;
+    const sy = (camY - placed.y) * zoom;
+
+    // Check if the part is visible.
+    const hw = def.width  * zoom / 2;
+    const hh = def.height * zoom / 2;
+    const partLeft   = sx - hw;
+    const partRight  = sx + hw;
+    const partTop    = sy - hh;
+    const partBottom = sy + hh;
+
+    const offLeft  = partRight  < 0;
+    const offRight = partLeft   > canvasW;
+    const offTop   = partBottom < 0;
+    const offBot   = partTop    > canvasH;
+
+    if (!offLeft && !offRight && !offTop && !offBot) continue;
+
+    // Determine edge and position.
+    const margin = 8;
+    const size   = 20;
+    let indX = Math.max(margin, Math.min(canvasW - margin - size, sx));
+    let indY = Math.max(margin, Math.min(canvasH - margin - size, sy));
+    let arrow = '?';
+
+    if (offLeft)  { indX = margin; arrow = '◀'; }
+    if (offRight) { indX = canvasW - margin - size; arrow = '▶'; }
+    if (offTop)   { indY = margin; arrow = '▲'; }
+    if (offBot)   { indY = canvasH - margin - size; arrow = '▼'; }
+
+    const ind = document.createElement('div');
+    ind.className = 'vab-offscreen-indicator';
+    ind.style.left = `${indX}px`;
+    ind.style.top  = `${indY}px`;
+    ind.title      = def.name;
+    ind.textContent = arrow;
+    _canvasArea.appendChild(ind);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1466,6 +1920,7 @@ function _showPartContextMenu(placed, clientX, clientY) {
       _gameState.money += def.cost;
       vabUpdateCash(_gameState);
     }
+    if (_selectedInstanceId === placed.instanceId) _setSelectedPart(null);
     removePartFromAssembly(_assembly, placed.instanceId);
     // Sync staging — removed part must be pruned from its stage/unstaged slot.
     _syncAndRenderStaging();
@@ -1480,6 +1935,7 @@ function _showPartContextMenu(placed, clientX, clientY) {
         _gameState.money += def.cost * 2;
         vabUpdateCash(_gameState);
       }
+      if (_selectedInstanceId === placed.instanceId || _selectedInstanceId === mirrorId) _setSelectedPart(null);
       removePartFromAssembly(_assembly, placed.instanceId);
       removePartFromAssembly(_assembly, mirrorId);
       _syncAndRenderStaging();
@@ -1714,13 +2170,15 @@ function _escSave(s) {
 
 /**
  * Attach all pointer interactions to the build-canvas overlay div:
+ *   - Left-button click on placed part → select it.
+ *   - Left-button drag on placed part → pick it up.
  *   - Left-button drag on empty space → pan camera.
- *   - Left-button drag on a placed part → pick it up.
  *   - Right-click on a placed part → context menu (Remove Part).
  *   - Scroll wheel → zoom.
  * @param {HTMLElement} canvasArea
  */
 function _setupCanvas(canvasArea) {
+  _canvasArea = canvasArea;
   let panning = false;
   let lastX = 0;
   let lastY = 0;
@@ -1732,15 +2190,14 @@ function _setupCanvas(canvasArea) {
     const hit = _hitTestPlacedPart(worldX, worldY);
 
     if (hit) {
-      // Pick up the placed part: disconnect it from the graph, start dragging.
-      disconnectPart(_assembly, hit.instanceId);
-      _startDrag(hit.partId, hit.instanceId, e.clientX, e.clientY);
-      // Consume event so panning doesn't also start.
+      // Don't immediately pick up — wait for movement to distinguish click from drag.
+      _pendingPickup = { hit, startX: e.clientX, startY: e.clientY };
       e.stopPropagation();
       return;
     }
 
-    // No hit — start camera pan.
+    // No hit — deselect and start camera pan.
+    _setSelectedPart(null);
     panning = true;
     lastX = e.clientX;
     lastY = e.clientY;
@@ -1749,6 +2206,18 @@ function _setupCanvas(canvasArea) {
   });
 
   canvasArea.addEventListener('pointermove', (e) => {
+    if (_pendingPickup) {
+      const dx = e.clientX - _pendingPickup.startX;
+      const dy = e.clientY - _pendingPickup.startY;
+      if (Math.hypot(dx, dy) > 8) {
+        // Movement threshold exceeded → start dragging (pick up the part).
+        const { hit } = _pendingPickup;
+        _pendingPickup = null;
+        disconnectPart(_assembly, hit.instanceId);
+        _startDrag(hit.partId, hit.instanceId, e.clientX, e.clientY);
+      }
+      return;
+    }
     if (!panning) return;
     const dx = e.clientX - lastX;
     const dy = e.clientY - lastY;
@@ -1756,14 +2225,25 @@ function _setupCanvas(canvasArea) {
     lastY = e.clientY;
     vabPanCamera(dx, dy);
     _drawScaleTicks();
+    _updateOffscreenIndicators();
   });
 
-  const _stopPan = () => {
+  const _stopPan = (e) => {
+    if (_pendingPickup) {
+      // Pointer released without moving enough → treat as a click (select the part).
+      _setSelectedPart(_pendingPickup.hit.instanceId);
+      _pendingPickup = null;
+      return;
+    }
     panning = false;
     canvasArea.classList.remove('panning');
   };
   canvasArea.addEventListener('pointerup',     _stopPan);
-  canvasArea.addEventListener('pointercancel', _stopPan);
+  canvasArea.addEventListener('pointercancel', () => {
+    _pendingPickup = null;
+    panning = false;
+    canvasArea.classList.remove('panning');
+  });
 
   // Right-click → context menu for placed parts.
   canvasArea.addEventListener('contextmenu', (e) => {
@@ -1782,6 +2262,8 @@ function _setupCanvas(canvasArea) {
     const { zoom } = vabGetCamera();
     vabSetZoom(zoom * factor);
     _drawScaleTicks();
+    _updateScaleBarExtents();
+    _updateOffscreenIndicators();
   }, { passive: false });
 }
 
@@ -1812,20 +2294,64 @@ function _setupPanelDrag(partsPanel) {
 // ---------------------------------------------------------------------------
 
 /**
+ * Recompute positions of all open side panels and the canvas area offset.
+ * Panels stack left-to-right in the order they appear in _openPanels.
+ */
+function _recomputePanelPositions() {
+  const root = document.getElementById('vab-main');
+  if (!root) return;
+
+  const panelMap = {
+    missions: document.getElementById('vab-missions-panel'),
+    engineer: document.getElementById('vab-engineer-panel'),
+    staging:  document.getElementById('vab-staging-panel'),
+  };
+
+  let idx = 0;
+  for (const [id, el] of Object.entries(panelMap)) {
+    if (!el) continue;
+    if (_openPanels.has(id)) {
+      el.style.left = `${VAB_SCALE_BAR_WIDTH + idx * SIDE_PANEL_WIDTH}px`;
+      idx++;
+    } else {
+      el.setAttribute('hidden', '');
+    }
+  }
+
+  // Offset the canvas area so it starts after all open panels.
+  if (_canvasArea) {
+    _canvasArea.style.marginLeft = `${_openPanels.size * SIDE_PANEL_WIDTH}px`;
+  }
+}
+
+/**
+ * Toggle a named side panel.
+ * @param {string} panelId  'missions' | 'engineer' | 'staging'
+ * @param {() => void} [onOpen]  Called when the panel is about to open.
+ */
+function _togglePanel(panelId, onOpen) {
+  const panelMap = {
+    missions: document.getElementById('vab-missions-panel'),
+    engineer: document.getElementById('vab-engineer-panel'),
+    staging:  document.getElementById('vab-staging-panel'),
+  };
+  const el = panelMap[panelId];
+  if (!el) return;
+
+  if (_openPanels.has(panelId)) {
+    _openPanels.delete(panelId);
+  } else {
+    _openPanels.add(panelId);
+    el.removeAttribute('hidden');
+    if (onOpen) onOpen();
+  }
+  _recomputePanelPositions();
+}
+
+/**
  * @param {HTMLElement} root  The #vab-root element.
  */
 function _bindButtons(root) {
-  const missionsPanel = /** @type {HTMLElement} */ (root.querySelector('#vab-missions-panel'));
-  const engineerPanel = /** @type {HTMLElement} */ (root.querySelector('#vab-engineer-panel'));
-  const stagingPanel  = /** @type {HTMLElement} */ (root.querySelector('#vab-staging-panel'));
-
-  /** Close all side panels. */
-  const _closeAllPanels = () => {
-    missionsPanel?.setAttribute('hidden', '');
-    engineerPanel?.setAttribute('hidden', '');
-    stagingPanel?.setAttribute('hidden', '');
-  };
-
   // ── "← Hub" button — return to the space agency hub ──────────────────────
   root.querySelector('#vab-back-btn')?.addEventListener('click', () => {
     if (_onBack) _onBack();
@@ -1838,41 +2364,32 @@ function _bindButtons(root) {
 
   // ── "View Accepted Missions" toggle ──────────────────────────────────────
   root.querySelector('#vab-btn-missions')?.addEventListener('click', () => {
-    const willOpen = missionsPanel.hasAttribute('hidden');
-    _closeAllPanels();
-    if (willOpen) missionsPanel.removeAttribute('hidden');
+    _togglePanel('missions');
   });
 
   root.querySelector('#vab-missions-close')?.addEventListener('click', () => {
-    missionsPanel?.setAttribute('hidden', '');
+    _openPanels.delete('missions');
+    _recomputePanelPositions();
   });
 
   // ── "Rocket Engineer" toggle ─────────────────────────────────────────────
   root.querySelector('#vab-btn-engineer')?.addEventListener('click', () => {
-    const willOpen = engineerPanel.hasAttribute('hidden');
-    _closeAllPanels();
-    if (willOpen) {
-      engineerPanel.removeAttribute('hidden');
-      _renderEngineerPanel(); // Populate with current validation result.
-    }
+    _togglePanel('engineer', () => _renderEngineerPanel());
   });
 
   root.querySelector('#vab-engineer-close')?.addEventListener('click', () => {
-    engineerPanel?.setAttribute('hidden', '');
+    _openPanels.delete('engineer');
+    _recomputePanelPositions();
   });
 
   // ── "Staging" toggle ─────────────────────────────────────────────────────
   root.querySelector('#vab-btn-staging')?.addEventListener('click', () => {
-    const willOpen = stagingPanel.hasAttribute('hidden');
-    _closeAllPanels();
-    if (willOpen) {
-      stagingPanel.removeAttribute('hidden');
-      _renderStagingPanel(); // Refresh on open so it reflects latest assembly state.
-    }
+    _togglePanel('staging', () => _renderStagingPanel());
   });
 
   root.querySelector('#vab-staging-close')?.addEventListener('click', () => {
-    stagingPanel?.setAttribute('hidden', '');
+    _openPanels.delete('staging');
+    _recomputePanelPositions();
   });
 
   // ── Symmetry toggle ───────────────────────────────────────────────────────
@@ -1905,6 +2422,9 @@ function _syncAndRenderStaging() {
     syncStagingWithAssembly(_assembly, _stagingConfig);
     _renderStagingPanel();
     _runAndRenderValidation();
+    _updateStatusBar();
+    _updateScaleBarExtents();
+    _updateOffscreenIndicators();
   }
 }
 
@@ -2342,10 +2862,21 @@ function _doLaunch(crewIds) {
     if (def) totalFuel += def.properties?.fuelMass ?? 0;
   }
 
+  // Auto-save the current rocket design so it can be re-launched from the launch pad.
+  const launchDesign = createRocketDesign({
+    id:          'launch-' + Date.now(),
+    name:        'VAB Launch ' + new Date().toLocaleDateString(),
+    parts:       [..._assembly.parts.values()].map(p => ({ partId: p.partId, position: { x: p.x, y: p.y } })),
+    staging:     { stages: _stagingConfig.stages.map(s => [...s.instanceIds]), unstaged: [..._stagingConfig.unstaged] },
+    totalMass:   _lastValidation?.totalMassKg ?? 0,
+    totalThrust: _lastValidation?.stage1Thrust ?? 0,
+  });
+  _gameState.rockets.push(launchDesign);
+
   // Write the live flight state into game state.
   _gameState.currentFlight = {
     missionId,
-    rocketId:        'vab-session', // Saved rocket designs added in a later task.
+    rocketId:        launchDesign.id,
     crewIds,
     timeElapsed:     0,
     altitude:        0,
@@ -2479,6 +3010,12 @@ export function initVabUI(container, state, { onBack } = {}) {
       </div>
     </div>
 
+    <!-- ── Status bar ─────────────────────────────────────────────────── -->
+    <div id="vab-status-bar">
+      <span id="vab-status-parts">Parts: 0</span>
+      <span id="vab-status-cost">Cost: $0</span>
+    </div>
+
     <!-- ── Main row ───────────────────────────────────────────────────── -->
     <div id="vab-main">
 
@@ -2488,7 +3025,9 @@ export function initVabUI(container, state, { onBack } = {}) {
       </div>
 
       <!-- Build canvas (transparent — PixiJS renders grid beneath) -->
-      <div id="vab-canvas-area"></div>
+      <div id="vab-canvas-area">
+        <div id="vab-selection-highlight" hidden></div>
+      </div>
 
       <!-- Parts panel (right) -->
       <div id="vab-parts-panel">
@@ -2496,6 +3035,7 @@ export function initVabUI(container, state, { onBack } = {}) {
         <div class="vab-parts-list" id="vab-parts-list">
           ${_buildPartsHTML(state)}
         </div>
+        <div id="vab-part-detail" hidden></div>
       </div>
 
       <!-- Accepted Missions side panel -->
@@ -2564,6 +3104,22 @@ export function initVabUI(container, state, { onBack } = {}) {
     _setupStagingDnD(stagingBody);  // Set up DnD once (event delegation survives re-renders).
     _renderStagingPanel();          // Initial render (empty assembly — shows one empty stage).
   }
+
+  // ── Delete / Backspace: remove selected part ──────────────────────────────
+  window.addEventListener('keydown', (e) => {
+    if ((e.code !== 'Delete' && e.code !== 'Backspace') || !_selectedInstanceId || !_assembly) return;
+    // Don't intercept Backspace when focus is inside an input/textarea.
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+    e.preventDefault();
+    const idToRemove = _selectedInstanceId;
+    _setSelectedPart(null);
+    removePartFromAssembly(_assembly, idToRemove);
+    syncStagingWithAssembly(_stagingConfig, _assembly);
+    vabSetAssembly(_assembly);
+    vabRenderParts(_assembly, null);
+    _syncAndRenderStaging();
+    _runAndRenderValidation();
+  });
 
   // ── Spacebar: fire next stage during flight ────────────────────────────────
   // _flightActive is set to true by the flight system (implemented in a later task).

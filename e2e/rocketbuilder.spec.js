@@ -282,9 +282,13 @@ test.describe('VAB — Rocket Builder Flow', () => {
   // ── (6) Moving engine into Stage 1 shows it in the Stage 1 slot ──────────
 
   test('(6) moving engine into Stage 1 shows it in the Stage 1 slot', async () => {
-    // Re-open Staging panel (engineer panel auto-closed it)
-    await page.click('#vab-btn-staging');
-    await expect(page.locator('#vab-staging-panel')).toBeVisible();
+    // Ensure the staging panel is open. With stackable panels it may already be
+    // visible from test (5); only click the button if it is currently hidden.
+    const stagingPanel = page.locator('#vab-staging-panel');
+    if (!(await stagingPanel.isVisible())) {
+      await page.click('#vab-btn-staging');
+    }
+    await expect(stagingPanel).toBeVisible();
 
     // Ensure the engine chip is visible in the unstaged zone
     const unstagedChip = page.locator('[data-drop-zone="unstaged"] .vab-stage-chip', {

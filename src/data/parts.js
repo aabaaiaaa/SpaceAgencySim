@@ -108,6 +108,9 @@ export const ActivationBehaviour = Object.freeze({
  * @property {string} name
  *   Human-readable label shown in the parts panel and on-screen tooltips.
  *
+ * @property {string} [description]
+ *   Short description of the part shown in the detail panel.
+ *
  * @property {string} type
  *   Part category.  Must be a value from the PartType enum
  *   (src/core/constants.js).
@@ -247,6 +250,7 @@ export const PARTS = [
   {
     id: 'cmd-mk1',
     name: 'Mk1 Command Module',
+    description: 'A single-seat crewed capsule. Features built-in RCS for attitude control and an ejector seat for emergency crew escape. Mount a parachute on top for safe re-entry.',
     type: PartType.COMMAND_MODULE,
     mass: 840,
     cost: 8_000,
@@ -284,6 +288,7 @@ export const PARTS = [
   {
     id: 'probe-core-mk1',
     name: 'Probe Core Mk1',
+    description: 'A lightweight uncrewed avionics pod. Perfect for scientific probes and satellite missions that do not require a crew. No ejector seat or RCS.',
     type: PartType.COMPUTER_MODULE,
     mass: 50,
     cost: 5_000,
@@ -317,6 +322,7 @@ export const PARTS = [
   {
     id: 'science-module-mk1',
     name: 'Science Module Mk1',
+    description: 'A science experiment module. Activate in flight to begin a timed data collection experiment. Can be stacked in-line or mounted radially on the side of the rocket.',
     type: PartType.SERVICE_MODULE,
     mass: 200,
     cost: 12_000,
@@ -349,6 +355,7 @@ export const PARTS = [
   {
     id: 'tank-small',
     name: 'Small Tank',
+    description: 'A small liquid propellant tank. Holds 400 kg of fuel for powering rocket engines. Lightweight for upper stages or small first stages.',
     type: PartType.FUEL_TANK,
     mass: 50,    // empty (dry) mass
     cost: 800,
@@ -377,6 +384,7 @@ export const PARTS = [
   {
     id: 'tank-medium',
     name: 'Medium Tank',
+    description: 'A medium liquid propellant tank. Holds 1,800 kg of fuel. A versatile workhorse for first and upper stages of mid-sized rockets.',
     type: PartType.FUEL_TANK,
     mass: 100,
     cost: 1_600,
@@ -405,6 +413,7 @@ export const PARTS = [
   {
     id: 'tank-large',
     name: 'Large Tank',
+    description: 'A large liquid propellant tank. Holds 8,000 kg of fuel. Essential for heavy rockets destined for orbit or beyond.',
     type: PartType.FUEL_TANK,
     mass: 200,
     cost: 3_200,
@@ -439,6 +448,7 @@ export const PARTS = [
   {
     id: 'engine-spark',
     name: 'Spark Engine',
+    description: 'A small, lightweight first-stage engine. Throttleable for precise thrust control. Good efficiency for its size — ideal for smaller rockets and upper stages.',
     type: PartType.ENGINE,
     mass: 120,
     cost: 6_000,
@@ -471,6 +481,7 @@ export const PARTS = [
   {
     id: 'engine-reliant',
     name: 'Reliant Engine',
+    description: 'A large atmospheric workhorse engine. High thrust makes it ideal for heavy first stages. Fully throttleable for ascent profile control.',
     type: PartType.ENGINE,
     mass: 500,
     cost: 12_000,
@@ -507,6 +518,7 @@ export const PARTS = [
   {
     id: 'engine-poodle',
     name: 'Poodle Engine',
+    description: 'A high-efficiency upper-stage engine. Better ISP trades raw thrust for fuel economy at altitude where atmospheric drag is minimal.',
     type: PartType.ENGINE,
     mass: 180,
     cost: 9_000,
@@ -543,6 +555,7 @@ export const PARTS = [
   {
     id: 'engine-nerv',
     name: 'Nerv Vacuum Engine',
+    description: 'An extreme-efficiency vacuum engine. Outstanding ISP makes it ideal for deep-space missions and orbital manoeuvring. Performance degrades in thick atmosphere.',
     type: PartType.ENGINE,
     mass: 250,
     cost: 15_000,
@@ -581,6 +594,7 @@ export const PARTS = [
   {
     id: 'srb-small',
     name: 'SRB Small',
+    description: 'A compact solid rocket booster. Attaches radially to boost first-stage thrust. Burns at a fixed rate until empty — cannot be throttled or shut down.',
     type: PartType.SOLID_ROCKET_BOOSTER,
     mass: 180,    // empty (dry) mass
     cost: 3_000,
@@ -617,6 +631,7 @@ export const PARTS = [
   {
     id: 'srb-large',
     name: 'SRB Large',
+    description: 'A heavy solid rocket booster. Provides massive first-stage thrust for heavy payloads. Cannot be throttled or stopped once ignited — plan your staging carefully.',
     type: PartType.SOLID_ROCKET_BOOSTER,
     mass: 360,
     cost: 6_000,
@@ -656,6 +671,7 @@ export const PARTS = [
   {
     id: 'decoupler-stack-tr18',
     name: 'Stack Decoupler TR-18',
+    description: 'A standard in-line stage separation ring. Fires a one-shot charge to separate two stack sections. Place between stages to shed dead weight as fuel runs out.',
     type: PartType.STACK_DECOUPLER,
     mass: 50,
     cost: 400,
@@ -689,6 +705,7 @@ export const PARTS = [
   {
     id: 'decoupler-radial',
     name: 'Radial Decoupler',
+    description: 'A bracket that mounts a radial part (SRB, landing leg) to the main stack and separates it on command. Use to jettison spent boosters or landing gear.',
     type: PartType.RADIAL_DECOUPLER,
     mass: 30,
     cost: 600,
@@ -722,6 +739,7 @@ export const PARTS = [
   {
     id: 'landing-legs-small',
     name: 'Small Landing Leg',
+    description: 'Lightweight retractable landing legs. Extend before touchdown to cushion the landing. Safe for rockets up to 2,000 kg total mass at landing speed ≤10 m/s.',
     type: PartType.LANDING_LEGS,
     mass: 80,
     cost: 1_200,
@@ -750,6 +768,7 @@ export const PARTS = [
   {
     id: 'landing-legs-large',
     name: 'Large Landing Leg',
+    description: 'Heavy-duty retractable landing legs. Built for heavier rockets up to 8,000 kg. Essential for propulsive landings of first-stage boosters.',
     type: PartType.LANDING_LEGS,
     mass: 180,
     cost: 2_000,
@@ -783,6 +802,7 @@ export const PARTS = [
   {
     id: 'parachute-mk1',
     name: 'Mk1 Parachute',
+    description: 'A light recovery parachute for small capsules. Deploy during re-entry to slow descent. Mount on top of a command module or radially for symmetrical deployment.',
     type: PartType.PARACHUTE,
     mass: 100,
     cost: 400,
@@ -815,6 +835,7 @@ export const PARTS = [
   {
     id: 'parachute-mk2',
     name: 'Mk2 Parachute',
+    description: 'A heavy-duty recovery parachute for larger capsules. Can handle payloads up to 4,000 kg. Use multiple chutes for very heavy re-entry vehicles.',
     type: PartType.PARACHUTE,
     mass: 250,
     cost: 800,
@@ -849,6 +870,7 @@ export const PARTS = [
   {
     id: 'satellite-mk1',
     name: 'Satellite Mk1',
+    description: 'A deployable satellite payload. Carry it to orbit and activate RELEASE to separate it into independent flight. Required for satellite deployment missions.',
     type: PartType.SATELLITE,
     mass: 300,
     cost: 20_000,

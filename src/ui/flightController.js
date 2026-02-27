@@ -23,13 +23,14 @@ import {
   handleKeyUp,
   fireNextStage,
 } from '../core/physics.js';
-import { initFlightHud, destroyFlightHud, setHudTimeWarp, lockTimeWarp } from './flightHud.js';
+import { initFlightHud, destroyFlightHud, setHudTimeWarp, lockTimeWarp, showLaunchTip, hideLaunchTip } from './flightHud.js';
 import { initFlightContextMenu, destroyFlightContextMenu } from './flightContextMenu.js';
 import { saveGame, listSaves } from '../core/saveload.js';
 import { ATMOSPHERE_TOP, isReentryCondition } from '../core/atmosphere.js';
 import { getPartById } from '../data/parts.js';
 import { PartType, DEATH_FINE_PER_ASTRONAUT } from '../core/constants.js';
 import { processFlightReturn } from '../core/flightReturn.js';
+import { setTopBarFlightItems, clearTopBarFlightItems } from './topbar.js';
 
 // ---------------------------------------------------------------------------
 // Module state
@@ -109,7 +110,7 @@ const FLIGHT_CTRL_CSS = `
 /* ── Flight control overlay ─────────────────────────────────────────────── */
 #flight-overlay {
   position: fixed;
-  inset: 0;
+  inset: 44px 0 0;
   pointer-events: none;
   z-index: 200;
   font-family: 'Segoe UI', system-ui, sans-serif;
@@ -481,8 +482,20 @@ export function startFlightScene(
   // Mount the HUD overlay.
   initFlightHud(container, _ps, assembly, stagingConfig, flightState, state, _onTimeWarpButtonClick);
 
-  // Build the in-flight control overlay (hamburger button + dropdown menu).
+  // Build the in-flight control overlay (save notice only — no hamburger).
   _buildFlightOverlay(container);
+
+  // Inject "Return to Space Agency" into the topbar hamburger dropdown.
+  setTopBarFlightItems([
+    {
+      label: 'Return to Space Agency',
+      title: 'End this flight and return to your Space Agency hub to review results and plan your next launch.',
+      onClick: _handleReturnToAgency,
+    },
+  ]);
+
+  // Show the launch pad tip if the rocket hasn't launched yet.
+  showLaunchTip();
 
   // Initialise the right-click part context menu.
   initFlightContextMenu(
@@ -528,6 +541,7 @@ export function stopFlightScene() {
   destroyFlightHud();
   destroyFlightContextMenu();
   destroyFlightRenderer();
+  clearTopBarFlightItems();
 
   if (_flightOverlay) {
     _flightOverlay.remove();
@@ -704,6 +718,9 @@ function _onTimeWarpButtonClick(level) {
 // Private — keyboard handlers
 // ---------------------------------------------------------------------------
 
+/** Ordered warp levels for < / > key stepping. */
+const WARP_LEVELS_ORDERED = [0, 0.25, 0.5, 1, 2, 5, 10, 50];
+
 /** @param {KeyboardEvent} e */
 function _onKeyDown(e) {
   if (!_ps || !_assembly || !_stagingConfig || !_flightState) return;
@@ -718,6 +735,23 @@ function _onKeyDown(e) {
     lockTimeWarp(true);
 
     fireNextStage(_ps, _assembly, _stagingConfig, _flightState);
+    hideLaunchTip();
+    return;
+  }
+
+  // < (Comma) — decrease warp one step.
+  if (e.code === 'Comma') {
+    e.preventDefault();
+    const idx = WARP_LEVELS_ORDERED.indexOf(_timeWarp);
+    if (idx > 0) _onTimeWarpButtonClick(WARP_LEVELS_ORDERED[idx - 1]);
+    return;
+  }
+
+  // > (Period) — increase warp one step.
+  if (e.code === 'Period') {
+    e.preventDefault();
+    const idx = WARP_LEVELS_ORDERED.indexOf(_timeWarp);
+    if (idx < WARP_LEVELS_ORDERED.length - 1) _onTimeWarpButtonClick(WARP_LEVELS_ORDERED[idx + 1]);
     return;
   }
 
@@ -735,85 +769,16 @@ function _onKeyUp(e) {
 // ---------------------------------------------------------------------------
 
 /**
- * Build the in-flight control overlay:
- *   - A hamburger menu button centred at the top of the screen.
- *   - A dropdown menu with Save Game, Load Game, and Return to Space Agency.
+ * Build the in-flight control overlay.
+ * The hamburger menu has been consolidated into the top-bar dropdown.
+ * This overlay now serves as a pointer-events pass-through layer for any
+ * future flight-specific HUD controls.
  *
  * @param {HTMLElement} container
  */
 function _buildFlightOverlay(container) {
   const overlay = document.createElement('div');
   overlay.id = 'flight-overlay';
-
-  // ── Hamburger button ──────────────────────────────────────────────────────
-  const menuBtn = document.createElement('button');
-  menuBtn.id = 'flight-menu-btn';
-  menuBtn.setAttribute('aria-label', 'Flight menu');
-  menuBtn.innerHTML = '<span aria-hidden="true">&#9776;</span> Menu';
-
-  // ── Dropdown ──────────────────────────────────────────────────────────────
-  const menu = document.createElement('div');
-  menu.id = 'flight-menu';
-  menu.classList.add('hidden');
-
-  // Save Game
-  const saveBtn = document.createElement('button');
-  saveBtn.id        = 'flight-menu-save';
-  saveBtn.className = 'flight-menu-item';
-  saveBtn.textContent = 'Save Game';
-  saveBtn.addEventListener('click', () => {
-    _toggleMenu(false);
-    _handleSaveGame();
-  });
-  menu.appendChild(saveBtn);
-
-  // Load Game
-  const loadBtn = document.createElement('button');
-  loadBtn.id        = 'flight-menu-load';
-  loadBtn.className = 'flight-menu-item';
-  loadBtn.textContent = 'Load Game';
-  loadBtn.addEventListener('click', () => {
-    _toggleMenu(false);
-    // Reload the page to reach the main-menu load screen.
-    if (typeof window !== 'undefined') window.location.reload();
-  });
-  menu.appendChild(loadBtn);
-
-  // Divider
-  const divider = document.createElement('div');
-  divider.className = 'flight-menu-divider';
-  menu.appendChild(divider);
-
-  // Return to Space Agency
-  const returnBtn = document.createElement('button');
-  returnBtn.id        = 'flight-menu-return';
-  returnBtn.className = 'flight-menu-item';
-  returnBtn.textContent = 'Return to Space Agency';
-  returnBtn.addEventListener('click', () => {
-    _toggleMenu(false);
-    _handleReturnToAgency();
-  });
-  menu.appendChild(returnBtn);
-
-  // Toggle menu visibility on button click.
-  menuBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    _toggleMenu();
-  });
-
-  // Close the menu when clicking outside of it.
-  document.addEventListener('click', (e) => {
-    if (
-      _flightOverlay &&
-      !menu.contains(/** @type {Node} */ (e.target)) &&
-      e.target !== menuBtn
-    ) {
-      _toggleMenu(false);
-    }
-  });
-
-  overlay.appendChild(menuBtn);
-  overlay.appendChild(menu);
   _flightOverlay = overlay;
   container.appendChild(overlay);
 }
@@ -1110,6 +1075,7 @@ function _showPostFlightSummary(ps, assembly, flightState, state, onFlightEnd) {
   restartBtn.textContent = lostPartsCost > 0
     ? `↩ Restart from Launch  (−$${lostPartsCost.toLocaleString('en-US')})`
     : '↩ Restart from Launch';
+  restartBtn.title = 'Return to your Space Agency hub. Parts that were lost during this flight will be deducted from your budget.';
 
   restartBtn.addEventListener('click', () => {
     // Deduct the cost of lost parts immediately.
@@ -1128,6 +1094,7 @@ function _showPostFlightSummary(ps, assembly, flightState, state, onFlightEnd) {
     continueBtn.id        = 'post-flight-continue-btn';
     continueBtn.className = 'pf-btn pf-btn-primary';
     continueBtn.textContent = '▶ Continue Flying';
+    continueBtn.title = 'Close this summary and continue controlling the landed rocket.';
     continueBtn.addEventListener('click', () => {
       // The flight scene is still running — close the summary and restore HUD.
       _summaryShown = false;
@@ -1143,6 +1110,7 @@ function _showPostFlightSummary(ps, assembly, flightState, state, onFlightEnd) {
   returnBtn.id          = 'post-flight-return-btn';
   returnBtn.className   = 'pf-btn pf-btn-primary';
   returnBtn.textContent = '← Return to Space Agency';
+  returnBtn.title = 'End this flight, process mission results and part recovery, and return to your Space Agency hub.';
   returnBtn.addEventListener('click', () => {
     // Process all end-of-flight game-state changes (mission completion,
     // part recovery, loan interest, death fines, flight history) and collect
@@ -1157,6 +1125,27 @@ function _showPostFlightSummary(ps, assembly, flightState, state, onFlightEnd) {
     if (onFlightEnd) onFlightEnd(state, returnResults);
   });
   buttonsEl.appendChild(returnBtn);
+
+  // ── "Retry with same design" button ───────────────────────────────────────
+  // Only shown when a saved design exists (auto-saved at launch in D2).
+  if (state && state.rockets && state.rockets.length > 0 && flightState) {
+    const savedDesign = state.rockets.find(r => r.id === flightState.rocketId)
+      ?? state.rockets[state.rockets.length - 1];
+    if (savedDesign) {
+      const retryBtn = document.createElement('button');
+      retryBtn.id          = 'post-flight-retry-btn';
+      retryBtn.className   = 'pf-btn pf-btn-secondary';
+      retryBtn.textContent = '↺ Retry with Same Design';
+      retryBtn.title = 'Reload the same rocket design back onto the launch pad and start a new flight immediately.';
+      retryBtn.addEventListener('click', () => {
+        overlay.remove();
+        stopFlightScene();
+        // Return to hub so the player can re-launch.
+        if (onFlightEnd) onFlightEnd(state);
+      });
+      buttonsEl.appendChild(retryBtn);
+    }
+  }
 
   content.appendChild(buttonsEl);
   host.appendChild(overlay);

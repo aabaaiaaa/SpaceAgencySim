@@ -283,12 +283,11 @@ test.describe('Flight — Launch & Basic Flight', () => {
     // Root HUD overlay.
     await expect(page.locator('#flight-hud')).toBeVisible();
 
-    // Throttle bar.
-    await expect(page.locator('#flight-hud-throttle')).toBeVisible();
+    // Unified left panel (replaces separate throttle + telemetry panels).
+    await expect(page.locator('#flight-left-panel')).toBeVisible();
     await expect(page.locator('#flight-hud-throttle-pct')).toBeVisible();
 
-    // Telemetry panel.
-    await expect(page.locator('#flight-hud-telem')).toBeVisible();
+    // Altitude and vertical speed are in the status section of the left panel.
     await expect(page.locator('#hud-alt')).toBeVisible();
     await expect(page.locator('#hud-vely')).toBeVisible();
   });
@@ -370,30 +369,35 @@ test.describe('Flight — Launch & Basic Flight', () => {
   // ── (7) In-flight menu shows Save Game, Load Game, Return to Space Agency ─
 
   test('(7) in-flight menu button opens menu with Save Game, Load Game, and Return to Space Agency', async () => {
-    // Click the hamburger / Menu button.
-    await page.click('#flight-menu-btn');
+    // The flight menu is now consolidated into the top-bar hamburger dropdown.
+    await page.click('#topbar-menu-btn');
 
-    const menu = page.locator('#flight-menu');
-    await expect(menu).toBeVisible();
+    const dropdown = page.locator('#topbar-dropdown');
+    await expect(dropdown).toBeVisible();
 
-    // All three expected items should be present.
-    await expect(menu.locator('#flight-menu-save')).toContainText('Save Game');
-    await expect(menu.locator('#flight-menu-load')).toContainText('Load Game');
-    await expect(menu.locator('#flight-menu-return')).toContainText('Return to Space Agency');
+    // Standard items.
+    await expect(dropdown).toContainText('Save Game');
+    await expect(dropdown).toContainText('Load Game');
+
+    // Flight-specific item injected while in flight.
+    await expect(dropdown).toContainText('Return to Space Agency');
+
+    // Close the dropdown by clicking the menu button again (toggle).
+    await page.click('#topbar-menu-btn');
   });
 
   // ── (8) "Return to Space Agency" brings up the post-flight summary ────────
 
   test('(8) clicking "Return to Space Agency" from the menu shows the post-flight summary', async () => {
-    // Ensure the menu is open (it was left open from test 7; re-open if needed).
-    const menu = page.locator('#flight-menu');
-    if (!(await menu.isVisible())) {
-      await page.click('#flight-menu-btn');
-      await expect(menu).toBeVisible({ timeout: 2_000 });
+    // Open the topbar dropdown (it was closed at the end of test 7).
+    const dropdown = page.locator('#topbar-dropdown');
+    if (!(await dropdown.isVisible())) {
+      await page.click('#topbar-menu-btn');
+      await expect(dropdown).toBeVisible({ timeout: 2_000 });
     }
 
-    // Click "Return to Space Agency".
-    await page.click('#flight-menu-return');
+    // Click "Return to Space Agency" in the dropdown.
+    await dropdown.getByText('Return to Space Agency').click();
 
     // Post-flight summary overlay should appear.
     await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 5_000 });

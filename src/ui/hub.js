@@ -32,7 +32,7 @@ const HUB_STYLES = `
   inset: 0;
   pointer-events: none;
   z-index: 10;
-  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-family: 'Courier New', Courier, monospace;
 }
 
 /* ── Return Results overlay ───────────────────────────────────────────────── */
@@ -44,7 +44,7 @@ const HUB_STYLES = `
   display: flex;
   flex-direction: column;
   align-items: center;
-  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-family: 'Courier New', Courier, monospace;
   color: #d0e0f0;
   pointer-events: auto;
   overflow: hidden;

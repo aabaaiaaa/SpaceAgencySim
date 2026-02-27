@@ -94,8 +94,11 @@ const STAR_COUNT = 200;
 // Engine trail constants
 // ---------------------------------------------------------------------------
 
-/** Lifetime of a single trail segment (seconds). */
+/** Lifetime of a single trail segment at throttle=1 in vacuum (seconds). */
 const TRAIL_MAX_AGE = 0.5;
+
+/** Lifetime multiplier added by atmospheric density (dense air → longer smoke). */
+const TRAIL_ATMOSPHERE_AGE_BONUS = 2.5;
 
 /**
  * Air density threshold (kg/m³) below which engine trails are suppressed.
@@ -105,6 +108,12 @@ const TRAIL_DENSITY_THRESHOLD = 0.01;
 
 /** Speed (m/s) at which trail segments drift away from the engine nozzle. */
 const TRAIL_DRIFT_SPEED = 45;
+
+/** Lateral smoke fan speed (m/s) at zero velocity (launch-pad smoke spread). */
+const TRAIL_FAN_SPEED = 20;
+
+/** Velocity (m/s) at which the lateral fanning effect disappears. */
+const TRAIL_FAN_VELOCITY_CUTOFF = 80;
 
 // ---------------------------------------------------------------------------
 // Part-type fill colours (identical palette to vab.js for visual consistency)
@@ -587,8 +596,25 @@ function _renderRocket(ps, assembly, w, h) {
   // Position the container at the rocket's world-space reference point.
   const { sx, sy } = _worldToScreen(ps.posX, ps.posY, w, h);
   _rocketContainer.x        = sx;
-  _rocketContainer.y        = sy;
   _rocketContainer.rotation = ps.angle;
+
+  // When grounded, visually align the rocket so the bottom of the lowest active
+  // part sits exactly on the ground line rather than extending underground.
+  // This is a rendering-only correction; physics posY remains at 0 (ground).
+  let lowestPartBottomPx = 0;
+  if (ps.grounded) {
+    for (const instanceId of ps.activeParts) {
+      const placed = assembly.parts.get(instanceId);
+      const def    = placed ? getPartById(placed.partId) : null;
+      if (!def) continue;
+      const bottom = placed.y - (def.height ?? 40) / 2;
+      if (bottom < lowestPartBottomPx) lowestPartBottomPx = bottom;
+    }
+  }
+  // In PixiJS screen space Y increases downward; a negative lowestPartBottomPx
+  // means parts extend below the VAB 0 m line.  Shift the container up by that
+  // amount so the lowest part's bottom aligns with the rendered ground line.
+  _rocketContainer.y = sy + lowestPartBottomPx;
 
   // Batch all part rectangles into a single Graphics object.
   const g = new PIXI.Graphics();
@@ -694,10 +720,11 @@ function _nozzleWorldPos(ps, placed, def) {
 }
 
 /**
- * Emit one trail segment per currently-firing engine that is inside the
- * atmosphere (density > TRAIL_DENSITY_THRESHOLD).
+ * Emit trail segments for all engines this frame.
  *
- * SRBs produce wider, brighter segments than liquid engines.
+ * Fire/glow segments are scaled by throttle.  Smoke segments are always emitted
+ * (even at throttle = 0) but scaled by air density for atmosphere-wide trails.
+ * At low velocity (e.g. on the launch pad) smoke fans out sideways.
  *
  * @param {import('../core/physics.js').PhysicsState}           ps
  * @param {import('../core/rocketbuilder.js').RocketAssembly}   assembly
@@ -705,32 +732,92 @@ function _nozzleWorldPos(ps, placed, def) {
  */
 function _emitTrailSegments(ps, assembly, density) {
   if (density <= TRAIL_DENSITY_THRESHOLD) return;
-  if (!ps.firingEngines || ps.firingEngines.size === 0) return;
 
-  // Exhaust drifts opposite to the thrust direction.
+  // Exhaust drift direction: opposite to rocket nose (thrust direction).
   const exVx = -Math.sin(ps.angle) * TRAIL_DRIFT_SPEED;
   const exVy = -Math.cos(ps.angle) * TRAIL_DRIFT_SPEED;
 
-  for (const instanceId of ps.firingEngines) {
-    if (!ps.activeParts.has(instanceId)) continue;
+  // Lateral fanning: smoke spreads sideways when velocity is low.
+  // Fan effect falls off as speed increases above TRAIL_FAN_VELOCITY_CUTOFF.
+  const speed      = Math.hypot(ps.velX, ps.velY);
+  const fanFactor  = Math.max(0, 1 - speed / TRAIL_FAN_VELOCITY_CUTOFF);
+  const fanX       = Math.cos(ps.angle) * TRAIL_FAN_SPEED * fanFactor;
 
-    const placed = assembly.parts.get(instanceId);
-    const def    = placed ? getPartById(placed.partId) : null;
+  // Atmospheric lifetime multiplier: denser air → longer-lived smoke.
+  const densityRatio = Math.min(1, density / 1.225); // normalised to sea-level
+  const ageMultiplier = 1 + TRAIL_ATMOSPHERE_AGE_BONUS * densityRatio;
+
+  const throttle = ps.throttle ?? 0;
+
+  // Collect all engine parts (firing or not) for residual smoke.
+  for (const [instanceId, placed] of assembly.parts) {
+    if (!ps.activeParts.has(instanceId)) continue;
+    const def = placed ? getPartById(placed.partId) : null;
     if (!def) continue;
 
-    const isSRB  = def.type === PartType.SOLID_ROCKET_BOOSTER;
+    const isSRB     = def.type === PartType.SOLID_ROCKET_BOOSTER;
+    const isEngine  = def.type === PartType.ENGINE || isSRB;
+    if (!isEngine) continue;
+
+    const isFiring  = ps.firingEngines && ps.firingEngines.has(instanceId);
+    const effectiveThrottle = isSRB ? (isFiring ? 1 : 0) : throttle;
+
+    // Only emit if firing OR always emit residual smoke (heat trail) regardless.
+    if (!isFiring && effectiveThrottle === 0) {
+      // Residual heat smoke — tiny, only in dense atmosphere.
+      if (densityRatio < 0.1) continue;
+      const nozzle = _nozzleWorldPos(ps, placed, def);
+      _trailSegments.push({
+        worldX:      nozzle.x,
+        worldY:      nozzle.y,
+        vx:          exVx * 0.15 + (Math.random() - 0.5) * fanX,
+        vy:          exVy * 0.15 + Math.abs(exVy) * 0.2 * fanFactor, // slow upward drift
+        age:         0,
+        baseW:       2,
+        baseH:       4,
+        isSRB:       false,
+        maxAge:      TRAIL_MAX_AGE * ageMultiplier * 0.4,
+        isSmoke:     true,
+      });
+      continue;
+    }
+
     const nozzle = _nozzleWorldPos(ps, placed, def);
 
+    // Fire/glow segment — size and emission rate proportional to throttle.
+    const fireW = (isSRB ? 12 : 6) * (0.4 + effectiveThrottle * 0.6);
+    const fireH = (isSRB ? 26 : 14) * (0.4 + effectiveThrottle * 0.6);
     _trailSegments.push({
-      worldX: nozzle.x,
-      worldY: nozzle.y,
-      vx:     exVx,
-      vy:     exVy,
-      age:    0,
-      baseW:  isSRB ? 12 : 6,
-      baseH:  isSRB ? 26 : 14,
+      worldX:  nozzle.x,
+      worldY:  nozzle.y,
+      vx:      exVx,
+      vy:      exVy,
+      age:     0,
+      baseW:   fireW,
+      baseH:   fireH,
       isSRB,
+      maxAge:  TRAIL_MAX_AGE,
+      isSmoke: false,
     });
+
+    // Atmosphere smoke — longer trail in dense air, fans at low velocity.
+    if (densityRatio > 0.05) {
+      const smokeW = (isSRB ? 18 : 10) * densityRatio * (0.5 + effectiveThrottle * 0.5);
+      const smokeH = (isSRB ? 40 : 22) * densityRatio * (0.5 + effectiveThrottle * 0.5);
+      const lateralSign = Math.random() < 0.5 ? 1 : -1;
+      _trailSegments.push({
+        worldX:  nozzle.x,
+        worldY:  nozzle.y,
+        vx:      exVx * 0.5 + lateralSign * fanX * (0.3 + Math.random() * 0.7),
+        vy:      exVy * 0.5 + Math.abs(exVy) * 0.3 * fanFactor,
+        age:     0,
+        baseW:   smokeW,
+        baseH:   smokeH,
+        isSRB:   false,
+        maxAge:  TRAIL_MAX_AGE * ageMultiplier,
+        isSmoke: true,
+      });
+    }
   }
 }
 
@@ -748,7 +835,8 @@ function _updateTrails(dt) {
   // Compact array in place — avoids allocation of a filtered copy.
   let write = 0;
   for (let i = 0; i < _trailSegments.length; i++) {
-    if (_trailSegments[i].age < TRAIL_MAX_AGE) {
+    const maxAge = _trailSegments[i].maxAge ?? TRAIL_MAX_AGE;
+    if (_trailSegments[i].age < maxAge) {
       _trailSegments[write++] = _trailSegments[i];
     }
   }
@@ -776,22 +864,32 @@ function _renderTrails(w, h) {
   _trailContainer.addChild(g);
 
   for (const seg of _trailSegments) {
-    const t     = seg.age / TRAIL_MAX_AGE;
-    const alpha = Math.max(0, 1 - t);
+    const maxAge = seg.maxAge ?? TRAIL_MAX_AGE;
+    const t      = seg.age / maxAge;
+    const alpha  = Math.max(0, 1 - t);
 
-    // Colour: bright at birth → orange → dark red at death.
-    const birthColor = seg.isSRB ? 0xffffff : 0xffff80;
-    const color = t < 0.4
-      ? _lerpColor(birthColor, 0xff8800, t / 0.4)
-      : _lerpColor(0xff8800, 0xff2000, (t - 0.4) / 0.6);
+    let color;
+    if (seg.isSmoke) {
+      // Smoke: grey at birth → dark grey at death.
+      color = t < 0.5
+        ? _lerpColor(0x888888, 0x444444, t / 0.5)
+        : _lerpColor(0x444444, 0x222222, (t - 0.5) / 0.5);
+    } else {
+      // Fire/glow: bright at birth → orange → dark red at death.
+      const birthColor = seg.isSRB ? 0xffffff : 0xffff80;
+      color = t < 0.4
+        ? _lerpColor(birthColor, 0xff8800, t / 0.4)
+        : _lerpColor(0xff8800, 0xff2000, (t - 0.4) / 0.6);
+    }
 
-    // Radius shrinks as the segment ages.
-    const rx = Math.max(0.5, (seg.baseW * (1 - t * 0.5)) / 2);
-    const ry = Math.max(0.5, (seg.baseH * (1 - t * 0.3)) / 2);
+    // Radius grows slightly as smoke disperses, shrinks for fire.
+    const growFactor = seg.isSmoke ? (1 + t * 0.6) : (1 - t * 0.5);
+    const rx = Math.max(0.5, (seg.baseW * growFactor) / 2);
+    const ry = Math.max(0.5, (seg.baseH * (seg.isSmoke ? (1 + t * 0.4) : (1 - t * 0.3))) / 2);
 
     const { sx, sy } = _worldToScreen(seg.worldX, seg.worldY, w, h);
     g.ellipse(sx, sy, rx, ry);
-    g.fill({ color, alpha });
+    g.fill({ color, alpha: alpha * (seg.isSmoke ? 0.55 : 1) });
   }
 }
 

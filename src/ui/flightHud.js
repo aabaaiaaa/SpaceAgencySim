@@ -37,6 +37,7 @@
  */
 
 import { getPartById } from '../data/parts.js';
+import { PartType } from '../core/constants.js';
 
 // ---------------------------------------------------------------------------
 // Physics constant
@@ -55,7 +56,7 @@ const FLIGHT_HUD_STYLES = `
    ═══════════════════════════════════════════════════════════════════════════ */
 #flight-hud {
   position: fixed;
-  inset: 0;
+  inset: 44px 0 0;
   pointer-events: none;
   z-index: 100;
   font-family: 'Courier New', Courier, monospace;
@@ -64,70 +65,219 @@ const FLIGHT_HUD_STYLES = `
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Throttle bar — left edge, vertically centred
+   Left panel — throttle + staging + fuel (replaces old throttle + telem + fuel)
    ═══════════════════════════════════════════════════════════════════════════ */
-#flight-hud-throttle {
+#flight-left-panel {
   position: absolute;
   left: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 34px;
+  bottom: 60px;
+  width: 230px;
+  background: rgba(0, 8, 0, 0.78);
+  border: 1px solid #284828;
+  border-radius: 4px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 3px;
+  pointer-events: auto;
+  max-height: calc(100% - 120px);
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
-#flight-hud-throttle-label-top,
-#flight-hud-throttle-label-bot {
+.flight-lp-section {
+  padding: 8px 10px 7px;
+  border-bottom: 1px solid rgba(40, 72, 40, 0.5);
+  flex-shrink: 0;
+}
+
+.flight-lp-section:last-child {
+  border-bottom: none;
+}
+
+.flight-lp-title {
   font-size: 8px;
   color: #507860;
-  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 7px;
 }
 
-#flight-hud-throttle-track {
-  width: 14px;
-  height: 180px;
+/* Throttle subsection */
+.flight-lp-throttle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.flight-lp-throttle-track {
+  width: 10px;
+  height: 80px;
   border: 1px solid #305030;
   border-radius: 2px;
   background: rgba(0, 0, 0, 0.55);
   position: relative;
-  overflow: hidden;
   flex-shrink: 0;
 }
 
-#flight-hud-throttle-fill {
+.flight-lp-throttle-fill {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
   background: linear-gradient(to top, #20c040, #60ff80);
   transition: height 0.06s linear;
-  border-radius: 0 0 2px 2px;
 }
 
-#flight-hud-throttle-pct {
-  font-size: 10px;
+.flight-lp-throttle-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.flight-lp-pct {
+  font-size: 14px;
   color: #c0ffd8;
-  text-align: center;
-  width: 100%;
   letter-spacing: 0.02em;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   Telemetry panel — top-left, beside the throttle bar
-   ═══════════════════════════════════════════════════════════════════════════ */
-#flight-hud-telem {
-  position: absolute;
-  left: 54px;
-  top: 10px;
-  background: rgba(0, 8, 0, 0.68);
-  border: 1px solid #284828;
-  border-radius: 4px;
-  padding: 8px 12px 6px;
-  min-width: 190px;
+.flight-lp-twr-row {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
 
+.flight-lp-lbl {
+  font-size: 8px;
+  color: #507860;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.flight-lp-val {
+  font-size: 11px;
+  color: #a0d8b0;
+}
+
+.flight-lp-btn-row {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 5px;
+}
+
+.flight-lp-btn {
+  padding: 2px 7px;
+  background: rgba(0, 16, 0, 0.8);
+  border: 1px solid #305030;
+  border-radius: 3px;
+  color: #70a880;
+  font-size: 9px;
+  font-family: 'Courier New', Courier, monospace;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.flight-lp-btn:hover {
+  background: rgba(0, 36, 0, 0.9);
+  border-color: #407840;
+  color: #a0d8b0;
+}
+
+/* Staging subsection — stages stacked bottom-to-top (rendered top-to-bottom,
+   but visually labeled in reverse so Stage 1 appears at the bottom of the list) */
+.flight-lp-stage-item {
+  padding: 4px 6px;
+  border: 1px solid #1a3020;
+  border-radius: 3px;
+  margin-bottom: 4px;
+}
+
+.flight-lp-stage-item:last-child {
+  margin-bottom: 0;
+}
+
+.flight-lp-stage-item.active {
+  border-color: #40c060;
+  background: rgba(16, 48, 16, 0.4);
+}
+
+.flight-lp-stage-item.spent {
+  opacity: 0.35;
+}
+
+.flight-lp-stage-label {
+  font-size: 8px;
+  color: #507860;
+  margin-bottom: 2px;
+}
+
+.flight-lp-stage-item.active .flight-lp-stage-label {
+  color: #60c070;
+}
+
+.flight-lp-stage-parts {
+  font-size: 8px;
+  color: #88c8a0;
+  margin-bottom: 1px;
+  word-break: break-word;
+}
+
+.flight-lp-stage-dv {
+  font-size: 9px;
+  color: #c0ffd8;
+}
+
+/* Fuel subsection */
+.flight-lp-fuel-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 3px;
+  font-size: 10px;
+}
+
+.flight-lp-fuel-row:last-child {
+  margin-bottom: 0;
+}
+
+.flight-lp-fuel-name {
+  color: #80c090;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 140px;
+}
+
+.flight-lp-fuel-kg {
+  color: #c0ffd8;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-left: 6px;
+}
+
+/* ─── Launch tip ─────────────────────────────────────────────────────────── */
+#flight-launch-tip {
+  position: absolute;
+  bottom: 120px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(4, 20, 8, 0.90);
+  border: 1px solid #407840;
+  border-radius: 6px;
+  padding: 10px 22px;
+  color: #a0e8a0;
+  font-size: 13px;
+  pointer-events: none;
+  white-space: nowrap;
+  animation: flight-tip-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes flight-tip-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.45; }
+}
+
+/* Shared row/val helpers (kept for objectives panel) */
 .hud-row {
   margin-bottom: 5px;
 }
@@ -210,49 +360,6 @@ const FLIGHT_HUD_STYLES = `
 
 .hud-obj-desc.met {
   color: #60d080;
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   Fuel panel — bottom-right
-   ═══════════════════════════════════════════════════════════════════════════ */
-#flight-hud-fuel {
-  position: absolute;
-  right: 10px;
-  bottom: 10px;
-  background: rgba(0, 8, 0, 0.68);
-  border: 1px solid #284828;
-  border-radius: 4px;
-  padding: 8px 12px 6px;
-  min-width: 160px;
-  max-width: 240px;
-}
-
-.hud-fuel-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 10px;
-  margin-bottom: 4px;
-  font-size: 10px;
-}
-
-.hud-fuel-row:last-child {
-  margin-bottom: 0;
-}
-
-.hud-fuel-name {
-  color: #80c090;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 130px;
-}
-
-.hud-fuel-kg {
-  color: #c0ffd8;
-  white-space: nowrap;
-  flex-shrink: 0;
-  text-align: right;
 }
 
 .hud-empty {
@@ -353,15 +460,16 @@ let _warpLocked = false;
 let _warpButtons = [];
 
 // DOM nodes updated on every frame:
-let _elThrottleFill = null;
-let _elThrottlePct  = null;
-let _elAlt          = null;
-let _elVelY         = null;
-let _elVelX         = null;
-let _elStage        = null;
-let _elApo          = null;
-let _elObjList      = null;
-let _elFuelList     = null;
+let _elThrottleFill  = null;   // left-panel throttle bar fill
+let _elThrottlePct   = null;   // left-panel throttle % (id: flight-hud-throttle-pct)
+let _elTWR           = null;   // left-panel TWR value
+let _elAlt           = null;   // left-panel altitude (id: hud-alt)
+let _elVelY          = null;   // left-panel vertical speed (id: hud-vely)
+let _elStagingList   = null;   // left-panel staging container
+let _elFuelList      = null;   // left-panel fuel list
+let _elObjList       = null;   // objectives panel (top-right, unchanged)
+let _elLaunchTip     = null;   // launch pad "press space" tip
+let _launchTipHidden = false;  // once hidden, stays hidden
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -406,10 +514,8 @@ export function initFlightHud(container, ps, assembly, stagingConfig, flightStat
   _hud.id = 'flight-hud';
   container.appendChild(_hud);
 
-  _buildThrottleBar();
-  _buildTelemPanel();
+  _buildLeftPanel();
   _buildObjectivesPanel();
-  _buildFuelPanel();
   _buildTimeWarpPanel();
 
   // X → throttle 0 %, Z → throttle 100 %.
@@ -463,15 +569,16 @@ export function destroyFlightHud() {
   _warpLocked       = false;
   _warpButtons      = [];
 
-  _elThrottleFill = null;
-  _elThrottlePct  = null;
-  _elAlt          = null;
-  _elVelY         = null;
-  _elVelX         = null;
-  _elStage        = null;
-  _elApo          = null;
-  _elObjList      = null;
-  _elFuelList     = null;
+  _elThrottleFill  = null;
+  _elThrottlePct   = null;
+  _elTWR           = null;
+  _elAlt           = null;
+  _elVelY          = null;
+  _elStagingList   = null;
+  _elFuelList      = null;
+  _elObjList       = null;
+  _elLaunchTip     = null;
+  _launchTipHidden = false;
 
   console.log('[Flight HUD] Destroyed');
 }
@@ -485,12 +592,12 @@ export function destroyFlightHud() {
  * Call this from the flight controller when the warp level changes for any
  * reason (button click, automatic reset, etc.).
  *
- * @param {number} level  New warp multiplier (1, 2, 5, 10, or 50).
+ * @param {number} level  New warp multiplier (0 = pause, 0.25, 0.5, 1, 2, 5, 10, or 50).
  */
 export function setHudTimeWarp(level) {
   _timeWarp = level;
   for (const btn of _warpButtons) {
-    const btnLevel = parseInt(btn.dataset.warp ?? '1', 10);
+    const btnLevel = parseFloat(btn.dataset.warp ?? '1');
     btn.classList.toggle('active', btnLevel === level);
   }
 }
@@ -515,74 +622,160 @@ export function lockTimeWarp(locked) {
 // ---------------------------------------------------------------------------
 
 /**
- * Build the vertical throttle bar on the left edge.
+ * Build the unified left panel containing throttle, staging, and fuel sections.
  */
-function _buildThrottleBar() {
-  const wrap = document.createElement('div');
-  wrap.id = 'flight-hud-throttle';
+function _buildLeftPanel() {
+  const panel = document.createElement('div');
+  panel.id = 'flight-left-panel';
 
-  const labelTop = document.createElement('div');
-  labelTop.id = 'flight-hud-throttle-label-top';
-  labelTop.textContent = '100%';
-  wrap.appendChild(labelTop);
+  // ── Status section (altitude + vertical speed) ────────────────────────────
+  const statusSec = document.createElement('div');
+  statusSec.className = 'flight-lp-section';
 
+  const statusTitle = document.createElement('div');
+  statusTitle.className = 'flight-lp-title';
+  statusTitle.textContent = 'Status';
+  statusSec.appendChild(statusTitle);
+
+  const altRow = document.createElement('div');
+  altRow.className = 'flight-lp-twr-row';
+  const altLbl = document.createElement('div');
+  altLbl.className = 'flight-lp-lbl';
+  altLbl.textContent = 'Alt';
+  _elAlt = document.createElement('div');
+  _elAlt.id = 'hud-alt';
+  _elAlt.className = 'flight-lp-val';
+  _elAlt.textContent = '0 m';
+  altRow.appendChild(altLbl);
+  altRow.appendChild(_elAlt);
+  statusSec.appendChild(altRow);
+
+  const velYRow = document.createElement('div');
+  velYRow.className = 'flight-lp-twr-row';
+  const velYLbl = document.createElement('div');
+  velYLbl.className = 'flight-lp-lbl';
+  velYLbl.textContent = 'Vert';
+  _elVelY = document.createElement('div');
+  _elVelY.id = 'hud-vely';
+  _elVelY.className = 'flight-lp-val';
+  _elVelY.textContent = '0 m/s';
+  velYRow.appendChild(velYLbl);
+  velYRow.appendChild(_elVelY);
+  statusSec.appendChild(velYRow);
+
+  panel.appendChild(statusSec);
+
+  // ── Throttle section ──────────────────────────────────────────────────────
+  const throttleSec = document.createElement('div');
+  throttleSec.className = 'flight-lp-section';
+
+  const throttleTitle = document.createElement('div');
+  throttleTitle.className = 'flight-lp-title';
+  throttleTitle.textContent = 'Throttle';
+  throttleSec.appendChild(throttleTitle);
+
+  const throttleRow = document.createElement('div');
+  throttleRow.className = 'flight-lp-throttle-row';
+
+  // Vertical bar
   const track = document.createElement('div');
-  track.id = 'flight-hud-throttle-track';
-
+  track.className = 'flight-lp-throttle-track';
   _elThrottleFill = document.createElement('div');
-  _elThrottleFill.id = 'flight-hud-throttle-fill';
+  _elThrottleFill.className = 'flight-lp-throttle-fill';
   _elThrottleFill.style.height = '100%';
   track.appendChild(_elThrottleFill);
+  throttleRow.appendChild(track);
 
-  wrap.appendChild(track);
-
-  const labelBot = document.createElement('div');
-  labelBot.id = 'flight-hud-throttle-label-bot';
-  labelBot.textContent = '0%';
-  wrap.appendChild(labelBot);
+  // Info column: pct + TWR
+  const info = document.createElement('div');
+  info.className = 'flight-lp-throttle-info';
 
   _elThrottlePct = document.createElement('div');
   _elThrottlePct.id = 'flight-hud-throttle-pct';
+  _elThrottlePct.className = 'flight-lp-pct';
   _elThrottlePct.textContent = '100%';
-  wrap.appendChild(_elThrottlePct);
+  info.appendChild(_elThrottlePct);
 
-  _hud.appendChild(wrap);
-}
+  const twrRow = document.createElement('div');
+  twrRow.className = 'flight-lp-twr-row';
+  const twrLbl = document.createElement('div');
+  twrLbl.className = 'flight-lp-lbl';
+  twrLbl.textContent = 'TWR';
+  _elTWR = document.createElement('div');
+  _elTWR.className = 'flight-lp-val';
+  _elTWR.textContent = '—';
+  twrRow.appendChild(twrLbl);
+  twrRow.appendChild(_elTWR);
+  info.appendChild(twrRow);
 
-/**
- * Build the telemetry panel (altitude, speeds, stage, apoapsis).
- */
-function _buildTelemPanel() {
-  const panel = document.createElement('div');
-  panel.id = 'flight-hud-telem';
+  throttleRow.appendChild(info);
+  throttleSec.appendChild(throttleRow);
 
-  /** @param {string} label @param {string} valClass @param {string} id */
-  function addRow(label, valClass, id) {
-    const row = document.createElement('div');
-    row.className = 'hud-row';
+  // Throttle buttons
+  const btnRow = document.createElement('div');
+  btnRow.className = 'flight-lp-btn-row';
 
-    const lbl = document.createElement('div');
-    lbl.className = 'hud-lbl';
-    lbl.textContent = label;
-    row.appendChild(lbl);
+  const setTWR1Btn = document.createElement('button');
+  setTWR1Btn.className = 'flight-lp-btn';
+  setTWR1Btn.textContent = 'TWR=1';
+  setTWR1Btn.title = 'Set throttle so thrust-to-weight ratio equals 1';
+  setTWR1Btn.addEventListener('click', () => _setThrottleForTWR1());
+  btnRow.appendChild(setTWR1Btn);
 
-    const val = document.createElement('div');
-    val.className = valClass;
-    val.id = id;
-    val.textContent = '—';
-    row.appendChild(val);
+  const minusBtn = document.createElement('button');
+  minusBtn.className = 'flight-lp-btn';
+  minusBtn.textContent = '−0.1';
+  minusBtn.title = 'Decrease throttle by 10%';
+  minusBtn.addEventListener('click', () => { if (_ps) _ps.throttle = Math.max(0, Math.round((_ps.throttle - 0.1) * 10) / 10); });
+  btnRow.appendChild(minusBtn);
 
-    panel.appendChild(row);
-    return val;
-  }
+  const plusBtn = document.createElement('button');
+  plusBtn.className = 'flight-lp-btn';
+  plusBtn.textContent = '+0.1';
+  plusBtn.title = 'Increase throttle by 10%';
+  plusBtn.addEventListener('click', () => { if (_ps) _ps.throttle = Math.min(1, Math.round((_ps.throttle + 0.1) * 10) / 10); });
+  btnRow.appendChild(plusBtn);
 
-  _elAlt   = addRow('Altitude',       'hud-val',    'hud-alt');
-  _elVelY  = addRow('Vert Speed',     'hud-val-sm', 'hud-vely');
-  _elVelX  = addRow('Horiz Speed',    'hud-val-sm', 'hud-velx');
-  _elStage = addRow('Stage',          'hud-val-sm', 'hud-stage');
-  _elApo   = addRow('Apoapsis (est)', 'hud-val-sm', 'hud-apo');
+  throttleSec.appendChild(btnRow);
+  panel.appendChild(throttleSec);
+
+  // ── Staging section ───────────────────────────────────────────────────────
+  const stagingSec = document.createElement('div');
+  stagingSec.className = 'flight-lp-section';
+
+  const stagingTitle = document.createElement('div');
+  stagingTitle.className = 'flight-lp-title';
+  stagingTitle.textContent = 'Staging';
+  stagingSec.appendChild(stagingTitle);
+
+  _elStagingList = document.createElement('div');
+  _elStagingList.id = 'flight-lp-staging-list';
+  stagingSec.appendChild(_elStagingList);
+
+  panel.appendChild(stagingSec);
+
+  // ── Fuel section ──────────────────────────────────────────────────────────
+  const fuelSec = document.createElement('div');
+  fuelSec.className = 'flight-lp-section';
+
+  const fuelTitle = document.createElement('div');
+  fuelTitle.className = 'flight-lp-title';
+  fuelTitle.textContent = 'Fuel';
+  fuelSec.appendChild(fuelTitle);
+
+  _elFuelList = document.createElement('div');
+  _elFuelList.id = 'flight-lp-fuel-list';
+  fuelSec.appendChild(_elFuelList);
+
+  panel.appendChild(fuelSec);
 
   _hud.appendChild(panel);
+
+  // ── Launch pad tip ────────────────────────────────────────────────────────
+  _elLaunchTip = document.createElement('div');
+  _elLaunchTip.id = 'flight-launch-tip';
+  _elLaunchTip.textContent = 'Press [Space] to activate Stage 1';
+  _hud.appendChild(_elLaunchTip);
 }
 
 /**
@@ -620,13 +813,14 @@ function _buildTimeWarpPanel() {
   label.textContent = 'Warp:';
   panel.appendChild(label);
 
-  const WARP_LEVELS = [1, 2, 5, 10, 50];
+  const WARP_LEVELS = [0, 0.25, 0.5, 1, 2, 5, 10, 50];
   for (const level of WARP_LEVELS) {
     const btn = /** @type {HTMLButtonElement} */ (document.createElement('button'));
+    const label = level === 0 ? 'PAUSE' : level === 0.25 ? '¼×' : level === 0.5 ? '½×' : `${level}×`;
     btn.className       = 'hud-warp-btn' + (level === 1 ? ' active' : '');
-    btn.textContent     = `${level}×`;
+    btn.textContent     = label;
     btn.dataset.warp    = String(level);
-    btn.setAttribute('aria-label', `Time warp ${level}×`);
+    btn.setAttribute('aria-label', level === 0 ? 'Pause' : `Time warp ${label}`);
     btn.addEventListener('click', () => {
       if (_warpLocked) return;
       if (_onTimeWarpChange) _onTimeWarpChange(level);
@@ -639,22 +833,20 @@ function _buildTimeWarpPanel() {
 }
 
 /**
- * Build the per-tank fuel panel (bottom-right).
+ * Show the launch pad tip ("Press [Space] to activate Stage 1").
+ * Called by the flight controller after initFlightHud.
  */
-function _buildFuelPanel() {
-  const panel = document.createElement('div');
-  panel.id = 'flight-hud-fuel';
+export function showLaunchTip() {
+  _launchTipHidden = false;
+  if (_elLaunchTip) _elLaunchTip.hidden = false;
+}
 
-  const title = document.createElement('div');
-  title.className = 'hud-panel-title';
-  title.textContent = 'Fuel Remaining';
-  panel.appendChild(title);
-
-  _elFuelList = document.createElement('div');
-  _elFuelList.id = 'flight-hud-fuel-list';
-  panel.appendChild(_elFuelList);
-
-  _hud.appendChild(panel);
+/**
+ * Permanently hide the launch tip (e.g. after first spacebar press fires Stage 1).
+ */
+export function hideLaunchTip() {
+  _launchTipHidden = true;
+  if (_elLaunchTip) _elLaunchTip.hidden = true;
 }
 
 // ---------------------------------------------------------------------------
@@ -666,10 +858,9 @@ function _buildFuelPanel() {
  */
 function _tick() {
   if (_hud && _ps) {
-    _updateThrottleBar();
-    _updateTelemPanel();
+    _updateLeftPanel();
     _updateObjectivesPanel();
-    _updateFuelPanel();
+    _updateLaunchTip();
   }
   _rafId = requestAnimationFrame(_tick);
 }
@@ -679,35 +870,41 @@ function _tick() {
 // ---------------------------------------------------------------------------
 
 /**
- * Update the throttle bar fill height and percentage label.
+ * Update all sections of the unified left panel (throttle, staging, fuel).
  */
-function _updateThrottleBar() {
+function _updateLeftPanel() {
+  // ── Status (altitude + vertical speed) ───────────────────────────────────
+  if (_elAlt) {
+    const alt = _ps.posY ?? 0;
+    _elAlt.textContent = alt >= 1000
+      ? `${(alt / 1000).toFixed(1)} km`
+      : `${Math.round(alt)} m`;
+  }
+  if (_elVelY) {
+    const vy = _ps.velY ?? 0;
+    _elVelY.textContent = `${vy >= 0 ? '+' : ''}${vy.toFixed(1)} m/s`;
+  }
+
+  // ── Throttle ──────────────────────────────────────────────────────────────
   const pct = Math.round((_ps.throttle ?? 0) * 100);
   if (_elThrottleFill) _elThrottleFill.style.height = `${pct}%`;
   if (_elThrottlePct)  _elThrottlePct.textContent   = `${pct}%`;
-}
 
-/**
- * Update the telemetry panel values.
- */
-function _updateTelemPanel() {
-  const altitude = Math.max(0, _ps.posY);
-  const velY     = _ps.velY ?? 0;
-  const velX     = _ps.velX ?? 0;
-
-  if (_elAlt)   _elAlt.textContent  = `${_fmtAlt(altitude)} m`;
-  if (_elVelY)  _elVelY.textContent = `${_fmtSigned(velY)} m/s`;
-  if (_elVelX)  _elVelX.textContent = `${Math.abs(velX).toFixed(1)} m/s`;
-
-  if (_elStage && _stagingConfig) {
-    const cur   = _stagingConfig.currentStageIdx + 1;
-    const total = _stagingConfig.stages.length;
-    _elStage.textContent = `${cur} / ${total}`;
+  // ── TWR ───────────────────────────────────────────────────────────────────
+  if (_elTWR) {
+    const twr = _computeTWR();
+    _elTWR.textContent = twr > 0 ? twr.toFixed(2) : '—';
+    _elTWR.style.color = twr >= 1 ? '#a0ffc0' : twr > 0 ? '#ffc080' : '#a0d8b0';
   }
 
-  if (_elApo) {
-    const apo = _estimateApoapsis(altitude, velY);
-    _elApo.textContent = `~${_fmtAlt(apo)} m`;
+  // ── Staging ───────────────────────────────────────────────────────────────
+  if (_elStagingList && _stagingConfig) {
+    _updateStagingList();
+  }
+
+  // ── Fuel ─────────────────────────────────────────────────────────────────
+  if (_elFuelList) {
+    _updateFuelList();
   }
 }
 
@@ -762,28 +959,75 @@ function _updateObjectivesPanel() {
 }
 
 /**
- * Rebuild the per-tank fuel list.
- * Uses a simple fingerprint to avoid thrashing the DOM every frame.
+ * Rebuild the staging list (stages shown bottom-to-top = stage 1 at bottom).
  */
-function _updateFuelPanel() {
+function _updateStagingList() {
+  if (!_elStagingList || !_stagingConfig || !_assembly || !_ps) return;
+
+  const stages    = _stagingConfig.stages;
+  const activeIdx = _stagingConfig.currentStageIdx;
+  const fp        = `${activeIdx}:${stages.length}`;
+  if (_elStagingList.dataset.fp === fp) return; // avoid full rebuild every frame
+  _elStagingList.dataset.fp = fp;
+  _elStagingList.innerHTML  = '';
+
+  // Render stages in reverse order so Stage 1 appears at the bottom.
+  for (let i = stages.length - 1; i >= 0; i--) {
+    const stage    = stages[i];
+    const isActive = i === activeIdx;
+    const isSpent  = i < activeIdx;
+
+    const item = document.createElement('div');
+    item.className = 'flight-lp-stage-item' +
+      (isActive ? ' active' : isSpent ? ' spent' : '');
+
+    const lbl = document.createElement('div');
+    lbl.className = 'flight-lp-stage-label';
+    lbl.textContent = `Stage ${i + 1}${isActive ? ' ▶' : ''}`;
+    item.appendChild(lbl);
+
+    // Part names for this stage.
+    const partNames = [];
+    for (const instanceId of stage.instanceIds) {
+      const placed = _assembly.parts.get(instanceId);
+      const def    = placed ? getPartById(placed.partId) : null;
+      if (def) partNames.push(def.name);
+    }
+
+    const parts = document.createElement('div');
+    parts.className = 'flight-lp-stage-parts';
+    parts.textContent = partNames.join(', ') || '(empty)';
+    item.appendChild(parts);
+
+    // Delta-V estimate.
+    const dv    = _computeStageDeltaV(i);
+    const dvEl  = document.createElement('div');
+    dvEl.className = 'flight-lp-stage-dv';
+    dvEl.textContent = dv > 0 ? `ΔV ~${Math.round(dv)} m/s` : '';
+    item.appendChild(dvEl);
+
+    _elStagingList.appendChild(item);
+  }
+}
+
+/**
+ * Rebuild the fuel list showing active tanks.
+ */
+function _updateFuelList() {
   if (!_elFuelList || !_ps || !_assembly) return;
 
-  // Build a fingerprint: sorted list of "id:rounded_kg" for active tanks.
   const entries = [];
   for (const [instanceId, fuelKg] of _ps.fuelStore) {
     if (!_ps.activeParts.has(instanceId)) continue;
-    if (fuelKg < 0.1) continue; // skip effectively empty tanks
+    if (fuelKg < 0.1) continue;
     entries.push({ instanceId, fuelKg });
   }
-
-  // Sort by fuelKg descending (largest tank first).
   entries.sort((a, b) => b.fuelKg - a.fuelKg);
 
   const fingerprint = entries.map((e) => `${e.instanceId}:${Math.round(e.fuelKg)}`).join('|');
   if (_elFuelList.dataset.fp === fingerprint) return;
   _elFuelList.dataset.fp = fingerprint;
-
-  _elFuelList.innerHTML = '';
+  _elFuelList.innerHTML  = '';
 
   if (entries.length === 0) {
     const empty = document.createElement('div');
@@ -799,20 +1043,149 @@ function _updateFuelPanel() {
     const name   = def?.name ?? placed?.partId ?? instanceId;
 
     const row = document.createElement('div');
-    row.className = 'hud-fuel-row';
+    row.className = 'flight-lp-fuel-row';
 
     const nameEl = document.createElement('span');
-    nameEl.className = 'hud-fuel-name';
+    nameEl.className = 'flight-lp-fuel-name';
     nameEl.textContent = name;
 
     const kgEl = document.createElement('span');
-    kgEl.className = 'hud-fuel-kg';
+    kgEl.className = 'flight-lp-fuel-kg';
     kgEl.textContent = `${_fmtAlt(fuelKg)} kg`;
 
     row.appendChild(nameEl);
     row.appendChild(kgEl);
     _elFuelList.appendChild(row);
   }
+}
+
+/**
+ * Update visibility of the launch pad tip.
+ * Hide it once the rocket has left the pad or a stage has been fired.
+ */
+function _updateLaunchTip() {
+  if (_launchTipHidden || !_elLaunchTip) return;
+  // Hide if rocket has moved or staging has advanced beyond stage 0.
+  const launched = _ps && (!_ps.grounded || (_stagingConfig && _stagingConfig.currentStageIdx > 0));
+  if (launched) {
+    _launchTipHidden = true;
+    _elLaunchTip.hidden = true;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Private — physics helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute the current thrust-to-weight ratio.
+ * Uses firing engines at current throttle; 0 if nothing is firing.
+ * @returns {number}
+ */
+function _computeTWR() {
+  if (!_ps || !_assembly) return 0;
+  let totalThrust = 0;
+  let totalMass   = 0;
+
+  for (const [instanceId, placed] of _assembly.parts) {
+    if (!_ps.activeParts.has(instanceId)) continue;
+    const def = getPartById(placed.partId);
+    if (!def) continue;
+    totalMass += def.mass ?? 0;
+    totalMass += _ps.fuelStore.get(instanceId) ?? 0;
+    if (_ps.firingEngines && _ps.firingEngines.has(instanceId)) {
+      const isSRB   = def.type === PartType.SOLID_ROCKET_BOOSTER;
+      const thrust  = (def.properties?.thrust ?? 0) * (isSRB ? 1 : (_ps.throttle ?? 0));
+      totalThrust  += thrust;
+    }
+  }
+
+  if (totalMass <= 0) return 0;
+  return totalThrust / (totalMass * G0);
+}
+
+/**
+ * Compute the estimated delta-V for a given stage index using the
+ * Tsiolkovsky rocket equation:  ΔV = Isp × g × ln(m0 / mf)
+ *
+ * @param {number} stageIdx
+ * @returns {number}  Delta-V in m/s; 0 if data is missing.
+ */
+function _computeStageDeltaV(stageIdx) {
+  if (!_ps || !_assembly || !_stagingConfig) return 0;
+  const stage = _stagingConfig.stages[stageIdx];
+  if (!stage) return 0;
+
+  // Total current rocket mass (active parts only).
+  let totalMass = 0;
+  for (const [instanceId, placed] of _assembly.parts) {
+    if (!_ps.activeParts.has(instanceId)) continue;
+    const def = getPartById(placed.partId);
+    if (!def) continue;
+    totalMass += def.mass ?? 0;
+    totalMass += _ps.fuelStore.get(instanceId) ?? 0;
+  }
+
+  // Stage fuel and engine properties.
+  let stageFuel        = 0;
+  let thrustTotal      = 0;
+  let ispTimesThrust   = 0;
+
+  for (const instanceId of stage.instanceIds) {
+    if (!_ps.activeParts.has(instanceId)) continue;
+    const placed = _assembly.parts.get(instanceId);
+    const def    = placed ? getPartById(placed.partId) : null;
+    if (!def) continue;
+
+    const fuelKg = _ps.fuelStore.get(instanceId) ?? 0;
+    if (fuelKg > 0) stageFuel += fuelKg;
+
+    const thrust = def.properties?.thrust ?? 0;
+    if (thrust > 0) {
+      const isp      = def.properties?.isp ?? 300;
+      thrustTotal   += thrust;
+      ispTimesThrust += isp * thrust;
+    }
+  }
+
+  if (stageFuel <= 0 || thrustTotal <= 0 || totalMass <= 0) return 0;
+  const avgIsp = ispTimesThrust / thrustTotal;
+  const mf     = totalMass - stageFuel;
+  if (mf <= 0) return 0;
+  return avgIsp * G0 * Math.log(totalMass / mf);
+}
+
+/**
+ * Adjust throttle so the current TWR equals 1 (if enough thrust available).
+ */
+function _setThrottleForTWR1() {
+  if (!_ps || !_assembly) return;
+
+  // Total dry+fuel mass.
+  let totalMass    = 0;
+  let maxThrust    = 0;
+  let srbThrust    = 0;
+
+  for (const [instanceId, placed] of _assembly.parts) {
+    if (!_ps.activeParts.has(instanceId)) continue;
+    const def = getPartById(placed.partId);
+    if (!def) continue;
+    totalMass += def.mass ?? 0;
+    totalMass += _ps.fuelStore.get(instanceId) ?? 0;
+    if (_ps.firingEngines && _ps.firingEngines.has(instanceId)) {
+      const thrust = def.properties?.thrust ?? 0;
+      if (def.type === PartType.SOLID_ROCKET_BOOSTER) {
+        srbThrust  += thrust; // SRBs always full
+      } else {
+        maxThrust  += thrust;
+      }
+    }
+  }
+
+  const weightN   = totalMass * G0;
+  const remaining = weightN - srbThrust; // thrust needed from throttleable engines
+  if (maxThrust <= 0) return;
+  _ps.throttle = Math.min(1, Math.max(0, remaining / maxThrust));
 }
 
 // ---------------------------------------------------------------------------
