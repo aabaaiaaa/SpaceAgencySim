@@ -24,6 +24,12 @@ import {
   fireNextStage,
 } from '../core/physics.js';
 import {
+  LegState,
+  deployLandingLeg,
+  getLegStatus,
+  getLegContextMenuItems,
+} from '../core/legs.js';
+import {
   createRocketAssembly,
   addPartToAssembly,
   connectParts,
@@ -288,8 +294,10 @@ describe('tick() — landing and crash events', () => {
     const ps = createPhysicsState(assembly, fs);
 
     // Put rocket just above ground, falling slowly.
+    // Use 3 m/s so that after one integration step (gravity adds ~0.16 m/s)
+    // the impact speed is still well below the no-legs safe threshold (5 m/s).
     ps.posY    = 0.01;
-    ps.velY    = -5;   // 5 m/s — within safe range
+    ps.velY    = -3;   // ~3.16 m/s impact — within ≤ 5 m/s no-legs safe range
     ps.grounded = false;
 
     tick(ps, assembly, staging, fs, 1 / 60);
@@ -1128,5 +1136,464 @@ describe('TASK-037: time warp scaling — 10×5× warp equals 50×1× warp', () 
     expect(ps5x.posY).toBeCloseTo(ps1x.posY, 6);
     expect(ps5x.velY).toBeCloseTo(ps1x.velY, 6);
     expect(fs5x.timeElapsed).toBeCloseTo(fs1x.timeElapsed, 6);
+  });
+});
+
+// ===========================================================================
+// TASK-025: Landing Legs — state machine and landing detection tests
+// ===========================================================================
+
+/**
+ * Build a rocket with two small landing legs attached.
+ * Probe Core at y=60, two legs at y=0 on either side.
+ */
+function makeRocketWithLegs() {
+  const assembly = createRocketAssembly();
+  const staging  = createStagingConfig();
+
+  const probeId = addPartToAssembly(assembly, 'probe-core-mk1',     0,  60);
+  const legId1  = addPartToAssembly(assembly, 'landing-legs-small', 20,  0);
+  const legId2  = addPartToAssembly(assembly, 'landing-legs-small', -20, 0);
+
+  // Assign both legs to Stage 1 (DEPLOY activation).
+  syncStagingWithAssembly(assembly, staging);
+  assignPartToStage(staging, legId1, 0);
+  assignPartToStage(staging, legId2, 0);
+
+  return { assembly, staging, probeId, legId1, legId2 };
+}
+
+// ---------------------------------------------------------------------------
+// Landing leg state machine — initLegStates
+// ---------------------------------------------------------------------------
+
+describe('TASK-025: createPhysicsState() — landing legs initialised', () => {
+  it('creates legStates map populated with RETRACTED entries for leg parts', () => {
+    const { assembly } = makeRocketWithLegs();
+    const ps = createPhysicsState(assembly, makeFlightState());
+
+    expect(ps.legStates).toBeInstanceOf(Map);
+    // Two leg parts should be tracked.
+    expect(ps.legStates.size).toBe(2);
+    for (const [, entry] of ps.legStates) {
+      expect(entry.state).toBe(LegState.RETRACTED);
+      expect(entry.deployTimer).toBe(0);
+    }
+  });
+
+  it('non-leg parts are not added to legStates', () => {
+    const { assembly, probeId } = makeRocketWithLegs();
+    const ps = createPhysicsState(assembly, makeFlightState());
+
+    expect(ps.legStates.has(probeId)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// deployLandingLeg() — state machine transition
+// ---------------------------------------------------------------------------
+
+describe('TASK-025: deployLandingLeg() — state transitions', () => {
+  it('transitions a leg from RETRACTED to DEPLOYING', () => {
+    const { assembly, legId1 } = makeRocketWithLegs();
+    const ps = createPhysicsState(assembly, makeFlightState());
+
+    deployLandingLeg(ps, legId1);
+
+    expect(getLegStatus(ps, legId1)).toBe(LegState.DEPLOYING);
+  });
+
+  it('sets deployTimer to LEG_DEPLOY_DURATION (1.5 s)', () => {
+    const { assembly, legId1 } = makeRocketWithLegs();
+    const ps = createPhysicsState(assembly, makeFlightState());
+
+    deployLandingLeg(ps, legId1);
+
+    const entry = ps.legStates.get(legId1);
+    expect(entry.deployTimer).toBe(1.5);
+  });
+
+  it('is a no-op if already DEPLOYING', () => {
+    const { assembly, legId1 } = makeRocketWithLegs();
+    const ps = createPhysicsState(assembly, makeFlightState());
+
+    deployLandingLeg(ps, legId1);
+    const entry = ps.legStates.get(legId1);
+    entry.deployTimer = 0.5; // reduce to 0.5 s remaining
+
+    deployLandingLeg(ps, legId1); // call again
+    // Timer should still be 0.5 (not reset to 1.5).
+    expect(entry.deployTimer).toBe(0.5);
+  });
+
+  it('is a no-op if already DEPLOYED', () => {
+    const { assembly, legId1 } = makeRocketWithLegs();
+    const ps = createPhysicsState(assembly, makeFlightState());
+
+    // Manually set to deployed.
+    ps.legStates.get(legId1).state = LegState.DEPLOYED;
+    deployLandingLeg(ps, legId1);
+
+    // State should remain deployed.
+    expect(getLegStatus(ps, legId1)).toBe(LegState.DEPLOYED);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Leg deployment via staging (DEPLOY activation)
+// ---------------------------------------------------------------------------
+
+describe('TASK-025: fireNextStage() — DEPLOY (landing legs)', () => {
+  it('marks leg as DEPLOYING and adds to deployedParts after stage fires', () => {
+    const { assembly, staging, legId1, legId2 } = makeRocketWithLegs();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    // Place rocket in flight so staging events fire.
+    ps.posY     = 1000;
+    ps.grounded = false;
+
+    fireNextStage(ps, assembly, staging, fs);
+
+    // Both legs should now be deploying.
+    expect(getLegStatus(ps, legId1)).toBe(LegState.DEPLOYING);
+    expect(getLegStatus(ps, legId2)).toBe(LegState.DEPLOYING);
+    expect(ps.deployedParts.has(legId1)).toBe(true);
+    expect(ps.deployedParts.has(legId2)).toBe(true);
+  });
+
+  it('emits PART_ACTIVATED events for both leg parts', () => {
+    const { assembly, staging } = makeRocketWithLegs();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+    ps.posY     = 1000;
+    ps.grounded = false;
+
+    fireNextStage(ps, assembly, staging, fs);
+
+    const legEvents = fs.events.filter(
+      (e) => e.type === 'PART_ACTIVATED' && e.partType === 'LANDING_LEGS',
+    );
+    expect(legEvents.length).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Leg deployment timer (tickLegs via physics tick)
+// ---------------------------------------------------------------------------
+
+describe('TASK-025: tickLegs() — deploying → deployed timer', () => {
+  it('leg transitions to DEPLOYED after 1.5 s of simulation', () => {
+    const { assembly, staging, legId1 } = makeRocketWithLegs();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    // Start at altitude, begin deploying.
+    ps.posY     = 5000;
+    ps.grounded = false;
+
+    fireNextStage(ps, assembly, staging, fs);
+    expect(getLegStatus(ps, legId1)).toBe(LegState.DEPLOYING);
+
+    // Advance 2 full seconds (well past the 1.5 s timer).
+    tick(ps, assembly, staging, fs, 2.0);
+
+    expect(getLegStatus(ps, legId1)).toBe(LegState.DEPLOYED);
+  });
+
+  it('emits LEG_DEPLOYED event when timer expires', () => {
+    const { assembly, staging, legId1 } = makeRocketWithLegs();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    ps.posY     = 5000;
+    ps.grounded = false;
+
+    fireNextStage(ps, assembly, staging, fs);
+    tick(ps, assembly, staging, fs, 2.0);
+
+    const deployedEvt = fs.events.find(
+      (e) => e.type === 'LEG_DEPLOYED' && e.instanceId === legId1,
+    );
+    expect(deployedEvt).toBeDefined();
+    expect(deployedEvt.altitude).toBeGreaterThan(0);
+  });
+
+  it('leg stays DEPLOYING before 1.5 s has elapsed', () => {
+    const { assembly, staging, legId1 } = makeRocketWithLegs();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    ps.posY     = 5000;
+    ps.grounded = false;
+
+    fireNextStage(ps, assembly, staging, fs);
+    // Advance only 1 second — timer has not yet expired.
+    tick(ps, assembly, staging, fs, 1.0);
+
+    expect(getLegStatus(ps, legId1)).toBe(LegState.DEPLOYING);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Landing detection — ≥ 2 deployed legs AND speed < 10 m/s → safe
+// ---------------------------------------------------------------------------
+
+describe('TASK-025: landing detection — controlled landing', () => {
+  it('emits LANDING and sets ps.landed when ≥ 2 legs deployed and speed < 10', () => {
+    const { assembly, staging, legId1, legId2 } = makeRocketWithLegs();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    // Manually set both legs to DEPLOYED state.
+    ps.legStates.get(legId1).state = LegState.DEPLOYED;
+    ps.legStates.get(legId2).state = LegState.DEPLOYED;
+
+    // Set rocket just above ground, falling within safe speed.
+    ps.posY     = 0.01;
+    ps.velY     = -7; // 7 m/s — below 10 m/s threshold
+    ps.grounded = false;
+
+    tick(ps, assembly, staging, fs, 1 / 60);
+
+    const evt = fs.events.find((e) => e.type === 'LANDING');
+    expect(evt).toBeDefined();
+    expect(evt.speed).toBeCloseTo(7, 0);
+    expect(evt.legsDestroyed).toBe(false);
+    expect(ps.landed).toBe(true);
+    expect(ps.crashed).toBe(false);
+  });
+
+  it('does NOT emit LANDING for < 2 deployed legs even at low speed', () => {
+    const { assembly, staging, legId1, legId2 } = makeRocketWithLegs();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    // Only 1 leg deployed.
+    ps.legStates.get(legId1).state = LegState.DEPLOYED;
+    // legId2 stays RETRACTED.
+
+    ps.posY     = 0.01;
+    ps.velY     = -7; // within 10 m/s
+    ps.grounded = false;
+
+    tick(ps, assembly, staging, fs, 1 / 60);
+
+    // Speed is 7 > 5 m/s and < 2 deployed legs → should CRASH (no-legs path)
+    const crashEvt = fs.events.find((e) => e.type === 'CRASH');
+    expect(crashEvt).toBeDefined();
+    expect(ps.crashed).toBe(true);
+    expect(ps.landed).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Landing detection — ≥ 1 deployed leg AND speed 10–29 m/s → hard landing
+// ---------------------------------------------------------------------------
+
+describe('TASK-025: landing detection — hard landing (legs destroyed)', () => {
+  it('emits LANDING with legsDestroyed=true and destroys leg parts', () => {
+    const { assembly, staging, legId1, legId2 } = makeRocketWithLegs();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    // Both legs deployed.
+    ps.legStates.get(legId1).state = LegState.DEPLOYED;
+    ps.legStates.get(legId2).state = LegState.DEPLOYED;
+
+    // Falling at 20 m/s — legs deployed but too fast.
+    ps.posY     = 0.01;
+    ps.velY     = -20;
+    ps.grounded = false;
+
+    tick(ps, assembly, staging, fs, 1 / 60);
+
+    const evt = fs.events.find((e) => e.type === 'LANDING');
+    expect(evt).toBeDefined();
+    expect(evt.legsDestroyed).toBe(true);
+    expect(ps.landed).toBe(true);
+    expect(ps.crashed).toBe(false);
+
+    // Leg parts should have been removed from activeParts.
+    expect(ps.activeParts.has(legId1)).toBe(false);
+    expect(ps.activeParts.has(legId2)).toBe(false);
+  });
+
+  it('probe (non-leg) survives hard landing', () => {
+    const { assembly, staging, probeId, legId1, legId2 } = makeRocketWithLegs();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    ps.legStates.get(legId1).state = LegState.DEPLOYED;
+    ps.legStates.get(legId2).state = LegState.DEPLOYED;
+
+    ps.posY     = 0.01;
+    ps.velY     = -20;
+    ps.grounded = false;
+
+    tick(ps, assembly, staging, fs, 1 / 60);
+
+    // Probe core should still be active.
+    expect(ps.activeParts.has(probeId)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Landing detection — speed ≥ 30 m/s → full destruction
+// ---------------------------------------------------------------------------
+
+describe('TASK-025: landing detection — catastrophic impact (≥ 30 m/s)', () => {
+  it('emits CRASH and clears all active parts at 30+ m/s', () => {
+    const { assembly, staging } = makeRocketWithLegs();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    // Both legs deployed — still destroyed at 30 m/s.
+    for (const [, entry] of ps.legStates) {
+      entry.state = LegState.DEPLOYED;
+    }
+
+    ps.posY     = 0.01;
+    ps.velY     = -30;
+    ps.grounded = false;
+
+    tick(ps, assembly, staging, fs, 1 / 60);
+
+    const evt = fs.events.find((e) => e.type === 'CRASH');
+    expect(evt).toBeDefined();
+    expect(ps.crashed).toBe(true);
+    expect(ps.landed).toBe(false);
+    expect(ps.activeParts.size).toBe(0);
+  });
+
+  it('emits CRASH at 50 m/s (no legs)', () => {
+    const { assembly, staging } = makeSimpleRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    ps.posY     = 0.01;
+    ps.velY     = -50;
+    ps.grounded = false;
+
+    tick(ps, assembly, staging, fs, 1 / 60);
+
+    const evt = fs.events.find((e) => e.type === 'CRASH');
+    expect(evt).toBeDefined();
+    expect(ps.crashed).toBe(true);
+    expect(ps.activeParts.size).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Landing detection — no legs AND speed > 5 m/s → bottom parts destroyed
+// ---------------------------------------------------------------------------
+
+describe('TASK-025: landing detection — no legs, speed > 5 m/s', () => {
+  it('emits CRASH when landing without legs at 7 m/s', () => {
+    const { assembly, staging } = makeSimpleRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    ps.posY     = 0.01;
+    ps.velY     = -7;
+    ps.grounded = false;
+
+    tick(ps, assembly, staging, fs, 1 / 60);
+
+    const evt = fs.events.find((e) => e.type === 'CRASH');
+    expect(evt).toBeDefined();
+    expect(ps.crashed).toBe(true);
+  });
+
+  it('destroys at least one bottom part (engine at lowest y)', () => {
+    const { assembly, staging, engineId } = makeSimpleRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    ps.posY     = 0.01;
+    ps.velY     = -7;
+    ps.grounded = false;
+
+    tick(ps, assembly, staging, fs, 1 / 60);
+
+    // The engine is at placed.y = -55 (lowest part) — should be destroyed.
+    expect(ps.activeParts.has(engineId)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Landing detection — no legs AND speed ≤ 5 m/s → safe landing
+// ---------------------------------------------------------------------------
+
+describe('TASK-025: landing detection — no legs, speed ≤ 5 m/s', () => {
+  it('emits LANDING when speed is 4 m/s with no legs', () => {
+    const { assembly, staging } = makeSimpleRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    ps.posY     = 0.01;
+    ps.velY     = -4;
+    ps.grounded = false;
+
+    tick(ps, assembly, staging, fs, 1 / 60);
+
+    const evt = fs.events.find((e) => e.type === 'LANDING');
+    expect(evt).toBeDefined();
+    expect(ps.landed).toBe(true);
+    expect(ps.crashed).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Context menu — getLegContextMenuItems (via legs.js directly)
+// ---------------------------------------------------------------------------
+
+describe('TASK-025: getLegContextMenuItems()', () => {
+  it('returns items for each leg part in activeParts', () => {
+    const { assembly, legId1, legId2 } = makeRocketWithLegs();
+    const ps = createPhysicsState(assembly, makeFlightState());
+
+    const items = getLegContextMenuItems(ps, assembly);
+    expect(items.length).toBe(2);
+    const ids = items.map((i) => i.instanceId);
+    expect(ids).toContain(legId1);
+    expect(ids).toContain(legId2);
+  });
+
+  it('canDeploy is true for RETRACTED legs', () => {
+    const { assembly } = makeRocketWithLegs();
+    const ps = createPhysicsState(assembly, makeFlightState());
+
+    const items = getLegContextMenuItems(ps, assembly);
+    for (const item of items) {
+      expect(item.canDeploy).toBe(true);
+      expect(item.state).toBe(LegState.RETRACTED);
+    }
+  });
+
+  it('canDeploy is false for DEPLOYED legs', () => {
+    const { assembly, legId1 } = makeRocketWithLegs();
+    const ps = createPhysicsState(assembly, makeFlightState());
+
+    ps.legStates.get(legId1).state = LegState.DEPLOYED;
+
+    const items = getLegContextMenuItems(ps, assembly);
+    const item1 = items.find((i) => i.instanceId === legId1);
+    expect(item1.canDeploy).toBe(false);
+    expect(item1.statusLabel).toBe('Deployed');
+  });
+
+  it('shows deployTimer for DEPLOYING legs', () => {
+    const { assembly, legId1 } = makeRocketWithLegs();
+    const ps = createPhysicsState(assembly, makeFlightState());
+
+    const entry = ps.legStates.get(legId1);
+    entry.state       = LegState.DEPLOYING;
+    entry.deployTimer = 0.8;
+
+    const items = getLegContextMenuItems(ps, assembly);
+    const item1 = items.find((i) => i.instanceId === legId1);
+    expect(item1.deployTimer).toBeCloseTo(0.8, 1);
+    expect(item1.statusLabel).toContain('Deploying');
   });
 });

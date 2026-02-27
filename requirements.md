@@ -258,7 +258,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-025: Landing Legs
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-020, TASK-004
 - **Description**: Landing legs can be in states: `retracted`, `deploying`, `deployed`. Triggered via context menu (or stage). `deploying` takes 1.5 seconds, then `deployed`. Deployed legs change the effective landing collision radius of the rocket — they extend outward and downward, widening the base. On ground contact: if at least 2 landing legs are deployed AND vertical descent speed is < 10 m/s, the landing is classified as a controlled landing (safe). If legs are deployed but speed > 10 m/s at contact, the legs and the parts they are attached to are destroyed but the rest of the rocket may survive if the impact is not too severe (speed < 30 m/s destroys only the legs; speed > 30 m/s destroys the whole rocket). If no legs are deployed, any ground contact above 5 m/s destroys the part that contacts the ground and propagates destruction upward.

@@ -58,6 +58,12 @@ import {
   tickParachutes,
   getChuteMultiplier,
 } from './parachute.js';
+import {
+  initLegStates,
+  tickLegs,
+  countDeployedLegs,
+  LegState,
+} from './legs.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -121,6 +127,10 @@ const DEFAULT_SAFE_LANDING_SPEED = 10;
  *                                           Detailed lifecycle state for each PARACHUTE part
  *                                           (packed / deploying / deployed / failed), managed
  *                                           by parachute.js.  Keyed by instance ID.
+ * @property {Map<string, import('./legs.js').LegEntry>} legStates
+ *                                           Detailed lifecycle state for each LANDING_LEGS /
+ *                                           LANDING_LEG part (retracted / deploying / deployed),
+ *                                           managed by legs.js.  Keyed by instance ID.
  * @property {boolean}         landed        True after a successful soft touchdown.
  * @property {boolean}         crashed       True after a fatal impact.
  * @property {boolean}         grounded      True while still sitting on the launch pad.
@@ -179,6 +189,7 @@ export function createPhysicsState(assembly, flightState) {
     activeParts: new Set(assembly.parts.keys()),
     deployedParts: new Set(),
     parachuteStates: new Map(),
+    legStates: new Map(),
     heatMap: new Map(),
     debris: [],
     landed: false,
@@ -190,6 +201,9 @@ export function createPhysicsState(assembly, flightState) {
 
   // Initialise the parachute state machine for all PARACHUTE parts in the assembly.
   initParachuteStates(ps, assembly);
+
+  // Initialise the landing leg state machine for all LANDING_LEGS/LANDING_LEG parts.
+  initLegStates(ps, assembly);
 
   return ps;
 }
@@ -380,6 +394,12 @@ function _integrate(ps, assembly, flightState) {
   // totalMass was computed at step 1 above.
   if (!ps.grounded) {
     tickParachutes(ps, assembly, flightState, FIXED_DT, totalMass);
+  }
+
+  // --- 9b. Landing leg state machine ---------------------------------------
+  // Advance deploying → deployed timers for all landing legs.
+  if (!ps.grounded) {
+    tickLegs(ps, assembly, flightState, FIXED_DT);
   }
 
   // --- 10. Reentry heat model ----------------------------------------------
@@ -610,61 +630,183 @@ function _hasRcs(ps, assembly) {
 /**
  * Handle the rocket touching down (or crashing into) the ground.
  *
- * A "safe landing" requires:
- *   1. At least one set of deployed landing legs OR a deployed parachute.
- *   2. Impact speed ≤ the landing leg's `maxLandingSpeed` (or 10 m/s default).
+ * Landing outcome depends on how many legs are deployed and impact speed:
  *
- * Emits either a 'LANDING' or 'CRASH' event and sets `ps.landed` / `ps.crashed`.
+ *   1. ≥ 2 deployed legs AND speed < 10 m/s
+ *        → Controlled landing (LANDING event, ps.landed = true).
+ *
+ *   2. ≥ 1 deployed leg AND 10 m/s ≤ speed < 30 m/s
+ *        → Hard landing: legs (and their connected parts) are destroyed but
+ *          the rocket body may survive (LANDING event with legs_destroyed flag).
+ *
+ *   3. speed ≥ 30 m/s (any leg state)
+ *        → Catastrophic impact: all parts destroyed (CRASH event, ps.crashed = true).
+ *
+ *   4. 0 deployed legs AND speed > 5 m/s
+ *        → Contact without leg support: bottom-most parts damaged/destroyed
+ *          (CRASH event, ps.crashed = true).
+ *
+ *   5. speed ≤ 5 m/s (no legs or fewer than 2 legs)
+ *        → Gentle touchdown (LANDING event, ps.landed = true).
+ *
+ * Emits LANDING or CRASH event and sets ps.landed / ps.crashed accordingly.
  *
  * @param {PhysicsState}                               ps
  * @param {import('./rocketbuilder.js').RocketAssembly} assembly
  * @param {import('./gameState.js').FlightState}        flightState
  */
 function _handleGroundContact(ps, assembly, flightState) {
-  const impactSpeed = Math.hypot(ps.velX, ps.velY);
-  const time        = flightState.timeElapsed;
+  const impactSpeed    = Math.hypot(ps.velX, ps.velY);
+  const time           = flightState.timeElapsed;
+  const deployedLegs   = countDeployedLegs(ps);
 
-  // Determine safe landing speed from deployed legs / chutes.
-  let safeLandingSpeed = DEFAULT_SAFE_LANDING_SPEED;
-  let hasLandingAid    = false;
-
-  for (const instanceId of ps.deployedParts) {
-    if (!ps.activeParts.has(instanceId)) continue;
-    const placed = assembly.parts.get(instanceId);
-    const def    = placed ? getPartById(placed.partId) : null;
-    if (!def) continue;
-
-    if (def.type === PartType.LANDING_LEGS || def.type === PartType.LANDING_LEG) {
-      hasLandingAid    = true;
-      const legSpeed   = def.properties?.maxLandingSpeed ?? DEFAULT_SAFE_LANDING_SPEED;
-      safeLandingSpeed = Math.max(safeLandingSpeed, legSpeed);
-    } else if (def.type === PartType.PARACHUTE) {
-      // A deployed parachute counts as a landing aid; use 10 m/s threshold.
-      hasLandingAid    = true;
-    }
-  }
-
-  // Clamp to ground.
+  // Clamp to ground and stop motion.
   ps.posY = 0;
   ps.velX = 0;
   ps.velY = 0;
 
-  if (impactSpeed <= safeLandingSpeed) {
-    ps.landed = true;
-    _emitEvent(flightState, {
-      type: 'LANDING',
-      time,
-      speed: impactSpeed,
-      description: `Landed safely at ${impactSpeed.toFixed(1)} m/s.`,
-    });
-  } else {
+  // --- Case 3: Catastrophic speed (≥ 30 m/s) — full destruction -----------
+  if (impactSpeed >= 30) {
+    ps.activeParts.clear();
+    ps.firingEngines.clear();
+    ps.deployedParts.clear();
     ps.crashed = true;
     _emitEvent(flightState, {
-      type: 'CRASH',
+      type:        'CRASH',
       time,
-      speed: impactSpeed,
-      description: `Crash landing at ${impactSpeed.toFixed(1)} m/s!`,
+      speed:       impactSpeed,
+      legsDestroyed: false,
+      description: `Catastrophic impact at ${impactSpeed.toFixed(1)} m/s — rocket destroyed!`,
     });
+    return;
+  }
+
+  // --- Case 1: Controlled landing — ≥ 2 deployed legs AND speed < 10 m/s --
+  if (deployedLegs >= 2 && impactSpeed < 10) {
+    ps.landed = true;
+    _emitEvent(flightState, {
+      type:        'LANDING',
+      time,
+      speed:       impactSpeed,
+      legsDestroyed: false,
+      description: `Controlled landing at ${impactSpeed.toFixed(1)} m/s.`,
+    });
+    return;
+  }
+
+  // --- Case 2: Hard landing — deployed legs but too fast (10–29 m/s) -------
+  if (deployedLegs >= 1 && impactSpeed >= 10 && impactSpeed < 30) {
+    // Destroy all deployed landing legs; rocket body survives.
+    _destroyDeployedLegs(ps, assembly);
+    ps.landed = true;
+    _emitEvent(flightState, {
+      type:        'LANDING',
+      time,
+      speed:       impactSpeed,
+      legsDestroyed: true,
+      description: `Hard landing at ${impactSpeed.toFixed(1)} m/s — landing legs destroyed.`,
+    });
+    return;
+  }
+
+  // --- Case 5: Gentle landing with no/insufficient legs (speed ≤ 5 m/s) ---
+  if (impactSpeed <= 5) {
+    ps.landed = true;
+    _emitEvent(flightState, {
+      type:        'LANDING',
+      time,
+      speed:       impactSpeed,
+      legsDestroyed: false,
+      description: `Landed at ${impactSpeed.toFixed(1)} m/s.`,
+    });
+    return;
+  }
+
+  // --- Case 4: No deployed legs AND speed > 5 m/s — ground contact damage --
+  // Destroy the bottom-most parts (those that physically contact the ground)
+  // and propagate destruction upward.
+  _destroyBottomParts(ps, assembly);
+  ps.crashed = true;
+  _emitEvent(flightState, {
+    type:        'CRASH',
+    time,
+    speed:       impactSpeed,
+    legsDestroyed: false,
+    description: `Impact without landing legs at ${impactSpeed.toFixed(1)} m/s — contact parts destroyed!`,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Destruction helpers (private)
+// ---------------------------------------------------------------------------
+
+/**
+ * Destroy all deployed landing legs by removing them from the active parts
+ * and state maps.  Call this after a hard landing (speed 10–29 m/s with legs).
+ *
+ * @param {PhysicsState}                               ps
+ * @param {import('./rocketbuilder.js').RocketAssembly} assembly
+ */
+function _destroyDeployedLegs(ps, assembly) {
+  const toDestroy = [];
+
+  for (const [instanceId, entry] of (ps.legStates ?? [])) {
+    if (entry.state !== LegState.DEPLOYED) continue;
+    toDestroy.push(instanceId);
+  }
+
+  for (const instanceId of toDestroy) {
+    ps.activeParts.delete(instanceId);
+    ps.deployedParts.delete(instanceId);
+    ps.legStates.delete(instanceId);
+  }
+}
+
+/**
+ * Destroy the bottom-most part(s) of the rocket and propagate damage upward.
+ *
+ * "Bottom" is determined by ascending placed.y (the most negative placed.y
+ * value corresponds to the physically lowest point of the rocket when upright).
+ * In a simplified model, we destroy the single lowest part; if there are
+ * multiple parts at the same Y level they are all destroyed together.
+ *
+ * After removal, any parts that depended on the destroyed part for structural
+ * connectivity are also removed (simple propagation: all parts with placed.y
+ * below the rocket's median are removed).
+ *
+ * @param {PhysicsState}                               ps
+ * @param {import('./rocketbuilder.js').RocketAssembly} assembly
+ */
+function _destroyBottomParts(ps, assembly) {
+  if (ps.activeParts.size === 0) return;
+
+  // Collect placed Y positions of all active parts.
+  const entries = [];
+  for (const instanceId of ps.activeParts) {
+    const placed = assembly.parts.get(instanceId);
+    if (!placed) continue;
+    entries.push({ instanceId, y: placed.y });
+  }
+
+  if (entries.length === 0) return;
+
+  // Sort ascending (lowest Y first).
+  entries.sort((a, b) => a.y - b.y);
+
+  // Find the minimum Y value.
+  const minY = entries[0].y;
+
+  // Destroy all parts at (or very near) the minimum Y.
+  // "Very near" = within 5 VAB world units of the minimum (accounts for
+  // parts that span the same row, e.g., radial SRBs).
+  const DESTRUCTION_BAND = 5;
+  for (const { instanceId, y } of entries) {
+    if (y <= minY + DESTRUCTION_BAND) {
+      ps.activeParts.delete(instanceId);
+      ps.deployedParts.delete(instanceId);
+      ps.firingEngines.delete(instanceId);
+      ps.legStates?.delete(instanceId);
+    }
   }
 }
 

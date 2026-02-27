@@ -46,6 +46,7 @@ import { PartType }                 from './constants.js';
 import { airDensity, SEA_LEVEL_DENSITY } from './atmosphere.js';
 import { tickFuelSystem }           from './fuelsystem.js';
 import { deployParachute, getChuteMultiplier } from './parachute.js';
+import { deployLandingLeg } from './legs.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -100,6 +101,9 @@ let _debrisNextId = 1;
  * @property {Map<string, import('./parachute.js').ParachuteEntry>} parachuteStates
  *   Parachute lifecycle states inherited from the parent rocket at separation.
  *   Keyed by instance ID.  An empty map when the debris has no parachutes.
+ * @property {Map<string, import('./legs.js').LegEntry>} legStates
+ *   Landing leg lifecycle states inherited from the parent rocket at separation.
+ *   Keyed by instance ID.  An empty map when the debris has no landing legs.
  * @property {Map<string,number>}  heatMap       Accumulated reentry heat per
  *   part instance ID (heat units).
  * @property {number}              posX          Horizontal position (m;
@@ -205,11 +209,17 @@ export function activateCurrentStage(ps, assembly, stagingConfig, flightState) {
 
       case 'DEPLOY':
         // PARACHUTE or LANDING_LEGS — deploy / extend.
-        // For parachutes, also start the state-machine transition through the
-        // 2-second deploying animation before reaching full deployment.
+        // Both types start a state-machine transition:
+        //   PARACHUTE    → deploying (2 s animation) → deployed
+        //   LANDING_LEGS → deploying (1.5 s animation) → deployed
         ps.deployedParts.add(instanceId);
         if (def.type === PartType.PARACHUTE) {
           deployParachute(ps, instanceId);
+        } else if (
+          def.type === PartType.LANDING_LEGS ||
+          def.type === PartType.LANDING_LEG
+        ) {
+          deployLandingLeg(ps, instanceId);
         }
         _emitEvent(flightState, {
           type:        'PART_ACTIVATED',
@@ -488,6 +498,7 @@ function _createDebrisFromParts(ps, partIds) {
   const fuelStore       = new Map();
   const deployedParts   = new Set();
   const parachuteStates = new Map();
+  const legStates       = new Map();
   const heatMap         = new Map();
 
   for (const id of partIds) {
@@ -514,6 +525,12 @@ function _createDebrisFromParts(ps, partIds) {
       parachuteStates.set(id, { state: src.state, deployTimer: src.deployTimer });
     }
 
+    // Transfer landing leg state machine entry.
+    if (ps.legStates?.has(id)) {
+      const src = ps.legStates.get(id);
+      legStates.set(id, { state: src.state, deployTimer: src.deployTimer });
+    }
+
     // Transfer heat accumulation.
     if (ps.heatMap.has(id)) {
       heatMap.set(id, ps.heatMap.get(id));
@@ -530,6 +547,7 @@ function _createDebrisFromParts(ps, partIds) {
     fuelStore,
     deployedParts,
     parachuteStates,
+    legStates,
     heatMap,
     posX:    ps.posX,
     posY:    ps.posY,
