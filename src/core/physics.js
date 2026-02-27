@@ -53,6 +53,11 @@ import {
 } from './atmosphere.js';
 import { tickFuelSystem } from './fuelsystem.js';
 import { activateCurrentStage, tickDebris } from './staging.js';
+import {
+  initParachuteStates,
+  tickParachutes,
+  getChuteMultiplier,
+} from './parachute.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -112,6 +117,10 @@ const DEFAULT_SAFE_LANDING_SPEED = 10;
  *                                           Covers both liquid tanks and SRB integral fuel.
  * @property {Set<string>}     activeParts   Instance IDs of parts still attached to the rocket.
  * @property {Set<string>}     deployedParts Instance IDs of parachutes/legs that have been deployed.
+ * @property {Map<string, import('./parachute.js').ParachuteEntry>} parachuteStates
+ *                                           Detailed lifecycle state for each PARACHUTE part
+ *                                           (packed / deploying / deployed / failed), managed
+ *                                           by parachute.js.  Keyed by instance ID.
  * @property {boolean}         landed        True after a successful soft touchdown.
  * @property {boolean}         crashed       True after a fatal impact.
  * @property {boolean}         grounded      True while still sitting on the launch pad.
@@ -158,7 +167,7 @@ export function createPhysicsState(assembly, flightState) {
     flightState.fuelRemaining = totalFuel;
   }
 
-  return {
+  const ps = {
     posX: 0,
     posY: 0,
     velX: 0,
@@ -169,6 +178,7 @@ export function createPhysicsState(assembly, flightState) {
     fuelStore,
     activeParts: new Set(assembly.parts.keys()),
     deployedParts: new Set(),
+    parachuteStates: new Map(),
     heatMap: new Map(),
     debris: [],
     landed: false,
@@ -177,6 +187,11 @@ export function createPhysicsState(assembly, flightState) {
     _heldKeys: new Set(),
     _accumulator: 0,
   };
+
+  // Initialise the parachute state machine for all PARACHUTE parts in the assembly.
+  initParachuteStates(ps, assembly);
+
+  return ps;
 }
 
 // ---------------------------------------------------------------------------
@@ -360,8 +375,14 @@ function _integrate(ps, assembly, flightState) {
   // --- 8. Fuel consumption (segment-aware, via fuelsystem.js) -------------
   tickFuelSystem(ps, assembly, FIXED_DT, density);
 
-  // --- 9. Reentry heat model -----------------------------------------------
-  // (renumbered; step 8 is fuel consumption above)
+  // --- 9. Parachute state machine ------------------------------------------
+  // Advance deploying → deployed timers and run the mass-safety check.
+  // totalMass was computed at step 1 above.
+  if (!ps.grounded) {
+    tickParachutes(ps, assembly, flightState, FIXED_DT, totalMass);
+  }
+
+  // --- 10. Reentry heat model ----------------------------------------------
   if (!ps.grounded) {
     updateHeat(ps, assembly, flightState, speed, altitude, density);
   }
@@ -524,9 +545,11 @@ function _computeDragForce(ps, assembly, density, speed) {
     const widthM   = (def.width ?? 40) * SCALE_M_PER_PX;
     const area     = Math.PI * (widthM / 2) ** 2; // circular cross-section
 
-    // Deployed parachutes vastly increase drag.
-    const cdMultiplier = ps.deployedParts.has(instanceId) &&
-      def.type === PartType.PARACHUTE ? CHUTE_DRAG_MULTIPLIER : 1;
+    // Parachutes use a density-scaled, state-machine-driven multiplier;
+    // all other parts have a fixed multiplier of 1.
+    const cdMultiplier = def.type === PartType.PARACHUTE
+      ? getChuteMultiplier(ps, instanceId, density)
+      : 1;
 
     totalCdA += cd * area * cdMultiplier;
   }

@@ -250,7 +250,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-024: Parachute Mechanics
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-020, TASK-004
 - **Description**: Implement parachute behaviour in `/src/core/parachute.js`. A parachute can be in states: `packed`, `deploying`, `deployed`. Deployment triggered via stage activation or context menu. `deploying` state lasts 2 seconds (visual animation transition), then becomes `deployed`. A deployed parachute applies additional drag force: `chuteDrag = chuteDragCoefficient * airDensity(altitude) * velocity²`. The chuteDragCoefficient scales with atmospheric density — parachutes are less effective at high altitude (density < 0.1 kg/m³). A parachute has a `maxSafeMass` property. If the mass of the rocket segment connected to the parachute exceeds `maxSafeMass` when the chute is fully deployed, the parachute is marked as failed (destroyed) and no longer applies drag. Display parachute status in context menu.

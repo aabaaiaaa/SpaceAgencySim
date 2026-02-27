@@ -45,6 +45,7 @@ import { getPartById }              from '../data/parts.js';
 import { PartType }                 from './constants.js';
 import { airDensity, SEA_LEVEL_DENSITY } from './atmosphere.js';
 import { tickFuelSystem }           from './fuelsystem.js';
+import { deployParachute, getChuteMultiplier } from './parachute.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -96,6 +97,9 @@ let _debrisNextId = 1;
  *   per part instance ID.
  * @property {Set<string>}         deployedParts Instance IDs of parachutes
  *   or legs that were deployed at separation time.
+ * @property {Map<string, import('./parachute.js').ParachuteEntry>} parachuteStates
+ *   Parachute lifecycle states inherited from the parent rocket at separation.
+ *   Keyed by instance ID.  An empty map when the debris has no parachutes.
  * @property {Map<string,number>}  heatMap       Accumulated reentry heat per
  *   part instance ID (heat units).
  * @property {number}              posX          Horizontal position (m;
@@ -201,7 +205,12 @@ export function activateCurrentStage(ps, assembly, stagingConfig, flightState) {
 
       case 'DEPLOY':
         // PARACHUTE or LANDING_LEGS — deploy / extend.
+        // For parachutes, also start the state-machine transition through the
+        // 2-second deploying animation before reaching full deployment.
         ps.deployedParts.add(instanceId);
+        if (def.type === PartType.PARACHUTE) {
+          deployParachute(ps, instanceId);
+        }
         _emitEvent(flightState, {
           type:        'PART_ACTIVATED',
           time,
@@ -474,11 +483,12 @@ export function tickDebris(debris, assembly, dt) {
  * @returns {DebrisState}
  */
 function _createDebrisFromParts(ps, partIds) {
-  const activeParts   = new Set(partIds);
-  const firingEngines = new Set();
-  const fuelStore     = new Map();
-  const deployedParts = new Set();
-  const heatMap       = new Map();
+  const activeParts     = new Set(partIds);
+  const firingEngines   = new Set();
+  const fuelStore       = new Map();
+  const deployedParts   = new Set();
+  const parachuteStates = new Map();
+  const heatMap         = new Map();
 
   for (const id of partIds) {
     // Transfer firing engine state.
@@ -497,6 +507,13 @@ function _createDebrisFromParts(ps, partIds) {
       deployedParts.add(id);
     }
 
+    // Transfer parachute state machine entry so debris chutes keep animating.
+    if (ps.parachuteStates?.has(id)) {
+      // Deep-copy the entry so the debris state evolves independently.
+      const src = ps.parachuteStates.get(id);
+      parachuteStates.set(id, { state: src.state, deployTimer: src.deployTimer });
+    }
+
     // Transfer heat accumulation.
     if (ps.heatMap.has(id)) {
       heatMap.set(id, ps.heatMap.get(id));
@@ -507,11 +524,12 @@ function _createDebrisFromParts(ps, partIds) {
   }
 
   return {
-    id:           `debris-${_debrisNextId++}`,
+    id:             `debris-${_debrisNextId++}`,
     activeParts,
     firingEngines,
     fuelStore,
     deployedParts,
+    parachuteStates,
     heatMap,
     posX:    ps.posX,
     posY:    ps.posY,
@@ -599,9 +617,10 @@ function _debrisDrag(debris, assembly, density, speed) {
     const widthM   = (def.width ?? 40) * SCALE_M_PER_PX;
     const area     = Math.PI * (widthM / 2) ** 2; // circular cross-section
 
-    // Deployed parachutes vastly increase drag.
-    const cdMult = debris.deployedParts.has(id) && def.type === PartType.PARACHUTE
-      ? CHUTE_DRAG_MULTIPLIER
+    // Parachutes use the state-machine multiplier (density-scaled);
+    // all other parts have a multiplier of 1.
+    const cdMult = def.type === PartType.PARACHUTE
+      ? getChuteMultiplier(debris, id, density)
       : 1;
 
     totalCdA += cd * area * cdMult;
