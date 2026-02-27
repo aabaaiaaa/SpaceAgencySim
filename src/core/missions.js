@@ -390,7 +390,10 @@ export function checkObjectiveCompletion(state, flightState) {
           (e) =>
             e.type === 'SATELLITE_RELEASED' &&
             typeof e.altitude === 'number' &&
-            e.altitude >= obj.target.minAltitude,
+            e.altitude >= obj.target.minAltitude &&
+            (obj.target.minVelocity == null ||
+              (typeof e.velocity === 'number' &&
+                e.velocity >= obj.target.minVelocity)),
         );
         if (releaseEvent) obj.completed = true;
         break;

@@ -376,6 +376,156 @@ describe('activateCurrentStage() — RELEASE', () => {
 });
 
 // ---------------------------------------------------------------------------
+// activateCurrentStage() — RELEASE (satellite debris)
+// ---------------------------------------------------------------------------
+
+describe('activateCurrentStage() — RELEASE (satellite debris)', () => {
+  function makeRocketWithSatellite() {
+    const assembly = createRocketAssembly();
+    const staging  = createStagingConfig();
+
+    const probeId = addPartToAssembly(assembly, 'probe-core-mk1', 0, 60);
+    const satId   = addPartToAssembly(assembly, 'satellite-mk1',  0, 100);
+    connectParts(assembly, probeId, 0, satId, 1);
+
+    syncStagingWithAssembly(assembly, staging);
+    assignPartToStage(staging, satId, 0);
+
+    return { assembly, staging, probeId, satId };
+  }
+
+  it('removes the satellite from ps.activeParts after RELEASE', () => {
+    const { assembly, staging, satId } = makeRocketWithSatellite();
+    const ps = makePhysicsState(assembly);
+    const fs = makeFlightState();
+
+    activateCurrentStage(ps, assembly, staging, fs);
+
+    expect(ps.activeParts.has(satId)).toBe(false);
+  });
+
+  it('returns a debris fragment containing the satellite after RELEASE', () => {
+    const { assembly, staging, satId } = makeRocketWithSatellite();
+    const ps = makePhysicsState(assembly);
+    const fs = makeFlightState();
+
+    const debris = activateCurrentStage(ps, assembly, staging, fs);
+
+    expect(debris.length).toBeGreaterThanOrEqual(1);
+    const satFragment = debris.find((d) => d.activeParts.has(satId));
+    expect(satFragment).toBeDefined();
+  });
+
+  it('emits SATELLITE_RELEASED event with altitude and velocity', () => {
+    const { assembly, staging } = makeRocketWithSatellite();
+    const ps = makePhysicsState(assembly);
+    ps.posY = 200_000;
+    ps.velX = 500;
+    ps.velY = 200;
+    const fs = makeFlightState();
+
+    activateCurrentStage(ps, assembly, staging, fs);
+
+    const evt = fs.events.find((e) => e.type === 'SATELLITE_RELEASED');
+    expect(evt).toBeDefined();
+    expect(evt.altitude).toBeCloseTo(200_000, 0);
+    expect(typeof evt.velocity).toBe('number');
+    expect(evt.velocity).toBeGreaterThan(0);
+  });
+
+  it('satellite debris inherits parent rocket position and velocity', () => {
+    const { assembly, staging, satId } = makeRocketWithSatellite();
+    const ps = makePhysicsState(assembly);
+    ps.posX = 100;
+    ps.posY = 50_000;
+    ps.velX = 300;
+    ps.velY = 150;
+    const fs = makeFlightState();
+
+    const debris = activateCurrentStage(ps, assembly, staging, fs);
+    const satFragment = debris.find((d) => d.activeParts.has(satId));
+
+    expect(satFragment.posX).toBe(100);
+    expect(satFragment.posY).toBe(50_000);
+    expect(satFragment.velX).toBe(300);
+    expect(satFragment.velY).toBe(150);
+  });
+});
+
+describe('activateCurrentStage() — SEPARATE with satellite in lower stage', () => {
+  /**
+   * Rocket layout (top to bottom):
+   *   Probe Core (command)
+   *   Stack Decoupler  ← Stage 2
+   *   Satellite Mk1
+   *   Small Tank
+   *   Spark Engine     ← Stage 1
+   */
+  function makeRocketWithSatelliteBelow() {
+    const assembly = createRocketAssembly();
+    const staging  = createStagingConfig();
+
+    const probeId  = addPartToAssembly(assembly, 'probe-core-mk1',       0,  130);
+    const decId    = addPartToAssembly(assembly, 'decoupler-stack-tr18', 0,   90);
+    const satId    = addPartToAssembly(assembly, 'satellite-mk1',        0,   60);
+    const tankId   = addPartToAssembly(assembly, 'tank-small',           0,    0);
+    const engineId = addPartToAssembly(assembly, 'engine-spark',         0,  -55);
+
+    connectParts(assembly, probeId,  1, decId,    0);
+    connectParts(assembly, decId,    1, satId,    0);
+    connectParts(assembly, satId,    1, tankId,   0);
+    connectParts(assembly, tankId,   1, engineId, 0);
+
+    syncStagingWithAssembly(assembly, staging);
+    assignPartToStage(staging, engineId, 0);
+    addStageToConfig(staging);
+    assignPartToStage(staging, decId, 1);
+
+    return { assembly, staging, probeId, decId, satId, tankId, engineId };
+  }
+
+  it('emits SATELLITE_RELEASED when decoupler separates the satellite into debris', () => {
+    const { assembly, staging } = makeRocketWithSatelliteBelow();
+    const ps = makePhysicsState(assembly);
+    ps.posY = 35_000;
+    ps.velY = 1_000;
+    const fs = makeFlightState();
+
+    activateCurrentStage(ps, assembly, staging, fs); // stage 1: engine ignites
+    activateCurrentStage(ps, assembly, staging, fs); // stage 2: decoupler fires
+
+    const evt = fs.events.find((e) => e.type === 'SATELLITE_RELEASED');
+    expect(evt).toBeDefined();
+    expect(evt.altitude).toBeCloseTo(35_000, 0);
+    expect(typeof evt.velocity).toBe('number');
+  });
+
+  it('satellite is in the debris fragment after decoupler fires', () => {
+    const { assembly, staging, satId } = makeRocketWithSatelliteBelow();
+    const ps = makePhysicsState(assembly);
+    const fs = makeFlightState();
+
+    activateCurrentStage(ps, assembly, staging, fs); // engine
+    const debris = activateCurrentStage(ps, assembly, staging, fs); // decoupler
+
+    expect(debris.length).toBe(1);
+    expect(debris[0].activeParts.has(satId)).toBe(true);
+    expect(ps.activeParts.has(satId)).toBe(false);
+  });
+
+  it('probe core stays in active parts after the satellite section separates', () => {
+    const { assembly, staging, probeId } = makeRocketWithSatelliteBelow();
+    const ps = makePhysicsState(assembly);
+    const fs = makeFlightState();
+
+    activateCurrentStage(ps, assembly, staging, fs);
+    activateCurrentStage(ps, assembly, staging, fs);
+
+    expect(ps.activeParts.has(probeId)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // activateCurrentStage() — COLLECT_SCIENCE
 // ---------------------------------------------------------------------------
 

@@ -97,9 +97,11 @@ export const ObjectiveType = Object.freeze({
   EJECT_CREW: 'EJECT_CREW',
 
   /**
-   * Release a satellite payload at or above a minimum altitude.
-   * Checks for a 'SATELLITE_RELEASED' event at `event.altitude >= minAltitude`.
-   * target: { minAltitude: number }  (metres)
+   * Release a satellite payload at or above a minimum altitude (and optionally
+   * at or above a minimum velocity).
+   * Checks for a 'SATELLITE_RELEASED' event at `event.altitude >= minAltitude`
+   * and, if minVelocity is provided, `event.velocity >= minVelocity`.
+   * target: { minAltitude: number, minVelocity?: number }
    */
   RELEASE_SATELLITE: 'RELEASE_SATELLITE',
 
@@ -148,7 +150,7 @@ export const MissionStatus = Object.freeze({
  *   RETURN_SCIENCE_DATA → {}
  *   CONTROLLED_CRASH    → { minCrashSpeed: number }
  *   EJECT_CREW          → { minAltitude: number }
- *   RELEASE_SATELLITE   → { minAltitude: number }
+ *   RELEASE_SATELLITE   → { minAltitude: number, minVelocity?: number }
  *   REACH_ORBIT         → { orbitAltitude: number, orbitalVelocity: number }
  *
  * @typedef {Object} ObjectiveTarget

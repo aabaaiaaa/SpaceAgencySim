@@ -1001,6 +1001,71 @@ describe('checkObjectiveCompletion() — RELEASE_SATELLITE', () => {
     checkObjectiveCompletion(state, fs);
     expect(state.missions.accepted[0].objectives[0].completed).toBe(false);
   });
+
+  it('completes when SATELLITE_RELEASED event has velocity field (backwards compatible)', () => {
+    const fs = makeFlightState('m1', {
+      events: [{ type: 'SATELLITE_RELEASED', time: 200, altitude: 35_000, velocity: 1_500, description: 'deployed with velocity' }],
+    });
+    checkObjectiveCompletion(state, fs);
+    expect(state.missions.accepted[0].objectives[0].completed).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// checkObjectiveCompletion() — RELEASE_SATELLITE with minVelocity
+// ---------------------------------------------------------------------------
+
+describe('checkObjectiveCompletion() — RELEASE_SATELLITE with minVelocity', () => {
+  let state;
+
+  beforeEach(() => {
+    state = freshState();
+    const def = makeMissionDef({
+      id: 'm1',
+      objectives: [
+        {
+          id: 'o1',
+          type: ObjectiveType.RELEASE_SATELLITE,
+          target: { minAltitude: 80_000, minVelocity: 7_000 },
+          completed: false,
+          description: 'release satellite in orbit',
+        },
+      ],
+    });
+    seedAcceptedMission(state, def);
+  });
+
+  it('completes when both altitude and velocity thresholds are met', () => {
+    const fs = makeFlightState('m1', {
+      events: [{ type: 'SATELLITE_RELEASED', time: 300, altitude: 85_000, velocity: 7_500, description: 'orbital deployment' }],
+    });
+    checkObjectiveCompletion(state, fs);
+    expect(state.missions.accepted[0].objectives[0].completed).toBe(true);
+  });
+
+  it('does not complete when altitude met but velocity below minimum', () => {
+    const fs = makeFlightState('m1', {
+      events: [{ type: 'SATELLITE_RELEASED', time: 300, altitude: 85_000, velocity: 6_999, description: 'too slow' }],
+    });
+    checkObjectiveCompletion(state, fs);
+    expect(state.missions.accepted[0].objectives[0].completed).toBe(false);
+  });
+
+  it('does not complete when altitude too low even if velocity is met', () => {
+    const fs = makeFlightState('m1', {
+      events: [{ type: 'SATELLITE_RELEASED', time: 300, altitude: 79_999, velocity: 8_000, description: 'altitude too low' }],
+    });
+    checkObjectiveCompletion(state, fs);
+    expect(state.missions.accepted[0].objectives[0].completed).toBe(false);
+  });
+
+  it('does not complete when velocity field is missing from event', () => {
+    const fs = makeFlightState('m1', {
+      events: [{ type: 'SATELLITE_RELEASED', time: 300, altitude: 85_000, description: 'no velocity field' }],
+    });
+    checkObjectiveCompletion(state, fs);
+    expect(state.missions.accepted[0].objectives[0].completed).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------

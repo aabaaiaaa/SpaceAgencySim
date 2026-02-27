@@ -208,6 +208,22 @@ export function activateCurrentStage(ps, assembly, stagingConfig, flightState) {
         // collect newly disconnected sections as debris.
         const fragments = recomputeActiveGraph(ps, assembly);
         newDebris.push(...fragments);
+
+        // If a satellite part ended up in the disconnected debris, emit a
+        // SATELLITE_RELEASED event so mission objectives can be checked.
+        const separateVelocity = Math.hypot(ps.velX, ps.velY);
+        for (const frag of fragments) {
+          if (_fragmentContainsSatellite(frag, assembly)) {
+            _emitEvent(flightState, {
+              type:        'SATELLITE_RELEASED',
+              time,
+              altitude,
+              velocity:    separateVelocity,
+              description: `Satellite detached at ${altitude.toFixed(0)} m.`,
+            });
+            break; // Only emit one event per stage fire.
+          }
+        }
         break;
       }
 
@@ -240,15 +256,28 @@ export function activateCurrentStage(ps, assembly, stagingConfig, flightState) {
         activateEjectorSeat(ps, assembly, flightState, instanceId);
         break;
 
-      case 'RELEASE':
-        // SATELLITE or payload bay — release into free flight.
+      case 'RELEASE': {
+        // SATELLITE — release into free flight as a detached physics object.
+        // Package the satellite into its own debris fragment so it continues
+        // to be simulated independently (position, velocity, drag).
+        const releaseVelocity = Math.hypot(ps.velX, ps.velY);
+        const satelliteDebris = _createDebrisFromParts(ps, [instanceId]);
+        newDebris.push(satelliteDebris);
+
+        // Recompute graph in case other parts were only connected through
+        // the satellite (e.g. satellite was mid-stack).
+        const orphanFragments = recomputeActiveGraph(ps, assembly);
+        newDebris.push(...orphanFragments);
+
         _emitEvent(flightState, {
           type:        'SATELLITE_RELEASED',
           time,
           altitude,
+          velocity:    releaseVelocity,
           description: `Satellite released at ${altitude.toFixed(0)} m.`,
         });
         break;
+      }
 
       case 'COLLECT_SCIENCE':
         // SERVICE_MODULE science instrument — start the timed experiment.
@@ -330,6 +359,22 @@ export function activatePartDirect(ps, assembly, flightState, instanceId) {
       ps.firingEngines.delete(instanceId);
       const fragments = recomputeActiveGraph(ps, assembly);
       newDebris.push(...fragments);
+
+      // If a satellite part ended up in the disconnected debris, emit a
+      // SATELLITE_RELEASED event so mission objectives can be checked.
+      const directSeparateVelocity = Math.hypot(ps.velX, ps.velY);
+      for (const frag of fragments) {
+        if (_fragmentContainsSatellite(frag, assembly)) {
+          _emitEvent(flightState, {
+            type:        'SATELLITE_RELEASED',
+            time,
+            altitude,
+            velocity:    directSeparateVelocity,
+            description: `Satellite detached at ${altitude.toFixed(0)} m.`,
+          });
+          break;
+        }
+      }
       break;
     }
 
@@ -358,16 +403,26 @@ export function activatePartDirect(ps, assembly, flightState, instanceId) {
       activateEjectorSeat(ps, assembly, flightState, instanceId);
       break;
 
-    case 'RELEASE':
-      // SATELLITE or payload bay — release into free flight.
+    case 'RELEASE': {
+      // SATELLITE — release into free flight as a detached physics object.
+      const directReleaseVelocity = Math.hypot(ps.velX, ps.velY);
+      const directSatDebris = _createDebrisFromParts(ps, [instanceId]);
+      newDebris.push(directSatDebris);
+
+      // Recompute graph in case other parts were only connected through the satellite.
+      const directOrphanFragments = recomputeActiveGraph(ps, assembly);
+      newDebris.push(...directOrphanFragments);
+
       _emitEvent(flightState, {
         type:        'SATELLITE_RELEASED',
         time,
         instanceId,
         altitude,
+        velocity:    directReleaseVelocity,
         description: `Satellite released at ${altitude.toFixed(0)} m.`,
       });
       break;
+    }
 
     case 'COLLECT_SCIENCE':
       // SERVICE_MODULE science instrument — start the timed experiment.
@@ -752,6 +807,25 @@ function _debrisDrag(debris, assembly, density, speed) {
   }
 
   return 0.5 * density * speed * speed * totalCdA;
+}
+
+/**
+ * Return true if the given debris fragment contains at least one SATELLITE part.
+ *
+ * Used after a decoupler fires to detect when a satellite has been released into
+ * free flight so that a SATELLITE_RELEASED mission event can be emitted.
+ *
+ * @param {DebrisState}                                  debris
+ * @param {import('./rocketbuilder.js').RocketAssembly}  assembly
+ * @returns {boolean}
+ */
+function _fragmentContainsSatellite(debris, assembly) {
+  for (const partId of debris.activeParts) {
+    const placed = assembly.parts.get(partId);
+    const def    = placed ? getPartById(placed.partId) : null;
+    if (def && def.type === PartType.SATELLITE) return true;
+  }
+  return false;
 }
 
 /**

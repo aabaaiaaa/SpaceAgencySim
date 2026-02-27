@@ -322,7 +322,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-033: Satellite Deployment
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-023, TASK-031
 - **Description**: The Satellite Mk1 part is a passive payload. It can be connected to the rocket via stack or radial snap points. A decoupler below (or adjacent to) the satellite is used to release it. When the decoupler fires, the satellite becomes a detached physics object (same debris simulation as any other detached part). Mission objectives of type `RELEASE_SATELLITE` are completed when: (1) a satellite part has been detached from the rocket, AND (2) the satellite's altitude at time of release meets the mission target altitude, AND (3) the satellite's velocity meets the mission target velocity (if specified). The satellite's position and velocity are tracked in the debris simulation list. Once the mission objective is met, it is marked complete.
