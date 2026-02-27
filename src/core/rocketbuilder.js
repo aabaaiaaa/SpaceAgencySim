@@ -56,7 +56,8 @@ const OPPOSITE_SIDE = Object.freeze({
  * @typedef {Object} RocketAssembly
  * @property {Map<string, PlacedPart>} parts
  * @property {PartConnection[]}        connections
- * @property {number}                  _nextId  Internal ID counter.
+ * @property {number}                  _nextId       Internal ID counter.
+ * @property {Array<[string, string]>} symmetryPairs Pairs of mirrored instance IDs.
  */
 
 /**
@@ -81,9 +82,10 @@ const OPPOSITE_SIDE = Object.freeze({
  */
 export function createRocketAssembly() {
   return {
-    parts:       new Map(),
-    connections: [],
-    _nextId:     1,
+    parts:         new Map(),
+    connections:   [],
+    symmetryPairs: [],
+    _nextId:       1,
   };
 }
 
@@ -113,6 +115,7 @@ export function addPartToAssembly(assembly, partId, worldX, worldY) {
 export function removePartFromAssembly(assembly, instanceId) {
   assembly.parts.delete(instanceId);
   _pruneConnections(assembly, instanceId);
+  _pruneSymmetryPairs(assembly, instanceId);
 }
 
 /**
@@ -256,12 +259,125 @@ function _pruneConnections(assembly, instanceId) {
   );
 }
 
+function _pruneSymmetryPairs(assembly, instanceId) {
+  if (!assembly.symmetryPairs) return;
+  assembly.symmetryPairs = assembly.symmetryPairs.filter(
+    ([a, b]) => a !== instanceId && b !== instanceId,
+  );
+}
+
 function _snapOccupied(assembly, instanceId, snapIndex) {
   return assembly.connections.some(
     (c) =>
       (c.fromInstanceId === instanceId && c.fromSnapIndex === snapIndex) ||
       (c.toInstanceId   === instanceId && c.toSnapIndex   === snapIndex),
   );
+}
+
+// ---------------------------------------------------------------------------
+// Symmetry pair management
+// ---------------------------------------------------------------------------
+
+/**
+ * Record a symmetry (mirror) relationship between two placed parts.
+ * @param {RocketAssembly} assembly
+ * @param {string} id1
+ * @param {string} id2
+ */
+export function addSymmetryPair(assembly, id1, id2) {
+  if (!assembly.symmetryPairs) assembly.symmetryPairs = [];
+  assembly.symmetryPairs.push([id1, id2]);
+}
+
+/**
+ * Return the instance ID of the mirror partner of the given part, or null.
+ * @param {RocketAssembly} assembly
+ * @param {string} instanceId
+ * @returns {string | null}
+ */
+export function getMirrorPartId(assembly, instanceId) {
+  if (!assembly.symmetryPairs) return null;
+  for (const [a, b] of assembly.symmetryPairs) {
+    if (a === instanceId) return b;
+    if (b === instanceId) return a;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Mirror candidate finder
+// ---------------------------------------------------------------------------
+
+/**
+ * @typedef {Object} MirrorCandidate
+ * @property {number} mirrorTargetSnapIndex  Snap index on the parent for the mirror.
+ * @property {number} mirrorDragSnapIndex    Snap index on the drag part for the mirror.
+ * @property {number} mirrorWorldX           World X where the mirror part centre lands.
+ * @property {number} mirrorWorldY           World Y where the mirror part centre lands.
+ */
+
+/**
+ * Given a radial snap candidate, compute the mirror snap position on the
+ * opposite side of the same parent part.
+ *
+ * Returns null when:
+ *   - The candidate snap is not radial (not left/right side).
+ *   - The parent has no socket on the opposite side that accepts the dragged
+ *     part type.
+ *   - The opposite-side socket is already occupied.
+ *   - The dragged part has no socket on the complementary side.
+ *
+ * @param {RocketAssembly} assembly
+ * @param {SnapCandidate}  candidate   The primary snap candidate.
+ * @param {string}         dragPartId  Part catalog ID being placed.
+ * @returns {MirrorCandidate | null}
+ */
+export function findMirrorCandidate(assembly, candidate, dragPartId) {
+  const parentPlaced = assembly.parts.get(candidate.targetInstanceId);
+  if (!parentPlaced) return null;
+
+  const parentDef = getPartById(parentPlaced.partId);
+  const dragDef   = getPartById(dragPartId);
+  if (!parentDef || !dragDef) return null;
+
+  const tSnap = parentDef.snapPoints[candidate.targetSnapIndex];
+  // Only radial (left/right) snaps get symmetry.
+  if (tSnap.side !== 'left' && tSnap.side !== 'right') return null;
+
+  const mirrorSide = OPPOSITE_SIDE[tSnap.side];
+
+  // Find the mirror socket on the parent (accepts the dragged type, opposite side).
+  const mirrorTargetSnapIndex = parentDef.snapPoints.findIndex(
+    (sp) => sp.side === mirrorSide && sp.accepts.includes(dragDef.type),
+  );
+  if (mirrorTargetSnapIndex === -1) return null;
+
+  // Mirror socket must be free.
+  if (_snapOccupied(assembly, parentPlaced.instanceId, mirrorTargetSnapIndex)) return null;
+
+  // Find the drag part's socket for the mirror connection.
+  // mirrorTargetSnap.side = mirrorSide → drag socket must be on OPPOSITE_SIDE[mirrorSide] = tSnap.side
+  const mirrorDragSnapIndex = dragDef.snapPoints.findIndex(
+    (sp) => sp.side === tSnap.side,
+  );
+  if (mirrorDragSnapIndex === -1) return null;
+
+  // Compute mirror part centre in world space.
+  const mirrorTargetSnap = parentDef.snapPoints[mirrorTargetSnapIndex];
+  const mirrorDragSnap   = dragDef.snapPoints[mirrorDragSnapIndex];
+
+  const mirrorTSnapWX =  parentPlaced.x + mirrorTargetSnap.offsetX;
+  const mirrorTSnapWY =  parentPlaced.y - mirrorTargetSnap.offsetY;
+
+  const mirrorDSnapRelX =  mirrorDragSnap.offsetX;
+  const mirrorDSnapRelY = -mirrorDragSnap.offsetY;
+
+  return {
+    mirrorTargetSnapIndex,
+    mirrorDragSnapIndex,
+    mirrorWorldX: mirrorTSnapWX - mirrorDSnapRelX,
+    mirrorWorldY: mirrorTSnapWY - mirrorDSnapRelY,
+  };
 }
 
 // ---------------------------------------------------------------------------

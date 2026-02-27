@@ -194,7 +194,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-017: Rocket Builder — Symmetry Snapping
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-016
 - **Description**: When placing a part onto a radial (left or right side) snap point, show a "Mirror?" prompt or toggle button. If symmetry is on (default for radial placements), automatically place a mirrored copy of the part on the opposite side radial snap point of the same parent part, if that snap point is free. Both parts are added to the rocket graph simultaneously. Removing one mirrored part asks if the user wants to remove both. Symmetry applies to: landing legs, SRBs attached radially, radial decouplers, parachutes placed radially. Symmetry only applies to pairs (2-way). No 3- or 4-way symmetry needed for this scope.

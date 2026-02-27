@@ -46,6 +46,9 @@ import {
   connectParts,
   disconnectPart,
   findSnapCandidates,
+  findMirrorCandidate,
+  addSymmetryPair,
+  getMirrorPartId,
   createStagingConfig,
   syncStagingWithAssembly,
   addStageToConfig,
@@ -95,6 +98,14 @@ let _lastValidation = null;
 
 /** Optional callback invoked when the player clicks "← Hub". @type {(() => void) | null} */
 let _onBack = null;
+
+/**
+ * Whether radial symmetry is active.  When true, placing a part onto a
+ * left/right snap point will also place a mirror copy on the opposite side
+ * of the same parent (if that socket is free and compatible).
+ * Defaults to true — the most common workflow for SRBs, legs, etc.
+ */
+let _symmetryMode = true;
 
 // ---------------------------------------------------------------------------
 // Part-type display helpers
@@ -248,6 +259,38 @@ const VAB_CSS = `
   background: rgba(22, 80, 30, 0.97);
   border-color: #38883e;
   color: #8ef09a;
+}
+
+/* ── Symmetry toggle button ──────────────────────────────────────────── */
+.vab-btn-symmetry {
+  background: rgba(12, 26, 54, 0.92);
+  border: 1px solid #1e3b60;
+  color: #5a88a8;
+  padding: 5px 10px;
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: background .1s, border-color .1s, color .1s;
+  white-space: nowrap;
+  line-height: 1.4;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.vab-btn-symmetry[aria-pressed="true"] {
+  background: rgba(8, 38, 60, 0.95);
+  border-color: #2a6090;
+  color: #60c0e8;
+}
+.vab-btn-symmetry:hover {
+  background: rgba(16, 38, 72, 0.95);
+  border-color: #3060a0;
+  color: #88c8e8;
+}
+.vab-btn-symmetry-icon {
+  font-size: 13px;
+  line-height: 1;
 }
 
 /* ── Main row (toolbar bottom to window bottom) ───────────────────── */
@@ -1298,6 +1341,27 @@ function _onDragEnd(e) {
         instanceId,                 bestCandidate.dragSnapIndex,
         bestCandidate.targetInstanceId, bestCandidate.targetSnapIndex,
       );
+      // Symmetry: if placing onto a radial socket and symmetry is on, mirror it.
+      if (_symmetryMode) {
+        const mirror = findMirrorCandidate(_assembly, bestCandidate, partId);
+        if (mirror) {
+          const mirrorId = addPartToAssembly(_assembly, partId, mirror.mirrorWorldX, mirror.mirrorWorldY);
+          connectParts(
+            _assembly,
+            mirrorId,                          mirror.mirrorDragSnapIndex,
+            bestCandidate.targetInstanceId,    mirror.mirrorTargetSnapIndex,
+          );
+          addSymmetryPair(_assembly, instanceId, mirrorId);
+          // New mirrored part needs staging sync.
+          _syncAndRenderStaging();
+          // Deduct cost for the mirror copy.
+          const def = getPartById(partId);
+          if (def && _gameState) {
+            _gameState.money -= def.cost;
+            vabUpdateCash(_gameState);
+          }
+        }
+      }
     }
   } else {
     // New part from the panel — deduct cost, add to assembly.
@@ -1313,8 +1377,26 @@ function _onDragEnd(e) {
         newId,                          bestCandidate.dragSnapIndex,
         bestCandidate.targetInstanceId, bestCandidate.targetSnapIndex,
       );
+      // Symmetry: if placing onto a radial socket and symmetry is on, mirror it.
+      if (_symmetryMode) {
+        const mirror = findMirrorCandidate(_assembly, bestCandidate, partId);
+        if (mirror) {
+          const mirrorId = addPartToAssembly(_assembly, partId, mirror.mirrorWorldX, mirror.mirrorWorldY);
+          connectParts(
+            _assembly,
+            mirrorId,                          mirror.mirrorDragSnapIndex,
+            bestCandidate.targetInstanceId,    mirror.mirrorTargetSnapIndex,
+          );
+          addSymmetryPair(_assembly, newId, mirrorId);
+          // Deduct cost for the mirror copy.
+          if (def && _gameState) {
+            _gameState.money -= def.cost;
+            vabUpdateCash(_gameState);
+          }
+        }
+      }
     }
-    // Sync staging — new activatable part may need to appear in unstaged pool.
+    // Sync staging — new activatable part(s) may need to appear in unstaged pool.
     _syncAndRenderStaging();
   }
 
@@ -1353,12 +1435,21 @@ function _showPartContextMenu(placed, clientX, clientY) {
 
   const def = getPartById(placed.partId);
   const costLabel = def ? ` (+${fmt$(def.cost)})` : '';
+  const mirrorId = _assembly ? getMirrorPartId(_assembly, placed.instanceId) : null;
 
-  _ctxMenu.innerHTML =
+  let menuHtml =
     `<button class="vab-ctx-item vab-ctx-item-danger" id="vab-ctx-remove">` +
       `Remove Part${costLabel}` +
     `</button>`;
 
+  if (mirrorId) {
+    menuHtml +=
+      `<button class="vab-ctx-item vab-ctx-item-danger" id="vab-ctx-remove-both">` +
+        `Remove Both (mirror pair)` +
+      `</button>`;
+  }
+
+  _ctxMenu.innerHTML = menuHtml;
   _ctxMenu.style.left = `${clientX}px`;
   _ctxMenu.style.top  = `${clientY}px`;
   _ctxMenu.removeAttribute('hidden');
@@ -1375,6 +1466,21 @@ function _showPartContextMenu(placed, clientX, clientY) {
     _syncAndRenderStaging();
     vabRenderParts();
   }, { once: true });
+
+  if (mirrorId) {
+    _ctxMenu.querySelector('#vab-ctx-remove-both')?.addEventListener('click', () => {
+      _ctxMenu.setAttribute('hidden', '');
+      // Refund cost for both parts.
+      if (def && _gameState) {
+        _gameState.money += def.cost * 2;
+        vabUpdateCash(_gameState);
+      }
+      removePartFromAssembly(_assembly, placed.instanceId);
+      removePartFromAssembly(_assembly, mirrorId);
+      _syncAndRenderStaging();
+      vabRenderParts();
+    }, { once: true });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1763,6 +1869,16 @@ function _bindButtons(root) {
   root.querySelector('#vab-staging-close')?.addEventListener('click', () => {
     stagingPanel?.setAttribute('hidden', '');
   });
+
+  // ── Symmetry toggle ───────────────────────────────────────────────────────
+  const symmetryBtn = /** @type {HTMLButtonElement|null} */ (root.querySelector('#vab-btn-symmetry'));
+  if (symmetryBtn) {
+    symmetryBtn.setAttribute('aria-pressed', String(_symmetryMode));
+    symmetryBtn.addEventListener('click', () => {
+      _symmetryMode = !_symmetryMode;
+      symmetryBtn.setAttribute('aria-pressed', String(_symmetryMode));
+    });
+  }
 
   // ── Launch — enabled only when validation passes ──────────────────────────
   root.querySelector('#vab-btn-launch')?.addEventListener('click', () => {
@@ -2319,6 +2435,10 @@ export function initVabUI(container, state, { onBack } = {}) {
         </button>
         <button class="vab-btn" id="vab-btn-staging" type="button">
           Staging
+        </button>
+        <button class="vab-btn-symmetry" id="vab-btn-symmetry" type="button"
+                aria-pressed="true" title="Toggle radial symmetry (mirrors parts placed on left/right snap points)">
+          <span class="vab-btn-symmetry-icon">&#x2194;</span>Mirror
         </button>
         <button class="vab-btn vab-btn-launch" id="vab-btn-launch" type="button" disabled>
           Launch
