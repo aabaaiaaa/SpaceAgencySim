@@ -1051,8 +1051,16 @@ function _onWheel(e) {
 export function initFlightRenderer() {
   const app = getApp();
 
-  // Tear down whatever scene was previously on stage (e.g. the VAB).
-  app.stage.removeChildren();
+  // Remove any stale flight containers left from a previous flight (defensive).
+  // We deliberately do NOT call app.stage.removeChildren() because the hub and
+  // VAB renderers keep persistent containers on the stage that must survive the
+  // flight scene lifecycle.
+  if (_skyGraphics)     app.stage.removeChild(_skyGraphics);
+  if (_starsContainer)  app.stage.removeChild(_starsContainer);
+  if (_groundGraphics)  app.stage.removeChild(_groundGraphics);
+  if (_debrisContainer) app.stage.removeChild(_debrisContainer);
+  if (_trailContainer)  app.stage.removeChild(_trailContainer);
+  if (_rocketContainer) app.stage.removeChild(_rocketContainer);
 
   // Layer order (bottom → top):
   //   sky  →  stars  →  ground  →  debris  →  engine trails  →  active rocket
@@ -1147,7 +1155,16 @@ export function renderFlightFrame(ps, assembly) {
  */
 export function destroyFlightRenderer() {
   const app = getApp();
-  app.stage.removeChildren();
+
+  // Remove only the flight-specific containers.  Using removeChildren() would
+  // also strip the persistent hub/VAB containers from the stage, causing them
+  // to become invisible after returning from a flight.
+  if (_skyGraphics)     app.stage.removeChild(_skyGraphics);
+  if (_starsContainer)  app.stage.removeChild(_starsContainer);
+  if (_groundGraphics)  app.stage.removeChild(_groundGraphics);
+  if (_debrisContainer) app.stage.removeChild(_debrisContainer);
+  if (_trailContainer)  app.stage.removeChild(_trailContainer);
+  if (_rocketContainer) app.stage.removeChild(_rocketContainer);
 
   _skyGraphics     = null;
   _starsContainer  = null;

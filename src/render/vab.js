@@ -511,7 +511,13 @@ export function initVabRenderer() {
  * Call this when the player navigates to the Vehicle Assembly Building.
  */
 export function showVabScene() {
-  if (_vabRoot) _vabRoot.visible = true;
+  if (!_vabRoot) return;
+  const app = getApp();
+  // Re-attach if the container was orphaned by a flight renderer teardown.
+  if (!_vabRoot.parent) {
+    app.stage.addChild(_vabRoot);
+  }
+  _vabRoot.visible = true;
 }
 
 /**

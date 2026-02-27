@@ -136,6 +136,11 @@ export function initHubRenderer() {
  */
 export function showHubScene() {
   if (!_hubRoot) return;
+  const app = getApp();
+  // Re-attach if the container was orphaned by a flight renderer teardown.
+  if (!_hubRoot.parent) {
+    app.stage.addChildAt(_hubRoot, 0);
+  }
   _hubRoot.visible = true;
   _drawScene();
 }
