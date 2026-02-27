@@ -96,7 +96,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-007: Main Menu & Load Screen
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-006
 - **Description**: The game entry screen. If any save slots contain data, show the load screen by default. Display each save slot as a card showing: save name, date saved, missions completed, money (formatted), accepted missions, total flights, crew count, crew KIA, time played (formatted as h:mm:ss). Actions per slot: Load, Delete, Export. A separate "Import Save" button accepts a JSON file upload. A "New Game" button starts a fresh state (prompts for agency name). If no saves exist, show the New Game screen directly. New Game sets starting state: cash $2,000,000, loan $2,000,000, no crew, no accepted missions, only initial tutorial missions available, only starter parts unlocked.

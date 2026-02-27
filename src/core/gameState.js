@@ -144,6 +144,7 @@ import {
 /**
  * The complete game state.  All subsystems read from and write to this shape.
  * @typedef {Object} GameState
+ * @property {string}        agencyName     - Player-assigned agency name (set on new game).
  * @property {number}        money          - Current cash balance (dollars).
  * @property {Loan}          loan           - Outstanding loan details.
  * @property {CrewMember[]}  crew           - Hired astronauts.
@@ -168,6 +169,8 @@ import {
  */
 export function createGameState() {
   return {
+    agencyName: '',
+
     money: STARTING_MONEY,
 
     loan: {

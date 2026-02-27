@@ -5,10 +5,7 @@
 
 import { initRenderer } from './render/index.js';
 import { initVabRenderer } from './render/vab.js';
-import { initUI } from './ui/index.js';
-import { createGameState } from './core/gameState.js';
-import { initializeMissions } from './core/missions.js';
-import { getAllParts } from './data/parts.js';
+import { showMainMenu, initUI } from './ui/index.js';
 
 async function main() {
   console.log('[SpaceAgencySim] Starting...');
@@ -16,29 +13,26 @@ async function main() {
   const canvas    = document.getElementById('game-canvas');
   const uiOverlay = document.getElementById('ui-overlay');
 
-  // ── Game state ─────────────────────────────────────────────────────────
-  const state = createGameState();
-  // Expose for e2e testing (Playwright can read/verify game state)
-  window.__gameState = state;
-
-  // Seed the mission board with tutorial missions.
-  initializeMissions(state);
-
-  // Development: unlock all parts so the parts panel is fully populated.
-  // In a shipped game this is driven incrementally by mission rewards.
-  state.parts = getAllParts().map((p) => p.id);
-
-  // ── Rendering ─────────────────────────────────────────────────────────
+  // ── Rendering ──────────────────────────────────────────────────────────
   // Initialize PixiJS (async — creates WebGL context).
   await initRenderer(canvas);
 
-  // Initialize the VAB scene (grid, camera).
+  // Initialize the VAB scene (grid, camera) — canvas is ready but hidden
+  // behind the main menu until the player starts or loads a game.
   initVabRenderer();
 
-  // ── UI overlay ─────────────────────────────────────────────────────────
-  initUI(uiOverlay, state);
+  // ── Main menu ──────────────────────────────────────────────────────────
+  // Show the load screen / new-game screen.  The menu calls onGameReady
+  // once the player has chosen a game to play.
+  showMainMenu(uiOverlay, (state) => {
+    // Expose for e2e testing (Playwright can read/verify game state).
+    window.__gameState = state;
 
-  console.log('[SpaceAgencySim] Ready.');
+    // Boot the in-game UI overlay (VAB chrome, toolbar, panels, etc.).
+    initUI(uiOverlay, state);
+
+    console.log('[SpaceAgencySim] Ready. Agency:', state.agencyName || '(unnamed)');
+  });
 }
 
 main().catch((err) => {
