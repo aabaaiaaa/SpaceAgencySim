@@ -322,6 +322,18 @@ const VAB_CSS = `
   line-height: 1;
 }
 
+/* ── Clear All button ─────────────────────────────────────────────── */
+.vab-btn-clear-all {
+  background: rgba(54, 12, 12, 0.92);
+  border-color: #501818;
+  color: #a06060;
+}
+.vab-btn-clear-all:hover {
+  background: rgba(80, 20, 20, 0.95);
+  border-color: #703030;
+  color: #e08080;
+}
+
 /* ── Main row (toolbar bottom to window bottom) ───────────────────── */
 #vab-main {
   flex: 1;
@@ -576,18 +588,18 @@ const VAB_CSS = `
   align-items: center;
   gap: 20px;
   padding: 0 14px;
-  height: 22px;
-  min-height: 22px;
+  height: 28px;
+  min-height: 28px;
   background: rgba(2, 4, 14, 0.97);
   border-bottom: 1px solid #0a1826;
-  font-size: 9px;
-  color: #3a6080;
+  font-size: 12px;
+  color: #5a8aa8;
   flex-shrink: 0;
   pointer-events: none;
 }
 .vab-status-item { display: flex; gap: 5px; }
-.vab-status-label { color: #224050; text-transform: uppercase; letter-spacing: .08em; }
-.vab-status-value { color: #6a9ab8; font-weight: 700; }
+.vab-status-label { color: #3a6080; text-transform: uppercase; letter-spacing: .08em; }
+.vab-status-value { color: #8ab8d8; font-weight: 700; }
 
 /* ── Side panels — stackable ─────────────────────────────────────────── */
 .vab-side-panel {
@@ -1744,31 +1756,17 @@ function _setSelectedPart(instanceId) {
  */
 function _updateSelectionHighlight(placed, def, highlight) {
   const { zoom, x: camX, y: camY } = vabGetCamera();
-  const pxPerUnit = zoom;
 
-  // Canvas area left offset (scale bar + open panels).
-  const canvasLeft = VAB_SCALE_BAR_WIDTH + _openPanels.size * SIDE_PANEL_WIDTH;
-
-  // World to screen: The VAB world x=0 is centred in canvas, y increases upward.
-  // Canvas origin (screen coords) = canvasLeft + canvasWidth/2 + camX, toolbarBottom - camY
   const canvasArea = _canvasArea;
   if (!canvasArea) return;
-  const canvasW = canvasArea.offsetWidth;
-  const canvasH = canvasArea.offsetHeight;
-  const toolbarH = VAB_TOOLBAR_HEIGHT + 22; // include status bar
 
-  const screenX = (canvasLeft + canvasW / 2) + (placed.x + (canvasArea.getBoundingClientRect().left - canvasLeft - canvasW/2)/zoom) * pxPerUnit;
-  // Simpler: use vabScreenToWorld in reverse via known camera values from vabGetCamera.
-  // The render vab module uses: screenX = (worldX - camX) * zoom + canvasW/2 + VAB_SCALE_BAR_WIDTH + openPanelsWidth
-  // => screenX = placed.x * zoom + canvasW/2 + canvasLeft - camX * zoom (approximately)
-  const sx = (placed.x * zoom) + (canvasW / 2) + canvasLeft - (camX * zoom);
-  // For Y: screenY = VAB_TOOLBAR_HEIGHT + 22 + canvasH/2 - (placed.y * zoom) + (camY * zoom - canvasH/2)
-  // Actually: screenY = toolbarH + (camY - placed.y) * zoom (where camY is pixels from bottom=0)
-  // Using: barY = camY - m * pxPerMetre in scale bar → placed.y is already in world px units
-  const sy = toolbarH + (camY - placed.y) * pxPerUnit;
+  // Canvas-local coordinates matching render/vab.js _worldToScreen (minus area offset).
+  // sx_canvas = camX + wx * zoom;  sy_canvas = camY - wy * zoom
+  const sx = camX + placed.x * zoom;
+  const sy = camY - placed.y * zoom;
 
-  const w = def.width  * pxPerUnit;
-  const h = def.height * pxPerUnit;
+  const w = def.width  * zoom;
+  const h = def.height * zoom;
 
   highlight.style.left   = `${(sx - w / 2).toFixed(1)}px`;
   highlight.style.top    = `${(sy - h / 2).toFixed(1)}px`;
@@ -1795,8 +1793,8 @@ function _updateStatusBar() {
     if (def) totalCost += def.cost;
   }
 
-  partsEl.textContent = String(count);
-  costEl.textContent  = fmt$(totalCost);
+  partsEl.textContent = `Parts: ${count}`;
+  costEl.textContent  = `Cost: ${fmt$(totalCost)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -1821,9 +1819,10 @@ function _updateOffscreenIndicators() {
     const def = getPartById(placed.partId);
     if (!def) continue;
 
-    // World → canvas-local screen coords.
-    const sx = placed.x * zoom + canvasW / 2 - camX * zoom;
-    const sy = (camY - placed.y) * zoom;
+    // Canvas-local coords matching render/vab.js _worldToScreen (minus area offset).
+    // sx_canvas = camX + wx * zoom;  sy_canvas = camY - wy * zoom
+    const sx = camX + placed.x * zoom;
+    const sy = camY - placed.y * zoom;
 
     // Check if the part is visible.
     const hw = def.width  * zoom / 2;
@@ -2401,6 +2400,30 @@ function _bindButtons(root) {
       symmetryBtn.setAttribute('aria-pressed', String(_symmetryMode));
     });
   }
+
+  // ── Clear All — remove all parts and refund cost ─────────────────────────
+  root.querySelector('#vab-btn-clear-all')?.addEventListener('click', () => {
+    if (!_assembly || _assembly.parts.size === 0) return;
+    if (!confirm('Remove all parts? This will refund their cost.')) return;
+    // Refund all part costs.
+    for (const placed of _assembly.parts.values()) {
+      const def = getPartById(placed.partId);
+      if (def && _gameState) _gameState.money += def.cost;
+    }
+    // Clear the assembly.
+    _assembly.parts.clear();
+    _assembly.connections.length = 0;
+    _assembly.symmetryPairs.length = 0;
+    _setSelectedPart(null);
+    syncStagingWithAssembly(_assembly, _stagingConfig);
+    vabSetAssembly(_assembly);
+    vabRenderParts(_assembly, null);
+    _syncAndRenderStaging();
+    _runAndRenderValidation();
+    // Refresh cash display.
+    const cashEl = document.getElementById('vab-cash');
+    if (cashEl && _gameState) cashEl.textContent = fmt$(_gameState.money);
+  });
 
   // ── Launch — enabled only when validation passes ──────────────────────────
   root.querySelector('#vab-btn-launch')?.addEventListener('click', () => {
@@ -3004,6 +3027,10 @@ export function initVabUI(container, state, { onBack } = {}) {
                 aria-pressed="true" title="Toggle radial symmetry (mirrors parts placed on left/right snap points)">
           <span class="vab-btn-symmetry-icon">&#x2194;</span>Mirror
         </button>
+        <button class="vab-btn vab-btn-clear-all" id="vab-btn-clear-all" type="button"
+                title="Remove all parts from the rocket (refunds cost)">
+          Clear All
+        </button>
         <button class="vab-btn vab-btn-launch" id="vab-btn-launch" type="button" disabled>
           Launch
         </button>
@@ -3089,12 +3116,19 @@ export function initVabUI(container, state, { onBack } = {}) {
   _drawScaleTicks();
 
   // ── Rocket assembly (part graph) ──────────────────────────────────────────
-  _assembly  = createRocketAssembly();
+  // Preserve the existing assembly if the player is returning to VAB (e.g.
+  // after going back to hub and re-entering).  Only create a fresh assembly
+  // when entering VAB for the very first time or after resetVabUI().
+  if (!_assembly) {
+    _assembly = createRocketAssembly();
+  }
   _gameState = state;
   vabSetAssembly(_assembly);
 
   // ── Staging configuration ──────────────────────────────────────────────────
-  _stagingConfig = createStagingConfig();
+  if (!_stagingConfig) {
+    _stagingConfig = createStagingConfig();
+  }
 
   // Expose internals for e2e testing (Playwright can verify assembly/staging state)
   window.__vabAssembly      = _assembly;
@@ -3154,10 +3188,28 @@ export function initVabUI(container, state, { onBack } = {}) {
   // ── Toolbar buttons ────────────────────────────────────────────────────────
   _bindButtons(root);
 
-  // ── Initial validation run (empty assembly — all checks fail) ─────────────
+  // ── Restore visual state if returning to a previous assembly ──────────────
+  if (_assembly.parts.size > 0) {
+    vabRenderParts(_assembly, _selectedInstanceId);
+    _updateStatusBar();
+    _updateOffscreenIndicators();
+  }
+
+  // ── Initial / restored validation run ─────────────────────────────────────
   _runAndRenderValidation();
 
   console.log('[VAB UI] Initialized');
+}
+
+/**
+ * Reset VAB session state so the next call to `initVabUI` creates a fresh
+ * empty rocket.  Call this when starting a new game or loading a save.
+ */
+export function resetVabUI() {
+  _assembly         = null;
+  _stagingConfig    = null;
+  _selectedInstanceId = null;
+  _lastValidation   = null;
 }
 
 /**

@@ -966,7 +966,12 @@ function _updateStagingList() {
 
   const stages    = _stagingConfig.stages;
   const activeIdx = _stagingConfig.currentStageIdx;
-  const fp        = `${activeIdx}:${stages.length}`;
+  // Include a coarse fuel snapshot so delta-V updates as propellant burns.
+  let totalFuel = 0;
+  if (_ps) {
+    for (const fuelKg of _ps.fuelStore.values()) totalFuel += fuelKg;
+  }
+  const fp = `${activeIdx}:${stages.length}:${Math.round(totalFuel)}`;
   if (_elStagingList.dataset.fp === fp) return; // avoid full rebuild every frame
   _elStagingList.dataset.fp = fp;
   _elStagingList.innerHTML  = '';
@@ -1094,9 +1099,10 @@ function _computeTWR() {
     totalMass += def.mass ?? 0;
     totalMass += _ps.fuelStore.get(instanceId) ?? 0;
     if (_ps.firingEngines && _ps.firingEngines.has(instanceId)) {
-      const isSRB   = def.type === PartType.SOLID_ROCKET_BOOSTER;
-      const thrust  = (def.properties?.thrust ?? 0) * (isSRB ? 1 : (_ps.throttle ?? 0));
-      totalThrust  += thrust;
+      const isSRB      = def.type === PartType.SOLID_ROCKET_BOOSTER;
+      const thrustN    = (def.properties?.thrust ?? 0) * 1_000; // kN → N
+      const thrust     = thrustN * (isSRB ? 1 : (_ps.throttle ?? 0));
+      totalThrust     += thrust;
     }
   }
 
@@ -1116,41 +1122,38 @@ function _computeStageDeltaV(stageIdx) {
   const stage = _stagingConfig.stages[stageIdx];
   if (!stage) return 0;
 
-  // Total current rocket mass (active parts only).
+  // Total current rocket mass (active parts only) and total available fuel.
   let totalMass = 0;
+  let totalFuel = 0;
   for (const [instanceId, placed] of _assembly.parts) {
     if (!_ps.activeParts.has(instanceId)) continue;
     const def = getPartById(placed.partId);
     if (!def) continue;
-    totalMass += def.mass ?? 0;
-    totalMass += _ps.fuelStore.get(instanceId) ?? 0;
+    const fuelKg = _ps.fuelStore.get(instanceId) ?? 0;
+    totalMass += (def.mass ?? 0) + fuelKg;
+    // Count fuel in any part that carries propellant (tanks, SRBs, etc.)
+    if (fuelKg > 0) totalFuel += fuelKg;
   }
 
-  // Stage fuel and engine properties.
-  let stageFuel        = 0;
-  let thrustTotal      = 0;
-  let ispTimesThrust   = 0;
-
+  // Engine properties from this stage's engines.
+  let thrustTotal    = 0;
+  let ispTimesThrust = 0;
   for (const instanceId of stage.instanceIds) {
     if (!_ps.activeParts.has(instanceId)) continue;
     const placed = _assembly.parts.get(instanceId);
     const def    = placed ? getPartById(placed.partId) : null;
     if (!def) continue;
-
-    const fuelKg = _ps.fuelStore.get(instanceId) ?? 0;
-    if (fuelKg > 0) stageFuel += fuelKg;
-
     const thrust = def.properties?.thrust ?? 0;
     if (thrust > 0) {
-      const isp      = def.properties?.isp ?? 300;
-      thrustTotal   += thrust;
+      const isp = def.properties?.isp ?? 300;
+      thrustTotal    += thrust;
       ispTimesThrust += isp * thrust;
     }
   }
 
-  if (stageFuel <= 0 || thrustTotal <= 0 || totalMass <= 0) return 0;
+  if (totalFuel <= 0 || thrustTotal <= 0 || totalMass <= 0) return 0;
   const avgIsp = ispTimesThrust / thrustTotal;
-  const mf     = totalMass - stageFuel;
+  const mf     = totalMass - totalFuel;
   if (mf <= 0) return 0;
   return avgIsp * G0 * Math.log(totalMass / mf);
 }
@@ -1161,10 +1164,10 @@ function _computeStageDeltaV(stageIdx) {
 function _setThrottleForTWR1() {
   if (!_ps || !_assembly) return;
 
-  // Total dry+fuel mass.
-  let totalMass    = 0;
-  let maxThrust    = 0;
-  let srbThrust    = 0;
+  // Total dry+fuel mass (all active parts).
+  let totalMass = 0;
+  let maxThrust = 0; // sum of all active throttleable engine thrust
+  let srbThrust = 0; // SRB thrust only counted if currently firing
 
   for (const [instanceId, placed] of _assembly.parts) {
     if (!_ps.activeParts.has(instanceId)) continue;
@@ -1172,13 +1175,16 @@ function _setThrottleForTWR1() {
     if (!def) continue;
     totalMass += def.mass ?? 0;
     totalMass += _ps.fuelStore.get(instanceId) ?? 0;
-    if (_ps.firingEngines && _ps.firingEngines.has(instanceId)) {
-      const thrust = def.properties?.thrust ?? 0;
-      if (def.type === PartType.SOLID_ROCKET_BOOSTER) {
-        srbThrust  += thrust; // SRBs always full
-      } else {
-        maxThrust  += thrust;
+
+    const thrustN = (def.properties?.thrust ?? 0) * 1_000; // kN → N
+    if (def.type === PartType.SOLID_ROCKET_BOOSTER) {
+      // SRBs contribute fixed thrust only if actively burning.
+      if (_ps.firingEngines && _ps.firingEngines.has(instanceId)) {
+        srbThrust += thrustN;
       }
+    } else if (def.type === PartType.ENGINE) {
+      // Count ALL active throttleable engines regardless of staging.
+      maxThrust += thrustN;
     }
   }
 

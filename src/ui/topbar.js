@@ -73,7 +73,7 @@ const TOPBAR_STYLES = `
   pointer-events: auto;
   z-index: 100;
   box-sizing: border-box;
-  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-family: 'Courier New', Courier, monospace;
   user-select: none;
 }
 
@@ -209,7 +209,7 @@ const TOPBAR_STYLES = `
   overflow-y: auto;
   box-sizing: border-box;
   pointer-events: auto;
-  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-family: 'Courier New', Courier, monospace;
   color: #cce4f8;
 }
 

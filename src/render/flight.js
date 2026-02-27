@@ -95,11 +95,11 @@ const STAR_COUNT = 200;
 // Engine trail constants
 // ---------------------------------------------------------------------------
 
-/** Lifetime of a single trail segment at throttle=1 in vacuum (seconds). */
-const TRAIL_MAX_AGE = 0.5;
+/** Lifetime of a single fire trail segment at throttle=1 in vacuum (seconds). */
+const TRAIL_MAX_AGE = 0.18;
 
 /** Lifetime multiplier added by atmospheric density (dense air → longer smoke). */
-const TRAIL_ATMOSPHERE_AGE_BONUS = 2.5;
+const TRAIL_ATMOSPHERE_AGE_BONUS = 3.0;
 
 /**
  * Air density threshold (kg/m³) below which engine trails are suppressed.
@@ -107,11 +107,11 @@ const TRAIL_ATMOSPHERE_AGE_BONUS = 2.5;
  */
 const TRAIL_DENSITY_THRESHOLD = 0.01;
 
-/** Speed (m/s) at which trail segments drift away from the engine nozzle. */
-const TRAIL_DRIFT_SPEED = 45;
+/** Speed (m/s) at which fire trail segments drift away from the engine nozzle. */
+const TRAIL_DRIFT_SPEED = 30;
 
 /** Lateral smoke fan speed (m/s) at zero velocity (launch-pad smoke spread). */
-const TRAIL_FAN_SPEED = 20;
+const TRAIL_FAN_SPEED = 18;
 
 /** Velocity (m/s) at which the lateral fanning effect disappears. */
 const TRAIL_FAN_VELOCITY_CUTOFF = 80;
@@ -670,14 +670,15 @@ function _renderRocket(ps, assembly, w, h) {
   while (_rocketContainer.children.length) _rocketContainer.removeChildAt(0);
   if (ps.activeParts.size === 0) return;
 
-  // Position the container at the rocket's world-space reference point.
-  const { sx, sy } = _worldToScreen(ps.posX, ps.posY, w, h);
-  _rocketContainer.x        = sx;
-  _rocketContainer.rotation = ps.angle;
+  // Compute the centre of mass in local container space (VAB pixels, Y-down).
+  // This is used to set the rotation pivot so the rocket spins around its CoM
+  // rather than the reference origin at the base.
+  const com       = _computeCoM(ps.fuelStore, assembly, ps.activeParts, ps.posX, ps.posY);
+  const comLocalX =  (com.x - ps.posX) / SCALE_M_PER_PX;  // local X offset (pixels)
+  const comLocalY = -(com.y - ps.posY) / SCALE_M_PER_PX;  // local Y offset (Y-down)
 
-  // When grounded, visually align the rocket so the bottom of the lowest active
-  // part sits exactly on the ground line rather than extending underground.
-  // This is a rendering-only correction; physics posY remains at 0 (ground).
+  // When grounded, shift the container so the lowest active part's bottom edge
+  // sits exactly on the ground line.  lowestPartBottomPx is in VAB-pixel / local space.
   let lowestPartBottomPx = 0;
   if (ps.grounded) {
     for (const instanceId of ps.activeParts) {
@@ -688,10 +689,18 @@ function _renderRocket(ps, assembly, w, h) {
       if (bottom < lowestPartBottomPx) lowestPartBottomPx = bottom;
     }
   }
-  // In PixiJS screen space Y increases downward; a negative lowestPartBottomPx
-  // means parts extend below the VAB 0 m line.  Shift the container up by that
-  // amount so the lowest part's bottom aligns with the rendered ground line.
-  _rocketContainer.y = sy + lowestPartBottomPx;
+
+  // Position the container so that:
+  //   - the pivot (CoM) appears at the correct screen position, AND
+  //   - the local origin (reference point, ps.posX/posY) maps to its world screen pos.
+  // With pivot = (comLocalX, comLocalY), container.x = sx + comLocalX keeps the
+  // local origin at screen sx; container.y = sy + lowestPartBottomPx + comLocalY
+  // applies the ground correction while keeping the origin at sy + lowestPartBottomPx.
+  const { sx, sy } = _worldToScreen(ps.posX, ps.posY, w, h);
+  _rocketContainer.pivot.set(comLocalX, comLocalY);
+  _rocketContainer.x        = sx + comLocalX;
+  _rocketContainer.y        = sy + lowestPartBottomPx + comLocalY;
+  _rocketContainer.rotation = ps.angle;
 
   // Batch all part rectangles into a single Graphics object.
   const g = new PIXI.Graphics();
@@ -864,32 +873,40 @@ function _emitTrailSegments(ps, assembly, density) {
 
     const nozzle = _nozzleWorldPos(ps, placed, def);
 
-    // Fire/glow segment — size and emission rate proportional to throttle.
-    const fireW = (isSRB ? 12 : 6) * (0.4 + effectiveThrottle * 0.6);
-    const fireH = (isSRB ? 26 : 14) * (0.4 + effectiveThrottle * 0.6);
-    _trailSegments.push({
-      worldX:  nozzle.x,
-      worldY:  nozzle.y,
-      vx:      exVx,
-      vy:      exVy,
-      age:     0,
-      baseW:   fireW,
-      baseH:   fireH,
-      isSRB,
-      maxAge:  TRAIL_MAX_AGE,
-      isSmoke: false,
-    });
+    // Emit multiple overlapping fire segments per frame to create a
+    // connected flame shape — segments are staggered along the exhaust axis
+    // so the flame looks like a cone tapering away from the nozzle.
+    const fireBaseW = (isSRB ? 14 : 8)  * (0.5 + effectiveThrottle * 0.5);
+    const fireBaseH = (isSRB ? 32 : 18) * (0.5 + effectiveThrottle * 0.5);
+    const flameSteps = isSRB ? 4 : 3;
+    for (let step = 0; step < flameSteps; step++) {
+      const frac  = step / flameSteps;           // 0 = nozzle tip, 1 = tail end
+      const taper = 1 - frac * 0.6;             // wider at tip, narrower further back
+      // Pre-age the further segments so they fade correctly at the tail.
+      _trailSegments.push({
+        worldX:  nozzle.x + exVx * frac * TRAIL_MAX_AGE * 0.6,
+        worldY:  nozzle.y + exVy * frac * TRAIL_MAX_AGE * 0.6,
+        vx:      exVx,
+        vy:      exVy,
+        age:     frac * TRAIL_MAX_AGE * 0.5,
+        baseW:   fireBaseW * taper,
+        baseH:   fireBaseH * taper,
+        isSRB,
+        maxAge:  TRAIL_MAX_AGE,
+        isSmoke: false,
+      });
+    }
 
     // Atmosphere smoke — longer trail in dense air, fans at low velocity.
     if (densityRatio > 0.05) {
-      const smokeW = (isSRB ? 18 : 10) * densityRatio * (0.5 + effectiveThrottle * 0.5);
-      const smokeH = (isSRB ? 40 : 22) * densityRatio * (0.5 + effectiveThrottle * 0.5);
+      const smokeW = (isSRB ? 20 : 12) * densityRatio * (0.5 + effectiveThrottle * 0.5);
+      const smokeH = (isSRB ? 44 : 26) * densityRatio * (0.5 + effectiveThrottle * 0.5);
       const lateralSign = Math.random() < 0.5 ? 1 : -1;
       _trailSegments.push({
         worldX:  nozzle.x,
         worldY:  nozzle.y,
-        vx:      exVx * 0.5 + lateralSign * fanX * (0.3 + Math.random() * 0.7),
-        vy:      exVy * 0.5 + Math.abs(exVy) * 0.3 * fanFactor,
+        vx:      exVx * 0.45 + lateralSign * fanX * (0.3 + Math.random() * 0.7),
+        vy:      exVy * 0.45 + Math.abs(exVy) * 0.3 * fanFactor,
         age:     0,
         baseW:   smokeW,
         baseH:   smokeH,

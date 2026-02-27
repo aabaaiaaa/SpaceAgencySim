@@ -6,7 +6,7 @@
 
 import { initMainMenu } from './mainmenu.js';
 import { initHubUI, destroyHubUI } from './hub.js';
-import { initVabUI } from './vab.js';
+import { initVabUI, resetVabUI } from './vab.js';
 import { initCrewAdminUI, destroyCrewAdminUI } from './crewAdmin.js';
 import { initMissionControlUI, destroyMissionControlUI } from './missionControl.js';
 import { initLaunchPadUI, destroyLaunchPadUI } from './launchPad.js';
@@ -69,6 +69,7 @@ let _container = null;
 export function showMainMenu(container, onGameReady) {
   // Reset VAB state so a new game gets a fresh VAB session.
   _vabInitialized = false;
+  resetVabUI();
   initMainMenu(container, onGameReady);
   console.log('[UI] Main menu displayed');
 }
@@ -88,6 +89,8 @@ export function initUI(container, state) {
   _crewAdminOpen      = false;
   _missionControlOpen = false;
   _launchPadOpen      = false;
+  // Ensure a fresh VAB assembly for each new game session.
+  resetVabUI();
 
   // Mount the persistent top bar — visible on all in-game screens.
   initTopBar(container, state, {

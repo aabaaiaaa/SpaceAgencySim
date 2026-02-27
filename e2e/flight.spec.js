@@ -386,9 +386,54 @@ test.describe('Flight — Launch & Basic Flight', () => {
     await page.click('#topbar-menu-btn');
   });
 
-  // ── (8) "Return to Space Agency" brings up the post-flight summary ────────
+  // ── (8) TWR=1 button and ±0.1 throttle step buttons ─────────────────────
 
-  test('(8) clicking "Return to Space Agency" from the menu shows the post-flight summary', async () => {
+  test('(8) TWR=1 button sets throttle for unit thrust-to-weight ratio; ±0.1 buttons step throttle', async () => {
+    // Ensure throttle is at 100% before testing (direct mutation of physics state).
+    await page.evaluate(() => { if (window.__flightPs) window.__flightPs.throttle = 1.0; });
+    await expect(page.locator('#flight-hud-throttle-pct')).toContainText('100%', { timeout: 2_000 });
+
+    // The TWR=1 button is in the left panel's throttle section.
+    // Use { force: true } to click even if momentarily obscured by a dropdown, etc.
+    const twr1Btn = page.locator('.flight-lp-btn', { hasText: 'TWR=1' }).first();
+    await expect(twr1Btn).toBeVisible({ timeout: 2_000 });
+    await twr1Btn.click({ force: true });
+
+    // _setThrottleForTWR1 runs synchronously on click; read the result immediately.
+    // Expected: throttle = weight / maxThrust ≈ 2161 kg × 9.81 / 60000 N ≈ 0.35.
+    const throttleAfterTWR1 = await page.evaluate(() => window.__flightPs?.throttle ?? -1);
+    expect(throttleAfterTWR1).toBeGreaterThan(0);
+    expect(throttleAfterTWR1).toBeLessThan(1);
+
+    // HUD should reflect the new throttle value on the next animation frame.
+    const expectedPct = Math.round(throttleAfterTWR1 * 100);
+    await expect(page.locator('#flight-hud-throttle-pct')).toContainText(
+      `${expectedPct}%`,
+      { timeout: 2_000 },
+    );
+
+    // ── +0.1 button ────────────────────────────────────────────────────────
+    const plusBtn = page.locator('.flight-lp-btn', { hasText: '+0.1' }).first();
+    await expect(plusBtn).toBeVisible({ timeout: 2_000 });
+    await plusBtn.click({ force: true });
+
+    const throttleAfterPlus = await page.evaluate(() => window.__flightPs?.throttle ?? -1);
+    const expectedAfterPlus = Math.min(1, Math.round((throttleAfterTWR1 + 0.1) * 10) / 10);
+    expect(throttleAfterPlus).toBeCloseTo(expectedAfterPlus, 1);
+
+    // ── −0.1 button (uses Unicode minus sign U+2212) ───────────────────────
+    const minusBtn = page.locator('.flight-lp-btn', { hasText: '−0.1' }).first();
+    await expect(minusBtn).toBeVisible({ timeout: 2_000 });
+    await minusBtn.click({ force: true });
+
+    const throttleAfterMinus = await page.evaluate(() => window.__flightPs?.throttle ?? -1);
+    const expectedAfterMinus = Math.round((expectedAfterPlus - 0.1) * 10) / 10;
+    expect(throttleAfterMinus).toBeCloseTo(expectedAfterMinus, 1);
+  });
+
+  // ── (9) "Return to Space Agency" brings up the post-flight summary ────────
+
+  test('(9) clicking "Return to Space Agency" from the menu shows the post-flight summary', async () => {
     // Open the topbar dropdown (it was closed at the end of test 7).
     const dropdown = page.locator('#topbar-dropdown');
     if (!(await dropdown.isVisible())) {

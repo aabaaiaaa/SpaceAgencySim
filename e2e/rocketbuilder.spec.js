@@ -340,4 +340,57 @@ test.describe('VAB — Rocket Builder Flow', () => {
     await expect(cashEl).toBeVisible();
     await expect(cashEl).toContainText('1,985,200');
   });
+
+  // ── (10) Off-screen indicator appears/disappears as parts pan in/out ──────
+
+  test('(10) off-screen indicator appears when parts are panned out of view, disappears when visible', async () => {
+    // Close any open side panels so the canvas area returns to full width.
+    // After previous tests, staging and engineer panels may both be open.
+    const stagingClose  = page.locator('#vab-staging-close');
+    const engineerClose = page.locator('#vab-engineer-close');
+    if (await stagingClose.isVisible())  await stagingClose.click();
+    if (await engineerClose.isVisible()) await engineerClose.click();
+
+    // With no panels open, the canvas area starts at x = SCALE_BAR_W (50 px)
+    // and has width BUILD_W (950 px). Parts are at world x = 0, which maps to
+    // canvas-local x = camX + 0 = 475 — well inside the visible area.
+    // No off-screen indicators should be present.
+    const initialCount = await page.locator('.vab-offscreen-indicator').count();
+    expect(initialCount).toBe(0);
+
+    // Pan the camera 600 px to the right by dragging on empty canvas.
+    // Layout: global topbar 44 px, VAB toolbar 52 px, status bar 28 px → canvas
+    // area starts at y = 124. Drag start (200, 200) is safely inside the canvas
+    // (x ∈ [50, 1000], y > 124) and far from parts (centred at x ≈ 525).
+    // After a 600 px rightward pan: camX = 475 + 600 = 1075 > BUILD_W (950),
+    // so parts are off-screen to the right → indicators should appear.
+    const startX  = 200;
+    const startY  = 200;
+    const panDist = 600;
+
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX + panDist, startY, { steps: 20 });
+    await page.mouse.up();
+
+    // Wait for at least one off-screen indicator to appear.
+    await page.waitForFunction(
+      () => document.querySelectorAll('.vab-offscreen-indicator').length > 0,
+      { timeout: 2_000 },
+    );
+    const offCount = await page.locator('.vab-offscreen-indicator').count();
+    expect(offCount).toBeGreaterThanOrEqual(1);
+
+    // Pan back: drag the same distance in the opposite direction.
+    await page.mouse.move(startX + panDist, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX, startY, { steps: 20 });
+    await page.mouse.up();
+
+    // Indicators should disappear once parts are back in the visible area.
+    await page.waitForFunction(
+      () => document.querySelectorAll('.vab-offscreen-indicator').length === 0,
+      { timeout: 2_000 },
+    );
+  });
 });
