@@ -15,3 +15,4 @@
 
 export * from './constants.js';
 export * from './gameState.js';
+export * from './finance.js';

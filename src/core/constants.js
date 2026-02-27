@@ -130,14 +130,20 @@ export const FuelType = Object.freeze({
 // Starting / Default Values
 // ---------------------------------------------------------------------------
 
-/** Player's starting cash balance at a new game. */
-export const STARTING_MONEY = 10_000;
+/** Player's starting cash balance at a new game (equal to the initial loan proceeds). */
+export const STARTING_MONEY = 2_000_000;
 
-/** Starting loan balance (no debt by default). */
-export const STARTING_LOAN_BALANCE = 0;
+/** Starting loan balance — players begin the game $2 million in debt. */
+export const STARTING_LOAN_BALANCE = 2_000_000;
 
-/** Annual interest rate applied to outstanding loans (5 %). */
-export const DEFAULT_LOAN_INTEREST_RATE = 0.05;
+/** Per-mission interest rate applied to the outstanding loan (3 %). */
+export const DEFAULT_LOAN_INTEREST_RATE = 0.03;
+
+/** Fine per astronaut killed in action (deducted from cash). */
+export const DEATH_FINE_PER_ASTRONAUT = 500_000;
+
+/** Maximum cumulative loan balance the player may carry. */
+export const MAX_LOAN_BALANCE = 10_000_000;
 
 /** Maximum number of crew members the player can hire. */
 export const MAX_CREW_SIZE = 20;

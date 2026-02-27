@@ -80,7 +80,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-005: Financial System
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-002
 - **Description**: Implement the financial system in `/src/core/finance.js`. Starting values: loan balance $2,000,000, starting cash $2,000,000 (the loan proceeds), interest rate 3% per completed mission. After each mission is completed and the player returns to the space agency, apply interest: `loanBalance *= 1.03`. Functions: `applyInterest()`, `payDownLoan(amount)` (reduces balance, deducts from cash, cannot exceed balance or available cash), `borrowMore(amount)` (increases balance and cash, max borrow limit $10,000,000 total), `spend(amount)` (returns false if insufficient funds), `earn(amount)`, `applyDeathFine()` ($500,000 per astronaut KIA, deducted from cash). Enforce that cash cannot go below $0 for spend operations. The loan does not have a due date — the game does not end if you owe money — but interest accumulates every mission indefinitely.
