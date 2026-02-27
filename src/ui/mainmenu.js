@@ -220,6 +220,12 @@ const MENU_STYLES = `
   margin: 0 0 4px;
 }
 
+.mm-save-card-agency {
+  font-size: 0.82rem;
+  color: #88bce8;
+  margin: 0 0 4px;
+}
+
 .mm-save-card-date {
   font-size: 0.75rem;
   color: #5c7a94;
@@ -621,6 +627,7 @@ function _buildSaveCard(summary) {
 
   card.innerHTML = `
     <p class="mm-save-card-name">${_escapeHtml(summary.saveName)}</p>
+    ${summary.agencyName ? `<p class="mm-save-card-agency" data-agency-name="${_escapeHtml(summary.agencyName)}">${_escapeHtml(summary.agencyName)}</p>` : ''}
     <p class="mm-save-card-date">Saved ${formatDate(summary.timestamp)}</p>
     <div class="mm-save-card-stats">
       <div class="mm-stat">

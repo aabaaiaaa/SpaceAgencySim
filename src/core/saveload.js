@@ -77,6 +77,7 @@ export function _setSessionStartTimeForTesting(timestampMs) {
  * @typedef {Object} SaveSlotSummary
  * @property {number}  slotIndex            - Slot index (0–4).
  * @property {string}  saveName             - Player-assigned label.
+ * @property {string}  agencyName           - Player's agency name.
  * @property {string}  timestamp            - ISO 8601 date/time of the save.
  * @property {number}  missionsCompleted    - Count of completed missions.
  * @property {number}  money                - Cash balance at save time.
@@ -151,6 +152,7 @@ function summaryFromEnvelope(slotIndex, envelope) {
   return {
     slotIndex,
     saveName: envelope.saveName,
+    agencyName: s.agencyName ?? '',
     timestamp: envelope.timestamp,
     missionsCompleted: s.missions?.completed?.length ?? 0,
     money: s.money ?? 0,

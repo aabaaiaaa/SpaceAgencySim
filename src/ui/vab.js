@@ -56,6 +56,11 @@ import {
   validateStagingConfig,
   fireStagingStep,
 } from '../core/rocketbuilder.js';
+import {
+  listSaves,
+  saveGame,
+  SAVE_SLOT_COUNT,
+} from '../core/saveload.js';
 
 // ---------------------------------------------------------------------------
 // Module-level state (VAB session)
@@ -858,6 +863,159 @@ const VAB_CSS = `
   color: #3a6080;
   line-height: 1.7;
 }
+
+/* ── Game menu dropdown ──────────────────────────────────────────────── */
+#vab-game-menu {
+  position: fixed;
+  z-index: 300;
+  background: rgba(4, 8, 22, 0.99);
+  border: 1px solid #1e3a5c;
+  border-radius: 3px;
+  padding: 4px 0;
+  box-shadow: 2px 6px 24px rgba(0,0,0,.9);
+  min-width: 160px;
+}
+#vab-game-menu[hidden] {
+  display: none;
+}
+.vab-game-menu-item {
+  display: block;
+  width: 100%;
+  padding: 8px 16px;
+  font-size: 11px;
+  font-family: 'Courier New', Courier, monospace;
+  color: #a8c8e8;
+  cursor: pointer;
+  background: none;
+  border: none;
+  text-align: left;
+  white-space: nowrap;
+  box-sizing: border-box;
+  letter-spacing: .04em;
+}
+.vab-game-menu-item:hover {
+  background: rgba(14, 38, 74, 0.8);
+  color: #c8e4ff;
+}
+
+/* ── Save game dialog ────────────────────────────────────────────────── */
+#vab-save-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.72);
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#vab-save-backdrop[hidden] {
+  display: none;
+}
+#vab-save-dialog {
+  background: rgba(4, 8, 22, 0.99);
+  border: 1px solid #1e3a5c;
+  border-radius: 3px;
+  box-shadow: 0 8px 48px rgba(0,0,0,.9);
+  width: 480px;
+  max-width: 95vw;
+  font-family: 'Courier New', Courier, monospace;
+}
+.vab-save-dlg-hdr {
+  padding: 12px 16px;
+  border-bottom: 1px solid #0e1e30;
+  font-size: 12px;
+  font-weight: 700;
+  color: #88b4d0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.vab-save-dlg-body {
+  padding: 16px;
+}
+.vab-save-slots-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.vab-save-slot-btn {
+  background: rgba(8, 18, 40, 0.9);
+  border: 1px solid #1a3050;
+  border-radius: 3px;
+  padding: 10px 12px;
+  color: #5a88a8;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 10px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color .1s, background .1s;
+  line-height: 1.4;
+}
+.vab-save-slot-btn:hover {
+  border-color: #2a5080;
+  background: rgba(14, 30, 60, 0.9);
+  color: #88c0e0;
+}
+.vab-save-slot-btn.selected {
+  border-color: #3a80c8;
+  background: rgba(20, 50, 100, 0.6);
+  color: #c8e4ff;
+}
+.vab-save-slot-name {
+  font-weight: 700;
+  color: #88b4d0;
+  margin-bottom: 3px;
+}
+.vab-save-slot-btn.selected .vab-save-slot-name {
+  color: #c8e4ff;
+}
+.vab-save-slot-empty {
+  color: #3a5870;
+  font-style: italic;
+}
+.vab-save-name-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.vab-save-name-label {
+  font-size: 9px;
+  color: #3a6080;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+}
+#vab-save-name-input {
+  background: rgba(8, 18, 40, 0.9);
+  border: 1px solid #1a3050;
+  border-radius: 2px;
+  padding: 7px 10px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 11px;
+  color: #a8c8e8;
+  outline: none;
+}
+#vab-save-name-input:focus {
+  border-color: #3470a8;
+}
+.vab-save-dlg-footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 10px 16px;
+  border-top: 1px solid #0e1e30;
+}
+#vab-save-confirmation {
+  font-size: 10px;
+  color: #42cc74;
+  flex: 1;
+  min-height: 14px;
+}
+#vab-save-confirmation.error {
+  color: #e06060;
+}
 `;
 
 // ---------------------------------------------------------------------------
@@ -1214,6 +1372,226 @@ function _showPartContextMenu(placed, clientX, clientY) {
 }
 
 // ---------------------------------------------------------------------------
+// Game menu dropdown + Save Game dialog
+// ---------------------------------------------------------------------------
+
+/** Game menu dropdown element. @type {HTMLElement | null} */
+let _gameMenu = null;
+
+/** Save dialog backdrop element. @type {HTMLElement | null} */
+let _saveBackdrop = null;
+
+/** Currently selected save slot index in the save dialog. @type {number | null} */
+let _selectedSaveSlot = null;
+
+/**
+ * Create and append the game-menu dropdown and save dialog elements.
+ */
+function _initGameMenu() {
+  // ── Dropdown menu ──────────────────────────────────────────────────────────
+  _gameMenu = document.createElement('div');
+  _gameMenu.id = 'vab-game-menu';
+  _gameMenu.setAttribute('hidden', '');
+  _gameMenu.innerHTML =
+    `<button class="vab-game-menu-item" id="vab-menu-save-game" type="button">Save Game</button>`;
+  document.body.appendChild(_gameMenu);
+
+  _gameMenu.querySelector('#vab-menu-save-game')?.addEventListener('click', () => {
+    _gameMenu.setAttribute('hidden', '');
+    _openSaveDialog();
+  });
+
+  // Clicking outside the menu closes it.
+  document.addEventListener('pointerdown', (e) => {
+    if (_gameMenu && !_gameMenu.hasAttribute('hidden') &&
+        !_gameMenu.contains(/** @type {Node} */ (e.target))) {
+      // Only hide if the click is NOT on the menu button itself (the button
+      // handler will toggle it separately).
+      const menuBtn = document.getElementById('vab-btn-menu');
+      if (!menuBtn || !menuBtn.contains(/** @type {Node} */ (e.target))) {
+        _gameMenu.setAttribute('hidden', '');
+      }
+    }
+  }, { capture: true });
+
+  // ── Save dialog backdrop ───────────────────────────────────────────────────
+  _saveBackdrop = document.createElement('div');
+  _saveBackdrop.id = 'vab-save-backdrop';
+  _saveBackdrop.setAttribute('hidden', '');
+  _saveBackdrop.innerHTML = `
+    <div id="vab-save-dialog" role="dialog" aria-modal="true">
+      <div class="vab-save-dlg-hdr">
+        <span>Save Game</span>
+        <button class="vab-ctx-item" id="vab-save-close-btn"
+                style="padding:2px 8px;font-size:12px" type="button">&#x2715;</button>
+      </div>
+      <div class="vab-save-dlg-body">
+        <div class="vab-save-slots-grid" id="vab-save-slots-grid">
+          <!-- Slot buttons rendered by _renderSaveSlots() -->
+        </div>
+        <div class="vab-save-name-row">
+          <label class="vab-save-name-label" for="vab-save-name-input">Save Name</label>
+          <input id="vab-save-name-input" type="text" maxlength="48"
+                 placeholder="Enter save name…" autocomplete="off" />
+        </div>
+      </div>
+      <div class="vab-save-dlg-footer">
+        <span id="vab-save-confirmation"></span>
+        <button class="vab-btn" id="vab-save-cancel-btn" type="button">Cancel</button>
+        <button class="vab-btn vab-btn-launch" id="vab-save-confirm-btn"
+                type="button" disabled>Save</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(_saveBackdrop);
+
+  // Wire close / cancel.
+  _saveBackdrop.querySelector('#vab-save-close-btn')?.addEventListener('click', _closeSaveDialog);
+  _saveBackdrop.querySelector('#vab-save-cancel-btn')?.addEventListener('click', _closeSaveDialog);
+
+  // Close on backdrop click.
+  _saveBackdrop.addEventListener('pointerdown', (e) => {
+    if (e.target === _saveBackdrop) _closeSaveDialog();
+  });
+
+  // Enable the Save button only when a slot is selected.
+  const nameInput  = /** @type {HTMLInputElement} */ (_saveBackdrop.querySelector('#vab-save-name-input'));
+  const confirmBtn = /** @type {HTMLButtonElement} */ (_saveBackdrop.querySelector('#vab-save-confirm-btn'));
+
+  nameInput?.addEventListener('input', () => {
+    if (confirmBtn) confirmBtn.disabled = _selectedSaveSlot === null;
+  });
+
+  confirmBtn?.addEventListener('click', () => {
+    if (_selectedSaveSlot === null || !_gameState) return;
+    const saveName = nameInput.value.trim() || (_gameState.agencyName || 'New Save');
+    try {
+      saveGame(_gameState, _selectedSaveSlot, saveName);
+      const confirmEl = _saveBackdrop.querySelector('#vab-save-confirmation');
+      if (confirmEl) {
+        confirmEl.className = '';
+        confirmEl.textContent = `Saved to Slot ${_selectedSaveSlot + 1}!`;
+      }
+      // Refresh slots to reflect new save.
+      _renderSaveSlots();
+      // Briefly show confirmation then close.
+      setTimeout(_closeSaveDialog, 1200);
+    } catch (err) {
+      const confirmEl = _saveBackdrop.querySelector('#vab-save-confirmation');
+      if (confirmEl) {
+        confirmEl.className = 'error';
+        confirmEl.textContent = `Save failed: ${err.message}`;
+      }
+    }
+  });
+}
+
+/**
+ * Toggle the game-menu dropdown open/closed below the given button.
+ * @param {HTMLElement} btn  The button that was clicked.
+ */
+function _toggleGameMenu(btn) {
+  if (!_gameMenu) return;
+  if (!_gameMenu.hasAttribute('hidden')) {
+    _gameMenu.setAttribute('hidden', '');
+    return;
+  }
+  // Position below the button.
+  const box = btn.getBoundingClientRect();
+  _gameMenu.style.top  = `${box.bottom + 4}px`;
+  _gameMenu.style.left = `${box.left}px`;
+  _gameMenu.removeAttribute('hidden');
+}
+
+/**
+ * Open the save-game dialog, refreshing slot data.
+ */
+function _openSaveDialog() {
+  if (!_saveBackdrop) return;
+  _selectedSaveSlot = null;
+  // Pre-populate save name with agency name.
+  const nameInput = /** @type {HTMLInputElement} */ (_saveBackdrop.querySelector('#vab-save-name-input'));
+  if (nameInput) nameInput.value = (_gameState?.agencyName) || '';
+  // Clear confirmation.
+  const confirmEl = _saveBackdrop.querySelector('#vab-save-confirmation');
+  if (confirmEl) { confirmEl.className = ''; confirmEl.textContent = ''; }
+  // Disable save button (no slot selected yet).
+  const confirmBtn = /** @type {HTMLButtonElement} */ (_saveBackdrop.querySelector('#vab-save-confirm-btn'));
+  if (confirmBtn) confirmBtn.disabled = true;
+
+  _renderSaveSlots();
+  _saveBackdrop.removeAttribute('hidden');
+}
+
+/**
+ * Close the save-game dialog.
+ */
+function _closeSaveDialog() {
+  if (_saveBackdrop) _saveBackdrop.setAttribute('hidden', '');
+  _selectedSaveSlot = null;
+}
+
+/**
+ * Re-render the slot picker grid inside the save dialog.
+ */
+function _renderSaveSlots() {
+  const grid = _saveBackdrop?.querySelector('#vab-save-slots-grid');
+  if (!grid) return;
+
+  const saves = listSaves();
+  const frags = [];
+
+  for (let i = 0; i < SAVE_SLOT_COUNT; i++) {
+    const s = saves[i];
+    const selected = _selectedSaveSlot === i ? ' selected' : '';
+    if (s) {
+      const money = '$' + Math.round(s.money).toLocaleString('en-US');
+      frags.push(
+        `<button class="vab-save-slot-btn${selected}" data-save-slot="${i}" type="button">` +
+          `<div class="vab-save-slot-name">${_escSave(s.saveName)}</div>` +
+          `<div>${_escSave(s.agencyName || '')}</div>` +
+          `<div>${money} · ${s.missionsCompleted} missions</div>` +
+        `</button>`
+      );
+    } else {
+      frags.push(
+        `<button class="vab-save-slot-btn${selected}" data-save-slot="${i}" type="button">` +
+          `<span class="vab-save-slot-empty">Empty Slot ${i + 1}</span>` +
+        `</button>`
+      );
+    }
+  }
+
+  grid.innerHTML = frags.join('');
+
+  // Wire slot selection.
+  grid.querySelectorAll('[data-save-slot]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      _selectedSaveSlot = Number(/** @type {HTMLElement} */ (btn).dataset.saveSlot);
+      // Refresh selection styling.
+      grid.querySelectorAll('[data-save-slot]').forEach((b) => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      // Enable save button now that a slot is chosen.
+      const confirmBtn = /** @type {HTMLButtonElement} */ (_saveBackdrop?.querySelector('#vab-save-confirm-btn'));
+      if (confirmBtn) confirmBtn.disabled = false;
+    });
+  });
+}
+
+/**
+ * Escape a string for use in slot HTML.
+ * @param {string} s
+ * @returns {string}
+ */
+function _escSave(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ---------------------------------------------------------------------------
 // Canvas panning, zooming, part drag & context menu
 // ---------------------------------------------------------------------------
 
@@ -1330,6 +1708,11 @@ function _bindButtons(root) {
     engineerPanel?.setAttribute('hidden', '');
     stagingPanel?.setAttribute('hidden', '');
   };
+
+  // ── "Menu" button — opens game menu dropdown ─────────────────────────────
+  root.querySelector('#vab-btn-menu')?.addEventListener('click', (e) => {
+    _toggleGameMenu(/** @type {HTMLElement} */ (e.currentTarget));
+  });
 
   // ── "View Accepted Missions" toggle ──────────────────────────────────────
   root.querySelector('#vab-btn-missions')?.addEventListener('click', () => {
@@ -1911,6 +2294,9 @@ export function initVabUI(container, state) {
         <span class="vab-cash-value" id="vab-cash">${fmt$(state.money)}</span>
       </div>
       <div class="vab-toolbar-btns">
+        <button class="vab-btn" id="vab-btn-menu" type="button">
+          Menu
+        </button>
         <button class="vab-btn" id="vab-btn-missions" type="button">
           View Accepted Missions
         </button>
@@ -2038,6 +2424,9 @@ export function initVabUI(container, state) {
 
   // ── Context menu ───────────────────────────────────────────────────────────
   _initContextMenu();
+
+  // ── Game menu + Save dialog ────────────────────────────────────────────────
+  _initGameMenu();
 
   // ── Toolbar buttons ────────────────────────────────────────────────────────
   _bindButtons(root);

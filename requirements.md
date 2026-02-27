@@ -450,7 +450,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-049: E2E — Save & Load Flow
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-006, TASK-007, TASK-036
 - **Description**: Write Playwright tests in `/e2e/saveload.spec.js`. Tests: (1) From the hub, opening the menu and clicking "Save Game" shows a slot picker with 5 slots. (2) Saving to slot 0 with a name succeeds and shows a confirmation. (3) Navigating to the app root after saving shows the load screen with the save listed, including the correct agency name and stats (cash, missions completed). (4) Clicking "Load" on the saved slot returns to the hub with the correct game state (cash matches, agency name matches). (5) Deleting a save slot removes it from the load screen list. (6) After deleting the only save, navigating to the app root shows the New Game screen instead of the load screen. (7) Exporting a save produces a file download (Playwright intercepts the download and verifies it is valid JSON containing a `money` field). All tests must pass with `playwright test`.
