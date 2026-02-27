@@ -7,8 +7,10 @@
 import { initMainMenu } from './mainmenu.js';
 import { initHubUI, destroyHubUI } from './hub.js';
 import { initVabUI } from './vab.js';
+import { initCrewAdminUI, destroyCrewAdminUI } from './crewAdmin.js';
 import { initTopBar, destroyTopBar } from './topbar.js';
 import { showVabScene } from '../render/vab.js';
+import { showHubScene } from '../render/hub.js';
 
 // ---------------------------------------------------------------------------
 // Screen routing state
@@ -20,6 +22,12 @@ import { showVabScene } from '../render/vab.js';
  * hub later.
  */
 let _vabInitialized = false;
+
+/**
+ * True while the Crew Admin screen is open.
+ * Used to guard against double-mounting.
+ */
+let _crewAdminOpen = false;
 
 /**
  * The #ui-overlay container, stored so _handleExitToMenu can re-mount the
@@ -61,6 +69,7 @@ export function showMainMenu(container, onGameReady) {
 export function initUI(container, state) {
   _container = container;
   _vabInitialized = false;
+  _crewAdminOpen  = false;
 
   // Mount the persistent top bar — visible on all in-game screens.
   initTopBar(container, state, {
@@ -86,6 +95,10 @@ export function initUI(container, state) {
 function _handleExitToMenu() {
   destroyTopBar();
   destroyHubUI(); // no-op if hub is not the current screen
+  if (_crewAdminOpen) {
+    destroyCrewAdminUI();
+    _crewAdminOpen = false;
+  }
 
   // Wipe any remaining screen overlays from the container.
   if (_container) {
@@ -133,6 +146,29 @@ function _handleNavigation(container, state, destination) {
     return;
   }
 
-  // Other building screens are not yet implemented (TASK-011, TASK-014, etc.).
+  if (destination === 'crew-admin') {
+    // Tear down the hub overlay and show the Crew Admin screen.
+    destroyHubUI();
+
+    if (!_crewAdminOpen) {
+      initCrewAdminUI(container, state, {
+        onBack: () => {
+          // Crew Admin has already destroyed itself; re-show the hub.
+          _crewAdminOpen = false;
+          showHubScene();
+          initHubUI(container, state, (dest) => {
+            _handleNavigation(container, state, dest);
+          });
+          console.log('[UI] Returned to hub from Crew Admin');
+        },
+      });
+      _crewAdminOpen = true;
+    }
+
+    console.log('[UI] Navigated to Crew Admin');
+    return;
+  }
+
+  // Other building screens are not yet implemented (TASK-014, etc.).
   console.log(`[UI] Navigation to '${destination}' is not yet implemented.`);
 }

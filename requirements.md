@@ -128,7 +128,7 @@ A browser-based 2D space agency simulation game with pixel art visuals (placehol
 ---
 
 ### TASK-011: Crew Administration Building
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-010, TASK-008
 - **Description**: UI screen for the Crew Administration building. Three tabs: Active Crew, Hire, History. Active Crew tab lists all astronauts with status 'active', showing name, missions flown, flights flown, and a "Fire" button per astronaut. Hire tab shows a "Hire Astronaut" form with a name field (auto-generates a random name if left blank) and the hire cost ($50,000). Displays current cash so player can see affordability. History tab lists all crew ever hired (active, fired, and KIA), sorted by hire date descending. KIA entries are visually distinguished (red text or a skull marker). Each row shows: name, hire date, missions flown, status, and for KIA: date and cause.
