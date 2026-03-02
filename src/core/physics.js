@@ -53,6 +53,7 @@ import {
 } from './atmosphere.js';
 import { tickFuelSystem } from './fuelsystem.js';
 import { activateCurrentStage, tickDebris } from './staging.js';
+import { tickCollisions } from './collision.js';
 import {
   initParachuteStates,
   tickParachutes,
@@ -105,6 +106,28 @@ const CHUTE_DRAG_MULTIPLIER = 80;
 
 /** Landing speed below which a contact is considered "safe" (m/s). */
 const DEFAULT_SAFE_LANDING_SPEED = 10;
+
+// -- Ground tipping constants ------------------------------------------------
+/** N·m of torque applied by player A/D input while grounded. */
+const PLAYER_TIP_TORQUE = 50_000;
+/** Angle (radians) past which a grounded tipping rocket crashes (~80°). */
+const TOPPLE_CRASH_ANGLE = Math.PI * 0.44;
+/** Per-tick angular velocity damping while tipping on the ground. */
+const GROUND_ANGULAR_DAMPING = 0.98;
+/** Angle threshold below which a near-upright rocket snaps to 0. */
+const TILT_SNAP_THRESHOLD = 0.005;
+/** Angular velocity threshold below which snap to 0. */
+const ANGULAR_VEL_SNAP_THRESHOLD = 0.01;
+
+// -- Airborne torque-based rotation constants --------------------------------
+/** N·m of torque applied by player A/D input while airborne. */
+const PLAYER_FLIGHT_TORQUE = 2000;
+/** Torque multiplier when in vacuum with RCS-capable command module. */
+const RCS_TORQUE_MULTIPLIER = 2.5;
+/** Angular damping coefficient in atmosphere (proportional to density). */
+const AERO_ANGULAR_DAMPING = 0.02;
+/** Active RCS braking torque (N·m per rad/s) when keys released. */
+const RCS_ANGULAR_DAMPING = 3.0;
 
 // ---------------------------------------------------------------------------
 // Type Definitions (JSDoc)
@@ -159,6 +182,11 @@ const DEFAULT_SAFE_LANDING_SPEED = 10;
  * @property {import('./staging.js').DebrisState[]} debris  Jettisoned stage
  *   fragments that continue to be simulated independently.  New entries are
  *   appended whenever a decoupler fires via {@link fireNextStage}.
+ * @property {number}          angularVelocity  Angular velocity (rad/s; positive = clockwise).
+ * @property {boolean}         isTipping     True when tilted on ground — rotation is around
+ *                                           the ground contact point rather than centre of mass.
+ * @property {number}          tippingContactX  Ground contact pivot X in VAB local pixels.
+ * @property {number}          tippingContactY  Ground contact pivot Y in VAB local pixels.
  * @property {Set<string>}     _heldKeys     Keys currently held down (for continuous steering).
  * @property {number}          _accumulator  Leftover simulation time from the previous frame.
  */
@@ -218,6 +246,10 @@ export function createPhysicsState(assembly, flightState) {
     landed: false,
     crashed: false,
     grounded: true,
+    angularVelocity: 0,
+    isTipping: false,
+    tippingContactX: 0,
+    tippingContactY: 0,
     _heldKeys: new Set(),
     _accumulator: 0,
   };
@@ -267,7 +299,45 @@ export function createPhysicsState(assembly, flightState) {
  * @param {number}  [timeWarp=1]   Time-acceleration multiplier.
  */
 export function tick(ps, assembly, stagingConfig, flightState, realDeltaTime, timeWarp = 1) {
-  if (ps.landed || ps.crashed || flightState.aborted) return;
+  // Allow re-liftoff from a landed state when engines are producing thrust.
+  if (ps.landed && ps.firingEngines.size > 0 && ps.throttle > 0) {
+    ps.landed = false;
+    ps.grounded = true;
+  }
+
+  if (ps.crashed || flightState.aborted) return;
+
+  // When landed: run tipping physics if the rocket is tilted or player is pressing A/D.
+  if (ps.landed) {
+    const left  = ps._heldKeys.has('a') || ps._heldKeys.has('ArrowLeft');
+    const right = ps._heldKeys.has('d') || ps._heldKeys.has('ArrowRight');
+    const needsTipping = ps.isTipping || left || right ||
+      Math.abs(ps.angle) > TILT_SNAP_THRESHOLD ||
+      Math.abs(ps.angularVelocity) > ANGULAR_VEL_SNAP_THRESHOLD;
+
+    if (needsTipping) {
+      ps._accumulator += realDeltaTime * timeWarp;
+      while (ps._accumulator >= FIXED_DT) {
+        ps._accumulator -= FIXED_DT;
+        _applyGroundedSteering(ps, assembly, left, right, FIXED_DT);
+        _checkToppleCrash(ps, assembly, flightState);
+        flightState.timeElapsed += FIXED_DT;
+
+        // Advance debris while tipping.
+        for (const debris of ps.debris) {
+          tickDebris(debris, assembly, FIXED_DT);
+        }
+        tickCollisions(ps, assembly, FIXED_DT);
+
+        if (ps.crashed) break;
+      }
+      if (ps._accumulator > FIXED_DT * 10) {
+        ps._accumulator = FIXED_DT * 10;
+      }
+      _syncFlightState(ps, assembly, flightState);
+    }
+    return;
+  }
 
   // Scale real time by the warp factor and add to the accumulator.
   ps._accumulator += realDeltaTime * timeWarp;
@@ -282,6 +352,7 @@ export function tick(ps, assembly, stagingConfig, flightState, realDeltaTime, ti
     for (const debris of ps.debris) {
       tickDebris(debris, assembly, FIXED_DT);
     }
+    tickCollisions(ps, assembly, FIXED_DT);
 
     // Stop integrating if the flight has ended this step.
     if (ps.landed || ps.crashed) break;
@@ -368,7 +439,13 @@ export function handleKeyUp(ps, key) {
  * @param {import('./gameState.js').FlightState}         flightState
  */
 export function fireNextStage(ps, assembly, stagingConfig, flightState) {
-  if (ps.landed || ps.crashed || flightState.aborted) return;
+  if (ps.crashed || flightState.aborted) return;
+
+  // Allow staging while landed — transition to grounded so physics resumes.
+  if (ps.landed) {
+    ps.landed = false;
+    ps.grounded = true;
+  }
 
   const newDebris = activateCurrentStage(ps, assembly, stagingConfig, flightState);
   ps.debris.push(...newDebris);
@@ -431,6 +508,12 @@ function _integrate(ps, assembly, flightState) {
   // --- 7. Continuous steering ----------------------------------------------
   _applySteering(ps, assembly, altitude, FIXED_DT);
 
+  // --- 7b. Topple-crash check (grounded tipping) -------------------------
+  if (ps.grounded) {
+    _checkToppleCrash(ps, assembly, flightState);
+    if (ps.crashed) return;
+  }
+
   // --- 8. Fuel consumption (segment-aware, via fuelsystem.js) -------------
   tickFuelSystem(ps, assembly, FIXED_DT, density);
 
@@ -460,6 +543,7 @@ function _integrate(ps, assembly, flightState) {
   // --- 10. Liftoff detection -----------------------------------------------
   if (ps.grounded && ps.posY > 0) {
     ps.grounded = false;
+    ps.isTipping = false;
   }
 
   // --- 11. Ground clamping and landing detection ---------------------------
@@ -505,6 +589,121 @@ function _computeTotalMass(ps, assembly) {
   }
 
   return Math.max(1, mass);
+}
+
+// ---------------------------------------------------------------------------
+// Tipping geometry helpers (private)
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute the centre of mass in VAB local pixel coordinates.
+ *
+ * @param {PhysicsState}                               ps
+ * @param {import('./rocketbuilder.js').RocketAssembly} assembly
+ * @returns {{ x: number, y: number }}  CoM in VAB pixels (Y-up).
+ */
+function _computeCoMLocal(ps, assembly) {
+  let totalMass = 0;
+  let comX = 0;
+  let comY = 0;
+
+  for (const instanceId of ps.activeParts) {
+    const placed = assembly.parts.get(instanceId);
+    if (!placed) continue;
+    const def = getPartById(placed.partId);
+    if (!def) continue;
+    const fuelMass = ps.fuelStore.get(instanceId) ?? 0;
+    const mass = (def.mass ?? 1) + fuelMass;
+    comX += placed.x * mass;
+    comY += placed.y * mass;
+    totalMass += mass;
+  }
+
+  if (totalMass > 0) {
+    return { x: comX / totalMass, y: comY / totalMass };
+  }
+  return { x: 0, y: 0 };
+}
+
+/**
+ * Find the ground contact point (lowest corner) in the tilt direction.
+ *
+ * Scans active parts for the lowest bottom edge, then picks the most extreme
+ * X in the tilt direction at that level.  Landing legs widen the support base.
+ *
+ * @param {PhysicsState}                               ps
+ * @param {import('./rocketbuilder.js').RocketAssembly} assembly
+ * @param {number} tiltDirection  +1 for rightward tilt, -1 for leftward.
+ * @returns {{ x: number, y: number }}  Contact point in VAB pixels.
+ */
+function _computeGroundContactPoint(ps, assembly, tiltDirection) {
+  let lowestY = Infinity;
+  let bestX = 0;
+
+  for (const instanceId of ps.activeParts) {
+    const placed = assembly.parts.get(instanceId);
+    if (!placed) continue;
+    const def = getPartById(placed.partId);
+    if (!def) continue;
+
+    const halfH = (def.height ?? 40) / 2;
+    let halfW = (def.width ?? 40) / 2;
+
+    // Deployed landing legs widen the effective footprint.
+    if (
+      (def.type === PartType.LANDING_LEGS || def.type === PartType.LANDING_LEG) &&
+      ps.legStates?.get(instanceId)?.state === 'deployed'
+    ) {
+      halfW *= 1.5;
+    }
+
+    const bottomY = placed.y - halfH;
+
+    if (bottomY < lowestY - 0.5) {
+      // New lowest level — reset.
+      lowestY = bottomY;
+      bestX = placed.x + tiltDirection * halfW;
+    } else if (bottomY < lowestY + 0.5) {
+      // Same level — pick further out in the tilt direction.
+      const candidateX = placed.x + tiltDirection * halfW;
+      if (tiltDirection > 0 ? candidateX > bestX : candidateX < bestX) {
+        bestX = candidateX;
+      }
+    }
+  }
+
+  // Guard: no valid parts found — return origin.
+  if (!isFinite(lowestY)) return { x: 0, y: 0 };
+  return { x: bestX, y: lowestY };
+}
+
+/**
+ * Compute the moment of inertia about a given pivot point (point-mass approx).
+ *
+ * I = sum(m_i × r_i²) where r_i is the distance from each part's centre to
+ * the pivot, converted to metres.
+ *
+ * @param {PhysicsState}                               ps
+ * @param {import('./rocketbuilder.js').RocketAssembly} assembly
+ * @param {{ x: number, y: number }} pivot  Pivot in VAB local pixels.
+ * @returns {number}  Moment of inertia in kg·m² (minimum 1).
+ */
+function _computeMomentOfInertia(ps, assembly, pivot) {
+  let I = 0;
+
+  for (const instanceId of ps.activeParts) {
+    const placed = assembly.parts.get(instanceId);
+    if (!placed) continue;
+    const def = getPartById(placed.partId);
+    if (!def) continue;
+    const fuelMass = ps.fuelStore.get(instanceId) ?? 0;
+    const mass = (def.mass ?? 1) + fuelMass;
+    const dx = (placed.x - pivot.x) * SCALE_M_PER_PX;
+    const dy = (placed.y - pivot.y) * SCALE_M_PER_PX;
+    I += mass * (dx * dx + dy * dy);
+  }
+
+  return Math.max(1, I);
 }
 
 // ---------------------------------------------------------------------------
@@ -665,8 +864,8 @@ function _computeDragForce(ps, assembly, density, speed) {
 /**
  * Apply continuous steering inputs from held A/D (or arrow) keys.
  *
- * Turn rate is BASE_TURN_RATE radians/s, boosted by RCS_TURN_MULTIPLIER when
- * in vacuum AND the rocket has an RCS-capable command module.
+ * Torque-based rotation: heavier/longer rockets turn slower.
+ * When grounded, delegates to `_applyGroundedSteering` for tipping physics.
  *
  * @param {PhysicsState}                               ps
  * @param {import('./rocketbuilder.js').RocketAssembly} assembly
@@ -676,16 +875,154 @@ function _computeDragForce(ps, assembly, density, speed) {
 function _applySteering(ps, assembly, altitude, dt) {
   const left  = ps._heldKeys.has('a') || ps._heldKeys.has('ArrowLeft');
   const right = ps._heldKeys.has('d') || ps._heldKeys.has('ArrowRight');
-  if (!left && !right) return;
 
-  // Base turn rate, optionally boosted by RCS in vacuum.
-  let turnRate = BASE_TURN_RATE;
-  if (altitude > ATMOSPHERE_TOP && _hasRcs(ps, assembly)) {
-    turnRate *= RCS_TURN_MULTIPLIER;
+  // Grounded or landed: delegate to tipping physics (always runs for gravity torque).
+  if (ps.grounded || ps.landed) {
+    _applyGroundedSteering(ps, assembly, left, right, dt);
+    return;
   }
 
-  if (left)  ps.angle -= turnRate * dt;
-  if (right) ps.angle += turnRate * dt;
+  // --- Airborne torque-based rotation ---
+  const com = _computeCoMLocal(ps, assembly);
+  const I = _computeMomentOfInertia(ps, assembly, com);
+
+  // Player input torque.
+  let torque = 0;
+  let baseTorque = PLAYER_FLIGHT_TORQUE;
+  if (altitude > ATMOSPHERE_TOP && _hasRcs(ps, assembly)) {
+    baseTorque *= RCS_TORQUE_MULTIPLIER;
+  }
+  if (right) torque += baseTorque;
+  if (left)  torque -= baseTorque;
+
+  // Angular acceleration.
+  const alpha = torque / I;
+  ps.angularVelocity += alpha * dt;
+
+  // Damping (when no input).
+  if (!left && !right) {
+    const density = airDensity(Math.max(0, ps.posY));
+    // Aerodynamic damping (proportional to density).
+    const aeroDamping = AERO_ANGULAR_DAMPING * density;
+    ps.angularVelocity -= aeroDamping * ps.angularVelocity * dt;
+
+    // RCS active braking in vacuum.
+    if (altitude > ATMOSPHERE_TOP && _hasRcs(ps, assembly)) {
+      const rcsBrake = RCS_ANGULAR_DAMPING * ps.angularVelocity / I;
+      // Don't overshoot zero.
+      if (Math.abs(rcsBrake * dt) > Math.abs(ps.angularVelocity)) {
+        ps.angularVelocity = 0;
+      } else {
+        ps.angularVelocity -= rcsBrake * dt;
+      }
+    }
+  }
+
+  ps.angle += ps.angularVelocity * dt;
+}
+
+/**
+ * Apply ground-contact tipping physics.
+ *
+ * When the rocket is on the ground (grounded or landed), rotation happens
+ * around the base contact corner, not the centre of mass.  Gravity produces
+ * a restoring or toppling torque depending on how far the CoM has moved past
+ * the support base.  Player A/D input adds an additional torque.
+ *
+ * @param {PhysicsState}                               ps
+ * @param {import('./rocketbuilder.js').RocketAssembly} assembly
+ * @param {boolean} left   A/ArrowLeft held.
+ * @param {boolean} right  D/ArrowRight held.
+ * @param {number}  dt     Integration timestep (s).
+ */
+function _applyGroundedSteering(ps, assembly, left, right, dt) {
+  // If upright with no input and no angular velocity, nothing to do.
+  if (
+    !left && !right &&
+    Math.abs(ps.angle) < TILT_SNAP_THRESHOLD &&
+    Math.abs(ps.angularVelocity) < ANGULAR_VEL_SNAP_THRESHOLD
+  ) {
+    ps.angle = 0;
+    ps.angularVelocity = 0;
+    ps.isTipping = false;
+    return;
+  }
+
+  // Determine tilt direction: player input takes priority to prevent
+  // oscillation when the angle is near zero.
+  let tiltDir;
+  if (right) tiltDir = 1;
+  else if (left) tiltDir = -1;
+  else tiltDir = Math.sign(ps.angle) || Math.sign(ps.angularVelocity) || 1;
+
+  // Compute pivot (contact point) and moment of inertia about it.
+  const contact = _computeGroundContactPoint(ps, assembly, tiltDir);
+  const I = _computeMomentOfInertia(ps, assembly, contact);
+
+  // Compute CoM position relative to contact point, then rotate by current angle.
+  const com = _computeCoMLocal(ps, assembly);
+  const relX = (com.x - contact.x) * SCALE_M_PER_PX;
+  const relY = (com.y - contact.y) * SCALE_M_PER_PX;
+  const cosA = Math.cos(ps.angle);
+  const sinA = Math.sin(ps.angle);
+  const rotatedX = relX * cosA + relY * sinA;
+
+  // Gravity torque: weight × horizontal distance from contact to CoM.
+  // Positive rotatedX → CoM is to the right of contact → positive (clockwise) torque.
+  const totalMass = _computeTotalMass(ps, assembly);
+  const gravityTorque = totalMass * G0 * rotatedX;
+
+  // Player input torque.
+  let inputTorque = 0;
+  if (right) inputTorque += PLAYER_TIP_TORQUE;
+  if (left)  inputTorque -= PLAYER_TIP_TORQUE;
+
+  // Net angular acceleration.
+  const netTorque = gravityTorque + inputTorque;
+  const angAccel = netTorque / I;
+
+  // Euler integrate.
+  ps.angularVelocity += angAccel * dt;
+  ps.angularVelocity *= GROUND_ANGULAR_DAMPING;
+  ps.angle += ps.angularVelocity * dt;
+
+  // Update tipping state for renderer.
+  ps.isTipping = Math.abs(ps.angle) > TILT_SNAP_THRESHOLD;
+  ps.tippingContactX = contact.x;
+  ps.tippingContactY = contact.y;
+
+  // Snap near-zero.
+  if (
+    !left && !right &&
+    Math.abs(ps.angle) < TILT_SNAP_THRESHOLD &&
+    Math.abs(ps.angularVelocity) < ANGULAR_VEL_SNAP_THRESHOLD
+  ) {
+    ps.angle = 0;
+    ps.angularVelocity = 0;
+    ps.isTipping = false;
+  }
+}
+
+/**
+ * Check if the rocket has toppled past the crash angle and trigger a crash.
+ *
+ * @param {PhysicsState}                               ps
+ * @param {import('./rocketbuilder.js').RocketAssembly} assembly
+ * @param {import('./gameState.js').FlightState}        flightState
+ */
+function _checkToppleCrash(ps, assembly, flightState) {
+  if (Math.abs(ps.angle) > TOPPLE_CRASH_ANGLE) {
+    ps.crashed = true;
+    ps.angularVelocity = 0;
+    _destroyBottomParts(ps, assembly);
+    _emitEvent(flightState, {
+      type: 'CRASH',
+      time: flightState.timeElapsed,
+      speed: 0,
+      toppled: true,
+      description: 'Rocket toppled over and crashed!',
+    });
+  }
 }
 
 /**

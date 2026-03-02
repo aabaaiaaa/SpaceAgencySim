@@ -25,6 +25,7 @@ import {
 } from '../core/physics.js';
 import { initFlightHud, destroyFlightHud, setHudTimeWarp, lockTimeWarp, showLaunchTip, hideLaunchTip } from './flightHud.js';
 import { initFlightContextMenu, destroyFlightContextMenu } from './flightContextMenu.js';
+import { checkObjectiveCompletion } from '../core/missions.js';
 import { saveGame, listSaves } from '../core/saveload.js';
 import { ATMOSPHERE_TOP, isReentryCondition } from '../core/atmosphere.js';
 import { getPartById } from '../data/parts.js';
@@ -71,6 +72,12 @@ let _keyupHandler = null;
 
 /** The in-flight control overlay DOM element. @type {HTMLElement|null} */
 let _flightOverlay = null;
+
+/** Pristine deep-clone of the assembly at launch time (for restart). @type {import('../core/rocketbuilder.js').RocketAssembly|null} */
+let _originalAssembly = null;
+
+/** Pristine deep-clone of the staging config at launch time (for restart). @type {import('../core/rocketbuilder.js').StagingConfig|null} */
+let _originalStagingConfig = null;
 
 /**
  * True while the post-flight summary overlay is visible.
@@ -425,6 +432,40 @@ const FLIGHT_CTRL_CSS = `
 // ---------------------------------------------------------------------------
 
 /**
+ * Returns a shallow copy of `assembly` where every part's Y position is shifted
+ * so the lowest part's bottom edge sits exactly at world Y = 0 (the launch pad).
+ *
+ * In the VAB, parts can be placed anywhere in world space.  Physics assumes
+ * posY = 0 means the rocket's reference origin is at ground level; if parts are
+ * assembled above Y = 0, posY = 0 would show the rocket floating.  Normalising
+ * here ensures `posY = 0` always places the rocket bottom on the ground.
+ *
+ * The original assembly passed in from the VAB is never mutated.
+ *
+ * @param {import('../core/rocketbuilder.js').RocketAssembly} assembly
+ * @returns {import('../core/rocketbuilder.js').RocketAssembly}
+ */
+function _normalizeAssemblyToGround(assembly) {
+  // Find the world-Y of the lowest part's bottom edge (20 VAB px = 1 m, Y-up).
+  let lowestBottom = Infinity;
+  for (const placed of assembly.parts.values()) {
+    const def = getPartById(placed.partId);
+    if (!def) continue;
+    lowestBottom = Math.min(lowestBottom, placed.y - def.height / 2);
+  }
+
+  // Nothing to shift (empty assembly or already at ground).
+  if (!isFinite(lowestBottom) || lowestBottom === 0) return assembly;
+
+  // Shift every part so the lowest bottom is exactly at Y = 0.
+  const normalizedParts = new Map();
+  for (const [id, placed] of assembly.parts) {
+    normalizedParts.set(id, { ...placed, y: placed.y - lowestBottom });
+  }
+  return { ...assembly, parts: normalizedParts };
+}
+
+/**
  * Start the flight scene.
  *
  * Initialises the PixiJS renderer, creates the physics state, mounts the HUD
@@ -448,10 +489,29 @@ export function startFlightScene(
 ) {
   _container     = container;
   _state         = state;
-  _assembly      = assembly;
+  // Normalise the assembly so the rocket's lowest part bottom is exactly at
+  // world Y = 0 (launch-pad level), matching the physics ground plane.
+  _assembly      = _normalizeAssemblyToGround(assembly);
   _stagingConfig = stagingConfig;
   _flightState   = flightState;
   _onFlightEnd   = onFlightEnd;
+
+  // Guarantee staging starts at Stage 1 regardless of prior flight state.
+  _stagingConfig.currentStageIdx = 0;
+
+  // Deep-clone the pre-normalisation assembly and staging config so "Restart
+  // from Launch" can re-create a pristine flight without returning to the VAB.
+  _originalAssembly = {
+    parts:         new Map([...assembly.parts].map(([id, p]) => [id, { ...p }])),
+    connections:   assembly.connections.map(c => ({ ...c })),
+    symmetryPairs: assembly.symmetryPairs.map(sp => [...sp]),
+    _nextId:       assembly._nextId,
+  };
+  _originalStagingConfig = {
+    stages:          stagingConfig.stages.map(s => ({ instanceIds: [...s.instanceIds] })),
+    unstaged:        [...stagingConfig.unstaged],
+    currentStageIdx: 0,
+  };
 
   // Inject CSS once per page load.
   if (!document.getElementById('flight-ctrl-css')) {
@@ -468,8 +528,8 @@ export function startFlightScene(
   _prevInSpace         = false;
   _summaryShown        = false;
 
-  // Create the physics state from the assembly and initial flight state.
-  _ps = createPhysicsState(assembly, flightState);
+  // Create the physics state from the (normalised) assembly and initial flight state.
+  _ps = createPhysicsState(_assembly, flightState);
 
   // Expose for E2E testing — Playwright reads live physics values here.
   if (typeof window !== 'undefined') {
@@ -480,17 +540,27 @@ export function startFlightScene(
   initFlightRenderer();
 
   // Mount the HUD overlay.
-  initFlightHud(container, _ps, assembly, stagingConfig, flightState, state, _onTimeWarpButtonClick);
+  initFlightHud(container, _ps, _assembly, stagingConfig, flightState, state, _onTimeWarpButtonClick);
 
   // Build the in-flight control overlay (save notice only — no hamburger).
   _buildFlightOverlay(container);
 
-  // Inject "Return to Space Agency" into the topbar hamburger dropdown.
+  // Inject flight-action items into the topbar hamburger dropdown.
   setTopBarFlightItems([
     {
+      label: 'Restart from Launch',
+      title: 'Restart this flight from the launch pad with the same rocket and staging.',
+      onClick: _handleMenuRestart,
+    },
+    {
+      label: 'Adjust Build',
+      title: 'Return to the Vehicle Assembly Building with this rocket loaded so you can tweak and re-launch.',
+      onClick: _handleMenuAdjustBuild,
+    },
+    {
       label: 'Return to Space Agency',
-      title: 'End this flight and return to your Space Agency hub to review results and plan your next launch.',
-      onClick: _handleReturnToAgency,
+      title: 'End this flight and return to your Space Agency hub.',
+      onClick: _handleMenuReturnToAgency,
     },
   ]);
 
@@ -552,14 +622,16 @@ export function stopFlightScene() {
     window.__flightPs = null;
   }
 
-  _ps            = null;
-  _assembly      = null;
-  _stagingConfig = null;
-  _flightState   = null;
-  _state         = null;
-  _container     = null;
-  _onFlightEnd   = null;
-  _lastTs        = null;
+  _ps                    = null;
+  _assembly              = null;
+  _stagingConfig         = null;
+  _flightState           = null;
+  _state                 = null;
+  _container             = null;
+  _onFlightEnd           = null;
+  _lastTs                = null;
+  _originalAssembly      = null;
+  _originalStagingConfig = null;
 
   // Reset time-warp state.
   _timeWarp            = 1;
@@ -592,6 +664,9 @@ function _loop(timestamp) {
 
   // Advance physics simulation with the current warp multiplier.
   tick(_ps, _assembly, _stagingConfig, _flightState, realDt, _timeWarp);
+
+  // Check mission objective completion against live flight state.
+  checkObjectiveCompletion(_state, _flightState);
 
   // Render the flight scene.
   renderFlightFrame(_ps, _assembly);
@@ -816,9 +891,137 @@ function _handleSaveGame() {
   console.log(`[Flight Controller] Saved to slot ${targetSlot}`);
 }
 
+// ---------------------------------------------------------------------------
+// Private — direct menu action handlers (no post-flight summary)
+// ---------------------------------------------------------------------------
+
+/**
+ * Menu action: restart the current flight from the launch pad with the same
+ * rocket and staging. Deducts cost of lost parts, deep-clones the original
+ * assembly, then calls startFlightScene.
+ */
+function _handleMenuRestart() {
+  // Remove post-flight summary if it's showing (e.g. after a crash).
+  const summary = document.getElementById('post-flight-summary');
+  if (summary) summary.remove();
+  _summaryShown = false;
+
+  // Calculate lost-parts cost.
+  let lostPartsCost = 0;
+  if (_assembly && _ps) {
+    for (const [instanceId, placed] of _assembly.parts) {
+      if (!_ps.activeParts.has(instanceId)) {
+        const def = getPartById(placed.partId);
+        if (def) lostPartsCost += def.cost ?? 0;
+      }
+    }
+  }
+  if (lostPartsCost > 0 && _state) {
+    _state.money = (_state.money ?? 0) - lostPartsCost;
+  }
+
+  // Capture references before stopFlightScene nulls them.
+  const origAssembly = _originalAssembly;
+  const origStaging  = _originalStagingConfig;
+  const ctr          = _container;
+  const gs           = _state;
+  const endCb        = _onFlightEnd;
+  const missionId    = _flightState?.missionId ?? '';
+  const rocketId     = _flightState?.rocketId  ?? '';
+  const crewIds      = _flightState?.crewIds   ?? [];
+
+  stopFlightScene();
+
+  // If originals are missing, fall back to returning to hub.
+  if (!origAssembly || !origStaging || !ctr || !gs) {
+    if (endCb) endCb(gs);
+    return;
+  }
+
+  // Recompute total fuel from the original (unmodified) assembly.
+  let totalFuel = 0;
+  for (const placed of origAssembly.parts.values()) {
+    const def = getPartById(placed.partId);
+    if (def) totalFuel += def.properties?.fuelMass ?? 0;
+  }
+
+  // Fresh flight state.
+  gs.currentFlight = {
+    missionId,
+    rocketId,
+    crewIds,
+    timeElapsed:     0,
+    altitude:        0,
+    velocity:        0,
+    fuelRemaining:   totalFuel,
+    deltaVRemaining: 0,
+    events:          [],
+    aborted:         false,
+  };
+
+  // Deep-clone the originals so the new flight gets pristine copies.
+  const freshAssembly = {
+    parts:         new Map([...origAssembly.parts].map(([id, p]) => [id, { ...p }])),
+    connections:   origAssembly.connections.map(c => ({ ...c })),
+    symmetryPairs: origAssembly.symmetryPairs.map(sp => [...sp]),
+    _nextId:       origAssembly._nextId,
+  };
+  const freshStaging = {
+    stages:          origStaging.stages.map(s => ({ instanceIds: [...s.instanceIds] })),
+    unstaged:        [...origStaging.unstaged],
+    currentStageIdx: 0,
+  };
+
+  startFlightScene(ctr, gs, freshAssembly, freshStaging, gs.currentFlight, endCb);
+}
+
+/**
+ * Menu action: return to the VAB with the current rocket design loaded so the
+ * player can tweak parts/staging and re-launch.
+ */
+function _handleMenuAdjustBuild() {
+  // Remove post-flight summary if it's showing.
+  const summary = document.getElementById('post-flight-summary');
+  if (summary) summary.remove();
+  _summaryShown = false;
+
+  const origAssembly = _originalAssembly;
+  const origStaging  = _originalStagingConfig;
+  const gs           = _state;
+  const endCb        = _onFlightEnd;
+
+  // Store the pristine assembly on gameState so the VAB can restore it.
+  if (origAssembly && gs) {
+    gs.vabAssembly = {
+      parts:         [...origAssembly.parts.values()],
+      connections:   origAssembly.connections,
+      symmetryPairs: origAssembly.symmetryPairs,
+      _nextId:       origAssembly._nextId,
+    };
+    gs.vabStagingConfig = origStaging ? {
+      stages:          origStaging.stages.map(s => ({ instanceIds: [...s.instanceIds] })),
+      unstaged:        [...origStaging.unstaged],
+      currentStageIdx: 0,
+    } : null;
+  }
+
+  stopFlightScene();
+  if (endCb) endCb(gs, null, 'vab');
+}
+
+/**
+ * Menu action: process end-of-flight results (mission completion, part
+ * recovery, etc.) and return to the Space Agency hub.
+ */
+function _handleMenuReturnToAgency() {
+  // Show the post-flight summary so the player sees flight results,
+  // part recovery, and mission completion before returning to the hub.
+  _handleReturnToAgency();
+}
+
 /**
  * Show the post-flight summary screen.
- * Called when the player chooses "Return to Space Agency" from the menu.
+ * Auto-triggered when the rocket crashes or all command modules are destroyed.
  * Does NOT tear down the flight scene immediately — the summary's action
  * buttons handle that so the player can choose "Continue Flying" if landed.
  */
@@ -1075,16 +1278,68 @@ function _showPostFlightSummary(ps, assembly, flightState, state, onFlightEnd) {
   restartBtn.textContent = lostPartsCost > 0
     ? `↩ Restart from Launch  (−$${lostPartsCost.toLocaleString('en-US')})`
     : '↩ Restart from Launch';
-  restartBtn.title = 'Return to your Space Agency hub. Parts that were lost during this flight will be deducted from your budget.';
+  restartBtn.title = 'Restart this flight from the launch pad with the same rocket and staging.';
 
   restartBtn.addEventListener('click', () => {
     // Deduct the cost of lost parts immediately.
     if (lostPartsCost > 0 && state) {
       state.money = (state.money ?? 0) - lostPartsCost;
     }
+
+    // Capture pristine originals and refs before stopFlightScene nulls them.
+    const origAssembly = _originalAssembly;
+    const origStaging  = _originalStagingConfig;
+    const ctr          = _container;
+    const gs           = _state;
+    const endCb        = _onFlightEnd;
+    const missionId    = flightState?.missionId ?? '';
+    const rocketId     = flightState?.rocketId  ?? '';
+    const crewIds      = flightState?.crewIds   ?? [];
+
     overlay.remove();
     stopFlightScene();
-    if (onFlightEnd) onFlightEnd(state);
+
+    // If we don't have the originals, fall back to returning to hub.
+    if (!origAssembly || !origStaging || !ctr || !gs) {
+      if (endCb) endCb(gs);
+      return;
+    }
+
+    // Recompute total fuel from the original (unmodified) assembly.
+    let totalFuel = 0;
+    for (const placed of origAssembly.parts.values()) {
+      const def = getPartById(placed.partId);
+      if (def) totalFuel += def.properties?.fuelMass ?? 0;
+    }
+
+    // Fresh flight state on the game state.
+    gs.currentFlight = {
+      missionId,
+      rocketId,
+      crewIds,
+      timeElapsed:     0,
+      altitude:        0,
+      velocity:        0,
+      fuelRemaining:   totalFuel,
+      deltaVRemaining: 0,
+      events:          [],
+      aborted:         false,
+    };
+
+    // Deep-clone the originals so the new flight gets pristine copies.
+    const freshAssembly = {
+      parts:         new Map([...origAssembly.parts].map(([id, p]) => [id, { ...p }])),
+      connections:   origAssembly.connections.map(c => ({ ...c })),
+      symmetryPairs: origAssembly.symmetryPairs.map(sp => [...sp]),
+      _nextId:       origAssembly._nextId,
+    };
+    const freshStaging = {
+      stages:          origStaging.stages.map(s => ({ instanceIds: [...s.instanceIds] })),
+      unstaged:        [...origStaging.unstaged],
+      currentStageIdx: 0,
+    };
+
+    startFlightScene(ctr, gs, freshAssembly, freshStaging, gs.currentFlight, endCb);
   });
   buttonsEl.appendChild(restartBtn);
 
@@ -1126,25 +1381,39 @@ function _showPostFlightSummary(ps, assembly, flightState, state, onFlightEnd) {
   });
   buttonsEl.appendChild(returnBtn);
 
-  // ── "Retry with same design" button ───────────────────────────────────────
-  // Only shown when a saved design exists (auto-saved at launch in D2).
-  if (state && state.rockets && state.rockets.length > 0 && flightState) {
-    const savedDesign = state.rockets.find(r => r.id === flightState.rocketId)
-      ?? state.rockets[state.rockets.length - 1];
-    if (savedDesign) {
-      const retryBtn = document.createElement('button');
-      retryBtn.id          = 'post-flight-retry-btn';
-      retryBtn.className   = 'pf-btn pf-btn-secondary';
-      retryBtn.textContent = '↺ Retry with Same Design';
-      retryBtn.title = 'Reload the same rocket design back onto the launch pad and start a new flight immediately.';
-      retryBtn.addEventListener('click', () => {
-        overlay.remove();
-        stopFlightScene();
-        // Return to hub so the player can re-launch.
-        if (onFlightEnd) onFlightEnd(state);
-      });
-      buttonsEl.appendChild(retryBtn);
-    }
+  // ── "Retry with Same Design" button ─────────────────────────────────────
+  // Opens the VAB with the same rocket design loaded so the player can
+  // tweak staging, swap parts, and re-launch.
+  {
+    const retryBtn = document.createElement('button');
+    retryBtn.id          = 'post-flight-retry-btn';
+    retryBtn.className   = 'pf-btn pf-btn-secondary';
+    retryBtn.textContent = '↺ Retry with Same Design';
+    retryBtn.title = 'Return to the Vehicle Assembly Building with this rocket loaded so you can tweak and re-launch.';
+    retryBtn.addEventListener('click', () => {
+      // Store the pristine assembly and staging on gameState so the VAB
+      // can restore the design even when entered from the Launch Pad path.
+      const origAssembly = _originalAssembly;
+      const origStaging  = _originalStagingConfig;
+      if (origAssembly && state) {
+        state.vabAssembly = {
+          parts:         [...origAssembly.parts.values()],
+          connections:   origAssembly.connections,
+          symmetryPairs: origAssembly.symmetryPairs,
+          _nextId:       origAssembly._nextId,
+        };
+        state.vabStagingConfig = origStaging ? {
+          stages:          origStaging.stages.map(s => ({ instanceIds: [...s.instanceIds] })),
+          unstaged:        [...origStaging.unstaged],
+          currentStageIdx: 0,
+        } : null;
+      }
+
+      overlay.remove();
+      stopFlightScene();
+      if (onFlightEnd) onFlightEnd(state, null, 'vab');
+    });
+    buttonsEl.appendChild(retryBtn);
   }
 
   content.appendChild(buttonsEl);

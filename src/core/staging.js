@@ -51,6 +51,7 @@ import { deployParachute, DEPLOY_DURATION, LOW_DENSITY_THRESHOLD } from './parac
 import { deployLandingLeg } from './legs.js';
 import { activateEjectorSeat } from './ejector.js';
 import { activateScienceModule } from './sciencemodule.js';
+import { applySeparationImpulse } from './collision.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -64,6 +65,10 @@ const SCALE_M_PER_PX = 0.05;
 
 /** Landing speed below which ground contact is considered safe (m/s). */
 const DEFAULT_SAFE_LANDING_SPEED = 10;
+
+/** Number of physics ticks to skip collision detection after separation.
+ *  Must match the value in collision.js. */
+const SEPARATION_COOLDOWN_TICKS = 60;
 
 // ---------------------------------------------------------------------------
 // Internal ID counter for debris fragments
@@ -117,6 +122,15 @@ let _debrisNextId = 1;
  * @property {number}              throttle      Always 1.0 — SRBs ignore
  *   throttle and liquid engines on detached stages flame out immediately
  *   (no connected tanks).
+ * @property {number}              angularVelocity  Angular velocity (rad/s;
+ *   positive = clockwise).  Inherited from the parent rocket at separation
+ *   plus a small random perturbation.
+ * @property {boolean}             isTipping     True when the debris fragment
+ *   is on the ground and tilted — rotation is around the ground contact point.
+ * @property {number}              tippingContactX  Ground contact pivot X in
+ *   VAB local pixels (only meaningful when `isTipping` is true).
+ * @property {number}              tippingContactY  Ground contact pivot Y in
+ *   VAB local pixels (only meaningful when `isTipping` is true).
  * @property {boolean}             landed        True after a safe touchdown
  *   (speed ≤ {@link DEFAULT_SAFE_LANDING_SPEED}).
  * @property {boolean}             crashed       True after a high-speed
@@ -201,6 +215,9 @@ export function activateCurrentStage(ps, assembly, stagingConfig, flightState) {
         // Recompute which parts are still connected to a command module and
         // collect newly disconnected sections as debris.
         const fragments = recomputeActiveGraph(ps, assembly);
+        for (const frag of fragments) {
+          applySeparationImpulse(ps, frag, assembly);
+        }
         newDebris.push(...fragments);
 
         // If a satellite part ended up in the disconnected debris, emit a
@@ -291,6 +308,12 @@ export function activateCurrentStage(ps, assembly, stagingConfig, flightState) {
     stagingConfig.currentStageIdx += 1;
   }
 
+  // After parts have been removed, re-normalise the assembly so the lowest
+  // remaining active part's bottom is at Y = 0.  posY is adjusted upward by
+  // the same world-space amount so every part's absolute world position stays
+  // unchanged — no visual discontinuity.
+  _renormalizeAfterSeparation(ps, assembly);
+
   return newDebris;
 }
 
@@ -352,6 +375,9 @@ export function activatePartDirect(ps, assembly, flightState, instanceId) {
       ps.activeParts.delete(instanceId);
       ps.firingEngines.delete(instanceId);
       const fragments = recomputeActiveGraph(ps, assembly);
+      for (const frag of fragments) {
+        applySeparationImpulse(ps, frag, assembly);
+      }
       newDebris.push(...fragments);
 
       // If a satellite part ended up in the disconnected debris, emit a
@@ -429,6 +455,9 @@ export function activatePartDirect(ps, assembly, flightState, instanceId) {
     default:
       break;
   }
+
+  // Re-normalise the assembly origin after parts may have been removed.
+  _renormalizeAfterSeparation(ps, assembly);
 
   return newDebris;
 }
@@ -617,6 +646,15 @@ export function tickDebris(debris, assembly, dt) {
   // the same field names: activeParts, firingEngines, fuelStore, throttle.
   tickFuelSystem(debris, assembly, dt, density);
 
+  // --- 6b. Angular dynamics (airborne) ------------------------------------
+  if (debris.angularVelocity != null) {
+    debris.angle += debris.angularVelocity * dt;
+    // Light aerodynamic damping.
+    if (density > 0) {
+      debris.angularVelocity *= Math.max(0, 1 - 0.005 * density * dt);
+    }
+  }
+
   // --- 7. Ground contact ---------------------------------------------------
   if (debris.posY <= 0) {
     const impactSpeed = Math.hypot(debris.velX, debris.velY);
@@ -626,9 +664,69 @@ export function tickDebris(debris, assembly, dt) {
 
     if (impactSpeed <= DEFAULT_SAFE_LANDING_SPEED) {
       debris.landed  = true;
+      // If landing at an angle, begin tipping simulation.
+      if (Math.abs(debris.angle) > 0.005) {
+        debris.isTipping = true;
+      }
     } else {
       debris.crashed = true;
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Private — post-separation re-normalisation
+// ---------------------------------------------------------------------------
+
+/**
+ * After a stage separation removes parts from the active rocket, the assembly
+ * origin may no longer coincide with the lowest active part's bottom edge.
+ * This shifts `posY` upward (in world space) and every remaining active
+ * part's `placed.y` downward by the same amount so that:
+ *
+ *   1. The lowest active part's bottom sits at assembly Y = 0.
+ *   2. Every part's absolute world position is unchanged (no visual jump).
+ *   3. Ground collision at `posY ≤ 0` means the rocket's bottom touches the
+ *      ground, regardless of how many lower stages were jettisoned.
+ *
+ * No-op when the lowest active bottom is already at Y = 0 (or below).
+ *
+ * @param {import('./physics.js').PhysicsState}           ps
+ * @param {import('./rocketbuilder.js').RocketAssembly}   assembly
+ */
+function _renormalizeAfterSeparation(ps, assembly) {
+  if (ps.activeParts.size === 0) return;
+
+  // Find the lowest bottom edge (assembly Y-up, pixels) among active parts.
+  let lowestBottom = Infinity;
+  for (const instanceId of ps.activeParts) {
+    const placed = assembly.parts.get(instanceId);
+    const def    = placed ? getPartById(placed.partId) : null;
+    if (!def) continue;
+    const bottom = placed.y - (def.height ?? 40) / 2;
+    lowestBottom = Math.min(lowestBottom, bottom);
+  }
+
+  // Nothing to adjust if the lowest bottom is already at (or below) Y = 0.
+  if (!isFinite(lowestBottom) || lowestBottom <= 0) return;
+
+  const offsetM = lowestBottom * SCALE_M_PER_PX;
+
+  // Shift the world origin up so it stays at the new bottom.
+  ps.posY += offsetM;
+
+  // Shift every part in the assembly downward by the same amount so their
+  // absolute world positions remain unchanged.  ALL parts are shifted (not
+  // just active ones) because debris rendering still references the same
+  // placed objects.
+  for (const [, placed] of assembly.parts) {
+    placed.y -= lowestBottom;
+  }
+
+  // Debris fragments also reference the same placed objects, so their posY
+  // must be compensated by the same world-space offset to stay correct.
+  for (const debris of ps.debris) {
+    debris.posY += offsetM;
   }
 }
 
@@ -710,9 +808,14 @@ function _createDebrisFromParts(ps, partIds) {
     velX:    ps.velX,
     velY:    ps.velY,
     angle:   ps.angle,
+    angularVelocity: (ps.angularVelocity ?? 0) + (Math.random() - 0.5) * 0.3,
     throttle: 1.0,  // SRBs ignore throttle; liquid engines will flame out.
     landed:  false,
     crashed: false,
+    isTipping: false,
+    tippingContactX: 0,
+    tippingContactY: 0,
+    collisionCooldown: SEPARATION_COOLDOWN_TICKS,
   };
 }
 

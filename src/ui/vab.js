@@ -58,12 +58,9 @@ import {
   returnPartToUnstaged,
   validateStagingConfig,
   fireStagingStep,
+  autoStageNewPart,
+  moveStage,
 } from '../core/rocketbuilder.js';
-import {
-  listSaves,
-  saveGame,
-  SAVE_SLOT_COUNT,
-} from '../core/saveload.js';
 import { createRocketDesign } from '../core/gameState.js';
 import { startFlightScene } from './flightController.js';
 import { showReturnResultsOverlay } from './hub.js';
@@ -130,6 +127,56 @@ let _pendingPickup = null;
 
 /** The panel width for each side panel. */
 const SIDE_PANEL_WIDTH = 300;
+
+// ---------------------------------------------------------------------------
+// VAB ↔ gameState serialisation (persist assembly across save/load)
+// ---------------------------------------------------------------------------
+
+/**
+ * Serialise the current VAB assembly and staging config onto `_gameState` so
+ * that the next save call captures them.  No-op when there is no
+ * active assembly or gameState reference.
+ *
+ * The `parts` Map is converted to a plain Array so `JSON.stringify` works.
+ */
+export function syncVabToGameState() {
+  if (!_assembly || !_gameState) return;
+  _gameState.vabAssembly = {
+    parts:         [..._assembly.parts.values()],
+    connections:   _assembly.connections,
+    symmetryPairs: _assembly.symmetryPairs,
+    _nextId:       _assembly._nextId,
+  };
+  _gameState.vabStagingConfig = _stagingConfig;
+}
+
+/**
+ * If the supplied game state carries a serialised VAB assembly, restore it
+ * into the module-level `_assembly` and `_stagingConfig` variables so the
+ * VAB opens with the player's previous work.
+ *
+ * @param {import('../core/gameState.js').GameState} state
+ */
+function _restoreVabFromGameState(state) {
+  const saved = state.vabAssembly;
+  if (!saved || !Array.isArray(saved.parts) || saved.parts.length === 0) return;
+
+  _assembly = {
+    parts:         new Map(saved.parts.map(p => [p.instanceId, p])),
+    connections:   saved.connections   ?? [],
+    symmetryPairs: saved.symmetryPairs ?? [],
+    _nextId:       saved._nextId       ?? 1,
+  };
+
+  if (state.vabStagingConfig) {
+    _stagingConfig = state.vabStagingConfig;
+  }
+
+  // Reconcile staging with the restored part set.
+  if (_assembly && _stagingConfig) {
+    syncStagingWithAssembly(_assembly, _stagingConfig);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Part-type display helpers
@@ -727,6 +774,30 @@ const VAB_CSS = `
   color: #5a8aaa;
   margin-bottom: 6px;
   padding: 2px 0;
+  gap: 4px;
+}
+
+.vab-stage-drag-handle {
+  cursor: grab;
+  font-size: 12px;
+  color: #406a80;
+  user-select: none;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.vab-stage-drag-handle:hover {
+  color: #80c0e0;
+}
+
+.vab-staging-stage.dragging {
+  opacity: 0.5;
+  border-style: dashed;
+}
+
+.vab-staging-stage.drag-over {
+  border-color: #40a0d0;
+  background: rgba(30, 80, 120, 0.15);
 }
 
 .vab-staging-stage-first .vab-staging-stage-hdr {
@@ -1050,158 +1121,6 @@ const VAB_CSS = `
   line-height: 1.7;
 }
 
-/* ── Game menu dropdown ──────────────────────────────────────────────── */
-#vab-game-menu {
-  position: fixed;
-  z-index: 300;
-  background: rgba(4, 8, 22, 0.99);
-  border: 1px solid #1e3a5c;
-  border-radius: 3px;
-  padding: 4px 0;
-  box-shadow: 2px 6px 24px rgba(0,0,0,.9);
-  min-width: 160px;
-}
-#vab-game-menu[hidden] {
-  display: none;
-}
-.vab-game-menu-item {
-  display: block;
-  width: 100%;
-  padding: 8px 16px;
-  font-size: 11px;
-  font-family: system-ui, sans-serif;
-  color: #a8c8e8;
-  cursor: pointer;
-  background: none;
-  border: none;
-  text-align: left;
-  white-space: nowrap;
-  box-sizing: border-box;
-  letter-spacing: .04em;
-}
-.vab-game-menu-item:hover {
-  background: rgba(14, 38, 74, 0.8);
-  color: #c8e4ff;
-}
-
-/* ── Save game dialog ────────────────────────────────────────────────── */
-#vab-save-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,.72);
-  z-index: 400;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-#vab-save-backdrop[hidden] {
-  display: none;
-}
-#vab-save-dialog {
-  background: rgba(4, 8, 22, 0.99);
-  border: 1px solid #1e3a5c;
-  border-radius: 3px;
-  box-shadow: 0 8px 48px rgba(0,0,0,.9);
-  width: 480px;
-  max-width: 95vw;
-  font-family: system-ui, sans-serif;
-}
-.vab-save-dlg-hdr {
-  padding: 12px 16px;
-  border-bottom: 1px solid #0e1e30;
-  font-size: 12px;
-  font-weight: 700;
-  color: #88b4d0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.vab-save-dlg-body {
-  padding: 16px;
-}
-.vab-save-slots-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-.vab-save-slot-btn {
-  background: rgba(8, 18, 40, 0.9);
-  border: 1px solid #1a3050;
-  border-radius: 3px;
-  padding: 10px 12px;
-  color: #5a88a8;
-  font-family: system-ui, sans-serif;
-  font-size: 10px;
-  cursor: pointer;
-  text-align: left;
-  transition: border-color .1s, background .1s;
-  line-height: 1.4;
-}
-.vab-save-slot-btn:hover {
-  border-color: #2a5080;
-  background: rgba(14, 30, 60, 0.9);
-  color: #88c0e0;
-}
-.vab-save-slot-btn.selected {
-  border-color: #3a80c8;
-  background: rgba(20, 50, 100, 0.6);
-  color: #c8e4ff;
-}
-.vab-save-slot-name {
-  font-weight: 700;
-  color: #88b4d0;
-  margin-bottom: 3px;
-}
-.vab-save-slot-btn.selected .vab-save-slot-name {
-  color: #c8e4ff;
-}
-.vab-save-slot-empty {
-  color: #3a5870;
-  font-style: italic;
-}
-.vab-save-name-row {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 12px;
-}
-.vab-save-name-label {
-  font-size: 9px;
-  color: #3a6080;
-  text-transform: uppercase;
-  letter-spacing: .1em;
-}
-#vab-save-name-input {
-  background: rgba(8, 18, 40, 0.9);
-  border: 1px solid #1a3050;
-  border-radius: 2px;
-  padding: 7px 10px;
-  font-family: system-ui, sans-serif;
-  font-size: 11px;
-  color: #a8c8e8;
-  outline: none;
-}
-#vab-save-name-input:focus {
-  border-color: #3470a8;
-}
-.vab-save-dlg-footer {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-  align-items: center;
-  padding: 10px 16px;
-  border-top: 1px solid #0e1e30;
-}
-#vab-save-confirmation {
-  font-size: 10px;
-  color: #42cc74;
-  flex: 1;
-  min-height: 14px;
-}
-#vab-save-confirmation.error {
-  color: #e06060;
-}
 `;
 
 // ---------------------------------------------------------------------------
@@ -1225,6 +1144,14 @@ function _drawScaleTicks() {
   const pxPerMetre = VAB_PIXELS_PER_METRE * zoom;
   const h = _buildAreaHeight;
 
+  // _worldToScreen (render/vab.js) gives viewport y = getBuildArea().y + camY - wy*zoom.
+  // The scale bar starts at a different viewport y (below topbar + VAB toolbar + status bar),
+  // so barY (relative to scale bar top) = viewport_y - scaleBarTop
+  //   = (VAB_TOOLBAR_HEIGHT + camY - wy*zoom) - scaleBarTop.
+  // Bake the constant part into adjustedCamY so the rest of the formulas stay simple.
+  const scaleBarTop    = _scaleTicks.getBoundingClientRect().top;
+  const adjustedCamY   = VAB_TOOLBAR_HEIGHT + camY - scaleBarTop;
+
   // Choose a readable tick interval (in metres) based on current zoom.
   let tickM = 1;
   if      (pxPerMetre < 5)   tickM = 200;
@@ -1237,9 +1164,9 @@ function _drawScaleTicks() {
 
   const majorEvery = 5; // label every Nth tick
 
-  // Altitude at the top and bottom of the build area.
-  const topM  = camY / pxPerMetre;
-  const botM  = (camY - h) / pxPerMetre;
+  // Altitude at the top and bottom of the scale bar.
+  const topM  = adjustedCamY / pxPerMetre;
+  const botM  = (adjustedCamY - h) / pxPerMetre;
 
   const startM = Math.ceil(botM  / tickM) * tickM;
   const endM   = Math.floor(topM / tickM) * tickM;
@@ -1248,12 +1175,12 @@ function _drawScaleTicks() {
   let idx = 0;
 
   // Always show 0m tick if it's on screen.
-  const zeroBarY = camY; // 0m world = camY screen offset
+  const zeroBarY = adjustedCamY; // 0m world = adjustedCamY screen offset
   const zeroVisible = zeroBarY >= 0 && zeroBarY <= h;
 
   for (let m = startM; m <= endM; m += tickM, idx++) {
     // barY: screen-Y offset from the top of the scale bar.
-    const barY = camY - m * pxPerMetre;
+    const barY = adjustedCamY - m * pxPerMetre;
     if (barY < 0 || barY > h) continue;
 
     const isMajor = m === 0 || idx % majorEvery === 0;
@@ -1292,8 +1219,11 @@ function _updateScaleBarExtents() {
   if (!_scaleTicks || _buildAreaHeight === 0 || !_assembly || _assembly.parts.size === 0) return;
 
   const { zoom, y: camY } = vabGetCamera();
-  const pxPerMetre = VAB_PIXELS_PER_METRE * zoom;
   const h = _buildAreaHeight;
+
+  // Same viewport→scale-bar adjustment as _drawScaleTicks.
+  const scaleBarTop  = _scaleTicks.getBoundingClientRect().top;
+  const adjustedCamY = VAB_TOOLBAR_HEIGHT + camY - scaleBarTop;
 
   // Find the world-Y extent of all placed parts.
   let maxWorldY = -Infinity;
@@ -1310,10 +1240,9 @@ function _updateScaleBarExtents() {
 
   if (!isFinite(maxWorldY) || !isFinite(minWorldY)) return;
 
-  // Convert world Y to screen Y in the scale bar.
-  // World Y is in px (VAB world units, 20px = 1m). Screen Y: 0 = top of bar.
-  const topBarY    = camY - maxWorldY;
-  const bottomBarY = camY - minWorldY;
+  // Convert world Y → scale-bar Y, mirroring _worldToScreen then subtracting scaleBarTop.
+  const topBarY    = adjustedCamY - maxWorldY * zoom;
+  const bottomBarY = adjustedCamY - minWorldY * zoom;
   const midBarY    = (topBarY + bottomBarY) / 2;
   const heightM    = (maxWorldY - minWorldY) / VAB_PIXELS_PER_METRE;
 
@@ -1600,8 +1529,11 @@ function _onDragEnd(e) {
             bestCandidate.targetInstanceId,    mirror.mirrorTargetSnapIndex,
           );
           addSymmetryPair(_assembly, instanceId, mirrorId);
-          // New mirrored part needs staging sync.
+          // New mirrored part needs staging sync + auto-stage.
           _syncAndRenderStaging();
+          autoStageNewPart(_assembly, _stagingConfig, mirrorId);
+          _renderStagingPanel();
+          _runAndRenderValidation();
           // Deduct cost for the mirror copy.
           const def = getPartById(partId);
           if (def && _gameState) {
@@ -1644,8 +1576,22 @@ function _onDragEnd(e) {
         }
       }
     }
-    // Sync staging — new activatable part(s) may need to appear in unstaged pool.
+    // Sync staging — new activatable part(s) appear in the unstaged pool,
+    // then auto-stage based on activation behaviour.
     _syncAndRenderStaging();
+    autoStageNewPart(_assembly, _stagingConfig, newId);
+    if (_symmetryMode) {
+      // Mirror parts are tracked in symmetryPairs — find the mirror for newId.
+      const mirrorPair = _assembly.symmetryPairs.find(
+        ([a, b]) => a === newId || b === newId,
+      );
+      if (mirrorPair) {
+        const mirrorId = mirrorPair[0] === newId ? mirrorPair[1] : mirrorPair[0];
+        autoStageNewPart(_assembly, _stagingConfig, mirrorId);
+      }
+    }
+    _renderStagingPanel();
+    _runAndRenderValidation();
   }
 
   vabRenderParts();
@@ -1760,10 +1706,13 @@ function _updateSelectionHighlight(placed, def, highlight) {
   const canvasArea = _canvasArea;
   if (!canvasArea) return;
 
-  // Canvas-local coordinates matching render/vab.js _worldToScreen (minus area offset).
-  // sx_canvas = camX + wx * zoom;  sy_canvas = camY - wy * zoom
-  const sx = camX + placed.x * zoom;
-  const sy = camY - placed.y * zoom;
+  // Mirror render/vab.js _worldToScreen: viewport = (area.x + camX + wx*zoom, area.y + camY - wy*zoom).
+  // Subtract the canvas area's actual viewport position to get element-relative coords.
+  // This accounts for open side panels shifting #vab-canvas-area horizontally, and for the
+  // topbar + status bar height that getBuildArea().y (VAB_TOOLBAR_HEIGHT) doesn't include.
+  const rect = canvasArea.getBoundingClientRect();
+  const sx = (VAB_SCALE_BAR_WIDTH + camX + placed.x * zoom) - rect.left;
+  const sy = (VAB_TOOLBAR_HEIGHT  + camY - placed.y * zoom) - rect.top;
 
   const w = def.width  * zoom;
   const h = def.height * zoom;
@@ -1941,226 +1890,6 @@ function _showPartContextMenu(placed, clientX, clientY) {
       vabRenderParts();
     }, { once: true });
   }
-}
-
-// ---------------------------------------------------------------------------
-// Game menu dropdown + Save Game dialog
-// ---------------------------------------------------------------------------
-
-/** Game menu dropdown element. @type {HTMLElement | null} */
-let _gameMenu = null;
-
-/** Save dialog backdrop element. @type {HTMLElement | null} */
-let _saveBackdrop = null;
-
-/** Currently selected save slot index in the save dialog. @type {number | null} */
-let _selectedSaveSlot = null;
-
-/**
- * Create and append the game-menu dropdown and save dialog elements.
- */
-function _initGameMenu() {
-  // ── Dropdown menu ──────────────────────────────────────────────────────────
-  _gameMenu = document.createElement('div');
-  _gameMenu.id = 'vab-game-menu';
-  _gameMenu.setAttribute('hidden', '');
-  _gameMenu.innerHTML =
-    `<button class="vab-game-menu-item" id="vab-menu-save-game" type="button">Save Game</button>`;
-  document.body.appendChild(_gameMenu);
-
-  _gameMenu.querySelector('#vab-menu-save-game')?.addEventListener('click', () => {
-    _gameMenu.setAttribute('hidden', '');
-    _openSaveDialog();
-  });
-
-  // Clicking outside the menu closes it.
-  document.addEventListener('pointerdown', (e) => {
-    if (_gameMenu && !_gameMenu.hasAttribute('hidden') &&
-        !_gameMenu.contains(/** @type {Node} */ (e.target))) {
-      // Only hide if the click is NOT on the menu button itself (the button
-      // handler will toggle it separately).
-      const menuBtn = document.getElementById('vab-btn-menu');
-      if (!menuBtn || !menuBtn.contains(/** @type {Node} */ (e.target))) {
-        _gameMenu.setAttribute('hidden', '');
-      }
-    }
-  }, { capture: true });
-
-  // ── Save dialog backdrop ───────────────────────────────────────────────────
-  _saveBackdrop = document.createElement('div');
-  _saveBackdrop.id = 'vab-save-backdrop';
-  _saveBackdrop.setAttribute('hidden', '');
-  _saveBackdrop.innerHTML = `
-    <div id="vab-save-dialog" role="dialog" aria-modal="true">
-      <div class="vab-save-dlg-hdr">
-        <span>Save Game</span>
-        <button class="vab-ctx-item" id="vab-save-close-btn"
-                style="padding:2px 8px;font-size:12px" type="button">&#x2715;</button>
-      </div>
-      <div class="vab-save-dlg-body">
-        <div class="vab-save-slots-grid" id="vab-save-slots-grid">
-          <!-- Slot buttons rendered by _renderSaveSlots() -->
-        </div>
-        <div class="vab-save-name-row">
-          <label class="vab-save-name-label" for="vab-save-name-input">Save Name</label>
-          <input id="vab-save-name-input" type="text" maxlength="48"
-                 placeholder="Enter save name…" autocomplete="off" />
-        </div>
-      </div>
-      <div class="vab-save-dlg-footer">
-        <span id="vab-save-confirmation"></span>
-        <button class="vab-btn" id="vab-save-cancel-btn" type="button">Cancel</button>
-        <button class="vab-btn vab-btn-launch" id="vab-save-confirm-btn"
-                type="button" disabled>Save</button>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(_saveBackdrop);
-
-  // Wire close / cancel.
-  _saveBackdrop.querySelector('#vab-save-close-btn')?.addEventListener('click', _closeSaveDialog);
-  _saveBackdrop.querySelector('#vab-save-cancel-btn')?.addEventListener('click', _closeSaveDialog);
-
-  // Close on backdrop click.
-  _saveBackdrop.addEventListener('pointerdown', (e) => {
-    if (e.target === _saveBackdrop) _closeSaveDialog();
-  });
-
-  // Enable the Save button only when a slot is selected.
-  const nameInput  = /** @type {HTMLInputElement} */ (_saveBackdrop.querySelector('#vab-save-name-input'));
-  const confirmBtn = /** @type {HTMLButtonElement} */ (_saveBackdrop.querySelector('#vab-save-confirm-btn'));
-
-  nameInput?.addEventListener('input', () => {
-    if (confirmBtn) confirmBtn.disabled = _selectedSaveSlot === null;
-  });
-
-  confirmBtn?.addEventListener('click', () => {
-    if (_selectedSaveSlot === null || !_gameState) return;
-    const saveName = nameInput.value.trim() || (_gameState.agencyName || 'New Save');
-    try {
-      saveGame(_gameState, _selectedSaveSlot, saveName);
-      const confirmEl = _saveBackdrop.querySelector('#vab-save-confirmation');
-      if (confirmEl) {
-        confirmEl.className = '';
-        confirmEl.textContent = `Saved to Slot ${_selectedSaveSlot + 1}!`;
-      }
-      // Refresh slots to reflect new save.
-      _renderSaveSlots();
-      // Briefly show confirmation then close.
-      setTimeout(_closeSaveDialog, 1200);
-    } catch (err) {
-      const confirmEl = _saveBackdrop.querySelector('#vab-save-confirmation');
-      if (confirmEl) {
-        confirmEl.className = 'error';
-        confirmEl.textContent = `Save failed: ${err.message}`;
-      }
-    }
-  });
-}
-
-/**
- * Toggle the game-menu dropdown open/closed below the given button.
- * @param {HTMLElement} btn  The button that was clicked.
- */
-function _toggleGameMenu(btn) {
-  if (!_gameMenu) return;
-  if (!_gameMenu.hasAttribute('hidden')) {
-    _gameMenu.setAttribute('hidden', '');
-    return;
-  }
-  // Position below the button.
-  const box = btn.getBoundingClientRect();
-  _gameMenu.style.top  = `${box.bottom + 4}px`;
-  _gameMenu.style.left = `${box.left}px`;
-  _gameMenu.removeAttribute('hidden');
-}
-
-/**
- * Open the save-game dialog, refreshing slot data.
- */
-function _openSaveDialog() {
-  if (!_saveBackdrop) return;
-  _selectedSaveSlot = null;
-  // Pre-populate save name with agency name.
-  const nameInput = /** @type {HTMLInputElement} */ (_saveBackdrop.querySelector('#vab-save-name-input'));
-  if (nameInput) nameInput.value = (_gameState?.agencyName) || '';
-  // Clear confirmation.
-  const confirmEl = _saveBackdrop.querySelector('#vab-save-confirmation');
-  if (confirmEl) { confirmEl.className = ''; confirmEl.textContent = ''; }
-  // Disable save button (no slot selected yet).
-  const confirmBtn = /** @type {HTMLButtonElement} */ (_saveBackdrop.querySelector('#vab-save-confirm-btn'));
-  if (confirmBtn) confirmBtn.disabled = true;
-
-  _renderSaveSlots();
-  _saveBackdrop.removeAttribute('hidden');
-}
-
-/**
- * Close the save-game dialog.
- */
-function _closeSaveDialog() {
-  if (_saveBackdrop) _saveBackdrop.setAttribute('hidden', '');
-  _selectedSaveSlot = null;
-}
-
-/**
- * Re-render the slot picker grid inside the save dialog.
- */
-function _renderSaveSlots() {
-  const grid = _saveBackdrop?.querySelector('#vab-save-slots-grid');
-  if (!grid) return;
-
-  const saves = listSaves();
-  const frags = [];
-
-  for (let i = 0; i < SAVE_SLOT_COUNT; i++) {
-    const s = saves[i];
-    const selected = _selectedSaveSlot === i ? ' selected' : '';
-    if (s) {
-      const money = '$' + Math.round(s.money).toLocaleString('en-US');
-      frags.push(
-        `<button class="vab-save-slot-btn${selected}" data-save-slot="${i}" type="button">` +
-          `<div class="vab-save-slot-name">${_escSave(s.saveName)}</div>` +
-          `<div>${_escSave(s.agencyName || '')}</div>` +
-          `<div>${money} · ${s.missionsCompleted} missions</div>` +
-        `</button>`
-      );
-    } else {
-      frags.push(
-        `<button class="vab-save-slot-btn${selected}" data-save-slot="${i}" type="button">` +
-          `<span class="vab-save-slot-empty">Empty Slot ${i + 1}</span>` +
-        `</button>`
-      );
-    }
-  }
-
-  grid.innerHTML = frags.join('');
-
-  // Wire slot selection.
-  grid.querySelectorAll('[data-save-slot]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      _selectedSaveSlot = Number(/** @type {HTMLElement} */ (btn).dataset.saveSlot);
-      // Refresh selection styling.
-      grid.querySelectorAll('[data-save-slot]').forEach((b) => b.classList.remove('selected'));
-      btn.classList.add('selected');
-      // Enable save button now that a slot is chosen.
-      const confirmBtn = /** @type {HTMLButtonElement} */ (_saveBackdrop?.querySelector('#vab-save-confirm-btn'));
-      if (confirmBtn) confirmBtn.disabled = false;
-    });
-  });
-}
-
-/**
- * Escape a string for use in slot HTML.
- * @param {string} s
- * @returns {string}
- */
-function _escSave(s) {
-  return String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }
 
 // ---------------------------------------------------------------------------
@@ -2356,11 +2085,6 @@ function _bindButtons(root) {
     if (_onBack) _onBack();
   });
 
-  // ── "Menu" button — opens game menu dropdown ─────────────────────────────
-  root.querySelector('#vab-btn-menu')?.addEventListener('click', (e) => {
-    _toggleGameMenu(/** @type {HTMLElement} */ (e.currentTarget));
-  });
-
   // ── "View Accepted Missions" toggle ──────────────────────────────────────
   root.querySelector('#vab-btn-missions')?.addEventListener('click', () => {
     _togglePanel('missions');
@@ -2503,10 +2227,18 @@ function _renderStagingPanel() {
       isCurrent ? 'vab-staging-stage-current' : '',
     ].filter(Boolean).join(' ');
 
-    html.push(`<div class="${stageClasses}">`);
+    html.push(`<div class="${stageClasses}" data-stage-index="${i}">`);
 
     // Stage header.
     html.push('<div class="vab-staging-stage-hdr">');
+    // Drag handle for stage reordering (only when more than one stage).
+    if (numStages > 1) {
+      html.push(
+        `<span class="vab-stage-drag-handle" draggable="true" ` +
+        `data-stage-drag="true" data-stage-index="${i}" ` +
+        `title="Drag to reorder stage">&#x2807;</span>`,
+      );
+    }
     const label = isFirst
       ? `Stage ${stageNum} \u2014 FIRES FIRST`
       : `Stage ${stageNum}`;
@@ -2580,8 +2312,22 @@ function _renderStagingPanel() {
  * @param {HTMLElement} panelBody
  */
 function _setupStagingDnD(panelBody) {
-  // dragstart: fired on chip elements.
+  // dragstart: fired on chip elements OR stage drag handles.
   panelBody.addEventListener('dragstart', (e) => {
+    // ── Stage handle drag (reorder stages) ──────────────────────────────
+    const handle = /** @type {HTMLElement} */ (
+      /** @type {Element} */ (e.target).closest?.('.vab-stage-drag-handle')
+    );
+    if (handle) {
+      const stageIdx = handle.dataset.stageIndex ?? '';
+      e.dataTransfer.setData('text/plain', `stage-reorder|${stageIdx}`);
+      e.dataTransfer.effectAllowed = 'move';
+      const stageEl = handle.closest('.vab-staging-stage');
+      if (stageEl) stageEl.classList.add('dragging');
+      return;
+    }
+
+    // ── Part chip drag (move parts between stages) ──────────────────────
     const chip = /** @type {HTMLElement} */ (
       /** @type {Element} */ (e.target).closest?.('.vab-stage-chip')
     );
@@ -2597,12 +2343,14 @@ function _setupStagingDnD(panelBody) {
   panelBody.addEventListener('dragend', (e) => {
     const chip = /** @type {Element} */ (e.target).closest?.('.vab-stage-chip');
     if (chip) chip.classList.remove('dragging');
+    const stageEl = /** @type {Element} */ (e.target).closest?.('.vab-staging-stage');
+    if (stageEl) stageEl.classList.remove('dragging');
     panelBody.querySelectorAll('.drag-over').forEach((el) => el.classList.remove('drag-over'));
   });
 
-  // dragover: highlight the target zone.
+  // dragover: highlight the target zone or stage.
   panelBody.addEventListener('dragover', (e) => {
-    const zone = /** @type {Element} */ (e.target).closest?.('.vab-staging-zone');
+    const zone = /** @type {Element} */ (e.target).closest?.('.vab-staging-zone, .vab-staging-stage');
     if (!zone) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
@@ -2611,7 +2359,7 @@ function _setupStagingDnD(panelBody) {
 
   // dragleave: remove highlight only when truly leaving the zone.
   panelBody.addEventListener('dragleave', (e) => {
-    const zone = /** @type {Element} */ (e.target).closest?.('.vab-staging-zone');
+    const zone = /** @type {Element} */ (e.target).closest?.('.vab-staging-zone, .vab-staging-stage');
     if (!zone) return;
     if (!zone.contains(/** @type {Node} */ (e.relatedTarget))) {
       zone.classList.remove('drag-over');
@@ -2620,19 +2368,44 @@ function _setupStagingDnD(panelBody) {
 
   // drop: update staging config and re-render.
   panelBody.addEventListener('drop', (e) => {
-    const zone = /** @type {HTMLElement} */ (
-      /** @type {Element} */ (e.target).closest?.('.vab-staging-zone')
-    );
-    if (!zone || !_stagingConfig) return;
-    e.preventDefault();
-    zone.classList.remove('drag-over');
+    if (!_stagingConfig) return;
 
     const raw = e.dataTransfer.getData('text/plain');
     if (!raw) return;
 
-    const pipeIdx    = raw.indexOf('|');
-    const instanceId = raw.slice(0, pipeIdx);
-    const source     = raw.slice(pipeIdx + 1);
+    const pipeIdx = raw.indexOf('|');
+    const prefix  = raw.slice(0, pipeIdx);
+    const suffix  = raw.slice(pipeIdx + 1);
+
+    // ── Stage reorder drop ──────────────────────────────────────────────
+    if (prefix === 'stage-reorder') {
+      const targetStage = /** @type {HTMLElement} */ (
+        /** @type {Element} */ (e.target).closest?.('.vab-staging-stage')
+      );
+      if (!targetStage) return;
+      e.preventDefault();
+      panelBody.querySelectorAll('.drag-over').forEach((el) => el.classList.remove('drag-over'));
+
+      const fromIndex = parseInt(suffix, 10);
+      const toIndex   = parseInt(targetStage.dataset.stageIndex ?? '0', 10);
+      if (fromIndex !== toIndex) {
+        moveStage(_stagingConfig, fromIndex, toIndex);
+        _renderStagingPanel();
+        _runAndRenderValidation();
+      }
+      return;
+    }
+
+    // ── Part chip drop ──────────────────────────────────────────────────
+    const zone = /** @type {HTMLElement} */ (
+      /** @type {Element} */ (e.target).closest?.('.vab-staging-zone')
+    );
+    if (!zone) return;
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+
+    const instanceId = prefix;
+    const source     = suffix;
     const target     = zone.dataset.dropZone ?? '';
 
     if (target === source) return;   // Same zone — no-op.
@@ -2924,15 +2697,34 @@ function _doLaunch(crewIds) {
   if (vabRoot) vabRoot.style.display = 'none';
 
   // Transition to the flight scene.
+  // Deep-clone the staging config so flight mutations (currentStageIdx advancing,
+  // etc.) do not corrupt the VAB's copy — the player's staging setup is preserved
+  // when they return to the VAB after flight.
+  const flightStagingConfig = {
+    stages:          _stagingConfig.stages.map(s => ({ instanceIds: [...s.instanceIds] })),
+    unstaged:        [..._stagingConfig.unstaged],
+    currentStageIdx: _stagingConfig.currentStageIdx,
+  };
+
   const container = _container ?? document.getElementById('ui-overlay');
   if (container) {
     startFlightScene(
       container,
       _gameState,
       _assembly,
-      _stagingConfig,
+      flightStagingConfig,
       _gameState.currentFlight,
-      (_state, returnResults) => {
+      (_state, returnResults, navigateTo) => {
+        if (navigateTo === 'vab') {
+          // "Retry with Same Design" — re-show the VAB directly without
+          // going through the hub.  The module-level _assembly and
+          // _stagingConfig are still intact (deep-cloned before flight).
+          if (vabRoot) vabRoot.style.display = '';
+          _renderStagingPanel();
+          _runAndRenderValidation();
+          return;
+        }
+
         // Flight ended — restore the #vab-root and invoke the back callback
         // (which navigates to the hub).
         if (vabRoot) vabRoot.style.display = '';
@@ -3011,9 +2803,6 @@ export function initVabUI(container, state, { onBack } = {}) {
       </div>
       <div class="vab-toolbar-btns">
         <button class="vab-btn" id="vab-back-btn" type="button">&#8592; Hub</button>
-        <button class="vab-btn" id="vab-btn-menu" type="button">
-          Menu
-        </button>
         <button class="vab-btn" id="vab-btn-missions" type="button">
           View Accepted Missions
         </button>
@@ -3116,6 +2905,10 @@ export function initVabUI(container, state, { onBack } = {}) {
   _drawScaleTicks();
 
   // ── Rocket assembly (part graph) ──────────────────────────────────────────
+  // If a serialised assembly exists on the loaded game state, restore it
+  // before the fresh-assembly fallback runs.
+  _restoreVabFromGameState(state);
+
   // Preserve the existing assembly if the player is returning to VAB (e.g.
   // after going back to hub and re-entering).  Only create a fresh assembly
   // when entering VAB for the very first time or after resetVabUI().
@@ -3182,9 +2975,6 @@ export function initVabUI(container, state, { onBack } = {}) {
   // ── Context menu ───────────────────────────────────────────────────────────
   _initContextMenu();
 
-  // ── Game menu + Save dialog ────────────────────────────────────────────────
-  _initGameMenu();
-
   // ── Toolbar buttons ────────────────────────────────────────────────────────
   _bindButtons(root);
 
@@ -3210,6 +3000,10 @@ export function resetVabUI() {
   _stagingConfig    = null;
   _selectedInstanceId = null;
   _lastValidation   = null;
+  if (_gameState) {
+    _gameState.vabAssembly     = null;
+    _gameState.vabStagingConfig = null;
+  }
 }
 
 /**

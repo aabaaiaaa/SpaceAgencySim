@@ -28,6 +28,7 @@
 import { payDownLoan, borrowMore } from '../core/finance.js';
 import { saveGame, listSaves, SAVE_SLOT_COUNT } from '../core/saveload.js';
 import { MAX_LOAN_BALANCE } from '../core/constants.js';
+import { syncVabToGameState } from '../ui/vab.js';
 
 // ---------------------------------------------------------------------------
 // Module state
@@ -975,6 +976,7 @@ function _openSaveSlotPicker() {
     const slotIndex = i;
     card.addEventListener('click', () => {
       const saveName = _state.agencyName || 'New Save';
+      syncVabToGameState();
       saveGame(_state, slotIndex, saveName);
       backdrop.remove();
       console.log(`[TopBar] Game saved to slot ${slotIndex}`);

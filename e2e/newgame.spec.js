@@ -110,6 +110,7 @@ test.describe('App Load & New Game Flow', () => {
   // ── (6) Existing save → load screen shown by default ────────────────────
 
   test('(6) with a save present in localStorage, the app shows the load screen and lists the save stats', async ({ browser }) => {
+    test.setTimeout(60_000);
     const SAVE_NAME   = 'Test Save';
     const AGENCY_NAME = 'Stardust Corp';
     const MONEY       = 2_000_000;

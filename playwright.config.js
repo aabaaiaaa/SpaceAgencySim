@@ -7,6 +7,10 @@ export default defineConfig({
   // Run all tests in parallel
   fullyParallel: true,
 
+  // Limit parallel workers to avoid overwhelming the Vite dev server and
+  // exhausting Chromium process handles on Windows.
+  workers: process.env.CI ? 2 : 4,
+
   // Fail the build on CI if you accidentally left test.only in the source code
   forbidOnly: !!process.env.CI,
 

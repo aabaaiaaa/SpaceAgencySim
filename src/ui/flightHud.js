@@ -500,6 +500,7 @@ export function initFlightHud(container, ps, assembly, stagingConfig, flightStat
   _timeWarp         = 1;
   _warpLocked       = false;
   _warpButtons      = [];
+  _launchTipHidden  = false;
 
   // Inject stylesheet once per page load.
   if (!document.getElementById('flight-hud-styles')) {

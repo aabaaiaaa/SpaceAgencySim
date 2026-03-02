@@ -156,6 +156,10 @@ import {
  * @property {FlightResult[]} flightHistory - Past flight records.
  * @property {number}         playTimeSeconds - Total seconds of play.
  * @property {FlightState|null} currentFlight - Active flight, or null.
+ * @property {Object|null}      vabAssembly    - Serialisable snapshot of the VAB
+ *                                               rocket assembly (Map→Array), or null.
+ * @property {Object|null}      vabStagingConfig - Serialisable snapshot of the VAB
+ *                                                 staging configuration, or null.
  */
 
 // ---------------------------------------------------------------------------
@@ -200,6 +204,9 @@ export function createGameState() {
     playTimeSeconds: 0,
 
     currentFlight: null,
+
+    vabAssembly: null,
+    vabStagingConfig: null,
   };
 }
 

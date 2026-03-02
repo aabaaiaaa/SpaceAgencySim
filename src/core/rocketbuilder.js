@@ -14,7 +14,7 @@
  * This module has no DOM or canvas dependencies and can be unit-tested headlessly.
  */
 
-import { getPartById } from '../data/parts.js';
+import { getPartById, ActivationBehaviour } from '../data/parts.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -534,6 +534,65 @@ export function returnPartToUnstaged(config, instanceId) {
     }
   }
   return false;
+}
+
+/**
+ * Automatically stage a newly placed activatable part based on its
+ * activation behaviour:
+ *   - IGNITE (engines, SRBs) → assign to Stage 1 (index 0).
+ *   - SEPARATE (decouplers)  → create a new stage at the end, assign there.
+ *   - Anything else          → leave in the unstaged pool.
+ *
+ * The part must already be in the `unstaged` pool (placed by
+ * syncStagingWithAssembly) before calling this function.
+ *
+ * @param {RocketAssembly} assembly
+ * @param {StagingConfig}  config
+ * @param {string}         instanceId
+ */
+export function autoStageNewPart(assembly, config, instanceId) {
+  const placed = assembly.parts.get(instanceId);
+  if (!placed) return;
+  const def = getPartById(placed.partId);
+  if (!def || !def.activatable) return;
+
+  const behaviour = def.activationBehaviour;
+
+  if (behaviour === ActivationBehaviour.IGNITE) {
+    // Remove from unstaged and assign to Stage 1.
+    const pos = config.unstaged.indexOf(instanceId);
+    if (pos !== -1) config.unstaged.splice(pos, 1);
+    if (config.stages.length === 0) config.stages.push({ instanceIds: [] });
+    config.stages[0].instanceIds.push(instanceId);
+  } else if (behaviour === ActivationBehaviour.SEPARATE) {
+    // Remove from unstaged and create a new stage at the end.
+    const pos = config.unstaged.indexOf(instanceId);
+    if (pos !== -1) config.unstaged.splice(pos, 1);
+    config.stages.push({ instanceIds: [instanceId] });
+  }
+  // All other behaviours (DEPLOY, EJECT, RELEASE, COLLECT_SCIENCE, NONE)
+  // stay in unstaged — the player decides where to assign them.
+}
+
+/**
+ * Reorder stages by moving a stage from one index to another.
+ *
+ * @param {StagingConfig} config
+ * @param {number}        fromIndex  0-based source index.
+ * @param {number}        toIndex    0-based destination index.
+ * @returns {boolean}  True if the move was performed.
+ */
+export function moveStage(config, fromIndex, toIndex) {
+  if (fromIndex === toIndex) return false;
+  if (fromIndex < 0 || fromIndex >= config.stages.length) return false;
+  if (toIndex   < 0 || toIndex   >= config.stages.length) return false;
+
+  const [stage] = config.stages.splice(fromIndex, 1);
+  config.stages.splice(toIndex, 0, stage);
+
+  // Keep currentStageIdx pointing at the same logical stage if possible.
+  config.currentStageIdx = Math.min(config.currentStageIdx, config.stages.length - 1);
+  return true;
 }
 
 /**

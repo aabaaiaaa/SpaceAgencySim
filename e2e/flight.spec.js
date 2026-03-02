@@ -25,7 +25,10 @@ import { test, expect } from '@playwright/test';
  *   (6) Mission objectives panel is visible and shows the First Flight objective.
  *   (7) The in-flight menu (hamburger button) lists Save Game, Load Game, and
  *       Return to Space Agency.
- *   (8) Clicking "Return to Space Agency" shows the post-flight summary screen.
+ *   (8) TWR=1 button and ±0.1 throttle step buttons.
+ *   (9) "Restart from Launch" resets the flight to the launch pad.
+ *  (10) "Adjust Build" returns to the VAB with the rocket design loaded.
+ *  (11) "Return to Space Agency" ends flight and returns to hub.
  */
 
 test.describe.configure({ mode: 'serial' });
@@ -225,21 +228,15 @@ test.describe('Flight — Launch & Basic Flight', () => {
       { timeout: 5_000 },
     );
 
-    // ── Open staging panel and move engine chip into Stage 1 ──────────────
+    // ── Verify engine is auto-staged into Stage 1 ─────────────────────────
 
     await page.click('#vab-btn-staging');
     await expect(page.locator('#vab-staging-panel')).toBeVisible();
 
-    // Drag engine chip from Unstaged → Stage 1 (data-drop-zone="stage-0").
-    await page.dragAndDrop(
-      '[data-drop-zone="unstaged"] .vab-stage-chip:has-text("Spark Engine")',
-      '[data-drop-zone="stage-0"]',
-    );
-
-    // Confirm the engine is now in Stage 1.
+    // Engine should be auto-staged into Stage 1 (no manual drag needed).
     await expect(
       page.locator('[data-drop-zone="stage-0"]').getByText('Spark Engine'),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 5_000 });
 
     // ── Click Launch ──────────────────────────────────────────────────────
 
@@ -431,26 +428,106 @@ test.describe('Flight — Launch & Basic Flight', () => {
     expect(throttleAfterMinus).toBeCloseTo(expectedAfterMinus, 1);
   });
 
-  // ── (9) "Return to Space Agency" brings up the post-flight summary ────────
+  // ── (9) "Restart from Launch" restarts the flight with fresh state ────────
 
-  test('(9) clicking "Return to Space Agency" from the menu shows the post-flight summary', async () => {
-    // Open the topbar dropdown (it was closed at the end of test 7).
+  test('(9) clicking "Restart from Launch" resets the flight to the launch pad', async () => {
+    // The rocket is currently in flight (staged + throttle applied).
+    // Record pre-restart altitude to prove the state resets.
+    const altBefore = await page.evaluate(() => window.__flightPs?.posY ?? 0);
+    expect(altBefore).toBeGreaterThan(0);
+
+    // Open the topbar dropdown and click "Restart from Launch".
     const dropdown = page.locator('#topbar-dropdown');
     if (!(await dropdown.isVisible())) {
       await page.click('#topbar-menu-btn');
       await expect(dropdown).toBeVisible({ timeout: 2_000 });
     }
+    await dropdown.getByText('Restart from Launch').click();
 
-    // Click "Return to Space Agency" in the dropdown.
+    // Flight HUD should still be visible (we're in a new flight, not the hub).
+    await expect(page.locator('#flight-hud')).toBeVisible({ timeout: 10_000 });
+
+    // Wait for the new physics state to be exposed.
+    await page.waitForFunction(
+      () => window.__flightPs !== null && window.__flightPs !== undefined,
+      { timeout: 10_000 },
+    );
+
+    // Altitude should be back near 0 — the rocket is on the pad again.
+    const altAfter = await page.evaluate(() => window.__flightPs?.posY ?? -1);
+    expect(altAfter).toBeGreaterThanOrEqual(0);
+    expect(altAfter).toBeLessThan(5);
+
+    // The rocket should be grounded.
+    const grounded = await page.evaluate(() => window.__flightPs?.grounded ?? false);
+    expect(grounded).toBe(true);
+  });
+
+  // ── (10) "Adjust Build" navigates to the VAB with the design loaded ─────
+
+  test('(10) clicking "Adjust Build" returns to the VAB with parts loaded', async () => {
+    // We're on the launch pad from the restart in test (9).
+    await expect(page.locator('#flight-hud')).toBeVisible();
+
+    // Open the topbar dropdown and click "Adjust Build".
+    const dropdown = page.locator('#topbar-dropdown');
+    if (!(await dropdown.isVisible())) {
+      await page.click('#topbar-menu-btn');
+      await expect(dropdown).toBeVisible({ timeout: 2_000 });
+    }
+    await dropdown.getByText('Adjust Build').click();
+
+    // Flight HUD should be gone.
+    await expect(page.locator('#flight-hud')).not.toBeVisible({ timeout: 5_000 });
+
+    // VAB should be visible with the rocket design loaded.
+    await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 15_000 });
+    await page.waitForFunction(
+      () => typeof window.__vabAssembly !== 'undefined',
+      { timeout: 10_000 },
+    );
+
+    // The assembly should have all 3 parts from the original rocket.
+    const partCount = await page.evaluate(() => window.__vabAssembly?.parts?.size ?? 0);
+    expect(partCount).toBe(3);
+  });
+
+  // ── (11) "Return to Space Agency" ends flight and returns to hub ─────────
+
+  test('(11) clicking "Return to Space Agency" from the menu returns to hub', async () => {
+    // We're in the VAB from test (10). Launch the loaded rocket again.
+    const launchBtn = page.locator('#vab-btn-launch');
+    await expect(launchBtn).not.toBeDisabled({ timeout: 5_000 });
+    await launchBtn.click();
+
+    // Handle crew dialog if it appears.
+    const crewOverlay = page.locator('#vab-crew-overlay');
+    if (await crewOverlay.isVisible({ timeout: 3_000 }).catch(() => false)) {
+      await page.click('#vab-crew-confirm');
+    }
+
+    // Wait for flight scene to load.
+    await page.waitForSelector('#flight-hud', { state: 'visible', timeout: 15_000 });
+    await page.waitForFunction(
+      () => window.__flightPs !== null && window.__flightPs !== undefined,
+      { timeout: 10_000 },
+    );
+
+    // Open the topbar dropdown and click "Return to Space Agency".
+    const dropdown = page.locator('#topbar-dropdown');
+    if (!(await dropdown.isVisible())) {
+      await page.click('#topbar-menu-btn');
+      await expect(dropdown).toBeVisible({ timeout: 2_000 });
+    }
     await dropdown.getByText('Return to Space Agency').click();
 
-    // Post-flight summary overlay should appear.
+    // The post-flight summary is shown first so the player can review results.
     await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 5_000 });
 
-    // The summary should include a "Return to Space Agency" button.
-    await expect(page.locator('#post-flight-return-btn')).toBeVisible();
+    // Click the "Return to Space Agency" button on the summary to go to the hub.
+    await page.click('#post-flight-return-btn');
 
-    // The flight HUD should no longer be visible (torn down by stopFlightScene).
-    await expect(page.locator('#flight-hud')).not.toBeVisible();
+    // Hub overlay should be visible — we're back at the Space Agency.
+    await expect(page.locator('#hub-overlay')).toBeVisible({ timeout: 5_000 });
   });
 });

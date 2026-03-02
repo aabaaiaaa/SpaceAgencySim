@@ -1,14 +1,31 @@
 /**
  * launchPad.js — Launch Pad Building HTML overlay UI.
  *
- * A placeholder screen for the Launch Pad building.  The full launch workflow
- * (selecting a rocket and crew, confirming the mission, and initiating flight)
- * is implemented in a later task.  This screen provides the navigation entry
- * point and the back-to-hub button so that hub navigation is fully testable
- * end-to-end.
+ * Displays previously launched rocket designs and allows the player to
+ * relaunch them directly.  Each saved design (stored in gameState.rockets)
+ * is shown as a card with name, stats, and a Launch button.
+ *
+ * Launch flow:
+ *   1. Player selects a rocket design card and clicks Launch.
+ *   2. The assembly and staging config are reconstructed from the saved design.
+ *   3. If the rocket has crew seats, a crew assignment dialog is shown.
+ *   4. A FlightState is created and the flight scene is started.
+ *   5. On flight end, the player returns to the hub with optional results.
  *
  * @module launchPad
  */
+
+import { getPartById } from '../data/parts.js';
+import { PartType } from '../core/constants.js';
+import {
+  createRocketAssembly,
+  addPartToAssembly,
+  createStagingConfig,
+  syncStagingWithAssembly,
+} from '../core/rocketbuilder.js';
+import { getActiveCrew } from '../core/crew.js';
+import { startFlightScene } from './flightController.js';
+import { showReturnResultsOverlay } from './hub.js';
 
 // ---------------------------------------------------------------------------
 // CSS
@@ -68,9 +85,9 @@ const LAUNCH_PAD_STYLES = `
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   padding: 20px;
   gap: 16px;
+  overflow-y: auto;
 }
 
 #launch-pad-status {
@@ -87,6 +104,164 @@ const LAUNCH_PAD_STYLES = `
   max-width: 420px;
   line-height: 1.55;
 }
+
+/* ── Rocket list ─────────────────────────────────────────────────────────── */
+#launch-pad-rocket-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 600px;
+}
+
+.lp-rocket-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  transition: background 0.15s;
+}
+.lp-rocket-card:hover {
+  background: rgba(255,255,255,0.07);
+}
+
+.lp-rocket-preview {
+  flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 4px;
+  background: rgba(0,0,0,0.3);
+}
+
+.lp-rocket-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.lp-rocket-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #e8e8e8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lp-rocket-stats {
+  font-size: 0.78rem;
+  color: #7888a0;
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.lp-rocket-date {
+  font-size: 0.72rem;
+  color: #5a6880;
+}
+
+.lp-launch-btn {
+  background: #2a6040;
+  border: 1px solid rgba(255,255,255,0.15);
+  color: #e8e8e8;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 8px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.lp-launch-btn:hover:not(:disabled) {
+  background: #357a50;
+}
+.lp-launch-btn:disabled {
+  background: #3a3a3a;
+  color: #666;
+  cursor: not-allowed;
+  border-color: rgba(255,255,255,0.08);
+}
+
+.lp-rocket-cost {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #80c8a0;
+}
+.lp-rocket-cost-insufficient {
+  color: #c07040;
+}
+
+/* ── Crew dialog ─────────────────────────────────────────────────────────── */
+#lp-crew-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#lp-crew-dialog {
+  background: #1a1e28;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 10px;
+  padding: 20px;
+  min-width: 280px;
+  max-width: 360px;
+  color: #e8e8e8;
+  font-family: system-ui, sans-serif;
+}
+.lp-crew-dlg-hdr {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+  text-align: center;
+}
+.lp-crew-seat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.lp-crew-seat-label {
+  font-size: 0.85rem;
+  color: #a0b0c0;
+}
+.lp-crew-seat-select {
+  background: #222838;
+  border: 1px solid rgba(255,255,255,0.15);
+  color: #e8e8e8;
+  font-size: 0.82rem;
+  padding: 4px 8px;
+  border-radius: 4px;
+  max-width: 180px;
+}
+.lp-crew-dlg-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+}
+.lp-crew-dlg-footer button {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.18);
+  color: #e8e8e8;
+  font-size: 0.82rem;
+  padding: 6px 16px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.lp-crew-dlg-footer .lp-crew-confirm-btn {
+  background: #2a6040;
+}
+.lp-crew-dlg-footer .lp-crew-confirm-btn:hover {
+  background: #357a50;
+}
 `;
 
 // ---------------------------------------------------------------------------
@@ -96,8 +271,161 @@ const LAUNCH_PAD_STYLES = `
 /** The root overlay element. @type {HTMLElement | null} */
 let _overlay = null;
 
+/** The #ui-overlay container reference. @type {HTMLElement | null} */
+let _container = null;
+
+/** The game state reference. @type {import('../core/gameState.js').GameState | null} */
+let _state = null;
+
 /** Callback to navigate back to the hub. @type {(() => void) | null} */
 let _onBack = null;
+
+// ---------------------------------------------------------------------------
+// Formatting helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Format a number with commas.
+ * @param {number} n
+ * @returns {string}
+ */
+function _fmt(n) {
+  return n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+}
+
+/**
+ * Format a dollar amount.
+ * @param {number} n
+ * @returns {string}
+ */
+function _fmt$(n) {
+  return '$' + Math.floor(n).toLocaleString('en-US');
+}
+
+/**
+ * Compute the total cost of a rocket design by summing part costs.
+ * @param {import('../core/gameState.js').RocketDesign} design
+ * @returns {number}
+ */
+function _computeDesignCost(design) {
+  let total = 0;
+  for (const part of design.parts) {
+    const def = getPartById(part.partId);
+    if (def) total += def.cost;
+  }
+  return total;
+}
+
+// ---------------------------------------------------------------------------
+// Rocket preview rendering (Canvas 2D)
+// ---------------------------------------------------------------------------
+
+/** Part fill colours keyed by PartType (CSS hex strings). */
+const PART_FILL = {
+  [PartType.COMMAND_MODULE]:       '#1a3860',
+  [PartType.COMPUTER_MODULE]:      '#122848',
+  [PartType.SERVICE_MODULE]:       '#1c2c58',
+  [PartType.FUEL_TANK]:            '#0e2040',
+  [PartType.ENGINE]:               '#3a1a08',
+  [PartType.SOLID_ROCKET_BOOSTER]: '#301408',
+  [PartType.STACK_DECOUPLER]:      '#142030',
+  [PartType.RADIAL_DECOUPLER]:     '#142030',
+  [PartType.DECOUPLER]:            '#142030',
+  [PartType.LANDING_LEG]:          '#102018',
+  [PartType.LANDING_LEGS]:         '#102018',
+  [PartType.PARACHUTE]:            '#2e1438',
+  [PartType.SATELLITE]:            '#142240',
+  [PartType.HEAT_SHIELD]:          '#2c1000',
+  [PartType.RCS_THRUSTER]:         '#182c30',
+  [PartType.SOLAR_PANEL]:          '#0a2810',
+};
+
+/** Part stroke colours keyed by PartType (CSS hex strings). */
+const PART_STROKE = {
+  [PartType.COMMAND_MODULE]:       '#4080c0',
+  [PartType.COMPUTER_MODULE]:      '#2870a0',
+  [PartType.SERVICE_MODULE]:       '#3860b0',
+  [PartType.FUEL_TANK]:            '#2060a0',
+  [PartType.ENGINE]:               '#c06020',
+  [PartType.SOLID_ROCKET_BOOSTER]: '#a04818',
+  [PartType.STACK_DECOUPLER]:      '#305080',
+  [PartType.RADIAL_DECOUPLER]:     '#305080',
+  [PartType.DECOUPLER]:            '#305080',
+  [PartType.LANDING_LEG]:          '#207840',
+  [PartType.LANDING_LEGS]:         '#207840',
+  [PartType.PARACHUTE]:            '#8040a0',
+  [PartType.SATELLITE]:            '#2868b0',
+  [PartType.HEAT_SHIELD]:          '#a04010',
+  [PartType.RCS_THRUSTER]:         '#2890a0',
+  [PartType.SOLAR_PANEL]:          '#20a040',
+};
+
+const PREVIEW_W = 80;
+const PREVIEW_H = 120;
+const PREVIEW_PAD = 6;
+
+/**
+ * Draw a miniature rocket preview onto a 2D canvas element.
+ *
+ * @param {HTMLCanvasElement} canvas
+ * @param {import('../core/gameState.js').RocketDesign} design
+ */
+function _renderRocketPreview(canvas, design) {
+  canvas.width  = PREVIEW_W;
+  canvas.height = PREVIEW_H;
+  canvas.className = 'lp-rocket-preview';
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx || !design.parts || design.parts.length === 0) return;
+
+  // Resolve part defs and compute bounding box.
+  const resolved = [];
+  let minX = Infinity, maxX = -Infinity;
+  let minY = Infinity, maxY = -Infinity;
+
+  for (const p of design.parts) {
+    const def = getPartById(p.partId);
+    if (!def) continue;
+    const hw = (def.width  ?? 40) / 2;
+    const hh = (def.height ?? 20) / 2;
+    const px = p.position.x;
+    const py = p.position.y;
+    minX = Math.min(minX, px - hw);
+    maxX = Math.max(maxX, px + hw);
+    minY = Math.min(minY, py - hh);
+    maxY = Math.max(maxY, py + hh);
+    resolved.push({ px, py, hw, hh, def });
+  }
+
+  if (resolved.length === 0) return;
+
+  const rocketW = maxX - minX;
+  const rocketH = maxY - minY;
+
+  // Scale to fit canvas with padding, preserving aspect ratio.
+  const drawW = PREVIEW_W - PREVIEW_PAD * 2;
+  const drawH = PREVIEW_H - PREVIEW_PAD * 2;
+  const scale = Math.min(drawW / Math.max(rocketW, 1), drawH / Math.max(rocketH, 1));
+
+  const cx = PREVIEW_W  / 2;
+  const cy = PREVIEW_H / 2;
+  const midX = (minX + maxX) / 2;
+  const midY = (minY + maxY) / 2;
+
+  for (const { px, py, hw, hh, def } of resolved) {
+    // Canvas coords: centre on canvas, Y-up → Y-down flip.
+    const sx = cx + (px - midX) * scale;
+    const sy = cy - (py - midY) * scale;
+    const sw = hw * 2 * scale;
+    const sh = hh * 2 * scale;
+
+    ctx.fillStyle   = PART_FILL[def.type]   ?? '#0e2040';
+    ctx.strokeStyle = PART_STROKE[def.type]  ?? '#2060a0';
+    ctx.lineWidth   = 1;
+    ctx.fillRect(sx - sw / 2, sy - sh / 2, sw, sh);
+    ctx.strokeRect(sx - sw / 2, sy - sh / 2, sw, sh);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -107,11 +435,13 @@ let _onBack = null;
  * Mount the Launch Pad overlay.
  *
  * @param {HTMLElement} container   The #ui-overlay div.
- * @param {import('../core/gameState.js').GameState} _state
+ * @param {import('../core/gameState.js').GameState} state
  * @param {{ onBack: () => void }} callbacks
  */
-export function initLaunchPadUI(container, _state, { onBack }) {
-  _onBack = onBack;
+export function initLaunchPadUI(container, state, { onBack }) {
+  _container = container;
+  _state     = state;
+  _onBack    = onBack;
 
   // Inject CSS once.
   if (!document.getElementById('launch-pad-styles')) {
@@ -138,19 +468,22 @@ export function destroyLaunchPadUI() {
     _overlay.remove();
     _overlay = null;
   }
-  _onBack = null;
+  _container = null;
+  _state     = null;
+  _onBack    = null;
   console.log('[Launch Pad UI] Destroyed');
 }
 
 // ---------------------------------------------------------------------------
-// Private
+// Private — rendering
 // ---------------------------------------------------------------------------
 
 /**
- * Build the static screen layout: header with back button + placeholder content.
+ * Build the screen layout: header with back button + rocket list or
+ * empty-state placeholder.
  */
 function _renderShell() {
-  if (!_overlay) return;
+  if (!_overlay || !_state) return;
 
   // Header
   const header = document.createElement('div');
@@ -158,7 +491,7 @@ function _renderShell() {
 
   const backBtn = document.createElement('button');
   backBtn.id = 'launch-pad-back-btn';
-  backBtn.textContent = '← Hub';
+  backBtn.textContent = '\u2190 Hub';
   backBtn.addEventListener('click', () => {
     const onBack = _onBack; // capture before destroy nulls it
     destroyLaunchPadUI();
@@ -173,20 +506,339 @@ function _renderShell() {
 
   _overlay.appendChild(header);
 
-  // Placeholder content
+  // Content
   const content = document.createElement('div');
   content.id = 'launch-pad-content';
 
-  const status = document.createElement('p');
-  status.id = 'launch-pad-status';
-  status.textContent = 'No rockets are ready for launch.';
-  content.appendChild(status);
+  const rockets = _state.rockets;
 
-  const hint = document.createElement('p');
-  hint.id = 'launch-pad-hint';
-  hint.textContent =
-    'Build a rocket in the Vehicle Assembly Building and select a mission to begin the launch sequence.';
-  content.appendChild(hint);
+  if (!rockets || rockets.length === 0) {
+    // Empty state
+    const status = document.createElement('p');
+    status.id = 'launch-pad-status';
+    status.textContent = 'No rockets are ready for launch.';
+    content.appendChild(status);
+
+    const hint = document.createElement('p');
+    hint.id = 'launch-pad-hint';
+    hint.textContent =
+      'Build a rocket in the Vehicle Assembly Building and launch it. ' +
+      'Previously launched designs will appear here for relaunch.';
+    content.appendChild(hint);
+  } else {
+    // Rocket list
+    const list = document.createElement('div');
+    list.id = 'launch-pad-rocket-list';
+
+    for (const design of rockets) {
+      list.appendChild(_buildRocketCard(design));
+    }
+
+    content.appendChild(list);
+  }
 
   _overlay.appendChild(content);
+}
+
+/**
+ * Build a single rocket design card.
+ *
+ * @param {import('../core/gameState.js').RocketDesign} design
+ * @returns {HTMLElement}
+ */
+function _buildRocketCard(design) {
+  const card = document.createElement('div');
+  card.className = 'lp-rocket-card';
+  card.dataset.rocketId = design.id;
+
+  const cost    = _computeDesignCost(design);
+  const canAfford = _state ? _state.money >= cost : false;
+
+  // Rocket preview thumbnail
+  const previewCanvas = document.createElement('canvas');
+  _renderRocketPreview(previewCanvas, design);
+  card.appendChild(previewCanvas);
+
+  // Info column
+  const info = document.createElement('div');
+  info.className = 'lp-rocket-info';
+  info.style.flex = '1';
+  info.style.minWidth = '0';
+
+  const name = document.createElement('div');
+  name.className = 'lp-rocket-name';
+  name.textContent = design.name || 'Unnamed Rocket';
+  info.appendChild(name);
+
+  const stats = document.createElement('div');
+  stats.className = 'lp-rocket-stats';
+  stats.innerHTML =
+    `<span>Parts: ${design.parts?.length ?? 0}</span>` +
+    `<span>Mass: ${_fmt(design.totalMass)} kg</span>` +
+    `<span>Thrust: ${_fmt(design.totalThrust)} kN</span>`;
+  info.appendChild(stats);
+
+  const costEl = document.createElement('div');
+  costEl.className = 'lp-rocket-cost' + (canAfford ? '' : ' lp-rocket-cost-insufficient');
+  costEl.textContent = `Launch cost: ${_fmt$(cost)}`;
+  info.appendChild(costEl);
+
+  const date = document.createElement('div');
+  date.className = 'lp-rocket-date';
+  if (design.createdDate) {
+    const d = new Date(design.createdDate);
+    date.textContent = `Launched: ${d.toLocaleDateString()} ${d.toLocaleTimeString()}`;
+  }
+  info.appendChild(date);
+
+  card.appendChild(info);
+
+  // Launch button
+  const launchBtn = document.createElement('button');
+  launchBtn.className = 'lp-launch-btn';
+  launchBtn.dataset.action = 'launch';
+  launchBtn.textContent = `Launch (${_fmt$(cost)})`;
+  if (!canAfford) {
+    launchBtn.disabled = true;
+    launchBtn.title = 'Insufficient funds';
+  }
+  launchBtn.addEventListener('click', () => _handleLaunch(design));
+  card.appendChild(launchBtn);
+
+  return card;
+}
+
+// ---------------------------------------------------------------------------
+// Private — launch flow
+// ---------------------------------------------------------------------------
+
+/**
+ * Reconstruct a live RocketAssembly from a saved RocketDesign.
+ * Parts are added in the same order they were saved, so the auto-generated
+ * instanceIds (inst-1, inst-2, ...) match the original staging references.
+ *
+ * @param {import('../core/gameState.js').RocketDesign} design
+ * @returns {import('../core/rocketbuilder.js').RocketAssembly}
+ */
+function _designToAssembly(design) {
+  const assembly = createRocketAssembly();
+  for (const part of design.parts) {
+    addPartToAssembly(assembly, part.partId, part.position.x, part.position.y);
+  }
+  return assembly;
+}
+
+/**
+ * Reconstruct a live StagingConfig from a saved RocketDesign's staging data.
+ * Falls back to a default single-stage config if staging data is missing.
+ *
+ * @param {import('../core/gameState.js').RocketDesign} design
+ * @param {import('../core/rocketbuilder.js').RocketAssembly} assembly
+ * @returns {import('../core/rocketbuilder.js').StagingConfig}
+ */
+function _designToStagingConfig(design, assembly) {
+  const staging = design.staging;
+
+  if (staging && Array.isArray(staging.stages)) {
+    const config = {
+      stages:          staging.stages.map(ids => ({
+        instanceIds: Array.isArray(ids) ? [...ids] : [],
+      })),
+      unstaged:        Array.isArray(staging.unstaged) ? [...staging.unstaged] : [],
+      currentStageIdx: 0,
+    };
+    // Clean up any stale references.
+    syncStagingWithAssembly(assembly, config);
+    return config;
+  }
+
+  // Fallback: create default staging and let sync populate it.
+  const config = createStagingConfig();
+  syncStagingWithAssembly(assembly, config);
+  return config;
+}
+
+/**
+ * Handle clicking Launch on a rocket design card.
+ * Checks for crew seats and shows a crew dialog if needed.
+ *
+ * @param {import('../core/gameState.js').RocketDesign} design
+ */
+function _handleLaunch(design) {
+  if (!_state) return;
+
+  const assembly      = _designToAssembly(design);
+  const stagingConfig = _designToStagingConfig(design, assembly);
+
+  // Count crew seats across command modules.
+  let totalSeats = 0;
+  for (const placed of assembly.parts.values()) {
+    const def = getPartById(placed.partId);
+    if (def?.type === PartType.COMMAND_MODULE) {
+      totalSeats += def.properties?.seats ?? 0;
+    }
+  }
+
+  if (totalSeats > 0) {
+    _showCrewDialog(totalSeats, design, assembly, stagingConfig);
+  } else {
+    _doLaunch([], design, assembly, stagingConfig);
+  }
+}
+
+/**
+ * Show a crew assignment dialog before launch.
+ *
+ * @param {number} totalSeats
+ * @param {import('../core/gameState.js').RocketDesign} design
+ * @param {import('../core/rocketbuilder.js').RocketAssembly} assembly
+ * @param {import('../core/rocketbuilder.js').StagingConfig} stagingConfig
+ */
+function _showCrewDialog(totalSeats, design, assembly, stagingConfig) {
+  if (!_state) return;
+
+  const activeCrew = getActiveCrew(_state);
+
+  const crewOpts = activeCrew.map(
+    (c) => `<option value="${c.id}">${c.name}</option>`,
+  ).join('');
+
+  const seatRows = [];
+  for (let i = 0; i < totalSeats; i++) {
+    seatRows.push(
+      `<div class="lp-crew-seat-row">` +
+        `<span class="lp-crew-seat-label">Seat ${i + 1}</span>` +
+        `<select class="lp-crew-seat-select" data-seat="${i}">` +
+          `<option value="">\u2014 Empty \u2014</option>` +
+          crewOpts +
+        `</select>` +
+      `</div>`,
+    );
+  }
+
+  const infoMsg = activeCrew.length === 0
+    ? `<p style="font-size:10px;color:#c07030;margin-bottom:10px;line-height:1.6;">` +
+      `No active crew to assign.<br>Seats will launch empty.</p>`
+    : `<p style="font-size:10px;color:#3a6080;margin-bottom:12px;line-height:1.6;">` +
+      `Assign crew to seats before launch.<br>Seats may be left empty.</p>`;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'lp-crew-overlay';
+  overlay.innerHTML =
+    `<div id="lp-crew-dialog">` +
+      `<div class="lp-crew-dlg-hdr">Crew Assignment</div>` +
+      `<div class="lp-crew-dlg-body">` +
+        infoMsg +
+        seatRows.join('') +
+      `</div>` +
+      `<div class="lp-crew-dlg-footer">` +
+        `<button class="lp-crew-cancel-btn" type="button">Cancel</button>` +
+        `<button class="lp-crew-confirm-btn" type="button">Launch</button>` +
+      `</div>` +
+    `</div>`;
+
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener('pointerdown', (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+
+  overlay.querySelector('.lp-crew-cancel-btn')?.addEventListener('click', () => {
+    overlay.remove();
+  });
+
+  overlay.querySelector('.lp-crew-confirm-btn')?.addEventListener('click', () => {
+    const selects = overlay.querySelectorAll('.lp-crew-seat-select');
+    const crewIds = [];
+    const seen    = new Set();
+    for (const sel of selects) {
+      const id = /** @type {HTMLSelectElement} */ (sel).value;
+      if (id && !seen.has(id)) {
+        crewIds.push(id);
+        seen.add(id);
+      }
+    }
+    overlay.remove();
+    _doLaunch(crewIds, design, assembly, stagingConfig);
+  });
+}
+
+/**
+ * Create the FlightState and transition to the flight scene.
+ *
+ * @param {string[]} crewIds
+ * @param {import('../core/gameState.js').RocketDesign} design
+ * @param {import('../core/rocketbuilder.js').RocketAssembly} assembly
+ * @param {import('../core/rocketbuilder.js').StagingConfig} stagingConfig
+ */
+function _doLaunch(crewIds, design, assembly, stagingConfig) {
+  if (!_state) return;
+
+  // Deduct the launch cost (re-purchasing the parts for this flight).
+  const cost = _computeDesignCost(design);
+  _state.money -= cost;
+
+  // Associate with the first accepted mission if one exists.
+  const missionId = _state.missions.accepted[0]?.id ?? '';
+
+  // Sum up initial fuel load.
+  let totalFuel = 0;
+  for (const placed of assembly.parts.values()) {
+    const def = getPartById(placed.partId);
+    if (def) totalFuel += def.properties?.fuelMass ?? 0;
+  }
+
+  // Write the live flight state.
+  _state.currentFlight = {
+    missionId,
+    rocketId:        design.id,
+    crewIds,
+    timeElapsed:     0,
+    altitude:        0,
+    velocity:        0,
+    fuelRemaining:   totalFuel,
+    deltaVRemaining: 0,
+    events:          [],
+    aborted:         false,
+  };
+
+  console.log('[Launch Pad] Launch initiated', {
+    designId:   design.id,
+    designName: design.name,
+    missionId:  missionId || '(none)',
+    crewCount:  crewIds.length,
+  });
+
+  // Capture references before destroying the launch pad overlay.
+  const container = _container;
+  const onBack    = _onBack;
+  const state     = _state;
+
+  destroyLaunchPadUI();
+
+  if (container) {
+    startFlightScene(
+      container,
+      state,
+      assembly,
+      stagingConfig,
+      state.currentFlight,
+      (_finalState, returnResults, navigateTo) => {
+        // Return to hub.
+        if (onBack) onBack();
+
+        // Show the post-flight results overlay if applicable.
+        if (returnResults) {
+          showReturnResultsOverlay(container, returnResults);
+        }
+
+        // "Retry with Same Design" — auto-navigate to the VAB.  The hub
+        // is already mounted by onBack(); click the VAB building to enter.
+        if (navigateTo === 'vab') {
+          const vabEl = document.querySelector('[data-building-id="vab"]');
+          if (vabEl) /** @type {HTMLElement} */ (vabEl).click();
+        }
+      },
+    );
+  }
 }

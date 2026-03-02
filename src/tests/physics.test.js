@@ -71,6 +71,31 @@ function makeSimpleRocket() {
 }
 
 /**
+ * Two-stage rocket: Probe Core + Decoupler + Small Tank + Spark Engine.
+ * Stage 1: engine ignition.  Stage 2: decoupler separation.
+ */
+function makeTwoStageRocketGlobal() {
+  const assembly = createRocketAssembly();
+  const staging  = createStagingConfig();
+
+  const probeId   = addPartToAssembly(assembly, 'probe-core-mk1',       0,  100);
+  const decId     = addPartToAssembly(assembly, 'decoupler-stack-tr18', 0,   60);
+  const tankId    = addPartToAssembly(assembly, 'tank-small',           0,    0);
+  const engineId  = addPartToAssembly(assembly, 'engine-spark',         0,  -55);
+
+  connectParts(assembly, probeId, 1, decId,    0);
+  connectParts(assembly, decId,   1, tankId,   0);
+  connectParts(assembly, tankId,  1, engineId, 0);
+
+  syncStagingWithAssembly(assembly, staging);
+  assignPartToStage(staging, engineId, 0);
+  addStageToConfig(staging);
+  assignPartToStage(staging, decId, 1);
+
+  return { assembly, staging, probeId, decId, tankId, engineId };
+}
+
+/**
  * Build a FlightState stub for a test flight.
  */
 function makeFlightState() {
@@ -443,7 +468,7 @@ describe('handleKeyDown() / handleKeyUp() — steering keys', () => {
     expect(ps.angle).toBeGreaterThan(0);
   });
 
-  it('steering stops when key is released', () => {
+  it('angular velocity decays after key is released (torque-based)', () => {
     const { assembly, staging } = makeSimpleRocket();
     const fs = makeFlightState();
     const ps = createPhysicsState(assembly, fs);
@@ -453,13 +478,14 @@ describe('handleKeyDown() / handleKeyUp() — steering keys', () => {
 
     handleKeyDown(ps, assembly, 'd');
     tick(ps, assembly, staging, fs, 0.25);
-    const angleAfterHold = ps.angle;
+    const angVelAfterHold = ps.angularVelocity;
+    expect(angVelAfterHold).toBeGreaterThan(0);
 
     handleKeyUp(ps, 'd');
-    tick(ps, assembly, staging, fs, 0.25);
+    tick(ps, assembly, staging, fs, 1.0);
 
-    // Angle should not have changed after key release.
-    expect(ps.angle).toBeCloseTo(angleAfterHold, 5);
+    // Angular velocity should have decayed (atmospheric damping at low altitude).
+    expect(Math.abs(ps.angularVelocity)).toBeLessThan(Math.abs(angVelAfterHold));
   });
 });
 
@@ -1595,5 +1621,266 @@ describe('TASK-025: getLegContextMenuItems()', () => {
     const item1 = items.find((i) => i.instanceId === legId1);
     expect(item1.deployTimer).toBeCloseTo(0.8, 1);
     expect(item1.statusLabel).toContain('Deploying');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Ground rotation — tipping physics
+// ---------------------------------------------------------------------------
+
+describe('Ground rotation — tipping physics', () => {
+  it('angularVelocity initialises to 0', () => {
+    const { assembly } = makeSimpleRocket();
+    const ps = createPhysicsState(assembly, makeFlightState());
+    expect(ps.angularVelocity).toBe(0);
+  });
+
+  it('isTipping initialises to false', () => {
+    const { assembly } = makeSimpleRocket();
+    const ps = createPhysicsState(assembly, makeFlightState());
+    expect(ps.isTipping).toBe(false);
+  });
+
+  it('holding D while grounded increases angle (clockwise)', () => {
+    const { assembly, staging } = makeSimpleRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    handleKeyDown(ps, assembly, 'd');
+    // Run several ticks while grounded.
+    for (let i = 0; i < 30; i++) {
+      tick(ps, assembly, staging, fs, 1 / 60);
+    }
+
+    expect(ps.angle).toBeGreaterThan(0);
+  });
+
+  it('holding A while grounded decreases angle (counter-clockwise)', () => {
+    const { assembly, staging } = makeSimpleRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    handleKeyDown(ps, assembly, 'a');
+    for (let i = 0; i < 30; i++) {
+      tick(ps, assembly, staging, fs, 1 / 60);
+    }
+
+    expect(ps.angle).toBeLessThan(0);
+  });
+
+  it('pre-tilted rocket with no input: gravity torque increases tilt further', () => {
+    const { assembly, staging } = makeSimpleRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    // Pre-tilt past the tipping point (~13° for this rocket) so gravity topples.
+    ps.angle = 0.4; // ~23 degrees clockwise — past tipping point
+    ps.angularVelocity = 0.1;
+    ps.isTipping = true;
+
+    for (let i = 0; i < 60; i++) {
+      tick(ps, assembly, staging, fs, 1 / 60);
+      if (ps.crashed) break;
+    }
+
+    // Gravity should have pulled it further clockwise.
+    expect(ps.angle).toBeGreaterThan(0.4);
+  });
+
+  it('toppling past crash angle triggers CRASH event with toppled flag', () => {
+    const { assembly, staging } = makeSimpleRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    // Set a large tilt with high angular velocity to ensure topple.
+    ps.angle = 1.2; // ~69 degrees — near topple threshold
+    ps.angularVelocity = 2.0;
+    ps.isTipping = true;
+
+    // Tick until crash.
+    for (let i = 0; i < 120; i++) {
+      tick(ps, assembly, staging, fs, 1 / 60);
+      if (ps.crashed) break;
+    }
+
+    expect(ps.crashed).toBe(true);
+    const crashEvt = fs.events.find((e) => e.type === 'CRASH' && e.toppled === true);
+    expect(crashEvt).toBeDefined();
+  });
+
+  it('tipping physics runs on ps.landed (not just grounded)', () => {
+    const { assembly, staging } = makeSimpleRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    // Simulate a landed state.
+    ps.grounded = false;
+    ps.landed = true;
+    ps.angle = 0.05;
+    ps.isTipping = true;
+
+    const angleBefore = ps.angle;
+    for (let i = 0; i < 30; i++) {
+      tick(ps, assembly, staging, fs, 1 / 60);
+    }
+
+    // Gravity torque should have changed the angle.
+    expect(ps.angle).not.toBeCloseTo(angleBefore, 3);
+  });
+
+  it('small tilt near vertical snaps back to 0', () => {
+    const { assembly, staging } = makeSimpleRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    // Very small angle with no input — should snap to 0.
+    ps.angle = 0.001;
+    ps.angularVelocity = 0.001;
+
+    for (let i = 0; i < 30; i++) {
+      tick(ps, assembly, staging, fs, 1 / 60);
+    }
+
+    expect(ps.angle).toBe(0);
+    expect(ps.angularVelocity).toBe(0);
+    expect(ps.isTipping).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Airborne torque-based rotation
+// ---------------------------------------------------------------------------
+
+describe('Airborne torque-based rotation', () => {
+  it('holding D in flight produces positive angular velocity', () => {
+    const { assembly, staging, engineId } = makeSimpleRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    // Get airborne.
+    fireNextStage(ps, assembly, staging, fs);
+    for (let i = 0; i < 60; i++) tick(ps, assembly, staging, fs, 1 / 60);
+    expect(ps.grounded).toBe(false);
+
+    handleKeyDown(ps, assembly, 'd');
+    for (let i = 0; i < 30; i++) tick(ps, assembly, staging, fs, 1 / 60);
+
+    expect(ps.angularVelocity).toBeGreaterThan(0);
+    expect(ps.angle).toBeGreaterThan(0);
+  });
+
+  it('heavier rocket turns slower (higher I → lower angular accel)', () => {
+    // Light rocket.
+    const r1 = makeSimpleRocket();
+    const fs1 = makeFlightState();
+    const ps1 = createPhysicsState(r1.assembly, fs1);
+    fireNextStage(ps1, r1.assembly, r1.staging, fs1);
+    for (let i = 0; i < 60; i++) tick(ps1, r1.assembly, r1.staging, fs1, 1 / 60);
+
+    handleKeyDown(ps1, r1.assembly, 'd');
+    for (let i = 0; i < 10; i++) tick(ps1, r1.assembly, r1.staging, fs1, 1 / 60);
+    const lightAngle = ps1.angle;
+
+    // Heavy rocket: add extra mass by filling tank with more fuel.
+    const r2 = makeSimpleRocket();
+    const fs2 = makeFlightState();
+    const ps2 = createPhysicsState(r2.assembly, fs2);
+    // Increase mass dramatically.
+    for (const [id] of ps2.fuelStore) {
+      ps2.fuelStore.set(id, 50000);
+    }
+    // Manually put the heavy rocket airborne (TWR < 1 so it can't lift off).
+    ps2.posY = 5000;
+    ps2.grounded = false;
+    fireNextStage(ps2, r2.assembly, r2.staging, fs2);
+
+    handleKeyDown(ps2, r2.assembly, 'd');
+    for (let i = 0; i < 10; i++) tick(ps2, r2.assembly, r2.staging, fs2, 1 / 60);
+    const heavyAngle = ps2.angle;
+
+    // Heavy rocket should have turned less.
+    expect(Math.abs(heavyAngle)).toBeLessThan(Math.abs(lightAngle));
+  });
+
+  it('angular velocity persists in vacuum when key released (no RCS)', () => {
+    const { assembly, staging } = makeSimpleRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    // Put rocket high up in vacuum with some angular velocity.
+    ps.posY = 100_000; // way above atmosphere
+    ps.grounded = false;
+    ps.angularVelocity = 0.5;
+
+    // Run a few ticks with no key held.
+    for (let i = 0; i < 30; i++) tick(ps, assembly, staging, fs, 1 / 60);
+
+    // Angular velocity should persist (no RCS, no atmosphere to damp).
+    expect(Math.abs(ps.angularVelocity)).toBeGreaterThan(0.45);
+  });
+
+  it('atmospheric flight damps angular velocity', () => {
+    const { assembly, staging } = makeSimpleRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    // Low altitude with angular velocity but no key held.
+    ps.posY = 100;
+    ps.grounded = false;
+    ps.angularVelocity = 1.0;
+
+    // Run for 10 seconds to allow meaningful atmospheric damping.
+    for (let i = 0; i < 600; i++) tick(ps, assembly, staging, fs, 1 / 60);
+
+    // Atmospheric damping should have reduced angular velocity noticeably.
+    expect(Math.abs(ps.angularVelocity)).toBeLessThan(0.95);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Debris angular dynamics
+// ---------------------------------------------------------------------------
+
+describe('Debris angular dynamics', () => {
+  it('debris inherits angularVelocity from parent at separation', () => {
+    const { assembly, staging, engineId } = makeTwoStageRocketGlobal();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    // Get airborne, give the rocket some angular velocity.
+    fireNextStage(ps, assembly, staging, fs);
+    for (let i = 0; i < 60; i++) tick(ps, assembly, staging, fs, 1 / 60);
+    ps.angularVelocity = 0.3;
+
+    // Fire decoupler stage.
+    fireNextStage(ps, assembly, staging, fs);
+
+    // Check that debris exists and has non-zero angular velocity.
+    expect(ps.debris.length).toBeGreaterThan(0);
+    const debris = ps.debris[0];
+    // Inherited 0.3 ± 0.15 random perturbation.
+    expect(debris.angularVelocity).toBeDefined();
+    expect(typeof debris.angularVelocity).toBe('number');
+  });
+
+  it('debris angle changes over time from angular velocity', () => {
+    const { assembly, staging } = makeTwoStageRocketGlobal();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    fireNextStage(ps, assembly, staging, fs);
+    for (let i = 0; i < 30; i++) tick(ps, assembly, staging, fs, 1 / 60);
+
+    fireNextStage(ps, assembly, staging, fs);
+    expect(ps.debris.length).toBeGreaterThan(0);
+
+    const debris = ps.debris[0];
+    debris.angularVelocity = 1.0;
+    const angleBefore = debris.angle;
+
+    // Tick the main sim (which ticks debris internally).
+    for (let i = 0; i < 30; i++) tick(ps, assembly, staging, fs, 1 / 60);
+
+    expect(debris.angle).not.toBe(angleBefore);
   });
 });

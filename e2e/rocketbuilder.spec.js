@@ -244,69 +244,49 @@ test.describe('VAB — Rocket Builder Flow', () => {
     expect(connCount).toBe(2);
   });
 
-  // ── (5) Staging panel shows engine in unstaged pool ──────────────────────
+  // ── (5) Staging panel shows engine auto-staged in Stage 1 ───────────────
 
-  test('(5) staging panel shows engine in the unstaged parts pool', async () => {
+  test('(5) staging panel shows engine auto-staged in Stage 1', async () => {
     // Open the Staging side panel
     await page.click('#vab-btn-staging');
     await expect(page.locator('#vab-staging-panel')).toBeVisible();
 
-    // The unstaged zone should contain a chip for the Spark Engine
-    // (cmd-mk1 is also activatable and may appear, but we check for the engine)
+    // With auto-staging, the Spark Engine (IGNITE behaviour) should be in Stage 1.
+    const stage1Zone = page.locator('[data-drop-zone="stage-0"]');
+    await expect(stage1Zone.getByText('Spark Engine')).toBeVisible({ timeout: 5_000 });
+
+    // Engine should NOT be in the unstaged pool.
     const unstagedZone = page.locator('[data-drop-zone="unstaged"]');
-    await expect(unstagedZone).toBeVisible();
-    await expect(unstagedZone.getByText('Spark Engine')).toBeVisible();
+    await expect(unstagedZone.getByText('Spark Engine')).not.toBeVisible();
   });
 
-  // ── (7) Rocket Engineer shows failing TWR when no engine is staged ────────
-  // NOTE: This test runs BEFORE (6) intentionally — at this point the engine
-  // is still in the unstaged pool, so Stage 1 has no thrust and TWR fails.
+  // ── (7) Rocket Engineer shows passing TWR when engine is auto-staged ──────
 
-  test('(7) Rocket Engineer shows failing TWR when no engine is staged', async () => {
+  test('(7) Rocket Engineer shows passing validation when engine is auto-staged', async () => {
     // Open Rocket Engineer panel (auto-closes Staging panel)
     await page.click('#vab-btn-engineer');
     await expect(page.locator('#vab-engineer-panel')).toBeVisible();
 
-    // TWR stat should be rendered with the "bad" class (twr <= 1.0)
-    const twrBadEl = page.locator('.vab-val-stat-bad');
-    await expect(twrBadEl).toBeVisible();
-
-    // At least one blocking check should fail (Stage 1 engine, TWR)
-    const failIcons = page.locator('.vab-val-icon-fail');
-    expect(await failIcons.count()).toBeGreaterThanOrEqual(1);
-
-    // Launch button must still be disabled
-    await expect(page.locator('#vab-btn-launch')).toBeDisabled();
+    // With engine auto-staged in Stage 1, all blocking checks should pass.
+    // Launch button should be enabled.
+    await expect(page.locator('#vab-btn-launch')).not.toBeDisabled({ timeout: 5_000 });
   });
 
-  // ── (6) Moving engine into Stage 1 shows it in the Stage 1 slot ──────────
+  // ── (6) Engine is correctly shown in Stage 1 slot ─────────────────────────
 
-  test('(6) moving engine into Stage 1 shows it in the Stage 1 slot', async () => {
-    // Ensure the staging panel is open. With stackable panels it may already be
-    // visible from test (5); only click the button if it is currently hidden.
+  test('(6) engine appears in Stage 1 slot via auto-staging', async () => {
+    // Ensure the staging panel is open.
     const stagingPanel = page.locator('#vab-staging-panel');
     if (!(await stagingPanel.isVisible())) {
       await page.click('#vab-btn-staging');
     }
     await expect(stagingPanel).toBeVisible();
 
-    // Ensure the engine chip is visible in the unstaged zone
-    const unstagedChip = page.locator('[data-drop-zone="unstaged"] .vab-stage-chip', {
-      hasText: 'Spark Engine',
-    });
-    await expect(unstagedChip).toBeVisible();
-
-    // HTML5 drag-and-drop: move chip from unstaged zone to Stage 1 zone
-    await page.dragAndDrop(
-      '[data-drop-zone="unstaged"] .vab-stage-chip:has-text("Spark Engine")',
-      '[data-drop-zone="stage-0"]',
-    );
-
-    // Engine should now appear in the Stage 1 drop zone
+    // Engine should be in the Stage 1 drop zone (auto-staged).
     const stage1Zone = page.locator('[data-drop-zone="stage-0"]');
     await expect(stage1Zone.getByText('Spark Engine')).toBeVisible();
 
-    // Engine should no longer be in the unstaged zone
+    // Engine should no longer be in the unstaged zone.
     const unstagedZone = page.locator('[data-drop-zone="unstaged"]');
     await expect(unstagedZone.getByText('Spark Engine')).not.toBeVisible();
   });

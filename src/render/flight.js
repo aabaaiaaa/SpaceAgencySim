@@ -677,10 +677,11 @@ function _renderRocket(ps, assembly, w, h) {
   const comLocalX =  (com.x - ps.posX) / SCALE_M_PER_PX;  // local X offset (pixels)
   const comLocalY = -(com.y - ps.posY) / SCALE_M_PER_PX;  // local Y offset (Y-down)
 
-  // When grounded, shift the container so the lowest active part's bottom edge
-  // sits exactly on the ground line.  lowestPartBottomPx is in VAB-pixel / local space.
+  // When on the ground (grounded or landed), shift the container so the lowest
+  // active part's bottom edge sits exactly on the ground line.
+  // lowestPartBottomPx is in VAB-pixel / local space.
   let lowestPartBottomPx = 0;
-  if (ps.grounded) {
+  if (ps.grounded || ps.landed) {
     for (const instanceId of ps.activeParts) {
       const placed = assembly.parts.get(instanceId);
       const def    = placed ? getPartById(placed.partId) : null;
@@ -690,16 +691,25 @@ function _renderRocket(ps, assembly, w, h) {
     }
   }
 
-  // Position the container so that:
-  //   - the pivot (CoM) appears at the correct screen position, AND
-  //   - the local origin (reference point, ps.posX/posY) maps to its world screen pos.
-  // With pivot = (comLocalX, comLocalY), container.x = sx + comLocalX keeps the
-  // local origin at screen sx; container.y = sy + lowestPartBottomPx + comLocalY
-  // applies the ground correction while keeping the origin at sy + lowestPartBottomPx.
   const { sx, sy } = _worldToScreen(ps.posX, ps.posY, w, h);
-  _rocketContainer.pivot.set(comLocalX, comLocalY);
-  _rocketContainer.x        = sx + comLocalX;
-  _rocketContainer.y        = sy + lowestPartBottomPx + comLocalY;
+
+  // When tipping on the ground, rotate around the contact point (base corner)
+  // instead of the centre of mass so the rocket visually tips from its base.
+  if ((ps.grounded || ps.landed) && ps.isTipping) {
+    // Contact point in container-local coords (Y-down).
+    const pivotX =  ps.tippingContactX;
+    const pivotY = -ps.tippingContactY;  // VAB Y-up → container Y-down
+
+    _rocketContainer.pivot.set(pivotX, pivotY);
+    // Pin the contact point to the ground line on screen.
+    _rocketContainer.x = sx + pivotX;
+    _rocketContainer.y = sy + lowestPartBottomPx + pivotY;
+  } else {
+    // Normal mode: rotate around CoM.
+    _rocketContainer.pivot.set(comLocalX, comLocalY);
+    _rocketContainer.x        = sx + comLocalX;
+    _rocketContainer.y        = sy + lowestPartBottomPx + comLocalY;
+  }
   _rocketContainer.rotation = ps.angle;
 
   // Batch all part rectangles into a single Graphics object.
@@ -787,24 +797,26 @@ function _renderDebris(debrisList, assembly, w, h) {
  * Compute the world-space position of an engine's nozzle exit.
  *
  * The nozzle sits at the "bottom" of the engine part (lowest VAB Y value).
- * The body-to-world transform for a rocket at angle α (0 = nose pointing up):
- *   world_x = origin_x + bx·cos(α) + by·sin(α)
- *   world_y = origin_y − bx·sin(α) + by·cos(α)
- * where bx/by are the body-frame offsets in metres (1 VAB pixel = SCALE_M_PER_PX m).
+ * Rotation is applied around the rocket's centre of mass (comBody) so the
+ * trail emission point matches the visual pivot used by _renderRocket.
  *
  * @param {import('../core/physics.js').PhysicsState}         ps
  * @param {import('../core/rocketbuilder.js').PlacedPart}     placed
  * @param {import('../data/parts.js').PartDef}                def
+ * @param {{ x: number, y: number }}                          comBody  CoM in body-frame metres.
  * @returns {{ x: number, y: number }}  Nozzle world position in metres.
  */
-function _nozzleWorldPos(ps, placed, def) {
-  const bx   = placed.x * SCALE_M_PER_PX;
-  const by   = (placed.y - (def.height ?? 20) / 2) * SCALE_M_PER_PX;
+function _nozzleWorldPos(ps, placed, def, comBody) {
+  const nozzleX = placed.x * SCALE_M_PER_PX;
+  const nozzleY = (placed.y - (def.height ?? 20) / 2) * SCALE_M_PER_PX;
+  // Offset from CoM so we rotate around the same pivot as the renderer.
+  const dx   = nozzleX - comBody.x;
+  const dy   = nozzleY - comBody.y;
   const cosA = Math.cos(ps.angle);
   const sinA = Math.sin(ps.angle);
   return {
-    x: ps.posX + bx * cosA + by * sinA,
-    y: ps.posY - bx * sinA + by * cosA,
+    x: ps.posX + comBody.x + dx * cosA + dy * sinA,
+    y: ps.posY + comBody.y - dx * sinA + dy * cosA,
   };
 }
 
@@ -821,6 +833,11 @@ function _nozzleWorldPos(ps, placed, def) {
  */
 function _emitTrailSegments(ps, assembly, density) {
   if (density <= TRAIL_DENSITY_THRESHOLD) return;
+
+  // Compute CoM in body-frame metres (relative to reference point) so trail
+  // emission rotates around the same pivot as the visual rocket.
+  const comWorld = _computeCoM(ps.fuelStore, assembly, ps.activeParts, 0, 0);
+  const comBody  = { x: comWorld.x, y: comWorld.y };
 
   // Exhaust drift direction: opposite to rocket nose (thrust direction).
   const exVx = -Math.sin(ps.angle) * TRAIL_DRIFT_SPEED;
@@ -851,27 +868,30 @@ function _emitTrailSegments(ps, assembly, density) {
     const isFiring  = ps.firingEngines && ps.firingEngines.has(instanceId);
     const effectiveThrottle = isFiring ? (isSRB ? 1 : throttle) : 0;
 
-    // Only emit if firing OR always emit residual smoke (heat trail) regardless.
-    if (!isFiring && effectiveThrottle === 0) {
-      // Residual heat smoke — tiny, only in dense atmosphere.
-      if (densityRatio < 0.1) continue;
-      const nozzle = _nozzleWorldPos(ps, placed, def);
-      _trailSegments.push({
-        worldX:      nozzle.x,
-        worldY:      nozzle.y,
-        vx:          exVx * 0.15 + (Math.random() - 0.5) * fanX,
-        vy:          exVy * 0.15 + Math.abs(exVy) * 0.2 * fanFactor, // slow upward drift
-        age:         0,
-        baseW:       2,
-        baseH:       4,
-        isSRB:       false,
-        maxAge:      TRAIL_MAX_AGE * ageMultiplier * 0.4,
-        isSmoke:     true,
-      });
+    // Skip all trail emission when throttle is zero (or engine not firing).
+    // No flames, no smoke — not even residual heat trails on the launch pad.
+    if (effectiveThrottle <= 0) {
+      // Residual heat smoke — tiny, only in dense atmosphere, and only when
+      // the rocket is actually in flight (not sitting idle on the pad).
+      if (!isFiring && !ps.grounded && densityRatio >= 0.1) {
+        const nozzle = _nozzleWorldPos(ps, placed, def, comBody);
+        _trailSegments.push({
+          worldX:      nozzle.x,
+          worldY:      nozzle.y,
+          vx:          exVx * 0.15 + (Math.random() - 0.5) * fanX,
+          vy:          exVy * 0.15 + Math.abs(exVy) * 0.2 * fanFactor,
+          age:         0,
+          baseW:       2,
+          baseH:       4,
+          isSRB:       false,
+          maxAge:      TRAIL_MAX_AGE * ageMultiplier * 0.4,
+          isSmoke:     true,
+        });
+      }
       continue;
     }
 
-    const nozzle = _nozzleWorldPos(ps, placed, def);
+    const nozzle = _nozzleWorldPos(ps, placed, def, comBody);
 
     // Emit multiple overlapping fire segments per frame to create a
     // connected flame shape — segments are staggered along the exhaust axis

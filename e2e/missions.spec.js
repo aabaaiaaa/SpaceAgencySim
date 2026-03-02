@@ -238,6 +238,7 @@ test.describe('Mission Control Flow', () => {
   // ── (7) Seeded completed state shows mission in Completed tab with reward ──
 
   test('(7) simulating mission completion via seeded state shows the mission in the Completed tab with its reward amount', async ({ browser }) => {
+    test.setTimeout(60_000);
     // Build an envelope where "First Flight" has already been completed.
     const completedFlight = {
       ...FIRST_FLIGHT,

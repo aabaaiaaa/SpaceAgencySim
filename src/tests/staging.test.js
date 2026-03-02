@@ -228,7 +228,7 @@ describe('activateCurrentStage() — SEPARATE (stack decoupler)', () => {
     // (debris is the return value of activateCurrentStage, tested separately)
   });
 
-  it('debris fragment inherits rocket position and velocity', () => {
+  it('debris fragment inherits rocket position and velocity (±separation impulse)', () => {
     const { assembly, staging } = makeTwoStageRocket();
     const ps = makePhysicsState(assembly);
     ps.posY = 5000;
@@ -239,7 +239,8 @@ describe('activateCurrentStage() — SEPARATE (stack decoupler)', () => {
     const [debris] = activateCurrentStage(ps, assembly, staging, fs); // stage 2
 
     expect(debris.posY).toBe(5000);
-    expect(debris.velY).toBe(200);
+    // Velocity is modified by the separation impulse (~±1 m/s), but close.
+    expect(Math.abs(debris.velY - 200)).toBeLessThan(2);
   });
 
   it('debris fragment has a unique id starting with "debris-"', () => {
