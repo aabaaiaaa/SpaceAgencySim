@@ -131,6 +131,8 @@ const RCS_TORQUE_MULTIPLIER = 2.5;
 const AERO_ANGULAR_DAMPING = 0.02;
 /** Active RCS braking torque (N·m per rad/s) when keys released. */
 const RCS_ANGULAR_DAMPING = 3.0;
+/** Tuning knob for parachute stabilization torque strength. */
+const CHUTE_TORQUE_SCALE = 1.0;
 
 // ---------------------------------------------------------------------------
 // Type Definitions (JSDoc)
@@ -946,6 +948,75 @@ function _computeDragForce(ps, assembly, density, speed) {
   return 0.5 * density * speed * speed * totalCdA;
 }
 
+/**
+ * Compute the restoring torque (N·m) from deployed parachutes.
+ *
+ * Each parachute's drag acts at an offset from the CoM — the canopy trails
+ * behind on lines, so the effective application point is *opposite* to the
+ * part's VAB position relative to CoM.  This creates a pendulum-like restoring
+ * torque that naturally orients the rocket with the parachute on top.
+ *
+ * Translational drag is already handled by `_computeDragForce()`; this
+ * function only returns the rotational (torque) component.
+ *
+ * @param {PhysicsState}                               ps
+ * @param {import('./rocketbuilder.js').RocketAssembly} assembly
+ * @param {{ x: number, y: number }}                   com  CoM in VAB pixels.
+ * @param {number} density  Air density (kg/m³).
+ * @param {number} speed    Current rocket speed (m/s).
+ * @returns {number}  Net torque in N·m (positive = clockwise).
+ */
+function _computeParachuteTorque(ps, assembly, com, density, speed) {
+  if (density <= 0 || speed <= 0 || !ps.parachuteStates) return 0;
+
+  const q = 0.5 * density * speed * speed;     // dynamic pressure
+  const cosA = Math.cos(ps.angle);
+  const sinA = Math.sin(ps.angle);
+
+  // Velocity unit vector (world frame) — drag opposes velocity.
+  const vx = ps.velX / speed;
+  const vy = ps.velY / speed;
+
+  let totalTorque = 0;
+
+  for (const [instanceId, entry] of ps.parachuteStates) {
+    if (entry.state !== 'deploying' && entry.state !== 'deployed') continue;
+
+    const placed = assembly.parts.get(instanceId);
+    if (!placed) continue;
+    const def = getPartById(placed.partId);
+    if (!def) continue;
+
+    // Chute CdA (same formula as _computeDragForce).
+    const props     = def.properties ?? {};
+    const widthM    = (def.width ?? 40) * SCALE_M_PER_PX;
+    const stowedA   = Math.PI * (widthM / 2) ** 2;
+    const stowedCdA = (props.dragCoefficient ?? 0.05) * stowedA;
+    const deployedR   = (props.deployedDiameter ?? 10) / 2;
+    const deployedCd  = props.deployedCd ?? 0.75;
+    const deployedCdA = deployedCd * Math.PI * deployedR * deployedR;
+    const progress     = _getChuteDeployProgress(ps, instanceId);
+    const densityScale = Math.min(1, density / LOW_DENSITY_THRESHOLD);
+    const chuteCdA = stowedCdA + (deployedCdA - stowedCdA) * progress * densityScale;
+
+    // Drag force vector (opposes velocity).
+    const dragMag = q * chuteCdA;
+    const Fx = -dragMag * vx;
+    const Fy = -dragMag * vy;
+
+    // Offset from CoM in VAB pixels → metres, then rotate to world frame.
+    const dx = (placed.x - com.x) * SCALE_M_PER_PX;
+    const dy = (placed.y - com.y) * SCALE_M_PER_PX;
+    const rx = dx * cosA + dy * sinA;
+    const ry = -dx * sinA + dy * cosA;
+
+    // Negated cross product: canopy trails behind → effective point is opposite.
+    totalTorque += -(rx * Fy - ry * Fx);
+  }
+
+  return totalTorque * CHUTE_TORQUE_SCALE;
+}
+
 // ---------------------------------------------------------------------------
 // Steering (private)
 // ---------------------------------------------------------------------------
@@ -974,6 +1045,8 @@ function _applySteering(ps, assembly, altitude, dt) {
   // --- Airborne torque-based rotation ---
   const com = _computeCoMLocal(ps, assembly);
   const I = _computeMomentOfInertia(ps, assembly, com);
+  const density = airDensity(Math.max(0, ps.posY));
+  const speed   = Math.hypot(ps.velX, ps.velY);
 
   // Player input torque.
   let torque = 0;
@@ -984,13 +1057,15 @@ function _applySteering(ps, assembly, altitude, dt) {
   if (right) torque += baseTorque;
   if (left)  torque -= baseTorque;
 
+  // Parachute stabilization torque (restoring pendulum effect).
+  torque += _computeParachuteTorque(ps, assembly, com, density, speed);
+
   // Angular acceleration.
   const alpha = torque / I;
   ps.angularVelocity += alpha * dt;
 
   // Damping (when no input).
   if (!left && !right) {
-    const density = airDensity(Math.max(0, ps.posY));
     // Aerodynamic damping (proportional to density).
     const aeroDamping = AERO_ANGULAR_DAMPING * density;
     ps.angularVelocity -= aeroDamping * ps.angularVelocity * dt;

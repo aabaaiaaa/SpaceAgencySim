@@ -1950,3 +1950,122 @@ describe('Debris angular dynamics', () => {
     expect(debris.angle).not.toBe(angleBefore);
   });
 });
+
+// ===========================================================================
+// Parachute stabilization torque
+// ===========================================================================
+
+/**
+ * Build a rocket with a parachute mounted on top:
+ * Parachute (y=70) → Probe Core (y=60) → Small Tank (y=0) → Spark Engine (y=-55)
+ *
+ * The parachute is above the CoM, so when deployed its drag creates a
+ * pendulum restoring torque that swings the rocket upright.
+ */
+function makeRocketWithChute(chuteId = 'parachute-mk1') {
+  const assembly = createRocketAssembly();
+  const staging  = createStagingConfig();
+
+  const chuteInstanceId = addPartToAssembly(assembly, chuteId,           0,   70);
+  const probeId         = addPartToAssembly(assembly, 'probe-core-mk1',  0,   60);
+  const tankId          = addPartToAssembly(assembly, 'tank-small',      0,    0);
+  const engineId        = addPartToAssembly(assembly, 'engine-spark',    0,  -55);
+
+  connectParts(assembly, chuteInstanceId, 1, probeId, 0); // chute bottom → probe top
+  connectParts(assembly, probeId, 1, tankId,   0);
+  connectParts(assembly, tankId,  1, engineId, 0);
+
+  syncStagingWithAssembly(assembly, staging);
+  assignPartToStage(staging, engineId, 0);
+  // Chute deploy on stage 2.
+  addStageToConfig(staging);
+  assignPartToStage(staging, chuteInstanceId, 1);
+
+  return { assembly, staging, chuteInstanceId, probeId, tankId, engineId };
+}
+
+describe('Parachute stabilization torque', () => {
+  it('deployed chute reduces angular velocity of a tilted, falling rocket', () => {
+    const { assembly, staging, chuteInstanceId } = makeRocketWithChute();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    // Airborne, falling at sea level (plenty of atmosphere).
+    ps.posY     = 5_000;
+    ps.velY     = -80;
+    ps.grounded = false;
+    ps.angle    = 0.5;            // ~29° clockwise tilt
+    ps.angularVelocity = 0;
+
+    // Deploy the chute manually.
+    ps.parachuteStates.set(chuteInstanceId, { state: 'deployed', deployTimer: 0 });
+
+    // Run 5 seconds of simulation.
+    const steps = 5 * 60;
+    for (let i = 0; i < steps; i++) {
+      tick(ps, assembly, staging, fs, FIXED_DT, 1);
+    }
+
+    // The restoring torque should have pushed the angle back toward 0.
+    expect(Math.abs(ps.angle)).toBeLessThan(0.5);
+  });
+
+  it('no torque when chute is still packed', () => {
+    const { assembly, staging } = makeRocketWithChute();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    ps.posY     = 5_000;
+    ps.velY     = -80;
+    ps.grounded = false;
+    ps.angle    = 0.3;
+    ps.angularVelocity = 0;
+
+    // Do NOT deploy chute — parachuteStates is empty or packed.
+    // Run 2 seconds.
+    const steps = 2 * 60;
+    for (let i = 0; i < steps; i++) {
+      tick(ps, assembly, staging, fs, FIXED_DT, 1);
+    }
+
+    // Without a deployed chute, no significant restoring correction.
+    // Angle should remain near the initial value (only generic aero damping acts,
+    // which doesn't produce a restoring torque toward 0 — it only damps velocity).
+    // With zero initial angularVelocity and no restoring torque, angle stays put.
+    expect(Math.abs(ps.angle - 0.3)).toBeLessThan(0.05);
+  });
+
+  it('Mk2 chute corrects faster than Mk1', () => {
+    // Build two identical rockets, one with Mk1, one with Mk2 chute.
+    const mk1 = makeRocketWithChute('parachute-mk1');
+    const mk2 = makeRocketWithChute('parachute-mk2');
+
+    const fsMk1 = makeFlightState();
+    const fsMk2 = makeFlightState();
+    const psMk1 = createPhysicsState(mk1.assembly, fsMk1);
+    const psMk2 = createPhysicsState(mk2.assembly, fsMk2);
+
+    // Identical initial conditions: tilted, falling.
+    for (const ps of [psMk1, psMk2]) {
+      ps.posY     = 5_000;
+      ps.velY     = -80;
+      ps.grounded = false;
+      ps.angle    = 0.5;
+      ps.angularVelocity = 0;
+    }
+
+    // Deploy both chutes.
+    psMk1.parachuteStates.set(mk1.chuteInstanceId, { state: 'deployed', deployTimer: 0 });
+    psMk2.parachuteStates.set(mk2.chuteInstanceId, { state: 'deployed', deployTimer: 0 });
+
+    // Run 3 seconds.
+    const steps = 3 * 60;
+    for (let i = 0; i < steps; i++) {
+      tick(psMk1, mk1.assembly, mk1.staging, fsMk1, FIXED_DT, 1);
+      tick(psMk2, mk2.assembly, mk2.staging, fsMk2, FIXED_DT, 1);
+    }
+
+    // Mk2 (35 m deployed diameter) should correct more than Mk1 (20 m).
+    expect(Math.abs(psMk2.angle)).toBeLessThan(Math.abs(psMk1.angle));
+  });
+});
