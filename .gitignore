@@ -36,6 +36,10 @@ yarn-error.log*
 coverage/
 .nyc_output/
 
+# Playwright
+playwright-report/
+test-results/
+
 # Misc
 *.bak
 *.tmp
