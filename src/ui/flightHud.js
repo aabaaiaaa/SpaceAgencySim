@@ -38,6 +38,7 @@
 
 import { getPartById } from '../data/parts.js';
 import { PartType } from '../core/constants.js';
+import { countDeployedLegs } from '../core/legs.js';
 
 // ---------------------------------------------------------------------------
 // Physics constant
@@ -425,6 +426,84 @@ const FLIGHT_HUD_STYLES = `
   opacity: 0.35;
   cursor: not-allowed;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TWR bar + mode toggle
+   ═══════════════════════════════════════════════════════════════════════════ */
+.flight-lp-mode-toggle {
+  padding: 1px 5px;
+  background: rgba(0, 16, 0, 0.8);
+  border: 1px solid #305030;
+  border-radius: 3px;
+  color: #507860;
+  font-size: 8px;
+  font-family: system-ui, sans-serif;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  transition: background 0.1s, border-color 0.1s, color 0.1s;
+  line-height: 1.4;
+}
+
+.flight-lp-mode-toggle.active {
+  background: rgba(16, 72, 16, 0.7);
+  border-color: #40a050;
+  color: #a0ffc0;
+}
+
+.flight-lp-twr-bar {
+  width: 10px;
+  height: 80px;
+  border: 1px solid #305030;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.55);
+  position: relative;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.flight-lp-twr-bar-center {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: #507860;
+  pointer-events: none;
+}
+
+.flight-lp-twr-bar-fill-up {
+  position: absolute;
+  bottom: 50%;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to top, #20c040, #60ff80);
+  transition: height 0.06s linear;
+}
+
+.flight-lp-twr-bar-fill-dn {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to bottom, #c08020, #ff9040);
+  transition: height 0.06s linear;
+}
+
+.flight-lp-twr-bar-value {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 7px;
+  color: #fff;
+  text-shadow: 0 0 3px #000, 0 0 3px #000;
+  pointer-events: none;
+  writing-mode: vertical-lr;
+  text-orientation: mixed;
+  letter-spacing: 0.02em;
+}
 `;
 
 // ---------------------------------------------------------------------------
@@ -470,6 +549,14 @@ let _elFuelList      = null;   // left-panel fuel list
 let _elObjList       = null;   // objectives panel (top-right, unchanged)
 let _elLaunchTip     = null;   // launch pad "press space" tip
 let _launchTipHidden = false;  // once hidden, stays hidden
+
+// TWR bar elements:
+let _elModeToggle    = null;   // TWR/ABS mode toggle button
+let _elTwrBarFillUp  = null;   // TWR bar green fill (>1)
+let _elTwrBarFillDn  = null;   // TWR bar orange fill (<1)
+let _elTwrBarValue   = null;   // TWR bar centered value text
+let _elTargetTwrRow  = null;   // "Target" info row (visible only in TWR mode)
+let _elTargetTwrVal  = null;   // Target TWR value text
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -525,9 +612,16 @@ export function initFlightHud(container, ps, assembly, stagingConfig, flightStat
   _keyHandler = (e) => {
     if (!_ps) return;
     const k = e.key;
+    const twrMode = _ps.throttleMode === 'twr';
     if (k === 'x' || k === 'X') {
+      if (twrMode) {
+        _ps.targetTWR = 0;
+      }
       _ps.throttle = 0;
     } else if (k === 'z' || k === 'Z') {
+      if (twrMode) {
+        _ps.targetTWR = Infinity;
+      }
       _ps.throttle = 1;
     }
   };
@@ -580,6 +674,13 @@ export function destroyFlightHud() {
   _elObjList       = null;
   _elLaunchTip     = null;
   _launchTipHidden = false;
+
+  _elModeToggle    = null;
+  _elTwrBarFillUp  = null;
+  _elTwrBarFillDn  = null;
+  _elTwrBarValue   = null;
+  _elTargetTwrRow  = null;
+  _elTargetTwrVal  = null;
 
   console.log('[Flight HUD] Destroyed');
 }
@@ -670,15 +771,41 @@ function _buildLeftPanel() {
   const throttleSec = document.createElement('div');
   throttleSec.className = 'flight-lp-section';
 
+  // Title row: "Throttle" + mode toggle button
+  const titleRow = document.createElement('div');
+  titleRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;';
   const throttleTitle = document.createElement('div');
   throttleTitle.className = 'flight-lp-title';
+  throttleTitle.style.marginBottom = '0';
   throttleTitle.textContent = 'Throttle';
-  throttleSec.appendChild(throttleTitle);
+  titleRow.appendChild(throttleTitle);
+
+  _elModeToggle = document.createElement('button');
+  _elModeToggle.className = 'flight-lp-mode-toggle active';
+  _elModeToggle.textContent = 'TWR';
+  _elModeToggle.title = 'Toggle throttle mode: TWR (auto-adjust) / ABS (manual)';
+  _elModeToggle.addEventListener('click', () => {
+    if (!_ps) return;
+    if (_ps.throttleMode === 'twr') {
+      _ps.throttleMode = 'absolute';
+      _elModeToggle.textContent = 'ABS';
+      _elModeToggle.classList.remove('active');
+    } else {
+      // Switching to TWR mode — snapshot current TWR as target to prevent jump
+      const currentTWR = _computeTWR();
+      _ps.targetTWR = currentTWR > 0 ? currentTWR : 1.0;
+      _ps.throttleMode = 'twr';
+      _elModeToggle.textContent = 'TWR';
+      _elModeToggle.classList.add('active');
+    }
+  });
+  titleRow.appendChild(_elModeToggle);
+  throttleSec.appendChild(titleRow);
 
   const throttleRow = document.createElement('div');
   throttleRow.className = 'flight-lp-throttle-row';
 
-  // Vertical bar
+  // Vertical throttle bar
   const track = document.createElement('div');
   track.className = 'flight-lp-throttle-track';
   _elThrottleFill = document.createElement('div');
@@ -687,7 +814,27 @@ function _buildLeftPanel() {
   track.appendChild(_elThrottleFill);
   throttleRow.appendChild(track);
 
-  // Info column: pct + TWR
+  // TWR bar (between throttle bar and info column)
+  const twrBar = document.createElement('div');
+  twrBar.className = 'flight-lp-twr-bar';
+  const twrBarCenter = document.createElement('div');
+  twrBarCenter.className = 'flight-lp-twr-bar-center';
+  _elTwrBarFillUp = document.createElement('div');
+  _elTwrBarFillUp.className = 'flight-lp-twr-bar-fill-up';
+  _elTwrBarFillUp.style.height = '0%';
+  _elTwrBarFillDn = document.createElement('div');
+  _elTwrBarFillDn.className = 'flight-lp-twr-bar-fill-dn';
+  _elTwrBarFillDn.style.height = '0%';
+  _elTwrBarValue = document.createElement('div');
+  _elTwrBarValue.className = 'flight-lp-twr-bar-value';
+  _elTwrBarValue.textContent = '—';
+  twrBar.appendChild(_elTwrBarFillUp);
+  twrBar.appendChild(_elTwrBarFillDn);
+  twrBar.appendChild(twrBarCenter);
+  twrBar.appendChild(_elTwrBarValue);
+  throttleRow.appendChild(twrBar);
+
+  // Info column: pct + TWR + target
   const info = document.createElement('div');
   info.className = 'flight-lp-throttle-info';
 
@@ -709,6 +856,19 @@ function _buildLeftPanel() {
   twrRow.appendChild(_elTWR);
   info.appendChild(twrRow);
 
+  // Target TWR row (visible only in TWR mode)
+  _elTargetTwrRow = document.createElement('div');
+  _elTargetTwrRow.className = 'flight-lp-twr-row';
+  const targetLbl = document.createElement('div');
+  targetLbl.className = 'flight-lp-lbl';
+  targetLbl.textContent = 'Target';
+  _elTargetTwrVal = document.createElement('div');
+  _elTargetTwrVal.className = 'flight-lp-val';
+  _elTargetTwrVal.textContent = 'MAX';
+  _elTargetTwrRow.appendChild(targetLbl);
+  _elTargetTwrRow.appendChild(_elTargetTwrVal);
+  info.appendChild(_elTargetTwrRow);
+
   throttleRow.appendChild(info);
   throttleSec.appendChild(throttleRow);
 
@@ -720,21 +880,46 @@ function _buildLeftPanel() {
   setTWR1Btn.className = 'flight-lp-btn';
   setTWR1Btn.textContent = 'TWR=1';
   setTWR1Btn.title = 'Set throttle so thrust-to-weight ratio equals 1';
-  setTWR1Btn.addEventListener('click', () => _setThrottleForTWR1());
+  setTWR1Btn.addEventListener('click', () => {
+    if (!_ps) return;
+    if (_ps.throttleMode === 'twr') {
+      _ps.targetTWR = 1.0;
+    } else {
+      _setThrottleForTWR1();
+    }
+  });
   btnRow.appendChild(setTWR1Btn);
 
   const minusBtn = document.createElement('button');
   minusBtn.className = 'flight-lp-btn';
   minusBtn.textContent = '−0.1';
-  minusBtn.title = 'Decrease throttle by 10%';
-  minusBtn.addEventListener('click', () => { if (_ps) _ps.throttle = Math.max(0, Math.round((_ps.throttle - 0.1) * 10) / 10); });
+  minusBtn.title = 'Decrease throttle/TWR by 0.1';
+  minusBtn.addEventListener('click', () => {
+    if (!_ps) return;
+    if (_ps.throttleMode === 'twr') {
+      _ps.targetTWR = _ps.targetTWR === Infinity
+        ? Math.max(0, 10 - 0.1)
+        : Math.max(0, Math.round((_ps.targetTWR - 0.1) * 10) / 10);
+    } else {
+      _ps.throttle = Math.max(0, Math.round((_ps.throttle - 0.1) * 10) / 10);
+    }
+  });
   btnRow.appendChild(minusBtn);
 
   const plusBtn = document.createElement('button');
   plusBtn.className = 'flight-lp-btn';
   plusBtn.textContent = '+0.1';
-  plusBtn.title = 'Increase throttle by 10%';
-  plusBtn.addEventListener('click', () => { if (_ps) _ps.throttle = Math.min(1, Math.round((_ps.throttle + 0.1) * 10) / 10); });
+  plusBtn.title = 'Increase throttle/TWR by 0.1';
+  plusBtn.addEventListener('click', () => {
+    if (!_ps) return;
+    if (_ps.throttleMode === 'twr') {
+      if (_ps.targetTWR !== Infinity) {
+        _ps.targetTWR = Math.round((_ps.targetTWR + 0.1) * 10) / 10;
+      }
+    } else {
+      _ps.throttle = Math.min(1, Math.round((_ps.throttle + 0.1) * 10) / 10);
+    }
+  });
   btnRow.appendChild(plusBtn);
 
   throttleSec.appendChild(btnRow);
@@ -867,6 +1052,53 @@ function _tick() {
 }
 
 // ---------------------------------------------------------------------------
+// Private — landing speed safety indicator
+// ---------------------------------------------------------------------------
+
+const _COLOR_SAFE    = '#a0ffc0';
+const _COLOR_CAUTION = '#ffc080';
+const _COLOR_DANGER  = '#ff6060';
+const _COLOR_DEFAULT = '#a0d8b0';
+
+/**
+ * Determine the landing-safety color for the vertical speed display
+ * and whether to show total speed. Mirrors the thresholds in
+ * physics.js `_handleGroundContact`.
+ *
+ * @returns {{ color: string, totalSpeed: number|null }}
+ */
+function _getLandingSpeedInfo() {
+  const vy = _ps.velY ?? 0;
+  const vx = _ps.velX ?? 0;
+
+  // Not descending, or already grounded/landed/crashed → default color
+  if (vy >= 0 || _ps.landed || _ps.crashed || _ps.grounded) {
+    return { color: _COLOR_DEFAULT, totalSpeed: null };
+  }
+
+  const totalSpeed = Math.hypot(vx, vy);
+  const legs = countDeployedLegs(_ps);
+
+  let color;
+  if (legs >= 2) {
+    // With legs: safe < 10, caution 10–29, danger ≥ 30
+    if (totalSpeed < 10)       color = _COLOR_SAFE;
+    else if (totalSpeed < 30)  color = _COLOR_CAUTION;
+    else                       color = _COLOR_DANGER;
+  } else {
+    // No/insufficient legs: safe ≤ 5, danger > 5
+    if (totalSpeed <= 5)  color = _COLOR_SAFE;
+    else                  color = _COLOR_DANGER;
+  }
+
+  // Show total speed in parens when below 500 m and there's horizontal velocity
+  const alt = _ps.posY ?? 0;
+  const showTotal = (alt < 500 && Math.abs(vx) > 0.1) ? totalSpeed : null;
+
+  return { color, totalSpeed: showTotal };
+}
+
+// ---------------------------------------------------------------------------
 // Private — per-section updates
 // ---------------------------------------------------------------------------
 
@@ -883,7 +1115,11 @@ function _updateLeftPanel() {
   }
   if (_elVelY) {
     const vy = _ps.velY ?? 0;
-    _elVelY.textContent = `${vy >= 0 ? '+' : ''}${vy.toFixed(1)} m/s`;
+    const { color, totalSpeed } = _getLandingSpeedInfo();
+    let text = `${vy >= 0 ? '+' : ''}${vy.toFixed(1)} m/s`;
+    if (totalSpeed !== null) text += ` (${Math.round(totalSpeed)})`;
+    _elVelY.textContent = text;
+    _elVelY.style.color = color;
   }
 
   // ── Throttle ──────────────────────────────────────────────────────────────
@@ -892,10 +1128,40 @@ function _updateLeftPanel() {
   if (_elThrottlePct)  _elThrottlePct.textContent   = `${pct}%`;
 
   // ── TWR ───────────────────────────────────────────────────────────────────
+  const twr = _computeTWR();
   if (_elTWR) {
-    const twr = _computeTWR();
     _elTWR.textContent = twr > 0 ? twr.toFixed(2) : '—';
     _elTWR.style.color = twr >= 1 ? '#a0ffc0' : twr > 0 ? '#ffc080' : '#a0d8b0';
+  }
+
+  // ── TWR bar ──────────────────────────────────────────────────────────────
+  if (_elTwrBarFillUp && _elTwrBarFillDn && _elTwrBarValue) {
+    if (twr > 1) {
+      // TWR 1-3 maps to 0-50% fill height above center
+      const fillPct = Math.min(50, ((twr - 1) / 2) * 50);
+      _elTwrBarFillUp.style.height = `${fillPct}%`;
+      _elTwrBarFillDn.style.height = '0%';
+    } else if (twr > 0) {
+      // TWR 0-1 maps to 0-50% fill below center
+      const fillPct = Math.min(50, ((1 - twr) / 1) * 50);
+      _elTwrBarFillUp.style.height = '0%';
+      _elTwrBarFillDn.style.height = `${fillPct}%`;
+    } else {
+      _elTwrBarFillUp.style.height = '0%';
+      _elTwrBarFillDn.style.height = '0%';
+    }
+    _elTwrBarValue.textContent = twr > 0 ? twr.toFixed(1) : '—';
+  }
+
+  // ── Target TWR row (TWR mode only) ──────────────────────────────────────
+  if (_elTargetTwrRow && _elTargetTwrVal) {
+    const isTwrMode = _ps.throttleMode === 'twr';
+    _elTargetTwrRow.style.display = isTwrMode ? '' : 'none';
+    if (isTwrMode) {
+      _elTargetTwrVal.textContent = _ps.targetTWR === Infinity
+        ? 'MAX'
+        : _ps.targetTWR.toFixed(1);
+    }
   }
 
   // ── Staging ───────────────────────────────────────────────────────────────

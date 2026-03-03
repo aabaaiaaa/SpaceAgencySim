@@ -98,6 +98,9 @@ const RCS_TURN_MULTIPLIER = 2.5;
 /** Throttle change per keypress (5 %). */
 const THROTTLE_STEP = 0.05;
 
+/** Target TWR change per keypress in TWR mode. */
+const TWR_STEP = 0.1;
+
 /**
  * Drag coefficient multiplier applied to an open parachute.
  * An open chute is modelled as having 80× its stowed Cd — very high drag.
@@ -232,6 +235,8 @@ export function createPhysicsState(assembly, flightState) {
     velY: 0,
     angle: 0,
     throttle: 1.0,
+    throttleMode: 'twr',       // 'twr' or 'absolute'
+    targetTWR: Infinity,       // desired TWR; Infinity = max thrust
     firingEngines: new Set(),
     fuelStore,
     activeParts: new Set(assembly.parts.keys()),
@@ -386,22 +391,46 @@ export function tick(ps, assembly, stagingConfig, flightState, realDeltaTime, ti
 export function handleKeyDown(ps, assembly, key) {
   ps._heldKeys.add(key);
 
+  const twrMode = ps.throttleMode === 'twr';
+
   switch (key) {
     case 'w':
     case 'ArrowUp':
-      ps.throttle = Math.min(1, ps.throttle + THROTTLE_STEP);
+      if (twrMode) {
+        ps.targetTWR = ps.targetTWR === Infinity
+          ? Infinity
+          : ps.targetTWR + TWR_STEP;
+      } else {
+        ps.throttle = Math.min(1, ps.throttle + THROTTLE_STEP);
+      }
       break;
     case 's':
     case 'ArrowDown':
-      ps.throttle = Math.max(0, ps.throttle - THROTTLE_STEP);
+      if (twrMode) {
+        ps.targetTWR = ps.targetTWR === Infinity
+          ? Math.max(0, 10 - TWR_STEP) // step down from "max" to a large finite value
+          : Math.max(0, ps.targetTWR - TWR_STEP);
+      } else {
+        ps.throttle = Math.max(0, ps.throttle - THROTTLE_STEP);
+      }
       break;
     case 'x':
     case 'X':
-      ps.throttle = 0;
+      if (twrMode) {
+        ps.targetTWR = 0;
+        ps.throttle  = 0;
+      } else {
+        ps.throttle = 0;
+      }
       break;
     case 'z':
     case 'Z':
-      ps.throttle = 1;
+      if (twrMode) {
+        ps.targetTWR = Infinity;
+        ps.throttle  = 1;
+      } else {
+        ps.throttle = 1;
+      }
       break;
     // A/D and ArrowLeft/ArrowRight are handled continuously in _integrate.
     default:
@@ -452,6 +481,63 @@ export function fireNextStage(ps, assembly, stagingConfig, flightState) {
 }
 
 // ---------------------------------------------------------------------------
+// TWR-relative throttle conversion (private)
+// ---------------------------------------------------------------------------
+
+/**
+ * When in TWR throttle mode, compute the raw throttle needed to achieve
+ * `ps.targetTWR` and write it to `ps.throttle`.
+ *
+ * Formula: throttle = clamp((targetTWR * totalMass * G0 - srbThrustN) / maxLiquidThrustN, 0, 1)
+ *
+ * If targetTWR is Infinity, sets throttle = 1 (max thrust).
+ * If no liquid engines are firing, does nothing (can't throttle SRBs).
+ *
+ * @param {PhysicsState}                               ps
+ * @param {import('./rocketbuilder.js').RocketAssembly} assembly
+ */
+function _updateThrottleFromTWR(ps, assembly) {
+  if (ps.throttleMode !== 'twr') return;
+
+  // Infinity means "max thrust"
+  if (ps.targetTWR === Infinity) {
+    ps.throttle = 1;
+    return;
+  }
+  if (ps.targetTWR <= 0) {
+    ps.throttle = 0;
+    return;
+  }
+
+  let totalMass        = 0;
+  let maxLiquidThrustN = 0;
+  let srbThrustN       = 0;
+
+  for (const [instanceId, placed] of assembly.parts) {
+    if (!ps.activeParts.has(instanceId)) continue;
+    const def = getPartById(placed.partId);
+    if (!def) continue;
+
+    totalMass += (def.mass ?? 0) + (ps.fuelStore.get(instanceId) ?? 0);
+
+    if (ps.firingEngines.has(instanceId)) {
+      const thrustN = (def.properties?.thrust ?? 0) * 1_000; // kN → N
+      if (def.type === PartType.SOLID_ROCKET_BOOSTER) {
+        srbThrustN += thrustN;
+      } else {
+        maxLiquidThrustN += thrustN;
+      }
+    }
+  }
+
+  if (maxLiquidThrustN <= 0) return; // can't throttle SRBs
+  if (totalMass <= 0) return;
+
+  const needed = ps.targetTWR * totalMass * G0 - srbThrustN;
+  ps.throttle = Math.max(0, Math.min(1, needed / maxLiquidThrustN));
+}
+
+// ---------------------------------------------------------------------------
 // Integration step (private)
 // ---------------------------------------------------------------------------
 
@@ -463,6 +549,9 @@ export function fireNextStage(ps, assembly, stagingConfig, flightState) {
  * @param {import('./gameState.js').FlightState}        flightState
  */
 function _integrate(ps, assembly, flightState) {
+  // --- 0. TWR-relative throttle conversion --------------------------------
+  _updateThrottleFromTWR(ps, assembly);
+
   const altitude = Math.max(0, ps.posY);
   const density  = airDensity(altitude);
 

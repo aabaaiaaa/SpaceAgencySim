@@ -531,7 +531,7 @@ describe('activateCurrentStage() — SEPARATE with satellite in lower stage', ()
 // ---------------------------------------------------------------------------
 
 describe('activateCurrentStage() — COLLECT_SCIENCE', () => {
-  it('emits both PART_ACTIVATED and SCIENCE_COLLECTED events', () => {
+  it('emits PART_ACTIVATED and transitions science module to running state', () => {
     const assembly = createRocketAssembly();
     const staging  = createStagingConfig();
 
@@ -548,7 +548,12 @@ describe('activateCurrentStage() — COLLECT_SCIENCE', () => {
     activateCurrentStage(ps, assembly, staging, fs);
 
     expect(fs.events.some((e) => e.type === 'PART_ACTIVATED')).toBe(true);
-    expect(fs.events.some((e) => e.type === 'SCIENCE_COLLECTED')).toBe(true);
+    // SCIENCE_COLLECTED is now deferred until the experiment timer expires
+    // in tickScienceModules, so it is NOT emitted on activation.
+    const entry = ps.scienceModuleStates?.get(scienceId);
+    expect(entry).toBeDefined();
+    expect(entry.state).toBe('running');
+    expect(entry.timer).toBeGreaterThan(0);
   });
 });
 

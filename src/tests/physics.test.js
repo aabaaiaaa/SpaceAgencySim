@@ -375,49 +375,103 @@ describe('tick() — landing and crash events', () => {
 // ---------------------------------------------------------------------------
 
 describe('handleKeyDown() — throttle', () => {
-  it('W key increases throttle by 5 %', () => {
+  it('W key increases throttle by 5 % (absolute mode)', () => {
     const { assembly } = makeSimpleRocket();
     const ps = createPhysicsState(assembly, makeFlightState());
+    ps.throttleMode = 'absolute';
     ps.throttle = 0.5;
 
     handleKeyDown(ps, assembly, 'w');
     expect(ps.throttle).toBeCloseTo(0.55, 6);
   });
 
-  it('ArrowUp key also increases throttle', () => {
+  it('ArrowUp key also increases throttle (absolute mode)', () => {
     const { assembly } = makeSimpleRocket();
     const ps = createPhysicsState(assembly, makeFlightState());
+    ps.throttleMode = 'absolute';
     ps.throttle = 0.5;
 
     handleKeyDown(ps, assembly, 'ArrowUp');
     expect(ps.throttle).toBeCloseTo(0.55, 6);
   });
 
-  it('S key decreases throttle by 5 %', () => {
+  it('S key decreases throttle by 5 % (absolute mode)', () => {
     const { assembly } = makeSimpleRocket();
     const ps = createPhysicsState(assembly, makeFlightState());
+    ps.throttleMode = 'absolute';
     ps.throttle = 0.5;
 
     handleKeyDown(ps, assembly, 's');
     expect(ps.throttle).toBeCloseTo(0.45, 6);
   });
 
-  it('throttle is clamped to 0 at the bottom', () => {
+  it('throttle is clamped to 0 at the bottom (absolute mode)', () => {
     const { assembly } = makeSimpleRocket();
     const ps = createPhysicsState(assembly, makeFlightState());
+    ps.throttleMode = 'absolute';
     ps.throttle = 0.02;
 
     handleKeyDown(ps, assembly, 's');
     expect(ps.throttle).toBe(0);
   });
 
-  it('throttle is clamped to 1 at the top', () => {
+  it('throttle is clamped to 1 at the top (absolute mode)', () => {
     const { assembly } = makeSimpleRocket();
     const ps = createPhysicsState(assembly, makeFlightState());
+    ps.throttleMode = 'absolute';
     ps.throttle = 0.98;
 
     handleKeyDown(ps, assembly, 'w');
     expect(ps.throttle).toBe(1);
+  });
+
+  it('W key increases targetTWR in TWR mode', () => {
+    const { assembly } = makeSimpleRocket();
+    const ps = createPhysicsState(assembly, makeFlightState());
+    ps.targetTWR = 1.5;
+
+    handleKeyDown(ps, assembly, 'w');
+    expect(ps.targetTWR).toBeCloseTo(1.6, 6);
+  });
+
+  it('S key decreases targetTWR in TWR mode', () => {
+    const { assembly } = makeSimpleRocket();
+    const ps = createPhysicsState(assembly, makeFlightState());
+    ps.targetTWR = 1.5;
+
+    handleKeyDown(ps, assembly, 's');
+    expect(ps.targetTWR).toBeCloseTo(1.4, 6);
+  });
+
+  it('targetTWR is clamped to 0 at the bottom', () => {
+    const { assembly } = makeSimpleRocket();
+    const ps = createPhysicsState(assembly, makeFlightState());
+    ps.targetTWR = 0.05;
+
+    handleKeyDown(ps, assembly, 's');
+    expect(ps.targetTWR).toBe(0);
+  });
+
+  it('Z sets targetTWR to Infinity and throttle to 1 in TWR mode', () => {
+    const { assembly } = makeSimpleRocket();
+    const ps = createPhysicsState(assembly, makeFlightState());
+    ps.targetTWR = 1.5;
+    ps.throttle = 0.5;
+
+    handleKeyDown(ps, assembly, 'z');
+    expect(ps.targetTWR).toBe(Infinity);
+    expect(ps.throttle).toBe(1);
+  });
+
+  it('X sets targetTWR to 0 and throttle to 0 in TWR mode', () => {
+    const { assembly } = makeSimpleRocket();
+    const ps = createPhysicsState(assembly, makeFlightState());
+    ps.targetTWR = 1.5;
+    ps.throttle = 0.5;
+
+    handleKeyDown(ps, assembly, 'x');
+    expect(ps.targetTWR).toBe(0);
+    expect(ps.throttle).toBe(0);
   });
 });
 
@@ -701,7 +755,7 @@ describe('fireNextStage() — RELEASE (satellite)', () => {
 });
 
 describe('fireNextStage() — COLLECT_SCIENCE (service module)', () => {
-  it('emits SCIENCE_COLLECTED event', () => {
+  it('transitions science module to running state (SCIENCE_COLLECTED deferred to timer)', () => {
     const assembly = createRocketAssembly();
     const staging  = createStagingConfig();
 
@@ -719,8 +773,20 @@ describe('fireNextStage() — COLLECT_SCIENCE (service module)', () => {
 
     fireNextStage(ps, assembly, staging, fs);
 
-    const evt = fs.events.find((e) => e.type === 'SCIENCE_COLLECTED');
-    expect(evt).toBeDefined();
+    // PART_ACTIVATED is emitted immediately.
+    const activated = fs.events.find((e) => e.type === 'PART_ACTIVATED');
+    expect(activated).toBeDefined();
+
+    // Science module enters RUNNING state with a countdown timer.
+    const entry = ps.scienceModuleStates?.get(scienceId);
+    expect(entry).toBeDefined();
+    expect(entry.state).toBe('running');
+    expect(entry.timer).toBeGreaterThan(0);
+
+    // SCIENCE_COLLECTED is NOT emitted on activation — it fires when the
+    // timer expires in tickScienceModules.
+    const sci = fs.events.find((e) => e.type === 'SCIENCE_COLLECTED');
+    expect(sci).toBeUndefined();
   });
 });
 

@@ -328,6 +328,11 @@ test.describe('Flight — Launch & Basic Flight', () => {
   // ── (5) Throttle display reflects W / S key changes ──────────────────────
 
   test('(5) throttle display reflects keyboard throttle changes (W increases, S decreases)', async () => {
+    // Switch to absolute throttle mode so W/S directly change the throttle %.
+    await page.evaluate(() => {
+      if (window.__flightPs) window.__flightPs.throttleMode = 'absolute';
+    });
+
     // Read current throttle from physics state (should be 1.0 = 100 %).
     const initialThrottle = await page.evaluate(
       () => window.__flightPs?.throttle ?? 1,
@@ -386,8 +391,13 @@ test.describe('Flight — Launch & Basic Flight', () => {
   // ── (8) TWR=1 button and ±0.1 throttle step buttons ─────────────────────
 
   test('(8) TWR=1 button sets throttle for unit thrust-to-weight ratio; ±0.1 buttons step throttle', async () => {
-    // Ensure throttle is at 100% before testing (direct mutation of physics state).
-    await page.evaluate(() => { if (window.__flightPs) window.__flightPs.throttle = 1.0; });
+    // Switch to absolute mode so buttons control throttle directly.
+    await page.evaluate(() => {
+      if (window.__flightPs) {
+        window.__flightPs.throttleMode = 'absolute';
+        window.__flightPs.throttle = 1.0;
+      }
+    });
     await expect(page.locator('#flight-hud-throttle-pct')).toContainText('100%', { timeout: 2_000 });
 
     // The TWR=1 button is in the left panel's throttle section.

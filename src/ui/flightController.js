@@ -662,6 +662,10 @@ function _loop(timestamp) {
   // Evaluate time-warp reset conditions before advancing physics.
   _checkTimeWarpResets(timestamp);
 
+  // Reset per-frame science flag before sub-steps; tickScienceModules will
+  // set it to true if any experiment was running during ANY sub-step.
+  _flightState.scienceModuleRunning = false;
+
   // Advance physics simulation with the current warp multiplier.
   tick(_ps, _assembly, _stagingConfig, _flightState, realDt, _timeWarp);
 

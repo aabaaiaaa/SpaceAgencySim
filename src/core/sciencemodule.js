@@ -150,8 +150,9 @@ export function activateScienceModule(ps, assembly, flightState, instanceId) {
 
   const altitude = Math.max(0, ps.posY);
 
-  entry.state = ScienceModuleState.COMPLETE;
-  entry.timer = 0;
+  const duration = def.properties?.experimentDuration ?? 30;
+  entry.state = ScienceModuleState.RUNNING;
+  entry.timer = duration;
 
   flightState.events.push({
     type:        'PART_ACTIVATED',
@@ -159,14 +160,6 @@ export function activateScienceModule(ps, assembly, flightState, instanceId) {
     instanceId,
     partType:    def.type,
     description: `${def.name} experiment started at ${altitude.toFixed(0)} m.`,
-  });
-
-  flightState.events.push({
-    type:        'SCIENCE_COLLECTED',
-    time:        flightState.timeElapsed,
-    instanceId,
-    altitude,
-    description: `${def.name} experiment complete — data ready for recovery at ${altitude.toFixed(0)} m.`,
   });
 
   return true;
@@ -201,26 +194,30 @@ export function activateScienceModule(ps, assembly, flightState, instanceId) {
  * @param {number} dt  Fixed integration timestep in seconds.
  */
 export function tickScienceModules(ps, assembly, flightState, dt) {
-  if (!ps.scienceModuleStates) {
-    flightState.scienceModuleRunning = false;
-    return;
+  if (!ps.scienceModuleStates) return;
+
+  // Report running status BEFORE processing expirations so that
+  // HOLD_ALTITUDE can complete in the same frame an experiment finishes.
+  // The per-frame reset to false is handled by the flight controller
+  // before calling tick(), so we only ever SET the flag here.
+  for (const [instanceId, entry] of ps.scienceModuleStates) {
+    if (!ps.activeParts.has(instanceId)) continue;
+    if (entry.state === ScienceModuleState.RUNNING) {
+      flightState.scienceModuleRunning = true;
+      break;
+    }
   }
 
-  let anyRunning = false;
-
+  // Now process timer decrements and expirations.
   for (const [instanceId, entry] of ps.scienceModuleStates) {
-    // Only advance modules that are still part of the active rocket.
     if (!ps.activeParts.has(instanceId)) continue;
-
     if (entry.state !== ScienceModuleState.RUNNING) continue;
 
     entry.timer -= dt;
-    anyRunning = true;
 
     if (entry.timer <= 0) {
       entry.timer = 0;
       entry.state = ScienceModuleState.COMPLETE;
-      anyRunning  = false; // this module is no longer running
 
       const placed  = assembly.parts.get(instanceId);
       const def     = placed ? getPartById(placed.partId) : null;
@@ -235,21 +232,6 @@ export function tickScienceModules(ps, assembly, flightState, dt) {
       });
     }
   }
-
-  // Recompute anyRunning after processing all entries (a module may have just
-  // completed, reducing the running count to zero).
-  if (!anyRunning) {
-    // Double-check: are there any still genuinely running?
-    for (const [instanceId, entry] of ps.scienceModuleStates) {
-      if (!ps.activeParts.has(instanceId)) continue;
-      if (entry.state === ScienceModuleState.RUNNING) {
-        anyRunning = true;
-        break;
-      }
-    }
-  }
-
-  flightState.scienceModuleRunning = anyRunning;
 }
 
 // ---------------------------------------------------------------------------
