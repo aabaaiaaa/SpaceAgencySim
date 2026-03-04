@@ -133,6 +133,8 @@ const AERO_ANGULAR_DAMPING = 0.02;
 const RCS_ANGULAR_DAMPING = 3.0;
 /** Tuning knob for parachute stabilization torque strength. */
 const CHUTE_TORQUE_SCALE = 1.0;
+/** Angular damping coefficient for deployed parachutes (opposes spin). */
+const CHUTE_ANGULAR_DAMPING = 0.5;
 
 // ---------------------------------------------------------------------------
 // Type Definitions (JSDoc)
@@ -791,7 +793,11 @@ function _computeMomentOfInertia(ps, assembly, pivot) {
     const mass = (def.mass ?? 1) + fuelMass;
     const dx = (placed.x - pivot.x) * SCALE_M_PER_PX;
     const dy = (placed.y - pivot.y) * SCALE_M_PER_PX;
-    I += mass * (dx * dx + dy * dy);
+    // Self-inertia: rectangular body I = m(w² + h²)/12.
+    const wM = (def.width  ?? 40) * SCALE_M_PER_PX;
+    const hM = (def.height ?? 40) * SCALE_M_PER_PX;
+    const Iself = mass * (wM * wM + hM * hM) / 12;
+    I += Iself + mass * (dx * dx + dy * dy);
   }
 
   return Math.max(1, I);
@@ -1059,6 +1065,30 @@ function _applySteering(ps, assembly, altitude, dt) {
 
   // Parachute stabilization torque (restoring pendulum effect).
   torque += _computeParachuteTorque(ps, assembly, com, density, speed);
+
+  // Parachute angular damping — opposes spin unconditionally when chutes deployed.
+  if (density > 0 && speed > 0 && ps.parachuteStates) {
+    const q = 0.5 * density * speed * speed;
+    let totalChuteCdA = 0;
+    for (const [instanceId, entry] of ps.parachuteStates) {
+      if (entry.state !== 'deploying' && entry.state !== 'deployed') continue;
+      const placed = assembly.parts.get(instanceId);
+      if (!placed) continue;
+      const def = getPartById(placed.partId);
+      if (!def) continue;
+      const props     = def.properties ?? {};
+      const widthM    = (def.width ?? 40) * SCALE_M_PER_PX;
+      const stowedA   = Math.PI * (widthM / 2) ** 2;
+      const stowedCdA = (props.dragCoefficient ?? 0.05) * stowedA;
+      const deployedR   = (props.deployedDiameter ?? 10) / 2;
+      const deployedCd  = props.deployedCd ?? 0.75;
+      const deployedCdA = deployedCd * Math.PI * deployedR * deployedR;
+      const progress     = _getChuteDeployProgress(ps, instanceId);
+      const densityScale = Math.min(1, density / LOW_DENSITY_THRESHOLD);
+      totalChuteCdA += stowedCdA + (deployedCdA - stowedCdA) * progress * densityScale;
+    }
+    torque -= CHUTE_ANGULAR_DAMPING * totalChuteCdA * q * ps.angularVelocity;
+  }
 
   // Angular acceleration.
   const alpha = torque / I;

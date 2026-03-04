@@ -2058,14 +2058,109 @@ describe('Parachute stabilization torque', () => {
     psMk1.parachuteStates.set(mk1.chuteInstanceId, { state: 'deployed', deployTimer: 0 });
     psMk2.parachuteStates.set(mk2.chuteInstanceId, { state: 'deployed', deployTimer: 0 });
 
-    // Run 3 seconds.
-    const steps = 3 * 60;
+    // Run 0.25 seconds — short enough to see differential correction before
+    // the larger Mk2 chute overshoots past zero.
+    const steps = Math.round(0.25 * 60);
     for (let i = 0; i < steps; i++) {
       tick(psMk1, mk1.assembly, mk1.staging, fsMk1, FIXED_DT, 1);
       tick(psMk2, mk2.assembly, mk2.staging, fsMk2, FIXED_DT, 1);
     }
 
-    // Mk2 (35 m deployed diameter) should correct more than Mk1 (20 m).
-    expect(Math.abs(psMk2.angle)).toBeLessThan(Math.abs(psMk1.angle));
+    // Both started at 0.5 rad. Mk2 (35 m) should have corrected more toward 0.
+    const mk1Correction = 0.5 - Math.abs(psMk1.angle);
+    const mk2Correction = 0.5 - Math.abs(psMk2.angle);
+    expect(mk2Correction).toBeGreaterThan(mk1Correction);
+  });
+});
+
+// ===========================================================================
+// Self-inertia and parachute damping
+// ===========================================================================
+
+describe('Single command module turn sensitivity', () => {
+  /**
+   * A lone command module (cmd-mk1, 840 kg) with no other parts.
+   * Before the self-inertia fix the MoI was clamped to 1 kg·m²,
+   * giving absurd angular acceleration.
+   */
+  function makeSoloCmdModule() {
+    const assembly = createRocketAssembly();
+    const staging  = createStagingConfig();
+    const cmdId = addPartToAssembly(assembly, 'cmd-mk1', 0, 0);
+    syncStagingWithAssembly(assembly, staging);
+    return { assembly, staging, cmdId };
+  }
+
+  it('angular velocity after 1 s of turning is less than 5 rad/s', () => {
+    const { assembly, staging } = makeSoloCmdModule();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    // Airborne in vacuum so no aero damping interferes.
+    ps.posY     = 200_000;
+    ps.velY     = 0;
+    ps.grounded = false;
+
+    // Hold right-turn key for 1 second.
+    handleKeyDown(ps, 'd');
+    const steps = Math.round(1 / FIXED_DT);
+    for (let i = 0; i < steps; i++) {
+      tick(ps, assembly, staging, fs, FIXED_DT, 1);
+    }
+    handleKeyUp(ps, 'd');
+
+    // With self-inertia the angular velocity should be moderate, not thousands.
+    expect(Math.abs(ps.angularVelocity)).toBeLessThan(5);
+  });
+});
+
+describe('Parachute angular damping', () => {
+  it('deployed chute damps angular velocity to near-zero within 5 seconds', () => {
+    const { assembly, staging, chuteInstanceId } = makeRocketWithChute();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    ps.posY     = 5_000;
+    ps.velY     = -80;
+    ps.grounded = false;
+    ps.angle    = 0;
+    ps.angularVelocity = 2.0;  // spinning at 2 rad/s
+
+    ps.parachuteStates.set(chuteInstanceId, { state: 'deployed', deployTimer: 0 });
+
+    const steps = 5 * 60;
+    for (let i = 0; i < steps; i++) {
+      tick(ps, assembly, staging, fs, FIXED_DT, 1);
+    }
+
+    // Angular velocity should be damped to near zero.
+    expect(Math.abs(ps.angularVelocity)).toBeLessThan(0.1);
+  });
+
+  it('parachute damping applies even while rotation keys are held', () => {
+    const { assembly, staging, chuteInstanceId } = makeRocketWithChute();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    ps.posY     = 5_000;
+    ps.velY     = -80;
+    ps.grounded = false;
+    ps.angle    = 0;
+    ps.angularVelocity = 0;
+
+    ps.parachuteStates.set(chuteInstanceId, { state: 'deployed', deployTimer: 0 });
+
+    // Hold right-turn key throughout.
+    handleKeyDown(ps, 'd');
+
+    const steps = 3 * 60;
+    for (let i = 0; i < steps; i++) {
+      tick(ps, assembly, staging, fs, FIXED_DT, 1);
+    }
+    handleKeyUp(ps, 'd');
+
+    // Without damping the angular velocity would grow unbounded;
+    // with chute damping it should stay moderate (< 2 rad/s).
+    expect(Math.abs(ps.angularVelocity)).toBeLessThan(2);
   });
 });
