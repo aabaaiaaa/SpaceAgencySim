@@ -1271,18 +1271,49 @@ export function hitTestFlightPart(screenX, screenY, ps, assembly) {
   const w = window.innerWidth;
   const h = window.innerHeight;
 
-  // Screen position of the rocket container's origin (ps.posX, ps.posY in world space).
+  // Base screen position of the rocket's world origin.
   const { sx, sy } = _worldToScreen(ps.posX, ps.posY, w, h);
 
-  // Offset of the click from the container origin, in screen pixels.
-  const dx = screenX - sx;
-  const dy = screenY - sy;
+  // Replicate the same pivot + ground offset that _renderRocket applies to the
+  // PixiJS container so the hit-test matches the visual placement exactly.
+  const com       = _computeCoM(ps.fuelStore, assembly, ps.activeParts, ps.posX, ps.posY);
+  const comLocalX =  (com.x - ps.posX) / SCALE_M_PER_PX;
+  const comLocalY = -(com.y - ps.posY) / SCALE_M_PER_PX;
 
-  // Rotate by the inverse of the container rotation to get container-local space.
+  let lowestPartBottomPx = 0;
+  if (ps.grounded || ps.landed) {
+    for (const instanceId of ps.activeParts) {
+      const placed = assembly.parts.get(instanceId);
+      const def    = placed ? getPartById(placed.partId) : null;
+      if (!def) continue;
+      const bottom = placed.y - (def.height ?? 40) / 2;
+      if (bottom < lowestPartBottomPx) lowestPartBottomPx = bottom;
+    }
+  }
+
+  let pivotX, pivotY, containerX, containerY;
+  if ((ps.grounded || ps.landed) && ps.isTipping) {
+    pivotX     =  ps.tippingContactX;
+    pivotY     = -ps.tippingContactY;
+    containerX = sx + pivotX;
+    containerY = sy + lowestPartBottomPx + pivotY;
+  } else {
+    pivotX     = comLocalX;
+    pivotY     = comLocalY;
+    containerX = sx + comLocalX;
+    containerY = sy + lowestPartBottomPx + comLocalY;
+  }
+
+  // Offset of the click from the container's screen position.
+  const dx = screenX - containerX;
+  const dy = screenY - containerY;
+
+  // Rotate by the inverse of the container rotation to get pivot-relative
+  // local space, then add the pivot to recover container-local coordinates.
   const cosNeg = Math.cos(-ps.angle);
   const sinNeg = Math.sin(-ps.angle);
-  const localX = dx * cosNeg - dy * sinNeg;
-  const localY = dx * sinNeg + dy * cosNeg;
+  const localX = dx * cosNeg - dy * sinNeg + pivotX;
+  const localY = dx * sinNeg + dy * cosNeg + pivotY;
 
   // Test each active part in reverse insertion order (topmost rendered last).
   const activeIds = [...ps.activeParts];

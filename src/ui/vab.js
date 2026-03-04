@@ -2139,11 +2139,11 @@ function _bindButtons(root) {
     _assembly.connections.length = 0;
     _assembly.symmetryPairs.length = 0;
     _setSelectedPart(null);
-    syncStagingWithAssembly(_assembly, _stagingConfig);
-    vabSetAssembly(_assembly);
-    vabRenderParts(_assembly, null);
     _syncAndRenderStaging();
-    _runAndRenderValidation();
+    vabRenderParts();
+    _updateStatusBar();
+    _updateScaleBarExtents();
+    _updateOffscreenIndicators();
     // Refresh cash display.
     const cashEl = document.getElementById('vab-cash');
     if (cashEl && _gameState) cashEl.textContent = fmt$(_gameState.money);
@@ -2941,11 +2941,11 @@ export function initVabUI(container, state, { onBack } = {}) {
     const idToRemove = _selectedInstanceId;
     _setSelectedPart(null);
     removePartFromAssembly(_assembly, idToRemove);
-    syncStagingWithAssembly(_stagingConfig, _assembly);
-    vabSetAssembly(_assembly);
-    vabRenderParts(_assembly, null);
     _syncAndRenderStaging();
-    _runAndRenderValidation();
+    vabRenderParts();
+    _updateStatusBar();
+    _updateScaleBarExtents();
+    _updateOffscreenIndicators();
   });
 
   // ── Spacebar: fire next stage during flight ────────────────────────────────

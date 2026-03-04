@@ -350,9 +350,9 @@ const FLIGHT_CTRL_CSS = `
 /* Action buttons */
 .pf-buttons {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 12px;
-  justify-content: center;
+  align-items: center;
   margin-top: 12px;
   width: 100%;
 }
@@ -533,7 +533,8 @@ export function startFlightScene(
 
   // Expose for E2E testing — Playwright reads live physics values here.
   if (typeof window !== 'undefined') {
-    window.__flightPs = _ps;
+    window.__flightPs       = _ps;
+    window.__flightAssembly = _assembly;
   }
 
   // Boot the PixiJS flight renderer (clears whatever scene was on stage).
@@ -619,7 +620,8 @@ export function stopFlightScene() {
   }
 
   if (typeof window !== 'undefined') {
-    window.__flightPs = null;
+    window.__flightPs       = null;
+    window.__flightAssembly = null;
   }
 
   _ps                    = null;
