@@ -895,7 +895,10 @@ function _getChuteDeployProgress(ps, instanceId) {
   if (!entry) return 0;
   switch (entry.state) {
     case 'deployed':  return 1;
-    case 'deploying': return Math.max(0, Math.min(1, 1 - entry.deployTimer / DEPLOY_DURATION));
+    case 'deploying': {
+      const linear = Math.max(0, Math.min(1, 1 - entry.deployTimer / DEPLOY_DURATION));
+      return linear * linear * linear;
+    }
     default:          return 0;
   }
 }

@@ -31,7 +31,7 @@ import { ATMOSPHERE_TOP, isReentryCondition } from '../core/atmosphere.js';
 import { getPartById } from '../data/parts.js';
 import { PartType, DEATH_FINE_PER_ASTRONAUT } from '../core/constants.js';
 import { processFlightReturn } from '../core/flightReturn.js';
-import { setTopBarFlightItems, clearTopBarFlightItems } from './topbar.js';
+import { setTopBarFlightItems, clearTopBarFlightItems, setTopBarDropdownToggleCallback } from './topbar.js';
 
 // ---------------------------------------------------------------------------
 // Module state
@@ -95,6 +95,9 @@ let _summaryShown = false;
  * 1 = real-time; 2 = 2× speed; up to 50×.
  */
 let _timeWarp = 1;
+
+/** Time-warp value saved when the hamburger menu opens, restored on close. */
+let _preMenuTimeWarp = 1;
 
 /**
  * Performance.now() timestamp (ms) at which the staging lockout expires.
@@ -565,6 +568,16 @@ export function startFlightScene(
     },
   ]);
 
+  // Pause physics while the hamburger dropdown is open.
+  setTopBarDropdownToggleCallback((isOpen) => {
+    if (isOpen) {
+      _preMenuTimeWarp = _timeWarp;
+      _timeWarp = 0;
+    } else {
+      _timeWarp = _preMenuTimeWarp ?? 1;
+    }
+  });
+
   // Show the launch pad tip if the rocket hasn't launched yet.
   showLaunchTip();
 
@@ -1020,8 +1033,85 @@ function _handleMenuAdjustBuild() {
  * recovery, etc.) and return to the Space Agency hub.
  */
 function _handleMenuReturnToAgency() {
-  // Show the post-flight summary so the player sees flight results,
-  // part recovery, and mission completion before returning to the hub.
+  // If the rocket is still in flight (not landed, not crashed), warn the player
+  // that returning now forfeits all parts with no recovery.
+  if (_ps && !_ps.landed && !_ps.crashed) {
+    // Calculate total cost of active parts at risk.
+    let totalCost = 0;
+    if (_assembly) {
+      for (const [instanceId, placed] of _assembly.parts) {
+        if (!_ps.activeParts.has(instanceId)) continue;
+        const def = getPartById(placed.partId);
+        if (def) totalCost += def.cost ?? 0;
+      }
+    }
+
+    const host = document.getElementById('ui-overlay') ?? document.body;
+    const backdrop = document.createElement('div');
+    backdrop.id = 'abort-flight-backdrop';
+    backdrop.className = 'topbar-modal-backdrop';
+
+    const modal = document.createElement('div');
+    modal.className = 'topbar-modal';
+    modal.setAttribute('role', 'alertdialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', 'Abort Flight');
+    modal.addEventListener('click', (e) => e.stopPropagation());
+
+    // Title
+    const titleRow = document.createElement('div');
+    titleRow.className = 'topbar-modal-title-row';
+    const h2 = document.createElement('h2');
+    h2.className = 'topbar-modal-title';
+    h2.textContent = 'Abort Flight?';
+    titleRow.appendChild(h2);
+    modal.appendChild(titleRow);
+
+    // Message
+    const msg = document.createElement('p');
+    msg.className = 'confirm-msg';
+    const costStr = '$' + Math.round(totalCost).toLocaleString('en-US');
+    msg.textContent =
+      'Your rocket is still in flight. Returning now means no parts will be recovered.';
+    modal.appendChild(msg);
+
+    const costLine = document.createElement('p');
+    costLine.className = 'confirm-msg';
+    costLine.style.fontWeight = '600';
+    costLine.style.marginTop = '-12px';
+    costLine.textContent = `Parts at risk: ${costStr}`;
+    modal.appendChild(costLine);
+
+    // Buttons
+    const btnRow = document.createElement('div');
+    btnRow.className = 'confirm-btn-row';
+
+    const continueBtn = document.createElement('button');
+    continueBtn.className = 'confirm-btn confirm-btn-cancel';
+    continueBtn.textContent = 'Continue Flying';
+    continueBtn.dataset.testid = 'abort-continue-btn';
+    continueBtn.addEventListener('click', () => backdrop.remove());
+
+    const abortBtn = document.createElement('button');
+    abortBtn.className = 'confirm-btn confirm-btn-danger';
+    abortBtn.textContent = 'Abort & Return';
+    abortBtn.dataset.testid = 'abort-confirm-btn';
+    abortBtn.addEventListener('click', () => {
+      backdrop.remove();
+      _handleReturnToAgency();
+    });
+
+    btnRow.appendChild(continueBtn);
+    btnRow.appendChild(abortBtn);
+    modal.appendChild(btnRow);
+
+    backdrop.addEventListener('click', () => backdrop.remove());
+    backdrop.appendChild(modal);
+    host.appendChild(backdrop);
+    return;
+  }
+
+  // Already landed or crashed — go straight to the summary.
   _handleReturnToAgency();
 }
 
@@ -1349,8 +1439,8 @@ function _showPostFlightSummary(ps, assembly, flightState, state, onFlightEnd) {
   });
   buttonsEl.appendChild(restartBtn);
 
-  // ── "Continue Flying" button — only if the rocket landed intact ───────────
-  if (isLanded) {
+  // ── "Continue Flying" button — available when rocket isn't destroyed ──────
+  if (!isCrashed) {
     const continueBtn = document.createElement('button');
     continueBtn.id        = 'post-flight-continue-btn';
     continueBtn.className = 'pf-btn pf-btn-primary';

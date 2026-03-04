@@ -50,6 +50,13 @@ let _onExitToMenu = null;
  */
 let _flightMenuItems = [];
 
+/**
+ * Optional callback fired when the dropdown opens or closes.
+ * Receives `true` when opening, `false` when closing.
+ * @type {((isOpen: boolean) => void) | null}
+ */
+let _onDropdownToggle = null;
+
 // ---------------------------------------------------------------------------
 // CSS
 // ---------------------------------------------------------------------------
@@ -576,6 +583,15 @@ export function setTopBarFlightItems(items) {
  */
 export function clearTopBarFlightItems() {
   _flightMenuItems = [];
+  _onDropdownToggle = null;
+}
+
+/**
+ * Register a callback that fires when the hamburger dropdown opens or closes.
+ * @param {((isOpen: boolean) => void) | null} cb
+ */
+export function setTopBarDropdownToggleCallback(cb) {
+  _onDropdownToggle = cb;
 }
 
 // ---------------------------------------------------------------------------
@@ -585,13 +601,14 @@ export function clearTopBarFlightItems() {
 function _toggleDropdown() {
   const existing = document.getElementById('topbar-dropdown');
   if (existing) {
-    existing.remove();
+    _closeDropdown();
   } else {
     _openDropdown();
   }
 }
 
 function _openDropdown() {
+  _onDropdownToggle?.(true);
   const menu = document.createElement('div');
   menu.id = 'topbar-dropdown';
   menu.setAttribute('role', 'menu');
@@ -647,7 +664,10 @@ function _openDropdown() {
 
 function _closeDropdown() {
   const d = document.getElementById('topbar-dropdown');
-  if (d) d.remove();
+  if (d) {
+    _onDropdownToggle?.(false);
+    d.remove();
+  }
 }
 
 /**

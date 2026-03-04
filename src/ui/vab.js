@@ -519,8 +519,6 @@ const VAB_CSS = `
 
 .vab-part-rect {
   flex-shrink: 0;
-  background: rgba(36, 80, 140, 0.45);
-  border: 1px solid #1e5898;
   border-radius: 1px;
   box-sizing: border-box;
 }
@@ -1280,6 +1278,48 @@ function _updateScaleBarExtents() {
 // Parts panel HTML builder
 // ---------------------------------------------------------------------------
 
+// Per-type colours for part cards — matches the PART_FILL / PART_STROKE maps
+// in src/render/vab.js so the menu previews look like the placed parts.
+const _hex = (n) => '#' + n.toString(16).padStart(6, '0');
+const _CARD_FILL = {
+  [PartType.COMMAND_MODULE]:       _hex(0x1a3860),
+  [PartType.COMPUTER_MODULE]:      _hex(0x122848),
+  [PartType.SERVICE_MODULE]:       _hex(0x1c2c58),
+  [PartType.FUEL_TANK]:            _hex(0x0e2040),
+  [PartType.ENGINE]:               _hex(0x3a1a08),
+  [PartType.SOLID_ROCKET_BOOSTER]: _hex(0x301408),
+  [PartType.STACK_DECOUPLER]:      _hex(0x142030),
+  [PartType.RADIAL_DECOUPLER]:     _hex(0x142030),
+  [PartType.DECOUPLER]:            _hex(0x142030),
+  [PartType.LANDING_LEG]:          _hex(0x102018),
+  [PartType.LANDING_LEGS]:         _hex(0x102018),
+  [PartType.PARACHUTE]:            _hex(0x2e1438),
+  [PartType.SATELLITE]:            _hex(0x142240),
+  [PartType.HEAT_SHIELD]:          _hex(0x2c1000),
+  [PartType.RCS_THRUSTER]:         _hex(0x182c30),
+  [PartType.SOLAR_PANEL]:          _hex(0x0a2810),
+};
+const _CARD_STROKE = {
+  [PartType.COMMAND_MODULE]:       _hex(0x4080c0),
+  [PartType.COMPUTER_MODULE]:      _hex(0x2870a0),
+  [PartType.SERVICE_MODULE]:       _hex(0x3860b0),
+  [PartType.FUEL_TANK]:            _hex(0x2060a0),
+  [PartType.ENGINE]:               _hex(0xc06020),
+  [PartType.SOLID_ROCKET_BOOSTER]: _hex(0xa04818),
+  [PartType.STACK_DECOUPLER]:      _hex(0x305080),
+  [PartType.RADIAL_DECOUPLER]:     _hex(0x305080),
+  [PartType.DECOUPLER]:            _hex(0x305080),
+  [PartType.LANDING_LEG]:          _hex(0x207840),
+  [PartType.LANDING_LEGS]:         _hex(0x207840),
+  [PartType.PARACHUTE]:            _hex(0x8040a0),
+  [PartType.SATELLITE]:            _hex(0x2868b0),
+  [PartType.HEAT_SHIELD]:          _hex(0xa04010),
+  [PartType.RCS_THRUSTER]:         _hex(0x2890a0),
+  [PartType.SOLAR_PANEL]:          _hex(0x20a040),
+};
+const _CARD_FILL_DEFAULT  = '#1a4080';
+const _CARD_STROKE_DEFAULT = '#4090d0';
+
 /**
  * Build the inner HTML for the parts list from the current game state.
  * @param {import('../core/gameState.js').GameState} state
@@ -1316,7 +1356,9 @@ function _buildPartsHTML(state) {
       rows.push(
         `<div class="vab-part-card" data-part-id="${p.id}" ` +
             `title="${p.name} — ${p.mass} kg · ${fmt$(p.cost)}">` +
-          `<div class="vab-part-rect" style="width:${rw}px;height:${rh}px"></div>` +
+          `<div class="vab-part-rect" style="width:${rw}px;height:${rh}px;` +
+              `background:${_CARD_FILL[p.type] ?? _CARD_FILL_DEFAULT};` +
+              `border:1px solid ${_CARD_STROKE[p.type] ?? _CARD_STROKE_DEFAULT}"></div>` +
           `<div class="vab-part-info">` +
             `<div class="vab-part-name">${p.name}</div>` +
             `<div class="vab-part-meta">` +

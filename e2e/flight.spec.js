@@ -336,6 +336,12 @@ test.describe('Flight — Launch & Basic Flight', () => {
     }
     await dropdown.getByText('Return to Space Agency').click();
 
+    // If the rocket is still in flight, an abort confirmation dialog appears first.
+    const abortBtn = page.locator('[data-testid="abort-confirm-btn"]');
+    if (await abortBtn.isVisible({ timeout: 1_000 }).catch(() => false)) {
+      await abortBtn.click();
+    }
+
     // The post-flight summary is shown first so the player can review results.
     await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 5_000 });
 

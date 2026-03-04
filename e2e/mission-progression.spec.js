@@ -429,6 +429,11 @@ async function waitObjectivesComplete(page, missionId, timeout = 120_000) {
 }
 
 async function returnToHub(page) {
+  // If an abort confirmation dialog is visible (mid-flight return), dismiss it first.
+  const abortBtn = page.locator('[data-testid="abort-confirm-btn"]');
+  if (await abortBtn.isVisible({ timeout: 1_000 }).catch(() => false)) {
+    await abortBtn.click();
+  }
   await page.waitForSelector('#post-flight-summary', { state: 'visible', timeout: 60_000 });
   await page.click('#post-flight-return-btn');
   // A return-results overlay appears on top of the hub — dismiss it.
@@ -450,6 +455,11 @@ async function triggerReturnViaMenu(page) {
   const dropdown = page.locator('#topbar-dropdown');
   await expect(dropdown).toBeVisible({ timeout: 5_000 });
   await dropdown.getByText('Return to Space Agency').click();
+  // If the rocket is still in flight, an abort confirmation dialog appears.
+  const abortBtn = page.locator('[data-testid="abort-confirm-btn"]');
+  if (await abortBtn.isVisible({ timeout: 1_000 }).catch(() => false)) {
+    await abortBtn.click();
+  }
 }
 
 async function expectCompleted(page, missionId) {

@@ -70,7 +70,7 @@ export const ParachuteState = Object.freeze({
 });
 
 /** Duration of the deploying → deployed animation transition in seconds. */
-export const DEPLOY_DURATION = 2.0;
+export const DEPLOY_DURATION = 5.0;
 
 /**
  * Atmospheric density threshold below which chute effectiveness is reduced
@@ -301,11 +301,11 @@ export function getChuteMultiplier(ps, instanceId, density) {
       break;
 
     case ParachuteState.DEPLOYING: {
-      // Linear ramp: at deployTimer = DEPLOY_DURATION → 0% open (mult = 1);
-      //              at deployTimer = 0               → 100% open (mult = 80).
-      const progress = Math.max(0, Math.min(1,
+      // Cubic ease-in: drag builds slowly at first, accelerates as canopy inflates.
+      const linear = Math.max(0, Math.min(1,
         1 - entry.deployTimer / DEPLOY_DURATION,
       ));
+      const progress = linear * linear * linear;
       baseMult = 1 + (CHUTE_DRAG_MULTIPLIER - 1) * progress;
       break;
     }
