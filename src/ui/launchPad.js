@@ -20,6 +20,7 @@ import { PartType } from '../core/constants.js';
 import {
   createRocketAssembly,
   addPartToAssembly,
+  connectParts,
   createStagingConfig,
   syncStagingWithAssembly,
 } from '../core/rocketbuilder.js';
@@ -612,10 +613,22 @@ function _buildRocketCard(design) {
 // Private — launch flow
 // ---------------------------------------------------------------------------
 
+/** @type {Readonly<Record<string, string>>} */
+const OPPOSITE_SIDE = Object.freeze({
+  top: 'bottom', bottom: 'top', left: 'right', right: 'left',
+});
+
+/** Positional tolerance for snap-point matching (world units). */
+const SNAP_TOLERANCE = 1;
+
 /**
  * Reconstruct a live RocketAssembly from a saved RocketDesign.
  * Parts are added in the same order they were saved, so the auto-generated
  * instanceIds (inst-1, inst-2, ...) match the original staging references.
+ *
+ * After placing parts, connections are rebuilt by finding pairs of snap points
+ * that coincide positionally — this is required for the fuel system's BFS
+ * traversal to route propellant from tanks to engines.
  *
  * @param {import('../core/gameState.js').RocketDesign} design
  * @returns {import('../core/rocketbuilder.js').RocketAssembly}
@@ -625,7 +638,67 @@ function _designToAssembly(design) {
   for (const part of design.parts) {
     addPartToAssembly(assembly, part.partId, part.position.x, part.position.y);
   }
+
+  // Rebuild connections from snap-point positions.
+  _rebuildConnections(assembly);
+
   return assembly;
+}
+
+/**
+ * Infer part connections by checking snap-point overlap.
+ *
+ * For every pair of parts, check whether a snap point from one part coincides
+ * (within tolerance) with a complementary-side snap point from the other.
+ * When a match is found, record a connection so the fuel system can traverse
+ * the assembly graph.
+ *
+ * @param {import('../core/rocketbuilder.js').RocketAssembly} assembly
+ */
+function _rebuildConnections(assembly) {
+  const parts = [...assembly.parts.values()];
+  const occupied = new Set(); // "instanceId:snapIndex" → already connected
+
+  for (let i = 0; i < parts.length; i++) {
+    const pA = parts[i];
+    const defA = getPartById(pA.partId);
+    if (!defA) continue;
+
+    for (let j = i + 1; j < parts.length; j++) {
+      const pB = parts[j];
+      const defB = getPartById(pB.partId);
+      if (!defB) continue;
+
+      for (let si = 0; si < defA.snapPoints.length; si++) {
+        const spA = defA.snapPoints[si];
+        const keyA = `${pA.instanceId}:${si}`;
+        if (occupied.has(keyA)) continue;
+
+        // World position of snap A (offsetY: positive = below centre in screen coords).
+        const awx = pA.x + spA.offsetX;
+        const awy = pA.y - spA.offsetY;
+
+        const neededSide = OPPOSITE_SIDE[spA.side];
+
+        for (let sj = 0; sj < defB.snapPoints.length; sj++) {
+          const spB = defB.snapPoints[sj];
+          if (spB.side !== neededSide) continue;
+
+          const keyB = `${pB.instanceId}:${sj}`;
+          if (occupied.has(keyB)) continue;
+
+          const bwx = pB.x + spB.offsetX;
+          const bwy = pB.y - spB.offsetY;
+
+          if (Math.abs(awx - bwx) < SNAP_TOLERANCE && Math.abs(awy - bwy) < SNAP_TOLERANCE) {
+            connectParts(assembly, pA.instanceId, si, pB.instanceId, sj);
+            occupied.add(keyA);
+            occupied.add(keyB);
+          }
+        }
+      }
+    }
+  }
 }
 
 /**
