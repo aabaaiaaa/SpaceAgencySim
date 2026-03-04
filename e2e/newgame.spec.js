@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { SAVE_KEY, buildSaveEnvelope } from './helpers.js';
 
 /**
  * E2E — App Load & New Game Flow
@@ -125,23 +126,8 @@ test.describe('App Load & New Game Flow', () => {
     await p.addInitScript(({ key, envelope }) => {
       localStorage.setItem(key, JSON.stringify(envelope));
     }, {
-      key: 'spaceAgencySave_0',
-      envelope: {
-        saveName:  SAVE_NAME,
-        timestamp: new Date().toISOString(),
-        state: {
-          agencyName:      AGENCY_NAME,
-          money:           MONEY,
-          missions:        { available: [], accepted: [], completed: [] },
-          crew:            [],
-          flightHistory:   [],
-          playTimeSeconds: 0,
-          loan:            { balance: 2_000_000, interestRate: 0.03 },
-          rockets:         [],
-          parts:           [],
-          currentFlight:   null,
-        },
-      },
+      key: SAVE_KEY,
+      envelope: buildSaveEnvelope({ saveName: SAVE_NAME, agencyName: AGENCY_NAME, money: MONEY }),
     });
 
     await p.goto('/');

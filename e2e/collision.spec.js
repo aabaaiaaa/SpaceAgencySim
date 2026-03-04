@@ -126,8 +126,12 @@ test.describe('Collision — Stage Separation', () => {
       { timeout: 10_000 },
     );
 
-    // Wait 2 seconds for separation to take effect.
-    await page.waitForTimeout(2_000);
+    // Wait for debris to separate from the rocket.
+    await page.waitForFunction(() => {
+      const ps = window.__flightPs;
+      if (!ps?.debris?.length) return false;
+      return Math.abs(ps.posY - ps.debris[0].posY) > 0.1;
+    }, { timeout: 5_000 });
 
     // Verify debris position differs from rocket position.
     const positions = await page.evaluate(() => {
@@ -168,8 +172,12 @@ test.describe('Collision — Stage Separation', () => {
   // ── (3) No indefinite overlap ─────────────────────────────────────────
 
   test('(3) no indefinite overlap after separation', async () => {
-    // Wait 3 more seconds.
-    await page.waitForTimeout(3_000);
+    // Wait for bodies to diverge significantly.
+    await page.waitForFunction(() => {
+      const ps = window.__flightPs;
+      if (!ps?.debris?.length) return false;
+      return Math.abs(ps.posY - ps.debris[0].posY) > 1;
+    }, { timeout: 10_000 });
 
     const result = await page.evaluate(() => {
       const ps = window.__flightPs;

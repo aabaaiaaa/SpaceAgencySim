@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { STARTING_MONEY, dragPartToCanvas } from './helpers.js';
 
 /**
  * E2E — Save & Load Flow
@@ -29,7 +30,6 @@ test.describe('Save & Load Flow', () => {
   let page;
 
   const AGENCY_NAME    = 'Test Agency';
-  const STARTING_MONEY = 2_000_000;
 
   // ── Setup ──────────────────────────────────────────────────────────────────
 
@@ -251,21 +251,7 @@ test.describe('Save & Load Flow', () => {
     await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 15_000 });
 
     // ── Place a part onto the canvas ──────────────────────────────────────
-    const partId = 'cmd-mk1';
-    const card = page.locator(`.vab-part-card[data-part-id="${partId}"]`);
-    const cardBox = await card.boundingBox();
-    if (!cardBox) throw new Error('Part card not visible');
-
-    const startX = cardBox.x + cardBox.width  / 2;
-    const startY = cardBox.y + cardBox.height / 2;
-    // Drop into roughly the centre of the canvas build area.
-    const dropX = 525;
-    const dropY = 400;
-
-    await page.mouse.move(startX, startY);
-    await page.mouse.down();
-    await page.mouse.move(dropX, dropY, { steps: 20 });
-    await page.mouse.up();
+    await dragPartToCanvas(page, 'cmd-mk1', 525, 400);
 
     // Wait for the part to be registered.
     await page.waitForFunction(

@@ -1,4 +1,9 @@
 import { test, expect } from '@playwright/test';
+import {
+  VP_W, VP_H,
+  SAVE_KEY, STARTING_MONEY,
+  FIRST_FLIGHT_MISSION, buildSaveEnvelope,
+} from './helpers.js';
 
 /**
  * E2E — Launch Pad
@@ -25,12 +30,7 @@ test.describe.configure({ mode: 'serial' });
 // Constants
 // ---------------------------------------------------------------------------
 
-const VP_W = 1280;
-const VP_H = 720;
-
-const SAVE_KEY    = 'spaceAgencySave_0';
 const AGENCY_NAME = 'LP Test Agency';
-const STARTING_MONEY = 2_000_000;
 
 // Unlocked parts needed for the seeded rocket design.
 const UNLOCKED_PARTS = ['cmd-mk1', 'tank-small', 'engine-spark'];
@@ -58,49 +58,15 @@ const SEEDED_DESIGN = {
   updatedDate: new Date().toISOString(),
 };
 
-/**
- * "First Flight" mission (accepted) — provides an objective for launches.
- */
-const ACCEPTED_MISSION = {
-  id:           'mission-001',
-  title:        'First Flight',
-  description:  'Reach 100 metres altitude.',
-  location:     'desert',
-  objectives: [
-    {
-      id:          'obj-001-1',
-      type:        'REACH_ALTITUDE',
-      target:      { altitude: 100 },
-      completed:   false,
-      description: 'Reach 100 m altitude',
-    },
-  ],
-  reward:        15_000,
-  unlocksAfter:  [],
-  unlockedParts: [],
-  status:        'accepted',
-};
-
-/** Build a save-slot envelope. */
-function buildSaveEnvelope(rockets = []) {
-  return {
-    saveName:  'LP E2E Test',
-    timestamp: new Date().toISOString(),
-    state: {
-      agencyName:      AGENCY_NAME,
-      money:           STARTING_MONEY,
-      loan:            { balance: STARTING_MONEY, interestRate: 0.03, totalInterestAccrued: 0 },
-      missions:        { available: [], accepted: [ACCEPTED_MISSION], completed: [] },
-      crew:            [],
-      rockets,
-      parts:           UNLOCKED_PARTS,
-      flightHistory:   [],
-      playTimeSeconds: 0,
-      currentFlight:   null,
-      vabAssembly:     null,
-      vabStagingConfig: null,
-    },
-  };
+/** Build a save-slot envelope for launchpad tests. */
+function lpSaveEnvelope(rockets = []) {
+  return buildSaveEnvelope({
+    saveName: 'LP E2E Test',
+    agencyName: AGENCY_NAME,
+    missions: { available: [], accepted: [{ ...FIRST_FLIGHT_MISSION, status: 'accepted' }], completed: [] },
+    parts: UNLOCKED_PARTS,
+    rockets,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -126,7 +92,7 @@ test.describe('Launch Pad', () => {
     // Seed a save with one rocket design.
     await page.addInitScript(({ key, envelope }) => {
       localStorage.setItem(key, JSON.stringify(envelope));
-    }, { key: SAVE_KEY, envelope: buildSaveEnvelope([SEEDED_DESIGN]) });
+    }, { key: SAVE_KEY, envelope: lpSaveEnvelope([SEEDED_DESIGN]) });
 
     await page.goto('/');
     await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
@@ -175,7 +141,7 @@ test.describe('Launch Pad', () => {
     // Seed a save with NO rocket designs (overwrite the previous seed).
     await page.addInitScript(({ key, envelope }) => {
       localStorage.setItem(key, JSON.stringify(envelope));
-    }, { key: SAVE_KEY, envelope: buildSaveEnvelope([]) });
+    }, { key: SAVE_KEY, envelope: lpSaveEnvelope([]) });
 
     await page.goto('/');
     await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
@@ -207,7 +173,7 @@ test.describe('Launch Pad', () => {
     // Seed a save with the test rocket design.
     await page.addInitScript(({ key, envelope }) => {
       localStorage.setItem(key, JSON.stringify(envelope));
-    }, { key: SAVE_KEY, envelope: buildSaveEnvelope([SEEDED_DESIGN]) });
+    }, { key: SAVE_KEY, envelope: lpSaveEnvelope([SEEDED_DESIGN]) });
 
     await page.goto('/');
     await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
@@ -257,7 +223,7 @@ test.describe('Launch Pad', () => {
 
   test('(4) launch button is disabled when player cannot afford the rocket', async () => {
     // Seed a save with very low money — not enough to cover the $14,800 cost.
-    const poorEnvelope = buildSaveEnvelope([SEEDED_DESIGN]);
+    const poorEnvelope = lpSaveEnvelope([SEEDED_DESIGN]);
     poorEnvelope.state.money = 5_000;
 
     await page.addInitScript(({ key, envelope }) => {

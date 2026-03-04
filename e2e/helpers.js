@@ -96,6 +96,7 @@ export function buildSaveEnvelope({
  */
 export async function dragPartToCanvas(page, partId, targetX, targetY) {
   const card    = page.locator(`.vab-part-card[data-part-id="${partId}"]`);
+  await card.scrollIntoViewIfNeeded();
   const cardBox = await card.boundingBox();
   if (!cardBox) throw new Error(`Part card not visible: ${partId}`);
 

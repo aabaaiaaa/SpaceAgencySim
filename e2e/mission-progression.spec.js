@@ -1,4 +1,10 @@
 import { test, expect } from '@playwright/test';
+import {
+  VP_W, VP_H,
+  CENTRE_X, CANVAS_CENTRE_Y,
+  dragPartToCanvas, placePart,
+  seedAndLoadSave, navigateToVab,
+} from './helpers.js';
 
 /**
  * E2E — Mission Progression
@@ -15,24 +21,9 @@ import { test, expect } from '@playwright/test';
  */
 
 // ---------------------------------------------------------------------------
-// Constants
+// Constants (domain-specific to this file)
 // ---------------------------------------------------------------------------
 
-const VP_W = 1280;
-const VP_H = 720;
-
-const TOOLBAR_H     = 52;
-const SCALE_BAR_W   = 50;
-const PARTS_PANEL_W = 280;
-const STATUS_BAR_H  = 28;
-
-const BUILD_W = VP_W - PARTS_PANEL_W - SCALE_BAR_W;  // 950
-const BUILD_H = VP_H - TOOLBAR_H;                    // 668
-
-const CENTRE_X        = SCALE_BAR_W + BUILD_W / 2;    // 525
-const CANVAS_CENTRE_Y = TOOLBAR_H + BUILD_H / 2;      // 386
-
-const SAVE_KEY       = 'spaceAgencySave_0';
 const STARTING_MONEY = 10_000_000;
 
 const STARTER_PARTS = [
@@ -272,46 +263,6 @@ function testCrew() {
 // Page interaction helpers
 // ---------------------------------------------------------------------------
 
-async function seedAndLoad(page, envelope) {
-  await page.setViewportSize({ width: VP_W, height: VP_H });
-  await page.addInitScript(({ key, data }) => {
-    localStorage.setItem(key, JSON.stringify(data));
-  }, { key: SAVE_KEY, data: envelope });
-  await page.goto('/');
-  await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
-  await page.click('[data-action="load"][data-slot="0"]');
-  await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
-}
-
-async function goToVab(page) {
-  await page.click('[data-building-id="vab"]');
-  await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 15_000 });
-  await page.waitForFunction(
-    () => typeof window.__vabAssembly !== 'undefined',
-    { timeout: 15_000 },
-  );
-}
-
-async function dragPart(page, partId, x, y) {
-  const card    = page.locator(`.vab-part-card[data-part-id="${partId}"]`);
-  await card.scrollIntoViewIfNeeded();
-  const cardBox = await card.boundingBox();
-  if (!cardBox) throw new Error(`Part card not visible: ${partId}`);
-  const sx = cardBox.x + cardBox.width / 2;
-  const sy = cardBox.y + cardBox.height / 2;
-  await page.mouse.move(sx, sy);
-  await page.mouse.down();
-  await page.mouse.move(x, y, { steps: 30 });
-  await page.mouse.up();
-}
-
-async function waitAssembly(page, n) {
-  await page.waitForFunction(
-    count => (window.__vabAssembly?.parts?.size ?? 0) >= count,
-    n, { timeout: 5_000 },
-  );
-}
-
 async function openStaging(page) {
   const panel = page.locator('#vab-staging-panel');
   if (!await panel.isVisible()) {
@@ -518,7 +469,7 @@ async function expectPartUnlocked(page, partId) {
 }
 
 async function expectPartInVab(page, partId) {
-  await goToVab(page);
+  await navigateToVab(page);
   await expect(
     page.locator(`.vab-part-card[data-part-id="${partId}"]`),
   ).toBeVisible({ timeout: 5_000 });
@@ -535,8 +486,7 @@ async function expectPartInVab(page, partId) {
 async function buildStack(page, parts, anchorY = CANVAS_CENTRE_Y) {
   const ys = stackYs(parts, anchorY);
   for (let i = 0; i < parts.length; i++) {
-    await dragPart(page, parts[i], CENTRE_X, ys[i]);
-    await waitAssembly(page, i + 1);
+    await placePart(page, parts[i], CENTRE_X, ys[i], i + 1);
   }
 }
 
@@ -550,7 +500,7 @@ async function placeRadialLeft(page, radialPartId, parentPartId, parentY) {
   const parent = GEO[parentPartId];
   const child  = GEO[radialPartId];
   const x = CENTRE_X + parent.leftX - child.rightX;
-  await dragPart(page, radialPartId, x, parentY);
+  await dragPartToCanvas(page, radialPartId, x, parentY);
 }
 
 // ---------------------------------------------------------------------------
@@ -572,8 +522,9 @@ test.describe('Mission Progression', () => {
       acceptedId: 'mission-001',
       parts: STARTER_PARTS,
     });
-    await seedAndLoad(page, env);
-    await goToVab(page);
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    await seedAndLoadSave(page, env);
+    await navigateToVab(page);
 
     // Build: cmd-mk1 + tank-small + engine-spark
     await buildStack(page, ['cmd-mk1', 'tank-small', 'engine-spark']);
@@ -597,8 +548,9 @@ test.describe('Mission Progression', () => {
       acceptedId: 'mission-002',
       parts: STARTER_PARTS,
     });
-    await seedAndLoad(page, env);
-    await goToVab(page);
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    await seedAndLoadSave(page, env);
+    await navigateToVab(page);
     await buildStack(page, ['cmd-mk1', 'tank-small', 'engine-spark']);
     await launch(page);
     await stage(page);
@@ -617,8 +569,9 @@ test.describe('Mission Progression', () => {
       acceptedId: 'mission-003',
       parts: STARTER_PARTS,
     });
-    await seedAndLoad(page, env);
-    await goToVab(page);
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    await seedAndLoadSave(page, env);
+    await navigateToVab(page);
 
     // tank-small + engine-spark has enough delta-V to coast well past 1km.
     await buildStack(page, ['cmd-mk1', 'tank-small', 'engine-spark']);
@@ -639,8 +592,9 @@ test.describe('Mission Progression', () => {
       acceptedId: 'mission-004',
       parts: [...STARTER_PARTS, 'tank-medium'],
     });
-    await seedAndLoad(page, env);
-    await goToVab(page);
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    await seedAndLoadSave(page, env);
+    await navigateToVab(page);
     await buildStack(page, ['cmd-mk1', 'tank-medium', 'engine-spark']);
     await launch(page);
     await stage(page);
@@ -664,8 +618,9 @@ test.describe('Mission Progression', () => {
       acceptedId: 'mission-005',
       parts: STARTER_PARTS,
     });
-    await seedAndLoad(page, env);
-    await goToVab(page);
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    await seedAndLoadSave(page, env);
+    await navigateToVab(page);
 
     // Use probe-core for a lighter rocket. Without landing legs, the physics
     // engine requires ≤5 m/s for a LANDING event. Terminal velocity with mk1
@@ -717,8 +672,9 @@ test.describe('Mission Progression', () => {
       acceptedId: 'mission-006',
       parts: STARTER_PARTS,
     });
-    await seedAndLoad(page, env);
-    await goToVab(page);
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    await seedAndLoadSave(page, env);
+    await navigateToVab(page);
 
     // Use probe-core for lighter rocket: wet 720kg, dry 320kg — both under
     // parachute-mk1 maxSafeMass 1200kg. Terminal velocity ≈ 4.7 m/s < 5 m/s.
@@ -763,8 +719,9 @@ test.describe('Mission Progression', () => {
       acceptedId: 'mission-007',
       parts: [...STARTER_PARTS, 'landing-legs-small'],
     });
-    await seedAndLoad(page, env);
-    await goToVab(page);
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    await seedAndLoadSave(page, env);
+    await navigateToVab(page);
 
     // Use probe-core for lighter rocket. With 2 deployed legs AND speed < 10
     // the physics uses Case 1 (controlled landing). Terminal velocity at dry
@@ -781,12 +738,18 @@ test.describe('Mission Progression', () => {
 
     // Attach 2 landing-legs-small radially (left + right of tank).
     await placeRadialLeft(page, 'landing-legs-small', 'tank-small', tankY);
-    await waitAssembly(page, 5);
+    await page.waitForFunction(
+      count => (window.__vabAssembly?.parts?.size ?? 0) >= count,
+      5, { timeout: 5_000 },
+    );
     // Place second leg on the right side.
     const parentGeo = GEO['tank-small'];
     const childGeo = GEO['landing-legs-small'];
-    await dragPart(page, 'landing-legs-small', CENTRE_X + parentGeo.rightX - childGeo.leftX, tankY);
-    await waitAssembly(page, 6);
+    await dragPartToCanvas(page, 'landing-legs-small', CENTRE_X + parentGeo.rightX - childGeo.leftX, tankY);
+    await page.waitForFunction(
+      count => (window.__vabAssembly?.parts?.size ?? 0) >= count,
+      6, { timeout: 5_000 },
+    );
 
     // Staging: engine in stage-0 (auto). Move BOTH legs + parachute to stage-1.
     await stagePartFromUnstaged(page, 'parachute-mk1', 1);
@@ -827,8 +790,9 @@ test.describe('Mission Progression', () => {
       acceptedId: 'mission-008',
       parts: [...STARTER_PARTS, 'science-module-mk1', 'tank-medium'],
     });
-    await seedAndLoad(page, env);
-    await goToVab(page);
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    await seedAndLoadSave(page, env);
+    await navigateToVab(page);
 
     // Build: cmd-mk1 + science-module-mk1 + tank-medium + engine-spark
     await buildStack(page, ['cmd-mk1', 'science-module-mk1', 'tank-medium', 'engine-spark']);
@@ -860,8 +824,9 @@ test.describe('Mission Progression', () => {
       parts: STARTER_PARTS,
       crew: [crew],
     });
-    await seedAndLoad(page, env);
-    await goToVab(page);
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    await seedAndLoadSave(page, env);
+    await navigateToVab(page);
 
     // Build: cmd-mk1 + tank-small + engine-spark
     await buildStack(page, ['cmd-mk1', 'tank-small', 'engine-spark']);
@@ -899,8 +864,9 @@ test.describe('Mission Progression', () => {
       acceptedId: 'mission-010',
       parts: [...STARTER_PARTS, 'science-module-mk1', 'tank-medium', 'parachute-mk2'],
     });
-    await seedAndLoad(page, env);
-    await goToVab(page);
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    await seedAndLoadSave(page, env);
+    await navigateToVab(page);
 
     // probe-core (50) + parachute-mk2 (250) + science-module (200) + tank-small (50+400)
     // + engine-spark (120) = 1070kg wet.  Terminal velocity under mk2 chute
@@ -994,8 +960,9 @@ test.describe('Mission Progression', () => {
       parts: STARTER_PARTS,
       crew: [crew],
     });
-    await seedAndLoad(page, env);
-    await goToVab(page);
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    await seedAndLoadSave(page, env);
+    await navigateToVab(page);
 
     // Build: cmd-mk1 + tank-small + engine-spark
     await buildStack(page, ['cmd-mk1', 'tank-small', 'engine-spark']);
@@ -1036,8 +1003,9 @@ test.describe('Mission Progression', () => {
       acceptedId: 'mission-012',
       parts: [...STARTER_PARTS, 'tank-medium'],
     });
-    await seedAndLoad(page, env);
-    await goToVab(page);
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    await seedAndLoadSave(page, env);
+    await navigateToVab(page);
 
     // Two-stage rocket (top to bottom):
     //   cmd-mk1 → tank-medium → engine-spark → decoupler → tank-medium → engine-spark
@@ -1091,8 +1059,9 @@ test.describe('Mission Progression', () => {
       acceptedId: 'mission-013',
       parts: [...STARTER_PARTS, 'tank-medium'],
     });
-    await seedAndLoad(page, env);
-    await goToVab(page);
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    await seedAndLoadSave(page, env);
+    await navigateToVab(page);
 
     // Two-stage rocket for high altitude.
     await buildStack(page, [
@@ -1137,8 +1106,9 @@ test.describe('Mission Progression', () => {
       acceptedId: 'mission-014',
       parts: [...STARTER_PARTS, 'tank-medium', 'engine-reliant'],
     });
-    await seedAndLoad(page, env);
-    await goToVab(page);
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    await seedAndLoadSave(page, env);
+    await navigateToVab(page);
 
     // Two-stage rocket with reliant first stage for more thrust.
     await buildStack(page, [
@@ -1186,8 +1156,9 @@ test.describe('Mission Progression', () => {
       acceptedId: 'mission-015',
       parts: [...STARTER_PARTS, 'tank-medium', 'satellite-mk1', 'engine-reliant'],
     });
-    await seedAndLoad(page, env);
-    await goToVab(page);
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    await seedAndLoadSave(page, env);
+    await navigateToVab(page);
 
     // Satellite on top, decoupler below to release it.
     // satellite-mk1 + decoupler + cmd-mk1 + tank-medium + engine-spark + decoupler + tank-medium + engine-reliant
@@ -1269,8 +1240,9 @@ test.describe('Mission Progression', () => {
       acceptedId: 'mission-016',
       parts: [...STARTER_PARTS, 'tank-medium', 'engine-reliant', 'engine-nerv'],
     });
-    await seedAndLoad(page, env);
-    await goToVab(page);
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    await seedAndLoadSave(page, env);
+    await navigateToVab(page);
 
     // Two-stage orbital rocket:
     //   Upper: cmd-mk1 + tank-medium + tank-medium + engine-nerv (ISP 800s)
@@ -1367,8 +1339,9 @@ test.describe('Mission Progression', () => {
         'tank-large', 'satellite-mk1', 'parachute-mk2',
       ],
     });
-    await seedAndLoad(page, env);
-    await goToVab(page);
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    await seedAndLoadSave(page, env);
+    await navigateToVab(page);
 
     // Orbital rocket with satellite payload:
     //   satellite-mk1 + decoupler + cmd-mk1 + tank-medium + tank-medium + engine-nerv

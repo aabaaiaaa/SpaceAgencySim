@@ -83,9 +83,12 @@ test.describe('Tipping physics — ground-contact rotation', () => {
     const initAngle = await page.evaluate(() => window.__flightPs.angle);
     expect(initAngle).toBeCloseTo(0, 1);
 
-    // Hold D key for ~1 second.
+    // Hold D key until rocket tilts noticeably.
     await page.keyboard.down('d');
-    await page.waitForTimeout(1000);
+    await page.waitForFunction(
+      () => Math.abs(window.__flightPs?.angle ?? 0) > 0.05,
+      { timeout: 5_000 },
+    );
     await page.keyboard.up('d');
 
     const angle = await page.evaluate(() => window.__flightPs.angle);
@@ -98,8 +101,15 @@ test.describe('Tipping physics — ground-contact rotation', () => {
     // The rocket already has some tilt from test (1).
     const angleBefore = await page.evaluate(() => window.__flightPs.angle);
 
-    // Wait without any key input — gravity should increase tilt.
-    await page.waitForTimeout(1500);
+    // Wait without any key input — gravity should increase tilt (or crash).
+    await page.waitForFunction(
+      (prev) => {
+        const a = Math.abs(window.__flightPs?.angle ?? 0);
+        return a > Math.abs(prev) + 0.01 || window.__flightPs?.crashed === true;
+      },
+      angleBefore,
+      { timeout: 10_000 },
+    );
 
     const angleAfter = await page.evaluate(() => window.__flightPs.angle);
     // Should have tilted further (or crashed).
