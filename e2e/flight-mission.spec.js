@@ -1,4 +1,10 @@
 import { test, expect } from '@playwright/test';
+import {
+  VP_W, VP_H,
+  CENTRE_X, CANVAS_CENTRE_Y,
+  FIRST_FLIGHT_MISSION, buildSaveEnvelope,
+  placePart, seedAndLoadSave, navigateToVab, launchFromVab,
+} from './helpers.js';
 
 /**
  * E2E — First Flight Mission Completion
@@ -11,7 +17,6 @@ import { test, expect } from '@playwright/test';
  *   2. Load the save, navigate to the VAB.
  *   3. Build a rocket: Mk1 Command Module + Medium Tank + Spark Engine.
  *   4. Engine is auto-staged into Stage 1.
- *   5. Click Launch → confirm crew dialog → flight scene loads.
  *
  * Test list:
  *   (1) Engine is auto-staged into Stage 1 (no manual drag needed).
@@ -22,89 +27,14 @@ import { test, expect } from '@playwright/test';
 test.describe.configure({ mode: 'serial' });
 
 // ---------------------------------------------------------------------------
-// Constants
+// Drop positions for a 3-part stack (cmd-mk1 + tank-medium + engine-spark)
 // ---------------------------------------------------------------------------
 
-const VP_W = 1280;
-const VP_H = 720;
-
-// VAB layout constants (must match src/render/vab.js / src/ui/vab.js).
-const TOOLBAR_H     = 52;
-const SCALE_BAR_W   = 50;
-const PARTS_PANEL_W = 280;
-
-const BUILD_W = VP_W - PARTS_PANEL_W - SCALE_BAR_W;   // 950
-const BUILD_H = VP_H - TOOLBAR_H;                     // 668
-
-// Screen X of rocket centreline (world X = 0):
-const CENTRE_X = SCALE_BAR_W + BUILD_W / 2;  // 525
-
-// Canvas vertical centre (screen Y for cmd-mk1 drop):
-const CANVAS_CENTRE_Y = TOOLBAR_H + BUILD_H / 2;  // 386
-
-// Drop positions for a 3-part stack.
 const CMD_DROP_Y    = CANVAS_CENTRE_Y;            // 386
 const TANK_M_DROP_Y = CMD_DROP_Y   + 20 + 30;     // 436
 const ENGINE_DROP_Y = TANK_M_DROP_Y + 30 + 15;     // 481
 
-// Save / seed config
-const SAVE_KEY    = 'spaceAgencySave_0';
-const AGENCY_NAME = 'Mission Test Agency';
-const STARTING_MONEY = 2_000_000;
-
-/**
- * "First Flight" mission template — status set to 'accepted'.
- */
-const ACCEPTED_FIRST_FLIGHT = {
-  id:           'mission-001',
-  title:        'First Flight',
-  description:
-    'Our engineers have assembled a basic sounding rocket. Your task is simple: ' +
-    'get it off the pad and reach 100 metres altitude. This is the first step ' +
-    'in what will become a legendary space programme.',
-  location:     'desert',
-  objectives: [
-    {
-      id:          'obj-001-1',
-      type:        'REACH_ALTITUDE',
-      target:      { altitude: 100 },
-      completed:   false,
-      description: 'Reach 100 m altitude',
-    },
-  ],
-  reward:        15_000,
-  unlocksAfter:  [],
-  unlockedParts: [],
-  status:        'accepted',
-};
-
 const UNLOCKED_PARTS = ['cmd-mk1', 'tank-medium', 'engine-spark'];
-
-/** Build a save-slot envelope to inject into localStorage. */
-function buildSaveEnvelope() {
-  return {
-    saveName:  'Mission E2E Test',
-    timestamp: new Date().toISOString(),
-    state: {
-      agencyName:      AGENCY_NAME,
-      money:           STARTING_MONEY,
-      loan:            { balance: STARTING_MONEY, interestRate: 0.03, totalInterestAccrued: 0 },
-      missions:        {
-        available: [],
-        accepted:  [ACCEPTED_FIRST_FLIGHT],
-        completed: [],
-      },
-      crew:            [],
-      rockets:         [],
-      parts:           UNLOCKED_PARTS,
-      flightHistory:   [],
-      playTimeSeconds: 0,
-      currentFlight:   null,
-    },
-  };
-}
-
-const SAVE_ENVELOPE = buildSaveEnvelope();
 
 // ---------------------------------------------------------------------------
 // Suite
@@ -114,23 +44,6 @@ test.describe('Flight — First Flight Mission Completion', () => {
   /** @type {import('@playwright/test').Page} */
   let page;
 
-  /**
-   * Drag a part card from the parts panel to a canvas position.
-   */
-  async function dragPartToCanvas(partId, targetX, targetY) {
-    const card    = page.locator(`.vab-part-card[data-part-id="${partId}"]`);
-    const cardBox = await card.boundingBox();
-    if (!cardBox) throw new Error(`Part card not visible: ${partId}`);
-
-    const startX = cardBox.x + cardBox.width  / 2;
-    const startY = cardBox.y + cardBox.height / 2;
-
-    await page.mouse.move(startX, startY);
-    await page.mouse.down();
-    await page.mouse.move(targetX, targetY, { steps: 30 });
-    await page.mouse.up();
-  }
-
   // ── Suite setup ─────────────────────────────────────────────────────────
 
   test.beforeAll(async ({ browser }) => {
@@ -138,44 +51,20 @@ test.describe('Flight — First Flight Mission Completion', () => {
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
-    // Seed localStorage.
-    await page.addInitScript(({ key, envelope }) => {
-      localStorage.setItem(key, JSON.stringify(envelope));
-    }, { key: SAVE_KEY, envelope: SAVE_ENVELOPE });
+    const envelope = buildSaveEnvelope({
+      saveName: 'Mission E2E Test',
+      agencyName: 'Mission Test Agency',
+      missions: { available: [], accepted: [{ ...FIRST_FLIGHT_MISSION, status: 'accepted' }], completed: [] },
+      parts: UNLOCKED_PARTS,
+    });
 
-    // Navigate and load save.
-    await page.goto('/');
-    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
-    await page.click('[data-action="load"][data-slot="0"]');
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
-
-    // Navigate to VAB.
-    await page.click('[data-building-id="vab"]');
-    await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 15_000 });
-    await page.waitForFunction(
-      () => typeof window.__vabAssembly !== 'undefined',
-      { timeout: 15_000 },
-    );
+    await seedAndLoadSave(page, envelope);
+    await navigateToVab(page);
 
     // ── Build rocket: Mk1 + Medium Tank + Spark Engine ──────────────────
-
-    await dragPartToCanvas('cmd-mk1', CENTRE_X, CMD_DROP_Y);
-    await page.waitForFunction(
-      () => (window.__vabAssembly?.parts?.size ?? 0) >= 1,
-      { timeout: 5_000 },
-    );
-
-    await dragPartToCanvas('tank-medium', CENTRE_X, TANK_M_DROP_Y);
-    await page.waitForFunction(
-      () => (window.__vabAssembly?.parts?.size ?? 0) >= 2,
-      { timeout: 5_000 },
-    );
-
-    await dragPartToCanvas('engine-spark', CENTRE_X, ENGINE_DROP_Y);
-    await page.waitForFunction(
-      () => (window.__vabAssembly?.parts?.size ?? 0) >= 3,
-      { timeout: 5_000 },
-    );
+    await placePart(page, 'cmd-mk1', CENTRE_X, CMD_DROP_Y, 1);
+    await placePart(page, 'tank-medium', CENTRE_X, TANK_M_DROP_Y, 2);
+    await placePart(page, 'engine-spark', CENTRE_X, ENGINE_DROP_Y, 3);
   });
 
   test.afterAll(async () => {
@@ -205,20 +94,7 @@ test.describe('Flight — First Flight Mission Completion', () => {
     test.setTimeout(90_000);
 
     // Launch the rocket.
-    const launchBtn = page.locator('#vab-btn-launch');
-    await expect(launchBtn).not.toBeDisabled({ timeout: 5_000 });
-    await launchBtn.click();
-
-    // Crew dialog (cmd-mk1 has 1 seat; launches empty).
-    await page.waitForSelector('#vab-crew-overlay', { state: 'visible', timeout: 5_000 });
-    await page.click('#vab-crew-confirm');
-
-    // Wait for flight scene.
-    await page.waitForSelector('#flight-hud', { state: 'visible', timeout: 15_000 });
-    await page.waitForFunction(
-      () => typeof window.__flightPs !== 'undefined' && window.__flightPs !== null,
-      { timeout: 10_000 },
-    );
+    await launchFromVab(page);
 
     // Record money before flight return.
     const moneyBefore = await page.evaluate(() => window.__gameState?.money ?? 0);

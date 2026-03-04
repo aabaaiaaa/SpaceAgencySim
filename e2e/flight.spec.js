@@ -1,4 +1,10 @@
 import { test, expect } from '@playwright/test';
+import {
+  VP_W, VP_H, STARTING_MONEY,
+  CENTRE_X, CANVAS_CENTRE_Y,
+  FIRST_FLIGHT_MISSION, buildSaveEnvelope,
+  placePart, seedAndLoadSave, navigateToVab, launchFromVab,
+} from './helpers.js';
 
 /**
  * E2E — Flight Launch & Basic Flight
@@ -15,130 +21,24 @@ import { test, expect } from '@playwright/test';
  *   5. Click Launch → confirm crew dialog → flight scene loads.
  *
  * Tests run in serial order and share a single page/flight-scene instance.
- *
- * Test list:
- *   (1) Clicking Launch from the VAB loads the flight scene.
- *   (2) The flight HUD is visible with altitude, vertical speed, and throttle.
- *   (3) At launch (before any input), altitude reads near 0 m.
- *   (4) Pressing spacebar fires Stage 1 — altitude increases within 2 s.
- *   (5) Throttle display updates when W / S keys are pressed.
- *   (6) Mission objectives panel is visible and shows the First Flight objective.
- *   (7) The in-flight menu (hamburger button) lists Save Game, Load Game, and
- *       Return to Space Agency.
- *   (8) TWR=1 button and ±0.1 throttle step buttons.
- *   (9) "Restart from Launch" resets the flight to the launch pad.
- *  (10) "Adjust Build" returns to the VAB with the rocket design loaded.
- *  (11) "Return to Space Agency" ends flight and returns to hub.
  */
 
 test.describe.configure({ mode: 'serial' });
 
 // ---------------------------------------------------------------------------
-// Constants
+// Drop positions (cmd-mk1 + tank-medium + engine-spark)
 // ---------------------------------------------------------------------------
-
-const VP_W = 1280;
-const VP_H = 720;
-
-// VAB layout constants (must match src/render/vab.js / src/ui/vab.js).
-const TOOLBAR_H     = 52;
-const SCALE_BAR_W   = 50;
-const PARTS_PANEL_W = 280;
-
-const BUILD_X = SCALE_BAR_W;                          // 50
-const BUILD_W = VP_W - PARTS_PANEL_W - SCALE_BAR_W;   // 950
-const BUILD_H = VP_H - TOOLBAR_H;                     // 668
-
-// Default camera: camX = BUILD_W/2 = 475, camY = BUILD_H * 0.85 ≈ 567.8
-// Screen X of rocket centreline (world X = 0):
-const CENTRE_X = BUILD_X + BUILD_W / 2;  // 525
-
-// Canvas vertical centre (screen Y for cmd-mk1 drop):
-const CANVAS_CENTRE_Y = TOOLBAR_H + BUILD_H / 2;  // 386
-
-// ── Drop positions (cmd-mk1 + tank-medium + engine-spark) ────────────────
-//
-// Part snap geometry:
-//   cmd-mk1       : height 40, bottom snap offsetY +20
-//   tank-medium   : height 60, top snap offsetY -30, bottom snap offsetY +30
-//   engine-spark  : height 30, top snap offsetY -15
-//
-// cmd-mk1   centre → 386          bottom snap → 386 + 20 = 406
-// tank-med  top snap matches   → centre = 406 + 30 = 436
-//           bottom snap        → 436 + 30 = 466
-// engine    top snap matches   → centre = 466 + 15 = 481
 
 const CMD_DROP_Y    = CANVAS_CENTRE_Y;          // 386
 const TANK_M_DROP_Y = CMD_DROP_Y   + 20 + 30;   // 436
 const ENGINE_DROP_Y = TANK_M_DROP_Y + 30 + 15;   // 481
 
-// ── Part costs (from src/data/parts.js) ──────────────────────────────────
+// Part costs (from src/data/parts.js)
 const CMD_COST         = 8_000;
 const TANK_MEDIUM_COST = 1_600;
 const ENGINE_COST      = 6_000;
-const STARTING_MONEY   = 2_000_000;
 
-// ── Save / seed config ───────────────────────────────────────────────────
-const SAVE_KEY   = 'spaceAgencySave_0';
-const AGENCY_NAME = 'Test Agency';
-
-/**
- * "First Flight" mission template mirrored from src/data/missions.js.
- * status is set to 'accepted' so the seeded save skips Mission Control.
- */
-const ACCEPTED_FIRST_FLIGHT = {
-  id:           'mission-001',
-  title:        'First Flight',
-  description:
-    'Our engineers have assembled a basic sounding rocket. Your task is simple: ' +
-    'get it off the pad and reach 100 metres altitude. This is the first step ' +
-    'in what will become a legendary space programme.',
-  location:     'desert',
-  objectives: [
-    {
-      id:          'obj-001-1',
-      type:        'REACH_ALTITUDE',
-      target:      { altitude: 100 },
-      completed:   false,
-      description: 'Reach 100 m altitude',
-    },
-  ],
-  reward:        15_000,
-  unlocksAfter:  [],
-  unlockedParts: [],
-  status:        'accepted',
-};
-
-// ── Unlocked parts ───────────────────────────────────────────────────────────
-// The save must have the three parts we need in the VAB parts panel.
 const UNLOCKED_PARTS = ['cmd-mk1', 'tank-medium', 'engine-spark'];
-
-/** Build a save-slot envelope to inject into localStorage. */
-function buildSaveEnvelope(missionsState) {
-  return {
-    saveName:  'Flight E2E Test',
-    timestamp: new Date().toISOString(),
-    state: {
-      agencyName:     AGENCY_NAME,
-      money:          STARTING_MONEY,
-      loan:           { balance: STARTING_MONEY, interestRate: 0.03, totalInterestAccrued: 0 },
-      missions:       missionsState,
-      crew:           [],
-      rockets:        [],
-      parts:          UNLOCKED_PARTS,
-      flightHistory:  [],
-      playTimeSeconds: 0,
-      currentFlight:  null,
-    },
-  };
-}
-
-/** Save envelope used for all tests: First Flight already accepted. */
-const FLIGHT_ENVELOPE = buildSaveEnvelope({
-  available: [],
-  accepted:  [ACCEPTED_FIRST_FLIGHT],
-  completed: [],
-});
 
 // ---------------------------------------------------------------------------
 // Suite
@@ -148,29 +48,6 @@ test.describe('Flight — Launch & Basic Flight', () => {
   /** @type {import('@playwright/test').Page} */
   let page;
 
-  // ── Drag helper ───────────────────────────────────────────────────────────
-
-  /**
-   * Drag a part card from the parts panel and drop it at (targetX, targetY).
-   *
-   * @param {string} partId   data-part-id of the part card to drag.
-   * @param {number} targetX  Drop screen X.
-   * @param {number} targetY  Drop screen Y.
-   */
-  async function dragPartToCanvas(partId, targetX, targetY) {
-    const card    = page.locator(`.vab-part-card[data-part-id="${partId}"]`);
-    const cardBox = await card.boundingBox();
-    if (!cardBox) throw new Error(`Part card not visible: ${partId}`);
-
-    const startX = cardBox.x + cardBox.width  / 2;
-    const startY = cardBox.y + cardBox.height / 2;
-
-    await page.mouse.move(startX, startY);
-    await page.mouse.down();
-    await page.mouse.move(targetX, targetY, { steps: 30 });
-    await page.mouse.up();
-  }
-
   // ── Suite setup ───────────────────────────────────────────────────────────
 
   test.beforeAll(async ({ browser }) => {
@@ -178,86 +55,29 @@ test.describe('Flight — Launch & Basic Flight', () => {
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
-    // Seed localStorage with the pre-built save (First Flight accepted).
-    await page.addInitScript(({ key, envelope }) => {
-      localStorage.setItem(key, JSON.stringify(envelope));
-    }, { key: SAVE_KEY, envelope: FLIGHT_ENVELOPE });
+    const envelope = buildSaveEnvelope({
+      saveName: 'Flight E2E Test',
+      missions: { available: [], accepted: [{ ...FIRST_FLIGHT_MISSION, status: 'accepted' }], completed: [] },
+      parts: UNLOCKED_PARTS,
+    });
 
-    // Navigate to app root — the init script has already written the save.
-    await page.goto('/');
-
-    // The seeded save appears in the load screen.
-    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
-
-    // Load slot 0.
-    await page.click('[data-action="load"][data-slot="0"]');
-
-    // Hub overlay confirms the game has loaded.
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
-
-    // Navigate to the Vehicle Assembly Building.
-    await page.click('[data-building-id="vab"]');
-
-    // Wait for the VAB to fully initialise.
-    await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 15_000 });
-    await page.waitForFunction(
-      () => typeof window.__vabAssembly !== 'undefined',
-      { timeout: 15_000 },
-    );
+    await seedAndLoadSave(page, envelope);
+    await navigateToVab(page);
 
     // ── Build the rocket: Mk1 Command Module + Medium Tank + Spark Engine ──
-
-    // Place the command module at the canvas centre.
-    await dragPartToCanvas('cmd-mk1', CENTRE_X, CMD_DROP_Y);
-    await page.waitForFunction(
-      () => (window.__vabAssembly?.parts?.size ?? 0) >= 1,
-      { timeout: 5_000 },
-    );
-
-    // Place the medium tank below the command module.
-    await dragPartToCanvas('tank-medium', CENTRE_X, TANK_M_DROP_Y);
-    await page.waitForFunction(
-      () => (window.__vabAssembly?.parts?.size ?? 0) >= 2,
-      { timeout: 5_000 },
-    );
-
-    // Place the Spark Engine below the medium tank.
-    await dragPartToCanvas('engine-spark', CENTRE_X, ENGINE_DROP_Y);
-    await page.waitForFunction(
-      () => (window.__vabAssembly?.parts?.size ?? 0) >= 3,
-      { timeout: 5_000 },
-    );
+    await placePart(page, 'cmd-mk1', CENTRE_X, CMD_DROP_Y, 1);
+    await placePart(page, 'tank-medium', CENTRE_X, TANK_M_DROP_Y, 2);
+    await placePart(page, 'engine-spark', CENTRE_X, ENGINE_DROP_Y, 3);
 
     // ── Verify engine is auto-staged into Stage 1 ─────────────────────────
-
     await page.click('#vab-btn-staging');
     await expect(page.locator('#vab-staging-panel')).toBeVisible();
-
-    // Engine should be auto-staged into Stage 1 (no manual drag needed).
     await expect(
       page.locator('[data-drop-zone="stage-0"]').getByText('Spark Engine'),
     ).toBeVisible({ timeout: 5_000 });
 
-    // ── Click Launch ──────────────────────────────────────────────────────
-
-    const launchBtn = page.locator('#vab-btn-launch');
-    await expect(launchBtn).not.toBeDisabled({ timeout: 5_000 });
-    await launchBtn.click();
-
-    // Crew dialog appears (cmd-mk1 has 1 seat; no crew assigned → launches empty).
-    await page.waitForSelector('#vab-crew-overlay', { state: 'visible', timeout: 5_000 });
-    await page.click('#vab-crew-confirm');
-
-    // ── Wait for flight scene ─────────────────────────────────────────────
-
-    // The flight HUD is mounted by startFlightScene(); wait for it to appear.
-    await page.waitForSelector('#flight-hud', { state: 'visible', timeout: 15_000 });
-
-    // Wait for physics state to be exposed on window.__flightPs.
-    await page.waitForFunction(
-      () => typeof window.__flightPs !== 'undefined' && window.__flightPs !== null,
-      { timeout: 10_000 },
-    );
+    // ── Launch ──────────────────────────────────────────────────────────────
+    await launchFromVab(page);
   });
 
   test.afterAll(async () => {
@@ -506,22 +326,7 @@ test.describe('Flight — Launch & Basic Flight', () => {
 
   test('(11) clicking "Return to Space Agency" from the menu returns to hub', async () => {
     // We're in the VAB from test (10). Launch the loaded rocket again.
-    const launchBtn = page.locator('#vab-btn-launch');
-    await expect(launchBtn).not.toBeDisabled({ timeout: 5_000 });
-    await launchBtn.click();
-
-    // Handle crew dialog if it appears.
-    const crewOverlay = page.locator('#vab-crew-overlay');
-    if (await crewOverlay.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      await page.click('#vab-crew-confirm');
-    }
-
-    // Wait for flight scene to load.
-    await page.waitForSelector('#flight-hud', { state: 'visible', timeout: 15_000 });
-    await page.waitForFunction(
-      () => window.__flightPs !== null && window.__flightPs !== undefined,
-      { timeout: 10_000 },
-    );
+    await launchFromVab(page);
 
     // Open the topbar dropdown and click "Return to Space Agency".
     const dropdown = page.locator('#topbar-dropdown');

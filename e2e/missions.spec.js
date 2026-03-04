@@ -1,4 +1,8 @@
 import { test, expect } from '@playwright/test';
+import {
+  SAVE_KEY, STARTING_MONEY,
+  FIRST_FLIGHT_MISSION, buildSaveEnvelope, seedAndLoadSave,
+} from './helpers.js';
 
 /**
  * E2E — Mission Control Flow
@@ -7,9 +11,9 @@ import { test, expect } from '@playwright/test';
  * a mission, viewing objectives, cash invariant on accept, tutorial lock rules,
  * and completed missions display.
  *
- * A fresh game save (slot 0) is injected into localStorage via addInitScript
- * before each test so every test begins from a known, consistent state.
- * Test (7) builds its own isolated browser context with a seeded completed state.
+ * A fresh game state is restored in-place before each test via SPA navigation
+ * (no full page reload). Test (7) builds its own isolated browser context with
+ * a seeded completed state.
  *
  * Tests (run in serial order):
  *   (1) The Available tab lists "First Flight" as the only available mission
@@ -30,71 +34,17 @@ test.describe.configure({ mode: 'serial' });
 // Constants & helpers
 // ---------------------------------------------------------------------------
 
-const STARTING_MONEY = 2_000_000;
-const SAVE_KEY       = 'spaceAgencySave_0';
-
-/**
- * Mirror of the mission-001 "First Flight" template from src/data/missions.js.
- * Objective description and reward are hard-coded to match the live data so that
- * assertions stay in sync with the actual game content.
- */
-const FIRST_FLIGHT = {
-  id:           'mission-001',
-  title:        'First Flight',
-  description:
-    'Our engineers have assembled a basic sounding rocket. Your task is simple: ' +
-    'get it off the pad and reach 100 metres altitude. This is the first step ' +
-    'in what will become a legendary space programme.',
-  location:     'desert',
-  objectives: [
-    {
-      id:          'obj-001-1',
-      type:        'REACH_ALTITUDE',
-      target:      { altitude: 100 },
-      completed:   false,
-      description: 'Reach 100 m altitude',
-    },
-  ],
-  reward:        15_000,
-  unlocksAfter:  [],
-  unlockedParts: [],
-  status:        'available',
-};
-
-/**
- * Build a save-slot envelope to inject into localStorage.
- *
- * @param {{ available: object[], accepted: object[], completed: object[] }} missionsState
- * @returns {object}
- */
-function buildSaveEnvelope(missionsState) {
-  return {
-    saveName:  'Mission E2E Test',
-    timestamp: new Date().toISOString(),
-    state: {
-      agencyName:      'Test Agency',
-      money:           STARTING_MONEY,
-      loan:            { balance: STARTING_MONEY, interestRate: 0.03, totalInterestAccrued: 0 },
-      missions:        missionsState,
-      crew:            [],
-      rockets:         [],
-      parts:           [],
-      flightHistory:   [],
-      playTimeSeconds: 0,
-      currentFlight:   null,
-    },
-  };
-}
-
 /**
  * The standard fresh-game envelope used for tests (1)–(6):
  * only First Flight in the available bucket, nothing accepted or completed.
  */
 const FRESH_ENVELOPE = buildSaveEnvelope({
-  available: [{ ...FIRST_FLIGHT }],
-  accepted:  [],
-  completed: [],
+  saveName: 'Mission E2E Test',
+  missions: { available: [{ ...FIRST_FLIGHT_MISSION, status: 'available' }], accepted: [], completed: [] },
 });
+
+/** The state portion used to reset gameState between tests. */
+const FRESH_STATE = FRESH_ENVELOPE.state;
 
 // ---------------------------------------------------------------------------
 // Suite
@@ -109,35 +59,32 @@ test.describe('Mission Control Flow', () => {
   test.beforeAll(async ({ browser }) => {
     page = await browser.newPage();
 
-    // Register an init script that writes the fresh save into localStorage
-    // on every subsequent navigation to '/'.  This is the seed mechanism for
-    // tests (1)–(6); test (7) uses its own isolated context.
-    await page.addInitScript(({ key, envelope }) => {
-      localStorage.setItem(key, JSON.stringify(envelope));
-    }, { key: SAVE_KEY, envelope: FRESH_ENVELOPE });
+    // Seed save and navigate to hub.
+    await seedAndLoadSave(page, FRESH_ENVELOPE);
+
+    // Enter Mission Control initially (so beforeEach can use back button).
+    await page.click('[data-building-id="mission-control"]');
+    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
   });
 
   test.afterAll(async () => {
     await page.close();
   });
 
-  // ── Per-test setup: navigate to Mission Control with fresh state ───────────
+  // ── Per-test setup: SPA reset + re-enter building ─────────────────────────
 
   test.beforeEach(async () => {
-    // goto('/') triggers the registered addInitScript, which writes the fresh
-    // save envelope into localStorage before the page's JS runs.
-    await page.goto('/');
+    // Reset game state in-place (no page reload).
+    await page.evaluate((freshState) => {
+      const copy = JSON.parse(JSON.stringify(freshState));
+      Object.assign(window.__gameState, copy);
+    }, FRESH_STATE);
 
-    // A save exists in slot 0, so the load screen is shown (not new-game).
-    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
+    // Navigate back to hub.
+    await page.click('#mission-control-back-btn');
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 5_000 });
 
-    // Load slot 0.
-    await page.click('[data-action="load"][data-slot="0"]');
-
-    // Hub overlay confirms the game has loaded and window.__gameState is set.
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
-
-    // Navigate to Mission Control.
+    // Re-enter Mission Control (triggers fresh UI render from gameState).
     await page.click('[data-building-id="mission-control"]');
     await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
   });
@@ -241,15 +188,14 @@ test.describe('Mission Control Flow', () => {
     test.setTimeout(60_000);
     // Build an envelope where "First Flight" has already been completed.
     const completedFlight = {
-      ...FIRST_FLIGHT,
+      ...FIRST_FLIGHT_MISSION,
       status:        'completed',
       completedDate: '2026-02-27T00:00:00.000Z',
     };
 
     const completedEnvelope = buildSaveEnvelope({
-      available: [],
-      accepted:  [],
-      completed: [completedFlight],
+      saveName: 'Mission E2E Test',
+      missions: { available: [], accepted: [], completed: [completedFlight] },
     });
 
     // Use an isolated browser context so this test does not share localStorage
@@ -257,14 +203,8 @@ test.describe('Mission Control Flow', () => {
     const ctx = await browser.newContext();
     const p   = await ctx.newPage();
 
-    await p.addInitScript(({ key, envelope }) => {
-      localStorage.setItem(key, JSON.stringify(envelope));
-    }, { key: SAVE_KEY, envelope: completedEnvelope });
+    await seedAndLoadSave(p, completedEnvelope);
 
-    await p.goto('/');
-    await p.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
-    await p.click('[data-action="load"][data-slot="0"]');
-    await p.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
     await p.click('[data-building-id="mission-control"]');
     await p.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
 

@@ -1,4 +1,10 @@
 import { test, expect } from '@playwright/test';
+import {
+  VP_W, VP_H,
+  CENTRE_X, CANVAS_CENTRE_Y,
+  FIRST_FLIGHT_MISSION, buildSaveEnvelope,
+  placePart, seedAndLoadSave, navigateToVab, launchFromVab,
+} from './helpers.js';
 
 /**
  * E2E — Flight Landing
@@ -29,57 +35,14 @@ import { test, expect } from '@playwright/test';
 test.describe.configure({ mode: 'serial' });
 
 // ---------------------------------------------------------------------------
-// Constants
+// Drop positions (5-part stack)
 // ---------------------------------------------------------------------------
-
-const VP_W = 1280;
-const VP_H = 720;
-
-const TOOLBAR_H     = 52;
-const SCALE_BAR_W   = 50;
-const PARTS_PANEL_W = 280;
-
-const BUILD_X = SCALE_BAR_W;
-const BUILD_W = VP_W - PARTS_PANEL_W - SCALE_BAR_W;   // 950
-const BUILD_H = VP_H - TOOLBAR_H;                     // 668
-
-const CENTRE_X        = BUILD_X + BUILD_W / 2;         // 525
-const CANVAS_CENTRE_Y = TOOLBAR_H + BUILD_H / 2;       // 386
-
-// ── Drop positions ──────────────────────────────────────────────────────────
-//
-// Snap geometry (formula: child_centre = parent_snap_Y − child_top_snap.offsetY):
-//
-//   parachute-mk2 (h=15, bottom snap +7):
-//     cmd top snap   = 386 − 20 = 366
-//     chute centre   = 366 − 7  = 359
-//
-//   cmd-mk1 (h=40, top snap −20, bottom snap +20):
-//     centre         = 386
-//     bottom snap    = 406
-//
-//   decoupler-stack-tr18 (h=10, top snap −5, bottom snap +5):
-//     centre         = 406 − (−5) = 411
-//     bottom snap    = 416
-//
-//   tank-small (h=40, top snap −20, bottom snap +20):
-//     centre         = 416 − (−20) = 436
-//     bottom snap    = 456
-//
-//   engine-spark (h=30, top snap −15):
-//     centre         = 456 − (−15) = 471
 
 const CMD_DROP_Y      = CANVAS_CENTRE_Y;   // 386
 const CHUTE_DROP_Y    = 359;               // above cmd
 const DECOUPLE_DROP_Y = 411;              // below cmd
 const TANK_DROP_Y     = 436;              // below decoupler
 const ENGINE_DROP_Y   = 471;             // below tank
-
-// ── Save / seed config ───────────────────────────────────────────────────────
-
-const SAVE_KEY    = 'spaceAgencySave_0';
-const AGENCY_NAME = 'Test Agency';
-const STARTING_MONEY = 2_000_000;
 
 const UNLOCKED_PARTS = [
   'cmd-mk1',
@@ -89,52 +52,6 @@ const UNLOCKED_PARTS = [
   'engine-spark',
 ];
 
-const ACCEPTED_FIRST_FLIGHT = {
-  id:          'mission-001',
-  title:       'First Flight',
-  description:
-    'Our engineers have assembled a basic sounding rocket. Your task is simple: ' +
-    'get it off the pad and reach 100 metres altitude. This is the first step ' +
-    'in what will become a legendary space programme.',
-  location:    'desert',
-  objectives: [{
-    id:          'obj-001-1',
-    type:        'REACH_ALTITUDE',
-    target:      { altitude: 100 },
-    completed:   false,
-    description: 'Reach 100 m altitude',
-  }],
-  reward:        15_000,
-  unlocksAfter:  [],
-  unlockedParts: [],
-  status:        'accepted',
-};
-
-function buildSaveEnvelope(missionsState) {
-  return {
-    saveName:  'Landing E2E Test',
-    timestamp: new Date().toISOString(),
-    state: {
-      agencyName:      AGENCY_NAME,
-      money:           STARTING_MONEY,
-      loan:            { balance: STARTING_MONEY, interestRate: 0.03, totalInterestAccrued: 0 },
-      missions:        missionsState,
-      crew:            [],
-      rockets:         [],
-      parts:           UNLOCKED_PARTS,
-      flightHistory:   [],
-      playTimeSeconds: 0,
-      currentFlight:   null,
-    },
-  };
-}
-
-const LANDING_ENVELOPE = buildSaveEnvelope({
-  available: [],
-  accepted:  [ACCEPTED_FIRST_FLIGHT],
-  completed: [],
-});
-
 // ---------------------------------------------------------------------------
 // Suite
 // ---------------------------------------------------------------------------
@@ -142,22 +59,6 @@ const LANDING_ENVELOPE = buildSaveEnvelope({
 test.describe('Flight — Landing', () => {
   /** @type {import('@playwright/test').Page} */
   let page;
-
-  // ── Drag helper ───────────────────────────────────────────────────────────
-
-  async function dragPartToCanvas(partId, targetX, targetY) {
-    const card    = page.locator(`.vab-part-card[data-part-id="${partId}"]`);
-    const cardBox = await card.boundingBox();
-    if (!cardBox) throw new Error(`Part card not visible: ${partId}`);
-
-    const startX = cardBox.x + cardBox.width  / 2;
-    const startY = cardBox.y + cardBox.height / 2;
-
-    await page.mouse.move(startX, startY);
-    await page.mouse.down();
-    await page.mouse.move(targetX, targetY, { steps: 30 });
-    await page.mouse.up();
-  }
 
   /**
    * Wait for the time-warp staging lockout (set on every Space press) to clear.
@@ -177,45 +78,25 @@ test.describe('Flight — Landing', () => {
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
-    await page.addInitScript(({ key, envelope }) => {
-      localStorage.setItem(key, JSON.stringify(envelope));
-    }, { key: SAVE_KEY, envelope: LANDING_ENVELOPE });
+    const envelope = buildSaveEnvelope({
+      saveName: 'Landing E2E Test',
+      missions: { available: [], accepted: [{ ...FIRST_FLIGHT_MISSION, status: 'accepted' }], completed: [] },
+      parts: UNLOCKED_PARTS,
+    });
 
-    await page.goto('/');
-    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
-    await page.click('[data-action="load"][data-slot="0"]');
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
-
-    await page.click('[data-building-id="vab"]');
-    await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 15_000 });
-    await page.waitForFunction(
-      () => typeof window.__vabAssembly !== 'undefined',
-      { timeout: 15_000 },
-    );
+    await seedAndLoadSave(page, envelope);
+    await navigateToVab(page);
 
     // ── Build rocket ──────────────────────────────────────────────────────
     // Place cmd-mk1 as anchor, then attach parachute above and
     // decoupler → tank → engine below.
-
-    await dragPartToCanvas('cmd-mk1', CENTRE_X, CMD_DROP_Y);
-    await page.waitForFunction(() => (window.__vabAssembly?.parts?.size ?? 0) >= 1, { timeout: 5_000 });
-
-    await dragPartToCanvas('parachute-mk2', CENTRE_X, CHUTE_DROP_Y);
-    await page.waitForFunction(() => (window.__vabAssembly?.parts?.size ?? 0) >= 2, { timeout: 5_000 });
-
-    await dragPartToCanvas('decoupler-stack-tr18', CENTRE_X, DECOUPLE_DROP_Y);
-    await page.waitForFunction(() => (window.__vabAssembly?.parts?.size ?? 0) >= 3, { timeout: 5_000 });
-
-    await dragPartToCanvas('tank-small', CENTRE_X, TANK_DROP_Y);
-    await page.waitForFunction(() => (window.__vabAssembly?.parts?.size ?? 0) >= 4, { timeout: 5_000 });
-
-    await dragPartToCanvas('engine-spark', CENTRE_X, ENGINE_DROP_Y);
-    await page.waitForFunction(() => (window.__vabAssembly?.parts?.size ?? 0) >= 5, { timeout: 5_000 });
+    await placePart(page, 'cmd-mk1', CENTRE_X, CMD_DROP_Y, 1);
+    await placePart(page, 'parachute-mk2', CENTRE_X, CHUTE_DROP_Y, 2);
+    await placePart(page, 'decoupler-stack-tr18', CENTRE_X, DECOUPLE_DROP_Y, 3);
+    await placePart(page, 'tank-small', CENTRE_X, TANK_DROP_Y, 4);
+    await placePart(page, 'engine-spark', CENTRE_X, ENGINE_DROP_Y, 5);
 
     // ── Verify auto-staging and assign parachute to Stage 2 ────────────────
-    // With auto-staging: engine → Stage 1, decoupler → new Stage 2 (auto-created).
-    // Parachute stays in unstaged — drag it to Stage 2 alongside the decoupler.
-
     await page.click('#vab-btn-staging');
     await expect(page.locator('#vab-staging-panel')).toBeVisible();
 
@@ -239,19 +120,7 @@ test.describe('Flight — Landing', () => {
     ).toBeVisible();
 
     // ── Launch ────────────────────────────────────────────────────────────
-
-    const launchBtn = page.locator('#vab-btn-launch');
-    await expect(launchBtn).not.toBeDisabled({ timeout: 5_000 });
-    await launchBtn.click();
-
-    await page.waitForSelector('#vab-crew-overlay', { state: 'visible', timeout: 5_000 });
-    await page.click('#vab-crew-confirm');
-
-    await page.waitForSelector('#flight-hud', { state: 'visible', timeout: 15_000 });
-    await page.waitForFunction(
-      () => typeof window.__flightPs !== 'undefined' && window.__flightPs !== null,
-      { timeout: 10_000 },
-    );
+    await launchFromVab(page);
   });
 
   test.afterAll(async () => {

@@ -1,4 +1,11 @@
 import { test, expect } from '@playwright/test';
+import {
+  VP_W, VP_H, STARTING_MONEY,
+  TOOLBAR_H, SCALE_BAR_W, PARTS_PANEL_W,
+  BUILD_W, BUILD_H,
+  CENTRE_X, CANVAS_CENTRE_Y,
+  dragPartToCanvas,
+} from './helpers.js';
 
 /**
  * E2E — Rocket Builder Flow
@@ -30,53 +37,15 @@ test.describe('VAB — Rocket Builder Flow', () => {
   /** @type {import('@playwright/test').Page} */
   let page;
 
-  // Viewport dimensions matching Playwright Desktop Chrome default (1280×720).
-  const VP_W = 1280;
-  const VP_H = 720;
-
-  // VAB layout constants (must match src/render/vab.js and src/ui/vab.js)
-  const TOOLBAR_H     = 52;
-  const SCALE_BAR_W   = 50;
-  const PARTS_PANEL_W = 280;
-
-  // Build-area geometry
-  const BUILD_X = SCALE_BAR_W;                           // 50
-  const BUILD_W = VP_W - PARTS_PANEL_W - SCALE_BAR_W;   // 950
-  const BUILD_H = VP_H - TOOLBAR_H;                     // 668
-
-  // Default camera is set by initVabRenderer():
-  //   camX = BUILD_W / 2  = 475
-  //   camY = BUILD_H * 0.85 = 567.8
-  // At these camera values, canvas-centre screen coords map to world (0, ~234).
-  // We drop all parts along the rocket centreline (screen X = BUILD_X + camX = 525).
-  const CAM_X = BUILD_W / 2;         // 475
-  const CAM_Y = BUILD_H * 0.85;      // 567.8
-
-  // Screen X of the rocket centreline (world X = 0)
-  const CENTRE_X = BUILD_X + CAM_X;  // 525
-
-  // Screen Y of canvas vertical centre — used to place cmd-mk1
-  const CANVAS_CENTRE_Y = TOOLBAR_H + BUILD_H / 2;  // 386
-
   // ── Drop positions calculated from part snap-point geometry ──────────────
-  //
-  // Formula: screenSnapY = screenPartCentreY + snap.offsetY
-  // (positive offsetY = below centre in screen space)
-  //
-  // cmd-mk1  (height 40, bottom snap offsetY +20) → snap at CANVAS_CENTRE_Y + 20 = 406
-  // tank-small (height 40, top snap offsetY -20) → centre at 406 + 20 = 426
-  //            tank bottom snap offsetY +20 → snap at 426 + 20 = 446
-  // engine-spark (height 30, top snap offsetY -15) → centre at 446 + 15 = 461
-
   const CMD_DROP_Y    = CANVAS_CENTRE_Y;            // 386
-  const TANK_DROP_Y   = CMD_DROP_Y + 20 + 20;       // 426  (below cmd's bottom snap)
-  const ENGINE_DROP_Y = TANK_DROP_Y + 20 + 15;      // 461  (below tank's bottom snap)
+  const TANK_DROP_Y   = CMD_DROP_Y + 20 + 20;       // 426
+  const ENGINE_DROP_Y = TANK_DROP_Y + 20 + 15;      // 461
 
   // ── Part costs (from src/data/parts.js) ─────────────────────────────────
   const CMD_COST    = 8_000;
   const TANK_COST   = 800;
   const ENGINE_COST = 6_000;
-  const STARTING_MONEY = 2_000_000;
 
   // ── Setup / teardown ─────────────────────────────────────────────────────
 
@@ -112,34 +81,6 @@ test.describe('VAB — Rocket Builder Flow', () => {
   test.afterAll(async () => {
     await page.close();
   });
-
-  // ── Drag helper ───────────────────────────────────────────────────────────
-
-  /**
-   * Drag a part card from the parts panel and drop it at (targetX, targetY)
-   * in screen/client coordinates.
-   *
-   * Uses Playwright mouse API which fires both pointer and mouse events.
-   * The VAB drag system is pointer-event based, so this works directly.
-   *
-   * @param {string} partId       data-part-id of the card to drag
-   * @param {number} targetX      Drop screen X
-   * @param {number} targetY      Drop screen Y
-   */
-  async function dragPartToCanvas(partId, targetX, targetY) {
-    const card    = page.locator(`.vab-part-card[data-part-id="${partId}"]`);
-    const cardBox = await card.boundingBox();
-    if (!cardBox) throw new Error(`Part card not visible: ${partId}`);
-
-    const startX = cardBox.x + cardBox.width  / 2;
-    const startY = cardBox.y + cardBox.height / 2;
-
-    await page.mouse.move(startX, startY);
-    await page.mouse.down();
-    // Move in 30 steps so pointermove events fire reliably during transit
-    await page.mouse.move(targetX, targetY, { steps: 30 });
-    await page.mouse.up();
-  }
 
   // ── (1) Parts panel shows at least one part per key category ─────────────
 
@@ -188,7 +129,7 @@ test.describe('VAB — Rocket Builder Flow', () => {
     const cashBefore = await page.evaluate(() => window.__gameState?.money ?? 0);
 
     // Drag cmd-mk1 to the canvas centre
-    await dragPartToCanvas('cmd-mk1', CENTRE_X, CMD_DROP_Y);
+    await dragPartToCanvas(page, 'cmd-mk1', CENTRE_X, CMD_DROP_Y);
 
     // Wait for assembly to update (placement is synchronous, but give a tick)
     await page.waitForFunction(
@@ -223,14 +164,14 @@ test.describe('VAB — Rocket Builder Flow', () => {
 
   test('(4) placing tank + engine produces a connected rocket', async () => {
     // Drag small tank to snap below command module
-    await dragPartToCanvas('tank-small', CENTRE_X, TANK_DROP_Y);
+    await dragPartToCanvas(page, 'tank-small', CENTRE_X, TANK_DROP_Y);
     await page.waitForFunction(
       () => (window.__vabAssembly?.parts?.size ?? 0) >= 2,
       { timeout: 3_000 },
     );
 
     // Drag Spark Engine to snap below the tank
-    await dragPartToCanvas('engine-spark', CENTRE_X, ENGINE_DROP_Y);
+    await dragPartToCanvas(page, 'engine-spark', CENTRE_X, ENGINE_DROP_Y);
     await page.waitForFunction(
       () => (window.__vabAssembly?.parts?.size ?? 0) >= 3,
       { timeout: 3_000 },

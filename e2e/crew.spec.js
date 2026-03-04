@@ -1,4 +1,8 @@
 import { test, expect } from '@playwright/test';
+import {
+  SAVE_KEY, STARTING_MONEY,
+  FIRST_FLIGHT_MISSION, buildSaveEnvelope, seedAndLoadSave,
+} from './helpers.js';
 
 /**
  * E2E — Crew Administration Flow
@@ -8,9 +12,9 @@ import { test, expect } from '@playwright/test';
  * history tab, and the insufficient-funds guard.
  *
  * Tests (1)–(6) share a page instance seeded with a fresh save (no crew,
- * full starting funds).  Each test is isolated: `beforeEach` reloads the
- * fresh save before every test, so state changes in one test do not bleed
- * into the next.
+ * full starting funds).  Each test is isolated: `beforeEach` resets state
+ * in-place via SPA navigation (no full page reload), so state changes in
+ * one test do not bleed into the next.
  *
  * Test (7) uses its own isolated browser context seeded with a save whose
  * cash balance is below the $50,000 hire cost.
@@ -36,65 +40,23 @@ test.describe.configure({ mode: 'serial' });
 // Constants & helpers
 // ---------------------------------------------------------------------------
 
-const HIRE_COST      = 50_000;
-const STARTING_MONEY = 2_000_000;
-const SAVE_KEY       = 'spaceAgencySave_0';
-
-/**
- * Minimal "First Flight" mission definition — included in the seeded state
- * so the hub can load normally (Mission Control reads the available bucket).
- */
-const FIRST_FLIGHT = {
-  id:          'mission-001',
-  title:       'First Flight',
-  description: 'Get off the pad and reach 100 metres altitude.',
-  location:    'desert',
-  objectives: [
-    {
-      id:          'obj-001-1',
-      type:        'REACH_ALTITUDE',
-      target:      { altitude: 100 },
-      completed:   false,
-      description: 'Reach 100 m altitude',
-    },
-  ],
-  reward:        15_000,
-  unlocksAfter:  [],
-  unlockedParts: [],
-  status:        'available',
-};
-
-/**
- * Build a localStorage save envelope for the given cash balance and crew array.
- *
- * @param {number}   money  Cash on hand.
- * @param {object[]} crew   Pre-populated crew records (empty by default).
- * @returns {object}
- */
-function buildSaveEnvelope(money, crew = []) {
-  return {
-    saveName:  'Crew E2E Test',
-    timestamp: new Date().toISOString(),
-    state: {
-      agencyName:      'Test Agency',
-      money,
-      loan:            { balance: STARTING_MONEY, interestRate: 0.03, totalInterestAccrued: 0 },
-      missions:        { available: [{ ...FIRST_FLIGHT }], accepted: [], completed: [] },
-      crew,
-      rockets:         [],
-      parts:           [],
-      flightHistory:   [],
-      playTimeSeconds: 0,
-      currentFlight:   null,
-    },
-  };
-}
+const HIRE_COST = 50_000;
 
 /** Standard fresh-game envelope: no crew, full starting funds. */
-const FRESH_ENVELOPE = buildSaveEnvelope(STARTING_MONEY);
+const FRESH_ENVELOPE = buildSaveEnvelope({
+  saveName: 'Crew E2E Test',
+  missions: { available: [{ ...FIRST_FLIGHT_MISSION, status: 'available' }], accepted: [], completed: [] },
+});
+
+/** The state portion used to reset gameState between tests. */
+const FRESH_STATE = FRESH_ENVELOPE.state;
 
 /** Broke envelope: cash below the hire cost so hire is blocked. */
-const BROKE_ENVELOPE = buildSaveEnvelope(10_000);
+const BROKE_ENVELOPE = buildSaveEnvelope({
+  saveName: 'Crew E2E Test',
+  money: 10_000,
+  missions: { available: [{ ...FIRST_FLIGHT_MISSION, status: 'available' }], accepted: [], completed: [] },
+});
 
 // ---------------------------------------------------------------------------
 // Suite
@@ -109,34 +71,32 @@ test.describe('Crew Administration Flow', () => {
   test.beforeAll(async ({ browser }) => {
     page = await browser.newPage();
 
-    // Register init script: writes the fresh save into localStorage before
-    // the page's JS runs on every subsequent navigation to '/'.
-    await page.addInitScript(({ key, envelope }) => {
-      localStorage.setItem(key, JSON.stringify(envelope));
-    }, { key: SAVE_KEY, envelope: FRESH_ENVELOPE });
+    // Seed save and navigate to hub.
+    await seedAndLoadSave(page, FRESH_ENVELOPE);
+
+    // Enter Crew Administration initially (so beforeEach can use back button).
+    await page.click('[data-building-id="crew-admin"]');
+    await page.waitForSelector('#crew-admin-overlay', { state: 'visible', timeout: 10_000 });
   });
 
   test.afterAll(async () => {
     await page.close();
   });
 
-  // ── Per-test setup: reload fresh save and navigate to Crew Administration ─
+  // ── Per-test setup: SPA reset + re-enter building ─────────────────────────
 
   test.beforeEach(async () => {
-    // Navigating to '/' re-runs the registered addInitScript, which writes
-    // the fresh save envelope into localStorage before the app JS executes.
-    await page.goto('/');
+    // Reset game state in-place (no page reload).
+    await page.evaluate((freshState) => {
+      const copy = JSON.parse(JSON.stringify(freshState));
+      Object.assign(window.__gameState, copy);
+    }, FRESH_STATE);
 
-    // A save exists in slot 0, so the load screen is shown.
-    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
+    // Navigate back to hub.
+    await page.click('#crew-admin-back-btn');
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 5_000 });
 
-    // Load the seeded save.
-    await page.click('[data-action="load"][data-slot="0"]');
-
-    // Wait for the hub to confirm the game state is ready.
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
-
-    // Navigate to Crew Administration.
+    // Re-enter Crew Administration (triggers fresh UI render from gameState).
     await page.click('[data-building-id="crew-admin"]');
     await page.waitForSelector('#crew-admin-overlay', { state: 'visible', timeout: 10_000 });
   });
@@ -285,14 +245,7 @@ test.describe('Crew Administration Flow', () => {
     const ctx = await browser.newContext();
     const p   = await ctx.newPage();
 
-    await p.addInitScript(({ key, envelope }) => {
-      localStorage.setItem(key, JSON.stringify(envelope));
-    }, { key: SAVE_KEY, envelope: BROKE_ENVELOPE });
-
-    await p.goto('/');
-    await p.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
-    await p.click('[data-action="load"][data-slot="0"]');
-    await p.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
+    await seedAndLoadSave(p, BROKE_ENVELOPE);
 
     await p.click('[data-building-id="crew-admin"]');
     await p.waitForSelector('#crew-admin-overlay', { state: 'visible', timeout: 10_000 });

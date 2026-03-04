@@ -1,4 +1,10 @@
 import { test, expect } from '@playwright/test';
+import {
+  VP_W, VP_H,
+  CENTRE_X, CANVAS_CENTRE_Y,
+  FIRST_FLIGHT_MISSION, buildSaveEnvelope,
+  placePart, seedAndLoadSave, navigateToVab, launchFromVab,
+} from './helpers.js';
 
 /**
  * E2E — Ground-Contact Rotation & Gravity Tipping
@@ -18,67 +24,14 @@ import { test, expect } from '@playwright/test';
 test.describe.configure({ mode: 'serial' });
 
 // ---------------------------------------------------------------------------
-// Constants
+// Drop positions (probe-core-mk1 + tank-small + engine-spark)
 // ---------------------------------------------------------------------------
-
-const VP_W = 1280;
-const VP_H = 720;
-
-const TOOLBAR_H     = 52;
-const SCALE_BAR_W   = 50;
-const PARTS_PANEL_W = 280;
-const BUILD_W = VP_W - PARTS_PANEL_W - SCALE_BAR_W;
-const BUILD_H = VP_H - TOOLBAR_H;
-const CENTRE_X = SCALE_BAR_W + BUILD_W / 2;
-const CANVAS_CENTRE_Y = TOOLBAR_H + BUILD_H / 2;
 
 const CMD_DROP_Y    = CANVAS_CENTRE_Y;
 const TANK_DROP_Y   = CMD_DROP_Y + 20 + 20;   // tank-small: half-height 20
 const ENGINE_DROP_Y = TANK_DROP_Y + 20 + 15;   // engine-spark: half-height 15
 
-const SAVE_KEY    = 'spaceAgencySave_0';
-const AGENCY_NAME = 'Tipping Test';
-
-const ACCEPTED_FIRST_FLIGHT = {
-  id:           'mission-001',
-  title:        'First Flight',
-  description:  'Test tipping mission.',
-  location:     'desert',
-  objectives: [
-    {
-      id:          'obj-001-1',
-      type:        'REACH_ALTITUDE',
-      target:      { altitude: 100 },
-      completed:   false,
-      description: 'Reach 100 m altitude',
-    },
-  ],
-  reward:        15_000,
-  unlocksAfter:  [],
-  unlockedParts: [],
-  status:        'accepted',
-};
-
 const UNLOCKED_PARTS = ['probe-core-mk1', 'tank-small', 'engine-spark'];
-
-function buildSaveEnvelope() {
-  return {
-    saveName:  'Tipping E2E Test',
-    timestamp: new Date().toISOString(),
-    state: {
-      agencyName:     AGENCY_NAME,
-      money:          2_000_000,
-      loan:           { balance: 2_000_000, interestRate: 0.03, totalInterestAccrued: 0 },
-      missions:       { available: [], accepted: [ACCEPTED_FIRST_FLIGHT], completed: [] },
-      crew:           [],
-      rockets:        [],
-      parts:          UNLOCKED_PARTS,
-      flightHistory:  [],
-      playTimeSeconds: 0,
-      currentFlight:  null,
-    },
-  };
-}
 
 // ---------------------------------------------------------------------------
 // Suite
@@ -88,55 +41,25 @@ test.describe('Tipping physics — ground-contact rotation', () => {
   /** @type {import('@playwright/test').Page} */
   let page;
 
-  async function dragPartToCanvas(partId, targetX, targetY) {
-    const card    = page.locator(`.vab-part-card[data-part-id="${partId}"]`);
-    const cardBox = await card.boundingBox();
-    if (!cardBox) throw new Error(`Part card not visible: ${partId}`);
-    const startX = cardBox.x + cardBox.width  / 2;
-    const startY = cardBox.y + cardBox.height / 2;
-    await page.mouse.move(startX, startY);
-    await page.mouse.down();
-    await page.mouse.move(targetX, targetY, { steps: 30 });
-    await page.mouse.up();
-  }
-
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
-    const envelope = buildSaveEnvelope();
-    await page.addInitScript(({ key, env }) => {
-      localStorage.setItem(key, JSON.stringify(env));
-    }, { key: SAVE_KEY, env: envelope });
+    const envelope = buildSaveEnvelope({
+      saveName: 'Tipping E2E Test',
+      agencyName: 'Tipping Test',
+      missions: { available: [], accepted: [{ ...FIRST_FLIGHT_MISSION, status: 'accepted' }], completed: [] },
+      parts: UNLOCKED_PARTS,
+    });
 
-    await page.goto('/');
-    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
-    await page.click('[data-action="load"][data-slot="0"]');
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
-    await page.click('[data-building-id="vab"]');
-    await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 15_000 });
-    await page.waitForFunction(
-      () => typeof window.__vabAssembly !== 'undefined',
-      { timeout: 15_000 },
-    );
+    await seedAndLoadSave(page, envelope);
+    await navigateToVab(page);
 
     // Build rocket: Probe Core + Small Tank + Spark Engine.
-    await dragPartToCanvas('probe-core-mk1', CENTRE_X, CMD_DROP_Y);
-    await page.waitForFunction(
-      () => (window.__vabAssembly?.parts?.size ?? 0) >= 1,
-      { timeout: 5_000 },
-    );
-    await dragPartToCanvas('tank-small', CENTRE_X, TANK_DROP_Y);
-    await page.waitForFunction(
-      () => (window.__vabAssembly?.parts?.size ?? 0) >= 2,
-      { timeout: 5_000 },
-    );
-    await dragPartToCanvas('engine-spark', CENTRE_X, ENGINE_DROP_Y);
-    await page.waitForFunction(
-      () => (window.__vabAssembly?.parts?.size ?? 0) >= 3,
-      { timeout: 5_000 },
-    );
+    await placePart(page, 'probe-core-mk1', CENTRE_X, CMD_DROP_Y, 1);
+    await placePart(page, 'tank-small', CENTRE_X, TANK_DROP_Y, 2);
+    await placePart(page, 'engine-spark', CENTRE_X, ENGINE_DROP_Y, 3);
 
     // Stage the engine.
     await page.click('#vab-btn-staging');
@@ -146,21 +69,7 @@ test.describe('Tipping physics — ground-contact rotation', () => {
     ).toBeVisible({ timeout: 5_000 });
 
     // Launch.
-    const launchBtn = page.locator('#vab-btn-launch');
-    await expect(launchBtn).not.toBeDisabled({ timeout: 5_000 });
-    await launchBtn.click();
-
-    // Handle crew dialog if it appears.
-    const crewOverlay = page.locator('#vab-crew-overlay');
-    if (await crewOverlay.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      await page.click('#vab-crew-confirm');
-    }
-
-    await page.waitForSelector('#flight-hud', { state: 'visible', timeout: 15_000 });
-    await page.waitForFunction(
-      () => typeof window.__flightPs !== 'undefined' && window.__flightPs !== null,
-      { timeout: 10_000 },
-    );
+    await launchFromVab(page);
   });
 
   test.afterAll(async () => {
