@@ -133,6 +133,12 @@ describe('createPhysicsState()', () => {
     expect(ps.throttle).toBe(1.0);
   });
 
+  it('initialises targetTWR to 1.1', () => {
+    const { assembly } = makeSimpleRocket();
+    const ps = createPhysicsState(assembly, makeFlightState());
+    expect(ps.targetTWR).toBe(1.1);
+  });
+
   it('marks rocket as grounded (on launch pad)', () => {
     const { assembly } = makeSimpleRocket();
     const ps = createPhysicsState(assembly, makeFlightState());
@@ -906,6 +912,7 @@ describe('TASK-037: net force — known thrust/mass/drag inputs produce correct 
     ps.posY     = VAC_ALT;
     ps.velY     = 0;
     ps.grounded = false;
+    ps.targetTWR = Infinity;   // max thrust for deterministic calculation
 
     // Ignite stage 1 (Spark Engine).
     fireNextStage(ps, assembly, staging, fs);

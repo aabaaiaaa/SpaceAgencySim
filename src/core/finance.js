@@ -34,7 +34,9 @@ import {
  */
 export function applyInterest(state) {
   const interest = state.loan.balance * state.loan.interestRate;
-  state.loan.balance += interest;
+  const paid = Math.min(interest, Math.max(0, state.money));
+  state.money -= paid;
+  state.loan.balance += interest - paid;
   state.loan.totalInterestAccrued = (state.loan.totalInterestAccrued ?? 0) + interest;
 }
 

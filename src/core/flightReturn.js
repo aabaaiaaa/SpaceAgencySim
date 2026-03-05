@@ -113,9 +113,10 @@ export function processFlightReturn(state, flightState, ps, assembly) {
 
   // ── 5. Loan interest — once per completed mission ─────────────────────────
   for (let i = 0; i < completedMissions.length; i++) {
+    const cashBefore2 = state.money;
     const loanBefore  = state.loan.balance;
     applyInterest(state);
-    interestCharged  += state.loan.balance - loanBefore;
+    interestCharged  += (cashBefore2 - state.money) + (state.loan.balance - loanBefore);
   }
 
   // ── 6. Death fines (if not already applied mid-flight) ───────────────────

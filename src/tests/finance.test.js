@@ -77,38 +77,70 @@ describe('applyInterest()', () => {
   let state;
   beforeEach(() => { state = freshState(); });
 
-  it('multiplies the loan balance by (1 + interestRate)', () => {
-    const before = state.loan.balance;          // 2_000_000
+  it('deducts interest from cash when cash covers it fully', () => {
+    // balance=2M, cash=2M, rate=3% → interest=60k
     applyInterest(state);
-    expect(state.loan.balance).toBeCloseTo(before * 1.03);
+    expect(state.money).toBeCloseTo(2_000_000 - 60_000);
+    expect(state.loan.balance).toBe(2_000_000);
+    expect(state.loan.totalInterestAccrued).toBeCloseTo(60_000);
+  });
+
+  it('does not increase loan balance when cash covers interest', () => {
+    applyInterest(state);
+    expect(state.loan.balance).toBe(2_000_000);
   });
 
   it('uses the rate stored in state.loan.interestRate', () => {
     state.loan.balance = 1_000_000;
+    state.money = 2_000_000;
     state.loan.interestRate = 0.10;             // 10% custom rate
     applyInterest(state);
-    expect(state.loan.balance).toBeCloseTo(1_100_000);
+    expect(state.money).toBeCloseTo(1_900_000);
+    expect(state.loan.balance).toBe(1_000_000);
   });
 
-  it('does not change state.money', () => {
-    const moneyBefore = state.money;
+  it('adds shortfall to balance when cash is insufficient', () => {
+    state.loan.balance = 2_000_000;
+    state.money = 30_000;
+    state.loan.interestRate = 0.03;             // interest = 60k
     applyInterest(state);
-    expect(state.money).toBe(moneyBefore);
+    expect(state.money).toBe(0);
+    expect(state.loan.balance).toBeCloseTo(2_030_000);
   });
 
-  it('compounds correctly over multiple missions', () => {
-    state.loan.balance = 1_000_000;
+  it('adds all interest to balance when cash is zero', () => {
+    state.loan.balance = 2_000_000;
+    state.money = 0;
     state.loan.interestRate = 0.03;
     applyInterest(state);
+    expect(state.money).toBe(0);
+    expect(state.loan.balance).toBeCloseTo(2_060_000);
+  });
+
+  it('handles negative cash (from death fines) without deducting more', () => {
+    state.loan.balance = 2_000_000;
+    state.money = -100_000;
+    state.loan.interestRate = 0.03;
     applyInterest(state);
-    // After 2 missions: 1_000_000 * 1.03^2 = 1_060_900
-    expect(state.loan.balance).toBeCloseTo(1_060_900);
+    expect(state.money).toBe(-100_000);
+    expect(state.loan.balance).toBeCloseTo(2_060_000);
   });
 
   it('leaves a zero balance at zero', () => {
     state.loan.balance = 0;
+    state.money = 2_000_000;
     applyInterest(state);
     expect(state.loan.balance).toBe(0);
+    expect(state.money).toBe(2_000_000);
+  });
+
+  it('tracks totalInterestAccrued across multiple calls', () => {
+    state.loan.balance = 1_000_000;
+    state.money = 2_000_000;
+    state.loan.interestRate = 0.03;
+    applyInterest(state);
+    applyInterest(state);
+    expect(state.loan.totalInterestAccrued).toBeCloseTo(60_000);
   });
 });
 

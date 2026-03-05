@@ -243,7 +243,7 @@ export function createPhysicsState(assembly, flightState) {
     angle: 0,
     throttle: 1.0,
     throttleMode: 'twr',       // 'twr' or 'absolute'
-    targetTWR: Infinity,       // desired TWR; Infinity = max thrust
+    targetTWR: 1.1,            // desired TWR; default to efficient ascent
     firingEngines: new Set(),
     fuelStore,
     activeParts: new Set(assembly.parts.keys()),
