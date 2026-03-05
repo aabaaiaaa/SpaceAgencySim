@@ -428,6 +428,97 @@ const FLIGHT_CTRL_CSS = `
 #post-flight-return-btn:hover {
   background: #235a90;
 }
+
+/* ── Flight Log overlay ───────────────────────────────────────────────── */
+#flight-log-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 8, 16, 0.97);
+  z-index: 400;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: system-ui, sans-serif;
+  color: #d0e0f0;
+  pointer-events: auto;
+}
+
+.fl-content {
+  width: 100%;
+  max-width: 500px;
+  padding: 32px 24px 40px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+#flight-log-overlay h1 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin: 0 0 20px;
+  letter-spacing: 0.04em;
+}
+
+.fl-empty {
+  color: #607080;
+  font-style: italic;
+  margin-top: 24px;
+}
+
+.fl-list {
+  width: 100%;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.fl-event {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.fl-event-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-top: 6px;
+  flex-shrink: 0;
+}
+
+.fl-event-time {
+  font-family: 'Courier New', monospace;
+  font-size: 0.82rem;
+  color: #8090a0;
+  flex-shrink: 0;
+  min-width: 62px;
+}
+
+.fl-event-desc {
+  font-size: 0.88rem;
+  color: #c0d0e0;
+}
+
+.fl-close-btn {
+  margin-top: 24px;
+  padding: 10px 36px;
+  background: #1a4878;
+  border: none;
+  border-radius: 6px;
+  color: #c8e8ff;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.15s;
+  letter-spacing: 0.02em;
+}
+
+.fl-close-btn:hover {
+  background: #235a90;
+}
 `;
 
 // ---------------------------------------------------------------------------
@@ -565,6 +656,11 @@ export function startFlightScene(
       label: 'Return to Space Agency',
       title: 'End this flight and return to your Space Agency hub.',
       onClick: _handleMenuReturnToAgency,
+    },
+    {
+      label: 'Flight Log',
+      title: 'View a log of all flight events.',
+      onClick: _handleMenuFlightLog,
     },
   ]);
 
@@ -1026,6 +1122,114 @@ function _handleMenuAdjustBuild() {
 
   stopFlightScene();
   if (endCb) endCb(gs, null, 'vab');
+}
+
+// ---------------------------------------------------------------------------
+// Flight Log
+// ---------------------------------------------------------------------------
+
+/** Format elapsed flight seconds as `T+MM:SS`. */
+function _formatFlightTime(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `T+${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+/** Colour for the event-type dot in the flight log. */
+function _eventDotColor(type) {
+  switch (type) {
+    case 'PART_ACTIVATED':
+    case 'LEG_DEPLOYED':
+    case 'PARACHUTE_DEPLOYED':
+    case 'LANDING':
+      return '#40e060';
+    case 'PART_DESTROYED':
+    case 'CRASH':
+    case 'PARACHUTE_FAILED':
+      return '#ff5040';
+    case 'CREW_EJECTED':
+      return '#60a0ff';
+    case 'SATELLITE_RELEASED':
+    case 'SCIENCE_COLLECTED':
+    case 'SCIENCE_DATA_RETURNED':
+      return '#f0d040';
+    default:
+      return '#8090a0';
+  }
+}
+
+/** Menu action: show the flight log overlay. */
+function _handleMenuFlightLog() {
+  const host = document.getElementById('ui-overlay') ?? document.body;
+
+  // Remove any existing log overlay.
+  const existing = document.getElementById('flight-log-overlay');
+  if (existing) existing.remove();
+
+  // Ensure game stays paused (dropdown toggle callback already set _timeWarp=0).
+  const savedWarp = _preMenuTimeWarp;
+  _timeWarp = 0;
+
+  // ── Root overlay ─────────────────────────────────────────────────────────
+  const overlay = document.createElement('div');
+  overlay.id = 'flight-log-overlay';
+
+  const content = document.createElement('div');
+  content.className = 'fl-content';
+  overlay.appendChild(content);
+
+  // Heading
+  const heading = document.createElement('h1');
+  heading.textContent = 'Flight Log';
+  content.appendChild(heading);
+
+  // Event list
+  const events = _flightState ? _flightState.events : [];
+  if (events.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'fl-empty';
+    empty.textContent = 'No events recorded.';
+    content.appendChild(empty);
+  } else {
+    const list = document.createElement('ul');
+    list.className = 'fl-list';
+
+    for (const evt of events) {
+      const li = document.createElement('li');
+      li.className = 'fl-event';
+
+      const dot = document.createElement('span');
+      dot.className = 'fl-event-dot';
+      dot.style.background = _eventDotColor(evt.type);
+
+      const time = document.createElement('span');
+      time.className = 'fl-event-time';
+      time.textContent = _formatFlightTime(evt.time ?? 0);
+
+      const desc = document.createElement('span');
+      desc.className = 'fl-event-desc';
+      desc.textContent = evt.description ?? evt.type;
+
+      li.appendChild(dot);
+      li.appendChild(time);
+      li.appendChild(desc);
+      list.appendChild(li);
+    }
+
+    content.appendChild(list);
+  }
+
+  // Close button
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'fl-close-btn';
+  closeBtn.textContent = 'Close';
+  closeBtn.addEventListener('click', () => {
+    overlay.remove();
+    _timeWarp = savedWarp || 1;
+  });
+  content.appendChild(closeBtn);
+
+  host.appendChild(overlay);
 }
 
 /**
