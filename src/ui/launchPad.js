@@ -27,6 +27,7 @@ import {
 import { getActiveCrew } from '../core/crew.js';
 import { startFlightScene } from './flightController.js';
 import { showReturnResultsOverlay } from './hub.js';
+import { renderRocketPreview, buildRocketCard, injectRocketCardCSS } from './rocketCardUtil.js';
 
 // ---------------------------------------------------------------------------
 // CSS
@@ -445,6 +446,7 @@ export function initLaunchPadUI(container, state, { onBack }) {
   _onBack    = onBack;
 
   // Inject CSS once.
+  injectRocketCardCSS();
   if (!document.getElementById('launch-pad-styles')) {
     const styleEl = document.createElement('style');
     styleEl.id = 'launch-pad-styles';
@@ -544,57 +546,30 @@ function _renderShell() {
 /**
  * Build a single rocket design card.
  *
+ * Uses the shared `buildRocketCard` from rocketCardUtil for the base layout,
+ * then appends launch-pad-specific cost info and a Launch button.
+ *
  * @param {import('../core/gameState.js').RocketDesign} design
  * @returns {HTMLElement}
  */
 function _buildRocketCard(design) {
-  const card = document.createElement('div');
-  card.className = 'lp-rocket-card';
-  card.dataset.rocketId = design.id;
-
-  const cost    = _computeDesignCost(design);
+  const cost      = _computeDesignCost(design);
   const canAfford = _state ? _state.money >= cost : false;
 
-  // Rocket preview thumbnail
-  const previewCanvas = document.createElement('canvas');
-  _renderRocketPreview(previewCanvas, design);
-  card.appendChild(previewCanvas);
+  const card = buildRocketCard(design, []);
+  card.classList.add('lp-rocket-card');
 
-  // Info column
-  const info = document.createElement('div');
-  info.className = 'lp-rocket-info';
-  info.style.flex = '1';
-  info.style.minWidth = '0';
-
-  const name = document.createElement('div');
-  name.className = 'lp-rocket-name';
-  name.textContent = design.name || 'Unnamed Rocket';
-  info.appendChild(name);
-
-  const stats = document.createElement('div');
-  stats.className = 'lp-rocket-stats';
-  stats.innerHTML =
-    `<span>Parts: ${design.parts?.length ?? 0}</span>` +
-    `<span>Mass: ${_fmt(design.totalMass)} kg</span>` +
-    `<span>Thrust: ${_fmt(design.totalThrust)} kN</span>`;
-  info.appendChild(stats);
-
-  const costEl = document.createElement('div');
-  costEl.className = 'lp-rocket-cost' + (canAfford ? '' : ' lp-rocket-cost-insufficient');
-  costEl.textContent = `Launch cost: ${_fmt$(cost)}`;
-  info.appendChild(costEl);
-
-  const date = document.createElement('div');
-  date.className = 'lp-rocket-date';
-  if (design.createdDate) {
-    const d = new Date(design.createdDate);
-    date.textContent = `Launched: ${d.toLocaleDateString()} ${d.toLocaleTimeString()}`;
+  // Insert cost info into the info column (before the date element).
+  const info = card.querySelector('.rocket-card-info');
+  if (info) {
+    const costEl = document.createElement('div');
+    costEl.className = 'lp-rocket-cost' + (canAfford ? '' : ' lp-rocket-cost-insufficient');
+    costEl.textContent = `Launch cost: ${_fmt$(cost)}`;
+    const dateEl = info.querySelector('.rocket-card-date');
+    info.insertBefore(costEl, dateEl);
   }
-  info.appendChild(date);
 
-  card.appendChild(info);
-
-  // Launch button
+  // Replace the empty actions container with a Launch button.
   const launchBtn = document.createElement('button');
   launchBtn.className = 'lp-launch-btn';
   launchBtn.dataset.action = 'launch';

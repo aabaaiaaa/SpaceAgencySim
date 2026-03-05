@@ -61,10 +61,11 @@ import {
   autoStageNewPart,
   moveStage,
 } from '../core/rocketbuilder.js';
-import { createRocketDesign } from '../core/gameState.js';
+import { createRocketDesign, saveDesign, deleteDesign } from '../core/gameState.js';
 import { startFlightScene } from './flightController.js';
 import { showReturnResultsOverlay } from './hub.js';
 import { refreshTopBar } from './topbar.js';
+import { buildRocketCard, injectRocketCardCSS } from './rocketCardUtil.js';
 
 // ---------------------------------------------------------------------------
 // Module-level state (VAB session)
@@ -116,6 +117,12 @@ let _symmetryMode = true;
 
 /** Currently selected placed part instance ID (for delete + hover detail). @type {string | null} */
 let _selectedInstanceId = null;
+
+/** ID of the design currently loaded from savedDesigns, for overwrite on re-save. @type {string | null} */
+let _currentDesignId = null;
+
+/** Name of the last-saved design, for pre-filling the save prompt. @type {string} */
+let _currentDesignName = '';
 
 /** Set of currently open panel IDs (missions | staging | engineer). @type {Set<string>} */
 const _openPanels = new Set();
@@ -1073,6 +1080,128 @@ const VAB_CSS = `
   font-size: 11px;
   color: #3a6080;
   line-height: 1.7;
+}
+
+/* ── Save prompt modal ───────────────────────────────────────────── */
+#vab-save-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: system-ui, sans-serif;
+}
+.vab-save-dialog {
+  background: #1a1e28;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 10px;
+  padding: 20px;
+  min-width: 300px;
+  max-width: 400px;
+  color: #e8e8e8;
+}
+.vab-save-dialog h3 {
+  margin: 0 0 12px;
+  font-size: 1rem;
+  font-weight: 700;
+  text-align: center;
+}
+.vab-save-dialog input {
+  width: 100%;
+  box-sizing: border-box;
+  background: #222838;
+  border: 1px solid rgba(255,255,255,0.15);
+  color: #e8e8e8;
+  font-size: 0.9rem;
+  padding: 8px 10px;
+  border-radius: 5px;
+  margin-bottom: 14px;
+}
+.vab-save-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.vab-save-dialog-footer button {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.18);
+  color: #e8e8e8;
+  font-size: 0.82rem;
+  padding: 6px 16px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.vab-save-dialog-footer .vab-save-confirm {
+  background: #2a6040;
+}
+.vab-save-dialog-footer .vab-save-confirm:hover {
+  background: #357a50;
+}
+
+/* ── Load designs overlay ────────────────────────────────────────── */
+#vab-load-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 12, 20, 0.96);
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 60px;
+  font-family: system-ui, sans-serif;
+  color: #e8e8e8;
+  overflow-y: auto;
+}
+.vab-load-header {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-bottom: 20px;
+}
+.vab-load-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 600px;
+  padding: 0 20px;
+}
+.vab-load-empty {
+  font-size: 0.95rem;
+  color: #5a6880;
+  text-align: center;
+  margin-top: 40px;
+  line-height: 1.6;
+}
+.vab-load-close {
+  margin-top: 24px;
+  margin-bottom: 40px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.18);
+  color: #e8e8e8;
+  font-size: 0.85rem;
+  padding: 8px 24px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.vab-load-close:hover {
+  background: rgba(255,255,255,0.16);
+}
+.vab-load-card-load-btn {
+  background: #1a4a70 !important;
+  border-color: #2a6a90 !important;
+}
+.vab-load-card-load-btn:hover {
+  background: #205a80 !important;
+}
+.vab-load-card-delete-btn {
+  background: rgba(80,20,20,0.8) !important;
+  border-color: #703030 !important;
+  color: #d08080 !important;
+}
+.vab-load-card-delete-btn:hover {
+  background: rgba(100,30,30,0.9) !important;
 }
 
 `;
@@ -2146,6 +2275,8 @@ function _bindButtons(root) {
     _assembly.connections.length = 0;
     _assembly.symmetryPairs.length = 0;
     _setSelectedPart(null);
+    _currentDesignId   = null;
+    _currentDesignName = '';
     _syncAndRenderStaging();
     vabRenderParts();
     _updateStatusBar();
@@ -2154,6 +2285,16 @@ function _bindButtons(root) {
     // Refresh cash display.
     const cashEl = document.getElementById('vab-cash');
     if (cashEl && _gameState) cashEl.textContent = fmt$(_gameState.money);
+  });
+
+  // ── Save design ─────────────────────────────────────────────────────────────
+  root.querySelector('#vab-btn-save')?.addEventListener('click', () => {
+    _handleSaveDesign();
+  });
+
+  // ── Load design ────────────────────────────────────────────────────────────
+  root.querySelector('#vab-btn-load')?.addEventListener('click', () => {
+    _handleLoadDesign();
   });
 
   // ── Launch — enabled only when validation passes ──────────────────────────
@@ -2539,6 +2680,279 @@ function _runAndRenderValidation() {
 // ---------------------------------------------------------------------------
 // Launch sequence — crew dialog & flight state
 // ---------------------------------------------------------------------------
+// Save / Load design handlers
+// ---------------------------------------------------------------------------
+
+/**
+ * Show a save-name prompt and persist the current assembly as a saved design.
+ */
+function _handleSaveDesign() {
+  if (!_assembly || _assembly.parts.size === 0 || !_gameState) {
+    alert('Nothing to save.');
+    return;
+  }
+
+  // Remove any existing save overlay.
+  document.getElementById('vab-save-overlay')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'vab-save-overlay';
+
+  const defaultName = _currentDesignName || 'Rocket Design ' + new Date().toLocaleDateString();
+
+  overlay.innerHTML =
+    `<div class="vab-save-dialog">` +
+      `<h3>Save Design</h3>` +
+      `<input type="text" id="vab-save-name" value="${defaultName.replace(/"/g, '&quot;')}" maxlength="60" />` +
+      `<div class="vab-save-dialog-footer">` +
+        `<button type="button" id="vab-save-cancel">Cancel</button>` +
+        `<button type="button" class="vab-save-confirm" id="vab-save-confirm">Save</button>` +
+      `</div>` +
+    `</div>`;
+
+  document.body.appendChild(overlay);
+
+  const nameInput = /** @type {HTMLInputElement} */ (overlay.querySelector('#vab-save-name'));
+  nameInput?.select();
+
+  overlay.addEventListener('pointerdown', (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+
+  overlay.querySelector('#vab-save-cancel')?.addEventListener('click', () => overlay.remove());
+
+  const doSave = () => {
+    const name = nameInput?.value.trim() || defaultName;
+    const designId = _currentDesignId || ('design-' + Date.now());
+
+    const design = createRocketDesign({
+      id:          designId,
+      name,
+      parts:       [..._assembly.parts.values()].map(p => ({ partId: p.partId, position: { x: p.x, y: p.y } })),
+      staging:     { stages: _stagingConfig.stages.map(s => [...s.instanceIds]), unstaged: [..._stagingConfig.unstaged] },
+      totalMass:   _lastValidation?.totalMassKg ?? 0,
+      totalThrust: _lastValidation?.stage1Thrust ?? 0,
+    });
+
+    saveDesign(_gameState, design);
+    _currentDesignId   = designId;
+    _currentDesignName = name;
+
+    overlay.remove();
+
+    // Brief confirmation toast.
+    _showToast('Design saved.');
+  };
+
+  overlay.querySelector('#vab-save-confirm')?.addEventListener('click', doSave);
+  nameInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') doSave();
+  });
+}
+
+/**
+ * Show a brief toast message near the top of the VAB.
+ * @param {string} msg
+ */
+function _showToast(msg) {
+  const toast = document.createElement('div');
+  toast.textContent = msg;
+  toast.style.cssText =
+    'position:fixed;top:60px;left:50%;transform:translateX(-50%);' +
+    'background:#1a3a28;color:#80d0a0;border:1px solid #2a6040;' +
+    'padding:8px 20px;border-radius:6px;font-size:0.85rem;z-index:400;' +
+    'pointer-events:none;opacity:1;transition:opacity 0.4s;font-family:system-ui,sans-serif;';
+  document.body.appendChild(toast);
+  setTimeout(() => { toast.style.opacity = '0'; }, 1200);
+  setTimeout(() => { toast.remove(); }, 1700);
+}
+
+/**
+ * Show a full-screen load overlay listing all saved designs.
+ */
+function _handleLoadDesign() {
+  if (!_gameState) return;
+
+  injectRocketCardCSS();
+
+  document.getElementById('vab-load-overlay')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'vab-load-overlay';
+
+  const header = document.createElement('div');
+  header.className = 'vab-load-header';
+  header.textContent = 'Load Design';
+  overlay.appendChild(header);
+
+  const list = document.createElement('div');
+  list.className = 'vab-load-list';
+  overlay.appendChild(list);
+
+  const renderList = () => {
+    list.innerHTML = '';
+    const designs = _gameState.savedDesigns ?? [];
+
+    if (designs.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'vab-load-empty';
+      empty.textContent = 'No saved designs. Use Save to store your current rocket.';
+      list.appendChild(empty);
+      return;
+    }
+
+    for (const design of designs) {
+      const card = buildRocketCard(design, [
+        {
+          label: 'Load',
+          className: 'vab-load-card-load-btn',
+          onClick: () => {
+            _loadDesignIntoVab(design);
+            overlay.remove();
+          },
+        },
+        {
+          label: 'Delete',
+          className: 'vab-load-card-delete-btn',
+          onClick: () => {
+            if (!confirm(`Delete "${design.name}"?`)) return;
+            deleteDesign(_gameState, design.id);
+            renderList();
+          },
+        },
+      ]);
+      list.appendChild(card);
+    }
+  };
+
+  renderList();
+
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'vab-load-close';
+  closeBtn.type = 'button';
+  closeBtn.textContent = 'Close';
+  closeBtn.addEventListener('click', () => overlay.remove());
+  overlay.appendChild(closeBtn);
+
+  document.body.appendChild(overlay);
+}
+
+/**
+ * Restore a saved RocketDesign into the VAB assembly and staging.
+ *
+ * @param {import('../core/gameState.js').RocketDesign} design
+ */
+function _loadDesignIntoVab(design) {
+  if (!_gameState) return;
+
+  // Refund current assembly parts before clearing.
+  if (_assembly) {
+    for (const placed of _assembly.parts.values()) {
+      const def = getPartById(placed.partId);
+      if (def) _gameState.money += def.cost;
+    }
+  }
+
+  // Clear and rebuild assembly from the design.
+  _assembly = createRocketAssembly();
+  _stagingConfig = createStagingConfig();
+
+  // Deduct costs and place parts.
+  for (const p of design.parts) {
+    const def = getPartById(p.partId);
+    if (def) _gameState.money -= def.cost;
+    addPartToAssembly(_assembly, p.partId, p.position.x, p.position.y);
+  }
+
+  // Rebuild connections by checking snap-point overlap (same pattern as launchPad).
+  _rebuildConnectionsFromSnaps(_assembly);
+
+  // Restore staging from the design.
+  if (design.staging && Array.isArray(design.staging.stages)) {
+    // The design stores staging as instanceId arrays. Since addPartToAssembly
+    // generates instanceIds sequentially (inst-1, inst-2, ...) matching the
+    // order of design.parts, we can map the saved staging directly.
+    _stagingConfig = {
+      stages:          design.staging.stages.map(ids => ({
+        instanceIds: Array.isArray(ids) ? [...ids] : [],
+      })),
+      unstaged:        Array.isArray(design.staging.unstaged) ? [...design.staging.unstaged] : [],
+      currentStageIdx: 0,
+    };
+  }
+
+  syncStagingWithAssembly(_assembly, _stagingConfig);
+
+  _currentDesignId   = design.id;
+  _currentDesignName = design.name;
+  _setSelectedPart(null);
+
+  // Re-render everything.
+  vabSetAssembly(_assembly);
+  vabRenderParts();
+  _renderStagingPanel();
+  _runAndRenderValidation();
+  _updateStatusBar();
+  _updateScaleBarExtents();
+  _updateOffscreenIndicators();
+
+  // Refresh cash display.
+  const cashEl = document.getElementById('vab-cash');
+  if (cashEl && _gameState) cashEl.textContent = fmt$(_gameState.money);
+}
+
+/**
+ * Rebuild part connections by checking snap-point overlap.
+ * Same algorithm as launchPad.js _rebuildConnections.
+ *
+ * @param {import('../core/rocketbuilder.js').RocketAssembly} assembly
+ */
+function _rebuildConnectionsFromSnaps(assembly) {
+  const OPPOSITE_SIDE = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' };
+  const SNAP_TOLERANCE = 1;
+  const parts = [...assembly.parts.values()];
+  const occupied = new Set();
+
+  for (let i = 0; i < parts.length; i++) {
+    const pA = parts[i];
+    const defA = getPartById(pA.partId);
+    if (!defA) continue;
+
+    for (let j = i + 1; j < parts.length; j++) {
+      const pB = parts[j];
+      const defB = getPartById(pB.partId);
+      if (!defB) continue;
+
+      for (let si = 0; si < defA.snapPoints.length; si++) {
+        const spA = defA.snapPoints[si];
+        const keyA = `${pA.instanceId}:${si}`;
+        if (occupied.has(keyA)) continue;
+
+        const awx = pA.x + spA.offsetX;
+        const awy = pA.y - spA.offsetY;
+        const neededSide = OPPOSITE_SIDE[spA.side];
+
+        for (let sj = 0; sj < defB.snapPoints.length; sj++) {
+          const spB = defB.snapPoints[sj];
+          if (spB.side !== neededSide) continue;
+          const keyB = `${pB.instanceId}:${sj}`;
+          if (occupied.has(keyB)) continue;
+
+          const bwx = pB.x + spB.offsetX;
+          const bwy = pB.y - spB.offsetY;
+
+          if (Math.abs(awx - bwx) < SNAP_TOLERANCE && Math.abs(awy - bwy) < SNAP_TOLERANCE) {
+            connectParts(assembly, pA.instanceId, si, pB.instanceId, sj);
+            occupied.add(keyA);
+            occupied.add(keyB);
+          }
+        }
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 /**
  * Entry point called when the enabled Launch button is clicked.
@@ -2791,6 +3205,7 @@ export function initVabUI(container, state, { onBack } = {}) {
   _container = container;
 
   // Inject styles once.
+  injectRocketCardCSS();
   if (!document.getElementById('vab-css')) {
     const styleEl = document.createElement('style');
     styleEl.id = 'vab-css';
@@ -2820,6 +3235,8 @@ export function initVabUI(container, state, { onBack } = {}) {
                 title="Remove all parts from the rocket (refunds cost)">
           Clear All
         </button>
+        <button class="vab-btn" id="vab-btn-save" type="button">Save</button>
+        <button class="vab-btn" id="vab-btn-load" type="button">Load</button>
         <button class="vab-btn vab-btn-launch" id="vab-btn-launch" type="button" disabled>
           Launch
         </button>

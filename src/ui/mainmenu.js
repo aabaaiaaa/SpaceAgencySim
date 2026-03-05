@@ -155,6 +155,13 @@ const MENU_STYLES = `
   flex-shrink: 0;
 }
 
+.mm-logo {
+  width: 96px;
+  height: 96px;
+  margin: 0 auto 18px;
+  filter: drop-shadow(0 0 24px rgba(100,180,255,0.5));
+}
+
 .mm-title {
   font-size: 3rem;
   font-weight: 700;
@@ -559,6 +566,7 @@ function _renderTitle(overlay) {
   const block = document.createElement('div');
   block.className = 'mm-title-block';
   block.innerHTML = `
+    <img class="mm-logo" src="/favicon.svg" alt="Space Agency Logo" />
     <h1 class="mm-title">Space Agency</h1>
     <p class="mm-subtitle">Simulation</p>
   `;

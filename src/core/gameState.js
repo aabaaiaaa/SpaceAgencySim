@@ -195,6 +195,8 @@ export function createGameState() {
 
     rockets: [],
 
+    savedDesigns: [],
+
     // New players start with no parts unlocked; the tutorial unlocks the
     // starter set during first-run onboarding.
     parts: [],
@@ -429,6 +431,31 @@ export function findMissionById(state, id) {
     ...state.missions.completed,
   ];
   return all.find((m) => m.id === id) ?? null;
+}
+
+/**
+ * Save or overwrite a rocket design in the savedDesigns array.
+ *
+ * @param {GameState} state
+ * @param {RocketDesign} design
+ */
+export function saveDesign(state, design) {
+  const idx = state.savedDesigns.findIndex(d => d.id === design.id);
+  if (idx >= 0) {
+    state.savedDesigns[idx] = design;
+  } else {
+    state.savedDesigns.push(design);
+  }
+}
+
+/**
+ * Delete a saved design by ID.
+ *
+ * @param {GameState} state
+ * @param {string} designId
+ */
+export function deleteDesign(state, designId) {
+  state.savedDesigns = state.savedDesigns.filter(d => d.id !== designId);
 }
 
 /**

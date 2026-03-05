@@ -239,6 +239,9 @@ export function loadGame(slotIndex) {
   // double-counted on the next save.
   resetSessionTimer();
 
+  // Default savedDesigns for saves created before this feature existed.
+  envelope.state.savedDesigns ??= [];
+
   return envelope.state;
 }
 
