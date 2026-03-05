@@ -57,6 +57,7 @@ import { tickCollisions } from './collision.js';
 import {
   initParachuteStates,
   tickParachutes,
+  tickCanopyAngles,
   DEPLOY_DURATION,
   LOW_DENSITY_THRESHOLD,
 } from './parachute.js';
@@ -615,6 +616,7 @@ function _integrate(ps, assembly, flightState) {
   // totalMass was computed at step 1 above.
   if (!ps.grounded) {
     tickParachutes(ps, assembly, flightState, FIXED_DT, totalMass);
+    tickCanopyAngles(ps, FIXED_DT);
   }
 
   // --- 9b. Landing leg state machine ---------------------------------------

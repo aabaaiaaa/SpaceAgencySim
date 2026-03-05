@@ -180,6 +180,9 @@ let _trailContainer = null;
 /** Container for the active rocket's part rectangles + labels. */
 let _rocketContainer = null;
 
+/** Container for independently-oriented parachute canopies (drawn in world space). */
+let _canopyContainer = null;
+
 // ---------------------------------------------------------------------------
 // Pre-generated star positions — normalised [0, 1] in screen space
 // ---------------------------------------------------------------------------
@@ -577,21 +580,34 @@ function _makePartLabel(placed, def, alpha = 1) {
 // ---------------------------------------------------------------------------
 
 /**
- * Draw a deployed-canopy placeholder above every deploying or deployed
- * PARACHUTE part currently in the rocket.
+ * Draw a deployed-canopy above every deploying or deployed PARACHUTE part.
  *
- * The canopy is a filled ellipse whose width interpolates from the stowed
- * part width up to `deployedDiameter / SCALE_M_PER_PX` as the deployment
- * animation progresses (0 → 1).  Two thin rigging lines connect the stowed
- * chute top to the canopy edges for visual clarity.
+ * The canopy swings independently from the rocket — it has its own
+ * `canopyAngle` that springs toward upright.  Drawn in world space into
+ * `_canopyContainer` (not the rotated rocket container).
  *
- * All coordinates are in the container's local pixel space (1 px = SCALE_M_PER_PX m).
- *
- * @param {PIXI.Graphics}                                      g
  * @param {import('../core/physics.js').PhysicsState}          ps
  * @param {import('../core/rocketbuilder.js').RocketAssembly}  assembly
+ * @param {number}                                              w  Canvas width.
+ * @param {number}                                              h  Canvas height.
  */
-function _drawParachuteCanopies(g, ps, assembly) {
+function _drawParachuteCanopies(ps, assembly, w, h) {
+  if (!_canopyContainer) return;
+
+  // Clear previous frame's canopy graphics.
+  while (_canopyContainer.children.length) _canopyContainer.removeChildAt(0);
+
+  const ppm = _ppm();
+  const rocketAngle = ps.angle;
+  const cosR = Math.cos(rocketAngle);
+  const sinR = Math.sin(rocketAngle);
+
+  // The rocket container has a pivot offset (CoM or tipping contact).
+  // We need the same transform: local → world → screen.
+  // Local part coords are in VAB pixels (Y-down for screen).
+  // placed.x, placed.y are VAB coords (Y-up).
+  // In local screen space: lx = placed.x, ly = -(placed.y).
+
   for (const instanceId of ps.activeParts) {
     const placed = assembly.parts.get(instanceId);
     const def    = placed ? getPartById(placed.partId) : null;
@@ -608,6 +624,7 @@ function _drawParachuteCanopies(g, ps, assembly) {
     if (progress <= 0) continue;
 
     const props = def.properties ?? {};
+    const canopyAngle = entry.canopyAngle ?? 0;
 
     // Stowed width (local pixels) → deployed diameter (local pixels).
     const stowedW    = def.width ?? 20;
@@ -618,33 +635,74 @@ function _drawParachuteCanopies(g, ps, assembly) {
     // Canopy dome height is 35 % of its width — flat hemispherical profile.
     const halfH = halfW * 0.35;
 
-    // Top of the stowed chute body in local Y (screen Y increases downward,
-    // placed.y is world-up, so the stowed top is at screen Y = -(placed.y + halfStowedH)).
-    const stowedHalfH  = (def.height ?? 10) / 2;
-    const stowedTopY   = -(placed.y + stowedHalfH);
+    const stowedHalfH = (def.height ?? 10) / 2;
 
-    // Canopy centre sits one canopy half-height above the stowed top.
-    const canopyCentreX = placed.x;
-    const canopyCentreY = stowedTopY - halfH;
+    // --- Stowed part top in local container space (Y-down) ---
+    const stowedTopLX = placed.x;
+    const stowedTopLY = -(placed.y + stowedHalfH);
+
+    // --- Transform stowed top to world coords ---
+    // Local → world (metres): rotate by rocketAngle, scale by SCALE_M_PER_PX, add rocket pos.
+    const stowedWorldX = ps.posX + (stowedTopLX * cosR - stowedTopLY * sinR) * SCALE_M_PER_PX;
+    const stowedWorldY = ps.posY - (stowedTopLX * sinR + stowedTopLY * cosR) * SCALE_M_PER_PX;
+
+    // --- Canopy centre in world coords (offset along canopyAngle direction) ---
+    // The canopy sits one halfH (in local pixels) above the stowed top, but rotated
+    // by canopyAngle instead of rocketAngle.
+    const canopyOffsetM = halfH * SCALE_M_PER_PX;
+    const cosC = Math.cos(canopyAngle);
+    const sinC = Math.sin(canopyAngle);
+    // "Above" in canopy frame means along the -Y direction in the canopy's rotated frame.
+    // In world coords, the canopy's up direction is (-sinC, cosC).
+    const canopyWorldX = stowedWorldX - sinC * canopyOffsetM;
+    const canopyWorldY = stowedWorldY + cosC * canopyOffsetM;
+
+    // --- Convert world → screen ---
+    const { sx: canopySX, sy: canopySY } = _worldToScreen(canopyWorldX, canopyWorldY, w, h);
+    const { sx: stowedSX, sy: stowedSY } = _worldToScreen(stowedWorldX, stowedWorldY, w, h);
+
+    // Scale the canopy dimensions from local pixels to screen pixels.
+    const scale = ppm * SCALE_M_PER_PX;
+    const sHalfW = halfW * scale;
+    const sHalfH = halfH * scale;
 
     const alpha = Math.min(1, progress);
+    const cg = new PIXI.Graphics();
 
-    // Filled canopy ellipse.
-    g.ellipse(canopyCentreX, canopyCentreY, halfW, halfH);
-    g.fill({ color: 0x6020a8, alpha: 0.55 * alpha });
-    g.stroke({ color: 0xc070ff, width: 1, alpha: 0.85 * alpha });
+    // Draw canopy ellipse rotated by canopyAngle.
+    cg.save();
+    cg.translate(canopySX, canopySY);
+    cg.rotate(canopyAngle);
+    cg.ellipse(0, 0, sHalfW, sHalfH);
+    cg.fill({ color: 0x6020a8, alpha: 0.55 * alpha });
+    cg.stroke({ color: 0xc070ff, width: 1, alpha: 0.85 * alpha });
+    cg.restore();
 
-    // Rigging lines from the stowed chute's upper corners to the canopy edges.
-    const cordAlpha  = 0.6 * alpha;
-    const cordInset  = stowedW * 0.25; // lines start slightly inward from stowed edges
+    // Rigging lines: from stowed part top (rotated with rocket) to canopy edges.
+    const cordAlpha = 0.6 * alpha;
+    const cordInset = (stowedW * 0.25) * scale;
 
-    g.moveTo(canopyCentreX - cordInset, stowedTopY);
-    g.lineTo(canopyCentreX - halfW,     canopyCentreY + halfH);
-    g.stroke({ color: 0xc070ff, width: 0.8, alpha: cordAlpha });
+    // Stowed attachment points (inset from edges, in rocket-rotated frame).
+    const stowedLeftX  = stowedSX + cosR * (-cordInset);
+    const stowedLeftY  = stowedSY + sinR * (-cordInset);
+    const stowedRightX = stowedSX + cosR * cordInset;
+    const stowedRightY = stowedSY + sinR * cordInset;
 
-    g.moveTo(canopyCentreX + cordInset, stowedTopY);
-    g.lineTo(canopyCentreX + halfW,     canopyCentreY + halfH);
-    g.stroke({ color: 0xc070ff, width: 0.8, alpha: cordAlpha });
+    // Canopy edge points (in canopy-rotated frame).
+    const canopyLeftX  = canopySX + cosC * (-sHalfW) - sinC * sHalfH;
+    const canopyLeftY  = canopySY + sinC * (-sHalfW) + cosC * sHalfH;
+    const canopyRightX = canopySX + cosC * sHalfW    - sinC * sHalfH;
+    const canopyRightY = canopySY + sinC * sHalfW    + cosC * sHalfH;
+
+    cg.moveTo(stowedLeftX, stowedLeftY);
+    cg.lineTo(canopyLeftX, canopyLeftY);
+    cg.stroke({ color: 0xc070ff, width: 0.8, alpha: cordAlpha });
+
+    cg.moveTo(stowedRightX, stowedRightY);
+    cg.lineTo(canopyRightX, canopyRightY);
+    cg.stroke({ color: 0xc070ff, width: 0.8, alpha: cordAlpha });
+
+    _canopyContainer.addChild(cg);
   }
 }
 
@@ -723,8 +781,8 @@ function _renderRocket(ps, assembly, w, h) {
     _drawPartRect(g, placed, def, 0.9);
   }
 
-  // Draw deployed parachute canopies above the stowed part rectangles.
-  _drawParachuteCanopies(g, ps, assembly);
+  // Draw deployed parachute canopies independently (in world space, not rotating with rocket).
+  _drawParachuteCanopies(ps, assembly, w, h);
 
   // Add text labels as separate child objects (labels are part of the rotated
   // container, so they tilt with the rocket — acceptable for a simple renderer).
@@ -1098,15 +1156,17 @@ export function initFlightRenderer() {
   if (_debrisContainer) app.stage.removeChild(_debrisContainer);
   if (_trailContainer)  app.stage.removeChild(_trailContainer);
   if (_rocketContainer) app.stage.removeChild(_rocketContainer);
+  if (_canopyContainer) app.stage.removeChild(_canopyContainer);
 
   // Layer order (bottom → top):
-  //   sky  →  stars  →  ground  →  debris  →  engine trails  →  active rocket
+  //   sky  →  stars  →  ground  →  debris  →  engine trails  →  active rocket  →  canopies
   _skyGraphics     = new PIXI.Graphics();
   _starsContainer  = new PIXI.Container();
   _groundGraphics  = new PIXI.Graphics();
   _debrisContainer = new PIXI.Container();
   _trailContainer  = new PIXI.Container();
   _rocketContainer = new PIXI.Container();
+  _canopyContainer = new PIXI.Container();
 
   app.stage.addChild(_skyGraphics);
   app.stage.addChild(_starsContainer);
@@ -1114,6 +1174,7 @@ export function initFlightRenderer() {
   app.stage.addChild(_debrisContainer);
   app.stage.addChild(_trailContainer);
   app.stage.addChild(_rocketContainer);
+  app.stage.addChild(_canopyContainer);
 
   // Pre-generate the deterministic star field.
   _generateStars();
@@ -1202,6 +1263,7 @@ export function destroyFlightRenderer() {
   if (_debrisContainer) app.stage.removeChild(_debrisContainer);
   if (_trailContainer)  app.stage.removeChild(_trailContainer);
   if (_rocketContainer) app.stage.removeChild(_rocketContainer);
+  if (_canopyContainer) app.stage.removeChild(_canopyContainer);
 
   _skyGraphics     = null;
   _starsContainer  = null;
@@ -1209,6 +1271,7 @@ export function destroyFlightRenderer() {
   _debrisContainer = null;
   _trailContainer  = null;
   _rocketContainer = null;
+  _canopyContainer = null;
   _stars           = [];
   _trailSegments   = [];
   _lastTrailTime   = null;

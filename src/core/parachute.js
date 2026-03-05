@@ -40,6 +40,7 @@
  *   initParachuteStates(ps, assembly)                             → void
  *   deployParachute(ps, instanceId)                               → void
  *   tickParachutes(ps, assembly, flightState, dt, totalMass)      → void
+ *   tickCanopyAngles(ps, dt)                                     → void
  *   getChuteMultiplier(ps, instanceId, density)                   → number
  *   getParachuteStatus(ps, instanceId)                            → string
  *   getParachuteContextMenuItems(ps, assembly)                    → Object[]
@@ -97,9 +98,12 @@ const CHUTE_DRAG_MULTIPLIER = 80;
  * Per-parachute entry stored in PhysicsState.parachuteStates.
  *
  * @typedef {Object} ParachuteEntry
- * @property {string} state        One of the {@link ParachuteState} values.
- * @property {number} deployTimer  Seconds remaining in the deploying animation.
- *                                 0 when not in the DEPLOYING state.
+ * @property {string} state            One of the {@link ParachuteState} values.
+ * @property {number} deployTimer      Seconds remaining in the deploying animation.
+ *                                     0 when not in the DEPLOYING state.
+ * @property {number} canopyAngle      Independent canopy orientation (radians).
+ *                                     0 = upright. Initialised to rocket angle on deploy.
+ * @property {number} canopyAngularVel Angular velocity of the canopy (rad/s).
  */
 
 // ---------------------------------------------------------------------------
@@ -124,8 +128,10 @@ export function initParachuteStates(ps, assembly) {
     const def = getPartById(placed.partId);
     if (!def || def.type !== PartType.PARACHUTE) continue;
     ps.parachuteStates.set(instanceId, {
-      state:       ParachuteState.PACKED,
-      deployTimer: 0,
+      state:            ParachuteState.PACKED,
+      deployTimer:      0,
+      canopyAngle:      0,
+      canopyAngularVel: 0,
     });
   }
 }
@@ -154,14 +160,18 @@ export function deployParachute(ps, instanceId) {
   let entry = ps.parachuteStates.get(instanceId);
   if (!entry) {
     // Late-initialise for parts that weren't present at createPhysicsState time.
-    entry = { state: ParachuteState.PACKED, deployTimer: 0 };
+    entry = { state: ParachuteState.PACKED, deployTimer: 0, canopyAngle: 0, canopyAngularVel: 0 };
     ps.parachuteStates.set(instanceId, entry);
   }
 
   if (entry.state !== ParachuteState.PACKED) return;
 
-  entry.state       = ParachuteState.DEPLOYING;
-  entry.deployTimer = DEPLOY_DURATION;
+  entry.state            = ParachuteState.DEPLOYING;
+  entry.deployTimer      = DEPLOY_DURATION;
+  // Initialise canopy orientation to the rocket's current angle so it starts
+  // aligned with the rocket and then springs toward upright independently.
+  entry.canopyAngle      = ps.angle ?? 0;
+  entry.canopyAngularVel = 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -242,6 +252,38 @@ export function tickParachutes(ps, assembly, flightState, dt, totalMass) {
         description: `${partName} fully deployed at ${altitude.toFixed(0)} m.`,
       });
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Canopy independent swing
+// ---------------------------------------------------------------------------
+
+/** Spring constant for canopy restoring torque toward upright. */
+const CANOPY_SPRING_K = 12.0;
+
+/** Angular damping coefficient for canopy swing. */
+const CANOPY_DAMPING  = 8.0;
+
+/**
+ * Step every deploying/deployed parachute's independent canopy angle.
+ *
+ * The canopy is treated as a light object that quickly orients upward
+ * (angle → 0) via a strong spring + damping, independent of the rocket body.
+ *
+ * @param {{ parachuteStates: Map<string, ParachuteEntry> }} ps
+ * @param {number} dt  Fixed timestep in seconds.
+ */
+export function tickCanopyAngles(ps, dt) {
+  if (!ps.parachuteStates) return;
+
+  for (const [, entry] of ps.parachuteStates) {
+    if (entry.state !== ParachuteState.DEPLOYING && entry.state !== ParachuteState.DEPLOYED) continue;
+
+    // Spring torque toward upright (angle = 0) + angular damping.
+    const accel = -CANOPY_SPRING_K * entry.canopyAngle - CANOPY_DAMPING * entry.canopyAngularVel;
+    entry.canopyAngularVel += accel * dt;
+    entry.canopyAngle      += entry.canopyAngularVel * dt;
   }
 }
 

@@ -85,15 +85,19 @@ const TOPBAR_STYLES = `
   user-select: none;
 }
 
-/* Agency name — left, takes all remaining space */
+/* Agency name — left */
 #topbar-agency {
   font-size: 0.83rem;
   font-weight: 600;
   color: #cce4f8;
-  flex: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Spacer pushes hamburger to the right */
+#topbar-spacer {
+  flex: 1;
 }
 
 /* Cash button — centre */
@@ -525,8 +529,12 @@ export function initTopBar(container, state, { onExitToMenu }) {
     _toggleDropdown();
   });
 
+  const spacer = document.createElement('div');
+  spacer.id = 'topbar-spacer';
+
   _root.appendChild(agency);
   _root.appendChild(cash);
+  _root.appendChild(spacer);
   _root.appendChild(menuBtn);
 
   container.appendChild(_root);

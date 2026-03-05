@@ -10,7 +10,7 @@ import { initVabUI, resetVabUI } from './vab.js';
 import { initCrewAdminUI, destroyCrewAdminUI } from './crewAdmin.js';
 import { initMissionControlUI, destroyMissionControlUI } from './missionControl.js';
 import { initLaunchPadUI, destroyLaunchPadUI } from './launchPad.js';
-import { initTopBar, destroyTopBar } from './topbar.js';
+import { initTopBar, destroyTopBar, refreshTopBar } from './topbar.js';
 import { showVabScene, hideVabScene } from '../render/vab.js';
 import { showHubScene } from '../render/hub.js';
 
@@ -175,6 +175,7 @@ function _handleNavigation(container, state, destination) {
           _vabInitialized = false;
           hideVabScene();
           showHubScene();
+          refreshTopBar();
           initHubUI(container, state, (dest) => {
             _handleNavigation(container, state, dest);
           });

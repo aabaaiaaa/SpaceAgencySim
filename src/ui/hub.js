@@ -550,7 +550,7 @@ export function showReturnResultsOverlay(container, summary, onDismiss) {
   const dismissBtn = document.createElement('button');
   dismissBtn.id        = 'return-results-dismiss-btn';
   dismissBtn.className = 'rr-dismiss-btn';
-  dismissBtn.textContent = 'Return to Hub →';
+  dismissBtn.textContent = '← Return to Hub';
 
   dismissBtn.addEventListener('click', () => {
     overlay.remove();

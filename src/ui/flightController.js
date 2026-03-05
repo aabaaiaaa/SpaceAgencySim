@@ -31,7 +31,7 @@ import { ATMOSPHERE_TOP, isReentryCondition } from '../core/atmosphere.js';
 import { getPartById } from '../data/parts.js';
 import { PartType, DEATH_FINE_PER_ASTRONAUT } from '../core/constants.js';
 import { processFlightReturn } from '../core/flightReturn.js';
-import { setTopBarFlightItems, clearTopBarFlightItems, setTopBarDropdownToggleCallback } from './topbar.js';
+import { setTopBarFlightItems, clearTopBarFlightItems, setTopBarDropdownToggleCallback, refreshTopBar } from './topbar.js';
 
 // ---------------------------------------------------------------------------
 // Module state
@@ -1036,6 +1036,10 @@ function _handleMenuReturnToAgency() {
   // If the rocket is still in flight (not landed, not crashed), warn the player
   // that returning now forfeits all parts with no recovery.
   if (_ps && !_ps.landed && !_ps.crashed) {
+    // Pause physics while the abort confirmation modal is showing.
+    _preMenuTimeWarp = _timeWarp;
+    _timeWarp = 0;
+
     // Calculate total cost of active parts at risk.
     let totalCost = 0;
     if (_assembly) {
@@ -1090,7 +1094,10 @@ function _handleMenuReturnToAgency() {
     continueBtn.className = 'confirm-btn confirm-btn-cancel';
     continueBtn.textContent = 'Continue Flying';
     continueBtn.dataset.testid = 'abort-continue-btn';
-    continueBtn.addEventListener('click', () => backdrop.remove());
+    continueBtn.addEventListener('click', () => {
+      _timeWarp = _preMenuTimeWarp ?? 1;
+      backdrop.remove();
+    });
 
     const abortBtn = document.createElement('button');
     abortBtn.className = 'confirm-btn confirm-btn-danger';
@@ -1105,7 +1112,10 @@ function _handleMenuReturnToAgency() {
     btnRow.appendChild(abortBtn);
     modal.appendChild(btnRow);
 
-    backdrop.addEventListener('click', () => backdrop.remove());
+    backdrop.addEventListener('click', () => {
+      _timeWarp = _preMenuTimeWarp ?? 1;
+      backdrop.remove();
+    });
     backdrop.appendChild(modal);
     host.appendChild(backdrop);
     return;
@@ -1471,6 +1481,7 @@ function _showPostFlightSummary(ps, assembly, flightState, state, onFlightEnd) {
       returnResults = processFlightReturn(state, flightState, ps, assembly);
     }
 
+    refreshTopBar();
     overlay.remove();
     stopFlightScene();
     if (onFlightEnd) onFlightEnd(state, returnResults);
