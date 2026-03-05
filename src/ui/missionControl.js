@@ -21,6 +21,7 @@
  */
 
 import { acceptMission, getUnlockedMissions } from '../core/missions.js';
+import { refreshTopBarMissions } from './topbar.js';
 
 // ---------------------------------------------------------------------------
 // CSS
@@ -627,6 +628,7 @@ function _handleAccept(missionId) {
   if (result.success) {
     // Re-render the Available tab to reflect the updated state.
     _renderAvailableTab();
+    refreshTopBarMissions();
   } else {
     console.warn('[Mission Control UI] acceptMission failed:', result.error);
   }

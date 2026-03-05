@@ -450,6 +450,85 @@ const TOPBAR_STYLES = `
 .confirm-btn-danger:hover {
   background: #9a2a2a;
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   Missions dropdown
+   ══════════════════════════════════════════════════════════════════ */
+
+#topbar-missions-btn {
+  border: none;
+  background: none;
+  padding: 4px 12px;
+  margin: 0;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #88bcdc;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.12s;
+  white-space: nowrap;
+}
+#topbar-missions-btn:hover {
+  background: rgba(100, 160, 220, 0.12);
+}
+#topbar-missions-btn:active {
+  background: rgba(100, 160, 220, 0.22);
+}
+#topbar-missions-btn.has-missions {
+  color: #cce4f8;
+}
+
+#topbar-missions-dropdown {
+  position: fixed;
+  top: 44px;
+  right: 50%;
+  transform: translateX(50%);
+  width: 300px;
+  max-height: 60vh;
+  overflow-y: auto;
+  background: #0d1520;
+  border: 1px solid rgba(100, 160, 220, 0.28);
+  border-radius: 6px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+  z-index: 150;
+  pointer-events: auto;
+  padding: 8px;
+  box-sizing: border-box;
+}
+
+.topbar-mission-card {
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  background: rgba(10, 22, 46, 0.7);
+  border: 1px solid rgba(100, 160, 220, 0.16);
+  border-radius: 5px;
+}
+.topbar-mission-card:last-child {
+  margin-bottom: 0;
+}
+.topbar-mission-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #88bcdc;
+  margin-bottom: 3px;
+}
+.topbar-mission-reward {
+  font-size: 0.78rem;
+  color: #45df88;
+  margin-bottom: 5px;
+}
+.topbar-mission-desc {
+  font-size: 0.78rem;
+  color: #5a8aaa;
+  line-height: 1.55;
+}
+.topbar-missions-empty {
+  padding: 16px 0;
+  font-size: 0.82rem;
+  color: #4a6880;
+  text-align: center;
+}
 `;
 
 // ---------------------------------------------------------------------------
@@ -529,15 +608,29 @@ export function initTopBar(container, state, { onExitToMenu }) {
     _toggleDropdown();
   });
 
+  // Missions button
+  const missionsBtn = document.createElement('button');
+  missionsBtn.id = 'topbar-missions-btn';
+  missionsBtn.dataset.testid = 'topbar-missions-btn';
+  missionsBtn.setAttribute('aria-label', 'View accepted missions');
+  missionsBtn.title = 'Accepted Missions';
+  missionsBtn.textContent = 'Missions';
+  missionsBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    _toggleMissionsDropdown();
+  });
+
   const spacer = document.createElement('div');
   spacer.id = 'topbar-spacer';
 
   _root.appendChild(agency);
   _root.appendChild(cash);
+  _root.appendChild(missionsBtn);
   _root.appendChild(spacer);
   _root.appendChild(menuBtn);
 
   container.appendChild(_root);
+  _refreshMissionsBtn();
 
   // Close dropdown when clicking anywhere outside it.
   document.addEventListener('click', _onDocClick, true);
@@ -553,6 +646,7 @@ export function destroyTopBar() {
   document.removeEventListener('click', _onDocClick, true);
   _closeAllModals();
   _closeDropdown();
+  _closeMissionsDropdown();
   if (_root) {
     _root.remove();
     _root = null;
@@ -573,6 +667,7 @@ export function refreshTopBar() {
   if (cashEl) {
     cashEl.textContent = _fmtCash(_state.money ?? 0);
   }
+  _refreshMissionsBtn();
 }
 
 /**
@@ -685,12 +780,113 @@ function _closeDropdown() {
  */
 function _onDocClick(e) {
   const dropdown = document.getElementById('topbar-dropdown');
-  if (!dropdown) return;
-  const btn = document.getElementById('topbar-menu-btn');
-  if (btn && btn.contains(e.target)) return; // the button toggle handles this
-  if (!dropdown.contains(e.target)) {
-    _closeDropdown();
+  if (dropdown) {
+    const btn = document.getElementById('topbar-menu-btn');
+    if (!(btn && btn.contains(e.target)) && !dropdown.contains(e.target)) {
+      _closeDropdown();
+    }
   }
+
+  const mDropdown = document.getElementById('topbar-missions-dropdown');
+  if (mDropdown) {
+    const mBtn = document.getElementById('topbar-missions-btn');
+    if (!(mBtn && mBtn.contains(e.target)) && !mDropdown.contains(e.target)) {
+      _closeMissionsDropdown();
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Missions Dropdown
+// ---------------------------------------------------------------------------
+
+function _toggleMissionsDropdown() {
+  const existing = document.getElementById('topbar-missions-dropdown');
+  if (existing) {
+    _closeMissionsDropdown();
+  } else {
+    _openMissionsDropdown();
+  }
+}
+
+function _openMissionsDropdown() {
+  _closeDropdown(); // close hamburger if open
+  const panel = document.createElement('div');
+  panel.id = 'topbar-missions-dropdown';
+  _buildMissionsContent(panel);
+
+  // Position below the missions button
+  const btn = document.getElementById('topbar-missions-btn');
+  if (btn) {
+    const rect = btn.getBoundingClientRect();
+    panel.style.right = 'auto';
+    panel.style.left = rect.left + 'px';
+    panel.style.transform = 'none';
+  }
+
+  document.body.appendChild(panel);
+}
+
+function _closeMissionsDropdown() {
+  const d = document.getElementById('topbar-missions-dropdown');
+  if (d) d.remove();
+}
+
+function _buildMissionsContent(container) {
+  container.innerHTML = '';
+  if (!_state) return;
+  const accepted = _state.missions?.accepted ?? [];
+  if (accepted.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'topbar-missions-empty';
+    empty.textContent = 'No missions accepted.';
+    container.appendChild(empty);
+    return;
+  }
+  for (const m of accepted) {
+    const card = document.createElement('div');
+    card.className = 'topbar-mission-card';
+
+    const title = document.createElement('div');
+    title.className = 'topbar-mission-title';
+    title.textContent = m.title;
+
+    const reward = document.createElement('div');
+    reward.className = 'topbar-mission-reward';
+    reward.textContent = 'Reward: ' + _fmtCash(m.reward);
+
+    const desc = document.createElement('div');
+    desc.className = 'topbar-mission-desc';
+    desc.textContent = m.description;
+
+    card.appendChild(title);
+    card.appendChild(reward);
+    card.appendChild(desc);
+    container.appendChild(card);
+  }
+}
+
+/**
+ * Update the missions button label (with count) and refresh dropdown if open.
+ */
+function _refreshMissionsBtn() {
+  const btn = document.getElementById('topbar-missions-btn');
+  if (!btn || !_state) return;
+  const count = _state.missions?.accepted?.length ?? 0;
+  btn.textContent = count > 0 ? `Missions (${count})` : 'Missions';
+  btn.classList.toggle('has-missions', count > 0);
+
+  // If the dropdown is open, refresh its content
+  const dropdown = document.getElementById('topbar-missions-dropdown');
+  if (dropdown) _buildMissionsContent(dropdown);
+}
+
+/**
+ * Refresh the missions button and dropdown from the current game state.
+ * Call after accepting/completing missions.
+ */
+export function refreshTopBarMissions() {
+  _refreshMissionsBtn();
 }
 
 // ---------------------------------------------------------------------------

@@ -682,30 +682,6 @@ const VAB_CSS = `
   border-radius: 2px;
 }
 
-.vab-mission-card {
-  margin-bottom: 14px;
-  padding: 10px 12px;
-  background: rgba(10, 22, 46, 0.7);
-  border: 1px solid #162c48;
-  border-radius: 2px;
-}
-.vab-mission-title {
-  font-size: 11px;
-  font-weight: 700;
-  color: #88bcdc;
-  margin-bottom: 3px;
-}
-.vab-mission-reward {
-  font-size: 9px;
-  color: #45df88;
-  margin-bottom: 5px;
-}
-.vab-mission-desc {
-  font-size: 9px;
-  color: #3a6080;
-  line-height: 1.55;
-}
-
 .vab-side-empty {
   padding: 24px 0;
   font-size: 10px;
@@ -1350,28 +1326,6 @@ function _buildPartsHTML(state) {
     }
   }
   return rows.join('');
-}
-
-// ---------------------------------------------------------------------------
-// Missions side-panel HTML builder
-// ---------------------------------------------------------------------------
-
-/**
- * @param {import('../core/gameState.js').GameState} state
- * @returns {string}
- */
-function _buildMissionsHTML(state) {
-  const accepted = state.missions.accepted;
-  if (accepted.length === 0) {
-    return `<p class="vab-side-empty">No missions accepted.<br>Visit the mission board<br>to accept a mission first.</p>`;
-  }
-  return accepted.map((m) =>
-    `<div class="vab-mission-card">` +
-      `<div class="vab-mission-title">${m.title}</div>` +
-      `<div class="vab-mission-reward">Reward: ${fmt$(m.reward)}</div>` +
-      `<div class="vab-mission-desc">${m.description}</div>` +
-    `</div>`,
-  ).join('');
 }
 
 // ---------------------------------------------------------------------------
@@ -2067,7 +2021,6 @@ function _recomputePanelPositions() {
   if (!root) return;
 
   const panelMap = {
-    missions: document.getElementById('vab-missions-panel'),
     engineer: document.getElementById('vab-engineer-panel'),
     staging:  document.getElementById('vab-staging-panel'),
   };
@@ -2096,7 +2049,6 @@ function _recomputePanelPositions() {
  */
 function _togglePanel(panelId, onOpen) {
   const panelMap = {
-    missions: document.getElementById('vab-missions-panel'),
     engineer: document.getElementById('vab-engineer-panel'),
     staging:  document.getElementById('vab-staging-panel'),
   };
@@ -2120,16 +2072,6 @@ function _bindButtons(root) {
   // ── "← Hub" button — return to the space agency hub ──────────────────────
   root.querySelector('#vab-back-btn')?.addEventListener('click', () => {
     if (_onBack) _onBack();
-  });
-
-  // ── "View Accepted Missions" toggle ──────────────────────────────────────
-  root.querySelector('#vab-btn-missions')?.addEventListener('click', () => {
-    _togglePanel('missions');
-  });
-
-  root.querySelector('#vab-missions-close')?.addEventListener('click', () => {
-    _openPanels.delete('missions');
-    _recomputePanelPositions();
   });
 
   // ── "Rocket Engineer" toggle ─────────────────────────────────────────────
@@ -2836,9 +2778,6 @@ export function initVabUI(container, state, { onBack } = {}) {
     <div id="vab-toolbar">
       <div class="vab-toolbar-btns">
         <button class="vab-btn" id="vab-back-btn" type="button">&#8592; Hub</button>
-        <button class="vab-btn" id="vab-btn-missions" type="button">
-          View Accepted Missions
-        </button>
         <button class="vab-btn" id="vab-btn-engineer" type="button">
           Rocket Engineer
         </button>
@@ -2882,17 +2821,6 @@ export function initVabUI(container, state, { onBack } = {}) {
           ${_buildPartsHTML(state)}
         </div>
         <div id="vab-part-detail" hidden></div>
-      </div>
-
-      <!-- Accepted Missions side panel -->
-      <div class="vab-side-panel" id="vab-missions-panel" hidden>
-        <div class="vab-side-hdr">
-          <span>Accepted Missions</span>
-          <button class="vab-side-close" id="vab-missions-close" type="button">&#x2715;</button>
-        </div>
-        <div class="vab-side-body" id="vab-missions-body">
-          ${_buildMissionsHTML(state)}
-        </div>
       </div>
 
       <!-- Staging side panel -->
@@ -3045,15 +2973,6 @@ export function resetVabUI() {
 export function vabRefreshParts(state) {
   const el = document.getElementById('vab-parts-list');
   if (el) el.innerHTML = _buildPartsHTML(state);
-}
-
-/**
- * Refresh the accepted-missions side panel from an updated game state.
- * @param {import('../core/gameState.js').GameState} state
- */
-export function vabRefreshMissions(state) {
-  const el = document.getElementById('vab-missions-body');
-  if (el) el.innerHTML = _buildMissionsHTML(state);
 }
 
 /**
