@@ -165,15 +165,17 @@ describe('activateCurrentStage() — IGNITE (engine)', () => {
 // ---------------------------------------------------------------------------
 
 describe('activateCurrentStage() — SEPARATE (stack decoupler)', () => {
-  it('creates one debris fragment when the decoupler fires', () => {
-    const { assembly, staging } = makeTwoStageRocket();
+  it('creates two debris fragments when the decoupler fires (decoupler + lower stage)', () => {
+    const { assembly, staging, decId } = makeTwoStageRocket();
     const ps = makePhysicsState(assembly);
     const fs = makeFlightState();
 
     activateCurrentStage(ps, assembly, staging, fs); // stage 1: engine
     const debris = activateCurrentStage(ps, assembly, staging, fs); // stage 2: decouple
 
-    expect(debris.length).toBe(1);
+    expect(debris.length).toBe(2);
+    // First fragment is the decoupler itself.
+    expect(debris[0].activeParts.has(decId)).toBe(true);
   });
 
   it('removes the decoupler from ps.activeParts', () => {
@@ -198,18 +200,20 @@ describe('activateCurrentStage() — SEPARATE (stack decoupler)', () => {
     expect(ps.activeParts.has(probeId)).toBe(true);
   });
 
-  it('moves the tank and engine into the debris fragment', () => {
+  it('moves the tank and engine into the stage debris fragment', () => {
     const { assembly, staging, tankId, engineId } = makeTwoStageRocket();
     const ps = makePhysicsState(assembly);
     const fs = makeFlightState();
 
     activateCurrentStage(ps, assembly, staging, fs); // stage 1
-    const [debris] = activateCurrentStage(ps, assembly, staging, fs); // stage 2
+    const allDebris = activateCurrentStage(ps, assembly, staging, fs); // stage 2
+    // Index 0 is the decoupler, index 1 is the disconnected stage.
+    const stageDebris = allDebris[1];
 
     expect(ps.activeParts.has(tankId)).toBe(false);
     expect(ps.activeParts.has(engineId)).toBe(false);
-    expect(debris.activeParts.has(tankId)).toBe(true);
-    expect(debris.activeParts.has(engineId)).toBe(true);
+    expect(stageDebris.activeParts.has(tankId)).toBe(true);
+    expect(stageDebris.activeParts.has(engineId)).toBe(true);
   });
 
   it('transfers firing engine from ps.firingEngines to debris.firingEngines', () => {
@@ -238,9 +242,11 @@ describe('activateCurrentStage() — SEPARATE (stack decoupler)', () => {
     activateCurrentStage(ps, assembly, staging, fs); // stage 1
     const [debris] = activateCurrentStage(ps, assembly, staging, fs); // stage 2
 
-    expect(debris.posY).toBe(5000);
-    // Velocity is modified by the separation impulse (~±1 m/s), but close.
-    expect(Math.abs(debris.velY - 200)).toBeLessThan(2);
+    // Both ps.posY and debris.posY are shifted by the same renorm offset,
+    // so they should be approximately equal after separation.
+    expect(Math.abs(debris.posY - ps.posY)).toBeLessThan(1);
+    // Velocity is modified by the separation impulse (~±0.1 m/s), but close.
+    expect(Math.abs(debris.velY - 200)).toBeLessThan(0.5);
   });
 
   it('debris fragment has a unique id starting with "debris-"', () => {
@@ -447,7 +453,8 @@ describe('activateCurrentStage() — RELEASE (satellite debris)', () => {
     const satFragment = debris.find((d) => d.activeParts.has(satId));
 
     expect(satFragment.posX).toBe(100);
-    expect(satFragment.posY).toBe(50_000);
+    // posY is shifted by renormalization, but satellite and rocket share the same offset
+    expect(Math.abs(satFragment.posY - ps.posY)).toBeLessThan(1);
     expect(satFragment.velX).toBe(300);
     expect(satFragment.velY).toBe(150);
   });
@@ -509,8 +516,9 @@ describe('activateCurrentStage() — SEPARATE with satellite in lower stage', ()
     activateCurrentStage(ps, assembly, staging, fs); // engine
     const debris = activateCurrentStage(ps, assembly, staging, fs); // decoupler
 
-    expect(debris.length).toBe(1);
-    expect(debris[0].activeParts.has(satId)).toBe(true);
+    expect(debris.length).toBe(2); // decoupler fragment + disconnected stage
+    const stageFrag = debris.find((d) => d.activeParts.has(satId));
+    expect(stageFrag).toBeDefined();
     expect(ps.activeParts.has(satId)).toBe(false);
   });
 
@@ -587,6 +595,76 @@ describe('activateCurrentStage() — SRB IGNITE', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Renormalization compensation for new debris
+// ---------------------------------------------------------------------------
+
+describe('renormalization compensates new debris posY', () => {
+  it('debris posY matches ps.posY after separation (both receive renorm offset)', () => {
+    const { assembly, staging } = makeTwoStageRocket();
+    const ps = makePhysicsState(assembly);
+    ps.posY = 5000;
+    const fs = makeFlightState();
+
+    activateCurrentStage(ps, assembly, staging, fs); // stage 1: engine
+    const [debris] = activateCurrentStage(ps, assembly, staging, fs); // stage 2: decouple
+
+    // Both should have been shifted by the same renorm offset.
+    expect(Math.abs(debris.posY - ps.posY)).toBeLessThan(1);
+  });
+
+  it('debris position stays consistent through renormalization with multiple stages', () => {
+    // Three-stage rocket: two decouplers.
+    const assembly = createRocketAssembly();
+    const staging  = createStagingConfig();
+
+    const probeId  = addPartToAssembly(assembly, 'probe-core-mk1',       0,  140);
+    const dec1Id   = addPartToAssembly(assembly, 'decoupler-stack-tr18', 0,  100);
+    const tank1Id  = addPartToAssembly(assembly, 'tank-small',           0,   40);
+    const dec2Id   = addPartToAssembly(assembly, 'decoupler-stack-tr18', 0,   -5);
+    const tank2Id  = addPartToAssembly(assembly, 'tank-small',           0,  -65);
+    const engId    = addPartToAssembly(assembly, 'engine-spark',         0, -120);
+
+    connectParts(assembly, probeId, 1, dec1Id, 0);
+    connectParts(assembly, dec1Id,  1, tank1Id, 0);
+    connectParts(assembly, tank1Id, 1, dec2Id, 0);
+    connectParts(assembly, dec2Id,  1, tank2Id, 0);
+    connectParts(assembly, tank2Id, 1, engId,  0);
+
+    syncStagingWithAssembly(assembly, staging);
+    assignPartToStage(staging, engId,  0); // Stage 1: engine
+    addStageToConfig(staging);
+    assignPartToStage(staging, dec2Id, 1); // Stage 2: lower sep
+    addStageToConfig(staging);
+    assignPartToStage(staging, dec1Id, 2); // Stage 3: upper sep
+
+    const fs = makeFlightState();
+    const ps = makePhysicsState(assembly);
+    ps.posY = 10000;
+
+    activateCurrentStage(ps, assembly, staging, fs); // engine
+    const debris1 = activateCurrentStage(ps, assembly, staging, fs); // lower sep
+    expect(debris1.length).toBe(2); // decoupler + disconnected stage
+    // All debris fragments should have posY close to ps.posY
+    for (const d of debris1) {
+      expect(Math.abs(d.posY - ps.posY)).toBeLessThan(1);
+    }
+
+    // Push first batch into ps.debris so second renorm can compensate them
+    ps.debris.push(...debris1);
+
+    const debris2 = activateCurrentStage(ps, assembly, staging, fs); // upper sep
+    expect(debris2.length).toBe(2); // decoupler + disconnected stage
+    for (const d of debris2) {
+      expect(Math.abs(d.posY - ps.posY)).toBeLessThan(1);
+    }
+    // First batch (now in ps.debris) should also still be consistent
+    for (const d of debris1) {
+      expect(Math.abs(d.posY - ps.posY)).toBeLessThan(1);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
 // recomputeActiveGraph()
 // ---------------------------------------------------------------------------
 
@@ -630,7 +708,7 @@ describe('recomputeActiveGraph()', () => {
     expect(ps.activeParts.has(engineId)).toBe(false);
   });
 
-  it('transfers firing engines from ps to debris.firingEngines', () => {
+  it('removes liquid engines from firingEngines on separation (flame out)', () => {
     const { assembly, decId, engineId } = makeTwoStageRocket();
     const ps = makePhysicsState(assembly);
     ps.firingEngines.add(engineId); // engine was burning
@@ -638,8 +716,9 @@ describe('recomputeActiveGraph()', () => {
     ps.activeParts.delete(decId);
     const [debris] = recomputeActiveGraph(ps, assembly);
 
+    // Liquid engine removed from ps but NOT transferred to debris (no command module).
     expect(ps.firingEngines.has(engineId)).toBe(false);
-    expect(debris.firingEngines.has(engineId)).toBe(true);
+    expect(debris.firingEngines.has(engineId)).toBe(false);
   });
 
   it('preserves all command-module-connected parts in ps.activeParts', () => {
@@ -806,7 +885,9 @@ describe('tickDebris() — SRB thrust on detached stage', () => {
     activateCurrentStage(ps, assembly, staging, fs); // Stage 1: SRB ignites
     // At this point ps.firingEngines has srbId.
 
-    const [debris] = activateCurrentStage(ps, assembly, staging, fs); // Stage 2: separate
+    const allDebris = activateCurrentStage(ps, assembly, staging, fs); // Stage 2: separate
+    // Find the fragment containing the SRB (not the decoupler fragment).
+    const debris = allDebris.find((d) => d.activeParts.has(srbId));
 
     // SRB should now be in debris.firingEngines with fuel remaining.
     expect(debris.firingEngines.has(srbId)).toBe(true);
@@ -821,6 +902,52 @@ describe('tickDebris() — SRB thrust on detached stage', () => {
 
     // Net effect: SRB thrust > gravity → should gain altitude.
     expect(debris.posY).toBeGreaterThan(initialY);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Liquid engines flame out on debris
+// ---------------------------------------------------------------------------
+
+describe('liquid engines flame out on debris', () => {
+  it('liquid engine is removed from firingEngines when transferred to debris', () => {
+    const { assembly, staging, engineId } = makeTwoStageRocket();
+    const ps = makePhysicsState(assembly);
+    const fs = makeFlightState();
+
+    activateCurrentStage(ps, assembly, staging, fs); // stage 1: engine ignites
+    expect(ps.firingEngines.has(engineId)).toBe(true);
+
+    const allDebris = activateCurrentStage(ps, assembly, staging, fs); // stage 2: separate
+    // Find the stage fragment (not the decoupler fragment).
+    const stageDebris = allDebris.find((d) => d.activeParts.has(engineId));
+
+    // Liquid engine should NOT be in debris.firingEngines (no command module).
+    expect(stageDebris.firingEngines.has(engineId)).toBe(false);
+    // But the engine part itself is still in the debris fragment.
+    expect(stageDebris.activeParts.has(engineId)).toBe(true);
+  });
+
+  it('debris with liquid engine does not accelerate from thrust', () => {
+    const { assembly, staging } = makeTwoStageRocket();
+    const ps = makePhysicsState(assembly);
+    ps.posY = 5000;
+    ps.velY = 0;
+    const fs = makeFlightState();
+
+    activateCurrentStage(ps, assembly, staging, fs); // stage 1: engine ignites
+    const allDebris = activateCurrentStage(ps, assembly, staging, fs); // stage 2: separate
+    // Find the stage fragment containing the engine (not the decoupler).
+    const stageDebris = allDebris.find((d) => d.activeParts.size > 1);
+
+    stageDebris.velY = 0;
+    const initialY = stageDebris.posY;
+
+    // Tick for 0.5s — should only decelerate from gravity, no thrust.
+    tickDebris(stageDebris, assembly, 0.5);
+
+    // Debris should fall (gravity only, no engine thrust).
+    expect(stageDebris.posY).toBeLessThan(initialY);
   });
 });
 
@@ -840,7 +967,7 @@ describe('fireNextStage() — debris integration via physics.js', () => {
     expect(ps.debris).toHaveLength(0); // no separation yet
 
     fireNextStage(ps, assembly, staging, fs); // stage 2: separation
-    expect(ps.debris).toHaveLength(1);
+    expect(ps.debris).toHaveLength(2); // decoupler + disconnected stage
   });
 
   it('debris fragments are ticked during tick()', () => {
@@ -852,7 +979,8 @@ describe('fireNextStage() — debris integration via physics.js', () => {
     fireNextStage(ps, assembly, staging, fs); // engine
     fireNextStage(ps, assembly, staging, fs); // separate → creates debris
 
-    const [debris] = ps.debris;
+    // Pick the stage fragment (not the single-part decoupler).
+    const debris = ps.debris.find((d) => d.activeParts.size > 1) ?? ps.debris[0];
     // Clear firing engines so this test isolates gravity-based falling.
     debris.firingEngines.clear();
     debris.posY = 5000;
@@ -899,9 +1027,9 @@ describe('fireNextStage() — debris integration via physics.js', () => {
     expect(ps.debris).toHaveLength(0);
 
     fireNextStage(ps, assembly, staging, fs); // stage 2: lower decoupler
-    expect(ps.debris).toHaveLength(1);
+    expect(ps.debris).toHaveLength(2); // decoupler + disconnected stage
 
     fireNextStage(ps, assembly, staging, fs); // stage 3: upper decoupler
-    expect(ps.debris).toHaveLength(2);
+    expect(ps.debris).toHaveLength(4); // 2 decouplers + 2 disconnected stages
   });
 });

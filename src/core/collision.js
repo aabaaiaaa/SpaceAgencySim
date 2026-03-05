@@ -37,7 +37,7 @@ import { airDensity }  from './atmosphere.js';
 // ---------------------------------------------------------------------------
 
 /** N·s impulse applied at decoupling to push stages apart. */
-const SEPARATION_IMPULSE = 500;
+const SEPARATION_IMPULSE = 50;
 
 /** Bounciness coefficient (0 = inelastic, 1 = perfectly elastic). */
 const BASE_RESTITUTION = 0.3;
@@ -57,7 +57,7 @@ const POSITION_CORRECTION_RATE = 0.5;
 /** Number of ticks (~1s at 60 Hz) to skip collisions after separation.
  *  Must be long enough for the separation impulse + any active thrust to
  *  physically separate the two bodies before collision detection activates. */
-const SEPARATION_COOLDOWN_TICKS = 60;
+const SEPARATION_COOLDOWN_TICKS = 10;
 
 /** Scale factor: metres per pixel at default 1× zoom. */
 const SCALE_M_PER_PX = 0.05;

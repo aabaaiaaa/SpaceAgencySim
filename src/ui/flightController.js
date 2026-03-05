@@ -945,6 +945,11 @@ function _onKeyDown(e) {
     return;
   }
 
+  // Prevent browser defaults for Shift/Ctrl used as throttle controls.
+  if (e.key === 'Shift' || e.key === 'Control') {
+    e.preventDefault();
+  }
+
   handleKeyDown(_ps, _assembly, e.key);
 }
 

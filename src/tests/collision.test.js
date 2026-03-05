@@ -592,6 +592,116 @@ describe('applySeparationImpulse()', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Separation impulse magnitude
+// ---------------------------------------------------------------------------
+
+describe('applySeparationImpulse() — reduced impulse magnitude', () => {
+  it('produces small delta-v proportional to 50 N·s impulse', () => {
+    const assembly = createRocketAssembly();
+    // probe-core-mk1 is 50 kg
+    const id1 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 100);
+    const id2 = addPartToAssembly(assembly, 'probe-core-mk1', 0,   0);
+
+    const ps = {
+      posX: 0, posY: 1000, velX: 0, velY: 0, angle: 0,
+      activeParts: new Set([id1]),
+      fuelStore: new Map(),
+    };
+
+    const debris = {
+      id: 'debris-dv',
+      posX: 0, posY: 1000, velX: 0, velY: 0, angle: 0,
+      activeParts: new Set([id2]),
+      fuelStore: new Map(),
+    };
+
+    applySeparationImpulse(ps, debris, assembly);
+
+    // Both 50 kg → Δv = 50 N·s / 50 kg = 1 m/s each
+    expect(Math.abs(ps.velY)).toBeCloseTo(1.0, 1);
+    expect(Math.abs(debris.velY)).toBeCloseTo(1.0, 1);
+  });
+
+  it('heavy stage gets proportionally smaller delta-v', () => {
+    const assembly = createRocketAssembly();
+    const lightId = addPartToAssembly(assembly, 'probe-core-mk1', 0, 100); // 50 kg
+    const heavyId = addPartToAssembly(assembly, 'tank-small',     0,   0); // 50 kg dry
+
+    const ps = {
+      posX: 0, posY: 1000, velX: 0, velY: 0, angle: 0,
+      activeParts: new Set([lightId]),
+      fuelStore: new Map(),
+    };
+
+    const debris = {
+      id: 'debris-heavy-dv',
+      posX: 0, posY: 1000, velX: 0, velY: 0, angle: 0,
+      activeParts: new Set([heavyId]),
+      fuelStore: new Map([[heavyId, 400]]), // 50 + 400 = 450 kg
+    };
+
+    applySeparationImpulse(ps, debris, assembly);
+
+    // Light (50 kg): Δv = 50/50 = 1.0 m/s
+    // Heavy (450 kg): Δv = 50/450 ≈ 0.11 m/s
+    expect(Math.abs(ps.velY)).toBeCloseTo(1.0, 1);
+    expect(Math.abs(debris.velY)).toBeCloseTo(50 / 450, 1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Collision cooldown timing
+// ---------------------------------------------------------------------------
+
+describe('collision cooldown at reduced value', () => {
+  it('cooldown of 10 prevents collision for 9 ticks then allows it on tick 10', () => {
+    const assembly = createRocketAssembly();
+    const id1 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
+    const id2 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
+
+    const ps = {
+      posX: 0, posY: 9999, velX: 0, velY: 0, angle: 0,
+      angularVelocity: 0,
+      landed: true, crashed: false,
+      activeParts: new Set(),
+      fuelStore: new Map(),
+      firingEngines: new Set(),
+      debris: [{
+        id: 'debris-cd10',
+        posX: 0, posY: 200, velX: 0, velY: 3, angle: 0,
+        angularVelocity: 0,
+        landed: false, crashed: false,
+        activeParts: new Set([id1]),
+        fuelStore: new Map(),
+        firingEngines: new Set(),
+        collisionCooldown: 10,
+      }, {
+        id: 'debris-cd10b',
+        posX: 0, posY: 200.3, velX: 0, velY: -3, angle: 0,
+        angularVelocity: 0,
+        landed: false, crashed: false,
+        activeParts: new Set([id2]),
+        fuelStore: new Map(),
+        firingEngines: new Set(),
+        collisionCooldown: 10,
+      }],
+    };
+
+    // After 9 ticks, cooldown should be 1 and no collision yet.
+    for (let i = 0; i < 9; i++) {
+      tickCollisions(ps, assembly, 1 / 60);
+    }
+    expect(ps.debris[0].collisionCooldown).toBe(1);
+    expect(ps.debris[1].velY).toBe(-3); // unchanged — still in cooldown
+
+    // Tick 10: cooldown decrements to 0, collision fires immediately.
+    tickCollisions(ps, assembly, 1 / 60);
+    expect(ps.debris[0].collisionCooldown).toBe(0);
+    expect(ps.debris[1].velY).not.toBe(-3); // velocity changed by collision
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Integration — tickCollisions in tick loop
 // ---------------------------------------------------------------------------
 

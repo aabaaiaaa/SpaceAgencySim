@@ -68,7 +68,7 @@ const DEFAULT_SAFE_LANDING_SPEED = 10;
 
 /** Number of physics ticks to skip collision detection after separation.
  *  Must match the value in collision.js. */
-const SEPARATION_COOLDOWN_TICKS = 60;
+const SEPARATION_COOLDOWN_TICKS = 10;
 
 // ---------------------------------------------------------------------------
 // Internal ID counter for debris fragments
@@ -120,8 +120,8 @@ let _debrisNextId = 1;
  * @property {number}              angle         Orientation (radians; 0 =
  *   pointing straight up; inherited from parent).
  * @property {number}              throttle      Always 1.0 — SRBs ignore
- *   throttle and liquid engines on detached stages flame out immediately
- *   (no connected tanks).
+ *   throttle.  Liquid engines are removed from firingEngines at separation
+ *   (no command module to control them).
  * @property {number}              angularVelocity  Angular velocity (rad/s;
  *   positive = clockwise).  Inherited from the parent rocket at separation
  *   plus a small random perturbation.
@@ -212,6 +212,13 @@ export function activateCurrentStage(ps, assembly, stagingConfig, flightState) {
         ps.activeParts.delete(instanceId);
         ps.firingEngines.delete(instanceId);
 
+        // The decoupler itself becomes a small debris fragment (it detaches
+        // from both sides).  Re-add temporarily so _createDebrisFromParts
+        // can transfer it properly.
+        ps.activeParts.add(instanceId);
+        const decouplerDebris = _createDebrisFromParts(ps, [instanceId], assembly);
+        newDebris.push(decouplerDebris);
+
         // Recompute which parts are still connected to a command module and
         // collect newly disconnected sections as debris.
         const fragments = recomputeActiveGraph(ps, assembly);
@@ -272,7 +279,7 @@ export function activateCurrentStage(ps, assembly, stagingConfig, flightState) {
         // Package the satellite into its own debris fragment so it continues
         // to be simulated independently (position, velocity, drag).
         const releaseVelocity = Math.hypot(ps.velX, ps.velY);
-        const satelliteDebris = _createDebrisFromParts(ps, [instanceId]);
+        const satelliteDebris = _createDebrisFromParts(ps, [instanceId], assembly);
         newDebris.push(satelliteDebris);
 
         // Recompute graph in case other parts were only connected through
@@ -312,7 +319,7 @@ export function activateCurrentStage(ps, assembly, stagingConfig, flightState) {
   // remaining active part's bottom is at Y = 0.  posY is adjusted upward by
   // the same world-space amount so every part's absolute world position stays
   // unchanged — no visual discontinuity.
-  _renormalizeAfterSeparation(ps, assembly);
+  _renormalizeAfterSeparation(ps, assembly, newDebris);
 
   return newDebris;
 }
@@ -374,6 +381,12 @@ export function activatePartDirect(ps, assembly, flightState, instanceId) {
       });
       ps.activeParts.delete(instanceId);
       ps.firingEngines.delete(instanceId);
+
+      // The decoupler itself becomes a small debris fragment.
+      ps.activeParts.add(instanceId);
+      const directDecDebris = _createDebrisFromParts(ps, [instanceId], assembly);
+      newDebris.push(directDecDebris);
+
       const fragments = recomputeActiveGraph(ps, assembly);
       for (const frag of fragments) {
         applySeparationImpulse(ps, frag, assembly);
@@ -426,7 +439,7 @@ export function activatePartDirect(ps, assembly, flightState, instanceId) {
     case 'RELEASE': {
       // SATELLITE — release into free flight as a detached physics object.
       const directReleaseVelocity = Math.hypot(ps.velX, ps.velY);
-      const directSatDebris = _createDebrisFromParts(ps, [instanceId]);
+      const directSatDebris = _createDebrisFromParts(ps, [instanceId], assembly);
       newDebris.push(directSatDebris);
 
       // Recompute graph in case other parts were only connected through the satellite.
@@ -457,7 +470,7 @@ export function activatePartDirect(ps, assembly, flightState, instanceId) {
   }
 
   // Re-normalise the assembly origin after parts may have been removed.
-  _renormalizeAfterSeparation(ps, assembly);
+  _renormalizeAfterSeparation(ps, assembly, newDebris);
 
   return newDebris;
 }
@@ -544,7 +557,7 @@ export function recomputeActiveGraph(ps, assembly) {
 
   // Package all disconnected parts into one new debris fragment and remove
   // them from the active rocket.
-  const debris = _createDebrisFromParts(ps, disconnected);
+  const debris = _createDebrisFromParts(ps, disconnected, assembly);
   return [debris];
 }
 
@@ -585,9 +598,9 @@ export function tickDebris(debris, assembly, dt) {
   // --- 1. Total mass (dry parts + remaining propellant) --------------------
   const totalMass = _debrisMass(debris, assembly);
 
-  // --- 2. SRB thrust (only SRBs; liquid engines on debris flame out) -------
-  // We read firingEngines here for thrust calculation.  tickFuelSystem (step 6)
-  // is responsible for draining fuel and removing exhausted engines.
+  // --- 2. SRB thrust (only SRBs; liquid engines are excluded) --------------
+  // Liquid engines flame out immediately on debris (no command module).
+  // tickFuelSystem (step 6) drains fuel and removes exhausted SRBs.
   let thrustX = 0;
   let thrustY = 0;
 
@@ -598,11 +611,12 @@ export function tickDebris(debris, assembly, dt) {
     const def    = placed ? getPartById(placed.partId) : null;
     if (!def) continue;
 
-    // For SRBs, check that integral fuel has not run out.
-    if (def.type === PartType.SOLID_ROCKET_BOOSTER) {
-      const fuelLeft = debris.fuelStore.get(engineId) ?? 0;
-      if (fuelLeft <= 0) continue; // Exhausted — tickFuelSystem will remove it.
-    }
+    // Only SRBs produce thrust on debris — liquid engines flame out
+    // immediately (no command module to control them).
+    if (def.type !== PartType.SOLID_ROCKET_BOOSTER) continue;
+
+    const fuelLeft = debris.fuelStore.get(engineId) ?? 0;
+    if (fuelLeft <= 0) continue; // Exhausted — tickFuelSystem will remove it.
 
     // Interpolate thrust between sea-level and vacuum values.
     const props        = def.properties ?? {};
@@ -694,7 +708,7 @@ export function tickDebris(debris, assembly, dt) {
  * @param {import('./physics.js').PhysicsState}           ps
  * @param {import('./rocketbuilder.js').RocketAssembly}   assembly
  */
-function _renormalizeAfterSeparation(ps, assembly) {
+function _renormalizeAfterSeparation(ps, assembly, extraDebris = []) {
   if (ps.activeParts.size === 0) return;
 
   // Find the lowest bottom edge (assembly Y-up, pixels) among active parts.
@@ -728,6 +742,11 @@ function _renormalizeAfterSeparation(ps, assembly) {
   for (const debris of ps.debris) {
     debris.posY += offsetM;
   }
+
+  // Also compensate newly created debris not yet in ps.debris.
+  for (const debris of extraDebris) {
+    debris.posY += offsetM;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -744,9 +763,10 @@ function _renormalizeAfterSeparation(ps, assembly) {
  *
  * @param {import('./physics.js').PhysicsState} ps
  * @param {string[]}                            partIds  Part IDs to transfer.
+ * @param {import('./rocketbuilder.js').RocketAssembly} assembly
  * @returns {DebrisState}
  */
-function _createDebrisFromParts(ps, partIds) {
+function _createDebrisFromParts(ps, partIds, assembly) {
   const activeParts     = new Set(partIds);
   const firingEngines   = new Set();
   const fuelStore       = new Map();
@@ -757,8 +777,14 @@ function _createDebrisFromParts(ps, partIds) {
 
   for (const id of partIds) {
     // Transfer firing engine state.
+    // Only SRBs continue burning on debris — liquid engines flame out
+    // immediately (no command module to control them).
     if (ps.firingEngines.has(id)) {
-      firingEngines.add(id);
+      const placed = assembly.parts.get(id);
+      const def    = placed ? getPartById(placed.partId) : null;
+      if (def && def.type === PartType.SOLID_ROCKET_BOOSTER) {
+        firingEngines.add(id);
+      }
       ps.firingEngines.delete(id);
     }
 

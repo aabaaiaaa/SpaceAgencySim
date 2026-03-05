@@ -141,6 +141,9 @@ const RCS_ANGULAR_DAMPING = 3.0;
 const CHUTE_TORQUE_SCALE = 1.0;
 /** Angular damping coefficient for deployed parachutes (opposes spin). */
 const CHUTE_ANGULAR_DAMPING = 0.5;
+/** Maximum angular acceleration (rad/s²) from player input.
+ *  Prevents tiny rockets from spinning uncontrollably. */
+const MAX_PLAYER_ANGULAR_ACCEL = 2.0;
 
 // ---------------------------------------------------------------------------
 // Type Definitions (JSDoc)
@@ -412,6 +415,7 @@ export function handleKeyDown(ps, assembly, key) {
   switch (key) {
     case 'w':
     case 'ArrowUp':
+    case 'Shift':
       if (twrMode) {
         ps.targetTWR = ps.targetTWR === Infinity
           ? Infinity
@@ -422,6 +426,7 @@ export function handleKeyDown(ps, assembly, key) {
       break;
     case 's':
     case 'ArrowDown':
+    case 'Control':
       if (twrMode) {
         ps.targetTWR = ps.targetTWR === Infinity
           ? Math.max(0, 10 - TWR_STEP) // step down from "max" to a large finite value
@@ -1070,14 +1075,19 @@ function _applySteering(ps, assembly, altitude, dt) {
   const density = airDensity(Math.max(0, ps.posY));
   const speed   = Math.hypot(ps.velX, ps.velY);
 
-  // Player input torque.
-  let torque = 0;
+  // Player input torque — compute angular acceleration and cap it so light
+  // rockets don't spin uncontrollably.
   let baseTorque = PLAYER_FLIGHT_TORQUE;
   if (altitude > ATMOSPHERE_TOP && _hasRcs(ps, assembly)) {
     baseTorque *= RCS_TORQUE_MULTIPLIER;
   }
-  if (right) torque += baseTorque;
-  if (left)  torque -= baseTorque;
+  let playerAlpha = 0;
+  if (right) playerAlpha += baseTorque / I;
+  if (left)  playerAlpha -= baseTorque / I;
+  playerAlpha = Math.max(-MAX_PLAYER_ANGULAR_ACCEL, Math.min(MAX_PLAYER_ANGULAR_ACCEL, playerAlpha));
+
+  // Non-player torques (parachute stabilization, damping) are not capped.
+  let torque = 0;
 
   // Parachute stabilization torque (restoring pendulum effect).
   torque += _computeParachuteTorque(ps, assembly, com, density, speed);
@@ -1106,8 +1116,8 @@ function _applySteering(ps, assembly, altitude, dt) {
     torque -= CHUTE_ANGULAR_DAMPING * totalChuteCdA * q * ps.angularVelocity;
   }
 
-  // Angular acceleration.
-  const alpha = torque / I;
+  // Angular acceleration: capped player input + uncapped environmental torques.
+  const alpha = playerAlpha + torque / I;
   ps.angularVelocity += alpha * dt;
 
   // Damping (when no input).
@@ -1305,9 +1315,6 @@ function _handleGroundContact(ps, assembly, flightState) {
   ps.velX = 0;
   ps.velY = 0;
 
-  // Record lowest bottom edge before destruction (for ground alignment).
-  const bottomBefore = _getLowestBottomEdge(ps, assembly);
-
   // --- Cascading per-part crash threshold system ---
   let remainingSpeed = impactSpeed;
   let anyDestroyed   = false;
@@ -1346,17 +1353,21 @@ function _handleGroundContact(ps, assembly, flightState) {
     remainingSpeed -= minThreshold;
   }
 
-  // --- Align remaining rocket with the ground ---
-  // When bottom parts are destroyed, the surviving rocket's lowest point is
-  // higher up. Lower posY so the new bottom edge sits at ground level.
+  // --- Renormalize surviving rocket so its new bottom sits at ground level ---
+  // Same approach as _renormalizeAfterSeparation in staging.js: shift all
+  // assembly part positions down so the lowest edge is at VAB Y=0, and adjust
+  // posY by the corresponding world-space offset.
   if (anyDestroyed && ps.activeParts.size > 0) {
     const bottomAfter = _getLowestBottomEdge(ps, assembly);
-    if (isFinite(bottomBefore) && isFinite(bottomAfter)) {
-      // bottomAfter > bottomBefore (new bottom is higher in VAB coords).
-      // Convert the difference to metres and lower posY accordingly.
-      const dropPx = bottomAfter - bottomBefore;
-      ps.posY -= dropPx * SCALE_M_PER_PX;
-      if (ps.posY < 0) ps.posY = 0;
+    if (isFinite(bottomAfter) && bottomAfter > 0) {
+      const offsetM = bottomAfter * SCALE_M_PER_PX;
+      ps.posY += offsetM;
+      for (const [, placed] of assembly.parts) {
+        placed.y -= bottomAfter;
+      }
+      for (const debris of ps.debris) {
+        debris.posY += offsetM;
+      }
     }
   }
 
