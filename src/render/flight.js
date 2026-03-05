@@ -670,15 +670,14 @@ function _drawParachuteCanopies(ps, assembly, w, h) {
     const cg = new PIXI.Graphics();
 
     // Draw canopy ellipse rotated by canopyAngle.
-    cg.save();
-    cg.translate(canopySX, canopySY);
-    cg.rotate(canopyAngle);
+    // PixiJS Graphics has no save/translate/rotate — use the display object transform.
+    cg.position.set(canopySX, canopySY);
+    cg.rotation = canopyAngle;
     cg.ellipse(0, 0, sHalfW, sHalfH);
     cg.fill({ color: 0x6020a8, alpha: 0.55 * alpha });
     cg.stroke({ color: 0xc070ff, width: 1, alpha: 0.85 * alpha });
-    cg.restore();
 
-    // Rigging lines: from stowed part top (rotated with rocket) to canopy edges.
+    // Rigging lines in a separate untransformed Graphics (screen-space coords).
     const cordAlpha = 0.6 * alpha;
     const cordInset = (stowedW * 0.25) * scale;
 
@@ -694,15 +693,17 @@ function _drawParachuteCanopies(ps, assembly, w, h) {
     const canopyRightX = canopySX + cosC * sHalfW    - sinC * sHalfH;
     const canopyRightY = canopySY + sinC * sHalfW    + cosC * sHalfH;
 
-    cg.moveTo(stowedLeftX, stowedLeftY);
-    cg.lineTo(canopyLeftX, canopyLeftY);
-    cg.stroke({ color: 0xc070ff, width: 0.8, alpha: cordAlpha });
+    const cordGfx = new PIXI.Graphics();
+    cordGfx.moveTo(stowedLeftX, stowedLeftY);
+    cordGfx.lineTo(canopyLeftX, canopyLeftY);
+    cordGfx.stroke({ color: 0xc070ff, width: 0.8, alpha: cordAlpha });
 
-    cg.moveTo(stowedRightX, stowedRightY);
-    cg.lineTo(canopyRightX, canopyRightY);
-    cg.stroke({ color: 0xc070ff, width: 0.8, alpha: cordAlpha });
+    cordGfx.moveTo(stowedRightX, stowedRightY);
+    cordGfx.lineTo(canopyRightX, canopyRightY);
+    cordGfx.stroke({ color: 0xc070ff, width: 0.8, alpha: cordAlpha });
 
     _canopyContainer.addChild(cg);
+    _canopyContainer.addChild(cordGfx);
   }
 }
 
