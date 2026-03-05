@@ -481,6 +481,7 @@ export function initVabRenderer() {
   _vabRoot.addChild(_partsContainer);
   // Expose for e2e testing (Playwright can query placed-part text labels)
   window.__vabPartsContainer = _partsContainer;
+  window.__vabWorldToScreen  = vabWorldToScreen;
 
   _snapContainer = new PIXI.Container();
   _vabRoot.addChild(_snapContainer);

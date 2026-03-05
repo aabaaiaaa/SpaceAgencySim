@@ -1572,6 +1572,7 @@ function _onDragEnd(e) {
         }
       }
     }
+    _runAndRenderValidation();
   } else {
     // New part from the panel — deduct cost, add to assembly.
     const def = getPartById(partId);

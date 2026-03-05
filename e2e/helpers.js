@@ -15,7 +15,7 @@ export const SAVE_KEY       = 'spaceAgencySave_0';
 export const STARTING_MONEY = 2_000_000;
 
 export const TOOLBAR_H      = 52;
-export const SCALE_BAR_W    = 50;
+export const SCALE_BAR_W    = 66;
 export const PARTS_PANEL_W  = 280;
 
 export const BUILD_W = VP_W - PARTS_PANEL_W - SCALE_BAR_W;   // 950

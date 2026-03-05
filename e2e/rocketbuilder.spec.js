@@ -256,8 +256,8 @@ test.describe('VAB — Rocket Builder Flow', () => {
     const actualCash = await page.evaluate(() => window.__gameState?.money ?? -1);
     expect(actualCash).toBe(expectedCash);
 
-    // Verify the DOM readout shows the same value
-    const cashEl = page.locator('#vab-cash');
+    // Verify the DOM readout shows the same value (cash is now in the top bar).
+    const cashEl = page.locator('#topbar-cash');
     await expect(cashEl).toBeVisible();
     await expect(cashEl).toContainText('1,985,200');
   });
