@@ -58,6 +58,8 @@ import {
   initParachuteStates,
   tickParachutes,
   tickCanopyAngles,
+  tickLandedParachutes,
+  ParachuteState,
   DEPLOY_DURATION,
   LOW_DENSITY_THRESHOLD,
 } from './parachute.js';
@@ -317,20 +319,26 @@ export function tick(ps, assembly, stagingConfig, flightState, realDeltaTime, ti
 
   if (ps.crashed || flightState.aborted) return;
 
-  // When landed: run tipping physics if the rocket is tilted or player is pressing A/D.
+  // When landed: run tipping physics and/or parachute post-landing swing.
   if (ps.landed) {
     const left  = ps._heldKeys.has('a') || ps._heldKeys.has('ArrowLeft');
     const right = ps._heldKeys.has('d') || ps._heldKeys.has('ArrowRight');
     const needsTipping = ps.isTipping || left || right ||
       Math.abs(ps.angle) > TILT_SNAP_THRESHOLD ||
       Math.abs(ps.angularVelocity) > ANGULAR_VEL_SNAP_THRESHOLD;
+    const needsParachuteTick = _hasActiveParachutes(ps);
 
-    if (needsTipping) {
+    if (needsTipping || needsParachuteTick) {
       ps._accumulator += realDeltaTime * timeWarp;
       while (ps._accumulator >= FIXED_DT) {
         ps._accumulator -= FIXED_DT;
-        _applyGroundedSteering(ps, assembly, left, right, FIXED_DT);
-        _checkToppleCrash(ps, assembly, flightState);
+        if (needsTipping) {
+          _applyGroundedSteering(ps, assembly, left, right, FIXED_DT);
+          _checkToppleCrash(ps, assembly, flightState);
+        }
+        if (needsParachuteTick) {
+          tickLandedParachutes(ps, FIXED_DT);
+        }
         flightState.timeElapsed += FIXED_DT;
 
         // Advance debris while tipping.
@@ -1134,6 +1142,16 @@ function _applySteering(ps, assembly, altitude, dt) {
  * @param {boolean} right  D/ArrowRight held.
  * @param {number}  dt     Integration timestep (s).
  */
+
+/** Returns true if any parachute is currently deploying or deployed. */
+function _hasActiveParachutes(ps) {
+  if (!ps.parachuteStates) return false;
+  for (const [, entry] of ps.parachuteStates) {
+    if (entry.state === ParachuteState.DEPLOYING || entry.state === ParachuteState.DEPLOYED) return true;
+  }
+  return false;
+}
+
 function _applyGroundedSteering(ps, assembly, left, right, dt) {
   // If upright with no input and no angular velocity, nothing to do.
   if (

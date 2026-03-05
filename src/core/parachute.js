@@ -73,6 +73,9 @@ export const ParachuteState = Object.freeze({
 /** Duration of the deploying → deployed animation transition in seconds. */
 export const DEPLOY_DURATION = 5.0;
 
+/** Seconds after landing before deployed parachutes auto-stow to packed. */
+export const POST_LANDING_STOW_DELAY = 3.0;
+
 /**
  * Atmospheric density threshold below which chute effectiveness is reduced
  * (kg/m³).  Above this value the chute runs at full effectiveness.
@@ -132,6 +135,7 @@ export function initParachuteStates(ps, assembly) {
       deployTimer:      0,
       canopyAngle:      0,
       canopyAngularVel: 0,
+      stowTimer:        0,
     });
   }
 }
@@ -160,7 +164,7 @@ export function deployParachute(ps, instanceId) {
   let entry = ps.parachuteStates.get(instanceId);
   if (!entry) {
     // Late-initialise for parts that weren't present at createPhysicsState time.
-    entry = { state: ParachuteState.PACKED, deployTimer: 0, canopyAngle: 0, canopyAngularVel: 0 };
+    entry = { state: ParachuteState.PACKED, deployTimer: 0, canopyAngle: 0, canopyAngularVel: 0, stowTimer: 0 };
     ps.parachuteStates.set(instanceId, entry);
   }
 
@@ -284,6 +288,49 @@ export function tickCanopyAngles(ps, dt) {
     const accel = -CANOPY_SPRING_K * entry.canopyAngle - CANOPY_DAMPING * entry.canopyAngularVel;
     entry.canopyAngularVel += accel * dt;
     entry.canopyAngle      += entry.canopyAngularVel * dt;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Post-landing swing & auto-stow
+// ---------------------------------------------------------------------------
+
+/**
+ * Tick deployed/deploying parachutes while the rocket is landed.
+ *
+ * Springs the canopy angle toward PI (hanging straight down under gravity)
+ * and counts down the stow timer.  When the timer expires, the parachute
+ * resets to PACKED so it can be reused on a subsequent flight.
+ *
+ * @param {{ parachuteStates: Map<string, ParachuteEntry> }} ps
+ * @param {number} dt  Fixed timestep in seconds.
+ */
+export function tickLandedParachutes(ps, dt) {
+  if (!ps.parachuteStates) return;
+
+  for (const [, entry] of ps.parachuteStates) {
+    if (entry.state !== ParachuteState.DEPLOYING && entry.state !== ParachuteState.DEPLOYED) continue;
+
+    // Spring canopy toward PI (hanging down) instead of 0 (upright).
+    const targetAngle = Math.PI;
+    const accel = -CANOPY_SPRING_K * (entry.canopyAngle - targetAngle) - CANOPY_DAMPING * entry.canopyAngularVel;
+    entry.canopyAngularVel += accel * dt;
+    entry.canopyAngle      += entry.canopyAngularVel * dt;
+
+    // Lazily start stow timer on first landed tick.
+    if (!(entry.stowTimer > 0)) {
+      entry.stowTimer = POST_LANDING_STOW_DELAY;
+    }
+
+    entry.stowTimer -= dt;
+    if (entry.stowTimer <= 0) {
+      // Auto-stow: reset to packed state for reuse.
+      entry.state            = ParachuteState.PACKED;
+      entry.canopyAngle      = 0;
+      entry.canopyAngularVel = 0;
+      entry.deployTimer      = 0;
+      entry.stowTimer        = 0;
+    }
   }
 }
 
