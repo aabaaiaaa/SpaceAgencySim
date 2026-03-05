@@ -1539,13 +1539,13 @@ describe('TASK-025: landing detection — hard landing (cascading damage)', () =
 // Landing detection — speed ≥ 30 m/s → full destruction
 // ---------------------------------------------------------------------------
 
-describe('TASK-025: landing detection — catastrophic impact (≥ 30 m/s)', () => {
-  it('emits CRASH and clears all active parts at 30+ m/s', () => {
-    const { assembly, staging } = makeRocketWithLegs();
+describe('TASK-025: landing detection — catastrophic impact', () => {
+  it('legs absorb 25 m/s at 30 m/s — probe survives with 5 m/s remaining', () => {
+    const { assembly, staging, probeId } = makeRocketWithLegs();
     const fs = makeFlightState();
     const ps = createPhysicsState(assembly, fs);
 
-    // Both legs deployed — still destroyed at 30 m/s.
+    // Both legs deployed.
     for (const [, entry] of ps.legStates) {
       entry.state = LegState.DEPLOYED;
     }
@@ -1556,11 +1556,11 @@ describe('TASK-025: landing detection — catastrophic impact (≥ 30 m/s)', () 
 
     tick(ps, assembly, staging, fs, 1 / 60);
 
-    const evt = fs.events.find((e) => e.type === 'CRASH');
-    expect(evt).toBeDefined();
-    expect(ps.crashed).toBe(true);
-    expect(ps.landed).toBe(false);
-    expect(ps.activeParts.size).toBe(0);
+    // Legs (threshold 25) absorb 25 m/s → 5 m/s remaining < probe threshold 12.
+    const landEvt = fs.events.find((e) => e.type === 'LANDING');
+    expect(landEvt).toBeDefined();
+    expect(ps.landed).toBe(true);
+    expect(ps.activeParts.has(probeId)).toBe(true);
   });
 
   it('emits CRASH at 50 m/s (no legs)', () => {
@@ -2213,15 +2213,17 @@ describe('cascading crash thresholds', () => {
     expect(ps.activeParts.size).toBe(3);
   });
 
-  it('single layer destroyed — engine at bottom destroyed, probe survives', () => {
-    // tank-small crashThreshold=8, engine-spark crashThreshold=12
-    // Impact at 15 m/s should destroy engine (threshold 12) and tank (threshold 8)
-    // but probe-core (threshold 12) may survive due to energy absorption.
+  it('single layer destroyed — engine at bottom destroyed, tank and probe survive', () => {
+    // engine-spark crashThreshold=12, tank-small crashThreshold=8, probe crashThreshold=12
+    // Impact at 15 m/s: engine destroyed (threshold 12), remaining speed = 15 - 12 = 3.
+    // Tank threshold 8 > 3 → tank survives. Probe survives.
     const { ps, assembly, engineId, tankId, probeId } = dropRocket(15);
 
-    // Engine is at the bottom (y=-55), should be destroyed first.
+    // Engine is at the bottom (y=-55), should be destroyed.
     expect(ps.activeParts.has(engineId)).toBe(false);
-    // Probe should survive (it's the command module).
+    // Tank and probe should survive — engine absorbed 12 m/s, leaving only 3.
+    expect(ps.activeParts.has(tankId)).toBe(true);
+    expect(ps.activeParts.has(probeId)).toBe(true);
     expect(ps.crashed).toBe(false);
     expect(ps.landed).toBe(true);
   });
@@ -2270,9 +2272,9 @@ describe('cascading crash thresholds', () => {
     expect(ps.activeParts.has(probeId)).toBe(true);
   });
 
-  it('heavy bottom part destroyed but command module survives', () => {
-    // Reliant engine (mass 500, threshold 12) at bottom + cmd-mk1 (mass 840, threshold 15).
-    // At 15 m/s: engine destroyed. v = 15 * sqrt(1 - 500/1340) ≈ 11.9. 11.9 < 15 → cmd survives.
+  it('bottom part destroyed but command module survives', () => {
+    // Reliant engine (threshold 12) at bottom + cmd-mk1 (threshold 15).
+    // At 15 m/s: engine destroyed, remaining = 15 - 12 = 3. 3 < 15 → cmd survives.
     const assembly = createRocketAssembly();
     const staging  = createStagingConfig();
 
@@ -2337,10 +2339,10 @@ describe('cascading crash thresholds', () => {
     expect(engineDestroyed.partId).toBe('engine-spark');
   });
 
-  it('mass-proportional absorption — heavy engine absorbs more than light decoupler', () => {
+  it('higher threshold absorbs more — engine (12) vs decoupler (6) at bottom', () => {
     // Build: probe(y=100) + decoupler(y=60) + tank(y=0) + engine(y=-55)
-    // The heavy engine (120kg) at the bottom should absorb more energy
-    // than a light decoupler (50kg) would at the bottom.
+    // The engine (threshold 12) at the bottom absorbs more speed
+    // than a decoupler (threshold 6) would at the bottom.
     const { assembly: a1, staging: s1 } = makeTwoStageRocketGlobal();
     const fs1 = makeFlightState();
     const ps1 = createPhysicsState(a1, fs1);
@@ -2378,8 +2380,8 @@ describe('cascading crash thresholds', () => {
 
     const destroyed2 = fs2.events.filter((e) => e.type === 'PART_DESTROYED').length;
 
-    // With the light decoupler (50kg, threshold 6) at the bottom,
-    // it absorbs less energy, so more layers should be destroyed.
+    // With the low-threshold decoupler (threshold 6) at the bottom,
+    // it absorbs less speed (6 vs 12), so more layers should be destroyed.
     expect(destroyed2).toBeGreaterThanOrEqual(destroyed1);
   });
 });

@@ -1470,6 +1470,33 @@ function _onDragEnd(e) {
     return;
   }
 
+  // --- Drop on parts panel = discard / delete ---------------------------
+  const partsPanel = document.getElementById('vab-parts-panel');
+  if (partsPanel) {
+    const panelRect = partsPanel.getBoundingClientRect();
+    const overPanel = (
+      e.clientX >= panelRect.left && e.clientX <= panelRect.right &&
+      e.clientY >= panelRect.top  && e.clientY <= panelRect.bottom
+    );
+    if (overPanel) {
+      if (instanceId !== null) {
+        // Picked-up part dragged back to panel → delete it and refund cost.
+        const def = getPartById(partId);
+        if (def && _gameState) {
+          _gameState.money += def.cost;
+          refreshTopBar();
+        }
+        if (_selectedInstanceId === instanceId) _setSelectedPart(null);
+        removePartFromAssembly(_assembly, instanceId);
+        _syncAndRenderStaging();
+        _runAndRenderValidation();
+      }
+      // New part from panel dragged back to panel → simply don't place it.
+      vabRenderParts();
+      return;
+    }
+  }
+
   // Determine world drop position.
   const { worldX, worldY } = vabScreenToWorld(e.clientX, e.clientY);
   const { zoom } = vabGetCamera();
@@ -1635,6 +1662,7 @@ function _showPartDetail(partId) {
   if (p.maxLandingSpeed !== undefined) stats.push(['Max landing speed', `${p.maxLandingSpeed} m/s`]);
   if (p.seats !== undefined) stats.push(['Crew seats', String(p.seats)]);
   if (p.experimentDuration !== undefined) stats.push(['Experiment time', `${p.experimentDuration} s`]);
+  if (p.crashThreshold !== undefined) stats.push(['Crash rating', `${p.crashThreshold} m/s`]);
 
   detailEl.innerHTML =
     `<div class="vab-detail-name">${def.name}</div>` +

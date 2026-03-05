@@ -1305,10 +1305,10 @@ function _handleGroundContact(ps, assembly, flightState) {
   ps.velX = 0;
   ps.velY = 0;
 
-  // --- Cascading per-part crash threshold system ---
-  // Compute total mass before the cascade (for energy absorption formula).
-  const totalMassBefore = _computeTotalMass(ps, assembly);
+  // Record lowest bottom edge before destruction (for ground alignment).
+  const bottomBefore = _getLowestBottomEdge(ps, assembly);
 
+  // --- Cascading per-part crash threshold system ---
   let remainingSpeed = impactSpeed;
   let anyDestroyed   = false;
 
@@ -1326,11 +1326,8 @@ function _handleGroundContact(ps, assembly, flightState) {
     // If remaining speed is within the layer's tolerance, it survives.
     if (remainingSpeed <= minThreshold) break;
 
-    // Destroy all parts in this layer and accumulate their mass.
-    let layerMass = 0;
+    // Destroy all parts in this layer.
     for (const entry of layer) {
-      const partMass = (entry.def.mass ?? 0) + (ps.fuelStore.get(entry.instanceId) ?? 0);
-      layerMass += partMass;
       _removePartFromState(ps, entry.instanceId);
       _emitEvent(flightState, {
         type:       'PART_DESTROYED',
@@ -1343,11 +1340,24 @@ function _handleGroundContact(ps, assembly, flightState) {
 
     anyDestroyed = true;
 
-    // Reduce speed: heavier destroyed layers absorb more energy.
-    // v_new = v_old * sqrt(1 - m_destroyed / m_total)
-    const massFraction = totalMassBefore > 0 ? layerMass / totalMassBefore : 0;
-    const factor = Math.max(0, 1 - massFraction);
-    remainingSpeed *= Math.sqrt(factor);
+    // Each destroyed layer absorbs impact speed equal to its crash threshold.
+    // This creates predictable tiers: an engine (threshold 12) absorbs 12 m/s,
+    // so a 15 m/s impact leaves only 3 m/s for the next layer.
+    remainingSpeed -= minThreshold;
+  }
+
+  // --- Align remaining rocket with the ground ---
+  // When bottom parts are destroyed, the surviving rocket's lowest point is
+  // higher up. Lower posY so the new bottom edge sits at ground level.
+  if (anyDestroyed && ps.activeParts.size > 0) {
+    const bottomAfter = _getLowestBottomEdge(ps, assembly);
+    if (isFinite(bottomBefore) && isFinite(bottomAfter)) {
+      // bottomAfter > bottomBefore (new bottom is higher in VAB coords).
+      // Convert the difference to metres and lower posY accordingly.
+      const dropPx = bottomAfter - bottomBefore;
+      ps.posY -= dropPx * SCALE_M_PER_PX;
+      if (ps.posY < 0) ps.posY = 0;
+    }
   }
 
   // --- Determine outcome ---
@@ -1387,12 +1397,15 @@ function _handleGroundContact(ps, assembly, flightState) {
 const DESTRUCTION_BAND = 5;
 
 /**
- * Return the bottom-most layer of active parts — all parts within
- * DESTRUCTION_BAND of the minimum placed.y value.
+ * Return the bottom-most layer of active parts — all parts whose bottom
+ * edge is within DESTRUCTION_BAND of the lowest bottom edge.
+ *
+ * Uses `placed.y - halfHeight` as the bottom edge (world Y is positive-up),
+ * matching the tipping physics ground-contact calculation.
  *
  * @param {PhysicsState}                               ps
  * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @returns {Array<{instanceId: string, y: number, placed: object, def: object}>}
+ * @returns {Array<{instanceId: string, bottomY: number, placed: object, def: object}>}
  */
 function _getBottomPartLayer(ps, assembly) {
   const entries = [];
@@ -1401,13 +1414,15 @@ function _getBottomPartLayer(ps, assembly) {
     if (!placed) continue;
     const def = getPartById(placed.partId);
     if (!def) continue;
-    entries.push({ instanceId, y: placed.y, placed, def });
+    const halfH   = (def.height ?? 40) / 2;
+    const bottomY = placed.y - halfH;
+    entries.push({ instanceId, bottomY, placed, def });
   }
   if (entries.length === 0) return [];
 
-  entries.sort((a, b) => a.y - b.y);
-  const minY = entries[0].y;
-  return entries.filter((e) => e.y <= minY + DESTRUCTION_BAND);
+  entries.sort((a, b) => a.bottomY - b.bottomY);
+  const minY = entries[0].bottomY;
+  return entries.filter((e) => e.bottomY <= minY + DESTRUCTION_BAND);
 }
 
 /**
@@ -1423,6 +1438,27 @@ function _removePartFromState(ps, instanceId) {
   ps.legStates?.delete(instanceId);
   ps.parachuteStates?.delete(instanceId);
   ps.heatMap?.delete(instanceId);
+}
+
+/**
+ * Return the lowest bottom edge (VAB world Y) across all active parts.
+ * Used to compute how far the rocket should drop after bottom parts are removed.
+ *
+ * @param {PhysicsState}                               ps
+ * @param {import('./rocketbuilder.js').RocketAssembly} assembly
+ * @returns {number}  Lowest bottom edge Y value, or Infinity if no parts.
+ */
+function _getLowestBottomEdge(ps, assembly) {
+  let lowest = Infinity;
+  for (const instanceId of ps.activeParts) {
+    const placed = assembly.parts.get(instanceId);
+    if (!placed) continue;
+    const def = getPartById(placed.partId);
+    if (!def) continue;
+    const bottomY = placed.y - (def.height ?? 40) / 2;
+    if (bottomY < lowest) lowest = bottomY;
+  }
+  return lowest;
 }
 
 /**
