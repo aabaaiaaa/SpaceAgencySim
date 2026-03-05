@@ -138,9 +138,9 @@ const AERO_ANGULAR_DAMPING = 0.02;
 /** Active RCS braking torque (N·m per rad/s) when keys released. */
 const RCS_ANGULAR_DAMPING = 3.0;
 /** Tuning knob for parachute stabilization torque strength. */
-const CHUTE_TORQUE_SCALE = 1.0;
+const CHUTE_TORQUE_SCALE = 3.0;
 /** Angular damping coefficient for deployed parachutes (opposes spin). */
-const CHUTE_ANGULAR_DAMPING = 0.5;
+const CHUTE_ANGULAR_DAMPING = 1.0;
 /** Maximum angular acceleration (rad/s²) from player input.
  *  Prevents tiny rockets from spinning uncontrollably. */
 const MAX_PLAYER_ANGULAR_ACCEL = 2.0;

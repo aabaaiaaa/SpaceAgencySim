@@ -216,11 +216,20 @@ let _lastTrailTime = null;
 // Camera state — world-space centre of the viewport
 // ---------------------------------------------------------------------------
 
+/** Lerp speed for camera smoothing (units per second; higher = snappier). */
+const CAMERA_LERP_SPEED = 25;
+
 /** World X (metres) the camera is centred on. */
 let _camWorldX = 0;
 
 /** World Y (metres) the camera is centred on. */
 let _camWorldY = 0;
+
+/** Timestamp of the last camera update (ms), used to compute dt for lerp. */
+let _lastCamTime = null;
+
+/** When true, the camera snaps instantly to target on the next update. */
+let _camSnap = true;
 
 // ---------------------------------------------------------------------------
 // Zoom state
@@ -328,27 +337,46 @@ function _worldToScreen(worldX, worldY, screenW, screenH) {
  * @param {import('../core/rocketbuilder.js').RocketAssembly}   assembly
  */
 function _updateCamera(ps, assembly) {
-  // Check whether the primary command module is still on the main rocket.
+  // Determine target position.
+  let targetX, targetY;
+
   if (_hasCommandModule(ps.activeParts, assembly)) {
     const com = _computeCoM(ps.fuelStore, assembly, ps.activeParts, ps.posX, ps.posY);
-    _camWorldX = com.x;
-    _camWorldY = com.y;
-    return;
-  }
-
-  // Search debris fragments for the one containing the command module.
-  for (const debris of ps.debris) {
-    if (_hasCommandModule(debris.activeParts, assembly)) {
-      const com = _computeCoM(debris.fuelStore, assembly, debris.activeParts, debris.posX, debris.posY);
-      _camWorldX = com.x;
-      _camWorldY = com.y;
-      return;
+    targetX = com.x;
+    targetY = com.y;
+  } else {
+    // Search debris fragments for the one containing the command module.
+    let found = false;
+    for (const debris of ps.debris) {
+      if (_hasCommandModule(debris.activeParts, assembly)) {
+        const com = _computeCoM(debris.fuelStore, assembly, debris.activeParts, debris.posX, debris.posY);
+        targetX = com.x;
+        targetY = com.y;
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      targetX = ps.posX;
+      targetY = ps.posY;
     }
   }
 
-  // Fallback: follow the main rocket's reference point.
-  _camWorldX = ps.posX;
-  _camWorldY = ps.posY;
+  // Compute dt from wall-clock time.
+  const now = performance.now();
+  const dt  = _lastCamTime !== null ? (now - _lastCamTime) / 1000 : 0;
+  _lastCamTime = now;
+
+  // Snap instantly on first frame or after reset; otherwise lerp smoothly.
+  if (_camSnap || dt === 0) {
+    _camWorldX = targetX;
+    _camWorldY = targetY;
+    _camSnap = false;
+  } else {
+    const t = Math.min(1, CAMERA_LERP_SPEED * dt);
+    _camWorldX += (targetX - _camWorldX) * t;
+    _camWorldY += (targetY - _camWorldY) * t;
+  }
 }
 
 /**
@@ -1185,8 +1213,10 @@ export function initFlightRenderer() {
   _lastTrailTime = null;
 
   // Reset camera to launch-pad origin.
-  _camWorldX = 0;
-  _camWorldY = 0;
+  _camWorldX  = 0;
+  _camWorldY  = 0;
+  _lastCamTime = null;
+  _camSnap     = true;
 
   // Reset zoom and initialise mouse tracking.
   _zoomLevel = 1.0;
@@ -1277,8 +1307,10 @@ export function destroyFlightRenderer() {
   _trailSegments   = [];
   _lastTrailTime   = null;
 
-  _camWorldX = 0;
-  _camWorldY = 0;
+  _camWorldX   = 0;
+  _camWorldY   = 0;
+  _lastCamTime = null;
+  _camSnap     = true;
 
   // Remove zoom input handlers.
   if (_wheelHandler) {

@@ -2065,18 +2065,16 @@ describe('Parachute stabilization torque', () => {
     psMk1.parachuteStates.set(mk1.chuteInstanceId, { state: 'deployed', deployTimer: 0 });
     psMk2.parachuteStates.set(mk2.chuteInstanceId, { state: 'deployed', deployTimer: 0 });
 
-    // Run 0.25 seconds — short enough to see differential correction before
-    // the larger Mk2 chute overshoots past zero.
+    // Run 0.25 seconds.
     const steps = Math.round(0.25 * 60);
     for (let i = 0; i < steps; i++) {
       tick(psMk1, mk1.assembly, mk1.staging, fsMk1, FIXED_DT, 1);
       tick(psMk2, mk2.assembly, mk2.staging, fsMk2, FIXED_DT, 1);
     }
 
-    // Both started at 0.5 rad. Mk2 (35 m) should have corrected more toward 0.
-    const mk1Correction = 0.5 - Math.abs(psMk1.angle);
-    const mk2Correction = 0.5 - Math.abs(psMk2.angle);
-    expect(mk2Correction).toBeGreaterThan(mk1Correction);
+    // Both started at +0.5 rad. Mk2 (35 m) should have corrected more toward
+    // (and possibly past) 0 — its raw angle will be smaller than Mk1's.
+    expect(psMk2.angle).toBeLessThan(psMk1.angle);
   });
 });
 
