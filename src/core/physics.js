@@ -113,6 +113,9 @@ const CHUTE_DRAG_MULTIPLIER = 80;
 /** Landing speed below which a contact is considered "safe" (m/s). */
 const DEFAULT_SAFE_LANDING_SPEED = 10;
 
+/** Default crash threshold (m/s) for parts without an explicit crashThreshold. */
+const DEFAULT_CRASH_THRESHOLD = 10;
+
 // -- Ground tipping constants ------------------------------------------------
 /** N·m of torque applied by player A/D input while grounded. */
 const PLAYER_TIP_TORQUE = 50_000;
@@ -1231,7 +1234,10 @@ function _checkToppleCrash(ps, assembly, flightState) {
   if (Math.abs(ps.angle) > TOPPLE_CRASH_ANGLE) {
     ps.crashed = true;
     ps.angularVelocity = 0;
-    _destroyBottomParts(ps, assembly);
+    // Toppling is catastrophic — destroy everything.
+    ps.activeParts.clear();
+    ps.firingEngines.clear();
+    ps.deployedParts.clear();
     _emitEvent(flightState, {
       type: 'CRASH',
       time: flightState.timeElapsed,
@@ -1291,162 +1297,153 @@ function _hasRcs(ps, assembly) {
  * @param {import('./gameState.js').FlightState}        flightState
  */
 function _handleGroundContact(ps, assembly, flightState) {
-  const impactSpeed    = Math.hypot(ps.velX, ps.velY);
-  const time           = flightState.timeElapsed;
-  const deployedLegs   = countDeployedLegs(ps);
+  const impactSpeed = Math.hypot(ps.velX, ps.velY);
+  const time        = flightState.timeElapsed;
 
   // Clamp to ground and stop motion.
   ps.posY = 0;
   ps.velX = 0;
   ps.velY = 0;
 
-  // --- Case 3: Catastrophic speed (≥ 30 m/s) — full destruction -----------
-  if (impactSpeed >= 30) {
-    ps.activeParts.clear();
-    ps.firingEngines.clear();
-    ps.deployedParts.clear();
+  // --- Cascading per-part crash threshold system ---
+  // Compute total mass before the cascade (for energy absorption formula).
+  const totalMassBefore = _computeTotalMass(ps, assembly);
+
+  let remainingSpeed = impactSpeed;
+  let anyDestroyed   = false;
+
+  while (remainingSpeed > 0 && ps.activeParts.size > 0) {
+    const layer = _getBottomPartLayer(ps, assembly);
+    if (layer.length === 0) break;
+
+    // Find the minimum crashThreshold in the bottom layer.
+    let minThreshold = Infinity;
+    for (const entry of layer) {
+      const threshold = entry.def.properties?.crashThreshold ?? DEFAULT_CRASH_THRESHOLD;
+      if (threshold < minThreshold) minThreshold = threshold;
+    }
+
+    // If remaining speed is within the layer's tolerance, it survives.
+    if (remainingSpeed <= minThreshold) break;
+
+    // Destroy all parts in this layer and accumulate their mass.
+    let layerMass = 0;
+    for (const entry of layer) {
+      const partMass = (entry.def.mass ?? 0) + (ps.fuelStore.get(entry.instanceId) ?? 0);
+      layerMass += partMass;
+      _removePartFromState(ps, entry.instanceId);
+      _emitEvent(flightState, {
+        type:       'PART_DESTROYED',
+        time,
+        instanceId: entry.instanceId,
+        partId:     entry.placed.partId,
+        speed:      remainingSpeed,
+      });
+    }
+
+    anyDestroyed = true;
+
+    // Reduce speed: heavier destroyed layers absorb more energy.
+    // v_new = v_old * sqrt(1 - m_destroyed / m_total)
+    const massFraction = totalMassBefore > 0 ? layerMass / totalMassBefore : 0;
+    const factor = Math.max(0, 1 - massFraction);
+    remainingSpeed *= Math.sqrt(factor);
+  }
+
+  // --- Determine outcome ---
+  const allCmdLost = _allCommandModulesGone(ps, assembly);
+
+  if (allCmdLost) {
+    // All command / computer modules are destroyed — rocket is lost.
     ps.crashed = true;
     _emitEvent(flightState, {
       type:        'CRASH',
       time,
       speed:       impactSpeed,
-      legsDestroyed: false,
-      description: `Catastrophic impact at ${impactSpeed.toFixed(1)} m/s — rocket destroyed!`,
+      description: `Impact at ${impactSpeed.toFixed(1)} m/s — rocket destroyed!`,
     });
-    return;
-  }
-
-  // --- Case 1: Controlled landing — ≥ 2 deployed legs AND speed < 10 m/s --
-  if (deployedLegs >= 2 && impactSpeed < 10) {
+  } else {
+    // Rocket survives (possibly with partial damage).
     ps.landed = true;
+    const desc = anyDestroyed
+      ? `Hard landing at ${impactSpeed.toFixed(1)} m/s — some parts destroyed.`
+      : `Landed at ${impactSpeed.toFixed(1)} m/s.`;
     _emitEvent(flightState, {
-      type:        'LANDING',
+      type:          'LANDING',
       time,
-      speed:       impactSpeed,
-      legsDestroyed: false,
-      description: `Controlled landing at ${impactSpeed.toFixed(1)} m/s.`,
+      speed:         impactSpeed,
+      partsDestroyed: anyDestroyed,
+      description:   desc,
     });
-    // Recover any complete science data modules that are still attached.
     onSafeLanding(ps, assembly, flightState);
-    return;
   }
-
-  // --- Case 2: Hard landing — deployed legs but too fast (10–29 m/s) -------
-  if (deployedLegs >= 1 && impactSpeed >= 10 && impactSpeed < 30) {
-    // Destroy all deployed landing legs; rocket body survives.
-    _destroyDeployedLegs(ps, assembly);
-    ps.landed = true;
-    _emitEvent(flightState, {
-      type:        'LANDING',
-      time,
-      speed:       impactSpeed,
-      legsDestroyed: true,
-      description: `Hard landing at ${impactSpeed.toFixed(1)} m/s — landing legs destroyed.`,
-    });
-    return;
-  }
-
-  // --- Case 5: Gentle landing with no/insufficient legs (speed ≤ 5 m/s) ---
-  if (impactSpeed <= 5) {
-    ps.landed = true;
-    _emitEvent(flightState, {
-      type:        'LANDING',
-      time,
-      speed:       impactSpeed,
-      legsDestroyed: false,
-      description: `Landed at ${impactSpeed.toFixed(1)} m/s.`,
-    });
-    // Recover any complete science data modules that are still attached.
-    onSafeLanding(ps, assembly, flightState);
-    return;
-  }
-
-  // --- Case 4: No deployed legs AND speed > 5 m/s — ground contact damage --
-  // Destroy the bottom-most parts (those that physically contact the ground)
-  // and propagate destruction upward.
-  _destroyBottomParts(ps, assembly);
-  ps.crashed = true;
-  _emitEvent(flightState, {
-    type:        'CRASH',
-    time,
-    speed:       impactSpeed,
-    legsDestroyed: false,
-    description: `Impact without landing legs at ${impactSpeed.toFixed(1)} m/s — contact parts destroyed!`,
-  });
 }
 
 // ---------------------------------------------------------------------------
 // Destruction helpers (private)
 // ---------------------------------------------------------------------------
 
+/** Band (VAB world units) around the minimum Y to treat as the same layer. */
+const DESTRUCTION_BAND = 5;
+
 /**
- * Destroy all deployed landing legs by removing them from the active parts
- * and state maps.  Call this after a hard landing (speed 10–29 m/s with legs).
+ * Return the bottom-most layer of active parts — all parts within
+ * DESTRUCTION_BAND of the minimum placed.y value.
  *
  * @param {PhysicsState}                               ps
  * @param {import('./rocketbuilder.js').RocketAssembly} assembly
+ * @returns {Array<{instanceId: string, y: number, placed: object, def: object}>}
  */
-function _destroyDeployedLegs(ps, assembly) {
-  const toDestroy = [];
-
-  for (const [instanceId, entry] of (ps.legStates ?? [])) {
-    if (entry.state !== LegState.DEPLOYED) continue;
-    toDestroy.push(instanceId);
-  }
-
-  for (const instanceId of toDestroy) {
-    ps.activeParts.delete(instanceId);
-    ps.deployedParts.delete(instanceId);
-    ps.legStates.delete(instanceId);
-  }
-}
-
-/**
- * Destroy the bottom-most part(s) of the rocket and propagate damage upward.
- *
- * "Bottom" is determined by ascending placed.y (the most negative placed.y
- * value corresponds to the physically lowest point of the rocket when upright).
- * In a simplified model, we destroy the single lowest part; if there are
- * multiple parts at the same Y level they are all destroyed together.
- *
- * After removal, any parts that depended on the destroyed part for structural
- * connectivity are also removed (simple propagation: all parts with placed.y
- * below the rocket's median are removed).
- *
- * @param {PhysicsState}                               ps
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- */
-function _destroyBottomParts(ps, assembly) {
-  if (ps.activeParts.size === 0) return;
-
-  // Collect placed Y positions of all active parts.
+function _getBottomPartLayer(ps, assembly) {
   const entries = [];
   for (const instanceId of ps.activeParts) {
     const placed = assembly.parts.get(instanceId);
     if (!placed) continue;
-    entries.push({ instanceId, y: placed.y });
+    const def = getPartById(placed.partId);
+    if (!def) continue;
+    entries.push({ instanceId, y: placed.y, placed, def });
   }
+  if (entries.length === 0) return [];
 
-  if (entries.length === 0) return;
-
-  // Sort ascending (lowest Y first).
   entries.sort((a, b) => a.y - b.y);
-
-  // Find the minimum Y value.
   const minY = entries[0].y;
+  return entries.filter((e) => e.y <= minY + DESTRUCTION_BAND);
+}
 
-  // Destroy all parts at (or very near) the minimum Y.
-  // "Very near" = within 5 VAB world units of the minimum (accounts for
-  // parts that span the same row, e.g., radial SRBs).
-  const DESTRUCTION_BAND = 5;
-  for (const { instanceId, y } of entries) {
-    if (y <= minY + DESTRUCTION_BAND) {
-      ps.activeParts.delete(instanceId);
-      ps.deployedParts.delete(instanceId);
-      ps.firingEngines.delete(instanceId);
-      ps.legStates?.delete(instanceId);
+/**
+ * Remove a single part from all physics state tracking sets/maps.
+ *
+ * @param {PhysicsState} ps
+ * @param {string}       instanceId
+ */
+function _removePartFromState(ps, instanceId) {
+  ps.activeParts.delete(instanceId);
+  ps.firingEngines.delete(instanceId);
+  ps.deployedParts.delete(instanceId);
+  ps.legStates?.delete(instanceId);
+  ps.parachuteStates?.delete(instanceId);
+  ps.heatMap?.delete(instanceId);
+}
+
+/**
+ * Return true if all COMMAND_MODULE and COMPUTER_MODULE parts in the assembly
+ * have been removed from activeParts.
+ *
+ * @param {PhysicsState}                               ps
+ * @param {import('./rocketbuilder.js').RocketAssembly} assembly
+ * @returns {boolean}
+ */
+function _allCommandModulesGone(ps, assembly) {
+  let hadCmd = false;
+  for (const [instanceId, placed] of assembly.parts) {
+    const def = getPartById(placed.partId);
+    if (!def) continue;
+    if (def.type === PartType.COMMAND_MODULE || def.type === PartType.COMPUTER_MODULE) {
+      hadCmd = true;
+      if (ps.activeParts.has(instanceId)) return false; // at least one survives
     }
   }
+  return hadCmd; // true only if there were cmd modules and none survive
 }
 
 // ---------------------------------------------------------------------------

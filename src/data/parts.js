@@ -166,6 +166,7 @@ export const ActivationBehaviour = Object.freeze({
  *     - experimentDuration {number} Seconds the science experiment runs.
  *     - dragCoefficient {number}  Aerodynamic drag (dimensionless).
  *     - heatTolerance   {number}  Max temperature in K before part fails.
+ *     - crashThreshold  {number}  Impact speed (m/s) the part can survive.
  */
 
 // ---------------------------------------------------------------------------
@@ -274,6 +275,7 @@ export const PARTS = [
       hasEjectorSeat: true,
       dragCoefficient: 0.2,
       heatTolerance: 2000,
+      crashThreshold: 15,
     },
   },
 
@@ -307,6 +309,7 @@ export const PARTS = [
       hasRcs: false,
       dragCoefficient: 0.1,
       heatTolerance: 1500,
+      crashThreshold: 12,
     },
   },
 
@@ -341,6 +344,7 @@ export const PARTS = [
       experimentDuration: 30, // seconds
       dragCoefficient: 0.1,
       heatTolerance: 1500,
+      crashThreshold: 10,
     },
   },
 
@@ -375,6 +379,7 @@ export const PARTS = [
       fuelType: FuelType.LIQUID,
       dragCoefficient: 0.05,
       heatTolerance: 1500,
+      crashThreshold: 8,
     },
   },
 
@@ -404,6 +409,7 @@ export const PARTS = [
       fuelType: FuelType.LIQUID,
       dragCoefficient: 0.05,
       heatTolerance: 1500,
+      crashThreshold: 8,
     },
   },
 
@@ -433,6 +439,7 @@ export const PARTS = [
       fuelType: FuelType.LIQUID,
       dragCoefficient: 0.05,
       heatTolerance: 1500,
+      crashThreshold: 8,
     },
   },
 
@@ -470,6 +477,7 @@ export const PARTS = [
       fuelType: FuelType.LIQUID,
       dragCoefficient: 0.1,
       heatTolerance: 2000,
+      crashThreshold: 12,
     },
   },
 
@@ -503,6 +511,7 @@ export const PARTS = [
       fuelType: FuelType.LIQUID,
       dragCoefficient: 0.1,
       heatTolerance: 2000,
+      crashThreshold: 12,
     },
   },
 
@@ -540,6 +549,7 @@ export const PARTS = [
       fuelType: FuelType.LIQUID,
       dragCoefficient: 0.1,
       heatTolerance: 2000,
+      crashThreshold: 12,
     },
   },
 
@@ -577,6 +587,7 @@ export const PARTS = [
       fuelType: FuelType.LIQUID,
       dragCoefficient: 0.1,
       heatTolerance: 2000,
+      crashThreshold: 12,
     },
   },
 
@@ -622,6 +633,7 @@ export const PARTS = [
       fuelType: FuelType.SOLID,
       dragCoefficient: 0.15,
       heatTolerance: 2000,
+      crashThreshold: 10,
     },
   },
 
@@ -655,6 +667,7 @@ export const PARTS = [
       fuelType: FuelType.SOLID,
       dragCoefficient: 0.15,
       heatTolerance: 2000,
+      crashThreshold: 10,
     },
   },
 
@@ -687,6 +700,7 @@ export const PARTS = [
     properties: {
       dragCoefficient: 0.05,
       heatTolerance: 1500,
+      crashThreshold: 6,
     },
   },
 
@@ -725,6 +739,7 @@ export const PARTS = [
     properties: {
       dragCoefficient: 0.05,
       heatTolerance: 1500,
+      crashThreshold: 6,
     },
   },
 
@@ -758,6 +773,7 @@ export const PARTS = [
       maxLandingSpeed: 10,
       dragCoefficient: 0.1,
       heatTolerance: 1200,
+      crashThreshold: 25,
     },
   },
 
@@ -786,6 +802,7 @@ export const PARTS = [
       maxLandingSpeed: 10,
       dragCoefficient: 0.1,
       heatTolerance: 1200,
+      crashThreshold: 25,
     },
   },
 
@@ -827,6 +844,7 @@ export const PARTS = [
       deployedDiameter: 20,    // m — fully-deployed canopy diameter (~314 m² area)
       deployedCd: 0.75,        // hemispherical canopy Cd when fully deployed
       heatTolerance: 1200,
+      crashThreshold: 20,
     },
   },
 
@@ -859,6 +877,7 @@ export const PARTS = [
       deployedDiameter: 35,    // m — fully-deployed canopy diameter (~962 m² area)
       deployedCd: 0.75,        // hemispherical canopy Cd when fully deployed
       heatTolerance: 1200,
+      crashThreshold: 20,
     },
   },
 
@@ -890,6 +909,7 @@ export const PARTS = [
     properties: {
       dragCoefficient: 0.1,
       heatTolerance: 1500,
+      crashThreshold: 8,
     },
   },
 

@@ -1439,7 +1439,7 @@ describe('TASK-025: tickLegs() — deploying → deployed timer', () => {
 // ---------------------------------------------------------------------------
 
 describe('TASK-025: landing detection — controlled landing', () => {
-  it('emits LANDING and sets ps.landed when ≥ 2 legs deployed and speed < 10', () => {
+  it('emits LANDING and sets ps.landed when speed below all crash thresholds', () => {
     const { assembly, staging, legId1, legId2 } = makeRocketWithLegs();
     const fs = makeFlightState();
     const ps = createPhysicsState(assembly, fs);
@@ -1450,7 +1450,7 @@ describe('TASK-025: landing detection — controlled landing', () => {
 
     // Set rocket just above ground, falling within safe speed.
     ps.posY     = 0.01;
-    ps.velY     = -7; // 7 m/s — below 10 m/s threshold
+    ps.velY     = -7; // 7 m/s — below all crash thresholds
     ps.grounded = false;
 
     tick(ps, assembly, staging, fs, 1 / 60);
@@ -1458,12 +1458,11 @@ describe('TASK-025: landing detection — controlled landing', () => {
     const evt = fs.events.find((e) => e.type === 'LANDING');
     expect(evt).toBeDefined();
     expect(evt.speed).toBeCloseTo(7, 0);
-    expect(evt.legsDestroyed).toBe(false);
     expect(ps.landed).toBe(true);
     expect(ps.crashed).toBe(false);
   });
 
-  it('does NOT emit LANDING for < 2 deployed legs even at low speed', () => {
+  it('emits LANDING even for 1 deployed leg when speed is below thresholds', () => {
     const { assembly, staging, legId1, legId2 } = makeRocketWithLegs();
     const fs = makeFlightState();
     const ps = createPhysicsState(assembly, fs);
@@ -1473,16 +1472,16 @@ describe('TASK-025: landing detection — controlled landing', () => {
     // legId2 stays RETRACTED.
 
     ps.posY     = 0.01;
-    ps.velY     = -7; // within 10 m/s
+    ps.velY     = -7; // within all crash thresholds (probe=12, leg=25)
     ps.grounded = false;
 
     tick(ps, assembly, staging, fs, 1 / 60);
 
-    // Speed is 7 > 5 m/s and < 2 deployed legs → should CRASH (no-legs path)
-    const crashEvt = fs.events.find((e) => e.type === 'CRASH');
-    expect(crashEvt).toBeDefined();
-    expect(ps.crashed).toBe(true);
-    expect(ps.landed).toBe(false);
+    // With cascading thresholds, 7 m/s is below all part thresholds → safe landing.
+    const landEvt = fs.events.find((e) => e.type === 'LANDING');
+    expect(landEvt).toBeDefined();
+    expect(ps.landed).toBe(true);
+    expect(ps.crashed).toBe(false);
   });
 });
 
@@ -1490,8 +1489,8 @@ describe('TASK-025: landing detection — controlled landing', () => {
 // Landing detection — ≥ 1 deployed leg AND speed 10–29 m/s → hard landing
 // ---------------------------------------------------------------------------
 
-describe('TASK-025: landing detection — hard landing (legs destroyed)', () => {
-  it('emits LANDING with legsDestroyed=true and destroys leg parts', () => {
+describe('TASK-025: landing detection — hard landing (cascading damage)', () => {
+  it('legs survive at 20 m/s (threshold 25) — everything lands safely', () => {
     const { assembly, staging, legId1, legId2 } = makeRocketWithLegs();
     const fs = makeFlightState();
     const ps = createPhysicsState(assembly, fs);
@@ -1500,7 +1499,7 @@ describe('TASK-025: landing detection — hard landing (legs destroyed)', () => 
     ps.legStates.get(legId1).state = LegState.DEPLOYED;
     ps.legStates.get(legId2).state = LegState.DEPLOYED;
 
-    // Falling at 20 m/s — legs deployed but too fast.
+    // Falling at 20 m/s — legs have crashThreshold 25, so they survive.
     ps.posY     = 0.01;
     ps.velY     = -20;
     ps.grounded = false;
@@ -1509,16 +1508,15 @@ describe('TASK-025: landing detection — hard landing (legs destroyed)', () => 
 
     const evt = fs.events.find((e) => e.type === 'LANDING');
     expect(evt).toBeDefined();
-    expect(evt.legsDestroyed).toBe(true);
     expect(ps.landed).toBe(true);
     expect(ps.crashed).toBe(false);
 
-    // Leg parts should have been removed from activeParts.
-    expect(ps.activeParts.has(legId1)).toBe(false);
-    expect(ps.activeParts.has(legId2)).toBe(false);
+    // Legs should still be active (threshold 25 > impact 20).
+    expect(ps.activeParts.has(legId1)).toBe(true);
+    expect(ps.activeParts.has(legId2)).toBe(true);
   });
 
-  it('probe (non-leg) survives hard landing', () => {
+  it('probe (non-leg) survives hard landing at 20 m/s', () => {
     const { assembly, staging, probeId, legId1, legId2 } = makeRocketWithLegs();
     const fs = makeFlightState();
     const ps = createPhysicsState(assembly, fs);
@@ -1587,8 +1585,8 @@ describe('TASK-025: landing detection — catastrophic impact (≥ 30 m/s)', () 
 // Landing detection — no legs AND speed > 5 m/s → bottom parts destroyed
 // ---------------------------------------------------------------------------
 
-describe('TASK-025: landing detection — no legs, speed > 5 m/s', () => {
-  it('emits CRASH when landing without legs at 7 m/s', () => {
+describe('TASK-025: landing detection — no legs, cascading thresholds', () => {
+  it('lands safely at 7 m/s without legs (below all crash thresholds)', () => {
     const { assembly, staging } = makeSimpleRocket();
     const fs = makeFlightState();
     const ps = createPhysicsState(assembly, fs);
@@ -1599,23 +1597,25 @@ describe('TASK-025: landing detection — no legs, speed > 5 m/s', () => {
 
     tick(ps, assembly, staging, fs, 1 / 60);
 
-    const evt = fs.events.find((e) => e.type === 'CRASH');
+    // 7 m/s is below the lowest crash threshold (tank=8), so safe landing.
+    const evt = fs.events.find((e) => e.type === 'LANDING');
     expect(evt).toBeDefined();
-    expect(ps.crashed).toBe(true);
+    expect(ps.landed).toBe(true);
+    expect(ps.crashed).toBe(false);
   });
 
-  it('destroys at least one bottom part (engine at lowest y)', () => {
+  it('destroys bottom engine at 15 m/s (exceeds threshold 12)', () => {
     const { assembly, staging, engineId } = makeSimpleRocket();
     const fs = makeFlightState();
     const ps = createPhysicsState(assembly, fs);
 
     ps.posY     = 0.01;
-    ps.velY     = -7;
+    ps.velY     = -15;
     ps.grounded = false;
 
     tick(ps, assembly, staging, fs, 1 / 60);
 
-    // The engine is at placed.y = -55 (lowest part) — should be destroyed.
+    // The engine (threshold 12) at y=-55 should be destroyed at 15 m/s.
     expect(ps.activeParts.has(engineId)).toBe(false);
   });
 });
@@ -2169,5 +2169,217 @@ describe('Parachute angular damping', () => {
     // Without damping the angular velocity would grow unbounded;
     // with chute damping it should stay moderate (< 2 rad/s).
     expect(Math.abs(ps.angularVelocity)).toBeLessThan(2);
+  });
+});
+
+// ===========================================================================
+// Cascading per-part crash thresholds
+// ===========================================================================
+
+describe('cascading crash thresholds', () => {
+  /**
+   * Helper: build a rocket and drop it at a given speed.
+   * Returns { ps, assembly, flightState } after impact.
+   *
+   * Rocket layout (bottom to top by Y position):
+   *   engine-spark    at y=-55  (crashThreshold: 12, mass: 120)
+   *   tank-small      at y=0    (crashThreshold: 8,  mass: 50 dry + 400 fuel)
+   *   probe-core-mk1  at y=60   (crashThreshold: 12, mass: 50)
+   */
+  function dropRocket(speed) {
+    const { assembly, staging, probeId, tankId, engineId } = makeSimpleRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    // Place rocket barely above ground. At 1/60s step, position delta is
+    // roughly speed/60 m, so for speed=5 that's ~0.08m. Use a tiny posY
+    // so ground contact is triggered in the first integration step.
+    ps.posY     = speed * (1 / 60) * 0.5;
+    ps.velY     = -speed;
+    ps.grounded = false;
+
+    // Tick enough frames that the rocket definitely hits ground.
+    tick(ps, assembly, staging, fs, 0.5);
+
+    return { ps, assembly, fs, probeId, tankId, engineId };
+  }
+
+  it('safe landing — impact 5 m/s, all parts survive, landed = true', () => {
+    const { ps, assembly } = dropRocket(5);
+
+    expect(ps.landed).toBe(true);
+    expect(ps.crashed).toBe(false);
+    // All 3 parts should still be active.
+    expect(ps.activeParts.size).toBe(3);
+  });
+
+  it('single layer destroyed — engine at bottom destroyed, probe survives', () => {
+    // tank-small crashThreshold=8, engine-spark crashThreshold=12
+    // Impact at 15 m/s should destroy engine (threshold 12) and tank (threshold 8)
+    // but probe-core (threshold 12) may survive due to energy absorption.
+    const { ps, assembly, engineId, tankId, probeId } = dropRocket(15);
+
+    // Engine is at the bottom (y=-55), should be destroyed first.
+    expect(ps.activeParts.has(engineId)).toBe(false);
+    // Probe should survive (it's the command module).
+    expect(ps.crashed).toBe(false);
+    expect(ps.landed).toBe(true);
+  });
+
+  it('total destruction — impact 50 m/s, all parts destroyed, crashed = true', () => {
+    const { ps } = dropRocket(50);
+
+    expect(ps.crashed).toBe(true);
+    expect(ps.activeParts.size).toBe(0);
+  });
+
+  it('landing legs absorb — legs deployed, threshold 25, impact 20 m/s survives', () => {
+    const assembly = createRocketAssembly();
+    const staging  = createStagingConfig();
+
+    const probeId = addPartToAssembly(assembly, 'probe-core-mk1',     0,  60);
+    const tankId  = addPartToAssembly(assembly, 'tank-small',         0,   0);
+    const legId1  = addPartToAssembly(assembly, 'landing-legs-small', 20, -30);
+    const legId2  = addPartToAssembly(assembly, 'landing-legs-small', -20, -30);
+
+    connectParts(assembly, probeId, 1, tankId, 0);
+
+    syncStagingWithAssembly(assembly, staging);
+    assignPartToStage(staging, legId1, 0);
+    assignPartToStage(staging, legId2, 0);
+
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    // Deploy legs and advance to finish deployment.
+    ps.grounded = false;
+    ps.posY     = 50_000;
+    fireNextStage(ps, assembly, staging, fs);
+    tick(ps, assembly, staging, fs, 2.0);
+
+    // Set up for landing at 20 m/s.
+    ps.posY   = 20 * (1 / 60) * 0.5;
+    ps.velY   = -20;
+    ps.velX   = 0;
+    ps.landed = false;
+    tick(ps, assembly, staging, fs, 0.5);
+
+    // Legs have crashThreshold=25, so 20 m/s should be survived by all.
+    expect(ps.landed).toBe(true);
+    expect(ps.crashed).toBe(false);
+    expect(ps.activeParts.has(probeId)).toBe(true);
+  });
+
+  it('heavy bottom part destroyed but command module survives', () => {
+    // Reliant engine (mass 500, threshold 12) at bottom + cmd-mk1 (mass 840, threshold 15).
+    // At 15 m/s: engine destroyed. v = 15 * sqrt(1 - 500/1340) ≈ 11.9. 11.9 < 15 → cmd survives.
+    const assembly = createRocketAssembly();
+    const staging  = createStagingConfig();
+
+    const cmdId    = addPartToAssembly(assembly, 'cmd-mk1',        0,  60);
+    const engineId = addPartToAssembly(assembly, 'engine-reliant', 0, -20);
+
+    connectParts(assembly, cmdId, 1, engineId, 0);
+    syncStagingWithAssembly(assembly, staging);
+
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    ps.posY     = 0.01;
+    ps.velY     = -15;
+    ps.grounded = false;
+
+    tick(ps, assembly, staging, fs, 1 / 60);
+
+    // Engine (threshold 12) destroyed, cmd (threshold 15) survives.
+    expect(ps.activeParts.has(engineId)).toBe(false);
+    expect(ps.activeParts.has(cmdId)).toBe(true);
+    expect(ps.landed).toBe(true);
+    expect(ps.crashed).toBe(false);
+  });
+
+  it('command module destruction = crashed', () => {
+    // Build a rocket with only a probe core (at bottom) and an engine above.
+    // Impact should destroy probe first since it's the only cmd module.
+    const assembly = createRocketAssembly();
+    const staging  = createStagingConfig();
+
+    // Probe at the bottom (lowest Y).
+    const probeId  = addPartToAssembly(assembly, 'probe-core-mk1', 0, -30);
+    const tankId   = addPartToAssembly(assembly, 'tank-small',     0,  30);
+
+    connectParts(assembly, probeId, 1, tankId, 0);
+    syncStagingWithAssembly(assembly, staging);
+
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    ps.posY     = 0.1;
+    ps.velY     = -20;
+    ps.grounded = false;
+
+    tick(ps, assembly, staging, fs, 1 / 60);
+
+    // Probe (threshold 12) should be destroyed at 20 m/s → crashed.
+    expect(ps.crashed).toBe(true);
+  });
+
+  it('PART_DESTROYED events emitted for each destroyed part', () => {
+    const { fs, engineId } = dropRocket(15);
+
+    const destroyedEvents = fs.events.filter((e) => e.type === 'PART_DESTROYED');
+    // At 15 m/s at least the engine (threshold 12) should be destroyed.
+    expect(destroyedEvents.length).toBeGreaterThanOrEqual(1);
+
+    // Check that the engine appears in destroyed events.
+    const engineDestroyed = destroyedEvents.find((e) => e.instanceId === engineId);
+    expect(engineDestroyed).toBeDefined();
+    expect(engineDestroyed.partId).toBe('engine-spark');
+  });
+
+  it('mass-proportional absorption — heavy engine absorbs more than light decoupler', () => {
+    // Build: probe(y=100) + decoupler(y=60) + tank(y=0) + engine(y=-55)
+    // The heavy engine (120kg) at the bottom should absorb more energy
+    // than a light decoupler (50kg) would at the bottom.
+    const { assembly: a1, staging: s1 } = makeTwoStageRocketGlobal();
+    const fs1 = makeFlightState();
+    const ps1 = createPhysicsState(a1, fs1);
+    ps1.posY     = 0.1;
+    ps1.velY     = -20;
+    ps1.grounded = false;
+
+    tick(ps1, a1, s1, fs1, 1 / 60);
+
+    // The engine at the bottom (mass=120+0 fuel) should be destroyed.
+    // Count how many parts were destroyed.
+    const destroyed1 = fs1.events.filter((e) => e.type === 'PART_DESTROYED').length;
+
+    // Now build the same rocket but swap: put decoupler at bottom.
+    const assembly2 = createRocketAssembly();
+    const staging2  = createStagingConfig();
+    const probeId2  = addPartToAssembly(assembly2, 'probe-core-mk1',       0, 100);
+    const tankId2   = addPartToAssembly(assembly2, 'tank-small',           0,  60);
+    const engineId2 = addPartToAssembly(assembly2, 'engine-spark',         0,   0);
+    const decId2    = addPartToAssembly(assembly2, 'decoupler-stack-tr18', 0, -55);
+
+    connectParts(assembly2, probeId2, 1, tankId2, 0);
+    connectParts(assembly2, tankId2,  1, engineId2, 0);
+    connectParts(assembly2, engineId2, 1, decId2, 0);
+
+    syncStagingWithAssembly(assembly2, staging2);
+
+    const fs2 = makeFlightState();
+    const ps2 = createPhysicsState(assembly2, fs2);
+    ps2.posY     = 0.1;
+    ps2.velY     = -20;
+    ps2.grounded = false;
+
+    tick(ps2, assembly2, staging2, fs2, 1 / 60);
+
+    const destroyed2 = fs2.events.filter((e) => e.type === 'PART_DESTROYED').length;
+
+    // With the light decoupler (50kg, threshold 6) at the bottom,
+    // it absorbs less energy, so more layers should be destroyed.
+    expect(destroyed2).toBeGreaterThanOrEqual(destroyed1);
   });
 });
