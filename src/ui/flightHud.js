@@ -70,7 +70,7 @@ const FLIGHT_HUD_STYLES = `
    ═══════════════════════════════════════════════════════════════════════════ */
 #flight-left-panel {
   position: absolute;
-  left: 10px;
+  left: 58px;
   bottom: 60px;
   width: 230px;
   background: rgba(0, 8, 0, 0.78);
@@ -504,6 +504,95 @@ const FLIGHT_HUD_STYLES = `
   text-orientation: mixed;
   letter-spacing: 0.02em;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Altitude tape — vertical scrolling scale beside the rocket
+   ═══════════════════════════════════════════════════════════════════════════ */
+#flight-alt-tape {
+  position: absolute;
+  left: 6px;
+  bottom: 60px;
+  width: 48px;
+  height: calc(100% - 120px);
+  background: rgba(0, 8, 0, 0.78);
+  border: 1px solid #284828;
+  border-radius: 4px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.alt-tape-ticks {
+  position: absolute;
+  inset: 0;
+}
+
+.alt-tape-tick-minor {
+  position: absolute;
+  right: 0;
+  width: 8px;
+  height: 1px;
+  background: #406040;
+}
+
+.alt-tape-tick-major {
+  position: absolute;
+  right: 0;
+  width: 16px;
+  height: 1px;
+  background: #70b080;
+}
+
+.alt-tape-tick-label {
+  position: absolute;
+  right: 18px;
+  font-size: 8px;
+  color: #90c8a0;
+  white-space: nowrap;
+  transform: translateY(-50%);
+}
+
+.alt-tape-indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.alt-tape-indicator-line {
+  width: 100%;
+  height: 2px;
+  background: #40ff80;
+  box-shadow: 0 0 6px #40ff80;
+}
+
+.alt-tape-indicator-val {
+  position: absolute;
+  right: 2px;
+  top: 3px;
+  font-size: 9px;
+  font-weight: bold;
+  color: #40ff80;
+  text-shadow: 0 0 4px #000;
+  white-space: nowrap;
+}
+
+.alt-tape-ground {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(80, 60, 20, 0.5) 0px,
+    rgba(80, 60, 20, 0.5) 3px,
+    rgba(40, 30, 10, 0.5) 3px,
+    rgba(40, 30, 10, 0.5) 6px
+  );
+  border-top: 1px solid #806020;
+}
 `;
 
 // ---------------------------------------------------------------------------
@@ -549,6 +638,10 @@ let _elFuelList      = null;   // left-panel fuel list
 let _elObjList       = null;   // objectives panel (top-right, unchanged)
 let _elLaunchTip     = null;   // launch pad "press space" tip
 let _launchTipHidden = false;  // once hidden, stays hidden
+
+// Altitude tape elements:
+let _elAltTape       = null;   // altitude tape container
+let _elAltTapeTicks  = null;   // altitude tape ticks container
 
 // TWR bar elements:
 let _elModeToggle    = null;   // TWR/ABS mode toggle button
@@ -605,6 +698,7 @@ export function initFlightHud(container, ps, assembly, stagingConfig, flightStat
   _buildLeftPanel();
   _buildObjectivesPanel();
   _buildTimeWarpPanel();
+  _buildAltTape();
 
   // X → throttle 0 %, Z → throttle 100 %.
   // W/S/ArrowUp/ArrowDown are handled by physics.js handleKeyDown when the
@@ -674,6 +768,9 @@ export function destroyFlightHud() {
   _elObjList       = null;
   _elLaunchTip     = null;
   _launchTipHidden = false;
+
+  _elAltTape       = null;
+  _elAltTapeTicks  = null;
 
   _elModeToggle    = null;
   _elTwrBarFillUp  = null;
@@ -1036,6 +1133,109 @@ export function hideLaunchTip() {
 }
 
 // ---------------------------------------------------------------------------
+// Private — altitude tape
+// ---------------------------------------------------------------------------
+
+/**
+ * Build the altitude tape DOM structure and append to HUD.
+ */
+function _buildAltTape() {
+  const tape = document.createElement('div');
+  tape.id = 'flight-alt-tape';
+
+  const ticks = document.createElement('div');
+  ticks.className = 'alt-tape-ticks';
+  tape.appendChild(ticks);
+
+  const indicator = document.createElement('div');
+  indicator.className = 'alt-tape-indicator';
+  indicator.innerHTML = '<div class="alt-tape-indicator-line"></div>'
+    + '<span class="alt-tape-indicator-val"></span>';
+  tape.appendChild(indicator);
+
+  _hud.appendChild(tape);
+  _elAltTape      = tape;
+  _elAltTapeTicks = ticks;
+}
+
+/**
+ * Return scale parameters based on current altitude.
+ * @param {number} alt — current altitude in metres
+ * @returns {{ range: number, minorTick: number, majorTick: number }}
+ */
+function _altTapeScale(alt) {
+  const a = Math.abs(alt);
+  if (a < 500)    return { range: 200,    minorTick: 10,    majorTick: 50 };
+  if (a < 2000)   return { range: 1000,   minorTick: 50,    majorTick: 200 };
+  if (a < 10000)  return { range: 5000,   minorTick: 200,   majorTick: 1000 };
+  if (a < 50000)  return { range: 20000,  minorTick: 1000,  majorTick: 5000 };
+  if (a < 200000) return { range: 100000, minorTick: 5000,  majorTick: 20000 };
+  return            { range: 500000, minorTick: 20000, majorTick: 100000 };
+}
+
+/**
+ * Format altitude for tick labels.
+ * @param {number} m — altitude in metres
+ * @returns {string}
+ */
+function _fmtAltLabel(m) {
+  const a = Math.abs(m);
+  const sign = m < 0 ? '-' : '';
+  if (a >= 1000) return sign + (a / 1000).toFixed(a % 1000 === 0 ? 0 : 1) + 'k';
+  return sign + Math.round(a) + '';
+}
+
+/**
+ * Update altitude tape every frame.
+ */
+function _updateAltTape() {
+  if (!_elAltTape || !_ps) return;
+
+  const alt   = _ps.posY;
+  const scale = _altTapeScale(alt);
+  const halfRange = scale.range / 2;
+  const altMin = alt - halfRange;
+  const altMax = alt + halfRange;
+  const tapeH  = _elAltTape.clientHeight || 1;
+
+  let html = '';
+
+  // Generate tick marks
+  const firstTick = Math.ceil(altMin / scale.minorTick) * scale.minorTick;
+  for (let t = firstTick; t <= altMax; t += scale.minorTick) {
+    const pct = ((t - altMin) / scale.range) * 100;   // 0 = bottom, 100 = top
+    const bottom = pct;
+    const isMajor = (Math.round(t / scale.majorTick) * scale.majorTick === Math.round(t));
+
+    if (isMajor) {
+      html += `<div class="alt-tape-tick-major" style="bottom:${bottom.toFixed(2)}%"></div>`;
+      html += `<div class="alt-tape-tick-label" style="bottom:${bottom.toFixed(2)}%">${_fmtAltLabel(t)}</div>`;
+    } else {
+      html += `<div class="alt-tape-tick-minor" style="bottom:${bottom.toFixed(2)}%"></div>`;
+    }
+  }
+
+  // Ground fill if visible
+  if (altMin < 0) {
+    const groundPct = Math.min(100, ((0 - altMin) / scale.range) * 100);
+    html += `<div class="alt-tape-ground" style="height:${groundPct.toFixed(2)}%"></div>`;
+  }
+
+  _elAltTapeTicks.innerHTML = html;
+
+  // Update centre indicator value
+  const valEl = _elAltTape.querySelector('.alt-tape-indicator-val');
+  if (valEl) {
+    const a = Math.abs(alt);
+    if (a >= 1000) {
+      valEl.textContent = (alt / 1000).toFixed(1) + 'k';
+    } else {
+      valEl.textContent = Math.round(alt) + 'm';
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Private — update loop
 // ---------------------------------------------------------------------------
 
@@ -1047,6 +1247,7 @@ function _tick() {
     _updateLeftPanel();
     _updateObjectivesPanel();
     _updateLaunchTip();
+    _updateAltTape();
   }
   _rafId = requestAnimationFrame(_tick);
 }
