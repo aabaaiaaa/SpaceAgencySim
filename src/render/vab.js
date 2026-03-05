@@ -41,7 +41,7 @@ export const VAB_TOOLBAR_HEIGHT = 52;
 export const VAB_PARTS_PANEL_WIDTH = 280;
 
 /** Scale bar strip width in CSS pixels. */
-export const VAB_SCALE_BAR_WIDTH = 50;
+export const VAB_SCALE_BAR_WIDTH = 66;
 
 /**
  * CSS pixels per metre at default zoom (zoom = 1).

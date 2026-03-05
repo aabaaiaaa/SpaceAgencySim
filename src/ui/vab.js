@@ -64,6 +64,7 @@ import {
 import { createRocketDesign } from '../core/gameState.js';
 import { startFlightScene } from './flightController.js';
 import { showReturnResultsOverlay } from './hub.js';
+import { refreshTopBar } from './topbar.js';
 
 // ---------------------------------------------------------------------------
 // Module-level state (VAB session)
@@ -268,23 +269,19 @@ const VAB_CSS = `
   gap: 12px;
 }
 
-.vab-cash-block {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.15;
-  min-width: 130px;
+/* Toolbar stats (parts count + cost) — pushed right via spacer */
+.vab-toolbar-spacer { flex: 1; }
+.vab-toolbar-stat {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #8ab8d8;
+  white-space: nowrap;
 }
-.vab-cash-label {
-  font-size: 9px;
-  color: #3a6080;
-  text-transform: uppercase;
-  letter-spacing: .1em;
-}
-.vab-cash-value {
-  font-size: 20px;
-  font-weight: 700;
-  color: #45df88;
-  letter-spacing: .02em;
+.vab-toolbar-cost {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #5ddb50;
+  letter-spacing: 0.02em;
 }
 
 .vab-toolbar-btns {
@@ -422,23 +419,23 @@ const VAB_CSS = `
   position: absolute;
   right: 0;
   height: 1px;
-  width: 6px;
-  background: #16283e;
+  width: 8px;
+  background: #1e3850;
 }
 .vab-tick-major::after {
   content: '';
   position: absolute;
   right: 0;
   height: 1px;
-  width: 12px;
-  background: #1e3c5a;
+  width: 14px;
+  background: #2a4e6e;
 }
 
 .vab-tick-label {
   position: absolute;
-  right: 16px;
-  font-size: 8px;
-  color: #2e5878;
+  right: 18px;
+  font-size: 10px;
+  color: #4a7a9a;
   transform: translateY(-50%);
   white-space: nowrap;
   line-height: 1;
@@ -627,24 +624,7 @@ const VAB_CSS = `
   background: rgba(30, 80, 130, 0.95);
 }
 
-/* ── VAB status bar (parts count + cost) ─────────────────────────────── */
-#vab-status-bar {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  padding: 0 14px;
-  height: 28px;
-  min-height: 28px;
-  background: rgba(2, 4, 14, 0.97);
-  border-bottom: 1px solid #0a1826;
-  font-size: 12px;
-  color: #5a8aa8;
-  flex-shrink: 0;
-  pointer-events: none;
-}
-.vab-status-item { display: flex; gap: 5px; }
-.vab-status-label { color: #3a6080; text-transform: uppercase; letter-spacing: .08em; }
-.vab-status-value { color: #8ab8d8; font-weight: 700; }
+/* (status bar content now lives inside the toolbar) */
 
 /* ── Side panels — stackable ─────────────────────────────────────────── */
 .vab-side-panel {
@@ -1560,6 +1540,13 @@ function _onDragEnd(e) {
         instanceId,                 bestCandidate.dragSnapIndex,
         bestCandidate.targetInstanceId, bestCandidate.targetSnapIndex,
       );
+      // Connect additional snap points (e.g. top + bottom of a middle part).
+      const usedDragSnaps = new Set([bestCandidate.dragSnapIndex]);
+      for (const c of candidates) {
+        if (usedDragSnaps.has(c.dragSnapIndex)) continue;
+        connectParts(_assembly, instanceId, c.dragSnapIndex, c.targetInstanceId, c.targetSnapIndex);
+        usedDragSnaps.add(c.dragSnapIndex);
+      }
       // Symmetry: if placing onto a radial socket and symmetry is on, mirror it.
       if (_symmetryMode) {
         const mirror = findMirrorCandidate(_assembly, bestCandidate, partId);
@@ -1580,7 +1567,7 @@ function _onDragEnd(e) {
           const def = getPartById(partId);
           if (def && _gameState) {
             _gameState.money -= def.cost;
-            vabUpdateCash(_gameState);
+            refreshTopBar();
           }
         }
       }
@@ -1590,7 +1577,7 @@ function _onDragEnd(e) {
     const def = getPartById(partId);
     if (def && _gameState) {
       _gameState.money -= def.cost;
-      vabUpdateCash(_gameState);
+      refreshTopBar();
     }
     const newId = addPartToAssembly(_assembly, partId, finalX, finalY);
     if (bestCandidate) {
@@ -1599,6 +1586,13 @@ function _onDragEnd(e) {
         newId,                          bestCandidate.dragSnapIndex,
         bestCandidate.targetInstanceId, bestCandidate.targetSnapIndex,
       );
+      // Connect additional snap points (e.g. top + bottom of a middle part).
+      const usedDragSnaps2 = new Set([bestCandidate.dragSnapIndex]);
+      for (const c of candidates) {
+        if (usedDragSnaps2.has(c.dragSnapIndex)) continue;
+        connectParts(_assembly, newId, c.dragSnapIndex, c.targetInstanceId, c.targetSnapIndex);
+        usedDragSnaps2.add(c.dragSnapIndex);
+      }
       // Symmetry: if placing onto a radial socket and symmetry is on, mirror it.
       if (_symmetryMode) {
         const mirror = findMirrorCandidate(_assembly, bestCandidate, partId);
@@ -1613,7 +1607,7 @@ function _onDragEnd(e) {
           // Deduct cost for the mirror copy.
           if (def && _gameState) {
             _gameState.money -= def.cost;
-            vabUpdateCash(_gameState);
+            refreshTopBar();
           }
         }
       }
@@ -1908,7 +1902,7 @@ function _showPartContextMenu(placed, clientX, clientY) {
     // Refund cost.
     if (def && _gameState) {
       _gameState.money += def.cost;
-      vabUpdateCash(_gameState);
+      refreshTopBar();
     }
     if (_selectedInstanceId === placed.instanceId) _setSelectedPart(null);
     removePartFromAssembly(_assembly, placed.instanceId);
@@ -1923,7 +1917,7 @@ function _showPartContextMenu(placed, clientX, clientY) {
       // Refund cost for both parts.
       if (def && _gameState) {
         _gameState.money += def.cost * 2;
-        vabUpdateCash(_gameState);
+        refreshTopBar();
       }
       if (_selectedInstanceId === placed.instanceId || _selectedInstanceId === mirrorId) _setSelectedPart(null);
       removePartFromAssembly(_assembly, placed.instanceId);
@@ -2839,10 +2833,6 @@ export function initVabUI(container, state, { onBack } = {}) {
   root.innerHTML = `
     <!-- ── Toolbar ────────────────────────────────────────────────────── -->
     <div id="vab-toolbar">
-      <div class="vab-cash-block">
-        <span class="vab-cash-label">Cash</span>
-        <span class="vab-cash-value" id="vab-cash">${fmt$(state.money)}</span>
-      </div>
       <div class="vab-toolbar-btns">
         <button class="vab-btn" id="vab-back-btn" type="button">&#8592; Hub</button>
         <button class="vab-btn" id="vab-btn-missions" type="button">
@@ -2865,13 +2855,10 @@ export function initVabUI(container, state, { onBack } = {}) {
         <button class="vab-btn vab-btn-launch" id="vab-btn-launch" type="button" disabled>
           Launch
         </button>
+        <span class="vab-toolbar-spacer"></span>
+        <span class="vab-toolbar-stat" id="vab-status-parts">Parts: 0</span>
+        <span class="vab-toolbar-stat vab-toolbar-cost" id="vab-status-cost">Cost: $0</span>
       </div>
-    </div>
-
-    <!-- ── Status bar ─────────────────────────────────────────────────── -->
-    <div id="vab-status-bar">
-      <span id="vab-status-parts">Parts: 0</span>
-      <span id="vab-status-cost">Cost: $0</span>
     </div>
 
     <!-- ── Main row ───────────────────────────────────────────────────── -->
@@ -3048,14 +3035,6 @@ export function resetVabUI() {
   }
 }
 
-/**
- * Update the cash readout in the toolbar.
- * @param {import('../core/gameState.js').GameState} state
- */
-export function vabUpdateCash(state) {
-  const el = document.getElementById('vab-cash');
-  if (el) el.textContent = fmt$(state.money);
-}
 
 /**
  * Refresh the parts list from an updated game state (e.g. after a mission
