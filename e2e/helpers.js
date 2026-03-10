@@ -62,6 +62,7 @@ export function buildSaveEnvelope({
   rockets    = [],
   parts      = [],
   agencyName = 'Test Agency',
+  loan       = { balance: STARTING_MONEY, interestRate: 0.03, totalInterestAccrued: 0 },
 } = {}) {
   return {
     saveName,
@@ -69,7 +70,7 @@ export function buildSaveEnvelope({
     state: {
       agencyName,
       money,
-      loan:            { balance: STARTING_MONEY, interestRate: 0.03, totalInterestAccrued: 0 },
+      loan,
       missions,
       crew,
       rockets,

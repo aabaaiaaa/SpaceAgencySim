@@ -224,7 +224,7 @@ test.describe('Flight — Landing', () => {
 
     const landingEvent = events.find((e) => e.type === 'LANDING');
     expect(landingEvent).toBeTruthy();
-    expect(landingEvent.legsDestroyed).toBe(false);
+    expect(landingEvent.partsDestroyed).toBe(false);
     expect(landingEvent.speed).toBeLessThan(5);
   });
 

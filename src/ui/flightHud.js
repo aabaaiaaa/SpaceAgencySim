@@ -1388,18 +1388,16 @@ function _updateObjectivesPanel() {
     (m) => m.id === _flightState.missionId,
   );
 
-  // No active mission or none accepted — show placeholder.
+  // No active mission or none accepted — hide the panel entirely.
   if (!mission || !mission.objectives || mission.objectives.length === 0) {
-    if (_elObjList.dataset.empty !== '1') {
-      _elObjList.innerHTML = '';
-      const ph = document.createElement('div');
-      ph.className = 'hud-empty';
-      ph.textContent = 'No objectives';
-      _elObjList.appendChild(ph);
-      _elObjList.dataset.empty = '1';
-    }
+    const panel = _elObjList.parentElement;
+    if (panel) panel.style.display = 'none';
     return;
   }
+
+  // Ensure the panel is visible when a mission is active.
+  const panel = _elObjList.parentElement;
+  if (panel) panel.style.display = '';
 
   // Build a compact state fingerprint (completed flags as a bit string).
   const fingerprint = mission.objectives.map((o) => o.completed ? '1' : '0').join('');

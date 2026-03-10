@@ -10,6 +10,7 @@ import { initVabUI, resetVabUI } from './vab.js';
 import { initCrewAdminUI, destroyCrewAdminUI } from './crewAdmin.js';
 import { initMissionControlUI, destroyMissionControlUI } from './missionControl.js';
 import { initLaunchPadUI, destroyLaunchPadUI } from './launchPad.js';
+import { stopFlightScene } from './flightController.js';
 import { initTopBar, destroyTopBar, refreshTopBar } from './topbar.js';
 import { showVabScene, hideVabScene } from '../render/vab.js';
 import { showHubScene } from '../render/hub.js';
@@ -91,6 +92,7 @@ export function initUI(container, state) {
   _launchPadOpen      = false;
   // Ensure a fresh VAB assembly for each new game session.
   resetVabUI();
+  hideVabScene(); // ensure VAB PixiJS is hidden when starting a new session
 
   // Mount the persistent top bar — visible on all in-game screens.
   initTopBar(container, state, {
@@ -114,6 +116,8 @@ export function initUI(container, state) {
  * hamburger dropdown in the top bar.
  */
 function _handleExitToMenu() {
+  stopFlightScene(); // safe to call even if no flight is active
+  hideVabScene();    // hide VAB PixiJS container (no-op if already hidden)
   destroyTopBar();
   destroyHubUI(); // no-op if hub is not the current screen
   if (_crewAdminOpen) {

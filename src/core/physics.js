@@ -123,7 +123,7 @@ const PLAYER_TIP_TORQUE = 50_000;
 const TOPPLE_CRASH_ANGLE = Math.PI * 0.44;
 /** Per-tick angular velocity damping while tipping on the ground.
  *  0.92 gives roughly 0.92^60 ≈ 0.007 decay per second — settles in ~2s. */
-const GROUND_ANGULAR_DAMPING = 0.92;
+const GROUND_ANGULAR_DAMPING = 0.98;
 /** Maximum angular acceleration (rad/s²) from player tipping input.
  *  Prevents tiny landed parts from instantly toppling, but must exceed the
  *  gravity restoring acceleration for a typical capsule (~5 rad/s²). */
@@ -937,7 +937,7 @@ function _getChuteDeployProgress(ps, instanceId) {
     case 'deployed':  return 1;
     case 'deploying': {
       const linear = Math.max(0, Math.min(1, 1 - entry.deployTimer / DEPLOY_DURATION));
-      return linear * linear * linear;
+      return linear;
     }
     default:          return 0;
   }
@@ -1313,7 +1313,7 @@ function _applyGroundedSteering(ps, assembly, left, right, dt) {
     const snapGrav = totalMass * G0 * sRotX;
     const snapAccel = Math.abs(snapGrav / I);
 
-    if (snapAccel < 2.0) {
+    if (snapAccel < 0.5) {
       // Near equilibrium — freeze in place.
       ps.angularVelocity = 0;
       // If also near upright, snap angle to exactly 0.

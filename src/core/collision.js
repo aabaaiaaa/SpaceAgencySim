@@ -37,7 +37,7 @@ import { airDensity }  from './atmosphere.js';
 // ---------------------------------------------------------------------------
 
 /** N·s impulse applied at decoupling to push stages apart. */
-const SEPARATION_IMPULSE = 50;
+const SEPARATION_IMPULSE = 2000;
 
 /** Bounciness coefficient (0 = inelastic, 1 = perfectly elastic). */
 const BASE_RESTITUTION = 0.3;

@@ -71,7 +71,7 @@ export const ParachuteState = Object.freeze({
 });
 
 /** Duration of the deploying → deployed animation transition in seconds. */
-export const DEPLOY_DURATION = 5.0;
+export const DEPLOY_DURATION = 1.5;
 
 /** Seconds after landing before deployed parachutes auto-stow to packed. */
 export const POST_LANDING_STOW_DELAY = 3.0;
@@ -390,11 +390,10 @@ export function getChuteMultiplier(ps, instanceId, density) {
       break;
 
     case ParachuteState.DEPLOYING: {
-      // Cubic ease-in: drag builds slowly at first, accelerates as canopy inflates.
-      const linear = Math.max(0, Math.min(1,
+      // Linear ramp: drag builds steadily as canopy inflates.
+      const progress = Math.max(0, Math.min(1,
         1 - entry.deployTimer / DEPLOY_DURATION,
       ));
-      const progress = linear * linear * linear;
       baseMult = 1 + (CHUTE_DRAG_MULTIPLIER - 1) * progress;
       break;
     }

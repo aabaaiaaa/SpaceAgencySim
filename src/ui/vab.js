@@ -1651,9 +1651,12 @@ function _onDragEnd(e) {
         bestCandidate.targetInstanceId, bestCandidate.targetSnapIndex,
       );
       // Connect additional snap points (e.g. top + bottom of a middle part).
+      // Skip candidates that target the same instance as the best (prevents a
+      // thin part like a decoupler from using both snaps on a single neighbour).
       const usedDragSnaps = new Set([bestCandidate.dragSnapIndex]);
       for (const c of candidates) {
         if (usedDragSnaps.has(c.dragSnapIndex)) continue;
+        if (c.targetInstanceId === bestCandidate.targetInstanceId) continue;
         connectParts(_assembly, instanceId, c.dragSnapIndex, c.targetInstanceId, c.targetSnapIndex);
         usedDragSnaps.add(c.dragSnapIndex);
       }
@@ -1698,9 +1701,11 @@ function _onDragEnd(e) {
         bestCandidate.targetInstanceId, bestCandidate.targetSnapIndex,
       );
       // Connect additional snap points (e.g. top + bottom of a middle part).
+      // Skip candidates that target the same instance as the best.
       const usedDragSnaps2 = new Set([bestCandidate.dragSnapIndex]);
       for (const c of candidates) {
         if (usedDragSnaps2.has(c.dragSnapIndex)) continue;
+        if (c.targetInstanceId === bestCandidate.targetInstanceId) continue;
         connectParts(_assembly, newId, c.dragSnapIndex, c.targetInstanceId, c.targetSnapIndex);
         usedDragSnaps2.add(c.dragSnapIndex);
       }

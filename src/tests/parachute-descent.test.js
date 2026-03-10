@@ -459,8 +459,8 @@ describe('landed command module steering', () => {
     }
     handleKeyUp(ps, 'd');
 
-    // Let it settle for 5 seconds.
-    for (let i = 0; i < 300; i++) {
+    // Let it settle for 20 seconds (weaker damping needs more time).
+    for (let i = 0; i < 1200; i++) {
       tick(ps, assembly, staging, fs, dt);
     }
 

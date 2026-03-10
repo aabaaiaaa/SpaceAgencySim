@@ -596,7 +596,7 @@ describe('applySeparationImpulse()', () => {
 // ---------------------------------------------------------------------------
 
 describe('applySeparationImpulse() — reduced impulse magnitude', () => {
-  it('produces small delta-v proportional to 50 N·s impulse', () => {
+  it('produces delta-v proportional to 2000 N·s impulse', () => {
     const assembly = createRocketAssembly();
     // probe-core-mk1 is 50 kg
     const id1 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 100);
@@ -617,9 +617,9 @@ describe('applySeparationImpulse() — reduced impulse magnitude', () => {
 
     applySeparationImpulse(ps, debris, assembly);
 
-    // Both 50 kg → Δv = 50 N·s / 50 kg = 1 m/s each
-    expect(Math.abs(ps.velY)).toBeCloseTo(1.0, 1);
-    expect(Math.abs(debris.velY)).toBeCloseTo(1.0, 1);
+    // Both 50 kg → Δv = 2000 N·s / 50 kg = 40 m/s each
+    expect(Math.abs(ps.velY)).toBeCloseTo(40.0, 0);
+    expect(Math.abs(debris.velY)).toBeCloseTo(40.0, 0);
   });
 
   it('heavy stage gets proportionally smaller delta-v', () => {
@@ -642,10 +642,10 @@ describe('applySeparationImpulse() — reduced impulse magnitude', () => {
 
     applySeparationImpulse(ps, debris, assembly);
 
-    // Light (50 kg): Δv = 50/50 = 1.0 m/s
-    // Heavy (450 kg): Δv = 50/450 ≈ 0.11 m/s
-    expect(Math.abs(ps.velY)).toBeCloseTo(1.0, 1);
-    expect(Math.abs(debris.velY)).toBeCloseTo(50 / 450, 1);
+    // Light (50 kg): Δv = 2000/50 = 40.0 m/s
+    // Heavy (450 kg): Δv = 2000/450 ≈ 4.44 m/s
+    expect(Math.abs(ps.velY)).toBeCloseTo(40.0, 0);
+    expect(Math.abs(debris.velY)).toBeCloseTo(2000 / 450, 1);
   });
 });
 

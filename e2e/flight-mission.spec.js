@@ -56,6 +56,7 @@ test.describe('Flight — First Flight Mission Completion', () => {
       agencyName: 'Mission Test Agency',
       missions: { available: [], accepted: [{ ...FIRST_FLIGHT_MISSION, status: 'accepted' }], completed: [] },
       parts: UNLOCKED_PARTS,
+      loan: { balance: 0, interestRate: 0.03, totalInterestAccrued: 0 },
     });
 
     await seedAndLoadSave(page, envelope);
