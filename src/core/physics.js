@@ -347,6 +347,8 @@ export function tick(ps, assembly, stagingConfig, flightState, realDeltaTime, ti
     if (!needsTipping && (ps.angularVelocity !== 0 || ps.isTipping)) {
       ps.angularVelocity = 0;
       ps.isTipping = false;
+      ps._contactCX = undefined;
+      ps._contactCY = undefined;
       if (Math.abs(ps.angle) < TILT_SNAP_THRESHOLD) {
         ps.angle = 0;
       }
@@ -1182,6 +1184,8 @@ function _applyGroundedSteering(ps, assembly, left, right, dt) {
     ps.angle = 0;
     ps.angularVelocity = 0;
     ps.isTipping = false;
+    ps._contactCX = undefined;
+    ps._contactCY = undefined;
     return;
   }
 
@@ -1191,15 +1195,17 @@ function _applyGroundedSteering(ps, assembly, left, right, dt) {
   // Y-up world using: worldX = lx·cos - ly·sin,  worldY = lx·sin + ly·cos
   // (note the negated sin·y term compared to pure Y-up rotation).
   //
-  // Ground contact = corner with the highest "ground proximity" value:
-  //   gp = cx·sin(θ) + cy·cos(θ)
-  // When a flat face rests on the ground (two corners share the same gp),
-  // we average them so gravity torque is zero for a symmetric upright pose.
+  // Ground contact = softmax-weighted average of all corners, where each
+  // corner's weight is exp(CONTACT_SHARPNESS * (gp - maxGP)).  This gives:
+  //   - A single corner when one is clearly the lowest (sharp selection).
+  //   - A smooth midpoint when a flat face rests on the ground (no oscillation).
+  //   - Continuous transitions as the rocket rolls between orientations.
   const cosA = Math.cos(ps.angle);
   const sinA = Math.sin(ps.angle);
 
-  // Collect all corners with their ground-proximity values.
+  // Collect all corners with their gp values, tracking the maximum.
   const allCorners = [];
+  let maxGP = -Infinity;
   for (const instanceId of ps.activeParts) {
     const placed = assembly.parts.get(instanceId);
     if (!placed) continue;
@@ -1224,31 +1230,25 @@ function _applyGroundedSteering(ps, assembly, left, right, dt) {
       [placed.x + halfW, placed.y + hh],
     ];
     for (const [cx, cy] of corners) {
-      // Ground proximity: highest value = closest to the ground plane.
       const gp = cx * sinA + cy * cosA;
       allCorners.push({ cx, cy, gp });
+      if (gp > maxGP) maxGP = gp;
     }
   }
 
-  // Find the highest ground-proximity value (closest to ground).
-  let highestGP = -Infinity;
+  // Softmax-weighted average: corners near the ground dominate; corners far
+  // above contribute negligibly.  CONTACT_SHARPNESS controls the transition
+  // width (~1-2 px of gp difference at sharpness 2.0).
+  const CONTACT_SHARPNESS = 2.0;
+  let sumW = 0, sumWX = 0, sumWY = 0;
   for (const c of allCorners) {
-    if (c.gp > highestGP) highestGP = c.gp;
+    const w = Math.exp(CONTACT_SHARPNESS * (c.gp - maxGP));
+    sumW  += w;
+    sumWX += w * c.cx;
+    sumWY += w * c.cy;
   }
-
-  // Collect all corners within a small tolerance of the highest gp.
-  // When a face is flat on the ground, both edge corners will match.
-  const FACE_TOLERANCE = 0.01; // pixels in rotated space
-  let sumX = 0, sumY = 0, count = 0;
-  for (const c of allCorners) {
-    if (highestGP - c.gp < FACE_TOLERANCE) {
-      sumX += c.cx;
-      sumY += c.cy;
-      count++;
-    }
-  }
-  const contactLX = sumX / count;
-  const contactLY = sumY / count;
+  const contactLX = sumWX / sumW;
+  const contactLY = sumWY / sumW;
 
   const contact = { x: contactLX, y: contactLY };
 
@@ -1320,6 +1320,8 @@ function _applyGroundedSteering(ps, assembly, left, right, dt) {
       if (Math.abs(ps.angle) < TILT_SNAP_THRESHOLD) {
         ps.angle = 0;
         ps.isTipping = false;
+        ps._contactCX = undefined;
+        ps._contactCY = undefined;
         ps.posY = 0;
       }
     }

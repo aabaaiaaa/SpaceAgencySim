@@ -514,6 +514,94 @@ describe('landed command module steering', () => {
     expect(contactChanged).toBe(true);
     expect(ps.crashed).toBe(false);
   });
+
+  it('rolling does not cause sudden forward jumps in posX', () => {
+    const { ps, assembly, staging, fs } = setupLandedState();
+
+    // Give a moderate angular velocity to roll rightward.
+    ps.angularVelocity = 3.0;
+
+    const dt = 1 / 60;
+    let prevX = ps.posX;
+    // Maximum per-frame posX change: for a capsule spanning ~25px = 1.25m at
+    // the given angular velocity, the contact arc per frame is bounded.
+    // A jump significantly larger than that indicates a discontinuity.
+    const maxAllowedJumpPerFrame = 0.5; // metres — generous bound
+
+    for (let i = 0; i < 300; i++) {
+      tick(ps, assembly, staging, fs, dt);
+      assertNoNaN(ps, `frame ${i}`);
+
+      const dx = Math.abs(ps.posX - prevX);
+      expect(
+        dx,
+        `frame ${i}: posX jumped by ${dx.toFixed(4)}m (prev=${prevX.toFixed(4)}, now=${ps.posX.toFixed(4)}, angle=${ps.angle.toFixed(4)})`
+      ).toBeLessThan(maxAllowedJumpPerFrame);
+
+      prevX = ps.posX;
+    }
+
+    expect(ps.crashed).toBe(false);
+  });
+
+  it('capsule on its side (π/2) does not vibrate posX', () => {
+    const { ps, assembly, staging, fs } = setupLandedState();
+
+    // Place exactly on its side with a small angular velocity to activate tipping.
+    ps.angle = Math.PI / 2;
+    ps.angularVelocity = 0.1;
+
+    const dt = 1 / 60;
+    // Let it tick a few frames to settle the contact point.
+    for (let i = 0; i < 5; i++) {
+      tick(ps, assembly, staging, fs, dt);
+    }
+
+    // Now track posX for direction reversals (vibration = rapid sign changes).
+    let prevX = ps.posX;
+    let prevDX = 0;
+    let reversals = 0;
+
+    for (let i = 0; i < 120; i++) {
+      tick(ps, assembly, staging, fs, dt);
+      const dx = ps.posX - prevX;
+      // Count direction reversals (ignoring tiny movements < 1e-6).
+      if (Math.abs(dx) > 1e-6 && Math.abs(prevDX) > 1e-6) {
+        if (Math.sign(dx) !== Math.sign(prevDX)) {
+          reversals++;
+        }
+      }
+      if (Math.abs(dx) > 1e-6) prevDX = dx;
+      prevX = ps.posX;
+    }
+
+    // A few reversals are fine (natural rocking). Many reversals = vibration.
+    expect(
+      reversals,
+      `posX reversed direction ${reversals} times in 120 frames (vibration)`
+    ).toBeLessThan(10);
+    expect(ps.crashed).toBe(false);
+  });
+
+  it('rolling capsule posX moves consistently in the roll direction', () => {
+    const { ps, assembly, staging, fs } = setupLandedState();
+
+    // Roll rightward (positive angular velocity = clockwise).
+    ps.angularVelocity = 4.0;
+
+    const dt = 1 / 60;
+    const startX = ps.posX;
+
+    // Run for 2 seconds — enough for a full revolution.
+    for (let i = 0; i < 120; i++) {
+      tick(ps, assembly, staging, fs, dt);
+      assertNoNaN(ps, `frame ${i}`);
+    }
+
+    // Clockwise rolling should move rightward (positive X).
+    expect(ps.posX).toBeGreaterThan(startX);
+    expect(ps.crashed).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
