@@ -121,12 +121,17 @@ const DEFAULT_CRASH_THRESHOLD = 10;
 const PLAYER_TIP_TORQUE = 50_000;
 /** Angle (radians) past which a grounded tipping rocket crashes (~80°). */
 const TOPPLE_CRASH_ANGLE = Math.PI * 0.44;
-/** Per-tick angular velocity damping while tipping on the ground. */
-const GROUND_ANGULAR_DAMPING = 0.98;
+/** Per-tick angular velocity damping while tipping on the ground.
+ *  0.92 gives roughly 0.92^60 ≈ 0.007 decay per second — settles in ~2s. */
+const GROUND_ANGULAR_DAMPING = 0.92;
+/** Maximum angular acceleration (rad/s²) from player tipping input.
+ *  Prevents tiny landed parts from instantly toppling, but must exceed the
+ *  gravity restoring acceleration for a typical capsule (~5 rad/s²). */
+const MAX_PLAYER_TIP_ACCEL = 10.0;
 /** Angle threshold below which a near-upright rocket snaps to 0. */
 const TILT_SNAP_THRESHOLD = 0.005;
-/** Angular velocity threshold below which snap to 0. */
-const ANGULAR_VEL_SNAP_THRESHOLD = 0.01;
+/** Angular velocity threshold below which snap to rest. */
+const ANGULAR_VEL_SNAP_THRESHOLD = 0.05;
 
 // -- Airborne torque-based rotation constants --------------------------------
 /** N·m of torque applied by player A/D input while airborne. */
@@ -139,11 +144,17 @@ const AERO_ANGULAR_DAMPING = 0.02;
 const RCS_ANGULAR_DAMPING = 3.0;
 /** Tuning knob for parachute stabilization torque strength. */
 const CHUTE_TORQUE_SCALE = 3.0;
-/** Angular damping coefficient for deployed parachutes (opposes spin). */
-const CHUTE_ANGULAR_DAMPING = 1.0;
+/** Angular velocity decay rate (1/s) for deployed parachutes.
+ *  Models line/canopy drag resisting pendulum swing.
+ *  Applied as a fixed decay rate (not divided by I) so it works correctly
+ *  for both tiny capsules and heavy rockets. */
+const CHUTE_DIRECT_DAMPING = 5.0;
 /** Maximum angular acceleration (rad/s²) from player input.
  *  Prevents tiny rockets from spinning uncontrollably. */
 const MAX_PLAYER_ANGULAR_ACCEL = 2.0;
+/** Maximum angular acceleration (rad/s²) from parachute torques.
+ *  Prevents integration blow-up on small, light capsules. */
+const MAX_CHUTE_ANGULAR_ACCEL = 50.0;
 
 // ---------------------------------------------------------------------------
 // Type Definitions (JSDoc)
@@ -329,9 +340,17 @@ export function tick(ps, assembly, stagingConfig, flightState, realDeltaTime, ti
   if (ps.landed) {
     const left  = ps._heldKeys.has('a') || ps._heldKeys.has('ArrowLeft');
     const right = ps._heldKeys.has('d') || ps._heldKeys.has('ArrowRight');
-    const needsTipping = ps.isTipping || left || right ||
+    let needsTipping = ps.isTipping || left || right ||
       Math.abs(ps.angle) > TILT_SNAP_THRESHOLD ||
       Math.abs(ps.angularVelocity) > ANGULAR_VEL_SNAP_THRESHOLD;
+    // If tipping is no longer needed, snap any residual state to exactly zero.
+    if (!needsTipping && (ps.angularVelocity !== 0 || ps.isTipping)) {
+      ps.angularVelocity = 0;
+      ps.isTipping = false;
+      if (Math.abs(ps.angle) < TILT_SNAP_THRESHOLD) {
+        ps.angle = 0;
+      }
+    }
     const needsParachuteTick = _hasActiveParachutes(ps);
 
     if (needsTipping || needsParachuteTick) {
@@ -340,7 +359,8 @@ export function tick(ps, assembly, stagingConfig, flightState, realDeltaTime, ti
         ps._accumulator -= FIXED_DT;
         if (needsTipping) {
           _applyGroundedSteering(ps, assembly, left, right, FIXED_DT);
-          _checkToppleCrash(ps, assembly, flightState);
+          // No topple crash for landed vessels — tipping over from rest is
+          // harmless. _checkToppleCrash only applies to grounded (launch pad).
         }
         if (needsParachuteTick) {
           tickLandedParachutes(ps, FIXED_DT);
@@ -997,12 +1017,7 @@ function _computeParachuteTorque(ps, assembly, com, density, speed) {
   if (density <= 0 || speed <= 0 || !ps.parachuteStates) return 0;
 
   const q = 0.5 * density * speed * speed;     // dynamic pressure
-  const cosA = Math.cos(ps.angle);
   const sinA = Math.sin(ps.angle);
-
-  // Velocity unit vector (world frame) — drag opposes velocity.
-  const vx = ps.velX / speed;
-  const vy = ps.velY / speed;
 
   let totalTorque = 0;
 
@@ -1026,19 +1041,18 @@ function _computeParachuteTorque(ps, assembly, com, density, speed) {
     const densityScale = Math.min(1, density / LOW_DENSITY_THRESHOLD);
     const chuteCdA = stowedCdA + (deployedCdA - stowedCdA) * progress * densityScale;
 
-    // Drag force vector (opposes velocity).
+    // Drag magnitude (the line tension pulling the capsule toward the canopy).
     const dragMag = q * chuteCdA;
-    const Fx = -dragMag * vx;
-    const Fy = -dragMag * vy;
 
-    // Offset from CoM in VAB pixels → metres, then rotate to world frame.
+    // Pendulum restoring torque: the capsule hangs below the canopy on lines.
+    // When tilted by angle θ, the horizontal component of line tension
+    // provides a restoring torque = -dragMag * lineLength * sin(θ).
+    // The effective line length is the distance from CoM to the chute part.
     const dx = (placed.x - com.x) * SCALE_M_PER_PX;
     const dy = (placed.y - com.y) * SCALE_M_PER_PX;
-    const rx = dx * cosA + dy * sinA;
-    const ry = -dx * sinA + dy * cosA;
+    const lineLen = Math.sqrt(dx * dx + dy * dy);
 
-    // Negated cross product: canopy trails behind → effective point is opposite.
-    totalTorque += -(rx * Fy - ry * Fx);
+    totalTorque -= dragMag * lineLen * sinA;
   }
 
   return totalTorque * CHUTE_TORQUE_SCALE;
@@ -1086,39 +1100,32 @@ function _applySteering(ps, assembly, altitude, dt) {
   if (left)  playerAlpha -= baseTorque / I;
   playerAlpha = Math.max(-MAX_PLAYER_ANGULAR_ACCEL, Math.min(MAX_PLAYER_ANGULAR_ACCEL, playerAlpha));
 
-  // Non-player torques (parachute stabilization, damping) are not capped.
-  let torque = 0;
+  // Parachute restoring torque (pendulum effect) — capped per angular accel
+  // to prevent integration blow-up on very light capsules.
+  let restoringTorque = _computeParachuteTorque(ps, assembly, com, density, speed);
+  let restoringAlpha = restoringTorque / I;
+  restoringAlpha = Math.max(-MAX_CHUTE_ANGULAR_ACCEL, Math.min(MAX_CHUTE_ANGULAR_ACCEL, restoringAlpha));
 
-  // Parachute stabilization torque (restoring pendulum effect).
-  torque += _computeParachuteTorque(ps, assembly, com, density, speed);
-
-  // Parachute angular damping — opposes spin unconditionally when chutes deployed.
-  if (density > 0 && speed > 0 && ps.parachuteStates) {
-    const q = 0.5 * density * speed * speed;
-    let totalChuteCdA = 0;
-    for (const [instanceId, entry] of ps.parachuteStates) {
-      if (entry.state !== 'deploying' && entry.state !== 'deployed') continue;
-      const placed = assembly.parts.get(instanceId);
-      if (!placed) continue;
-      const def = getPartById(placed.partId);
-      if (!def) continue;
-      const props     = def.properties ?? {};
-      const widthM    = (def.width ?? 40) * SCALE_M_PER_PX;
-      const stowedA   = Math.PI * (widthM / 2) ** 2;
-      const stowedCdA = (props.dragCoefficient ?? 0.05) * stowedA;
-      const deployedR   = (props.deployedDiameter ?? 10) / 2;
-      const deployedCd  = props.deployedCd ?? 0.75;
-      const deployedCdA = deployedCd * Math.PI * deployedR * deployedR;
-      const progress     = _getChuteDeployProgress(ps, instanceId);
-      const densityScale = Math.min(1, density / LOW_DENSITY_THRESHOLD);
-      totalChuteCdA += stowedCdA + (deployedCdA - stowedCdA) * progress * densityScale;
-    }
-    torque -= CHUTE_ANGULAR_DAMPING * totalChuteCdA * q * ps.angularVelocity;
-  }
-
-  // Angular acceleration: capped player input + uncapped environmental torques.
-  const alpha = playerAlpha + torque / I;
+  const alpha = playerAlpha + restoringAlpha;
   ps.angularVelocity += alpha * dt;
+
+  // Parachute angular damping — applied as implicit exponential decay so it
+  // is unconditionally stable even for tiny moments of inertia.
+  // Uses a fixed decay rate modelling line/canopy drag on the pendulum swing,
+  // scaled by atmospheric density so it vanishes in vacuum.
+  if (density > 0 && ps.parachuteStates) {
+    let hasActiveChute = false;
+    for (const [, entry] of ps.parachuteStates) {
+      if (entry.state === 'deploying' || entry.state === 'deployed') {
+        hasActiveChute = true;
+        break;
+      }
+    }
+    if (hasActiveChute) {
+      const densityFrac = Math.min(1, density / LOW_DENSITY_THRESHOLD);
+      ps.angularVelocity *= Math.exp(-CHUTE_DIRECT_DAMPING * densityFrac * dt);
+    }
+  }
 
   // Damping (when no input).
   if (!left && !right) {
@@ -1178,58 +1185,144 @@ function _applyGroundedSteering(ps, assembly, left, right, dt) {
     return;
   }
 
-  // Determine tilt direction: player input takes priority to prevent
-  // oscillation when the angle is near zero.
-  let tiltDir;
-  if (right) tiltDir = 1;
-  else if (left) tiltDir = -1;
-  else tiltDir = Math.sign(ps.angle) || Math.sign(ps.angularVelocity) || 1;
-
-  // Compute pivot (contact point) and moment of inertia about it.
-  const contact = _computeGroundContactPoint(ps, assembly, tiltDir);
-  const I = _computeMomentOfInertia(ps, assembly, contact);
-
-  // Compute CoM position relative to contact point, then rotate by current angle.
-  const com = _computeCoMLocal(ps, assembly);
-  const relX = (com.x - contact.x) * SCALE_M_PER_PX;
-  const relY = (com.y - contact.y) * SCALE_M_PER_PX;
+  // --- Find ground contact point ---
+  // VAB local coords are Y-down (positive Y = screen-down = toward ground
+  // when upright).  All rotation formulas below convert from Y-down local to
+  // Y-up world using: worldX = lx·cos - ly·sin,  worldY = lx·sin + ly·cos
+  // (note the negated sin·y term compared to pure Y-up rotation).
+  //
+  // Ground contact = corner with the highest "ground proximity" value:
+  //   gp = cx·sin(θ) + cy·cos(θ)
+  // When a flat face rests on the ground (two corners share the same gp),
+  // we average them so gravity torque is zero for a symmetric upright pose.
   const cosA = Math.cos(ps.angle);
   const sinA = Math.sin(ps.angle);
-  const rotatedX = relX * cosA + relY * sinA;
+
+  // Collect all corners with their ground-proximity values.
+  const allCorners = [];
+  for (const instanceId of ps.activeParts) {
+    const placed = assembly.parts.get(instanceId);
+    if (!placed) continue;
+    const def = getPartById(placed.partId);
+    if (!def) continue;
+    const hw = (def.width  ?? 40) / 2;
+    const hh = (def.height ?? 40) / 2;
+
+    let halfW = hw;
+    // Deployed landing legs widen the effective footprint.
+    if (
+      (def.type === PartType.LANDING_LEGS || def.type === PartType.LANDING_LEG) &&
+      ps.legStates?.get(instanceId)?.state === 'deployed'
+    ) {
+      halfW *= 1.5;
+    }
+
+    const corners = [
+      [placed.x - halfW, placed.y - hh],
+      [placed.x + halfW, placed.y - hh],
+      [placed.x - halfW, placed.y + hh],
+      [placed.x + halfW, placed.y + hh],
+    ];
+    for (const [cx, cy] of corners) {
+      // Ground proximity: highest value = closest to the ground plane.
+      const gp = cx * sinA + cy * cosA;
+      allCorners.push({ cx, cy, gp });
+    }
+  }
+
+  // Find the highest ground-proximity value (closest to ground).
+  let highestGP = -Infinity;
+  for (const c of allCorners) {
+    if (c.gp > highestGP) highestGP = c.gp;
+  }
+
+  // Collect all corners within a small tolerance of the highest gp.
+  // When a face is flat on the ground, both edge corners will match.
+  const FACE_TOLERANCE = 0.01; // pixels in rotated space
+  let sumX = 0, sumY = 0, count = 0;
+  for (const c of allCorners) {
+    if (highestGP - c.gp < FACE_TOLERANCE) {
+      sumX += c.cx;
+      sumY += c.cy;
+      count++;
+    }
+  }
+  const contactLX = sumX / count;
+  const contactLY = sumY / count;
+
+  const contact = { x: contactLX, y: contactLY };
+
+  // Where is this contact point in world space right now?
+  // Y-down local → Y-up world X: posX + (lx·cos - ly·sin) * SCALE
+  const contactWorldX = ps.posX + (contactLX * cosA - contactLY * sinA) * SCALE_M_PER_PX;
+
+  // Compute moment of inertia about the contact point.
+  const I = _computeMomentOfInertia(ps, assembly, contact);
+
+  // Compute CoM position relative to contact point, then rotate to get
+  // the world-X offset (horizontal distance for gravity torque).
+  // Y-down local → Y-up world X: relX·cos - relY·sin
+  const com = _computeCoMLocal(ps, assembly);
+  const relX = (com.x - contactLX) * SCALE_M_PER_PX;
+  const relY = (com.y - contactLY) * SCALE_M_PER_PX;
+  const rotatedX = relX * cosA - relY * sinA;
 
   // Gravity torque: weight × horizontal distance from contact to CoM.
   // Positive rotatedX → CoM is to the right of contact → positive (clockwise) torque.
   const totalMass = _computeTotalMass(ps, assembly);
   const gravityTorque = totalMass * G0 * rotatedX;
 
-  // Player input torque.
-  let inputTorque = 0;
-  if (right) inputTorque += PLAYER_TIP_TORQUE;
-  if (left)  inputTorque -= PLAYER_TIP_TORQUE;
+  // Player input torque — capped per angular acceleration so light parts
+  // don't instantly topple.
+  let inputAccel = 0;
+  if (right) inputAccel += PLAYER_TIP_TORQUE / I;
+  if (left)  inputAccel -= PLAYER_TIP_TORQUE / I;
+  inputAccel = Math.max(-MAX_PLAYER_TIP_ACCEL, Math.min(MAX_PLAYER_TIP_ACCEL, inputAccel));
 
   // Net angular acceleration.
-  const netTorque = gravityTorque + inputTorque;
-  const angAccel = netTorque / I;
+  const gravAccel = gravityTorque / I;
+  const angAccel = gravAccel + inputAccel;
 
   // Euler integrate.
   ps.angularVelocity += angAccel * dt;
   ps.angularVelocity *= GROUND_ANGULAR_DAMPING;
   ps.angle += ps.angularVelocity * dt;
 
+  // --- Reposition so the contact corner stays on the ground surface ---
+  // posY stays at 0 — the renderer handles visual ground-pinning via the pivot.
+  // Only posX updates so the box rolls horizontally along the ground.
+  const cosB = Math.cos(ps.angle);
+  const sinB = Math.sin(ps.angle);
+  ps.posX = contactWorldX - (contactLX * cosB - contactLY * sinB) * SCALE_M_PER_PX;
+  ps.posY = 0;
+
   // Update tipping state for renderer.
   ps.isTipping = Math.abs(ps.angle) > TILT_SNAP_THRESHOLD;
-  ps.tippingContactX = contact.x;
-  ps.tippingContactY = contact.y;
+  ps.tippingContactX = contactLX;
+  ps.tippingContactY = contactLY;
 
-  // Snap near-zero.
-  if (
-    !left && !right &&
-    Math.abs(ps.angle) < TILT_SNAP_THRESHOLD &&
-    Math.abs(ps.angularVelocity) < ANGULAR_VEL_SNAP_THRESHOLD
-  ) {
-    ps.angle = 0;
-    ps.angularVelocity = 0;
-    ps.isTipping = false;
+  // --- Snap to rest ---
+  // When angular velocity is negligible and gravity torque is small (near a
+  // stable resting orientation), freeze the capsule so it doesn't rock forever.
+  if (!left && !right && Math.abs(ps.angularVelocity) < ANGULAR_VEL_SNAP_THRESHOLD) {
+    // Recompute gravity torque at the new angle to check if we're near equilibrium.
+    const comSnap  = _computeCoMLocal(ps, assembly);
+    const sRelX    = (comSnap.x - contactLX) * SCALE_M_PER_PX;
+    const sRelY    = (comSnap.y - contactLY) * SCALE_M_PER_PX;
+    const sRotX    = sRelX * cosB - sRelY * sinB;
+    const snapGrav = totalMass * G0 * sRotX;
+    const snapAccel = Math.abs(snapGrav / I);
+
+    if (snapAccel < 2.0) {
+      // Near equilibrium — freeze in place.
+      ps.angularVelocity = 0;
+      // If also near upright, snap angle to exactly 0.
+      if (Math.abs(ps.angle) < TILT_SNAP_THRESHOLD) {
+        ps.angle = 0;
+        ps.isTipping = false;
+        ps.posY = 0;
+      }
+    }
   }
 }
 

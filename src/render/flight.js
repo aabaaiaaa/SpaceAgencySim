@@ -216,8 +216,8 @@ let _lastTrailTime = null;
 // Camera state — world-space centre of the viewport
 // ---------------------------------------------------------------------------
 
-/** Lerp speed for camera smoothing (units per second; higher = snappier). */
-const CAMERA_LERP_SPEED = 25;
+/** Rate at which the CoM offset decays (metres per second). */
+const CAM_OFFSET_DECAY_RATE = 2.0;
 
 /** World X (metres) the camera is centred on. */
 let _camWorldX = 0;
@@ -225,11 +225,23 @@ let _camWorldX = 0;
 /** World Y (metres) the camera is centred on. */
 let _camWorldY = 0;
 
-/** Timestamp of the last camera update (ms), used to compute dt for lerp. */
+/** Timestamp of the last camera update (ms), used to compute dt. */
 let _lastCamTime = null;
 
 /** When true, the camera snaps instantly to target on the next update. */
 let _camSnap = true;
+
+/** Previous frame's camera target X (metres), for detecting CoM jumps. */
+let _prevTargetX = null;
+
+/** Previous frame's camera target Y (metres), for detecting CoM jumps. */
+let _prevTargetY = null;
+
+/** Residual offset X (metres) — absorbs CoM jumps, decays toward zero. */
+let _camOffsetX = 0;
+
+/** Residual offset Y (metres) — absorbs CoM jumps, decays toward zero. */
+let _camOffsetY = 0;
 
 // ---------------------------------------------------------------------------
 // Zoom state
@@ -337,13 +349,16 @@ function _worldToScreen(worldX, worldY, screenW, screenH) {
  * @param {import('../core/rocketbuilder.js').RocketAssembly}   assembly
  */
 function _updateCamera(ps, assembly) {
-  // Determine target position.
+  // Determine target position and its reference origin (rocket or debris).
   let targetX, targetY;
+  let refX, refY;
 
   if (_hasCommandModule(ps.activeParts, assembly)) {
     const com = _computeCoM(ps.fuelStore, assembly, ps.activeParts, ps.posX, ps.posY);
     targetX = com.x;
     targetY = com.y;
+    refX = ps.posX;
+    refY = ps.posY;
   } else {
     // Search debris fragments for the one containing the command module.
     let found = false;
@@ -352,6 +367,8 @@ function _updateCamera(ps, assembly) {
         const com = _computeCoM(debris.fuelStore, assembly, debris.activeParts, debris.posX, debris.posY);
         targetX = com.x;
         targetY = com.y;
+        refX = debris.posX;
+        refY = debris.posY;
         found = true;
         break;
       }
@@ -359,23 +376,57 @@ function _updateCamera(ps, assembly) {
     if (!found) {
       targetX = ps.posX;
       targetY = ps.posY;
+      refX = ps.posX;
+      refY = ps.posY;
     }
   }
+
+  // Detect CoM jumps relative to the rocket body (not world position).
+  // This ignores rocket velocity and only fires on structural changes like
+  // staging or sudden fuel shifts.
+  const relX = targetX - refX;
+  const relY = targetY - refY;
+  if (_prevTargetX !== null) {
+    const jumpX = relX - _prevTargetX;
+    const jumpY = relY - _prevTargetY;
+    if (Math.abs(jumpX) > 0.05 || Math.abs(jumpY) > 0.05) {
+      _camOffsetX -= jumpX;
+      _camOffsetY -= jumpY;
+    }
+  }
+
+  _prevTargetX = relX;
+  _prevTargetY = relY;
 
   // Compute dt from wall-clock time.
   const now = performance.now();
   const dt  = _lastCamTime !== null ? (now - _lastCamTime) / 1000 : 0;
   _lastCamTime = now;
 
-  // Snap instantly on first frame or after reset; otherwise lerp smoothly.
+  // Decay the offset toward zero at a fixed rate (metres/s).
+  if (_camOffsetX !== 0 || _camOffsetY !== 0) {
+    const decay = CAM_OFFSET_DECAY_RATE * dt;
+    const dist  = Math.sqrt(_camOffsetX * _camOffsetX + _camOffsetY * _camOffsetY);
+    if (dist <= decay) {
+      _camOffsetX = 0;
+      _camOffsetY = 0;
+    } else {
+      const ratio = decay / dist;
+      _camOffsetX -= _camOffsetX * ratio;
+      _camOffsetY -= _camOffsetY * ratio;
+    }
+  }
+
   if (_camSnap || dt === 0) {
-    _camWorldX = targetX;
-    _camWorldY = targetY;
-    _camSnap = false;
+    _camWorldX  = targetX;
+    _camWorldY  = targetY;
+    _camSnap    = false;
+    _camOffsetX = 0;
+    _camOffsetY = 0;
   } else {
-    const t = Math.min(1, CAMERA_LERP_SPEED * dt);
-    _camWorldX += (targetX - _camWorldX) * t;
-    _camWorldY += (targetY - _camWorldY) * t;
+    // Always snap to target — no lag. Offset provides smooth CoM transitions.
+    _camWorldX = targetX + _camOffsetX;
+    _camWorldY = targetY + _camOffsetY;
   }
 }
 
@@ -782,6 +833,8 @@ function _renderRocket(ps, assembly, w, h) {
 
   // When tipping on the ground, rotate around the contact point (base corner)
   // instead of the centre of mass so the rocket visually tips from its base.
+  // The physics provides a rotation-aware contact point that tracks the actual
+  // lowest corner at the current angle, so we pin it to the ground directly.
   if ((ps.grounded || ps.landed) && ps.isTipping) {
     // Contact point in container-local coords (Y-down).
     const pivotX =  ps.tippingContactX;
@@ -789,8 +842,9 @@ function _renderRocket(ps, assembly, w, h) {
 
     _rocketContainer.pivot.set(pivotX, pivotY);
     // Pin the contact point to the ground line on screen.
+    // posY is 0 during tipping, so sy IS the ground line.
     _rocketContainer.x = sx + pivotX;
-    _rocketContainer.y = sy + lowestPartBottomPx + pivotY;
+    _rocketContainer.y = sy;
   } else {
     // Normal mode: rotate around CoM.
     _rocketContainer.pivot.set(comLocalX, comLocalY);
@@ -1213,10 +1267,14 @@ export function initFlightRenderer() {
   _lastTrailTime = null;
 
   // Reset camera to launch-pad origin.
-  _camWorldX  = 0;
-  _camWorldY  = 0;
+  _camWorldX   = 0;
+  _camWorldY   = 0;
   _lastCamTime = null;
   _camSnap     = true;
+  _prevTargetX = null;
+  _prevTargetY = null;
+  _camOffsetX  = 0;
+  _camOffsetY  = 0;
 
   // Reset zoom and initialise mouse tracking.
   _zoomLevel = 1.0;
@@ -1311,6 +1369,10 @@ export function destroyFlightRenderer() {
   _camWorldY   = 0;
   _lastCamTime = null;
   _camSnap     = true;
+  _prevTargetX = null;
+  _prevTargetY = null;
+  _camOffsetX  = 0;
+  _camOffsetY  = 0;
 
   // Remove zoom input handlers.
   if (_wheelHandler) {
@@ -1392,7 +1454,7 @@ export function hitTestFlightPart(screenX, screenY, ps, assembly) {
     pivotX     =  ps.tippingContactX;
     pivotY     = -ps.tippingContactY;
     containerX = sx + pivotX;
-    containerY = sy + lowestPartBottomPx + pivotY;
+    containerY = sy;
   } else {
     pivotX     = comLocalX;
     pivotY     = comLocalY;

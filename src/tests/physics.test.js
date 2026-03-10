@@ -2073,8 +2073,8 @@ describe('Parachute stabilization torque', () => {
     }
 
     // Both started at +0.5 rad. Mk2 (35 m) should have corrected more toward
-    // (and possibly past) 0 — its raw angle will be smaller than Mk1's.
-    expect(psMk2.angle).toBeLessThan(psMk1.angle);
+    // 0 — its absolute angle will be closer to upright than Mk1's.
+    expect(Math.abs(psMk2.angle)).toBeLessThan(Math.abs(psMk1.angle));
   });
 });
 
