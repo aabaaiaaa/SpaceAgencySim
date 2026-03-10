@@ -40,6 +40,12 @@ coverage/
 playwright-report/
 test-results/
 
+# Claude Code
+.claude/
+
+# Project notes
+current-issues.txt
+
 # Misc
 *.bak
 *.tmp

@@ -836,15 +836,43 @@ function _renderRocket(ps, assembly, w, h) {
   // The physics provides a rotation-aware contact point that tracks the actual
   // lowest corner at the current angle, so we pin it to the ground directly.
   if ((ps.grounded || ps.landed) && ps.isTipping) {
-    // Contact point in container-local coords (Y-down).
+    // Contact point in container-local coords (Y-down screen convention).
     const pivotX =  ps.tippingContactX;
-    const pivotY = -ps.tippingContactY;  // VAB Y-up → container Y-down
+    const pivotY = -ps.tippingContactY;
+    const cosA = Math.cos(ps.angle);
+    const sinA = Math.sin(ps.angle);
 
     _rocketContainer.pivot.set(pivotX, pivotY);
-    // Pin the contact point to the ground line on screen.
-    // posY is 0 during tipping, so sy IS the ground line.
-    _rocketContainer.x = sx + pivotX;
-    _rocketContainer.y = sy;
+
+    // The contact's world-X position accounts for rotation (Y-down→Y-up):
+    //   contactWorldX = posX + (lx·cosA - ly·sinA) · SCALE
+    // At zoom=1 SCALE·ppm=1, so screen offset from sx = lx·cosA - ly·sinA.
+    _rocketContainer.x = sx + ps.tippingContactX * cosA - ps.tippingContactY * sinA;
+
+    // Compute how far below the pivot the visual bottom of the rotated rocket
+    // extends (the "drop"), then offset container.y so the visual bottom sits
+    // at the ground line (sy) instead of the pivot.
+    let maxDrop = 0;
+    for (const instanceId of ps.activeParts) {
+      const placed = assembly.parts.get(instanceId);
+      const def    = placed ? getPartById(placed.partId) : null;
+      if (!def) continue;
+      const hw = (def.width  ?? 40) / 2;
+      const hh = (def.height ?? 40) / 2;
+      const corners = [
+        [placed.x - hw, placed.y - hh],
+        [placed.x + hw, placed.y - hh],
+        [placed.x - hw, placed.y + hh],
+        [placed.x + hw, placed.y + hh],
+      ];
+      for (const [cx, cy] of corners) {
+        // Screen-Y offset from pivot (positive = below pivot on screen).
+        const drop = (cx - ps.tippingContactX) * sinA
+                   + (ps.tippingContactY - cy) * cosA;
+        if (drop > maxDrop) maxDrop = drop;
+      }
+    }
+    _rocketContainer.y = sy - maxDrop;
   } else {
     // Normal mode: rotate around CoM.
     _rocketContainer.pivot.set(comLocalX, comLocalY);
@@ -1453,8 +1481,30 @@ export function hitTestFlightPart(screenX, screenY, ps, assembly) {
   if ((ps.grounded || ps.landed) && ps.isTipping) {
     pivotX     =  ps.tippingContactX;
     pivotY     = -ps.tippingContactY;
-    containerX = sx + pivotX;
-    containerY = sy;
+    const cosA = Math.cos(ps.angle);
+    const sinA = Math.sin(ps.angle);
+    containerX = sx + ps.tippingContactX * cosA - ps.tippingContactY * sinA;
+    // Compute visual drop (same logic as _renderRocket tipping path).
+    let maxDrop = 0;
+    for (const instanceId of ps.activeParts) {
+      const placed = assembly.parts.get(instanceId);
+      const def    = placed ? getPartById(placed.partId) : null;
+      if (!def) continue;
+      const hw = (def.width  ?? 40) / 2;
+      const hh = (def.height ?? 40) / 2;
+      const corners = [
+        [placed.x - hw, placed.y - hh],
+        [placed.x + hw, placed.y - hh],
+        [placed.x - hw, placed.y + hh],
+        [placed.x + hw, placed.y + hh],
+      ];
+      for (const [cx, cy] of corners) {
+        const drop = (cx - ps.tippingContactX) * sinA
+                   + (ps.tippingContactY - cy) * cosA;
+        if (drop > maxDrop) maxDrop = drop;
+      }
+    }
+    containerY = sy - maxDrop;
   } else {
     pivotX     = comLocalX;
     pivotY     = comLocalY;

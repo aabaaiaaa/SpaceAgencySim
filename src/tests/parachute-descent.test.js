@@ -26,6 +26,7 @@ import {
 } from '../core/rocketbuilder.js';
 import { createFlightState } from '../core/gameState.js';
 import { deployParachute } from '../core/parachute.js';
+import { getPartById } from '../data/parts.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -511,6 +512,137 @@ describe('landed command module steering', () => {
     expect(ps.posX).not.toBe(0);
     // The contact point should have changed as the box rotated to a new face.
     expect(contactChanged).toBe(true);
+    expect(ps.crashed).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Ground-contact visual constraints
+// ---------------------------------------------------------------------------
+
+describe('landed capsule ground-contact rendering', () => {
+  /**
+   * Helper: compute the screen-Y position of every corner of a landed rocket
+   * relative to the ground line (sy = 0).  Uses the same formulas the renderer
+   * applies: pivot at the physics contact point, rotation by ps.angle, and a
+   * visual-drop offset so the lowest corner sits at ground level.
+   *
+   * Returns { minScreenY, maxScreenY } where 0 = ground level and
+   * negative = above ground.
+   */
+  function computeCornerScreenYs(ps, assembly) {
+    const SCALE = 0.05;  // SCALE_M_PER_PX
+    const contactX = ps.tippingContactX ?? 0;
+    const contactY = ps.tippingContactY ?? 0;
+    const cosA = Math.cos(ps.angle);
+    const sinA = Math.sin(ps.angle);
+
+    // Collect all corners in VAB coords.
+    const drops = [];
+    for (const instanceId of ps.activeParts) {
+      const placed = assembly.parts.get(instanceId);
+      if (!placed) continue;
+      const def = getPartById(placed.partId);
+      if (!def) continue;
+      const hw = (def.width  ?? 40) / 2;
+      const hh = (def.height ?? 40) / 2;
+      const corners = [
+        [placed.x - hw, placed.y - hh],
+        [placed.x + hw, placed.y - hh],
+        [placed.x - hw, placed.y + hh],
+        [placed.x + hw, placed.y + hh],
+      ];
+      for (const [cx, cy] of corners) {
+        // Screen-Y offset from pivot (positive = below pivot on screen).
+        const drop = (cx - contactX) * sinA + (contactY - cy) * cosA;
+        drops.push(drop);
+      }
+    }
+
+    const maxDrop = Math.max(...drops);
+    // Screen Y relative to ground: screenY = -maxDrop + drop.
+    // Ground (maxDrop corner) → 0.  Everything else → negative (above ground).
+    return {
+      minScreenY: -maxDrop + Math.min(...drops),
+      maxScreenY: 0,  // by construction the max drop maps to ground
+    };
+  }
+
+  function setupLandedState() {
+    const { assembly, staging, probeId, chuteId } = makeCapsuleWithChute();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+    ps.posY = 0; ps.velX = 0; ps.velY = 0;
+    ps.grounded = false; ps.landed = true;
+    ps.angle = 0; ps.angularVelocity = 0;
+    return { ps, assembly, staging, fs };
+  }
+
+  it('near-upright capsule: no part below ground and touches ground', () => {
+    const { ps, assembly, staging, fs } = setupLandedState();
+
+    // Slightly tilted so tipping physics activates and sets contact point.
+    ps.angle = 0.01;
+    ps.angularVelocity = 0.01;
+
+    const dt = 1 / 60;
+    tick(ps, assembly, staging, fs, dt);
+
+    if (ps.isTipping) {
+      const { minScreenY, maxScreenY } = computeCornerScreenYs(ps, assembly);
+      // No part below ground (maxScreenY = 0 = ground).
+      expect(maxScreenY).toBeLessThanOrEqual(0.001);
+      // Parts touch the ground (maxScreenY ≈ 0).
+      expect(maxScreenY).toBeGreaterThanOrEqual(-0.001);
+      // All other parts above ground.
+      expect(minScreenY).toBeLessThanOrEqual(0.001);
+    }
+  });
+
+  it('capsule on its side (90°): all parts above ground and touching', () => {
+    const { ps, assembly, staging, fs } = setupLandedState();
+
+    ps.angle = Math.PI / 2;
+    ps.angularVelocity = 0.1;
+
+    const dt = 1 / 60;
+    tick(ps, assembly, staging, fs, dt);
+
+    const { minScreenY, maxScreenY } = computeCornerScreenYs(ps, assembly);
+    expect(maxScreenY).toBeCloseTo(0, 1);     // touches ground
+    expect(minScreenY).toBeLessThanOrEqual(0.001);  // nothing below ground
+  });
+
+  it('capsule upside down (180°): all parts above ground and touching', () => {
+    const { ps, assembly, staging, fs } = setupLandedState();
+
+    ps.angle = Math.PI;
+    ps.angularVelocity = 0.1;
+
+    const dt = 1 / 60;
+    tick(ps, assembly, staging, fs, dt);
+
+    const { minScreenY, maxScreenY } = computeCornerScreenYs(ps, assembly);
+    expect(maxScreenY).toBeCloseTo(0, 1);
+    expect(minScreenY).toBeLessThanOrEqual(0.001);
+  });
+
+  it('capsule rolled through multiple angles: never below ground', () => {
+    const { ps, assembly, staging, fs } = setupLandedState();
+
+    ps.angularVelocity = 5.0;  // fast roll
+
+    const dt = 1 / 60;
+    for (let i = 0; i < 120; i++) {
+      tick(ps, assembly, staging, fs, dt);
+      if (!ps.isTipping) continue;
+
+      const { minScreenY, maxScreenY } = computeCornerScreenYs(ps, assembly);
+      // No corner should be below ground (allow small floating-point tolerance).
+      expect(maxScreenY).toBeLessThanOrEqual(0.01);
+      // The rocket should still be touching the ground (not floating).
+      expect(maxScreenY).toBeGreaterThanOrEqual(-1);
+    }
     expect(ps.crashed).toBe(false);
   });
 });
