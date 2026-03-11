@@ -48,7 +48,7 @@ import { PartType }                 from './constants.js';
 import { airDensity, SEA_LEVEL_DENSITY } from './atmosphere.js';
 import { tickFuelSystem }           from './fuelsystem.js';
 import { deployParachute, DEPLOY_DURATION, LOW_DENSITY_THRESHOLD } from './parachute.js';
-import { deployLandingLeg } from './legs.js';
+import { deployLandingLeg, getDeployedLegFootOffset } from './legs.js';
 import { activateEjectorSeat } from './ejector.js';
 import { activateScienceModule } from './sciencemodule.js';
 import { applySeparationImpulse } from './collision.js';
@@ -717,7 +717,13 @@ function _renormalizeAfterSeparation(ps, assembly, extraDebris = []) {
     const placed = assembly.parts.get(instanceId);
     const def    = placed ? getPartById(placed.partId) : null;
     if (!def) continue;
-    const bottom = placed.y - (def.height ?? 40) / 2;
+    let bottom = placed.y - (def.height ?? 40) / 2;
+    // Deployed legs extend below their bounding box.
+    if (def.type === PartType.LANDING_LEGS || def.type === PartType.LANDING_LEG) {
+      const { dy } = getDeployedLegFootOffset(instanceId, def, ps.legStates);
+      const footY = placed.y - dy;
+      if (footY < bottom) bottom = footY;
+    }
     lowestBottom = Math.min(lowestBottom, bottom);
   }
 

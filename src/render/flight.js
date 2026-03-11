@@ -34,6 +34,7 @@ import { getPartById } from '../data/parts.js';
 import { PartType }    from '../core/constants.js';
 import { airDensity }  from '../core/atmosphere.js';
 import { DEPLOY_DURATION } from '../core/parachute.js';
+import { LegState, LEG_DEPLOY_DURATION, getDeployedLegFootOffset } from '../core/legs.js';
 
 // ---------------------------------------------------------------------------
 // Scale constants
@@ -630,6 +631,105 @@ function _drawPartRect(g, placed, def, alpha = 1) {
 }
 
 /**
+ * Determine which side of the rocket a landing leg is attached to by
+ * inspecting the assembly's connection graph.  Returns +1 for right-side
+ * legs and -1 for left-side legs.
+ *
+ * @param {import('../core/rocketbuilder.js').PlacedPart}    placed
+ * @param {import('../core/rocketbuilder.js').RocketAssembly} assembly
+ * @returns {number}  +1 (right) or -1 (left).
+ */
+function _getLegSide(placed, assembly) {
+  if (assembly?.connections) {
+    for (const conn of assembly.connections) {
+      let parentInstanceId, parentSnapIndex;
+      if (conn.fromInstanceId === placed.instanceId) {
+        parentInstanceId = conn.toInstanceId;
+        parentSnapIndex  = conn.toSnapIndex;
+      } else if (conn.toInstanceId === placed.instanceId) {
+        parentInstanceId = conn.fromInstanceId;
+        parentSnapIndex  = conn.fromSnapIndex;
+      } else {
+        continue;
+      }
+      const parentPlaced = assembly.parts.get(parentInstanceId);
+      if (!parentPlaced) continue;
+      const parentDef = getPartById(parentPlaced.partId);
+      if (!parentDef) continue;
+      const snap = parentDef.snapPoints[parentSnapIndex];
+      if (snap) {
+        if (snap.side === 'left')  return -1;
+        if (snap.side === 'right') return  1;
+      }
+    }
+  }
+  // Fallback: use the leg's X position relative to centre (debris edge case).
+  return (placed.x >= 0) ? 1 : -1;
+}
+
+/**
+ * Draw a landing leg with state-aware deployment animation.
+ *
+ * Retracted: narrow rectangle flush against the rocket body.
+ * Deploying: struts interpolating outward/downward over LEG_DEPLOY_DURATION.
+ * Deployed:  angled struts extending below and outward with a foot pad.
+ *
+ * @param {PIXI.Graphics}                                    g
+ * @param {import('../core/rocketbuilder.js').PlacedPart}     placed
+ * @param {import('../data/parts.js').PartDef}                def
+ * @param {object}                                            ps      PhysicsState or debris object (needs legStates).
+ * @param {number}                                            [alpha=1]
+ */
+function _drawLandingLeg(g, placed, def, ps, assembly, alpha = 1) {
+  const lx = placed.x;
+  const ly = -placed.y;
+  const pw = def.width  ?? 40;
+  const ph = def.height ?? 20;
+
+  const fill   = PART_FILL[def.type]   ?? 0x0e2040;
+  const stroke = PART_STROKE[def.type] ?? 0x2060a0;
+
+  // Determine which side of the rocket this leg is on via connection graph.
+  const side = _getLegSide(placed, assembly);
+
+  // Get deployment progress via shared helper.
+  const { dx, dy, t } = getDeployedLegFootOffset(placed.instanceId, def, ps.legStates);
+
+  // --- Housing rectangle (always drawn at attachment point) ---
+  const housingW = pw * 0.5;
+  const housingH = ph * 0.4;
+  g.rect(lx - housingW / 2, ly - housingH / 2, housingW, housingH);
+  g.fill({ color: fill, alpha });
+  g.stroke({ color: stroke, width: 1, alpha });
+
+  // --- Foot point (interpolated) ---
+  const footX = lx + dx * side;
+  const footY = ly + dy;
+
+  // Upper strut: from top of housing to foot.
+  const upperStartX = lx;
+  const upperStartY = ly - ph / 4;
+  g.moveTo(upperStartX, upperStartY);
+  g.lineTo(footX, footY);
+  g.stroke({ color: stroke, width: 2, alpha });
+
+  // Lower strut: from bottom of housing to foot.
+  const lowerStartX = lx;
+  const lowerStartY = ly + ph / 4;
+  g.moveTo(lowerStartX, lowerStartY);
+  g.lineTo(footX, footY);
+  g.stroke({ color: stroke, width: 2, alpha });
+
+  // --- Foot pad (horizontal line at foot, visible when deploying/deployed) ---
+  if (t > 0) {
+    const padHalf = pw * 0.3 * t;
+    g.moveTo(footX - padHalf, footY);
+    g.lineTo(footX + padHalf, footY);
+    g.stroke({ color: stroke, width: 3, alpha });
+  }
+}
+
+/**
  * Create a PIXI.Text label for a part, positioned at the part's centre in
  * local container space.
  *
@@ -824,7 +924,12 @@ function _renderRocket(ps, assembly, w, h) {
       const placed = assembly.parts.get(instanceId);
       const def    = placed ? getPartById(placed.partId) : null;
       if (!def) continue;
-      const bottom = placed.y - (def.height ?? 40) / 2;
+      let bottom = placed.y - (def.height ?? 40) / 2;
+      if (def.type === PartType.LANDING_LEGS || def.type === PartType.LANDING_LEG) {
+        const { dy } = getDeployedLegFootOffset(instanceId, def, ps.legStates);
+        const footVabY = placed.y - dy;
+        if (footVabY < bottom) bottom = footVabY;
+      }
       if (bottom < lowestPartBottomPx) lowestPartBottomPx = bottom;
     }
   }
@@ -844,10 +949,10 @@ function _renderRocket(ps, assembly, w, h) {
 
     _rocketContainer.pivot.set(pivotX, pivotY);
 
-    // The contact's world-X position accounts for rotation (Y-down→Y-up):
-    //   contactWorldX = posX + (lx·cosA - ly·sinA) · SCALE
-    // At zoom=1 SCALE·ppm=1, so screen offset from sx = lx·cosA - ly·sinA.
-    _rocketContainer.x = sx + ps.tippingContactX * cosA - ps.tippingContactY * sinA;
+    // The contact's world-X position accounts for Y-up clockwise rotation:
+    //   contactWorldX = posX + (lx·cosA + ly·sinA) · SCALE
+    // At zoom=1 SCALE·ppm=1, so screen offset from sx = lx·cosA + ly·sinA.
+    _rocketContainer.x = sx + ps.tippingContactX * cosA + ps.tippingContactY * sinA;
 
     // Compute how far below the pivot the visual bottom of the rotated rocket
     // extends (the "drop"), then offset container.y so the visual bottom sits
@@ -859,11 +964,17 @@ function _renderRocket(ps, assembly, w, h) {
       if (!def) continue;
       const hw = (def.width  ?? 40) / 2;
       const hh = (def.height ?? 40) / 2;
+      let effHW = hw, effBottomH = hh;
+      if (def.type === PartType.LANDING_LEGS || def.type === PartType.LANDING_LEG) {
+        const { dx, dy } = getDeployedLegFootOffset(instanceId, def, ps.legStates);
+        effHW = Math.max(hw, dx);
+        effBottomH = Math.max(hh, dy);
+      }
       const corners = [
-        [placed.x - hw, placed.y - hh],
-        [placed.x + hw, placed.y - hh],
-        [placed.x - hw, placed.y + hh],
-        [placed.x + hw, placed.y + hh],
+        [placed.x - effHW, placed.y - effBottomH],
+        [placed.x + effHW, placed.y - effBottomH],
+        [placed.x - effHW, placed.y + hh],
+        [placed.x + effHW, placed.y + hh],
       ];
       for (const [cx, cy] of corners) {
         // Screen-Y offset from pivot (positive = below pivot on screen).
@@ -889,7 +1000,11 @@ function _renderRocket(ps, assembly, w, h) {
     const placed = assembly.parts.get(instanceId);
     const def    = placed ? getPartById(placed.partId) : null;
     if (!def) continue;
-    _drawPartRect(g, placed, def, 0.9);
+    if (def.type === PartType.LANDING_LEGS || def.type === PartType.LANDING_LEG) {
+      _drawLandingLeg(g, placed, def, ps, assembly, 0.9);
+    } else {
+      _drawPartRect(g, placed, def, 0.9);
+    }
   }
 
   // Draw deployed parachute canopies independently (in world space, not rotating with rocket).
@@ -945,7 +1060,11 @@ function _renderDebris(debrisList, assembly, w, h) {
       const placed = assembly.parts.get(instanceId);
       const def    = placed ? getPartById(placed.partId) : null;
       if (!def) continue;
-      _drawPartRect(g, placed, def, 0.5);
+      if (def.type === PartType.LANDING_LEGS || def.type === PartType.LANDING_LEG) {
+        _drawLandingLeg(g, placed, def, debris, assembly, 0.5);
+      } else {
+        _drawPartRect(g, placed, def, 0.5);
+      }
     }
 
     // Labels at matching opacity.
@@ -1472,7 +1591,12 @@ export function hitTestFlightPart(screenX, screenY, ps, assembly) {
       const placed = assembly.parts.get(instanceId);
       const def    = placed ? getPartById(placed.partId) : null;
       if (!def) continue;
-      const bottom = placed.y - (def.height ?? 40) / 2;
+      let bottom = placed.y - (def.height ?? 40) / 2;
+      if (def.type === PartType.LANDING_LEGS || def.type === PartType.LANDING_LEG) {
+        const { dy } = getDeployedLegFootOffset(instanceId, def, ps.legStates);
+        const footVabY = placed.y - dy;
+        if (footVabY < bottom) bottom = footVabY;
+      }
       if (bottom < lowestPartBottomPx) lowestPartBottomPx = bottom;
     }
   }
@@ -1483,7 +1607,7 @@ export function hitTestFlightPart(screenX, screenY, ps, assembly) {
     pivotY     = -ps.tippingContactY;
     const cosA = Math.cos(ps.angle);
     const sinA = Math.sin(ps.angle);
-    containerX = sx + ps.tippingContactX * cosA - ps.tippingContactY * sinA;
+    containerX = sx + ps.tippingContactX * cosA + ps.tippingContactY * sinA;
     // Compute visual drop (same logic as _renderRocket tipping path).
     let maxDrop = 0;
     for (const instanceId of ps.activeParts) {
@@ -1492,11 +1616,17 @@ export function hitTestFlightPart(screenX, screenY, ps, assembly) {
       if (!def) continue;
       const hw = (def.width  ?? 40) / 2;
       const hh = (def.height ?? 40) / 2;
+      let effHW = hw, effBottomH = hh;
+      if (def.type === PartType.LANDING_LEGS || def.type === PartType.LANDING_LEG) {
+        const { dx, dy } = getDeployedLegFootOffset(instanceId, def, ps.legStates);
+        effHW = Math.max(hw, dx);
+        effBottomH = Math.max(hh, dy);
+      }
       const corners = [
-        [placed.x - hw, placed.y - hh],
-        [placed.x + hw, placed.y - hh],
-        [placed.x - hw, placed.y + hh],
-        [placed.x + hw, placed.y + hh],
+        [placed.x - effHW, placed.y - effBottomH],
+        [placed.x + effHW, placed.y - effBottomH],
+        [placed.x - effHW, placed.y + hh],
+        [placed.x + effHW, placed.y + hh],
       ];
       for (const [cx, cy] of corners) {
         const drop = (cx - ps.tippingContactX) * sinA

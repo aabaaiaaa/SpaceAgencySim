@@ -788,7 +788,7 @@ function _loop(timestamp) {
 
   // Auto-trigger the post-flight summary when the rocket crashes or all
   // command modules are destroyed (the rocket becomes uncontrollable).
-  if (!_summaryShown && !_ps.grounded) {
+  if (!_summaryShown && (!_ps.grounded || _ps.crashed)) {
     const shouldAutoTrigger = _ps.crashed || _allCommandModulesDestroyed();
     if (shouldAutoTrigger) {
       _summaryShown = true;

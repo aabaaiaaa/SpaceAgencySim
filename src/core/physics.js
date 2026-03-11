@@ -67,6 +67,7 @@ import {
   initLegStates,
   tickLegs,
   countDeployedLegs,
+  getDeployedLegFootOffset,
   LegState,
 } from './legs.js';
 import { initEjectorStates } from './ejector.js';
@@ -659,9 +660,7 @@ function _integrate(ps, assembly, flightState) {
 
   // --- 9b. Landing leg state machine ---------------------------------------
   // Advance deploying → deployed timers for all landing legs.
-  if (!ps.grounded) {
-    tickLegs(ps, assembly, flightState, FIXED_DT);
-  }
+  tickLegs(ps, assembly, flightState, FIXED_DT);
 
   // --- 9c. Science module experiment timers --------------------------------
   // Decrement running experiment countdowns; emit SCIENCE_COLLECTED on
@@ -782,15 +781,15 @@ function _computeGroundContactPoint(ps, assembly, tiltDirection) {
     const halfH = (def.height ?? 40) / 2;
     let halfW = (def.width ?? 40) / 2;
 
-    // Deployed landing legs widen the effective footprint.
-    if (
-      (def.type === PartType.LANDING_LEGS || def.type === PartType.LANDING_LEG) &&
-      ps.legStates?.get(instanceId)?.state === 'deployed'
-    ) {
-      halfW *= 1.5;
+    let bottomY = placed.y - halfH;
+    // Deployed landing legs extend the foot below the housing.
+    if (def.type === PartType.LANDING_LEGS || def.type === PartType.LANDING_LEG) {
+      const { dx, dy } = getDeployedLegFootOffset(instanceId, def, ps.legStates);
+      if (dy > 0) {
+        bottomY = placed.y - dy;
+        halfW = Math.max(halfW, dx);
+      }
     }
-
-    const bottomY = placed.y - halfH;
 
     if (bottomY < lowestY - 0.5) {
       // New lowest level — reset.
@@ -1174,12 +1173,32 @@ function _hasActiveParachutes(ps) {
   return false;
 }
 
+function _hasAsymmetricLegs(ps, assembly) {
+  if (!ps.legStates || ps.legStates.size === 0) return false;
+  let hasDeployed = false;
+  let hasRetracted = false;
+  for (const instanceId of ps.activeParts) {
+    const entry = ps.legStates.get(instanceId);
+    if (!entry) continue;
+    if (entry.state === LegState.DEPLOYED || entry.state === LegState.DEPLOYING) {
+      hasDeployed = true;
+    } else {
+      hasRetracted = true;
+    }
+    if (hasDeployed && hasRetracted) return true;
+  }
+  return false;
+}
+
 function _applyGroundedSteering(ps, assembly, left, right, dt) {
-  // If upright with no input and no angular velocity, nothing to do.
+  // If upright with no input and no angular velocity, nothing to do —
+  // UNLESS legs are asymmetrically deployed (one deployed, one retracted),
+  // which creates an off-centre contact point that should cause tipping.
   if (
     !left && !right &&
     Math.abs(ps.angle) < TILT_SNAP_THRESHOLD &&
-    Math.abs(ps.angularVelocity) < ANGULAR_VEL_SNAP_THRESHOLD
+    Math.abs(ps.angularVelocity) < ANGULAR_VEL_SNAP_THRESHOLD &&
+    !_hasAsymmetricLegs(ps, assembly)
   ) {
     ps.angle = 0;
     ps.angularVelocity = 0;
@@ -1190,13 +1209,14 @@ function _applyGroundedSteering(ps, assembly, left, right, dt) {
   }
 
   // --- Find ground contact point ---
-  // VAB local coords are Y-down (positive Y = screen-down = toward ground
-  // when upright).  All rotation formulas below convert from Y-down local to
-  // Y-up world using: worldX = lx·cos - ly·sin,  worldY = lx·sin + ly·cos
-  // (note the negated sin·y term compared to pure Y-up rotation).
+  // VAB local coords are Y-up (positive Y = upward, away from ground).
+  // All rotation formulas below use the standard Y-up clockwise rotation:
+  //   worldX = lx·cos + ly·sin,  worldY = -lx·sin + ly·cos
   //
-  // Ground contact = softmax-weighted average of all corners, where each
-  // corner's weight is exp(CONTACT_SHARPNESS * (gp - maxGP)).  This gives:
+  // Ground contact = softmax-weighted average of all corners, where the
+  // "ground projection" gp is the dot product with the world-downward
+  // direction (-sin, -cos) in local coords.  max gp = closest to ground.
+  // The softmax gives:
   //   - A single corner when one is clearly the lowest (sharp selection).
   //   - A smooth midpoint when a flat face rests on the ground (no oscillation).
   //   - Continuous transitions as the rocket rolls between orientations.
@@ -1215,22 +1235,27 @@ function _applyGroundedSteering(ps, assembly, left, right, dt) {
     const hh = (def.height ?? 40) / 2;
 
     let halfW = hw;
-    // Deployed landing legs widen the effective footprint.
-    if (
-      (def.type === PartType.LANDING_LEGS || def.type === PartType.LANDING_LEG) &&
-      ps.legStates?.get(instanceId)?.state === 'deployed'
-    ) {
-      halfW *= 1.5;
+    let bottomHH = hh;
+    // Deployed landing legs extend the foot below and outward.
+    if (def.type === PartType.LANDING_LEGS || def.type === PartType.LANDING_LEG) {
+      const { dx, dy } = getDeployedLegFootOffset(instanceId, def, ps.legStates);
+      if (dy > 0) {
+        halfW = Math.max(halfW, dx);
+        bottomHH = Math.max(hh, dy);
+      }
     }
 
     const corners = [
-      [placed.x - halfW, placed.y - hh],
-      [placed.x + halfW, placed.y - hh],
-      [placed.x - halfW, placed.y + hh],
-      [placed.x + halfW, placed.y + hh],
+      [placed.x - halfW, placed.y - bottomHH],
+      [placed.x + halfW, placed.y - bottomHH],
+      [placed.x - hw, placed.y + hh],
+      [placed.x + hw, placed.y + hh],
     ];
     for (const [cx, cy] of corners) {
-      const gp = cx * sinA + cy * cosA;
+      // Project onto the world-downward direction so max gp = closest to
+      // ground.  In Y-up local coords the downward direction at angle A is
+      // (-sinA, -cosA), so gp = -(cx·sinA + cy·cosA).
+      const gp = -(cx * sinA + cy * cosA);
       allCorners.push({ cx, cy, gp });
       if (gp > maxGP) maxGP = gp;
     }
@@ -1253,19 +1278,20 @@ function _applyGroundedSteering(ps, assembly, left, right, dt) {
   const contact = { x: contactLX, y: contactLY };
 
   // Where is this contact point in world space right now?
-  // Y-down local → Y-up world X: posX + (lx·cos - ly·sin) * SCALE
-  const contactWorldX = ps.posX + (contactLX * cosA - contactLY * sinA) * SCALE_M_PER_PX;
+  // Y-up local, clockwise rotation by angle A:
+  //   worldX = posX + (lx·cos + ly·sin) * SCALE
+  const contactWorldX = ps.posX + (contactLX * cosA + contactLY * sinA) * SCALE_M_PER_PX;
 
   // Compute moment of inertia about the contact point.
   const I = _computeMomentOfInertia(ps, assembly, contact);
 
   // Compute CoM position relative to contact point, then rotate to get
   // the world-X offset (horizontal distance for gravity torque).
-  // Y-down local → Y-up world X: relX·cos - relY·sin
+  // Y-up clockwise rotation: worldX = relX·cos + relY·sin
   const com = _computeCoMLocal(ps, assembly);
   const relX = (com.x - contactLX) * SCALE_M_PER_PX;
   const relY = (com.y - contactLY) * SCALE_M_PER_PX;
-  const rotatedX = relX * cosA - relY * sinA;
+  const rotatedX = relX * cosA + relY * sinA;
 
   // Gravity torque: weight × horizontal distance from contact to CoM.
   // Positive rotatedX → CoM is to the right of contact → positive (clockwise) torque.
@@ -1293,7 +1319,7 @@ function _applyGroundedSteering(ps, assembly, left, right, dt) {
   // Only posX updates so the box rolls horizontally along the ground.
   const cosB = Math.cos(ps.angle);
   const sinB = Math.sin(ps.angle);
-  ps.posX = contactWorldX - (contactLX * cosB - contactLY * sinB) * SCALE_M_PER_PX;
+  ps.posX = contactWorldX - (contactLX * cosB + contactLY * sinB) * SCALE_M_PER_PX;
   ps.posY = 0;
 
   // Update tipping state for renderer.
@@ -1309,7 +1335,7 @@ function _applyGroundedSteering(ps, assembly, left, right, dt) {
     const comSnap  = _computeCoMLocal(ps, assembly);
     const sRelX    = (comSnap.x - contactLX) * SCALE_M_PER_PX;
     const sRelY    = (comSnap.y - contactLY) * SCALE_M_PER_PX;
-    const sRotX    = sRelX * cosB - sRelY * sinB;
+    const sRotX    = sRelX * cosB + sRelY * sinB;
     const snapGrav = totalMass * G0 * sRotX;
     const snapAccel = Math.abs(snapGrav / I);
 
@@ -1339,13 +1365,30 @@ function _checkToppleCrash(ps, assembly, flightState) {
   if (Math.abs(ps.angle) > TOPPLE_CRASH_ANGLE) {
     ps.crashed = true;
     ps.angularVelocity = 0;
-    // Toppling is catastrophic — destroy everything.
-    ps.activeParts.clear();
     ps.firingEngines.clear();
+
+    // Emit PART_DESTROYED for every active part so the crash summary
+    // shows what was lost.
+    const time = flightState.timeElapsed;
+    for (const instanceId of ps.activeParts) {
+      const placed = assembly.parts.get(instanceId);
+      _emitEvent(flightState, {
+        type:       'PART_DESTROYED',
+        time,
+        instanceId,
+        partId:     placed?.partId,
+        speed:      0,
+        toppled:    true,
+      });
+    }
+
+    // Clear active parts AFTER emitting events — the rocket is destroyed.
+    ps.activeParts.clear();
     ps.deployedParts.clear();
+
     _emitEvent(flightState, {
       type: 'CRASH',
-      time: flightState.timeElapsed,
+      time,
       speed: 0,
       toppled: true,
       description: 'Rocket toppled over and crashed!',
@@ -1521,7 +1564,12 @@ function _getBottomPartLayer(ps, assembly) {
     const def = getPartById(placed.partId);
     if (!def) continue;
     const halfH   = (def.height ?? 40) / 2;
-    const bottomY = placed.y - halfH;
+    let bottomY = placed.y - halfH;
+    if (def.type === PartType.LANDING_LEGS || def.type === PartType.LANDING_LEG) {
+      const { dy } = getDeployedLegFootOffset(instanceId, def, ps.legStates);
+      const footY = placed.y - dy;
+      if (footY < bottomY) bottomY = footY;
+    }
     entries.push({ instanceId, bottomY, placed, def });
   }
   if (entries.length === 0) return [];
@@ -1561,7 +1609,12 @@ function _getLowestBottomEdge(ps, assembly) {
     if (!placed) continue;
     const def = getPartById(placed.partId);
     if (!def) continue;
-    const bottomY = placed.y - (def.height ?? 40) / 2;
+    let bottomY = placed.y - (def.height ?? 40) / 2;
+    if (def.type === PartType.LANDING_LEGS || def.type === PartType.LANDING_LEG) {
+      const { dy } = getDeployedLegFootOffset(instanceId, def, ps.legStates);
+      const footY = placed.y - dy;
+      if (footY < bottomY) bottomY = footY;
+    }
     if (bottomY < lowest) lowest = bottomY;
   }
   return lowest;

@@ -25,10 +25,13 @@ import {
 } from '../core/physics.js';
 import {
   LegState,
+  LEG_DEPLOY_DURATION,
   deployLandingLeg,
   getLegStatus,
   getLegContextMenuItems,
+  getDeployedLegFootOffset,
 } from '../core/legs.js';
+import { getPartById } from '../data/parts.js';
 import {
   createRocketAssembly,
   addPartToAssembly,
@@ -2381,5 +2384,263 @@ describe('cascading crash thresholds', () => {
     // With the low-threshold decoupler (threshold 6) at the bottom,
     // it absorbs less speed (6 vs 12), so more layers should be destroyed.
     expect(destroyed2).toBeGreaterThanOrEqual(destroyed1);
+  });
+});
+
+// ===========================================================================
+// Landing Leg Foot Offset and Ground Interaction Tests
+// ===========================================================================
+
+describe('getDeployedLegFootOffset() — returns correct values', () => {
+  it('RETRACTED: dx=0, dy=0, t=0', () => {
+    const legStates = new Map();
+    legStates.set('leg1', { state: LegState.RETRACTED, deployTimer: 0 });
+    const def = { width: 10, height: 20 };
+    const result = getDeployedLegFootOffset('leg1', def, legStates);
+    expect(result.dx).toBe(0);
+    expect(result.dy).toBe(0);
+    expect(result.t).toBe(0);
+  });
+
+  it('DEPLOYED: dx=pw, dy=ph*3, t=1', () => {
+    const legStates = new Map();
+    legStates.set('leg1', { state: LegState.DEPLOYED, deployTimer: 0 });
+    const def = { width: 10, height: 20 };
+    const result = getDeployedLegFootOffset('leg1', def, legStates);
+    expect(result.dx).toBe(10);
+    expect(result.dy).toBe(60);
+    expect(result.t).toBe(1);
+  });
+
+  it('DEPLOYING halfway: dx=pw*0.5, dy=ph*1.5, t=0.5', () => {
+    const legStates = new Map();
+    legStates.set('leg1', {
+      state: LegState.DEPLOYING,
+      deployTimer: LEG_DEPLOY_DURATION * 0.5,
+    });
+    const def = { width: 10, height: 20 };
+    const result = getDeployedLegFootOffset('leg1', def, legStates);
+    expect(result.t).toBeCloseTo(0.5, 5);
+    expect(result.dx).toBeCloseTo(5, 5);
+    expect(result.dy).toBeCloseTo(30, 5);
+  });
+
+  it('returns zeros when instanceId not in legStates', () => {
+    const legStates = new Map();
+    const def = { width: 10, height: 20 };
+    const result = getDeployedLegFootOffset('missing', def, legStates);
+    expect(result.dx).toBe(0);
+    expect(result.dy).toBe(0);
+    expect(result.t).toBe(0);
+  });
+});
+
+describe('Deployed leg foot extends past engine', () => {
+  it('foot VAB Y is lower than engine bottom VAB Y', () => {
+    const assembly = createRocketAssembly();
+    const staging  = createStagingConfig();
+
+    const probeId  = addPartToAssembly(assembly, 'probe-core-mk1', 0, 60);
+    const tankId   = addPartToAssembly(assembly, 'tank-small',      0, 20);
+    const engineId = addPartToAssembly(assembly, 'engine-spark',    0, -20);
+    const legId1   = addPartToAssembly(assembly, 'landing-legs-small', 20, 0);
+    const legId2   = addPartToAssembly(assembly, 'landing-legs-small', -20, 0);
+
+    connectParts(assembly, probeId, 1, tankId, 0);
+    connectParts(assembly, tankId, 1, engineId, 0);
+
+    syncStagingWithAssembly(assembly, staging);
+
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    // Deploy legs manually.
+    ps.legStates.get(legId1).state = LegState.DEPLOYED;
+    ps.legStates.get(legId1).deployTimer = 0;
+    ps.legStates.get(legId2).state = LegState.DEPLOYED;
+    ps.legStates.get(legId2).deployTimer = 0;
+
+    const legDef = getPartById('landing-legs-small');
+    const engineDef = getPartById('engine-spark');
+
+    // Leg foot Y (in VAB coords, more negative = lower).
+    const legPlaced = assembly.parts.get(legId1);
+    const { dy } = getDeployedLegFootOffset(legId1, legDef, ps.legStates);
+    const footVabY = legPlaced.y - dy;
+
+    // Engine bottom Y.
+    const enginePlaced = assembly.parts.get(engineId);
+    const engineBottomY = enginePlaced.y - (engineDef.height ?? 40) / 2;
+
+    // Foot should be lower (more negative) than engine bottom.
+    expect(footVabY).toBeLessThan(engineBottomY);
+  });
+});
+
+describe('Legs deploy on launch pad (grounded)', () => {
+  it('legs reach DEPLOYED after 2s of ticking while grounded', () => {
+    const { assembly, staging, legId1, legId2 } = makeRocketWithLegs();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    // Start grounded on the pad.
+    ps.grounded = true;
+    ps.posY = 0;
+    ps.velY = 0;
+
+    // Fire the stage to deploy legs.
+    fireNextStage(ps, assembly, staging, fs);
+    expect(getLegStatus(ps, legId1)).toBe(LegState.DEPLOYING);
+    expect(getLegStatus(ps, legId2)).toBe(LegState.DEPLOYING);
+
+    // Tick 2 seconds (more than LEG_DEPLOY_DURATION=1.5s).
+    const dt = 1 / 60;
+    for (let i = 0; i < 120; i++) {
+      tick(ps, assembly, staging, fs, dt);
+    }
+
+    expect(getLegStatus(ps, legId1)).toBe(LegState.DEPLOYED);
+    expect(getLegStatus(ps, legId2)).toBe(LegState.DEPLOYED);
+  });
+
+  it('leg timers tick while grounded (DEPLOYING after 1.0s)', () => {
+    const { assembly, staging, legId1, legId2 } = makeRocketWithLegs();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    ps.grounded = true;
+    ps.posY = 0;
+    ps.velY = 0;
+
+    fireNextStage(ps, assembly, staging, fs);
+
+    // Tick 1.0 second (less than LEG_DEPLOY_DURATION=1.5s).
+    const dt = 1 / 60;
+    for (let i = 0; i < 60; i++) {
+      tick(ps, assembly, staging, fs, dt);
+    }
+
+    // Should still be deploying (timer decremented but not expired).
+    expect(getLegStatus(ps, legId1)).toBe(LegState.DEPLOYING);
+    const entry = ps.legStates.get(legId1);
+    expect(entry.deployTimer).toBeLessThan(LEG_DEPLOY_DURATION);
+    expect(entry.deployTimer).toBeGreaterThan(0);
+  });
+});
+
+describe('Deployed legs are lowest point on grounded rocket', () => {
+  it('lowest point matches foot position, not engine or leg housing', () => {
+    const assembly = createRocketAssembly();
+    const staging  = createStagingConfig();
+
+    const probeId  = addPartToAssembly(assembly, 'probe-core-mk1', 0, 60);
+    const tankId   = addPartToAssembly(assembly, 'tank-small',      0, 20);
+    const engineId = addPartToAssembly(assembly, 'engine-spark',    0, -20);
+    const legId1   = addPartToAssembly(assembly, 'landing-legs-small', 20, 0);
+    const legId2   = addPartToAssembly(assembly, 'landing-legs-small', -20, 0);
+
+    connectParts(assembly, probeId, 1, tankId, 0);
+    connectParts(assembly, tankId, 1, engineId, 0);
+
+    syncStagingWithAssembly(assembly, staging);
+
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    // Deploy legs.
+    ps.legStates.get(legId1).state = LegState.DEPLOYED;
+    ps.legStates.get(legId1).deployTimer = 0;
+    ps.legStates.get(legId2).state = LegState.DEPLOYED;
+    ps.legStates.get(legId2).deployTimer = 0;
+
+    // Find the lowest point across all parts, accounting for foot offset.
+    let lowestY = Infinity;
+    for (const instanceId of ps.activeParts) {
+      const placed = assembly.parts.get(instanceId);
+      const def = placed ? getPartById(placed.partId) : null;
+      if (!def) continue;
+      let bottomY = placed.y - (def.height ?? 40) / 2;
+      if (def.type === 'LANDING_LEGS' || def.type === 'LANDING_LEG') {
+        const { dy } = getDeployedLegFootOffset(instanceId, def, ps.legStates);
+        const footY = placed.y - dy;
+        if (footY < bottomY) bottomY = footY;
+      }
+      if (bottomY < lowestY) lowestY = bottomY;
+    }
+
+    // The lowest point should be the deployed leg foot, not the engine.
+    const legDef = getPartById('landing-legs-small');
+    const legPlaced = assembly.parts.get(legId1);
+    const { dy } = getDeployedLegFootOffset(legId1, legDef, ps.legStates);
+    const expectedFootY = legPlaced.y - dy;
+
+    expect(lowestY).toBe(expectedFootY);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Asymmetric leg deploy — tipping behaviour
+// ---------------------------------------------------------------------------
+
+describe('Asymmetric leg deploy causes tipping on pad', () => {
+  it('rocket tips and crashes when only one leg is deployed on the pad', () => {
+    const { assembly, staging, legId1, legId2 } = makeRocketWithLegs();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    // Deploy only leg1, leave leg2 retracted.
+    ps.legStates.get(legId1).state = LegState.DEPLOYED;
+    ps.legStates.get(legId1).deployTimer = 0;
+
+    ps.grounded = true;
+    ps.posY = 0;
+    ps.velY = 0;
+    ps.angle = 0;
+    ps.angularVelocity = 0;
+
+    // Tick long enough for the rocket to topple past crash angle.
+    const dt = 1 / 60;
+    for (let i = 0; i < 300; i++) {
+      tick(ps, assembly, staging, fs, dt);
+      if (ps.crashed) break;
+    }
+
+    // Rocket should have crashed from toppling.
+    expect(ps.crashed).toBe(true);
+
+    // A CRASH event with toppled flag should have been emitted.
+    const crashEvt = fs.events.find(e => e.type === 'CRASH' && e.toppled);
+    expect(crashEvt).toBeDefined();
+
+    // PART_DESTROYED events should have been emitted for all parts.
+    const destroyedEvts = fs.events.filter(e => e.type === 'PART_DESTROYED');
+    expect(destroyedEvts.length).toBeGreaterThan(0);
+  });
+
+  it('rocket stays upright when both legs are deployed symmetrically', () => {
+    const { assembly, staging, legId1, legId2 } = makeRocketWithLegs();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    // Deploy both legs.
+    ps.legStates.get(legId1).state = LegState.DEPLOYED;
+    ps.legStates.get(legId1).deployTimer = 0;
+    ps.legStates.get(legId2).state = LegState.DEPLOYED;
+    ps.legStates.get(legId2).deployTimer = 0;
+
+    ps.grounded = true;
+    ps.posY = 0;
+    ps.velY = 0;
+    ps.angle = 0;
+    ps.angularVelocity = 0;
+
+    // Tick ~1 second with no keyboard input.
+    const dt = 1 / 60;
+    for (let i = 0; i < 60; i++) {
+      tick(ps, assembly, staging, fs, dt);
+    }
+
+    // Rocket should remain upright.
+    expect(ps.angle).toBe(0);
   });
 });
