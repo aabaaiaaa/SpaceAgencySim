@@ -255,10 +255,10 @@ export function completeMission(state, id) {
 // ---------------------------------------------------------------------------
 
 /**
- * Check and update objective completion for the flight currently in progress.
+ * Check and update objective completion for all accepted missions.
  *
  * This function should be called once per physics tick while a flight is active.
- * It finds the accepted mission matching `flightState.missionId` and, for each
+ * It iterates over ALL missions in `state.missions.accepted` and, for each
  * incomplete objective, determines whether the completion condition is satisfied
  * given the current flight state.
  *
@@ -268,152 +268,155 @@ export function completeMission(state, id) {
  *
  * No-ops (returns immediately) when:
  *   - `flightState` is null / falsy
- *   - `flightState.missionId` is not set
- *   - No matching mission exists in `state.missions.accepted`
+ *   - No accepted missions exist
  *
  * @param {import('./gameState.js').GameState} state
  * @param {import('./gameState.js').FlightState} flightState  Live flight state from the physics engine.
  */
 export function checkObjectiveCompletion(state, flightState) {
-  if (!flightState || !flightState.missionId) return;
+  if (!flightState) return;
 
-  const mission = state.missions.accepted.find((m) => m.id === flightState.missionId);
-  if (!mission) return;
+  const accepted = state.missions.accepted;
+  if (!accepted || accepted.length === 0) return;
 
-  for (const obj of mission.objectives) {
-    if (obj.completed) continue;
+  for (const mission of accepted) {
+    if (!mission.objectives || mission.objectives.length === 0) continue;
 
-    switch (obj.type) {
-      // ------------------------------------------------------------------
-      case ObjectiveType.REACH_ALTITUDE:
-        if (flightState.altitude >= obj.target.altitude) {
-          obj.completed = true;
-        }
-        break;
+    for (const obj of mission.objectives) {
+      if (obj.completed) continue;
 
-      // ------------------------------------------------------------------
-      case ObjectiveType.REACH_SPEED:
-        if (flightState.velocity >= obj.target.speed) {
-          obj.completed = true;
-        }
-        break;
-
-      // ------------------------------------------------------------------
-      case ObjectiveType.SAFE_LANDING: {
-        const landingEvent = flightState.events.find(
-          (e) =>
-            e.type === 'LANDING' &&
-            typeof e.speed === 'number' &&
-            e.speed <= obj.target.maxLandingSpeed,
-        );
-        if (landingEvent) obj.completed = true;
-        break;
-      }
-
-      // ------------------------------------------------------------------
-      case ObjectiveType.ACTIVATE_PART: {
-        const activationEvent = flightState.events.find(
-          (e) => e.type === 'PART_ACTIVATED' && e.partType === obj.target.partType,
-        );
-        if (activationEvent) obj.completed = true;
-        break;
-      }
-
-      // ------------------------------------------------------------------
-      case ObjectiveType.HOLD_ALTITUDE: {
-        const inRange =
-          flightState.altitude >= obj.target.minAltitude &&
-          flightState.altitude <= obj.target.maxAltitude;
-
-        // When the rocket carries science modules, altitude hold time only
-        // accumulates while an experiment is actively running.  If there are
-        // no science modules on this flight (`hasScienceModules` is falsy),
-        // the experiment gate is bypassed and the hold is always valid.
-        const experimentOk =
-          !flightState.hasScienceModules ||
-          flightState.scienceModuleRunning === true;
-
-        if (inRange && experimentOk) {
-          if (obj._holdEnteredAt == null) {
-            // Rocket just entered the altitude band — start timing.
-            obj._holdEnteredAt = flightState.timeElapsed;
-          } else if (flightState.timeElapsed - obj._holdEnteredAt >= obj.target.duration) {
+      switch (obj.type) {
+        // ------------------------------------------------------------------
+        case ObjectiveType.REACH_ALTITUDE:
+          if (flightState.altitude >= obj.target.altitude) {
             obj.completed = true;
           }
-        } else {
-          // Outside the altitude band, or experiment not running — reset timer.
-          obj._holdEnteredAt = null;
+          break;
+
+        // ------------------------------------------------------------------
+        case ObjectiveType.REACH_SPEED:
+          if (flightState.velocity >= obj.target.speed) {
+            obj.completed = true;
+          }
+          break;
+
+        // ------------------------------------------------------------------
+        case ObjectiveType.SAFE_LANDING: {
+          const landingEvent = flightState.events.find(
+            (e) =>
+              e.type === 'LANDING' &&
+              typeof e.speed === 'number' &&
+              e.speed <= obj.target.maxLandingSpeed,
+          );
+          if (landingEvent) obj.completed = true;
+          break;
         }
-        break;
-      }
 
-      // ------------------------------------------------------------------
-      case ObjectiveType.RETURN_SCIENCE_DATA: {
-        // Requires both a SCIENCE_COLLECTED event (experiment ran) and a
-        // safe LANDING event (speed ≤ 10 m/s) to recover the data.
-        const scienceCollected = flightState.events.some(
-          (e) => e.type === 'SCIENCE_COLLECTED',
-        );
-        const safeLanding = flightState.events.some(
-          (e) => e.type === 'LANDING' && typeof e.speed === 'number' && e.speed <= 10,
-        );
-        if (scienceCollected && safeLanding) obj.completed = true;
-        break;
-      }
-
-      // ------------------------------------------------------------------
-      case ObjectiveType.CONTROLLED_CRASH: {
-        const crashEvent = flightState.events.find(
-          (e) =>
-            (e.type === 'LANDING' || e.type === 'CRASH') &&
-            typeof e.speed === 'number' &&
-            e.speed >= obj.target.minCrashSpeed,
-        );
-        if (crashEvent) obj.completed = true;
-        break;
-      }
-
-      // ------------------------------------------------------------------
-      case ObjectiveType.EJECT_CREW: {
-        const ejectEvent = flightState.events.find(
-          (e) =>
-            e.type === 'CREW_EJECTED' &&
-            typeof e.altitude === 'number' &&
-            e.altitude >= obj.target.minAltitude,
-        );
-        if (ejectEvent) obj.completed = true;
-        break;
-      }
-
-      // ------------------------------------------------------------------
-      case ObjectiveType.RELEASE_SATELLITE: {
-        const releaseEvent = flightState.events.find(
-          (e) =>
-            e.type === 'SATELLITE_RELEASED' &&
-            typeof e.altitude === 'number' &&
-            e.altitude >= obj.target.minAltitude &&
-            (obj.target.minVelocity == null ||
-              (typeof e.velocity === 'number' &&
-                e.velocity >= obj.target.minVelocity)),
-        );
-        if (releaseEvent) obj.completed = true;
-        break;
-      }
-
-      // ------------------------------------------------------------------
-      case ObjectiveType.REACH_ORBIT:
-        if (
-          flightState.altitude >= obj.target.orbitAltitude &&
-          flightState.velocity >= obj.target.orbitalVelocity
-        ) {
-          obj.completed = true;
+        // ------------------------------------------------------------------
+        case ObjectiveType.ACTIVATE_PART: {
+          const activationEvent = flightState.events.find(
+            (e) => e.type === 'PART_ACTIVATED' && e.partType === obj.target.partType,
+          );
+          if (activationEvent) obj.completed = true;
+          break;
         }
-        break;
 
-      // ------------------------------------------------------------------
-      default:
-        // Unknown objective type — silently skip to allow forward-compatibility.
-        break;
+        // ------------------------------------------------------------------
+        case ObjectiveType.HOLD_ALTITUDE: {
+          const inRange =
+            flightState.altitude >= obj.target.minAltitude &&
+            flightState.altitude <= obj.target.maxAltitude;
+
+          // When the rocket carries science modules, altitude hold time only
+          // accumulates while an experiment is actively running.  If there are
+          // no science modules on this flight (`hasScienceModules` is falsy),
+          // the experiment gate is bypassed and the hold is always valid.
+          const experimentOk =
+            !flightState.hasScienceModules ||
+            flightState.scienceModuleRunning === true;
+
+          if (inRange && experimentOk) {
+            if (obj._holdEnteredAt == null) {
+              // Rocket just entered the altitude band — start timing.
+              obj._holdEnteredAt = flightState.timeElapsed;
+            } else if (flightState.timeElapsed - obj._holdEnteredAt >= obj.target.duration) {
+              obj.completed = true;
+            }
+          } else {
+            // Outside the altitude band, or experiment not running — reset timer.
+            obj._holdEnteredAt = null;
+          }
+          break;
+        }
+
+        // ------------------------------------------------------------------
+        case ObjectiveType.RETURN_SCIENCE_DATA: {
+          // Requires both a SCIENCE_COLLECTED event (experiment ran) and a
+          // safe LANDING event (speed ≤ 10 m/s) to recover the data.
+          const scienceCollected = flightState.events.some(
+            (e) => e.type === 'SCIENCE_COLLECTED',
+          );
+          const safeLanding = flightState.events.some(
+            (e) => e.type === 'LANDING' && typeof e.speed === 'number' && e.speed <= 10,
+          );
+          if (scienceCollected && safeLanding) obj.completed = true;
+          break;
+        }
+
+        // ------------------------------------------------------------------
+        case ObjectiveType.CONTROLLED_CRASH: {
+          const crashEvent = flightState.events.find(
+            (e) =>
+              (e.type === 'LANDING' || e.type === 'CRASH') &&
+              typeof e.speed === 'number' &&
+              e.speed >= obj.target.minCrashSpeed,
+          );
+          if (crashEvent) obj.completed = true;
+          break;
+        }
+
+        // ------------------------------------------------------------------
+        case ObjectiveType.EJECT_CREW: {
+          const ejectEvent = flightState.events.find(
+            (e) =>
+              e.type === 'CREW_EJECTED' &&
+              typeof e.altitude === 'number' &&
+              e.altitude >= obj.target.minAltitude,
+          );
+          if (ejectEvent) obj.completed = true;
+          break;
+        }
+
+        // ------------------------------------------------------------------
+        case ObjectiveType.RELEASE_SATELLITE: {
+          const releaseEvent = flightState.events.find(
+            (e) =>
+              e.type === 'SATELLITE_RELEASED' &&
+              typeof e.altitude === 'number' &&
+              e.altitude >= obj.target.minAltitude &&
+              (obj.target.minVelocity == null ||
+                (typeof e.velocity === 'number' &&
+                  e.velocity >= obj.target.minVelocity)),
+          );
+          if (releaseEvent) obj.completed = true;
+          break;
+        }
+
+        // ------------------------------------------------------------------
+        case ObjectiveType.REACH_ORBIT:
+          if (
+            flightState.altitude >= obj.target.orbitAltitude &&
+            flightState.velocity >= obj.target.orbitalVelocity
+          ) {
+            obj.completed = true;
+          }
+          break;
+
+        // ------------------------------------------------------------------
+        default:
+          // Unknown objective type — silently skip to allow forward-compatibility.
+          break;
+      }
     }
   }
 }

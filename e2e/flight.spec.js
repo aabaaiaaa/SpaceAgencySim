@@ -325,7 +325,10 @@ test.describe('Flight — Launch & Basic Flight', () => {
   // ── (11) "Return to Space Agency" ends flight and returns to hub ─────────
 
   test('(11) clicking "Return to Space Agency" from the menu returns to hub', async () => {
-    // We're in the VAB from test (10). Launch the loaded rocket again.
+    // We're in the VAB from test (10). Ensure the launch button is ready
+    // before attempting to launch (occasionally the VAB hasn't fully rendered
+    // by the time this test begins).
+    await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 15_000 });
     await launchFromVab(page);
 
     // Open the topbar dropdown and click "Return to Space Agency".
@@ -337,16 +340,25 @@ test.describe('Flight — Launch & Basic Flight', () => {
     await dropdown.getByText('Return to Space Agency').click();
 
     // If the rocket is still in flight, an abort confirmation dialog appears first.
+    // Aborting skips the post-flight summary and goes straight to hub.
     const abortBtn = page.locator('[data-testid="abort-confirm-btn"]');
-    if (await abortBtn.isVisible({ timeout: 1_000 }).catch(() => false)) {
+    const didAbort = await abortBtn.isVisible({ timeout: 1_000 }).catch(() => false);
+    if (didAbort) {
       await abortBtn.click();
+    } else {
+      // Landed/crashed — post-flight summary appears; click through it.
+      await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 5_000 });
+      await page.click('#post-flight-return-btn');
     }
 
-    // The post-flight summary is shown first so the player can review results.
-    await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 5_000 });
-
-    // Click the "Return to Space Agency" button on the summary to go to the hub.
-    await page.click('#post-flight-return-btn');
+    // Return results overlay may appear — dismiss it.
+    try {
+      const dismissBtn = page.locator('#return-results-dismiss-btn');
+      await dismissBtn.waitFor({ state: 'visible', timeout: 5_000 });
+      await dismissBtn.click();
+    } catch {
+      // No return results overlay — proceed.
+    }
 
     // Hub overlay should be visible — we're back at the Space Agency.
     await expect(page.locator('#hub-overlay')).toBeVisible({ timeout: 5_000 });

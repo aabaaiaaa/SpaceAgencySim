@@ -24,6 +24,7 @@ import {
   getUnlockedParts,
   checkObjectiveCompletion,
 } from '../core/missions.js';
+import { processFlightReturn } from '../core/flightReturn.js';
 import { MISSIONS, ObjectiveType, MissionStatus } from '../data/missions.js';
 
 // ---------------------------------------------------------------------------
@@ -578,15 +579,9 @@ describe('checkObjectiveCompletion() guards', () => {
     expect(() => checkObjectiveCompletion(state, null)).not.toThrow();
   });
 
-  it('does nothing when flightState has no missionId', () => {
+  it('does nothing when no accepted missions exist', () => {
     const state = freshState();
-    expect(() => checkObjectiveCompletion(state, { missionId: null, events: [], altitude: 0, velocity: 0, timeElapsed: 0 })).not.toThrow();
-  });
-
-  it('does nothing when missionId does not match any accepted mission', () => {
-    const state = freshState();
-    const fs = makeFlightState('ghost-mission');
-    expect(() => checkObjectiveCompletion(state, fs)).not.toThrow();
+    expect(() => checkObjectiveCompletion(state, { events: [], altitude: 0, velocity: 0, timeElapsed: 0 })).not.toThrow();
   });
 
   it('skips objectives already marked completed', () => {
@@ -602,6 +597,30 @@ describe('checkObjectiveCompletion() guards', () => {
     checkObjectiveCompletion(state, fs);
     // Objective was already true — should stay true and not error.
     expect(state.missions.accepted[0].objectives[0].completed).toBe(true);
+  });
+
+  it('checks objectives across multiple accepted missions', () => {
+    const state = freshState();
+    const def1 = makeMissionDef({
+      id: 'mA',
+      objectives: [
+        { id: 'oA', type: ObjectiveType.REACH_ALTITUDE, target: { altitude: 500 }, completed: false, description: 'reach 500m' },
+      ],
+    });
+    const def2 = makeMissionDef({
+      id: 'mB',
+      objectives: [
+        { id: 'oB', type: ObjectiveType.REACH_SPEED, target: { speed: 100 }, completed: false, description: 'reach 100 m/s' },
+      ],
+    });
+    seedAcceptedMission(state, def1);
+    seedAcceptedMission(state, def2);
+
+    const fs = makeFlightState('mA', { altitude: 600, velocity: 150 });
+    checkObjectiveCompletion(state, fs);
+
+    expect(state.missions.accepted[0].objectives[0].completed).toBe(true);
+    expect(state.missions.accepted[1].objectives[0].completed).toBe(true);
   });
 });
 
@@ -1478,5 +1497,80 @@ describe('Mission lifecycle integration', () => {
     completeMission(state, 'm-parts');
 
     expect(state.parts).toContain('super-engine');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// processFlightReturn() — multi-mission completion
+// ---------------------------------------------------------------------------
+
+describe('processFlightReturn() — multi-mission completion', () => {
+  it('completes two missions when all objectives are met and credits both rewards', () => {
+    const state = freshState();
+    // Zero out any starting loan so interest doesn't affect the assertion.
+    state.loan = { balance: 0, interestRate: 0 };
+
+    // Seed two accepted missions with completed objectives.
+    const def1 = makeMissionDef({
+      id: 'pr-m1',
+      title: 'Mission Alpha',
+      reward: 5000,
+      objectives: [
+        { id: 'o1', type: ObjectiveType.REACH_ALTITUDE, target: { altitude: 100 }, completed: true, description: 'reach 100m' },
+      ],
+    });
+    const def2 = makeMissionDef({
+      id: 'pr-m2',
+      title: 'Mission Beta',
+      reward: 8000,
+      objectives: [
+        { id: 'o2', type: ObjectiveType.REACH_SPEED, target: { speed: 50 }, completed: true, description: 'reach 50 m/s' },
+      ],
+    });
+    seedAcceptedMission(state, def1);
+    seedAcceptedMission(state, def2);
+
+    const moneyBefore = state.money;
+    const fs = makeFlightState('pr-m1');
+
+    const result = processFlightReturn(state, fs, null, null);
+
+    expect(result.completedMissions).toHaveLength(2);
+    expect(state.missions.completed.map((m) => m.id)).toContain('pr-m1');
+    expect(state.missions.completed.map((m) => m.id)).toContain('pr-m2');
+    expect(state.money).toBe(moneyBefore + 5000 + 8000);
+  });
+
+  it('completes only missions whose objectives are all met', () => {
+    const state = freshState();
+    state.loan = { balance: 0, interestRate: 0 };
+
+    const def1 = makeMissionDef({
+      id: 'pr-done',
+      reward: 3000,
+      objectives: [
+        { id: 'o1', type: ObjectiveType.REACH_ALTITUDE, target: { altitude: 100 }, completed: true, description: 'done' },
+      ],
+    });
+    const def2 = makeMissionDef({
+      id: 'pr-pending',
+      reward: 7000,
+      objectives: [
+        { id: 'o2', type: ObjectiveType.REACH_ALTITUDE, target: { altitude: 9999 }, completed: false, description: 'not done' },
+      ],
+    });
+    seedAcceptedMission(state, def1);
+    seedAcceptedMission(state, def2);
+
+    const moneyBefore = state.money;
+    const fs = makeFlightState('pr-done');
+
+    const result = processFlightReturn(state, fs, null, null);
+
+    expect(result.completedMissions).toHaveLength(1);
+    expect(result.completedMissions[0].mission.id).toBe('pr-done');
+    expect(state.missions.accepted).toHaveLength(1);
+    expect(state.missions.accepted[0].id).toBe('pr-pending');
+    expect(state.money).toBe(moneyBefore + 3000);
   });
 });

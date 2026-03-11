@@ -73,26 +73,25 @@ export function processFlightReturn(state, flightState, ps, assembly) {
   let deathFineTotal   = 0;
 
   // ── 1 & 2 & 3. Mission completion, rewards, and unlocks ──────────────────
-  if (flightState && flightState.missionId) {
-    const mission = state.missions.accepted.find((m) => m.id === flightState.missionId);
+  // Snapshot the accepted list before iterating, since completeMission()
+  // mutates it by splicing completed missions out.
+  const acceptedSnapshot = [...state.missions.accepted];
+  for (const mission of acceptedSnapshot) {
+    const allObjectivesMet =
+      Array.isArray(mission.objectives) &&
+      mission.objectives.length > 0 &&
+      mission.objectives.every((obj) => obj.completed);
 
-    if (mission) {
-      const allObjectivesMet =
-        Array.isArray(mission.objectives) &&
-        mission.objectives.length > 0 &&
-        mission.objectives.every((obj) => obj.completed);
+    if (allObjectivesMet) {
+      const result = completeMission(state, mission.id);
 
-      if (allObjectivesMet) {
-        const result = completeMission(state, mission.id);
-
-        if (result.success) {
-          completedMissions.push({
-            mission:                result.mission,
-            reward:                 result.reward,
-            unlockedParts:          result.unlockedParts,
-            newlyAvailableMissions: result.newlyUnlockedMissions,
-          });
-        }
+      if (result.success) {
+        completedMissions.push({
+          mission:                result.mission,
+          reward:                 result.reward,
+          unlockedParts:          result.unlockedParts,
+          newlyAvailableMissions: result.newlyUnlockedMissions,
+        });
       }
     }
   }

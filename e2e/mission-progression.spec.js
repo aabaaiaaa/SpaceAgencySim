@@ -429,20 +429,34 @@ async function waitObjectivesComplete(page, missionId, timeout = 120_000) {
 }
 
 async function returnToHub(page) {
-  // If an abort confirmation dialog is visible (mid-flight return), dismiss it first.
-  const abortBtn = page.locator('[data-testid="abort-confirm-btn"]');
-  if (await abortBtn.isVisible({ timeout: 1_000 }).catch(() => false)) {
-    await abortBtn.click();
+  // If we're already at the hub (e.g. after triggerReturnViaMenu aborted),
+  // just dismiss any overlays and return.
+  const alreadyAtHub = await page.locator('#hub-overlay').isVisible().catch(() => false);
+
+  if (!alreadyAtHub) {
+    // If an abort confirmation dialog is visible (mid-flight return), dismiss it.
+    // Aborting skips the post-flight summary and goes straight to hub.
+    const abortBtn = page.locator('[data-testid="abort-confirm-btn"]');
+    const didAbort = await abortBtn.isVisible({ timeout: 1_000 }).catch(() => false);
+    if (didAbort) {
+      await abortBtn.click();
+    } else {
+      // Landed/crashed — post-flight summary appears; click through it.
+      await page.waitForSelector('#post-flight-summary', { state: 'visible', timeout: 60_000 });
+      await page.click('#post-flight-return-btn');
+    }
   }
-  await page.waitForSelector('#post-flight-summary', { state: 'visible', timeout: 60_000 });
-  await page.click('#post-flight-return-btn');
-  // A return-results overlay appears on top of the hub — dismiss it.
-  const dismissBtn = page.locator('#return-results-dismiss-btn');
-  await dismissBtn.waitFor({ state: 'visible', timeout: 15_000 });
-  await dismissBtn.click();
+
+  // A return-results overlay may appear on top of the hub — dismiss it.
+  try {
+    const dismissBtn = page.locator('#return-results-dismiss-btn');
+    await dismissBtn.waitFor({ state: 'visible', timeout: 15_000 });
+    await dismissBtn.click();
+    await page.waitForSelector('#return-results-overlay', { state: 'hidden', timeout: 5_000 }).catch(() => {});
+  } catch {
+    // No return results overlay — proceed.
+  }
   await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
-  // Ensure the overlay is fully gone before interacting with the hub.
-  await page.waitForSelector('#return-results-overlay', { state: 'hidden', timeout: 5_000 }).catch(() => {});
 }
 
 /**
@@ -456,9 +470,11 @@ async function triggerReturnViaMenu(page) {
   await expect(dropdown).toBeVisible({ timeout: 5_000 });
   await dropdown.getByText('Return to Space Agency').click();
   // If the rocket is still in flight, an abort confirmation dialog appears.
+  // Aborting skips the post-flight summary and goes straight to hub.
   const abortBtn = page.locator('[data-testid="abort-confirm-btn"]');
   if (await abortBtn.isVisible({ timeout: 1_000 }).catch(() => false)) {
     await abortBtn.click();
+    return; // Abort goes directly to hub — no post-flight summary.
   }
 }
 

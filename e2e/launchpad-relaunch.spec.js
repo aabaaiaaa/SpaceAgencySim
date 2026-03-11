@@ -140,14 +140,16 @@ async function returnToHub(page) {
   await dropdown.getByText('Return to Space Agency').click();
 
   // Abort confirmation dialog (rocket is in flight).
+  // Aborting now skips the post-flight summary and returns straight to hub.
   const abortBtn = page.locator('[data-testid="abort-confirm-btn"]');
-  if (await abortBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
+  const didAbort = await abortBtn.isVisible({ timeout: 2_000 }).catch(() => false);
+  if (didAbort) {
     await abortBtn.click();
+  } else {
+    // Landed/crashed — post-flight summary appears; click through it.
+    await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 10_000 });
+    await page.click('#post-flight-return-btn');
   }
-
-  // Post-flight summary.
-  await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 10_000 });
-  await page.click('#post-flight-return-btn');
 
   // Return results overlay may appear — dismiss it.
   try {

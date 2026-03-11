@@ -1314,7 +1314,7 @@ function _handleMenuReturnToAgency() {
     abortBtn.dataset.testid = 'abort-confirm-btn';
     abortBtn.addEventListener('click', () => {
       backdrop.remove();
-      _handleReturnToAgency();
+      _handleAbortReturnToAgency();
     });
 
     btnRow.appendChild(continueBtn);
@@ -1344,6 +1344,32 @@ function _handleReturnToAgency() {
   if (_summaryShown) return; // Already showing — ignore duplicate calls.
   _summaryShown = true;
   _showPostFlightSummary(_ps, _assembly, _flightState, _state, _onFlightEnd);
+}
+
+/**
+ * Handle abort: skip the post-flight summary and return directly to the hub.
+ * The player already confirmed the abort in the modal, so we process the
+ * flight return immediately and call onFlightEnd.
+ */
+function _handleAbortReturnToAgency() {
+  if (_summaryShown) return;
+  _summaryShown = true;
+
+  // Capture references before stopFlightScene nulls them.
+  const state       = _state;
+  const flightState = _flightState;
+  const ps          = _ps;
+  const assembly    = _assembly;
+  const onFlightEnd = _onFlightEnd;
+
+  let returnResults = null;
+  if (state && flightState) {
+    returnResults = processFlightReturn(state, flightState, ps, assembly);
+  }
+
+  refreshTopBar();
+  stopFlightScene();
+  if (onFlightEnd) onFlightEnd(state, returnResults);
 }
 
 // ---------------------------------------------------------------------------
@@ -1410,16 +1436,17 @@ function _showPostFlightSummary(ps, assembly, flightState, state, onFlightEnd) {
   }
   content.appendChild(heading);
 
-  // ── 2. Mission objectives ─────────────────────────────────────────────────
-  if (flightState && flightState.missionId && state) {
-    const missionId = flightState.missionId;
+  // ── 2. Mission objectives (all accepted + just-completed missions) ────────
+  if (state) {
     const allMissions = [
       ...(state.missions?.accepted  ?? []),
       ...(state.missions?.completed ?? []),
     ];
-    const mission = allMissions.find((m) => m.id === missionId);
+    const missionsWithObjectives = allMissions.filter(
+      (m) => Array.isArray(m.objectives) && m.objectives.length > 0,
+    );
 
-    if (mission && Array.isArray(mission.objectives) && mission.objectives.length > 0) {
+    for (const mission of missionsWithObjectives) {
       const section = document.createElement('div');
       section.className = 'pf-section';
 

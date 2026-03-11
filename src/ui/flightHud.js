@@ -322,6 +322,22 @@ const FLIGHT_HUD_STYLES = `
   padding: 8px 12px 6px;
   min-width: 180px;
   max-width: 280px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.hud-obj-mission-title {
+  font-size: 9px;
+  color: #40c070;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 5px;
+}
+
+.hud-obj-mission-group:not(:first-child) {
+  border-top: 1px solid rgba(40, 72, 40, 0.5);
+  margin-top: 6px;
+  padding-top: 6px;
 }
 
 .hud-panel-title {
@@ -1068,11 +1084,6 @@ function _buildObjectivesPanel() {
   const panel = document.createElement('div');
   panel.id = 'flight-hud-objectives';
 
-  const title = document.createElement('div');
-  title.className = 'hud-panel-title';
-  title.textContent = 'Mission Objectives';
-  panel.appendChild(title);
-
   _elObjList = document.createElement('div');
   _elObjList.id = 'flight-hud-obj-list';
   panel.appendChild(_elObjList);
@@ -1382,45 +1393,59 @@ function _updateLeftPanel() {
  * or a completion status has changed; otherwise leaves the DOM untouched.
  */
 function _updateObjectivesPanel() {
-  if (!_elObjList || !_state || !_flightState) return;
+  if (!_elObjList || !_state) return;
 
-  const mission = _state.missions.accepted.find(
-    (m) => m.id === _flightState.missionId,
+  // Gather all accepted missions that have objectives.
+  const missions = (_state.missions.accepted ?? []).filter(
+    (m) => Array.isArray(m.objectives) && m.objectives.length > 0,
   );
 
-  // No active mission or none accepted — hide the panel entirely.
-  if (!mission || !mission.objectives || mission.objectives.length === 0) {
+  // No accepted missions with objectives — hide the panel entirely.
+  if (missions.length === 0) {
     const panel = _elObjList.parentElement;
     if (panel) panel.style.display = 'none';
     return;
   }
 
-  // Ensure the panel is visible when a mission is active.
+  // Ensure the panel is visible.
   const panel = _elObjList.parentElement;
   if (panel) panel.style.display = '';
 
-  // Build a compact state fingerprint (completed flags as a bit string).
-  const fingerprint = mission.objectives.map((o) => o.completed ? '1' : '0').join('');
+  // Build a compact fingerprint: missionId + completion bits for each mission.
+  const fingerprint = missions.map(
+    (m) => m.id + ':' + m.objectives.map((o) => o.completed ? '1' : '0').join(''),
+  ).join('|');
   if (_elObjList.dataset.fp === fingerprint) return; // Nothing changed — skip.
-  _elObjList.dataset.fp    = fingerprint;
-  _elObjList.dataset.empty = '';
+  _elObjList.dataset.fp = fingerprint;
 
   _elObjList.innerHTML = '';
-  for (const obj of mission.objectives) {
-    const item = document.createElement('div');
-    item.className = 'hud-obj-item';
+  for (const mission of missions) {
+    const group = document.createElement('div');
+    group.className = 'hud-obj-mission-group';
 
-    const icon = document.createElement('span');
-    icon.className = `hud-obj-icon ${obj.completed ? 'met' : 'pending'}`;
-    icon.textContent = obj.completed ? '✓' : '○';
+    const title = document.createElement('div');
+    title.className = 'hud-obj-mission-title';
+    title.textContent = mission.title;
+    group.appendChild(title);
 
-    const desc = document.createElement('span');
-    desc.className = `hud-obj-desc${obj.completed ? ' met' : ''}`;
-    desc.textContent = obj.description ?? obj.type;
+    for (const obj of mission.objectives) {
+      const item = document.createElement('div');
+      item.className = 'hud-obj-item';
 
-    item.appendChild(icon);
-    item.appendChild(desc);
-    _elObjList.appendChild(item);
+      const icon = document.createElement('span');
+      icon.className = `hud-obj-icon ${obj.completed ? 'met' : 'pending'}`;
+      icon.textContent = obj.completed ? '✓' : '○';
+
+      const desc = document.createElement('span');
+      desc.className = `hud-obj-desc${obj.completed ? ' met' : ''}`;
+      desc.textContent = obj.description ?? obj.type;
+
+      item.appendChild(icon);
+      item.appendChild(desc);
+      group.appendChild(item);
+    }
+
+    _elObjList.appendChild(group);
   }
 }
 
