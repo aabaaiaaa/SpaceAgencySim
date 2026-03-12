@@ -27,6 +27,7 @@ import { PartType }                                           from '../core/cons
 import { getPartById }                                        from '../data/parts.js';
 import { deployParachute, getParachuteStatus, ParachuteState } from '../core/parachute.js';
 import { deployLandingLeg, getLegStatus, LegState, retractLandingLeg } from '../core/legs.js';
+import { getMirrorPartId } from '../core/rocketbuilder.js';
 import { activateEjectorSeat, getEjectorSeatStatus, EjectorState } from '../core/ejector.js';
 import { activatePartDirect }                                 from '../core/staging.js';
 import {
@@ -311,16 +312,60 @@ function _showMenu(instanceId, def, ps, assembly, flightState, clientX, clientY)
   // ── LANDING LEGS: deploy / retract ───────────────────────────────────────
   if (def.type === PartType.LANDING_LEGS || def.type === PartType.LANDING_LEG) {
     const legStatus = getLegStatus(ps, instanceId);
+    const mirrorId = getMirrorPartId(assembly, instanceId);
+    const mirrorStatus = mirrorId ? getLegStatus(ps, mirrorId) : null;
+    const hasMirror = mirrorId && mirrorStatus != null;
+
+    const _emitLegActivated = (id) => {
+      if (flightState?.events) {
+        flightState.events.push({
+          type: 'PART_ACTIVATED',
+          time: flightState.timeElapsed,
+          instanceId: id,
+          partType: def.type,
+          description: `${def.name} manually deployed.`,
+        });
+      }
+    };
+
     if (legStatus === LegState.RETRACTED) {
-      _menu.appendChild(_makeButton('Deploy Legs', () => {
-        deployLandingLeg(ps, instanceId);
-        _hideMenu();
-      }));
+      if (hasMirror && mirrorStatus === LegState.RETRACTED) {
+        _menu.appendChild(_makeButton('Deploy Both Legs', () => {
+          deployLandingLeg(ps, instanceId);
+          deployLandingLeg(ps, mirrorId);
+          _emitLegActivated(instanceId);
+          _emitLegActivated(mirrorId);
+          _hideMenu();
+        }));
+        _menu.appendChild(_makeButton('Deploy This Leg Only', () => {
+          deployLandingLeg(ps, instanceId);
+          _emitLegActivated(instanceId);
+          _hideMenu();
+        }));
+      } else {
+        _menu.appendChild(_makeButton('Deploy Legs', () => {
+          deployLandingLeg(ps, instanceId);
+          _emitLegActivated(instanceId);
+          _hideMenu();
+        }));
+      }
     } else if (legStatus === LegState.DEPLOYED) {
-      _menu.appendChild(_makeButton('Retract Legs', () => {
-        retractLandingLeg(ps, instanceId);
-        _hideMenu();
-      }));
+      if (hasMirror && mirrorStatus === LegState.DEPLOYED) {
+        _menu.appendChild(_makeButton('Retract Both Legs', () => {
+          retractLandingLeg(ps, instanceId);
+          retractLandingLeg(ps, mirrorId);
+          _hideMenu();
+        }));
+        _menu.appendChild(_makeButton('Retract This Leg Only', () => {
+          retractLandingLeg(ps, instanceId);
+          _hideMenu();
+        }));
+      } else {
+        _menu.appendChild(_makeButton('Retract Legs', () => {
+          retractLandingLeg(ps, instanceId);
+          _hideMenu();
+        }));
+      }
     } else {
       // DEPLOYING state — show status only.
       _menu.appendChild(_makeReadOnly('Legs: Deploying…'));

@@ -346,9 +346,12 @@ export function findMirrorCandidate(assembly, candidate, dragPartId) {
 
   const mirrorSide = OPPOSITE_SIDE[tSnap.side];
 
-  // Find the mirror socket on the parent (accepts the dragged type, opposite side).
+  // Find the mirror socket on the parent (accepts the dragged type, opposite side,
+  // matching vertical offset so top-left mirrors to top-right, etc.).
   const mirrorTargetSnapIndex = parentDef.snapPoints.findIndex(
-    (sp) => sp.side === mirrorSide && sp.accepts.includes(dragDef.type),
+    (sp) => sp.side === mirrorSide
+         && sp.accepts.includes(dragDef.type)
+         && sp.offsetY === tSnap.offsetY,
   );
   if (mirrorTargetSnapIndex === -1) return null;
 

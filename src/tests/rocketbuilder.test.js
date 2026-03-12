@@ -26,6 +26,7 @@ import {
   syncStagingWithAssembly,
   assignPartToStage,
   findSnapCandidates,
+  findMirrorCandidate,
   validateStagingConfig,
 } from '../core/rocketbuilder.js';
 import {
@@ -368,5 +369,227 @@ describe('Connectivity — part isolation after decoupler separation', () => {
     expect(check.pass).toBe(false);
     expect(check.message).toMatch(/floating/i);
     expect(result.canLaunch).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test 10 — Multiple radial snap points on fuel tanks
+// ---------------------------------------------------------------------------
+
+describe('Snap system — multiple radial snap points on fuel tanks', () => {
+  // Small Tank snap layout (after adding top/middle/bottom radial snaps):
+  //   0: top    (0, -20)       4: left-bottom  (-10, 12)
+  //   1: bottom (0,  20)       5: right-top    ( 10, -12)
+  //   2: left-top (-10, -12)   6: right-mid    ( 10, 0)
+  //   3: left-mid (-10,  0)    7: right-bottom ( 10, 12)
+
+  it('finds snap candidates at top, middle, and bottom of the left side', () => {
+    const assembly = createRocketAssembly();
+    addPartToAssembly(assembly, 'tank-small', 0, 0);
+
+    // Drag a landing leg near each of the three left-side snap points.
+    // Landing leg 'right' snap: offsetX=5, offsetY=0 → dSnapRelX=5, dSnapRelY=0.
+    // For target snap at worldX = tankX + offsetX = 0 + (-10) = -10,
+    //   dragWorldX + dSnapRelX = targetWorldX → dragWorldX = -10 - 5 = -15.
+    // For target snap offsetY:
+    //   worldY = tankY - offsetY
+
+    // Left-top snap (index 2): offsetY = -12 → target world Y = 0 - (-12) = 12
+    const topCandidates = findSnapCandidates(assembly, 'landing-legs-small', -15, 12, 1.0);
+    expect(topCandidates.length).toBeGreaterThanOrEqual(1);
+    expect(topCandidates[0].targetSnapIndex).toBe(2);
+
+    // Left-mid snap (index 3): offsetY = 0 → target world Y = 0
+    const midCandidates = findSnapCandidates(assembly, 'landing-legs-small', -15, 0, 1.0);
+    expect(midCandidates.length).toBeGreaterThanOrEqual(1);
+    expect(midCandidates[0].targetSnapIndex).toBe(3);
+
+    // Left-bottom snap (index 4): offsetY = 12 → target world Y = -12
+    const botCandidates = findSnapCandidates(assembly, 'landing-legs-small', -15, -12, 1.0);
+    expect(botCandidates.length).toBeGreaterThanOrEqual(1);
+    expect(botCandidates[0].targetSnapIndex).toBe(4);
+  });
+
+  it('finds snap candidates at top, middle, and bottom of the right side', () => {
+    const assembly = createRocketAssembly();
+    addPartToAssembly(assembly, 'tank-small', 0, 0);
+
+    // Landing leg 'left' snap: offsetX=-5, offsetY=0 → dSnapRelX=-5, dSnapRelY=0.
+    // dragWorldX + (-5) = 10 → dragWorldX = 15.
+
+    // Right-top snap (index 5): offsetY = -12 → target world Y = 12
+    const topCandidates = findSnapCandidates(assembly, 'landing-legs-small', 15, 12, 1.0);
+    expect(topCandidates.length).toBeGreaterThanOrEqual(1);
+    expect(topCandidates[0].targetSnapIndex).toBe(5);
+
+    // Right-mid snap (index 6): offsetY = 0 → target world Y = 0
+    const midCandidates = findSnapCandidates(assembly, 'landing-legs-small', 15, 0, 1.0);
+    expect(midCandidates.length).toBeGreaterThanOrEqual(1);
+    expect(midCandidates[0].targetSnapIndex).toBe(6);
+
+    // Right-bottom snap (index 7): offsetY = 12 → target world Y = -12
+    const botCandidates = findSnapCandidates(assembly, 'landing-legs-small', 15, -12, 1.0);
+    expect(botCandidates.length).toBeGreaterThanOrEqual(1);
+    expect(botCandidates[0].targetSnapIndex).toBe(7);
+  });
+
+  it('all three left and right radial snap points accept radial types (SRBs, legs, etc.)', () => {
+    const assembly = createRocketAssembly();
+    addPartToAssembly(assembly, 'tank-small', 0, 0);
+
+    // SRBs should also snap to all six radial points.
+    // SRB 'left' snap: offsetX=-10, offsetY=0 → dSnapRelX=-10.
+    // dragWorldX + (-10) = 10 → dragWorldX = 20.
+    // Right-mid (index 6): target world Y = 0
+    const srbRight = findSnapCandidates(assembly, 'srb-small', 20, 0, 1.0);
+    expect(srbRight.length).toBeGreaterThanOrEqual(1);
+    expect(srbRight[0].targetSnapIndex).toBe(6);
+
+    // SRB 'right' snap: offsetX=10.
+    // dragWorldX + 10 = -10 → dragWorldX = -20.
+    // Left-mid (index 3): target world Y = 0
+    const srbLeft = findSnapCandidates(assembly, 'srb-small', -20, 0, 1.0);
+    expect(srbLeft.length).toBeGreaterThanOrEqual(1);
+    expect(srbLeft[0].targetSnapIndex).toBe(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test 11 — Mirror candidate picks matching vertical position
+// ---------------------------------------------------------------------------
+
+describe('Mirror candidate — picks corresponding vertical position', () => {
+  // Verifies that when a part snaps to a specific left-side radial point
+  // (e.g. bottom), the mirror candidate picks the matching right-side point
+  // at the same offsetY (e.g. right-bottom), not just the first right snap.
+
+  function buildTankAssemblyWithLegCandidate(targetSnapIndex) {
+    const assembly = createRocketAssembly();
+    const tankId = addPartToAssembly(assembly, 'tank-small', 0, 0);
+
+    const { getPartById } = require('../data/parts.js');
+    const tankDef = getPartById('tank-small');
+    const tSnap = tankDef.snapPoints[targetSnapIndex];
+
+    const candidate = {
+      targetInstanceId: tankId,
+      targetSnapIndex,
+      dragSnapIndex: 0,
+      snapWorldX: 0,
+      snapWorldY: 0,
+      targetSnapWorldX: tSnap.offsetX,
+      targetSnapWorldY: -tSnap.offsetY,
+      screenDist: 0,
+    };
+    return { assembly, candidate };
+  }
+
+  it('left-top (index 2) mirrors to right-top (index 5)', () => {
+    const { assembly, candidate } = buildTankAssemblyWithLegCandidate(2);
+    const mirror = findMirrorCandidate(assembly, candidate, 'landing-legs-small');
+    expect(mirror).not.toBeNull();
+    expect(mirror.mirrorTargetSnapIndex).toBe(5);
+  });
+
+  it('left-mid (index 3) mirrors to right-mid (index 6)', () => {
+    const { assembly, candidate } = buildTankAssemblyWithLegCandidate(3);
+    const mirror = findMirrorCandidate(assembly, candidate, 'landing-legs-small');
+    expect(mirror).not.toBeNull();
+    expect(mirror.mirrorTargetSnapIndex).toBe(6);
+  });
+
+  it('left-bottom (index 4) mirrors to right-bottom (index 7)', () => {
+    const { assembly, candidate } = buildTankAssemblyWithLegCandidate(4);
+    const mirror = findMirrorCandidate(assembly, candidate, 'landing-legs-small');
+    expect(mirror).not.toBeNull();
+    expect(mirror.mirrorTargetSnapIndex).toBe(7);
+  });
+
+  it('right-top (index 5) mirrors to left-top (index 2)', () => {
+    const { assembly, candidate } = buildTankAssemblyWithLegCandidate(5);
+    const mirror = findMirrorCandidate(assembly, candidate, 'landing-legs-small');
+    expect(mirror).not.toBeNull();
+    expect(mirror.mirrorTargetSnapIndex).toBe(2);
+  });
+
+  it('right-mid (index 6) mirrors to left-mid (index 3)', () => {
+    const { assembly, candidate } = buildTankAssemblyWithLegCandidate(6);
+    const mirror = findMirrorCandidate(assembly, candidate, 'landing-legs-small');
+    expect(mirror).not.toBeNull();
+    expect(mirror.mirrorTargetSnapIndex).toBe(3);
+  });
+
+  it('right-bottom (index 7) mirrors to left-bottom (index 4)', () => {
+    const { assembly, candidate } = buildTankAssemblyWithLegCandidate(7);
+    const mirror = findMirrorCandidate(assembly, candidate, 'landing-legs-small');
+    expect(mirror).not.toBeNull();
+    expect(mirror.mirrorTargetSnapIndex).toBe(4);
+  });
+
+  it('mirror returns null when the opposite snap is already occupied', () => {
+    const assembly = createRocketAssembly();
+    const tankId = addPartToAssembly(assembly, 'tank-small', 0, 0);
+
+    // Place a leg on the right-mid snap (index 6) to occupy it.
+    const legId = addPartToAssembly(assembly, 'landing-legs-small', 15, 0);
+    connectParts(assembly, tankId, 6, legId, 0);
+
+    // Now try to mirror from left-mid (index 3) → should fail because
+    // right-mid (index 6) is occupied.
+    const candidate = {
+      targetInstanceId: tankId,
+      targetSnapIndex:  3,
+      dragSnapIndex:    0,
+      snapWorldX:       0,
+      snapWorldY:       0,
+      targetSnapWorldX: -10,
+      targetSnapWorldY: 0,
+      screenDist:       0,
+    };
+
+    const mirror = findMirrorCandidate(assembly, candidate, 'landing-legs-small');
+    expect(mirror).toBeNull();
+  });
+
+  it('mirror works across all three tank sizes', () => {
+    const { getPartById } = require('../data/parts.js');
+
+    for (const partId of ['tank-small', 'tank-medium', 'tank-large']) {
+      const assembly = createRocketAssembly();
+      const tid = addPartToAssembly(assembly, partId, 0, 0);
+
+      const tankDef = getPartById(partId);
+
+      // Find all left snaps and their matching right snaps.
+      const leftSnaps  = [];
+      const rightSnaps = [];
+      tankDef.snapPoints.forEach((sp, i) => {
+        if (sp.side === 'left')  leftSnaps.push({ index: i, offsetY: sp.offsetY });
+        if (sp.side === 'right') rightSnaps.push({ index: i, offsetY: sp.offsetY });
+      });
+
+      // Each tank should have 3 left and 3 right radial snaps.
+      expect(leftSnaps).toHaveLength(3);
+      expect(rightSnaps).toHaveLength(3);
+
+      // For each left snap, the mirror should find the right snap with matching offsetY.
+      for (const ls of leftSnaps) {
+        const candidate = {
+          targetInstanceId: tid,
+          targetSnapIndex:  ls.index,
+          dragSnapIndex:    0,
+          snapWorldX:       0,
+          snapWorldY:       0,
+          targetSnapWorldX: 0,
+          targetSnapWorldY: 0,
+          screenDist:       0,
+        };
+        const mirror = findMirrorCandidate(assembly, candidate, 'landing-legs-small');
+        expect(mirror).not.toBeNull();
+        const expectedRight = rightSnaps.find(rs => rs.offsetY === ls.offsetY);
+        expect(expectedRight).toBeDefined();
+        expect(mirror.mirrorTargetSnapIndex).toBe(expectedRight.index);
+      }
+    }
   });
 });

@@ -124,6 +124,28 @@ let _ghostSY = 0;
 /** @type {import('../core/rocketbuilder.js').SnapCandidate[]} */
 let _snapCandidates = [];
 
+/** Mirror ghost state — shown when symmetry mode is active during drag. */
+let _mirrorGhostPartId = null;
+let _mirrorGhostWX = 0;
+let _mirrorGhostWY = 0;
+
+/** Ghost leg deploy animation state (ping-pong 0→1→0). */
+let _ghostLegAnimT = 0;
+let _ghostLegAnimDir = 1;
+let _lastGhostFrameTime = null;
+
+/** RAF-based leg animation ticker state. */
+let _legAnimRAF = null;
+
+/** Selected-part leg animation state. */
+let _selLegInstanceId = null;
+let _selLegDef = null;
+let _selLegWorldX = 0;
+let _selLegWorldY = 0;
+let _selLegAnimT = 0;
+let _selLegAnimDir = 1;
+let _selLegLastTime = null;
+
 // ---------------------------------------------------------------------------
 // Part-type fill colours
 // ---------------------------------------------------------------------------
@@ -259,7 +281,7 @@ function _drawPart(g, placed, def, picked = false) {
  */
 function _makePartLabel(placed, def) {
   const { sx, sy } = _worldToScreen(placed.x, placed.y);
-  const fontSize = Math.max(7, Math.round(10 * _camera.zoom));
+  const fontSize = 10;
 
   const label = new PIXI.Text({
     text: def.name,
@@ -323,14 +345,19 @@ function _renderGhostLayer() {
   g.rect(_ghostSX - sw / 2, _ghostSY - sh / 2, sw, sh);
   g.fill({ color: PART_FILL[def.type] ?? 0x1a4080, alpha: 0.7 });
   g.stroke({ color: PART_STROKE[def.type] ?? 0x4090d0, width: 1 });
+
+  // Draw leg deploy preview struts for landing legs.
+  if (def.type === PartType.LANDING_LEGS || def.type === PartType.LANDING_LEG) {
+    _drawLegStruts(g, _ghostSX, _ghostSY, def, _ghostLegAnimT, 0.7);
+  }
+
   _ghostContainer.addChild(g);
 
-  const fontSize = Math.max(7, Math.round(10 * _camera.zoom));
   const label = new PIXI.Text({
     text: def.name,
     style: new PIXI.TextStyle({
       fill: '#c8e4ff',
-      fontSize,
+      fontSize: 10,
       fontFamily: 'Courier New, Courier, monospace',
     }),
   });
@@ -338,7 +365,210 @@ function _renderGhostLayer() {
   label.x = _ghostSX;
   label.y = _ghostSY;
   _ghostContainer.addChild(label);
+
+  // Mirror ghost (dimmer copy shown on opposite side during symmetry drag).
+  if (_mirrorGhostPartId) {
+    const mDef = getPartById(_mirrorGhostPartId);
+    if (mDef) {
+      const { sx: msx, sy: msy } = _worldToScreen(_mirrorGhostWX, _mirrorGhostWY);
+      const msw = mDef.width  * _camera.zoom;
+      const msh = mDef.height * _camera.zoom;
+
+      const mg = new PIXI.Graphics();
+      mg.rect(msx - msw / 2, msy - msh / 2, msw, msh);
+      mg.fill({ color: PART_FILL[mDef.type] ?? 0x1a4080, alpha: 0.4 });
+      mg.stroke({ color: PART_STROKE[mDef.type] ?? 0x4090d0, width: 1, alpha: 0.5 });
+
+      // Leg struts for mirror ghost.
+      if (mDef.type === PartType.LANDING_LEGS || mDef.type === PartType.LANDING_LEG) {
+        _drawLegStruts(mg, msx, msy, mDef, _ghostLegAnimT, 0.4);
+      }
+
+      _ghostContainer.addChild(mg);
+
+      const mLabel = new PIXI.Text({
+        text: mDef.name,
+        style: new PIXI.TextStyle({
+          fill: '#c8e4ff',
+          fontSize: 10,
+          fontFamily: 'Courier New, Courier, monospace',
+        }),
+      });
+      mLabel.anchor.set(0.5, 0.5);
+      mLabel.alpha = 0.5;
+      mLabel.x = msx;
+      mLabel.y = msy;
+      _ghostContainer.addChild(mLabel);
+    }
+  }
 }
+
+/**
+ * Draw animated leg deploy struts on a Graphics object.
+ * @param {PIXI.Graphics} g    Target graphics.
+ * @param {number} cx          Screen X centre of the part.
+ * @param {number} cy          Screen Y centre of the part.
+ * @param {object} def         Part definition.
+ * @param {number} t           Animation parameter 0–1.
+ * @param {number} alpha       Opacity for the strut lines.
+ */
+function _drawLegStruts(g, cx, cy, def, t, alpha) {
+  const sw = def.width  * _camera.zoom;
+  const sh = def.height * _camera.zoom;
+
+  // Strut extends outward and downward from part bottom.
+  const dx = sw * 1.0 * t;
+  const dy = sh * 1.5 * t;
+  const footY = cy + sh / 2 + dy;
+  const baseY = cy + sh / 4;
+
+  // Left strut.
+  const leftFootX = cx - dx;
+  g.moveTo(cx, baseY);
+  g.lineTo(leftFootX, footY);
+  g.stroke({ color: 0x40c060, width: 2, alpha });
+  g.circle(leftFootX, footY, 3 * _camera.zoom);
+  g.fill({ color: 0x40c060, alpha });
+
+  // Right strut.
+  const rightFootX = cx + dx;
+  g.moveTo(cx, baseY);
+  g.lineTo(rightFootX, footY);
+  g.stroke({ color: 0x40c060, width: 2, alpha });
+  g.circle(rightFootX, footY, 3 * _camera.zoom);
+  g.fill({ color: 0x40c060, alpha });
+}
+
+// ---------------------------------------------------------------------------
+// Leg animation RAF ticker
+// ---------------------------------------------------------------------------
+
+/**
+ * Advance ping-pong animation parameter.
+ * @param {number} t     Current value (0–1).
+ * @param {number} dir   Current direction (+1 or -1).
+ * @param {number} dtSec Delta time in seconds.
+ * @returns {{ t: number, dir: number }}
+ */
+function _advancePingPong(t, dir, dtSec) {
+  t += dir * dtSec / 1.0; // 1s per half-cycle
+  if (t >= 1) { t = 1; dir = -1; }
+  if (t <= 0) { t = 0; dir = 1; }
+  return { t, dir };
+}
+
+/**
+ * RAF callback that advances leg animations for both ghost and selected parts.
+ */
+function _tickLegAnimation(now) {
+  // Ghost animation.
+  if (_ghostPartId) {
+    if (_lastGhostFrameTime !== null) {
+      const dtSec = (now - _lastGhostFrameTime) / 1000;
+      const r = _advancePingPong(_ghostLegAnimT, _ghostLegAnimDir, dtSec);
+      _ghostLegAnimT = r.t;
+      _ghostLegAnimDir = r.dir;
+    }
+    _lastGhostFrameTime = now;
+    _renderGhostLayer();
+  }
+
+  // Selected-part leg animation.
+  if (_selLegInstanceId) {
+    if (_selLegLastTime !== null) {
+      const dtSec = (now - _selLegLastTime) / 1000;
+      const r = _advancePingPong(_selLegAnimT, _selLegAnimDir, dtSec);
+      _selLegAnimT = r.t;
+      _selLegAnimDir = r.dir;
+    }
+    _selLegLastTime = now;
+    _renderSelectedLegStruts();
+  }
+
+  // Continue loop if either animation is active.
+  if (_ghostPartId || _selLegInstanceId) {
+    _legAnimRAF = requestAnimationFrame(_tickLegAnimation);
+  } else {
+    _legAnimRAF = null;
+  }
+}
+
+/** Start the leg animation ticker if not already running. */
+function _startLegAnimTicker() {
+  if (_legAnimRAF !== null) return;
+  _legAnimRAF = requestAnimationFrame(_tickLegAnimation);
+}
+
+/** Cancel the RAF ticker if neither ghost nor selection needs it. */
+function _stopLegAnimTickerIfIdle() {
+  if (!_ghostPartId && !_selLegInstanceId) {
+    if (_legAnimRAF !== null) {
+      cancelAnimationFrame(_legAnimRAF);
+      _legAnimRAF = null;
+    }
+  }
+}
+
+/**
+ * Draw leg struts on the selected part (into the ghost container overlay).
+ */
+function _renderSelectedLegStruts() {
+  // We draw into _ghostContainer — the ghost layer handles clearing in _renderGhostLayer,
+  // so we append after any ghost content.  When there's no ghost, we need to clear first.
+  if (!_ghostContainer || !_selLegDef) return;
+
+  // Remove previous selection leg graphics (tagged with __selLeg).
+  for (let i = _ghostContainer.children.length - 1; i >= 0; i--) {
+    if (_ghostContainer.children[i].__selLeg) {
+      _ghostContainer.removeChildAt(i);
+    }
+  }
+
+  const { sx, sy } = _worldToScreen(_selLegWorldX, _selLegWorldY);
+  const g = new PIXI.Graphics();
+  g.__selLeg = true;
+  _drawLegStruts(g, sx, sy, _selLegDef, _selLegAnimT, 0.7);
+  _ghostContainer.addChild(g);
+}
+
+/**
+ * Start animating leg struts on a selected placed part.
+ * @param {string} instanceId
+ * @param {number} worldX
+ * @param {number} worldY
+ * @param {object} def  Part definition.
+ */
+export function vabSetSelectedLegAnimation(instanceId, worldX, worldY, def) {
+  _selLegInstanceId = instanceId;
+  _selLegWorldX = worldX;
+  _selLegWorldY = worldY;
+  _selLegDef = def;
+  _selLegAnimT = 0;
+  _selLegAnimDir = 1;
+  _selLegLastTime = null;
+  _startLegAnimTicker();
+}
+
+/** Stop the selected-part leg animation. */
+export function vabClearSelectedLegAnimation() {
+  if (!_selLegInstanceId) return;
+  _selLegInstanceId = null;
+  _selLegDef = null;
+  _selLegLastTime = null;
+  // Remove selection leg graphics from ghost container.
+  if (_ghostContainer) {
+    for (let i = _ghostContainer.children.length - 1; i >= 0; i--) {
+      if (_ghostContainer.children[i].__selLeg) {
+        _ghostContainer.removeChildAt(i);
+      }
+    }
+  }
+  _stopLegAnimTickerIfIdle();
+}
+
+// ---------------------------------------------------------------------------
+// Snap layer
+// ---------------------------------------------------------------------------
 
 /**
  * Redraw the snap-highlight indicators for the current candidates.
@@ -367,6 +597,15 @@ function _renderSnapLayer() {
     g.circle(cx, cy, Math.max(4, 6 * _camera.zoom));
     g.fill({ color: 0x204840, alpha: 0.25 });
     g.stroke({ color: 0x308060, width: 1 });
+  }
+
+  // Mirror ghost snap highlight — dimmer green ring at the mirror target.
+  if (_mirrorGhostPartId) {
+    const { sx: msx, sy: msy } = _worldToScreen(_mirrorGhostWX, _mirrorGhostWY);
+    const mr = Math.max(6, 8 * _camera.zoom);
+    g.circle(msx, msy, mr);
+    g.fill({ color: 0x204840, alpha: 0.2 });
+    g.stroke({ color: 0x40a060, width: 1, alpha: 0.5 });
   }
 }
 
@@ -563,6 +802,42 @@ export function vabGetCamera() {
   return { ..._camera };
 }
 
+/**
+ * Zoom and pan the camera so that the given world-space bounds fit within
+ * 80% of the build area.  Clamps zoom to [0.25, 4].
+ *
+ * @param {{ minX: number, maxX: number, minY: number, maxY: number }} bounds
+ */
+export function vabZoomToFit(bounds) {
+  if (!bounds) return;
+
+  const area = getBuildArea();
+  const worldW = bounds.maxX - bounds.minX;
+  const worldH = bounds.maxY - bounds.minY;
+  if (worldW <= 0 && worldH <= 0) return;
+
+  const padding = 0.8; // use 80% of the available area
+  const zoomX = worldW > 0 ? (area.width  * padding) / worldW : 4;
+  const zoomY = worldH > 0 ? (area.height * padding) / worldH : 4;
+  const zoom = Math.max(0.25, Math.min(4, Math.min(zoomX, zoomY)));
+
+  // Centre camera on the rocket's centre.
+  const centreWX = (bounds.minX + bounds.maxX) / 2;
+  const centreWY = (bounds.minY + bounds.maxY) / 2;
+
+  // Camera equations (from _worldToScreen):
+  //   screenX = area.x + camera.x + worldX * zoom  →  camera.x = area.width/2 - centreWX * zoom
+  //   screenY = area.y + camera.y - worldY * zoom  →  camera.y = area.height/2 + centreWY * zoom
+  _camera.zoom = zoom;
+  _camera.x = area.width  / 2 - centreWX * zoom;
+  _camera.y = area.height / 2 + centreWY * zoom;
+
+  vabRedrawGrid();
+  _renderPartsLayer();
+  _renderSnapLayer();
+  _renderGhostLayer();
+}
+
 // ---------------------------------------------------------------------------
 // Part assembly rendering API
 // ---------------------------------------------------------------------------
@@ -600,6 +875,11 @@ export function vabSetDragGhost(partId, clientX, clientY) {
   _ghostSX = clientX;
   _ghostSY = clientY;
   _renderGhostLayer();
+  // Start RAF ticker for continuous leg animation if this is a leg part.
+  const def = getPartById(partId);
+  if (def && (def.type === PartType.LANDING_LEGS || def.type === PartType.LANDING_LEG)) {
+    _startLegAnimTicker();
+  }
 }
 
 /**
@@ -619,9 +899,45 @@ export function vabMoveDragGhost(clientX, clientY) {
  */
 export function vabClearDragGhost() {
   _ghostPartId = null;
+  _ghostLegAnimT = 0;
+  _ghostLegAnimDir = 1;
+  _lastGhostFrameTime = null;
   if (_ghostContainer) {
-    while (_ghostContainer.children.length) _ghostContainer.removeChildAt(0);
+    // Preserve selected-leg graphics when clearing ghost.
+    for (let i = _ghostContainer.children.length - 1; i >= 0; i--) {
+      if (!_ghostContainer.children[i].__selLeg) {
+        _ghostContainer.removeChildAt(i);
+      }
+    }
   }
+  _stopLegAnimTickerIfIdle();
+}
+
+// ---------------------------------------------------------------------------
+// Mirror ghost API
+// ---------------------------------------------------------------------------
+
+/**
+ * Show a mirror ghost for the given part at the given world position.
+ * Used during symmetry-mode dragging to preview the mirrored placement.
+ * @param {string} partId   Part catalog ID.
+ * @param {number} worldX   Mirror part centre in world coords.
+ * @param {number} worldY   Mirror part centre in world coords.
+ */
+export function vabSetMirrorGhost(partId, worldX, worldY) {
+  _mirrorGhostPartId = partId;
+  _mirrorGhostWX = worldX;
+  _mirrorGhostWY = worldY;
+  _renderGhostLayer();
+}
+
+/**
+ * Remove the mirror ghost.
+ */
+export function vabClearMirrorGhost() {
+  if (!_mirrorGhostPartId) return;
+  _mirrorGhostPartId = null;
+  _renderGhostLayer();
 }
 
 // ---------------------------------------------------------------------------

@@ -19,7 +19,7 @@
 
 import { PARTS, getPartById } from '../data/parts.js';
 import { PartType } from '../core/constants.js';
-import { runValidation } from '../core/rocketvalidator.js';
+import { runValidation, getTotalMass, getRocketBounds } from '../core/rocketvalidator.js';
 import { getActiveCrew } from '../core/crew.js';
 import {
   VAB_TOOLBAR_HEIGHT,
@@ -37,6 +37,11 @@ import {
   vabClearDragGhost,
   vabShowSnapHighlights,
   vabClearSnapHighlights,
+  vabSetMirrorGhost,
+  vabClearMirrorGhost,
+  vabZoomToFit,
+  vabSetSelectedLegAnimation,
+  vabClearSelectedLegAnimation,
 } from '../render/vab.js';
 import {
   createRocketAssembly,
@@ -106,6 +111,9 @@ let _lastValidation = null;
 
 /** Optional callback invoked when the player clicks "← Hub". @type {(() => void) | null} */
 let _onBack = null;
+
+/** Whether auto-zoom-to-fit is enabled. */
+let _autoZoomEnabled = true;
 
 /**
  * Whether radial symmetry is active.  When true, placing a part onto a
@@ -283,6 +291,11 @@ const VAB_CSS = `
   font-weight: 600;
   color: #8ab8d8;
   white-space: nowrap;
+}
+.vab-zoom-slider {
+  width: 100px;
+  cursor: pointer;
+  accent-color: #2080c0;
 }
 .vab-toolbar-cost {
   font-size: 0.92rem;
@@ -1527,6 +1540,7 @@ function _cancelDrag() {
   _pendingPickup = null;
   vabClearDragGhost();
   vabClearSnapHighlights();
+  vabClearMirrorGhost();
 
   // If a placed part was picked up but not re-dropped, its position was already
   // preserved in the assembly (it was disconnected but not removed). It will
@@ -1566,8 +1580,20 @@ function _onDragMove(e) {
 
   if (candidates.length > 0) {
     vabShowSnapHighlights(candidates);
+    // Show mirror ghost when symmetry mode is active and best snap is radial.
+    if (_symmetryMode) {
+      const mirror = findMirrorCandidate(_assembly, candidates[0], _dragState.partId);
+      if (mirror) {
+        vabSetMirrorGhost(_dragState.partId, mirror.mirrorWorldX, mirror.mirrorWorldY);
+      } else {
+        vabClearMirrorGhost();
+      }
+    } else {
+      vabClearMirrorGhost();
+    }
   } else {
     vabClearSnapHighlights();
+    vabClearMirrorGhost();
   }
 }
 
@@ -1587,6 +1613,7 @@ function _onDragEnd(e) {
 
   vabClearDragGhost();
   vabClearSnapHighlights();
+  vabClearMirrorGhost();
 
   // If pointer didn't move enough, treat as a click rather than a drag.
   if (!hasMoved) {
@@ -1829,7 +1856,7 @@ function _setSelectedPart(instanceId) {
 
   if (!instanceId || !_assembly) {
     highlight.setAttribute('hidden', '');
-    // Also hide the detail panel if it was showing a schematic-part detail.
+    vabClearSelectedLegAnimation();
     return;
   }
 
@@ -1837,11 +1864,19 @@ function _setSelectedPart(instanceId) {
   const def = placed ? getPartById(placed.partId) : null;
   if (!placed || !def) {
     highlight.setAttribute('hidden', '');
+    vabClearSelectedLegAnimation();
     return;
   }
 
   _updateSelectionHighlight(placed, def, highlight);
   highlight.removeAttribute('hidden');
+
+  // Animate leg struts on selected landing leg parts.
+  if (def.type === PartType.LANDING_LEGS || def.type === PartType.LANDING_LEG) {
+    vabSetSelectedLegAnimation(instanceId, placed.x, placed.y, def);
+  } else {
+    vabClearSelectedLegAnimation();
+  }
 
   // Show detail for the selected part.
   _showPartDetail(placed.partId);
@@ -1877,6 +1912,29 @@ function _updateSelectionHighlight(placed, def, highlight) {
 }
 
 // ---------------------------------------------------------------------------
+// Auto-zoom helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Zoom/pan the camera so the entire rocket fits comfortably in the build area.
+ * No-op when the assembly is empty.
+ */
+function _doZoomToFit() {
+  if (!_assembly) return;
+  const bounds = getRocketBounds(_assembly);
+  if (bounds) vabZoomToFit(bounds);
+  _syncZoomSlider();
+}
+
+/**
+ * Sync the zoom slider value with the current camera zoom level.
+ */
+function _syncZoomSlider() {
+  const slider = /** @type {HTMLInputElement|null} */ (document.getElementById('vab-zoom-slider'));
+  if (slider) slider.value = String(vabGetCamera().zoom);
+}
+
+// ---------------------------------------------------------------------------
 // Status bar (part count + cost)
 // ---------------------------------------------------------------------------
 
@@ -1886,6 +1944,7 @@ function _updateSelectionHighlight(placed, def, highlight) {
 function _updateStatusBar() {
   const partsEl = document.getElementById('vab-status-parts');
   const costEl  = document.getElementById('vab-status-cost');
+  const massEl  = document.getElementById('vab-status-mass');
   if (!partsEl || !costEl || !_assembly) return;
 
   const count = _assembly.parts.size;
@@ -1897,6 +1956,13 @@ function _updateStatusBar() {
 
   partsEl.textContent = `Parts: ${count}`;
   costEl.textContent  = `Cost: ${fmt$(totalCost)}`;
+
+  if (massEl) {
+    const massKg = getTotalMass(_assembly);
+    massEl.textContent = massKg >= 1000
+      ? `Mass: ${(massKg / 1000).toFixed(1)} t`
+      : `Mass: ${massKg} kg`;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -2145,6 +2211,7 @@ function _setupCanvas(canvasArea) {
     _drawScaleTicks();
     _updateScaleBarExtents();
     _updateOffscreenIndicators();
+    _syncZoomSlider();
   }, { passive: false });
 }
 
@@ -2307,6 +2374,26 @@ function _bindButtons(root) {
     if (!_lastValidation?.canLaunch) return; // Guard: button should be disabled anyway.
     _handleLaunchClicked();
   });
+
+  // ── Fit (zoom-to-fit) button ──────────────────────────────────────────────
+  root.querySelector('#vab-btn-fit')?.addEventListener('click', () => {
+    _doZoomToFit();
+  });
+
+  // ── Auto-zoom checkbox ────────────────────────────────────────────────────
+  root.querySelector('#vab-chk-autozoom')?.addEventListener('change', (e) => {
+    _autoZoomEnabled = /** @type {HTMLInputElement} */ (e.target).checked;
+    if (_autoZoomEnabled) _doZoomToFit();
+  });
+
+  // ── Zoom slider ─────────────────────────────────────────────────────────
+  root.querySelector('#vab-zoom-slider')?.addEventListener('input', (e) => {
+    const value = parseFloat(/** @type {HTMLInputElement} */ (e.target).value);
+    vabSetZoom(value);
+    _drawScaleTicks();
+    _updateScaleBarExtents();
+    _updateOffscreenIndicators();
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -2325,6 +2412,7 @@ function _syncAndRenderStaging() {
     _updateStatusBar();
     _updateScaleBarExtents();
     _updateOffscreenIndicators();
+    if (_autoZoomEnabled) _doZoomToFit();
   }
 }
 
@@ -3246,7 +3334,16 @@ export function initVabUI(container, state, { onBack } = {}) {
           Launch
         </button>
         <span class="vab-toolbar-spacer"></span>
+        <button class="vab-btn" id="vab-btn-fit" type="button" title="Zoom to fit rocket">Zoom to Fit</button>
+        <label class="vab-toolbar-stat" title="Automatically zoom to fit after changes">
+          <input type="checkbox" id="vab-chk-autozoom" checked> Auto Zoom
+        </label>
+        <input type="range" id="vab-zoom-slider" class="vab-zoom-slider"
+               min="0.25" max="4" step="0.05" value="1"
+               title="Zoom level">
+        <span class="vab-toolbar-spacer"></span>
         <span class="vab-toolbar-stat" id="vab-status-parts">Parts: 0</span>
+        <span class="vab-toolbar-stat" id="vab-status-mass">Mass: 0 kg</span>
         <span class="vab-toolbar-stat vab-toolbar-cost" id="vab-status-cost">Cost: $0</span>
       </div>
     </div>
@@ -3391,6 +3488,7 @@ export function initVabUI(container, state, { onBack } = {}) {
     vabRenderParts(_assembly, _selectedInstanceId);
     _updateStatusBar();
     _updateOffscreenIndicators();
+    if (_autoZoomEnabled) _doZoomToFit();
   }
 
   // ── Initial / restored validation run ─────────────────────────────────────

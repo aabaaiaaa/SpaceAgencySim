@@ -119,6 +119,38 @@ export function calculateTWR(assembly, stagingConfig) {
 }
 
 // ---------------------------------------------------------------------------
+// Rocket bounds (for auto-zoom)
+// ---------------------------------------------------------------------------
+
+/**
+ * Calculate the axis-aligned bounding box of all placed parts in the assembly.
+ *
+ * @param {import('./rocketbuilder.js').RocketAssembly} assembly
+ * @returns {{ minX: number, maxX: number, minY: number, maxY: number } | null}
+ *   Null when the assembly has no parts.
+ */
+export function getRocketBounds(assembly) {
+  if (!assembly || assembly.parts.size === 0) return null;
+
+  let minX = Infinity, maxX = -Infinity;
+  let minY = Infinity, maxY = -Infinity;
+
+  for (const placed of assembly.parts.values()) {
+    const def = getPartById(placed.partId);
+    if (!def) continue;
+    const hw = def.width  / 2;
+    const hh = def.height / 2;
+    minX = Math.min(minX, placed.x - hw);
+    maxX = Math.max(maxX, placed.x + hw);
+    minY = Math.min(minY, placed.y - hh);
+    maxY = Math.max(maxY, placed.y + hh);
+  }
+
+  if (minX === Infinity) return null;
+  return { minX, maxX, minY, maxY };
+}
+
+// ---------------------------------------------------------------------------
 // Private helper — undirected connectivity BFS
 // ---------------------------------------------------------------------------
 

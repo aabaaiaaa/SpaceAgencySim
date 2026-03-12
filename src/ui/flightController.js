@@ -1163,6 +1163,47 @@ function _eventDotColor(type) {
   }
 }
 
+/**
+ * Build the flight event list DOM element from an array of events.
+ * @param {Array<object>} events
+ * @returns {HTMLElement}  A <ul> or <p> element.
+ */
+function _buildFlightEventList(events) {
+  if (!events || events.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'fl-empty';
+    empty.textContent = 'No events recorded.';
+    return empty;
+  }
+
+  const list = document.createElement('ul');
+  list.className = 'fl-list';
+
+  for (const evt of events) {
+    const li = document.createElement('li');
+    li.className = 'fl-event';
+
+    const dot = document.createElement('span');
+    dot.className = 'fl-event-dot';
+    dot.style.background = _eventDotColor(evt.type);
+
+    const time = document.createElement('span');
+    time.className = 'fl-event-time';
+    time.textContent = _formatFlightTime(evt.time ?? 0);
+
+    const desc = document.createElement('span');
+    desc.className = 'fl-event-desc';
+    desc.textContent = evt.description ?? evt.type;
+
+    li.appendChild(dot);
+    li.appendChild(time);
+    li.appendChild(desc);
+    list.appendChild(li);
+  }
+
+  return list;
+}
+
 /** Menu action: show the flight log overlay. */
 function _handleMenuFlightLog() {
   const host = document.getElementById('ui-overlay') ?? document.body;
@@ -1190,39 +1231,7 @@ function _handleMenuFlightLog() {
 
   // Event list
   const events = _flightState ? _flightState.events : [];
-  if (events.length === 0) {
-    const empty = document.createElement('p');
-    empty.className = 'fl-empty';
-    empty.textContent = 'No events recorded.';
-    content.appendChild(empty);
-  } else {
-    const list = document.createElement('ul');
-    list.className = 'fl-list';
-
-    for (const evt of events) {
-      const li = document.createElement('li');
-      li.className = 'fl-event';
-
-      const dot = document.createElement('span');
-      dot.className = 'fl-event-dot';
-      dot.style.background = _eventDotColor(evt.type);
-
-      const time = document.createElement('span');
-      time.className = 'fl-event-time';
-      time.textContent = _formatFlightTime(evt.time ?? 0);
-
-      const desc = document.createElement('span');
-      desc.className = 'fl-event-desc';
-      desc.textContent = evt.description ?? evt.type;
-
-      li.appendChild(dot);
-      li.appendChild(time);
-      li.appendChild(desc);
-      list.appendChild(li);
-    }
-
-    content.appendChild(list);
-  }
+  content.appendChild(_buildFlightEventList(events));
 
   // Close button
   const closeBtn = document.createElement('button');
@@ -1438,10 +1447,7 @@ function _showPostFlightSummary(ps, assembly, flightState, state, onFlightEnd) {
 
   // ── 2. Mission objectives (all accepted + just-completed missions) ────────
   if (state) {
-    const allMissions = [
-      ...(state.missions?.accepted  ?? []),
-      ...(state.missions?.completed ?? []),
-    ];
+    const allMissions = [...(state.missions?.accepted ?? [])];
     const missionsWithObjectives = allMissions.filter(
       (m) => Array.isArray(m.objectives) && m.objectives.length > 0,
     );
@@ -1595,6 +1601,17 @@ function _showPostFlightSummary(ps, assembly, flightState, state, onFlightEnd) {
 
       content.appendChild(section);
     }
+  }
+
+  // ── 4b. Flight log ────────────────────────────────────────────────────────
+  if (flightState?.events?.length > 0) {
+    const logSection = document.createElement('div');
+    logSection.className = 'pf-section';
+    const logTitle = document.createElement('h2');
+    logTitle.textContent = 'Flight Log';
+    logSection.appendChild(logTitle);
+    logSection.appendChild(_buildFlightEventList(flightState.events));
+    content.appendChild(logSection);
   }
 
   // ── 5. Action buttons ─────────────────────────────────────────────────────

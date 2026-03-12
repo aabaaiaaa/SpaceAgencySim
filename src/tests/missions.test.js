@@ -1574,3 +1574,40 @@ describe('processFlightReturn() — multi-mission completion', () => {
     expect(state.money).toBe(moneyBefore + 3000);
   });
 });
+
+// ---------------------------------------------------------------------------
+// checkObjectiveCompletion — only accepted missions (Item 39)
+// ---------------------------------------------------------------------------
+
+describe('checkObjectiveCompletion() — only accepted missions', () => {
+  it('completed missions are not re-evaluated', () => {
+    const state = freshState();
+    const def = makeMissionDef({
+      id: 'already-done',
+      objectives: [
+        {
+          id: 'o-alt',
+          type: ObjectiveType.REACH_ALTITUDE,
+          target: { altitude: 100 },
+          completed: false,
+          description: 'Reach 100 m',
+        },
+      ],
+    });
+
+    // Place the mission directly in the completed bucket.
+    state.missions.completed.push({
+      ...def,
+      objectives: def.objectives.map((o) => ({ ...o })),
+      status: MissionStatus.COMPLETED,
+    });
+
+    // FlightState that would normally satisfy the objective.
+    const fs = makeFlightState('already-done', { altitude: 500 });
+
+    checkObjectiveCompletion(state, fs);
+
+    // The completed mission's objective should remain untouched.
+    expect(state.missions.completed[0].objectives[0].completed).toBe(false);
+  });
+});

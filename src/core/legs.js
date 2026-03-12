@@ -238,6 +238,33 @@ export function getLegStatus(ps, instanceId) {
  *           activeParts: Set<string> }}          ps
  * @returns {number}  Count of deployed legs (≥ 0).
  */
+/**
+ * Compute the deployed foot offset for a landing leg instance.
+ *
+ * Returns { dx, dy, t } where dx/dy are unsigned pixel offsets from the
+ * leg's centre position.  dy = downward extension, dx = outward extension.
+ * The caller applies the appropriate side sign to dx.
+ *
+ * @param {string}                            instanceId
+ * @param {{ width?: number, height?: number }} def  Part definition.
+ * @param {Map<string, LegEntry>|undefined}   legStates
+ * @returns {{ dx: number, dy: number, t: number }}
+ */
+export function getDeployedLegFootOffset(instanceId, def, legStates) {
+  let t = 0;
+  const entry = legStates?.get(instanceId);
+  if (entry) {
+    if (entry.state === LegState.DEPLOYED) t = 1;
+    else if (entry.state === LegState.DEPLOYING) {
+      t = 1 - (entry.deployTimer / LEG_DEPLOY_DURATION);
+      t = Math.max(0, Math.min(1, t));
+    }
+  }
+  const pw = def.width ?? 10;
+  const ph = def.height ?? 20;
+  return { dx: pw * 1.0 * t, dy: ph * 3.0 * t, t };
+}
+
 export function countDeployedLegs(ps) {
   if (!ps.legStates) return 0;
   let count = 0;
