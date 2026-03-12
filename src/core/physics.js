@@ -1377,38 +1377,69 @@ function _applyGroundedSteering(ps, assembly, left, right, dt) {
  * @param {import('./gameState.js').FlightState}        flightState
  */
 function _checkToppleCrash(ps, assembly, flightState) {
-  if (Math.abs(ps.angle) > TOPPLE_CRASH_ANGLE) {
-    ps.crashed = true;
-    ps.angularVelocity = 0;
-    ps.firingEngines.clear();
+  if (Math.abs(ps.angle) <= TOPPLE_CRASH_ANGLE) return;
 
-    // Emit PART_DESTROYED for every active part so the crash summary
-    // shows what was lost.
-    const time = flightState.timeElapsed;
-    for (const instanceId of ps.activeParts) {
-      const placed = assembly.parts.get(instanceId);
-      _emitEvent(flightState, {
-        type:       'PART_DESTROYED',
-        time,
-        instanceId,
-        partId:     placed?.partId,
-        speed:      0,
-        toppled:    true,
-      });
+  // Compute tip speed: linear velocity of the farthest part from the
+  // tipping contact pivot.  Compare against the weakest part's crash
+  // threshold — if tip speed is below that, it's a gentle topple.
+  const cx = ps.tippingContactX ?? 0;
+  const cy = ps.tippingContactY ?? 0;
+  let maxDist = 0;
+  let minThreshold = Infinity;
+  for (const instanceId of ps.activeParts) {
+    const placed = assembly.parts.get(instanceId);
+    if (!placed) continue;
+    const def = getPartById(placed.partId);
+    if (!def) continue;
+    const hw = (def.width  ?? 40) / 2;
+    const hh = (def.height ?? 40) / 2;
+    // Check all four corners for max distance from pivot.
+    for (const [px, py] of [
+      [placed.x - hw, placed.y - hh],
+      [placed.x + hw, placed.y - hh],
+      [placed.x - hw, placed.y + hh],
+      [placed.x + hw, placed.y + hh],
+    ]) {
+      const dx = (px - cx) * SCALE_M_PER_PX;
+      const dy = (py - cy) * SCALE_M_PER_PX;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > maxDist) maxDist = dist;
     }
+    const threshold = def.properties?.crashThreshold ?? DEFAULT_CRASH_THRESHOLD;
+    if (threshold < minThreshold) minThreshold = threshold;
+  }
 
-    // Clear active parts AFTER emitting events — the rocket is destroyed.
-    ps.activeParts.clear();
-    ps.deployedParts.clear();
+  const tipSpeed = Math.abs(ps.angularVelocity) * maxDist;
+  if (tipSpeed <= minThreshold) return; // gentle topple — no crash
 
+  // Destructive topple — crash.
+  ps.crashed = true;
+  ps.angularVelocity = 0;
+  ps.firingEngines.clear();
+
+  const time = flightState.timeElapsed;
+  for (const instanceId of ps.activeParts) {
+    const placed = assembly.parts.get(instanceId);
     _emitEvent(flightState, {
-      type: 'CRASH',
+      type:       'PART_DESTROYED',
       time,
-      speed: 0,
-      toppled: true,
-      description: 'Rocket toppled over and crashed!',
+      instanceId,
+      partId:     placed?.partId,
+      speed:      tipSpeed,
+      toppled:    true,
     });
   }
+
+  ps.activeParts.clear();
+  ps.deployedParts.clear();
+
+  _emitEvent(flightState, {
+    type: 'CRASH',
+    time,
+    speed: tipSpeed,
+    toppled: true,
+    description: `Rocket toppled over at ${tipSpeed.toFixed(1)} m/s and crashed!`,
+  });
 }
 
 /**

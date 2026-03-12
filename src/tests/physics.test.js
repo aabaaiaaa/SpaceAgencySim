@@ -1782,6 +1782,58 @@ describe('Ground rotation — tipping physics', () => {
     expect(ps.crashed).toBe(true);
     const crashEvt = fs.events.find((e) => e.type === 'CRASH' && e.toppled === true);
     expect(crashEvt).toBeDefined();
+    expect(crashEvt.speed).toBeGreaterThan(0);
+  });
+
+  it('slowly toppling rocket does not crash', () => {
+    const { assembly, staging } = makeSimpleRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    // Just past topple angle with very low angular velocity → low tip speed.
+    ps.angle = Math.PI * 0.44 + 0.05;
+    ps.angularVelocity = 0.1;
+    ps.isTipping = true;
+
+    tick(ps, assembly, staging, fs, 1 / 60);
+    expect(ps.crashed).toBeFalsy();
+  });
+
+  it('fast toppling rocket crashes', () => {
+    const { assembly, staging } = makeSimpleRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    // Same angle but high angular velocity → high tip speed.
+    ps.angle = Math.PI * 0.44 + 0.05;
+    ps.angularVelocity = 5.0;
+    ps.isTipping = true;
+
+    tick(ps, assembly, staging, fs, 1 / 60);
+    expect(ps.crashed).toBe(true);
+    const evt = fs.events.find(e => e.type === 'CRASH' && e.toppled);
+    expect(evt).toBeDefined();
+    expect(evt.speed).toBeGreaterThan(0);
+  });
+
+  it('slowly toppled rocket settles on its side without crashing', () => {
+    const { assembly, staging } = makeSimpleRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    ps.angle = Math.PI * 0.44 + 0.05;
+    ps.angularVelocity = 0.1;
+    ps.isTipping = true;
+
+    for (let i = 0; i < 1200; i++) {
+      tick(ps, assembly, staging, fs, 1 / 60);
+      if (ps.crashed) break;
+    }
+
+    expect(ps.crashed).toBeFalsy();
+    // Should have settled near π/2 (on its side).
+    expect(Math.abs(ps.angle)).toBeGreaterThan(1.0);
+    expect(Math.abs(ps.angularVelocity)).toBe(0);
   });
 
   it('tipping physics runs on ps.landed (not just grounded)', () => {
@@ -2583,7 +2635,7 @@ describe('Deployed legs are lowest point on grounded rocket', () => {
 // ---------------------------------------------------------------------------
 
 describe('Asymmetric leg deploy causes tipping on pad', () => {
-  it('rocket tips and crashes when only one leg is deployed on the pad', () => {
+  it('rocket tips and settles on its side when only one leg is deployed on the pad', () => {
     const { assembly, staging, legId1, legId2 } = makeRocketWithLegs();
     const fs = makeFlightState();
     const ps = createPhysicsState(assembly, fs);
@@ -2600,21 +2652,15 @@ describe('Asymmetric leg deploy causes tipping on pad', () => {
 
     // Tick long enough for the rocket to topple past crash angle.
     const dt = 1 / 60;
-    for (let i = 0; i < 300; i++) {
+    for (let i = 0; i < 1200; i++) {
       tick(ps, assembly, staging, fs, dt);
       if (ps.crashed) break;
     }
 
-    // Rocket should have crashed from toppling.
-    expect(ps.crashed).toBe(true);
-
-    // A CRASH event with toppled flag should have been emitted.
-    const crashEvt = fs.events.find(e => e.type === 'CRASH' && e.toppled);
-    expect(crashEvt).toBeDefined();
-
-    // PART_DESTROYED events should have been emitted for all parts.
-    const destroyedEvts = fs.events.filter(e => e.type === 'PART_DESTROYED');
-    expect(destroyedEvts.length).toBeGreaterThan(0);
+    // Gravity-driven topple from standing is gentle — tip speed stays below
+    // the crash threshold, so the rocket settles on its side without crashing.
+    expect(ps.crashed).toBeFalsy();
+    expect(Math.abs(ps.angle)).toBeGreaterThan(1.0);
   });
 
   it('rocket stays upright when both legs are deployed symmetrically', () => {
