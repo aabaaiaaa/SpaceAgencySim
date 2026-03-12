@@ -19,6 +19,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   createPhysicsState,
   tick,
+  tickDebrisGround,
   handleKeyDown,
   handleKeyUp,
   fireNextStage,
@@ -1872,6 +1873,105 @@ describe('Ground rotation — tipping physics', () => {
     expect(ps.angle).toBe(0);
     expect(ps.angularVelocity).toBe(0);
     expect(ps.isTipping).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Debris ground physics — tipping & settling
+// ---------------------------------------------------------------------------
+
+describe('Debris ground physics — tipping & settling', () => {
+  // Helper: create landed debris from a two-stage rocket separation.
+  function makeLandedDebris() {
+    const { assembly, staging } = makeTwoStageRocketGlobal();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    // Fire stage 1 (engine ignition), then stage 2 (decoupler separation).
+    fireNextStage(ps, assembly, staging, fs);
+    fireNextStage(ps, assembly, staging, fs);
+
+    const debris = ps.debris[0];
+    debris.posY = 0;
+    debris.velX = 0;
+    debris.velY = 0;
+    debris.landed = true;
+    debris.angularVelocity = 0;
+    return { debris, assembly };
+  }
+
+  it('tilted debris rocks under gravity torque', () => {
+    const { debris, assembly } = makeLandedDebris();
+    debris.angle = 0.3; // ~17° tilt
+    debris.isTipping = true;
+
+    const initialAngle = debris.angle;
+    tickDebrisGround(debris, assembly, 1 / 60);
+
+    // Gravity torque should change the angle (debris rocks).
+    expect(debris.angle).not.toBe(initialAngle);
+    // Angular velocity should be non-zero (gravity is acting).
+    expect(debris.angularVelocity).not.toBe(0);
+  });
+
+  it('upright debris settles to angle 0', () => {
+    const { debris, assembly } = makeLandedDebris();
+    debris.angle = 0.003; // tiny tilt — below snap threshold
+    debris.angularVelocity = 0.01;
+
+    for (let i = 0; i < 300; i++) {
+      tickDebrisGround(debris, assembly, 1 / 60);
+    }
+
+    expect(debris.angle).toBe(0);
+    expect(debris.angularVelocity).toBe(0);
+    expect(debris.isTipping).toBe(false);
+  });
+
+  it('fast toppling debris crashes', () => {
+    const { debris, assembly } = makeLandedDebris();
+    debris.angle = Math.PI * 0.44 + 0.05; // past topple threshold
+    debris.angularVelocity = 5.0;
+    debris.isTipping = true;
+
+    for (let i = 0; i < 60; i++) {
+      tickDebrisGround(debris, assembly, 1 / 60);
+      if (debris.crashed) break;
+    }
+
+    expect(debris.crashed).toBe(true);
+  });
+
+  it('slow topple does not crash debris', () => {
+    const { debris, assembly } = makeLandedDebris();
+    debris.angle = Math.PI * 0.44 + 0.05;
+    debris.angularVelocity = 0.1; // very slow
+    debris.isTipping = true;
+
+    tickDebrisGround(debris, assembly, 1 / 60);
+    expect(debris.crashed).toBeFalsy();
+  });
+
+  it('debris stays pinned to ground (posY = 0) while tipping', () => {
+    const { debris, assembly } = makeLandedDebris();
+    debris.angle = 0.5;
+    debris.isTipping = true;
+
+    for (let i = 0; i < 60; i++) {
+      tickDebrisGround(debris, assembly, 1 / 60);
+    }
+
+    expect(debris.posY).toBe(0);
+  });
+
+  it('no-op when debris is already crashed', () => {
+    const { debris, assembly } = makeLandedDebris();
+    debris.crashed = true;
+    debris.angle = 0.5;
+    const savedAngle = debris.angle;
+
+    tickDebrisGround(debris, assembly, 1 / 60);
+    expect(debris.angle).toBe(savedAngle);
   });
 });
 

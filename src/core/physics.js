@@ -376,6 +376,7 @@ export function tick(ps, assembly, stagingConfig, flightState, realDeltaTime, ti
         // Advance debris while tipping.
         for (const debris of ps.debris) {
           tickDebris(debris, assembly, FIXED_DT);
+          if (debris.landed && !debris.crashed) tickDebrisGround(debris, assembly, FIXED_DT);
         }
         tickCollisions(ps, assembly, FIXED_DT);
 
@@ -401,6 +402,7 @@ export function tick(ps, assembly, stagingConfig, flightState, realDeltaTime, ti
     // Advance all debris fragments by the same fixed timestep.
     for (const debris of ps.debris) {
       tickDebris(debris, assembly, FIXED_DT);
+      if (debris.landed && !debris.crashed) tickDebrisGround(debris, assembly, FIXED_DT);
     }
     tickCollisions(ps, assembly, FIXED_DT);
 
@@ -1440,6 +1442,161 @@ function _checkToppleCrash(ps, assembly, flightState) {
     toppled: true,
     description: `Rocket toppled over at ${tipSpeed.toFixed(1)} m/s and crashed!`,
   });
+}
+
+// ---------------------------------------------------------------------------
+// Debris ground tipping physics
+// ---------------------------------------------------------------------------
+
+/**
+ * Apply simplified ground tipping physics to a landed debris fragment.
+ *
+ * This is a stripped-down version of `_applyGroundedSteering` with no player
+ * input — debris just rocks under gravity, settles if balanced, and crashes
+ * if it topples too fast.
+ *
+ * @param {import('./staging.js').DebrisState}          debris
+ * @param {import('./rocketbuilder.js').RocketAssembly} assembly
+ * @param {number}                                      dt  Fixed timestep (s).
+ */
+export function tickDebrisGround(debris, assembly, dt) {
+  if (debris.crashed) return;
+
+  // Check if tipping is needed
+  const needsTipping = debris.isTipping ||
+    Math.abs(debris.angle) > TILT_SNAP_THRESHOLD ||
+    Math.abs(debris.angularVelocity) > ANGULAR_VEL_SNAP_THRESHOLD;
+
+  if (!needsTipping) {
+    // Smooth settle residuals
+    if (debris.angle !== 0 || debris.angularVelocity !== 0) {
+      debris.angle *= 0.9;
+      debris.angularVelocity *= 0.85;
+      debris.isTipping = false;
+      if (Math.abs(debris.angle) < 1e-4 && Math.abs(debris.angularVelocity) < 1e-4) {
+        debris.angle = 0;
+        debris.angularVelocity = 0;
+      }
+    }
+    return;
+  }
+
+  // Reuse the same tipping math as _applyGroundedSteering but with no player input
+  const cosA = Math.cos(debris.angle);
+  const sinA = Math.sin(debris.angle);
+
+  // Find ground contact point via softmax (same as rocket)
+  const allCorners = [];
+  let maxGP = -Infinity;
+  for (const instanceId of debris.activeParts) {
+    const placed = assembly.parts.get(instanceId);
+    if (!placed) continue;
+    const def = getPartById(placed.partId);
+    if (!def) continue;
+    let halfW = (def.width ?? 40) / 2;
+    let bottomHH = (def.height ?? 40) / 2;
+    if (def.type === PartType.LANDING_LEGS || def.type === PartType.LANDING_LEG) {
+      const { dx, dy } = getDeployedLegFootOffset(instanceId, def, debris.legStates);
+      if (dy > 0) { halfW = Math.max(halfW, dx); bottomHH = Math.max(bottomHH, dy); }
+    }
+    const hw = (def.width ?? 40) / 2;
+    const hh = (def.height ?? 40) / 2;
+    for (const [cx, cy] of [
+      [placed.x - halfW, placed.y - bottomHH],
+      [placed.x + halfW, placed.y - bottomHH],
+      [placed.x - hw, placed.y + hh],
+      [placed.x + hw, placed.y + hh],
+    ]) {
+      const gp = cx * sinA - cy * cosA;
+      allCorners.push({ cx, cy, gp });
+      if (gp > maxGP) maxGP = gp;
+    }
+  }
+
+  if (allCorners.length === 0) return;
+
+  const CONTACT_SHARPNESS = 2.0;
+  let sumW = 0, sumWX = 0, sumWY = 0;
+  for (const c of allCorners) {
+    const w = Math.exp(CONTACT_SHARPNESS * (c.gp - maxGP));
+    sumW += w; sumWX += w * c.cx; sumWY += w * c.cy;
+  }
+  const contactLX = sumWX / sumW;
+  const contactLY = sumWY / sumW;
+  const contact = { x: contactLX, y: contactLY };
+
+  const contactWorldX = debris.posX + (contactLX * cosA + contactLY * sinA) * SCALE_M_PER_PX;
+
+  // Moment of inertia, CoM, gravity torque
+  const I = _computeMomentOfInertia(debris, assembly, contact);
+  const com = _computeCoMLocal(debris, assembly);
+  const relX = (com.x - contactLX) * SCALE_M_PER_PX;
+  const relY = (com.y - contactLY) * SCALE_M_PER_PX;
+  const rotatedX = relX * cosA + relY * sinA;
+  const totalMass = _computeTotalMass(debris, assembly);
+  const gravityTorque = totalMass * G0 * rotatedX;
+
+  // Angular integration (no player input)
+  const angAccel = gravityTorque / I;
+  debris.angularVelocity += angAccel * dt;
+  debris.angularVelocity *= 0.99; // light damping
+  debris.angle += debris.angularVelocity * dt;
+
+  // Reposition to keep contact on ground
+  const cosB = Math.cos(debris.angle);
+  const sinB = Math.sin(debris.angle);
+  debris.posX = contactWorldX - (contactLX * cosB + contactLY * sinB) * SCALE_M_PER_PX;
+  debris.posY = 0;
+
+  debris.isTipping = Math.abs(debris.angle) > TILT_SNAP_THRESHOLD;
+  debris.tippingContactX = contactLX;
+  debris.tippingContactY = contactLY;
+
+  // Smooth settle
+  if (Math.abs(debris.angularVelocity) < ANGULAR_VEL_SNAP_THRESHOLD) {
+    const sRelX = (com.x - contactLX) * SCALE_M_PER_PX;
+    const sRelY = (com.y - contactLY) * SCALE_M_PER_PX;
+    const sRotX = sRelX * cosB + sRelY * sinB;
+    const snapGrav = totalMass * G0 * sRotX;
+    if (Math.abs(snapGrav / I) < 0.5) {
+      debris.angularVelocity *= 0.85;
+      if (Math.abs(debris.angle) < TILT_SNAP_THRESHOLD) debris.angle *= 0.9;
+      if (Math.abs(debris.angularVelocity) < 1e-4) debris.angularVelocity = 0;
+      if (Math.abs(debris.angle) < 1e-4) { debris.angle = 0; debris.isTipping = false; }
+    }
+  }
+
+  // Topple crash — simplified (no flight events, just set crashed)
+  if (Math.abs(debris.angle) > TOPPLE_CRASH_ANGLE) {
+    const cx = debris.tippingContactX ?? 0;
+    const cy = debris.tippingContactY ?? 0;
+    let maxDist = 0;
+    let minThreshold = Infinity;
+    for (const instanceId of debris.activeParts) {
+      const placed = assembly.parts.get(instanceId);
+      if (!placed) continue;
+      const def = getPartById(placed.partId);
+      if (!def) continue;
+      const hw = (def.width ?? 40) / 2;
+      const hh = (def.height ?? 40) / 2;
+      for (const [px, py] of [
+        [placed.x - hw, placed.y - hh], [placed.x + hw, placed.y - hh],
+        [placed.x - hw, placed.y + hh], [placed.x + hw, placed.y + hh],
+      ]) {
+        const ddx = (px - cx) * SCALE_M_PER_PX;
+        const ddy = (py - cy) * SCALE_M_PER_PX;
+        const dist = Math.sqrt(ddx * ddx + ddy * ddy);
+        if (dist > maxDist) maxDist = dist;
+      }
+      const threshold = def.properties?.crashThreshold ?? DEFAULT_CRASH_THRESHOLD;
+      if (threshold < minThreshold) minThreshold = threshold;
+    }
+    const tipSpeed = Math.abs(debris.angularVelocity) * maxDist;
+    if (tipSpeed > minThreshold) {
+      debris.crashed = true;
+      debris.angularVelocity = 0;
+    }
+  }
 }
 
 /**
