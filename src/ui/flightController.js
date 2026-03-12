@@ -200,23 +200,27 @@ const FLIGHT_CTRL_CSS = `
 #post-flight-summary {
   position: fixed;
   inset: 0;
-  background: rgba(5, 8, 16, 0.97);
+  background: rgba(0, 0, 0, 0.62);
   z-index: 400;
   display: flex;
-  flex-direction: column;
   align-items: center;
+  justify-content: center;
   font-family: system-ui, sans-serif;
   color: #d0e0f0;
   pointer-events: auto;
-  overflow: hidden;
 }
 
 .pf-content {
-  width: 100%;
-  max-width: 700px;
-  padding: 32px 24px 40px;
+  background: #0d1520;
+  border: 1px solid rgba(100, 160, 220, 0.28);
+  border-radius: 10px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7);
+  width: 600px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 64px);
   overflow-y: auto;
-  flex: 1;
+  padding: 26px 30px 22px;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -433,22 +437,27 @@ const FLIGHT_CTRL_CSS = `
 #flight-log-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(5, 8, 16, 0.97);
+  background: rgba(0, 0, 0, 0.62);
   z-index: 400;
   display: flex;
-  flex-direction: column;
   align-items: center;
+  justify-content: center;
   font-family: system-ui, sans-serif;
   color: #d0e0f0;
   pointer-events: auto;
 }
 
 .fl-content {
-  width: 100%;
-  max-width: 500px;
-  padding: 32px 24px 40px;
+  background: #0d1520;
+  border: 1px solid rgba(100, 160, 220, 0.28);
+  border-radius: 10px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7);
+  width: 500px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 64px);
   overflow-y: auto;
-  flex: 1;
+  padding: 26px 30px 22px;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1243,6 +1252,13 @@ function _handleMenuFlightLog() {
   });
   content.appendChild(closeBtn);
 
+  // Backdrop click closes the log (matching abort modal pattern).
+  overlay.addEventListener('click', () => {
+    overlay.remove();
+    _timeWarp = savedWarp || 1;
+  });
+  content.addEventListener('click', (e) => e.stopPropagation());
+
   host.appendChild(overlay);
 }
 
@@ -1777,6 +1793,18 @@ function _showPostFlightSummary(ps, assembly, flightState, state, onFlightEnd) {
   }
 
   content.appendChild(buttonsEl);
+
+  // Backdrop-click handling (matching abort modal pattern).
+  content.addEventListener('click', (e) => e.stopPropagation());
+  if (!isCrashed) {
+    overlay.addEventListener('click', () => {
+      _summaryShown = false;
+      overlay.remove();
+      const hud = document.getElementById('flight-hud');
+      if (hud) hud.style.display = '';
+    });
+  }
+
   host.appendChild(overlay);
 }
 
