@@ -28,6 +28,7 @@ import {
   VAB_PIXELS_PER_METRE,
   vabPanCamera,
   vabSetZoom,
+  vabSetZoomCentred,
   vabGetCamera,
   vabScreenToWorld,
   vabSetAssembly,
@@ -593,7 +594,7 @@ const VAB_CSS = `
   margin-bottom: 7px;
 }
 .vab-detail-desc {
-  font-size: 10px;
+  font-size: 11px;
   color: #608890;
   line-height: 1.6;
   margin-bottom: 8px;
@@ -1919,6 +1920,17 @@ function _updateSelectionHighlight(placed, def, highlight) {
  * Zoom/pan the camera so the entire rocket fits comfortably in the build area.
  * No-op when the assembly is empty.
  */
+/** Return the world-space centre of the current rocket, or (0,0) if empty. */
+function _getRocketCenter() {
+  if (!_assembly) return { x: 0, y: 0 };
+  const bounds = getRocketBounds(_assembly);
+  if (!bounds) return { x: 0, y: 0 };
+  return {
+    x: (bounds.minX + bounds.maxX) / 2,
+    y: (bounds.minY + bounds.maxY) / 2,
+  };
+}
+
 function _doZoomToFit() {
   if (!_assembly) return;
   const bounds = getRocketBounds(_assembly);
@@ -2207,7 +2219,8 @@ function _setupCanvas(canvasArea) {
     e.preventDefault();
     const factor = e.deltaY < 0 ? 1.1 : 0.9;
     const { zoom } = vabGetCamera();
-    vabSetZoom(zoom * factor);
+    const c = _getRocketCenter();
+    vabSetZoomCentred(zoom * factor, c.x, c.y);
     _drawScaleTicks();
     _updateScaleBarExtents();
     _updateOffscreenIndicators();
@@ -2389,7 +2402,8 @@ function _bindButtons(root) {
   // ── Zoom slider ─────────────────────────────────────────────────────────
   root.querySelector('#vab-zoom-slider')?.addEventListener('input', (e) => {
     const value = parseFloat(/** @type {HTMLInputElement} */ (e.target).value);
-    vabSetZoom(value);
+    const c = _getRocketCenter();
+    vabSetZoomCentred(value, c.x, c.y);
     _drawScaleTicks();
     _updateScaleBarExtents();
     _updateOffscreenIndicators();

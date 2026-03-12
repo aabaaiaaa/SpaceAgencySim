@@ -795,6 +795,23 @@ export function vabSetZoom(zoom) {
 }
 
 /**
+ * Set zoom while keeping a world-space point centred in the build area.
+ * @param {number} zoom
+ * @param {number} wx  World X to keep centred.
+ * @param {number} wy  World Y to keep centred.
+ */
+export function vabSetZoomCentred(zoom, wx, wy) {
+  _camera.zoom = Math.max(0.25, Math.min(4, zoom));
+  const area = getBuildArea();
+  _camera.x = area.width  / 2 - wx * _camera.zoom;
+  _camera.y = area.height / 2 + wy * _camera.zoom;
+  vabRedrawGrid();
+  _renderPartsLayer();
+  _renderSnapLayer();
+  _renderGhostLayer();
+}
+
+/**
  * Read-only snapshot of the current camera state.
  * @returns {{ x: number, y: number, zoom: number }}
  */
