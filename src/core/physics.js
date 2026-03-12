@@ -344,14 +344,17 @@ export function tick(ps, assembly, stagingConfig, flightState, realDeltaTime, ti
     let needsTipping = ps.isTipping || left || right ||
       Math.abs(ps.angle) > TILT_SNAP_THRESHOLD ||
       Math.abs(ps.angularVelocity) > ANGULAR_VEL_SNAP_THRESHOLD;
-    // If tipping is no longer needed, snap any residual state to exactly zero.
-    if (!needsTipping && (ps.angularVelocity !== 0 || ps.isTipping)) {
-      ps.angularVelocity = 0;
+    // Smooth settle: when tipping physics is no longer needed but angle/velocity
+    // are not yet exactly zero, decay them gradually to avoid a visible jump.
+    if (!needsTipping && (ps.angle !== 0 || ps.angularVelocity !== 0)) {
+      ps.angle *= 0.9;
+      ps.angularVelocity *= 0.85;
       ps.isTipping = false;
-      ps._contactCX = undefined;
-      ps._contactCY = undefined;
-      if (Math.abs(ps.angle) < TILT_SNAP_THRESHOLD) {
+      if (Math.abs(ps.angle) < 1e-4 && Math.abs(ps.angularVelocity) < 1e-4) {
         ps.angle = 0;
+        ps.angularVelocity = 0;
+        ps._contactCX = undefined;
+        ps._contactCY = undefined;
       }
     }
     const needsParachuteTick = _hasActiveParachutes(ps);
@@ -1191,17 +1194,14 @@ function _hasAsymmetricLegs(ps, assembly) {
 }
 
 function _applyGroundedSteering(ps, assembly, left, right, dt) {
-  // If upright with no input and no angular velocity, nothing to do —
+  // If fully at rest with no input, nothing to do —
   // UNLESS legs are asymmetrically deployed (one deployed, one retracted),
   // which creates an off-centre contact point that should cause tipping.
   if (
     !left && !right &&
-    Math.abs(ps.angle) < TILT_SNAP_THRESHOLD &&
-    Math.abs(ps.angularVelocity) < ANGULAR_VEL_SNAP_THRESHOLD &&
+    ps.angle === 0 && ps.angularVelocity === 0 &&
     !_hasAsymmetricLegs(ps, assembly)
   ) {
-    ps.angle = 0;
-    ps.angularVelocity = 0;
     ps.isTipping = false;
     ps._contactCX = undefined;
     ps._contactCY = undefined;
@@ -1253,9 +1253,10 @@ function _applyGroundedSteering(ps, assembly, left, right, dt) {
     ];
     for (const [cx, cy] of corners) {
       // Project onto the world-downward direction so max gp = closest to
-      // ground.  In Y-up local coords the downward direction at angle A is
-      // (-sinA, -cosA), so gp = -(cx·sinA + cy·cosA).
-      const gp = -(cx * sinA + cy * cosA);
+      // ground.  In Y-up local coords with clockwise rotation convention
+      // (worldY = -lx·sinA + ly·cosA), the downward direction (0,-1) maps
+      // to local (sinA, -cosA), so gp = cx·sinA - cy·cosA.
+      const gp = cx * sinA - cy * cosA;
       allCorners.push({ cx, cy, gp });
       if (gp > maxGP) maxGP = gp;
     }
@@ -1311,7 +1312,14 @@ function _applyGroundedSteering(ps, assembly, left, right, dt) {
 
   // Euler integrate.
   ps.angularVelocity += angAccel * dt;
-  ps.angularVelocity *= GROUND_ANGULAR_DAMPING;
+
+  // Heavy damping during active player input limits overshoot; lighter
+  // damping during free rocking allows several visible oscillations
+  // before the rocket settles upright on its legs or engine bell.
+  const hasLegBase = countDeployedLegs(ps) >= 2;
+  const effectiveDamping = (left || right) ? 0.85 : 0.99;
+  ps.angularVelocity *= effectiveDamping;
+
   ps.angle += ps.angularVelocity * dt;
 
   // --- Reposition so the contact corner stays on the ground surface ---
@@ -1327,11 +1335,12 @@ function _applyGroundedSteering(ps, assembly, left, right, dt) {
   ps.tippingContactX = contactLX;
   ps.tippingContactY = contactLY;
 
-  // --- Snap to rest ---
-  // When angular velocity is negligible and gravity torque is small (near a
-  // stable resting orientation), freeze the capsule so it doesn't rock forever.
+  // --- Smooth settle ---
+  // When angular velocity is small and gravity torque is negligible, the
+  // rocket is near a stable equilibrium (upright, on its side, etc.).
+  // Smoothly decay velocity (and angle if near upright) to avoid visible
+  // one-frame jumps and infinite micro-oscillation.
   if (!left && !right && Math.abs(ps.angularVelocity) < ANGULAR_VEL_SNAP_THRESHOLD) {
-    // Recompute gravity torque at the new angle to check if we're near equilibrium.
     const comSnap  = _computeCoMLocal(ps, assembly);
     const sRelX    = (comSnap.x - contactLX) * SCALE_M_PER_PX;
     const sRelY    = (comSnap.y - contactLY) * SCALE_M_PER_PX;
@@ -1340,15 +1349,21 @@ function _applyGroundedSteering(ps, assembly, left, right, dt) {
     const snapAccel = Math.abs(snapGrav / I);
 
     if (snapAccel < 0.5) {
-      // Near equilibrium — freeze in place.
-      ps.angularVelocity = 0;
-      // If also near upright, snap angle to exactly 0.
+      // Near equilibrium — smoothly decay velocity.
+      ps.angularVelocity *= 0.85;
+      // If also near upright, smoothly decay angle toward 0.
       if (Math.abs(ps.angle) < TILT_SNAP_THRESHOLD) {
+        ps.angle *= 0.9;
+      }
+      // Final cleanup when truly negligible.
+      if (Math.abs(ps.angularVelocity) < 1e-4) {
+        ps.angularVelocity = 0;
+      }
+      if (Math.abs(ps.angle) < 1e-4) {
         ps.angle = 0;
         ps.isTipping = false;
         ps._contactCX = undefined;
         ps._contactCY = undefined;
-        ps.posY = 0;
       }
     }
   }

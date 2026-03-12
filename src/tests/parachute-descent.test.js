@@ -476,7 +476,7 @@ describe('landed command module steering', () => {
     ps.angularVelocity = 1.0;
 
     const dt = 1 / 60;
-    for (let i = 0; i < 600; i++) {
+    for (let i = 0; i < 1200; i++) {
       tick(ps, assembly, staging, fs, dt);
     }
 

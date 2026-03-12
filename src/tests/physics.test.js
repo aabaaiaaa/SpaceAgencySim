@@ -2644,3 +2644,131 @@ describe('Asymmetric leg deploy causes tipping on pad', () => {
     expect(ps.angle).toBe(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Topple recovery with deployed legs
+// ---------------------------------------------------------------------------
+
+describe('Topple recovery with deployed legs', () => {
+  it('tilted rocket rocks back and forth with decreasing amplitude then settles', () => {
+    const { assembly, staging, legId1, legId2 } = makeRocketWithLegs();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    // Deploy both legs.
+    ps.legStates.get(legId1).state = LegState.DEPLOYED;
+    ps.legStates.get(legId1).deployTimer = 0;
+    ps.legStates.get(legId2).state = LegState.DEPLOYED;
+    ps.legStates.get(legId2).deployTimer = 0;
+
+    ps.landed = true;
+    ps.grounded = true;
+    ps.posY = 0;
+    ps.velY = 0;
+    // Tilted ~10° clockwise — within leg support polygon.
+    ps.angle = 0.17;
+    ps.angularVelocity = 0;
+
+    const dt = 1 / 60;
+
+    // Brief tap of 'a' (counter-clockwise) to nudge back towards upright.
+    handleKeyDown(ps, assembly, 'a');
+    for (let i = 0; i < 5; i++) {
+      tick(ps, assembly, staging, fs, dt);
+    }
+    handleKeyUp(ps, 'a');
+
+    let signChanges = 0;
+    let prevSign = Math.sign(ps.angle);
+    let peakAngle = Math.abs(ps.angle);
+
+    // Tick 1800 more frames (~30 seconds) with no input.
+    for (let i = 0; i < 1800; i++) {
+      tick(ps, assembly, staging, fs, dt);
+      const curSign = Math.sign(ps.angle);
+      if (curSign !== 0 && prevSign !== 0 && curSign !== prevSign) {
+        signChanges++;
+      }
+      if (curSign !== 0) prevSign = curSign;
+      peakAngle = Math.max(peakAngle, Math.abs(ps.angle));
+    }
+
+    // The rocket should rock side to side multiple times before settling.
+    expect(signChanges).toBeGreaterThanOrEqual(4);
+
+    // Peak angle during rocking must stay within the support polygon (not topple).
+    expect(peakAngle).toBeLessThan(0.4);
+
+    // After 30 seconds the oscillation must have settled to upright.
+    expect(Math.abs(ps.angle)).toBeLessThan(0.01);
+    expect(Math.abs(ps.angularVelocity)).toBeLessThan(0.01);
+    expect(ps.crashed).toBeFalsy();
+  });
+
+  it('gravity alone rocks a tilted legged lander back to upright', () => {
+    const { assembly, staging, legId1, legId2 } = makeRocketWithLegs();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    ps.legStates.get(legId1).state = LegState.DEPLOYED;
+    ps.legStates.get(legId1).deployTimer = 0;
+    ps.legStates.get(legId2).state = LegState.DEPLOYED;
+    ps.legStates.get(legId2).deployTimer = 0;
+
+    ps.landed = true;
+    ps.grounded = true;
+    ps.posY = 0;
+    ps.velY = 0;
+    // Tilted ~8.5° — no player input at all, pure gravity restoring.
+    ps.angle = 0.15;
+    ps.angularVelocity = 0;
+
+    const dt = 1 / 60;
+    let signChanges = 0;
+    let prevSign = Math.sign(ps.angle);
+
+    for (let i = 0; i < 1200; i++) {
+      tick(ps, assembly, staging, fs, dt);
+      const curSign = Math.sign(ps.angle);
+      if (curSign !== 0 && prevSign !== 0 && curSign !== prevSign) {
+        signChanges++;
+      }
+      if (curSign !== 0) prevSign = curSign;
+    }
+
+    // Gravity restoring torque should cause multiple oscillations.
+    expect(signChanges).toBeGreaterThanOrEqual(3);
+
+    // Must settle to upright.
+    expect(Math.abs(ps.angle)).toBeLessThan(0.01);
+    expect(ps.crashed).toBeFalsy();
+  });
+
+  it('legged lander at rest with no input stays upright', () => {
+    const { assembly, staging, legId1, legId2 } = makeRocketWithLegs();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    ps.legStates.get(legId1).state = LegState.DEPLOYED;
+    ps.legStates.get(legId1).deployTimer = 0;
+    ps.legStates.get(legId2).state = LegState.DEPLOYED;
+    ps.legStates.get(legId2).deployTimer = 0;
+
+    ps.landed = true;
+    ps.grounded = true;
+    ps.posY = 0;
+    ps.velY = 0;
+    ps.angle = 0;
+    ps.angularVelocity = 0;
+
+    const dt = 1 / 60;
+    for (let i = 0; i < 1800; i++) {
+      tick(ps, assembly, staging, fs, dt);
+    }
+
+    // Should remain exactly upright — no drift.
+    expect(ps.angle).toBe(0);
+    expect(ps.angularVelocity).toBe(0);
+    expect(ps.crashed).toBeFalsy();
+  });
+});
