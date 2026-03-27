@@ -21,6 +21,7 @@
  */
 
 import { acceptMission, getUnlockedMissions } from '../core/missions.js';
+import { getPartById } from '../data/parts.js';
 import { refreshTopBarMissions } from './topbar.js';
 
 // ---------------------------------------------------------------------------
@@ -160,6 +161,20 @@ const MISSION_CONTROL_STYLES = `
   color: #8898b0;
   line-height: 1.55;
   margin: 0 0 14px;
+}
+
+/* ── Reward parts ──────────────────────────────────────────────────────── */
+.mc-mission-rewards {
+  font-size: 0.8rem;
+  color: #7db8d8;
+  margin: 0 0 10px;
+  line-height: 1.5;
+}
+
+.mc-mission-rewards .mc-rewards-label {
+  color: #5a8aa8;
+  font-weight: 600;
+  margin-right: 4px;
 }
 
 /* ── Accept button / row ─────────────────────────────────────────────────── */
@@ -360,6 +375,32 @@ function _fmtDate(iso) {
  */
 function _fmtCash(amount) {
   return '$' + amount.toLocaleString();
+}
+
+/**
+ * Build a rewards paragraph element listing unlocked part names.
+ * Returns null if the mission has no unlockedParts.
+ *
+ * @param {import('../data/missions.js').MissionDef} mission
+ * @returns {HTMLElement|null}
+ */
+function _buildRewardsEl(mission) {
+  if (!Array.isArray(mission.unlockedParts) || mission.unlockedParts.length === 0) {
+    return null;
+  }
+  const el = document.createElement('p');
+  el.className = 'mc-mission-rewards';
+
+  const label = document.createElement('span');
+  label.className = 'mc-rewards-label';
+  label.textContent = 'Rewards:';
+  el.appendChild(label);
+
+  const partNames = mission.unlockedParts
+    .map((id) => getPartById(id)?.name ?? id)
+    .join(', ');
+  el.appendChild(document.createTextNode(' ' + partNames));
+  return el;
 }
 
 // ---------------------------------------------------------------------------
@@ -586,6 +627,10 @@ function _buildAvailableMissionCard(mission, blockAccept, tutorialPhase) {
   desc.textContent = mission.description;
   card.appendChild(desc);
 
+  // Reward parts (shown before accept so the player knows what they'll earn).
+  const availRewards = _buildRewardsEl(mission);
+  if (availRewards) card.appendChild(availRewards);
+
   // Accept row
   const acceptRow = document.createElement('div');
   acceptRow.className = 'mc-accept-row';
@@ -722,6 +767,10 @@ function _buildAcceptedMissionCard(mission) {
     card.appendChild(objList);
   }
 
+  // Reward parts.
+  const accRewards = _buildRewardsEl(mission);
+  if (accRewards) card.appendChild(accRewards);
+
   return card;
 }
 
@@ -751,6 +800,7 @@ function _renderCompletedTab() {
         <th>Mission</th>
         <th>Completed</th>
         <th>Reward</th>
+        <th>Parts Unlocked</th>
       </tr>
     </thead>
   `;
@@ -778,6 +828,14 @@ function _renderCompletedTab() {
     rewardTd.className = 'mc-completed-reward-cell';
     rewardTd.textContent = _fmtCash(mission.reward);
     tr.appendChild(rewardTd);
+
+    const partsTd = document.createElement('td');
+    partsTd.className = 'mc-completed-parts-cell';
+    const parts = mission.unlockedParts ?? [];
+    partsTd.textContent = parts.length > 0
+      ? parts.map((id) => getPartById(id)?.name ?? id).join(', ')
+      : '—';
+    tr.appendChild(partsTd);
 
     tbody.appendChild(tr);
   }

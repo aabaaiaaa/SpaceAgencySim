@@ -311,6 +311,59 @@ describe('acceptMission()', () => {
     const result = acceptMission(state, 'mission-a');  // second call fails
     expect(result.success).toBe(false);
   });
+
+  it('unlocks requiredParts when accepting a mission', () => {
+    if (cleanup) cleanup();
+    cleanup = withMissions(makeMissionDef({
+      id: 'mission-req',
+      unlocksAfter: [],
+      requiredParts: ['science-module-mk1'],
+    }));
+    state = freshState();
+    initializeMissions(state);
+
+    expect(state.parts).not.toContain('science-module-mk1');
+    const result = acceptMission(state, 'mission-req');
+    expect(result.success).toBe(true);
+    expect(result.unlockedParts).toContain('science-module-mk1');
+    expect(state.parts).toContain('science-module-mk1');
+  });
+
+  it('does not duplicate requiredParts already owned', () => {
+    if (cleanup) cleanup();
+    cleanup = withMissions(makeMissionDef({
+      id: 'mission-req',
+      unlocksAfter: [],
+      requiredParts: ['engine-spark'],
+    }));
+    state = freshState();
+    state.parts = ['engine-spark'];
+    initializeMissions(state);
+
+    const result = acceptMission(state, 'mission-req');
+    expect(result.unlockedParts).toHaveLength(0);
+    expect(state.parts.filter(p => p === 'engine-spark')).toHaveLength(1);
+  });
+
+  it('unlocks requiredParts from catalog for old saves missing the field', () => {
+    if (cleanup) cleanup();
+    cleanup = withMissions(makeMissionDef({
+      id: 'mission-req',
+      unlocksAfter: [],
+      requiredParts: ['satellite-mk1'],
+    }));
+    state = freshState();
+    initializeMissions(state);
+
+    // Simulate an old save by deleting requiredParts from the instance.
+    const instance = state.missions.available.find(m => m.id === 'mission-req');
+    delete instance.requiredParts;
+
+    const result = acceptMission(state, 'mission-req');
+    expect(result.success).toBe(true);
+    expect(result.unlockedParts).toContain('satellite-mk1');
+    expect(state.parts).toContain('satellite-mk1');
+  });
 });
 
 // ---------------------------------------------------------------------------

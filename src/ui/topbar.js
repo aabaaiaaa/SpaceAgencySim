@@ -28,6 +28,7 @@
 import { payDownLoan, borrowMore } from '../core/finance.js';
 import { saveGame, listSaves, SAVE_SLOT_COUNT } from '../core/saveload.js';
 import { MAX_LOAN_BALANCE } from '../core/constants.js';
+import { getPartById } from '../data/parts.js';
 import { syncVabToGameState } from '../ui/vab.js';
 
 // ---------------------------------------------------------------------------
@@ -518,6 +519,11 @@ const TOPBAR_STYLES = `
   color: #45df88;
   margin-bottom: 5px;
 }
+.topbar-mission-reward-parts {
+  font-size: 0.75rem;
+  color: #7db8d8;
+  margin-bottom: 5px;
+}
 .topbar-mission-desc {
   font-size: 0.78rem;
   color: #5a8aaa;
@@ -861,6 +867,14 @@ function _buildMissionsContent(container) {
 
     card.appendChild(title);
     card.appendChild(reward);
+    if (Array.isArray(m.unlockedParts) && m.unlockedParts.length > 0) {
+      const parts = document.createElement('div');
+      parts.className = 'topbar-mission-reward-parts';
+      parts.textContent = 'Unlocks: ' + m.unlockedParts
+        .map((id) => getPartById(id)?.name ?? id)
+        .join(', ');
+      card.appendChild(parts);
+    }
     card.appendChild(desc);
     container.appendChild(card);
   }

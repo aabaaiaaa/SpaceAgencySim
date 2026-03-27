@@ -179,8 +179,9 @@ export const MissionStatus = Object.freeze({
  * @property {number}         reward        - Cash payout on successful completion (dollars).
  * @property {string[]}       unlocksAfter  - IDs of missions that must be completed first.
  *                                            Empty array means available from game start.
- * @property {string[]}       unlockedParts - Part IDs added to state.parts on completion.
- * @property {MissionStatus}  status        - Initial status: 'locked' or 'available'.
+ * @property {string[]}       unlockedParts  - Part IDs added to state.parts on completion.
+ * @property {string[]}       [requiredParts] - Part IDs unlocked when the mission is accepted.
+ * @property {MissionStatus}  status         - Initial status: 'locked' or 'available'.
  */
 
 import { PartType } from '../core/constants.js';
@@ -358,6 +359,7 @@ export const MISSIONS = [
     reward: 35_000,
     unlocksAfter: ['mission-004'],
     unlockedParts: ['parachute-mk2'],
+    requiredParts: ['parachute-mk1'],
     status: MissionStatus.LOCKED,
   },
 
@@ -469,6 +471,7 @@ export const MISSIONS = [
     reward: 50_000,
     unlocksAfter: ['mission-005'],
     unlockedParts: [],
+    requiredParts: ['science-module-mk1'],
     status: MissionStatus.LOCKED,
   },
 
@@ -498,6 +501,7 @@ export const MISSIONS = [
     reward: 45_000,
     unlocksAfter: ['mission-007'],
     unlockedParts: [],
+    requiredParts: ['cmd-mk1'],
     status: MissionStatus.LOCKED,
   },
 
@@ -534,6 +538,7 @@ export const MISSIONS = [
     reward: 60_000,
     unlocksAfter: ['mission-008'],
     unlockedParts: ['engine-poodle'],
+    requiredParts: ['science-module-mk1'],
     status: MissionStatus.LOCKED,
   },
 
@@ -606,6 +611,7 @@ export const MISSIONS = [
     reward: 80_000,
     unlocksAfter: ['mission-010'],
     unlockedParts: ['engine-reliant', 'srb-small'],
+    requiredParts: ['decoupler-stack-tr18'],
     status: MissionStatus.LOCKED,
   },
 
@@ -693,6 +699,7 @@ export const MISSIONS = [
     reward: 150_000,
     unlocksAfter: ['mission-013'],
     unlockedParts: [],
+    requiredParts: ['satellite-mk1'],
     status: MissionStatus.LOCKED,
   },
 

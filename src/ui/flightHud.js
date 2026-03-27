@@ -38,6 +38,7 @@
 
 import { getPartById } from '../data/parts.js';
 import { PartType } from '../core/constants.js';
+import { ObjectiveType } from '../data/missions.js';
 import { countDeployedLegs } from '../core/legs.js';
 
 // ---------------------------------------------------------------------------
@@ -377,6 +378,17 @@ const FLIGHT_HUD_STYLES = `
 
 .hud-obj-desc.met {
   color: #60d080;
+}
+
+.hud-obj-timer {
+  font-size: 9px;
+  color: #60c0ff;
+  font-variant-numeric: tabular-nums;
+  margin-top: 1px;
+}
+
+.hud-obj-timer.inactive {
+  color: #506060;
 }
 
 .hud-empty {
@@ -1411,9 +1423,16 @@ function _updateObjectivesPanel() {
   const panel = _elObjList.parentElement;
   if (panel) panel.style.display = '';
 
-  // Build a compact fingerprint: missionId + completion bits for each mission.
+  // Build a compact fingerprint: missionId + completion bits + hold timer state.
+  const now = _flightState?.timeElapsed ?? 0;
   const fingerprint = missions.map(
-    (m) => m.id + ':' + m.objectives.map((o) => o.completed ? '1' : '0').join(''),
+    (m) => m.id + ':' + m.objectives.map((o) => {
+      if (o.completed) return '1';
+      if (o.type === ObjectiveType.HOLD_ALTITUDE && o._holdEnteredAt != null) {
+        return 'H' + Math.floor(now - o._holdEnteredAt);
+      }
+      return '0';
+    }).join(''),
   ).join('|');
   if (_elObjList.dataset.fp === fingerprint) return; // Nothing changed — skip.
   _elObjList.dataset.fp = fingerprint;
@@ -1436,12 +1455,32 @@ function _updateObjectivesPanel() {
       icon.className = `hud-obj-icon ${obj.completed ? 'met' : 'pending'}`;
       icon.textContent = obj.completed ? '✓' : '○';
 
+      const descWrap = document.createElement('div');
+
       const desc = document.createElement('span');
       desc.className = `hud-obj-desc${obj.completed ? ' met' : ''}`;
       desc.textContent = obj.description ?? obj.type;
+      descWrap.appendChild(desc);
+
+      // Show countdown timer for duration-based objectives.
+      if (obj.type === ObjectiveType.HOLD_ALTITUDE && !obj.completed && obj.target?.duration) {
+        const timer = document.createElement('div');
+        timer.className = 'hud-obj-timer';
+        timer.dataset.testid = 'hud-obj-hold-timer';
+
+        if (obj._holdEnteredAt != null) {
+          const elapsed = Math.max(0, now - obj._holdEnteredAt);
+          const remaining = Math.max(0, obj.target.duration - elapsed);
+          timer.textContent = `${Math.ceil(remaining)}s remaining`;
+        } else {
+          timer.className += ' inactive';
+          timer.textContent = `0 / ${obj.target.duration}s`;
+        }
+        descWrap.appendChild(timer);
+      }
 
       item.appendChild(icon);
-      item.appendChild(desc);
+      item.appendChild(descWrap);
       group.appendChild(item);
     }
 

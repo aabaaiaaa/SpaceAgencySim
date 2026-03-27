@@ -950,6 +950,10 @@ test.describe('Mission Progression', () => {
     await setWarp(page, 1);
     await stage(page);
 
+    // Verify the hold timer is visible in the objectives HUD.
+    await expect(page.locator('[data-testid="hud-obj-hold-timer"]'))
+      .toBeVisible({ timeout: 10_000 });
+
     // 50× warp through the 30s hold + experiment.  At ~4.4 m/s descent
     // the rocket traverses the 400m band in ~90 s — plenty for 30 s.
     await waitWarpUnlocked(page);
@@ -965,6 +969,10 @@ test.describe('Mission Progression', () => {
       'mission-010',
       { timeout: 90_000 },
     );
+
+    // Verify the HUD shows the hold objective as completed (green tick).
+    const holdItem = page.locator('.hud-obj-icon.met').first();
+    await expect(holdItem).toBeVisible({ timeout: 5_000 });
 
     // Continue 50× warp descent to landing.
     // RETURN_SCIENCE_DATA completes on safe landing (chute ≤ 5 m/s).

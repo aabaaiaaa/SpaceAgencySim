@@ -226,4 +226,86 @@ test.describe('Mission Control Flow', () => {
     await p.close();
     await ctx.close();
   });
+
+  // ── (8) Mission reward parts are shown on available, accepted, and completed tabs
+
+  test('(8) mission reward parts are displayed on available, accepted, and completed mission cards', async ({ browser }) => {
+    test.setTimeout(60_000);
+
+    // Use mission-005 (Safe Return I) which rewards parachute-mk2.
+    const safeReturnAvailable = {
+      id:           'mission-005',
+      title:        'Safe Return I',
+      description:  'Land at less than 10 m/s.',
+      location:     'desert',
+      objectives: [{
+        id:          'obj-005-1',
+        type:        'SAFE_LANDING',
+        target:      { maxLandingSpeed: 10 },
+        completed:   false,
+        description: 'Land at 10 m/s or less using a parachute',
+      }],
+      reward:        35_000,
+      unlocksAfter:  ['mission-004'],
+      unlockedParts: ['parachute-mk2'],
+      requiredParts: ['parachute-mk1'],
+      status:        'available',
+    };
+
+    const safeReturnAccepted = { ...safeReturnAvailable, status: 'accepted' };
+    const safeReturnCompleted = {
+      ...safeReturnAvailable,
+      status: 'completed',
+      completedDate: '2026-02-27T00:00:00.000Z',
+    };
+
+    // ── Available tab: rewards shown before accepting ──
+    const ctx = await browser.newContext();
+    const p   = await ctx.newPage();
+
+    const availEnv = buildSaveEnvelope({
+      saveName: 'Rewards Available Test',
+      missions: { available: [safeReturnAvailable], accepted: [], completed: [] },
+    });
+    await seedAndLoadSave(p, availEnv);
+    await p.click('[data-building-id="mission-control"]');
+    await p.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
+
+    await expect(p.locator('.mc-mission-rewards')).toContainText('Mk2 Parachute');
+
+    // ── Accepted tab: rewards shown ──
+    await p.evaluate((state) => {
+      Object.assign(window.__gameState.missions, {
+        available: [],
+        accepted: [state],
+        completed: [],
+      });
+    }, safeReturnAccepted);
+    await p.click('#mission-control-back-btn');
+    await p.waitForSelector('#hub-overlay', { state: 'visible', timeout: 5_000 });
+    await p.click('[data-building-id="mission-control"]');
+    await p.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
+    await p.click('[data-tab-id="accepted"]');
+
+    await expect(p.locator('.mc-mission-rewards')).toContainText('Mk2 Parachute');
+
+    // ── Completed tab: parts unlocked column shown ──
+    await p.evaluate((state) => {
+      Object.assign(window.__gameState.missions, {
+        available: [],
+        accepted: [],
+        completed: [state],
+      });
+    }, safeReturnCompleted);
+    await p.click('#mission-control-back-btn');
+    await p.waitForSelector('#hub-overlay', { state: 'visible', timeout: 5_000 });
+    await p.click('[data-building-id="mission-control"]');
+    await p.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
+    await p.click('[data-tab-id="completed"]');
+
+    await expect(p.locator('.mc-completed-parts-cell')).toContainText('Mk2 Parachute');
+
+    await p.close();
+    await ctx.close();
+  });
 });

@@ -30,7 +30,7 @@ import {
   SAVE_SLOT_COUNT,
 } from '../core/saveload.js';
 import { createGameState } from '../core/gameState.js';
-import { initializeMissions } from '../core/missions.js';
+import { initializeMissions, reconcileParts } from '../core/missions.js';
 
 // ---------------------------------------------------------------------------
 // Starter parts — unlocked for every new game.
@@ -42,12 +42,9 @@ import { initializeMissions } from '../core/missions.js';
  * @type {string[]}
  */
 const STARTER_PARTS = [
-  'cmd-mk1',        // Crewed command module
   'probe-core-mk1', // Uncrewed probe core
   'tank-small',     // Small fuel tank
   'engine-spark',   // Starter liquid engine
-  'parachute-mk1',  // Recovery parachute
-  'decoupler-stack-tr18', // In-line stack decoupler (enables staging)
 ];
 
 // ---------------------------------------------------------------------------
@@ -816,6 +813,7 @@ function _switchScreen(target, canGoBack) {
 function _handleLoad(slotIndex) {
   try {
     const state = loadGame(slotIndex);
+    reconcileParts(state);
     _beginGame(state);
   } catch (err) {
     console.error('[MainMenu] Load failed:', err);

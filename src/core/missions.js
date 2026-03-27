@@ -56,6 +56,7 @@ function _copyMission(def) {
     reward: def.reward,
     unlocksAfter: [...def.unlocksAfter],
     unlockedParts: [...def.unlockedParts],
+    requiredParts: def.requiredParts ? [...def.requiredParts] : [],
     status: def.status,
   };
 }
@@ -123,6 +124,57 @@ export function getUnlockedParts(state) {
 }
 
 /**
+ * Ensure the player owns all parts they should have based on mission progress.
+ *
+ * Checks completed missions for `unlockedParts` (rewards) and accepted/completed
+ * missions for `requiredParts` (needed to attempt the mission).  Any missing
+ * parts are added to `state.parts`.  This handles old saves created before
+ * `requiredParts` existed or before starter parts were reduced.
+ *
+ * @param {import('./gameState.js').GameState} state
+ * @returns {string[]}  Part IDs that were added.
+ */
+export function reconcileParts(state) {
+  const owned = new Set(state.parts);
+  const added = [];
+
+  const allMissions = [
+    ...(state.missions.accepted ?? []),
+    ...(state.missions.completed ?? []),
+  ];
+
+  for (const mission of allMissions) {
+    const def = MISSIONS.find((m) => m.id === mission.id);
+    if (!def) continue;
+
+    // requiredParts — unlocked on acceptance.
+    const reqParts = mission.requiredParts ?? def.requiredParts ?? [];
+    for (const partId of reqParts) {
+      if (!owned.has(partId)) {
+        state.parts.push(partId);
+        owned.add(partId);
+        added.push(partId);
+      }
+    }
+  }
+
+  // unlockedParts — rewards from completed missions.
+  for (const mission of state.missions.completed ?? []) {
+    const def = MISSIONS.find((m) => m.id === mission.id);
+    if (!def) continue;
+    for (const partId of def.unlockedParts) {
+      if (!owned.has(partId)) {
+        state.parts.push(partId);
+        owned.add(partId);
+        added.push(partId);
+      }
+    }
+  }
+
+  return added;
+}
+
+/**
  * Check the MISSIONS catalog for templates whose prerequisites have all been
  * completed.  Any such mission not yet tracked in state is copied into
  * `state.missions.available`.
@@ -187,7 +239,24 @@ export function acceptMission(state, id) {
   mission.status = MissionStatus.ACCEPTED;
   state.missions.accepted.push(mission);
 
-  return { success: true, mission };
+  // Unlock any parts the mission requires to be completable.
+  // Fall back to the catalog definition for saves created before requiredParts existed.
+  const reqParts = mission.requiredParts
+    ?? MISSIONS.find((d) => d.id === mission.id)?.requiredParts
+    ?? [];
+  const unlockedParts = [];
+  if (reqParts.length > 0) {
+    const owned = new Set(state.parts);
+    for (const partId of reqParts) {
+      if (!owned.has(partId)) {
+        state.parts.push(partId);
+        owned.add(partId);
+        unlockedParts.push(partId);
+      }
+    }
+  }
+
+  return { success: true, mission, unlockedParts };
 }
 
 /**
@@ -327,13 +396,14 @@ export function checkObjectiveCompletion(state, flightState) {
             flightState.altitude >= obj.target.minAltitude &&
             flightState.altitude <= obj.target.maxAltitude;
 
-          // When the rocket carries science modules, altitude hold time only
-          // accumulates while an experiment is actively running.  If there are
-          // no science modules on this flight (`hasScienceModules` is falsy),
-          // the experiment gate is bypassed and the hold is always valid.
+          // When the rocket carries science modules, the experiment must be
+          // running OR have already completed (SCIENCE_COLLECTED event) for
+          // hold time to count.  If there are no science modules on this
+          // flight, the gate is bypassed.
           const experimentOk =
             !flightState.hasScienceModules ||
-            flightState.scienceModuleRunning === true;
+            flightState.scienceModuleRunning === true ||
+            flightState.events.some((e) => e.type === 'SCIENCE_COLLECTED');
 
           if (inRange && experimentOk) {
             if (obj._holdEnteredAt == null) {
