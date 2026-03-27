@@ -661,6 +661,7 @@ let _elThrottlePct   = null;   // left-panel throttle % (id: flight-hud-throttle
 let _elTWR           = null;   // left-panel TWR value
 let _elAlt           = null;   // left-panel altitude (id: hud-alt)
 let _elVelY          = null;   // left-panel vertical speed (id: hud-vely)
+let _elVelX          = null;   // left-panel horizontal speed (id: hud-velx)
 let _elStagingList   = null;   // left-panel staging container
 let _elFuelList      = null;   // left-panel fuel list
 let _elObjList       = null;   // objectives panel (top-right, unchanged)
@@ -791,6 +792,7 @@ export function destroyFlightHud() {
   _elTWR           = null;
   _elAlt           = null;
   _elVelY          = null;
+  _elVelX          = null;
   _elStagingList   = null;
   _elFuelList      = null;
   _elObjList       = null;
@@ -889,6 +891,19 @@ function _buildLeftPanel() {
   velYRow.appendChild(velYLbl);
   velYRow.appendChild(_elVelY);
   statusSec.appendChild(velYRow);
+
+  const velXRow = document.createElement('div');
+  velXRow.className = 'flight-lp-twr-row';
+  const velXLbl = document.createElement('div');
+  velXLbl.className = 'flight-lp-lbl';
+  velXLbl.textContent = 'Horiz';
+  _elVelX = document.createElement('div');
+  _elVelX.id = 'hud-velx';
+  _elVelX.className = 'flight-lp-val';
+  _elVelX.textContent = '0 m/s';
+  velXRow.appendChild(velXLbl);
+  velXRow.appendChild(_elVelX);
+  statusSec.appendChild(velXRow);
 
   panel.appendChild(statusSec);
 
@@ -1344,6 +1359,10 @@ function _updateLeftPanel() {
     if (totalSpeed !== null) text += ` (${Math.round(totalSpeed)})`;
     _elVelY.textContent = text;
     _elVelY.style.color = color;
+  }
+  if (_elVelX) {
+    const vx = _ps.velX ?? 0;
+    _elVelX.textContent = `${vx >= 0 ? '+' : ''}${vx.toFixed(1)} m/s`;
   }
 
   // ── Throttle ──────────────────────────────────────────────────────────────

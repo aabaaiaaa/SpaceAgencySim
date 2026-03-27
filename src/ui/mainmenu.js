@@ -33,6 +33,94 @@ import { createGameState } from '../core/gameState.js';
 import { initializeMissions, reconcileParts } from '../core/missions.js';
 
 // ---------------------------------------------------------------------------
+// Shooting stars
+// ---------------------------------------------------------------------------
+
+/** @type {number|null} */
+let _shootingStarTimer = null;
+
+function _startShootingStars() {
+  _stopShootingStars();
+  _spawnShootingStar();
+  _scheduleNext();
+}
+
+function _scheduleNext() {
+  const delay = 1500 + Math.random() * 4000; // 1.5–5.5s between stars
+  _shootingStarTimer = setTimeout(() => {
+    _spawnShootingStar();
+    _scheduleNext();
+  }, delay);
+}
+
+function _stopShootingStars() {
+  if (_shootingStarTimer !== null) {
+    clearTimeout(_shootingStarTimer);
+    _shootingStarTimer = null;
+  }
+}
+
+function _spawnShootingStar() {
+  if (!_overlay) return;
+
+  const star = document.createElement('div');
+  star.className = 'mm-shooting-star';
+
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+
+  // Random start in the upper 80% of the screen
+  const x = Math.random() * w;
+  const y = Math.random() * h * 0.8;
+
+  // Random angle — mostly downward, can go left or right
+  // Range: 100°–250° (broadly downward, left-to-right or right-to-left)
+  const angleDeg = 100 + Math.random() * 150;
+  const angleRad = angleDeg * Math.PI / 180;
+
+  // Direction vector
+  const dx = Math.cos(angleRad);
+  const dy = Math.sin(angleRad);
+
+  // Random travel distance and tail length
+  const travel = 150 + Math.random() * 350;
+  const tailLen = 30 + Math.random() * 100;
+  const thickness = Math.random() < 0.3 ? 2 : 1;
+  const duration = 0.4 + Math.random() * 0.8;
+
+  // The tail gradient points opposite to travel direction
+  star.style.width = tailLen + 'px';
+  star.style.height = thickness + 'px';
+  star.style.left = x + 'px';
+  star.style.top = y + 'px';
+  star.style.borderRadius = thickness + 'px';
+
+  // Rotate so the element aligns with the travel direction
+  // Trail fades behind, bright end is the leading edge (right side of element)
+  star.style.transform = `rotate(${angleDeg}deg)`;
+  star.style.background = `linear-gradient(90deg, transparent, rgba(255,255,255,${0.5 + Math.random() * 0.4}))`;
+
+  // Animate using JS for true directional movement
+  const endX = x + dx * travel;
+  const endY = y + dy * travel;
+
+  const anim = star.animate([
+    { left: x + 'px', top: y + 'px', opacity: 0 },
+    { opacity: 1, offset: 0.1 },
+    { opacity: 0.7, offset: 0.6 },
+    { left: endX + 'px', top: endY + 'px', opacity: 0 },
+  ], {
+    duration: duration * 1000,
+    easing: 'linear',
+    fill: 'forwards',
+  });
+
+  _overlay.appendChild(star);
+
+  anim.onfinish = () => star.remove();
+}
+
+// ---------------------------------------------------------------------------
 // Starter parts — unlocked for every new game.
 // Advanced parts are unlocked through mission rewards as the player progresses.
 // ---------------------------------------------------------------------------
@@ -143,6 +231,15 @@ const MENU_STYLES = `
     radial-gradient(1px 1px at 65% 5%,  rgba(255,255,255,0.5) 0%, transparent 100%);
   pointer-events: none;
   z-index: -1;
+}
+
+/* ── Shooting stars ────────────────────────────────────────────────────── */
+.mm-shooting-star {
+  position: fixed;
+  height: 1px;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0;
 }
 
 /* ── Title ──────────────────────────────────────────────────────────────── */
@@ -547,6 +644,8 @@ export function initMainMenu(container, onGameReady) {
     _renderNewGameScreen(_overlay, false);
   }
 
+  _startShootingStars();
+
   console.log('[MainMenu] Displayed. Has saves:', hasAnySave);
 }
 
@@ -933,6 +1032,7 @@ function _wireImportButton(screen) {
 function _beginGame(state) {
   if (!_overlay) return;
 
+  _stopShootingStars();
   _overlay.classList.add('mm-fade-out');
 
   setTimeout(() => {

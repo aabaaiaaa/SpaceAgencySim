@@ -163,6 +163,13 @@ const MISSION_CONTROL_STYLES = `
   margin: 0 0 14px;
 }
 
+/* ── Completed card extras ─────────────────────────────────────────────── */
+.mc-completed-date {
+  font-size: 0.8rem;
+  color: #5a8aa8;
+  margin: 0 0 8px;
+}
+
 /* ── Reward parts ──────────────────────────────────────────────────────── */
 .mc-mission-rewards {
   font-size: 0.8rem;
@@ -260,53 +267,6 @@ const MISSION_CONTROL_STYLES = `
 }
 .mc-objective-text.pending {
   color: #c0cce0;
-}
-
-/* ── Completed missions table ────────────────────────────────────────────── */
-.mc-completed-table {
-  width: 100%;
-  max-width: 760px;
-  border-collapse: collapse;
-  font-size: 0.88rem;
-}
-
-.mc-completed-table th {
-  text-align: left;
-  padding: 8px 12px;
-  font-weight: 600;
-  color: #8090a8;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
-  white-space: nowrap;
-}
-
-.mc-completed-table td {
-  padding: 10px 12px;
-  border-bottom: 1px solid rgba(255,255,255,0.05);
-  vertical-align: middle;
-}
-
-.mc-completed-table tr:last-child td {
-  border-bottom: none;
-}
-
-.mc-completed-table tr:hover td {
-  background: rgba(255,255,255,0.03);
-}
-
-.mc-completed-title-cell {
-  font-weight: 600;
-  color: #d4e0f0;
-}
-
-.mc-completed-reward-cell {
-  color: #7dd87d;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.mc-completed-date-cell {
-  color: #8090a8;
-  white-space: nowrap;
 }
 
 /* ── Empty state messages ────────────────────────────────────────────────── */
@@ -735,6 +695,12 @@ function _buildAcceptedMissionCard(mission) {
 
   card.appendChild(cardHeader);
 
+  // Description
+  const desc = document.createElement('p');
+  desc.className = 'mc-mission-description';
+  desc.textContent = mission.description;
+  card.appendChild(desc);
+
   // Objectives section
   if (mission.objectives && mission.objectives.length > 0) {
     const objLabel = document.createElement('p');
@@ -792,54 +758,96 @@ function _renderCompletedTab() {
     return;
   }
 
-  const table = document.createElement('table');
-  table.className = 'mc-completed-table';
-  table.innerHTML = `
-    <thead>
-      <tr>
-        <th>Mission</th>
-        <th>Completed</th>
-        <th>Reward</th>
-        <th>Parts Unlocked</th>
-      </tr>
-    </thead>
-  `;
-
-  const tbody = document.createElement('tbody');
+  const list = document.createElement('div');
+  list.className = 'mc-mission-list';
 
   // Show most recently completed first.
   const sorted = missions.slice().reverse();
 
   for (const mission of sorted) {
-    const tr = document.createElement('tr');
-
-    const titleTd = document.createElement('td');
-    titleTd.className = 'mc-completed-title-cell';
-    titleTd.textContent = mission.title;
-    tr.appendChild(titleTd);
-
-    const dateTd = document.createElement('td');
-    dateTd.className = 'mc-completed-date-cell';
-    // completedDate is stamped by completeMission() in core/missions.js.
-    dateTd.textContent = _fmtDate(mission.completedDate);
-    tr.appendChild(dateTd);
-
-    const rewardTd = document.createElement('td');
-    rewardTd.className = 'mc-completed-reward-cell';
-    rewardTd.textContent = _fmtCash(mission.reward);
-    tr.appendChild(rewardTd);
-
-    const partsTd = document.createElement('td');
-    partsTd.className = 'mc-completed-parts-cell';
-    const parts = mission.unlockedParts ?? [];
-    partsTd.textContent = parts.length > 0
-      ? parts.map((id) => getPartById(id)?.name ?? id).join(', ')
-      : '—';
-    tr.appendChild(partsTd);
-
-    tbody.appendChild(tr);
+    list.appendChild(_buildCompletedMissionCard(mission));
   }
 
-  table.appendChild(tbody);
-  content.appendChild(table);
+  content.appendChild(list);
+}
+
+/**
+ * Build a mission card for the Completed tab.
+ * Matches the layout of accepted cards but with all objectives checked
+ * and a completion date shown.
+ *
+ * @param {import('../data/missions.js').MissionDef} mission
+ * @returns {HTMLElement}
+ */
+function _buildCompletedMissionCard(mission) {
+  const card = document.createElement('div');
+  card.className = 'mc-mission-card mc-mission-card-completed';
+  card.dataset.missionId = mission.id;
+
+  // Header row: title + reward
+  const cardHeader = document.createElement('div');
+  cardHeader.className = 'mc-mission-card-header';
+
+  const titleEl = document.createElement('h3');
+  titleEl.className = 'mc-mission-title';
+  titleEl.textContent = mission.title;
+  cardHeader.appendChild(titleEl);
+
+  const rewardEl = document.createElement('span');
+  rewardEl.className = 'mc-mission-reward';
+  rewardEl.textContent = _fmtCash(mission.reward);
+  cardHeader.appendChild(rewardEl);
+
+  card.appendChild(cardHeader);
+
+  // Completed date
+  if (mission.completedDate) {
+    const dateEl = document.createElement('p');
+    dateEl.className = 'mc-completed-date';
+    dateEl.textContent = 'Completed ' + _fmtDate(mission.completedDate);
+    card.appendChild(dateEl);
+  }
+
+  // Description
+  const desc = document.createElement('p');
+  desc.className = 'mc-mission-description';
+  desc.textContent = mission.description;
+  card.appendChild(desc);
+
+  // Objectives section (all completed)
+  if (mission.objectives && mission.objectives.length > 0) {
+    const objLabel = document.createElement('p');
+    objLabel.className = 'mc-objectives-label';
+    objLabel.textContent = 'Objectives';
+    card.appendChild(objLabel);
+
+    const objList = document.createElement('ul');
+    objList.className = 'mc-objectives-list';
+
+    for (const obj of mission.objectives) {
+      const item = document.createElement('li');
+      item.className = 'mc-objective-item';
+
+      const indicator = document.createElement('span');
+      indicator.className = 'mc-objective-indicator completed';
+      indicator.textContent = '✓';
+      indicator.setAttribute('aria-label', 'Completed');
+      item.appendChild(indicator);
+
+      const textEl = document.createElement('span');
+      textEl.className = 'mc-objective-text completed';
+      textEl.textContent = obj.description;
+      item.appendChild(textEl);
+
+      objList.appendChild(item);
+    }
+
+    card.appendChild(objList);
+  }
+
+  // Reward parts
+  const rewards = _buildRewardsEl(mission);
+  if (rewards) card.appendChild(rewards);
+
+  return card;
 }

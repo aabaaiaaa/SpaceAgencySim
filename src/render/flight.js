@@ -1087,6 +1087,64 @@ function _renderDebris(debrisList, assembly, w, h) {
 }
 
 // ---------------------------------------------------------------------------
+// Ejected crew rendering
+// ---------------------------------------------------------------------------
+
+/**
+ * Render ejected crew capsules as small rectangles with parachute canopies.
+ *
+ * @param {import('../core/physics.js').PhysicsState} ps
+ * @param {number} w  Canvas width.
+ * @param {number} h  Canvas height.
+ */
+function _renderEjectedCrew(ps, w, h) {
+  if (!ps.ejectedCrew || ps.ejectedCrew.length === 0) return;
+  if (!_debrisContainer) return;
+
+  const ppm = _ppm();
+
+  for (const crew of ps.ejectedCrew) {
+    const { sx, sy } = _worldToScreen(crew.x, crew.y, w, h);
+
+    const g = new PIXI.Graphics();
+
+    // Capsule body — small rectangle
+    const capsW = 8;
+    const capsH = 12;
+    g.rect(sx - capsW / 2, sy - capsH / 2, capsW, capsH);
+    g.fill({ color: 0xd0d8e0, alpha: 0.9 });
+    g.stroke({ color: 0x8090a0, width: 1, alpha: 0.8 });
+
+    // Parachute canopy when deployed
+    if (crew.chuteOpen) {
+      const chuteW = 28;
+      const chuteH = 10;
+      const chuteY = sy - capsH / 2 - 14;
+
+      // Canopy dome (arc)
+      g.moveTo(sx - chuteW / 2, chuteY);
+      g.bezierCurveTo(
+        sx - chuteW / 4, chuteY - chuteH,
+        sx + chuteW / 4, chuteY - chuteH,
+        sx + chuteW / 2, chuteY,
+      );
+      g.fill({ color: 0xff6030, alpha: 0.8 });
+
+      // Suspension lines
+      g.moveTo(sx - chuteW / 2, chuteY);
+      g.lineTo(sx - capsW / 2, sy - capsH / 2);
+      g.moveTo(sx + chuteW / 2, chuteY);
+      g.lineTo(sx + capsW / 2, sy - capsH / 2);
+      g.moveTo(sx, chuteY);
+      g.lineTo(sx, sy - capsH / 2);
+      g.stroke({ color: 0xc0c0c0, width: 0.5, alpha: 0.6 });
+    }
+
+    _debrisContainer.addChild(g);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Engine trail helpers
 // ---------------------------------------------------------------------------
 
@@ -1472,6 +1530,9 @@ export function renderFlightFrame(ps, assembly) {
   _emitTrailSegments(ps, assembly, trailDensity);
   _updateTrails(dt);
   _renderTrails(w, h);
+
+  // 6b. Ejected crew capsules with parachutes.
+  _renderEjectedCrew(ps, w, h);
 
   // 7. Active rocket — full opacity, camera centred here (normally).
   _renderRocket(ps, assembly, w, h);

@@ -211,17 +211,15 @@ test.describe('Mission Control Flow', () => {
     // Switch to the Completed tab.
     await p.click('[data-tab-id="completed"]');
 
-    // The completed-missions table must be rendered (not the empty-state message).
-    await expect(p.locator('.mc-completed-table')).toBeVisible();
+    // Exactly one completed mission card must exist.
+    const completedCards = p.locator('.mc-mission-card-completed');
+    await expect(completedCards).toHaveCount(1);
 
-    // Exactly one completed mission row must exist.
-    await expect(p.locator('.mc-completed-table tbody tr')).toHaveCount(1);
+    // The card must contain the mission title.
+    await expect(completedCards.first()).toContainText('First Flight');
 
-    // The title cell must name "First Flight".
-    await expect(p.locator('.mc-completed-title-cell')).toContainText('First Flight');
-
-    // The reward cell must display the correct reward amount ($15,000).
-    await expect(p.locator('.mc-completed-reward-cell')).toContainText('15,000');
+    // The card must display the reward amount ($15,000).
+    await expect(p.locator('.mc-mission-reward')).toContainText('15,000');
 
     await p.close();
     await ctx.close();
@@ -303,7 +301,7 @@ test.describe('Mission Control Flow', () => {
     await p.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
     await p.click('[data-tab-id="completed"]');
 
-    await expect(p.locator('.mc-completed-parts-cell')).toContainText('Mk2 Parachute');
+    await expect(p.locator('.mc-mission-rewards')).toContainText('Mk2 Parachute');
 
     await p.close();
     await ctx.close();

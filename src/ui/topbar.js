@@ -485,7 +485,7 @@ const TOPBAR_STYLES = `
   top: 44px;
   right: 50%;
   transform: translateX(50%);
-  width: 300px;
+  width: 600px;
   max-height: 60vh;
   overflow-y: auto;
   background: #0d1520;
@@ -529,6 +529,34 @@ const TOPBAR_STYLES = `
   color: #5a8aaa;
   line-height: 1.55;
 }
+.topbar-mission-obj-label {
+  font-size: 0.72rem;
+  color: #5a7a90;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 6px 0 3px;
+}
+.topbar-mission-obj-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.topbar-mission-obj-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  margin-bottom: 3px;
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+.topbar-mission-obj-indicator {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+}
+.topbar-mission-obj-indicator.completed { color: #40ff70; }
+.topbar-mission-obj-indicator.pending   { color: #405840; }
+.topbar-mission-obj-text.completed { color: #60d080; }
+.topbar-mission-obj-text.pending   { color: #6a90a8; }
 .topbar-missions-empty {
   padding: 16px 0;
   font-size: 0.82rem;
@@ -856,17 +884,13 @@ function _buildMissionsContent(container) {
     const title = document.createElement('div');
     title.className = 'topbar-mission-title';
     title.textContent = m.title;
+    card.appendChild(title);
 
     const reward = document.createElement('div');
     reward.className = 'topbar-mission-reward';
     reward.textContent = 'Reward: ' + _fmtCash(m.reward);
-
-    const desc = document.createElement('div');
-    desc.className = 'topbar-mission-desc';
-    desc.textContent = m.description;
-
-    card.appendChild(title);
     card.appendChild(reward);
+
     if (Array.isArray(m.unlockedParts) && m.unlockedParts.length > 0) {
       const parts = document.createElement('div');
       parts.className = 'topbar-mission-reward-parts';
@@ -875,7 +899,42 @@ function _buildMissionsContent(container) {
         .join(', ');
       card.appendChild(parts);
     }
+
+    const desc = document.createElement('div');
+    desc.className = 'topbar-mission-desc';
+    desc.textContent = m.description;
     card.appendChild(desc);
+
+    // Objectives
+    if (Array.isArray(m.objectives) && m.objectives.length > 0) {
+      const objLabel = document.createElement('div');
+      objLabel.className = 'topbar-mission-obj-label';
+      objLabel.textContent = 'Objectives';
+      card.appendChild(objLabel);
+
+      const objList = document.createElement('ul');
+      objList.className = 'topbar-mission-obj-list';
+
+      for (const obj of m.objectives) {
+        const item = document.createElement('li');
+        item.className = 'topbar-mission-obj-item';
+
+        const indicator = document.createElement('span');
+        indicator.className = `topbar-mission-obj-indicator ${obj.completed ? 'completed' : 'pending'}`;
+        indicator.textContent = obj.completed ? '✓' : '○';
+        item.appendChild(indicator);
+
+        const text = document.createElement('span');
+        text.className = `topbar-mission-obj-text ${obj.completed ? 'completed' : 'pending'}`;
+        text.textContent = obj.description;
+        item.appendChild(text);
+
+        objList.appendChild(item);
+      }
+
+      card.appendChild(objList);
+    }
+
     container.appendChild(card);
   }
 }

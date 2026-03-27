@@ -134,6 +134,28 @@ export function activateEjectorSeat(ps, assembly, flightState, instanceId) {
     }
   }
 
+  // Spawn a visible ejected crew capsule at the command module's world position.
+  const placed = assembly.parts.get(instanceId);
+  if (placed && ps.ejectedCrew) {
+    const cosA = Math.cos(ps.angle);
+    const sinA = Math.sin(ps.angle);
+    const lx = placed.x * 0.05;  // SCALE_M_PER_PX
+    const ly = placed.y * 0.05;
+    const worldX = ps.posX + lx * cosA + ly * sinA;
+    const worldY = ps.posY - lx * sinA + ly * cosA;
+
+    // Eject upward at 20 m/s relative to rocket, plus rocket's velocity.
+    ps.ejectedCrew.push({
+      x: worldX,
+      y: worldY,
+      velX: ps.velX - sinA * 20,
+      velY: ps.velY + cosA * 20,
+      hasChute: true,
+      chuteOpen: false,
+      chuteTimer: 1.5, // seconds before chute deploys
+    });
+  }
+
   // Emit the CREW_EJECTED flight event.
   const altitude = Math.max(0, ps.posY);
   flightState.events.push({

@@ -1165,10 +1165,10 @@ function _executeRestart(rebuildCost) {
     if (def) totalFuel += def.properties?.fuelMass ?? 0;
   }
 
-  // Reset mission objectives so they can be re-evaluated on the fresh flight.
-  if (missionId && gs.missions?.accepted) {
-    const mission = gs.missions.accepted.find(m => m.id === missionId);
-    if (mission?.objectives) {
+  // Reset ALL accepted mission objectives so they re-evaluate on the fresh flight.
+  if (gs.missions?.accepted) {
+    for (const mission of gs.missions.accepted) {
+      if (!mission.objectives) continue;
       for (const obj of mission.objectives) {
         obj.completed = false;
         delete obj._holdEnteredAt;
@@ -1810,10 +1810,10 @@ function _showPostFlightSummary(ps, assembly, flightState, state, onFlightEnd) {
         if (def) totalFuel += def.properties?.fuelMass ?? 0;
       }
 
-      // Reset mission objectives so they can be re-evaluated on the fresh flight.
-      if (missionId && gs.missions?.accepted) {
-        const mission = gs.missions.accepted.find(m => m.id === missionId);
-        if (mission?.objectives) {
+      // Reset ALL accepted mission objectives so they re-evaluate on the fresh flight.
+      if (gs.missions?.accepted) {
+        for (const mission of gs.missions.accepted) {
+          if (!mission.objectives) continue;
           for (const obj of mission.objectives) {
             obj.completed = false;
             delete obj._holdEnteredAt;

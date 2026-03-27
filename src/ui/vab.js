@@ -68,6 +68,7 @@ import {
   moveStage,
 } from '../core/rocketbuilder.js';
 import { createRocketDesign, saveDesign, deleteDesign } from '../core/gameState.js';
+import { airDensity, SEA_LEVEL_DENSITY } from '../core/atmosphere.js';
 import { startFlightScene } from './flightController.js';
 import { showReturnResultsOverlay } from './hub.js';
 import { refreshTopBar } from './topbar.js';
@@ -103,6 +104,9 @@ let _ctxMenu = null;
 
 /** Staging configuration for the current VAB session. @type {import('../core/rocketbuilder.js').StagingConfig | null} */
 let _stagingConfig = null;
+
+/** Altitude (metres) for VAB delta-v calculation. */
+let _dvAltitude = 0;
 
 /** True while a flight is in progress — enables Spacebar staging. */
 let _flightActive = false;
@@ -865,6 +869,66 @@ const VAB_CSS = `
   border-radius: 2px;
   padding: 7px 9px;
   line-height: 1.5;
+}
+
+/* ── Delta-V display ────────────────────────────────────────────────── */
+.vab-staging-dv {
+  padding: 8px 12px;
+  border-bottom: 1px solid #0e1e30;
+}
+
+.vab-staging-dv-total {
+  font-size: 11px;
+  font-weight: 700;
+  color: #60e0a0;
+  margin-bottom: 6px;
+}
+
+.vab-stage-stats {
+  display: flex;
+  gap: 10px;
+  font-size: 9px;
+  margin-top: 2px;
+}
+
+.vab-stage-dv {
+  color: #50c8a0;
+}
+
+.vab-stage-twr {
+  color: #88b8d8;
+}
+
+.vab-stage-twr.warn {
+  color: #d0a030;
+}
+
+.vab-dv-altitude {
+  padding: 8px 12px 6px;
+  border-bottom: 1px solid #0e1e30;
+}
+
+.vab-dv-altitude-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9px;
+  color: #5a8aaa;
+}
+
+.vab-dv-altitude input[type="range"] {
+  flex: 1;
+  accent-color: #3080b0;
+  height: 14px;
+}
+
+.vab-dv-altitude-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 8px;
+  color: #6a98b8;
+  font-variant-numeric: tabular-nums;
+  margin-top: 3px;
 }
 
 /* ── Context menu ────────────────────────────────────────────────────── */
@@ -2431,6 +2495,137 @@ function _syncAndRenderStaging() {
 }
 
 /**
+ * Compute the delta-v for a given stage index in the VAB.
+ *
+ * Uses the Tsiolkovsky rocket equation: ΔV = Isp × g₀ × ln(m₀ / m₁)
+ * ISP is interpolated between sea-level and vacuum based on `_dvAltitude`.
+ *
+ * @param {number} stageIdx  Stage index (0 = fires first).
+ * @returns {{ dv: number, engines: boolean }}
+ */
+function _computeVabStageDeltaV(stageIdx) {
+  if (!_assembly || !_stagingConfig) return { dv: 0, engines: false };
+  const stage = _stagingConfig.stages[stageIdx];
+  if (!stage) return { dv: 0, engines: false };
+
+  const G0 = 9.81;
+
+  // Atmospheric fraction: 1 at sea level, 0 in vacuum.
+  const density = airDensity(_dvAltitude);
+  const atmFrac = Math.min(1, density / SEA_LEVEL_DENSITY);
+
+  // Determine which parts are "active" at this stage — all parts except
+  // those in earlier-firing stages (lower indices) which have already been
+  // jettisoned by the time this stage fires.
+  const jettisoned = new Set();
+  for (let s = 0; s < stageIdx; s++) {
+    for (const id of _stagingConfig.stages[s].instanceIds) {
+      jettisoned.add(id);
+    }
+  }
+
+  // Total mass and fuel at the point this stage fires.
+  let totalMass = 0;
+  let totalFuel = 0;
+  for (const [instanceId, placed] of _assembly.parts) {
+    if (jettisoned.has(instanceId)) continue;
+    const def = getPartById(placed.partId);
+    if (!def) continue;
+    const fuelMass = def.properties?.fuelMass ?? 0;
+    totalMass += (def.mass ?? 0) + fuelMass;
+    if (fuelMass > 0) totalFuel += fuelMass;
+  }
+
+  // Engines in this stage — sum thrust-weighted ISP.
+  let thrustTotal    = 0;
+  let ispTimesThrust = 0;
+  let hasEngines     = false;
+  for (const instanceId of stage.instanceIds) {
+    if (jettisoned.has(instanceId)) continue;
+    const placed = _assembly.parts.get(instanceId);
+    const def    = placed ? getPartById(placed.partId) : null;
+    if (!def) continue;
+    const thrustKN = def.properties?.thrust ?? 0;
+    if (thrustKN > 0) {
+      hasEngines = true;
+      const thrustN = thrustKN * 1000; // kN → N
+      const ispSL  = def.properties?.isp    ?? 300;
+      const ispVac = def.properties?.ispVac ?? ispSL;
+      const isp = ispSL * atmFrac + ispVac * (1 - atmFrac);
+      thrustTotal    += thrustN;
+      ispTimesThrust += isp * thrustN;
+    }
+  }
+
+  const twr = totalMass > 0 && thrustTotal > 0
+    ? thrustTotal / (totalMass * G0)
+    : 0;
+
+  if (totalFuel <= 0 || thrustTotal <= 0 || totalMass <= 0) {
+    return { dv: 0, twr, engines: hasEngines };
+  }
+
+  const avgIsp = ispTimesThrust / thrustTotal;
+  const dryMass = totalMass - totalFuel;
+  if (dryMass <= 0) return { dv: 0, twr, engines: hasEngines };
+
+  return { dv: avgIsp * G0 * Math.log(totalMass / dryMass), twr, engines: true };
+}
+
+/**
+ * Update only the delta-v values and altitude label in the staging panel,
+ * without replacing the full DOM (so the slider keeps focus during drag).
+ * @param {HTMLElement} body
+ */
+function _updateStagingDvValues(body) {
+  if (!_stagingConfig || !_assembly) return;
+
+  const numStages = _stagingConfig.stages.length;
+  let totalDv = 0;
+  const stageDvs = [];
+  for (let i = 0; i < numStages; i++) {
+    const result = _computeVabStageDeltaV(i);
+    stageDvs.push(result);
+    totalDv += result.dv;
+  }
+
+  // Update altitude and density labels.
+  const density = airDensity(_dvAltitude);
+  const altStr = _dvAltitude >= 1000
+    ? (_dvAltitude / 1000).toFixed(1) + ' km'
+    : _dvAltitude + ' m';
+  const altEl = body.querySelector('.vab-dv-alt-label');
+  if (altEl) altEl.textContent = altStr;
+  const densEl = body.querySelector('.vab-dv-density-label');
+  if (densEl) densEl.textContent = `Air density: ${density.toFixed(3)} kg/m\u00B3`;
+
+  // Update total delta-v.
+  const totalEl = body.querySelector('.vab-staging-dv-total');
+  if (totalEl) {
+    totalEl.textContent = `Total \u0394V: ~${Math.round(totalDv).toLocaleString()} m/s`;
+  }
+
+  // Update per-stage delta-v and TWR.
+  body.querySelectorAll('.vab-staging-stage').forEach((stageEl) => {
+    const idx = parseInt(/** @type {HTMLElement} */ (stageEl).dataset.stageIndex ?? '0', 10);
+    const sdv = stageDvs[idx];
+    const dvEl = stageEl.querySelector('.vab-stage-dv');
+    if (dvEl) {
+      dvEl.textContent = sdv && sdv.dv > 0
+        ? `\u0394V ~${Math.round(sdv.dv).toLocaleString()} m/s`
+        : '';
+    }
+    const twrEl = stageEl.querySelector('.vab-stage-twr');
+    if (twrEl && sdv) {
+      twrEl.textContent = sdv.twr > 0 ? `TWR ${sdv.twr.toFixed(2)}` : '';
+      twrEl.className = sdv.twr > 0 && sdv.twr < 1
+        ? 'vab-stage-twr warn'
+        : 'vab-stage-twr';
+    }
+  });
+}
+
+/**
  * Build and inject the staging panel's inner HTML from the current
  * `_stagingConfig` and `_assembly` state.
  */
@@ -2446,6 +2641,43 @@ function _renderStagingPanel() {
   const warnings  = validateStagingConfig(_assembly, _stagingConfig);
   const numStages = _stagingConfig.stages.length;
   const html      = [];
+
+  // ── Delta-V altitude slider + total ────────────────────────────────────────
+  let totalDv = 0;
+  const stageDvs = [];
+  for (let i = 0; i < numStages; i++) {
+    const result = _computeVabStageDeltaV(i);
+    stageDvs.push(result);
+    totalDv += result.dv;
+  }
+
+  const density = airDensity(_dvAltitude);
+  const altStr = _dvAltitude >= 1000
+    ? (_dvAltitude / 1000).toFixed(1) + ' km'
+    : _dvAltitude + ' m';
+  const altDisplayLabel = `${altStr} (${density.toFixed(3)} kg/m³)`;
+
+  html.push('<div class="vab-dv-altitude">');
+  html.push('<div class="vab-dv-altitude-row">');
+  html.push('<span>Altitude</span>');
+  html.push(
+    `<input type="range" id="vab-dv-alt-slider" min="0" max="70000" ` +
+    `step="500" value="${_dvAltitude}">`,
+  );
+  html.push('</div>');
+  html.push(
+    `<div class="vab-dv-altitude-info">` +
+    `<span class="vab-dv-alt-label">${altStr}</span>` +
+    `<span class="vab-dv-density-label">Air density: ${density.toFixed(3)} kg/m\u00B3</span>` +
+    `</div>`,
+  );
+  html.push('</div>');
+
+  html.push('<div class="vab-staging-dv">');
+  html.push(
+    `<div class="vab-staging-dv-total">Total \u0394V: ~${Math.round(totalDv).toLocaleString()} m/s</div>`,
+  );
+  html.push('</div>');
 
   // ── Unstaged parts ────────────────────────────────────────────────────────
   html.push('<div class="vab-staging-section">');
@@ -2507,6 +2739,20 @@ function _renderStagingPanel() {
     }
     html.push('</div>');  // stage-hdr
 
+    // Per-stage delta-v and TWR.
+    const sdv = stageDvs[i];
+    if (sdv && (sdv.dv > 0 || sdv.twr > 0)) {
+      html.push('<div class="vab-stage-stats">');
+      if (sdv.dv > 0) {
+        html.push(`<span class="vab-stage-dv">\u0394V ~${Math.round(sdv.dv).toLocaleString()} m/s</span>`);
+      }
+      if (sdv.twr > 0) {
+        const twrClass = sdv.twr < 1 ? 'vab-stage-twr warn' : 'vab-stage-twr';
+        html.push(`<span class="${twrClass}">TWR ${sdv.twr.toFixed(2)}</span>`);
+      }
+      html.push('</div>');
+    }
+
     // Parts drop zone.
     html.push(`<div class="vab-staging-zone" data-drop-zone="stage-${i}">`);
     if (isEmpty) {
@@ -2551,6 +2797,15 @@ function _renderStagingPanel() {
     addStageToConfig(_stagingConfig);
     _renderStagingPanel();
   });
+  // Altitude slider — update delta-v values in-place without full re-render.
+  const altSlider = body.querySelector('#vab-dv-alt-slider');
+  if (altSlider) {
+    altSlider.addEventListener('input', (e) => {
+      _dvAltitude = parseInt(/** @type {HTMLInputElement} */ (e.target).value, 10);
+      _updateStagingDvValues(body);
+    });
+  }
+
   body.querySelectorAll('.vab-staging-del').forEach((btn) => {
     const el = /** @type {HTMLElement} */ (btn);
     el.addEventListener('click', () => {

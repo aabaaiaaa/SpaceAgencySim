@@ -270,6 +270,7 @@ export function createPhysicsState(assembly, flightState) {
     legStates: new Map(),
     ejectorStates: new Map(),
     ejectedCrewIds: new Set(),
+    ejectedCrew: [],              // { x, y, velX, velY } — visible ejected crew capsules
     scienceModuleStates: new Map(),
     heatMap: new Map(),
     debris: [],
@@ -671,6 +672,41 @@ function _integrate(ps, assembly, flightState) {
   // Decrement running experiment countdowns; emit SCIENCE_COLLECTED on
   // completion; update flightState.scienceModuleRunning.
   tickScienceModules(ps, assembly, flightState, FIXED_DT);
+
+  // --- 9d. Ejected crew physics --------------------------------------------
+  if (ps.ejectedCrew) {
+    const G = 9.81;
+    for (const crew of ps.ejectedCrew) {
+      // Countdown to chute deployment
+      if (!crew.chuteOpen && crew.chuteTimer > 0) {
+        crew.chuteTimer -= FIXED_DT;
+        if (crew.chuteTimer <= 0) crew.chuteOpen = true;
+      }
+
+      // Gravity
+      crew.velY -= G * FIXED_DT;
+
+      // Parachute drag when open (terminal velocity ~5 m/s)
+      if (crew.chuteOpen && crew.velY < 0) {
+        const drag = 0.5 * crew.velY * crew.velY * 0.08;
+        crew.velY += drag * FIXED_DT;
+        if (crew.velY > -5) crew.velY = Math.max(crew.velY, -5);
+      }
+
+      // Air drag on horizontal velocity
+      crew.velX *= (1 - 0.5 * FIXED_DT);
+
+      crew.x += crew.velX * FIXED_DT;
+      crew.y += crew.velY * FIXED_DT;
+
+      // Stop at ground
+      if (crew.y <= 0) {
+        crew.y = 0;
+        crew.velX = 0;
+        crew.velY = 0;
+      }
+    }
+  }
 
   // --- 10. Reentry heat model ----------------------------------------------
   if (!ps.grounded) {
