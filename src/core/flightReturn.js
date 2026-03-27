@@ -8,7 +8,7 @@
  *   2. Crediting mission rewards (delegated to completeMission → finance.earn).
  *   3. Unlocking downstream missions and parts (delegated to completeMission).
  *   4. Crediting part-recovery cash (60 % of cost for each intact landed part).
- *   5. Applying loan interest — once per mission completed this flight.
+ *   5. Applying loan interest — once per flight.
  *   6. Applying death fines for KIA crew (if not already charged mid-flight).
  *   7. Recording the flight in state.flightHistory and clearing currentFlight.
  *
@@ -41,6 +41,7 @@ import { PartType, DEATH_FINE_PER_ASTRONAUT, FlightOutcome } from './constants.j
  * @property {CompletedMissionEntry[]} completedMissions  - Missions completed this flight.
  * @property {number}  recoveryValue   - Cash credited for landed parts.
  * @property {number}  interestCharged - Total interest added to the loan.
+ * @property {number}  loanBalance     - Loan balance after interest is applied.
  * @property {number}  deathFineTotal  - Total death fines applied.
  * @property {number}  netCashChange   - Net change in state.money (positive = gained).
  * @property {number}  totalFlights    - New total flight count (state.flightHistory.length).
@@ -110,12 +111,12 @@ export function processFlightReturn(state, flightState, ps, assembly) {
     }
   }
 
-  // ── 5. Loan interest — once per completed mission ─────────────────────────
-  for (let i = 0; i < completedMissions.length; i++) {
+  // ── 5. Loan interest — once per flight ───────────────────────────────────
+  if (state.loan && state.loan.balance > 0) {
     const cashBefore2 = state.money;
     const loanBefore  = state.loan.balance;
     applyInterest(state);
-    interestCharged  += (cashBefore2 - state.money) + (state.loan.balance - loanBefore);
+    interestCharged = (cashBefore2 - state.money) + (state.loan.balance - loanBefore);
   }
 
   // ── 6. Death fines (if not already applied mid-flight) ───────────────────
@@ -137,6 +138,10 @@ export function processFlightReturn(state, flightState, ps, assembly) {
     // Mark as applied so double-processing is impossible.
     flightState.deathFinesApplied = true;
   }
+
+  // ── 6b. Accumulate in-game flight time ──────────────────────────────────
+  const flightSeconds = flightState?.timeElapsed ?? 0;
+  state.flightTimeSeconds = (state.flightTimeSeconds ?? 0) + flightSeconds;
 
   // ── 7. Record flight history and clear active flight ─────────────────────
   const outcome = _determineOutcome(ps, completedMissions.length > 0);
@@ -169,6 +174,7 @@ export function processFlightReturn(state, flightState, ps, assembly) {
     completedMissions,
     recoveryValue,
     interestCharged,
+    loanBalance:   state.loan?.balance ?? 0,
     deathFineTotal,
     netCashChange: state.money - cashBefore,
     totalFlights:  state.flightHistory.length,

@@ -358,27 +358,35 @@ const FLIGHT_CTRL_CSS = `
 .pf-buttons {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  align-items: center;
-  margin-top: 12px;
+  gap: 10px;
+  margin-top: 16px;
   width: 100%;
 }
 
+.pf-btn-row {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.pf-btn-row > .pf-btn { flex: 1; }
+
 .pf-btn {
-  padding: 11px 22px;
+  padding: 11px 16px;
   border-radius: 6px;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
   letter-spacing: 0.02em;
   border: 1px solid transparent;
-  white-space: nowrap;
+  text-align: center;
 }
 
 .pf-btn-primary {
   background: #1a4070;
   border-color: #4080b0;
   color: #c8e8ff;
+  width: 100%;
 }
 
 .pf-btn-primary:hover {
@@ -393,6 +401,13 @@ const FLIGHT_CTRL_CSS = `
 
 .pf-btn-secondary:hover {
   background: rgba(255, 255, 255, 0.13);
+}
+
+.pf-btn .pf-btn-cost {
+  display: block;
+  font-size: 0.75rem;
+  opacity: 0.7;
+  margin-top: 2px;
 }
 
 /* Keep old stat-row styles for backward compatibility */
@@ -1031,22 +1046,98 @@ function _handleSaveGame() {
  */
 function _handleMenuRestart() {
   // Remove post-flight summary if it's showing (e.g. after a crash).
-  const summary = document.getElementById('post-flight-summary');
-  if (summary) summary.remove();
+  const existingSummary = document.getElementById('post-flight-summary');
+  if (existingSummary) existingSummary.remove();
   _summaryShown = false;
 
-  // Calculate lost-parts cost.
-  let lostPartsCost = 0;
-  if (_assembly && _ps) {
-    for (const [instanceId, placed] of _assembly.parts) {
-      if (!_ps.activeParts.has(instanceId)) {
-        const def = getPartById(placed.partId);
-        if (def) lostPartsCost += def.cost ?? 0;
-      }
+  // Calculate full rocket rebuild cost.
+  let totalRocketCost = 0;
+  if (_assembly) {
+    for (const [, placed] of _assembly.parts) {
+      const def = getPartById(placed.partId);
+      if (def) totalRocketCost += def.cost ?? 0;
     }
   }
-  if (lostPartsCost > 0 && _state) {
-    _state.money = (_state.money ?? 0) - lostPartsCost;
+
+  // Pause physics while the confirmation modal is showing.
+  _preMenuTimeWarp = _timeWarp;
+  _timeWarp = 0;
+
+  const host = document.getElementById('ui-overlay') ?? document.body;
+  const backdrop = document.createElement('div');
+  backdrop.id = 'restart-flight-backdrop';
+  backdrop.className = 'topbar-modal-backdrop';
+
+  const modal = document.createElement('div');
+  modal.className = 'topbar-modal';
+  modal.setAttribute('role', 'alertdialog');
+  modal.setAttribute('aria-modal', 'true');
+  modal.setAttribute('aria-label', 'Restart Flight');
+  modal.addEventListener('click', (e) => e.stopPropagation());
+
+  // Title
+  const titleRow = document.createElement('div');
+  titleRow.className = 'topbar-modal-title-row';
+  const h2 = document.createElement('h2');
+  h2.className = 'topbar-modal-title';
+  h2.textContent = 'Restart from Launch?';
+  titleRow.appendChild(h2);
+  modal.appendChild(titleRow);
+
+  // Message
+  const msg = document.createElement('p');
+  msg.className = 'confirm-msg';
+  msg.textContent = 'This will end the current flight and rebuild the rocket from scratch.';
+  modal.appendChild(msg);
+
+  if (totalRocketCost > 0) {
+    const costLine = document.createElement('p');
+    costLine.className = 'confirm-msg';
+    costLine.style.fontWeight = '600';
+    costLine.style.marginTop = '-12px';
+    costLine.textContent = `Rebuild cost: −$${totalRocketCost.toLocaleString('en-US')}`;
+    modal.appendChild(costLine);
+  }
+
+  // Buttons
+  const btnRow = document.createElement('div');
+  btnRow.className = 'confirm-btn-row';
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'confirm-btn confirm-btn-cancel';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.addEventListener('click', () => {
+    _timeWarp = _preMenuTimeWarp ?? 1;
+    backdrop.remove();
+  });
+
+  const confirmBtn = document.createElement('button');
+  confirmBtn.className = 'confirm-btn confirm-btn-danger';
+  confirmBtn.textContent = 'Restart';
+  confirmBtn.addEventListener('click', () => {
+    backdrop.remove();
+    _executeRestart(totalRocketCost);
+  });
+
+  btnRow.appendChild(cancelBtn);
+  btnRow.appendChild(confirmBtn);
+  modal.appendChild(btnRow);
+
+  backdrop.addEventListener('click', () => {
+    _timeWarp = _preMenuTimeWarp ?? 1;
+    backdrop.remove();
+  });
+  backdrop.appendChild(modal);
+  host.appendChild(backdrop);
+}
+
+/**
+ * Execute the restart-from-launch action after confirmation.
+ * @param {number} rebuildCost  Total rocket cost to deduct.
+ */
+function _executeRestart(rebuildCost) {
+  if (rebuildCost > 0 && _state) {
+    _state.money = (_state.money ?? 0) - rebuildCost;
   }
 
   // Capture references before stopFlightScene nulls them.
@@ -1072,6 +1163,17 @@ function _handleMenuRestart() {
   for (const placed of origAssembly.parts.values()) {
     const def = getPartById(placed.partId);
     if (def) totalFuel += def.properties?.fuelMass ?? 0;
+  }
+
+  // Reset mission objectives so they can be re-evaluated on the fresh flight.
+  if (missionId && gs.missions?.accepted) {
+    const mission = gs.missions.accepted.find(m => m.id === missionId);
+    if (mission?.objectives) {
+      for (const obj of mission.objectives) {
+        obj.completed = false;
+        delete obj._holdEnteredAt;
+      }
+    }
   }
 
   // Fresh flight state.
@@ -1409,8 +1511,8 @@ function _handleAbortReturnToAgency() {
  *  2. Mission objectives completed this flight.
  *  3. Part recovery table (landed safely only).
  *  4. Crew KIA with fines.
- *  5. Action buttons: Restart from Launch, Continue Flying (if landed),
- *     Return to Space Agency.
+ *  5. Action buttons: Restart from Launch (crash only), Continue Flying
+ *     (landed only), Adjust Build, Return to Space Agency.
  *
  * The flight scene is NOT torn down before this is called — the action
  * buttons handle teardown so the player may choose "Continue Flying".
@@ -1632,13 +1734,17 @@ function _showPostFlightSummary(ps, assembly, flightState, state, onFlightEnd) {
 
   // ── 5. Action buttons ─────────────────────────────────────────────────────
 
-  // Calculate the replacement cost of parts that were lost (not in activeParts).
-  let lostPartsCost = 0;
-  if (assembly && ps) {
+  // Calculate the total rocket build cost (for restart / adjust build)
+  // and the recovery value of surviving parts (60% of cost, landed only).
+  let totalRocketCost = 0;
+  let recoveryValue = 0;
+  if (assembly) {
     for (const [instanceId, placed] of assembly.parts) {
-      if (!ps.activeParts.has(instanceId)) {
-        const def = getPartById(placed.partId);
-        if (def) lostPartsCost += def.cost ?? 0;
+      const def = getPartById(placed.partId);
+      if (!def) continue;
+      totalRocketCost += def.cost ?? 0;
+      if (isLanded && ps && ps.activeParts.has(instanceId)) {
+        recoveryValue += Math.round((def.cost ?? 0) * 0.6);
       }
     }
   }
@@ -1646,129 +1752,123 @@ function _showPostFlightSummary(ps, assembly, flightState, state, onFlightEnd) {
   const buttonsEl = document.createElement('div');
   buttonsEl.className = 'pf-buttons';
 
-  // ── "Restart from Launch" button ──────────────────────────────────────────
-  const restartBtn = document.createElement('button');
-  restartBtn.id        = 'post-flight-restart-btn';
-  restartBtn.className = 'pf-btn pf-btn-secondary';
-  restartBtn.textContent = lostPartsCost > 0
-    ? `↩ Restart from Launch  (−$${lostPartsCost.toLocaleString('en-US')})`
-    : '↩ Restart from Launch';
-  restartBtn.title = 'Restart this flight from the launch pad with the same rocket and staging.';
-
-  restartBtn.addEventListener('click', () => {
-    // Deduct the cost of lost parts immediately.
-    if (lostPartsCost > 0 && state) {
-      state.money = (state.money ?? 0) - lostPartsCost;
+  // Helper: create a button with an optional cost subtitle line.
+  function _pfBtn(label, costText, cls) {
+    const btn = document.createElement('button');
+    btn.className = `pf-btn ${cls}`;
+    const labelSpan = document.createElement('span');
+    labelSpan.textContent = label;
+    btn.appendChild(labelSpan);
+    if (costText) {
+      const costSpan = document.createElement('span');
+      costSpan.className = 'pf-btn-cost';
+      costSpan.textContent = costText;
+      btn.appendChild(costSpan);
     }
+    return btn;
+  }
 
-    // Capture pristine originals and refs before stopFlightScene nulls them.
-    const origAssembly = _originalAssembly;
-    const origStaging  = _originalStagingConfig;
-    const ctr          = _container;
-    const gs           = _state;
-    const endCb        = _onFlightEnd;
-    const missionId    = flightState?.missionId ?? '';
-    const rocketId     = flightState?.rocketId  ?? '';
-    const crewIds      = flightState?.crewIds   ?? [];
+  const costStr = totalRocketCost > 0
+    ? `−$${totalRocketCost.toLocaleString('en-US')}`
+    : null;
 
-    overlay.remove();
-    stopFlightScene();
+  // ── Row of secondary actions (side by side) ────────────────────────────────
+  const secondaryRow = document.createElement('div');
+  secondaryRow.className = 'pf-btn-row';
 
-    // If we don't have the originals, fall back to returning to hub.
-    if (!origAssembly || !origStaging || !ctr || !gs) {
-      if (endCb) endCb(gs);
-      return;
-    }
+  if (isCrashed) {
+    // ── "Restart from Launch" ──────────────────────────────────────────────
+    const restartBtn = _pfBtn('Restart from Launch', costStr, 'pf-btn-secondary');
+    restartBtn.id    = 'post-flight-restart-btn';
+    restartBtn.title = 'Rebuild the rocket and restart this flight from the launch pad.';
 
-    // Recompute total fuel from the original (unmodified) assembly.
-    let totalFuel = 0;
-    for (const placed of origAssembly.parts.values()) {
-      const def = getPartById(placed.partId);
-      if (def) totalFuel += def.properties?.fuelMass ?? 0;
-    }
+    restartBtn.addEventListener('click', () => {
+      if (totalRocketCost > 0 && state) {
+        state.money = (state.money ?? 0) - totalRocketCost;
+      }
 
-    // Fresh flight state on the game state.
-    gs.currentFlight = {
-      missionId,
-      rocketId,
-      crewIds,
-      timeElapsed:     0,
-      altitude:        0,
-      velocity:        0,
-      fuelRemaining:   totalFuel,
-      deltaVRemaining: 0,
-      events:          [],
-      aborted:         false,
-    };
+      const origAssembly = _originalAssembly;
+      const origStaging  = _originalStagingConfig;
+      const ctr          = _container;
+      const gs           = _state;
+      const endCb        = _onFlightEnd;
+      const missionId    = flightState?.missionId ?? '';
+      const rocketId     = flightState?.rocketId  ?? '';
+      const crewIds      = flightState?.crewIds   ?? [];
 
-    // Deep-clone the originals so the new flight gets pristine copies.
-    const freshAssembly = {
-      parts:         new Map([...origAssembly.parts].map(([id, p]) => [id, { ...p }])),
-      connections:   origAssembly.connections.map(c => ({ ...c })),
-      symmetryPairs: origAssembly.symmetryPairs.map(sp => [...sp]),
-      _nextId:       origAssembly._nextId,
-    };
-    const freshStaging = {
-      stages:          origStaging.stages.map(s => ({ instanceIds: [...s.instanceIds] })),
-      unstaged:        [...origStaging.unstaged],
-      currentStageIdx: 0,
-    };
+      overlay.remove();
+      stopFlightScene();
 
-    startFlightScene(ctr, gs, freshAssembly, freshStaging, gs.currentFlight, endCb);
-  });
-  buttonsEl.appendChild(restartBtn);
+      if (!origAssembly || !origStaging || !ctr || !gs) {
+        if (endCb) endCb(gs);
+        return;
+      }
 
-  // ── "Continue Flying" button — available when rocket isn't destroyed ──────
+      let totalFuel = 0;
+      for (const placed of origAssembly.parts.values()) {
+        const def = getPartById(placed.partId);
+        if (def) totalFuel += def.properties?.fuelMass ?? 0;
+      }
+
+      // Reset mission objectives so they can be re-evaluated on the fresh flight.
+      if (missionId && gs.missions?.accepted) {
+        const mission = gs.missions.accepted.find(m => m.id === missionId);
+        if (mission?.objectives) {
+          for (const obj of mission.objectives) {
+            obj.completed = false;
+            delete obj._holdEnteredAt;
+          }
+        }
+      }
+
+      gs.currentFlight = {
+        missionId, rocketId, crewIds,
+        timeElapsed: 0, altitude: 0, velocity: 0,
+        fuelRemaining: totalFuel, deltaVRemaining: 0,
+        events: [], aborted: false,
+      };
+
+      const freshAssembly = {
+        parts:         new Map([...origAssembly.parts].map(([id, p]) => [id, { ...p }])),
+        connections:   origAssembly.connections.map(c => ({ ...c })),
+        symmetryPairs: origAssembly.symmetryPairs.map(sp => [...sp]),
+        _nextId:       origAssembly._nextId,
+      };
+      const freshStaging = {
+        stages:          origStaging.stages.map(s => ({ instanceIds: [...s.instanceIds] })),
+        unstaged:        [...origStaging.unstaged],
+        currentStageIdx: 0,
+      };
+
+      startFlightScene(ctr, gs, freshAssembly, freshStaging, gs.currentFlight, endCb);
+    });
+    secondaryRow.appendChild(restartBtn);
+  }
+
   if (!isCrashed) {
-    const continueBtn = document.createElement('button');
-    continueBtn.id        = 'post-flight-continue-btn';
-    continueBtn.className = 'pf-btn pf-btn-primary';
-    continueBtn.textContent = '▶ Continue Flying';
+    // ── "Continue Flying" ─────────────────────────────────────────────────
+    const continueBtn = _pfBtn('Continue Flying', null, 'pf-btn-secondary');
+    continueBtn.id    = 'post-flight-continue-btn';
     continueBtn.title = 'Close this summary and continue controlling the landed rocket.';
     continueBtn.addEventListener('click', () => {
-      // The flight scene is still running — close the summary and restore HUD.
       _summaryShown = false;
       overlay.remove();
       const hud = document.getElementById('flight-hud');
       if (hud) hud.style.display = '';
     });
-    buttonsEl.appendChild(continueBtn);
+    secondaryRow.appendChild(continueBtn);
   }
 
-  // ── "Return to Space Agency" button ───────────────────────────────────────
-  const returnBtn = document.createElement('button');
-  returnBtn.id          = 'post-flight-return-btn';
-  returnBtn.className   = 'pf-btn pf-btn-primary';
-  returnBtn.textContent = '← Return to Space Agency';
-  returnBtn.title = 'End this flight, process mission results and part recovery, and return to your Space Agency hub.';
-  returnBtn.addEventListener('click', () => {
-    // Process all end-of-flight game-state changes (mission completion,
-    // part recovery, loan interest, death fines, flight history) and collect
-    // the summary for the "Return Results" overlay shown on the hub.
-    let returnResults = null;
-    if (state && flightState) {
-      returnResults = processFlightReturn(state, flightState, ps, assembly);
-    }
-
-    refreshTopBar();
-    overlay.remove();
-    stopFlightScene();
-    if (onFlightEnd) onFlightEnd(state, returnResults);
-  });
-  buttonsEl.appendChild(returnBtn);
-
-  // ── "Retry with Same Design" button ─────────────────────────────────────
-  // Opens the VAB with the same rocket design loaded so the player can
-  // tweak staging, swap parts, and re-launch.
+  // ── "Adjust Build" ────────────────────────────────────────────────────────
   {
-    const retryBtn = document.createElement('button');
-    retryBtn.id          = 'post-flight-retry-btn';
-    retryBtn.className   = 'pf-btn pf-btn-secondary';
-    retryBtn.textContent = '↺ Retry with Same Design';
-    retryBtn.title = 'Return to the Vehicle Assembly Building with this rocket loaded so you can tweak and re-launch.';
-    retryBtn.addEventListener('click', () => {
-      // Store the pristine assembly and staging on gameState so the VAB
-      // can restore the design even when entered from the Launch Pad path.
+    const adjustBtn = _pfBtn('Adjust Build', costStr, 'pf-btn-secondary');
+    adjustBtn.id    = 'post-flight-adjust-btn';
+    adjustBtn.title = 'Return to the Vehicle Assembly Building with this rocket loaded so you can tweak and re-launch.';
+    adjustBtn.addEventListener('click', () => {
+      if (totalRocketCost > 0 && state) {
+        state.money = (state.money ?? 0) - totalRocketCost;
+      }
+
       const origAssembly = _originalAssembly;
       const origStaging  = _originalStagingConfig;
       if (origAssembly && state) {
@@ -1789,8 +1889,33 @@ function _showPostFlightSummary(ps, assembly, flightState, state, onFlightEnd) {
       stopFlightScene();
       if (onFlightEnd) onFlightEnd(state, null, 'vab');
     });
-    buttonsEl.appendChild(retryBtn);
+    secondaryRow.appendChild(adjustBtn);
   }
+
+  buttonsEl.appendChild(secondaryRow);
+
+  // ── "Return to Space Agency" button (full width, primary) ─────────────────
+  const recoveryCostStr = recoveryValue > 0
+    ? `+$${recoveryValue.toLocaleString('en-US')} part recovery`
+    : null;
+  const returnBtn = _pfBtn('Return to Space Agency', recoveryCostStr, 'pf-btn-primary');
+  returnBtn.id    = 'post-flight-return-btn';
+  returnBtn.title = 'End this flight, process mission results and part recovery, and return to your Space Agency hub.';
+  returnBtn.addEventListener('click', () => {
+    // Process all end-of-flight game-state changes (mission completion,
+    // part recovery, loan interest, death fines, flight history) and collect
+    // the summary for the "Return Results" overlay shown on the hub.
+    let returnResults = null;
+    if (state && flightState) {
+      returnResults = processFlightReturn(state, flightState, ps, assembly);
+    }
+
+    refreshTopBar();
+    overlay.remove();
+    stopFlightScene();
+    if (onFlightEnd) onFlightEnd(state, returnResults);
+  });
+  buttonsEl.appendChild(returnBtn);
 
   content.appendChild(buttonsEl);
 

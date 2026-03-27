@@ -85,7 +85,8 @@ export function _setSessionStartTimeForTesting(timestampMs) {
  * @property {number}  totalFlights         - Entries in flightHistory.
  * @property {number}  crewCount            - Living (non-dead) crew members.
  * @property {number}  crewKIA              - Crew killed in action.
- * @property {number}  playTimeSeconds      - Cumulative play time in seconds.
+ * @property {number}  playTimeSeconds      - Cumulative real-world play time in seconds.
+ * @property {number}  flightTimeSeconds    - Cumulative in-game flight time in seconds.
  */
 
 // ---------------------------------------------------------------------------
@@ -161,6 +162,7 @@ function summaryFromEnvelope(slotIndex, envelope) {
     crewCount: countLivingCrew(s),
     crewKIA: countKIA(s),
     playTimeSeconds: s.playTimeSeconds ?? 0,
+    flightTimeSeconds: s.flightTimeSeconds ?? 0,
   };
 }
 

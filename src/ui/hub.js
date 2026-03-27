@@ -509,10 +509,14 @@ export function showReturnResultsOverlay(container, summary, onDismiss) {
     ));
   }
 
-  // Interest row.
+  // Interest row (shows loan balance alongside).
   if (summary.interestCharged > 0) {
+    const loanBalance = summary.loanBalance ?? 0;
+    const interestLabel = loanBalance > 0
+      ? `Loan interest (balance: $${Math.round(loanBalance).toLocaleString('en-US')})`
+      : 'Loan interest';
     finSection.appendChild(_rrRow(
-      'Loan interest',
+      interestLabel,
       `−$${Math.round(summary.interestCharged).toLocaleString('en-US')}`,
       'negative',
     ));

@@ -154,7 +154,8 @@ import {
  * @property {RocketDesign[]} rockets       - Saved rocket blueprints.
  * @property {string[]}       parts         - IDs of unlocked part definitions.
  * @property {FlightResult[]} flightHistory - Past flight records.
- * @property {number}         playTimeSeconds - Total seconds of play.
+ * @property {number}         playTimeSeconds   - Total real-world seconds of play.
+ * @property {number}         flightTimeSeconds - Cumulative in-game flight time (seconds).
  * @property {FlightState|null} currentFlight - Active flight, or null.
  * @property {Object|null}      vabAssembly    - Serialisable snapshot of the VAB
  *                                               rocket assembly (Map→Array), or null.
@@ -204,6 +205,7 @@ export function createGameState() {
     flightHistory: [],
 
     playTimeSeconds: 0,
+    flightTimeSeconds: 0,
 
     currentFlight: null,
 

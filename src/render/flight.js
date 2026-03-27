@@ -742,14 +742,19 @@ function _makePartLabel(placed, def, alpha = 1) {
   const label = new PIXI.Text({
     text:  def.name,
     style: new PIXI.TextStyle({
-      fill:       '#a8c8e8',
-      fontSize:   9,
+      fill:       '#c0ddf0',
+      fontSize:   48,
       fontFamily: 'Courier New, Courier, monospace',
+      fontWeight: 'bold',
     }),
   });
   label.anchor.set(0.5, 0.5);
   label.x     = placed.x;
   label.y     = -placed.y;
+  // Counteract the container's zoom scale so text stays a fixed screen size,
+  // while the high-res texture keeps it crisp.
+  const containerScale = _ppm() * SCALE_M_PER_PX;
+  label.scale.set(10 / 48 / containerScale);
   label.alpha = alpha;
   return label;
 }
@@ -935,6 +940,9 @@ function _renderRocket(ps, assembly, w, h) {
   }
 
   const { sx, sy } = _worldToScreen(ps.posX, ps.posY, w, h);
+  const scale = _ppm() * SCALE_M_PER_PX;
+
+  _rocketContainer.scale.set(scale);
 
   // When tipping on the ground, rotate around the contact point (base corner)
   // instead of the centre of mass so the rocket visually tips from its base.
@@ -951,8 +959,7 @@ function _renderRocket(ps, assembly, w, h) {
 
     // The contact's world-X position accounts for Y-up clockwise rotation:
     //   contactWorldX = posX + (lx·cosA + ly·sinA) · SCALE
-    // At zoom=1 SCALE·ppm=1, so screen offset from sx = lx·cosA + ly·sinA.
-    _rocketContainer.x = sx + ps.tippingContactX * cosA + ps.tippingContactY * sinA;
+    _rocketContainer.x = sx + (ps.tippingContactX * cosA + ps.tippingContactY * sinA) * scale;
 
     // Compute how far below the pivot the visual bottom of the rotated rocket
     // extends (the "drop"), then offset container.y so the visual bottom sits
@@ -983,12 +990,12 @@ function _renderRocket(ps, assembly, w, h) {
         if (drop > maxDrop) maxDrop = drop;
       }
     }
-    _rocketContainer.y = sy - maxDrop;
+    _rocketContainer.y = sy - maxDrop * scale;
   } else {
     // Normal mode: rotate around CoM.
     _rocketContainer.pivot.set(comLocalX, comLocalY);
-    _rocketContainer.x        = sx + comLocalX;
-    _rocketContainer.y        = sy + lowestPartBottomPx + comLocalY;
+    _rocketContainer.x        = sx + comLocalX * scale;
+    _rocketContainer.y        = sy + (lowestPartBottomPx + comLocalY) * scale;
   }
   _rocketContainer.rotation = ps.angle;
 
@@ -1045,10 +1052,12 @@ function _renderDebris(debrisList, assembly, w, h) {
     if (debris.activeParts.size === 0) continue;
 
     const { sx, sy } = _worldToScreen(debris.posX, debris.posY, w, h);
+    const scale = _ppm() * SCALE_M_PER_PX;
 
     const fragContainer    = new PIXI.Container();
     fragContainer.x        = sx;
     fragContainer.y        = sy;
+    fragContainer.scale.set(scale);
     fragContainer.rotation = debris.angle;
     _debrisContainer.addChild(fragContainer);
 
@@ -1289,8 +1298,9 @@ function _renderTrails(w, h) {
 
     // Radius grows slightly as smoke disperses, shrinks for fire.
     const growFactor = seg.isSmoke ? (1 + t * 0.6) : (1 - t * 0.5);
-    const rx = Math.max(0.5, (seg.baseW * growFactor) / 2);
-    const ry = Math.max(0.5, (seg.baseH * (seg.isSmoke ? (1 + t * 0.4) : (1 - t * 0.3))) / 2);
+    const zs = _zoomLevel;
+    const rx = Math.max(0.5, (seg.baseW * growFactor * zs) / 2);
+    const ry = Math.max(0.5, (seg.baseH * (seg.isSmoke ? (1 + t * 0.4) : (1 - t * 0.3)) * zs) / 2);
 
     const { sx, sy } = _worldToScreen(seg.worldX, seg.worldY, w, h);
     g.ellipse(sx, sy, rx, ry);
@@ -1343,22 +1353,9 @@ function _onMouseMove(e) {
 function _onWheel(e) {
   e.preventDefault();
 
-  const w = window.innerWidth;
-  const h = window.innerHeight;
-  const ppm = _ppm();
-
-  // World coordinate currently under the cursor.
-  const cursorWorldX = _camWorldX + (_mouseX - w / 2) / ppm;
-  const cursorWorldY = _camWorldY - (_mouseY - h / 2) / ppm;
-
   // Scroll up (deltaY < 0) = zoom in; scroll down = zoom out.
   const factor = e.deltaY < 0 ? 1.2 : 1 / 1.2;
   _zoomLevel = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, _zoomLevel * factor));
-
-  // Reposition the camera so the cursor world-point stays at the same pixel.
-  const newPpm = _ppm();
-  _camWorldX = cursorWorldX - (_mouseX - w / 2) / newPpm;
-  _camWorldY = cursorWorldY + (_mouseY - h / 2) / newPpm;
 }
 
 // ---------------------------------------------------------------------------

@@ -281,17 +281,18 @@ function _drawPart(g, placed, def, picked = false) {
  */
 function _makePartLabel(placed, def) {
   const { sx, sy } = _worldToScreen(placed.x, placed.y);
-  const fontSize = 10;
 
   const label = new PIXI.Text({
     text: def.name,
     style: new PIXI.TextStyle({
-      fill: '#a8c8e8',
-      fontSize,
+      fill: '#c0ddf0',
+      fontSize: 48,
       fontFamily: 'Courier New, Courier, monospace',
+      fontWeight: 'bold',
     }),
   });
   label.anchor.set(0.5, 0.5);
+  label.scale.set(10 / 48);
   label.x = sx;
   label.y = sy;
   return label;
@@ -356,12 +357,14 @@ function _renderGhostLayer() {
   const label = new PIXI.Text({
     text: def.name,
     style: new PIXI.TextStyle({
-      fill: '#c8e4ff',
-      fontSize: 10,
+      fill: '#c0ddf0',
+      fontSize: 48,
       fontFamily: 'Courier New, Courier, monospace',
+      fontWeight: 'bold',
     }),
   });
   label.anchor.set(0.5, 0.5);
+  label.scale.set(10 / 48);
   label.x = _ghostSX;
   label.y = _ghostSY;
   _ghostContainer.addChild(label);
@@ -389,12 +392,14 @@ function _renderGhostLayer() {
       const mLabel = new PIXI.Text({
         text: mDef.name,
         style: new PIXI.TextStyle({
-          fill: '#c8e4ff',
-          fontSize: 10,
+          fill: '#c0ddf0',
+          fontSize: 48,
           fontFamily: 'Courier New, Courier, monospace',
+          fontWeight: 'bold',
         }),
       });
       mLabel.anchor.set(0.5, 0.5);
+      mLabel.scale.set(10 / 48);
       mLabel.alpha = 0.5;
       mLabel.x = msx;
       mLabel.y = msy;

@@ -647,6 +647,10 @@ function _buildSaveCard(summary) {
         <span class="mm-stat-value">${formatPlayTime(summary.playTimeSeconds)}</span>
       </div>
       <div class="mm-stat">
+        <span class="mm-stat-label">Flight Time</span>
+        <span class="mm-stat-value">${formatPlayTime(summary.flightTimeSeconds)}</span>
+      </div>
+      <div class="mm-stat">
         <span class="mm-stat-label">Missions Done</span>
         <span class="mm-stat-value">${summary.missionsCompleted}</span>
       </div>
