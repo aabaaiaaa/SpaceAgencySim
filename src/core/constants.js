@@ -178,3 +178,65 @@ export const CREW_SALARY_PER_PERIOD = 5_000;
 
 /** Base facility upkeep charged per period. */
 export const FACILITY_UPKEEP_PER_PERIOD = 10_000;
+
+// ---------------------------------------------------------------------------
+// Celestial Bodies & Orbital Mechanics
+// ---------------------------------------------------------------------------
+
+/**
+ * Known celestial bodies.
+ * @enum {string}
+ */
+export const CelestialBody = Object.freeze({
+  EARTH: 'EARTH',
+});
+
+/**
+ * Gravitational parameters (GM) in m³/s² for each body.
+ * μ = G × M, used in Keplerian orbit calculations.
+ */
+export const BODY_GM = Object.freeze({
+  EARTH: 3.986004418e14,
+});
+
+/**
+ * Mean radius in metres for each body.
+ */
+export const BODY_RADIUS = Object.freeze({
+  EARTH: 6_371_000,
+});
+
+/**
+ * Altitude bands per celestial body.
+ * Each band defines a range of altitudes (metres above the surface).
+ * Objects in the same band can interact via proximity detection.
+ *
+ * @type {Readonly<Record<string, ReadonlyArray<Readonly<{id: string, name: string, min: number, max: number}>>>>}
+ */
+export const ALTITUDE_BANDS = Object.freeze({
+  EARTH: Object.freeze([
+    Object.freeze({ id: 'LEO', name: 'Low Earth Orbit', min: 80_000, max: 200_000 }),
+    Object.freeze({ id: 'MEO', name: 'Medium Earth Orbit', min: 200_000, max: 2_000_000 }),
+    Object.freeze({ id: 'HEO', name: 'High Earth Orbit', min: 2_000_000, max: 35_786_000 }),
+  ]),
+});
+
+/** Number of angular segments dividing each orbit plane. */
+export const ORBIT_SEGMENTS = 36;
+
+/** Degrees per angular segment. */
+export const ORBIT_SEGMENT_SIZE = 360 / 36; // 10°
+
+/** Maximum angular distance (degrees) for proximity detection. */
+export const PROXIMITY_ANGLE_DEG = 5;
+
+/**
+ * Type of object tracked in orbit.
+ * @enum {string}
+ */
+export const OrbitalObjectType = Object.freeze({
+  CRAFT: 'CRAFT',
+  SATELLITE: 'SATELLITE',
+  DEBRIS: 'DEBRIS',
+  STATION: 'STATION',
+});

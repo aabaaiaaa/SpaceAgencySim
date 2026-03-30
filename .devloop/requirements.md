@@ -14,7 +14,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Implement the period system where a period = one flight. Periods advance only when a flight is completed and the player returns to the space agency. Contract expiry, crew salaries, operating costs, and other time-based mechanics reference periods. Use "flight" in player-facing UI. Time warping does not advance the period counter. Returning to the agency from any flight (including orbit) completes one period, charges operating costs, and cashes in completed missions.
 
 ### TASK-002: Implement orbit slot system
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: none
 - **Description**: Replace full Newtonian orbital mechanics with simplified orbit slots. Altitude bands are fixed ranges per celestial body (e.g., LEO 80-200km, MEO 200-2,000km for Earth). Angular position divided into 36 segments. Objects follow simplified Newtonian orbits and move along orbital paths in real-time (warpable). Non-circular (elliptical) orbits cause objects to move between altitude bands — at apoapsis they are in a higher band, at periapsis a lower band. This is important for gameplay: a craft in an elliptical orbit passes through multiple biomes, enabling multiple science results per orbit. Proximity detection: object is "in the player's slot" when angular distance < 5 degrees AND within the same altitude band. Implement "warp to target" that simulates forward until a target meets proximity conditions or determines impossibility.

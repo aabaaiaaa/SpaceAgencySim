@@ -128,6 +128,26 @@ import {
  */
 
 /**
+ * Keplerian orbital elements for a 2D orbit.
+ * @typedef {Object} OrbitalElements
+ * @property {number} semiMajorAxis      - Semi-major axis (m from body centre).
+ * @property {number} eccentricity       - Eccentricity (0 = circular, 0 < e < 1 = elliptical).
+ * @property {number} argPeriapsis       - Argument of periapsis ω (radians).
+ * @property {number} meanAnomalyAtEpoch - Mean anomaly M₀ at the epoch (radians).
+ * @property {number} epoch              - Reference time for M₀ (seconds).
+ */
+
+/**
+ * A persistent object tracked in orbit (satellite, debris, station).
+ * @typedef {Object} OrbitalObject
+ * @property {string}          id       - Unique identifier.
+ * @property {string}          bodyId   - Celestial body this object orbits (e.g. 'EARTH').
+ * @property {string}          type     - OrbitalObjectType value.
+ * @property {string}          name     - Display name.
+ * @property {OrbitalElements} elements - Current orbital elements.
+ */
+
+/**
  * Live state of a flight that is currently in progress.
  * Set to null when no flight is active.
  * @typedef {Object} FlightState
@@ -141,6 +161,8 @@ import {
  * @property {number}        deltaVRemaining - Remaining Δv budget (m/s).
  * @property {FlightEvent[]} events         - Log of events so far.
  * @property {boolean}       aborted        - Whether abort has been triggered.
+ * @property {boolean}       inOrbit        - True when craft is in a stable orbit.
+ * @property {OrbitalElements|null} orbitalElements - Keplerian elements when in orbit, null otherwise.
  */
 
 /**
@@ -162,6 +184,8 @@ import {
  * @property {number}         playTimeSeconds   - Total real-world seconds of play.
  * @property {number}         flightTimeSeconds - Cumulative in-game flight time (seconds).
  * @property {FlightState|null} currentFlight - Active flight, or null.
+ * @property {OrbitalObject[]}  orbitalObjects - Persistent objects tracked in orbit
+ *                                               (satellites, debris, stations).
  * @property {Object|null}      vabAssembly    - Serialisable snapshot of the VAB
  *                                               rocket assembly (Map→Array), or null.
  * @property {Object|null}      vabStagingConfig - Serialisable snapshot of the VAB
@@ -215,6 +239,8 @@ export function createGameState() {
     flightTimeSeconds: 0,
 
     currentFlight: null,
+
+    orbitalObjects: [],
 
     vabAssembly: null,
     vabStagingConfig: null,
@@ -388,6 +414,8 @@ export function createFlightState({
     deltaVRemaining,
     events: [],
     aborted: false,
+    inOrbit: false,
+    orbitalElements: null,
   };
 }
 
