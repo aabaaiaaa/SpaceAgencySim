@@ -60,7 +60,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Implement contract generation: 2-3 new contracts appear after each flight return, filling board slots. Accepting frees a slot. Generated contracts match player's current progression. Board pool and active caps by Mission Control tier: Tier 1 = 4 pool / 2 active, Tier 2 = 8/5, Tier 3 = 12/8. Board expiry after N flights. Completion deadlines on accepted contracts (some open-ended). Multi-part chains with per-part deadlines. Cancellation with penalty fee and reputation hit.
 
 ### TASK-009: Contract system — structure and objectives
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-008
 - **Description**: Implement contract structure: objectives using existing ObjectiveType enum plus new types, rewards scaled to difficulty, optional over-performance bonus targets clearly marked. Categories with icons. Multi-part contracts creating chains. Landing not always required (orbital deployment contracts). Multiple simultaneous contracts that can conflict. Difficulty scaling based on constraints (cost limits, part restrictions, complexity) not just altitude. All new objective types must have automated tests. UI in Mission Control with category icons.

@@ -352,6 +352,35 @@ export const CONTRACT_TIER_CAPS = Object.freeze({
   3: Object.freeze({ pool: 12, active: 8 }),
 });
 
+/**
+ * Icons (text glyphs) for each contract category, used in the UI.
+ * @type {Readonly<Record<string, string>>}
+ */
+export const CONTRACT_CATEGORY_ICONS = Object.freeze({
+  ALTITUDE_RECORD: '\u2191',   // ↑
+  SPEED_RECORD:    '\u2192',   // →
+  SCIENCE_SURVEY:  '\u25C9',   // ◉
+  SATELLITE_DEPLOY:'\u2295',   // ⊕
+  SAFE_RECOVERY:   '\u2193',   // ↓
+  ORBITAL:         '\u25CB',   // ○
+  CRASH_TEST:      '\u2716',   // ✖
+});
+
+/**
+ * Conflict tags that indicate contracts in the same tag group are harder
+ * to complete simultaneously.  Used to warn the player in the UI.
+ * @type {Readonly<Record<string, string>>}
+ */
+export const CONTRACT_CONFLICT_TAGS = Object.freeze({
+  DESTRUCTIVE:  'DESTRUCTIVE',   // crash test vs safe recovery
+  BUDGET:       'BUDGET',        // budget-limited flights
+  CREW_HEAVY:   'CREW_HEAVY',    // crew requirement contracts
+  MINIMALIST:   'MINIMALIST',    // part-count-limited flights
+});
+
+/** Bonus reward multiplier: bonus reward = base reward * this factor. */
+export const CONTRACT_BONUS_REWARD_RATE = 0.5;
+
 /** Number of new contracts generated after each flight return. */
 export const CONTRACTS_PER_FLIGHT_MIN = 2;
 export const CONTRACTS_PER_FLIGHT_MAX = 3;

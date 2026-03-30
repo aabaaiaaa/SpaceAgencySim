@@ -29,6 +29,7 @@ import {
   processContractCompletions,
   getContractCaps,
   getMissionControlTier,
+  getActiveConflicts,
 } from '../core/contracts.js';
 import {
   CONTRACT_TIER_CAPS,
@@ -43,6 +44,9 @@ import {
   FacilityId,
   ContractCategory,
   STARTING_MONEY,
+  CONTRACT_BONUS_REWARD_RATE,
+  CONTRACT_CONFLICT_TAGS,
+  PartType,
 } from '../core/constants.js';
 import { ObjectiveType } from '../data/missions.js';
 
@@ -70,6 +74,8 @@ function makeContract(overrides = {}) {
     objectives: overrides.objectives ?? [
       { id: 'obj-1', type: ObjectiveType.REACH_ALTITUDE, target: { altitude: 500 }, completed: false, description: 'Reach 500 m' },
     ],
+    bonusObjectives: overrides.bonusObjectives ?? [],
+    bonusReward: overrides.bonusReward ?? 0,
     reward: overrides.reward ?? 50_000,
     penaltyFee: overrides.penaltyFee ?? 12_500,
     reputationReward: overrides.reputationReward ?? 6,
@@ -81,6 +87,7 @@ function makeContract(overrides = {}) {
     chainId: overrides.chainId ?? null,
     chainPart: overrides.chainPart ?? null,
     chainTotal: overrides.chainTotal ?? null,
+    conflictTags: overrides.conflictTags ?? [],
   };
 }
 
@@ -93,6 +100,11 @@ function makeFlightState(overrides = {}) {
     events: overrides.events ?? [],
     hasScienceModules: overrides.hasScienceModules ?? false,
     scienceModuleRunning: overrides.scienceModuleRunning ?? false,
+    // New fields for constraint-based objectives (TASK-009)
+    rocketCost: overrides.rocketCost,
+    partCount: overrides.partCount,
+    partTypes: overrides.partTypes,
+    crewCount: overrides.crewCount,
   };
 }
 
@@ -628,5 +640,508 @@ describe('GameState — contract fields', () => {
   it('createGameState() includes reputation at starting value', () => {
     const state = createGameState();
     expect(state.reputation).toBe(STARTING_REPUTATION);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// New objective types (TASK-009)
+// ---------------------------------------------------------------------------
+
+describe('checkContractObjectives() — BUDGET_LIMIT', () => {
+  let state;
+  beforeEach(() => { state = freshState(); });
+
+  it('completes when rocket cost is within budget', () => {
+    state.contracts.active.push(makeContract({
+      id: 'c-budget',
+      objectives: [{
+        id: 'obj-1', type: 'BUDGET_LIMIT',
+        target: { maxCost: 50_000 }, completed: false, description: 'Test',
+      }],
+    }));
+
+    checkContractObjectives(state, makeFlightState({ rocketCost: 45_000 }));
+    expect(state.contracts.active[0].objectives[0].completed).toBe(true);
+  });
+
+  it('completes when rocket cost equals budget exactly', () => {
+    state.contracts.active.push(makeContract({
+      id: 'c-budget',
+      objectives: [{
+        id: 'obj-1', type: 'BUDGET_LIMIT',
+        target: { maxCost: 50_000 }, completed: false, description: 'Test',
+      }],
+    }));
+
+    checkContractObjectives(state, makeFlightState({ rocketCost: 50_000 }));
+    expect(state.contracts.active[0].objectives[0].completed).toBe(true);
+  });
+
+  it('does not complete when rocket cost exceeds budget', () => {
+    state.contracts.active.push(makeContract({
+      id: 'c-budget',
+      objectives: [{
+        id: 'obj-1', type: 'BUDGET_LIMIT',
+        target: { maxCost: 50_000 }, completed: false, description: 'Test',
+      }],
+    }));
+
+    checkContractObjectives(state, makeFlightState({ rocketCost: 50_001 }));
+    expect(state.contracts.active[0].objectives[0].completed).toBe(false);
+  });
+
+  it('does not complete when rocketCost is missing from flightState', () => {
+    state.contracts.active.push(makeContract({
+      id: 'c-budget',
+      objectives: [{
+        id: 'obj-1', type: 'BUDGET_LIMIT',
+        target: { maxCost: 50_000 }, completed: false, description: 'Test',
+      }],
+    }));
+
+    checkContractObjectives(state, makeFlightState({}));
+    expect(state.contracts.active[0].objectives[0].completed).toBe(false);
+  });
+});
+
+describe('checkContractObjectives() — MAX_PARTS', () => {
+  let state;
+  beforeEach(() => { state = freshState(); });
+
+  it('completes when part count is within limit', () => {
+    state.contracts.active.push(makeContract({
+      id: 'c-parts',
+      objectives: [{
+        id: 'obj-1', type: 'MAX_PARTS',
+        target: { maxParts: 4 }, completed: false, description: 'Test',
+      }],
+    }));
+
+    checkContractObjectives(state, makeFlightState({ partCount: 3 }));
+    expect(state.contracts.active[0].objectives[0].completed).toBe(true);
+  });
+
+  it('completes when part count equals limit exactly', () => {
+    state.contracts.active.push(makeContract({
+      id: 'c-parts',
+      objectives: [{
+        id: 'obj-1', type: 'MAX_PARTS',
+        target: { maxParts: 4 }, completed: false, description: 'Test',
+      }],
+    }));
+
+    checkContractObjectives(state, makeFlightState({ partCount: 4 }));
+    expect(state.contracts.active[0].objectives[0].completed).toBe(true);
+  });
+
+  it('does not complete when part count exceeds limit', () => {
+    state.contracts.active.push(makeContract({
+      id: 'c-parts',
+      objectives: [{
+        id: 'obj-1', type: 'MAX_PARTS',
+        target: { maxParts: 4 }, completed: false, description: 'Test',
+      }],
+    }));
+
+    checkContractObjectives(state, makeFlightState({ partCount: 5 }));
+    expect(state.contracts.active[0].objectives[0].completed).toBe(false);
+  });
+});
+
+describe('checkContractObjectives() — RESTRICT_PART', () => {
+  let state;
+  beforeEach(() => { state = freshState(); });
+
+  it('completes when forbidden part type is absent', () => {
+    state.contracts.active.push(makeContract({
+      id: 'c-restrict',
+      objectives: [{
+        id: 'obj-1', type: 'RESTRICT_PART',
+        target: { forbiddenType: PartType.PARACHUTE }, completed: false, description: 'Test',
+      }],
+    }));
+
+    checkContractObjectives(state, makeFlightState({
+      partTypes: [PartType.ENGINE, PartType.FUEL_TANK, PartType.COMMAND_MODULE],
+    }));
+    expect(state.contracts.active[0].objectives[0].completed).toBe(true);
+  });
+
+  it('does not complete when forbidden part type is present', () => {
+    state.contracts.active.push(makeContract({
+      id: 'c-restrict',
+      objectives: [{
+        id: 'obj-1', type: 'RESTRICT_PART',
+        target: { forbiddenType: PartType.PARACHUTE }, completed: false, description: 'Test',
+      }],
+    }));
+
+    checkContractObjectives(state, makeFlightState({
+      partTypes: [PartType.ENGINE, PartType.PARACHUTE],
+    }));
+    expect(state.contracts.active[0].objectives[0].completed).toBe(false);
+  });
+
+  it('does not complete when partTypes is missing', () => {
+    state.contracts.active.push(makeContract({
+      id: 'c-restrict',
+      objectives: [{
+        id: 'obj-1', type: 'RESTRICT_PART',
+        target: { forbiddenType: PartType.PARACHUTE }, completed: false, description: 'Test',
+      }],
+    }));
+
+    checkContractObjectives(state, makeFlightState({}));
+    expect(state.contracts.active[0].objectives[0].completed).toBe(false);
+  });
+});
+
+describe('checkContractObjectives() — MULTI_SATELLITE', () => {
+  let state;
+  beforeEach(() => { state = freshState(); });
+
+  it('completes when enough satellites are released at altitude', () => {
+    state.contracts.active.push(makeContract({
+      id: 'c-msat',
+      objectives: [{
+        id: 'obj-1', type: 'MULTI_SATELLITE',
+        target: { count: 2, minAltitude: 5_000 }, completed: false, description: 'Test',
+      }],
+    }));
+
+    checkContractObjectives(state, makeFlightState({
+      events: [
+        { type: 'SATELLITE_RELEASED', altitude: 6_000 },
+        { type: 'SATELLITE_RELEASED', altitude: 5_500 },
+      ],
+    }));
+    expect(state.contracts.active[0].objectives[0].completed).toBe(true);
+  });
+
+  it('does not complete when not enough satellites released', () => {
+    state.contracts.active.push(makeContract({
+      id: 'c-msat',
+      objectives: [{
+        id: 'obj-1', type: 'MULTI_SATELLITE',
+        target: { count: 3, minAltitude: 5_000 }, completed: false, description: 'Test',
+      }],
+    }));
+
+    checkContractObjectives(state, makeFlightState({
+      events: [
+        { type: 'SATELLITE_RELEASED', altitude: 6_000 },
+        { type: 'SATELLITE_RELEASED', altitude: 5_500 },
+      ],
+    }));
+    expect(state.contracts.active[0].objectives[0].completed).toBe(false);
+  });
+
+  it('ignores satellites released below minimum altitude', () => {
+    state.contracts.active.push(makeContract({
+      id: 'c-msat',
+      objectives: [{
+        id: 'obj-1', type: 'MULTI_SATELLITE',
+        target: { count: 2, minAltitude: 5_000 }, completed: false, description: 'Test',
+      }],
+    }));
+
+    checkContractObjectives(state, makeFlightState({
+      events: [
+        { type: 'SATELLITE_RELEASED', altitude: 6_000 },
+        { type: 'SATELLITE_RELEASED', altitude: 4_000 }, // too low
+      ],
+    }));
+    expect(state.contracts.active[0].objectives[0].completed).toBe(false);
+  });
+});
+
+describe('checkContractObjectives() — MINIMUM_CREW', () => {
+  let state;
+  beforeEach(() => { state = freshState(); });
+
+  it('completes when crew count meets minimum', () => {
+    state.contracts.active.push(makeContract({
+      id: 'c-crew',
+      objectives: [{
+        id: 'obj-1', type: 'MINIMUM_CREW',
+        target: { minCrew: 2 }, completed: false, description: 'Test',
+      }],
+    }));
+
+    checkContractObjectives(state, makeFlightState({ crewCount: 2 }));
+    expect(state.contracts.active[0].objectives[0].completed).toBe(true);
+  });
+
+  it('completes when crew count exceeds minimum', () => {
+    state.contracts.active.push(makeContract({
+      id: 'c-crew',
+      objectives: [{
+        id: 'obj-1', type: 'MINIMUM_CREW',
+        target: { minCrew: 1 }, completed: false, description: 'Test',
+      }],
+    }));
+
+    checkContractObjectives(state, makeFlightState({ crewCount: 3 }));
+    expect(state.contracts.active[0].objectives[0].completed).toBe(true);
+  });
+
+  it('does not complete when crew count is below minimum', () => {
+    state.contracts.active.push(makeContract({
+      id: 'c-crew',
+      objectives: [{
+        id: 'obj-1', type: 'MINIMUM_CREW',
+        target: { minCrew: 2 }, completed: false, description: 'Test',
+      }],
+    }));
+
+    checkContractObjectives(state, makeFlightState({ crewCount: 1 }));
+    expect(state.contracts.active[0].objectives[0].completed).toBe(false);
+  });
+
+  it('does not complete when crewCount is missing', () => {
+    state.contracts.active.push(makeContract({
+      id: 'c-crew',
+      objectives: [{
+        id: 'obj-1', type: 'MINIMUM_CREW',
+        target: { minCrew: 1 }, completed: false, description: 'Test',
+      }],
+    }));
+
+    checkContractObjectives(state, makeFlightState({}));
+    expect(state.contracts.active[0].objectives[0].completed).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Bonus objectives (TASK-009)
+// ---------------------------------------------------------------------------
+
+describe('Bonus objectives', () => {
+  it('checkContractObjectives() checks bonus objectives', () => {
+    const state = freshState();
+    state.contracts.active.push(makeContract({
+      id: 'c-bonus',
+      objectives: [{
+        id: 'obj-1', type: 'REACH_ALTITUDE',
+        target: { altitude: 500 }, completed: false, description: 'Main',
+      }],
+      bonusObjectives: [{
+        id: 'obj-bonus-1', type: 'REACH_ALTITUDE',
+        target: { altitude: 1000 }, completed: false, description: 'Bonus',
+        bonus: true,
+      }],
+      bonusReward: 25_000,
+    }));
+
+    checkContractObjectives(state, makeFlightState({ altitude: 1200 }));
+    expect(state.contracts.active[0].objectives[0].completed).toBe(true);
+    expect(state.contracts.active[0].bonusObjectives[0].completed).toBe(true);
+  });
+
+  it('bonus objectives can remain incomplete while main objectives complete', () => {
+    const state = freshState();
+    state.contracts.active.push(makeContract({
+      id: 'c-bonus',
+      objectives: [{
+        id: 'obj-1', type: 'REACH_ALTITUDE',
+        target: { altitude: 500 }, completed: false, description: 'Main',
+      }],
+      bonusObjectives: [{
+        id: 'obj-bonus-1', type: 'REACH_ALTITUDE',
+        target: { altitude: 1000 }, completed: false, description: 'Bonus',
+        bonus: true,
+      }],
+      bonusReward: 25_000,
+    }));
+
+    checkContractObjectives(state, makeFlightState({ altitude: 700 }));
+    expect(state.contracts.active[0].objectives[0].completed).toBe(true);
+    expect(state.contracts.active[0].bonusObjectives[0].completed).toBe(false);
+  });
+
+  it('completeContract() awards bonus reward when all bonus objectives met', () => {
+    const state = freshState();
+    state.contracts.active.push(makeContract({
+      id: 'c-bonus',
+      reward: 100_000,
+      bonusObjectives: [{
+        id: 'obj-bonus-1', type: 'REACH_ALTITUDE',
+        target: { altitude: 1000 }, completed: true, description: 'Bonus',
+        bonus: true,
+      }],
+      bonusReward: 50_000,
+    }));
+
+    const cashBefore = state.money;
+    const result = completeContract(state, 'c-bonus');
+    expect(result.success).toBe(true);
+    expect(result.bonusAwarded).toBe(50_000);
+    expect(state.money).toBe(cashBefore + 100_000 + 50_000);
+  });
+
+  it('completeContract() does not award bonus when bonus objectives incomplete', () => {
+    const state = freshState();
+    state.contracts.active.push(makeContract({
+      id: 'c-bonus',
+      reward: 100_000,
+      bonusObjectives: [{
+        id: 'obj-bonus-1', type: 'REACH_ALTITUDE',
+        target: { altitude: 1000 }, completed: false, description: 'Bonus',
+        bonus: true,
+      }],
+      bonusReward: 50_000,
+    }));
+
+    const cashBefore = state.money;
+    const result = completeContract(state, 'c-bonus');
+    expect(result.success).toBe(true);
+    expect(result.bonusAwarded).toBe(0);
+    expect(state.money).toBe(cashBefore + 100_000);
+  });
+
+  it('completeContract() uses default bonus rate when bonusReward is 0', () => {
+    const state = freshState();
+    state.contracts.active.push(makeContract({
+      id: 'c-bonus-default',
+      reward: 100_000,
+      bonusObjectives: [{
+        id: 'obj-bonus-1', type: 'REACH_ALTITUDE',
+        target: { altitude: 1000 }, completed: true, description: 'Bonus',
+        bonus: true,
+      }],
+      bonusReward: 0,
+    }));
+
+    const cashBefore = state.money;
+    const result = completeContract(state, 'c-bonus-default');
+    expect(result.success).toBe(true);
+    // When bonusReward is 0 (falsy), uses default rate
+    const expectedBonus = Math.round(100_000 * CONTRACT_BONUS_REWARD_RATE);
+    expect(result.bonusAwarded).toBe(expectedBonus);
+    expect(state.money).toBe(cashBefore + 100_000 + expectedBonus);
+  });
+
+  it('completeContract() awards 0 bonus when no bonus objectives exist', () => {
+    const state = freshState();
+    state.contracts.active.push(makeContract({
+      id: 'c-no-bonus',
+      reward: 100_000,
+    }));
+
+    const cashBefore = state.money;
+    const result = completeContract(state, 'c-no-bonus');
+    expect(result.success).toBe(true);
+    expect(result.bonusAwarded).toBe(0);
+    expect(state.money).toBe(cashBefore + 100_000);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Conflict detection (TASK-009)
+// ---------------------------------------------------------------------------
+
+describe('getActiveConflicts()', () => {
+  it('detects conflicts between contracts with shared tags', () => {
+    const state = freshState();
+    state.contracts.active.push(makeContract({
+      id: 'c-crash',
+      conflictTags: [CONTRACT_CONFLICT_TAGS.DESTRUCTIVE],
+    }));
+    state.contracts.active.push(makeContract({
+      id: 'c-safe',
+      conflictTags: [CONTRACT_CONFLICT_TAGS.DESTRUCTIVE],
+    }));
+
+    const conflicts = getActiveConflicts(state);
+    expect(conflicts.length).toBe(1);
+    expect(conflicts[0].contractA).toBe('c-crash');
+    expect(conflicts[0].contractB).toBe('c-safe');
+    expect(conflicts[0].tag).toBe(CONTRACT_CONFLICT_TAGS.DESTRUCTIVE);
+  });
+
+  it('returns empty array when no conflicts exist', () => {
+    const state = freshState();
+    state.contracts.active.push(makeContract({
+      id: 'c-1',
+      conflictTags: [CONTRACT_CONFLICT_TAGS.BUDGET],
+    }));
+    state.contracts.active.push(makeContract({
+      id: 'c-2',
+      conflictTags: [CONTRACT_CONFLICT_TAGS.DESTRUCTIVE],
+    }));
+
+    const conflicts = getActiveConflicts(state);
+    expect(conflicts.length).toBe(0);
+  });
+
+  it('returns empty array when contracts have no tags', () => {
+    const state = freshState();
+    state.contracts.active.push(makeContract({ id: 'c-1' }));
+    state.contracts.active.push(makeContract({ id: 'c-2' }));
+
+    const conflicts = getActiveConflicts(state);
+    expect(conflicts.length).toBe(0);
+  });
+
+  it('detects multiple conflicts from multiple shared tags', () => {
+    const state = freshState();
+    state.contracts.active.push(makeContract({
+      id: 'c-1',
+      conflictTags: [CONTRACT_CONFLICT_TAGS.BUDGET, CONTRACT_CONFLICT_TAGS.MINIMALIST],
+    }));
+    state.contracts.active.push(makeContract({
+      id: 'c-2',
+      conflictTags: [CONTRACT_CONFLICT_TAGS.BUDGET, CONTRACT_CONFLICT_TAGS.MINIMALIST],
+    }));
+
+    const conflicts = getActiveConflicts(state);
+    expect(conflicts.length).toBe(2);
+  });
+
+  it('handles three-way conflicts correctly', () => {
+    const state = freshState();
+    state.contracts.active.push(makeContract({
+      id: 'c-1', conflictTags: [CONTRACT_CONFLICT_TAGS.DESTRUCTIVE],
+    }));
+    state.contracts.active.push(makeContract({
+      id: 'c-2', conflictTags: [CONTRACT_CONFLICT_TAGS.DESTRUCTIVE],
+    }));
+    state.contracts.active.push(makeContract({
+      id: 'c-3', conflictTags: [CONTRACT_CONFLICT_TAGS.DESTRUCTIVE],
+    }));
+
+    const conflicts = getActiveConflicts(state);
+    // 3 pairs: (1,2), (1,3), (2,3)
+    expect(conflicts.length).toBe(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Contract structure fields (TASK-009)
+// ---------------------------------------------------------------------------
+
+describe('Contract structure — new fields', () => {
+  it('generated contracts include bonusObjectives array', () => {
+    const state = freshState();
+    const result = generateContracts(state);
+    for (const c of result) {
+      expect(Array.isArray(c.bonusObjectives)).toBe(true);
+    }
+  });
+
+  it('generated contracts include conflictTags array', () => {
+    const state = freshState();
+    const result = generateContracts(state);
+    for (const c of result) {
+      expect(Array.isArray(c.conflictTags)).toBe(true);
+    }
+  });
+
+  it('generated contracts include bonusReward field', () => {
+    const state = freshState();
+    const result = generateContracts(state);
+    for (const c of result) {
+      expect(typeof c.bonusReward).toBe('number');
+    }
   });
 });

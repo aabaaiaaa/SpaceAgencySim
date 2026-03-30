@@ -25,6 +25,7 @@ import {
   CONTRACT_REP_GAIN_BASE,
   CONTRACT_REP_LOSS_CANCEL,
   CONTRACT_REP_LOSS_FAIL,
+  CONTRACT_BONUS_REWARD_RATE,
 } from './constants.js';
 import { earn } from './finance.js';
 import { CONTRACT_TEMPLATES, generateChainContinuation, getProgressionTier } from '../data/contracts.js';
@@ -131,6 +132,8 @@ export function generateContracts(state) {
       description: data.description,
       category: data.category,
       objectives: data.objectives,
+      bonusObjectives: data.bonusObjectives ?? [],
+      bonusReward: data.bonusReward ?? 0,
       reward: data.reward,
       penaltyFee: Math.round(data.reward * CONTRACT_CANCEL_PENALTY_RATE),
       reputationReward: CONTRACT_REP_GAIN_BASE + Math.floor(data.reward / 50_000),
@@ -144,6 +147,7 @@ export function generateContracts(state) {
       chainId: data.chainId,
       chainPart: data.chainPart,
       chainTotal: data.chainTotal,
+      conflictTags: data.conflictTags ?? [],
     };
 
     state.contracts.board.push(contract);
@@ -246,6 +250,14 @@ export function completeContract(state, contractId) {
   // Award cash.
   earn(state, contract.reward);
 
+  // Check bonus objectives — award bonus reward if all completed.
+  let bonusAwarded = 0;
+  if (Array.isArray(contract.bonusObjectives) && contract.bonusObjectives.length > 0 &&
+      contract.bonusObjectives.every((o) => o.completed)) {
+    bonusAwarded = contract.bonusReward || Math.round(contract.reward * CONTRACT_BONUS_REWARD_RATE);
+    earn(state, bonusAwarded);
+  }
+
   // Award reputation.
   state.reputation = _clampRep((state.reputation ?? 50) + contract.reputationReward);
 
@@ -262,6 +274,8 @@ export function completeContract(state, contractId) {
       description: data.description,
       category: data.category,
       objectives: data.objectives,
+      bonusObjectives: data.bonusObjectives ?? [],
+      bonusReward: data.bonusReward ?? 0,
       reward: data.reward,
       penaltyFee: Math.round(data.reward * CONTRACT_CANCEL_PENALTY_RATE),
       reputationReward: CONTRACT_REP_GAIN_BASE + Math.floor(data.reward / 50_000),
@@ -275,6 +289,7 @@ export function completeContract(state, contractId) {
       chainId: data.chainId,
       chainPart: data.chainPart,
       chainTotal: data.chainTotal,
+      conflictTags: data.conflictTags ?? [],
     };
 
     state.contracts.board.push(nextChainContract);
@@ -284,6 +299,7 @@ export function completeContract(state, contractId) {
     success: true,
     contract,
     reward: contract.reward,
+    bonusAwarded,
     nextChainContract,
   };
 }
@@ -384,6 +400,14 @@ export function checkContractObjectives(state, flightState) {
     for (const obj of contract.objectives) {
       if (obj.completed) continue;
       _checkSingleObjective(obj, flightState);
+    }
+
+    // Also check bonus objectives.
+    if (Array.isArray(contract.bonusObjectives)) {
+      for (const obj of contract.bonusObjectives) {
+        if (obj.completed) continue;
+        _checkSingleObjective(obj, flightState);
+      }
     }
   }
 }
@@ -486,6 +510,43 @@ function _checkSingleObjective(obj, flightState) {
       }
       break;
 
+    case 'BUDGET_LIMIT':
+      if (typeof flightState.rocketCost === 'number' &&
+          flightState.rocketCost <= obj.target.maxCost) {
+        obj.completed = true;
+      }
+      break;
+
+    case 'MAX_PARTS':
+      if (typeof flightState.partCount === 'number' &&
+          flightState.partCount <= obj.target.maxParts) {
+        obj.completed = true;
+      }
+      break;
+
+    case 'RESTRICT_PART':
+      if (Array.isArray(flightState.partTypes) &&
+          !flightState.partTypes.includes(obj.target.forbiddenType)) {
+        obj.completed = true;
+      }
+      break;
+
+    case 'MULTI_SATELLITE': {
+      const releases = flightState.events.filter(
+        (e) => e.type === 'SATELLITE_RELEASED' &&
+               typeof e.altitude === 'number' && e.altitude >= obj.target.minAltitude,
+      );
+      if (releases.length >= obj.target.count) obj.completed = true;
+      break;
+    }
+
+    case 'MINIMUM_CREW':
+      if (typeof flightState.crewCount === 'number' &&
+          flightState.crewCount >= obj.target.minCrew) {
+        obj.completed = true;
+      }
+      break;
+
     default:
       break;
   }
@@ -530,6 +591,47 @@ export function processContractCompletions(state) {
   }
 
   return { completedContracts };
+}
+
+// ---------------------------------------------------------------------------
+// Conflict detection
+// ---------------------------------------------------------------------------
+
+/**
+ * Detect conflicting active contracts based on shared conflict tags.
+ *
+ * Returns an array of conflict descriptions. Each entry is an object with
+ * the two conflicting contract IDs and the shared tag.
+ *
+ * @param {import('./gameState.js').GameState} state
+ * @returns {Array<{ contractA: string, contractB: string, tag: string }>}
+ */
+export function getActiveConflicts(state) {
+  _ensureContracts(state);
+  const active = state.contracts.active;
+  const conflicts = [];
+
+  for (let i = 0; i < active.length; i++) {
+    const tagsA = active[i].conflictTags;
+    if (!Array.isArray(tagsA) || tagsA.length === 0) continue;
+
+    for (let j = i + 1; j < active.length; j++) {
+      const tagsB = active[j].conflictTags;
+      if (!Array.isArray(tagsB) || tagsB.length === 0) continue;
+
+      for (const tag of tagsA) {
+        if (tagsB.includes(tag)) {
+          conflicts.push({
+            contractA: active[i].id,
+            contractB: active[j].id,
+            tag,
+          });
+        }
+      }
+    }
+  }
+
+  return conflicts;
 }
 
 // ---------------------------------------------------------------------------

@@ -16,7 +16,8 @@
  */
 
 import { acceptMission, getUnlockedMissions } from '../core/missions.js';
-import { acceptContract, cancelContract, getContractCaps } from '../core/contracts.js';
+import { acceptContract, cancelContract, getContractCaps, getActiveConflicts } from '../core/contracts.js';
+import { CONTRACT_CATEGORY_ICONS } from '../core/constants.js';
 import { getPartById } from '../data/parts.js';
 import { refreshTopBarMissions } from './topbar.js';
 
@@ -361,6 +362,56 @@ const MISSION_CONTROL_STYLES = `
   height: 6px;
   border-radius: 3px;
   background: rgba(255,255,255,0.08);
+}
+
+/* ── Category icon ────────────────────────────────────────────────────── */
+.mc-category-icon {
+  margin-right: 5px;
+  font-size: 0.85rem;
+}
+
+/* ── Bonus objectives ─────────────────────────────────────────────────── */
+.mc-bonus-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #c0a040;
+  margin: 12px 0 8px;
+}
+
+.mc-objective-item.bonus .mc-objective-indicator.pending {
+  color: #a08030;
+}
+.mc-objective-item.bonus .mc-objective-text.pending {
+  color: #c0b070;
+}
+.mc-objective-item.bonus .mc-objective-indicator.completed {
+  color: #d0c060;
+}
+.mc-objective-item.bonus .mc-objective-text.completed {
+  color: #d0c060;
+  text-decoration: line-through;
+  text-decoration-color: rgba(208, 192, 96, 0.4);
+}
+
+.mc-bonus-reward {
+  font-size: 0.82rem;
+  color: #c0a040;
+  font-weight: 700;
+  margin: 4px 0 0;
+}
+
+/* ── Conflict warning ─────────────────────────────────────────────────── */
+.mc-conflict-warning {
+  font-size: 0.78rem;
+  color: #d08040;
+  background: rgba(200, 120, 40, 0.1);
+  border: 1px solid rgba(200, 120, 40, 0.25);
+  border-radius: 4px;
+  padding: 6px 10px;
+  margin: 8px 0 0;
+  line-height: 1.4;
 }
 `;
 
@@ -970,6 +1021,15 @@ function _categoryLabel(category) {
   return labels[category] ?? category;
 }
 
+/**
+ * Get the icon glyph for a contract category.
+ * @param {string} category
+ * @returns {string}
+ */
+function _categoryIcon(category) {
+  return CONTRACT_CATEGORY_ICONS[category] ?? '';
+}
+
 function _renderContractsBoardTab() {
   const content = _getContent();
   if (!content || !_state) return;
@@ -1029,10 +1089,11 @@ function _buildContractBoardCard(contract, canAcceptMore) {
   card.className = 'mc-mission-card';
   card.dataset.contractId = contract.id;
 
-  // Category badge
+  // Category badge with icon
   const catBadge = document.createElement('span');
   catBadge.className = 'mc-contract-category';
-  catBadge.textContent = _categoryLabel(contract.category);
+  const icon = _categoryIcon(contract.category);
+  catBadge.textContent = (icon ? icon + ' ' : '') + _categoryLabel(contract.category);
   card.appendChild(catBadge);
 
   // Chain indicator
@@ -1092,6 +1153,42 @@ function _buildContractBoardCard(contract, canAcceptMore) {
       objList.appendChild(item);
     }
     card.appendChild(objList);
+  }
+
+  // Bonus objectives preview
+  if (Array.isArray(contract.bonusObjectives) && contract.bonusObjectives.length > 0) {
+    const bonusLabel = document.createElement('p');
+    bonusLabel.className = 'mc-bonus-label';
+    bonusLabel.textContent = 'Bonus Targets (Optional)';
+    card.appendChild(bonusLabel);
+
+    const bonusList = document.createElement('ul');
+    bonusList.className = 'mc-objectives-list';
+
+    for (const obj of contract.bonusObjectives) {
+      const item = document.createElement('li');
+      item.className = 'mc-objective-item bonus';
+
+      const indicator = document.createElement('span');
+      indicator.className = 'mc-objective-indicator pending';
+      indicator.textContent = '\u2606'; // ☆
+      item.appendChild(indicator);
+
+      const textEl = document.createElement('span');
+      textEl.className = 'mc-objective-text pending';
+      textEl.textContent = obj.description;
+      item.appendChild(textEl);
+
+      bonusList.appendChild(item);
+    }
+    card.appendChild(bonusList);
+
+    if (contract.bonusReward) {
+      const bonusRewardEl = document.createElement('p');
+      bonusRewardEl.className = 'mc-bonus-reward';
+      bonusRewardEl.textContent = `Bonus reward: ${_fmtCash(contract.bonusReward)}`;
+      card.appendChild(bonusRewardEl);
+    }
   }
 
   // Meta info
@@ -1193,10 +1290,11 @@ function _buildActiveContractCard(contract) {
   card.className = 'mc-mission-card';
   card.dataset.contractId = contract.id;
 
-  // Category badge
+  // Category badge with icon
   const catBadge = document.createElement('span');
   catBadge.className = 'mc-contract-category';
-  catBadge.textContent = _categoryLabel(contract.category);
+  const activeIcon = _categoryIcon(contract.category);
+  catBadge.textContent = (activeIcon ? activeIcon + ' ' : '') + _categoryLabel(contract.category);
   card.appendChild(catBadge);
 
   // Chain indicator
@@ -1256,6 +1354,63 @@ function _buildActiveContractCard(contract) {
       objList.appendChild(item);
     }
     card.appendChild(objList);
+  }
+
+  // Bonus objectives (active contract — show progress)
+  if (Array.isArray(contract.bonusObjectives) && contract.bonusObjectives.length > 0) {
+    const bonusLabel = document.createElement('p');
+    bonusLabel.className = 'mc-bonus-label';
+    bonusLabel.textContent = 'Bonus Targets (Optional)';
+    card.appendChild(bonusLabel);
+
+    const bonusList = document.createElement('ul');
+    bonusList.className = 'mc-objectives-list';
+
+    for (const obj of contract.bonusObjectives) {
+      const item = document.createElement('li');
+      item.className = 'mc-objective-item bonus';
+
+      const indicator = document.createElement('span');
+      indicator.className = `mc-objective-indicator ${obj.completed ? 'completed' : 'pending'}`;
+      indicator.textContent = obj.completed ? '\u2605' : '\u2606'; // ★ or ☆
+      item.appendChild(indicator);
+
+      const textEl = document.createElement('span');
+      textEl.className = `mc-objective-text ${obj.completed ? 'completed' : 'pending'}`;
+      textEl.textContent = obj.description;
+      item.appendChild(textEl);
+
+      bonusList.appendChild(item);
+    }
+    card.appendChild(bonusList);
+
+    if (contract.bonusReward) {
+      const bonusRewardEl = document.createElement('p');
+      bonusRewardEl.className = 'mc-bonus-reward';
+      bonusRewardEl.textContent = `Bonus reward: ${_fmtCash(contract.bonusReward)}`;
+      card.appendChild(bonusRewardEl);
+    }
+  }
+
+  // Conflict warning
+  if (_state && Array.isArray(contract.conflictTags) && contract.conflictTags.length > 0) {
+    const conflicts = getActiveConflicts(_state);
+    const myConflicts = conflicts.filter(
+      (c) => c.contractA === contract.id || c.contractB === contract.id,
+    );
+    if (myConflicts.length > 0) {
+      const otherIds = myConflicts.map((c) =>
+        c.contractA === contract.id ? c.contractB : c.contractA,
+      );
+      const otherTitles = otherIds.map((id) => {
+        const other = _state.contracts.active.find((ac) => ac.id === id);
+        return other ? other.title : id;
+      });
+      const warning = document.createElement('div');
+      warning.className = 'mc-conflict-warning';
+      warning.textContent = `Conflicts with: ${otherTitles.join(', ')}`;
+      card.appendChild(warning);
+    }
   }
 
   // Meta info (deadline)

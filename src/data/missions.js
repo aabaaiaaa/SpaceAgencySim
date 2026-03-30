@@ -112,6 +112,41 @@ export const ObjectiveType = Object.freeze({
    * target: { orbitAltitude: number, orbitalVelocity: number }
    */
   REACH_ORBIT: 'REACH_ORBIT',
+
+  /**
+   * Constraint: rocket build cost must not exceed a budget.
+   * Checked against flightState.rocketCost each tick.
+   * target: { maxCost: number }  (dollars)
+   */
+  BUDGET_LIMIT: 'BUDGET_LIMIT',
+
+  /**
+   * Constraint: rocket must use no more than N total parts.
+   * Checked against flightState.partCount each tick.
+   * target: { maxParts: number }
+   */
+  MAX_PARTS: 'MAX_PARTS',
+
+  /**
+   * Constraint: rocket must not include a specific part type.
+   * Checked against flightState.partTypes each tick.
+   * target: { forbiddenType: string }  (PartType enum value)
+   */
+  RESTRICT_PART: 'RESTRICT_PART',
+
+  /**
+   * Deploy multiple satellites in a single flight above a minimum altitude.
+   * Counts 'SATELLITE_RELEASED' events at event.altitude >= minAltitude.
+   * target: { count: number, minAltitude: number }
+   */
+  MULTI_SATELLITE: 'MULTI_SATELLITE',
+
+  /**
+   * Constraint: flight must carry a minimum number of crew members.
+   * Checked against flightState.crewCount each tick.
+   * target: { minCrew: number }
+   */
+  MINIMUM_CREW: 'MINIMUM_CREW',
 });
 
 /**
