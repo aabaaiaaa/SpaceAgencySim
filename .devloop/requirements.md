@@ -66,7 +66,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Implement contract structure: objectives using existing ObjectiveType enum plus new types, rewards scaled to difficulty, optional over-performance bonus targets clearly marked. Categories with icons. Multi-part contracts creating chains. Landing not always required (orbital deployment contracts). Multiple simultaneous contracts that can conflict. Difficulty scaling based on constraints (cost limits, part restrictions, complexity) not just altitude. All new objective types must have automated tests. UI in Mission Control with category icons.
 
 ### TASK-010: Operating costs system
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-001
 - **Description**: Each period charges operating costs: crew salaries and facility upkeep. Activate existing crew salary field (~$5k/period per astronaut). Facility upkeep: $10k base, scaling with upgrades (Phase 5). Creates pressure to keep lean roster. Implement bankruptcy state for when player cannot afford to build any rocket.

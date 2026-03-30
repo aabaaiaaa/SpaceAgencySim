@@ -17,6 +17,7 @@
 
 import { AstronautStatus, CREW_SALARY_PER_PERIOD, FACILITY_UPKEEP_PER_PERIOD } from './constants.js';
 import { expireBoardContracts, expireActiveContracts } from './contracts.js';
+import { isBankrupt } from './finance.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -32,6 +33,7 @@ import { expireBoardContracts, expireActiveContracts } from './contracts.js';
  * @property {string[]} expiredMissionIds - IDs of missions that expired this period.
  * @property {string[]} expiredBoardContractIds - Board contract IDs that expired this period.
  * @property {string[]} expiredActiveContractIds - Active contract IDs that expired this period.
+ * @property {boolean} bankrupt        - True if the player is bankrupt after this period.
  */
 
 // ---------------------------------------------------------------------------
@@ -57,11 +59,14 @@ export function advancePeriod(state) {
   // ── 1. Increment the period counter ────────────────────────────────────
   state.currentPeriod = (state.currentPeriod ?? 0) + 1;
 
-  // ── 2. Crew salaries ──────────────────────────────────────────────────
+  // ── 2. Crew salaries (use per-astronaut salary, fallback to constant) ──
   const activeCrew = state.crew.filter(
     (c) => c.status === AstronautStatus.ACTIVE,
   );
-  const crewSalaryCost = activeCrew.length * CREW_SALARY_PER_PERIOD;
+  const crewSalaryCost = activeCrew.reduce(
+    (sum, c) => sum + (c.salary ?? CREW_SALARY_PER_PERIOD),
+    0,
+  );
 
   // ── 3. Facility upkeep — base cost per built facility ─────────────────
   const builtCount = state.facilities
@@ -100,6 +105,9 @@ export function advancePeriod(state) {
   const expiredBoardContractIds = expireBoardContracts(state);
   const expiredActiveContractIds = expireActiveContracts(state);
 
+  // ── 7. Bankruptcy check ───────────────────────────────────────────────
+  const bankrupt = isBankrupt(state);
+
   return {
     newPeriod: state.currentPeriod,
     crewSalaryCost,
@@ -109,5 +117,6 @@ export function advancePeriod(state) {
     expiredMissionIds,
     expiredBoardContractIds,
     expiredActiveContractIds,
+    bankrupt,
   };
 }

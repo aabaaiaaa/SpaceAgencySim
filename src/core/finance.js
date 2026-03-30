@@ -17,7 +17,9 @@
 import {
   DEATH_FINE_PER_ASTRONAUT,
   MAX_LOAN_BALANCE,
+  PartType,
 } from './constants.js';
+import { getPartById } from '../data/parts.js';
 
 // ---------------------------------------------------------------------------
 // Interest
@@ -136,4 +138,83 @@ export function earn(state, amount) {
  */
 export function applyDeathFine(state, killedCount) {
   state.money -= DEATH_FINE_PER_ASTRONAUT * killedCount;
+}
+
+// ---------------------------------------------------------------------------
+// Bankruptcy Detection
+// ---------------------------------------------------------------------------
+
+/**
+ * Calculate the cost of the cheapest possible rocket the player can build
+ * from their currently unlocked parts.
+ *
+ * A minimum viable rocket needs:
+ *   - One command module (COMMAND_MODULE) or computer module (COMPUTER_MODULE)
+ *   - One thrust source: an ENGINE + FUEL_TANK pair, or a SOLID_ROCKET_BOOSTER
+ *
+ * Returns `Infinity` if the player doesn't have the parts to build any rocket.
+ *
+ * @param {import('./gameState.js').GameState} state
+ * @returns {number}  Minimum cost in dollars, or Infinity if impossible.
+ */
+export function getMinimumRocketCost(state) {
+  const unlocked = state.parts ?? [];
+  if (unlocked.length === 0) return Infinity;
+
+  // Find cheapest command/computer module.
+  let cheapestCommand = Infinity;
+  for (const partId of unlocked) {
+    const def = getPartById(partId);
+    if (!def) continue;
+    if (def.type === PartType.COMMAND_MODULE || def.type === PartType.COMPUTER_MODULE) {
+      cheapestCommand = Math.min(cheapestCommand, def.cost);
+    }
+  }
+  if (cheapestCommand === Infinity) return Infinity;
+
+  // Find cheapest thrust option: SRB alone, or engine + fuel tank.
+  let cheapestSRB = Infinity;
+  let cheapestEngine = Infinity;
+  let cheapestTank = Infinity;
+
+  for (const partId of unlocked) {
+    const def = getPartById(partId);
+    if (!def) continue;
+    if (def.type === PartType.SOLID_ROCKET_BOOSTER) {
+      cheapestSRB = Math.min(cheapestSRB, def.cost);
+    }
+    if (def.type === PartType.ENGINE) {
+      cheapestEngine = Math.min(cheapestEngine, def.cost);
+    }
+    if (def.type === PartType.FUEL_TANK) {
+      cheapestTank = Math.min(cheapestTank, def.cost);
+    }
+  }
+
+  const srbCost = cheapestSRB;
+  const liquidCost = cheapestEngine + cheapestTank;
+  const cheapestThrust = Math.min(srbCost, liquidCost);
+
+  if (cheapestThrust === Infinity) return Infinity;
+
+  return cheapestCommand + cheapestThrust;
+}
+
+/**
+ * Check whether the player is bankrupt.
+ *
+ * Bankruptcy occurs when the player's available purchasing power (current
+ * cash + remaining borrowing capacity) is less than the cost of the
+ * cheapest buildable rocket.
+ *
+ * @param {import('./gameState.js').GameState} state
+ * @returns {boolean}  True if the player is bankrupt.
+ */
+export function isBankrupt(state) {
+  const minCost = getMinimumRocketCost(state);
+  if (minCost === Infinity) return false; // No parts = not bankruptcy, just early game.
+
+  const borrowable = Math.max(0, MAX_LOAN_BALANCE - (state.loan?.balance ?? 0));
+  const purchasingPower = state.money + borrowable;
+  return purchasingPower < minCost;
 }

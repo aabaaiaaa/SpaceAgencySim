@@ -55,6 +55,7 @@ import { processContractCompletions, generateContracts } from './contracts.js';
  * @property {string[]} expiredMissionIds - Mission IDs that expired this period.
  * @property {Array<{contract: import('./gameState.js').Contract, reward: number}>} completedContracts - Contracts completed this flight.
  * @property {import('./gameState.js').Contract[]} newContracts - Newly generated board contracts.
+ * @property {boolean}  bankrupt        - True if the player is bankrupt after this flight.
  */
 
 /**
@@ -205,6 +206,7 @@ export function processFlightReturn(state, flightState, ps, assembly) {
     expiredMissionIds: periodSummary.expiredMissionIds,
     completedContracts: contractResult.completedContracts,
     newContracts,
+    bankrupt: periodSummary.bankrupt,
   };
 }
 

@@ -12,7 +12,7 @@
  */
 
 import { spend, applyDeathFine } from './finance.js';
-import { AstronautStatus, HIRE_COST } from './constants.js';
+import { AstronautStatus, HIRE_COST, CREW_SALARY_PER_PERIOD } from './constants.js';
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -52,6 +52,7 @@ function generateUUID() {
  * @property {string}                        name             - Display name.
  * @property {string}                        hireDate         - ISO 8601 date hired.
  * @property {import('./constants.js').AstronautStatus} status - Career status.
+ * @property {number}                        salary           - Per-period salary (dollars).
  * @property {number}                        missionsFlown    - Number of completed missions.
  * @property {number}                        flightsFlown     - Number of flights taken.
  * @property {string|null}                   deathDate        - ISO 8601 date of death, or null.
@@ -70,12 +71,13 @@ function generateUUID() {
  * @param {{ name: string, hireDate?: string }} opts
  * @returns {Astronaut}
  */
-function createAstronaut({ name, hireDate = new Date().toISOString() }) {
+function createAstronaut({ name, salary = CREW_SALARY_PER_PERIOD, hireDate = new Date().toISOString() }) {
   return {
     id: generateUUID(),
     name,
     hireDate,
     status: AstronautStatus.ACTIVE,
+    salary,
     missionsFlown: 0,
     flightsFlown: 0,
     deathDate: null,

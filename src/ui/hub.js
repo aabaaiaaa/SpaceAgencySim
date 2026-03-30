@@ -22,6 +22,7 @@
 import { showHubScene, hideHubScene } from '../render/hub.js';
 import { FACILITY_DEFINITIONS } from '../core/constants.js';
 import { hasFacility, canBuildFacility, buildFacility } from '../core/construction.js';
+import { isBankrupt } from '../core/finance.js';
 
 // ---------------------------------------------------------------------------
 // CSS
@@ -207,6 +208,46 @@ const HUB_STYLES = `
 
 .rr-dismiss-btn:hover {
   background: #235a90;
+}
+
+/* ── Bankruptcy banner ───────────────────────────────────────────────────── */
+#bankruptcy-banner {
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 14px 28px;
+  background: rgba(120, 20, 20, 0.92);
+  border: 1px solid #ff4040;
+  border-radius: 8px;
+  color: #ffc0c0;
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-align: center;
+  pointer-events: auto;
+  z-index: 25;
+  max-width: 500px;
+  line-height: 1.4;
+  animation: bankruptcy-pulse 2s ease-in-out infinite;
+}
+
+#bankruptcy-banner .bankruptcy-title {
+  font-size: 1.05rem;
+  color: #ff6060;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+#bankruptcy-banner .bankruptcy-hint {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: #d09090;
+}
+
+@keyframes bankruptcy-pulse {
+  0%, 100% { border-color: #ff4040; }
+  50% { border-color: #ff8080; }
 }
 
 /* ── Construction button ─────────────────────────────────────────────────── */
@@ -548,6 +589,7 @@ export function initHubUI(container, state, onNavigate) {
 
   _renderBuildings(onNavigate);
   _renderConstructionButton(container);
+  _renderBankruptcyBanner();
 
   // Show the PixiJS background.
   showHubScene();
@@ -765,6 +807,31 @@ export function showReturnResultsOverlay(container, summary, onDismiss) {
 
   content.appendChild(finSection);
 
+  // ── Bankruptcy warning (if applicable) ────────────────────────────────────
+  if (summary.bankrupt) {
+    const bankruptSection = document.createElement('div');
+    bankruptSection.className = 'rr-section';
+    bankruptSection.style.background = 'rgba(120, 20, 20, 0.5)';
+    bankruptSection.style.border = '1px solid #ff4040';
+    bankruptSection.style.borderRadius = '6px';
+    bankruptSection.style.padding = '14px 16px';
+
+    const bankruptTitle = document.createElement('h2');
+    bankruptTitle.textContent = 'Agency Bankrupt';
+    bankruptTitle.style.color = '#ff6060';
+    bankruptTitle.style.borderBottom = 'none';
+    bankruptSection.appendChild(bankruptTitle);
+
+    const bankruptMsg = document.createElement('p');
+    bankruptMsg.style.fontSize = '0.88rem';
+    bankruptMsg.style.color = '#ffc0c0';
+    bankruptMsg.style.margin = '0';
+    bankruptMsg.textContent = 'You cannot afford to build even the cheapest rocket. Fire crew to reduce salaries, take out a loan, or accept cheaper contracts.';
+    bankruptSection.appendChild(bankruptMsg);
+
+    content.appendChild(bankruptSection);
+  }
+
   // ── Dismiss button ────────────────────────────────────────────────────────
   const dismissBtn = document.createElement('button');
   dismissBtn.id        = 'return-results-dismiss-btn';
@@ -809,6 +876,38 @@ function _rrRow(label, value, tone = 'neutral') {
   row.appendChild(labelEl);
   row.appendChild(valueEl);
   return row;
+}
+
+/**
+ * Show a bankruptcy warning banner if the player cannot afford any rocket.
+ */
+function _renderBankruptcyBanner() {
+  if (!_overlay || !_state) return;
+
+  // Remove any stale banner.
+  const existing = document.getElementById('bankruptcy-banner');
+  if (existing) existing.remove();
+
+  if (!isBankrupt(_state)) return;
+
+  const banner = document.createElement('div');
+  banner.id = 'bankruptcy-banner';
+
+  const title = document.createElement('div');
+  title.className = 'bankruptcy-title';
+  title.textContent = 'Agency Bankrupt';
+  banner.appendChild(title);
+
+  const msg = document.createElement('div');
+  msg.textContent = 'You cannot afford to build even the cheapest rocket.';
+  banner.appendChild(msg);
+
+  const hint = document.createElement('div');
+  hint.className = 'bankruptcy-hint';
+  hint.textContent = 'Fire crew to reduce salaries, take out a loan, or accept cheaper contracts.';
+  banner.appendChild(hint);
+
+  _overlay.appendChild(banner);
 }
 
 /**
