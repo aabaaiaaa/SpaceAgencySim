@@ -94,7 +94,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 ## Phase 2: "Layers of Discovery" — Altitude Biomes & Science
 
 ### TASK-014: Altitude biome system
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-001
 - **Description**: Define altitude bands as named biomes per celestial body with distinct visual identity and science properties. Earth biomes: Ground (0-100m, 0.5x), Low Atmosphere (100-2000m, 1.0x), Mid Atmosphere (2000-10000m, 1.2x), Upper Atmosphere (10000-40000m, 1.5x), Mesosphere (40000-70000m, 2.0x), Near Space (70000-100000m, 2.5x), Low Orbit (100000-200000m, 3.0x), High Orbit (200000m+, 4.0x). Labels fade in/out at boundaries. Background horizon curvature rendering (imperceptible at ground, visible by 40km+, clear in orbit). Orbital science interaction with biome changes in elliptical orbits.

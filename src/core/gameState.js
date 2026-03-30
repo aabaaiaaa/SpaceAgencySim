@@ -198,6 +198,8 @@ import {
  * @property {import('./flightPhase.js').PhaseTransition[]} phaseLog - Log of all phase transitions.
  * @property {boolean}       inOrbit        - True when craft is in a stable orbit.
  * @property {OrbitalElements|null} orbitalElements - Keplerian elements when in orbit, null otherwise.
+ * @property {string|null}   currentBiome   - ID of the current altitude biome (e.g. 'LOW_ATMOSPHERE').
+ * @property {string[]}      biomesVisited  - Unique biome IDs visited during this flight.
  */
 
 /**
@@ -481,6 +483,8 @@ export function createFlightState({
     phaseLog: [],
     inOrbit: false,
     orbitalElements: null,
+    currentBiome: null,
+    biomesVisited: [],
   };
 }
 

@@ -46,6 +46,7 @@
 
 import { getPartById, ActivationBehaviour } from '../data/parts.js';
 import { PartType }                          from './constants.js';
+import { getBiome, getBiomeId, getScienceMultiplier } from './biomes.js';
 
 // ---------------------------------------------------------------------------
 // Public constants
@@ -74,8 +75,11 @@ export const ScienceModuleState = Object.freeze({
  * State tracking for a single science module instance.
  *
  * @typedef {Object} ScienceModuleEntry
- * @property {string} state  One of the {@link ScienceModuleState} values.
- * @property {number} timer  Countdown in seconds; positive while `running`.
+ * @property {string}      state             One of the {@link ScienceModuleState} values.
+ * @property {number}      timer             Countdown in seconds; positive while `running`.
+ * @property {string|null} startBiome        Biome ID where the experiment was started.
+ * @property {string|null} completeBiome     Biome ID where the experiment completed.
+ * @property {number}      scienceMultiplier Biome science multiplier at completion.
  */
 
 // ---------------------------------------------------------------------------
@@ -108,6 +112,9 @@ export function initScienceModuleStates(ps, assembly) {
     ps.scienceModuleStates.set(instanceId, {
       state: ScienceModuleState.IDLE,
       timer: 0,
+      startBiome: null,
+      completeBiome: null,
+      scienceMultiplier: 1.0,
     });
   }
 }
@@ -149,17 +156,22 @@ export function activateScienceModule(ps, assembly, flightState, instanceId) {
   if (!def) return false;
 
   const altitude = Math.max(0, ps.posY);
+  const biome = getBiome(altitude, 'EARTH');
+  const biomeId = biome ? biome.id : null;
+  const biomeName = biome ? biome.name : 'Unknown';
 
   const duration = def.properties?.experimentDuration ?? 30;
   entry.state = ScienceModuleState.RUNNING;
   entry.timer = duration;
+  entry.startBiome = biomeId;
 
   flightState.events.push({
     type:        'PART_ACTIVATED',
     time:        flightState.timeElapsed,
     instanceId,
     partType:    def.type,
-    description: `${def.name} experiment started at ${altitude.toFixed(0)} m.`,
+    biome:       biomeId,
+    description: `${def.name} experiment started in ${biomeName} at ${altitude.toFixed(0)} m.`,
   });
 
   return true;
@@ -222,13 +234,22 @@ export function tickScienceModules(ps, assembly, flightState, dt) {
       const placed  = assembly.parts.get(instanceId);
       const def     = placed ? getPartById(placed.partId) : null;
       const altitude = Math.max(0, ps.posY);
+      const biome = getBiome(altitude, 'EARTH');
+      const biomeId = biome ? biome.id : null;
+      const biomeName = biome ? biome.name : 'Unknown';
+      const multiplier = getScienceMultiplier(altitude, 'EARTH');
+
+      entry.completeBiome = biomeId;
+      entry.scienceMultiplier = multiplier;
 
       flightState.events.push({
         type:        'SCIENCE_COLLECTED',
         time:        flightState.timeElapsed,
         instanceId,
         altitude,
-        description: `${def?.name ?? 'Science Module'} experiment complete — data ready for recovery at ${altitude.toFixed(0)} m.`,
+        biome:       biomeId,
+        scienceMultiplier: multiplier,
+        description: `${def?.name ?? 'Science Module'} experiment complete in ${biomeName} (${multiplier}×) — data ready for recovery at ${altitude.toFixed(0)} m.`,
       });
     }
   }

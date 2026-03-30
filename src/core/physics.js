@@ -76,6 +76,7 @@ import {
   tickScienceModules,
   onSafeLanding,
 } from './sciencemodule.js';
+import { getBiomeId } from './biomes.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -2060,6 +2061,27 @@ function _allCommandModulesGone(ps, assembly) {
 function _syncFlightState(ps, assembly, flightState) {
   flightState.altitude = Math.max(0, ps.posY);
   flightState.velocity = Math.hypot(ps.velX, ps.velY);
+
+  // Track current biome and record visited biomes.
+  const newBiome = getBiomeId(flightState.altitude, 'EARTH');
+  if (newBiome && newBiome !== flightState.currentBiome) {
+    const prevBiome = flightState.currentBiome;
+    flightState.currentBiome = newBiome;
+    if (!flightState.biomesVisited.includes(newBiome)) {
+      flightState.biomesVisited.push(newBiome);
+    }
+    // Emit a biome change event (useful for orbital science tracking).
+    if (prevBiome) {
+      flightState.events.push({
+        type:        'BIOME_CHANGE',
+        time:        flightState.timeElapsed,
+        fromBiome:   prevBiome,
+        toBiome:     newBiome,
+        altitude:    flightState.altitude,
+        description: `Entered ${newBiome.replace(/_/g, ' ').toLowerCase()} biome at ${flightState.altitude.toFixed(0)} m.`,
+      });
+    }
+  }
 
   // Total remaining fuel.
   let totalFuel = 0;

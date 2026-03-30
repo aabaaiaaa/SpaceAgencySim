@@ -31,8 +31,9 @@
 import * as PIXI from 'pixi.js';
 import { getApp }      from './index.js';
 import { getPartById } from '../data/parts.js';
-import { PartType, ControlMode } from '../core/constants.js';
+import { PartType, ControlMode, BODY_RADIUS } from '../core/constants.js';
 import { airDensity }  from '../core/atmosphere.js';
+import { getBiome, getBiomeTransition, BIOME_FADE_RANGE } from '../core/biomes.js';
 import { DEPLOY_DURATION } from '../core/parachute.js';
 import { LegState, LEG_DEPLOY_DURATION, getDeployedLegFootOffset } from '../core/legs.js';
 
@@ -183,6 +184,18 @@ let _rocketContainer = null;
 
 /** Container for independently-oriented parachute canopies (drawn in world space). */
 let _canopyContainer = null;
+
+/** Container for the biome label overlay (rendered above canopies). */
+let _biomeLabelContainer = null;
+
+/** Graphics layer for the curved horizon effect (rendered between stars and ground). */
+let _horizonGraphics = null;
+
+/** Currently displayed biome name (to detect changes for label animation). */
+let _currentBiomeName = null;
+
+/** Biome label opacity (0 → 1), animated on transitions. */
+let _biomeLabelAlpha = 0;
 
 // ---------------------------------------------------------------------------
 // Pre-generated star positions — normalised [0, 1] in screen space
@@ -893,6 +906,173 @@ function _renderGround(w, h) {
   const drawH = h - drawY;
   _groundGraphics.rect(0, drawY, w, drawH);
   _groundGraphics.fill({ color: GROUND_COLOR });
+}
+
+// ---------------------------------------------------------------------------
+// Biome label rendering
+// ---------------------------------------------------------------------------
+
+/** Rate at which the biome label fades in/out (per second). */
+const BIOME_LABEL_FADE_SPEED = 3.0;
+
+/**
+ * Render the current biome name as a centered label at the top of the screen.
+ * Fades in when entering a new biome and fades out when near a boundary.
+ *
+ * @param {number} altitude  Current altitude in metres.
+ * @param {number} w         Canvas width.
+ * @param {number} h         Canvas height.
+ * @param {number} dt        Delta time in seconds.
+ */
+function _renderBiomeLabel(altitude, w, h, dt) {
+  if (!_biomeLabelContainer) return;
+
+  // Clear previous frame's label.
+  while (_biomeLabelContainer.children.length) _biomeLabelContainer.removeChildAt(0);
+
+  const biome = getBiome(altitude, 'EARTH');
+  if (!biome) return;
+
+  const transition = getBiomeTransition(altitude, 'EARTH');
+
+  // Determine the display name and target alpha.
+  let displayName = biome.name;
+  let targetAlpha = 1.0;
+
+  if (transition) {
+    // Near a boundary — cross-fade based on ratio.
+    // When ratio < 0.5, we're mostly in the 'from' biome; > 0.5, mostly in 'to'.
+    if (transition.ratio < 0.5) {
+      displayName = transition.from.name;
+      // Fade out as we approach the boundary (ratio → 0.5).
+      targetAlpha = 1.0 - (transition.ratio / 0.5);
+    } else {
+      displayName = transition.to.name;
+      // Fade in as we move into the new biome (ratio → 1.0).
+      targetAlpha = (transition.ratio - 0.5) / 0.5;
+    }
+  }
+
+  // Detect biome name change and reset alpha for a smooth pop-in.
+  if (displayName !== _currentBiomeName) {
+    _currentBiomeName = displayName;
+    _biomeLabelAlpha = 0;
+  }
+
+  // Animate alpha toward target.
+  if (_biomeLabelAlpha < targetAlpha) {
+    _biomeLabelAlpha = Math.min(targetAlpha, _biomeLabelAlpha + BIOME_LABEL_FADE_SPEED * dt);
+  } else if (_biomeLabelAlpha > targetAlpha) {
+    _biomeLabelAlpha = Math.max(targetAlpha, _biomeLabelAlpha - BIOME_LABEL_FADE_SPEED * dt);
+  }
+
+  if (_biomeLabelAlpha <= 0.01) return;
+
+  // Draw the biome name and altitude-formatted science multiplier.
+  const multiplierText = `${biome.scienceMultiplier}× Science`;
+  const label = new PIXI.Text({
+    text: displayName,
+    style: new PIXI.TextStyle({
+      fill: '#a8e8c0',
+      fontSize: 16,
+      fontFamily: 'system-ui, sans-serif',
+      fontWeight: 'bold',
+      dropShadow: true,
+      dropShadowColor: '#000000',
+      dropShadowBlur: 4,
+      dropShadowDistance: 1,
+    }),
+  });
+  label.anchor.set(0.5, 0);
+  label.x = w / 2;
+  label.y = 70;
+  label.alpha = _biomeLabelAlpha * 0.85;
+
+  const subLabel = new PIXI.Text({
+    text: multiplierText,
+    style: new PIXI.TextStyle({
+      fill: '#70b880',
+      fontSize: 11,
+      fontFamily: 'system-ui, sans-serif',
+      dropShadow: true,
+      dropShadowColor: '#000000',
+      dropShadowBlur: 3,
+      dropShadowDistance: 1,
+    }),
+  });
+  subLabel.anchor.set(0.5, 0);
+  subLabel.x = w / 2;
+  subLabel.y = 90;
+  subLabel.alpha = _biomeLabelAlpha * 0.65;
+
+  _biomeLabelContainer.addChild(label);
+  _biomeLabelContainer.addChild(subLabel);
+}
+
+// ---------------------------------------------------------------------------
+// Horizon curvature rendering
+// ---------------------------------------------------------------------------
+
+/**
+ * Render a curved horizon effect.  At ground level the horizon is flat; by
+ * 40 km the curvature is perceptible; in orbit it is clearly curved.
+ *
+ * The effect is drawn as an arc where the radius is proportional to the body's
+ * actual radius, scaled down so that the curvature becomes visible at sensible
+ * altitudes for gameplay.
+ *
+ * @param {number} altitude  Camera altitude in metres.
+ * @param {number} w         Canvas width.
+ * @param {number} h         Canvas height.
+ */
+function _renderHorizon(altitude, w, h) {
+  if (!_horizonGraphics) return;
+  _horizonGraphics.clear();
+
+  // Ground screen Y for a flat world (used to position the curvature centre).
+  const groundScreenY = h / 2 + _camWorldY * _ppm();
+
+  // Only draw curvature when ground is potentially visible (within 2× canvas height).
+  if (groundScreenY < -h) return;
+
+  // Curvature factor: 0 at ground, ramps up through atmosphere, strong in orbit.
+  // We use a perceptual scaling: at 40 km the curvature starts being visible,
+  // at 100 km+ it is very clear.
+  const curvatureStart = 5_000;   // metres — curvature begins to appear
+  const curvatureFull  = 200_000; // metres — full curvature effect
+
+  if (altitude < curvatureStart) return; // No curvature effect at low altitude.
+
+  const t = Math.min(1, (altitude - curvatureStart) / (curvatureFull - curvatureStart));
+
+  // The apparent radius of the horizon arc on screen.
+  // At full curvature, the arc radius is ~2× canvas width (clearly curved).
+  // At minimum, it is ~50× canvas width (barely perceptible).
+  const minRadius = w * 50;
+  const maxRadius = w * 1.5;
+  const arcRadius = minRadius + (maxRadius - minRadius) * (t * t); // ease-in for smooth appearance
+
+  // Arc centre: directly below the camera, at (w/2, groundScreenY + arcRadius).
+  const cx = w / 2;
+  const cy = groundScreenY + arcRadius;
+
+  // Draw a filled arc for the ground with curvature.
+  // The arc spans wide enough to cover the full canvas width plus overshoot.
+  const halfAngle = Math.asin(Math.min(1, (w * 0.6) / arcRadius));
+
+  _horizonGraphics.moveTo(0, h);
+  _horizonGraphics.arc(cx, cy, arcRadius, -Math.PI / 2 - halfAngle, -Math.PI / 2 + halfAngle);
+  _horizonGraphics.lineTo(w, h);
+  _horizonGraphics.closePath();
+  _horizonGraphics.fill({ color: GROUND_COLOR });
+
+  // Atmospheric glow along the curved horizon edge — a thin gradient line.
+  if (altitude > 30_000) {
+    const glowAlpha = Math.min(0.5, t * 0.6);
+    const glowWidth = 2 + t * 3; // pixels
+    _horizonGraphics.arc(cx, cy, arcRadius - glowWidth, -Math.PI / 2 - halfAngle, -Math.PI / 2 + halfAngle);
+    _horizonGraphics.stroke({ width: glowWidth, color: 0x4488cc, alpha: glowAlpha });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1954,31 +2134,37 @@ export function initFlightRenderer() {
   // We deliberately do NOT call app.stage.removeChildren() because the hub and
   // VAB renderers keep persistent containers on the stage that must survive the
   // flight scene lifecycle.
-  if (_skyGraphics)     app.stage.removeChild(_skyGraphics);
-  if (_starsContainer)  app.stage.removeChild(_starsContainer);
-  if (_groundGraphics)  app.stage.removeChild(_groundGraphics);
-  if (_debrisContainer) app.stage.removeChild(_debrisContainer);
-  if (_trailContainer)  app.stage.removeChild(_trailContainer);
-  if (_rocketContainer) app.stage.removeChild(_rocketContainer);
-  if (_canopyContainer) app.stage.removeChild(_canopyContainer);
+  if (_skyGraphics)          app.stage.removeChild(_skyGraphics);
+  if (_starsContainer)       app.stage.removeChild(_starsContainer);
+  if (_horizonGraphics)      app.stage.removeChild(_horizonGraphics);
+  if (_groundGraphics)       app.stage.removeChild(_groundGraphics);
+  if (_debrisContainer)      app.stage.removeChild(_debrisContainer);
+  if (_trailContainer)       app.stage.removeChild(_trailContainer);
+  if (_rocketContainer)      app.stage.removeChild(_rocketContainer);
+  if (_canopyContainer)      app.stage.removeChild(_canopyContainer);
+  if (_biomeLabelContainer)  app.stage.removeChild(_biomeLabelContainer);
 
   // Layer order (bottom → top):
-  //   sky  →  stars  →  ground  →  debris  →  engine trails  →  active rocket  →  canopies
-  _skyGraphics     = new PIXI.Graphics();
-  _starsContainer  = new PIXI.Container();
-  _groundGraphics  = new PIXI.Graphics();
-  _debrisContainer = new PIXI.Container();
-  _trailContainer  = new PIXI.Container();
-  _rocketContainer = new PIXI.Container();
-  _canopyContainer = new PIXI.Container();
+  //   sky → stars → horizon → ground → debris → engine trails → active rocket → canopies → biome label
+  _skyGraphics          = new PIXI.Graphics();
+  _starsContainer       = new PIXI.Container();
+  _horizonGraphics      = new PIXI.Graphics();
+  _groundGraphics       = new PIXI.Graphics();
+  _debrisContainer      = new PIXI.Container();
+  _trailContainer       = new PIXI.Container();
+  _rocketContainer      = new PIXI.Container();
+  _canopyContainer      = new PIXI.Container();
+  _biomeLabelContainer  = new PIXI.Container();
 
   app.stage.addChild(_skyGraphics);
   app.stage.addChild(_starsContainer);
+  app.stage.addChild(_horizonGraphics);
   app.stage.addChild(_groundGraphics);
   app.stage.addChild(_debrisContainer);
   app.stage.addChild(_trailContainer);
   app.stage.addChild(_rocketContainer);
   app.stage.addChild(_canopyContainer);
+  app.stage.addChild(_biomeLabelContainer);
 
   // Pre-generate the deterministic star field.
   _generateStars();
@@ -1997,6 +2183,10 @@ export function initFlightRenderer() {
   _prevTargetY = null;
   _camOffsetX  = 0;
   _camOffsetY  = 0;
+
+  // Reset biome label state.
+  _currentBiomeName = null;
+  _biomeLabelAlpha  = 0;
 
   // Reset zoom and initialise mouse tracking.
   _zoomLevel = 1.0;
@@ -2036,8 +2226,15 @@ export function renderFlightFrame(ps, assembly) {
   // 3. Stars — visible above 50 km, fully opaque above 70 km.
   _renderStars(altitude, w, h);
 
-  // 4. Ground band — sandy-tan terrain below world Y = 0.
-  _renderGround(w, h);
+  // 4a. Horizon curvature — curved ground for high-altitude visual.
+  _renderHorizon(altitude, w, h);
+
+  // 4b. Ground band — sandy-tan terrain below world Y = 0.
+  //     At high altitudes the curved horizon replaces the flat ground band,
+  //     so we only draw the flat ground when the curvature is not active.
+  if (altitude < 5_000) {
+    _renderGround(w, h);
+  }
 
   // 5. Debris fragments — dimmed, camera does not follow (unless they have
   //    the command module, which is handled by _updateCamera above).
@@ -2063,6 +2260,9 @@ export function renderFlightFrame(ps, assembly) {
 
   // 8. Mach effects — vapor cone and compression waves at transonic/supersonic.
   _renderMachEffects(ps, assembly, trailDensity, w, h, dt);
+
+  // 9. Biome label — shows current altitude biome with fade transitions.
+  _renderBiomeLabel(altitude, w, h, dt);
 }
 
 /**
@@ -2078,27 +2278,33 @@ export function destroyFlightRenderer() {
   // Remove only the flight-specific containers.  Using removeChildren() would
   // also strip the persistent hub/VAB containers from the stage, causing them
   // to become invisible after returning from a flight.
-  if (_skyGraphics)     app.stage.removeChild(_skyGraphics);
-  if (_starsContainer)  app.stage.removeChild(_starsContainer);
-  if (_groundGraphics)  app.stage.removeChild(_groundGraphics);
-  if (_debrisContainer) app.stage.removeChild(_debrisContainer);
-  if (_trailContainer)  app.stage.removeChild(_trailContainer);
-  if (_rocketContainer) app.stage.removeChild(_rocketContainer);
-  if (_canopyContainer) app.stage.removeChild(_canopyContainer);
+  if (_skyGraphics)          app.stage.removeChild(_skyGraphics);
+  if (_starsContainer)       app.stage.removeChild(_starsContainer);
+  if (_horizonGraphics)      app.stage.removeChild(_horizonGraphics);
+  if (_groundGraphics)       app.stage.removeChild(_groundGraphics);
+  if (_debrisContainer)      app.stage.removeChild(_debrisContainer);
+  if (_trailContainer)       app.stage.removeChild(_trailContainer);
+  if (_rocketContainer)      app.stage.removeChild(_rocketContainer);
+  if (_canopyContainer)      app.stage.removeChild(_canopyContainer);
+  if (_biomeLabelContainer)  app.stage.removeChild(_biomeLabelContainer);
 
-  _skyGraphics     = null;
-  _starsContainer  = null;
-  _groundGraphics  = null;
-  _debrisContainer = null;
-  _trailContainer  = null;
-  _rocketContainer = null;
-  _canopyContainer = null;
-  _stars           = [];
-  _trailSegments   = [];
-  _lastTrailTime   = null;
-  _plumeStates     = new Map();
-  _machGraphics    = null;
-  _machPhase       = 0;
+  _skyGraphics          = null;
+  _starsContainer       = null;
+  _horizonGraphics      = null;
+  _groundGraphics       = null;
+  _debrisContainer      = null;
+  _trailContainer       = null;
+  _rocketContainer      = null;
+  _canopyContainer      = null;
+  _biomeLabelContainer  = null;
+  _stars                = [];
+  _trailSegments        = [];
+  _lastTrailTime        = null;
+  _plumeStates          = new Map();
+  _machGraphics         = null;
+  _machPhase            = 0;
+  _currentBiomeName     = null;
+  _biomeLabelAlpha      = 0;
 
   _camWorldX   = 0;
   _camWorldY   = 0;
@@ -2129,26 +2335,30 @@ export function destroyFlightRenderer() {
  * doesn't consume GPU time while the map covers the screen.
  */
 export function hideFlightScene() {
-  if (_skyGraphics)     _skyGraphics.visible = false;
-  if (_starsContainer)  _starsContainer.visible = false;
-  if (_groundGraphics)  _groundGraphics.visible = false;
-  if (_debrisContainer) _debrisContainer.visible = false;
-  if (_trailContainer)  _trailContainer.visible = false;
-  if (_rocketContainer) _rocketContainer.visible = false;
-  if (_canopyContainer) _canopyContainer.visible = false;
+  if (_skyGraphics)          _skyGraphics.visible = false;
+  if (_starsContainer)       _starsContainer.visible = false;
+  if (_horizonGraphics)      _horizonGraphics.visible = false;
+  if (_groundGraphics)       _groundGraphics.visible = false;
+  if (_debrisContainer)      _debrisContainer.visible = false;
+  if (_trailContainer)       _trailContainer.visible = false;
+  if (_rocketContainer)      _rocketContainer.visible = false;
+  if (_canopyContainer)      _canopyContainer.visible = false;
+  if (_biomeLabelContainer)  _biomeLabelContainer.visible = false;
 }
 
 /**
  * Show all flight-scene containers (used when returning from the map view).
  */
 export function showFlightScene() {
-  if (_skyGraphics)     _skyGraphics.visible = true;
-  if (_starsContainer)  _starsContainer.visible = true;
-  if (_groundGraphics)  _groundGraphics.visible = true;
-  if (_debrisContainer) _debrisContainer.visible = true;
-  if (_trailContainer)  _trailContainer.visible = true;
-  if (_rocketContainer) _rocketContainer.visible = true;
-  if (_canopyContainer) _canopyContainer.visible = true;
+  if (_skyGraphics)          _skyGraphics.visible = true;
+  if (_starsContainer)       _starsContainer.visible = true;
+  if (_horizonGraphics)      _horizonGraphics.visible = true;
+  if (_groundGraphics)       _groundGraphics.visible = true;
+  if (_debrisContainer)      _debrisContainer.visible = true;
+  if (_trailContainer)       _trailContainer.visible = true;
+  if (_rocketContainer)      _rocketContainer.visible = true;
+  if (_canopyContainer)      _canopyContainer.visible = true;
+  if (_biomeLabelContainer)  _biomeLabelContainer.visible = true;
 }
 
 /**

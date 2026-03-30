@@ -455,6 +455,40 @@ export const ALTITUDE_BANDS = Object.freeze({
   ]),
 });
 
+// ---------------------------------------------------------------------------
+// Altitude Biomes
+// ---------------------------------------------------------------------------
+
+/**
+ * Named altitude biomes per celestial body.  Each biome defines:
+ *   - id:              Machine-readable identifier.
+ *   - name:            Human-readable display name.
+ *   - min / max:       Altitude range in metres (surface-relative).
+ *   - scienceMultiplier: Multiplier applied to science experiment value when
+ *                        collected in this biome.
+ *   - color:           Tint hint used by the flight renderer for label colouring.
+ *
+ * Biome boundaries are used for label fade-in/out and for the orbital science
+ * system (elliptical orbits sweeping through multiple biomes).
+ *
+ * @type {Readonly<Record<string, ReadonlyArray<Readonly<{
+ *   id: string, name: string, min: number, max: number,
+ *   scienceMultiplier: number, color: number
+ * }>>>>}
+ */
+export const BIOME_DEFINITIONS = Object.freeze({
+  EARTH: Object.freeze([
+    Object.freeze({ id: 'GROUND',           name: 'Ground',           min: 0,       max: 100,       scienceMultiplier: 0.5, color: 0xc4a882 }),
+    Object.freeze({ id: 'LOW_ATMOSPHERE',    name: 'Low Atmosphere',   min: 100,     max: 2_000,     scienceMultiplier: 1.0, color: 0x87ceeb }),
+    Object.freeze({ id: 'MID_ATMOSPHERE',    name: 'Mid Atmosphere',   min: 2_000,   max: 10_000,    scienceMultiplier: 1.2, color: 0x6aadce }),
+    Object.freeze({ id: 'UPPER_ATMOSPHERE',  name: 'Upper Atmosphere', min: 10_000,  max: 40_000,    scienceMultiplier: 1.5, color: 0x3a6a9e }),
+    Object.freeze({ id: 'MESOSPHERE',        name: 'Mesosphere',       min: 40_000,  max: 70_000,    scienceMultiplier: 2.0, color: 0x1a1a4e }),
+    Object.freeze({ id: 'NEAR_SPACE',        name: 'Near Space',       min: 70_000,  max: 100_000,   scienceMultiplier: 2.5, color: 0x0a0a2e }),
+    Object.freeze({ id: 'LOW_ORBIT',         name: 'Low Orbit',        min: 100_000, max: 200_000,   scienceMultiplier: 3.0, color: 0x050520 }),
+    Object.freeze({ id: 'HIGH_ORBIT',        name: 'High Orbit',       min: 200_000, max: Infinity,  scienceMultiplier: 4.0, color: 0x000010 }),
+  ]),
+});
+
 /** Number of angular segments dividing each orbit plane. */
 export const ORBIT_SEGMENTS = 36;
 

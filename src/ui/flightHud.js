@@ -41,6 +41,7 @@ import { PartType, ControlMode } from '../core/constants.js';
 import { getControlModeLabel, checkBandLimitWarning } from '../core/controlMode.js';
 import { ObjectiveType } from '../data/missions.js';
 import { countDeployedLegs } from '../core/legs.js';
+import { getBiome } from '../core/biomes.js';
 
 // ---------------------------------------------------------------------------
 // Physics constant
@@ -741,6 +742,7 @@ let _elTargetTwrVal  = null;   // Target TWR value text
 // Control mode indicator elements:
 let _elControlMode   = null;   // control mode badge (shows ORBIT / DOCKING / RCS)
 let _elBandWarning   = null;   // altitude band limit warning text
+let _elBiome         = null;   // biome name in status section
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -861,6 +863,7 @@ export function destroyFlightHud() {
   _elFuelList      = null;
   _elControlMode   = null;
   _elBandWarning   = null;
+  _elBiome         = null;
   _elObjList       = null;
   _elLaunchTip     = null;
   _launchTipHidden = false;
@@ -983,6 +986,20 @@ function _buildLeftPanel() {
   apoRow.appendChild(apoLbl);
   apoRow.appendChild(_elApo);
   statusSec.appendChild(apoRow);
+
+  const biomeRow = document.createElement('div');
+  biomeRow.className = 'flight-lp-twr-row';
+  const biomeLbl = document.createElement('div');
+  biomeLbl.className = 'flight-lp-lbl';
+  biomeLbl.textContent = 'Biome';
+  _elBiome = document.createElement('div');
+  _elBiome.id = 'hud-biome';
+  _elBiome.className = 'flight-lp-val';
+  _elBiome.style.fontSize = '9px';
+  _elBiome.textContent = 'Ground';
+  biomeRow.appendChild(biomeLbl);
+  biomeRow.appendChild(_elBiome);
+  statusSec.appendChild(biomeRow);
 
   panel.appendChild(statusSec);
 
@@ -1509,6 +1526,11 @@ function _updateLeftPanel() {
     } else {
       _elApo.textContent = '—';
     }
+  }
+  if (_elBiome) {
+    const alt = Math.max(0, _ps.posY ?? 0);
+    const biome = getBiome(alt, 'EARTH');
+    _elBiome.textContent = biome ? biome.name : '—';
   }
 
   // ── Throttle ──────────────────────────────────────────────────────────────
