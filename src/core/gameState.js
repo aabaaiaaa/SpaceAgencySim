@@ -14,6 +14,7 @@
 import {
   CrewStatus,
   FlightOutcome,
+  FlightPhase,
   MissionState,
   STARTING_MONEY,
   STARTING_LOAN_BALANCE,
@@ -161,6 +162,8 @@ import {
  * @property {number}        deltaVRemaining - Remaining Δv budget (m/s).
  * @property {FlightEvent[]} events         - Log of events so far.
  * @property {boolean}       aborted        - Whether abort has been triggered.
+ * @property {string}        phase          - Current flight phase (FlightPhase enum value).
+ * @property {import('./flightPhase.js').PhaseTransition[]} phaseLog - Log of all phase transitions.
  * @property {boolean}       inOrbit        - True when craft is in a stable orbit.
  * @property {OrbitalElements|null} orbitalElements - Keplerian elements when in orbit, null otherwise.
  */
@@ -414,6 +417,8 @@ export function createFlightState({
     deltaVRemaining,
     events: [],
     aborted: false,
+    phase: FlightPhase.PRELAUNCH,
+    phaseLog: [],
     inOrbit: false,
     orbitalElements: null,
   };

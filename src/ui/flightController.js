@@ -32,6 +32,9 @@ import { getPartById } from '../data/parts.js';
 import { PartType, DEATH_FINE_PER_ASTRONAUT } from '../core/constants.js';
 import { processFlightReturn } from '../core/flightReturn.js';
 import { setTopBarFlightItems, clearTopBarFlightItems, setTopBarDropdownToggleCallback, refreshTopBar } from './topbar.js';
+import { FlightPhase } from '../core/constants.js';
+import { evaluateAutoTransitions, canReturnToAgency, isPlayerLocked, getPhaseLabel, transitionPhase } from '../core/flightPhase.js';
+import { checkOrbitStatus } from '../core/orbit.js';
 
 // ---------------------------------------------------------------------------
 // Module state
@@ -543,6 +546,31 @@ const FLIGHT_CTRL_CSS = `
 .fl-close-btn:hover {
   background: #235a90;
 }
+
+/* ── Phase notification banner ─────────────────────────────────────────── */
+.phase-notification {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 32px;
+  background: rgba(10, 60, 120, 0.85);
+  border: 1px solid rgba(100, 180, 255, 0.5);
+  border-radius: 6px;
+  color: #e0f0ff;
+  font-family: system-ui, sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  z-index: 500;
+  opacity: 1;
+  transition: opacity 1s ease-out;
+}
+
+.phase-notification-fade {
+  opacity: 0;
+}
 `;
 
 // ---------------------------------------------------------------------------
@@ -804,6 +832,9 @@ function _loop(timestamp) {
   // Advance physics simulation with the current warp multiplier.
   tick(_ps, _assembly, _stagingConfig, _flightState, realDt, _timeWarp);
 
+  // --- Flight phase state machine: auto-detect transitions each frame ---
+  _evaluateFlightPhase();
+
   // Check mission objective completion against live flight state.
   checkObjectiveCompletion(_state, _flightState);
 
@@ -926,6 +957,78 @@ function _onTimeWarpButtonClick(level) {
   // Prevent warp changes during the staging lockout window.
   if (_stagingLockoutUntil > 0 && performance.now() < _stagingLockoutUntil) return;
   _applyTimeWarp(level);
+}
+
+// ---------------------------------------------------------------------------
+// Private — flight phase evaluation
+// ---------------------------------------------------------------------------
+
+/**
+ * Run flight-phase auto-detection once per frame.  Checks orbit status when
+ * the craft is above the atmosphere and passes the result to the state machine.
+ * Shows a notification label on phase transitions.
+ */
+function _evaluateFlightPhase() {
+  if (!_ps || !_flightState) return;
+
+  // Only compute orbit status when above the atmosphere (posY >= 70 km).
+  let orbitStatus = null;
+  if (_ps.posY >= 70_000 && !_ps.landed && !_ps.crashed) {
+    orbitStatus = checkOrbitStatus(_ps.posX, _ps.posY, _ps.velX, _ps.velY, 'EARTH');
+  }
+
+  // Also detect REENTRY: if we're in ORBIT and periapsis drops below atmosphere,
+  // the player has initiated a de-orbit burn.
+  if (_flightState.phase === FlightPhase.ORBIT && orbitStatus && !orbitStatus.valid) {
+    // Orbit is no longer valid (periapsis below 70 km) — transition to REENTRY.
+    const result = transitionPhase(_flightState, FlightPhase.REENTRY, 'De-orbit — periapsis below atmosphere');
+    if (result.success) {
+      _flightState.inOrbit = false;
+      _flightState.orbitalElements = null;
+      _showPhaseNotification('Re-Entry');
+      _applyTimeWarp(1); // Force warp to 1× on reentry.
+      return;
+    }
+  }
+
+  const transition = evaluateAutoTransitions(_flightState, _ps, orbitStatus);
+
+  if (transition) {
+    _showPhaseNotification(getPhaseLabel(transition.to));
+
+    // Update orbital state on the FlightState when entering/leaving orbit.
+    if (transition.to === FlightPhase.ORBIT && orbitStatus) {
+      _flightState.inOrbit = true;
+      _flightState.orbitalElements = orbitStatus.elements;
+    }
+  }
+}
+
+/**
+ * Show a brief notification label at the top of the screen when the flight
+ * phase changes (e.g. "Orbit", "Re-Entry").  The label fades out after 3 s.
+ *
+ * @param {string} label  Text to display.
+ */
+function _showPhaseNotification(label) {
+  const host = document.getElementById('ui-overlay') ?? document.body;
+
+  // Remove any existing notification.
+  const existing = host.querySelector('.phase-notification');
+  if (existing) existing.remove();
+
+  const el = document.createElement('div');
+  el.className = 'phase-notification';
+  el.textContent = label;
+  host.appendChild(el);
+
+  // Fade out after 3 seconds.
+  setTimeout(() => {
+    el.classList.add('phase-notification-fade');
+  }, 2500);
+  setTimeout(() => {
+    el.remove();
+  }, 3500);
 }
 
 // ---------------------------------------------------------------------------
@@ -1269,6 +1372,8 @@ function _eventDotColor(type) {
     case 'SCIENCE_COLLECTED':
     case 'SCIENCE_DATA_RETURNED':
       return '#f0d040';
+    case 'PHASE_CHANGE':
+      return '#80c0ff';
     default:
       return '#8090a0';
   }
@@ -1367,10 +1472,89 @@ function _handleMenuFlightLog() {
 /**
  * Menu action: process end-of-flight results (mission completion, part
  * recovery, etc.) and return to the Space Agency hub.
+ *
+ * Phase-aware behaviour:
+ *   - TRANSFER / CAPTURE: blocked entirely (player is locked).
+ *   - ORBIT: allowed with a brief confirmation warning.
+ *   - FLIGHT / LAUNCH / PRELAUNCH: abort warning (parts at risk).
+ *   - Landed / Crashed: go straight to summary.
  */
 function _handleMenuReturnToAgency() {
-  // If the rocket is still in flight (not landed, not crashed), warn the player
-  // that returning now forfeits all parts with no recovery.
+  const phase = _flightState ? _flightState.phase : null;
+
+  // --- Block return during TRANSFER / CAPTURE (player locked) ---
+  if (_ps && phase && isPlayerLocked(phase)) {
+    // Show a brief locked notification — no modal needed.
+    _showPhaseNotification('Cannot leave during ' + getPhaseLabel(phase));
+    return;
+  }
+
+  // --- ORBIT: direct return with a brief warning ---
+  if (_ps && phase === FlightPhase.ORBIT && !_ps.landed && !_ps.crashed) {
+    _preMenuTimeWarp = _timeWarp;
+    _timeWarp = 0;
+
+    const host = document.getElementById('ui-overlay') ?? document.body;
+    const backdrop = document.createElement('div');
+    backdrop.id = 'abort-flight-backdrop';
+    backdrop.className = 'topbar-modal-backdrop';
+
+    const modal = document.createElement('div');
+    modal.className = 'topbar-modal';
+    modal.setAttribute('role', 'alertdialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', 'Return from Orbit');
+    modal.addEventListener('click', (e) => e.stopPropagation());
+
+    const titleRow = document.createElement('div');
+    titleRow.className = 'topbar-modal-title-row';
+    const h2 = document.createElement('h2');
+    h2.className = 'topbar-modal-title';
+    h2.textContent = 'Return from Orbit?';
+    titleRow.appendChild(h2);
+    modal.appendChild(titleRow);
+
+    const msg = document.createElement('p');
+    msg.className = 'confirm-msg';
+    msg.textContent =
+      'Your craft is in a stable orbit. Returning to the agency will complete this flight period. The craft will remain in orbit.';
+    modal.appendChild(msg);
+
+    const btnRow = document.createElement('div');
+    btnRow.className = 'confirm-btn-row';
+
+    const continueBtn = document.createElement('button');
+    continueBtn.className = 'confirm-btn confirm-btn-cancel';
+    continueBtn.textContent = 'Stay in Orbit';
+    continueBtn.dataset.testid = 'abort-continue-btn';
+    continueBtn.addEventListener('click', () => {
+      _timeWarp = _preMenuTimeWarp ?? 1;
+      backdrop.remove();
+    });
+
+    const returnBtn = document.createElement('button');
+    returnBtn.className = 'confirm-btn confirm-btn-primary';
+    returnBtn.textContent = 'Return to Agency';
+    returnBtn.dataset.testid = 'orbit-return-btn';
+    returnBtn.addEventListener('click', () => {
+      backdrop.remove();
+      _handleReturnToAgency();
+    });
+
+    btnRow.appendChild(continueBtn);
+    btnRow.appendChild(returnBtn);
+    modal.appendChild(btnRow);
+
+    backdrop.addEventListener('click', () => {
+      _timeWarp = _preMenuTimeWarp ?? 1;
+      backdrop.remove();
+    });
+    backdrop.appendChild(modal);
+    host.appendChild(backdrop);
+    return;
+  }
+
+  // --- Mid-flight abort: warn about lost parts ---
   if (_ps && !_ps.landed && !_ps.crashed) {
     // Pause physics while the abort confirmation modal is showing.
     _preMenuTimeWarp = _timeWarp;

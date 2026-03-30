@@ -108,6 +108,43 @@ export const CrewStatus = Object.freeze({
 });
 
 // ---------------------------------------------------------------------------
+// Flight Phases
+// ---------------------------------------------------------------------------
+
+/**
+ * Distinct phases of a flight.  The state machine enforces valid transitions:
+ *
+ *   PRELAUNCH → LAUNCH → FLIGHT → ORBIT
+ *   ORBIT → MANOEUVRE → ORBIT
+ *   ORBIT → REENTRY → FLIGHT (landing)
+ *   ORBIT → TRANSFER → CAPTURE → ORBIT (at destination)
+ *   ORBIT → (return to agency — completes a period)
+ *   FLIGHT → (land / crash)
+ *
+ * Docking mode is a *control mode* within ORBIT, not a phase (see TASK-005).
+ *
+ * @enum {string}
+ */
+export const FlightPhase = Object.freeze({
+  /** On the pad, engines not yet ignited. */
+  PRELAUNCH: 'PRELAUNCH',
+  /** Engines ignited; ascending through lower atmosphere. */
+  LAUNCH: 'LAUNCH',
+  /** Powered or unpowered atmospheric / sub-orbital flight. */
+  FLIGHT: 'FLIGHT',
+  /** Stable orbit achieved; can time-warp, return to agency, or plan manoeuvres. */
+  ORBIT: 'ORBIT',
+  /** Executing an orbital manoeuvre (burn); returns to ORBIT when complete. */
+  MANOEUVRE: 'MANOEUVRE',
+  /** De-orbiting; descending back into the atmosphere toward landing. */
+  REENTRY: 'REENTRY',
+  /** In-transit between celestial bodies (player cannot leave craft). */
+  TRANSFER: 'TRANSFER',
+  /** Arriving at destination body; transitioning to stable orbit. */
+  CAPTURE: 'CAPTURE',
+});
+
+// ---------------------------------------------------------------------------
 // Flight Outcomes
 // ---------------------------------------------------------------------------
 

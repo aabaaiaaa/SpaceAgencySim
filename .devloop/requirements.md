@@ -20,7 +20,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Replace full Newtonian orbital mechanics with simplified orbit slots. Altitude bands are fixed ranges per celestial body (e.g., LEO 80-200km, MEO 200-2,000km for Earth). Angular position divided into 36 segments. Objects follow simplified Newtonian orbits and move along orbital paths in real-time (warpable). Non-circular (elliptical) orbits cause objects to move between altitude bands — at apoapsis they are in a higher band, at periapsis a lower band. This is important for gameplay: a craft in an elliptical orbit passes through multiple biomes, enabling multiple science results per orbit. Proximity detection: object is "in the player's slot" when angular distance < 5 degrees AND within the same altitude band. Implement "warp to target" that simulates forward until a target meets proximity conditions or determines impossibility.
 
 ### TASK-003: Implement flight phase state machine
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-002
 - **Description**: Implement distinct flight phases: LAUNCH → FLIGHT → ORBIT → MANOEUVRE / REENTRY / TRANSFER → CAPTURE → FLIGHT (landing). Seamless transition from FLIGHT to ORBIT with notification label. Player cannot leave craft mid-transfer. Brief warning on ORBIT to FLIGHT transition. From ORBIT, player can return to agency (completing a period). Note: docking mode is a control mode within ORBIT (see TASK-005), not a flight phase. Ensure all phase transitions are clean and well-defined.
