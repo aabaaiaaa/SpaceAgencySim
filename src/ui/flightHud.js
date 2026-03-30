@@ -37,7 +37,8 @@
  */
 
 import { getPartById } from '../data/parts.js';
-import { PartType } from '../core/constants.js';
+import { PartType, ControlMode } from '../core/constants.js';
+import { getControlModeLabel, checkBandLimitWarning } from '../core/controlMode.js';
 import { ObjectiveType } from '../data/missions.js';
 import { countDeployedLegs } from '../core/legs.js';
 
@@ -621,6 +622,62 @@ const FLIGHT_HUD_STYLES = `
   );
   border-top: 1px solid #806020;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Control mode indicator
+   ═══════════════════════════════════════════════════════════════════════════ */
+#hud-control-mode {
+  position: absolute;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px 16px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  pointer-events: none;
+  z-index: 110;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+#hud-control-mode[data-mode="NORMAL"] {
+  background: rgba(20, 60, 40, 0.7);
+  border: 1px solid rgba(80, 180, 120, 0.4);
+  color: #80d8a0;
+}
+
+#hud-control-mode[data-mode="DOCKING"] {
+  background: rgba(60, 50, 10, 0.8);
+  border: 1px solid rgba(220, 180, 60, 0.6);
+  color: #ffe080;
+}
+
+#hud-control-mode[data-mode="RCS"] {
+  background: rgba(40, 20, 60, 0.8);
+  border: 1px solid rgba(180, 100, 220, 0.6);
+  color: #d0a0ff;
+}
+
+#hud-band-warning {
+  position: absolute;
+  top: 86px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 14px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(120, 40, 20, 0.85);
+  border: 1px solid rgba(255, 100, 60, 0.6);
+  color: #ff9070;
+  pointer-events: none;
+  z-index: 110;
+  white-space: nowrap;
+}
+
+#hud-band-warning.hidden { display: none; }
 `;
 
 // ---------------------------------------------------------------------------
@@ -681,6 +738,10 @@ let _elTwrBarValue   = null;   // TWR bar centered value text
 let _elTargetTwrRow  = null;   // "Target" info row (visible only in TWR mode)
 let _elTargetTwrVal  = null;   // Target TWR value text
 
+// Control mode indicator elements:
+let _elControlMode   = null;   // control mode badge (shows ORBIT / DOCKING / RCS)
+let _elBandWarning   = null;   // altitude band limit warning text
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -729,6 +790,7 @@ export function initFlightHud(container, ps, assembly, stagingConfig, flightStat
   _buildObjectivesPanel();
   _buildTimeWarpPanel();
   _buildAltTape();
+  _buildControlModeIndicator();
 
   // X → throttle 0 %, Z → throttle 100 %.
   // W/S/ArrowUp/ArrowDown are handled by physics.js handleKeyDown when the
@@ -797,6 +859,8 @@ export function destroyFlightHud() {
   _elApo           = null;
   _elStagingList   = null;
   _elFuelList      = null;
+  _elControlMode   = null;
+  _elBandWarning   = null;
   _elObjList       = null;
   _elLaunchTip     = null;
   _launchTipHidden = false;
@@ -1291,6 +1355,60 @@ function _updateAltTape() {
 // ---------------------------------------------------------------------------
 // Private — update loop
 // ---------------------------------------------------------------------------
+// Private — control mode indicator
+// ---------------------------------------------------------------------------
+
+/**
+ * Build the control mode indicator badge and band warning overlay.
+ */
+function _buildControlModeIndicator() {
+  _elControlMode = document.createElement('div');
+  _elControlMode.id = 'hud-control-mode';
+  _elControlMode.dataset.mode = 'NORMAL';
+  _elControlMode.textContent = 'Orbit';
+  _hud.appendChild(_elControlMode);
+
+  _elBandWarning = document.createElement('div');
+  _elBandWarning.id = 'hud-band-warning';
+  _elBandWarning.className = 'hidden';
+  _elBandWarning.textContent = '';
+  _hud.appendChild(_elBandWarning);
+}
+
+/**
+ * Update the control mode indicator badge every frame.
+ * Only visible when in ORBIT phase (or docking/RCS sub-modes).
+ */
+function _updateControlModeIndicator() {
+  if (!_elControlMode || !_ps || !_flightState) return;
+
+  const mode = _ps.controlMode ?? ControlMode.NORMAL;
+  const label = getControlModeLabel(mode);
+
+  _elControlMode.dataset.mode = mode;
+  _elControlMode.textContent = label;
+
+  // Only show the indicator during ORBIT (and its sub-modes).
+  const inOrbitPhase = _flightState.phase === 'ORBIT' || _flightState.phase === 'MANOEUVRE';
+  _elControlMode.style.display = inOrbitPhase ? '' : 'none';
+
+  // Band warning (only in docking/RCS mode).
+  if (_elBandWarning) {
+    if (mode === ControlMode.DOCKING || mode === ControlMode.RCS) {
+      const warn = checkBandLimitWarning(_ps, 'EARTH');
+      if (warn.warning) {
+        _elBandWarning.textContent = warn.message;
+        _elBandWarning.classList.remove('hidden');
+      } else {
+        _elBandWarning.classList.add('hidden');
+      }
+    } else {
+      _elBandWarning.classList.add('hidden');
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 /**
  * One animation frame: update every HUD panel, then re-schedule.
@@ -1301,6 +1419,7 @@ function _tick() {
     _updateObjectivesPanel();
     _updateLaunchTip();
     _updateAltTape();
+    _updateControlModeIndicator();
   }
   _rafId = requestAnimationFrame(_tick);
 }

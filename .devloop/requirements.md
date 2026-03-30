@@ -32,7 +32,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Create a top-down map view as a completely separate PixiJS scene from the flight view. Toggle swaps active scene. Show control tip on toggle. During FLIGHT: static view, no time warp. During ORBIT: time warp enabled, objects move. Zoom levels: orbit slot detail, local body, craft-to-target, solar system. Player craft shown as point. Thrust/RCS controls work from map view with orbital-relative mapping (W=prograde, S=retrograde, A/D=radial). Orbit predictions cover a few orbits. "Warp to target" option. Day/night shadow overlay option. Requires Tracking Station facility.
 
 ### TASK-005: Implement control modes
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-003
 - **Description**: Implement three control modes for orbital flight with control tip on every mode switch. Normal Orbit Mode (default): engines affect orbit, A/D rotates craft, W/S throttle, spacebar stages. Docking Mode (toggled): engines affect local position within orbit slot, orbit frozen as reference, A/D along track, W/S radial, band limit warnings, thrust cuts to zero on toggle. RCS Mode (within docking): WASD directional translation, no rotation, RCS plumes shown. RCS outside docking mode: WASD = prograde/retrograde/radial-in/radial-out.

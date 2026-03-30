@@ -44,7 +44,7 @@
  */
 
 import { getPartById } from '../data/parts.js';
-import { PartType } from './constants.js';
+import { PartType, ControlMode } from './constants.js';
 import {
   airDensity,
   ATMOSPHERE_TOP,
@@ -217,6 +217,13 @@ const MAX_CHUTE_ANGULAR_ACCEL = 50.0;
  * @property {number}          tippingContactY  Ground contact pivot Y in VAB local pixels.
  * @property {Set<string>}     _heldKeys     Keys currently held down (for continuous steering).
  * @property {number}          _accumulator  Leftover simulation time from the previous frame.
+ * @property {string}          controlMode   Current control mode (ControlMode enum).
+ * @property {import('./gameState.js').OrbitalElements|null} baseOrbit
+ *                                           Frozen orbital elements in docking mode.
+ * @property {Object|null}     dockingAltitudeBand  Altitude band when docking mode entered.
+ * @property {number}          dockingOffsetAlongTrack  Along-track offset in docking (m).
+ * @property {number}          dockingOffsetRadial      Radial offset in docking (m).
+ * @property {Set<string>}     rcsActiveDirections  Active RCS thrust dirs for plume rendering.
  */
 
 // ---------------------------------------------------------------------------
@@ -283,6 +290,19 @@ export function createPhysicsState(assembly, flightState) {
     tippingContactY: 0,
     _heldKeys: new Set(),
     _accumulator: 0,
+    // -- Control mode state (TASK-005) --
+    /** Current control mode (NORMAL, DOCKING, or RCS). */
+    controlMode: ControlMode.NORMAL,
+    /** Frozen orbital elements when in docking mode (reference frame). */
+    baseOrbit: null,
+    /** Altitude band the craft was in when docking mode was entered. */
+    dockingAltitudeBand: null,
+    /** Accumulated along-track offset in docking mode (m). */
+    dockingOffsetAlongTrack: 0,
+    /** Accumulated radial offset in docking mode (m). */
+    dockingOffsetRadial: 0,
+    /** Active RCS thrust directions for plume rendering (set of 'up'|'down'|'left'|'right'). */
+    rcsActiveDirections: new Set(),
   };
 
   // Initialise the parachute state machine for all PARACHUTE parts in the assembly.
@@ -438,6 +458,18 @@ export function tick(ps, assembly, stagingConfig, flightState, realDeltaTime, ti
  */
 export function handleKeyDown(ps, assembly, key) {
   ps._heldKeys.add(key);
+
+  // In docking/RCS modes, W/S/A/D are handled continuously by
+  // _applyDockingMovement — skip one-shot throttle changes.
+  const isDockingOrRcs = ps.controlMode === ControlMode.DOCKING || ps.controlMode === ControlMode.RCS;
+  if (isDockingOrRcs) {
+    // Only allow X (cut throttle) and Z (max throttle) as safety overrides.
+    switch (key) {
+      case 'x': case 'X': ps.throttle = 0; break;
+      case 'z': case 'Z': ps.throttle = 0; break; // In docking, Z also cuts (no full thrust)
+    }
+    return;
+  }
 
   const twrMode = ps.throttleMode === 'twr';
 
@@ -608,8 +640,19 @@ function _integrate(ps, assembly, flightState) {
   // --- 1. Total rocket mass (dry + remaining fuel) -------------------------
   const totalMass = _computeTotalMass(ps, assembly);
 
+  // --- Docking / RCS mode: thrust affects local position, not orbit --------
+  const isDockingOrRcs = ps.controlMode === ControlMode.DOCKING || ps.controlMode === ControlMode.RCS;
+
   // --- 2. Thrust vector ----------------------------------------------------
-  const { thrustX, thrustY } = _computeThrust(ps, assembly, density);
+  // In docking/RCS modes, main engine thrust is suppressed — movement comes
+  // from docking thrusters only (handled in _applyDockingMovement).
+  let thrustX = 0;
+  let thrustY = 0;
+  if (!isDockingOrRcs) {
+    const thrustResult = _computeThrust(ps, assembly, density);
+    thrustX = thrustResult.thrustX;
+    thrustY = thrustResult.thrustY;
+  }
 
   // --- 3. Gravity force (constant downward) --------------------------------
   const gravFX = 0;
@@ -643,6 +686,11 @@ function _integrate(ps, assembly, flightState) {
   ps.velY += accY * FIXED_DT;
   ps.posX += ps.velX * FIXED_DT;
   ps.posY += ps.velY * FIXED_DT;
+
+  // --- 6b. Docking / RCS mode local movement --------------------------------
+  if (isDockingOrRcs) {
+    _applyDockingMovement(ps, assembly, totalMass, FIXED_DT);
+  }
 
   // --- 7. Continuous steering ----------------------------------------------
   _applySteering(ps, assembly, altitude, FIXED_DT);
@@ -1115,7 +1163,121 @@ function _computeParachuteTorque(ps, assembly, com, density, speed) {
  * @param {number} altitude  Current altitude (m) for vacuum check.
  * @param {number} dt        Integration timestep (s).
  */
+// ---------------------------------------------------------------------------
+// Docking / RCS mode movement (private)
+// ---------------------------------------------------------------------------
+
+/**
+ * Apply docking/RCS mode translational movement.
+ *
+ * In DOCKING mode: A/D = along-track, W/S = radial.
+ * In RCS mode: WASD = craft-relative directional translation.
+ * Movement is applied as small velocity deltas restricted to the altitude band.
+ *
+ * @param {PhysicsState}                               ps
+ * @param {import('./rocketbuilder.js').RocketAssembly} assembly
+ * @param {number} totalMass  Total rocket mass (kg).
+ * @param {number} dt         Timestep (s).
+ */
+function _applyDockingMovement(ps, assembly, totalMass, dt) {
+  const isDocking = ps.controlMode === ControlMode.DOCKING;
+  const isRcs     = ps.controlMode === ControlMode.RCS;
+  if (!isDocking && !isRcs) return;
+
+  // Clear RCS active directions each step; re-set below if active.
+  ps.rcsActiveDirections.clear();
+
+  const w = ps._heldKeys.has('w') || ps._heldKeys.has('ArrowUp');
+  const s = ps._heldKeys.has('s') || ps._heldKeys.has('ArrowDown');
+  const a = ps._heldKeys.has('a') || ps._heldKeys.has('ArrowLeft');
+  const d = ps._heldKeys.has('d') || ps._heldKeys.has('ArrowRight');
+
+  if (!w && !s && !a && !d) return;
+
+  // Determine thrust magnitude based on mode.
+  const thrustN = isRcs ? 500 : 2000; // N
+  const accel = thrustN / Math.max(1, totalMass);
+
+  if (isRcs) {
+    // RCS mode: WASD = craft-relative translation.
+    // W = forward (along rocket axis), S = backward,
+    // A = left, D = right (perpendicular to rocket axis).
+    let dvAlongAxis = 0;
+    let dvPerpAxis = 0;
+    if (w) { dvAlongAxis += accel * dt; ps.rcsActiveDirections.add('up'); }
+    if (s) { dvAlongAxis -= accel * dt; ps.rcsActiveDirections.add('down'); }
+    if (a) { dvPerpAxis -= accel * dt;  ps.rcsActiveDirections.add('left'); }
+    if (d) { dvPerpAxis += accel * dt;  ps.rcsActiveDirections.add('right'); }
+
+    // Convert craft-relative to world coordinates.
+    // Rocket angle: 0 = pointing up (+Y), positive = clockwise.
+    const sinA = Math.sin(ps.angle);
+    const cosA = Math.cos(ps.angle);
+    // Along axis (rocket's up direction): (+sinA, +cosA)
+    // Perpendicular (rocket's right direction): (+cosA, -sinA)
+    ps.velX += dvAlongAxis * sinA + dvPerpAxis * cosA;
+    ps.velY += dvAlongAxis * cosA - dvPerpAxis * sinA;
+  } else {
+    // DOCKING mode: A/D = along-track, W/S = radial.
+    // Along-track = velocity direction (prograde/retrograde).
+    // Radial = perpendicular to velocity (toward/away from body).
+    const speed = Math.hypot(ps.velX, ps.velY);
+    let progX, progY, radOutX, radOutY;
+
+    if (speed > 1e-3) {
+      progX = ps.velX / speed;
+      progY = ps.velY / speed;
+    } else {
+      progX = Math.sin(ps.angle);
+      progY = Math.cos(ps.angle);
+    }
+    // Radial out = perpendicular to prograde, pointing away from body.
+    radOutX = progY;
+    radOutY = -progX;
+    // Ensure radial out actually points away from body centre.
+    // Body centre is at (0, -R) in game coords, so radial out from craft
+    // should point in the direction of (posX, posY + R).
+    const radCheck = radOutX * ps.posX + radOutY * (ps.posY + 6_371_000);
+    if (radCheck < 0) {
+      radOutX = -radOutX;
+      radOutY = -radOutY;
+    }
+
+    let dvX = 0;
+    let dvY = 0;
+    if (d) { dvX += accel * dt * progX; dvY += accel * dt * progY; }   // along-track forward
+    if (a) { dvX -= accel * dt * progX; dvY -= accel * dt * progY; }   // along-track backward
+    if (w) { dvX += accel * dt * radOutX; dvY += accel * dt * radOutY; } // radial out
+    if (s) { dvX -= accel * dt * radOutX; dvY -= accel * dt * radOutY; } // radial in
+
+    // Band limit clamping — prevent leaving the altitude band.
+    if (ps.dockingAltitudeBand) {
+      const band = ps.dockingAltitudeBand;
+      const alt = Math.max(0, ps.posY);
+      if (alt >= band.max - 2500 && dvY > 0) dvY = 0;
+      if (alt <= band.min + 2500 && dvY < 0) dvY = 0;
+    }
+
+    ps.velX += dvX;
+    ps.velY += dvY;
+
+    // Track offsets for reference.
+    ps.dockingOffsetAlongTrack += (d ? 1 : 0) - (a ? 1 : 0);
+    ps.dockingOffsetRadial     += (w ? 1 : 0) - (s ? 1 : 0);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Steering (private)
+// ---------------------------------------------------------------------------
+
 function _applySteering(ps, assembly, altitude, dt) {
+  // In RCS mode, rotation is disabled.
+  if (ps.controlMode === ControlMode.RCS) return;
+
+  // In DOCKING mode, A/D don't rotate — they're handled by _applyDockingMovement.
+  if (ps.controlMode === ControlMode.DOCKING) return;
+
   const left  = ps._heldKeys.has('a') || ps._heldKeys.has('ArrowLeft');
   const right = ps._heldKeys.has('d') || ps._heldKeys.has('ArrowRight');
 

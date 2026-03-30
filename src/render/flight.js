@@ -31,7 +31,7 @@
 import * as PIXI from 'pixi.js';
 import { getApp }      from './index.js';
 import { getPartById } from '../data/parts.js';
-import { PartType }    from '../core/constants.js';
+import { PartType, ControlMode } from '../core/constants.js';
 import { airDensity }  from '../core/atmosphere.js';
 import { DEPLOY_DURATION } from '../core/parachute.js';
 import { LegState, LEG_DEPLOY_DURATION, getDeployedLegFootOffset } from '../core/legs.js';
@@ -1386,6 +1386,106 @@ function _renderDebris(debrisList, assembly, w, h) {
 // Ejected crew rendering
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// RCS plume rendering
+// ---------------------------------------------------------------------------
+
+/** RCS plume colour (blue-white). */
+const RCS_PLUME_COLOR = 0x88ccff;
+
+/** RCS plume length in metres. */
+const RCS_PLUME_LENGTH = 1.5;
+
+/** RCS plume base half-width in metres. */
+const RCS_PLUME_HALF_WIDTH = 0.3;
+
+/**
+ * Render small RCS plumes around the craft when in docking/RCS mode
+ * and directional thrust is active.
+ *
+ * Plumes appear at the craft's centre of mass, oriented to show thrust direction.
+ *
+ * @param {import('../core/physics.js').PhysicsState}          ps
+ * @param {import('../core/rocketbuilder.js').RocketAssembly}  assembly
+ * @param {number} w  Canvas width.
+ * @param {number} h  Canvas height.
+ */
+function _renderRcsPlumes(ps, assembly, w, h) {
+  if (!_trailContainer) return;
+  if (ps.controlMode !== ControlMode.RCS && ps.controlMode !== ControlMode.DOCKING) return;
+  if (!ps.rcsActiveDirections || ps.rcsActiveDirections.size === 0) return;
+
+  const ppm = _ppm();
+  const com = _computeCoM(ps.fuelStore, assembly, ps.activeParts, ps.posX, ps.posY);
+  const { sx: comSx, sy: comSy } = _worldToScreen(com.x, com.y, w, h);
+
+  const g = new PIXI.Graphics();
+  _trailContainer.addChild(g);
+
+  const lenPx  = RCS_PLUME_LENGTH * ppm;
+  const halfW  = RCS_PLUME_HALF_WIDTH * ppm;
+  const sinA   = Math.sin(ps.angle);
+  const cosA   = Math.cos(ps.angle);
+
+  // Screen-space craft axes:
+  // "Up" axis (rocket nose) in screen: (+sinA, -cosA) because screen Y is inverted.
+  // "Right" axis in screen: (+cosA, +sinA).
+  const upSx = sinA;
+  const upSy = -cosA;
+  const rtSx = cosA;
+  const rtSy = sinA;
+
+  for (const dir of ps.rcsActiveDirections) {
+    // Plumes fire OPPOSITE to thrust direction.
+    let plumeDirSx, plumeDirSy;
+    switch (dir) {
+      case 'up':    plumeDirSx = -upSx; plumeDirSy = -upSy; break; // thrust up → plume down
+      case 'down':  plumeDirSx =  upSx; plumeDirSy =  upSy; break; // thrust down → plume up
+      case 'left':  plumeDirSx =  rtSx; plumeDirSy =  rtSy; break; // thrust left → plume right
+      case 'right': plumeDirSx = -rtSx; plumeDirSy = -rtSy; break; // thrust right → plume left
+      default: continue;
+    }
+
+    // Perpendicular to plume direction for width.
+    const perpSx = -plumeDirSy;
+    const perpSy =  plumeDirSx;
+
+    // Draw a simple triangle plume.
+    const tipX = comSx + plumeDirSx * lenPx;
+    const tipY = comSy + plumeDirSy * lenPx;
+    const baseL_x = comSx + perpSx * halfW;
+    const baseL_y = comSy + perpSy * halfW;
+    const baseR_x = comSx - perpSx * halfW;
+    const baseR_y = comSy - perpSy * halfW;
+
+    g.moveTo(baseL_x, baseL_y);
+    g.lineTo(tipX, tipY);
+    g.lineTo(baseR_x, baseR_y);
+    g.closePath();
+    g.fill({ color: RCS_PLUME_COLOR, alpha: 0.6 });
+
+    // Inner brighter core (narrower).
+    const coreLen = lenPx * 0.5;
+    const coreHW  = halfW * 0.3;
+    const cTipX = comSx + plumeDirSx * coreLen;
+    const cTipY = comSy + plumeDirSy * coreLen;
+    const cBaseL_x = comSx + perpSx * coreHW;
+    const cBaseL_y = comSy + perpSy * coreHW;
+    const cBaseR_x = comSx - perpSx * coreHW;
+    const cBaseR_y = comSy - perpSy * coreHW;
+
+    g.moveTo(cBaseL_x, cBaseL_y);
+    g.lineTo(cTipX, cTipY);
+    g.lineTo(cBaseR_x, cBaseR_y);
+    g.closePath();
+    g.fill({ color: 0xffffff, alpha: 0.5 });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Ejected crew rendering
+// ---------------------------------------------------------------------------
+
 /**
  * Render ejected crew capsules as small rectangles with parachute canopies.
  *
@@ -1952,7 +2052,10 @@ export function renderFlightFrame(ps, assembly) {
   _updatePlumeStates(ps, assembly, dt);
   _renderPlumes(ps, assembly, trailDensity, w, h);
 
-  // 6b. Ejected crew capsules with parachutes.
+  // 6b. RCS plumes — small directional plumes when in docking/RCS mode.
+  _renderRcsPlumes(ps, assembly, w, h);
+
+  // 6c. Ejected crew capsules with parachutes.
   _renderEjectedCrew(ps, w, h);
 
   // 7. Active rocket — full opacity, camera centred here (normally).

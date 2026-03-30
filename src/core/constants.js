@@ -145,6 +145,29 @@ export const FlightPhase = Object.freeze({
 });
 
 // ---------------------------------------------------------------------------
+// Control Modes (within ORBIT phase)
+// ---------------------------------------------------------------------------
+
+/**
+ * Control modes available during orbital flight.
+ * Normal is the default; Docking and RCS are toggled by the player.
+ *
+ * @enum {string}
+ */
+export const ControlMode = Object.freeze({
+  /** Default orbital mode: A/D rotate, W/S throttle, Space stages.
+   *  Engines affect the orbit directly. */
+  NORMAL: 'NORMAL',
+  /** Docking mode: engines affect local position within the orbit slot.
+   *  Current orbit is frozen as a reference frame.
+   *  A/D = along track, W/S = radial. */
+  DOCKING: 'DOCKING',
+  /** RCS mode (sub-mode of docking): WASD directional translation,
+   *  no rotation, RCS plumes visible. */
+  RCS: 'RCS',
+});
+
+// ---------------------------------------------------------------------------
 // Flight Outcomes
 // ---------------------------------------------------------------------------
 

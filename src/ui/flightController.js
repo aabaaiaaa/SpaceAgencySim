@@ -35,9 +35,20 @@ import { getPartById } from '../data/parts.js';
 import { PartType, DEATH_FINE_PER_ASTRONAUT } from '../core/constants.js';
 import { processFlightReturn } from '../core/flightReturn.js';
 import { setTopBarFlightItems, clearTopBarFlightItems, setTopBarDropdownToggleCallback, refreshTopBar } from './topbar.js';
-import { FlightPhase } from '../core/constants.js';
+import { FlightPhase, ControlMode } from '../core/constants.js';
 import { evaluateAutoTransitions, canReturnToAgency, isPlayerLocked, getPhaseLabel, transitionPhase } from '../core/flightPhase.js';
 import { checkOrbitStatus } from '../core/orbit.js';
+import {
+  enterDockingMode,
+  exitDockingMode,
+  toggleRcsMode,
+  resetControlModeIfNeeded,
+  hasRcsThrusters,
+  getControlModeLabel,
+  CONTROL_MODE_TIPS,
+  checkBandLimitWarning,
+  getDockingThrustDirections,
+} from '../core/controlMode.js';
 
 // ---------------------------------------------------------------------------
 // Module state
@@ -108,6 +119,15 @@ let _mapHeldKeys = new Set();
 
 /** True while the craft is thrusting due to map-view orbital controls. */
 let _mapThrusting = false;
+
+/**
+ * Set of orbital-relative thrust keys held in NORMAL orbit mode in flight view
+ * (WASD = prograde/retrograde/radial-in/radial-out).
+ */
+let _normalOrbitHeldKeys = new Set();
+
+/** True while the craft is thrusting due to normal-orbit WASD controls. */
+let _normalOrbitThrusting = false;
 
 /** The DOM element for the map-view HUD overlay. @type {HTMLElement|null} */
 let _mapHud = null;
@@ -843,6 +863,8 @@ export function startFlightScene(
   _mapHeldKeys  = new Set();
   _mapThrusting = false;
   _mapHud       = null;
+  _normalOrbitHeldKeys  = new Set();
+  _normalOrbitThrusting = false;
   initMapRenderer();
 
   // Initialise the right-click part context menu.
@@ -917,6 +939,8 @@ export function stopFlightScene() {
   _mapHeldKeys           = new Set();
   _mapThrusting          = false;
   _mapHud                = null;
+  _normalOrbitHeldKeys   = new Set();
+  _normalOrbitThrusting  = false;
 
   // Reset time-warp state.
   _timeWarp            = 1;
@@ -955,6 +979,9 @@ function _loop(timestamp) {
   // Apply orbital-relative thrust when the map view is active and the
   // player is holding WASD keys (only effective during ORBIT phase).
   _applyMapThrust();
+
+  // Apply orbital-relative thrust from WASD in NORMAL orbit mode (flight view).
+  _applyNormalOrbitRcs();
 
   // Reset per-frame science flag before sub-steps; tickScienceModules will
   // set it to true if any experiment was running during ANY sub-step.
@@ -1140,6 +1167,14 @@ function _evaluateFlightPhase() {
       _flightState.orbitalElements = orbitStatus.elements;
     }
   }
+
+  // Reset control mode when flight phase leaves ORBIT.
+  if (_ps.controlMode !== ControlMode.NORMAL) {
+    const wasReset = resetControlModeIfNeeded(_ps, _flightState, 'EARTH');
+    if (wasReset) {
+      _showPhaseNotification(CONTROL_MODE_TIPS[ControlMode.NORMAL]);
+    }
+  }
 }
 
 /**
@@ -1220,8 +1255,30 @@ function _onKeyDown(e) {
     }
   }
 
+  // V — toggle docking mode (only in ORBIT phase).
+  if (e.code === 'KeyV') {
+    e.preventDefault();
+    _toggleDockingMode();
+    return;
+  }
+
+  // R — toggle RCS mode.
+  if (e.code === 'KeyR') {
+    e.preventDefault();
+    _toggleRcsMode();
+    return;
+  }
+
+  // In docking/RCS mode in flight view, WASD are handled by physics
+  // _applyDockingMovement via held keys — just pass through to handleKeyDown.
+  // Spacebar staging is blocked in docking/RCS mode.
   if (e.code === 'Space') {
     e.preventDefault();
+
+    // Block staging in docking/RCS mode.
+    if (_ps.controlMode === ControlMode.DOCKING || _ps.controlMode === ControlMode.RCS) {
+      return;
+    }
 
     // Reset time warp to 1× and lock it out for 2 seconds so the player
     // cannot accidentally time-warp during a staging sequence.
@@ -1255,6 +1312,19 @@ function _onKeyDown(e) {
     e.preventDefault();
   }
 
+  // In NORMAL orbit mode (not docking/RCS), WASD applies orbital-relative
+  // thrust: W=prograde, S=retrograde, A=radial-in, D=radial-out.
+  // This uses the same held-key mechanism as docking, but the
+  // _applyNormalOrbitRcs function handles it in the loop.
+  if (!_mapActive && _ps.controlMode === ControlMode.NORMAL &&
+      _flightState.phase === FlightPhase.ORBIT) {
+    const lower = e.key.toLowerCase();
+    if (lower === 'w' || lower === 's' || lower === 'a' || lower === 'd') {
+      _normalOrbitHeldKeys.add(lower);
+      return;
+    }
+  }
+
   handleKeyDown(_ps, _assembly, e.key);
 }
 
@@ -1266,6 +1336,12 @@ function _onKeyUp(e) {
   if (_mapActive) {
     const lower = e.key.toLowerCase();
     _mapHeldKeys.delete(lower);
+  }
+
+  // Release normal-orbit WASD keys.
+  {
+    const lower = e.key.toLowerCase();
+    _normalOrbitHeldKeys.delete(lower);
   }
 
   handleKeyUp(_ps, e.key);
@@ -1348,6 +1424,104 @@ function _applyMapThrust() {
     _mapThrusting = false;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Private — control mode toggles
+// ---------------------------------------------------------------------------
+
+/**
+ * Toggle docking mode on/off.
+ * Only available in ORBIT phase. Shows a control tip on every switch.
+ */
+function _toggleDockingMode() {
+  if (!_ps || !_flightState) return;
+
+  if (_ps.controlMode === ControlMode.DOCKING || _ps.controlMode === ControlMode.RCS) {
+    // Exit docking mode → NORMAL.
+    const result = exitDockingMode(_ps, _flightState, 'EARTH');
+    if (result.success) {
+      _showPhaseNotification(CONTROL_MODE_TIPS[ControlMode.NORMAL]);
+      _normalOrbitHeldKeys.clear();
+      _normalOrbitThrusting = false;
+    }
+  } else {
+    // Enter docking mode.
+    const result = enterDockingMode(_ps, _flightState, 'EARTH');
+    if (result.success) {
+      _showPhaseNotification(CONTROL_MODE_TIPS[ControlMode.DOCKING]);
+      // Force warp to 1× in docking mode.
+      _applyTimeWarp(1);
+    } else {
+      _showPhaseNotification(result.reason || 'Cannot enter docking mode');
+    }
+  }
+}
+
+/**
+ * Toggle RCS mode on/off.
+ * If in docking mode, toggles RCS sub-mode.
+ * If in NORMAL orbit mode, shows orbital-relative RCS tip.
+ */
+function _toggleRcsMode() {
+  if (!_ps || !_assembly || !_flightState) return;
+
+  if (_ps.controlMode === ControlMode.DOCKING || _ps.controlMode === ControlMode.RCS) {
+    // Toggle RCS within docking mode.
+    const result = toggleRcsMode(_ps, _assembly);
+    if (result.success) {
+      _showPhaseNotification(CONTROL_MODE_TIPS[_ps.controlMode]);
+    } else {
+      _showPhaseNotification(result.reason || 'Cannot toggle RCS');
+    }
+  } else if (_flightState.phase === FlightPhase.ORBIT) {
+    // In NORMAL orbit mode, R shows the RCS orbit tip.
+    _showPhaseNotification('RCS Orbit: W prograde, S retrograde, A radial-in, D radial-out');
+  }
+}
+
+/**
+ * Apply orbital-relative thrust from WASD in NORMAL orbit mode (flight view).
+ * Similar to map-view thrust but operates from the flight view.
+ * W=prograde, S=retrograde, A=radial-in, D=radial-out.
+ */
+function _applyNormalOrbitRcs() {
+  if (_mapActive || !_ps || !_flightState) return;
+  if (_ps.controlMode !== ControlMode.NORMAL) {
+    if (_normalOrbitThrusting) {
+      _ps.throttle = 0;
+      _normalOrbitThrusting = false;
+    }
+    _normalOrbitHeldKeys.clear();
+    return;
+  }
+  if (_flightState.phase !== FlightPhase.ORBIT) {
+    if (_normalOrbitThrusting) {
+      _ps.throttle = 0;
+      _normalOrbitThrusting = false;
+    }
+    _normalOrbitHeldKeys.clear();
+    return;
+  }
+
+  let direction = null;
+  if (_normalOrbitHeldKeys.has('w'))      direction = MapThrustDir.PROGRADE;
+  else if (_normalOrbitHeldKeys.has('s')) direction = MapThrustDir.RETROGRADE;
+  else if (_normalOrbitHeldKeys.has('a')) direction = MapThrustDir.RADIAL_IN;
+  else if (_normalOrbitHeldKeys.has('d')) direction = MapThrustDir.RADIAL_OUT;
+
+  if (direction) {
+    _ps.angle = computeOrbitalThrustAngle(_ps, 'EARTH', direction);
+    if (_ps.throttle === 0) _ps.throttle = 1;
+    _normalOrbitThrusting = true;
+  } else if (_normalOrbitThrusting) {
+    _ps.throttle = 0;
+    _normalOrbitThrusting = false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Private — warp to target
+// ---------------------------------------------------------------------------
 
 /**
  * Handle the "Warp to target" action.
