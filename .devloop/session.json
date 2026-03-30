@@ -1,12 +1,12 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 11,
+  "lastIteration": 12,
   "startedAt": "2026-03-30T20:49:34.099Z",
   "activeTask": {
-    "taskId": "TASK-015",
-    "taskTitle": "Science modules as instrument containers",
-    "iterationNumber": 11,
-    "startedAt": "2026-03-30T23:16:03.157Z"
+    "taskId": "TASK-016",
+    "taskTitle": "Implement initial science instruments",
+    "iterationNumber": 12,
+    "startedAt": "2026-03-30T23:41:37.968Z"
   }
 }

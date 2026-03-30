@@ -67,7 +67,7 @@
  */
 
 import { getPartById, ActivationBehaviour } from '../data/parts.js';
-import { getInstrumentById }                from '../data/instruments.js';
+import { getInstrumentById, isInstrumentValidForBiome } from '../data/instruments.js';
 import { PartType, ScienceDataType, DIMINISHING_RETURNS,
          ANALYSIS_TRANSMIT_YIELD_MIN, ANALYSIS_TRANSMIT_YIELD_MAX } from './constants.js';
 import { getBiome, getBiomeId, getScienceMultiplier } from './biomes.js';
@@ -239,6 +239,21 @@ export function activateInstrument(ps, assembly, flightState, key) {
   const biome = getBiome(altitude, 'EARTH');
   const biomeId = biome ? biome.id : null;
   const biomeName = biome ? biome.name : 'Unknown';
+
+  // Biome validation — instrument can only collect data in its valid biomes.
+  if (!isInstrumentValidForBiome(entry.instrumentId, biomeId)) {
+    flightState.events.push({
+      type:         'INSTRUMENT_INVALID_BIOME',
+      time:         flightState.timeElapsed,
+      instanceId:   entry.moduleInstanceId,
+      instrumentId: entry.instrumentId,
+      instrumentKey: key,
+      biome:        biomeId,
+      validBiomes:  instrDef.validBiomes ?? [],
+      description:  `${instrDef.name} cannot operate in ${biomeName}. Valid biomes: ${(instrDef.validBiomes ?? []).join(', ')}.`,
+    });
+    return false;
+  }
 
   entry.state = ScienceModuleState.RUNNING;
   entry.timer = instrDef.experimentDuration;

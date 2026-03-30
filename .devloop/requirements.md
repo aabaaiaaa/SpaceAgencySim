@@ -106,7 +106,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Rework science modules as containers with limited instrument slots. Player chooses which instruments to load in VAB. Module context menu collates all loaded instrument options. Individual instruments activatable via staging. Science data types: Samples (must be physically returned, full yield) and Analysis data (transmittable from orbit at 40-60% yield, or returned for full yield). Yield formula: baseYield × biomeMultiplier × scienceSkillBonus × diminishingReturn (100% first, 25% second, 10% third, 0% after).
 
 ### TASK-016: Implement initial science instruments
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-015
 - **Description**: Add science instruments that fit within science modules: thermometer-mk1 ($2k, 50kg, 10s, Ground/Low Atmo, 5pts, starter), Barometer ($4k, 80kg, 15s, Mid/Upper Atmo, 10pts, Tech T1), Radiation Detector ($8k, 120kg, 20s, Mesosphere/Near Space, 20pts, Tech T2), Gravity Gradiometer ($15k, 200kg, 30s, Low/High Orbit, 40pts, Tech T3), Magnetometer ($12k, 150kg, 25s, Upper Atmo/Mesosphere/Near Space, 15pts, Tech T3). Data definitions and in-game functionality for each.
