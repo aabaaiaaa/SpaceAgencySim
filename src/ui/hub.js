@@ -20,6 +20,8 @@
  */
 
 import { showHubScene, hideHubScene } from '../render/hub.js';
+import { FACILITY_DEFINITIONS } from '../core/constants.js';
+import { hasFacility, canBuildFacility, buildFacility } from '../core/construction.js';
 
 // ---------------------------------------------------------------------------
 // CSS
@@ -207,6 +209,187 @@ const HUB_STYLES = `
   background: #235a90;
 }
 
+/* ── Construction button ─────────────────────────────────────────────────── */
+#hub-construction-btn {
+  position: absolute;
+  top: 60px;
+  right: 16px;
+  padding: 10px 20px;
+  background: #1a4070;
+  border: 1px solid #4080b0;
+  border-radius: 6px;
+  color: #c8e8ff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background 0.15s;
+  letter-spacing: 0.03em;
+  z-index: 20;
+}
+
+#hub-construction-btn:hover {
+  background: #235a90;
+}
+
+/* ── Construction panel overlay ──────────────────────────────────────────── */
+#construction-panel {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 10, 20, 0.92);
+  z-index: 400;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: system-ui, sans-serif;
+  color: #d0e0f0;
+  pointer-events: auto;
+  overflow: hidden;
+}
+
+.cp-content {
+  width: 100%;
+  max-width: 600px;
+  padding: 36px 24px 44px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+#construction-panel h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 6px;
+  letter-spacing: 0.04em;
+  color: #80c8ff;
+}
+
+.cp-subtitle {
+  font-size: 0.82rem;
+  color: #5080a0;
+  margin: 0 0 24px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.cp-facility-list {
+  width: 100%;
+  list-style: none;
+  padding: 0;
+  margin: 0 0 24px;
+}
+
+.cp-facility-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  transition: border-color 0.15s;
+}
+
+.cp-facility-item:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.cp-facility-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.cp-facility-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #c0d8f0;
+  margin: 0 0 3px;
+}
+
+.cp-facility-desc {
+  font-size: 0.78rem;
+  color: #7090b0;
+  margin: 0;
+}
+
+.cp-facility-cost {
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #f0d060;
+  margin-right: 16px;
+  white-space: nowrap;
+}
+
+.cp-facility-cost-free {
+  color: #50d870;
+}
+
+.cp-build-btn {
+  padding: 7px 18px;
+  background: #1a5040;
+  border: 1px solid #40a080;
+  border-radius: 5px;
+  color: #b0f0d0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.cp-build-btn:hover:not(:disabled) {
+  background: #207050;
+}
+
+.cp-build-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.cp-built-badge {
+  padding: 6px 14px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #50d870;
+  border: 1px solid rgba(80, 216, 112, 0.3);
+  border-radius: 5px;
+  white-space: nowrap;
+}
+
+.cp-locked-badge {
+  padding: 6px 14px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #a08060;
+  border: 1px solid rgba(160, 128, 96, 0.3);
+  border-radius: 5px;
+  white-space: nowrap;
+  max-width: 160px;
+  text-align: center;
+  line-height: 1.3;
+}
+
+.cp-close-btn {
+  margin-top: 12px;
+  padding: 12px 40px;
+  background: #1a4070;
+  border: 1px solid #4080b0;
+  border-radius: 6px;
+  color: #c8e8ff;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.15s;
+  letter-spacing: 0.03em;
+}
+
+.cp-close-btn:hover {
+  background: #235a90;
+}
+
 /* ── Building hit areas ───────────────────────────────────────────────────── */
 .hub-building {
   position: absolute;
@@ -324,6 +507,9 @@ const BUILDINGS = [
 /** The hub overlay root element. @type {HTMLElement | null} */
 let _overlay = null;
 
+/** Cached reference to the game state for the construction panel. @type {import('../core/gameState.js').GameState | null} */
+let _state = null;
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -345,7 +531,9 @@ let _overlay = null;
  *   Possible destination values: 'vab', 'mission-control', 'crew-admin',
  *   'launch-pad'.
  */
-export function initHubUI(container, _state, onNavigate) {
+export function initHubUI(container, state, onNavigate) {
+  _state = state;
+
   // Inject styles once.
   if (!document.getElementById('hub-styles')) {
     const styleEl = document.createElement('style');
@@ -359,6 +547,7 @@ export function initHubUI(container, _state, onNavigate) {
   container.appendChild(_overlay);
 
   _renderBuildings(onNavigate);
+  _renderConstructionButton(container);
 
   // Show the PixiJS background.
   showHubScene();
@@ -371,10 +560,15 @@ export function initHubUI(container, _state, onNavigate) {
  * Call this before mounting a different screen (e.g. the VAB).
  */
 export function destroyHubUI() {
+  // Remove construction panel if open.
+  const panel = document.getElementById('construction-panel');
+  if (panel) panel.remove();
+
   if (_overlay) {
     _overlay.remove();
     _overlay = null;
   }
+  _state = null;
   hideHubScene();
   console.log('[Hub UI] Destroyed');
 }
@@ -662,4 +856,135 @@ function _renderBuildings(onNavigate) {
 
     _overlay.appendChild(el);
   }
+}
+
+/**
+ * Render the "Construction" button in the hub overlay.
+ *
+ * @param {HTMLElement} container  The #ui-overlay div.
+ */
+function _renderConstructionButton(container) {
+  if (!_overlay) return;
+
+  const btn = document.createElement('button');
+  btn.id          = 'hub-construction-btn';
+  btn.textContent = 'Construction';
+  btn.setAttribute('aria-label', 'Open construction menu');
+
+  btn.addEventListener('click', () => {
+    _openConstructionPanel(container);
+  });
+
+  _overlay.appendChild(btn);
+}
+
+/**
+ * Open the construction panel overlay.
+ *
+ * @param {HTMLElement} container  The #ui-overlay div.
+ */
+function _openConstructionPanel(container) {
+  // Prevent duplicate.
+  if (document.getElementById('construction-panel')) return;
+  if (!_state) return;
+
+  const panel = document.createElement('div');
+  panel.id = 'construction-panel';
+
+  const content = document.createElement('div');
+  content.className = 'cp-content';
+  panel.appendChild(content);
+
+  // ── Heading ────────────────────────────────────────────────────────────
+  const heading = document.createElement('h1');
+  heading.textContent = 'Construction';
+  content.appendChild(heading);
+
+  const subtitle = document.createElement('p');
+  subtitle.className = 'cp-subtitle';
+  subtitle.textContent = _state.tutorialMode
+    ? 'Tutorial Mode — Facilities unlocked via missions'
+    : 'Build new facilities for your agency';
+  content.appendChild(subtitle);
+
+  // ── Facility list ──────────────────────────────────────────────────────
+  const list = document.createElement('ul');
+  list.className = 'cp-facility-list';
+
+  for (const def of FACILITY_DEFINITIONS) {
+    const item = document.createElement('li');
+    item.className = 'cp-facility-item';
+
+    // Info column.
+    const info = document.createElement('div');
+    info.className = 'cp-facility-info';
+
+    const nameEl = document.createElement('p');
+    nameEl.className = 'cp-facility-name';
+    nameEl.textContent = def.name;
+    info.appendChild(nameEl);
+
+    const descEl = document.createElement('p');
+    descEl.className = 'cp-facility-desc';
+    descEl.textContent = def.description;
+    info.appendChild(descEl);
+
+    item.appendChild(info);
+
+    // Cost column.
+    const costEl = document.createElement('span');
+    costEl.className = def.cost === 0
+      ? 'cp-facility-cost cp-facility-cost-free'
+      : 'cp-facility-cost';
+    costEl.textContent = def.cost === 0 ? 'Free' : `$${def.cost.toLocaleString('en-US')}`;
+    item.appendChild(costEl);
+
+    // Action column: Built badge, Build button, or Locked badge.
+    if (hasFacility(_state, def.id)) {
+      const badge = document.createElement('span');
+      badge.className = 'cp-built-badge';
+      badge.textContent = 'Built';
+      item.appendChild(badge);
+    } else if (_state.tutorialMode) {
+      const badge = document.createElement('span');
+      badge.className = 'cp-locked-badge';
+      badge.textContent = 'Locked — complete missions to unlock';
+      item.appendChild(badge);
+    } else {
+      const check = canBuildFacility(_state, def.id);
+      const btn = document.createElement('button');
+      btn.className = 'cp-build-btn';
+      btn.textContent = 'Build';
+      btn.disabled = !check.allowed;
+      if (!check.allowed) {
+        btn.title = check.reason;
+      }
+      btn.addEventListener('click', () => {
+        const result = buildFacility(_state, def.id);
+        if (result.success) {
+          console.log(`[Hub UI] Built facility: ${def.name}`);
+          // Re-render the panel to reflect the change.
+          panel.remove();
+          _openConstructionPanel(container);
+        }
+      });
+      item.appendChild(btn);
+    }
+
+    list.appendChild(item);
+  }
+
+  content.appendChild(list);
+
+  // ── Close button ───────────────────────────────────────────────────────
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'cp-close-btn';
+  closeBtn.textContent = '← Back to Hub';
+  closeBtn.addEventListener('click', () => {
+    panel.remove();
+  });
+  content.appendChild(closeBtn);
+
+  container.appendChild(panel);
+  console.log('[Hub UI] Construction panel opened');
 }

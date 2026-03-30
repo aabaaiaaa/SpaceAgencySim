@@ -60,8 +60,11 @@ export function advancePeriod(state) {
   );
   const crewSalaryCost = activeCrew.length * CREW_SALARY_PER_PERIOD;
 
-  // ── 3. Facility upkeep (base cost; future: scaled by upgrade tier) ────
-  const facilityUpkeep = FACILITY_UPKEEP_PER_PERIOD;
+  // ── 3. Facility upkeep — base cost per built facility ─────────────────
+  const builtCount = state.facilities
+    ? Object.values(state.facilities).filter((f) => f.built).length
+    : 1; // fallback for legacy saves
+  const facilityUpkeep = FACILITY_UPKEEP_PER_PERIOD * builtCount;
 
   // ── 4. Deduct operating costs (mandatory — can go negative) ───────────
   const totalOperatingCost = crewSalaryCost + facilityUpkeep;

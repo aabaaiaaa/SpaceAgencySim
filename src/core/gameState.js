@@ -19,6 +19,7 @@ import {
   STARTING_MONEY,
   STARTING_LOAN_BALANCE,
   DEFAULT_LOAN_INTEREST_RATE,
+  FACILITY_DEFINITIONS,
 } from './constants.js';
 
 // ---------------------------------------------------------------------------
@@ -149,6 +150,13 @@ import {
  */
 
 /**
+ * State of a single built facility.
+ * @typedef {Object} FacilityState
+ * @property {boolean} built - Whether the facility has been constructed.
+ * @property {number}  tier  - Current upgrade tier (1 = base, higher = upgraded).
+ */
+
+/**
  * Live state of a flight that is currently in progress.
  * Set to null when no flight is active.
  * @typedef {Object} FlightState
@@ -193,6 +201,10 @@ import {
  *                                               rocket assembly (Map→Array), or null.
  * @property {Object|null}      vabStagingConfig - Serialisable snapshot of the VAB
  *                                                 staging configuration, or null.
+ * @property {boolean}          tutorialMode   - True when the game is in tutorial mode
+ *                                               (facilities awarded via missions, not built).
+ * @property {Object<string, FacilityState>} facilities - Map of facility ID → state.
+ *                                               Only facilities that have been built appear here.
  */
 
 // ---------------------------------------------------------------------------
@@ -247,6 +259,16 @@ export function createGameState() {
 
     vabAssembly: null,
     vabStagingConfig: null,
+
+    tutorialMode: true,
+
+    // Starter facilities are pre-built; the rest are added by
+    // buildFacility() (non-tutorial) or awarded via tutorial missions.
+    facilities: Object.fromEntries(
+      FACILITY_DEFINITIONS
+        .filter((f) => f.starter)
+        .map((f) => [f.id, { built: true, tier: 1 }]),
+    ),
   };
 }
 

@@ -230,6 +230,97 @@ export const MAX_CREW_SIZE = 20;
 export const AVAILABLE_MISSION_SLOTS = 5;
 
 // ---------------------------------------------------------------------------
+// Facilities
+// ---------------------------------------------------------------------------
+
+/**
+ * Unique identifiers for each facility the player can build on the hub.
+ * @enum {string}
+ */
+export const FacilityId = Object.freeze({
+  LAUNCH_PAD:     'launch-pad',
+  VAB:            'vab',
+  MISSION_CONTROL:'mission-control',
+  CREW_ADMIN:     'crew-admin',
+  TRACKING_STATION: 'tracking-station',
+  RD_LAB:         'rd-lab',
+  SATELLITE_OPS:  'satellite-ops',
+  LIBRARY:        'library',
+});
+
+/**
+ * Static definitions for every buildable facility.
+ * `cost` is the base build cost in dollars.  `starter` facilities are
+ * pre-built at tier 1 in every new game (both tutorial and non-tutorial).
+ *
+ * @type {ReadonlyArray<Readonly<{
+ *   id: string,
+ *   name: string,
+ *   description: string,
+ *   cost: number,
+ *   starter: boolean,
+ * }>>}
+ */
+export const FACILITY_DEFINITIONS = Object.freeze([
+  Object.freeze({
+    id:          FacilityId.LAUNCH_PAD,
+    name:        'Launch Pad',
+    description: 'Launch rockets into space.',
+    cost:        0,
+    starter:     true,
+  }),
+  Object.freeze({
+    id:          FacilityId.VAB,
+    name:        'Vehicle Assembly Building',
+    description: 'Design and assemble rockets.',
+    cost:        0,
+    starter:     true,
+  }),
+  Object.freeze({
+    id:          FacilityId.MISSION_CONTROL,
+    name:        'Mission Control Centre',
+    description: 'Accept contracts and monitor missions.',
+    cost:        0,
+    starter:     true,
+  }),
+  Object.freeze({
+    id:          FacilityId.CREW_ADMIN,
+    name:        'Crew Administration',
+    description: 'Hire, manage, and train astronauts.',
+    cost:        100_000,
+    starter:     false,
+  }),
+  Object.freeze({
+    id:          FacilityId.TRACKING_STATION,
+    name:        'Tracking Station',
+    description: 'Track orbital objects and plan transfers.',
+    cost:        200_000,
+    starter:     false,
+  }),
+  Object.freeze({
+    id:          FacilityId.RD_LAB,
+    name:        'R&D Lab',
+    description: 'Research new technologies and unlock advanced parts.',
+    cost:        300_000,
+    starter:     false,
+  }),
+  Object.freeze({
+    id:          FacilityId.SATELLITE_OPS,
+    name:        'Satellite Network Operations Centre',
+    description: 'Manage satellite networks and orbital infrastructure.',
+    cost:        400_000,
+    starter:     false,
+  }),
+  Object.freeze({
+    id:          FacilityId.LIBRARY,
+    name:        'Library',
+    description: 'View agency statistics, records, and knowledge.',
+    cost:        0,
+    starter:     false,
+  }),
+]);
+
+// ---------------------------------------------------------------------------
 // Period / Operating Costs
 // ---------------------------------------------------------------------------
 

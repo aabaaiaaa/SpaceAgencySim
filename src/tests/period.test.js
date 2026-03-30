@@ -16,9 +16,16 @@ import { advancePeriod } from '../core/period.js';
 import {
   CREW_SALARY_PER_PERIOD,
   FACILITY_UPKEEP_PER_PERIOD,
+  FACILITY_DEFINITIONS,
   AstronautStatus,
   STARTING_MONEY,
 } from '../core/constants.js';
+
+/** Number of starter facilities pre-built in a fresh game. */
+const STARTER_COUNT = FACILITY_DEFINITIONS.filter((f) => f.starter).length;
+
+/** Total base facility upkeep for a fresh game (per-facility cost × starters). */
+const BASE_UPKEEP = FACILITY_UPKEEP_PER_PERIOD * STARTER_COUNT;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -153,9 +160,9 @@ describe('advancePeriod() — facility upkeep', () => {
   let state;
   beforeEach(() => { state = freshState(); });
 
-  it('charges base facility upkeep', () => {
+  it('charges base facility upkeep per built facility', () => {
     const result = advancePeriod(state);
-    expect(result.facilityUpkeep).toBe(FACILITY_UPKEEP_PER_PERIOD);
+    expect(result.facilityUpkeep).toBe(BASE_UPKEEP);
   });
 });
 
@@ -172,7 +179,7 @@ describe('advancePeriod() — operating costs deduction', () => {
     addCrew(state);
     const cashBefore = state.money;
     const result = advancePeriod(state);
-    const expectedCost = 2 * CREW_SALARY_PER_PERIOD + FACILITY_UPKEEP_PER_PERIOD;
+    const expectedCost = 2 * CREW_SALARY_PER_PERIOD + BASE_UPKEEP;
     expect(result.totalOperatingCost).toBe(expectedCost);
     expect(state.money).toBe(cashBefore - expectedCost);
   });
@@ -180,8 +187,8 @@ describe('advancePeriod() — operating costs deduction', () => {
   it('with no crew, only facility upkeep is charged', () => {
     const cashBefore = state.money;
     const result = advancePeriod(state);
-    expect(result.totalOperatingCost).toBe(FACILITY_UPKEEP_PER_PERIOD);
-    expect(state.money).toBe(cashBefore - FACILITY_UPKEEP_PER_PERIOD);
+    expect(result.totalOperatingCost).toBe(BASE_UPKEEP);
+    expect(state.money).toBe(cashBefore - BASE_UPKEEP);
   });
 
   it('can drive cash negative (costs are mandatory)', () => {
@@ -190,15 +197,14 @@ describe('advancePeriod() — operating costs deduction', () => {
     addCrew(state);
     addCrew(state);
     advancePeriod(state);
-    // 3 * 5k + 10k = 25k; 1k - 25k = -24k
-    expect(state.money).toBe(1_000 - (3 * CREW_SALARY_PER_PERIOD + FACILITY_UPKEEP_PER_PERIOD));
+    expect(state.money).toBe(1_000 - (3 * CREW_SALARY_PER_PERIOD + BASE_UPKEEP));
     expect(state.money).toBeLessThan(0);
   });
 
   it('deducts from zero cash correctly', () => {
     state.money = 0;
     advancePeriod(state);
-    expect(state.money).toBe(-FACILITY_UPKEEP_PER_PERIOD);
+    expect(state.money).toBe(-BASE_UPKEEP);
   });
 });
 

@@ -13,7 +13,7 @@
  * @module saveload
  */
 
-import { CrewStatus } from './constants.js';
+import { CrewStatus, FACILITY_DEFINITIONS } from './constants.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -243,6 +243,16 @@ export function loadGame(slotIndex) {
 
   // Default savedDesigns for saves created before this feature existed.
   envelope.state.savedDesigns ??= [];
+
+  // Default facilities for saves created before the construction system.
+  if (!envelope.state.facilities || typeof envelope.state.facilities !== 'object') {
+    envelope.state.facilities = Object.fromEntries(
+      FACILITY_DEFINITIONS
+        .filter((f) => f.starter)
+        .map((f) => [f.id, { built: true, tier: 1 }]),
+    );
+  }
+  envelope.state.tutorialMode ??= true;
 
   return envelope.state;
 }

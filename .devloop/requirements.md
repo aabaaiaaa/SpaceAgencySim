@@ -48,7 +48,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 ## Phase 1: "The Business of Space" — Agency Depth
 
 ### TASK-007: Basic construction menu
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-001
 - **Description**: Add a construction menu to the hub screen for building new facilities. Simple list of available buildings with costs and a "Build" button. In tutorial mode, building is locked — facilities are awarded via tutorial missions; only upgrades available once a building exists. In non-tutorial mode, fully available from the start. Phase 5 extends this with the upgrade system.
