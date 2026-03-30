@@ -489,6 +489,51 @@ export const BIOME_DEFINITIONS = Object.freeze({
   ]),
 });
 
+// ---------------------------------------------------------------------------
+// Science Data Types
+// ---------------------------------------------------------------------------
+
+/**
+ * How a completed instrument's data can be recovered.
+ * @enum {string}
+ */
+export const ScienceDataType = Object.freeze({
+  /** Physical sample — must be returned to the ground for full yield.
+   *  Cannot be transmitted. */
+  SAMPLE: 'SAMPLE',
+  /** Telemetry / analysis data — can be transmitted from orbit at reduced
+   *  yield (40–60 %), or returned physically for full yield. */
+  ANALYSIS: 'ANALYSIS',
+});
+
+// ---------------------------------------------------------------------------
+// Science Yield Constants
+// ---------------------------------------------------------------------------
+
+/**
+ * Diminishing-return multipliers applied when the same (instrument, biome)
+ * pair is collected repeatedly across flights.
+ *
+ * Index = number of prior collections in that pair.
+ *   0 → first time  → 100 %
+ *   1 → second time →  25 %
+ *   2 → third time  →  10 %
+ *   3+ → no further value
+ *
+ * @type {readonly number[]}
+ */
+export const DIMINISHING_RETURNS = Object.freeze([1.0, 0.25, 0.10]);
+
+/** Minimum yield fraction when transmitting ANALYSIS data from orbit. */
+export const ANALYSIS_TRANSMIT_YIELD_MIN = 0.40;
+
+/** Maximum yield fraction when transmitting ANALYSIS data from orbit. */
+export const ANALYSIS_TRANSMIT_YIELD_MAX = 0.60;
+
+// ---------------------------------------------------------------------------
+// Orbit Segments
+// ---------------------------------------------------------------------------
+
 /** Number of angular segments dividing each orbit plane. */
 export const ORBIT_SEGMENTS = 36;
 

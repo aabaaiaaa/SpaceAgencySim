@@ -3090,7 +3090,7 @@ function _handleSaveDesign() {
     const design = createRocketDesign({
       id:          designId,
       name,
-      parts:       [..._assembly.parts.values()].map(p => ({ partId: p.partId, position: { x: p.x, y: p.y } })),
+      parts:       [..._assembly.parts.values()].map(p => ({ partId: p.partId, position: { x: p.x, y: p.y }, ...(p.instruments?.length ? { instruments: [...p.instruments] } : {}) })),
       staging:     { stages: _stagingConfig.stages.map(s => [...s.instanceIds]), unstaged: [..._stagingConfig.unstaged] },
       totalMass:   _lastValidation?.totalMassKg ?? 0,
       totalThrust: _lastValidation?.stage1Thrust ?? 0,
@@ -3223,7 +3223,12 @@ function _loadDesignIntoVab(design) {
   for (const p of design.parts) {
     const def = getPartById(p.partId);
     if (def) _gameState.money -= def.cost;
-    addPartToAssembly(_assembly, p.partId, p.position.x, p.position.y);
+    const instId = addPartToAssembly(_assembly, p.partId, p.position.x, p.position.y);
+    // Restore loaded instruments on science modules.
+    if (p.instruments?.length) {
+      const placed = _assembly.parts.get(instId);
+      if (placed) placed.instruments = [...p.instruments];
+    }
   }
 
   // Rebuild connections by checking snap-point overlap (same pattern as launchPad).
@@ -3445,7 +3450,7 @@ function _doLaunch(crewIds) {
   const launchDesign = createRocketDesign({
     id:          'launch-' + Date.now(),
     name:        'VAB Launch ' + new Date().toLocaleDateString(),
-    parts:       [..._assembly.parts.values()].map(p => ({ partId: p.partId, position: { x: p.x, y: p.y } })),
+    parts:       [..._assembly.parts.values()].map(p => ({ partId: p.partId, position: { x: p.x, y: p.y }, ...(p.instruments?.length ? { instruments: [...p.instruments] } : {}) })),
     staging:     { stages: _stagingConfig.stages.map(s => [...s.instanceIds]), unstaged: [..._stagingConfig.unstaged] },
     totalMass:   _lastValidation?.totalMassKg ?? 0,
     totalThrust: _lastValidation?.stage1Thrust ?? 0,

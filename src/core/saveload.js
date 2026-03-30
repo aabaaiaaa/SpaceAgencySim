@@ -260,6 +260,10 @@ export function loadGame(slotIndex) {
   }
   envelope.state.reputation ??= 50;
 
+  // Default science tracking for saves created before the instrument system.
+  envelope.state.sciencePoints ??= 0;
+  envelope.state.scienceLog ??= [];
+
   return envelope.state;
 }
 

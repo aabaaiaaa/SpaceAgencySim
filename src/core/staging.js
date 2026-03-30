@@ -50,7 +50,7 @@ import { tickFuelSystem }           from './fuelsystem.js';
 import { deployParachute, DEPLOY_DURATION, LOW_DENSITY_THRESHOLD } from './parachute.js';
 import { deployLandingLeg, getDeployedLegFootOffset } from './legs.js';
 import { activateEjectorSeat } from './ejector.js';
-import { activateScienceModule } from './sciencemodule.js';
+import { activateScienceModule, activateInstrument, parseInstrumentKey } from './sciencemodule.js';
 import { applySeparationImpulse } from './collision.js';
 
 // ---------------------------------------------------------------------------
@@ -177,6 +177,13 @@ export function activateCurrentStage(ps, assembly, stagingConfig, flightState) {
   const newDebris = [];
 
   for (const instanceId of instanceIds) {
+    // Handle individual instrument activation keys (moduleId:instr:N).
+    const instrParsed = parseInstrumentKey(instanceId);
+    if (instrParsed) {
+      activateInstrument(ps, assembly, flightState, instanceId);
+      continue;
+    }
+
     if (!ps.activeParts.has(instanceId)) continue;
 
     const placed = assembly.parts.get(instanceId);
@@ -346,6 +353,13 @@ export function activateCurrentStage(ps, assembly, stagingConfig, flightState) {
  * @returns {DebrisState[]}  Newly created debris fragments, or an empty array.
  */
 export function activatePartDirect(ps, assembly, flightState, instanceId) {
+  // Handle individual instrument activation keys (moduleId:instr:N).
+  const instrParsed = parseInstrumentKey(instanceId);
+  if (instrParsed) {
+    activateInstrument(ps, assembly, flightState, instanceId);
+    return [];
+  }
+
   if (!ps.activeParts.has(instanceId)) return [];
 
   const placed = assembly.parts.get(instanceId);

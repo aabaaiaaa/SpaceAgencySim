@@ -318,14 +318,17 @@ export const PARTS = [
   // =========================================================================
 
   /**
-   * Science Module Mk1 — carries experiments that collect data in flight.
+   * Science Module Mk1 — instrument container for science experiments.
+   * Has 2 instrument slots; the player chooses which instruments to load
+   * in the VAB.  Each loaded instrument can be individually activated
+   * during flight (via staging or the part context menu).
    * Can be stacked axially (top/bottom) or mounted radially on the side of
-   * the rocket for compact designs.  Activate to begin the timed experiment.
+   * the rocket for compact designs.
    */
   {
     id: 'science-module-mk1',
     name: 'Science Module Mk1',
-    description: 'A science experiment module. Activate in flight to begin a timed data collection experiment. Can be stacked in-line or mounted radially on the side of the rocket.',
+    description: 'A science instrument container with 2 slots. Load instruments in the VAB, then activate them individually in flight to collect data. Can be stacked in-line or mounted radially.',
     type: PartType.SERVICE_MODULE,
     mass: 200,
     cost: 12_000,
@@ -341,7 +344,7 @@ export const PARTS = [
     activatable: true,
     activationBehaviour: ActivationBehaviour.COLLECT_SCIENCE,
     properties: {
-      experimentDuration: 30, // seconds
+      instrumentSlots: 2,
       dragCoefficient: 0.1,
       heatTolerance: 1500,
       crashThreshold: 10,

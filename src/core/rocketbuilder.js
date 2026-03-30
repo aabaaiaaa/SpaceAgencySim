@@ -15,6 +15,7 @@
  */
 
 import { getPartById, ActivationBehaviour } from '../data/parts.js';
+import { getInstrumentKey }                from './sciencemodule.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -432,6 +433,16 @@ export function createStagingConfig() {
 export function syncStagingWithAssembly(assembly, config) {
   const live = new Set(assembly.parts.keys());
 
+  // Build the set of all valid IDs: live parts + instrument keys.
+  const liveAndInstruments = new Set(live);
+  for (const [id, placed] of assembly.parts) {
+    if (placed.instruments?.length) {
+      for (let i = 0; i < placed.instruments.length; i++) {
+        liveAndInstruments.add(getInstrumentKey(id, i));
+      }
+    }
+  }
+
   // All IDs currently tracked by staging.
   const tracked = new Set([
     ...config.unstaged,
@@ -444,17 +455,39 @@ export function syncStagingWithAssembly(assembly, config) {
       const placed = assembly.parts.get(id);
       const def    = placed ? getPartById(placed.partId) : null;
       if (def && def.activatable) {
-        config.unstaged.push(id);
+        // For science modules with instruments, register each instrument
+        // as a separate stageable entity instead of the module itself.
+        if (def.activationBehaviour === ActivationBehaviour.COLLECT_SCIENCE
+            && placed.instruments?.length) {
+          for (let i = 0; i < placed.instruments.length; i++) {
+            const instrKey = getInstrumentKey(id, i);
+            if (!tracked.has(instrKey)) config.unstaged.push(instrKey);
+          }
+        } else {
+          config.unstaged.push(id);
+        }
       }
     }
   }
 
-  // Prune removed parts from unstaged pool.
-  config.unstaged = config.unstaged.filter((id) => live.has(id));
+  // Also register any new instrument keys for parts already tracked.
+  for (const [id, placed] of assembly.parts) {
+    if (placed.instruments?.length) {
+      for (let i = 0; i < placed.instruments.length; i++) {
+        const instrKey = getInstrumentKey(id, i);
+        if (!tracked.has(instrKey) && !config.unstaged.includes(instrKey)) {
+          config.unstaged.push(instrKey);
+        }
+      }
+    }
+  }
 
-  // Prune removed parts from all stages.
+  // Prune removed parts and stale instrument keys from unstaged pool.
+  config.unstaged = config.unstaged.filter((id) => liveAndInstruments.has(id));
+
+  // Prune removed parts and stale instrument keys from all stages.
   for (const stage of config.stages) {
-    stage.instanceIds = stage.instanceIds.filter((id) => live.has(id));
+    stage.instanceIds = stage.instanceIds.filter((id) => liveAndInstruments.has(id));
   }
 }
 

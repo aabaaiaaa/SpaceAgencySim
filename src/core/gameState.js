@@ -235,6 +235,12 @@ import {
  *                                               - Procedurally generated contract system state.
  * @property {number}          reputation        - Agency reputation (0–100). Affects contract
  *                                                 generation quality and some rewards.
+ * @property {number}          sciencePoints     - Accumulated science points earned from
+ *                                                 experiments (used for tech-tree unlocks).
+ * @property {Array<{instrumentId: string, biomeId: string, count: number}>} scienceLog
+ *                                               - Tracks how many times each (instrument, biome)
+ *                                                 pair has been collected, for diminishing-return
+ *                                                 calculations.
  */
 
 // ---------------------------------------------------------------------------
@@ -309,6 +315,10 @@ export function createGameState() {
     },
 
     reputation: STARTING_REPUTATION,
+
+    // Science system — accumulated points and diminishing-return tracking.
+    sciencePoints: 0,
+    scienceLog: [],
   };
 }
 

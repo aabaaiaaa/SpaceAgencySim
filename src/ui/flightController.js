@@ -778,7 +778,7 @@ export function startFlightScene(
   // Deep-clone the pre-normalisation assembly and staging config so "Restart
   // from Launch" can re-create a pristine flight without returning to the VAB.
   _originalAssembly = {
-    parts:         new Map([...assembly.parts].map(([id, p]) => [id, { ...p }])),
+    parts:         new Map([...assembly.parts].map(([id, p]) => [id, { ...p, ...(p.instruments ? { instruments: [...p.instruments] } : {}) }])),
     connections:   assembly.connections.map(c => ({ ...c })),
     symmetryPairs: assembly.symmetryPairs.map(sp => [...sp]),
     _nextId:       assembly._nextId,
@@ -1873,7 +1873,7 @@ function _executeRestart(rebuildCost) {
 
   // Deep-clone the originals so the new flight gets pristine copies.
   const freshAssembly = {
-    parts:         new Map([...origAssembly.parts].map(([id, p]) => [id, { ...p }])),
+    parts:         new Map([...origAssembly.parts].map(([id, p]) => [id, { ...p, ...(p.instruments ? { instruments: [...p.instruments] } : {}) }])),
     connections:   origAssembly.connections.map(c => ({ ...c })),
     symmetryPairs: origAssembly.symmetryPairs.map(sp => [...sp]),
     _nextId:       origAssembly._nextId,
@@ -2591,7 +2591,7 @@ function _showPostFlightSummary(ps, assembly, flightState, state, onFlightEnd) {
       };
 
       const freshAssembly = {
-        parts:         new Map([...origAssembly.parts].map(([id, p]) => [id, { ...p }])),
+        parts:         new Map([...origAssembly.parts].map(([id, p]) => [id, { ...p, ...(p.instruments ? { instruments: [...p.instruments] } : {}) }])),
         connections:   origAssembly.connections.map(c => ({ ...c })),
         symmetryPairs: origAssembly.symmetryPairs.map(sp => [...sp]),
         _nextId:       origAssembly._nextId,

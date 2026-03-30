@@ -198,11 +198,14 @@ const MAX_CHUTE_ANGULAR_ACCEL = 50.0;
  * @property {Set<string>}     ejectedCrewIds  IDs of crew members who have safely ejected
  *                                           via the ejector seat system during this flight.
  *                                           Populated by `activateEjectorSeat()`.
- * @property {Map<string, import('./sciencemodule.js').ScienceModuleEntry>} scienceModuleStates
- *                                           Experiment lifecycle state for each SERVICE_MODULE
- *                                           part with `COLLECT_SCIENCE` activation behaviour,
- *                                           managed by sciencemodule.js.  Keyed by instance ID.
- *                                           States: idle → running → complete → data_returned.
+ * @property {Map<string, import('./sciencemodule.js').InstrumentStateEntry>} instrumentStates
+ *                                           Per-instrument experiment lifecycle state, keyed by
+ *                                           compound key `moduleInstanceId:instr:slotIndex`.
+ *                                           Managed by sciencemodule.js.
+ * @property {Map<string, object>} scienceModuleStates
+ *                                           Legacy module-level summary state for backward
+ *                                           compatibility with mission objective checks.
+ *                                           Keyed by module instance ID.
  * @property {boolean}         landed        True after a successful soft touchdown.
  * @property {boolean}         crashed       True after a fatal impact.
  * @property {boolean}         grounded      True while still sitting on the launch pad.
@@ -279,6 +282,7 @@ export function createPhysicsState(assembly, flightState) {
     ejectorStates: new Map(),
     ejectedCrewIds: new Set(),
     ejectedCrew: [],              // { x, y, velX, velY } — visible ejected crew capsules
+    instrumentStates: new Map(),
     scienceModuleStates: new Map(),
     heatMap: new Map(),
     debris: [],
@@ -322,7 +326,7 @@ export function createPhysicsState(assembly, flightState) {
   // Flag on flightState so mission objective checking knows whether science
   // modules are present (used to gate HOLD_ALTITUDE time accumulation).
   if (flightState) {
-    flightState.hasScienceModules = ps.scienceModuleStates.size > 0;
+    flightState.hasScienceModules = ps.scienceModuleStates.size > 0 || ps.instrumentStates.size > 0;
     flightState.scienceModuleRunning = false;
   }
 

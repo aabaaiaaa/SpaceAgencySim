@@ -34,7 +34,14 @@ import {
   getScienceModuleStatus,
   getScienceModuleTimer,
   ScienceModuleState,
+  getModuleInstrumentKeys,
+  getInstrumentStatus,
+  getInstrumentTimer,
+  activateInstrument,
+  transmitInstrument,
 }                                                             from '../core/sciencemodule.js';
+import { getInstrumentById }                                  from '../data/instruments.js';
+import { ScienceDataType }                                    from '../core/constants.js';
 
 // ---------------------------------------------------------------------------
 // CSS
@@ -271,40 +278,97 @@ function _showMenu(instanceId, def, ps, assembly, flightState, clientX, clientY)
     hasItems = true;
   }
 
-  // ── SERVICE MODULE: experiment state machine ─────────────────────────────
+  // ── SERVICE MODULE: per-instrument experiment state ───────────────────────
   if (def.type === PartType.SERVICE_MODULE) {
-    const sciState = getScienceModuleStatus(ps, instanceId);
+    const instrumentKeys = getModuleInstrumentKeys(ps, instanceId);
 
-    switch (sciState) {
-      case ScienceModuleState.IDLE:
-        _menu.appendChild(_makeButton('Activate Experiment', () => {
-          const debris = activatePartDirect(ps, assembly, flightState, instanceId);
-          for (const frag of debris) {
-            ps.debris.push(frag);
+    if (instrumentKeys.length > 0) {
+      // Show each loaded instrument with its current state.
+      for (const key of instrumentKeys) {
+        const entry = ps.instrumentStates?.get(key);
+        if (!entry) continue;
+
+        const instrDef = getInstrumentById(entry.instrumentId);
+        const instrName = instrDef?.name ?? entry.instrumentId;
+        const instrState = getInstrumentStatus(ps, key);
+        const dataLabel = entry.dataType === ScienceDataType.SAMPLE ? '[Sample]' : '[Analysis]';
+
+        switch (instrState) {
+          case ScienceModuleState.IDLE:
+            _menu.appendChild(_makeButton(`Activate ${instrName} ${dataLabel}`, () => {
+              activateInstrument(ps, assembly, flightState, key);
+              _hideMenu();
+            }));
+            break;
+
+          case ScienceModuleState.RUNNING: {
+            const remaining = getInstrumentTimer(ps, key);
+            _menu.appendChild(_makeReadOnly(
+              `${instrName}: Running — ${remaining.toFixed(1)} s`,
+            ));
+            break;
           }
-          _hideMenu();
-        }));
-        break;
 
-      case ScienceModuleState.RUNNING: {
-        const remaining = getScienceModuleTimer(ps, instanceId);
-        _menu.appendChild(_makeReadOnly(
-          `Experiment Running — ${remaining.toFixed(1)} s remaining`,
-        ));
-        break;
+          case ScienceModuleState.COMPLETE:
+            if (entry.dataType === ScienceDataType.ANALYSIS) {
+              _menu.appendChild(_makeReadOnly(`${instrName}: Complete ${dataLabel}`));
+              _menu.appendChild(_makeButton(`Transmit ${instrName} (40-60% yield)`, () => {
+                transmitInstrument(ps, assembly, flightState, key, null);
+                _hideMenu();
+              }));
+            } else {
+              _menu.appendChild(_makeReadOnly(`${instrName}: Sample collected — return to ground`));
+            }
+            break;
+
+          case ScienceModuleState.DATA_RETURNED:
+            _menu.appendChild(_makeReadOnly(`${instrName}: Data Returned ✓`));
+            break;
+
+          case ScienceModuleState.TRANSMITTED:
+            _menu.appendChild(_makeReadOnly(`${instrName}: Transmitted ✓`));
+            break;
+
+          default:
+            _menu.appendChild(_makeReadOnly(`${instrName}: ${instrState}`));
+            break;
+        }
       }
+    } else {
+      // Legacy: module with no instruments loaded.
+      const sciState = getScienceModuleStatus(ps, instanceId);
 
-      case ScienceModuleState.COMPLETE:
-        _menu.appendChild(_makeReadOnly('Experiment Complete — data aboard'));
-        break;
+      switch (sciState) {
+        case ScienceModuleState.IDLE:
+          _menu.appendChild(_makeButton('Activate Experiment', () => {
+            const debris = activatePartDirect(ps, assembly, flightState, instanceId);
+            for (const frag of debris) {
+              ps.debris.push(frag);
+            }
+            _hideMenu();
+          }));
+          break;
 
-      case ScienceModuleState.DATA_RETURNED:
-        _menu.appendChild(_makeReadOnly('Data Returned — mission success!'));
-        break;
+        case ScienceModuleState.RUNNING: {
+          const remaining = getScienceModuleTimer(ps, instanceId);
+          _menu.appendChild(_makeReadOnly(
+            `Experiment Running — ${remaining.toFixed(1)} s remaining`,
+          ));
+          break;
+        }
 
-      default:
-        _menu.appendChild(_makeReadOnly(`Experiment: ${sciState}`));
-        break;
+        case ScienceModuleState.COMPLETE:
+          _menu.appendChild(_makeReadOnly('Experiment Complete — data aboard'));
+          break;
+
+        case ScienceModuleState.DATA_RETURNED:
+          _menu.appendChild(_makeReadOnly('Data Returned — mission success!'));
+          break;
+
+        default:
+          _menu.appendChild(_makeReadOnly(`Experiment: ${sciState}`));
+          break;
+      }
     }
     hasItems = true;
   }

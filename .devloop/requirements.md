@@ -100,7 +100,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Define altitude bands as named biomes per celestial body with distinct visual identity and science properties. Earth biomes: Ground (0-100m, 0.5x), Low Atmosphere (100-2000m, 1.0x), Mid Atmosphere (2000-10000m, 1.2x), Upper Atmosphere (10000-40000m, 1.5x), Mesosphere (40000-70000m, 2.0x), Near Space (70000-100000m, 2.5x), Low Orbit (100000-200000m, 3.0x), High Orbit (200000m+, 4.0x). Labels fade in/out at boundaries. Background horizon curvature rendering (imperceptible at ground, visible by 40km+, clear in orbit). Orbital science interaction with biome changes in elliptical orbits.
 
 ### TASK-015: Science modules as instrument containers
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-014
 - **Description**: Rework science modules as containers with limited instrument slots. Player chooses which instruments to load in VAB. Module context menu collates all loaded instrument options. Individual instruments activatable via staging. Science data types: Samples (must be physically returned, full yield) and Analysis data (transmittable from orbit at 40-60% yield, or returned for full yield). Yield formula: baseYield × biomeMultiplier × scienceSkillBonus × diminishingReturn (100% first, 25% second, 10% third, 0% after).
