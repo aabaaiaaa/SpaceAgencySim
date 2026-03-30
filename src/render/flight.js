@@ -214,6 +214,22 @@ let _trailSegments = [];
 let _lastTrailTime = null;
 
 // ---------------------------------------------------------------------------
+// Plume state — sine-wave engine plumes
+// ---------------------------------------------------------------------------
+
+/** Per-engine plume animation state. @type {Map<string, { phase: number }>} */
+let _plumeStates = new Map();
+
+/** Number of sample points per plume edge. */
+const PLUME_SEGMENTS = 18;
+
+/** Sine phase advance rate (radians/second) for liquid engines. */
+const PLUME_PHASE_RATE_LIQUID = 18;
+
+/** Sine phase advance rate (radians/second) for SRBs (more turbulent). */
+const PLUME_PHASE_RATE_SRB = 25;
+
+// ---------------------------------------------------------------------------
 // Camera state — world-space centre of the viewport
 // ---------------------------------------------------------------------------
 
@@ -282,6 +298,280 @@ function _lerpColor(c1, c2, t) {
   const g  = Math.round(g1 + (g2 - g1) * t);
   const b  = Math.round(b1 + (b2 - b1) * t);
   return (r << 16) | (g << 8) | b;
+}
+
+// ---------------------------------------------------------------------------
+// Plume helpers — sine-wave engine plume rendering
+// ---------------------------------------------------------------------------
+
+/**
+ * Return outer/mid/core plume colours interpolated by atmospheric density.
+ * @param {boolean} isSRB
+ * @param {number}  densityRatio  0 = vacuum, 1 = sea level.
+ * @returns {{ outer: number, mid: number, core: number }}
+ */
+function _plumeColors(isSRB, densityRatio) {
+  if (isSRB) {
+    return {
+      outer: _lerpColor(0xff5500, 0xff3300, densityRatio),
+      mid:   _lerpColor(0xff8833, 0xff6600, densityRatio),
+      core:  _lerpColor(0xffffaa, 0xffff88, densityRatio),
+    };
+  }
+  return {
+    outer: _lerpColor(0xff6020, 0xff4400, densityRatio),
+    mid:   _lerpColor(0xffaa40, 0xff8800, densityRatio),
+    core:  _lerpColor(0xffffff, 0xffffcc, densityRatio),
+  };
+}
+
+/**
+ * Compute plume geometry parameters from engine definition and conditions.
+ * @param {import('../data/parts.js').PartDef} def
+ * @param {number} effectiveThrottle  0-1
+ * @param {number} densityRatio       0 = vacuum, 1 = sea level
+ * @param {{ phase: number }} plumeState
+ * @returns {object}
+ */
+function _computePlumeParams(def, effectiveThrottle, densityRatio, plumeState) {
+  const isSRB = def.type === PartType.SOLID_ROCKET_BOOSTER;
+  const thrustKN = def.properties?.thrust ?? 60;
+
+  // Engine size factor (independent of throttle — same nozzle regardless).
+  const sizeFactor = thrustKN / 120; // ~0.5 for Spark, ~3 for heavy SRB
+
+  // Throttle affects length: ranges from 40% at idle to 100% at full.
+  const throttleLengthScale = 0.4 + 0.6 * effectiveThrottle;
+
+  // Atmospheric mapping.
+  const lengthMult = 1.0 + 4.0 * (1 - densityRatio);
+  const baseWMult  = 0.8 + 1.0 * (1 - densityRatio);
+  const tipRatio   = 0.1 + 0.6 * (1 - densityRatio);
+
+  // Width is based on engine size only — the nozzle doesn't change.
+  const baseWidthM = 0.3 * sizeFactor;
+
+  // Length scales with both engine size and throttle.
+  const baseLengthM = 1.5 * sizeFactor * throttleLengthScale;
+
+  const length    = baseLengthM * lengthMult;
+  const baseWidth = baseWidthM * baseWMult;
+  const tipWidth  = baseWidth * tipRatio;
+
+  const sineFreq = isSRB ? 5.0 : 3.5;
+  const sineAmp  = baseWidth * (isSRB ? 0.15 : 0.10);
+
+  const diamondCount = Math.round(5 * densityRatio);
+  const diamondAlpha = 0.7 * densityRatio;
+
+  return {
+    length, baseWidth, tipWidth,
+    sineFreq, sineAmp,
+    phase: plumeState.phase,
+    diamondCount, diamondAlpha,
+    isSRB,
+    throttle: effectiveThrottle,
+    densityRatio,
+  };
+}
+
+/**
+ * Draw a sine-wave plume polygon path into a Graphics object.
+ * The plume centerline curves from the thrust axis at the nozzle toward
+ * the bend direction at the tip, simulating velocity-induced plume bending.
+ *
+ * @param {PIXI.Graphics} g
+ * @param {number} nsx        Nozzle screen X.
+ * @param {number} nsy        Nozzle screen Y.
+ * @param {number} exDirX     Exhaust direction X (screen space, unit-ish).
+ * @param {number} exDirY     Exhaust direction Y (screen space, unit-ish).
+ * @param {number} bendX      Bend offset X at tip (screen pixels).
+ * @param {number} bendY      Bend offset Y at tip (screen pixels).
+ * @param {number} pLength    Plume length in screen pixels.
+ * @param {number} pBaseW     Base half-width in screen pixels.
+ * @param {number} pTipW      Tip half-width in screen pixels.
+ * @param {number} sineAmpPx  Sine amplitude in screen pixels.
+ * @param {number} sineFreq   Sine frequency (cycles per plume length).
+ * @param {number} phase      Sine phase offset.
+ * @param {number} segs       Number of segments per edge.
+ */
+function _drawPlumePath(g, nsx, nsy, exDirX, exDirY, bendX, bendY, pLength, pBaseW, pTipW, sineAmpPx, sineFreq, phase, segs) {
+  // For each sample point at parameter t (0=nozzle, 1=tip):
+  //   centerline = nozzle + exDir * t * length + bend * t²
+  //   The t² gives a smooth curve — no bend at nozzle, full bend at tip.
+  //   Perpendicular is computed from the local tangent direction.
+
+  // Helper: compute centerline point and local perpendicular at parameter t.
+  function _sample(t) {
+    const t2 = t * t;
+    const cx = nsx + exDirX * t * pLength + bendX * t2;
+    const cy = nsy + exDirY * t * pLength + bendY * t2;
+    // Tangent = d/dt of centerline.
+    const tx = exDirX * pLength + 2 * bendX * t;
+    const ty = exDirY * pLength + 2 * bendY * t;
+    const tLen = Math.hypot(tx, ty) || 1;
+    // Perpendicular (rotated 90° CCW).
+    const px = -ty / tLen;
+    const py =  tx / tLen;
+    return { cx, cy, px, py };
+  }
+
+  // Left edge: nozzle → tip.
+  {
+    const s = _sample(0);
+    const hw = pBaseW + Math.sin(phase) * sineAmpPx;
+    g.moveTo(s.cx - s.px * hw, s.cy - s.py * hw);
+  }
+  for (let i = 1; i <= segs; i++) {
+    const t = i / segs;
+    const s = _sample(t);
+    const envHW = pBaseW + (pTipW - pBaseW) * t;
+    const sine  = Math.sin(t * sineFreq * Math.PI * 2 + phase) * sineAmpPx * (1 - t * 0.5);
+    const hw = envHW + sine;
+    g.lineTo(s.cx - s.px * hw, s.cy - s.py * hw);
+  }
+
+  // Right edge: tip → nozzle (offset phase for asymmetry).
+  const phaseR = phase + 1.3;
+  for (let i = segs; i >= 0; i--) {
+    const t = i / segs;
+    const s = _sample(t);
+    const envHW = pBaseW + (pTipW - pBaseW) * t;
+    const sine  = Math.sin(t * sineFreq * Math.PI * 2 + phaseR) * sineAmpPx * (1 - t * 0.5);
+    const hw = envHW + sine;
+    g.lineTo(s.cx + s.px * hw, s.cy + s.py * hw);
+  }
+
+  g.closePath();
+}
+
+/**
+ * Update per-engine plume animation state (create/remove/advance phase).
+ * @param {import('../core/physics.js').PhysicsState} ps
+ * @param {import('../core/rocketbuilder.js').RocketAssembly} assembly
+ * @param {number} dt  Frame delta in seconds.
+ */
+function _updatePlumeStates(ps, assembly, dt) {
+  // Collect currently-firing engine instance IDs.
+  const firingEngines = new Set();
+  for (const [instanceId, placed] of assembly.parts) {
+    if (!ps.activeParts.has(instanceId)) continue;
+    const def = getPartById(placed.partId);
+    if (!def) continue;
+    const isEngine = def.type === PartType.ENGINE || def.type === PartType.SOLID_ROCKET_BOOSTER;
+    if (!isEngine) continue;
+    const isFiring = ps.firingEngines && ps.firingEngines.has(instanceId);
+    const isSRB = def.type === PartType.SOLID_ROCKET_BOOSTER;
+    const effectiveThrottle = isFiring ? (isSRB ? 1 : (ps.throttle ?? 0)) : 0;
+    if (effectiveThrottle <= 0) continue;
+
+    firingEngines.add(instanceId);
+    if (!_plumeStates.has(instanceId)) {
+      _plumeStates.set(instanceId, { phase: Math.random() * Math.PI * 2 });
+    }
+    const state = _plumeStates.get(instanceId);
+    const rate = isSRB ? PLUME_PHASE_RATE_SRB : PLUME_PHASE_RATE_LIQUID;
+    state.phase += dt * rate;
+  }
+
+  // Remove entries for engines that stopped firing.
+  for (const id of _plumeStates.keys()) {
+    if (!firingEngines.has(id)) _plumeStates.delete(id);
+  }
+}
+
+/**
+ * Render sine-wave engine plumes for all firing engines.
+ * @param {import('../core/physics.js').PhysicsState} ps
+ * @param {import('../core/rocketbuilder.js').RocketAssembly} assembly
+ * @param {number} density  Air density at current altitude.
+ * @param {number} w  Canvas width.
+ * @param {number} h  Canvas height.
+ */
+function _renderPlumes(ps, assembly, density, w, h) {
+  if (!_trailContainer || _plumeStates.size === 0) return;
+
+  const ppm = _ppm();
+  const densityRatio = Math.min(1, density / 1.225);
+  const comWorld = _computeCoM(ps.fuelStore, assembly, ps.activeParts, 0, 0);
+  const comBody  = { x: comWorld.x, y: comWorld.y };
+  const segs = _zoomLevel < 0.3 ? 8 : PLUME_SEGMENTS;
+
+  // Exhaust direction in screen space (opposite to rocket nose).
+  // Nose in world = (sin(angle), cos(angle)).  Exhaust = negated.
+  // World→screen flips Y, so exhaust screen = (-sin(angle), +cos(angle)).
+  const exDirX = -Math.sin(ps.angle);
+  const exDirY =  Math.cos(ps.angle);
+
+  // Plume bends slightly when the rocket is turning (angular velocity).
+  // The tip of the plume lags behind the rotation — bend perpendicular
+  // to the exhaust axis in the direction opposite to the turn.
+  // Perpendicular to exhaust in screen space: (-exDirY, exDirX).
+  const angVel = ps.angularVelocity ?? 0;
+  const bendMag = Math.min(1, Math.abs(angVel) * 2) * ppm * 2; // max 2m bend
+  const bendSign = angVel > 0 ? -1 : 1; // bend opposite to rotation direction
+  const bendX = -exDirY * bendSign * bendMag;
+  const bendY =  exDirX * bendSign * bendMag;
+
+  const g = new PIXI.Graphics();
+  _trailContainer.addChild(g);
+
+  for (const [instanceId, plumeState] of _plumeStates) {
+    const placed = assembly.parts.get(instanceId);
+    const def = placed ? getPartById(placed.partId) : null;
+    if (!def) continue;
+
+    const isSRB = def.type === PartType.SOLID_ROCKET_BOOSTER;
+    const isFiring = ps.firingEngines && ps.firingEngines.has(instanceId);
+    const effectiveThrottle = isFiring ? (isSRB ? 1 : (ps.throttle ?? 0)) : 0;
+    if (effectiveThrottle <= 0) continue;
+
+    // Nozzle world position.
+    const nozzle = _nozzleWorldPos(ps, placed, def, comBody);
+    const { sx: nsx, sy: nsy } = _worldToScreen(nozzle.x, nozzle.y, w, h);
+
+    const params = _computePlumeParams(def, effectiveThrottle, densityRatio, plumeState);
+    const colors = _plumeColors(isSRB, densityRatio);
+
+    const lengthPx  = params.length * ppm;
+    const baseHWPx  = (params.baseWidth / 2) * ppm;
+    const tipHWPx   = (params.tipWidth / 2) * ppm;
+    const sineAmpPx = params.sineAmp * ppm;
+
+    // Layer 1: Outer glow.
+    _drawPlumePath(g, nsx, nsy, exDirX, exDirY, bendX, bendY,
+      lengthPx, baseHWPx, tipHWPx,
+      sineAmpPx, params.sineFreq, params.phase, segs);
+    g.fill({ color: colors.outer, alpha: 0.5 * effectiveThrottle });
+
+    // Layer 2: Mid core (60% width, less sine).
+    _drawPlumePath(g, nsx, nsy, exDirX, exDirY, bendX, bendY,
+      lengthPx, baseHWPx * 0.6, tipHWPx * 0.6,
+      sineAmpPx * 0.4, params.sineFreq, params.phase, segs);
+    g.fill({ color: colors.mid, alpha: 0.7 * effectiveThrottle });
+
+    // Layer 3: Inner core (25% width, no sine, 70% length).
+    _drawPlumePath(g, nsx, nsy, exDirX, exDirY,
+      bendX * 0.7, bendY * 0.7,  // less bend on core
+      lengthPx * 0.7, baseHWPx * 0.25, tipHWPx * 0.15,
+      0, params.sineFreq, params.phase, segs);
+    g.fill({ color: colors.core, alpha: 0.9 * effectiveThrottle });
+
+    // Shock diamonds — placed along the curved centerline.
+    if (params.diamondCount > 0 && params.diamondAlpha > 0) {
+      const spacing = lengthPx / (params.diamondCount + 1);
+      for (let d = 1; d <= params.diamondCount; d++) {
+        const t  = (d * spacing) / lengthPx;
+        const t2 = t * t;
+        const cx = nsx + exDirX * t * lengthPx + bendX * t2;
+        const cy = nsy + exDirY * t * lengthPx + bendY * t2;
+        const dw = (baseHWPx * 0.4 + (tipHWPx * 0.3 - baseHWPx * 0.4) * t);
+        const dh = dw * 0.6;
+        g.ellipse(cx, cy, Math.max(1, dw), Math.max(1, dh));
+        g.fill({ color: 0xeeeeff, alpha: params.diamondAlpha * (1 - t * 0.5) * effectiveThrottle });
+      }
+    }
+  }
 }
 
 /**
@@ -1145,6 +1435,173 @@ function _renderEjectedCrew(ps, w, h) {
 }
 
 // ---------------------------------------------------------------------------
+// Mach effects — vapor cone and compression waves
+// ---------------------------------------------------------------------------
+
+/** Speed of sound at sea level (m/s). */
+const MACH_1 = 343;
+
+/** Phase for animating compression wave shimmer. */
+let _machPhase = 0;
+
+/** Previous frame's Mach effect Graphics, removed at start of next frame. @type {PIXI.Graphics|null} */
+let _machGraphics = null;
+
+/**
+ * Render transonic/supersonic visual effects around the rocket.
+ *
+ * - Vapor cone: translucent V-shape at the nose, visible Mach 0.85–1.5
+ * - Compression waves: faint arcs trailing from the nose above Mach 1
+ *
+ * Both effects scale with atmospheric density and vanish in vacuum.
+ *
+ * @param {import('../core/physics.js').PhysicsState}             ps
+ * @param {import('../core/rocketbuilder.js').RocketAssembly}     assembly
+ * @param {number} density  Current air density.
+ * @param {number} w        Canvas width.
+ * @param {number} h        Canvas height.
+ * @param {number} dt       Frame delta in seconds.
+ */
+function _renderMachEffects(ps, assembly, density, w, h, dt) {
+  const speed = Math.hypot(ps.velX, ps.velY);
+  const mach  = speed / MACH_1;
+  const densityRatio = Math.min(1, density / 1.225);
+
+  // Remove previous frame's Mach graphics.
+  if (_machGraphics && _machGraphics.parent) {
+    _machGraphics.parent.removeChild(_machGraphics);
+  }
+  _machGraphics = null;
+
+  // No effects below Mach 0.85 or in near-vacuum.
+  if (mach < 0.85 || densityRatio < 0.02) return;
+  if (!_rocketContainer) return;
+
+  _machPhase += dt * 10;
+
+  const ppm = _ppm();
+
+  // Find the nose tip — highest VAB Y among active parts.
+  const comWorld = _computeCoM(ps.fuelStore, assembly, ps.activeParts, 0, 0);
+  let noseVabY = -Infinity;
+  let nosePartWidth = 20;
+  for (const instanceId of ps.activeParts) {
+    const placed = assembly.parts.get(instanceId);
+    if (!placed) continue;
+    const def = getPartById(placed.partId);
+    if (!def) continue;
+    const top = placed.y + (def.height ?? 20) / 2;
+    if (top > noseVabY) {
+      noseVabY = top;
+      nosePartWidth = def.width ?? 20;
+    }
+  }
+
+  // Convert nose tip from VAB local coords to world coords.
+  // VAB local: (0, noseVabY) in pixels. Convert to metres, then rotate.
+  const cosA = Math.cos(ps.angle);
+  const sinA = Math.sin(ps.angle);
+  const noseM = noseVabY * SCALE_M_PER_PX;
+  // In world space, the rocket body Y-up: nose at (posX + noseM*sinA, posY + noseM*cosA)
+  // But we need to account for CoM offset since the rocket rotates around CoM.
+  const comM = comWorld.y;  // CoM in metres from reference
+  const noseOffsetM = noseM - comM;
+  const noseWorldX = ps.posX + comWorld.x + noseOffsetM * sinA;
+  const noseWorldY = ps.posY + comM + noseOffsetM * cosA;
+  const { sx: noseSX, sy: noseSY } = _worldToScreen(noseWorldX, noseWorldY, w, h);
+
+  // Direction of travel in screen space.
+  const velSX =  ps.velX;
+  const velSY = -ps.velY;  // world Y-up → screen Y-down
+  const velLen = Math.hypot(velSX, velSY) || 1;
+  const vdx = velSX / velLen;
+  const vdy = velSY / velLen;
+
+  // Perpendicular to velocity (screen space).
+  const perpX = -vdy;
+  const perpY =  vdx;
+
+  const g = new PIXI.Graphics();
+
+  // ── Sine-wave shock lines ───────────────────────────────────────────────
+  // Two wavy lines emanating from ahead of the nose, spreading outward
+  // and trailing behind.  They start above/ahead of the rocket and extend
+  // well past it.
+
+  // Intensity: peaks at Mach 1, persists but fades at higher Mach.
+  const intensity = mach < 1
+    ? (mach - 0.85) / 0.15
+    : Math.max(0.3, 1 - (mach - 1) * 0.3);
+  const alpha = intensity * densityRatio * 0.4;
+  if (alpha < 0.01) {
+    if (_rocketContainer.parent) {
+      _rocketContainer.parent.addChild(g);
+      _machGraphics = g;
+    }
+    return;
+  }
+
+  // Shock cone half-angle: wide at Mach 1, narrows at higher Mach.
+  const halfAngle = mach >= 1
+    ? Math.asin(Math.min(1, 1 / mach))
+    : Math.PI / 2.5;
+
+  // How far ahead of the nose the lines start, and how far behind they trail.
+  const leadPx  = 20 * ppm * SCALE_M_PER_PX;   // start ahead of nose
+  const trailPx = 150 * ppm * SCALE_M_PER_PX;  // extend well past the rocket
+  const totalLen = leadPx + trailPx;
+
+  // Starting point: ahead of the nose along velocity direction.
+  const startX = noseSX + vdx * leadPx;
+  const startY = noseSY + vdy * leadPx;
+
+  const segs = 24;
+  const sineFreq = 3 + mach * 1.5;
+  const sineAmp  = 3 * ppm * SCALE_M_PER_PX;
+  const lineWidth = Math.max(1, 1.5 * densityRatio);
+
+  // Draw two symmetric shock lines (left and right).
+  for (const side of [-1, 1]) {
+    const sidePhase = _machPhase + side * 0.8;
+
+    g.moveTo(startX, startY);
+
+    for (let i = 1; i <= segs; i++) {
+      const t = i / segs;
+      // Distance behind the start point.
+      const dist = t * totalLen;
+      // Spread: increases along the line at the shock angle.
+      const spread = dist * Math.tan(halfAngle) * side;
+      // Sine wobble for organic look, dampened near the start.
+      const wobble = Math.sin(t * sineFreq * Math.PI * 2 + sidePhase)
+                   * sineAmp * Math.min(1, t * 3);
+
+      // Position: start - velocity*dist + perpendicular*(spread + wobble)
+      const px = startX - vdx * dist + perpX * (spread + wobble);
+      const py = startY - vdy * dist + perpY * (spread + wobble);
+      g.lineTo(px, py);
+    }
+
+    // Fade from bright near nose to transparent at tail.
+    g.stroke({ color: 0xc8e0ff, width: lineWidth, alpha: alpha });
+  }
+
+  // ── Condensation flash near Mach 1 ─────────────────────────────────────
+  // A brief white glow around the nose at transonic speeds.
+  if (mach > 0.95 && mach < 1.15) {
+    const flashIntensity = 1 - Math.abs(mach - 1.05) / 0.15;
+    const flashR = nosePartWidth * ppm * SCALE_M_PER_PX * 1.5;
+    g.circle(noseSX, noseSY, Math.max(3, flashR));
+    g.fill({ color: 0xffffff, alpha: flashIntensity * densityRatio * 0.2 });
+  }
+
+  if (_rocketContainer.parent) {
+    _rocketContainer.parent.addChild(g);
+    _machGraphics = g;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Engine trail helpers
 // ---------------------------------------------------------------------------
 
@@ -1186,108 +1643,63 @@ function _nozzleWorldPos(ps, placed, def, comBody) {
  * @param {import('../core/rocketbuilder.js').RocketAssembly}   assembly
  * @param {number}                                              density  Current air density (kg/m³).
  */
-function _emitTrailSegments(ps, assembly, density) {
+function _emitSmokeSegments(ps, assembly, density) {
   if (density <= TRAIL_DENSITY_THRESHOLD) return;
 
-  // Compute CoM in body-frame metres (relative to reference point) so trail
-  // emission rotates around the same pivot as the visual rocket.
   const comWorld = _computeCoM(ps.fuelStore, assembly, ps.activeParts, 0, 0);
   const comBody  = { x: comWorld.x, y: comWorld.y };
 
-  // Exhaust drift direction: opposite to rocket nose (thrust direction).
   const exVx = -Math.sin(ps.angle) * TRAIL_DRIFT_SPEED;
   const exVy = -Math.cos(ps.angle) * TRAIL_DRIFT_SPEED;
 
-  // Lateral fanning: smoke spreads sideways when velocity is low.
-  // Fan effect falls off as speed increases above TRAIL_FAN_VELOCITY_CUTOFF.
   const speed      = Math.hypot(ps.velX, ps.velY);
   const fanFactor  = Math.max(0, 1 - speed / TRAIL_FAN_VELOCITY_CUTOFF);
   const fanX       = Math.cos(ps.angle) * TRAIL_FAN_SPEED * fanFactor;
 
-  // Atmospheric lifetime multiplier: denser air → longer-lived smoke.
-  const densityRatio = Math.min(1, density / 1.225); // normalised to sea-level
+  const densityRatio  = Math.min(1, density / 1.225);
   const ageMultiplier = 1 + TRAIL_ATMOSPHERE_AGE_BONUS * densityRatio;
 
   const throttle = ps.throttle ?? 0;
 
-  // Collect all engine parts (firing or not) for residual smoke.
   for (const [instanceId, placed] of assembly.parts) {
     if (!ps.activeParts.has(instanceId)) continue;
     const def = placed ? getPartById(placed.partId) : null;
     if (!def) continue;
 
-    const isSRB     = def.type === PartType.SOLID_ROCKET_BOOSTER;
-    const isEngine  = def.type === PartType.ENGINE || isSRB;
+    const isSRB    = def.type === PartType.SOLID_ROCKET_BOOSTER;
+    const isEngine = def.type === PartType.ENGINE || isSRB;
     if (!isEngine) continue;
 
-    const isFiring  = ps.firingEngines && ps.firingEngines.has(instanceId);
+    const isFiring = ps.firingEngines && ps.firingEngines.has(instanceId);
     const effectiveThrottle = isFiring ? (isSRB ? 1 : throttle) : 0;
 
-    // Skip all trail emission when throttle is zero (or engine not firing).
-    // No flames, no smoke — not even residual heat trails on the launch pad.
     if (effectiveThrottle <= 0) {
-      // Residual heat smoke — tiny, only in dense atmosphere, and only when
-      // the rocket is actually in flight (not sitting idle on the pad).
+      // Residual heat smoke.
       if (!isFiring && !ps.grounded && densityRatio >= 0.1) {
         const nozzle = _nozzleWorldPos(ps, placed, def, comBody);
         _trailSegments.push({
-          worldX:      nozzle.x,
-          worldY:      nozzle.y,
-          vx:          exVx * 0.15 + (Math.random() - 0.5) * fanX,
-          vy:          exVy * 0.15 + Math.abs(exVy) * 0.2 * fanFactor,
-          age:         0,
-          baseW:       2,
-          baseH:       4,
-          isSRB:       false,
-          maxAge:      TRAIL_MAX_AGE * ageMultiplier * 0.4,
-          isSmoke:     true,
+          worldX: nozzle.x, worldY: nozzle.y,
+          vx: exVx * 0.15 + (Math.random() - 0.5) * fanX,
+          vy: exVy * 0.15 + Math.abs(exVy) * 0.2 * fanFactor,
+          age: 0, baseW: 2, baseH: 4, isSRB: false,
+          maxAge: TRAIL_MAX_AGE * ageMultiplier * 0.4, isSmoke: true,
         });
       }
       continue;
     }
 
-    const nozzle = _nozzleWorldPos(ps, placed, def, comBody);
-
-    // Emit multiple overlapping fire segments per frame to create a
-    // connected flame shape — segments are staggered along the exhaust axis
-    // so the flame looks like a cone tapering away from the nozzle.
-    const fireBaseW = (isSRB ? 14 : 8)  * (0.5 + effectiveThrottle * 0.5);
-    const fireBaseH = (isSRB ? 32 : 18) * (0.5 + effectiveThrottle * 0.5);
-    const flameSteps = isSRB ? 4 : 3;
-    for (let step = 0; step < flameSteps; step++) {
-      const frac  = step / flameSteps;           // 0 = nozzle tip, 1 = tail end
-      const taper = 1 - frac * 0.6;             // wider at tip, narrower further back
-      // Pre-age the further segments so they fade correctly at the tail.
-      _trailSegments.push({
-        worldX:  nozzle.x + exVx * frac * TRAIL_MAX_AGE * 0.6,
-        worldY:  nozzle.y + exVy * frac * TRAIL_MAX_AGE * 0.6,
-        vx:      exVx,
-        vy:      exVy,
-        age:     frac * TRAIL_MAX_AGE * 0.5,
-        baseW:   fireBaseW * taper,
-        baseH:   fireBaseH * taper,
-        isSRB,
-        maxAge:  TRAIL_MAX_AGE,
-        isSmoke: false,
-      });
-    }
-
-    // Atmosphere smoke — longer trail in dense air, fans at low velocity.
+    // Atmosphere smoke only (fire is now handled by _renderPlumes).
     if (densityRatio > 0.05) {
+      const nozzle = _nozzleWorldPos(ps, placed, def, comBody);
       const smokeW = (isSRB ? 20 : 12) * densityRatio * (0.5 + effectiveThrottle * 0.5);
       const smokeH = (isSRB ? 44 : 26) * densityRatio * (0.5 + effectiveThrottle * 0.5);
       const lateralSign = Math.random() < 0.5 ? 1 : -1;
       _trailSegments.push({
-        worldX:  nozzle.x,
-        worldY:  nozzle.y,
-        vx:      exVx * 0.45 + lateralSign * fanX * (0.3 + Math.random() * 0.7),
-        vy:      exVy * 0.45 + Math.abs(exVy) * 0.3 * fanFactor,
-        age:     0,
-        baseW:   smokeW,
-        baseH:   smokeH,
-        isSRB:   false,
-        maxAge:  TRAIL_MAX_AGE * ageMultiplier,
-        isSmoke: true,
+        worldX: nozzle.x, worldY: nozzle.y,
+        vx: exVx * 0.45 + lateralSign * fanX * (0.3 + Math.random() * 0.7),
+        vy: exVy * 0.45 + Math.abs(exVy) * 0.3 * fanFactor,
+        age: 0, baseW: smokeW, baseH: smokeH, isSRB: false,
+        maxAge: TRAIL_MAX_AGE * ageMultiplier, isSmoke: true,
       });
     }
   }
@@ -1464,9 +1876,10 @@ export function initFlightRenderer() {
   // Pre-generate the deterministic star field.
   _generateStars();
 
-  // Reset trail state.
+  // Reset trail and plume state.
   _trailSegments = [];
   _lastTrailTime = null;
+  _plumeStates   = new Map();
 
   // Reset camera to launch-pad origin.
   _camWorldX   = 0;
@@ -1523,19 +1936,23 @@ export function renderFlightFrame(ps, assembly) {
   //    the command module, which is handled by _updateCamera above).
   _renderDebris(ps.debris, assembly, w, h);
 
-  // 6. Engine trails — fading exhaust segments behind each firing engine.
-  //    Suppressed above ~50 000 m where atmospheric density drops below threshold.
+  // 6. Engine exhaust — smoke particles + sine-wave plumes.
   const trailDensity = airDensity(altitude);
   const dt           = _trailDt();
-  _emitTrailSegments(ps, assembly, trailDensity);
+  _emitSmokeSegments(ps, assembly, trailDensity);
   _updateTrails(dt);
   _renderTrails(w, h);
+  _updatePlumeStates(ps, assembly, dt);
+  _renderPlumes(ps, assembly, trailDensity, w, h);
 
   // 6b. Ejected crew capsules with parachutes.
   _renderEjectedCrew(ps, w, h);
 
   // 7. Active rocket — full opacity, camera centred here (normally).
   _renderRocket(ps, assembly, w, h);
+
+  // 8. Mach effects — vapor cone and compression waves at transonic/supersonic.
+  _renderMachEffects(ps, assembly, trailDensity, w, h, dt);
 }
 
 /**
@@ -1569,6 +1986,9 @@ export function destroyFlightRenderer() {
   _stars           = [];
   _trailSegments   = [];
   _lastTrailTime   = null;
+  _plumeStates     = new Map();
+  _machGraphics    = null;
+  _machPhase       = 0;
 
   _camWorldX   = 0;
   _camWorldY   = 0;

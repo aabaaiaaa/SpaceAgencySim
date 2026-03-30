@@ -662,6 +662,7 @@ let _elTWR           = null;   // left-panel TWR value
 let _elAlt           = null;   // left-panel altitude (id: hud-alt)
 let _elVelY          = null;   // left-panel vertical speed (id: hud-vely)
 let _elVelX          = null;   // left-panel horizontal speed (id: hud-velx)
+let _elApo           = null;   // left-panel apoapsis (id: hud-apo)
 let _elStagingList   = null;   // left-panel staging container
 let _elFuelList      = null;   // left-panel fuel list
 let _elObjList       = null;   // objectives panel (top-right, unchanged)
@@ -793,6 +794,7 @@ export function destroyFlightHud() {
   _elAlt           = null;
   _elVelY          = null;
   _elVelX          = null;
+  _elApo           = null;
   _elStagingList   = null;
   _elFuelList      = null;
   _elObjList       = null;
@@ -904,6 +906,19 @@ function _buildLeftPanel() {
   velXRow.appendChild(velXLbl);
   velXRow.appendChild(_elVelX);
   statusSec.appendChild(velXRow);
+
+  const apoRow = document.createElement('div');
+  apoRow.className = 'flight-lp-twr-row';
+  const apoLbl = document.createElement('div');
+  apoLbl.className = 'flight-lp-lbl';
+  apoLbl.textContent = 'Apo';
+  _elApo = document.createElement('div');
+  _elApo.id = 'hud-apo';
+  _elApo.className = 'flight-lp-val';
+  _elApo.textContent = '—';
+  apoRow.appendChild(apoLbl);
+  apoRow.appendChild(_elApo);
+  statusSec.appendChild(apoRow);
 
   panel.appendChild(statusSec);
 
@@ -1363,6 +1378,18 @@ function _updateLeftPanel() {
   if (_elVelX) {
     const vx = _ps.velX ?? 0;
     _elVelX.textContent = `${vx >= 0 ? '+' : ''}${vx.toFixed(1)} m/s`;
+  }
+  if (_elApo) {
+    const alt = Math.max(0, _ps.posY ?? 0);
+    const vy  = _ps.velY ?? 0;
+    const apo = _estimateApoapsis(alt, vy);
+    if (apo > alt + 10) {
+      _elApo.textContent = apo >= 1000
+        ? `${(apo / 1000).toFixed(1)} km`
+        : `${Math.round(apo)} m`;
+    } else {
+      _elApo.textContent = '—';
+    }
   }
 
   // ── Throttle ──────────────────────────────────────────────────────────────
