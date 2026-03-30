@@ -279,6 +279,12 @@ let _wheelHandler = null;
 /** Bound mousemove event handler, stored for removal on destroy. @type {((e: MouseEvent) => void)|null} */
 let _mouseMoveHandler = null;
 
+/**
+ * When false, flight-specific input handlers (wheel zoom, mouse tracking)
+ * are ignored.  Used by the map view to prevent conflicting scroll zoom.
+ */
+let _inputEnabled = true;
+
 // ---------------------------------------------------------------------------
 // Colour utilities
 // ---------------------------------------------------------------------------
@@ -1821,6 +1827,7 @@ function _onMouseMove(e) {
  * @param {WheelEvent} e
  */
 function _onWheel(e) {
+  if (!_inputEnabled) return;
   e.preventDefault();
 
   // Scroll up (deltaY < 0) = zoom in; scroll down = zoom out.
@@ -2011,6 +2018,45 @@ export function destroyFlightRenderer() {
   _zoomLevel = 1.0;
 
   console.log('[Flight Renderer] Destroyed');
+}
+
+/**
+ * Hide all flight-scene containers (used when the map view is active).
+ * The containers are not destroyed — just made invisible so rendering
+ * doesn't consume GPU time while the map covers the screen.
+ */
+export function hideFlightScene() {
+  if (_skyGraphics)     _skyGraphics.visible = false;
+  if (_starsContainer)  _starsContainer.visible = false;
+  if (_groundGraphics)  _groundGraphics.visible = false;
+  if (_debrisContainer) _debrisContainer.visible = false;
+  if (_trailContainer)  _trailContainer.visible = false;
+  if (_rocketContainer) _rocketContainer.visible = false;
+  if (_canopyContainer) _canopyContainer.visible = false;
+}
+
+/**
+ * Show all flight-scene containers (used when returning from the map view).
+ */
+export function showFlightScene() {
+  if (_skyGraphics)     _skyGraphics.visible = true;
+  if (_starsContainer)  _starsContainer.visible = true;
+  if (_groundGraphics)  _groundGraphics.visible = true;
+  if (_debrisContainer) _debrisContainer.visible = true;
+  if (_trailContainer)  _trailContainer.visible = true;
+  if (_rocketContainer) _rocketContainer.visible = true;
+  if (_canopyContainer) _canopyContainer.visible = true;
+}
+
+/**
+ * Enable or disable flight-specific input handling (scroll zoom, mouse
+ * tracking).  Disabled while the map view is active to prevent conflicting
+ * wheel events.
+ *
+ * @param {boolean} enabled
+ */
+export function setFlightInputEnabled(enabled) {
+  _inputEnabled = enabled;
 }
 
 /**

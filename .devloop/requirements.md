@@ -26,7 +26,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Implement distinct flight phases: LAUNCH → FLIGHT → ORBIT → MANOEUVRE / REENTRY / TRANSFER → CAPTURE → FLIGHT (landing). Seamless transition from FLIGHT to ORBIT with notification label. Player cannot leave craft mid-transfer. Brief warning on ORBIT to FLIGHT transition. From ORBIT, player can return to agency (completing a period). Note: docking mode is a control mode within ORBIT (see TASK-005), not a flight phase. Ensure all phase transitions are clean and well-defined.
 
 ### TASK-004: Implement map view
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-002, TASK-003
 - **Description**: Create a top-down map view as a completely separate PixiJS scene from the flight view. Toggle swaps active scene. Show control tip on toggle. During FLIGHT: static view, no time warp. During ORBIT: time warp enabled, objects move. Zoom levels: orbit slot detail, local body, craft-to-target, solar system. Player craft shown as point. Thrust/RCS controls work from map view with orbital-relative mapping (W=prograde, S=retrograde, A/D=radial). Orbit predictions cover a few orbits. "Warp to target" option. Day/night shadow overlay option. Requires Tracking Station facility.

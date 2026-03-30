@@ -15,7 +15,10 @@
  * @module ui/flightController
  */
 
-import { initFlightRenderer, destroyFlightRenderer, renderFlightFrame } from '../render/flight.js';
+import { initFlightRenderer, destroyFlightRenderer, renderFlightFrame, hideFlightScene, showFlightScene, setFlightInputEnabled } from '../render/flight.js';
+import { initMapRenderer, destroyMapRenderer, renderMapFrame, showMapScene, hideMapScene, isMapVisible, cycleMapZoom, getMapZoomLevel, cycleMapTarget, getMapTarget, toggleMapShadow, setMapTarget } from '../render/map.js';
+import { MapZoom, MapThrustDir, computeOrbitalThrustAngle, isMapViewAvailable } from '../core/mapView.js';
+import { warpToTarget } from '../core/orbit.js';
 import {
   createPhysicsState,
   tick,
@@ -88,6 +91,26 @@ let _originalStagingConfig = null;
  * firing on the same frame that the player clicks "Return to Agency").
  */
 let _summaryShown = false;
+
+// ---------------------------------------------------------------------------
+// Map view state
+// ---------------------------------------------------------------------------
+
+/** True when the map view is the active scene. */
+let _mapActive = false;
+
+/**
+ * Set of orbital-relative thrust keys currently held while the map view
+ * is active (e.g. 'w', 's', 'a', 'd').  Separate from the physics held-key
+ * set because WASD are not forwarded to `handleKeyDown` in map mode.
+ */
+let _mapHeldKeys = new Set();
+
+/** True while the craft is thrusting due to map-view orbital controls. */
+let _mapThrusting = false;
+
+/** The DOM element for the map-view HUD overlay. @type {HTMLElement|null} */
+let _mapHud = null;
 
 // ---------------------------------------------------------------------------
 // Time-warp state
@@ -571,6 +594,92 @@ const FLIGHT_CTRL_CSS = `
 .phase-notification-fade {
   opacity: 0;
 }
+
+/* ── Map view HUD overlay ─────────────────────────────────────────────── */
+#map-hud {
+  position: fixed;
+  inset: 44px 0 0;
+  pointer-events: none;
+  z-index: 200;
+  font-family: system-ui, sans-serif;
+}
+
+#map-hud-info {
+  position: absolute;
+  top: 10px;
+  left: 14px;
+  color: #90b8d0;
+  font-size: 12px;
+  line-height: 1.6;
+  background: rgba(5, 5, 16, 0.7);
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 1px solid rgba(100, 160, 220, 0.2);
+}
+
+#map-hud-info .map-label {
+  color: #60d890;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+}
+
+#map-hud-info .map-zoom {
+  color: #70a8c8;
+}
+
+#map-hud-info .map-target {
+  color: #ff8844;
+}
+
+#map-hud-controls {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #607888;
+  font-size: 11px;
+  text-align: center;
+  background: rgba(5, 5, 16, 0.65);
+  padding: 6px 18px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+#map-hud-controls kbd {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-family: monospace;
+  font-size: 11px;
+  color: #90b0c0;
+  margin: 0 1px;
+}
+
+#map-warp-btn {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  pointer-events: auto;
+  padding: 8px 16px;
+  background: rgba(80, 50, 10, 0.8);
+  border: 1px solid rgba(255, 136, 68, 0.4);
+  border-radius: 5px;
+  color: #ffaa66;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+#map-warp-btn:hover {
+  background: rgba(120, 70, 20, 0.9);
+}
+
+#map-warp-btn.hidden {
+  display: none;
+}
 `;
 
 // ---------------------------------------------------------------------------
@@ -729,6 +838,13 @@ export function startFlightScene(
   // Show the launch pad tip if the rocket hasn't launched yet.
   showLaunchTip();
 
+  // Initialise the map renderer (hidden by default).
+  _mapActive    = false;
+  _mapHeldKeys  = new Set();
+  _mapThrusting = false;
+  _mapHud       = null;
+  initMapRenderer();
+
   // Initialise the right-click part context menu.
   initFlightContextMenu(
     () => _ps,
@@ -772,6 +888,8 @@ export function stopFlightScene() {
 
   destroyFlightHud();
   destroyFlightContextMenu();
+  _destroyMapHud();
+  destroyMapRenderer();
   destroyFlightRenderer();
   clearTopBarFlightItems();
 
@@ -795,6 +913,10 @@ export function stopFlightScene() {
   _lastTs                = null;
   _originalAssembly      = null;
   _originalStagingConfig = null;
+  _mapActive             = false;
+  _mapHeldKeys           = new Set();
+  _mapThrusting          = false;
+  _mapHud                = null;
 
   // Reset time-warp state.
   _timeWarp            = 1;
@@ -825,6 +947,15 @@ function _loop(timestamp) {
   // Evaluate time-warp reset conditions before advancing physics.
   _checkTimeWarpResets(timestamp);
 
+  // When the map is active during non-ORBIT phases, force 1× warp.
+  if (_mapActive && _flightState.phase !== FlightPhase.ORBIT) {
+    if (_timeWarp !== 1) _applyTimeWarp(1);
+  }
+
+  // Apply orbital-relative thrust when the map view is active and the
+  // player is holding WASD keys (only effective during ORBIT phase).
+  _applyMapThrust();
+
   // Reset per-frame science flag before sub-steps; tickScienceModules will
   // set it to true if any experiment was running during ANY sub-step.
   _flightState.scienceModuleRunning = false;
@@ -838,8 +969,15 @@ function _loop(timestamp) {
   // Check mission objective completion against live flight state.
   checkObjectiveCompletion(_state, _flightState);
 
-  // Render the flight scene.
-  renderFlightFrame(_ps, _assembly);
+  // Render the active scene.
+  if (_mapActive) {
+    renderMapFrame(_ps, _flightState, _state);
+  } else {
+    renderFlightFrame(_ps, _assembly);
+  }
+
+  // Update the map HUD readouts if visible.
+  if (_mapActive) _updateMapHud();
 
   // Auto-trigger the post-flight summary when the rocket crashes or all
   // command modules are destroyed (the rocket becomes uncontrollable).
@@ -1042,6 +1180,46 @@ const WARP_LEVELS_ORDERED = [0, 0.25, 0.5, 1, 2, 5, 10, 50];
 function _onKeyDown(e) {
   if (!_ps || !_assembly || !_stagingConfig || !_flightState) return;
 
+  // M — toggle map view.
+  if (e.code === 'KeyM') {
+    e.preventDefault();
+    _toggleMapView();
+    return;
+  }
+
+  // Map-specific keys when the map is active.
+  if (_mapActive) {
+    // Tab — cycle zoom level.
+    if (e.code === 'Tab') {
+      e.preventDefault();
+      cycleMapZoom();
+      _updateMapHud();
+      return;
+    }
+    // N — toggle day/night shadow overlay.
+    if (e.code === 'KeyN') {
+      toggleMapShadow();
+      return;
+    }
+    // T — cycle target selection.
+    if (e.code === 'KeyT' && !e.ctrlKey) {
+      cycleMapTarget(_state.orbitalObjects, 'EARTH');
+      _updateMapHud();
+      return;
+    }
+    // G — warp to target.
+    if (e.code === 'KeyG') {
+      _handleWarpToTarget();
+      return;
+    }
+    // WASD — orbital-relative thrust (tracked separately, applied in _loop).
+    const lower = e.key.toLowerCase();
+    if (lower === 'w' || lower === 's' || lower === 'a' || lower === 'd') {
+      _mapHeldKeys.add(lower);
+      return;
+    }
+  }
+
   if (e.code === 'Space') {
     e.preventDefault();
 
@@ -1083,7 +1261,231 @@ function _onKeyDown(e) {
 /** @param {KeyboardEvent} e */
 function _onKeyUp(e) {
   if (!_ps) return;
+
+  // Release map thrust keys.
+  if (_mapActive) {
+    const lower = e.key.toLowerCase();
+    _mapHeldKeys.delete(lower);
+  }
+
   handleKeyUp(_ps, e.key);
+}
+
+// ---------------------------------------------------------------------------
+// Private — map view toggle and controls
+// ---------------------------------------------------------------------------
+
+/**
+ * Toggle between the flight view and the top-down orbital map view.
+ * Shows a control-tip notification each time the view is swapped.
+ */
+function _toggleMapView() {
+  if (!_ps || !_flightState) return;
+
+  // Check availability (Tracking Station facility).
+  if (!_mapActive && !isMapViewAvailable(_state)) {
+    _showPhaseNotification('Tracking Station required');
+    return;
+  }
+
+  _mapActive = !_mapActive;
+
+  if (_mapActive) {
+    // Switch to map view.
+    hideFlightScene();
+    setFlightInputEnabled(false);
+    showMapScene();
+    _buildMapHud();
+    _showPhaseNotification('Map View');
+  } else {
+    // Switch back to flight view.
+    hideMapScene();
+    showFlightScene();
+    setFlightInputEnabled(true);
+    _destroyMapHud();
+
+    // Cut any map thrust that was in progress.
+    if (_mapThrusting) {
+      _ps.throttle = 0;
+      _mapThrusting = false;
+    }
+    _mapHeldKeys.clear();
+
+    _showPhaseNotification('Flight View');
+  }
+}
+
+/**
+ * Apply orbital-relative thrust based on map-held keys.
+ * Only effective during ORBIT phase when the map view is active.
+ */
+function _applyMapThrust() {
+  if (!_mapActive || !_ps || !_flightState) return;
+
+  // Only apply orbital thrust in ORBIT phase.
+  if (_flightState.phase !== FlightPhase.ORBIT) {
+    if (_mapThrusting) {
+      _ps.throttle = 0;
+      _mapThrusting = false;
+    }
+    return;
+  }
+
+  // Determine thrust direction from held keys (priority order).
+  let direction = null;
+  if (_mapHeldKeys.has('w'))      direction = MapThrustDir.PROGRADE;
+  else if (_mapHeldKeys.has('s')) direction = MapThrustDir.RETROGRADE;
+  else if (_mapHeldKeys.has('a')) direction = MapThrustDir.RADIAL_IN;
+  else if (_mapHeldKeys.has('d')) direction = MapThrustDir.RADIAL_OUT;
+
+  if (direction) {
+    _ps.angle = computeOrbitalThrustAngle(_ps, 'EARTH', direction);
+    if (_ps.throttle === 0) _ps.throttle = 1;
+    _mapThrusting = true;
+  } else if (_mapThrusting) {
+    // No keys held — cut thrust.
+    _ps.throttle = 0;
+    _mapThrusting = false;
+  }
+}
+
+/**
+ * Handle the "Warp to target" action.
+ * Uses the orbit.js warpToTarget function to advance time until the
+ * craft and target satisfy proximity conditions.
+ */
+function _handleWarpToTarget() {
+  if (!_flightState || !_flightState.orbitalElements || !_state) return;
+
+  const targetId = getMapTarget();
+  if (!targetId) {
+    _showPhaseNotification('No target selected — press T to select');
+    return;
+  }
+
+  const targetObj = (_state.orbitalObjects || []).find(o => o.id === targetId);
+  if (!targetObj) {
+    _showPhaseNotification('Target not found');
+    return;
+  }
+
+  const result = warpToTarget(
+    _flightState.orbitalElements,
+    targetObj.elements,
+    'EARTH',
+    _flightState.timeElapsed,
+  );
+
+  if (!result.possible) {
+    _showPhaseNotification('Warp impossible — orbits do not intersect');
+    return;
+  }
+
+  // Advance the flight time.
+  _flightState.timeElapsed = result.time;
+
+  // Log the warp event.
+  _flightState.events.push({
+    time: result.time,
+    type: 'TIME_WARP',
+    description: `Warped ${(result.elapsed / 60).toFixed(1)} min to target "${targetObj.name}"`,
+  });
+
+  _showPhaseNotification(`Warped to ${targetObj.name}`);
+}
+
+// ---------------------------------------------------------------------------
+// Private — map HUD overlay
+// ---------------------------------------------------------------------------
+
+/** Human-readable zoom level names. */
+const ZOOM_LABELS = {
+  [MapZoom.ORBIT_DETAIL]:    'Orbit Detail',
+  [MapZoom.LOCAL_BODY]:      'Local Body',
+  [MapZoom.CRAFT_TO_TARGET]: 'Craft → Target',
+  [MapZoom.SOLAR_SYSTEM]:    'Solar System',
+};
+
+/**
+ * Build the map-view HUD overlay: info panel, controls hint, and warp button.
+ */
+function _buildMapHud() {
+  if (_mapHud) return;
+
+  const hud = document.createElement('div');
+  hud.id = 'map-hud';
+
+  // Info panel (top-left).
+  const info = document.createElement('div');
+  info.id = 'map-hud-info';
+  info.innerHTML = `
+    <div class="map-label">MAP VIEW</div>
+    <div>Zoom: <span class="map-zoom" data-field="zoom"></span></div>
+    <div>Target: <span class="map-target" data-field="target">None</span></div>
+    <div>Phase: <span data-field="phase"></span></div>
+  `;
+  hud.appendChild(info);
+
+  // Controls hint (bottom-centre).
+  const controls = document.createElement('div');
+  controls.id = 'map-hud-controls';
+  controls.innerHTML =
+    '<kbd>M</kbd> Flight view · ' +
+    '<kbd>Tab</kbd> Zoom · ' +
+    '<kbd>T</kbd> Target · ' +
+    '<kbd>G</kbd> Warp to target · ' +
+    '<kbd>N</kbd> Shadow · ' +
+    '<kbd>WASD</kbd> Orbital thrust (orbit only)';
+  hud.appendChild(controls);
+
+  // Warp to target button (top-right).
+  const warpBtn = document.createElement('button');
+  warpBtn.id = 'map-warp-btn';
+  warpBtn.className = 'hidden';
+  warpBtn.textContent = 'Warp to Target';
+  warpBtn.addEventListener('click', _handleWarpToTarget);
+  hud.appendChild(warpBtn);
+
+  _mapHud = hud;
+  const host = _container || document.getElementById('ui-overlay') || document.body;
+  host.appendChild(hud);
+
+  _updateMapHud();
+}
+
+/**
+ * Update the map HUD readouts to reflect current state.
+ */
+function _updateMapHud() {
+  if (!_mapHud || !_flightState) return;
+
+  const zoomEl   = _mapHud.querySelector('[data-field="zoom"]');
+  const targetEl = _mapHud.querySelector('[data-field="target"]');
+  const phaseEl  = _mapHud.querySelector('[data-field="phase"]');
+  const warpBtn  = _mapHud.querySelector('#map-warp-btn');
+
+  if (zoomEl)   zoomEl.textContent = ZOOM_LABELS[getMapZoomLevel()] || getMapZoomLevel();
+  if (phaseEl)  phaseEl.textContent = getPhaseLabel(_flightState.phase);
+
+  const targetId = getMapTarget();
+  const targetObj = targetId && _state
+    ? (_state.orbitalObjects || []).find(o => o.id === targetId)
+    : null;
+  if (targetEl)  targetEl.textContent = targetObj ? targetObj.name : 'None';
+  if (warpBtn) {
+    warpBtn.classList.toggle('hidden',
+      !targetObj || !_flightState.orbitalElements || _flightState.phase !== FlightPhase.ORBIT);
+  }
+}
+
+/**
+ * Remove the map HUD overlay.
+ */
+function _destroyMapHud() {
+  if (_mapHud) {
+    _mapHud.remove();
+    _mapHud = null;
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -1,12 +1,12 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 3,
+  "lastIteration": 4,
   "startedAt": "2026-03-30T20:49:34.099Z",
   "activeTask": {
-    "taskId": "TASK-003",
-    "taskTitle": "Implement flight phase state machine",
-    "iterationNumber": 3,
-    "startedAt": "2026-03-30T21:10:29.709Z"
+    "taskId": "TASK-004",
+    "taskTitle": "Implement map view",
+    "iterationNumber": 4,
+    "startedAt": "2026-03-30T21:19:32.704Z"
   }
 }

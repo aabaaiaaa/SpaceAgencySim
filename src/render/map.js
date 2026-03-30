@@ -1,0 +1,657 @@
+/**
+ * map.js — PixiJS rendering for the top-down orbital map view.
+ *
+ * Draws a 2D body-centred map showing:
+ *   - The central body (Earth) as a filled circle.
+ *   - Altitude bands as semi-transparent concentric rings.
+ *   - Orbit paths for the player craft and tracked orbital objects.
+ *   - The player craft as a highlighted dot with a velocity indicator.
+ *   - Periapsis / apoapsis markers on the craft's orbit.
+ *   - Orbit prediction tick marks (a few orbital periods ahead).
+ *   - An optional day/night shadow overlay on the body.
+ *   - Labels for key items using a reusable PIXI.Text pool.
+ *
+ * COORDINATE MAPPING
+ *   Orbital frame: origin at body centre; +X right, +Y up (metres).
+ *   Screen frame:  origin at top-left; +X right, +Y down (pixels).
+ *
+ *   screenX = centreX + worldX × scale
+ *   screenY = centreY − worldY × scale   (Y flipped)
+ *
+ * @module render/map
+ */
+
+import * as PIXI from 'pixi.js';
+import { getApp } from './index.js';
+import {
+  BODY_RADIUS,
+  ALTITUDE_BANDS,
+} from '../core/constants.js';
+import {
+  generateOrbitPath,
+  getCraftMapPosition,
+  getObjectMapPosition,
+  getViewRadius,
+  MapZoom,
+  generateOrbitPredictions,
+} from '../core/mapView.js';
+import {
+  getApoapsisAltitude,
+  getPeriapsisAltitude,
+  computeOrbitalElements,
+} from '../core/orbit.js';
+
+// ---------------------------------------------------------------------------
+// Colour palette
+// ---------------------------------------------------------------------------
+
+const MAP_BG            = 0x050510;
+const BODY_COLOR        = 0x1a4060;
+const BODY_ATMOSPHERE   = 0x4080c0;
+const CRAFT_COLOR       = 0x00ff88;
+const CRAFT_ORBIT_COLOR = 0x00ccff;
+const OBJECT_COLOR      = 0x6090b0;
+const OBJECT_ORBIT_COLOR = 0x304860;
+const TARGET_COLOR      = 0xff8844;
+const TARGET_ORBIT_COLOR = 0x885522;
+const PREDICTION_COLOR  = 0x00ccff;
+const SHADOW_COLOR      = 0x000000;
+const PE_COLOR          = 0x44aaff;
+const AP_COLOR          = 0xff6644;
+
+const BAND_COLORS = {
+  LEO: 0x104020,
+  MEO: 0x403020,
+  HEO: 0x401020,
+};
+
+/** Visual atmosphere height (m above surface). */
+const ATMOSPHERE_VISUAL_HEIGHT = 70_000;
+
+// ---------------------------------------------------------------------------
+// Label pool
+// ---------------------------------------------------------------------------
+
+const MAX_LABELS = 16;
+
+// ---------------------------------------------------------------------------
+// Module-level state
+// ---------------------------------------------------------------------------
+
+/** Root container added to app.stage; toggled visible/invisible. */
+let _mapRoot = null;
+
+// Graphics objects — cleared and redrawn each frame.
+let _bgGraphics      = null;
+let _bandsGraphics   = null;
+let _orbitsGraphics  = null;
+let _bodyGraphics    = null;
+let _shadowGraphics  = null;
+let _objectsGraphics = null;
+let _craftGraphics   = null;
+
+/** Container for reusable PIXI.Text labels. */
+let _labelContainer = null;
+/** @type {PIXI.Text[]} */
+let _labelPool = [];
+let _nextLabel = 0;
+
+// Zoom / view state
+let _currentZoom     = MapZoom.ORBIT_DETAIL;
+let _viewRadius      = 10_000_000;
+let _customViewRadius = null;
+let _selectedTarget  = null;
+let _showShadow      = false;
+
+// Input handlers
+let _wheelHandler = null;
+
+// ---------------------------------------------------------------------------
+// Public API — lifecycle
+// ---------------------------------------------------------------------------
+
+/**
+ * Create all PixiJS containers for the map scene and add them to the stage
+ * (hidden by default).  Call once when the flight scene starts.
+ */
+export function initMapRenderer() {
+  const app = getApp();
+
+  // Defensive cleanup.
+  if (_mapRoot) {
+    app.stage.removeChild(_mapRoot);
+    _mapRoot.destroy({ children: true });
+  }
+
+  _mapRoot = new PIXI.Container();
+  _mapRoot.visible = false;
+
+  // Layer order (bottom → top):
+  //   background → bands → orbits → body → shadow → objects → craft → labels
+  _bgGraphics      = new PIXI.Graphics();
+  _bandsGraphics   = new PIXI.Graphics();
+  _orbitsGraphics  = new PIXI.Graphics();
+  _bodyGraphics    = new PIXI.Graphics();
+  _shadowGraphics  = new PIXI.Graphics();
+  _objectsGraphics = new PIXI.Graphics();
+  _craftGraphics   = new PIXI.Graphics();
+  _labelContainer  = new PIXI.Container();
+
+  _mapRoot.addChild(_bgGraphics);
+  _mapRoot.addChild(_bandsGraphics);
+  _mapRoot.addChild(_orbitsGraphics);
+  _mapRoot.addChild(_bodyGraphics);
+  _mapRoot.addChild(_shadowGraphics);
+  _mapRoot.addChild(_objectsGraphics);
+  _mapRoot.addChild(_craftGraphics);
+  _mapRoot.addChild(_labelContainer);
+
+  app.stage.addChild(_mapRoot);
+
+  // Create the reusable text label pool.
+  _labelPool = [];
+  for (let i = 0; i < MAX_LABELS; i++) {
+    const t = new PIXI.Text({
+      text: '',
+      style: new PIXI.TextStyle({
+        fontFamily: 'Courier New, Courier, monospace',
+        fontSize: 11,
+        fill: '#ffffff',
+      }),
+    });
+    t.visible = false;
+    _labelContainer.addChild(t);
+    _labelPool.push(t);
+  }
+
+  _customViewRadius = null;
+  _selectedTarget   = null;
+  _showShadow       = false;
+
+  console.log('[Map Renderer] Initialized');
+}
+
+/**
+ * Make the map scene visible.
+ * Registers the map-specific scroll-wheel zoom handler.
+ */
+export function showMapScene() {
+  if (!_mapRoot) return;
+  _mapRoot.visible = true;
+  if (!_wheelHandler) {
+    _wheelHandler = _onWheel;
+    window.addEventListener('wheel', _wheelHandler, { passive: false });
+  }
+}
+
+/**
+ * Hide the map scene.
+ * Unregisters the scroll-wheel zoom handler so it doesn't conflict with
+ * the flight renderer's zoom.
+ */
+export function hideMapScene() {
+  if (!_mapRoot) return;
+  _mapRoot.visible = false;
+  if (_wheelHandler) {
+    window.removeEventListener('wheel', _wheelHandler);
+    _wheelHandler = null;
+  }
+}
+
+/** @returns {boolean} */
+export function isMapVisible() {
+  return _mapRoot ? _mapRoot.visible : false;
+}
+
+/**
+ * Tear down the map renderer and remove all PixiJS objects.
+ */
+export function destroyMapRenderer() {
+  if (_wheelHandler) {
+    window.removeEventListener('wheel', _wheelHandler);
+    _wheelHandler = null;
+  }
+
+  if (_mapRoot) {
+    const app = getApp();
+    app.stage.removeChild(_mapRoot);
+    _mapRoot.destroy({ children: true });
+    _mapRoot = null;
+  }
+
+  _bgGraphics      = null;
+  _bandsGraphics   = null;
+  _orbitsGraphics  = null;
+  _bodyGraphics    = null;
+  _shadowGraphics  = null;
+  _objectsGraphics = null;
+  _craftGraphics   = null;
+  _labelContainer  = null;
+  _labelPool       = [];
+
+  _customViewRadius = null;
+  _selectedTarget   = null;
+  _showShadow       = false;
+
+  console.log('[Map Renderer] Destroyed');
+}
+
+// ---------------------------------------------------------------------------
+// Public API — zoom & target
+// ---------------------------------------------------------------------------
+
+/** Set the zoom level to a named preset. Resets any manual scroll zoom. */
+export function setMapZoomLevel(level) {
+  _currentZoom = level;
+  _customViewRadius = null;
+}
+
+/** @returns {string} Current MapZoom value. */
+export function getMapZoomLevel() {
+  return _currentZoom;
+}
+
+/** Cycle to the next zoom level preset (wraps around). */
+export function cycleMapZoom() {
+  const levels = [
+    MapZoom.ORBIT_DETAIL,
+    MapZoom.LOCAL_BODY,
+    MapZoom.CRAFT_TO_TARGET,
+    MapZoom.SOLAR_SYSTEM,
+  ];
+  const idx = levels.indexOf(_currentZoom);
+  _currentZoom = levels[(idx + 1) % levels.length];
+  _customViewRadius = null;
+}
+
+/** Set the selected target orbital object ID (for craft-to-target zoom and warp). */
+export function setMapTarget(targetId) {
+  _selectedTarget = targetId;
+}
+
+/** @returns {string|null} */
+export function getMapTarget() {
+  return _selectedTarget;
+}
+
+/**
+ * Cycle the selected target through all orbital objects for the given body.
+ * Returns the new target ID (or null if none available).
+ */
+export function cycleMapTarget(orbitalObjects, bodyId) {
+  const candidates = (orbitalObjects || []).filter(o => o.bodyId === bodyId);
+  if (candidates.length === 0) {
+    _selectedTarget = null;
+    return null;
+  }
+  const idx = candidates.findIndex(o => o.id === _selectedTarget);
+  const next = candidates[(idx + 1) % candidates.length];
+  _selectedTarget = next.id;
+  return _selectedTarget;
+}
+
+/** Toggle the day/night shadow overlay. */
+export function toggleMapShadow() {
+  _showShadow = !_showShadow;
+}
+
+/** @returns {boolean} */
+export function isMapShadowEnabled() {
+  return _showShadow;
+}
+
+// ---------------------------------------------------------------------------
+// Public API — rendering
+// ---------------------------------------------------------------------------
+
+/**
+ * Render one frame of the map view.
+ *
+ * @param {import('../core/physics.js').PhysicsState}     ps
+ * @param {import('../core/gameState.js').FlightState}    flightState
+ * @param {import('../core/gameState.js').GameState}      state
+ * @param {string}                                        [bodyId='EARTH']
+ */
+export function renderMapFrame(ps, flightState, state, bodyId = 'EARTH') {
+  if (!_mapRoot || !_mapRoot.visible) return;
+
+  const w  = window.innerWidth;
+  const h  = window.innerHeight;
+  const cx = w / 2;
+  const cy = h / 2;
+  const R  = BODY_RADIUS[bodyId];
+
+  // Resolve target elements.
+  let targetElements = null;
+  if (_selectedTarget && state.orbitalObjects) {
+    const target = state.orbitalObjects.find(o => o.id === _selectedTarget);
+    if (target) targetElements = target.elements;
+  }
+
+  // Compute view radius and scale.
+  if (_customViewRadius) {
+    _viewRadius = _customViewRadius;
+  } else {
+    _viewRadius = getViewRadius(_currentZoom, bodyId, flightState.orbitalElements, targetElements);
+  }
+  const screenHalf = Math.min(w, h) / 2 * 0.88;
+  const scale = screenHalf / _viewRadius; // pixels per metre
+
+  // Reset the label pool for this frame.
+  _resetLabels();
+
+  // 1. Background.
+  _bgGraphics.clear();
+  _bgGraphics.rect(0, 0, w, h);
+  _bgGraphics.fill(MAP_BG);
+
+  // 2. Altitude bands.
+  _drawBands(bodyId, cx, cy, scale);
+
+  // 3. Orbital-object orbits and positions.
+  _drawOrbitalObjects(state, flightState, cx, cy, scale, bodyId);
+
+  // 4. Craft orbit, position, and predictions.
+  _drawCraft(ps, flightState, cx, cy, scale, bodyId);
+
+  // 5. Body (drawn on top of orbits so the surface occludes near-surface paths).
+  _drawBody(cx, cy, scale, R);
+
+  // 6. Day/night shadow.
+  _drawShadow(cx, cy, scale, R, flightState.timeElapsed);
+}
+
+// ---------------------------------------------------------------------------
+// Private — label pool helpers
+// ---------------------------------------------------------------------------
+
+function _resetLabels() {
+  _nextLabel = 0;
+  for (const l of _labelPool) l.visible = false;
+}
+
+/**
+ * Claim the next label from the pool, configure it, and make it visible.
+ * Returns null if the pool is exhausted.
+ */
+function _useLabel(text, x, y, color) {
+  if (_nextLabel >= MAX_LABELS) return null;
+  const l = _labelPool[_nextLabel++];
+  l.text = text;
+  l.style.fill = typeof color === 'number' ? `#${color.toString(16).padStart(6, '0')}` : color;
+  l.x = x;
+  l.y = y;
+  l.visible = true;
+  return l;
+}
+
+// ---------------------------------------------------------------------------
+// Private — drawing helpers
+// ---------------------------------------------------------------------------
+
+function _drawBody(cx, cy, scale, R) {
+  _bodyGraphics.clear();
+
+  const bodyPxR = R * scale;
+
+  if (bodyPxR < 2) {
+    // Too small — draw a dot.
+    _bodyGraphics.circle(cx, cy, 3);
+    _bodyGraphics.fill(BODY_COLOR);
+    return;
+  }
+
+  // Atmosphere glow.
+  if (bodyPxR > 10) {
+    const atmosR = (R + ATMOSPHERE_VISUAL_HEIGHT) * scale;
+    _bodyGraphics.circle(cx, cy, atmosR);
+    _bodyGraphics.fill({ color: BODY_ATMOSPHERE, alpha: 0.08 });
+  }
+
+  // Solid body.
+  _bodyGraphics.circle(cx, cy, bodyPxR);
+  _bodyGraphics.fill(BODY_COLOR);
+
+  // Edge highlight.
+  _bodyGraphics.circle(cx, cy, bodyPxR);
+  _bodyGraphics.stroke({ color: BODY_ATMOSPHERE, width: 1, alpha: 0.4 });
+}
+
+function _drawBands(bodyId, cx, cy, scale) {
+  _bandsGraphics.clear();
+
+  const bands = ALTITUDE_BANDS[bodyId];
+  const R     = BODY_RADIUS[bodyId];
+  if (!bands) return;
+
+  for (const band of bands) {
+    const innerPx = (R + band.min) * scale;
+    const outerPx = (R + band.max) * scale;
+
+    // Skip bands entirely off-screen.
+    if (innerPx > Math.max(window.innerWidth, window.innerHeight) * 1.5) continue;
+
+    const color = BAND_COLORS[band.id] || 0x202020;
+
+    // Semi-transparent fill for the band zone.
+    // Draw outer filled circle then punch the inner with the background.
+    // PixiJS doesn't easily support donut shapes, so we draw boundary lines only.
+    _bandsGraphics.circle(cx, cy, innerPx);
+    _bandsGraphics.stroke({ color, width: 1, alpha: 0.35 });
+    _bandsGraphics.circle(cx, cy, outerPx);
+    _bandsGraphics.stroke({ color, width: 1, alpha: 0.2 });
+
+    // Band name label.
+    if (innerPx > 30 && innerPx < window.innerWidth) {
+      _useLabel(band.name, cx + innerPx + 6, cy - 8, color);
+    }
+  }
+}
+
+function _drawOrbitalObjects(state, flightState, cx, cy, scale, bodyId) {
+  _objectsGraphics.clear();
+
+  if (!state.orbitalObjects || state.orbitalObjects.length === 0) return;
+
+  const t = flightState.timeElapsed;
+
+  for (const obj of state.orbitalObjects) {
+    if (obj.bodyId !== bodyId) continue;
+
+    const isTarget   = obj.id === _selectedTarget;
+    const orbitColor = isTarget ? TARGET_ORBIT_COLOR : OBJECT_ORBIT_COLOR;
+    const dotColor   = isTarget ? TARGET_COLOR : OBJECT_COLOR;
+
+    // Orbit path.
+    _drawOrbitEllipse(_objectsGraphics, obj.elements, bodyId, cx, cy, scale,
+      orbitColor, isTarget ? 1.5 : 1, isTarget ? 0.6 : 0.3);
+
+    // Position dot.
+    const pos = getObjectMapPosition(obj.elements, t, bodyId);
+    const sx  = cx + pos.x * scale;
+    const sy  = cy - pos.y * scale;
+    const dotSize = isTarget ? 5 : 3;
+
+    _objectsGraphics.circle(sx, sy, dotSize);
+    _objectsGraphics.fill(dotColor);
+
+    // Label (target always labelled; others only if not too dense).
+    if (isTarget) {
+      _useLabel(obj.name, sx + dotSize + 4, sy - 6, dotColor);
+    }
+  }
+}
+
+function _drawCraft(ps, flightState, cx, cy, scale, bodyId) {
+  _orbitsGraphics.clear();
+  _craftGraphics.clear();
+
+  const R = BODY_RADIUS[bodyId];
+
+  // --- Orbit path ---
+  if (flightState.orbitalElements) {
+    // Stable orbit — draw the full ellipse.
+    _drawOrbitEllipse(_orbitsGraphics, flightState.orbitalElements, bodyId,
+      cx, cy, scale, CRAFT_ORBIT_COLOR, 2, 0.7);
+
+    // Prediction ticks along the orbit.
+    const preds = generateOrbitPredictions(
+      flightState.orbitalElements, bodyId, flightState.timeElapsed, 3, 36,
+    );
+    for (let i = 0; i < preds.length; i++) {
+      const p     = preds[i];
+      const px    = cx + p.x * scale;
+      const py    = cy - p.y * scale;
+      const alpha = 0.6 - (i / preds.length) * 0.45;
+      _orbitsGraphics.circle(px, py, 1.5);
+      _orbitsGraphics.fill({ color: PREDICTION_COLOR, alpha });
+    }
+
+    // Periapsis & apoapsis markers.
+    _drawApsides(flightState.orbitalElements, bodyId, cx, cy, scale);
+  } else {
+    // Sub-orbital — project the trajectory as if it were a (possibly
+    // intersecting-surface) ellipse and clip to above-surface.
+    const projected = computeOrbitalElements(
+      ps.posX, ps.posY, ps.velX, ps.velY, bodyId, flightState.timeElapsed,
+    );
+    if (projected) {
+      const path = generateOrbitPath(projected, bodyId, 180);
+      let started = false;
+      for (let i = 0; i < path.length; i++) {
+        const r = Math.sqrt(path[i].x ** 2 + path[i].y ** 2);
+        if (r > R) {
+          const px = cx + path[i].x * scale;
+          const py = cy - path[i].y * scale;
+          if (!started) {
+            _orbitsGraphics.moveTo(px, py);
+            started = true;
+          } else {
+            _orbitsGraphics.lineTo(px, py);
+          }
+        } else {
+          started = false;
+        }
+      }
+      if (started) {
+        _orbitsGraphics.stroke({ color: CRAFT_ORBIT_COLOR, width: 1.5, alpha: 0.4 });
+      }
+    }
+  }
+
+  // --- Craft dot ---
+  const craftPos = getCraftMapPosition(ps, bodyId);
+  const sx = cx + craftPos.x * scale;
+  const sy = cy - craftPos.y * scale;
+
+  // Outer glow.
+  _craftGraphics.circle(sx, sy, 8);
+  _craftGraphics.fill({ color: CRAFT_COLOR, alpha: 0.15 });
+
+  // Inner dot.
+  _craftGraphics.circle(sx, sy, 4);
+  _craftGraphics.fill(CRAFT_COLOR);
+
+  // Velocity direction indicator (prograde arrow).
+  const speed = Math.hypot(ps.velX, ps.velY);
+  if (speed > 10) {
+    const vAngle   = Math.atan2(ps.velX, ps.velY);
+    const arrowLen = 18;
+    const tipX     = sx + Math.sin(vAngle) * arrowLen;
+    const tipY     = sy - Math.cos(vAngle) * arrowLen;
+    _craftGraphics.moveTo(sx, sy);
+    _craftGraphics.lineTo(tipX, tipY);
+    _craftGraphics.stroke({ color: CRAFT_COLOR, width: 1.5, alpha: 0.8 });
+  }
+
+  // Label.
+  _useLabel('CRAFT', sx + 10, sy - 5, CRAFT_COLOR);
+}
+
+function _drawApsides(elements, bodyId, cx, cy, scale) {
+  const { semiMajorAxis: a, eccentricity: e, argPeriapsis: omega } = elements;
+  const R = BODY_RADIUS[bodyId];
+
+  // Periapsis (true anomaly = 0).
+  const rPe  = a * (1 - e);
+  const peX  = cx + rPe * Math.cos(omega) * scale;
+  const peY  = cy - rPe * Math.sin(omega) * scale;
+  const peAlt = rPe - R;
+
+  _orbitsGraphics.circle(peX, peY, 3);
+  _orbitsGraphics.stroke({ color: PE_COLOR, width: 1.5 });
+  _useLabel(`Pe ${_fmtAlt(peAlt)}`, peX + 6, peY - 5, PE_COLOR);
+
+  // Apoapsis (true anomaly = π).
+  const rAp  = a * (1 + e);
+  const apX  = cx + rAp * Math.cos(omega + Math.PI) * scale;
+  const apY  = cy - rAp * Math.sin(omega + Math.PI) * scale;
+  const apAlt = rAp - R;
+
+  _orbitsGraphics.circle(apX, apY, 3);
+  _orbitsGraphics.stroke({ color: AP_COLOR, width: 1.5 });
+  _useLabel(`Ap ${_fmtAlt(apAlt)}`, apX + 6, apY - 5, AP_COLOR);
+}
+
+/**
+ * Draw an orbit ellipse by sampling it at many points.
+ */
+function _drawOrbitEllipse(g, elements, bodyId, cx, cy, scale, color, width, alpha) {
+  const path = generateOrbitPath(elements, bodyId, 180);
+  if (path.length < 2) return;
+
+  g.moveTo(cx + path[0].x * scale, cy - path[0].y * scale);
+  for (let i = 1; i < path.length; i++) {
+    g.lineTo(cx + path[i].x * scale, cy - path[i].y * scale);
+  }
+  g.stroke({ color, width, alpha });
+}
+
+function _drawShadow(cx, cy, scale, R, timeElapsed) {
+  _shadowGraphics.clear();
+  if (!_showShadow) return;
+
+  const bodyPxR = R * scale;
+  if (bodyPxR < 5) return;
+
+  // Sun direction rotates as time passes (one full rotation per 86 400 s).
+  const sunAngle = (timeElapsed / 86_400) * Math.PI * 2;
+  const nightAngle = sunAngle + Math.PI;
+
+  // Semi-circle shadow on the night side.
+  _shadowGraphics.moveTo(cx, cy);
+  _shadowGraphics.arc(cx, cy, bodyPxR, nightAngle - Math.PI / 2, nightAngle + Math.PI / 2);
+  _shadowGraphics.closePath();
+  _shadowGraphics.fill({ color: SHADOW_COLOR, alpha: 0.4 });
+}
+
+// ---------------------------------------------------------------------------
+// Private — input
+// ---------------------------------------------------------------------------
+
+function _onWheel(e) {
+  if (!_mapRoot || !_mapRoot.visible) return;
+  e.preventDefault();
+
+  const factor = e.deltaY > 0 ? 1.15 : 1 / 1.15;
+
+  if (_customViewRadius == null) {
+    _customViewRadius = _viewRadius;
+  }
+  _customViewRadius *= factor;
+
+  // Clamp to reasonable bounds.
+  const minR = BODY_RADIUS.EARTH * 1.02;
+  const maxR = BODY_RADIUS.EARTH * 20;
+  _customViewRadius = Math.max(minR, Math.min(maxR, _customViewRadius));
+}
+
+// ---------------------------------------------------------------------------
+// Private — formatting
+// ---------------------------------------------------------------------------
+
+function _fmtAlt(metres) {
+  if (metres >= 1_000_000) return `${(metres / 1_000_000).toFixed(0)} Mm`;
+  if (metres >= 1_000)     return `${(metres / 1_000).toFixed(0)} km`;
+  return `${metres.toFixed(0)} m`;
+}
