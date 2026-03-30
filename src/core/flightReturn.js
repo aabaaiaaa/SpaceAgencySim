@@ -24,6 +24,7 @@ import { earn, applyInterest, applyDeathFine } from './finance.js';
 import { advancePeriod } from './period.js';
 import { getPartById } from '../data/parts.js';
 import { PartType, DEATH_FINE_PER_ASTRONAUT, FlightOutcome } from './constants.js';
+import { processContractCompletions, generateContracts } from './contracts.js';
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -52,6 +53,8 @@ import { PartType, DEATH_FINE_PER_ASTRONAUT, FlightOutcome } from './constants.j
  * @property {number}  totalFlights    - New total flight count (state.flightHistory.length).
  * @property {number}  currentPeriod   - Period number after this flight.
  * @property {string[]} expiredMissionIds - Mission IDs that expired this period.
+ * @property {Array<{contract: import('./gameState.js').Contract, reward: number}>} completedContracts - Contracts completed this flight.
+ * @property {import('./gameState.js').Contract[]} newContracts - Newly generated board contracts.
  */
 
 /**
@@ -146,10 +149,16 @@ export function processFlightReturn(state, flightState, ps, assembly) {
     flightState.deathFinesApplied = true;
   }
 
-  // ── 6b. Advance the period counter and charge operating costs ──────────
+  // ── 6b. Contract completions ───────────────────────────────────────────
+  const contractResult = processContractCompletions(state);
+
+  // ── 6c. Advance the period counter and charge operating costs ─────────
   const periodSummary = advancePeriod(state);
 
-  // ── 6c. Accumulate in-game flight time ──────────────────────────────────
+  // ── 6d. Generate new contracts for the board ──────────────────────────
+  const newContracts = generateContracts(state);
+
+  // ── 6e. Accumulate in-game flight time ──────────────────────────────────
   const flightSeconds = flightState?.timeElapsed ?? 0;
   state.flightTimeSeconds = (state.flightTimeSeconds ?? 0) + flightSeconds;
 
@@ -194,6 +203,8 @@ export function processFlightReturn(state, flightState, ps, assembly) {
     totalFlights:      state.flightHistory.length,
     currentPeriod:     periodSummary.newPeriod,
     expiredMissionIds: periodSummary.expiredMissionIds,
+    completedContracts: contractResult.completedContracts,
+    newContracts,
   };
 }
 

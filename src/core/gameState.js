@@ -20,6 +20,7 @@ import {
   STARTING_LOAN_BALANCE,
   DEFAULT_LOAN_INTEREST_RATE,
   FACILITY_DEFINITIONS,
+  STARTING_REPUTATION,
 } from './constants.js';
 
 // ---------------------------------------------------------------------------
@@ -157,6 +158,29 @@ import {
  */
 
 /**
+ * A procedurally generated contract on the board or in the player's active list.
+ * @typedef {Object} Contract
+ * @property {string}       id               - Unique identifier (e.g. 'contract-abc123').
+ * @property {string}       title            - Short display name.
+ * @property {string}       description      - Flavour text explaining the contract.
+ * @property {string}       category         - ContractCategory enum value.
+ * @property {import('../data/missions.js').ObjectiveDef[]} objectives - Objectives to complete.
+ * @property {number}       reward           - Cash payout on completion (dollars).
+ * @property {number}       penaltyFee       - Cash penalty for cancellation (dollars).
+ * @property {number}       reputationReward - Reputation gained on completion.
+ * @property {number}       reputationPenalty- Reputation lost on cancellation/failure.
+ * @property {number|null}  deadlinePeriod   - Period by which the contract must be completed,
+ *                                             or null if open-ended.
+ * @property {number}       boardExpiryPeriod- Period when this contract expires from the board
+ *                                             (only relevant while on the board).
+ * @property {number}       generatedPeriod  - Period when this contract was generated.
+ * @property {number|null}  acceptedPeriod   - Period when accepted, or null.
+ * @property {string|null}  chainId          - ID linking multi-part chain contracts, or null.
+ * @property {number|null}  chainPart        - 1-based part number in the chain, or null.
+ * @property {number|null}  chainTotal       - Total parts in the chain, or null.
+ */
+
+/**
  * Live state of a flight that is currently in progress.
  * Set to null when no flight is active.
  * @typedef {Object} FlightState
@@ -205,6 +229,10 @@ import {
  *                                               (facilities awarded via missions, not built).
  * @property {Object<string, FacilityState>} facilities - Map of facility ID → state.
  *                                               Only facilities that have been built appear here.
+ * @property {{ board: Contract[], active: Contract[], completed: Contract[], failed: Contract[] }} contracts
+ *                                               - Procedurally generated contract system state.
+ * @property {number}          reputation        - Agency reputation (0–100). Affects contract
+ *                                                 generation quality and some rewards.
  */
 
 // ---------------------------------------------------------------------------
@@ -269,6 +297,16 @@ export function createGameState() {
         .filter((f) => f.starter)
         .map((f) => [f.id, { built: true, tier: 1 }]),
     ),
+
+    // Procedurally generated contract system.
+    contracts: {
+      board: [],      // Available contracts visible on the board (pool).
+      active: [],     // Accepted contracts the player is working on.
+      completed: [],  // Successfully completed contracts (history).
+      failed: [],     // Failed, expired, or cancelled contracts (history).
+    },
+
+    reputation: STARTING_REPUTATION,
   };
 }
 

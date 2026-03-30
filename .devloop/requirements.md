@@ -54,7 +54,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Add a construction menu to the hub screen for building new facilities. Simple list of available buildings with costs and a "Build" button. In tutorial mode, building is locked — facilities are awarded via tutorial missions; only upgrades available once a building exists. In non-tutorial mode, fully available from the start. Phase 5 extends this with the upgrade system.
 
 ### TASK-008: Contract system — generation and board
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-001, TASK-007
 - **Description**: Implement contract generation: 2-3 new contracts appear after each flight return, filling board slots. Accepting frees a slot. Generated contracts match player's current progression. Board pool and active caps by Mission Control tier: Tier 1 = 4 pool / 2 active, Tier 2 = 8/5, Tier 3 = 12/8. Board expiry after N flights. Completion deadlines on accepted contracts (some open-ended). Multi-part chains with per-part deadlines. Cancellation with penalty fee and reputation hit.

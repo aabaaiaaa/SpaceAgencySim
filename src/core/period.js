@@ -16,6 +16,7 @@
  */
 
 import { AstronautStatus, CREW_SALARY_PER_PERIOD, FACILITY_UPKEEP_PER_PERIOD } from './constants.js';
+import { expireBoardContracts, expireActiveContracts } from './contracts.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -29,6 +30,8 @@ import { AstronautStatus, CREW_SALARY_PER_PERIOD, FACILITY_UPKEEP_PER_PERIOD } f
  * @property {number} totalOperatingCost - Sum of all operating costs.
  * @property {number} activeCrewCount  - Number of active crew members charged.
  * @property {string[]} expiredMissionIds - IDs of missions that expired this period.
+ * @property {string[]} expiredBoardContractIds - Board contract IDs that expired this period.
+ * @property {string[]} expiredActiveContractIds - Active contract IDs that expired this period.
  */
 
 // ---------------------------------------------------------------------------
@@ -93,6 +96,10 @@ export function advancePeriod(state) {
     }
   }
 
+  // ── 6. Expire contracts ────────────────────────────────────────────────
+  const expiredBoardContractIds = expireBoardContracts(state);
+  const expiredActiveContractIds = expireActiveContracts(state);
+
   return {
     newPeriod: state.currentPeriod,
     crewSalaryCost,
@@ -100,5 +107,7 @@ export function advancePeriod(state) {
     totalOperatingCost,
     activeCrewCount: activeCrew.length,
     expiredMissionIds,
+    expiredBoardContractIds,
+    expiredActiveContractIds,
   };
 }

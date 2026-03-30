@@ -254,6 +254,12 @@ export function loadGame(slotIndex) {
   }
   envelope.state.tutorialMode ??= true;
 
+  // Default contracts for saves created before the contract system.
+  if (!envelope.state.contracts || typeof envelope.state.contracts !== 'object') {
+    envelope.state.contracts = { board: [], active: [], completed: [], failed: [] };
+  }
+  envelope.state.reputation ??= 50;
+
   return envelope.state;
 }
 

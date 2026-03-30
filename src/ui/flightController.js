@@ -29,6 +29,7 @@ import {
 import { initFlightHud, destroyFlightHud, setHudTimeWarp, lockTimeWarp, showLaunchTip, hideLaunchTip } from './flightHud.js';
 import { initFlightContextMenu, destroyFlightContextMenu } from './flightContextMenu.js';
 import { checkObjectiveCompletion } from '../core/missions.js';
+import { checkContractObjectives } from '../core/contracts.js';
 import { saveGame, listSaves } from '../core/saveload.js';
 import { ATMOSPHERE_TOP, isReentryCondition } from '../core/atmosphere.js';
 import { getPartById } from '../data/parts.js';
@@ -993,8 +994,9 @@ function _loop(timestamp) {
   // --- Flight phase state machine: auto-detect transitions each frame ---
   _evaluateFlightPhase();
 
-  // Check mission objective completion against live flight state.
+  // Check mission and contract objective completion against live flight state.
   checkObjectiveCompletion(_state, _flightState);
+  checkContractObjectives(_state, _flightState);
 
   // Render the active scene.
   if (_mapActive) {

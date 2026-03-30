@@ -1,18 +1,13 @@
 /**
  * missionControl.js — Mission Control Centre HTML overlay UI.
  *
- * Three tabs:
- *   - Available  : Lists all available missions with title, description, reward,
- *                  and an "Accept" button.  During the early tutorial (missions
- *                  1–4), only one mission can be accepted at a time; if one is
- *                  already active the Accept button is disabled for all others.
- *                  After mission 4 is completed, multiple missions can be
- *                  accepted simultaneously.
- *   - Accepted   : Lists currently accepted missions with their objectives,
- *                  showing each objective description and a completion indicator
- *                  (checkmark if done, hollow circle if pending).
- *   - Completed  : Lists all completed missions with the date they were
- *                  completed and the reward received.
+ * Five tabs:
+ *   - Available  : Lists all available tutorial missions with title, description,
+ *                  reward, and an "Accept" button.
+ *   - Accepted   : Lists currently accepted missions with their objectives.
+ *   - Completed  : Lists all completed missions.
+ *   - Contracts  : Board of procedurally generated contracts (pool).
+ *   - Active     : Active (accepted) contracts with objectives and cancel option.
  *
  * Mission unlock state is recalculated each time this screen is opened by
  * calling getUnlockedMissions() on init.
@@ -21,6 +16,7 @@
  */
 
 import { acceptMission, getUnlockedMissions } from '../core/missions.js';
+import { acceptContract, cancelContract, getContractCaps } from '../core/contracts.js';
 import { getPartById } from '../data/parts.js';
 import { refreshTopBarMissions } from './topbar.js';
 
@@ -277,6 +273,95 @@ const MISSION_CONTROL_STYLES = `
   padding: 40px 20px;
   font-size: 0.9rem;
 }
+
+/* ── Tab group divider ──────────────────────────────────────────────────── */
+.mc-tab-divider {
+  width: 1px;
+  background: rgba(255,255,255,0.15);
+  margin: 6px 8px;
+  flex-shrink: 0;
+}
+
+/* ── Contract-specific styles ───────────────────────────────────────────── */
+.mc-contract-category {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: rgba(100, 140, 200, 0.15);
+  color: #7098c0;
+  display: inline-block;
+  margin-bottom: 8px;
+}
+
+.mc-contract-meta {
+  font-size: 0.78rem;
+  color: #6878a0;
+  margin: 6px 0 0;
+  line-height: 1.5;
+}
+
+.mc-contract-meta span {
+  margin-right: 16px;
+}
+
+.mc-contract-chain {
+  font-size: 0.75rem;
+  color: #a08850;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.mc-cancel-btn {
+  background: rgba(200, 60, 60, 0.15);
+  border: 1px solid rgba(200, 60, 60, 0.35);
+  color: #c07070;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 5px 14px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  margin-top: 10px;
+}
+.mc-cancel-btn:hover {
+  background: rgba(200, 60, 60, 0.3);
+  border-color: rgba(200, 60, 60, 0.6);
+}
+
+.mc-caps-info {
+  font-size: 0.8rem;
+  color: #6878a0;
+  padding: 0 0 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  margin-bottom: 14px;
+}
+
+.mc-reputation-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: #8898b0;
+  margin-bottom: 14px;
+}
+
+.mc-rep-fill {
+  height: 6px;
+  border-radius: 3px;
+  background: #5090d0;
+  transition: width 0.3s;
+}
+
+.mc-rep-track {
+  flex: 1;
+  max-width: 200px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.08);
+}
 `;
 
 // ---------------------------------------------------------------------------
@@ -467,12 +552,21 @@ function _renderShell() {
   tabBar.id = 'mission-control-tabs';
 
   const tabs = [
-    { id: 'available', label: 'Available' },
+    { id: 'available', label: 'Missions' },
     { id: 'accepted',  label: 'Accepted'  },
     { id: 'completed', label: 'Completed' },
+    { id: '_divider',  label: '' },
+    { id: 'contracts', label: 'Contracts' },
+    { id: 'active-contracts', label: 'Active' },
   ];
 
   for (const tab of tabs) {
+    if (tab.id === '_divider') {
+      const divider = document.createElement('div');
+      divider.className = 'mc-tab-divider';
+      tabBar.appendChild(divider);
+      continue;
+    }
     const btn = document.createElement('button');
     btn.className = 'mc-tab' + (tab.id === _activeTab ? ' active' : '');
     btn.dataset.tabId = tab.id;
@@ -503,9 +597,11 @@ function _switchTab(tabId) {
     });
   }
 
-  if (tabId === 'available') _renderAvailableTab();
-  if (tabId === 'accepted')  _renderAcceptedTab();
-  if (tabId === 'completed') _renderCompletedTab();
+  if (tabId === 'available')        _renderAvailableTab();
+  if (tabId === 'accepted')         _renderAcceptedTab();
+  if (tabId === 'completed')        _renderCompletedTab();
+  if (tabId === 'contracts')        _renderContractsBoardTab();
+  if (tabId === 'active-contracts') _renderActiveContractsTab();
 }
 
 /**
@@ -850,4 +946,350 @@ function _buildCompletedMissionCard(mission) {
   if (rewards) card.appendChild(rewards);
 
   return card;
+}
+
+// ---------------------------------------------------------------------------
+// Private — Contracts Board tab
+// ---------------------------------------------------------------------------
+
+/**
+ * Format a ContractCategory enum value as a readable label.
+ * @param {string} category
+ * @returns {string}
+ */
+function _categoryLabel(category) {
+  const labels = {
+    ALTITUDE_RECORD: 'Altitude',
+    SPEED_RECORD: 'Speed',
+    SCIENCE_SURVEY: 'Science',
+    SATELLITE_DEPLOY: 'Satellite',
+    SAFE_RECOVERY: 'Recovery',
+    ORBITAL: 'Orbital',
+    CRASH_TEST: 'Crash Test',
+  };
+  return labels[category] ?? category;
+}
+
+function _renderContractsBoardTab() {
+  const content = _getContent();
+  if (!content || !_state) return;
+
+  const contracts = _state.contracts?.board ?? [];
+  const caps = getContractCaps(_state);
+
+  // Caps info bar
+  const capsInfo = document.createElement('div');
+  capsInfo.className = 'mc-caps-info';
+  capsInfo.textContent = `Board: ${contracts.length}/${caps.pool} slots | Active: ${(_state.contracts?.active ?? []).length}/${caps.active} slots`;
+  content.appendChild(capsInfo);
+
+  // Reputation bar
+  const repBar = document.createElement('div');
+  repBar.className = 'mc-reputation-bar';
+  repBar.innerHTML = `<span>Reputation: ${_state.reputation ?? 50}</span>`;
+  const repTrack = document.createElement('div');
+  repTrack.className = 'mc-rep-track';
+  const repFill = document.createElement('div');
+  repFill.className = 'mc-rep-fill';
+  repFill.style.width = `${Math.max(0, Math.min(100, _state.reputation ?? 50))}%`;
+  repTrack.appendChild(repFill);
+  repBar.appendChild(repTrack);
+  content.appendChild(repBar);
+
+  if (contracts.length === 0) {
+    const msg = document.createElement('p');
+    msg.className = 'mc-empty-msg';
+    msg.textContent = 'No contracts on the board. Complete a flight to generate new contracts.';
+    content.appendChild(msg);
+    return;
+  }
+
+  const activeCount = (_state.contracts?.active ?? []).length;
+  const canAcceptMore = activeCount < caps.active;
+
+  const list = document.createElement('div');
+  list.className = 'mc-mission-list';
+
+  for (const contract of contracts) {
+    list.appendChild(_buildContractBoardCard(contract, canAcceptMore));
+  }
+
+  content.appendChild(list);
+}
+
+/**
+ * Build a contract card for the Board tab.
+ *
+ * @param {import('../core/gameState.js').Contract} contract
+ * @param {boolean} canAcceptMore
+ * @returns {HTMLElement}
+ */
+function _buildContractBoardCard(contract, canAcceptMore) {
+  const card = document.createElement('div');
+  card.className = 'mc-mission-card';
+  card.dataset.contractId = contract.id;
+
+  // Category badge
+  const catBadge = document.createElement('span');
+  catBadge.className = 'mc-contract-category';
+  catBadge.textContent = _categoryLabel(contract.category);
+  card.appendChild(catBadge);
+
+  // Chain indicator
+  if (contract.chainId && contract.chainPart) {
+    const chainEl = document.createElement('div');
+    chainEl.className = 'mc-contract-chain';
+    chainEl.textContent = `Chain: Part ${contract.chainPart} of ${contract.chainTotal}`;
+    card.appendChild(chainEl);
+  }
+
+  // Header row: title + reward
+  const cardHeader = document.createElement('div');
+  cardHeader.className = 'mc-mission-card-header';
+
+  const titleEl = document.createElement('h3');
+  titleEl.className = 'mc-mission-title';
+  titleEl.textContent = contract.title;
+  cardHeader.appendChild(titleEl);
+
+  const rewardEl = document.createElement('span');
+  rewardEl.className = 'mc-mission-reward';
+  rewardEl.textContent = _fmtCash(contract.reward);
+  cardHeader.appendChild(rewardEl);
+
+  card.appendChild(cardHeader);
+
+  // Description
+  const desc = document.createElement('p');
+  desc.className = 'mc-mission-description';
+  desc.textContent = contract.description;
+  card.appendChild(desc);
+
+  // Objectives preview
+  if (contract.objectives && contract.objectives.length > 0) {
+    const objLabel = document.createElement('p');
+    objLabel.className = 'mc-objectives-label';
+    objLabel.textContent = 'Objectives';
+    card.appendChild(objLabel);
+
+    const objList = document.createElement('ul');
+    objList.className = 'mc-objectives-list';
+
+    for (const obj of contract.objectives) {
+      const item = document.createElement('li');
+      item.className = 'mc-objective-item';
+
+      const indicator = document.createElement('span');
+      indicator.className = 'mc-objective-indicator pending';
+      indicator.textContent = '○';
+      item.appendChild(indicator);
+
+      const textEl = document.createElement('span');
+      textEl.className = 'mc-objective-text pending';
+      textEl.textContent = obj.description;
+      item.appendChild(textEl);
+
+      objList.appendChild(item);
+    }
+    card.appendChild(objList);
+  }
+
+  // Meta info
+  const meta = document.createElement('p');
+  meta.className = 'mc-contract-meta';
+  const flightsLeft = contract.boardExpiryPeriod - (_state?.currentPeriod ?? 0);
+  meta.innerHTML =
+    `<span>Expires in ${flightsLeft} flight${flightsLeft !== 1 ? 's' : ''}</span>` +
+    (contract.deadlinePeriod != null
+      ? `<span>Deadline: ${contract.deadlinePeriod - (_state?.currentPeriod ?? 0)} flights after accept</span>`
+      : '<span>No deadline</span>') +
+    `<span>Penalty: ${_fmtCash(contract.penaltyFee)}</span>`;
+  card.appendChild(meta);
+
+  // Accept button
+  const acceptRow = document.createElement('div');
+  acceptRow.className = 'mc-accept-row';
+
+  const acceptBtn = document.createElement('button');
+  acceptBtn.className = 'mc-accept-btn';
+  acceptBtn.textContent = 'Accept Contract';
+  acceptBtn.disabled = !canAcceptMore;
+  if (!canAcceptMore) {
+    acceptBtn.title = 'Active contract limit reached.';
+  }
+  acceptBtn.addEventListener('click', () => _handleAcceptContract(contract.id));
+  acceptRow.appendChild(acceptBtn);
+
+  if (!canAcceptMore) {
+    const notice = document.createElement('span');
+    notice.className = 'mc-tutorial-notice';
+    notice.textContent = 'Active contract limit reached.';
+    acceptRow.appendChild(notice);
+  }
+
+  card.appendChild(acceptRow);
+
+  return card;
+}
+
+/**
+ * Handle clicking Accept on a board contract.
+ * @param {string} contractId
+ */
+function _handleAcceptContract(contractId) {
+  if (!_state) return;
+
+  const result = acceptContract(_state, contractId);
+  if (result.success) {
+    _renderContractsBoardTab();
+  } else {
+    console.warn('[Mission Control UI] acceptContract failed:', result.error);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Private — Active Contracts tab
+// ---------------------------------------------------------------------------
+
+function _renderActiveContractsTab() {
+  const content = _getContent();
+  if (!content || !_state) return;
+
+  const contracts = _state.contracts?.active ?? [];
+  const caps = getContractCaps(_state);
+
+  // Caps info bar
+  const capsInfo = document.createElement('div');
+  capsInfo.className = 'mc-caps-info';
+  capsInfo.textContent = `Active: ${contracts.length}/${caps.active} slots`;
+  content.appendChild(capsInfo);
+
+  if (contracts.length === 0) {
+    const msg = document.createElement('p');
+    msg.className = 'mc-empty-msg';
+    msg.textContent = 'No active contracts. Visit the Contracts tab to accept one.';
+    content.appendChild(msg);
+    return;
+  }
+
+  const list = document.createElement('div');
+  list.className = 'mc-mission-list';
+
+  for (const contract of contracts) {
+    list.appendChild(_buildActiveContractCard(contract));
+  }
+
+  content.appendChild(list);
+}
+
+/**
+ * Build a card for an active contract (objectives + cancel button).
+ *
+ * @param {import('../core/gameState.js').Contract} contract
+ * @returns {HTMLElement}
+ */
+function _buildActiveContractCard(contract) {
+  const card = document.createElement('div');
+  card.className = 'mc-mission-card';
+  card.dataset.contractId = contract.id;
+
+  // Category badge
+  const catBadge = document.createElement('span');
+  catBadge.className = 'mc-contract-category';
+  catBadge.textContent = _categoryLabel(contract.category);
+  card.appendChild(catBadge);
+
+  // Chain indicator
+  if (contract.chainId && contract.chainPart) {
+    const chainEl = document.createElement('div');
+    chainEl.className = 'mc-contract-chain';
+    chainEl.textContent = `Chain: Part ${contract.chainPart} of ${contract.chainTotal}`;
+    card.appendChild(chainEl);
+  }
+
+  // Header row: title + reward
+  const cardHeader = document.createElement('div');
+  cardHeader.className = 'mc-mission-card-header';
+
+  const titleEl = document.createElement('h3');
+  titleEl.className = 'mc-mission-title';
+  titleEl.textContent = contract.title;
+  cardHeader.appendChild(titleEl);
+
+  const rewardEl = document.createElement('span');
+  rewardEl.className = 'mc-mission-reward';
+  rewardEl.textContent = _fmtCash(contract.reward);
+  cardHeader.appendChild(rewardEl);
+
+  card.appendChild(cardHeader);
+
+  // Description
+  const desc = document.createElement('p');
+  desc.className = 'mc-mission-description';
+  desc.textContent = contract.description;
+  card.appendChild(desc);
+
+  // Objectives section
+  if (contract.objectives && contract.objectives.length > 0) {
+    const objLabel = document.createElement('p');
+    objLabel.className = 'mc-objectives-label';
+    objLabel.textContent = 'Objectives';
+    card.appendChild(objLabel);
+
+    const objList = document.createElement('ul');
+    objList.className = 'mc-objectives-list';
+
+    for (const obj of contract.objectives) {
+      const item = document.createElement('li');
+      item.className = 'mc-objective-item';
+
+      const indicator = document.createElement('span');
+      indicator.className = `mc-objective-indicator ${obj.completed ? 'completed' : 'pending'}`;
+      indicator.textContent = obj.completed ? '✓' : '○';
+      item.appendChild(indicator);
+
+      const textEl = document.createElement('span');
+      textEl.className = `mc-objective-text ${obj.completed ? 'completed' : 'pending'}`;
+      textEl.textContent = obj.description;
+      item.appendChild(textEl);
+
+      objList.appendChild(item);
+    }
+    card.appendChild(objList);
+  }
+
+  // Meta info (deadline)
+  const meta = document.createElement('p');
+  meta.className = 'mc-contract-meta';
+  if (contract.deadlinePeriod != null) {
+    const flightsLeft = contract.deadlinePeriod - (_state?.currentPeriod ?? 0);
+    meta.innerHTML = `<span>Deadline: ${flightsLeft} flight${flightsLeft !== 1 ? 's' : ''} remaining</span>`;
+  } else {
+    meta.innerHTML = '<span>No deadline (open-ended)</span>';
+  }
+  card.appendChild(meta);
+
+  // Cancel button
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'mc-cancel-btn';
+  cancelBtn.textContent = `Cancel (${_fmtCash(contract.penaltyFee)} penalty)`;
+  cancelBtn.addEventListener('click', () => _handleCancelContract(contract.id));
+  card.appendChild(cancelBtn);
+
+  return card;
+}
+
+/**
+ * Handle clicking Cancel on an active contract.
+ * @param {string} contractId
+ */
+function _handleCancelContract(contractId) {
+  if (!_state) return;
+
+  const result = cancelContract(_state, contractId);
+  if (result.success) {
+    _renderActiveContractsTab();
+  } else {
+    console.warn('[Mission Control UI] cancelContract failed:', result.error);
+  }
 }

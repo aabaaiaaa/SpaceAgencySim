@@ -321,6 +321,60 @@ export const FACILITY_DEFINITIONS = Object.freeze([
 ]);
 
 // ---------------------------------------------------------------------------
+// Contract System
+// ---------------------------------------------------------------------------
+
+/**
+ * Categories of procedurally generated contracts.
+ * @enum {string}
+ */
+export const ContractCategory = Object.freeze({
+  ALTITUDE_RECORD: 'ALTITUDE_RECORD',
+  SPEED_RECORD: 'SPEED_RECORD',
+  SCIENCE_SURVEY: 'SCIENCE_SURVEY',
+  SATELLITE_DEPLOY: 'SATELLITE_DEPLOY',
+  SAFE_RECOVERY: 'SAFE_RECOVERY',
+  ORBITAL: 'ORBITAL',
+  CRASH_TEST: 'CRASH_TEST',
+});
+
+/**
+ * Contract board pool and active contract caps by Mission Control tier.
+ *
+ * pool  = max contracts visible on the board at once.
+ * active = max contracts the player may have accepted simultaneously.
+ *
+ * @type {Readonly<Record<number, Readonly<{pool: number, active: number}>>>}
+ */
+export const CONTRACT_TIER_CAPS = Object.freeze({
+  1: Object.freeze({ pool: 4,  active: 2 }),
+  2: Object.freeze({ pool: 8,  active: 5 }),
+  3: Object.freeze({ pool: 12, active: 8 }),
+});
+
+/** Number of new contracts generated after each flight return. */
+export const CONTRACTS_PER_FLIGHT_MIN = 2;
+export const CONTRACTS_PER_FLIGHT_MAX = 3;
+
+/** Number of flights before an unaccepted board contract expires. */
+export const CONTRACT_BOARD_EXPIRY_FLIGHTS = 4;
+
+/** Cancellation penalty as a fraction of the contract reward. */
+export const CONTRACT_CANCEL_PENALTY_RATE = 0.25;
+
+/** Reputation gained per completed contract (base, before difficulty scaling). */
+export const CONTRACT_REP_GAIN_BASE = 5;
+
+/** Reputation lost per cancelled contract. */
+export const CONTRACT_REP_LOSS_CANCEL = 8;
+
+/** Reputation lost per expired/failed contract. */
+export const CONTRACT_REP_LOSS_FAIL = 5;
+
+/** Starting reputation for a new agency. */
+export const STARTING_REPUTATION = 50;
+
+// ---------------------------------------------------------------------------
 // Period / Operating Costs
 // ---------------------------------------------------------------------------
 
