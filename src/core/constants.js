@@ -168,3 +168,13 @@ export const MAX_CREW_SIZE = 20;
 
 /** Number of missions generated on the board at one time. */
 export const AVAILABLE_MISSION_SLOTS = 5;
+
+// ---------------------------------------------------------------------------
+// Period / Operating Costs
+// ---------------------------------------------------------------------------
+
+/** Crew salary charged per period (per astronaut). */
+export const CREW_SALARY_PER_PERIOD = 5_000;
+
+/** Base facility upkeep charged per period. */
+export const FACILITY_UPKEEP_PER_PERIOD = 10_000;

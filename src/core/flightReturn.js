@@ -21,6 +21,7 @@
 
 import { completeMission } from './missions.js';
 import { earn, applyInterest, applyDeathFine } from './finance.js';
+import { advancePeriod } from './period.js';
 import { getPartById } from '../data/parts.js';
 import { PartType, DEATH_FINE_PER_ASTRONAUT, FlightOutcome } from './constants.js';
 
@@ -43,8 +44,14 @@ import { PartType, DEATH_FINE_PER_ASTRONAUT, FlightOutcome } from './constants.j
  * @property {number}  interestCharged - Total interest added to the loan.
  * @property {number}  loanBalance     - Loan balance after interest is applied.
  * @property {number}  deathFineTotal  - Total death fines applied.
+ * @property {number}  operatingCosts  - Total operating costs charged (salaries + upkeep).
+ * @property {number}  crewSalaryCost  - Crew salary portion of operating costs.
+ * @property {number}  facilityUpkeep  - Facility upkeep portion of operating costs.
+ * @property {number}  activeCrewCount - Number of active crew charged salaries.
  * @property {number}  netCashChange   - Net change in state.money (positive = gained).
  * @property {number}  totalFlights    - New total flight count (state.flightHistory.length).
+ * @property {number}  currentPeriod   - Period number after this flight.
+ * @property {string[]} expiredMissionIds - Mission IDs that expired this period.
  */
 
 /**
@@ -139,7 +146,10 @@ export function processFlightReturn(state, flightState, ps, assembly) {
     flightState.deathFinesApplied = true;
   }
 
-  // ── 6b. Accumulate in-game flight time ──────────────────────────────────
+  // ── 6b. Advance the period counter and charge operating costs ──────────
+  const periodSummary = advancePeriod(state);
+
+  // ── 6c. Accumulate in-game flight time ──────────────────────────────────
   const flightSeconds = flightState?.timeElapsed ?? 0;
   state.flightTimeSeconds = (state.flightTimeSeconds ?? 0) + flightSeconds;
 
@@ -174,10 +184,16 @@ export function processFlightReturn(state, flightState, ps, assembly) {
     completedMissions,
     recoveryValue,
     interestCharged,
-    loanBalance:   state.loan?.balance ?? 0,
+    loanBalance:       state.loan?.balance ?? 0,
     deathFineTotal,
-    netCashChange: state.money - cashBefore,
-    totalFlights:  state.flightHistory.length,
+    operatingCosts:    periodSummary.totalOperatingCost,
+    crewSalaryCost:    periodSummary.crewSalaryCost,
+    facilityUpkeep:    periodSummary.facilityUpkeep,
+    activeCrewCount:   periodSummary.activeCrewCount,
+    netCashChange:     state.money - cashBefore,
+    totalFlights:      state.flightHistory.length,
+    currentPeriod:     periodSummary.newPeriod,
+    expiredMissionIds: periodSummary.expiredMissionIds,
   };
 }
 

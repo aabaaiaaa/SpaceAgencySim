@@ -96,6 +96,16 @@ const TOPBAR_STYLES = `
   text-overflow: ellipsis;
 }
 
+/* Flight (period) counter */
+#topbar-flight {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #7098b8;
+  white-space: nowrap;
+  margin-left: 12px;
+  letter-spacing: 0.04em;
+}
+
 /* Spacer pushes hamburger to the right */
 #topbar-spacer {
   flex: 1;
@@ -621,6 +631,12 @@ export function initTopBar(container, state, { onExitToMenu }) {
   agency.id = 'topbar-agency';
   agency.textContent = state.agencyName || 'Space Agency';
 
+  // Flight (period) counter
+  const flightCounter = document.createElement('span');
+  flightCounter.id = 'topbar-flight';
+  const period = state.currentPeriod ?? 0;
+  flightCounter.textContent = period > 0 ? `Flight ${period}` : '';
+
   // Cash button — centre
   const cash = document.createElement('button');
   cash.id = 'topbar-cash';
@@ -658,6 +674,7 @@ export function initTopBar(container, state, { onExitToMenu }) {
   spacer.id = 'topbar-spacer';
 
   _root.appendChild(agency);
+  _root.appendChild(flightCounter);
   _root.appendChild(cash);
   _root.appendChild(missionsBtn);
   _root.appendChild(spacer);
@@ -700,6 +717,11 @@ export function refreshTopBar() {
   const cashEl = document.getElementById('topbar-cash');
   if (cashEl) {
     cashEl.textContent = _fmtCash(_state.money ?? 0);
+  }
+  const flightEl = document.getElementById('topbar-flight');
+  if (flightEl) {
+    const period = _state.currentPeriod ?? 0;
+    flightEl.textContent = period > 0 ? `Flight ${period}` : '';
   }
   _refreshMissionsBtn();
 }

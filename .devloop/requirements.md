@@ -8,7 +8,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 ## Phase 0: Core Game Mechanics
 
 ### TASK-001: Implement period (flight) system
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: none
 - **Description**: Implement the period system where a period = one flight. Periods advance only when a flight is completed and the player returns to the space agency. Contract expiry, crew salaries, operating costs, and other time-based mechanics reference periods. Use "flight" in player-facing UI. Time warping does not advance the period counter. Returning to the agency from any flight (including orbit) completes one period, charges operating costs, and cashes in completed missions.

@@ -1591,7 +1591,8 @@ describe('processFlightReturn() — multi-mission completion', () => {
     expect(result.completedMissions).toHaveLength(2);
     expect(state.missions.completed.map((m) => m.id)).toContain('pr-m1');
     expect(state.missions.completed.map((m) => m.id)).toContain('pr-m2');
-    expect(state.money).toBe(moneyBefore + 5000 + 8000);
+    // Operating costs (facility upkeep) are deducted each period.
+    expect(state.money).toBe(moneyBefore + 5000 + 8000 - result.operatingCosts);
   });
 
   it('completes only missions whose objectives are all met', () => {
@@ -1624,7 +1625,8 @@ describe('processFlightReturn() — multi-mission completion', () => {
     expect(result.completedMissions[0].mission.id).toBe('pr-done');
     expect(state.missions.accepted).toHaveLength(1);
     expect(state.missions.accepted[0].id).toBe('pr-pending');
-    expect(state.money).toBe(moneyBefore + 3000);
+    // Operating costs (facility upkeep) are deducted each period.
+    expect(state.money).toBe(moneyBefore + 3000 - result.operatingCosts);
   });
 });
 

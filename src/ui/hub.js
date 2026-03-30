@@ -423,7 +423,7 @@ export function showReturnResultsOverlay(container, summary, onDismiss) {
 
   const subtitle = document.createElement('p');
   subtitle.className = 'rr-subtitle';
-  subtitle.textContent = `Flight ${summary.totalFlights} summary`;
+  subtitle.textContent = `Flight ${summary.currentPeriod ?? summary.totalFlights} summary`;
   content.appendChild(subtitle);
 
   // ── Missions completed ────────────────────────────────────────────────────
@@ -529,6 +529,27 @@ export function showReturnResultsOverlay(container, summary, onDismiss) {
       `−$${summary.deathFineTotal.toLocaleString('en-US')}`,
       'negative',
     ));
+  }
+
+  // Operating costs rows.
+  if (summary.operatingCosts > 0) {
+    if (summary.crewSalaryCost > 0) {
+      const crewLabel = summary.activeCrewCount === 1
+        ? 'Crew salaries (1 astronaut)'
+        : `Crew salaries (${summary.activeCrewCount} astronauts)`;
+      finSection.appendChild(_rrRow(
+        crewLabel,
+        `−$${summary.crewSalaryCost.toLocaleString('en-US')}`,
+        'negative',
+      ));
+    }
+    if (summary.facilityUpkeep > 0) {
+      finSection.appendChild(_rrRow(
+        'Facility upkeep',
+        `−$${summary.facilityUpkeep.toLocaleString('en-US')}`,
+        'negative',
+      ));
+    }
   }
 
   // Net cash change.

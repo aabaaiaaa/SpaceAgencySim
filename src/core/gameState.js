@@ -154,6 +154,11 @@ import {
  * @property {RocketDesign[]} rockets       - Saved rocket blueprints.
  * @property {string[]}       parts         - IDs of unlocked part definitions.
  * @property {FlightResult[]} flightHistory - Past flight records.
+ * @property {number}         currentPeriod     - Current period (flight) counter.
+ *                                                Starts at 0; incremented each time the
+ *                                                player completes a flight and returns to
+ *                                                the agency. Time-based mechanics reference
+ *                                                this counter, not wall-clock time.
  * @property {number}         playTimeSeconds   - Total real-world seconds of play.
  * @property {number}         flightTimeSeconds - Cumulative in-game flight time (seconds).
  * @property {FlightState|null} currentFlight - Active flight, or null.
@@ -203,6 +208,8 @@ export function createGameState() {
     parts: [],
 
     flightHistory: [],
+
+    currentPeriod: 0,
 
     playTimeSeconds: 0,
     flightTimeSeconds: 0,
