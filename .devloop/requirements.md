@@ -250,7 +250,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Free building, no upgrades. Statistics and records dashboard (total flights, records per body, max speed, heaviest rocket, crew careers, financial history, exploration progress). Celestial body knowledge for discovered bodies, usable for mission planning. Tab for frequently flown rocket configurations with statistics (top 5).
 
 ### TASK-038: Tutorial missions for new facilities
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-007, TASK-018, TASK-034, TASK-035, TASK-026
 - **Description**: Each new facility gets 1-2 introductory tutorial missions that teach the player what it does, award the building when accepting (tutorial mode), include narrative congratulating progression, and explain the construction menu. Crew Admin tutorial: after command module introduction. R&D Lab tutorial: after first science collection. Tracking Station tutorial: after first orbit, opens orbital tutorial chain. Satellite Network Ops: after deploying satellites.

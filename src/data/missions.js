@@ -217,6 +217,10 @@ export const MissionStatus = Object.freeze({
  * @property {string[]}       unlockedParts  - Part IDs added to state.parts on completion.
  * @property {string[]}       [requiredParts] - Part IDs unlocked when the mission is accepted.
  * @property {string|null}    [unlocksFacility] - FacilityId awarded on completion (tutorial mode).
+ * @property {string|null}    [awardsFacilityOnAccept] - FacilityId awarded when the mission is
+ *                                            accepted (tutorial mode).  Used for tutorial missions
+ *                                            that require the facility to be built before the
+ *                                            player can complete the objectives.
  * @property {MissionStatus}  status         - Initial status: 'locked' or 'available'.
  */
 
@@ -238,15 +242,20 @@ import { PartType, FacilityId } from '../core/constants.js';
  *
  * UNLOCK TREE SUMMARY
  * ===================
- *   001 → 002 → 003 → 004 ──┬──> 005 → 008 → 010 → 012 → 014 → 016
- *                            │                                      ↓
- *                            ├──> 006                              017 (requires 015 + 016)
- *                            │                         ↑
+ *   001 → 002 → 003 → 004 ──┬──> 005 → 008 → 010 ─┬─> 012 → 014 → 016 ─┬─> 020 → 021
+ *                            │                       │                     │
+ *                            ├──> 006                └─> 019 (R&D Lab)     ↓
+ *                            │                         ↑              017 (requires 015+016)
+ *                            ├──> 018 (Crew Admin)     │                   ↓
+ *                            │                         │              022 (Sat Ops)
  *                            └──> 007 → 009 ─────> 011 → 013 → 015
  *
  * Missions 1–4 are strictly linear (one at a time).
- * Missions 5, 6, 7 all unlock simultaneously after mission 4.
+ * Missions 5, 6, 7, 18 all unlock simultaneously after mission 4.
  * Mission 17 requires both 15 and 16 completed.
+ * Mission 19 (R&D Lab tutorial) unlocks after 10.
+ * Mission 20 (Tracking Station tutorial) unlocks after 16 → 21 (Orbital Survey).
+ * Mission 22 (Satellite Ops tutorial) unlocks after 17.
  *
  * @type {MissionDef[]}
  */
@@ -811,6 +820,210 @@ export const MISSIONS = [
     reward: 300_000,
     unlocksAfter: ['mission-015', 'mission-016'],
     unlockedParts: [],
+    status: MissionStatus.LOCKED,
+  },
+
+  // =========================================================================
+  // FACILITY TUTORIAL MISSIONS — introduce new buildings (TASK-038)
+  // =========================================================================
+
+  /**
+   * Mission 18 — First Crew Flight (Crew Admin tutorial)
+   * Unlocks after mission 4 (which awards Crew Admin + cmd-mk1).
+   * Teaches the player to hire crew and fly with them.
+   */
+  {
+    id: 'mission-018',
+    title: 'First Crew Flight',
+    description:
+      'Congratulations — your agency now has a Crew Administration building ' +
+      'and access to the crewed command module! The Crew Admin facility lets you ' +
+      'recruit and manage astronauts for crewed missions. Visit the Crew Admin ' +
+      'building to hire your first astronaut, then build a rocket with the Mk1 ' +
+      'Command Module, assign a crew member, and bring them home safely. ' +
+      'Tip: open the Construction Menu from the hub to see all your facilities ' +
+      'and available upgrades.',
+    location: 'desert',
+    objectives: [
+      {
+        id: 'obj-018-1',
+        type: ObjectiveType.MINIMUM_CREW,
+        target: { minCrew: 1 },
+        completed: false,
+        description: 'Fly with at least 1 crew member aboard',
+      },
+      {
+        id: 'obj-018-2',
+        type: ObjectiveType.SAFE_LANDING,
+        target: { maxLandingSpeed: 10 },
+        completed: false,
+        description: 'Land safely at 10 m/s or less — bring your crew home',
+      },
+    ],
+    reward: 40_000,
+    unlocksAfter: ['mission-004'],
+    unlockedParts: [],
+    requiredParts: ['cmd-mk1'],
+    status: MissionStatus.LOCKED,
+  },
+
+  /**
+   * Mission 19 — Research Division (R&D Lab tutorial)
+   * Unlocks after mission 10 (first science data return).
+   * Awards the R&D Lab on acceptance so the player can use it during the mission.
+   */
+  {
+    id: 'mission-019',
+    title: 'Research Division',
+    description:
+      'Outstanding work — your team has successfully returned experimental data ' +
+      'from altitude! Raw data is valuable, but to turn it into breakthrough ' +
+      'technology you need a dedicated research facility. Accepting this mission ' +
+      'will establish your R&D Laboratory. The R&D Lab lets you spend science ' +
+      'points to unlock new parts and capabilities through the tech tree. ' +
+      'To prove the lab\'s value, collect and return science data from above ' +
+      '5,000 metres. Check the Construction Menu to see your new facility ' +
+      'and its upgrade path.',
+    location: 'desert',
+    objectives: [
+      {
+        id: 'obj-019-1',
+        type: ObjectiveType.REACH_ALTITUDE,
+        target: { altitude: 5_000 },
+        completed: false,
+        description: 'Reach 5,000 m altitude',
+      },
+      {
+        id: 'obj-019-2',
+        type: ObjectiveType.RETURN_SCIENCE_DATA,
+        target: {},
+        completed: false,
+        description: 'Collect and return science data safely',
+      },
+    ],
+    reward: 80_000,
+    unlocksAfter: ['mission-010'],
+    unlockedParts: [],
+    requiredParts: ['science-module-mk1'],
+    awardsFacilityOnAccept: FacilityId.RD_LAB,
+    status: MissionStatus.LOCKED,
+  },
+
+  /**
+   * Mission 20 — Eyes on the Sky (Tracking Station tutorial)
+   * Unlocks after mission 16 (first orbit achieved).
+   * Awards the Tracking Station on acceptance so the player can use
+   * orbital tracking and map view during the mission.
+   * Opens the orbital tutorial chain (mission 21).
+   */
+  {
+    id: 'mission-020',
+    title: 'Eyes on the Sky',
+    description:
+      'You have reached orbit — a historic achievement for your agency! But ' +
+      'flying blind in the void is dangerous. Accepting this mission will ' +
+      'establish your Tracking Station, giving you the ability to track objects ' +
+      'in orbit, view orbital predictions on the map, and plan manoeuvres from ' +
+      'the ground. To calibrate the station, reach orbit once more and prove ' +
+      'the tracking systems are operational. Open the Construction Menu to ' +
+      'see the Tracking Station and its upgrade tiers — higher tiers unlock ' +
+      'deep-space communications and transfer planning.',
+    location: 'desert',
+    objectives: [
+      {
+        id: 'obj-020-1',
+        type: ObjectiveType.REACH_ORBIT,
+        target: { orbitAltitude: 80_000, orbitalVelocity: 7_800 },
+        completed: false,
+        description: 'Reach Low Earth Orbit to calibrate tracking systems',
+      },
+    ],
+    reward: 200_000,
+    unlocksAfter: ['mission-016'],
+    unlockedParts: [],
+    awardsFacilityOnAccept: FacilityId.TRACKING_STATION,
+    status: MissionStatus.LOCKED,
+  },
+
+  /**
+   * Mission 21 — Orbital Survey (Tracking Station chain)
+   * Unlocks after mission 20 (Tracking Station tutorial).
+   * Uses the Tracking Station to perform orbital science — collect
+   * data from orbit and return it safely.
+   */
+  {
+    id: 'mission-021',
+    title: 'Orbital Survey',
+    description:
+      'With the Tracking Station online, your ground controllers can guide ' +
+      'missions with precision. Use your new orbital tracking capability to ' +
+      'perform an orbital science survey: reach orbit, activate your science ' +
+      'instruments, and return the data safely. The Tracking Station\'s map ' +
+      'view will help you monitor your orbit and plan your re-entry.',
+    location: 'desert',
+    objectives: [
+      {
+        id: 'obj-021-1',
+        type: ObjectiveType.REACH_ORBIT,
+        target: { orbitAltitude: 80_000, orbitalVelocity: 7_800 },
+        completed: false,
+        description: 'Reach Low Earth Orbit',
+      },
+      {
+        id: 'obj-021-2',
+        type: ObjectiveType.RETURN_SCIENCE_DATA,
+        target: {},
+        completed: false,
+        description: 'Collect science data from orbit and return it safely',
+      },
+    ],
+    reward: 150_000,
+    unlocksAfter: ['mission-020'],
+    unlockedParts: [],
+    requiredParts: ['science-module-mk1'],
+    status: MissionStatus.LOCKED,
+  },
+
+  /**
+   * Mission 22 — Network Control (Satellite Network Ops tutorial)
+   * Unlocks after mission 17 (orbital satellite deployment).
+   * Awards the Satellite Network Operations Centre on acceptance
+   * so the player can manage their growing satellite constellation.
+   */
+  {
+    id: 'mission-022',
+    title: 'Network Control',
+    description:
+      'Your satellite deployments have been successful, but managing individual ' +
+      'satellites without a dedicated operations centre is unsustainable. ' +
+      'Accepting this mission will establish your Satellite Network Operations ' +
+      'Centre, giving you the tools to coordinate your constellation, lease ' +
+      'bandwidth, and plan future deployments. To prove the centre\'s value, ' +
+      'deploy two satellites into orbit in a single flight. Check the ' +
+      'Construction Menu to see the new facility and its upgrade tiers — ' +
+      'higher tiers unlock constellation management and repositioning.',
+    location: 'desert',
+    objectives: [
+      {
+        id: 'obj-022-1',
+        type: ObjectiveType.REACH_ORBIT,
+        target: { orbitAltitude: 80_000, orbitalVelocity: 7_800 },
+        completed: false,
+        description: 'Reach Low Earth Orbit',
+      },
+      {
+        id: 'obj-022-2',
+        type: ObjectiveType.MULTI_SATELLITE,
+        target: { count: 2, minAltitude: 80_000 },
+        completed: false,
+        description: 'Deploy 2 satellites while in orbit above 80,000 m',
+      },
+    ],
+    reward: 300_000,
+    unlocksAfter: ['mission-017'],
+    unlockedParts: [],
+    requiredParts: ['satellite-mk1'],
+    awardsFacilityOnAccept: FacilityId.SATELLITE_OPS,
     status: MissionStatus.LOCKED,
   },
 

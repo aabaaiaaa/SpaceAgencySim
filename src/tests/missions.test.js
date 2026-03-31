@@ -1256,7 +1256,7 @@ describe('Catalog (3): completing Mission 4 unlocks Missions 5, 6, and 7 simulta
     }
   }
 
-  it('exactly missions 5, 6, and 7 become available after mission-004 is completed', () => {
+  it('missions 5, 6, 7, and 18 become available after mission-004 is completed', () => {
     const state = freshState();
     initializeMissions(state);
     completeTutorialChainTo(state, 'mission-004');
@@ -1264,7 +1264,8 @@ describe('Catalog (3): completing Mission 4 unlocks Missions 5, 6, and 7 simulta
     expect(ids).toContain('mission-005');
     expect(ids).toContain('mission-006');
     expect(ids).toContain('mission-007');
-    expect(ids).toHaveLength(3);
+    expect(ids).toContain('mission-018');
+    expect(ids).toHaveLength(4);
   });
 
   it('missions 5, 6, and 7 are not available after only mission-003 is completed', () => {

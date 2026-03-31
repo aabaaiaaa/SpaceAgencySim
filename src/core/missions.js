@@ -266,7 +266,19 @@ export function acceptMission(state, id) {
     }
   }
 
-  return { success: true, mission, unlockedParts };
+  // Award a facility on acceptance if the mission template specifies one.
+  // Used by tutorial missions that need the facility built BEFORE the player
+  // can complete the mission objectives (e.g. "use the R&D Lab").
+  let awardedFacility = null;
+  const def = MISSIONS.find((d) => d.id === mission.id);
+  if (def?.awardsFacilityOnAccept) {
+    const facilityResult = awardFacility(state, def.awardsFacilityOnAccept);
+    if (facilityResult.success) {
+      awardedFacility = def.awardsFacilityOnAccept;
+    }
+  }
+
+  return { success: true, mission, unlockedParts, awardedFacility };
 }
 
 /**
@@ -501,6 +513,28 @@ export function checkObjectiveCompletion(state, flightState) {
             obj.completed = true;
           }
           break;
+
+        // ------------------------------------------------------------------
+        case ObjectiveType.MINIMUM_CREW:
+          if (
+            typeof flightState.crewCount === 'number' &&
+            flightState.crewCount >= obj.target.minCrew
+          ) {
+            obj.completed = true;
+          }
+          break;
+
+        // ------------------------------------------------------------------
+        case ObjectiveType.MULTI_SATELLITE: {
+          const releases = flightState.events.filter(
+            (e) =>
+              e.type === 'SATELLITE_RELEASED' &&
+              typeof e.altitude === 'number' &&
+              e.altitude >= obj.target.minAltitude,
+          );
+          if (releases.length >= obj.target.count) obj.completed = true;
+          break;
+        }
 
         // ------------------------------------------------------------------
         default:
