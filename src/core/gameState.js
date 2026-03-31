@@ -202,6 +202,7 @@ import {
  * @property {string|null}   orbitBandId    - ID of the altitude band at orbit entry (e.g. 'LEO'), or null.
  * @property {string|null}   currentBiome   - ID of the current altitude biome (e.g. 'LOW_ATMOSPHERE').
  * @property {string[]}      biomesVisited  - Unique biome IDs visited during this flight.
+ * @property {import('./docking.js').DockingSystemState|null} dockingState - Docking system state, or null.
  */
 
 /**
@@ -541,6 +542,7 @@ export function createFlightState({
     orbitBandId: null,
     currentBiome: null,
     biomesVisited: [],
+    dockingState: null,
   };
 }
 

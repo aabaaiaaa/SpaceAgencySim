@@ -48,6 +48,8 @@ export const PartType = Object.freeze({
   RCS_THRUSTER: 'RCS_THRUSTER',
   /** Generates electricity for systems with no atmosphere. */
   SOLAR_PANEL: 'SOLAR_PANEL',
+  /** Docking port for connecting vessels in orbit. */
+  DOCKING_PORT: 'DOCKING_PORT',
 });
 
 // ---------------------------------------------------------------------------
@@ -834,3 +836,50 @@ export const SATELLITE_OPS_TIER_CAPS = Object.freeze({
   2: 12,
   3: 24,
 });
+
+// ---------------------------------------------------------------------------
+// Docking System
+// ---------------------------------------------------------------------------
+
+/**
+ * Docking procedure states.
+ * @enum {string}
+ */
+export const DockingState = Object.freeze({
+  /** No docking in progress. */
+  IDLE: 'IDLE',
+  /** Target selected, approaching within visual range. */
+  APPROACHING: 'APPROACHING',
+  /** Within docking range, aligning orientation and velocity. */
+  ALIGNING: 'ALIGNING',
+  /** Final approach — automatic docking engaged. */
+  FINAL_APPROACH: 'FINAL_APPROACH',
+  /** Hard-docked — vessels are connected. */
+  DOCKED: 'DOCKED',
+  /** Undocking sequence in progress. */
+  UNDOCKING: 'UNDOCKING',
+});
+
+/** Maximum angular distance (degrees) at which a target becomes visible/targetable in orbit view. */
+export const DOCKING_VISUAL_RANGE_DEG = 3;
+
+/** Distance (m) at which docking guidance screen activates in docking mode. */
+export const DOCKING_GUIDANCE_RANGE = 500;
+
+/** Distance (m) at which automatic final docking engages. */
+export const DOCKING_AUTO_RANGE = 15;
+
+/** Maximum relative speed (m/s) for safe docking alignment. */
+export const DOCKING_MAX_RELATIVE_SPEED = 2.0;
+
+/** Maximum orientation difference (radians) for acceptable alignment. */
+export const DOCKING_MAX_ORIENTATION_DIFF = 0.15; // ~8.6°
+
+/** Maximum lateral offset (m) for acceptable alignment. */
+export const DOCKING_MAX_LATERAL_OFFSET = 3.0;
+
+/** Automatic docking approach speed (m/s) during final approach. */
+export const DOCKING_AUTO_APPROACH_SPEED = 0.5;
+
+/** Separation impulse speed (m/s) applied when undocking. */
+export const UNDOCKING_SEPARATION_SPEED = 1.0;

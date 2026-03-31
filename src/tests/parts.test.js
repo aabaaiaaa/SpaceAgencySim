@@ -66,15 +66,19 @@ describe('ActivationBehaviour', () => {
     expect(ActivationBehaviour.COLLECT_SCIENCE).toBe('COLLECT_SCIENCE');
   });
 
+  it('has DOCK for docking ports', () => {
+    expect(ActivationBehaviour.DOCK).toBe('DOCK');
+  });
+
   it('contains exactly the expected keys', () => {
     const keys = Object.keys(ActivationBehaviour);
     expect(keys).toEqual(
       expect.arrayContaining([
-        'NONE', 'IGNITE', 'SEPARATE', 'DEPLOY', 'EJECT', 'RELEASE', 'COLLECT_SCIENCE',
+        'NONE', 'IGNITE', 'SEPARATE', 'DEPLOY', 'EJECT', 'RELEASE', 'COLLECT_SCIENCE', 'DOCK',
       ]),
     );
     // No undocumented extras
-    expect(keys).toHaveLength(7);
+    expect(keys).toHaveLength(8);
   });
 });
 

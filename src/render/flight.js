@@ -916,6 +916,116 @@ function _renderGround(w, h) {
 /** Rate at which the biome label fades in/out (per second). */
 const BIOME_LABEL_FADE_SPEED = 3.0;
 
+// ---------------------------------------------------------------------------
+// Docking target rendering
+// ---------------------------------------------------------------------------
+
+/** Graphics object for the docking target marker. @type {PIXI.Graphics|null} */
+let _dockingTargetGfx = null;
+
+/**
+ * Render a docking target marker when the craft is in docking/RCS mode
+ * and has a docking target selected.
+ *
+ * Shows a simple diamond-shaped marker with a distance indicator at the
+ * target's estimated position relative to the craft.
+ */
+function _renderDockingTarget(ps, w, h) {
+  if (!_rocketContainer) return;
+
+  // Lazy-create the graphics object.
+  if (!_dockingTargetGfx) {
+    _dockingTargetGfx = new PIXI.Graphics();
+    // Insert it behind the rocket container but above debris.
+    const app = getApp();
+    const rocketIdx = app.stage.getChildIndex(_rocketContainer);
+    app.stage.addChildAt(_dockingTargetGfx, rocketIdx);
+  }
+
+  _dockingTargetGfx.clear();
+
+  // Only render when in docking/RCS mode.
+  if (ps.controlMode !== ControlMode.DOCKING && ps.controlMode !== ControlMode.RCS) {
+    return;
+  }
+
+  // Check for docking port states — if any are extended or docked, show target.
+  let hasDockingActivity = false;
+  if (ps.dockingPortStates) {
+    for (const [, portState] of ps.dockingPortStates) {
+      if (portState === 'extended' || portState === 'docked') {
+        hasDockingActivity = true;
+        break;
+      }
+    }
+  }
+
+  if (!hasDockingActivity) return;
+
+  // Place the target marker at the docking offset position.
+  // In docking mode, the target is at (dockingOffsetAlongTrack, dockingOffsetRadial)
+  // relative to the craft's base orbit position.
+  const offsetX = ps.dockingOffsetAlongTrack || 0;
+  const offsetY = ps.dockingOffsetRadial || 0;
+
+  // Only show if there's a meaningful offset (target selected).
+  if (Math.abs(offsetX) < 0.1 && Math.abs(offsetY) < 0.1) return;
+
+  // Convert the offset to screen coordinates.
+  // The craft is at the camera centre; the target is offset from that.
+  const ppm = FLIGHT_PIXELS_PER_METRE * (_zoomLevel || 1.0);
+  const centerX = w / 2;
+  const centerY = h / 2;
+
+  // Target screen position (along-track is horizontal, radial is vertical).
+  const targetSX = centerX + offsetX * ppm;
+  const targetSY = centerY - offsetY * ppm;
+
+  // Clamp to screen bounds with margin.
+  const margin = 40;
+  const clampedX = Math.max(margin, Math.min(w - margin, targetSX));
+  const clampedY = Math.max(margin, Math.min(h - margin, targetSY));
+  const isOffScreen = clampedX !== targetSX || clampedY !== targetSY;
+
+  const g = _dockingTargetGfx;
+
+  if (isOffScreen) {
+    // Off-screen indicator: arrow pointing toward target.
+    g.beginFill(0x00ccff, 0.7);
+    g.drawCircle(clampedX, clampedY, 8);
+    g.endFill();
+  } else {
+    // On-screen: diamond crosshair.
+    const size = 16;
+    g.lineStyle(2, 0x00ccff, 0.9);
+
+    // Diamond shape.
+    g.moveTo(targetSX, targetSY - size);
+    g.lineTo(targetSX + size, targetSY);
+    g.lineTo(targetSX, targetSY + size);
+    g.lineTo(targetSX - size, targetSY);
+    g.closePath();
+
+    // Inner crosshair.
+    const inner = size * 0.4;
+    g.moveTo(targetSX - inner, targetSY);
+    g.lineTo(targetSX + inner, targetSY);
+    g.moveTo(targetSX, targetSY - inner);
+    g.lineTo(targetSX, targetSY + inner);
+
+    // Docked indicator: filled green circle.
+    for (const [, portState] of (ps.dockingPortStates || new Map())) {
+      if (portState === 'docked') {
+        g.lineStyle(0);
+        g.beginFill(0x44ff44, 0.6);
+        g.drawCircle(targetSX, targetSY, 6);
+        g.endFill();
+        break;
+      }
+    }
+  }
+}
+
 /**
  * Render the current biome name as a centered label at the top of the screen.
  * Fades in when entering a new biome and fades out when near a boundary.
@@ -2308,6 +2418,9 @@ export function renderFlightFrame(ps, assembly) {
   // 7. Active rocket — full opacity, camera centred here (normally).
   _renderRocket(ps, assembly, w, h);
 
+  // 7b. Docking target — rendered as a marker when approaching in docking mode.
+  _renderDockingTarget(ps, w, h);
+
   // 8. Mach effects — vapor cone and compression waves at transonic/supersonic.
   _renderMachEffects(ps, assembly, trailDensity, w, h, dt);
 
@@ -2337,6 +2450,7 @@ export function destroyFlightRenderer() {
   if (_rocketContainer)      app.stage.removeChild(_rocketContainer);
   if (_canopyContainer)      app.stage.removeChild(_canopyContainer);
   if (_biomeLabelContainer)  app.stage.removeChild(_biomeLabelContainer);
+  if (_dockingTargetGfx)     app.stage.removeChild(_dockingTargetGfx);
 
   _skyGraphics          = null;
   _starsContainer       = null;
@@ -2353,6 +2467,7 @@ export function destroyFlightRenderer() {
   _plumeStates          = new Map();
   _machGraphics         = null;
   _machPhase            = 0;
+  _dockingTargetGfx     = null;
   _currentBiomeName     = null;
   _biomeLabelAlpha      = 0;
 

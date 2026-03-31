@@ -180,7 +180,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: New facility managing satellite networks and health, separate from Tracking Station. Tier 1 ($400k): view satellite health, auto-maintenance payments. Tier 2 ($800k): lease satellites to third parties for income, constellation management. Tier 3 ($1.5M): advanced network planning, satellite repositioning commands, shadow overlay. Ability to lease satellite use for funds.
 
 ### TASK-027: Docking system
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-005, TASK-023
 - **Description**: Docking ports attachable radially, extendable away from craft for easier alignment. Targetable in orbit view within visual range. Docking guidance screen: orientation, distance, speed differences — each turns green when acceptable. Automatic final docking in last moments. New combined centre of mass with smooth camera transition. Undocking: ports disengage, command module/probe determines player control and camera. No limit on docked craft count. Enables: orbital assembly, crew transfer, fuel transfer, refuelling from depots.

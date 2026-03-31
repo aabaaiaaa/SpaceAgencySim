@@ -534,6 +534,13 @@ function _drawOrbitalObjects(state, flightState, cx, cy, scale, bodyId) {
     // Label (target always labelled; others only if not too dense).
     if (isTarget) {
       _useLabel(obj.name, sx + dotSize + 4, sy - 6, dotColor);
+
+      // Docking indicator ring — pulsing circle around the selected target.
+      if (obj.type === 'CRAFT' || obj.type === 'STATION') {
+        const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 300);
+        _objectsGraphics.circle(sx, sy, dotSize + 6 + pulse * 3);
+        _objectsGraphics.stroke({ color: 0x00ccff, width: 1.5, alpha: 0.4 + pulse * 0.3 });
+      }
     }
   }
 }

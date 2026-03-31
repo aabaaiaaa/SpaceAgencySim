@@ -33,7 +33,7 @@
  * 40 px wide.  Use this as a guide when sizing new parts.
  */
 
-import { PartType, FuelType, RELIABILITY_TIERS, SatelliteType } from '../core/constants.js';
+import { PartType, FuelType, RELIABILITY_TIERS, SatelliteType, DockingState } from '../core/constants.js';
 
 // ---------------------------------------------------------------------------
 // Activation Behaviour Enum
@@ -70,6 +70,9 @@ export const ActivationBehaviour = Object.freeze({
 
   /** Science module: begin the timed experiment and start data collection. */
   COLLECT_SCIENCE: 'COLLECT_SCIENCE',
+
+  /** Docking port: engage or disengage the docking mechanism. */
+  DOCK: 'DOCK',
 });
 
 // ---------------------------------------------------------------------------
@@ -195,6 +198,7 @@ export const STACK_TYPES = Object.freeze([
   PartType.STACK_DECOUPLER,
   PartType.PARACHUTE,
   PartType.SATELLITE,
+  PartType.DOCKING_PORT,
 ]);
 
 /**
@@ -208,6 +212,7 @@ export const RADIAL_TYPES = Object.freeze([
   PartType.LANDING_LEGS,
   PartType.PARACHUTE,
   PartType.SERVICE_MODULE,
+  PartType.DOCKING_PORT,
 ]);
 
 // ---------------------------------------------------------------------------
@@ -1102,6 +1107,86 @@ export const PARTS = [
       heatTolerance: 1500,
       crashThreshold: 8,
       builtInPower: true,
+    },
+  },
+
+  // =========================================================================
+  // DOCKING PORTS
+  // =========================================================================
+
+  /**
+   * Standard Docking Port — connects two vessels in orbit.
+   * Attachable both axially (top/bottom) and radially (left/right).
+   * The extended probe extends away from the craft for easier alignment.
+   * When docked, the two vessels share a single physics body with combined
+   * centre of mass.
+   */
+  {
+    id: 'docking-port-std',
+    name: 'Docking Port',
+    description: 'Standard docking port for connecting two vessels in orbit. Attachable radially or in-line. Features an extendable probe for easier alignment and a guidance system. Enables orbital assembly, crew transfer, and fuel transfer.',
+    type: PartType.DOCKING_PORT,
+    reliability: RELIABILITY_TIERS.MID,
+    mass: 80,
+    cost: 15_000,
+    width: 24,   // 1.2 m
+    height: 16,  // 0.8 m
+    snapPoints: [
+      // Dock face — only another docking port can connect here (in flight).
+      // In the VAB this acts as a structural top connector.
+      makeSnapPoint('top',    0, -8,  STACK_TYPES),
+      // Attach to rocket body — stack or radial.
+      makeSnapPoint('bottom', 0,  8,  STACK_TYPES),
+      // Radial mount sockets on the sides.
+      makeSnapPoint('left',  -12, 0,  RADIAL_TYPES),
+      makeSnapPoint('right',  12, 0,  RADIAL_TYPES),
+    ],
+    animationStates: ['retracted', 'extended', 'docked'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.DOCK,
+    properties: {
+      /** Docking port size class — must match for two ports to dock. */
+      portSize: 'STANDARD',
+      /** Whether the port extends a probe outward for alignment. */
+      hasProbe: true,
+      /** Extension distance in metres when probe is extended. */
+      probeExtension: 1.0,
+      dragCoefficient: 0.05,
+      heatTolerance: 1800,
+      crashThreshold: 10,
+    },
+  },
+
+  /**
+   * Small Docking Port — compact variant for lightweight craft.
+   * Lighter and cheaper, but only docks with other small ports.
+   */
+  {
+    id: 'docking-port-small',
+    name: 'Docking Port Jr.',
+    description: 'A compact docking port for small probes and lightweight craft. Only connects to other small docking ports. Lighter and cheaper than the standard port.',
+    type: PartType.DOCKING_PORT,
+    reliability: RELIABILITY_TIERS.MID,
+    mass: 30,
+    cost: 8_000,
+    width: 16,   // 0.8 m
+    height: 10,  // 0.5 m
+    snapPoints: [
+      makeSnapPoint('top',    0, -5, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  5, STACK_TYPES),
+      makeSnapPoint('left',  -8,  0, RADIAL_TYPES),
+      makeSnapPoint('right',  8,  0, RADIAL_TYPES),
+    ],
+    animationStates: ['retracted', 'extended', 'docked'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.DOCK,
+    properties: {
+      portSize: 'SMALL',
+      hasProbe: true,
+      probeExtension: 0.6,
+      dragCoefficient: 0.03,
+      heatTolerance: 1800,
+      crashThreshold: 8,
     },
   },
 

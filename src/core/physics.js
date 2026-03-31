@@ -316,6 +316,10 @@ export function createPhysicsState(assembly, flightState) {
     dockingOffsetRadial: 0,
     /** Active RCS thrust directions for plume rendering (set of 'up'|'down'|'left'|'right'). */
     rcsActiveDirections: new Set(),
+    /** Docking port states: instanceId → 'retracted'|'extended'|'docked'. */
+    dockingPortStates: new Map(),
+    /** Combined mass when docked (0 = not docked, use craft mass only). */
+    _dockedCombinedMass: 0,
   };
 
   // Initialise the parachute state machine for all PARACHUTE parts in the assembly.
@@ -333,6 +337,14 @@ export function createPhysicsState(assembly, flightState) {
 
   // Initialise the malfunction system for all parts.
   initMalfunctionState(ps, assembly);
+
+  // Initialise docking port states.
+  for (const [instanceId, placed] of assembly.parts) {
+    const def = getPartById(placed.partId);
+    if (def && def.type === PartType.DOCKING_PORT) {
+      ps.dockingPortStates.set(instanceId, 'retracted');
+    }
+  }
 
   // Flag on flightState so mission objective checking knows whether science
   // modules are present (used to gate HOLD_ALTITUDE time accumulation).
@@ -1237,8 +1249,12 @@ function _applyDockingMovement(ps, assembly, totalMass, dt) {
   if (!w && !s && !a && !d) return;
 
   // Determine thrust magnitude based on mode.
+  // When docked, use combined mass for thrust calculations.
   const thrustN = isRcs ? 500 : 2000; // N
-  const accel = thrustN / Math.max(1, totalMass);
+  const effectiveMass = ps._dockedCombinedMass > 0
+    ? Math.max(totalMass, ps._dockedCombinedMass)
+    : totalMass;
+  const accel = thrustN / Math.max(1, effectiveMass);
 
   if (isRcs) {
     // RCS mode: WASD = craft-relative translation.

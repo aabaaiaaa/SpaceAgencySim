@@ -57,6 +57,19 @@ import {
   checkSOITransition,
   isEscapeTrajectory,
 } from '../core/manoeuvre.js';
+import {
+  createDockingState,
+  tickDocking,
+  getDockingGuidance,
+  getTargetsInVisualRange,
+  selectDockingTarget,
+  clearDockingTarget,
+  hasDockingPort,
+  canDockWith,
+  undock,
+  transferFuel,
+} from '../core/docking.js';
+import { DockingState } from '../core/constants.js';
 
 // ---------------------------------------------------------------------------
 // Module state
@@ -139,6 +152,13 @@ let _normalOrbitThrusting = false;
 
 /** The DOM element for the map-view HUD overlay. @type {HTMLElement|null} */
 let _mapHud = null;
+
+// ---------------------------------------------------------------------------
+// Docking state
+// ---------------------------------------------------------------------------
+
+/** DOM element for the docking guidance overlay. @type {HTMLElement|null} */
+let _dockingHud = null;
 
 // ---------------------------------------------------------------------------
 // Time-warp state
@@ -891,6 +911,12 @@ export function startFlightScene(
   _normalOrbitThrusting = false;
   initMapRenderer();
 
+  // Initialise the docking system state on the flight state.
+  if (!_flightState.dockingState) {
+    _flightState.dockingState = createDockingState();
+  }
+  _dockingHud = null;
+
   // Initialise the right-click part context menu.
   initFlightContextMenu(
     () => _ps,
@@ -934,6 +960,7 @@ export function stopFlightScene() {
 
   destroyFlightHud();
   destroyFlightContextMenu();
+  _destroyDockingHud();
   _destroyMapHud();
   destroyMapRenderer();
   destroyFlightRenderer();
@@ -1018,6 +1045,9 @@ function _loop(timestamp) {
   // --- Flight phase state machine: auto-detect transitions each frame ---
   _evaluateFlightPhase();
 
+  // --- Docking system tick ---
+  _tickDockingSystem(realDt);
+
   // Check mission and contract objective completion against live flight state.
   checkObjectiveCompletion(_state, _flightState);
   checkContractObjectives(_state, _flightState);
@@ -1031,6 +1061,9 @@ function _loop(timestamp) {
 
   // Update the map HUD readouts if visible.
   if (_mapActive) _updateMapHud();
+
+  // Update the docking guidance HUD if active.
+  _updateDockingHud();
 
   // Auto-trigger the post-flight summary when the rocket crashes or all
   // command modules are destroyed (the rocket becomes uncontrollable).
@@ -1376,6 +1409,30 @@ function _onKeyDown(e) {
     const lower = e.key.toLowerCase();
     if (lower === 'w' || lower === 's' || lower === 'a' || lower === 'd') {
       _mapHeldKeys.add(lower);
+      return;
+    }
+  }
+
+  // T — cycle docking target (in docking/RCS mode, flight view).
+  if (e.code === 'KeyT' && !_mapActive &&
+      (_ps.controlMode === ControlMode.DOCKING || _ps.controlMode === ControlMode.RCS)) {
+    e.preventDefault();
+    _cycleDockingTarget();
+    return;
+  }
+
+  // U — undock from currently docked vessel.
+  if (e.code === 'KeyU' && !_mapActive) {
+    e.preventDefault();
+    _handleUndock();
+    return;
+  }
+
+  // F — transfer fuel from docked depot.
+  if (e.code === 'KeyF' && !_mapActive && !e.ctrlKey) {
+    if (_flightState?.dockingState?.state === DockingState.DOCKED) {
+      e.preventDefault();
+      _handleFuelTransfer();
       return;
     }
   }
@@ -2862,4 +2919,225 @@ function _allCommandModulesDestroyedFor(ps, assembly) {
     if (ps.activeParts.has(instanceId)) return false;
   }
   return hadCommandModule;
+}
+
+// ---------------------------------------------------------------------------
+// Docking system helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Tick the docking system each frame.
+ * @param {number} dt  Real delta time (seconds).
+ */
+function _tickDockingSystem(dt) {
+  if (!_ps || !_assembly || !_flightState || !_state) return;
+
+  const dockingState = _flightState.dockingState;
+  if (!dockingState) return;
+
+  // Only tick docking when in ORBIT phase.
+  if (_flightState.phase !== FlightPhase.ORBIT) {
+    if (dockingState.state !== DockingState.IDLE && dockingState.state !== DockingState.DOCKED) {
+      clearDockingTarget(dockingState);
+    }
+    return;
+  }
+
+  // Update combined mass on physics state for thrust calculations.
+  _ps._dockedCombinedMass = dockingState.combinedMass;
+
+  const result = tickDocking(dockingState, _ps, _assembly, _flightState, _state, dt);
+
+  if (result.docked) {
+    _showPhaseNotification('Docking Complete!');
+    // Set all docking ports to 'docked' state.
+    for (const [instanceId, portState] of _ps.dockingPortStates) {
+      if (portState === 'extended') {
+        _ps.dockingPortStates.set(instanceId, 'docked');
+      }
+    }
+  }
+
+  if (result.event === 'AUTO_DOCK_ABORT') {
+    _showPhaseNotification('Auto-dock aborted — moved too far', 'warning');
+  }
+}
+
+/**
+ * Cycle through available docking targets in visual range.
+ */
+function _cycleDockingTarget() {
+  if (!_ps || !_assembly || !_flightState || !_state) return;
+
+  const dockingState = _flightState.dockingState;
+  if (!dockingState) return;
+
+  // If already docked, can't select new target.
+  if (dockingState.state === DockingState.DOCKED) {
+    _showPhaseNotification('Already docked — press U to undock');
+    return;
+  }
+
+  if (!hasDockingPort(_ps, _assembly)) {
+    _showPhaseNotification('No docking port on craft');
+    return;
+  }
+
+  const targets = getTargetsInVisualRange(_ps, _flightState, _state);
+  const dockable = targets.filter(t => canDockWith(t.object));
+
+  if (dockable.length === 0) {
+    _showPhaseNotification('No docking targets in range');
+    clearDockingTarget(dockingState);
+    return;
+  }
+
+  // Find current target index and cycle to next.
+  const currentIdx = dockable.findIndex(t => t.object.id === dockingState.targetId);
+  const nextIdx = (currentIdx + 1) % dockable.length;
+  const nextTarget = dockable[nextIdx];
+
+  const result = selectDockingTarget(dockingState, nextTarget.object.id, _ps, _assembly);
+  if (result.success) {
+    _showPhaseNotification(`Docking target: ${nextTarget.object.name} (${Math.round(nextTarget.distance)} m)`);
+    // Extend docking ports.
+    for (const [instanceId, portState] of _ps.dockingPortStates) {
+      if (portState === 'retracted') {
+        _ps.dockingPortStates.set(instanceId, 'extended');
+      }
+    }
+    // Also set this as the map target for visibility.
+    setMapTarget(nextTarget.object.id);
+  } else {
+    _showPhaseNotification(result.reason || 'Cannot select target');
+  }
+}
+
+/**
+ * Handle undocking from the current docked vessel.
+ */
+function _handleUndock() {
+  if (!_ps || !_assembly || !_flightState || !_state) return;
+
+  const dockingState = _flightState.dockingState;
+  if (!dockingState || dockingState.state !== DockingState.DOCKED) {
+    return;
+  }
+
+  const result = undock(dockingState, _ps, _assembly, _flightState, _state);
+  if (result.success) {
+    _showPhaseNotification('Undocked');
+    // Reset docking port states.
+    for (const [instanceId] of _ps.dockingPortStates) {
+      _ps.dockingPortStates.set(instanceId, 'retracted');
+    }
+    _ps._dockedCombinedMass = 0;
+  }
+}
+
+/**
+ * Handle fuel transfer from docked depot.
+ */
+function _handleFuelTransfer() {
+  if (!_ps || !_assembly || !_flightState) return;
+
+  const dockingState = _flightState.dockingState;
+  if (!dockingState) return;
+
+  // Transfer up to 500 kg at a time.
+  const result = transferFuel(dockingState, _ps, _assembly, _flightState, 500);
+  if (result.success && result.transferred > 0) {
+    _showPhaseNotification(`Transferred ${Math.round(result.transferred)} kg fuel`);
+  } else if (result.transferred === 0) {
+    _showPhaseNotification('Tanks are full');
+  }
+}
+
+/**
+ * Build or update the docking guidance HUD overlay.
+ */
+function _updateDockingHud() {
+  if (!_flightState || !_flightState.dockingState) {
+    _destroyDockingHud();
+    return;
+  }
+
+  const guidance = getDockingGuidance(_flightState.dockingState);
+
+  if (!guidance.active) {
+    _destroyDockingHud();
+    return;
+  }
+
+  // Create the HUD element if it doesn't exist.
+  if (!_dockingHud && _container) {
+    _dockingHud = document.createElement('div');
+    _dockingHud.id = 'docking-guidance-hud';
+    _dockingHud.style.cssText = `
+      position: fixed; top: 80px; right: 16px; z-index: 500;
+      background: rgba(0, 0, 0, 0.85); border: 1px solid #444;
+      border-radius: 6px; padding: 12px 16px; min-width: 220px;
+      font-family: monospace; font-size: 13px; color: #ccc;
+      pointer-events: none;
+    `;
+    _container.appendChild(_dockingHud);
+  }
+
+  if (!_dockingHud) return;
+
+  // Color helpers.
+  const greenStyle = 'color: #4f4; font-weight: bold;';
+  const redStyle   = 'color: #f44; font-weight: bold;';
+  const whiteStyle = 'color: #fff;';
+
+  let stateLabel;
+  switch (guidance.state) {
+    case DockingState.APPROACHING:   stateLabel = 'APPROACHING'; break;
+    case DockingState.ALIGNING:      stateLabel = 'ALIGNING'; break;
+    case DockingState.FINAL_APPROACH:stateLabel = 'AUTO-DOCK'; break;
+    case DockingState.DOCKED:        stateLabel = 'DOCKED'; break;
+    default:                         stateLabel = guidance.state;
+  }
+
+  const distStr = guidance.distance < 1000
+    ? `${guidance.distance.toFixed(1)} m`
+    : `${(guidance.distance / 1000).toFixed(2)} km`;
+
+  const speedColor = guidance.speedOk ? greenStyle : redStyle;
+  const oriColor   = guidance.orientationOk ? greenStyle : redStyle;
+  const latColor   = guidance.lateralOk ? greenStyle : redStyle;
+
+  let html = `<div style="${whiteStyle}; margin-bottom: 6px; font-size: 14px; border-bottom: 1px solid #555; padding-bottom: 4px;">
+    DOCKING — ${stateLabel}
+  </div>`;
+
+  if (guidance.isDocked) {
+    html += `<div style="${greenStyle}">DOCKED (${guidance.dockedCount} vessel${guidance.dockedCount !== 1 ? 's' : ''})</div>`;
+    html += `<div style="color: #888; margin-top: 6px; font-size: 11px;">U = Undock &nbsp; F = Transfer fuel</div>`;
+  } else {
+    html += `<div>Distance: ${distStr}</div>`;
+    html += `<div style="${speedColor}">Rel. Speed: ${guidance.relativeSpeed.toFixed(2)} m/s ${guidance.speedOk ? '✓' : '✗'}</div>`;
+    html += `<div style="${oriColor}">Orientation: ${(guidance.orientationDiff * 180 / Math.PI).toFixed(1)}° ${guidance.orientationOk ? '✓' : '✗'}</div>`;
+    html += `<div style="${latColor}">Lateral: ${guidance.lateralOffset.toFixed(1)} m ${guidance.lateralOk ? '✓' : '✗'}</div>`;
+
+    if (guidance.state === DockingState.FINAL_APPROACH) {
+      html += `<div style="${greenStyle}; margin-top: 6px;">Auto-dock engaged...</div>`;
+    } else if (guidance.allGreen && guidance.distance <= 500) {
+      html += `<div style="color: #ff0; margin-top: 6px;">Close to ${Math.round(15)} m for auto-dock</div>`;
+    }
+
+    html += `<div style="color: #888; margin-top: 6px; font-size: 11px;">T = Cycle target</div>`;
+  }
+
+  _dockingHud.innerHTML = html;
+}
+
+/**
+ * Remove the docking guidance HUD.
+ */
+function _destroyDockingHud() {
+  if (_dockingHud) {
+    _dockingHud.remove();
+    _dockingHud = null;
+  }
 }
