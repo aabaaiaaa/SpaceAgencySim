@@ -44,8 +44,14 @@ import {
  * Moon SOI  ≈ 66,100 km.
  */
 export const SOI_RADIUS = Object.freeze({
+  SUN: Infinity,          // Sun's SOI encompasses the entire solar system
+  MERCURY: 112_000_000,
+  VENUS: 616_000_000,
   EARTH: 924_000_000,
   MOON: 66_100_000,
+  MARS: 577_000_000,
+  PHOBOS: 170_000,
+  DEIMOS: 500_000,
 });
 
 /**
@@ -53,8 +59,20 @@ export const SOI_RADIUS = Object.freeze({
  * Used for Hohmann transfer calculations.
  */
 export const BODY_ORBIT_RADIUS = Object.freeze({
+  /** Mercury's mean distance from the Sun. */
+  MERCURY: 57_909_000_000,
+  /** Venus's mean distance from the Sun. */
+  VENUS: 108_208_000_000,
+  /** Earth's mean distance from the Sun (1 AU). */
+  EARTH: 149_598_000_000,
   /** Moon's mean distance from Earth centre. */
   MOON: 384_400_000,
+  /** Mars's mean distance from the Sun. */
+  MARS: 227_939_000_000,
+  /** Phobos's mean distance from Mars centre. */
+  PHOBOS: 9_376_000,
+  /** Deimos's mean distance from Mars centre. */
+  DEIMOS: 23_463_000,
 });
 
 /**
@@ -62,16 +80,28 @@ export const BODY_ORBIT_RADIUS = Object.freeze({
  * Earth is the root (no parent in our simplified system).
  */
 export const BODY_PARENT = Object.freeze({
-  EARTH: null,
+  SUN: null,            // Root body (no parent)
+  MERCURY: 'SUN',
+  VENUS: 'SUN',
+  EARTH: 'SUN',
   MOON: 'EARTH',
+  MARS: 'SUN',
+  PHOBOS: 'MARS',
+  DEIMOS: 'MARS',
 });
 
 /**
  * Child bodies that orbit each parent.
  */
 export const BODY_CHILDREN = Object.freeze({
+  SUN: Object.freeze(['MERCURY', 'VENUS', 'EARTH', 'MARS']),
+  MERCURY: Object.freeze([]),
+  VENUS: Object.freeze([]),
   EARTH: Object.freeze(['MOON']),
   MOON: Object.freeze([]),
+  MARS: Object.freeze(['PHOBOS', 'DEIMOS']),
+  PHOBOS: Object.freeze([]),
+  DEIMOS: Object.freeze([]),
 });
 
 // ---------------------------------------------------------------------------
@@ -646,11 +676,17 @@ function _generateTransferArc(fromBodyId, toBodyId, altitude) {
  * Human-readable name for a celestial body.
  */
 function _bodyName(bodyId) {
-  switch (bodyId) {
-    case CelestialBody.EARTH: return 'Earth';
-    case CelestialBody.MOON:  return 'Moon';
-    default:                  return bodyId;
-  }
+  const names = {
+    SUN: 'Sun',
+    MERCURY: 'Mercury',
+    VENUS: 'Venus',
+    EARTH: 'Earth',
+    MOON: 'Moon',
+    MARS: 'Mars',
+    PHOBOS: 'Phobos',
+    DEIMOS: 'Deimos',
+  };
+  return names[bodyId] || bodyId;
 }
 
 /**

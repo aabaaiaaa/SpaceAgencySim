@@ -435,8 +435,14 @@ export const FACILITY_UPKEEP_PER_PERIOD = 10_000;
  * @enum {string}
  */
 export const CelestialBody = Object.freeze({
+  SUN: 'SUN',
+  MERCURY: 'MERCURY',
+  VENUS: 'VENUS',
   EARTH: 'EARTH',
   MOON: 'MOON',
+  MARS: 'MARS',
+  PHOBOS: 'PHOBOS',
+  DEIMOS: 'DEIMOS',
 });
 
 /**
@@ -444,16 +450,28 @@ export const CelestialBody = Object.freeze({
  * μ = G × M, used in Keplerian orbit calculations.
  */
 export const BODY_GM = Object.freeze({
+  SUN: 1.32712440018e20,
+  MERCURY: 2.2032e13,
+  VENUS: 3.24859e14,
   EARTH: 3.986004418e14,
   MOON: 4.9048695e12,
+  MARS: 4.282837e13,
+  PHOBOS: 7.112e5,
+  DEIMOS: 9.8e4,
 });
 
 /**
  * Mean radius in metres for each body.
  */
 export const BODY_RADIUS = Object.freeze({
+  SUN: 695_700_000,
+  MERCURY: 2_439_700,
+  VENUS: 6_051_800,
   EARTH: 6_371_000,
   MOON: 1_737_400,
+  MARS: 3_389_500,
+  PHOBOS: 11_267,
+  DEIMOS: 6_200,
 });
 
 /**
@@ -464,8 +482,14 @@ export const BODY_RADIUS = Object.freeze({
  * @type {Readonly<Record<string, number>>}
  */
 export const MIN_ORBIT_ALTITUDE = Object.freeze({
+  SUN: 2_000_000_000,
+  MERCURY: 20_000,
+  VENUS: 250_000,
   EARTH: 70_000,
   MOON: 15_000,
+  MARS: 80_000,
+  PHOBOS: 1_000,
+  DEIMOS: 500,
 });
 
 /**
@@ -476,6 +500,20 @@ export const MIN_ORBIT_ALTITUDE = Object.freeze({
  * @type {Readonly<Record<string, ReadonlyArray<Readonly<{id: string, name: string, min: number, max: number}>>>>}
  */
 export const ALTITUDE_BANDS = Object.freeze({
+  SUN: Object.freeze([
+    Object.freeze({ id: 'INNER_CORONA', name: 'Inner Corona', min: 0, max: 2_000_000_000 }),
+    Object.freeze({ id: 'OUTER_CORONA', name: 'Outer Corona', min: 2_000_000_000, max: 20_000_000_000 }),
+  ]),
+  MERCURY: Object.freeze([
+    Object.freeze({ id: 'LMeO', name: 'Low Mercury Orbit', min: 20_000, max: 200_000 }),
+    Object.freeze({ id: 'MMeO', name: 'Medium Mercury Orbit', min: 200_000, max: 1_000_000 }),
+    Object.freeze({ id: 'HMeO', name: 'High Mercury Orbit', min: 1_000_000, max: 5_000_000 }),
+  ]),
+  VENUS: Object.freeze([
+    Object.freeze({ id: 'LVO', name: 'Low Venus Orbit', min: 250_000, max: 500_000 }),
+    Object.freeze({ id: 'MVO', name: 'Medium Venus Orbit', min: 500_000, max: 2_000_000 }),
+    Object.freeze({ id: 'HVO', name: 'High Venus Orbit', min: 2_000_000, max: 10_000_000 }),
+  ]),
   EARTH: Object.freeze([
     Object.freeze({ id: 'LEO', name: 'Low Earth Orbit', min: 80_000, max: 200_000 }),
     Object.freeze({ id: 'MEO', name: 'Medium Earth Orbit', min: 200_000, max: 2_000_000 }),
@@ -485,6 +523,19 @@ export const ALTITUDE_BANDS = Object.freeze({
     Object.freeze({ id: 'LLO', name: 'Low Lunar Orbit', min: 15_000, max: 100_000 }),
     Object.freeze({ id: 'MLO', name: 'Medium Lunar Orbit', min: 100_000, max: 1_000_000 }),
     Object.freeze({ id: 'HLO', name: 'High Lunar Orbit', min: 1_000_000, max: 10_000_000 }),
+  ]),
+  MARS: Object.freeze([
+    Object.freeze({ id: 'LMO', name: 'Low Mars Orbit', min: 80_000, max: 300_000 }),
+    Object.freeze({ id: 'MMO', name: 'Medium Mars Orbit', min: 300_000, max: 2_000_000 }),
+    Object.freeze({ id: 'HMO', name: 'High Mars Orbit', min: 2_000_000, max: 20_000_000 }),
+  ]),
+  PHOBOS: Object.freeze([
+    Object.freeze({ id: 'LPO', name: 'Low Phobos Orbit', min: 1_000, max: 5_000 }),
+    Object.freeze({ id: 'HPO', name: 'High Phobos Orbit', min: 5_000, max: 20_000 }),
+  ]),
+  DEIMOS: Object.freeze([
+    Object.freeze({ id: 'LDO', name: 'Low Deimos Orbit', min: 500, max: 3_000 }),
+    Object.freeze({ id: 'HDO', name: 'High Deimos Orbit', min: 3_000, max: 10_000 }),
   ]),
 });
 
@@ -510,6 +561,26 @@ export const ALTITUDE_BANDS = Object.freeze({
  * }>>>>}
  */
 export const BIOME_DEFINITIONS = Object.freeze({
+  SUN: Object.freeze([
+    Object.freeze({ id: 'SOLAR_CORONA',        name: 'Solar Corona',         min: 0,               max: 2_000_000_000, scienceMultiplier: 10.0, color: 0xffdd44 }),
+    Object.freeze({ id: 'NEAR_SUN',            name: 'Near Sun Space',       min: 2_000_000_000,   max: Infinity,      scienceMultiplier: 6.0,  color: 0xff8800 }),
+  ]),
+  MERCURY: Object.freeze([
+    Object.freeze({ id: 'MERCURY_SURFACE',     name: 'Mercury Surface',      min: 0,       max: 100,       scienceMultiplier: 2.0,  color: 0x8a8a8a }),
+    Object.freeze({ id: 'MERCURY_NEAR',        name: 'Near Surface',         min: 100,     max: 5_000,     scienceMultiplier: 2.5,  color: 0x707070 }),
+    Object.freeze({ id: 'MERCURY_LOW_ALT',     name: 'Low Altitude',         min: 5_000,   max: 20_000,    scienceMultiplier: 3.0,  color: 0x505060 }),
+    Object.freeze({ id: 'MERCURY_LOW_ORBIT',   name: 'Low Mercury Orbit',    min: 20_000,  max: 200_000,   scienceMultiplier: 3.5,  color: 0x303040 }),
+    Object.freeze({ id: 'MERCURY_HIGH_ORBIT',  name: 'High Mercury Orbit',   min: 200_000, max: Infinity,  scienceMultiplier: 4.0,  color: 0x101020 }),
+  ]),
+  VENUS: Object.freeze([
+    Object.freeze({ id: 'VENUS_SURFACE',       name: 'Venus Surface',        min: 0,       max: 100,       scienceMultiplier: 3.0,  color: 0xd4a04a }),
+    Object.freeze({ id: 'VENUS_LOW_ATMO',      name: 'Low Atmosphere',       min: 100,     max: 10_000,    scienceMultiplier: 2.5,  color: 0xcc9944 }),
+    Object.freeze({ id: 'VENUS_MID_ATMO',      name: 'Mid Atmosphere',       min: 10_000,  max: 50_000,    scienceMultiplier: 2.0,  color: 0xbb8833 }),
+    Object.freeze({ id: 'VENUS_UPPER_ATMO',    name: 'Upper Atmosphere',     min: 50_000,  max: 150_000,   scienceMultiplier: 2.5,  color: 0x886622 }),
+    Object.freeze({ id: 'VENUS_EXOSPHERE',     name: 'Exosphere',            min: 150_000, max: 250_000,   scienceMultiplier: 3.0,  color: 0x443311 }),
+    Object.freeze({ id: 'VENUS_LOW_ORBIT',     name: 'Low Venus Orbit',      min: 250_000, max: 500_000,   scienceMultiplier: 3.5,  color: 0x202020 }),
+    Object.freeze({ id: 'VENUS_HIGH_ORBIT',    name: 'High Venus Orbit',     min: 500_000, max: Infinity,  scienceMultiplier: 4.0,  color: 0x101010 }),
+  ]),
   EARTH: Object.freeze([
     Object.freeze({ id: 'GROUND',           name: 'Ground',           min: 0,       max: 100,       scienceMultiplier: 0.5, color: 0xc4a882 }),
     Object.freeze({ id: 'LOW_ATMOSPHERE',    name: 'Low Atmosphere',   min: 100,     max: 2_000,     scienceMultiplier: 1.0, color: 0x87ceeb }),
@@ -526,6 +597,25 @@ export const BIOME_DEFINITIONS = Object.freeze({
     Object.freeze({ id: 'LOW_ALTITUDE',     name: 'Low Altitude',      min: 5_000,   max: 15_000,    scienceMultiplier: 2.0, color: 0x404060 }),
     Object.freeze({ id: 'LOW_LUNAR_ORBIT',  name: 'Low Lunar Orbit',   min: 15_000,  max: 100_000,   scienceMultiplier: 3.0, color: 0x202040 }),
     Object.freeze({ id: 'HIGH_LUNAR_ORBIT', name: 'High Lunar Orbit',  min: 100_000, max: Infinity,  scienceMultiplier: 4.0, color: 0x101020 }),
+  ]),
+  MARS: Object.freeze([
+    Object.freeze({ id: 'MARS_SURFACE',       name: 'Mars Surface',        min: 0,       max: 100,       scienceMultiplier: 2.0,  color: 0xc1440e }),
+    Object.freeze({ id: 'MARS_LOW_ATMO',      name: 'Low Atmosphere',      min: 100,     max: 5_000,     scienceMultiplier: 2.5,  color: 0xb0550e }),
+    Object.freeze({ id: 'MARS_MID_ATMO',      name: 'Mid Atmosphere',      min: 5_000,   max: 20_000,    scienceMultiplier: 2.8,  color: 0x8a3a0a }),
+    Object.freeze({ id: 'MARS_UPPER_ATMO',    name: 'Upper Atmosphere',    min: 20_000,  max: 50_000,    scienceMultiplier: 3.0,  color: 0x5a2208 }),
+    Object.freeze({ id: 'MARS_EXOSPHERE',     name: 'Exosphere',           min: 50_000,  max: 80_000,    scienceMultiplier: 3.5,  color: 0x2a1104 }),
+    Object.freeze({ id: 'MARS_LOW_ORBIT',     name: 'Low Mars Orbit',      min: 80_000,  max: 300_000,   scienceMultiplier: 4.0,  color: 0x150808 }),
+    Object.freeze({ id: 'MARS_HIGH_ORBIT',    name: 'High Mars Orbit',     min: 300_000, max: Infinity,  scienceMultiplier: 5.0,  color: 0x0a0404 }),
+  ]),
+  PHOBOS: Object.freeze([
+    Object.freeze({ id: 'PHOBOS_SURFACE',     name: 'Phobos Surface',      min: 0,      max: 50,        scienceMultiplier: 3.0, color: 0x6a6a60 }),
+    Object.freeze({ id: 'PHOBOS_NEAR',        name: 'Near Phobos',         min: 50,     max: 1_000,     scienceMultiplier: 3.5, color: 0x505050 }),
+    Object.freeze({ id: 'PHOBOS_ORBIT',       name: 'Phobos Orbit',        min: 1_000,  max: Infinity,  scienceMultiplier: 4.0, color: 0x303030 }),
+  ]),
+  DEIMOS: Object.freeze([
+    Object.freeze({ id: 'DEIMOS_SURFACE',     name: 'Deimos Surface',      min: 0,      max: 50,        scienceMultiplier: 3.0, color: 0x7a7a70 }),
+    Object.freeze({ id: 'DEIMOS_NEAR',        name: 'Near Deimos',         min: 50,     max: 1_000,     scienceMultiplier: 3.5, color: 0x606060 }),
+    Object.freeze({ id: 'DEIMOS_ORBIT',       name: 'Deimos Orbit',        min: 1_000,  max: Infinity,  scienceMultiplier: 4.0, color: 0x404040 }),
   ]),
 });
 

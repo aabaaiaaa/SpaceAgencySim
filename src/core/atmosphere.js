@@ -39,6 +39,7 @@
 
 import { getPartById } from '../data/parts.js';
 import { PartType } from './constants.js';
+import { getAirDensity as _bodyAirDensity, getAtmosphereTop as _bodyAtmoTop, hasAtmosphere } from '../data/bodies.js';
 
 // ---------------------------------------------------------------------------
 // Constants (exported so physics.js and tests can reference the same values)
@@ -87,6 +88,43 @@ export function airDensity(altitude) {
   if (altitude >= ATMOSPHERE_TOP) return 0;
   const clamped = Math.max(0, altitude);
   return SEA_LEVEL_DENSITY * Math.exp(-clamped / SCALE_HEIGHT);
+}
+
+/**
+ * Compute air density for any celestial body at the given altitude.
+ * Uses the body's atmosphere profile from the celestial body data system.
+ * Returns 0 for airless bodies or altitudes above the atmosphere top.
+ *
+ * @param {number} altitude  Metres above body surface.
+ * @param {string} bodyId    Celestial body ID (e.g., 'EARTH', 'MARS', 'VENUS').
+ * @returns {number}  Air density in kg/m³.
+ */
+export function airDensityForBody(altitude, bodyId) {
+  return _bodyAirDensity(altitude, bodyId);
+}
+
+/**
+ * Get the atmosphere top altitude for a body. Returns 0 for airless bodies.
+ * @param {string} bodyId
+ * @returns {number}
+ */
+export function atmosphereTopForBody(bodyId) {
+  return _bodyAtmoTop(bodyId);
+}
+
+/**
+ * Check reentry condition for any celestial body.
+ * Uses the body's atmosphere top instead of the hardcoded Earth value.
+ *
+ * @param {number} altitude  Metres above body surface.
+ * @param {number} speed     Rocket speed magnitude (m/s).
+ * @param {string} bodyId    Celestial body ID.
+ * @returns {boolean}
+ */
+export function isReentryConditionForBody(altitude, speed, bodyId) {
+  const top = _bodyAtmoTop(bodyId);
+  if (top <= 0) return false; // Airless bodies have no reentry heating
+  return altitude < top && speed > REENTRY_SPEED_THRESHOLD;
 }
 
 // ---------------------------------------------------------------------------

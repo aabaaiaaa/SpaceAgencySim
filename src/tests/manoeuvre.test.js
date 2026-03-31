@@ -98,8 +98,10 @@ describe('Manoeuvre — constants', () => {
   });
 
   it('defines parent-child relationships', () => {
-    expect(BODY_PARENT.EARTH).toBeNull();
+    expect(BODY_PARENT.SUN).toBeNull();
+    expect(BODY_PARENT.EARTH).toBe('SUN');
     expect(BODY_PARENT.MOON).toBe('EARTH');
+    expect(BODY_CHILDREN.SUN).toContain('EARTH');
     expect(BODY_CHILDREN.EARTH).toContain('MOON');
     expect(BODY_CHILDREN.MOON).toHaveLength(0);
   });

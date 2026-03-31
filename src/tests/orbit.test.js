@@ -352,7 +352,7 @@ describe('altitude bands', () => {
   });
 
   it('returns null for unknown body', () => {
-    expect(getAltitudeBandId(100_000, 'MARS')).toBeNull();
+    expect(getAltitudeBandId(100_000, 'JUPITER')).toBeNull();
   });
 });
 
@@ -708,7 +708,7 @@ describe('getMinOrbitAltitude', () => {
   });
 
   it('returns default 70 km for unknown body', () => {
-    expect(getMinOrbitAltitude('MARS')).toBe(70_000);
+    expect(getMinOrbitAltitude('JUPITER')).toBe(70_000);
   });
 });
 
