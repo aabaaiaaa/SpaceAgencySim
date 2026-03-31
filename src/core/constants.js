@@ -50,6 +50,8 @@ export const PartType = Object.freeze({
   SOLAR_PANEL: 'SOLAR_PANEL',
   /** Docking port for connecting vessels in orbit. */
   DOCKING_PORT: 'DOCKING_PORT',
+  /** Aerodynamic nose cone that reduces drag on atmospheric ascent. */
+  NOSE_CONE: 'NOSE_CONE',
 });
 
 // ---------------------------------------------------------------------------

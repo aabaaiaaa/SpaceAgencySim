@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 69
-- **Completed**: 26
-- **Remaining**: 43
-- **Last Updated**: 2026-03-31T05:25:45.320Z
+- **Completed**: 27
+- **Remaining**: 42
+- **Last Updated**: 2026-03-31T05:37:40.398Z
 
 ## Iteration Log
 
@@ -215,4 +215,12 @@
 - **Exit Status**: success
 - **Tokens**: 10,004,782 total (112 in, 33,868 out, 124,656 cache-create, 9,846,146 cache-read)
 - **Cost**: $6.8158
+
+### Iteration 27 - 2026-03-31T05:25:48.918Z
+- **Task Completed**: TASK-065
+- **Summary**: Completed Tech tree part definitions
+- **Duration**: 711s
+- **Exit Status**: success
+- **Tokens**: 1,908,573 total (30 in, 36,959 out, 89,656 cache-create, 1,781,928 cache-read)
+- **Cost**: $2.3754
 

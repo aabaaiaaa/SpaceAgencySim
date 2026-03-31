@@ -73,6 +73,12 @@ export const ActivationBehaviour = Object.freeze({
 
   /** Docking port: engage or disengage the docking mechanism. */
   DOCK: 'DOCK',
+
+  /** Landing guidance computer: engage automated landing sequence. */
+  AUTO_LAND: 'AUTO_LAND',
+
+  /** Science lab: begin processing collected science data for bonus yield. */
+  PROCESS_SCIENCE: 'PROCESS_SCIENCE',
 });
 
 // ---------------------------------------------------------------------------
@@ -200,6 +206,7 @@ export const STACK_TYPES = Object.freeze([
   PartType.SATELLITE,
   PartType.DOCKING_PORT,
   PartType.HEAT_SHIELD,
+  PartType.NOSE_CONE,
 ]);
 
 /**
@@ -1251,6 +1258,393 @@ export const PARTS = [
       heatTolerance: 3500,
       dragCoefficient: 0.40,
       crashThreshold: 15,
+    },
+  },
+
+  // =========================================================================
+  // PROPULSION — Tech Tree Upgrades
+  // =========================================================================
+
+  /**
+   * Spark II Engine — improved version of the starter Spark.
+   * Better specific impulse and slightly more thrust.
+   * Tech tree: Propulsion T1.
+   */
+  {
+    id: 'engine-spark-improved',
+    name: 'Spark II Engine',
+    description: 'An upgraded Spark engine with improved combustion efficiency. Better ISP and slightly more thrust than the original — a solid step up for upper stages.',
+    type: PartType.ENGINE,
+    reliability: RELIABILITY_TIERS.MID,
+    mass: 135,
+    cost: 9_000,
+    width: 20,
+    height: 30,
+    snapPoints: [
+      makeSnapPoint('top',    0, -15, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  15, [PartType.STACK_DECOUPLER]),
+    ],
+    animationStates: ['idle', 'firing', 'burnt-out'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.IGNITE,
+    properties: {
+      thrust: 75,
+      thrustVac: 90,
+      isp: 320,
+      ispVac: 360,
+      throttleable: true,
+      fuelType: FuelType.LIQUID,
+      dragCoefficient: 0.1,
+      heatTolerance: 2200,
+      crashThreshold: 12,
+    },
+  },
+
+  /**
+   * IX-6 Ion Engine — extremely high ISP, very low thrust.
+   * Uses integrated xenon propellant supply (electric fuel type).
+   * Ideal for long-duration probes and deep-space transfers.
+   * Nearly useless in atmosphere; designed for vacuum operation.
+   * Tech tree: Propulsion T4.
+   */
+  {
+    id: 'engine-ion',
+    name: 'IX-6 Ion Engine',
+    description: 'An ion propulsion system with extreme fuel efficiency. Very low thrust but outstanding ISP makes it ideal for deep-space probes. Includes integrated xenon supply. Nearly useless in atmosphere.',
+    type: PartType.ENGINE,
+    reliability: RELIABILITY_TIERS.HIGH,
+    mass: 60,
+    cost: 25_000,
+    width: 16,
+    height: 20,
+    snapPoints: [
+      makeSnapPoint('top',    0, -10, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  10, [PartType.STACK_DECOUPLER]),
+    ],
+    animationStates: ['idle', 'firing', 'burnt-out'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.IGNITE,
+    properties: {
+      thrust: 0.5,
+      thrustVac: 4,
+      isp: 100,
+      ispVac: 4200,
+      throttleable: true,
+      fuelType: FuelType.ELECTRIC,
+      fuelMass: 30,
+      dragCoefficient: 0.05,
+      heatTolerance: 1200,
+      crashThreshold: 8,
+    },
+  },
+
+  // =========================================================================
+  // NOSE CONES
+  // =========================================================================
+
+  /**
+   * AE-FF1 Nose Cone — aerodynamic fairing that reduces drag.
+   * Mounts on top of SRBs, fuel tanks, or any stack part.
+   * Purely passive — no activation.
+   * Tech tree: Structural T2.
+   */
+  {
+    id: 'nose-cone',
+    name: 'AE-FF1 Nose Cone',
+    description: 'An aerodynamic nose fairing that reduces drag during atmospheric ascent. Mount on top of boosters or exposed stack parts for a cleaner profile.',
+    type: PartType.NOSE_CONE,
+    reliability: RELIABILITY_TIERS.STARTER,
+    mass: 15,
+    cost: 150,
+    width: 20,
+    height: 20,
+    snapPoints: [
+      // Nose tip — nothing mounts above.
+      makeSnapPoint('top',    0, -10, []),
+      // Base — attaches on top of a stack part.
+      makeSnapPoint('bottom', 0,  10, STACK_TYPES),
+    ],
+    animationStates: ['idle'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      dragCoefficient: 0.01,
+      dragReduction: 0.3,
+      heatTolerance: 1500,
+      crashThreshold: 6,
+    },
+  },
+
+  // =========================================================================
+  // STRUCTURAL — Tech Tree Additions
+  // =========================================================================
+
+  /**
+   * Structural Tube — empty structural connector with no fuel.
+   * Provides separation between stages or adapts diameters.
+   * Tech tree: Structural T3.
+   */
+  {
+    id: 'tube-connector',
+    name: 'Structural Tube',
+    description: 'A hollow structural connector that separates stages or bridges different diameters. No fuel capacity — purely structural. Lightweight and cheap.',
+    type: PartType.FUEL_TANK,
+    reliability: RELIABILITY_TIERS.MID,
+    mass: 30,
+    cost: 300,
+    width: 30,
+    height: 30,
+    snapPoints: [
+      makeSnapPoint('top',    0, -15, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  15, STACK_TYPES),
+      makeSnapPoint('left',  -15,  0, RADIAL_TYPES),
+      makeSnapPoint('right',  15,  0, RADIAL_TYPES),
+    ],
+    animationStates: ['idle'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      fuelMass: 0,
+      fuelType: FuelType.LIQUID,
+      dragCoefficient: 0.03,
+      heatTolerance: 1500,
+      crashThreshold: 10,
+    },
+  },
+
+  // =========================================================================
+  // STATION MODULES — Tech Tree Structural T5
+  // =========================================================================
+
+  /**
+   * Station Habitat Module — pressurised living quarters for orbital stations.
+   * Houses up to 4 crew members and includes built-in RCS for attitude control.
+   * Large and heavy — designed for assembly in orbit via docking ports.
+   * Tech tree: Structural T5.
+   */
+  {
+    id: 'station-habitat',
+    name: 'Station Habitat Module',
+    description: 'A pressurised habitation module for orbital stations. Houses up to 4 crew with life support. Includes built-in RCS. Designed for orbital assembly via docking.',
+    type: PartType.SERVICE_MODULE,
+    reliability: RELIABILITY_TIERS.HIGH,
+    mass: 3_000,
+    cost: 60_000,
+    width: 40,
+    height: 80,
+    snapPoints: [
+      makeSnapPoint('top',    0, -40, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  40, STACK_TYPES),
+      makeSnapPoint('left',  -20, -24, RADIAL_TYPES),
+      makeSnapPoint('left',  -20,   0, RADIAL_TYPES),
+      makeSnapPoint('left',  -20,  24, RADIAL_TYPES),
+      makeSnapPoint('right',  20, -24, RADIAL_TYPES),
+      makeSnapPoint('right',  20,   0, RADIAL_TYPES),
+      makeSnapPoint('right',  20,  24, RADIAL_TYPES),
+    ],
+    animationStates: ['idle'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      seats: 4,
+      hasRcs: true,
+      dragCoefficient: 0.15,
+      heatTolerance: 2000,
+      crashThreshold: 8,
+    },
+  },
+
+  /**
+   * Station Truss Segment — structural backbone for orbital stations.
+   * Provides multiple attachment points for modules, solar panels, etc.
+   * No fuel capacity — purely structural framework.
+   * Tech tree: Structural T5.
+   */
+  {
+    id: 'station-truss',
+    name: 'Station Truss Segment',
+    description: 'A structural truss for orbital station assembly. Provides the backbone framework with multiple attachment points for modules and equipment. No fuel capacity.',
+    type: PartType.FUEL_TANK,
+    reliability: RELIABILITY_TIERS.HIGH,
+    mass: 500,
+    cost: 25_000,
+    width: 40,
+    height: 40,
+    snapPoints: [
+      makeSnapPoint('top',    0, -20, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  20, STACK_TYPES),
+      makeSnapPoint('left',  -20, -12, RADIAL_TYPES),
+      makeSnapPoint('left',  -20,  12, RADIAL_TYPES),
+      makeSnapPoint('right',  20, -12, RADIAL_TYPES),
+      makeSnapPoint('right',  20,  12, RADIAL_TYPES),
+    ],
+    animationStates: ['idle'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      fuelMass: 0,
+      fuelType: FuelType.LIQUID,
+      dragCoefficient: 0.08,
+      heatTolerance: 1500,
+      crashThreshold: 10,
+    },
+  },
+
+  // =========================================================================
+  // PARACHUTES — Tech Tree Additions
+  // =========================================================================
+
+  /**
+   * Drogue Chute — high-altitude pre-deployment parachute.
+   * Deploys at supersonic speeds to stabilise descent before main
+   * chute deployment. Use alongside a main parachute for safe recovery.
+   * Tech tree: Recovery T2.
+   */
+  {
+    id: 'parachute-drogue',
+    name: 'Drogue Chute',
+    description: 'A high-speed drogue parachute that deploys at supersonic speeds and high altitudes. Stabilises and pre-slows the craft before main chute deployment. Best used alongside a main parachute.',
+    type: PartType.PARACHUTE,
+    reliability: RELIABILITY_TIERS.MID,
+    mass: 60,
+    cost: 500,
+    width: 15,
+    height: 8,
+    snapPoints: [
+      makeSnapPoint('top',     0, -4, []),
+      makeSnapPoint('bottom',  0,  4, STACK_TYPES),
+      makeSnapPoint('right',   7,  0, []),
+      makeSnapPoint('left',   -7,  0, []),
+    ],
+    animationStates: ['stowed', 'deploying', 'deployed'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.DEPLOY,
+    properties: {
+      maxSafeMass: 2_000,
+      maxLandingSpeed: 25,
+      highAltitudeDeploy: true,
+      maxDeploySpeed: 400,
+      dragCoefficient: 0.03,
+      deployedDiameter: 8,
+      deployedCd: 0.45,
+      heatTolerance: 1500,
+      crashThreshold: 15,
+    },
+  },
+
+  // =========================================================================
+  // RECOVERY MODULES — Tech Tree Additions
+  // =========================================================================
+
+  /**
+   * Landing Guidance Computer — automated landing system.
+   * Activatable during the FLIGHT phase while descending toward any body.
+   * Automates the landing sequence, consuming fuel normally.
+   * Works on all bodies with and without atmospheres.
+   * No malfunctions — always reliable. Bypasses piloting skill bonuses.
+   * Tech tree: Recovery T4.
+   */
+  {
+    id: 'landing-legs-powered',
+    name: 'Landing Guidance Computer',
+    description: 'An automated landing guidance system. Activate during descent to let the computer handle the landing sequence. Consumes fuel normally. Works on all bodies — atmosphere or vacuum. Bypasses piloting skill bonuses.',
+    type: PartType.SERVICE_MODULE,
+    reliability: 1.0,
+    mass: 150,
+    cost: 30_000,
+    width: 20,
+    height: 15,
+    snapPoints: [
+      makeSnapPoint('top',    0,  -7, STACK_TYPES),
+      makeSnapPoint('bottom', 0,   7, STACK_TYPES),
+      makeSnapPoint('left',  -10,  0, RADIAL_TYPES),
+      makeSnapPoint('right',  10,  0, RADIAL_TYPES),
+    ],
+    animationStates: ['idle', 'active'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.AUTO_LAND,
+    properties: {
+      autoLand: true,
+      bypassesPilotingBonus: true,
+      noMalfunctions: true,
+      dragCoefficient: 0.05,
+      heatTolerance: 1800,
+      crashThreshold: 10,
+    },
+  },
+
+  /**
+   * Booster Recovery Module — enables autonomous booster recovery.
+   * Attach to a booster stage; when decoupled, the booster automatically
+   * lands safely off-screen and the recovered parts enter inventory.
+   * Tech tree: Recovery T5.
+   */
+  {
+    id: 'booster-reusable',
+    name: 'Booster Recovery Module',
+    description: 'Autonomous recovery system for booster stages. When a booster with this module is decoupled, it automatically lands safely off-screen. Recovered parts return to your inventory.',
+    type: PartType.SERVICE_MODULE,
+    reliability: RELIABILITY_TIERS.HIGH,
+    mass: 250,
+    cost: 25_000,
+    width: 15,
+    height: 20,
+    snapPoints: [
+      makeSnapPoint('top',    0, -10, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  10, STACK_TYPES),
+      makeSnapPoint('left',  -7,   0, RADIAL_TYPES),
+      makeSnapPoint('right',  7,   0, RADIAL_TYPES),
+    ],
+    animationStates: ['idle', 'recovering'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      autoRecover: true,
+      dragCoefficient: 0.1,
+      heatTolerance: 2000,
+      crashThreshold: 15,
+    },
+  },
+
+  // =========================================================================
+  // SCIENCE LAB — Tech Tree Science T4
+  // =========================================================================
+
+  /**
+   * Science Lab Module — orbital laboratory for processing science data.
+   * Takes collected science data and processes it over time to generate
+   * additional science points. Must be in orbit to function.
+   * Tech tree: Science T4.
+   */
+  {
+    id: 'science-lab',
+    name: 'Science Lab Module',
+    description: 'An orbital research laboratory. Processes collected science data over time to generate additional science points. Must be in a stable orbit to function. Larger and heavier than standard science modules.',
+    type: PartType.SERVICE_MODULE,
+    reliability: RELIABILITY_TIERS.HIGH,
+    mass: 2_500,
+    cost: 45_000,
+    width: 40,
+    height: 60,
+    snapPoints: [
+      makeSnapPoint('top',    0, -30, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  30, STACK_TYPES),
+      makeSnapPoint('left',  -20, -15, RADIAL_TYPES),
+      makeSnapPoint('left',  -20,  15, RADIAL_TYPES),
+      makeSnapPoint('right',  20, -15, RADIAL_TYPES),
+      makeSnapPoint('right',  20,  15, RADIAL_TYPES),
+    ],
+    animationStates: ['idle', 'processing'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.PROCESS_SCIENCE,
+    properties: {
+      instrumentSlots: 4,
+      scienceProcessingRate: 2,
+      scienceMultiplier: 1.5,
+      requiresOrbit: true,
+      dragCoefficient: 0.12,
+      heatTolerance: 1800,
+      crashThreshold: 8,
     },
   },
 

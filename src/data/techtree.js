@@ -212,7 +212,7 @@ export const TECH_NODES = Object.freeze([
     tier:               4,
     scienceCost:        TIER_COSTS[4].science,
     fundsCost:          TIER_COSTS[4].funds,
-    unlocksParts:       ['docking-port'],
+    unlocksParts:       ['docking-port-std', 'docking-port-small'],
     unlocksInstruments: [],
     description:        'Standard docking mechanism for orbital assembly and crew transfer.',
   }),
