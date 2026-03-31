@@ -272,7 +272,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Sun as gravitational centre of solar system. No solid surface but "surface" altitude where heat destroys everything. Destruction altitude (point of no return). Escalating heat damage on approach — only advanced heat shields allow close approach. Unique biomes (solar orbit, outer/inner corona) with very high science multipliers. Extreme solar power near Sun. Late-game challenge. Players in solar orbit from failed transfers can burn toward planetary bodies to escape. Light source for day/night power cycle and shadow calculations.
 
 ### TASK-041: Transfer gameplay
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-024, TASK-039
 - **Description**: Transfer time warping from map view (does NOT advance period counter). Player cannot leave craft mid-transfer — must reach stable orbit first. Returning to agency from any stable orbit = one period. Map view during transfer: zoomed out, player trajectory shown, thrust/RCS controls work, orbit predictions, target body delta-v requirements, route planning with gravitational assists, zoom levels (craft, craft-to-target, solar system).

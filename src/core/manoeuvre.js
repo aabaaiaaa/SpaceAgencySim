@@ -22,6 +22,7 @@ import {
   CelestialBody,
   FlightPhase,
   ControlMode,
+  MIN_ORBIT_ALTITUDE,
 } from './constants.js';
 import {
   computeOrbitalElements,
@@ -163,55 +164,68 @@ export function isOrbitalBurnActive(ps) {
 export function computeTransferDeltaV(fromBodyId, toBodyId, altitude) {
   if (fromBodyId === toBodyId) return null;
 
-  // Currently only support Earth ↔ Moon transfers.
-  if (fromBodyId === CelestialBody.EARTH && toBodyId === CelestialBody.MOON) {
-    return _earthToMoonTransfer(altitude);
+  const fromParent = BODY_PARENT[fromBodyId];
+  const toParent = BODY_PARENT[toBodyId];
+
+  // Case 1: Transferring to a child body (e.g. Earth → Moon, Mars → Phobos).
+  if (toParent === fromBodyId) {
+    return _parentToChildTransfer(fromBodyId, toBodyId, altitude);
   }
-  if (fromBodyId === CelestialBody.MOON && toBodyId === CelestialBody.EARTH) {
-    return _moonToEarthTransfer(altitude);
+
+  // Case 2: Transferring to parent body (e.g. Moon → Earth, Phobos → Mars).
+  if (fromParent === toBodyId) {
+    return _childToParentTransfer(fromBodyId, toBodyId, altitude);
+  }
+
+  // Case 3: Sibling transfer — same parent (e.g. Earth → Mars, Phobos → Deimos).
+  if (fromParent && fromParent === toParent) {
+    return _siblingTransfer(fromBodyId, toBodyId, altitude);
+  }
+
+  // Case 4: Cross-hierarchy — e.g. Moon → Mars (child of one → child of another).
+  // Decompose: escape from current body, then sibling transfer in parent frame,
+  // then capture at destination.
+  if (fromParent && toParent && BODY_PARENT[fromParent] === BODY_PARENT[toParent]) {
+    return _crossHierarchyTransfer(fromBodyId, toBodyId, altitude);
+  }
+
+  // Case 5: One level up then across — e.g. Moon → Mars (Moon orbits Earth, Mars orbits Sun).
+  if (fromParent && BODY_PARENT[fromParent] === toParent) {
+    return _deepToShallowTransfer(fromBodyId, toBodyId, altitude);
+  }
+  if (toParent && BODY_PARENT[toParent] === fromParent) {
+    // e.g. Earth → Phobos: go to Mars first, then to Phobos.
+    return _shallowToDeepTransfer(fromBodyId, toBodyId, altitude);
   }
 
   return null;
 }
 
 /**
- * Earth → Moon Hohmann transfer.
+ * Transfer from a parent body to one of its child bodies (e.g. Earth → Moon).
+ * Uses Hohmann transfer in the parent-centred frame.
  *
- * @param {number} altitude  Departure orbit altitude above Earth (m).
+ * @param {string} parentId  Parent body (departure).
+ * @param {string} childId   Child body (destination).
+ * @param {number} altitude  Departure orbit altitude above parent (m).
  * @returns {{ departureDV: number, captureDV: number, transferTime: number, totalDV: number }}
  */
-function _earthToMoonTransfer(altitude) {
-  const muEarth = BODY_GM[CelestialBody.EARTH];
-  const rEarth = BODY_RADIUS[CelestialBody.EARTH];
-  const rMoon = BODY_ORBIT_RADIUS[CelestialBody.MOON];
+function _parentToChildTransfer(parentId, childId, altitude) {
+  const muParent = BODY_GM[parentId];
+  const rParent = BODY_RADIUS[parentId];
+  const rChild = BODY_ORBIT_RADIUS[childId];
 
-  // Departure orbit radius (from Earth centre).
-  const r1 = rEarth + altitude;
-
-  // Hohmann transfer ellipse semi-major axis.
-  const a_transfer = (r1 + rMoon) / 2;
-
-  // Circular orbit velocity at departure altitude.
-  const v_circular = Math.sqrt(muEarth / r1);
-
-  // Velocity at periapsis of transfer ellipse.
-  const v_transfer_peri = Math.sqrt(muEarth * (2 / r1 - 1 / a_transfer));
-
-  // Departure delta-v (prograde burn to enter transfer).
+  const r1 = rParent + altitude;
+  const a_transfer = (r1 + rChild) / 2;
+  const v_circular = Math.sqrt(muParent / r1);
+  const v_transfer_peri = Math.sqrt(muParent * (2 / r1 - 1 / a_transfer));
   const departureDV = Math.abs(v_transfer_peri - v_circular);
 
-  // Velocity at apoapsis of transfer ellipse (arriving at Moon's orbit).
-  const v_transfer_apo = Math.sqrt(muEarth * (2 / rMoon - 1 / a_transfer));
+  const v_transfer_apo = Math.sqrt(muParent * (2 / rChild - 1 / a_transfer));
+  const v_child_orbit = Math.sqrt(muParent / rChild);
+  const captureDV = Math.abs(v_child_orbit - v_transfer_apo);
 
-  // Circular orbit velocity at Moon's distance (in Earth-centred frame).
-  const v_moon_orbit = Math.sqrt(muEarth / rMoon);
-
-  // Capture delta-v (retrograde burn to match Moon's velocity / enter lunar orbit).
-  // In practice the Moon's gravity helps, so this is approximate.
-  const captureDV = Math.abs(v_moon_orbit - v_transfer_apo);
-
-  // Transfer time (half the transfer orbit period).
-  const transferTime = Math.PI * Math.sqrt(a_transfer ** 3 / muEarth);
+  const transferTime = Math.PI * Math.sqrt(a_transfer ** 3 / muParent);
 
   return {
     departureDV: Math.round(departureDV),
@@ -222,40 +236,205 @@ function _earthToMoonTransfer(altitude) {
 }
 
 /**
- * Moon → Earth transfer.
+ * Transfer from a child body to its parent (e.g. Moon → Earth).
+ * Escape child SOI, then transfer in parent frame.
  *
- * @param {number} altitude  Departure orbit altitude above Moon (m).
+ * @param {string} childId   Child body (departure).
+ * @param {string} parentId  Parent body (destination).
+ * @param {number} altitude  Departure orbit altitude above child (m).
  * @returns {{ departureDV: number, captureDV: number, transferTime: number, totalDV: number }}
  */
-function _moonToEarthTransfer(altitude) {
-  const muMoon = BODY_GM[CelestialBody.MOON];
-  const muEarth = BODY_GM[CelestialBody.EARTH];
-  const rMoonBody = BODY_RADIUS[CelestialBody.MOON];
-  const rMoonOrbit = BODY_ORBIT_RADIUS[CelestialBody.MOON];
+function _childToParentTransfer(childId, parentId, altitude) {
+  const muChild = BODY_GM[childId];
+  const muParent = BODY_GM[parentId];
+  const rChildBody = BODY_RADIUS[childId];
+  const rChildOrbit = BODY_ORBIT_RADIUS[childId];
+  const rParent = BODY_RADIUS[parentId];
 
-  // Escape velocity from Moon at the given altitude.
-  const r_depart = rMoonBody + altitude;
-  const v_circular_moon = Math.sqrt(muMoon / r_depart);
-  const v_escape_moon = Math.sqrt(2 * muMoon / r_depart);
+  const r_depart = rChildBody + altitude;
+  const v_circular_child = Math.sqrt(muChild / r_depart);
+  const v_escape_child = Math.sqrt(2 * muChild / r_depart);
+  const escapeDV = v_escape_child - v_circular_child;
 
-  // Delta-v to escape Moon's SOI.
-  const escapeDV = v_escape_moon - v_circular_moon;
+  // Target a low orbit at the parent body.
+  const minOrbitAlt = MIN_ORBIT_ALTITUDE[parentId] || 100_000;
+  const rTarget = rParent + minOrbitAlt;
+  const a_return = (rChildOrbit + rTarget) / 2;
+  const v_at_child_dist = Math.sqrt(muParent * (2 / rChildOrbit - 1 / a_return));
+  const v_child_circular_in_parent = Math.sqrt(muParent / rChildOrbit);
+  const returnBurnDV = Math.abs(v_child_circular_in_parent - v_at_child_dist);
 
-  // After escaping Moon, the craft is in an Earth-centred orbit at Moon's distance.
-  // Need to lower periapsis to a reasonable Earth orbit (say 100 km).
-  const rTarget = BODY_RADIUS[CelestialBody.EARTH] + 100_000;
-  const a_return = (rMoonOrbit + rTarget) / 2;
-  const v_at_moon_dist = Math.sqrt(muEarth * (2 / rMoonOrbit - 1 / a_return));
-  const v_moon_circular = Math.sqrt(muEarth / rMoonOrbit);
-  const returnBurnDV = Math.abs(v_moon_circular - v_at_moon_dist);
-
-  // Capture at Earth (aerobraking is free, but budget for orbit insertion).
-  const v_at_earth = Math.sqrt(muEarth * (2 / rTarget - 1 / a_return));
-  const v_circular_earth = Math.sqrt(muEarth / rTarget);
-  const captureDV = Math.abs(v_at_earth - v_circular_earth);
+  const v_at_parent = Math.sqrt(muParent * (2 / rTarget - 1 / a_return));
+  const v_circular_parent = Math.sqrt(muParent / rTarget);
+  const captureDV = Math.abs(v_at_parent - v_circular_parent);
 
   const departureDV = escapeDV + returnBurnDV;
-  const transferTime = Math.PI * Math.sqrt(a_return ** 3 / muEarth);
+  const transferTime = Math.PI * Math.sqrt(a_return ** 3 / muParent);
+
+  return {
+    departureDV: Math.round(departureDV),
+    captureDV: Math.round(captureDV),
+    transferTime: Math.round(transferTime),
+    totalDV: Math.round(departureDV + captureDV),
+  };
+}
+
+/**
+ * Sibling transfer — both bodies orbit the same parent (e.g. Earth → Mars).
+ * Escape from departure body, Hohmann in parent frame, capture at destination.
+ *
+ * @param {string} fromBodyId  Departure body.
+ * @param {string} toBodyId    Destination body.
+ * @param {number} altitude    Departure orbit altitude (m above surface).
+ * @returns {{ departureDV: number, captureDV: number, transferTime: number, totalDV: number }}
+ */
+function _siblingTransfer(fromBodyId, toBodyId, altitude) {
+  const parentId = BODY_PARENT[fromBodyId];
+  const muFrom = BODY_GM[fromBodyId];
+  const muParent = BODY_GM[parentId];
+  const rFrom = BODY_RADIUS[fromBodyId];
+  const rTo = BODY_RADIUS[toBodyId];
+  const muTo = BODY_GM[toBodyId];
+
+  const rFromOrbit = BODY_ORBIT_RADIUS[fromBodyId];
+  const rToOrbit = BODY_ORBIT_RADIUS[toBodyId];
+
+  // 1. Escape from departure body.
+  const r_depart = rFrom + altitude;
+  const v_circular_from = Math.sqrt(muFrom / r_depart);
+  const v_escape_from = Math.sqrt(2 * muFrom / r_depart);
+  const escapeDV = v_escape_from - v_circular_from;
+
+  // 2. Hohmann transfer in parent-centred frame.
+  const a_transfer = (rFromOrbit + rToOrbit) / 2;
+  const v_from_in_parent = Math.sqrt(muParent / rFromOrbit);
+  const v_transfer_depart = Math.sqrt(muParent * (2 / rFromOrbit - 1 / a_transfer));
+  const hohmannDepartDV = Math.abs(v_transfer_depart - v_from_in_parent);
+
+  const v_transfer_arrive = Math.sqrt(muParent * (2 / rToOrbit - 1 / a_transfer));
+  const v_to_in_parent = Math.sqrt(muParent / rToOrbit);
+  const hohmannArriveDV = Math.abs(v_to_in_parent - v_transfer_arrive);
+
+  // 3. Capture at destination body into low orbit.
+  const minOrbitAlt = MIN_ORBIT_ALTITUDE[toBodyId] || 80_000;
+  const rCapture = rTo + minOrbitAlt;
+  const v_circular_to = Math.sqrt(muTo / rCapture);
+  const v_escape_to = Math.sqrt(2 * muTo / rCapture);
+  const captureFromEscape = v_escape_to - v_circular_to;
+
+  const departureDV = escapeDV + hohmannDepartDV;
+  const captureDV = hohmannArriveDV + captureFromEscape;
+  const transferTime = Math.PI * Math.sqrt(a_transfer ** 3 / muParent);
+
+  return {
+    departureDV: Math.round(departureDV),
+    captureDV: Math.round(captureDV),
+    transferTime: Math.round(transferTime),
+    totalDV: Math.round(departureDV + captureDV),
+  };
+}
+
+/**
+ * Cross-hierarchy transfer — bodies at the same depth but with different
+ * parents that share a grandparent (e.g. Phobos → Moon: Mars→Sun→Earth→Moon).
+ *
+ * Simplified: escape child, do sibling transfer between parents, capture at dest child.
+ *
+ * @param {string} fromBodyId
+ * @param {string} toBodyId
+ * @param {number} altitude
+ * @returns {{ departureDV: number, captureDV: number, transferTime: number, totalDV: number }|null}
+ */
+function _crossHierarchyTransfer(fromBodyId, toBodyId, altitude) {
+  const fromParent = BODY_PARENT[fromBodyId];
+  const toParent = BODY_PARENT[toBodyId];
+  if (!fromParent || !toParent) return null;
+
+  // Escape from starting body to parent.
+  const escapeResult = _childToParentTransfer(fromBodyId, fromParent, altitude);
+  if (!escapeResult) return null;
+
+  // Sibling transfer between the two parents (use minimum orbit altitude at fromParent).
+  const minAlt = MIN_ORBIT_ALTITUDE[fromParent] || 100_000;
+  const siblingResult = _siblingTransfer(fromParent, toParent, minAlt);
+  if (!siblingResult) return null;
+
+  // Capture at destination child from parent orbit.
+  const minAltTo = MIN_ORBIT_ALTITUDE[toParent] || 100_000;
+  const captureResult = _parentToChildTransfer(toParent, toBodyId, minAltTo);
+  if (!captureResult) return null;
+
+  const departureDV = escapeResult.departureDV + siblingResult.departureDV;
+  const captureDV = siblingResult.captureDV + captureResult.departureDV + captureResult.captureDV;
+  const transferTime = escapeResult.transferTime + siblingResult.transferTime + captureResult.transferTime;
+
+  return {
+    departureDV: Math.round(departureDV),
+    captureDV: Math.round(captureDV),
+    transferTime: Math.round(transferTime),
+    totalDV: Math.round(departureDV + captureDV),
+  };
+}
+
+/**
+ * Transfer from a deeper body to a shallower one (e.g. Moon → Mars).
+ * Moon orbits Earth, Mars orbits Sun. Escape Moon → escape Earth → transfer to Mars.
+ *
+ * @param {string} fromBodyId  Deeper body (e.g. Moon).
+ * @param {string} toBodyId    Shallower body (e.g. Mars).
+ * @param {number} altitude
+ * @returns {{ departureDV: number, captureDV: number, transferTime: number, totalDV: number }|null}
+ */
+function _deepToShallowTransfer(fromBodyId, toBodyId, altitude) {
+  const fromParent = BODY_PARENT[fromBodyId];
+  if (!fromParent) return null;
+
+  // Escape from the child body.
+  const escapeResult = _childToParentTransfer(fromBodyId, fromParent, altitude);
+  if (!escapeResult) return null;
+
+  // Then do the sibling transfer from parent to toBody.
+  const minAlt = MIN_ORBIT_ALTITUDE[fromParent] || 100_000;
+  const siblingResult = _siblingTransfer(fromParent, toBodyId, minAlt);
+  if (!siblingResult) return null;
+
+  const departureDV = escapeResult.departureDV + siblingResult.departureDV;
+  const captureDV = siblingResult.captureDV;
+  const transferTime = escapeResult.transferTime + siblingResult.transferTime;
+
+  return {
+    departureDV: Math.round(departureDV),
+    captureDV: Math.round(captureDV),
+    transferTime: Math.round(transferTime),
+    totalDV: Math.round(departureDV + captureDV),
+  };
+}
+
+/**
+ * Transfer from a shallower body to a deeper one (e.g. Earth → Phobos).
+ * Earth orbits Sun, Phobos orbits Mars. Transfer to Mars then descend to Phobos.
+ *
+ * @param {string} fromBodyId  Shallower body.
+ * @param {string} toBodyId    Deeper body.
+ * @param {number} altitude
+ * @returns {{ departureDV: number, captureDV: number, transferTime: number, totalDV: number }|null}
+ */
+function _shallowToDeepTransfer(fromBodyId, toBodyId, altitude) {
+  const toParent = BODY_PARENT[toBodyId];
+  if (!toParent) return null;
+
+  // Sibling transfer from this body to the target's parent.
+  const siblingResult = _siblingTransfer(fromBodyId, toParent, altitude);
+  if (!siblingResult) return null;
+
+  // Then descend from the parent to the target child.
+  const minAlt = MIN_ORBIT_ALTITUDE[toParent] || 80_000;
+  const captureResult = _parentToChildTransfer(toParent, toBodyId, minAlt);
+  if (!captureResult) return null;
+
+  const departureDV = siblingResult.departureDV;
+  const captureDV = siblingResult.captureDV + captureResult.departureDV + captureResult.captureDV;
+  const transferTime = siblingResult.transferTime + captureResult.transferTime;
 
   return {
     departureDV: Math.round(departureDV),
@@ -288,38 +467,64 @@ function _moonToEarthTransfer(altitude) {
  */
 export function getTransferTargets(bodyId, altitude) {
   const targets = [];
+  const added = new Set();
 
-  // Add child bodies.
-  const children = BODY_CHILDREN[bodyId] || [];
-  for (const childId of children) {
-    const transfer = computeTransferDeltaV(bodyId, childId, altitude);
+  const _addTarget = (targetId) => {
+    if (added.has(targetId) || targetId === bodyId) return;
+    // Don't show the Sun as a transfer target (not landable / orbitale in gameplay).
+    if (targetId === CelestialBody.SUN) return;
+    const transfer = computeTransferDeltaV(bodyId, targetId, altitude);
     if (transfer) {
+      added.add(targetId);
       targets.push({
-        bodyId: childId,
-        name: _bodyName(childId),
+        bodyId: targetId,
+        name: _bodyName(targetId),
         departureDV: transfer.departureDV,
         captureDV: transfer.captureDV,
         totalDV: transfer.totalDV,
         transferTime: transfer.transferTime,
       });
     }
-  }
+  };
+
+  // Add child bodies (e.g. Earth → Moon).
+  const children = BODY_CHILDREN[bodyId] || [];
+  for (const childId of children) _addTarget(childId);
 
   // Add parent body.
   const parent = BODY_PARENT[bodyId];
+  if (parent) _addTarget(parent);
+
+  // Add sibling bodies (same parent, e.g. Earth → Mars).
   if (parent) {
-    const transfer = computeTransferDeltaV(bodyId, parent, altitude);
-    if (transfer) {
-      targets.push({
-        bodyId: parent,
-        name: _bodyName(parent),
-        departureDV: transfer.departureDV,
-        captureDV: transfer.captureDV,
-        totalDV: transfer.totalDV,
-        transferTime: transfer.transferTime,
-      });
+    const siblings = BODY_CHILDREN[parent] || [];
+    for (const sibId of siblings) _addTarget(sibId);
+  }
+
+  // Add bodies reachable via cross-hierarchy transfer (e.g. Moon → Mars).
+  const grandparent = parent ? BODY_PARENT[parent] : null;
+  if (grandparent) {
+    // Siblings of parent (e.g. from Moon, parent=Earth, grandparent=Sun → Mars, Venus).
+    const parentSiblings = BODY_CHILDREN[grandparent] || [];
+    for (const psId of parentSiblings) {
+      _addTarget(psId);
+      // Also add their children (e.g. from Moon → Phobos via Mars).
+      const psChildren = BODY_CHILDREN[psId] || [];
+      for (const pcId of psChildren) _addTarget(pcId);
     }
   }
+
+  // If this is a Sun-orbiting body, add children of siblings (e.g. Earth → Phobos).
+  if (parent === CelestialBody.SUN) {
+    const siblings = BODY_CHILDREN[parent] || [];
+    for (const sibId of siblings) {
+      const sibChildren = BODY_CHILDREN[sibId] || [];
+      for (const scId of sibChildren) _addTarget(scId);
+    }
+  }
+
+  // Sort by total delta-v (cheapest transfers first).
+  targets.sort((a, b) => a.totalDV - b.totalDV);
 
   return targets;
 }
@@ -533,20 +738,35 @@ export function computeTransferRoute(fromBodyId, toBodyId, altitude, craftElemen
   let burnDirection;
   let burnPoint;
 
-  if (BODY_PARENT[toBodyId] === fromBodyId) {
+  const toParent = BODY_PARENT[toBodyId];
+  const fromParent = BODY_PARENT[fromBodyId];
+
+  if (toParent === fromBodyId) {
     // Transferring to a child body (e.g. Earth → Moon).
-    // Burn prograde at periapsis for maximum efficiency.
     burnDirection = 'PROGRADE';
     burnPoint = 'periapsis';
-  } else {
+  } else if (fromParent === toBodyId) {
     // Transferring to parent (e.g. Moon → Earth).
-    // Burn retrograde to lower orbit and escape.
     burnDirection = 'RETROGRADE';
-    burnPoint = 'retrograde';
+    burnPoint = 'apoapsis';
+  } else {
+    // Sibling or cross-hierarchy: determine by relative orbital distance.
+    const rFrom = BODY_ORBIT_RADIUS[fromBodyId] || 0;
+    const rTo = BODY_ORBIT_RADIUS[toBodyId] || 0;
+    if (rTo > rFrom) {
+      burnDirection = 'PROGRADE';
+      burnPoint = 'periapsis';
+    } else {
+      burnDirection = 'RETROGRADE';
+      burnPoint = 'apoapsis';
+    }
   }
 
   // Generate a simple transfer arc for map view rendering.
   const transferPath = _generateTransferArc(fromBodyId, toBodyId, altitude);
+
+  // Also compute a gravity assist route if intermediate bodies exist.
+  const assistInfo = _computeAssistRoute(fromBodyId, toBodyId);
 
   return {
     fromBodyId,
@@ -558,6 +778,7 @@ export function computeTransferRoute(fromBodyId, toBodyId, altitude, craftElemen
     burnDirection,
     burnPoint,
     transferPath,
+    assistInfo,
   };
 }
 
@@ -633,6 +854,7 @@ function _determineTurnDirection(ps, bodyId, approachAngle) {
 /**
  * Generate a simple transfer arc path for map view rendering.
  * Returns Cartesian points (body-centred) tracing the transfer ellipse.
+ * Works for parent→child, child→parent, and sibling transfers.
  */
 function _generateTransferArc(fromBodyId, toBodyId, altitude) {
   const R = BODY_RADIUS[fromBodyId];
@@ -640,27 +862,34 @@ function _generateTransferArc(fromBodyId, toBodyId, altitude) {
   const points = [];
 
   let rArrive;
-  if (BODY_PARENT[toBodyId] === fromBodyId) {
+  const toParent = BODY_PARENT[toBodyId];
+  const fromParent = BODY_PARENT[fromBodyId];
+
+  if (toParent === fromBodyId) {
     // Transferring outward to child body.
     rArrive = BODY_ORBIT_RADIUS[toBodyId];
-  } else {
+  } else if (fromParent === toBodyId) {
     // Transferring inward to parent.
-    rArrive = R * 2; // Approximate: show arc going inward
+    rArrive = R * 2;
+  } else if (fromParent && fromParent === toParent) {
+    // Sibling transfer: show arc in parent-centred frame.
+    // Use orbital radii of both bodies in the parent frame.
+    const rFromOrbit = BODY_ORBIT_RADIUS[fromBodyId];
+    const rToOrbit = BODY_ORBIT_RADIUS[toBodyId];
+    return _generateSiblingArc(rFromOrbit, rToOrbit);
+  } else {
+    // Cross-hierarchy: approximate as a long arc.
+    rArrive = (BODY_ORBIT_RADIUS[toBodyId] || R * 5);
   }
 
   if (!rArrive) return points;
 
-  // Semi-major axis of transfer ellipse.
   const a = (rDepart + rArrive) / 2;
   const e = Math.abs(rArrive - rDepart) / (rArrive + rDepart);
 
   const numPoints = 60;
-  // Transfer is half an orbit (0 to π for outward, π to 2π for inward).
-  const startTheta = 0;
-  const endTheta = Math.PI;
-
   for (let i = 0; i <= numPoints; i++) {
-    const theta = startTheta + (endTheta - startTheta) * (i / numPoints);
+    const theta = (Math.PI * i) / numPoints;
     const p = a * (1 - e * e);
     const r = p / (1 + e * Math.cos(theta));
     points.push({
@@ -670,6 +899,86 @@ function _generateTransferArc(fromBodyId, toBodyId, altitude) {
   }
 
   return points;
+}
+
+/**
+ * Generate a transfer arc for sibling bodies in the parent-centred frame.
+ * @param {number} rFrom  Orbital radius of departure body.
+ * @param {number} rTo    Orbital radius of destination body.
+ * @returns {{ x: number, y: number }[]}
+ */
+function _generateSiblingArc(rFrom, rTo) {
+  const a = (rFrom + rTo) / 2;
+  const e = Math.abs(rTo - rFrom) / (rTo + rFrom);
+  const points = [];
+  const numPoints = 60;
+
+  for (let i = 0; i <= numPoints; i++) {
+    const theta = (Math.PI * i) / numPoints;
+    const p = a * (1 - e * e);
+    const r = p / (1 + e * Math.cos(theta));
+    points.push({
+      x: r * Math.cos(theta),
+      y: r * Math.sin(theta),
+    });
+  }
+  return points;
+}
+
+/**
+ * Compute potential gravity-assist flyby bodies along a transfer route.
+ * Returns information about intermediate bodies that could provide
+ * gravitational assists if the route passes near them.
+ *
+ * @param {string} fromBodyId
+ * @param {string} toBodyId
+ * @returns {{ bodies: Array<{ bodyId: string, name: string, potentialDV: number }> }|null}
+ */
+function _computeAssistRoute(fromBodyId, toBodyId) {
+  const fromParent = BODY_PARENT[fromBodyId];
+  const toParent = BODY_PARENT[toBodyId];
+
+  // Find a common parent frame for the transfer.
+  let commonParent = null;
+  if (fromParent === toParent) commonParent = fromParent;
+  else if (BODY_PARENT[fromParent] === toParent) commonParent = toParent;
+  else if (BODY_PARENT[toParent] === fromParent) commonParent = fromParent;
+  else if (fromParent && toParent && BODY_PARENT[fromParent] === BODY_PARENT[toParent]) {
+    commonParent = BODY_PARENT[fromParent];
+  }
+
+  if (!commonParent) return null;
+
+  // Check siblings in the common parent frame that lie between the two orbits.
+  const children = BODY_CHILDREN[commonParent] || [];
+  const rFrom = BODY_ORBIT_RADIUS[fromBodyId] || BODY_ORBIT_RADIUS[fromParent] || 0;
+  const rTo = BODY_ORBIT_RADIUS[toBodyId] || BODY_ORBIT_RADIUS[toParent] || 0;
+  const minR = Math.min(rFrom, rTo);
+  const maxR = Math.max(rFrom, rTo);
+
+  const assistBodies = [];
+  for (const childId of children) {
+    if (childId === fromBodyId || childId === toBodyId) continue;
+    if (childId === fromParent || childId === toParent) continue;
+
+    const childR = BODY_ORBIT_RADIUS[childId];
+    if (!childR || childR <= minR || childR >= maxR) continue;
+
+    // Estimate assist potential using a flyby at 2× body radius.
+    const periAlt = BODY_RADIUS[childId];
+    const excessSpeed = 5000; // Approximate 5 km/s excess (typical transfer speed).
+    const assist = computeGravityAssist(childId, periAlt, excessSpeed);
+
+    if (assist.valid && assist.deltaV > 50) {
+      assistBodies.push({
+        bodyId: childId,
+        name: _bodyName(childId),
+        potentialDV: Math.round(assist.deltaV),
+      });
+    }
+  }
+
+  return assistBodies.length > 0 ? { bodies: assistBodies } : null;
 }
 
 /**

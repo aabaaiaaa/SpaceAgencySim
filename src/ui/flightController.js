@@ -17,7 +17,7 @@
 
 import { initFlightRenderer, destroyFlightRenderer, renderFlightFrame, hideFlightScene, showFlightScene, setFlightInputEnabled } from '../render/flight.js';
 import { initMapRenderer, destroyMapRenderer, renderMapFrame, showMapScene, hideMapScene, isMapVisible, cycleMapZoom, getMapZoomLevel, cycleMapTarget, getMapTarget, toggleMapShadow, setMapTarget, cycleTransferTarget, getSelectedTransferTarget } from '../render/map.js';
-import { MapZoom, MapThrustDir, computeOrbitalThrustAngle, isMapViewAvailable, getMapTransferTargets } from '../core/mapView.js';
+import { MapZoom, MapThrustDir, computeOrbitalThrustAngle, isMapViewAvailable, getMapTransferTargets, getTransferProgressInfo } from '../core/mapView.js';
 import { warpToTarget } from '../core/orbit.js';
 import {
   createPhysicsState,
@@ -1023,8 +1023,13 @@ function _loop(timestamp) {
   // Evaluate time-warp reset conditions before advancing physics.
   _checkTimeWarpResets(timestamp);
 
-  // When the map is active during non-ORBIT phases, force 1× warp.
-  if (_mapActive && _flightState.phase !== FlightPhase.ORBIT) {
+  // When the map is active during non-ORBIT phases, force 1× warp —
+  // EXCEPT during TRANSFER and CAPTURE phases where time warp is allowed
+  // from the map view (transfer time warping does NOT advance the period counter).
+  if (_mapActive &&
+      _flightState.phase !== FlightPhase.ORBIT &&
+      _flightState.phase !== FlightPhase.TRANSFER &&
+      _flightState.phase !== FlightPhase.CAPTURE) {
     if (_timeWarp !== 1) _applyTimeWarp(1);
   }
 
@@ -1054,7 +1059,8 @@ function _loop(timestamp) {
 
   // Render the active scene.
   if (_mapActive) {
-    renderMapFrame(_ps, _flightState, _state);
+    const mapBodyId = (_flightState && _flightState.bodyId) || 'EARTH';
+    renderMapFrame(_ps, _flightState, _state, mapBodyId);
   } else {
     renderFlightFrame(_ps, _assembly);
   }
@@ -1206,12 +1212,14 @@ function _evaluateFlightPhase() {
     orbitStatus = checkOrbitStatus(_ps.posX, _ps.posY, _ps.velX, _ps.velY, bodyId);
   }
 
-  // --- Continuous orbit recalculation during MANOEUVRE phase ---
-  // When the player is in MANOEUVRE (actively burning or just finished a burn),
-  // continuously update the orbital elements from state vectors so the map
-  // view orbit path updates in real-time.
-  if (_flightState.phase === FlightPhase.MANOEUVRE ||
-      (_flightState.phase === FlightPhase.ORBIT && isOrbitalBurnActive(_ps))) {
+  // --- Continuous orbit recalculation during MANOEUVRE / TRANSFER / CAPTURE ---
+  // When the player is burning or in transfer, continuously update orbital
+  // elements from state vectors so the map view orbit path updates in real-time.
+  const phase = _flightState.phase;
+  if (phase === FlightPhase.MANOEUVRE ||
+      phase === FlightPhase.TRANSFER ||
+      phase === FlightPhase.CAPTURE ||
+      (phase === FlightPhase.ORBIT && isOrbitalBurnActive(_ps))) {
     const newElements = recalculateOrbit(_ps, bodyId, _flightState.timeElapsed);
     if (newElements) {
       _flightState.orbitalElements = newElements;
@@ -1251,8 +1259,14 @@ function _evaluateFlightPhase() {
     } else if (transition.to === FlightPhase.TRANSFER) {
       _showPhaseNotification('Transfer Injection');
       _applyTimeWarp(1);
+
+      // Auto-open map view during transfer — player needs the orbital map.
+      if (!_mapActive) {
+        _toggleMapView();
+      }
     } else if (transition.to === FlightPhase.CAPTURE) {
       _showPhaseNotification(`Entering ${_flightState.bodyId || 'destination'} SOI`);
+      _applyTimeWarp(1);
     } else {
       _showPhaseNotification(getPhaseLabel(transition.to));
     }
@@ -1381,7 +1395,8 @@ function _onKeyDown(e) {
     }
     // T — cycle target selection.
     if (e.code === 'KeyT' && !e.ctrlKey) {
-      cycleMapTarget(_state.orbitalObjects, 'EARTH');
+      const tBodyId = (_flightState && _flightState.bodyId) || 'EARTH';
+      cycleMapTarget(_state.orbitalObjects, tBodyId);
       _updateMapHud();
       return;
     }
@@ -1540,6 +1555,12 @@ function _onKeyUp(e) {
 function _toggleMapView() {
   if (!_ps || !_flightState) return;
 
+  // During TRANSFER/CAPTURE, the player cannot leave the map view.
+  if (_mapActive && isPlayerLocked(_flightState.phase)) {
+    _showPhaseNotification('Cannot leave map during ' + getPhaseLabel(_flightState.phase));
+    return;
+  }
+
   // Check availability (Tracking Station facility).
   if (!_mapActive && !isMapViewAvailable(_state)) {
     _showPhaseNotification('Tracking Station required');
@@ -1580,8 +1601,10 @@ function _toggleMapView() {
 function _applyMapThrust() {
   if (!_mapActive || !_ps || !_flightState) return;
 
-  // Only apply orbital thrust in ORBIT or MANOEUVRE phase.
-  if (_flightState.phase !== FlightPhase.ORBIT && _flightState.phase !== FlightPhase.MANOEUVRE) {
+  // Apply orbital thrust in ORBIT, MANOEUVRE, TRANSFER, or CAPTURE phases.
+  const phase = _flightState.phase;
+  if (phase !== FlightPhase.ORBIT && phase !== FlightPhase.MANOEUVRE &&
+      phase !== FlightPhase.TRANSFER && phase !== FlightPhase.CAPTURE) {
     if (_mapThrusting) {
       _ps.throttle = 0;
       _mapThrusting = false;
@@ -1596,8 +1619,10 @@ function _applyMapThrust() {
   else if (_mapHeldKeys.has('a')) direction = MapThrustDir.RADIAL_IN;
   else if (_mapHeldKeys.has('d')) direction = MapThrustDir.RADIAL_OUT;
 
+  const bodyId = _flightState.bodyId || 'EARTH';
+
   if (direction) {
-    _ps.angle = computeOrbitalThrustAngle(_ps, 'EARTH', direction);
+    _ps.angle = computeOrbitalThrustAngle(_ps, bodyId, direction);
     if (_ps.throttle === 0) _ps.throttle = 1;
     _mapThrusting = true;
   } else if (_mapThrusting) {
@@ -1691,8 +1716,10 @@ function _applyNormalOrbitRcs() {
   else if (_normalOrbitHeldKeys.has('a')) direction = MapThrustDir.RADIAL_IN;
   else if (_normalOrbitHeldKeys.has('d')) direction = MapThrustDir.RADIAL_OUT;
 
+  const nBodyId = (_flightState && _flightState.bodyId) || 'EARTH';
+
   if (direction) {
-    _ps.angle = computeOrbitalThrustAngle(_ps, 'EARTH', direction);
+    _ps.angle = computeOrbitalThrustAngle(_ps, nBodyId, direction);
     if (_ps.throttle === 0) _ps.throttle = 1;
     _normalOrbitThrusting = true;
   } else if (_normalOrbitThrusting) {
@@ -1725,10 +1752,11 @@ function _handleWarpToTarget() {
     return;
   }
 
+  const warpBodyId = (_flightState && _flightState.bodyId) || 'EARTH';
   const result = warpToTarget(
     _flightState.orbitalElements,
     targetObj.elements,
-    'EARTH',
+    warpBodyId,
     _flightState.timeElapsed,
   );
 
@@ -1777,9 +1805,11 @@ function _buildMapHud() {
   info.innerHTML = `
     <div class="map-label">MAP VIEW</div>
     <div>Zoom: <span class="map-zoom" data-field="zoom"></span></div>
+    <div>Body: <span data-field="body">Earth</span></div>
     <div>Target: <span class="map-target" data-field="target">None</span></div>
     <div>Phase: <span data-field="phase"></span></div>
     <div data-field="transfer-info" style="color:#ffcc44;margin-top:4px;display:none"></div>
+    <div data-field="transfer-progress" style="color:#ff6644;margin-top:4px;display:none"></div>
   `;
   hud.appendChild(info);
 
@@ -1793,7 +1823,8 @@ function _buildMapHud() {
     '<kbd>B</kbd> Transfer target · ' +
     '<kbd>G</kbd> Warp to target · ' +
     '<kbd>N</kbd> Shadow · ' +
-    '<kbd>WASD</kbd> Orbital thrust (orbit only)';
+    '<kbd>&lt;/&gt;</kbd> Time warp · ' +
+    '<kbd>WASD</kbd> Orbital thrust';
   hud.appendChild(controls);
 
   // Warp to target button (top-right).
@@ -1818,13 +1849,23 @@ function _updateMapHud() {
   if (!_mapHud || !_flightState) return;
 
   const zoomEl       = _mapHud.querySelector('[data-field="zoom"]');
+  const bodyEl       = _mapHud.querySelector('[data-field="body"]');
   const targetEl     = _mapHud.querySelector('[data-field="target"]');
   const phaseEl      = _mapHud.querySelector('[data-field="phase"]');
   const warpBtn      = _mapHud.querySelector('#map-warp-btn');
   const transferEl   = _mapHud.querySelector('[data-field="transfer-info"]');
+  const progressEl   = _mapHud.querySelector('[data-field="transfer-progress"]');
 
   if (zoomEl)   zoomEl.textContent = ZOOM_LABELS[getMapZoomLevel()] || getMapZoomLevel();
-  if (phaseEl)  phaseEl.textContent = getPhaseLabel(_flightState.phase);
+  if (phaseEl)  phaseEl.textContent = `${getPhaseLabel(_flightState.phase)}${_timeWarp > 1 ? ` (${_timeWarp}×)` : ''}`;
+
+  // Show current celestial body.
+  const bodyId = _flightState.bodyId || 'EARTH';
+  const bodyNames = {
+    SUN: 'Sun', MERCURY: 'Mercury', VENUS: 'Venus', EARTH: 'Earth',
+    MOON: 'Moon', MARS: 'Mars', PHOBOS: 'Phobos', DEIMOS: 'Deimos',
+  };
+  if (bodyEl) bodyEl.textContent = bodyNames[bodyId] || bodyId;
 
   const targetId = getMapTarget();
   const targetObj = targetId && _state
@@ -1836,11 +1877,10 @@ function _updateMapHud() {
       !targetObj || !_flightState.orbitalElements || _flightState.phase !== FlightPhase.ORBIT);
   }
 
-  // Transfer target info.
+  // Transfer target route info.
   if (transferEl) {
     const transferTarget = getSelectedTransferTarget();
     if (transferTarget && _ps) {
-      const bodyId = _flightState.bodyId || 'EARTH';
       const alt = Math.max(0, _ps.posY);
       const targets = getMapTransferTargets(bodyId, alt, _flightState.phase);
       const t = targets.find(tt => tt.bodyId === transferTarget);
@@ -1852,6 +1892,18 @@ function _updateMapHud() {
       }
     } else {
       transferEl.style.display = 'none';
+    }
+  }
+
+  // Transfer progress during active TRANSFER/CAPTURE phase.
+  if (progressEl) {
+    const info = getTransferProgressInfo(_flightState.transferState, _flightState.timeElapsed);
+    if (info) {
+      const pct = Math.round(info.progress * 100);
+      progressEl.textContent = `Transfer: ${info.originName} → ${info.destName} — ${pct}% — ETA: ${info.etaStr}`;
+      progressEl.style.display = '';
+    } else {
+      progressEl.style.display = 'none';
     }
   }
 }

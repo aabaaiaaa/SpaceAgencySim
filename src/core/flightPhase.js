@@ -32,6 +32,8 @@ import {
   shouldEnterTransfer,
   isEscapeTrajectory,
   checkSOITransition,
+  getTransferTargets,
+  computeTransferDeltaV,
 } from './manoeuvre.js';
 import { checkOrbitStatus, computeOrbitalElements } from './orbit.js';
 
@@ -228,6 +230,25 @@ export function evaluateAutoTransitions(flightState, ps, orbitStatus) {
         const transferResult = transitionPhase(flightState, FlightPhase.TRANSFER, 'Transfer injection — escape trajectory');
         if (transferResult.success) {
           flightState.inOrbit = false;
+
+          // Populate transfer state with best-guess destination.
+          const altitude = Math.max(0, ps.posY);
+          const targets = getTransferTargets(bodyId, altitude);
+          if (targets.length > 0) {
+            const target = targets[0]; // Cheapest reachable target.
+            const transfer = computeTransferDeltaV(bodyId, target.bodyId, altitude);
+            flightState.transferState = {
+              originBodyId: bodyId,
+              destinationBodyId: target.bodyId,
+              departureTime: flightState.timeElapsed,
+              estimatedArrival: flightState.timeElapsed + (transfer ? transfer.transferTime : 0),
+              departureDV: transfer ? transfer.departureDV : 0,
+              captureDV: transfer ? transfer.captureDV : 0,
+              totalDV: transfer ? transfer.totalDV : 0,
+              trajectoryPath: [],
+            };
+          }
+
           return flightState.phaseLog[flightState.phaseLog.length - 1];
         }
       }
@@ -270,6 +291,7 @@ export function evaluateAutoTransitions(flightState, ps, orbitStatus) {
       if (result.success) {
         flightState.inOrbit = true;
         flightState.orbitalElements = orbitStatus.elements;
+        flightState.transferState = null; // Transfer complete.
         return flightState.phaseLog[flightState.phaseLog.length - 1];
       }
     }

@@ -13,7 +13,7 @@
  * @module core/mapView
  */
 
-import { BODY_RADIUS, ALTITUDE_BANDS, FlightPhase } from './constants.js';
+import { BODY_RADIUS, BODY_GM, ALTITUDE_BANDS, FlightPhase } from './constants.js';
 import {
   getOrbitalStateAtTime,
   getOrbitalPeriod,
@@ -27,6 +27,10 @@ import {
   formatTransferTime,
   formatDeltaV,
   BODY_ORBIT_RADIUS,
+  BODY_PARENT,
+  BODY_CHILDREN,
+  SOI_RADIUS,
+  computeGravityAssist,
 } from './manoeuvre.js';
 
 // ---------------------------------------------------------------------------
@@ -79,7 +83,7 @@ export const MapThrustDir = Object.freeze({
  * @param {import('./orbit.js').OrbitalElements|null} targetElements
  * @returns {number}  View radius in metres.
  */
-export function getViewRadius(zoomLevel, bodyId, craftElements, targetElements) {
+export function getViewRadius(zoomLevel, bodyId, craftElements, targetElements, transferState) {
   const R = BODY_RADIUS[bodyId];
   const bands = ALTITUDE_BANDS[bodyId];
 
@@ -95,15 +99,33 @@ export function getViewRadius(zoomLevel, bodyId, craftElements, targetElements) 
       return (R + maxAlt) * 1.1;
     }
     case MapZoom.CRAFT_TO_TARGET: {
+      // During transfer: show the path to the destination body.
+      if (transferState) {
+        const destOrbitR = BODY_ORBIT_RADIUS[transferState.destinationBodyId] || 0;
+        const soiR = SOI_RADIUS[bodyId] || R * 5;
+        return Math.max(destOrbitR, soiR) * 1.3;
+      }
       if (!craftElements || !targetElements) {
-        return getViewRadius(MapZoom.LOCAL_BODY, bodyId, craftElements, null);
+        return getViewRadius(MapZoom.LOCAL_BODY, bodyId, craftElements, null, null);
       }
       const craftApo = getApoapsisAltitude(craftElements, bodyId);
       const targetApo = getApoapsisAltitude(targetElements, bodyId);
       return (R + Math.max(craftApo, targetApo)) * 1.3;
     }
-    case MapZoom.SOLAR_SYSTEM:
-      return R * 15;
+    case MapZoom.SOLAR_SYSTEM: {
+      // During transfer between Sun-orbiting bodies, show solar system scale.
+      if (transferState) {
+        const destR = BODY_ORBIT_RADIUS[transferState.destinationBodyId] || 0;
+        const originR = BODY_ORBIT_RADIUS[transferState.originBodyId] || 0;
+        return Math.max(destR, originR, R * 5) * 1.3;
+      }
+      // Show the SOI of the current body or its children's orbits.
+      const soiR = SOI_RADIUS[bodyId];
+      if (soiR && soiR !== Infinity) return soiR * 1.3;
+      // For Sun: show to Mars orbit.
+      const marsR = BODY_ORBIT_RADIUS.MARS || R * 15;
+      return marsR * 1.2;
+    }
     default:
       return R * 2;
   }
@@ -318,12 +340,155 @@ export function getMapTransferRoute(fromBodyId, toBodyId, altitude, craftElement
  * Uses a fixed angle per body for visual consistency.
  */
 function _getBodyDisplayAngle(bodyId) {
-  switch (bodyId) {
-    case 'MOON':  return Math.PI * 0.25; // Upper-right
-    case 'EARTH': return Math.PI * 1.25; // Lower-left
-    default:      return 0;
-  }
+  const angles = {
+    MERCURY: Math.PI * 1.5,
+    VENUS:   Math.PI * 1.75,
+    EARTH:   Math.PI * 1.25,
+    MOON:    Math.PI * 0.25,
+    MARS:    Math.PI * 0.5,
+    PHOBOS:  Math.PI * 0.3,
+    DEIMOS:  Math.PI * 0.7,
+  };
+  return angles[bodyId] || 0;
 }
+
+// ---------------------------------------------------------------------------
+// Transfer trajectory prediction
+// ---------------------------------------------------------------------------
+
+/**
+ * Generate a predicted trajectory for a craft in TRANSFER phase.
+ * Returns body-centred Cartesian points showing the craft's projected path
+ * from its current position outward toward the SOI boundary or destination.
+ *
+ * @param {import('./physics.js').PhysicsState} ps
+ * @param {string} bodyId  Current reference body.
+ * @param {number} numPoints  Number of trajectory points.
+ * @returns {{ x: number, y: number }[]}
+ */
+export function generateTransferTrajectory(ps, bodyId, numPoints = 120) {
+  const R = BODY_RADIUS[bodyId];
+  const mu = BODY_GM[bodyId];
+  const soiR = SOI_RADIUS[bodyId] || R * 100;
+
+  const points = [];
+  let px = ps.posX;
+  let py = ps.posY + R; // Convert to body-centred
+  let vx = ps.velX;
+  let vy = ps.velY;
+
+  // Simple forward integration using velocity Verlet.
+  // Use a timestep that covers roughly the SOI crossing time.
+  const r0 = Math.sqrt(px * px + py * py);
+  const v0 = Math.sqrt(vx * vx + vy * vy);
+  const estTime = Math.max((soiR - r0) / Math.max(v0, 100), 3600);
+  const dt = estTime / numPoints;
+
+  for (let i = 0; i <= numPoints; i++) {
+    points.push({ x: px, y: py });
+
+    const r = Math.sqrt(px * px + py * py);
+    if (r > soiR * 1.1 || r < R * 0.9) break; // Past SOI or crashed.
+
+    // Gravitational acceleration toward body centre.
+    const r3 = r * r * r;
+    const ax = -mu * px / r3;
+    const ay = -mu * py / r3;
+
+    // Velocity Verlet integration.
+    px += vx * dt + 0.5 * ax * dt * dt;
+    py += vy * dt + 0.5 * ay * dt * dt;
+
+    const rNew = Math.sqrt(px * px + py * py);
+    const r3New = rNew * rNew * rNew;
+    const axNew = -mu * px / r3New;
+    const ayNew = -mu * py / r3New;
+
+    vx += 0.5 * (ax + axNew) * dt;
+    vy += 0.5 * (ay + ayNew) * dt;
+  }
+
+  return points;
+}
+
+/**
+ * Get info for displaying transfer progress on the map HUD.
+ *
+ * @param {import('../core/gameState.js').TransferState|null} transferState
+ * @param {number} timeElapsed  Current flight elapsed time.
+ * @returns {{ progress: number, etaStr: string, destName: string, originName: string }|null}
+ */
+export function getTransferProgressInfo(transferState, timeElapsed) {
+  if (!transferState) return null;
+
+  const totalTime = transferState.estimatedArrival - transferState.departureTime;
+  const elapsed = timeElapsed - transferState.departureTime;
+  const progress = totalTime > 0 ? Math.min(1, Math.max(0, elapsed / totalTime)) : 0;
+  const remaining = Math.max(0, transferState.estimatedArrival - timeElapsed);
+
+  return {
+    progress,
+    etaStr: formatTransferTime(remaining),
+    destName: _bodyDisplayName(transferState.destinationBodyId),
+    originName: _bodyDisplayName(transferState.originBodyId),
+    captureDV: formatDeltaV(transferState.captureDV),
+  };
+}
+
+/**
+ * Get all celestial bodies relevant for the current map view context.
+ * During transfer, returns destination body and any intermediate bodies.
+ * During orbit, returns child bodies and the parent.
+ *
+ * @param {string} bodyId  Current reference body.
+ * @param {import('../core/gameState.js').TransferState|null} transferState
+ * @returns {Array<{ bodyId: string, name: string, orbitRadius: number, angle: number, parentId: string|null }>}
+ */
+export function getMapCelestialBodies(bodyId, transferState) {
+  const bodies = [];
+
+  // Add child bodies of current reference body.
+  const children = BODY_CHILDREN[bodyId] || [];
+  for (const childId of children) {
+    const orbitR = BODY_ORBIT_RADIUS[childId] || 0;
+    bodies.push({
+      bodyId: childId,
+      name: _bodyDisplayName(childId),
+      orbitRadius: orbitR,
+      angle: _getBodyDisplayAngle(childId),
+      parentId: bodyId,
+    });
+  }
+
+  // During transfer, add destination body info.
+  if (transferState) {
+    const destId = transferState.destinationBodyId;
+    if (!bodies.find(b => b.bodyId === destId)) {
+      const orbitR = BODY_ORBIT_RADIUS[destId] || 0;
+      bodies.push({
+        bodyId: destId,
+        name: _bodyDisplayName(destId),
+        orbitRadius: orbitR,
+        angle: _getBodyDisplayAngle(destId),
+        parentId: BODY_PARENT[destId],
+      });
+    }
+  }
+
+  return bodies;
+}
+
+/**
+ * Human-readable display name for a celestial body.
+ */
+function _bodyDisplayName(bodyId) {
+  const names = {
+    SUN: 'Sun', MERCURY: 'Mercury', VENUS: 'Venus', EARTH: 'Earth',
+    MOON: 'Moon', MARS: 'Mars', PHOBOS: 'Phobos', DEIMOS: 'Deimos',
+  };
+  return names[bodyId] || bodyId;
+}
+
 
 // ---------------------------------------------------------------------------
 // Availability

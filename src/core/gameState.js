@@ -203,6 +203,20 @@ import {
  * @property {string|null}   currentBiome   - ID of the current altitude biome (e.g. 'LOW_ATMOSPHERE').
  * @property {string[]}      biomesVisited  - Unique biome IDs visited during this flight.
  * @property {import('./docking.js').DockingSystemState|null} dockingState - Docking system state, or null.
+ * @property {TransferState|null} transferState  - Active transfer data when in TRANSFER/CAPTURE phase.
+ */
+
+/**
+ * State tracking for an active interplanetary transfer.
+ * @typedef {Object} TransferState
+ * @property {string}   originBodyId      - Body the transfer departed from.
+ * @property {string}   destinationBodyId - Target body for the transfer.
+ * @property {number}   departureTime     - Flight elapsed time at departure (seconds).
+ * @property {number}   estimatedArrival  - Estimated flight elapsed time at arrival (seconds).
+ * @property {number}   departureDV       - Planned departure delta-v (m/s).
+ * @property {number}   captureDV         - Planned capture delta-v (m/s).
+ * @property {number}   totalDV           - Total planned delta-v (m/s).
+ * @property {{ x: number, y: number }[]} trajectoryPath - Predicted trajectory points for map rendering.
  */
 
 /**
@@ -543,6 +557,7 @@ export function createFlightState({
     currentBiome: null,
     biomesVisited: [],
     dockingState: null,
+    transferState: null,
   };
 }
 

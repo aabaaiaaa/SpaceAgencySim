@@ -36,6 +36,9 @@ import {
   generateOrbitPredictions,
   getMapTransferTargets,
   getMapTransferRoute,
+  generateTransferTrajectory,
+  getMapCelestialBodies,
+  getTransferProgressInfo,
 } from '../core/mapView.js';
 import {
   getApoapsisAltitude,
@@ -43,6 +46,7 @@ import {
   computeOrbitalElements,
 } from '../core/orbit.js';
 import { FlightPhase } from '../core/constants.js';
+import { SOI_RADIUS } from '../core/manoeuvre.js';
 
 // ---------------------------------------------------------------------------
 // Colour palette
@@ -64,7 +68,11 @@ const AP_COLOR          = 0xff6644;
 
 const TRANSFER_TARGET_COLOR = 0xffcc44;
 const TRANSFER_ROUTE_COLOR  = 0xffaa22;
+const TRANSFER_TRAJECTORY_COLOR = 0xff6644;
 const MOON_BODY_COLOR       = 0xa0a0a0;
+const DEST_BODY_COLOR       = 0xff8844;
+const SOI_BOUNDARY_COLOR    = 0x334455;
+const ASSIST_BODY_COLOR     = 0x88cc44;
 
 const BAND_COLORS = {
   LEO: 0x104020,
@@ -79,7 +87,7 @@ const ATMOSPHERE_VISUAL_HEIGHT = 70_000;
 // Label pool
 // ---------------------------------------------------------------------------
 
-const MAX_LABELS = 16;
+const MAX_LABELS = 24;
 
 // ---------------------------------------------------------------------------
 // Module-level state
@@ -374,6 +382,10 @@ export function renderMapFrame(ps, flightState, state, bodyId = 'EARTH') {
   const cy = h / 2;
   const R  = BODY_RADIUS[bodyId];
 
+  const isTransfer = flightState.phase === FlightPhase.TRANSFER ||
+                     flightState.phase === FlightPhase.CAPTURE;
+  const transferState = flightState.transferState;
+
   // Resolve target elements.
   let targetElements = null;
   if (_selectedTarget && state.orbitalObjects) {
@@ -385,7 +397,7 @@ export function renderMapFrame(ps, flightState, state, bodyId = 'EARTH') {
   if (_customViewRadius) {
     _viewRadius = _customViewRadius;
   } else {
-    _viewRadius = getViewRadius(_currentZoom, bodyId, flightState.orbitalElements, targetElements);
+    _viewRadius = getViewRadius(_currentZoom, bodyId, flightState.orbitalElements, targetElements, transferState);
   }
   const screenHalf = Math.min(w, h) / 2 * 0.88;
   const scale = screenHalf / _viewRadius; // pixels per metre
@@ -403,6 +415,13 @@ export function renderMapFrame(ps, flightState, state, bodyId = 'EARTH') {
 
   // 2b. Transfer targets and route.
   _drawTransferTargets(ps, flightState, cx, cy, scale, bodyId);
+
+  // 2c. During transfer: draw transfer trajectory, destination bodies, and SOI.
+  if (isTransfer) {
+    _drawTransferTrajectory(ps, flightState, cx, cy, scale, bodyId);
+    _drawCelestialBodies(flightState, cx, cy, scale, bodyId);
+    _drawTransferProgress(flightState, w, h);
+  }
 
   // 3. Orbital-object orbits and positions.
   _drawOrbitalObjects(state, flightState, cx, cy, scale, bodyId);
@@ -763,6 +782,140 @@ function _drawTransferTargets(ps, flightState, cx, cy, scale, bodyId) {
   }
 }
 
+/**
+ * Draw the predicted transfer trajectory during TRANSFER/CAPTURE phase.
+ * Shows the craft's projected path as a dotted/fading line.
+ */
+function _drawTransferTrajectory(ps, flightState, cx, cy, scale, bodyId) {
+  const points = generateTransferTrajectory(ps, bodyId, 120);
+  if (points.length < 2) return;
+
+  // Draw the trajectory as a fading line.
+  _transferGraphics.moveTo(
+    cx + points[0].x * scale,
+    cy - points[0].y * scale,
+  );
+  for (let i = 1; i < points.length; i++) {
+    _transferGraphics.lineTo(
+      cx + points[i].x * scale,
+      cy - points[i].y * scale,
+    );
+  }
+  _transferGraphics.stroke({
+    color: TRANSFER_TRAJECTORY_COLOR,
+    width: 2,
+    alpha: 0.6,
+  });
+
+  // Draw tick marks along the trajectory for time reference.
+  const tickInterval = Math.max(1, Math.floor(points.length / 12));
+  for (let i = tickInterval; i < points.length; i += tickInterval) {
+    const px = cx + points[i].x * scale;
+    const py = cy - points[i].y * scale;
+    const alpha = 0.7 - (i / points.length) * 0.5;
+    _transferGraphics.circle(px, py, 2);
+    _transferGraphics.fill({ color: TRANSFER_TRAJECTORY_COLOR, alpha });
+  }
+}
+
+/**
+ * Draw celestial bodies relevant during transfer (destination, intermediate bodies).
+ */
+function _drawCelestialBodies(flightState, cx, cy, scale, bodyId) {
+  const bodies = getMapCelestialBodies(bodyId, flightState.transferState);
+
+  for (const body of bodies) {
+    const sx = cx + body.orbitRadius * Math.cos(body.angle) * scale;
+    const sy = cy - body.orbitRadius * Math.sin(body.angle) * scale;
+
+    // Draw orbit circle for the body (dashed).
+    const orbitPxR = body.orbitRadius * scale;
+    if (orbitPxR > 5 && orbitPxR < window.innerWidth * 3) {
+      const segments = 72;
+      for (let i = 0; i < segments; i += 2) {
+        const a1 = (Math.PI * 2 * i) / segments;
+        const a2 = (Math.PI * 2 * (i + 1)) / segments;
+        _transferGraphics.moveTo(cx + orbitPxR * Math.cos(a1), cy - orbitPxR * Math.sin(a1));
+        _transferGraphics.lineTo(cx + orbitPxR * Math.cos(a2), cy - orbitPxR * Math.sin(a2));
+      }
+
+      const isDestination = flightState.transferState &&
+        body.bodyId === flightState.transferState.destinationBodyId;
+
+      _transferGraphics.stroke({
+        color: isDestination ? DEST_BODY_COLOR : SOI_BOUNDARY_COLOR,
+        width: isDestination ? 1.5 : 0.5,
+        alpha: isDestination ? 0.5 : 0.2,
+      });
+    }
+
+    // Body dot.
+    const isDestination = flightState.transferState &&
+      body.bodyId === flightState.transferState.destinationBodyId;
+    const bodyR = BODY_RADIUS[body.bodyId] || 1000;
+    const dotR = Math.max(4, Math.min(12, bodyR * scale));
+    const color = isDestination ? DEST_BODY_COLOR : MOON_BODY_COLOR;
+
+    _transferGraphics.circle(sx, sy, dotR);
+    _transferGraphics.fill(color);
+
+    // Label.
+    _useLabel(body.name, sx + dotR + 4, sy - 6, color);
+
+    // If destination, add a pulsing highlight ring.
+    if (isDestination) {
+      const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 400);
+      _transferGraphics.circle(sx, sy, dotR + 4 + pulse * 3);
+      _transferGraphics.stroke({ color: DEST_BODY_COLOR, width: 1.5, alpha: 0.3 + pulse * 0.3 });
+    }
+  }
+
+  // Draw SOI boundary circle of current body during transfer.
+  const soiR = SOI_RADIUS[bodyId];
+  if (soiR && soiR !== Infinity) {
+    const soiPx = soiR * scale;
+    if (soiPx > 10 && soiPx < window.innerWidth * 3) {
+      _transferGraphics.circle(cx, cy, soiPx);
+      _transferGraphics.stroke({ color: SOI_BOUNDARY_COLOR, width: 1, alpha: 0.3 });
+      _useLabel('SOI Boundary', cx + soiPx + 4, cy - 8, SOI_BOUNDARY_COLOR);
+    }
+  }
+}
+
+/**
+ * Draw transfer progress indicator (ETA, progress bar, destination info).
+ */
+function _drawTransferProgress(flightState, w, h) {
+  const info = getTransferProgressInfo(flightState.transferState, flightState.timeElapsed);
+  if (!info) return;
+
+  // Progress bar at the top of the screen.
+  const barW = 300;
+  const barH = 6;
+  const barX = (w - barW) / 2;
+  const barY = 60;
+
+  // Background.
+  _transferGraphics.rect(barX, barY, barW, barH);
+  _transferGraphics.fill({ color: 0x222233, alpha: 0.8 });
+
+  // Fill.
+  _transferGraphics.rect(barX, barY, barW * info.progress, barH);
+  _transferGraphics.fill({ color: TRANSFER_TRAJECTORY_COLOR, alpha: 0.9 });
+
+  // Labels.
+  _useLabel(
+    `${info.originName} → ${info.destName}`,
+    barX, barY - 16,
+    TRANSFER_TRAJECTORY_COLOR,
+  );
+  _useLabel(
+    `ETA: ${info.etaStr} — Capture Δv: ${info.captureDV}`,
+    barX, barY + barH + 4,
+    0xcccccc,
+  );
+}
+
 function _drawShadow(cx, cy, scale, R, timeElapsed) {
   _shadowGraphics.clear();
   if (!_showShadow) return;
@@ -796,9 +949,9 @@ function _onWheel(e) {
   }
   _customViewRadius *= factor;
 
-  // Clamp to reasonable bounds.
+  // Clamp to reasonable bounds — wider range to support interplanetary views.
   const minR = BODY_RADIUS.EARTH * 1.02;
-  const maxR = BODY_RADIUS.EARTH * 20;
+  const maxR = 300_000_000_000; // ~2 AU, enough for Mars transfers.
   _customViewRadius = Math.max(minR, Math.min(maxR, _customViewRadius));
 }
 

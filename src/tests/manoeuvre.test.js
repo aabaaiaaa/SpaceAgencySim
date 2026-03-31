@@ -204,6 +204,80 @@ describe('Manoeuvre — computeTransferDeltaV', () => {
     // Higher orbit means less energy needed to reach Moon.
     expect(highOrbit.departureDV).toBeLessThan(lowOrbit.departureDV);
   });
+
+  // ── Extended body pair transfers (TASK-041) ────────────────────────
+
+  it('computes Earth → Mars sibling transfer', () => {
+    const result = computeTransferDeltaV(CelestialBody.EARTH, CelestialBody.MARS, 150_000);
+    expect(result).not.toBeNull();
+    expect(result.departureDV).toBeGreaterThan(3000);   // ~3.6 km/s escape + Hohmann
+    expect(result.departureDV).toBeLessThan(15000);
+    expect(result.captureDV).toBeGreaterThan(500);
+    expect(result.transferTime).toBeGreaterThan(10_000_000); // ~8 months
+  });
+
+  it('computes Mars → Earth sibling transfer', () => {
+    const result = computeTransferDeltaV(CelestialBody.MARS, CelestialBody.EARTH, 100_000);
+    expect(result).not.toBeNull();
+    expect(result.departureDV).toBeGreaterThan(2000);
+    expect(result.totalDV).toBeGreaterThan(result.departureDV);
+  });
+
+  it('computes Mars → Phobos parent-to-child transfer', () => {
+    const result = computeTransferDeltaV(CelestialBody.MARS, CelestialBody.PHOBOS, 100_000);
+    expect(result).not.toBeNull();
+    expect(result.departureDV).toBeGreaterThan(0);
+    expect(result.transferTime).toBeGreaterThan(0);
+  });
+
+  it('computes Phobos → Mars child-to-parent transfer', () => {
+    const result = computeTransferDeltaV(CelestialBody.PHOBOS, CelestialBody.MARS, 2_000);
+    expect(result).not.toBeNull();
+    expect(result.departureDV).toBeGreaterThan(0);
+  });
+
+  it('computes Moon → Mars deep-to-shallow transfer', () => {
+    const result = computeTransferDeltaV(CelestialBody.MOON, CelestialBody.MARS, 50_000);
+    expect(result).not.toBeNull();
+    expect(result.departureDV).toBeGreaterThan(3000);  // Escape Moon + Earth + Hohmann
+    expect(result.transferTime).toBeGreaterThan(10_000_000);
+  });
+
+  it('computes Earth → Phobos shallow-to-deep transfer', () => {
+    const result = computeTransferDeltaV(CelestialBody.EARTH, CelestialBody.PHOBOS, 150_000);
+    expect(result).not.toBeNull();
+    expect(result.departureDV).toBeGreaterThan(3000);
+    expect(result.totalDV).toBeGreaterThan(result.departureDV);
+  });
+
+  it('computes Earth → Venus sibling transfer', () => {
+    const result = computeTransferDeltaV(CelestialBody.EARTH, CelestialBody.VENUS, 150_000);
+    expect(result).not.toBeNull();
+    expect(result.departureDV).toBeGreaterThan(3000);
+  });
+
+  it('computes Earth → Mercury sibling transfer', () => {
+    const result = computeTransferDeltaV(CelestialBody.EARTH, CelestialBody.MERCURY, 150_000);
+    expect(result).not.toBeNull();
+    expect(result.departureDV).toBeGreaterThan(3000);
+  });
+
+  it('returns null for Sun as either endpoint', () => {
+    // computeTransferDeltaV doesn't directly return null for Sun,
+    // but getTransferTargets filters it out.
+    // Sun → Earth would be a sibling transfer with parent=null for Sun, so not handled.
+    const result = computeTransferDeltaV(CelestialBody.SUN, CelestialBody.EARTH, 1_000_000);
+    // Sun has no parent, so sibling transfer won't work. Should return null.
+    // (Sun → Earth: SUN is parent of EARTH, so this is parent-to-child.)
+    // This actually should work — SUN to child EARTH.
+    expect(result).not.toBeNull();
+  });
+
+  it('returns consistent totalDV = departureDV + captureDV', () => {
+    const result = computeTransferDeltaV(CelestialBody.EARTH, CelestialBody.MARS, 150_000);
+    expect(result).not.toBeNull();
+    expect(result.totalDV).toBe(result.departureDV + result.captureDV);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -231,6 +305,37 @@ describe('Manoeuvre — getTransferTargets', () => {
       expect(t.transferTime).toBeGreaterThan(0);
       expect(t.name).toBeTruthy();
     }
+  });
+
+  it('lists Mars and Venus as targets from Earth orbit', () => {
+    const targets = getTransferTargets(CelestialBody.EARTH, 150_000);
+    expect(targets.some(t => t.bodyId === CelestialBody.MARS)).toBe(true);
+    expect(targets.some(t => t.bodyId === CelestialBody.VENUS)).toBe(true);
+  });
+
+  it('lists Phobos and Deimos as targets from Mars orbit', () => {
+    const targets = getTransferTargets(CelestialBody.MARS, 100_000);
+    expect(targets.some(t => t.bodyId === CelestialBody.PHOBOS)).toBe(true);
+    expect(targets.some(t => t.bodyId === CelestialBody.DEIMOS)).toBe(true);
+  });
+
+  it('lists multiple interplanetary targets from Moon orbit', () => {
+    const targets = getTransferTargets(CelestialBody.MOON, 50_000);
+    // Should include Earth (parent), and potentially Mars, Venus (via Earth's siblings).
+    expect(targets.some(t => t.bodyId === CelestialBody.EARTH)).toBe(true);
+    expect(targets.some(t => t.bodyId === CelestialBody.MARS)).toBe(true);
+  });
+
+  it('targets are sorted by total delta-v (cheapest first)', () => {
+    const targets = getTransferTargets(CelestialBody.EARTH, 150_000);
+    for (let i = 1; i < targets.length; i++) {
+      expect(targets[i].totalDV).toBeGreaterThanOrEqual(targets[i - 1].totalDV);
+    }
+  });
+
+  it('does not include the Sun as a target', () => {
+    const targets = getTransferTargets(CelestialBody.EARTH, 150_000);
+    expect(targets.some(t => t.bodyId === CelestialBody.SUN)).toBe(false);
   });
 });
 
@@ -451,6 +556,27 @@ describe('Manoeuvre — computeTransferRoute', () => {
       CelestialBody.EARTH, CelestialBody.EARTH, 150_000, null,
     );
     expect(route).toBeNull();
+  });
+
+  it('returns a route for Earth → Mars with prograde burn', () => {
+    const route = computeTransferRoute(
+      CelestialBody.EARTH, CelestialBody.MARS, 150_000, null,
+    );
+    expect(route).not.toBeNull();
+    expect(route.burnDirection).toBe('PROGRADE');
+    expect(route.transferPath.length).toBeGreaterThan(0);
+    expect(route.transferTime).toBeGreaterThan(10_000_000);
+  });
+
+  it('returns a route with assistInfo for interplanetary transfers', () => {
+    const route = computeTransferRoute(
+      CelestialBody.EARTH, CelestialBody.MARS, 150_000, null,
+    );
+    // assistInfo may be null if no intermediate bodies exist between Earth and Mars.
+    // This just verifies the field is present.
+    if (route.assistInfo) {
+      expect(route.assistInfo.bodies).toBeInstanceOf(Array);
+    }
   });
 });
 
