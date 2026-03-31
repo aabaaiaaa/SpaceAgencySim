@@ -598,8 +598,8 @@ export const CREW_ADMIN_TIER_FEATURES = Object.freeze({
   2: Object.freeze({
     label: 'Training Centre',
     features: Object.freeze([
-      'Assign crew to skill training between flights',
-      'Training grants XP each period',
+      'Assign crew to training courses (1 slot)',
+      'Course: $20k, 3 periods, +15 skill',
       'All Tier 1 features',
     ]),
   }),
@@ -608,6 +608,7 @@ export const CREW_ADMIN_TIER_FEATURES = Object.freeze({
     features: Object.freeze([
       'Recruit experienced crew (starting skills > 0)',
       'Advanced medical (recovery time reduced to 1/3)',
+      'Training slots increased to 3',
       'All Tier 2 features',
     ]),
   }),
@@ -652,19 +653,33 @@ export const TRACKING_STATION_TIER_FEATURES = Object.freeze({
 });
 
 /**
- * Training XP awarded per period to crew assigned to training.
- * At Tier 2+, crew in TRAINING status gain this much raw XP per period
- * in their assigned skill (subject to diminishing returns).
+ * Cost to enrol one astronaut in a training course.
+ * Charged upfront when training is assigned.
  * @type {number}
  */
-export const TRAINING_XP_PER_PERIOD = 4;
+export const TRAINING_COURSE_COST = 20_000;
 
 /**
- * Cost per period to keep one astronaut in training.
- * Charged alongside crew salaries during period advancement.
+ * Duration of a single training course in periods.
+ * The astronaut is unavailable for flights for this many periods.
  * @type {number}
  */
-export const TRAINING_COST_PER_PERIOD = 10_000;
+export const TRAINING_COURSE_DURATION = 3;
+
+/**
+ * Flat skill points awarded when a training course completes.
+ * Applied directly (not subject to diminishing returns) to the chosen skill,
+ * but still capped at 100.
+ * @type {number}
+ */
+export const TRAINING_SKILL_GAIN = 15;
+
+/**
+ * Maximum number of simultaneous training slots by Crew Admin tier.
+ * Tier 2 provides 1 slot, Tier 3 provides 3.
+ * @type {Readonly<Record<number, number>>}
+ */
+export const TRAINING_SLOTS_BY_TIER = Object.freeze({ 2: 1, 3: 3 });
 
 /**
  * Starting skill range for experienced crew (Tier 3 recruitment).

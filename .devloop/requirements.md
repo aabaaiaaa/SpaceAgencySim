@@ -238,7 +238,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Unlocked via tutorial mission introducing orbital gameplay (also awards basic docking port). Tier 1 ($200k): map view (local body only), see objects in orbit. Tier 2 ($500k): map view (solar system), track debris, predict weather windows. Tier 3 ($1M): deep space communication, transfer route planning, track distant bodies.
 
 ### TASK-036: Crew training system
-- **Status**: in-progress
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-034
 - **Description**: Requires Crew Admin Tier 2. Assign idle crew to training: pick skill (piloting/engineering/science). Cost: $20k per course. Duration: 3 periods. Gain: +15 in chosen skill. Crew status set to TRAINING (exists in enum), unavailable for flights. Training slots: 1 at tier 2, 3 at tier 3. Creates opportunity cost: best pilot unavailable while cross-training.

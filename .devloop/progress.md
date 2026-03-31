@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 69
-- **Completed**: 44
-- **Remaining**: 25
-- **Last Updated**: 2026-03-31T12:17:01.254Z
+- **Completed**: 45
+- **Remaining**: 24
+- **Last Updated**: 2026-03-31T14:13:57.489Z
 
 ## Iteration Log
 
@@ -367,4 +367,12 @@
 - **Exit Status**: success
 - **Tokens**: 5,390,287 total (78 in, 28,587 out, 92,887 cache-create, 5,268,735 cache-read)
 - **Cost**: $4.2731
+
+### Iteration 46 - 2026-03-31T14:05:41.167Z
+- **Task Completed**: TASK-036
+- **Summary**: Completed Crew training system
+- **Duration**: 495s
+- **Exit Status**: success
+- **Tokens**: 2,682,008 total (1,337 in, 18,951 out, 63,324 cache-create, 2,598,396 cache-read)
+- **Cost**: $2.3156
 

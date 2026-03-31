@@ -14,13 +14,13 @@
 
 import {
   hireCrew, fireCrew, getActiveCrew, getFullHistory, getAdjustedHireCost,
-  assignToTraining, cancelTraining, getTrainingCrew,
+  assignToTraining, cancelTraining, getTrainingCrew, getTrainingSlotInfo,
   hireExperiencedCrew, getExperiencedHireCost,
   payMedicalCare, payAdvancedMedicalCare, isCrewInjured,
 } from '../core/crew.js';
 import {
   AstronautStatus, FacilityId,
-  CREW_ADMIN_TIER_FEATURES, TRAINING_COST_PER_PERIOD,
+  CREW_ADMIN_TIER_FEATURES, TRAINING_COURSE_COST, TRAINING_COURSE_DURATION, TRAINING_SKILL_GAIN,
 } from '../core/constants.js';
 import { getFacilityTier } from '../core/construction.js';
 import { refreshTopBar } from './topbar.js';
@@ -930,7 +930,8 @@ function _renderActiveTab() {
     } else if (astronaut.trainingSkill) {
       const badge = document.createElement('span');
       badge.className = 'crew-training-badge';
-      badge.textContent = `Training: ${astronaut.trainingSkill}`;
+      const periodsLeft = Math.max(0, (astronaut.trainingEnds ?? 0) - (_state.currentPeriod ?? 0));
+      badge.textContent = `Training: ${astronaut.trainingSkill} (${periodsLeft} left)`;
       statusTd.appendChild(badge);
     } else {
       statusTd.textContent = 'Ready';
@@ -1207,13 +1208,21 @@ function _renderTrainingTab() {
   const panel = document.createElement('div');
   panel.className = 'training-panel';
 
+  // Slot info
+  const slotInfo = getTrainingSlotInfo(_state);
+  const currentPeriod = _state.currentPeriod ?? 0;
+
   // Info box
   const infoBox = document.createElement('div');
   infoBox.className = 'training-info-box';
   infoBox.innerHTML = `
-    Assign astronauts to skill training between flights. Each trainee gains XP in their
-    chosen skill every flight (period), using diminishing returns just like flight experience.
-    <div class="training-cost-note">Training cost: ${fmtCash(TRAINING_COST_PER_PERIOD)} per trainee per flight</div>
+    Enrol astronauts in training courses to improve a chosen skill.
+    <div class="training-cost-note">
+      Course cost: ${fmtCash(TRAINING_COURSE_COST)} &bull; Duration: ${TRAINING_COURSE_DURATION} flights &bull; Gain: +${TRAINING_SKILL_GAIN} skill
+    </div>
+    <div class="training-cost-note" style="margin-top:4px;">
+      Training slots: ${slotInfo.usedSlots} / ${slotInfo.maxSlots} in use
+    </div>
   `;
   panel.appendChild(infoBox);
 
@@ -1234,17 +1243,20 @@ function _renderTrainingTab() {
       name.textContent = astronaut.name;
       item.appendChild(name);
 
+      // Progress info: skill + periods remaining
+      const periodsLeft = (astronaut.trainingEnds ?? 0) - currentPeriod;
       const status = document.createElement('span');
       status.className = 'training-status';
-      status.textContent = `Training: ${astronaut.trainingSkill}`;
+      status.textContent = `${astronaut.trainingSkill} — ${Math.max(0, periodsLeft)} flight${periodsLeft !== 1 ? 's' : ''} remaining`;
       item.appendChild(status);
 
       const cancelBtn = document.createElement('button');
       cancelBtn.className = 'training-cancel-btn';
-      cancelBtn.textContent = 'Stop Training';
+      cancelBtn.textContent = 'Cancel Course';
       cancelBtn.addEventListener('click', () => {
         cancelTraining(_state, astronaut.id);
         _renderTrainingTab();
+        refreshTopBar(_state);
       });
       item.appendChild(cancelBtn);
 
@@ -1253,6 +1265,7 @@ function _renderTrainingTab() {
   }
 
   // Available for training
+  const slotsAvailable = slotInfo.availableSlots > 0;
   const activeCrew = getActiveCrew(_state);
   const availableForTraining = activeCrew.filter((a) => {
     if (a.trainingSkill) return false; // already training
@@ -1265,6 +1278,14 @@ function _renderTrainingTab() {
   availTitle.style.cssText = 'color: #a0aab8; font-size: 0.9rem; margin: 20px 0 10px;';
   availTitle.textContent = `Available for Training (${availableForTraining.length})`;
   panel.appendChild(availTitle);
+
+  if (!slotsAvailable && availableForTraining.length > 0) {
+    const slotMsg = document.createElement('p');
+    slotMsg.className = 'crew-empty-msg';
+    slotMsg.style.padding = '6px 0 12px';
+    slotMsg.textContent = 'All training slots are in use. Wait for a course to finish or upgrade Crew Admin.';
+    panel.appendChild(slotMsg);
+  }
 
   if (availableForTraining.length === 0) {
     const msg = document.createElement('p');
@@ -1296,11 +1317,13 @@ function _renderTrainingTab() {
 
       const assignBtn = document.createElement('button');
       assignBtn.className = 'training-assign-btn';
-      assignBtn.textContent = 'Start Training';
+      assignBtn.textContent = `Enrol (${fmtCash(TRAINING_COURSE_COST)})`;
+      assignBtn.disabled = !slotsAvailable;
       assignBtn.addEventListener('click', () => {
         const result = assignToTraining(_state, astronaut.id, select.value);
         if (result.success) {
           _renderTrainingTab();
+          refreshTopBar(_state);
         }
       });
       item.appendChild(assignBtn);

@@ -41,8 +41,8 @@ import { getFacilityTier } from './construction.js';
  * @property {number}   satelliteLeaseIncome    - Income from leased satellites this period.
  * @property {string[]} decommissionedSatellites - Satellite IDs that reached 0 health.
  * @property {string[]} healedCrewIds  - IDs of crew members whose injuries were cleared.
- * @property {number}   trainingCost  - Total crew training cost this period.
- * @property {Array<{id: string, name: string, skill: string, gain: number}>} trainees - Training progress.
+ * @property {number}   trainingCost  - Total crew training cost this period (0 — courses are paid upfront).
+ * @property {Array<{id: string, name: string, skill: string, gain: number, completed: boolean}>} trainees - Training status; completed entries received their skill gain.
  * @property {boolean} bankrupt        - True if the player is bankrupt after this period.
  */
 

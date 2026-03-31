@@ -22,12 +22,16 @@ import {
   HARD_LANDING_INJURY_MAX,
   EJECTION_INJURY_PERIODS,
   MEDICAL_CARE_COST,
-  TRAINING_XP_PER_PERIOD,
-  TRAINING_COST_PER_PERIOD,
+  TRAINING_COURSE_COST,
+  TRAINING_COURSE_DURATION,
+  TRAINING_SKILL_GAIN,
+  TRAINING_SLOTS_BY_TIER,
   EXPERIENCED_CREW_SKILL_RANGE,
   EXPERIENCED_HIRE_COST_MULTIPLIER,
+  FacilityId,
   getCrewCostModifier,
 } from './constants.js';
+import { getFacilityTier } from './construction.js';
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -76,6 +80,7 @@ function generateUUID() {
  * @property {{ piloting: number, engineering: number, science: number }} skills
  *           Skill levels (0–100). Gains apply diminishing returns.
  * @property {string|null}                   trainingSkill    - Skill being trained ('piloting', 'engineering', 'science'), or null.
+ * @property {number|null}                   trainingEnds     - Period number when training course completes, or null.
  */
 
 // ---------------------------------------------------------------------------
@@ -104,6 +109,7 @@ function createAstronaut({ name, salary = CREW_SALARY_PER_PERIOD, hireDate = new
     skills: skills ?? { piloting: 0, engineering: 0, science: 0 },
     injuryEnds: null,
     trainingSkill: null,
+    trainingEnds: null,
   };
 }
 
@@ -213,7 +219,10 @@ export function assignToCrew(state, astronautId, rocketId) {
   if (!astronaut || astronaut.status !== AstronautStatus.ACTIVE) return false;
   if (astronaut.injuryEnds != null && astronaut.injuryEnds > (state.currentPeriod ?? 0)) return false;
   // Cancel any active training when assigned to a rocket.
-  if (astronaut.trainingSkill) astronaut.trainingSkill = null;
+  if (astronaut.trainingSkill) {
+    astronaut.trainingSkill = null;
+    astronaut.trainingEnds = null;
+  }
   astronaut.assignedRocketId = rocketId;
   return true;
 }
@@ -583,15 +592,29 @@ export function getMaxCrewSkill(state, crewIds, skill) {
 // ---------------------------------------------------------------------------
 
 /**
- * Assign an astronaut to skill training.
+ * Get training slot info for the current Crew Admin tier.
  *
- * Requires the astronaut to be active, not injured, and not already assigned
- * to a rocket. Sets `trainingSkill` on the astronaut record.
+ * @param {import('./gameState.js').GameState} state
+ * @returns {{ maxSlots: number, usedSlots: number, availableSlots: number }}
+ */
+export function getTrainingSlotInfo(state) {
+  const tier = getFacilityTier(state, FacilityId.CREW_ADMIN);
+  const maxSlots = TRAINING_SLOTS_BY_TIER[tier] ?? 0;
+  const usedSlots = getTrainingCrew(state).length;
+  return { maxSlots, usedSlots, availableSlots: maxSlots - usedSlots };
+}
+
+/**
+ * Assign an astronaut to a training course.
+ *
+ * Requires the astronaut to be active, not injured, not assigned to a rocket,
+ * and a free training slot. Charges the course cost ($20k) upfront via spend().
+ * Sets `trainingSkill` and `trainingEnds` on the astronaut record.
  *
  * @param {import('./gameState.js').GameState} state
  * @param {string} astronautId
  * @param {'piloting'|'engineering'|'science'} skill
- * @returns {{ success: boolean, error?: string }}
+ * @returns {{ success: boolean, cost?: number, error?: string }}
  */
 export function assignToTraining(state, astronautId, skill) {
   const astronaut = state.crew.find((a) => a.id === astronautId);
@@ -603,13 +626,30 @@ export function assignToTraining(state, astronautId, skill) {
   if (astronaut.assignedRocketId) {
     return { success: false, error: 'Astronaut is assigned to a rocket. Unassign first.' };
   }
+  if (astronaut.trainingSkill) {
+    return { success: false, error: 'Astronaut is already in training.' };
+  }
 
+  // Check training slot availability
+  const { availableSlots } = getTrainingSlotInfo(state);
+  if (availableSlots <= 0) {
+    return { success: false, error: 'No training slots available. Upgrade Crew Admin for more slots.' };
+  }
+
+  // Charge course cost upfront
+  const ok = spend(state, TRAINING_COURSE_COST);
+  if (!ok) {
+    return { success: false, error: `Insufficient funds for training (need $${TRAINING_COURSE_COST.toLocaleString('en-US')}).` };
+  }
+
+  const currentPeriod = state.currentPeriod ?? 0;
   astronaut.trainingSkill = skill;
-  return { success: true };
+  astronaut.trainingEnds = currentPeriod + TRAINING_COURSE_DURATION;
+  return { success: true, cost: TRAINING_COURSE_COST };
 }
 
 /**
- * Remove an astronaut from training.
+ * Remove an astronaut from training (cancels in-progress course, no refund).
  *
  * @param {import('./gameState.js').GameState} state
  * @param {string} astronautId
@@ -619,22 +659,24 @@ export function cancelTraining(state, astronautId) {
   const astronaut = state.crew.find((a) => a.id === astronautId);
   if (!astronaut || !astronaut.trainingSkill) return false;
   astronaut.trainingSkill = null;
+  astronaut.trainingEnds = null;
   return true;
 }
 
 /**
- * Process training progress for all crew currently in training.
+ * Process training completions for all crew currently in training.
  * Called once per period advancement.
  *
- * Awards TRAINING_XP_PER_PERIOD in the assigned skill (with diminishing returns).
- * Returns the total training cost charged this period.
+ * Checks if any trainees have completed their course (currentPeriod >= trainingEnds).
+ * Completed trainees receive TRAINING_SKILL_GAIN (+15) in their chosen skill,
+ * capped at 100. No per-period cost — the course cost is paid upfront.
  *
  * @param {import('./gameState.js').GameState} state
- * @returns {{ trainingCost: number, trainees: Array<{id: string, name: string, skill: string, gain: number}> }}
+ * @returns {{ trainingCost: number, trainees: Array<{id: string, name: string, skill: string, gain: number, completed: boolean}> }}
  */
 export function processTraining(state) {
   const trainees = [];
-  let trainingCost = 0;
+  const currentPeriod = state.currentPeriod ?? 0;
 
   for (const astronaut of state.crew) {
     if (
@@ -642,25 +684,28 @@ export function processTraining(state) {
       !astronaut.trainingSkill
     ) continue;
 
-    // Skip injured crew — they can't train
-    if (astronaut.injuryEnds != null && astronaut.injuryEnds > (state.currentPeriod ?? 0)) continue;
-
     const skill = astronaut.trainingSkill;
-    const before = astronaut.skills?.[skill] ?? 0;
-    awardSkillXP(astronaut, skill, TRAINING_XP_PER_PERIOD);
-    const after = astronaut.skills[skill];
-    const gain = Math.round((after - before) * 10) / 10;
 
-    trainingCost += TRAINING_COST_PER_PERIOD;
-    trainees.push({ id: astronaut.id, name: astronaut.name, skill, gain });
+    // Check if course is complete
+    if (astronaut.trainingEnds != null && currentPeriod >= astronaut.trainingEnds) {
+      const before = astronaut.skills?.[skill] ?? 0;
+      if (!astronaut.skills) astronaut.skills = { piloting: 0, engineering: 0, science: 0 };
+      astronaut.skills[skill] = Math.min(100, before + TRAINING_SKILL_GAIN);
+      const gain = Math.round((astronaut.skills[skill] - before) * 10) / 10;
+
+      trainees.push({ id: astronaut.id, name: astronaut.name, skill, gain, completed: true });
+
+      // Clear training state
+      astronaut.trainingSkill = null;
+      astronaut.trainingEnds = null;
+    } else {
+      // Still in progress — report for display
+      trainees.push({ id: astronaut.id, name: astronaut.name, skill, gain: 0, completed: false });
+    }
   }
 
-  // Deduct training costs (mandatory — can go negative like other operating costs)
-  if (trainingCost > 0) {
-    state.money -= trainingCost;
-  }
-
-  return { trainingCost, trainees };
+  // No per-period cost; course cost is paid upfront in assignToTraining.
+  return { trainingCost: 0, trainees };
 }
 
 /**
