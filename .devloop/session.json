@@ -1,12 +1,12 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 16,
+  "lastIteration": 17,
   "startedAt": "2026-03-30T20:49:34.099Z",
   "activeTask": {
-    "taskId": "TASK-023",
-    "taskTitle": "Orbit entry and exit mechanics",
-    "iterationNumber": 16,
-    "startedAt": "2026-03-31T00:27:44.852Z"
+    "taskId": "TASK-024",
+    "taskTitle": "Orbital manoeuvres",
+    "iterationNumber": 17,
+    "startedAt": "2026-03-31T00:40:58.065Z"
   }
 }

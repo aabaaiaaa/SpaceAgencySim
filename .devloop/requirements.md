@@ -162,7 +162,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Implement orbit entry when craft's periapsis rises above minimum stable orbit altitude for that body — seamless transition with notification label. Player retains full engine control. Orbit exit (deorbit) shows brief warning, craft leaves orbital model, other craft no longer visible. Different celestial bodies have different named altitude bands. Integrate with flight phase state machine.
 
 ### TASK-024: Orbital manoeuvres
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-023, TASK-005
 - **Description**: No manoeuvre menu — all orbital changes done by hand. Normal mode: engine burns affect orbit (prograde raises opposite side, retrograde lowers). Docking mode: burns and RCS affect local position only within orbit slot band limits. Transfers: manually apply delta-v at correct orbital point. Map view shows target bodies with required delta-v for basic direct transfer. Route planning available in map view during orbit and transfer phases. Gravitational assists apply.

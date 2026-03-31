@@ -13,7 +13,7 @@
  * @module core/mapView
  */
 
-import { BODY_RADIUS, ALTITUDE_BANDS } from './constants.js';
+import { BODY_RADIUS, ALTITUDE_BANDS, FlightPhase } from './constants.js';
 import {
   getOrbitalStateAtTime,
   getOrbitalPeriod,
@@ -21,6 +21,13 @@ import {
   getApoapsisAltitude,
   computeOrbitalElements,
 } from './orbit.js';
+import {
+  getTransferTargets,
+  computeTransferRoute,
+  formatTransferTime,
+  formatDeltaV,
+  BODY_ORBIT_RADIUS,
+} from './manoeuvre.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -229,6 +236,93 @@ export function generateOrbitPredictions(elements, bodyId, currentTime, numOrbit
     predictions.push({ x: pos.x, y: pos.y, t });
   }
   return predictions;
+}
+
+// ---------------------------------------------------------------------------
+// Availability
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Transfer target info for map view
+// ---------------------------------------------------------------------------
+
+/**
+ * @typedef {Object} MapTransferTarget
+ * @property {string}  bodyId         Celestial body ID.
+ * @property {string}  name           Display name.
+ * @property {number}  departureDV    Departure delta-v (m/s).
+ * @property {number}  totalDV        Total delta-v (m/s).
+ * @property {number}  transferTime   Transfer time (seconds).
+ * @property {string}  departureDVStr Formatted departure delta-v string.
+ * @property {string}  totalDVStr     Formatted total delta-v string.
+ * @property {string}  transferTimeStr Formatted transfer time string.
+ * @property {{ x: number, y: number }}  position  Body-centred position for rendering.
+ * @property {number}  orbitRadius    Distance from parent body centre (m).
+ */
+
+/**
+ * Get transfer targets with formatted display data for the map view.
+ * Only available during ORBIT and TRANSFER phases.
+ *
+ * @param {string} bodyId             Current body.
+ * @param {number} altitude           Current orbital altitude (m).
+ * @param {string} phase              Current flight phase.
+ * @returns {MapTransferTarget[]}
+ */
+export function getMapTransferTargets(bodyId, altitude, phase) {
+  if (phase !== FlightPhase.ORBIT &&
+      phase !== FlightPhase.TRANSFER &&
+      phase !== FlightPhase.MANOEUVRE) {
+    return [];
+  }
+
+  const targets = getTransferTargets(bodyId, altitude);
+  return targets.map(t => {
+    const orbitR = BODY_ORBIT_RADIUS[t.bodyId] || 0;
+    // Position the target body indicator at its orbital distance.
+    // Use a fixed angle for now (right side of the map).
+    const angle = _getBodyDisplayAngle(t.bodyId);
+    return {
+      bodyId: t.bodyId,
+      name: t.name,
+      departureDV: t.departureDV,
+      totalDV: t.totalDV,
+      transferTime: t.transferTime,
+      departureDVStr: formatDeltaV(t.departureDV),
+      totalDVStr: formatDeltaV(t.totalDV),
+      transferTimeStr: formatTransferTime(t.transferTime),
+      position: {
+        x: orbitR * Math.cos(angle),
+        y: orbitR * Math.sin(angle),
+      },
+      orbitRadius: orbitR,
+    };
+  });
+}
+
+/**
+ * Get a route plan for display on the map.
+ *
+ * @param {string} fromBodyId
+ * @param {string} toBodyId
+ * @param {number} altitude
+ * @param {import('./orbit.js').OrbitalElements|null} craftElements
+ * @returns {import('./manoeuvre.js').TransferRoute|null}
+ */
+export function getMapTransferRoute(fromBodyId, toBodyId, altitude, craftElements) {
+  return computeTransferRoute(fromBodyId, toBodyId, altitude, craftElements);
+}
+
+/**
+ * Get a display angle for a body's position on the map.
+ * Uses a fixed angle per body for visual consistency.
+ */
+function _getBodyDisplayAngle(bodyId) {
+  switch (bodyId) {
+    case 'MOON':  return Math.PI * 0.25; // Upper-right
+    case 'EARTH': return Math.PI * 1.25; // Lower-left
+    default:      return 0;
+  }
 }
 
 // ---------------------------------------------------------------------------

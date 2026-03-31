@@ -34,12 +34,15 @@ import {
   getViewRadius,
   MapZoom,
   generateOrbitPredictions,
+  getMapTransferTargets,
+  getMapTransferRoute,
 } from '../core/mapView.js';
 import {
   getApoapsisAltitude,
   getPeriapsisAltitude,
   computeOrbitalElements,
 } from '../core/orbit.js';
+import { FlightPhase } from '../core/constants.js';
 
 // ---------------------------------------------------------------------------
 // Colour palette
@@ -58,6 +61,10 @@ const PREDICTION_COLOR  = 0x00ccff;
 const SHADOW_COLOR      = 0x000000;
 const PE_COLOR          = 0x44aaff;
 const AP_COLOR          = 0xff6644;
+
+const TRANSFER_TARGET_COLOR = 0xffcc44;
+const TRANSFER_ROUTE_COLOR  = 0xffaa22;
+const MOON_BODY_COLOR       = 0xa0a0a0;
 
 const BAND_COLORS = {
   LEO: 0x104020,
@@ -82,13 +89,14 @@ const MAX_LABELS = 16;
 let _mapRoot = null;
 
 // Graphics objects — cleared and redrawn each frame.
-let _bgGraphics      = null;
-let _bandsGraphics   = null;
-let _orbitsGraphics  = null;
-let _bodyGraphics    = null;
-let _shadowGraphics  = null;
-let _objectsGraphics = null;
-let _craftGraphics   = null;
+let _bgGraphics       = null;
+let _bandsGraphics    = null;
+let _orbitsGraphics   = null;
+let _bodyGraphics     = null;
+let _shadowGraphics   = null;
+let _objectsGraphics  = null;
+let _craftGraphics    = null;
+let _transferGraphics = null;
 
 /** Container for reusable PIXI.Text labels. */
 let _labelContainer = null;
@@ -102,6 +110,9 @@ let _viewRadius      = 10_000_000;
 let _customViewRadius = null;
 let _selectedTarget  = null;
 let _showShadow      = false;
+
+/** Currently selected transfer route target body ID. @type {string|null} */
+let _selectedTransferTarget = null;
 
 // Input handlers
 let _wheelHandler = null;
@@ -127,18 +138,20 @@ export function initMapRenderer() {
   _mapRoot.visible = false;
 
   // Layer order (bottom → top):
-  //   background → bands → orbits → body → shadow → objects → craft → labels
-  _bgGraphics      = new PIXI.Graphics();
-  _bandsGraphics   = new PIXI.Graphics();
-  _orbitsGraphics  = new PIXI.Graphics();
-  _bodyGraphics    = new PIXI.Graphics();
-  _shadowGraphics  = new PIXI.Graphics();
-  _objectsGraphics = new PIXI.Graphics();
-  _craftGraphics   = new PIXI.Graphics();
-  _labelContainer  = new PIXI.Container();
+  //   background → bands → transfer → orbits → body → shadow → objects → craft → labels
+  _bgGraphics       = new PIXI.Graphics();
+  _bandsGraphics    = new PIXI.Graphics();
+  _transferGraphics = new PIXI.Graphics();
+  _orbitsGraphics   = new PIXI.Graphics();
+  _bodyGraphics     = new PIXI.Graphics();
+  _shadowGraphics   = new PIXI.Graphics();
+  _objectsGraphics  = new PIXI.Graphics();
+  _craftGraphics    = new PIXI.Graphics();
+  _labelContainer   = new PIXI.Container();
 
   _mapRoot.addChild(_bgGraphics);
   _mapRoot.addChild(_bandsGraphics);
+  _mapRoot.addChild(_transferGraphics);
   _mapRoot.addChild(_orbitsGraphics);
   _mapRoot.addChild(_bodyGraphics);
   _mapRoot.addChild(_shadowGraphics);
@@ -219,19 +232,21 @@ export function destroyMapRenderer() {
     _mapRoot = null;
   }
 
-  _bgGraphics      = null;
-  _bandsGraphics   = null;
-  _orbitsGraphics  = null;
-  _bodyGraphics    = null;
-  _shadowGraphics  = null;
-  _objectsGraphics = null;
-  _craftGraphics   = null;
-  _labelContainer  = null;
-  _labelPool       = [];
+  _bgGraphics       = null;
+  _bandsGraphics    = null;
+  _orbitsGraphics   = null;
+  _bodyGraphics     = null;
+  _shadowGraphics   = null;
+  _objectsGraphics  = null;
+  _craftGraphics    = null;
+  _transferGraphics = null;
+  _labelContainer   = null;
+  _labelPool        = [];
 
-  _customViewRadius = null;
-  _selectedTarget   = null;
-  _showShadow       = false;
+  _customViewRadius        = null;
+  _selectedTarget          = null;
+  _selectedTransferTarget  = null;
+  _showShadow              = false;
 
   console.log('[Map Renderer] Destroyed');
 }
@@ -295,6 +310,44 @@ export function toggleMapShadow() {
   _showShadow = !_showShadow;
 }
 
+/**
+ * Cycle through transfer target bodies (for route planning).
+ *
+ * @param {string} bodyId  Current celestial body.
+ * @param {number} altitude  Current orbital altitude (m).
+ * @param {string} phase  Current flight phase.
+ * @returns {string|null}  New selected transfer target body ID.
+ */
+export function cycleTransferTarget(bodyId, altitude, phase) {
+  const targets = getMapTransferTargets(bodyId, altitude, phase);
+  if (targets.length === 0) {
+    _selectedTransferTarget = null;
+    return null;
+  }
+  const idx = targets.findIndex(t => t.bodyId === _selectedTransferTarget);
+  if (idx < 0) {
+    // Nothing selected — select the first.
+    _selectedTransferTarget = targets[0].bodyId;
+  } else if (idx === targets.length - 1) {
+    // Last one — deselect.
+    _selectedTransferTarget = null;
+  } else {
+    // Next target.
+    _selectedTransferTarget = targets[idx + 1].bodyId;
+  }
+  return _selectedTransferTarget;
+}
+
+/** @returns {string|null} Currently selected transfer target body ID. */
+export function getSelectedTransferTarget() {
+  return _selectedTransferTarget;
+}
+
+/** Set the selected transfer target body ID. */
+export function setSelectedTransferTarget(bodyId) {
+  _selectedTransferTarget = bodyId;
+}
+
 /** @returns {boolean} */
 export function isMapShadowEnabled() {
   return _showShadow;
@@ -347,6 +400,9 @@ export function renderMapFrame(ps, flightState, state, bodyId = 'EARTH') {
 
   // 2. Altitude bands.
   _drawBands(bodyId, cx, cy, scale);
+
+  // 2b. Transfer targets and route.
+  _drawTransferTargets(ps, flightState, cx, cy, scale, bodyId);
 
   // 3. Orbital-object orbits and positions.
   _drawOrbitalObjects(state, flightState, cx, cy, scale, bodyId);
@@ -605,6 +661,99 @@ function _drawOrbitEllipse(g, elements, bodyId, cx, cy, scale, color, width, alp
     g.lineTo(cx + path[i].x * scale, cy - path[i].y * scale);
   }
   g.stroke({ color, width, alpha });
+}
+
+function _drawTransferTargets(ps, flightState, cx, cy, scale, bodyId) {
+  _transferGraphics.clear();
+
+  const altitude = Math.max(0, ps.posY);
+  const phase = flightState.phase;
+  const targets = getMapTransferTargets(bodyId, altitude, phase);
+
+  if (targets.length === 0) return;
+
+  for (const target of targets) {
+    const isSelected = target.bodyId === _selectedTransferTarget;
+
+    // Draw the target body's orbit as a dashed circle indicator.
+    const orbitPxR = target.orbitRadius * scale;
+    if (orbitPxR > 10 && orbitPxR < window.innerWidth * 2) {
+      // Orbit circle for the target body (dashed via segments).
+      const segments = 72;
+      for (let i = 0; i < segments; i += 2) {
+        const a1 = (Math.PI * 2 * i) / segments;
+        const a2 = (Math.PI * 2 * (i + 1)) / segments;
+        _transferGraphics.moveTo(cx + orbitPxR * Math.cos(a1), cy - orbitPxR * Math.sin(a1));
+        _transferGraphics.lineTo(cx + orbitPxR * Math.cos(a2), cy - orbitPxR * Math.sin(a2));
+      }
+      _transferGraphics.stroke({
+        color: isSelected ? TRANSFER_TARGET_COLOR : 0x555533,
+        width: isSelected ? 1.5 : 0.5,
+        alpha: isSelected ? 0.6 : 0.2,
+      });
+    }
+
+    // Draw the target body as a dot at its position.
+    const sx = cx + target.position.x * scale;
+    const sy = cy - target.position.y * scale;
+    const dotR = isSelected ? 8 : 5;
+
+    // Body dot.
+    _transferGraphics.circle(sx, sy, dotR);
+    _transferGraphics.fill(isSelected ? TRANSFER_TARGET_COLOR : MOON_BODY_COLOR);
+
+    // Label with delta-v info.
+    if (isSelected) {
+      _useLabel(
+        `${target.name} — Δv ${target.departureDVStr} depart`,
+        sx + dotR + 6, sy - 14,
+        TRANSFER_TARGET_COLOR,
+      );
+      _useLabel(
+        `Total Δv ${target.totalDVStr} — ${target.transferTimeStr}`,
+        sx + dotR + 6, sy + 2,
+        TRANSFER_TARGET_COLOR,
+      );
+    } else {
+      _useLabel(
+        `${target.name} (Δv ${target.departureDVStr})`,
+        sx + dotR + 4, sy - 6,
+        0x888866,
+      );
+    }
+
+    // Draw transfer route arc if this target is selected.
+    if (isSelected && flightState.orbitalElements) {
+      const route = getMapTransferRoute(
+        bodyId, target.bodyId, altitude, flightState.orbitalElements,
+      );
+      if (route && route.transferPath.length > 1) {
+        const path = route.transferPath;
+        _transferGraphics.moveTo(
+          cx + path[0].x * scale,
+          cy - path[0].y * scale,
+        );
+        for (let i = 1; i < path.length; i++) {
+          _transferGraphics.lineTo(
+            cx + path[i].x * scale,
+            cy - path[i].y * scale,
+          );
+        }
+        _transferGraphics.stroke({
+          color: TRANSFER_ROUTE_COLOR,
+          width: 2,
+          alpha: 0.5,
+        });
+
+        // Burn direction label.
+        _useLabel(
+          `Burn: ${route.burnDirection} at ${route.burnPoint}`,
+          cx + 10, cy + Math.min(window.innerHeight, window.innerWidth) / 2 - 30,
+          TRANSFER_ROUTE_COLOR,
+        );
+      }
+    }
+  }
 }
 
 function _drawShadow(cx, cy, scale, R, timeElapsed) {

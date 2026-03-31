@@ -24,7 +24,16 @@
  * @module core/flightPhase
  */
 
-import { FlightPhase, MIN_ORBIT_ALTITUDE } from './constants.js';
+import { FlightPhase, MIN_ORBIT_ALTITUDE, ControlMode } from './constants.js';
+import {
+  isOrbitalBurnActive,
+  shouldEnterManoeuvre,
+  shouldExitManoeuvre,
+  shouldEnterTransfer,
+  isEscapeTrajectory,
+  checkSOITransition,
+} from './manoeuvre.js';
+import { checkOrbitStatus, computeOrbitalElements } from './orbit.js';
 
 // ---------------------------------------------------------------------------
 // Valid transition map
@@ -194,6 +203,59 @@ export function evaluateAutoTransitions(flightState, ps, orbitStatus) {
       if (result.success) {
         flightState.inOrbit = false;
         flightState.orbitalElements = null;
+        return flightState.phaseLog[flightState.phaseLog.length - 1];
+      }
+    }
+  }
+
+  // ORBIT → MANOEUVRE:  player starts an orbital burn in NORMAL mode.
+  if (phase === FlightPhase.ORBIT) {
+    if (shouldEnterManoeuvre(ps, flightState)) {
+      const result = transitionPhase(flightState, FlightPhase.MANOEUVRE, 'Orbital burn started');
+      return result.success ? flightState.phaseLog[flightState.phaseLog.length - 1] : null;
+    }
+  }
+
+  // MANOEUVRE → ORBIT:  burn completed and orbit is still valid.
+  if (phase === FlightPhase.MANOEUVRE) {
+    const bodyId = (flightState && flightState.bodyId) || 'EARTH';
+
+    // Check if craft is on escape trajectory → transition to TRANSFER.
+    if (shouldEnterTransfer(ps, flightState)) {
+      const result = transitionPhase(flightState, FlightPhase.ORBIT, 'Burn complete — transfer pending');
+      if (result.success) {
+        // Immediately try ORBIT → TRANSFER (allowed by the transition map).
+        const transferResult = transitionPhase(flightState, FlightPhase.TRANSFER, 'Transfer injection — escape trajectory');
+        if (transferResult.success) {
+          flightState.inOrbit = false;
+          return flightState.phaseLog[flightState.phaseLog.length - 1];
+        }
+      }
+    }
+
+    // Normal case: burn ended, orbit is still valid.
+    if (shouldExitManoeuvre(ps, flightState, bodyId)) {
+      // Recalculate orbital elements from current state vectors.
+      const newElements = computeOrbitalElements(
+        ps.posX, ps.posY, ps.velX, ps.velY, bodyId, flightState.timeElapsed,
+      );
+      const result = transitionPhase(flightState, FlightPhase.ORBIT, 'Burn complete');
+      if (result.success) {
+        if (newElements) {
+          flightState.orbitalElements = newElements;
+        }
+        return flightState.phaseLog[flightState.phaseLog.length - 1];
+      }
+    }
+  }
+
+  // TRANSFER → CAPTURE:  SOI change or approaching destination.
+  if (phase === FlightPhase.TRANSFER) {
+    const soiCheck = checkSOITransition(ps, flightState);
+    if (soiCheck.transition && soiCheck.newBodyId) {
+      const result = transitionPhase(flightState, FlightPhase.CAPTURE, soiCheck.reason);
+      if (result.success) {
+        flightState.bodyId = soiCheck.newBodyId;
         return flightState.phaseLog[flightState.phaseLog.length - 1];
       }
     }

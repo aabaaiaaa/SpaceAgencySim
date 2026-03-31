@@ -16,8 +16,8 @@
  */
 
 import { initFlightRenderer, destroyFlightRenderer, renderFlightFrame, hideFlightScene, showFlightScene, setFlightInputEnabled } from '../render/flight.js';
-import { initMapRenderer, destroyMapRenderer, renderMapFrame, showMapScene, hideMapScene, isMapVisible, cycleMapZoom, getMapZoomLevel, cycleMapTarget, getMapTarget, toggleMapShadow, setMapTarget } from '../render/map.js';
-import { MapZoom, MapThrustDir, computeOrbitalThrustAngle, isMapViewAvailable } from '../core/mapView.js';
+import { initMapRenderer, destroyMapRenderer, renderMapFrame, showMapScene, hideMapScene, isMapVisible, cycleMapZoom, getMapZoomLevel, cycleMapTarget, getMapTarget, toggleMapShadow, setMapTarget, cycleTransferTarget, getSelectedTransferTarget } from '../render/map.js';
+import { MapZoom, MapThrustDir, computeOrbitalThrustAngle, isMapViewAvailable, getMapTransferTargets } from '../core/mapView.js';
 import { warpToTarget } from '../core/orbit.js';
 import {
   createPhysicsState,
@@ -51,6 +51,12 @@ import {
   getDockingThrustDirections,
 } from '../core/controlMode.js';
 import { setMalfunctionMode, getMalfunctionMode } from '../core/malfunction.js';
+import {
+  recalculateOrbit,
+  isOrbitalBurnActive,
+  checkSOITransition,
+  isEscapeTrajectory,
+} from '../core/manoeuvre.js';
 
 // ---------------------------------------------------------------------------
 // Module state
@@ -1167,12 +1173,31 @@ function _evaluateFlightPhase() {
     orbitStatus = checkOrbitStatus(_ps.posX, _ps.posY, _ps.velX, _ps.velY, bodyId);
   }
 
+  // --- Continuous orbit recalculation during MANOEUVRE phase ---
+  // When the player is in MANOEUVRE (actively burning or just finished a burn),
+  // continuously update the orbital elements from state vectors so the map
+  // view orbit path updates in real-time.
+  if (_flightState.phase === FlightPhase.MANOEUVRE ||
+      (_flightState.phase === FlightPhase.ORBIT && isOrbitalBurnActive(_ps))) {
+    const newElements = recalculateOrbit(_ps, bodyId, _flightState.timeElapsed);
+    if (newElements) {
+      _flightState.orbitalElements = newElements;
+    } else {
+      // Orbit is no longer valid (escape trajectory) — clear elements
+      // but keep the phase for now (auto-transition will handle it).
+      _flightState.orbitalElements = null;
+    }
+  }
+
   // Detect REENTRY: if we're in ORBIT and periapsis drops below the minimum
   // orbit altitude, the player has initiated a de-orbit burn.
   // Show a brief warning before transitioning.
   if (_flightState.phase === FlightPhase.ORBIT && orbitStatus && !orbitStatus.valid) {
-    _showDeorbitWarning(bodyId);
-    return;
+    // Check if this is an escape trajectory (should go to TRANSFER, not REENTRY).
+    if (!isEscapeTrajectory(_ps, bodyId)) {
+      _showDeorbitWarning(bodyId);
+      return;
+    }
   }
 
   const transition = evaluateAutoTransitions(_flightState, _ps, orbitStatus);
@@ -1186,13 +1211,24 @@ function _evaluateFlightPhase() {
       _flightState.inOrbit = true;
       _flightState.orbitalElements = orbitStatus.elements;
       _flightState.orbitBandId = orbitStatus.altitudeBand ? orbitStatus.altitudeBand.id : null;
+    } else if (transition.to === FlightPhase.MANOEUVRE) {
+      _showPhaseNotification('Manoeuvre');
+      // Force warp to 1× during burns.
+      _applyTimeWarp(1);
+    } else if (transition.to === FlightPhase.TRANSFER) {
+      _showPhaseNotification('Transfer Injection');
+      _applyTimeWarp(1);
+    } else if (transition.to === FlightPhase.CAPTURE) {
+      _showPhaseNotification(`Entering ${_flightState.bodyId || 'destination'} SOI`);
     } else {
       _showPhaseNotification(getPhaseLabel(transition.to));
     }
   }
 
-  // Reset control mode when flight phase leaves ORBIT.
-  if (_ps.controlMode !== ControlMode.NORMAL) {
+  // Reset control mode when flight phase leaves ORBIT (but allow MANOEUVRE).
+  if (_ps.controlMode !== ControlMode.NORMAL &&
+      _flightState.phase !== FlightPhase.ORBIT &&
+      _flightState.phase !== FlightPhase.MANOEUVRE) {
     const wasReset = resetControlModeIfNeeded(_ps, _flightState, bodyId);
     if (wasReset) {
       _showPhaseNotification(CONTROL_MODE_TIPS[ControlMode.NORMAL]);
@@ -1321,6 +1357,21 @@ function _onKeyDown(e) {
       _handleWarpToTarget();
       return;
     }
+    // B — cycle transfer target (route planning).
+    if (e.code === 'KeyB') {
+      if (_flightState) {
+        const bodyId = _flightState.bodyId || 'EARTH';
+        const alt = Math.max(0, _ps.posY);
+        const selected = cycleTransferTarget(bodyId, alt, _flightState.phase);
+        if (selected) {
+          _showPhaseNotification(`Transfer target: ${selected}`);
+        } else {
+          _showPhaseNotification('Transfer target: none');
+        }
+        _updateMapHud();
+      }
+      return;
+    }
     // WASD — orbital-relative thrust (tracked separately, applied in _loop).
     const lower = e.key.toLowerCase();
     if (lower === 'w' || lower === 's' || lower === 'a' || lower === 'd') {
@@ -1391,7 +1442,7 @@ function _onKeyDown(e) {
   // This uses the same held-key mechanism as docking, but the
   // _applyNormalOrbitRcs function handles it in the loop.
   if (!_mapActive && _ps.controlMode === ControlMode.NORMAL &&
-      _flightState.phase === FlightPhase.ORBIT) {
+      (_flightState.phase === FlightPhase.ORBIT || _flightState.phase === FlightPhase.MANOEUVRE)) {
     const lower = e.key.toLowerCase();
     if (lower === 'w' || lower === 's' || lower === 'a' || lower === 'd') {
       _normalOrbitHeldKeys.add(lower);
@@ -1472,8 +1523,8 @@ function _toggleMapView() {
 function _applyMapThrust() {
   if (!_mapActive || !_ps || !_flightState) return;
 
-  // Only apply orbital thrust in ORBIT phase.
-  if (_flightState.phase !== FlightPhase.ORBIT) {
+  // Only apply orbital thrust in ORBIT or MANOEUVRE phase.
+  if (_flightState.phase !== FlightPhase.ORBIT && _flightState.phase !== FlightPhase.MANOEUVRE) {
     if (_mapThrusting) {
       _ps.throttle = 0;
       _mapThrusting = false;
@@ -1568,7 +1619,7 @@ function _applyNormalOrbitRcs() {
     _normalOrbitHeldKeys.clear();
     return;
   }
-  if (_flightState.phase !== FlightPhase.ORBIT) {
+  if (_flightState.phase !== FlightPhase.ORBIT && _flightState.phase !== FlightPhase.MANOEUVRE) {
     if (_normalOrbitThrusting) {
       _ps.throttle = 0;
       _normalOrbitThrusting = false;
@@ -1671,6 +1722,7 @@ function _buildMapHud() {
     <div>Zoom: <span class="map-zoom" data-field="zoom"></span></div>
     <div>Target: <span class="map-target" data-field="target">None</span></div>
     <div>Phase: <span data-field="phase"></span></div>
+    <div data-field="transfer-info" style="color:#ffcc44;margin-top:4px;display:none"></div>
   `;
   hud.appendChild(info);
 
@@ -1681,6 +1733,7 @@ function _buildMapHud() {
     '<kbd>M</kbd> Flight view · ' +
     '<kbd>Tab</kbd> Zoom · ' +
     '<kbd>T</kbd> Target · ' +
+    '<kbd>B</kbd> Transfer target · ' +
     '<kbd>G</kbd> Warp to target · ' +
     '<kbd>N</kbd> Shadow · ' +
     '<kbd>WASD</kbd> Orbital thrust (orbit only)';
@@ -1707,10 +1760,11 @@ function _buildMapHud() {
 function _updateMapHud() {
   if (!_mapHud || !_flightState) return;
 
-  const zoomEl   = _mapHud.querySelector('[data-field="zoom"]');
-  const targetEl = _mapHud.querySelector('[data-field="target"]');
-  const phaseEl  = _mapHud.querySelector('[data-field="phase"]');
-  const warpBtn  = _mapHud.querySelector('#map-warp-btn');
+  const zoomEl       = _mapHud.querySelector('[data-field="zoom"]');
+  const targetEl     = _mapHud.querySelector('[data-field="target"]');
+  const phaseEl      = _mapHud.querySelector('[data-field="phase"]');
+  const warpBtn      = _mapHud.querySelector('#map-warp-btn');
+  const transferEl   = _mapHud.querySelector('[data-field="transfer-info"]');
 
   if (zoomEl)   zoomEl.textContent = ZOOM_LABELS[getMapZoomLevel()] || getMapZoomLevel();
   if (phaseEl)  phaseEl.textContent = getPhaseLabel(_flightState.phase);
@@ -1723,6 +1777,25 @@ function _updateMapHud() {
   if (warpBtn) {
     warpBtn.classList.toggle('hidden',
       !targetObj || !_flightState.orbitalElements || _flightState.phase !== FlightPhase.ORBIT);
+  }
+
+  // Transfer target info.
+  if (transferEl) {
+    const transferTarget = getSelectedTransferTarget();
+    if (transferTarget && _ps) {
+      const bodyId = _flightState.bodyId || 'EARTH';
+      const alt = Math.max(0, _ps.posY);
+      const targets = getMapTransferTargets(bodyId, alt, _flightState.phase);
+      const t = targets.find(tt => tt.bodyId === transferTarget);
+      if (t) {
+        transferEl.textContent = `Route: ${t.name} — Depart Δv ${t.departureDVStr} — ${t.transferTimeStr}`;
+        transferEl.style.display = '';
+      } else {
+        transferEl.style.display = 'none';
+      }
+    } else {
+      transferEl.style.display = 'none';
+    }
   }
 }
 

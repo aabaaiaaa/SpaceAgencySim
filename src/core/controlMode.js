@@ -312,8 +312,10 @@ export function getDockingThrustDirections(ps, bodyId) {
 export function resetControlModeIfNeeded(ps, flightState, bodyId) {
   if (ps.controlMode === ControlMode.NORMAL) return false;
   if (flightState.phase === FlightPhase.ORBIT) return false;
+  // Allow docking mode to persist during MANOEUVRE (burn from docking is local only).
+  if (flightState.phase === FlightPhase.MANOEUVRE) return false;
 
-  // Phase left ORBIT — force back to normal.
+  // Phase left ORBIT / MANOEUVRE — force back to normal.
   exitDockingMode(ps, flightState, bodyId);
   ps.controlMode = ControlMode.NORMAL;
   return true;
