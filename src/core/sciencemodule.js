@@ -69,7 +69,8 @@
 import { getPartById, ActivationBehaviour } from '../data/parts.js';
 import { getInstrumentById, isInstrumentValidForBiome } from '../data/instruments.js';
 import { PartType, ScienceDataType, DIMINISHING_RETURNS,
-         ANALYSIS_TRANSMIT_YIELD_MIN, ANALYSIS_TRANSMIT_YIELD_MAX } from './constants.js';
+         ANALYSIS_TRANSMIT_YIELD_MIN, ANALYSIS_TRANSMIT_YIELD_MAX,
+         FacilityId, RD_LAB_SCIENCE_BONUS } from './constants.js';
 import { getBiome, getBiomeId, getScienceMultiplier } from './biomes.js';
 
 // ---------------------------------------------------------------------------
@@ -739,7 +740,24 @@ export function calculateYield(instrumentId, biomeId, biomeMultiplier, scienceSk
     ? DIMINISHING_RETURNS[priorCount]
     : 0;
 
-  return Math.round(baseYield * biomeMultiplier * scienceSkillBonus * diminishingReturn * 100) / 100;
+  // R&D Lab science yield bonus based on facility tier.
+  const rdLabBonus = _getRdLabScienceBonus(gameState);
+
+  return Math.round(baseYield * biomeMultiplier * scienceSkillBonus * diminishingReturn * (1 + rdLabBonus) * 100) / 100;
+}
+
+/**
+ * Get the R&D Lab science yield bonus based on the current facility tier.
+ *
+ * @param {import('./gameState.js').GameState|null} gameState
+ * @returns {number}  Bonus fraction (e.g. 0.10 for +10%).
+ */
+function _getRdLabScienceBonus(gameState) {
+  if (!gameState) return 0;
+  const fac = gameState.facilities?.[FacilityId.RD_LAB];
+  if (!fac?.built) return 0;
+  const tier = fac.tier ?? 1;
+  return RD_LAB_SCIENCE_BONUS[tier] ?? 0;
 }
 
 // ---------------------------------------------------------------------------

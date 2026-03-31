@@ -1,18 +1,31 @@
 /**
- * construction.js — Facility construction system.
+ * construction.js — Facility construction and upgrade system.
  *
- * Manages building new facilities on the hub.  Each facility is defined in
- * `FACILITY_DEFINITIONS` (constants.js) and tracked in `state.facilities`.
+ * Manages building new facilities on the hub and upgrading existing ones.
+ * Each facility is defined in `FACILITY_DEFINITIONS` (constants.js) and
+ * tracked in `state.facilities`.
  *
  * Tutorial mode:  Building is locked — facilities are awarded via tutorial
  *                 missions.  Only upgrades are available once a building
  *                 exists (Phase 5).
  * Non-tutorial:   All facilities available to build from the start.
  *
+ * R&D Lab special rules:
+ *   - Only facility that costs both money AND science points.
+ *   - Reputation discounts apply to the money portion only.
+ *   - Upgradeable through 3 tiers (each tier unlocks higher tech and
+ *     grants a larger science yield bonus).
+ *
  * @module core/construction
  */
 
-import { FACILITY_DEFINITIONS } from './constants.js';
+import {
+  FACILITY_DEFINITIONS,
+  FacilityId,
+  RD_LAB_TIER_DEFS,
+  RD_LAB_MAX_TIER,
+  getReputationDiscount,
+} from './constants.js';
 import { spend } from './finance.js';
 
 // ---------------------------------------------------------------------------
@@ -31,6 +44,18 @@ export function hasFacility(state, facilityId) {
 }
 
 /**
+ * Returns the current tier of a built facility, or 0 if not built.
+ *
+ * @param {import('./gameState.js').GameState} state
+ * @param {string} facilityId
+ * @returns {number}
+ */
+export function getFacilityTier(state, facilityId) {
+  if (!hasFacility(state, facilityId)) return 0;
+  return state.facilities[facilityId]?.tier ?? 1;
+}
+
+/**
  * Returns the definition for a facility, or undefined if not found.
  *
  * @param {string} facilityId
@@ -38,6 +63,19 @@ export function hasFacility(state, facilityId) {
  */
 export function getFacilityDef(facilityId) {
   return FACILITY_DEFINITIONS.find((f) => f.id === facilityId);
+}
+
+/**
+ * Compute the actual money cost after applying reputation discount.
+ * Reputation discounts apply only to the money portion of facility costs.
+ *
+ * @param {number} baseMoneyCost  The base money cost.
+ * @param {number} reputation     Current agency reputation (0–100).
+ * @returns {number}  Discounted money cost (floored to whole dollars).
+ */
+export function getDiscountedMoneyCost(baseMoneyCost, reputation) {
+  const discount = getReputationDiscount(reputation);
+  return Math.floor(baseMoneyCost * (1 - discount));
 }
 
 /**
@@ -61,10 +99,92 @@ export function canBuildFacility(state, facilityId) {
   if (state.tutorialMode) {
     return { allowed: false, reason: 'Locked in tutorial mode — complete missions to unlock.' };
   }
-  if (def.cost > 0 && state.money < def.cost) {
-    return { allowed: false, reason: `Insufficient funds (need $${def.cost.toLocaleString('en-US')}).` };
+  // Money check (with reputation discount).
+  if (def.cost > 0) {
+    const moneyCost = getDiscountedMoneyCost(def.cost, state.reputation ?? 50);
+    if (state.money < moneyCost) {
+      return { allowed: false, reason: `Insufficient funds (need $${moneyCost.toLocaleString('en-US')}).` };
+    }
+  }
+  // Science cost check (R&D Lab).
+  if ((def.scienceCost ?? 0) > 0) {
+    if ((state.sciencePoints ?? 0) < def.scienceCost) {
+      return {
+        allowed: false,
+        reason: `Insufficient science (need ${def.scienceCost}, have ${Math.floor(state.sciencePoints ?? 0)}).`,
+      };
+    }
   }
   return { allowed: true, reason: '' };
+}
+
+/**
+ * Check whether a facility can be upgraded to the next tier.
+ *
+ * Currently only the R&D Lab supports upgrades.
+ *
+ * @param {import('./gameState.js').GameState} state
+ * @param {string} facilityId
+ * @returns {{ allowed: boolean, reason: string, nextTier: number,
+ *             moneyCost: number, scienceCost: number, description: string }}
+ */
+export function canUpgradeFacility(state, facilityId) {
+  const noUpgrade = { allowed: false, reason: '', nextTier: 0, moneyCost: 0, scienceCost: 0, description: '' };
+
+  if (!hasFacility(state, facilityId)) {
+    return { ...noUpgrade, reason: 'Facility not built.' };
+  }
+
+  // Only R&D Lab is upgradeable for now.
+  if (facilityId !== FacilityId.RD_LAB) {
+    return { ...noUpgrade, reason: 'This facility cannot be upgraded.' };
+  }
+
+  const currentTier = getFacilityTier(state, facilityId);
+  const nextTier = currentTier + 1;
+
+  if (nextTier > RD_LAB_MAX_TIER) {
+    return { ...noUpgrade, reason: 'Already at maximum tier.' };
+  }
+
+  const tierDef = RD_LAB_TIER_DEFS[nextTier];
+  if (!tierDef) {
+    return { ...noUpgrade, reason: 'No upgrade definition found.' };
+  }
+
+  const moneyCost = getDiscountedMoneyCost(tierDef.moneyCost, state.reputation ?? 50);
+  const scienceCost = tierDef.scienceCost;
+
+  if (state.money < moneyCost) {
+    return {
+      ...noUpgrade,
+      reason: `Insufficient funds (need $${moneyCost.toLocaleString('en-US')}).`,
+      nextTier,
+      moneyCost,
+      scienceCost,
+      description: tierDef.description,
+    };
+  }
+
+  if ((state.sciencePoints ?? 0) < scienceCost) {
+    return {
+      ...noUpgrade,
+      reason: `Insufficient science (need ${scienceCost}, have ${Math.floor(state.sciencePoints ?? 0)}).`,
+      nextTier,
+      moneyCost,
+      scienceCost,
+      description: tierDef.description,
+    };
+  }
+
+  return {
+    allowed: true,
+    reason: '',
+    nextTier,
+    moneyCost,
+    scienceCost,
+    description: tierDef.description,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -72,7 +192,8 @@ export function canBuildFacility(state, facilityId) {
 // ---------------------------------------------------------------------------
 
 /**
- * Build a facility, deducting its cost from the player's cash.
+ * Build a facility, deducting its cost from the player's cash (and science
+ * for the R&D Lab).
  *
  * Returns `{ success, reason }`.  On success the facility is added to
  * `state.facilities` at tier 1.
@@ -88,14 +209,62 @@ export function buildFacility(state, facilityId) {
   }
 
   const def = getFacilityDef(facilityId);
+
+  // Deduct science cost first (R&D Lab).
+  if ((def.scienceCost ?? 0) > 0) {
+    state.sciencePoints = (state.sciencePoints ?? 0) - def.scienceCost;
+  }
+
+  // Deduct money cost (with reputation discount).
   if (def.cost > 0) {
-    const ok = spend(state, def.cost);
+    const moneyCost = getDiscountedMoneyCost(def.cost, state.reputation ?? 50);
+    const ok = spend(state, moneyCost);
     if (!ok) {
+      // Rollback science.
+      if ((def.scienceCost ?? 0) > 0) {
+        state.sciencePoints += def.scienceCost;
+      }
       return { success: false, reason: 'Insufficient funds.' };
     }
   }
 
   state.facilities[facilityId] = { built: true, tier: 1 };
+  return { success: true, reason: '' };
+}
+
+/**
+ * Upgrade a facility to the next tier, deducting costs.
+ *
+ * Currently only the R&D Lab supports upgrades.
+ *
+ * @param {import('./gameState.js').GameState} state
+ * @param {string} facilityId
+ * @returns {{ success: boolean, reason: string }}
+ */
+export function upgradeFacility(state, facilityId) {
+  const check = canUpgradeFacility(state, facilityId);
+  if (!check.allowed) {
+    return { success: false, reason: check.reason };
+  }
+
+  // Deduct science cost.
+  if (check.scienceCost > 0) {
+    state.sciencePoints = (state.sciencePoints ?? 0) - check.scienceCost;
+  }
+
+  // Deduct money cost (already discounted by canUpgradeFacility).
+  if (check.moneyCost > 0) {
+    const ok = spend(state, check.moneyCost);
+    if (!ok) {
+      // Rollback science.
+      if (check.scienceCost > 0) {
+        state.sciencePoints += check.scienceCost;
+      }
+      return { success: false, reason: 'Insufficient funds.' };
+    }
+  }
+
+  state.facilities[facilityId].tier = check.nextTier;
   return { success: true, reason: '' };
 }
 

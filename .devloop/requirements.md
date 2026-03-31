@@ -118,7 +118,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Science points plus funds unlock nodes in a technology tree. Visible from the start. Dual currency per node. R&D facility gates tiers. Tutorial unlocks shown as pre-unlocked nodes ("Unlocked via tutorial"). Starter parts do NOT appear in tree. Non-tutorial players can purchase tutorial-unlocked nodes through the tree normally, providing an alternative unlock path. 4 branches: Propulsion (Improved Spark → Reliant → Poodle → Ion → Nuclear), Structural (Medium tank → Radial decouplers/nose cones → Large tank/tubes → Docking ports → Station segments), Recovery (Parachute Mk2 → Drogue → Heat shield → Powered landing → Reusable booster), Science (Barometer → Radiation Detector → Gradiometer/Magnetometer → Science Lab → Deep space instruments). Uniform tier costs: T1=15sci/$50k, T2=30/$100k, T3=60/$200k, T4=120/$400k, T5=200/$750k.
 
 ### TASK-018: R&D Lab facility
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-017, TASK-007
 - **Description**: Introduce R&D Lab as gateway to tech tree. Unlocked via tutorial mission after first science collection (non-tutorial: available to build immediately). Tier 1 ($300k + 20 sci): tech tree tiers 1-2, 10% science yield bonus. Tier 2 ($600k + 100 sci): tiers 3-4, 20% bonus. Tier 3 ($1M + 200 sci): tier 5, 30% bonus, experimental parts. Only facility costing both money and science. Reputation discounts apply to money portion only.

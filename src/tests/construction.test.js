@@ -2,11 +2,15 @@
  * construction.test.js — Unit tests for the facility construction system.
  *
  * Tests cover:
- *   - hasFacility()     — checks whether a facility is built
- *   - getFacilityDef()  — looks up a facility definition by ID
- *   - canBuildFacility() — pre-condition checks (tutorial lock, funds, already built)
- *   - buildFacility()   — builds a facility and deducts cost
- *   - awardFacility()   — awards a facility for free (tutorial missions)
+ *   - hasFacility()        — checks whether a facility is built
+ *   - getFacilityDef()     — looks up a facility definition by ID
+ *   - getFacilityTier()    — returns the current tier of a built facility
+ *   - canBuildFacility()   — pre-condition checks (tutorial lock, funds, science, already built)
+ *   - buildFacility()      — builds a facility and deducts cost (money + science for R&D Lab)
+ *   - awardFacility()      — awards a facility for free (tutorial missions)
+ *   - canUpgradeFacility() — pre-condition checks for upgrading a facility
+ *   - upgradeFacility()    — upgrades a facility to the next tier
+ *   - getDiscountedMoneyCost() — reputation discount on money costs
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -14,11 +18,22 @@ import { createGameState } from '../core/gameState.js';
 import {
   hasFacility,
   getFacilityDef,
+  getFacilityTier,
   canBuildFacility,
   buildFacility,
   awardFacility,
+  canUpgradeFacility,
+  upgradeFacility,
+  getDiscountedMoneyCost,
 } from '../core/construction.js';
-import { FacilityId, FACILITY_DEFINITIONS } from '../core/constants.js';
+import {
+  FacilityId,
+  FACILITY_DEFINITIONS,
+  RD_LAB_TIER_DEFS,
+  RD_LAB_MAX_TIER,
+  STARTING_REPUTATION,
+  getReputationDiscount,
+} from '../core/constants.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -80,6 +95,50 @@ describe('getFacilityDef', () => {
       expect(getFacilityDef(def.id)).toBe(def);
     }
   });
+
+  it('all facility definitions have a scienceCost field', () => {
+    for (const def of FACILITY_DEFINITIONS) {
+      expect(typeof def.scienceCost).toBe('number');
+    }
+  });
+
+  it('only R&D Lab has a non-zero scienceCost', () => {
+    for (const def of FACILITY_DEFINITIONS) {
+      if (def.id === FacilityId.RD_LAB) {
+        expect(def.scienceCost).toBe(20);
+      } else {
+        expect(def.scienceCost).toBe(0);
+      }
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getFacilityTier
+// ---------------------------------------------------------------------------
+
+describe('getFacilityTier', () => {
+  it('returns 0 for an unbuilt facility', () => {
+    const state = freshState();
+    expect(getFacilityTier(state, FacilityId.RD_LAB)).toBe(0);
+  });
+
+  it('returns 1 for a freshly built facility', () => {
+    const state = nonTutorialState();
+    state.money = 1_000_000;
+    state.sciencePoints = 100;
+    buildFacility(state, FacilityId.RD_LAB);
+    expect(getFacilityTier(state, FacilityId.RD_LAB)).toBe(1);
+  });
+
+  it('returns the correct tier after upgrades', () => {
+    const state = nonTutorialState();
+    state.money = 5_000_000;
+    state.sciencePoints = 500;
+    buildFacility(state, FacilityId.RD_LAB);
+    upgradeFacility(state, FacilityId.RD_LAB);
+    expect(getFacilityTier(state, FacilityId.RD_LAB)).toBe(2);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -128,6 +187,23 @@ describe('canBuildFacility', () => {
     const state = nonTutorialState();
     state.money = 0;
     const result = canBuildFacility(state, FacilityId.LIBRARY);
+    expect(result.allowed).toBe(true);
+  });
+
+  it('blocks R&D Lab when insufficient science', () => {
+    const state = nonTutorialState();
+    state.money = 500_000;
+    state.sciencePoints = 10; // Need 20
+    const result = canBuildFacility(state, FacilityId.RD_LAB);
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toContain('Insufficient science');
+  });
+
+  it('allows R&D Lab with sufficient money and science', () => {
+    const state = nonTutorialState();
+    state.money = 500_000;
+    state.sciencePoints = 20;
+    const result = canBuildFacility(state, FacilityId.RD_LAB);
     expect(result.allowed).toBe(true);
   });
 });
@@ -183,6 +259,41 @@ describe('buildFacility', () => {
     const result = buildFacility(state, 'nonexistent');
     expect(result.success).toBe(false);
   });
+
+  it('builds R&D Lab and deducts both money and science', () => {
+    const state = nonTutorialState();
+    state.money = 500_000;
+    state.sciencePoints = 50;
+    const result = buildFacility(state, FacilityId.RD_LAB);
+    expect(result.success).toBe(true);
+    expect(hasFacility(state, FacilityId.RD_LAB)).toBe(true);
+    expect(state.money).toBe(200_000); // 500k - 300k
+    expect(state.sciencePoints).toBe(30); // 50 - 20
+  });
+
+  it('fails R&D Lab with insufficient science (money is sufficient)', () => {
+    const state = nonTutorialState();
+    state.money = 500_000;
+    state.sciencePoints = 10;
+    const result = buildFacility(state, FacilityId.RD_LAB);
+    expect(result.success).toBe(false);
+    expect(state.money).toBe(500_000); // unchanged
+    expect(state.sciencePoints).toBe(10); // unchanged
+  });
+
+  it('applies reputation discount to R&D Lab money cost', () => {
+    const state = nonTutorialState();
+    state.reputation = 100; // Max reputation
+    state.money = 500_000;
+    state.sciencePoints = 50;
+    const discount = getReputationDiscount(100);
+    const expectedMoneyCost = Math.floor(300_000 * (1 - discount));
+    const result = buildFacility(state, FacilityId.RD_LAB);
+    expect(result.success).toBe(true);
+    expect(state.money).toBe(500_000 - expectedMoneyCost);
+    // Science is NOT discounted.
+    expect(state.sciencePoints).toBe(30);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -219,6 +330,157 @@ describe('awardFacility', () => {
 });
 
 // ---------------------------------------------------------------------------
+// canUpgradeFacility
+// ---------------------------------------------------------------------------
+
+describe('canUpgradeFacility', () => {
+  it('rejects unbuilt facility', () => {
+    const state = nonTutorialState();
+    const result = canUpgradeFacility(state, FacilityId.RD_LAB);
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toContain('not built');
+  });
+
+  it('rejects non-upgradeable facility', () => {
+    const state = nonTutorialState();
+    const result = canUpgradeFacility(state, FacilityId.CREW_ADMIN);
+    // Crew Admin is not built in nonTutorialState, so it fails on "not built"
+    // Build it first, then check
+    state.money = 500_000;
+    buildFacility(state, FacilityId.CREW_ADMIN);
+    const result2 = canUpgradeFacility(state, FacilityId.CREW_ADMIN);
+    expect(result2.allowed).toBe(false);
+    expect(result2.reason).toContain('cannot be upgraded');
+  });
+
+  it('allows upgrading R&D Lab from tier 1 to tier 2', () => {
+    const state = nonTutorialState();
+    state.money = 2_000_000;
+    state.sciencePoints = 200;
+    buildFacility(state, FacilityId.RD_LAB);
+    const result = canUpgradeFacility(state, FacilityId.RD_LAB);
+    expect(result.allowed).toBe(true);
+    expect(result.nextTier).toBe(2);
+    expect(result.scienceCost).toBe(RD_LAB_TIER_DEFS[2].scienceCost);
+  });
+
+  it('rejects upgrade when insufficient funds', () => {
+    const state = nonTutorialState();
+    state.money = 400_000;
+    state.sciencePoints = 200;
+    buildFacility(state, FacilityId.RD_LAB);
+    // After build: money = 400k - 300k = 100k, not enough for tier 2 ($600k)
+    const result = canUpgradeFacility(state, FacilityId.RD_LAB);
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toContain('Insufficient funds');
+  });
+
+  it('rejects upgrade when insufficient science', () => {
+    const state = nonTutorialState();
+    state.money = 2_000_000;
+    state.sciencePoints = 50; // After build: 50 - 20 = 30, need 100 for tier 2
+    buildFacility(state, FacilityId.RD_LAB);
+    const result = canUpgradeFacility(state, FacilityId.RD_LAB);
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toContain('Insufficient science');
+  });
+
+  it('rejects upgrade past max tier', () => {
+    const state = nonTutorialState();
+    state.money = 10_000_000;
+    state.sciencePoints = 1000;
+    buildFacility(state, FacilityId.RD_LAB);
+    upgradeFacility(state, FacilityId.RD_LAB); // → Tier 2
+    upgradeFacility(state, FacilityId.RD_LAB); // → Tier 3
+    const result = canUpgradeFacility(state, FacilityId.RD_LAB);
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toContain('maximum tier');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// upgradeFacility
+// ---------------------------------------------------------------------------
+
+describe('upgradeFacility', () => {
+  it('upgrades R&D Lab from tier 1 to tier 2 and deducts costs', () => {
+    const state = nonTutorialState();
+    state.money = 2_000_000;
+    state.sciencePoints = 500;
+    buildFacility(state, FacilityId.RD_LAB);
+    const moneyBefore = state.money;
+    const scienceBefore = state.sciencePoints;
+    const result = upgradeFacility(state, FacilityId.RD_LAB);
+    expect(result.success).toBe(true);
+    expect(getFacilityTier(state, FacilityId.RD_LAB)).toBe(2);
+    const discountedCost = getDiscountedMoneyCost(RD_LAB_TIER_DEFS[2].moneyCost, state.reputation ?? 50);
+    expect(state.money).toBe(moneyBefore - discountedCost);
+    expect(state.sciencePoints).toBe(scienceBefore - RD_LAB_TIER_DEFS[2].scienceCost);
+  });
+
+  it('can upgrade R&D Lab through all 3 tiers', () => {
+    const state = nonTutorialState();
+    state.money = 10_000_000;
+    state.sciencePoints = 1000;
+    buildFacility(state, FacilityId.RD_LAB);
+    expect(getFacilityTier(state, FacilityId.RD_LAB)).toBe(1);
+    upgradeFacility(state, FacilityId.RD_LAB);
+    expect(getFacilityTier(state, FacilityId.RD_LAB)).toBe(2);
+    upgradeFacility(state, FacilityId.RD_LAB);
+    expect(getFacilityTier(state, FacilityId.RD_LAB)).toBe(3);
+  });
+
+  it('fails past max tier', () => {
+    const state = nonTutorialState();
+    state.money = 10_000_000;
+    state.sciencePoints = 1000;
+    buildFacility(state, FacilityId.RD_LAB);
+    upgradeFacility(state, FacilityId.RD_LAB);
+    upgradeFacility(state, FacilityId.RD_LAB);
+    const result = upgradeFacility(state, FacilityId.RD_LAB);
+    expect(result.success).toBe(false);
+    expect(getFacilityTier(state, FacilityId.RD_LAB)).toBe(3);
+  });
+
+  it('applies reputation discount to money portion only', () => {
+    const state = nonTutorialState();
+    state.reputation = 100;
+    state.money = 5_000_000;
+    state.sciencePoints = 500;
+    buildFacility(state, FacilityId.RD_LAB);
+    const moneyBefore = state.money;
+    const scienceBefore = state.sciencePoints;
+    upgradeFacility(state, FacilityId.RD_LAB);
+    const discount = getReputationDiscount(100);
+    const expectedMoneyCost = Math.floor(RD_LAB_TIER_DEFS[2].moneyCost * (1 - discount));
+    expect(state.money).toBe(moneyBefore - expectedMoneyCost);
+    // Science is NOT discounted
+    expect(state.sciencePoints).toBe(scienceBefore - RD_LAB_TIER_DEFS[2].scienceCost);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getDiscountedMoneyCost
+// ---------------------------------------------------------------------------
+
+describe('getDiscountedMoneyCost', () => {
+  it('returns full cost at starting reputation', () => {
+    expect(getDiscountedMoneyCost(100_000, STARTING_REPUTATION)).toBe(100_000);
+  });
+
+  it('returns discounted cost at high reputation', () => {
+    const cost = getDiscountedMoneyCost(100_000, 100);
+    const discount = getReputationDiscount(100);
+    expect(cost).toBe(Math.floor(100_000 * (1 - discount)));
+    expect(cost).toBeLessThan(100_000);
+  });
+
+  it('returns full cost below starting reputation', () => {
+    expect(getDiscountedMoneyCost(100_000, 30)).toBe(100_000);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Integration: starter facilities
 // ---------------------------------------------------------------------------
 
@@ -246,5 +508,36 @@ describe('starter facilities', () => {
   it('new state has tutorialMode = true by default', () => {
     const state = freshState();
     expect(state.tutorialMode).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// R&D Lab tier definitions
+// ---------------------------------------------------------------------------
+
+describe('R&D Lab tier definitions', () => {
+  it('has definitions for all 3 tiers', () => {
+    for (let tier = 1; tier <= RD_LAB_MAX_TIER; tier++) {
+      expect(RD_LAB_TIER_DEFS[tier]).toBeDefined();
+      expect(typeof RD_LAB_TIER_DEFS[tier].moneyCost).toBe('number');
+      expect(typeof RD_LAB_TIER_DEFS[tier].scienceCost).toBe('number');
+      expect(RD_LAB_TIER_DEFS[tier].description).toBeTruthy();
+    }
+  });
+
+  it('tier costs increase with each tier', () => {
+    expect(RD_LAB_TIER_DEFS[2].moneyCost).toBeGreaterThan(RD_LAB_TIER_DEFS[1].moneyCost);
+    expect(RD_LAB_TIER_DEFS[3].moneyCost).toBeGreaterThan(RD_LAB_TIER_DEFS[2].moneyCost);
+    expect(RD_LAB_TIER_DEFS[2].scienceCost).toBeGreaterThan(RD_LAB_TIER_DEFS[1].scienceCost);
+    expect(RD_LAB_TIER_DEFS[3].scienceCost).toBeGreaterThan(RD_LAB_TIER_DEFS[2].scienceCost);
+  });
+
+  it('tier 1 = $300k + 20 sci, tier 2 = $600k + 100 sci, tier 3 = $1M + 200 sci', () => {
+    expect(RD_LAB_TIER_DEFS[1].moneyCost).toBe(300_000);
+    expect(RD_LAB_TIER_DEFS[1].scienceCost).toBe(20);
+    expect(RD_LAB_TIER_DEFS[2].moneyCost).toBe(600_000);
+    expect(RD_LAB_TIER_DEFS[2].scienceCost).toBe(100);
+    expect(RD_LAB_TIER_DEFS[3].moneyCost).toBe(1_000_000);
+    expect(RD_LAB_TIER_DEFS[3].scienceCost).toBe(200);
   });
 });

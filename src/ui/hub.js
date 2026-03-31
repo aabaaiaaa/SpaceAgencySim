@@ -20,8 +20,12 @@
  */
 
 import { showHubScene, hideHubScene } from '../render/hub.js';
-import { FACILITY_DEFINITIONS } from '../core/constants.js';
-import { hasFacility, canBuildFacility, buildFacility } from '../core/construction.js';
+import { FACILITY_DEFINITIONS, FacilityId, RD_LAB_MAX_TIER } from '../core/constants.js';
+import {
+  hasFacility, canBuildFacility, buildFacility,
+  canUpgradeFacility, upgradeFacility, getFacilityTier,
+  getDiscountedMoneyCost,
+} from '../core/construction.js';
 import { isBankrupt } from '../core/finance.js';
 
 // ---------------------------------------------------------------------------
@@ -429,6 +433,79 @@ const HUB_STYLES = `
 
 .cp-close-btn:hover {
   background: #235a90;
+}
+
+/* ── Construction panel — science cost ────────────────────────────────────── */
+.cp-facility-cost-science {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #60c0f0;
+  white-space: nowrap;
+}
+
+.cp-cost-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  margin-right: 16px;
+}
+
+.cp-cost-group .cp-facility-cost {
+  margin-right: 0;
+}
+
+.cp-discount-note {
+  font-size: 0.7rem;
+  color: #50d870;
+  white-space: nowrap;
+}
+
+/* ── Construction panel — tier/upgrade ────────────────────────────────────── */
+.cp-tier-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #80c8ff;
+  margin-left: 8px;
+  padding: 1px 6px;
+  border: 1px solid rgba(128, 200, 255, 0.3);
+  border-radius: 3px;
+}
+
+.cp-upgrade-btn {
+  padding: 7px 18px;
+  background: #1a4070;
+  border: 1px solid #4080b0;
+  border-radius: 5px;
+  color: #b0d0f0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.cp-upgrade-btn:hover:not(:disabled) {
+  background: #235a90;
+}
+
+.cp-upgrade-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.cp-upgrade-desc {
+  font-size: 0.72rem;
+  color: #6090b0;
+  margin: 3px 0 0;
+  font-style: italic;
+}
+
+.cp-action-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
 }
 
 /* ── Building hit areas ───────────────────────────────────────────────────── */
@@ -1021,6 +1098,16 @@ function _openConstructionPanel(container) {
     const nameEl = document.createElement('p');
     nameEl.className = 'cp-facility-name';
     nameEl.textContent = def.name;
+
+    // Show tier badge for built, upgradeable facilities.
+    if (hasFacility(_state, def.id) && def.id === FacilityId.RD_LAB) {
+      const tier = getFacilityTier(_state, def.id);
+      const tierBadge = document.createElement('span');
+      tierBadge.className = 'cp-tier-badge';
+      tierBadge.textContent = `Tier ${tier}`;
+      nameEl.appendChild(tierBadge);
+    }
+
     info.appendChild(nameEl);
 
     const descEl = document.createElement('p');
@@ -1030,26 +1117,117 @@ function _openConstructionPanel(container) {
 
     item.appendChild(info);
 
-    // Cost column.
-    const costEl = document.createElement('span');
-    costEl.className = def.cost === 0
-      ? 'cp-facility-cost cp-facility-cost-free'
-      : 'cp-facility-cost';
-    costEl.textContent = def.cost === 0 ? 'Free' : `$${def.cost.toLocaleString('en-US')}`;
-    item.appendChild(costEl);
+    // ── Cost + Action columns ──────────────────────────────────────────
+    const isBuilt = hasFacility(_state, def.id);
 
-    // Action column: Built badge, Build button, or Locked badge.
-    if (hasFacility(_state, def.id)) {
-      const badge = document.createElement('span');
-      badge.className = 'cp-built-badge';
-      badge.textContent = 'Built';
-      item.appendChild(badge);
+    if (isBuilt) {
+      // Check if upgradeable (R&D Lab).
+      const upgrade = canUpgradeFacility(_state, def.id);
+      if (upgrade.nextTier > 0) {
+        // Show upgrade cost.
+        const costGroup = document.createElement('div');
+        costGroup.className = 'cp-cost-group';
+
+        const moneyCostEl = document.createElement('span');
+        moneyCostEl.className = 'cp-facility-cost';
+        moneyCostEl.textContent = `$${upgrade.moneyCost.toLocaleString('en-US')}`;
+        costGroup.appendChild(moneyCostEl);
+
+        if (upgrade.scienceCost > 0) {
+          const sciCostEl = document.createElement('span');
+          sciCostEl.className = 'cp-facility-cost-science';
+          sciCostEl.textContent = `${upgrade.scienceCost} science`;
+          costGroup.appendChild(sciCostEl);
+        }
+
+        item.appendChild(costGroup);
+
+        // Upgrade action.
+        const actionGroup = document.createElement('div');
+        actionGroup.className = 'cp-action-group';
+
+        const btn = document.createElement('button');
+        btn.className = 'cp-upgrade-btn';
+        btn.textContent = `Upgrade to Tier ${upgrade.nextTier}`;
+        btn.disabled = !upgrade.allowed;
+        if (!upgrade.allowed) {
+          btn.title = upgrade.reason;
+        }
+        btn.addEventListener('click', () => {
+          const result = upgradeFacility(_state, def.id);
+          if (result.success) {
+            console.log(`[Hub UI] Upgraded facility: ${def.name} → Tier ${upgrade.nextTier}`);
+            panel.remove();
+            _openConstructionPanel(container);
+          }
+        });
+        actionGroup.appendChild(btn);
+
+        if (upgrade.description) {
+          const descNote = document.createElement('p');
+          descNote.className = 'cp-upgrade-desc';
+          descNote.textContent = upgrade.description;
+          actionGroup.appendChild(descNote);
+        }
+
+        item.appendChild(actionGroup);
+      } else {
+        // Built, no upgrades available (or max tier).
+        const costEl = document.createElement('span');
+        costEl.className = 'cp-facility-cost cp-facility-cost-free';
+        costEl.textContent = '';
+        item.appendChild(costEl);
+
+        const badge = document.createElement('span');
+        badge.className = 'cp-built-badge';
+        badge.textContent = def.id === FacilityId.RD_LAB ? 'Max Tier' : 'Built';
+        item.appendChild(badge);
+      }
     } else if (_state.tutorialMode) {
+      // Cost column (informational).
+      const costEl = document.createElement('span');
+      costEl.className = 'cp-facility-cost';
+      costEl.textContent = '';
+      item.appendChild(costEl);
+
       const badge = document.createElement('span');
       badge.className = 'cp-locked-badge';
       badge.textContent = 'Locked — complete missions to unlock';
       item.appendChild(badge);
     } else {
+      // Not built, not tutorial — show build cost + button.
+      const costGroup = document.createElement('div');
+      costGroup.className = 'cp-cost-group';
+
+      const discountedCost = getDiscountedMoneyCost(def.cost, _state.reputation ?? 50);
+      const hasDiscount = def.cost > 0 && discountedCost < def.cost;
+
+      const moneyCostEl = document.createElement('span');
+      moneyCostEl.className = def.cost === 0
+        ? 'cp-facility-cost cp-facility-cost-free'
+        : 'cp-facility-cost';
+      moneyCostEl.textContent = def.cost === 0
+        ? 'Free'
+        : `$${discountedCost.toLocaleString('en-US')}`;
+      costGroup.appendChild(moneyCostEl);
+
+      if (hasDiscount) {
+        const discountNote = document.createElement('span');
+        discountNote.className = 'cp-discount-note';
+        discountNote.textContent = `(was $${def.cost.toLocaleString('en-US')})`;
+        costGroup.appendChild(discountNote);
+      }
+
+      if ((def.scienceCost ?? 0) > 0) {
+        const sciCostEl = document.createElement('span');
+        sciCostEl.className = 'cp-facility-cost-science';
+        sciCostEl.textContent = `${def.scienceCost} science`;
+        costGroup.appendChild(sciCostEl);
+      }
+
+      item.appendChild(costGroup);
+
+      // Build button.
       const check = canBuildFacility(_state, def.id);
       const btn = document.createElement('button');
       btn.className = 'cp-build-btn';

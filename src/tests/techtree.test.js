@@ -53,8 +53,8 @@ function readyState() {
   const state = createGameState();
   state.tutorialMode = false;
   state.money = 10_000_000;
-  buildFacility(state, FacilityId.RD_LAB);
   state.sciencePoints = 1000;
+  buildFacility(state, FacilityId.RD_LAB);
   return state;
 }
 
@@ -304,9 +304,21 @@ describe('Tech Tree Core Logic', () => {
       expect(getMaxResearchableTier(state)).toBe(0);
     });
 
-    it('returns correct max tier when R&D Lab is built', () => {
+    it('returns max tier 2 for R&D Lab tier 1', () => {
       const state = readyState();
-      expect(getMaxResearchableTier(state)).toBe(RD_TIER_MAX_TECH[1]);
+      expect(getMaxResearchableTier(state)).toBe(2);
+    });
+
+    it('returns max tier 4 for R&D Lab tier 2', () => {
+      const state = readyState();
+      state.facilities[FacilityId.RD_LAB].tier = 2;
+      expect(getMaxResearchableTier(state)).toBe(4);
+    });
+
+    it('returns max tier 5 for R&D Lab tier 3', () => {
+      const state = readyState();
+      state.facilities[FacilityId.RD_LAB].tier = 3;
+      expect(getMaxResearchableTier(state)).toBe(5);
     });
   });
 
@@ -438,8 +450,9 @@ describe('Tech Tree Core Logic', () => {
       expect(result.unlockedParts).toHaveLength(0);
     });
 
-    it('can chain-research a full branch', () => {
+    it('can chain-research a full branch (R&D Lab tier 3)', () => {
       const state = readyState();
+      state.facilities[FacilityId.RD_LAB].tier = 3;
       state.sciencePoints = 10_000;
       state.money = 50_000_000;
 
@@ -449,6 +462,19 @@ describe('Tech Tree Core Logic', () => {
         expect(result.success).toBe(true);
       }
       expect(state.techTree.researched).toHaveLength(5);
+    });
+
+    it('blocks tier 3+ nodes when R&D Lab is tier 1', () => {
+      const state = readyState();
+      state.sciencePoints = 10_000;
+      state.money = 50_000_000;
+      // Research T1 and T2 (allowed at R&D Lab tier 1)
+      researchNode(state, 'prop-t1');
+      researchNode(state, 'prop-t2');
+      // T3 should be blocked — R&D Lab tier 1 only allows tech tiers 1–2
+      const result = canResearchNode(state, 'prop-t3');
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toContain('upgraded');
     });
 
     it('handles missing techTree gracefully on older saves', () => {

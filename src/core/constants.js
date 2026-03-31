@@ -252,12 +252,15 @@ export const FacilityId = Object.freeze({
  * Static definitions for every buildable facility.
  * `cost` is the base build cost in dollars.  `starter` facilities are
  * pre-built at tier 1 in every new game (both tutorial and non-tutorial).
+ * `scienceCost` is the science-point cost to build (default 0; only the
+ * R&D Lab costs science).
  *
  * @type {ReadonlyArray<Readonly<{
  *   id: string,
  *   name: string,
  *   description: string,
  *   cost: number,
+ *   scienceCost: number,
  *   starter: boolean,
  * }>>}
  */
@@ -267,6 +270,7 @@ export const FACILITY_DEFINITIONS = Object.freeze([
     name:        'Launch Pad',
     description: 'Launch rockets into space.',
     cost:        0,
+    scienceCost: 0,
     starter:     true,
   }),
   Object.freeze({
@@ -274,6 +278,7 @@ export const FACILITY_DEFINITIONS = Object.freeze([
     name:        'Vehicle Assembly Building',
     description: 'Design and assemble rockets.',
     cost:        0,
+    scienceCost: 0,
     starter:     true,
   }),
   Object.freeze({
@@ -281,6 +286,7 @@ export const FACILITY_DEFINITIONS = Object.freeze([
     name:        'Mission Control Centre',
     description: 'Accept contracts and monitor missions.',
     cost:        0,
+    scienceCost: 0,
     starter:     true,
   }),
   Object.freeze({
@@ -288,6 +294,7 @@ export const FACILITY_DEFINITIONS = Object.freeze([
     name:        'Crew Administration',
     description: 'Hire, manage, and train astronauts.',
     cost:        100_000,
+    scienceCost: 0,
     starter:     false,
   }),
   Object.freeze({
@@ -295,6 +302,7 @@ export const FACILITY_DEFINITIONS = Object.freeze([
     name:        'Tracking Station',
     description: 'Track orbital objects and plan transfers.',
     cost:        200_000,
+    scienceCost: 0,
     starter:     false,
   }),
   Object.freeze({
@@ -302,6 +310,7 @@ export const FACILITY_DEFINITIONS = Object.freeze([
     name:        'R&D Lab',
     description: 'Research new technologies and unlock advanced parts.',
     cost:        300_000,
+    scienceCost: 20,
     starter:     false,
   }),
   Object.freeze({
@@ -309,6 +318,7 @@ export const FACILITY_DEFINITIONS = Object.freeze([
     name:        'Satellite Network Operations Centre',
     description: 'Manage satellite networks and orbital infrastructure.',
     cost:        400_000,
+    scienceCost: 0,
     starter:     false,
   }),
   Object.freeze({
@@ -316,6 +326,7 @@ export const FACILITY_DEFINITIONS = Object.freeze([
     name:        'Library',
     description: 'View agency statistics, records, and knowledge.',
     cost:        0,
+    scienceCost: 0,
     starter:     false,
   }),
 ]);
@@ -537,18 +548,71 @@ export const ANALYSIS_TRANSMIT_YIELD_MAX = 0.60;
 /**
  * Maximum tech tier accessible per R&D Lab facility tier.
  *
- * R&D Lab tier 1 grants access to all tech tiers (1–5) since facility
- * upgrades are not yet implemented.  When facility upgrades are added,
- * this mapping can be tightened (e.g. tier 1 → T1–T2, tier 2 → T3–T4,
- * tier 3 → T5).
+ *   R&D Lab Tier 1 → tech tiers 1–2
+ *   R&D Lab Tier 2 → tech tiers 3–4
+ *   R&D Lab Tier 3 → tech tier 5
  *
  * @type {Readonly<Record<number, number>>}
  */
 export const RD_TIER_MAX_TECH = Object.freeze({
-  1: 5,
-  2: 5,
+  1: 2,
+  2: 4,
   3: 5,
 });
+
+// ---------------------------------------------------------------------------
+// R&D Lab Upgrade Definitions
+// ---------------------------------------------------------------------------
+
+/**
+ * R&D Lab science yield bonus per facility tier.
+ * Applied as a multiplier: `yield *= (1 + bonus)`.
+ *
+ * @type {Readonly<Record<number, number>>}
+ */
+export const RD_LAB_SCIENCE_BONUS = Object.freeze({
+  0: 0,     // No lab built
+  1: 0.10,  // Tier 1: +10 %
+  2: 0.20,  // Tier 2: +20 %
+  3: 0.30,  // Tier 3: +30 %
+});
+
+/**
+ * Upgrade cost definitions for each R&D Lab tier.
+ *
+ * Tier 1 is the initial build.  Tiers 2–3 are upgrades.
+ * The R&D Lab is the only facility that costs both money AND science.
+ * Reputation discounts apply to the money portion only.
+ *
+ * @type {Readonly<Record<number, Readonly<{
+ *   moneyCost: number,
+ *   scienceCost: number,
+ *   description: string
+ * }>>>}
+ */
+export const RD_LAB_TIER_DEFS = Object.freeze({
+  1: Object.freeze({ moneyCost: 300_000,   scienceCost: 20,  description: 'Tech tiers 1–2, 10% science bonus' }),
+  2: Object.freeze({ moneyCost: 600_000,   scienceCost: 100, description: 'Tech tiers 3–4, 20% science bonus' }),
+  3: Object.freeze({ moneyCost: 1_000_000, scienceCost: 200, description: 'Tier 5, 30% science bonus, experimental parts' }),
+});
+
+/** Maximum upgrade tier for the R&D Lab. */
+export const RD_LAB_MAX_TIER = 3;
+
+/**
+ * Calculate the reputation discount fraction for facility construction.
+ *
+ * Discount scales linearly from 0 % at reputation 50 to 25 % at reputation 100.
+ * Below the starting reputation (50), no discount is given.
+ *
+ *   discount = max(0, reputation − 50) / 200
+ *
+ * @param {number} reputation  Current agency reputation (0–100).
+ * @returns {number}  Discount fraction (0.0–0.25).
+ */
+export function getReputationDiscount(reputation) {
+  return Math.max(0, reputation - STARTING_REPUTATION) / 200;
+}
 
 // ---------------------------------------------------------------------------
 // Orbit Segments
