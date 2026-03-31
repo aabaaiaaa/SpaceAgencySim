@@ -10,6 +10,7 @@ import { initVabUI, resetVabUI } from './vab.js';
 import { initCrewAdminUI, destroyCrewAdminUI } from './crewAdmin.js';
 import { initMissionControlUI, destroyMissionControlUI } from './missionControl.js';
 import { initLaunchPadUI, destroyLaunchPadUI } from './launchPad.js';
+import { initSatelliteOpsUI, destroySatelliteOpsUI } from './satelliteOps.js';
 import { stopFlightScene } from './flightController.js';
 import { initTopBar, destroyTopBar, refreshTopBar } from './topbar.js';
 import { showVabScene, hideVabScene } from '../render/vab.js';
@@ -45,6 +46,12 @@ let _missionControlOpen = false;
  * Used to guard against double-mounting.
  */
 let _launchPadOpen = false;
+
+/**
+ * True while the Satellite Ops screen is open.
+ * Used to guard against double-mounting.
+ */
+let _satelliteOpsOpen = false;
 
 /**
  * The #ui-overlay container, stored so _handleExitToMenu can re-mount the
@@ -259,6 +266,28 @@ function _handleNavigation(container, state, destination) {
     }
 
     console.log('[UI] Navigated to Launch Pad');
+    return;
+  }
+
+  if (destination === 'satellite-ops') {
+    // Tear down the hub overlay and show the Satellite Ops screen.
+    destroyHubUI();
+
+    if (!_satelliteOpsOpen) {
+      initSatelliteOpsUI(container, state, {
+        onBack: () => {
+          _satelliteOpsOpen = false;
+          showHubScene();
+          initHubUI(container, state, (dest) => {
+            _handleNavigation(container, state, dest);
+          });
+          console.log('[UI] Returned to hub from Satellite Ops');
+        },
+      });
+      _satelliteOpsOpen = true;
+    }
+
+    console.log('[UI] Navigated to Satellite Ops');
     return;
   }
 

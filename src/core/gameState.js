@@ -244,6 +244,7 @@ import {
  *                                                 pair has been collected, for diminishing-return
  *                                                 calculations.
  * @property {TechTreeState}   techTree          - Technology tree research progress.
+ * @property {SatelliteNetworkState} satelliteNetwork - Deployed satellite network state.
  */
 
 /**
@@ -251,6 +252,27 @@ import {
  * @typedef {Object} TechTreeState
  * @property {string[]}  researched           - Node IDs that have been explicitly researched.
  * @property {string[]}  unlockedInstruments  - Instrument IDs unlocked via tech tree research.
+ */
+
+/**
+ * Metadata for a deployed satellite in the network.
+ * Linked to an OrbitalObject by `orbitalObjectId`.
+ * @typedef {Object} SatelliteRecord
+ * @property {string}      id                - Unique satellite record ID.
+ * @property {string}      orbitalObjectId   - ID of the corresponding OrbitalObject.
+ * @property {string}      satelliteType     - SatelliteType enum value (or 'GENERIC' for untyped).
+ * @property {string}      partId            - Part definition ID used (e.g. 'satellite-comm').
+ * @property {string}      bodyId            - Celestial body this satellite orbits.
+ * @property {string}      bandId            - Altitude band ID at deployment (e.g. 'LEO').
+ * @property {number}      health            - Current health (0–100). Degrades each period.
+ * @property {boolean}     autoMaintain      - If true, pay per-period maintenance cost to heal.
+ * @property {number}      deployedPeriod    - Period when this satellite was deployed.
+ */
+
+/**
+ * Top-level satellite network state.
+ * @typedef {Object} SatelliteNetworkState
+ * @property {SatelliteRecord[]} satellites  - All deployed satellite records.
  */
 
 // ---------------------------------------------------------------------------
@@ -334,6 +356,11 @@ export function createGameState() {
     techTree: {
       researched: [],
       unlockedInstruments: [],
+    },
+
+    // Satellite network — tracks deployed satellites and their health/metadata.
+    satelliteNetwork: {
+      satellites: [],
     },
   };
 }

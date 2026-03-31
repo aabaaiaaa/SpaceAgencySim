@@ -254,12 +254,14 @@ export function activateCurrentStage(ps, assembly, stagingConfig, flightState) {
         // SATELLITE_RELEASED event so mission objectives can be checked.
         const separateVelocity = Math.hypot(ps.velX, ps.velY);
         for (const frag of fragments) {
-          if (_fragmentContainsSatellite(frag, assembly)) {
+          const fragSatPartId = _getFragmentSatellitePartId(frag, assembly);
+          if (fragSatPartId) {
             _emitEvent(flightState, {
               type:        'SATELLITE_RELEASED',
               time,
               altitude,
               velocity:    separateVelocity,
+              partId:      fragSatPartId,
               description: `Satellite detached at ${altitude.toFixed(0)} m.`,
             });
             break; // Only emit one event per stage fire.
@@ -329,6 +331,7 @@ export function activateCurrentStage(ps, assembly, stagingConfig, flightState) {
           time,
           altitude,
           velocity:    releaseVelocity,
+          partId:      placed.partId,
           description: `Satellite released at ${altitude.toFixed(0)} m.`,
         });
         break;
@@ -441,12 +444,14 @@ export function activatePartDirect(ps, assembly, flightState, instanceId) {
       // SATELLITE_RELEASED event so mission objectives can be checked.
       const directSeparateVelocity = Math.hypot(ps.velX, ps.velY);
       for (const frag of fragments) {
-        if (_fragmentContainsSatellite(frag, assembly)) {
+        const directFragSatPartId = _getFragmentSatellitePartId(frag, assembly);
+        if (directFragSatPartId) {
           _emitEvent(flightState, {
             type:        'SATELLITE_RELEASED',
             time,
             altitude,
             velocity:    directSeparateVelocity,
+            partId:      directFragSatPartId,
             description: `Satellite detached at ${altitude.toFixed(0)} m.`,
           });
           break;
@@ -496,6 +501,7 @@ export function activatePartDirect(ps, assembly, flightState, instanceId) {
         instanceId,
         altitude,
         velocity:    directReleaseVelocity,
+        partId:      placed.partId,
         description: `Satellite released at ${altitude.toFixed(0)} m.`,
       });
       break;
@@ -1023,6 +1029,23 @@ function _fragmentContainsSatellite(debris, assembly) {
     if (def && def.type === PartType.SATELLITE) return true;
   }
   return false;
+}
+
+/**
+ * Return the part definition ID of the first SATELLITE part in a debris fragment,
+ * or null if none found.
+ *
+ * @param {DebrisState}                                  debris
+ * @param {import('./rocketbuilder.js').RocketAssembly}  assembly
+ * @returns {string|null}
+ */
+function _getFragmentSatellitePartId(debris, assembly) {
+  for (const instanceId of debris.activeParts) {
+    const placed = assembly.parts.get(instanceId);
+    const def    = placed ? getPartById(placed.partId) : null;
+    if (def && def.type === PartType.SATELLITE) return placed.partId;
+  }
+  return null;
 }
 
 /**

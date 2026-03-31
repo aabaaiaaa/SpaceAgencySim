@@ -168,7 +168,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: No manoeuvre menu — all orbital changes done by hand. Normal mode: engine burns affect orbit (prograde raises opposite side, retrograde lowers). Docking mode: burns and RCS affect local position only within orbit slot band limits. Transfers: manually apply delta-v at correct orbital point. Map view shows target bodies with required delta-v for basic direct transfer. Route planning available in map view during orbit and transfer phases. Gravitational assists apply.
 
 ### TASK-025: Satellite network system
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-023
 - **Description**: Satellite types: Communication (any orbit, enables science transmission), Weather (LEO/MEO, reduces weather skip cost + forecast), Science (any orbit, passive science/period), GPS/Navigation (MEO, needs 3+, widens landing threshold + recovery profitability + new mission types), Relay (HEO/GEO, extends deep space comms). Constellation bonus: 3+ same type = 2× benefit (simple count). Built-in satellite parts include batteries/solar (no power micromanagement). Custom satellites require power management. Satellite degradation over time with manual maintenance missions or auto-pay option.

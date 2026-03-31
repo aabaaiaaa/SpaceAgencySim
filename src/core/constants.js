@@ -746,3 +746,91 @@ export const RELIABILITY_TIERS = Object.freeze({
   HIGH:     0.98,
   UPGRADE_BONUS: 0.02,
 });
+
+// ---------------------------------------------------------------------------
+// Satellite Network System
+// ---------------------------------------------------------------------------
+
+/**
+ * Functional types of satellite that provide network bonuses.
+ * @enum {string}
+ */
+export const SatelliteType = Object.freeze({
+  /** Communication satellite — enables science data transmission from orbit. */
+  COMMUNICATION: 'COMMUNICATION',
+  /** Weather satellite — reduces weather-skip cost and improves forecast. */
+  WEATHER: 'WEATHER',
+  /** Science satellite — generates passive science points per period. */
+  SCIENCE: 'SCIENCE',
+  /** GPS/Navigation satellite — widens landing threshold, recovery profitability, new mission types. */
+  GPS: 'GPS',
+  /** Relay satellite — extends deep-space communication range. */
+  RELAY: 'RELAY',
+});
+
+/**
+ * Which altitude bands each satellite type may operate in.
+ * A satellite must be deployed in one of its valid bands to be active.
+ * @type {Readonly<Record<string, readonly string[]>>}
+ */
+export const SATELLITE_VALID_BANDS = Object.freeze({
+  [SatelliteType.COMMUNICATION]: Object.freeze(['LEO', 'MEO', 'HEO', 'LLO', 'MLO', 'HLO']),
+  [SatelliteType.WEATHER]:       Object.freeze(['LEO', 'MEO', 'LLO', 'MLO']),
+  [SatelliteType.SCIENCE]:       Object.freeze(['LEO', 'MEO', 'HEO', 'LLO', 'MLO', 'HLO']),
+  [SatelliteType.GPS]:           Object.freeze(['MEO', 'MLO']),
+  [SatelliteType.RELAY]:         Object.freeze(['HEO', 'HLO']),
+});
+
+/**
+ * Constellation bonus threshold — 3+ satellites of the same type = 2× benefit.
+ * @type {number}
+ */
+export const CONSTELLATION_THRESHOLD = 3;
+
+/** Multiplier applied when constellation bonus is active. */
+export const CONSTELLATION_MULTIPLIER = 2;
+
+/**
+ * Base benefits per satellite type (before constellation multiplier).
+ *
+ * COMMUNICATION: transmitYieldBonus — additive bonus to science transmit yield.
+ * WEATHER:       weatherSkipDiscount — fraction discount on weather-skip cost;
+ *                forecastAccuracy — bonus to launch forecast display.
+ * SCIENCE:       sciencePerPeriod — passive science points earned per period.
+ * GPS:           landingThresholdBonus — m/s added to safe-landing tolerance;
+ *                recoveryBonus — fraction bonus to recovery revenue.
+ * RELAY:         deepSpaceComms — enables deep-space mission types.
+ */
+export const SATELLITE_BENEFITS = Object.freeze({
+  [SatelliteType.COMMUNICATION]: Object.freeze({ transmitYieldBonus: 0.15 }),
+  [SatelliteType.WEATHER]:       Object.freeze({ weatherSkipDiscount: 0.10, forecastAccuracy: 0.15 }),
+  [SatelliteType.SCIENCE]:       Object.freeze({ sciencePerPeriod: 2 }),
+  [SatelliteType.GPS]:           Object.freeze({ landingThresholdBonus: 2, recoveryBonus: 0.10 }),
+  [SatelliteType.RELAY]:         Object.freeze({ deepSpaceComms: true }),
+});
+
+/**
+ * Satellite health degradation per period (percentage points).
+ * A satellite starts at 100 health and loses this each period.
+ * At 0 health, the satellite is decommissioned.
+ */
+export const SATELLITE_DEGRADATION_PER_PERIOD = 3;
+
+/** Health threshold below which a satellite provides reduced (50%) benefits. */
+export const SATELLITE_DEGRADED_THRESHOLD = 30;
+
+/** Cost per satellite for auto-maintenance per period (dollars). */
+export const SATELLITE_AUTO_MAINTENANCE_COST = 15_000;
+
+/** Health restored per auto-maintenance cycle (percentage points). */
+export const SATELLITE_AUTO_MAINTENANCE_HEAL = 10;
+
+/**
+ * Satellite Ops facility tier caps for max active satellites.
+ * @type {Readonly<Record<number, number>>}
+ */
+export const SATELLITE_OPS_TIER_CAPS = Object.freeze({
+  1: 6,
+  2: 12,
+  3: 24,
+});

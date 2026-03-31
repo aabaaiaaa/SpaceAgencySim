@@ -25,6 +25,7 @@ import { advancePeriod } from './period.js';
 import { getPartById } from '../data/parts.js';
 import { PartType, DEATH_FINE_PER_ASTRONAUT, FlightOutcome } from './constants.js';
 import { processContractCompletions, generateContracts } from './contracts.js';
+import { deploySatellitesFromFlight } from './satellites.js';
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -56,6 +57,7 @@ import { processContractCompletions, generateContracts } from './contracts.js';
  * @property {Array<{contract: import('./gameState.js').Contract, reward: number}>} completedContracts - Contracts completed this flight.
  * @property {import('./gameState.js').Contract[]} newContracts - Newly generated board contracts.
  * @property {boolean}  bankrupt        - True if the player is bankrupt after this flight.
+ * @property {Array<{satelliteId: string, satelliteType: string}>} deployedSatellites - Satellites deployed during this flight.
  */
 
 /**
@@ -159,7 +161,10 @@ export function processFlightReturn(state, flightState, ps, assembly) {
   // ── 6d. Generate new contracts for the board ──────────────────────────
   const newContracts = generateContracts(state);
 
-  // ── 6e. Accumulate in-game flight time ──────────────────────────────────
+  // ── 6e. Deploy satellites released during this flight ─────────────────
+  const deployedSatellites = deploySatellitesFromFlight(state, flightState);
+
+  // ── 6f. Accumulate in-game flight time ──────────────────────────────────
   const flightSeconds = flightState?.timeElapsed ?? 0;
   state.flightTimeSeconds = (state.flightTimeSeconds ?? 0) + flightSeconds;
 
@@ -207,6 +212,7 @@ export function processFlightReturn(state, flightState, ps, assembly) {
     completedContracts: contractResult.completedContracts,
     newContracts,
     bankrupt: periodSummary.bankrupt,
+    deployedSatellites,
   };
 }
 

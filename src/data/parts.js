@@ -33,7 +33,7 @@
  * 40 px wide.  Use this as a guide when sizing new parts.
  */
 
-import { PartType, FuelType, RELIABILITY_TIERS } from '../core/constants.js';
+import { PartType, FuelType, RELIABILITY_TIERS, SatelliteType } from '../core/constants.js';
 
 // ---------------------------------------------------------------------------
 // Activation Behaviour Enum
@@ -926,14 +926,14 @@ export const PARTS = [
   // =========================================================================
 
   /**
-   * Satellite Mk1 — deployable satellite payload.
-   * Stack-mounted; activate RELEASE to separate it into independent flight
-   * (mission objective for satellite deployment missions).
+   * Satellite Mk1 — generic deployable satellite payload.
+   * Stack-mounted; activate RELEASE to separate it into independent flight.
+   * Has no satellite type — satisfies basic deployment contracts only.
    */
   {
     id: 'satellite-mk1',
     name: 'Satellite Mk1',
-    description: 'A deployable satellite payload. Carry it to orbit and activate RELEASE to separate it into independent flight. Required for satellite deployment missions.',
+    description: 'A generic deployable satellite. Carry it to orbit and activate RELEASE to deploy. Includes built-in batteries and solar panels. Satisfies basic satellite deployment missions.',
     type: PartType.SATELLITE,
     reliability: RELIABILITY_TIERS.MID,
     mass: 300,
@@ -951,6 +951,157 @@ export const PARTS = [
       dragCoefficient: 0.1,
       heatTolerance: 1500,
       crashThreshold: 8,
+      builtInPower: true,
+    },
+  },
+
+  /**
+   * Communication Satellite — enables science data transmission from orbit.
+   * Can operate in any orbit band. Built-in power (batteries + solar).
+   */
+  {
+    id: 'satellite-comm',
+    name: 'CommSat',
+    description: 'A communication satellite. Enables science data transmission from orbit when deployed. Built-in batteries and solar panels — no power management needed. Valid in any orbit.',
+    type: PartType.SATELLITE,
+    reliability: RELIABILITY_TIERS.MID,
+    mass: 350,
+    cost: 30_000,
+    width: 30,
+    height: 20,
+    snapPoints: [
+      makeSnapPoint('top',    0, -10, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  10, STACK_TYPES),
+    ],
+    animationStates: ['stowed', 'deployed'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.RELEASE,
+    properties: {
+      satelliteType: SatelliteType.COMMUNICATION,
+      dragCoefficient: 0.1,
+      heatTolerance: 1500,
+      crashThreshold: 8,
+      builtInPower: true,
+    },
+  },
+
+  /**
+   * Weather Satellite — reduces weather-skip cost and improves forecast.
+   * Must be deployed in LEO or MEO (Earth) / LLO or MLO (Moon).
+   */
+  {
+    id: 'satellite-weather',
+    name: 'WeatherSat',
+    description: 'A weather observation satellite. Reduces weather-related launch skip cost and improves forecasts. Must operate in LEO or MEO. Built-in power.',
+    type: PartType.SATELLITE,
+    reliability: RELIABILITY_TIERS.MID,
+    mass: 400,
+    cost: 35_000,
+    width: 30,
+    height: 20,
+    snapPoints: [
+      makeSnapPoint('top',    0, -10, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  10, STACK_TYPES),
+    ],
+    animationStates: ['stowed', 'deployed'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.RELEASE,
+    properties: {
+      satelliteType: SatelliteType.WEATHER,
+      dragCoefficient: 0.1,
+      heatTolerance: 1500,
+      crashThreshold: 8,
+      builtInPower: true,
+    },
+  },
+
+  /**
+   * Science Satellite — generates passive science points per period.
+   * Can operate in any orbit band.
+   */
+  {
+    id: 'satellite-science',
+    name: 'SciSat',
+    description: 'A science research satellite. Generates passive science points each period while operational. Valid in any orbit. Built-in power.',
+    type: PartType.SATELLITE,
+    reliability: RELIABILITY_TIERS.MID,
+    mass: 450,
+    cost: 40_000,
+    width: 30,
+    height: 20,
+    snapPoints: [
+      makeSnapPoint('top',    0, -10, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  10, STACK_TYPES),
+    ],
+    animationStates: ['stowed', 'deployed'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.RELEASE,
+    properties: {
+      satelliteType: SatelliteType.SCIENCE,
+      dragCoefficient: 0.1,
+      heatTolerance: 1500,
+      crashThreshold: 8,
+      builtInPower: true,
+    },
+  },
+
+  /**
+   * GPS/Navigation Satellite — widens landing threshold, improves recovery.
+   * Must be deployed in MEO (Earth) / MLO (Moon). Needs 3+ for full benefit.
+   */
+  {
+    id: 'satellite-gps',
+    name: 'NavSat',
+    description: 'A GPS/navigation satellite. Widens safe landing thresholds and improves recovery profitability. Must operate in MEO. Needs 3+ for constellation bonus. Built-in power.',
+    type: PartType.SATELLITE,
+    reliability: RELIABILITY_TIERS.MID,
+    mass: 500,
+    cost: 45_000,
+    width: 30,
+    height: 20,
+    snapPoints: [
+      makeSnapPoint('top',    0, -10, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  10, STACK_TYPES),
+    ],
+    animationStates: ['stowed', 'deployed'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.RELEASE,
+    properties: {
+      satelliteType: SatelliteType.GPS,
+      dragCoefficient: 0.1,
+      heatTolerance: 1500,
+      crashThreshold: 8,
+      builtInPower: true,
+    },
+  },
+
+  /**
+   * Relay Satellite — extends deep-space communications range.
+   * Must be deployed in HEO (Earth) / HLO (Moon).
+   */
+  {
+    id: 'satellite-relay',
+    name: 'RelaySat',
+    description: 'A deep-space relay satellite. Extends communication range for interplanetary missions. Must operate in HEO or HLO. Built-in power.',
+    type: PartType.SATELLITE,
+    reliability: RELIABILITY_TIERS.MID,
+    mass: 550,
+    cost: 50_000,
+    width: 30,
+    height: 20,
+    snapPoints: [
+      makeSnapPoint('top',    0, -10, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  10, STACK_TYPES),
+    ],
+    animationStates: ['stowed', 'deployed'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.RELEASE,
+    properties: {
+      satelliteType: SatelliteType.RELAY,
+      dragCoefficient: 0.1,
+      heatTolerance: 1500,
+      crashThreshold: 8,
+      builtInPower: true,
     },
   },
 

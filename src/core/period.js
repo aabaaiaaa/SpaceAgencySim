@@ -18,6 +18,7 @@
 import { AstronautStatus, CREW_SALARY_PER_PERIOD, FACILITY_UPKEEP_PER_PERIOD } from './constants.js';
 import { expireBoardContracts, expireActiveContracts } from './contracts.js';
 import { isBankrupt } from './finance.js';
+import { processSatelliteNetwork } from './satellites.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -33,6 +34,9 @@ import { isBankrupt } from './finance.js';
  * @property {string[]} expiredMissionIds - IDs of missions that expired this period.
  * @property {string[]} expiredBoardContractIds - Board contract IDs that expired this period.
  * @property {string[]} expiredActiveContractIds - Active contract IDs that expired this period.
+ * @property {number}   satelliteMaintenanceCost - Satellite auto-maintenance cost this period.
+ * @property {number}   satelliteScienceEarned  - Passive science from Science satellites.
+ * @property {string[]} decommissionedSatellites - Satellite IDs that reached 0 health.
  * @property {boolean} bankrupt        - True if the player is bankrupt after this period.
  */
 
@@ -105,7 +109,10 @@ export function advancePeriod(state) {
   const expiredBoardContractIds = expireBoardContracts(state);
   const expiredActiveContractIds = expireActiveContracts(state);
 
-  // ── 7. Bankruptcy check ───────────────────────────────────────────────
+  // ── 7. Satellite network — degradation, maintenance, passive science ─
+  const satResult = processSatelliteNetwork(state);
+
+  // ── 8. Bankruptcy check ───────────────────────────────────────────────
   const bankrupt = isBankrupt(state);
 
   return {
@@ -117,6 +124,9 @@ export function advancePeriod(state) {
     expiredMissionIds,
     expiredBoardContractIds,
     expiredActiveContractIds,
+    satelliteMaintenanceCost: satResult.maintenanceCost,
+    satelliteScienceEarned: satResult.scienceEarned,
+    decommissionedSatellites: satResult.decommissioned,
     bankrupt,
   };
 }
