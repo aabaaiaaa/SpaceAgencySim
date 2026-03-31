@@ -264,6 +264,13 @@ export function loadGame(slotIndex) {
   envelope.state.sciencePoints ??= 0;
   envelope.state.scienceLog ??= [];
 
+  // Default tech tree state for saves created before the tech tree system.
+  if (!envelope.state.techTree || typeof envelope.state.techTree !== 'object') {
+    envelope.state.techTree = { researched: [], unlockedInstruments: [] };
+  }
+  envelope.state.techTree.researched ??= [];
+  envelope.state.techTree.unlockedInstruments ??= [];
+
   return envelope.state;
 }
 

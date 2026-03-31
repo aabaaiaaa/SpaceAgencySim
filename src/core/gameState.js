@@ -241,6 +241,14 @@ import {
  *                                               - Tracks how many times each (instrument, biome)
  *                                                 pair has been collected, for diminishing-return
  *                                                 calculations.
+ * @property {TechTreeState}   techTree          - Technology tree research progress.
+ */
+
+/**
+ * Tech tree research state tracked in game state.
+ * @typedef {Object} TechTreeState
+ * @property {string[]}  researched           - Node IDs that have been explicitly researched.
+ * @property {string[]}  unlockedInstruments  - Instrument IDs unlocked via tech tree research.
  */
 
 // ---------------------------------------------------------------------------
@@ -319,6 +327,12 @@ export function createGameState() {
     // Science system — accumulated points and diminishing-return tracking.
     sciencePoints: 0,
     scienceLog: [],
+
+    // Technology tree research progress.
+    techTree: {
+      researched: [],
+      unlockedInstruments: [],
+    },
   };
 }
 

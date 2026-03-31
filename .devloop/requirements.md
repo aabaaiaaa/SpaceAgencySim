@@ -112,7 +112,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Add science instruments that fit within science modules: thermometer-mk1 ($2k, 50kg, 10s, Ground/Low Atmo, 5pts, starter), Barometer ($4k, 80kg, 15s, Mid/Upper Atmo, 10pts, Tech T1), Radiation Detector ($8k, 120kg, 20s, Mesosphere/Near Space, 20pts, Tech T2), Gravity Gradiometer ($15k, 200kg, 30s, Low/High Orbit, 40pts, Tech T3), Magnetometer ($12k, 150kg, 25s, Upper Atmo/Mesosphere/Near Space, 15pts, Tech T3). Data definitions and in-game functionality for each.
 
 ### TASK-017: Tech tree system
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-014, TASK-015
 - **Description**: Science points plus funds unlock nodes in a technology tree. Visible from the start. Dual currency per node. R&D facility gates tiers. Tutorial unlocks shown as pre-unlocked nodes ("Unlocked via tutorial"). Starter parts do NOT appear in tree. Non-tutorial players can purchase tutorial-unlocked nodes through the tree normally, providing an alternative unlock path. 4 branches: Propulsion (Improved Spark → Reliant → Poodle → Ion → Nuclear), Structural (Medium tank → Radial decouplers/nose cones → Large tank/tubes → Docking ports → Station segments), Recovery (Parachute Mk2 → Drogue → Heat shield → Powered landing → Reusable booster), Science (Barometer → Radiation Detector → Gradiometer/Magnetometer → Science Lab → Deep space instruments). Uniform tier costs: T1=15sci/$50k, T2=30/$100k, T3=60/$200k, T4=120/$400k, T5=200/$750k.

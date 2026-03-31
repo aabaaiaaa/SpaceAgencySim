@@ -33,6 +33,7 @@
 
 import { MISSIONS, MissionStatus, ObjectiveType } from '../data/missions.js';
 import { earn } from './finance.js';
+import { getTechTreeUnlockedParts } from './techtree.js';
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -101,9 +102,12 @@ export function getAvailableMissions(state) {
 /**
  * Return all part IDs that have been unlocked so far.
  *
- * Collects `unlockedParts` from every completed mission and merges them with
- * the base set already stored in `state.parts` (which includes starting parts
- * granted outside the mission system).  Returns a deduplicated array.
+ * Collects parts from three sources:
+ *   1. `state.parts` (starter parts and previously granted parts).
+ *   2. `unlockedParts` from every completed mission.
+ *   3. Parts unlocked via tech tree research.
+ *
+ * Returns a deduplicated array.
  *
  * @param {import('./gameState.js').GameState} state
  * @returns {string[]}
@@ -118,6 +122,11 @@ export function getUnlockedParts(state) {
         ids.add(partId);
       }
     }
+  }
+
+  // Include parts unlocked via the tech tree.
+  for (const partId of getTechTreeUnlockedParts(state)) {
+    ids.add(partId);
   }
 
   return [...ids];

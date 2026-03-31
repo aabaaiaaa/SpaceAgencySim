@@ -1,12 +1,12 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 12,
+  "lastIteration": 13,
   "startedAt": "2026-03-30T20:49:34.099Z",
   "activeTask": {
-    "taskId": "TASK-016",
-    "taskTitle": "Implement initial science instruments",
-    "iterationNumber": 12,
-    "startedAt": "2026-03-30T23:41:37.968Z"
+    "taskId": "TASK-017",
+    "taskTitle": "Tech tree system",
+    "iterationNumber": 13,
+    "startedAt": "2026-03-30T23:48:03.694Z"
   }
 }

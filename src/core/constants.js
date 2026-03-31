@@ -531,6 +531,26 @@ export const ANALYSIS_TRANSMIT_YIELD_MIN = 0.40;
 export const ANALYSIS_TRANSMIT_YIELD_MAX = 0.60;
 
 // ---------------------------------------------------------------------------
+// Tech Tree
+// ---------------------------------------------------------------------------
+
+/**
+ * Maximum tech tier accessible per R&D Lab facility tier.
+ *
+ * R&D Lab tier 1 grants access to all tech tiers (1–5) since facility
+ * upgrades are not yet implemented.  When facility upgrades are added,
+ * this mapping can be tightened (e.g. tier 1 → T1–T2, tier 2 → T3–T4,
+ * tier 3 → T5).
+ *
+ * @type {Readonly<Record<number, number>>}
+ */
+export const RD_TIER_MAX_TECH = Object.freeze({
+  1: 5,
+  2: 5,
+  3: 5,
+});
+
+// ---------------------------------------------------------------------------
 // Orbit Segments
 // ---------------------------------------------------------------------------
 

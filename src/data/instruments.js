@@ -234,6 +234,23 @@ export function getInstrumentsByTier(maxTier) {
 }
 
 /**
+ * Return instruments available to the player based on tech tree state.
+ *
+ * An instrument is available if:
+ *   1. Its `techTier` is 0 (starter — always available), OR
+ *   2. Its ID appears in `state.techTree.unlockedInstruments`.
+ *
+ * @param {import('../core/gameState.js').GameState} state
+ * @returns {InstrumentDef[]}
+ */
+export function getAvailableInstruments(state) {
+  const unlocked = new Set(state.techTree?.unlockedInstruments ?? []);
+  return INSTRUMENTS.filter(
+    (i) => i.techTier === 0 || unlocked.has(i.id),
+  );
+}
+
+/**
  * Check whether an instrument can produce data in the given biome.
  * @param {string} instrumentId
  * @param {string} biomeId
