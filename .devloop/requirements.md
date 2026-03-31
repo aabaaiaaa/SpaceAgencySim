@@ -38,7 +38,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Implement three control modes for orbital flight with control tip on every mode switch. Normal Orbit Mode (default): engines affect orbit, A/D rotates craft, W/S throttle, spacebar stages. Docking Mode (toggled): engines affect local position within orbit slot, orbit frozen as reference, A/D along track, W/S radial, band limit warnings, thrust cuts to zero on toggle. RCS Mode (within docking): WASD directional translation, no rotation, RCS plumes shown. RCS outside docking mode: WASD = prograde/retrograde/radial-in/radial-out.
 
 ### TASK-006: Configure starter parts availability
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: none
 - **Description**: Configure part availability based on game mode. Non-tutorial mode: all starters available from game start (probe-core-mk1, tank-small, engine-spark, parachute-mk1, science-module-mk1, thermometer-mk1, cmd-mk1). Tutorial mode: gated starters — probe-core-mk1/tank-small/engine-spark/parachute-mk1 at game start; cmd-mk1 after Crew Admin tutorial (mission 4); science-module-mk1 and thermometer-mk1 after Science tutorial (missions 5-7 area). All other parts unlocked via tech tree or tutorial rewards.

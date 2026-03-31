@@ -121,18 +121,37 @@ function _spawnShootingStar() {
 }
 
 // ---------------------------------------------------------------------------
-// Starter parts — unlocked for every new game.
-// Advanced parts are unlocked through mission rewards as the player progresses.
+// Starter parts — vary by game mode.
+// Tutorial mode gates some parts behind mission rewards; non-tutorial mode
+// gives the full starter set immediately.
 // ---------------------------------------------------------------------------
 
 /**
- * Part IDs available at the start of every new game.
+ * Part IDs available at the start of a tutorial game.
+ * cmd-mk1, science-module-mk1, and thermometer-mk1 are gated behind
+ * tutorial mission rewards (see missions.js).
  * @type {string[]}
  */
-const STARTER_PARTS = [
+const TUTORIAL_STARTER_PARTS = [
   'probe-core-mk1', // Uncrewed probe core
-  'tank-small',     // Small fuel tank
-  'engine-spark',   // Starter liquid engine
+  'tank-small',      // Small fuel tank
+  'engine-spark',    // Starter liquid engine
+  'parachute-mk1',   // Basic parachute
+];
+
+/**
+ * Part IDs available at the start of a non-tutorial (free play) game.
+ * All starter-tier parts are unlocked immediately.
+ * @type {string[]}
+ */
+const FREE_STARTER_PARTS = [
+  'probe-core-mk1',     // Uncrewed probe core
+  'tank-small',          // Small fuel tank
+  'engine-spark',        // Starter liquid engine
+  'parachute-mk1',       // Basic parachute
+  'science-module-mk1',  // Science instrument container
+  'thermometer-mk1',     // Starter science instrument
+  'cmd-mk1',             // Crewed command module
 ];
 
 // ---------------------------------------------------------------------------
@@ -517,6 +536,62 @@ const MENU_STYLES = `
   gap: 12px;
 }
 
+/* ── Game mode toggle ──────────────────────────────────────────────────── */
+.mm-mode-toggle {
+  margin-bottom: 24px;
+}
+
+.mm-mode-toggle label {
+  display: block;
+  font-size: 0.78rem;
+  color: #7099c0;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin-bottom: 10px;
+}
+
+.mm-mode-options {
+  display: flex;
+  gap: 10px;
+}
+
+.mm-mode-option {
+  flex: 1;
+  background: rgba(255,255,255,0.04);
+  border: 2px solid rgba(100,160,220,0.2);
+  border-radius: 8px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.mm-mode-option:hover {
+  background: rgba(255,255,255,0.07);
+  border-color: rgba(100,160,220,0.4);
+}
+
+.mm-mode-option.selected {
+  border-color: rgba(100,180,255,0.7);
+  background: rgba(100,180,255,0.08);
+}
+
+.mm-mode-option input[type="radio"] {
+  display: none;
+}
+
+.mm-mode-option .mm-mode-title {
+  font-size: 0.9rem;
+  color: #d0dce8;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.mm-mode-option .mm-mode-hint {
+  font-size: 0.75rem;
+  color: #5a7e9c;
+  line-height: 1.4;
+}
+
 /* ── Error / info messages ──────────────────────────────────────────────── */
 .mm-message {
   padding: 10px 16px;
@@ -819,8 +894,8 @@ function _renderNewGameScreen(overlay, canGoBack) {
     <div class="mm-newgame-form">
       <p class="mm-newgame-desc">
         You are founding a new space agency with $2,000,000 in seed funding
-        (matched by a $2,000,000 loan). Start with tutorial missions and basic
-        parts, then expand your programme by completing objectives.
+        (matched by a $2,000,000 loan). Choose a game mode, name your agency,
+        and begin your space programme.
       </p>
       <div class="mm-field">
         <label for="mm-agency-name-input">Agency Name</label>
@@ -831,6 +906,21 @@ function _renderNewGameScreen(overlay, canGoBack) {
           placeholder="e.g. Kerbal Space Program"
           autocomplete="off"
         />
+      </div>
+      <div class="mm-mode-toggle">
+        <label>Game Mode</label>
+        <div class="mm-mode-options">
+          <div class="mm-mode-option selected" data-mode="tutorial">
+            <input type="radio" name="mm-game-mode" value="tutorial" checked />
+            <div class="mm-mode-title">Tutorial</div>
+            <div class="mm-mode-hint">Guided missions unlock parts and facilities step by step.</div>
+          </div>
+          <div class="mm-mode-option" data-mode="freeplay">
+            <input type="radio" name="mm-game-mode" value="freeplay" />
+            <div class="mm-mode-title">Free Play</div>
+            <div class="mm-mode-hint">All starter parts and facility building available from the start.</div>
+          </div>
+        </div>
       </div>
       <div id="mm-newgame-error"></div>
       <div class="mm-newgame-actions">
@@ -847,6 +937,16 @@ function _renderNewGameScreen(overlay, canGoBack) {
   const backBtn    = screen.querySelector('#mm-back-btn');
   const errorDiv   = screen.querySelector('#mm-newgame-error');
 
+  // Wire up game mode toggle cards.
+  const modeOptions = screen.querySelectorAll('.mm-mode-option');
+  for (const opt of modeOptions) {
+    opt.addEventListener('click', () => {
+      for (const o of modeOptions) o.classList.remove('selected');
+      opt.classList.add('selected');
+      opt.querySelector('input[type="radio"]').checked = true;
+    });
+  }
+
   // Focus the name field immediately.
   setTimeout(() => nameInput.focus(), 50);
 
@@ -862,7 +962,9 @@ function _renderNewGameScreen(overlay, canGoBack) {
       nameInput.focus();
       return;
     }
-    _startNewGame(agencyName);
+    const selectedMode = screen.querySelector('input[name="mm-game-mode"]:checked').value;
+    const tutorialMode = selectedMode === 'tutorial';
+    _startNewGame(agencyName, tutorialMode);
   });
 
   if (backBtn) {
@@ -968,18 +1070,27 @@ function _handleDeleteConfirm(slotIndex, saveName) {
  * Creates a fresh game state for a new game and begins playing.
  *
  * @param {string} agencyName
+ * @param {boolean} tutorialMode  Whether to start in tutorial mode (guided
+ *                                missions) or free-play mode (all starters).
  */
-function _startNewGame(agencyName) {
+function _startNewGame(agencyName, tutorialMode) {
   const state = createGameState();
   state.agencyName = agencyName;
+  state.tutorialMode = tutorialMode;
 
   // Seed tutorial missions.
   initializeMissions(state);
 
-  // Unlock starter parts only — further parts are earned through missions.
-  state.parts = [...STARTER_PARTS];
+  // Unlock starter parts based on game mode.
+  // Tutorial mode: basic parts only — cmd-mk1, science-module-mk1, and
+  // thermometer-mk1 are gated behind tutorial mission rewards.
+  // Free-play mode: all starter-tier parts available immediately.
+  state.parts = tutorialMode
+    ? [...TUTORIAL_STARTER_PARTS]
+    : [...FREE_STARTER_PARTS];
 
-  console.log('[MainMenu] New game started. Agency:', agencyName);
+  const modeLabel = tutorialMode ? 'tutorial' : 'free-play';
+  console.log(`[MainMenu] New game started (${modeLabel}). Agency:`, agencyName);
   _beginGame(state);
 }
 

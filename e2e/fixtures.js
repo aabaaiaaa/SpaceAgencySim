@@ -28,7 +28,7 @@ import {
 /** Starter parts available from the very beginning (non-tutorial). */
 export const STARTER_PARTS = [
   'probe-core-mk1', 'tank-small', 'engine-spark', 'parachute-mk1',
-  'science-module-mk1', 'cmd-mk1',
+  'science-module-mk1', 'thermometer-mk1', 'cmd-mk1',
 ];
 
 /** Early game — starters + first mission rewards. */

@@ -361,7 +361,9 @@ export const MISSIONS = [
     ],
     reward: 30_000,
     unlocksAfter: ['mission-003'],
-    unlockedParts: [],
+    // In tutorial mode, completing this mission awards the crewed command
+    // module — gated until the player has demonstrated basic competency.
+    unlockedParts: ['cmd-mk1'],
     status: MissionStatus.LOCKED,
   },
 
@@ -393,7 +395,10 @@ export const MISSIONS = [
     ],
     reward: 35_000,
     unlocksAfter: ['mission-004'],
-    unlockedParts: ['parachute-mk2'],
+    // In tutorial mode, completing this mission awards the science module
+    // and starter instrument alongside the parachute upgrade.  This gates
+    // science parts until the player has demonstrated safe recovery.
+    unlockedParts: ['parachute-mk2', 'science-module-mk1', 'thermometer-mk1'],
     requiredParts: ['parachute-mk1'],
     status: MissionStatus.LOCKED,
   },
