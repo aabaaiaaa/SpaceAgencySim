@@ -113,7 +113,7 @@ describe('Round-trip: save and load a complex state', () => {
         skills: { piloting: 20, engineering: 90, science: 30 },
         salary: 6000,
         hiredDate: '2025-03-15T00:00:00.000Z',
-        injuryEnds: '2025-04-01T00:00:00.000Z',
+        injuryEnds: 5,
       },
       {
         id: 'crew-3',
@@ -208,7 +208,7 @@ describe('Round-trip: save and load a complex state', () => {
     expect(restored.crew[0].name).toBe('Alice');
     expect(restored.crew[0].skills.piloting).toBe(75);
     expect(restored.crew[1].status).toBe(CrewStatus.ON_MISSION);
-    expect(restored.crew[1].injuryEnds).toBe('2025-04-01T00:00:00.000Z');
+    expect(restored.crew[1].injuryEnds).toBe(5);
     expect(restored.crew[2].status).toBe(CrewStatus.DEAD);
 
     // Missions — all three buckets.

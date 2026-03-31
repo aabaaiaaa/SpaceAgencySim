@@ -23,12 +23,22 @@ import {
   unassignCrew,
   getActiveCrew,
   getFullHistory,
+  injureCrew,
+  isCrewInjured,
+  payMedicalCare,
+  checkInjuryRecovery,
+  getAssignableCrew,
+  processFlightInjuries,
 } from '../core/crew.js';
 import {
   AstronautStatus,
   HIRE_COST,
   DEATH_FINE_PER_ASTRONAUT,
   STARTING_MONEY,
+  MEDICAL_CARE_COST,
+  HARD_LANDING_SPEED_MIN,
+  HARD_LANDING_SPEED_MAX,
+  EJECTION_INJURY_PERIODS,
 } from '../core/constants.js';
 
 // ---------------------------------------------------------------------------
@@ -505,5 +515,363 @@ describe('getFullHistory()', () => {
     const a = hireOne(state, 'A');
     const history = getFullHistory(state);
     expect(history[0]).toBe(a);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// injureCrew()
+// ---------------------------------------------------------------------------
+
+describe('injureCrew()', () => {
+  let state;
+  beforeEach(() => { state = freshState(); });
+
+  it('sets injuryEnds to currentPeriod + duration', () => {
+    const a = hireOne(state);
+    state.currentPeriod = 3;
+    injureCrew(state, a.id, 2);
+    expect(a.injuryEnds).toBe(5);
+  });
+
+  it('returns true on success', () => {
+    const a = hireOne(state);
+    expect(injureCrew(state, a.id, 1)).toBe(true);
+  });
+
+  it('returns false for unknown id', () => {
+    expect(injureCrew(state, 'nobody', 1)).toBe(false);
+  });
+
+  it('returns false for fired astronaut', () => {
+    const a = hireOne(state);
+    fireCrew(state, a.id);
+    expect(injureCrew(state, a.id, 1)).toBe(false);
+  });
+
+  it('returns false for KIA astronaut', () => {
+    const a = hireOne(state);
+    recordKIA(state, a.id, 'crash');
+    expect(injureCrew(state, a.id, 1)).toBe(false);
+  });
+
+  it('defaults currentPeriod to 0 when undefined', () => {
+    const a = hireOne(state);
+    state.currentPeriod = undefined;
+    injureCrew(state, a.id, 3);
+    expect(a.injuryEnds).toBe(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isCrewInjured()
+// ---------------------------------------------------------------------------
+
+describe('isCrewInjured()', () => {
+  let state;
+  beforeEach(() => { state = freshState(); });
+
+  it('returns true when injuryEnds is in the future', () => {
+    const a = hireOne(state);
+    state.currentPeriod = 2;
+    injureCrew(state, a.id, 3);
+    expect(isCrewInjured(state, a.id)).toBe(true);
+  });
+
+  it('returns false when injuryEnds is null', () => {
+    const a = hireOne(state);
+    expect(isCrewInjured(state, a.id)).toBe(false);
+  });
+
+  it('returns false when current period has reached injuryEnds', () => {
+    const a = hireOne(state);
+    injureCrew(state, a.id, 2);
+    state.currentPeriod = 2;
+    expect(isCrewInjured(state, a.id)).toBe(false);
+  });
+
+  it('returns false for unknown id', () => {
+    expect(isCrewInjured(state, 'nobody')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// assignToCrew() — injury blocking
+// ---------------------------------------------------------------------------
+
+describe('assignToCrew() — injury blocking', () => {
+  let state;
+  beforeEach(() => { state = freshState(); });
+
+  it('returns false for injured crew', () => {
+    const a = hireOne(state);
+    state.currentPeriod = 1;
+    injureCrew(state, a.id, 3);
+    expect(assignToCrew(state, a.id, 'rocket-1')).toBe(false);
+  });
+
+  it('allows assignment after injury has healed', () => {
+    const a = hireOne(state);
+    injureCrew(state, a.id, 2);
+    state.currentPeriod = 2;
+    expect(assignToCrew(state, a.id, 'rocket-1')).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// payMedicalCare()
+// ---------------------------------------------------------------------------
+
+describe('payMedicalCare()', () => {
+  let state;
+  beforeEach(() => { state = freshState(); });
+
+  it('halves remaining recovery time (round up)', () => {
+    const a = hireOne(state);
+    state.currentPeriod = 2;
+    injureCrew(state, a.id, 3); // injuryEnds = 5, remaining = 3
+    const result = payMedicalCare(state, a.id);
+    expect(result.success).toBe(true);
+    // remaining = 3, halved = ceil(3/2) = 2 → new injuryEnds = 2 + 2 = 4
+    expect(a.injuryEnds).toBe(4);
+  });
+
+  it('deducts MEDICAL_CARE_COST from cash', () => {
+    const a = hireOne(state);
+    injureCrew(state, a.id, 2);
+    const cashBefore = state.money;
+    payMedicalCare(state, a.id);
+    expect(state.money).toBe(cashBefore - MEDICAL_CARE_COST);
+  });
+
+  it('returns error when astronaut is not injured', () => {
+    const a = hireOne(state);
+    const result = payMedicalCare(state, a.id);
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/not injured/i);
+  });
+
+  it('returns error when astronaut is not found', () => {
+    const result = payMedicalCare(state, 'nobody');
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/not found/i);
+  });
+
+  it('returns error when funds are insufficient', () => {
+    const a = hireOne(state);
+    injureCrew(state, a.id, 2);
+    state.money = 0;
+    const result = payMedicalCare(state, a.id);
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/insufficient/i);
+  });
+
+  it('rounds up when remaining is odd (1 period → still 1)', () => {
+    const a = hireOne(state);
+    state.currentPeriod = 0;
+    injureCrew(state, a.id, 1); // remaining = 1, ceil(1/2) = 1
+    const result = payMedicalCare(state, a.id);
+    expect(result.success).toBe(true);
+    expect(a.injuryEnds).toBe(1); // 0 + ceil(1/2) = 1
+  });
+});
+
+// ---------------------------------------------------------------------------
+// checkInjuryRecovery()
+// ---------------------------------------------------------------------------
+
+describe('checkInjuryRecovery()', () => {
+  let state;
+  beforeEach(() => { state = freshState(); });
+
+  it('clears injuryEnds when period has reached it', () => {
+    const a = hireOne(state);
+    injureCrew(state, a.id, 2); // injuryEnds = 2
+    state.currentPeriod = 2;
+    const healed = checkInjuryRecovery(state);
+    expect(a.injuryEnds).toBeNull();
+    expect(healed).toContain(a.id);
+  });
+
+  it('does not clear injury that is still in the future', () => {
+    const a = hireOne(state);
+    injureCrew(state, a.id, 3); // injuryEnds = 3
+    state.currentPeriod = 1;
+    const healed = checkInjuryRecovery(state);
+    expect(a.injuryEnds).toBe(3);
+    expect(healed).toHaveLength(0);
+  });
+
+  it('handles multiple crew members', () => {
+    const a = hireOne(state, 'Alice');
+    const b = hireOne(state, 'Bob');
+    injureCrew(state, a.id, 1);
+    injureCrew(state, b.id, 3);
+    state.currentPeriod = 2;
+    const healed = checkInjuryRecovery(state);
+    expect(healed).toContain(a.id);
+    expect(healed).not.toContain(b.id);
+    expect(a.injuryEnds).toBeNull();
+    expect(b.injuryEnds).toBe(3);
+  });
+
+  it('ignores fired/KIA crew with leftover injuryEnds', () => {
+    const a = hireOne(state);
+    injureCrew(state, a.id, 1);
+    fireCrew(state, a.id);
+    state.currentPeriod = 5;
+    const healed = checkInjuryRecovery(state);
+    expect(healed).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getAssignableCrew()
+// ---------------------------------------------------------------------------
+
+describe('getAssignableCrew()', () => {
+  let state;
+  beforeEach(() => { state = freshState(); });
+
+  it('excludes injured crew', () => {
+    const a = hireOne(state, 'Healthy');
+    const b = hireOne(state, 'Injured');
+    state.currentPeriod = 1;
+    injureCrew(state, b.id, 3);
+    const assignable = getAssignableCrew(state);
+    expect(assignable).toHaveLength(1);
+    expect(assignable[0].id).toBe(a.id);
+  });
+
+  it('includes crew whose injury has expired', () => {
+    const a = hireOne(state);
+    injureCrew(state, a.id, 2);
+    state.currentPeriod = 2;
+    const assignable = getAssignableCrew(state);
+    expect(assignable).toHaveLength(1);
+  });
+
+  it('excludes fired and KIA crew', () => {
+    const a = hireOne(state, 'Active');
+    const b = hireOne(state, 'Fired');
+    const c = hireOne(state, 'KIA');
+    fireCrew(state, b.id);
+    recordKIA(state, c.id, 'crash');
+    const assignable = getAssignableCrew(state);
+    expect(assignable).toHaveLength(1);
+    expect(assignable[0].id).toBe(a.id);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// processFlightInjuries()
+// ---------------------------------------------------------------------------
+
+describe('processFlightInjuries()', () => {
+  let state;
+  beforeEach(() => { state = freshState(); state.currentPeriod = 5; });
+
+  it('injures crew on hard landing (5–10 m/s)', () => {
+    const a = hireOne(state, 'Pilot');
+    const flightState = {
+      crewIds: [a.id],
+      events: [{ type: 'LANDING', speed: 7.5, time: 100 }],
+      timeElapsed: 100,
+    };
+    const ps = { crashed: false, ejectedCrewIds: new Set() };
+
+    const injuries = processFlightInjuries(state, flightState, ps);
+    expect(injuries).toHaveLength(1);
+    expect(injuries[0].crewId).toBe(a.id);
+    expect(injuries[0].cause).toBe('Hard landing');
+    expect(injuries[0].periods).toBeGreaterThanOrEqual(2);
+    expect(injuries[0].periods).toBeLessThanOrEqual(3);
+    expect(a.injuryEnds).toBeGreaterThan(5);
+  });
+
+  it('does not injure on gentle landing (< 5 m/s)', () => {
+    const a = hireOne(state, 'Pilot');
+    const flightState = {
+      crewIds: [a.id],
+      events: [{ type: 'LANDING', speed: 3.0, time: 50 }],
+      timeElapsed: 50,
+    };
+    const ps = { crashed: false, ejectedCrewIds: new Set() };
+
+    const injuries = processFlightInjuries(state, flightState, ps);
+    expect(injuries).toHaveLength(0);
+    expect(a.injuryEnds).toBeNull();
+  });
+
+  it('injures ejected crew for 1 period', () => {
+    const a = hireOne(state, 'Pilot');
+    const flightState = {
+      crewIds: [a.id],
+      events: [{ type: 'CREW_EJECTED', altitude: 5000, time: 30 }],
+      timeElapsed: 30,
+    };
+    const ejected = new Set([a.id]);
+    const ps = { crashed: true, ejectedCrewIds: ejected };
+
+    const injuries = processFlightInjuries(state, flightState, ps);
+    expect(injuries).toHaveLength(1);
+    expect(injuries[0].cause).toBe('Ejection');
+    expect(injuries[0].periods).toBe(EJECTION_INJURY_PERIODS);
+    expect(a.injuryEnds).toBe(5 + EJECTION_INJURY_PERIODS);
+  });
+
+  it('does not injure KIA crew (crash without ejection)', () => {
+    const a = hireOne(state, 'Pilot');
+    const flightState = {
+      crewIds: [a.id],
+      events: [{ type: 'CRASH', speed: 50, time: 80 }],
+      timeElapsed: 80,
+    };
+    const ps = { crashed: true, ejectedCrewIds: new Set() };
+
+    const injuries = processFlightInjuries(state, flightState, ps);
+    expect(injuries).toHaveLength(0);
+  });
+
+  it('logs CREW_INJURED events to flightState.events', () => {
+    const a = hireOne(state, 'Pilot');
+    const flightState = {
+      crewIds: [a.id],
+      events: [{ type: 'LANDING', speed: 8.0, time: 100 }],
+      timeElapsed: 100,
+    };
+    const ps = { crashed: false, ejectedCrewIds: new Set() };
+
+    processFlightInjuries(state, flightState, ps);
+    const injuryEvents = flightState.events.filter((e) => e.type === 'CREW_INJURED');
+    expect(injuryEvents).toHaveLength(1);
+    expect(injuryEvents[0].crewId).toBe(a.id);
+    expect(injuryEvents[0].cause).toBe('Hard landing');
+  });
+
+  it('returns empty when no flight state', () => {
+    expect(processFlightInjuries(state, null, null)).toEqual([]);
+  });
+
+  it('scales injury duration by impact speed', () => {
+    // At exactly 5 m/s → 2 periods (minimum)
+    const a = hireOne(state, 'SlowLanding');
+    const flightState1 = {
+      crewIds: [a.id],
+      events: [{ type: 'LANDING', speed: HARD_LANDING_SPEED_MIN, time: 10 }],
+      timeElapsed: 10,
+    };
+    const ps = { crashed: false, ejectedCrewIds: new Set() };
+    const injuries1 = processFlightInjuries(state, flightState1, ps);
+    expect(injuries1[0].periods).toBe(2);
+
+    // At ~10 m/s → 3 periods (maximum, but 10 is the crash threshold so use 9.9)
+    const b = hireOne(state, 'FastLanding');
+    const flightState2 = {
+      crewIds: [b.id],
+      events: [{ type: 'LANDING', speed: HARD_LANDING_SPEED_MAX - 0.1, time: 10 }],
+      timeElapsed: 10,
+    };
+    const injuries2 = processFlightInjuries(state, flightState2, ps);
+    expect(injuries2[0].periods).toBe(3);
   });
 });

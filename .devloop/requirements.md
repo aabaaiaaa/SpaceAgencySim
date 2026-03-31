@@ -78,7 +78,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Activate existing skills.piloting/engineering/science fields on CrewMember (currently always 0). XP gains per flight: Piloting (+5 safe landing, +3 per flight, +2 per staging), Engineering (+3 per part recovered, +2 per staging), Science (+5 per science data return, +3 per science activation). Effects: Piloting = turn rate bonus (up to +30%), Engineering = part recovery value (60%→80%), Science = experiment duration reduction (30s→20s) and yield bonus. Skills 0-100 with diminishing returns. Crew selection UI must show effects. Crew visible during flight.
 
 ### TASK-012: Crew injury system
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-011
 - **Description**: Activate CrewStatus.INJURED and injuryEnds field. Hard landing (5-10 m/s): injured 2-3 periods. Ejection: injured 1 period. Crew NOT affected by nearby part failure. Injured crew cannot be assigned to flights. Medical care option: pay fee to halve recovery time (round up). All injury events recorded in flight log with timestamp, altitude, and cause.

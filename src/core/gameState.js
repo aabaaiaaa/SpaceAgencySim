@@ -54,8 +54,9 @@ import {
  * @property {CrewSkills}  skills     - Skill levels.
  * @property {number}      salary     - Weekly salary cost (dollars).
  * @property {string}      hiredDate  - ISO 8601 date string when hired.
- * @property {string|null} injuryEnds - ISO 8601 date when injury clears, or
- *                                      null if not injured.
+ * @property {number|null} injuryEnds - Period number when the injury clears
+ *                                      (crew becomes IDLE again), or null if
+ *                                      not injured.
  */
 
 /**

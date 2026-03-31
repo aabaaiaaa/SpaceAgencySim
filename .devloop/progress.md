@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 69
-- **Completed**: 30
-- **Remaining**: 39
-- **Last Updated**: 2026-03-31T06:45:18.717Z
+- **Completed**: 31
+- **Remaining**: 38
+- **Last Updated**: 2026-03-31T06:53:32.624Z
 
 ## Iteration Log
 
@@ -247,4 +247,12 @@
 - **Exit Status**: success
 - **Tokens**: 7,657,207 total (1,424 in, 29,245 out, 112,564 cache-create, 7,513,974 cache-read)
 - **Cost**: $5.4141
+
+### Iteration 31 - 2026-03-31T06:45:21.416Z
+- **Task Completed**: TASK-012
+- **Summary**: Completed Crew injury system
+- **Duration**: 491s
+- **Exit Status**: success
+- **Tokens**: 3,791,179 total (663 in, 25,483 out, 87,945 cache-create, 3,677,088 cache-read)
+- **Cost**: $3.0286
 

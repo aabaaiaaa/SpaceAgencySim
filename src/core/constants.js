@@ -429,6 +429,28 @@ export const CREW_SALARY_PER_PERIOD = 5_000;
 export const FACILITY_UPKEEP_PER_PERIOD = 10_000;
 
 // ---------------------------------------------------------------------------
+// Crew Injury System
+// ---------------------------------------------------------------------------
+
+/** Landing speed (m/s) at or above which crew sustain hard-landing injuries. */
+export const HARD_LANDING_SPEED_MIN = 5;
+
+/** Landing speed (m/s) at or above which a hard landing is fatal (crash). */
+export const HARD_LANDING_SPEED_MAX = 10;
+
+/** Injury duration (periods) for a hard landing — minimum. */
+export const HARD_LANDING_INJURY_MIN = 2;
+
+/** Injury duration (periods) for a hard landing — maximum. */
+export const HARD_LANDING_INJURY_MAX = 3;
+
+/** Injury duration (periods) for crew ejection. */
+export const EJECTION_INJURY_PERIODS = 1;
+
+/** Medical care fee per injured crew member (halves recovery, rounded up). */
+export const MEDICAL_CARE_COST = 25_000;
+
+// ---------------------------------------------------------------------------
 // Celestial Bodies & Orbital Mechanics
 // ---------------------------------------------------------------------------
 

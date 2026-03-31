@@ -26,7 +26,7 @@ import { getPartById } from '../data/parts.js';
 import { PartType, DEATH_FINE_PER_ASTRONAUT, FlightOutcome } from './constants.js';
 import { processContractCompletions, generateContracts } from './contracts.js';
 import { deploySatellitesFromFlight } from './satellites.js';
-import { awardFlightXP, getMaxCrewSkill } from './crew.js';
+import { awardFlightXP, getMaxCrewSkill, processFlightInjuries } from './crew.js';
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -60,6 +60,7 @@ import { awardFlightXP, getMaxCrewSkill } from './crew.js';
  * @property {boolean}  bankrupt        - True if the player is bankrupt after this flight.
  * @property {Array<{satelliteId: string, satelliteType: string}>} deployedSatellites - Satellites deployed during this flight.
  * @property {Array<{id: string, name: string, piloting: number, engineering: number, science: number}>} crewXPGains - Skill XP gains per crew member.
+ * @property {Array<{crewId: string, crewName: string, cause: string, periods: number, altitude: number}>} crewInjuries - Crew injuries sustained this flight.
  */
 
 /**
@@ -158,6 +159,9 @@ export function processFlightReturn(state, flightState, ps, assembly) {
     scienceActivations,
   });
 
+  // ── 4c. Crew injury processing ────────────────────────────────────────────
+  const crewInjuries = processFlightInjuries(state, flightState, ps);
+
   // ── 5. Loan interest — once per flight ───────────────────────────────────
   if (state.loan && state.loan.balance > 0) {
     const cashBefore2 = state.money;
@@ -248,6 +252,7 @@ export function processFlightReturn(state, flightState, ps, assembly) {
     bankrupt: periodSummary.bankrupt,
     deployedSatellites,
     crewXPGains,
+    crewInjuries,
   };
 }
 
