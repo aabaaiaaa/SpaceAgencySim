@@ -1890,6 +1890,12 @@ function _showPartDetail(partId) {
   if (p.experimentDuration !== undefined) stats.push(['Experiment time', `${p.experimentDuration} s`]);
   if (p.crashThreshold !== undefined) stats.push(['Crash rating', `${p.crashThreshold} m/s`]);
 
+  // Reliability rating (from malfunction system).
+  if (def.reliability !== undefined) {
+    const pct = (def.reliability * 100).toFixed(0);
+    stats.push(['Reliability', `${pct} %`]);
+  }
+
   detailEl.innerHTML =
     `<div class="vab-detail-name">${def.name}</div>` +
     `<div class="vab-detail-type">${typeLbl}</div>` +

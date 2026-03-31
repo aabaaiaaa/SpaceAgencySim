@@ -33,7 +33,7 @@
  * 40 px wide.  Use this as a guide when sizing new parts.
  */
 
-import { PartType, FuelType } from '../core/constants.js';
+import { PartType, FuelType, RELIABILITY_TIERS } from '../core/constants.js';
 
 // ---------------------------------------------------------------------------
 // Activation Behaviour Enum
@@ -167,6 +167,13 @@ export const ActivationBehaviour = Object.freeze({
  *     - dragCoefficient {number}  Aerodynamic drag (dimensionless).
  *     - heatTolerance   {number}  Max temperature in K before part fails.
  *     - crashThreshold  {number}  Impact speed (m/s) the part can survive.
+ *
+ * @property {number} [reliability]
+ *   Base reliability rating (0.0 – 1.0).  Determines the probability that the
+ *   part will NOT malfunction when checked (higher = more reliable).  Defaults
+ *   to 1.0 (no malfunctions) if not specified.
+ *   Starter parts: 0.92, Mid-tier: 0.96, High-tier: 0.98.
+ *   Tech-tree upgrades add +0.02.
  */
 
 // ---------------------------------------------------------------------------
@@ -253,6 +260,7 @@ export const PARTS = [
     name: 'Mk1 Command Module',
     description: 'A single-seat crewed capsule. Features built-in RCS for attitude control and an ejector seat for emergency crew escape. Mount a parachute on top for safe re-entry.',
     type: PartType.COMMAND_MODULE,
+    reliability: RELIABILITY_TIERS.STARTER,
     mass: 840,
     cost: 8_000,
     width: 40,   // 2 m diameter
@@ -292,6 +300,7 @@ export const PARTS = [
     name: 'Probe Core Mk1',
     description: 'A lightweight uncrewed avionics pod. Perfect for scientific probes and satellite missions that do not require a crew. No ejector seat or RCS.',
     type: PartType.COMPUTER_MODULE,
+    reliability: RELIABILITY_TIERS.STARTER,
     mass: 50,
     cost: 5_000,
     width: 20,  // 1 m
@@ -330,6 +339,7 @@ export const PARTS = [
     name: 'Science Module Mk1',
     description: 'A science instrument container with 2 slots. Load instruments in the VAB, then activate them individually in flight to collect data. Can be stacked in-line or mounted radially.',
     type: PartType.SERVICE_MODULE,
+    reliability: RELIABILITY_TIERS.STARTER,
     mass: 200,
     cost: 12_000,
     width: 30,  // 1.5 m
@@ -364,6 +374,7 @@ export const PARTS = [
     name: 'Small Tank',
     description: 'A small liquid propellant tank. Holds 400 kg of fuel for powering rocket engines. Lightweight for upper stages or small first stages.',
     type: PartType.FUEL_TANK,
+    reliability: RELIABILITY_TIERS.STARTER,
     mass: 50,    // empty (dry) mass
     cost: 800,
     width: 20,   // 1 m
@@ -398,6 +409,7 @@ export const PARTS = [
     name: 'Medium Tank',
     description: 'A medium liquid propellant tank. Holds 1,800 kg of fuel. A versatile workhorse for first and upper stages of mid-sized rockets.',
     type: PartType.FUEL_TANK,
+    reliability: RELIABILITY_TIERS.MID,
     mass: 100,
     cost: 1_600,
     width: 30,   // 1.5 m
@@ -432,6 +444,7 @@ export const PARTS = [
     name: 'Large Tank',
     description: 'A large liquid propellant tank. Holds 8,000 kg of fuel. Essential for heavy rockets destined for orbit or beyond.',
     type: PartType.FUEL_TANK,
+    reliability: RELIABILITY_TIERS.HIGH,
     mass: 200,
     cost: 3_200,
     width: 40,   // 2 m
@@ -472,6 +485,7 @@ export const PARTS = [
     name: 'Spark Engine',
     description: 'A small, lightweight first-stage engine. Throttleable for precise thrust control. Good efficiency for its size — ideal for smaller rockets and upper stages.',
     type: PartType.ENGINE,
+    reliability: RELIABILITY_TIERS.STARTER,
     mass: 120,
     cost: 6_000,
     width: 20,  // 1 m
@@ -506,6 +520,7 @@ export const PARTS = [
     name: 'Reliant Engine',
     description: 'A large atmospheric workhorse engine. High thrust makes it ideal for heavy first stages. Fully throttleable for ascent profile control.',
     type: PartType.ENGINE,
+    reliability: RELIABILITY_TIERS.MID,
     mass: 500,
     cost: 12_000,
     width: 30,  // 1.5 m
@@ -544,6 +559,7 @@ export const PARTS = [
     name: 'Poodle Engine',
     description: 'A high-efficiency upper-stage engine. Better ISP trades raw thrust for fuel economy at altitude where atmospheric drag is minimal.',
     type: PartType.ENGINE,
+    reliability: RELIABILITY_TIERS.MID,
     mass: 180,
     cost: 9_000,
     width: 30,  // 1.5 m
@@ -582,6 +598,7 @@ export const PARTS = [
     name: 'Nerv Vacuum Engine',
     description: 'An extreme-efficiency vacuum engine. Outstanding ISP makes it ideal for deep-space missions and orbital manoeuvring. Performance degrades in thick atmosphere.',
     type: PartType.ENGINE,
+    reliability: RELIABILITY_TIERS.HIGH,
     mass: 250,
     cost: 15_000,
     width: 20,  // 1 m
@@ -622,6 +639,7 @@ export const PARTS = [
     name: 'SRB Small',
     description: 'A compact solid rocket booster. Attaches radially to boost first-stage thrust. Burns at a fixed rate until empty — cannot be throttled or shut down.',
     type: PartType.SOLID_ROCKET_BOOSTER,
+    reliability: RELIABILITY_TIERS.STARTER,
     mass: 180,    // empty (dry) mass
     cost: 3_000,
     width: 20,   // 1 m diameter
@@ -660,6 +678,7 @@ export const PARTS = [
     name: 'SRB Large',
     description: 'A heavy solid rocket booster. Provides massive first-stage thrust for heavy payloads. Cannot be throttled or stopped once ignited — plan your staging carefully.',
     type: PartType.SOLID_ROCKET_BOOSTER,
+    reliability: RELIABILITY_TIERS.MID,
     mass: 360,
     cost: 6_000,
     width: 30,   // 1.5 m diameter
@@ -701,6 +720,7 @@ export const PARTS = [
     name: 'Stack Decoupler TR-18',
     description: 'A standard in-line stage separation ring. Fires a one-shot charge to separate two stack sections. Place between stages to shed dead weight as fuel runs out.',
     type: PartType.STACK_DECOUPLER,
+    reliability: RELIABILITY_TIERS.STARTER,
     mass: 50,
     cost: 400,
     width: 40,  // 2 m — matches standard tank/capsule diameter
@@ -736,6 +756,7 @@ export const PARTS = [
     name: 'Radial Decoupler',
     description: 'A bracket that mounts a radial part (SRB, landing leg) to the main stack and separates it on command. Use to jettison spent boosters or landing gear.',
     type: PartType.RADIAL_DECOUPLER,
+    reliability: RELIABILITY_TIERS.STARTER,
     mass: 30,
     cost: 600,
     width: 10,  // 0.5 m
@@ -771,6 +792,7 @@ export const PARTS = [
     name: 'Small Landing Leg',
     description: 'Lightweight retractable landing legs. Extend before touchdown to cushion the landing. Safe for rockets up to 2,000 kg total mass at landing speed ≤10 m/s.',
     type: PartType.LANDING_LEGS,
+    reliability: RELIABILITY_TIERS.STARTER,
     mass: 80,
     cost: 1_200,
     width: 10,  // 0.5 m
@@ -801,6 +823,7 @@ export const PARTS = [
     name: 'Large Landing Leg',
     description: 'Heavy-duty retractable landing legs. Built for heavier rockets up to 8,000 kg. Essential for propulsive landings of first-stage boosters.',
     type: PartType.LANDING_LEGS,
+    reliability: RELIABILITY_TIERS.MID,
     mass: 180,
     cost: 2_000,
     width: 15,  // 0.75 m
@@ -836,6 +859,7 @@ export const PARTS = [
     name: 'Mk1 Parachute',
     description: 'A light recovery parachute for small capsules. Deploy during re-entry to slow descent. Mount on top of a command module or radially for symmetrical deployment.',
     type: PartType.PARACHUTE,
+    reliability: RELIABILITY_TIERS.STARTER,
     mass: 100,
     cost: 400,
     width: 20,  // 1 m
@@ -872,6 +896,7 @@ export const PARTS = [
     name: 'Mk2 Parachute',
     description: 'A heavy-duty recovery parachute for larger capsules. Can handle payloads up to 4,000 kg. Use multiple chutes for very heavy re-entry vehicles.',
     type: PartType.PARACHUTE,
+    reliability: RELIABILITY_TIERS.MID,
     mass: 250,
     cost: 800,
     width: 30,  // 1.5 m
@@ -910,6 +935,7 @@ export const PARTS = [
     name: 'Satellite Mk1',
     description: 'A deployable satellite payload. Carry it to orbit and activate RELEASE to separate it into independent flight. Required for satellite deployment missions.',
     type: PartType.SATELLITE,
+    reliability: RELIABILITY_TIERS.MID,
     mass: 300,
     cost: 20_000,
     width: 30,  // 1.5 m

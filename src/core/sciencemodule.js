@@ -72,6 +72,8 @@ import { PartType, ScienceDataType, DIMINISHING_RETURNS,
          ANALYSIS_TRANSMIT_YIELD_MIN, ANALYSIS_TRANSMIT_YIELD_MAX,
          FacilityId, RD_LAB_SCIENCE_BONUS } from './constants.js';
 import { getBiome, getBiomeId, getScienceMultiplier } from './biomes.js';
+import { hasMalfunction } from './malfunction.js';
+import { MalfunctionType } from './constants.js';
 
 // ---------------------------------------------------------------------------
 // Public constants
@@ -232,6 +234,14 @@ export function activateInstrument(ps, assembly, flightState, key) {
   if (!entry) return false;
   if (entry.state !== ScienceModuleState.IDLE) return false;
   if (!ps.activeParts.has(entry.moduleInstanceId)) return false;
+
+  // Block activation if the parent science module has an instrument failure.
+  if (hasMalfunction(ps, entry.moduleInstanceId)) {
+    const malf = ps.malfunctions?.get(entry.moduleInstanceId);
+    if (malf && malf.type === MalfunctionType.SCIENCE_INSTRUMENT_FAILURE) {
+      return false;
+    }
+  }
 
   const instrDef = getInstrumentById(entry.instrumentId);
   if (!instrDef) return false;

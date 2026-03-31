@@ -42,6 +42,14 @@ import {
 }                                                             from '../core/sciencemodule.js';
 import { getInstrumentById }                                  from '../data/instruments.js';
 import { ScienceDataType }                                    from '../core/constants.js';
+import {
+  hasMalfunction,
+  getMalfunction,
+  attemptRecovery,
+  MALFUNCTION_RECOVERY_TIPS,
+  MALFUNCTION_LABELS,
+}                                                             from '../core/malfunction.js';
+import { MalfunctionType }                                    from '../core/constants.js';
 
 // ---------------------------------------------------------------------------
 // CSS
@@ -271,6 +279,72 @@ function _showMenu(instanceId, def, ps, assembly, flightState, clientX, clientY)
 
   let hasItems = false;
 
+  // ── MALFUNCTION STATUS & RECOVERY ────────────────────────────────────────
+  if (hasMalfunction(ps, instanceId)) {
+    const malf = getMalfunction(ps, instanceId);
+    const label = MALFUNCTION_LABELS[malf.type] ?? malf.type;
+    const tip = MALFUNCTION_RECOVERY_TIPS[malf.type] ?? '';
+
+    // Show malfunction status.
+    const statusDiv = _makeReadOnly(`\u26A0 ${label}`);
+    statusDiv.style.color = '#ff6644';
+    statusDiv.style.fontWeight = '700';
+    _menu.appendChild(statusDiv);
+
+    if (tip) {
+      const tipDiv = _makeReadOnly(tip);
+      tipDiv.style.color = '#aa8855';
+      tipDiv.style.fontSize = '11px';
+      _menu.appendChild(tipDiv);
+    }
+
+    // Recovery actions based on type.
+    const recoverable = [
+      MalfunctionType.ENGINE_FLAMEOUT,
+      MalfunctionType.FUEL_TANK_LEAK,
+      MalfunctionType.DECOUPLER_STUCK,
+      MalfunctionType.SCIENCE_INSTRUMENT_FAILURE,
+      MalfunctionType.LANDING_LEGS_STUCK,
+    ];
+
+    if (recoverable.includes(malf.type)) {
+      const actionLabels = {
+        [MalfunctionType.ENGINE_FLAMEOUT]:           'Attempt Reignition',
+        [MalfunctionType.FUEL_TANK_LEAK]:            'Attempt Seal Leak',
+        [MalfunctionType.DECOUPLER_STUCK]:           'Manual Decouple',
+        [MalfunctionType.SCIENCE_INSTRUMENT_FAILURE]:'Reboot Instruments',
+        [MalfunctionType.LANDING_LEGS_STUCK]:        'Force Deploy Legs',
+      };
+
+      _menu.appendChild(_makeButton(actionLabels[malf.type] ?? 'Attempt Recovery', () => {
+        const result = attemptRecovery(ps, instanceId);
+        // If decoupler recovery succeeded, actually fire the separation.
+        if (result.success && malf.type === MalfunctionType.DECOUPLER_STUCK) {
+          const debris = activatePartDirect(ps, _getAssembly(), _getFlightState(), instanceId);
+          for (const frag of debris) {
+            ps.debris.push(frag);
+          }
+        }
+        // If landing legs recovery succeeded, deploy them.
+        if (result.success && malf.type === MalfunctionType.LANDING_LEGS_STUCK) {
+          deployLandingLeg(ps, instanceId);
+        }
+        _hideMenu();
+      }));
+    } else {
+      // Non-recoverable — show info only.
+      const noFixDiv = _makeReadOnly('No recovery available');
+      noFixDiv.style.color = '#665544';
+      _menu.appendChild(noFixDiv);
+    }
+
+    const malfDivider = document.createElement('div');
+    malfDivider.className = 'fctx-divider';
+    _menu.appendChild(malfDivider);
+
+    hasItems = true;
+  }
+
   // ── FUEL TANK: read-only fuel display ────────────────────────────────────
   if (def.type === PartType.FUEL_TANK || def.type === PartType.SOLID_ROCKET_BOOSTER) {
     const fuelRemaining = ps.fuelStore?.get(instanceId) ?? 0;
@@ -293,12 +367,24 @@ function _showMenu(instanceId, def, ps, assembly, flightState, clientX, clientY)
         const instrState = getInstrumentStatus(ps, key);
         const dataLabel = entry.dataType === ScienceDataType.SAMPLE ? '[Sample]' : '[Analysis]';
 
+        // Check for instrument failure malfunction on this module.
+        const sciMalf = getMalfunction(ps, instanceId);
+        const instrFailed = sciMalf && !sciMalf.recovered &&
+          sciMalf.type === MalfunctionType.SCIENCE_INSTRUMENT_FAILURE;
+
         switch (instrState) {
           case ScienceModuleState.IDLE:
-            _menu.appendChild(_makeButton(`Activate ${instrName} ${dataLabel}`, () => {
-              activateInstrument(ps, assembly, flightState, key);
-              _hideMenu();
-            }));
+            if (instrFailed) {
+              const failBtn = _makeButton(`${instrName}: Instruments Failed`, null);
+              failBtn.classList.add('fctx-item-disabled');
+              failBtn.disabled = true;
+              _menu.appendChild(failBtn);
+            } else {
+              _menu.appendChild(_makeButton(`Activate ${instrName} ${dataLabel}`, () => {
+                activateInstrument(ps, assembly, flightState, key);
+                _hideMenu();
+              }));
+            }
             break;
 
           case ScienceModuleState.RUNNING: {
@@ -380,6 +466,11 @@ function _showMenu(instanceId, def, ps, assembly, flightState, clientX, clientY)
     const mirrorStatus = mirrorId ? getLegStatus(ps, mirrorId) : null;
     const hasMirror = mirrorId && mirrorStatus != null;
 
+    // Block normal deployment if legs are stuck (recovery handles it above).
+    const legMalf = getMalfunction(ps, instanceId);
+    const legsStuck = legMalf && !legMalf.recovered &&
+      legMalf.type === MalfunctionType.LANDING_LEGS_STUCK;
+
     const _emitLegActivated = (id) => {
       if (flightState?.events) {
         flightState.events.push({
@@ -392,7 +483,10 @@ function _showMenu(instanceId, def, ps, assembly, flightState, clientX, clientY)
       }
     };
 
-    if (legStatus === LegState.RETRACTED) {
+    if (legsStuck && legStatus === LegState.RETRACTED) {
+      // Shown as stuck — recovery button is in the malfunction section above.
+      _menu.appendChild(_makeReadOnly('Legs: Stuck (see recovery above)'));
+    } else if (legStatus === LegState.RETRACTED) {
       if (hasMirror && mirrorStatus === LegState.RETRACTED) {
         _menu.appendChild(_makeButton('Deploy Both Legs', () => {
           deployLandingLeg(ps, instanceId);

@@ -36,6 +36,7 @@ import { airDensity }  from '../core/atmosphere.js';
 import { getBiome, getBiomeTransition, BIOME_FADE_RANGE } from '../core/biomes.js';
 import { DEPLOY_DURATION } from '../core/parachute.js';
 import { LegState, LEG_DEPLOY_DURATION, getDeployedLegFootOffset } from '../core/legs.js';
+import { hasMalfunction, MALFUNCTION_LABELS } from '../core/malfunction.js';
 
 // ---------------------------------------------------------------------------
 // Scale constants
@@ -1107,6 +1108,52 @@ function _drawPartRect(g, placed, def, alpha = 1) {
 }
 
 /**
+ * Draw pulsing warning overlays on all parts with active malfunctions.
+ *
+ * A translucent red-orange rectangle is drawn over each malfunctioning part,
+ * with a pulsing alpha based on the current time (sine wave, ~2 Hz).
+ *
+ * @param {PIXI.Graphics}                                    g
+ * @param {import('../core/physics.js').PhysicsState}        ps
+ * @param {import('../core/rocketbuilder.js').RocketAssembly} assembly
+ */
+function _drawMalfunctionOverlays(g, ps, assembly) {
+  if (!ps.malfunctions || ps.malfunctions.size === 0) return;
+
+  // Pulsing alpha: oscillates between 0.15 and 0.45 at ~2 Hz.
+  const pulse = 0.30 + 0.15 * Math.sin(Date.now() * 0.012);
+
+  for (const [instanceId, entry] of ps.malfunctions) {
+    if (entry.recovered) continue;
+    if (!ps.activeParts.has(instanceId)) continue;
+
+    const placed = assembly.parts.get(instanceId);
+    if (!placed) continue;
+    const def = getPartById(placed.partId);
+    if (!def) continue;
+
+    const lx = placed.x;
+    const ly = -placed.y;
+    const pw = def.width  ?? 40;
+    const ph = def.height ?? 20;
+
+    // Red-orange warning overlay.
+    g.rect(lx - pw / 2, ly - ph / 2, pw, ph);
+    g.fill({ color: 0xff4422, alpha: pulse });
+    g.stroke({ color: 0xff6633, width: 2, alpha: pulse + 0.2 });
+
+    // Small warning triangle indicator at top-right corner.
+    const tx = lx + pw / 2 - 3;
+    const ty = ly - ph / 2 + 2;
+    g.moveTo(tx, ty);
+    g.lineTo(tx + 5, ty + 8);
+    g.lineTo(tx - 5, ty + 8);
+    g.closePath();
+    g.fill({ color: 0xffaa00, alpha: 0.9 });
+  }
+}
+
+/**
  * Determine which side of the rocket a landing leg is attached to by
  * inspecting the assembly's connection graph.  Returns +1 for right-side
  * legs and -1 for left-side legs.
@@ -1489,6 +1536,9 @@ function _renderRocket(ps, assembly, w, h) {
       _drawPartRect(g, placed, def, 0.9);
     }
   }
+
+  // Draw malfunction overlays: pulsing red-orange border + warning stripe.
+  _drawMalfunctionOverlays(g, ps, assembly);
 
   // Draw deployed parachute canopies independently (in world space, not rotating with rocket).
   _drawParachuteCanopies(ps, assembly, w, h);

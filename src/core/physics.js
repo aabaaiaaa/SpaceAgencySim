@@ -77,6 +77,14 @@ import {
   onSafeLanding,
 } from './sciencemodule.js';
 import { getBiomeId } from './biomes.js';
+import {
+  initMalfunctionState,
+  checkMalfunctions,
+  tickMalfunctions,
+  hasMalfunction,
+  getMalfunction,
+} from './malfunction.js';
+import { MalfunctionType, REDUCED_THRUST_FACTOR, PARTIAL_CHUTE_FACTOR } from './constants.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -322,6 +330,9 @@ export function createPhysicsState(assembly, flightState) {
   // Initialise the science module state machine for all SERVICE_MODULE parts
   // with COLLECT_SCIENCE activation behaviour.
   initScienceModuleStates(ps, assembly);
+
+  // Initialise the malfunction system for all parts.
+  initMalfunctionState(ps, assembly);
 
   // Flag on flightState so mission objective checking knows whether science
   // modules are present (used to gate HOLD_ALTITUDE time accumulation).
@@ -709,6 +720,18 @@ function _integrate(ps, assembly, flightState) {
   // --- 8. Fuel consumption (segment-aware, via fuelsystem.js) -------------
   tickFuelSystem(ps, assembly, FIXED_DT, density);
 
+  // --- 8b. Malfunction tick (continuous effects like fuel leaks) ----------
+  tickMalfunctions(ps, assembly, FIXED_DT);
+
+  // --- 8c. Pending malfunction check (delayed after biome transition) -----
+  if (ps._malfunctionCheckPending) {
+    ps._malfunctionCheckTimer -= FIXED_DT;
+    if (ps._malfunctionCheckTimer <= 0) {
+      ps._malfunctionCheckPending = false;
+      checkMalfunctions(ps, assembly, flightState, ps._gameState ?? null);
+    }
+  }
+
   // --- 9. Parachute state machine ------------------------------------------
   // Advance deploying → deployed timers and run the mass-safety check.
   // totalMass was computed at step 1 above.
@@ -994,7 +1017,13 @@ function _computeThrust(ps, assembly, density) {
 
     // Throttle: SRBs always at 100 %; liquid engines use current setting.
     const throttleMult     = isSRB ? 1.0 : ps.throttle;
-    const effectiveThrustN = rawThrustN * throttleMult;
+    let   effectiveThrustN = rawThrustN * throttleMult;
+
+    // Apply reduced thrust from ENGINE_REDUCED_THRUST malfunction.
+    const malf = ps.malfunctions?.get(instanceId);
+    if (malf && !malf.recovered && malf.type === MalfunctionType.ENGINE_REDUCED_THRUST) {
+      effectiveThrustN *= REDUCED_THRUST_FACTOR;
+    }
 
     totalThrustN += effectiveThrustN;
   }
@@ -1081,7 +1110,15 @@ function _computeDragForce(ps, assembly, density, speed) {
       // Scale by atmospheric density so chutes are ineffective near vacuum.
       const progress     = _getChuteDeployProgress(ps, instanceId);
       const densityScale = Math.min(1, density / LOW_DENSITY_THRESHOLD);
-      totalCdA += stowedCdA + (deployedCdA - stowedCdA) * progress * densityScale;
+      let   chuteCdA     = stowedCdA + (deployedCdA - stowedCdA) * progress * densityScale;
+
+      // Partial deploy malfunction: 50 % of normal deployed drag.
+      const cMalf = ps.malfunctions?.get(instanceId);
+      if (cMalf && !cMalf.recovered && cMalf.type === MalfunctionType.PARACHUTE_PARTIAL) {
+        chuteCdA = stowedCdA + (chuteCdA - stowedCdA) * PARTIAL_CHUTE_FACTOR;
+      }
+
+      totalCdA += chuteCdA;
     } else {
       totalCdA += (props.dragCoefficient ?? 0.2) * area;
     }
@@ -2084,6 +2121,13 @@ function _syncFlightState(ps, assembly, flightState) {
         altitude:    flightState.altitude,
         description: `Entered ${newBiome.replace(/_/g, ' ').toLowerCase()} biome at ${flightState.altitude.toFixed(0)} m.`,
       });
+
+      // Schedule a malfunction check with a small random delay (0.5–2.0 s)
+      // so it doesn't fire at the exact biome boundary — adds unpredictability.
+      if (ps._malfunctionCheckPending !== true) {
+        ps._malfunctionCheckPending = true;
+        ps._malfunctionCheckTimer = 0.5 + Math.random() * 1.5;
+      }
     }
   }
 

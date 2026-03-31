@@ -50,6 +50,7 @@ import {
   checkBandLimitWarning,
   getDockingThrustDirections,
 } from '../core/controlMode.js';
+import { setMalfunctionMode, getMalfunctionMode } from '../core/malfunction.js';
 
 // ---------------------------------------------------------------------------
 // Module state
@@ -807,10 +808,20 @@ export function startFlightScene(
   // Create the physics state from the (normalised) assembly and initial flight state.
   _ps = createPhysicsState(_assembly, flightState);
 
+  // Store a reference to the top-level game state so the malfunction system
+  // can look up crew engineering skills during reliability checks.
+  _ps._gameState = _state;
+
   // Expose for E2E testing — Playwright reads live physics values here.
   if (typeof window !== 'undefined') {
     window.__flightPs       = _ps;
     window.__flightAssembly = _assembly;
+    // Malfunction mode control for E2E testing:
+    //   window.__setMalfunctionMode('off')    — disable all malfunctions
+    //   window.__setMalfunctionMode('forced') — force all malfunctions to 100%
+    //   window.__setMalfunctionMode('normal') — standard reliability rolls
+    window.__setMalfunctionMode = setMalfunctionMode;
+    window.__getMalfunctionMode = getMalfunctionMode;
   }
 
   // Boot the PixiJS flight renderer (clears whatever scene was on stage).

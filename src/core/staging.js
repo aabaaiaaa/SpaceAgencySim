@@ -52,6 +52,8 @@ import { deployLandingLeg, getDeployedLegFootOffset } from './legs.js';
 import { activateEjectorSeat } from './ejector.js';
 import { activateScienceModule, activateInstrument, parseInstrumentKey } from './sciencemodule.js';
 import { applySeparationImpulse } from './collision.js';
+import { hasMalfunction, getMalfunction } from './malfunction.js';
+import { MalfunctionType } from './constants.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -207,6 +209,20 @@ export function activateCurrentStage(ps, assembly, stagingConfig, flightState) {
         break;
 
       case 'SEPARATE': {
+        // DECOUPLER_STUCK malfunction: skip automatic staging (player must
+        // manually decouple via context menu).
+        const decMalf = getMalfunction(ps, instanceId);
+        if (decMalf && !decMalf.recovered && decMalf.type === MalfunctionType.DECOUPLER_STUCK) {
+          _emitEvent(flightState, {
+            type:        'MALFUNCTION_BLOCKED',
+            time,
+            instanceId,
+            partType:    def.type,
+            description: `${def.name} stuck — manual decouple required.`,
+          });
+          break;
+        }
+
         // DECOUPLER (stack or radial) — fire one-shot separation charge.
         _emitEvent(flightState, {
           type:        'PART_ACTIVATED',
@@ -252,7 +268,20 @@ export function activateCurrentStage(ps, assembly, stagingConfig, flightState) {
         break;
       }
 
-      case 'DEPLOY':
+      case 'DEPLOY': {
+        // Check for LANDING_LEGS_STUCK malfunction: block deployment via staging.
+        const legMalf = getMalfunction(ps, instanceId);
+        if (legMalf && !legMalf.recovered && legMalf.type === MalfunctionType.LANDING_LEGS_STUCK) {
+          _emitEvent(flightState, {
+            type:        'MALFUNCTION_BLOCKED',
+            time,
+            instanceId,
+            partType:    def.type,
+            description: `${def.name} stuck — manual deployment required.`,
+          });
+          break;
+        }
+
         // PARACHUTE or LANDING_LEGS — deploy / extend.
         // Both types start a state-machine transition:
         //   PARACHUTE    → deploying (2 s animation) → deployed
@@ -273,6 +302,7 @@ export function activateCurrentStage(ps, assembly, stagingConfig, flightState) {
           description: `${def.name} deployed at ${altitude.toFixed(0)} m.`,
         });
         break;
+      }
 
       case 'EJECT':
         // COMMAND_MODULE ejector seat — emergency crew escape.

@@ -637,3 +637,85 @@ export const OrbitalObjectType = Object.freeze({
   DEBRIS: 'DEBRIS',
   STATION: 'STATION',
 });
+
+// ---------------------------------------------------------------------------
+// Malfunction System
+// ---------------------------------------------------------------------------
+
+/**
+ * Types of part malfunctions that can occur during flight.
+ * Each malfunction has specific effects and recovery options.
+ * @enum {string}
+ */
+export const MalfunctionType = Object.freeze({
+  /** Engine loses all thrust; player can attempt reignition via context menu. */
+  ENGINE_FLAMEOUT: 'ENGINE_FLAMEOUT',
+  /** Engine output drops to 60 % of nominal. */
+  ENGINE_REDUCED_THRUST: 'ENGINE_REDUCED_THRUST',
+  /** Fuel tank loses ~2 %/s of remaining propellant. */
+  FUEL_TANK_LEAK: 'FUEL_TANK_LEAK',
+  /** Decoupler fails to fire via staging; player must manually decouple via context menu. */
+  DECOUPLER_STUCK: 'DECOUPLER_STUCK',
+  /** Parachute deploys at 50 % effectiveness (half drag). */
+  PARACHUTE_PARTIAL: 'PARACHUTE_PARTIAL',
+  /** SRB burns out earlier than expected (lose remaining fuel). */
+  SRB_EARLY_BURNOUT: 'SRB_EARLY_BURNOUT',
+  /** Science module instruments fail — cannot activate experiments. */
+  SCIENCE_INSTRUMENT_FAILURE: 'SCIENCE_INSTRUMENT_FAILURE',
+  /** Landing legs refuse to deploy via staging; stuck in stowed position. */
+  LANDING_LEGS_STUCK: 'LANDING_LEGS_STUCK',
+});
+
+/**
+ * Malfunction mode for E2E testing.
+ *   'normal'  — reliability rolls happen as designed
+ *   'off'     — no malfunctions ever trigger (testing reliability)
+ *   'forced'  — every roll triggers a malfunction at 100 % (testing effects)
+ * @enum {string}
+ */
+export const MalfunctionMode = Object.freeze({
+  NORMAL: 'normal',
+  OFF:    'off',
+  FORCED: 'forced',
+});
+
+/**
+ * Mapping from PartType to which MalfunctionType(s) can affect that part.
+ * When a malfunction roll succeeds, one type is chosen from the applicable list.
+ * @type {Readonly<Record<string, readonly string[]>>}
+ */
+export const MALFUNCTION_TYPE_MAP = Object.freeze({
+  [PartType.ENGINE]:               Object.freeze([MalfunctionType.ENGINE_FLAMEOUT, MalfunctionType.ENGINE_REDUCED_THRUST]),
+  [PartType.FUEL_TANK]:            Object.freeze([MalfunctionType.FUEL_TANK_LEAK]),
+  [PartType.SOLID_ROCKET_BOOSTER]: Object.freeze([MalfunctionType.SRB_EARLY_BURNOUT]),
+  [PartType.STACK_DECOUPLER]:      Object.freeze([MalfunctionType.DECOUPLER_STUCK]),
+  [PartType.RADIAL_DECOUPLER]:     Object.freeze([MalfunctionType.DECOUPLER_STUCK]),
+  [PartType.DECOUPLER]:            Object.freeze([MalfunctionType.DECOUPLER_STUCK]),
+  [PartType.PARACHUTE]:            Object.freeze([MalfunctionType.PARACHUTE_PARTIAL]),
+  [PartType.SERVICE_MODULE]:       Object.freeze([MalfunctionType.SCIENCE_INSTRUMENT_FAILURE]),
+  [PartType.LANDING_LEGS]:         Object.freeze([MalfunctionType.LANDING_LEGS_STUCK]),
+  [PartType.LANDING_LEG]:          Object.freeze([MalfunctionType.LANDING_LEGS_STUCK]),
+});
+
+/** Fuel leak rate as fraction of remaining fuel per second (~2 %/s). */
+export const FUEL_LEAK_RATE = 0.02;
+
+/** Thrust multiplier for ENGINE_REDUCED_THRUST malfunction (60 %). */
+export const REDUCED_THRUST_FACTOR = 0.60;
+
+/** Drag multiplier for PARACHUTE_PARTIAL malfunction (50 % effectiveness). */
+export const PARTIAL_CHUTE_FACTOR = 0.50;
+
+/** Maximum crew engineering skill reduction to malfunction chance (30 %). */
+export const MAX_ENGINEERING_MALFUNCTION_REDUCTION = 0.30;
+
+/**
+ * Default reliability values by part tier.
+ * Parts reference these when defining their `reliability` property.
+ */
+export const RELIABILITY_TIERS = Object.freeze({
+  STARTER:  0.92,
+  MID:      0.96,
+  HIGH:     0.98,
+  UPGRADE_BONUS: 0.02,
+});
