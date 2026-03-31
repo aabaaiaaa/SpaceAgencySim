@@ -848,6 +848,7 @@ export function startFlightScene(
   if (typeof window !== 'undefined') {
     window.__flightPs       = _ps;
     window.__flightAssembly = _assembly;
+    window.__flightState    = flightState;
     // Malfunction mode control for E2E testing:
     //   window.__setMalfunctionMode('off')    — disable all malfunctions
     //   window.__setMalfunctionMode('forced') — force all malfunctions to 100%
@@ -974,6 +975,7 @@ export function stopFlightScene() {
   if (typeof window !== 'undefined') {
     window.__flightPs       = null;
     window.__flightAssembly = null;
+    window.__flightState    = null;
   }
 
   _ps                    = null;

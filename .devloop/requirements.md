@@ -352,7 +352,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 **Rule: Every player-facing feature must have E2E test coverage. All tests (unit + E2E) must pass before work on that phase is considered complete.**
 
 ### TASK-052: Automated E2E test infrastructure
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: none
 - **Description**: Save game states or generated game states must allow any part of game progression to be tested in isolation. Malfunction system must support off/forced-100% for test determinism. All new objective types must have automated tests verifying completion. This infrastructure underpins all per-phase E2E test tasks below and must be built first.

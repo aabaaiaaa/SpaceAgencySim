@@ -1,0 +1,299 @@
+/**
+ * fixtures.js — Pre-built game state factories for E2E testing.
+ *
+ * Each fixture represents a specific point in game progression, allowing
+ * tests to start from any phase without replaying earlier gameplay.
+ *
+ * Usage:
+ *   import { earlyGameFixture } from './fixtures.js';
+ *   const envelope = earlyGameFixture({ money: 500_000 });
+ *   await seedAndLoadSave(page, envelope);
+ */
+
+import {
+  STARTING_MONEY,
+  STARTER_FACILITIES,
+  ALL_FACILITIES,
+  FacilityId,
+  buildSaveEnvelope,
+  buildCrewMember,
+  buildContract,
+  buildObjective,
+} from './helpers.js';
+
+// ---------------------------------------------------------------------------
+// Part sets at various progression stages
+// ---------------------------------------------------------------------------
+
+/** Starter parts available from the very beginning (non-tutorial). */
+export const STARTER_PARTS = [
+  'probe-core-mk1', 'tank-small', 'engine-spark', 'parachute-mk1',
+  'science-module-mk1', 'cmd-mk1',
+];
+
+/** Early game — starters + first mission rewards. */
+export const EARLY_PARTS = [
+  ...STARTER_PARTS,
+  'tank-medium', 'srb-small', 'decoupler-stack-tr18',
+];
+
+/** Mid game — includes landing legs, larger tanks, science instruments. */
+export const MID_PARTS = [
+  ...EARLY_PARTS,
+  'engine-reliant', 'tank-large', 'srb-large', 'decoupler-radial',
+  'parachute-mk2', 'landing-legs-small', 'landing-legs-large',
+  'satellite-mk1',
+];
+
+/** Late game — orbital-capable, all parts unlocked. */
+export const ALL_PARTS = [
+  ...MID_PARTS,
+  'engine-poodle', 'engine-nerv',
+  'satellite-comm', 'satellite-weather', 'satellite-science',
+  'satellite-gps', 'satellite-relay',
+  'docking-port-std', 'docking-port-small',
+];
+
+// ---------------------------------------------------------------------------
+// Fixture: Fresh start (non-tutorial)
+// ---------------------------------------------------------------------------
+
+/**
+ * Brand-new game, non-tutorial mode. Starter parts unlocked, starter facilities
+ * built, no missions attempted.
+ *
+ * @param {object} [overrides]  Fields to override on the save envelope.
+ * @returns {object} Save envelope ready for seedAndLoadSave.
+ */
+export function freshStartFixture(overrides = {}) {
+  return buildSaveEnvelope({
+    saveName:     'Fresh Start',
+    agencyName:   'Test Agency',
+    parts:        STARTER_PARTS,
+    tutorialMode: false,
+    ...overrides,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Fixture: Early game (a few flights completed)
+// ---------------------------------------------------------------------------
+
+/**
+ * Early game: 3 missions completed, some money earned, basic parts unlocked.
+ * Represents Phase 0 completion / early Phase 1.
+ *
+ * @param {object} [overrides]
+ * @returns {object}
+ */
+export function earlyGameFixture(overrides = {}) {
+  return buildSaveEnvelope({
+    saveName:       'Early Game',
+    agencyName:     'Early Test Agency',
+    money:          2_200_000,
+    loan:           { balance: 1_800_000, interestRate: 0.03, totalInterestAccrued: 12_000 },
+    parts:          EARLY_PARTS,
+    currentPeriod:  3,
+    tutorialMode:   false,
+    missions: {
+      available: [],
+      accepted:  [],
+      completed: [
+        { id: 'mission-001', title: 'First Flight',     objectives: [{ id: 'obj-001-1', type: 'REACH_ALTITUDE', target: { altitude: 100 },  completed: true }], reward: 15_000, status: 'completed' },
+        { id: 'mission-002', title: 'Higher Ground',    objectives: [{ id: 'obj-002-1', type: 'REACH_ALTITUDE', target: { altitude: 500 },  completed: true }], reward: 25_000, status: 'completed' },
+        { id: 'mission-003', title: 'Breaking Records', objectives: [{ id: 'obj-003-1', type: 'REACH_ALTITUDE', target: { altitude: 2000 }, completed: true }], reward: 40_000, status: 'completed' },
+      ],
+    },
+    flightHistory: [
+      { id: 'fh-1', missionId: 'mission-001', outcome: 'SUCCESS' },
+      { id: 'fh-2', missionId: 'mission-002', outcome: 'SUCCESS' },
+      { id: 'fh-3', missionId: 'mission-003', outcome: 'SUCCESS' },
+    ],
+    reputation:   58,
+    ...overrides,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Fixture: Mid game (crew, facilities, science)
+// ---------------------------------------------------------------------------
+
+/**
+ * Mid game: multiple facilities built, crew hired, science collected,
+ * tech researched. Represents Phase 2–3 gameplay.
+ *
+ * @param {object} [overrides]
+ * @returns {object}
+ */
+export function midGameFixture(overrides = {}) {
+  return buildSaveEnvelope({
+    saveName:       'Mid Game',
+    agencyName:     'Mid Test Agency',
+    money:          3_500_000,
+    loan:           { balance: 1_000_000, interestRate: 0.03, totalInterestAccrued: 60_000 },
+    parts:          MID_PARTS,
+    currentPeriod:  10,
+    tutorialMode:   false,
+    facilities: {
+      ...ALL_FACILITIES,
+    },
+    crew: [
+      buildCrewMember({ id: 'crew-1', name: 'Alice Shepard', skills: { piloting: 70, engineering: 40, science: 30 } }),
+      buildCrewMember({ id: 'crew-2', name: 'Bob Kerman',    skills: { piloting: 30, engineering: 70, science: 20 } }),
+      buildCrewMember({ id: 'crew-3', name: 'Carol Ride',    skills: { piloting: 20, engineering: 20, science: 80 } }),
+    ],
+    missions: {
+      available: [],
+      accepted:  [],
+      completed: [
+        { id: 'mission-001', title: 'First Flight',     objectives: [], reward: 15_000, status: 'completed' },
+        { id: 'mission-002', title: 'Higher Ground',    objectives: [], reward: 25_000, status: 'completed' },
+        { id: 'mission-003', title: 'Breaking Records', objectives: [], reward: 40_000, status: 'completed' },
+        { id: 'mission-004', title: 'Crew Training',    objectives: [], reward: 50_000, status: 'completed' },
+        { id: 'mission-005', title: 'Speed Demon',      objectives: [], reward: 60_000, status: 'completed' },
+        { id: 'mission-006', title: 'Science Flight',   objectives: [], reward: 75_000, status: 'completed' },
+        { id: 'mission-007', title: 'Return Science',   objectives: [], reward: 80_000, status: 'completed' },
+        { id: 'mission-008', title: 'Crash Test',       objectives: [], reward: 90_000, status: 'completed' },
+      ],
+    },
+    flightHistory: Array.from({ length: 8 }, (_, i) => ({
+      id: `fh-${i + 1}`,
+      missionId: `mission-00${i + 1}`,
+      outcome: 'SUCCESS',
+    })),
+    reputation:     72,
+    sciencePoints:  45,
+    scienceLog: [
+      { instrumentId: 'thermometer-mk1', biomeId: 'lower-atmosphere', count: 3 },
+      { instrumentId: 'thermometer-mk1', biomeId: 'upper-atmosphere', count: 2 },
+    ],
+    techTree: {
+      researched: [],
+      unlockedInstruments: ['thermometer-mk1'],
+    },
+    ...overrides,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Fixture: Orbital-capable (late game)
+// ---------------------------------------------------------------------------
+
+/**
+ * Late game: orbital capability, satellites deployed, full tech tree,
+ * advanced contracts. Represents Phase 5–6 gameplay.
+ *
+ * @param {object} [overrides]
+ * @returns {object}
+ */
+export function orbitalFixture(overrides = {}) {
+  return buildSaveEnvelope({
+    saveName:       'Orbital',
+    agencyName:     'Orbital Test Agency',
+    money:          8_000_000,
+    loan:           { balance: 0, interestRate: 0.03, totalInterestAccrued: 200_000 },
+    parts:          ALL_PARTS,
+    currentPeriod:  25,
+    tutorialMode:   false,
+    facilities:     { ...ALL_FACILITIES },
+    crew: [
+      buildCrewMember({ id: 'crew-1', name: 'Alice Shepard', skills: { piloting: 90, engineering: 60, science: 50 }, missionsFlown: 12 }),
+      buildCrewMember({ id: 'crew-2', name: 'Bob Kerman',    skills: { piloting: 40, engineering: 90, science: 40 }, missionsFlown: 10 }),
+      buildCrewMember({ id: 'crew-3', name: 'Carol Ride',    skills: { piloting: 30, engineering: 30, science: 95 }, missionsFlown: 8 }),
+      buildCrewMember({ id: 'crew-4', name: 'Dave Aldrin',   skills: { piloting: 80, engineering: 50, science: 60 }, missionsFlown: 6 }),
+    ],
+    missions: {
+      available: [],
+      accepted:  [],
+      completed: Array.from({ length: 16 }, (_, i) => ({
+        id: `mission-${String(i + 1).padStart(3, '0')}`,
+        title: `Completed Mission ${i + 1}`,
+        objectives: [],
+        reward: 50_000 + i * 25_000,
+        status: 'completed',
+      })),
+    },
+    flightHistory: Array.from({ length: 20 }, (_, i) => ({
+      id: `fh-${i + 1}`,
+      missionId: i < 16 ? `mission-${String(i + 1).padStart(3, '0')}` : null,
+      outcome: 'SUCCESS',
+    })),
+    reputation:     90,
+    sciencePoints:  120,
+    scienceLog: [
+      { instrumentId: 'thermometer-mk1', biomeId: 'lower-atmosphere', count: 5 },
+      { instrumentId: 'thermometer-mk1', biomeId: 'upper-atmosphere', count: 4 },
+      { instrumentId: 'thermometer-mk1', biomeId: 'near-space',       count: 3 },
+      { instrumentId: 'barometer',        biomeId: 'lower-atmosphere', count: 3 },
+      { instrumentId: 'barometer',        biomeId: 'upper-atmosphere', count: 2 },
+    ],
+    techTree: {
+      researched: [],
+      unlockedInstruments: ['thermometer-mk1', 'barometer', 'radiation-detector'],
+    },
+    satelliteNetwork: {
+      satellites: [
+        { id: 'sat-1', name: 'CommSat-1', partId: 'satellite-comm', bodyId: 'EARTH', bandId: 'LEO', health: 90, autoMaintain: true, deployedPeriod: 15 },
+      ],
+    },
+    ...overrides,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Fixture builder: custom mission / contract in flight-ready state
+// ---------------------------------------------------------------------------
+
+/**
+ * Create a fixture with a specific accepted mission, ready to fly.
+ * Useful for testing individual objective types in isolation.
+ *
+ * @param {object} mission         Mission object (must have id, objectives, reward).
+ * @param {object} [stateOverrides] Additional state overrides.
+ * @returns {object}
+ */
+export function missionTestFixture(mission, stateOverrides = {}) {
+  return buildSaveEnvelope({
+    saveName:     'Mission Test',
+    agencyName:   'Mission Test Agency',
+    parts:        ALL_PARTS,
+    tutorialMode: false,
+    facilities:   { ...ALL_FACILITIES },
+    crew: [
+      buildCrewMember({ id: 'crew-1', name: 'Test Pilot', skills: { piloting: 80, engineering: 50, science: 50 } }),
+    ],
+    missions: {
+      available: [],
+      accepted:  [{ ...mission, status: 'accepted' }],
+      completed: [],
+    },
+    ...stateOverrides,
+  });
+}
+
+/**
+ * Create a fixture with a specific active contract, ready to fly.
+ *
+ * @param {object} contract        Contract object (must have id, objectives, reward).
+ * @param {object} [stateOverrides]
+ * @returns {object}
+ */
+export function contractTestFixture(contract, stateOverrides = {}) {
+  return buildSaveEnvelope({
+    saveName:     'Contract Test',
+    agencyName:   'Contract Test Agency',
+    parts:        ALL_PARTS,
+    tutorialMode: false,
+    facilities:   { ...ALL_FACILITIES },
+    crew: [
+      buildCrewMember({ id: 'crew-1', name: 'Test Pilot', skills: { piloting: 80, engineering: 50, science: 50 } }),
+    ],
+    contracts: {
+      board:     [],
+      active:    [contract],
+      completed: [],
+      failed:    [],
+    },
+    ...stateOverrides,
+  });
+}
