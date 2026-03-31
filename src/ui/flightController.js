@@ -37,8 +37,8 @@ import { PartType, DEATH_FINE_PER_ASTRONAUT } from '../core/constants.js';
 import { processFlightReturn } from '../core/flightReturn.js';
 import { setTopBarFlightItems, clearTopBarFlightItems, setTopBarDropdownToggleCallback, refreshTopBar } from './topbar.js';
 import { FlightPhase, ControlMode } from '../core/constants.js';
-import { evaluateAutoTransitions, canReturnToAgency, isPlayerLocked, getPhaseLabel, transitionPhase } from '../core/flightPhase.js';
-import { checkOrbitStatus } from '../core/orbit.js';
+import { evaluateAutoTransitions, canReturnToAgency, isPlayerLocked, getPhaseLabel, transitionPhase, getDeorbitWarningMessage } from '../core/flightPhase.js';
+import { checkOrbitStatus, getMinOrbitAltitude, getOrbitEntryLabel } from '../core/orbit.js';
 import {
   enterDockingMode,
   exitDockingMode,
@@ -613,6 +613,12 @@ const FLIGHT_CTRL_CSS = `
   transition: opacity 1s ease-out;
 }
 
+.phase-notification-warning {
+  background: rgba(120, 80, 10, 0.9);
+  border: 1px solid rgba(255, 180, 50, 0.6);
+  color: #ffe0a0;
+}
+
 .phase-notification-fade {
   opacity: 0;
 }
@@ -961,6 +967,7 @@ export function stopFlightScene() {
   _prevInSpace         = false;
 
   _summaryShown = false;
+  _deorbitWarningActive = false;
 
   console.log('[Flight Controller] Flight scene stopped');
 }
@@ -1143,47 +1150,50 @@ function _onTimeWarpButtonClick(level) {
 
 /**
  * Run flight-phase auto-detection once per frame.  Checks orbit status when
- * the craft is above the atmosphere and passes the result to the state machine.
- * Shows a notification label on phase transitions.
+ * the craft is above the minimum orbit altitude for the current body and passes
+ * the result to the state machine.
+ * Shows a notification label on phase transitions, including the named altitude
+ * band on orbit entry (e.g. "Low Earth Orbit" instead of "Orbit").
  */
 function _evaluateFlightPhase() {
   if (!_ps || !_flightState) return;
 
-  // Only compute orbit status when above the atmosphere (posY >= 70 km).
+  const bodyId = _flightState.bodyId || 'EARTH';
+  const minOrbitAlt = getMinOrbitAltitude(bodyId);
+
+  // Only compute orbit status when above the minimum orbit altitude.
   let orbitStatus = null;
-  if (_ps.posY >= 70_000 && !_ps.landed && !_ps.crashed) {
-    orbitStatus = checkOrbitStatus(_ps.posX, _ps.posY, _ps.velX, _ps.velY, 'EARTH');
+  if (_ps.posY >= minOrbitAlt && !_ps.landed && !_ps.crashed) {
+    orbitStatus = checkOrbitStatus(_ps.posX, _ps.posY, _ps.velX, _ps.velY, bodyId);
   }
 
-  // Also detect REENTRY: if we're in ORBIT and periapsis drops below atmosphere,
-  // the player has initiated a de-orbit burn.
+  // Detect REENTRY: if we're in ORBIT and periapsis drops below the minimum
+  // orbit altitude, the player has initiated a de-orbit burn.
+  // Show a brief warning before transitioning.
   if (_flightState.phase === FlightPhase.ORBIT && orbitStatus && !orbitStatus.valid) {
-    // Orbit is no longer valid (periapsis below 70 km) — transition to REENTRY.
-    const result = transitionPhase(_flightState, FlightPhase.REENTRY, 'De-orbit — periapsis below atmosphere');
-    if (result.success) {
-      _flightState.inOrbit = false;
-      _flightState.orbitalElements = null;
-      _showPhaseNotification('Re-Entry');
-      _applyTimeWarp(1); // Force warp to 1× on reentry.
-      return;
-    }
+    _showDeorbitWarning(bodyId);
+    return;
   }
 
   const transition = evaluateAutoTransitions(_flightState, _ps, orbitStatus);
 
   if (transition) {
-    _showPhaseNotification(getPhaseLabel(transition.to));
-
-    // Update orbital state on the FlightState when entering/leaving orbit.
+    // On orbit entry, show the named altitude band (e.g. "Low Earth Orbit").
     if (transition.to === FlightPhase.ORBIT && orbitStatus) {
+      const label = getOrbitEntryLabel(orbitStatus);
+      _showPhaseNotification(label);
+
       _flightState.inOrbit = true;
       _flightState.orbitalElements = orbitStatus.elements;
+      _flightState.orbitBandId = orbitStatus.altitudeBand ? orbitStatus.altitudeBand.id : null;
+    } else {
+      _showPhaseNotification(getPhaseLabel(transition.to));
     }
   }
 
   // Reset control mode when flight phase leaves ORBIT.
   if (_ps.controlMode !== ControlMode.NORMAL) {
-    const wasReset = resetControlModeIfNeeded(_ps, _flightState, 'EARTH');
+    const wasReset = resetControlModeIfNeeded(_ps, _flightState, bodyId);
     if (wasReset) {
       _showPhaseNotification(CONTROL_MODE_TIPS[ControlMode.NORMAL]);
     }
@@ -1191,12 +1201,62 @@ function _evaluateFlightPhase() {
 }
 
 /**
+ * True while the deorbit warning banner is visible, preventing re-triggering.
+ */
+let _deorbitWarningActive = false;
+
+/**
+ * Show a brief deorbit warning notification before transitioning from ORBIT
+ * to REENTRY.  The warning stays visible for 2 seconds, then the phase
+ * transitions automatically.  Player retains engine control throughout.
+ *
+ * @param {string} bodyId  Celestial body ID.
+ */
+function _showDeorbitWarning(bodyId) {
+  if (_deorbitWarningActive) return;
+  _deorbitWarningActive = true;
+
+  const warningMsg = getDeorbitWarningMessage(bodyId);
+  _showPhaseNotification(warningMsg, 'warning');
+
+  // After a brief delay, execute the REENTRY transition.
+  setTimeout(() => {
+    if (!_flightState || !_ps) { _deorbitWarningActive = false; return; }
+
+    const result = transitionPhase(
+      _flightState, FlightPhase.REENTRY,
+      'De-orbit — periapsis below minimum stable orbit altitude',
+    );
+
+    if (result.success) {
+      _flightState.inOrbit = false;
+      _flightState.orbitalElements = null;
+      _flightState.orbitBandId = null;
+
+      // Force-close the map view on deorbit — other orbital objects are no
+      // longer visible once the craft leaves the orbital model.
+      if (_mapActive) {
+        _toggleMapView();
+      }
+
+      _showPhaseNotification('Re-Entry');
+      _applyTimeWarp(1); // Force warp to 1× on reentry.
+    }
+
+    _deorbitWarningActive = false;
+  }, 2000);
+}
+
+/**
  * Show a brief notification label at the top of the screen when the flight
- * phase changes (e.g. "Orbit", "Re-Entry").  The label fades out after 3 s.
+ * phase changes (e.g. "Low Earth Orbit", "Re-Entry").  The label fades out
+ * after 3 s.
  *
  * @param {string} label  Text to display.
+ * @param {'info'|'warning'} [style='info']  Visual style — 'warning' uses an
+ *   amber colour scheme for deorbit warnings.
  */
-function _showPhaseNotification(label) {
+function _showPhaseNotification(label, style = 'info') {
   const host = document.getElementById('ui-overlay') ?? document.body;
 
   // Remove any existing notification.
@@ -1205,6 +1265,7 @@ function _showPhaseNotification(label) {
 
   const el = document.createElement('div');
   el.className = 'phase-notification';
+  if (style === 'warning') el.classList.add('phase-notification-warning');
   el.textContent = label;
   host.appendChild(el);
 

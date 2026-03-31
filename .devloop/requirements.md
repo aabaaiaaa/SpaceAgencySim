@@ -156,7 +156,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 ## Phase 4: "The Final Frontier" — Orbital Operations
 
 ### TASK-023: Orbit entry and exit mechanics
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-002, TASK-003
 - **Description**: Implement orbit entry when craft's periapsis rises above minimum stable orbit altitude for that body — seamless transition with notification label. Player retains full engine control. Orbit exit (deorbit) shows brief warning, craft leaves orbital model, other craft no longer visible. Different celestial bodies have different named altitude bands. Integrate with flight phase state machine.

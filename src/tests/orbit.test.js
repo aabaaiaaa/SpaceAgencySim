@@ -34,6 +34,8 @@ import {
   angularDistance,
   checkProximity,
   checkOrbitStatus,
+  getMinOrbitAltitude,
+  getOrbitEntryLabel,
   createOrbitalObject,
   tickOrbitalObjects,
   rebaseEpoch,
@@ -44,6 +46,7 @@ import {
   CelestialBody,
   BODY_GM,
   BODY_RADIUS,
+  MIN_ORBIT_ALTITUDE,
 } from '../core/constants.js';
 
 const EARTH = CelestialBody.EARTH;
@@ -688,5 +691,111 @@ describe('periapsis and apoapsis', () => {
     const peri = getPeriapsisAltitude(el, EARTH);
     const apo = getApoapsisAltitude(el, EARTH);
     expect(peri).toBeLessThan(apo);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Per-body minimum orbit altitude (TASK-023)
+// ---------------------------------------------------------------------------
+
+describe('getMinOrbitAltitude', () => {
+  it('returns 70 km for Earth', () => {
+    expect(getMinOrbitAltitude('EARTH')).toBe(70_000);
+  });
+
+  it('returns 15 km for Moon', () => {
+    expect(getMinOrbitAltitude('MOON')).toBe(15_000);
+  });
+
+  it('returns default 70 km for unknown body', () => {
+    expect(getMinOrbitAltitude('MARS')).toBe(70_000);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Orbit entry with altitude band detection (TASK-023)
+// ---------------------------------------------------------------------------
+
+describe('checkOrbitStatus altitude band', () => {
+  it('LEO orbit reports LEO altitude band', () => {
+    const { posX, posY, velX, velY } = circularOrbitState(100_000);
+    const result = checkOrbitStatus(posX, posY, velX, velY, EARTH);
+    expect(result.valid).toBe(true);
+    expect(result.altitudeBand).not.toBeNull();
+    expect(result.altitudeBand.id).toBe('LEO');
+    expect(result.altitudeBand.name).toBe('Low Earth Orbit');
+  });
+
+  it('MEO orbit reports MEO altitude band', () => {
+    const { posX, posY, velX, velY } = circularOrbitState(500_000);
+    const result = checkOrbitStatus(posX, posY, velX, velY, EARTH);
+    expect(result.valid).toBe(true);
+    expect(result.altitudeBand).not.toBeNull();
+    expect(result.altitudeBand.id).toBe('MEO');
+  });
+
+  it('invalid orbit has null altitude band', () => {
+    // Sub-orbital: periapsis below 70 km.
+    const result = checkOrbitStatus(0, 80_000, 2000, 500, EARTH);
+    expect(result.valid).toBe(false);
+    expect(result.altitudeBand).toBeNull();
+  });
+
+  it('uses per-body min orbit altitude for Moon', () => {
+    const MOON = CelestialBody.MOON;
+    const R_MOON = BODY_RADIUS.MOON;
+    const MU_MOON = BODY_GM.MOON;
+    const alt = 20_000; // Above Moon's 15 km minimum
+    const r = R_MOON + alt;
+    const v = Math.sqrt(MU_MOON / r);
+    const result = checkOrbitStatus(0, alt, v, 0, MOON);
+    expect(result.valid).toBe(true);
+    expect(result.altitudeBand).not.toBeNull();
+    expect(result.altitudeBand.id).toBe('LLO');
+  });
+
+  it('orbit below Moon min altitude is invalid', () => {
+    const MOON = CelestialBody.MOON;
+    const R_MOON = BODY_RADIUS.MOON;
+    const MU_MOON = BODY_GM.MOON;
+    // Create orbit with periapsis at 10 km (below Moon's 15 km min).
+    // Use higher altitude for current position but with eccentricity
+    // that brings periapsis below 15 km.
+    const alt = 50_000;
+    const r = R_MOON + alt;
+    // Velocity slightly less than circular to lower periapsis
+    const vCirc = Math.sqrt(MU_MOON / r);
+    const vLow = vCirc * 0.85;
+    const result = checkOrbitStatus(0, alt, vLow, 0, MOON);
+    // Either bound with low periapsis or unbound
+    if (result.elements) {
+      expect(result.periapsisAlt).toBeLessThan(15_000);
+    }
+    expect(result.valid).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Orbit entry label (TASK-023)
+// ---------------------------------------------------------------------------
+
+describe('getOrbitEntryLabel', () => {
+  it('returns altitude band name when present', () => {
+    const orbitStatus = {
+      altitudeBand: { id: 'LEO', name: 'Low Earth Orbit' },
+    };
+    expect(getOrbitEntryLabel(orbitStatus)).toBe('Low Earth Orbit');
+  });
+
+  it('returns "Orbit" when no altitude band', () => {
+    expect(getOrbitEntryLabel({ altitudeBand: null })).toBe('Orbit');
+    expect(getOrbitEntryLabel(null)).toBe('Orbit');
+  });
+
+  it('returns Moon band name for lunar orbit', () => {
+    const orbitStatus = {
+      altitudeBand: { id: 'LLO', name: 'Low Lunar Orbit' },
+    };
+    expect(getOrbitEntryLabel(orbitStatus)).toBe('Low Lunar Orbit');
   });
 });

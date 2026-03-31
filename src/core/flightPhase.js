@@ -24,7 +24,7 @@
  * @module core/flightPhase
  */
 
-import { FlightPhase } from './constants.js';
+import { FlightPhase, MIN_ORBIT_ALTITUDE } from './constants.js';
 
 // ---------------------------------------------------------------------------
 // Valid transition map
@@ -56,6 +56,7 @@ const VALID_TRANSITIONS = new Map([
  * @property {string} to         - New phase.
  * @property {number} time       - Flight elapsed time (seconds) when the transition occurred.
  * @property {string} reason     - Human-readable reason for the transition.
+ * @property {object} [meta]     - Optional metadata (e.g. altitude band info on orbit entry).
  */
 
 // ---------------------------------------------------------------------------
@@ -83,9 +84,11 @@ export function isValidTransition(from, to) {
  * @param {import('./gameState.js').FlightState} flightState
  * @param {string} newPhase     Target FlightPhase value.
  * @param {string} [reason='']  Human-readable reason for the transition.
- * @returns {{ success: boolean, from: string, to: string, reason?: string }}
+ * @param {object} [meta=null]  Optional metadata attached to the transition
+ *                              (e.g. `{ altitudeBand }` on orbit entry).
+ * @returns {{ success: boolean, from: string, to: string, reason?: string, meta?: object }}
  */
-export function transitionPhase(flightState, newPhase, reason = '') {
+export function transitionPhase(flightState, newPhase, reason = '', meta = null) {
   const from = flightState.phase;
 
   if (from === newPhase) {
@@ -111,6 +114,7 @@ export function transitionPhase(flightState, newPhase, reason = '') {
     time: flightState.timeElapsed,
     reason: reason || `${from} → ${newPhase}`,
   };
+  if (meta) entry.meta = meta;
   flightState.phaseLog.push(entry);
 
   // Also append to the flight event log for the HUD timeline.
@@ -120,7 +124,7 @@ export function transitionPhase(flightState, newPhase, reason = '') {
     description: reason || `Phase: ${_phaseLabel(newPhase)}`,
   });
 
-  return { success: true, from, to: newPhase };
+  return { success: true, from, to: newPhase, meta };
 }
 
 /**
@@ -170,7 +174,9 @@ export function evaluateAutoTransitions(flightState, ps, orbitStatus) {
   // FLIGHT → ORBIT:  orbit check passes.
   if (phase === FlightPhase.FLIGHT) {
     if (orbitStatus && orbitStatus.valid) {
-      const result = transitionPhase(flightState, FlightPhase.ORBIT, 'Stable orbit achieved');
+      const bandName = orbitStatus.altitudeBand ? orbitStatus.altitudeBand.name : 'Orbit';
+      const meta = orbitStatus.altitudeBand ? { altitudeBand: orbitStatus.altitudeBand } : null;
+      const result = transitionPhase(flightState, FlightPhase.ORBIT, `${bandName} achieved`, meta);
       if (result.success) {
         flightState.inOrbit = true;
         flightState.orbitalElements = orbitStatus.elements;
@@ -179,10 +185,11 @@ export function evaluateAutoTransitions(flightState, ps, orbitStatus) {
     }
   }
 
-  // REENTRY → FLIGHT:  craft has descended into the atmosphere.
+  // REENTRY → FLIGHT:  craft has descended below the minimum orbit altitude.
   if (phase === FlightPhase.REENTRY) {
-    // Atmosphere top is 70 km; once below it, the craft is in atmospheric flight.
-    if (ps.posY < 70_000) {
+    const bodyId = (flightState && flightState.bodyId) || 'EARTH';
+    const atmosphereAlt = MIN_ORBIT_ALTITUDE[bodyId] ?? 70_000;
+    if (ps.posY < atmosphereAlt) {
       const result = transitionPhase(flightState, FlightPhase.FLIGHT, 'Atmospheric entry');
       if (result.success) {
         flightState.inOrbit = false;
@@ -195,7 +202,9 @@ export function evaluateAutoTransitions(flightState, ps, orbitStatus) {
   // CAPTURE → ORBIT:  orbit check passes at destination.
   if (phase === FlightPhase.CAPTURE) {
     if (orbitStatus && orbitStatus.valid) {
-      const result = transitionPhase(flightState, FlightPhase.ORBIT, 'Orbit captured');
+      const bandName = orbitStatus.altitudeBand ? orbitStatus.altitudeBand.name : 'Orbit';
+      const meta = orbitStatus.altitudeBand ? { altitudeBand: orbitStatus.altitudeBand } : null;
+      const result = transitionPhase(flightState, FlightPhase.ORBIT, `${bandName} captured`, meta);
       if (result.success) {
         flightState.inOrbit = true;
         flightState.orbitalElements = orbitStatus.elements;
@@ -268,6 +277,22 @@ export function isPlayerLocked(phase) {
  */
 export function getPhaseLabel(phase) {
   return _phaseLabel(phase);
+}
+
+/**
+ * Returns a warning message for de-orbit transitions.  The message varies
+ * by body, reminding the player what they are about to leave.
+ *
+ * @param {string} bodyId  Celestial body ID.
+ * @returns {string}
+ */
+export function getDeorbitWarningMessage(bodyId) {
+  switch (bodyId) {
+    case 'MOON':
+      return 'De-orbit — craft will leave lunar orbital model. Other craft will no longer be visible.';
+    default:
+      return 'De-orbit — craft will leave orbital model. Other craft will no longer be visible.';
+  }
 }
 
 // ---------------------------------------------------------------------------

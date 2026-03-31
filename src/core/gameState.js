@@ -198,6 +198,8 @@ import {
  * @property {import('./flightPhase.js').PhaseTransition[]} phaseLog - Log of all phase transitions.
  * @property {boolean}       inOrbit        - True when craft is in a stable orbit.
  * @property {OrbitalElements|null} orbitalElements - Keplerian elements when in orbit, null otherwise.
+ * @property {string}        bodyId         - Celestial body the craft is currently at (CelestialBody enum).
+ * @property {string|null}   orbitBandId    - ID of the altitude band at orbit entry (e.g. 'LEO'), or null.
  * @property {string|null}   currentBiome   - ID of the current altitude biome (e.g. 'LOW_ATMOSPHERE').
  * @property {string[]}      biomesVisited  - Unique biome IDs visited during this flight.
  */
@@ -491,6 +493,7 @@ export function createFlightState({
   crewIds = [],
   fuelRemaining = 0,
   deltaVRemaining = 0,
+  bodyId = 'EARTH',
 }) {
   return {
     missionId,
@@ -507,6 +510,8 @@ export function createFlightState({
     phaseLog: [],
     inOrbit: false,
     orbitalElements: null,
+    bodyId,
+    orbitBandId: null,
     currentBiome: null,
     biomesVisited: [],
   };

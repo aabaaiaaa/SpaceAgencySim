@@ -39,6 +39,7 @@ import {
   BODY_GM,
   BODY_RADIUS,
   ALTITUDE_BANDS,
+  MIN_ORBIT_ALTITUDE,
   ORBIT_SEGMENTS,
   PROXIMITY_ANGLE_DEG,
   CelestialBody,
@@ -61,8 +62,15 @@ const KEPLER_TOLERANCE = 1e-12;
 /** Below this eccentricity, treat the orbit as perfectly circular. */
 const CIRCULAR_THRESHOLD = 1e-8;
 
-/** Minimum altitude above atmosphere for a valid orbit (m). */
-const MIN_ORBIT_ALTITUDE = 70_000;
+/**
+ * Get the minimum stable orbit altitude for a given celestial body.
+ *
+ * @param {string} bodyId  Celestial body ID.
+ * @returns {number}  Minimum orbit altitude in metres.
+ */
+export function getMinOrbitAltitude(bodyId) {
+  return MIN_ORBIT_ALTITUDE[bodyId] ?? 70_000;
+}
 
 // ---------------------------------------------------------------------------
 // Kepler's equation solver
@@ -459,27 +467,46 @@ export function checkProximity(state1, state2, bodyId) {
  *
  * A valid orbit requires:
  *   1. The trajectory is a bound ellipse (specific energy < 0).
- *   2. Periapsis altitude > 70 km (above the atmosphere).
+ *   2. Periapsis altitude ≥ minimum stable orbit altitude for that body.
  *
  * @param {number} posX    Horizontal position (m).
  * @param {number} posY    Altitude above surface (m).
  * @param {number} velX    Horizontal velocity (m/s).
  * @param {number} velY    Vertical velocity (m/s).
  * @param {string} bodyId  Celestial body ID.
- * @returns {{ valid: boolean, elements: OrbitalElements|null, periapsisAlt: number, apoapsisAlt: number }}
+ * @returns {{ valid: boolean, elements: OrbitalElements|null, periapsisAlt: number, apoapsisAlt: number, altitudeBand: {id: string, name: string}|null }}
  */
 export function checkOrbitStatus(posX, posY, velX, velY, bodyId) {
   const elements = computeOrbitalElements(posX, posY, velX, velY, bodyId);
 
   if (!elements) {
-    return { valid: false, elements: null, periapsisAlt: 0, apoapsisAlt: 0 };
+    return { valid: false, elements: null, periapsisAlt: 0, apoapsisAlt: 0, altitudeBand: null };
   }
 
   const periapsisAlt = getPeriapsisAltitude(elements, bodyId);
   const apoapsisAlt = getApoapsisAltitude(elements, bodyId);
-  const valid = periapsisAlt >= MIN_ORBIT_ALTITUDE;
+  const minAlt = getMinOrbitAltitude(bodyId);
+  const valid = periapsisAlt >= minAlt;
 
-  return { valid, elements, periapsisAlt, apoapsisAlt };
+  // Determine which altitude band the craft's periapsis falls in.
+  const altitudeBand = valid ? getAltitudeBand(periapsisAlt, bodyId) : null;
+
+  return { valid, elements, periapsisAlt, apoapsisAlt, altitudeBand };
+}
+
+/**
+ * Get the human-readable altitude band label for an orbit entry notification.
+ * Returns the band name (e.g. "Low Earth Orbit") if the periapsis is within
+ * a named band, otherwise falls back to "Orbit".
+ *
+ * @param {{ altitudeBand: {id: string, name: string}|null }} orbitStatus
+ * @returns {string}
+ */
+export function getOrbitEntryLabel(orbitStatus) {
+  if (orbitStatus && orbitStatus.altitudeBand) {
+    return orbitStatus.altitudeBand.name;
+  }
+  return 'Orbit';
 }
 
 // ---------------------------------------------------------------------------

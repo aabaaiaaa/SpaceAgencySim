@@ -434,6 +434,7 @@ export const FACILITY_UPKEEP_PER_PERIOD = 10_000;
  */
 export const CelestialBody = Object.freeze({
   EARTH: 'EARTH',
+  MOON: 'MOON',
 });
 
 /**
@@ -442,6 +443,7 @@ export const CelestialBody = Object.freeze({
  */
 export const BODY_GM = Object.freeze({
   EARTH: 3.986004418e14,
+  MOON: 4.9048695e12,
 });
 
 /**
@@ -449,6 +451,19 @@ export const BODY_GM = Object.freeze({
  */
 export const BODY_RADIUS = Object.freeze({
   EARTH: 6_371_000,
+  MOON: 1_737_400,
+});
+
+/**
+ * Minimum stable orbit altitude per celestial body (metres above the surface).
+ * Below this altitude, atmospheric drag (or surface proximity for airless bodies)
+ * prevents a stable orbit.  Used by orbit entry detection.
+ *
+ * @type {Readonly<Record<string, number>>}
+ */
+export const MIN_ORBIT_ALTITUDE = Object.freeze({
+  EARTH: 70_000,
+  MOON: 15_000,
 });
 
 /**
@@ -463,6 +478,11 @@ export const ALTITUDE_BANDS = Object.freeze({
     Object.freeze({ id: 'LEO', name: 'Low Earth Orbit', min: 80_000, max: 200_000 }),
     Object.freeze({ id: 'MEO', name: 'Medium Earth Orbit', min: 200_000, max: 2_000_000 }),
     Object.freeze({ id: 'HEO', name: 'High Earth Orbit', min: 2_000_000, max: 35_786_000 }),
+  ]),
+  MOON: Object.freeze([
+    Object.freeze({ id: 'LLO', name: 'Low Lunar Orbit', min: 15_000, max: 100_000 }),
+    Object.freeze({ id: 'MLO', name: 'Medium Lunar Orbit', min: 100_000, max: 1_000_000 }),
+    Object.freeze({ id: 'HLO', name: 'High Lunar Orbit', min: 1_000_000, max: 10_000_000 }),
   ]),
 });
 
@@ -497,6 +517,13 @@ export const BIOME_DEFINITIONS = Object.freeze({
     Object.freeze({ id: 'NEAR_SPACE',        name: 'Near Space',       min: 70_000,  max: 100_000,   scienceMultiplier: 2.5, color: 0x0a0a2e }),
     Object.freeze({ id: 'LOW_ORBIT',         name: 'Low Orbit',        min: 100_000, max: 200_000,   scienceMultiplier: 3.0, color: 0x050520 }),
     Object.freeze({ id: 'HIGH_ORBIT',        name: 'High Orbit',       min: 200_000, max: Infinity,  scienceMultiplier: 4.0, color: 0x000010 }),
+  ]),
+  MOON: Object.freeze([
+    Object.freeze({ id: 'LUNAR_SURFACE',    name: 'Lunar Surface',     min: 0,       max: 100,       scienceMultiplier: 1.0, color: 0xa0a0a0 }),
+    Object.freeze({ id: 'NEAR_SURFACE',     name: 'Near Surface',      min: 100,     max: 5_000,     scienceMultiplier: 1.5, color: 0x808080 }),
+    Object.freeze({ id: 'LOW_ALTITUDE',     name: 'Low Altitude',      min: 5_000,   max: 15_000,    scienceMultiplier: 2.0, color: 0x404060 }),
+    Object.freeze({ id: 'LOW_LUNAR_ORBIT',  name: 'Low Lunar Orbit',   min: 15_000,  max: 100_000,   scienceMultiplier: 3.0, color: 0x202040 }),
+    Object.freeze({ id: 'HIGH_LUNAR_ORBIT', name: 'High Lunar Orbit',  min: 100_000, max: Infinity,  scienceMultiplier: 4.0, color: 0x101020 }),
   ]),
 });
 

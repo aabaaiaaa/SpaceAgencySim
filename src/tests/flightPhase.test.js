@@ -21,6 +21,7 @@ import {
   canReturnToAgency,
   isPlayerLocked,
   getPhaseLabel,
+  getDeorbitWarningMessage,
 } from '../core/flightPhase.js';
 
 // ---------------------------------------------------------------------------
@@ -519,5 +520,137 @@ describe('full flight lifecycle', () => {
     };
     evaluateAutoTransitions(fs, ps, orbitStatus);
     expect(fs.phase).toBe(FlightPhase.ORBIT);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Orbit entry with altitude band metadata (TASK-023)
+// ---------------------------------------------------------------------------
+
+describe('orbit entry altitude band metadata', () => {
+  it('FLIGHT → ORBIT transition includes altitude band in reason', () => {
+    const fs = freshFlightState();
+    fs.phase = FlightPhase.FLIGHT;
+
+    const ps = stubPs({ posY: 100_000 });
+    const orbitStatus = {
+      valid: true,
+      elements: { semiMajorAxis: 6_500_000, eccentricity: 0.01 },
+      periapsisAlt: 95_000,
+      apoapsisAlt: 105_000,
+      altitudeBand: { id: 'LEO', name: 'Low Earth Orbit', min: 80_000, max: 200_000 },
+    };
+
+    const transition = evaluateAutoTransitions(fs, ps, orbitStatus);
+    expect(transition).not.toBeNull();
+    expect(transition.to).toBe(FlightPhase.ORBIT);
+    expect(transition.reason).toContain('Low Earth Orbit');
+  });
+
+  it('FLIGHT → ORBIT transition includes band meta object', () => {
+    const fs = freshFlightState();
+    fs.phase = FlightPhase.FLIGHT;
+
+    const orbitStatus = {
+      valid: true,
+      elements: { semiMajorAxis: 6_500_000, eccentricity: 0.01 },
+      periapsisAlt: 95_000,
+      apoapsisAlt: 105_000,
+      altitudeBand: { id: 'LEO', name: 'Low Earth Orbit', min: 80_000, max: 200_000 },
+    };
+    const ps = stubPs({ posY: 100_000 });
+
+    evaluateAutoTransitions(fs, ps, orbitStatus);
+    const lastEntry = fs.phaseLog[fs.phaseLog.length - 1];
+    expect(lastEntry.meta).toBeDefined();
+    expect(lastEntry.meta.altitudeBand.id).toBe('LEO');
+  });
+
+  it('FLIGHT → ORBIT without altitude band uses generic reason', () => {
+    const fs = freshFlightState();
+    fs.phase = FlightPhase.FLIGHT;
+
+    const orbitStatus = {
+      valid: true,
+      elements: { semiMajorAxis: 6_500_000, eccentricity: 0.01 },
+      periapsisAlt: 95_000,
+      apoapsisAlt: 105_000,
+      altitudeBand: null,
+    };
+    const ps = stubPs({ posY: 100_000 });
+
+    const transition = evaluateAutoTransitions(fs, ps, orbitStatus);
+    expect(transition.reason).toContain('Orbit');
+  });
+
+  it('CAPTURE → ORBIT transition includes altitude band', () => {
+    const fs = freshFlightState();
+    fs.phase = FlightPhase.CAPTURE;
+
+    const orbitStatus = {
+      valid: true,
+      elements: { semiMajorAxis: 2_000_000, eccentricity: 0.1 },
+      periapsisAlt: 25_000,
+      apoapsisAlt: 80_000,
+      altitudeBand: { id: 'LLO', name: 'Low Lunar Orbit', min: 15_000, max: 100_000 },
+    };
+    const ps = stubPs({ posY: 25_000 });
+
+    const transition = evaluateAutoTransitions(fs, ps, orbitStatus);
+    expect(transition).not.toBeNull();
+    expect(transition.reason).toContain('Low Lunar Orbit');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// transitionPhase with metadata (TASK-023)
+// ---------------------------------------------------------------------------
+
+describe('transitionPhase metadata', () => {
+  it('attaches meta to phase log entry when provided', () => {
+    const fs = freshFlightState();
+    const meta = { altitudeBand: { id: 'LEO', name: 'Low Earth Orbit' } };
+    transitionPhase(fs, FlightPhase.LAUNCH, 'Engine ignition', meta);
+    expect(fs.phaseLog[0].meta).toEqual(meta);
+  });
+
+  it('omits meta from phase log entry when not provided', () => {
+    const fs = freshFlightState();
+    transitionPhase(fs, FlightPhase.LAUNCH, 'Engine ignition');
+    expect(fs.phaseLog[0].meta).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Deorbit warning message (TASK-023)
+// ---------------------------------------------------------------------------
+
+describe('getDeorbitWarningMessage', () => {
+  it('returns Earth deorbit warning', () => {
+    const msg = getDeorbitWarningMessage('EARTH');
+    expect(msg).toContain('orbital model');
+    expect(msg).toContain('no longer be visible');
+  });
+
+  it('returns Moon deorbit warning', () => {
+    const msg = getDeorbitWarningMessage('MOON');
+    expect(msg).toContain('lunar');
+    expect(msg).toContain('no longer be visible');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FlightState bodyId (TASK-023)
+// ---------------------------------------------------------------------------
+
+describe('FlightState bodyId', () => {
+  it('defaults bodyId to EARTH', () => {
+    const fs = freshFlightState();
+    expect(fs.bodyId).toBe('EARTH');
+  });
+
+  it('includes orbitBandId initialized to null', () => {
+    const fs = freshFlightState();
+    expect(fs.orbitBandId).toBeNull();
   });
 });
