@@ -331,6 +331,16 @@ export function processFlightReturn(state, flightState, ps, assembly) {
 
   const missionRevenueTotal = completedMissions.reduce((sum, e) => sum + e.reward, 0);
 
+  // Collect bodies visited during this flight (current body + transfer endpoints).
+  const visitedBodies = new Set();
+  if (flightState?.bodyId) visitedBodies.add(flightState.bodyId);
+  if (flightState?.transferState?.originBodyId) visitedBodies.add(flightState.transferState.originBodyId);
+  if (flightState?.transferState?.destinationBodyId) visitedBodies.add(flightState.transferState.destinationBodyId);
+
+  // Look up the rocket design name for display in the Library.
+  const rocketDesign = state.savedDesigns?.find((d) => d.id === flightState?.rocketId)
+    ?? state.rockets?.find((r) => r.id === flightState?.rocketId);
+
   /** @type {import('./gameState.js').FlightResult} */
   const flightResult = {
     id:          _generateId(),
@@ -342,6 +352,11 @@ export function processFlightReturn(state, flightState, ps, assembly) {
     deltaVUsed:  0,
     revenue:     missionRevenueTotal + recoveryValue,
     notes:       '',
+    maxAltitude: flightState?.maxAltitude ?? flightState?.altitude ?? 0,
+    maxSpeed:    flightState?.maxVelocity ?? flightState?.velocity ?? 0,
+    bodiesVisited: [...visitedBodies],
+    duration:    flightState?.timeElapsed ?? 0,
+    rocketName:  rocketDesign?.name ?? '',
   };
 
   if (!Array.isArray(state.flightHistory)) {

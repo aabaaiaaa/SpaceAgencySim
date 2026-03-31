@@ -12,6 +12,7 @@ import { initMissionControlUI, destroyMissionControlUI } from './missionControl.
 import { initLaunchPadUI, destroyLaunchPadUI } from './launchPad.js';
 import { initSatelliteOpsUI, destroySatelliteOpsUI } from './satelliteOps.js';
 import { initTrackingStationUI, destroyTrackingStationUI } from './trackingStation.js';
+import { initLibraryUI, destroyLibraryUI } from './library.js';
 import { stopFlightScene } from './flightController.js';
 import { initTopBar, destroyTopBar, refreshTopBar } from './topbar.js';
 import { showVabScene, hideVabScene } from '../render/vab.js';
@@ -61,6 +62,12 @@ let _satelliteOpsOpen = false;
 let _trackingStationOpen = false;
 
 /**
+ * True while the Library screen is open.
+ * Used to guard against double-mounting.
+ */
+let _libraryOpen = false;
+
+/**
  * The #ui-overlay container, stored so _handleExitToMenu can re-mount the
  * main menu without needing it passed through every callback.
  * @type {HTMLElement | null}
@@ -104,6 +111,7 @@ export function initUI(container, state) {
   _crewAdminOpen      = false;
   _missionControlOpen = false;
   _launchPadOpen      = false;
+  _libraryOpen        = false;
   // Ensure a fresh VAB assembly for each new game session.
   resetVabUI();
   hideVabScene(); // ensure VAB PixiJS is hidden when starting a new session
@@ -153,6 +161,10 @@ function _handleExitToMenu() {
   if (_trackingStationOpen) {
     destroyTrackingStationUI();
     _trackingStationOpen = false;
+  }
+  if (_libraryOpen) {
+    destroyLibraryUI();
+    _libraryOpen = false;
   }
 
   // Wipe any remaining screen overlays from the container.
@@ -325,6 +337,27 @@ function _handleNavigation(container, state, destination) {
     }
 
     console.log('[UI] Navigated to Tracking Station');
+    return;
+  }
+
+  if (destination === 'library') {
+    destroyHubUI();
+
+    if (!_libraryOpen) {
+      initLibraryUI(container, state, {
+        onBack: () => {
+          _libraryOpen = false;
+          showHubScene();
+          initHubUI(container, state, (dest) => {
+            _handleNavigation(container, state, dest);
+          });
+          console.log('[UI] Returned to hub from Library');
+        },
+      });
+      _libraryOpen = true;
+    }
+
+    console.log('[UI] Navigated to Library');
     return;
   }
 

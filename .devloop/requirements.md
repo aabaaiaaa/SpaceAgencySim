@@ -244,7 +244,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Requires Crew Admin Tier 2. Assign idle crew to training: pick skill (piloting/engineering/science). Cost: $20k per course. Duration: 3 periods. Gain: +15 in chosen skill. Crew status set to TRAINING (exists in enum), unavailable for flights. Training slots: 1 at tier 2, 3 at tier 3. Creates opportunity cost: best pilot unavailable while cross-training.
 
 ### TASK-037: Library facility
-- **Status**: pending
+- **Status**: done
 - **Priority**: low
 - **Dependencies**: TASK-030
 - **Description**: Free building, no upgrades. Statistics and records dashboard (total flights, records per body, max speed, heaviest rocket, crew careers, financial history, exploration progress). Celestial body knowledge for discovered bodies, usable for mission planning. Tab for frequently flown rocket configurations with statistics (top 5).

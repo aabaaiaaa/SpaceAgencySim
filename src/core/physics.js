@@ -2328,6 +2328,14 @@ function _syncFlightState(ps, assembly, flightState) {
   flightState.altitude = Math.max(0, ps.posY);
   flightState.velocity = Math.hypot(ps.velX, ps.velY);
 
+  // Track peak altitude and velocity for records/statistics.
+  if (flightState.altitude > (flightState.maxAltitude ?? 0)) {
+    flightState.maxAltitude = flightState.altitude;
+  }
+  if (flightState.velocity > (flightState.maxVelocity ?? 0)) {
+    flightState.maxVelocity = flightState.velocity;
+  }
+
   // Track current biome and record visited biomes.
   const newBiome = getBiomeId(flightState.altitude, 'EARTH');
   if (newBiome && newBiome !== flightState.currentBiome) {

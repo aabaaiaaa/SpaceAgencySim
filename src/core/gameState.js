@@ -124,6 +124,11 @@ import {
  * @property {number}        deltaVUsed   - Δv consumed during the flight (m/s).
  * @property {number}        revenue      - Money earned (0 if not successful).
  * @property {string}        notes        - Human-readable summary of events.
+ * @property {number}        [maxAltitude] - Peak altitude reached during the flight (m).
+ * @property {number}        [maxSpeed]    - Peak velocity reached during the flight (m/s).
+ * @property {string[]}      [bodiesVisited] - Celestial body IDs visited during the flight.
+ * @property {number}        [duration]    - Flight duration in seconds.
+ * @property {string}        [rocketName]  - Display name of the rocket design used.
  */
 
 /**
@@ -671,6 +676,8 @@ export function createFlightState({
     orbitBandId: null,
     currentBiome: null,
     biomesVisited: [],
+    maxAltitude: 0,
+    maxVelocity: 0,
     dockingState: null,
     transferState: null,
     powerState: null,
