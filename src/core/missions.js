@@ -34,6 +34,7 @@
 import { MISSIONS, MissionStatus, ObjectiveType } from '../data/missions.js';
 import { earn } from './finance.js';
 import { getTechTreeUnlockedParts } from './techtree.js';
+import { awardFacility } from './construction.js';
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -307,11 +308,20 @@ export function completeMission(state, id) {
   // edits to templates are reflected even on loaded saves.
   const def = MISSIONS.find((m) => m.id === id);
   const unlockedParts = [];
+  let awardedFacility = null;
   if (def) {
     for (const partId of def.unlockedParts) {
       if (!state.parts.includes(partId)) {
         state.parts.push(partId);
         unlockedParts.push(partId);
+      }
+    }
+
+    // Award a facility if the mission template specifies one (tutorial mode).
+    if (def.unlocksFacility) {
+      const facilityResult = awardFacility(state, def.unlocksFacility);
+      if (facilityResult.success) {
+        awardedFacility = def.unlocksFacility;
       }
     }
   }
@@ -324,6 +334,7 @@ export function completeMission(state, id) {
     mission,
     reward: mission.reward,
     unlockedParts,
+    awardedFacility,
     newlyUnlockedMissions,
   };
 }

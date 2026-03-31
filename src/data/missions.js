@@ -216,10 +216,11 @@ export const MissionStatus = Object.freeze({
  *                                            Empty array means available from game start.
  * @property {string[]}       unlockedParts  - Part IDs added to state.parts on completion.
  * @property {string[]}       [requiredParts] - Part IDs unlocked when the mission is accepted.
+ * @property {string|null}    [unlocksFacility] - FacilityId awarded on completion (tutorial mode).
  * @property {MissionStatus}  status         - Initial status: 'locked' or 'available'.
  */
 
-import { PartType } from '../core/constants.js';
+import { PartType, FacilityId } from '../core/constants.js';
 
 // ---------------------------------------------------------------------------
 // Mission Catalog
@@ -363,7 +364,9 @@ export const MISSIONS = [
     unlocksAfter: ['mission-003'],
     // In tutorial mode, completing this mission awards the crewed command
     // module — gated until the player has demonstrated basic competency.
+    // Also awards the Crew Administration building so the player can hire crew.
     unlockedParts: ['cmd-mk1'],
+    unlocksFacility: FacilityId.CREW_ADMIN,
     status: MissionStatus.LOCKED,
   },
 

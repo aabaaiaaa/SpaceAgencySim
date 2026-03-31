@@ -574,6 +574,75 @@ export const EJECTION_INJURY_PERIODS = 1;
 export const MEDICAL_CARE_COST = 25_000;
 
 // ---------------------------------------------------------------------------
+// Crew Admin Tier Features
+// ---------------------------------------------------------------------------
+
+/**
+ * Crew Administration facility tier feature descriptions.
+ *
+ * Tier 1 ($100k):  Basic hire/fire, skill tracking.
+ * Tier 2 ($250k):  Training facility — assign crew to skill training between flights.
+ * Tier 3 ($600k):  Recruit experienced crew (starting skills > 0), advanced medical.
+ *
+ * @type {Readonly<Record<number, Readonly<{label: string, features: readonly string[]}>>>}
+ */
+export const CREW_ADMIN_TIER_FEATURES = Object.freeze({
+  1: Object.freeze({
+    label: 'Basic',
+    features: Object.freeze([
+      'Hire and fire astronauts',
+      'Basic skill tracking',
+      'Medical care (halves recovery)',
+    ]),
+  }),
+  2: Object.freeze({
+    label: 'Training Centre',
+    features: Object.freeze([
+      'Assign crew to skill training between flights',
+      'Training grants XP each period',
+      'All Tier 1 features',
+    ]),
+  }),
+  3: Object.freeze({
+    label: 'Advanced Operations',
+    features: Object.freeze([
+      'Recruit experienced crew (starting skills > 0)',
+      'Advanced medical (recovery time reduced to 1/3)',
+      'All Tier 2 features',
+    ]),
+  }),
+});
+
+/**
+ * Training XP awarded per period to crew assigned to training.
+ * At Tier 2+, crew in TRAINING status gain this much raw XP per period
+ * in their assigned skill (subject to diminishing returns).
+ * @type {number}
+ */
+export const TRAINING_XP_PER_PERIOD = 4;
+
+/**
+ * Cost per period to keep one astronaut in training.
+ * Charged alongside crew salaries during period advancement.
+ * @type {number}
+ */
+export const TRAINING_COST_PER_PERIOD = 10_000;
+
+/**
+ * Starting skill range for experienced crew (Tier 3 recruitment).
+ * Each skill starts at a random value in [min, max].
+ * @type {Readonly<{min: number, max: number}>}
+ */
+export const EXPERIENCED_CREW_SKILL_RANGE = Object.freeze({ min: 10, max: 30 });
+
+/**
+ * Hire cost multiplier for experienced crew (Tier 3).
+ * Applied on top of the reputation-adjusted hire cost.
+ * @type {number}
+ */
+export const EXPERIENCED_HIRE_COST_MULTIPLIER = 2.5;
+
+// ---------------------------------------------------------------------------
 // Weather & Launch Conditions
 // ---------------------------------------------------------------------------
 

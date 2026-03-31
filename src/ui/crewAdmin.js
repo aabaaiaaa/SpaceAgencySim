@@ -1,20 +1,28 @@
 /**
  * crewAdmin.js — Crew Administration Building HTML overlay UI.
  *
- * Three tabs:
+ * Four tabs (Training tab visible at Crew Admin Tier 2+):
  *   - Active Crew  : Lists active astronauts with name, missions/flights, Fire button.
  *   - Hire          : Form to hire a new astronaut (name optional; auto-generated if blank).
- *                     Shows hire cost and current cash so the player can judge affordability.
+ *                     At Tier 3, also offers experienced crew recruitment.
+ *   - Training      : (Tier 2+) Assign crew to skill training between flights.
  *   - History       : All crew ever hired (active, fired, KIA), sorted by hire date
- *                     descending. KIA rows are visually distinguished in red. Each row
- *                     shows name, hire date, missions flown, status, and for KIA: death date
- *                     and cause of death.
+ *                     descending.
  *
  * @module crewAdmin
  */
 
-import { hireCrew, fireCrew, getActiveCrew, getFullHistory, getAdjustedHireCost } from '../core/crew.js';
-import { AstronautStatus } from '../core/constants.js';
+import {
+  hireCrew, fireCrew, getActiveCrew, getFullHistory, getAdjustedHireCost,
+  assignToTraining, cancelTraining, getTrainingCrew,
+  hireExperiencedCrew, getExperiencedHireCost,
+  payMedicalCare, payAdvancedMedicalCare, isCrewInjured,
+} from '../core/crew.js';
+import {
+  AstronautStatus, FacilityId,
+  CREW_ADMIN_TIER_FEATURES, TRAINING_COST_PER_PERIOD,
+} from '../core/constants.js';
+import { getFacilityTier } from '../core/construction.js';
 import { refreshTopBar } from './topbar.js';
 
 // ---------------------------------------------------------------------------
@@ -421,6 +429,183 @@ const CREW_ADMIN_STYLES = `
   padding: 40px 20px;
   font-size: 0.9rem;
 }
+
+/* ── Tier info bar ─────────────────────────────────────────────────────────── */
+.crew-tier-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  background: rgba(255,255,255,0.03);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  font-size: 0.82rem;
+  color: #8090a8;
+  flex-shrink: 0;
+}
+
+.crew-tier-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: rgba(60, 120, 220, 0.2);
+  color: #80b4f0;
+  border: 1px solid rgba(60, 120, 220, 0.35);
+}
+
+.crew-tier-features {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.crew-tier-feature {
+  color: #6a7a8a;
+  font-size: 0.78rem;
+}
+
+/* ── Training tab ──────────────────────────────────────────────────────────── */
+.training-panel {
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.training-info-box {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  font-size: 0.85rem;
+  color: #8090a8;
+}
+
+.training-cost-note {
+  color: #ccaa44;
+  font-size: 0.8rem;
+  margin-top: 6px;
+}
+
+.training-crew-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.training-crew-name {
+  font-weight: 600;
+  color: #d4e0f0;
+  min-width: 140px;
+}
+
+.training-skill-select {
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 4px;
+  color: #e8e8e8;
+  font-size: 0.82rem;
+  padding: 5px 8px;
+}
+
+.training-assign-btn,
+.training-cancel-btn {
+  font-size: 0.8rem;
+  padding: 5px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.training-assign-btn {
+  background: rgba(60, 180, 80, 0.15);
+  border: 1px solid rgba(60, 180, 80, 0.4);
+  color: #7dd87d;
+}
+.training-assign-btn:hover {
+  background: rgba(60, 180, 80, 0.3);
+}
+
+.training-cancel-btn {
+  background: rgba(220, 160, 60, 0.15);
+  border: 1px solid rgba(220, 160, 60, 0.4);
+  color: #ddaa44;
+}
+.training-cancel-btn:hover {
+  background: rgba(220, 160, 60, 0.3);
+}
+
+.training-status {
+  font-size: 0.8rem;
+  color: #66dd88;
+  font-style: italic;
+}
+
+/* ── Experienced hire section ──────────────────────────────────────────────── */
+.exp-hire-section {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+.exp-hire-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #ccaa44;
+  margin-bottom: 12px;
+}
+
+.exp-hire-desc {
+  font-size: 0.82rem;
+  color: #8090a8;
+  margin-bottom: 14px;
+}
+
+/* ── Medical buttons ──────────────────────────────────────────────────────── */
+.crew-medical-btn {
+  background: rgba(60, 180, 120, 0.15);
+  border: 1px solid rgba(60, 180, 120, 0.4);
+  color: #66cc88;
+  font-size: 0.75rem;
+  padding: 3px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+  margin-left: 6px;
+}
+.crew-medical-btn:hover {
+  background: rgba(60, 180, 120, 0.3);
+}
+
+.crew-injury-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  color: #e0a040;
+  background: rgba(220, 160, 60, 0.15);
+  border: 1px solid rgba(220, 160, 60, 0.3);
+  padding: 1px 8px;
+  border-radius: 3px;
+  margin-left: 6px;
+}
+
+.crew-training-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  color: #66dd88;
+  background: rgba(60, 180, 80, 0.12);
+  border: 1px solid rgba(60, 180, 80, 0.3);
+  padding: 1px 8px;
+  border-radius: 3px;
+  margin-left: 6px;
+}
 `;
 
 // ---------------------------------------------------------------------------
@@ -578,6 +763,30 @@ function _renderShell() {
 
   _overlay.appendChild(header);
 
+  // Tier info bar
+  const crewAdminTier = _state ? getFacilityTier(_state, FacilityId.CREW_ADMIN) : 1;
+  const tierFeatures = CREW_ADMIN_TIER_FEATURES[crewAdminTier];
+  if (tierFeatures) {
+    const tierBar = document.createElement('div');
+    tierBar.className = 'crew-tier-bar';
+
+    const badge = document.createElement('span');
+    badge.className = 'crew-tier-badge';
+    badge.textContent = `Tier ${crewAdminTier} — ${tierFeatures.label}`;
+    tierBar.appendChild(badge);
+
+    const featureList = document.createElement('div');
+    featureList.className = 'crew-tier-features';
+    for (const feat of tierFeatures.features) {
+      const span = document.createElement('span');
+      span.className = 'crew-tier-feature';
+      span.textContent = feat;
+      featureList.appendChild(span);
+    }
+    tierBar.appendChild(featureList);
+    _overlay.appendChild(tierBar);
+  }
+
   // Tab bar
   const tabBar = document.createElement('div');
   tabBar.id = 'crew-admin-tabs';
@@ -585,8 +794,14 @@ function _renderShell() {
   const tabs = [
     { id: 'active',  label: 'Active Crew' },
     { id: 'hire',    label: 'Hire' },
-    { id: 'history', label: 'History' },
   ];
+
+  // Training tab only visible at Tier 2+
+  if (crewAdminTier >= 2) {
+    tabs.push({ id: 'training', label: 'Training' });
+  }
+
+  tabs.push({ id: 'history', label: 'History' });
 
   for (const tab of tabs) {
     const btn = document.createElement('button');
@@ -620,9 +835,10 @@ function _switchTab(tabId) {
   }
 
   // Re-render the content area.
-  if (tabId === 'active')  _renderActiveTab();
-  if (tabId === 'hire')    _renderHireTab();
-  if (tabId === 'history') _renderHistoryTab();
+  if (tabId === 'active')   _renderActiveTab();
+  if (tabId === 'hire')     _renderHireTab();
+  if (tabId === 'training') _renderTrainingTab();
+  if (tabId === 'history')  _renderHistoryTab();
 }
 
 /**
@@ -653,6 +869,8 @@ function _renderActiveTab() {
     return;
   }
 
+  const crewAdminTier = getFacilityTier(_state, FacilityId.CREW_ADMIN);
+
   const table = document.createElement('table');
   table.className = 'crew-table';
   table.innerHTML = `
@@ -660,6 +878,7 @@ function _renderActiveTab() {
       <tr>
         <th>Name</th>
         <th>Skills</th>
+        <th>Status</th>
         <th>Missions</th>
         <th>Flights</th>
         <th></th>
@@ -683,6 +902,41 @@ function _renderActiveTab() {
     const skills = astronaut.skills ?? { piloting: 0, engineering: 0, science: 0 };
     skillsTd.innerHTML = _renderSkillBars(skills);
     tr.appendChild(skillsTd);
+
+    // Status column — injury, training, or ready
+    const statusTd = document.createElement('td');
+    const injured = isCrewInjured(_state, astronaut.id);
+    if (injured) {
+      const remaining = (astronaut.injuryEnds ?? 0) - (_state.currentPeriod ?? 0);
+      const badge = document.createElement('span');
+      badge.className = 'crew-injury-badge';
+      badge.textContent = `Injured (${remaining} flights)`;
+      statusTd.appendChild(badge);
+
+      // Medical care button
+      const medBtn = document.createElement('button');
+      medBtn.className = 'crew-medical-btn';
+      medBtn.textContent = crewAdminTier >= 3 ? 'Adv. Medical' : 'Medical';
+      medBtn.addEventListener('click', () => {
+        const result = crewAdminTier >= 3
+          ? payAdvancedMedicalCare(_state, astronaut.id)
+          : payMedicalCare(_state, astronaut.id);
+        if (result.success) {
+          refreshTopBar();
+          _renderActiveTab();
+        }
+      });
+      statusTd.appendChild(medBtn);
+    } else if (astronaut.trainingSkill) {
+      const badge = document.createElement('span');
+      badge.className = 'crew-training-badge';
+      badge.textContent = `Training: ${astronaut.trainingSkill}`;
+      statusTd.appendChild(badge);
+    } else {
+      statusTd.textContent = 'Ready';
+      statusTd.style.color = '#7dd87d';
+    }
+    tr.appendChild(statusTd);
 
     const missionsTd = document.createElement('td');
     missionsTd.textContent = String(astronaut.missionsFlown);
@@ -852,6 +1106,208 @@ function _renderHireTab() {
       feedback.textContent = result.error || 'Unable to hire astronaut.';
     }
   });
+
+  // ── Experienced crew section (Tier 3) ────────────────────────────────────
+  const crewAdminTier = getFacilityTier(_state, FacilityId.CREW_ADMIN);
+  if (crewAdminTier >= 3 && !atCapacity) {
+    const expSection = document.createElement('div');
+    expSection.className = 'exp-hire-section';
+
+    const expTitle = document.createElement('div');
+    expTitle.className = 'exp-hire-title';
+    expTitle.textContent = 'Recruit Experienced Astronaut';
+    expSection.appendChild(expTitle);
+
+    const expDesc = document.createElement('p');
+    expDesc.className = 'exp-hire-desc';
+    expDesc.textContent = 'Experienced recruits start with skills between 10–30 in all areas, but cost significantly more to hire.';
+    expSection.appendChild(expDesc);
+
+    const expCost = getExperiencedHireCost(_state.reputation ?? 50);
+    const canAffordExp = cash >= expCost;
+
+    const expNameGroup = document.createElement('div');
+    expNameGroup.className = 'hire-form-group';
+    const expLabel = document.createElement('label');
+    expLabel.className = 'hire-form-label';
+    expLabel.htmlFor = 'exp-hire-name-input';
+    expLabel.textContent = 'Astronaut Name';
+    expNameGroup.appendChild(expLabel);
+
+    const expNameInput = document.createElement('input');
+    expNameInput.type = 'text';
+    expNameInput.id = 'exp-hire-name-input';
+    expNameInput.className = 'hire-form-input';
+    expNameInput.placeholder = 'Leave blank for a random name';
+    expNameInput.maxLength = 60;
+    expNameGroup.appendChild(expNameInput);
+    expSection.appendChild(expNameGroup);
+
+    const expBtn = document.createElement('button');
+    expBtn.className = 'hire-btn';
+    expBtn.disabled = !canAffordExp;
+    expBtn.style.background = 'rgba(200, 160, 40, 0.25)';
+    expBtn.style.borderColor = 'rgba(200, 160, 40, 0.5)';
+    expBtn.style.color = '#ddcc66';
+    expBtn.textContent = `Hire Experienced — ${fmtCash(expCost)}`;
+    expSection.appendChild(expBtn);
+
+    const expFeedback = document.createElement('p');
+    expFeedback.className = 'hire-feedback';
+    expSection.appendChild(expFeedback);
+
+    expBtn.addEventListener('click', () => {
+      if (!_state) return;
+      const rawName = expNameInput.value.trim();
+      const name = rawName.length > 0 ? rawName : generateRandomName();
+      const result = hireExperiencedCrew(_state, name);
+
+      if (result.success) {
+        const sk = result.astronaut.skills;
+        expFeedback.className = 'hire-feedback success';
+        expFeedback.textContent = `${result.astronaut.name} joined (P:${Math.round(sk.piloting)} E:${Math.round(sk.engineering)} S:${Math.round(sk.science)})!`;
+        expNameInput.value = '';
+        refreshTopBar();
+        _renderHireTab();
+        // Show feedback again after re-render
+        const newFb = content.querySelector('.exp-hire-section .hire-feedback');
+        if (newFb) {
+          newFb.className = 'hire-feedback success';
+          newFb.textContent = `${result.astronaut.name} joined!`;
+        }
+      } else {
+        expFeedback.className = 'hire-feedback error';
+        expFeedback.textContent = result.error || 'Unable to hire experienced astronaut.';
+      }
+    });
+
+    panel.appendChild(expSection);
+  }
+
+  content.appendChild(panel);
+}
+
+// ---------------------------------------------------------------------------
+// Private — Training tab (Tier 2+)
+// ---------------------------------------------------------------------------
+
+function _renderTrainingTab() {
+  const content = _getContent();
+  if (!content || !_state) return;
+
+  const crewAdminTier = getFacilityTier(_state, FacilityId.CREW_ADMIN);
+  if (crewAdminTier < 2) {
+    const msg = document.createElement('p');
+    msg.className = 'crew-empty-msg';
+    msg.textContent = 'Upgrade Crew Administration to Tier 2 to unlock training.';
+    content.appendChild(msg);
+    return;
+  }
+
+  const panel = document.createElement('div');
+  panel.className = 'training-panel';
+
+  // Info box
+  const infoBox = document.createElement('div');
+  infoBox.className = 'training-info-box';
+  infoBox.innerHTML = `
+    Assign astronauts to skill training between flights. Each trainee gains XP in their
+    chosen skill every flight (period), using diminishing returns just like flight experience.
+    <div class="training-cost-note">Training cost: ${fmtCash(TRAINING_COST_PER_PERIOD)} per trainee per flight</div>
+  `;
+  panel.appendChild(infoBox);
+
+  // Currently training section
+  const trainingCrew = getTrainingCrew(_state);
+  if (trainingCrew.length > 0) {
+    const sectionTitle = document.createElement('h3');
+    sectionTitle.style.cssText = 'color: #a0aab8; font-size: 0.9rem; margin: 16px 0 10px;';
+    sectionTitle.textContent = `Currently Training (${trainingCrew.length})`;
+    panel.appendChild(sectionTitle);
+
+    for (const astronaut of trainingCrew) {
+      const item = document.createElement('div');
+      item.className = 'training-crew-item';
+
+      const name = document.createElement('span');
+      name.className = 'training-crew-name';
+      name.textContent = astronaut.name;
+      item.appendChild(name);
+
+      const status = document.createElement('span');
+      status.className = 'training-status';
+      status.textContent = `Training: ${astronaut.trainingSkill}`;
+      item.appendChild(status);
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.className = 'training-cancel-btn';
+      cancelBtn.textContent = 'Stop Training';
+      cancelBtn.addEventListener('click', () => {
+        cancelTraining(_state, astronaut.id);
+        _renderTrainingTab();
+      });
+      item.appendChild(cancelBtn);
+
+      panel.appendChild(item);
+    }
+  }
+
+  // Available for training
+  const activeCrew = getActiveCrew(_state);
+  const availableForTraining = activeCrew.filter((a) => {
+    if (a.trainingSkill) return false; // already training
+    if (a.assignedRocketId) return false; // assigned to rocket
+    if (isCrewInjured(_state, a.id)) return false; // injured
+    return true;
+  });
+
+  const availTitle = document.createElement('h3');
+  availTitle.style.cssText = 'color: #a0aab8; font-size: 0.9rem; margin: 20px 0 10px;';
+  availTitle.textContent = `Available for Training (${availableForTraining.length})`;
+  panel.appendChild(availTitle);
+
+  if (availableForTraining.length === 0) {
+    const msg = document.createElement('p');
+    msg.className = 'crew-empty-msg';
+    msg.style.padding = '12px 0';
+    msg.textContent = 'No crew available. Crew must be active, uninjured, and not assigned to a rocket.';
+    panel.appendChild(msg);
+  } else {
+    for (const astronaut of availableForTraining) {
+      const item = document.createElement('div');
+      item.className = 'training-crew-item';
+
+      const name = document.createElement('span');
+      name.className = 'training-crew-name';
+      name.textContent = astronaut.name;
+      item.appendChild(name);
+
+      // Skill selector
+      const select = document.createElement('select');
+      select.className = 'training-skill-select';
+      for (const skill of ['piloting', 'engineering', 'science']) {
+        const opt = document.createElement('option');
+        opt.value = skill;
+        const currentVal = Math.round(astronaut.skills?.[skill] ?? 0);
+        opt.textContent = `${skill.charAt(0).toUpperCase() + skill.slice(1)} (${currentVal})`;
+        select.appendChild(opt);
+      }
+      item.appendChild(select);
+
+      const assignBtn = document.createElement('button');
+      assignBtn.className = 'training-assign-btn';
+      assignBtn.textContent = 'Start Training';
+      assignBtn.addEventListener('click', () => {
+        const result = assignToTraining(_state, astronaut.id, select.value);
+        if (result.success) {
+          _renderTrainingTab();
+        }
+      });
+      item.appendChild(assignBtn);
+
+      panel.appendChild(item);
+    }
+  }
 
   content.appendChild(panel);
 }

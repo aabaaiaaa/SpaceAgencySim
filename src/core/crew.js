@@ -22,6 +22,10 @@ import {
   HARD_LANDING_INJURY_MAX,
   EJECTION_INJURY_PERIODS,
   MEDICAL_CARE_COST,
+  TRAINING_XP_PER_PERIOD,
+  TRAINING_COST_PER_PERIOD,
+  EXPERIENCED_CREW_SKILL_RANGE,
+  EXPERIENCED_HIRE_COST_MULTIPLIER,
   getCrewCostModifier,
 } from './constants.js';
 
@@ -71,6 +75,7 @@ function generateUUID() {
  * @property {string|null}                   assignedRocketId - Rocket design ID, or null if unassigned.
  * @property {{ piloting: number, engineering: number, science: number }} skills
  *           Skill levels (0–100). Gains apply diminishing returns.
+ * @property {string|null}                   trainingSkill    - Skill being trained ('piloting', 'engineering', 'science'), or null.
  */
 
 // ---------------------------------------------------------------------------
@@ -84,7 +89,7 @@ function generateUUID() {
  * @param {{ name: string, hireDate?: string }} opts
  * @returns {Astronaut}
  */
-function createAstronaut({ name, salary = CREW_SALARY_PER_PERIOD, hireDate = new Date().toISOString() }) {
+function createAstronaut({ name, salary = CREW_SALARY_PER_PERIOD, hireDate = new Date().toISOString(), skills = null }) {
   return {
     id: generateUUID(),
     name,
@@ -96,8 +101,9 @@ function createAstronaut({ name, salary = CREW_SALARY_PER_PERIOD, hireDate = new
     deathDate: null,
     deathCause: null,
     assignedRocketId: null,
-    skills: { piloting: 0, engineering: 0, science: 0 },
+    skills: skills ?? { piloting: 0, engineering: 0, science: 0 },
     injuryEnds: null,
+    trainingSkill: null,
   };
 }
 
@@ -206,6 +212,8 @@ export function assignToCrew(state, astronautId, rocketId) {
   const astronaut = state.crew.find((a) => a.id === astronautId);
   if (!astronaut || astronaut.status !== AstronautStatus.ACTIVE) return false;
   if (astronaut.injuryEnds != null && astronaut.injuryEnds > (state.currentPeriod ?? 0)) return false;
+  // Cancel any active training when assigned to a rocket.
+  if (astronaut.trainingSkill) astronaut.trainingSkill = null;
   astronaut.assignedRocketId = rocketId;
   return true;
 }
@@ -343,7 +351,7 @@ export function checkInjuryRecovery(state) {
 
 /**
  * Get all active crew members who are available for flight assignment
- * (not injured).
+ * (not injured and not in training).
  *
  * @param {import('./gameState.js').GameState} state
  * @returns {Astronaut[]}
@@ -352,7 +360,8 @@ export function getAssignableCrew(state) {
   const currentPeriod = state.currentPeriod ?? 0;
   return state.crew.filter(
     (a) => a.status === AstronautStatus.ACTIVE &&
-           (a.injuryEnds == null || a.injuryEnds <= currentPeriod),
+           (a.injuryEnds == null || a.injuryEnds <= currentPeriod) &&
+           !a.trainingSkill,
   );
 }
 
@@ -567,4 +576,175 @@ export function getMaxCrewSkill(state, crewIds, skill) {
     }
   }
   return max;
+}
+
+// ---------------------------------------------------------------------------
+// Training system (Crew Admin Tier 2+)
+// ---------------------------------------------------------------------------
+
+/**
+ * Assign an astronaut to skill training.
+ *
+ * Requires the astronaut to be active, not injured, and not already assigned
+ * to a rocket. Sets `trainingSkill` on the astronaut record.
+ *
+ * @param {import('./gameState.js').GameState} state
+ * @param {string} astronautId
+ * @param {'piloting'|'engineering'|'science'} skill
+ * @returns {{ success: boolean, error?: string }}
+ */
+export function assignToTraining(state, astronautId, skill) {
+  const astronaut = state.crew.find((a) => a.id === astronautId);
+  if (!astronaut) return { success: false, error: 'Astronaut not found.' };
+  if (astronaut.status !== AstronautStatus.ACTIVE) return { success: false, error: 'Astronaut is not active.' };
+  if (astronaut.injuryEnds != null && astronaut.injuryEnds > (state.currentPeriod ?? 0)) {
+    return { success: false, error: 'Astronaut is injured and cannot train.' };
+  }
+  if (astronaut.assignedRocketId) {
+    return { success: false, error: 'Astronaut is assigned to a rocket. Unassign first.' };
+  }
+
+  astronaut.trainingSkill = skill;
+  return { success: true };
+}
+
+/**
+ * Remove an astronaut from training.
+ *
+ * @param {import('./gameState.js').GameState} state
+ * @param {string} astronautId
+ * @returns {boolean}  `true` if training was cancelled.
+ */
+export function cancelTraining(state, astronautId) {
+  const astronaut = state.crew.find((a) => a.id === astronautId);
+  if (!astronaut || !astronaut.trainingSkill) return false;
+  astronaut.trainingSkill = null;
+  return true;
+}
+
+/**
+ * Process training progress for all crew currently in training.
+ * Called once per period advancement.
+ *
+ * Awards TRAINING_XP_PER_PERIOD in the assigned skill (with diminishing returns).
+ * Returns the total training cost charged this period.
+ *
+ * @param {import('./gameState.js').GameState} state
+ * @returns {{ trainingCost: number, trainees: Array<{id: string, name: string, skill: string, gain: number}> }}
+ */
+export function processTraining(state) {
+  const trainees = [];
+  let trainingCost = 0;
+
+  for (const astronaut of state.crew) {
+    if (
+      astronaut.status !== AstronautStatus.ACTIVE ||
+      !astronaut.trainingSkill
+    ) continue;
+
+    // Skip injured crew — they can't train
+    if (astronaut.injuryEnds != null && astronaut.injuryEnds > (state.currentPeriod ?? 0)) continue;
+
+    const skill = astronaut.trainingSkill;
+    const before = astronaut.skills?.[skill] ?? 0;
+    awardSkillXP(astronaut, skill, TRAINING_XP_PER_PERIOD);
+    const after = astronaut.skills[skill];
+    const gain = Math.round((after - before) * 10) / 10;
+
+    trainingCost += TRAINING_COST_PER_PERIOD;
+    trainees.push({ id: astronaut.id, name: astronaut.name, skill, gain });
+  }
+
+  // Deduct training costs (mandatory — can go negative like other operating costs)
+  if (trainingCost > 0) {
+    state.money -= trainingCost;
+  }
+
+  return { trainingCost, trainees };
+}
+
+/**
+ * Get all crew currently in training.
+ *
+ * @param {import('./gameState.js').GameState} state
+ * @returns {Array<import('./crew.js').Astronaut>}
+ */
+export function getTrainingCrew(state) {
+  return state.crew.filter(
+    (a) => a.status === AstronautStatus.ACTIVE && a.trainingSkill != null,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Experienced crew recruitment (Crew Admin Tier 3)
+// ---------------------------------------------------------------------------
+
+/**
+ * Get the hire cost for an experienced crew member (Tier 3).
+ *
+ * @param {number} reputation  Current agency reputation (0–100).
+ * @returns {number}  Adjusted hire cost (floored to whole dollars).
+ */
+export function getExperiencedHireCost(reputation) {
+  return Math.floor(HIRE_COST * getCrewCostModifier(reputation) * EXPERIENCED_HIRE_COST_MULTIPLIER);
+}
+
+/**
+ * Hire an experienced astronaut with starting skills > 0.
+ * Only available at Crew Admin Tier 3.
+ *
+ * @param {import('./gameState.js').GameState} state
+ * @param {string} name  Display name for the new astronaut.
+ * @returns {{ success: boolean, astronaut?: import('./crew.js').Astronaut, cost?: number, error?: string }}
+ */
+export function hireExperiencedCrew(state, name) {
+  const cost = getExperiencedHireCost(state.reputation ?? 50);
+  const ok = spend(state, cost);
+  if (!ok) {
+    return { success: false, error: `Insufficient funds to hire experienced astronaut (need $${cost.toLocaleString('en-US')}).` };
+  }
+
+  const { min, max } = EXPERIENCED_CREW_SKILL_RANGE;
+  const randSkill = () => min + Math.floor(Math.random() * (max - min + 1));
+  const skills = {
+    piloting: randSkill(),
+    engineering: randSkill(),
+    science: randSkill(),
+  };
+
+  const astronaut = createAstronaut({ name, skills });
+  state.crew.push(astronaut);
+  return { success: true, astronaut, cost };
+}
+
+// ---------------------------------------------------------------------------
+// Advanced medical (Crew Admin Tier 3)
+// ---------------------------------------------------------------------------
+
+/**
+ * Pay for advanced medical care to reduce an injured astronaut's remaining
+ * recovery time to 1/3 (rounded up). Only available at Crew Admin Tier 3.
+ *
+ * Deducts MEDICAL_CARE_COST from cash via spend().
+ *
+ * @param {import('./gameState.js').GameState} state
+ * @param {string} id  Astronaut ID.
+ * @returns {{ success: boolean, newInjuryEnds?: number, error?: string }}
+ */
+export function payAdvancedMedicalCare(state, id) {
+  const astronaut = state.crew.find((a) => a.id === id);
+  if (!astronaut) return { success: false, error: 'Astronaut not found.' };
+  if (astronaut.injuryEnds == null || astronaut.injuryEnds <= (state.currentPeriod ?? 0)) {
+    return { success: false, error: 'Astronaut is not injured.' };
+  }
+
+  const ok = spend(state, MEDICAL_CARE_COST);
+  if (!ok) return { success: false, error: 'Insufficient funds for advanced medical care.' };
+
+  const currentPeriod = state.currentPeriod ?? 0;
+  const remaining = astronaut.injuryEnds - currentPeriod;
+  const reduced = Math.ceil(remaining / 3);
+  astronaut.injuryEnds = currentPeriod + reduced;
+
+  return { success: true, newInjuryEnds: astronaut.injuryEnds };
 }

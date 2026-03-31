@@ -226,7 +226,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: MCC tiers: Tier 1 (free, tutorial missions, 2 active contracts, 4 board pool), Tier 2 ($200k, 5 active, 8 pool, medium-difficulty contracts), Tier 3 ($500k, 8 active, 12 pool, premium contracts, multi-part chains).
 
 ### TASK-034: Crew Administration facility and upgrade tiers
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-030, TASK-011
 - **Description**: Crew Admin must be built ($100k, not free). Tier 1: hire/fire crew, basic skill tracking. Tier 2 ($250k): training facility (assign crew to skill training between flights). Tier 3 ($600k): recruit experienced crew (starting skills > 0), advanced medical (faster recovery). Tutorial mission unlocking command module also introduces this building.

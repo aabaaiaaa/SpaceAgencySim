@@ -15,11 +15,12 @@
  * @module core/period
  */
 
-import { AstronautStatus, CREW_SALARY_PER_PERIOD, FACILITY_UPKEEP_PER_PERIOD } from './constants.js';
+import { AstronautStatus, CREW_SALARY_PER_PERIOD, FACILITY_UPKEEP_PER_PERIOD, FacilityId } from './constants.js';
 import { expireBoardContracts, expireActiveContracts } from './contracts.js';
 import { isBankrupt } from './finance.js';
 import { processSatelliteNetwork } from './satellites.js';
-import { checkInjuryRecovery } from './crew.js';
+import { checkInjuryRecovery, processTraining } from './crew.js';
+import { getFacilityTier } from './construction.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -40,6 +41,8 @@ import { checkInjuryRecovery } from './crew.js';
  * @property {number}   satelliteLeaseIncome    - Income from leased satellites this period.
  * @property {string[]} decommissionedSatellites - Satellite IDs that reached 0 health.
  * @property {string[]} healedCrewIds  - IDs of crew members whose injuries were cleared.
+ * @property {number}   trainingCost  - Total crew training cost this period.
+ * @property {Array<{id: string, name: string, skill: string, gain: number}>} trainees - Training progress.
  * @property {boolean} bankrupt        - True if the player is bankrupt after this period.
  */
 
@@ -118,7 +121,11 @@ export function advancePeriod(state) {
   // ── 8. Crew injury recovery — clear injuries whose period has elapsed ─
   const healedCrewIds = checkInjuryRecovery(state);
 
-  // ── 9. Bankruptcy check ───────────────────────────────────────────────
+  // ── 9. Crew training — award XP and charge training costs (Tier 2+) ──
+  const crewAdminTier = getFacilityTier(state, FacilityId.CREW_ADMIN);
+  const trainingResult = crewAdminTier >= 2 ? processTraining(state) : { trainingCost: 0, trainees: [] };
+
+  // ── 10. Bankruptcy check ──────────────────────────────────────────────
   const bankrupt = isBankrupt(state);
 
   return {
@@ -135,6 +142,8 @@ export function advancePeriod(state) {
     satelliteLeaseIncome: satResult.leaseIncome,
     decommissionedSatellites: satResult.decommissioned,
     healedCrewIds,
+    trainingCost: trainingResult.trainingCost,
+    trainees: trainingResult.trainees,
     bankrupt,
   };
 }
