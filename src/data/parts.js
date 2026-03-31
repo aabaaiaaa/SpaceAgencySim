@@ -208,6 +208,9 @@ export const STACK_TYPES = Object.freeze([
   PartType.HEAT_SHIELD,
   PartType.NOSE_CONE,
   PartType.BATTERY,
+  PartType.ANTENNA,
+  PartType.SENSOR,
+  PartType.INSTRUMENT,
 ]);
 
 /**
@@ -225,6 +228,9 @@ export const RADIAL_TYPES = Object.freeze([
   PartType.SOLAR_PANEL,
   PartType.BATTERY,
   PartType.LAUNCH_CLAMP,
+  PartType.ANTENNA,
+  PartType.SENSOR,
+  PartType.INSTRUMENT,
 ]);
 
 // ---------------------------------------------------------------------------
@@ -1769,10 +1775,40 @@ export const PARTS = [
   },
 
   /**
+   * OX-4W Solar Panel — medium fixed solar panel.
+   * Good balance of power output and weight for mid-size satellites.
+   * Tech tree: Structural T2.
+   */
+  {
+    id: 'solar-panel-medium',
+    name: 'OX-4W Solar Panel',
+    description: 'A medium fixed solar panel with solid power output. Good balance of weight and generation for mid-size satellites and probes that need more power than the OX-STAT provides.',
+    type: PartType.SOLAR_PANEL,
+    reliability: RELIABILITY_TIERS.MID,
+    mass: 30,
+    cost: 4_500,
+    width: 30,   // 1.5 m
+    height: 8,   // 0.4 m
+    snapPoints: [
+      makeSnapPoint('left',  -15,  0, []),
+      makeSnapPoint('right',  15,  0, RADIAL_TYPES),
+    ],
+    animationStates: ['stowed', 'deployed'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      solarPanelArea: 2.5,     // 2.5 m² panel area
+      dragCoefficient: 0.03,
+      heatTolerance: 1200,
+      crashThreshold: 4,
+    },
+  },
+
+  /**
    * Gigantor XL Solar Array — large deployable solar array.
    * High power output for stations and large satellites.
    * Mount radially for best coverage.
-   * Tech tree: Electrical T3.
+   * Tech tree: Structural T3.
    */
   {
     id: 'solar-panel-large',
@@ -1835,9 +1871,41 @@ export const PARTS = [
   },
 
   /**
+   * Z-200 Battery Pack — medium rechargeable battery.
+   * Good capacity for mid-size satellites and probes.
+   * Tech tree: Structural T2.
+   */
+  {
+    id: 'battery-medium',
+    name: 'Z-200 Battery Pack',
+    description: 'A medium rechargeable battery with solid storage capacity. Ideal for custom satellites and probes that need more eclipse endurance than the Z-100 provides.',
+    type: PartType.BATTERY,
+    reliability: RELIABILITY_TIERS.MID,
+    mass: 12,
+    cost: 2_000,
+    width: 12,
+    height: 12,
+    snapPoints: [
+      makeSnapPoint('top',    0, -6, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  6, STACK_TYPES),
+      makeSnapPoint('left',  -6,  0, []),
+      makeSnapPoint('right',  6,  0, RADIAL_TYPES),
+    ],
+    animationStates: ['idle'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      batteryCapacity: 200,    // 200 Wh
+      dragCoefficient: 0.02,
+      heatTolerance: 1200,
+      crashThreshold: 8,
+    },
+  },
+
+  /**
    * Z-400 Battery Bank — large rechargeable battery.
    * High capacity for stations and power-intensive missions.
-   * Tech tree: Electrical T2.
+   * Tech tree: Structural T3.
    */
   {
     id: 'battery-large',
@@ -2054,6 +2122,252 @@ export const PARTS = [
       dragCoefficient: 0.06,
       heatTolerance: 1200,
       crashThreshold: 6,
+    },
+  },
+
+  // =========================================================================
+  // SATELLITE COMPONENT — ANTENNAS
+  // =========================================================================
+
+  /**
+   * Standard Antenna — basic short-range communication antenna.
+   * Suitable for LEO/MEO satellite links. Low power draw.
+   * Tech tree: Structural T2.
+   */
+  {
+    id: 'antenna-standard',
+    name: 'Standard Antenna',
+    description: 'A basic communication antenna for short-range satellite data links. Suitable for LEO and MEO operations. Low power draw makes it ideal for small custom satellites.',
+    type: PartType.ANTENNA,
+    reliability: RELIABILITY_TIERS.MID,
+    mass: 15,
+    cost: 5_000,
+    width: 14,   // 0.7 m
+    height: 20,  // 1.0 m
+    snapPoints: [
+      makeSnapPoint('top',    0, -10, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  10, STACK_TYPES),
+      makeSnapPoint('left',  -7,   0, []),
+      makeSnapPoint('right',  7,   0, RADIAL_TYPES),
+    ],
+    animationStates: ['stowed', 'deployed'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      antennaRange: 'short',       // LEO/MEO range
+      powerDraw: 8,                // 8 W when active
+      dragCoefficient: 0.04,
+      heatTolerance: 1200,
+      crashThreshold: 5,
+    },
+  },
+
+  /**
+   * High-Power Antenna — medium-range communication antenna.
+   * Reaches HEO and lunar orbits. Higher power draw.
+   * Tech tree: Structural T3.
+   */
+  {
+    id: 'antenna-high-power',
+    name: 'High-Power Antenna',
+    description: 'A high-power communication antenna for medium-range satellite links. Reaches HEO and lunar orbit distances. Higher power draw but essential for extended-range custom satellites.',
+    type: PartType.ANTENNA,
+    reliability: RELIABILITY_TIERS.MID,
+    mass: 40,
+    cost: 12_000,
+    width: 20,   // 1.0 m
+    height: 24,  // 1.2 m
+    snapPoints: [
+      makeSnapPoint('top',    0, -12, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  12, STACK_TYPES),
+      makeSnapPoint('left',  -10,  0, []),
+      makeSnapPoint('right',  10,  0, RADIAL_TYPES),
+    ],
+    animationStates: ['stowed', 'deployed'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      antennaRange: 'medium',      // HEO/lunar range
+      powerDraw: 25,               // 25 W when active
+      dragCoefficient: 0.05,
+      heatTolerance: 1200,
+      crashThreshold: 4,
+    },
+  },
+
+  /**
+   * Relay Dish — long-range relay antenna for interplanetary distances.
+   * Enables deep-space communication relays. High power draw.
+   * Tech tree: Structural T4.
+   */
+  {
+    id: 'antenna-relay',
+    name: 'Relay Dish',
+    description: 'A high-gain relay dish for interplanetary communication. Bridges vast distances between planetary systems. Essential for deep-space custom satellite relay networks. High power draw requires robust power systems.',
+    type: PartType.ANTENNA,
+    reliability: RELIABILITY_TIERS.HIGH,
+    mass: 70,
+    cost: 25_000,
+    width: 28,   // 1.4 m
+    height: 30,  // 1.5 m
+    snapPoints: [
+      makeSnapPoint('top',    0, -15, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  15, STACK_TYPES),
+      makeSnapPoint('left',  -14,  0, []),
+      makeSnapPoint('right',  14,  0, RADIAL_TYPES),
+    ],
+    animationStates: ['stowed', 'deployed'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      antennaRange: 'interplanetary',  // deep-space range
+      relayCapable: true,
+      powerDraw: 45,                   // 45 W when active
+      dragCoefficient: 0.06,
+      heatTolerance: 1200,
+      crashThreshold: 3,
+    },
+  },
+
+  // =========================================================================
+  // SATELLITE COMPONENT — SENSOR PACKAGES
+  // =========================================================================
+
+  /**
+   * Weather Sensor Package — meteorological observation sensor.
+   * Collects atmospheric and weather data from orbit.
+   * Tech tree: Science T2.
+   */
+  {
+    id: 'sensor-weather',
+    name: 'Weather Sensor Package',
+    description: 'A meteorological sensor suite for orbital weather observation. Collects atmospheric pressure, temperature, and cloud-cover data. Mount on a custom satellite for dedicated weather monitoring.',
+    type: PartType.SENSOR,
+    reliability: RELIABILITY_TIERS.MID,
+    mass: 25,
+    cost: 8_000,
+    width: 16,   // 0.8 m
+    height: 14,  // 0.7 m
+    snapPoints: [
+      makeSnapPoint('top',    0,  -7, STACK_TYPES),
+      makeSnapPoint('bottom', 0,   7, STACK_TYPES),
+      makeSnapPoint('left',  -8,   0, []),
+      makeSnapPoint('right',  8,   0, RADIAL_TYPES),
+    ],
+    animationStates: ['idle', 'active'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      sensorType: SatelliteType.WEATHER,
+      powerDraw: 12,               // 12 W when active
+      dragCoefficient: 0.03,
+      heatTolerance: 1400,
+      crashThreshold: 6,
+    },
+  },
+
+  /**
+   * Science Sensor Package — orbital science data collection sensor.
+   * Generates passive science yield from orbit.
+   * Tech tree: Science T2.
+   */
+  {
+    id: 'sensor-science',
+    name: 'Science Sensor Package',
+    description: 'A multi-spectral science sensor for orbital research. Collects environmental and geological data, generating passive science yield each period. Essential for custom orbital science platforms.',
+    type: PartType.SENSOR,
+    reliability: RELIABILITY_TIERS.MID,
+    mass: 30,
+    cost: 10_000,
+    width: 16,   // 0.8 m
+    height: 14,  // 0.7 m
+    snapPoints: [
+      makeSnapPoint('top',    0,  -7, STACK_TYPES),
+      makeSnapPoint('bottom', 0,   7, STACK_TYPES),
+      makeSnapPoint('left',  -8,   0, []),
+      makeSnapPoint('right',  8,   0, RADIAL_TYPES),
+    ],
+    animationStates: ['idle', 'active'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      sensorType: SatelliteType.SCIENCE,
+      powerDraw: 18,               // 18 W when active
+      dragCoefficient: 0.03,
+      heatTolerance: 1400,
+      crashThreshold: 6,
+    },
+  },
+
+  /**
+   * GPS Transponder — navigation signal transponder.
+   * Broadcasts positioning signals when deployed in MEO.
+   * Needs 3+ in constellation for full benefit.
+   * Tech tree: Science T3.
+   */
+  {
+    id: 'sensor-gps',
+    name: 'GPS Transponder',
+    description: 'A navigation signal transponder for GPS constellation satellites. Broadcasts precise positioning data when deployed in MEO. Requires 3 or more units in constellation for full navigation benefits.',
+    type: PartType.SENSOR,
+    reliability: RELIABILITY_TIERS.MID,
+    mass: 20,
+    cost: 15_000,
+    width: 14,   // 0.7 m
+    height: 12,  // 0.6 m
+    snapPoints: [
+      makeSnapPoint('top',    0,  -6, STACK_TYPES),
+      makeSnapPoint('bottom', 0,   6, STACK_TYPES),
+      makeSnapPoint('left',  -7,   0, []),
+      makeSnapPoint('right',  7,   0, RADIAL_TYPES),
+    ],
+    animationStates: ['idle', 'active'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      sensorType: SatelliteType.GPS,
+      powerDraw: 10,               // 10 W when active
+      dragCoefficient: 0.02,
+      heatTolerance: 1400,
+      crashThreshold: 7,
+    },
+  },
+
+  // =========================================================================
+  // SATELLITE COMPONENT — SPECIALISED INSTRUMENTS
+  // =========================================================================
+
+  /**
+   * Science Telescope — large orbital telescope for high-yield science.
+   * Powerful but heavy and power-hungry. Needs a robust satellite bus.
+   * Tech tree: Science T4.
+   */
+  {
+    id: 'instrument-telescope',
+    name: 'Science Telescope',
+    description: 'A large orbital telescope for high-yield science observations. Generates significantly more science per period than standard sensors, but requires substantial power and a heavy satellite bus. The pinnacle of orbital science platforms.',
+    type: PartType.INSTRUMENT,
+    reliability: RELIABILITY_TIERS.HIGH,
+    mass: 200,
+    cost: 35_000,
+    width: 30,   // 1.5 m
+    height: 50,  // 2.5 m
+    snapPoints: [
+      makeSnapPoint('top',    0, -25, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  25, STACK_TYPES),
+      makeSnapPoint('left',  -15,  0, []),
+      makeSnapPoint('right',  15,  0, RADIAL_TYPES),
+    ],
+    animationStates: ['stowed', 'deployed', 'observing'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      instrumentType: 'telescope',
+      scienceMultiplier: 3.0,      // 3× science yield vs standard sensor
+      powerDraw: 50,               // 50 W when active
+      dragCoefficient: 0.08,
+      heatTolerance: 1000,
+      crashThreshold: 3,
     },
   },
 

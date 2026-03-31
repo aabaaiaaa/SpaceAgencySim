@@ -56,6 +56,12 @@ export const PartType = Object.freeze({
   NOSE_CONE: 'NOSE_CONE',
   /** Ground-mounted launch clamp that holds the rocket on the pad until staged. */
   LAUNCH_CLAMP: 'LAUNCH_CLAMP',
+  /** Communication antenna for satellite data links. */
+  ANTENNA: 'ANTENNA',
+  /** Sensor package for satellite observation and data collection. */
+  SENSOR: 'SENSOR',
+  /** Specialised scientific instrument for satellite platforms. */
+  INSTRUMENT: 'INSTRUMENT',
 });
 
 // ---------------------------------------------------------------------------

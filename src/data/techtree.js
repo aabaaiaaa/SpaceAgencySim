@@ -188,9 +188,9 @@ export const TECH_NODES = Object.freeze([
     tier:               2,
     scienceCost:        TIER_COSTS[2].science,
     fundsCost:          TIER_COSTS[2].funds,
-    unlocksParts:       ['decoupler-radial', 'nose-cone'],
+    unlocksParts:       ['decoupler-radial', 'nose-cone', 'antenna-standard', 'solar-panel-medium', 'battery-medium'],
     unlocksInstruments: [],
-    description:        'Radial decouplers for booster staging and aerodynamic nose cones.',
+    description:        'Radial decouplers, nose cones, and basic satellite components for custom satellite construction.',
   }),
 
   Object.freeze({
@@ -200,9 +200,9 @@ export const TECH_NODES = Object.freeze([
     tier:               3,
     scienceCost:        TIER_COSTS[3].science,
     fundsCost:          TIER_COSTS[3].funds,
-    unlocksParts:       ['tank-large', 'tube-connector'],
+    unlocksParts:       ['tank-large', 'tube-connector', 'antenna-high-power'],
     unlocksInstruments: [],
-    description:        'Large fuel tanks and structural tubes for heavy-lift vehicle designs.',
+    description:        'Large fuel tanks, structural tubes, and high-power satellite antennas.',
   }),
 
   Object.freeze({
@@ -212,9 +212,9 @@ export const TECH_NODES = Object.freeze([
     tier:               4,
     scienceCost:        TIER_COSTS[4].science,
     fundsCost:          TIER_COSTS[4].funds,
-    unlocksParts:       ['docking-port-std', 'docking-port-small', 'relay-antenna'],
+    unlocksParts:       ['docking-port-std', 'docking-port-small', 'relay-antenna', 'antenna-relay'],
     unlocksInstruments: [],
-    description:        'Standard docking mechanism for orbital assembly and crew transfer.',
+    description:        'Docking mechanisms, orbital assembly, and interplanetary relay dishes.',
   }),
 
   Object.freeze({
@@ -312,9 +312,9 @@ export const TECH_NODES = Object.freeze([
     tier:               2,
     scienceCost:        TIER_COSTS[2].science,
     fundsCost:          TIER_COSTS[2].funds,
-    unlocksParts:       [],
+    unlocksParts:       ['sensor-weather', 'sensor-science'],
     unlocksInstruments: ['radiation-detector'],
-    description:        'Charged-particle flux sensors for studying cosmic and solar radiation.',
+    description:        'Radiation detectors and satellite sensor packages for weather and science observation.',
   }),
 
   Object.freeze({
@@ -324,9 +324,9 @@ export const TECH_NODES = Object.freeze([
     tier:               3,
     scienceCost:        TIER_COSTS[3].science,
     fundsCost:          TIER_COSTS[3].funds,
-    unlocksParts:       ['sample-return-container', 'surface-instrument-package'],
+    unlocksParts:       ['sample-return-container', 'surface-instrument-package', 'sensor-gps'],
     unlocksInstruments: ['gravity-gradiometer', 'magnetometer'],
-    description:        'Precision instruments for mapping gravitational and magnetic fields from orbit.',
+    description:        'Field instruments, GPS transponders, and precision mapping from orbit.',
   }),
 
   Object.freeze({
@@ -336,9 +336,9 @@ export const TECH_NODES = Object.freeze([
     tier:               4,
     scienceCost:        TIER_COSTS[4].science,
     fundsCost:          TIER_COSTS[4].funds,
-    unlocksParts:       ['science-lab'],
+    unlocksParts:       ['science-lab', 'instrument-telescope'],
     unlocksInstruments: [],
-    description:        'An orbital laboratory module that can process samples for bonus science yield.',
+    description:        'Orbital laboratory module and science telescope for high-yield research.',
   }),
 
   Object.freeze({
