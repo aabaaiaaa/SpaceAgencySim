@@ -134,7 +134,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Each part has reliability rating (0.0-1.0). Malfunction chance checked on biome transitions (offset from exact point for unpredictability). Must be toggleable for E2E testing (off or forced 100%). Malfunction types: Engine flameout (thrust→0, reignition attempts), Engine reduced thrust (60%), Fuel tank leak (~2%/s), Decoupler stuck (context menu manual decouple), Parachute partial deploy (50% drag), SRB early burnout, Science module instrument failure, Landing legs stuck stowed. Malfunctions are not catastrophic — player can always attempt recovery. Recovery via context menu, not staging. Visual cues and recovery tips for all malfunctions. Reliability visible in VAB. Example values: Starter 0.92, Mid-tier 0.96, High-tier 0.98, upgraded +0.02. Crew engineering skill reduces chance by up to 30%.
 
 ### TASK-020: Part wear and reusability system
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-019
 - **Description**: Recovered parts go into state.partInventory with wear tracking. Each flight adds wear based on stress (engine firing = more, passive tank = less). Wear 0-100% affects reliability: effectiveReliability = baseReliability × (1 - wear × 0.5). VAB integration: parts menu shows inventory count, new inventory tab to LEFT of existing parts menu. Part descriptions show altered price when inventory exists. Inventory tab allows refurbish (30% cost, wear→10%) or scrap (sell for small amount). When building: buy new (full price, 0% wear) or use recovered (free, has wear). Recovered parts visually distinguished.

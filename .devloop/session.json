@@ -1,12 +1,12 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 33,
+  "lastIteration": 34,
   "startedAt": "2026-03-30T20:49:34.099Z",
   "activeTask": {
-    "taskId": "TASK-055",
-    "taskTitle": "E2E tests — Phase 1 (Agency Depth)",
-    "iterationNumber": 33,
-    "startedAt": "2026-03-31T07:03:49.424Z"
+    "taskId": "TASK-020",
+    "taskTitle": "Part wear and reusability system",
+    "iterationNumber": 34,
+    "startedAt": "2026-03-31T07:48:03.295Z"
   }
 }

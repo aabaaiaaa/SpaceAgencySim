@@ -263,6 +263,16 @@ import {
  *                                                 calculations.
  * @property {TechTreeState}   techTree          - Technology tree research progress.
  * @property {SatelliteNetworkState} satelliteNetwork - Deployed satellite network state.
+ * @property {InventoryPart[]}      partInventory    - Recovered parts available for reuse.
+ */
+
+/**
+ * A single recovered part sitting in the player's inventory.
+ * @typedef {Object} InventoryPart
+ * @property {string}  id        - Unique inventory entry ID.
+ * @property {string}  partId    - Catalog part ID (e.g. 'engine-spark').
+ * @property {number}  wear      - Wear level 0–100 (0 = pristine, 100 = destroyed).
+ * @property {number}  flights   - Number of flights this part has been through.
  */
 
 /**
@@ -380,6 +390,9 @@ export function createGameState() {
     satelliteNetwork: {
       satellites: [],
     },
+
+    // Part inventory — recovered parts available for reuse in the VAB.
+    partInventory: [],
   };
 }
 

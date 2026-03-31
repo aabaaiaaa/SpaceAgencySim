@@ -27,6 +27,7 @@ import { PartType, DEATH_FINE_PER_ASTRONAUT, FlightOutcome } from './constants.j
 import { processContractCompletions, generateContracts } from './contracts.js';
 import { deploySatellitesFromFlight } from './satellites.js';
 import { awardFlightXP, getMaxCrewSkill, processFlightInjuries } from './crew.js';
+import { recoverPartsToInventory } from './partInventory.js';
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -61,6 +62,7 @@ import { awardFlightXP, getMaxCrewSkill, processFlightInjuries } from './crew.js
  * @property {Array<{satelliteId: string, satelliteType: string}>} deployedSatellites - Satellites deployed during this flight.
  * @property {Array<{id: string, name: string, piloting: number, engineering: number, science: number}>} crewXPGains - Skill XP gains per crew member.
  * @property {Array<{crewId: string, crewName: string, cause: string, periods: number, altitude: number}>} crewInjuries - Crew injuries sustained this flight.
+ * @property {import('./gameState.js').InventoryPart[]} recoveredParts - Parts recovered to inventory.
  */
 
 /**
@@ -116,22 +118,31 @@ export function processFlightReturn(state, flightState, ps, assembly) {
   // ── 4. Part recovery (landed safely only) ────────────────────────────────
   const isLanded = !!(ps && ps.landed && !ps.crashed);
   let partsRecovered = 0;
+  /** @type {import('./gameState.js').InventoryPart[]} */
+  let recoveredParts = [];
   if (isLanded && assembly) {
     // Engineering skill bonus: recovery value scales from 60% to 80%.
     const crewIds = flightState?.crewIds ?? [];
     const engSkill = getMaxCrewSkill(state, crewIds, 'engineering');
     const recoveryFrac = 0.6 + (engSkill / 100) * 0.2;
 
+    // Cash recovery for all intact parts.
     for (const [instanceId, placed] of assembly.parts) {
       if (!ps.activeParts.has(instanceId)) continue;
       const def = getPartById(placed.partId);
       if (!def) continue;
       recoveryValue += Math.round((def.cost ?? 0) * recoveryFrac);
-      partsRecovered++;
     }
     if (recoveryValue > 0) {
       earn(state, recoveryValue);
     }
+
+    // Add recovered parts to inventory with wear tracking.
+    // _usedInventoryParts is attached to ps by the VAB at launch time.
+    const usedInventoryParts = ps._usedInventoryParts ?? null;
+    const result = recoverPartsToInventory(state, assembly, ps, usedInventoryParts);
+    partsRecovered = result.partsRecovered;
+    recoveredParts = result.entries;
   }
 
   // ── 4b. Crew skill XP awards ──────────────────────────────────────────────
@@ -253,6 +264,7 @@ export function processFlightReturn(state, flightState, ps, assembly) {
     deployedSatellites,
     crewXPGains,
     crewInjuries,
+    recoveredParts,
   };
 }
 

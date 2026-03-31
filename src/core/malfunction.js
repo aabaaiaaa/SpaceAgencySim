@@ -220,8 +220,13 @@ export function checkMalfunctions(ps, assembly, flightState, gameState) {
     // Mark as checked so it won't be re-rolled on the next biome transition.
     ps.malfunctionChecked.add(instanceId);
 
-    // Reliability check.
-    const baseReliability = getPartReliability(def);
+    // Reliability check — account for part wear from inventory reuse.
+    let baseReliability = getPartReliability(def);
+    const invEntry = ps._usedInventoryParts?.get(instanceId);
+    if (invEntry && invEntry.wear > 0) {
+      // effectiveReliability = baseReliability × (1 - wear/100 × 0.5)
+      baseReliability = baseReliability * (1 - (invEntry.wear / 100) * 0.5);
+    }
 
     // Adjusted failure chance: (1 - reliability) * (1 - engineering reduction).
     const failureChance = (1 - baseReliability) * (1 - engineeringReduction);

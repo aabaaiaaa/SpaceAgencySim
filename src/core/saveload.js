@@ -299,6 +299,9 @@ export function loadGame(slotIndex) {
   envelope.state.techTree.researched ??= [];
   envelope.state.techTree.unlockedInstruments ??= [];
 
+  // Default part inventory for saves created before the reusability system.
+  envelope.state.partInventory ??= [];
+
   return envelope.state;
 }
 

@@ -84,6 +84,15 @@ import { startFlightScene } from './flightController.js';
 import { showReturnResultsOverlay } from './hub.js';
 import { refreshTopBar } from './topbar.js';
 import { buildRocketCard, injectRocketCardCSS } from './rocketCardUtil.js';
+import {
+  getInventoryCount,
+  getInventoryForPart,
+  useInventoryPart,
+  addToInventory,
+  refurbishPart,
+  scrapPart,
+  getEffectiveReliability,
+} from '../core/partInventory.js';
 
 // ---------------------------------------------------------------------------
 // Module-level state (VAB session)
@@ -148,8 +157,17 @@ let _currentDesignId = null;
 /** Name of the last-saved design, for pre-filling the save prompt. @type {string} */
 let _currentDesignName = '';
 
-/** Set of currently open panel IDs (missions | staging | engineer). @type {Set<string>} */
+/** Set of currently open panel IDs (missions | staging | engineer | inventory). @type {Set<string>} */
 const _openPanels = new Set();
+
+/**
+ * Tracks placed parts that came from inventory (not bought new).
+ * Maps instanceId → InventoryPart entry (with wear, flights, etc.).
+ * When a part from inventory is deleted, it's returned to inventory
+ * instead of refunding cash.
+ * @type {Map<string, import('../core/gameState.js').InventoryPart>}
+ */
+const _inventoryUsedParts = new Map();
 
 /** The #vab-canvas-area element (stored for panel offset calculations). @type {HTMLElement | null} */
 let _canvasArea = null;
@@ -581,6 +599,127 @@ const VAB_CSS = `
   color: #224060;
   text-align: center;
   line-height: 1.75;
+}
+
+/* ── Inventory badge on part cards ──────────────────────────────────── */
+.vab-inv-badge {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 4px;
+  font-size: 9px;
+  font-weight: 700;
+  color: #50c860;
+  background: rgba(40, 100, 50, 0.35);
+  border-radius: 7px;
+  line-height: 1.5;
+  vertical-align: middle;
+}
+.vab-part-cost-free {
+  color: #50c860;
+  font-weight: 700;
+}
+.vab-part-cost-orig {
+  text-decoration: line-through;
+  color: #365474;
+  margin-left: 3px;
+  font-size: 8px;
+}
+
+/* ── Inventory panel ────────────────────────────────────────────────── */
+.vab-inv-body {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #152a44 transparent;
+}
+.vab-inv-empty {
+  padding: 28px 16px;
+  font-size: 10px;
+  color: #224060;
+  text-align: center;
+  line-height: 1.75;
+}
+.vab-inv-group-hdr {
+  padding: 8px 12px 3px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: #3a6848;
+  border-bottom: 1px solid #0e1e30;
+}
+.vab-inv-item {
+  padding: 5px 10px;
+  border-bottom: 1px solid rgba(14, 30, 48, 0.5);
+  transition: background .08s;
+}
+.vab-inv-item:hover {
+  background: rgba(14, 38, 74, 0.35);
+}
+.vab-inv-item-info {
+  display: flex;
+  gap: 8px;
+  font-size: 10px;
+  margin-bottom: 4px;
+}
+.vab-inv-wear { font-weight: 700; }
+.vab-inv-flights { color: #4a6a8a; }
+.vab-inv-rel { color: #6080a0; }
+.vab-inv-item-actions {
+  display: flex;
+  gap: 4px;
+}
+.vab-inv-btn {
+  background: rgba(12, 26, 54, 0.92);
+  border: 1px solid #1e3b60;
+  color: #84aece;
+  padding: 2px 8px;
+  font-family: inherit;
+  font-size: 9px;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: background .1s, border-color .1s;
+}
+.vab-inv-btn:hover {
+  background: rgba(22, 52, 90, 0.95);
+  border-color: #3470a8;
+  color: #c8e4ff;
+}
+.vab-inv-btn-refurb {
+  border-color: #2a5040;
+  color: #50a870;
+}
+.vab-inv-btn-refurb:hover {
+  background: rgba(22, 60, 40, 0.95);
+  border-color: #40806a;
+  color: #80d0a0;
+}
+.vab-inv-btn-scrap {
+  border-color: #504020;
+  color: #a08040;
+}
+.vab-inv-btn-scrap:hover {
+  background: rgba(60, 40, 10, 0.95);
+  border-color: #806830;
+  color: #c0a060;
+}
+
+/* ── Inventory detail in part detail panel ──────────────────────────── */
+.vab-detail-inv {
+  padding: 4px 0;
+  margin-bottom: 4px;
+  border-radius: 3px;
+}
+.vab-detail-inv-count {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  color: #50c860;
+}
+.vab-detail-inv-wear {
+  display: block;
+  font-size: 9px;
+  color: #6a9a7a;
+  margin-top: 1px;
 }
 
 /* ── Part detail panel (bottom of parts list) ────────────────────────── */
@@ -1527,16 +1666,23 @@ function _buildPartsHTML(state) {
       const scale = Math.min(36 / p.width, 36 / p.height, 1);
       const rw = Math.max(8,  Math.round(p.width  * scale));
       const rh = Math.max(4,  Math.round(p.height * scale));
+      const invCount = getInventoryCount(state, p.id);
+      const invBadge = invCount > 0
+        ? `<span class="vab-inv-badge" title="${invCount} in inventory (free)">${invCount}</span>`
+        : '';
+      const costLabel = invCount > 0
+        ? `<span class="vab-part-cost-free">Free</span><span class="vab-part-cost-orig">${fmt$(p.cost)}</span>`
+        : `<span>${fmt$(p.cost)}</span>`;
       rows.push(
         `<div class="vab-part-card" data-part-id="${p.id}" ` +
-            `title="${p.name} — ${p.mass} kg · ${fmt$(p.cost)}">` +
+            `title="${p.name} — ${p.mass} kg · ${invCount > 0 ? 'Free (inventory)' : fmt$(p.cost)}">` +
           `<div class="vab-part-rect" style="width:${rw}px;height:${rh}px;` +
               `background:${_CARD_FILL[p.type] ?? _CARD_FILL_DEFAULT};` +
               `border:1px solid ${_CARD_STROKE[p.type] ?? _CARD_STROKE_DEFAULT}"></div>` +
           `<div class="vab-part-info">` +
-            `<div class="vab-part-name">${p.name}</div>` +
+            `<div class="vab-part-name">${p.name}${invBadge}</div>` +
             `<div class="vab-part-meta">` +
-              `<span>${p.mass}\u202fkg</span><span>${fmt$(p.cost)}</span>` +
+              `<span>${p.mass}\u202fkg</span>${costLabel}` +
             `</div>` +
           `</div>` +
         `</div>`,
@@ -1712,16 +1858,13 @@ function _onDragEnd(e) {
     );
     if (overPanel) {
       if (instanceId !== null) {
-        // Picked-up part dragged back to panel → delete it and refund cost.
-        const def = getPartById(partId);
-        if (def && _gameState) {
-          _gameState.money += def.cost;
-          refreshTopBar();
-        }
+        // Picked-up part dragged back to panel → delete it and refund/return.
+        _refundOrReturnPart(instanceId, partId);
         if (_selectedInstanceId === instanceId) _setSelectedPart(null);
         removePartFromAssembly(_assembly, instanceId);
         _syncAndRenderStaging();
         _runAndRenderValidation();
+        _refreshInventoryPanel();
       }
       // New part from panel dragged back to panel → simply don't place it.
       vabRenderParts();
@@ -1779,10 +1922,17 @@ function _onDragEnd(e) {
           autoStageNewPart(_assembly, _stagingConfig, mirrorId);
           _renderStagingPanel();
           _runAndRenderValidation();
-          // Deduct cost for the mirror copy.
+          // Deduct cost for the mirror copy (or use inventory).
           const def = getPartById(partId);
           if (def && _gameState) {
-            _gameState.money -= def.cost;
+            const mirrorInv = useInventoryPart(_gameState, partId);
+            if (mirrorInv) {
+              _inventoryUsedParts.set(mirrorId, mirrorInv);
+              const mirrorPlaced = _assembly.parts.get(mirrorId);
+              if (mirrorPlaced) mirrorPlaced._fromInventory = true;
+            } else {
+              _gameState.money -= def.cost;
+            }
             refreshTopBar();
           }
         }
@@ -1790,13 +1940,27 @@ function _onDragEnd(e) {
     }
     _runAndRenderValidation();
   } else {
-    // New part from the panel — deduct cost, add to assembly.
+    // New part from the panel — use inventory (free) or buy new (deduct cost).
     const def = getPartById(partId);
     if (def && _gameState) {
-      _gameState.money -= def.cost;
+      const invPart = useInventoryPart(_gameState, partId);
+      if (invPart) {
+        // Free — part came from inventory. Track it so removal returns it.
+        // (instanceId will be assigned below by addPartToAssembly)
+        var _pendingInvPart = invPart;  // eslint-disable-line no-var
+      } else {
+        _gameState.money -= def.cost;
+      }
       refreshTopBar();
     }
     const newId = addPartToAssembly(_assembly, partId, finalX, finalY);
+    // Track inventory-sourced part.
+    if (typeof _pendingInvPart !== 'undefined' && _pendingInvPart) {
+      _inventoryUsedParts.set(newId, _pendingInvPart);
+      // Mark the placed part visually as recovered.
+      const placed = _assembly.parts.get(newId);
+      if (placed) placed._fromInventory = true;
+    }
     if (bestCandidate) {
       connectParts(
         _assembly,
@@ -1823,9 +1987,16 @@ function _onDragEnd(e) {
             bestCandidate.targetInstanceId,    mirror.mirrorTargetSnapIndex,
           );
           addSymmetryPair(_assembly, newId, mirrorId);
-          // Deduct cost for the mirror copy.
+          // Deduct cost for the mirror copy (or use inventory).
           if (def && _gameState) {
-            _gameState.money -= def.cost;
+            const mirrorInv = useInventoryPart(_gameState, partId);
+            if (mirrorInv) {
+              _inventoryUsedParts.set(mirrorId, mirrorInv);
+              const mirrorPlaced = _assembly.parts.get(mirrorId);
+              if (mirrorPlaced) mirrorPlaced._fromInventory = true;
+            } else {
+              _gameState.money -= def.cost;
+            }
             refreshTopBar();
           }
         }
@@ -1853,6 +2024,109 @@ function _onDragEnd(e) {
   _updateStatusBar();
   _updateScaleBarExtents();
   _updateOffscreenIndicators();
+}
+
+// ---------------------------------------------------------------------------
+// Inventory helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Refund cash or return inventory part when removing a placed part.
+ * If the part came from inventory, return it instead of refunding cash.
+ * @param {string} instanceId
+ * @param {string} partId
+ */
+function _refundOrReturnPart(instanceId, partId) {
+  if (!_gameState) return;
+  const invEntry = _inventoryUsedParts.get(instanceId);
+  if (invEntry) {
+    // Return to inventory (no cash change).
+    addToInventory(_gameState, invEntry.partId, invEntry.wear, invEntry.flights);
+    _inventoryUsedParts.delete(instanceId);
+  } else {
+    // Bought new — refund cash.
+    const def = getPartById(partId);
+    if (def) _gameState.money += def.cost;
+  }
+  refreshTopBar();
+  // Refresh the parts list to update inventory counts.
+  if (_gameState) vabRefreshParts(_gameState);
+}
+
+/**
+ * Build the inventory panel HTML listing all recovered parts with
+ * wear levels and refurbish/scrap actions.
+ * @returns {string}
+ */
+function _buildInventoryHTML() {
+  if (!_gameState || !Array.isArray(_gameState.partInventory) || _gameState.partInventory.length === 0) {
+    return `<p class="vab-inv-empty">No recovered parts.<br>Land safely to recover<br>parts from flights.</p>`;
+  }
+
+  // Group by partId.
+  /** @type {Map<string, import('../core/gameState.js').InventoryPart[]>} */
+  const groups = new Map();
+  for (const entry of _gameState.partInventory) {
+    if (!groups.has(entry.partId)) groups.set(entry.partId, []);
+    groups.get(entry.partId).push(entry);
+  }
+
+  const rows = [];
+  for (const [partId, entries] of groups) {
+    const def = getPartById(partId);
+    if (!def) continue;
+    const label = def.name;
+    rows.push(`<div class="vab-inv-group-hdr">${label} (${entries.length})</div>`);
+    // Sort best condition first.
+    entries.sort((a, b) => a.wear - b.wear);
+    for (const entry of entries) {
+      const wearPct = Math.round(entry.wear);
+      const wearColor = wearPct < 30 ? '#50c860' : wearPct < 60 ? '#c0a030' : '#c04040';
+      const refurbCost = Math.round(def.cost * 0.3);
+      const scrapValue = Math.round(def.cost * 0.15);
+      const effRel = def.reliability !== undefined
+        ? (getEffectiveReliability(def.reliability, entry.wear) * 100).toFixed(0) + '%'
+        : '—';
+      rows.push(
+        `<div class="vab-inv-item" data-inv-id="${entry.id}">` +
+          `<div class="vab-inv-item-info">` +
+            `<span class="vab-inv-wear" style="color:${wearColor}">${wearPct}% wear</span>` +
+            `<span class="vab-inv-flights">${entry.flights} flight${entry.flights !== 1 ? 's' : ''}</span>` +
+            `<span class="vab-inv-rel">Rel: ${effRel}</span>` +
+          `</div>` +
+          `<div class="vab-inv-item-actions">` +
+            `<button class="vab-inv-btn vab-inv-btn-refurb" data-inv-id="${entry.id}" ` +
+                `title="Refurbish: pay ${fmt$(refurbCost)} to reset wear to 10%">` +
+              `Refurb ${fmt$(refurbCost)}` +
+            `</button>` +
+            `<button class="vab-inv-btn vab-inv-btn-scrap" data-inv-id="${entry.id}" ` +
+                `title="Scrap: sell for ${fmt$(scrapValue)}">` +
+              `Scrap ${fmt$(scrapValue)}` +
+            `</button>` +
+          `</div>` +
+        `</div>`,
+      );
+    }
+  }
+  return rows.join('');
+}
+
+/**
+ * Render (or re-render) the inventory panel body.
+ */
+function _renderInventoryPanel() {
+  const body = document.getElementById('vab-inventory-body');
+  if (!body) return;
+  body.innerHTML = _buildInventoryHTML();
+}
+
+/**
+ * Refresh the inventory panel if it's open.
+ */
+function _refreshInventoryPanel() {
+  if (_openPanels.has('inventory')) {
+    _renderInventoryPanel();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1909,10 +2183,29 @@ function _showPartDetail(partId) {
     stats.push(['Reliability', `${pct} %`]);
   }
 
+  // Inventory availability info.
+  const invCount = _gameState ? getInventoryCount(_gameState, partId) : 0;
+  let invInfo = '';
+  if (invCount > 0) {
+    const bestPart = _gameState ? getInventoryForPart(_gameState, partId)[0] : null;
+    const bestWear = bestPart ? Math.round(bestPart.wear) : 0;
+    const effRel = (bestPart && def.reliability !== undefined)
+      ? (getEffectiveReliability(def.reliability, bestPart.wear) * 100).toFixed(0)
+      : null;
+    invInfo =
+      `<div class="vab-detail-inv">` +
+        `<span class="vab-detail-inv-count">${invCount} in inventory (free)</span>` +
+        `<span class="vab-detail-inv-wear">Best: ${bestWear}% wear` +
+          (effRel ? ` / ${effRel}% eff. reliability` : '') +
+        `</span>` +
+      `</div>`;
+  }
+
   detailEl.innerHTML =
     `<div class="vab-detail-name">${def.name}</div>` +
     `<div class="vab-detail-type">${typeLbl}</div>` +
     (def.description ? `<div class="vab-detail-desc">${def.description}</div>` : '') +
+    invInfo +
     `<div class="vab-detail-stats">` +
       stats.map(([lbl, val]) =>
         `<div class="vab-detail-stat">` +
@@ -2177,31 +2470,26 @@ function _showPartContextMenu(placed, clientX, clientY) {
 
   _ctxMenu.querySelector('#vab-ctx-remove')?.addEventListener('click', () => {
     _ctxMenu.setAttribute('hidden', '');
-    // Refund cost.
-    if (def && _gameState) {
-      _gameState.money += def.cost;
-      refreshTopBar();
-    }
+    _refundOrReturnPart(placed.instanceId, placed.partId);
     if (_selectedInstanceId === placed.instanceId) _setSelectedPart(null);
     removePartFromAssembly(_assembly, placed.instanceId);
-    // Sync staging — removed part must be pruned from its stage/unstaged slot.
     _syncAndRenderStaging();
     vabRenderParts();
+    _refreshInventoryPanel();
   }, { once: true });
 
   if (mirrorId) {
     _ctxMenu.querySelector('#vab-ctx-remove-both')?.addEventListener('click', () => {
       _ctxMenu.setAttribute('hidden', '');
-      // Refund cost for both parts.
-      if (def && _gameState) {
-        _gameState.money += def.cost * 2;
-        refreshTopBar();
-      }
+      _refundOrReturnPart(placed.instanceId, placed.partId);
+      const mirrorPlaced = _assembly.parts.get(mirrorId);
+      _refundOrReturnPart(mirrorId, mirrorPlaced?.partId ?? placed.partId);
       if (_selectedInstanceId === placed.instanceId || _selectedInstanceId === mirrorId) _setSelectedPart(null);
       removePartFromAssembly(_assembly, placed.instanceId);
       removePartFromAssembly(_assembly, mirrorId);
       _syncAndRenderStaging();
       vabRenderParts();
+      _refreshInventoryPanel();
     }, { once: true });
   }
 }
@@ -2346,8 +2634,9 @@ function _recomputePanelPositions() {
   if (!root) return;
 
   const panelMap = {
-    engineer: document.getElementById('vab-engineer-panel'),
-    staging:  document.getElementById('vab-staging-panel'),
+    inventory: document.getElementById('vab-inventory-panel'),
+    engineer:  document.getElementById('vab-engineer-panel'),
+    staging:   document.getElementById('vab-staging-panel'),
   };
 
   let idx = 0;
@@ -2374,8 +2663,9 @@ function _recomputePanelPositions() {
  */
 function _togglePanel(panelId, onOpen) {
   const panelMap = {
-    engineer: document.getElementById('vab-engineer-panel'),
-    staging:  document.getElementById('vab-staging-panel'),
+    inventory: document.getElementById('vab-inventory-panel'),
+    engineer:  document.getElementById('vab-engineer-panel'),
+    staging:   document.getElementById('vab-staging-panel'),
   };
   const el = panelMap[panelId];
   if (!el) return;
@@ -2397,6 +2687,40 @@ function _bindButtons(root) {
   // ── "← Hub" button — return to the space agency hub ──────────────────────
   root.querySelector('#vab-back-btn')?.addEventListener('click', () => {
     if (_onBack) _onBack();
+  });
+
+  // ── "Inventory" toggle ───────────────────────────────────────────────────
+  root.querySelector('#vab-btn-inventory')?.addEventListener('click', () => {
+    _togglePanel('inventory', () => _renderInventoryPanel());
+  });
+
+  root.querySelector('#vab-inventory-close')?.addEventListener('click', () => {
+    _openPanels.delete('inventory');
+    _recomputePanelPositions();
+  });
+
+  // Inventory panel: refurbish / scrap actions (event delegation).
+  root.querySelector('#vab-inventory-body')?.addEventListener('click', (e) => {
+    const btn = /** @type {HTMLElement} */ (e.target)?.closest?.('.vab-inv-btn');
+    if (!btn || !_gameState) return;
+    const invId = btn.dataset.invId;
+    if (!invId) return;
+
+    if (btn.classList.contains('vab-inv-btn-refurb')) {
+      const result = refurbishPart(_gameState, invId);
+      if (result.success) {
+        _renderInventoryPanel();
+        refreshTopBar();
+        vabRefreshParts(_gameState);
+      }
+    } else if (btn.classList.contains('vab-inv-btn-scrap')) {
+      const result = scrapPart(_gameState, invId);
+      if (result.success) {
+        _renderInventoryPanel();
+        refreshTopBar();
+        vabRefreshParts(_gameState);
+      }
+    }
   });
 
   // ── "Rocket Engineer" toggle ─────────────────────────────────────────────
@@ -2433,10 +2757,9 @@ function _bindButtons(root) {
   root.querySelector('#vab-btn-clear-all')?.addEventListener('click', () => {
     if (!_assembly || _assembly.parts.size === 0) return;
     if (!confirm('Remove all parts? This will refund their cost.')) return;
-    // Refund all part costs.
-    for (const placed of _assembly.parts.values()) {
-      const def = getPartById(placed.partId);
-      if (def && _gameState) _gameState.money += def.cost;
+    // Refund all part costs (or return inventory parts).
+    for (const [instId, placed] of _assembly.parts) {
+      _refundOrReturnPart(instId, placed.partId);
     }
     // Clear the assembly.
     _assembly.parts.clear();
@@ -2450,6 +2773,7 @@ function _bindButtons(root) {
     _updateStatusBar();
     _updateScaleBarExtents();
     _updateOffscreenIndicators();
+    _refreshInventoryPanel();
     // Refresh cash display.
     const cashEl = document.getElementById('vab-cash');
     if (cashEl && _gameState) cashEl.textContent = fmt$(_gameState.money);
@@ -3591,11 +3915,10 @@ function _injectLibraryCSS() {
 function _loadDesignIntoVab(design) {
   if (!_gameState) return;
 
-  // Refund current assembly parts before clearing.
+  // Refund current assembly parts before clearing (or return inventory parts).
   if (_assembly) {
-    for (const placed of _assembly.parts.values()) {
-      const def = getPartById(placed.partId);
-      if (def) _gameState.money += def.cost;
+    for (const [instId, placed] of _assembly.parts) {
+      _refundOrReturnPart(instId, placed.partId);
     }
   }
 
@@ -3972,6 +4295,9 @@ export function initVabUI(container, state, { onBack } = {}) {
     <div id="vab-toolbar">
       <div class="vab-toolbar-btns">
         <button class="vab-btn" id="vab-back-btn" type="button">&#8592; Hub</button>
+        <button class="vab-btn" id="vab-btn-inventory" type="button">
+          Inventory
+        </button>
         <button class="vab-btn" id="vab-btn-engineer" type="button">
           Rocket Engineer
         </button>
@@ -4026,6 +4352,15 @@ export function initVabUI(container, state, { onBack } = {}) {
           ${_buildPartsHTML(state)}
         </div>
         <div id="vab-part-detail" hidden></div>
+      </div>
+
+      <!-- Inventory side panel -->
+      <div class="vab-side-panel" id="vab-inventory-panel" hidden>
+        <div class="vab-side-hdr">
+          <span>Part Inventory</span>
+          <button class="vab-side-close" id="vab-inventory-close" type="button">&#x2715;</button>
+        </div>
+        <div class="vab-side-body vab-inv-body" id="vab-inventory-body"></div>
       </div>
 
       <!-- Staging side panel -->
@@ -4164,6 +4499,7 @@ export function resetVabUI() {
   _stagingConfig    = null;
   _selectedInstanceId = null;
   _lastValidation   = null;
+  _inventoryUsedParts.clear();
   if (_gameState) {
     _gameState.vabAssembly     = null;
     _gameState.vabStagingConfig = null;
@@ -4185,6 +4521,16 @@ export function vabRefreshParts(state) {
  * Enable or disable the Launch button.
  * @param {boolean} valid  True when rocket validation passes.
  */
+/**
+ * Returns the current map of instanceId → InventoryPart for parts placed
+ * from inventory in the VAB. Called by the flight controller to attach
+ * wear tracking data to the physics state.
+ * @returns {Map<string, import('../core/gameState.js').InventoryPart>}
+ */
+export function getVabInventoryUsedParts() {
+  return _inventoryUsedParts;
+}
+
 export function vabSetLaunchEnabled(valid) {
   const btn = /** @type {HTMLButtonElement|null} */ (document.getElementById('vab-btn-launch'));
   if (btn) btn.disabled = !valid;

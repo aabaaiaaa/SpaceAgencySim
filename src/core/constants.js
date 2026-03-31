@@ -1085,3 +1085,47 @@ export const DOCKING_AUTO_APPROACH_SPEED = 0.5;
 
 /** Separation impulse speed (m/s) applied when undocking. */
 export const UNDOCKING_SEPARATION_SPEED = 1.0;
+
+// ---------------------------------------------------------------------------
+// Part Inventory & Wear System
+// ---------------------------------------------------------------------------
+
+/**
+ * Wear added per flight for passive parts (tanks, modules, parachutes, etc.).
+ * Expressed as percentage points (0–100 scale).
+ */
+export const WEAR_PER_FLIGHT_PASSIVE = 5;
+
+/**
+ * Wear added per flight for engine parts (extra stress from firing).
+ * Expressed as percentage points (0–100 scale).
+ */
+export const WEAR_PER_FLIGHT_ENGINE = 15;
+
+/**
+ * Wear added per flight for solid rocket boosters.
+ * SRBs endure extreme stress; single-use in practice.
+ */
+export const WEAR_PER_FLIGHT_SRB = 40;
+
+/**
+ * Factor by which wear reduces effective reliability.
+ * effectiveReliability = baseReliability × (1 - wear/100 × WEAR_RELIABILITY_FACTOR).
+ */
+export const WEAR_RELIABILITY_FACTOR = 0.5;
+
+/**
+ * Refurbishment cost as a fraction of the part's original purchase price.
+ * Paying this resets wear to WEAR_AFTER_REFURBISH.
+ */
+export const REFURBISH_COST_FRACTION = 0.3;
+
+/**
+ * Wear level (%) after refurbishment.
+ */
+export const WEAR_AFTER_REFURBISH = 10;
+
+/**
+ * Fraction of original part cost returned when scrapping an inventory part.
+ */
+export const SCRAP_VALUE_FRACTION = 0.15;

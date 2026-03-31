@@ -71,6 +71,7 @@ import {
   transferFuel,
 } from '../core/docking.js';
 import { DockingState } from '../core/constants.js';
+import { getVabInventoryUsedParts } from './vab.js';
 
 // ---------------------------------------------------------------------------
 // Module state
@@ -844,6 +845,9 @@ export function startFlightScene(
   // Store a reference to the top-level game state so the malfunction system
   // can look up crew engineering skills during reliability checks.
   _ps._gameState = _state;
+
+  // Attach inventory-sourced part data for wear tracking on recovery.
+  _ps._usedInventoryParts = getVabInventoryUsedParts();
 
   // Expose for E2E testing — Playwright reads live physics values here.
   if (typeof window !== 'undefined') {
