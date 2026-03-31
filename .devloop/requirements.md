@@ -334,7 +334,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 ## Tutorial Mission Revisions
 
 ### TASK-050: Restructure tutorial mission chain
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-006, TASK-038
 - **Description**: Restructure existing 17-mission tutorial to integrate new facilities and systems. Missions 1-4 (probe only): linear chain with starter parts. After mission 4: Crew Admin tutorial unlocks (awards building + cmd-mk1, crewed mission). Missions 5-7 open. Science tutorial (5-7 area, after safe landing): awards science-module-mk1 + thermometer-mk1. After first science: R&D Lab tutorial. Missions 8-13 continue (updated for instrument-in-module). After first orbit: Tracking Station tutorial (awards building + basic docking port, opens orbital chain: map view, manoeuvres, docking, satellite deployment). Missions 14-17 updated for orbital gameplay. After first satellite: Satellite Network Ops tutorial.

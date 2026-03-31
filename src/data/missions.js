@@ -242,20 +242,30 @@ import { PartType, FacilityId } from '../core/constants.js';
  *
  * UNLOCK TREE SUMMARY
  * ===================
- *   001 → 002 → 003 → 004 ──┬──> 005 → 008 → 010 ─┬─> 012 → 014 → 016 ─┬─> 020 → 021
- *                            │                       │                     │
+ *   001 → 002 → 003 → 004 ──┬──> 005 → 008 → 010 ─┬─> 012 → 014 → 016 ─┬─> 020 (+docking port) → 021
+ *                            │    (science parts)    │                     │
  *                            ├──> 006                └─> 019 (R&D Lab)     ↓
  *                            │                         ↑              017 (requires 015+016)
- *                            ├──> 018 (Crew Admin)     │                   ↓
- *                            │                         │              022 (Sat Ops)
+ *                            ├──> 018 (Crew Admin      │                   ↓
+ *                            │    + cmd-mk1)           │              022 (Sat Ops)
  *                            └──> 007 → 009 ─────> 011 → 013 → 015
  *
- * Missions 1–4 are strictly linear (one at a time).
- * Missions 5, 6, 7, 18 all unlock simultaneously after mission 4.
+ * Missions 1–4 are strictly linear probe-only chain (starter parts).
+ * After mission 4: missions 5, 6, 7, 18 all unlock simultaneously.
+ *   - Mission 18 (Crew Admin tutorial): awards Crew Admin facility + cmd-mk1
+ *     on acceptance, enabling crewed flights.
+ *   - Mission 5 (Science tutorial): after safe landing, awards science-module-mk1
+ *     + thermometer-mk1.
+ * After first science (mission 10): Mission 19 (R&D Lab tutorial) unlocks.
+ * Missions 8–13 continue (updated for instrument-in-module mechanic).
+ * After first orbit (mission 16): Mission 20 (Tracking Station tutorial)
+ *   unlocks — awards Tracking Station on acceptance + docking port on
+ *   completion.  Opens orbital chain: mission 21 (map view, manoeuvres,
+ *   docking, satellite deployment).
+ * Missions 14–17 updated for orbital gameplay (Tracking Station, map view).
  * Mission 17 requires both 15 and 16 completed.
- * Mission 19 (R&D Lab tutorial) unlocks after 10.
- * Mission 20 (Tracking Station tutorial) unlocks after 16 → 21 (Orbital Survey).
- * Mission 22 (Satellite Ops tutorial) unlocks after 17.
+ * After first orbital satellite (mission 17): Mission 22 (Satellite Network
+ *   Ops tutorial) unlocks.
  *
  * @type {MissionDef[]}
  */
@@ -350,7 +360,8 @@ export const MISSIONS = [
   /**
    * Mission 4 — Speed Test Alpha
    * Unlocks after Breaking the Kilometre.  Prove horizontal speed capability.
-   * Completing this mission opens three parallel tracks (missions 5, 6, 7).
+   * Completing this mission opens three parallel tracks (missions 5, 6, 7)
+   * plus the Crew Admin tutorial (mission 18).
    */
   {
     id: 'mission-004',
@@ -371,11 +382,10 @@ export const MISSIONS = [
     ],
     reward: 30_000,
     unlocksAfter: ['mission-003'],
-    // In tutorial mode, completing this mission awards the crewed command
-    // module — gated until the player has demonstrated basic competency.
-    // Also awards the Crew Administration building so the player can hire crew.
-    unlockedParts: ['cmd-mk1'],
-    unlocksFacility: FacilityId.CREW_ADMIN,
+    // Completing mission 4 opens three parallel tracks (5, 6, 7) plus the
+    // Crew Admin tutorial (18).  The crewed command module and Crew Admin
+    // facility are now awarded by mission 18, not here.
+    unlockedParts: [],
     status: MissionStatus.LOCKED,
   },
 
@@ -384,9 +394,11 @@ export const MISSIONS = [
   // =========================================================================
 
   /**
-   * Mission 5 — Safe Return I
-   * Recovery track: test parachute recovery.
-   * Unlocks: Mk2 Parachute part, Mission 8.
+   * Mission 5 — Safe Return I (Science tutorial gate)
+   * Recovery track: test parachute recovery.  This is the science
+   * tutorial — a safe landing unlocks the science module and starter
+   * instrument (thermometer-mk1), gating science behind recovery skill.
+   * Unlocks: Mk2 Parachute, science-module-mk1, thermometer-mk1, Mission 8.
    */
   {
     id: 'mission-005',
@@ -492,7 +504,7 @@ export const MISSIONS = [
 
   /**
    * Mission 8 — Black Box Test
-   * Science/crash track: intentional crash with Science Module attached.
+   * Science/crash track: intentional crash with Science Module + instrument.
    * Unlocks: Mission 10.
    */
   {
@@ -500,9 +512,10 @@ export const MISSIONS = [
     title: 'Black Box Test',
     description:
       'We need to verify that our Science Module can survive extreme impact forces. ' +
-      'Mount a Science Module on your rocket, activate it during flight, then ' +
-      'deliberately crash at over 50 m/s impact speed. If the module survives ' +
-      'and returns its data, the design is approved for high-stress missions.',
+      'Mount a Science Module on your rocket with an instrument loaded inside, ' +
+      'activate the instrument during flight, then deliberately crash at over ' +
+      '50 m/s impact speed. If the module and its instrument survive, the design ' +
+      'is approved for high-stress missions.',
     location: 'desert',
     objectives: [
       {
@@ -510,7 +523,7 @@ export const MISSIONS = [
         type: ObjectiveType.ACTIVATE_PART,
         target: { partType: PartType.SERVICE_MODULE },
         completed: false,
-        description: 'Activate the Science Module during flight',
+        description: 'Activate an instrument in the Science Module during flight',
       },
       {
         id: 'obj-008-2',
@@ -559,17 +572,18 @@ export const MISSIONS = [
 
   /**
    * Mission 10 — Science Experiment Alpha
-   * Science track: sustained altitude hold with data return.
+   * Science track: sustained altitude hold with instrument data return.
    * Unlocks: Mission 12, Poodle Engine part.
    */
   {
     id: 'mission-010',
     title: 'Science Experiment Alpha',
     description:
-      'Our Science Module is ready for its first real experiment. Activate it, ' +
-      'then hold altitude between 800 m and 1,200 m for at least 30 continuous ' +
-      'seconds while the experiment runs. Then bring the rocket — and the data — ' +
-      'home safely with a landing speed under 10 m/s.',
+      'Your Science Module and its instruments are ready for a real experiment. ' +
+      'Load an instrument into the Science Module, fly to between 800 m and ' +
+      '1,200 m altitude, and hold steady for at least 30 continuous seconds while ' +
+      'the instrument collects data. Then bring the rocket — and the data — home ' +
+      'safely with a landing speed under 10 m/s.',
     location: 'desert',
     objectives: [
       {
@@ -584,7 +598,7 @@ export const MISSIONS = [
         type: ObjectiveType.RETURN_SCIENCE_DATA,
         target: {},
         completed: false,
-        description: 'Activate the Science Module and land safely to return the data',
+        description: 'Activate an instrument in the Science Module and land safely to return the data',
       },
     ],
     reward: 60_000,
@@ -699,6 +713,7 @@ export const MISSIONS = [
   /**
    * Mission 14 — Kármán Line Approach
    * Altitude push: approach the edge of space at 60 km.
+   * At this altitude the player is on the threshold of orbital flight.
    * Unlocks: Mission 16, Nerv Vacuum Engine part, SRB Large part.
    */
   {
@@ -707,8 +722,9 @@ export const MISSIONS = [
     description:
       'The internationally recognised boundary of space sits at 100 km. We are ' +
       'not there yet — but reaching 60 kilometres will demonstrate that our rocket ' +
-      'technology is ready for the final push. Vacuum-rated engines and heavy-lift ' +
-      'boosters are required to achieve this altitude.',
+      'technology is ready for the final push into orbit. At this altitude the ' +
+      'atmosphere is negligible and you will need vacuum-rated engines and ' +
+      'heavy-lift boosters. Build for orbital-class performance.',
     location: 'desert',
     objectives: [
       {
@@ -728,6 +744,8 @@ export const MISSIONS = [
   /**
    * Mission 15 — Satellite Deployment Test
    * Payload delivery: release a satellite above 30 km.
+   * This is the first satellite launch — paves the way for orbital
+   * satellite deployment and ultimately the Satellite Network Ops tutorial.
    * Unlocks: Mission 17.
    */
   {
@@ -736,8 +754,9 @@ export const MISSIONS = [
     description:
       'Satellite deployment is the backbone of our commercial revenue stream. ' +
       'Carry a Satellite Mk1 payload to above 30,000 metres altitude and release ' +
-      'it into free flight. A successful deployment here opens the door to ' +
-      'full orbital satellite contracts.',
+      'it into free flight. Once we achieve orbit, the Tracking Station will let ' +
+      'us manage these assets from the ground — but first, prove the deployment ' +
+      'mechanism works.',
     location: 'desert',
     objectives: [
       {
@@ -758,8 +777,9 @@ export const MISSIONS = [
   /**
    * Mission 16 — Low Earth Orbit
    * The main orbital milestone.  Reach >80 km and build orbital velocity.
-   * Completing this mission triggers the congratulations screen.
-   * Unlocks: Mission 17, Large Tank part.
+   * Completing this unlocks the Tracking Station tutorial (mission 20),
+   * which opens the orbital gameplay chain.
+   * Unlocks: Mission 17, Mission 20, Large Tank part.
    * Note: Reliant Engine may already be unlocked via mission-012; the
    * completeMission() logic safely skips duplicates.
    */
@@ -769,8 +789,9 @@ export const MISSIONS = [
     description:
       'Everything has led to this moment. Build a rocket capable of reaching ' +
       'Low Earth Orbit: climb above 80 kilometres and sustain a horizontal ' +
-      'velocity of at least 7,800 m/s. Once in orbit, the entire solar system ' +
-      'becomes accessible. Welcome to space.',
+      'velocity of at least 7,800 m/s. Achieving orbit will unlock the ' +
+      'Tracking Station — your gateway to orbital manoeuvres, map view, ' +
+      'docking, and satellite network management. Welcome to space.',
     location: 'desert',
     objectives: [
       {
@@ -789,17 +810,21 @@ export const MISSIONS = [
 
   /**
    * Mission 17 — Orbital Satellite Deployment
-   * Endgame contract: reach orbit AND deploy a satellite.
+   * Endgame contract: reach orbit AND deploy a satellite using the
+   * Tracking Station for orbital slot placement.
    * Requires both Mission 15 AND Mission 16 completed first.
+   * Completing this unlocks the Satellite Network Ops tutorial (mission 22).
    */
   {
     id: 'mission-017',
     title: 'Orbital Satellite Deployment',
     description:
       'The ultimate commercial mission: reach Low Earth Orbit and deploy a ' +
-      'Satellite Mk1 payload into orbit. This contract marks the successful ' +
-      'completion of the Desert R&D campaign. Your agency is now a full ' +
-      'spacefaring organisation.',
+      'Satellite Mk1 payload into an orbital slot. Use the Tracking Station ' +
+      'and map view to verify your orbit before releasing the satellite. This ' +
+      'contract marks the successful completion of the Desert R&D campaign — ' +
+      'your agency is now a full spacefaring organisation, ready to build and ' +
+      'manage a satellite constellation.',
     location: 'desert',
     objectives: [
       {
@@ -829,20 +854,21 @@ export const MISSIONS = [
 
   /**
    * Mission 18 — First Crew Flight (Crew Admin tutorial)
-   * Unlocks after mission 4 (which awards Crew Admin + cmd-mk1).
-   * Teaches the player to hire crew and fly with them.
+   * Unlocks after mission 4.  Accepting this mission awards the Crew
+   * Administration building AND the crewed command module (cmd-mk1),
+   * enabling the player to hire astronauts and build crewed rockets.
    */
   {
     id: 'mission-018',
     title: 'First Crew Flight',
     description:
-      'Congratulations — your agency now has a Crew Administration building ' +
-      'and access to the crewed command module! The Crew Admin facility lets you ' +
-      'recruit and manage astronauts for crewed missions. Visit the Crew Admin ' +
-      'building to hire your first astronaut, then build a rocket with the Mk1 ' +
-      'Command Module, assign a crew member, and bring them home safely. ' +
-      'Tip: open the Construction Menu from the hub to see all your facilities ' +
-      'and available upgrades.',
+      'Your probe programme has proven our rocket technology is sound. It is time ' +
+      'to put people in the sky. Accepting this mission will establish your Crew ' +
+      'Administration building and grant access to the Mk1 Command Module. Visit ' +
+      'the Crew Admin facility to recruit your first astronaut, then build a ' +
+      'rocket with the command module, assign a crew member, and bring them home ' +
+      'safely. Tip: open the Construction Menu from the hub to see all your ' +
+      'facilities and available upgrades.',
     location: 'desert',
     objectives: [
       {
@@ -864,6 +890,7 @@ export const MISSIONS = [
     unlocksAfter: ['mission-004'],
     unlockedParts: [],
     requiredParts: ['cmd-mk1'],
+    awardsFacilityOnAccept: FacilityId.CREW_ADMIN,
     status: MissionStatus.LOCKED,
   },
 
@@ -914,7 +941,9 @@ export const MISSIONS = [
    * Unlocks after mission 16 (first orbit achieved).
    * Awards the Tracking Station on acceptance so the player can use
    * orbital tracking and map view during the mission.
-   * Opens the orbital tutorial chain (mission 21).
+   * Awards a basic docking port on completion to open docking gameplay.
+   * Opens the orbital tutorial chain (mission 21): map view, manoeuvres,
+   * docking, and satellite deployment.
    */
   {
     id: 'mission-020',
@@ -924,9 +953,11 @@ export const MISSIONS = [
       'flying blind in the void is dangerous. Accepting this mission will ' +
       'establish your Tracking Station, giving you the ability to track objects ' +
       'in orbit, view orbital predictions on the map, and plan manoeuvres from ' +
-      'the ground. To calibrate the station, reach orbit once more and prove ' +
-      'the tracking systems are operational. Open the Construction Menu to ' +
-      'see the Tracking Station and its upgrade tiers — higher tiers unlock ' +
+      'the ground. To calibrate the station, reach orbit once more and use the ' +
+      'map view to verify the tracking systems are operational. Completing this ' +
+      'mission also grants your engineers the Standard Docking Port — the key to ' +
+      'orbital rendezvous and construction. Open the Construction Menu to see ' +
+      'the Tracking Station and its upgrade tiers — higher tiers unlock ' +
       'deep-space communications and transfer planning.',
     location: 'desert',
     objectives: [
@@ -940,26 +971,30 @@ export const MISSIONS = [
     ],
     reward: 200_000,
     unlocksAfter: ['mission-016'],
-    unlockedParts: [],
+    unlockedParts: ['docking-port-std'],
     awardsFacilityOnAccept: FacilityId.TRACKING_STATION,
     status: MissionStatus.LOCKED,
   },
 
   /**
-   * Mission 21 — Orbital Survey (Tracking Station chain)
+   * Mission 21 — Orbital Survey (Tracking Station orbital chain)
    * Unlocks after mission 20 (Tracking Station tutorial).
-   * Uses the Tracking Station to perform orbital science — collect
-   * data from orbit and return it safely.
+   * First mission in the orbital chain: teaches the player to use the
+   * map view for orbital tracking, plan manoeuvres, and collect science
+   * data from orbit.  The docking port awarded by mission 20 opens the
+   * door to future docking and station-building gameplay.
    */
   {
     id: 'mission-021',
     title: 'Orbital Survey',
     description:
       'With the Tracking Station online, your ground controllers can guide ' +
-      'missions with precision. Use your new orbital tracking capability to ' +
-      'perform an orbital science survey: reach orbit, activate your science ' +
-      'instruments, and return the data safely. The Tracking Station\'s map ' +
-      'view will help you monitor your orbit and plan your re-entry.',
+      'missions with precision. Use the map view to monitor your orbital path ' +
+      'and plan manoeuvres. The docking port you earned opens the door to ' +
+      'rendezvous and orbital construction — but first, prove the tracking ' +
+      'systems work: reach orbit, use your instruments to collect science data ' +
+      'from the orbital biome, and return it safely. Tip: elliptical orbits ' +
+      'pass through multiple altitude biomes, yielding more science.',
     location: 'desert',
     objectives: [
       {
