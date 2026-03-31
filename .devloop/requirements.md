@@ -358,7 +358,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Save game states or generated game states must allow any part of game progression to be tested in isolation. Malfunction system must support off/forced-100% for test determinism. All new objective types must have automated tests verifying completion. This infrastructure underpins all per-phase E2E test tasks below and must be built first.
 
 ### TASK-053: Debug game save menu for manual testing
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-052
 - **Description**: Debug save menu (separate from normal save slots) containing pre-built game states at various progression points. States named descriptively (e.g., "post-tutorial-all-parts", "first-orbit-achieved", "lunar-orbit-with-fuel-depot"). Allows testers to quickly load any progression state for manual testing.

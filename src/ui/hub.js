@@ -22,6 +22,7 @@
 import { showHubScene, hideHubScene, setHubWeather } from '../render/hub.js';
 import { FACILITY_DEFINITIONS, FacilityId, FACILITY_UPGRADE_DEFS, getFacilityUpgradeDef, getReputationTier } from '../core/constants.js';
 import { openSettingsPanel } from './settings.js';
+import { openDebugSavePanel } from './debugSaves.js';
 import {
   hasFacility, canBuildFacility, buildFacility,
   canUpgradeFacility, upgradeFacility, getFacilityTier,
@@ -301,6 +302,28 @@ const HUB_STYLES = `
 
 #hub-settings-btn:hover {
   background: #235070;
+}
+
+#hub-debug-saves-btn {
+  position: absolute;
+  top: 60px;
+  right: 280px;
+  padding: 10px 20px;
+  background: #3a2810;
+  border: 1px solid #906830;
+  border-radius: 6px;
+  color: #ffb060;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background 0.15s;
+  letter-spacing: 0.03em;
+  z-index: 20;
+}
+
+#hub-debug-saves-btn:hover {
+  background: #5a3818;
 }
 
 /* ── Construction panel overlay ──────────────────────────────────────────── */
@@ -861,6 +884,7 @@ export function initHubUI(container, state, onNavigate) {
   _renderBuildings(onNavigate);
   _renderConstructionButton(container);
   _renderSettingsButton(container);
+  _renderDebugSavesButton(container);
   _renderBankruptcyBanner();
   _renderReputationBadge();
   _renderWeatherPanel();
@@ -879,6 +903,10 @@ export function destroyHubUI() {
   // Remove construction panel if open.
   const panel = document.getElementById('construction-panel');
   if (panel) panel.remove();
+
+  // Remove debug save panel if open.
+  const debugPanel = document.getElementById('debug-save-panel');
+  if (debugPanel) debugPanel.remove();
 
   if (_overlay) {
     _overlay.remove();
@@ -1578,6 +1606,26 @@ function _renderSettingsButton(container) {
 
   btn.addEventListener('click', () => {
     openSettingsPanel(container, _state);
+  });
+
+  _overlay.appendChild(btn);
+}
+
+/**
+ * Render the "Debug Saves" button in the hub overlay.
+ *
+ * @param {HTMLElement} container  The #ui-overlay div.
+ */
+function _renderDebugSavesButton(container) {
+  if (!_overlay) return;
+
+  const btn = document.createElement('button');
+  btn.id          = 'hub-debug-saves-btn';
+  btn.textContent = 'Debug Saves';
+  btn.setAttribute('aria-label', 'Open debug save menu');
+
+  btn.addEventListener('click', () => {
+    openDebugSavePanel(container, _state);
   });
 
   _overlay.appendChild(btn);
