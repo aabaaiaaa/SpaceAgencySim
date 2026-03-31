@@ -37,6 +37,7 @@ import { checkInjuryRecovery } from './crew.js';
  * @property {string[]} expiredActiveContractIds - Active contract IDs that expired this period.
  * @property {number}   satelliteMaintenanceCost - Satellite auto-maintenance cost this period.
  * @property {number}   satelliteScienceEarned  - Passive science from Science satellites.
+ * @property {number}   satelliteLeaseIncome    - Income from leased satellites this period.
  * @property {string[]} decommissionedSatellites - Satellite IDs that reached 0 health.
  * @property {string[]} healedCrewIds  - IDs of crew members whose injuries were cleared.
  * @property {boolean} bankrupt        - True if the player is bankrupt after this period.
@@ -131,6 +132,7 @@ export function advancePeriod(state) {
     expiredActiveContractIds,
     satelliteMaintenanceCost: satResult.maintenanceCost,
     satelliteScienceEarned: satResult.scienceEarned,
+    satelliteLeaseIncome: satResult.leaseIncome,
     decommissionedSatellites: satResult.decommissioned,
     healedCrewIds,
     bankrupt,

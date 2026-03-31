@@ -7,6 +7,10 @@
  *   - Aggregate benefits panel: current bonuses from the active network.
  *   - Decommission button for each satellite.
  *
+ * Tier-gated features:
+ *   - Tier 2+: Lease satellites to third parties for income, constellation mgmt.
+ *   - Tier 3:  Satellite repositioning, advanced network planning.
+ *
  * Requires the Satellite Ops facility to be built.
  *
  * @module satelliteOps
@@ -18,11 +22,19 @@ import {
   CONSTELLATION_THRESHOLD,
   SATELLITE_AUTO_MAINTENANCE_COST,
   SATELLITE_DEGRADED_THRESHOLD,
+  SATELLITE_LEASE_INCOME,
+  SATELLITE_LEASE_INCOME_DEFAULT,
+  SATELLITE_REPOSITION_COST,
+  SATELLITE_REPOSITION_HEALTH_COST,
 } from '../core/constants.js';
 import {
   getNetworkSummary,
   setAutoMaintenance,
   decommissionSatellite,
+  setSatelliteLease,
+  getSatelliteLeaseIncome,
+  repositionSatellite,
+  getRepositionTargets,
 } from '../core/satellites.js';
 
 // ---------------------------------------------------------------------------
@@ -73,6 +85,17 @@ const SAT_OPS_STYLES = `
   letter-spacing: 0.03em;
   color: #f0f0f0;
   margin: 0;
+}
+
+#sat-ops-tier-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #80c8ff;
+  background: rgba(128,200,255,0.12);
+  border: 1px solid rgba(128,200,255,0.2);
+  padding: 2px 10px;
+  border-radius: 12px;
+  letter-spacing: 0.04em;
 }
 
 /* ── Content ─────────────────────────────────────────────────────────────── */
@@ -129,6 +152,10 @@ const SAT_OPS_STYLES = `
   color: #60dd80;
 }
 
+.sat-overview-card .value.income {
+  color: #ddcc40;
+}
+
 /* ── Benefits table ──────────────────────────────────────────────────────── */
 .sat-benefits-table {
   width: 100%;
@@ -174,14 +201,21 @@ const SAT_OPS_STYLES = `
   display: flex;
   align-items: center;
   gap: 16px;
+  flex-wrap: wrap;
 }
 
 .sat-card.decommissioned {
   opacity: 0.4;
 }
 
+.sat-card.leased {
+  border-color: rgba(220,200,60,0.3);
+  background: rgba(220,200,60,0.04);
+}
+
 .sat-card .sat-info {
   flex: 1;
+  min-width: 160px;
 }
 
 .sat-card .sat-name {
@@ -194,6 +228,16 @@ const SAT_OPS_STYLES = `
 .sat-card .sat-meta {
   font-size: 0.78rem;
   color: #8899aa;
+}
+
+.sat-card .sat-lease-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #ddcc40;
+  background: rgba(220,200,60,0.15);
+  border-radius: 3px;
+  padding: 1px 6px;
+  margin-left: 6px;
 }
 
 .sat-health-bar {
@@ -218,6 +262,7 @@ const SAT_OPS_STYLES = `
   display: flex;
   gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .sat-toggle {
@@ -247,10 +292,131 @@ const SAT_OPS_STYLES = `
   background: rgba(220,60,60,0.3);
 }
 
+.sat-lease-btn {
+  background: rgba(220,200,60,0.12);
+  border: 1px solid rgba(220,200,60,0.25);
+  color: #ddcc40;
+  font-size: 0.75rem;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.sat-lease-btn:hover {
+  background: rgba(220,200,60,0.25);
+}
+.sat-lease-btn.active {
+  background: rgba(220,200,60,0.25);
+  border-color: rgba(220,200,60,0.5);
+}
+
+.sat-reposition-btn {
+  background: rgba(100,180,255,0.12);
+  border: 1px solid rgba(100,180,255,0.25);
+  color: #80c8ff;
+  font-size: 0.75rem;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.sat-reposition-btn:hover {
+  background: rgba(100,180,255,0.25);
+}
+
+.sat-reposition-select {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.18);
+  color: #e8e8e8;
+  font-size: 0.75rem;
+  padding: 3px 6px;
+  border-radius: 4px;
+}
+
 .sat-empty {
   color: #667;
   font-style: italic;
   padding: 20px 0;
+}
+
+/* ── Constellation management (Tier 2+) ─────────────────────────────────── */
+.sat-constellation-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.sat-constellation-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 6px;
+  padding: 10px 14px;
+}
+
+.sat-constellation-card.active {
+  border-color: rgba(96,221,128,0.3);
+  background: rgba(96,221,128,0.05);
+}
+
+.sat-constellation-card .type-label {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #e0f0ff;
+  margin-bottom: 4px;
+}
+
+.sat-constellation-card .count-label {
+  font-size: 0.78rem;
+  color: #8899aa;
+}
+
+.sat-constellation-card .status-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.sat-constellation-card .status-label.active {
+  color: #60dd80;
+  background: none;
+  border: none;
+}
+
+.sat-constellation-card .status-label.inactive {
+  color: #887755;
+}
+
+/* ── Network planning (Tier 3) ──────────────────────────────────────────── */
+.sat-planning-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.sat-planning-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 6px;
+  padding: 10px 14px;
+}
+
+.sat-planning-card .band-label {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #e0f0ff;
+  margin-bottom: 2px;
+}
+
+.sat-planning-card .sat-count {
+  font-size: 0.78rem;
+  color: #8899aa;
+}
+
+.sat-tier-locked {
+  color: #556;
+  font-style: italic;
+  font-size: 0.85rem;
+  padding: 8px 0;
 }
 `;
 
@@ -358,6 +524,14 @@ function _render() {
   title.textContent = 'Satellite Network Operations';
   header.appendChild(title);
 
+  // Tier badge.
+  if (summary.tier > 0) {
+    const badge = document.createElement('span');
+    badge.id = 'sat-ops-tier-badge';
+    badge.textContent = `Tier ${summary.tier}`;
+    header.appendChild(badge);
+  }
+
   _overlay.appendChild(header);
 
   // Content area.
@@ -369,6 +543,16 @@ function _render() {
 
   // Benefits section.
   content.appendChild(_renderBenefits(summary));
+
+  // Constellation management (Tier 2+).
+  if (summary.tier >= 2) {
+    content.appendChild(_renderConstellationManagement(summary));
+  }
+
+  // Network planning (Tier 3).
+  if (summary.tier >= 3) {
+    content.appendChild(_renderNetworkPlanning(summary));
+  }
 
   // Satellite list.
   content.appendChild(_renderSatelliteList(summary));
@@ -405,6 +589,22 @@ function _renderOverview(summary) {
     constellations.length > 0,
   );
   cards.appendChild(constCard);
+
+  // Lease income (Tier 2+).
+  if (summary.tier >= 2) {
+    const leaseCard = _card(
+      'Lease Income / Period',
+      summary.totalLeaseIncome > 0
+        ? `$${(summary.totalLeaseIncome / 1000).toFixed(0)}k`
+        : 'None',
+      false,
+      summary.totalLeaseIncome > 0,
+    );
+    cards.appendChild(leaseCard);
+
+    const leasedCard = _card('Leased Satellites', `${summary.leasedCount}`);
+    cards.appendChild(leasedCard);
+  }
 
   section.appendChild(cards);
   return section;
@@ -459,6 +659,145 @@ function _renderBenefits(summary) {
 }
 
 /**
+ * Render constellation management panel (Tier 2+).
+ * Shows each satellite type, its count, constellation status, and benefits.
+ */
+function _renderConstellationManagement(summary) {
+  const section = document.createElement('div');
+  section.className = 'sat-section';
+
+  const h2 = document.createElement('h2');
+  h2.textContent = 'Constellation Management';
+  section.appendChild(h2);
+
+  const grid = document.createElement('div');
+  grid.className = 'sat-constellation-grid';
+
+  for (const type of Object.values(SatelliteType)) {
+    const info = summary.byType[type];
+    if (!info) continue;
+
+    const card = document.createElement('div');
+    card.className = 'sat-constellation-card' + (info.constellation ? ' active' : '');
+
+    const icon = SAT_TYPE_ICONS[type] || SAT_TYPE_ICONS.GENERIC;
+    const label = SAT_TYPE_LABELS[type] || type;
+
+    const typeLbl = document.createElement('div');
+    typeLbl.className = 'type-label';
+    typeLbl.textContent = `${icon} ${label}`;
+    card.appendChild(typeLbl);
+
+    const countLbl = document.createElement('div');
+    countLbl.className = 'count-label';
+    countLbl.textContent = `${info.count} satellite${info.count !== 1 ? 's' : ''} (${CONSTELLATION_THRESHOLD} needed)`;
+    card.appendChild(countLbl);
+
+    const statusLbl = document.createElement('div');
+    statusLbl.className = 'status-label ' + (info.constellation ? 'active' : 'inactive');
+    statusLbl.textContent = info.constellation ? 'Constellation Active (2x bonus)' : `Need ${Math.max(0, CONSTELLATION_THRESHOLD - info.count)} more`;
+    card.appendChild(statusLbl);
+
+    // Show valid bands.
+    const validBands = SATELLITE_VALID_BANDS[type];
+    if (validBands) {
+      const bandsLbl = document.createElement('div');
+      bandsLbl.style.cssText = 'font-size:0.72rem;color:#667;margin-top:4px';
+      bandsLbl.textContent = `Bands: ${validBands.join(', ')}`;
+      card.appendChild(bandsLbl);
+    }
+
+    grid.appendChild(card);
+  }
+
+  section.appendChild(grid);
+  return section;
+}
+
+/**
+ * Render network planning view (Tier 3).
+ * Shows satellites grouped by altitude band and body.
+ */
+function _renderNetworkPlanning(summary) {
+  const section = document.createElement('div');
+  section.className = 'sat-section';
+
+  const h2 = document.createElement('h2');
+  h2.textContent = 'Network Planning';
+  section.appendChild(h2);
+
+  // Group active satellites by body → band.
+  const activeSats = summary.satellites.filter(s => s.health > 0);
+  const byBody = {};
+  for (const sat of activeSats) {
+    if (!byBody[sat.bodyId]) byBody[sat.bodyId] = {};
+    if (!byBody[sat.bodyId][sat.bandId]) byBody[sat.bodyId][sat.bandId] = [];
+    byBody[sat.bodyId][sat.bandId].push(sat);
+  }
+
+  if (Object.keys(byBody).length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'sat-empty';
+    empty.textContent = 'No active satellites to plan around.';
+    section.appendChild(empty);
+    return section;
+  }
+
+  for (const [bodyId, bands] of Object.entries(byBody)) {
+    const bodyH3 = document.createElement('h3');
+    bodyH3.style.cssText = 'font-size:0.95rem;color:#c0d8f0;margin:12px 0 6px;font-weight:600';
+    bodyH3.textContent = bodyId;
+    section.appendChild(bodyH3);
+
+    const grid = document.createElement('div');
+    grid.className = 'sat-planning-grid';
+
+    for (const [bandId, sats] of Object.entries(bands)) {
+      const card = document.createElement('div');
+      card.className = 'sat-planning-card';
+
+      const bandLbl = document.createElement('div');
+      bandLbl.className = 'band-label';
+      bandLbl.textContent = bandId;
+      card.appendChild(bandLbl);
+
+      const countLbl = document.createElement('div');
+      countLbl.className = 'sat-count';
+      const types = {};
+      for (const s of sats) {
+        const t = SAT_TYPE_LABELS[s.satelliteType] || 'Generic';
+        types[t] = (types[t] || 0) + 1;
+      }
+      const typeStr = Object.entries(types).map(([t, c]) => `${c} ${t}`).join(', ');
+      countLbl.textContent = `${sats.length} satellite${sats.length !== 1 ? 's' : ''}: ${typeStr}`;
+      card.appendChild(countLbl);
+
+      // Average health.
+      const avgHealth = Math.round(sats.reduce((s, sat) => s + sat.health, 0) / sats.length);
+      const healthLbl = document.createElement('div');
+      healthLbl.style.cssText = `font-size:0.75rem;margin-top:4px;color:${avgHealth > 60 ? '#60dd80' : avgHealth > 30 ? '#ddaa40' : '#dd4040'}`;
+      healthLbl.textContent = `Avg health: ${avgHealth}%`;
+      card.appendChild(healthLbl);
+
+      // Leased count in this band.
+      const leasedInBand = sats.filter(s => s.leased).length;
+      if (leasedInBand > 0) {
+        const leaseLbl = document.createElement('div');
+        leaseLbl.style.cssText = 'font-size:0.72rem;color:#ddcc40;margin-top:2px';
+        leaseLbl.textContent = `${leasedInBand} leased`;
+        card.appendChild(leaseLbl);
+      }
+
+      grid.appendChild(card);
+    }
+
+    section.appendChild(grid);
+  }
+
+  return section;
+}
+
+/**
  * Render the list of all satellites (active and decommissioned).
  */
 function _renderSatelliteList(summary) {
@@ -479,7 +818,7 @@ function _renderSatelliteList(summary) {
     list.appendChild(empty);
   } else {
     for (const sat of summary.satellites) {
-      list.appendChild(_renderSatCard(sat));
+      list.appendChild(_renderSatCard(sat, summary.tier));
     }
   }
 
@@ -490,9 +829,12 @@ function _renderSatelliteList(summary) {
 /**
  * Render a single satellite card.
  */
-function _renderSatCard(sat) {
+function _renderSatCard(sat, facilityTier) {
   const card = document.createElement('div');
-  card.className = 'sat-card' + (sat.health <= 0 ? ' decommissioned' : '');
+  let cardClass = 'sat-card';
+  if (sat.health <= 0) cardClass += ' decommissioned';
+  else if (sat.leased) cardClass += ' leased';
+  card.className = cardClass;
 
   // Info
   const info = document.createElement('div');
@@ -503,6 +845,16 @@ function _renderSatCard(sat) {
   const icon = SAT_TYPE_ICONS[sat.satelliteType] || SAT_TYPE_ICONS.GENERIC;
   const typeLabel = SAT_TYPE_LABELS[sat.satelliteType] || 'Generic';
   name.textContent = `${icon} ${typeLabel}`;
+
+  // Lease badge.
+  if (sat.leased && sat.health > 0) {
+    const leaseBadge = document.createElement('span');
+    leaseBadge.className = 'sat-lease-badge';
+    const income = getSatelliteLeaseIncome(sat);
+    leaseBadge.textContent = `LEASED +$${(income / 1000).toFixed(0)}k/period`;
+    name.appendChild(leaseBadge);
+  }
+
   info.appendChild(name);
 
   const meta = document.createElement('div');
@@ -550,6 +902,32 @@ function _renderSatCard(sat) {
     ));
     controls.appendChild(toggle);
 
+    // Lease toggle (Tier 2+).
+    if (facilityTier >= 2) {
+      const leaseBtn = document.createElement('button');
+      leaseBtn.className = 'sat-lease-btn' + (sat.leased ? ' active' : '');
+      leaseBtn.textContent = sat.leased ? 'End Lease' : 'Lease';
+      leaseBtn.addEventListener('click', () => {
+        setSatelliteLease(_state, sat.id, !sat.leased);
+        _render();
+      });
+      controls.appendChild(leaseBtn);
+    }
+
+    // Reposition (Tier 3).
+    if (facilityTier >= 3) {
+      const targets = getRepositionTargets(_state, sat.id);
+      if (targets.length > 0) {
+        const reposBtn = document.createElement('button');
+        reposBtn.className = 'sat-reposition-btn';
+        reposBtn.textContent = `Reposition ($${(SATELLITE_REPOSITION_COST.SAME_BODY / 1000).toFixed(0)}k)`;
+        reposBtn.addEventListener('click', () => {
+          _showRepositionDropdown(card, sat, targets, reposBtn);
+        });
+        controls.appendChild(reposBtn);
+      }
+    }
+
     // Decommission button.
     const decommBtn = document.createElement('button');
     decommBtn.className = 'sat-decommission-btn';
@@ -566,16 +944,58 @@ function _renderSatCard(sat) {
   return card;
 }
 
+/**
+ * Show a dropdown to select repositioning target band.
+ */
+function _showRepositionDropdown(card, sat, targets, triggerBtn) {
+  // Remove any existing dropdown.
+  const existing = card.querySelector('.sat-reposition-select');
+  if (existing) {
+    existing.remove();
+    return;
+  }
+
+  const select = document.createElement('select');
+  select.className = 'sat-reposition-select';
+
+  const defaultOpt = document.createElement('option');
+  defaultOpt.value = '';
+  defaultOpt.textContent = 'Select band...';
+  select.appendChild(defaultOpt);
+
+  for (const target of targets) {
+    const opt = document.createElement('option');
+    opt.value = target.id;
+    opt.textContent = `${target.id} (${target.name})`;
+    select.appendChild(opt);
+  }
+
+  select.addEventListener('change', () => {
+    if (!select.value) return;
+    const result = repositionSatellite(_state, sat.id, select.value);
+    if (!result.success) {
+      alert(result.reason);
+    }
+    _render();
+  });
+
+  // Insert after the trigger button.
+  triggerBtn.parentElement.insertBefore(select, triggerBtn.nextSibling);
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function _card(label, value, isConstellation = false) {
+function _card(label, value, isConstellation = false, isIncome = false) {
   const card = document.createElement('div');
   card.className = 'sat-overview-card';
+  let valueClass = 'value';
+  if (isConstellation) valueClass += ' constellation';
+  if (isIncome) valueClass += ' income';
   card.innerHTML = `
     <div class="label">${label}</div>
-    <div class="value${isConstellation ? ' constellation' : ''}">${value}</div>
+    <div class="${valueClass}">${value}</div>
   `;
   return card;
 }

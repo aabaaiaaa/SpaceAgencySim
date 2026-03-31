@@ -1,12 +1,12 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 38,
+  "lastIteration": 39,
   "startedAt": "2026-03-30T20:49:34.099Z",
   "activeTask": {
-    "taskId": "TASK-057",
-    "taskTitle": "E2E tests — Phase 3 (Reliability & Risk)",
-    "iterationNumber": 38,
-    "startedAt": "2026-03-31T10:53:29.382Z"
+    "taskId": "TASK-026",
+    "taskTitle": "Satellite Network Operations Centre facility",
+    "iterationNumber": 39,
+    "startedAt": "2026-03-31T10:59:27.634Z"
   }
 }

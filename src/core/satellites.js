@@ -37,6 +37,12 @@ import {
   SATELLITE_AUTO_MAINTENANCE_COST,
   SATELLITE_AUTO_MAINTENANCE_HEAL,
   SATELLITE_OPS_TIER_CAPS,
+  SATELLITE_LEASE_INCOME,
+  SATELLITE_LEASE_INCOME_DEFAULT,
+  SATELLITE_LEASE_BENEFIT_PENALTY,
+  SATELLITE_REPOSITION_COST,
+  SATELLITE_REPOSITION_HEALTH_COST,
+  ALTITUDE_BANDS,
   OrbitalObjectType,
   FacilityId,
   BODY_RADIUS,
@@ -289,6 +295,17 @@ export function getBenefitMultiplier(state, satelliteType) {
     multiplier = CONSTELLATION_MULTIPLIER;
   }
 
+  // Leased satellites reduce benefit: if ALL are leased, apply full penalty.
+  // Mixed fleet: proportional reduction based on leased fraction.
+  const leasedCount = sats.filter(s => s.leased).length;
+  if (leasedCount > 0 && leasedCount < sats.length) {
+    // Partial lease: blend penalty proportionally.
+    const leasedFraction = leasedCount / sats.length;
+    multiplier *= (1 - leasedFraction * (1 - SATELLITE_LEASE_BENEFIT_PENALTY));
+  } else if (leasedCount === sats.length) {
+    multiplier *= SATELLITE_LEASE_BENEFIT_PENALTY;
+  }
+
   return multiplier;
 }
 
@@ -371,16 +388,18 @@ export function getNetworkBenefits(state) {
  * @returns {{
  *   maintenanceCost: number,
  *   scienceEarned: number,
+ *   leaseIncome: number,
  *   decommissioned: string[],
  * }}
  */
 export function processSatelliteNetwork(state) {
   const network = state.satelliteNetwork;
   if (!network || !network.satellites) {
-    return { maintenanceCost: 0, scienceEarned: 0, decommissioned: [] };
+    return { maintenanceCost: 0, scienceEarned: 0, leaseIncome: 0, decommissioned: [] };
   }
 
   let maintenanceCost = 0;
+  let leaseIncome = 0;
   const decommissioned = [];
 
   // Step 1 & 2: Maintenance + degradation for each active satellite.
@@ -393,11 +412,15 @@ export function processSatelliteNetwork(state) {
       sat.health = Math.min(100, sat.health + SATELLITE_AUTO_MAINTENANCE_HEAL);
     }
 
+    // Lease income: collect before degradation (satellite was active this period).
+    leaseIncome += getSatelliteLeaseIncome(sat);
+
     // Degrade.
     sat.health = Math.max(0, sat.health - SATELLITE_DEGRADATION_PER_PERIOD);
 
-    // Decommission if dead.
+    // Decommission if dead. Also clear lease flag.
     if (sat.health <= 0) {
+      sat.leased = false;
       decommissioned.push(sat.id);
     }
   }
@@ -405,12 +428,15 @@ export function processSatelliteNetwork(state) {
   // Deduct maintenance cost (mandatory, can go negative like other operating costs).
   state.money -= maintenanceCost;
 
+  // Add lease income.
+  state.money += leaseIncome;
+
   // Step 3: Award passive science from Science satellites.
   const benefits = getNetworkBenefits(state);
   const scienceEarned = benefits.sciencePerPeriod;
   state.sciencePoints = (state.sciencePoints ?? 0) + scienceEarned;
 
-  return { maintenanceCost, scienceEarned, decommissioned };
+  return { maintenanceCost, scienceEarned, leaseIncome, decommissioned };
 }
 
 // ---------------------------------------------------------------------------
@@ -452,6 +478,159 @@ export function setAutoMaintenance(state, satelliteId, enabled) {
 }
 
 // ---------------------------------------------------------------------------
+// Leasing (Tier 2+)
+// ---------------------------------------------------------------------------
+
+/**
+ * Toggle satellite lease status.
+ * Leased satellites earn income per period but provide reduced network benefits.
+ * Requires Satellite Ops Tier 2+.
+ *
+ * @param {import('./gameState.js').GameState} state
+ * @param {string} satelliteId
+ * @param {boolean} leased
+ * @returns {{ success: boolean, reason?: string }}
+ */
+export function setSatelliteLease(state, satelliteId, leased) {
+  const tier = getFacilityTier(state, FacilityId.SATELLITE_OPS);
+  if (tier < 2) {
+    return { success: false, reason: 'Satellite Ops Tier 2 required for leasing.' };
+  }
+
+  const sat = state.satelliteNetwork.satellites.find(s => s.id === satelliteId);
+  if (!sat) return { success: false, reason: 'Satellite not found.' };
+  if (sat.health <= 0) return { success: false, reason: 'Satellite is decommissioned.' };
+
+  sat.leased = leased;
+  return { success: true };
+}
+
+/**
+ * Get the per-period lease income for a single satellite.
+ *
+ * @param {import('./gameState.js').SatelliteRecord} sat
+ * @returns {number}  Income in dollars (0 if not leased or dead).
+ */
+export function getSatelliteLeaseIncome(sat) {
+  if (!sat.leased || sat.health <= 0) return 0;
+  return SATELLITE_LEASE_INCOME[sat.satelliteType] ?? SATELLITE_LEASE_INCOME_DEFAULT;
+}
+
+/**
+ * Get total lease income across the entire network per period.
+ *
+ * @param {import('./gameState.js').GameState} state
+ * @returns {number}
+ */
+export function getTotalLeaseIncome(state) {
+  const sats = state.satelliteNetwork?.satellites ?? [];
+  let total = 0;
+  for (const sat of sats) {
+    total += getSatelliteLeaseIncome(sat);
+  }
+  return total;
+}
+
+// ---------------------------------------------------------------------------
+// Repositioning (Tier 3)
+// ---------------------------------------------------------------------------
+
+/**
+ * Reposition a satellite to a different altitude band on the same body.
+ * Requires Satellite Ops Tier 3. Costs money and satellite health.
+ *
+ * @param {import('./gameState.js').GameState} state
+ * @param {string} satelliteId
+ * @param {string} targetBandId  Target altitude band ID (e.g. 'MEO').
+ * @returns {{ success: boolean, reason?: string }}
+ */
+export function repositionSatellite(state, satelliteId, targetBandId) {
+  const tier = getFacilityTier(state, FacilityId.SATELLITE_OPS);
+  if (tier < 3) {
+    return { success: false, reason: 'Satellite Ops Tier 3 required for repositioning.' };
+  }
+
+  const sat = state.satelliteNetwork.satellites.find(s => s.id === satelliteId);
+  if (!sat) return { success: false, reason: 'Satellite not found.' };
+  if (sat.health <= 0) return { success: false, reason: 'Satellite is decommissioned.' };
+
+  if (sat.bandId === targetBandId) {
+    return { success: false, reason: 'Satellite is already in that band.' };
+  }
+
+  // Validate target band exists for this body.
+  const bodyBands = ALTITUDE_BANDS[sat.bodyId];
+  if (!bodyBands) return { success: false, reason: 'Unknown celestial body.' };
+  const targetBand = bodyBands.find(b => b.id === targetBandId);
+  if (!targetBand) {
+    return { success: false, reason: `Band "${targetBandId}" does not exist for ${sat.bodyId}.` };
+  }
+
+  // Validate typed satellites can operate in the target band.
+  if (sat.satelliteType !== 'GENERIC') {
+    const validBands = SATELLITE_VALID_BANDS[sat.satelliteType];
+    if (validBands && !validBands.includes(targetBandId)) {
+      return {
+        success: false,
+        reason: `${sat.satelliteType} satellites cannot operate in ${targetBandId}.`,
+      };
+    }
+  }
+
+  // Check cost.
+  const cost = SATELLITE_REPOSITION_COST.SAME_BODY;
+  if (state.money < cost) {
+    return { success: false, reason: `Insufficient funds. Repositioning costs $${(cost / 1000).toFixed(0)}k.` };
+  }
+
+  // Check health (must survive the manoeuvre).
+  if (sat.health <= SATELLITE_REPOSITION_HEALTH_COST) {
+    return { success: false, reason: 'Satellite health too low to survive repositioning.' };
+  }
+
+  // Apply repositioning.
+  state.money -= cost;
+  sat.health -= SATELLITE_REPOSITION_HEALTH_COST;
+  sat.bandId = targetBandId;
+
+  // Update orbital object elements to match new band altitude.
+  const orbObj = state.orbitalObjects.find(o => o.id === sat.orbitalObjectId);
+  if (orbObj) {
+    const midAlt = (targetBand.min + targetBand.max) / 2;
+    const R = BODY_RADIUS[sat.bodyId] ?? 6_371_000;
+    orbObj.elements.semiMajorAxis = R + midAlt;
+    orbObj.elements.eccentricity = 0;
+  }
+
+  return { success: true };
+}
+
+/**
+ * Get valid repositioning targets for a satellite.
+ * Returns bands the satellite can move to (excluding current band).
+ *
+ * @param {import('./gameState.js').GameState} state
+ * @param {string} satelliteId
+ * @returns {Array<{ id: string, name: string }>}
+ */
+export function getRepositionTargets(state, satelliteId) {
+  const sat = state.satelliteNetwork.satellites.find(s => s.id === satelliteId);
+  if (!sat || sat.health <= 0) return [];
+
+  const bodyBands = ALTITUDE_BANDS[sat.bodyId];
+  if (!bodyBands) return [];
+
+  const validBands = (sat.satelliteType !== 'GENERIC')
+    ? SATELLITE_VALID_BANDS[sat.satelliteType]
+    : null;
+
+  return bodyBands
+    .filter(b => b.id !== sat.bandId)
+    .filter(b => !validBands || validBands.includes(b.id))
+    .map(b => ({ id: b.id, name: b.name }));
+}
+
+// ---------------------------------------------------------------------------
 // Decommission
 // ---------------------------------------------------------------------------
 
@@ -469,6 +648,7 @@ export function decommissionSatellite(state, satelliteId) {
 
   sat.health = 0;
   sat.autoMaintain = false;
+  sat.leased = false;
   return { success: true };
 }
 
@@ -483,6 +663,9 @@ export function decommissionSatellite(state, satelliteId) {
  * @returns {{
  *   totalActive: number,
  *   capacity: number,
+ *   tier: number,
+ *   leasedCount: number,
+ *   totalLeaseIncome: number,
  *   byType: Record<string, { count: number, constellation: boolean }>,
  *   benefits: ReturnType<typeof getNetworkBenefits>,
  *   satellites: import('./gameState.js').SatelliteRecord[],
@@ -505,9 +688,14 @@ export function getNetworkSummary(state) {
     };
   }
 
+  const leasedCount = active.filter(s => s.leased).length;
+
   return {
     totalActive: active.length,
     capacity,
+    tier,
+    leasedCount,
+    totalLeaseIncome: getTotalLeaseIncome(state),
     byType,
     benefits: getNetworkBenefits(state),
     satellites: state.satelliteNetwork?.satellites ?? [],

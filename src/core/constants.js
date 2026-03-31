@@ -913,8 +913,8 @@ export const FACILITY_UPGRADE_DEFS = Object.freeze({
   [FacilityId.SATELLITE_OPS]: Object.freeze({
     maxTier: 3,
     tiers: Object.freeze({
-      2: Object.freeze({ moneyCost: 300_000, scienceCost: 0, description: 'Advanced orbit management, relay networks' }),
-      3: Object.freeze({ moneyCost: 700_000, scienceCost: 0, description: 'Deep space satellite networks, autonomous ops' }),
+      2: Object.freeze({ moneyCost: 400_000, scienceCost: 0, description: 'Lease satellites to third parties, constellation management' }),
+      3: Object.freeze({ moneyCost: 700_000, scienceCost: 0, description: 'Advanced network planning, satellite repositioning, shadow overlay' }),
     }),
   }),
 });
@@ -1141,6 +1141,51 @@ export const SATELLITE_OPS_TIER_CAPS = Object.freeze({
   2: 12,
   3: 24,
 });
+
+// ---------------------------------------------------------------------------
+// Satellite Leasing (Tier 2+)
+// ---------------------------------------------------------------------------
+
+/**
+ * Income earned per leased satellite per period (dollars).
+ * Leasing requires Satellite Ops Tier 2+.
+ * @type {Readonly<Record<string, number>>}
+ */
+export const SATELLITE_LEASE_INCOME = Object.freeze({
+  [SatelliteType.COMMUNICATION]: 25_000,
+  [SatelliteType.WEATHER]:       20_000,
+  [SatelliteType.SCIENCE]:       15_000,
+  [SatelliteType.GPS]:           30_000,
+  [SatelliteType.RELAY]:         35_000,
+});
+
+/** Default lease income for generic/untyped satellites. */
+export const SATELLITE_LEASE_INCOME_DEFAULT = 10_000;
+
+/**
+ * Leased satellites provide reduced network benefits (penalty multiplier).
+ * A leased satellite still provides benefits, but at a reduced rate.
+ */
+export const SATELLITE_LEASE_BENEFIT_PENALTY = 0.5;
+
+// ---------------------------------------------------------------------------
+// Satellite Repositioning (Tier 3)
+// ---------------------------------------------------------------------------
+
+/**
+ * Cost to reposition a satellite to a different altitude band (dollars).
+ * Repositioning requires Satellite Ops Tier 3.
+ * @type {Readonly<Record<string, number>>}
+ */
+export const SATELLITE_REPOSITION_COST = Object.freeze({
+  SAME_BODY: 50_000,
+});
+
+/**
+ * Health cost for repositioning a satellite (percentage points).
+ * Orbital manoeuvres stress the satellite hardware.
+ */
+export const SATELLITE_REPOSITION_HEALTH_COST = 10;
 
 // ---------------------------------------------------------------------------
 // Docking System

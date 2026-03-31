@@ -296,6 +296,7 @@ import {
  * @property {number}      health            - Current health (0–100). Degrades each period.
  * @property {boolean}     autoMaintain      - If true, pay per-period maintenance cost to heal.
  * @property {number}      deployedPeriod    - Period when this satellite was deployed.
+ * @property {boolean}     [leased]          - If true, satellite is leased to third parties for income.
  */
 
 /**
