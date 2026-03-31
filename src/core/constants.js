@@ -972,6 +972,56 @@ export const LAUNCH_PAD_MAX_MASS = Object.freeze({
 });
 
 // ---------------------------------------------------------------------------
+// VAB Tier Limits
+// ---------------------------------------------------------------------------
+
+/**
+ * Maximum number of parts allowed in a rocket assembly per VAB tier.
+ *
+ *   Tier 1: 20 parts  — basic sounding rockets and simple multi-stage
+ *   Tier 2: 40 parts  — larger multi-stage vehicles with radial mounts
+ *   Tier 3: Infinity  — no part limit
+ *
+ * @type {Readonly<Record<number, number>>}
+ */
+export const VAB_MAX_PARTS = Object.freeze({
+  1: 20,
+  2: 40,
+  3: Infinity,
+});
+
+/**
+ * Maximum rocket height (pixels, from getRocketBounds) per VAB tier.
+ * 1 px = 0.05 m, so 400 px ≈ 20 m, 800 px ≈ 40 m.
+ *
+ *   Tier 1: 400 px (20 m)
+ *   Tier 2: 800 px (40 m)
+ *   Tier 3: Infinity
+ *
+ * @type {Readonly<Record<number, number>>}
+ */
+export const VAB_MAX_HEIGHT = Object.freeze({
+  1: 400,
+  2: 800,
+  3: Infinity,
+});
+
+/**
+ * Maximum rocket width (pixels, from getRocketBounds) per VAB tier.
+ *
+ *   Tier 1: 120 px (6 m)
+ *   Tier 2: 200 px (10 m)
+ *   Tier 3: Infinity
+ *
+ * @type {Readonly<Record<number, number>>}
+ */
+export const VAB_MAX_WIDTH = Object.freeze({
+  1: 120,
+  2: 200,
+  3: Infinity,
+});
+
+// ---------------------------------------------------------------------------
 // Orbit Segments
 // ---------------------------------------------------------------------------
 

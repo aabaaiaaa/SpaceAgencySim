@@ -18,7 +18,7 @@
 
 import { getPartById } from '../data/parts.js';
 import { ActivationBehaviour } from '../data/parts.js';
-import { PartType, FacilityId, LAUNCH_PAD_MAX_MASS } from './constants.js';
+import { PartType, FacilityId, LAUNCH_PAD_MAX_MASS, VAB_MAX_PARTS, VAB_MAX_HEIGHT, VAB_MAX_WIDTH } from './constants.js';
 import { TECH_NODES } from '../data/techtree.js';
 import { getFacilityTier } from './construction.js';
 
@@ -432,6 +432,48 @@ export function runValidation(assembly, stagingConfig, gameState) {
         pass:    false,
         warn:    false,
         message: 'Launch clamps must be assigned to a stage. The rocket cannot launch until clamps are released via staging.',
+      });
+    }
+  }
+
+  // ── CHECK 5e: VAB part count limit ──────────────────────────────────────
+  const vabTier = getFacilityTier(gameState, FacilityId.VAB);
+  const maxParts = VAB_MAX_PARTS[vabTier] ?? VAB_MAX_PARTS[1];
+  if (totalParts > maxParts) {
+    checks.push({
+      id:      'vab-part-limit',
+      label:   'VAB Part Limit',
+      pass:    false,
+      warn:    false,
+      message: `Rocket has ${totalParts} parts, exceeding Tier ${vabTier} VAB limit of ${isFinite(maxParts) ? maxParts : 'unlimited'}. Upgrade the VAB.`,
+    });
+  }
+
+  // ── CHECK 5f: VAB height limit ──────────────────────────────────────────
+  const bounds = getRocketBounds(assembly);
+  if (bounds) {
+    const rocketHeight = bounds.maxY - bounds.minY;
+    const maxHeight = VAB_MAX_HEIGHT[vabTier] ?? VAB_MAX_HEIGHT[1];
+    if (rocketHeight > maxHeight) {
+      checks.push({
+        id:      'vab-height-limit',
+        label:   'VAB Height Limit',
+        pass:    false,
+        warn:    false,
+        message: `Rocket height ${Math.round(rocketHeight)} px exceeds Tier ${vabTier} VAB limit of ${isFinite(maxHeight) ? maxHeight + ' px' : 'unlimited'}. Upgrade the VAB.`,
+      });
+    }
+
+    // ── CHECK 5g: VAB width limit ───────────────────────────────────────
+    const rocketWidth = bounds.maxX - bounds.minX;
+    const maxWidth = VAB_MAX_WIDTH[vabTier] ?? VAB_MAX_WIDTH[1];
+    if (rocketWidth > maxWidth) {
+      checks.push({
+        id:      'vab-width-limit',
+        label:   'VAB Width Limit',
+        pass:    false,
+        warn:    false,
+        message: `Rocket width ${Math.round(rocketWidth)} px exceeds Tier ${vabTier} VAB limit of ${isFinite(maxWidth) ? maxWidth + ' px' : 'unlimited'}. Upgrade the VAB.`,
       });
     }
   }

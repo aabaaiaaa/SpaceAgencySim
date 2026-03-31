@@ -18,7 +18,8 @@
  */
 
 import { PARTS, getPartById } from '../data/parts.js';
-import { PartType } from '../core/constants.js';
+import { PartType, FacilityId, VAB_MAX_PARTS, VAB_MAX_HEIGHT, VAB_MAX_WIDTH } from '../core/constants.js';
+import { getFacilityTier } from '../core/construction.js';
 import { getCurrentWeather } from '../core/weather.js';
 import { runValidation, getTotalMass, getRocketBounds } from '../core/rocketvalidator.js';
 import { getActiveCrew } from '../core/crew.js';
@@ -1945,6 +1946,18 @@ function _onDragEnd(e) {
     }
     _runAndRenderValidation();
   } else {
+    // ── VAB tier part-count gate ──────────────────────────────────────────
+    if (_gameState) {
+      const vabTier = getFacilityTier(_gameState, FacilityId.VAB);
+      const maxParts = VAB_MAX_PARTS[vabTier] ?? VAB_MAX_PARTS[1];
+      const partsToAdd = _symmetryMode ? 2 : 1;
+      if (_assembly.parts.size + partsToAdd > maxParts) {
+        _showToast(`Part limit reached (${maxParts}). Upgrade the VAB for more parts.`);
+        vabRenderParts();
+        return;
+      }
+    }
+
     // New part from the panel — use inventory (free) or buy new (deduct cost).
     const def = getPartById(partId);
     if (def && _gameState) {
@@ -2347,7 +2360,13 @@ function _updateStatusBar() {
     if (def) totalCost += def.cost;
   }
 
-  partsEl.textContent = `Parts: ${count}`;
+  const vabTier = _gameState ? getFacilityTier(_gameState, FacilityId.VAB) : 1;
+  const maxParts = VAB_MAX_PARTS[vabTier] ?? VAB_MAX_PARTS[1];
+  const limitLabel = isFinite(maxParts) ? `/${maxParts}` : '';
+  partsEl.textContent = `Parts: ${count}${limitLabel}`;
+  if (count > maxParts) partsEl.style.color = '#ff4444';
+  else partsEl.style.color = '';
+
   costEl.textContent  = `Cost: ${fmt$(totalCost)}`;
 
   if (massEl) {

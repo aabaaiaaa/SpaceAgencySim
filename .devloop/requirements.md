@@ -214,7 +214,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Launch Pad tiers: Tier 1 (free, basic launches, limited max mass), Tier 2 ($200k, higher max mass, fuel top-off), Tier 3 ($500k, highest max mass, launch clamp support). Launch clamps: attached "behind" rocket, visual swing-away on staging, player positions clamp release in correct stage, clamp prevents launch until staged.
 
 ### TASK-032: VAB upgrade tiers
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-030
 - **Description**: VAB tiers: Tier 1 (free, part placement, save/load, symmetry, basic part count/size limit), Tier 2 ($150k, higher part count, greater height/width), Tier 3 ($400k, highest count, largest height/width). Save/load and symmetry always available at all tiers. Upgrades only affect part count, height, and width limits.
