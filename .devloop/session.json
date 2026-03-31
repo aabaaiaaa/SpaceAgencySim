@@ -3,10 +3,5 @@
   "sessionId": null,
   "lastIteration": 45,
   "startedAt": "2026-03-30T20:49:34.099Z",
-  "activeTask": {
-    "taskId": "TASK-035",
-    "taskTitle": "Tracking Station facility and upgrade tiers",
-    "iterationNumber": 45,
-    "startedAt": "2026-03-31T12:05:36.915Z"
-  }
+  "activeTask": null
 }
