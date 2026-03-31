@@ -37,6 +37,8 @@ import {
 } from './reputation.js';
 import { processSampleReturns } from './surfaceOps.js';
 import { checkAchievements } from './achievements.js';
+import { createFieldCraft, hasExtendedLifeSupport } from './lifeSupport.js';
+import { FieldCraftStatus } from './constants.js';
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -75,6 +77,9 @@ import { checkAchievements } from './achievements.js';
  * @property {number}  reputationChange - Net reputation change this flight.
  * @property {number}  reputationAfter  - Reputation value after all changes.
  * @property {Array<{id: string, title: string, cashReward: number, repReward: number}>} newAchievements - Achievements earned this flight.
+ * @property {import('./gameState.js').FieldCraft|null} deployedFieldCraft - Field craft created this flight (null if crew returned home).
+ * @property {Array<{craftId: string, craftName: string, suppliesRemaining: number, crewIds: string[]}>} lifeSupportWarnings - Field craft with critically low supplies.
+ * @property {Array<{craftId: string, craftName: string, crewId: string, crewName: string}>} lifeSupportDeaths - Crew who died from life support exhaustion.
  */
 
 /**
@@ -263,6 +268,52 @@ export function processFlightReturn(state, flightState, ps, assembly) {
   const landingBodyId = flightState?.bodyId ?? 'EARTH';
   const sampleResult = isLanded ? processSampleReturns(state, landingBodyId) : { samplesReturned: 0, scienceEarned: 0 };
 
+  // ── 6e3. Persist crewed vessels left in the field ──────────────────────
+  //   If the craft ended in orbit or landed on a non-Earth body with crew
+  //   aboard, create a field craft entry to track their life support.
+  let deployedFieldCraft = null;
+  {
+    const crewIds = Array.isArray(flightState?.crewIds) ? flightState.crewIds : [];
+    const wasInOrbit = !!(flightState?.inOrbit);
+    const landedOnNonEarth = isLanded && landingBodyId !== 'EARTH';
+
+    if (crewIds.length > 0 && (wasInOrbit || landedOnNonEarth)) {
+      // Check if any surviving crew (not KIA from crash).
+      const ejectedIds = ps?.ejectedCrewIds ?? new Set();
+      const isCrashed = !!(ps && ps.crashed);
+      const survivingCrewIds = crewIds.filter((id) => {
+        if (isCrashed && !ejectedIds.has(id)) return false;
+        // Also skip crew already KIA.
+        const astro = state.crew.find((a) => a.id === id);
+        return astro && astro.status !== 'kia';
+      });
+
+      if (survivingCrewIds.length > 0) {
+        if (!Array.isArray(state.fieldCraft)) state.fieldCraft = [];
+
+        const rocketDesign = state.rockets?.find((r) => r.id === flightState.rocketId);
+        const craftName = rocketDesign?.name ?? `Craft-${(flightState.rocketId ?? '').slice(0, 6)}`;
+
+        const fieldStatus = wasInOrbit
+          ? FieldCraftStatus.IN_ORBIT
+          : FieldCraftStatus.LANDED;
+
+        deployedFieldCraft = createFieldCraft({
+          name: craftName,
+          bodyId: landingBodyId,
+          status: fieldStatus,
+          crewIds: survivingCrewIds,
+          hasExtendedLifeSupport: hasExtendedLifeSupport(assembly, ps),
+          deployedPeriod: state.currentPeriod,
+          orbitalElements: flightState?.orbitalElements ?? null,
+          orbitBandId: flightState?.orbitBandId ?? null,
+        });
+
+        state.fieldCraft.push(deployedFieldCraft);
+      }
+    }
+  }
+
   // ── 6f. Accumulate in-game flight time ──────────────────────────────────
   const flightSeconds = flightState?.timeElapsed ?? 0;
   state.flightTimeSeconds = (state.flightTimeSeconds ?? 0) + flightSeconds;
@@ -332,6 +383,9 @@ export function processFlightReturn(state, flightState, ps, assembly) {
     samplesReturned: sampleResult.samplesReturned,
     sampleScienceEarned: sampleResult.scienceEarned,
     newAchievements,
+    deployedFieldCraft,
+    lifeSupportWarnings: periodSummary.lifeSupportWarnings ?? [],
+    lifeSupportDeaths: periodSummary.lifeSupportDeaths ?? [],
   };
 }
 

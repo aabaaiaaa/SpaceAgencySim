@@ -22,6 +22,7 @@ import { processSatelliteNetwork } from './satellites.js';
 import { checkInjuryRecovery, processTraining } from './crew.js';
 import { getFacilityTier } from './construction.js';
 import { processSurfaceOps } from './surfaceOps.js';
+import { processLifeSupport } from './lifeSupport.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -44,6 +45,8 @@ import { processSurfaceOps } from './surfaceOps.js';
  * @property {string[]} healedCrewIds  - IDs of crew members whose injuries were cleared.
  * @property {number}   trainingCost  - Total crew training cost this period (0 — courses are paid upfront).
  * @property {Array<{id: string, name: string, skill: string, gain: number, completed: boolean}>} trainees - Training status; completed entries received their skill gain.
+ * @property {Array<{craftId: string, craftName: string, suppliesRemaining: number, crewIds: string[]}>} lifeSupportWarnings - Field craft with critically low supplies.
+ * @property {Array<{craftId: string, craftName: string, crewId: string, crewName: string}>} lifeSupportDeaths - Crew who died from life support exhaustion.
  * @property {boolean} bankrupt        - True if the player is bankrupt after this period.
  */
 
@@ -129,7 +132,10 @@ export function advancePeriod(state) {
   // ── 10. Surface operations — passive science from deployed instruments ─
   const surfaceResult = processSurfaceOps(state);
 
-  // ── 11. Bankruptcy check ──────────────────────────────────────────────
+  // ── 11. Life support — tick down supplies for crewed field vessels ─────
+  const lifeSupportResult = processLifeSupport(state);
+
+  // ── 12. Bankruptcy check ──────────────────────────────────────────────
   const bankrupt = isBankrupt(state);
 
   return {
@@ -149,6 +155,8 @@ export function advancePeriod(state) {
     trainingCost: trainingResult.trainingCost,
     trainees: trainingResult.trainees,
     surfaceScienceEarned: surfaceResult.scienceEarned,
+    lifeSupportWarnings: lifeSupportResult.warnings,
+    lifeSupportDeaths: lifeSupportResult.deaths,
     bankrupt,
   };
 }

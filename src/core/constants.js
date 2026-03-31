@@ -1666,3 +1666,37 @@ export const SURFACE_INSTRUMENT_SCIENCE_PER_PERIOD = 3;
 
 /** Number of GPS satellites required at a body for surface items to be visible on map. */
 export const GPS_VISIBILITY_THRESHOLD = 1;
+
+// ---------------------------------------------------------------------------
+// Life Support System
+// ---------------------------------------------------------------------------
+
+/**
+ * Default number of periods of life support provided by the command module.
+ * Each period a crewed craft spends in the field (orbit or landed on a
+ * non-Earth body) consumes one period of supply.
+ */
+export const DEFAULT_LIFE_SUPPORT_PERIODS = 5;
+
+/**
+ * Government fine charged per crew member who dies from life support
+ * exhaustion (same as crash death fine).
+ */
+export const LIFE_SUPPORT_DEATH_FINE = 500_000;
+
+/**
+ * Supply level at which a critical warning is shown, giving the player
+ * one last chance to launch a rescue mission.
+ */
+export const LIFE_SUPPORT_WARNING_THRESHOLD = 1;
+
+/**
+ * Status of a crewed vessel left in the field.
+ * @enum {string}
+ */
+export const FieldCraftStatus = Object.freeze({
+  /** Vessel is in a stable orbit around a celestial body. */
+  IN_ORBIT: 'IN_ORBIT',
+  /** Vessel is safely landed on a non-Earth celestial body. */
+  LANDED: 'LANDED',
+});

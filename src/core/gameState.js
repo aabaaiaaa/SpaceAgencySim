@@ -269,6 +269,9 @@ import {
  * @property {SurfaceItem[]}  surfaceItems - Items deployed on celestial body surfaces
  *                                           (flags, samples, instruments, beacons).
  * @property {AchievementRecord[]} achievements - Earned prestige milestones.
+ * @property {FieldCraft[]}  fieldCraft   - Crewed vessels left in the field (orbit or
+ *                                           landed on non-Earth bodies). Life support
+ *                                           supplies count down each period.
  */
 
 /**
@@ -276,6 +279,22 @@ import {
  * @typedef {Object} AchievementRecord
  * @property {string}  id           - Achievement definition ID.
  * @property {number}  earnedPeriod - Period when the achievement was earned.
+ */
+
+/**
+ * A crewed vessel left in the field (orbit or landed on a non-Earth body).
+ * Crew aboard consume life support supplies each period.
+ * @typedef {Object} FieldCraft
+ * @property {string}   id                      - Unique identifier.
+ * @property {string}   name                    - Display name of the vessel.
+ * @property {string}   bodyId                  - Celestial body the craft is at.
+ * @property {string}   status                  - FieldCraftStatus value ('IN_ORBIT' or 'LANDED').
+ * @property {string[]} crewIds                 - IDs of crew members aboard.
+ * @property {number}   suppliesRemaining       - Periods of life support remaining.
+ * @property {boolean}  hasExtendedLifeSupport  - True if Extended Mission Module is present (infinite supplies).
+ * @property {number}   deployedPeriod          - Period when the craft was left in the field.
+ * @property {OrbitalElements|null} orbitalElements - Orbital elements if in orbit, null if landed.
+ * @property {string|null} orbitBandId           - Altitude band ID if in orbit (e.g. 'LEO').
  */
 
 /**
@@ -427,6 +446,10 @@ export function createGameState() {
 
     // Prestige milestones — one-time achievements for major firsts.
     achievements: [],
+
+    // Crewed vessels left in orbit or landed on non-Earth bodies.
+    // Life support supplies count down each period.
+    fieldCraft: [],
   };
 }
 

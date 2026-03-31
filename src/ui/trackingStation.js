@@ -16,6 +16,8 @@ import {
   FacilityId,
   TRACKING_STATION_TIER_FEATURES,
   OrbitalObjectType,
+  DEFAULT_LIFE_SUPPORT_PERIODS,
+  LIFE_SUPPORT_WARNING_THRESHOLD,
 } from '../core/constants.js';
 import { getFacilityTier } from '../core/construction.js';
 import { getWeatherForecast } from '../core/weather.js';
@@ -259,6 +261,81 @@ const TS_STYLES = `
   font-size: 0.85rem;
   padding: 8px 0;
 }
+
+/* -- Field craft (crewed vessels) ---------------------------------------- */
+.ts-field-craft-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin-bottom: 8px;
+}
+
+.ts-field-craft-card.warning {
+  border-color: rgba(255,170,48,0.5);
+  background: rgba(120,100,20,0.15);
+}
+
+.ts-field-craft-card.critical {
+  border-color: rgba(255,64,64,0.5);
+  background: rgba(120,20,20,0.15);
+}
+
+.ts-field-craft-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.ts-field-craft-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #e0f0ff;
+}
+
+.ts-field-craft-status {
+  font-size: 0.78rem;
+  color: #8899aa;
+}
+
+.ts-field-craft-detail {
+  display: flex;
+  gap: 20px;
+  font-size: 0.82rem;
+  color: #b0c0d0;
+}
+
+.ts-supply-bar {
+  display: inline-flex;
+  gap: 3px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.ts-supply-pip {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: rgba(96,221,128,0.8);
+  border: 1px solid rgba(96,221,128,0.4);
+}
+
+.ts-supply-pip.empty {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.15);
+}
+
+.ts-supply-pip.warning {
+  background: rgba(255,170,48,0.8);
+  border-color: rgba(255,170,48,0.4);
+}
+
+.ts-supply-infinite {
+  font-size: 0.82rem;
+  color: #60dd80;
+  font-weight: 600;
+}
 `;
 
 // ---------------------------------------------------------------------------
@@ -372,6 +449,9 @@ function _render() {
 
   // Orbital objects overview.
   content.appendChild(_renderObjectOverview(tier));
+
+  // Crewed vessels in the field (life support tracking).
+  content.appendChild(_renderFieldCraft());
 
   // Tracked objects list.
   content.appendChild(_renderObjectList(tier));
@@ -624,6 +704,120 @@ function _renderTransferRoutes() {
   }
 
   section.appendChild(grid);
+
+  return section;
+}
+
+/**
+ * Render crewed vessels in the field with life support status.
+ */
+function _renderFieldCraft() {
+  const section = document.createElement('div');
+  section.className = 'ts-section';
+
+  const h2 = document.createElement('h2');
+  h2.textContent = 'Crewed Vessels';
+  section.appendChild(h2);
+
+  const fieldCraft = _state.fieldCraft || [];
+  if (fieldCraft.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'ts-tier-locked';
+    empty.textContent = 'No crewed vessels currently deployed in the field.';
+    section.appendChild(empty);
+    return section;
+  }
+
+  for (const craft of fieldCraft) {
+    const card = document.createElement('div');
+    card.className = 'ts-field-craft-card';
+
+    // Apply warning/critical class based on supply level.
+    if (!craft.hasExtendedLifeSupport) {
+      if (craft.suppliesRemaining <= 0) {
+        card.classList.add('critical');
+      } else if (craft.suppliesRemaining <= LIFE_SUPPORT_WARNING_THRESHOLD) {
+        card.classList.add('warning');
+      }
+    }
+
+    // Header: name + status.
+    const header = document.createElement('div');
+    header.className = 'ts-field-craft-header';
+
+    const nameEl = document.createElement('span');
+    nameEl.className = 'ts-field-craft-name';
+    nameEl.textContent = craft.name;
+    header.appendChild(nameEl);
+
+    const statusEl = document.createElement('span');
+    statusEl.className = 'ts-field-craft-status';
+    const statusLabel = craft.status === 'IN_ORBIT' ? 'In orbit' : 'Landed';
+    statusEl.textContent = `${statusLabel} — ${craft.bodyId}`;
+    if (craft.orbitBandId) {
+      statusEl.textContent += ` (${craft.orbitBandId})`;
+    }
+    header.appendChild(statusEl);
+
+    card.appendChild(header);
+
+    // Details: crew count + supply status.
+    const detail = document.createElement('div');
+    detail.className = 'ts-field-craft-detail';
+
+    // Crew count.
+    const crewCount = craft.crewIds ? craft.crewIds.length : 0;
+    const crewEl = document.createElement('span');
+    crewEl.textContent = `Crew: ${crewCount}`;
+
+    // Show crew names if available.
+    if (crewCount > 0 && _state.crew) {
+      const names = craft.crewIds
+        .map((id) => {
+          const a = _state.crew.find((c) => c.id === id);
+          return a ? a.name : '???';
+        })
+        .join(', ');
+      crewEl.textContent = `Crew: ${names}`;
+    }
+    detail.appendChild(crewEl);
+
+    // Supply status.
+    const supplyEl = document.createElement('span');
+    if (craft.hasExtendedLifeSupport) {
+      supplyEl.className = 'ts-supply-infinite';
+      supplyEl.textContent = 'Supplies: Unlimited';
+    } else {
+      supplyEl.textContent = 'Supplies: ';
+      const bar = document.createElement('span');
+      bar.className = 'ts-supply-bar';
+      for (let i = 0; i < DEFAULT_LIFE_SUPPORT_PERIODS; i++) {
+        const pip = document.createElement('span');
+        pip.className = 'ts-supply-pip';
+        if (i >= craft.suppliesRemaining) {
+          pip.classList.add('empty');
+        } else if (craft.suppliesRemaining <= LIFE_SUPPORT_WARNING_THRESHOLD) {
+          pip.classList.add('warning');
+        }
+        bar.appendChild(pip);
+      }
+      supplyEl.appendChild(bar);
+
+      const countLabel = document.createElement('span');
+      countLabel.style.marginLeft = '6px';
+      countLabel.style.fontSize = '0.82rem';
+      if (craft.suppliesRemaining <= LIFE_SUPPORT_WARNING_THRESHOLD) {
+        countLabel.style.color = '#ffaa30';
+        countLabel.style.fontWeight = '600';
+      }
+      countLabel.textContent = `${craft.suppliesRemaining}/${DEFAULT_LIFE_SUPPORT_PERIODS}`;
+      supplyEl.appendChild(countLabel);
+    }
+    detail.appendChild(supplyEl);
+
+    card.appendChild(detail);
+    section.appendChild(card);
+  }
 
   return section;
 }

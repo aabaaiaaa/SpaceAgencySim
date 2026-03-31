@@ -1096,6 +1096,102 @@ export function showReturnResultsOverlay(container, summary, onDismiss) {
     content.appendChild(repSection);
   }
 
+  // ── Deployed field craft (crew left in orbit/landed) ──────────────────────
+  if (summary.deployedFieldCraft) {
+    const fcSection = document.createElement('div');
+    fcSection.className = 'rr-section';
+
+    const fcTitle = document.createElement('h2');
+    fcTitle.textContent = 'Crew Deployed in Field';
+    fcSection.appendChild(fcTitle);
+
+    const fc = summary.deployedFieldCraft;
+    const statusLabel = fc.status === 'IN_ORBIT' ? 'In orbit' : 'Landed';
+    const supplyLabel = fc.hasExtendedLifeSupport
+      ? 'Supplies: Unlimited (Extended Mission Module)'
+      : `Supplies: ${fc.suppliesRemaining} flights remaining`;
+
+    fcSection.appendChild(_rrRow(fc.name, `${statusLabel} at ${fc.bodyId}`));
+    fcSection.appendChild(_rrRow('Crew aboard', `${fc.crewIds.length} astronaut${fc.crewIds.length !== 1 ? 's' : ''}`));
+    fcSection.appendChild(_rrRow('Life support', supplyLabel));
+
+    content.appendChild(fcSection);
+  }
+
+  // ── Life support deaths (crew died from supply exhaustion) ──────────────
+  if (Array.isArray(summary.lifeSupportDeaths) && summary.lifeSupportDeaths.length > 0) {
+    const deathSection = document.createElement('div');
+    deathSection.className = 'rr-section';
+    deathSection.style.background = 'rgba(120, 20, 20, 0.5)';
+    deathSection.style.border = '1px solid #ff4040';
+    deathSection.style.borderRadius = '6px';
+    deathSection.style.padding = '14px 16px';
+
+    const deathTitle = document.createElement('h2');
+    deathTitle.textContent = 'Life Support Exhausted';
+    deathTitle.style.color = '#ff6060';
+    deathTitle.style.borderBottom = 'none';
+    deathSection.appendChild(deathTitle);
+
+    for (const d of summary.lifeSupportDeaths) {
+      const row = document.createElement('div');
+      row.className = 'rr-row';
+      const label = document.createElement('span');
+      label.className = 'rr-label';
+      label.textContent = `${d.crewName} — ${d.craftName}`;
+      label.style.color = '#ffc0c0';
+      const value = document.createElement('span');
+      value.className = 'rr-value rr-value-negative';
+      value.textContent = 'KIA';
+      row.appendChild(label);
+      row.appendChild(value);
+      deathSection.appendChild(row);
+    }
+
+    content.appendChild(deathSection);
+  }
+
+  // ── Life support warnings (supplies critically low) ────────────────────
+  if (Array.isArray(summary.lifeSupportWarnings) && summary.lifeSupportWarnings.length > 0) {
+    const warnSection = document.createElement('div');
+    warnSection.className = 'rr-section';
+    warnSection.style.background = 'rgba(120, 100, 20, 0.4)';
+    warnSection.style.border = '1px solid #ffaa30';
+    warnSection.style.borderRadius = '6px';
+    warnSection.style.padding = '14px 16px';
+
+    const warnTitle = document.createElement('h2');
+    warnTitle.textContent = 'Life Support Warning';
+    warnTitle.style.color = '#ffcc40';
+    warnTitle.style.borderBottom = 'none';
+    warnSection.appendChild(warnTitle);
+
+    for (const w of summary.lifeSupportWarnings) {
+      const row = document.createElement('div');
+      row.className = 'rr-row';
+      const label = document.createElement('span');
+      label.className = 'rr-label';
+      label.textContent = `${w.craftName} — ${w.crewIds.length} crew`;
+      label.style.color = '#ffe0a0';
+      const value = document.createElement('span');
+      value.className = 'rr-value';
+      value.style.color = '#ffcc40';
+      value.textContent = `${w.suppliesRemaining} flight${w.suppliesRemaining !== 1 ? 's' : ''} of supplies left`;
+      row.appendChild(label);
+      row.appendChild(value);
+      warnSection.appendChild(row);
+    }
+
+    const warnMsg = document.createElement('p');
+    warnMsg.style.fontSize = '0.85rem';
+    warnMsg.style.color = '#ffe0a0';
+    warnMsg.style.margin = '8px 0 0';
+    warnMsg.textContent = 'Launch a rescue mission before supplies run out or the crew will die!';
+    warnSection.appendChild(warnMsg);
+
+    content.appendChild(warnSection);
+  }
+
   // ── Bankruptcy warning (if applicable) ────────────────────────────────────
   if (summary.bankrupt) {
     const bankruptSection = document.createElement('div');
