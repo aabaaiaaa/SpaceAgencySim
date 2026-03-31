@@ -92,6 +92,7 @@ import {
   getMalfunction,
 } from './malfunction.js';
 import { MalfunctionType, REDUCED_THRUST_FACTOR, PARTIAL_CHUTE_FACTOR } from './constants.js';
+import { getWindForce, getCurrentWeather } from './weather.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -403,6 +404,8 @@ export function createPhysicsState(assembly, flightState) {
     dockingPortStates: new Map(),
     /** Combined mass when docked (0 = not docked, use craft mass only). */
     _dockedCombinedMass: 0,
+    /** Weather-based ISP modifier (0.95–1.05, applied to all engine ISP). */
+    weatherIspModifier: 1.0,
   };
 
   // Initialise the parachute state machine for all PARACHUTE parts in the assembly.
@@ -785,9 +788,20 @@ function _integrate(ps, assembly, flightState) {
     dragFY = -dragMag * (ps.velY / speed);
   }
 
+  // --- 4b. Wind force (weather system) -------------------------------------
+  let windFX = 0;
+  let windFY = 0;
+  if (density > 0 && ps._gameState?.weather?.current) {
+    const weather = ps._gameState.weather.current;
+    const windAccel = getWindForce(weather, altitude, bodyId);
+    // Wind acts as a force on the rocket (acceleration × mass → force component).
+    windFX = windAccel.windFX * totalMass;
+    windFY = windAccel.windFY * totalMass;
+  }
+
   // --- 5. Net acceleration -------------------------------------------------
-  const netFX = thrustX + gravFX + dragFX;
-  const netFY = thrustY + gravFY + dragFY;
+  const netFX = thrustX + gravFX + dragFX + windFX;
+  const netFY = thrustY + gravFY + dragFY + windFY;
 
   let accX = netFX / totalMass;
   let accY = netFY / totalMass;
@@ -1113,8 +1127,10 @@ function _computeThrust(ps, assembly, density) {
     }
 
     // Interpolate thrust between sea-level and vacuum values.
-    const thrustSL   = (props.thrust    ?? 0) * 1_000; // kN → N
-    const thrustVac  = (props.thrustVac ?? props.thrust ?? 0) * 1_000;
+    // Weather temperature affects ISP → indirectly scales effective thrust.
+    const ispMod     = ps.weatherIspModifier ?? 1.0;
+    const thrustSL   = (props.thrust    ?? 0) * 1_000 * ispMod; // kN → N, ISP-adjusted
+    const thrustVac  = (props.thrustVac ?? props.thrust ?? 0) * 1_000 * ispMod;
     const rawThrustN = densityRatio * thrustSL + (1 - densityRatio) * thrustVac;
 
     // Throttle: SRBs always at 100 %; liquid engines use current setting.

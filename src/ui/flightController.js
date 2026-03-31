@@ -15,7 +15,7 @@
  * @module ui/flightController
  */
 
-import { initFlightRenderer, destroyFlightRenderer, renderFlightFrame, hideFlightScene, showFlightScene, setFlightInputEnabled } from '../render/flight.js';
+import { initFlightRenderer, destroyFlightRenderer, renderFlightFrame, hideFlightScene, showFlightScene, setFlightInputEnabled, setFlightWeather } from '../render/flight.js';
 import { initMapRenderer, destroyMapRenderer, renderMapFrame, showMapScene, hideMapScene, isMapVisible, cycleMapZoom, getMapZoomLevel, cycleMapTarget, getMapTarget, toggleMapShadow, setMapTarget, cycleTransferTarget, getSelectedTransferTarget } from '../render/map.js';
 import { MapZoom, MapThrustDir, computeOrbitalThrustAngle, isMapViewAvailable, getMapTransferTargets, getTransferProgressInfo } from '../core/mapView.js';
 import { warpToTarget } from '../core/orbit.js';
@@ -845,6 +845,13 @@ export function startFlightScene(
   // Store a reference to the top-level game state so the malfunction system
   // can look up crew engineering skills during reliability checks.
   _ps._gameState = _state;
+
+  // Apply weather effects (temperature → ISP, visibility → fog/haze).
+  if (_state.weather?.current) {
+    const w = _state.weather.current;
+    if (w.temperature != null) _ps.weatherIspModifier = w.temperature;
+    setFlightWeather(w.visibility ?? 0);
+  }
 
   // Attach inventory-sourced part data for wear tracking on recovery.
   _ps._usedInventoryParts = getVabInventoryUsedParts();

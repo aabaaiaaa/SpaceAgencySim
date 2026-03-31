@@ -19,7 +19,7 @@
  * @module hub
  */
 
-import { showHubScene, hideHubScene } from '../render/hub.js';
+import { showHubScene, hideHubScene, setHubWeather } from '../render/hub.js';
 import { FACILITY_DEFINITIONS, FacilityId, FACILITY_UPGRADE_DEFS, getFacilityUpgradeDef } from '../core/constants.js';
 import {
   hasFacility, canBuildFacility, buildFacility,
@@ -27,6 +27,7 @@ import {
   getDiscountedMoneyCost,
 } from '../core/construction.js';
 import { isBankrupt } from '../core/finance.js';
+import { initWeather, getCurrentWeather, getWeatherForecast } from '../core/weather.js';
 
 // ---------------------------------------------------------------------------
 // CSS
@@ -508,6 +509,93 @@ const HUB_STYLES = `
   gap: 4px;
 }
 
+/* ── Weather panel ──────────────────────────────────────────────────────── */
+#weather-panel {
+  position: absolute;
+  top: 60px;
+  left: 16px;
+  padding: 12px 18px;
+  background: rgba(10, 20, 40, 0.88);
+  border: 1px solid #304868;
+  border-radius: 8px;
+  color: #c8dce8;
+  font-size: 0.82rem;
+  pointer-events: auto;
+  z-index: 20;
+  min-width: 180px;
+  line-height: 1.5;
+}
+
+#weather-panel .weather-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #6090b0;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 6px;
+}
+
+#weather-panel .weather-description {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+#weather-panel .weather-description.weather-extreme {
+  color: #ff6060;
+}
+
+#weather-panel .weather-description.weather-good {
+  color: #50d870;
+}
+
+#weather-panel .weather-description.weather-moderate {
+  color: #e0c050;
+}
+
+#weather-panel .weather-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 2px 0;
+  font-size: 0.82rem;
+}
+
+#weather-panel .weather-label {
+  color: #7090a0;
+}
+
+#weather-panel .weather-value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+#weather-panel .weather-forecast {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.75rem;
+  color: #6080a0;
+}
+
+#weather-panel .weather-forecast-day {
+  display: flex;
+  justify-content: space-between;
+  padding: 1px 0;
+}
+
+#weather-panel .weather-warning {
+  margin-top: 6px;
+  padding: 4px 8px;
+  background: rgba(160, 40, 40, 0.4);
+  border: 1px solid rgba(255, 80, 80, 0.3);
+  border-radius: 4px;
+  color: #ff8080;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: center;
+}
+
 /* ── Building hit areas ───────────────────────────────────────────────────── */
 .hub-building {
   position: absolute;
@@ -695,6 +783,7 @@ export function initHubUI(container, state, onNavigate) {
   _renderBuildings(onNavigate);
   _renderConstructionButton(container);
   _renderBankruptcyBanner();
+  _renderWeatherPanel();
 
   // Show the PixiJS background.
   showHubScene();
@@ -1013,6 +1102,130 @@ function _renderBankruptcyBanner() {
   banner.appendChild(hint);
 
   _overlay.appendChild(banner);
+}
+
+/**
+ * Render the weather conditions panel on the hub screen.
+ * Initialises weather state if not already present.
+ */
+function _renderWeatherPanel() {
+  if (!_overlay || !_state) return;
+
+  // Remove any stale panel.
+  const existing = document.getElementById('weather-panel');
+  if (existing) existing.remove();
+
+  // Initialise weather if needed (first hub visit or after save load).
+  if (!_state.weather) {
+    initWeather(_state, 'EARTH');
+  }
+
+  const weather = getCurrentWeather(_state);
+
+  // Don't show panel for airless bodies.
+  if (weather.description === 'No atmosphere') return;
+
+  const panel = document.createElement('div');
+  panel.id = 'weather-panel';
+
+  // Title
+  const title = document.createElement('div');
+  title.className = 'weather-title';
+  title.textContent = 'Launch Conditions';
+  panel.appendChild(title);
+
+  // Description
+  const desc = document.createElement('div');
+  desc.className = 'weather-description';
+  if (weather.extreme) {
+    desc.classList.add('weather-extreme');
+  } else if (weather.windSpeed < 6) {
+    desc.classList.add('weather-good');
+  } else {
+    desc.classList.add('weather-moderate');
+  }
+  desc.textContent = weather.description;
+  panel.appendChild(desc);
+
+  // Wind speed
+  _addWeatherRow(panel, 'Wind', `${weather.windSpeed.toFixed(1)} m/s`);
+
+  // Temperature (ISP effect)
+  const tempPct = ((weather.temperature - 1) * 100).toFixed(1);
+  const tempStr = weather.temperature >= 1 ? `+${tempPct}%` : `${tempPct}%`;
+  _addWeatherRow(panel, 'ISP Effect', tempStr);
+
+  // Visibility
+  const visLabels = ['Clear', 'Light haze', 'Moderate haze', 'Heavy haze', 'Dense fog'];
+  const visIdx = Math.min(4, Math.floor(weather.visibility * 5));
+  _addWeatherRow(panel, 'Visibility', visLabels[visIdx]);
+
+  // Extreme weather warning
+  if (weather.extreme) {
+    const warn = document.createElement('div');
+    warn.className = 'weather-warning';
+    warn.textContent = 'EXTREME — Launch not recommended';
+    panel.appendChild(warn);
+  }
+
+  // Forecast (if weather satellites provide data)
+  const forecast = getWeatherForecast(_state, 'EARTH', 3);
+  if (forecast.length > 0) {
+    const fcSection = document.createElement('div');
+    fcSection.className = 'weather-forecast';
+
+    const fcTitle = document.createElement('div');
+    fcTitle.style.fontWeight = '600';
+    fcTitle.style.marginBottom = '2px';
+    fcTitle.textContent = 'Forecast';
+    fcSection.appendChild(fcTitle);
+
+    forecast.forEach((fc, i) => {
+      const row = document.createElement('div');
+      row.className = 'weather-forecast-day';
+
+      const dayLabel = document.createElement('span');
+      dayLabel.textContent = `Skip ${i + 1}`;
+      row.appendChild(dayLabel);
+
+      const dayDesc = document.createElement('span');
+      dayDesc.textContent = `${fc.description} (${fc.windSpeed.toFixed(0)} m/s)`;
+      if (fc.extreme) dayDesc.style.color = '#ff6060';
+      row.appendChild(dayDesc);
+
+      fcSection.appendChild(row);
+    });
+
+    panel.appendChild(fcSection);
+  }
+
+  _overlay.appendChild(panel);
+
+  // Update the PixiJS hub renderer with weather visuals.
+  setHubWeather(weather.visibility, weather.extreme);
+}
+
+/**
+ * Helper: add a label–value row to the weather panel.
+ * @param {HTMLElement} parent
+ * @param {string} label
+ * @param {string} value
+ */
+function _addWeatherRow(parent, label, value) {
+  const row = document.createElement('div');
+  row.className = 'weather-row';
+
+  const lbl = document.createElement('span');
+  lbl.className = 'weather-label';
+  lbl.textContent = label;
+  row.appendChild(lbl);
+
+  const val = document.createElement('span');
+  val.className = 'weather-value';
+  val.textContent = value;
+  row.appendChild(val);
+
+  parent.appendChild(row);
 }
 
 /**

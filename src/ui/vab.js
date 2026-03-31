@@ -19,6 +19,7 @@
 
 import { PARTS, getPartById } from '../data/parts.js';
 import { PartType } from '../core/constants.js';
+import { getCurrentWeather } from '../core/weather.js';
 import { runValidation, getTotalMass, getRocketBounds } from '../core/rocketvalidator.js';
 import { getActiveCrew } from '../core/crew.js';
 import {
@@ -4036,6 +4037,22 @@ function _rebuildConnectionsFromSnaps(assembly) {
 function _handleLaunchClicked() {
   if (!_assembly || !_gameState || !_lastValidation?.canLaunch) return;
 
+  // Check for extreme weather — show a warning.
+  const weather = getCurrentWeather(_gameState);
+  if (weather.extreme) {
+    _showVabWeatherWarning();
+    return;
+  }
+
+  _proceedVabLaunch();
+}
+
+/**
+ * Continue the VAB launch flow after weather checks.
+ */
+function _proceedVabLaunch() {
+  if (!_assembly || !_gameState) return;
+
   // Count total available crew seats across all crewed command modules.
   let totalSeats = 0;
   for (const placed of _assembly.parts.values()) {
@@ -4048,9 +4065,59 @@ function _handleLaunchClicked() {
   if (totalSeats > 0) {
     _showCrewDialog(totalSeats);
   } else {
-    // Uncrewed rocket — no dialog needed.
     _doLaunch([]);
   }
+}
+
+/**
+ * Show a warning dialog when launching from VAB in extreme weather.
+ */
+function _showVabWeatherWarning() {
+  const weather = getCurrentWeather(_gameState);
+
+  const overlay = document.createElement('div');
+  overlay.id = 'vab-weather-warning-overlay';
+  overlay.style.cssText =
+    'position:fixed;inset:0;background:rgba(20,0,0,0.85);z-index:600;' +
+    'display:flex;align-items:center;justify-content:center;' +
+    'font-family:system-ui,sans-serif;pointer-events:auto;';
+
+  const dialog = document.createElement('div');
+  dialog.style.cssText =
+    'background:#1a1020;border:2px solid #ff4040;border-radius:12px;' +
+    'padding:28px 36px;max-width:400px;text-align:center;color:#e0d0d0;';
+
+  dialog.innerHTML =
+    `<div style="font-size:1.2rem;font-weight:700;color:#ff5050;margin-bottom:8px;">` +
+      `Extreme Weather Warning</div>` +
+    `<div style="font-size:0.88rem;color:#c0a0a0;margin-bottom:16px;line-height:1.5;">` +
+      `Current conditions: <strong style="color:#ff8060;">${weather.description}</strong><br>` +
+      `Wind: ${weather.windSpeed.toFixed(1)} m/s<br>` +
+      `Launching in these conditions is highly inadvisable.</div>` +
+    `<div style="display:flex;gap:12px;justify-content:center;">` +
+      `<button id="vab-weather-cancel" style="padding:10px 24px;background:#302020;` +
+        `border:1px solid #804040;border-radius:6px;color:#e0c0c0;cursor:pointer;` +
+        `font-size:0.9rem;">Cancel</button>` +
+      `<button id="vab-weather-proceed" style="padding:10px 24px;background:#601010;` +
+        `border:1px solid #ff4040;border-radius:6px;color:#ffa0a0;cursor:pointer;` +
+        `font-size:0.9rem;font-weight:600;">Launch Anyway</button>` +
+    `</div>`;
+
+  overlay.appendChild(dialog);
+  document.body.appendChild(overlay);
+
+  overlay.querySelector('#vab-weather-cancel')?.addEventListener('click', () => {
+    overlay.remove();
+  });
+
+  overlay.querySelector('#vab-weather-proceed')?.addEventListener('click', () => {
+    overlay.remove();
+    _proceedVabLaunch();
+  });
+
+  overlay.addEventListener('pointerdown', (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
 }
 
 /**

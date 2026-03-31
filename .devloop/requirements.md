@@ -140,7 +140,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Recovered parts go into state.partInventory with wear tracking. Each flight adds wear based on stress (engine firing = more, passive tank = less). Wear 0-100% affects reliability: effectiveReliability = baseReliability × (1 - wear × 0.5). VAB integration: parts menu shows inventory count, new inventory tab to LEFT of existing parts menu. Part descriptions show altered price when inventory exists. Inventory tab allows refurbish (30% cost, wear→10%) or scrap (sell for small amount). When building: buy new (full price, 0% wear) or use recovered (free, has wear). Recovered parts visually distinguished.
 
 ### TASK-021: Weather and launch conditions
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-014
 - **Description**: Random weather per "day" visible from hub before launching. Wind (horizontal force, 0-15 m/s), Temperature (ISP modifier, -5% to +5%), Visibility (cosmetic fog/haze). Visible from hub with visual indication and status text. Day skipping: pay fee to reroll (does NOT advance period), escalating fees for consecutive skips. Extreme weather exists (highly advised not to fly). Weather satellites (Phase 4) reduce skip cost and show forecasts. No seasons. Different bodies have different weather (Moon=none, Mars=dust storms). Weather only affects atmospheric flight.

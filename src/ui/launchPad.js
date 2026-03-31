@@ -17,6 +17,7 @@
 
 import { getPartById } from '../data/parts.js';
 import { PartType } from '../core/constants.js';
+import { getCurrentWeather, getWeatherSkipCost, skipWeather } from '../core/weather.js';
 import {
   createRocketAssembly,
   addPartToAssembly,
@@ -509,6 +510,9 @@ function _renderShell() {
 
   _overlay.appendChild(header);
 
+  // Weather bar with skip button
+  _renderWeatherBar();
+
   // Content
   const content = document.createElement('div');
   content.id = 'launch-pad-content';
@@ -541,6 +545,89 @@ function _renderShell() {
   }
 
   _overlay.appendChild(content);
+}
+
+/**
+ * Render a compact weather info bar at the top of the launch pad with a Skip Day button.
+ */
+function _renderWeatherBar() {
+  if (!_overlay || !_state) return;
+
+  // Remove stale bar.
+  const existing = document.getElementById('lp-weather-bar');
+  if (existing) existing.remove();
+
+  const weather = getCurrentWeather(_state);
+  if (weather.description === 'No atmosphere') return;
+
+  const bar = document.createElement('div');
+  bar.id = 'lp-weather-bar';
+  bar.style.cssText =
+    'display:flex;align-items:center;justify-content:space-between;gap:16px;' +
+    'padding:10px 20px;margin:0 20px 8px;' +
+    'background:rgba(10,20,40,0.85);border:1px solid #304868;border-radius:8px;' +
+    'color:#c8dce8;font-size:0.82rem;font-family:system-ui,sans-serif;';
+
+  // Weather summary
+  const info = document.createElement('div');
+  info.style.cssText = 'display:flex;gap:16px;align-items:center;flex-wrap:wrap;';
+
+  const descSpan = document.createElement('span');
+  descSpan.style.fontWeight = '600';
+  descSpan.style.fontSize = '0.9rem';
+  if (weather.extreme) {
+    descSpan.style.color = '#ff6060';
+  } else if (weather.windSpeed < 6) {
+    descSpan.style.color = '#50d870';
+  } else {
+    descSpan.style.color = '#e0c050';
+  }
+  descSpan.textContent = weather.description;
+  info.appendChild(descSpan);
+
+  const windSpan = document.createElement('span');
+  windSpan.style.color = '#7090a0';
+  windSpan.textContent = `Wind: ${weather.windSpeed.toFixed(1)} m/s`;
+  info.appendChild(windSpan);
+
+  const tempPct = ((weather.temperature - 1) * 100).toFixed(1);
+  const tempSpan = document.createElement('span');
+  tempSpan.style.color = '#7090a0';
+  tempSpan.textContent = `ISP: ${weather.temperature >= 1 ? '+' : ''}${tempPct}%`;
+  info.appendChild(tempSpan);
+
+  bar.appendChild(info);
+
+  // Skip button
+  const skipCost = getWeatherSkipCost(_state);
+  const canAfford = _state.money >= skipCost;
+
+  const skipBtn = document.createElement('button');
+  skipBtn.id = 'lp-weather-skip-btn';
+  skipBtn.style.cssText =
+    'padding:7px 18px;background:#1a3060;border:1px solid #3070b0;border-radius:6px;' +
+    'color:#a0c8f0;font-size:0.82rem;font-weight:600;cursor:pointer;white-space:nowrap;' +
+    'transition:background 0.15s;';
+  skipBtn.textContent = `Skip Day ($${(skipCost / 1000).toFixed(0)}k)`;
+
+  if (!canAfford) {
+    skipBtn.disabled = true;
+    skipBtn.style.opacity = '0.4';
+    skipBtn.style.cursor = 'not-allowed';
+    skipBtn.title = 'Insufficient funds';
+  }
+
+  skipBtn.addEventListener('click', () => {
+    if (!_state) return;
+    const result = skipWeather(_state, 'EARTH');
+    if (result.success) {
+      // Re-render the weather bar with new conditions.
+      _renderWeatherBar();
+    }
+  });
+
+  bar.appendChild(skipBtn);
+  _overlay.appendChild(bar);
 }
 
 /**
@@ -718,6 +805,23 @@ function _handleLaunch(design) {
   const assembly      = _designToAssembly(design);
   const stagingConfig = _designToStagingConfig(design, assembly);
 
+  // Check for extreme weather — show a warning before launching.
+  const weather = getCurrentWeather(_state);
+  if (weather.extreme) {
+    _showExtremeWeatherWarning(design, assembly, stagingConfig);
+    return;
+  }
+
+  _proceedToLaunch(design, assembly, stagingConfig);
+}
+
+/**
+ * Continue the launch flow after weather checks.
+ * Counts crew seats and shows crew dialog if needed.
+ */
+function _proceedToLaunch(design, assembly, stagingConfig) {
+  if (!_state) return;
+
   // Count crew seats across command modules.
   let totalSeats = 0;
   for (const placed of assembly.parts.values()) {
@@ -732,6 +836,57 @@ function _handleLaunch(design) {
   } else {
     _doLaunch([], design, assembly, stagingConfig);
   }
+}
+
+/**
+ * Show a warning dialog when launching in extreme weather.
+ */
+function _showExtremeWeatherWarning(design, assembly, stagingConfig) {
+  const weather = getCurrentWeather(_state);
+
+  const overlay = document.createElement('div');
+  overlay.id = 'lp-weather-warning-overlay';
+  overlay.style.cssText =
+    'position:fixed;inset:0;background:rgba(20,0,0,0.85);z-index:600;' +
+    'display:flex;align-items:center;justify-content:center;' +
+    'font-family:system-ui,sans-serif;pointer-events:auto;';
+
+  const dialog = document.createElement('div');
+  dialog.style.cssText =
+    'background:#1a1020;border:2px solid #ff4040;border-radius:12px;' +
+    'padding:28px 36px;max-width:400px;text-align:center;color:#e0d0d0;';
+
+  dialog.innerHTML =
+    `<div style="font-size:1.2rem;font-weight:700;color:#ff5050;margin-bottom:8px;">` +
+      `Extreme Weather Warning</div>` +
+    `<div style="font-size:0.88rem;color:#c0a0a0;margin-bottom:16px;line-height:1.5;">` +
+      `Current conditions: <strong style="color:#ff8060;">${weather.description}</strong><br>` +
+      `Wind: ${weather.windSpeed.toFixed(1)} m/s<br>` +
+      `Launching in these conditions is highly inadvisable.</div>` +
+    `<div style="display:flex;gap:12px;justify-content:center;">` +
+      `<button id="lp-weather-cancel" style="padding:10px 24px;background:#302020;` +
+        `border:1px solid #804040;border-radius:6px;color:#e0c0c0;cursor:pointer;` +
+        `font-size:0.9rem;">Cancel</button>` +
+      `<button id="lp-weather-proceed" style="padding:10px 24px;background:#601010;` +
+        `border:1px solid #ff4040;border-radius:6px;color:#ffa0a0;cursor:pointer;` +
+        `font-size:0.9rem;font-weight:600;">Launch Anyway</button>` +
+    `</div>`;
+
+  overlay.appendChild(dialog);
+  document.body.appendChild(overlay);
+
+  overlay.querySelector('#lp-weather-cancel')?.addEventListener('click', () => {
+    overlay.remove();
+  });
+
+  overlay.querySelector('#lp-weather-proceed')?.addEventListener('click', () => {
+    overlay.remove();
+    _proceedToLaunch(design, assembly, stagingConfig);
+  });
+
+  overlay.addEventListener('pointerdown', (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
 }
 
 /**

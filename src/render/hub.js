@@ -134,6 +134,12 @@ const BUILDINGS = [
 /** Root PixiJS container for all hub scene layers. @type {PIXI.Container | null} */
 let _hubRoot = null;
 
+/** Cached weather visibility for rendering (0 = clear, 1 = dense fog). */
+let _weatherVisibility = 0;
+
+/** Cached weather sky tint: true for storm/extreme, false normal. */
+let _weatherExtreme = false;
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -160,6 +166,21 @@ export function initHubRenderer() {
   });
 
   console.log('[Hub Renderer] Initialized');
+}
+
+/**
+ * Update the hub renderer's weather state for visual effects.
+ * Call this after weather changes (init, skip).
+ *
+ * @param {number} visibility  Fog/haze level (0 = clear, 1 = dense).
+ * @param {boolean} extreme    True for extreme weather.
+ */
+export function setHubWeather(visibility, extreme) {
+  _weatherVisibility = visibility;
+  _weatherExtreme = extreme;
+  if (_hubRoot && _hubRoot.visible) {
+    _drawScene();
+  }
 }
 
 /**
@@ -236,5 +257,15 @@ function _drawScene() {
     g.fill({ color: bld.colorFill, alpha: 0.9 });
     g.stroke({ color: bld.colorStroke, width: 2 });
     _hubRoot.addChild(g);
+  }
+
+  // ── Weather haze overlay ──────────────────────────────────────────────────
+  if (_weatherVisibility > 0.01) {
+    const hazeAlpha = Math.min(0.6, _weatherVisibility * 0.6);
+    const hazeColor = _weatherExtreme ? 0x604030 : 0xc0c0c0;
+    const haze = new PIXI.Graphics();
+    haze.rect(0, 0, W, H);
+    haze.fill({ color: hazeColor, alpha: hazeAlpha });
+    _hubRoot.addChild(haze);
   }
 }

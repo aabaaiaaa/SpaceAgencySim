@@ -451,6 +451,31 @@ export const EJECTION_INJURY_PERIODS = 1;
 export const MEDICAL_CARE_COST = 25_000;
 
 // ---------------------------------------------------------------------------
+// Weather & Launch Conditions
+// ---------------------------------------------------------------------------
+
+/** Base cost to skip a day's weather and reroll (dollars). */
+export const WEATHER_BASE_SKIP_COST = 25_000;
+
+/** Escalation factor per consecutive skip: cost *= factor^skipCount. */
+export const WEATHER_SKIP_ESCALATION = 1.5;
+
+/** Maximum normal wind speed in m/s. */
+export const WEATHER_MAX_WIND = 15;
+
+/** ISP temperature range: modifier spans [1 - range, 1 + range]. */
+export const WEATHER_ISP_RANGE = 0.05;
+
+/** Chance of extreme weather per reroll (10 %). */
+export const WEATHER_EXTREME_CHANCE = 0.10;
+
+/** Minimum wind speed threshold for extreme weather (m/s). */
+export const WEATHER_EXTREME_WIND_MIN = 20;
+
+/** Minimum visibility value in extreme weather (0–1 scale). */
+export const WEATHER_EXTREME_VISIBILITY_MAX = 0.7;
+
+// ---------------------------------------------------------------------------
 // Celestial Bodies & Orbital Mechanics
 // ---------------------------------------------------------------------------
 

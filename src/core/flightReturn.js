@@ -22,6 +22,7 @@
 import { completeMission } from './missions.js';
 import { earn, applyInterest, applyDeathFine } from './finance.js';
 import { advancePeriod } from './period.js';
+import { initWeather } from './weather.js';
 import { getPartById } from '../data/parts.js';
 import { PartType, DEATH_FINE_PER_ASTRONAUT, FlightOutcome } from './constants.js';
 import { processContractCompletions, generateContracts } from './contracts.js';
@@ -216,6 +217,9 @@ export function processFlightReturn(state, flightState, ps, assembly) {
   // ── 6f. Accumulate in-game flight time ──────────────────────────────────
   const flightSeconds = flightState?.timeElapsed ?? 0;
   state.flightTimeSeconds = (state.flightTimeSeconds ?? 0) + flightSeconds;
+
+  // ── 6g. Reroll weather for the new day (resets skip counter) ───────────
+  initWeather(state, flightState?.bodyId ?? 'EARTH');
 
   // ── 7. Record flight history and clear active flight ─────────────────────
   const outcome = _determineOutcome(ps, completedMissions.length > 0);

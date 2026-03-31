@@ -264,6 +264,7 @@ import {
  * @property {TechTreeState}   techTree          - Technology tree research progress.
  * @property {SatelliteNetworkState} satelliteNetwork - Deployed satellite network state.
  * @property {InventoryPart[]}      partInventory    - Recovered parts available for reuse.
+ * @property {import('./weather.js').WeatherState|null} weather - Current weather conditions at the launch site.
  */
 
 /**
@@ -393,6 +394,9 @@ export function createGameState() {
 
     // Part inventory — recovered parts available for reuse in the VAB.
     partInventory: [],
+
+    // Weather conditions at the launch site (null until first hub visit).
+    weather: null,
   };
 }
 

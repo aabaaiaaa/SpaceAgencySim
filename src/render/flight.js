@@ -37,7 +37,7 @@ import { getBiome, getBiomeTransition, BIOME_FADE_RANGE } from '../core/biomes.j
 import { DEPLOY_DURATION } from '../core/parachute.js';
 import { LegState, LEG_DEPLOY_DURATION, getDeployedLegFootOffset } from '../core/legs.js';
 import { hasMalfunction, MALFUNCTION_LABELS } from '../core/malfunction.js';
-import { getSkyVisual, getGroundVisual, getAirDensity as bodyAirDensity } from '../data/bodies.js';
+import { getSkyVisual, getGroundVisual, getAirDensity as bodyAirDensity, getAtmosphereTop } from '../data/bodies.js';
 
 // ---------------------------------------------------------------------------
 // Scale constants
@@ -221,6 +221,12 @@ let _canopyContainer = null;
 
 /** Container for the biome label overlay (rendered above canopies). */
 let _biomeLabelContainer = null;
+
+/** Graphics overlay for weather fog/haze during atmospheric flight. */
+let _hazeGraphics = null;
+
+/** Cached weather visibility (0 = clear, 1 = dense fog). Set from weather state. */
+let _weatherVisibility = 0;
 
 /** Graphics layer for the curved horizon effect (rendered between stars and ground). */
 let _horizonGraphics = null;
@@ -1170,6 +1176,43 @@ function _renderBiomeLabel(altitude, w, h, dt, bodyId) {
 
   _biomeLabelContainer.addChild(label);
   _biomeLabelContainer.addChild(subLabel);
+}
+
+// ---------------------------------------------------------------------------
+// Weather haze rendering
+// ---------------------------------------------------------------------------
+
+/**
+ * Render a cosmetic fog/haze overlay that fades out with altitude.
+ * Only drawn when weather visibility > 0 and within the atmosphere.
+ *
+ * @param {number} altitude  Current altitude in metres.
+ * @param {number} w         Viewport width.
+ * @param {number} h         Viewport height.
+ * @param {string} [bodyId]  Celestial body ID.
+ */
+function _renderWeatherHaze(altitude, w, h, bodyId) {
+  if (!_hazeGraphics) return;
+  _hazeGraphics.clear();
+
+  if (_weatherVisibility <= 0.01) return;
+
+  // Atmosphere top — haze disappears above the atmosphere.
+  const atmoTop = getAtmosphereTop(bodyId || 'EARTH') || 70_000;
+  if (altitude >= atmoTop) return;
+
+  // Haze fades out with altitude (linear falloff).
+  const altFraction = Math.max(0, 1 - altitude / atmoTop);
+  const hazeAlpha = _weatherVisibility * altFraction * 0.45;
+
+  if (hazeAlpha < 0.01) return;
+
+  // Use a grey-white haze (or brownish for Mars dust storms).
+  const isDust = bodyId === 'MARS';
+  const hazeColor = isDust ? 0x906040 : 0xd0d0d0;
+
+  _hazeGraphics.rect(0, 0, w, h);
+  _hazeGraphics.fill({ color: hazeColor, alpha: hazeAlpha });
 }
 
 // ---------------------------------------------------------------------------
@@ -2422,9 +2465,10 @@ export function initFlightRenderer() {
   if (_rocketContainer)      app.stage.removeChild(_rocketContainer);
   if (_canopyContainer)      app.stage.removeChild(_canopyContainer);
   if (_biomeLabelContainer)  app.stage.removeChild(_biomeLabelContainer);
+  if (_hazeGraphics)         app.stage.removeChild(_hazeGraphics);
 
   // Layer order (bottom → top):
-  //   sky → stars → horizon → ground → debris → engine trails → active rocket → canopies → biome label
+  //   sky → stars → horizon → ground → debris → engine trails → active rocket → canopies → haze → biome label
   _skyGraphics          = new PIXI.Graphics();
   _starsContainer       = new PIXI.Container();
   _horizonGraphics      = new PIXI.Graphics();
@@ -2433,6 +2477,7 @@ export function initFlightRenderer() {
   _trailContainer       = new PIXI.Container();
   _rocketContainer      = new PIXI.Container();
   _canopyContainer      = new PIXI.Container();
+  _hazeGraphics         = new PIXI.Graphics();
   _biomeLabelContainer  = new PIXI.Container();
 
   app.stage.addChild(_skyGraphics);
@@ -2443,6 +2488,7 @@ export function initFlightRenderer() {
   app.stage.addChild(_trailContainer);
   app.stage.addChild(_rocketContainer);
   app.stage.addChild(_canopyContainer);
+  app.stage.addChild(_hazeGraphics);
   app.stage.addChild(_biomeLabelContainer);
 
   // Pre-generate the deterministic star field.
@@ -2550,6 +2596,9 @@ export function renderFlightFrame(ps, assembly, flightState) {
 
   // 9. Biome label — shows current altitude biome with fade transitions.
   _renderBiomeLabel(altitude, w, h, dt, bodyId);
+
+  // 10. Weather haze overlay — cosmetic fog/haze in the atmosphere.
+  _renderWeatherHaze(altitude, w, h, bodyId);
 }
 
 /**
@@ -2574,6 +2623,7 @@ export function destroyFlightRenderer() {
   if (_rocketContainer)      app.stage.removeChild(_rocketContainer);
   if (_canopyContainer)      app.stage.removeChild(_canopyContainer);
   if (_biomeLabelContainer)  app.stage.removeChild(_biomeLabelContainer);
+  if (_hazeGraphics)         app.stage.removeChild(_hazeGraphics);
   if (_dockingTargetGfx)     app.stage.removeChild(_dockingTargetGfx);
 
   _skyGraphics          = null;
@@ -2585,6 +2635,8 @@ export function destroyFlightRenderer() {
   _rocketContainer      = null;
   _canopyContainer      = null;
   _biomeLabelContainer  = null;
+  _hazeGraphics         = null;
+  _weatherVisibility    = 0;
   _stars                = [];
   _trailSegments        = [];
   _lastTrailTime        = null;
@@ -2633,6 +2685,7 @@ export function hideFlightScene() {
   if (_rocketContainer)      _rocketContainer.visible = false;
   if (_canopyContainer)      _canopyContainer.visible = false;
   if (_biomeLabelContainer)  _biomeLabelContainer.visible = false;
+  if (_hazeGraphics)         _hazeGraphics.visible = false;
 }
 
 /**
@@ -2648,6 +2701,7 @@ export function showFlightScene() {
   if (_rocketContainer)      _rocketContainer.visible = true;
   if (_canopyContainer)      _canopyContainer.visible = true;
   if (_biomeLabelContainer)  _biomeLabelContainer.visible = true;
+  if (_hazeGraphics)         _hazeGraphics.visible = true;
 }
 
 /**
@@ -2659,6 +2713,14 @@ export function showFlightScene() {
  */
 export function setFlightInputEnabled(enabled) {
   _inputEnabled = enabled;
+}
+
+/**
+ * Set the flight renderer's weather visibility for fog/haze effects.
+ * @param {number} visibility  0 = clear, 1 = dense fog.
+ */
+export function setFlightWeather(visibility) {
+  _weatherVisibility = visibility;
 }
 
 /**
