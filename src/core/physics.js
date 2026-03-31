@@ -5,7 +5,7 @@
  * multiplier.  Each integration step:
  *   1. Compute total rocket mass (dry parts + remaining fuel).
  *   2. Compute net thrust from all firing engines/SRBs.
- *   3. Apply gravity: 9.81 m/s² downward (constant, simplified).
+ *   3. Apply gravity: body-specific, inverse-square law from surface.
  *   4. Compute atmospheric drag using an exponential density model.
  *   5. Integrate Newton's 2nd law → update velocity and position.
  *   6. Consume fuel from tanks/SRBs proportional to engine mass-flow rate.
@@ -44,7 +44,7 @@
  */
 
 import { getPartById } from '../data/parts.js';
-import { PartType, ControlMode } from './constants.js';
+import { PartType, ControlMode, BODY_RADIUS } from './constants.js';
 import {
   airDensity,
   airDensityForBody,
@@ -52,6 +52,12 @@ import {
   SEA_LEVEL_DENSITY,
   updateHeat,
 } from './atmosphere.js';
+import {
+  getSurfaceGravity,
+  hasAtmosphere,
+  getAtmosphereTop,
+  getAirDensity as bodyAirDensity,
+} from '../data/bodies.js';
 import { tickFuelSystem } from './fuelsystem.js';
 import { activateCurrentStage, tickDebris } from './staging.js';
 import { tickCollisions } from './collision.js';
@@ -166,6 +172,58 @@ const MAX_PLAYER_ANGULAR_ACCEL = 2.0;
 /** Maximum angular acceleration (rad/s²) from parachute torques.
  *  Prevents integration blow-up on small, light capsules. */
 const MAX_CHUTE_ANGULAR_ACCEL = 50.0;
+
+// ---------------------------------------------------------------------------
+// Multi-body gravity helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute gravitational acceleration at a given altitude above a celestial body.
+ *
+ * Uses inverse-square law: g = g₀ × (R / (R + h))²
+ * Falls back to Earth's 9.81 m/s² if bodyId is undefined.
+ *
+ * @param {string|undefined} bodyId   Celestial body identifier.
+ * @param {number}           altitude Altitude above body surface in metres.
+ * @returns {number} Gravitational acceleration in m/s² (always positive).
+ */
+function _gravityForBody(bodyId, altitude) {
+  const g0 = bodyId ? getSurfaceGravity(bodyId) : G0;
+  const R = bodyId ? (BODY_RADIUS[bodyId] ?? 6_371_000) : 6_371_000;
+  const h = Math.max(0, altitude);
+  // Inverse-square: negligible effect at low altitudes, significant in orbit.
+  return g0 * (R * R) / ((R + h) * (R + h));
+}
+
+/**
+ * Return the atmospheric density for the current flight body.
+ * Delegates to body-aware density when bodyId is present, otherwise
+ * falls back to Earth's default model.
+ *
+ * @param {number}           altitude Metres above surface.
+ * @param {string|undefined} bodyId   Celestial body identifier.
+ * @returns {number} Density in kg/m³.
+ */
+function _densityForBody(altitude, bodyId) {
+  if (bodyId && bodyId !== 'EARTH') {
+    return airDensityForBody(altitude, bodyId);
+  }
+  return airDensity(altitude);
+}
+
+/**
+ * Return the atmosphere top altitude for a body.
+ * Falls back to Earth's ATMOSPHERE_TOP if bodyId is not given.
+ *
+ * @param {string|undefined} bodyId
+ * @returns {number}
+ */
+function _atmosphereTopForBody(bodyId) {
+  if (bodyId && bodyId !== 'EARTH') {
+    return getAtmosphereTop(bodyId);
+  }
+  return ATMOSPHERE_TOP;
+}
 
 // ---------------------------------------------------------------------------
 // Type Definitions (JSDoc)
@@ -426,7 +484,7 @@ export function tick(ps, assembly, stagingConfig, flightState, realDeltaTime, ti
         // Advance debris while tipping.
         for (const debris of ps.debris) {
           tickDebris(debris, assembly, FIXED_DT);
-          if (debris.landed && !debris.crashed) tickDebrisGround(debris, assembly, FIXED_DT);
+          if (debris.landed && !debris.crashed) tickDebrisGround(debris, assembly, FIXED_DT, flightState?.bodyId);
         }
         tickCollisions(ps, assembly, FIXED_DT);
 
@@ -452,7 +510,7 @@ export function tick(ps, assembly, stagingConfig, flightState, realDeltaTime, ti
     // Advance all debris fragments by the same fixed timestep.
     for (const debris of ps.debris) {
       tickDebris(debris, assembly, FIXED_DT);
-      if (debris.landed && !debris.crashed) tickDebrisGround(debris, assembly, FIXED_DT);
+      if (debris.landed && !debris.crashed) tickDebrisGround(debris, assembly, FIXED_DT, flightState?.bodyId);
     }
     tickCollisions(ps, assembly, FIXED_DT);
 
@@ -599,15 +657,17 @@ export function fireNextStage(ps, assembly, stagingConfig, flightState) {
  * When in TWR throttle mode, compute the raw throttle needed to achieve
  * `ps.targetTWR` and write it to `ps.throttle`.
  *
- * Formula: throttle = clamp((targetTWR * totalMass * G0 - srbThrustN) / maxLiquidThrustN, 0, 1)
+ * Formula: throttle = clamp((targetTWR * totalMass * localG - srbThrustN) / maxLiquidThrustN, 0, 1)
  *
+ * Uses the current body's surface gravity so TWR is meaningful on any world.
  * If targetTWR is Infinity, sets throttle = 1 (max thrust).
  * If no liquid engines are firing, does nothing (can't throttle SRBs).
  *
  * @param {PhysicsState}                               ps
  * @param {import('./rocketbuilder.js').RocketAssembly} assembly
+ * @param {string} [bodyId]                            Current celestial body ID.
  */
-function _updateThrottleFromTWR(ps, assembly) {
+function _updateThrottleFromTWR(ps, assembly, bodyId) {
   if (ps.throttleMode !== 'twr') return;
 
   // Infinity means "max thrust"
@@ -644,7 +704,8 @@ function _updateThrottleFromTWR(ps, assembly) {
   if (maxLiquidThrustN <= 0) return; // can't throttle SRBs
   if (totalMass <= 0) return;
 
-  const needed = ps.targetTWR * totalMass * G0 - srbThrustN;
+  const localG = _gravityForBody(bodyId, Math.max(0, ps.posY));
+  const needed = ps.targetTWR * totalMass * localG - srbThrustN;
   ps.throttle = Math.max(0, Math.min(1, needed / maxLiquidThrustN));
 }
 
@@ -660,11 +721,13 @@ function _updateThrottleFromTWR(ps, assembly) {
  * @param {import('./gameState.js').FlightState}        flightState
  */
 function _integrate(ps, assembly, flightState) {
+  const bodyId   = flightState?.bodyId;
+
   // --- 0. TWR-relative throttle conversion --------------------------------
-  _updateThrottleFromTWR(ps, assembly);
+  _updateThrottleFromTWR(ps, assembly, bodyId);
 
   const altitude = Math.max(0, ps.posY);
-  const density  = airDensity(altitude);
+  const density  = _densityForBody(altitude, bodyId);
 
   // --- 1. Total rocket mass (dry + remaining fuel) -------------------------
   const totalMass = _computeTotalMass(ps, assembly);
@@ -683,9 +746,10 @@ function _integrate(ps, assembly, flightState) {
     thrustY = thrustResult.thrustY;
   }
 
-  // --- 3. Gravity force (constant downward) --------------------------------
+  // --- 3. Gravity force (body-specific, inverse-square) --------------------
+  const gravAccel = _gravityForBody(bodyId, altitude);
   const gravFX = 0;
-  const gravFY = -G0 * totalMass;
+  const gravFY = -gravAccel * totalMass;
 
   // --- 4. Drag force -------------------------------------------------------
   const speed    = Math.hypot(ps.velX, ps.velY);
@@ -722,7 +786,7 @@ function _integrate(ps, assembly, flightState) {
   }
 
   // --- 7. Continuous steering ----------------------------------------------
-  _applySteering(ps, assembly, altitude, FIXED_DT);
+  _applySteering(ps, assembly, altitude, FIXED_DT, bodyId);
 
   // --- 7b. Topple-crash check (grounded tipping) -------------------------
   if (ps.grounded) {
@@ -764,7 +828,7 @@ function _integrate(ps, assembly, flightState) {
 
   // --- 9d. Ejected crew physics --------------------------------------------
   if (ps.ejectedCrew) {
-    const G = 9.81;
+    const crewG = _gravityForBody(bodyId, Math.max(0, ps.posY));
     for (const crew of ps.ejectedCrew) {
       // Countdown to chute deployment
       if (!crew.chuteOpen && crew.chuteTimer > 0) {
@@ -772,8 +836,8 @@ function _integrate(ps, assembly, flightState) {
         if (crew.chuteTimer <= 0) crew.chuteOpen = true;
       }
 
-      // Gravity
-      crew.velY -= G * FIXED_DT;
+      // Gravity (body-specific)
+      crew.velY -= crewG * FIXED_DT;
 
       // Parachute drag when open (terminal velocity ~5 m/s)
       if (crew.chuteOpen && crew.velY < 0) {
@@ -799,12 +863,8 @@ function _integrate(ps, assembly, flightState) {
 
   // --- 10. Atmospheric heat model -------------------------------------------
   if (!ps.grounded) {
-    // Use body-aware density for heat when flying at a non-Earth body.
-    const bodyId = flightState.bodyId;
-    const heatDensity = (bodyId && bodyId !== 'EARTH')
-      ? airDensityForBody(altitude, bodyId)
-      : density;
-    updateHeat(ps, assembly, flightState, speed, altitude, heatDensity);
+    // density is already body-aware (computed above via _densityForBody).
+    updateHeat(ps, assembly, flightState, speed, altitude, density);
   }
 
   // --- 10. Liftoff detection -----------------------------------------------
@@ -1335,7 +1395,7 @@ function _applyDockingMovement(ps, assembly, totalMass, dt) {
 // Steering (private)
 // ---------------------------------------------------------------------------
 
-function _applySteering(ps, assembly, altitude, dt) {
+function _applySteering(ps, assembly, altitude, dt, bodyId) {
   // In RCS mode, rotation is disabled.
   if (ps.controlMode === ControlMode.RCS) return;
 
@@ -1347,20 +1407,21 @@ function _applySteering(ps, assembly, altitude, dt) {
 
   // Grounded or landed: delegate to tipping physics (always runs for gravity torque).
   if (ps.grounded || ps.landed) {
-    _applyGroundedSteering(ps, assembly, left, right, dt);
+    _applyGroundedSteering(ps, assembly, left, right, dt, bodyId);
     return;
   }
 
   // --- Airborne torque-based rotation ---
   const com = _computeCoMLocal(ps, assembly);
   const I = _computeMomentOfInertia(ps, assembly, com);
-  const density = airDensity(Math.max(0, ps.posY));
+  const density = _densityForBody(Math.max(0, ps.posY), bodyId);
   const speed   = Math.hypot(ps.velX, ps.velY);
+  const atmoTop = _atmosphereTopForBody(bodyId);
 
   // Player input torque — compute angular acceleration and cap it so light
   // rockets don't spin uncontrollably.
   let baseTorque = PLAYER_FLIGHT_TORQUE;
-  if (altitude > ATMOSPHERE_TOP && _hasRcs(ps, assembly)) {
+  if (altitude > atmoTop && _hasRcs(ps, assembly)) {
     baseTorque *= RCS_TORQUE_MULTIPLIER;
   }
   let playerAlpha = 0;
@@ -1402,7 +1463,7 @@ function _applySteering(ps, assembly, altitude, dt) {
     ps.angularVelocity -= aeroDamping * ps.angularVelocity * dt;
 
     // RCS active braking in vacuum.
-    if (altitude > ATMOSPHERE_TOP && _hasRcs(ps, assembly)) {
+    if (altitude > atmoTop && _hasRcs(ps, assembly)) {
       const rcsBrake = RCS_ANGULAR_DAMPING * ps.angularVelocity / I;
       // Don't overshoot zero.
       if (Math.abs(rcsBrake * dt) > Math.abs(ps.angularVelocity)) {
@@ -1457,7 +1518,8 @@ function _hasAsymmetricLegs(ps, assembly) {
   return false;
 }
 
-function _applyGroundedSteering(ps, assembly, left, right, dt) {
+function _applyGroundedSteering(ps, assembly, left, right, dt, bodyId) {
+  const surfaceG = _gravityForBody(bodyId, 0);
   // If fully at rest with no input, nothing to do —
   // UNLESS legs are asymmetrically deployed (one deployed, one retracted),
   // which creates an off-centre contact point that should cause tipping.
@@ -1561,7 +1623,7 @@ function _applyGroundedSteering(ps, assembly, left, right, dt) {
   // Gravity torque: weight × horizontal distance from contact to CoM.
   // Positive rotatedX → CoM is to the right of contact → positive (clockwise) torque.
   const totalMass = _computeTotalMass(ps, assembly);
-  const gravityTorque = totalMass * G0 * rotatedX;
+  const gravityTorque = totalMass * surfaceG * rotatedX;
 
   // Player input torque — capped per angular acceleration so light parts
   // don't instantly topple.
@@ -1609,7 +1671,7 @@ function _applyGroundedSteering(ps, assembly, left, right, dt) {
     const sRelX    = (comSnap.x - contactLX) * SCALE_M_PER_PX;
     const sRelY    = (comSnap.y - contactLY) * SCALE_M_PER_PX;
     const sRotX    = sRelX * cosB + sRelY * sinB;
-    const snapGrav = totalMass * G0 * sRotX;
+    const snapGrav = totalMass * surfaceG * sRotX;
     const snapAccel = Math.abs(snapGrav / I);
 
     if (snapAccel < 0.5) {
@@ -1721,8 +1783,9 @@ function _checkToppleCrash(ps, assembly, flightState) {
  * @param {import('./rocketbuilder.js').RocketAssembly} assembly
  * @param {number}                                      dt  Fixed timestep (s).
  */
-export function tickDebrisGround(debris, assembly, dt) {
+export function tickDebrisGround(debris, assembly, dt, bodyId) {
   if (debris.crashed) return;
+  const debrisG = _gravityForBody(bodyId, 0);
 
   // Check if tipping is needed
   const needsTipping = debris.isTipping ||
@@ -1796,7 +1859,7 @@ export function tickDebrisGround(debris, assembly, dt) {
   const relY = (com.y - contactLY) * SCALE_M_PER_PX;
   const rotatedX = relX * cosA + relY * sinA;
   const totalMass = _computeTotalMass(debris, assembly);
-  const gravityTorque = totalMass * G0 * rotatedX;
+  const gravityTorque = totalMass * debrisG * rotatedX;
 
   // Angular integration (no player input)
   const angAccel = gravityTorque / I;
@@ -1819,7 +1882,7 @@ export function tickDebrisGround(debris, assembly, dt) {
     const sRelX = (com.x - contactLX) * SCALE_M_PER_PX;
     const sRelY = (com.y - contactLY) * SCALE_M_PER_PX;
     const sRotX = sRelX * cosB + sRelY * sinB;
-    const snapGrav = totalMass * G0 * sRotX;
+    const snapGrav = totalMass * debrisG * sRotX;
     if (Math.abs(snapGrav / I) < 0.5) {
       debris.angularVelocity *= 0.85;
       if (Math.abs(debris.angle) < TILT_SNAP_THRESHOLD) debris.angle *= 0.9;
@@ -1977,6 +2040,13 @@ function _handleGroundContact(ps, assembly, flightState) {
   // --- Determine outcome ---
   const allCmdLost = _allCommandModulesGone(ps, assembly);
 
+  const landingBodyId = flightState.bodyId || 'EARTH';
+  const bodyNames = {
+    SUN: 'Sun', MERCURY: 'Mercury', VENUS: 'Venus', EARTH: 'Earth',
+    MOON: 'Moon', MARS: 'Mars', PHOBOS: 'Phobos', DEIMOS: 'Deimos',
+  };
+  const bodyName = bodyNames[landingBodyId] || landingBodyId;
+
   if (allCmdLost) {
     // All command / computer modules are destroyed — rocket is lost.
     ps.crashed = true;
@@ -1984,18 +2054,20 @@ function _handleGroundContact(ps, assembly, flightState) {
       type:        'CRASH',
       time,
       speed:       impactSpeed,
-      description: `Impact at ${impactSpeed.toFixed(1)} m/s — rocket destroyed!`,
+      bodyId:      landingBodyId,
+      description: `Impact on ${bodyName} at ${impactSpeed.toFixed(1)} m/s — rocket destroyed!`,
     });
   } else {
     // Rocket survives (possibly with partial damage).
     ps.landed = true;
     const desc = anyDestroyed
-      ? `Hard landing at ${impactSpeed.toFixed(1)} m/s — some parts destroyed.`
-      : `Landed at ${impactSpeed.toFixed(1)} m/s.`;
+      ? `Hard landing on ${bodyName} at ${impactSpeed.toFixed(1)} m/s — some parts destroyed.`
+      : `Landed on ${bodyName} at ${impactSpeed.toFixed(1)} m/s.`;
     _emitEvent(flightState, {
       type:          'LANDING',
       time,
       speed:         impactSpeed,
+      bodyId:        landingBodyId,
       partsDestroyed: anyDestroyed,
       description:   desc,
     });

@@ -32,6 +32,7 @@ import { checkObjectiveCompletion } from '../core/missions.js';
 import { checkContractObjectives } from '../core/contracts.js';
 import { saveGame, listSaves } from '../core/saveload.js';
 import { ATMOSPHERE_TOP, isReentryCondition } from '../core/atmosphere.js';
+import { getAtmosphereTop as getBodyAtmosphereTop } from '../data/bodies.js';
 import { getPartById } from '../data/parts.js';
 import { PartType, DEATH_FINE_PER_ASTRONAUT } from '../core/constants.js';
 import { processFlightReturn } from '../core/flightReturn.js';
@@ -1064,7 +1065,7 @@ function _loop(timestamp) {
     const mapBodyId = (_flightState && _flightState.bodyId) || 'EARTH';
     renderMapFrame(_ps, _flightState, _state, mapBodyId);
   } else {
-    renderFlightFrame(_ps, _assembly);
+    renderFlightFrame(_ps, _assembly, _flightState);
   }
 
   // Update the map HUD readouts if visible.
@@ -1143,16 +1144,20 @@ function _checkTimeWarpResets(timestamp) {
     lockTimeWarp(false);
   }
 
+  // Body-aware atmosphere top for space detection.
+  const _twBodyId = (_flightState && _flightState.bodyId) || 'EARTH';
+  const _twAtmoTop = getBodyAtmosphereTop(_twBodyId) || ATMOSPHERE_TOP;
+
   // No automatic resets needed if we're already at 1×.
   if (_timeWarp === 1) {
     _prevAltitude = Math.max(0, _ps.posY);
-    _prevInSpace  = _prevAltitude >= ATMOSPHERE_TOP;
+    _prevInSpace  = _prevAltitude >= _twAtmoTop;
     return;
   }
 
   const altitude = Math.max(0, _ps.posY);
   const speed    = Math.hypot(_ps.velX, _ps.velY);
-  const inSpace  = altitude >= ATMOSPHERE_TOP;
+  const inSpace  = altitude >= _twAtmoTop;
 
   // Reset on successful landing or crash.
   if (_ps.landed || _ps.crashed) {
@@ -1647,7 +1652,8 @@ function _toggleDockingMode() {
 
   if (_ps.controlMode === ControlMode.DOCKING || _ps.controlMode === ControlMode.RCS) {
     // Exit docking mode → NORMAL.
-    const result = exitDockingMode(_ps, _flightState, 'EARTH');
+    const dockBodyId = (_flightState && _flightState.bodyId) || 'EARTH';
+    const result = exitDockingMode(_ps, _flightState, dockBodyId);
     if (result.success) {
       _showPhaseNotification(CONTROL_MODE_TIPS[ControlMode.NORMAL]);
       _normalOrbitHeldKeys.clear();
@@ -1655,7 +1661,8 @@ function _toggleDockingMode() {
     }
   } else {
     // Enter docking mode.
-    const result = enterDockingMode(_ps, _flightState, 'EARTH');
+    const dockBodyId = (_flightState && _flightState.bodyId) || 'EARTH';
+    const result = enterDockingMode(_ps, _flightState, dockBodyId);
     if (result.success) {
       _showPhaseNotification(CONTROL_MODE_TIPS[ControlMode.DOCKING]);
       // Force warp to 1× in docking mode.

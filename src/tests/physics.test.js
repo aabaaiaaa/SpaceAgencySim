@@ -893,6 +893,10 @@ describe('deltaV estimate', () => {
 const G0         = 9.81;          // Standard gravity (m/s²)
 const FIXED_DT   = 1 / 60;        // Physics timestep (s)
 const VAC_ALT    = 80_000;        // Above ATMOSPHERE_TOP (70 000 m) — zero drag
+const EARTH_RADIUS = 6_371_000;   // Earth radius (m)
+
+// Gravity at VAC_ALT using inverse-square law (TASK-042 multi-body gravity)
+const G_AT_VAC_ALT = G0 * Math.pow(EARTH_RADIUS / (EARTH_RADIUS + VAC_ALT), 2);
 
 // ---------------------------------------------------------------------------
 // 1. Net force calculation
@@ -962,9 +966,10 @@ describe('TASK-037: ballistic trajectory — integration over multiple ticks', (
       tick(ps, assembly, staging, fs, FIXED_DT, 1);
     }
 
-    // Euler velocity is exact for constant acceleration: v = v0 − G0 × t.
-    const expectedVelY = v0Y - G0 * 1.0; // 50 − 9.81 = 40.19 m/s
-    expect(ps.velY).toBeCloseTo(expectedVelY, 3);
+    // Euler velocity: v ≈ v0 − g(alt) × t. Gravity at VAC_ALT is slightly
+    // less than G0 due to inverse-square law (TASK-042).
+    const expectedVelY = v0Y - G_AT_VAC_ALT * 1.0;
+    expect(ps.velY).toBeCloseTo(expectedVelY, 1);
   });
 
   it('position approximates y0 + v0×t − ½g×t² after 60 fixed steps in vacuum', () => {
@@ -1031,7 +1036,8 @@ describe('TASK-037: gravity freefall — position matches 0.5 × g × t²', () =
       tick(ps, assembly, staging, fs, FIXED_DT, 1);
     }
 
-    expect(ps.velY).toBeCloseTo(-G0 * 1.0, 3);
+    // Gravity at VAC_ALT is slightly less than G0 due to inverse-square (TASK-042).
+    expect(ps.velY).toBeCloseTo(-G_AT_VAC_ALT * 1.0, 1);
   });
 });
 
@@ -1080,10 +1086,11 @@ describe('TASK-037: atmospheric drag — sea level vs vacuum', () => {
     // Run exactly one fixed step.
     tick(ps, assembly, staging, fs, FIXED_DT, 1);
 
-    // In vacuum: drag = 0, thrust = 0 → accY = -G0
-    // velY after 1 step = -50 − G0 × FIXED_DT
-    const expectedVelY = -50 - G0 * FIXED_DT;
-    expect(ps.velY).toBeCloseTo(expectedVelY, 4);
+    // In vacuum: drag = 0, thrust = 0 → accY = -g(alt)
+    // velY after 1 step = -50 − g(VAC_ALT) × FIXED_DT
+    // Gravity at VAC_ALT is slightly less than G0 due to inverse-square (TASK-042).
+    const expectedVelY = -50 - G_AT_VAC_ALT * FIXED_DT;
+    expect(ps.velY).toBeCloseTo(expectedVelY, 3);
   });
 });
 

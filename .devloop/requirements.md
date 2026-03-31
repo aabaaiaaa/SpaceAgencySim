@@ -278,7 +278,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Transfer time warping from map view (does NOT advance period counter). Player cannot leave craft mid-transfer — must reach stable orbit first. Returning to agency from any stable orbit = one period. Map view during transfer: zoomed out, player trajectory shown, thrust/RCS controls work, orbit predictions, target body delta-v requirements, route planning with gravitational assists, zoom levels (craft, craft-to-target, solar system).
 
 ### TASK-042: Landing on other bodies
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-039, TASK-041, TASK-064
 - **Description**: Reuse existing flight physics with body-specific constants: gravity, atmosphere profile, ground visual, sky gradient (Moon=black, Mars=butterscotch), weather, biomes. No-atmosphere landings (Moon, Mercury, Phobos, Deimos): no parachutes/aerobraking, fully propulsive, significant skill challenge. Thin-atmosphere landings (Mars): partial aerobraking generates heat (TASK-064 thermal system applies), parachutes help but insufficient alone, combination approach. Return missions require enough delta-v for round trip or pre-positioned fuel in orbit. Reentry to any body with an atmosphere involves heating — craft need appropriate thermal protection or heat shields for the body's atmospheric density and approach speed.

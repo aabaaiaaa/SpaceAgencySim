@@ -37,6 +37,7 @@ import { getBiome, getBiomeTransition, BIOME_FADE_RANGE } from '../core/biomes.j
 import { DEPLOY_DURATION } from '../core/parachute.js';
 import { LegState, LEG_DEPLOY_DURATION, getDeployedLegFootOffset } from '../core/legs.js';
 import { hasMalfunction, MALFUNCTION_LABELS } from '../core/malfunction.js';
+import { getSkyVisual, getGroundVisual, getAirDensity as bodyAirDensity } from '../data/bodies.js';
 
 // ---------------------------------------------------------------------------
 // Scale constants
@@ -62,7 +63,7 @@ const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 5.0;
 
 // ---------------------------------------------------------------------------
-// Sky colours
+// Sky colours (Earth defaults — overridden per-body at runtime)
 // ---------------------------------------------------------------------------
 
 /** Sky colour at sea level (light blue). */
@@ -75,14 +76,14 @@ const SKY_HIGH_ALT  = 0x1a1a4e;
 const SKY_SPACE     = 0x000005;
 
 // ---------------------------------------------------------------------------
-// Ground / terrain colour
+// Ground / terrain colour (Earth default)
 // ---------------------------------------------------------------------------
 
 /** Desert sandy-tan ground colour below world Y = 0. */
 const GROUND_COLOR = 0xc4a882;
 
 // ---------------------------------------------------------------------------
-// Star parameters
+// Star parameters (Earth defaults)
 // ---------------------------------------------------------------------------
 
 /** Altitude (m) at which stars start to become visible. */
@@ -90,6 +91,38 @@ const STAR_FADE_START = 50_000;
 
 /** Altitude (m) at which stars reach full opacity. */
 const STAR_FADE_FULL  = 70_000;
+
+// ---------------------------------------------------------------------------
+// Current body visual overrides (set per frame from flightState.bodyId)
+// ---------------------------------------------------------------------------
+
+/** @type {{ seaLevel: number, highAlt: number, space: number, starStart: number, starEnd: number, ground: number }} */
+let _bodyVisuals = {
+  seaLevel:  SKY_SEA_LEVEL,
+  highAlt:   SKY_HIGH_ALT,
+  space:     SKY_SPACE,
+  starStart: STAR_FADE_START,
+  starEnd:   STAR_FADE_FULL,
+  ground:    GROUND_COLOR,
+};
+
+/**
+ * Update the body visual overrides based on a celestial body ID.
+ * Falls back to Earth defaults when bodyId is undefined or 'EARTH'.
+ *
+ * @param {string|undefined} bodyId
+ */
+function _updateBodyVisuals(bodyId) {
+  const sky = bodyId ? getSkyVisual(bodyId) : null;
+  const gnd = bodyId ? getGroundVisual(bodyId) : null;
+
+  _bodyVisuals.seaLevel  = sky ? sky.seaLevelColor  : SKY_SEA_LEVEL;
+  _bodyVisuals.highAlt   = sky ? sky.highAltColor    : SKY_HIGH_ALT;
+  _bodyVisuals.space     = sky ? sky.spaceColor      : SKY_SPACE;
+  _bodyVisuals.starStart = sky ? sky.starFadeStart   : STAR_FADE_START;
+  _bodyVisuals.starEnd   = sky ? sky.starFadeEnd     : STAR_FADE_FULL;
+  _bodyVisuals.ground    = gnd ? gnd.color           : GROUND_COLOR;
+}
 
 /** Total number of star dots pre-generated for the star field. */
 const STAR_COUNT = 200;
@@ -596,21 +629,30 @@ function _renderPlumes(ps, assembly, density, w, h) {
 
 /**
  * Return the sky background colour for a given altitude.
- *   0 m         → #87CEEB  light blue
- *   30,000 m    → #1a1a4e  dark blue
- *   ≥ 70,000 m  → #000005  near-black (space)
+ * Uses the current body's visual parameters (set via _updateBodyVisuals).
+ *
+ * For bodies with atmosphere: interpolates sea-level → high-alt → space.
+ * For airless bodies (starEnd === 0): always returns the space colour.
  *
  * @param {number} altitude  Altitude in metres.
  * @returns {number}         Packed 0xRRGGBB colour.
  */
 function _skyColor(altitude) {
-  if (altitude >= STAR_FADE_FULL) return SKY_SPACE;
-  if (altitude >= 30_000) {
-    const t = (altitude - 30_000) / (STAR_FADE_FULL - 30_000);
-    return _lerpColor(SKY_HIGH_ALT, SKY_SPACE, t);
+  const { seaLevel, highAlt, space, starStart, starEnd } = _bodyVisuals;
+
+  // Airless bodies: always black/space sky.
+  if (starEnd <= 0) return space;
+
+  if (altitude >= starEnd) return space;
+
+  // Interpolate in two bands: sea-level → highAlt, then highAlt → space.
+  const midAlt = starStart > 0 ? starStart * 0.6 : 30_000;
+  if (altitude >= midAlt) {
+    const t = (altitude - midAlt) / (starEnd - midAlt);
+    return _lerpColor(highAlt, space, Math.min(1, t));
   }
-  const t = altitude / 30_000;
-  return _lerpColor(SKY_SEA_LEVEL, SKY_HIGH_ALT, t);
+  const t = midAlt > 0 ? altitude / midAlt : 0;
+  return _lerpColor(seaLevel, highAlt, Math.min(1, t));
 }
 
 // ---------------------------------------------------------------------------
@@ -855,7 +897,8 @@ function _generateStars() {
 }
 
 /**
- * Render the star field, fading in as altitude rises above STAR_FADE_START.
+ * Render the star field, fading in as altitude rises.
+ * Uses body-specific star fade altitudes; on airless bodies stars are always visible.
  *
  * @param {number} altitude  Current camera altitude in metres.
  * @param {number} w         Canvas width in pixels.
@@ -864,11 +907,18 @@ function _generateStars() {
 function _renderStars(altitude, w, h) {
   if (!_starsContainer) return;
 
-  // Alpha: 0 below 50 km, 1 at 70 km and above.
-  const alpha = Math.max(
-    0,
-    Math.min(1, (altitude - STAR_FADE_START) / (STAR_FADE_FULL - STAR_FADE_START)),
-  );
+  const { starStart, starEnd } = _bodyVisuals;
+
+  // Airless bodies: stars always fully visible.
+  let alpha;
+  if (starEnd <= 0) {
+    alpha = 1;
+  } else {
+    const range = starEnd - starStart;
+    alpha = range > 0
+      ? Math.max(0, Math.min(1, (altitude - starStart) / range))
+      : (altitude >= starStart ? 1 : 0);
+  }
 
   while (_starsContainer.children.length) _starsContainer.removeChildAt(0);
   if (alpha <= 0) return;
@@ -906,7 +956,7 @@ function _renderGround(w, h) {
   const drawY = Math.max(0, groundScreenY);
   const drawH = h - drawY;
   _groundGraphics.rect(0, drawY, w, drawH);
-  _groundGraphics.fill({ color: GROUND_COLOR });
+  _groundGraphics.fill({ color: _bodyVisuals.ground });
 }
 
 // ---------------------------------------------------------------------------
@@ -1034,17 +1084,19 @@ function _renderDockingTarget(ps, w, h) {
  * @param {number} w         Canvas width.
  * @param {number} h         Canvas height.
  * @param {number} dt        Delta time in seconds.
+ * @param {string} [bodyId]  Current celestial body ID.
  */
-function _renderBiomeLabel(altitude, w, h, dt) {
+function _renderBiomeLabel(altitude, w, h, dt, bodyId) {
   if (!_biomeLabelContainer) return;
 
   // Clear previous frame's label.
   while (_biomeLabelContainer.children.length) _biomeLabelContainer.removeChildAt(0);
 
-  const biome = getBiome(altitude, 'EARTH');
+  const biomeBodyId = bodyId || 'EARTH';
+  const biome = getBiome(altitude, biomeBodyId);
   if (!biome) return;
 
-  const transition = getBiomeTransition(altitude, 'EARTH');
+  const transition = getBiomeTransition(altitude, biomeBodyId);
 
   // Determine the display name and target alpha.
   let displayName = biome.name;
@@ -1175,7 +1227,7 @@ function _renderHorizon(altitude, w, h) {
   _horizonGraphics.arc(cx, cy, arcRadius, -Math.PI / 2 - halfAngle, -Math.PI / 2 + halfAngle);
   _horizonGraphics.lineTo(w, h);
   _horizonGraphics.closePath();
-  _horizonGraphics.fill({ color: GROUND_COLOR });
+  _horizonGraphics.fill({ color: _bodyVisuals.ground });
 
   // Atmospheric glow along the curved horizon edge — a thin gradient line.
   if (altitude > 30_000) {
@@ -2439,10 +2491,14 @@ export function initFlightRenderer() {
  * @param {import('../core/physics.js').PhysicsState}           ps
  * @param {import('../core/rocketbuilder.js').RocketAssembly}   assembly
  */
-export function renderFlightFrame(ps, assembly) {
+export function renderFlightFrame(ps, assembly, flightState) {
   const w        = window.innerWidth;
   const h        = window.innerHeight;
   const altitude = Math.max(0, ps.posY);
+  const bodyId   = flightState?.bodyId;
+
+  // Update per-body sky/ground/star visuals.
+  _updateBodyVisuals(bodyId);
 
   // 1. Update camera to follow the relevant object's CoM.
   _updateCamera(ps, assembly);
@@ -2450,13 +2506,13 @@ export function renderFlightFrame(ps, assembly) {
   // 2. Sky background — full-screen rect with altitude-interpolated colour.
   _renderSky(altitude, w, h);
 
-  // 3. Stars — visible above 50 km, fully opaque above 70 km.
+  // 3. Stars — visible above atmosphere (always visible on airless bodies).
   _renderStars(altitude, w, h);
 
   // 4a. Horizon curvature — curved ground for high-altitude visual.
   _renderHorizon(altitude, w, h);
 
-  // 4b. Ground band — sandy-tan terrain below world Y = 0.
+  // 4b. Ground band — body-coloured terrain below world Y = 0.
   //     At high altitudes the curved horizon replaces the flat ground band,
   //     so we only draw the flat ground when the curvature is not active.
   if (altitude < 5_000) {
@@ -2468,7 +2524,8 @@ export function renderFlightFrame(ps, assembly) {
   _renderDebris(ps.debris, assembly, w, h);
 
   // 6. Engine exhaust — smoke particles + sine-wave plumes.
-  const trailDensity = airDensity(altitude);
+  // Use body-aware air density for visual trail thickness.
+  const trailDensity = bodyId ? bodyAirDensity(altitude, bodyId) : airDensity(altitude);
   const dt           = _trailDt();
   _emitSmokeSegments(ps, assembly, trailDensity);
   _updateTrails(dt);
@@ -2492,7 +2549,7 @@ export function renderFlightFrame(ps, assembly) {
   _renderMachEffects(ps, assembly, trailDensity, w, h, dt);
 
   // 9. Biome label — shows current altitude biome with fade transitions.
-  _renderBiomeLabel(altitude, w, h, dt);
+  _renderBiomeLabel(altitude, w, h, dt, bodyId);
 }
 
 /**
