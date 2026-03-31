@@ -1285,6 +1285,38 @@ export const PARTS = [
     },
   },
 
+  /**
+   * Solar Heat Shield — advanced ablative shield for close solar approach.
+   * Uses exotic refractory composites to withstand the extreme radiant heat
+   * near the Sun.  The `solarHeatResistance` property reduces solar proximity
+   * heat by 80 %, enabling inner-corona science missions.  Very heavy and
+   * expensive — a late-game item.  Tech tree: Recovery T5.
+   */
+  {
+    id: 'heat-shield-solar',
+    name: 'Solar Heat Shield',
+    description: 'Exotic refractory heat shield designed for close solar approach. Blocks 80% of solar radiation heat, enabling science missions into the inner corona. Extremely heavy — plan your delta-v budget carefully.',
+    type: PartType.HEAT_SHIELD,
+    reliability: RELIABILITY_TIERS.HIGH,
+    mass: 300,
+    cost: 50_000,
+    width: 40,   // 2 m — matches command module width
+    height: 12,  // 0.6 m thick disc
+    snapPoints: [
+      makeSnapPoint('top',    0, -6, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  6, STACK_TYPES),
+    ],
+    animationStates: ['intact', 'charred'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      heatTolerance: 6000,
+      solarHeatResistance: 0.8,
+      dragCoefficient: 0.45,
+      crashThreshold: 15,
+    },
+  },
+
   // =========================================================================
   // PROPULSION — Tech Tree Upgrades
   // =========================================================================

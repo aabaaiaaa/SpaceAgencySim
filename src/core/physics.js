@@ -51,6 +51,7 @@ import {
   ATMOSPHERE_TOP,
   SEA_LEVEL_DENSITY,
   updateHeat,
+  updateSolarHeat,
 } from './atmosphere.js';
 import {
   getSurfaceGravity,
@@ -961,6 +962,11 @@ function _integrate(ps, assembly, flightState) {
   if (!ps.grounded) {
     // density is already body-aware (computed above via _densityForBody).
     updateHeat(ps, assembly, flightState, speed, altitude, density);
+
+    // Solar proximity heat: escalating radiant heat when near the Sun.
+    if (bodyId === 'SUN') {
+      updateSolarHeat(ps, assembly, flightState, altitude);
+    }
   }
 
   // --- 10. Launch clamp check -----------------------------------------------

@@ -795,8 +795,10 @@ export const MIN_ORBIT_ALTITUDE = Object.freeze({
  */
 export const ALTITUDE_BANDS = Object.freeze({
   SUN: Object.freeze([
-    Object.freeze({ id: 'INNER_CORONA', name: 'Inner Corona', min: 0, max: 2_000_000_000 }),
-    Object.freeze({ id: 'OUTER_CORONA', name: 'Outer Corona', min: 2_000_000_000, max: 20_000_000_000 }),
+    Object.freeze({ id: 'INNER_CORONA', name: 'Inner Corona',   min: 500_000_000,     max: 2_000_000_000 }),
+    Object.freeze({ id: 'OUTER_CORONA', name: 'Outer Corona',   min: 2_000_000_000,   max: 10_000_000_000 }),
+    Object.freeze({ id: 'NSS',          name: 'Near Sun Space',  min: 10_000_000_000,  max: 30_000_000_000 }),
+    Object.freeze({ id: 'SOL',          name: 'Solar Orbit',     min: 30_000_000_000,  max: 300_000_000_000 }),
   ]),
   MERCURY: Object.freeze([
     Object.freeze({ id: 'LMeO', name: 'Low Mercury Orbit', min: 20_000, max: 200_000 }),
@@ -856,8 +858,11 @@ export const ALTITUDE_BANDS = Object.freeze({
  */
 export const BIOME_DEFINITIONS = Object.freeze({
   SUN: Object.freeze([
-    Object.freeze({ id: 'SOLAR_CORONA',        name: 'Solar Corona',         min: 0,               max: 2_000_000_000, scienceMultiplier: 10.0, color: 0xffdd44 }),
-    Object.freeze({ id: 'NEAR_SUN',            name: 'Near Sun Space',       min: 2_000_000_000,   max: Infinity,      scienceMultiplier: 6.0,  color: 0xff8800 }),
+    Object.freeze({ id: 'SUN_INFERNO',         name: 'Solar Inferno',        min: 0,               max: 500_000_000,     scienceMultiplier: 0,    color: 0xffffff }),
+    Object.freeze({ id: 'SUN_INNER_CORONA',    name: 'Inner Corona',         min: 500_000_000,     max: 2_000_000_000,   scienceMultiplier: 12.0, color: 0xffee44 }),
+    Object.freeze({ id: 'SUN_OUTER_CORONA',    name: 'Outer Corona',         min: 2_000_000_000,   max: 10_000_000_000,  scienceMultiplier: 8.0,  color: 0xffaa22 }),
+    Object.freeze({ id: 'SUN_NEAR_SPACE',      name: 'Near Sun Space',       min: 10_000_000_000,  max: 30_000_000_000,  scienceMultiplier: 5.0,  color: 0xff8800 }),
+    Object.freeze({ id: 'SUN_SOLAR_ORBIT',     name: 'Solar Orbit',          min: 30_000_000_000,  max: Infinity,        scienceMultiplier: 3.0,  color: 0x332200 }),
   ]),
   MERCURY: Object.freeze([
     Object.freeze({ id: 'MERCURY_SURFACE',     name: 'Mercury Surface',      min: 0,       max: 100,       scienceMultiplier: 2.0,  color: 0x8a8a8a }),
@@ -1584,3 +1589,46 @@ export const POWER_CRITICAL_THRESHOLD = 0.5;
  * usable electrical power.  Real panels are ~20–30 %; we use a gameplay value.
  */
 export const SOLAR_PANEL_EFFICIENCY = 0.25;
+
+// ---------------------------------------------------------------------------
+// Sun Heat Mechanics
+// ---------------------------------------------------------------------------
+
+/**
+ * Altitude below which a craft is instantly destroyed by the Sun (metres
+ * above the Sun's surface).  This is the "point of no return" — the solar
+ * inferno zone.  ~500,000 km from the photosphere.
+ */
+export const SUN_DESTRUCTION_ALTITUDE = 500_000_000;
+
+/**
+ * Altitude below which solar proximity heat begins to accumulate (metres).
+ * ~20 million km from the surface — roughly inside Venus's orbit.
+ * Heat scales with inverse-square distance from the Sun's centre.
+ */
+export const SUN_HEAT_START_ALTITUDE = 20_000_000_000;
+
+/**
+ * Base heat rate at SUN_HEAT_START_ALTITUDE (heat units per tick).
+ * The actual rate scales as (SUN_HEAT_START_ALTITUDE / distance)².
+ * At the inner corona edge (2B m) this gives ~100× the base rate.
+ */
+export const SUN_HEAT_RATE_BASE = 0.5;
+
+/**
+ * Fraction of solar heat blocked by a standard heat shield.
+ * Solar heat shields have a separate, higher value via solarHeatResistance.
+ */
+export const STANDARD_SHIELD_SOLAR_RESISTANCE = 0.3;
+
+/**
+ * Maximum solar irradiance multiplier when computing solar power near
+ * the Sun.  Prevents unreasonable generation values at very close range.
+ */
+export const MAX_SOLAR_IRRADIANCE_MULTIPLIER = 50.0;
+
+/**
+ * Earth's mean orbital distance from the Sun centre (1 AU in metres).
+ * Used for distance-based solar irradiance calculations.
+ */
+export const ONE_AU = 149_598_000_000;

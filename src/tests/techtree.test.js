@@ -204,11 +204,11 @@ describe('Tech Tree Data', () => {
       ]);
     });
 
-    it('Recovery: Parachute Mk2 → Drogue Chute → Heat Shield → Powered Landing → Reusable Booster', () => {
+    it('Recovery: Parachute Mk2 → Drogue Chute → Heat Shield → Powered Landing → Solar Approach', () => {
       const names = getNodesByBranch(TechBranch.RECOVERY).map((n) => n.name);
       expect(names).toEqual([
         'Parachute Mk2', 'Drogue Chute', 'Heat Shield',
-        'Powered Landing', 'Reusable Booster',
+        'Powered Landing', 'Solar Approach',
       ]);
     });
 

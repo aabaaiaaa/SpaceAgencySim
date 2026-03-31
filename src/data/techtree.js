@@ -274,21 +274,21 @@ export const TECH_NODES = Object.freeze([
     tier:               4,
     scienceCost:        TIER_COSTS[4].science,
     fundsCost:          TIER_COSTS[4].funds,
-    unlocksParts:       ['landing-legs-powered'],
+    unlocksParts:       ['landing-legs-powered', 'heat-shield-mk2'],
     unlocksInstruments: [],
-    description:        'Retro-propulsion landing systems for controlled vertical touchdown.',
+    description:        'Retro-propulsion landing systems and heavy-duty heat shields for crewed reentry.',
   }),
 
   Object.freeze({
     id:                 'recov-t5',
-    name:               'Reusable Booster',
+    name:               'Solar Approach',
     branch:             TechBranch.RECOVERY,
     tier:               5,
     scienceCost:        TIER_COSTS[5].science,
     fundsCost:          TIER_COSTS[5].funds,
-    unlocksParts:       ['booster-reusable'],
+    unlocksParts:       ['booster-reusable', 'heat-shield-solar'],
     unlocksInstruments: [],
-    description:        'Autonomous booster recovery and refurbishment — dramatically reduces launch costs.',
+    description:        'Reusable boosters and exotic solar heat shields for close approach to the Sun.',
   }),
 
   // ── Science Branch ───────────────────────────────────────────────────────

@@ -34,6 +34,9 @@ import {
   POWER_DRAW_COMMS,
   POWER_CRITICAL_THRESHOLD,
   SOLAR_PANEL_EFFICIENCY,
+  ONE_AU,
+  MAX_SOLAR_IRRADIANCE_MULTIPLIER,
+  SOLAR_IRRADIANCE_1AU,
 } from './constants.js';
 import { getPartById } from '../data/parts.js';
 
@@ -108,6 +111,32 @@ export function getSunlitFraction(altitude, bodyId) {
   const halfAngle = getShadowHalfAngle(altitude, bodyId);
   // Sunlit fraction = 1 − (shadow arc / full circle).
   return Math.max(0, Math.min(1, 1 - halfAngle / 180));
+}
+
+// ---------------------------------------------------------------------------
+// Distance-based solar irradiance (Sun proximity)
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute the solar irradiance scale factor based on distance from the
+ * Sun's centre.  When orbiting the Sun directly, irradiance scales with
+ * the inverse square of the distance (closer = exponentially brighter).
+ *
+ * For bodies other than the Sun, returns the pre-defined per-body constant.
+ *
+ * @param {number} altitude  Altitude above body surface (metres).
+ * @param {string} bodyId    Celestial body identifier.
+ * @returns {number}  Irradiance scale factor (1.0 = Earth distance).
+ */
+export function getSolarIrradianceScale(altitude, bodyId) {
+  if (bodyId === 'SUN') {
+    const sunRadius = BODY_RADIUS.SUN;
+    const dist = sunRadius + Math.max(0, altitude);
+    // Inverse-square from 1 AU.
+    const scale = (ONE_AU * ONE_AU) / (dist * dist);
+    return Math.min(scale, MAX_SOLAR_IRRADIANCE_MULTIPLIER);
+  }
+  return SOLAR_IRRADIANCE_SCALE[bodyId] ?? 1.0;
 }
 
 // ---------------------------------------------------------------------------
@@ -247,7 +276,10 @@ export function tickPower(powerState, opts) {
   }
 
   // --- Sunlight check ---
-  if (angularPositionDeg != null && inOrbit) {
+  if (bodyId === 'SUN') {
+    // Orbiting the Sun: always in direct sunlight (no shadow cone).
+    powerState.sunlit = true;
+  } else if (angularPositionDeg != null && inOrbit) {
     const sunAngle = getSunAngle(gameTimeSeconds);
     const halfAngle = getShadowHalfAngle(altitude, bodyId);
     powerState.sunlit = isSunlit(angularPositionDeg, sunAngle, halfAngle);
@@ -260,8 +292,9 @@ export function tickPower(powerState, opts) {
   }
 
   // --- Solar generation ---
-  const irradianceScale = SOLAR_IRRADIANCE_SCALE[bodyId] ?? 1.0;
-  const irradiance = irradianceScale * 1361; // W/m² at this body
+  // Use distance-based irradiance when orbiting the Sun (extreme power near Sun).
+  const irradianceScale = getSolarIrradianceScale(altitude, bodyId);
+  const irradiance = irradianceScale * SOLAR_IRRADIANCE_1AU; // W/m² at this distance
   const rawGeneration = powerState.solarPanelArea * irradiance * SOLAR_PANEL_EFFICIENCY;
   powerState.solarGeneration = powerState.sunlit ? rawGeneration : 0;
 
@@ -312,9 +345,9 @@ export function tickPower(powerState, opts) {
  * @returns {{ avgGeneration: number, sunlitFraction: number }}
  */
 export function getSatellitePowerInfo(altitude, bodyId, panelArea = 2.0) {
-  const fraction = getSunlitFraction(altitude, bodyId);
-  const irradianceScale = SOLAR_IRRADIANCE_SCALE[bodyId] ?? 1.0;
-  const rawPower = panelArea * irradianceScale * 1361 * SOLAR_PANEL_EFFICIENCY;
+  const fraction = bodyId === 'SUN' ? 1.0 : getSunlitFraction(altitude, bodyId);
+  const irradianceScale = getSolarIrradianceScale(altitude, bodyId);
+  const rawPower = panelArea * irradianceScale * SOLAR_IRRADIANCE_1AU * SOLAR_PANEL_EFFICIENCY;
   return {
     avgGeneration: rawPower * fraction,
     sunlitFraction: fraction,

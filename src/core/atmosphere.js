@@ -51,6 +51,13 @@
 
 import { getPartById } from '../data/parts.js';
 import { PartType } from './constants.js';
+import {
+  SUN_DESTRUCTION_ALTITUDE,
+  SUN_HEAT_START_ALTITUDE,
+  SUN_HEAT_RATE_BASE,
+  STANDARD_SHIELD_SOLAR_RESISTANCE,
+  BODY_RADIUS,
+} from './constants.js';
 import { getAirDensity as _bodyAirDensity, getAtmosphereTop as _bodyAtmoTop, hasAtmosphere } from '../data/bodies.js';
 
 // ---------------------------------------------------------------------------
@@ -445,6 +452,155 @@ export function updateHeat(ps, assembly, flightState, speed, altitude, density) 
       partName:    name,
       altitude,
       description: `${name} destroyed by atmospheric heating at ${altitude.toFixed(0)} m.`,
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Solar proximity heat system
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute the solar heat rate at a given altitude above the Sun's surface.
+ *
+ * Uses inverse-square scaling from the Sun's centre:
+ *   heatRate = BASE × (startDist / dist)²
+ *
+ * where `startDist` = SUN_HEAT_START_ALTITUDE + Sun radius
+ *   and `dist`      = altitude + Sun radius.
+ *
+ * Returns 0 when the altitude is above SUN_HEAT_START_ALTITUDE.
+ *
+ * @param {number} altitude  Altitude above Sun surface in metres.
+ * @returns {number}  Heat units per tick.
+ */
+export function computeSolarHeatRate(altitude) {
+  if (altitude >= SUN_HEAT_START_ALTITUDE) return 0;
+
+  const sunRadius = BODY_RADIUS.SUN;
+  const dist     = sunRadius + Math.max(0, altitude);
+  const startDist = sunRadius + SUN_HEAT_START_ALTITUDE;
+
+  // Inverse-square: closer = exponentially more heat.
+  const ratio = startDist / dist;
+  return SUN_HEAT_RATE_BASE * ratio * ratio;
+}
+
+/**
+ * Return the best solar heat resistance among active heat shields.
+ *
+ * Heat shields with the `solarHeatResistance` property (e.g. Solar Heat
+ * Shield) provide their declared resistance (0–1).  Standard heat shields
+ * without the property provide STANDARD_SHIELD_SOLAR_RESISTANCE (0.3).
+ *
+ * @param {Set<string>} activeParts
+ * @param {Map<string, { partId: string }>} assemblyParts
+ * @returns {number}  Best resistance factor (0–1), or 0 if no shields.
+ */
+function _getBestSolarShieldResistance(activeParts, assemblyParts) {
+  let best = 0;
+  for (const instanceId of activeParts) {
+    const placed = assemblyParts.get(instanceId);
+    if (!placed) continue;
+    const def = getPartById(placed.partId);
+    if (!def || def.type !== PartType.HEAT_SHIELD) continue;
+
+    const resistance = def.properties?.solarHeatResistance ?? STANDARD_SHIELD_SOLAR_RESISTANCE;
+    if (resistance > best) best = resistance;
+  }
+  return best;
+}
+
+/**
+ * Apply solar proximity heat to all parts when the craft is near the Sun.
+ *
+ * Unlike atmospheric reentry heat (which only affects the leading face),
+ * solar radiant heat affects ALL parts uniformly — there is no "leading
+ * face" in radiative heating.  Heat shields with solarHeatResistance
+ * reduce the heat rate for shielded parts (same shielding logic as
+ * atmospheric heat — parts behind the shield in the stack).
+ *
+ * DESTRUCTION ZONE: If altitude < SUN_DESTRUCTION_ALTITUDE, ALL parts are
+ * instantly destroyed — the craft is vaporised.  This is the point of no
+ * return.
+ *
+ * @param {import('./physics.js').PhysicsState}          ps
+ * @param {import('./rocketbuilder.js').RocketAssembly}  assembly
+ * @param {import('./gameState.js').FlightState}         flightState
+ * @param {number} altitude  Altitude above Sun surface (m).
+ */
+export function updateSolarHeat(ps, assembly, flightState, altitude) {
+  // Only applies when orbiting / flying near the Sun.
+  if (altitude >= SUN_HEAT_START_ALTITUDE) return;
+
+  // --- Destruction zone: instant vaporisation ---
+  if (altitude < SUN_DESTRUCTION_ALTITUDE) {
+    const toDestroy = [...ps.activeParts];
+    for (const instanceId of toDestroy) {
+      const placed = assembly.parts.get(instanceId);
+      const def    = placed ? getPartById(placed.partId) : null;
+      const name   = def?.name ?? 'Unknown part';
+
+      ps.activeParts.delete(instanceId);
+      ps.firingEngines.delete(instanceId);
+      ps.heatMap.delete(instanceId);
+
+      flightState.events.push({
+        type:        'PART_DESTROYED',
+        time:        flightState.timeElapsed,
+        instanceId,
+        partName:    name,
+        altitude,
+        description: `${name} vaporised by solar inferno at ${(altitude / 1_000_000).toFixed(0)} Mm altitude.`,
+      });
+    }
+    return;
+  }
+
+  // --- Escalating heat damage ---
+  const solarHeatRate = computeSolarHeatRate(altitude);
+  if (solarHeatRate <= 0) return;
+
+  // Determine shield protection.
+  const shieldResistance = _getBestSolarShieldResistance(ps.activeParts, assembly.parts);
+  const shielded = shieldResistance > 0 ? getShieldedPartIds(ps, assembly) : new Set();
+
+  const toDestroy = [];
+
+  for (const instanceId of ps.activeParts) {
+    let heat = ps.heatMap.get(instanceId) ?? 0;
+
+    if (shielded.has(instanceId)) {
+      // Shielded parts receive reduced solar heat.
+      heat += solarHeatRate * (1 - shieldResistance);
+    } else {
+      // Unshielded parts receive full solar heat.
+      heat += solarHeatRate;
+    }
+
+    ps.heatMap.set(instanceId, heat);
+
+    // Check destruction.
+    const placed = assembly.parts.get(instanceId);
+    const def    = placed ? getPartById(placed.partId) : null;
+    if (heat > getHeatTolerance(def)) {
+      toDestroy.push({ instanceId, name: def?.name ?? 'Unknown part' });
+    }
+  }
+
+  // Destroy overheated parts.
+  for (const { instanceId, name } of toDestroy) {
+    ps.activeParts.delete(instanceId);
+    ps.firingEngines.delete(instanceId);
+    ps.heatMap.delete(instanceId);
+
+    flightState.events.push({
+      type:        'PART_DESTROYED',
+      time:        flightState.timeElapsed,
+      instanceId,
+      partName:    name,
+      altitude,
+      description: `${name} destroyed by solar radiation at ${(altitude / 1_000_000).toFixed(0)} Mm from the Sun.`,
     });
   }
 }

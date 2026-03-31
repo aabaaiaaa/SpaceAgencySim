@@ -101,12 +101,22 @@ const SUN = {
   orbitalDistance: 0,
   orbitalPeriod: 0,
   biomes: [
-    { id: 'SOLAR_CORONA',        name: 'Solar Corona',         min: 0,           max: 2_000_000_000, scienceMultiplier: 10.0, color: 0xffdd44 },
-    { id: 'NEAR_SUN',            name: 'Near Sun Space',       min: 2_000_000_000, max: Infinity,    scienceMultiplier: 6.0,  color: 0xff8800 },
+    // Destruction zone — craft is instantly vaporised (point of no return).
+    { id: 'SUN_INFERNO',         name: 'Solar Inferno',        min: 0,                max: 500_000_000,     scienceMultiplier: 0,    color: 0xffffff },
+    // Inner corona — extreme heat, only advanced solar heat shields survive.
+    { id: 'SUN_INNER_CORONA',    name: 'Inner Corona',         min: 500_000_000,      max: 2_000_000_000,   scienceMultiplier: 12.0, color: 0xffee44 },
+    // Outer corona — heavy heat damage, good heat shields required.
+    { id: 'SUN_OUTER_CORONA',    name: 'Outer Corona',         min: 2_000_000_000,    max: 10_000_000_000,  scienceMultiplier: 8.0,  color: 0xffaa22 },
+    // Near Sun space — moderate heat damage escalating on approach.
+    { id: 'SUN_NEAR_SPACE',      name: 'Near Sun Space',       min: 10_000_000_000,   max: 30_000_000_000,  scienceMultiplier: 5.0,  color: 0xff8800 },
+    // Solar orbit — safe interplanetary space. Planetary orbits are within this zone.
+    { id: 'SUN_SOLAR_ORBIT',     name: 'Solar Orbit',          min: 30_000_000_000,   max: Infinity,        scienceMultiplier: 3.0,  color: 0x332200 },
   ],
   altitudeBands: [
-    { id: 'INNER_CORONA', name: 'Inner Corona',  min: 0,               max: 2_000_000_000 },
-    { id: 'OUTER_CORONA', name: 'Outer Corona',  min: 2_000_000_000,   max: 20_000_000_000 },
+    { id: 'INNER_CORONA', name: 'Inner Corona',   min: 500_000_000,     max: 2_000_000_000 },
+    { id: 'OUTER_CORONA', name: 'Outer Corona',   min: 2_000_000_000,   max: 10_000_000_000 },
+    { id: 'NSS',          name: 'Near Sun Space',  min: 10_000_000_000,  max: 30_000_000_000 },
+    { id: 'SOL',          name: 'Solar Orbit',     min: 30_000_000_000,  max: 300_000_000_000 },
   ],
   groundVisual: { color: 0xffcc00, description: 'Incandescent plasma surface' },
   skyVisual: {
@@ -122,7 +132,7 @@ const SUN = {
   parentId: null,
   childIds: ['MERCURY', 'VENUS', 'EARTH', 'MARS'],
   minOrbitAltitude: 2_000_000_000, // Well above the corona
-  destructionZone: 'extreme_heat', // Craft destroyed below corona altitude
+  destructionZone: 'extreme_heat', // Craft destroyed below destruction altitude
 };
 
 /** @type {CelestialBodyDef} */

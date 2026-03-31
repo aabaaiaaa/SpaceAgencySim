@@ -532,9 +532,9 @@ describe('Biome integrity', () => {
         expect(new Set(ids).size).toBe(ids.length);
       });
 
-      it('all biomes have positive science multipliers', () => {
+      it('all biomes have non-negative science multipliers (0 for destruction zones)', () => {
         for (const biome of body.biomes) {
-          expect(biome.scienceMultiplier).toBeGreaterThan(0);
+          expect(biome.scienceMultiplier).toBeGreaterThanOrEqual(0);
         }
       });
     });

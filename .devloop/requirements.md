@@ -266,7 +266,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Define bodies as data objects parameterising physics and rendering: name, surface gravity, radius, atmosphere (density profile, scale height, top altitude or none), orbital distance, orbital period, biomes, ground visual, sky visual, weather, landable flag, and sphere of influence (SOI) radius. Each body has an SOI — the region where its gravity dominates. The Sun's SOI encompasses the entire solar system. When a craft crosses an SOI boundary it transitions from one body's gravitational dominance to another's (e.g., leaving Earth SOI enters Sun's, entering Moon's SOI leaves Earth's). SOI detection is critical for transfers (TASK-041) and the CAPTURE flight phase (TASK-003). Initial bodies: Sun (274 m/s², destruction altitude, extreme heat, high-value science), Mercury (3.7 m/s², no atmo), Venus (8.87 m/s², very dense atmo), Earth (9.81 m/s²), Moon (1.62 m/s², no atmo), Mars (3.72 m/s², thin atmo, dust storms), Phobos (0.0057 m/s²), Deimos (0.003 m/s²). Each body has unique biomes.
 
 ### TASK-040: Sun mechanics
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-039
 - **Description**: Sun as gravitational centre of solar system. No solid surface but "surface" altitude where heat destroys everything. Destruction altitude (point of no return). Escalating heat damage on approach — only advanced heat shields allow close approach. Unique biomes (solar orbit, outer/inner corona) with very high science multipliers. Extreme solar power near Sun. Late-game challenge. Players in solar orbit from failed transfers can burn toward planetary bodies to escape. Light source for day/night power cycle and shadow calculations.
