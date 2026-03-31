@@ -79,6 +79,9 @@ export const ActivationBehaviour = Object.freeze({
 
   /** Science lab: begin processing collected science data for bonus yield. */
   PROCESS_SCIENCE: 'PROCESS_SCIENCE',
+
+  /** Grabbing arm: extend, grab a satellite, or release a grabbed satellite. */
+  GRAB: 'GRAB',
 });
 
 // ---------------------------------------------------------------------------
@@ -231,6 +234,7 @@ export const RADIAL_TYPES = Object.freeze([
   PartType.ANTENNA,
   PartType.SENSOR,
   PartType.INSTRUMENT,
+  PartType.GRABBING_ARM,
 ]);
 
 // ---------------------------------------------------------------------------
@@ -2411,6 +2415,50 @@ export const PARTS = [
       heatTolerance: 3000,
       crashThreshold: 50,
       isLaunchClamp: true,
+    },
+  },
+
+  // =========================================================================
+  // GRABBING ARMS
+  // =========================================================================
+
+  /**
+   * Grabbing Arm — extends out to attach the player craft to a satellite.
+   *
+   * Once attached, the player can repair the satellite (restoring health to
+   * 100) or perform other servicing actions.  The arm is small and light
+   * enough to grab compact satellite payloads.
+   *
+   * Mounts radially (left/right) on the craft body.  In orbit, the player
+   * activates the arm to extend it toward a targeted satellite within
+   * GRAB_ARM_RANGE.  Alignment requirements are looser than docking.
+   */
+  {
+    id: 'grabbing-arm',
+    name: 'Grabbing Arm',
+    description: 'A compact robotic arm that extends to grab nearby satellites for repair and servicing. Once attached, restores the satellite to full health. Mount radially on your craft. Requires close proximity to the target satellite in orbit.',
+    type: PartType.GRABBING_ARM,
+    reliability: RELIABILITY_TIERS.MID,
+    mass: 150,
+    cost: 35_000,
+    width: 12,   // 0.6 m — compact profile
+    height: 24,  // 1.2 m — extends when deployed
+    snapPoints: [
+      // Radial mount — attaches to the side of a stack part.
+      makeSnapPoint('left',  -6, 0, RADIAL_TYPES),
+      makeSnapPoint('right',  6, 0, RADIAL_TYPES),
+    ],
+    animationStates: ['stowed', 'extending', 'grabbed', 'retracting'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.GRAB,
+    properties: {
+      /** Maximum reach of the arm in metres (matching GRAB_ARM_RANGE constant). */
+      armReach: 25,
+      /** Maximum relative speed (m/s) at which the arm can safely grab. */
+      maxGrabSpeed: 1.0,
+      dragCoefficient: 0.04,
+      heatTolerance: 1600,
+      crashThreshold: 8,
     },
   },
 

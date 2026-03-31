@@ -212,9 +212,9 @@ export const TECH_NODES = Object.freeze([
     tier:               4,
     scienceCost:        TIER_COSTS[4].science,
     fundsCost:          TIER_COSTS[4].funds,
-    unlocksParts:       ['docking-port-std', 'docking-port-small', 'relay-antenna', 'antenna-relay'],
+    unlocksParts:       ['docking-port-std', 'docking-port-small', 'relay-antenna', 'antenna-relay', 'grabbing-arm'],
     unlocksInstruments: [],
-    description:        'Docking mechanisms, orbital assembly, and interplanetary relay dishes.',
+    description:        'Docking mechanisms, grabbing arms, orbital assembly, and interplanetary relay dishes.',
   }),
 
   Object.freeze({

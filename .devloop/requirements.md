@@ -192,7 +192,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Solar panels generate power when sunlit (position-based day/night relative to nearest star). Batteries store power for eclipse. Power consumers: science instruments, communication/transmission, rotation (small). Built-in batteries on command/probe modules and pre-made satellite parts. Separate battery parts for custom satellites. Satellite ops centre shadow overlay. Map view optional shadow overlay. Orbital manoeuvres don't require power unless engine specifically uses electrical power.
 
 ### TASK-029: Satellite repair — grabbing arm
-- **Status**: pending
+- **Status**: done
 - **Priority**: low
 - **Dependencies**: TASK-027
 - **Description**: New grabbing arm part ($35k, 150kg) that extends out and attaches player craft to a satellite. Once attached, repair or other actions can be performed. Arm small enough to grab satellites. Part data definition (cost, mass, thermal rating, etc.) is included in this task — the grabbing arm is self-contained here rather than in TASK-045.

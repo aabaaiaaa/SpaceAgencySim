@@ -62,6 +62,8 @@ export const PartType = Object.freeze({
   SENSOR: 'SENSOR',
   /** Specialised scientific instrument for satellite platforms. */
   INSTRUMENT: 'INSTRUMENT',
+  /** Grabbing arm for attaching to satellites for repair and servicing. */
+  GRABBING_ARM: 'GRABBING_ARM',
 });
 
 // ---------------------------------------------------------------------------
@@ -1537,6 +1539,48 @@ export const DOCKING_AUTO_APPROACH_SPEED = 0.5;
 
 /** Separation impulse speed (m/s) applied when undocking. */
 export const UNDOCKING_SEPARATION_SPEED = 1.0;
+
+// ---------------------------------------------------------------------------
+// Grabbing Arm System
+// ---------------------------------------------------------------------------
+
+/**
+ * Grabbing arm procedure states.
+ * @enum {string}
+ */
+export const GrabState = Object.freeze({
+  /** No grab in progress. */
+  IDLE: 'IDLE',
+  /** Target satellite selected, approaching within range. */
+  APPROACHING: 'APPROACHING',
+  /** Arm extending toward satellite. */
+  EXTENDING: 'EXTENDING',
+  /** Arm attached to satellite — repair/service actions available. */
+  GRABBED: 'GRABBED',
+  /** Arm retracting after release. */
+  RELEASING: 'RELEASING',
+});
+
+/** Maximum angular distance (degrees) at which a satellite becomes targetable for grabbing. */
+export const GRAB_VISUAL_RANGE_DEG = 3;
+
+/** Distance (m) at which the grabbing arm guidance activates. */
+export const GRAB_GUIDANCE_RANGE = 500;
+
+/** Distance (m) at which the arm can extend and grab. */
+export const GRAB_ARM_RANGE = 25;
+
+/** Maximum relative speed (m/s) for safe grabbing. */
+export const GRAB_MAX_RELATIVE_SPEED = 1.0;
+
+/** Maximum lateral offset (m) for acceptable grab alignment. */
+export const GRAB_MAX_LATERAL_OFFSET = 5.0;
+
+/** Health points restored when a satellite is repaired via grabbing arm. */
+export const GRAB_REPAIR_HEALTH = 100;
+
+/** Separation impulse speed (m/s) applied when releasing a grabbed satellite. */
+export const GRAB_RELEASE_SPEED = 0.5;
 
 // ---------------------------------------------------------------------------
 // Part Inventory & Wear System
