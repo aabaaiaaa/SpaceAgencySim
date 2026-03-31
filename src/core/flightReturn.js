@@ -29,6 +29,12 @@ import { processContractCompletions, generateContracts } from './contracts.js';
 import { deploySatellitesFromFlight } from './satellites.js';
 import { awardFlightXP, getMaxCrewSkill, processFlightInjuries } from './crew.js';
 import { recoverPartsToInventory } from './partInventory.js';
+import {
+  applyCrewDeathReputation,
+  applySafeCrewReturnReputation,
+  applyMissionFailureReputation,
+  applyRocketDestructionReputation,
+} from './reputation.js';
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -64,6 +70,8 @@ import { recoverPartsToInventory } from './partInventory.js';
  * @property {Array<{id: string, name: string, piloting: number, engineering: number, science: number}>} crewXPGains - Skill XP gains per crew member.
  * @property {Array<{crewId: string, crewName: string, cause: string, periods: number, altitude: number}>} crewInjuries - Crew injuries sustained this flight.
  * @property {import('./gameState.js').InventoryPart[]} recoveredParts - Parts recovered to inventory.
+ * @property {number}  reputationChange - Net reputation change this flight.
+ * @property {number}  reputationAfter  - Reputation value after all changes.
  */
 
 /**
@@ -85,6 +93,7 @@ import { recoverPartsToInventory } from './partInventory.js';
  */
 export function processFlightReturn(state, flightState, ps, assembly) {
   const cashBefore = state.money;
+  const repBefore = state.reputation ?? 50;
 
   /** @type {CompletedMissionEntry[]} */
   const completedMissions = [];
@@ -202,6 +211,39 @@ export function processFlightReturn(state, flightState, ps, assembly) {
     flightState.deathFinesApplied = true;
   }
 
+  // ── 6a. Reputation events ──────────────────────────────────────────────
+  {
+    const isCrashed = !!(ps && ps.crashed);
+    const crewIds = Array.isArray(flightState?.crewIds) ? flightState.crewIds : [];
+    const ejectedIds = ps?.ejectedCrewIds ?? new Set();
+    const kiaCount = isCrashed ? crewIds.filter((id) => !ejectedIds.has(id)).length : 0;
+
+    // Crew death: −10 per KIA.
+    if (kiaCount > 0) {
+      applyCrewDeathReputation(state, kiaCount);
+    }
+
+    // Safe crew return: +1 per surviving crew member on a safe landing.
+    if (isLanded && crewIds.length > 0) {
+      const safeCount = crewIds.length - kiaCount;
+      if (safeCount > 0) {
+        applySafeCrewReturnReputation(state, safeCount);
+      }
+    }
+
+    // Rocket destruction without recovery: −2.
+    if (isCrashed && !isLanded) {
+      applyRocketDestructionReputation(state);
+    }
+
+    // Mission/contract failure: −3 if the flight ended without completing
+    // any missions or contracts (outcome = FAILURE).
+    const outcome = _determineOutcome(ps, completedMissions.length > 0);
+    if (outcome === FlightOutcome.FAILURE) {
+      applyMissionFailureReputation(state);
+    }
+  }
+
   // ── 6b. Contract completions ───────────────────────────────────────────
   const contractResult = processContractCompletions(state);
 
@@ -269,6 +311,8 @@ export function processFlightReturn(state, flightState, ps, assembly) {
     crewXPGains,
     crewInjuries,
     recoveredParts,
+    reputationChange: (state.reputation ?? 50) - repBefore,
+    reputationAfter:  state.reputation ?? 50,
   };
 }
 

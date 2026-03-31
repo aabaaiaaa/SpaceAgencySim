@@ -22,7 +22,8 @@ import {
   CONTRACTS_PER_FLIGHT_MAX,
   CONTRACT_BOARD_EXPIRY_FLIGHTS,
   CONTRACT_CANCEL_PENALTY_RATE,
-  CONTRACT_REP_GAIN_BASE,
+  CONTRACT_REP_GAIN_MIN,
+  CONTRACT_REP_GAIN_MAX,
   CONTRACT_REP_LOSS_CANCEL,
   CONTRACT_REP_LOSS_FAIL,
   CONTRACT_BONUS_REWARD_RATE,
@@ -136,7 +137,7 @@ export function generateContracts(state) {
       bonusReward: data.bonusReward ?? 0,
       reward: data.reward,
       penaltyFee: Math.round(data.reward * CONTRACT_CANCEL_PENALTY_RATE),
-      reputationReward: CONTRACT_REP_GAIN_BASE + Math.floor(data.reward / 50_000),
+      reputationReward: CONTRACT_REP_GAIN_MIN + Math.floor(Math.random() * (CONTRACT_REP_GAIN_MAX - CONTRACT_REP_GAIN_MIN + 1)),
       reputationPenalty: CONTRACT_REP_LOSS_CANCEL,
       deadlinePeriod: data.deadlineFlights != null
         ? state.currentPeriod + data.deadlineFlights
@@ -278,7 +279,7 @@ export function completeContract(state, contractId) {
       bonusReward: data.bonusReward ?? 0,
       reward: data.reward,
       penaltyFee: Math.round(data.reward * CONTRACT_CANCEL_PENALTY_RATE),
-      reputationReward: CONTRACT_REP_GAIN_BASE + Math.floor(data.reward / 50_000),
+      reputationReward: CONTRACT_REP_GAIN_MIN + Math.floor(Math.random() * (CONTRACT_REP_GAIN_MAX - CONTRACT_REP_GAIN_MIN + 1)),
       reputationPenalty: CONTRACT_REP_LOSS_CANCEL,
       deadlinePeriod: data.deadlineFlights != null
         ? state.currentPeriod + data.deadlineFlights

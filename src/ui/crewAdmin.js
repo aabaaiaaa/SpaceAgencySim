@@ -13,8 +13,8 @@
  * @module crewAdmin
  */
 
-import { hireCrew, fireCrew, getActiveCrew, getFullHistory } from '../core/crew.js';
-import { AstronautStatus, HIRE_COST } from '../core/constants.js';
+import { hireCrew, fireCrew, getActiveCrew, getFullHistory, getAdjustedHireCost } from '../core/crew.js';
+import { AstronautStatus } from '../core/constants.js';
 import { refreshTopBar } from './topbar.js';
 
 // ---------------------------------------------------------------------------
@@ -767,7 +767,8 @@ function _renderHireTab() {
   if (!content || !_state) return;
 
   const cash         = _state.money;
-  const canAfford    = cash >= HIRE_COST;
+  const hireCost     = getAdjustedHireCost(_state.reputation ?? 50);
+  const canAfford    = cash >= hireCost;
   const activeCrew   = getActiveCrew(_state);
   const atCapacity   = activeCrew.length >= 20; // MAX_CREW_SIZE
 
@@ -780,7 +781,7 @@ function _renderHireTab() {
   cashBox.innerHTML = `
     <div class="hire-cash-label">Current Funds</div>
     <div class="hire-cash-amount ${canAfford ? '' : 'insufficient'}">${fmtCash(cash)}</div>
-    <div class="hire-cost-note">Hire cost: ${fmtCash(HIRE_COST)} per astronaut</div>
+    <div class="hire-cost-note">Hire cost: ${fmtCash(hireCost)} per astronaut</div>
   `;
   panel.appendChild(cashBox);
 
@@ -818,7 +819,7 @@ function _renderHireTab() {
   const hireBtn = document.createElement('button');
   hireBtn.className = 'hire-btn';
   hireBtn.disabled = !canAfford;
-  hireBtn.textContent = `Hire Astronaut — ${fmtCash(HIRE_COST)}`;
+  hireBtn.textContent = `Hire Astronaut — ${fmtCash(hireCost)}`;
   panel.appendChild(hireBtn);
 
   // Feedback message

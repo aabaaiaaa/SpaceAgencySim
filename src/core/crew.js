@@ -22,6 +22,7 @@ import {
   HARD_LANDING_INJURY_MAX,
   EJECTION_INJURY_PERIODS,
   MEDICAL_CARE_COST,
+  getCrewCostModifier,
 } from './constants.js';
 
 // ---------------------------------------------------------------------------
@@ -105,25 +106,43 @@ function createAstronaut({ name, salary = CREW_SALARY_PER_PERIOD, hireDate = new
 // ---------------------------------------------------------------------------
 
 /**
+ * Get the actual crew hiring cost after applying the reputation modifier.
+ *
+ * @param {number} reputation  Current agency reputation (0–100).
+ * @returns {number}  Adjusted hire cost (floored to whole dollars).
+ */
+export function getAdjustedHireCost(reputation) {
+  return Math.floor(HIRE_COST * getCrewCostModifier(reputation));
+}
+
+/**
  * Hire a new astronaut.
  *
- * Deducts $50,000 from the player's cash via `spend()`. If the player cannot
- * afford the fee, no astronaut is added and the function returns a failure
- * result (cash is not modified).
+ * Deducts the reputation-adjusted hire cost from the player's cash via
+ * `spend()`. If the player cannot afford the fee, no astronaut is added
+ * and the function returns a failure result (cash is not modified).
+ *
+ * Base cost: $50,000.  Modified by reputation tier:
+ *   0–20:  +50 % → $75,000
+ *   21–40: +25 % → $62,500
+ *   41–60: normal → $50,000
+ *   61–80: −10 % → $45,000
+ *   81–100:−25 % → $37,500
  *
  * @param {import('./gameState.js').GameState} state
  * @param {string} name  Display name for the new astronaut.
- * @returns {{ success: boolean, astronaut?: Astronaut, error?: string }}
+ * @returns {{ success: boolean, astronaut?: Astronaut, cost?: number, error?: string }}
  */
 export function hireCrew(state, name) {
-  const ok = spend(state, HIRE_COST);
+  const cost = getAdjustedHireCost(state.reputation ?? 50);
+  const ok = spend(state, cost);
   if (!ok) {
-    return { success: false, error: 'Insufficient funds to hire astronaut.' };
+    return { success: false, error: `Insufficient funds to hire astronaut (need $${cost.toLocaleString('en-US')}).` };
   }
 
   const astronaut = createAstronaut({ name });
   state.crew.push(astronaut);
-  return { success: true, astronaut };
+  return { success: true, astronaut, cost };
 }
 
 /**

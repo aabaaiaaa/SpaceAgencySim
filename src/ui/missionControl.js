@@ -17,7 +17,7 @@
 
 import { acceptMission, getUnlockedMissions } from '../core/missions.js';
 import { acceptContract, cancelContract, getContractCaps, getActiveConflicts } from '../core/contracts.js';
-import { CONTRACT_CATEGORY_ICONS } from '../core/constants.js';
+import { CONTRACT_CATEGORY_ICONS, getReputationTier } from '../core/constants.js';
 import { getPartById } from '../data/parts.js';
 import { refreshTopBarMissions } from './topbar.js';
 
@@ -1043,15 +1043,18 @@ function _renderContractsBoardTab() {
   capsInfo.textContent = `Board: ${contracts.length}/${caps.pool} slots | Active: ${(_state.contracts?.active ?? []).length}/${caps.active} slots`;
   content.appendChild(capsInfo);
 
-  // Reputation bar
+  // Reputation bar (colour-coded by tier)
+  const rep = _state.reputation ?? 50;
+  const repTier = getReputationTier(rep);
   const repBar = document.createElement('div');
   repBar.className = 'mc-reputation-bar';
-  repBar.innerHTML = `<span>Reputation: ${_state.reputation ?? 50}</span>`;
+  repBar.innerHTML = `<span>Reputation: <strong style="color:${repTier.color}">${Math.round(rep)}</strong></span><span style="font-size:0.72rem;color:${repTier.color};background:${repTier.color}22;border:1px solid ${repTier.color}44;padding:1px 6px;border-radius:3px;margin-left:4px;text-transform:uppercase;letter-spacing:0.04em;font-weight:600">${repTier.label}</span>`;
   const repTrack = document.createElement('div');
   repTrack.className = 'mc-rep-track';
   const repFill = document.createElement('div');
   repFill.className = 'mc-rep-fill';
-  repFill.style.width = `${Math.max(0, Math.min(100, _state.reputation ?? 50))}%`;
+  repFill.style.width = `${Math.max(0, Math.min(100, rep))}%`;
+  repFill.style.backgroundColor = repTier.color;
   repTrack.appendChild(repFill);
   repBar.appendChild(repTrack);
   content.appendChild(repBar);

@@ -215,13 +215,14 @@ describe('canBuildFacility', () => {
 // ---------------------------------------------------------------------------
 
 describe('buildFacility', () => {
-  it('builds a facility and deducts cost', () => {
+  it('builds a facility and deducts cost (with reputation discount)', () => {
     const state = nonTutorialState();
     state.money = 500_000;
+    // At starting reputation (50, Good tier), 5 % discount applies.
     const result = buildFacility(state, FacilityId.CREW_ADMIN);
     expect(result.success).toBe(true);
     expect(hasFacility(state, FacilityId.CREW_ADMIN)).toBe(true);
-    expect(state.money).toBe(400_000);
+    expect(state.money).toBe(405_000); // 500k − 100k×0.95 = 405k
     expect(state.facilities[FacilityId.CREW_ADMIN].tier).toBe(1);
   });
 
@@ -269,7 +270,9 @@ describe('buildFacility', () => {
     const result = buildFacility(state, FacilityId.RD_LAB);
     expect(result.success).toBe(true);
     expect(hasFacility(state, FacilityId.RD_LAB)).toBe(true);
-    expect(state.money).toBe(200_000); // 500k - 300k
+    // At starting reputation (50, Good tier), 5 % money discount applies.
+    // Science cost is never discounted.
+    expect(state.money).toBe(215_000); // 500k − 300k×0.95 = 215k
     expect(state.sciencePoints).toBe(30); // 50 - 20
   });
 
@@ -463,18 +466,21 @@ describe('upgradeFacility', () => {
 // ---------------------------------------------------------------------------
 
 describe('getDiscountedMoneyCost', () => {
-  it('returns full cost at starting reputation', () => {
-    expect(getDiscountedMoneyCost(100_000, STARTING_REPUTATION)).toBe(100_000);
+  it('returns 5 % discounted cost at starting reputation (Good tier)', () => {
+    // Starting reputation 50 is in the Good tier (5 % discount).
+    expect(getDiscountedMoneyCost(100_000, STARTING_REPUTATION)).toBe(95_000);
   });
 
-  it('returns discounted cost at high reputation', () => {
+  it('returns 15 % discounted cost at Elite reputation', () => {
     const cost = getDiscountedMoneyCost(100_000, 100);
     const discount = getReputationDiscount(100);
+    expect(discount).toBe(0.15);
     expect(cost).toBe(Math.floor(100_000 * (1 - discount)));
-    expect(cost).toBeLessThan(100_000);
+    expect(cost).toBe(85_000);
   });
 
-  it('returns full cost below starting reputation', () => {
+  it('returns full cost at Standard tier reputation', () => {
+    // Reputation 30 is in the Standard tier (0 % discount).
     expect(getDiscountedMoneyCost(100_000, 30)).toBe(100_000);
   });
 });

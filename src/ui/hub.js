@@ -20,7 +20,7 @@
  */
 
 import { showHubScene, hideHubScene, setHubWeather } from '../render/hub.js';
-import { FACILITY_DEFINITIONS, FacilityId, FACILITY_UPGRADE_DEFS, getFacilityUpgradeDef } from '../core/constants.js';
+import { FACILITY_DEFINITIONS, FacilityId, FACILITY_UPGRADE_DEFS, getFacilityUpgradeDef, getReputationTier } from '../core/constants.js';
 import {
   hasFacility, canBuildFacility, buildFacility,
   canUpgradeFacility, upgradeFacility, getFacilityTier,
@@ -656,6 +656,59 @@ const HUB_STYLES = `
   hyphens: auto;
   user-select: none;
 }
+
+/* ── Reputation badge (hub) ────────────────────────────────────────────── */
+#hub-reputation-badge {
+  position: absolute;
+  top: 60px;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: rgba(4, 8, 20, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  pointer-events: auto;
+  z-index: 20;
+  font-family: system-ui, sans-serif;
+}
+
+.hub-rep-label {
+  font-size: 0.75rem;
+  color: #8898b0;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.hub-rep-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.hub-rep-tier {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.hub-rep-track {
+  width: 80px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.hub-rep-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s, background-color 0.3s;
+}
 `;
 
 // ---------------------------------------------------------------------------
@@ -783,6 +836,7 @@ export function initHubUI(container, state, onNavigate) {
   _renderBuildings(onNavigate);
   _renderConstructionButton(container);
   _renderBankruptcyBanner();
+  _renderReputationBadge();
   _renderWeatherPanel();
 
   // Show the PixiJS background.
@@ -1001,6 +1055,46 @@ export function showReturnResultsOverlay(container, summary, onDismiss) {
 
   content.appendChild(finSection);
 
+  // ── Reputation change (if any) ──────────────────────────────────────────
+  if (typeof summary.reputationChange === 'number' && summary.reputationChange !== 0) {
+    const repSection = document.createElement('div');
+    repSection.className = 'rr-section';
+
+    const repTitle = document.createElement('h2');
+    repTitle.textContent = 'Reputation';
+    repSection.appendChild(repTitle);
+
+    const repTier = getReputationTier(summary.reputationAfter ?? 50);
+
+    const repRow = document.createElement('div');
+    repRow.className = 'rr-row';
+    const repLabel = document.createElement('span');
+    repLabel.className = 'rr-label';
+    repLabel.textContent = 'Change';
+    const repValue = document.createElement('span');
+    const repSign = summary.reputationChange >= 0 ? '+' : '';
+    repValue.className = `rr-value ${summary.reputationChange >= 0 ? 'rr-value-positive' : 'rr-value-negative'}`;
+    repValue.textContent = `${repSign}${summary.reputationChange}`;
+    repRow.appendChild(repLabel);
+    repRow.appendChild(repValue);
+    repSection.appendChild(repRow);
+
+    const repNowRow = document.createElement('div');
+    repNowRow.className = 'rr-row';
+    const repNowLabel = document.createElement('span');
+    repNowLabel.className = 'rr-label';
+    repNowLabel.textContent = 'Current';
+    const repNowValue = document.createElement('span');
+    repNowValue.className = 'rr-value';
+    repNowValue.style.color = repTier.color;
+    repNowValue.textContent = `${Math.round(summary.reputationAfter ?? 50)} — ${repTier.label}`;
+    repNowRow.appendChild(repNowLabel);
+    repNowRow.appendChild(repNowValue);
+    repSection.appendChild(repNowRow);
+
+    content.appendChild(repSection);
+  }
+
   // ── Bankruptcy warning (if applicable) ────────────────────────────────────
   if (summary.bankrupt) {
     const bankruptSection = document.createElement('div');
@@ -1102,6 +1196,58 @@ function _renderBankruptcyBanner() {
   banner.appendChild(hint);
 
   _overlay.appendChild(banner);
+}
+
+/**
+ * Render the reputation badge on the hub screen.
+ * Shows current reputation value, tier label (colour-coded), and a progress bar.
+ */
+function _renderReputationBadge() {
+  if (!_overlay || !_state) return;
+
+  // Remove existing badge if present (for refresh).
+  const existing = document.getElementById('hub-reputation-badge');
+  if (existing) existing.remove();
+
+  const rep = _state.reputation ?? 50;
+  const tier = getReputationTier(rep);
+
+  const badge = document.createElement('div');
+  badge.id = 'hub-reputation-badge';
+
+  // Label
+  const label = document.createElement('span');
+  label.className = 'hub-rep-label';
+  label.textContent = 'Reputation';
+  badge.appendChild(label);
+
+  // Value
+  const value = document.createElement('span');
+  value.className = 'hub-rep-value';
+  value.style.color = tier.color;
+  value.textContent = `${Math.round(rep)}`;
+  badge.appendChild(value);
+
+  // Tier chip
+  const tierChip = document.createElement('span');
+  tierChip.className = 'hub-rep-tier';
+  tierChip.style.color = tier.color;
+  tierChip.style.background = `${tier.color}22`;
+  tierChip.style.border = `1px solid ${tier.color}44`;
+  tierChip.textContent = tier.label;
+  badge.appendChild(tierChip);
+
+  // Progress track
+  const track = document.createElement('div');
+  track.className = 'hub-rep-track';
+  const fill = document.createElement('div');
+  fill.className = 'hub-rep-fill';
+  fill.style.width = `${Math.max(0, Math.min(100, rep))}%`;
+  fill.style.backgroundColor = tier.color;
+  track.appendChild(fill);
+  badge.appendChild(track);
+
+  _overlay.appendChild(badge);
 }
 
 /**

@@ -406,7 +406,13 @@ export const CONTRACT_BOARD_EXPIRY_FLIGHTS = 4;
 /** Cancellation penalty as a fraction of the contract reward. */
 export const CONTRACT_CANCEL_PENALTY_RATE = 0.25;
 
-/** Reputation gained per completed contract (base, before difficulty scaling). */
+/** Reputation gained per completed contract (minimum of random 3–5 range). */
+export const CONTRACT_REP_GAIN_MIN = 3;
+
+/** Reputation gained per completed contract (maximum of random 3–5 range). */
+export const CONTRACT_REP_GAIN_MAX = 5;
+
+/** @deprecated Use CONTRACT_REP_GAIN_MIN/MAX. Kept for contract generation compat. */
 export const CONTRACT_REP_GAIN_BASE = 5;
 
 /** Reputation lost per cancelled contract. */
@@ -417,6 +423,74 @@ export const CONTRACT_REP_LOSS_FAIL = 5;
 
 /** Starting reputation for a new agency. */
 export const STARTING_REPUTATION = 50;
+
+// ---------------------------------------------------------------------------
+// Reputation Events
+// ---------------------------------------------------------------------------
+
+/** Reputation gained for each crew member safely returned from a crewed flight. */
+export const REP_GAIN_SAFE_CREW_RETURN = 1;
+
+/** Reputation gained for reaching a milestone (first orbit, first landing, etc.). */
+export const REP_GAIN_MILESTONE = 10;
+
+/** Reputation lost per crew member killed in action. */
+export const REP_LOSS_CREW_DEATH = 10;
+
+/** Reputation lost when a flight ends in failure (objectives not met). */
+export const REP_LOSS_MISSION_FAILURE = 3;
+
+/** Reputation lost when rocket is destroyed with no recovery. */
+export const REP_LOSS_ROCKET_DESTRUCTION = 2;
+
+// ---------------------------------------------------------------------------
+// Reputation Tiers
+// ---------------------------------------------------------------------------
+
+/**
+ * Reputation tier definitions.  Each tier covers a range of reputation values
+ * and applies modifiers to crew hiring cost and facility construction cost.
+ *
+ * `crewCostModifier`:    multiplier applied to HIRE_COST (1.0 = normal).
+ * `facilityDiscount`:    fractional discount on money cost of facilities/upgrades.
+ *                        Never applied to science costs (e.g. R&D Lab).
+ * `label`:               human-readable tier name.
+ * `color`:               hex CSS colour for UI display.
+ *
+ * @type {Array<{ min: number, max: number, label: string, color: string, crewCostModifier: number, facilityDiscount: number }>}
+ */
+export const REPUTATION_TIERS = Object.freeze([
+  { min: 0,  max: 20,  label: 'Basic',   color: '#cc4444', crewCostModifier: 1.50, facilityDiscount: 0.00 },
+  { min: 21, max: 40,  label: 'Standard', color: '#cc8844', crewCostModifier: 1.25, facilityDiscount: 0.00 },
+  { min: 41, max: 60,  label: 'Good',    color: '#cccc44', crewCostModifier: 1.00, facilityDiscount: 0.05 },
+  { min: 61, max: 80,  label: 'Premium', color: '#44cc88', crewCostModifier: 0.90, facilityDiscount: 0.10 },
+  { min: 81, max: 100, label: 'Elite',   color: '#4488ff', crewCostModifier: 0.75, facilityDiscount: 0.15 },
+]);
+
+/**
+ * Get the reputation tier object for a given reputation value.
+ *
+ * @param {number} reputation  Current agency reputation (0–100).
+ * @returns {{ min: number, max: number, label: string, color: string, crewCostModifier: number, facilityDiscount: number }}
+ */
+export function getReputationTier(reputation) {
+  const rep = Math.max(0, Math.min(100, reputation));
+  for (const tier of REPUTATION_TIERS) {
+    if (rep >= tier.min && rep <= tier.max) return tier;
+  }
+  return REPUTATION_TIERS[0];
+}
+
+/**
+ * Get the crew hiring cost modifier for the current reputation.
+ * Applied as a multiplier to HIRE_COST.
+ *
+ * @param {number} reputation  Current agency reputation (0–100).
+ * @returns {number}  Multiplier (e.g. 1.5 = +50 %, 0.75 = −25 %).
+ */
+export function getCrewCostModifier(reputation) {
+  return getReputationTier(reputation).crewCostModifier;
+}
 
 // ---------------------------------------------------------------------------
 // Period / Operating Costs
@@ -858,16 +932,20 @@ export function getFacilityUpgradeDef(facilityId) {
 /**
  * Calculate the reputation discount fraction for facility construction.
  *
- * Discount scales linearly from 0 % at reputation 50 to 25 % at reputation 100.
- * Below the starting reputation (50), no discount is given.
+ * Uses tier-based discounts:
+ *   0–20:  0 %    (Basic)
+ *   21–40: 0 %    (Standard)
+ *   41–60: 5 %    (Good)
+ *   61–80: 10 %   (Premium)
+ *   81–100: 15 %  (Elite)
  *
- *   discount = max(0, reputation − 50) / 200
+ * Facility discounts apply to money only — never to science costs (R&D Lab).
  *
  * @param {number} reputation  Current agency reputation (0–100).
- * @returns {number}  Discount fraction (0.0–0.25).
+ * @returns {number}  Discount fraction (0.0–0.15).
  */
 export function getReputationDiscount(reputation) {
-  return Math.max(0, reputation - STARTING_REPUTATION) / 200;
+  return getReputationTier(reputation).facilityDiscount;
 }
 
 // ---------------------------------------------------------------------------

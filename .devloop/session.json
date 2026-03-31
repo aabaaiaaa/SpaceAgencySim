@@ -1,12 +1,12 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 35,
+  "lastIteration": 36,
   "startedAt": "2026-03-30T20:49:34.099Z",
   "activeTask": {
-    "taskId": "TASK-021",
-    "taskTitle": "Weather and launch conditions",
-    "iterationNumber": 35,
-    "startedAt": "2026-03-31T08:02:38.931Z"
+    "taskId": "TASK-022",
+    "taskTitle": "Agency reputation system",
+    "iterationNumber": 36,
+    "startedAt": "2026-03-31T08:19:37.822Z"
   }
 }

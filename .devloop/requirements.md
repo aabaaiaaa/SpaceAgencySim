@@ -146,7 +146,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Random weather per "day" visible from hub before launching. Wind (horizontal force, 0-15 m/s), Temperature (ISP modifier, -5% to +5%), Visibility (cosmetic fog/haze). Visible from hub with visual indication and status text. Day skipping: pay fee to reroll (does NOT advance period), escalating fees for consecutive skips. Extreme weather exists (highly advised not to fly). Weather satellites (Phase 4) reduce skip cost and show forecasts. No seasons. Different bodies have different weather (Moon=none, Mars=dust storms). Weather only affects atmospheric flight.
 
 ### TASK-022: Agency reputation system
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-009
 - **Description**: Reputation score 0-100, visible from hub as colour-coded scale. Starting reputation: 50. Gains: successful mission +3-5, safe crew return +1, milestones +10. Losses: crew death -10, mission failure -3, rocket destruction without recovery -2. Effects by tier: 0-20 (basic contracts, +50% crew cost), 21-40 (standard, +25%), 41-60 (good/occasional premium, normal $50k, 5% facility discount), 61-80 (premium, -10% crew, 10% discount), 81-100 (elite/exclusive, -25% crew, 15% discount). Facility discounts apply to money only (never science on R&D).
