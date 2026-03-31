@@ -242,13 +242,15 @@ import { PartType, FacilityId } from '../core/constants.js';
  *
  * UNLOCK TREE SUMMARY
  * ===================
- *   001 → 002 → 003 → 004 ──┬──> 005 → 008 → 010 ─┬─> 012 → 014 → 016 ─┬─> 020 (+docking port) → 021
- *                            │    (science parts)    │                     │
- *                            ├──> 006                └─> 019 (R&D Lab)     ↓
- *                            │                         ↑              017 (requires 015+016)
- *                            ├──> 018 (Crew Admin      │                   ↓
- *                            │    + cmd-mk1)           │              022 (Sat Ops)
- *                            └──> 007 → 009 ─────> 011 → 013 → 015
+ *   001 → 002 → 003 → 004 ──┬──> 005 → 008 → 010 ─┬─> 012 → 014 → 016 ─┬─> 015 ──┐
+ *                            │    (science parts)    │                     │         │
+ *                            ├──> 006                └─> 019 (R&D Lab)     ├─> 020 ──┤
+ *                            │                                             │  (Track  │
+ *                            ├──> 018 (Crew Admin                          │  Station)│
+ *                            │    + cmd-mk1)                               │    ↓     ↓
+ *                            └──> 007 → 009 ─────> 011 → 013              │   021   017 (15+20)
+ *                                                                          │          ↓
+ *                                                                          │     022 (Sat Ops)
  *
  * Missions 1–4 are strictly linear probe-only chain (starter parts).
  * After mission 4: missions 5, 6, 7, 18 all unlock simultaneously.
@@ -257,15 +259,18 @@ import { PartType, FacilityId } from '../core/constants.js';
  *   - Mission 5 (Science tutorial): after safe landing, awards science-module-mk1
  *     + thermometer-mk1.
  * After first science (mission 10): Mission 19 (R&D Lab tutorial) unlocks.
- * Missions 8–13 continue (updated for instrument-in-module mechanic).
- * After first orbit (mission 16): Mission 20 (Tracking Station tutorial)
- *   unlocks — awards Tracking Station on acceptance + docking port on
- *   completion.  Opens orbital chain: mission 21 (map view, manoeuvres,
- *   docking, satellite deployment).
- * Missions 14–17 updated for orbital gameplay (Tracking Station, map view).
- * Mission 17 requires both 15 and 16 completed.
- * After first orbital satellite (mission 17): Mission 22 (Satellite Network
- *   Ops tutorial) unlocks.
+ * Missions 8, 10 updated for instrument-in-module mechanic (load instruments
+ *   into Science Module slots in the VAB, activate during flight).
+ * After first orbit (mission 16): Opens the orbital tutorial chain:
+ *   - Mission 15 (orbital satellite deployment into LEO slot)
+ *   - Mission 20 (Tracking Station tutorial → map view, manoeuvres,
+ *     docking port on completion)
+ *   - Mission 21 (orbital survey → science from orbit)
+ * Mission 13 (High Altitude Record) is a standalone milestone reward.
+ * Mission 17 (Tracked Satellite Deployment) requires both mission 15
+ *   AND mission 20 — ensuring the player has both satellite deployment
+ *   experience and Tracking Station access.
+ * After mission 17: Mission 22 (Satellite Network Ops tutorial) unlocks.
  *
  * @type {MissionDef[]}
  */
@@ -505,6 +510,8 @@ export const MISSIONS = [
   /**
    * Mission 8 — Black Box Test
    * Science/crash track: intentional crash with Science Module + instrument.
+   * Tests the instrument-in-module mechanic: the player must load an
+   * instrument into the Science Module in the VAB, then activate it in flight.
    * Unlocks: Mission 10.
    */
   {
@@ -512,10 +519,12 @@ export const MISSIONS = [
     title: 'Black Box Test',
     description:
       'We need to verify that our Science Module can survive extreme impact forces. ' +
-      'Mount a Science Module on your rocket with an instrument loaded inside, ' +
-      'activate the instrument during flight, then deliberately crash at over ' +
-      '50 m/s impact speed. If the module and its instrument survive, the design ' +
-      'is approved for high-stress missions.',
+      'In the VAB, load an instrument (such as the Thermometer Mk1) into a Science ' +
+      'Module slot, then mount the module on your rocket. During flight, activate ' +
+      'the Science Module to begin collecting data — the instrument inside will ' +
+      'start running automatically. Then deliberately crash at over 50 m/s impact ' +
+      'speed. If the module and its instrument survive, the design is approved ' +
+      'for high-stress missions.',
     location: 'desert',
     objectives: [
       {
@@ -523,7 +532,7 @@ export const MISSIONS = [
         type: ObjectiveType.ACTIVATE_PART,
         target: { partType: PartType.SERVICE_MODULE },
         completed: false,
-        description: 'Activate an instrument in the Science Module during flight',
+        description: 'Load an instrument into the Science Module and activate it during flight',
       },
       {
         id: 'obj-008-2',
@@ -533,7 +542,7 @@ export const MISSIONS = [
         description: 'Impact at 50 m/s or faster with Science Module attached',
       },
     ],
-    reward: 50_000,
+    reward: 55_000,
     unlocksAfter: ['mission-005'],
     unlockedParts: [],
     requiredParts: ['science-module-mk1'],
@@ -573,6 +582,9 @@ export const MISSIONS = [
   /**
    * Mission 10 — Science Experiment Alpha
    * Science track: sustained altitude hold with instrument data return.
+   * Uses instrument-in-module mechanic: the player must load an instrument
+   * into the Science Module, activate it in the correct biome, and return
+   * the sample data via a safe landing.
    * Unlocks: Mission 12, Poodle Engine part.
    */
   {
@@ -580,10 +592,13 @@ export const MISSIONS = [
     title: 'Science Experiment Alpha',
     description:
       'Your Science Module and its instruments are ready for a real experiment. ' +
-      'Load an instrument into the Science Module, fly to between 800 m and ' +
-      '1,200 m altitude, and hold steady for at least 30 continuous seconds while ' +
-      'the instrument collects data. Then bring the rocket — and the data — home ' +
-      'safely with a landing speed under 10 m/s.',
+      'In the VAB, load an instrument into a Science Module slot — the Thermometer ' +
+      'Mk1 is ideal for atmospheric readings. Fly to between 800 m and 1,200 m ' +
+      'altitude and hold steady for at least 30 continuous seconds while the ' +
+      'instrument collects sample data. Instruments produce SAMPLE-type data that ' +
+      'must be physically returned — bring the rocket and the data home safely ' +
+      'with a landing speed under 10 m/s. Tip: each instrument yields diminishing ' +
+      'returns per biome, so future experiments should target different altitudes.',
     location: 'desert',
     objectives: [
       {
@@ -598,10 +613,10 @@ export const MISSIONS = [
         type: ObjectiveType.RETURN_SCIENCE_DATA,
         target: {},
         completed: false,
-        description: 'Activate an instrument in the Science Module and land safely to return the data',
+        description: 'Activate an instrument in the Science Module and land safely to return sample data',
       },
     ],
-    reward: 60_000,
+    reward: 75_000,
     unlocksAfter: ['mission-008'],
     unlockedParts: ['engine-poodle'],
     requiredParts: ['science-module-mk1'],
@@ -674,7 +689,7 @@ export const MISSIONS = [
         description: 'Fire the stack decoupler to separate stages above 2,000 m',
       },
     ],
-    reward: 80_000,
+    reward: 90_000,
     unlocksAfter: ['mission-010'],
     unlockedParts: ['engine-reliant', 'srb-small'],
     requiredParts: ['decoupler-stack-tr18'],
@@ -704,7 +719,7 @@ export const MISSIONS = [
         description: 'Reach 20,000 m altitude',
       },
     ],
-    reward: 100_000,
+    reward: 120_000,
     unlocksAfter: ['mission-011'],
     unlockedParts: [],
     status: MissionStatus.LOCKED,
@@ -742,33 +757,44 @@ export const MISSIONS = [
   },
 
   /**
-   * Mission 15 — Satellite Deployment Test
-   * Payload delivery: release a satellite above 30 km.
-   * This is the first satellite launch — paves the way for orbital
-   * satellite deployment and ultimately the Satellite Network Ops tutorial.
+   * Mission 15 — Orbital Satellite Deployment I
+   * Orbital payload delivery: deploy a satellite into LEO.
+   * Now requires orbit (mission 16) — ties satellite gameplay to the
+   * orbital mechanics and Tracking Station systems.  The player must
+   * reach orbit and release the satellite at orbital altitude so it
+   * enters a stable LEO slot tracked by the Tracking Station.
    * Unlocks: Mission 17.
    */
   {
     id: 'mission-015',
-    title: 'Satellite Deployment Test',
+    title: 'Orbital Satellite Deployment I',
     description:
       'Satellite deployment is the backbone of our commercial revenue stream. ' +
-      'Carry a Satellite Mk1 payload to above 30,000 metres altitude and release ' +
-      'it into free flight. Once we achieve orbit, the Tracking Station will let ' +
-      'us manage these assets from the ground — but first, prove the deployment ' +
-      'mechanism works.',
+      'Now that you have achieved orbit, carry a Satellite Mk1 payload to ' +
+      'Low Earth Orbit and release it at orbital altitude — above 80,000 m ' +
+      'and at orbital velocity. The satellite will enter a stable LEO slot ' +
+      'where the Tracking Station can monitor it. Once the Tracking Station ' +
+      'is online, you will be able to manage deployed satellites from the ' +
+      'ground and build a full constellation.',
     location: 'desert',
     objectives: [
       {
         id: 'obj-015-1',
-        type: ObjectiveType.RELEASE_SATELLITE,
-        target: { minAltitude: 30_000 },
+        type: ObjectiveType.REACH_ORBIT,
+        target: { orbitAltitude: 80_000, orbitalVelocity: 7_800 },
         completed: false,
-        description: 'Release a Satellite Mk1 above 30,000 m altitude',
+        description: 'Reach Low Earth Orbit (>80,000 m at ≥7,800 m/s)',
+      },
+      {
+        id: 'obj-015-2',
+        type: ObjectiveType.RELEASE_SATELLITE,
+        target: { minAltitude: 80_000 },
+        completed: false,
+        description: 'Release a Satellite Mk1 while in orbit above 80,000 m',
       },
     ],
-    reward: 150_000,
-    unlocksAfter: ['mission-013'],
+    reward: 250_000,
+    unlocksAfter: ['mission-016'],
     unlockedParts: [],
     requiredParts: ['satellite-mk1'],
     status: MissionStatus.LOCKED,
@@ -777,9 +803,13 @@ export const MISSIONS = [
   /**
    * Mission 16 — Low Earth Orbit
    * The main orbital milestone.  Reach >80 km and build orbital velocity.
-   * Completing this unlocks the Tracking Station tutorial (mission 20),
-   * which opens the orbital gameplay chain.
-   * Unlocks: Mission 17, Mission 20, Large Tank part.
+   * Completing this opens the orbital tutorial chain:
+   *   - Mission 15 (orbital satellite deployment)
+   *   - Mission 20 (Tracking Station tutorial → map view, manoeuvres)
+   *   - Mission 21 (orbital survey → science from orbit)
+   *   - Mission 17 (advanced satellite + Tracking Station)
+   *   - Mission 22 (Satellite Network Ops tutorial)
+   * Unlocks: Mission 15, Mission 20, Large Tank part.
    * Note: Reliant Engine may already be unlocked via mission-012; the
    * completeMission() logic safely skips duplicates.
    */
@@ -789,9 +819,11 @@ export const MISSIONS = [
     description:
       'Everything has led to this moment. Build a rocket capable of reaching ' +
       'Low Earth Orbit: climb above 80 kilometres and sustain a horizontal ' +
-      'velocity of at least 7,800 m/s. Achieving orbit will unlock the ' +
-      'Tracking Station — your gateway to orbital manoeuvres, map view, ' +
-      'docking, and satellite network management. Welcome to space.',
+      'velocity of at least 7,800 m/s. Achieving orbit opens an entire chain ' +
+      'of orbital missions: the Tracking Station tutorial (map view, orbital ' +
+      'manoeuvres, docking), satellite deployment into orbital slots, science ' +
+      'from orbit, and eventually a full satellite constellation managed from ' +
+      'the Satellite Network Operations Centre. Welcome to space.',
     location: 'desert',
     objectives: [
       {
@@ -809,22 +841,26 @@ export const MISSIONS = [
   },
 
   /**
-   * Mission 17 — Orbital Satellite Deployment
-   * Endgame contract: reach orbit AND deploy a satellite using the
-   * Tracking Station for orbital slot placement.
-   * Requires both Mission 15 AND Mission 16 completed first.
+   * Mission 17 — Tracked Satellite Deployment
+   * Advanced orbital contract: deploy a satellite using the Tracking Station
+   * for orbital slot placement and ground monitoring.
+   * Requires both Mission 15 (first orbital satellite) AND Mission 20
+   * (Tracking Station tutorial) completed first — ensuring the player has
+   * both satellite deployment experience and Tracking Station access.
    * Completing this unlocks the Satellite Network Ops tutorial (mission 22).
    */
   {
     id: 'mission-017',
-    title: 'Orbital Satellite Deployment',
+    title: 'Tracked Satellite Deployment',
     description:
-      'The ultimate commercial mission: reach Low Earth Orbit and deploy a ' +
-      'Satellite Mk1 payload into an orbital slot. Use the Tracking Station ' +
-      'and map view to verify your orbit before releasing the satellite. This ' +
-      'contract marks the successful completion of the Desert R&D campaign — ' +
-      'your agency is now a full spacefaring organisation, ready to build and ' +
-      'manage a satellite constellation.',
+      'Now that the Tracking Station is operational, deploy a satellite with ' +
+      'full ground support. Reach Low Earth Orbit and use the map view to ' +
+      'verify your orbital parameters before releasing the Satellite Mk1 into ' +
+      'a tracked LEO slot. The Tracking Station will monitor the satellite\'s ' +
+      'altitude band and orbital position in real time. This mission proves ' +
+      'your agency can reliably place satellites into designated orbital slots — ' +
+      'the foundation for building a managed constellation via the Satellite ' +
+      'Network Operations Centre.',
     location: 'desert',
     objectives: [
       {
@@ -832,18 +868,18 @@ export const MISSIONS = [
         type: ObjectiveType.REACH_ORBIT,
         target: { orbitAltitude: 80_000, orbitalVelocity: 7_800 },
         completed: false,
-        description: 'Reach orbital altitude (>80,000 m) at ≥7,800 m/s horizontal speed',
+        description: 'Reach Low Earth Orbit (>80,000 m at ≥7,800 m/s)',
       },
       {
         id: 'obj-017-2',
         type: ObjectiveType.RELEASE_SATELLITE,
         target: { minAltitude: 80_000 },
         completed: false,
-        description: 'Release a Satellite Mk1 while in orbit above 80,000 m',
+        description: 'Release a Satellite Mk1 into a tracked orbital slot above 80,000 m',
       },
     ],
-    reward: 300_000,
-    unlocksAfter: ['mission-015', 'mission-016'],
+    reward: 350_000,
+    unlocksAfter: ['mission-015', 'mission-020'],
     unlockedParts: [],
     status: MissionStatus.LOCKED,
   },
@@ -886,7 +922,7 @@ export const MISSIONS = [
         description: 'Land safely at 10 m/s or less — bring your crew home',
       },
     ],
-    reward: 40_000,
+    reward: 60_000,
     unlocksAfter: ['mission-004'],
     unlockedParts: [],
     requiredParts: ['cmd-mk1'],
@@ -928,7 +964,7 @@ export const MISSIONS = [
         description: 'Collect and return science data safely',
       },
     ],
-    reward: 80_000,
+    reward: 120_000,
     unlocksAfter: ['mission-010'],
     unlockedParts: [],
     requiredParts: ['science-module-mk1'],
@@ -969,7 +1005,7 @@ export const MISSIONS = [
         description: 'Reach Low Earth Orbit to calibrate tracking systems',
       },
     ],
-    reward: 200_000,
+    reward: 250_000,
     unlocksAfter: ['mission-016'],
     unlockedParts: ['docking-port-std'],
     awardsFacilityOnAccept: FacilityId.TRACKING_STATION,
@@ -1012,7 +1048,7 @@ export const MISSIONS = [
         description: 'Collect science data from orbit and return it safely',
       },
     ],
-    reward: 150_000,
+    reward: 200_000,
     unlocksAfter: ['mission-020'],
     unlockedParts: [],
     requiredParts: ['science-module-mk1'],
@@ -1054,7 +1090,7 @@ export const MISSIONS = [
         description: 'Deploy 2 satellites while in orbit above 80,000 m',
       },
     ],
-    reward: 300_000,
+    reward: 400_000,
     unlocksAfter: ['mission-017'],
     unlockedParts: [],
     requiredParts: ['satellite-mk1'],

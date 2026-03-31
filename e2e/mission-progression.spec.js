@@ -123,7 +123,7 @@ const OBJ = {
       { id: 'obj-008-1', type: 'ACTIVATE_PART', target: { partType: 'SERVICE_MODULE' } },
       { id: 'obj-008-2', type: 'CONTROLLED_CRASH', target: { minCrashSpeed: 50 } },
     ],
-    reward: 50_000, unlocksAfter: ['mission-005'], unlockedParts: [],
+    reward: 55_000, unlocksAfter: ['mission-005'], unlockedParts: [],
   },
   'mission-009': {
     title: 'Ejector Seat Test',
@@ -136,7 +136,7 @@ const OBJ = {
       { id: 'obj-010-1', type: 'HOLD_ALTITUDE', target: { minAltitude: 800, maxAltitude: 1_200, duration: 30 } },
       { id: 'obj-010-2', type: 'RETURN_SCIENCE_DATA', target: {} },
     ],
-    reward: 60_000, unlocksAfter: ['mission-008'], unlockedParts: ['engine-poodle'],
+    reward: 75_000, unlocksAfter: ['mission-008'], unlockedParts: ['engine-poodle'],
   },
   'mission-011': {
     title: 'Emergency Systems Verified',
@@ -152,12 +152,12 @@ const OBJ = {
       { id: 'obj-012-1', type: 'REACH_ALTITUDE', target: { altitude: 2_000 } },
       { id: 'obj-012-2', type: 'ACTIVATE_PART', target: { partType: 'STACK_DECOUPLER' } },
     ],
-    reward: 80_000, unlocksAfter: ['mission-010'], unlockedParts: ['engine-reliant', 'srb-small'],
+    reward: 90_000, unlocksAfter: ['mission-010'], unlockedParts: ['engine-reliant', 'srb-small'],
   },
   'mission-013': {
     title: 'High Altitude Record',
     objectives: [{ id: 'obj-013-1', type: 'REACH_ALTITUDE', target: { altitude: 20_000 } }],
-    reward: 100_000, unlocksAfter: ['mission-011'], unlockedParts: [],
+    reward: 120_000, unlocksAfter: ['mission-011'], unlockedParts: [],
   },
   'mission-014': {
     title: 'Kármán Line Approach',
@@ -165,9 +165,12 @@ const OBJ = {
     reward: 200_000, unlocksAfter: ['mission-012'], unlockedParts: ['engine-nerv', 'srb-large'],
   },
   'mission-015': {
-    title: 'Satellite Deployment Test',
-    objectives: [{ id: 'obj-015-1', type: 'RELEASE_SATELLITE', target: { minAltitude: 30_000 } }],
-    reward: 150_000, unlocksAfter: ['mission-013'], unlockedParts: [],
+    title: 'Orbital Satellite Deployment I',
+    objectives: [
+      { id: 'obj-015-1', type: 'REACH_ORBIT', target: { orbitAltitude: 80_000, orbitalVelocity: 7_800 } },
+      { id: 'obj-015-2', type: 'RELEASE_SATELLITE', target: { minAltitude: 80_000 } },
+    ],
+    reward: 250_000, unlocksAfter: ['mission-016'], unlockedParts: [],
   },
   'mission-016': {
     title: 'Low Earth Orbit',
@@ -175,12 +178,17 @@ const OBJ = {
     reward: 500_000, unlocksAfter: ['mission-014'], unlockedParts: ['tank-large', 'engine-reliant'],
   },
   'mission-017': {
-    title: 'Orbital Satellite Deployment',
+    title: 'Tracked Satellite Deployment',
     objectives: [
       { id: 'obj-017-1', type: 'REACH_ORBIT', target: { orbitAltitude: 80_000, orbitalVelocity: 7_800 } },
       { id: 'obj-017-2', type: 'RELEASE_SATELLITE', target: { minAltitude: 80_000 } },
     ],
-    reward: 300_000, unlocksAfter: ['mission-015', 'mission-016'], unlockedParts: [],
+    reward: 350_000, unlocksAfter: ['mission-015', 'mission-020'], unlockedParts: [],
+  },
+  'mission-020': {
+    title: 'Eyes on the Sky',
+    objectives: [{ id: 'obj-020-1', type: 'REACH_ORBIT', target: { orbitAltitude: 80_000, orbitalVelocity: 7_800 } }],
+    reward: 250_000, unlocksAfter: ['mission-016'], unlockedParts: ['docking-port-std'],
   },
 };
 
@@ -1182,86 +1190,123 @@ test.describe('Mission Progression', () => {
     await expectPartInVab(page, 'engine-nerv');
   });
 
-  test('M015 — Satellite Deployment Test (release satellite >30,000m)', async ({ page }) => {
-    test.setTimeout(180_000);
+  test('M015 — Orbital Satellite Deployment I (orbit + release satellite >80km)', async ({ page }) => {
+    test.setTimeout(300_000);
     const m1to4 = ['mission-001', 'mission-002', 'mission-003', 'mission-004'];
     const env = buildEnvelope({
-      completedIds: [...m1to4, 'mission-005', 'mission-007', 'mission-008', 'mission-009', 'mission-011', 'mission-013'],
+      completedIds: [
+        ...m1to4, 'mission-005', 'mission-008', 'mission-010', 'mission-012',
+        'mission-014', 'mission-016',
+      ],
       acceptedId: 'mission-015',
-      parts: [...STARTER_PARTS, 'tank-medium', 'satellite-mk1', 'engine-reliant'],
+      parts: [
+        ...STARTER_PARTS, 'tank-medium', 'engine-reliant', 'engine-nerv',
+        'tank-large', 'satellite-mk1',
+      ],
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, env);
     await navigateToVab(page);
 
-    // Satellite on top, decoupler below to release it.
-    // satellite-mk1 + decoupler + cmd-mk1 + tank-medium + engine-spark + decoupler + tank-medium + engine-reliant
+    // Orbital rocket with satellite payload:
+    //   satellite-mk1 + decoupler + cmd-mk1 + tank-medium + tank-medium + engine-nerv
+    //   + decoupler + tank-medium + engine-reliant
     await buildStack(page, [
       'satellite-mk1', 'decoupler-stack-tr18', 'cmd-mk1',
-      'tank-medium', 'engine-spark',
+      'tank-medium', 'tank-medium', 'engine-nerv',
       'decoupler-stack-tr18', 'tank-medium', 'engine-reliant',
     ]);
 
-    // Auto-staging order (parts placed top-to-bottom):
-    //   stage-0: [engine-spark, engine-reliant]
-    //   stage-1: [top-decoupler] (placed first = satellite release)
-    //   stage-2: [lower-decoupler] (placed second = stage separation)
-    // We need:
-    //   stage-0: reliant only
-    //   stage-1: lower-decoupler + spark (stage separation)
-    //   stage-2: top-decoupler (satellite release)
-    // So: move spark from stage-0 to stage-2, then swap stage-1 and stage-2 contents.
-    // Simpler: programmatically rebuild staging from scratch.
+    // Programmatic staging:
+    //   stage-0: reliant (lower engine)
+    //   stage-1: lower decoupler + nerv engine (stage separation)
+    //   stage-2: upper decoupler (satellite release)
     await page.evaluate(() => {
       const config = window.__vabStagingConfig;
       const assembly = window.__vabAssembly;
-      // Collect all instance IDs grouped by partId
       const byPartId = {};
       for (const [instanceId, placed] of assembly.parts) {
         if (!byPartId[placed.partId]) byPartId[placed.partId] = [];
         byPartId[placed.partId].push(instanceId);
       }
-      // Clear all stages and unstaged
       config.stages = [];
       config.unstaged = [];
-      // stage-0: reliant engine only
       config.stages.push({ instanceIds: [byPartId['engine-reliant'][0]] });
-      // stage-1: lower decoupler (second placed = index 1) + spark engine
-      config.stages.push({ instanceIds: [byPartId['decoupler-stack-tr18'][1], byPartId['engine-spark'][0]] });
-      // stage-2: top decoupler (first placed = index 0, satellite release)
+      config.stages.push({ instanceIds: [byPartId['decoupler-stack-tr18'][1], byPartId['engine-nerv'][0]] });
       config.stages.push({ instanceIds: [byPartId['decoupler-stack-tr18'][0]] });
-      // unstaged: cmd-mk1
-      if (byPartId['cmd-mk1']) config.unstaged.push(...byPartId['cmd-mk1']);
+      const staged = new Set(config.stages.flatMap(s => s.instanceIds));
+      for (const [instanceId] of assembly.parts) {
+        if (!staged.has(instanceId)) config.unstaged.push(instanceId);
+      }
     });
 
     await launch(page);
-    await stage(page); // stage-0: fire reliant
+    await stage(page); // fire lower engine (reliant)
     await page.keyboard.press('z');
 
-    // 50× warp for first stage climb.
+    // Slight tilt at ~2km.
+    await waitAlt(page, 2_000);
+    await page.keyboard.down('d');
+    await page.waitForFunction(
+      () => Math.abs(window.__flightPs?.angle ?? 0) > 0.3,
+      { timeout: 10_000 },
+    );
+    await page.keyboard.up('d');
+
+    // Separate first stage at ~8km.
+    await waitAlt(page, 8_000);
+    await waitWarpUnlocked(page);
+    await stage(page); // decouple + fire nerv
+
+    // Set slight tilt to climb fast.
+    await page.evaluate(() => {
+      const ps = window.__flightPs;
+      if (ps) { ps.angle = 0.2; ps.angularVelocity = 0; }
+    });
+
+    // 50× warp for nerv burn.
     await waitWarpUnlocked(page);
     await setWarp(page, 50);
 
-    await waitAlt(page, 10_000);
+    // Wait to reach 80km altitude.
+    await page.waitForFunction(
+      () => (window.__flightPs?.posY ?? 0) >= 80_000,
+      { timeout: 180_000 },
+    );
+
+    // Inject horizontal velocity for orbit conditions.
+    await page.evaluate(() => {
+      const ps = window.__flightPs;
+      if (ps) {
+        ps.velX = 8000;
+        ps.velY = Math.max(ps.velY, 0);
+      }
+    });
+
+    // Wait for REACH_ORBIT objective.
+    await page.waitForFunction(
+      () => {
+        const state = window.__gameState;
+        const m = state?.missions?.accepted?.find(x => x.id === 'mission-015');
+        return m?.objectives?.find(o => o.type === 'REACH_ORBIT')?.completed;
+      },
+      { timeout: 10_000 },
+    );
+
+    // Release satellite while still in orbit.
     await setWarp(page, 1);
     await waitWarpUnlocked(page);
-    await stage(page); // stage-1: separate lower stage + fire spark
+    await stage(page); // fire satellite decoupler
 
-    // Re-engage 50× warp for coast to 30km.
-    await waitWarpUnlocked(page);
-    await setWarp(page, 50);
-    await waitAlt(page, 30_000, 120_000);
-
-    // Release satellite.
-    await setWarp(page, 1);
-    await waitWarpUnlocked(page);
-    await stage(page); // stage-2: fire top decoupler to release satellite
-
-    // Verify objective.
+    // Wait for RELEASE_SATELLITE objective.
     await waitObjectivesComplete(page, 'mission-015', 30_000);
 
-    // Objectives met — return via menu instead of waiting for long descent.
-    await triggerReturnViaMenu(page);
+    // Return to hub via menu (in orbit, won't land naturally).
+    await page.click('#topbar-menu-btn', { force: true });
+    const dropdown = page.locator('#topbar-dropdown');
+    await expect(dropdown).toBeVisible();
+    await dropdown.getByText('Return to Space Agency').click();
+
     await returnToHub(page);
     await expectCompleted(page, 'mission-015');
   });
@@ -1360,13 +1405,13 @@ test.describe('Mission Progression', () => {
     await expectPartInVab(page, 'tank-large');
   });
 
-  test('M017 — Orbital Satellite Deployment (orbit + release satellite >80km)', async ({ page }) => {
+  test('M017 — Tracked Satellite Deployment (orbit + release satellite >80km, Tracking Station)', async ({ page }) => {
     test.setTimeout(300_000);
-    // All previous missions completed.
+    // All previous missions + mission-020 (Tracking Station tutorial) completed.
     const allPrev = Array.from({ length: 16 }, (_, i) =>
       `mission-${String(i + 1).padStart(3, '0')}`);
     const env = buildEnvelope({
-      completedIds: allPrev,
+      completedIds: [...allPrev, 'mission-020'],
       acceptedId: 'mission-017',
       parts: [
         ...STARTER_PARTS, 'tank-medium', 'engine-reliant', 'engine-nerv',
