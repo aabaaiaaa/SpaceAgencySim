@@ -22,6 +22,7 @@
 import {
   FACILITY_DEFINITIONS,
   FacilityId,
+  GameMode,
   RD_LAB_TIER_DEFS,
   RD_LAB_MAX_TIER,
   FACILITY_UPGRADE_DEFS,
@@ -98,6 +99,10 @@ export function canBuildFacility(state, facilityId) {
   if (hasFacility(state, facilityId)) {
     return { allowed: false, reason: 'Already built.' };
   }
+  // Sandbox mode: always allowed, no cost.
+  if (state.gameMode === GameMode.SANDBOX) {
+    return { allowed: true, reason: '' };
+  }
   if (state.tutorialMode) {
     return { allowed: false, reason: 'Locked in tutorial mode — complete missions to unlock.' };
   }
@@ -158,34 +163,37 @@ export function canUpgradeFacility(state, facilityId) {
   const moneyCost = getDiscountedMoneyCost(tierDef.moneyCost, state.reputation ?? 50);
   const scienceCost = tierDef.scienceCost;
 
-  if (state.money < moneyCost) {
-    return {
-      ...noUpgrade,
-      reason: `Insufficient funds (need $${moneyCost.toLocaleString('en-US')}).`,
-      nextTier,
-      moneyCost,
-      scienceCost,
-      description: tierDef.description,
-    };
-  }
+  // Sandbox mode: skip cost checks entirely.
+  if (state.gameMode !== GameMode.SANDBOX) {
+    if (state.money < moneyCost) {
+      return {
+        ...noUpgrade,
+        reason: `Insufficient funds (need $${moneyCost.toLocaleString('en-US')}).`,
+        nextTier,
+        moneyCost,
+        scienceCost,
+        description: tierDef.description,
+      };
+    }
 
-  if (scienceCost > 0 && (state.sciencePoints ?? 0) < scienceCost) {
-    return {
-      ...noUpgrade,
-      reason: `Insufficient science (need ${scienceCost}, have ${Math.floor(state.sciencePoints ?? 0)}).`,
-      nextTier,
-      moneyCost,
-      scienceCost,
-      description: tierDef.description,
-    };
+    if (scienceCost > 0 && (state.sciencePoints ?? 0) < scienceCost) {
+      return {
+        ...noUpgrade,
+        reason: `Insufficient science (need ${scienceCost}, have ${Math.floor(state.sciencePoints ?? 0)}).`,
+        nextTier,
+        moneyCost,
+        scienceCost,
+        description: tierDef.description,
+      };
+    }
   }
 
   return {
     allowed: true,
     reason: '',
     nextTier,
-    moneyCost,
-    scienceCost,
+    moneyCost: state.gameMode === GameMode.SANDBOX ? 0 : moneyCost,
+    scienceCost: state.gameMode === GameMode.SANDBOX ? 0 : scienceCost,
     description: tierDef.description,
   };
 }
@@ -212,22 +220,26 @@ export function buildFacility(state, facilityId) {
   }
 
   const def = getFacilityDef(facilityId);
+  const isSandbox = state.gameMode === GameMode.SANDBOX;
 
-  // Deduct science cost first (R&D Lab).
-  if ((def.scienceCost ?? 0) > 0) {
-    state.sciencePoints = (state.sciencePoints ?? 0) - def.scienceCost;
-  }
+  // Sandbox mode: skip all cost deductions.
+  if (!isSandbox) {
+    // Deduct science cost first (R&D Lab).
+    if ((def.scienceCost ?? 0) > 0) {
+      state.sciencePoints = (state.sciencePoints ?? 0) - def.scienceCost;
+    }
 
-  // Deduct money cost (with reputation discount).
-  if (def.cost > 0) {
-    const moneyCost = getDiscountedMoneyCost(def.cost, state.reputation ?? 50);
-    const ok = spend(state, moneyCost);
-    if (!ok) {
-      // Rollback science.
-      if ((def.scienceCost ?? 0) > 0) {
-        state.sciencePoints += def.scienceCost;
+    // Deduct money cost (with reputation discount).
+    if (def.cost > 0) {
+      const moneyCost = getDiscountedMoneyCost(def.cost, state.reputation ?? 50);
+      const ok = spend(state, moneyCost);
+      if (!ok) {
+        // Rollback science.
+        if ((def.scienceCost ?? 0) > 0) {
+          state.sciencePoints += def.scienceCost;
+        }
+        return { success: false, reason: 'Insufficient funds.' };
       }
-      return { success: false, reason: 'Insufficient funds.' };
     }
   }
 
@@ -250,20 +262,23 @@ export function upgradeFacility(state, facilityId) {
     return { success: false, reason: check.reason };
   }
 
-  // Deduct science cost.
-  if (check.scienceCost > 0) {
-    state.sciencePoints = (state.sciencePoints ?? 0) - check.scienceCost;
-  }
+  // Sandbox mode: skip all cost deductions (costs are returned as 0).
+  if (state.gameMode !== GameMode.SANDBOX) {
+    // Deduct science cost.
+    if (check.scienceCost > 0) {
+      state.sciencePoints = (state.sciencePoints ?? 0) - check.scienceCost;
+    }
 
-  // Deduct money cost (already discounted by canUpgradeFacility).
-  if (check.moneyCost > 0) {
-    const ok = spend(state, check.moneyCost);
-    if (!ok) {
-      // Rollback science.
-      if (check.scienceCost > 0) {
-        state.sciencePoints += check.scienceCost;
+    // Deduct money cost (already discounted by canUpgradeFacility).
+    if (check.moneyCost > 0) {
+      const ok = spend(state, check.moneyCost);
+      if (!ok) {
+        // Rollback science.
+        if (check.scienceCost > 0) {
+          state.sciencePoints += check.scienceCost;
+        }
+        return { success: false, reason: 'Insufficient funds.' };
       }
-      return { success: false, reason: 'Insufficient funds.' };
     }
   }
 

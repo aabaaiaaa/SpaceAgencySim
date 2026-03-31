@@ -35,6 +35,7 @@
 import { getPartById } from '../data/parts.js';
 import {
   PartType,
+  GameMode,
   MalfunctionType,
   MalfunctionMode,
   MALFUNCTION_TYPE_MAP,
@@ -198,6 +199,9 @@ export function getPartReliability(def) {
  */
 export function checkMalfunctions(ps, assembly, flightState, gameState) {
   if (_malfunctionMode === MalfunctionMode.OFF) return;
+  // Sandbox mode with malfunctions disabled: skip all checks.
+  if (gameState?.gameMode === GameMode.SANDBOX &&
+      !gameState.sandboxSettings?.malfunctionsEnabled) return;
   if (!ps.malfunctions) return;
 
   // Calculate crew engineering bonus (reduces malfunction chance).

@@ -210,11 +210,31 @@ export const FuelType = Object.freeze({
 });
 
 // ---------------------------------------------------------------------------
+// Game Modes
+// ---------------------------------------------------------------------------
+
+/**
+ * Available game modes.
+ * @enum {string}
+ */
+export const GameMode = Object.freeze({
+  /** Guided tutorial: missions unlock parts and facilities step by step. */
+  TUTORIAL: 'tutorial',
+  /** Free play: all starter parts, building available from the start. */
+  FREEPLAY: 'freeplay',
+  /** Sandbox: everything unlocked, free building, toggleable malfunctions/weather. */
+  SANDBOX: 'sandbox',
+});
+
+// ---------------------------------------------------------------------------
 // Starting / Default Values
 // ---------------------------------------------------------------------------
 
 /** Player's starting cash balance at a new game (equal to the initial loan proceeds). */
 export const STARTING_MONEY = 2_000_000;
+
+/** Sandbox mode starting cash — effectively unlimited. */
+export const SANDBOX_STARTING_MONEY = 999_999_999;
 
 /** Starting loan balance — players begin the game $2 million in debt. */
 export const STARTING_LOAN_BALANCE = 2_000_000;

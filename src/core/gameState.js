@@ -15,6 +15,7 @@ import {
   CrewStatus,
   FlightOutcome,
   FlightPhase,
+  GameMode,
   MissionState,
   STARTING_MONEY,
   STARTING_LOAN_BALANCE,
@@ -250,6 +251,9 @@ import {
  *                                                 staging configuration, or null.
  * @property {boolean}          tutorialMode   - True when the game is in tutorial mode
  *                                               (facilities awarded via missions, not built).
+ * @property {string}           gameMode       - Current game mode (GameMode enum value).
+ * @property {SandboxSettings|null} sandboxSettings - Settings for sandbox mode, or null
+ *                                                    when not in sandbox mode.
  * @property {Object<string, FacilityState>} facilities - Map of facility ID → state.
  *                                               Only facilities that have been built appear here.
  * @property {{ board: Contract[], active: Contract[], completed: Contract[], failed: Contract[] }} contracts
@@ -279,6 +283,13 @@ import {
  * @typedef {Object} AchievementRecord
  * @property {string}  id           - Achievement definition ID.
  * @property {number}  earnedPeriod - Period when the achievement was earned.
+ */
+
+/**
+ * Settings specific to sandbox mode.
+ * @typedef {Object} SandboxSettings
+ * @property {boolean} malfunctionsEnabled - Whether part malfunctions can occur.
+ * @property {boolean} weatherEnabled      - Whether weather affects launches.
  */
 
 /**
@@ -401,6 +412,12 @@ export function createGameState() {
     vabStagingConfig: null,
 
     tutorialMode: true,
+
+    // Game mode — 'tutorial', 'freeplay', or 'sandbox'.
+    gameMode: GameMode.TUTORIAL,
+
+    // Sandbox-only settings (null when not in sandbox mode).
+    sandboxSettings: null,
 
     // Starter facilities are pre-built; the rest are added by
     // buildFacility() (non-tutorial) or awarded via tutorial missions.

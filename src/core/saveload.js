@@ -13,7 +13,7 @@
  * @module saveload
  */
 
-import { CrewStatus, FACILITY_DEFINITIONS } from './constants.js';
+import { CrewStatus, FACILITY_DEFINITIONS, GameMode } from './constants.js';
 import { loadSharedLibrary, saveSharedLibrary } from './designLibrary.js';
 
 // ---------------------------------------------------------------------------
@@ -88,6 +88,7 @@ export function _setSessionStartTimeForTesting(timestampMs) {
  * @property {number}  crewKIA              - Crew killed in action.
  * @property {number}  playTimeSeconds      - Cumulative real-world play time in seconds.
  * @property {number}  flightTimeSeconds    - Cumulative in-game flight time in seconds.
+ * @property {string}  gameMode             - Game mode ('tutorial', 'freeplay', or 'sandbox').
  */
 
 // ---------------------------------------------------------------------------
@@ -164,6 +165,7 @@ function summaryFromEnvelope(slotIndex, envelope) {
     crewKIA: countKIA(s),
     playTimeSeconds: s.playTimeSeconds ?? 0,
     flightTimeSeconds: s.flightTimeSeconds ?? 0,
+    gameMode: s.gameMode ?? (s.tutorialMode ? GameMode.TUTORIAL : GameMode.FREEPLAY),
   };
 }
 
@@ -281,6 +283,12 @@ export function loadGame(slotIndex) {
     );
   }
   envelope.state.tutorialMode ??= true;
+
+  // Default gameMode for saves created before the game mode system.
+  if (!envelope.state.gameMode) {
+    envelope.state.gameMode = envelope.state.tutorialMode ? GameMode.TUTORIAL : GameMode.FREEPLAY;
+  }
+  envelope.state.sandboxSettings ??= null;
 
   // Default contracts for saves created before the contract system.
   if (!envelope.state.contracts || typeof envelope.state.contracts !== 'object') {

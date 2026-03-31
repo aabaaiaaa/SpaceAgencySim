@@ -19,7 +19,7 @@
  * @module core/techtree
  */
 
-import { FacilityId, RD_TIER_MAX_TECH } from './constants.js';
+import { FacilityId, GameMode, RD_TIER_MAX_TECH } from './constants.js';
 import { hasFacility } from './construction.js';
 import { spend } from './finance.js';
 import {
@@ -125,6 +125,13 @@ export function canResearchNode(state, nodeId) {
     return { allowed: false, reason: 'Already researched.' };
   }
 
+  // Sandbox mode: skip all prerequisite and cost checks.
+  // Must be checked before isNodeTutorialUnlocked since sandbox has all parts
+  // owned, which would otherwise flag every node as tutorial-unlocked.
+  if (state.gameMode === GameMode.SANDBOX) {
+    return { allowed: true, reason: '' };
+  }
+
   if (isNodeTutorialUnlocked(state, nodeId)) {
     return { allowed: false, reason: 'Already unlocked via tutorial.' };
   }
@@ -204,20 +211,23 @@ export function researchNode(state, nodeId) {
 
   const node = getTechNodeById(nodeId);
 
-  // Deduct science points.
-  state.sciencePoints -= node.scienceCost;
+  // Sandbox mode: skip cost deductions.
+  if (state.gameMode !== GameMode.SANDBOX) {
+    // Deduct science points.
+    state.sciencePoints -= node.scienceCost;
 
-  // Deduct funds.
-  const ok = spend(state, node.fundsCost);
-  if (!ok) {
-    // Rollback science — should not happen since canResearchNode checked.
-    state.sciencePoints += node.scienceCost;
-    return {
-      success: false,
-      reason: 'Insufficient funds.',
-      unlockedParts: [],
-      unlockedInstruments: [],
-    };
+    // Deduct funds.
+    const ok = spend(state, node.fundsCost);
+    if (!ok) {
+      // Rollback science — should not happen since canResearchNode checked.
+      state.sciencePoints += node.scienceCost;
+      return {
+        success: false,
+        reason: 'Insufficient funds.',
+        unlockedParts: [],
+        unlockedInstruments: [],
+      };
+    }
   }
 
   // Ensure techTree state is initialised (handles older saves).

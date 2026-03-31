@@ -26,6 +26,7 @@
  */
 
 import {
+  GameMode,
   WEATHER_BASE_SKIP_COST,
   WEATHER_SKIP_ESCALATION,
   WEATHER_MAX_WIND,
@@ -201,6 +202,23 @@ export function generateWeather(bodyId, seed) {
  * @param {string} [bodyId='EARTH']  Body to generate weather for.
  */
 export function initWeather(state, bodyId = 'EARTH') {
+  // Sandbox mode with weather disabled: always perfect conditions.
+  if (state.gameMode === GameMode.SANDBOX && !state.sandboxSettings?.weatherEnabled) {
+    state.weather = {
+      current: {
+        windSpeed: 0,
+        windAngle: 0,
+        temperature: 1.0,
+        visibility: 0,
+        extreme: false,
+        description: 'Clear skies (sandbox)',
+        bodyId,
+      },
+      skipCount: 0,
+      seed: 0,
+    };
+    return;
+  }
   const seed = (state.currentPeriod * 7919 + Date.now()) & 0x7fffffff;
   state.weather = {
     current: generateWeather(bodyId, seed),
@@ -239,6 +257,9 @@ export function getCurrentWeather(state) {
  * @returns {number}  Cost in dollars.
  */
 export function getWeatherSkipCost(state) {
+  // Sandbox mode: weather skip is always free.
+  if (state.gameMode === GameMode.SANDBOX) return 0;
+
   const skipCount = state.weather?.skipCount ?? 0;
   const baseCost = WEATHER_BASE_SKIP_COST * Math.pow(WEATHER_SKIP_ESCALATION, skipCount);
 

@@ -31,6 +31,9 @@ import {
 } from '../core/saveload.js';
 import { createGameState } from '../core/gameState.js';
 import { initializeMissions, reconcileParts } from '../core/missions.js';
+import { GameMode, FACILITY_DEFINITIONS, SANDBOX_STARTING_MONEY } from '../core/constants.js';
+import { getAllParts } from '../data/parts.js';
+import { TECH_NODES } from '../data/techtree.js';
 
 // ---------------------------------------------------------------------------
 // Shooting stars
@@ -340,6 +343,30 @@ const MENU_STYLES = `
   margin: 0 0 4px;
 }
 
+.mm-mode-badge {
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+  vertical-align: middle;
+  letter-spacing: 0.04em;
+}
+.mm-mode-sandbox {
+  background: rgba(230, 180, 50, 0.25);
+  color: #e6b432;
+  border: 1px solid rgba(230, 180, 50, 0.4);
+}
+.mm-mode-tutorial {
+  background: rgba(80, 160, 230, 0.2);
+  color: #6ab0e8;
+  border: 1px solid rgba(80, 160, 230, 0.3);
+}
+.mm-mode-freeplay {
+  background: rgba(80, 200, 120, 0.2);
+  color: #60c880;
+  border: 1px solid rgba(80, 200, 120, 0.3);
+}
+
 .mm-save-card-agency {
   font-size: 0.82rem;
   color: #88bce8;
@@ -592,6 +619,36 @@ const MENU_STYLES = `
   line-height: 1.4;
 }
 
+/* ── Sandbox options ─────────────────────────────────────────────────── */
+.mm-sandbox-options {
+  margin-top: 12px;
+}
+.mm-sandbox-options > label {
+  display: block;
+  font-size: 0.85rem;
+  color: #b0c4d8;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.mm-sandbox-toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mm-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: #8ab0cc;
+  cursor: pointer;
+}
+.mm-toggle-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #4a90d9;
+}
+
 /* ── Error / info messages ──────────────────────────────────────────────── */
 .mm-message {
   padding: 10px 16px;
@@ -804,8 +861,14 @@ function _buildSaveCard(summary) {
 
   const kiaClass = summary.crewKIA > 0 ? 'mm-stat-kia' : '';
 
+  const modeBadge = summary.gameMode === 'sandbox'
+    ? '<span class="mm-mode-badge mm-mode-sandbox">SANDBOX</span>'
+    : summary.gameMode === 'tutorial'
+      ? '<span class="mm-mode-badge mm-mode-tutorial">TUTORIAL</span>'
+      : '<span class="mm-mode-badge mm-mode-freeplay">FREE PLAY</span>';
+
   card.innerHTML = `
-    <p class="mm-save-card-name">${_escapeHtml(summary.saveName)}</p>
+    <p class="mm-save-card-name">${_escapeHtml(summary.saveName)} ${modeBadge}</p>
     ${summary.agencyName ? `<p class="mm-save-card-agency" data-agency-name="${_escapeHtml(summary.agencyName)}">${_escapeHtml(summary.agencyName)}</p>` : ''}
     <p class="mm-save-card-date">Saved ${formatDate(summary.timestamp)}</p>
     <div class="mm-save-card-stats">
@@ -920,6 +983,24 @@ function _renderNewGameScreen(overlay, canGoBack) {
             <div class="mm-mode-title">Free Play</div>
             <div class="mm-mode-hint">All starter parts and facility building available from the start.</div>
           </div>
+          <div class="mm-mode-option" data-mode="sandbox">
+            <input type="radio" name="mm-game-mode" value="sandbox" />
+            <div class="mm-mode-title">Sandbox</div>
+            <div class="mm-mode-hint">Everything unlocked, unlimited funds. Contracts and reputation still active.</div>
+          </div>
+        </div>
+      </div>
+      <div class="mm-sandbox-options" id="mm-sandbox-options" style="display:none">
+        <label>Sandbox Options</label>
+        <div class="mm-sandbox-toggles">
+          <label class="mm-toggle-label">
+            <input type="checkbox" id="mm-sandbox-malfunctions" />
+            Enable malfunctions
+          </label>
+          <label class="mm-toggle-label">
+            <input type="checkbox" id="mm-sandbox-weather" />
+            Enable weather effects
+          </label>
         </div>
       </div>
       <div id="mm-newgame-error"></div>
@@ -939,11 +1020,16 @@ function _renderNewGameScreen(overlay, canGoBack) {
 
   // Wire up game mode toggle cards.
   const modeOptions = screen.querySelectorAll('.mm-mode-option');
+  const sandboxOpts = screen.querySelector('#mm-sandbox-options');
   for (const opt of modeOptions) {
     opt.addEventListener('click', () => {
       for (const o of modeOptions) o.classList.remove('selected');
       opt.classList.add('selected');
       opt.querySelector('input[type="radio"]').checked = true;
+      // Show/hide sandbox-specific options.
+      if (sandboxOpts) {
+        sandboxOpts.style.display = opt.dataset.mode === 'sandbox' ? '' : 'none';
+      }
     });
   }
 
@@ -963,8 +1049,11 @@ function _renderNewGameScreen(overlay, canGoBack) {
       return;
     }
     const selectedMode = screen.querySelector('input[name="mm-game-mode"]:checked').value;
-    const tutorialMode = selectedMode === 'tutorial';
-    _startNewGame(agencyName, tutorialMode);
+    const sandboxOptions = selectedMode === 'sandbox' ? {
+      malfunctionsEnabled: screen.querySelector('#mm-sandbox-malfunctions')?.checked ?? false,
+      weatherEnabled: screen.querySelector('#mm-sandbox-weather')?.checked ?? false,
+    } : null;
+    _startNewGame(agencyName, selectedMode, sandboxOptions);
   });
 
   if (backBtn) {
@@ -1070,27 +1159,55 @@ function _handleDeleteConfirm(slotIndex, saveName) {
  * Creates a fresh game state for a new game and begins playing.
  *
  * @param {string} agencyName
- * @param {boolean} tutorialMode  Whether to start in tutorial mode (guided
- *                                missions) or free-play mode (all starters).
+ * @param {string} selectedMode  GameMode enum value ('tutorial', 'freeplay', 'sandbox').
+ * @param {import('../core/gameState.js').SandboxSettings|null} sandboxOptions  Sandbox toggle settings (null if not sandbox).
  */
-function _startNewGame(agencyName, tutorialMode) {
+function _startNewGame(agencyName, selectedMode, sandboxOptions = null) {
   const state = createGameState();
   state.agencyName = agencyName;
-  state.tutorialMode = tutorialMode;
+  state.tutorialMode = selectedMode === GameMode.TUTORIAL;
+  state.gameMode = selectedMode;
 
-  // Seed tutorial missions.
+  if (selectedMode === GameMode.SANDBOX) {
+    // -- Sandbox initialisation -----------------------------------------------
+    state.sandboxSettings = {
+      malfunctionsEnabled: sandboxOptions?.malfunctionsEnabled ?? false,
+      weatherEnabled: sandboxOptions?.weatherEnabled ?? false,
+    };
+
+    // Unlimited funds, no loan.
+    state.money = SANDBOX_STARTING_MONEY;
+    state.loan = { balance: 0, interestRate: 0, totalInterestAccrued: 0 };
+
+    // All facilities built at tier 1.
+    for (const def of FACILITY_DEFINITIONS) {
+      state.facilities[def.id] = { built: true, tier: 1 };
+    }
+
+    // All parts unlocked.
+    state.parts = getAllParts().map((p) => p.id);
+
+    // All tech tree nodes researched and instruments unlocked.
+    const researched = [];
+    const instruments = [];
+    for (const node of TECH_NODES) {
+      researched.push(node.id);
+      for (const iid of node.unlocksInstruments) {
+        if (!instruments.includes(iid)) instruments.push(iid);
+      }
+    }
+    state.techTree = { researched, unlockedInstruments: instruments };
+  } else {
+    // Tutorial or free-play — existing logic.
+    state.parts = selectedMode === GameMode.TUTORIAL
+      ? [...TUTORIAL_STARTER_PARTS]
+      : [...FREE_STARTER_PARTS];
+  }
+
+  // Seed tutorial missions (applies to all modes for contract generation).
   initializeMissions(state);
 
-  // Unlock starter parts based on game mode.
-  // Tutorial mode: basic parts only — cmd-mk1, science-module-mk1, and
-  // thermometer-mk1 are gated behind tutorial mission rewards.
-  // Free-play mode: all starter-tier parts available immediately.
-  state.parts = tutorialMode
-    ? [...TUTORIAL_STARTER_PARTS]
-    : [...FREE_STARTER_PARTS];
-
-  const modeLabel = tutorialMode ? 'tutorial' : 'free-play';
-  console.log(`[MainMenu] New game started (${modeLabel}). Agency:`, agencyName);
+  console.log(`[MainMenu] New game started (${selectedMode}). Agency:`, agencyName);
   _beginGame(state);
 }
 

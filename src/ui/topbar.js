@@ -27,7 +27,7 @@
 
 import { payDownLoan, borrowMore } from '../core/finance.js';
 import { saveGame, listSaves, SAVE_SLOT_COUNT } from '../core/saveload.js';
-import { MAX_LOAN_BALANCE } from '../core/constants.js';
+import { GameMode, MAX_LOAN_BALANCE } from '../core/constants.js';
 import { getPartById } from '../data/parts.js';
 import { syncVabToGameState } from '../ui/vab.js';
 
@@ -94,6 +94,19 @@ const TOPBAR_STYLES = `
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Sandbox badge */
+#topbar-sandbox-badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(230, 180, 50, 0.25);
+  color: #e6b432;
+  border: 1px solid rgba(230, 180, 50, 0.4);
+  letter-spacing: 0.04em;
+  margin-left: 8px;
 }
 
 /* Flight (period) counter */
@@ -674,6 +687,15 @@ export function initTopBar(container, state, { onExitToMenu }) {
   spacer.id = 'topbar-spacer';
 
   _root.appendChild(agency);
+
+  // Sandbox mode badge — shown only in sandbox games.
+  if (state.gameMode === GameMode.SANDBOX) {
+    const badge = document.createElement('span');
+    badge.id = 'topbar-sandbox-badge';
+    badge.textContent = 'SANDBOX';
+    _root.appendChild(badge);
+  }
+
   _root.appendChild(flightCounter);
   _root.appendChild(cash);
   _root.appendChild(missionsBtn);
@@ -795,9 +817,16 @@ function _openDropdown() {
   const items = [
     { label: 'Save Game',    action: _openSaveSlotPicker },
     { label: 'Load Game',    action: _doLoadGame        },
-    null, // separator
-    { label: 'Exit to Menu', action: _doExitToMenu, danger: true },
   ];
+
+  // Sandbox Settings — only shown in sandbox mode.
+  if (_state?.gameMode === GameMode.SANDBOX) {
+    items.push(null); // separator
+    items.push({ label: 'Sandbox Settings', action: _openSandboxSettings });
+  }
+
+  items.push(null); // separator
+  items.push({ label: 'Exit to Menu', action: _doExitToMenu, danger: true });
 
   for (const item of items) {
     if (item === null) {
@@ -1325,6 +1354,70 @@ function _doLoadGame() {
 // Exit to Menu — confirmation dialog
 // ---------------------------------------------------------------------------
 
+/**
+ * Opens the sandbox settings modal (malfunctions/weather toggles).
+ */
+function _openSandboxSettings() {
+  _closeAllModals();
+  if (!_state || _state.gameMode !== GameMode.SANDBOX) return;
+
+  const backdrop = _makeBackdrop('sandbox-settings-backdrop');
+  const modal = document.createElement('div');
+  modal.className = 'topbar-modal';
+  modal.setAttribute('role', 'dialog');
+  modal.setAttribute('aria-modal', 'true');
+  modal.setAttribute('aria-label', 'Sandbox Settings');
+  modal.addEventListener('click', (e) => e.stopPropagation());
+
+  modal.appendChild(_makeTitleRow('Sandbox Settings', () => backdrop.remove()));
+
+  const settings = _state.sandboxSettings || { malfunctionsEnabled: false, weatherEnabled: false };
+
+  const form = document.createElement('div');
+  form.style.cssText = 'display:flex;flex-direction:column;gap:12px;padding:8px 0';
+
+  // Malfunctions toggle
+  const malfLabel = document.createElement('label');
+  malfLabel.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:0.85rem;color:#b0c4d8;cursor:pointer';
+  const malfCheck = document.createElement('input');
+  malfCheck.type = 'checkbox';
+  malfCheck.checked = settings.malfunctionsEnabled;
+  malfCheck.style.cssText = 'width:16px;height:16px;accent-color:#4a90d9';
+  malfCheck.addEventListener('change', () => {
+    if (_state?.sandboxSettings) _state.sandboxSettings.malfunctionsEnabled = malfCheck.checked;
+  });
+  malfLabel.appendChild(malfCheck);
+  malfLabel.appendChild(document.createTextNode('Enable malfunctions'));
+  form.appendChild(malfLabel);
+
+  // Weather toggle
+  const wxLabel = document.createElement('label');
+  wxLabel.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:0.85rem;color:#b0c4d8;cursor:pointer';
+  const wxCheck = document.createElement('input');
+  wxCheck.type = 'checkbox';
+  wxCheck.checked = settings.weatherEnabled;
+  wxCheck.style.cssText = 'width:16px;height:16px;accent-color:#4a90d9';
+  wxCheck.addEventListener('change', () => {
+    if (_state?.sandboxSettings) _state.sandboxSettings.weatherEnabled = wxCheck.checked;
+  });
+  wxLabel.appendChild(wxCheck);
+  wxLabel.appendChild(document.createTextNode('Enable weather effects'));
+  form.appendChild(wxLabel);
+
+  modal.appendChild(form);
+
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'confirm-btn confirm-btn-cancel';
+  closeBtn.textContent = 'Close';
+  closeBtn.style.marginTop = '8px';
+  closeBtn.addEventListener('click', () => backdrop.remove());
+  modal.appendChild(closeBtn);
+
+  backdrop.addEventListener('click', () => backdrop.remove());
+  backdrop.appendChild(modal);
+  document.body.appendChild(backdrop);
+}
+
 function _doExitToMenu() {
   _closeAllModals();
 
@@ -1416,7 +1509,7 @@ function _makeTitleRow(title, onClose) {
  * Remove all open topbar modals from the DOM.
  */
 function _closeAllModals() {
-  for (const id of ['loan-modal-backdrop', 'save-modal-backdrop', 'exit-confirm-backdrop']) {
+  for (const id of ['loan-modal-backdrop', 'save-modal-backdrop', 'exit-confirm-backdrop', 'sandbox-settings-backdrop']) {
     const el = document.getElementById(id);
     if (el) el.remove();
   }

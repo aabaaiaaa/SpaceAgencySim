@@ -306,7 +306,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 ## Phase 7: "Your Space Program" — Sandbox & Replayability
 
 ### TASK-046: Sandbox mode
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-017, TASK-009, TASK-022
 - **Description**: New game option: everything free, all buildings/upgrades present, all parts unlocked. Contracts and reputation enabled. Malfunctions toggleable off. Weather toggleable off. Separate save slots from career mode. Completely separate progression. No creative mode (physics overrides) yet. Rocket design library shared between sandbox and career (per Phase 1f).
