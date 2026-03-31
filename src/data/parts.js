@@ -199,6 +199,7 @@ export const STACK_TYPES = Object.freeze([
   PartType.PARACHUTE,
   PartType.SATELLITE,
   PartType.DOCKING_PORT,
+  PartType.HEAT_SHIELD,
 ]);
 
 /**
@@ -1187,6 +1188,69 @@ export const PARTS = [
       dragCoefficient: 0.03,
       heatTolerance: 1800,
       crashThreshold: 8,
+    },
+  },
+
+  // =========================================================================
+  // HEAT SHIELDS
+  // =========================================================================
+
+  /**
+   * Heat Shield Mk1 — small ablative heat shield for lightweight probes.
+   * Placed at the bottom of the stack (below decoupler), nose-down during
+   * reentry. Protects all parts above it in the stack from atmospheric heating.
+   * Single-use: stage it off after reentry via the decoupler above.
+   */
+  {
+    id: 'heat-shield-mk1',
+    name: 'Heat Shield Mk1',
+    description: 'Small ablative heat shield for probes and lightweight craft. Protects parts above it from atmospheric heating during reentry. Mount below a decoupler and stage off after reentry.',
+    type: PartType.HEAT_SHIELD,
+    reliability: RELIABILITY_TIERS.HIGH,
+    mass: 80,
+    cost: 4_000,
+    width: 24,   // 1.2 m — matches small probe/tank width
+    height: 8,   // 0.4 m thin disc
+    snapPoints: [
+      makeSnapPoint('top',    0, -4, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  4, STACK_TYPES),
+    ],
+    animationStates: ['intact', 'charred'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      heatTolerance: 3000,
+      dragCoefficient: 0.35,
+      crashThreshold: 12,
+    },
+  },
+
+  /**
+   * Heat Shield Mk2 — standard ablative heat shield for crewed capsules.
+   * Wider coverage for command modules and larger stacks. High thermal
+   * tolerance allows survival of aggressive reentry profiles.
+   */
+  {
+    id: 'heat-shield-mk2',
+    name: 'Heat Shield Mk2',
+    description: 'Standard ablative heat shield for crewed capsules and medium craft. Wide coverage protects the full stack above from extreme atmospheric heating. Essential for Earth and Venus reentry.',
+    type: PartType.HEAT_SHIELD,
+    reliability: RELIABILITY_TIERS.HIGH,
+    mass: 150,
+    cost: 8_000,
+    width: 40,   // 2 m — matches command module width
+    height: 10,  // 0.5 m thin disc
+    snapPoints: [
+      makeSnapPoint('top',    0, -5, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  5, STACK_TYPES),
+    ],
+    animationStates: ['intact', 'charred'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      heatTolerance: 3500,
+      dragCoefficient: 0.40,
+      crashThreshold: 15,
     },
   },
 

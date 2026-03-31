@@ -1868,6 +1868,7 @@ function _showPartDetail(partId) {
     engine: 'Engine', solid_rocket_booster: 'Solid Rocket Booster',
     stack_decoupler: 'Stack Decoupler', radial_decoupler: 'Radial Decoupler',
     landing_legs: 'Landing Legs', parachute: 'Parachute', satellite: 'Satellite',
+    heat_shield: 'Heat Shield',
   };
 
   const typeLbl = TYPE_LABEL[def.type] ?? def.type;
@@ -1889,6 +1890,7 @@ function _showPartDetail(partId) {
   if (p.seats !== undefined) stats.push(['Crew seats', String(p.seats)]);
   if (p.experimentDuration !== undefined) stats.push(['Experiment time', `${p.experimentDuration} s`]);
   if (p.crashThreshold !== undefined) stats.push(['Crash rating', `${p.crashThreshold} m/s`]);
+  if (p.heatTolerance !== undefined) stats.push(['Heat tolerance', `${p.heatTolerance.toLocaleString('en-US')}`]);
 
   // Reliability rating (from malfunction system).
   if (def.reliability !== undefined) {

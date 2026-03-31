@@ -422,7 +422,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 ## Additional Systems (gaps identified during review)
 
 ### TASK-064: Reentry heating and thermal system
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-014, TASK-039
 - **Description**: Implement atmospheric heating during FLIGHT phase when a craft is moving at speed through an atmosphere — applies during both reentry and ascent. Heat generated per tick based on craft speed × atmospheric density at current altitude. Each celestial body's atmosphere profile determines density (airless bodies = no heating; Mars = low; Earth = moderate; Venus = extreme). The Sun uses proximity-based heating (see TASK-040) rather than atmospheric density. Heat accumulates on parts over time. Each part has a thermal tolerance rating — when accumulated heat exceeds the rating, the part is destroyed. Engines have naturally high thermal ratings. Heat shields have very high ratings and protect parts behind them in the stack (above, since reentry is typically nose-down) — rocket orientation during reentry matters. Parts not behind a shield are exposed directly. Heat dissipates over time when not under thermal stress (e.g., after slowing down or exiting atmosphere), allowing brief aerobraking passes to be survivable. Heat shields are single-use, meant to be staged off after reentry — detachment failure is covered by the existing stuck decoupler malfunction (TASK-019). Visual heat glow effect using the sine wave approach already in the codebase, intensity scaling with heat level. Thermal tolerance ratings visible on parts in the VAB so the player can make informed decisions.

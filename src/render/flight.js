@@ -32,7 +32,7 @@ import * as PIXI from 'pixi.js';
 import { getApp }      from './index.js';
 import { getPartById } from '../data/parts.js';
 import { PartType, ControlMode, BODY_RADIUS } from '../core/constants.js';
-import { airDensity }  from '../core/atmosphere.js';
+import { airDensity, getHeatRatio }  from '../core/atmosphere.js';
 import { getBiome, getBiomeTransition, BIOME_FADE_RANGE } from '../core/biomes.js';
 import { DEPLOY_DURATION } from '../core/parachute.js';
 import { LegState, LEG_DEPLOY_DURATION, getDeployedLegFootOffset } from '../core/legs.js';
@@ -1264,6 +1264,70 @@ function _drawMalfunctionOverlays(g, ps, assembly) {
 }
 
 /**
+ * Draw heat glow overlays on parts experiencing atmospheric heating.
+ *
+ * Uses a sine-wave pulsing effect that intensifies with heat level.
+ * Cold parts (ratio < 0.1) get no overlay. As heat increases:
+ *   - Low heat (0.1–0.4): faint orange glow, slow pulse
+ *   - Medium heat (0.4–0.7): bright orange-red glow, faster pulse
+ *   - High heat (0.7–1.0): intense white-orange glow, rapid pulse
+ *
+ * @param {PIXI.Graphics}                                    g
+ * @param {import('../core/physics.js').PhysicsState}        ps
+ * @param {import('../core/rocketbuilder.js').RocketAssembly} assembly
+ */
+function _drawHeatGlowOverlays(g, ps, assembly) {
+  if (!ps.heatMap || ps.heatMap.size === 0) return;
+
+  const now = Date.now();
+
+  for (const instanceId of ps.activeParts) {
+    const ratio = getHeatRatio(ps, instanceId, assembly);
+    if (ratio < 0.1) continue;
+
+    const placed = assembly.parts.get(instanceId);
+    if (!placed) continue;
+    const def = getPartById(placed.partId);
+    if (!def) continue;
+
+    const lx = placed.x;
+    const ly = -placed.y;
+    const pw = def.width  ?? 40;
+    const ph = def.height ?? 20;
+
+    // Sine wave pulse: frequency increases with heat intensity.
+    // Low heat: ~1.5 Hz, high heat: ~4 Hz.
+    const freq = 1.5 + ratio * 2.5;
+    const pulse = 0.5 + 0.5 * Math.sin(now * freq * 0.006);
+
+    // Interpolate colour from orange (low) through red-orange to white-hot.
+    let color;
+    if (ratio < 0.4) {
+      color = 0xff6600; // Orange
+    } else if (ratio < 0.7) {
+      color = 0xff4400; // Red-orange
+    } else {
+      color = 0xff8844; // White-hot orange
+    }
+
+    // Alpha scales with heat ratio and pulse.
+    const baseAlpha = 0.15 + ratio * 0.45;
+    const alpha = baseAlpha * (0.6 + 0.4 * pulse);
+
+    // Draw the glow fill.
+    g.rect(lx - pw / 2, ly - ph / 2, pw, ph);
+    g.fill({ color, alpha });
+
+    // Draw a brighter border glow at higher heat levels.
+    if (ratio > 0.3) {
+      const strokeAlpha = (ratio - 0.3) * 0.8 * (0.7 + 0.3 * pulse);
+      g.rect(lx - pw / 2, ly - ph / 2, pw, ph);
+      g.stroke({ color: 0xffaa22, width: 2, alpha: strokeAlpha });
+    }
+  }
+}
+
+/**
  * Determine which side of the rocket a landing leg is attached to by
  * inspecting the assembly's connection graph.  Returns +1 for right-side
  * legs and -1 for left-side legs.
@@ -1649,6 +1713,9 @@ function _renderRocket(ps, assembly, w, h) {
 
   // Draw malfunction overlays: pulsing red-orange border + warning stripe.
   _drawMalfunctionOverlays(g, ps, assembly);
+
+  // Draw heat glow overlays: orange-to-white pulsing glow on heated parts.
+  _drawHeatGlowOverlays(g, ps, assembly);
 
   // Draw deployed parachute canopies independently (in world space, not rotating with rocket).
   _drawParachuteCanopies(ps, assembly, w, h);

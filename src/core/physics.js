@@ -47,6 +47,7 @@ import { getPartById } from '../data/parts.js';
 import { PartType, ControlMode } from './constants.js';
 import {
   airDensity,
+  airDensityForBody,
   ATMOSPHERE_TOP,
   SEA_LEVEL_DENSITY,
   updateHeat,
@@ -796,9 +797,14 @@ function _integrate(ps, assembly, flightState) {
     }
   }
 
-  // --- 10. Reentry heat model ----------------------------------------------
+  // --- 10. Atmospheric heat model -------------------------------------------
   if (!ps.grounded) {
-    updateHeat(ps, assembly, flightState, speed, altitude, density);
+    // Use body-aware density for heat when flying at a non-Earth body.
+    const bodyId = flightState.bodyId;
+    const heatDensity = (bodyId && bodyId !== 'EARTH')
+      ? airDensityForBody(altitude, bodyId)
+      : density;
+    updateHeat(ps, assembly, flightState, speed, altitude, heatDensity);
   }
 
   // --- 10. Liftoff detection -----------------------------------------------

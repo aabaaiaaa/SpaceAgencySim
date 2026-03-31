@@ -1,37 +1,49 @@
 /**
- * atmosphere.js — Atmosphere model and reentry heat simulation.
+ * atmosphere.js — Atmosphere model and reentry/ascent heat simulation.
  *
  * Provides:
  *   - Exponential air density curve (ISA-inspired, simplified)
  *   - Terminal velocity calculation (informational; drag enforces it naturally)
- *   - Per-tick reentry heat accumulation on the leading-face part
+ *   - Per-tick atmospheric heat accumulation on exposed parts
+ *   - Heat shield protection for parts behind the shield in the stack
  *   - Heat dissipation when flight conditions ease
  *   - Part destruction when accumulated heat exceeds tolerance
+ *   - Multi-body atmosphere support (Earth, Mars, Venus, etc.)
  *
  * ATMOSPHERE MODEL
- *   density(alt) = 1.225 × exp(−alt / 8500)  kg/m³
- *   Effective vacuum above 70 000 m (density < 0.0001 kg/m³).
+ *   density(alt) = 1.225 × exp(−alt / 8500)  kg/m³   (Earth default)
+ *   Multi-body: uses per-body seaLevelDensity / scaleHeight / topAltitude.
+ *   Effective vacuum above topAltitude (density < 0.0001 kg/m³).
  *
- * REENTRY CONDITIONS
- *   Active when: altitude < 70 000 m  AND  speed > 1 500 m/s
+ * HEATING CONDITIONS
+ *   Active when: inside body's atmosphere AND speed > 1 500 m/s
+ *   Applies during both ascent and reentry.
  *
  * HEAT RULES (per fixed-timestep tick)
  *   heatRate = (speed − 1500) × density × 0.01
- *   Leading-face part accumulates the full heatRate each tick.
- *   All parts dissipate 5 heat units per tick when NOT in reentry.
- *   A part is destroyed (removed from the rocket graph) when:
- *     currentHeat > heatTolerance
- *   Default tolerances:
- *     Structural parts  → 1 200
- *     Heat shield parts → 3 000
+ *   Leading-face part: accumulates full heatRate.
+ *   Other exposed parts (not behind a heat shield): accumulate 40% heatRate.
+ *   Shielded parts (behind a heat shield relative to travel direction): no heat.
+ *   All parts dissipate HEAT_DISSIPATION_PER_TICK when NOT under thermal stress.
+ *   A part is destroyed when: currentHeat > heatTolerance
+ *
+ * HEAT SHIELD PROTECTION
+ *   During descent (velY < 0): shield protects parts with Y > shield.Y (above it).
+ *   During ascent  (velY ≥ 0): shield protects parts with Y < shield.Y (below it).
+ *   Only active heat shields (in ps.activeParts) provide protection.
  *
  * PUBLIC API
  *   airDensity(altitude)                                          → number
+ *   airDensityForBody(altitude, bodyId)                           → number
+ *   atmosphereTopForBody(bodyId)                                  → number
+ *   isReentryConditionForBody(altitude, speed, bodyId)            → boolean
  *   terminalVelocity(mass, gravity, density, Cd, area)           → number
  *   isReentryCondition(altitude, speed)                          → boolean
  *   computeHeatRate(speed, density)                              → number
  *   getLeadingPartId(ps, assembly)                               → string|null
+ *   getShieldedPartIds(ps, assembly)                             → Set<string>
  *   getHeatTolerance(def)                                        → number
+ *   getHeatRatio(ps, instanceId, assembly)                       → number
  *   updateHeat(ps, assembly, flightState, speed, altitude, density) → void
  *
  * @module atmosphere
@@ -54,13 +66,13 @@ export const SEA_LEVEL_DENSITY = 1.225;
 /** Atmospheric scale height (metres). Controls how quickly density falls off. */
 export const SCALE_HEIGHT = 8_500;
 
-/** Speed threshold above which reentry heating begins (m/s). */
+/** Speed threshold above which atmospheric heating begins (m/s). */
 export const REENTRY_SPEED_THRESHOLD = 1_500;
 
 /** Heat rate scalar: heatRate = (speed − threshold) × density × HEAT_RATE_COEFF. */
 export const HEAT_RATE_COEFF = 0.01;
 
-/** Heat units dissipated per tick when not in reentry conditions. */
+/** Heat units dissipated per tick when not under thermal stress. */
 export const HEAT_DISSIPATION_PER_TICK = 5;
 
 /** Default heat tolerance for structural parts (arbitrary heat units). */
@@ -68,6 +80,9 @@ export const DEFAULT_HEAT_TOLERANCE = 1_200;
 
 /** Default heat tolerance for heat shield parts. */
 export const HEAT_SHIELD_TOLERANCE = 3_000;
+
+/** Fraction of heat rate applied to non-leading exposed parts. */
+export const EXPOSED_HEAT_FRACTION = 0.4;
 
 // ---------------------------------------------------------------------------
 // Air density model
@@ -113,7 +128,7 @@ export function atmosphereTopForBody(bodyId) {
 }
 
 /**
- * Check reentry condition for any celestial body.
+ * Check heating condition for any celestial body.
  * Uses the body's atmosphere top instead of the hardcoded Earth value.
  *
  * @param {number} altitude  Metres above body surface.
@@ -159,7 +174,7 @@ export function terminalVelocity(mass, gravity, density, Cd, area) {
 // ---------------------------------------------------------------------------
 
 /**
- * Return true when flight conditions require reentry heat to be applied.
+ * Return true when flight conditions require atmospheric heat to be applied.
  *
  * Conditions: altitude < {@link ATMOSPHERE_TOP}  AND  speed > {@link REENTRY_SPEED_THRESHOLD}
  *
@@ -172,8 +187,8 @@ export function isReentryCondition(altitude, speed) {
 }
 
 /**
- * Compute the heat rate for a single fixed-timestep tick under reentry
- * conditions.
+ * Compute the heat rate for a single fixed-timestep tick under atmospheric
+ * heating conditions.
  *
  *   heatRate = (speed − REENTRY_SPEED_THRESHOLD) × density × HEAT_RATE_COEFF
  *
@@ -229,6 +244,78 @@ export function getLeadingPartId(ps, assembly) {
 }
 
 // ---------------------------------------------------------------------------
+// Heat shield protection
+// ---------------------------------------------------------------------------
+
+/**
+ * Return the set of instance IDs that are shielded by an active heat shield.
+ *
+ * A heat shield protects parts that are "behind" it relative to the direction
+ * of travel:
+ *   Descending (velY < 0): leading face is bottom → shield protects parts
+ *     with Y > shield.Y (above the shield in the stack).
+ *   Ascending  (velY ≥ 0): leading face is top → shield protects parts
+ *     with Y < shield.Y (below the shield in the stack).
+ *
+ * Only active heat shields (present in ps.activeParts) provide protection.
+ * Radial parts are not protected — only stack-aligned parts behind the shield.
+ *
+ * @param {{ velY: number, activeParts: Set<string> }} ps
+ * @param {{ parts: Map<string, { y: number, partId: string }> }} assembly
+ * @returns {Set<string>}  Instance IDs of shielded parts.
+ */
+export function getShieldedPartIds(ps, assembly) {
+  const shielded = new Set();
+  const descending = ps.velY < 0;
+
+  // Find all active heat shields.
+  const shields = [];
+  for (const instanceId of ps.activeParts) {
+    const placed = assembly.parts.get(instanceId);
+    if (!placed) continue;
+    const def = getPartById(placed.partId);
+    if (def && def.type === PartType.HEAT_SHIELD) {
+      shields.push({ instanceId, y: placed.y, halfWidth: (def.width ?? 40) / 2, x: placed.x });
+    }
+  }
+
+  if (shields.length === 0) return shielded;
+
+  // Check each active part against each shield.
+  for (const instanceId of ps.activeParts) {
+    const placed = assembly.parts.get(instanceId);
+    if (!placed) continue;
+    const def = getPartById(placed.partId);
+    if (!def) continue;
+    // Heat shields don't shield themselves.
+    if (def.type === PartType.HEAT_SHIELD) continue;
+
+    for (const shield of shields) {
+      // Part must be roughly inline with the shield (within shield width).
+      const dx = Math.abs(placed.x - shield.x);
+      if (dx > shield.halfWidth) continue;
+
+      // Check if the part is behind the shield relative to travel direction.
+      if (descending) {
+        // Leading face is bottom (low Y). Shield protects parts above it (higher Y).
+        if (placed.y > shield.y) {
+          shielded.add(instanceId);
+          break;
+        }
+      } else {
+        // Leading face is top (high Y). Shield protects parts below it (lower Y).
+        if (placed.y < shield.y) {
+          shielded.add(instanceId);
+          break;
+        }
+      }
+    }
+  }
+
+  return shielded;
+}
+
+// ---------------------------------------------------------------------------
 // Heat tolerance lookup
 // ---------------------------------------------------------------------------
 
@@ -255,20 +342,43 @@ export function getHeatTolerance(def) {
 }
 
 // ---------------------------------------------------------------------------
+// Heat ratio helper (for rendering)
+// ---------------------------------------------------------------------------
+
+/**
+ * Return the heat ratio (0–1) for a given part, where 0 is cold and 1 is at
+ * the part's thermal tolerance limit. Used by the renderer for glow intensity.
+ *
+ * @param {{ heatMap: Map<string, number>, activeParts: Set<string> }} ps
+ * @param {string} instanceId
+ * @param {{ parts: Map<string, { partId: string }> }} assembly
+ * @returns {number}  Heat ratio clamped to [0, 1].
+ */
+export function getHeatRatio(ps, instanceId, assembly) {
+  const heat = ps.heatMap.get(instanceId) ?? 0;
+  if (heat <= 0) return 0;
+  const placed = assembly.parts.get(instanceId);
+  const def = placed ? getPartById(placed.partId) : null;
+  const tolerance = getHeatTolerance(def);
+  return Math.min(1, heat / tolerance);
+}
+
+// ---------------------------------------------------------------------------
 // Per-tick heat update — main integration hook
 // ---------------------------------------------------------------------------
 
 /**
- * Apply reentry heat to the leading-face part and dissipate heat from all
- * other active parts.  Destroys any part whose accumulated heat exceeds its
+ * Apply atmospheric heat to exposed parts and dissipate heat from shielded /
+ * non-stressed parts. Destroys any part whose accumulated heat exceeds its
  * tolerance.
  *
  * Call once per fixed-timestep integration step (typically dt = 1/60 s).
  *
  * Heat rules per tick:
- *   IN reentry  → leading part: `currentHeat += heatRate`
- *                 all other parts: `currentHeat = max(0, currentHeat − 5)`
- *   NOT reentry → all parts: `currentHeat = max(0, currentHeat − 5)`
+ *   IN heating zone → leading part: `currentHeat += heatRate`
+ *                     other exposed parts: `currentHeat += heatRate × 0.4`
+ *                     shielded parts: `currentHeat = max(0, currentHeat − 5)`
+ *   NOT in heating zone → all parts: `currentHeat = max(0, currentHeat − 5)`
  *
  * Destruction: when `currentHeat > heatTolerance`, the part is removed from
  * `ps.activeParts` and `ps.firingEngines`, its heat entry is deleted, and a
@@ -288,16 +398,27 @@ export function updateHeat(ps, assembly, flightState, speed, altitude, density) 
   // Determine which part faces the oncoming atmosphere this tick.
   const leadingId = reentry ? getLeadingPartId(ps, assembly) : null;
 
+  // Determine which parts are protected by heat shields.
+  const shielded = reentry ? getShieldedPartIds(ps, assembly) : new Set();
+
   const toDestroy = [];
 
   for (const instanceId of ps.activeParts) {
     let heat = ps.heatMap.get(instanceId) ?? 0;
 
-    if (reentry && instanceId === leadingId) {
-      // Leading face: absorb the full heat rate.
-      heat += heatRate;
+    if (reentry) {
+      if (instanceId === leadingId) {
+        // Leading face: absorb the full heat rate.
+        heat += heatRate;
+      } else if (!shielded.has(instanceId)) {
+        // Exposed (not shielded): absorb a fraction of the heat rate.
+        heat += heatRate * EXPOSED_HEAT_FRACTION;
+      } else {
+        // Shielded: cool down.
+        heat = Math.max(0, heat - HEAT_DISSIPATION_PER_TICK);
+      }
     } else {
-      // All other parts cool down (or stay cool if already at 0).
+      // Not in heating zone: all parts cool down.
       heat = Math.max(0, heat - HEAT_DISSIPATION_PER_TICK);
     }
 
@@ -323,7 +444,7 @@ export function updateHeat(ps, assembly, flightState, speed, altitude, density) 
       instanceId,
       partName:    name,
       altitude,
-      description: `${name} destroyed by reentry heat at ${altitude.toFixed(0)} m.`,
+      description: `${name} destroyed by atmospheric heating at ${altitude.toFixed(0)} m.`,
     });
   }
 }
