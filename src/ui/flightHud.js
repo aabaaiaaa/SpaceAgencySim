@@ -743,6 +743,7 @@ let _elTargetTwrVal  = null;   // Target TWR value text
 let _elControlMode   = null;   // control mode badge (shows ORBIT / DOCKING / RCS)
 let _elBandWarning   = null;   // altitude band limit warning text
 let _elBiome         = null;   // biome name in status section
+let _elCrewList      = null;   // left-panel crew list
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -861,6 +862,7 @@ export function destroyFlightHud() {
   _elApo           = null;
   _elStagingList   = null;
   _elFuelList      = null;
+  _elCrewList      = null;
   _elControlMode   = null;
   _elBandWarning   = null;
   _elBiome         = null;
@@ -1190,6 +1192,22 @@ function _buildLeftPanel() {
   fuelSec.appendChild(_elFuelList);
 
   panel.appendChild(fuelSec);
+
+  // ── Crew section (visible only when crew aboard) ──────────────────────────
+  const crewSec = document.createElement('div');
+  crewSec.className = 'flight-lp-section';
+  crewSec.id = 'flight-lp-crew-section';
+
+  const crewTitle = document.createElement('div');
+  crewTitle.className = 'flight-lp-title';
+  crewTitle.textContent = 'Crew';
+  crewSec.appendChild(crewTitle);
+
+  _elCrewList = document.createElement('div');
+  _elCrewList.id = 'flight-lp-crew-list';
+  crewSec.appendChild(_elCrewList);
+
+  panel.appendChild(crewSec);
 
   _hud.appendChild(panel);
 
@@ -1584,6 +1602,11 @@ function _updateLeftPanel() {
   if (_elFuelList) {
     _updateFuelList();
   }
+
+  // ── Crew ──────────────────────────────────────────────────────────────────
+  if (_elCrewList) {
+    _updateCrewList();
+  }
 }
 
 /**
@@ -1778,6 +1801,60 @@ function _updateFuelList() {
     row.appendChild(nameEl);
     row.appendChild(kgEl);
     _elFuelList.appendChild(row);
+  }
+}
+
+/**
+ * Update crew list in the left panel.
+ * Shows names and status of crew aboard the flight.
+ */
+function _updateCrewList() {
+  if (!_elCrewList || !_flightState || !_state) return;
+
+  const crewIds = _flightState.crewIds ?? [];
+  const crewSection = _elCrewList.parentElement;
+
+  if (crewIds.length === 0) {
+    if (crewSection) crewSection.style.display = 'none';
+    return;
+  }
+  if (crewSection) crewSection.style.display = '';
+
+  // Only rebuild if crew changed (stable during flight, so build once).
+  const fingerprint = crewIds.join(',');
+  if (_elCrewList.dataset.fp === fingerprint) return;
+  _elCrewList.dataset.fp = fingerprint;
+  _elCrewList.innerHTML = '';
+
+  const ejectedIds = _ps?.ejectedCrewIds ?? new Set();
+
+  for (const crewId of crewIds) {
+    const member = _state.crew?.find((c) => c.id === crewId);
+    if (!member) continue;
+
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:3px;font-size:0.78rem;';
+
+    const ejected = ejectedIds.has(crewId);
+    const statusDot = document.createElement('span');
+    statusDot.style.cssText = `width:6px;height:6px;border-radius:50%;flex-shrink:0;background:${ejected ? '#e8a030' : '#60d080'};`;
+    statusDot.title = ejected ? 'Ejected' : 'Aboard';
+    row.appendChild(statusDot);
+
+    const nameEl = document.createElement('span');
+    nameEl.style.cssText = 'flex:1;color:#c0d8c0;';
+    nameEl.textContent = member.name;
+    row.appendChild(nameEl);
+
+    // Compact skill display.
+    const skills = member.skills ?? { piloting: 0, engineering: 0, science: 0 };
+    const skillEl = document.createElement('span');
+    skillEl.style.cssText = 'color:#6a8a6a;font-size:0.68rem;white-space:nowrap;';
+    skillEl.textContent = `P${Math.round(skills.piloting)} E${Math.round(skills.engineering)} S${Math.round(skills.science)}`;
+    skillEl.title = `Piloting ${Math.round(skills.piloting)}, Engineering ${Math.round(skills.engineering)}, Science ${Math.round(skills.science)}`;
+    row.appendChild(skillEl);
+
+    _elCrewList.appendChild(row);
   }
 }
 

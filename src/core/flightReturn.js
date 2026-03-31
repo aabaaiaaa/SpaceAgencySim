@@ -26,6 +26,7 @@ import { getPartById } from '../data/parts.js';
 import { PartType, DEATH_FINE_PER_ASTRONAUT, FlightOutcome } from './constants.js';
 import { processContractCompletions, generateContracts } from './contracts.js';
 import { deploySatellitesFromFlight } from './satellites.js';
+import { awardFlightXP, getMaxCrewSkill } from './crew.js';
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -58,6 +59,7 @@ import { deploySatellitesFromFlight } from './satellites.js';
  * @property {import('./gameState.js').Contract[]} newContracts - Newly generated board contracts.
  * @property {boolean}  bankrupt        - True if the player is bankrupt after this flight.
  * @property {Array<{satelliteId: string, satelliteType: string}>} deployedSatellites - Satellites deployed during this flight.
+ * @property {Array<{id: string, name: string, piloting: number, engineering: number, science: number}>} crewXPGains - Skill XP gains per crew member.
  */
 
 /**
@@ -112,17 +114,49 @@ export function processFlightReturn(state, flightState, ps, assembly) {
 
   // ── 4. Part recovery (landed safely only) ────────────────────────────────
   const isLanded = !!(ps && ps.landed && !ps.crashed);
+  let partsRecovered = 0;
   if (isLanded && assembly) {
+    // Engineering skill bonus: recovery value scales from 60% to 80%.
+    const crewIds = flightState?.crewIds ?? [];
+    const engSkill = getMaxCrewSkill(state, crewIds, 'engineering');
+    const recoveryFrac = 0.6 + (engSkill / 100) * 0.2;
+
     for (const [instanceId, placed] of assembly.parts) {
       if (!ps.activeParts.has(instanceId)) continue;
       const def = getPartById(placed.partId);
       if (!def) continue;
-      recoveryValue += Math.round((def.cost ?? 0) * 0.6);
+      recoveryValue += Math.round((def.cost ?? 0) * recoveryFrac);
+      partsRecovered++;
     }
     if (recoveryValue > 0) {
       earn(state, recoveryValue);
     }
   }
+
+  // ── 4b. Crew skill XP awards ──────────────────────────────────────────────
+  const flightEvents = flightState?.events ?? [];
+  const stagingEvents = flightEvents.filter((e) => e.type === 'PART_ACTIVATED').length;
+  const scienceActivations = flightEvents.filter((e) =>
+    e.type === 'PART_ACTIVATED' && e.partType === PartType.SERVICE_MODULE
+  ).length;
+  const scienceReturns = flightEvents.filter((e) =>
+    e.type === 'SCIENCE_DATA_RETURNED' || e.type === 'SCIENCE_TRANSMITTED'
+  ).length;
+
+  const survivingCrewIds = (flightState?.crewIds ?? []).filter((id) => {
+    const ejectedIds = ps?.ejectedCrewIds ?? new Set();
+    // Only award XP to crew who survived (not KIA).
+    if (ps?.crashed && !ejectedIds.has(id)) return false;
+    return true;
+  });
+
+  const crewXPGains = awardFlightXP(state, survivingCrewIds, {
+    safeLanding: isLanded,
+    stagingEvents,
+    partsRecovered,
+    scienceReturns,
+    scienceActivations,
+  });
 
   // ── 5. Loan interest — once per flight ───────────────────────────────────
   if (state.loan && state.loan.balance > 0) {
@@ -213,6 +247,7 @@ export function processFlightReturn(state, flightState, ps, assembly) {
     newContracts,
     bankrupt: periodSummary.bankrupt,
     deployedSatellites,
+    crewXPGains,
   };
 }
 

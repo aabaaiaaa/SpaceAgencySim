@@ -58,6 +58,8 @@ function generateUUID() {
  * @property {string|null}                   deathDate        - ISO 8601 date of death, or null.
  * @property {string|null}                   deathCause       - Cause of death, or null.
  * @property {string|null}                   assignedRocketId - Rocket design ID, or null if unassigned.
+ * @property {{ piloting: number, engineering: number, science: number }} skills
+ *           Skill levels (0–100). Gains apply diminishing returns.
  */
 
 // ---------------------------------------------------------------------------
@@ -83,6 +85,7 @@ function createAstronaut({ name, salary = CREW_SALARY_PER_PERIOD, hireDate = new
     deathDate: null,
     deathCause: null,
     assignedRocketId: null,
+    skills: { piloting: 0, engineering: 0, science: 0 },
   };
 }
 
@@ -215,4 +218,110 @@ export function getActiveCrew(state) {
  */
 export function getFullHistory(state) {
   return [...state.crew];
+}
+
+// ---------------------------------------------------------------------------
+// Skill progression
+// ---------------------------------------------------------------------------
+
+/**
+ * Apply diminishing-returns XP gain to a specific skill.
+ * Effective XP = rawXP × (100 - currentSkill) / 100.
+ * At skill 0 → 100 % gain; at skill 90 → 10 % gain; at skill 100 → 0.
+ *
+ * @param {Astronaut} astronaut
+ * @param {'piloting'|'engineering'|'science'} skill
+ * @param {number} rawXP  Base XP before diminishing returns.
+ */
+export function awardSkillXP(astronaut, skill, rawXP) {
+  if (!astronaut.skills) astronaut.skills = { piloting: 0, engineering: 0, science: 0 };
+  const current = astronaut.skills[skill] ?? 0;
+  const effective = rawXP * (100 - current) / 100;
+  astronaut.skills[skill] = Math.min(100, current + effective);
+}
+
+/**
+ * Award XP to all crew members who flew on a completed flight.
+ *
+ * XP sources:
+ *   Piloting:    +5 safe landing, +3 per flight, +2 per staging event
+ *   Engineering: +3 per part recovered, +2 per staging event
+ *   Science:     +5 per science data return, +3 per science activation
+ *
+ * @param {import('./gameState.js').GameState} state
+ * @param {string[]} crewIds              IDs of crew who flew.
+ * @param {object}   flightStats          Summary of flight events.
+ * @param {boolean}  flightStats.safeLanding      Whether the rocket landed safely.
+ * @param {number}   flightStats.stagingEvents    Number of staging events.
+ * @param {number}   flightStats.partsRecovered   Number of parts recovered.
+ * @param {number}   flightStats.scienceReturns   Number of science data returns.
+ * @param {number}   flightStats.scienceActivations Number of science activations.
+ * @returns {{ id: string, name: string, piloting: number, engineering: number, science: number }[]}
+ *   Skill gains per crew member (for display in the summary).
+ */
+export function awardFlightXP(state, crewIds, flightStats) {
+  const results = [];
+
+  for (const crewId of crewIds) {
+    const astronaut = state.crew.find((a) => a.id === crewId);
+    if (!astronaut || astronaut.status !== AstronautStatus.ACTIVE) continue;
+
+    const before = {
+      piloting: astronaut.skills?.piloting ?? 0,
+      engineering: astronaut.skills?.engineering ?? 0,
+      science: astronaut.skills?.science ?? 0,
+    };
+
+    // Piloting XP
+    awardSkillXP(astronaut, 'piloting', 3); // per flight
+    if (flightStats.safeLanding) awardSkillXP(astronaut, 'piloting', 5);
+    for (let i = 0; i < flightStats.stagingEvents; i++) {
+      awardSkillXP(astronaut, 'piloting', 2);
+    }
+
+    // Engineering XP
+    for (let i = 0; i < flightStats.stagingEvents; i++) {
+      awardSkillXP(astronaut, 'engineering', 2);
+    }
+    for (let i = 0; i < flightStats.partsRecovered; i++) {
+      awardSkillXP(astronaut, 'engineering', 3);
+    }
+
+    // Science XP
+    for (let i = 0; i < flightStats.scienceReturns; i++) {
+      awardSkillXP(astronaut, 'science', 5);
+    }
+    for (let i = 0; i < flightStats.scienceActivations; i++) {
+      awardSkillXP(astronaut, 'science', 3);
+    }
+
+    results.push({
+      id: astronaut.id,
+      name: astronaut.name,
+      piloting: Math.round((astronaut.skills.piloting - before.piloting) * 10) / 10,
+      engineering: Math.round((astronaut.skills.engineering - before.engineering) * 10) / 10,
+      science: Math.round((astronaut.skills.science - before.science) * 10) / 10,
+    });
+  }
+
+  return results;
+}
+
+/**
+ * Get the maximum value of a skill among a set of crew members.
+ *
+ * @param {import('./gameState.js').GameState} state
+ * @param {string[]} crewIds
+ * @param {'piloting'|'engineering'|'science'} skill
+ * @returns {number}  Highest skill value (0–100) among the crew, or 0 if none.
+ */
+export function getMaxCrewSkill(state, crewIds, skill) {
+  let max = 0;
+  for (const id of crewIds) {
+    const member = state.crew?.find((c) => c.id === id);
+    if (member?.skills?.[skill] != null) {
+      max = Math.max(max, member.skills[skill]);
+    }
+  }
+  return max;
 }

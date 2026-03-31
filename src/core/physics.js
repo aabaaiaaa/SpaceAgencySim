@@ -196,6 +196,30 @@ function _gravityForBody(bodyId, altitude) {
 }
 
 /**
+ * Look up the highest value of a crew skill among the flight's crew.
+ * Uses ps._gameState (set by flightController) and flightState.crewIds.
+ *
+ * @param {object}      ps          PhysicsState (with _gameState attached).
+ * @param {object|null} flightState FlightState with crewIds.
+ * @param {'piloting'|'engineering'|'science'} skill
+ * @returns {number}  0–100.
+ */
+function _getMaxCrewSkill(ps, flightState, skill) {
+  const gameState = ps?._gameState;
+  const crewIds = flightState?.crewIds;
+  if (!gameState || !crewIds || !crewIds.length) return 0;
+
+  let max = 0;
+  for (const id of crewIds) {
+    const member = gameState.crew?.find((c) => c.id === id);
+    if (member?.skills?.[skill] != null) {
+      max = Math.max(max, member.skills[skill]);
+    }
+  }
+  return max;
+}
+
+/**
  * Return the atmospheric density for the current flight body.
  * Delegates to body-aware density when bodyId is present, otherwise
  * falls back to Earth's default model.
@@ -786,7 +810,7 @@ function _integrate(ps, assembly, flightState) {
   }
 
   // --- 7. Continuous steering ----------------------------------------------
-  _applySteering(ps, assembly, altitude, FIXED_DT, bodyId);
+  _applySteering(ps, assembly, altitude, FIXED_DT, bodyId, flightState);
 
   // --- 7b. Topple-crash check (grounded tipping) -------------------------
   if (ps.grounded) {
@@ -1395,7 +1419,7 @@ function _applyDockingMovement(ps, assembly, totalMass, dt) {
 // Steering (private)
 // ---------------------------------------------------------------------------
 
-function _applySteering(ps, assembly, altitude, dt, bodyId) {
+function _applySteering(ps, assembly, altitude, dt, bodyId, flightState) {
   // In RCS mode, rotation is disabled.
   if (ps.controlMode === ControlMode.RCS) return;
 
@@ -1420,7 +1444,10 @@ function _applySteering(ps, assembly, altitude, dt, bodyId) {
 
   // Player input torque — compute angular acceleration and cap it so light
   // rockets don't spin uncontrollably.
-  let baseTorque = PLAYER_FLIGHT_TORQUE;
+  // Piloting skill bonus: up to +30% torque at max skill.
+  const pilotingSkill = _getMaxCrewSkill(ps, flightState, 'piloting');
+  const pilotingBonus = 1 + (pilotingSkill / 100) * 0.3;
+  let baseTorque = PLAYER_FLIGHT_TORQUE * pilotingBonus;
   if (altitude > atmoTop && _hasRcs(ps, assembly)) {
     baseTorque *= RCS_TORQUE_MULTIPLIER;
   }

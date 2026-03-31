@@ -169,6 +169,73 @@ const CREW_ADMIN_STYLES = `
   font-size: 0.9rem;
 }
 
+/* ── Skill bars ──────────────────────────────────────────────────────────────── */
+.crew-skills-cell {
+  min-width: 180px;
+}
+
+.crew-skill-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 3px;
+  font-size: 0.78rem;
+}
+
+.crew-skill-row:last-child {
+  margin-bottom: 0;
+}
+
+.crew-skill-label {
+  width: 52px;
+  text-align: right;
+  color: #8090a8;
+  flex-shrink: 0;
+}
+
+.crew-skill-bar-bg {
+  flex: 1;
+  height: 8px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 4px;
+  overflow: hidden;
+  min-width: 80px;
+}
+
+.crew-skill-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s;
+}
+
+.crew-skill-bar-fill.piloting {
+  background: linear-gradient(90deg, #4488cc, #66aaee);
+}
+
+.crew-skill-bar-fill.engineering {
+  background: linear-gradient(90deg, #cc8844, #eeaa66);
+}
+
+.crew-skill-bar-fill.science {
+  background: linear-gradient(90deg, #44aa66, #66dd88);
+}
+
+.crew-skill-value {
+  width: 28px;
+  text-align: right;
+  color: #a0aab8;
+  font-size: 0.72rem;
+  flex-shrink: 0;
+}
+
+.crew-skill-effect {
+  font-size: 0.7rem;
+  color: #6a7a8a;
+  margin-left: 58px;
+  margin-top: -1px;
+  margin-bottom: 4px;
+}
+
 /* ── Hire tab ────────────────────────────────────────────────────────────────── */
 #crew-hire-panel {
   max-width: 460px;
@@ -592,8 +659,9 @@ function _renderActiveTab() {
     <thead>
       <tr>
         <th>Name</th>
-        <th>Missions Flown</th>
-        <th>Flights Flown</th>
+        <th>Skills</th>
+        <th>Missions</th>
+        <th>Flights</th>
         <th></th>
       </tr>
     </thead>
@@ -608,6 +676,13 @@ function _renderActiveTab() {
     nameTd.className = 'crew-name-cell';
     nameTd.textContent = astronaut.name;
     tr.appendChild(nameTd);
+
+    // Skills column with bars and effect descriptions
+    const skillsTd = document.createElement('td');
+    skillsTd.className = 'crew-skills-cell';
+    const skills = astronaut.skills ?? { piloting: 0, engineering: 0, science: 0 };
+    skillsTd.innerHTML = _renderSkillBars(skills);
+    tr.appendChild(skillsTd);
 
     const missionsTd = document.createElement('td');
     missionsTd.textContent = String(astronaut.missionsFlown);
@@ -631,6 +706,43 @@ function _renderActiveTab() {
 
   table.appendChild(tbody);
   content.appendChild(table);
+}
+
+/**
+ * Render skill bars with effect descriptions for a crew member.
+ * @param {{ piloting: number, engineering: number, science: number }} skills
+ * @returns {string}  HTML string.
+ */
+function _renderSkillBars(skills) {
+  const p = Math.round(skills.piloting);
+  const e = Math.round(skills.engineering);
+  const s = Math.round(skills.science);
+
+  const pilotEffect = `+${(p * 0.3).toFixed(0)}% turn rate`;
+  const engEffect = `${(60 + (e / 100) * 20).toFixed(0)}% part recovery`;
+  const sciDuration = (100 - (s / 100) * 33.3).toFixed(0);
+  const sciEffect = `${sciDuration}% exp. time, +${((s / 100) * 50).toFixed(0)}% yield`;
+
+  return `
+    <div class="crew-skill-row">
+      <span class="crew-skill-label">Pilot</span>
+      <div class="crew-skill-bar-bg"><div class="crew-skill-bar-fill piloting" style="width:${p}%"></div></div>
+      <span class="crew-skill-value">${p}</span>
+    </div>
+    <div class="crew-skill-effect">${pilotEffect}</div>
+    <div class="crew-skill-row">
+      <span class="crew-skill-label">Eng.</span>
+      <div class="crew-skill-bar-bg"><div class="crew-skill-bar-fill engineering" style="width:${e}%"></div></div>
+      <span class="crew-skill-value">${e}</span>
+    </div>
+    <div class="crew-skill-effect">${engEffect}</div>
+    <div class="crew-skill-row">
+      <span class="crew-skill-label">Science</span>
+      <div class="crew-skill-bar-bg"><div class="crew-skill-bar-fill science" style="width:${s}%"></div></div>
+      <span class="crew-skill-value">${s}</span>
+    </div>
+    <div class="crew-skill-effect">${sciEffect}</div>
+  `;
 }
 
 /**

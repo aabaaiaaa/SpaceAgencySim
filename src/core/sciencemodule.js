@@ -267,7 +267,10 @@ export function activateInstrument(ps, assembly, flightState, key) {
   }
 
   entry.state = ScienceModuleState.RUNNING;
-  entry.timer = instrDef.experimentDuration;
+  // Science skill reduces experiment duration: 0 skill = 100%, 100 skill = 66.7% (30s→20s).
+  const sciSkill = _getCrewScienceSkill(flightState, ps?._gameState);
+  const durationFactor = 1 - (sciSkill / 100) * (1 / 3);
+  entry.timer = instrDef.experimentDuration * durationFactor;
   entry.startBiome = biomeId;
 
   // Update legacy module state.
@@ -397,7 +400,7 @@ export function transmitInstrument(ps, assembly, flightState, key, gameState) {
     entry.instrumentId,
     entry.completeBiome,
     entry.scienceMultiplier,
-    _getCrewScienceSkill(flightState),
+    _getCrewScienceSkill(flightState, gameState),
     gameState,
   );
 
@@ -640,7 +643,7 @@ export function onSafeLanding(ps, assembly, flightState, gameState) {
         entry.instrumentId,
         entry.completeBiome,
         entry.scienceMultiplier,
-        _getCrewScienceSkill(flightState),
+        _getCrewScienceSkill(flightState, gameState),
         gameState,
       );
 
@@ -911,12 +914,18 @@ function _recordCollection(gameState, instrumentId, biomeId) {
  * @param {{ crewIds?: string[] }} flightState
  * @returns {number}  Science skill 0–100 (0 if no crew or no data).
  */
-function _getCrewScienceSkill(flightState) {
-  // During flight we don't have direct access to the full gameState crew
-  // roster from here. The flight state stores crewIds but not skill data.
-  // Science skill bonus is applied at the calculation point; callers that
-  // need the full bonus should pass it via the gameState lookup.
-  // For now, return 0 (no bonus) — the bonus is factored in when
-  // the caller has access to the game state's crew roster.
-  return 0;
+function _getCrewScienceSkill(flightState, gameState) {
+  // Look up the highest science skill among the flight's crew.
+  const gs = gameState || flightState?._gameState;
+  const crewIds = flightState?.crewIds;
+  if (!gs || !crewIds || !crewIds.length) return 0;
+
+  let max = 0;
+  for (const id of crewIds) {
+    const member = gs.crew?.find((c) => c.id === id);
+    if (member?.skills?.science != null) {
+      max = Math.max(max, member.skills.science);
+    }
+  }
+  return max;
 }

@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 69
-- **Completed**: 29
-- **Remaining**: 40
-- **Last Updated**: 2026-03-31T06:32:33.649Z
+- **Completed**: 30
+- **Remaining**: 39
+- **Last Updated**: 2026-03-31T06:45:18.717Z
 
 ## Iteration Log
 
@@ -239,4 +239,12 @@
 - **Exit Status**: success
 - **Tokens**: 169,440 total (3 in, 61 out, 601 cache-create, 168,775 cache-read)
 - **Cost**: $6.0386
+
+### Iteration 30 - 2026-03-31T06:32:36.334Z
+- **Task Completed**: TASK-011
+- **Summary**: Completed Crew skill progression
+- **Duration**: 762s
+- **Exit Status**: success
+- **Tokens**: 7,657,207 total (1,424 in, 29,245 out, 112,564 cache-create, 7,513,974 cache-read)
+- **Cost**: $5.4141
 

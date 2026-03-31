@@ -72,7 +72,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Each period charges operating costs: crew salaries and facility upkeep. Activate existing crew salary field (~$5k/period per astronaut). Facility upkeep: $10k base, scaling with upgrades (Phase 5). Creates pressure to keep lean roster. Implement bankruptcy state for when player cannot afford to build any rocket.
 
 ### TASK-011: Crew skill progression
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-001
 - **Description**: Activate existing skills.piloting/engineering/science fields on CrewMember (currently always 0). XP gains per flight: Piloting (+5 safe landing, +3 per flight, +2 per staging), Engineering (+3 per part recovered, +2 per staging), Science (+5 per science data return, +3 per science activation). Effects: Piloting = turn rate bonus (up to +30%), Engineering = part recovery value (60%→80%), Science = experiment duration reduction (30s→20s) and yield bonus. Skills 0-100 with diminishing returns. Crew selection UI must show effects. Crew visible during flight.
