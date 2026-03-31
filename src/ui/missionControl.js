@@ -22,6 +22,8 @@ import { CONTRACT_CATEGORY_ICONS, MCC_TIER_FEATURES, getReputationTier } from '.
 import { getPartById } from '../data/parts.js';
 import { refreshTopBarMissions } from './topbar.js';
 import { getAchievementStatus } from '../core/achievements.js';
+import { getUnlockedChallenges, getChallengeResult, getActiveChallenge, acceptChallenge, abandonChallenge } from '../core/challenges.js';
+import { MedalTier, ScoreDirection } from '../data/challenges.js';
 
 // ---------------------------------------------------------------------------
 // CSS
@@ -499,6 +501,191 @@ const MISSION_CONTROL_STYLES = `
 .mc-achievement-summary strong {
   color: #90d890;
 }
+
+/* ── Challenge styles ──────────────────────────────────────────────────── */
+.mc-challenge-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 14px;
+  max-width: 900px;
+}
+
+.mc-challenge-card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  padding: 16px 18px;
+  transition: border-color 0.2s, background 0.2s;
+}
+.mc-challenge-card.active-challenge {
+  border-color: rgba(80, 140, 220, 0.4);
+  background: rgba(60, 120, 220, 0.06);
+}
+
+.mc-challenge-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.mc-challenge-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #d4e0f0;
+  margin: 0;
+}
+
+.mc-challenge-medal {
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.mc-challenge-briefing {
+  font-size: 0.82rem;
+  color: #7888a0;
+  line-height: 1.5;
+  margin: 0 0 10px;
+}
+
+.mc-challenge-desc {
+  font-size: 0.82rem;
+  color: #8898b0;
+  line-height: 1.5;
+  margin: 0 0 12px;
+}
+
+.mc-challenge-medals-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 10px;
+  font-size: 0.8rem;
+}
+
+.mc-medal-tier {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.mc-medal-tier.earned {
+  background: rgba(80, 160, 80, 0.08);
+  border-color: rgba(80, 160, 80, 0.2);
+}
+.mc-medal-tier.tier-bronze {
+  color: #cd7f32;
+}
+.mc-medal-tier.tier-silver {
+  color: #c0c0c0;
+}
+.mc-medal-tier.tier-gold {
+  color: #ffd700;
+}
+.mc-medal-tier .mc-medal-icon {
+  font-size: 0.9rem;
+}
+.mc-medal-tier .mc-medal-value {
+  font-weight: 600;
+}
+.mc-medal-tier .mc-medal-reward {
+  font-size: 0.72rem;
+  color: #7dd87d;
+  margin-left: 2px;
+}
+
+.mc-challenge-best {
+  font-size: 0.78rem;
+  color: #5a8aa8;
+  margin: 0 0 10px;
+}
+.mc-challenge-best strong {
+  color: #7db8d8;
+}
+
+.mc-challenge-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.mc-challenge-accept-btn {
+  background: rgba(60, 120, 220, 0.2);
+  border: 1px solid rgba(60, 120, 220, 0.45);
+  color: #80b4f0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 6px 16px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.mc-challenge-accept-btn:hover {
+  background: rgba(60, 120, 220, 0.38);
+  border-color: rgba(60, 120, 220, 0.75);
+}
+
+.mc-challenge-abandon-btn {
+  background: rgba(200, 60, 60, 0.12);
+  border: 1px solid rgba(200, 60, 60, 0.3);
+  color: #c07070;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.mc-challenge-abandon-btn:hover {
+  background: rgba(200, 60, 60, 0.25);
+}
+
+.mc-challenge-active-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #80b4f0;
+  background: rgba(60, 120, 220, 0.15);
+  padding: 2px 8px;
+  border-radius: 3px;
+}
+
+.mc-challenge-summary {
+  font-size: 0.85rem;
+  color: #8898b0;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.mc-challenge-summary strong {
+  color: #ffd700;
+}
+
+.mc-challenge-objectives {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mc-challenge-obj-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: #9aa0b0;
+}
+.mc-challenge-obj-item .mc-obj-bullet {
+  color: #5868a0;
+  flex-shrink: 0;
+}
 `;
 
 // ---------------------------------------------------------------------------
@@ -698,6 +885,7 @@ function _renderShell() {
     { id: 'contracts', label: 'Contracts' },
     { id: 'active-contracts', label: 'Active' },
     { id: '_divider2', label: '' },
+    { id: 'challenges', label: 'Challenges' },
     { id: 'achievements', label: 'Achievements' },
   ];
 
@@ -743,6 +931,7 @@ function _switchTab(tabId) {
   if (tabId === 'completed')        _renderCompletedTab();
   if (tabId === 'contracts')        _renderContractsBoardTab();
   if (tabId === 'active-contracts') _renderActiveContractsTab();
+  if (tabId === 'challenges')       _renderChallengesTab();
   if (tabId === 'achievements')     _renderAchievementsTab();
 }
 
@@ -1557,6 +1746,216 @@ function _handleCancelContract(contractId) {
   } else {
     console.warn('[Mission Control UI] cancelContract failed:', result.error);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Private — Challenges tab
+// ---------------------------------------------------------------------------
+
+/** Medal display icons. */
+const _MEDAL_ICONS = {
+  [MedalTier.GOLD]:   '\u{1F947}',
+  [MedalTier.SILVER]: '\u{1F948}',
+  [MedalTier.BRONZE]: '\u{1F949}',
+  [MedalTier.NONE]:   '\u{2014}',
+};
+
+/**
+ * Format a score value for display with appropriate unit.
+ * @param {number} score
+ * @param {string} unit
+ * @param {string} metric
+ * @returns {string}
+ */
+function _fmtScore(score, unit, metric) {
+  if (unit === '$') return _fmtCash(score);
+  if (unit === '%') return `${score}%`;
+  if (unit === 'm' && score >= 1000) return `${(score / 1000).toFixed(1)} km`;
+  if (unit === 'm/s') return `${score.toFixed(1)} m/s`;
+  return `${score.toLocaleString()} ${unit}`;
+}
+
+function _renderChallengesTab() {
+  const content = _getContent();
+  if (!content || !_state) return;
+
+  const unlocked = getUnlockedChallenges(_state);
+  const activeChallenge = getActiveChallenge(_state);
+
+  // Count medals earned.
+  let goldCount = 0;
+  let silverCount = 0;
+  let bronzeCount = 0;
+  for (const ch of unlocked) {
+    const result = getChallengeResult(_state, ch.id);
+    if (result) {
+      if (result.medal === MedalTier.GOLD) goldCount++;
+      else if (result.medal === MedalTier.SILVER) silverCount++;
+      else if (result.medal === MedalTier.BRONZE) bronzeCount++;
+    }
+  }
+
+  // Summary bar
+  const summary = document.createElement('div');
+  summary.className = 'mc-challenge-summary';
+  const totalMedals = goldCount + silverCount + bronzeCount;
+  summary.innerHTML =
+    `<strong>${totalMedals}</strong> of ${unlocked.length} challenges completed` +
+    (goldCount > 0 ? ` \u2014 ${_MEDAL_ICONS[MedalTier.GOLD]} ${goldCount} Gold` : '') +
+    (silverCount > 0 ? ` ${_MEDAL_ICONS[MedalTier.SILVER]} ${silverCount} Silver` : '') +
+    (bronzeCount > 0 ? ` ${_MEDAL_ICONS[MedalTier.BRONZE]} ${bronzeCount} Bronze` : '');
+  content.appendChild(summary);
+
+  if (unlocked.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'mc-empty-msg';
+    empty.textContent = 'Complete more tutorial missions to unlock challenges.';
+    content.appendChild(empty);
+    return;
+  }
+
+  // Grid of challenge cards
+  const grid = document.createElement('div');
+  grid.className = 'mc-challenge-grid';
+
+  for (const ch of unlocked) {
+    const result = getChallengeResult(_state, ch.id);
+    const isActive = activeChallenge && activeChallenge.id === ch.id;
+
+    const card = document.createElement('div');
+    card.className = 'mc-challenge-card' + (isActive ? ' active-challenge' : '');
+
+    // Header: title + best medal
+    const header = document.createElement('div');
+    header.className = 'mc-challenge-header';
+
+    const title = document.createElement('h3');
+    title.className = 'mc-challenge-title';
+    title.textContent = ch.title;
+    header.appendChild(title);
+
+    if (result && result.medal !== MedalTier.NONE) {
+      const medalEl = document.createElement('span');
+      medalEl.className = 'mc-challenge-medal';
+      medalEl.textContent = _MEDAL_ICONS[result.medal];
+      medalEl.title = `Best: ${result.medal}`;
+      header.appendChild(medalEl);
+    }
+
+    card.appendChild(header);
+
+    // Description
+    const desc = document.createElement('p');
+    desc.className = 'mc-challenge-desc';
+    desc.textContent = ch.description;
+    card.appendChild(desc);
+
+    // Objectives list
+    const objList = document.createElement('ul');
+    objList.className = 'mc-challenge-objectives';
+    for (const obj of ch.objectives) {
+      const li = document.createElement('li');
+      li.className = 'mc-challenge-obj-item';
+      const bullet = document.createElement('span');
+      bullet.className = 'mc-obj-bullet';
+      bullet.textContent = '\u25C7';
+      li.appendChild(bullet);
+      li.appendChild(document.createTextNode(obj.description));
+      objList.appendChild(li);
+    }
+    card.appendChild(objList);
+
+    // Medal thresholds row
+    const medalsRow = document.createElement('div');
+    medalsRow.className = 'mc-challenge-medals-row';
+
+    const tiers = [
+      { key: 'bronze', label: 'Bronze', icon: _MEDAL_ICONS[MedalTier.BRONZE] },
+      { key: 'silver', label: 'Silver', icon: _MEDAL_ICONS[MedalTier.SILVER] },
+      { key: 'gold',   label: 'Gold',   icon: _MEDAL_ICONS[MedalTier.GOLD] },
+    ];
+
+    for (const tier of tiers) {
+      const tierEl = document.createElement('div');
+      const isEarned = result && _medalRank(result.medal) >= _medalRank(tier.key);
+      tierEl.className = `mc-medal-tier tier-${tier.key}` + (isEarned ? ' earned' : '');
+
+      const iconSpan = document.createElement('span');
+      iconSpan.className = 'mc-medal-icon';
+      iconSpan.textContent = tier.icon;
+      tierEl.appendChild(iconSpan);
+
+      const valueSpan = document.createElement('span');
+      valueSpan.className = 'mc-medal-value';
+      const dir = ch.scoreDirection === ScoreDirection.LOWER_IS_BETTER ? '\u2264' : '\u2265';
+      valueSpan.textContent = `${dir} ${_fmtScore(ch.medals[tier.key], ch.scoreUnit, ch.scoreMetric)}`;
+      tierEl.appendChild(valueSpan);
+
+      const rewardSpan = document.createElement('span');
+      rewardSpan.className = 'mc-medal-reward';
+      rewardSpan.textContent = _fmtCash(ch.rewards[tier.key]);
+      tierEl.appendChild(rewardSpan);
+
+      medalsRow.appendChild(tierEl);
+    }
+    card.appendChild(medalsRow);
+
+    // Best score info
+    if (result) {
+      const best = document.createElement('p');
+      best.className = 'mc-challenge-best';
+      best.innerHTML =
+        `Best: <strong>${_fmtScore(result.score, ch.scoreUnit, ch.scoreMetric)}</strong>` +
+        ` \u2014 ${result.attempts} attempt${result.attempts !== 1 ? 's' : ''}`;
+      card.appendChild(best);
+    }
+
+    // Action buttons
+    const actions = document.createElement('div');
+    actions.className = 'mc-challenge-actions';
+
+    if (isActive) {
+      const badge = document.createElement('span');
+      badge.className = 'mc-challenge-active-badge';
+      badge.textContent = 'Active';
+      actions.appendChild(badge);
+
+      const abandonBtn = document.createElement('button');
+      abandonBtn.className = 'mc-challenge-abandon-btn';
+      abandonBtn.textContent = 'Abandon';
+      abandonBtn.addEventListener('click', () => {
+        abandonChallenge(_state);
+        _renderChallengesTab();
+      });
+      actions.appendChild(abandonBtn);
+    } else {
+      const acceptBtn = document.createElement('button');
+      acceptBtn.className = 'mc-challenge-accept-btn';
+      acceptBtn.textContent = result ? 'Replay' : 'Accept';
+      acceptBtn.addEventListener('click', () => {
+        const res = acceptChallenge(_state, ch.id);
+        if (res.success) {
+          _renderChallengesTab();
+        }
+      });
+      actions.appendChild(acceptBtn);
+    }
+
+    card.appendChild(actions);
+    grid.appendChild(card);
+  }
+
+  content.appendChild(grid);
+}
+
+/**
+ * Convert medal tier string to a numeric rank for comparison.
+ * @param {string} medal
+ * @returns {number}
+ */
+function _medalRank(medal) {
+  const ranks = { none: 0, bronze: 1, silver: 2, gold: 3 };
+  return ranks[medal] ?? 0;
 }
 
 // ---------------------------------------------------------------------------

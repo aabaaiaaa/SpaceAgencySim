@@ -39,6 +39,7 @@ import { processSampleReturns } from './surfaceOps.js';
 import { checkAchievements } from './achievements.js';
 import { createFieldCraft, hasExtendedLifeSupport } from './lifeSupport.js';
 import { FieldCraftStatus } from './constants.js';
+import { processChallengeCompletion } from './challenges.js';
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -80,6 +81,7 @@ import { FieldCraftStatus } from './constants.js';
  * @property {import('./gameState.js').FieldCraft|null} deployedFieldCraft - Field craft created this flight (null if crew returned home).
  * @property {Array<{craftId: string, craftName: string, suppliesRemaining: number, crewIds: string[]}>} lifeSupportWarnings - Field craft with critically low supplies.
  * @property {Array<{craftId: string, craftName: string, crewId: string, crewName: string}>} lifeSupportDeaths - Crew who died from life support exhaustion.
+ * @property {{ completed: boolean, challengeId?: string, challengeTitle?: string, score?: number, medal?: string, previousMedal?: string, isNewBest?: boolean, reward?: number }} challengeResult - Challenge completion result (if a challenge was active).
  */
 
 /**
@@ -255,6 +257,9 @@ export function processFlightReturn(state, flightState, ps, assembly) {
   // ── 6b. Contract completions ───────────────────────────────────────────
   const contractResult = processContractCompletions(state);
 
+  // ── 6b2. Challenge completion ─────────────────────────────────────────
+  const challengeResult = processChallengeCompletion(state, flightState, ps);
+
   // ── 6c. Advance the period counter and charge operating costs ─────────
   const periodSummary = advancePeriod(state);
 
@@ -386,6 +391,7 @@ export function processFlightReturn(state, flightState, ps, assembly) {
     deployedFieldCraft,
     lifeSupportWarnings: periodSummary.lifeSupportWarnings ?? [],
     lifeSupportDeaths: periodSummary.lifeSupportDeaths ?? [],
+    challengeResult,
   };
 }
 

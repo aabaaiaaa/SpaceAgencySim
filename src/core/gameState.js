@@ -464,6 +464,12 @@ export function createGameState() {
     // Prestige milestones — one-time achievements for major firsts.
     achievements: [],
 
+    // Challenge missions — replayable hand-crafted missions with medal scoring.
+    challenges: {
+      active: null,     // Currently accepted challenge instance (max 1).
+      results: {},      // Best result per challenge: { [id]: { medal, score, attempts } }.
+    },
+
     // Crewed vessels left in orbit or landed on non-Earth bodies.
     // Life support supplies count down each period.
     fieldCraft: [],

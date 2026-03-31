@@ -312,7 +312,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: New game option: everything free, all buildings/upgrades present, all parts unlocked. Contracts and reputation enabled. Malfunctions toggleable off. Weather toggleable off. Separate save slots from career mode. Completely separate progression. No creative mode (physics overrides) yet. Rocket design library shared between sandbox and career (per Phase 1f).
 
 ### TASK-047: Challenge missions
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-009
 - **Description**: Hand-crafted missions with constraints and scoring in MCC "Challenges" tab. Structure: objective, constraints, scoring metric, Bronze/Silver/Gold medals. Replayable. Examples: Penny Pincher (reach 10km, $50k budget), Bullseye (land within 2 m/s), Minimalist (orbit with max 5 parts), Heavy Lifter (deploy 3 satellites one flight), Lunar Express (Moon landing + return, time limit), Rescue Mission (dock with stranded craft, fuel remaining). Need playtesting to verify possible and challenging.

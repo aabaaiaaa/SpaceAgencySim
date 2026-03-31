@@ -313,6 +313,12 @@ export function loadGame(slotIndex) {
   // Default achievements for saves created before the achievement system.
   envelope.state.achievements ??= [];
 
+  // Default challenges for saves created before the challenge system.
+  if (!envelope.state.challenges || typeof envelope.state.challenges !== 'object') {
+    envelope.state.challenges = { active: null, results: {} };
+  }
+  envelope.state.challenges.results ??= {};
+
   return envelope.state;
 }
 

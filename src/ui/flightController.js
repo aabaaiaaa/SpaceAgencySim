@@ -30,6 +30,7 @@ import { initFlightHud, destroyFlightHud, setHudTimeWarp, lockTimeWarp, showLaun
 import { initFlightContextMenu, destroyFlightContextMenu } from './flightContextMenu.js';
 import { checkObjectiveCompletion } from '../core/missions.js';
 import { checkContractObjectives } from '../core/contracts.js';
+import { checkChallengeObjectives } from '../core/challenges.js';
 import { saveGame, listSaves } from '../core/saveload.js';
 import { ATMOSPHERE_TOP, isReentryCondition } from '../core/atmosphere.js';
 import { getAtmosphereTop as getBodyAtmosphereTop } from '../data/bodies.js';
@@ -1074,9 +1075,10 @@ function _loop(timestamp) {
   // --- Docking system tick ---
   _tickDockingSystem(realDt);
 
-  // Check mission and contract objective completion against live flight state.
+  // Check mission, contract, and challenge objective completion against live flight state.
   checkObjectiveCompletion(_state, _flightState);
   checkContractObjectives(_state, _flightState);
+  checkChallengeObjectives(_state, _flightState);
 
   // Render the active scene.
   if (_mapActive) {
