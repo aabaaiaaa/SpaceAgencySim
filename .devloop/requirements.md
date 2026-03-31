@@ -232,7 +232,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Crew Admin must be built ($100k, not free). Tier 1: hire/fire crew, basic skill tracking. Tier 2 ($250k): training facility (assign crew to skill training between flights). Tier 3 ($600k): recruit experienced crew (starting skills > 0), advanced medical (faster recovery). Tutorial mission unlocking command module also introduces this building.
 
 ### TASK-035: Tracking Station facility and upgrade tiers
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-030, TASK-004
 - **Description**: Unlocked via tutorial mission introducing orbital gameplay (also awards basic docking port). Tier 1 ($200k): map view (local body only), see objects in orbit. Tier 2 ($500k): map view (solar system), track debris, predict weather windows. Tier 3 ($1M): deep space communication, transfer route planning, track distant bodies.

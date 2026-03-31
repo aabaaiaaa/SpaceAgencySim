@@ -372,8 +372,9 @@ export function isMapShadowEnabled() {
  * @param {import('../core/gameState.js').FlightState}    flightState
  * @param {import('../core/gameState.js').GameState}      state
  * @param {string}                                        [bodyId='EARTH']
+ * @param {{ showDebris?: boolean }}                      [options]
  */
-export function renderMapFrame(ps, flightState, state, bodyId = 'EARTH') {
+export function renderMapFrame(ps, flightState, state, bodyId = 'EARTH', options) {
   if (!_mapRoot || !_mapRoot.visible) return;
 
   const w  = window.innerWidth;
@@ -424,7 +425,7 @@ export function renderMapFrame(ps, flightState, state, bodyId = 'EARTH') {
   }
 
   // 3. Orbital-object orbits and positions.
-  _drawOrbitalObjects(state, flightState, cx, cy, scale, bodyId);
+  _drawOrbitalObjects(state, flightState, cx, cy, scale, bodyId, options);
 
   // 4. Craft orbit, position, and predictions.
   _drawCraft(ps, flightState, cx, cy, scale, bodyId);
@@ -523,15 +524,18 @@ function _drawBands(bodyId, cx, cy, scale) {
   }
 }
 
-function _drawOrbitalObjects(state, flightState, cx, cy, scale, bodyId) {
+function _drawOrbitalObjects(state, flightState, cx, cy, scale, bodyId, options) {
   _objectsGraphics.clear();
 
   if (!state.orbitalObjects || state.orbitalObjects.length === 0) return;
 
+  const showDebris = options?.showDebris !== false;
   const t = flightState.timeElapsed;
 
   for (const obj of state.orbitalObjects) {
     if (obj.bodyId !== bodyId) continue;
+    // Hide debris objects when Tracking Station tier < 2.
+    if (!showDebris && obj.type === 'DEBRIS') continue;
 
     const isTarget   = obj.id === _selectedTarget;
     const orbitColor = isTarget ? TARGET_ORBIT_COLOR : OBJECT_ORBIT_COLOR;

@@ -231,8 +231,16 @@ describe('generateOrbitPredictions', () => {
 // ---------------------------------------------------------------------------
 
 describe('isMapViewAvailable', () => {
-  it('returns true by default (facilities not yet implemented)', () => {
-    const state = { orbitalObjects: [] };
+  it('returns false when tracking station is not built', () => {
+    const state = { orbitalObjects: [], facilities: {} };
+    expect(isMapViewAvailable(state)).toBe(false);
+  });
+
+  it('returns true when tracking station is built', () => {
+    const state = {
+      orbitalObjects: [],
+      facilities: { 'tracking-station': { built: true, tier: 1 } },
+    };
     expect(isMapViewAvailable(state)).toBe(true);
   });
 });

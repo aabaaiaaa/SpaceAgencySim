@@ -16,8 +16,8 @@
  */
 
 import { initFlightRenderer, destroyFlightRenderer, renderFlightFrame, hideFlightScene, showFlightScene, setFlightInputEnabled, setFlightWeather } from '../render/flight.js';
-import { initMapRenderer, destroyMapRenderer, renderMapFrame, showMapScene, hideMapScene, isMapVisible, cycleMapZoom, getMapZoomLevel, cycleMapTarget, getMapTarget, toggleMapShadow, setMapTarget, cycleTransferTarget, getSelectedTransferTarget } from '../render/map.js';
-import { MapZoom, MapThrustDir, computeOrbitalThrustAngle, isMapViewAvailable, getMapTransferTargets, getTransferProgressInfo } from '../core/mapView.js';
+import { initMapRenderer, destroyMapRenderer, renderMapFrame, showMapScene, hideMapScene, isMapVisible, cycleMapZoom, getMapZoomLevel, setMapZoomLevel, cycleMapTarget, getMapTarget, toggleMapShadow, setMapTarget, cycleTransferTarget, getSelectedTransferTarget } from '../render/map.js';
+import { MapZoom, MapThrustDir, computeOrbitalThrustAngle, isMapViewAvailable, getMapTransferTargets, getTransferProgressInfo, getAllowedMapZooms, isTransferPlanningAvailable, isDebrisTrackingAvailable } from '../core/mapView.js';
 import { warpToTarget } from '../core/orbit.js';
 import {
   createPhysicsState,
@@ -1074,7 +1074,9 @@ function _loop(timestamp) {
   // Render the active scene.
   if (_mapActive) {
     const mapBodyId = (_flightState && _flightState.bodyId) || 'EARTH';
-    renderMapFrame(_ps, _flightState, _state, mapBodyId);
+    renderMapFrame(_ps, _flightState, _state, mapBodyId, {
+      showDebris: isDebrisTrackingAvailable(_state),
+    });
   } else {
     renderFlightFrame(_ps, _assembly, _flightState);
   }
@@ -1399,10 +1401,14 @@ function _onKeyDown(e) {
 
   // Map-specific keys when the map is active.
   if (_mapActive) {
-    // Tab — cycle zoom level.
+    // Tab — cycle zoom level (filtered by Tracking Station tier).
     if (e.code === 'Tab') {
       e.preventDefault();
-      cycleMapZoom();
+      const allowed = getAllowedMapZooms(_state);
+      const current = getMapZoomLevel();
+      const idx = allowed.indexOf(current);
+      const next = allowed[(idx + 1) % allowed.length];
+      setMapZoomLevel(next);
       _updateMapHud();
       return;
     }
@@ -1423,8 +1429,12 @@ function _onKeyDown(e) {
       _handleWarpToTarget();
       return;
     }
-    // B — cycle transfer target (route planning).
+    // B — cycle transfer target (route planning, requires Tracking Station tier 3).
     if (e.code === 'KeyB') {
+      if (!isTransferPlanningAvailable(_state)) {
+        _showPhaseNotification('Tracking Station Tier 3 required for transfer planning');
+        return;
+      }
       if (_flightState) {
         const bodyId = _flightState.bodyId || 'EARTH';
         const alt = Math.max(0, _ps.posY);

@@ -11,6 +11,7 @@ import { initCrewAdminUI, destroyCrewAdminUI } from './crewAdmin.js';
 import { initMissionControlUI, destroyMissionControlUI } from './missionControl.js';
 import { initLaunchPadUI, destroyLaunchPadUI } from './launchPad.js';
 import { initSatelliteOpsUI, destroySatelliteOpsUI } from './satelliteOps.js';
+import { initTrackingStationUI, destroyTrackingStationUI } from './trackingStation.js';
 import { stopFlightScene } from './flightController.js';
 import { initTopBar, destroyTopBar, refreshTopBar } from './topbar.js';
 import { showVabScene, hideVabScene } from '../render/vab.js';
@@ -52,6 +53,12 @@ let _launchPadOpen = false;
  * Used to guard against double-mounting.
  */
 let _satelliteOpsOpen = false;
+
+/**
+ * True while the Tracking Station screen is open.
+ * Used to guard against double-mounting.
+ */
+let _trackingStationOpen = false;
 
 /**
  * The #ui-overlay container, stored so _handleExitToMenu can re-mount the
@@ -138,6 +145,14 @@ function _handleExitToMenu() {
   if (_launchPadOpen) {
     destroyLaunchPadUI();
     _launchPadOpen = false;
+  }
+  if (_satelliteOpsOpen) {
+    destroySatelliteOpsUI();
+    _satelliteOpsOpen = false;
+  }
+  if (_trackingStationOpen) {
+    destroyTrackingStationUI();
+    _trackingStationOpen = false;
   }
 
   // Wipe any remaining screen overlays from the container.
@@ -288,6 +303,28 @@ function _handleNavigation(container, state, destination) {
     }
 
     console.log('[UI] Navigated to Satellite Ops');
+    return;
+  }
+
+  if (destination === 'tracking-station') {
+    // Tear down the hub overlay and show the Tracking Station screen.
+    destroyHubUI();
+
+    if (!_trackingStationOpen) {
+      initTrackingStationUI(container, state, {
+        onBack: () => {
+          _trackingStationOpen = false;
+          showHubScene();
+          initHubUI(container, state, (dest) => {
+            _handleNavigation(container, state, dest);
+          });
+          console.log('[UI] Returned to hub from Tracking Station');
+        },
+      });
+      _trackingStationOpen = true;
+    }
+
+    console.log('[UI] Navigated to Tracking Station');
     return;
   }
 

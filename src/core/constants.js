@@ -614,6 +614,44 @@ export const CREW_ADMIN_TIER_FEATURES = Object.freeze({
 });
 
 /**
+ * Tracking Station facility tier feature descriptions.
+ *
+ * Tier 1 ($200k):  Map view (local body only), see objects in orbit.
+ * Tier 2 ($500k):  Map view (solar system), track debris, predict weather windows.
+ * Tier 3 ($1M):    Deep space communication, transfer route planning, track distant bodies.
+ *
+ * @type {Readonly<Record<number, Readonly<{label: string, features: readonly string[]}>>>}
+ */
+export const TRACKING_STATION_TIER_FEATURES = Object.freeze({
+  1: Object.freeze({
+    label: 'Basic',
+    features: Object.freeze([
+      'Map view (local body only)',
+      'See objects in orbit',
+      'Basic orbital tracking',
+    ]),
+  }),
+  2: Object.freeze({
+    label: 'Advanced',
+    features: Object.freeze([
+      'Map view (solar system)',
+      'Track debris',
+      'Predict weather windows',
+      'All Tier 1 features',
+    ]),
+  }),
+  3: Object.freeze({
+    label: 'Deep Space',
+    features: Object.freeze([
+      'Deep space communication',
+      'Transfer route planning',
+      'Track distant bodies',
+      'All Tier 2 features',
+    ]),
+  }),
+});
+
+/**
  * Training XP awarded per period to crew assigned to training.
  * At Tier 2+, crew in TRAINING status gain this much raw XP per period
  * in their assigned skill (subject to diminishing returns).

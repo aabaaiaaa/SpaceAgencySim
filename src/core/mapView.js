@@ -13,7 +13,8 @@
  * @module core/mapView
  */
 
-import { BODY_RADIUS, BODY_GM, ALTITUDE_BANDS, FlightPhase } from './constants.js';
+import { BODY_RADIUS, BODY_GM, ALTITUDE_BANDS, FlightPhase, FacilityId } from './constants.js';
+import { hasFacility, getFacilityTier } from './construction.js';
 import { getSunAngle, getShadowHalfAngle } from './power.js';
 import {
   getOrbitalStateAtTime,
@@ -497,16 +498,94 @@ function _bodyDisplayName(bodyId) {
 
 /**
  * Check whether the map view is available.
- * Requires Tracking Station facility; returns true if facilities are not
- * yet implemented (TASK-007).
+ * Requires the Tracking Station facility to be built.
  *
  * @param {import('./gameState.js').GameState} state
  * @returns {boolean}
  */
 export function isMapViewAvailable(state) {
-  // Facilities system not yet implemented (TASK-007).
-  // When it is, check for 'tracking-station' in state.facilities.
-  return true;
+  return hasFacility(state, FacilityId.TRACKING_STATION);
+}
+
+/**
+ * Get the current Tracking Station tier (0 if not built).
+ *
+ * @param {import('./gameState.js').GameState} state
+ * @returns {number}
+ */
+export function getTrackingStationTier(state) {
+  return getFacilityTier(state, FacilityId.TRACKING_STATION);
+}
+
+/**
+ * Check whether the solar system map zoom level is available.
+ * Requires Tracking Station tier 2+.
+ *
+ * @param {import('./gameState.js').GameState} state
+ * @returns {boolean}
+ */
+export function isSolarSystemMapAvailable(state) {
+  return getTrackingStationTier(state) >= 2;
+}
+
+/**
+ * Check whether debris tracking is available on the map.
+ * Requires Tracking Station tier 2+.
+ *
+ * @param {import('./gameState.js').GameState} state
+ * @returns {boolean}
+ */
+export function isDebrisTrackingAvailable(state) {
+  return getTrackingStationTier(state) >= 2;
+}
+
+/**
+ * Check whether weather window predictions are available.
+ * Requires Tracking Station tier 2+.
+ *
+ * @param {import('./gameState.js').GameState} state
+ * @returns {boolean}
+ */
+export function isWeatherPredictionAvailable(state) {
+  return getTrackingStationTier(state) >= 2;
+}
+
+/**
+ * Check whether transfer route planning is available on the map.
+ * Requires Tracking Station tier 3.
+ *
+ * @param {import('./gameState.js').GameState} state
+ * @returns {boolean}
+ */
+export function isTransferPlanningAvailable(state) {
+  return getTrackingStationTier(state) >= 3;
+}
+
+/**
+ * Check whether deep space communication is available.
+ * Requires Tracking Station tier 3.
+ *
+ * @param {import('./gameState.js').GameState} state
+ * @returns {boolean}
+ */
+export function isDeepSpaceCommsAvailable(state) {
+  return getTrackingStationTier(state) >= 3;
+}
+
+/**
+ * Get the list of allowed map zoom levels based on Tracking Station tier.
+ * Tier 1: ORBIT_DETAIL, LOCAL_BODY only.
+ * Tier 2+: all zoom levels including SOLAR_SYSTEM and CRAFT_TO_TARGET.
+ *
+ * @param {import('./gameState.js').GameState} state
+ * @returns {string[]}
+ */
+export function getAllowedMapZooms(state) {
+  const tier = getTrackingStationTier(state);
+  if (tier >= 2) {
+    return [MapZoom.ORBIT_DETAIL, MapZoom.LOCAL_BODY, MapZoom.CRAFT_TO_TARGET, MapZoom.SOLAR_SYSTEM];
+  }
+  return [MapZoom.ORBIT_DETAIL, MapZoom.LOCAL_BODY];
 }
 
 // ---------------------------------------------------------------------------

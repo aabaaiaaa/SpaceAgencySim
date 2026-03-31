@@ -28,6 +28,7 @@ import {
 } from '../core/construction.js';
 import { isBankrupt } from '../core/finance.js';
 import { initWeather, getCurrentWeather, getWeatherForecast } from '../core/weather.js';
+import { isWeatherPredictionAvailable } from '../core/mapView.js';
 
 // ---------------------------------------------------------------------------
 // CSS
@@ -1314,8 +1315,8 @@ function _renderWeatherPanel() {
     panel.appendChild(warn);
   }
 
-  // Forecast (if weather satellites provide data)
-  const forecast = getWeatherForecast(_state, 'EARTH', 3);
+  // Forecast (if weather satellites provide data AND Tracking Station tier 2+)
+  const forecast = isWeatherPredictionAvailable(_state) ? getWeatherForecast(_state, 'EARTH', 3) : [];
   if (forecast.length > 0) {
     const fcSection = document.createElement('div');
     fcSection.className = 'weather-forecast';
