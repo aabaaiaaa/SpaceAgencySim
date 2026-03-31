@@ -54,6 +54,8 @@ export const PartType = Object.freeze({
   DOCKING_PORT: 'DOCKING_PORT',
   /** Aerodynamic nose cone that reduces drag on atmospheric ascent. */
   NOSE_CONE: 'NOSE_CONE',
+  /** Ground-mounted launch clamp that holds the rocket on the pad until staged. */
+  LAUNCH_CLAMP: 'LAUNCH_CLAMP',
 });
 
 // ---------------------------------------------------------------------------
@@ -949,6 +951,25 @@ export function getFacilityUpgradeDef(facilityId) {
 export function getReputationDiscount(reputation) {
   return getReputationTier(reputation).facilityDiscount;
 }
+
+// ---------------------------------------------------------------------------
+// Launch Pad Tier Limits
+// ---------------------------------------------------------------------------
+
+/**
+ * Maximum total rocket mass (wet mass, kg) allowed per Launch Pad tier.
+ *
+ *   Tier 1: 18,000 kg  — small sounding rockets
+ *   Tier 2: 80,000 kg  — medium orbital launch vehicles
+ *   Tier 3: Infinity   — no mass limit (heavy-lift allowed)
+ *
+ * @type {Readonly<Record<number, number>>}
+ */
+export const LAUNCH_PAD_MAX_MASS = Object.freeze({
+  1: 18_000,
+  2: 80_000,
+  3: Infinity,
+});
 
 // ---------------------------------------------------------------------------
 // Orbit Segments

@@ -16,7 +16,7 @@
  */
 
 import { getPartById } from '../data/parts.js';
-import { PartType } from '../core/constants.js';
+import { PartType, FacilityId, LAUNCH_PAD_MAX_MASS } from '../core/constants.js';
 import { getCurrentWeather, getWeatherSkipCost, skipWeather } from '../core/weather.js';
 import {
   createRocketAssembly,
@@ -26,6 +26,8 @@ import {
   syncStagingWithAssembly,
 } from '../core/rocketbuilder.js';
 import { getActiveCrew } from '../core/crew.js';
+import { getFacilityTier } from '../core/construction.js';
+import { getTotalMass } from '../core/rocketvalidator.js';
 import { startFlightScene } from './flightController.js';
 import { showReturnResultsOverlay } from './hub.js';
 import { renderRocketPreview, buildRocketCard, injectRocketCardCSS } from './rocketCardUtil.js';
@@ -341,6 +343,7 @@ const PART_FILL = {
   [PartType.HEAT_SHIELD]:          '#2c1000',
   [PartType.RCS_THRUSTER]:         '#182c30',
   [PartType.SOLAR_PANEL]:          '#0a2810',
+  [PartType.LAUNCH_CLAMP]:         '#2a2818',
 };
 
 /** Part stroke colours keyed by PartType (CSS hex strings). */
@@ -361,6 +364,7 @@ const PART_STROKE = {
   [PartType.HEAT_SHIELD]:          '#a04010',
   [PartType.RCS_THRUSTER]:         '#2890a0',
   [PartType.SOLAR_PANEL]:          '#20a040',
+  [PartType.LAUNCH_CLAMP]:         '#807040',
 };
 
 const PREVIEW_W = 80;
@@ -508,6 +512,22 @@ function _renderShell() {
   title.textContent = 'Launch Pad';
   header.appendChild(title);
 
+  // Show pad tier info
+  const padTier = getFacilityTier(_state, FacilityId.LAUNCH_PAD);
+  const maxMass = LAUNCH_PAD_MAX_MASS[padTier] ?? LAUNCH_PAD_MAX_MASS[1];
+  const tierInfo = document.createElement('span');
+  tierInfo.style.cssText =
+    'font-size:0.82rem;color:#6888a8;margin-left:auto;padding:4px 12px;' +
+    'background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);' +
+    'border-radius:4px;white-space:nowrap;';
+  const massLabel = isFinite(maxMass) ? `${(maxMass / 1000).toFixed(0)}t` : 'Unlimited';
+  const features = [];
+  if (padTier >= 2) features.push('Fuel Top-Off');
+  if (padTier >= 3) features.push('Launch Clamps');
+  const featureStr = features.length > 0 ? ` | ${features.join(', ')}` : '';
+  tierInfo.textContent = `Tier ${padTier} | Max Mass: ${massLabel}${featureStr}`;
+  header.appendChild(tierInfo);
+
   _overlay.appendChild(header);
 
   // Weather bar with skip button
@@ -643,6 +663,13 @@ function _buildRocketCard(design) {
   const cost      = _computeDesignCost(design);
   const canAfford = _state ? _state.money >= cost : false;
 
+  // Check mass against launch pad tier limit.
+  const assembly = _designToAssembly(design);
+  const rocketMass = getTotalMass(assembly);
+  const padTier = _state ? getFacilityTier(_state, FacilityId.LAUNCH_PAD) : 1;
+  const maxMass = LAUNCH_PAD_MAX_MASS[padTier] ?? LAUNCH_PAD_MAX_MASS[1];
+  const tooHeavy = rocketMass > maxMass;
+
   const card = buildRocketCard(design, []);
   card.classList.add('lp-rocket-card');
 
@@ -654,6 +681,17 @@ function _buildRocketCard(design) {
     costEl.textContent = `Launch cost: ${_fmt$(cost)}`;
     const dateEl = info.querySelector('.rocket-card-date');
     info.insertBefore(costEl, dateEl);
+
+    // Show mass and limit info.
+    const massEl = document.createElement('div');
+    massEl.style.cssText = `font-size:0.75rem;color:${tooHeavy ? '#c06040' : '#607888'};`;
+    const massStr = _fmt(Math.round(rocketMass));
+    const limitStr = isFinite(maxMass) ? _fmt(maxMass) : 'Unlimited';
+    massEl.textContent = `Mass: ${massStr} kg / ${limitStr} kg`;
+    if (tooHeavy) {
+      massEl.textContent += ' (over limit!)';
+    }
+    info.insertBefore(massEl, dateEl);
   }
 
   // Replace the empty actions container with a Launch button.
@@ -661,9 +699,11 @@ function _buildRocketCard(design) {
   launchBtn.className = 'lp-launch-btn';
   launchBtn.dataset.action = 'launch';
   launchBtn.textContent = `Launch (${_fmt$(cost)})`;
-  if (!canAfford) {
+  if (!canAfford || tooHeavy) {
     launchBtn.disabled = true;
-    launchBtn.title = 'Insufficient funds';
+    launchBtn.title = tooHeavy
+      ? `Rocket too heavy for Tier ${padTier} pad (max ${isFinite(maxMass) ? _fmt(maxMass) + ' kg' : 'unlimited'})`
+      : 'Insufficient funds';
   }
   launchBtn.addEventListener('click', () => _handleLaunch(design));
   card.appendChild(launchBtn);

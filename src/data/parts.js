@@ -224,6 +224,7 @@ export const RADIAL_TYPES = Object.freeze([
   PartType.DOCKING_PORT,
   PartType.SOLAR_PANEL,
   PartType.BATTERY,
+  PartType.LAUNCH_CLAMP,
 ]);
 
 // ---------------------------------------------------------------------------
@@ -1806,6 +1807,49 @@ export const PARTS = [
       dragCoefficient: 0.12,
       heatTolerance: 1800,
       crashThreshold: 8,
+    },
+  },
+
+  // =========================================================================
+  // LAUNCH CLAMPS
+  // =========================================================================
+
+  /**
+   * Launch Clamp — ground-mounted support that holds the rocket on the pad
+   * until explicitly released via staging.
+   *
+   * Attaches radially to the lower portion of the rocket.  When staged
+   * (SEPARATE behaviour), the clamp swings away from the rocket and is
+   * removed from the active assembly — it is NOT carried into flight.
+   *
+   * Requires Launch Pad Tier 3 to use.  The clamp prevents launch until the
+   * stage containing it is fired — the player must position the clamp in
+   * the correct stage to release the rocket.
+   *
+   * Zero fuel mass, zero drag — clamps are ground-only infrastructure.
+   */
+  {
+    id: 'launch-clamp-1',
+    name: 'TT18-A Launch Stability Clamp',
+    description: 'A ground-mounted stabilizer that holds the rocket firmly on the pad until staged. Swings away on release. Requires Launch Pad Tier 3.',
+    type: PartType.LAUNCH_CLAMP,
+    reliability: RELIABILITY_TIERS.HIGH,
+    mass: 0,
+    cost: 500,
+    width: 20,
+    height: 60,
+    snapPoints: [
+      // Attaches to the right side of a rocket stack (the clamp "grabs" the rocket).
+      makeSnapPoint('right', 10, 0, STACK_TYPES),
+    ],
+    animationStates: ['clamped', 'releasing', 'released'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.SEPARATE,
+    properties: {
+      dragCoefficient: 0,
+      heatTolerance: 3000,
+      crashThreshold: 50,
+      isLaunchClamp: true,
     },
   },
 

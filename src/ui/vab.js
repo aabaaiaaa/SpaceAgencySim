@@ -251,6 +251,7 @@ const TYPE_LABELS = {
   [PartType.HEAT_SHIELD]:          'Heat Shields',
   [PartType.RCS_THRUSTER]:         'RCS Thrusters',
   [PartType.SOLAR_PANEL]:          'Solar Panels',
+  [PartType.LAUNCH_CLAMP]:         'Launch Clamps',
 };
 
 /** Top-to-bottom display order for part-type groups in the panel. */
@@ -271,6 +272,7 @@ const TYPE_ORDER = [
   PartType.HEAT_SHIELD,
   PartType.RCS_THRUSTER,
   PartType.SOLAR_PANEL,
+  PartType.LAUNCH_CLAMP,
 ];
 
 /**
@@ -1612,6 +1614,7 @@ const _CARD_FILL = {
   [PartType.HEAT_SHIELD]:          _hex(0x2c1000),
   [PartType.RCS_THRUSTER]:         _hex(0x182c30),
   [PartType.SOLAR_PANEL]:          _hex(0x0a2810),
+  [PartType.LAUNCH_CLAMP]:         _hex(0x2a2818),
 };
 const _CARD_STROKE = {
   [PartType.COMMAND_MODULE]:       _hex(0x4080c0),
@@ -1630,6 +1633,7 @@ const _CARD_STROKE = {
   [PartType.HEAT_SHIELD]:          _hex(0xa04010),
   [PartType.RCS_THRUSTER]:         _hex(0x2890a0),
   [PartType.SOLAR_PANEL]:          _hex(0x20a040),
+  [PartType.LAUNCH_CLAMP]:         _hex(0x807040),
 };
 const _CARD_FILL_DEFAULT  = '#1a4080';
 const _CARD_STROKE_DEFAULT = '#4090d0';

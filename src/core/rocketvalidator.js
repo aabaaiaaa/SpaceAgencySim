@@ -18,8 +18,9 @@
 
 import { getPartById } from '../data/parts.js';
 import { ActivationBehaviour } from '../data/parts.js';
-import { PartType } from './constants.js';
+import { PartType, FacilityId, LAUNCH_PAD_MAX_MASS } from './constants.js';
 import { TECH_NODES } from '../data/techtree.js';
+import { getFacilityTier } from './construction.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -27,6 +28,16 @@ import { TECH_NODES } from '../data/techtree.js';
 
 /** Standard gravity (m/s²) used for TWR calculation. */
 const G = 9.81;
+
+/**
+ * Format a mass value for human display.
+ * @param {number} kg  Mass in kilograms.
+ * @returns {string}  e.g. "18,000 kg" or "80,000 kg".
+ */
+function _fmtMass(kg) {
+  if (!isFinite(kg)) return 'unlimited';
+  return kg.toLocaleString('en-US', { maximumFractionDigits: 0 }) + ' kg';
+}
 
 // ---------------------------------------------------------------------------
 // Type Definitions (JSDoc)
@@ -366,6 +377,65 @@ export function runValidation(assembly, stagingConfig, gameState) {
     }
   }
 
+  // ── CHECK 5b: Launch Pad max mass limit ──────────────────────────────────
+  const padTier = getFacilityTier(gameState, FacilityId.LAUNCH_PAD);
+  const maxMass = LAUNCH_PAD_MAX_MASS[padTier] ?? LAUNCH_PAD_MAX_MASS[1];
+  const massPass = totalMassKg <= maxMass;
+
+  if (!massPass) {
+    checks.push({
+      id:      'pad-mass-limit',
+      label:   'Launch Pad Mass Limit',
+      pass:    false,
+      warn:    false,
+      message: `Rocket mass ${_fmtMass(totalMassKg)} exceeds Tier ${padTier} pad limit of ${_fmtMass(maxMass)}. Upgrade the Launch Pad.`,
+    });
+  }
+
+  // ── CHECK 5c: Launch clamps require Tier 3 launch pad ──────────────────
+  let hasLaunchClamp = false;
+  const clampInstanceIds = [];
+  for (const placed of assembly.parts.values()) {
+    const def = getPartById(placed.partId);
+    if (def && def.type === PartType.LAUNCH_CLAMP) {
+      hasLaunchClamp = true;
+      clampInstanceIds.push(placed.instanceId);
+    }
+  }
+
+  if (hasLaunchClamp && padTier < 3) {
+    checks.push({
+      id:      'clamp-tier-required',
+      label:   'Launch Clamp',
+      pass:    false,
+      warn:    false,
+      message: 'Launch clamps require Launch Pad Tier 3. Upgrade the Launch Pad or remove clamps.',
+    });
+  }
+
+  // ── CHECK 5d: Launch clamps must be staged ──────────────────────────────
+  // If clamps are present, at least one must be assigned to a stage so
+  // the rocket can be released.
+  if (hasLaunchClamp) {
+    const allStagedIds = new Set();
+    for (const stage of stagingConfig.stages) {
+      for (const id of stage.instanceIds) {
+        allStagedIds.add(id);
+      }
+    }
+    const clampStaged = clampInstanceIds.some(id => allStagedIds.has(id));
+
+    if (!clampStaged) {
+      checks.push({
+        id:      'clamp-not-staged',
+        label:   'Launch Clamp Staging',
+        pass:    false,
+        warn:    false,
+        message: 'Launch clamps must be assigned to a stage. The rocket cannot launch until clamps are released via staging.',
+      });
+    }
+  }
+
   // ── CHECK 6: All parts unlocked via tech tree ────────────────────────────
   // Build a quick lookup: partId → tech node name.
   const unlockedParts = new Set(gameState.parts ?? []);
@@ -400,5 +470,20 @@ export function runValidation(assembly, stagingConfig, gameState) {
     totalMassKg,
     stage1Thrust,
     twr,
+    hasLaunchClamp,
   };
+}
+
+/**
+ * Check whether a rocket assembly contains any launch clamp parts.
+ *
+ * @param {import('./rocketbuilder.js').RocketAssembly} assembly
+ * @returns {boolean}
+ */
+export function hasLaunchClamps(assembly) {
+  for (const placed of assembly.parts.values()) {
+    const def = getPartById(placed.partId);
+    if (def && def.type === PartType.LAUNCH_CLAMP) return true;
+  }
+  return false;
 }

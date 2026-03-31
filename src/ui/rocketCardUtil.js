@@ -32,6 +32,7 @@ const PART_FILL = {
   [PartType.HEAT_SHIELD]:          '#2c1000',
   [PartType.RCS_THRUSTER]:         '#182c30',
   [PartType.SOLAR_PANEL]:          '#0a2810',
+  [PartType.LAUNCH_CLAMP]:         '#2a2818',
 };
 
 /** Part stroke colours keyed by PartType (CSS hex strings). */
@@ -52,6 +53,7 @@ const PART_STROKE = {
   [PartType.HEAT_SHIELD]:          '#a04010',
   [PartType.RCS_THRUSTER]:         '#2890a0',
   [PartType.SOLAR_PANEL]:          '#20a040',
+  [PartType.LAUNCH_CLAMP]:         '#807040',
 };
 
 const PREVIEW_W = 80;

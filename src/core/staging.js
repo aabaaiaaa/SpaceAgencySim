@@ -223,23 +223,36 @@ export function activateCurrentStage(ps, assembly, stagingConfig, flightState) {
           break;
         }
 
-        // DECOUPLER (stack or radial) — fire one-shot separation charge.
+        // DECOUPLER / LAUNCH_CLAMP — fire one-shot separation charge.
+        const isClamp = def.type === PartType.LAUNCH_CLAMP;
         _emitEvent(flightState, {
-          type:        'PART_ACTIVATED',
+          type:        isClamp ? 'LAUNCH_CLAMP_RELEASED' : 'PART_ACTIVATED',
           time,
           partType:    def.type,
-          description: `${def.name} fired — stage separation.`,
+          description: isClamp
+            ? `${def.name} released — rocket free.`
+            : `${def.name} fired — stage separation.`,
         });
-        // Remove the decoupler from the rocket immediately so the BFS below
+        // Remove the part from the rocket immediately so the BFS below
         // cannot traverse through it.
         ps.activeParts.delete(instanceId);
         ps.firingEngines.delete(instanceId);
 
-        // The decoupler itself becomes a small debris fragment (it detaches
+        // The part itself becomes a small debris fragment (it detaches
         // from both sides).  Re-add temporarily so _createDebrisFromParts
         // can transfer it properly.
         ps.activeParts.add(instanceId);
         const decouplerDebris = _createDebrisFromParts(ps, [instanceId], assembly);
+
+        // Launch clamp debris swings away laterally instead of just falling.
+        if (isClamp) {
+          const clampPlaced = assembly.parts.get(instanceId);
+          // Swing away from the rocket centre: if clamp is to the left, push left; else push right.
+          const lateralDir = (clampPlaced && clampPlaced.x < 0) ? -1 : 1;
+          decouplerDebris.velX += lateralDir * 3;  // 3 m/s lateral swing
+          decouplerDebris.velY += 0.5;             // slight upward before falling
+          decouplerDebris.angularVelocity = lateralDir * 2.0; // visual rotation
+        }
         newDebris.push(decouplerDebris);
 
         // Recompute which parts are still connected to a command module and

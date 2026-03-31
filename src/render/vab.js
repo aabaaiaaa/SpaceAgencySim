@@ -167,6 +167,7 @@ const PART_FILL = {
   [PartType.HEAT_SHIELD]:          0x2c1000,
   [PartType.RCS_THRUSTER]:         0x182c30,
   [PartType.SOLAR_PANEL]:          0x0a2810,
+  [PartType.LAUNCH_CLAMP]:         0x2a2818,
 };
 
 const PART_STROKE = {
@@ -186,6 +187,7 @@ const PART_STROKE = {
   [PartType.HEAT_SHIELD]:          0xa04010,
   [PartType.RCS_THRUSTER]:         0x2890a0,
   [PartType.SOLAR_PANEL]:          0x20a040,
+  [PartType.LAUNCH_CLAMP]:         0x807040,
 };
 
 // ---------------------------------------------------------------------------

@@ -208,7 +208,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Extend the basic construction menu from Phase 1 with an upgrade system. Each facility gains upgrade tiers improving capabilities. All upgrades purchased from construction menu on hub. Upgrades are instant (no build time). No limitation on what player can upgrade. All costs money only, except R&D Lab (money + science). Facility placement: fixed locations on hub with placeholder rectangles and descriptive text.
 
 ### TASK-031: Launch Pad upgrade tiers
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-030
 - **Description**: Launch Pad tiers: Tier 1 (free, basic launches, limited max mass), Tier 2 ($200k, higher max mass, fuel top-off), Tier 3 ($500k, highest max mass, launch clamp support). Launch clamps: attached "behind" rocket, visual swing-away on staging, player positions clamp release in correct stage, clamp prevents launch until staged.

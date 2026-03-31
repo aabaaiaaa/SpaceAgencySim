@@ -408,7 +408,18 @@ export function createPhysicsState(assembly, flightState) {
     _dockedCombinedMass: 0,
     /** Weather-based ISP modifier (0.95–1.05, applied to all engine ISP). */
     weatherIspModifier: 1.0,
+    /** True while launch clamps are still active — prevents liftoff. */
+    hasLaunchClamps: false,
   };
+
+  // Detect launch clamps in the assembly.
+  for (const [instanceId, placed] of assembly.parts) {
+    const clampDef = getPartById(placed.partId);
+    if (clampDef && clampDef.type === PartType.LAUNCH_CLAMP) {
+      ps.hasLaunchClamps = true;
+      break;
+    }
+  }
 
   // Initialise the parachute state machine for all PARACHUTE parts in the assembly.
   initParachuteStates(ps, assembly);
@@ -818,6 +829,13 @@ function _integrate(ps, assembly, flightState) {
     accX = 0; // no horizontal drift on pad
   }
 
+  // Launch clamp hold: while clamps are active, prevent all movement.
+  // Engines can fire (for engine spool-up visuals) but the rocket stays put.
+  if (ps.grounded && ps.hasLaunchClamps) {
+    accX = 0;
+    accY = 0;
+  }
+
   // --- 6. Euler integration ------------------------------------------------
   ps.velX += accX * FIXED_DT;
   ps.velY += accY * FIXED_DT;
@@ -945,8 +963,27 @@ function _integrate(ps, assembly, flightState) {
     updateHeat(ps, assembly, flightState, speed, altitude, density);
   }
 
-  // --- 10. Liftoff detection -----------------------------------------------
-  if (ps.grounded && ps.posY > 0) {
+  // --- 10. Launch clamp check -----------------------------------------------
+  // If launch clamps were flagged, re-check whether any clamp parts remain
+  // in the active assembly.  Once all clamps are staged away, clear the flag.
+  if (ps.hasLaunchClamps) {
+    let clampsRemain = false;
+    for (const instanceId of ps.activeParts) {
+      const placed = assembly.parts.get(instanceId);
+      const cDef = placed ? getPartById(placed.partId) : null;
+      if (cDef && cDef.type === PartType.LAUNCH_CLAMP) {
+        clampsRemain = true;
+        break;
+      }
+    }
+    if (!clampsRemain) {
+      ps.hasLaunchClamps = false;
+    }
+  }
+
+  // --- 10b. Liftoff detection -----------------------------------------------
+  // Rocket cannot lift off while launch clamps are still active.
+  if (ps.grounded && ps.posY > 0 && !ps.hasLaunchClamps) {
     ps.grounded = false;
     ps.isTipping = false;
   }
