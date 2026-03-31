@@ -628,6 +628,94 @@ export const RD_LAB_TIER_DEFS = Object.freeze({
 /** Maximum upgrade tier for the R&D Lab. */
 export const RD_LAB_MAX_TIER = 3;
 
+// ---------------------------------------------------------------------------
+// Generalized Facility Upgrade Definitions
+// ---------------------------------------------------------------------------
+
+/**
+ * Upgrade tier definitions for every upgradeable facility.
+ *
+ * Each key is a FacilityId.  The value is an object with:
+ *   - `maxTier` — the highest tier this facility can reach.
+ *   - `tiers`   — a map from tier number (2+) to upgrade cost & description.
+ *     Tier 1 is always the initial build (no upgrade cost).
+ *
+ * All facilities cost money only, except R&D Lab which also costs science.
+ * Reputation discounts apply to the money portion only.
+ *
+ * Facilities absent from this map (e.g. Library) have no upgrades (max tier 1).
+ *
+ * @type {Readonly<Record<string, Readonly<{
+ *   maxTier: number,
+ *   tiers: Readonly<Record<number, Readonly<{
+ *     moneyCost: number,
+ *     scienceCost: number,
+ *     description: string,
+ *   }>>>
+ * }>>>}
+ */
+export const FACILITY_UPGRADE_DEFS = Object.freeze({
+  [FacilityId.LAUNCH_PAD]: Object.freeze({
+    maxTier: 3,
+    tiers: Object.freeze({
+      2: Object.freeze({ moneyCost: 200_000, scienceCost: 0, description: 'Higher max mass, fuel top-off' }),
+      3: Object.freeze({ moneyCost: 500_000, scienceCost: 0, description: 'Highest max mass, launch clamp support' }),
+    }),
+  }),
+  [FacilityId.VAB]: Object.freeze({
+    maxTier: 3,
+    tiers: Object.freeze({
+      2: Object.freeze({ moneyCost: 150_000, scienceCost: 0, description: 'Higher part count, greater height/width' }),
+      3: Object.freeze({ moneyCost: 400_000, scienceCost: 0, description: 'Highest part count, largest height/width' }),
+    }),
+  }),
+  [FacilityId.MISSION_CONTROL]: Object.freeze({
+    maxTier: 3,
+    tiers: Object.freeze({
+      2: Object.freeze({ moneyCost: 200_000, scienceCost: 0, description: '5 active contracts, 8 board pool, medium-difficulty' }),
+      3: Object.freeze({ moneyCost: 500_000, scienceCost: 0, description: '8 active contracts, 12 board pool, premium contracts' }),
+    }),
+  }),
+  [FacilityId.CREW_ADMIN]: Object.freeze({
+    maxTier: 3,
+    tiers: Object.freeze({
+      2: Object.freeze({ moneyCost: 250_000, scienceCost: 0, description: 'Training facility for crew skill development' }),
+      3: Object.freeze({ moneyCost: 600_000, scienceCost: 0, description: 'Recruit experienced crew, advanced medical' }),
+    }),
+  }),
+  [FacilityId.TRACKING_STATION]: Object.freeze({
+    maxTier: 3,
+    tiers: Object.freeze({
+      2: Object.freeze({ moneyCost: 500_000, scienceCost: 0, description: 'Solar system map, debris tracking, weather windows' }),
+      3: Object.freeze({ moneyCost: 1_000_000, scienceCost: 0, description: 'Deep space comms, transfer route planning' }),
+    }),
+  }),
+  [FacilityId.RD_LAB]: Object.freeze({
+    maxTier: 3,
+    tiers: Object.freeze({
+      2: Object.freeze({ moneyCost: 600_000,   scienceCost: 100, description: 'Tech tiers 3–4, 20% science bonus' }),
+      3: Object.freeze({ moneyCost: 1_000_000, scienceCost: 200, description: 'Tier 5, 30% science bonus, experimental parts' }),
+    }),
+  }),
+  [FacilityId.SATELLITE_OPS]: Object.freeze({
+    maxTier: 3,
+    tiers: Object.freeze({
+      2: Object.freeze({ moneyCost: 300_000, scienceCost: 0, description: 'Advanced orbit management, relay networks' }),
+      3: Object.freeze({ moneyCost: 700_000, scienceCost: 0, description: 'Deep space satellite networks, autonomous ops' }),
+    }),
+  }),
+});
+
+/**
+ * Look up the upgrade definition for a facility.
+ *
+ * @param {string} facilityId
+ * @returns {{ maxTier: number, tiers: Record<number, { moneyCost: number, scienceCost: number, description: string }> } | null}
+ */
+export function getFacilityUpgradeDef(facilityId) {
+  return FACILITY_UPGRADE_DEFS[facilityId] ?? null;
+}
+
 /**
  * Calculate the reputation discount fraction for facility construction.
  *

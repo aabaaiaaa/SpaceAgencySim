@@ -31,6 +31,8 @@ import {
   FACILITY_DEFINITIONS,
   RD_LAB_TIER_DEFS,
   RD_LAB_MAX_TIER,
+  FACILITY_UPGRADE_DEFS,
+  getFacilityUpgradeDef,
   STARTING_REPUTATION,
   getReputationDiscount,
 } from '../core/constants.js';
@@ -343,14 +345,11 @@ describe('canUpgradeFacility', () => {
 
   it('rejects non-upgradeable facility', () => {
     const state = nonTutorialState();
-    const result = canUpgradeFacility(state, FacilityId.CREW_ADMIN);
-    // Crew Admin is not built in nonTutorialState, so it fails on "not built"
-    // Build it first, then check
-    state.money = 500_000;
-    buildFacility(state, FacilityId.CREW_ADMIN);
-    const result2 = canUpgradeFacility(state, FacilityId.CREW_ADMIN);
-    expect(result2.allowed).toBe(false);
-    expect(result2.reason).toContain('cannot be upgraded');
+    // Library has no upgrade definitions.
+    buildFacility(state, FacilityId.LIBRARY);
+    const result = canUpgradeFacility(state, FacilityId.LIBRARY);
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toContain('cannot be upgraded');
   });
 
   it('allows upgrading R&D Lab from tier 1 to tier 2', () => {
@@ -539,5 +538,131 @@ describe('R&D Lab tier definitions', () => {
     expect(RD_LAB_TIER_DEFS[2].scienceCost).toBe(100);
     expect(RD_LAB_TIER_DEFS[3].moneyCost).toBe(1_000_000);
     expect(RD_LAB_TIER_DEFS[3].scienceCost).toBe(200);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Generalized facility upgrade system
+// ---------------------------------------------------------------------------
+
+describe('FACILITY_UPGRADE_DEFS', () => {
+  it('has upgrade definitions for all expected facilities', () => {
+    const upgradeable = [
+      FacilityId.LAUNCH_PAD,
+      FacilityId.VAB,
+      FacilityId.MISSION_CONTROL,
+      FacilityId.CREW_ADMIN,
+      FacilityId.TRACKING_STATION,
+      FacilityId.RD_LAB,
+      FacilityId.SATELLITE_OPS,
+    ];
+    for (const id of upgradeable) {
+      expect(getFacilityUpgradeDef(id)).toBeTruthy();
+    }
+  });
+
+  it('returns null for Library (no upgrades)', () => {
+    expect(getFacilityUpgradeDef(FacilityId.LIBRARY)).toBeNull();
+  });
+
+  it('all upgrade tiers have moneyCost, scienceCost, and description', () => {
+    for (const [id, def] of Object.entries(FACILITY_UPGRADE_DEFS)) {
+      for (let tier = 2; tier <= def.maxTier; tier++) {
+        const tierDef = def.tiers[tier];
+        expect(tierDef).toBeDefined();
+        expect(typeof tierDef.moneyCost).toBe('number');
+        expect(typeof tierDef.scienceCost).toBe('number');
+        expect(tierDef.description).toBeTruthy();
+      }
+    }
+  });
+
+  it('only R&D Lab has non-zero scienceCost in upgrade tiers', () => {
+    for (const [id, def] of Object.entries(FACILITY_UPGRADE_DEFS)) {
+      for (let tier = 2; tier <= def.maxTier; tier++) {
+        if (id === FacilityId.RD_LAB) {
+          expect(def.tiers[tier].scienceCost).toBeGreaterThan(0);
+        } else {
+          expect(def.tiers[tier].scienceCost).toBe(0);
+        }
+      }
+    }
+  });
+
+  it('upgrade costs increase with tier', () => {
+    for (const [, def] of Object.entries(FACILITY_UPGRADE_DEFS)) {
+      if (def.maxTier >= 3) {
+        expect(def.tiers[3].moneyCost).toBeGreaterThan(def.tiers[2].moneyCost);
+      }
+    }
+  });
+});
+
+describe('generalized facility upgrades', () => {
+  it('can upgrade Launch Pad from tier 1 to tier 2 (money only)', () => {
+    const state = nonTutorialState();
+    state.money = 1_000_000;
+    // Launch Pad is a starter, already built at tier 1.
+    expect(getFacilityTier(state, FacilityId.LAUNCH_PAD)).toBe(1);
+    const check = canUpgradeFacility(state, FacilityId.LAUNCH_PAD);
+    expect(check.allowed).toBe(true);
+    expect(check.nextTier).toBe(2);
+    expect(check.scienceCost).toBe(0);
+    const result = upgradeFacility(state, FacilityId.LAUNCH_PAD);
+    expect(result.success).toBe(true);
+    expect(getFacilityTier(state, FacilityId.LAUNCH_PAD)).toBe(2);
+  });
+
+  it('can upgrade VAB through all 3 tiers', () => {
+    const state = nonTutorialState();
+    state.money = 5_000_000;
+    expect(getFacilityTier(state, FacilityId.VAB)).toBe(1);
+    upgradeFacility(state, FacilityId.VAB);
+    expect(getFacilityTier(state, FacilityId.VAB)).toBe(2);
+    upgradeFacility(state, FacilityId.VAB);
+    expect(getFacilityTier(state, FacilityId.VAB)).toBe(3);
+    // Cannot upgrade past max tier.
+    const result = upgradeFacility(state, FacilityId.VAB);
+    expect(result.success).toBe(false);
+    expect(getFacilityTier(state, FacilityId.VAB)).toBe(3);
+  });
+
+  it('deducts correct money for Mission Control upgrade', () => {
+    const state = nonTutorialState();
+    state.money = 1_000_000;
+    const moneyBefore = state.money;
+    const upgDef = getFacilityUpgradeDef(FacilityId.MISSION_CONTROL);
+    const expectedCost = getDiscountedMoneyCost(upgDef.tiers[2].moneyCost, state.reputation ?? 50);
+    upgradeFacility(state, FacilityId.MISSION_CONTROL);
+    expect(state.money).toBe(moneyBefore - expectedCost);
+  });
+
+  it('blocks upgrade when insufficient funds for Crew Admin', () => {
+    const state = nonTutorialState();
+    state.money = 200_000;
+    buildFacility(state, FacilityId.CREW_ADMIN); // costs $100k → $100k left
+    const check = canUpgradeFacility(state, FacilityId.CREW_ADMIN);
+    expect(check.allowed).toBe(false);
+    expect(check.reason).toContain('Insufficient funds');
+  });
+
+  it('applies reputation discount to upgrade money costs', () => {
+    const state = nonTutorialState();
+    state.reputation = 100;
+    state.money = 5_000_000;
+    const moneyBefore = state.money;
+    const upgDef = getFacilityUpgradeDef(FacilityId.LAUNCH_PAD);
+    const discount = getReputationDiscount(100);
+    const expectedCost = Math.floor(upgDef.tiers[2].moneyCost * (1 - discount));
+    upgradeFacility(state, FacilityId.LAUNCH_PAD);
+    expect(state.money).toBe(moneyBefore - expectedCost);
+  });
+
+  it('non-R&D Lab upgrades do not require science', () => {
+    const state = nonTutorialState();
+    state.money = 5_000_000;
+    state.sciencePoints = 0;
+    const result = upgradeFacility(state, FacilityId.LAUNCH_PAD);
+    expect(result.success).toBe(true);
   });
 });

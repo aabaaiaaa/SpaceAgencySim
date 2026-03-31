@@ -202,7 +202,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 ## Phase 5: "Building Your Empire" — Facilities & Infrastructure
 
 ### TASK-030: Facility upgrade system
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-007
 - **Description**: Extend the basic construction menu from Phase 1 with an upgrade system. Each facility gains upgrade tiers improving capabilities. All upgrades purchased from construction menu on hub. Upgrades are instant (no build time). No limitation on what player can upgrade. All costs money only, except R&D Lab (money + science). Facility placement: fixed locations on hub with placeholder rectangles and descriptive text.

@@ -10,11 +10,11 @@
  *                 exists (Phase 5).
  * Non-tutorial:   All facilities available to build from the start.
  *
- * R&D Lab special rules:
- *   - Only facility that costs both money AND science points.
+ * Upgrades:
+ *   - Any facility in FACILITY_UPGRADE_DEFS can be upgraded through tiers.
+ *   - All costs are money only, except R&D Lab (money + science).
  *   - Reputation discounts apply to the money portion only.
- *   - Upgradeable through 3 tiers (each tier unlocks higher tech and
- *     grants a larger science yield bonus).
+ *   - R&D Lab is the only facility that costs both money AND science points.
  *
  * @module core/construction
  */
@@ -24,6 +24,8 @@ import {
   FacilityId,
   RD_LAB_TIER_DEFS,
   RD_LAB_MAX_TIER,
+  FACILITY_UPGRADE_DEFS,
+  getFacilityUpgradeDef,
   getReputationDiscount,
 } from './constants.js';
 import { spend } from './finance.js';
@@ -121,7 +123,8 @@ export function canBuildFacility(state, facilityId) {
 /**
  * Check whether a facility can be upgraded to the next tier.
  *
- * Currently only the R&D Lab supports upgrades.
+ * Any facility listed in FACILITY_UPGRADE_DEFS can be upgraded.
+ * All facilities cost money only, except R&D Lab (money + science).
  *
  * @param {import('./gameState.js').GameState} state
  * @param {string} facilityId
@@ -135,19 +138,19 @@ export function canUpgradeFacility(state, facilityId) {
     return { ...noUpgrade, reason: 'Facility not built.' };
   }
 
-  // Only R&D Lab is upgradeable for now.
-  if (facilityId !== FacilityId.RD_LAB) {
+  const upgradeDef = getFacilityUpgradeDef(facilityId);
+  if (!upgradeDef) {
     return { ...noUpgrade, reason: 'This facility cannot be upgraded.' };
   }
 
   const currentTier = getFacilityTier(state, facilityId);
   const nextTier = currentTier + 1;
 
-  if (nextTier > RD_LAB_MAX_TIER) {
+  if (nextTier > upgradeDef.maxTier) {
     return { ...noUpgrade, reason: 'Already at maximum tier.' };
   }
 
-  const tierDef = RD_LAB_TIER_DEFS[nextTier];
+  const tierDef = upgradeDef.tiers[nextTier];
   if (!tierDef) {
     return { ...noUpgrade, reason: 'No upgrade definition found.' };
   }
@@ -166,7 +169,7 @@ export function canUpgradeFacility(state, facilityId) {
     };
   }
 
-  if ((state.sciencePoints ?? 0) < scienceCost) {
+  if (scienceCost > 0 && (state.sciencePoints ?? 0) < scienceCost) {
     return {
       ...noUpgrade,
       reason: `Insufficient science (need ${scienceCost}, have ${Math.floor(state.sciencePoints ?? 0)}).`,
@@ -235,7 +238,7 @@ export function buildFacility(state, facilityId) {
 /**
  * Upgrade a facility to the next tier, deducting costs.
  *
- * Currently only the R&D Lab supports upgrades.
+ * Any facility listed in FACILITY_UPGRADE_DEFS can be upgraded.
  *
  * @param {import('./gameState.js').GameState} state
  * @param {string} facilityId

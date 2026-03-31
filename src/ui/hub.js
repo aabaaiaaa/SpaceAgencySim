@@ -20,7 +20,7 @@
  */
 
 import { showHubScene, hideHubScene } from '../render/hub.js';
-import { FACILITY_DEFINITIONS, FacilityId, RD_LAB_MAX_TIER } from '../core/constants.js';
+import { FACILITY_DEFINITIONS, FacilityId, FACILITY_UPGRADE_DEFS, getFacilityUpgradeDef } from '../core/constants.js';
 import {
   hasFacility, canBuildFacility, buildFacility,
   canUpgradeFacility, upgradeFacility, getFacilityTier,
@@ -591,30 +591,58 @@ const BUILDINGS = [
   {
     id:         'launch-pad',
     label:      'Launch Pad',
-    xCenterPct: 0.14,
-    widthPct:   0.09,
+    xCenterPct: 0.07,
+    widthPct:   0.07,
     heightPct:  0.22,
   },
   {
     id:         'vab',
     label:      'Vehicle Assembly Building',
-    xCenterPct: 0.35,
-    widthPct:   0.16,
+    xCenterPct: 0.19,
+    widthPct:   0.10,
     heightPct:  0.32,
   },
   {
     id:         'mission-control',
     label:      'Mission Control Centre',
-    xCenterPct: 0.58,
-    widthPct:   0.13,
+    xCenterPct: 0.31,
+    widthPct:   0.09,
     heightPct:  0.24,
   },
   {
     id:         'crew-admin',
     label:      'Crew Administration',
-    xCenterPct: 0.78,
-    widthPct:   0.11,
+    xCenterPct: 0.42,
+    widthPct:   0.08,
     heightPct:  0.18,
+  },
+  {
+    id:         'tracking-station',
+    label:      'Tracking Station',
+    xCenterPct: 0.53,
+    widthPct:   0.09,
+    heightPct:  0.26,
+  },
+  {
+    id:         'rd-lab',
+    label:      'R&D Lab',
+    xCenterPct: 0.65,
+    widthPct:   0.10,
+    heightPct:  0.24,
+  },
+  {
+    id:         'satellite-ops',
+    label:      'Satellite Ops',
+    xCenterPct: 0.77,
+    widthPct:   0.09,
+    heightPct:  0.20,
+  },
+  {
+    id:         'library',
+    label:      'Library',
+    xCenterPct: 0.88,
+    widthPct:   0.08,
+    heightPct:  0.16,
   },
 ];
 
@@ -1100,7 +1128,8 @@ function _openConstructionPanel(container) {
     nameEl.textContent = def.name;
 
     // Show tier badge for built, upgradeable facilities.
-    if (hasFacility(_state, def.id) && def.id === FacilityId.RD_LAB) {
+    const upgradeDef = getFacilityUpgradeDef(def.id);
+    if (hasFacility(_state, def.id) && upgradeDef) {
       const tier = getFacilityTier(_state, def.id);
       const tierBadge = document.createElement('span');
       tierBadge.className = 'cp-tier-badge';
@@ -1180,7 +1209,7 @@ function _openConstructionPanel(container) {
 
         const badge = document.createElement('span');
         badge.className = 'cp-built-badge';
-        badge.textContent = def.id === FacilityId.RD_LAB ? 'Max Tier' : 'Built';
+        badge.textContent = upgradeDef ? 'Max Tier' : 'Built';
         item.appendChild(badge);
       }
     } else if (_state.tutorialMode) {
