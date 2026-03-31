@@ -48,6 +48,19 @@ async function main() {
     //
     window.__e2eStartFlight = (partIds, opts = {}) => {
       const { assembly, stagingConfig } = buildTestRocket(partIds);
+
+      // Load instruments into science modules if specified.
+      // opts.instruments is a map of part catalog ID → instrument ID array.
+      // e.g. { 'science-module-mk1': ['thermometer-mk1', 'barometer'] }
+      if (opts.instruments) {
+        for (const [instanceId, placed] of assembly.parts) {
+          const instrumentList = opts.instruments[placed.partId];
+          if (instrumentList) {
+            placed.instruments = [...instrumentList];
+          }
+        }
+      }
+
       const missionId = opts.missionId
         ?? state.missions?.accepted?.[0]?.id
         ?? '';
