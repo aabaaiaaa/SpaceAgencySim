@@ -115,6 +115,7 @@ export function hasScienceCapability(state) {
  * @property {string}   category  - ContractCategory value.
  * @property {number}   minTier   - Minimum progression tier to generate this.
  * @property {number}   [maxTier] - Maximum progression tier (inclusive), or undefined.
+ * @property {number}   minMccTier - Minimum Mission Control Centre tier required (1, 2, or 3).
  * @property {function(import('../core/gameState.js').GameState, number): boolean} canGenerate
  *   Extra check beyond minTier (e.g. "has science module").
  * @property {function(import('../core/gameState.js').GameState, number): GeneratedContract} generate
@@ -148,6 +149,7 @@ export const CONTRACT_TEMPLATES = [
     id: 'altitude-push',
     category: ContractCategory.ALTITUDE_RECORD,
     minTier: 1,
+    minMccTier: 1,
     canGenerate: () => true,
     generate(state, rand) {
       const highest = getHighestAltitude(state);
@@ -193,6 +195,7 @@ export const CONTRACT_TEMPLATES = [
     id: 'speed-push',
     category: ContractCategory.SPEED_RECORD,
     minTier: 2,
+    minMccTier: 2,
     canGenerate: () => true,
     generate(state, rand) {
       const tier = getProgressionTier(state);
@@ -237,6 +240,7 @@ export const CONTRACT_TEMPLATES = [
     id: 'safe-recovery',
     category: ContractCategory.SAFE_RECOVERY,
     minTier: 1,
+    minMccTier: 1,
     canGenerate: () => true,
     generate(state, rand) {
       const tier = getProgressionTier(state);
@@ -282,6 +286,7 @@ export const CONTRACT_TEMPLATES = [
     id: 'science-survey',
     category: ContractCategory.SCIENCE_SURVEY,
     minTier: 2,
+    minMccTier: 2,
     canGenerate: (state) => hasScienceCapability(state),
     generate(state, rand) {
       const highest = getHighestAltitude(state);
@@ -324,6 +329,7 @@ export const CONTRACT_TEMPLATES = [
     id: 'science-chain',
     category: ContractCategory.SCIENCE_SURVEY,
     minTier: 3,
+    minMccTier: 3,
     canGenerate: (state) => hasScienceCapability(state),
     generate(state, rand) {
       const chainId = `chain-sci-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -366,6 +372,7 @@ export const CONTRACT_TEMPLATES = [
     id: 'satellite-deploy',
     category: ContractCategory.SATELLITE_DEPLOY,
     minTier: 3,
+    minMccTier: 3,
     canGenerate: (state) => hasSatelliteCapability(state),
     generate(state, rand) {
       const highest = getHighestAltitude(state);
@@ -397,6 +404,7 @@ export const CONTRACT_TEMPLATES = [
     id: 'crash-test',
     category: ContractCategory.CRASH_TEST,
     minTier: 2,
+    minMccTier: 2,
     canGenerate: () => true,
     generate(state, rand) {
       const tier = getProgressionTier(state);
@@ -429,6 +437,7 @@ export const CONTRACT_TEMPLATES = [
     id: 'orbital-mission',
     category: ContractCategory.ORBITAL,
     minTier: 5,
+    minMccTier: 3,
     canGenerate: (state) => hasOrbitalCapability(state),
     generate(state, rand) {
       const reward = Math.round(200_000 + rand * 300_000);
@@ -458,6 +467,7 @@ export const CONTRACT_TEMPLATES = [
     id: 'orbital-satellite',
     category: ContractCategory.SATELLITE_DEPLOY,
     minTier: 5,
+    minMccTier: 3,
     canGenerate: (state) => hasOrbitalCapability(state) && hasSatelliteCapability(state),
     generate(state, rand) {
       const reward = Math.round(350_000 + rand * 200_000);
@@ -496,6 +506,7 @@ export const CONTRACT_TEMPLATES = [
     id: 'budget-challenge',
     category: ContractCategory.ALTITUDE_RECORD,
     minTier: 1,
+    minMccTier: 1,
     canGenerate: () => true,
     generate(state, rand) {
       const highest = getHighestAltitude(state);
@@ -538,6 +549,7 @@ export const CONTRACT_TEMPLATES = [
     id: 'minimalist',
     category: ContractCategory.ALTITUDE_RECORD,
     minTier: 2,
+    minMccTier: 2,
     canGenerate: () => true,
     generate(state, rand) {
       const tier = getProgressionTier(state);
@@ -580,6 +592,7 @@ export const CONTRACT_TEMPLATES = [
     id: 'no-chute-recovery',
     category: ContractCategory.SAFE_RECOVERY,
     minTier: 2,
+    minMccTier: 2,
     canGenerate: () => true,
     generate(state, rand) {
       const tier = getProgressionTier(state);
@@ -629,6 +642,7 @@ export const CONTRACT_TEMPLATES = [
     id: 'multi-satellite',
     category: ContractCategory.SATELLITE_DEPLOY,
     minTier: 4,
+    minMccTier: 3,
     canGenerate: (state) => hasSatelliteCapability(state),
     generate(state, rand) {
       const count = 2 + Math.floor(rand * 2); // 2-3 satellites
@@ -661,6 +675,7 @@ export const CONTRACT_TEMPLATES = [
     id: 'crewed-orbital',
     category: ContractCategory.ORBITAL,
     minTier: 5,
+    minMccTier: 3,
     canGenerate: (state) => hasOrbitalCapability(state),
     generate(state, rand) {
       const minCrew = 1 + Math.floor(rand * 2); // 1-2 crew
@@ -701,6 +716,7 @@ export const CONTRACT_TEMPLATES = [
     id: 'budget-orbital',
     category: ContractCategory.ORBITAL,
     minTier: 5,
+    minMccTier: 3,
     canGenerate: (state) => hasOrbitalCapability(state),
     generate(state, rand) {
       const maxCost = Math.round(300_000 + rand * 200_000);

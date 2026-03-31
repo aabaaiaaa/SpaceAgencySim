@@ -220,7 +220,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: VAB tiers: Tier 1 (free, part placement, save/load, symmetry, basic part count/size limit), Tier 2 ($150k, higher part count, greater height/width), Tier 3 ($400k, highest count, largest height/width). Save/load and symmetry always available at all tiers. Upgrades only affect part count, height, and width limits.
 
 ### TASK-033: Mission Control Centre upgrade tiers
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-030, TASK-008
 - **Description**: MCC tiers: Tier 1 (free, tutorial missions, 2 active contracts, 4 board pool), Tier 2 ($200k, 5 active, 8 pool, medium-difficulty contracts), Tier 3 ($500k, 8 active, 12 pool, premium contracts, multi-part chains).

@@ -372,6 +372,51 @@ export const CONTRACT_TIER_CAPS = Object.freeze({
 });
 
 /**
+ * Mission Control Centre tier feature descriptions.
+ *
+ * Each tier defines:
+ *   - label:       Display name for the tier.
+ *   - features:    Array of feature strings for UI display.
+ *   - minMccTier:  The minimum MCC tier a contract template must declare
+ *                  to be eligible for generation.  Templates with
+ *                  `minMccTier <= currentMccTier` are included.
+ *
+ * Tier 1 (free):   Tutorial-level and basic contracts only.
+ * Tier 2 ($200k):  Unlocks medium-difficulty contracts.
+ * Tier 3 ($500k):  Unlocks premium contracts and multi-part chains.
+ *
+ * @type {Readonly<Record<number, Readonly<{label: string, features: readonly string[]}>>>}
+ */
+export const MCC_TIER_FEATURES = Object.freeze({
+  1: Object.freeze({
+    label: 'Basic',
+    features: Object.freeze([
+      'Tutorial missions',
+      '2 active contracts',
+      '4 board pool',
+      'Basic contracts only',
+    ]),
+  }),
+  2: Object.freeze({
+    label: 'Standard',
+    features: Object.freeze([
+      '5 active contracts',
+      '8 board pool',
+      'Medium-difficulty contracts',
+    ]),
+  }),
+  3: Object.freeze({
+    label: 'Advanced',
+    features: Object.freeze([
+      '8 active contracts',
+      '12 board pool',
+      'Premium contracts',
+      'Multi-part chain contracts',
+    ]),
+  }),
+});
+
+/**
  * Icons (text glyphs) for each contract category, used in the UI.
  * @type {Readonly<Record<string, string>>}
  */

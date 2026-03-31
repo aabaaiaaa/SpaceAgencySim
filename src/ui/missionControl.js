@@ -16,8 +16,8 @@
  */
 
 import { acceptMission, getUnlockedMissions } from '../core/missions.js';
-import { acceptContract, cancelContract, getContractCaps, getActiveConflicts } from '../core/contracts.js';
-import { CONTRACT_CATEGORY_ICONS, getReputationTier } from '../core/constants.js';
+import { acceptContract, cancelContract, getContractCaps, getActiveConflicts, getMissionControlTier } from '../core/contracts.js';
+import { CONTRACT_CATEGORY_ICONS, MCC_TIER_FEATURES, getReputationTier } from '../core/constants.js';
 import { getPartById } from '../data/parts.js';
 import { refreshTopBarMissions } from './topbar.js';
 
@@ -593,7 +593,9 @@ function _renderShell() {
 
   const title = document.createElement('h1');
   title.id = 'mission-control-title';
-  title.textContent = 'Mission Control Centre';
+  const mccTierLevel = _state ? getMissionControlTier(_state) : 1;
+  const mccTierInfo = MCC_TIER_FEATURES[mccTierLevel];
+  title.textContent = `Mission Control Centre — Tier ${mccTierLevel}` + (mccTierInfo ? ` (${mccTierInfo.label})` : '');
   header.appendChild(title);
 
   _overlay.appendChild(header);
@@ -1036,6 +1038,22 @@ function _renderContractsBoardTab() {
 
   const contracts = _state.contracts?.board ?? [];
   const caps = getContractCaps(_state);
+  const mccTier = getMissionControlTier(_state);
+  const tierInfo = MCC_TIER_FEATURES[mccTier];
+
+  // MCC Tier info bar
+  const tierBar = document.createElement('div');
+  tierBar.className = 'mc-caps-info';
+  tierBar.style.marginBottom = '4px';
+  tierBar.innerHTML = `Mission Control: <strong>Tier ${mccTier}</strong> (${tierInfo?.label ?? 'Unknown'})`;
+  if (mccTier < 3 && MCC_TIER_FEATURES[mccTier + 1]) {
+    const nextInfo = MCC_TIER_FEATURES[mccTier + 1];
+    const hint = document.createElement('span');
+    hint.style.cssText = 'margin-left:8px;font-size:0.72rem;opacity:0.7';
+    hint.textContent = `Upgrade to unlock: ${nextInfo.features[nextInfo.features.length - 1]}`;
+    tierBar.appendChild(hint);
+  }
+  content.appendChild(tierBar);
 
   // Caps info bar
   const capsInfo = document.createElement('div');

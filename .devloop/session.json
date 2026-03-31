@@ -1,12 +1,12 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 42,
+  "lastIteration": 43,
   "startedAt": "2026-03-30T20:49:34.099Z",
   "activeTask": {
-    "taskId": "TASK-032",
-    "taskTitle": "VAB upgrade tiers",
-    "iterationNumber": 42,
-    "startedAt": "2026-03-31T11:38:20.976Z"
+    "taskId": "TASK-033",
+    "taskTitle": "Mission Control Centre upgrade tiers",
+    "iterationNumber": 43,
+    "startedAt": "2026-03-31T11:45:23.813Z"
   }
 }

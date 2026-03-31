@@ -107,8 +107,12 @@ export function generateContracts(state) {
   );
 
   const tier = getProgressionTier(state);
+  const mccTier = getMissionControlTier(state);
   const eligible = CONTRACT_TEMPLATES.filter(
-    (t) => tier >= t.minTier && (!t.maxTier || tier <= t.maxTier) && t.canGenerate(state, tier),
+    (t) => tier >= t.minTier &&
+           (!t.maxTier || tier <= t.maxTier) &&
+           (t.minMccTier ?? 1) <= mccTier &&
+           t.canGenerate(state, tier),
   );
 
   if (eligible.length === 0) return [];
