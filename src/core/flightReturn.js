@@ -35,6 +35,7 @@ import {
   applyMissionFailureReputation,
   applyRocketDestructionReputation,
 } from './reputation.js';
+import { processSampleReturns } from './surfaceOps.js';
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -256,6 +257,10 @@ export function processFlightReturn(state, flightState, ps, assembly) {
   // ── 6e. Deploy satellites released during this flight ─────────────────
   const deployedSatellites = deploySatellitesFromFlight(state, flightState);
 
+  // ── 6e2. Process surface sample returns (safe Earth landing) ──────────
+  const landingBodyId = flightState?.bodyId ?? 'EARTH';
+  const sampleResult = isLanded ? processSampleReturns(state, landingBodyId) : { samplesReturned: 0, scienceEarned: 0 };
+
   // ── 6f. Accumulate in-game flight time ──────────────────────────────────
   const flightSeconds = flightState?.timeElapsed ?? 0;
   state.flightTimeSeconds = (state.flightTimeSeconds ?? 0) + flightSeconds;
@@ -313,6 +318,8 @@ export function processFlightReturn(state, flightState, ps, assembly) {
     recoveredParts,
     reputationChange: (state.reputation ?? 50) - repBefore,
     reputationAfter:  state.reputation ?? 50,
+    samplesReturned: sampleResult.samplesReturned,
+    sampleScienceEarned: sampleResult.scienceEarned,
   };
 }
 

@@ -42,6 +42,7 @@ import { getControlModeLabel, checkBandLimitWarning } from '../core/controlMode.
 import { ObjectiveType } from '../data/missions.js';
 import { countDeployedLegs } from '../core/legs.js';
 import { getBiome } from '../core/biomes.js';
+import { getAvailableSurfaceActions } from '../core/surfaceOps.js';
 
 // ---------------------------------------------------------------------------
 // Physics constant
@@ -679,6 +680,62 @@ const FLIGHT_HUD_STYLES = `
 }
 
 #hud-band-warning.hidden { display: none; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Surface Operations panel — bottom-left, visible only when landed
+   ═══════════════════════════════════════════════════════════════════════════ */
+#flight-hud-surface {
+  position: absolute;
+  bottom: 10px;
+  left: 70px;
+  background: rgba(0, 8, 0, 0.78);
+  border: 1px solid #486828;
+  border-radius: 4px;
+  padding: 8px 10px;
+  pointer-events: auto;
+  max-width: 200px;
+}
+
+#flight-hud-surface.hidden { display: none; }
+
+#flight-hud-surface .surface-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #6a8a4a;
+  margin-bottom: 6px;
+}
+
+#flight-hud-surface .surface-btn {
+  display: block;
+  width: 100%;
+  padding: 5px 8px;
+  margin-bottom: 3px;
+  font-size: 11px;
+  font-family: system-ui, sans-serif;
+  border: 1px solid #486828;
+  border-radius: 3px;
+  background: rgba(20, 40, 10, 0.9);
+  color: #a0d8b0;
+  cursor: pointer;
+  text-align: left;
+}
+
+#flight-hud-surface .surface-btn:hover:not(:disabled) {
+  background: rgba(40, 80, 20, 0.9);
+  border-color: #6a8a4a;
+}
+
+#flight-hud-surface .surface-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+#flight-hud-surface .surface-btn-reason {
+  font-size: 9px;
+  color: #707070;
+  margin-left: 4px;
+}
 `;
 
 // ---------------------------------------------------------------------------
@@ -709,6 +766,12 @@ let _timeWarp = 1;
 
 /** Whether the warp buttons are locked out (e.g. during a staging sequence). */
 let _warpLocked = false;
+
+/** Surface operations panel. @type {HTMLElement|null} */
+let _elSurfacePanel = null;
+
+/** Callback invoked with the surface action id when a surface button is clicked. @type {((actionId: string) => void)|null} */
+let _onSurfaceAction = null;
 
 /** Array of warp-level button DOM elements (kept for highlight updates). @type {HTMLButtonElement[]} */
 let _warpButtons = [];
@@ -764,13 +827,14 @@ let _elCrewList      = null;   // left-panel crew list
  * @param {((level: number) => void)|null}                          [onTimeWarpChange]
  *   Called with the new warp level whenever the player clicks a time-warp button.
  */
-export function initFlightHud(container, ps, assembly, stagingConfig, flightState, state, onTimeWarpChange) {
+export function initFlightHud(container, ps, assembly, stagingConfig, flightState, state, onTimeWarpChange, onSurfaceAction) {
   _ps               = ps;
   _assembly         = assembly;
   _stagingConfig    = stagingConfig;
   _flightState      = flightState;
   _state            = state;
   _onTimeWarpChange = onTimeWarpChange ?? null;
+  _onSurfaceAction  = onSurfaceAction ?? null;
   _timeWarp         = 1;
   _warpLocked       = false;
   _warpButtons      = [];
@@ -794,6 +858,7 @@ export function initFlightHud(container, ps, assembly, stagingConfig, flightStat
   _buildTimeWarpPanel();
   _buildAltTape();
   _buildControlModeIndicator();
+  _buildSurfacePanel();
 
   // X → throttle 0 %, Z → throttle 100 %.
   // W/S/ArrowUp/ArrowDown are handled by physics.js handleKeyDown when the
@@ -849,6 +914,7 @@ export function destroyFlightHud() {
   _flightState      = null;
   _state            = null;
   _onTimeWarpChange = null;
+  _onSurfaceAction  = null;
   _timeWarp         = 1;
   _warpLocked       = false;
   _warpButtons      = [];
@@ -872,6 +938,8 @@ export function destroyFlightHud() {
 
   _elAltTape       = null;
   _elAltTapeTicks  = null;
+
+  _elSurfacePanel  = null;
 
   _elModeToggle    = null;
   _elTwrBarFillUp  = null;
@@ -1444,6 +1512,82 @@ function _updateControlModeIndicator() {
 }
 
 // ---------------------------------------------------------------------------
+// Surface operations panel
+// ---------------------------------------------------------------------------
+
+/**
+ * Build the surface operations panel (bottom-left, hidden by default).
+ * Shows action buttons when the rocket is landed.
+ */
+function _buildSurfacePanel() {
+  const panel = document.createElement('div');
+  panel.id = 'flight-hud-surface';
+  panel.classList.add('hidden');
+
+  const title = document.createElement('div');
+  title.className = 'surface-title';
+  title.textContent = 'Surface Ops';
+  panel.appendChild(title);
+
+  _elSurfacePanel = panel;
+  _hud.appendChild(panel);
+}
+
+/**
+ * Update the surface operations panel: show/hide based on landed state,
+ * rebuild action buttons to reflect current availability.
+ */
+function _updateSurfacePanel() {
+  if (!_elSurfacePanel || !_ps || !_flightState || !_state) return;
+
+  // Only show when landed.
+  if (!_ps.landed) {
+    _elSurfacePanel.classList.add('hidden');
+    return;
+  }
+
+  _elSurfacePanel.classList.remove('hidden');
+
+  const actions = getAvailableSurfaceActions(_state, _flightState, _ps, _assembly);
+
+  // Rebuild buttons only when the action list changes (avoid constant DOM churn).
+  const key = actions.map(a => `${a.id}:${a.enabled}`).join('|');
+  if (_elSurfacePanel.dataset.key === key) return;
+  _elSurfacePanel.dataset.key = key;
+
+  // Remove old buttons (keep the title).
+  while (_elSurfacePanel.children.length > 1) {
+    _elSurfacePanel.removeChild(_elSurfacePanel.lastChild);
+  }
+
+  for (const action of actions) {
+    const btn = document.createElement('button');
+    btn.className = 'surface-btn';
+    btn.disabled = !action.enabled;
+
+    let label = action.label;
+    if (!action.enabled && action.reason) {
+      label += ` `;
+      const reason = document.createElement('span');
+      reason.className = 'surface-btn-reason';
+      reason.textContent = `(${action.reason})`;
+      btn.textContent = action.label;
+      btn.appendChild(reason);
+    } else {
+      btn.textContent = label;
+    }
+
+    if (action.enabled) {
+      btn.addEventListener('click', () => {
+        if (_onSurfaceAction) _onSurfaceAction(action.id);
+      });
+    }
+
+    _elSurfacePanel.appendChild(btn);
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 /**
  * One animation frame: update every HUD panel, then re-schedule.
@@ -1455,6 +1599,7 @@ function _tick() {
     _updateLaunchTip();
     _updateAltTape();
     _updateControlModeIndicator();
+    _updateSurfacePanel();
   }
   _rafId = requestAnimationFrame(_tick);
 }

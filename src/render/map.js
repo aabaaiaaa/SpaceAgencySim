@@ -26,7 +26,9 @@ import { getApp } from './index.js';
 import {
   BODY_RADIUS,
   ALTITUDE_BANDS,
+  SurfaceItemType,
 } from '../core/constants.js';
+import { getSurfaceItemsAtBody, areSurfaceItemsVisible } from '../core/surfaceOps.js';
 import {
   generateOrbitPath,
   getCraftMapPosition,
@@ -105,6 +107,7 @@ let _shadowGraphics   = null;
 let _objectsGraphics  = null;
 let _craftGraphics    = null;
 let _transferGraphics = null;
+let _surfaceGraphics  = null;
 
 /** Container for reusable PIXI.Text labels. */
 let _labelContainer = null;
@@ -153,6 +156,7 @@ export function initMapRenderer() {
   _orbitsGraphics   = new PIXI.Graphics();
   _bodyGraphics     = new PIXI.Graphics();
   _shadowGraphics   = new PIXI.Graphics();
+  _surfaceGraphics  = new PIXI.Graphics();
   _objectsGraphics  = new PIXI.Graphics();
   _craftGraphics    = new PIXI.Graphics();
   _labelContainer   = new PIXI.Container();
@@ -162,6 +166,7 @@ export function initMapRenderer() {
   _mapRoot.addChild(_transferGraphics);
   _mapRoot.addChild(_orbitsGraphics);
   _mapRoot.addChild(_bodyGraphics);
+  _mapRoot.addChild(_surfaceGraphics);
   _mapRoot.addChild(_shadowGraphics);
   _mapRoot.addChild(_objectsGraphics);
   _mapRoot.addChild(_craftGraphics);
@@ -248,6 +253,7 @@ export function destroyMapRenderer() {
   _objectsGraphics  = null;
   _craftGraphics    = null;
   _transferGraphics = null;
+  _surfaceGraphics  = null;
   _labelContainer   = null;
   _labelPool        = [];
 
@@ -433,6 +439,9 @@ export function renderMapFrame(ps, flightState, state, bodyId = 'EARTH', options
   // 5. Body (drawn on top of orbits so the surface occludes near-surface paths).
   _drawBody(cx, cy, scale, R);
 
+  // 5b. Surface items (flags, instruments, beacons) on the body surface.
+  _drawSurfaceItems(state, bodyId, cx, cy, scale, R);
+
   // 6. Day/night shadow.
   _drawShadow(cx, cy, scale, R, flightState.timeElapsed);
 }
@@ -491,6 +500,61 @@ function _drawBody(cx, cy, scale, R) {
   // Edge highlight.
   _bodyGraphics.circle(cx, cy, bodyPxR);
   _bodyGraphics.stroke({ color: BODY_ATMOSPHERE, width: 1, alpha: 0.4 });
+}
+
+/** Map colours for each surface item type. */
+const MAP_SURFACE_COLORS = {
+  [SurfaceItemType.FLAG]:               0xff4444,
+  [SurfaceItemType.SURFACE_SAMPLE]:     0xddcc88,
+  [SurfaceItemType.SURFACE_INSTRUMENT]: 0x44aaff,
+  [SurfaceItemType.BEACON]:             0x44ff44,
+};
+
+/** Map glyph labels for each surface item type. */
+const MAP_SURFACE_GLYPHS = {
+  [SurfaceItemType.FLAG]:               '\u2691',  // ⚑
+  [SurfaceItemType.SURFACE_SAMPLE]:     '\u25CF',  // ●
+  [SurfaceItemType.SURFACE_INSTRUMENT]: '\u25B2',  // ▲
+  [SurfaceItemType.BEACON]:             '\u25C6',  // ◆
+};
+
+/**
+ * Draw deployed surface items on the body surface (at the body radius).
+ * Items are spread around the body circle at angles derived from their
+ * world posX coordinate.
+ *
+ * Only visible if GPS coverage exists for the body (or it's Earth).
+ */
+function _drawSurfaceItems(state, bodyId, cx, cy, scale, R) {
+  if (!_surfaceGraphics) return;
+  _surfaceGraphics.clear();
+
+  if (!areSurfaceItemsVisible(state, bodyId)) return;
+
+  const items = getSurfaceItemsAtBody(state, bodyId);
+  if (items.length === 0) return;
+
+  const bodyPxR = R * scale;
+  if (bodyPxR < 5) return; // Body too small to show surface items.
+
+  for (const item of items) {
+    // Map world X to angular position on the body circle.
+    // posX is in metres; spread items around the circumference.
+    const angle = (item.posX / (R * 0.5)) % (2 * Math.PI);
+    const ix = cx + Math.cos(angle) * bodyPxR;
+    const iy = cy - Math.sin(angle) * bodyPxR;
+
+    const color = MAP_SURFACE_COLORS[item.type] || 0xffffff;
+    const dotR  = Math.max(3, Math.min(6, bodyPxR * 0.03));
+
+    _surfaceGraphics.circle(ix, iy, dotR);
+    _surfaceGraphics.fill({ color, alpha: 0.9 });
+
+    // Label nearby if room.
+    const glyph = MAP_SURFACE_GLYPHS[item.type] || '?';
+    const labelText = `${glyph} ${item.label || item.type}`;
+    _useLabel(labelText, ix + dotR + 3, iy - 5, color);
+  }
 }
 
 function _drawBands(bodyId, cx, cy, scale) {

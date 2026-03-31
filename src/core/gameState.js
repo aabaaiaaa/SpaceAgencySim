@@ -266,6 +266,8 @@ import {
  * @property {SatelliteNetworkState} satelliteNetwork - Deployed satellite network state.
  * @property {InventoryPart[]}      partInventory    - Recovered parts available for reuse.
  * @property {import('./weather.js').WeatherState|null} weather - Current weather conditions at the launch site.
+ * @property {SurfaceItem[]}  surfaceItems - Items deployed on celestial body surfaces
+ *                                           (flags, samples, instruments, beacons).
  */
 
 /**
@@ -304,6 +306,18 @@ import {
  * Top-level satellite network state.
  * @typedef {Object} SatelliteNetworkState
  * @property {SatelliteRecord[]} satellites  - All deployed satellite records.
+ */
+
+/**
+ * An item deployed on a celestial body's surface.
+ * @typedef {Object} SurfaceItem
+ * @property {string}  id        - Unique identifier.
+ * @property {string}  type      - SurfaceItemType enum value (FLAG, SURFACE_SAMPLE, SURFACE_INSTRUMENT, BEACON).
+ * @property {string}  bodyId    - Celestial body where the item is deployed.
+ * @property {number}  posX      - World X position on the surface (metres from landing site origin).
+ * @property {number}  deployedPeriod - Period when the item was deployed.
+ * @property {string}  [label]   - Optional display label (e.g. flag inscription, beacon name).
+ * @property {boolean} [collected] - For SURFACE_SAMPLE: true when physically returned to lab.
  */
 
 // ---------------------------------------------------------------------------
@@ -399,6 +413,9 @@ export function createGameState() {
 
     // Weather conditions at the launch site (null until first hub visit).
     weather: null,
+
+    // Surface operations — items deployed on celestial body surfaces.
+    surfaceItems: [],
   };
 }
 

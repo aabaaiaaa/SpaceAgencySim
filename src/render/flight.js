@@ -31,7 +31,7 @@
 import * as PIXI from 'pixi.js';
 import { getApp }      from './index.js';
 import { getPartById } from '../data/parts.js';
-import { PartType, ControlMode, BODY_RADIUS } from '../core/constants.js';
+import { PartType, ControlMode, BODY_RADIUS, SurfaceItemType } from '../core/constants.js';
 import { airDensity, getHeatRatio }  from '../core/atmosphere.js';
 import { getBiome, getBiomeTransition, BIOME_FADE_RANGE } from '../core/biomes.js';
 import { DEPLOY_DURATION } from '../core/parachute.js';
@@ -208,6 +208,9 @@ let _starsContainer = null;
 
 /** Ground band Graphics, redrawn each frame when the ground is on screen. */
 let _groundGraphics = null;
+
+/** Graphics layer for deployed surface items (flags, instruments, beacons). */
+let _surfaceItemsGraphics = null;
 
 /** Container for all debris-fragment part rectangles + labels. */
 let _debrisContainer = null;
@@ -965,6 +968,94 @@ function _renderGround(w, h) {
   const drawH = h - drawY;
   _groundGraphics.rect(0, drawY, w, drawH);
   _groundGraphics.fill({ color: _bodyVisuals.ground });
+}
+
+// ---------------------------------------------------------------------------
+// Surface item rendering
+// ---------------------------------------------------------------------------
+
+/** Colours for each surface item type. */
+const SURFACE_ITEM_COLORS = {
+  [SurfaceItemType.FLAG]:               0xff4444,  // Red flag
+  [SurfaceItemType.SURFACE_SAMPLE]:     0xddcc88,  // Sandy/sample yellow
+  [SurfaceItemType.SURFACE_INSTRUMENT]: 0x44aaff,  // Blue science
+  [SurfaceItemType.BEACON]:             0x44ff44,  // Green beacon
+};
+
+/**
+ * Render deployed surface items on the ground surface.
+ * Items are drawn as small icons sitting on the ground line (world Y = 0).
+ *
+ * @param {import('../core/gameState.js').SurfaceItem[]} items  Items on this body.
+ * @param {number} w  Canvas width in pixels.
+ * @param {number} h  Canvas height in pixels.
+ */
+function _renderSurfaceItems(items, w, h) {
+  if (!_surfaceItemsGraphics) return;
+  _surfaceItemsGraphics.clear();
+
+  if (!items || items.length === 0) return;
+
+  const ppm = _ppm();
+  const groundScreenY = h / 2 + _camWorldY * ppm;
+
+  // Don't render if ground is off-screen.
+  if (groundScreenY < -50 || groundScreenY > h + 50) return;
+
+  for (const item of items) {
+    // Convert world X to screen X.
+    const sx = w / 2 + (item.posX - _camWorldX) * ppm;
+
+    // Skip items far off-screen.
+    if (sx < -50 || sx > w + 50) continue;
+
+    const color = SURFACE_ITEM_COLORS[item.type] || 0xffffff;
+
+    switch (item.type) {
+      case SurfaceItemType.FLAG: {
+        // Flag pole + flag pennant.
+        const poleH = 20 * (_zoomLevel || 1);
+        const flagW = 12 * (_zoomLevel || 1);
+        const flagH = 8 * (_zoomLevel || 1);
+        // Pole.
+        _surfaceItemsGraphics.rect(sx - 1, groundScreenY - poleH, 2, poleH);
+        _surfaceItemsGraphics.fill({ color: 0xcccccc });
+        // Pennant.
+        _surfaceItemsGraphics.rect(sx + 1, groundScreenY - poleH, flagW, flagH);
+        _surfaceItemsGraphics.fill({ color });
+        break;
+      }
+      case SurfaceItemType.SURFACE_SAMPLE: {
+        // Small circle.
+        const r = 4 * (_zoomLevel || 1);
+        _surfaceItemsGraphics.circle(sx, groundScreenY - r, r);
+        _surfaceItemsGraphics.fill({ color, alpha: 0.8 });
+        break;
+      }
+      case SurfaceItemType.SURFACE_INSTRUMENT: {
+        // Triangular instrument icon.
+        const sz = 6 * (_zoomLevel || 1);
+        _surfaceItemsGraphics.moveTo(sx, groundScreenY - sz * 2);
+        _surfaceItemsGraphics.lineTo(sx - sz, groundScreenY);
+        _surfaceItemsGraphics.lineTo(sx + sz, groundScreenY);
+        _surfaceItemsGraphics.closePath();
+        _surfaceItemsGraphics.fill({ color, alpha: 0.9 });
+        break;
+      }
+      case SurfaceItemType.BEACON: {
+        // Pulsing diamond.
+        const sz = 5 * (_zoomLevel || 1);
+        const pulse = 0.7 + 0.3 * Math.sin(Date.now() / 500);
+        _surfaceItemsGraphics.moveTo(sx, groundScreenY - sz * 2);
+        _surfaceItemsGraphics.lineTo(sx - sz, groundScreenY - sz);
+        _surfaceItemsGraphics.lineTo(sx, groundScreenY);
+        _surfaceItemsGraphics.lineTo(sx + sz, groundScreenY - sz);
+        _surfaceItemsGraphics.closePath();
+        _surfaceItemsGraphics.fill({ color, alpha: pulse });
+        break;
+      }
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -2461,31 +2552,34 @@ export function initFlightRenderer() {
   if (_skyGraphics)          app.stage.removeChild(_skyGraphics);
   if (_starsContainer)       app.stage.removeChild(_starsContainer);
   if (_horizonGraphics)      app.stage.removeChild(_horizonGraphics);
-  if (_groundGraphics)       app.stage.removeChild(_groundGraphics);
-  if (_debrisContainer)      app.stage.removeChild(_debrisContainer);
-  if (_trailContainer)       app.stage.removeChild(_trailContainer);
-  if (_rocketContainer)      app.stage.removeChild(_rocketContainer);
-  if (_canopyContainer)      app.stage.removeChild(_canopyContainer);
-  if (_biomeLabelContainer)  app.stage.removeChild(_biomeLabelContainer);
-  if (_hazeGraphics)         app.stage.removeChild(_hazeGraphics);
+  if (_groundGraphics)         app.stage.removeChild(_groundGraphics);
+  if (_surfaceItemsGraphics)   app.stage.removeChild(_surfaceItemsGraphics);
+  if (_debrisContainer)        app.stage.removeChild(_debrisContainer);
+  if (_trailContainer)         app.stage.removeChild(_trailContainer);
+  if (_rocketContainer)        app.stage.removeChild(_rocketContainer);
+  if (_canopyContainer)        app.stage.removeChild(_canopyContainer);
+  if (_biomeLabelContainer)    app.stage.removeChild(_biomeLabelContainer);
+  if (_hazeGraphics)           app.stage.removeChild(_hazeGraphics);
 
   // Layer order (bottom → top):
-  //   sky → stars → horizon → ground → debris → engine trails → active rocket → canopies → haze → biome label
-  _skyGraphics          = new PIXI.Graphics();
-  _starsContainer       = new PIXI.Container();
-  _horizonGraphics      = new PIXI.Graphics();
-  _groundGraphics       = new PIXI.Graphics();
-  _debrisContainer      = new PIXI.Container();
-  _trailContainer       = new PIXI.Container();
-  _rocketContainer      = new PIXI.Container();
-  _canopyContainer      = new PIXI.Container();
-  _hazeGraphics         = new PIXI.Graphics();
-  _biomeLabelContainer  = new PIXI.Container();
+  //   sky → stars → horizon → ground → surface items → debris → engine trails → active rocket → canopies → haze → biome label
+  _skyGraphics           = new PIXI.Graphics();
+  _starsContainer        = new PIXI.Container();
+  _horizonGraphics       = new PIXI.Graphics();
+  _groundGraphics        = new PIXI.Graphics();
+  _surfaceItemsGraphics  = new PIXI.Graphics();
+  _debrisContainer       = new PIXI.Container();
+  _trailContainer        = new PIXI.Container();
+  _rocketContainer       = new PIXI.Container();
+  _canopyContainer       = new PIXI.Container();
+  _hazeGraphics          = new PIXI.Graphics();
+  _biomeLabelContainer   = new PIXI.Container();
 
   app.stage.addChild(_skyGraphics);
   app.stage.addChild(_starsContainer);
   app.stage.addChild(_horizonGraphics);
   app.stage.addChild(_groundGraphics);
+  app.stage.addChild(_surfaceItemsGraphics);
   app.stage.addChild(_debrisContainer);
   app.stage.addChild(_trailContainer);
   app.stage.addChild(_rocketContainer);
@@ -2539,7 +2633,7 @@ export function initFlightRenderer() {
  * @param {import('../core/physics.js').PhysicsState}           ps
  * @param {import('../core/rocketbuilder.js').RocketAssembly}   assembly
  */
-export function renderFlightFrame(ps, assembly, flightState) {
+export function renderFlightFrame(ps, assembly, flightState, surfaceItems) {
   const w        = window.innerWidth;
   const h        = window.innerHeight;
   const altitude = Math.max(0, ps.posY);
@@ -2565,6 +2659,8 @@ export function renderFlightFrame(ps, assembly, flightState) {
   //     so we only draw the flat ground when the curvature is not active.
   if (altitude < 5_000) {
     _renderGround(w, h);
+    // 4c. Deployed surface items (flags, instruments, beacons) on the ground.
+    _renderSurfaceItems(surfaceItems, w, h);
   }
 
   // 5. Debris fragments — dimmed, camera does not follow (unless they have
@@ -2619,20 +2715,22 @@ export function destroyFlightRenderer() {
   if (_skyGraphics)          app.stage.removeChild(_skyGraphics);
   if (_starsContainer)       app.stage.removeChild(_starsContainer);
   if (_horizonGraphics)      app.stage.removeChild(_horizonGraphics);
-  if (_groundGraphics)       app.stage.removeChild(_groundGraphics);
-  if (_debrisContainer)      app.stage.removeChild(_debrisContainer);
-  if (_trailContainer)       app.stage.removeChild(_trailContainer);
-  if (_rocketContainer)      app.stage.removeChild(_rocketContainer);
-  if (_canopyContainer)      app.stage.removeChild(_canopyContainer);
-  if (_biomeLabelContainer)  app.stage.removeChild(_biomeLabelContainer);
-  if (_hazeGraphics)         app.stage.removeChild(_hazeGraphics);
-  if (_dockingTargetGfx)     app.stage.removeChild(_dockingTargetGfx);
+  if (_groundGraphics)         app.stage.removeChild(_groundGraphics);
+  if (_surfaceItemsGraphics)   app.stage.removeChild(_surfaceItemsGraphics);
+  if (_debrisContainer)        app.stage.removeChild(_debrisContainer);
+  if (_trailContainer)         app.stage.removeChild(_trailContainer);
+  if (_rocketContainer)        app.stage.removeChild(_rocketContainer);
+  if (_canopyContainer)        app.stage.removeChild(_canopyContainer);
+  if (_biomeLabelContainer)    app.stage.removeChild(_biomeLabelContainer);
+  if (_hazeGraphics)           app.stage.removeChild(_hazeGraphics);
+  if (_dockingTargetGfx)       app.stage.removeChild(_dockingTargetGfx);
 
-  _skyGraphics          = null;
-  _starsContainer       = null;
-  _horizonGraphics      = null;
-  _groundGraphics       = null;
-  _debrisContainer      = null;
+  _skyGraphics           = null;
+  _starsContainer        = null;
+  _horizonGraphics       = null;
+  _groundGraphics        = null;
+  _surfaceItemsGraphics  = null;
+  _debrisContainer       = null;
   _trailContainer       = null;
   _rocketContainer      = null;
   _canopyContainer      = null;
@@ -2681,8 +2779,9 @@ export function hideFlightScene() {
   if (_skyGraphics)          _skyGraphics.visible = false;
   if (_starsContainer)       _starsContainer.visible = false;
   if (_horizonGraphics)      _horizonGraphics.visible = false;
-  if (_groundGraphics)       _groundGraphics.visible = false;
-  if (_debrisContainer)      _debrisContainer.visible = false;
+  if (_groundGraphics)         _groundGraphics.visible = false;
+  if (_surfaceItemsGraphics)   _surfaceItemsGraphics.visible = false;
+  if (_debrisContainer)        _debrisContainer.visible = false;
   if (_trailContainer)       _trailContainer.visible = false;
   if (_rocketContainer)      _rocketContainer.visible = false;
   if (_canopyContainer)      _canopyContainer.visible = false;
@@ -2697,8 +2796,9 @@ export function showFlightScene() {
   if (_skyGraphics)          _skyGraphics.visible = true;
   if (_starsContainer)       _starsContainer.visible = true;
   if (_horizonGraphics)      _horizonGraphics.visible = true;
-  if (_groundGraphics)       _groundGraphics.visible = true;
-  if (_debrisContainer)      _debrisContainer.visible = true;
+  if (_groundGraphics)         _groundGraphics.visible = true;
+  if (_surfaceItemsGraphics)   _surfaceItemsGraphics.visible = true;
+  if (_debrisContainer)        _debrisContainer.visible = true;
   if (_trailContainer)       _trailContainer.visible = true;
   if (_rocketContainer)      _rocketContainer.visible = true;
   if (_canopyContainer)      _canopyContainer.visible = true;

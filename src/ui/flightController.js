@@ -72,6 +72,13 @@ import {
 } from '../core/docking.js';
 import { DockingState } from '../core/constants.js';
 import { getVabInventoryUsedParts } from './vab.js';
+import {
+  plantFlag,
+  collectSurfaceSample,
+  deploySurfaceInstrument,
+  deployBeacon,
+  getSurfaceItemsAtBody,
+} from '../core/surfaceOps.js';
 
 // ---------------------------------------------------------------------------
 // Module state
@@ -873,7 +880,7 @@ export function startFlightScene(
   initFlightRenderer();
 
   // Mount the HUD overlay.
-  initFlightHud(container, _ps, _assembly, stagingConfig, flightState, state, _onTimeWarpButtonClick);
+  initFlightHud(container, _ps, _assembly, stagingConfig, flightState, state, _onTimeWarpButtonClick, _onSurfaceAction);
 
   // Build the in-flight control overlay (save notice only — no hamburger).
   _buildFlightOverlay(container);
@@ -1078,7 +1085,8 @@ function _loop(timestamp) {
       showDebris: isDebrisTrackingAvailable(_state),
     });
   } else {
-    renderFlightFrame(_ps, _assembly, _flightState);
+    const _surfItems = _state ? getSurfaceItemsAtBody(_state, _flightState.bodyId) : [];
+    renderFlightFrame(_ps, _assembly, _flightState, _surfItems);
   }
 
   // Update the map HUD readouts if visible.
@@ -1207,6 +1215,42 @@ function _onTimeWarpButtonClick(level) {
   // Prevent warp changes during the staging lockout window.
   if (_stagingLockoutUntil > 0 && performance.now() < _stagingLockoutUntil) return;
   _applyTimeWarp(level);
+}
+
+// ---------------------------------------------------------------------------
+// Private — surface operations callback
+// ---------------------------------------------------------------------------
+
+/**
+ * Callback invoked by the surface operations panel when the player clicks
+ * an action button.
+ *
+ * @param {string} actionId  Surface action identifier.
+ */
+function _onSurfaceAction(actionId) {
+  if (!_state || !_flightState || !_ps) return;
+
+  let result;
+  switch (actionId) {
+    case 'plant-flag':
+      result = plantFlag(_state, _flightState, _ps);
+      break;
+    case 'collect-sample':
+      result = collectSurfaceSample(_state, _flightState, _ps);
+      break;
+    case 'deploy-instrument':
+      result = deploySurfaceInstrument(_state, _flightState, _ps, _assembly);
+      break;
+    case 'deploy-beacon':
+      result = deployBeacon(_state, _flightState, _ps);
+      break;
+    default:
+      return;
+  }
+
+  if (!result.success) {
+    console.warn(`[Surface Ops] ${actionId} failed: ${result.reason}`);
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -21,6 +21,7 @@ import { isBankrupt } from './finance.js';
 import { processSatelliteNetwork } from './satellites.js';
 import { checkInjuryRecovery, processTraining } from './crew.js';
 import { getFacilityTier } from './construction.js';
+import { processSurfaceOps } from './surfaceOps.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -125,7 +126,10 @@ export function advancePeriod(state) {
   const crewAdminTier = getFacilityTier(state, FacilityId.CREW_ADMIN);
   const trainingResult = crewAdminTier >= 2 ? processTraining(state) : { trainingCost: 0, trainees: [] };
 
-  // ── 10. Bankruptcy check ──────────────────────────────────────────────
+  // ── 10. Surface operations — passive science from deployed instruments ─
+  const surfaceResult = processSurfaceOps(state);
+
+  // ── 11. Bankruptcy check ──────────────────────────────────────────────
   const bankrupt = isBankrupt(state);
 
   return {
@@ -144,6 +148,7 @@ export function advancePeriod(state) {
     healedCrewIds,
     trainingCost: trainingResult.trainingCost,
     trainees: trainingResult.trainees,
+    surfaceScienceEarned: surfaceResult.scienceEarned,
     bankrupt,
   };
 }

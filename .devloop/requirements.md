@@ -284,7 +284,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Reuse existing flight physics with body-specific constants: gravity, atmosphere profile, ground visual, sky gradient (Moon=black, Mars=butterscotch), weather, biomes. No-atmosphere landings (Moon, Mercury, Phobos, Deimos): no parachutes/aerobraking, fully propulsive, significant skill challenge. Thin-atmosphere landings (Mars): partial aerobraking generates heat (TASK-064 thermal system applies), parachutes help but insufficient alone, combination approach. Return missions require enough delta-v for round trip or pre-positioned fuel in orbit. Reentry to any body with an atmosphere involves heating — craft need appropriate thermal protection or heat shields for the body's atmospheric density and approach speed.
 
 ### TASK-043: Surface operations
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-042
 - **Description**: Plant a flag (one per body, ceremonial milestone bonus, crewed only). Collect surface samples (crewed module required, must physically return to lab). Deploy surface instruments (science module with surface instrument, batteries/solar included). Deploy base marker beacon (shows on map, allows returning to landing site). Deployed items visible on map if GPS satellites in orbit around body, otherwise only with direct line of sight to agency hub. All deployed parts rendered on ground surface.
