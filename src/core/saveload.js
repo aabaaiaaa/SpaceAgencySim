@@ -302,6 +302,9 @@ export function loadGame(slotIndex) {
   // Default part inventory for saves created before the reusability system.
   envelope.state.partInventory ??= [];
 
+  // Default achievements for saves created before the achievement system.
+  envelope.state.achievements ??= [];
+
   return envelope.state;
 }
 

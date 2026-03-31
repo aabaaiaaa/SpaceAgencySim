@@ -1,13 +1,14 @@
 /**
  * missionControl.js — Mission Control Centre HTML overlay UI.
  *
- * Five tabs:
- *   - Available  : Lists all available tutorial missions with title, description,
- *                  reward, and an "Accept" button.
- *   - Accepted   : Lists currently accepted missions with their objectives.
- *   - Completed  : Lists all completed missions.
- *   - Contracts  : Board of procedurally generated contracts (pool).
- *   - Active     : Active (accepted) contracts with objectives and cancel option.
+ * Six tabs:
+ *   - Available     : Lists all available tutorial missions with title, description,
+ *                     reward, and an "Accept" button.
+ *   - Accepted      : Lists currently accepted missions with their objectives.
+ *   - Completed     : Lists all completed missions.
+ *   - Contracts     : Board of procedurally generated contracts (pool).
+ *   - Active        : Active (accepted) contracts with objectives and cancel option.
+ *   - Achievements  : Prestige milestones and one-time achievement tracker.
  *
  * Mission unlock state is recalculated each time this screen is opened by
  * calling getUnlockedMissions() on init.
@@ -20,6 +21,7 @@ import { acceptContract, cancelContract, getContractCaps, getActiveConflicts, ge
 import { CONTRACT_CATEGORY_ICONS, MCC_TIER_FEATURES, getReputationTier } from '../core/constants.js';
 import { getPartById } from '../data/parts.js';
 import { refreshTopBarMissions } from './topbar.js';
+import { getAchievementStatus } from '../core/achievements.js';
 
 // ---------------------------------------------------------------------------
 // CSS
@@ -413,6 +415,90 @@ const MISSION_CONTROL_STYLES = `
   margin: 8px 0 0;
   line-height: 1.4;
 }
+
+/* ── Achievement styles ──────────────────────────────────────────────── */
+.mc-achievement-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+  max-width: 900px;
+}
+
+.mc-achievement-card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  padding: 16px 18px;
+  transition: border-color 0.2s, background 0.2s;
+}
+.mc-achievement-card.earned {
+  background: rgba(80, 160, 80, 0.06);
+  border-color: rgba(80, 160, 80, 0.25);
+}
+.mc-achievement-card.locked {
+  opacity: 0.55;
+}
+
+.mc-achievement-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.mc-achievement-icon {
+  font-size: 1.4rem;
+  flex-shrink: 0;
+  width: 1.6em;
+  text-align: center;
+}
+
+.mc-achievement-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #d4e0f0;
+  margin: 0;
+}
+.mc-achievement-card.earned .mc-achievement-title {
+  color: #90d890;
+}
+
+.mc-achievement-desc {
+  font-size: 0.82rem;
+  color: #7888a0;
+  line-height: 1.5;
+  margin: 0 0 10px;
+}
+
+.mc-achievement-rewards {
+  display: flex;
+  gap: 16px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.mc-achievement-cash {
+  color: #7dd87d;
+}
+.mc-achievement-rep {
+  color: #70a8d0;
+}
+
+.mc-achievement-earned-date {
+  font-size: 0.75rem;
+  color: #5a8a5a;
+  margin-top: 6px;
+}
+
+.mc-achievement-summary {
+  font-size: 0.85rem;
+  color: #8898b0;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.mc-achievement-summary strong {
+  color: #90d890;
+}
 `;
 
 // ---------------------------------------------------------------------------
@@ -611,10 +697,12 @@ function _renderShell() {
     { id: '_divider',  label: '' },
     { id: 'contracts', label: 'Contracts' },
     { id: 'active-contracts', label: 'Active' },
+    { id: '_divider2', label: '' },
+    { id: 'achievements', label: 'Achievements' },
   ];
 
   for (const tab of tabs) {
-    if (tab.id === '_divider') {
+    if (tab.id.startsWith('_divider')) {
       const divider = document.createElement('div');
       divider.className = 'mc-tab-divider';
       tabBar.appendChild(divider);
@@ -655,6 +743,7 @@ function _switchTab(tabId) {
   if (tabId === 'completed')        _renderCompletedTab();
   if (tabId === 'contracts')        _renderContractsBoardTab();
   if (tabId === 'active-contracts') _renderActiveContractsTab();
+  if (tabId === 'achievements')     _renderAchievementsTab();
 }
 
 /**
@@ -1468,4 +1557,97 @@ function _handleCancelContract(contractId) {
   } else {
     console.warn('[Mission Control UI] cancelContract failed:', result.error);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Private — Achievements tab
+// ---------------------------------------------------------------------------
+
+/** Achievement icon map — earned vs locked. */
+const _ACHIEVEMENT_ICONS = {
+  FIRST_ORBIT:          { earned: '\u{1F30D}', locked: '\u{1F311}' },
+  FIRST_SATELLITE:      { earned: '\u{1F6F0}', locked: '\u{1F311}' },
+  FIRST_CONSTELLATION:  { earned: '\u{2728}',  locked: '\u{1F311}' },
+  FIRST_LUNAR_FLYBY:    { earned: '\u{1F319}', locked: '\u{1F311}' },
+  FIRST_LUNAR_ORBIT:    { earned: '\u{1F31D}', locked: '\u{1F311}' },
+  FIRST_LUNAR_LANDING:  { earned: '\u{1F311}', locked: '\u{1F311}' },
+  FIRST_LUNAR_RETURN:   { earned: '\u{1F680}', locked: '\u{1F311}' },
+  FIRST_MARS_ORBIT:     { earned: '\u{1FA90}', locked: '\u{1F311}' },
+  FIRST_MARS_LANDING:   { earned: '\u{1F534}', locked: '\u{1F311}' },
+  FIRST_SOLAR_SCIENCE:  { earned: '\u{2600}',  locked: '\u{1F311}' },
+};
+
+function _renderAchievementsTab() {
+  const content = _getContent();
+  if (!content || !_state) return;
+
+  const achievements = getAchievementStatus(_state);
+  const earnedCount = achievements.filter((a) => a.earned).length;
+  const totalCount = achievements.length;
+
+  // Summary bar
+  const summary = document.createElement('div');
+  summary.className = 'mc-achievement-summary';
+  summary.innerHTML = `<strong>${earnedCount}</strong> of ${totalCount} achievements earned`;
+  content.appendChild(summary);
+
+  // Grid of achievement cards
+  const grid = document.createElement('div');
+  grid.className = 'mc-achievement-grid';
+
+  for (const ach of achievements) {
+    const card = document.createElement('div');
+    card.className = 'mc-achievement-card' + (ach.earned ? ' earned' : ' locked');
+
+    // Header with icon and title
+    const header = document.createElement('div');
+    header.className = 'mc-achievement-header';
+
+    const icon = document.createElement('span');
+    icon.className = 'mc-achievement-icon';
+    const iconMap = _ACHIEVEMENT_ICONS[ach.id] ?? { earned: '\u{1F3C6}', locked: '\u{1F311}' };
+    icon.textContent = ach.earned ? iconMap.earned : iconMap.locked;
+    header.appendChild(icon);
+
+    const title = document.createElement('h3');
+    title.className = 'mc-achievement-title';
+    title.textContent = ach.earned ? ach.title : ach.title;
+    header.appendChild(title);
+
+    card.appendChild(header);
+
+    // Description
+    const desc = document.createElement('p');
+    desc.className = 'mc-achievement-desc';
+    desc.textContent = ach.description;
+    card.appendChild(desc);
+
+    // Rewards row
+    const rewards = document.createElement('div');
+    rewards.className = 'mc-achievement-rewards';
+
+    const cash = document.createElement('span');
+    cash.className = 'mc-achievement-cash';
+    cash.textContent = _fmtCash(ach.cashReward);
+    rewards.appendChild(cash);
+
+    const rep = document.createElement('span');
+    rep.className = 'mc-achievement-rep';
+    rep.textContent = `+${ach.repReward} rep`;
+    rewards.appendChild(rep);
+
+    card.appendChild(rewards);
+
+    // Earned date
+    if (ach.earned && ach.earnedPeriod != null) {
+      const earnedEl = document.createElement('div');
+      earnedEl.className = 'mc-achievement-earned-date';
+      earnedEl.textContent = `Earned on flight ${ach.earnedPeriod}`;
+      card.appendChild(earnedEl);
+    }
+
+    grid.appendChild(card);
+  }
+
+  content.appendChild(grid);
 }

@@ -268,6 +268,14 @@ import {
  * @property {import('./weather.js').WeatherState|null} weather - Current weather conditions at the launch site.
  * @property {SurfaceItem[]}  surfaceItems - Items deployed on celestial body surfaces
  *                                           (flags, samples, instruments, beacons).
+ * @property {AchievementRecord[]} achievements - Earned prestige milestones.
+ */
+
+/**
+ * A record of an earned achievement.
+ * @typedef {Object} AchievementRecord
+ * @property {string}  id           - Achievement definition ID.
+ * @property {number}  earnedPeriod - Period when the achievement was earned.
  */
 
 /**
@@ -416,6 +424,9 @@ export function createGameState() {
 
     // Surface operations — items deployed on celestial body surfaces.
     surfaceItems: [],
+
+    // Prestige milestones — one-time achievements for major firsts.
+    achievements: [],
   };
 }
 

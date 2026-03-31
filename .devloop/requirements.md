@@ -290,7 +290,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Plant a flag (one per body, ceremonial milestone bonus, crewed only). Collect surface samples (crewed module required, must physically return to lab). Deploy surface instruments (science module with surface instrument, batteries/solar included). Deploy base marker beacon (shows on map, allows returning to landing site). Deployed items visible on map if GPS satellites in orbit around body, otherwise only with direct line of sight to agency hub. All deployed parts rendered on ground surface.
 
 ### TASK-044: Prestige milestones and achievements
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-039
 - **Description**: One-time achievements for major firsts, visible in MCC under "Achievements" tab. Milestones: First Orbit ($200k+20rep), First Satellite ($150k+15rep), First Constellation ($300k+25rep), First Lunar Flyby ($500k+30rep), First Lunar Orbit ($750k+35rep), First Lunar Landing ($1M+40rep), First Lunar Return ($2M+50rep), First Mars Orbit ($3M+50rep), First Mars Landing ($5M+60rep), First Solar Science ($4M+50rep).

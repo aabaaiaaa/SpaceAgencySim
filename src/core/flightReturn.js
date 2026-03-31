@@ -36,6 +36,7 @@ import {
   applyRocketDestructionReputation,
 } from './reputation.js';
 import { processSampleReturns } from './surfaceOps.js';
+import { checkAchievements } from './achievements.js';
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -73,6 +74,7 @@ import { processSampleReturns } from './surfaceOps.js';
  * @property {import('./gameState.js').InventoryPart[]} recoveredParts - Parts recovered to inventory.
  * @property {number}  reputationChange - Net reputation change this flight.
  * @property {number}  reputationAfter  - Reputation value after all changes.
+ * @property {Array<{id: string, title: string, cashReward: number, repReward: number}>} newAchievements - Achievements earned this flight.
  */
 
 /**
@@ -291,6 +293,15 @@ export function processFlightReturn(state, flightState, ps, assembly) {
   }
   state.flightHistory.push(flightResult);
 
+  // ── 8. Achievement checks ──────────────────────────────────────────────
+  const achievementCtx = {
+    flightState,
+    ps,
+    isLanded,
+    landingBodyId,
+  };
+  const newAchievements = checkAchievements(state, achievementCtx);
+
   // Clear the active flight.
   state.currentFlight = null;
 
@@ -320,6 +331,7 @@ export function processFlightReturn(state, flightState, ps, assembly) {
     reputationAfter:  state.reputation ?? 50,
     samplesReturned: sampleResult.samplesReturned,
     sampleScienceEarned: sampleResult.scienceEarned,
+    newAchievements,
   };
 }
 
