@@ -116,6 +116,8 @@ export function buildSaveEnvelope({
   scienceLog      = [],
   techTree        = { researched: [], unlockedInstruments: [] },
   satelliteNetwork= { satellites: [] },
+  surfaceItems    = [],
+  achievements    = [],
 } = {}) {
   return {
     saveName,
@@ -145,6 +147,8 @@ export function buildSaveEnvelope({
       scienceLog,
       techTree,
       satelliteNetwork,
+      surfaceItems,
+      achievements,
     },
   };
 }

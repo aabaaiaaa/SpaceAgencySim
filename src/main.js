@@ -11,6 +11,11 @@ import { buildTestRocket } from './core/testFlightBuilder.js';
 import { startFlightScene, stopFlightScene } from './ui/flightController.js';
 import { createFlightState } from './core/gameState.js';
 import { setMalfunctionMode } from './core/malfunction.js';
+import { plantFlag, collectSurfaceSample, deploySurfaceInstrument, deployBeacon, processSurfaceOps, processSampleReturns, areSurfaceItemsVisible } from './core/surfaceOps.js';
+import { checkAchievements } from './core/achievements.js';
+import { computeTransferDeltaV } from './core/manoeuvre.js';
+import { CELESTIAL_BODIES, isLandable } from './data/bodies.js';
+import { getPartById } from './data/parts.js';
 
 async function main() {
   console.log('[SpaceAgencySim] Starting...');
@@ -87,6 +92,49 @@ async function main() {
         flightState,
         () => { /* no-op end callback for test flights */ },
       );
+    };
+
+    // ── Phase 6 E2E test APIs ──────────────────────────────────────────────
+    // Surface operations.
+    window.__plantFlag = () => {
+      const fs = state.currentFlight;
+      const ps = window.__flightPs;
+      return plantFlag(state, fs, ps);
+    };
+    window.__collectSample = () => {
+      const fs = state.currentFlight;
+      const ps = window.__flightPs;
+      return collectSurfaceSample(state, fs, ps);
+    };
+    window.__deployInstrument = () => {
+      const fs = state.currentFlight;
+      const ps = window.__flightPs;
+      const assembly = window.__flightAssembly;
+      return deploySurfaceInstrument(state, fs, ps, assembly);
+    };
+    window.__deployBeacon = (name) => {
+      const fs = state.currentFlight;
+      const ps = window.__flightPs;
+      return deployBeacon(state, fs, ps, name);
+    };
+    window.__processSurfaceOps = () => processSurfaceOps(state);
+    window.__processSampleReturns = (bodyId) => processSampleReturns(state, bodyId);
+    window.__areSurfaceItemsVisible = (bodyId) => areSurfaceItemsVisible(state, bodyId);
+
+    // Achievements.
+    window.__checkAchievements = (ctx) => checkAchievements(state, ctx);
+
+    // Transfer delta-v.
+    window.__computeTransferDeltaV = (from, to, alt) => computeTransferDeltaV(from, to, alt);
+
+    // Celestial body data.
+    window.__celestialBodies = CELESTIAL_BODIES;
+    window.__isLandable = isLandable;
+
+    // Part lookup.
+    window.__getPartById = (id) => {
+      const p = getPartById(id);
+      return p ? JSON.parse(JSON.stringify(p)) : null;
     };
 
     console.log('[SpaceAgencySim] Ready. Agency:', state.agencyName || '(unnamed)');

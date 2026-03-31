@@ -26,6 +26,7 @@ import {
 } from './constants.js';
 import { earn } from './finance.js';
 import { getActiveSatellites } from './satellites.js';
+import { getPartById } from '../data/parts.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -81,8 +82,10 @@ export function isCrewedFlight(flightState) {
  */
 export function hasScienceModule(assembly, ps) {
   if (!assembly || !ps) return false;
-  for (const [idx, part] of assembly.parts.entries()) {
-    if (part.type === PartType.SERVICE_MODULE && ps.activeParts.has(idx)) {
+  for (const [idx, placed] of assembly.parts.entries()) {
+    if (!ps.activeParts.has(idx)) continue;
+    const def = getPartById(placed.partId);
+    if (def && def.type === PartType.SERVICE_MODULE) {
       return true;
     }
   }
