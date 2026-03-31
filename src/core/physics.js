@@ -93,6 +93,8 @@ import {
 } from './malfunction.js';
 import { MalfunctionType, REDUCED_THRUST_FACTOR, PARTIAL_CHUTE_FACTOR } from './constants.js';
 import { getWindForce, getCurrentWeather } from './weather.js';
+import { initPowerState, tickPower, recalcPowerState } from './power.js';
+import { getOrbitalStateAtTime } from './orbit.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -432,11 +434,15 @@ export function createPhysicsState(assembly, flightState) {
     }
   }
 
+  // Initialise the power system (solar panels, batteries, built-in power).
+  ps.powerState = initPowerState(assembly, ps.activeParts);
+
   // Flag on flightState so mission objective checking knows whether science
   // modules are present (used to gate HOLD_ALTITUDE time accumulation).
   if (flightState) {
     flightState.hasScienceModules = ps.scienceModuleStates.size > 0 || ps.instrumentStates.size > 0;
     flightState.scienceModuleRunning = false;
+    flightState.powerState = ps.powerState;
   }
 
   return ps;
@@ -864,7 +870,41 @@ function _integrate(ps, assembly, flightState) {
   // completion; update flightState.scienceModuleRunning.
   tickScienceModules(ps, assembly, flightState, FIXED_DT);
 
-  // --- 9d. Ejected crew physics --------------------------------------------
+  // --- 9d. Power system (solar generation, battery, consumers) ------------
+  if (ps.powerState) {
+    // Count active science instruments for power draw calculation.
+    let activeScienceCount = 0;
+    for (const [, entry] of ps.instrumentStates) {
+      if (entry.state === 'COLLECTING' || entry.state === 'RUNNING') {
+        activeScienceCount++;
+      }
+    }
+
+    // Compute angular position for orbital sunlight check.
+    let angularPositionDeg = null;
+    if (flightState.inOrbit && flightState.orbitalElements) {
+      const oState = getOrbitalStateAtTime(
+        flightState.orbitalElements,
+        flightState.timeElapsed,
+        flightState.bodyId || 'EARTH',
+      );
+      angularPositionDeg = oState.angularPositionDeg;
+    }
+
+    tickPower(ps.powerState, {
+      dt: FIXED_DT,
+      altitude: Math.max(0, ps.posY),
+      bodyId: flightState.bodyId || 'EARTH',
+      gameTimeSeconds: flightState.timeElapsed,
+      angularPositionDeg,
+      inOrbit: flightState.inOrbit,
+      scienceRunning: flightState.scienceModuleRunning,
+      activeScienceCount,
+      commsActive: false, // comms are passive for player craft
+    });
+  }
+
+  // --- 9e. Ejected crew physics --------------------------------------------
   if (ps.ejectedCrew) {
     const crewG = _gravityForBody(bodyId, Math.max(0, ps.posY));
     for (const crew of ps.ejectedCrew) {
@@ -2044,7 +2084,7 @@ function _handleGroundContact(ps, assembly, flightState) {
 
     // Destroy all parts in this layer.
     for (const entry of layer) {
-      _removePartFromState(ps, entry.instanceId);
+      _removePartFromState(ps, entry.instanceId, assembly);
       _emitEvent(flightState, {
         type:       'PART_DESTROYED',
         time,
@@ -2165,13 +2205,18 @@ function _getBottomPartLayer(ps, assembly) {
  * @param {PhysicsState} ps
  * @param {string}       instanceId
  */
-function _removePartFromState(ps, instanceId) {
+function _removePartFromState(ps, instanceId, assembly) {
   ps.activeParts.delete(instanceId);
   ps.firingEngines.delete(instanceId);
   ps.deployedParts.delete(instanceId);
   ps.legStates?.delete(instanceId);
   ps.parachuteStates?.delete(instanceId);
   ps.heatMap?.delete(instanceId);
+
+  // Recalculate power state after losing a part (may have lost panels/batteries).
+  if (ps.powerState && assembly) {
+    recalcPowerState(ps.powerState, assembly, ps.activeParts);
+  }
 }
 
 /**
@@ -2274,6 +2319,17 @@ function _syncFlightState(ps, assembly, flightState) {
     if (ps.activeParts.has(instanceId)) totalFuel += fuel;
   }
   flightState.fuelRemaining = totalFuel;
+
+  // Recalculate power state if active part count changed (staging/destruction).
+  if (ps.powerState) {
+    const prevCap = ps.powerState.batteryCapacity;
+    const prevArea = ps.powerState.solarPanelArea;
+    recalcPowerState(ps.powerState, assembly, ps.activeParts);
+    // Only sync to flightState if capacity changed (avoids unnecessary writes).
+    if (ps.powerState.batteryCapacity !== prevCap || ps.powerState.solarPanelArea !== prevArea) {
+      flightState.powerState = ps.powerState;
+    }
+  }
 
   // Estimate remaining ΔV using current wet/dry mass split and average Isp.
   flightState.deltaVRemaining = _estimateDeltaV(ps, assembly);

@@ -186,7 +186,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Docking ports attachable radially, extendable away from craft for easier alignment. Targetable in orbit view within visual range. Docking guidance screen: orientation, distance, speed differences — each turns green when acceptable. Automatic final docking in last moments. New combined centre of mass with smooth camera transition. Undocking: ports disengage, command module/probe determines player control and camera. No limit on docked craft count. Enables: orbital assembly, crew transfer, fuel transfer, refuelling from depots.
 
 ### TASK-028: Power system
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-023
 - **Description**: Solar panels generate power when sunlit (position-based day/night relative to nearest star). Batteries store power for eclipse. Power consumers: science instruments, communication/transmission, rotation (small). Built-in batteries on command/probe modules and pre-made satellite parts. Separate battery parts for custom satellites. Satellite ops centre shadow overlay. Map view optional shadow overlay. Orbital manoeuvres don't require power unless engine specifically uses electrical power.

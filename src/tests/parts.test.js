@@ -374,7 +374,7 @@ describe('lookup functions with a fixture part', () => {
     });
 
     it('returns empty array for a type with no parts', () => {
-      expect(getPartsByType(PartType.SOLAR_PANEL)).toEqual([]);
+      expect(getPartsByType(PartType.PAYLOAD)).toEqual([]);
     });
 
     it('returns empty array for an unrecognised type string', () => {

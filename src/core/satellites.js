@@ -50,6 +50,7 @@ import {
 import { createOrbitalObject, getAltitudeBandId, getMinOrbitAltitude } from './orbit.js';
 import { hasFacility, getFacilityTier } from './construction.js';
 import { getPartById } from '../data/parts.js';
+import { getSunlitFraction, getSatellitePowerInfo } from './power.js';
 
 // ---------------------------------------------------------------------------
 // Deployment
@@ -690,6 +691,25 @@ export function getNetworkSummary(state) {
 
   const leasedCount = active.filter(s => s.leased).length;
 
+  // Compute sunlit fraction and power info per satellite for UI display.
+  const allSats = state.satelliteNetwork?.satellites ?? [];
+  const satellitePowerInfo = {};
+  for (const sat of allSats) {
+    if (sat.health <= 0) continue;
+    // Look up the orbit altitude from the corresponding OrbitalObject.
+    const oo = state.orbitalObjects?.find(o => o.id === sat.orbitalObjectId);
+    if (oo && oo.elements) {
+      const altitude = oo.elements.semiMajorAxis - (BODY_RADIUS[sat.bodyId] ?? 6_371_000);
+      const fraction = getSunlitFraction(altitude, sat.bodyId);
+      const powerInfo = getSatellitePowerInfo(altitude, sat.bodyId);
+      satellitePowerInfo[sat.id] = {
+        sunlitFraction: fraction,
+        avgGeneration: powerInfo.avgGeneration,
+        altitude,
+      };
+    }
+  }
+
   return {
     totalActive: active.length,
     capacity,
@@ -698,6 +718,7 @@ export function getNetworkSummary(state) {
     totalLeaseIncome: getTotalLeaseIncome(state),
     byType,
     benefits: getNetworkBenefits(state),
-    satellites: state.satelliteNetwork?.satellites ?? [],
+    satellites: allSats,
+    satellitePowerInfo,
   };
 }

@@ -48,6 +48,8 @@ export const PartType = Object.freeze({
   RCS_THRUSTER: 'RCS_THRUSTER',
   /** Generates electricity for systems with no atmosphere. */
   SOLAR_PANEL: 'SOLAR_PANEL',
+  /** Stores electrical energy for use during eclipse periods. */
+  BATTERY: 'BATTERY',
   /** Docking port for connecting vessels in orbit. */
   DOCKING_PORT: 'DOCKING_PORT',
   /** Aerodynamic nose cone that reduces drag on atmospheric ascent. */
@@ -1277,3 +1279,70 @@ export const WEAR_AFTER_REFURBISH = 10;
  * Fraction of original part cost returned when scrapping an inventory part.
  */
 export const SCRAP_VALUE_FRACTION = 0.15;
+
+// ---------------------------------------------------------------------------
+// Power System
+// ---------------------------------------------------------------------------
+
+/**
+ * Power units: watts (W) for generation/consumption, watt-hours (Wh) for storage.
+ * One physics tick at 1/60 s → dt = 1/60 h / 3600 = 1/216000 hours.
+ */
+
+/** Base solar irradiance near Earth (W/m² at 1 AU). */
+export const SOLAR_IRRADIANCE_1AU = 1361;
+
+/**
+ * Solar irradiance scaling per body.  Multiplied by SOLAR_IRRADIANCE_1AU to
+ * get effective irradiance at each body's orbital distance.
+ * Bodies orbiting a planet (Moon, Phobos, Deimos) inherit their parent's value.
+ *
+ * @type {Readonly<Record<string, number>>}
+ */
+export const SOLAR_IRRADIANCE_SCALE = Object.freeze({
+  SUN:     10.0,    // very close to sun (unused for orbiting, but defined)
+  MERCURY: 6.68,    // ~0.387 AU → 1/0.387² ≈ 6.68
+  VENUS:   1.91,    // ~0.723 AU → 1/0.723² ≈ 1.91
+  EARTH:   1.00,    // 1 AU (reference)
+  MOON:    1.00,    // Same distance from Sun as Earth
+  MARS:    0.43,    // ~1.524 AU → 1/1.524² ≈ 0.43
+  PHOBOS:  0.43,    // Same as Mars
+  DEIMOS:  0.43,    // Same as Mars
+});
+
+/**
+ * Rate at which the "sun direction angle" rotates (degrees per game-second).
+ * Models the apparent motion of the shadow cone.  One full rotation every
+ * ~5400 seconds (90 minutes) — roughly an LEO orbital period, so a satellite
+ * in a circular LEO orbit sees roughly one day/night cycle per orbit.
+ */
+export const SUN_ROTATION_RATE = 360 / 5400;
+
+/**
+ * Power draw (watts) for rotation / attitude control (small constant).
+ * Applied whenever the craft is in orbit.
+ */
+export const POWER_DRAW_ROTATION = 5;
+
+/**
+ * Power draw (watts) for an active science instrument during data collection.
+ */
+export const POWER_DRAW_SCIENCE = 25;
+
+/**
+ * Power draw (watts) for communication/data transmission.
+ * Applied when a COMMUNICATION satellite is operational (per period fraction).
+ */
+export const POWER_DRAW_COMMS = 15;
+
+/**
+ * Minimum battery charge (Wh) below which power-dependent systems are disabled.
+ * Provides a small reserve so systems don't flicker at the boundary.
+ */
+export const POWER_CRITICAL_THRESHOLD = 0.5;
+
+/**
+ * Solar panel efficiency factor (0–1).  Converts raw irradiance × area to
+ * usable electrical power.  Real panels are ~20–30 %; we use a gameplay value.
+ */
+export const SOLAR_PANEL_EFFICIENCY = 0.25;

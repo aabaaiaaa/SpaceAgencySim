@@ -33,7 +33,7 @@
  * 40 px wide.  Use this as a guide when sizing new parts.
  */
 
-import { PartType, FuelType, RELIABILITY_TIERS, SatelliteType, DockingState } from '../core/constants.js';
+import { PartType, FuelType, RELIABILITY_TIERS, SatelliteType } from '../core/constants.js';
 
 // ---------------------------------------------------------------------------
 // Activation Behaviour Enum
@@ -207,6 +207,7 @@ export const STACK_TYPES = Object.freeze([
   PartType.DOCKING_PORT,
   PartType.HEAT_SHIELD,
   PartType.NOSE_CONE,
+  PartType.BATTERY,
 ]);
 
 /**
@@ -221,6 +222,8 @@ export const RADIAL_TYPES = Object.freeze([
   PartType.PARACHUTE,
   PartType.SERVICE_MODULE,
   PartType.DOCKING_PORT,
+  PartType.SOLAR_PANEL,
+  PartType.BATTERY,
 ]);
 
 // ---------------------------------------------------------------------------
@@ -294,6 +297,7 @@ export const PARTS = [
       seats: 1,
       hasRcs: true,
       hasEjectorSeat: true,
+      batteryCapacity: 50,   // 50 Wh built-in battery
       dragCoefficient: 0.2,
       heatTolerance: 2000,
       crashThreshold: 15,
@@ -329,6 +333,7 @@ export const PARTS = [
     activationBehaviour: ActivationBehaviour.NONE,
     properties: {
       hasRcs: false,
+      batteryCapacity: 20,   // 20 Wh built-in battery
       dragCoefficient: 0.1,
       heatTolerance: 1500,
       crashThreshold: 12,
@@ -368,6 +373,7 @@ export const PARTS = [
     activationBehaviour: ActivationBehaviour.COLLECT_SCIENCE,
     properties: {
       instrumentSlots: 2,
+      powerDraw: 25,           // 25 W per active instrument
       dragCoefficient: 0.1,
       heatTolerance: 1500,
       crashThreshold: 10,
@@ -961,6 +967,8 @@ export const PARTS = [
     activatable: true,
     activationBehaviour: ActivationBehaviour.RELEASE,
     properties: {
+      batteryCapacity: 100,    // 100 Wh built-in battery
+      solarPanelArea: 2.0,     // 2 m² built-in solar panels
       dragCoefficient: 0.1,
       heatTolerance: 1500,
       crashThreshold: 8,
@@ -991,6 +999,9 @@ export const PARTS = [
     activationBehaviour: ActivationBehaviour.RELEASE,
     properties: {
       satelliteType: SatelliteType.COMMUNICATION,
+      batteryCapacity: 120,
+      solarPanelArea: 2.5,
+      powerDraw: 15,           // comms power draw
       dragCoefficient: 0.1,
       heatTolerance: 1500,
       crashThreshold: 8,
@@ -1021,6 +1032,9 @@ export const PARTS = [
     activationBehaviour: ActivationBehaviour.RELEASE,
     properties: {
       satelliteType: SatelliteType.WEATHER,
+      batteryCapacity: 130,
+      solarPanelArea: 2.5,
+      powerDraw: 20,           // weather instruments power draw
       dragCoefficient: 0.1,
       heatTolerance: 1500,
       crashThreshold: 8,
@@ -1051,6 +1065,9 @@ export const PARTS = [
     activationBehaviour: ActivationBehaviour.RELEASE,
     properties: {
       satelliteType: SatelliteType.SCIENCE,
+      batteryCapacity: 150,
+      solarPanelArea: 3.0,
+      powerDraw: 25,           // science instruments power draw
       dragCoefficient: 0.1,
       heatTolerance: 1500,
       crashThreshold: 8,
@@ -1081,6 +1098,9 @@ export const PARTS = [
     activationBehaviour: ActivationBehaviour.RELEASE,
     properties: {
       satelliteType: SatelliteType.GPS,
+      batteryCapacity: 140,
+      solarPanelArea: 2.5,
+      powerDraw: 18,           // GPS transponder power draw
       dragCoefficient: 0.1,
       heatTolerance: 1500,
       crashThreshold: 8,
@@ -1111,6 +1131,9 @@ export const PARTS = [
     activationBehaviour: ActivationBehaviour.RELEASE,
     properties: {
       satelliteType: SatelliteType.RELAY,
+      batteryCapacity: 160,
+      solarPanelArea: 3.0,
+      powerDraw: 30,           // high-power relay transponder
       dragCoefficient: 0.1,
       heatTolerance: 1500,
       crashThreshold: 8,
@@ -1448,6 +1471,7 @@ export const PARTS = [
     properties: {
       seats: 4,
       hasRcs: true,
+      batteryCapacity: 200,    // 200 Wh built-in battery
       dragCoefficient: 0.15,
       heatTolerance: 2000,
       crashThreshold: 8,
@@ -1610,6 +1634,142 @@ export const PARTS = [
   // SCIENCE LAB — Tech Tree Science T4
   // =========================================================================
 
+  // =========================================================================
+  // SOLAR PANELS
+  // =========================================================================
+
+  /**
+   * OX-STAT Solar Panel — small fixed solar panel for probes and satellites.
+   * Generates power when sunlit. Mount radially on the side of the craft.
+   * Lightweight and inexpensive — good for small probes.
+   */
+  {
+    id: 'solar-panel-small',
+    name: 'OX-STAT Solar Panel',
+    description: 'A compact fixed solar panel that generates electricity when sunlit. Mount radially on your craft. Ideal for small probes and satellites that need modest power.',
+    type: PartType.SOLAR_PANEL,
+    reliability: RELIABILITY_TIERS.MID,
+    mass: 10,
+    cost: 2_000,
+    width: 20,   // 1 m
+    height: 8,   // 0.4 m
+    snapPoints: [
+      makeSnapPoint('left',  -10,  0, []),
+      makeSnapPoint('right',  10,  0, RADIAL_TYPES),
+    ],
+    animationStates: ['stowed', 'deployed'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      solarPanelArea: 1.0,     // 1 m² panel area
+      dragCoefficient: 0.02,
+      heatTolerance: 1200,
+      crashThreshold: 5,
+    },
+  },
+
+  /**
+   * Gigantor XL Solar Array — large deployable solar array.
+   * High power output for stations and large satellites.
+   * Mount radially for best coverage.
+   * Tech tree: Electrical T3.
+   */
+  {
+    id: 'solar-panel-large',
+    name: 'Gigantor XL Solar Array',
+    description: 'A large deployable solar array with high power output. Essential for orbital stations and power-hungry satellites. Mount radially for best sun exposure.',
+    type: PartType.SOLAR_PANEL,
+    reliability: RELIABILITY_TIERS.HIGH,
+    mass: 60,
+    cost: 8_000,
+    width: 40,   // 2 m
+    height: 10,  // 0.5 m
+    snapPoints: [
+      makeSnapPoint('left',  -20,  0, []),
+      makeSnapPoint('right',  20,  0, RADIAL_TYPES),
+    ],
+    animationStates: ['stowed', 'deployed'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      solarPanelArea: 4.0,     // 4 m² panel area
+      dragCoefficient: 0.04,
+      heatTolerance: 1000,
+      crashThreshold: 3,
+    },
+  },
+
+  // =========================================================================
+  // BATTERIES
+  // =========================================================================
+
+  /**
+   * Z-100 Battery Pack — small rechargeable battery.
+   * Stores power for eclipse periods. Lightweight, suitable for probes.
+   */
+  {
+    id: 'battery-small',
+    name: 'Z-100 Battery Pack',
+    description: 'A small rechargeable battery that stores electrical energy for use during eclipse. Essential for custom satellites and probes without built-in power.',
+    type: PartType.BATTERY,
+    reliability: RELIABILITY_TIERS.MID,
+    mass: 5,
+    cost: 1_000,
+    width: 10,
+    height: 10,
+    snapPoints: [
+      makeSnapPoint('top',    0, -5, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  5, STACK_TYPES),
+      makeSnapPoint('left',  -5,  0, []),
+      makeSnapPoint('right',  5,  0, RADIAL_TYPES),
+    ],
+    animationStates: ['idle'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      batteryCapacity: 100,    // 100 Wh
+      dragCoefficient: 0.02,
+      heatTolerance: 1200,
+      crashThreshold: 8,
+    },
+  },
+
+  /**
+   * Z-400 Battery Bank — large rechargeable battery.
+   * High capacity for stations and power-intensive missions.
+   * Tech tree: Electrical T2.
+   */
+  {
+    id: 'battery-large',
+    name: 'Z-400 Battery Bank',
+    description: 'A high-capacity rechargeable battery bank. Stores ample electrical energy for orbital stations and long eclipse periods. Heavier but essential for power-hungry craft.',
+    type: PartType.BATTERY,
+    reliability: RELIABILITY_TIERS.HIGH,
+    mass: 20,
+    cost: 3_500,
+    width: 16,
+    height: 16,
+    snapPoints: [
+      makeSnapPoint('top',    0, -8, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  8, STACK_TYPES),
+      makeSnapPoint('left',  -8,  0, []),
+      makeSnapPoint('right',  8,  0, RADIAL_TYPES),
+    ],
+    animationStates: ['idle'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      batteryCapacity: 400,    // 400 Wh
+      dragCoefficient: 0.03,
+      heatTolerance: 1200,
+      crashThreshold: 8,
+    },
+  },
+
+  // =========================================================================
+  // SCIENCE LAB — Tech Tree Science T4
+  // =========================================================================
+
   /**
    * Science Lab Module — orbital laboratory for processing science data.
    * Takes collected science data and processes it over time to generate
@@ -1642,6 +1802,7 @@ export const PARTS = [
       scienceProcessingRate: 2,
       scienceMultiplier: 1.5,
       requiresOrbit: true,
+      powerDraw: 40,           // 40 W when processing
       dragCoefficient: 0.12,
       heatTolerance: 1800,
       crashThreshold: 8,

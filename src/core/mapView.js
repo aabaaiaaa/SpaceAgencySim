@@ -14,6 +14,7 @@
  */
 
 import { BODY_RADIUS, BODY_GM, ALTITUDE_BANDS, FlightPhase } from './constants.js';
+import { getSunAngle, getShadowHalfAngle } from './power.js';
 import {
   getOrbitalStateAtTime,
   getOrbitalPeriod,
@@ -506,4 +507,55 @@ export function isMapViewAvailable(state) {
   // Facilities system not yet implemented (TASK-007).
   // When it is, check for 'tracking-station' in state.facilities.
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// Shadow Overlay
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute shadow overlay geometry for the map view renderer.
+ *
+ * Returns the arc parameters needed to draw the body's shadow cone on the map.
+ * The renderer draws a semi-transparent dark wedge on the anti-sun side.
+ *
+ * @param {string} bodyId           Celestial body ID.
+ * @param {number} gameTimeSeconds  Current game time (for sun angle computation).
+ * @param {number} [maxRadius]      Maximum radius to draw the shadow to (metres
+ *                                  from body centre).  Defaults to the highest
+ *                                  altitude band's max + body radius.
+ * @returns {{
+ *   sunAngleDeg: number,
+ *   shadowStartAngleDeg: number,
+ *   shadowArcDeg: number,
+ *   bodyRadius: number,
+ *   maxRadius: number,
+ * }}
+ */
+export function getShadowOverlayGeometry(bodyId, gameTimeSeconds, maxRadius) {
+  const R = BODY_RADIUS[bodyId];
+  const bands = ALTITUDE_BANDS[bodyId];
+  const highestBand = bands ? bands[bands.length - 1] : null;
+  const defaultMaxR = highestBand
+    ? R + highestBand.max
+    : R * 2;
+  const effectiveMaxR = maxRadius ?? defaultMaxR;
+
+  const sunAngleDeg = getSunAngle(gameTimeSeconds);
+  // Use the body's radius as the shadow source — the shadow is a truncated
+  // cone that narrows at higher altitudes.  For the map overlay, we use
+  // the half-angle at the midpoint of the altitude range for a reasonable visual.
+  const midAlt = (effectiveMaxR - R) / 2;
+  const halfAngle = getShadowHalfAngle(midAlt, bodyId);
+
+  // Shadow centre is on the anti-sun side.
+  const antiSunDeg = (sunAngleDeg + 180) % 360;
+
+  return {
+    sunAngleDeg,
+    shadowStartAngleDeg: (antiSunDeg - halfAngle + 360) % 360,
+    shadowArcDeg: halfAngle * 2,
+    bodyRadius: R,
+    maxRadius: effectiveMaxR,
+  };
 }

@@ -207,6 +207,7 @@ import {
  * @property {string[]}      biomesVisited  - Unique biome IDs visited during this flight.
  * @property {import('./docking.js').DockingSystemState|null} dockingState - Docking system state, or null.
  * @property {TransferState|null} transferState  - Active transfer data when in TRANSFER/CAPTURE phase.
+ * @property {import('./power.js').PowerState|null} powerState - Power system state (generation, storage, consumption).
  */
 
 /**
@@ -581,6 +582,7 @@ export function createFlightState({
     biomesVisited: [],
     dockingState: null,
     transferState: null,
+    powerState: null,
   };
 }
 

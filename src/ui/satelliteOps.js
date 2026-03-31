@@ -554,6 +554,11 @@ function _render() {
     content.appendChild(_renderNetworkPlanning(summary));
   }
 
+  // Shadow overlay (Tier 3) — shows sunlight/eclipse status per orbit.
+  if (summary.tier >= 3 && summary.totalActive > 0) {
+    content.appendChild(_renderShadowOverlay(summary));
+  }
+
   // Satellite list.
   content.appendChild(_renderSatelliteList(summary));
 
@@ -798,6 +803,79 @@ function _renderNetworkPlanning(summary) {
 }
 
 /**
+ * Render the shadow overlay section showing sunlit/eclipse breakdown per orbit.
+ * Tier 3 feature: visualises which fraction of each satellite's orbit is in
+ * shadow vs sunlight with a simple bar chart.
+ */
+function _renderShadowOverlay(summary) {
+  const section = document.createElement('div');
+  section.className = 'sat-section';
+
+  const h2 = document.createElement('h2');
+  h2.textContent = 'Shadow Overlay';
+  section.appendChild(h2);
+
+  const desc = document.createElement('div');
+  desc.style.cssText = 'font-size:0.8rem;color:#8899aa;margin-bottom:10px';
+  desc.textContent = 'Shows the sunlit fraction of each satellite\'s orbit. Higher orbits spend less time in eclipse.';
+  section.appendChild(desc);
+
+  const activeSats = summary.satellites.filter(s => s.health > 0);
+  if (activeSats.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'sat-empty';
+    empty.textContent = 'No active satellites.';
+    section.appendChild(empty);
+    return section;
+  }
+
+  const grid = document.createElement('div');
+  grid.style.cssText = 'display:flex;flex-direction:column;gap:8px';
+
+  for (const sat of activeSats) {
+    const pi = summary.satellitePowerInfo?.[sat.id];
+    if (!pi) continue;
+
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:10px';
+
+    const label = document.createElement('div');
+    label.style.cssText = 'min-width:120px;font-size:0.82rem;color:#c0d8f0';
+    const icon = SAT_TYPE_ICONS[sat.satelliteType] || SAT_TYPE_ICONS.GENERIC;
+    label.textContent = `${icon} ${sat.bandId}`;
+    row.appendChild(label);
+
+    // Sunlit bar.
+    const barOuter = document.createElement('div');
+    barOuter.style.cssText = 'flex:1;height:16px;background:rgba(20,20,40,0.8);border-radius:3px;overflow:hidden;position:relative';
+
+    const sunlit = document.createElement('div');
+    const pct = Math.max(0, Math.min(100, pi.sunlitFraction * 100));
+    sunlit.style.cssText = `width:${pct}%;height:100%;background:linear-gradient(90deg,#ffcc00,#ff9900);border-radius:3px 0 0 3px`;
+    barOuter.appendChild(sunlit);
+
+    // Shadow portion label.
+    const shadowLabel = document.createElement('div');
+    shadowLabel.style.cssText = 'position:absolute;right:4px;top:0;height:100%;display:flex;align-items:center;font-size:0.7rem;color:#8899aa';
+    shadowLabel.textContent = `${(100 - pct).toFixed(0)}% eclipse`;
+    barOuter.appendChild(shadowLabel);
+
+    row.appendChild(barOuter);
+
+    // Percentage label.
+    const pctLabel = document.createElement('div');
+    pctLabel.style.cssText = 'min-width:50px;text-align:right;font-size:0.82rem;color:#ffcc00;font-weight:600';
+    pctLabel.textContent = `${pct.toFixed(0)}%`;
+    row.appendChild(pctLabel);
+
+    grid.appendChild(row);
+  }
+
+  section.appendChild(grid);
+  return section;
+}
+
+/**
  * Render the list of all satellites (active and decommissioned).
  */
 function _renderSatelliteList(summary) {
@@ -818,7 +896,8 @@ function _renderSatelliteList(summary) {
     list.appendChild(empty);
   } else {
     for (const sat of summary.satellites) {
-      list.appendChild(_renderSatCard(sat, summary.tier));
+      const powerInfo = summary.satellitePowerInfo?.[sat.id] ?? null;
+      list.appendChild(_renderSatCard(sat, summary.tier, powerInfo));
     }
   }
 
@@ -829,7 +908,7 @@ function _renderSatelliteList(summary) {
 /**
  * Render a single satellite card.
  */
-function _renderSatCard(sat, facilityTier) {
+function _renderSatCard(sat, facilityTier, powerInfo) {
   const card = document.createElement('div');
   let cardClass = 'sat-card';
   if (sat.health <= 0) cardClass += ' decommissioned';
@@ -859,7 +938,12 @@ function _renderSatCard(sat, facilityTier) {
 
   const meta = document.createElement('div');
   meta.className = 'sat-meta';
-  meta.textContent = `${sat.bodyId} - ${sat.bandId} | Deployed period ${sat.deployedPeriod}`;
+  let metaText = `${sat.bodyId} - ${sat.bandId} | Deployed period ${sat.deployedPeriod}`;
+  if (powerInfo) {
+    const pct = (powerInfo.sunlitFraction * 100).toFixed(0);
+    metaText += ` | Sunlit: ${pct}%`;
+  }
+  meta.textContent = metaText;
   info.appendChild(meta);
 
   card.appendChild(info);
