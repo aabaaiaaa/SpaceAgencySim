@@ -296,7 +296,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: One-time achievements for major firsts, visible in MCC under "Achievements" tab. Milestones: First Orbit ($200k+20rep), First Satellite ($150k+15rep), First Constellation ($300k+25rep), First Lunar Flyby ($500k+30rep), First Lunar Orbit ($750k+35rep), First Lunar Landing ($1M+40rep), First Lunar Return ($2M+50rep), First Mars Orbit ($3M+50rep), First Mars Landing ($5M+60rep), First Solar Science ($4M+50rep).
 
 ### TASK-045: Phase 6 new parts
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-039
 - **Description**: Add new parts: Deep Space Engine ($50k, 300kg, ISP 1200s, 15kN thrust), Extended Mission Module ($30k, 500kg, life support for crew left in orbit or landed beyond the default 5-period supply — see TASK-067), Sample Return Container ($15k, 100kg, fits in science module for surface samples), Surface Instrument Package ($25k, 200kg, deployable surface science station in science module), Relay Antenna ($20k, 80kg, extends deep space comms). Multiple heat shield tiers with clear protection guidance, heavy variant for interplanetary re-entry, advanced for solar approach. Note: Grabbing Arm part data is defined in TASK-029.

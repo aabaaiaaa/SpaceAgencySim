@@ -1235,7 +1235,7 @@ export const PARTS = [
   {
     id: 'heat-shield-mk1',
     name: 'Heat Shield Mk1',
-    description: 'Small ablative heat shield for probes and lightweight craft. Protects parts above it from atmospheric heating during reentry. Mount below a decoupler and stage off after reentry.',
+    description: 'Small ablative heat shield for probes and lightweight craft. Rated for Low Earth Orbit reentry only. Protects parts above it from atmospheric heating. Mount below a decoupler and stage off after reentry.',
     type: PartType.HEAT_SHIELD,
     reliability: RELIABILITY_TIERS.HIGH,
     mass: 80,
@@ -1264,7 +1264,7 @@ export const PARTS = [
   {
     id: 'heat-shield-mk2',
     name: 'Heat Shield Mk2',
-    description: 'Standard ablative heat shield for crewed capsules and medium craft. Wide coverage protects the full stack above from extreme atmospheric heating. Essential for Earth and Venus reentry.',
+    description: 'Standard ablative heat shield for crewed capsules and medium craft. Rated for Earth orbital and Lunar return reentry speeds. Wide coverage protects the full stack above from extreme atmospheric heating.',
     type: PartType.HEAT_SHIELD,
     reliability: RELIABILITY_TIERS.HIGH,
     mass: 150,
@@ -1295,7 +1295,7 @@ export const PARTS = [
   {
     id: 'heat-shield-solar',
     name: 'Solar Heat Shield',
-    description: 'Exotic refractory heat shield designed for close solar approach. Blocks 80% of solar radiation heat, enabling science missions into the inner corona. Extremely heavy — plan your delta-v budget carefully.',
+    description: 'Exotic refractory heat shield designed for close solar approach. Rated for solar corona proximity. Blocks 80% of solar radiation heat, enabling science missions into the inner corona. Extremely heavy — plan your delta-v budget carefully.',
     type: PartType.HEAT_SHIELD,
     reliability: RELIABILITY_TIERS.HIGH,
     mass: 300,
@@ -1313,6 +1313,36 @@ export const PARTS = [
       heatTolerance: 6000,
       solarHeatResistance: 0.8,
       dragCoefficient: 0.45,
+      crashThreshold: 15,
+    },
+  },
+
+  /**
+   * Heat Shield Heavy — heavy-duty heat shield for interplanetary reentry.
+   * Required for Mars and Venus atmospheric entries, which involve much
+   * higher velocities than Earth orbital returns.  Heavier than the Mk2
+   * but still lighter than the Solar shield.  Tech tree: Recovery T5.
+   */
+  {
+    id: 'heat-shield-heavy',
+    name: 'Heat Shield Heavy',
+    description: 'Heavy-duty ablative heat shield rated for interplanetary reentry. Required for Mars and Venus atmospheric entries where velocities far exceed Earth orbital returns. Heavier than the Mk2 but essential for safe planetary return.',
+    type: PartType.HEAT_SHIELD,
+    reliability: RELIABILITY_TIERS.HIGH,
+    mass: 220,
+    cost: 18_000,
+    width: 44,   // 2.2 m — wider than Mk2 for heavier craft
+    height: 12,  // 0.6 m thick disc
+    snapPoints: [
+      makeSnapPoint('top',    0, -6, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  6, STACK_TYPES),
+    ],
+    animationStates: ['intact', 'charred'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      heatTolerance: 4500,
+      dragCoefficient: 0.42,
       crashThreshold: 15,
     },
   },
@@ -1391,6 +1421,43 @@ export const PARTS = [
       dragCoefficient: 0.05,
       heatTolerance: 1200,
       crashThreshold: 8,
+    },
+  },
+
+  /**
+   * Deep Space Engine — high-ISP engine for interplanetary transfers.
+   * Bridges the gap between the Nerv (high thrust, moderate ISP) and the
+   * Ion engine (extreme ISP, near-zero thrust).  Designed for crewed
+   * deep-space missions where the Ion engine is too slow but the Nerv
+   * is too fuel-hungry.  Tech tree: Propulsion T5.
+   */
+  {
+    id: 'engine-deep-space',
+    name: 'Deep Space Engine',
+    description: 'A high-efficiency deep space engine optimised for interplanetary transfers. 1200s ISP bridges the gap between conventional and ion propulsion, with enough thrust for crewed missions. Performance degrades significantly in atmosphere.',
+    type: PartType.ENGINE,
+    reliability: RELIABILITY_TIERS.HIGH,
+    mass: 300,
+    cost: 50_000,
+    width: 24,  // 1.2 m
+    height: 44, // 2.2 m
+    snapPoints: [
+      makeSnapPoint('top',    0, -22, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  22, [PartType.STACK_DECOUPLER]),
+    ],
+    animationStates: ['idle', 'firing', 'burnt-out'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.IGNITE,
+    properties: {
+      thrust: 5,
+      thrustVac: 15,
+      isp: 400,
+      ispVac: 1200,
+      throttleable: true,
+      fuelType: FuelType.LIQUID,
+      dragCoefficient: 0.1,
+      heatTolerance: 2200,
+      crashThreshold: 10,
     },
   },
 
@@ -1839,6 +1906,154 @@ export const PARTS = [
       dragCoefficient: 0.12,
       heatTolerance: 1800,
       crashThreshold: 8,
+    },
+  },
+
+  // =========================================================================
+  // PHASE 6 — Deep Space & Surface Operations
+  // =========================================================================
+
+  /**
+   * Extended Mission Module — life support extension for long-duration missions.
+   * When present on a crewed craft, crew life support becomes infinite —
+   * no supply countdown.  Binary check: one module = infinite support,
+   * does not stack.  Passive — no activation needed.
+   * Tech tree: Recovery T4.
+   */
+  {
+    id: 'mission-module-extended',
+    name: 'Extended Mission Module',
+    description: 'A self-sustaining life support module for long-duration crewed missions. When attached, crew supplies become unlimited — no more supply countdown. One module is sufficient; additional modules have no extra effect.',
+    type: PartType.SERVICE_MODULE,
+    reliability: RELIABILITY_TIERS.HIGH,
+    mass: 500,
+    cost: 30_000,
+    width: 30,   // 1.5 m
+    height: 40,  // 2 m
+    snapPoints: [
+      makeSnapPoint('top',    0, -20, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  20, STACK_TYPES),
+      makeSnapPoint('left',  -15,  0, RADIAL_TYPES),
+      makeSnapPoint('right',  15,  0, RADIAL_TYPES),
+    ],
+    animationStates: ['idle'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      extendedLifeSupport: true,
+      powerDraw: 15,           // 15 W continuous
+      dragCoefficient: 0.1,
+      heatTolerance: 1800,
+      crashThreshold: 10,
+    },
+  },
+
+  /**
+   * Sample Return Container — sealed container for surface samples.
+   * Fits in a science module slot.  Stores collected surface samples for
+   * return to Earth where they provide bonus science yield.
+   * Tech tree: Science T3.
+   */
+  {
+    id: 'sample-return-container',
+    name: 'Sample Return Container',
+    description: 'A sealed container for storing surface samples collected during landed operations. Return samples to Earth for bonus science yield. Lightweight and compact — fits alongside other science instruments.',
+    type: PartType.SERVICE_MODULE,
+    reliability: RELIABILITY_TIERS.HIGH,
+    mass: 100,
+    cost: 15_000,
+    width: 20,   // 1 m
+    height: 16,  // 0.8 m
+    snapPoints: [
+      makeSnapPoint('top',    0, -8, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  8, STACK_TYPES),
+      makeSnapPoint('left',  -10,  0, RADIAL_TYPES),
+      makeSnapPoint('right',  10,  0, RADIAL_TYPES),
+    ],
+    animationStates: ['idle', 'collecting', 'sealed'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.COLLECT_SCIENCE,
+    properties: {
+      sampleContainer: true,
+      sampleCapacity: 3,
+      instrumentSlots: 0,
+      powerDraw: 0,
+      dragCoefficient: 0.05,
+      heatTolerance: 2000,
+      crashThreshold: 12,
+    },
+  },
+
+  /**
+   * Surface Instrument Package — deployable surface science station.
+   * Deployed on the surface of a celestial body to collect long-term
+   * science data.  Once deployed, it cannot be recovered but continues
+   * generating science points passively each period.
+   * Tech tree: Science T3.
+   */
+  {
+    id: 'surface-instrument-package',
+    name: 'Surface Instrument Package',
+    description: 'A deployable surface science station. Land on any body and deploy to establish a permanent science outpost. Generates passive science data each period. Cannot be recovered once deployed.',
+    type: PartType.SERVICE_MODULE,
+    reliability: RELIABILITY_TIERS.HIGH,
+    mass: 200,
+    cost: 25_000,
+    width: 24,   // 1.2 m
+    height: 20,  // 1 m
+    snapPoints: [
+      makeSnapPoint('top',    0, -10, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  10, STACK_TYPES),
+      makeSnapPoint('left',  -12,  0, RADIAL_TYPES),
+      makeSnapPoint('right',  12,  0, RADIAL_TYPES),
+    ],
+    animationStates: ['stowed', 'deploying', 'deployed'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.DEPLOY,
+    properties: {
+      surfaceStation: true,
+      sciencePerPeriod: 3,
+      requiresLanded: true,
+      powerDraw: 10,           // 10 W when deployed
+      dragCoefficient: 0.08,
+      heatTolerance: 1500,
+      crashThreshold: 8,
+    },
+  },
+
+  /**
+   * Relay Antenna — extends deep-space communication range.
+   * Provides interplanetary communication links, bridging distances
+   * between planetary systems.  A craft carrying a relay antenna
+   * maintains its own connection back to the agency.
+   * Tech tree: Structural T4.
+   */
+  {
+    id: 'relay-antenna',
+    name: 'Relay Antenna',
+    description: 'A high-gain relay antenna for deep space communications. Bridges interplanetary distances, extending mission range far beyond Earth orbit. A craft carrying this antenna maintains its own connection back to the agency.',
+    type: PartType.SERVICE_MODULE,
+    reliability: RELIABILITY_TIERS.HIGH,
+    mass: 80,
+    cost: 20_000,
+    width: 24,   // 1.2 m
+    height: 30,  // 1.5 m
+    snapPoints: [
+      makeSnapPoint('top',    0, -15, STACK_TYPES),
+      makeSnapPoint('bottom', 0,  15, STACK_TYPES),
+      makeSnapPoint('left',  -12,  0, RADIAL_TYPES),
+      makeSnapPoint('right',  12,  0, RADIAL_TYPES),
+    ],
+    animationStates: ['stowed', 'deployed'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      relayAntenna: true,
+      deepSpaceComms: true,
+      powerDraw: 20,           // 20 W when active
+      dragCoefficient: 0.06,
+      heatTolerance: 1200,
+      crashThreshold: 6,
     },
   },
 
