@@ -3,10 +3,5 @@
   "sessionId": null,
   "lastIteration": 37,
   "startedAt": "2026-03-30T20:49:34.099Z",
-  "activeTask": {
-    "taskId": "TASK-057",
-    "taskTitle": "E2E tests — Phase 3 (Reliability & Risk)",
-    "iterationNumber": 37,
-    "startedAt": "2026-03-31T08:33:07.090Z"
-  }
+  "activeTask": null
 }
