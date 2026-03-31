@@ -34,10 +34,12 @@ import {
   WEATHER_EXTREME_CHANCE,
   WEATHER_EXTREME_WIND_MIN,
   WEATHER_EXTREME_VISIBILITY_MAX,
+  WeatherSeverity,
 } from './constants.js';
 import { getBodyDef, hasAtmosphere } from '../data/bodies.js';
 import { getNetworkBenefits } from './satellites.js';
 import { spend } from './finance.js';
+import { getWeatherSeverityMultipliers } from './settings.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -114,9 +116,13 @@ const MARS_WEATHER_TIERS = [
  *
  * @param {string} bodyId  Celestial body ID.
  * @param {number} seed    PRNG seed.
+ * @param {{ windMult?: number, extremeChanceMult?: number }} [severityMults]
+ *   Optional difficulty severity multipliers.  Defaults to 1.0 for both.
  * @returns {WeatherConditions}
  */
-export function generateWeather(bodyId, seed) {
+export function generateWeather(bodyId, seed, severityMults) {
+  const windMult = severityMults?.windMult ?? 1.0;
+  const extremeChanceMult = severityMults?.extremeChanceMult ?? 1.0;
   const body = getBodyDef(bodyId);
 
   // Airless bodies have no weather.
@@ -132,10 +138,23 @@ export function generateWeather(bodyId, seed) {
     };
   }
 
+  // Weather severity OFF: always clear.
+  if (windMult <= 0) {
+    return {
+      windSpeed: 0,
+      windAngle: 0,
+      temperature: 1.0,
+      visibility: 0,
+      extreme: false,
+      description: 'Clear skies',
+      bodyId,
+    };
+  }
+
   const rand = _mulberry32(seed);
 
-  // Determine if this is an extreme weather event.
-  const isExtreme = rand() < WEATHER_EXTREME_CHANCE;
+  // Determine if this is an extreme weather event (scaled by severity).
+  const isExtreme = rand() < WEATHER_EXTREME_CHANCE * extremeChanceMult;
 
   let windSpeed, windAngle, temperature, visibility, description;
 
@@ -143,7 +162,7 @@ export function generateWeather(bodyId, seed) {
     // Mars: dust storms are the dominant weather pattern.
     if (isExtreme) {
       // Dust storm — extreme
-      windSpeed = WEATHER_EXTREME_WIND_MIN + rand() * 20; // 20-40 m/s
+      windSpeed = (WEATHER_EXTREME_WIND_MIN + rand() * 20) * windMult; // 20-40 m/s base
       windAngle = rand() * Math.PI * 2;
       temperature = 1.0 - rand() * 0.03; // slight cooling
       visibility = 0.8 + rand() * 0.2;   // very low visibility
@@ -151,7 +170,7 @@ export function generateWeather(bodyId, seed) {
     } else {
       const tier = Math.min(Math.floor(rand() * 4), 3);
       const t = MARS_WEATHER_TIERS[tier];
-      windSpeed = rand() * t.maxWind;
+      windSpeed = rand() * t.maxWind * windMult;
       windAngle = rand() * Math.PI * 2;
       temperature = 1.0 + (rand() - 0.5) * WEATHER_ISP_RANGE * 2;
       visibility = rand() * t.maxVis;
@@ -160,7 +179,7 @@ export function generateWeather(bodyId, seed) {
   } else {
     // Earth, Venus, or other atmospheric bodies.
     if (isExtreme) {
-      windSpeed = WEATHER_EXTREME_WIND_MIN + rand() * (WEATHER_MAX_WIND * 2 - WEATHER_EXTREME_WIND_MIN);
+      windSpeed = (WEATHER_EXTREME_WIND_MIN + rand() * (WEATHER_MAX_WIND * 2 - WEATHER_EXTREME_WIND_MIN)) * windMult;
       windAngle = rand() * Math.PI * 2;
       temperature = 1.0 + (rand() - 0.5) * WEATHER_ISP_RANGE * 2;
       visibility = WEATHER_EXTREME_VISIBILITY_MAX + rand() * (1 - WEATHER_EXTREME_VISIBILITY_MAX);
@@ -168,7 +187,7 @@ export function generateWeather(bodyId, seed) {
     } else {
       const tier = Math.min(Math.floor(rand() * 4), 3);
       const t = WEATHER_TIERS[tier];
-      windSpeed = rand() * t.maxWind;
+      windSpeed = rand() * t.maxWind * windMult;
       windAngle = rand() * Math.PI * 2;
       temperature = 1.0 + (rand() - 0.5) * WEATHER_ISP_RANGE * 2;
       visibility = rand() * t.maxVis;
@@ -220,8 +239,9 @@ export function initWeather(state, bodyId = 'EARTH') {
     return;
   }
   const seed = (state.currentPeriod * 7919 + Date.now()) & 0x7fffffff;
+  const sevMults = getWeatherSeverityMultipliers(state);
   state.weather = {
-    current: generateWeather(bodyId, seed),
+    current: generateWeather(bodyId, seed, sevMults),
     skipCount: 0,
     seed,
   };
@@ -286,7 +306,8 @@ export function skipWeather(state, bodyId = 'EARTH') {
   const skipCount = (state.weather?.skipCount ?? 0) + 1;
   const seed = ((state.weather?.seed ?? 0) + skipCount * 13397) & 0x7fffffff;
 
-  const newWeather = generateWeather(bodyId, seed);
+  const sevMults = getWeatherSeverityMultipliers(state);
+  const newWeather = generateWeather(bodyId, seed, sevMults);
   state.weather = {
     current: newWeather,
     skipCount,
@@ -313,9 +334,10 @@ export function getWeatherForecast(state, bodyId = 'EARTH', days = 3) {
   const skipCount = state.weather?.skipCount ?? 0;
   const forecast = [];
 
+  const sevMults = getWeatherSeverityMultipliers(state);
   for (let i = 1; i <= days; i++) {
     const futureSeed = (baseSeed + (skipCount + i) * 13397) & 0x7fffffff;
-    forecast.push(generateWeather(bodyId, futureSeed));
+    forecast.push(generateWeather(bodyId, futureSeed, sevMults));
   }
 
   return forecast;

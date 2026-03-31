@@ -25,7 +25,7 @@
  */
 
 import { CHALLENGES, MedalTier, ScoreDirection } from '../data/challenges.js';
-import { earn } from './finance.js';
+import { earnReward } from './finance.js';
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -503,7 +503,7 @@ export function processChallengeCompletion(state, flightState, ps) {
 
   // Award cash.
   if (reward > 0) {
-    earn(state, reward);
+    earnReward(state, reward);
   }
 
   // Update best result.

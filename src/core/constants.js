@@ -1720,3 +1720,108 @@ export const FieldCraftStatus = Object.freeze({
   /** Vessel is safely landed on a non-Earth celestial body. */
   LANDED: 'LANDED',
 });
+
+// ---------------------------------------------------------------------------
+// Difficulty Settings
+// ---------------------------------------------------------------------------
+
+/**
+ * Malfunction frequency options.
+ * Controls how likely malfunctions are to occur during flight.
+ * @enum {string}
+ */
+export const MalfunctionFrequency = Object.freeze({
+  OFF:    'off',
+  LOW:    'low',
+  NORMAL: 'normal',
+  HIGH:   'high',
+});
+
+/**
+ * Multipliers applied to base malfunction failure chance.
+ * @type {Readonly<Record<string, number>>}
+ */
+export const MALFUNCTION_FREQUENCY_MULTIPLIERS = Object.freeze({
+  [MalfunctionFrequency.OFF]:    0,
+  [MalfunctionFrequency.LOW]:    0.4,
+  [MalfunctionFrequency.NORMAL]: 1.0,
+  [MalfunctionFrequency.HIGH]:   2.0,
+});
+
+/**
+ * Weather severity options.
+ * Controls how severe weather conditions are at the launch site.
+ * @enum {string}
+ */
+export const WeatherSeverity = Object.freeze({
+  OFF:     'off',
+  MILD:    'mild',
+  NORMAL:  'normal',
+  EXTREME: 'extreme',
+});
+
+/**
+ * Multipliers applied to wind speed and extreme weather chance.
+ * @type {Readonly<Record<string, { windMult: number, extremeChanceMult: number }>>}
+ */
+export const WEATHER_SEVERITY_MULTIPLIERS = Object.freeze({
+  [WeatherSeverity.OFF]:     Object.freeze({ windMult: 0, extremeChanceMult: 0 }),
+  [WeatherSeverity.MILD]:    Object.freeze({ windMult: 0.5, extremeChanceMult: 0.25 }),
+  [WeatherSeverity.NORMAL]:  Object.freeze({ windMult: 1.0, extremeChanceMult: 1.0 }),
+  [WeatherSeverity.EXTREME]: Object.freeze({ windMult: 1.5, extremeChanceMult: 3.0 }),
+});
+
+/**
+ * Financial pressure options.
+ * Controls reward and cost multipliers.
+ * @enum {string}
+ */
+export const FinancialPressure = Object.freeze({
+  EASY:   'easy',
+  NORMAL: 'normal',
+  HARD:   'hard',
+});
+
+/**
+ * Multipliers for financial pressure levels.
+ * rewardMult: applied to all earned income (contracts, missions).
+ * costMult: applied to operating costs (salaries, facility upkeep).
+ * @type {Readonly<Record<string, { rewardMult: number, costMult: number }>>}
+ */
+export const FINANCIAL_PRESSURE_MULTIPLIERS = Object.freeze({
+  [FinancialPressure.EASY]:   Object.freeze({ rewardMult: 2.0, costMult: 1.0 }),
+  [FinancialPressure.NORMAL]: Object.freeze({ rewardMult: 1.0, costMult: 1.0 }),
+  [FinancialPressure.HARD]:   Object.freeze({ rewardMult: 0.5, costMult: 2.0 }),
+});
+
+/**
+ * Crew injury duration options.
+ * Controls how long crew injuries last.
+ * @enum {string}
+ */
+export const InjuryDuration = Object.freeze({
+  SHORT:  'short',
+  NORMAL: 'normal',
+  LONG:   'long',
+});
+
+/**
+ * Multipliers applied to crew injury period durations.
+ * @type {Readonly<Record<string, number>>}
+ */
+export const INJURY_DURATION_MULTIPLIERS = Object.freeze({
+  [InjuryDuration.SHORT]:  0.5,
+  [InjuryDuration.NORMAL]: 1.0,
+  [InjuryDuration.LONG]:   2.0,
+});
+
+/**
+ * Default difficulty settings for a new game.
+ * @type {Readonly<{ malfunctionFrequency: string, weatherSeverity: string, financialPressure: string, injuryDuration: string }>}
+ */
+export const DEFAULT_DIFFICULTY_SETTINGS = Object.freeze({
+  malfunctionFrequency: MalfunctionFrequency.NORMAL,
+  weatherSeverity:      WeatherSeverity.NORMAL,
+  financialPressure:    FinancialPressure.NORMAL,
+  injuryDuration:       InjuryDuration.NORMAL,
+});

@@ -32,6 +32,7 @@ import {
   getCrewCostModifier,
 } from './constants.js';
 import { getFacilityTier } from './construction.js';
+import { getInjuryDurationMultiplier } from './settings.js';
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -287,7 +288,9 @@ export function injureCrew(state, id, periods) {
   const astronaut = state.crew.find((a) => a.id === id);
   if (!astronaut || astronaut.status !== AstronautStatus.ACTIVE) return false;
   const currentPeriod = state.currentPeriod ?? 0;
-  astronaut.injuryEnds = currentPeriod + periods;
+  const mult = getInjuryDurationMultiplier(state);
+  const adjusted = Math.max(1, Math.round(periods * mult));
+  astronaut.injuryEnds = currentPeriod + adjusted;
   return true;
 }
 

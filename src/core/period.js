@@ -23,6 +23,7 @@ import { checkInjuryRecovery, processTraining } from './crew.js';
 import { getFacilityTier } from './construction.js';
 import { processSurfaceOps } from './surfaceOps.js';
 import { processLifeSupport } from './lifeSupport.js';
+import { getFinancialMultipliers } from './settings.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -74,19 +75,20 @@ export function advancePeriod(state) {
   state.currentPeriod = (state.currentPeriod ?? 0) + 1;
 
   // ── 2. Crew salaries (use per-astronaut salary, fallback to constant) ──
+  const { costMult } = getFinancialMultipliers(state);
   const activeCrew = state.crew.filter(
     (c) => c.status === AstronautStatus.ACTIVE,
   );
-  const crewSalaryCost = activeCrew.reduce(
+  const crewSalaryCost = Math.round(activeCrew.reduce(
     (sum, c) => sum + (c.salary ?? CREW_SALARY_PER_PERIOD),
     0,
-  );
+  ) * costMult);
 
   // ── 3. Facility upkeep — base cost per built facility ─────────────────
   const builtCount = state.facilities
     ? Object.values(state.facilities).filter((f) => f.built).length
     : 1; // fallback for legacy saves
-  const facilityUpkeep = FACILITY_UPKEEP_PER_PERIOD * builtCount;
+  const facilityUpkeep = Math.round(FACILITY_UPKEEP_PER_PERIOD * builtCount * costMult);
 
   // ── 4. Deduct operating costs (mandatory — can go negative) ───────────
   const totalOperatingCost = crewSalaryCost + facilityUpkeep;

@@ -11,7 +11,7 @@
  * @module core/achievements
  */
 
-import { earn } from './finance.js';
+import { earnReward } from './finance.js';
 import { adjustReputation } from './reputation.js';
 import { CelestialBody, CONSTELLATION_THRESHOLD, SatelliteType } from './constants.js';
 
@@ -186,7 +186,7 @@ export function checkAchievements(state, ctx) {
 
     if (met) {
       // Award cash and reputation.
-      earn(state, def.cashReward);
+      earnReward(state, def.cashReward);
       adjustReputation(state, def.repReward);
 
       // Record achievement.

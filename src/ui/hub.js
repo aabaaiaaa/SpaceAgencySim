@@ -21,6 +21,7 @@
 
 import { showHubScene, hideHubScene, setHubWeather } from '../render/hub.js';
 import { FACILITY_DEFINITIONS, FacilityId, FACILITY_UPGRADE_DEFS, getFacilityUpgradeDef, getReputationTier } from '../core/constants.js';
+import { openSettingsPanel } from './settings.js';
 import {
   hasFacility, canBuildFacility, buildFacility,
   canUpgradeFacility, upgradeFacility, getFacilityTier,
@@ -277,6 +278,29 @@ const HUB_STYLES = `
 
 #hub-construction-btn:hover {
   background: #235a90;
+}
+
+/* ── Settings button ───────────────────────────────────────────────────── */
+#hub-settings-btn {
+  position: absolute;
+  top: 60px;
+  right: 160px;
+  padding: 10px 20px;
+  background: #1a3050;
+  border: 1px solid #4070a0;
+  border-radius: 6px;
+  color: #a8c8e0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background 0.15s;
+  letter-spacing: 0.03em;
+  z-index: 20;
+}
+
+#hub-settings-btn:hover {
+  background: #235070;
 }
 
 /* ── Construction panel overlay ──────────────────────────────────────────── */
@@ -836,6 +860,7 @@ export function initHubUI(container, state, onNavigate) {
 
   _renderBuildings(onNavigate);
   _renderConstructionButton(container);
+  _renderSettingsButton(container);
   _renderBankruptcyBanner();
   _renderReputationBadge();
   _renderWeatherPanel();
@@ -1533,6 +1558,26 @@ function _renderConstructionButton(container) {
 
   btn.addEventListener('click', () => {
     _openConstructionPanel(container);
+  });
+
+  _overlay.appendChild(btn);
+}
+
+/**
+ * Render the "Settings" button in the hub overlay.
+ *
+ * @param {HTMLElement} container  The #ui-overlay div.
+ */
+function _renderSettingsButton(container) {
+  if (!_overlay) return;
+
+  const btn = document.createElement('button');
+  btn.id          = 'hub-settings-btn';
+  btn.textContent = 'Settings';
+  btn.setAttribute('aria-label', 'Open game settings');
+
+  btn.addEventListener('click', () => {
+    openSettingsPanel(container, _state);
   });
 
   _overlay.appendChild(btn);

@@ -22,6 +22,7 @@ import {
   DEFAULT_LOAN_INTEREST_RATE,
   FACILITY_DEFINITIONS,
   STARTING_REPUTATION,
+  DEFAULT_DIFFICULTY_SETTINGS,
 } from './constants.js';
 
 // ---------------------------------------------------------------------------
@@ -254,6 +255,8 @@ import {
  * @property {string}           gameMode       - Current game mode (GameMode enum value).
  * @property {SandboxSettings|null} sandboxSettings - Settings for sandbox mode, or null
  *                                                    when not in sandbox mode.
+ * @property {DifficultySettings}  difficultySettings - Difficulty options changeable
+ *                                                      in-game from the hub settings menu.
  * @property {Object<string, FacilityState>} facilities - Map of facility ID → state.
  *                                               Only facilities that have been built appear here.
  * @property {{ board: Contract[], active: Contract[], completed: Contract[], failed: Contract[] }} contracts
@@ -290,6 +293,15 @@ import {
  * @typedef {Object} SandboxSettings
  * @property {boolean} malfunctionsEnabled - Whether part malfunctions can occur.
  * @property {boolean} weatherEnabled      - Whether weather affects launches.
+ */
+
+/**
+ * Difficulty settings changeable in-game from the hub settings menu.
+ * @typedef {Object} DifficultySettings
+ * @property {string} malfunctionFrequency - MalfunctionFrequency enum value.
+ * @property {string} weatherSeverity      - WeatherSeverity enum value.
+ * @property {string} financialPressure    - FinancialPressure enum value.
+ * @property {string} injuryDuration       - InjuryDuration enum value.
  */
 
 /**
@@ -418,6 +430,9 @@ export function createGameState() {
 
     // Sandbox-only settings (null when not in sandbox mode).
     sandboxSettings: null,
+
+    // Difficulty options — changeable in-game from the hub settings menu.
+    difficultySettings: { ...DEFAULT_DIFFICULTY_SETTINGS },
 
     // Starter facilities are pre-built; the rest are added by
     // buildFacility() (non-tutorial) or awarded via tutorial missions.

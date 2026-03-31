@@ -24,7 +24,7 @@ import {
   CelestialBody,
   PartType,
 } from './constants.js';
-import { earn } from './finance.js';
+import { earnReward } from './finance.js';
 import { getActiveSatellites } from './satellites.js';
 import { getPartById } from '../data/parts.js';
 
@@ -157,7 +157,7 @@ export function plantFlag(state, flightState, ps) {
   state.surfaceItems.push(item);
 
   // Award milestone bonus.
-  earn(state, FLAG_MILESTONE_BONUS);
+  earnReward(state, FLAG_MILESTONE_BONUS);
   state.reputation = Math.min(100, (state.reputation ?? 50) + FLAG_MILESTONE_REP);
 
   // Log flight event.

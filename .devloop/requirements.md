@@ -324,7 +324,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Players create personal challenges in MCC Challenges tab. Pick objective types, set thresholds, add constraints, set rewards. Personal challenges clearly marked as distinct from official. Assumes player understands what they're doing (broken missions accepted). Export/import as JSON for sharing.
 
 ### TASK-049: Game settings — difficulty options
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: TASK-019, TASK-021
 - **Description**: Difficulty/game speed options changeable in-game from settings menu at hub. Malfunction frequency: Off/Low/Normal/High. Weather severity: Off/Mild/Normal/Extreme. Financial pressure: Easy (2× rewards)/Normal/Hard (0.5× rewards, 2× costs). Crew injury duration: Short/Normal/Long. Settings not shown on save slots.

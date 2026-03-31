@@ -28,7 +28,7 @@ import {
   CONTRACT_REP_LOSS_FAIL,
   CONTRACT_BONUS_REWARD_RATE,
 } from './constants.js';
-import { earn } from './finance.js';
+import { earnReward } from './finance.js';
 import { CONTRACT_TEMPLATES, generateChainContinuation, getProgressionTier } from '../data/contracts.js';
 
 // ---------------------------------------------------------------------------
@@ -253,14 +253,14 @@ export function completeContract(state, contractId) {
   state.contracts.completed.push(contract);
 
   // Award cash.
-  earn(state, contract.reward);
+  earnReward(state, contract.reward);
 
   // Check bonus objectives — award bonus reward if all completed.
   let bonusAwarded = 0;
   if (Array.isArray(contract.bonusObjectives) && contract.bonusObjectives.length > 0 &&
       contract.bonusObjectives.every((o) => o.completed)) {
     bonusAwarded = contract.bonusReward || Math.round(contract.reward * CONTRACT_BONUS_REWARD_RATE);
-    earn(state, bonusAwarded);
+    earnReward(state, bonusAwarded);
   }
 
   // Award reputation.

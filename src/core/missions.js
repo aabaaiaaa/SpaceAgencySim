@@ -32,7 +32,7 @@
  */
 
 import { MISSIONS, MissionStatus, ObjectiveType } from '../data/missions.js';
-import { earn } from './finance.js';
+import { earnReward } from './finance.js';
 import { getTechTreeUnlockedParts } from './techtree.js';
 import { awardFacility } from './construction.js';
 
@@ -313,7 +313,7 @@ export function completeMission(state, id) {
   state.missions.completed.push(mission);
 
   // Award the cash reward.
-  earn(state, mission.reward);
+  earnReward(state, mission.reward);
 
   // Unlock any parts gated on this mission.
   // The canonical unlock list comes from the template definition so that

@@ -13,7 +13,7 @@
  * @module saveload
  */
 
-import { CrewStatus, FACILITY_DEFINITIONS, GameMode } from './constants.js';
+import { CrewStatus, FACILITY_DEFINITIONS, GameMode, DEFAULT_DIFFICULTY_SETTINGS } from './constants.js';
 import { loadSharedLibrary, saveSharedLibrary } from './designLibrary.js';
 
 // ---------------------------------------------------------------------------
@@ -318,6 +318,15 @@ export function loadGame(slotIndex) {
     envelope.state.challenges = { active: null, results: {} };
   }
   envelope.state.challenges.results ??= {};
+
+  // Default difficulty settings for saves created before the settings system.
+  if (!envelope.state.difficultySettings || typeof envelope.state.difficultySettings !== 'object') {
+    envelope.state.difficultySettings = { ...DEFAULT_DIFFICULTY_SETTINGS };
+  }
+  envelope.state.difficultySettings.malfunctionFrequency ??= DEFAULT_DIFFICULTY_SETTINGS.malfunctionFrequency;
+  envelope.state.difficultySettings.weatherSeverity      ??= DEFAULT_DIFFICULTY_SETTINGS.weatherSeverity;
+  envelope.state.difficultySettings.financialPressure    ??= DEFAULT_DIFFICULTY_SETTINGS.financialPressure;
+  envelope.state.difficultySettings.injuryDuration       ??= DEFAULT_DIFFICULTY_SETTINGS.injuryDuration;
 
   return envelope.state;
 }

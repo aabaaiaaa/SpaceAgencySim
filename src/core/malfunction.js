@@ -44,6 +44,7 @@ import {
   PARTIAL_CHUTE_FACTOR,
   MAX_ENGINEERING_MALFUNCTION_REDUCTION,
 } from './constants.js';
+import { getMalfunctionMultiplier } from './settings.js';
 
 // ---------------------------------------------------------------------------
 // Module state
@@ -202,6 +203,9 @@ export function checkMalfunctions(ps, assembly, flightState, gameState) {
   // Sandbox mode with malfunctions disabled: skip all checks.
   if (gameState?.gameMode === GameMode.SANDBOX &&
       !gameState.sandboxSettings?.malfunctionsEnabled) return;
+  // Difficulty setting: malfunctions off.
+  const malfunctionMult = getMalfunctionMultiplier(gameState);
+  if (malfunctionMult <= 0) return;
   if (!ps.malfunctions) return;
 
   // Calculate crew engineering bonus (reduces malfunction chance).
@@ -232,8 +236,8 @@ export function checkMalfunctions(ps, assembly, flightState, gameState) {
       baseReliability = baseReliability * (1 - (invEntry.wear / 100) * 0.5);
     }
 
-    // Adjusted failure chance: (1 - reliability) * (1 - engineering reduction).
-    const failureChance = (1 - baseReliability) * (1 - engineeringReduction);
+    // Adjusted failure chance: (1 - reliability) * (1 - engineering reduction) * difficulty mult.
+    const failureChance = (1 - baseReliability) * (1 - engineeringReduction) * malfunctionMult;
 
     let malfunctioned = false;
     if (_malfunctionMode === MalfunctionMode.FORCED) {

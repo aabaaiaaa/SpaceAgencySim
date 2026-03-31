@@ -20,6 +20,7 @@ import {
   PartType,
 } from './constants.js';
 import { getPartById } from '../data/parts.js';
+import { getFinancialMultipliers } from './settings.js';
 
 // ---------------------------------------------------------------------------
 // Interest
@@ -119,6 +120,24 @@ export function spend(state, amount) {
  */
 export function earn(state, amount) {
   state.money += amount;
+}
+
+/**
+ * Add reward income scaled by the current financial pressure difficulty setting.
+ *
+ * Use this instead of `earn()` for mission rewards, contract payouts,
+ * achievement bonuses, and other gameplay rewards.  Non-reward income
+ * (part sales, recovery value) should still use `earn()` directly.
+ *
+ * @param {import('./gameState.js').GameState} state
+ * @param {number} amount  Base reward amount in dollars.
+ * @returns {number}  Actual amount earned after the difficulty multiplier.
+ */
+export function earnReward(state, amount) {
+  const { rewardMult } = getFinancialMultipliers(state);
+  const adjusted = Math.round(amount * rewardMult);
+  state.money += adjusted;
+  return adjusted;
 }
 
 // ---------------------------------------------------------------------------
