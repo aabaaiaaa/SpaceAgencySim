@@ -412,7 +412,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: E2E tests covering all Phase 7 player-facing features. Must include: sandbox mode — all parts/buildings/upgrades available, free purchases, separate save slots, malfunction and weather toggle off, rocket design library shared with career; challenge missions — objective/constraint/scoring display, medal award at thresholds, replayability; custom mission creator — objective type selection, threshold/constraint/reward setting, export/import JSON; game settings — each difficulty option (malfunction frequency, weather severity, financial pressure, crew injury duration) correctly modifying gameplay values, settings changeable from hub, settings not shown on save slots. All tests must pass.
 
 ### TASK-062: E2E tests — Tutorial revisions
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-052, TASK-050, TASK-051
 - **Description**: E2E tests covering the revised tutorial chain. Must include: missions 1-4 completable with starter parts only; Crew Admin tutorial unlocking after mission 4, awarding building + cmd-mk1; science tutorial unlocking in missions 5-7 area, awarding science-module-mk1 + thermometer-mk1; R&D Lab tutorial unlocking after first science collection; Tracking Station tutorial unlocking after first orbit, awarding building + basic docking port; orbital tutorial chain (map view, manoeuvres, docking, satellite deployment) completable; Satellite Network Ops tutorial unlocking after first satellite deployment; updated missions 8-13 using instrument-in-module system; updated missions 14-17 using orbital gameplay systems. All tests must pass.

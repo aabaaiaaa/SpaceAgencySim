@@ -1036,6 +1036,7 @@ function _doLaunch(crewIds, design, assembly, stagingConfig) {
     missionId,
     rocketId:        design.id,
     crewIds,
+    crewCount:       crewIds.length,
     timeElapsed:     0,
     altitude:        0,
     velocity:        0,

@@ -654,6 +654,7 @@ export function createFlightState({
     missionId,
     rocketId,
     crewIds,
+    crewCount: crewIds.length,
     timeElapsed: 0,
     altitude: 0,
     velocity: 0,

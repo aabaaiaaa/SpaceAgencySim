@@ -4259,6 +4259,7 @@ function _doLaunch(crewIds) {
     missionId,
     rocketId:        launchDesign.id,
     crewIds,
+    crewCount:       crewIds.length,
     timeElapsed:     0,
     altitude:        0,
     velocity:        0,

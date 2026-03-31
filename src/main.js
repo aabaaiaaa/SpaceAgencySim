@@ -66,6 +66,34 @@ async function main() {
         }
       }
 
+      // Custom staging override: opts.staging is an array of { partIds: string[] }.
+      // Each entry becomes a stage (fired in order by Space key).
+      // Parts not listed in any stage go to unstaged.
+      // e.g. [{ partIds: ['engine-spark'] }, { partIds: ['parachute-mk1'] }]
+      if (opts.staging) {
+        stagingConfig.stages = [];
+        stagingConfig.unstaged = [];
+        const staged = new Set();
+        for (const stageSpec of opts.staging) {
+          const instanceIds = [];
+          for (const partId of stageSpec.partIds) {
+            for (const [instanceId, placed] of assembly.parts) {
+              if (placed.partId === partId && !staged.has(instanceId)) {
+                instanceIds.push(instanceId);
+                staged.add(instanceId);
+                break;
+              }
+            }
+          }
+          stagingConfig.stages.push({ instanceIds });
+        }
+        for (const [instanceId] of assembly.parts) {
+          if (!staged.has(instanceId)) {
+            stagingConfig.unstaged.push(instanceId);
+          }
+        }
+      }
+
       const missionId = opts.missionId
         ?? state.missions?.accepted?.[0]?.id
         ?? '';
