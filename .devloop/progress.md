@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 69
-- **Completed**: 28
-- **Remaining**: 41
-- **Last Updated**: 2026-03-31T05:47:09.388Z
+- **Completed**: 29
+- **Remaining**: 40
+- **Last Updated**: 2026-03-31T06:32:33.649Z
 
 ## Iteration Log
 
@@ -231,4 +231,12 @@
 - **Exit Status**: success
 - **Tokens**: 2,747,269 total (1,263 in, 22,537 out, 74,600 cache-create, 2,648,869 cache-read)
 - **Cost**: $2.6299
+
+### Iteration 29 - 2026-03-31T05:47:12.077Z
+- **Task Completed**: TASK-054
+- **Summary**: Completed E2E tests — Phase 0 (Core Mechanics)
+- **Duration**: 2722s
+- **Exit Status**: success
+- **Tokens**: 169,440 total (3 in, 61 out, 601 cache-create, 168,775 cache-read)
+- **Cost**: $6.0386
 

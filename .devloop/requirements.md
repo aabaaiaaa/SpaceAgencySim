@@ -364,7 +364,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Debug save menu (separate from normal save slots) containing pre-built game states at various progression points. States named descriptively (e.g., "post-tutorial-all-parts", "first-orbit-achieved", "lunar-orbit-with-fuel-depot"). Allows testers to quickly load any progression state for manual testing.
 
 ### TASK-054: E2E tests — Phase 0 (Core Mechanics)
-- **Status**: pending
+- **Status**: done
 - **Priority**: high
 - **Dependencies**: TASK-052, TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006
 - **Description**: E2E tests covering all Phase 0 player-facing features. Must include: period advancement on flight completion and return to agency; period NOT advancing during time warp; orbit slot proximity detection and warp-to-target; flight phase transitions (LAUNCH→FLIGHT→ORBIT→REENTRY, ORBIT→MANOEUVRE, ORBIT→TRANSFER); control mode switching within ORBIT (normal→docking mode→RCS mode); map view toggle and scene swap; map view controls (thrust/RCS in orbital-relative mapping); control mode switching with thrust-cut-to-zero on docking toggle; RCS mode directional translation; starter part availability per game mode (tutorial vs non-tutorial gating). All tests must pass.
