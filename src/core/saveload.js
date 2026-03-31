@@ -14,6 +14,7 @@
  */
 
 import { CrewStatus, FACILITY_DEFINITIONS } from './constants.js';
+import { loadSharedLibrary, saveSharedLibrary } from './designLibrary.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -243,6 +244,33 @@ export function loadGame(slotIndex) {
 
   // Default savedDesigns for saves created before this feature existed.
   envelope.state.savedDesigns ??= [];
+
+  // Migrate legacy savedDesigns: designs without a savePrivate flag are
+  // migrated to the shared library (cross-save) and removed from the
+  // per-slot array. Designs explicitly marked savePrivate stay in the slot.
+  const toMigrate = [];
+  const toKeep = [];
+  for (const d of envelope.state.savedDesigns) {
+    if (d.savePrivate === undefined || d.savePrivate === null) {
+      d.savePrivate = false;
+      toMigrate.push(d);
+    } else if (d.savePrivate) {
+      toKeep.push(d);
+    } else {
+      toMigrate.push(d);
+    }
+  }
+  if (toMigrate.length > 0) {
+    const shared = loadSharedLibrary();
+    const existingIds = new Set(shared.map(s => s.id));
+    for (const d of toMigrate) {
+      if (!existingIds.has(d.id)) {
+        shared.push(d);
+      }
+    }
+    saveSharedLibrary(shared);
+  }
+  envelope.state.savedDesigns = toKeep;
 
   // Default facilities for saves created before the construction system.
   if (!envelope.state.facilities || typeof envelope.state.facilities !== 'object') {

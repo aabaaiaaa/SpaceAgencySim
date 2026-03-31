@@ -106,6 +106,8 @@ import {
  * @property {number}        totalThrust  - Computed sea-level thrust (kN).
  * @property {string}        createdDate  - ISO 8601 creation date.
  * @property {string}        updatedDate  - ISO 8601 last-modified date.
+ * @property {boolean}       [savePrivate] - If true, design is private to the
+ *                                           current save slot (not shared across saves).
  */
 
 /**
@@ -463,6 +465,7 @@ export function createRocketDesign({
   staging = { stages: [[]], unstaged: [] },
   totalMass = 0,
   totalThrust = 0,
+  savePrivate = false,
 }) {
   const now = new Date().toISOString();
   return {
@@ -474,6 +477,7 @@ export function createRocketDesign({
     totalThrust,
     createdDate: now,
     updatedDate: now,
+    savePrivate,
   };
 }
 

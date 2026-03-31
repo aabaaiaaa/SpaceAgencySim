@@ -13,11 +13,13 @@
  *  3. Stage 1 has at least one engine or SRB   (blocking)
  *  4. Stage 1 TWR > 1.0                        (blocking, shows TWR value)
  *  5. Crewed mission with only computer module (warning — non-blocking)
+ *  6. All parts unlocked via tech tree         (blocking)
  */
 
 import { getPartById } from '../data/parts.js';
 import { ActivationBehaviour } from '../data/parts.js';
 import { PartType } from './constants.js';
+import { TECH_NODES } from '../data/techtree.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -362,6 +364,31 @@ export function runValidation(assembly, stagingConfig, gameState) {
         message: 'An accepted mission requires crew, but this rocket has no crewed command module.',
       });
     }
+  }
+
+  // ── CHECK 6: All parts unlocked via tech tree ────────────────────────────
+  // Build a quick lookup: partId → tech node name.
+  const unlockedParts = new Set(gameState.parts ?? []);
+  const lockedParts = [];
+  for (const placed of assembly.parts.values()) {
+    const partId = placed.partId;
+    if (unlockedParts.has(partId)) continue;
+    // Check if part is a tech-tree part (starters won't be in any node)
+    const node = TECH_NODES.find(n => n.unlocksParts.includes(partId));
+    if (!node) continue; // Starter part — always available
+    const def = getPartById(partId);
+    lockedParts.push({ name: def?.name ?? partId, nodeName: node.name });
+  }
+
+  if (lockedParts.length > 0) {
+    const uniqueNames = [...new Set(lockedParts.map(lp => lp.name))];
+    checks.push({
+      id:      'locked-parts',
+      label:   'Locked Parts',
+      pass:    false,
+      warn:    false,
+      message: `${uniqueNames.length} locked part${uniqueNames.length > 1 ? 's' : ''}: ${uniqueNames.join(', ')}. Research required.`,
+    });
   }
 
   // A launch is possible when all blocking checks pass.

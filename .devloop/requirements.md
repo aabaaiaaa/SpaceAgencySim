@@ -84,7 +84,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Activate CrewStatus.INJURED and injuryEnds field. Hard landing (5-10 m/s): injured 2-3 periods. Ejection: injured 1 period. Crew NOT affected by nearby part failure. Injured crew cannot be assigned to flights. Medical care option: pay fee to halve recovery time (round up). All injury events recorded in flight log with timestamp, altitude, and cause.
 
 ### TASK-013: Rocket design library
-- **Status**: pending
+- **Status**: done
 - **Priority**: medium
 - **Dependencies**: none
 - **Description**: Name, save, load, and duplicate designs from the VAB. Show total launch cost breakdown (parts + fuel, not crew salaries). Grouping/filtering by characteristics (single/2/3-stage, crewed, probe, etc.) — rockets can belong to multiple groups, groups only appear when matching rockets exist. Shared across save slots by default with toggle for save-private. Cross-save compatibility: locked parts shown as red/ghosted placeholders with tech tree node label, rocket fails validation until all parts unlocked. Compatibility indicator per design (green/yellow/red).
