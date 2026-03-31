@@ -16,7 +16,7 @@
  */
 
 import { initFlightRenderer, destroyFlightRenderer, renderFlightFrame, hideFlightScene, showFlightScene, setFlightInputEnabled, setFlightWeather } from '../render/flight.js';
-import { initMapRenderer, destroyMapRenderer, renderMapFrame, showMapScene, hideMapScene, isMapVisible, cycleMapZoom, getMapZoomLevel, setMapZoomLevel, cycleMapTarget, getMapTarget, toggleMapShadow, setMapTarget, cycleTransferTarget, getSelectedTransferTarget } from '../render/map.js';
+import { initMapRenderer, destroyMapRenderer, renderMapFrame, showMapScene, hideMapScene, isMapVisible, cycleMapZoom, getMapZoomLevel, setMapZoomLevel, cycleMapTarget, getMapTarget, toggleMapShadow, setMapTarget, cycleTransferTarget, getSelectedTransferTarget, toggleMapCommsOverlay } from '../render/map.js';
 import { MapZoom, MapThrustDir, computeOrbitalThrustAngle, isMapViewAvailable, getMapTransferTargets, getTransferProgressInfo, getAllowedMapZooms, isTransferPlanningAvailable, isDebrisTrackingAvailable } from '../core/mapView.js';
 import { warpToTarget } from '../core/orbit.js';
 import {
@@ -80,6 +80,8 @@ import {
   deployBeacon,
   getSurfaceItemsAtBody,
 } from '../core/surfaceOps.js';
+import { evaluateComms, createCommsState, getCommsLinkLabel } from '../core/comms.js';
+import { CommsStatus } from '../core/constants.js';
 
 // ---------------------------------------------------------------------------
 // Module state
@@ -1055,12 +1057,32 @@ function _loop(timestamp) {
     if (_timeWarp !== 1) _applyTimeWarp(1);
   }
 
+  // --- Communication range evaluation ---
+  // Update comms state every frame; if controls are locked (probe + no signal),
+  // zero out throttle and skip thrust application.
+  if (_flightState && _state) {
+    const comms = evaluateComms(_state, _flightState, _ps ? {
+      altitude: _ps.posY + (_ps.surfaceAltitude ?? 0),
+      posX: _ps.posX,
+      posY: _ps.posY,
+    } : undefined);
+    _flightState.commsState = comms;
+    if (comms.controlLocked) {
+      _ps.throttle = 0;
+    }
+  }
+
   // Apply orbital-relative thrust when the map view is active and the
   // player is holding WASD keys (only effective during ORBIT phase).
-  _applyMapThrust();
+  // Skip if comms control is locked.
+  if (!(_flightState.commsState?.controlLocked)) {
+    _applyMapThrust();
+  }
 
   // Apply orbital-relative thrust from WASD in NORMAL orbit mode (flight view).
-  _applyNormalOrbitRcs();
+  if (!(_flightState.commsState?.controlLocked)) {
+    _applyNormalOrbitRcs();
+  }
 
   // Reset per-frame science flag before sub-steps; tickScienceModules will
   // set it to true if any experiment was running during ANY sub-step.
@@ -1463,6 +1485,11 @@ function _onKeyDown(e) {
       toggleMapShadow();
       return;
     }
+    // C — toggle comms coverage overlay.
+    if (e.code === 'KeyC') {
+      toggleMapCommsOverlay();
+      return;
+    }
     // T — cycle target selection.
     if (e.code === 'KeyT' && !e.ctrlKey) {
       const tBodyId = (_flightState && _flightState.bodyId) || 'EARTH';
@@ -1531,6 +1558,19 @@ function _onKeyDown(e) {
     e.preventDefault();
     _toggleDockingMode();
     return;
+  }
+
+  // --- Comms control lockout ---
+  // If the craft has no comms and is probe-only, block all control inputs
+  // except map view (M), time warp (</>), and menu actions.
+  if (_flightState.commsState?.controlLocked) {
+    // Allow only map toggle, time warp, and non-control keys.
+    if (e.code !== 'KeyM' && e.code !== 'Comma' && e.code !== 'Period' &&
+        e.code !== 'Tab' && e.code !== 'KeyN' && e.code !== 'KeyT' &&
+        e.code !== 'KeyG' && e.code !== 'KeyB' && e.code !== 'KeyC') {
+      e.preventDefault();
+      return;
+    }
   }
 
   // R — toggle RCS mode.
@@ -1899,6 +1939,7 @@ function _buildMapHud() {
     '<kbd>B</kbd> Transfer target · ' +
     '<kbd>G</kbd> Warp to target · ' +
     '<kbd>N</kbd> Shadow · ' +
+    '<kbd>C</kbd> Comms · ' +
     '<kbd>&lt;/&gt;</kbd> Time warp · ' +
     '<kbd>WASD</kbd> Orbital thrust';
   hud.appendChild(controls);

@@ -210,6 +210,7 @@ import {
  * @property {import('./docking.js').DockingSystemState|null} dockingState - Docking system state, or null.
  * @property {TransferState|null} transferState  - Active transfer data when in TRANSFER/CAPTURE phase.
  * @property {import('./power.js').PowerState|null} powerState - Power system state (generation, storage, consumption).
+ * @property {import('./comms.js').CommsState|null} commsState - Communication link state (status, link type, control lockout).
  */
 
 /**
@@ -673,6 +674,7 @@ export function createFlightState({
     dockingState: null,
     transferState: null,
     powerState: null,
+    commsState: null,
   };
 }
 

@@ -807,6 +807,7 @@ let _elControlMode   = null;   // control mode badge (shows ORBIT / DOCKING / RC
 let _elBandWarning   = null;   // altitude band limit warning text
 let _elBiome         = null;   // biome name in status section
 let _elCrewList      = null;   // left-panel crew list
+let _elCommsStatus   = null;   // comms status indicator in status section
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -1070,6 +1071,20 @@ function _buildLeftPanel() {
   biomeRow.appendChild(biomeLbl);
   biomeRow.appendChild(_elBiome);
   statusSec.appendChild(biomeRow);
+
+  const commsRow = document.createElement('div');
+  commsRow.className = 'flight-lp-twr-row';
+  const commsLbl = document.createElement('div');
+  commsLbl.className = 'flight-lp-lbl';
+  commsLbl.textContent = 'Comms';
+  _elCommsStatus = document.createElement('div');
+  _elCommsStatus.id = 'hud-comms';
+  _elCommsStatus.className = 'flight-lp-val';
+  _elCommsStatus.style.fontSize = '9px';
+  _elCommsStatus.textContent = 'Direct Link';
+  commsRow.appendChild(commsLbl);
+  commsRow.appendChild(_elCommsStatus);
+  statusSec.appendChild(commsRow);
 
   panel.appendChild(statusSec);
 
@@ -1605,6 +1620,22 @@ function _tick() {
 }
 
 // ---------------------------------------------------------------------------
+// Private — comms link label
+// ---------------------------------------------------------------------------
+
+function _getCommsLinkLabel(linkType) {
+  switch (linkType) {
+    case 'DIRECT':            return 'Direct Link';
+    case 'TRACKING_STATION':  return 'Tracking Station';
+    case 'LOCAL_NETWORK':     return 'Comm-Sat Network';
+    case 'RELAY':             return 'Relay Chain';
+    case 'ONBOARD_RELAY':     return 'Onboard Relay';
+    case 'NONE':              return 'No Signal';
+    default:                  return 'Unknown';
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Private — landing speed safety indicator
 // ---------------------------------------------------------------------------
 
@@ -1694,6 +1725,18 @@ function _updateLeftPanel() {
     const alt = Math.max(0, _ps.posY ?? 0);
     const biome = getBiome(alt, 'EARTH');
     _elBiome.textContent = biome ? biome.name : '—';
+  }
+  if (_elCommsStatus && _flightState) {
+    const comms = _flightState.commsState;
+    if (comms) {
+      const isConnected = comms.status === 'CONNECTED';
+      _elCommsStatus.textContent = comms.controlLocked
+        ? 'NO SIGNAL'
+        : isConnected
+          ? _getCommsLinkLabel(comms.linkType)
+          : 'No Signal';
+      _elCommsStatus.style.color = isConnected ? '#a0ffc0' : '#ff6060';
+    }
   }
 
   // ── Throttle ──────────────────────────────────────────────────────────────

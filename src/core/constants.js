@@ -1352,11 +1352,44 @@ export const SatelliteType = Object.freeze({
  * @type {Readonly<Record<string, readonly string[]>>}
  */
 export const SATELLITE_VALID_BANDS = Object.freeze({
-  [SatelliteType.COMMUNICATION]: Object.freeze(['LEO', 'MEO', 'HEO', 'LLO', 'MLO', 'HLO']),
-  [SatelliteType.WEATHER]:       Object.freeze(['LEO', 'MEO', 'LLO', 'MLO']),
-  [SatelliteType.SCIENCE]:       Object.freeze(['LEO', 'MEO', 'HEO', 'LLO', 'MLO', 'HLO']),
-  [SatelliteType.GPS]:           Object.freeze(['MEO', 'MLO']),
-  [SatelliteType.RELAY]:         Object.freeze(['HEO', 'HLO']),
+  [SatelliteType.COMMUNICATION]: Object.freeze([
+    'LEO', 'MEO', 'HEO',       // Earth
+    'LLO', 'MLO', 'HLO',       // Moon
+    'LMO', 'MMO', 'HMO',       // Mars
+    'LMeO', 'MMeO', 'HMeO',   // Mercury
+    'LVO', 'MVO', 'HVO',       // Venus
+    'LPO', 'HPO',              // Phobos
+    'LDO', 'HDO',              // Deimos
+  ]),
+  [SatelliteType.WEATHER]:       Object.freeze([
+    'LEO', 'MEO',               // Earth
+    'LLO', 'MLO',               // Moon
+    'LMO', 'MMO',               // Mars
+    'LVO', 'MVO',               // Venus
+  ]),
+  [SatelliteType.SCIENCE]:       Object.freeze([
+    'LEO', 'MEO', 'HEO',       // Earth
+    'LLO', 'MLO', 'HLO',       // Moon
+    'LMO', 'MMO', 'HMO',       // Mars
+    'LMeO', 'MMeO', 'HMeO',   // Mercury
+    'LVO', 'MVO', 'HVO',       // Venus
+    'LPO', 'HPO',              // Phobos
+    'LDO', 'HDO',              // Deimos
+  ]),
+  [SatelliteType.GPS]:           Object.freeze([
+    'MEO',                      // Earth
+    'MLO',                      // Moon
+    'MMO',                      // Mars
+  ]),
+  [SatelliteType.RELAY]:         Object.freeze([
+    'HEO',                      // Earth
+    'HLO',                      // Moon
+    'HMO',                      // Mars
+    'HMeO',                     // Mercury
+    'HVO',                      // Venus
+    'HPO',                      // Phobos
+    'HDO',                      // Deimos
+  ]),
 });
 
 /**
@@ -1831,3 +1864,81 @@ export const DEFAULT_DIFFICULTY_SETTINGS = Object.freeze({
   financialPressure:    FinancialPressure.NORMAL,
   injuryDuration:       InjuryDuration.NORMAL,
 });
+
+// ---------------------------------------------------------------------------
+// Communication Range System
+// ---------------------------------------------------------------------------
+
+/**
+ * Communication status of a craft.
+ * @enum {string}
+ */
+export const CommsStatus = Object.freeze({
+  /** Full communication link to agency — all controls available. */
+  CONNECTED: 'CONNECTED',
+  /** No communication link — probe-only: controls locked; crewed: science data blocked. */
+  NO_SIGNAL: 'NO_SIGNAL',
+});
+
+/**
+ * Communication link type indicating how the craft is connected.
+ * @enum {string}
+ */
+export const CommsLinkType = Object.freeze({
+  /** Direct line-of-sight to the agency hub on Earth. */
+  DIRECT: 'DIRECT',
+  /** Via Tracking Station T3 ground-based long-range antenna. */
+  TRACKING_STATION: 'TRACKING_STATION',
+  /** Via a local comm-sat constellation around the body. */
+  LOCAL_NETWORK: 'LOCAL_NETWORK',
+  /** Via an interplanetary relay chain back to Earth. */
+  RELAY: 'RELAY',
+  /** Craft carries its own relay antenna — self-sustaining link. */
+  ONBOARD_RELAY: 'ONBOARD_RELAY',
+  /** No link available. */
+  NONE: 'NONE',
+});
+
+/**
+ * Direct comms range from the agency hub on Earth's surface (metres).
+ * Works within Earth orbit (roughly HEO distance) but not much further.
+ * ~40,000 km — covers LEO/MEO, fades in HEO.
+ */
+export const COMMS_DIRECT_RANGE = 40_000_000;
+
+/**
+ * Extended direct range when Tracking Station is at Tier 3 (metres).
+ * Significantly extends range — covers Earth SOI including lunar distance.
+ * ~500,000 km — reaches the Moon comfortably.
+ */
+export const COMMS_TRACKING_T3_RANGE = 500_000_000;
+
+/**
+ * Comm-sat local network coverage radius around a body (metres).
+ * A constellation of 3+ COMMUNICATION satellites covers the body and
+ * nearby space. Coverage extends to roughly this distance from the body centre.
+ * If fewer than a full constellation, coverage has dark spots (far side).
+ */
+export const COMMS_LOCAL_NETWORK_RANGE = 50_000_000;
+
+/**
+ * Number of COMMUNICATION satellites needed for full-sphere coverage
+ * of a body (no dark spots).  Below this count, the far side of the body
+ * relative to the agency (or relay link direction) is a dead zone.
+ */
+export const COMMS_FULL_COVERAGE_THRESHOLD = 3;
+
+/**
+ * Relay satellite interplanetary link range (metres).
+ * A deployed RELAY satellite in high orbit can bridge to other bodies'
+ * networks within this range.  Roughly 1 AU — covers inner solar system.
+ */
+export const COMMS_RELAY_RANGE = 300_000_000_000;
+
+/**
+ * Angular half-width of the shadow cone behind a celestial body (degrees).
+ * If a craft is within this cone on the far side of a body from the
+ * signal source, and the body has no full constellation, the signal is blocked.
+ * Using a generous 80° half-angle — effectively the far hemisphere.
+ */
+export const COMMS_SHADOW_HALF_ANGLE_DEG = 80;

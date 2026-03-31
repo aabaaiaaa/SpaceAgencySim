@@ -49,6 +49,7 @@ import {
 } from '../core/orbit.js';
 import { FlightPhase } from '../core/constants.js';
 import { SOI_RADIUS } from '../core/manoeuvre.js';
+import { getCommsCoverageInfo } from '../core/comms.js';
 
 // ---------------------------------------------------------------------------
 // Colour palette
@@ -108,6 +109,7 @@ let _objectsGraphics  = null;
 let _craftGraphics    = null;
 let _transferGraphics = null;
 let _surfaceGraphics  = null;
+let _commsGraphics    = null;
 
 /** Container for reusable PIXI.Text labels. */
 let _labelContainer = null;
@@ -121,6 +123,7 @@ let _viewRadius      = 10_000_000;
 let _customViewRadius = null;
 let _selectedTarget  = null;
 let _showShadow      = false;
+let _showCommsOverlay = false;
 
 /** Currently selected transfer route target body ID. @type {string|null} */
 let _selectedTransferTarget = null;
@@ -157,6 +160,7 @@ export function initMapRenderer() {
   _bodyGraphics     = new PIXI.Graphics();
   _shadowGraphics   = new PIXI.Graphics();
   _surfaceGraphics  = new PIXI.Graphics();
+  _commsGraphics    = new PIXI.Graphics();
   _objectsGraphics  = new PIXI.Graphics();
   _craftGraphics    = new PIXI.Graphics();
   _labelContainer   = new PIXI.Container();
@@ -167,6 +171,7 @@ export function initMapRenderer() {
   _mapRoot.addChild(_orbitsGraphics);
   _mapRoot.addChild(_bodyGraphics);
   _mapRoot.addChild(_surfaceGraphics);
+  _mapRoot.addChild(_commsGraphics);
   _mapRoot.addChild(_shadowGraphics);
   _mapRoot.addChild(_objectsGraphics);
   _mapRoot.addChild(_craftGraphics);
@@ -325,6 +330,22 @@ export function toggleMapShadow() {
 }
 
 /**
+ * Toggle the comms coverage overlay on the map.
+ * Shows connected zones (green) and dead zones (red) around the body.
+ */
+export function toggleMapCommsOverlay() {
+  _showCommsOverlay = !_showCommsOverlay;
+}
+
+/**
+ * Check whether the comms overlay is currently shown.
+ * @returns {boolean}
+ */
+export function isCommsOverlayVisible() {
+  return _showCommsOverlay;
+}
+
+/**
  * Cycle through transfer target bodies (for route planning).
  *
  * @param {string} bodyId  Current celestial body.
@@ -444,6 +465,9 @@ export function renderMapFrame(ps, flightState, state, bodyId = 'EARTH', options
 
   // 6. Day/night shadow.
   _drawShadow(cx, cy, scale, R, flightState.timeElapsed);
+
+  // 7. Comms coverage overlay.
+  _drawCommsOverlay(state, bodyId, cx, cy, scale, R);
 }
 
 // ---------------------------------------------------------------------------
@@ -1000,6 +1024,77 @@ function _drawShadow(cx, cy, scale, R, timeElapsed) {
   _shadowGraphics.arc(cx, cy, bodyPxR, nightAngle - Math.PI / 2, nightAngle + Math.PI / 2);
   _shadowGraphics.closePath();
   _shadowGraphics.fill({ color: SHADOW_COLOR, alpha: 0.4 });
+}
+
+// ---------------------------------------------------------------------------
+// Private — comms coverage overlay
+// ---------------------------------------------------------------------------
+
+const COMMS_CONNECTED_COLOR = 0x00cc44;
+const COMMS_DEAD_ZONE_COLOR = 0xcc2200;
+const COMMS_DIRECT_COLOR    = 0x4488ff;
+
+/**
+ * Draw comms coverage zones on the map.
+ * Connected zones shown in green, dead zones in red.
+ */
+function _drawCommsOverlay(state, bodyId, cx, cy, scale, R) {
+  if (!_commsGraphics) return;
+  _commsGraphics.clear();
+  if (!_showCommsOverlay) return;
+
+  const coverage = getCommsCoverageInfo(state, bodyId);
+  if (!coverage) return;
+
+  // Draw direct coverage ring (Earth only).
+  if (coverage.hasDirectCoverage && coverage.directRange > 0) {
+    const directPxR = coverage.directRange * scale;
+    if (directPxR > 2) {
+      _commsGraphics.circle(cx, cy, directPxR);
+      _commsGraphics.stroke({ color: COMMS_DIRECT_COLOR, width: 1.5, alpha: 0.4 });
+    }
+  }
+
+  // Draw local network coverage ring.
+  if (coverage.hasLocalNetwork && coverage.localNetworkRange > 0) {
+    const netPxR = coverage.localNetworkRange * scale;
+    if (netPxR > 2) {
+      if (coverage.fullCoverage) {
+        // Full coverage — complete green ring.
+        _commsGraphics.circle(cx, cy, netPxR);
+        _commsGraphics.fill({ color: COMMS_CONNECTED_COLOR, alpha: 0.06 });
+        _commsGraphics.circle(cx, cy, netPxR);
+        _commsGraphics.stroke({ color: COMMS_CONNECTED_COLOR, width: 1.5, alpha: 0.3 });
+      } else {
+        // Partial coverage — green on signal side, red shadow on far side.
+        const shadowRad = (coverage.shadowAngleDeg * Math.PI) / 180;
+
+        // Draw the connected arc (front hemisphere).
+        const frontStart = -Math.PI / 2 + shadowRad;
+        const frontEnd = -Math.PI / 2 - shadowRad + 2 * Math.PI;
+
+        _commsGraphics.moveTo(cx, cy);
+        _commsGraphics.arc(cx, cy, netPxR, frontStart, frontEnd);
+        _commsGraphics.closePath();
+        _commsGraphics.fill({ color: COMMS_CONNECTED_COLOR, alpha: 0.06 });
+
+        // Draw the dead zone arc (far side).
+        _commsGraphics.moveTo(cx, cy);
+        _commsGraphics.arc(cx, cy, netPxR, frontEnd, frontStart);
+        _commsGraphics.closePath();
+        _commsGraphics.fill({ color: COMMS_DEAD_ZONE_COLOR, alpha: 0.08 });
+
+        // Outline.
+        _commsGraphics.circle(cx, cy, netPxR);
+        _commsGraphics.stroke({ color: COMMS_CONNECTED_COLOR, width: 1, alpha: 0.25 });
+      }
+    }
+  }
+
+  // Status label.
+  if (!coverage.connectedToEarth && coverage.hasLocalNetwork) {
+    _useLabel('NOT LINKED TO EARTH', cx - 70, cy - R * scale - 30, COMMS_DEAD_ZONE_COLOR);
+  }
 }
 
 // ---------------------------------------------------------------------------
