@@ -13,7 +13,7 @@
 - **Verification**: Click R&D Lab on the hub — a tech tree panel must open showing available and researched nodes. Click "Back"/"← Hub" to return to hub without breaking it.
 
 ### TASK-003: Hide unbuilt facilities on hub in tutorial mode
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: `_renderBuildings()` in `src/ui/hub.js` (lines 1532-1572) renders all 8 buildings unconditionally. It must check `hasFacility(state, buildingId)` and only render built facilities. Unbuilt facilities should be hidden entirely (not greyed out — just absent). The navigation handler in `src/ui/index.js` should also check facility lock state and show a tooltip/message if the player somehow clicks a locked facility. In non-tutorial mode (Freeplay), facilities that haven't been built yet via the Construction menu should also not appear. In Sandbox mode, all facilities are always built so all should show. See requirements section 1.3.
 - **Verification**: Start a fresh Tutorial game — only Launch Pad, VAB, and MCC should be visible on the hub. Accept mission-018 (First Crew Flight) — Crew Admin should appear on the hub after accepting.

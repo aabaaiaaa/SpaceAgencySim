@@ -19,8 +19,8 @@
  * @module hub
  */
 
-import { showHubScene, hideHubScene, setHubWeather } from '../render/hub.js';
-import { FACILITY_DEFINITIONS, FacilityId, FACILITY_UPGRADE_DEFS, getFacilityUpgradeDef, getReputationTier } from '../core/constants.js';
+import { showHubScene, hideHubScene, setHubWeather, setBuiltFacilities } from '../render/hub.js';
+import { FACILITY_DEFINITIONS, FacilityId, FACILITY_UPGRADE_DEFS, getFacilityUpgradeDef, getReputationTier, GameMode } from '../core/constants.js';
 import { openSettingsPanel } from './settings.js';
 import { openDebugSavePanel } from './debugSaves.js';
 import {
@@ -881,6 +881,16 @@ export function initHubUI(container, state, onNavigate) {
   _overlay.id = 'hub-overlay';
   container.appendChild(_overlay);
 
+  // Tell the PixiJS renderer which facilities are built so it only draws those.
+  if (state.gameMode === GameMode.SANDBOX) {
+    setBuiltFacilities(null); // show all in sandbox
+  } else {
+    const builtIds = new Set(
+      Object.keys(state.facilities).filter((id) => state.facilities[id]?.built)
+    );
+    setBuiltFacilities(builtIds);
+  }
+
   _renderBuildings(onNavigate);
   _renderConstructionButton(container);
   _renderSettingsButton(container);
@@ -1533,6 +1543,11 @@ function _renderBuildings(onNavigate) {
   if (!_overlay) return;
 
   for (const bld of BUILDINGS) {
+    // In sandbox mode all facilities are always built, so show all.
+    // In tutorial/freeplay mode, only show facilities that have been built.
+    if (_state && _state.gameMode !== GameMode.SANDBOX && !hasFacility(_state, bld.id)) {
+      continue;
+    }
     const el = document.createElement('div');
     el.className    = 'hub-building';
     el.dataset.buildingId = bld.id;

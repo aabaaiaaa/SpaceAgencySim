@@ -44,8 +44,9 @@ test.describe('Hub Navigation', () => {
       timeout: 15_000,
     });
 
-    // Start a new game so that missions are initialised and the hub is shown.
+    // Start a Sandbox game so all buildings are visible and navigable.
     await page.fill('#mm-agency-name-input', 'Orbit Inc');
+    await page.click('.mm-mode-option[data-mode="sandbox"]');
     await page.click('#mm-start-btn');
 
     // Wait for the hub overlay to appear.

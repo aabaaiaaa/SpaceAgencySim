@@ -93,18 +93,25 @@ test.describe('App Load & New Game Flow', () => {
 
   // ── (5) Hub shows all four clickable buildings ───────────────────────────
 
-  test('(5) the hub shows all four clickable buildings with the correct labels', async () => {
-    const buildings = [
+  test('(5) the hub shows only the starter buildings (tutorial mode hides unbuilt facilities)', async () => {
+    // In tutorial mode, only starter facilities (Launch Pad, VAB, MCC) are
+    // pre-built — unbuilt facilities like Crew Admin are hidden.
+    const starterBuildings = [
       { id: 'launch-pad',      label: 'Launch Pad' },
       { id: 'vab',             label: 'Vehicle Assembly Building' },
       { id: 'mission-control', label: 'Mission Control Centre' },
-      { id: 'crew-admin',      label: 'Crew Administration' },
     ];
 
-    for (const { id, label } of buildings) {
+    for (const { id, label } of starterBuildings) {
       const bld = page.locator(`[data-building-id="${id}"]`);
       await expect(bld).toBeVisible();
       await expect(bld).toContainText(label);
+    }
+
+    // Unbuilt facilities must NOT be visible.
+    const unbuiltIds = ['crew-admin', 'tracking-station', 'rd-lab', 'satellite-ops', 'library'];
+    for (const id of unbuiltIds) {
+      await expect(page.locator(`[data-building-id="${id}"]`)).toHaveCount(0);
     }
   });
 

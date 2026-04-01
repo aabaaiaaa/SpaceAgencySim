@@ -140,6 +140,9 @@ let _weatherVisibility = 0;
 /** Cached weather sky tint: true for storm/extreme, false normal. */
 let _weatherExtreme = false;
 
+/** Set of facility IDs that are built (null = show all). @type {Set<string> | null} */
+let _builtFacilities = null;
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -178,6 +181,19 @@ export function initHubRenderer() {
 export function setHubWeather(visibility, extreme) {
   _weatherVisibility = visibility;
   _weatherExtreme = extreme;
+  if (_hubRoot && _hubRoot.visible) {
+    _drawScene();
+  }
+}
+
+/**
+ * Update the set of built facility IDs so only those buildings are rendered.
+ * Pass null to show all buildings (e.g. sandbox mode).
+ *
+ * @param {Set<string> | null} builtIds
+ */
+export function setBuiltFacilities(builtIds) {
+  _builtFacilities = builtIds;
   if (_hubRoot && _hubRoot.visible) {
     _drawScene();
   }
@@ -247,6 +263,9 @@ function _drawScene() {
 
   // ── Building rectangles ─────────────────────────────────────────────────────
   for (const bld of BUILDINGS) {
+    // Skip unbuilt facilities when a filter is active.
+    if (_builtFacilities && !_builtFacilities.has(bld.id)) continue;
+
     const bldW = W * bld.widthPct;
     const bldH = H * bld.heightPct;
     const bldX = W * bld.xCenterPct - bldW / 2;

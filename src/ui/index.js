@@ -18,6 +18,8 @@ import { stopFlightScene } from './flightController.js';
 import { initTopBar, destroyTopBar, refreshTopBar, setCurrentScreen } from './topbar.js';
 import { showVabScene, hideVabScene } from '../render/vab.js';
 import { showHubScene } from '../render/hub.js';
+import { hasFacility } from '../core/construction.js';
+import { GameMode } from '../core/constants.js';
 
 export { initFlightHud, destroyFlightHud } from './flightHud.js';
 
@@ -211,6 +213,24 @@ function _handleExitToMenu() {
  * @param {string} destination  Building ID: 'vab' | 'mission-control' | 'crew-admin' | 'launch-pad'
  */
 function _handleNavigation(container, state, destination) {
+  // Block navigation to unbuilt facilities (except in sandbox where all are built).
+  if (state.gameMode !== GameMode.SANDBOX && !hasFacility(state, destination)) {
+    console.log(`[UI] Facility "${destination}" is not built — navigation blocked`);
+    // Show a brief tooltip message on the hub overlay.
+    const overlay = document.getElementById('hub-overlay');
+    if (overlay) {
+      const existing = overlay.querySelector('.hub-locked-msg');
+      if (existing) existing.remove();
+      const msg = document.createElement('div');
+      msg.className = 'hub-locked-msg';
+      msg.textContent = 'This facility has not been built yet.';
+      msg.style.cssText = 'position:absolute;top:40%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.85);color:#ffcc00;padding:12px 24px;border-radius:6px;font-size:16px;z-index:9999;pointer-events:none;';
+      overlay.appendChild(msg);
+      setTimeout(() => msg.remove(), 2000);
+    }
+    return;
+  }
+
   if (destination === 'vab') {
     // Tear down the hub overlay and show the VAB.
     destroyHubUI();

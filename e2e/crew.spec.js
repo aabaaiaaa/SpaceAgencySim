@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import {
   SAVE_KEY, STARTING_MONEY,
   FIRST_FLIGHT_MISSION, buildSaveEnvelope, seedAndLoadSave,
+  ALL_FACILITIES,
 } from './helpers.js';
 
 /**
@@ -42,10 +43,11 @@ test.describe.configure({ mode: 'serial' });
 
 const HIRE_COST = 50_000;
 
-/** Standard fresh-game envelope: no crew, full starting funds. */
+/** Standard fresh-game envelope: no crew, full starting funds, all facilities built. */
 const FRESH_ENVELOPE = buildSaveEnvelope({
   saveName: 'Crew E2E Test',
   missions: { available: [{ ...FIRST_FLIGHT_MISSION, status: 'available' }], accepted: [], completed: [] },
+  facilities: ALL_FACILITIES,
 });
 
 /** The state portion used to reset gameState between tests. */
@@ -56,6 +58,7 @@ const BROKE_ENVELOPE = buildSaveEnvelope({
   saveName: 'Crew E2E Test',
   money: 10_000,
   missions: { available: [{ ...FIRST_FLIGHT_MISSION, status: 'available' }], accepted: [], completed: [] },
+  facilities: ALL_FACILITIES,
 });
 
 // ---------------------------------------------------------------------------

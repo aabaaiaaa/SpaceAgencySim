@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 24
-- **Completed**: 2
-- **Remaining**: 22
-- **Last Updated**: 2026-04-01T22:49:41.328Z
+- **Completed**: 3
+- **Remaining**: 21
+- **Last Updated**: 2026-04-01T23:03:39.701Z
 
 ## Iteration Log
 
@@ -25,4 +25,13 @@
 - **Exit Status**: success
 - **Tokens**: 2,814,402 total (56 in, 11,399 out, 63,713 cache-create, 2,739,234 cache-read)
 - **Cost**: $2.0531
+
+### Iteration 3 - 2026-04-01T22:49:46.773Z
+- **Task Attempted**: TASK-003
+- **Task Completed**: TASK-003
+- **Summary**: Completed Hide unbuilt facilities on hub in tutorial mode
+- **Duration**: 13m 53s
+- **Exit Status**: success
+- **Tokens**: 97,421 total (3 in, 22 out, 1,391 cache-create, 96,005 cache-read)
+- **Cost**: $3.5461
 
