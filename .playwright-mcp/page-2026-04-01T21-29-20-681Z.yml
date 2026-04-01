@@ -1,0 +1,122 @@
+- generic [ref=e2]:
+  - generic:
+    - generic [ref=e30]:
+      - generic [ref=e31]: Test Agency
+      - generic [ref=e133]: Flight 60
+      - button "View loan details" [ref=e32] [cursor=pointer]: $8,000,000
+      - button "View accepted missions" [ref=e33] [cursor=pointer]: Missions
+      - button "Open menu" [ref=e34] [cursor=pointer]: ☰
+    - generic [ref=e170]:
+      - generic [ref=e171]:
+        - button "Back" [ref=e172] [cursor=pointer]
+        - heading "Satellite Network Operations" [level=1] [ref=e173]
+        - generic [ref=e174]: Tier 2
+      - generic [ref=e175]:
+        - generic [ref=e176]:
+          - heading "Network Overview" [level=2] [ref=e177]
+          - generic [ref=e178]:
+            - generic [ref=e179]:
+              - generic [ref=e180]: Active Satellites
+              - generic [ref=e181]: 3 / 12
+            - generic [ref=e182]:
+              - generic [ref=e183]: Constellations
+              - generic [ref=e184]: None
+            - generic [ref=e185]:
+              - generic [ref=e186]: Lease Income / Period
+              - generic [ref=e187]: None
+            - generic [ref=e188]:
+              - generic [ref=e189]: Leased Satellites
+              - generic [ref=e190]: "0"
+        - generic [ref=e191]:
+          - heading "Network Benefits" [level=2] [ref=e192]
+          - table [ref=e193]:
+            - rowgroup [ref=e194]:
+              - row "Benefit Value" [ref=e195]:
+                - columnheader "Benefit" [ref=e196]
+                - columnheader "Value" [ref=e197]
+            - rowgroup [ref=e198]:
+              - row "Science Transmit Bonus +0%" [ref=e199]:
+                - cell "Science Transmit Bonus" [ref=e200]
+                - cell "+0%" [ref=e201]
+              - row "Weather Skip Discount 0% off" [ref=e202]:
+                - cell "Weather Skip Discount" [ref=e203]
+                - cell "0% off" [ref=e204]
+              - row "Forecast Accuracy +0%" [ref=e205]:
+                - cell "Forecast Accuracy" [ref=e206]
+                - cell "+0%" [ref=e207]
+              - row "Passive Science/Period +2 SP" [ref=e208]:
+                - cell "Passive Science/Period" [ref=e209]
+                - cell "+2 SP" [ref=e210]
+              - row "Landing Threshold Bonus +2 m/s" [ref=e211]:
+                - cell "Landing Threshold Bonus" [ref=e212]
+                - cell "+2 m/s" [ref=e213]
+              - row "Recovery Bonus +10%" [ref=e214]:
+                - cell "Recovery Bonus" [ref=e215]
+                - cell "+10%" [ref=e216]
+              - row "Deep Space Comms Disabled" [ref=e217]:
+                - cell "Deep Space Comms" [ref=e218]
+                - cell "Disabled" [ref=e219]
+        - generic [ref=e220]:
+          - heading "Constellation Management" [level=2] [ref=e221]
+          - generic [ref=e222]:
+            - generic [ref=e223]:
+              - generic [ref=e224]: 📡 Communication
+              - generic [ref=e225]: 0 satellites (3 needed)
+              - generic [ref=e226]: Need 3 more
+              - generic [ref=e227]: "Bands: LEO, MEO, HEO, LLO, MLO, HLO, LMO, MMO, HMO, LMeO, MMeO, HMeO, LVO, MVO, HVO, LPO, HPO, LDO, HDO"
+            - generic [ref=e228]:
+              - generic [ref=e229]: 🌧 Weather
+              - generic [ref=e230]: 0 satellites (3 needed)
+              - generic [ref=e231]: Need 3 more
+              - generic [ref=e232]: "Bands: LEO, MEO, LLO, MLO, LMO, MMO, LVO, MVO"
+            - generic [ref=e233]:
+              - generic [ref=e234]: 🔬 Science
+              - generic [ref=e235]: 1 satellite (3 needed)
+              - generic [ref=e236]: Need 2 more
+              - generic [ref=e237]: "Bands: LEO, MEO, HEO, LLO, MLO, HLO, LMO, MMO, HMO, LMeO, MMeO, HMeO, LVO, MVO, HVO, LPO, HPO, LDO, HDO"
+            - generic [ref=e238]:
+              - generic [ref=e239]: 📍 GPS/Navigation
+              - generic [ref=e240]: 1 satellite (3 needed)
+              - generic [ref=e241]: Need 2 more
+              - generic [ref=e242]: "Bands: MEO, MLO, MMO"
+            - generic [ref=e243]:
+              - generic [ref=e244]: 📨 Relay
+              - generic [ref=e245]: 0 satellites (3 needed)
+              - generic [ref=e246]: Need 3 more
+              - generic [ref=e247]: "Bands: HEO, HLO, HMO, HMeO, HVO, HPO, HDO"
+        - generic [ref=e248]:
+          - heading "Satellites" [level=2] [ref=e249]
+          - generic [ref=e250]:
+            - generic [ref=e251]:
+              - generic [ref=e252]:
+                - generic [ref=e253]: 🛰 Generic
+                - generic [ref=e254]: "EARTH - LEO | Deployed period 22 | Sunlit: 58%"
+              - generic [ref=e257]: 85%
+              - generic [ref=e258]:
+                - generic [ref=e259] [cursor=pointer]:
+                  - checkbox "Auto ($15k/period)" [checked] [ref=e260]
+                  - text: Auto ($15k/period)
+                - button "Lease" [ref=e261] [cursor=pointer]
+                - button "Decommission" [ref=e262] [cursor=pointer]
+            - generic [ref=e263]:
+              - generic [ref=e264]:
+                - generic [ref=e265]: 📍 GPS/Navigation
+                - generic [ref=e266]: "EARTH - LEO | Deployed period 30 | Sunlit: 64%"
+              - generic [ref=e269]: 90%
+              - generic [ref=e270]:
+                - generic [ref=e271] [cursor=pointer]:
+                  - checkbox "Auto ($15k/period)" [checked] [ref=e272]
+                  - text: Auto ($15k/period)
+                - button "Lease" [ref=e273] [cursor=pointer]
+                - button "Decommission" [ref=e274] [cursor=pointer]
+            - generic [ref=e275]:
+              - generic [ref=e276]:
+                - generic [ref=e277]: 🔬 Science
+                - generic [ref=e278]: "EARTH - LEO | Deployed period 45 | Sunlit: 61%"
+              - generic [ref=e281]: 100%
+              - generic [ref=e282]:
+                - generic [ref=e283] [cursor=pointer]:
+                  - checkbox "Auto ($15k/period)" [ref=e284]
+                  - text: Auto ($15k/period)
+                - button "Lease" [ref=e285] [cursor=pointer]
+                - button "Decommission" [ref=e286] [cursor=pointer]

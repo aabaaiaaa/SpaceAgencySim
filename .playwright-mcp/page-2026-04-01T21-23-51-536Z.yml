@@ -1,0 +1,27 @@
+- generic [ref=e2]:
+  - generic:
+    - generic [ref=e31]:
+      - generic [ref=e32]: Test Agency
+      - button "View loan details" [ref=e33] [cursor=pointer]: $2,000,000
+      - button "View accepted missions" [ref=e34] [cursor=pointer]: Missions (1)
+      - button "Open menu" [ref=e35] [cursor=pointer]: ☰
+    - generic [ref=e385]:
+      - generic [ref=e386]:
+        - button "← Hub" [ref=e387] [cursor=pointer]
+        - heading "Mission Control Centre — Tier 1 (Basic)" [level=1] [ref=e388]
+      - generic [ref=e389]:
+        - button "Missions" [ref=e390] [cursor=pointer]
+        - button "Accepted" [ref=e391] [cursor=pointer]
+        - button "Completed" [ref=e392] [cursor=pointer]
+        - button "Contracts" [ref=e394] [cursor=pointer]
+        - button "Active" [ref=e395] [cursor=pointer]
+        - button "Challenges" [active] [ref=e397] [cursor=pointer]
+        - button "Achievements" [ref=e398] [cursor=pointer]
+      - generic [ref=e399]:
+        - generic [ref=e430]:
+          - strong [ref=e431]: "0"
+          - text: of 0 challenges completed
+        - generic [ref=e432]:
+          - button "+ Create Challenge" [ref=e433] [cursor=pointer]
+          - button "Import JSON" [ref=e434] [cursor=pointer]
+        - paragraph [ref=e435]: Complete more tutorial missions to unlock challenges.

@@ -1,0 +1,44 @@
+- generic [ref=e2]:
+  - generic:
+    - generic [ref=e31]:
+      - generic [ref=e32]: Test Agency
+      - button "View loan details" [ref=e33] [cursor=pointer]: $2,000,000
+      - button "View accepted missions" [ref=e34] [cursor=pointer]: Missions
+      - button "Open menu" [ref=e35] [cursor=pointer]: ☰
+    - generic:
+      - button "Launch Pad" [ref=e272] [cursor=pointer]:
+        - generic: Launch Pad
+      - button "Vehicle Assembly Building" [ref=e273] [cursor=pointer]:
+        - generic: Vehicle Assembly Building
+      - button "Mission Control Centre" [ref=e274] [cursor=pointer]:
+        - generic: Mission Control Centre
+      - button "Crew Administration" [ref=e275] [cursor=pointer]:
+        - generic: Crew Administration
+      - button "Tracking Station" [ref=e276] [cursor=pointer]:
+        - generic: Tracking Station
+      - button "R&D Lab" [ref=e277] [cursor=pointer]:
+        - generic: R&D Lab
+      - button "Satellite Ops" [ref=e278] [cursor=pointer]:
+        - generic: Satellite Ops
+      - button "Library" [ref=e279] [cursor=pointer]:
+        - generic: Library
+      - button "Open construction menu" [ref=e280] [cursor=pointer]: Construction
+      - button "Open game settings" [ref=e281] [cursor=pointer]: Settings
+      - button "Open debug save menu" [ref=e282] [cursor=pointer]: Debug Saves
+      - generic [ref=e283]:
+        - generic [ref=e284]: Reputation
+        - generic [ref=e285]: "50"
+        - generic [ref=e286]: Good
+      - generic [ref=e289]:
+        - generic [ref=e290]: Launch Conditions
+        - generic [ref=e291]: Severe storm
+        - generic [ref=e292]:
+          - generic [ref=e293]: Wind
+          - generic [ref=e294]: 25.5 m/s
+        - generic [ref=e295]:
+          - generic [ref=e296]: ISP Effect
+          - generic [ref=e297]: "-0.7%"
+        - generic [ref=e298]:
+          - generic [ref=e299]: Visibility
+          - generic [ref=e300]: Dense fog
+        - generic [ref=e301]: EXTREME — Launch not recommended

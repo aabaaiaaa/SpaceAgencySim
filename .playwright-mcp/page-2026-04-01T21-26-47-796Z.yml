@@ -1,0 +1,45 @@
+- generic [ref=e2]:
+  - generic:
+    - generic [ref=e31]:
+      - generic [ref=e32]: Test Agency
+      - generic [ref=e723]: Flight 40
+      - button "View loan details" [ref=e33] [cursor=pointer]: $3,775,000
+      - button "View accepted missions" [ref=e34] [cursor=pointer]: Missions
+      - button "Open menu" [ref=e35] [cursor=pointer]: ☰
+    - generic:
+      - button "Launch Pad" [ref=e624] [cursor=pointer]:
+        - generic: Launch Pad
+      - button "Vehicle Assembly Building" [ref=e625] [cursor=pointer]:
+        - generic: Vehicle Assembly Building
+      - button "Mission Control Centre" [ref=e626] [cursor=pointer]:
+        - generic: Mission Control Centre
+      - button "Crew Administration" [ref=e627] [cursor=pointer]:
+        - generic: Crew Administration
+      - button "Tracking Station" [ref=e628] [cursor=pointer]:
+        - generic: Tracking Station
+      - button "R&D Lab" [ref=e629] [cursor=pointer]:
+        - generic: R&D Lab
+      - button "Satellite Ops" [ref=e630] [cursor=pointer]:
+        - generic: Satellite Ops
+      - button "Library" [ref=e631] [cursor=pointer]:
+        - generic: Library
+      - button "Open construction menu" [ref=e632] [cursor=pointer]: Construction
+      - button "Open game settings" [ref=e633] [cursor=pointer]: Settings
+      - button "Open debug save menu" [ref=e634] [cursor=pointer]: Debug Saves
+      - generic [ref=e635]:
+        - generic [ref=e636]: Reputation
+        - generic [ref=e637]: "50"
+        - generic [ref=e638]: Good
+      - generic [ref=e641]:
+        - generic [ref=e642]: Launch Conditions
+        - generic [ref=e643]: Severe storm
+        - generic [ref=e644]:
+          - generic [ref=e645]: Wind
+          - generic [ref=e646]: 25.5 m/s
+        - generic [ref=e647]:
+          - generic [ref=e648]: ISP Effect
+          - generic [ref=e649]: "-0.7%"
+        - generic [ref=e650]:
+          - generic [ref=e651]: Visibility
+          - generic [ref=e652]: Dense fog
+        - generic [ref=e653]: EXTREME — Launch not recommended

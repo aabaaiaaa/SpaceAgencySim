@@ -1,0 +1,100 @@
+- generic [ref=e2]:
+  - generic:
+    - generic [ref=e4]:
+      - generic [ref=e5]: Test Agency
+      - button "View loan details" [ref=e6] [cursor=pointer]: $2,000,000
+      - button "View accepted missions" [ref=e7] [cursor=pointer]: Missions
+      - button "Open menu" [ref=e8] [cursor=pointer]: ☰
+    - generic:
+      - button "Launch Pad" [ref=e9] [cursor=pointer]:
+        - generic: Launch Pad
+      - button "Vehicle Assembly Building" [ref=e10] [cursor=pointer]:
+        - generic: Vehicle Assembly Building
+      - button "Mission Control Centre" [ref=e11] [cursor=pointer]:
+        - generic: Mission Control Centre
+      - button "Crew Administration" [ref=e12] [cursor=pointer]:
+        - generic: Crew Administration
+      - button "Tracking Station" [ref=e13] [cursor=pointer]:
+        - generic: Tracking Station
+      - button "R&D Lab" [ref=e14] [cursor=pointer]:
+        - generic: R&D Lab
+      - button "Satellite Ops" [ref=e15] [cursor=pointer]:
+        - generic: Satellite Ops
+      - button "Library" [ref=e16] [cursor=pointer]:
+        - generic: Library
+      - button "Open construction menu" [ref=e17] [cursor=pointer]: Construction
+      - button "Open game settings" [ref=e18] [cursor=pointer]: Settings
+      - button "Open debug save menu" [ref=e19] [cursor=pointer]: Debug Saves
+      - generic [ref=e20]:
+        - generic [ref=e21]: Reputation
+        - generic [ref=e22]: "50"
+        - generic [ref=e23]: Good
+      - generic [ref=e26]:
+        - generic [ref=e27]: Launch Conditions
+        - generic [ref=e28]: Moderate wind
+        - generic [ref=e29]:
+          - generic [ref=e30]: Wind
+          - generic [ref=e31]: 9.4 m/s
+        - generic [ref=e32]:
+          - generic [ref=e33]: ISP Effect
+          - generic [ref=e34]: +0.6%
+        - generic [ref=e35]:
+          - generic [ref=e36]: Visibility
+          - generic [ref=e37]: Clear
+    - generic [ref=e45]:
+      - navigation [ref=e46]:
+        - heading "Help" [level=2] [ref=e47]
+        - button "Getting Started" [ref=e48] [cursor=pointer]
+        - button "Space Agency Hub" [ref=e49] [cursor=pointer]
+        - button "Vehicle Assembly" [ref=e50] [cursor=pointer]
+        - button "Flight Controls" [ref=e51] [cursor=pointer]
+        - button "Orbital Mechanics" [ref=e52] [cursor=pointer]
+        - button "Missions & Contracts" [ref=e53] [cursor=pointer]
+        - button "Crew Management" [ref=e54] [cursor=pointer]
+        - button "Finance & Economy" [ref=e55] [cursor=pointer]
+        - button "Facilities & Upgrades" [ref=e56] [cursor=pointer]
+        - button "Satellites & Science" [ref=e57] [cursor=pointer]
+        - button "Advanced Systems" [ref=e58] [cursor=pointer]
+      - generic [ref=e59]:
+        - button "×" [ref=e61] [cursor=pointer]
+        - generic [ref=e62]:
+          - generic [ref=e63]:
+            - heading "Getting Started" [level=2] [ref=e64]
+            - paragraph [ref=e65]:
+              - text: Welcome to
+              - strong [ref=e66]: Space Agency Simulator
+              - text: — a rocket physics and space agency management game. Design rockets, launch them into space, complete missions, and grow your agency from a small startup into an interplanetary programme.
+            - heading "Game Modes" [level=3] [ref=e67]
+            - table [ref=e68]:
+              - rowgroup [ref=e69]:
+                - row "Tutorial Guided progression — missions unlock parts and facilities step by step. Best for new players." [ref=e70]:
+                  - cell "Tutorial" [ref=e71]:
+                    - strong [ref=e72]: Tutorial
+                  - cell "Guided progression — missions unlock parts and facilities step by step. Best for new players." [ref=e73]
+                - row "Freeplay All starter parts available from the beginning. Missions and contracts still provide rewards." [ref=e74]:
+                  - cell "Freeplay" [ref=e75]:
+                    - strong [ref=e76]: Freeplay
+                  - cell "All starter parts available from the beginning. Missions and contracts still provide rewards." [ref=e77]
+                - row "Sandbox Everything unlocked, unlimited funds. Toggle malfunctions and weather freely. Great for experimenting." [ref=e78]:
+                  - cell "Sandbox" [ref=e79]:
+                    - strong [ref=e80]: Sandbox
+                  - cell "Everything unlocked, unlimited funds. Toggle malfunctions and weather freely. Great for experimenting." [ref=e81]
+            - heading "Basic Flow" [level=3] [ref=e82]
+            - list [ref=e83]:
+              - listitem [ref=e84]:
+                - text: Accept a
+                - strong [ref=e85]: mission
+                - text: from Mission Control.
+              - listitem [ref=e86]:
+                - text: Design a rocket in the
+                - strong [ref=e87]: Vehicle Assembly Building
+                - text: (VAB).
+              - listitem [ref=e88]: Launch and fly the rocket to complete the mission objectives.
+              - listitem [ref=e89]: Return to the agency to collect your reward and unlock new parts.
+              - listitem [ref=e90]: Use rewards to hire crew, upgrade facilities, and take on harder missions.
+            - heading "Saving Your Game" [level=3] [ref=e91]
+            - paragraph [ref=e92]:
+              - text: Open the
+              - generic [ref=e93]: ☰
+              - text: hamburger menu (top-right) at any time to save your game. There are 5 save slots available. The game does not auto-save.
+          - button "← Close Help" [ref=e94] [cursor=pointer]

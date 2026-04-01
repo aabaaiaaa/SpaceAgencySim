@@ -1,0 +1,25 @@
+- generic [ref=e2]:
+  - generic:
+    - generic [ref=e31]:
+      - generic [ref=e32]: Test Agency
+      - button "View loan details" [ref=e33] [cursor=pointer]: $2,000,000
+      - button "View accepted missions" [ref=e34] [cursor=pointer]: Missions
+      - button "Open menu" [ref=e35] [cursor=pointer]: ☰
+    - generic [ref=e385]:
+      - generic [ref=e386]:
+        - button "← Hub" [ref=e387] [cursor=pointer]
+        - heading "Mission Control Centre — Tier 1 (Basic)" [level=1] [ref=e388]
+      - generic [ref=e389]:
+        - button "Missions" [ref=e390] [cursor=pointer]
+        - button "Accepted" [ref=e391] [cursor=pointer]
+        - button "Completed" [ref=e392] [cursor=pointer]
+        - button "Contracts" [ref=e394] [cursor=pointer]
+        - button "Active" [ref=e395] [cursor=pointer]
+        - button "Challenges" [ref=e397] [cursor=pointer]
+        - button "Achievements" [ref=e398] [cursor=pointer]
+      - generic [ref=e401]:
+        - generic [ref=e402]:
+          - heading "First Flight" [level=3] [ref=e403]
+          - generic [ref=e404]: $15,000
+        - paragraph [ref=e405]: "Our engineers have assembled a basic sounding rocket. Your task is simple: get it off the pad and reach 100 metres altitude. This is the first step in what will become a legendary space programme."
+        - button "Accept Mission" [ref=e407] [cursor=pointer]

@@ -1,0 +1,153 @@
+- generic [ref=e2]:
+  - generic:
+    - generic [ref=e30]:
+      - generic [ref=e31]: Test Agency
+      - generic [ref=e32]: Flight 60
+      - button "View loan details" [ref=e33] [cursor=pointer]: $8,000,000
+      - button "View accepted missions" [ref=e34] [cursor=pointer]: Missions
+      - button "Open menu" [ref=e35] [cursor=pointer]: ☰
+    - generic [ref=e65]:
+      - generic [ref=e66]:
+        - button "Back" [ref=e67] [cursor=pointer]
+        - heading "Agency Library" [level=1] [ref=e68]
+      - generic [ref=e69]:
+        - button "Statistics & Records" [ref=e70] [cursor=pointer]
+        - button "Celestial Bodies" [ref=e71] [cursor=pointer]
+        - button "Frequent Rockets" [ref=e72] [cursor=pointer]
+      - generic [ref=e73]:
+        - generic [ref=e74]:
+          - heading "Agency Overview" [level=2] [ref=e75]
+          - generic [ref=e76]:
+            - generic [ref=e77]:
+              - generic [ref=e78]: Total Flights
+              - generic [ref=e79]: "30"
+              - generic [ref=e80]: 30 successful, 0 failed
+            - generic [ref=e81]:
+              - generic [ref=e82]: Current Period
+              - generic [ref=e83]: "60"
+            - generic [ref=e84]:
+              - generic [ref=e85]: Science Points
+              - generic [ref=e86]: "350"
+            - generic [ref=e87]:
+              - generic [ref=e88]: Achievements
+              - generic [ref=e89]: 3 / 12
+            - generic [ref=e90]:
+              - generic [ref=e91]: Satellites
+              - generic [ref=e92]: "3"
+            - generic [ref=e93]:
+              - generic [ref=e94]: Active Crew
+              - generic [ref=e95]: "5"
+        - generic [ref=e96]:
+          - heading "Records" [level=2] [ref=e97]
+          - generic [ref=e98]:
+            - generic [ref=e99]:
+              - generic [ref=e100]: Peak Altitude
+              - generic [ref=e101]: None
+            - generic [ref=e102]:
+              - generic [ref=e103]: Peak Speed
+              - generic [ref=e104]: None
+            - generic [ref=e105]:
+              - generic [ref=e106]: Heaviest Rocket
+              - generic [ref=e107]: None
+            - generic [ref=e108]:
+              - generic [ref=e109]: Longest Flight
+              - generic [ref=e110]: None
+            - generic [ref=e111]:
+              - generic [ref=e112]: Best Streak
+              - generic [ref=e113]: 30 in a row
+            - generic [ref=e114]:
+              - generic [ref=e115]: Total Flight Time
+              - generic [ref=e116]: 1h 40m 0s
+        - generic [ref=e117]:
+          - heading "Exploration Progress" [level=2] [ref=e118]
+          - generic [ref=e119]:
+            - generic [ref=e120]:
+              - generic [ref=e121]: Bodies Discovered
+              - generic [ref=e122]: 1 / 8
+            - generic [ref=e123]:
+              - generic [ref=e124]: Biomes Explored
+              - generic [ref=e125]: 5 / 43
+            - generic [ref=e126]:
+              - generic [ref=e127]: Surface Items
+              - generic [ref=e128]: "0"
+          - table [ref=e129]:
+            - rowgroup [ref=e130]:
+              - row "Body Visited Orbited Landed" [ref=e131]:
+                - columnheader "Body" [ref=e132]
+                - columnheader "Visited" [ref=e133]
+                - columnheader "Orbited" [ref=e134]
+                - columnheader "Landed" [ref=e135]
+            - rowgroup [ref=e136]:
+              - row "EARTH Visited Orbited —" [ref=e137]:
+                - cell "EARTH" [ref=e138]
+                - cell "Visited" [ref=e139]
+                - cell "Orbited" [ref=e140]
+                - cell "—" [ref=e141]
+        - generic [ref=e142]:
+          - heading "Financial History" [level=2] [ref=e143]
+          - generic [ref=e144]:
+            - generic [ref=e145]:
+              - generic [ref=e146]: Current Balance
+              - generic [ref=e147]: $8.0M
+            - generic [ref=e148]:
+              - generic [ref=e149]: Loan Balance
+              - generic [ref=e150]: $0
+            - generic [ref=e151]:
+              - generic [ref=e152]: Total Interest Paid
+              - generic [ref=e153]: $120k
+            - generic [ref=e154]:
+              - generic [ref=e155]: Mission Revenue
+              - generic [ref=e156]: $0
+            - generic [ref=e157]:
+              - generic [ref=e158]: Contract Revenue
+              - generic [ref=e159]: $0
+            - generic [ref=e160]:
+              - generic [ref=e161]: Reputation
+              - generic [ref=e162]: 95 / 100
+        - generic [ref=e163]:
+          - heading "Crew Careers" [level=2] [ref=e164]
+          - table [ref=e165]:
+            - rowgroup [ref=e166]:
+              - row "Name Status Flights Piloting Engineering Science" [ref=e167]:
+                - columnheader "Name" [ref=e168]
+                - columnheader "Status" [ref=e169]
+                - columnheader "Flights" [ref=e170]
+                - columnheader "Piloting" [ref=e171]
+                - columnheader "Engineering" [ref=e172]
+                - columnheader "Science" [ref=e173]
+            - rowgroup [ref=e174]:
+              - row "Alex Mitchell IDLE 0 60 40 30" [ref=e175]:
+                - cell "Alex Mitchell" [ref=e176]
+                - cell "IDLE" [ref=e177]
+                - cell "0" [ref=e178]
+                - cell "60" [ref=e179]
+                - cell "40" [ref=e180]
+                - cell "30" [ref=e181]
+              - row "Jordan Lee IDLE 0 30 55 35" [ref=e182]:
+                - cell "Jordan Lee" [ref=e183]
+                - cell "IDLE" [ref=e184]
+                - cell "0" [ref=e185]
+                - cell "30" [ref=e186]
+                - cell "55" [ref=e187]
+                - cell "35" [ref=e188]
+              - row "Sam Rivera IDLE 0 35 25 55" [ref=e189]:
+                - cell "Sam Rivera" [ref=e190]
+                - cell "IDLE" [ref=e191]
+                - cell "0" [ref=e192]
+                - cell "35" [ref=e193]
+                - cell "25" [ref=e194]
+                - cell "55" [ref=e195]
+              - row "Casey Park IDLE 0 45 35 40" [ref=e196]:
+                - cell "Casey Park" [ref=e197]
+                - cell "IDLE" [ref=e198]
+                - cell "0" [ref=e199]
+                - cell "45" [ref=e200]
+                - cell "35" [ref=e201]
+                - cell "40" [ref=e202]
+              - row "Morgan Chen IDLE 0 50 45 45" [ref=e203]:
+                - cell "Morgan Chen" [ref=e204]
+                - cell "IDLE" [ref=e205]
+                - cell "0" [ref=e206]
+                - cell "50" [ref=e207]
+                - cell "45" [ref=e208]
+                - cell "45" [ref=e209]

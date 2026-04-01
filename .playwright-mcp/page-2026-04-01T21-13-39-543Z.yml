@@ -1,0 +1,64 @@
+- generic [ref=e2]:
+  - generic:
+    - generic [ref=e31]:
+      - generic [ref=e32]: Test Agency
+      - button "View loan details" [ref=e33] [cursor=pointer]: $2,000,000
+      - button "View accepted missions" [ref=e34] [cursor=pointer]: Missions
+      - button "Open menu" [ref=e35] [cursor=pointer]: ☰
+    - generic:
+      - generic [ref=e218]:
+        - button "← Hub" [ref=e219] [cursor=pointer]
+        - button "Inventory" [ref=e220] [cursor=pointer]
+        - button "Rocket Engineer" [ref=e221] [cursor=pointer]
+        - button "Staging" [ref=e222] [cursor=pointer]
+        - button "↔ Mirror" [pressed] [ref=e223] [cursor=pointer]:
+          - generic [ref=e224]: ↔
+          - text: Mirror
+        - button "Clear All" [ref=e225] [cursor=pointer]
+        - button "Save" [ref=e226] [cursor=pointer]
+        - button "Library" [ref=e227] [cursor=pointer]
+        - button "Launch" [disabled] [ref=e228]
+        - button "Zoom to Fit" [ref=e229] [cursor=pointer]
+        - generic "Automatically zoom to fit after changes" [ref=e230]:
+          - checkbox "Auto Zoom" [checked] [ref=e231]
+          - text: Auto Zoom
+        - slider "Zoom level" [ref=e232] [cursor=pointer]: "1"
+        - generic [ref=e233]: "Parts: 0"
+        - generic [ref=e234]: "Mass: 0 kg"
+        - generic [ref=e235]: "Cost: $0"
+      - generic:
+        - generic:
+          - generic:
+            - generic:
+              - generic: 0m
+        - generic [ref=e237]:
+          - generic [ref=e238]: Parts
+          - generic [ref=e239]:
+            - generic [ref=e240]: Computer Modules
+            - generic "Probe Core Mk1 — 50 kg · $5,000" [ref=e241]:
+              - generic [ref=e243]:
+                - generic [ref=e244]: Probe Core Mk1
+                - generic [ref=e245]:
+                  - generic [ref=e246]: 50 kg
+                  - generic [ref=e247]: $5,000
+            - generic [ref=e248]: Fuel Tanks
+            - generic "Small Tank — 50 kg · $800" [ref=e249]:
+              - generic [ref=e251]:
+                - generic [ref=e252]: Small Tank
+                - generic [ref=e253]:
+                  - generic [ref=e254]: 50 kg
+                  - generic [ref=e255]: $800
+            - generic [ref=e256]: Engines
+            - generic "Spark Engine — 120 kg · $6,000" [ref=e257]:
+              - generic [ref=e259]:
+                - generic [ref=e260]: Spark Engine
+                - generic [ref=e261]:
+                  - generic [ref=e262]: 120 kg
+                  - generic [ref=e263]: $6,000
+            - generic [ref=e264]: Parachutes
+            - generic "Mk1 Parachute — 100 kg · $400" [ref=e265]:
+              - generic [ref=e267]:
+                - generic [ref=e268]: Mk1 Parachute
+                - generic [ref=e269]:
+                  - generic [ref=e270]: 100 kg
+                  - generic [ref=e271]: $400

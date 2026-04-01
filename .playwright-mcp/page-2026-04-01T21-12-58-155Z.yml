@@ -1,0 +1,44 @@
+- generic [ref=e2]:
+  - generic:
+    - generic [ref=e31]:
+      - generic [ref=e32]: Test Agency
+      - button "View loan details" [ref=e33] [cursor=pointer]: $2,000,000
+      - button "View accepted missions" [ref=e34] [cursor=pointer]: Missions
+      - button "Open menu" [ref=e35] [cursor=pointer]: ☰
+    - generic:
+      - button "Launch Pad" [ref=e129] [cursor=pointer]:
+        - generic: Launch Pad
+      - button "Vehicle Assembly Building" [ref=e130] [cursor=pointer]:
+        - generic: Vehicle Assembly Building
+      - button "Mission Control Centre" [ref=e131] [cursor=pointer]:
+        - generic: Mission Control Centre
+      - button "Crew Administration" [ref=e132] [cursor=pointer]:
+        - generic: Crew Administration
+      - button "Tracking Station" [ref=e133] [cursor=pointer]:
+        - generic: Tracking Station
+      - button "R&D Lab" [active] [ref=e134] [cursor=pointer]:
+        - generic: R&D Lab
+      - button "Satellite Ops" [ref=e135] [cursor=pointer]:
+        - generic: Satellite Ops
+      - button "Library" [ref=e136] [cursor=pointer]:
+        - generic: Library
+      - button "Open construction menu" [ref=e137] [cursor=pointer]: Construction
+      - button "Open game settings" [ref=e138] [cursor=pointer]: Settings
+      - button "Open debug save menu" [ref=e139] [cursor=pointer]: Debug Saves
+      - generic [ref=e140]:
+        - generic [ref=e141]: Reputation
+        - generic [ref=e142]: "50"
+        - generic [ref=e143]: Good
+      - generic [ref=e146]:
+        - generic [ref=e147]: Launch Conditions
+        - generic [ref=e148]: Severe storm
+        - generic [ref=e149]:
+          - generic [ref=e150]: Wind
+          - generic [ref=e151]: 25.5 m/s
+        - generic [ref=e152]:
+          - generic [ref=e153]: ISP Effect
+          - generic [ref=e154]: "-0.7%"
+        - generic [ref=e155]:
+          - generic [ref=e156]: Visibility
+          - generic [ref=e157]: Dense fog
+        - generic [ref=e158]: EXTREME — Launch not recommended

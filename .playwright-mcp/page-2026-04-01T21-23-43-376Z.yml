@@ -1,0 +1,31 @@
+- generic [ref=e2]:
+  - generic:
+    - generic [ref=e31]:
+      - generic [ref=e32]: Test Agency
+      - button "View loan details" [ref=e33] [cursor=pointer]: $2,000,000
+      - button "View accepted missions" [ref=e34] [cursor=pointer]: Missions (1)
+      - button "Open menu" [ref=e35] [cursor=pointer]: ☰
+    - generic [ref=e385]:
+      - generic [ref=e386]:
+        - button "← Hub" [ref=e387] [cursor=pointer]
+        - heading "Mission Control Centre — Tier 1 (Basic)" [level=1] [ref=e388]
+      - generic [ref=e389]:
+        - button "Missions" [ref=e390] [cursor=pointer]
+        - button "Accepted" [ref=e391] [cursor=pointer]
+        - button "Completed" [ref=e392] [cursor=pointer]
+        - button "Contracts" [active] [ref=e394] [cursor=pointer]
+        - button "Active" [ref=e395] [cursor=pointer]
+        - button "Challenges" [ref=e397] [cursor=pointer]
+        - button "Achievements" [ref=e398] [cursor=pointer]
+      - generic [ref=e399]:
+        - generic [ref=e420]:
+          - text: "Mission Control:"
+          - strong [ref=e421]: Tier 1
+          - text: "(Basic)Upgrade to unlock: Medium-difficulty contracts"
+        - generic [ref=e422]: "Board: 0/4 slots | Active: 0/2 slots"
+        - generic [ref=e423]:
+          - generic [ref=e424]:
+            - text: "Reputation:"
+            - strong [ref=e425]: "50"
+          - generic [ref=e426]: Good
+        - paragraph [ref=e429]: No contracts on the board. Complete a flight to generate new contracts.

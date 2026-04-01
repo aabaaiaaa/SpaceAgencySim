@@ -1,0 +1,56 @@
+- generic [ref=e2]:
+  - generic:
+    - generic [ref=e31]:
+      - generic [ref=e32]: Test Agency
+      - generic [ref=e723]: Flight 40
+      - button "View loan details" [ref=e33] [cursor=pointer]: $3,775,000
+      - button "View accepted missions" [ref=e34] [cursor=pointer]: Missions
+      - button "Open menu" [ref=e35] [cursor=pointer]: ☰
+    - generic [ref=e795]:
+      - generic [ref=e796]:
+        - button "Back" [ref=e797] [cursor=pointer]
+        - heading "Tracking Station" [level=1] [ref=e798]
+        - generic [ref=e799]: Tier 2 — Advanced
+      - generic [ref=e800]:
+        - generic [ref=e801]:
+          - heading "Capabilities" [level=2] [ref=e802]
+          - list [ref=e803]:
+            - listitem [ref=e804]: ✓Map view (solar system)
+            - listitem [ref=e805]: ✓Track debris
+            - listitem [ref=e806]: ✓Predict weather windows
+            - listitem [ref=e807]: ✓All Tier 1 features
+        - generic [ref=e808]:
+          - heading "Orbital Overview" [level=2] [ref=e809]
+          - generic [ref=e810]:
+            - generic [ref=e811]:
+              - generic [ref=e812]: Total Objects
+              - generic [ref=e813]: "2"
+            - generic [ref=e814]:
+              - generic [ref=e815]: Satellites
+              - generic [ref=e816]: "2"
+            - generic [ref=e817]:
+              - generic [ref=e818]: Stations
+              - generic [ref=e819]: "0"
+            - generic [ref=e820]:
+              - generic [ref=e821]: Debris
+              - generic [ref=e822]: "0"
+        - generic [ref=e823]:
+          - heading "Crewed Vessels" [level=2] [ref=e824]
+          - generic [ref=e825]: No crewed vessels currently deployed in the field.
+        - generic [ref=e826]:
+          - heading "Tracked Objects" [level=2] [ref=e827]
+          - generic [ref=e828]:
+            - generic [ref=e829]:
+              - generic [ref=e830]: CommSat Alpha
+              - generic [ref=e831]: Satellite
+              - generic [ref=e832]: EARTH
+            - generic [ref=e833]:
+              - generic [ref=e834]: GPS Relay 1
+              - generic [ref=e835]: Satellite
+              - generic [ref=e836]: EARTH
+        - generic [ref=e837]:
+          - heading "Weather Window Predictions" [level=2] [ref=e838]
+          - generic [ref=e839]: No forecast data available. Deploy weather satellites for predictions.
+        - generic [ref=e840]:
+          - heading "Transfer Route Planning" [level=2] [ref=e841]
+          - generic [ref=e842]: Upgrade to Tier 3 to unlock deep space communication and transfer route planning.

@@ -1,0 +1,104 @@
+- generic [ref=e2]:
+  - generic:
+    - generic [ref=e31]:
+      - generic [ref=e32]: Test Agency
+      - button "View loan details" [ref=e33] [cursor=pointer]: $2,000,000
+      - button "View accepted missions" [ref=e34] [cursor=pointer]: Missions (1)
+      - button "Open menu" [ref=e35] [cursor=pointer]: ☰
+    - generic [ref=e385]:
+      - generic [ref=e386]:
+        - button "← Hub" [ref=e387] [cursor=pointer]
+        - heading "Mission Control Centre — Tier 1 (Basic)" [level=1] [ref=e388]
+      - generic [ref=e389]:
+        - button "Missions" [ref=e390] [cursor=pointer]
+        - button "Accepted" [ref=e391] [cursor=pointer]
+        - button "Completed" [ref=e392] [cursor=pointer]
+        - button "Contracts" [ref=e394] [cursor=pointer]
+        - button "Active" [ref=e395] [cursor=pointer]
+        - button "Challenges" [ref=e397] [cursor=pointer]
+        - button "Achievements" [active] [ref=e398] [cursor=pointer]
+      - generic [ref=e399]:
+        - generic [ref=e436]:
+          - strong [ref=e437]: "0"
+          - text: of 10 achievements earned
+        - generic [ref=e438]:
+          - generic [ref=e439]:
+            - generic [ref=e440]:
+              - generic [ref=e441]: 🌑
+              - heading "First Orbit" [level=3] [ref=e442]
+            - paragraph [ref=e443]: Achieve a stable orbit around Earth.
+            - generic [ref=e444]:
+              - generic [ref=e445]: $200,000
+              - generic [ref=e446]: +20 rep
+          - generic [ref=e447]:
+            - generic [ref=e448]:
+              - generic [ref=e449]: 🌑
+              - heading "First Satellite" [level=3] [ref=e450]
+            - paragraph [ref=e451]: Deploy a satellite into orbit.
+            - generic [ref=e452]:
+              - generic [ref=e453]: $150,000
+              - generic [ref=e454]: +15 rep
+          - generic [ref=e455]:
+            - generic [ref=e456]:
+              - generic [ref=e457]: 🌑
+              - heading "First Constellation" [level=3] [ref=e458]
+            - paragraph [ref=e459]: Deploy 3+ satellites of the same type.
+            - generic [ref=e460]:
+              - generic [ref=e461]: $300,000
+              - generic [ref=e462]: +25 rep
+          - generic [ref=e463]:
+            - generic [ref=e464]:
+              - generic [ref=e465]: 🌑
+              - heading "First Lunar Flyby" [level=3] [ref=e466]
+            - paragraph [ref=e467]: Send a craft to the Moon's sphere of influence.
+            - generic [ref=e468]:
+              - generic [ref=e469]: $500,000
+              - generic [ref=e470]: +30 rep
+          - generic [ref=e471]:
+            - generic [ref=e472]:
+              - generic [ref=e473]: 🌑
+              - heading "First Lunar Orbit" [level=3] [ref=e474]
+            - paragraph [ref=e475]: Achieve a stable orbit around the Moon.
+            - generic [ref=e476]:
+              - generic [ref=e477]: $750,000
+              - generic [ref=e478]: +35 rep
+          - generic [ref=e479]:
+            - generic [ref=e480]:
+              - generic [ref=e481]: 🌑
+              - heading "First Lunar Landing" [level=3] [ref=e482]
+            - paragraph [ref=e483]: Land safely on the Moon.
+            - generic [ref=e484]:
+              - generic [ref=e485]: $1,000,000
+              - generic [ref=e486]: +40 rep
+          - generic [ref=e487]:
+            - generic [ref=e488]:
+              - generic [ref=e489]: 🌑
+              - heading "First Lunar Return" [level=3] [ref=e490]
+            - paragraph [ref=e491]: Land on the Moon and return safely to Earth.
+            - generic [ref=e492]:
+              - generic [ref=e493]: $2,000,000
+              - generic [ref=e494]: +50 rep
+          - generic [ref=e495]:
+            - generic [ref=e496]:
+              - generic [ref=e497]: 🌑
+              - heading "First Mars Orbit" [level=3] [ref=e498]
+            - paragraph [ref=e499]: Achieve a stable orbit around Mars.
+            - generic [ref=e500]:
+              - generic [ref=e501]: $3,000,000
+              - generic [ref=e502]: +50 rep
+          - generic [ref=e503]:
+            - generic [ref=e504]:
+              - generic [ref=e505]: 🌑
+              - heading "First Mars Landing" [level=3] [ref=e506]
+            - paragraph [ref=e507]: Land safely on Mars.
+            - generic [ref=e508]:
+              - generic [ref=e509]: $5,000,000
+              - generic [ref=e510]: +60 rep
+          - generic [ref=e511]:
+            - generic [ref=e512]:
+              - generic [ref=e513]: 🌑
+              - heading "First Solar Science" [level=3] [ref=e514]
+            - paragraph [ref=e515]: Collect science data near the Sun.
+            - generic [ref=e516]:
+              - generic [ref=e517]: $4,000,000
+              - generic [ref=e518]: +50 rep
