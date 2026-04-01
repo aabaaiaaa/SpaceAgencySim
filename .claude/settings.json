@@ -11,7 +11,6 @@
       "Bash(mkdir:*)",
       "Bash(ls:*)",
       "Bash(cat:*)",
-      "Bash(echo:*)",
       "Read",
       "Write",
       "Edit",
@@ -24,7 +23,11 @@
       "Bash(rm -rf ..)",
       "Bash(sudo:*)",
       "Bash(chmod:*)",
-      "Bash(chown:*)"
+      "Bash(chown:*)",
+      "Edit(C:/Users/jeastaugh/source/repos/Experiments/SpaceAgencySim/.devloop/**)",
+      "Write(C:/Users/jeastaugh/source/repos/Experiments/SpaceAgencySim/.devloop/**)",
+      "Edit(C:/Users/jeastaugh/source/repos/Experiments/SpaceAgencySim/.claude/**)",
+      "Write(C:/Users/jeastaugh/source/repos/Experiments/SpaceAgencySim/.claude/**)"
     ]
   },
   "restrictToWorkspace": true,

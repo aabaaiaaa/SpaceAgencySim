@@ -514,8 +514,9 @@ function _render() {
   backBtn.id = 'sat-ops-back-btn';
   backBtn.textContent = 'Back';
   backBtn.addEventListener('click', () => {
+    const onBack = _onBack; // capture before destroy nulls it
     destroySatelliteOpsUI();
-    if (_onBack) _onBack();
+    if (onBack) onBack();
   });
   header.appendChild(backBtn);
 

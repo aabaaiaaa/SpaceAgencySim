@@ -1,7 +1,7 @@
 # UX Polish Tasks
 
 ### TASK-001: Fix "Back" button destroying hub for Tracking Station, Satellite Ops, Library
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Clicking "Back" from Tracking Station, Satellite Ops, or Library leaves a blank screen with only the topbar. The onBack callbacks in `src/ui/index.js` call `showHubScene()` and `initHubUI()` but the facility UI modules aren't cleaning up properly. Compare the working cleanup pattern used by Crew Admin and Mission Control (which use `← Hub` and work correctly) with the broken pattern in these three facilities. Fix the teardown/cleanup in each module so the hub re-renders correctly. See requirements section 1.1.
 - **Verification**: Start game, load "All Facilities Unlocked" debug save, click Tracking Station then "Back" — hub must render fully. Repeat for Satellite Ops and Library. All three must return to a fully functional hub.
