@@ -128,6 +128,7 @@ export function initUI(container, state) {
   // Mount the persistent top bar — visible on all in-game screens.
   initTopBar(container, state, {
     onExitToMenu: () => _handleExitToMenu(),
+    onLoadGame: (loadedState) => _handleLoadGame(loadedState),
   });
 
   setCurrentScreen('hub');
@@ -199,6 +200,43 @@ function _handleExitToMenu() {
   }
 
   console.log('[UI] Exited to main menu');
+}
+
+/**
+ * Tear down all in-game UI and reinitialize with the loaded game state.
+ * Called when the player loads a save from the in-game hamburger menu modal.
+ *
+ * @param {import('../core/gameState.js').GameState} loadedState
+ */
+function _handleLoadGame(loadedState) {
+  stopFlightScene();
+  hideVabScene();
+  destroyTopBar();
+  destroyHubUI();
+  if (_crewAdminOpen)      { destroyCrewAdminUI();      _crewAdminOpen = false; }
+  if (_missionControlOpen) { destroyMissionControlUI();  _missionControlOpen = false; }
+  if (_launchPadOpen)      { destroyLaunchPadUI();       _launchPadOpen = false; }
+  if (_satelliteOpsOpen)   { destroySatelliteOpsUI();    _satelliteOpsOpen = false; }
+  if (_trackingStationOpen){ destroyTrackingStationUI(); _trackingStationOpen = false; }
+  if (_libraryOpen)        { destroyLibraryUI();         _libraryOpen = false; }
+  if (_rdLabOpen)          { destroyRdLabUI();           _rdLabOpen = false; }
+
+  if (_container) {
+    _container.innerHTML = '';
+  }
+  _vabInitialized = false;
+
+  // Keep window.__gameState in sync for e2e test access.
+  if (typeof window !== 'undefined') {
+    window.__gameState = loadedState;
+  }
+
+  // Reinitialize the game UI with the loaded state.
+  if (_container) {
+    initUI(_container, loadedState);
+  }
+
+  console.log('[UI] Game loaded from in-game modal');
 }
 
 // ---------------------------------------------------------------------------

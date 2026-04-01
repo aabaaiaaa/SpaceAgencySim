@@ -16,7 +16,7 @@
  *
  * Hamburger dropdown:
  *   - Save Game   → opens save slot picker
- *   - Load Game   → navigates to main menu (load screen)
+ *   - Load Game   → opens load slot picker modal with confirmation
  *   - Exit to Menu → confirmation dialog, then navigates to main menu
  *
  * Mount with initTopBar(), remove with destroyTopBar().
@@ -26,7 +26,8 @@
  */
 
 import { payDownLoan, borrowMore } from '../core/finance.js';
-import { saveGame, listSaves, SAVE_SLOT_COUNT } from '../core/saveload.js';
+import { saveGame, loadGame, listSaves, SAVE_SLOT_COUNT } from '../core/saveload.js';
+import { reconcileParts } from '../core/missions.js';
 import { GameMode, MAX_LOAN_BALANCE } from '../core/constants.js';
 import { getPartById } from '../data/parts.js';
 import { syncVabToGameState } from '../ui/vab.js';
@@ -44,6 +45,9 @@ let _state = null;
 
 /** Callback invoked when the player wants to exit to the main menu. @type {(() => void) | null} */
 let _onExitToMenu = null;
+
+/** Callback invoked when the player loads a game from the in-game modal. @type {((state: import('../core/gameState.js').GameState) => void) | null} */
+let _onLoadGame = null;
 
 /**
  * Optional flight-specific menu items injected by the flight controller.
@@ -482,6 +486,13 @@ const TOPBAR_STYLES = `
 .confirm-btn-danger:hover {
   background: #9a2a2a;
 }
+.confirm-btn-primary {
+  background: #1a5a8a;
+  color: #dce8f4;
+}
+.confirm-btn-primary:hover {
+  background: #2070a8;
+}
 
 /* ══════════════════════════════════════════════════════════════════
    Missions dropdown
@@ -629,12 +640,14 @@ function _fmtRate(r) {
  *   The #ui-overlay div from index.html.
  * @param {import('../core/gameState.js').GameState} state
  *   The current game state.
- * @param {{ onExitToMenu: () => void }} callbacks
+ * @param {{ onExitToMenu: () => void, onLoadGame?: (state: import('../core/gameState.js').GameState) => void }} callbacks
  *   `onExitToMenu` is called when the player confirms they want to leave.
+ *   `onLoadGame` is called with the loaded state when the player loads a save from the in-game modal.
  */
-export function initTopBar(container, state, { onExitToMenu }) {
+export function initTopBar(container, state, { onExitToMenu, onLoadGame }) {
   _state = state;
   _onExitToMenu = onExitToMenu;
+  _onLoadGame = onLoadGame || null;
 
   // Inject styles once.
   if (!document.getElementById('topbar-styles')) {
@@ -734,6 +747,7 @@ export function destroyTopBar() {
   }
   _state = null;
   _onExitToMenu = null;
+  _onLoadGame = null;
   console.log('[TopBar] Destroyed');
 }
 
@@ -1386,15 +1400,151 @@ function _openSaveSlotPicker() {
 }
 
 // ---------------------------------------------------------------------------
-// Load Game — navigates directly to main menu (load screen)
+// Load Game — modal overlay with save slots
 // ---------------------------------------------------------------------------
 
 function _doLoadGame() {
-  // Navigate to main menu without a confirmation prompt; the main menu will
-  // show the load screen when existing saves are detected.
-  if (_onExitToMenu) {
-    _onExitToMenu();
+  _closeAllModals();
+
+  const backdrop = _makeBackdrop('load-modal-backdrop');
+
+  const modal = document.createElement('div');
+  modal.className = 'topbar-modal';
+  modal.setAttribute('role', 'dialog');
+  modal.setAttribute('aria-modal', 'true');
+  modal.setAttribute('aria-label', 'Load Game');
+  modal.addEventListener('click', (e) => e.stopPropagation());
+
+  modal.appendChild(_makeTitleRow('Load Game', () => backdrop.remove()));
+
+  const saves = listSaves();
+  let hasAnySave = false;
+
+  for (let i = 0; i < SAVE_SLOT_COUNT; i++) {
+    const slot = saves[i];
+    const card = document.createElement('div');
+    card.className = 'save-slot-card';
+    card.dataset.testid = `load-slot-${i}`;
+
+    const info = document.createElement('div');
+    info.className = 'save-slot-info';
+
+    if (slot) {
+      hasAnySave = true;
+      const name = document.createElement('strong');
+      name.textContent = slot.saveName || `Slot ${i + 1}`;
+
+      const detail = document.createElement('span');
+      const ts = new Date(slot.timestamp).toLocaleString();
+      detail.textContent = `${slot.agencyName} · ${ts}`;
+
+      info.appendChild(name);
+      info.appendChild(detail);
+    } else {
+      const name = document.createElement('strong');
+      name.textContent = `Slot ${i + 1}`;
+
+      const detail = document.createElement('span');
+      detail.className = 'empty-slot';
+      detail.textContent = 'Empty';
+
+      info.appendChild(name);
+      info.appendChild(detail);
+    }
+
+    const tag = document.createElement('span');
+    tag.className = 'save-slot-action-tag';
+    if (slot) {
+      tag.textContent = 'Load';
+      tag.classList.add('load-action');
+    } else {
+      tag.textContent = '—';
+      tag.style.opacity = '0.3';
+    }
+
+    card.appendChild(info);
+    card.appendChild(tag);
+
+    if (slot) {
+      const slotIndex = i;
+      card.style.cursor = 'pointer';
+      card.addEventListener('click', () => {
+        _confirmAndLoad(slotIndex, backdrop);
+      });
+    } else {
+      card.style.opacity = '0.5';
+      card.style.cursor = 'default';
+    }
+
+    modal.appendChild(card);
   }
+
+  if (!hasAnySave) {
+    const empty = document.createElement('p');
+    empty.style.cssText = 'text-align:center;color:#8899aa;padding:12px 0;';
+    empty.textContent = 'No saved games found.';
+    modal.appendChild(empty);
+  }
+
+  backdrop.addEventListener('click', () => backdrop.remove());
+  backdrop.appendChild(modal);
+  document.body.appendChild(backdrop);
+}
+
+/**
+ * Show a confirmation dialog, then load the save and reinitialize the game.
+ * @param {number} slotIndex
+ * @param {HTMLElement} loadBackdrop  The load modal backdrop to remove on confirm.
+ */
+function _confirmAndLoad(slotIndex, loadBackdrop) {
+  loadBackdrop.remove();
+
+  const backdrop = _makeBackdrop('load-confirm-backdrop');
+  const modal = document.createElement('div');
+  modal.className = 'topbar-modal';
+  modal.setAttribute('role', 'alertdialog');
+  modal.setAttribute('aria-modal', 'true');
+  modal.addEventListener('click', (e) => e.stopPropagation());
+
+  modal.appendChild(_makeTitleRow('Load Game', () => backdrop.remove()));
+
+  const msg = document.createElement('p');
+  msg.className = 'confirm-msg';
+  msg.textContent = 'Any unsaved progress will be lost. Are you sure you want to load this save?';
+  modal.appendChild(msg);
+
+  const btnRow = document.createElement('div');
+  btnRow.className = 'confirm-btn-row';
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'confirm-btn confirm-btn-cancel';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.addEventListener('click', () => backdrop.remove());
+
+  const confirmBtn = document.createElement('button');
+  confirmBtn.className = 'confirm-btn confirm-btn-primary';
+  confirmBtn.dataset.testid = 'load-confirm-btn';
+  confirmBtn.textContent = 'Load Game';
+  confirmBtn.addEventListener('click', () => {
+    backdrop.remove();
+    try {
+      const loadedState = loadGame(slotIndex);
+      reconcileParts(loadedState);
+      if (_onLoadGame) {
+        _onLoadGame(loadedState);
+      }
+    } catch (err) {
+      console.error('[TopBar] Load failed:', err);
+    }
+  });
+
+  btnRow.appendChild(cancelBtn);
+  btnRow.appendChild(confirmBtn);
+  modal.appendChild(btnRow);
+
+  backdrop.addEventListener('click', () => backdrop.remove());
+  backdrop.appendChild(modal);
+  document.body.appendChild(backdrop);
 }
 
 // ---------------------------------------------------------------------------
@@ -1556,7 +1706,7 @@ function _makeTitleRow(title, onClose) {
  * Remove all open topbar modals from the DOM.
  */
 function _closeAllModals() {
-  for (const id of ['loan-modal-backdrop', 'save-modal-backdrop', 'exit-confirm-backdrop', 'sandbox-settings-backdrop']) {
+  for (const id of ['loan-modal-backdrop', 'save-modal-backdrop', 'load-modal-backdrop', 'load-confirm-backdrop', 'exit-confirm-backdrop', 'sandbox-settings-backdrop']) {
     const el = document.getElementById(id);
     if (el) el.remove();
   }

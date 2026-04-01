@@ -19,7 +19,7 @@
 - **Verification**: Start a fresh Tutorial game — only Launch Pad, VAB, and MCC should be visible on the hub. Accept mission-018 (First Crew Flight) — Crew Admin should appear on the hub after accepting.
 
 ### TASK-004: Fix Load Game functionality
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: The "Load Game" option in the hamburger menu currently exits to the main menu (which has no load UI), destroying unsaved progress without warning. Fix in two parts: (a) Add a Load Game dialog as a modal overlay within the hub, matching the Save Game dialog style — show 5 slots with saved game info and "Load" buttons. (b) Add a "Load Game" section to the main menu below the New Game form. If any save slots contain data, show them with a "Load" button. See requirements sections 1.4 and 1.5.
 - **Verification**: From the hub, click hamburger menu > Load Game — a modal should appear showing save slots (not navigate away). From the main menu, saved games should be visible and loadable.
