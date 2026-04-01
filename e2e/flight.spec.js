@@ -277,7 +277,7 @@ test.describe('Flight — Launch & Basic Flight', () => {
     // Confirm the restart in the confirmation modal.
     const restartBackdrop = page.locator('#restart-flight-backdrop');
     await expect(restartBackdrop).toBeVisible({ timeout: 2_000 });
-    await restartBackdrop.getByText('Restart').click();
+    await restartBackdrop.getByRole('button', { name: 'Restart' }).click();
 
     // Flight HUD should still be visible (we're in a new flight, not the hub).
     await expect(page.locator('#flight-hud')).toBeVisible({ timeout: 10_000 });

@@ -109,6 +109,9 @@ export function buildSaveEnvelope({
   vabAssembly     = null,
   vabStagingConfig= null,
   tutorialMode    = true,
+  gameMode        = null,
+  sandboxSettings = null,
+  difficultySettings = { malfunctionFrequency: 'normal', weatherSeverity: 'normal', financialPressure: 'normal', injuryDuration: 'normal' },
   facilities      = STARTER_FACILITIES,
   contracts       = { board: [], active: [], completed: [], failed: [] },
   reputation      = 50,
@@ -116,8 +119,13 @@ export function buildSaveEnvelope({
   scienceLog      = [],
   techTree        = { researched: [], unlockedInstruments: [] },
   satelliteNetwork= { satellites: [] },
+  partInventory   = [],
+  weather         = null,
   surfaceItems    = [],
   achievements    = [],
+  challenges      = { active: null, results: {} },
+  customChallenges= [],
+  fieldCraft      = [],
 } = {}) {
   return {
     saveName,
@@ -140,6 +148,9 @@ export function buildSaveEnvelope({
       vabAssembly,
       vabStagingConfig,
       tutorialMode,
+      gameMode,
+      sandboxSettings,
+      difficultySettings,
       facilities: { ...facilities },
       contracts,
       reputation,
@@ -147,8 +158,13 @@ export function buildSaveEnvelope({
       scienceLog,
       techTree,
       satelliteNetwork,
+      partInventory,
+      weather,
       surfaceItems,
       achievements,
+      challenges,
+      customChallenges,
+      fieldCraft,
     },
   };
 }
@@ -211,6 +227,21 @@ export async function navigateToVab(page) {
     () => typeof window.__vabAssembly !== 'undefined',
     { timeout: 15_000 },
   );
+
+  // Disable auto-zoom and reset zoom to 1× so that viewport-pixel offsets
+  // used by placePart / dragPartToCanvas map 1:1 to world units.
+  await page.evaluate(() => {
+    const chk = document.getElementById('vab-chk-autozoom');
+    if (chk && chk.checked) {
+      chk.checked = false;
+      chk.dispatchEvent(new Event('change'));
+    }
+    const slider = document.getElementById('vab-zoom-slider');
+    if (slider) {
+      slider.value = '1';
+      slider.dispatchEvent(new Event('input'));
+    }
+  });
 }
 
 /**

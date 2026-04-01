@@ -250,6 +250,14 @@ test.describe('Save & Load Flow', () => {
     await page.click('[data-building-id="vab"]');
     await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 15_000 });
 
+    // Disable auto-zoom so viewport-pixel offsets map 1:1 to world units.
+    await page.evaluate(() => {
+      const chk = document.getElementById('vab-chk-autozoom');
+      if (chk && chk.checked) { chk.checked = false; chk.dispatchEvent(new Event('change')); }
+      const slider = document.getElementById('vab-zoom-slider');
+      if (slider) { slider.value = '1'; slider.dispatchEvent(new Event('input')); }
+    });
+
     // ── Place a part onto the canvas ──────────────────────────────────────
     await dragPartToCanvas(page, 'cmd-mk1', 525, 400);
 

@@ -69,7 +69,7 @@ import {
   autoStageNewPart,
   moveStage,
 } from '../core/rocketbuilder.js';
-import { createRocketDesign, saveDesign, deleteDesign } from '../core/gameState.js';
+import { createRocketDesign, saveDesign, deleteDesign, createFlightState } from '../core/gameState.js';
 import {
   getAllDesigns,
   saveDesignToLibrary,
@@ -4255,19 +4255,13 @@ function _doLaunch(crewIds) {
   _gameState.rockets.push(launchDesign);
 
   // Write the live flight state into game state.
-  _gameState.currentFlight = {
+  _gameState.currentFlight = createFlightState({
     missionId,
     rocketId:        launchDesign.id,
     crewIds,
-    crewCount:       crewIds.length,
-    timeElapsed:     0,
-    altitude:        0,
-    velocity:        0,
     fuelRemaining:   totalFuel,
     deltaVRemaining: 0,
-    events:          [],
-    aborted:         false,
-  };
+  });
 
   console.log('[VAB] Launch initiated', {
     missionId:    missionId || '(none)',

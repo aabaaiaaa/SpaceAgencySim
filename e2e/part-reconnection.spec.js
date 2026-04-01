@@ -33,6 +33,7 @@ test.describe('VAB — Part Disconnection & Reconnection', () => {
     // New game setup.
     await page.waitForSelector('#mm-agency-name-input', { state: 'visible', timeout: 15_000 });
     await page.fill('#mm-agency-name-input', 'Reconnect Test');
+    await page.click('.mm-mode-option[data-mode="freeplay"]');
     await page.click('#mm-start-btn');
     await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
 
@@ -43,6 +44,14 @@ test.describe('VAB — Part Disconnection & Reconnection', () => {
       () => typeof window.__vabAssembly !== 'undefined',
       { timeout: 15_000 },
     );
+
+    // Disable auto-zoom so viewport-pixel offsets map 1:1 to world units.
+    await page.evaluate(() => {
+      const chk = document.getElementById('vab-chk-autozoom');
+      if (chk && chk.checked) { chk.checked = false; chk.dispatchEvent(new Event('change')); }
+      const slider = document.getElementById('vab-zoom-slider');
+      if (slider) { slider.value = '1'; slider.dispatchEvent(new Event('input')); }
+    });
   });
 
   test.afterAll(async () => {

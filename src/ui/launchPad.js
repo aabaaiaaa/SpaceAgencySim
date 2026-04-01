@@ -28,6 +28,7 @@ import {
 import { getActiveCrew } from '../core/crew.js';
 import { getFacilityTier } from '../core/construction.js';
 import { getTotalMass } from '../core/rocketvalidator.js';
+import { createFlightState } from '../core/gameState.js';
 import { startFlightScene } from './flightController.js';
 import { showReturnResultsOverlay } from './hub.js';
 import { renderRocketPreview, buildRocketCard, injectRocketCardCSS } from './rocketCardUtil.js';
@@ -1032,19 +1033,13 @@ function _doLaunch(crewIds, design, assembly, stagingConfig) {
   }
 
   // Write the live flight state.
-  _state.currentFlight = {
+  _state.currentFlight = createFlightState({
     missionId,
     rocketId:        design.id,
     crewIds,
-    crewCount:       crewIds.length,
-    timeElapsed:     0,
-    altitude:        0,
-    velocity:        0,
     fuelRemaining:   totalFuel,
     deltaVRemaining: 0,
-    events:          [],
-    aborted:         false,
-  };
+  });
 
   console.log('[Launch Pad] Launch initiated', {
     designId:   design.id,

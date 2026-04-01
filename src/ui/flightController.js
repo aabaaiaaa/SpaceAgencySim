@@ -53,6 +53,7 @@ import {
   getDockingThrustDirections,
 } from '../core/controlMode.js';
 import { setMalfunctionMode, getMalfunctionMode } from '../core/malfunction.js';
+import { createFlightState } from '../core/gameState.js';
 import {
   recalculateOrbit,
   isOrbitalBurnActive,
@@ -2229,18 +2230,14 @@ function _executeRestart(rebuildCost) {
   }
 
   // Fresh flight state.
-  gs.currentFlight = {
+  gs.currentFlight = createFlightState({
     missionId,
     rocketId,
     crewIds,
-    timeElapsed:     0,
-    altitude:        0,
-    velocity:        0,
     fuelRemaining:   totalFuel,
     deltaVRemaining: 0,
-    events:          [],
-    aborted:         false,
-  };
+    bodyId:          _flightState?.bodyId ?? 'EARTH',
+  });
 
   // Deep-clone the originals so the new flight gets pristine copies.
   const freshAssembly = {
@@ -2954,12 +2951,11 @@ function _showPostFlightSummary(ps, assembly, flightState, state, onFlightEnd) {
         }
       }
 
-      gs.currentFlight = {
+      gs.currentFlight = createFlightState({
         missionId, rocketId, crewIds,
-        timeElapsed: 0, altitude: 0, velocity: 0,
         fuelRemaining: totalFuel, deltaVRemaining: 0,
-        events: [], aborted: false,
-      };
+        bodyId: _flightState?.bodyId ?? 'EARTH',
+      });
 
       const freshAssembly = {
         parts:         new Map([...origAssembly.parts].map(([id, p]) => [id, { ...p, ...(p.instruments ? { instruments: [...p.instruments] } : {}) }])),

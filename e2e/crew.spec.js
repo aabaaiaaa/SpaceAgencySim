@@ -174,8 +174,8 @@ test.describe('Crew Administration Flow', () => {
     await page.click('[data-tab-id="active"]');
     await expect(page.locator('.crew-name-cell')).toContainText('Yuri Gagarin');
 
-    // Missions Flown column (2nd <td> in the data row) must show "0".
-    const missionsCell = page.locator('.crew-table tbody tr td:nth-child(2)').first();
+    // Missions Flown column (4th <td> in the data row) must show "0".
+    const missionsCell = page.locator('.crew-table tbody tr td:nth-child(4)').first();
     await expect(missionsCell).toHaveText('0');
 
     // The astronaut's status in game state must be "active".
