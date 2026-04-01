@@ -319,6 +319,11 @@ export function loadGame(slotIndex) {
   }
   envelope.state.challenges.results ??= {};
 
+  // Default custom challenges for saves created before the custom challenge system.
+  if (!Array.isArray(envelope.state.customChallenges)) {
+    envelope.state.customChallenges = [];
+  }
+
   // Default difficulty settings for saves created before the settings system.
   if (!envelope.state.difficultySettings || typeof envelope.state.difficultySettings !== 'object') {
     envelope.state.difficultySettings = { ...DEFAULT_DIFFICULTY_SETTINGS };

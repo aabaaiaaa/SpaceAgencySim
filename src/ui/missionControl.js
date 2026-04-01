@@ -24,6 +24,11 @@ import { refreshTopBarMissions } from './topbar.js';
 import { getAchievementStatus } from '../core/achievements.js';
 import { getUnlockedChallenges, getChallengeResult, getActiveChallenge, acceptChallenge, abandonChallenge } from '../core/challenges.js';
 import { MedalTier, ScoreDirection } from '../data/challenges.js';
+import {
+  createCustomChallenge, deleteCustomChallenge,
+  exportChallengeJSON, importChallengeJSON,
+  OBJECTIVE_TYPE_META, SCORE_METRIC_OPTIONS,
+} from '../core/customChallenges.js';
 
 // ---------------------------------------------------------------------------
 // CSS
@@ -686,6 +691,272 @@ const MISSION_CONTROL_STYLES = `
   color: #5868a0;
   flex-shrink: 0;
 }
+
+/* ── Custom challenge badge ────────────────────────────────────────────── */
+.mc-custom-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #c8a050;
+  background: rgba(200, 160, 80, 0.12);
+  border: 1px solid rgba(200, 160, 80, 0.25);
+  padding: 1px 7px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.mc-challenge-card.custom-challenge {
+  border-color: rgba(200, 160, 80, 0.2);
+}
+
+/* ── Challenge toolbar (Create / Import buttons) ───────────────────────── */
+.mc-challenge-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.mc-challenge-toolbar button {
+  background: rgba(200, 160, 80, 0.15);
+  border: 1px solid rgba(200, 160, 80, 0.35);
+  color: #d8b860;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 6px 16px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.mc-challenge-toolbar button:hover {
+  background: rgba(200, 160, 80, 0.3);
+  border-color: rgba(200, 160, 80, 0.6);
+}
+
+/* ── Custom challenge delete / export buttons ──────────────────────────── */
+.mc-challenge-delete-btn {
+  background: rgba(200, 60, 60, 0.12);
+  border: 1px solid rgba(200, 60, 60, 0.3);
+  color: #c07070;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.mc-challenge-delete-btn:hover {
+  background: rgba(200, 60, 60, 0.25);
+}
+.mc-challenge-export-btn {
+  background: rgba(80, 160, 80, 0.12);
+  border: 1px solid rgba(80, 160, 80, 0.3);
+  color: #70b070;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.mc-challenge-export-btn:hover {
+  background: rgba(80, 160, 80, 0.25);
+}
+
+/* ── Creator form ──────────────────────────────────────────────────────── */
+.mc-creator-form {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(200, 160, 80, 0.25);
+  border-radius: 8px;
+  padding: 18px 20px;
+  margin-bottom: 18px;
+  max-width: 720px;
+}
+.mc-creator-form h3 {
+  margin: 0 0 14px;
+  font-size: 1rem;
+  color: #d8b860;
+  font-weight: 700;
+}
+.mc-creator-field {
+  margin-bottom: 12px;
+}
+.mc-creator-field label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #8898b0;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.mc-creator-field input,
+.mc-creator-field textarea,
+.mc-creator-field select {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: #e0e0e0;
+  font-size: 0.85rem;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-family: inherit;
+}
+.mc-creator-field textarea {
+  resize: vertical;
+  min-height: 50px;
+}
+.mc-creator-field input:focus,
+.mc-creator-field textarea:focus,
+.mc-creator-field select:focus {
+  outline: none;
+  border-color: rgba(200, 160, 80, 0.5);
+}
+.mc-creator-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.mc-creator-row .mc-creator-field {
+  flex: 1;
+  min-width: 120px;
+}
+
+/* Objectives builder */
+.mc-creator-objectives {
+  margin-bottom: 12px;
+}
+.mc-creator-objectives h4 {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+  color: #9aa0b0;
+  font-weight: 600;
+}
+.mc-creator-obj-entry {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.mc-creator-obj-entry select,
+.mc-creator-obj-entry input {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: #e0e0e0;
+  font-size: 0.82rem;
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-family: inherit;
+}
+.mc-creator-obj-entry select:focus,
+.mc-creator-obj-entry input:focus {
+  outline: none;
+  border-color: rgba(200, 160, 80, 0.5);
+}
+.mc-creator-obj-remove {
+  background: rgba(200, 60, 60, 0.15);
+  border: 1px solid rgba(200, 60, 60, 0.3);
+  color: #c07070;
+  font-size: 0.78rem;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.mc-creator-add-obj {
+  background: rgba(60, 120, 220, 0.15);
+  border: 1px solid rgba(60, 120, 220, 0.35);
+  color: #80b4f0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+/* Form actions */
+.mc-creator-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+.mc-creator-submit {
+  background: rgba(200, 160, 80, 0.2);
+  border: 1px solid rgba(200, 160, 80, 0.45);
+  color: #d8b860;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 7px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.mc-creator-submit:hover {
+  background: rgba(200, 160, 80, 0.35);
+}
+.mc-creator-cancel {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: #9aa0b0;
+  font-size: 0.85rem;
+  padding: 7px 16px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.mc-creator-cancel:hover {
+  background: rgba(255,255,255,0.12);
+}
+.mc-creator-error {
+  color: #e06060;
+  font-size: 0.82rem;
+  margin-top: 8px;
+}
+
+/* Import modal */
+.mc-import-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mc-import-dialog {
+  background: #1a1c28;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 10px;
+  padding: 24px;
+  max-width: 520px;
+  width: 90%;
+}
+.mc-import-dialog h3 {
+  margin: 0 0 12px;
+  color: #d8b860;
+  font-size: 1rem;
+}
+.mc-import-dialog textarea {
+  width: 100%;
+  box-sizing: border-box;
+  height: 200px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: #e0e0e0;
+  font-size: 0.82rem;
+  font-family: monospace;
+  padding: 10px;
+  border-radius: 4px;
+  resize: vertical;
+}
+.mc-import-dialog textarea:focus {
+  outline: none;
+  border-color: rgba(200, 160, 80, 0.5);
+}
+.mc-import-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
 `;
 
 // ---------------------------------------------------------------------------
@@ -714,6 +985,9 @@ let _onBack = null;
 
 /** Currently active tab id: 'available' | 'accepted' | 'completed' */
 let _activeTab = 'available';
+
+/** Whether the custom challenge creator form is currently visible. */
+let _creatorFormOpen = false;
 
 // ---------------------------------------------------------------------------
 // Formatting helpers
@@ -1806,6 +2080,30 @@ function _renderChallengesTab() {
     (bronzeCount > 0 ? ` ${_MEDAL_ICONS[MedalTier.BRONZE]} ${bronzeCount} Bronze` : '');
   content.appendChild(summary);
 
+  // Toolbar: Create + Import buttons
+  const toolbar = document.createElement('div');
+  toolbar.className = 'mc-challenge-toolbar';
+
+  const createBtn = document.createElement('button');
+  createBtn.textContent = '+ Create Challenge';
+  createBtn.addEventListener('click', () => {
+    _creatorFormOpen = !_creatorFormOpen;
+    _renderChallengesTab();
+  });
+  toolbar.appendChild(createBtn);
+
+  const importBtn = document.createElement('button');
+  importBtn.textContent = 'Import JSON';
+  importBtn.addEventListener('click', () => _showImportDialog());
+  toolbar.appendChild(importBtn);
+
+  content.appendChild(toolbar);
+
+  // Creator form (inline, toggled)
+  if (_creatorFormOpen) {
+    content.appendChild(_buildCreatorForm());
+  }
+
   if (unlocked.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'mc-empty-msg';
@@ -1821,11 +2119,14 @@ function _renderChallengesTab() {
   for (const ch of unlocked) {
     const result = getChallengeResult(_state, ch.id);
     const isActive = activeChallenge && activeChallenge.id === ch.id;
+    const isCustom = !!ch.custom;
 
     const card = document.createElement('div');
-    card.className = 'mc-challenge-card' + (isActive ? ' active-challenge' : '');
+    card.className = 'mc-challenge-card'
+      + (isActive ? ' active-challenge' : '')
+      + (isCustom ? ' custom-challenge' : '');
 
-    // Header: title + best medal
+    // Header: title + custom badge + best medal
     const header = document.createElement('div');
     header.className = 'mc-challenge-header';
 
@@ -1833,6 +2134,13 @@ function _renderChallengesTab() {
     title.className = 'mc-challenge-title';
     title.textContent = ch.title;
     header.appendChild(title);
+
+    if (isCustom) {
+      const badge = document.createElement('span');
+      badge.className = 'mc-custom-badge';
+      badge.textContent = 'Custom';
+      header.appendChild(badge);
+    }
 
     if (result && result.medal !== MedalTier.NONE) {
       const medalEl = document.createElement('span');
@@ -1941,11 +2249,447 @@ function _renderChallengesTab() {
       actions.appendChild(acceptBtn);
     }
 
+    // Export + Delete buttons for custom challenges
+    if (isCustom) {
+      const exportBtn = document.createElement('button');
+      exportBtn.className = 'mc-challenge-export-btn';
+      exportBtn.textContent = 'Export';
+      exportBtn.addEventListener('click', () => {
+        const json = exportChallengeJSON(ch);
+        _showExportDialog(json);
+      });
+      actions.appendChild(exportBtn);
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'mc-challenge-delete-btn';
+      delBtn.textContent = 'Delete';
+      delBtn.addEventListener('click', () => {
+        deleteCustomChallenge(_state, ch.id);
+        _renderChallengesTab();
+      });
+      actions.appendChild(delBtn);
+    }
+
     card.appendChild(actions);
     grid.appendChild(card);
   }
 
   content.appendChild(grid);
+}
+
+// ---------------------------------------------------------------------------
+// Private — Custom challenge creator form
+// ---------------------------------------------------------------------------
+
+/**
+ * Build the inline creator form for defining a custom challenge.
+ * @returns {HTMLElement}
+ */
+function _buildCreatorForm() {
+  const form = document.createElement('div');
+  form.className = 'mc-creator-form';
+
+  const heading = document.createElement('h3');
+  heading.textContent = 'Create Custom Challenge';
+  form.appendChild(heading);
+
+  // Title
+  const titleField = _makeField('Title', 'text', 'cc-title', 'My Challenge');
+  form.appendChild(titleField);
+
+  // Description
+  const descField = document.createElement('div');
+  descField.className = 'mc-creator-field';
+  const descLabel = document.createElement('label');
+  descLabel.textContent = 'Description';
+  descLabel.htmlFor = 'cc-description';
+  descField.appendChild(descLabel);
+  const descInput = document.createElement('textarea');
+  descInput.id = 'cc-description';
+  descInput.placeholder = 'Optional flavour text for your challenge';
+  descInput.rows = 2;
+  descField.appendChild(descInput);
+  form.appendChild(descField);
+
+  // Objectives section
+  const objSection = document.createElement('div');
+  objSection.className = 'mc-creator-objectives';
+  objSection.id = 'cc-objectives-section';
+
+  const objHeading = document.createElement('h4');
+  objHeading.textContent = 'Objectives';
+  objSection.appendChild(objHeading);
+
+  // Start with one objective row
+  const objContainer = document.createElement('div');
+  objContainer.id = 'cc-obj-container';
+  objContainer.appendChild(_buildObjectiveRow(0));
+  objSection.appendChild(objContainer);
+
+  const addObjBtn = document.createElement('button');
+  addObjBtn.className = 'mc-creator-add-obj';
+  addObjBtn.textContent = '+ Add Objective';
+  addObjBtn.type = 'button';
+  addObjBtn.addEventListener('click', () => {
+    const container = document.getElementById('cc-obj-container');
+    if (container) {
+      const idx = container.children.length;
+      container.appendChild(_buildObjectiveRow(idx));
+    }
+  });
+  objSection.appendChild(addObjBtn);
+  form.appendChild(objSection);
+
+  // Score metric
+  const metricField = document.createElement('div');
+  metricField.className = 'mc-creator-field';
+  const metricLabel = document.createElement('label');
+  metricLabel.textContent = 'Score Metric';
+  metricLabel.htmlFor = 'cc-metric';
+  metricField.appendChild(metricLabel);
+  const metricSelect = document.createElement('select');
+  metricSelect.id = 'cc-metric';
+  for (const opt of SCORE_METRIC_OPTIONS) {
+    const option = document.createElement('option');
+    option.value = opt.value;
+    option.textContent = `${opt.label} (${opt.unit}, ${opt.direction === ScoreDirection.LOWER_IS_BETTER ? 'lower is better' : 'higher is better'})`;
+    metricSelect.appendChild(option);
+  }
+  metricField.appendChild(metricSelect);
+  form.appendChild(metricField);
+
+  // Medal thresholds
+  const medalHeading = document.createElement('h4');
+  medalHeading.textContent = 'Medal Thresholds';
+  medalHeading.style.cssText = 'margin: 12px 0 6px; font-size: 0.85rem; color: #9aa0b0;';
+  form.appendChild(medalHeading);
+
+  const medalRow = document.createElement('div');
+  medalRow.className = 'mc-creator-row';
+  medalRow.appendChild(_makeField('Bronze', 'number', 'cc-medal-bronze', '100'));
+  medalRow.appendChild(_makeField('Silver', 'number', 'cc-medal-silver', '50'));
+  medalRow.appendChild(_makeField('Gold', 'number', 'cc-medal-gold', '25'));
+  form.appendChild(medalRow);
+
+  // Rewards
+  const rewardHeading = document.createElement('h4');
+  rewardHeading.textContent = 'Rewards ($)';
+  rewardHeading.style.cssText = 'margin: 12px 0 6px; font-size: 0.85rem; color: #9aa0b0;';
+  form.appendChild(rewardHeading);
+
+  const rewardRow = document.createElement('div');
+  rewardRow.className = 'mc-creator-row';
+  rewardRow.appendChild(_makeField('Bronze', 'number', 'cc-reward-bronze', '10000'));
+  rewardRow.appendChild(_makeField('Silver', 'number', 'cc-reward-silver', '25000'));
+  rewardRow.appendChild(_makeField('Gold', 'number', 'cc-reward-gold', '50000'));
+  form.appendChild(rewardRow);
+
+  // Error message area
+  const errorEl = document.createElement('div');
+  errorEl.id = 'cc-error';
+  errorEl.className = 'mc-creator-error';
+  form.appendChild(errorEl);
+
+  // Actions
+  const actions = document.createElement('div');
+  actions.className = 'mc-creator-actions';
+
+  const submitBtn = document.createElement('button');
+  submitBtn.className = 'mc-creator-submit';
+  submitBtn.textContent = 'Create';
+  submitBtn.type = 'button';
+  submitBtn.addEventListener('click', () => _handleCreateSubmit());
+  actions.appendChild(submitBtn);
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'mc-creator-cancel';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.type = 'button';
+  cancelBtn.addEventListener('click', () => {
+    _creatorFormOpen = false;
+    _renderChallengesTab();
+  });
+  actions.appendChild(cancelBtn);
+
+  form.appendChild(actions);
+  return form;
+}
+
+/**
+ * Build a single objective row for the creator form.
+ * @param {number} idx
+ * @returns {HTMLElement}
+ */
+function _buildObjectiveRow(idx) {
+  const row = document.createElement('div');
+  row.className = 'mc-creator-obj-entry';
+  row.dataset.objIdx = idx;
+
+  // Type selector
+  const typeSelect = document.createElement('select');
+  typeSelect.className = 'cc-obj-type';
+  for (const [type, meta] of Object.entries(OBJECTIVE_TYPE_META)) {
+    const opt = document.createElement('option');
+    opt.value = type;
+    opt.textContent = meta.label;
+    typeSelect.appendChild(opt);
+  }
+  typeSelect.addEventListener('change', () => {
+    // Rebuild target fields when type changes
+    _rebuildObjTargetFields(row, typeSelect.value);
+  });
+  row.appendChild(typeSelect);
+
+  // Target fields container
+  const fieldsContainer = document.createElement('span');
+  fieldsContainer.className = 'cc-obj-fields';
+  row.appendChild(fieldsContainer);
+
+  // Remove button
+  const removeBtn = document.createElement('button');
+  removeBtn.className = 'mc-creator-obj-remove';
+  removeBtn.textContent = 'X';
+  removeBtn.type = 'button';
+  removeBtn.addEventListener('click', () => row.remove());
+  row.appendChild(removeBtn);
+
+  // Initialize target fields for the default type
+  _rebuildObjTargetFields(row, typeSelect.value);
+
+  return row;
+}
+
+/**
+ * Rebuild the target input fields for an objective row when the type changes.
+ * @param {HTMLElement} row
+ * @param {string} type
+ */
+function _rebuildObjTargetFields(row, type) {
+  const container = row.querySelector('.cc-obj-fields');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const meta = OBJECTIVE_TYPE_META[type];
+  if (!meta) return;
+
+  for (const field of meta.fields) {
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.placeholder = field.label;
+    input.title = field.label;
+    input.className = 'cc-obj-target';
+    input.dataset.targetKey = field.key;
+    input.min = field.min ?? '';
+    input.style.width = '110px';
+    container.appendChild(input);
+  }
+}
+
+/**
+ * Create a simple labelled input field.
+ * @param {string} labelText
+ * @param {string} inputType
+ * @param {string} id
+ * @param {string} placeholder
+ * @returns {HTMLElement}
+ */
+function _makeField(labelText, inputType, id, placeholder) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'mc-creator-field';
+  const label = document.createElement('label');
+  label.textContent = labelText;
+  label.htmlFor = id;
+  wrapper.appendChild(label);
+  const input = document.createElement('input');
+  input.type = inputType;
+  input.id = id;
+  input.placeholder = placeholder || '';
+  wrapper.appendChild(input);
+  return wrapper;
+}
+
+/**
+ * Handle the Create button click — gather form data and create the challenge.
+ */
+function _handleCreateSubmit() {
+  if (!_state) return;
+
+  const errorEl = document.getElementById('cc-error');
+  const setError = (msg) => { if (errorEl) errorEl.textContent = msg; };
+
+  const title = /** @type {HTMLInputElement} */ (document.getElementById('cc-title'))?.value ?? '';
+  const description = /** @type {HTMLTextAreaElement} */ (document.getElementById('cc-description'))?.value ?? '';
+
+  // Gather objectives
+  const objRows = document.querySelectorAll('#cc-obj-container .mc-creator-obj-entry');
+  const objectives = [];
+  for (const row of objRows) {
+    const typeSelect = row.querySelector('.cc-obj-type');
+    if (!typeSelect) continue;
+    const type = /** @type {HTMLSelectElement} */ (typeSelect).value;
+    const target = {};
+    const targetInputs = row.querySelectorAll('.cc-obj-target');
+    for (const inp of targetInputs) {
+      const key = /** @type {HTMLElement} */ (inp).dataset.targetKey;
+      const val = /** @type {HTMLInputElement} */ (inp).value;
+      if (key && val !== '') {
+        target[key] = Number(val);
+      }
+    }
+    objectives.push({ type, target });
+  }
+
+  // Gather metric
+  const scoreMetric = /** @type {HTMLSelectElement} */ (document.getElementById('cc-metric'))?.value ?? '';
+
+  // Gather medals
+  const medals = {
+    bronze: Number(/** @type {HTMLInputElement} */ (document.getElementById('cc-medal-bronze'))?.value) || 0,
+    silver: Number(/** @type {HTMLInputElement} */ (document.getElementById('cc-medal-silver'))?.value) || 0,
+    gold:   Number(/** @type {HTMLInputElement} */ (document.getElementById('cc-medal-gold'))?.value) || 0,
+  };
+
+  // Gather rewards
+  const rewards = {
+    bronze: Number(/** @type {HTMLInputElement} */ (document.getElementById('cc-reward-bronze'))?.value) || 0,
+    silver: Number(/** @type {HTMLInputElement} */ (document.getElementById('cc-reward-silver'))?.value) || 0,
+    gold:   Number(/** @type {HTMLInputElement} */ (document.getElementById('cc-reward-gold'))?.value) || 0,
+  };
+
+  const result = createCustomChallenge(_state, {
+    title,
+    description,
+    objectives,
+    scoreMetric,
+    medals,
+    rewards,
+  });
+
+  if (!result.success) {
+    setError(result.error || 'Failed to create challenge.');
+    return;
+  }
+
+  _creatorFormOpen = false;
+  _renderChallengesTab();
+}
+
+/**
+ * Show a modal dialog for importing a challenge from JSON.
+ */
+function _showImportDialog() {
+  const overlay = document.createElement('div');
+  overlay.className = 'mc-import-overlay';
+
+  const dialog = document.createElement('div');
+  dialog.className = 'mc-import-dialog';
+
+  const heading = document.createElement('h3');
+  heading.textContent = 'Import Custom Challenge';
+  dialog.appendChild(heading);
+
+  const desc = document.createElement('p');
+  desc.style.cssText = 'font-size: 0.82rem; color: #8898b0; margin: 0 0 10px;';
+  desc.textContent = 'Paste a challenge JSON export below:';
+  dialog.appendChild(desc);
+
+  const textarea = document.createElement('textarea');
+  textarea.placeholder = '{ "title": "...", ... }';
+  dialog.appendChild(textarea);
+
+  const errorEl = document.createElement('div');
+  errorEl.className = 'mc-creator-error';
+  dialog.appendChild(errorEl);
+
+  const actions = document.createElement('div');
+  actions.className = 'mc-import-actions';
+
+  const importBtn = document.createElement('button');
+  importBtn.className = 'mc-creator-submit';
+  importBtn.textContent = 'Import';
+  importBtn.addEventListener('click', () => {
+    if (!_state) return;
+    const result = importChallengeJSON(_state, textarea.value);
+    if (!result.success) {
+      errorEl.textContent = result.error || 'Import failed.';
+      return;
+    }
+    overlay.remove();
+    _renderChallengesTab();
+  });
+  actions.appendChild(importBtn);
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'mc-creator-cancel';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.addEventListener('click', () => overlay.remove());
+  actions.appendChild(cancelBtn);
+
+  dialog.appendChild(actions);
+  overlay.appendChild(dialog);
+
+  // Close on backdrop click
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+
+  document.body.appendChild(overlay);
+}
+
+/**
+ * Show a modal dialog with exported JSON (for copying).
+ * @param {string} json
+ */
+function _showExportDialog(json) {
+  const overlay = document.createElement('div');
+  overlay.className = 'mc-import-overlay';
+
+  const dialog = document.createElement('div');
+  dialog.className = 'mc-import-dialog';
+
+  const heading = document.createElement('h3');
+  heading.textContent = 'Export Custom Challenge';
+  dialog.appendChild(heading);
+
+  const desc = document.createElement('p');
+  desc.style.cssText = 'font-size: 0.82rem; color: #8898b0; margin: 0 0 10px;';
+  desc.textContent = 'Copy the JSON below to share this challenge:';
+  dialog.appendChild(desc);
+
+  const textarea = document.createElement('textarea');
+  textarea.value = json;
+  textarea.readOnly = true;
+  dialog.appendChild(textarea);
+
+  const actions = document.createElement('div');
+  actions.className = 'mc-import-actions';
+
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'mc-creator-submit';
+  copyBtn.textContent = 'Copy to Clipboard';
+  copyBtn.addEventListener('click', () => {
+    textarea.select();
+    navigator.clipboard.writeText(json).then(() => {
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => { copyBtn.textContent = 'Copy to Clipboard'; }, 1500);
+    });
+  });
+  actions.appendChild(copyBtn);
+
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'mc-creator-cancel';
+  closeBtn.textContent = 'Close';
+  closeBtn.addEventListener('click', () => overlay.remove());
+  actions.appendChild(closeBtn);
+
+  dialog.appendChild(actions);
+  overlay.appendChild(dialog);
+
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+
+  document.body.appendChild(overlay);
 }
 
 /**

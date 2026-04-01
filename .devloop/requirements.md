@@ -318,7 +318,7 @@ Phase 1 → Phase 2 → Phase 3 (needs biomes), Phase 5 (needs science); Phase 1
 - **Description**: Hand-crafted missions with constraints and scoring in MCC "Challenges" tab. Structure: objective, constraints, scoring metric, Bronze/Silver/Gold medals. Replayable. Examples: Penny Pincher (reach 10km, $50k budget), Bullseye (land within 2 m/s), Minimalist (orbit with max 5 parts), Heavy Lifter (deploy 3 satellites one flight), Lunar Express (Moon landing + return, time limit), Rescue Mission (dock with stranded craft, fuel remaining). Need playtesting to verify possible and challenging.
 
 ### TASK-048: Custom mission creator
-- **Status**: pending
+- **Status**: done
 - **Priority**: low
 - **Dependencies**: TASK-047
 - **Description**: Players create personal challenges in MCC Challenges tab. Pick objective types, set thresholds, add constraints, set rewards. Personal challenges clearly marked as distinct from official. Assumes player understands what they're doing (broken missions accepted). Export/import as JSON for sharing.

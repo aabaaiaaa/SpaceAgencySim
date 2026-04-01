@@ -491,6 +491,9 @@ export function createGameState() {
       results: {},      // Best result per challenge: { [id]: { medal, score, attempts } }.
     },
 
+    // Player-created custom challenges (same shape as ChallengeDef + custom: true).
+    customChallenges: [],
+
     // Crewed vessels left in orbit or landed on non-Earth bodies.
     // Life support supplies count down each period.
     fieldCraft: [],

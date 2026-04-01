@@ -26,6 +26,7 @@
 
 import { CHALLENGES, MedalTier, ScoreDirection } from '../data/challenges.js';
 import { earnReward } from './finance.js';
+import { ensureCustomChallengeState } from './customChallenges.js';
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -88,10 +89,16 @@ export function getUnlockedChallenges(state) {
     (state.missions?.completed ?? []).map((m) => m.id),
   );
 
-  return CHALLENGES.filter((ch) => {
+  const official = CHALLENGES.filter((ch) => {
     if (!ch.requiredMissions || ch.requiredMissions.length === 0) return true;
     return ch.requiredMissions.every((mid) => completedMissionIds.has(mid));
   });
+
+  // Include all player-created custom challenges (no prerequisites).
+  ensureCustomChallengeState(state);
+  const custom = state.customChallenges ?? [];
+
+  return [...official, ...custom];
 }
 
 /**
@@ -134,12 +141,17 @@ export function getActiveChallenge(state) {
 export function acceptChallenge(state, challengeId) {
   ensureChallengeState(state);
 
-  const def = CHALLENGES.find((ch) => ch.id === challengeId);
+  // Search official challenges first, then custom.
+  let def = CHALLENGES.find((ch) => ch.id === challengeId);
+  if (!def) {
+    ensureCustomChallengeState(state);
+    def = (state.customChallenges ?? []).find((ch) => ch.id === challengeId);
+  }
   if (!def) {
     return { success: false, error: `Challenge '${challengeId}' not found.` };
   }
 
-  // Check prerequisites.
+  // Check prerequisites (custom challenges have none).
   const completedMissionIds = new Set(
     (state.missions?.completed ?? []).map((m) => m.id),
   );
@@ -151,6 +163,7 @@ export function acceptChallenge(state, challengeId) {
   }
 
   const instance = _copyChallenge(def);
+  if (def.custom) instance.custom = true;
   state.challenges.active = instance;
 
   return { success: true, challenge: instance };
