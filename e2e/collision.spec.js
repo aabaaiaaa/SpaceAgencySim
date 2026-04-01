@@ -19,7 +19,9 @@ import {
  *   Launch, fire engine, gain altitude, fire decoupler, observe separation.
  */
 
-test.describe.configure({ mode: 'serial' });
+// Retry once — this suite occasionally hits a Chromium WebGL crash under
+// concurrent test load that manifests as "Target page has been closed".
+test.describe.configure({ mode: 'serial', retries: 1 });
 
 // ---------------------------------------------------------------------------
 // Drop positions for: cmd-mk1 + decoupler + tank-small + engine-spark

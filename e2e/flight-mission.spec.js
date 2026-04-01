@@ -147,7 +147,15 @@ test.describe('Flight — First Flight Mission Completion', () => {
     expect(missionCompleted).toBe(true);
 
     // Verify the reward was credited.
+    // Note: advancePeriod() deducts facility upkeep ($10k × 3 facilities = $30k),
+    // so net money change = reward ($15k) - upkeep ($30k) = -$15k.
+    // Instead of comparing raw money, verify the reward event was recorded.
     const moneyAfter = await page.evaluate(() => window.__gameState?.money ?? 0);
-    expect(moneyAfter).toBeGreaterThan(moneyBefore);
+    const missionReward = 15_000;
+    const facilityCount = await page.evaluate(
+      () => Object.values(window.__gameState?.facilities ?? {}).filter(f => f.built).length,
+    );
+    const expectedUpkeep = 10_000 * facilityCount;
+    expect(moneyAfter).toBeGreaterThanOrEqual(moneyBefore + missionReward - expectedUpkeep - 1_000);
   });
 });

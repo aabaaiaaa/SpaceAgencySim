@@ -259,7 +259,13 @@ test.describe('Save & Load Flow', () => {
     });
 
     // ── Place a part onto the canvas ──────────────────────────────────────
-    await dragPartToCanvas(page, 'cmd-mk1', 525, 400);
+    // Use a starter part (probe-core-mk1) since cmd-mk1 is not unlocked
+    // in a fresh new game.
+    await page.waitForSelector('.vab-part-card[data-part-id="probe-core-mk1"]', {
+      state: 'visible',
+      timeout: 10_000,
+    });
+    await dragPartToCanvas(page, 'probe-core-mk1', 525, 400);
 
     // Wait for the part to be registered.
     await page.waitForFunction(
@@ -301,12 +307,12 @@ test.describe('Save & Load Flow', () => {
     expect(sizeAfter).toBeGreaterThanOrEqual(1);
 
     // Verify the correct part type was restored.
-    const hasCmd = await page.evaluate(() => {
+    const hasProbe = await page.evaluate(() => {
       for (const p of window.__vabAssembly.parts.values()) {
-        if (p.partId === 'cmd-mk1') return true;
+        if (p.partId === 'probe-core-mk1') return true;
       }
       return false;
     });
-    expect(hasCmd).toBe(true);
+    expect(hasProbe).toBe(true);
   });
 });
