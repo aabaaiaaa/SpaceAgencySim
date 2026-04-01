@@ -1,5 +1,5 @@
 /**
- * orbit.js — Simplified Keplerian orbit slot system.
+ * orbit.ts — Simplified Keplerian orbit slot system.
  *
  * Replaces full N-body simulation with a 2D Keplerian two-body model once a
  * craft achieves orbit.  Orbits are defined by classical orbital elements
@@ -42,8 +42,56 @@ import {
   MIN_ORBIT_ALTITUDE,
   ORBIT_SEGMENTS,
   PROXIMITY_ANGLE_DEG,
-  CelestialBody,
 } from './constants.js';
+
+import type { AltitudeBand } from './constants.js';
+import type { OrbitalElements, OrbitalObject } from './gameState.js';
+
+// ---------------------------------------------------------------------------
+// Interfaces for complex return types
+// ---------------------------------------------------------------------------
+
+/** Instantaneous orbital state at a given time. */
+export interface OrbitalState {
+  /** True anomaly at time t (radians). */
+  trueAnomaly: number;
+  /** Radial distance from body centre (m). */
+  radius: number;
+  /** Altitude above body surface (m). */
+  altitude: number;
+  /** Absolute angular position in degrees [0, 360). */
+  angularPositionDeg: number;
+}
+
+/** Result of checking whether a craft is in a valid orbit. */
+export interface OrbitStatus {
+  /** True if the orbit is stable (bound ellipse with periapsis above min altitude). */
+  valid: boolean;
+  /** Computed orbital elements, or null if trajectory is not a bound orbit. */
+  elements: OrbitalElements | null;
+  /** Periapsis altitude above surface (m). */
+  periapsisAlt: number;
+  /** Apoapsis altitude above surface (m). */
+  apoapsisAlt: number;
+  /** Altitude band at periapsis, or null. */
+  altitudeBand: AltitudeBand | null;
+}
+
+/** Result of a warp-to-target search. */
+export interface WarpResult {
+  /** Whether a proximity window was found. */
+  possible: boolean;
+  /** Absolute time of proximity, or null if not found. */
+  time: number | null;
+  /** Seconds elapsed from startTime to proximity, or null if not found. */
+  elapsed: number | null;
+}
+
+/** Minimal orbital state used for proximity checks. */
+export interface ProximityState {
+  altitude: number;
+  angularPositionDeg: number;
+}
 
 // ---------------------------------------------------------------------------
 // Internal constants
@@ -65,10 +113,10 @@ const CIRCULAR_THRESHOLD = 1e-8;
 /**
  * Get the minimum stable orbit altitude for a given celestial body.
  *
- * @param {string} bodyId  Celestial body ID.
- * @returns {number}  Minimum orbit altitude in metres.
+ * @param bodyId  Celestial body ID.
+ * @returns Minimum orbit altitude in metres.
  */
-export function getMinOrbitAltitude(bodyId) {
+export function getMinOrbitAltitude(bodyId: string): number {
   return MIN_ORBIT_ALTITUDE[bodyId] ?? 70_000;
 }
 
@@ -81,11 +129,11 @@ export function getMinOrbitAltitude(bodyId) {
  *
  * Uses Newton-Raphson iteration with M as the initial guess.
  *
- * @param {number} M  Mean anomaly (radians).
- * @param {number} e  Eccentricity (0 ≤ e < 1).
- * @returns {number}  Eccentric anomaly E (radians).
+ * @param M  Mean anomaly (radians).
+ * @param e  Eccentricity (0 ≤ e < 1).
+ * @returns Eccentric anomaly E (radians).
  */
-export function solveKepler(M, e) {
+export function solveKepler(M: number, e: number): number {
   if (e < CIRCULAR_THRESHOLD) return M;
 
   // Normalise M to [0, 2π)
@@ -107,11 +155,11 @@ export function solveKepler(M, e) {
 /**
  * Convert mean anomaly to true anomaly via eccentric anomaly.
  *
- * @param {number} M  Mean anomaly (radians).
- * @param {number} e  Eccentricity.
- * @returns {number}  True anomaly θ in [0, 2π).
+ * @param M  Mean anomaly (radians).
+ * @param e  Eccentricity.
+ * @returns True anomaly θ in [0, 2π).
  */
-export function meanAnomalyToTrue(M, e) {
+export function meanAnomalyToTrue(M: number, e: number): number {
   if (e < CIRCULAR_THRESHOLD) return ((M % TWO_PI) + TWO_PI) % TWO_PI;
 
   const E = solveKepler(M, e);
@@ -127,11 +175,11 @@ export function meanAnomalyToTrue(M, e) {
 /**
  * Convert true anomaly to eccentric anomaly.
  *
- * @param {number} theta  True anomaly (radians).
- * @param {number} e      Eccentricity.
- * @returns {number}  Eccentric anomaly E in [0, 2π).
+ * @param theta  True anomaly (radians).
+ * @param e      Eccentricity.
+ * @returns Eccentric anomaly E in [0, 2π).
  */
-export function trueToEccentricAnomaly(theta, e) {
+export function trueToEccentricAnomaly(theta: number, e: number): number {
   if (e < CIRCULAR_THRESHOLD) return ((theta % TWO_PI) + TWO_PI) % TWO_PI;
 
   const E = Math.atan2(
@@ -144,11 +192,11 @@ export function trueToEccentricAnomaly(theta, e) {
 /**
  * Convert true anomaly to mean anomaly.
  *
- * @param {number} theta  True anomaly (radians).
- * @param {number} e      Eccentricity.
- * @returns {number}  Mean anomaly M in [0, 2π).
+ * @param theta  True anomaly (radians).
+ * @param e      Eccentricity.
+ * @returns Mean anomaly M in [0, 2π).
  */
-export function trueAnomalyToMean(theta, e) {
+export function trueAnomalyToMean(theta: number, e: number): number {
   if (e < CIRCULAR_THRESHOLD) return ((theta % TWO_PI) + TWO_PI) % TWO_PI;
 
   const E = trueToEccentricAnomaly(theta, e);
@@ -161,29 +209,20 @@ export function trueAnomalyToMean(theta, e) {
 // ---------------------------------------------------------------------------
 
 /**
- * @typedef {Object} OrbitalElements
- * @property {number} semiMajorAxis      Semi-major axis (m from body centre).
- * @property {number} eccentricity       Eccentricity (0 = circular, 0 < e < 1 = elliptical).
- * @property {number} argPeriapsis       Argument of periapsis ω (radians).
- * @property {number} meanAnomalyAtEpoch Mean anomaly M₀ at the epoch (radians).
- * @property {number} epoch              Reference time (seconds) for M₀.
- */
-
-/**
  * Compute Keplerian orbital elements from game-coordinate state vectors.
  *
  * Returns null if the trajectory is not a bound elliptical orbit (i.e. the
  * specific orbital energy is non-negative → hyperbolic/escape).
  *
- * @param {number} posX    Horizontal position in game coords (m).
- * @param {number} posY    Altitude above surface (m).
- * @param {number} velX    Horizontal velocity (m/s).
- * @param {number} velY    Vertical velocity (m/s).
- * @param {string} bodyId  Celestial body ID (e.g. 'EARTH').
- * @param {number} [epoch=0]  Reference time for the epoch.
- * @returns {OrbitalElements|null}  Elements, or null if not a bound orbit.
+ * @param posX    Horizontal position in game coords (m).
+ * @param posY    Altitude above surface (m).
+ * @param velX    Horizontal velocity (m/s).
+ * @param velY    Vertical velocity (m/s).
+ * @param bodyId  Celestial body ID (e.g. 'EARTH').
+ * @param epoch   Reference time for the epoch.
+ * @returns Elements, or null if not a bound orbit.
  */
-export function computeOrbitalElements(posX, posY, velX, velY, bodyId, epoch = 0) {
+export function computeOrbitalElements(posX: number, posY: number, velX: number, velY: number, bodyId: string, epoch: number = 0): OrbitalElements | null {
   const mu = BODY_GM[bodyId];
   const R = BODY_RADIUS[bodyId];
   if (mu == null || R == null) return null;
@@ -220,7 +259,7 @@ export function computeOrbitalElements(posX, posY, velX, velY, bodyId, epoch = 0
   const ey = (coeff * y - rdotv * velY) / mu;
 
   // Argument of periapsis (angle of eccentricity vector from reference).
-  let omega;
+  let omega: number;
   if (e < CIRCULAR_THRESHOLD) {
     omega = 0;
   } else {
@@ -228,7 +267,7 @@ export function computeOrbitalElements(posX, posY, velX, velY, bodyId, epoch = 0
   }
 
   // True anomaly: angle from periapsis direction to current position.
-  let theta;
+  let theta: number;
   if (e < CIRCULAR_THRESHOLD) {
     theta = Math.atan2(y, x);
   } else {
@@ -256,11 +295,11 @@ export function computeOrbitalElements(posX, posY, velX, velY, bodyId, epoch = 0
 /**
  * Orbital period for an elliptical orbit.
  *
- * @param {number} a       Semi-major axis (m).
- * @param {string} bodyId  Celestial body ID.
- * @returns {number}  Period in seconds.
+ * @param a       Semi-major axis (m).
+ * @param bodyId  Celestial body ID.
+ * @returns Period in seconds.
  */
-export function getOrbitalPeriod(a, bodyId) {
+export function getOrbitalPeriod(a: number, bodyId: string): number {
   const mu = BODY_GM[bodyId];
   return TWO_PI * Math.sqrt((a * a * a) / mu);
 }
@@ -268,11 +307,11 @@ export function getOrbitalPeriod(a, bodyId) {
 /**
  * Mean motion (radians per second).
  *
- * @param {number} a       Semi-major axis (m).
- * @param {string} bodyId  Celestial body ID.
- * @returns {number}  n (rad/s).
+ * @param a       Semi-major axis (m).
+ * @param bodyId  Celestial body ID.
+ * @returns n (rad/s).
  */
-export function getMeanMotion(a, bodyId) {
+export function getMeanMotion(a: number, bodyId: string): number {
   const mu = BODY_GM[bodyId];
   return Math.sqrt(mu / (a * a * a));
 }
@@ -284,12 +323,11 @@ export function getMeanMotion(a, bodyId) {
 /**
  * Compute the orbital state of an object at a given time.
  *
- * @param {OrbitalElements} elements  Orbital elements.
- * @param {number}          t         Absolute time (seconds, same frame as epoch).
- * @param {string}          bodyId    Celestial body ID.
- * @returns {{ trueAnomaly: number, radius: number, altitude: number, angularPositionDeg: number }}
+ * @param elements  Orbital elements.
+ * @param t         Absolute time (seconds, same frame as epoch).
+ * @param bodyId    Celestial body ID.
  */
-export function getOrbitalStateAtTime(elements, t, bodyId) {
+export function getOrbitalStateAtTime(elements: OrbitalElements, t: number, bodyId: string): OrbitalState {
   const { semiMajorAxis: a, eccentricity: e, argPeriapsis: omega, meanAnomalyAtEpoch: M0, epoch } = elements;
   const R = BODY_RADIUS[bodyId];
   const n = getMeanMotion(a, bodyId);
@@ -316,11 +354,11 @@ export function getOrbitalStateAtTime(elements, t, bodyId) {
 /**
  * Circular orbit velocity at a given altitude.
  *
- * @param {number} altitude  Metres above the surface.
- * @param {string} bodyId    Celestial body ID.
- * @returns {number}  Orbital velocity in m/s.
+ * @param altitude  Metres above the surface.
+ * @param bodyId    Celestial body ID.
+ * @returns Orbital velocity in m/s.
  */
-export function circularOrbitVelocity(altitude, bodyId) {
+export function circularOrbitVelocity(altitude: number, bodyId: string): number {
   const mu = BODY_GM[bodyId];
   const R = BODY_RADIUS[bodyId];
   return Math.sqrt(mu / (R + altitude));
@@ -329,11 +367,11 @@ export function circularOrbitVelocity(altitude, bodyId) {
 /**
  * Periapsis altitude (above surface).
  *
- * @param {OrbitalElements} elements
- * @param {string}          bodyId
- * @returns {number}  Metres above surface.
+ * @param elements  Orbital elements.
+ * @param bodyId    Celestial body ID.
+ * @returns Metres above surface.
  */
-export function getPeriapsisAltitude(elements, bodyId) {
+export function getPeriapsisAltitude(elements: OrbitalElements, bodyId: string): number {
   const rPeri = elements.semiMajorAxis * (1 - elements.eccentricity);
   return rPeri - BODY_RADIUS[bodyId];
 }
@@ -341,11 +379,11 @@ export function getPeriapsisAltitude(elements, bodyId) {
 /**
  * Apoapsis altitude (above surface).
  *
- * @param {OrbitalElements} elements
- * @param {string}          bodyId
- * @returns {number}  Metres above surface.
+ * @param elements  Orbital elements.
+ * @param bodyId    Celestial body ID.
+ * @returns Metres above surface.
  */
-export function getApoapsisAltitude(elements, bodyId) {
+export function getApoapsisAltitude(elements: OrbitalElements, bodyId: string): number {
   const rApo = elements.semiMajorAxis * (1 + elements.eccentricity);
   return rApo - BODY_RADIUS[bodyId];
 }
@@ -357,12 +395,11 @@ export function getApoapsisAltitude(elements, bodyId) {
 /**
  * Determine which altitude band an object is in.
  *
- * @param {number} altitude  Altitude above surface (m).
- * @param {string} bodyId    Celestial body ID.
- * @returns {{ id: string, name: string, min: number, max: number }|null}
- *   The matching band, or null if outside all defined bands.
+ * @param altitude  Altitude above surface (m).
+ * @param bodyId    Celestial body ID.
+ * @returns The matching band, or null if outside all defined bands.
  */
-export function getAltitudeBand(altitude, bodyId) {
+export function getAltitudeBand(altitude: number, bodyId: string): AltitudeBand | null {
   const bands = ALTITUDE_BANDS[bodyId];
   if (!bands) return null;
 
@@ -375,11 +412,10 @@ export function getAltitudeBand(altitude, bodyId) {
 /**
  * Get the ID string of the altitude band, or null.
  *
- * @param {number} altitude
- * @param {string} bodyId
- * @returns {string|null}
+ * @param altitude  Altitude above surface (m).
+ * @param bodyId    Celestial body ID.
  */
-export function getAltitudeBandId(altitude, bodyId) {
+export function getAltitudeBandId(altitude: number, bodyId: string): string | null {
   const band = getAltitudeBand(altitude, bodyId);
   return band ? band.id : null;
 }
@@ -387,12 +423,11 @@ export function getAltitudeBandId(altitude, bodyId) {
 /**
  * Check whether an orbit's altitude range overlaps with a specific band.
  *
- * @param {OrbitalElements} elements
- * @param {string}          bandId   e.g. 'LEO'
- * @param {string}          bodyId
- * @returns {boolean}
+ * @param elements  Orbital elements.
+ * @param bandId    e.g. 'LEO'
+ * @param bodyId    Celestial body ID.
  */
-export function orbitOverlapsBand(elements, bandId, bodyId) {
+export function orbitOverlapsBand(elements: OrbitalElements, bandId: string, bodyId: string): boolean {
   const bands = ALTITUDE_BANDS[bodyId];
   if (!bands) return false;
   const band = bands.find(b => b.id === bandId);
@@ -412,10 +447,10 @@ export function orbitOverlapsBand(elements, bandId, bodyId) {
 /**
  * Map an angular position (degrees) to one of the 36 segments.
  *
- * @param {number} angleDeg  Angular position in degrees [0, 360).
- * @returns {number}  Segment index (0–35).
+ * @param angleDeg  Angular position in degrees [0, 360).
+ * @returns Segment index (0–35).
  */
-export function getAngularSegment(angleDeg) {
+export function getAngularSegment(angleDeg: number): number {
   const normalised = ((angleDeg % 360) + 360) % 360;
   return Math.floor(normalised / (360 / ORBIT_SEGMENTS));
 }
@@ -423,11 +458,11 @@ export function getAngularSegment(angleDeg) {
 /**
  * Shortest angular distance between two angles (always positive, ≤ 180°).
  *
- * @param {number} a  First angle (degrees).
- * @param {number} b  Second angle (degrees).
- * @returns {number}  Distance in degrees (0–180).
+ * @param a  First angle (degrees).
+ * @param b  Second angle (degrees).
+ * @returns Distance in degrees (0–180).
  */
-export function angularDistance(a, b) {
+export function angularDistance(a: number, b: number): number {
   let d = ((a - b) % 360 + 360) % 360;
   if (d > 180) d = 360 - d;
   return d;
@@ -441,12 +476,11 @@ export function angularDistance(a, b) {
  * Check whether two orbital states satisfy the proximity condition:
  *   angular distance < 5° AND same altitude band.
  *
- * @param {{ altitude: number, angularPositionDeg: number }} state1
- * @param {{ altitude: number, angularPositionDeg: number }} state2
- * @param {string} bodyId
- * @returns {boolean}
+ * @param state1  First orbital state.
+ * @param state2  Second orbital state.
+ * @param bodyId  Celestial body ID.
  */
-export function checkProximity(state1, state2, bodyId) {
+export function checkProximity(state1: ProximityState, state2: ProximityState, bodyId: string): boolean {
   // Angular distance check.
   const angleDist = angularDistance(state1.angularPositionDeg, state2.angularPositionDeg);
   if (angleDist >= PROXIMITY_ANGLE_DEG) return false;
@@ -469,14 +503,13 @@ export function checkProximity(state1, state2, bodyId) {
  *   1. The trajectory is a bound ellipse (specific energy < 0).
  *   2. Periapsis altitude ≥ minimum stable orbit altitude for that body.
  *
- * @param {number} posX    Horizontal position (m).
- * @param {number} posY    Altitude above surface (m).
- * @param {number} velX    Horizontal velocity (m/s).
- * @param {number} velY    Vertical velocity (m/s).
- * @param {string} bodyId  Celestial body ID.
- * @returns {{ valid: boolean, elements: OrbitalElements|null, periapsisAlt: number, apoapsisAlt: number, altitudeBand: {id: string, name: string}|null }}
+ * @param posX    Horizontal position (m).
+ * @param posY    Altitude above surface (m).
+ * @param velX    Horizontal velocity (m/s).
+ * @param velY    Vertical velocity (m/s).
+ * @param bodyId  Celestial body ID.
  */
-export function checkOrbitStatus(posX, posY, velX, velY, bodyId) {
+export function checkOrbitStatus(posX: number, posY: number, velX: number, velY: number, bodyId: string): OrbitStatus {
   const elements = computeOrbitalElements(posX, posY, velX, velY, bodyId);
 
   if (!elements) {
@@ -499,10 +532,9 @@ export function checkOrbitStatus(posX, posY, velX, velY, bodyId) {
  * Returns the band name (e.g. "Low Earth Orbit") if the periapsis is within
  * a named band, otherwise falls back to "Orbit".
  *
- * @param {{ altitudeBand: {id: string, name: string}|null }} orbitStatus
- * @returns {string}
+ * @param orbitStatus  Result from checkOrbitStatus.
  */
-export function getOrbitEntryLabel(orbitStatus) {
+export function getOrbitEntryLabel(orbitStatus: { altitudeBand: { id: string; name: string } | null } | null): string {
   if (orbitStatus && orbitStatus.altitudeBand) {
     return orbitStatus.altitudeBand.name;
   }
@@ -513,22 +545,21 @@ export function getOrbitEntryLabel(orbitStatus) {
 // Orbital object management
 // ---------------------------------------------------------------------------
 
-/**
- * @typedef {Object} OrbitalObject
- * @property {string}          id        Unique identifier.
- * @property {string}          bodyId    Celestial body this object orbits.
- * @property {string}          type      OrbitalObjectType value.
- * @property {string}          name      Display name.
- * @property {OrbitalElements} elements  Current orbital elements.
- */
+/** Options for creating a new orbital object. */
+interface CreateOrbitalObjectOpts {
+  id: string;
+  bodyId: string;
+  type: string;
+  name: string;
+  elements: OrbitalElements;
+}
 
 /**
  * Create a new orbital object.
  *
- * @param {{ id: string, bodyId: string, type: string, name: string, elements: OrbitalElements }} opts
- * @returns {OrbitalObject}
+ * @param opts  Object creation options.
  */
-export function createOrbitalObject({ id, bodyId, type, name, elements }) {
+export function createOrbitalObject({ id, bodyId, type, name, elements }: CreateOrbitalObjectOpts): OrbitalObject {
   return {
     id,
     bodyId,
@@ -550,10 +581,10 @@ export function createOrbitalObject({ id, bodyId, type, name, elements }) {
  * reflects the most recent update time.  This prevents floating-point drift
  * when (t − epoch) grows very large.
  *
- * @param {OrbitalObject[]} objects  Array of orbital objects (mutated in place).
- * @param {number}          newTime  New absolute time (seconds).
+ * @param objects  Array of orbital objects (mutated in place).
+ * @param newTime  New absolute time (seconds).
  */
-export function tickOrbitalObjects(objects, newTime) {
+export function tickOrbitalObjects(objects: OrbitalObject[], newTime: number): void {
   for (const obj of objects) {
     rebaseEpoch(obj.elements, newTime, obj.bodyId);
   }
@@ -565,11 +596,11 @@ export function tickOrbitalObjects(objects, newTime) {
  * Computes the mean anomaly at `newEpoch` and stores it as M₀, then sets
  * epoch = newEpoch.
  *
- * @param {OrbitalElements} elements  Mutated in place.
- * @param {number}          newEpoch  New epoch time (seconds).
- * @param {string}          bodyId    Celestial body ID.
+ * @param elements  Mutated in place.
+ * @param newEpoch  New epoch time (seconds).
+ * @param bodyId    Celestial body ID.
  */
-export function rebaseEpoch(elements, newEpoch, bodyId) {
+export function rebaseEpoch(elements: OrbitalElements, newEpoch: number, bodyId: string): void {
   const n = getMeanMotion(elements.semiMajorAxis, bodyId);
   const dt = newEpoch - elements.epoch;
   const M = elements.meanAnomalyAtEpoch + n * dt;
@@ -587,18 +618,15 @@ export function rebaseEpoch(elements, newEpoch, bodyId) {
  *
  * Searches forward in time from `startTime` up to `maxSearchTime` seconds.
  *
- * @param {OrbitalElements} craftElements   Craft's orbital elements.
- * @param {OrbitalElements} targetElements  Target's orbital elements.
- * @param {string}          bodyId          Celestial body ID.
- * @param {number}          startTime       Time to begin searching (seconds).
- * @param {number}          [maxSearchTime] Maximum seconds to search forward.
+ * @param craftElements   Craft's orbital elements.
+ * @param targetElements  Target's orbital elements.
+ * @param bodyId          Celestial body ID.
+ * @param startTime       Time to begin searching (seconds).
+ * @param maxSearchTime   Maximum seconds to search forward.
  *   Defaults to 2× the synodic period (or 2× the longer orbital period if
  *   the periods are nearly equal).
- * @returns {{ possible: boolean, time: number|null, elapsed: number|null }}
- *   `possible` is false if no proximity window was found.  Otherwise `time`
- *   is the absolute time and `elapsed` is seconds from `startTime`.
  */
-export function warpToTarget(craftElements, targetElements, bodyId, startTime, maxSearchTime) {
+export function warpToTarget(craftElements: OrbitalElements, targetElements: OrbitalElements, bodyId: string, startTime: number, maxSearchTime?: number): WarpResult {
   const T_craft = getOrbitalPeriod(craftElements.semiMajorAxis, bodyId);
   const T_target = getOrbitalPeriod(targetElements.semiMajorAxis, bodyId);
 
@@ -649,12 +677,11 @@ export function warpToTarget(craftElements, targetElements, bodyId, startTime, m
  * Check if two orbits share any altitude band (their altitude ranges overlap
  * within at least one common band).
  *
- * @param {OrbitalElements} elem1
- * @param {OrbitalElements} elem2
- * @param {string}          bodyId
- * @returns {boolean}
+ * @param elem1   First orbit's elements.
+ * @param elem2   Second orbit's elements.
+ * @param bodyId  Celestial body ID.
  */
-function _orbitsShareBand(elem1, elem2, bodyId) {
+function _orbitsShareBand(elem1: OrbitalElements, elem2: OrbitalElements, bodyId: string): boolean {
   const bands = ALTITUDE_BANDS[bodyId];
   if (!bands) return false;
 

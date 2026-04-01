@@ -37,6 +37,7 @@ import {
 } from '../core/rocketvalidator.js';
 import { getConnectedTanks } from '../core/fuelsystem.js';
 import { createGameState }   from '../core/gameState.js';
+import { getPartById }       from '../data/parts.js';
 
 // ---------------------------------------------------------------------------
 // Test 1 — Part graph structure
@@ -467,7 +468,6 @@ describe('Mirror candidate — picks corresponding vertical position', () => {
     const assembly = createRocketAssembly();
     const tankId = addPartToAssembly(assembly, 'tank-small', 0, 0);
 
-    const { getPartById } = require('../data/parts.js');
     const tankDef = getPartById('tank-small');
     const tSnap = tankDef.snapPoints[targetSnapIndex];
 
@@ -552,8 +552,6 @@ describe('Mirror candidate — picks corresponding vertical position', () => {
   });
 
   it('mirror works across all three tank sizes', () => {
-    const { getPartById } = require('../data/parts.js');
-
     for (const partId of ['tank-small', 'tank-medium', 'tank-large']) {
       const assembly = createRocketAssembly();
       const tid = addPartToAssembly(assembly, partId, 0, 0);

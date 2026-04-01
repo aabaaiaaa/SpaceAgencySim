@@ -1,5 +1,5 @@
 /**
- * physics.js — Flight physics simulation engine.
+ * physics.ts — Flight physics simulation engine.
  *
  * Fixed-timestep integration loop at dt = 1/60 s, scaled by a time-warp
  * multiplier.  Each integration step:
@@ -97,85 +97,266 @@ import { getWindForce, getCurrentWeather } from './weather.js';
 import { initPowerState, tickPower, recalcPowerState } from './power.js';
 import { getOrbitalStateAtTime } from './orbit.js';
 
+import type { AltitudeBand, ControlMode as ControlModeType } from './constants.js';
+import type { FlightState, OrbitalElements, PowerState, GameState } from './gameState.js';
+
+// ---------------------------------------------------------------------------
+// Types for modules still in .js — use `any` with TODO markers
+// ---------------------------------------------------------------------------
+
+// TODO: type properly when rocketbuilder.js is converted to TypeScript
+/** A placed part in the assembly: { partId, x, y, ... }. */
+type PlacedPart = any;
+
+// TODO: type properly when rocketbuilder.js is converted to TypeScript
+/** The full rocket assembly: { parts: Map<string, PlacedPart>, ... }. */
+type RocketAssembly = any;
+
+// TODO: type properly when rocketbuilder.js is converted to TypeScript
+/** Staging configuration for a rocket design. */
+type StagingConfig = any;
+
+// TODO: type properly when data/parts.js is converted to TypeScript
+/** A part definition from the catalog. */
+type PartDef = any;
+
+// TODO: type properly when staging.js is converted to TypeScript
+/** A debris fragment simulated after stage separation. */
+type DebrisState = any;
+
+// TODO: type properly when parachute.js is converted to TypeScript
+/** Per-parachute lifecycle entry. */
+type ParachuteEntry = any;
+
+// TODO: type properly when legs.js is converted to TypeScript
+/** Per-landing-leg lifecycle entry. */
+type LegEntry = any;
+
+// TODO: type properly when sciencemodule.js is converted to TypeScript
+/** Per-instrument experiment lifecycle entry. */
+type InstrumentStateEntry = any;
+
+// TODO: type properly when malfunction.js is converted to TypeScript
+/** Malfunction entry for a part. */
+type MalfunctionEntry = any;
+
+// ---------------------------------------------------------------------------
+// PhysicsState interface
+// ---------------------------------------------------------------------------
+
+/**
+ * Internal physics state for an active flight.
+ *
+ * This object is created once per launch via {@link createPhysicsState} and
+ * mutated in-place on every {@link tick}.  It is NOT part of the serialised
+ * GameState — the higher-level FlightState in gameState.ts carries the
+ * persisted snapshot.
+ */
+export interface PhysicsState {
+  /** Horizontal position (m; 0 = launch pad). */
+  posX: number;
+  /** Vertical position (m; 0 = ground). */
+  posY: number;
+  /** Horizontal velocity (m/s). */
+  velX: number;
+  /** Vertical velocity (m/s). */
+  velY: number;
+  /** Rocket orientation (radians; 0 = straight up). */
+  angle: number;
+  /** Current throttle level (0 – 1; 1 = 100 %). */
+  throttle: number;
+  /** Throttle mode: 'twr' (TWR-relative) or 'absolute'. */
+  throttleMode: 'twr' | 'absolute';
+  /** Target TWR when in TWR throttle mode. */
+  targetTWR: number;
+  /** Instance IDs of currently burning engines/SRBs. */
+  firingEngines: Set<string>;
+  /** Remaining propellant per part (kg). Keyed by instance ID. */
+  fuelStore: Map<string, number>;
+  /** Instance IDs of parts still attached to the rocket. */
+  activeParts: Set<string>;
+  /** Instance IDs of parachutes/legs that have been deployed. */
+  deployedParts: Set<string>;
+  /** Detailed lifecycle state for each PARACHUTE part. Keyed by instance ID. */
+  parachuteStates: Map<string, ParachuteEntry>;
+  /** Detailed lifecycle state for each LANDING_LEGS/LANDING_LEG part. Keyed by instance ID. */
+  legStates: Map<string, LegEntry>;
+  /** Armed/activated state for each ejector-seat-capable COMMAND_MODULE. Keyed by instance ID. */
+  ejectorStates: Map<string, string>;
+  /** IDs of crew members who have safely ejected during this flight. */
+  ejectedCrewIds: Set<string>;
+  /** Visible ejected crew capsules. */
+  ejectedCrew: EjectedCrewEntry[];
+  /** Per-instrument experiment lifecycle state. Keyed by compound key. */
+  instrumentStates: Map<string, InstrumentStateEntry>;
+  /** Legacy module-level summary state. Keyed by module instance ID. */
+  scienceModuleStates: Map<string, object>;
+  /** Accumulated reentry heat per part (heat units). Keyed by instance ID. */
+  heatMap: Map<string, number>;
+  /** Jettisoned stage fragments simulated independently. */
+  debris: DebrisState[];
+  /** True after a successful soft touchdown. */
+  landed: boolean;
+  /** True after a fatal impact. */
+  crashed: boolean;
+  /** True while still sitting on the launch pad. */
+  grounded: boolean;
+  /** Angular velocity (rad/s; positive = clockwise). */
+  angularVelocity: number;
+  /** True when tilted on ground. */
+  isTipping: boolean;
+  /** Ground contact pivot X in VAB local pixels. */
+  tippingContactX: number;
+  /** Ground contact pivot Y in VAB local pixels. */
+  tippingContactY: number;
+  /** Keys currently held down (for continuous steering). */
+  _heldKeys: Set<string>;
+  /** Leftover simulation time from the previous frame. */
+  _accumulator: number;
+  /** Current control mode (ControlMode enum). */
+  controlMode: ControlModeType;
+  /** Frozen orbital elements in docking mode. */
+  baseOrbit: OrbitalElements | null;
+  /** Altitude band when docking mode entered. */
+  dockingAltitudeBand: AltitudeBand | null;
+  /** Along-track offset in docking (m). */
+  dockingOffsetAlongTrack: number;
+  /** Radial offset in docking (m). */
+  dockingOffsetRadial: number;
+  /** Active RCS thrust dirs for plume rendering. */
+  rcsActiveDirections: Set<string>;
+  /** Docking port states: instanceId -> 'retracted'|'extended'|'docked'. */
+  dockingPortStates: Map<string, string>;
+  /** Combined mass when docked (0 = not docked). */
+  _dockedCombinedMass: number;
+  /** Weather-based ISP modifier (0.95–1.05). */
+  weatherIspModifier: number;
+  /** True while launch clamps are still active. */
+  hasLaunchClamps: boolean;
+  /** Power system state. */
+  powerState: PowerState | null;
+  /** Per-part malfunction entries. */
+  malfunctions?: Map<string, MalfunctionEntry>;
+  /** Reference to game state (set by flightController). */
+  _gameState?: GameState;
+  /** Cached contact corner X for tipping. */
+  _contactCX?: number;
+  /** Cached contact corner Y for tipping. */
+  _contactCY?: number;
+  /** True when a malfunction check is pending after biome transition. */
+  _malfunctionCheckPending?: boolean;
+  /** Countdown timer for pending malfunction check (seconds). */
+  _malfunctionCheckTimer?: number;
+}
+
+/** An ejected crew capsule tracked for physics/rendering. */
+interface EjectedCrewEntry {
+  x: number;
+  y: number;
+  velX: number;
+  velY: number;
+  chuteOpen: boolean;
+  chuteTimer: number;
+}
+
+/** Result of thrust calculation. */
+interface ThrustResult {
+  thrustX: number;
+  thrustY: number;
+}
+
+/** A 2D point in VAB local pixel coordinates. */
+interface Point2D {
+  x: number;
+  y: number;
+}
+
+/** Entry in the bottom-part-layer array used for cascading destruction. */
+interface BottomLayerEntry {
+  instanceId: string;
+  bottomY: number;
+  placed: PlacedPart;
+  def: PartDef;
+}
+
+/** Corner entry used for ground-contact softmax computation. */
+interface CornerEntry {
+  cx: number;
+  cy: number;
+  gp: number;
+}
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
 /** Standard gravity (m/s²). */
-const G0 = 9.81;
+const G0: number = 9.81;
 
 /** Fixed physics timestep (seconds). */
-const FIXED_DT = 1 / 60;
+const FIXED_DT: number = 1 / 60;
 
 /** Scale factor: metres per pixel at default 1× zoom. */
-const SCALE_M_PER_PX = 0.05;
+const SCALE_M_PER_PX: number = 0.05;
 
 /**
  * Base rocket turn rate in radians/second.
  * At 30°/s, a 90° turn takes 3 seconds — deliberately sluggish.
  */
-const BASE_TURN_RATE = Math.PI / 6;
+const BASE_TURN_RATE: number = Math.PI / 6;
 
 /** Turn-rate multiplier applied when RCS is available in vacuum. */
-const RCS_TURN_MULTIPLIER = 2.5;
+const RCS_TURN_MULTIPLIER: number = 2.5;
 
 /** Throttle change per keypress (5 %). */
-const THROTTLE_STEP = 0.05;
+const THROTTLE_STEP: number = 0.05;
 
 /** Target TWR change per keypress in TWR mode. */
-const TWR_STEP = 0.1;
+const TWR_STEP: number = 0.1;
 
 /**
  * Drag coefficient multiplier applied to an open parachute.
  * An open chute is modelled as having 80× its stowed Cd — very high drag.
  */
-const CHUTE_DRAG_MULTIPLIER = 80;
+const CHUTE_DRAG_MULTIPLIER: number = 80;
 
 /** Landing speed below which a contact is considered "safe" (m/s). */
-const DEFAULT_SAFE_LANDING_SPEED = 10;
+const DEFAULT_SAFE_LANDING_SPEED: number = 10;
 
 /** Default crash threshold (m/s) for parts without an explicit crashThreshold. */
-const DEFAULT_CRASH_THRESHOLD = 10;
+const DEFAULT_CRASH_THRESHOLD: number = 10;
 
 // -- Ground tipping constants ------------------------------------------------
 /** N·m of torque applied by player A/D input while grounded. */
-const PLAYER_TIP_TORQUE = 50_000;
+const PLAYER_TIP_TORQUE: number = 50_000;
 /** Angle (radians) past which a grounded tipping rocket crashes (~80°). */
-const TOPPLE_CRASH_ANGLE = Math.PI * 0.44;
-/** Per-tick angular velocity damping while tipping on the ground.
- *  0.92 gives roughly 0.92^60 ≈ 0.007 decay per second — settles in ~2s. */
-const GROUND_ANGULAR_DAMPING = 0.98;
-/** Maximum angular acceleration (rad/s²) from player tipping input.
- *  Prevents tiny landed parts from instantly toppling, but must exceed the
- *  gravity restoring acceleration for a typical capsule (~5 rad/s²). */
-const MAX_PLAYER_TIP_ACCEL = 10.0;
+const TOPPLE_CRASH_ANGLE: number = Math.PI * 0.44;
+/** Per-tick angular velocity damping while tipping on the ground. */
+const GROUND_ANGULAR_DAMPING: number = 0.98;
+/** Maximum angular acceleration (rad/s²) from player tipping input. */
+const MAX_PLAYER_TIP_ACCEL: number = 10.0;
 /** Angle threshold below which a near-upright rocket snaps to 0. */
-const TILT_SNAP_THRESHOLD = 0.005;
+const TILT_SNAP_THRESHOLD: number = 0.005;
 /** Angular velocity threshold below which snap to rest. */
-const ANGULAR_VEL_SNAP_THRESHOLD = 0.05;
+const ANGULAR_VEL_SNAP_THRESHOLD: number = 0.05;
 
 // -- Airborne torque-based rotation constants --------------------------------
 /** N·m of torque applied by player A/D input while airborne. */
-const PLAYER_FLIGHT_TORQUE = 2000;
+const PLAYER_FLIGHT_TORQUE: number = 2000;
 /** Torque multiplier when in vacuum with RCS-capable command module. */
-const RCS_TORQUE_MULTIPLIER = 2.5;
+const RCS_TORQUE_MULTIPLIER: number = 2.5;
 /** Angular damping coefficient in atmosphere (proportional to density). */
-const AERO_ANGULAR_DAMPING = 0.02;
+const AERO_ANGULAR_DAMPING: number = 0.02;
 /** Active RCS braking torque (N·m per rad/s) when keys released. */
-const RCS_ANGULAR_DAMPING = 3.0;
+const RCS_ANGULAR_DAMPING: number = 3.0;
 /** Tuning knob for parachute stabilization torque strength. */
-const CHUTE_TORQUE_SCALE = 3.0;
-/** Angular velocity decay rate (1/s) for deployed parachutes.
- *  Models line/canopy drag resisting pendulum swing.
- *  Applied as a fixed decay rate (not divided by I) so it works correctly
- *  for both tiny capsules and heavy rockets. */
-const CHUTE_DIRECT_DAMPING = 5.0;
-/** Maximum angular acceleration (rad/s²) from player input.
- *  Prevents tiny rockets from spinning uncontrollably. */
-const MAX_PLAYER_ANGULAR_ACCEL = 2.0;
-/** Maximum angular acceleration (rad/s²) from parachute torques.
- *  Prevents integration blow-up on small, light capsules. */
-const MAX_CHUTE_ANGULAR_ACCEL = 50.0;
+const CHUTE_TORQUE_SCALE: number = 3.0;
+/** Angular velocity decay rate (1/s) for deployed parachutes. */
+const CHUTE_DIRECT_DAMPING: number = 5.0;
+/** Maximum angular acceleration (rad/s²) from player input. */
+const MAX_PLAYER_ANGULAR_ACCEL: number = 2.0;
+/** Maximum angular acceleration (rad/s²) from parachute torques. */
+const MAX_CHUTE_ANGULAR_ACCEL: number = 50.0;
 
 // ---------------------------------------------------------------------------
 // Multi-body gravity helper
@@ -186,15 +367,11 @@ const MAX_CHUTE_ANGULAR_ACCEL = 50.0;
  *
  * Uses inverse-square law: g = g₀ × (R / (R + h))²
  * Falls back to Earth's 9.81 m/s² if bodyId is undefined.
- *
- * @param {string|undefined} bodyId   Celestial body identifier.
- * @param {number}           altitude Altitude above body surface in metres.
- * @returns {number} Gravitational acceleration in m/s² (always positive).
  */
-function _gravityForBody(bodyId, altitude) {
-  const g0 = bodyId ? getSurfaceGravity(bodyId) : G0;
-  const R = bodyId ? (BODY_RADIUS[bodyId] ?? 6_371_000) : 6_371_000;
-  const h = Math.max(0, altitude);
+function _gravityForBody(bodyId: string | undefined, altitude: number): number {
+  const g0: number = bodyId ? getSurfaceGravity(bodyId) : G0;
+  const R: number = bodyId ? (BODY_RADIUS[bodyId] ?? 6_371_000) : 6_371_000;
+  const h: number = Math.max(0, altitude);
   // Inverse-square: negligible effect at low altitudes, significant in orbit.
   return g0 * (R * R) / ((R + h) * (R + h));
 }
@@ -202,13 +379,12 @@ function _gravityForBody(bodyId, altitude) {
 /**
  * Look up the highest value of a crew skill among the flight's crew.
  * Uses ps._gameState (set by flightController) and flightState.crewIds.
- *
- * @param {object}      ps          PhysicsState (with _gameState attached).
- * @param {object|null} flightState FlightState with crewIds.
- * @param {'piloting'|'engineering'|'science'} skill
- * @returns {number}  0–100.
  */
-function _getMaxCrewSkill(ps, flightState, skill) {
+function _getMaxCrewSkill(
+  ps: PhysicsState,
+  flightState: FlightState | null,
+  skill: 'piloting' | 'engineering' | 'science',
+): number {
   const gameState = ps?._gameState;
   const crewIds = flightState?.crewIds;
   if (!gameState || !crewIds || !crewIds.length) return 0;
@@ -227,12 +403,8 @@ function _getMaxCrewSkill(ps, flightState, skill) {
  * Return the atmospheric density for the current flight body.
  * Delegates to body-aware density when bodyId is present, otherwise
  * falls back to Earth's default model.
- *
- * @param {number}           altitude Metres above surface.
- * @param {string|undefined} bodyId   Celestial body identifier.
- * @returns {number} Density in kg/m³.
  */
-function _densityForBody(altitude, bodyId) {
+function _densityForBody(altitude: number, bodyId: string | undefined): number {
   if (bodyId && bodyId !== 'EARTH') {
     return airDensityForBody(altitude, bodyId);
   }
@@ -242,88 +414,13 @@ function _densityForBody(altitude, bodyId) {
 /**
  * Return the atmosphere top altitude for a body.
  * Falls back to Earth's ATMOSPHERE_TOP if bodyId is not given.
- *
- * @param {string|undefined} bodyId
- * @returns {number}
  */
-function _atmosphereTopForBody(bodyId) {
+function _atmosphereTopForBody(bodyId: string | undefined): number {
   if (bodyId && bodyId !== 'EARTH') {
     return getAtmosphereTop(bodyId);
   }
   return ATMOSPHERE_TOP;
 }
-
-// ---------------------------------------------------------------------------
-// Type Definitions (JSDoc)
-// ---------------------------------------------------------------------------
-
-/**
- * Internal physics state for an active flight.
- *
- * This object is created once per launch via {@link createPhysicsState} and
- * mutated in-place on every {@link tick}.  It is NOT part of the serialised
- * GameState — the higher-level FlightState in gameState.js carries the
- * persisted snapshot.
- *
- * @typedef {Object} PhysicsState
- * @property {number}          posX          Horizontal position (m; 0 = launch pad).
- * @property {number}          posY          Vertical position   (m; 0 = ground).
- * @property {number}          velX          Horizontal velocity (m/s).
- * @property {number}          velY          Vertical velocity   (m/s).
- * @property {number}          angle         Rocket orientation (radians; 0 = straight up).
- * @property {number}          throttle      Current throttle level (0 – 1; 1 = 100 %).
- * @property {Set<string>}     firingEngines Instance IDs of currently burning engines/SRBs.
- * @property {Map<string,number>} fuelStore  Remaining propellant per part (kg).
- *                                           Covers both liquid tanks and SRB integral fuel.
- * @property {Set<string>}     activeParts   Instance IDs of parts still attached to the rocket.
- * @property {Set<string>}     deployedParts Instance IDs of parachutes/legs that have been deployed.
- * @property {Map<string, import('./parachute.js').ParachuteEntry>} parachuteStates
- *                                           Detailed lifecycle state for each PARACHUTE part
- *                                           (packed / deploying / deployed / failed), managed
- *                                           by parachute.js.  Keyed by instance ID.
- * @property {Map<string, import('./legs.js').LegEntry>} legStates
- *                                           Detailed lifecycle state for each LANDING_LEGS /
- *                                           LANDING_LEG part (retracted / deploying / deployed),
- *                                           managed by legs.js.  Keyed by instance ID.
- * @property {Map<string, string>} ejectorStates
- *                                           Armed/activated state for each COMMAND_MODULE part
- *                                           with an ejector seat (`hasEjectorSeat = true`),
- *                                           managed by ejector.js.  Keyed by instance ID.
- *                                           Values are EjectorState enum strings.
- * @property {Set<string>}     ejectedCrewIds  IDs of crew members who have safely ejected
- *                                           via the ejector seat system during this flight.
- *                                           Populated by `activateEjectorSeat()`.
- * @property {Map<string, import('./sciencemodule.js').InstrumentStateEntry>} instrumentStates
- *                                           Per-instrument experiment lifecycle state, keyed by
- *                                           compound key `moduleInstanceId:instr:slotIndex`.
- *                                           Managed by sciencemodule.js.
- * @property {Map<string, object>} scienceModuleStates
- *                                           Legacy module-level summary state for backward
- *                                           compatibility with mission objective checks.
- *                                           Keyed by module instance ID.
- * @property {boolean}         landed        True after a successful soft touchdown.
- * @property {boolean}         crashed       True after a fatal impact.
- * @property {boolean}         grounded      True while still sitting on the launch pad.
- * @property {Map<string,number>} heatMap      Accumulated reentry heat per part (heat units).
- *                                             Keyed by instance ID; initialised to 0.
- * @property {import('./staging.js').DebrisState[]} debris  Jettisoned stage
- *   fragments that continue to be simulated independently.  New entries are
- *   appended whenever a decoupler fires via {@link fireNextStage}.
- * @property {number}          angularVelocity  Angular velocity (rad/s; positive = clockwise).
- * @property {boolean}         isTipping     True when tilted on ground — rotation is around
- *                                           the ground contact point rather than centre of mass.
- * @property {number}          tippingContactX  Ground contact pivot X in VAB local pixels.
- * @property {number}          tippingContactY  Ground contact pivot Y in VAB local pixels.
- * @property {Set<string>}     _heldKeys     Keys currently held down (for continuous steering).
- * @property {number}          _accumulator  Leftover simulation time from the previous frame.
- * @property {string}          controlMode   Current control mode (ControlMode enum).
- * @property {import('./gameState.js').OrbitalElements|null} baseOrbit
- *                                           Frozen orbital elements in docking mode.
- * @property {Object|null}     dockingAltitudeBand  Altitude band when docking mode entered.
- * @property {number}          dockingOffsetAlongTrack  Along-track offset in docking (m).
- * @property {number}          dockingOffsetRadial      Radial offset in docking (m).
- * @property {Set<string>}     rcsActiveDirections  Active RCS thrust dirs for plume rendering.
- */
 
 // ---------------------------------------------------------------------------
 // Factory
@@ -334,20 +431,15 @@ function _atmosphereTopForBody(bodyId) {
  *
  * Populates the fuel store from tank/SRB `fuelMass` properties and marks
  * every part in the assembly as active.
- *
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @param {import('./gameState.js').FlightState}        flightState  Used to
- *   initialise `fuelRemaining` with the full wet-fuel load.
- * @returns {PhysicsState}
  */
-export function createPhysicsState(assembly, flightState) {
-  const fuelStore = new Map();
+export function createPhysicsState(assembly: RocketAssembly, flightState: FlightState): PhysicsState {
+  const fuelStore = new Map<string, number>();
   let totalFuel = 0;
 
   for (const [instanceId, placed] of assembly.parts) {
-    const def = getPartById(placed.partId);
+    const def: PartDef = getPartById(placed.partId);
     if (!def) continue;
-    const fuelMass = def.properties?.fuelMass ?? 0;
+    const fuelMass: number = def.properties?.fuelMass ?? 0;
     if (fuelMass > 0) {
       fuelStore.set(instanceId, fuelMass);
       totalFuel += fuelMass;
@@ -359,7 +451,7 @@ export function createPhysicsState(assembly, flightState) {
     flightState.fuelRemaining = totalFuel;
   }
 
-  const ps = {
+  const ps: PhysicsState = {
     posX: 0,
     posY: 0,
     velX: 0,
@@ -376,7 +468,7 @@ export function createPhysicsState(assembly, flightState) {
     legStates: new Map(),
     ejectorStates: new Map(),
     ejectedCrewIds: new Set(),
-    ejectedCrew: [],              // { x, y, velX, velY } — visible ejected crew capsules
+    ejectedCrew: [],
     instrumentStates: new Map(),
     scienceModuleStates: new Map(),
     heatMap: new Map(),
@@ -391,31 +483,22 @@ export function createPhysicsState(assembly, flightState) {
     _heldKeys: new Set(),
     _accumulator: 0,
     // -- Control mode state (TASK-005) --
-    /** Current control mode (NORMAL, DOCKING, or RCS). */
     controlMode: ControlMode.NORMAL,
-    /** Frozen orbital elements when in docking mode (reference frame). */
     baseOrbit: null,
-    /** Altitude band the craft was in when docking mode was entered. */
     dockingAltitudeBand: null,
-    /** Accumulated along-track offset in docking mode (m). */
     dockingOffsetAlongTrack: 0,
-    /** Accumulated radial offset in docking mode (m). */
     dockingOffsetRadial: 0,
-    /** Active RCS thrust directions for plume rendering (set of 'up'|'down'|'left'|'right'). */
     rcsActiveDirections: new Set(),
-    /** Docking port states: instanceId → 'retracted'|'extended'|'docked'. */
     dockingPortStates: new Map(),
-    /** Combined mass when docked (0 = not docked, use craft mass only). */
     _dockedCombinedMass: 0,
-    /** Weather-based ISP modifier (0.95–1.05, applied to all engine ISP). */
     weatherIspModifier: 1.0,
-    /** True while launch clamps are still active — prevents liftoff. */
     hasLaunchClamps: false,
+    powerState: null,
   };
 
   // Detect launch clamps in the assembly.
   for (const [instanceId, placed] of assembly.parts) {
-    const clampDef = getPartById(placed.partId);
+    const clampDef: PartDef = getPartById(placed.partId);
     if (clampDef && clampDef.type === PartType.LAUNCH_CLAMP) {
       ps.hasLaunchClamps = true;
       break;
@@ -440,7 +523,7 @@ export function createPhysicsState(assembly, flightState) {
 
   // Initialise docking port states.
   for (const [instanceId, placed] of assembly.parts) {
-    const def = getPartById(placed.partId);
+    const def: PartDef = getPartById(placed.partId);
     if (def && def.type === PartType.DOCKING_PORT) {
       ps.dockingPortStates.set(instanceId, 'retracted');
     }
@@ -452,8 +535,8 @@ export function createPhysicsState(assembly, flightState) {
   // Flag on flightState so mission objective checking knows whether science
   // modules are present (used to gate HOLD_ALTITUDE time accumulation).
   if (flightState) {
-    flightState.hasScienceModules = ps.scienceModuleStates.size > 0 || ps.instrumentStates.size > 0;
-    flightState.scienceModuleRunning = false;
+    (flightState as any).hasScienceModules = ps.scienceModuleStates.size > 0 || ps.instrumentStates.size > 0;
+    (flightState as any).scienceModuleRunning = false;
     flightState.powerState = ps.powerState;
   }
 
@@ -473,15 +556,15 @@ export function createPhysicsState(assembly, flightState) {
  * After this call, `flightState.altitude`, `flightState.velocity`, and
  * `flightState.fuelRemaining` reflect the updated simulation state.
  * New events may have been appended to `flightState.events`.
- *
- * @param {PhysicsState}                                  ps
- * @param {import('./rocketbuilder.js').RocketAssembly}   assembly
- * @param {import('./rocketbuilder.js').StagingConfig}    stagingConfig
- * @param {import('./gameState.js').FlightState}          flightState
- * @param {number}  realDeltaTime  Seconds since the last frame.
- * @param {number}  [timeWarp=1]   Time-acceleration multiplier.
  */
-export function tick(ps, assembly, stagingConfig, flightState, realDeltaTime, timeWarp = 1) {
+export function tick(
+  ps: PhysicsState,
+  assembly: RocketAssembly,
+  stagingConfig: StagingConfig,
+  flightState: FlightState,
+  realDeltaTime: number,
+  timeWarp: number = 1,
+): void {
   // Allow re-liftoff from a landed state when engines are producing thrust.
   if (ps.landed && ps.firingEngines.size > 0 && ps.throttle > 0) {
     ps.landed = false;
@@ -581,14 +664,8 @@ export function tick(ps, assembly, stagingConfig, flightState, realDeltaTime, ti
  * One-shot actions (throttle change) are processed immediately.
  * Continuous actions (steering) are recorded in `ps._heldKeys` and applied
  * each integration step.
- *
- * @param {PhysicsState}                               ps
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly  Needed for
- *   RCS lookup in the turn-rate calculation. May be omitted (pass null) if
- *   steering is handled externally.
- * @param {string} key  KeyboardEvent.key value (e.g. 'a', 'ArrowUp').
  */
-export function handleKeyDown(ps, assembly, key) {
+export function handleKeyDown(ps: PhysicsState, assembly: RocketAssembly, key: string): void {
   ps._heldKeys.add(key);
 
   // In docking/RCS modes, W/S/A/D are handled continuously by
@@ -655,11 +732,8 @@ export function handleKeyDown(ps, assembly, key) {
 /**
  * Handle a key-up event.
  * Removes the key from the held-key set so continuous steering stops.
- *
- * @param {PhysicsState} ps
- * @param {string}       key  KeyboardEvent.key value.
  */
-export function handleKeyUp(ps, key) {
+export function handleKeyUp(ps: PhysicsState, key: string): void {
   ps._heldKeys.delete(key);
 }
 
@@ -675,13 +749,13 @@ export function handleKeyUp(ps, key) {
  * rocket sections that become disconnected after a decoupler fires.  Newly
  * created debris fragments are appended to `ps.debris` so they are simulated
  * on every subsequent {@link tick}.
- *
- * @param {PhysicsState}                                 ps
- * @param {import('./rocketbuilder.js').RocketAssembly}  assembly
- * @param {import('./rocketbuilder.js').StagingConfig}   stagingConfig
- * @param {import('./gameState.js').FlightState}         flightState
  */
-export function fireNextStage(ps, assembly, stagingConfig, flightState) {
+export function fireNextStage(
+  ps: PhysicsState,
+  assembly: RocketAssembly,
+  stagingConfig: StagingConfig,
+  flightState: FlightState,
+): void {
   if (ps.crashed || flightState.aborted) return;
 
   // Allow staging while landed — transition to grounded so physics resumes.
@@ -690,7 +764,7 @@ export function fireNextStage(ps, assembly, stagingConfig, flightState) {
     ps.grounded = true;
   }
 
-  const newDebris = activateCurrentStage(ps, assembly, stagingConfig, flightState);
+  const newDebris: DebrisState[] = activateCurrentStage(ps, assembly, stagingConfig, flightState);
   ps.debris.push(...newDebris);
 }
 
@@ -701,18 +775,8 @@ export function fireNextStage(ps, assembly, stagingConfig, flightState) {
 /**
  * When in TWR throttle mode, compute the raw throttle needed to achieve
  * `ps.targetTWR` and write it to `ps.throttle`.
- *
- * Formula: throttle = clamp((targetTWR * totalMass * localG - srbThrustN) / maxLiquidThrustN, 0, 1)
- *
- * Uses the current body's surface gravity so TWR is meaningful on any world.
- * If targetTWR is Infinity, sets throttle = 1 (max thrust).
- * If no liquid engines are firing, does nothing (can't throttle SRBs).
- *
- * @param {PhysicsState}                               ps
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @param {string} [bodyId]                            Current celestial body ID.
  */
-function _updateThrottleFromTWR(ps, assembly, bodyId) {
+function _updateThrottleFromTWR(ps: PhysicsState, assembly: RocketAssembly, bodyId: string | undefined): void {
   if (ps.throttleMode !== 'twr') return;
 
   // Infinity means "max thrust"
@@ -731,13 +795,13 @@ function _updateThrottleFromTWR(ps, assembly, bodyId) {
 
   for (const [instanceId, placed] of assembly.parts) {
     if (!ps.activeParts.has(instanceId)) continue;
-    const def = getPartById(placed.partId);
+    const def: PartDef = getPartById(placed.partId);
     if (!def) continue;
 
     totalMass += (def.mass ?? 0) + (ps.fuelStore.get(instanceId) ?? 0);
 
     if (ps.firingEngines.has(instanceId)) {
-      const thrustN = (def.properties?.thrust ?? 0) * 1_000; // kN → N
+      const thrustN: number = (def.properties?.thrust ?? 0) * 1_000; // kN → N
       if (def.type === PartType.SOLID_ROCKET_BOOSTER) {
         srbThrustN += thrustN;
       } else {
@@ -749,8 +813,8 @@ function _updateThrottleFromTWR(ps, assembly, bodyId) {
   if (maxLiquidThrustN <= 0) return; // can't throttle SRBs
   if (totalMass <= 0) return;
 
-  const localG = _gravityForBody(bodyId, Math.max(0, ps.posY));
-  const needed = ps.targetTWR * totalMass * localG - srbThrustN;
+  const localG: number = _gravityForBody(bodyId, Math.max(0, ps.posY));
+  const needed: number = ps.targetTWR * totalMass * localG - srbThrustN;
   ps.throttle = Math.max(0, Math.min(1, needed / maxLiquidThrustN));
 }
 
@@ -760,22 +824,18 @@ function _updateThrottleFromTWR(ps, assembly, bodyId) {
 
 /**
  * Advance the simulation by exactly FIXED_DT seconds.
- *
- * @param {PhysicsState}                               ps
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @param {import('./gameState.js').FlightState}        flightState
  */
-function _integrate(ps, assembly, flightState) {
-  const bodyId   = flightState?.bodyId;
+function _integrate(ps: PhysicsState, assembly: RocketAssembly, flightState: FlightState): void {
+  const bodyId: string | undefined = flightState?.bodyId;
 
   // --- 0. TWR-relative throttle conversion --------------------------------
   _updateThrottleFromTWR(ps, assembly, bodyId);
 
-  const altitude = Math.max(0, ps.posY);
-  const density  = _densityForBody(altitude, bodyId);
+  const altitude: number = Math.max(0, ps.posY);
+  const density: number  = _densityForBody(altitude, bodyId);
 
   // --- 1. Total rocket mass (dry + remaining fuel) -------------------------
-  const totalMass = _computeTotalMass(ps, assembly);
+  const totalMass: number = _computeTotalMass(ps, assembly);
 
   // --- Docking / RCS mode: thrust affects local position, not orbit --------
   const isDockingOrRcs = ps.controlMode === ControlMode.DOCKING || ps.controlMode === ControlMode.RCS;
@@ -786,19 +846,19 @@ function _integrate(ps, assembly, flightState) {
   let thrustX = 0;
   let thrustY = 0;
   if (!isDockingOrRcs) {
-    const thrustResult = _computeThrust(ps, assembly, density);
+    const thrustResult: ThrustResult = _computeThrust(ps, assembly, density);
     thrustX = thrustResult.thrustX;
     thrustY = thrustResult.thrustY;
   }
 
   // --- 3. Gravity force (body-specific, inverse-square) --------------------
-  const gravAccel = _gravityForBody(bodyId, altitude);
+  const gravAccel: number = _gravityForBody(bodyId, altitude);
   const gravFX = 0;
-  const gravFY = -gravAccel * totalMass;
+  const gravFY: number = -gravAccel * totalMass;
 
   // --- 4. Drag force -------------------------------------------------------
-  const speed    = Math.hypot(ps.velX, ps.velY);
-  const dragMag  = _computeDragForce(ps, assembly, density, speed);
+  const speed: number    = Math.hypot(ps.velX, ps.velY);
+  const dragMag: number  = _computeDragForce(ps, assembly, density, speed);
   let dragFX = 0;
   let dragFY = 0;
   if (speed > 1e-6) {
@@ -818,11 +878,11 @@ function _integrate(ps, assembly, flightState) {
   }
 
   // --- 5. Net acceleration -------------------------------------------------
-  const netFX = thrustX + gravFX + dragFX + windFX;
-  const netFY = thrustY + gravFY + dragFY + windFY;
+  const netFX: number = thrustX + gravFX + dragFX + windFX;
+  const netFY: number = thrustY + gravFY + dragFY + windFY;
 
-  let accX = netFX / totalMass;
-  let accY = netFY / totalMass;
+  let accX: number = netFX / totalMass;
+  let accY: number = netFY / totalMass;
 
   // Ground reaction: prevent downward acceleration while on launch pad.
   if (ps.grounded && accY < 0) {
@@ -865,10 +925,10 @@ function _integrate(ps, assembly, flightState) {
 
   // --- 8c. Pending malfunction check (delayed after biome transition) -----
   if (ps._malfunctionCheckPending) {
-    ps._malfunctionCheckTimer -= FIXED_DT;
+    ps._malfunctionCheckTimer = (ps._malfunctionCheckTimer ?? 0) - FIXED_DT;
     if (ps._malfunctionCheckTimer <= 0) {
       ps._malfunctionCheckPending = false;
-      checkMalfunctions(ps, assembly, flightState, ps._gameState ?? null);
+      checkMalfunctions(ps, assembly, flightState, ps._gameState ?? undefined);
     }
   }
 
@@ -900,7 +960,7 @@ function _integrate(ps, assembly, flightState) {
     }
 
     // Compute angular position for orbital sunlight check.
-    let angularPositionDeg = null;
+    let angularPositionDeg: number | undefined = undefined;
     if (flightState.inOrbit && flightState.orbitalElements) {
       const oState = getOrbitalStateAtTime(
         flightState.orbitalElements,
@@ -917,7 +977,7 @@ function _integrate(ps, assembly, flightState) {
       gameTimeSeconds: flightState.timeElapsed,
       angularPositionDeg,
       inOrbit: flightState.inOrbit,
-      scienceRunning: flightState.scienceModuleRunning,
+      scienceRunning: (flightState as any).scienceModuleRunning,
       activeScienceCount,
       commsActive: false, // comms are passive for player craft
     });
@@ -925,7 +985,7 @@ function _integrate(ps, assembly, flightState) {
 
   // --- 9e. Ejected crew physics --------------------------------------------
   if (ps.ejectedCrew) {
-    const crewG = _gravityForBody(bodyId, Math.max(0, ps.posY));
+    const crewG: number = _gravityForBody(bodyId, Math.max(0, ps.posY));
     for (const crew of ps.ejectedCrew) {
       // Countdown to chute deployment
       if (!crew.chuteOpen && crew.chuteTimer > 0) {
@@ -938,7 +998,7 @@ function _integrate(ps, assembly, flightState) {
 
       // Parachute drag when open (terminal velocity ~5 m/s)
       if (crew.chuteOpen && crew.velY < 0) {
-        const drag = 0.5 * crew.velY * crew.velY * 0.08;
+        const drag: number = 0.5 * crew.velY * crew.velY * 0.08;
         crew.velY += drag * FIXED_DT;
         if (crew.velY > -5) crew.velY = Math.max(crew.velY, -5);
       }
@@ -976,7 +1036,7 @@ function _integrate(ps, assembly, flightState) {
     let clampsRemain = false;
     for (const instanceId of ps.activeParts) {
       const placed = assembly.parts.get(instanceId);
-      const cDef = placed ? getPartById(placed.partId) : null;
+      const cDef: PartDef = placed ? getPartById(placed.partId) : null;
       if (cDef && cDef.type === PartType.LAUNCH_CLAMP) {
         clampsRemain = true;
         break;
@@ -1012,18 +1072,14 @@ function _integrate(ps, assembly, flightState) {
 /**
  * Compute the current total mass (dry + remaining propellant) of all parts
  * still attached to the rocket.
- *
- * @param {PhysicsState}                               ps
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @returns {number}  Mass in kilograms (minimum 1 kg to avoid division-by-zero).
  */
-function _computeTotalMass(ps, assembly) {
+function _computeTotalMass(ps: PhysicsState, assembly: RocketAssembly): number {
   let mass = 0;
 
   for (const instanceId of ps.activeParts) {
     const placed = assembly.parts.get(instanceId);
     if (!placed) continue;
-    const def = getPartById(placed.partId);
+    const def: PartDef = getPartById(placed.partId);
     if (!def) continue;
     // Dry mass of the part itself.
     mass += def.mass ?? 0;
@@ -1045,12 +1101,8 @@ function _computeTotalMass(ps, assembly) {
 
 /**
  * Compute the centre of mass in VAB local pixel coordinates.
- *
- * @param {PhysicsState}                               ps
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @returns {{ x: number, y: number }}  CoM in VAB pixels (Y-up).
  */
-function _computeCoMLocal(ps, assembly) {
+function _computeCoMLocal(ps: PhysicsState, assembly: RocketAssembly): Point2D {
   let totalMass = 0;
   let comX = 0;
   let comY = 0;
@@ -1058,10 +1110,10 @@ function _computeCoMLocal(ps, assembly) {
   for (const instanceId of ps.activeParts) {
     const placed = assembly.parts.get(instanceId);
     if (!placed) continue;
-    const def = getPartById(placed.partId);
+    const def: PartDef = getPartById(placed.partId);
     if (!def) continue;
-    const fuelMass = ps.fuelStore.get(instanceId) ?? 0;
-    const mass = (def.mass ?? 1) + fuelMass;
+    const fuelMass: number = ps.fuelStore.get(instanceId) ?? 0;
+    const mass: number = (def.mass ?? 1) + fuelMass;
     comX += placed.x * mass;
     comY += placed.y * mass;
     totalMass += mass;
@@ -1078,26 +1130,20 @@ function _computeCoMLocal(ps, assembly) {
  *
  * Scans active parts for the lowest bottom edge, then picks the most extreme
  * X in the tilt direction at that level.  Landing legs widen the support base.
- *
- * @param {PhysicsState}                               ps
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @param {number} tiltDirection  +1 for rightward tilt, -1 for leftward.
- * @returns {{ x: number, y: number }}  Contact point in VAB pixels.
  */
-function _computeGroundContactPoint(ps, assembly, tiltDirection) {
+function _computeGroundContactPoint(ps: PhysicsState, assembly: RocketAssembly, tiltDirection: number): Point2D {
   let lowestY = Infinity;
   let bestX = 0;
 
   for (const instanceId of ps.activeParts) {
     const placed = assembly.parts.get(instanceId);
     if (!placed) continue;
-    const def = getPartById(placed.partId);
+    const def: PartDef = getPartById(placed.partId);
     if (!def) continue;
+    const halfH: number = (def.height ?? 40) / 2;
+    let halfW: number = (def.width ?? 40) / 2;
 
-    const halfH = (def.height ?? 40) / 2;
-    let halfW = (def.width ?? 40) / 2;
-
-    let bottomY = placed.y - halfH;
+    let bottomY: number = placed.y - halfH;
     // Deployed landing legs extend the foot below the housing.
     if (def.type === PartType.LANDING_LEGS || def.type === PartType.LANDING_LEG) {
       const { dx, dy } = getDeployedLegFootOffset(instanceId, def, ps.legStates);
@@ -1113,7 +1159,7 @@ function _computeGroundContactPoint(ps, assembly, tiltDirection) {
       bestX = placed.x + tiltDirection * halfW;
     } else if (bottomY < lowestY + 0.5) {
       // Same level — pick further out in the tilt direction.
-      const candidateX = placed.x + tiltDirection * halfW;
+      const candidateX: number = placed.x + tiltDirection * halfW;
       if (tiltDirection > 0 ? candidateX > bestX : candidateX < bestX) {
         bestX = candidateX;
       }
@@ -1130,28 +1176,23 @@ function _computeGroundContactPoint(ps, assembly, tiltDirection) {
  *
  * I = sum(m_i × r_i²) where r_i is the distance from each part's centre to
  * the pivot, converted to metres.
- *
- * @param {PhysicsState}                               ps
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @param {{ x: number, y: number }} pivot  Pivot in VAB local pixels.
- * @returns {number}  Moment of inertia in kg·m² (minimum 1).
  */
-function _computeMomentOfInertia(ps, assembly, pivot) {
+function _computeMomentOfInertia(ps: PhysicsState, assembly: RocketAssembly, pivot: Point2D): number {
   let I = 0;
 
   for (const instanceId of ps.activeParts) {
     const placed = assembly.parts.get(instanceId);
     if (!placed) continue;
-    const def = getPartById(placed.partId);
+    const def: PartDef = getPartById(placed.partId);
     if (!def) continue;
-    const fuelMass = ps.fuelStore.get(instanceId) ?? 0;
-    const mass = (def.mass ?? 1) + fuelMass;
-    const dx = (placed.x - pivot.x) * SCALE_M_PER_PX;
-    const dy = (placed.y - pivot.y) * SCALE_M_PER_PX;
+    const fuelMass: number = ps.fuelStore.get(instanceId) ?? 0;
+    const mass: number = (def.mass ?? 1) + fuelMass;
+    const dx: number = (placed.x - pivot.x) * SCALE_M_PER_PX;
+    const dy: number = (placed.y - pivot.y) * SCALE_M_PER_PX;
     // Self-inertia: rectangular body I = m(w² + h²)/12.
-    const wM = (def.width  ?? 40) * SCALE_M_PER_PX;
-    const hM = (def.height ?? 40) * SCALE_M_PER_PX;
-    const Iself = mass * (wM * wM + hM * hM) / 12;
+    const wM: number = (def.width  ?? 40) * SCALE_M_PER_PX;
+    const hM: number = (def.height ?? 40) * SCALE_M_PER_PX;
+    const Iself: number = mass * (wM * wM + hM * hM) / 12;
     I += Iself + mass * (dx * dx + dy * dy);
   }
 
@@ -1167,22 +1208,12 @@ function _computeMomentOfInertia(ps, assembly, pivot) {
  *
  * Thrust is treated as acting purely along the rocket's orientation axis
  * (simplified symmetric thrust — no engine placement offsets).
- *
- * Fuel consumption is handled separately by tickFuelSystem (fuelsystem.js),
- * which runs after this function each step.  The only fuel check performed
- * here is a cheap guard against SRBs that were already empty at the start
- * of the step.
- *
- * @param {PhysicsState}                               ps
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @param {number} density  Current atmospheric density (kg/m³).
- * @returns {{ thrustX: number, thrustY: number }}
  */
-function _computeThrust(ps, assembly, density) {
-  const densityRatio = density / SEA_LEVEL_DENSITY; // 0 in vacuum, 1 at sea level
+function _computeThrust(ps: PhysicsState, assembly: RocketAssembly, density: number): ThrustResult {
+  const densityRatio: number = density / SEA_LEVEL_DENSITY; // 0 in vacuum, 1 at sea level
 
   let totalThrustN = 0;
-  const exhausted  = [];
+  const exhausted: string[]  = [];
 
   for (const instanceId of ps.firingEngines) {
     // Skip parts that have been jettisoned.
@@ -1194,15 +1225,15 @@ function _computeThrust(ps, assembly, density) {
     const placed = assembly.parts.get(instanceId);
     if (!placed) { exhausted.push(instanceId); continue; }
 
-    const def = getPartById(placed.partId);
+    const def: PartDef = getPartById(placed.partId);
     if (!def)   { exhausted.push(instanceId); continue; }
 
     const props = def.properties ?? {};
-    const isSRB = def.type === PartType.SOLID_ROCKET_BOOSTER;
+    const isSRB: boolean = def.type === PartType.SOLID_ROCKET_BOOSTER;
 
     // Guard: SRBs that already have no fuel produce no thrust this step.
     if (isSRB) {
-      const fuelLeft = ps.fuelStore.get(instanceId) ?? 0;
+      const fuelLeft: number = ps.fuelStore.get(instanceId) ?? 0;
       if (fuelLeft <= 0) {
         exhausted.push(instanceId);
         continue;
@@ -1211,14 +1242,14 @@ function _computeThrust(ps, assembly, density) {
 
     // Interpolate thrust between sea-level and vacuum values.
     // Weather temperature affects ISP → indirectly scales effective thrust.
-    const ispMod     = ps.weatherIspModifier ?? 1.0;
-    const thrustSL   = (props.thrust    ?? 0) * 1_000 * ispMod; // kN → N, ISP-adjusted
-    const thrustVac  = (props.thrustVac ?? props.thrust ?? 0) * 1_000 * ispMod;
-    const rawThrustN = densityRatio * thrustSL + (1 - densityRatio) * thrustVac;
+    const ispMod: number     = ps.weatherIspModifier ?? 1.0;
+    const thrustSL: number   = (props.thrust    ?? 0) * 1_000 * ispMod; // kN → N, ISP-adjusted
+    const thrustVac: number  = (props.thrustVac ?? props.thrust ?? 0) * 1_000 * ispMod;
+    const rawThrustN: number = densityRatio * thrustSL + (1 - densityRatio) * thrustVac;
 
     // Throttle: SRBs always at 100 %; liquid engines use current setting.
-    const throttleMult     = isSRB ? 1.0 : ps.throttle;
-    let   effectiveThrustN = rawThrustN * throttleMult;
+    const throttleMult: number     = isSRB ? 1.0 : ps.throttle;
+    let   effectiveThrustN: number = rawThrustN * throttleMult;
 
     // Apply reduced thrust from ENGINE_REDUCED_THRUST malfunction.
     const malf = ps.malfunctions?.get(instanceId);
@@ -1235,8 +1266,8 @@ function _computeThrust(ps, assembly, density) {
   }
 
   // Project thrust along the rocket's orientation axis.
-  const thrustX = totalThrustN * Math.sin(ps.angle);
-  const thrustY = totalThrustN * Math.cos(ps.angle);
+  const thrustX: number = totalThrustN * Math.sin(ps.angle);
+  const thrustY: number = totalThrustN * Math.cos(ps.angle);
 
   return { thrustX, thrustY };
 }
@@ -1248,18 +1279,14 @@ function _computeThrust(ps, assembly, density) {
 /**
  * Return the deployment progress for a parachute: 0 = packed/failed,
  * 0→1 during the deploying animation, 1 = fully deployed.
- *
- * @param {PhysicsState} ps
- * @param {string}       instanceId
- * @returns {number}
  */
-function _getChuteDeployProgress(ps, instanceId) {
+function _getChuteDeployProgress(ps: PhysicsState, instanceId: string): number {
   const entry = ps.parachuteStates?.get(instanceId);
   if (!entry) return 0;
   switch (entry.state) {
     case 'deployed':  return 1;
     case 'deploying': {
-      const linear = Math.max(0, Math.min(1, 1 - entry.deployTimer / DEPLOY_DURATION));
+      const linear: number = Math.max(0, Math.min(1, 1 - entry.deployTimer / DEPLOY_DURATION));
       return linear;
     }
     default:          return 0;
@@ -1269,21 +1296,9 @@ function _getChuteDeployProgress(ps, instanceId) {
 /**
  * Compute the aerodynamic drag force magnitude (Newtons).
  *
- * dragForce = 0.5 × ρ × v² × Cd × A  (summed over all active parts)
- *
- * For PARACHUTE parts, CdA is interpolated between the small stowed profile
- * and the large deployed canopy area (from `properties.deployedDiameter` and
- * `properties.deployedCd`) based on the deployment state machine progress.
- * Both ends are scaled by atmospheric density so chutes are ineffective in
- * near-vacuum conditions.
- *
- * @param {PhysicsState}                               ps
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @param {number} density  Air density (kg/m³).
- * @param {number} speed    Current rocket speed (m/s).
- * @returns {number}  Drag force in Newtons.
+ * dragForce = 0.5 × rho × v² × Cd × A  (summed over all active parts)
  */
-function _computeDragForce(ps, assembly, density, speed) {
+function _computeDragForce(ps: PhysicsState, assembly: RocketAssembly, density: number, speed: number): number {
   if (density <= 0 || speed <= 0) return 0;
 
   let totalCdA = 0;
@@ -1291,27 +1306,26 @@ function _computeDragForce(ps, assembly, density, speed) {
   for (const instanceId of ps.activeParts) {
     const placed = assembly.parts.get(instanceId);
     if (!placed) continue;
-    const def = getPartById(placed.partId);
+    const def: PartDef = getPartById(placed.partId);
     if (!def) continue;
-
     const props  = def.properties ?? {};
-    const widthM = (def.width ?? 40) * SCALE_M_PER_PX;
-    const area   = Math.PI * (widthM / 2) ** 2; // stowed circular cross-section
+    const widthM: number = (def.width ?? 40) * SCALE_M_PER_PX;
+    const area: number   = Math.PI * (widthM / 2) ** 2; // stowed circular cross-section
 
     if (def.type === PartType.PARACHUTE) {
       // Stowed CdA — used when packed or failed.
-      const stowedCdA = (props.dragCoefficient ?? 0.05) * area;
+      const stowedCdA: number = (props.dragCoefficient ?? 0.05) * area;
 
       // Deployed CdA — uses the real canopy diameter, not the stowed profile.
-      const deployedR   = (props.deployedDiameter ?? 10) / 2;
-      const deployedCd  = props.deployedCd ?? 0.75;
-      const deployedCdA = deployedCd * Math.PI * deployedR * deployedR;
+      const deployedR: number   = (props.deployedDiameter ?? 10) / 2;
+      const deployedCd: number  = props.deployedCd ?? 0.75;
+      const deployedCdA: number = deployedCd * Math.PI * deployedR * deployedR;
 
       // Linearly interpolate from stowed → deployed as the canopy opens.
       // Scale by atmospheric density so chutes are ineffective near vacuum.
-      const progress     = _getChuteDeployProgress(ps, instanceId);
-      const densityScale = Math.min(1, density / LOW_DENSITY_THRESHOLD);
-      let   chuteCdA     = stowedCdA + (deployedCdA - stowedCdA) * progress * densityScale;
+      const progress: number     = _getChuteDeployProgress(ps, instanceId);
+      const densityScale: number = Math.min(1, density / LOW_DENSITY_THRESHOLD);
+      let   chuteCdA: number     = stowedCdA + (deployedCdA - stowedCdA) * progress * densityScale;
 
       // Partial deploy malfunction: 50 % of normal deployed drag.
       const cMalf = ps.malfunctions?.get(instanceId);
@@ -1335,22 +1349,18 @@ function _computeDragForce(ps, assembly, density, speed) {
  * behind on lines, so the effective application point is *opposite* to the
  * part's VAB position relative to CoM.  This creates a pendulum-like restoring
  * torque that naturally orients the rocket with the parachute on top.
- *
- * Translational drag is already handled by `_computeDragForce()`; this
- * function only returns the rotational (torque) component.
- *
- * @param {PhysicsState}                               ps
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @param {{ x: number, y: number }}                   com  CoM in VAB pixels.
- * @param {number} density  Air density (kg/m³).
- * @param {number} speed    Current rocket speed (m/s).
- * @returns {number}  Net torque in N·m (positive = clockwise).
  */
-function _computeParachuteTorque(ps, assembly, com, density, speed) {
+function _computeParachuteTorque(
+  ps: PhysicsState,
+  assembly: RocketAssembly,
+  com: Point2D,
+  density: number,
+  speed: number,
+): number {
   if (density <= 0 || speed <= 0 || !ps.parachuteStates) return 0;
 
-  const q = 0.5 * density * speed * speed;     // dynamic pressure
-  const sinA = Math.sin(ps.angle);
+  const q: number = 0.5 * density * speed * speed;     // dynamic pressure
+  const sinA: number = Math.sin(ps.angle);
 
   let totalTorque = 0;
 
@@ -1359,31 +1369,28 @@ function _computeParachuteTorque(ps, assembly, com, density, speed) {
 
     const placed = assembly.parts.get(instanceId);
     if (!placed) continue;
-    const def = getPartById(placed.partId);
+    const def: PartDef = getPartById(placed.partId);
     if (!def) continue;
 
     // Chute CdA (same formula as _computeDragForce).
     const props     = def.properties ?? {};
-    const widthM    = (def.width ?? 40) * SCALE_M_PER_PX;
-    const stowedA   = Math.PI * (widthM / 2) ** 2;
-    const stowedCdA = (props.dragCoefficient ?? 0.05) * stowedA;
-    const deployedR   = (props.deployedDiameter ?? 10) / 2;
-    const deployedCd  = props.deployedCd ?? 0.75;
-    const deployedCdA = deployedCd * Math.PI * deployedR * deployedR;
-    const progress     = _getChuteDeployProgress(ps, instanceId);
-    const densityScale = Math.min(1, density / LOW_DENSITY_THRESHOLD);
-    const chuteCdA = stowedCdA + (deployedCdA - stowedCdA) * progress * densityScale;
+    const widthM: number    = (def.width ?? 40) * SCALE_M_PER_PX;
+    const stowedA: number   = Math.PI * (widthM / 2) ** 2;
+    const stowedCdA: number = (props.dragCoefficient ?? 0.05) * stowedA;
+    const deployedR: number   = (props.deployedDiameter ?? 10) / 2;
+    const deployedCd: number  = props.deployedCd ?? 0.75;
+    const deployedCdA: number = deployedCd * Math.PI * deployedR * deployedR;
+    const progress: number     = _getChuteDeployProgress(ps, instanceId);
+    const densityScale: number = Math.min(1, density / LOW_DENSITY_THRESHOLD);
+    const chuteCdA: number = stowedCdA + (deployedCdA - stowedCdA) * progress * densityScale;
 
     // Drag magnitude (the line tension pulling the capsule toward the canopy).
-    const dragMag = q * chuteCdA;
+    const dragMag: number = q * chuteCdA;
 
     // Pendulum restoring torque: the capsule hangs below the canopy on lines.
-    // When tilted by angle θ, the horizontal component of line tension
-    // provides a restoring torque = -dragMag * lineLength * sin(θ).
-    // The effective line length is the distance from CoM to the chute part.
-    const dx = (placed.x - com.x) * SCALE_M_PER_PX;
-    const dy = (placed.y - com.y) * SCALE_M_PER_PX;
-    const lineLen = Math.sqrt(dx * dx + dy * dy);
+    const dx: number = (placed.x - com.x) * SCALE_M_PER_PX;
+    const dy: number = (placed.y - com.y) * SCALE_M_PER_PX;
+    const lineLen: number = Math.sqrt(dx * dx + dy * dy);
 
     totalTorque -= dragMag * lineLen * sinA;
   }
@@ -1395,17 +1402,6 @@ function _computeParachuteTorque(ps, assembly, com, density, speed) {
 // Steering (private)
 // ---------------------------------------------------------------------------
 
-/**
- * Apply continuous steering inputs from held A/D (or arrow) keys.
- *
- * Torque-based rotation: heavier/longer rockets turn slower.
- * When grounded, delegates to `_applyGroundedSteering` for tipping physics.
- *
- * @param {PhysicsState}                               ps
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @param {number} altitude  Current altitude (m) for vacuum check.
- * @param {number} dt        Integration timestep (s).
- */
 // ---------------------------------------------------------------------------
 // Docking / RCS mode movement (private)
 // ---------------------------------------------------------------------------
@@ -1415,40 +1411,32 @@ function _computeParachuteTorque(ps, assembly, com, density, speed) {
  *
  * In DOCKING mode: A/D = along-track, W/S = radial.
  * In RCS mode: WASD = craft-relative directional translation.
- * Movement is applied as small velocity deltas restricted to the altitude band.
- *
- * @param {PhysicsState}                               ps
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @param {number} totalMass  Total rocket mass (kg).
- * @param {number} dt         Timestep (s).
  */
-function _applyDockingMovement(ps, assembly, totalMass, dt) {
-  const isDocking = ps.controlMode === ControlMode.DOCKING;
-  const isRcs     = ps.controlMode === ControlMode.RCS;
+function _applyDockingMovement(ps: PhysicsState, assembly: RocketAssembly, totalMass: number, dt: number): void {
+  const isDocking: boolean = ps.controlMode === ControlMode.DOCKING;
+  const isRcs: boolean     = ps.controlMode === ControlMode.RCS;
   if (!isDocking && !isRcs) return;
 
   // Clear RCS active directions each step; re-set below if active.
   ps.rcsActiveDirections.clear();
 
-  const w = ps._heldKeys.has('w') || ps._heldKeys.has('ArrowUp');
-  const s = ps._heldKeys.has('s') || ps._heldKeys.has('ArrowDown');
-  const a = ps._heldKeys.has('a') || ps._heldKeys.has('ArrowLeft');
-  const d = ps._heldKeys.has('d') || ps._heldKeys.has('ArrowRight');
+  const w: boolean = ps._heldKeys.has('w') || ps._heldKeys.has('ArrowUp');
+  const s: boolean = ps._heldKeys.has('s') || ps._heldKeys.has('ArrowDown');
+  const a: boolean = ps._heldKeys.has('a') || ps._heldKeys.has('ArrowLeft');
+  const d: boolean = ps._heldKeys.has('d') || ps._heldKeys.has('ArrowRight');
 
   if (!w && !s && !a && !d) return;
 
   // Determine thrust magnitude based on mode.
   // When docked, use combined mass for thrust calculations.
-  const thrustN = isRcs ? 500 : 2000; // N
-  const effectiveMass = ps._dockedCombinedMass > 0
+  const thrustN: number = isRcs ? 500 : 2000; // N
+  const effectiveMass: number = ps._dockedCombinedMass > 0
     ? Math.max(totalMass, ps._dockedCombinedMass)
     : totalMass;
-  const accel = thrustN / Math.max(1, effectiveMass);
+  const accel: number = thrustN / Math.max(1, effectiveMass);
 
   if (isRcs) {
     // RCS mode: WASD = craft-relative translation.
-    // W = forward (along rocket axis), S = backward,
-    // A = left, D = right (perpendicular to rocket axis).
     let dvAlongAxis = 0;
     let dvPerpAxis = 0;
     if (w) { dvAlongAxis += accel * dt; ps.rcsActiveDirections.add('up'); }
@@ -1457,19 +1445,14 @@ function _applyDockingMovement(ps, assembly, totalMass, dt) {
     if (d) { dvPerpAxis += accel * dt;  ps.rcsActiveDirections.add('right'); }
 
     // Convert craft-relative to world coordinates.
-    // Rocket angle: 0 = pointing up (+Y), positive = clockwise.
-    const sinA = Math.sin(ps.angle);
-    const cosA = Math.cos(ps.angle);
-    // Along axis (rocket's up direction): (+sinA, +cosA)
-    // Perpendicular (rocket's right direction): (+cosA, -sinA)
+    const sinA: number = Math.sin(ps.angle);
+    const cosA: number = Math.cos(ps.angle);
     ps.velX += dvAlongAxis * sinA + dvPerpAxis * cosA;
     ps.velY += dvAlongAxis * cosA - dvPerpAxis * sinA;
   } else {
     // DOCKING mode: A/D = along-track, W/S = radial.
-    // Along-track = velocity direction (prograde/retrograde).
-    // Radial = perpendicular to velocity (toward/away from body).
-    const speed = Math.hypot(ps.velX, ps.velY);
-    let progX, progY, radOutX, radOutY;
+    const speed: number = Math.hypot(ps.velX, ps.velY);
+    let progX: number, progY: number, radOutX: number, radOutY: number;
 
     if (speed > 1e-3) {
       progX = ps.velX / speed;
@@ -1482,9 +1465,7 @@ function _applyDockingMovement(ps, assembly, totalMass, dt) {
     radOutX = progY;
     radOutY = -progX;
     // Ensure radial out actually points away from body centre.
-    // Body centre is at (0, -R) in game coords, so radial out from craft
-    // should point in the direction of (posX, posY + R).
-    const radCheck = radOutX * ps.posX + radOutY * (ps.posY + 6_371_000);
+    const radCheck: number = radOutX * ps.posX + radOutY * (ps.posY + 6_371_000);
     if (radCheck < 0) {
       radOutX = -radOutX;
       radOutY = -radOutY;
@@ -1500,7 +1481,7 @@ function _applyDockingMovement(ps, assembly, totalMass, dt) {
     // Band limit clamping — prevent leaving the altitude band.
     if (ps.dockingAltitudeBand) {
       const band = ps.dockingAltitudeBand;
-      const alt = Math.max(0, ps.posY);
+      const alt: number = Math.max(0, ps.posY);
       if (alt >= band.max - 2500 && dvY > 0) dvY = 0;
       if (alt <= band.min + 2500 && dvY < 0) dvY = 0;
     }
@@ -1518,15 +1499,22 @@ function _applyDockingMovement(ps, assembly, totalMass, dt) {
 // Steering (private)
 // ---------------------------------------------------------------------------
 
-function _applySteering(ps, assembly, altitude, dt, bodyId, flightState) {
+function _applySteering(
+  ps: PhysicsState,
+  assembly: RocketAssembly,
+  altitude: number,
+  dt: number,
+  bodyId: string | undefined,
+  flightState: FlightState,
+): void {
   // In RCS mode, rotation is disabled.
   if (ps.controlMode === ControlMode.RCS) return;
 
   // In DOCKING mode, A/D don't rotate — they're handled by _applyDockingMovement.
   if (ps.controlMode === ControlMode.DOCKING) return;
 
-  const left  = ps._heldKeys.has('a') || ps._heldKeys.has('ArrowLeft');
-  const right = ps._heldKeys.has('d') || ps._heldKeys.has('ArrowRight');
+  const left: boolean  = ps._heldKeys.has('a') || ps._heldKeys.has('ArrowLeft');
+  const right: boolean = ps._heldKeys.has('d') || ps._heldKeys.has('ArrowRight');
 
   // Grounded or landed: delegate to tipping physics (always runs for gravity torque).
   if (ps.grounded || ps.landed) {
@@ -1535,18 +1523,18 @@ function _applySteering(ps, assembly, altitude, dt, bodyId, flightState) {
   }
 
   // --- Airborne torque-based rotation ---
-  const com = _computeCoMLocal(ps, assembly);
-  const I = _computeMomentOfInertia(ps, assembly, com);
-  const density = _densityForBody(Math.max(0, ps.posY), bodyId);
-  const speed   = Math.hypot(ps.velX, ps.velY);
-  const atmoTop = _atmosphereTopForBody(bodyId);
+  const com: Point2D = _computeCoMLocal(ps, assembly);
+  const I: number = _computeMomentOfInertia(ps, assembly, com);
+  const density: number = _densityForBody(Math.max(0, ps.posY), bodyId);
+  const speed: number   = Math.hypot(ps.velX, ps.velY);
+  const atmoTop: number = _atmosphereTopForBody(bodyId);
 
   // Player input torque — compute angular acceleration and cap it so light
   // rockets don't spin uncontrollably.
   // Piloting skill bonus: up to +30% torque at max skill.
-  const pilotingSkill = _getMaxCrewSkill(ps, flightState, 'piloting');
-  const pilotingBonus = 1 + (pilotingSkill / 100) * 0.3;
-  let baseTorque = PLAYER_FLIGHT_TORQUE * pilotingBonus;
+  const pilotingSkill: number = _getMaxCrewSkill(ps, flightState, 'piloting');
+  const pilotingBonus: number = 1 + (pilotingSkill / 100) * 0.3;
+  let baseTorque: number = PLAYER_FLIGHT_TORQUE * pilotingBonus;
   if (altitude > atmoTop && _hasRcs(ps, assembly)) {
     baseTorque *= RCS_TORQUE_MULTIPLIER;
   }
@@ -1557,17 +1545,15 @@ function _applySteering(ps, assembly, altitude, dt, bodyId, flightState) {
 
   // Parachute restoring torque (pendulum effect) — capped per angular accel
   // to prevent integration blow-up on very light capsules.
-  let restoringTorque = _computeParachuteTorque(ps, assembly, com, density, speed);
-  let restoringAlpha = restoringTorque / I;
+  let restoringTorque: number = _computeParachuteTorque(ps, assembly, com, density, speed);
+  let restoringAlpha: number = restoringTorque / I;
   restoringAlpha = Math.max(-MAX_CHUTE_ANGULAR_ACCEL, Math.min(MAX_CHUTE_ANGULAR_ACCEL, restoringAlpha));
 
-  const alpha = playerAlpha + restoringAlpha;
+  const alpha: number = playerAlpha + restoringAlpha;
   ps.angularVelocity += alpha * dt;
 
   // Parachute angular damping — applied as implicit exponential decay so it
   // is unconditionally stable even for tiny moments of inertia.
-  // Uses a fixed decay rate modelling line/canopy drag on the pendulum swing,
-  // scaled by atmospheric density so it vanishes in vacuum.
   if (density > 0 && ps.parachuteStates) {
     let hasActiveChute = false;
     for (const [, entry] of ps.parachuteStates) {
@@ -1577,7 +1563,7 @@ function _applySteering(ps, assembly, altitude, dt, bodyId, flightState) {
       }
     }
     if (hasActiveChute) {
-      const densityFrac = Math.min(1, density / LOW_DENSITY_THRESHOLD);
+      const densityFrac: number = Math.min(1, density / LOW_DENSITY_THRESHOLD);
       ps.angularVelocity *= Math.exp(-CHUTE_DIRECT_DAMPING * densityFrac * dt);
     }
   }
@@ -1585,12 +1571,12 @@ function _applySteering(ps, assembly, altitude, dt, bodyId, flightState) {
   // Damping (when no input).
   if (!left && !right) {
     // Aerodynamic damping (proportional to density).
-    const aeroDamping = AERO_ANGULAR_DAMPING * density;
+    const aeroDamping: number = AERO_ANGULAR_DAMPING * density;
     ps.angularVelocity -= aeroDamping * ps.angularVelocity * dt;
 
     // RCS active braking in vacuum.
     if (altitude > atmoTop && _hasRcs(ps, assembly)) {
-      const rcsBrake = RCS_ANGULAR_DAMPING * ps.angularVelocity / I;
+      const rcsBrake: number = RCS_ANGULAR_DAMPING * ps.angularVelocity / I;
       // Don't overshoot zero.
       if (Math.abs(rcsBrake * dt) > Math.abs(ps.angularVelocity)) {
         ps.angularVelocity = 0;
@@ -1603,23 +1589,8 @@ function _applySteering(ps, assembly, altitude, dt, bodyId, flightState) {
   ps.angle += ps.angularVelocity * dt;
 }
 
-/**
- * Apply ground-contact tipping physics.
- *
- * When the rocket is on the ground (grounded or landed), rotation happens
- * around the base contact corner, not the centre of mass.  Gravity produces
- * a restoring or toppling torque depending on how far the CoM has moved past
- * the support base.  Player A/D input adds an additional torque.
- *
- * @param {PhysicsState}                               ps
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @param {boolean} left   A/ArrowLeft held.
- * @param {boolean} right  D/ArrowRight held.
- * @param {number}  dt     Integration timestep (s).
- */
-
 /** Returns true if any parachute is currently deploying or deployed. */
-function _hasActiveParachutes(ps) {
+function _hasActiveParachutes(ps: PhysicsState): boolean {
   if (!ps.parachuteStates) return false;
   for (const [, entry] of ps.parachuteStates) {
     if (entry.state === ParachuteState.DEPLOYING || entry.state === ParachuteState.DEPLOYED) return true;
@@ -1627,7 +1598,7 @@ function _hasActiveParachutes(ps) {
   return false;
 }
 
-function _hasAsymmetricLegs(ps, assembly) {
+function _hasAsymmetricLegs(ps: PhysicsState, assembly: RocketAssembly): boolean {
   if (!ps.legStates || ps.legStates.size === 0) return false;
   let hasDeployed = false;
   let hasRetracted = false;
@@ -1644,8 +1615,23 @@ function _hasAsymmetricLegs(ps, assembly) {
   return false;
 }
 
-function _applyGroundedSteering(ps, assembly, left, right, dt, bodyId) {
-  const surfaceG = _gravityForBody(bodyId, 0);
+/**
+ * Apply ground-contact tipping physics.
+ *
+ * When the rocket is on the ground (grounded or landed), rotation happens
+ * around the base contact corner, not the centre of mass.  Gravity produces
+ * a restoring or toppling torque depending on how far the CoM has moved past
+ * the support base.  Player A/D input adds an additional torque.
+ */
+function _applyGroundedSteering(
+  ps: PhysicsState,
+  assembly: RocketAssembly,
+  left: boolean,
+  right: boolean,
+  dt: number,
+  bodyId?: string,
+): void {
+  const surfaceG: number = _gravityForBody(bodyId, 0);
   // If fully at rest with no input, nothing to do —
   // UNLESS legs are asymmetrically deployed (one deployed, one retracted),
   // which creates an off-centre contact point that should cause tipping.
@@ -1661,33 +1647,22 @@ function _applyGroundedSteering(ps, assembly, left, right, dt, bodyId) {
   }
 
   // --- Find ground contact point ---
-  // VAB local coords are Y-up (positive Y = upward, away from ground).
-  // All rotation formulas below use the standard Y-up clockwise rotation:
-  //   worldX = lx·cos + ly·sin,  worldY = -lx·sin + ly·cos
-  //
-  // Ground contact = softmax-weighted average of all corners, where the
-  // "ground projection" gp is the dot product with the world-downward
-  // direction (-sin, -cos) in local coords.  max gp = closest to ground.
-  // The softmax gives:
-  //   - A single corner when one is clearly the lowest (sharp selection).
-  //   - A smooth midpoint when a flat face rests on the ground (no oscillation).
-  //   - Continuous transitions as the rocket rolls between orientations.
-  const cosA = Math.cos(ps.angle);
-  const sinA = Math.sin(ps.angle);
+  const cosA: number = Math.cos(ps.angle);
+  const sinA: number = Math.sin(ps.angle);
 
   // Collect all corners with their gp values, tracking the maximum.
-  const allCorners = [];
+  const allCorners: CornerEntry[] = [];
   let maxGP = -Infinity;
   for (const instanceId of ps.activeParts) {
     const placed = assembly.parts.get(instanceId);
     if (!placed) continue;
-    const def = getPartById(placed.partId);
+    const def: PartDef = getPartById(placed.partId);
     if (!def) continue;
-    const hw = (def.width  ?? 40) / 2;
-    const hh = (def.height ?? 40) / 2;
+    const hw: number = (def.width  ?? 40) / 2;
+    const hh: number = (def.height ?? 40) / 2;
 
-    let halfW = hw;
-    let bottomHH = hh;
+    let halfW: number = hw;
+    let bottomHH: number = hh;
     // Deployed landing legs extend the foot below and outward.
     if (def.type === PartType.LANDING_LEGS || def.type === PartType.LANDING_LEG) {
       const { dx, dy } = getDeployedLegFootOffset(instanceId, def, ps.legStates);
@@ -1697,59 +1672,49 @@ function _applyGroundedSteering(ps, assembly, left, right, dt, bodyId) {
       }
     }
 
-    const corners = [
+    const corners: [number, number][] = [
       [placed.x - halfW, placed.y - bottomHH],
       [placed.x + halfW, placed.y - bottomHH],
       [placed.x - hw, placed.y + hh],
       [placed.x + hw, placed.y + hh],
     ];
     for (const [cx, cy] of corners) {
-      // Project onto the world-downward direction so max gp = closest to
-      // ground.  In Y-up local coords with clockwise rotation convention
-      // (worldY = -lx·sinA + ly·cosA), the downward direction (0,-1) maps
-      // to local (sinA, -cosA), so gp = cx·sinA - cy·cosA.
-      const gp = cx * sinA - cy * cosA;
+      const gp: number = cx * sinA - cy * cosA;
       allCorners.push({ cx, cy, gp });
       if (gp > maxGP) maxGP = gp;
     }
   }
 
-  // Softmax-weighted average: corners near the ground dominate; corners far
-  // above contribute negligibly.  CONTACT_SHARPNESS controls the transition
-  // width (~1-2 px of gp difference at sharpness 2.0).
+  // Softmax-weighted average: corners near the ground dominate.
   const CONTACT_SHARPNESS = 2.0;
   let sumW = 0, sumWX = 0, sumWY = 0;
   for (const c of allCorners) {
-    const w = Math.exp(CONTACT_SHARPNESS * (c.gp - maxGP));
+    const w: number = Math.exp(CONTACT_SHARPNESS * (c.gp - maxGP));
     sumW  += w;
     sumWX += w * c.cx;
     sumWY += w * c.cy;
   }
-  const contactLX = sumWX / sumW;
-  const contactLY = sumWY / sumW;
+  const contactLX: number = sumWX / sumW;
+  const contactLY: number = sumWY / sumW;
 
-  const contact = { x: contactLX, y: contactLY };
+  const contact: Point2D = { x: contactLX, y: contactLY };
 
   // Where is this contact point in world space right now?
-  // Y-up local, clockwise rotation by angle A:
-  //   worldX = posX + (lx·cos + ly·sin) * SCALE
-  const contactWorldX = ps.posX + (contactLX * cosA + contactLY * sinA) * SCALE_M_PER_PX;
+  const contactWorldX: number = ps.posX + (contactLX * cosA + contactLY * sinA) * SCALE_M_PER_PX;
 
   // Compute moment of inertia about the contact point.
-  const I = _computeMomentOfInertia(ps, assembly, contact);
+  const I: number = _computeMomentOfInertia(ps, assembly, contact);
 
   // Compute CoM position relative to contact point, then rotate to get
   // the world-X offset (horizontal distance for gravity torque).
-  // Y-up clockwise rotation: worldX = relX·cos + relY·sin
-  const com = _computeCoMLocal(ps, assembly);
-  const relX = (com.x - contactLX) * SCALE_M_PER_PX;
-  const relY = (com.y - contactLY) * SCALE_M_PER_PX;
-  const rotatedX = relX * cosA + relY * sinA;
+  const com: Point2D = _computeCoMLocal(ps, assembly);
+  const relX: number = (com.x - contactLX) * SCALE_M_PER_PX;
+  const relY: number = (com.y - contactLY) * SCALE_M_PER_PX;
+  const rotatedX: number = relX * cosA + relY * sinA;
 
   // Gravity torque: weight × horizontal distance from contact to CoM.
-  // Positive rotatedX → CoM is to the right of contact → positive (clockwise) torque.
-  const totalMass = _computeTotalMass(ps, assembly);
-  const gravityTorque = totalMass * surfaceG * rotatedX;
+  const totalMass: number = _computeTotalMass(ps, assembly);
+  const gravityTorque: number = totalMass * surfaceG * rotatedX;
 
   // Player input torque — capped per angular acceleration so light parts
   // don't instantly topple.
@@ -1759,26 +1724,23 @@ function _applyGroundedSteering(ps, assembly, left, right, dt, bodyId) {
   inputAccel = Math.max(-MAX_PLAYER_TIP_ACCEL, Math.min(MAX_PLAYER_TIP_ACCEL, inputAccel));
 
   // Net angular acceleration.
-  const gravAccel = gravityTorque / I;
-  const angAccel = gravAccel + inputAccel;
+  const gravAccel: number = gravityTorque / I;
+  const angAccel: number = gravAccel + inputAccel;
 
   // Euler integrate.
   ps.angularVelocity += angAccel * dt;
 
   // Heavy damping during active player input limits overshoot; lighter
-  // damping during free rocking allows several visible oscillations
-  // before the rocket settles upright on its legs or engine bell.
-  const hasLegBase = countDeployedLegs(ps) >= 2;
-  const effectiveDamping = (left || right) ? 0.85 : 0.99;
+  // damping during free rocking allows several visible oscillations.
+  const hasLegBase: boolean = countDeployedLegs(ps) >= 2;
+  const effectiveDamping: number = (left || right) ? 0.85 : 0.99;
   ps.angularVelocity *= effectiveDamping;
 
   ps.angle += ps.angularVelocity * dt;
 
   // --- Reposition so the contact corner stays on the ground surface ---
-  // posY stays at 0 — the renderer handles visual ground-pinning via the pivot.
-  // Only posX updates so the box rolls horizontally along the ground.
-  const cosB = Math.cos(ps.angle);
-  const sinB = Math.sin(ps.angle);
+  const cosB: number = Math.cos(ps.angle);
+  const sinB: number = Math.sin(ps.angle);
   ps.posX = contactWorldX - (contactLX * cosB + contactLY * sinB) * SCALE_M_PER_PX;
   ps.posY = 0;
 
@@ -1788,17 +1750,13 @@ function _applyGroundedSteering(ps, assembly, left, right, dt, bodyId) {
   ps.tippingContactY = contactLY;
 
   // --- Smooth settle ---
-  // When angular velocity is small and gravity torque is negligible, the
-  // rocket is near a stable equilibrium (upright, on its side, etc.).
-  // Smoothly decay velocity (and angle if near upright) to avoid visible
-  // one-frame jumps and infinite micro-oscillation.
   if (!left && !right && Math.abs(ps.angularVelocity) < ANGULAR_VEL_SNAP_THRESHOLD) {
-    const comSnap  = _computeCoMLocal(ps, assembly);
-    const sRelX    = (comSnap.x - contactLX) * SCALE_M_PER_PX;
-    const sRelY    = (comSnap.y - contactLY) * SCALE_M_PER_PX;
-    const sRotX    = sRelX * cosB + sRelY * sinB;
-    const snapGrav = totalMass * surfaceG * sRotX;
-    const snapAccel = Math.abs(snapGrav / I);
+    const comSnap: Point2D  = _computeCoMLocal(ps, assembly);
+    const sRelX: number    = (comSnap.x - contactLX) * SCALE_M_PER_PX;
+    const sRelY: number    = (comSnap.y - contactLY) * SCALE_M_PER_PX;
+    const sRotX: number    = sRelX * cosB + sRelY * sinB;
+    const snapGrav: number = totalMass * surfaceG * sRotX;
+    const snapAccel: number = Math.abs(snapGrav / I);
 
     if (snapAccel < 0.5) {
       // Near equilibrium — smoothly decay velocity.
@@ -1823,45 +1781,40 @@ function _applyGroundedSteering(ps, assembly, left, right, dt, bodyId) {
 
 /**
  * Check if the rocket has toppled past the crash angle and trigger a crash.
- *
- * @param {PhysicsState}                               ps
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @param {import('./gameState.js').FlightState}        flightState
  */
-function _checkToppleCrash(ps, assembly, flightState) {
+function _checkToppleCrash(ps: PhysicsState, assembly: RocketAssembly, flightState: FlightState): void {
   if (Math.abs(ps.angle) <= TOPPLE_CRASH_ANGLE) return;
 
   // Compute tip speed: linear velocity of the farthest part from the
-  // tipping contact pivot.  Compare against the weakest part's crash
-  // threshold — if tip speed is below that, it's a gentle topple.
-  const cx = ps.tippingContactX ?? 0;
-  const cy = ps.tippingContactY ?? 0;
+  // tipping contact pivot.
+  const cx: number = ps.tippingContactX ?? 0;
+  const cy: number = ps.tippingContactY ?? 0;
   let maxDist = 0;
   let minThreshold = Infinity;
   for (const instanceId of ps.activeParts) {
     const placed = assembly.parts.get(instanceId);
     if (!placed) continue;
-    const def = getPartById(placed.partId);
+    const def: PartDef = getPartById(placed.partId);
     if (!def) continue;
-    const hw = (def.width  ?? 40) / 2;
-    const hh = (def.height ?? 40) / 2;
+    const hw: number = (def.width  ?? 40) / 2;
+    const hh: number = (def.height ?? 40) / 2;
     // Check all four corners for max distance from pivot.
     for (const [px, py] of [
       [placed.x - hw, placed.y - hh],
       [placed.x + hw, placed.y - hh],
       [placed.x - hw, placed.y + hh],
       [placed.x + hw, placed.y + hh],
-    ]) {
-      const dx = (px - cx) * SCALE_M_PER_PX;
-      const dy = (py - cy) * SCALE_M_PER_PX;
-      const dist = Math.sqrt(dx * dx + dy * dy);
+    ] as [number, number][]) {
+      const dx: number = (px - cx) * SCALE_M_PER_PX;
+      const dy: number = (py - cy) * SCALE_M_PER_PX;
+      const dist: number = Math.sqrt(dx * dx + dy * dy);
       if (dist > maxDist) maxDist = dist;
     }
-    const threshold = def.properties?.crashThreshold ?? DEFAULT_CRASH_THRESHOLD;
+    const threshold: number = def.properties?.crashThreshold ?? DEFAULT_CRASH_THRESHOLD;
     if (threshold < minThreshold) minThreshold = threshold;
   }
 
-  const tipSpeed = Math.abs(ps.angularVelocity) * maxDist;
+  const tipSpeed: number = Math.abs(ps.angularVelocity) * maxDist;
   if (tipSpeed <= minThreshold) return; // gentle topple — no crash
 
   // Destructive topple — crash.
@@ -1869,7 +1822,7 @@ function _checkToppleCrash(ps, assembly, flightState) {
   ps.angularVelocity = 0;
   ps.firingEngines.clear();
 
-  const time = flightState.timeElapsed;
+  const time: number = flightState.timeElapsed;
   for (const instanceId of ps.activeParts) {
     const placed = assembly.parts.get(instanceId);
     _emitEvent(flightState, {
@@ -1904,17 +1857,13 @@ function _checkToppleCrash(ps, assembly, flightState) {
  * This is a stripped-down version of `_applyGroundedSteering` with no player
  * input — debris just rocks under gravity, settles if balanced, and crashes
  * if it topples too fast.
- *
- * @param {import('./staging.js').DebrisState}          debris
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @param {number}                                      dt  Fixed timestep (s).
  */
-export function tickDebrisGround(debris, assembly, dt, bodyId) {
+export function tickDebrisGround(debris: DebrisState, assembly: RocketAssembly, dt: number, bodyId?: string): void {
   if (debris.crashed) return;
-  const debrisG = _gravityForBody(bodyId, 0);
+  const debrisG: number = _gravityForBody(bodyId, 0);
 
   // Check if tipping is needed
-  const needsTipping = debris.isTipping ||
+  const needsTipping: boolean = debris.isTipping ||
     Math.abs(debris.angle) > TILT_SNAP_THRESHOLD ||
     Math.abs(debris.angularVelocity) > ANGULAR_VEL_SNAP_THRESHOLD;
 
@@ -1933,32 +1882,32 @@ export function tickDebrisGround(debris, assembly, dt, bodyId) {
   }
 
   // Reuse the same tipping math as _applyGroundedSteering but with no player input
-  const cosA = Math.cos(debris.angle);
-  const sinA = Math.sin(debris.angle);
+  const cosA: number = Math.cos(debris.angle);
+  const sinA: number = Math.sin(debris.angle);
 
   // Find ground contact point via softmax (same as rocket)
-  const allCorners = [];
+  const allCorners: CornerEntry[] = [];
   let maxGP = -Infinity;
   for (const instanceId of debris.activeParts) {
     const placed = assembly.parts.get(instanceId);
     if (!placed) continue;
-    const def = getPartById(placed.partId);
+    const def: PartDef = getPartById(placed.partId);
     if (!def) continue;
-    let halfW = (def.width ?? 40) / 2;
-    let bottomHH = (def.height ?? 40) / 2;
+    let halfW: number = (def.width ?? 40) / 2;
+    let bottomHH: number = (def.height ?? 40) / 2;
     if (def.type === PartType.LANDING_LEGS || def.type === PartType.LANDING_LEG) {
       const { dx, dy } = getDeployedLegFootOffset(instanceId, def, debris.legStates);
       if (dy > 0) { halfW = Math.max(halfW, dx); bottomHH = Math.max(bottomHH, dy); }
     }
-    const hw = (def.width ?? 40) / 2;
-    const hh = (def.height ?? 40) / 2;
+    const hw: number = (def.width ?? 40) / 2;
+    const hh: number = (def.height ?? 40) / 2;
     for (const [cx, cy] of [
       [placed.x - halfW, placed.y - bottomHH],
       [placed.x + halfW, placed.y - bottomHH],
       [placed.x - hw, placed.y + hh],
       [placed.x + hw, placed.y + hh],
-    ]) {
-      const gp = cx * sinA - cy * cosA;
+    ] as [number, number][]) {
+      const gp: number = cx * sinA - cy * cosA;
       allCorners.push({ cx, cy, gp });
       if (gp > maxGP) maxGP = gp;
     }
@@ -1969,33 +1918,33 @@ export function tickDebrisGround(debris, assembly, dt, bodyId) {
   const CONTACT_SHARPNESS = 2.0;
   let sumW = 0, sumWX = 0, sumWY = 0;
   for (const c of allCorners) {
-    const w = Math.exp(CONTACT_SHARPNESS * (c.gp - maxGP));
+    const w: number = Math.exp(CONTACT_SHARPNESS * (c.gp - maxGP));
     sumW += w; sumWX += w * c.cx; sumWY += w * c.cy;
   }
-  const contactLX = sumWX / sumW;
-  const contactLY = sumWY / sumW;
-  const contact = { x: contactLX, y: contactLY };
+  const contactLX: number = sumWX / sumW;
+  const contactLY: number = sumWY / sumW;
+  const contact: Point2D = { x: contactLX, y: contactLY };
 
-  const contactWorldX = debris.posX + (contactLX * cosA + contactLY * sinA) * SCALE_M_PER_PX;
+  const contactWorldX: number = debris.posX + (contactLX * cosA + contactLY * sinA) * SCALE_M_PER_PX;
 
   // Moment of inertia, CoM, gravity torque
-  const I = _computeMomentOfInertia(debris, assembly, contact);
-  const com = _computeCoMLocal(debris, assembly);
-  const relX = (com.x - contactLX) * SCALE_M_PER_PX;
-  const relY = (com.y - contactLY) * SCALE_M_PER_PX;
-  const rotatedX = relX * cosA + relY * sinA;
-  const totalMass = _computeTotalMass(debris, assembly);
-  const gravityTorque = totalMass * debrisG * rotatedX;
+  const I: number = _computeMomentOfInertia(debris, assembly, contact);
+  const com: Point2D = _computeCoMLocal(debris, assembly);
+  const relX: number = (com.x - contactLX) * SCALE_M_PER_PX;
+  const relY: number = (com.y - contactLY) * SCALE_M_PER_PX;
+  const rotatedX: number = relX * cosA + relY * sinA;
+  const totalMass: number = _computeTotalMass(debris, assembly);
+  const gravityTorque: number = totalMass * debrisG * rotatedX;
 
   // Angular integration (no player input)
-  const angAccel = gravityTorque / I;
+  const angAccel: number = gravityTorque / I;
   debris.angularVelocity += angAccel * dt;
   debris.angularVelocity *= 0.99; // light damping
   debris.angle += debris.angularVelocity * dt;
 
   // Reposition to keep contact on ground
-  const cosB = Math.cos(debris.angle);
-  const sinB = Math.sin(debris.angle);
+  const cosB: number = Math.cos(debris.angle);
+  const sinB: number = Math.sin(debris.angle);
   debris.posX = contactWorldX - (contactLX * cosB + contactLY * sinB) * SCALE_M_PER_PX;
   debris.posY = 0;
 
@@ -2005,10 +1954,10 @@ export function tickDebrisGround(debris, assembly, dt, bodyId) {
 
   // Smooth settle
   if (Math.abs(debris.angularVelocity) < ANGULAR_VEL_SNAP_THRESHOLD) {
-    const sRelX = (com.x - contactLX) * SCALE_M_PER_PX;
-    const sRelY = (com.y - contactLY) * SCALE_M_PER_PX;
-    const sRotX = sRelX * cosB + sRelY * sinB;
-    const snapGrav = totalMass * debrisG * sRotX;
+    const sRelX: number = (com.x - contactLX) * SCALE_M_PER_PX;
+    const sRelY: number = (com.y - contactLY) * SCALE_M_PER_PX;
+    const sRotX: number = sRelX * cosB + sRelY * sinB;
+    const snapGrav: number = totalMass * debrisG * sRotX;
     if (Math.abs(snapGrav / I) < 0.5) {
       debris.angularVelocity *= 0.85;
       if (Math.abs(debris.angle) < TILT_SNAP_THRESHOLD) debris.angle *= 0.9;
@@ -2019,30 +1968,30 @@ export function tickDebrisGround(debris, assembly, dt, bodyId) {
 
   // Topple crash — simplified (no flight events, just set crashed)
   if (Math.abs(debris.angle) > TOPPLE_CRASH_ANGLE) {
-    const cx = debris.tippingContactX ?? 0;
-    const cy = debris.tippingContactY ?? 0;
+    const dcx: number = debris.tippingContactX ?? 0;
+    const dcy: number = debris.tippingContactY ?? 0;
     let maxDist = 0;
     let minThreshold = Infinity;
     for (const instanceId of debris.activeParts) {
       const placed = assembly.parts.get(instanceId);
       if (!placed) continue;
-      const def = getPartById(placed.partId);
+      const def: PartDef = getPartById(placed.partId);
       if (!def) continue;
-      const hw = (def.width ?? 40) / 2;
-      const hh = (def.height ?? 40) / 2;
+      const hw: number = (def.width ?? 40) / 2;
+      const hh: number = (def.height ?? 40) / 2;
       for (const [px, py] of [
         [placed.x - hw, placed.y - hh], [placed.x + hw, placed.y - hh],
         [placed.x - hw, placed.y + hh], [placed.x + hw, placed.y + hh],
-      ]) {
-        const ddx = (px - cx) * SCALE_M_PER_PX;
-        const ddy = (py - cy) * SCALE_M_PER_PX;
-        const dist = Math.sqrt(ddx * ddx + ddy * ddy);
+      ] as [number, number][]) {
+        const ddx: number = (px - dcx) * SCALE_M_PER_PX;
+        const ddy: number = (py - dcy) * SCALE_M_PER_PX;
+        const dist: number = Math.sqrt(ddx * ddx + ddy * ddy);
         if (dist > maxDist) maxDist = dist;
       }
-      const threshold = def.properties?.crashThreshold ?? DEFAULT_CRASH_THRESHOLD;
+      const threshold: number = def.properties?.crashThreshold ?? DEFAULT_CRASH_THRESHOLD;
       if (threshold < minThreshold) minThreshold = threshold;
     }
-    const tipSpeed = Math.abs(debris.angularVelocity) * maxDist;
+    const tipSpeed: number = Math.abs(debris.angularVelocity) * maxDist;
     if (tipSpeed > minThreshold) {
       debris.crashed = true;
       debris.angularVelocity = 0;
@@ -2052,15 +2001,11 @@ export function tickDebrisGround(debris, assembly, dt, bodyId) {
 
 /**
  * Return true if the rocket has at least one active RCS-capable command module.
- *
- * @param {PhysicsState}                               ps
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @returns {boolean}
  */
-function _hasRcs(ps, assembly) {
+function _hasRcs(ps: PhysicsState, assembly: RocketAssembly): boolean {
   for (const instanceId of ps.activeParts) {
     const placed = assembly.parts.get(instanceId);
-    const def    = placed ? getPartById(placed.partId) : null;
+    const def: PartDef    = placed ? getPartById(placed.partId) : null;
     if (def && def.properties?.hasRcs === true) return true;
   }
   return false;
@@ -2075,32 +2020,28 @@ function _hasRcs(ps, assembly) {
  *
  * Landing outcome depends on how many legs are deployed and impact speed:
  *
- *   1. ≥ 2 deployed legs AND speed < 10 m/s
- *        → Controlled landing (LANDING event, ps.landed = true).
+ *   1. >= 2 deployed legs AND speed < 10 m/s
+ *        -> Controlled landing (LANDING event, ps.landed = true).
  *
- *   2. ≥ 1 deployed leg AND 10 m/s ≤ speed < 30 m/s
- *        → Hard landing: legs (and their connected parts) are destroyed but
+ *   2. >= 1 deployed leg AND 10 m/s <= speed < 30 m/s
+ *        -> Hard landing: legs (and their connected parts) are destroyed but
  *          the rocket body may survive (LANDING event with legs_destroyed flag).
  *
- *   3. speed ≥ 30 m/s (any leg state)
- *        → Catastrophic impact: all parts destroyed (CRASH event, ps.crashed = true).
+ *   3. speed >= 30 m/s (any leg state)
+ *        -> Catastrophic impact: all parts destroyed (CRASH event, ps.crashed = true).
  *
  *   4. 0 deployed legs AND speed > 5 m/s
- *        → Contact without leg support: bottom-most parts damaged/destroyed
+ *        -> Contact without leg support: bottom-most parts damaged/destroyed
  *          (CRASH event, ps.crashed = true).
  *
- *   5. speed ≤ 5 m/s (no legs or fewer than 2 legs)
- *        → Gentle touchdown (LANDING event, ps.landed = true).
+ *   5. speed <= 5 m/s (no legs or fewer than 2 legs)
+ *        -> Gentle touchdown (LANDING event, ps.landed = true).
  *
  * Emits LANDING or CRASH event and sets ps.landed / ps.crashed accordingly.
- *
- * @param {PhysicsState}                               ps
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @param {import('./gameState.js').FlightState}        flightState
  */
-function _handleGroundContact(ps, assembly, flightState) {
-  const impactSpeed = Math.hypot(ps.velX, ps.velY);
-  const time        = flightState.timeElapsed;
+function _handleGroundContact(ps: PhysicsState, assembly: RocketAssembly, flightState: FlightState): void {
+  const impactSpeed: number = Math.hypot(ps.velX, ps.velY);
+  const time: number        = flightState.timeElapsed;
 
   // Clamp to ground and stop motion.
   ps.posY = 0;
@@ -2108,17 +2049,17 @@ function _handleGroundContact(ps, assembly, flightState) {
   ps.velY = 0;
 
   // --- Cascading per-part crash threshold system ---
-  let remainingSpeed = impactSpeed;
-  let anyDestroyed   = false;
+  let remainingSpeed: number = impactSpeed;
+  let anyDestroyed = false;
 
   while (remainingSpeed > 0 && ps.activeParts.size > 0) {
-    const layer = _getBottomPartLayer(ps, assembly);
+    const layer: BottomLayerEntry[] = _getBottomPartLayer(ps, assembly);
     if (layer.length === 0) break;
 
     // Find the minimum crashThreshold in the bottom layer.
     let minThreshold = Infinity;
     for (const entry of layer) {
-      const threshold = entry.def.properties?.crashThreshold ?? DEFAULT_CRASH_THRESHOLD;
+      const threshold: number = entry.def.properties?.crashThreshold ?? DEFAULT_CRASH_THRESHOLD;
       if (threshold < minThreshold) minThreshold = threshold;
     }
 
@@ -2140,38 +2081,33 @@ function _handleGroundContact(ps, assembly, flightState) {
     anyDestroyed = true;
 
     // Each destroyed layer absorbs impact speed equal to its crash threshold.
-    // This creates predictable tiers: an engine (threshold 12) absorbs 12 m/s,
-    // so a 15 m/s impact leaves only 3 m/s for the next layer.
     remainingSpeed -= minThreshold;
   }
 
   // --- Renormalize surviving rocket so its new bottom sits at ground level ---
-  // Same approach as _renormalizeAfterSeparation in staging.js: shift all
-  // assembly part positions down so the lowest edge is at VAB Y=0, and adjust
-  // posY by the corresponding world-space offset.
   if (anyDestroyed && ps.activeParts.size > 0) {
-    const bottomAfter = _getLowestBottomEdge(ps, assembly);
+    const bottomAfter: number = _getLowestBottomEdge(ps, assembly);
     if (isFinite(bottomAfter) && bottomAfter > 0) {
-      const offsetM = bottomAfter * SCALE_M_PER_PX;
+      const offsetM: number = bottomAfter * SCALE_M_PER_PX;
       ps.posY += offsetM;
       for (const [, placed] of assembly.parts) {
         placed.y -= bottomAfter;
       }
-      for (const debris of ps.debris) {
-        debris.posY += offsetM;
+      for (const deb of ps.debris) {
+        deb.posY += offsetM;
       }
     }
   }
 
   // --- Determine outcome ---
-  const allCmdLost = _allCommandModulesGone(ps, assembly);
+  const allCmdLost: boolean = _allCommandModulesGone(ps, assembly);
 
-  const landingBodyId = flightState.bodyId || 'EARTH';
-  const bodyNames = {
+  const landingBodyId: string = flightState.bodyId || 'EARTH';
+  const bodyNames: Record<string, string> = {
     SUN: 'Sun', MERCURY: 'Mercury', VENUS: 'Venus', EARTH: 'Earth',
     MOON: 'Moon', MARS: 'Mars', PHOBOS: 'Phobos', DEIMOS: 'Deimos',
   };
-  const bodyName = bodyNames[landingBodyId] || landingBodyId;
+  const bodyName: string = bodyNames[landingBodyId] || landingBodyId;
 
   if (allCmdLost) {
     // All command / computer modules are destroyed — rocket is lost.
@@ -2186,7 +2122,7 @@ function _handleGroundContact(ps, assembly, flightState) {
   } else {
     // Rocket survives (possibly with partial damage).
     ps.landed = true;
-    const desc = anyDestroyed
+    const desc: string = anyDestroyed
       ? `Hard landing on ${bodyName} at ${impactSpeed.toFixed(1)} m/s — some parts destroyed.`
       : `Landed on ${bodyName} at ${impactSpeed.toFixed(1)} m/s.`;
     _emitEvent(flightState, {
@@ -2206,31 +2142,24 @@ function _handleGroundContact(ps, assembly, flightState) {
 // ---------------------------------------------------------------------------
 
 /** Band (VAB world units) around the minimum Y to treat as the same layer. */
-const DESTRUCTION_BAND = 5;
+const DESTRUCTION_BAND: number = 5;
 
 /**
  * Return the bottom-most layer of active parts — all parts whose bottom
  * edge is within DESTRUCTION_BAND of the lowest bottom edge.
- *
- * Uses `placed.y - halfHeight` as the bottom edge (world Y is positive-up),
- * matching the tipping physics ground-contact calculation.
- *
- * @param {PhysicsState}                               ps
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @returns {Array<{instanceId: string, bottomY: number, placed: object, def: object}>}
  */
-function _getBottomPartLayer(ps, assembly) {
-  const entries = [];
+function _getBottomPartLayer(ps: PhysicsState, assembly: RocketAssembly): BottomLayerEntry[] {
+  const entries: BottomLayerEntry[] = [];
   for (const instanceId of ps.activeParts) {
     const placed = assembly.parts.get(instanceId);
     if (!placed) continue;
-    const def = getPartById(placed.partId);
+    const def: PartDef = getPartById(placed.partId);
     if (!def) continue;
-    const halfH   = (def.height ?? 40) / 2;
-    let bottomY = placed.y - halfH;
+    const halfH: number   = (def.height ?? 40) / 2;
+    let bottomY: number = placed.y - halfH;
     if (def.type === PartType.LANDING_LEGS || def.type === PartType.LANDING_LEG) {
       const { dy } = getDeployedLegFootOffset(instanceId, def, ps.legStates);
-      const footY = placed.y - dy;
+      const footY: number = placed.y - dy;
       if (footY < bottomY) bottomY = footY;
     }
     entries.push({ instanceId, bottomY, placed, def });
@@ -2238,17 +2167,14 @@ function _getBottomPartLayer(ps, assembly) {
   if (entries.length === 0) return [];
 
   entries.sort((a, b) => a.bottomY - b.bottomY);
-  const minY = entries[0].bottomY;
+  const minY: number = entries[0].bottomY;
   return entries.filter((e) => e.bottomY <= minY + DESTRUCTION_BAND);
 }
 
 /**
  * Remove a single part from all physics state tracking sets/maps.
- *
- * @param {PhysicsState} ps
- * @param {string}       instanceId
  */
-function _removePartFromState(ps, instanceId, assembly) {
+function _removePartFromState(ps: PhysicsState, instanceId: string, assembly: RocketAssembly): void {
   ps.activeParts.delete(instanceId);
   ps.firingEngines.delete(instanceId);
   ps.deployedParts.delete(instanceId);
@@ -2264,23 +2190,18 @@ function _removePartFromState(ps, instanceId, assembly) {
 
 /**
  * Return the lowest bottom edge (VAB world Y) across all active parts.
- * Used to compute how far the rocket should drop after bottom parts are removed.
- *
- * @param {PhysicsState}                               ps
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @returns {number}  Lowest bottom edge Y value, or Infinity if no parts.
  */
-function _getLowestBottomEdge(ps, assembly) {
+function _getLowestBottomEdge(ps: PhysicsState, assembly: RocketAssembly): number {
   let lowest = Infinity;
   for (const instanceId of ps.activeParts) {
     const placed = assembly.parts.get(instanceId);
     if (!placed) continue;
-    const def = getPartById(placed.partId);
+    const def: PartDef = getPartById(placed.partId);
     if (!def) continue;
-    let bottomY = placed.y - (def.height ?? 40) / 2;
+    let bottomY: number = placed.y - (def.height ?? 40) / 2;
     if (def.type === PartType.LANDING_LEGS || def.type === PartType.LANDING_LEG) {
       const { dy } = getDeployedLegFootOffset(instanceId, def, ps.legStates);
-      const footY = placed.y - dy;
+      const footY: number = placed.y - dy;
       if (footY < bottomY) bottomY = footY;
     }
     if (bottomY < lowest) lowest = bottomY;
@@ -2291,15 +2212,11 @@ function _getLowestBottomEdge(ps, assembly) {
 /**
  * Return true if all COMMAND_MODULE and COMPUTER_MODULE parts in the assembly
  * have been removed from activeParts.
- *
- * @param {PhysicsState}                               ps
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @returns {boolean}
  */
-function _allCommandModulesGone(ps, assembly) {
+function _allCommandModulesGone(ps: PhysicsState, assembly: RocketAssembly): boolean {
   let hadCmd = false;
   for (const [instanceId, placed] of assembly.parts) {
-    const def = getPartById(placed.partId);
+    const def: PartDef = getPartById(placed.partId);
     if (!def) continue;
     if (def.type === PartType.COMMAND_MODULE || def.type === PartType.COMPUTER_MODULE) {
       hadCmd = true;
@@ -2318,13 +2235,9 @@ function _allCommandModulesGone(ps, assembly) {
  * the game (mission objectives, UI, save/load) reads.
  *
  * Also recomputes `deltaVRemaining` using the simplified Tsiolkovsky equation:
- *   ΔV ≈ avgIsp × g₀ × ln(wetMass / dryMass)
- *
- * @param {PhysicsState}                               ps
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @param {import('./gameState.js').FlightState}        flightState
+ *   deltaV ~= avgIsp × g0 × ln(wetMass / dryMass)
  */
-function _syncFlightState(ps, assembly, flightState) {
+function _syncFlightState(ps: PhysicsState, assembly: RocketAssembly, flightState: FlightState): void {
   flightState.altitude = Math.max(0, ps.posY);
   flightState.velocity = Math.hypot(ps.velX, ps.velY);
 
@@ -2337,9 +2250,9 @@ function _syncFlightState(ps, assembly, flightState) {
   }
 
   // Track current biome and record visited biomes.
-  const newBiome = getBiomeId(flightState.altitude, 'EARTH');
+  const newBiome: string | null = getBiomeId(flightState.altitude, 'EARTH');
   if (newBiome && newBiome !== flightState.currentBiome) {
-    const prevBiome = flightState.currentBiome;
+    const prevBiome: string | null = flightState.currentBiome;
     flightState.currentBiome = newBiome;
     if (!flightState.biomesVisited.includes(newBiome)) {
       flightState.biomesVisited.push(newBiome);
@@ -2353,10 +2266,9 @@ function _syncFlightState(ps, assembly, flightState) {
         toBiome:     newBiome,
         altitude:    flightState.altitude,
         description: `Entered ${newBiome.replace(/_/g, ' ').toLowerCase()} biome at ${flightState.altitude.toFixed(0)} m.`,
-      });
+      } as any);
 
       // Schedule a malfunction check with a small random delay (0.5–2.0 s)
-      // so it doesn't fire at the exact biome boundary — adds unpredictability.
       if (ps._malfunctionCheckPending !== true) {
         ps._malfunctionCheckPending = true;
         ps._malfunctionCheckTimer = 0.5 + Math.random() * 1.5;
@@ -2373,8 +2285,8 @@ function _syncFlightState(ps, assembly, flightState) {
 
   // Recalculate power state if active part count changed (staging/destruction).
   if (ps.powerState) {
-    const prevCap = ps.powerState.batteryCapacity;
-    const prevArea = ps.powerState.solarPanelArea;
+    const prevCap: number = ps.powerState.batteryCapacity;
+    const prevArea: number = ps.powerState.solarPanelArea;
     recalcPowerState(ps.powerState, assembly, ps.activeParts);
     // Only sync to flightState if capacity changed (avoids unnecessary writes).
     if (ps.powerState.batteryCapacity !== prevCap || ps.powerState.solarPanelArea !== prevArea) {
@@ -2382,18 +2294,14 @@ function _syncFlightState(ps, assembly, flightState) {
     }
   }
 
-  // Estimate remaining ΔV using current wet/dry mass split and average Isp.
+  // Estimate remaining deltaV using current wet/dry mass split and average Isp.
   flightState.deltaVRemaining = _estimateDeltaV(ps, assembly);
 }
 
 /**
- * Estimate remaining ΔV using the Tsiolkovsky rocket equation.
- *
- * @param {PhysicsState}                               ps
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @returns {number}  Estimated ΔV in m/s.
+ * Estimate remaining deltaV using the Tsiolkovsky rocket equation.
  */
-function _estimateDeltaV(ps, assembly) {
+function _estimateDeltaV(ps: PhysicsState, assembly: RocketAssembly): number {
   let dryMass  = 0;
   let wetMass  = 0;
   let totalIspTimesMdot = 0;
@@ -2401,29 +2309,29 @@ function _estimateDeltaV(ps, assembly) {
 
   for (const instanceId of ps.activeParts) {
     const placed = assembly.parts.get(instanceId);
-    const def    = placed ? getPartById(placed.partId) : null;
+    const def: PartDef    = placed ? getPartById(placed.partId) : null;
     if (!def) continue;
 
     dryMass += def.mass ?? 0;
-    const fuel = ps.fuelStore.get(instanceId) ?? 0;
+    const fuel: number = ps.fuelStore.get(instanceId) ?? 0;
     wetMass   += (def.mass ?? 0) + fuel;
   }
 
-  // Average Isp from all active engines/SRBs (vacuum, for ΔV budget).
+  // Average Isp from all active engines/SRBs (vacuum, for deltaV budget).
   for (const instanceId of ps.firingEngines) {
     const placed = assembly.parts.get(instanceId);
-    const def    = placed ? getPartById(placed.partId) : null;
+    const def: PartDef    = placed ? getPartById(placed.partId) : null;
     if (!def) continue;
-    const isp   = def.properties?.ispVac ?? def.properties?.isp ?? 300;
-    const thrust = (def.properties?.thrustVac ?? def.properties?.thrust ?? 0) * 1_000;
-    const mdot  = thrust > 0 ? thrust / (isp * G0) : 0;
+    const isp: number   = def.properties?.ispVac ?? def.properties?.isp ?? 300;
+    const thrust: number = (def.properties?.thrustVac ?? def.properties?.thrust ?? 0) * 1_000;
+    const mdot: number  = thrust > 0 ? thrust / (isp * G0) : 0;
     totalIspTimesMdot += isp * mdot;
     totalMdot         += mdot;
   }
 
   if (dryMass <= 0 || wetMass <= dryMass) return 0;
 
-  const avgIsp = totalMdot > 0 ? totalIspTimesMdot / totalMdot : 300;
+  const avgIsp: number = totalMdot > 0 ? totalIspTimesMdot / totalMdot : 300;
   return avgIsp * G0 * Math.log(wetMass / dryMass);
 }
 
@@ -2433,10 +2341,7 @@ function _estimateDeltaV(ps, assembly) {
 
 /**
  * Append a flight event to the FlightState event log.
- *
- * @param {import('./gameState.js').FlightState} flightState
- * @param {object} event  Must include at minimum `type` and `time`.
  */
-function _emitEvent(flightState, event) {
-  flightState.events.push(event);
+function _emitEvent(flightState: FlightState, event: Record<string, unknown>): void {
+  flightState.events.push(event as any);
 }

@@ -1,0 +1,1161 @@
+/**
+ * _css.js — VAB CSS template literal.
+ *
+ * Extracted from the original vab.js so other sub-modules don't carry
+ * the weight of the large style block.
+ */
+
+import {
+  VAB_TOOLBAR_HEIGHT,
+  VAB_PARTS_PANEL_WIDTH,
+  VAB_SCALE_BAR_WIDTH,
+} from '../../render/vab.js';
+
+export const VAB_CSS = `
+/* ── VAB root ───────────────────────────────────────────────────────── */
+#vab-root {
+  position: absolute;
+  top: 44px; /* leave room for the global top bar (src/ui/topbar.js) */
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+  font-family: system-ui, sans-serif;
+  color: #c0d4ec;
+  user-select: none;
+  overflow: hidden;
+}
+
+/* ── Toolbar ─────────────────────────────────────────────────────────── */
+#vab-toolbar {
+  height: ${VAB_TOOLBAR_HEIGHT}px;
+  min-height: ${VAB_TOOLBAR_HEIGHT}px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0 14px;
+  background: rgba(4, 8, 20, 0.97);
+  border-bottom: 1px solid #162c48;
+  pointer-events: auto;
+  flex-shrink: 0;
+  z-index: 20;
+  gap: 12px;
+}
+
+/* Toolbar stats (parts count + cost) — pushed right via spacer */
+.vab-toolbar-spacer { flex: 1; }
+.vab-toolbar-stat {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #8ab8d8;
+  white-space: nowrap;
+}
+.vab-zoom-slider {
+  width: 100px;
+  cursor: pointer;
+  accent-color: #2080c0;
+}
+.vab-toolbar-cost {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #5ddb50;
+  letter-spacing: 0.02em;
+}
+
+.vab-toolbar-btns {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex: 1;
+}
+
+#vab-btn-launch {
+  margin-left: auto;
+}
+
+.vab-btn {
+  background: rgba(12, 26, 54, 0.92);
+  border: 1px solid #1e3b60;
+  color: #84aece;
+  padding: 5px 13px;
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: background .1s, border-color .1s, color .1s;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.vab-btn:hover:not(:disabled) {
+  background: rgba(22, 52, 90, 0.95);
+  border-color: #3470a8;
+  color: #c8e4ff;
+}
+.vab-btn:disabled {
+  opacity: .28;
+  cursor: not-allowed;
+}
+
+.vab-btn-launch {
+  background: rgba(36, 12, 12, 0.92);
+  border-color: #401818;
+  color: #9a5858;
+}
+.vab-btn-launch:not(:disabled) {
+  background: rgba(16, 58, 22, 0.92);
+  border-color: #235828;
+  color: #62c870;
+}
+.vab-btn-launch:hover:not(:disabled) {
+  background: rgba(22, 80, 30, 0.97);
+  border-color: #38883e;
+  color: #8ef09a;
+}
+
+/* ── Symmetry toggle button ──────────────────────────────────────────── */
+.vab-btn-symmetry {
+  background: rgba(12, 26, 54, 0.92);
+  border: 1px solid #1e3b60;
+  color: #5a88a8;
+  padding: 5px 10px;
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: background .1s, border-color .1s, color .1s;
+  white-space: nowrap;
+  line-height: 1.4;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.vab-btn-symmetry[aria-pressed="true"] {
+  background: rgba(8, 38, 60, 0.95);
+  border-color: #2a6090;
+  color: #60c0e8;
+}
+.vab-btn-symmetry:hover {
+  background: rgba(16, 38, 72, 0.95);
+  border-color: #3060a0;
+  color: #88c8e8;
+}
+.vab-btn-symmetry-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+
+/* ── Clear All button ─────────────────────────────────────────────── */
+.vab-btn-clear-all {
+  background: rgba(54, 12, 12, 0.92);
+  border-color: #501818;
+  color: #a06060;
+}
+.vab-btn-clear-all:hover {
+  background: rgba(80, 20, 20, 0.95);
+  border-color: #703030;
+  color: #e08080;
+}
+
+/* ── Main row (toolbar bottom to window bottom) ───────────────────── */
+#vab-main {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ── Scale bar ───────────────────────────────────────────────────────── */
+#vab-scale-bar {
+  width: ${VAB_SCALE_BAR_WIDTH}px;
+  min-width: ${VAB_SCALE_BAR_WIDTH}px;
+  flex-shrink: 0;
+  background: rgba(3, 6, 16, 0.92);
+  border-right: 1px solid #0e1e30;
+  position: relative;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.vab-scale-ticks {
+  position: absolute;
+  inset: 0;
+}
+
+.vab-tick {
+  position: absolute;
+  right: 0;
+  height: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+/* Tick mark line rendered via ::after */
+.vab-tick-minor::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  height: 1px;
+  width: 8px;
+  background: #1e3850;
+}
+.vab-tick-major::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  height: 1px;
+  width: 14px;
+  background: #2a4e6e;
+}
+
+.vab-tick-label {
+  position: absolute;
+  right: 18px;
+  font-size: 10px;
+  color: #4a7a9a;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  line-height: 1;
+}
+
+/* ── Build canvas (transparent — PixiJS grid visible beneath) ──────── */
+#vab-canvas-area {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  pointer-events: auto;
+  cursor: crosshair;
+}
+#vab-canvas-area.panning {
+  cursor: grabbing;
+}
+
+/* ── Parts panel ─────────────────────────────────────────────────────── */
+#vab-parts-panel {
+  width: ${VAB_PARTS_PANEL_WIDTH}px;
+  min-width: ${VAB_PARTS_PANEL_WIDTH}px;
+  flex-shrink: 0;
+  background: rgba(3, 6, 18, 0.97);
+  border-left: 1px solid #162c48;
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+  z-index: 20;
+}
+
+.vab-parts-title {
+  flex-shrink: 0;
+  padding: 9px 12px 7px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  color: #2e5878;
+  border-bottom: 1px solid #0e1e30;
+}
+
+.vab-parts-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 0 14px;
+  scrollbar-width: thin;
+  scrollbar-color: #152a44 transparent;
+}
+.vab-parts-list::-webkit-scrollbar { width: 4px; }
+.vab-parts-list::-webkit-scrollbar-thumb {
+  background: #152a44;
+  border-radius: 2px;
+}
+
+.vab-parts-group-hdr {
+  padding: 8px 12px 3px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: #223850;
+}
+
+.vab-part-card {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 10px 5px 12px;
+  cursor: grab;
+  transition: background .08s;
+}
+.vab-part-card:hover {
+  background: rgba(14, 38, 74, 0.55);
+}
+.vab-part-card:active {
+  cursor: grabbing;
+}
+
+.vab-part-rect {
+  flex-shrink: 0;
+  border-radius: 1px;
+  box-sizing: border-box;
+}
+
+.vab-part-info {
+  flex: 1;
+  min-width: 0;
+}
+.vab-part-name {
+  font-size: 11px;
+  color: #a8c8e8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.vab-part-meta {
+  display: flex;
+  gap: 6px;
+  font-size: 9px;
+  color: #365474;
+  margin-top: 2px;
+}
+
+.vab-parts-empty {
+  padding: 28px 16px;
+  font-size: 10px;
+  color: #224060;
+  text-align: center;
+  line-height: 1.75;
+}
+
+/* ── Inventory badge on part cards ──────────────────────────────────── */
+.vab-inv-badge {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 4px;
+  font-size: 9px;
+  font-weight: 700;
+  color: #50c860;
+  background: rgba(40, 100, 50, 0.35);
+  border-radius: 7px;
+  line-height: 1.5;
+  vertical-align: middle;
+}
+.vab-part-cost-free {
+  color: #50c860;
+  font-weight: 700;
+}
+.vab-part-cost-orig {
+  text-decoration: line-through;
+  color: #365474;
+  margin-left: 3px;
+  font-size: 8px;
+}
+
+/* ── Inventory panel ────────────────────────────────────────────────── */
+.vab-inv-body {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #152a44 transparent;
+}
+.vab-inv-empty {
+  padding: 28px 16px;
+  font-size: 10px;
+  color: #224060;
+  text-align: center;
+  line-height: 1.75;
+}
+.vab-inv-group-hdr {
+  padding: 8px 12px 3px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: #3a6848;
+  border-bottom: 1px solid #0e1e30;
+}
+.vab-inv-item {
+  padding: 5px 10px;
+  border-bottom: 1px solid rgba(14, 30, 48, 0.5);
+  transition: background .08s;
+}
+.vab-inv-item:hover {
+  background: rgba(14, 38, 74, 0.35);
+}
+.vab-inv-item-info {
+  display: flex;
+  gap: 8px;
+  font-size: 10px;
+  margin-bottom: 4px;
+}
+.vab-inv-wear { font-weight: 700; }
+.vab-inv-flights { color: #4a6a8a; }
+.vab-inv-rel { color: #6080a0; }
+.vab-inv-item-actions {
+  display: flex;
+  gap: 4px;
+}
+.vab-inv-btn {
+  background: rgba(12, 26, 54, 0.92);
+  border: 1px solid #1e3b60;
+  color: #84aece;
+  padding: 2px 8px;
+  font-family: inherit;
+  font-size: 9px;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: background .1s, border-color .1s;
+}
+.vab-inv-btn:hover {
+  background: rgba(22, 52, 90, 0.95);
+  border-color: #3470a8;
+  color: #c8e4ff;
+}
+.vab-inv-btn-refurb {
+  border-color: #2a5040;
+  color: #50a870;
+}
+.vab-inv-btn-refurb:hover {
+  background: rgba(22, 60, 40, 0.95);
+  border-color: #40806a;
+  color: #80d0a0;
+}
+.vab-inv-btn-scrap {
+  border-color: #504020;
+  color: #a08040;
+}
+.vab-inv-btn-scrap:hover {
+  background: rgba(60, 40, 10, 0.95);
+  border-color: #806830;
+  color: #c0a060;
+}
+
+/* ── Inventory detail in part detail panel ──────────────────────────── */
+.vab-detail-inv {
+  padding: 4px 0;
+  margin-bottom: 4px;
+  border-radius: 3px;
+}
+.vab-detail-inv-count {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  color: #50c860;
+}
+.vab-detail-inv-wear {
+  display: block;
+  font-size: 9px;
+  color: #6a9a7a;
+  margin-top: 1px;
+}
+
+/* ── Part detail panel (bottom of parts list) ────────────────────────── */
+#vab-part-detail {
+  flex-shrink: 0;
+  border-top: 1px solid #0e1e30;
+  background: rgba(2, 4, 14, 0.98);
+  padding: 10px 12px;
+  max-height: 220px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #152a44 transparent;
+}
+#vab-part-detail[hidden] { display: none; }
+.vab-detail-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: #a8c8e8;
+  margin-bottom: 3px;
+}
+.vab-detail-type {
+  font-size: 9px;
+  color: #3a6080;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  margin-bottom: 7px;
+}
+.vab-detail-desc {
+  font-size: 11px;
+  color: #608890;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+.vab-detail-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.vab-detail-stat {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+}
+.vab-detail-stat-label { color: #3a6080; }
+.vab-detail-stat-value { color: #7ab0d0; font-weight: 700; }
+
+/* ── Part selection highlight on canvas ──────────────────────────────── */
+#vab-selection-highlight {
+  position: absolute;
+  pointer-events: none;
+  border: 2px solid #60d0ff;
+  box-shadow: 0 0 8px rgba(96,208,255,0.4);
+  border-radius: 1px;
+  z-index: 30;
+}
+#vab-selection-highlight[hidden] { display: none; }
+
+/* ── Off-screen part indicator arrows ────────────────────────────────── */
+.vab-offscreen-indicator {
+  position: absolute;
+  pointer-events: auto;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 60, 100, 0.85);
+  border: 1px solid #2a6090;
+  border-radius: 3px;
+  font-size: 11px;
+  color: #80c0e8;
+  cursor: default;
+  z-index: 50;
+  transition: background .1s;
+}
+.vab-offscreen-indicator:hover {
+  background: rgba(30, 80, 130, 0.95);
+}
+
+/* (status bar content now lives inside the toolbar) */
+
+/* ── Side panels — stackable ─────────────────────────────────────────── */
+.vab-side-panel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: ${VAB_SCALE_BAR_WIDTH}px;
+  width: 300px;
+  background: rgba(3, 6, 18, 0.98);
+  border-right: 1px solid #162c48;
+  box-shadow: 6px 0 28px rgba(0,0,0,.75);
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+  z-index: 40;
+}
+.vab-side-panel[hidden] {
+  display: none;
+}
+
+.vab-side-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 14px;
+  border-bottom: 1px solid #0e1e30;
+  font-size: 12px;
+  font-weight: 700;
+  color: #88b4d0;
+  flex-shrink: 0;
+}
+
+.vab-side-close {
+  background: none;
+  border: none;
+  color: #2e5070;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 3px;
+  line-height: 1;
+  font-family: inherit;
+}
+.vab-side-close:hover { color: #88b4d0; }
+
+.vab-side-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  scrollbar-width: thin;
+  scrollbar-color: #152a44 transparent;
+}
+.vab-side-body::-webkit-scrollbar { width: 4px; }
+.vab-side-body::-webkit-scrollbar-thumb {
+  background: #152a44;
+  border-radius: 2px;
+}
+
+.vab-side-empty {
+  padding: 24px 0;
+  font-size: 10px;
+  color: #224060;
+  text-align: center;
+  line-height: 1.75;
+}
+
+/* ── Staging panel ───────────────────────────────────────────────────── */
+.vab-staging-body {
+  padding: 0;
+  overflow-y: auto;
+}
+
+.vab-staging-section {
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid #0e1e30;
+}
+
+.vab-staging-section-hdr {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  color: #2e5878;
+  margin-bottom: 6px;
+}
+
+.vab-staging-stage {
+  padding: 8px 12px 6px;
+  border-bottom: 1px solid #0a1826;
+}
+
+.vab-staging-stage-first {
+  background: rgba(0, 12, 6, 0.35);
+}
+
+.vab-staging-stage-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  font-weight: 700;
+  color: #5a8aaa;
+  margin-bottom: 6px;
+  padding: 2px 0;
+  gap: 4px;
+}
+
+.vab-stage-drag-handle {
+  cursor: grab;
+  font-size: 12px;
+  color: #406a80;
+  user-select: none;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.vab-stage-drag-handle:hover {
+  color: #80c0e0;
+}
+
+.vab-staging-stage.dragging {
+  opacity: 0.5;
+  border-style: dashed;
+}
+
+.vab-staging-stage.drag-over {
+  border-color: #40a0d0;
+  background: rgba(30, 80, 120, 0.15);
+}
+
+.vab-staging-stage-first .vab-staging-stage-hdr {
+  color: #42cc74;
+}
+
+.vab-staging-stage-current .vab-staging-stage-hdr {
+  color: #e8b840;
+}
+
+.vab-staging-del {
+  background: none;
+  border: none;
+  color: #2a4060;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0 3px;
+  font-family: inherit;
+  line-height: 1;
+}
+.vab-staging-del:hover { color: #d06060; }
+
+.vab-staging-zone {
+  min-height: 32px;
+  background: rgba(4, 10, 26, 0.6);
+  border: 1px dashed #162c48;
+  border-radius: 2px;
+  padding: 5px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: flex-start;
+  align-content: flex-start;
+  transition: border-color .1s, background .1s;
+  margin-bottom: 2px;
+}
+
+.vab-staging-zone.drag-over {
+  border-color: #4890e0;
+  background: rgba(16, 44, 100, 0.65);
+}
+
+.vab-staging-zone-empty {
+  font-size: 9px;
+  color: #1e3a54;
+  text-align: center;
+  line-height: 1.5;
+  padding: 2px 0;
+  width: 100%;
+}
+
+.vab-stage-chip {
+  background: rgba(14, 36, 72, 0.9);
+  border: 1px solid #1e3e68;
+  border-radius: 2px;
+  padding: 3px 8px;
+  font-size: 10px;
+  color: #88b8d8;
+  cursor: grab;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  user-select: none;
+  line-height: 1.4;
+}
+.vab-stage-chip:hover {
+  border-color: #3870b8;
+  color: #b8d8f0;
+}
+.vab-stage-chip:active { cursor: grabbing; }
+.vab-stage-chip.dragging { opacity: 0.35; }
+
+.vab-staging-controls {
+  padding: 10px 12px;
+  border-bottom: 1px solid #0e1e30;
+  display: flex;
+  gap: 8px;
+}
+
+.vab-staging-warnings {
+  padding: 10px 12px;
+}
+
+.vab-staging-warn {
+  font-size: 10px;
+  color: #d0a030;
+  background: rgba(48, 24, 0, 0.45);
+  border: 1px solid #583010;
+  border-radius: 2px;
+  padding: 7px 9px;
+  line-height: 1.5;
+}
+
+/* ── Delta-V display ────────────────────────────────────────────────── */
+.vab-staging-dv {
+  padding: 8px 12px;
+  border-bottom: 1px solid #0e1e30;
+}
+
+.vab-staging-dv-total {
+  font-size: 11px;
+  font-weight: 700;
+  color: #60e0a0;
+  margin-bottom: 6px;
+}
+
+.vab-stage-stats {
+  display: flex;
+  gap: 10px;
+  font-size: 9px;
+  margin-top: 2px;
+}
+
+.vab-stage-dv {
+  color: #50c8a0;
+}
+
+.vab-stage-twr {
+  color: #88b8d8;
+}
+
+.vab-stage-twr.warn {
+  color: #d0a030;
+}
+
+.vab-dv-altitude {
+  padding: 8px 12px 6px;
+  border-bottom: 1px solid #0e1e30;
+}
+
+.vab-dv-altitude-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9px;
+  color: #5a8aaa;
+}
+
+.vab-dv-altitude input[type="range"] {
+  flex: 1;
+  accent-color: #3080b0;
+  height: 14px;
+}
+
+.vab-dv-altitude-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 8px;
+  color: #6a98b8;
+  font-variant-numeric: tabular-nums;
+  margin-top: 3px;
+}
+
+/* ── Context menu ────────────────────────────────────────────────────── */
+#vab-ctx-menu {
+  position: fixed;
+  z-index: 200;
+  background: rgba(4, 8, 22, 0.98);
+  border: 1px solid #1e3a5c;
+  border-radius: 2px;
+  padding: 2px 0;
+  box-shadow: 2px 4px 18px rgba(0,0,0,.85);
+  min-width: 140px;
+}
+#vab-ctx-menu[hidden] {
+  display: none;
+}
+.vab-ctx-item {
+  display: block;
+  width: 100%;
+  padding: 6px 14px;
+  font-size: 11px;
+  font-family: system-ui, sans-serif;
+  color: #a8c8e8;
+  cursor: pointer;
+  background: none;
+  border: none;
+  text-align: left;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+.vab-ctx-item:hover {
+  background: rgba(14, 38, 74, 0.8);
+  color: #c8e4ff;
+}
+.vab-ctx-item-danger {
+  color: #e09090;
+}
+.vab-ctx-item-danger:hover {
+  background: rgba(50, 8, 8, 0.8);
+  color: #ffb0b0;
+}
+
+/* ── Rocket Engineer validation panel ───────────────────────────────── */
+.vab-val-stats {
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid #0e1e30;
+}
+
+.vab-val-stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 10px;
+  padding: 3px 0;
+}
+
+.vab-val-stat-label { color: #3a6080; }
+.vab-val-stat-value { color: #88b8d8; font-weight: 700; letter-spacing: .02em; }
+.vab-val-stat-good  { color: #42cc74 !important; }
+.vab-val-stat-bad   { color: #e06060 !important; }
+
+.vab-val-checks {
+  padding: 4px 12px;
+}
+
+.vab-val-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid #0a1826;
+}
+.vab-val-check:last-child { border-bottom: none; }
+
+.vab-val-icon {
+  flex-shrink: 0;
+  font-size: 12px;
+  width: 14px;
+  text-align: center;
+  margin-top: 1px;
+}
+.vab-val-icon-pass { color: #42cc74; }
+.vab-val-icon-warn { color: #d0a030; }
+.vab-val-icon-fail { color: #e06060; }
+
+.vab-val-text  { flex: 1; min-width: 0; }
+
+.vab-val-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .10em;
+  color: #4878a0;
+  margin-bottom: 2px;
+}
+
+.vab-val-msg {
+  font-size: 10px;
+  line-height: 1.45;
+  color: #4a7898;
+}
+.vab-val-msg-pass { color: #3a9858; }
+.vab-val-msg-warn { color: #b07820; }
+.vab-val-msg-fail { color: #a84040; }
+
+.vab-val-status {
+  margin: 8px 12px 10px;
+  padding: 7px 10px;
+  border-radius: 2px;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: .04em;
+}
+.vab-val-status-ready   { background: rgba(4,30,12,0.7); border: 1px solid #1a4c26; color: #42cc74; }
+.vab-val-status-blocked { background: rgba(30,4,4,0.7);  border: 1px solid #4c1a1a; color: #d06060; }
+
+/* ── Crew selection dialog ───────────────────────────────────────────── */
+#vab-crew-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.72);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#vab-crew-dialog {
+  background: rgba(4, 8, 22, 0.99);
+  border: 1px solid #1e3a5c;
+  border-radius: 3px;
+  box-shadow: 0 8px 48px rgba(0,0,0,.9);
+  width: 340px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  font-family: system-ui, sans-serif;
+}
+
+.vab-crew-dlg-hdr {
+  padding: 12px 16px;
+  border-bottom: 1px solid #0e1e30;
+  font-size: 12px;
+  font-weight: 700;
+  color: #88b4d0;
+  flex-shrink: 0;
+}
+
+.vab-crew-dlg-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+  scrollbar-width: thin;
+  scrollbar-color: #152a44 transparent;
+}
+.vab-crew-dlg-body::-webkit-scrollbar { width: 4px; }
+.vab-crew-dlg-body::-webkit-scrollbar-thumb { background: #152a44; border-radius: 2px; }
+
+.vab-crew-seat-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid #0a1826;
+}
+.vab-crew-seat-row:last-child { border-bottom: none; }
+
+.vab-crew-seat-label {
+  font-size: 10px;
+  color: #5a88a8;
+  flex-shrink: 0;
+  min-width: 50px;
+}
+
+.vab-crew-seat-select {
+  flex: 1;
+  background: rgba(8,18,40,0.9);
+  border: 1px solid #1a3050;
+  color: #a0c4e0;
+  font-family: inherit;
+  font-size: 10px;
+  padding: 4px 6px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+.vab-crew-seat-select:focus { outline: none; border-color: #3470a8; }
+
+.vab-crew-dlg-footer {
+  display: flex;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid #0e1e30;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+/* ── Launch banner ───────────────────────────────────────────────────── */
+#vab-launch-banner {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.85);
+  z-index: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: system-ui, sans-serif;
+}
+
+.vab-launch-msg {
+  text-align: center;
+  padding: 32px 40px;
+  background: rgba(4,8,22,0.98);
+  border: 1px solid #1e3a5c;
+  border-radius: 3px;
+  box-shadow: 0 8px 48px rgba(0,0,0,.9);
+}
+
+.vab-launch-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #42cc74;
+  letter-spacing: .06em;
+  margin-bottom: 8px;
+}
+.vab-launch-sub {
+  font-size: 11px;
+  color: #3a6080;
+  line-height: 1.7;
+}
+
+/* ── Save prompt modal ───────────────────────────────────────────── */
+#vab-save-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: system-ui, sans-serif;
+}
+.vab-save-dialog {
+  background: #1a1e28;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 10px;
+  padding: 20px;
+  min-width: 300px;
+  max-width: 400px;
+  color: #e8e8e8;
+}
+.vab-save-dialog h3 {
+  margin: 0 0 12px;
+  font-size: 1rem;
+  font-weight: 700;
+  text-align: center;
+}
+.vab-save-dialog input {
+  width: 100%;
+  box-sizing: border-box;
+  background: #222838;
+  border: 1px solid rgba(255,255,255,0.15);
+  color: #e8e8e8;
+  font-size: 0.9rem;
+  padding: 8px 10px;
+  border-radius: 5px;
+  margin-bottom: 14px;
+}
+.vab-save-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.vab-save-dialog-footer button {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.18);
+  color: #e8e8e8;
+  font-size: 0.82rem;
+  padding: 6px 16px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.vab-save-dialog-footer .vab-save-confirm {
+  background: #2a6040;
+}
+.vab-save-dialog-footer .vab-save-confirm:hover {
+  background: #357a50;
+}
+
+/* ── Load designs overlay ────────────────────────────────────────── */
+#vab-load-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 12, 20, 0.96);
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 60px;
+  font-family: system-ui, sans-serif;
+  color: #e8e8e8;
+  overflow-y: auto;
+}
+.vab-load-header {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-bottom: 20px;
+}
+.vab-load-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 600px;
+  padding: 0 20px;
+}
+.vab-load-empty {
+  font-size: 0.95rem;
+  color: #5a6880;
+  text-align: center;
+  margin-top: 40px;
+  line-height: 1.6;
+}
+.vab-load-close {
+  margin-top: 24px;
+  margin-bottom: 40px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.18);
+  color: #e8e8e8;
+  font-size: 0.85rem;
+  padding: 8px 24px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.vab-load-close:hover {
+  background: rgba(255,255,255,0.16);
+}
+.vab-load-card-load-btn {
+  background: #1a4a70 !important;
+  border-color: #2a6a90 !important;
+}
+.vab-load-card-load-btn:hover {
+  background: #205a80 !important;
+}
+.vab-load-card-delete-btn {
+  background: rgba(80,20,20,0.8) !important;
+  border-color: #703030 !important;
+  color: #d08080 !important;
+}
+.vab-load-card-delete-btn:hover {
+  background: rgba(100,30,30,0.9) !important;
+}
+
+`;

@@ -278,8 +278,8 @@ export function runValidation(assembly, stagingConfig, gameState) {
   // ── CHECK 2: All parts connected to root (no floating parts) ─────────────
   const allIds     = new Set(assembly.parts.keys());
   const totalParts = allIds.size;
-  let check2Pass   = false;
-  let check2Msg    = '';
+  let check2Pass;
+  let check2Msg;
 
   if (totalParts === 0) {
     check2Pass = false;

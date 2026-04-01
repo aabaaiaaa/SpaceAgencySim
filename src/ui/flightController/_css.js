@@ -1,0 +1,551 @@
+/**
+ * _css.js — CSS template literal for the flight controller overlay.
+ *
+ * @module ui/flightController/_css
+ */
+
+export const FLIGHT_CTRL_CSS = `
+/* ── Flight control overlay ─────────────────────────────────────────────── */
+#flight-overlay {
+  position: fixed;
+  inset: 44px 0 0;
+  pointer-events: none;
+  z-index: 200;
+  font-family: system-ui, sans-serif;
+}
+
+/* ── Hamburger / menu button — centred at the top ──────────────────────── */
+#flight-menu-btn {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #d8e8f0;
+  font-size: 13px;
+  cursor: pointer;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  transition: background 0.15s;
+  z-index: 202;
+}
+
+#flight-menu-btn:hover {
+  background: rgba(0, 0, 0, 0.88);
+}
+
+/* ── Dropdown menu ─────────────────────────────────────────────────────── */
+#flight-menu {
+  position: absolute;
+  top: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(10, 14, 24, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  padding: 4px 0;
+  min-width: 210px;
+  pointer-events: auto;
+  z-index: 201;
+}
+
+#flight-menu.hidden {
+  display: none;
+}
+
+.flight-menu-item {
+  display: block;
+  width: 100%;
+  padding: 10px 18px;
+  text-align: left;
+  background: none;
+  border: none;
+  color: #d8e0f0;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.1s;
+  box-sizing: border-box;
+}
+
+.flight-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.flight-menu-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 4px 0;
+}
+
+/* ── Post-flight summary screen ────────────────────────────────────────── */
+#post-flight-summary {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.62);
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: system-ui, sans-serif;
+  color: #d0e0f0;
+  pointer-events: auto;
+}
+
+.pf-content {
+  background: #0d1520;
+  border: 1px solid rgba(100, 160, 220, 0.28);
+  border-radius: 10px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7);
+  width: 600px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+  padding: 26px 30px 22px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+#post-flight-summary h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0 0 28px;
+  letter-spacing: 0.04em;
+}
+
+.pf-section {
+  width: 100%;
+  margin-bottom: 28px;
+}
+
+.pf-section h2 {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #5880a0;
+  margin: 0 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.pf-section-danger h2 {
+  color: #b06060;
+}
+
+/* Mission objectives */
+.pf-obj-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.pf-obj-list li {
+  padding: 5px 0;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  line-height: 1.4;
+}
+
+.pf-obj-check {
+  flex-shrink: 0;
+  font-size: 0.9rem;
+}
+
+.pf-obj-complete {
+  color: #50d870;
+}
+
+.pf-obj-incomplete {
+  color: #907070;
+}
+
+/* Recovery table */
+.pf-recovery-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.pf-recovery-table th {
+  text-align: left;
+  padding: 6px 10px;
+  color: #5880a0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.pf-recovery-table th:last-child {
+  text-align: right;
+}
+
+.pf-recovery-table td {
+  padding: 5px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  color: #c0d8f0;
+}
+
+.pf-recovery-table td:last-child {
+  text-align: right;
+  color: #60d890;
+  font-variant-numeric: tabular-nums;
+}
+
+.pf-recovery-total td {
+  padding-top: 8px;
+  color: #80e0a0 !important;
+  font-weight: 700;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  border-bottom: none;
+}
+
+/* KIA list */
+.pf-kia-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 6px;
+}
+
+.pf-kia-list li {
+  padding: 5px 0;
+  font-size: 0.95rem;
+  color: #e08888;
+  display: flex;
+  justify-content: space-between;
+}
+
+.pf-kia-fine {
+  color: #ff9999;
+  font-variant-numeric: tabular-nums;
+}
+
+.pf-kia-total {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #ff8080;
+  text-align: right;
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 100, 100, 0.2);
+}
+
+/* Action buttons */
+.pf-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+  width: 100%;
+}
+
+.pf-btn-row {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.pf-btn-row > .pf-btn { flex: 1; }
+
+.pf-btn {
+  padding: 11px 16px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
+  text-align: center;
+}
+
+.pf-btn-primary {
+  background: #1a4070;
+  border-color: #4080b0;
+  color: #c8e8ff;
+  width: 100%;
+}
+
+.pf-btn-primary:hover {
+  background: #235a90;
+}
+
+.pf-btn-secondary {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #b0c8e0;
+}
+
+.pf-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.13);
+}
+
+.pf-btn .pf-btn-cost {
+  display: block;
+  font-size: 0.75rem;
+  opacity: 0.7;
+  margin-top: 2px;
+}
+
+/* Keep old stat-row styles for backward compatibility */
+.pf-stat-row {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 10px;
+  font-size: 1rem;
+  align-items: baseline;
+}
+
+.pf-stat-label {
+  color: #5880a0;
+  min-width: 180px;
+  text-align: right;
+}
+
+.pf-stat-value {
+  color: #c8e8ff;
+  font-weight: 600;
+}
+
+/* Legacy single-button style kept for tests that may target it */
+#post-flight-return-btn {
+  margin-top: 36px;
+  padding: 12px 36px;
+  background: #1a4070;
+  border: 1px solid #4080b0;
+  border-radius: 6px;
+  color: #c8e8ff;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.15s;
+  letter-spacing: 0.02em;
+}
+
+#post-flight-return-btn:hover {
+  background: #235a90;
+}
+
+/* ── Flight Log overlay ───────────────────────────────────────────────── */
+#flight-log-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.62);
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: system-ui, sans-serif;
+  color: #d0e0f0;
+  pointer-events: auto;
+}
+
+.fl-content {
+  background: #0d1520;
+  border: 1px solid rgba(100, 160, 220, 0.28);
+  border-radius: 10px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7);
+  width: 500px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+  padding: 26px 30px 22px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+#flight-log-overlay h1 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin: 0 0 20px;
+  letter-spacing: 0.04em;
+}
+
+.fl-empty {
+  color: #607080;
+  font-style: italic;
+  margin-top: 24px;
+}
+
+.fl-list {
+  width: 100%;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.fl-event {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.fl-event-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-top: 6px;
+  flex-shrink: 0;
+}
+
+.fl-event-time {
+  font-family: 'Courier New', monospace;
+  font-size: 0.82rem;
+  color: #8090a0;
+  flex-shrink: 0;
+  min-width: 62px;
+}
+
+.fl-event-desc {
+  font-size: 0.88rem;
+  color: #c0d0e0;
+}
+
+.fl-close-btn {
+  margin-top: 24px;
+  padding: 10px 36px;
+  background: #1a4878;
+  border: none;
+  border-radius: 6px;
+  color: #c8e8ff;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.15s;
+  letter-spacing: 0.02em;
+}
+
+.fl-close-btn:hover {
+  background: #235a90;
+}
+
+/* ── Phase notification banner ─────────────────────────────────────────── */
+.phase-notification {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 32px;
+  background: rgba(10, 60, 120, 0.85);
+  border: 1px solid rgba(100, 180, 255, 0.5);
+  border-radius: 6px;
+  color: #e0f0ff;
+  font-family: system-ui, sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  z-index: 500;
+  opacity: 1;
+  transition: opacity 1s ease-out;
+}
+
+.phase-notification-warning {
+  background: rgba(120, 80, 10, 0.9);
+  border: 1px solid rgba(255, 180, 50, 0.6);
+  color: #ffe0a0;
+}
+
+.phase-notification-fade {
+  opacity: 0;
+}
+
+/* ── Map view HUD overlay ─────────────────────────────────────────────── */
+#map-hud {
+  position: fixed;
+  inset: 44px 0 0;
+  pointer-events: none;
+  z-index: 200;
+  font-family: system-ui, sans-serif;
+}
+
+#map-hud-info {
+  position: absolute;
+  top: 10px;
+  left: 14px;
+  color: #90b8d0;
+  font-size: 12px;
+  line-height: 1.6;
+  background: rgba(5, 5, 16, 0.7);
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 1px solid rgba(100, 160, 220, 0.2);
+}
+
+#map-hud-info .map-label {
+  color: #60d890;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+}
+
+#map-hud-info .map-zoom {
+  color: #70a8c8;
+}
+
+#map-hud-info .map-target {
+  color: #ff8844;
+}
+
+#map-hud-controls {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #607888;
+  font-size: 11px;
+  text-align: center;
+  background: rgba(5, 5, 16, 0.65);
+  padding: 6px 18px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+#map-hud-controls kbd {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-family: monospace;
+  font-size: 11px;
+  color: #90b0c0;
+  margin: 0 1px;
+}
+
+#map-warp-btn {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  pointer-events: auto;
+  padding: 8px 16px;
+  background: rgba(80, 50, 10, 0.8);
+  border: 1px solid rgba(255, 136, 68, 0.4);
+  border-radius: 5px;
+  color: #ffaa66;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+#map-warp-btn:hover {
+  background: rgba(120, 70, 20, 0.9);
+}
+
+#map-warp-btn.hidden {
+  display: none;
+}
+`;

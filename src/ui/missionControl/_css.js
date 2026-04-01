@@ -1,0 +1,933 @@
+/**
+ * _css.js — CSS styles for the Mission Control overlay.
+ *
+ * Extracted from the monolithic missionControl.js so each sub-module can
+ * remain focused on behaviour.
+ *
+ * @module missionControl/_css
+ */
+
+export const MISSION_CONTROL_STYLES = `
+/* ── Mission Control overlay ──────────────────────────────────────────────── */
+#mission-control-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 12, 20, 0.96);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+  font-family: system-ui, sans-serif;
+  color: #e8e8e8;
+  /* leave room for the persistent top bar (approx 44px) */
+  padding-top: 44px;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+#mission-control-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px 0;
+  flex-shrink: 0;
+}
+
+#mission-control-back-btn {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.18);
+  color: #e8e8e8;
+  font-size: 0.85rem;
+  padding: 6px 14px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+#mission-control-back-btn:hover {
+  background: rgba(255,255,255,0.16);
+}
+
+#mission-control-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #f0f0f0;
+  margin: 0;
+}
+
+/* ── Tab bar ──────────────────────────────────────────────────────────────── */
+#mission-control-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 12px 20px 0;
+  border-bottom: 2px solid rgba(255,255,255,0.1);
+  flex-shrink: 0;
+}
+
+.mc-tab {
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: none;
+  color: #9aa0b0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 8px 18px;
+  cursor: pointer;
+  border-radius: 5px 5px 0 0;
+  transition: color 0.15s, background 0.15s;
+  position: relative;
+  bottom: -2px;
+}
+.mc-tab:hover {
+  color: #e0e0e0;
+  background: rgba(255,255,255,0.05);
+}
+.mc-tab.active {
+  color: #ffffff;
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.15);
+  border-bottom-color: rgba(10, 12, 20, 0.96);
+}
+
+/* ── Tab content area ────────────────────────────────────────────────────── */
+#mission-control-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+/* ── Mission card list (Available + Accepted tabs) ───────────────────────── */
+.mc-mission-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 760px;
+}
+
+.mc-mission-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 8px;
+  padding: 16px 18px;
+}
+
+.mc-mission-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.mc-mission-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #d4e0f0;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.mc-mission-reward {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #7dd87d;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.mc-mission-description {
+  font-size: 0.85rem;
+  color: #8898b0;
+  line-height: 1.55;
+  margin: 0 0 14px;
+}
+
+/* ── Completed card extras ─────────────────────────────────────────────── */
+.mc-completed-date {
+  font-size: 0.8rem;
+  color: #5a8aa8;
+  margin: 0 0 8px;
+}
+
+/* ── Reward parts ──────────────────────────────────────────────────────── */
+.mc-mission-rewards {
+  font-size: 0.8rem;
+  color: #7db8d8;
+  margin: 0 0 10px;
+  line-height: 1.5;
+}
+
+.mc-mission-rewards .mc-rewards-label {
+  color: #5a8aa8;
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+/* ── Accept button / row ─────────────────────────────────────────────────── */
+.mc-accept-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.mc-accept-btn {
+  background: rgba(60, 120, 220, 0.2);
+  border: 1px solid rgba(60, 120, 220, 0.45);
+  color: #80b4f0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 7px 18px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  letter-spacing: 0.02em;
+}
+.mc-accept-btn:hover:not(:disabled) {
+  background: rgba(60, 120, 220, 0.38);
+  border-color: rgba(60, 120, 220, 0.75);
+}
+.mc-accept-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.mc-tutorial-notice {
+  font-size: 0.78rem;
+  color: #a08040;
+  font-style: italic;
+}
+
+/* ── Objectives list (Accepted tab) ──────────────────────────────────────── */
+.mc-objectives-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #7080a0;
+  margin: 12px 0 8px;
+}
+
+.mc-objectives-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mc-objective-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.mc-objective-indicator {
+  flex-shrink: 0;
+  font-size: 0.9rem;
+  margin-top: 1px;
+  width: 1.1em;
+  text-align: center;
+}
+.mc-objective-indicator.completed {
+  color: #7dd87d;
+}
+.mc-objective-indicator.pending {
+  color: #5868a0;
+}
+
+.mc-objective-text.completed {
+  color: #7dd87d;
+  text-decoration: line-through;
+  text-decoration-color: rgba(125, 216, 125, 0.4);
+}
+.mc-objective-text.pending {
+  color: #c0cce0;
+}
+
+/* ── Empty state messages ────────────────────────────────────────────────── */
+.mc-empty-msg {
+  color: #666;
+  font-style: italic;
+  text-align: center;
+  padding: 40px 20px;
+  font-size: 0.9rem;
+}
+
+/* ── Tab group divider ──────────────────────────────────────────────────── */
+.mc-tab-divider {
+  width: 1px;
+  background: rgba(255,255,255,0.15);
+  margin: 6px 8px;
+  flex-shrink: 0;
+}
+
+/* ── Contract-specific styles ───────────────────────────────────────────── */
+.mc-contract-category {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: rgba(100, 140, 200, 0.15);
+  color: #7098c0;
+  display: inline-block;
+  margin-bottom: 8px;
+}
+
+.mc-contract-meta {
+  font-size: 0.78rem;
+  color: #6878a0;
+  margin: 6px 0 0;
+  line-height: 1.5;
+}
+
+.mc-contract-meta span {
+  margin-right: 16px;
+}
+
+.mc-contract-chain {
+  font-size: 0.75rem;
+  color: #a08850;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.mc-cancel-btn {
+  background: rgba(200, 60, 60, 0.15);
+  border: 1px solid rgba(200, 60, 60, 0.35);
+  color: #c07070;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 5px 14px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  margin-top: 10px;
+}
+.mc-cancel-btn:hover {
+  background: rgba(200, 60, 60, 0.3);
+  border-color: rgba(200, 60, 60, 0.6);
+}
+
+.mc-caps-info {
+  font-size: 0.8rem;
+  color: #6878a0;
+  padding: 0 0 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  margin-bottom: 14px;
+}
+
+.mc-reputation-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: #8898b0;
+  margin-bottom: 14px;
+}
+
+.mc-rep-fill {
+  height: 6px;
+  border-radius: 3px;
+  background: #5090d0;
+  transition: width 0.3s;
+}
+
+.mc-rep-track {
+  flex: 1;
+  max-width: 200px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.08);
+}
+
+/* ── Category icon ────────────────────────────────────────────────────── */
+.mc-category-icon {
+  margin-right: 5px;
+  font-size: 0.85rem;
+}
+
+/* ── Bonus objectives ─────────────────────────────────────────────────── */
+.mc-bonus-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #c0a040;
+  margin: 12px 0 8px;
+}
+
+.mc-objective-item.bonus .mc-objective-indicator.pending {
+  color: #a08030;
+}
+.mc-objective-item.bonus .mc-objective-text.pending {
+  color: #c0b070;
+}
+.mc-objective-item.bonus .mc-objective-indicator.completed {
+  color: #d0c060;
+}
+.mc-objective-item.bonus .mc-objective-text.completed {
+  color: #d0c060;
+  text-decoration: line-through;
+  text-decoration-color: rgba(208, 192, 96, 0.4);
+}
+
+.mc-bonus-reward {
+  font-size: 0.82rem;
+  color: #c0a040;
+  font-weight: 700;
+  margin: 4px 0 0;
+}
+
+/* ── Conflict warning ─────────────────────────────────────────────────── */
+.mc-conflict-warning {
+  font-size: 0.78rem;
+  color: #d08040;
+  background: rgba(200, 120, 40, 0.1);
+  border: 1px solid rgba(200, 120, 40, 0.25);
+  border-radius: 4px;
+  padding: 6px 10px;
+  margin: 8px 0 0;
+  line-height: 1.4;
+}
+
+/* ── Achievement styles ──────────────────────────────────────────────── */
+.mc-achievement-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+  max-width: 900px;
+}
+
+.mc-achievement-card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  padding: 16px 18px;
+  transition: border-color 0.2s, background 0.2s;
+}
+.mc-achievement-card.earned {
+  background: rgba(80, 160, 80, 0.06);
+  border-color: rgba(80, 160, 80, 0.25);
+}
+.mc-achievement-card.locked {
+  opacity: 0.55;
+}
+
+.mc-achievement-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.mc-achievement-icon {
+  font-size: 1.4rem;
+  flex-shrink: 0;
+  width: 1.6em;
+  text-align: center;
+}
+
+.mc-achievement-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #d4e0f0;
+  margin: 0;
+}
+.mc-achievement-card.earned .mc-achievement-title {
+  color: #90d890;
+}
+
+.mc-achievement-desc {
+  font-size: 0.82rem;
+  color: #7888a0;
+  line-height: 1.5;
+  margin: 0 0 10px;
+}
+
+.mc-achievement-rewards {
+  display: flex;
+  gap: 16px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.mc-achievement-cash {
+  color: #7dd87d;
+}
+.mc-achievement-rep {
+  color: #70a8d0;
+}
+
+.mc-achievement-earned-date {
+  font-size: 0.75rem;
+  color: #5a8a5a;
+  margin-top: 6px;
+}
+
+.mc-achievement-summary {
+  font-size: 0.85rem;
+  color: #8898b0;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.mc-achievement-summary strong {
+  color: #90d890;
+}
+
+/* ── Challenge styles ──────────────────────────────────────────────────── */
+.mc-challenge-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 14px;
+  max-width: 900px;
+}
+
+.mc-challenge-card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  padding: 16px 18px;
+  transition: border-color 0.2s, background 0.2s;
+}
+.mc-challenge-card.active-challenge {
+  border-color: rgba(80, 140, 220, 0.4);
+  background: rgba(60, 120, 220, 0.06);
+}
+
+.mc-challenge-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.mc-challenge-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #d4e0f0;
+  margin: 0;
+}
+
+.mc-challenge-medal {
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.mc-challenge-briefing {
+  font-size: 0.82rem;
+  color: #7888a0;
+  line-height: 1.5;
+  margin: 0 0 10px;
+}
+
+.mc-challenge-desc {
+  font-size: 0.82rem;
+  color: #8898b0;
+  line-height: 1.5;
+  margin: 0 0 12px;
+}
+
+.mc-challenge-medals-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 10px;
+  font-size: 0.8rem;
+}
+
+.mc-medal-tier {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.mc-medal-tier.earned {
+  background: rgba(80, 160, 80, 0.08);
+  border-color: rgba(80, 160, 80, 0.2);
+}
+.mc-medal-tier.tier-bronze {
+  color: #cd7f32;
+}
+.mc-medal-tier.tier-silver {
+  color: #c0c0c0;
+}
+.mc-medal-tier.tier-gold {
+  color: #ffd700;
+}
+.mc-medal-tier .mc-medal-icon {
+  font-size: 0.9rem;
+}
+.mc-medal-tier .mc-medal-value {
+  font-weight: 600;
+}
+.mc-medal-tier .mc-medal-reward {
+  font-size: 0.72rem;
+  color: #7dd87d;
+  margin-left: 2px;
+}
+
+.mc-challenge-best {
+  font-size: 0.78rem;
+  color: #5a8aa8;
+  margin: 0 0 10px;
+}
+.mc-challenge-best strong {
+  color: #7db8d8;
+}
+
+.mc-challenge-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.mc-challenge-accept-btn {
+  background: rgba(60, 120, 220, 0.2);
+  border: 1px solid rgba(60, 120, 220, 0.45);
+  color: #80b4f0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 6px 16px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.mc-challenge-accept-btn:hover {
+  background: rgba(60, 120, 220, 0.38);
+  border-color: rgba(60, 120, 220, 0.75);
+}
+
+.mc-challenge-abandon-btn {
+  background: rgba(200, 60, 60, 0.12);
+  border: 1px solid rgba(200, 60, 60, 0.3);
+  color: #c07070;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.mc-challenge-abandon-btn:hover {
+  background: rgba(200, 60, 60, 0.25);
+}
+
+.mc-challenge-active-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #80b4f0;
+  background: rgba(60, 120, 220, 0.15);
+  padding: 2px 8px;
+  border-radius: 3px;
+}
+
+.mc-challenge-summary {
+  font-size: 0.85rem;
+  color: #8898b0;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.mc-challenge-summary strong {
+  color: #ffd700;
+}
+
+.mc-challenge-objectives {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mc-challenge-obj-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: #9aa0b0;
+}
+.mc-challenge-obj-item .mc-obj-bullet {
+  color: #5868a0;
+  flex-shrink: 0;
+}
+
+/* ── Custom challenge badge ────────────────────────────────────────────── */
+.mc-custom-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #c8a050;
+  background: rgba(200, 160, 80, 0.12);
+  border: 1px solid rgba(200, 160, 80, 0.25);
+  padding: 1px 7px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.mc-challenge-card.custom-challenge {
+  border-color: rgba(200, 160, 80, 0.2);
+}
+
+/* ── Challenge toolbar (Create / Import buttons) ───────────────────────── */
+.mc-challenge-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.mc-challenge-toolbar button {
+  background: rgba(200, 160, 80, 0.15);
+  border: 1px solid rgba(200, 160, 80, 0.35);
+  color: #d8b860;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 6px 16px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.mc-challenge-toolbar button:hover {
+  background: rgba(200, 160, 80, 0.3);
+  border-color: rgba(200, 160, 80, 0.6);
+}
+
+/* ── Custom challenge delete / export buttons ──────────────────────────── */
+.mc-challenge-delete-btn {
+  background: rgba(200, 60, 60, 0.12);
+  border: 1px solid rgba(200, 60, 60, 0.3);
+  color: #c07070;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.mc-challenge-delete-btn:hover {
+  background: rgba(200, 60, 60, 0.25);
+}
+.mc-challenge-export-btn {
+  background: rgba(80, 160, 80, 0.12);
+  border: 1px solid rgba(80, 160, 80, 0.3);
+  color: #70b070;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.mc-challenge-export-btn:hover {
+  background: rgba(80, 160, 80, 0.25);
+}
+
+/* ── Creator form ──────────────────────────────────────────────────────── */
+.mc-creator-form {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(200, 160, 80, 0.25);
+  border-radius: 8px;
+  padding: 18px 20px;
+  margin-bottom: 18px;
+  max-width: 720px;
+}
+.mc-creator-form h3 {
+  margin: 0 0 14px;
+  font-size: 1rem;
+  color: #d8b860;
+  font-weight: 700;
+}
+.mc-creator-field {
+  margin-bottom: 12px;
+}
+.mc-creator-field label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #8898b0;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.mc-creator-field input,
+.mc-creator-field textarea,
+.mc-creator-field select {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: #e0e0e0;
+  font-size: 0.85rem;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-family: inherit;
+}
+.mc-creator-field textarea {
+  resize: vertical;
+  min-height: 50px;
+}
+.mc-creator-field input:focus,
+.mc-creator-field textarea:focus,
+.mc-creator-field select:focus {
+  outline: none;
+  border-color: rgba(200, 160, 80, 0.5);
+}
+.mc-creator-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.mc-creator-row .mc-creator-field {
+  flex: 1;
+  min-width: 120px;
+}
+
+/* Objectives builder */
+.mc-creator-objectives {
+  margin-bottom: 12px;
+}
+.mc-creator-objectives h4 {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+  color: #9aa0b0;
+  font-weight: 600;
+}
+.mc-creator-obj-entry {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.mc-creator-obj-entry select,
+.mc-creator-obj-entry input {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: #e0e0e0;
+  font-size: 0.82rem;
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-family: inherit;
+}
+.mc-creator-obj-entry select:focus,
+.mc-creator-obj-entry input:focus {
+  outline: none;
+  border-color: rgba(200, 160, 80, 0.5);
+}
+.mc-creator-obj-remove {
+  background: rgba(200, 60, 60, 0.15);
+  border: 1px solid rgba(200, 60, 60, 0.3);
+  color: #c07070;
+  font-size: 0.78rem;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.mc-creator-add-obj {
+  background: rgba(60, 120, 220, 0.15);
+  border: 1px solid rgba(60, 120, 220, 0.35);
+  color: #80b4f0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+/* Form actions */
+.mc-creator-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+.mc-creator-submit {
+  background: rgba(200, 160, 80, 0.2);
+  border: 1px solid rgba(200, 160, 80, 0.45);
+  color: #d8b860;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 7px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.mc-creator-submit:hover {
+  background: rgba(200, 160, 80, 0.35);
+}
+.mc-creator-cancel {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: #9aa0b0;
+  font-size: 0.85rem;
+  padding: 7px 16px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.mc-creator-cancel:hover {
+  background: rgba(255,255,255,0.12);
+}
+.mc-creator-error {
+  color: #e06060;
+  font-size: 0.82rem;
+  margin-top: 8px;
+}
+
+/* Import modal */
+.mc-import-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mc-import-dialog {
+  background: #1a1c28;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 10px;
+  padding: 24px;
+  max-width: 520px;
+  width: 90%;
+}
+.mc-import-dialog h3 {
+  margin: 0 0 12px;
+  color: #d8b860;
+  font-size: 1rem;
+}
+.mc-import-dialog textarea {
+  width: 100%;
+  box-sizing: border-box;
+  height: 200px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: #e0e0e0;
+  font-size: 0.82rem;
+  font-family: monospace;
+  padding: 10px;
+  border-radius: 4px;
+  resize: vertical;
+}
+.mc-import-dialog textarea:focus {
+  outline: none;
+  border-color: rgba(200, 160, 80, 0.5);
+}
+.mc-import-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+`;
