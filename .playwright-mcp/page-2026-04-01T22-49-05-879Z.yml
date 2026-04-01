@@ -1,0 +1,43 @@
+- generic [ref=e2]:
+  - generic:
+    - generic [ref=e30]:
+      - generic [ref=e31]: Test Agency
+      - button "View loan details" [ref=e32] [cursor=pointer]: $2,000,000
+      - button "View accepted missions" [ref=e33] [cursor=pointer]: Missions
+      - button "Open menu" [ref=e34] [cursor=pointer]: ☰
+    - generic:
+      - button "Launch Pad" [ref=e35] [cursor=pointer]:
+        - generic: Launch Pad
+      - button "Vehicle Assembly Building" [ref=e36] [cursor=pointer]:
+        - generic: Vehicle Assembly Building
+      - button "Mission Control Centre" [ref=e37] [cursor=pointer]:
+        - generic: Mission Control Centre
+      - button "Crew Administration" [ref=e38] [cursor=pointer]:
+        - generic: Crew Administration
+      - button "Tracking Station" [ref=e39] [cursor=pointer]:
+        - generic: Tracking Station
+      - button "R&D Lab" [ref=e40] [cursor=pointer]:
+        - generic: R&D Lab
+      - button "Satellite Ops" [ref=e41] [cursor=pointer]:
+        - generic: Satellite Ops
+      - button "Library" [ref=e42] [cursor=pointer]:
+        - generic: Library
+      - button "Open construction menu" [ref=e43] [cursor=pointer]: Construction
+      - button "Open game settings" [ref=e44] [cursor=pointer]: Settings
+      - button "Open debug save menu" [ref=e45] [cursor=pointer]: Debug Saves
+      - generic [ref=e46]:
+        - generic [ref=e47]: Reputation
+        - generic [ref=e48]: "50"
+        - generic [ref=e49]: Good
+      - generic [ref=e52]:
+        - generic [ref=e53]: Launch Conditions
+        - generic [ref=e54]: Light breeze
+        - generic [ref=e55]:
+          - generic [ref=e56]: Wind
+          - generic [ref=e57]: 3.5 m/s
+        - generic [ref=e58]:
+          - generic [ref=e59]: ISP Effect
+          - generic [ref=e60]: "-1.3%"
+        - generic [ref=e61]:
+          - generic [ref=e62]: Visibility
+          - generic [ref=e63]: Clear

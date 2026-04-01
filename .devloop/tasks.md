@@ -7,7 +7,7 @@
 - **Verification**: Start game, load "All Facilities Unlocked" debug save, click Tracking Station then "Back" — hub must render fully. Repeat for Satellite Ops and Library. All three must return to a fully functional hub.
 
 ### TASK-002: Add R&D Lab navigation handler and tech tree panel
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: `_handleNavigation()` in `src/ui/index.js` has no `if (destination === 'rd-lab')` case — the tech tree is completely inaccessible from the hub. Add a handler following the same pattern as other facilities. Check if an `initRdLabUI` function already exists; if not, create a tech tree panel that displays the tech tree data from `src/data/techtree.js` and allows purchasing nodes with science points + funds. See requirements section 1.2.
 - **Verification**: Click R&D Lab on the hub — a tech tree panel must open showing available and researched nodes. Click "Back"/"← Hub" to return to hub without breaking it.

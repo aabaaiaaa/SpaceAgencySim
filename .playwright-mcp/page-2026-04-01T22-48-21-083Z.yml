@@ -1,0 +1,88 @@
+- generic [ref=e2]:
+  - generic:
+    - generic [ref=e31]:
+      - generic [ref=e32]: Test Agency
+      - button "View loan details" [ref=e33] [cursor=pointer]: $2,000,000
+      - button "View accepted missions" [ref=e34] [cursor=pointer]: Missions
+      - button "Open menu" [ref=e35] [cursor=pointer]: ☰
+    - generic [ref=e65]:
+      - generic [ref=e66]:
+        - button "← Hub" [ref=e67] [cursor=pointer]
+        - heading "R&D Lab — Technology Tree" [level=1] [ref=e68]
+        - generic [ref=e69]:
+          - text: "Science:"
+          - generic [ref=e70]: "0"
+          - generic [ref=e71]: "|"
+          - text: "Funds:"
+          - generic [ref=e72]: $2,000,000
+      - generic [ref=e73]:
+        - button "Propulsion" [ref=e74] [cursor=pointer]
+        - button "Structural" [ref=e75] [cursor=pointer]
+        - button "Recovery" [ref=e76] [cursor=pointer]
+        - button "Science" [ref=e77] [cursor=pointer]
+      - generic [ref=e79]:
+        - generic [ref=e80]:
+          - generic [ref=e81]:
+            - generic [ref=e82]: Tier 1
+            - generic [ref=e83]: Improved Spark
+            - generic [ref=e84]: Locked
+          - generic [ref=e85]: An upgraded Spark engine with better specific impulse and thrust vectoring.
+          - generic [ref=e86]:
+            - strong [ref=e87]: "Unlocks:"
+            - text: "Parts: engine-spark-improved"
+          - generic [ref=e88]:
+            - generic [ref=e89]: 15 Science
+            - generic [ref=e90]: $50,000
+          - generic [ref=e91]: R&D Lab must be built first.
+        - generic [ref=e92]:
+          - generic [ref=e93]:
+            - generic [ref=e94]: Tier 2
+            - generic [ref=e95]: Reliant
+            - generic [ref=e96]: Locked
+          - generic [ref=e97]: A reliable mid-range liquid engine suitable for upper stages and orbital insertion.
+          - generic [ref=e98]:
+            - strong [ref=e99]: "Unlocks:"
+            - text: "Parts: engine-reliant"
+          - generic [ref=e100]:
+            - generic [ref=e101]: 30 Science
+            - generic [ref=e102]: $100,000
+          - generic [ref=e103]: R&D Lab must be built first.
+        - generic [ref=e104]:
+          - generic [ref=e105]:
+            - generic [ref=e106]: Tier 3
+            - generic [ref=e107]: Poodle
+            - generic [ref=e108]: Locked
+          - generic [ref=e109]: A vacuum-optimised engine with high efficiency for deep-space manoeuvres.
+          - generic [ref=e110]:
+            - strong [ref=e111]: "Unlocks:"
+            - text: "Parts: engine-poodle"
+          - generic [ref=e112]:
+            - generic [ref=e113]: 60 Science
+            - generic [ref=e114]: $200,000
+          - generic [ref=e115]: R&D Lab must be built first.
+        - generic [ref=e116]:
+          - generic [ref=e117]:
+            - generic [ref=e118]: Tier 4
+            - generic [ref=e119]: Ion Drive
+            - generic [ref=e120]: Locked
+          - generic [ref=e121]: Low thrust but extreme efficiency — ideal for long-duration probes and station-keeping.
+          - generic [ref=e122]:
+            - strong [ref=e123]: "Unlocks:"
+            - text: "Parts: engine-ion"
+          - generic [ref=e124]:
+            - generic [ref=e125]: 120 Science
+            - generic [ref=e126]: $400,000
+          - generic [ref=e127]: R&D Lab must be built first.
+        - generic [ref=e128]:
+          - generic [ref=e129]:
+            - generic [ref=e130]: Tier 5
+            - generic [ref=e131]: Nuclear Thermal
+            - generic [ref=e132]: Locked
+          - generic [ref=e133]: Nuclear thermal propulsion — the highest specific impulse for crewed interplanetary missions.
+          - generic [ref=e134]:
+            - strong [ref=e135]: "Unlocks:"
+            - text: "Parts: engine-nerv, engine-deep-space"
+          - generic [ref=e136]:
+            - generic [ref=e137]: 200 Science
+            - generic [ref=e138]: $750,000
+          - generic [ref=e139]: R&D Lab must be built first.

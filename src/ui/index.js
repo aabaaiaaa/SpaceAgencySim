@@ -13,6 +13,7 @@ import { initLaunchPadUI, destroyLaunchPadUI } from './launchPad.js';
 import { initSatelliteOpsUI, destroySatelliteOpsUI } from './satelliteOps.js';
 import { initTrackingStationUI, destroyTrackingStationUI } from './trackingStation.js';
 import { initLibraryUI, destroyLibraryUI } from './library.js';
+import { initRdLabUI, destroyRdLabUI } from './rdLab.js';
 import { stopFlightScene } from './flightController.js';
 import { initTopBar, destroyTopBar, refreshTopBar, setCurrentScreen } from './topbar.js';
 import { showVabScene, hideVabScene } from '../render/vab.js';
@@ -66,6 +67,12 @@ let _trackingStationOpen = false;
  * Used to guard against double-mounting.
  */
 let _libraryOpen = false;
+
+/**
+ * True while the R&D Lab screen is open.
+ * Used to guard against double-mounting.
+ */
+let _rdLabOpen = false;
 
 /**
  * The #ui-overlay container, stored so _handleExitToMenu can re-mount the
@@ -166,6 +173,10 @@ function _handleExitToMenu() {
   if (_libraryOpen) {
     destroyLibraryUI();
     _libraryOpen = false;
+  }
+  if (_rdLabOpen) {
+    destroyRdLabUI();
+    _rdLabOpen = false;
   }
 
   // Wipe any remaining screen overlays from the container.
@@ -373,6 +384,29 @@ function _handleNavigation(container, state, destination) {
     }
 
     console.log('[UI] Navigated to Library');
+    return;
+  }
+
+  if (destination === 'rd-lab') {
+    destroyHubUI();
+    setCurrentScreen('rd-lab');
+
+    if (!_rdLabOpen) {
+      initRdLabUI(container, state, {
+        onBack: () => {
+          _rdLabOpen = false;
+          setCurrentScreen('hub');
+          showHubScene();
+          initHubUI(container, state, (dest) => {
+            _handleNavigation(container, state, dest);
+          });
+          console.log('[UI] Returned to hub from R&D Lab');
+        },
+      });
+      _rdLabOpen = true;
+    }
+
+    console.log('[UI] Navigated to R&D Lab');
     return;
   }
 

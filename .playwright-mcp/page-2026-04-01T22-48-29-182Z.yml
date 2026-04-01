@@ -1,0 +1,5 @@
+- generic [ref=e31]:
+  - generic [ref=e32]: Test Agency
+  - button "View loan details" [ref=e33] [cursor=pointer]: $2,000,000
+  - button "View accepted missions" [ref=e34] [cursor=pointer]: Missions
+  - button "Open menu" [ref=e35] [cursor=pointer]: ☰
