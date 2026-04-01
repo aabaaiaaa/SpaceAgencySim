@@ -14,7 +14,7 @@ import { initSatelliteOpsUI, destroySatelliteOpsUI } from './satelliteOps.js';
 import { initTrackingStationUI, destroyTrackingStationUI } from './trackingStation.js';
 import { initLibraryUI, destroyLibraryUI } from './library.js';
 import { stopFlightScene } from './flightController.js';
-import { initTopBar, destroyTopBar, refreshTopBar } from './topbar.js';
+import { initTopBar, destroyTopBar, refreshTopBar, setCurrentScreen } from './topbar.js';
 import { showVabScene, hideVabScene } from '../render/vab.js';
 import { showHubScene } from '../render/hub.js';
 
@@ -121,6 +121,7 @@ export function initUI(container, state) {
     onExitToMenu: () => _handleExitToMenu(),
   });
 
+  setCurrentScreen('hub');
   initHubUI(container, state, (destination) => {
     _handleNavigation(container, state, destination);
   });
@@ -203,6 +204,7 @@ function _handleNavigation(container, state, destination) {
     // Tear down the hub overlay and show the VAB.
     destroyHubUI();
     showVabScene();
+    setCurrentScreen('vab');
 
     if (!_vabInitialized) {
       initVabUI(container, state, {
@@ -213,6 +215,7 @@ function _handleNavigation(container, state, destination) {
           _vabInitialized = false;
           hideVabScene();
           showHubScene();
+          setCurrentScreen('hub');
           refreshTopBar();
           initHubUI(container, state, (dest) => {
             _handleNavigation(container, state, dest);
@@ -230,12 +233,14 @@ function _handleNavigation(container, state, destination) {
   if (destination === 'crew-admin') {
     // Tear down the hub overlay and show the Crew Admin screen.
     destroyHubUI();
+    setCurrentScreen('crew-admin');
 
     if (!_crewAdminOpen) {
       initCrewAdminUI(container, state, {
         onBack: () => {
           // Crew Admin has already destroyed itself; re-show the hub.
           _crewAdminOpen = false;
+          setCurrentScreen('hub');
           showHubScene();
           initHubUI(container, state, (dest) => {
             _handleNavigation(container, state, dest);
@@ -253,12 +258,14 @@ function _handleNavigation(container, state, destination) {
   if (destination === 'mission-control') {
     // Tear down the hub overlay and show the Mission Control screen.
     destroyHubUI();
+    setCurrentScreen('mission-control');
 
     if (!_missionControlOpen) {
       initMissionControlUI(container, state, {
         onBack: () => {
           // Mission Control has already destroyed itself; re-show the hub.
           _missionControlOpen = false;
+          setCurrentScreen('hub');
           showHubScene();
           initHubUI(container, state, (dest) => {
             _handleNavigation(container, state, dest);
@@ -276,12 +283,14 @@ function _handleNavigation(container, state, destination) {
   if (destination === 'launch-pad') {
     // Tear down the hub overlay and show the Launch Pad screen.
     destroyHubUI();
+    setCurrentScreen('launch-pad');
 
     if (!_launchPadOpen) {
       initLaunchPadUI(container, state, {
         onBack: () => {
           // Launch Pad has already destroyed itself; re-show the hub.
           _launchPadOpen = false;
+          setCurrentScreen('hub');
           showHubScene();
           initHubUI(container, state, (dest) => {
             _handleNavigation(container, state, dest);
@@ -299,11 +308,13 @@ function _handleNavigation(container, state, destination) {
   if (destination === 'satellite-ops') {
     // Tear down the hub overlay and show the Satellite Ops screen.
     destroyHubUI();
+    setCurrentScreen('satellite-ops');
 
     if (!_satelliteOpsOpen) {
       initSatelliteOpsUI(container, state, {
         onBack: () => {
           _satelliteOpsOpen = false;
+          setCurrentScreen('hub');
           showHubScene();
           initHubUI(container, state, (dest) => {
             _handleNavigation(container, state, dest);
@@ -321,11 +332,13 @@ function _handleNavigation(container, state, destination) {
   if (destination === 'tracking-station') {
     // Tear down the hub overlay and show the Tracking Station screen.
     destroyHubUI();
+    setCurrentScreen('tracking-station');
 
     if (!_trackingStationOpen) {
       initTrackingStationUI(container, state, {
         onBack: () => {
           _trackingStationOpen = false;
+          setCurrentScreen('hub');
           showHubScene();
           initHubUI(container, state, (dest) => {
             _handleNavigation(container, state, dest);
@@ -342,11 +355,13 @@ function _handleNavigation(container, state, destination) {
 
   if (destination === 'library') {
     destroyHubUI();
+    setCurrentScreen('library');
 
     if (!_libraryOpen) {
       initLibraryUI(container, state, {
         onBack: () => {
           _libraryOpen = false;
+          setCurrentScreen('hub');
           showHubScene();
           initHubUI(container, state, (dest) => {
             _handleNavigation(container, state, dest);

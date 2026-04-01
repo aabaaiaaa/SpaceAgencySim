@@ -10,7 +10,7 @@ import { initMapRenderer, destroyMapRenderer } from '../../render/map.js';
 import { createPhysicsState } from '../../core/physics.js';
 import { initFlightHud, destroyFlightHud, showLaunchTip } from '../flightHud.js';
 import { initFlightContextMenu, destroyFlightContextMenu } from '../flightContextMenu.js';
-import { setTopBarFlightItems, clearTopBarFlightItems, setTopBarDropdownToggleCallback } from '../topbar.js';
+import { setTopBarFlightItems, clearTopBarFlightItems, setTopBarDropdownToggleCallback, setCurrentScreen } from '../topbar.js';
 import { setMalfunctionMode, getMalfunctionMode } from '../../core/malfunction.js';
 import { createDockingState } from '../../core/docking.js';
 import { getPartById } from '../../data/parts.js';
@@ -170,6 +170,9 @@ export function startFlightScene(
 
   // Build the in-flight control overlay.
   _buildFlightOverlay(container);
+
+  // Mark current screen as flight for help panel context.
+  setCurrentScreen('flight');
 
   // Inject flight-action items into the topbar hamburger dropdown.
   setTopBarFlightItems([

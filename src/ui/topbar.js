@@ -30,6 +30,7 @@ import { saveGame, listSaves, SAVE_SLOT_COUNT } from '../core/saveload.js';
 import { GameMode, MAX_LOAN_BALANCE } from '../core/constants.js';
 import { getPartById } from '../data/parts.js';
 import { syncVabToGameState } from '../ui/vab.js';
+import { openHelpPanel } from './help.js';
 
 // ---------------------------------------------------------------------------
 // Module state
@@ -57,6 +58,13 @@ let _flightMenuItems = [];
  * @type {((isOpen: boolean) => void) | null}
  */
 let _onDropdownToggle = null;
+
+/**
+ * Current screen identifier, set by the navigation handler in index.js.
+ * Used to determine the default help section.
+ * @type {string}
+ */
+let _currentScreen = 'hub';
 
 // ---------------------------------------------------------------------------
 // CSS
@@ -775,6 +783,43 @@ export function setTopBarDropdownToggleCallback(cb) {
   _onDropdownToggle = cb;
 }
 
+/**
+ * Set the current screen identifier so the help panel can open to the
+ * relevant section by default.
+ * @param {string} screenId  e.g. 'hub', 'vab', 'flight', 'mission-control', etc.
+ */
+export function setCurrentScreen(screenId) {
+  _currentScreen = screenId;
+}
+
+// ---------------------------------------------------------------------------
+// Dropdown
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Help
+// ---------------------------------------------------------------------------
+
+/** Screen ID → default help section mapping. */
+const _SCREEN_TO_HELP_SECTION = {
+  'hub':              'overview',
+  'vab':              'vab',
+  'flight':           'flight',
+  'orbit':            'orbit',
+  'mission-control':  'missions',
+  'crew-admin':       'crew',
+  'launch-pad':       'vab',
+  'tracking-station': 'orbit',
+  'satellite-ops':    'satellites',
+  'library':          'facilities',
+};
+
+function _openHelp() {
+  const section = _SCREEN_TO_HELP_SECTION[_currentScreen] || 'overview';
+  const container = _root?.parentElement || document.body;
+  openHelpPanel(container, _state, section);
+}
+
 // ---------------------------------------------------------------------------
 // Dropdown
 // ---------------------------------------------------------------------------
@@ -825,6 +870,8 @@ function _openDropdown() {
     items.push({ label: 'Sandbox Settings', action: _openSandboxSettings });
   }
 
+  items.push(null); // separator
+  items.push({ label: 'Help', action: _openHelp });
   items.push(null); // separator
   items.push({ label: 'Exit to Menu', action: _doExitToMenu, danger: true });
 
