@@ -11,6 +11,7 @@ import { PartType, ControlMode } from '../../core/constants.js';
 import { getFlightRenderState } from './_state.js';
 import { ppm, worldToScreen, computeCoM } from './_camera.js';
 import { lerpColor } from './_sky.js';
+import { acquireGraphics, releaseGraphics, releaseContainerChildren } from './_pool.js';
 import {
   SCALE_M_PER_PX,
   FLIGHT_PIXELS_PER_METRE,
@@ -213,7 +214,7 @@ export function renderPlumes(ps, assembly, density, w, h) {
   const bendX = -exDirY * bendSign * bendMag;
   const bendY =  exDirX * bendSign * bendMag;
 
-  const g = new PIXI.Graphics();
+  const g = acquireGraphics();
   s.trailContainer.addChild(g);
 
   for (const [instanceId, plumeState] of s.plumeStates) {
@@ -367,10 +368,10 @@ export function updateTrails(dt) {
 export function renderTrails(w, h) {
   const s = getFlightRenderState();
   if (!s.trailContainer) return;
-  while (s.trailContainer.children.length) s.trailContainer.removeChildAt(0);
+  releaseContainerChildren(s.trailContainer);
   if (s.trailSegments.length === 0) return;
 
-  const g = new PIXI.Graphics();
+  const g = acquireGraphics();
   s.trailContainer.addChild(g);
 
   for (const seg of s.trailSegments) {
@@ -433,7 +434,7 @@ export function renderRcsPlumes(ps, assembly, w, h) {
   const com = computeCoM(ps.fuelStore, assembly, ps.activeParts, ps.posX, ps.posY);
   const { sx: comSx, sy: comSy } = worldToScreen(com.x, com.y, w, h);
 
-  const g = new PIXI.Graphics();
+  const g = acquireGraphics();
   s.trailContainer.addChild(g);
 
   const lenPx  = RCS_PLUME_LENGTH * p;
@@ -502,10 +503,8 @@ export function renderMachEffects(ps, assembly, density, w, h, dt) {
   const mach  = speed / MACH_1;
   const densityRatio = Math.min(1, density / 1.225);
 
-  // Remove previous frame's Mach graphics.
-  if (s.machGraphics && s.machGraphics.parent) {
-    s.machGraphics.parent.removeChild(s.machGraphics);
-  }
+  // Release previous frame's Mach graphics back to pool.
+  releaseGraphics(s.machGraphics);
   s.machGraphics = null;
 
   if (mach < 0.85 || densityRatio < 0.02) return;
@@ -549,7 +548,7 @@ export function renderMachEffects(ps, assembly, density, w, h, dt) {
   const perpX = -vdy;
   const perpY =  vdx;
 
-  const g = new PIXI.Graphics();
+  const g = acquireGraphics();
 
   const intensity = mach < 1
     ? (mach - 0.85) / 0.15

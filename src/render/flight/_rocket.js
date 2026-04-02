@@ -16,6 +16,7 @@ import { LegState, LEG_DEPLOY_DURATION, getDeployedLegFootOffset } from '../../c
 import { getFlightRenderState } from './_state.js';
 import { ppm, worldToScreen, computeCoM } from './_camera.js';
 import { SCALE_M_PER_PX, PART_FILL, PART_STROKE, FLIGHT_PIXELS_PER_METRE } from './_constants.js';
+import { acquireGraphics, acquireText, releaseContainerChildren } from './_pool.js';
 
 // ---------------------------------------------------------------------------
 // Part drawing helpers
@@ -239,14 +240,13 @@ export function drawLandingLeg(g, placed, def, ps, assembly, alpha = 1) {
  * @returns {PIXI.Text}
  */
 export function makePartLabel(placed, def, alpha = 1) {
-  const label = new PIXI.Text({
-    text:  def.name,
-    style: new PIXI.TextStyle({
-      fill:       '#c0ddf0',
-      fontSize:   48,
-      fontFamily: 'Courier New, Courier, monospace',
-      fontWeight: 'bold',
-    }),
+  const label = acquireText();
+  label.text = def.name;
+  label.style = new PIXI.TextStyle({
+    fill:       '#c0ddf0',
+    fontSize:   48,
+    fontFamily: 'Courier New, Courier, monospace',
+    fontWeight: 'bold',
   });
   label.anchor.set(0.5, 0.5);
   label.x     = placed.x;
@@ -273,7 +273,7 @@ export function drawParachuteCanopies(ps, assembly, w, h) {
   const s = getFlightRenderState();
   if (!s.canopyContainer) return;
 
-  while (s.canopyContainer.children.length) s.canopyContainer.removeChildAt(0);
+  releaseContainerChildren(s.canopyContainer);
 
   const p = ppm();
   const rocketAngle = ps.angle;
@@ -326,7 +326,7 @@ export function drawParachuteCanopies(ps, assembly, w, h) {
     const sHalfH = halfH * scale;
 
     const alpha = Math.min(1, progress);
-    const cg = new PIXI.Graphics();
+    const cg = acquireGraphics();
 
     cg.position.set(canopySX, canopySY);
     cg.rotation = canopyAngle;
@@ -347,7 +347,7 @@ export function drawParachuteCanopies(ps, assembly, w, h) {
     const canopyRightX = canopySX + cosC * sHalfW    - sinC * sHalfH;
     const canopyRightY = canopySY + sinC * sHalfW    + cosC * sHalfH;
 
-    const cordGfx = new PIXI.Graphics();
+    const cordGfx = acquireGraphics();
     cordGfx.moveTo(stowedLeftX, stowedLeftY);
     cordGfx.lineTo(canopyLeftX, canopyLeftY);
     cordGfx.stroke({ color: 0xc070ff, width: 0.8, alpha: cordAlpha });
@@ -377,7 +377,7 @@ export function renderRocket(ps, assembly, w, h) {
   const s = getFlightRenderState();
   if (!s.rocketContainer) return;
 
-  while (s.rocketContainer.children.length) s.rocketContainer.removeChildAt(0);
+  releaseContainerChildren(s.rocketContainer);
   if (ps.activeParts.size === 0) return;
 
   const com       = computeCoM(ps.fuelStore, assembly, ps.activeParts, ps.posX, ps.posY);
@@ -447,7 +447,7 @@ export function renderRocket(ps, assembly, w, h) {
   }
   s.rocketContainer.rotation = ps.angle;
 
-  const g = new PIXI.Graphics();
+  const g = acquireGraphics();
   s.rocketContainer.addChild(g);
 
   for (const instanceId of ps.activeParts) {

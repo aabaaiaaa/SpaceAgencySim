@@ -9,6 +9,7 @@ import { SurfaceItemType } from '../../core/constants.js';
 import { getBiome, getBiomeTransition } from '../../core/biomes.js';
 import { getFlightRenderState } from './_state.js';
 import { ppm } from './_camera.js';
+import { acquireText, releaseContainerChildren } from './_pool.js';
 import { SURFACE_ITEM_COLORS, BIOME_LABEL_FADE_SPEED } from './_constants.js';
 
 // ---------------------------------------------------------------------------
@@ -124,7 +125,7 @@ export function renderBiomeLabel(altitude, w, h, dt, bodyId) {
   const s = getFlightRenderState();
   if (!s.biomeLabelContainer) return;
 
-  while (s.biomeLabelContainer.children.length) s.biomeLabelContainer.removeChildAt(0);
+  releaseContainerChildren(s.biomeLabelContainer);
 
   const biomeBodyId = bodyId || 'EARTH';
   const biome = getBiome(altitude, biomeBodyId);
@@ -159,35 +160,33 @@ export function renderBiomeLabel(altitude, w, h, dt, bodyId) {
   if (s.biomeLabelAlpha <= 0.01) return;
 
   const multiplierText = `${biome.scienceMultiplier}\u00d7 Science`;
-  const label = new PIXI.Text({
-    text: displayName,
-    style: new PIXI.TextStyle({
-      fill: '#a8e8c0',
-      fontSize: 16,
-      fontFamily: 'system-ui, sans-serif',
-      fontWeight: 'bold',
-      dropShadow: true,
-      dropShadowColor: '#000000',
-      dropShadowBlur: 4,
-      dropShadowDistance: 1,
-    }),
+  const label = acquireText();
+  label.text = displayName;
+  label.style = new PIXI.TextStyle({
+    fill: '#a8e8c0',
+    fontSize: 16,
+    fontFamily: 'system-ui, sans-serif',
+    fontWeight: 'bold',
+    dropShadow: true,
+    dropShadowColor: '#000000',
+    dropShadowBlur: 4,
+    dropShadowDistance: 1,
   });
   label.anchor.set(0.5, 0);
   label.x = w / 2;
   label.y = 70;
   label.alpha = s.biomeLabelAlpha * 0.85;
 
-  const subLabel = new PIXI.Text({
-    text: multiplierText,
-    style: new PIXI.TextStyle({
-      fill: '#70b880',
-      fontSize: 11,
-      fontFamily: 'system-ui, sans-serif',
-      dropShadow: true,
-      dropShadowColor: '#000000',
-      dropShadowBlur: 3,
-      dropShadowDistance: 1,
-    }),
+  const subLabel = acquireText();
+  subLabel.text = multiplierText;
+  subLabel.style = new PIXI.TextStyle({
+    fill: '#70b880',
+    fontSize: 11,
+    fontFamily: 'system-ui, sans-serif',
+    dropShadow: true,
+    dropShadowColor: '#000000',
+    dropShadowBlur: 3,
+    dropShadowDistance: 1,
   });
   subLabel.anchor.set(0.5, 0);
   subLabel.x = w / 2;

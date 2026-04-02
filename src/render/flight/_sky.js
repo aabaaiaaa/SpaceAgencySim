@@ -8,6 +8,7 @@ import * as PIXI from 'pixi.js';
 import { getSkyVisual, getGroundVisual, getAtmosphereTop } from '../../data/bodies.js';
 import { getFlightRenderState } from './_state.js';
 import { ppm } from './_camera.js';
+import { acquireGraphics, releaseContainerChildren } from './_pool.js';
 import {
   SKY_SEA_LEVEL, SKY_HIGH_ALT, SKY_SPACE,
   STAR_FADE_START, STAR_FADE_FULL, GROUND_COLOR,
@@ -154,10 +155,10 @@ export function renderStars(altitude, w, h) {
       : (altitude >= starStart ? 1 : 0);
   }
 
-  while (s.starsContainer.children.length) s.starsContainer.removeChildAt(0);
+  releaseContainerChildren(s.starsContainer);
   if (alpha <= 0) return;
 
-  const g = new PIXI.Graphics();
+  const g = acquireGraphics();
   s.starsContainer.addChild(g);
 
   for (const star of s.stars) {

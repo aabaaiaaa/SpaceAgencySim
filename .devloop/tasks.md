@@ -55,7 +55,7 @@
 - **Verification**: Run `npm run test:unit` — all tests pass. Then run `npx playwright test e2e/launchpad.spec.js` to verify Launch Pad UI still works correctly.
 
 ### TASK-010: Implement PixiJS object pooling for flight renderer
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Create a simple array-based object pool for `PIXI.Graphics` and `PIXI.Text` objects. Integrate it into `src/render/flight/_trails.js`, `_debris.js`, `_rocket.js`, `_sky.js`, and `_ground.js` — replace per-frame `new PIXI.Graphics()` / `new PIXI.Text()` calls with pool acquire/release. Reset graphics state on reuse. See requirements Section 4.1.
 - **Verification**: Run `npm run test:unit` — all tests pass. Then run `npx playwright test e2e/flight.spec.js` to verify flight rendering still works. No visual regressions.

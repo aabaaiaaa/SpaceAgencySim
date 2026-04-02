@@ -12,6 +12,7 @@ import { ppm, worldToScreen } from './_camera.js';
 import { getApp } from '../index.js';
 import { SCALE_M_PER_PX, FLIGHT_PIXELS_PER_METRE } from './_constants.js';
 import { drawPartRect, drawLandingLeg, makePartLabel } from './_rocket.js';
+import { acquireGraphics, releaseContainerChildren } from './_pool.js';
 
 // ---------------------------------------------------------------------------
 // Debris rendering
@@ -29,7 +30,7 @@ export function renderDebris(debrisList, assembly, w, h) {
   const s = getFlightRenderState();
   if (!s.debrisContainer) return;
 
-  while (s.debrisContainer.children.length) s.debrisContainer.removeChildAt(0);
+  releaseContainerChildren(s.debrisContainer);
 
   for (const debris of debrisList) {
     if (debris.activeParts.size === 0) continue;
@@ -44,7 +45,7 @@ export function renderDebris(debrisList, assembly, w, h) {
     fragContainer.rotation = debris.angle;
     s.debrisContainer.addChild(fragContainer);
 
-    const g = new PIXI.Graphics();
+    const g = acquireGraphics();
     fragContainer.addChild(g);
 
     for (const instanceId of debris.activeParts) {
@@ -177,7 +178,7 @@ export function renderEjectedCrew(ps, w, h) {
   for (const crew of ps.ejectedCrew) {
     const { sx, sy } = worldToScreen(crew.x, crew.y, w, h);
 
-    const g = new PIXI.Graphics();
+    const g = acquireGraphics();
 
     const capsW = 8;
     const capsH = 12;

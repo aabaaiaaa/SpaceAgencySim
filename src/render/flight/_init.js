@@ -25,6 +25,7 @@ import {
 } from './_trails.js';
 import { renderDebris, renderDockingTarget, renderEjectedCrew } from './_debris.js';
 import { onMouseMove, onWheel } from './_input.js';
+import { drainPools } from './_pool.js';
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -244,6 +245,8 @@ export function destroyFlightRenderer() {
     s.mouseMoveHandler = null;
   }
   s.zoomLevel = 1.0;
+
+  drainPools();
 
   console.log('[Flight Renderer] Destroyed');
 }
