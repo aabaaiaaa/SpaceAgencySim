@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 24
-- **Completed**: 21
-- **Remaining**: 3
-- **Last Updated**: 2026-04-02T03:03:36.678Z
+- **Completed**: 22
+- **Remaining**: 2
+- **Last Updated**: 2026-04-02T04:03:03.302Z
 
 ## Iteration Log
 
@@ -196,4 +196,13 @@
 - **Exit Status**: success
 - **Tokens**: 592,234 total (17 in, 2,878 out, 32,142 cache-create, 557,197 cache-read)
 - **Cost**: $0.5515
+
+### Iteration 22 - 2026-04-02T03:03:39.217Z
+- **Task Attempted**: TASK-022
+- **Task Completed**: TASK-022
+- **Summary**: Completed Clear building selection highlight when leaving hub
+- **Duration**: 59m 24s
+- **Exit Status**: success
+- **Tokens**: 85,537 total (3 in, 34 out, 238 cache-create, 85,262 cache-read)
+- **Cost**: $2.7074
 

@@ -127,7 +127,7 @@
 - **Verification**: Start a fresh game — the topbar layout should be stable. Complete a flight — the counter should update without layout shift.
 
 ### TASK-022: Clear building selection highlight when leaving hub
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Clicking R&D Lab on the hub adds a yellow highlight border that persists into flight mode (visible behind the flight view). Building selection state must be cleared when navigating away from the hub to any other screen. See requirements section 3.8.
 - **Verification**: Click R&D Lab on hub, then launch a flight — no yellow highlight should be visible.

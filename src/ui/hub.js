@@ -1008,6 +1008,12 @@ export function destroyHubUI() {
   clearTopBarHubItems();
   _unbindDebugSavesShortcut();
 
+  // Clear any focused building to prevent selection highlight leaking into
+  // other screens (e.g. flight view).
+  if (_overlay && document.activeElement && _overlay.contains(document.activeElement)) {
+    /** @type {HTMLElement} */ (document.activeElement).blur();
+  }
+
   if (_overlay) {
     _overlay.remove();
     _overlay = null;
@@ -1686,6 +1692,7 @@ function _renderBuildings(onNavigate) {
 
     // Click handler
     el.addEventListener('click', () => {
+      el.blur(); // Clear focus highlight before navigating away
       console.log(`[Hub UI] Building clicked: ${bld.id}`);
       onNavigate(bld.id);
     });
@@ -1694,6 +1701,7 @@ function _renderBuildings(onNavigate) {
     el.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
+        el.blur();
         onNavigate(bld.id);
       }
     });
