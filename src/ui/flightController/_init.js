@@ -6,11 +6,12 @@
  */
 
 import { initFlightRenderer, destroyFlightRenderer, setFlightWeather } from '../../render/flight.js';
+import { hideHubScene } from '../../render/hub.js';
 import { initMapRenderer, destroyMapRenderer } from '../../render/map.js';
 import { createPhysicsState } from '../../core/physics.js';
 import { initFlightHud, destroyFlightHud, showLaunchTip } from '../flightHud.js';
 import { initFlightContextMenu, destroyFlightContextMenu } from '../flightContextMenu.js';
-import { setTopBarFlightItems, clearTopBarFlightItems, setTopBarDropdownToggleCallback, setCurrentScreen } from '../topbar.js';
+import { setTopBarFlightItems, clearTopBarFlightItems, clearTopBarHubItems, setTopBarDropdownToggleCallback, setCurrentScreen } from '../topbar.js';
 import { setMalfunctionMode, getMalfunctionMode } from '../../core/malfunction.js';
 import { createDockingState } from '../../core/docking.js';
 import { getPartById } from '../../data/parts.js';
@@ -96,6 +97,14 @@ export function startFlightScene(
   onFlightEnd,
 ) {
   const s = getFCState();
+
+  // Ensure hub overlay is fully hidden during flight. In the normal gameplay
+  // flow the hub is destroyed before reaching here, but programmatic flights
+  // (E2E test API) may skip that step.
+  const hubOverlay = document.getElementById('hub-overlay');
+  if (hubOverlay) hubOverlay.remove();
+  hideHubScene();
+  clearTopBarHubItems();
 
   s.container     = container;
   s.state         = state;

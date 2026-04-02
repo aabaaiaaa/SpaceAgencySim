@@ -43,7 +43,7 @@
 - **Verification**: On the hub, both the weather panel and reputation indicator should be fully visible without overlapping. Debug Saves button should not be visible. Settings and Construction should be accessible but not floating disconnected.
 
 ### TASK-008: Hide hub elements during flight
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: During flight, the hub building labels (Launch Pad, VAB, MCC, etc.), weather panel, reputation widget, and hub action buttons (Debug Saves, Settings, Construction) are all visible behind the flight view. When entering flight mode, fully hide the hub overlay DOM elements. When returning to the hub, re-show them. Also hide the weather panel during ORBIT phase (weather is irrelevant in space). See requirements sections 3.1, 3.2, 3.3.
 - **Verification**: Launch a flight — no hub building labels, weather panel, or hub buttons should be visible at any altitude (ground, atmosphere, orbit, map view).
