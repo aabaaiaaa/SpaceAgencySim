@@ -50,6 +50,18 @@ export function eventDotColor(type) {
 }
 
 /**
+ * Produce a human-readable label for events that lack a `description` field.
+ * For PART_DESTROYED events this resolves the part name from the catalogue.
+ */
+function _formatEventFallback(evt) {
+  if (evt.type === 'PART_DESTROYED' && evt.partId) {
+    const def = getPartById(evt.partId);
+    if (def) return `${def.name} destroyed`;
+  }
+  return evt.type;
+}
+
+/**
  * Build the flight event list DOM element from an array of events.
  * @param {Array<object>} events
  * @returns {HTMLElement}  A <ul> or <p> element.
@@ -79,7 +91,7 @@ export function buildFlightEventList(events) {
 
     const desc = document.createElement('span');
     desc.className = 'fl-event-desc';
-    desc.textContent = evt.description ?? evt.type;
+    desc.textContent = evt.description ?? _formatEventFallback(evt);
 
     li.appendChild(dot);
     li.appendChild(time);

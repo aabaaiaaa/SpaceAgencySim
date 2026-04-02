@@ -49,7 +49,7 @@
 - **Verification**: Launch a flight — no hub building labels, weather panel, or hub buttons should be visible at any altitude (ground, atmosphere, orbit, map view).
 
 ### TASK-009: Fix PART_DESTROYED raw enum in flight log
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: When parts are destroyed on crash, the flight log shows "PART_DESTROYED" instead of human-readable messages. Find where crash events are logged and replace the raw enum with the part name: "Probe Core Mk1 destroyed", "Small Tank destroyed", etc. See requirements section 3.5.
 - **Verification**: Crash a rocket — the flight log and Rocket Destroyed screen should show specific part names, not "PART_DESTROYED".
