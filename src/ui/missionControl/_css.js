@@ -197,6 +197,22 @@ export const MISSION_CONTROL_STYLES = `
   font-style: italic;
 }
 
+/* ── Tutorial blocking badge (Available tab, Tutorial mode only) ──────── */
+.mc-blocking-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #80c8f0;
+  background: rgba(60, 140, 220, 0.15);
+  border: 1px solid rgba(60, 140, 220, 0.3);
+  padding: 2px 8px;
+  border-radius: 3px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  align-self: center;
+}
+
 /* ── Objectives list (Accepted tab) ──────────────────────────────────────── */
 .mc-objectives-label {
   font-size: 0.78rem;

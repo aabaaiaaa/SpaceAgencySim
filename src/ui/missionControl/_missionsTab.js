@@ -7,9 +7,39 @@
 import { acceptMission } from '../../core/missions.js';
 import { getFacilityDef } from '../../core/construction.js';
 import { getPartById } from '../../data/parts.js';
+import { MISSIONS } from '../../data/missions.js';
+import { GameMode } from '../../core/constants.js';
 import { refreshTopBarMissions } from '../topbar.js';
 import { getMCState } from './_state.js';
 import { fmtCash, fmtDate, buildRewardsEl, isTutorialPhase, getContent } from './_shell.js';
+
+// ---------------------------------------------------------------------------
+// Tutorial blocking indicator helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Return true if completing `missionId` is required (directly or transitively)
+ * to unlock any other tutorial mission that has not yet been completed.
+ *
+ * Only meaningful in Tutorial mode — always returns false otherwise.
+ *
+ * @param {import('../../core/gameState.js').GameState} state
+ * @param {string} missionId
+ * @returns {boolean}
+ */
+function isTutorialBlockingMission(state, missionId) {
+  if (state.gameMode !== GameMode.TUTORIAL) return false;
+
+  const completedIds = new Set(state.missions.completed.map((m) => m.id));
+
+  // Check whether any not-yet-completed mission lists missionId in unlocksAfter.
+  for (const def of MISSIONS) {
+    if (completedIds.has(def.id)) continue;
+    if (def.id === missionId) continue;
+    if (def.unlocksAfter && def.unlocksAfter.includes(missionId)) return true;
+  }
+  return false;
+}
 
 // ---------------------------------------------------------------------------
 // Available tab
@@ -39,7 +69,8 @@ export function renderAvailableTab() {
   list.className = 'mc-mission-list';
 
   for (const mission of missions) {
-    const card = _buildAvailableMissionCard(mission, blockAccept, tutorialPhase);
+    const isBlocking = isTutorialBlockingMission(mc.state, mission.id);
+    const card = _buildAvailableMissionCard(mission, blockAccept, tutorialPhase, isBlocking);
     list.appendChild(card);
   }
 
@@ -52,9 +83,10 @@ export function renderAvailableTab() {
  * @param {import('../../data/missions.js').MissionDef} mission
  * @param {boolean} blockAccept  True if the Accept button should be disabled.
  * @param {boolean} tutorialPhase  True while in the early tutorial.
+ * @param {boolean} isBlocking  True if this mission gates other tutorial missions.
  * @returns {HTMLElement}
  */
-function _buildAvailableMissionCard(mission, blockAccept, tutorialPhase) {
+function _buildAvailableMissionCard(mission, blockAccept, tutorialPhase, isBlocking) {
   const card = document.createElement('div');
   card.className = 'mc-mission-card';
   card.dataset.missionId = mission.id;
@@ -67,6 +99,14 @@ function _buildAvailableMissionCard(mission, blockAccept, tutorialPhase) {
   titleEl.className = 'mc-mission-title';
   titleEl.textContent = mission.title;
   cardHeader.appendChild(titleEl);
+
+  if (isBlocking) {
+    const badge = document.createElement('span');
+    badge.className = 'mc-blocking-badge';
+    badge.textContent = 'Unlocks next step';
+    badge.setAttribute('aria-label', 'Completing this mission unlocks the next tutorial step');
+    cardHeader.appendChild(badge);
+  }
 
   const rewardEl = document.createElement('span');
   rewardEl.className = 'mc-mission-reward';

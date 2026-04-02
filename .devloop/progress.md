@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 28
-- **Completed**: 7
-- **Remaining**: 21
-- **Last Updated**: 2026-04-02T10:04:53.793Z
+- **Completed**: 8
+- **Remaining**: 20
+- **Last Updated**: 2026-04-02T10:18:48.128Z
 
 ## Iteration Log
 
@@ -70,4 +70,13 @@
 - **Exit Status**: success
 - **Tokens**: 3,497,763 total (62 in, 29,039 out, 77,880 cache-create, 3,390,782 cache-read)
 - **Cost**: $2.9084
+
+### Iteration 8 - 2026-04-02T10:04:56.783Z
+- **Task Attempted**: TASK-008
+- **Task Completed**: TASK-008
+- **Summary**: Completed Add tutorial mission blocking indicators
+- **Duration**: 13m 51s
+- **Exit Status**: success
+- **Tokens**: 77,531 total (3 in, 22 out, 1,047 cache-create, 76,459 cache-read)
+- **Cost**: $1.7373
 

@@ -43,7 +43,7 @@
 - **Verification**: Run `npm run test:unit` — all tests pass. Then run `npx playwright test e2e/smoke.spec.js` as a basic sanity check that the game still starts and renders.
 
 ### TASK-008: Add tutorial mission blocking indicators
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In Tutorial mode, missions that are prerequisites for other uncompleted tutorial missions should display a visual indicator (e.g., "Unlocks next step" label or chain icon). This should be data-driven: check whether the mission's completion is in the dependency chain of any other uncompleted tutorial mission. Non-blocking tutorial missions should NOT get the indicator. Only applies in Tutorial mode — Freeplay and Sandbox are unaffected. See requirements Section 3.1.
 - **Verification**: Run `npm run test:unit` — all tests pass. Then run `npx playwright test e2e/missions.spec.js e2e/mission-progression.spec.js` to verify mission UI still works and blocking indicators appear correctly in tutorial mode.
