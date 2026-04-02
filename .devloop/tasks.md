@@ -115,7 +115,7 @@
 - **Verification**: Run the spec files that use teleport: `npx playwright test e2e/core-mechanics.spec.js e2e/orbital-operations.spec.js e2e/destinations.spec.js e2e/additional-systems.spec.js e2e/tutorial-revisions.spec.js e2e/mission-progression.spec.js e2e/relaunch.spec.js` — all pass. Grep for manual `fs.phase =` and `fs.orbitalElements =` in teleport helpers and verify they're removed.
 
 ### TASK-020: Add E2E phase transition tests
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-018, TASK-019
 - **Description**: Add one dedicated E2E test per unique flight phase transition that runs through real physics. Use teleport+velocity to get near the transition point, then let physics run at high time warp through the actual transition. Transitions to cover: PRELAUNCH→LAUNCH (ignition), LAUNCH→FLIGHT (liftoff), FLIGHT→ORBIT (orbital velocity + checkOrbitStatus), ORBIT→MANOEUVRE (burn initiation), MANOEUVRE→TRANSFER (escape trajectory), reentry (atmospheric interface), landing (parachute + ground contact), crash (impact detection). See requirements Section 5.2.3.
 - **Verification**: Run `npx playwright test e2e/phase-transitions.spec.js` (or whatever the new spec is named) — all tests pass. Each test verifies the phase transition fires through the real physics pipeline, not via direct state mutation.
