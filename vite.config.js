@@ -46,9 +46,9 @@ export default defineConfig({
       include: ['src/core/**'],
       exclude: ['src/core/debugSaves.js', 'src/core/library.js'],
       thresholds: {
-        lines: 80,
+        lines: 91,
         branches: 78,
-        functions: 80,
+        functions: 89,
       },
     },
   },

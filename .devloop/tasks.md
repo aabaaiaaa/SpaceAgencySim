@@ -139,7 +139,7 @@
 - **Verification**: Run `npm run test:coverage` — completes successfully, reports coverage percentages, and enforces 80% thresholds.
 
 ### TASK-024: Assess coverage and raise thresholds
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-013, TASK-014, TASK-015, TASK-016, TASK-017, TASK-023
 - **Description**: After all new unit tests are written and coverage is configured, run `npm run test:coverage` to assess actual coverage. Raise thresholds in Vitest config to match or slightly exceed actual coverage, locking in the higher numbers to prevent regression. Document the final thresholds. See requirements Section 5.5.
 - **Verification**: Run `npm run test:coverage` — passes with the raised thresholds. Thresholds are higher than the initial 80% where actual coverage exceeds it.
