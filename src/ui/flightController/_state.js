@@ -88,6 +88,12 @@ function _createDefaultState() {
     // Deorbit warning flag
     /** True while the deorbit warning banner is visible. */
     deorbitWarningActive: false,
+
+    // Loop error tracking
+    /** Count of consecutive loop() errors (reset to 0 on each successful frame). */
+    loopConsecutiveErrors: 0,
+    /** @type {HTMLElement|null} The error-abort banner element, if visible. */
+    loopErrorBanner: null,
   };
 }
 

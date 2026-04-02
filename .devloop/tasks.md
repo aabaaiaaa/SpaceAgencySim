@@ -1,7 +1,7 @@
 # Iteration 3 — Tasks
 
 ### TASK-001: Add try-catch error handling to the flight controller RAF loop
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Wrap the main simulation loop body in `src/ui/flightController/_loop.js:58-158` (physics tick through render call) in try-catch. Add a consecutive error counter that resets on successful frames. After 5 consecutive errors, display an abort-to-hub banner matching the pattern in `flightHud.js`. Log errors with `console.error()`. On non-consecutive errors, log and continue. See requirements Section 1.1.
 - **Verification**: `npm run test:unit` passes. New unit tests verify: tick() throwing is caught, consecutive errors trigger abort path, intermittent errors allow recovery.

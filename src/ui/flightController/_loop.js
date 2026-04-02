@@ -23,6 +23,10 @@ import { applyNormalOrbitRcs } from './_orbitRcs.js';
 import { evaluateFlightPhase } from './_flightPhase.js';
 import { tickDockingSystem, updateDockingHud } from './_docking.js';
 import { showPostFlightSummary } from './_postFlight.js';
+import { handleAbortReturnToAgency } from './_menuActions.js';
+
+/** Maximum consecutive loop errors before showing the abort banner. */
+export const MAX_CONSECUTIVE_LOOP_ERRORS = 5;
 
 /**
  * Returns true when the assembly contains at least one COMMAND_MODULE part
@@ -67,87 +71,98 @@ export function loop(timestamp) {
   const realDt = Math.min((timestamp - s.lastTs) / 1000, 0.1);
   s.lastTs = timestamp;
 
-  // Evaluate time-warp reset conditions before advancing physics.
-  checkTimeWarpResets(timestamp);
+  try {
+    // Evaluate time-warp reset conditions before advancing physics.
+    checkTimeWarpResets(timestamp);
 
-  // When the map is active during non-ORBIT phases, force 1x warp —
-  // EXCEPT during TRANSFER and CAPTURE phases where time warp is allowed.
-  if (s.mapActive &&
-      flightState.phase !== FlightPhase.ORBIT &&
-      flightState.phase !== FlightPhase.TRANSFER &&
-      flightState.phase !== FlightPhase.CAPTURE) {
-    if (s.timeWarp !== 1) applyTimeWarp(1);
-  }
-
-  // --- Communication range evaluation ---
-  if (flightState && state) {
-    const comms = evaluateComms(state, flightState, ps ? {
-      altitude: ps.posY + (ps.surfaceAltitude ?? 0),
-      posX: ps.posX,
-      posY: ps.posY,
-    } : undefined);
-    flightState.commsState = comms;
-    if (comms.controlLocked) {
-      ps.throttle = 0;
+    // When the map is active during non-ORBIT phases, force 1x warp —
+    // EXCEPT during TRANSFER and CAPTURE phases where time warp is allowed.
+    if (s.mapActive &&
+        flightState.phase !== FlightPhase.ORBIT &&
+        flightState.phase !== FlightPhase.TRANSFER &&
+        flightState.phase !== FlightPhase.CAPTURE) {
+      if (s.timeWarp !== 1) applyTimeWarp(1);
     }
-  }
 
-  // Apply orbital-relative thrust when the map view is active.
-  if (!(flightState.commsState?.controlLocked)) {
-    applyMapThrust();
-  }
+    // --- Communication range evaluation ---
+    if (flightState && state) {
+      const comms = evaluateComms(state, flightState, ps ? {
+        altitude: ps.posY + (ps.surfaceAltitude ?? 0),
+        posX: ps.posX,
+        posY: ps.posY,
+      } : undefined);
+      flightState.commsState = comms;
+      if (comms.controlLocked) {
+        ps.throttle = 0;
+      }
+    }
 
-  // Apply orbital-relative thrust from WASD in NORMAL orbit mode (flight view).
-  if (!(flightState.commsState?.controlLocked)) {
-    applyNormalOrbitRcs();
-  }
+    // Apply orbital-relative thrust when the map view is active.
+    if (!(flightState.commsState?.controlLocked)) {
+      applyMapThrust();
+    }
 
-  // Reset per-frame science flag before sub-steps.
-  flightState.scienceModuleRunning = false;
+    // Apply orbital-relative thrust from WASD in NORMAL orbit mode (flight view).
+    if (!(flightState.commsState?.controlLocked)) {
+      applyNormalOrbitRcs();
+    }
 
-  // Advance physics simulation with the current warp multiplier.
-  tick(ps, assembly, stagingConfig, flightState, realDt, s.timeWarp);
+    // Reset per-frame science flag before sub-steps.
+    flightState.scienceModuleRunning = false;
 
-  // --- Flight phase state machine: auto-detect transitions each frame ---
-  evaluateFlightPhase();
+    // Advance physics simulation with the current warp multiplier.
+    tick(ps, assembly, stagingConfig, flightState, realDt, s.timeWarp);
 
-  // --- Docking system tick ---
-  tickDockingSystem(realDt);
+    // --- Flight phase state machine: auto-detect transitions each frame ---
+    evaluateFlightPhase();
 
-  // Check mission, contract, and challenge objective completion.
-  checkObjectiveCompletion(state, flightState);
-  checkContractObjectives(state, flightState);
-  checkChallengeObjectives(state, flightState);
+    // --- Docking system tick ---
+    tickDockingSystem(realDt);
 
-  // Render the active scene.
-  if (s.mapActive) {
-    const mapBodyId = (flightState && flightState.bodyId) || 'EARTH';
-    renderMapFrame(ps, flightState, state, mapBodyId, {
-      showDebris: isDebrisTrackingAvailable(state),
-    });
-  } else {
-    const _surfItems = state ? getSurfaceItemsAtBody(state, flightState.bodyId) : [];
-    renderFlightFrame(ps, assembly, flightState, _surfItems);
-  }
+    // Check mission, contract, and challenge objective completion.
+    checkObjectiveCompletion(state, flightState);
+    checkContractObjectives(state, flightState);
+    checkChallengeObjectives(state, flightState);
 
-  // Update the map HUD readouts if visible.
-  if (s.mapActive) updateMapHud();
+    // Render the active scene.
+    if (s.mapActive) {
+      const mapBodyId = (flightState && flightState.bodyId) || 'EARTH';
+      renderMapFrame(ps, flightState, state, mapBodyId, {
+        showDebris: isDebrisTrackingAvailable(state),
+      });
+    } else {
+      const _surfItems = state ? getSurfaceItemsAtBody(state, flightState.bodyId) : [];
+      renderFlightFrame(ps, assembly, flightState, _surfItems);
+    }
 
-  // Update the docking guidance HUD if active.
-  updateDockingHud();
+    // Update the map HUD readouts if visible.
+    if (s.mapActive) updateMapHud();
 
-  // Auto-trigger the post-flight summary when the rocket crashes, all
-  // command modules are destroyed, or the craft lands safely.
-  if (!s.summaryShown) {
-    const shouldAutoTrigger =
-      ps.crashed ||
-      _allCommandModulesDestroyed() ||
-      (ps.landed && ps.grounded && !ps.crashed);
-    if (shouldAutoTrigger) {
-      s.summaryShown = true;
-      showPostFlightSummary(
-        ps, assembly, flightState, state, s.onFlightEnd,
-      );
+    // Update the docking guidance HUD if active.
+    updateDockingHud();
+
+    // Auto-trigger the post-flight summary when the rocket crashes, all
+    // command modules are destroyed, or the craft lands safely.
+    if (!s.summaryShown) {
+      const shouldAutoTrigger =
+        ps.crashed ||
+        _allCommandModulesDestroyed() ||
+        (ps.landed && ps.grounded && !ps.crashed);
+      if (shouldAutoTrigger) {
+        s.summaryShown = true;
+        showPostFlightSummary(
+          ps, assembly, flightState, state, s.onFlightEnd,
+        );
+      }
+    }
+
+    // Successful frame — reset error counter.
+    s.loopConsecutiveErrors = 0;
+  } catch (err) {
+    s.loopConsecutiveErrors++;
+    console.error(`[Flight Loop] Error (${s.loopConsecutiveErrors} consecutive):`, err);
+    if (s.loopConsecutiveErrors >= MAX_CONSECUTIVE_LOOP_ERRORS && !s.loopErrorBanner) {
+      _showLoopErrorBanner(s);
     }
   }
 
@@ -155,4 +170,57 @@ export function loop(timestamp) {
   if (s.rafId !== null) {
     s.rafId = requestAnimationFrame(loop);
   }
+}
+
+/**
+ * Show an error banner offering the player a way to abort to the hub.
+ * Matches the pattern used in flightHud.js.
+ * @param {object} s  The flight controller state object.
+ */
+function _showLoopErrorBanner(s) {
+  const host = s.container ?? document.body;
+  if (s.loopErrorBanner) return;
+
+  const banner = document.createElement('div');
+  banner.dataset.testid = 'loop-error-banner';
+  banner.style.cssText =
+    'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);' +
+    'background:rgba(30,10,10,0.95);border:2px solid #ff4444;border-radius:8px;' +
+    'padding:20px 28px;z-index:9999;text-align:center;color:#fff;' +
+    'font-family:inherit;max-width:400px;';
+
+  const msg = document.createElement('p');
+  msg.style.cssText = 'margin:0 0 16px 0;font-size:1rem;line-height:1.4;';
+  msg.textContent = 'The flight simulation encountered repeated errors. You can try to continue or abort to the hub.';
+  banner.appendChild(msg);
+
+  const btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display:flex;gap:12px;justify-content:center;';
+
+  const continueBtn = document.createElement('button');
+  continueBtn.textContent = 'Try to Continue';
+  continueBtn.style.cssText =
+    'padding:8px 16px;border:1px solid #888;border-radius:4px;' +
+    'background:#333;color:#fff;cursor:pointer;font-size:0.9rem;';
+  continueBtn.addEventListener('click', () => {
+    s.loopConsecutiveErrors = 0;
+    if (s.loopErrorBanner) { s.loopErrorBanner.remove(); s.loopErrorBanner = null; }
+  });
+
+  const abortBtn = document.createElement('button');
+  abortBtn.textContent = 'Abort to Hub';
+  abortBtn.dataset.testid = 'loop-error-abort-btn';
+  abortBtn.style.cssText =
+    'padding:8px 16px;border:1px solid #ff4444;border-radius:4px;' +
+    'background:#882222;color:#fff;cursor:pointer;font-size:0.9rem;';
+  abortBtn.addEventListener('click', () => {
+    if (s.loopErrorBanner) { s.loopErrorBanner.remove(); s.loopErrorBanner = null; }
+    handleAbortReturnToAgency();
+  });
+
+  btnRow.appendChild(continueBtn);
+  btnRow.appendChild(abortBtn);
+  banner.appendChild(btnRow);
+  host.appendChild(banner);
+  s.loopErrorBanner = banner;
 }
