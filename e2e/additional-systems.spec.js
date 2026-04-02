@@ -32,6 +32,8 @@ import {
   ALL_FACILITIES,
   FacilityId,
   navigateToVab,
+  teleportCraft,
+  waitForOrbit,
 } from './helpers.js';
 import {
   orbitalFixture,
@@ -122,78 +124,6 @@ function fullFixture(overrides = {}) {
   });
 }
 
-/**
- * Teleport the craft to a specific body orbit.
- */
-async function teleportToOrbit(page, bodyId, altitude, vel) {
-  await page.evaluate(({ bodyId, alt, v }) => {
-    const ps = window.__flightPs;
-    const fs = window.__flightState;
-    if (!ps || !fs) return;
-
-    ps.posX = 0;
-    ps.posY = alt;
-    ps.velX = v;
-    ps.velY = 0;
-    ps.grounded = false;
-    ps.landed = false;
-    ps.crashed = false;
-    ps.throttle = 0;
-    ps.firingEngines.clear();
-    ps.controlMode = 'NORMAL';
-
-    fs.phase = 'ORBIT';
-    fs.inOrbit = true;
-    fs.bodyId = bodyId;
-
-    const GM = {
-      SUN: 1.32712440018e20, EARTH: 3.986004418e14, MOON: 4.9048695e12,
-      MARS: 4.282837e13, MERCURY: 2.2032e13, VENUS: 3.24859e14,
-    };
-    const RADIUS = {
-      SUN: 695700000, EARTH: 6371000, MOON: 1737400,
-      MARS: 3389500, MERCURY: 2439700, VENUS: 6051800,
-    };
-    const mu = GM[bodyId] || GM.EARTH;
-    const R = RADIUS[bodyId] || RADIUS.EARTH;
-    const y = alt + R;
-    const v2 = v * v;
-    const h = -y * v;
-    const epsilon = v2 / 2 - mu / y;
-    const a = -mu / (2 * epsilon);
-    const p = (h * h) / mu;
-    const e = Math.sqrt(Math.max(0, 1 - p / a));
-
-    fs.orbitalElements = {
-      semiMajorAxis: a, eccentricity: e, argPeriapsis: 0,
-      meanAnomalyAtEpoch: Math.PI / 2, epoch: fs.timeElapsed || 0,
-    };
-    if (fs.phaseLog.length === 0) {
-      fs.phaseLog.push({ phase: 'ORBIT', time: fs.timeElapsed || 0 });
-    }
-  }, { bodyId, alt: altitude, v: vel });
-}
-
-/**
- * Set physics state for reentry conditions.
- */
-async function setReentryState(page, altitude, speed) {
-  await page.evaluate(({ alt, spd }) => {
-    const ps = window.__flightPs;
-    const fs = window.__flightState;
-    if (!ps || !fs) return;
-    ps.posX = 0;
-    ps.posY = alt;
-    ps.velX = 0;
-    ps.velY = -spd;
-    ps.grounded = false;
-    ps.landed = false;
-    ps.crashed = false;
-    fs.phase = 'FLIGHT';
-    fs.inOrbit = false;
-  }, { alt: altitude, spd: speed });
-}
-
 // =========================================================================
 // THERMAL SYSTEM
 // =========================================================================
@@ -216,7 +146,7 @@ test.describe('Thermal system', () => {
     await startTestFlight(page, BASIC_PROBE);
 
     // Place craft at 50km altitude moving at 2000 m/s (above threshold) descending.
-    await setReentryState(page, 50_000, 2000);
+    await teleportCraft(page, { posY: 50_000, velY: -2000 });
 
     // Wait a bit for heat to accumulate.
     await page.waitForTimeout(2000);
@@ -242,7 +172,7 @@ test.describe('Thermal system', () => {
     await startTestFlight(page, BASIC_PROBE);
 
     // First accumulate heat.
-    await setReentryState(page, 50_000, 2000);
+    await teleportCraft(page, { posY: 50_000, velY: -2000 });
     await page.waitForTimeout(1500);
 
     const beforeHeat = await page.evaluate(() => {
@@ -282,7 +212,7 @@ test.describe('Thermal system', () => {
 
     // Put craft in extreme reentry conditions to trigger destruction.
     // Speed of 5000 m/s at 30km = very high heat rate.
-    await setReentryState(page, 30_000, 5000);
+    await teleportCraft(page, { posY: 30_000, velY: -5000 });
 
     // Wait for a PART_DESTROYED event (heat accumulates over several ticks).
     try {
@@ -313,7 +243,7 @@ test.describe('Thermal system', () => {
     await startTestFlight(page, ['probe-core-mk1', 'tank-small', 'engine-spark', 'heat-shield-mk2']);
 
     // Set descending reentry conditions.
-    await setReentryState(page, 50_000, 2500);
+    await teleportCraft(page, { posY: 50_000, velY: -2500 });
     await page.waitForTimeout(2000);
 
     // The heat shield should be leading face (lowest Y); parts above (probe, tank, engine)
@@ -354,18 +284,7 @@ test.describe('Thermal system', () => {
     await startTestFlight(page, ['probe-core-mk1', 'tank-small', 'engine-spark', 'heat-shield-mk2']);
 
     // Set ascending through atmosphere at high speed.
-    await page.evaluate(() => {
-      const ps = window.__flightPs;
-      const fs = window.__flightState;
-      ps.posX = 0;
-      ps.posY = 30_000; // 30 km — denser atmosphere for more heat.
-      ps.velX = 0;
-      ps.velY = 3000; // Ascending at 3000 m/s.
-      ps.grounded = false;
-      ps.landed = false;
-      fs.phase = 'FLIGHT';
-      fs.inOrbit = false;
-    });
+    await teleportCraft(page, { posY: 30_000, velY: 3000 }); // 30 km, ascending at 3000 m/s.
 
     await page.waitForTimeout(2000);
 
@@ -430,18 +349,11 @@ test.describe('Thermal system', () => {
     await startTestFlight(page, BASIC_PROBE, { bodyId: 'MOON' });
 
     // Teleport to Moon at high speed.
-    await teleportToOrbit(page, 'MOON', 20_000, 1633);
+    await teleportCraft(page, { posY: 20_000, velX: 1671, bodyId: 'MOON' });
+    await waitForOrbit(page);
 
     // Set descending at high speed on the Moon.
-    await page.evaluate(() => {
-      const ps = window.__flightPs;
-      const fs = window.__flightState;
-      ps.posY = 20_000;
-      ps.velY = -2000;
-      fs.phase = 'FLIGHT';
-      fs.inOrbit = false;
-      fs.bodyId = 'MOON';
-    });
+    await teleportCraft(page, { posY: 20_000, velY: -2000, bodyId: 'MOON' });
 
     await page.waitForTimeout(1500);
 
@@ -974,7 +886,8 @@ test.describe('Satellite components', () => {
     ]);
 
     // Teleport to orbit where power system is active.
-    await teleportToOrbit(page, 'EARTH', EARTH_ORBIT_ALT, EARTH_ORBIT_VEL);
+    await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
+    await waitForOrbit(page);
     await page.waitForTimeout(1000);
 
     const power = await page.evaluate(() => {
@@ -1205,7 +1118,8 @@ test.describe('Comms range', () => {
     await startTestFlight(page, BASIC_PROBE);
 
     // Teleport to LEO on Earth — should have direct comms.
-    await teleportToOrbit(page, 'EARTH', EARTH_ORBIT_ALT, EARTH_ORBIT_VEL);
+    await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
+    await waitForOrbit(page);
     await page.waitForTimeout(500);
 
     const comms = await page.evaluate(() => {
@@ -1243,7 +1157,8 @@ test.describe('Comms range', () => {
     await startTestFlight(page, BASIC_PROBE);
 
     // Teleport to Moon orbit — beyond direct range (40,000 km).
-    await teleportToOrbit(page, 'MOON', 20_000, 1633);
+    await teleportCraft(page, { posY: 20_000, velX: 1671, bodyId: 'MOON' });
+    await waitForOrbit(page);
     await page.waitForTimeout(1000);
 
     const comms = await page.evaluate(() => {
@@ -1278,7 +1193,8 @@ test.describe('Comms range', () => {
 
     // High Earth orbit at ~100,000 km — beyond basic range but within T3.
     // BODY_RADIUS[EARTH] = 6,371,000 + 100,000,000 = 106,371,000 < 500,000,000 T3 range.
-    await teleportToOrbit(page, 'EARTH', 100_000_000, 2000);
+    await teleportCraft(page, { posY: 100_000_000, velX: 2000, bodyId: 'EARTH' });
+    await waitForOrbit(page);
     await page.waitForTimeout(1000);
 
     const comms = await page.evaluate(() => {
@@ -1319,7 +1235,8 @@ test.describe('Comms range', () => {
     }));
     await startTestFlight(page, BASIC_PROBE);
 
-    await teleportToOrbit(page, 'MOON', 20_000, 1633);
+    await teleportCraft(page, { posY: 20_000, velX: 1671, bodyId: 'MOON' });
+    await waitForOrbit(page);
     await page.waitForTimeout(1000);
 
     const comms = await page.evaluate(() => {
@@ -1396,7 +1313,8 @@ test.describe('Comms range', () => {
     }));
     await startTestFlight(page, BASIC_PROBE, { bodyId: 'MARS' });
 
-    await teleportToOrbit(page, 'MARS', 100_000, 3360);
+    await teleportCraft(page, { posY: 100_000, velX: 3503, bodyId: 'MARS' });
+    await waitForOrbit(page);
     await page.waitForTimeout(1000);
 
     const comms = await page.evaluate(() => {
@@ -1465,7 +1383,8 @@ test.describe('Comms range', () => {
     await startTestFlight(page, BASIC_PROBE);
 
     // Teleport probe to Mars orbit — no relay infrastructure.
-    await teleportToOrbit(page, 'MARS', 100_000, 3360);
+    await teleportCraft(page, { posY: 100_000, velX: 3503, bodyId: 'MARS' });
+    await waitForOrbit(page);
     await page.waitForTimeout(1000);
 
     const comms = await page.evaluate(() => {
@@ -1499,7 +1418,8 @@ test.describe('Comms range', () => {
     }));
     await startTestFlight(page, BASIC_PROBE);
 
-    await teleportToOrbit(page, 'MARS', 100_000, 3360);
+    await teleportCraft(page, { posY: 100_000, velX: 3503, bodyId: 'MARS' });
+    await waitForOrbit(page);
     await page.waitForTimeout(500);
 
     // Inject relay satellites into the game state.
@@ -1545,7 +1465,8 @@ test.describe('Comms range', () => {
     }));
     await startTestFlight(page, ['cmd-mk1', 'tank-small', 'engine-spark'], { crewIds: ['crew-1'] });
 
-    await teleportToOrbit(page, 'MARS', 100_000, 3360);
+    await teleportCraft(page, { posY: 100_000, velX: 3503, bodyId: 'MARS' });
+    await waitForOrbit(page);
     await page.waitForTimeout(1000);
 
     const comms = await page.evaluate(() => {

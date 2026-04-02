@@ -109,7 +109,7 @@
 - **Verification**: Write a small E2E test (in `e2e/test-infrastructure.spec.js` or a new spec) that sets time warp to 100x, verifies simulation time advances faster than real time, then resets to 1x. Run `npx playwright test e2e/test-infrastructure.spec.js` — passes.
 
 ### TASK-019: Upgrade E2E teleport helper to set velocity
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-018
 - **Description**: Upgrade the teleport helpers across all 7 spec files that use them. The new helper should set position (posX, posY) AND velocity (velX, velY) plus basic flags (grounded, landed, crashed, throttle), but should NOT manually set phase or orbital elements — let the physics simulation compute those from position/velocity. Replace the current helpers that manually set `fs.phase`, `fs.orbitalElements`, and fake phase log entries. See requirements Section 5.2.2.
 - **Verification**: Run the spec files that use teleport: `npx playwright test e2e/core-mechanics.spec.js e2e/orbital-operations.spec.js e2e/destinations.spec.js e2e/additional-systems.spec.js e2e/tutorial-revisions.spec.js e2e/mission-progression.spec.js e2e/relaunch.spec.js` — all pass. Grep for manual `fs.phase =` and `fs.orbitalElements =` in teleport helpers and verify they're removed.

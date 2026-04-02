@@ -28,6 +28,8 @@ import {
   waitForFlightEvent,
   buildCrewMember,
   ALL_FACILITIES,
+  teleportCraft,
+  waitForOrbit,
 } from './helpers.js';
 import {
   orbitalFixture,
@@ -62,9 +64,9 @@ const SOLAR_PROBE     = ['probe-core-mk1', 'heat-shield-solar', 'tank-small', 'e
 const EARTH_ORBIT_ALT = 100_000;
 const EARTH_ORBIT_VEL = 7848;
 const MOON_ORBIT_ALT  = 20_000;
-const MOON_ORBIT_VEL  = 1633;
+const MOON_ORBIT_VEL  = 1671;  // Circular velocity at 20 km above Moon surface
 const MARS_ORBIT_ALT  = 100_000;
-const MARS_ORBIT_VEL  = 3360;
+const MARS_ORBIT_VEL  = 3503;  // Circular velocity at 100 km above Mars surface
 
 // Sun constants from src/core/constants.js.
 const SUN_DESTRUCTION_ALTITUDE   = 500_000_000;
@@ -132,145 +134,6 @@ function phase6Fixture(overrides = {}) {
     },
     ...overrides,
   });
-}
-
-/**
- * Teleport the craft to orbit around a specific body.
- */
-async function teleportToOrbit(page, bodyId, altitude, vel) {
-  await page.evaluate(({ bodyId, alt, v }) => {
-    const ps = window.__flightPs;
-    const fs = window.__flightState;
-    if (!ps || !fs) return;
-
-    ps.posX = 0;
-    ps.posY = alt;
-    ps.velX = v;
-    ps.velY = 0;
-    ps.grounded = false;
-    ps.landed = false;
-    ps.crashed = false;
-    ps.throttle = 0;
-    ps.firingEngines.clear();
-    ps.controlMode = 'NORMAL';
-
-    fs.phase = 'ORBIT';
-    fs.inOrbit = true;
-    fs.bodyId = bodyId;
-
-    // Compute orbital elements for the body.
-    const GM = {
-      SUN: 1.32712440018e20,
-      EARTH: 3.986004418e14,
-      MOON: 4.9048695e12,
-      MARS: 4.282837e13,
-      MERCURY: 2.2032e13,
-      VENUS: 3.24859e14,
-      PHOBOS: 7.112e5,
-      DEIMOS: 9.8e4,
-    };
-    const RADIUS = {
-      SUN: 695700000,
-      EARTH: 6371000,
-      MOON: 1737400,
-      MARS: 3389500,
-      MERCURY: 2439700,
-      VENUS: 6051800,
-      PHOBOS: 11267,
-      DEIMOS: 6200,
-    };
-    const mu = GM[bodyId] || GM.EARTH;
-    const R = RADIUS[bodyId] || RADIUS.EARTH;
-    const y = alt + R;
-    const v2 = v * v;
-    const h = -y * v;
-    const epsilon = v2 / 2 - mu / y;
-    const a = -mu / (2 * epsilon);
-    const p = (h * h) / mu;
-    const e = Math.sqrt(Math.max(0, 1 - p / a));
-
-    fs.orbitalElements = {
-      semiMajorAxis: a,
-      eccentricity: e,
-      argPeriapsis: 0,
-      meanAnomalyAtEpoch: Math.PI / 2,
-      epoch: fs.timeElapsed || 0,
-    };
-
-    if (fs.phaseLog.length === 0) {
-      fs.phaseLog.push(
-        { from: 'PRELAUNCH', to: 'LAUNCH', time: 0, reason: 'E2E teleport' },
-        { from: 'LAUNCH', to: 'FLIGHT', time: 0.1, reason: 'E2E teleport' },
-        { from: 'FLIGHT', to: 'ORBIT', time: 1.0, reason: `E2E teleport orbit at ${bodyId}` },
-      );
-    }
-  }, { bodyId, alt: altitude, v: vel });
-
-  await page.waitForFunction(
-    () => window.__flightState?.phase === 'ORBIT' && window.__flightState?.inOrbit === true,
-    { timeout: 10_000 },
-  );
-}
-
-/**
- * Teleport craft to landed state on a body surface.
- */
-async function teleportToLanded(page, bodyId) {
-  await page.evaluate(({ bodyId }) => {
-    const ps = window.__flightPs;
-    const fs = window.__flightState;
-    if (!ps || !fs) return;
-
-    ps.posX = 0;
-    ps.posY = 0;
-    ps.velX = 0;
-    ps.velY = 0;
-    ps.grounded = true;
-    ps.landed = true;
-    ps.crashed = false;
-    ps.throttle = 0;
-    ps.firingEngines.clear();
-
-    fs.phase = 'FLIGHT';
-    fs.inOrbit = false;
-    fs.bodyId = bodyId;
-
-    if (!fs.phaseLog) fs.phaseLog = [];
-    if (!fs.events) fs.events = [];
-  }, { bodyId });
-
-  await page.waitForFunction(
-    () => window.__flightPs?.landed === true,
-    { timeout: 10_000 },
-  );
-}
-
-/**
- * Set the craft near the Sun at a specific altitude.
- */
-async function teleportNearSun(page, altitude) {
-  await page.evaluate(({ alt }) => {
-    const ps = window.__flightPs;
-    const fs = window.__flightState;
-    if (!ps || !fs) return;
-
-    ps.posX = 0;
-    ps.posY = alt;
-    ps.velX = 0;
-    ps.velY = 0;
-    ps.grounded = false;
-    ps.landed = false;
-    ps.crashed = false;
-    ps.throttle = 0;
-    ps.firingEngines.clear();
-
-    fs.phase = 'FLIGHT';
-    fs.inOrbit = false;
-    fs.bodyId = 'SUN';
-
-    if (!fs.phaseLog) fs.phaseLog = [];
-    if (!fs.events) fs.events = [];
-  }, { alt: altitude });
 }
 
 /**
@@ -495,7 +358,7 @@ test.describe('Sun destruction altitude and escalating heat damage', () => {
     await startTestFlight(page, SOLAR_PROBE, { bodyId: 'SUN' });
 
     // Teleport above the heat start altitude.
-    await teleportNearSun(page, SUN_HEAT_START_ALTITUDE + 1_000_000_000);
+    await teleportCraft(page, { posY: SUN_HEAT_START_ALTITUDE + 1_000_000_000, bodyId: 'SUN' });
     await page.waitForTimeout(1_000);
 
     // Check that no heat-related events fired.
@@ -518,7 +381,7 @@ test.describe('Sun destruction altitude and escalating heat damage', () => {
     await startTestFlight(page, BASIC_PROBE, { bodyId: 'SUN' });
 
     // Teleport inside the heat zone but above destruction.
-    await teleportNearSun(page, 5_000_000_000);
+    await teleportCraft(page, { posY: 5_000_000_000, bodyId: 'SUN' });
     await page.waitForTimeout(3_000);
 
     // Check for heat-related effects — parts should accumulate heat.
@@ -554,7 +417,7 @@ test.describe('Sun destruction altitude and escalating heat damage', () => {
     await startTestFlight(page, BASIC_PROBE, { bodyId: 'SUN' });
 
     // Teleport below destruction altitude.
-    await teleportNearSun(page, SUN_DESTRUCTION_ALTITUDE - 100_000_000);
+    await teleportCraft(page, { posY: SUN_DESTRUCTION_ALTITUDE - 100_000_000, bodyId: 'SUN' });
     await page.waitForTimeout(2_000);
 
     // All parts should be destroyed — check for crash or destruction state.
@@ -584,7 +447,7 @@ test.describe('Sun destruction altitude and escalating heat damage', () => {
     await startTestFlight(page, SOLAR_PROBE, { bodyId: 'SUN' });
 
     // Teleport to inner corona — should survive longer with solar shield.
-    await teleportNearSun(page, 3_000_000_000);
+    await teleportCraft(page, { posY: 3_000_000_000, bodyId: 'SUN' });
     await page.waitForTimeout(2_000);
 
     const shieldState = await page.evaluate(() => {
@@ -630,7 +493,8 @@ test.describe('Transfer gameplay mechanics', () => {
 
   test('(1) transfer state stores origin and destination bodies', async () => {
     await startTestFlight(page, DEEP_SPACE_SHIP, { bodyId: 'EARTH', crewIds: ['crew-1'] });
-    await teleportToOrbit(page, 'EARTH', EARTH_ORBIT_ALT, EARTH_ORBIT_VEL);
+    await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
+    await waitForOrbit(page);
     await setTransferState(page, 'EARTH', 'MOON');
 
     const fs = await getFlightState(page);
@@ -759,7 +623,7 @@ test.describe('Landing on airless and atmospheric bodies', () => {
 
   test('(1) landing on Moon (airless) — fully propulsive', async () => {
     await startTestFlight(page, LUNAR_LANDER, { bodyId: 'MOON', crewIds: ['crew-1'] });
-    await teleportToLanded(page, 'MOON');
+    await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MOON' });
 
     const ps = await getPhysicsSnapshot(page);
     expect(ps.landed).toBe(true);
@@ -777,7 +641,7 @@ test.describe('Landing on airless and atmospheric bodies', () => {
 
   test('(2) landing on Mars (thin atmosphere)', async () => {
     await startTestFlight(page, LUNAR_LANDER, { bodyId: 'MARS', crewIds: ['crew-1'] });
-    await teleportToLanded(page, 'MARS');
+    await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MARS' });
 
     const ps = await getPhysicsSnapshot(page);
     expect(ps.landed).toBe(true);
@@ -794,7 +658,7 @@ test.describe('Landing on airless and atmospheric bodies', () => {
 
   test('(3) landing on Mercury (airless)', async () => {
     await startTestFlight(page, LUNAR_LANDER, { bodyId: 'MERCURY', crewIds: ['crew-1'] });
-    await teleportToLanded(page, 'MERCURY');
+    await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MERCURY' });
 
     const ps = await getPhysicsSnapshot(page);
     expect(ps.landed).toBe(true);
@@ -940,7 +804,7 @@ test.describe('Surface operations — flag planting', () => {
 
   test('(1) can plant flag on Moon (crewed, landed)', async () => {
     await startTestFlight(page, LUNAR_LANDER, { bodyId: 'MOON', crewIds: ['crew-1'] });
-    await teleportToLanded(page, 'MOON');
+    await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MOON' });
 
     const gsBefore = await getGameState(page);
     const moneyBefore = gsBefore.money;
@@ -1008,7 +872,7 @@ test.describe('Surface operations — flag planting', () => {
 
     // Start uncrewed flight.
     await startTestFlight(page, BASIC_PROBE, { bodyId: 'MARS' });
-    await teleportToLanded(page, 'MARS');
+    await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MARS' });
 
     const result = await page.evaluate(() => {
       if (typeof window.__plantFlag === 'function') {
@@ -1051,7 +915,7 @@ test.describe('Surface operations — sample collection and return', () => {
 
   test('(1) can collect surface sample on Moon (crewed, landed)', async () => {
     await startTestFlight(page, LUNAR_LANDER, { bodyId: 'MOON', crewIds: ['crew-1'] });
-    await teleportToLanded(page, 'MOON');
+    await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MOON' });
 
     const result = await page.evaluate(() => {
       if (typeof window.__collectSample === 'function') {
@@ -1182,7 +1046,7 @@ test.describe('Surface operations — instruments and beacons', () => {
     await startTestFlight(page, [
       'cmd-mk1', 'science-module-mk1', 'tank-large', 'engine-reliant', 'landing-legs-small',
     ], { bodyId: 'MOON', crewIds: ['crew-1'] });
-    await teleportToLanded(page, 'MOON');
+    await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MOON' });
 
     const result = await page.evaluate(() => {
       if (typeof window.__deployInstrument === 'function') {
@@ -1258,7 +1122,7 @@ test.describe('Surface operations — instruments and beacons', () => {
 
   test('(3) can deploy beacon on any body (no crew required)', async () => {
     await startTestFlight(page, BASIC_PROBE, { bodyId: 'MARS' });
-    await teleportToLanded(page, 'MARS');
+    await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MARS' });
 
     const result = await page.evaluate(() => {
       if (typeof window.__deployBeacon === 'function') {
@@ -1868,7 +1732,8 @@ test.describe('Map view controls during transfer', () => {
 
   test('(1) map view can be toggled during transfer', async () => {
     await startTestFlight(page, DEEP_SPACE_SHIP, { bodyId: 'EARTH', crewIds: ['crew-1'] });
-    await teleportToOrbit(page, 'EARTH', EARTH_ORBIT_ALT, EARTH_ORBIT_VEL);
+    await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
+    await waitForOrbit(page);
     await setTransferState(page, 'EARTH', 'MARS');
 
     // Toggle map view (key 'c' or 'm' depending on implementation).
@@ -1922,7 +1787,8 @@ test.describe('Integration — full lunar mission flow', () => {
 
   test('(1) launch from Earth, teleport to Moon orbit', async () => {
     await startTestFlight(page, LUNAR_LANDER, { bodyId: 'MOON', crewIds: ['crew-1'] });
-    await teleportToOrbit(page, 'MOON', MOON_ORBIT_ALT, MOON_ORBIT_VEL);
+    await teleportCraft(page, { posY: MOON_ORBIT_ALT, velX: MOON_ORBIT_VEL, bodyId: 'MOON' });
+    await waitForOrbit(page);
 
     const fs = await getFlightState(page);
     expect(fs.phase).toBe('ORBIT');
@@ -1930,7 +1796,7 @@ test.describe('Integration — full lunar mission flow', () => {
   });
 
   test('(2) land on Moon surface', async () => {
-    await teleportToLanded(page, 'MOON');
+    await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MOON' });
 
     const ps = await getPhysicsSnapshot(page);
     expect(ps.landed).toBe(true);

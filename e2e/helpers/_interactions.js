@@ -339,3 +339,76 @@ export async function openSettingsPanel(page) {
   await page.click('#topbar-menu-btn');
   await page.click('#hub-settings-btn');
 }
+
+// ---------------------------------------------------------------------------
+// Teleport helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Teleport the craft to a specific position with velocity.
+ *
+ * Sets position, velocity, and basic flags.  The physics simulation
+ * computes phase transitions (FLIGHT → ORBIT, etc.) and orbital elements
+ * automatically on the next frame — callers should follow with
+ * {@link waitForOrbit} or similar condition checks as needed.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {object} opts
+ * @param {number} [opts.posX=0]         Position X (metres).
+ * @param {number} opts.posY             Position Y / altitude (metres).
+ * @param {number} [opts.velX=0]         Velocity X (m/s).
+ * @param {number} [opts.velY=0]         Velocity Y (m/s).
+ * @param {boolean} [opts.grounded=false]
+ * @param {boolean} [opts.landed=false]
+ * @param {boolean} [opts.crashed=false]
+ * @param {number}  [opts.throttle=0]
+ * @param {string}  [opts.bodyId]        Celestial body ID (e.g. 'EARTH', 'MOON').
+ */
+export async function teleportCraft(page, opts) {
+  await page.evaluate((o) => {
+    const ps = window.__flightPs;
+    const fs = window.__flightState;
+    if (!ps || !fs) return;
+
+    // Position and velocity.
+    ps.posX = o.posX ?? 0;
+    ps.posY = o.posY;
+    ps.velX = o.velX ?? 0;
+    ps.velY = o.velY ?? 0;
+
+    // Basic flags.
+    ps.grounded = o.grounded ?? false;
+    ps.landed   = o.landed ?? false;
+    ps.crashed  = o.crashed ?? false;
+    ps.throttle = o.throttle ?? 0;
+    ps.firingEngines.clear();
+
+    // Body.
+    if (o.bodyId) fs.bodyId = o.bodyId;
+
+    // Reset to airborne FLIGHT state so the physics auto-detection can
+    // compute the correct phase (ORBIT, etc.) and orbital elements from
+    // the position/velocity on the next simulation frame.
+    fs.phase = 'FLIGHT';
+    fs.inOrbit = false;
+    fs.orbitalElements = null;
+
+    // Defensive initialisation.
+    if (!fs.phaseLog) fs.phaseLog = [];
+    if (!fs.events) fs.events = [];
+  }, opts);
+}
+
+/**
+ * Wait for the physics simulation to detect a valid orbit and transition
+ * the flight phase to ORBIT.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {number} [timeout=10_000]
+ */
+export async function waitForOrbit(page, timeout = 10_000) {
+  await page.waitForFunction(
+    () => window.__flightState?.phase === 'ORBIT' && window.__flightState?.inOrbit === true,
+    { timeout },
+  );
+}

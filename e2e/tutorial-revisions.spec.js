@@ -27,6 +27,7 @@ import {
   waitForObjectiveComplete,
   areAllObjectivesComplete,
   waitForFlightEvent,
+  teleportCraft,
 } from './helpers.js';
 
 // ---------------------------------------------------------------------------
@@ -263,9 +264,18 @@ async function triggerReturnViaMenu(page) {
   const dropdown = page.locator('#topbar-dropdown');
   await expect(dropdown).toBeVisible({ timeout: 5_000 });
   await dropdown.getByText('Return to Space Agency').click();
+
+  // Handle different return flows — orbit return (ORBIT phase) or abort (FLIGHT).
+  const orbitBtn = page.locator('[data-testid="orbit-return-btn"]');
   const abortBtn = page.locator('[data-testid="abort-confirm-btn"]');
-  if (await abortBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
-    await abortBtn.click();
+  const orbitVisible = await orbitBtn.isVisible({ timeout: 2_000 }).catch(() => false);
+  if (orbitVisible) {
+    await orbitBtn.click();
+  } else {
+    const abortVisible = await abortBtn.isVisible({ timeout: 2_000 }).catch(() => false);
+    if (abortVisible) {
+      await abortBtn.click();
+    }
   }
 }
 
@@ -335,16 +345,8 @@ async function expectMissionAvailable(page, missionId) {
 }
 
 /** Teleport the rocket to orbital conditions. */
-async function teleportToOrbit(page) {
-  await page.evaluate(() => {
-    const ps = window.__flightPs;
-    if (ps) {
-      ps.posY = 85_000;
-      ps.velX = 8_000;
-      ps.velY = 0;
-      ps.grounded = false;
-    }
-  });
+async function teleportToOrbitConditions(page) {
+  await teleportCraft(page, { posY: 85_000, velX: 8_000 });
 }
 
 /** Completed mission IDs for a given range. */
@@ -598,7 +600,7 @@ test.describe('Tutorial Revisions', () => {
       await waitForAltitude(page, 100);
 
       // Teleport to orbital conditions.
-      await teleportToOrbit(page);
+      await teleportToOrbitConditions(page);
       await page.waitForFunction(
         id => {
           const m = window.__gameState?.missions?.accepted?.find(x => x.id === id);
@@ -638,7 +640,7 @@ test.describe('Tutorial Revisions', () => {
       await stage(page);
       await page.keyboard.press('z');
       await waitForAltitude(page, 100);
-      await teleportToOrbit(page);
+      await teleportToOrbitConditions(page);
 
       // Wait for REACH_ORBIT objective.
       await page.waitForFunction(
@@ -773,7 +775,7 @@ test.describe('Tutorial Revisions', () => {
       await stage(page);
       await page.keyboard.press('z');
       await waitForAltitude(page, 100);
-      await teleportToOrbit(page);
+      await teleportToOrbitConditions(page);
 
       await page.waitForFunction(
         () => {
@@ -948,7 +950,7 @@ test.describe('Tutorial Revisions', () => {
       );
 
       // Teleport to orbit to satisfy REACH_ORBIT.
-      await teleportToOrbit(page);
+      await teleportToOrbitConditions(page);
       await page.waitForFunction(
         () => {
           const m = window.__gameState?.missions?.accepted?.find(x => x.id === 'mission-021');
@@ -1003,7 +1005,7 @@ test.describe('Tutorial Revisions', () => {
       await waitForAltitude(page, 100);
 
       // Teleport to orbit.
-      await teleportToOrbit(page);
+      await teleportToOrbitConditions(page);
       await page.waitForFunction(
         () => {
           const m = window.__gameState?.missions?.accepted?.find(x => x.id === 'mission-022');
@@ -1224,7 +1226,7 @@ test.describe('Tutorial Revisions', () => {
       await stage(page);
       await page.keyboard.press('z');
       await waitForAltitude(page, 100);
-      await teleportToOrbit(page);
+      await teleportToOrbitConditions(page);
 
       // Wait for REACH_ORBIT objective.
       await page.waitForFunction(
@@ -1266,7 +1268,7 @@ test.describe('Tutorial Revisions', () => {
       await stage(page);
       await page.keyboard.press('z');
       await waitForAltitude(page, 100);
-      await teleportToOrbit(page);
+      await teleportToOrbitConditions(page);
 
       await page.waitForFunction(
         () => {
@@ -1304,7 +1306,7 @@ test.describe('Tutorial Revisions', () => {
       await stage(page);
       await page.keyboard.press('z');
       await waitForAltitude(page, 100);
-      await teleportToOrbit(page);
+      await teleportToOrbitConditions(page);
 
       await page.waitForFunction(
         () => {

@@ -25,6 +25,8 @@ import {
   getFlightState,
   waitForAltitude,
   ALL_FACILITIES,
+  teleportCraft,
+  waitForOrbit,
 } from './helpers.js';
 import {
   freshStartFixture,
@@ -47,75 +49,6 @@ const BASIC_ROCKET   = ['probe-core-mk1', 'tank-small', 'engine-spark'];
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Teleport the craft to a circular orbit by directly setting physics and
- * flight state. Does NOT stage the engine — avoids race conditions and crashes.
- *
- * @param {import('@playwright/test').Page} page
- * @param {number} [altitude=ORBIT_ALT]
- * @param {number} [vel=ORBIT_VEL]
- */
-async function teleportToOrbit(page, altitude = ORBIT_ALT, vel = ORBIT_VEL) {
-  await page.evaluate(({ alt, v }) => {
-    const ps = window.__flightPs;
-    const fs = window.__flightState;
-    if (!ps || !fs) return;
-
-    // Set orbital position and velocity.
-    ps.posX = 0;
-    ps.posY = alt;
-    ps.velX = v;
-    ps.velY = 0;
-    ps.grounded = false;
-    ps.landed = false;
-    ps.crashed = false;
-    ps.throttle = 0;
-    ps.firingEngines.clear();
-    ps.controlMode = 'NORMAL';
-
-    // Manually set phase to ORBIT.
-    fs.phase = 'ORBIT';
-    fs.inOrbit = true;
-    fs.orbitBandId = 'LEO';
-
-    // Compute orbital elements inline for Earth orbit.
-    const mu = 3.986004418e14;
-    const R = 6_371_000;
-    const x = 0;
-    const y = alt + R;
-    const r = y; // posX=0, so r = y
-    const v2 = v * v;
-    const h = -y * v; // x*velY - y*velX = 0 - y*v
-    const epsilon = v2 / 2 - mu / r;
-    const a = -mu / (2 * epsilon);
-    const p = (h * h) / mu;
-    const e = Math.sqrt(Math.max(0, 1 - p / a));
-    fs.orbitalElements = {
-      semiMajorAxis: a,
-      eccentricity: e,
-      argPeriapsis: 0,
-      meanAnomalyAtEpoch: Math.PI / 2, // Position along y-axis.
-      epoch: fs.timeElapsed || 0,
-    };
-
-    // Add phase log entries.
-    if (fs.phaseLog.length === 0) {
-      fs.phaseLog.push(
-        { from: 'PRELAUNCH', to: 'LAUNCH', time: 0, reason: 'E2E teleport' },
-        { from: 'LAUNCH', to: 'FLIGHT', time: 0.1, reason: 'E2E teleport' },
-        { from: 'FLIGHT', to: 'ORBIT', time: 1.0, reason: 'E2E teleport',
-          meta: { altitudeBand: { id: 'LEO', name: 'Low Earth Orbit' } } },
-      );
-    }
-  }, { alt: altitude, v: vel });
-
-  // Verify orbit state is set.
-  await page.waitForFunction(
-    () => window.__flightState?.phase === 'ORBIT' && window.__flightState?.inOrbit === true,
-    { timeout: 10_000 },
-  );
-}
 
 /**
  * Return to agency from flight.
@@ -256,7 +189,8 @@ test.describe('Period does NOT advance during time warp', () => {
     });
     await seedAndLoadSave(page, envelope);
     await startTestFlight(page, ORBITAL_ROCKET);
-    await teleportToOrbit(page);
+    await teleportCraft(page, { posY: ORBIT_ALT, velX: ORBIT_VEL });
+    await waitForOrbit(page);
 
     await page.waitForFunction(
       () => {
@@ -428,7 +362,8 @@ test.describe('Flight phase transitions', () => {
     } catch { /* noop */ }
 
     await startTestFlight(page, ORBITAL_ROCKET);
-    await teleportToOrbit(page);
+    await teleportCraft(page, { posY: ORBIT_ALT, velX: ORBIT_VEL });
+    await waitForOrbit(page);
 
     // Set escape velocity and activate engine.
     await page.evaluate(({ escVel }) => {
@@ -485,7 +420,8 @@ test.describe('Control mode switching in ORBIT', () => {
     });
     await seedAndLoadSave(page, envelope);
     await startTestFlight(page, ORBITAL_ROCKET);
-    await teleportToOrbit(page);
+    await teleportCraft(page, { posY: ORBIT_ALT, velX: ORBIT_VEL });
+    await waitForOrbit(page);
   });
 
   test.afterAll(async () => { await page.close(); });
@@ -579,7 +515,8 @@ test.describe('RCS mode directional translation', () => {
     });
     await seedAndLoadSave(page, envelope);
     await startTestFlight(page, ORBITAL_ROCKET);
-    await teleportToOrbit(page);
+    await teleportCraft(page, { posY: ORBIT_ALT, velX: ORBIT_VEL });
+    await waitForOrbit(page);
 
     // Enter docking mode then RCS mode.
     await page.keyboard.press('v');
@@ -650,7 +587,8 @@ test.describe('Map view toggle and controls', () => {
     });
     await seedAndLoadSave(page, envelope);
     await startTestFlight(page, ORBITAL_ROCKET);
-    await teleportToOrbit(page);
+    await teleportCraft(page, { posY: ORBIT_ALT, velX: ORBIT_VEL });
+    await waitForOrbit(page);
   });
 
   test.afterAll(async () => { await page.close(); });
@@ -770,7 +708,8 @@ test.describe('Orbit slot proximity detection and warp-to-target', () => {
     });
     await seedAndLoadSave(page, envelope);
     await startTestFlight(page, ORBITAL_ROCKET);
-    await teleportToOrbit(page);
+    await teleportCraft(page, { posY: ORBIT_ALT, velX: ORBIT_VEL });
+    await waitForOrbit(page);
   });
 
   test.afterAll(async () => { await page.close(); });
