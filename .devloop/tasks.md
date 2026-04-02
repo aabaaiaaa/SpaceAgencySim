@@ -133,7 +133,7 @@
 - **Verification**: Run `npx playwright test e2e/failure-paths.spec.js` (or whatever the new spec is named) — all tests pass.
 
 ### TASK-023: Configure Vitest coverage with 80% thresholds
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Add `v8` coverage provider to Vitest config. Set 80% thresholds for lines, branches, and functions. Add `npm run test:coverage` script to `package.json`. See requirements Section 5.5.
 - **Verification**: Run `npm run test:coverage` — completes successfully, reports coverage percentages, and enforces 80% thresholds.

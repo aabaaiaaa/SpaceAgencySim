@@ -41,5 +41,15 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/tests/**/*.test.{js,ts}'],
+    coverage: {
+      provider: 'v8',
+      include: ['src/core/**'],
+      exclude: ['src/core/debugSaves.js', 'src/core/library.js'],
+      thresholds: {
+        lines: 80,
+        branches: 78,
+        functions: 80,
+      },
+    },
   },
 });
