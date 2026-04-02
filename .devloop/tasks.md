@@ -103,7 +103,7 @@
 - **Verification**: Load "Post-Tutorial Basics (Mission 4 Done)" debug save, go to MCC — missions 5, 6, 7, and 18 should be available to accept.
 
 ### TASK-018: Add game mode indicator and sandbox weather fix
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Add a subtle game mode indicator on the hub (e.g., small badge near the agency name showing "Tutorial" / "Freeplay" / "Sandbox"). Also fix sandbox mode to hide the weather panel when `sandboxSettings.weatherEnabled` is false. See requirements sections 2.7 and 2.8.
 - **Verification**: Start each game mode — the mode should be visible on the hub. Sandbox should not show weather panel.

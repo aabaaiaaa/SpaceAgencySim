@@ -1534,6 +1534,9 @@ function _renderWeatherPanel(parent) {
   const existing = document.getElementById('weather-panel');
   if (existing) existing.remove();
 
+  // Hide weather panel in sandbox mode when weather is disabled.
+  if (_state.gameMode === GameMode.SANDBOX && !_state.sandboxSettings?.weatherEnabled) return;
+
   // Initialise weather if needed (first hub visit or after save load).
   if (!_state.weather) {
     initWeather(_state, 'EARTH');

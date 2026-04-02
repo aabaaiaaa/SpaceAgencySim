@@ -115,17 +115,29 @@ const TOPBAR_STYLES = `
   text-overflow: ellipsis;
 }
 
-/* Sandbox badge */
-#topbar-sandbox-badge {
+/* Game mode badge */
+#topbar-mode-badge {
   font-size: 0.62rem;
   font-weight: 700;
   padding: 2px 6px;
   border-radius: 3px;
+  letter-spacing: 0.04em;
+  margin-left: 8px;
+}
+#topbar-mode-badge.mode-sandbox {
   background: rgba(230, 180, 50, 0.25);
   color: #e6b432;
   border: 1px solid rgba(230, 180, 50, 0.4);
-  letter-spacing: 0.04em;
-  margin-left: 8px;
+}
+#topbar-mode-badge.mode-tutorial {
+  background: rgba(80, 180, 230, 0.25);
+  color: #50b4e6;
+  border: 1px solid rgba(80, 180, 230, 0.4);
+}
+#topbar-mode-badge.mode-freeplay {
+  background: rgba(80, 200, 120, 0.25);
+  color: #50c878;
+  border: 1px solid rgba(80, 200, 120, 0.4);
 }
 
 /* Flight (period) counter */
@@ -729,11 +741,20 @@ export function initTopBar(container, state, { onExitToMenu, onLoadGame }) {
 
   _root.appendChild(agency);
 
-  // Sandbox mode badge — shown only in sandbox games.
-  if (state.gameMode === GameMode.SANDBOX) {
+  // Game mode badge — always shown.
+  {
     const badge = document.createElement('span');
-    badge.id = 'topbar-sandbox-badge';
-    badge.textContent = 'SANDBOX';
+    badge.id = 'topbar-mode-badge';
+    if (state.gameMode === GameMode.SANDBOX) {
+      badge.className = 'mode-sandbox';
+      badge.textContent = 'SANDBOX';
+    } else if (state.gameMode === GameMode.TUTORIAL) {
+      badge.className = 'mode-tutorial';
+      badge.textContent = 'TUTORIAL';
+    } else {
+      badge.className = 'mode-freeplay';
+      badge.textContent = 'FREEPLAY';
+    }
     _root.appendChild(badge);
   }
 
