@@ -7,7 +7,7 @@
 - **Verification**: Write a unit test that mocks `localStorage.setItem` to throw `QuotaExceededError` and verify the error is caught gracefully (no unhandled exception). Verify `console.warn` is called on corrupt JSON parse. Run `npm run test:unit` — all tests pass. No E2E needed — pure core logic.
 
 ### TASK-002: Add try-catch to flight HUD requestAnimationFrame loop
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Add error handling around the flight HUD's `requestAnimationFrame` callback so that invalid physics state (NaN, missing references) doesn't crash the entire HUD. Log errors, attempt to continue on transient failures, and if errors repeat (e.g., 5+ consecutive frames), offer the player a way to abort to the hub. See requirements Section 1.3.
 - **Verification**: Run `npm run test:unit` — all tests pass. Then run `npx playwright test e2e/flight.spec.js` to verify flight still works normally.

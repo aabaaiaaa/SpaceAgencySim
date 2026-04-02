@@ -391,7 +391,7 @@ export function handleMenuReturnToAgency() {
     abortBtn.dataset.testid = 'abort-confirm-btn';
     abortBtn.addEventListener('click', () => {
       backdrop.remove();
-      _handleAbortReturnToAgency();
+      handleAbortReturnToAgency();
     });
 
     btnRow.appendChild(continueBtn);
@@ -424,7 +424,7 @@ function _handleReturnToAgency() {
 /**
  * Handle abort: skip the post-flight summary and return directly to the hub.
  */
-function _handleAbortReturnToAgency() {
+export function handleAbortReturnToAgency() {
   const s = getFCState();
   if (s.summaryShown) return;
   s.summaryShown = true;

@@ -761,6 +761,15 @@ let _keyHandler = null;
 /** Callback invoked with the chosen warp level when a warp button is clicked. @type {((level: number) => void)|null} */
 let _onTimeWarpChange = null;
 
+/** Callback invoked when the player clicks "Abort to Hub" after repeated HUD errors. @type {(() => void)|null} */
+let _onAbort = null;
+
+/** Count of consecutive _tick errors (reset to 0 on each successful frame). */
+let _consecutiveErrors = 0;
+
+/** Whether the error banner is currently visible. @type {HTMLElement|null} */
+let _errorBanner = null;
+
 /** Current active time warp level (1, 2, 5, 10, or 50). */
 let _timeWarp = 1;
 
@@ -827,8 +836,11 @@ let _elCommsStatus   = null;   // comms status indicator in status section
  * @param {import('../core/gameState.js').GameState}                state
  * @param {((level: number) => void)|null}                          [onTimeWarpChange]
  *   Called with the new warp level whenever the player clicks a time-warp button.
+ * @param {((actionId: string) => void)|null}                       [onSurfaceAction]
+ * @param {(() => void)|null}                                       [onAbort]
+ *   Called when the player clicks "Abort to Hub" after repeated HUD errors.
  */
-export function initFlightHud(container, ps, assembly, stagingConfig, flightState, state, onTimeWarpChange, onSurfaceAction) {
+export function initFlightHud(container, ps, assembly, stagingConfig, flightState, state, onTimeWarpChange, onSurfaceAction, onAbort) {
   _ps               = ps;
   _assembly         = assembly;
   _stagingConfig    = stagingConfig;
@@ -836,10 +848,13 @@ export function initFlightHud(container, ps, assembly, stagingConfig, flightStat
   _state            = state;
   _onTimeWarpChange = onTimeWarpChange ?? null;
   _onSurfaceAction  = onSurfaceAction ?? null;
+  _onAbort          = onAbort ?? null;
   _timeWarp         = 1;
   _warpLocked       = false;
   _warpButtons      = [];
   _launchTipHidden  = false;
+  _consecutiveErrors = 0;
+  _errorBanner       = null;
 
   // Inject stylesheet once per page load.
   if (!document.getElementById('flight-hud-styles')) {
@@ -916,9 +931,12 @@ export function destroyFlightHud() {
   _state            = null;
   _onTimeWarpChange = null;
   _onSurfaceAction  = null;
+  _onAbort          = null;
   _timeWarp         = 1;
   _warpLocked       = false;
   _warpButtons      = [];
+  _consecutiveErrors = 0;
+  _errorBanner       = null;
 
   _elThrottleFill  = null;
   _elThrottlePct   = null;
@@ -1604,19 +1622,80 @@ function _updateSurfacePanel() {
 
 // ---------------------------------------------------------------------------
 
+/** Maximum consecutive errors before showing the abort banner. */
+const _MAX_CONSECUTIVE_ERRORS = 5;
+
 /**
  * One animation frame: update every HUD panel, then re-schedule.
  */
 function _tick() {
   if (_hud && _ps) {
-    _updateLeftPanel();
-    _updateObjectivesPanel();
-    _updateLaunchTip();
-    _updateAltTape();
-    _updateControlModeIndicator();
-    _updateSurfacePanel();
+    try {
+      _updateLeftPanel();
+      _updateObjectivesPanel();
+      _updateLaunchTip();
+      _updateAltTape();
+      _updateControlModeIndicator();
+      _updateSurfacePanel();
+      _consecutiveErrors = 0;
+    } catch (err) {
+      _consecutiveErrors++;
+      console.error(`[Flight HUD] Tick error (${_consecutiveErrors} consecutive):`, err);
+      if (_consecutiveErrors >= _MAX_CONSECUTIVE_ERRORS && !_errorBanner) {
+        _showErrorBanner();
+      }
+    }
   }
   _rafId = requestAnimationFrame(_tick);
+}
+
+/**
+ * Show an error banner offering the player a way to abort to the hub.
+ * Only shown after repeated consecutive errors.
+ */
+function _showErrorBanner() {
+  if (!_hud || _errorBanner) return;
+
+  _errorBanner = document.createElement('div');
+  _errorBanner.style.cssText =
+    'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);' +
+    'background:rgba(30,10,10,0.95);border:2px solid #ff4444;border-radius:8px;' +
+    'padding:20px 28px;z-index:9999;text-align:center;color:#fff;' +
+    'font-family:inherit;max-width:400px;';
+
+  const msg = document.createElement('p');
+  msg.style.cssText = 'margin:0 0 16px 0;font-size:1rem;line-height:1.4;';
+  msg.textContent = 'The flight display encountered repeated errors. You can try to continue or abort to the hub.';
+  _errorBanner.appendChild(msg);
+
+  const btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display:flex;gap:12px;justify-content:center;';
+
+  const continueBtn = document.createElement('button');
+  continueBtn.textContent = 'Try to Continue';
+  continueBtn.style.cssText =
+    'padding:8px 16px;border:1px solid #888;border-radius:4px;' +
+    'background:#333;color:#fff;cursor:pointer;font-size:0.9rem;';
+  continueBtn.addEventListener('click', () => {
+    _consecutiveErrors = 0;
+    if (_errorBanner) { _errorBanner.remove(); _errorBanner = null; }
+  });
+
+  const abortBtn = document.createElement('button');
+  abortBtn.textContent = 'Abort to Hub';
+  abortBtn.dataset.testid = 'hud-error-abort-btn';
+  abortBtn.style.cssText =
+    'padding:8px 16px;border:1px solid #ff4444;border-radius:4px;' +
+    'background:#882222;color:#fff;cursor:pointer;font-size:0.9rem;';
+  abortBtn.addEventListener('click', () => {
+    if (_errorBanner) { _errorBanner.remove(); _errorBanner = null; }
+    if (_onAbort) _onAbort();
+  });
+
+  btnRow.appendChild(continueBtn);
+  btnRow.appendChild(abortBtn);
+  _errorBanner.appendChild(btnRow);
+  _hud.appendChild(_errorBanner);
 }
 
 // ---------------------------------------------------------------------------

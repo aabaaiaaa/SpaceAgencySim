@@ -28,6 +28,7 @@ import {
   handleMenuRestart,
   handleMenuAdjustBuild,
   handleMenuReturnToAgency,
+  handleAbortReturnToAgency,
   handleMenuFlightLog,
 } from './_menuActions.js';
 
@@ -175,7 +176,7 @@ export function startFlightScene(
   initFlightRenderer();
 
   // Mount the HUD overlay.
-  initFlightHud(container, s.ps, s.assembly, stagingConfig, flightState, state, onTimeWarpButtonClick, onSurfaceAction);
+  initFlightHud(container, s.ps, s.assembly, stagingConfig, flightState, state, onTimeWarpButtonClick, onSurfaceAction, handleAbortReturnToAgency);
 
   // Build the in-flight control overlay.
   _buildFlightOverlay(container);
