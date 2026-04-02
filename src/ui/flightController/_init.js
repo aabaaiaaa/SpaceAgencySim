@@ -257,7 +257,7 @@ export function startFlightScene(
   s.lastTs = performance.now();
   s.rafId  = requestAnimationFrame(loop);
 
-  console.log('[Flight Controller] Flight scene started');
+
 }
 
 /**
@@ -307,5 +307,5 @@ export function stopFlightScene() {
   // Reset all state.
   resetFCState();
 
-  console.log('[Flight Controller] Flight scene stopped');
+
 }

@@ -41,6 +41,11 @@ export default [
       'no-throw-literal': 'error',
       'no-useless-assignment': 'warn',
 
+      // -- Console / async rules --
+      'no-console': ['error', { allow: ['warn', 'error'] }],
+      'require-await': 'warn',
+      'no-async-promise-executor': 'error',
+
       // -- Formatting rules OFF --
       'no-mixed-spaces-and-tabs': 'off',
     },
@@ -93,6 +98,14 @@ export default [
       'eqeqeq': ['error', 'always', { null: 'ignore' }],
       'no-throw-literal': 'error',
 
+      // -- Console / async rules --
+      'no-console': ['error', { allow: ['warn', 'error'] }],
+      'require-await': 'off', // TS plugin handles this
+      '@typescript-eslint/require-await': 'warn',
+      'no-async-promise-executor': 'error',
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/no-misused-promises': 'error',
+
       // -- Formatting rules OFF --
       'no-mixed-spaces-and-tabs': 'off',
     },
@@ -119,6 +132,17 @@ export default [
       globals: {
         ...globals.node,
       },
+    },
+  },
+
+  // -----------------------------------------------------------------------
+  // Test file overrides: relax console and async rules
+  // -----------------------------------------------------------------------
+  {
+    files: ['src/tests/**', 'e2e/**'],
+    rules: {
+      'no-console': 'off',
+      'require-await': 'off',
     },
   },
 ];

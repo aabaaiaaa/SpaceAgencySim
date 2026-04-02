@@ -18,8 +18,6 @@ import { CELESTIAL_BODIES, isLandable } from './data/bodies.js';
 import { getPartById } from './data/parts.js';
 
 async function main() {
-  console.log('[SpaceAgencySim] Starting...');
-
   const canvas    = document.getElementById('game-canvas');
   const uiOverlay = document.getElementById('ui-overlay');
 
@@ -167,7 +165,6 @@ async function main() {
       return p ? JSON.parse(JSON.stringify(p)) : null;
     };
 
-    console.log('[SpaceAgencySim] Ready. Agency:', state.agencyName || '(unnamed)');
   });
 }
 

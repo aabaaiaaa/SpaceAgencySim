@@ -31,7 +31,6 @@ export function handleSaveGame() {
 
   const saveName = `${s.state.agencyName || 'Agency'} \u2014 In-Flight`;
   saveGame(s.state, targetSlot, saveName);
-  console.log(`[Flight Controller] Saved to slot ${targetSlot}`);
 }
 
 /**

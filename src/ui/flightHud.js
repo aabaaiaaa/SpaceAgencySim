@@ -896,7 +896,7 @@ export function initFlightHud(container, ps, assembly, stagingConfig, flightStat
   // Start the update loop.
   _rafId = requestAnimationFrame(_tick);
 
-  console.log('[Flight HUD] Initialized');
+
 }
 
 /**
@@ -963,7 +963,7 @@ export function destroyFlightHud() {
   _elTargetTwrRow  = null;
   _elTargetTwrVal  = null;
 
-  console.log('[Flight HUD] Destroyed');
+
 }
 
 // ---------------------------------------------------------------------------

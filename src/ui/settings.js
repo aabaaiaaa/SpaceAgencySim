@@ -293,5 +293,4 @@ export function openSettingsPanel(container, state) {
   content.appendChild(closeBtn);
 
   container.appendChild(panel);
-  console.log('[Settings UI] Settings panel opened');
 }

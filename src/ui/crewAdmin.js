@@ -698,7 +698,7 @@ export function initCrewAdminUI(container, state, { onBack }) {
   _renderShell();
   _renderActiveTab();
 
-  console.log('[Crew Admin UI] Initialized');
+
 }
 
 /**
@@ -711,7 +711,7 @@ export function destroyCrewAdminUI() {
   }
   _state   = null;
   _onBack  = null;
-  console.log('[Crew Admin UI] Destroyed');
+
 }
 
 // ---------------------------------------------------------------------------

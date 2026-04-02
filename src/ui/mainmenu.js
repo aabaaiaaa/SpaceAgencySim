@@ -774,7 +774,7 @@ export function initMainMenu(container, onGameReady) {
 
   _startShootingStars();
 
-  console.log('[MainMenu] Displayed. Has saves:', hasAnySave);
+
 }
 
 // ---------------------------------------------------------------------------
@@ -1203,7 +1203,7 @@ function _startNewGame(agencyName, selectedMode, sandboxOptions = null) {
   // Seed tutorial missions (applies to all modes for contract generation).
   initializeMissions(state);
 
-  console.log(`[MainMenu] New game started (${selectedMode}). Agency:`, agencyName);
+
   _beginGame(state);
 }
 

@@ -112,7 +112,6 @@ export function initFlightRenderer() {
   window.addEventListener('wheel',     s.wheelHandler,     { passive: false });
   window.addEventListener('mousemove', s.mouseMoveHandler);
 
-  console.log('[Flight Renderer] Initialized');
 }
 
 /**
@@ -248,7 +247,6 @@ export function destroyFlightRenderer() {
 
   drainPools();
 
-  console.log('[Flight Renderer] Destroyed');
 }
 
 /**

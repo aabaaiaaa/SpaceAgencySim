@@ -241,15 +241,6 @@ function doLaunch(crewIds) {
     deltaVRemaining: 0,
   });
 
-  console.log('[VAB] Launch initiated', {
-    missionId:    missionId || '(none)',
-    crewCount:    crewIds.length,
-    crewIds,
-    totalMassKg:  S.lastValidation?.totalMassKg ?? 0,
-    stage1Thrust: S.lastValidation?.stage1Thrust ?? 0,
-    twr:          (S.lastValidation?.twr ?? 0).toFixed(2),
-  });
-
   const vabRoot = document.getElementById('vab-root');
   if (vabRoot) vabRoot.style.display = 'none';
 

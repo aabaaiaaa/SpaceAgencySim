@@ -145,7 +145,7 @@
 - **Verification**: Run `npm run test:coverage` — passes with the raised thresholds. Thresholds are higher than the initial 80% where actual coverage exceeds it.
 
 ### TASK-025: Add no-console and async/await error handling ESLint rules
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Add `no-console` rule (error level, with exceptions for `console.warn` and `console.error`) and async/await error handling rules to `eslint.config.js`. Fix any existing violations in production source code (not test files — exclude test directories from `no-console`). See requirements Section 6.1.
 - **Verification**: Run `npm run lint` — no errors. Grep for bare `console.log` in `src/` (excluding tests) — none found. No E2E needed — config and lint fixes only.

@@ -181,7 +181,7 @@ export function initFlightContextMenu(getPs, getAssembly, getFlightState) {
   _outsideClickHandler = _onOutsideClick;
   document.addEventListener('click', _outsideClickHandler, true);
 
-  console.log('[Flight Context Menu] Initialized');
+
 }
 
 /**
@@ -207,7 +207,7 @@ export function destroyFlightContextMenu() {
   _getAssembly    = null;
   _getFlightState = null;
 
-  console.log('[Flight Context Menu] Destroyed');
+
 }
 
 // ---------------------------------------------------------------------------

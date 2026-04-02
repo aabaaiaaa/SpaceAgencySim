@@ -465,7 +465,7 @@ export function initSatelliteOpsUI(container, state, { onBack }) {
 
   _render();
 
-  console.log('[Satellite Ops UI] Initialized');
+
 }
 
 /**
@@ -478,7 +478,7 @@ export function destroySatelliteOpsUI() {
   }
   _state = null;
   _onBack = null;
-  console.log('[Satellite Ops UI] Destroyed');
+
 }
 
 // ---------------------------------------------------------------------------

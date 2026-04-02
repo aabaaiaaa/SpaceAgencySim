@@ -198,8 +198,6 @@ export function initMapRenderer() {
   _customViewRadius = null;
   _selectedTarget   = null;
   _showShadow       = false;
-
-  console.log('[Map Renderer] Initialized');
 }
 
 /**
@@ -266,8 +264,6 @@ export function destroyMapRenderer() {
   _selectedTarget          = null;
   _selectedTransferTarget  = null;
   _showShadow              = false;
-
-  console.log('[Map Renderer] Destroyed');
 }
 
 // ---------------------------------------------------------------------------

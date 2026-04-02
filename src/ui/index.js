@@ -107,7 +107,6 @@ export function showMainMenu(container, onGameReady) {
   _vabInitialized = false;
   resetVabUI();
   initMainMenu(container, onGameReady);
-  console.log('[UI] Main menu displayed');
 }
 
 /**
@@ -146,7 +145,6 @@ export function initUI(container, state) {
     showWelcomeModal(container, state);
   }
 
-  console.log('[UI] Hub overlay initialized');
 }
 
 /**
@@ -230,7 +228,6 @@ function _handleExitToMenu() {
     });
   }
 
-  console.log('[UI] Exited to main menu');
 }
 
 /**
@@ -267,7 +264,6 @@ function _handleLoadGame(loadedState) {
     initUI(_container, loadedState);
   }
 
-  console.log('[UI] Game loaded from in-game modal');
 }
 
 // ---------------------------------------------------------------------------
@@ -284,7 +280,6 @@ function _handleLoadGame(loadedState) {
 function _handleNavigation(container, state, destination) {
   // Block navigation to unbuilt facilities (except in sandbox where all are built).
   if (state.gameMode !== GameMode.SANDBOX && !hasFacility(state, destination)) {
-    console.log(`[UI] Facility "${destination}" is not built — navigation blocked`);
     // Show a brief tooltip message on the hub overlay.
     const overlay = document.getElementById('hub-overlay');
     if (overlay) {
@@ -320,13 +315,12 @@ function _handleNavigation(container, state, destination) {
           initHubUI(container, state, (dest) => {
             _handleNavigation(container, state, dest);
           });
-          console.log('[UI] Returned to hub from VAB');
+
         },
       });
       _vabInitialized = true;
     }
 
-    console.log('[UI] Navigated to VAB');
     return;
   }
 
@@ -345,13 +339,12 @@ function _handleNavigation(container, state, destination) {
           initHubUI(container, state, (dest) => {
             _handleNavigation(container, state, dest);
           });
-          console.log('[UI] Returned to hub from Crew Admin');
+
         },
       });
       _crewAdminOpen = true;
     }
 
-    console.log('[UI] Navigated to Crew Admin');
     return;
   }
 
@@ -370,13 +363,12 @@ function _handleNavigation(container, state, destination) {
           initHubUI(container, state, (dest) => {
             _handleNavigation(container, state, dest);
           });
-          console.log('[UI] Returned to hub from Mission Control');
+
         },
       });
       _missionControlOpen = true;
     }
 
-    console.log('[UI] Navigated to Mission Control');
     return;
   }
 
@@ -395,13 +387,12 @@ function _handleNavigation(container, state, destination) {
           initHubUI(container, state, (dest) => {
             _handleNavigation(container, state, dest);
           });
-          console.log('[UI] Returned to hub from Launch Pad');
+
         },
       });
       _launchPadOpen = true;
     }
 
-    console.log('[UI] Navigated to Launch Pad');
     return;
   }
 
@@ -419,13 +410,12 @@ function _handleNavigation(container, state, destination) {
           initHubUI(container, state, (dest) => {
             _handleNavigation(container, state, dest);
           });
-          console.log('[UI] Returned to hub from Satellite Ops');
+
         },
       });
       _satelliteOpsOpen = true;
     }
 
-    console.log('[UI] Navigated to Satellite Ops');
     return;
   }
 
@@ -443,13 +433,12 @@ function _handleNavigation(container, state, destination) {
           initHubUI(container, state, (dest) => {
             _handleNavigation(container, state, dest);
           });
-          console.log('[UI] Returned to hub from Tracking Station');
+
         },
       });
       _trackingStationOpen = true;
     }
 
-    console.log('[UI] Navigated to Tracking Station');
     return;
   }
 
@@ -466,13 +455,12 @@ function _handleNavigation(container, state, destination) {
           initHubUI(container, state, (dest) => {
             _handleNavigation(container, state, dest);
           });
-          console.log('[UI] Returned to hub from Library');
+
         },
       });
       _libraryOpen = true;
     }
 
-    console.log('[UI] Navigated to Library');
     return;
   }
 
@@ -489,16 +477,14 @@ function _handleNavigation(container, state, destination) {
           initHubUI(container, state, (dest) => {
             _handleNavigation(container, state, dest);
           });
-          console.log('[UI] Returned to hub from R&D Lab');
+
         },
       });
       _rdLabOpen = true;
     }
 
-    console.log('[UI] Navigated to R&D Lab');
     return;
   }
 
   // Other building screens are not yet implemented.
-  console.log(`[UI] Navigation to '${destination}' is not yet implemented.`);
 }

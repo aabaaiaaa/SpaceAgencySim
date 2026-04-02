@@ -750,7 +750,6 @@ export function initVabRenderer() {
     _renderGhostLayer();
   });
 
-  console.log('[VAB Renderer] Initialized');
 }
 
 /**

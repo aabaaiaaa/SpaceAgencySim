@@ -344,7 +344,6 @@ export function initVabUI(container, state, { onBack } = {}) {
   // ── Initial / restored validation run ────────────────────────────────────
   _runAndRenderValidation();
 
-  console.log('[VAB UI] Initialized');
 }
 
 /**

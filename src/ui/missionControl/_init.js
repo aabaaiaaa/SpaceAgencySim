@@ -76,7 +76,7 @@ export function initMissionControlUI(container, state, { onBack }) {
   renderShell();
   renderAvailableTab();
 
-  console.log('[Mission Control UI] Initialized');
+
 }
 
 /**
@@ -92,5 +92,5 @@ export function destroyMissionControlUI() {
     state:   null,
     onBack:  null,
   });
-  console.log('[Mission Control UI] Destroyed');
+
 }

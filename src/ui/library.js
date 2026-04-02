@@ -417,7 +417,7 @@ export function initLibraryUI(container, state, { onBack }) {
 
   _render();
 
-  console.log('[Library UI] Initialized');
+
 }
 
 /**
@@ -430,7 +430,7 @@ export function destroyLibraryUI() {
   }
   _state = null;
   _onBack = null;
-  console.log('[Library UI] Destroyed');
+
 }
 
 // ---------------------------------------------------------------------------

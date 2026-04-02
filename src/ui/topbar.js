@@ -770,7 +770,7 @@ export function initTopBar(container, state, { onExitToMenu, onLoadGame }) {
   // Close dropdown when clicking anywhere outside it.
   _tracker.add(document, 'click', _onDocClick, true);
 
-  console.log('[TopBar] Initialized');
+
 }
 
 /**
@@ -790,7 +790,7 @@ export function destroyTopBar() {
   _state = null;
   _onExitToMenu = null;
   _onLoadGame = null;
-  console.log('[TopBar] Destroyed');
+
 }
 
 /**
@@ -1469,7 +1469,7 @@ function _openSaveSlotPicker() {
       syncVabToGameState();
       saveGame(_state, slotIndex, saveName);
       backdrop.remove();
-      console.log(`[TopBar] Game saved to slot ${slotIndex}`);
+
     });
 
     modal.appendChild(card);

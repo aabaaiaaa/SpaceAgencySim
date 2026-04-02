@@ -328,13 +328,6 @@ export function bindKeyboardShortcuts() {
     if (e.code !== 'Space' || !S.flightActive || !S.stagingConfig) return;
     e.preventDefault();
     const result = fireStagingStep(S.stagingConfig);
-    console.log(
-      `[Flight] Stage ${result.firedStageIndex + 1} fired. ` +
-      `Parts activated: [${result.instanceIds.join(', ')}]. ` +
-      (result.nextStageIndex !== null
-        ? `Next: Stage ${result.nextStageIndex + 1}`
-        : 'All stages spent.'),
-    );
     _renderStagingPanelFn();
   });
 }

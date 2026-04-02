@@ -371,7 +371,7 @@ export function initTrackingStationUI(container, state, { onBack }) {
 
   _render();
 
-  console.log('[Tracking Station UI] Initialized');
+
 }
 
 /**
@@ -384,7 +384,7 @@ export function destroyTrackingStationUI() {
   }
   _state = null;
   _onBack = null;
-  console.log('[Tracking Station UI] Destroyed');
+
 }
 
 // ---------------------------------------------------------------------------

@@ -288,7 +288,7 @@ export function initRdLabUI(container, state, { onBack }) {
 
   _render();
 
-  console.log('[R&D Lab UI] Initialized');
+
 }
 
 /**
@@ -301,7 +301,7 @@ export function destroyRdLabUI() {
   }
   _state = null;
   _onBack = null;
-  console.log('[R&D Lab UI] Destroyed');
+
 }
 
 // ---------------------------------------------------------------------------

@@ -347,5 +347,4 @@ function _loadDebugState(liveState, def, feedbackEl) {
     feedbackEl.style.display = 'none';
   }, 3000);
 
-  console.log(`[Debug Saves] Loaded state: ${def.id} (${def.name})`);
 }

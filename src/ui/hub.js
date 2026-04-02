@@ -919,8 +919,6 @@ export function showWelcomeModal(container, state) {
 
   content.appendChild(dismissBtn);
   container.appendChild(overlay);
-
-  console.log('[Hub UI] Welcome modal shown');
 }
 
 // ---------------------------------------------------------------------------
@@ -972,8 +970,6 @@ export function initHubUI(container, state, onNavigate) {
 
   // Show the PixiJS background.
   showHubScene();
-
-  console.log('[Hub UI] Initialized');
 }
 
 /**
@@ -1005,7 +1001,6 @@ export function destroyHubUI() {
   }
   _state = null;
   hideHubScene();
-  console.log('[Hub UI] Destroyed');
 }
 
 /**
@@ -1370,8 +1365,6 @@ export function showReturnResultsOverlay(container, summary, onDismiss) {
 
   content.appendChild(dismissBtn);
   container.appendChild(overlay);
-
-  console.log('[Hub UI] Return Results overlay shown', summary);
 }
 
 // ---------------------------------------------------------------------------
@@ -1660,7 +1653,6 @@ function _renderBuildings(onNavigate) {
     // Click handler
     el.addEventListener('click', () => {
       el.blur(); // Clear focus highlight before navigating away
-      console.log(`[Hub UI] Building clicked: ${bld.id}`);
       onNavigate(bld.id);
     });
 
@@ -1827,7 +1819,6 @@ function _openConstructionPanel(container) {
         btn.addEventListener('click', () => {
           const result = upgradeFacility(_state, def.id);
           if (result.success) {
-            console.log(`[Hub UI] Upgraded facility: ${def.name} → Tier ${upgrade.nextTier}`);
             panel.remove();
             _openConstructionPanel(container);
           }
@@ -1910,7 +1901,6 @@ function _openConstructionPanel(container) {
       btn.addEventListener('click', () => {
         const result = buildFacility(_state, def.id);
         if (result.success) {
-          console.log(`[Hub UI] Built facility: ${def.name}`);
           // Re-render the panel to reflect the change.
           panel.remove();
           _openConstructionPanel(container);
@@ -1934,5 +1924,4 @@ function _openConstructionPanel(container) {
   content.appendChild(closeBtn);
 
   container.appendChild(panel);
-  console.log('[Hub UI] Construction panel opened');
 }

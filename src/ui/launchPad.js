@@ -461,7 +461,7 @@ export function initLaunchPadUI(container, state, { onBack }) {
 
   _renderShell();
 
-  console.log('[Launch Pad UI] Initialized');
+
 }
 
 /**
@@ -475,7 +475,7 @@ export function destroyLaunchPadUI() {
   _container = null;
   _state     = null;
   _onBack    = null;
-  console.log('[Launch Pad UI] Destroyed');
+
 }
 
 // ---------------------------------------------------------------------------
@@ -1053,12 +1053,6 @@ function _doLaunch(crewIds, design, assembly, stagingConfig) {
     deltaVRemaining: 0,
   });
 
-  console.log('[Launch Pad] Launch initiated', {
-    designId:   design.id,
-    designName: design.name,
-    missionId:  missionId || '(none)',
-    crewCount:  crewIds.length,
-  });
 
   // Capture references before destroying the launch pad overlay.
   const container = _container;

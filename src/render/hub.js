@@ -168,7 +168,6 @@ export function initHubRenderer() {
     }
   });
 
-  console.log('[Hub Renderer] Initialized');
 }
 
 /**
