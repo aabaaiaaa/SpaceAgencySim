@@ -22,6 +22,7 @@ import {
 import { getFacilityTier } from '../core/construction.js';
 import { getWeatherForecast } from '../core/weather.js';
 import { getTransferTargets } from '../core/manoeuvre.js';
+import { injectStyleOnce } from './injectStyle.js';
 
 // ---------------------------------------------------------------------------
 // CSS
@@ -362,12 +363,7 @@ export function initTrackingStationUI(container, state, { onBack }) {
   _onBack = onBack;
 
   // Inject styles once.
-  if (!document.getElementById('ts-styles')) {
-    const styleEl = document.createElement('style');
-    styleEl.id = 'ts-styles';
-    styleEl.textContent = TS_STYLES;
-    document.head.appendChild(styleEl);
-  }
+  injectStyleOnce('ts-styles', TS_STYLES);
 
   _overlay = document.createElement('div');
   _overlay.id = 'ts-overlay';

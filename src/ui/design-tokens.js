@@ -396,18 +396,15 @@ const BUTTON_VARIANTS = `
 // Injection
 // ---------------------------------------------------------------------------
 
-let _injected = false;
-
 /**
  * Injects the design tokens and shared utility classes into the document head.
- * Safe to call multiple times — only injects once.
+ * Safe to call multiple times — only injects once (checks DOM, not just a flag).
  */
 export function injectDesignTokens() {
-  if (_injected) return;
-  _injected = true;
+  if (document.getElementById('design-tokens')) return;
 
   const style = document.createElement('style');
-  style.setAttribute('data-id', 'design-tokens');
+  style.id = 'design-tokens';
   style.textContent = DESIGN_TOKENS + BUTTON_VARIANTS;
   // Prepend so tokens are available before any module styles
   document.head.insertBefore(style, document.head.firstChild);

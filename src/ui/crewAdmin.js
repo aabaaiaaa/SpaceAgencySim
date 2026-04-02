@@ -24,6 +24,7 @@ import {
 } from '../core/constants.js';
 import { getFacilityTier } from '../core/construction.js';
 import { refreshTopBar } from './topbar.js';
+import { injectStyleOnce } from './injectStyle.js';
 
 // ---------------------------------------------------------------------------
 // CSS
@@ -688,12 +689,7 @@ export function initCrewAdminUI(container, state, { onBack }) {
   _activeTab = 'active';
 
   // Inject CSS once.
-  if (!document.getElementById('crew-admin-styles')) {
-    const styleEl = document.createElement('style');
-    styleEl.id = 'crew-admin-styles';
-    styleEl.textContent = CREW_ADMIN_STYLES;
-    document.head.appendChild(styleEl);
-  }
+  injectStyleOnce('crew-admin-styles', CREW_ADMIN_STYLES);
 
   _overlay = document.createElement('div');
   _overlay.id = 'crew-admin-overlay';

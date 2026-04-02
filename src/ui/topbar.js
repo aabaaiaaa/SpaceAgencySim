@@ -33,6 +33,7 @@ import { getPartById } from '../data/parts.js';
 import { syncVabToGameState } from '../ui/vab.js';
 import { openHelpPanel } from './help.js';
 import { createListenerTracker } from './listenerTracker.js';
+import { injectStyleOnce } from './injectStyle.js';
 
 // ---------------------------------------------------------------------------
 // Module state
@@ -685,12 +686,7 @@ export function initTopBar(container, state, { onExitToMenu, onLoadGame }) {
   _onLoadGame = onLoadGame || null;
 
   // Inject styles once.
-  if (!document.getElementById('topbar-styles')) {
-    const styleEl = document.createElement('style');
-    styleEl.id = 'topbar-styles';
-    styleEl.textContent = TOPBAR_STYLES;
-    document.head.appendChild(styleEl);
-  }
+  injectStyleOnce('topbar-styles', TOPBAR_STYLES);
 
   _root = document.createElement('div');
   _root.id = 'game-topbar';

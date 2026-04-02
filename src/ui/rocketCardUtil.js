@@ -9,6 +9,7 @@
 
 import { getPartById } from '../data/parts.js';
 import { PartType } from '../core/constants.js';
+import { injectStyleOnce } from './injectStyle.js';
 
 // ---------------------------------------------------------------------------
 // Preview rendering constants
@@ -132,19 +133,11 @@ const ROCKET_CARD_CSS = `
 }
 `;
 
-let _cssInjected = false;
-
 /**
  * Inject shared rocket card CSS into the document head (idempotent).
  */
 export function injectRocketCardCSS() {
-  if (_cssInjected) return;
-  if (document.getElementById('rocket-card-css')) { _cssInjected = true; return; }
-  const style = document.createElement('style');
-  style.id = 'rocket-card-css';
-  style.textContent = ROCKET_CARD_CSS;
-  document.head.appendChild(style);
-  _cssInjected = true;
+  injectStyleOnce('rocket-card-css', ROCKET_CARD_CSS);
 }
 
 // ---------------------------------------------------------------------------

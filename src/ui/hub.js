@@ -33,6 +33,7 @@ import { getPartById } from '../data/parts.js';
 import { isBankrupt } from '../core/finance.js';
 import { initWeather, getCurrentWeather, getWeatherForecast } from '../core/weather.js';
 import { isWeatherPredictionAvailable } from '../core/mapView.js';
+import { injectStyleOnce } from './injectStyle.js';
 
 // ---------------------------------------------------------------------------
 // CSS
@@ -861,12 +862,7 @@ let _state = null;
  */
 export function showWelcomeModal(container, state) {
   // Inject styles if not already present.
-  if (!document.getElementById('hub-styles')) {
-    const styleEl = document.createElement('style');
-    styleEl.id = 'hub-styles';
-    styleEl.textContent = HUB_STYLES;
-    document.head.appendChild(styleEl);
-  }
+  injectStyleOnce('hub-styles', HUB_STYLES);
 
   const existing = document.getElementById('welcome-modal');
   if (existing) existing.remove();
@@ -958,12 +954,7 @@ export function initHubUI(container, state, onNavigate) {
   _state = state;
 
   // Inject styles once.
-  if (!document.getElementById('hub-styles')) {
-    const styleEl = document.createElement('style');
-    styleEl.id = 'hub-styles';
-    styleEl.textContent = HUB_STYLES;
-    document.head.appendChild(styleEl);
-  }
+  injectStyleOnce('hub-styles', HUB_STYLES);
 
   _overlay = document.createElement('div');
   _overlay.id = 'hub-overlay';
@@ -1042,12 +1033,7 @@ export function destroyHubUI() {
  */
 export function showReturnResultsOverlay(container, summary, onDismiss) {
   // Inject styles if not already present (hub-styles covers these).
-  if (!document.getElementById('hub-styles')) {
-    const styleEl = document.createElement('style');
-    styleEl.id = 'hub-styles';
-    styleEl.textContent = HUB_STYLES;
-    document.head.appendChild(styleEl);
-  }
+  injectStyleOnce('hub-styles', HUB_STYLES);
 
   // Remove any stale overlay.
   const existing = document.getElementById('return-results-overlay');

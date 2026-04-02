@@ -50,6 +50,7 @@ import {
   MALFUNCTION_LABELS,
 }                                                             from '../core/malfunction.js';
 import { MalfunctionType }                                    from '../core/constants.js';
+import { injectStyleOnce }                                    from './injectStyle.js';
 
 // ---------------------------------------------------------------------------
 // CSS
@@ -164,12 +165,7 @@ export function initFlightContextMenu(getPs, getAssembly, getFlightState) {
   _getFlightState = getFlightState;
 
   // Inject CSS once per page load.
-  if (!document.getElementById('flight-ctx-css')) {
-    const style = document.createElement('style');
-    style.id = 'flight-ctx-css';
-    style.textContent = CTX_MENU_CSS;
-    document.head.appendChild(style);
-  }
+  injectStyleOnce('flight-ctx-css', CTX_MENU_CSS);
 
   // Create the menu DOM element.
   _menu = document.createElement('div');

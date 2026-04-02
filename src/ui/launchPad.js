@@ -32,6 +32,7 @@ import { createFlightState } from '../core/gameState.js';
 import { startFlightScene } from './flightController.js';
 import { showReturnResultsOverlay } from './hub.js';
 import { renderRocketPreview, buildRocketCard, injectRocketCardCSS } from './rocketCardUtil.js';
+import { injectStyleOnce } from './injectStyle.js';
 
 // ---------------------------------------------------------------------------
 // CSS
@@ -452,12 +453,7 @@ export function initLaunchPadUI(container, state, { onBack }) {
 
   // Inject CSS once.
   injectRocketCardCSS();
-  if (!document.getElementById('launch-pad-styles')) {
-    const styleEl = document.createElement('style');
-    styleEl.id = 'launch-pad-styles';
-    styleEl.textContent = LAUNCH_PAD_STYLES;
-    document.head.appendChild(styleEl);
-  }
+  injectStyleOnce('launch-pad-styles', LAUNCH_PAD_STYLES);
 
   _overlay = document.createElement('div');
   _overlay.id = 'launch-pad-overlay';

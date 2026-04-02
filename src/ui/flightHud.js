@@ -43,6 +43,7 @@ import { ObjectiveType } from '../data/missions.js';
 import { countDeployedLegs } from '../core/legs.js';
 import { getBiome } from '../core/biomes.js';
 import { getAvailableSurfaceActions } from '../core/surfaceOps.js';
+import { injectStyleOnce } from './injectStyle.js';
 
 // ---------------------------------------------------------------------------
 // Physics constant
@@ -857,12 +858,7 @@ export function initFlightHud(container, ps, assembly, stagingConfig, flightStat
   _errorBanner       = null;
 
   // Inject stylesheet once per page load.
-  if (!document.getElementById('flight-hud-styles')) {
-    const styleEl = document.createElement('style');
-    styleEl.id = 'flight-hud-styles';
-    styleEl.textContent = FLIGHT_HUD_STYLES;
-    document.head.appendChild(styleEl);
-  }
+  injectStyleOnce('flight-hud-styles', FLIGHT_HUD_STYLES);
 
   // Root container.
   _hud = document.createElement('div');

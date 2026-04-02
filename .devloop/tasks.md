@@ -37,7 +37,7 @@
 - **Verification**: Run `npm run test:unit` — all tests pass. Then run `npx playwright test e2e/help.spec.js e2e/hub-navigation.spec.js` to verify help and hub panel interactions still work.
 
 ### TASK-007: Fix style element accumulation across game sessions
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Multiple UI modules inject `<style>` elements into `document.head` on initialization but never remove them. Implement idempotent style injection — check for an existing style element (by ID or data attribute) before injecting, and reuse it if present. Apply across all UI modules that inject styles. See requirements Section 2.2.
 - **Verification**: Run `npm run test:unit` — all tests pass. Then run `npx playwright test e2e/smoke.spec.js` as a basic sanity check that the game still starts and renders.

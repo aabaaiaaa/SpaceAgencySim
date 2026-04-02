@@ -34,6 +34,7 @@ import { initializeMissions, reconcileParts } from '../core/missions.js';
 import { GameMode, FACILITY_DEFINITIONS, SANDBOX_STARTING_MONEY } from '../core/constants.js';
 import { getAllParts } from '../data/parts.js';
 import { TECH_NODES } from '../data/techtree.js';
+import { injectStyleOnce } from './injectStyle.js';
 
 // ---------------------------------------------------------------------------
 // Shooting stars
@@ -752,12 +753,7 @@ export function initMainMenu(container, onGameReady) {
   _onGameReady = onGameReady;
 
   // Inject styles once.
-  if (!document.getElementById('mm-styles')) {
-    const styleEl = document.createElement('style');
-    styleEl.id = 'mm-styles';
-    styleEl.textContent = MENU_STYLES;
-    document.head.appendChild(styleEl);
-  }
+  injectStyleOnce('mm-styles', MENU_STYLES);
 
   // Create overlay element.
   _overlay = document.createElement('div');

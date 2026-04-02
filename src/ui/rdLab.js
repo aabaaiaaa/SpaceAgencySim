@@ -17,6 +17,7 @@ import {
 import { FacilityId, RD_LAB_TIER_LABELS } from '../core/constants.js';
 import { getFacilityTier } from '../core/construction.js';
 import { refreshTopBar } from './topbar.js';
+import { injectStyleOnce } from './injectStyle.js';
 
 // ---------------------------------------------------------------------------
 // CSS
@@ -279,12 +280,7 @@ export function initRdLabUI(container, state, { onBack }) {
   _activeBranch = TechBranch.PROPULSION;
 
   // Inject styles once.
-  if (!document.getElementById('rd-styles')) {
-    const styleEl = document.createElement('style');
-    styleEl.id = 'rd-styles';
-    styleEl.textContent = RD_STYLES;
-    document.head.appendChild(styleEl);
-  }
+  injectStyleOnce('rd-styles', RD_STYLES);
 
   _overlay = document.createElement('div');
   _overlay.id = 'rd-overlay';

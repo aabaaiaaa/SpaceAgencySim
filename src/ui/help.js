@@ -9,6 +9,7 @@
  */
 
 import { createListenerTracker } from './listenerTracker.js';
+import { injectStyleOnce } from './injectStyle.js';
 
 // ---------------------------------------------------------------------------
 // Section definitions
@@ -656,12 +657,7 @@ export function openHelpPanel(container, _state, defaultSection = 'overview') {
   if (document.getElementById('help-panel')) return;
 
   // Inject styles once.
-  if (!document.getElementById('help-styles')) {
-    const styleEl = document.createElement('style');
-    styleEl.id = 'help-styles';
-    styleEl.textContent = HELP_STYLES;
-    document.head.appendChild(styleEl);
-  }
+  injectStyleOnce('help-styles', HELP_STYLES);
 
   const tracker = createListenerTracker();
 

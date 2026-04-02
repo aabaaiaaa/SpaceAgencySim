@@ -23,6 +23,7 @@ import {
   getCelestialBodyKnowledge,
   getFrequentRockets,
 } from '../core/library.js';
+import { injectStyleOnce } from './injectStyle.js';
 
 // ---------------------------------------------------------------------------
 // CSS
@@ -408,12 +409,7 @@ export function initLibraryUI(container, state, { onBack }) {
   _activeTab = 'stats';
 
   // Inject styles once.
-  if (!document.getElementById('lib-styles')) {
-    const styleEl = document.createElement('style');
-    styleEl.id = 'lib-styles';
-    styleEl.textContent = LIB_STYLES;
-    document.head.appendChild(styleEl);
-  }
+  injectStyleOnce('lib-styles', LIB_STYLES);
 
   _overlay = document.createElement('div');
   _overlay.id = 'lib-overlay';

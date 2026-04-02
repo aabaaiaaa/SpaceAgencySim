@@ -37,6 +37,7 @@ import {
   repositionSatellite,
   getRepositionTargets,
 } from '../core/satellites.js';
+import { injectStyleOnce } from './injectStyle.js';
 
 // ---------------------------------------------------------------------------
 // CSS
@@ -456,12 +457,7 @@ export function initSatelliteOpsUI(container, state, { onBack }) {
   _onBack = onBack;
 
   // Inject styles once.
-  if (!document.getElementById('sat-ops-styles')) {
-    const styleEl = document.createElement('style');
-    styleEl.id = 'sat-ops-styles';
-    styleEl.textContent = SAT_OPS_STYLES;
-    document.head.appendChild(styleEl);
-  }
+  injectStyleOnce('sat-ops-styles', SAT_OPS_STYLES);
 
   _overlay = document.createElement('div');
   _overlay.id = 'sat-ops-overlay';

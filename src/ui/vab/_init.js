@@ -21,6 +21,7 @@ import { injectRocketCardCSS } from '../rocketCardUtil.js';
 
 import { getVabState, setVabState } from './_state.js';
 import { VAB_CSS } from './_css.js';
+import { injectStyleOnce } from '../injectStyle.js';
 import { buildPartsHTML, setupPanelDrag } from './_partsPanel.js';
 import { drawScaleTicks, updateScaleBarExtents } from './_scalebar.js';
 import {
@@ -178,12 +179,7 @@ export function initVabUI(container, state, { onBack } = {}) {
 
   // Inject styles once.
   injectRocketCardCSS();
-  if (!document.getElementById('vab-css')) {
-    const styleEl = document.createElement('style');
-    styleEl.id = 'vab-css';
-    styleEl.textContent = VAB_CSS;
-    document.head.appendChild(styleEl);
-  }
+  injectStyleOnce('vab-css', VAB_CSS);
 
   // ── Root DOM ──────────────────────────────────────────────────────────────
   const root = document.createElement('div');

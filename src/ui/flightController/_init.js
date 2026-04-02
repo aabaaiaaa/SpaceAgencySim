@@ -18,6 +18,7 @@ import { getPartById } from '../../data/parts.js';
 import { getVabInventoryUsedParts } from '../vab.js';
 import { getFCState, setFCState, resetFCState } from './_state.js';
 import { FLIGHT_CTRL_CSS } from './_css.js';
+import { injectStyleOnce } from '../injectStyle.js';
 import { onKeyDown, onKeyUp } from './_keyboard.js';
 import { onTimeWarpButtonClick } from './_timeWarp.js';
 import { onSurfaceAction } from './_surfaceActions.js';
@@ -132,12 +133,7 @@ export function startFlightScene(
   };
 
   // Inject CSS once per page load.
-  if (!document.getElementById('flight-ctrl-css')) {
-    const styleEl = document.createElement('style');
-    styleEl.id = 'flight-ctrl-css';
-    styleEl.textContent = FLIGHT_CTRL_CSS;
-    document.head.appendChild(styleEl);
-  }
+  injectStyleOnce('flight-ctrl-css', FLIGHT_CTRL_CSS);
 
   // Reset time-warp and summary state.
   s.timeWarp            = 1;

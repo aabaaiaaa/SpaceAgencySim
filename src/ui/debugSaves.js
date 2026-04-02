@@ -15,6 +15,7 @@ import { DEBUG_SAVE_DEFINITIONS } from '../core/debugSaves.js';
 import { getUnlockedMissions, reconcileParts } from '../core/missions.js';
 import { refreshTopBar } from './topbar.js';
 import { createListenerTracker } from './listenerTracker.js';
+import { injectStyleOnce } from './injectStyle.js';
 
 // ---------------------------------------------------------------------------
 // CSS
@@ -196,12 +197,7 @@ export function openDebugSavePanel(container, state) {
   if (document.getElementById('debug-save-panel')) return;
 
   // Inject styles once.
-  if (!document.getElementById('debug-save-styles')) {
-    const styleEl = document.createElement('style');
-    styleEl.id = 'debug-save-styles';
-    styleEl.textContent = DEBUG_SAVE_STYLES;
-    document.head.appendChild(styleEl);
-  }
+  injectStyleOnce('debug-save-styles', DEBUG_SAVE_STYLES);
 
   const tracker = createListenerTracker();
 

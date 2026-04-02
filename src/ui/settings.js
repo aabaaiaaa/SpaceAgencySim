@@ -22,6 +22,7 @@ import {
 } from '../core/constants.js';
 import { getDifficultySettings, updateDifficultySettings } from '../core/settings.js';
 import { createListenerTracker } from './listenerTracker.js';
+import { injectStyleOnce } from './injectStyle.js';
 
 // ---------------------------------------------------------------------------
 // CSS
@@ -208,12 +209,7 @@ export function openSettingsPanel(container, state) {
   if (document.getElementById('settings-panel')) return;
 
   // Inject styles once.
-  if (!document.getElementById('settings-styles')) {
-    const styleEl = document.createElement('style');
-    styleEl.id = 'settings-styles';
-    styleEl.textContent = SETTINGS_STYLES;
-    document.head.appendChild(styleEl);
-  }
+  injectStyleOnce('settings-styles', SETTINGS_STYLES);
 
   const tracker = createListenerTracker();
 

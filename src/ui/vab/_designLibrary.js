@@ -11,6 +11,7 @@ import {
   syncStagingWithAssembly,
 } from '../../core/rocketbuilder.js';
 import { createRocketDesign } from '../../core/gameState.js';
+import { injectStyleOnce } from '../injectStyle.js';
 import {
   getAllDesigns,
   saveDesignToLibrary,
@@ -155,18 +156,7 @@ export function handleSaveDesign() {
   });
 }
 
-/** Whether library CSS has been injected. */
-let _libCSS = false;
-
-/**
- * Inject design library CSS (idempotent).
- */
-function injectLibraryCSS() {
-  if (_libCSS) return;
-  if (document.getElementById('vab-library-css')) { _libCSS = true; return; }
-  const style = document.createElement('style');
-  style.id = 'vab-library-css';
-  style.textContent = `
+const VAB_LIBRARY_CSS = `
 /* ── Design Library filter bar ──────────────────────────────────── */
 .vab-lib-filter-bar {
   display: flex;
@@ -313,8 +303,12 @@ function injectLibraryCSS() {
   cursor: not-allowed;
 }
 `;
-  document.head.appendChild(style);
-  _libCSS = true;
+
+/**
+ * Inject design library CSS (idempotent).
+ */
+function injectLibraryCSS() {
+  injectStyleOnce('vab-library-css', VAB_LIBRARY_CSS);
 }
 
 /**

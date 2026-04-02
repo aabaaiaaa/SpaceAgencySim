@@ -16,6 +16,7 @@ import { renderAvailableTab, renderAcceptedTab, renderCompletedTab } from './_mi
 import { renderContractsBoardTab, renderActiveContractsTab } from './_contractsTab.js';
 import { renderChallengesTab } from './_challengesTab.js';
 import { renderAchievementsTab } from './_achievementsTab.js';
+import { injectStyleOnce } from '../injectStyle.js';
 
 // ---------------------------------------------------------------------------
 // Tab dispatch
@@ -61,12 +62,7 @@ export function initMissionControlUI(container, state, { onBack }) {
   getUnlockedMissions(state);
 
   // Inject CSS once.
-  if (!document.getElementById('mission-control-styles')) {
-    const styleEl = document.createElement('style');
-    styleEl.id = 'mission-control-styles';
-    styleEl.textContent = MISSION_CONTROL_STYLES;
-    document.head.appendChild(styleEl);
-  }
+  injectStyleOnce('mission-control-styles', MISSION_CONTROL_STYLES);
 
   const overlay = document.createElement('div');
   overlay.id = 'mission-control-overlay';
