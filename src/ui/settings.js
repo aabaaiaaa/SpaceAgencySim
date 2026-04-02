@@ -283,7 +283,7 @@ export function openSettingsPanel(container, state) {
   // ── Close button ───────────────────────────────────────────────────────
   const closeBtn = document.createElement('button');
   closeBtn.className = 'settings-close-btn';
-  closeBtn.textContent = '\u2190 Back to Hub';
+  closeBtn.textContent = '\u2190 Hub';
   closeBtn.addEventListener('click', () => {
     panel.remove();
   });

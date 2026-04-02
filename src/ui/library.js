@@ -451,7 +451,7 @@ function _render() {
 
   const backBtn = document.createElement('button');
   backBtn.id = 'lib-back-btn';
-  backBtn.textContent = 'Back';
+  backBtn.textContent = '← Hub';
   backBtn.addEventListener('click', () => {
     const onBack = _onBack; // capture before destroy nulls it
     destroyLibraryUI();

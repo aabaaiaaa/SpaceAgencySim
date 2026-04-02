@@ -1949,7 +1949,7 @@ function _openConstructionPanel(container) {
   // ── Close button ───────────────────────────────────────────────────────
   const closeBtn = document.createElement('button');
   closeBtn.className = 'cp-close-btn';
-  closeBtn.textContent = '← Back to Hub';
+  closeBtn.textContent = '← Hub';
   closeBtn.addEventListener('click', () => {
     panel.remove();
   });

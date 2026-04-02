@@ -61,7 +61,7 @@
 - **Verification**: Fly to orbit — biome transition log entries should show "km" for altitudes above 1000m.
 
 ### TASK-011: Standardise back button text across all screens
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001
 - **Description**: Normalise all back-navigation buttons to use "← Hub" for facility screens. Currently Tracking Station, Satellite Ops, and Library use "Back"; Settings and Construction use "← Back to Hub". Change all to "← Hub" for consistency. Help can keep "← Close Help". See requirements section 5.1.
 - **Verification**: Visit every facility screen — all should show "← Hub" as the back button.
