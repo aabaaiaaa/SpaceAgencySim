@@ -202,7 +202,14 @@ export function saveGame(state, slotIndex, saveName = 'New Save') {
     state: JSON.parse(JSON.stringify(state)),
   };
 
-  localStorage.setItem(slotKey(slotIndex), JSON.stringify(envelope));
+  try {
+    localStorage.setItem(slotKey(slotIndex), JSON.stringify(envelope));
+  } catch (err) {
+    if (err?.name === 'QuotaExceededError') {
+      throw new Error('Storage full — unable to save. Delete old saves to free space.');
+    }
+    throw err;
+  }
   return summaryFromEnvelope(slotIndex, envelope);
 }
 
@@ -499,7 +506,14 @@ export function importSave(jsonString, slotIndex) {
   _validateState(envelope.state);
 
   // --- Persist --------------------------------------------------------------
-  localStorage.setItem(slotKey(slotIndex), JSON.stringify(envelope));
+  try {
+    localStorage.setItem(slotKey(slotIndex), JSON.stringify(envelope));
+  } catch (err) {
+    if (err?.name === 'QuotaExceededError') {
+      throw new Error('Storage full — unable to import save. Delete old saves to free space.');
+    }
+    throw err;
+  }
   return summaryFromEnvelope(slotIndex, envelope);
 }
 

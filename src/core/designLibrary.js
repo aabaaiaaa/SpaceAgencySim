@@ -127,7 +127,8 @@ export function loadSharedLibrary() {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
-  } catch {
+  } catch (err) {
+    console.warn('designLibrary: failed to parse shared library from localStorage:', err);
     return [];
   }
 }
@@ -137,7 +138,14 @@ export function loadSharedLibrary() {
  * @param {import('./gameState.js').RocketDesign[]} designs
  */
 export function saveSharedLibrary(designs) {
-  localStorage.setItem(SHARED_LIBRARY_KEY, JSON.stringify(designs));
+  try {
+    localStorage.setItem(SHARED_LIBRARY_KEY, JSON.stringify(designs));
+  } catch (err) {
+    if (err?.name === 'QuotaExceededError') {
+      throw new Error('Storage full — unable to save design library. Delete old saves or designs to free space.');
+    }
+    throw err;
+  }
 }
 
 /**

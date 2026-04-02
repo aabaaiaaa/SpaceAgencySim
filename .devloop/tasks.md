@@ -1,7 +1,7 @@
 # Iteration 2 — Tasks
 
 ### TASK-001: Handle localStorage quota errors and improve error logging in saveload.js and designLibrary.js
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Wrap all `localStorage.setItem()` calls in `src/core/saveload.js` and `src/core/designLibrary.js` with try-catch for `QuotaExceededError`. Surface a user-friendly "Storage full" message on quota failure. Also add `console.warn()` to the silent JSON.parse catch blocks in `designLibrary.js` (around lines 125-132) so corrupt data is logged rather than silently swallowed. See requirements Section 1.1 and 1.2.
 - **Verification**: Write a unit test that mocks `localStorage.setItem` to throw `QuotaExceededError` and verify the error is caught gracefully (no unhandled exception). Verify `console.warn` is called on corrupt JSON parse. Run `npm run test:unit` — all tests pass. No E2E needed — pure core logic.
