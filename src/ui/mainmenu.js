@@ -220,13 +220,13 @@ const MENU_STYLES = `
   position: fixed;
   inset: 0;
   background: linear-gradient(180deg, #05080f 0%, #0a1628 60%, #0d1e38 100%);
-  z-index: 100;
+  z-index: var(--z-topbar);
   display: flex;
   flex-direction: column;
   align-items: center;
   overflow-y: auto;
   pointer-events: auto;
-  font-family: system-ui, sans-serif;
+  font-family: var(--font-family);
   color: #d0dce8;
 }
 
@@ -324,9 +324,9 @@ const MENU_STYLES = `
 }
 
 .mm-save-card {
-  background: rgba(255,255,255,0.04);
+  background: var(--color-card-bg);
   border: 1px solid rgba(100,160,220,0.18);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   padding: 18px 20px;
   transition: border-color 0.15s, background 0.15s;
 }
@@ -436,7 +436,7 @@ const MENU_STYLES = `
 /* ── Buttons ────────────────────────────────────────────────────────────── */
 .mm-btn {
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   padding: 8px 16px;
   font-size: 0.82rem;
   font-weight: 600;

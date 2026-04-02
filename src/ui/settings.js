@@ -31,13 +31,13 @@ const SETTINGS_STYLES = `
 #settings-panel {
   position: fixed;
   inset: 0;
-  background: rgba(5, 10, 20, 0.94);
-  z-index: 400;
+  background: var(--color-overlay-bg);
+  z-index: var(--z-overlay);
   display: flex;
   flex-direction: column;
   align-items: center;
-  font-family: system-ui, sans-serif;
-  color: #d0e0f0;
+  font-family: var(--font-family);
+  color: var(--color-text-light);
   pointer-events: auto;
   overflow: hidden;
 }
@@ -54,11 +54,11 @@ const SETTINGS_STYLES = `
 }
 
 #settings-panel h1 {
-  font-size: 1.5rem;
+  font-size: var(--font-size-h1);
   font-weight: 700;
   margin: 0 0 6px;
   letter-spacing: 0.04em;
-  color: #80c8ff;
+  color: var(--color-text-accent);
 }
 
 .settings-subtitle {
@@ -73,10 +73,10 @@ const SETTINGS_STYLES = `
 .settings-group {
   width: 100%;
   margin-bottom: 22px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  padding: 16px 18px;
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--card-padding);
 }
 
 .settings-group-label {
@@ -99,10 +99,10 @@ const SETTINGS_STYLES = `
 }
 
 .settings-option-btn {
-  padding: 7px 16px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 5px;
+  padding: var(--btn-padding-lg);
+  background: var(--color-surface-hover);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
   color: #90b0c8;
   font-size: 0.82rem;
   font-weight: 500;
@@ -117,29 +117,29 @@ const SETTINGS_STYLES = `
 }
 
 .settings-option-btn.active {
-  background: #1a4070;
-  border-color: #4080b0;
+  background: var(--color-primary-solid);
+  border-color: var(--color-primary-solid-border);
   color: #c8e8ff;
   font-weight: 600;
 }
 
 /* ── Close button ────────────────────────────────────────────────────────── */
 .settings-close-btn {
-  margin-top: 20px;
-  padding: 10px 32px;
-  background: #1a3050;
-  border: 1px solid #4080b0;
-  border-radius: 6px;
+  margin-top: var(--space-xl);
+  padding: var(--btn-padding-xl);
+  background: var(--color-primary-solid);
+  border: 1px solid var(--color-primary-solid-border);
+  border-radius: var(--radius-md);
   color: #c8e8ff;
-  font-size: 0.88rem;
+  font-size: var(--font-size-body-sm);
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background var(--transition-default);
   letter-spacing: 0.03em;
 }
 
 .settings-close-btn:hover {
-  background: #235a90;
+  background: var(--color-primary-solid-hover);
 }
 `;
 

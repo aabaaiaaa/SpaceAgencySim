@@ -91,17 +91,17 @@ const TOPBAR_STYLES = `
   top: 0;
   left: 0;
   right: 0;
-  height: 44px;
+  height: var(--topbar-height);
   display: flex;
   align-items: center;
-  padding: 0 12px;
-  gap: 8px;
-  background: rgba(4, 8, 20, 0.92);
-  border-bottom: 1px solid rgba(100, 160, 220, 0.22);
+  padding: 0 var(--space-md);
+  gap: var(--space-sm);
+  background: var(--color-topbar-bg);
+  border-bottom: 1px solid var(--color-border-accent);
   pointer-events: auto;
-  z-index: 100;
+  z-index: var(--z-topbar);
   box-sizing: border-box;
-  font-family: system-ui, sans-serif;
+  font-family: var(--font-family);
   user-select: none;
 }
 
@@ -147,16 +147,16 @@ const TOPBAR_STYLES = `
 #topbar-cash {
   border: none;
   background: none;
-  padding: 4px 12px;
+  padding: var(--space-xs) var(--space-md);
   margin: 0;
   font-family: inherit;
-  font-size: 0.92rem;
+  font-size: var(--font-size-body);
   font-weight: 600;
-  color: #5ddb50;
+  color: var(--color-money);
   letter-spacing: 0.02em;
   cursor: pointer;
-  border-radius: 4px;
-  transition: background 0.12s;
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast);
   white-space: nowrap;
 }
 #topbar-cash:hover {
@@ -170,15 +170,15 @@ const TOPBAR_STYLES = `
 #topbar-menu-btn {
   border: none;
   background: none;
-  padding: 4px 8px;
+  padding: var(--space-xs) var(--space-sm);
   margin: 0;
   font-family: inherit;
   font-size: 1.25rem;
   line-height: 1;
   color: #8eb8d8;
   cursor: pointer;
-  border-radius: 4px;
-  transition: background 0.12s, color 0.12s;
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
 #topbar-menu-btn:hover {
   background: rgba(140, 184, 216, 0.14);
@@ -191,14 +191,14 @@ const TOPBAR_STYLES = `
 
 #topbar-dropdown {
   position: fixed;
-  top: 44px;
-  right: 8px;
+  top: var(--topbar-height);
+  right: var(--space-sm);
   min-width: 186px;
-  background: #0d1520;
-  border: 1px solid rgba(100, 160, 220, 0.28);
-  border-radius: 6px;
+  background: var(--color-modal-bg);
+  border: 1px solid var(--color-border-accent-strong);
+  border-radius: var(--radius-md);
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
-  z-index: 150;
+  z-index: var(--z-dropdown);
   overflow: hidden;
   pointer-events: auto;
 }
@@ -207,15 +207,15 @@ const TOPBAR_STYLES = `
   display: block;
   width: 100%;
   box-sizing: border-box;
-  padding: 10px 16px;
+  padding: 10px var(--space-lg);
   border: none;
   background: none;
   text-align: left;
   font-family: inherit;
-  font-size: 0.88rem;
+  font-size: var(--font-size-body-sm);
   color: #cce4f8;
   cursor: pointer;
-  transition: background 0.1s;
+  transition: background var(--transition-fast);
 }
 .topbar-dropdown-item:hover {
   background: rgba(100, 160, 220, 0.12);
@@ -240,8 +240,8 @@ const TOPBAR_STYLES = `
 .topbar-modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.62);
-  z-index: 200;
+  background: var(--color-modal-backdrop);
+  z-index: var(--z-modal);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -253,18 +253,18 @@ const TOPBAR_STYLES = `
    ══════════════════════════════════════════════════════════════════ */
 
 .topbar-modal {
-  background: #0d1520;
-  border: 1px solid rgba(100, 160, 220, 0.28);
-  border-radius: 10px;
+  background: var(--color-modal-bg);
+  border: 1px solid var(--color-border-accent-strong);
+  border-radius: var(--radius-lg);
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7);
-  padding: 26px 30px 22px;
+  padding: var(--modal-padding);
   width: 440px;
   max-width: calc(100vw - 32px);
   max-height: calc(100vh - 64px);
   overflow-y: auto;
   box-sizing: border-box;
   pointer-events: auto;
-  font-family: system-ui, sans-serif;
+  font-family: var(--font-family);
   color: #cce4f8;
 }
 
@@ -275,7 +275,7 @@ const TOPBAR_STYLES = `
   margin-bottom: 18px;
 }
 .topbar-modal-title {
-  font-size: 1.05rem;
+  font-size: var(--font-size-h3);
   font-weight: 700;
   color: #e8f4ff;
   margin: 0;
@@ -301,7 +301,7 @@ const TOPBAR_STYLES = `
 
 #loan-stats-container {
   border: 1px solid rgba(100, 160, 220, 0.12);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   overflow: hidden;
 }
 .loan-stat-row {
@@ -358,8 +358,8 @@ const TOPBAR_STYLES = `
   flex: 1;
   padding: 7px 10px;
   background: #141e2e;
-  border: 1px solid rgba(100, 160, 220, 0.22);
-  border-radius: 5px;
+  border: 1px solid var(--color-border-accent);
+  border-radius: var(--radius-sm);
   color: #e8f4ff;
   font-family: inherit;
   font-size: 0.88rem;
@@ -372,7 +372,7 @@ const TOPBAR_STYLES = `
 .loan-action-btn {
   padding: 7px 16px;
   border: none;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   font-family: inherit;
   font-size: 0.84rem;
   font-weight: 600;
@@ -415,7 +415,7 @@ const TOPBAR_STYLES = `
   justify-content: space-between;
   padding: 10px 14px;
   border: 1px solid rgba(100, 160, 220, 0.16);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   margin-bottom: 8px;
   cursor: pointer;
   transition: background 0.1s, border-color 0.1s;
@@ -442,10 +442,10 @@ const TOPBAR_STYLES = `
   color: #455870;
 }
 .save-slot-action-tag {
-  font-size: 0.78rem;
+  font-size: var(--font-size-small);
   padding: 3px 10px;
   border: 1px solid rgba(100, 160, 220, 0.24);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: rgba(60, 120, 200, 0.12);
   color: #8eb8d8;
   white-space: nowrap;
@@ -472,7 +472,7 @@ const TOPBAR_STYLES = `
 .confirm-btn {
   padding: 8px 20px;
   border: none;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   font-family: inherit;
   font-size: 0.85rem;
   font-weight: 600;

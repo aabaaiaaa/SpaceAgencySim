@@ -73,7 +73,7 @@
 - **Verification**: Visit each facility — all should show tier in the same format.
 
 ### TASK-013: Create CSS design tokens and standardise styles
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Create a `src/ui/design-tokens.js` (or CSS custom properties file) defining the shared design system: color palette, spacing scale, typography scale, border-radius values (4px/6px/8px), z-index layers, and button variants. Then progressively migrate the most visible inconsistencies — button backgrounds, panel backgrounds, border-radius, font sizes, and modal padding — to use the shared tokens. Focus on the hub, MCC, Crew Admin, VAB toolbar, and flight HUD first. See requirements section 6.
 - **Verification**: Visual inspection of hub, MCC, Crew Admin, VAB, and flight HUD — buttons should use consistent colors, panels should have consistent backgrounds, border-radius should be uniform for same-type elements.

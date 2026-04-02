@@ -32,44 +32,44 @@ const TS_STYLES = `
 #ts-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(10, 12, 20, 0.96);
-  z-index: 20;
+  background: var(--color-surface);
+  z-index: var(--z-facility);
   display: flex;
   flex-direction: column;
   pointer-events: auto;
-  font-family: system-ui, sans-serif;
-  color: #e8e8e8;
-  padding-top: 44px;
+  font-family: var(--font-family);
+  color: var(--color-text-primary);
+  padding-top: var(--topbar-height);
 }
 
 #ts-header {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 12px 20px 0;
+  gap: var(--space-lg);
+  padding: var(--header-padding);
   flex-shrink: 0;
 }
 
 #ts-back-btn {
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.18);
-  color: #e8e8e8;
-  font-size: 0.85rem;
-  padding: 6px 14px;
-  border-radius: 5px;
+  background: var(--color-secondary-bg);
+  border: 1px solid var(--color-secondary-border);
+  color: var(--color-secondary-text);
+  font-size: var(--font-size-label);
+  padding: var(--btn-padding-md);
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background var(--transition-default);
   white-space: nowrap;
 }
 #ts-back-btn:hover {
-  background: rgba(255,255,255,0.16);
+  background: var(--color-secondary-bg-hover);
 }
 
 #ts-title {
-  font-size: 1.3rem;
+  font-size: var(--font-size-h2);
   font-weight: 700;
   letter-spacing: 0.03em;
-  color: #f0f0f0;
+  color: var(--color-text-heading);
   margin: 0;
 }
 
@@ -101,8 +101,8 @@ const TS_STYLES = `
 }
 
 .ts-overview-card {
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.1);
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-card-border);
   border-radius: 6px;
   padding: 12px 16px;
   min-width: 140px;
@@ -195,8 +195,8 @@ const TS_STYLES = `
 }
 
 .ts-forecast-card {
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.1);
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-card-border);
   border-radius: 6px;
   padding: 10px 14px;
 }
@@ -226,8 +226,8 @@ const TS_STYLES = `
 }
 
 .ts-transfer-card {
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.1);
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-card-border);
   border-radius: 6px;
   padding: 10px 14px;
 }
@@ -253,8 +253,8 @@ const TS_STYLES = `
 
 /* -- Field craft (crewed vessels) ---------------------------------------- */
 .ts-field-craft-card {
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.1);
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-card-border);
   border-radius: 6px;
   padding: 12px 16px;
   margin-bottom: 8px;

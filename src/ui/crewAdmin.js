@@ -34,55 +34,54 @@ const CREW_ADMIN_STYLES = `
 #crew-admin-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(10, 12, 20, 0.96);
-  z-index: 20;
+  background: var(--color-surface);
+  z-index: var(--z-facility);
   display: flex;
   flex-direction: column;
   pointer-events: auto;
-  font-family: system-ui, sans-serif;
-  color: #e8e8e8;
-  /* leave room for the persistent top bar (approx 44px) */
-  padding-top: 44px;
+  font-family: var(--font-family);
+  color: var(--color-text-primary);
+  padding-top: var(--topbar-height);
 }
 
 /* ── Header ─────────────────────────────────────────────────────────────────── */
 #crew-admin-header {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 12px 20px 0;
+  gap: var(--space-lg);
+  padding: var(--header-padding);
   flex-shrink: 0;
 }
 
 #crew-admin-back-btn {
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.18);
-  color: #e8e8e8;
-  font-size: 0.85rem;
-  padding: 6px 14px;
-  border-radius: 5px;
+  background: var(--color-secondary-bg);
+  border: 1px solid var(--color-secondary-border);
+  color: var(--color-secondary-text);
+  font-size: var(--font-size-label);
+  padding: var(--btn-padding-md);
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background var(--transition-default);
   white-space: nowrap;
 }
 #crew-admin-back-btn:hover {
-  background: rgba(255,255,255,0.16);
+  background: var(--color-secondary-bg-hover);
 }
 
 #crew-admin-title {
-  font-size: 1.3rem;
+  font-size: var(--font-size-h2);
   font-weight: 700;
   letter-spacing: 0.03em;
-  color: #f0f0f0;
+  color: var(--color-text-heading);
   margin: 0;
 }
 
 /* ── Tab bar ─────────────────────────────────────────────────────────────────── */
 #crew-admin-tabs {
   display: flex;
-  gap: 4px;
-  padding: 12px 20px 0;
-  border-bottom: 2px solid rgba(255,255,255,0.1);
+  gap: var(--space-xs);
+  padding: var(--space-md) var(--space-xl) 0;
+  border-bottom: 2px solid var(--color-border-tab);
   flex-shrink: 0;
 }
 
@@ -90,32 +89,32 @@ const CREW_ADMIN_STYLES = `
   background: transparent;
   border: 1px solid transparent;
   border-bottom: none;
-  color: #9aa0b0;
+  color: var(--color-tab-text);
   font-size: 0.9rem;
   font-weight: 600;
-  padding: 8px 18px;
+  padding: var(--space-sm) 18px;
   cursor: pointer;
-  border-radius: 5px 5px 0 0;
-  transition: color 0.15s, background 0.15s;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  transition: color var(--transition-default), background var(--transition-default);
   position: relative;
   bottom: -2px;
 }
 .crew-admin-tab:hover {
-  color: #e0e0e0;
-  background: rgba(255,255,255,0.05);
+  color: var(--color-tab-text-hover);
+  background: var(--color-tab-bg-hover);
 }
 .crew-admin-tab.active {
-  color: #ffffff;
-  background: rgba(255,255,255,0.06);
-  border-color: rgba(255,255,255,0.15);
-  border-bottom-color: rgba(10, 12, 20, 0.96);
+  color: var(--color-tab-text-active);
+  background: var(--color-tab-bg-active);
+  border-color: var(--color-tab-border-active);
+  border-bottom-color: var(--color-surface);
 }
 
 /* ── Tab content area ────────────────────────────────────────────────────────── */
 #crew-admin-content {
   flex: 1;
   overflow-y: auto;
-  padding: 20px;
+  padding: var(--panel-padding);
 }
 
 /* ── Active Crew tab ─────────────────────────────────────────────────────────── */
@@ -154,14 +153,14 @@ const CREW_ADMIN_STYLES = `
 }
 
 .crew-fire-btn {
-  background: rgba(220, 60, 60, 0.15);
-  border: 1px solid rgba(220, 60, 60, 0.4);
-  color: #e86060;
+  background: var(--color-danger-bg);
+  border: 1px solid var(--color-danger-border);
+  color: var(--color-danger);
   font-size: 0.8rem;
-  padding: 4px 12px;
-  border-radius: 4px;
+  padding: var(--btn-padding-sm);
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background var(--transition-default), border-color var(--transition-default);
   white-space: nowrap;
 }
 .crew-fire-btn:hover {
@@ -170,10 +169,10 @@ const CREW_ADMIN_STYLES = `
 }
 
 .crew-empty-msg {
-  color: #666;
+  color: var(--color-text-disabled);
   font-style: italic;
   text-align: center;
-  padding: 40px 20px;
+  padding: var(--space-4xl) var(--space-xl);
   font-size: 0.9rem;
 }
 
@@ -251,9 +250,9 @@ const CREW_ADMIN_STYLES = `
 }
 
 .hire-cash-display {
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 8px;
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-lg);
   padding: 14px 18px;
   margin-bottom: 22px;
   font-size: 0.9rem;
@@ -295,8 +294,8 @@ const CREW_ADMIN_STYLES = `
 .hire-form-input {
   width: 100%;
   background: rgba(255,255,255,0.07);
-  border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 5px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
   color: #e8e8e8;
   font-size: 0.9rem;
   padding: 9px 12px;
@@ -313,20 +312,20 @@ const CREW_ADMIN_STYLES = `
 
 .hire-btn {
   width: 100%;
-  background: rgba(60, 120, 220, 0.25);
-  border: 1px solid rgba(60, 120, 220, 0.5);
-  color: #80b4f0;
+  background: var(--color-primary-bg);
+  border: 1px solid var(--color-primary-border);
+  color: var(--color-primary-text);
   font-size: 0.9rem;
   font-weight: 700;
   padding: 11px 20px;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background var(--transition-default), border-color var(--transition-default);
   letter-spacing: 0.03em;
 }
 .hire-btn:hover:not(:disabled) {
-  background: rgba(60, 120, 220, 0.4);
-  border-color: rgba(60, 120, 220, 0.8);
+  background: var(--color-primary-bg-hover);
+  border-color: var(--color-primary-border-hover);
 }
 .hire-btn:disabled {
   opacity: 0.4;
@@ -423,10 +422,10 @@ const CREW_ADMIN_STYLES = `
 }
 
 .history-empty-msg {
-  color: #666;
+  color: var(--color-text-disabled);
   font-style: italic;
   text-align: center;
-  padding: 40px 20px;
+  padding: var(--space-4xl) var(--space-xl);
   font-size: 0.9rem;
 }
 
@@ -461,9 +460,9 @@ const CREW_ADMIN_STYLES = `
 }
 
 .training-info-box {
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 8px;
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-lg);
   padding: 14px 18px;
   margin-bottom: 20px;
   font-size: 0.85rem;
@@ -479,11 +478,11 @@ const CREW_ADMIN_STYLES = `
 .training-crew-item {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-md);
   padding: 10px 14px;
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.06);
-  border-radius: 6px;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
   margin-bottom: 8px;
 }
 
@@ -495,8 +494,8 @@ const CREW_ADMIN_STYLES = `
 
 .training-skill-select {
   background: rgba(255,255,255,0.07);
-  border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 4px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
   color: #e8e8e8;
   font-size: 0.82rem;
   padding: 5px 8px;
@@ -506,7 +505,7 @@ const CREW_ADMIN_STYLES = `
 .training-cancel-btn {
   font-size: 0.8rem;
   padding: 5px 12px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background 0.15s;
   white-space: nowrap;
@@ -563,7 +562,7 @@ const CREW_ADMIN_STYLES = `
   color: #66cc88;
   font-size: 0.75rem;
   padding: 3px 10px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background 0.15s;
   white-space: nowrap;

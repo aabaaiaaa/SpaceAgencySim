@@ -1,0 +1,414 @@
+/**
+ * design-tokens.js — Shared design system for the Space Agency Sim UI.
+ *
+ * Defines CSS custom properties for colors, spacing, typography, border-radius,
+ * z-index layers, and button variants. All UI modules should reference these
+ * tokens instead of hardcoding values.
+ *
+ * Usage:
+ *   import { injectDesignTokens } from './design-tokens.js';
+ *   // Call once at app startup:
+ *   injectDesignTokens();
+ *
+ *   // Then reference in CSS template literals:
+ *   `background: var(--panel-bg);`
+ *   `border-radius: var(--radius-md);`
+ *
+ * @module ui/design-tokens
+ */
+
+// ---------------------------------------------------------------------------
+// CSS custom properties — injected onto :root
+// ---------------------------------------------------------------------------
+
+const DESIGN_TOKENS = `
+:root {
+  /* ── Color palette ─────────────────────────────────────────────────────── */
+
+  /* Backgrounds */
+  --color-base:            #0a0e18;
+  --color-surface:         rgba(10, 12, 20, 0.96);
+  --color-surface-raised:  rgba(255, 255, 255, 0.04);
+  --color-surface-hover:   rgba(255, 255, 255, 0.06);
+  --color-topbar-bg:       rgba(4, 8, 20, 0.92);
+  --color-modal-backdrop:  rgba(0, 0, 0, 0.62);
+  --color-modal-bg:        #0d1520;
+  --color-overlay-bg:      rgba(5, 10, 20, 0.94);
+
+  /* Text */
+  --color-text-primary:    #e8e8e8;
+  --color-text-heading:    #f0f0f0;
+  --color-text-secondary:  #8898b0;
+  --color-text-muted:      #6080a0;
+  --color-text-disabled:   #666666;
+  --color-text-accent:     #80c8ff;
+  --color-text-light:      #d0e0f0;
+  --color-text-body:       #c0d8f0;
+
+  /* Borders */
+  --color-border-subtle:   rgba(255, 255, 255, 0.08);
+  --color-border-default:  rgba(255, 255, 255, 0.12);
+  --color-border-strong:   rgba(255, 255, 255, 0.18);
+  --color-border-accent:   rgba(100, 160, 220, 0.22);
+  --color-border-accent-strong: rgba(100, 160, 220, 0.28);
+  --color-border-tab:      rgba(255, 255, 255, 0.10);
+
+  /* Semantic colors */
+  --color-success:         #7dd87d;
+  --color-success-text:    #50d870;
+  --color-success-bg:      rgba(80, 160, 80, 0.06);
+  --color-danger:          #e86060;
+  --color-danger-text:     #ff8080;
+  --color-danger-bg:       rgba(220, 60, 60, 0.15);
+  --color-danger-border:   rgba(220, 60, 60, 0.4);
+  --color-warning:         #d8b860;
+  --color-warning-bg:      rgba(200, 120, 40, 0.1);
+  --color-warning-border:  rgba(200, 120, 40, 0.25);
+  --color-money:           #5ddb50;
+  --color-science:         #80c8ff;
+
+  /* Primary (blue) action palette */
+  --color-primary-bg:      rgba(60, 120, 220, 0.2);
+  --color-primary-bg-hover: rgba(60, 120, 220, 0.38);
+  --color-primary-border:  rgba(60, 120, 220, 0.45);
+  --color-primary-border-hover: rgba(60, 120, 220, 0.75);
+  --color-primary-text:    #80b4f0;
+  --color-primary-solid:   #1a4070;
+  --color-primary-solid-hover: #235a90;
+  --color-primary-solid-border: #4080b0;
+
+  /* Secondary (neutral) action palette */
+  --color-secondary-bg:      rgba(255, 255, 255, 0.08);
+  --color-secondary-bg-hover: rgba(255, 255, 255, 0.16);
+  --color-secondary-border:  rgba(255, 255, 255, 0.18);
+  --color-secondary-text:    #e8e8e8;
+
+  /* Tab colors */
+  --color-tab-text:        #9aa0b0;
+  --color-tab-text-hover:  #e0e0e0;
+  --color-tab-text-active: #ffffff;
+  --color-tab-bg-hover:    rgba(255, 255, 255, 0.05);
+  --color-tab-bg-active:   rgba(255, 255, 255, 0.06);
+  --color-tab-border-active: rgba(255, 255, 255, 0.15);
+
+  /* Card colors */
+  --color-card-bg:         rgba(255, 255, 255, 0.04);
+  --color-card-border:     rgba(255, 255, 255, 0.10);
+  --color-card-bg-hover:   rgba(255, 255, 255, 0.03);
+
+  /* ── Typography ────────────────────────────────────────────────────────── */
+  --font-family:           system-ui, sans-serif;
+
+  --font-size-display:     1.7rem;    /* large headings, overlay titles */
+  --font-size-h1:          1.5rem;    /* panel titles */
+  --font-size-h2:          1.3rem;    /* facility titles */
+  --font-size-h3:          1.05rem;   /* modal titles, section headings */
+  --font-size-body:        0.92rem;   /* standard body text */
+  --font-size-body-sm:     0.88rem;   /* dropdown items, descriptions */
+  --font-size-label:       0.85rem;   /* buttons, labels */
+  --font-size-caption:     0.82rem;   /* hints, subtitles */
+  --font-size-small:       0.78rem;   /* section headers, meta text */
+  --font-size-tiny:        0.72rem;   /* badges, fine print */
+
+  /* ── Spacing scale ─────────────────────────────────────────────────────── */
+  --space-xs:   4px;
+  --space-sm:   8px;
+  --space-md:   12px;
+  --space-lg:   16px;
+  --space-xl:   20px;
+  --space-2xl:  24px;
+  --space-3xl:  32px;
+  --space-4xl:  40px;
+
+  /* Common component spacing */
+  --panel-padding:         20px;
+  --card-padding:          16px 18px;
+  --header-padding:        12px 20px 0;
+  --btn-padding-sm:        4px 12px;
+  --btn-padding-md:        6px 14px;
+  --btn-padding-lg:        7px 18px;
+  --btn-padding-xl:        10px 32px;
+  --modal-padding:         26px 30px 22px;
+
+  /* ── Border radius ─────────────────────────────────────────────────────── */
+  --radius-sm:  4px;   /* buttons, small elements */
+  --radius-md:  6px;   /* cards, panels, dropdowns */
+  --radius-lg:  8px;   /* modals, large cards */
+
+  /* ── Z-index layers ────────────────────────────────────────────────────── */
+  --z-base:       1;
+  --z-hub:        10;
+  --z-hub-widget: 20;
+  --z-facility:   20;
+  --z-topbar:     100;
+  --z-dropdown:   150;
+  --z-modal:      200;
+  --z-flight-hud: 90;
+  --z-overlay:    400;
+  --z-return:     500;
+
+  /* ── Topbar ────────────────────────────────────────────────────────────── */
+  --topbar-height: 44px;
+
+  /* ── Transitions ───────────────────────────────────────────────────────── */
+  --transition-fast: 0.1s;
+  --transition-default: 0.15s;
+}
+`;
+
+// ---------------------------------------------------------------------------
+// Reusable CSS class snippets for common button variants
+// ---------------------------------------------------------------------------
+
+const BUTTON_VARIANTS = `
+/* ═══════════════════════════════════════════════════════════════════════════
+   Shared button variants — import design-tokens.js to get these globally
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Primary action button (blue) */
+.btn-primary {
+  background: var(--color-primary-bg);
+  border: 1px solid var(--color-primary-border);
+  color: var(--color-primary-text);
+  font-size: var(--font-size-label);
+  font-weight: 700;
+  padding: var(--btn-padding-lg);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-default), border-color var(--transition-default);
+  letter-spacing: 0.02em;
+  font-family: var(--font-family);
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-primary-bg-hover);
+  border-color: var(--color-primary-border-hover);
+}
+.btn-primary:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Primary solid button (for dismiss/close/CTA) */
+.btn-primary-solid {
+  background: var(--color-primary-solid);
+  border: 1px solid var(--color-primary-solid-border);
+  color: #c8e8ff;
+  font-size: var(--font-size-body);
+  font-weight: 600;
+  padding: var(--btn-padding-xl);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--transition-default);
+  letter-spacing: 0.03em;
+  font-family: var(--font-family);
+}
+.btn-primary-solid:hover {
+  background: var(--color-primary-solid-hover);
+}
+
+/* Secondary / navigation button (subtle) */
+.btn-secondary {
+  background: var(--color-secondary-bg);
+  border: 1px solid var(--color-secondary-border);
+  color: var(--color-secondary-text);
+  font-size: var(--font-size-label);
+  padding: var(--btn-padding-md);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-default);
+  white-space: nowrap;
+  font-family: var(--font-family);
+}
+.btn-secondary:hover {
+  background: var(--color-secondary-bg-hover);
+}
+
+/* Danger button (destructive actions) */
+.btn-danger {
+  background: var(--color-danger-bg);
+  border: 1px solid var(--color-danger-border);
+  color: var(--color-danger);
+  font-size: var(--font-size-small);
+  font-weight: 700;
+  padding: var(--btn-padding-sm);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-default), border-color var(--transition-default);
+  font-family: var(--font-family);
+}
+.btn-danger:hover {
+  background: rgba(220, 60, 60, 0.3);
+  border-color: rgba(220, 60, 60, 0.7);
+}
+
+/* Ghost button (minimal styling) */
+.btn-ghost {
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-label);
+  padding: var(--btn-padding-sm);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-default), color var(--transition-default);
+  font-family: var(--font-family);
+}
+.btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-text-primary);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Shared facility screen base — common overlay + header pattern
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Facility overlay base */
+.facility-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--color-surface);
+  z-index: var(--z-facility);
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+  font-family: var(--font-family);
+  color: var(--color-text-primary);
+  padding-top: var(--topbar-height);
+}
+
+/* Facility header row */
+.facility-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  padding: var(--header-padding);
+  flex-shrink: 0;
+}
+
+/* Facility title */
+.facility-title {
+  font-size: var(--font-size-h2);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--color-text-heading);
+  margin: 0;
+}
+
+/* Tab bar */
+.facility-tabs {
+  display: flex;
+  gap: var(--space-xs);
+  padding: var(--space-md) var(--space-xl) 0;
+  border-bottom: 2px solid var(--color-border-tab);
+  flex-shrink: 0;
+}
+
+/* Individual tab */
+.facility-tab {
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: none;
+  color: var(--color-tab-text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: var(--space-sm) 18px;
+  cursor: pointer;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  transition: color var(--transition-default), background var(--transition-default);
+  position: relative;
+  bottom: -2px;
+}
+.facility-tab:hover {
+  color: var(--color-tab-text-hover);
+  background: var(--color-tab-bg-hover);
+}
+.facility-tab.active {
+  color: var(--color-tab-text-active);
+  background: var(--color-tab-bg-active);
+  border-color: var(--color-tab-border-active);
+  border-bottom-color: var(--color-surface);
+}
+
+/* Tab content area */
+.facility-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--panel-padding);
+}
+
+/* Card (mission cards, achievement cards, setting groups, etc.) */
+.card {
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-lg);
+  padding: var(--card-padding);
+}
+
+/* Empty state message */
+.empty-msg {
+  color: var(--color-text-disabled);
+  font-style: italic;
+  text-align: center;
+  padding: var(--space-4xl) var(--space-xl);
+  font-size: 0.9rem;
+}
+
+/* Section label (uppercase meta text) */
+.section-label {
+  font-size: var(--font-size-small);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-sm);
+}
+
+/* Modal base */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--color-modal-backdrop);
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.modal-box {
+  background: var(--color-modal-bg);
+  border: 1px solid var(--color-border-accent-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7);
+  padding: var(--modal-padding);
+  width: 440px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  pointer-events: auto;
+  font-family: var(--font-family);
+  color: #cce4f8;
+}
+`;
+
+// ---------------------------------------------------------------------------
+// Injection
+// ---------------------------------------------------------------------------
+
+let _injected = false;
+
+/**
+ * Injects the design tokens and shared utility classes into the document head.
+ * Safe to call multiple times — only injects once.
+ */
+export function injectDesignTokens() {
+  if (_injected) return;
+  _injected = true;
+
+  const style = document.createElement('style');
+  style.setAttribute('data-id', 'design-tokens');
+  style.textContent = DESIGN_TOKENS + BUTTON_VARIANTS;
+  // Prepend so tokens are available before any module styles
+  document.head.insertBefore(style, document.head.firstChild);
+}

@@ -8,10 +8,10 @@ export const FLIGHT_CTRL_CSS = `
 /* ── Flight control overlay ─────────────────────────────────────────────── */
 #flight-overlay {
   position: fixed;
-  inset: 44px 0 0;
+  inset: var(--topbar-height) 0 0;
   pointer-events: none;
-  z-index: 200;
-  font-family: system-ui, sans-serif;
+  z-index: var(--z-modal);
+  font-family: var(--font-family);
 }
 
 /* ── Hamburger / menu button — centred at the top ──────────────────────── */
@@ -23,7 +23,7 @@ export const FLIGHT_CTRL_CSS = `
   height: 32px;
   padding: 0 14px;
   border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: rgba(0, 0, 0, 0.65);
   color: #d8e8f0;
   font-size: 13px;
@@ -47,9 +47,9 @@ export const FLIGHT_CTRL_CSS = `
   top: 48px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(10, 14, 24, 0.96);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 6px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-secondary-border);
+  border-radius: var(--radius-md);
   padding: 4px 0;
   min-width: 210px;
   pointer-events: auto;
@@ -99,15 +99,15 @@ export const FLIGHT_CTRL_CSS = `
 }
 
 .pf-content {
-  background: #0d1520;
-  border: 1px solid rgba(100, 160, 220, 0.28);
-  border-radius: 10px;
+  background: var(--color-modal-bg);
+  border: 1px solid var(--color-border-accent-strong);
+  border-radius: var(--radius-lg);
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7);
   width: 600px;
   max-width: calc(100vw - 32px);
   max-height: calc(100vh - 64px);
   overflow-y: auto;
-  padding: 26px 30px 22px;
+  padding: var(--modal-padding);
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -351,15 +351,15 @@ export const FLIGHT_CTRL_CSS = `
 }
 
 .fl-content {
-  background: #0d1520;
-  border: 1px solid rgba(100, 160, 220, 0.28);
-  border-radius: 10px;
+  background: var(--color-modal-bg);
+  border: 1px solid var(--color-border-accent-strong);
+  border-radius: var(--radius-lg);
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7);
   width: 500px;
   max-width: calc(100vw - 32px);
   max-height: calc(100vh - 64px);
   overflow-y: auto;
-  padding: 26px 30px 22px;
+  padding: var(--modal-padding);
   box-sizing: border-box;
   display: flex;
   flex-direction: column;

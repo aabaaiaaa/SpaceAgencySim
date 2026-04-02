@@ -61,10 +61,10 @@ const FLIGHT_HUD_STYLES = `
    ═══════════════════════════════════════════════════════════════════════════ */
 #flight-hud {
   position: fixed;
-  inset: 44px 0 0;
+  inset: var(--topbar-height) 0 0;
   pointer-events: none;
-  z-index: 100;
-  font-family: system-ui, sans-serif;
+  z-index: var(--z-flight-hud);
+  font-family: var(--font-family);
   color: #a8e8c0;
   user-select: none;
 }
@@ -79,7 +79,7 @@ const FLIGHT_HUD_STYLES = `
   width: 230px;
   background: rgba(0, 8, 0, 0.78);
   border: 1px solid #284828;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   display: flex;
   flex-direction: column;
   pointer-events: auto;
@@ -268,7 +268,7 @@ const FLIGHT_HUD_STYLES = `
   transform: translateX(-50%);
   background: rgba(4, 20, 8, 0.90);
   border: 1px solid #407840;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   padding: 10px 22px;
   color: #a0e8a0;
   font-size: 13px;
@@ -322,7 +322,7 @@ const FLIGHT_HUD_STYLES = `
   top: 10px;
   background: rgba(0, 8, 0, 0.68);
   border: 1px solid #284828;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 8px 12px 6px;
   min-width: 180px;
   max-width: 280px;

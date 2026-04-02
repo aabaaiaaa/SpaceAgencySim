@@ -15,14 +15,14 @@ export const VAB_CSS = `
 /* ── VAB root ───────────────────────────────────────────────────────── */
 #vab-root {
   position: absolute;
-  top: 44px; /* leave room for the global top bar (src/ui/topbar.js) */
+  top: var(--topbar-height); /* leave room for the global top bar (src/ui/topbar.js) */
   left: 0;
   right: 0;
   bottom: 0;
   display: flex;
   flex-direction: column;
   pointer-events: none;
-  font-family: system-ui, sans-serif;
+  font-family: var(--font-family);
   color: #c0d4ec;
   user-select: none;
   overflow: hidden;
@@ -36,12 +36,12 @@ export const VAB_CSS = `
   align-items: center;
   justify-content: flex-start;
   padding: 0 14px;
-  background: rgba(4, 8, 20, 0.97);
+  background: var(--color-topbar-bg);
   border-bottom: 1px solid #162c48;
   pointer-events: auto;
   flex-shrink: 0;
-  z-index: 20;
-  gap: 12px;
+  z-index: var(--z-hub-widget);
+  gap: var(--space-md);
 }
 
 /* Toolbar stats (parts count + cost) — pushed right via spacer */

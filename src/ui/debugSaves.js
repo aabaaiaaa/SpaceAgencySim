@@ -23,13 +23,13 @@ const DEBUG_SAVE_STYLES = `
 #debug-save-panel {
   position: fixed;
   inset: 0;
-  background: rgba(5, 10, 20, 0.94);
-  z-index: 400;
+  background: var(--color-overlay-bg);
+  z-index: var(--z-overlay);
   display: flex;
   flex-direction: column;
   align-items: center;
-  font-family: system-ui, sans-serif;
-  color: #d0e0f0;
+  font-family: var(--font-family);
+  color: var(--color-text-light);
   pointer-events: auto;
   overflow: hidden;
 }
@@ -46,7 +46,7 @@ const DEBUG_SAVE_STYLES = `
 }
 
 #debug-save-panel h1 {
-  font-size: 1.5rem;
+  font-size: var(--font-size-h1);
   font-weight: 700;
   margin: 0 0 6px;
   letter-spacing: 0.04em;
@@ -62,13 +62,13 @@ const DEBUG_SAVE_STYLES = `
 }
 
 .debug-save-warning {
-  font-size: 0.78rem;
+  font-size: var(--font-size-small);
   color: #ff8060;
   margin: 0 0 20px;
-  padding: 8px 14px;
+  padding: var(--space-sm) 14px;
   background: rgba(255, 80, 40, 0.1);
   border: 1px solid rgba(255, 80, 40, 0.25);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   text-align: center;
   width: 100%;
 }
@@ -130,10 +130,10 @@ const DEBUG_SAVE_STYLES = `
 }
 
 .debug-save-card-load {
-  padding: 7px 18px;
+  padding: var(--btn-padding-lg);
   background: #3a2810;
   border: 1px solid #906830;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   color: #ffb060;
   font-size: 0.82rem;
   font-weight: 600;

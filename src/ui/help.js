@@ -450,12 +450,12 @@ const HELP_STYLES = `
 #help-panel {
   position: fixed;
   inset: 0;
-  background: rgba(5, 10, 20, 0.96);
-  z-index: 400;
+  background: var(--color-surface);
+  z-index: var(--z-overlay);
   display: flex;
   flex-direction: row;
-  font-family: system-ui, sans-serif;
-  color: #d0e0f0;
+  font-family: var(--font-family);
+  color: var(--color-text-light);
   pointer-events: auto;
   overflow: hidden;
 }

@@ -12,55 +12,54 @@ export const MISSION_CONTROL_STYLES = `
 #mission-control-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(10, 12, 20, 0.96);
-  z-index: 20;
+  background: var(--color-surface);
+  z-index: var(--z-facility);
   display: flex;
   flex-direction: column;
   pointer-events: auto;
-  font-family: system-ui, sans-serif;
-  color: #e8e8e8;
-  /* leave room for the persistent top bar (approx 44px) */
-  padding-top: 44px;
+  font-family: var(--font-family);
+  color: var(--color-text-primary);
+  padding-top: var(--topbar-height);
 }
 
 /* ── Header ──────────────────────────────────────────────────────────────── */
 #mission-control-header {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 12px 20px 0;
+  gap: var(--space-lg);
+  padding: var(--header-padding);
   flex-shrink: 0;
 }
 
 #mission-control-back-btn {
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.18);
-  color: #e8e8e8;
-  font-size: 0.85rem;
-  padding: 6px 14px;
-  border-radius: 5px;
+  background: var(--color-secondary-bg);
+  border: 1px solid var(--color-secondary-border);
+  color: var(--color-secondary-text);
+  font-size: var(--font-size-label);
+  padding: var(--btn-padding-md);
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background var(--transition-default);
   white-space: nowrap;
 }
 #mission-control-back-btn:hover {
-  background: rgba(255,255,255,0.16);
+  background: var(--color-secondary-bg-hover);
 }
 
 #mission-control-title {
-  font-size: 1.3rem;
+  font-size: var(--font-size-h2);
   font-weight: 700;
   letter-spacing: 0.03em;
-  color: #f0f0f0;
+  color: var(--color-text-heading);
   margin: 0;
 }
 
 /* ── Tab bar ──────────────────────────────────────────────────────────────── */
 #mission-control-tabs {
   display: flex;
-  gap: 4px;
-  padding: 12px 20px 0;
-  border-bottom: 2px solid rgba(255,255,255,0.1);
+  gap: var(--space-xs);
+  padding: var(--space-md) var(--space-xl) 0;
+  border-bottom: 2px solid var(--color-border-tab);
   flex-shrink: 0;
 }
 
@@ -68,32 +67,32 @@ export const MISSION_CONTROL_STYLES = `
   background: transparent;
   border: 1px solid transparent;
   border-bottom: none;
-  color: #9aa0b0;
+  color: var(--color-tab-text);
   font-size: 0.9rem;
   font-weight: 600;
-  padding: 8px 18px;
+  padding: var(--space-sm) 18px;
   cursor: pointer;
-  border-radius: 5px 5px 0 0;
-  transition: color 0.15s, background 0.15s;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  transition: color var(--transition-default), background var(--transition-default);
   position: relative;
   bottom: -2px;
 }
 .mc-tab:hover {
-  color: #e0e0e0;
-  background: rgba(255,255,255,0.05);
+  color: var(--color-tab-text-hover);
+  background: var(--color-tab-bg-hover);
 }
 .mc-tab.active {
-  color: #ffffff;
-  background: rgba(255,255,255,0.06);
-  border-color: rgba(255,255,255,0.15);
-  border-bottom-color: rgba(10, 12, 20, 0.96);
+  color: var(--color-tab-text-active);
+  background: var(--color-tab-bg-active);
+  border-color: var(--color-tab-border-active);
+  border-bottom-color: var(--color-surface);
 }
 
 /* ── Tab content area ────────────────────────────────────────────────────── */
 #mission-control-content {
   flex: 1;
   overflow-y: auto;
-  padding: 20px;
+  padding: var(--panel-padding);
 }
 
 /* ── Mission card list (Available + Accepted tabs) ───────────────────────── */
@@ -105,10 +104,10 @@ export const MISSION_CONTROL_STYLES = `
 }
 
 .mc-mission-card {
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.10);
-  border-radius: 8px;
-  padding: 16px 18px;
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-lg);
+  padding: var(--card-padding);
 }
 
 .mc-mission-card-header {
@@ -172,20 +171,20 @@ export const MISSION_CONTROL_STYLES = `
 }
 
 .mc-accept-btn {
-  background: rgba(60, 120, 220, 0.2);
-  border: 1px solid rgba(60, 120, 220, 0.45);
-  color: #80b4f0;
-  font-size: 0.85rem;
+  background: var(--color-primary-bg);
+  border: 1px solid var(--color-primary-border);
+  color: var(--color-primary-text);
+  font-size: var(--font-size-label);
   font-weight: 700;
-  padding: 7px 18px;
-  border-radius: 5px;
+  padding: var(--btn-padding-lg);
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background var(--transition-default), border-color var(--transition-default);
   letter-spacing: 0.02em;
 }
 .mc-accept-btn:hover:not(:disabled) {
-  background: rgba(60, 120, 220, 0.38);
-  border-color: rgba(60, 120, 220, 0.75);
+  background: var(--color-primary-bg-hover);
+  border-color: var(--color-primary-border-hover);
 }
 .mc-accept-btn:disabled {
   opacity: 0.35;
@@ -250,10 +249,10 @@ export const MISSION_CONTROL_STYLES = `
 
 /* ── Empty state messages ────────────────────────────────────────────────── */
 .mc-empty-msg {
-  color: #666;
+  color: var(--color-text-disabled);
   font-style: italic;
   text-align: center;
-  padding: 40px 20px;
+  padding: var(--space-4xl) var(--space-xl);
   font-size: 0.9rem;
 }
 
@@ -298,15 +297,15 @@ export const MISSION_CONTROL_STYLES = `
 }
 
 .mc-cancel-btn {
-  background: rgba(200, 60, 60, 0.15);
+  background: var(--color-danger-bg);
   border: 1px solid rgba(200, 60, 60, 0.35);
   color: #c07070;
-  font-size: 0.78rem;
+  font-size: var(--font-size-small);
   font-weight: 700;
   padding: 5px 14px;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background var(--transition-default), border-color var(--transition-default);
   margin-top: 10px;
 }
 .mc-cancel-btn:hover {
@@ -386,11 +385,11 @@ export const MISSION_CONTROL_STYLES = `
 
 /* ── Conflict warning ─────────────────────────────────────────────────── */
 .mc-conflict-warning {
-  font-size: 0.78rem;
+  font-size: var(--font-size-small);
   color: #d08040;
-  background: rgba(200, 120, 40, 0.1);
-  border: 1px solid rgba(200, 120, 40, 0.25);
-  border-radius: 4px;
+  background: var(--color-warning-bg);
+  border: 1px solid var(--color-warning-border);
+  border-radius: var(--radius-sm);
   padding: 6px 10px;
   margin: 8px 0 0;
   line-height: 1.4;
@@ -405,10 +404,10 @@ export const MISSION_CONTROL_STYLES = `
 }
 
 .mc-achievement-card {
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 8px;
-  padding: 16px 18px;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--card-padding);
   transition: border-color 0.2s, background 0.2s;
 }
 .mc-achievement-card.earned {
@@ -489,10 +488,10 @@ export const MISSION_CONTROL_STYLES = `
 }
 
 .mc-challenge-card {
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 8px;
-  padding: 16px 18px;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--card-padding);
   transition: border-color 0.2s, background 0.2s;
 }
 .mc-challenge-card.active-challenge {
@@ -592,29 +591,29 @@ export const MISSION_CONTROL_STYLES = `
 }
 
 .mc-challenge-accept-btn {
-  background: rgba(60, 120, 220, 0.2);
-  border: 1px solid rgba(60, 120, 220, 0.45);
-  color: #80b4f0;
-  font-size: 0.82rem;
+  background: var(--color-primary-bg);
+  border: 1px solid var(--color-primary-border);
+  color: var(--color-primary-text);
+  font-size: var(--font-size-caption);
   font-weight: 700;
-  padding: 6px 16px;
-  border-radius: 5px;
+  padding: var(--btn-padding-md);
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background var(--transition-default), border-color var(--transition-default);
 }
 .mc-challenge-accept-btn:hover {
-  background: rgba(60, 120, 220, 0.38);
-  border-color: rgba(60, 120, 220, 0.75);
+  background: var(--color-primary-bg-hover);
+  border-color: var(--color-primary-border-hover);
 }
 
 .mc-challenge-abandon-btn {
   background: rgba(200, 60, 60, 0.12);
   border: 1px solid rgba(200, 60, 60, 0.3);
   color: #c07070;
-  font-size: 0.78rem;
+  font-size: var(--font-size-small);
   font-weight: 600;
   padding: 5px 12px;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background 0.15s;
 }
@@ -692,11 +691,11 @@ export const MISSION_CONTROL_STYLES = `
 .mc-challenge-toolbar button {
   background: rgba(200, 160, 80, 0.15);
   border: 1px solid rgba(200, 160, 80, 0.35);
-  color: #d8b860;
-  font-size: 0.82rem;
+  color: var(--color-warning);
+  font-size: var(--font-size-caption);
   font-weight: 700;
-  padding: 6px 16px;
-  border-radius: 5px;
+  padding: var(--btn-padding-md);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 }
@@ -737,9 +736,9 @@ export const MISSION_CONTROL_STYLES = `
 
 /* ── Creator form ──────────────────────────────────────────────────────── */
 .mc-creator-form {
-  background: rgba(255,255,255,0.03);
+  background: var(--color-surface-raised);
   border: 1px solid rgba(200, 160, 80, 0.25);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   padding: 18px 20px;
   margin-bottom: 18px;
   max-width: 720px;
@@ -897,8 +896,8 @@ export const MISSION_CONTROL_STYLES = `
 }
 .mc-import-dialog {
   background: #1a1c28;
-  border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 10px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
   padding: 24px;
   max-width: 520px;
   width: 90%;

@@ -44,21 +44,21 @@ const HUB_STYLES = `
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: 10;
-  font-family: system-ui, sans-serif;
+  z-index: var(--z-hub);
+  font-family: var(--font-family);
 }
 
 /* ── Return Results overlay ───────────────────────────────────────────────── */
 #return-results-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(5, 10, 20, 0.94);
-  z-index: 500;
+  background: var(--color-overlay-bg);
+  z-index: var(--z-return);
   display: flex;
   flex-direction: column;
   align-items: center;
-  font-family: system-ui, sans-serif;
-  color: #d0e0f0;
+  font-family: var(--font-family);
+  color: var(--color-text-light);
   pointer-events: auto;
   overflow: hidden;
 }
@@ -75,11 +75,11 @@ const HUB_STYLES = `
 }
 
 #return-results-overlay h1 {
-  font-size: 1.7rem;
+  font-size: var(--font-size-display);
   font-weight: 700;
-  margin: 0 0 8px;
+  margin: 0 0 var(--space-sm);
   letter-spacing: 0.04em;
-  color: #80c8ff;
+  color: var(--color-text-accent);
 }
 
 .rr-subtitle {
@@ -204,34 +204,34 @@ const HUB_STYLES = `
 }
 
 .rr-dismiss-btn {
-  margin-top: 24px;
+  margin-top: var(--space-2xl);
   padding: 12px 40px;
-  background: #1a4070;
-  border: 1px solid #4080b0;
-  border-radius: 6px;
+  background: var(--color-primary-solid);
+  border: 1px solid var(--color-primary-solid-border);
+  border-radius: var(--radius-md);
   color: #c8e8ff;
   font-size: 0.95rem;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background var(--transition-default);
   letter-spacing: 0.03em;
 }
 
 .rr-dismiss-btn:hover {
-  background: #235a90;
+  background: var(--color-primary-solid-hover);
 }
 
 /* ── Welcome modal ───────────────────────────────────────────────────────── */
 #welcome-modal {
   position: fixed;
   inset: 0;
-  background: rgba(5, 10, 20, 0.94);
-  z-index: 500;
+  background: var(--color-overlay-bg);
+  z-index: var(--z-return);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-family: system-ui, sans-serif;
-  color: #d0e0f0;
+  font-family: var(--font-family);
+  color: var(--color-text-light);
   pointer-events: auto;
   overflow: hidden;
 }
@@ -247,11 +247,11 @@ const HUB_STYLES = `
 }
 
 #welcome-modal h1 {
-  font-size: 1.5rem;
+  font-size: var(--font-size-h1);
   font-weight: 700;
   margin: 0 0 6px;
   letter-spacing: 0.04em;
-  color: #80c8ff;
+  color: var(--color-text-accent);
 }
 
 .welcome-subtitle {
@@ -271,18 +271,18 @@ const HUB_STYLES = `
 
 .welcome-dismiss-btn {
   padding: 12px 40px;
-  background: #1a4070;
-  border: 1px solid #4080b0;
-  border-radius: 6px;
+  background: var(--color-primary-solid);
+  border: 1px solid var(--color-primary-solid-border);
+  border-radius: var(--radius-md);
   color: #c8e8ff;
   font-size: 0.95rem;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background var(--transition-default);
   letter-spacing: 0.03em;
 }
 
 .welcome-dismiss-btn:hover {
-  background: #235a90;
+  background: var(--color-primary-solid-hover);
 }
 
 /* ── Bankruptcy banner ───────────────────────────────────────────────────── */
@@ -294,7 +294,7 @@ const HUB_STYLES = `
   padding: 14px 28px;
   background: rgba(120, 20, 20, 0.92);
   border: 1px solid #ff4040;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   color: #ffc0c0;
   font-size: 0.92rem;
   font-weight: 600;
@@ -341,13 +341,13 @@ const HUB_STYLES = `
 #construction-panel {
   position: fixed;
   inset: 0;
-  background: rgba(5, 10, 20, 0.92);
-  z-index: 400;
+  background: var(--color-overlay-bg);
+  z-index: var(--z-overlay);
   display: flex;
   flex-direction: column;
   align-items: center;
-  font-family: system-ui, sans-serif;
-  color: #d0e0f0;
+  font-family: var(--font-family);
+  color: var(--color-text-light);
   pointer-events: auto;
   overflow: hidden;
 }
@@ -364,11 +364,11 @@ const HUB_STYLES = `
 }
 
 #construction-panel h1 {
-  font-size: 1.5rem;
+  font-size: var(--font-size-h1);
   font-weight: 700;
   margin: 0 0 6px;
   letter-spacing: 0.04em;
-  color: #80c8ff;
+  color: var(--color-text-accent);
 }
 
 .cp-subtitle {
@@ -390,11 +390,11 @@ const HUB_STYLES = `
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px;
-  margin-bottom: 8px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
+  padding: 14px var(--space-lg);
+  margin-bottom: var(--space-sm);
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
   transition: border-color 0.15s;
 }
 
@@ -434,10 +434,10 @@ const HUB_STYLES = `
 }
 
 .cp-build-btn {
-  padding: 7px 18px;
+  padding: var(--btn-padding-lg);
   background: #1a5040;
   border: 1px solid #40a080;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   color: #b0f0d0;
   font-size: 0.82rem;
   font-weight: 600;
@@ -456,22 +456,22 @@ const HUB_STYLES = `
 }
 
 .cp-built-badge {
-  padding: 6px 14px;
+  padding: var(--btn-padding-md);
   font-size: 0.8rem;
   font-weight: 600;
-  color: #50d870;
+  color: var(--color-success-text);
   border: 1px solid rgba(80, 216, 112, 0.3);
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   white-space: nowrap;
 }
 
 .cp-locked-badge {
-  padding: 6px 14px;
-  font-size: 0.78rem;
+  padding: var(--btn-padding-md);
+  font-size: var(--font-size-small);
   font-weight: 500;
   color: #a08060;
   border: 1px solid rgba(160, 128, 96, 0.3);
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   white-space: nowrap;
   max-width: 160px;
   text-align: center;
@@ -479,20 +479,20 @@ const HUB_STYLES = `
 }
 
 .cp-close-btn {
-  margin-top: 12px;
+  margin-top: var(--space-md);
   padding: 12px 40px;
-  background: #1a4070;
-  border: 1px solid #4080b0;
-  border-radius: 6px;
+  background: var(--color-primary-solid);
+  border: 1px solid var(--color-primary-solid-border);
+  border-radius: var(--radius-md);
   color: #c8e8ff;
   font-size: 0.95rem;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background var(--transition-default);
   letter-spacing: 0.03em;
 }
 
 .cp-close-btn:hover {
-  background: #235a90;
+  background: var(--color-primary-solid-hover);
 }
 
 /* ── Construction panel — science cost ────────────────────────────────────── */
@@ -533,10 +533,10 @@ const HUB_STYLES = `
 }
 
 .cp-upgrade-btn {
-  padding: 7px 18px;
-  background: #1a4070;
-  border: 1px solid #4080b0;
-  border-radius: 5px;
+  padding: var(--btn-padding-lg);
+  background: var(--color-primary-solid);
+  border: 1px solid var(--color-primary-solid-border);
+  border-radius: var(--radius-sm);
   color: #b0d0f0;
   font-size: 0.82rem;
   font-weight: 600;
@@ -546,7 +546,7 @@ const HUB_STYLES = `
 }
 
 .cp-upgrade-btn:hover:not(:disabled) {
-  background: #235a90;
+  background: var(--color-primary-solid-hover);
 }
 
 .cp-upgrade-btn:disabled {
@@ -570,10 +570,10 @@ const HUB_STYLES = `
 
 /* ── Weather panel ──────────────────────────────────────────────────────── */
 #weather-panel {
-  padding: 12px 18px;
+  padding: var(--space-md) 18px;
   background: rgba(10, 20, 40, 0.88);
   border: 1px solid #304868;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   color: #c8dce8;
   font-size: 0.82rem;
   pointer-events: auto;
