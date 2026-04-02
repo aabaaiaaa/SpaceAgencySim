@@ -19,7 +19,7 @@
 - **Verification**: Read the comment in the code and confirm it explains the ordering dependency and the early-return requirement. No tests needed — comment-only change.
 
 ### TASK-004: Fix timer stacking in debugSaves.js
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/ui/debugSaves.js` (around line 343), clear the previous timeout stored on `feedbackEl._timer` before setting a new one. Use `clearTimeout(feedbackEl._timer)` before the new `setTimeout` assignment. See requirements Section 1.5.
 - **Verification**: Run `npm run test:unit` — all tests pass. No E2E needed — trivial one-line fix in debug tooling.
