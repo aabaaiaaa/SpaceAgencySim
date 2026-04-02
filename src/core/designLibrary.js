@@ -142,7 +142,7 @@ export function saveSharedLibrary(designs) {
     localStorage.setItem(SHARED_LIBRARY_KEY, JSON.stringify(designs));
   } catch (err) {
     if (err?.name === 'QuotaExceededError') {
-      throw new Error('Storage full — unable to save design library. Delete old saves or designs to free space.');
+      throw new Error('Storage full — unable to save design library. Delete old saves or designs to free space.', { cause: err });
     }
     throw err;
   }
