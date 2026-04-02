@@ -218,7 +218,16 @@ export function evaluateAutoTransitions(flightState, ps, orbitStatus) {
     }
   }
 
-  // MANOEUVRE → ORBIT:  burn completed and orbit is still valid.
+  // MANOEUVRE → ORBIT (or → TRANSFER):  burn completed.
+  //
+  // ORDERING DEPENDENCY — the escape-trajectory check MUST come before the
+  // normal shouldExitManoeuvre() check, and its success path MUST return
+  // early. Both branches can be true simultaneously (an escape trajectory
+  // is also a completed burn), so without the early return the craft would
+  // first transition MANOEUVRE → ORBIT → TRANSFER, then fall through and
+  // attempt a second MANOEUVRE → ORBIT transition — double-mutating
+  // flightState.orbitalElements and phaseLog. The early return inside the
+  // escape-trajectory success path is therefore load-bearing; do not remove it.
   if (phase === FlightPhase.MANOEUVRE) {
     const bodyId = (flightState && flightState.bodyId) || 'EARTH';
 

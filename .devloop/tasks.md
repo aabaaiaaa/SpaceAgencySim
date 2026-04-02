@@ -13,7 +13,7 @@
 - **Verification**: Run `npm run test:unit` — all tests pass. Then run `npx playwright test e2e/flight.spec.js` to verify flight still works normally.
 
 ### TASK-003: Add ordering dependency comment to flightPhase.js transition logic
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Add a clear comment in `src/core/flightPhase.js` (around lines 222-255) explaining why the MANOEUVRE exit handler checks escape trajectory first with an early return, and that removing the early return would cause double-mutation. See requirements Section 1.4.
 - **Verification**: Read the comment in the code and confirm it explains the ordering dependency and the early-return requirement. No tests needed — comment-only change.
