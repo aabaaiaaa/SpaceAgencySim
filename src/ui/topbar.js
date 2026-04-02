@@ -160,10 +160,10 @@ const TOPBAR_STYLES = `
   white-space: nowrap;
 }
 #topbar-cash:hover {
-  background: rgba(93, 219, 80, 0.12);
+  background: rgba(255, 255, 255, 0.08);
 }
 #topbar-cash:active {
-  background: rgba(93, 219, 80, 0.22);
+  background: rgba(255, 255, 255, 0.14);
 }
 
 /* Hamburger button — right */
@@ -628,6 +628,18 @@ function _fmtCash(n) {
 }
 
 /**
+ * Return a CSS color string reflecting financial health.
+ * Green = healthy (>= $100k), amber = tight (< $100k), red = near bankruptcy (< $20k).
+ * @param {number} funds
+ * @returns {string}
+ */
+function _moneyColor(funds) {
+  if (funds < 20_000)  return 'var(--color-danger-text)';   // red
+  if (funds < 100_000) return 'var(--color-warning)';       // amber
+  return 'var(--color-money)';                              // green
+}
+
+/**
  * Format an interest rate decimal as a percentage string.
  * @param {number} r  e.g. 0.03
  * @returns {string}  e.g. "3%"
@@ -685,6 +697,7 @@ export function initTopBar(container, state, { onExitToMenu, onLoadGame }) {
   cash.setAttribute('aria-label', 'View loan details');
   cash.title = 'View loan details';
   cash.textContent = _fmtCash(state.money ?? 0);
+  cash.style.color = _moneyColor(state.money ?? 0);
   cash.addEventListener('click', () => _openLoanModal());
 
   // Hamburger button — right
@@ -768,6 +781,7 @@ export function refreshTopBar() {
   const cashEl = document.getElementById('topbar-cash');
   if (cashEl) {
     cashEl.textContent = _fmtCash(_state.money ?? 0);
+    cashEl.style.color = _moneyColor(_state.money ?? 0);
   }
   const flightEl = document.getElementById('topbar-flight');
   if (flightEl) {

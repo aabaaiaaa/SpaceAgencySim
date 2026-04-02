@@ -85,7 +85,7 @@
 - **Verification**: Open Settings from hub — no hub buildings or weather panel should be visible behind it. Repeat for Construction, Help, and VAB Design Library.
 
 ### TASK-015: Fix money color logic
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Money displayed in red/orange even with $2M starting funds (healthy amount). The color should reflect actual financial health: green when funds > reasonable threshold (e.g., > $500k or > next rocket cost), amber when tight (< $100k), red when near bankruptcy (< $20k or can't afford any rocket). See requirements section 7.1.
 - **Verification**: Fresh game with $2M — money should be green. Near Bankruptcy save with $15k — money should be red. Mid-game with healthy funds — money should be green.
