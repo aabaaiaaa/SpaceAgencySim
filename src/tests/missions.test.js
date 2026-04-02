@@ -25,7 +25,7 @@ import {
   checkObjectiveCompletion,
 } from '../core/missions.js';
 import { processFlightReturn } from '../core/flightReturn.js';
-import { MISSIONS, ObjectiveType, MissionStatus } from '../data/missions.js';
+import { MISSIONS, ObjectiveType, MissionStatus, rebuildMissionsIndex } from '../data/missions.js';
 
 // ---------------------------------------------------------------------------
 // Test fixture helpers
@@ -110,9 +110,11 @@ function makeFlightState(missionId, overrides = {}) {
 function withMissions(...defs) {
   const saved = MISSIONS.splice(0, MISSIONS.length); // save & clear
   MISSIONS.push(...defs);
+  rebuildMissionsIndex();
   return () => {
     MISSIONS.splice(0, MISSIONS.length); // clear injected
     MISSIONS.push(...saved);             // restore original
+    rebuildMissionsIndex();
   };
 }
 

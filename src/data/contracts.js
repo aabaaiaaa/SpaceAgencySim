@@ -753,6 +753,14 @@ export const CONTRACT_TEMPLATES = [
   },
 ];
 
+/**
+ * Contract templates indexed by ID for O(1) lookups.
+ * Built once at module load time from the CONTRACT_TEMPLATES array.
+ *
+ * @type {Map<string, ContractTemplate>}
+ */
+export const CONTRACT_TEMPLATES_BY_ID = new Map(CONTRACT_TEMPLATES.map((t) => [t.id, t]));
+
 // ---------------------------------------------------------------------------
 // Chain continuation templates
 // ---------------------------------------------------------------------------

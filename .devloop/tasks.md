@@ -67,7 +67,7 @@
 - **Verification**: Run `npm run test:unit` — all tests pass. Then run `npx playwright test e2e/flight.spec.js` to verify part hover/click behavior during flight still works.
 
 ### TASK-012: Convert mission/contract Array.find lookups to Map
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Mission and contract lookups in `src/data/missions.js` and `src/data/contracts.js` (and any core modules that look up by ID) use `Array.find()` O(n). Build `Map` objects keyed by ID at module load time and export them alongside the arrays. Update all lookup sites to use the maps. See requirements Section 4.3.
 - **Verification**: Run `npm run test:unit` — all tests pass. Grep for `.find(` in mission/contract lookup paths and verify they've been replaced. No E2E needed — data layer only, unit tests cover mission/contract logic.

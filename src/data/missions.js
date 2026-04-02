@@ -1099,3 +1099,24 @@ export const MISSIONS = [
   },
 
 ];
+
+/**
+ * Mission templates indexed by ID for O(1) lookups.
+ * Built at module load time from the MISSIONS array.
+ * Call `rebuildMissionsIndex()` if the MISSIONS array is mutated at runtime
+ * (e.g. during tests).
+ *
+ * @type {Map<string, MissionDef>}
+ */
+export const MISSIONS_BY_ID = new Map(MISSIONS.map((m) => [m.id, m]));
+
+/**
+ * Rebuild the MISSIONS_BY_ID index after the MISSIONS array has been mutated.
+ * Only needed for test fixtures that splice the array.
+ */
+export function rebuildMissionsIndex() {
+  MISSIONS_BY_ID.clear();
+  for (const m of MISSIONS) {
+    MISSIONS_BY_ID.set(m.id, m);
+  }
+}

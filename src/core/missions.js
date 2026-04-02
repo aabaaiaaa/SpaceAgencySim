@@ -31,7 +31,7 @@
  * @module missions
  */
 
-import { MISSIONS, MissionStatus, ObjectiveType } from '../data/missions.js';
+import { MISSIONS, MISSIONS_BY_ID, MissionStatus, ObjectiveType } from '../data/missions.js';
 import { earnReward } from './finance.js';
 import { getTechTreeUnlockedParts } from './techtree.js';
 import { awardFacility } from './construction.js';
@@ -117,7 +117,7 @@ export function getUnlockedParts(state) {
   const ids = new Set(state.parts);
 
   for (const completedMission of state.missions.completed) {
-    const def = MISSIONS.find((m) => m.id === completedMission.id);
+    const def = MISSIONS_BY_ID.get(completedMission.id);
     if (def) {
       for (const partId of def.unlockedParts) {
         ids.add(partId);
@@ -154,7 +154,7 @@ export function reconcileParts(state) {
   ];
 
   for (const mission of allMissions) {
-    const def = MISSIONS.find((m) => m.id === mission.id);
+    const def = MISSIONS_BY_ID.get(mission.id);
     if (!def) continue;
 
     // requiredParts — unlocked on acceptance.
@@ -170,7 +170,7 @@ export function reconcileParts(state) {
 
   // unlockedParts — rewards from completed missions.
   for (const mission of state.missions.completed ?? []) {
-    const def = MISSIONS.find((m) => m.id === mission.id);
+    const def = MISSIONS_BY_ID.get(mission.id);
     if (!def) continue;
     for (const partId of def.unlockedParts) {
       if (!owned.has(partId)) {
@@ -252,7 +252,7 @@ export function acceptMission(state, id) {
   // Unlock any parts the mission requires to be completable.
   // Fall back to the catalog definition for saves created before requiredParts existed.
   const reqParts = mission.requiredParts
-    ?? MISSIONS.find((d) => d.id === mission.id)?.requiredParts
+    ?? MISSIONS_BY_ID.get(mission.id)?.requiredParts
     ?? [];
   const unlockedParts = [];
   if (reqParts.length > 0) {
@@ -270,7 +270,7 @@ export function acceptMission(state, id) {
   // Used by tutorial missions that need the facility built BEFORE the player
   // can complete the mission objectives (e.g. "use the R&D Lab").
   let awardedFacility = null;
-  const def = MISSIONS.find((d) => d.id === mission.id);
+  const def = MISSIONS_BY_ID.get(mission.id);
   if (def?.awardsFacilityOnAccept) {
     const facilityResult = awardFacility(state, def.awardsFacilityOnAccept);
     if (facilityResult.success) {
@@ -318,7 +318,7 @@ export function completeMission(state, id) {
   // Unlock any parts gated on this mission.
   // The canonical unlock list comes from the template definition so that
   // edits to templates are reflected even on loaded saves.
-  const def = MISSIONS.find((m) => m.id === id);
+  const def = MISSIONS_BY_ID.get(id);
   const unlockedParts = [];
   let awardedFacility = null;
   if (def) {
