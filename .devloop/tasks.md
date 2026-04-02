@@ -85,7 +85,7 @@
 - **Verification**: Run `npx vitest run src/tests/sciencemodule.test.js` — all tests pass.
 
 ### TASK-015: Add unit tests for customChallenges.js
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Create `src/tests/customChallenges.test.js` covering challenge creation, validation, completion detection, and edge cases. See requirements Section 5.1.
 - **Verification**: Run `npx vitest run src/tests/customChallenges.test.js` — all tests pass.
