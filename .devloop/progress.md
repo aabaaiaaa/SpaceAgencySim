@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 24
-- **Completed**: 11
-- **Remaining**: 13
-- **Last Updated**: 2026-04-02T00:56:11.431Z
+- **Completed**: 12
+- **Remaining**: 12
+- **Last Updated**: 2026-04-02T01:51:39.466Z
 
 ## Iteration Log
 
@@ -106,4 +106,13 @@
 - **Exit Status**: success
 - **Tokens**: 475,750 total (14 in, 3,639 out, 31,517 cache-create, 440,580 cache-read)
 - **Cost**: $0.5083
+
+### Iteration 12 - 2026-04-02T00:56:14.542Z
+- **Task Attempted**: TASK-012
+- **Task Completed**: TASK-012
+- **Summary**: Completed Standardise facility header format
+- **Duration**: 55m 25s
+- **Exit Status**: success
+- **Tokens**: 85,035 total (3 in, 50 out, 217 cache-create, 84,765 cache-read)
+- **Cost**: $3.3649
 

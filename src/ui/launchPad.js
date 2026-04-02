@@ -16,7 +16,7 @@
  */
 
 import { getPartById } from '../data/parts.js';
-import { PartType, FacilityId, LAUNCH_PAD_MAX_MASS } from '../core/constants.js';
+import { PartType, FacilityId, LAUNCH_PAD_MAX_MASS, LAUNCH_PAD_TIER_LABELS } from '../core/constants.js';
 import { getCurrentWeather, getWeatherSkipCost, skipWeather } from '../core/weather.js';
 import {
   createRocketAssembly,
@@ -508,13 +508,14 @@ function _renderShell() {
   });
   header.appendChild(backBtn);
 
+  const padTier = getFacilityTier(_state, FacilityId.LAUNCH_PAD);
+  const padTierLabel = LAUNCH_PAD_TIER_LABELS[padTier] || '';
   const title = document.createElement('h1');
   title.id = 'launch-pad-title';
-  title.textContent = 'Launch Pad';
+  title.textContent = `Launch Pad \u2014 Tier ${padTier}` + (padTierLabel ? ` (${padTierLabel})` : '');
   header.appendChild(title);
 
-  // Show pad tier info
-  const padTier = getFacilityTier(_state, FacilityId.LAUNCH_PAD);
+  // Show pad capability details
   const maxMass = LAUNCH_PAD_MAX_MASS[padTier] ?? LAUNCH_PAD_MAX_MASS[1];
   const tierInfo = document.createElement('span');
   tierInfo.style.cssText =
@@ -526,7 +527,7 @@ function _renderShell() {
   if (padTier >= 2) features.push('Fuel Top-Off');
   if (padTier >= 3) features.push('Launch Clamps');
   const featureStr = features.length > 0 ? ` | ${features.join(', ')}` : '';
-  tierInfo.textContent = `Tier ${padTier} | Max Mass: ${massLabel}${featureStr}`;
+  tierInfo.textContent = `Max Mass: ${massLabel}${featureStr}`;
   header.appendChild(tierInfo);
 
   _overlay.appendChild(header);

@@ -1186,6 +1186,37 @@ export function getReputationDiscount(reputation: number): number {
 }
 
 // ---------------------------------------------------------------------------
+// Facility Tier Labels (for facilities without full TierFeatureSet definitions)
+// ---------------------------------------------------------------------------
+
+/**
+ * Launch Pad tier display labels for the facility header.
+ */
+export const LAUNCH_PAD_TIER_LABELS: Readonly<Record<number, string>> = Object.freeze({
+  1: 'Basic',
+  2: 'Enhanced',
+  3: 'Heavy Lift',
+});
+
+/**
+ * R&D Lab tier display labels for the facility header.
+ */
+export const RD_LAB_TIER_LABELS: Readonly<Record<number, string>> = Object.freeze({
+  1: 'Foundation',
+  2: 'Advanced',
+  3: 'Cutting Edge',
+});
+
+/**
+ * Satellite Network Operations Centre tier display labels for the facility header.
+ */
+export const SATELLITE_OPS_TIER_LABELS: Readonly<Record<number, string>> = Object.freeze({
+  1: 'Monitoring',
+  2: 'Commercial',
+  3: 'Command',
+});
+
+// ---------------------------------------------------------------------------
 // Launch Pad Tier Limits
 // ---------------------------------------------------------------------------
 

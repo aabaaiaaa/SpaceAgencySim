@@ -26,6 +26,7 @@ import {
   SATELLITE_LEASE_INCOME_DEFAULT,
   SATELLITE_REPOSITION_COST,
   SATELLITE_REPOSITION_HEALTH_COST,
+  SATELLITE_OPS_TIER_LABELS,
 } from '../core/constants.js';
 import {
   getNetworkSummary,
@@ -85,17 +86,6 @@ const SAT_OPS_STYLES = `
   letter-spacing: 0.03em;
   color: #f0f0f0;
   margin: 0;
-}
-
-#sat-ops-tier-badge {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #80c8ff;
-  background: rgba(128,200,255,0.12);
-  border: 1px solid rgba(128,200,255,0.2);
-  padding: 2px 10px;
-  border-radius: 12px;
-  letter-spacing: 0.04em;
 }
 
 /* ── Content ─────────────────────────────────────────────────────────────── */
@@ -522,16 +512,9 @@ function _render() {
 
   const title = document.createElement('h1');
   title.id = 'sat-ops-title';
-  title.textContent = 'Satellite Network Operations';
+  const satTierLabel = SATELLITE_OPS_TIER_LABELS[summary.tier] || '';
+  title.textContent = `Satellite Network Operations \u2014 Tier ${summary.tier}` + (satTierLabel ? ` (${satTierLabel})` : '');
   header.appendChild(title);
-
-  // Tier badge.
-  if (summary.tier > 0) {
-    const badge = document.createElement('span');
-    badge.id = 'sat-ops-tier-badge';
-    badge.textContent = `Tier ${summary.tier}`;
-    header.appendChild(badge);
-  }
 
   _overlay.appendChild(header);
 

@@ -14,6 +14,8 @@ import {
   researchNode,
   getMaxResearchableTier,
 } from '../core/techtree.js';
+import { FacilityId, RD_LAB_TIER_LABELS } from '../core/constants.js';
+import { getFacilityTier } from '../core/construction.js';
 import { refreshTopBar } from './topbar.js';
 
 // ---------------------------------------------------------------------------
@@ -328,9 +330,11 @@ function _render() {
   });
   header.appendChild(backBtn);
 
+  const rdTier = _state ? getFacilityTier(_state, FacilityId.RD_LAB) : 1;
+  const rdTierLabel = RD_LAB_TIER_LABELS[rdTier] || '';
   const title = document.createElement('h1');
   title.id = 'rd-title';
-  title.textContent = 'R&D Lab — Technology Tree';
+  title.textContent = `R&D Lab \u2014 Tier ${rdTier}` + (rdTierLabel ? ` (${rdTierLabel})` : '');
   header.appendChild(title);
 
   // Resource display

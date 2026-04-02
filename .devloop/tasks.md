@@ -67,7 +67,7 @@
 - **Verification**: Visit every facility screen — all should show "← Hub" as the back button.
 
 ### TASK-012: Standardise facility header format
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Each facility displays its tier differently. MCC uses inline "— Tier 1 (Basic)"; Tracking Station uses a separate badge; Satellite Ops uses a badge; Crew Admin sometimes shows no tier; Launch Pad puts it on the right. Standardise to: `[Facility Name] — Tier X (Tier Label)` inline in the H1, matching the MCC pattern. See requirements section 5.2.
 - **Verification**: Visit each facility — all should show tier in the same format.

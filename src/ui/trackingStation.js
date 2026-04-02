@@ -73,17 +73,6 @@ const TS_STYLES = `
   margin: 0;
 }
 
-#ts-tier-badge {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #80c8ff;
-  background: rgba(128,200,255,0.12);
-  border: 1px solid rgba(128,200,255,0.2);
-  padding: 2px 10px;
-  border-radius: 12px;
-  letter-spacing: 0.04em;
-}
-
 /* -- Content ------------------------------------------------------------- */
 #ts-content {
   flex: 1;
@@ -430,14 +419,8 @@ function _render() {
 
   const title = document.createElement('h1');
   title.id = 'ts-title';
-  title.textContent = 'Tracking Station';
+  title.textContent = `Tracking Station \u2014 Tier ${tier} (${tierInfo.label})`;
   header.appendChild(title);
-
-  // Tier badge.
-  const badge = document.createElement('span');
-  badge.id = 'ts-tier-badge';
-  badge.textContent = `Tier ${tier} — ${tierInfo.label}`;
-  header.appendChild(badge);
 
   _overlay.appendChild(header);
 

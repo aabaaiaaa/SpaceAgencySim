@@ -443,18 +443,6 @@ const CREW_ADMIN_STYLES = `
   flex-shrink: 0;
 }
 
-.crew-tier-badge {
-  display: inline-block;
-  padding: 3px 10px;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  background: rgba(60, 120, 220, 0.2);
-  color: #80b4f0;
-  border: 1px solid rgba(60, 120, 220, 0.35);
-}
-
 .crew-tier-features {
   display: flex;
   gap: 14px;
@@ -756,24 +744,19 @@ function _renderShell() {
   });
   header.appendChild(backBtn);
 
+  const crewAdminTier = _state ? getFacilityTier(_state, FacilityId.CREW_ADMIN) : 1;
+  const tierFeatures = CREW_ADMIN_TIER_FEATURES[crewAdminTier];
   const title = document.createElement('h1');
   title.id = 'crew-admin-title';
-  title.textContent = 'Crew Administration';
+  title.textContent = `Crew Administration \u2014 Tier ${crewAdminTier}` + (tierFeatures ? ` (${tierFeatures.label})` : '');
   header.appendChild(title);
 
   _overlay.appendChild(header);
 
-  // Tier info bar
-  const crewAdminTier = _state ? getFacilityTier(_state, FacilityId.CREW_ADMIN) : 1;
-  const tierFeatures = CREW_ADMIN_TIER_FEATURES[crewAdminTier];
+  // Tier feature list
   if (tierFeatures) {
     const tierBar = document.createElement('div');
     tierBar.className = 'crew-tier-bar';
-
-    const badge = document.createElement('span');
-    badge.className = 'crew-tier-badge';
-    badge.textContent = `Tier ${crewAdminTier} — ${tierFeatures.label}`;
-    tierBar.appendChild(badge);
 
     const featureList = document.createElement('div');
     featureList.className = 'crew-tier-features';
