@@ -115,7 +115,7 @@
 - **Verification**: Complete a mission and return — a summary overlay should appear showing rewards and costs. Crash with completed objectives — the crash screen should mention the mission reward.
 
 ### TASK-020: Style "Flight View"/"Map View" labels as status indicators
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: The "Flight View" and "Map View" labels shown during flight look like clickable buttons but are just status indicators. Restyle them as passive text — smaller, no border, no hover effect, perhaps with a subtle icon. See requirements section 3.6.
 - **Verification**: Toggle between flight and map view — the label should look like status text, not a button.

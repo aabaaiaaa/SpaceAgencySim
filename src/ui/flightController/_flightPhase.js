@@ -29,8 +29,9 @@ import { toggleMapView } from './_mapView.js';
  * after 3 s.
  *
  * @param {string} label  Text to display.
- * @param {'info'|'warning'} [style='info']  Visual style — 'warning' uses an
- *   amber colour scheme for deorbit warnings.
+ * @param {'info'|'warning'|'status'} [style='info']  Visual style — 'warning'
+ *   uses an amber colour scheme for deorbit warnings; 'status' uses a subtle
+ *   passive text style for view indicators.
  */
 export function showPhaseNotification(label, style = 'info') {
   const host = document.getElementById('ui-overlay') ?? document.body;
@@ -42,6 +43,7 @@ export function showPhaseNotification(label, style = 'info') {
   const el = document.createElement('div');
   el.className = 'phase-notification';
   if (style === 'warning') el.classList.add('phase-notification-warning');
+  if (style === 'status') el.classList.add('phase-notification-status');
   el.textContent = label;
   host.appendChild(el);
 

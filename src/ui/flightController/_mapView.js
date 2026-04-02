@@ -73,7 +73,7 @@ export function toggleMapView() {
     setFlightInputEnabled(false);
     showMapScene();
     buildMapHud();
-    showPhaseNotification('Map View');
+    showPhaseNotification('\u{1F4E1} Map View', 'status');
   } else {
     // Switch back to flight view.
     hideMapScene();
@@ -88,7 +88,7 @@ export function toggleMapView() {
     }
     s.mapHeldKeys.clear();
 
-    showPhaseNotification('Flight View');
+    showPhaseNotification('\u{1F680} Flight View', 'status');
   }
 }
 

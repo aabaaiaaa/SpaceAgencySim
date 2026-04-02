@@ -459,6 +459,17 @@ export const FLIGHT_CTRL_CSS = `
   color: #ffe0a0;
 }
 
+.phase-notification-status {
+  background: none;
+  border: none;
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 400;
+  color: rgba(180, 210, 240, 0.8);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .phase-notification-fade {
   opacity: 0;
 }

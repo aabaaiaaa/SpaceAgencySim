@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 24
-- **Completed**: 19
-- **Remaining**: 5
-- **Last Updated**: 2026-04-02T02:57:04.278Z
+- **Completed**: 20
+- **Remaining**: 4
+- **Last Updated**: 2026-04-02T03:00:03.269Z
 
 ## Iteration Log
 
@@ -178,4 +178,13 @@
 - **Exit Status**: success
 - **Tokens**: 3,658,528 total (49 in, 15,242 out, 89,759 cache-create, 3,553,478 cache-read)
 - **Cost**: $2.9080
+
+### Iteration 20 - 2026-04-02T02:57:07.451Z
+- **Task Attempted**: TASK-020
+- **Task Completed**: TASK-020
+- **Summary**: Completed Style "Flight View"/"Map View" labels as status indicators
+- **Duration**: 2m 56s
+- **Exit Status**: success
+- **Tokens**: 700,512 total (16 in, 3,729 out, 45,302 cache-create, 651,465 cache-read)
+- **Cost**: $0.7022
 
