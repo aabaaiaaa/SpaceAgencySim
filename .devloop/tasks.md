@@ -7,7 +7,7 @@
 - **Verification**: `npm run test:unit` passes. New unit tests verify: tick() throwing is caught, consecutive errors trigger abort path, intermittent errors allow recovery.
 
 ### TASK-002: Add defensive null guards to designLibrary.js
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Add `if (!Array.isArray(state.savedDesigns)) state.savedDesigns = [];` before all `.findIndex()`, `.filter()`, and `.push()` calls on `state.savedDesigns` in `src/core/designLibrary.js`. Audit all functions in the file for this pattern. See requirements Section 1.2.
 - **Verification**: `npm run test:unit` passes. New unit test covers `saveDesignToLibrary()` with `state.savedDesigns` as undefined and null.

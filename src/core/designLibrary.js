@@ -199,6 +199,7 @@ export function getAllDesigns(state) {
  * @param {import('./gameState.js').RocketDesign} design
  */
 export function saveDesignToLibrary(state, design) {
+  if (!Array.isArray(state.savedDesigns)) state.savedDesigns = [];
   if (design.savePrivate) {
     // Save to game state's private designs
     const idx = state.savedDesigns.findIndex((d) => d.id === design.id);
@@ -223,6 +224,7 @@ export function saveDesignToLibrary(state, design) {
  * @param {string} designId
  */
 export function deleteDesignFromLibrary(state, designId) {
+  if (!Array.isArray(state.savedDesigns)) state.savedDesigns = [];
   // Remove from both locations
   state.savedDesigns = state.savedDesigns.filter((d) => d.id !== designId);
   deleteDesignFromSharedLibrary(designId);

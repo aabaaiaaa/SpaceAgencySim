@@ -330,6 +330,32 @@ describe('Design Library', () => {
       expect(state.savedDesigns).toHaveLength(0);
     });
 
+    it('handles undefined savedDesigns when saving private design', () => {
+      const state = freshState();
+      state.savedDesigns = undefined;
+      const design = makeDesign({ savePrivate: true });
+      expect(() => saveDesignToLibrary(state, design)).not.toThrow();
+      expect(state.savedDesigns).toHaveLength(1);
+      expect(state.savedDesigns[0].id).toBe('design-test-1');
+    });
+
+    it('handles null savedDesigns when saving private design', () => {
+      const state = freshState();
+      state.savedDesigns = null;
+      const design = makeDesign({ savePrivate: true });
+      expect(() => saveDesignToLibrary(state, design)).not.toThrow();
+      expect(state.savedDesigns).toHaveLength(1);
+    });
+
+    it('handles undefined savedDesigns when saving shared design', () => {
+      const state = freshState();
+      state.savedDesigns = undefined;
+      const design = makeDesign({ savePrivate: false });
+      expect(() => saveDesignToLibrary(state, design)).not.toThrow();
+      expect(loadSharedLibrary()).toHaveLength(1);
+      expect(state.savedDesigns).toEqual([]);
+    });
+
     it('overwrites existing private design with same ID', () => {
       const state = freshState();
       state.savedDesigns = [makeDesign({ savePrivate: true, name: 'Old' })];
@@ -361,6 +387,20 @@ describe('Design Library', () => {
       state.savedDesigns = [makeDesign()];
       deleteDesignFromLibrary(state, 'design-test-1');
       expect(state.savedDesigns).toHaveLength(0);
+    });
+
+    it('handles undefined savedDesigns', () => {
+      const state = freshState();
+      state.savedDesigns = undefined;
+      expect(() => deleteDesignFromLibrary(state, 'design-test-1')).not.toThrow();
+      expect(state.savedDesigns).toEqual([]);
+    });
+
+    it('handles null savedDesigns', () => {
+      const state = freshState();
+      state.savedDesigns = null;
+      expect(() => deleteDesignFromLibrary(state, 'design-test-1')).not.toThrow();
+      expect(state.savedDesigns).toEqual([]);
     });
   });
 
