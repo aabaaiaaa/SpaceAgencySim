@@ -1,253 +1,226 @@
-# UX Polish & Consistency Requirements
+# Iteration 2 — Code Quality, Resilience & Test Coverage
 
-This document describes the UX issues, styling inconsistencies, and bugs found during a comprehensive audit of the game using Playwright. The previous iteration built out all game features — this iteration focuses exclusively on polishing what exists. No new features; only fixes, consistency improvements, and UX refinements.
+This iteration addresses findings from the Iteration 1 final code review. No new game features — the focus is on error handling, UI lifecycle management, performance, test coverage gaps, and a couple of lingering UX items from the previous iteration's requirements that weren't fully addressed.
 
----
-
-## 1. Critical Bugs
-
-### 1.1 "Back" button destroys the hub (Tracking Station, Satellite Ops, Library)
-
-Clicking "Back" from Tracking Station, Satellite Ops, or Library returns to a completely blank screen — only the topbar remains, all hub content (buildings, weather, reputation, action buttons) is gone. 100% reproducible.
-
-**Root cause:** The `onBack` callbacks in `src/ui/index.js` (lines 316, 339, 362) correctly call `showHubScene()` and `initHubUI()`, but the `initTrackingStationUI`, `initSatelliteOpsUI`, or `initLibraryUI` cleanup functions are likely not properly tearing down their DOM before the hub re-initialises. These three facilities were added in a later phase and use a different internal pattern than the original facilities (MCC, Crew Admin, VAB, Launch Pad) which work correctly.
-
-**Fix:** Investigate the destroy/cleanup logic in the Tracking Station, Satellite Ops, and Library UI modules. Their back-button handlers must properly clean up before the hub re-renders. Compare with the working pattern used by Crew Admin or Mission Control.
-
-### 1.2 R&D Lab / Tech Tree completely inaccessible
-
-Clicking R&D Lab from the hub only highlights it with a yellow border — no panel opens. This is because `_handleNavigation()` in `src/ui/index.js` has no handler for the `rd-lab` destination. The function handles vab, crew-admin, mission-control, launch-pad, satellite-ops, tracking-station, and library — but `rd-lab` is completely missing.
-
-**Fix:** Add an `if (destination === 'rd-lab')` handler in `_handleNavigation()` following the same pattern as other facilities. This requires either an existing `initRdLabUI` function or creating one that shows the tech tree.
-
-### 1.3 All buildings visible on hub in tutorial mode
-
-The hub renders all 8 facilities (Launch Pad, VAB, MCC, Crew Admin, Tracking Station, R&D Lab, Satellite Ops, Library) as clickable buildings regardless of whether they're built. The Construction menu correctly shows locked facilities, but the hub building renderer ignores lock state entirely.
-
-**Root cause:** `_renderBuildings()` in `src/ui/hub.js` (lines 1532-1572) iterates through the `BUILDINGS` array and renders all buildings unconditionally. The navigation handler in `src/ui/index.js` also has no lock check before opening facility screens.
-
-**Fix:** The hub building renderer must filter buildings based on `hasFacility(state, buildingId)`. Unbuilt facilities should either be hidden entirely or shown as greyed-out placeholders with a "Locked" indicator. The navigation handler should also check facility lock state and show a message instead of opening the panel if the facility isn't built.
-
-### 1.4 "Load Game" exits to main menu, destroying unsaved progress
-
-Clicking "Load Game" from the hamburger menu navigates to the main menu, which has NO load game functionality — only "Start Game". The player's unsaved progress is silently destroyed with no warning or confirmation dialog.
-
-**Fix:** Either (a) show a load game dialog as a modal overlay within the current game (like the save dialog), or (b) add a load/continue section to the main menu. At minimum, add a confirmation dialog before destroying the current game: "Any unsaved progress will be lost. Continue?"
-
-### 1.5 Main menu has no load/continue functionality
-
-The main menu only shows "New Game" with agency name, game mode, and Start Game button. There is no way to load a previously saved game. The `#mm-load-screen` element referenced in E2E tests does not exist in the production UI.
-
-**Fix:** Add a "Load Game" / "Continue" section to the main menu that shows saved game slots (similar to the save dialog).
-
-### 1.6 Debug saves don't populate available missions
-
-Every debug save has `available: []` and `accepted: []` for missions. After loading a mid-game debug save, the MCC shows "No missions currently available" even though missions should be unlockable based on the completed list. The debug save factory doesn't run the mission unlock logic after setting the completed list.
-
-**Fix:** After loading a debug save, run the mission unlock evaluation to populate the available missions list based on completed missions and their dependency chains.
+The codebase is ~66,000 lines of source with 2,271 passing unit tests and 31 E2E spec files. All work builds on the existing codebase; nothing is being rewritten.
 
 ---
 
-## 2. Hub & Navigation UX
+## 1. Error Handling & Resilience
 
-### 2.1 No welcome/introduction message
+### 1.1 localStorage Quota Handling
 
-All three game modes (Tutorial, Freeplay, Sandbox) drop the player directly into the hub with no context. Tutorial mode especially needs an introduction that explains: what the player's role is, why they have $2M + a $2M loan, what a "period"/"flight" means, and what to do first (go to Mission Control to accept the first mission). This should be a dismissable modal or overlay that appears once on first entering the hub.
+`localStorage.setItem()` can throw `QuotaExceededError` if the player accumulates many saves or large rocket designs. This is currently unhandled in two locations:
 
-### 2.2 No facility unlock notifications
+- `src/core/saveload.js` (around line 205 and 502) — game save persistence
+- `src/core/designLibrary.js` (around line 140) — rocket design persistence
 
-When accepting a tutorial mission that awards a facility (e.g., "First Crew Flight" awards Crew Admin + cmd-mk1), the facility and parts are silently unlocked. The MCC just returns to the normal mission list. There should be a clear notification/modal: "Crew Administration building unlocked! You can now hire astronauts. Command Module Mk1 is now available in the VAB."
+Both need try-catch wrappers that surface a user-friendly "Storage full" message rather than silently crashing. This is the most likely production failure mode for players who play extensively.
 
-### 2.3 Multiple missions unlock simultaneously without guidance
+### 1.2 Silent Error Swallowing in designLibrary.js
 
-After mission 4, four missions appear at once (Safe Return I, Controlled Descent, Leg Day, First Crew Flight) with no indication of priority or that "First Crew Flight" is the critical tutorial unlock mission. Tutorial mode should either highlight key missions or provide ordering hints.
+`designLibrary.js` (around lines 125-132) catches corrupt JSON during design library loading and silently returns `[]` with no logging. This hides data corruption from developers. Add `console.warn()` to these catch blocks so corruption is at least visible in the console. This should be done alongside 1.1 since they touch the same file.
 
-### 2.4 Weather panel overlaps Reputation widget
+### 1.3 Flight HUD requestAnimationFrame Crash Recovery
 
-The Launch Conditions panel completely covers the Reputation display on the hub. The Reputation widget exists in the DOM ("50 / Good") but is invisible. These two widgets need separate, non-overlapping positions.
+The flight HUD's `requestAnimationFrame` loop has no try-catch. If physics state becomes invalid mid-flight (NaN propagation, missing part references, etc.), the entire HUD crashes with no recovery path. The loop should catch errors gracefully — log the error, attempt to continue, and if repeated failures occur, offer the player a way to abort to the hub rather than leaving them on a frozen screen.
 
-### 2.5 Debug Saves button visible in normal gameplay
+### 1.4 Flight Phase Transition Ordering Fragility
 
-The bright orange "Debug Saves" button sits prominently in the top-right corner. This should be hidden in production or behind a developer key combo (e.g., Ctrl+Shift+D).
+`src/core/flightPhase.js` (around lines 222-255) has the MANOEUVRE exit handler check for escape trajectory first, transition through ORBIT to TRANSFER, and return early. The normal manoeuvre exit is checked second. The early return prevents double-mutation, so the logic is **correct** — but a future change that removes the early return would introduce a bug. Add a clear comment explaining the ordering dependency and why the early return is load-bearing.
 
-### 2.6 Construction/Settings/Debug buttons float disconnected
+### 1.5 Timer Stacking in debugSaves.js
 
-Three action buttons (Debug Saves, Settings, Construction) float in the top-right of the hub with inconsistent styling and no visual grouping. They should be integrated into the hub layout more cohesively — perhaps in a sidebar, the topbar, or the hamburger menu.
-
-### 2.7 No game mode indicator on the hub
-
-There's no visual indication of whether you're in Tutorial, Freeplay, or Sandbox mode once in the game. The hub looks identical for all three modes.
-
-### 2.8 Sandbox shows weather despite it being disabled
-
-Sandbox has `weatherEnabled: false` but the weather panel still displays on the hub. It should be hidden or show "Weather disabled".
+`debugSaves.js` (around line 343) stores a timeout on a DOM element property (`feedbackEl._timer`) but never clears the previous timeout before setting a new one. Rapid debug save loads stack timers, causing visual glitches. Clear the previous timeout before setting a new one.
 
 ---
 
-## 3. Flight View UX
+## 2. UI Lifecycle Management
 
-### 3.1 Hub building labels visible during flight
+### 2.1 Event Listener Cleanup
 
-During all flight phases (ground, atmosphere, orbit, map view), the hub building labels (Launch Pad, VAB, MCC, Crew Admin, Tracking Station, R&D Lab, Satellite Ops, Library) are visible at the bottom of the screen. The flight view doesn't properly hide or overlay the hub.
+Several UI modules add event listeners that are never removed when their panels close:
 
-**Fix:** The hub overlay must be fully hidden when entering flight mode. The flight controller should ensure the hub DOM elements are not visible.
+- **`help.js`** — Tab click handlers created every time help opens; not removed on close. Repeated opens accumulate duplicate handlers.
+- **`settings.js`** — Difficulty option click handlers not removed when the settings panel closes.
+- **`debugSaves.js`** — Load button handlers not explicitly removed (relies on `panel.remove()` garbage collection, which doesn't reliably remove listeners on all elements).
+- **`topbar.js`** — Click handlers on menu items stored in arrays but cleanup path not verified for all cases.
 
-### 3.2 Weather panel shown during flight and in space
+In a long-running single-page game, accumulated listeners cause memory pressure and unexpected behavior when stale handlers fire. The fix should create a pattern for tracking listeners and clearing them on panel close — ideally a small helper that other modules can reuse, since this is a cross-cutting concern.
 
-The Launch Conditions panel (wind, ISP, visibility) persists throughout the entire flight, including at 150km altitude in orbit. Weather is irrelevant above the atmosphere. The panel should be hidden once the craft exits the atmosphere or at minimum during ORBIT phase.
+### 2.2 Style Element Accumulation
 
-### 3.3 Debug Saves/Settings/Construction visible during flight
+Multiple UI modules inject `<style>` elements into `document.head` on initialization but never remove them during teardown. When the player cycles through main menu → game → exit → new game, style elements accumulate. Each cycle adds ~10KB of CSS that persists until page reload.
 
-These hub-only action buttons persist across all game screens including active flight and orbital views. They should be hidden when not on the hub.
-
-### 3.4 Mission objective overlay overlaps hub buttons
-
-The mission objective tracker in the top-right (e.g., "FIRST FLIGHT / Reach 100 m altitude") overlaps with the Construction button. Since the Construction button shouldn't be visible during flight anyway, fixing 3.3 fixes this too.
-
-### 3.5 "PART_DESTROYED" raw enum in flight log
-
-When parts are destroyed on crash, the flight log shows `PART_DESTROYED` as raw text instead of human-readable messages like "Probe Core Mk1 destroyed" or "Small Tank destroyed". This appears in both the flight log and the Rocket Destroyed post-crash screen.
-
-### 3.6 "Flight View" / "Map View" labels look like buttons
-
-Prominent centered labels toggle between "Map View" and "Flight View" but look like clickable UI elements rather than passive status indicators. They should be styled as status text, not buttons.
-
-### 3.7 Biome transition shows raw altitude in meters
-
-Flight log entries like "Entered low orbit biome at 150000 m." should display formatted altitude: "150 km" instead of "150000 m".
-
-### 3.8 R&D Lab building selection highlight persists into flight
-
-The yellow highlight border from clicking R&D Lab on the hub carries through to the flight view — a visual state leak. Building selection state should be cleared when leaving the hub.
+The fix should either: (a) check for existing style elements before injecting new ones (idempotent injection), or (b) remove style elements during module teardown. Option (a) is simpler and less error-prone.
 
 ---
 
-## 4. Post-Flight & Return UX
+## 3. UX Improvements (Iteration 1 Gaps)
 
-### 4.1 No post-flight summary on return to agency
+### 3.1 Tutorial Mission Blocking Indicators
 
-After completing a flight and returning to the agency, the player goes straight to the hub with no summary of what happened — no period advancement notice, no costs breakdown, no mission rewards. The return-results overlay (`#return-results-dismiss-btn`) exists in code but rarely appears.
+**Carries forward from Iteration 1 Requirement 2.3**, which was only partially addressed.
 
-### 4.2 Crash screen doesn't show mission rewards
+When multiple missions unlock simultaneously in tutorial mode, there's no indication of which missions are prerequisites for unlocking later content. For example, after mission 4, four missions appear at once — but "First Crew Flight" is the one that unlocks the Crew Admin facility and gates further progression.
 
-The "Rocket Destroyed" screen shows restart costs but doesn't mention that mission objectives were completed or what reward the player will receive. A new player completing their first mission ever gets no celebration.
+The fix: missions that are **prerequisites for other tutorial missions** should display a clear visual indicator (e.g., a label like "Unlocks next step" or a chain icon). This should be data-driven — check whether a mission's completion is in the dependency chain of any other uncompleted tutorial mission. Non-blocking tutorial missions (ones that don't gate future content) should NOT get the indicator.
 
-### 4.3 Crew KIA fine is very harsh with no warning
+This only applies in Tutorial mode. Freeplay and Sandbox should not show these indicators.
 
-A crew death on crash immediately charges $500,000 with no prior indication of the risk. The game should warn new players about crew death consequences before their first crewed flight.
+### 3.2 Weather Display Format Consistency
 
----
+**Carries forward from Iteration 1 Requirement 5.4**, which was not explicitly verified.
 
-## 5. Navigation Consistency
-
-### 5.1 Back button text varies across every screen
-
-| Screen | Button Text |
-|---|---|
-| MCC, Crew Admin, VAB, Launch Pad | `← Hub` |
-| Tracking Station, Satellite Ops, Library | `Back` |
-| Settings, Construction | `← Back to Hub` |
-| Help | `← Close Help` |
-
-**Fix:** Standardise to `← Hub` for all facility screens. Help can keep `← Close Help` since it's a different context.
-
-### 5.2 Facility header format inconsistent
-
-Each facility shows its tier differently — some inline in the title, some as separate badges, some on the right side, some not at all. Standardise to a consistent format across all facility screens.
-
-### 5.3 Flight counter absent on fresh game
-
-Fresh start shows no flight counter in the topbar. After the first flight, "Flight 1" appears. The topbar layout shifts. Either always show "Flight 0" or handle the layout so it doesn't jump.
-
-### 5.4 Weather display format differs between hub and Launch Pad
-
-Hub shows a full panel with header/title. Launch Pad shows a compact inline bar. Different visual treatment for the same information.
+The hub shows weather in a full panel with header/title. The Launch Pad shows weather in a compact inline bar. These should use a consistent visual treatment — either both use the compact format or both use the full panel. The compact format is probably better since weather is supplementary information, not a primary display.
 
 ---
 
-## 6. CSS & Styling Consistency
+## 4. Performance Optimization
 
-A code audit found systemic inconsistencies across all 15+ UI files. The root cause is that all colors, sizes, and spacing are hardcoded with no shared design tokens.
+### 4.1 PixiJS Object Pooling
 
-### 6.1 Create CSS variables for the design system
+The flight renderer creates new `PIXI.Graphics()` objects every frame in multiple sub-modules:
 
-Define a central set of CSS custom properties for: color palette (backgrounds, text, borders, accents), spacing scale (padding, margins, gaps), typography scale (font sizes for headings, body, labels), border-radius values, and z-index layers. Place these in a shared CSS file or at the `:root` level and migrate existing hardcoded values to use the variables.
+- `src/render/flight/_trails.js` — plumes, trails, RCS plumes, Mach effects
+- `src/render/flight/_debris.js` — containers and graphics per debris fragment
+- `src/render/flight/_rocket.js` — rocket part graphics
+- `src/render/flight/_sky.js` — star graphics
+- `src/render/flight/_ground.js` — biome label text objects
 
-### 6.2 Standardise border-radius
+Container children are properly cleared each frame before re-adding, so there are no memory leaks. But the constant create-destroy cycle pressures the garbage collector. For short flights this is fine; for long orbital sessions with time warp, it causes periodic frame drops during GC pauses.
 
-Currently 8 different values (3px through 10px) used inconsistently. Standardise to 3 values: 4px (buttons/small), 6px (cards/panels), 8px (modals/large).
+Implement a simple object pool for `PIXI.Graphics` and `PIXI.Text` objects. The pool should: acquire an object (create if pool empty, reuse if available), release it back to the pool on frame clear, and reset graphics state on reuse. The pool doesn't need to be complex — a simple array-based free list per object type is sufficient.
 
-### 6.3 Standardise button styles
+### 4.2 Hit Testing Optimization
 
-15+ different button background colors across the codebase. Define 3-4 button variants: primary (actions), secondary (navigation), danger (destructive), and ghost (subtle). Apply consistently.
+`src/render/flight/_rocket.js` `hitTestFlightPart()` iterates all parts on every mouse move (O(n)). For rockets with 30+ parts, this can cause perceptible input lag. Consider spatial indexing or bounding-box pre-filtering to reduce the number of detailed hit tests needed.
 
-### 6.4 Standardise panel/modal backgrounds
+### 4.3 Mission/Contract Data Lookup Optimization
 
-Multiple slightly different background colors and opacities for overlays and modals. Pick one and use it everywhere.
-
-### 6.5 Standardise font sizes
-
-Panel titles range from 1.3rem to 2rem depending on which screen. Define a typography scale and apply consistently.
-
-### 6.6 Fix z-index layering
-
-Flight HUD and topbar share z-index 100 (collision). Multiple components at z-index 400. Define a clear layering system: base (1-10), hub (10-20), overlays (50), topbar (100), dropdowns (150), modals (200), flight HUD (300).
-
-### 6.7 Standardise padding and spacing
-
-Modal padding varies from `20px` to `36px 24px 44px`. Card padding varies from `12px` to `16px`. Define a spacing scale and apply consistently.
-
-### 6.8 Fix overlay bleed-through
-
-Settings, Construction, Debug Saves, Help, and Design Library panels all allow hub elements to show through behind them. These overlays need proper opaque backgrounds or the underlying elements need to be hidden.
+Mission and contract lookups use `Array.find()` (O(n)) in code paths that run during flight. Building a `Map` keyed by ID at module load time would eliminate these repeated linear scans. The maps should be built once when the data modules load and exported alongside the arrays.
 
 ---
 
-## 7. Money Display
+## 5. Testing Improvements
 
-### 7.1 Money color logic is misleading
+### 5.1 Unit Tests for Untested Core Modules
 
-$2,000,000 starting funds shown in red/orange (warning color), which signals "danger" when the player has plenty of cash. The color appears based on loan balance, not financial health.
+The following core modules have no direct unit test coverage. They are listed in priority order based on risk and complexity:
 
-**Fix:** Money should be green when the player has healthy funds, amber when low, red only when at risk of bankruptcy. The threshold should be based on actual financial pressure, not just loan existence.
+1. **`flightReturn.js`** (HIGH) — Processes mission completion, objective validation, contract rewards, crew recovery, part recovery, and financial transactions. This is the most complex untested module and handles the critical path of "what happens when a flight ends."
+
+2. **`sciencemodule.js`** (MEDIUM) — Science module activation, data collection, yield calculation. Moderate complexity with numerical logic that benefits from unit testing.
+
+3. **`customChallenges.js`** (MEDIUM) — Custom challenge creation and validation logic.
+
+4. **`designLibrary.js`** (MEDIUM) — Rocket design persistence, cross-save sharing, JSON import/export. Tests should be written AFTER the error handling improvements in Section 1.1/1.2 are complete, so tests cover the improved code.
+
+5. **`parachute.js` deployment triggers** (MEDIUM) — Only descent/landing physics are tested. The deployment trigger logic (when parachutes activate, conditions for deployment) is not tested.
+
+### 5.2 Overhaul E2E Teleport Pattern and Flight Testing
+
+Currently 7 E2E spec files use direct state mutation via `page.evaluate()` to teleport craft by setting `window.__flightPs` and `window.__flightState`, with 80+ individual mutations across the suite. This bypasses the entire flight physics pipeline — phase transitions, orbit validation, atmospheric reentry, parachute deployment, and landing detection are never E2E tested under realistic conditions.
+
+The overhaul has three parts:
+
+#### 5.2.1 Programmatic Time Warp API
+
+Expose a testing-only API (via `window.__testTimeWarp` or similar) that lets E2E tests set arbitrary simulation speeds not limited to the player-facing time warp increments (which use `,` and `.` keys). This allows tests to fast-forward through predictable flight segments (atmospheric climb, orbital coasting, descent) without waiting in real-time, and without teleporting past the physics simulation entirely.
+
+#### 5.2.2 Upgraded Teleport Helper
+
+The existing teleport helpers only set position. Upgrade them to also set **velocity** (direction and magnitude), so tests can place a craft at a specific position moving at a specific speed. This allows much faster E2E tests overall — a test can teleport to 65km altitude with upward velocity of 2000 m/s, then let the physics run (with time warp) through the FLIGHT→ORBIT transition naturally. The teleport skips the boring part; the physics handles the transition.
+
+The upgraded teleport should:
+- Set position (posX, posY)
+- Set velocity (velX, velY)
+- Set basic flags (grounded, landed, crashed, throttle)
+- NOT set phase or orbital elements — let the physics simulation compute these from the position/velocity state
+
+#### 5.2.3 Phase Transition Tests
+
+Add one dedicated E2E test per unique phase transition that runs through the real physics:
+
+- **PRELAUNCH → LAUNCH** — Engine ignition, throttle up
+- **LAUNCH → FLIGHT** — Liftoff, ground clearance
+- **FLIGHT → ORBIT** — Reaching orbital velocity, `checkOrbitStatus()` validation, altitude band classification
+- **ORBIT → MANOEUVRE** — Initiating a burn in orbit
+- **MANOEUVRE → TRANSFER** — Escape trajectory detection
+- **Reentry** — De-orbit, atmospheric interface, heating
+- **Landing** — Parachute deployment, deceleration, ground contact
+- **Crash** — Impact detection, part destruction
+
+Each test uses teleport+velocity to get close to the transition point, then lets the physics run at high time warp through the actual transition. This covers every transition in the flight state machine without running a full 20-minute mission.
+
+The existing 7 spec files can continue using teleport for tests that are testing non-flight systems (satellite ops, science, docking, etc.) where orbit is just a prerequisite — but they should use the upgraded teleport helper rather than manually setting phase and orbital elements.
+
+### 5.3 Replace waitForTimeout with Conditional Waits in E2E Tests
+
+76 `waitForTimeout()` calls across 10 E2E spec files use arbitrary delays instead of condition-based waits. The heaviest offender is `additional-systems.spec.js` (19 occurrences). This pattern makes tests flaky under load and slow in all cases.
+
+Replace with `page.waitForFunction(() => condition)` or `page.waitForSelector()` where possible. Some waits may be genuinely necessary (animation timing), but most can be converted to deterministic condition checks.
+
+### 5.4 E2E Failure-Path Tests
+
+E2E specs focus almost exclusively on happy paths. Missing failure scenarios that should be covered:
+
+- **Malfunction during flight** — A part fails mid-flight; verify the malfunction UI appears, flight log records it, and the player can still complete or abort.
+- **Crew KIA recovery flow** — A crewed rocket crashes; verify crew death is recorded, the fine is applied, and the crew admin screen reflects the loss.
+- **Contract deadline expiry** — A contract expires without completion; verify the penalty is applied and the contract is removed from active list.
+- **Loan default / bankruptcy** — Funds go negative beyond the loan threshold; verify the bankruptcy/game-over flow triggers correctly.
+
+### 5.5 Vitest Coverage Configuration
+
+No coverage configuration exists. Add:
+
+- `v8` coverage provider in Vitest config
+- 80% threshold for lines, branches, and functions as a starting point
+- `npm run test:coverage` script in package.json
+- After all new tests from 5.1 are written, assess actual coverage numbers and raise thresholds to match (locking in the higher coverage so it can't regress).
 
 ---
 
-## 8. Part Type Display
+## 6. Build & Configuration
 
-### 8.1 "COMPUTER_MODULE" raw enum shown in VAB
+### 6.1 ESLint Rules
 
-The part type display in the VAB detail panel shows programmatic names like `COMPUTER_MODULE` instead of human-readable "Computer Module". All part type enums should be formatted with proper capitalisation and spacing.
+Two categories of rules are missing:
 
----
+- **`no-console`** — Debug `console.log` calls can leak into production code. Add a `no-console` rule with `warn` level (or `error` with exceptions for `console.warn` and `console.error`). This will require a one-time cleanup of existing console.log calls in production code (test files should be excluded).
 
-## 9. Data & Display Issues
+- **Async/await error handling** — No rules catch unhandled promise rejections or missing try-catch around await expressions in critical paths. Add appropriate `@typescript-eslint` and/or ESLint rules for promise handling.
 
-### 9.1 Achievements count mismatch
+### 6.2 Node.js Engine Version
 
-Library shows "Achievements: 3 / 12" but the Achievements tab only shows 10 milestones. The denominator should match the actual number of defined achievements.
-
-### 9.2 Library records show "None" for most stats in Late Game save
-
-Peak Altitude, Peak Speed, Heaviest Rocket, and Longest Flight all show "None" despite 30 successful flights in the Late Game debug save. Either the debug save doesn't populate these fields or the tracking logic isn't recording them.
+No `engines` field in `package.json`. The project uses very recent dependency versions (TypeScript 6, Vite 6, ESLint 10, Vitest 3) that require a modern Node.js. Add an `engines` field specifying the minimum required Node.js version.
 
 ---
 
-## 10. Verification Pass (Final Gate)
+## 7. TypeScript Improvements
 
-After all fixes are implemented, a complete tutorial playthrough must be performed using Playwright MCP against http://localhost:5173/ to verify:
+### 7.1 Address 17 TypeScript TODOs
 
-1. **Fresh tutorial start** shows welcome message, only 3 buildings (Launch Pad, VAB, MCC), and first mission available
-2. **Hub building visibility** matches actual built facilities at every stage — no locked facilities visible until their unlock mission is accepted
-3. **Part availability** is correctly gated — only starter parts (probe-core-mk1, tank-small, engine-spark, parachute-mk1) at start; cmd-mk1 unlocks when mission-018 is accepted; science-module-mk1 and thermometer-mk1 unlock when mission-005 is completed; etc.
-4. **Facility unlock notifications** appear when accepting missions that award facilities (mission-018 awards crew-admin, mission-019 awards rd-lab, mission-020 awards tracking-station, mission-022 awards satellite-ops)
-5. **Mission chain** progresses naturally through all 22 missions without dead ends or empty MCC states
-6. **Flight view** has no hub element bleed-through, no weather in space, no debug buttons
-7. **Post-flight flow** shows proper summaries and rewards
-8. **Back navigation** works from every facility screen without breaking the hub
-9. **R&D Lab / tech tree** is accessible and functional from the hub
-10. **Save/Load** works correctly from both the hub and main menu
-11. **All 3 game modes** (Tutorial, Freeplay, Sandbox) have appropriate starting states
-12. **No CSS/styling regressions** — consistent buttons, panels, typography
+The four existing TypeScript files (`constants.ts`, `gameState.ts`, `physics.ts`, `orbit.ts`) contain 17 TODO comments marking places where JS module imports need proper type definitions. These TODOs block full type safety across module boundaries.
 
-Any issues found during this verification pass must be fixed before the work is considered complete. This is the final gate — the UX polish is not done until a clean playthrough succeeds.
+Address all 17 by adding proper type imports, declarations, or type assertion patterns for the JS modules they reference. This may involve creating `.d.ts` declaration files for frequently-imported JS modules or adding JSDoc type annotations to the JS source files.
+
+---
+
+## 8. Input Validation
+
+### 8.1 Player String Length Validation
+
+Player-input strings (agency name, crew names, design names) have no length validation. Extremely long names could cause layout issues. Add reasonable max-length constraints at the input level (e.g., 40-50 characters for names) with visible character counters or truncation.
+
+---
+
+## 9. Verification
+
+After all changes are complete, run:
+
+1. `npm run typecheck` — no errors
+2. `npm run lint` — no errors (after ESLint rule updates, existing violations should be fixed)
+3. `npm run test:unit` — all 2,271+ tests pass (plus new tests)
+4. `npm run test:e2e` — all E2E specs pass (including updated and new specs)
+5. `npm run test:coverage` — meets or exceeds 80% thresholds
