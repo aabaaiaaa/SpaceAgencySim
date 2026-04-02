@@ -73,7 +73,7 @@
 - **Verification**: Run `npm run test:unit` — all tests pass. Grep for `.find(` in mission/contract lookup paths and verify they've been replaced. No E2E needed — data layer only, unit tests cover mission/contract logic.
 
 ### TASK-013: Add unit tests for flightReturn.js
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Create `src/tests/flightReturn.test.js` with comprehensive tests for mission completion, objective validation, contract rewards, crew recovery, part recovery, and financial transactions. This is the highest-priority untested module. See requirements Section 5.1.
 - **Verification**: Run `npx vitest run src/tests/flightReturn.test.js` — all tests pass. Coverage of `flightReturn.js` should be ≥80% lines/branches.
