@@ -91,7 +91,7 @@
 - **Verification**: Fresh game with $2M — money should be green. Near Bankruptcy save with $15k — money should be red. Mid-game with healthy funds — money should be green.
 
 ### TASK-016: Fix part type enum display in VAB
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Part detail panel in VAB shows raw enum names like "COMPUTER_MODULE". Add a display name formatter that converts enums to readable text: COMPUTER_MODULE → "Computer Module", FUEL_TANK → "Fuel Tank", etc. See requirements section 8.1.
 - **Verification**: Click any part in the VAB — the type should show in readable format, not SCREAMING_SNAKE_CASE.

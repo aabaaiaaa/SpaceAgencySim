@@ -189,11 +189,17 @@ export function showPartDetail(partId) {
     service_module: 'Service Module', fuel_tank: 'Fuel Tank',
     engine: 'Engine', solid_rocket_booster: 'Solid Rocket Booster',
     stack_decoupler: 'Stack Decoupler', radial_decoupler: 'Radial Decoupler',
+    decoupler: 'Decoupler', landing_leg: 'Landing Leg',
     landing_legs: 'Landing Legs', parachute: 'Parachute', satellite: 'Satellite',
-    heat_shield: 'Heat Shield',
+    heat_shield: 'Heat Shield', rcs_thruster: 'RCS Thruster',
+    solar_panel: 'Solar Panel', battery: 'Battery', payload: 'Payload',
+    docking_port: 'Docking Port', nose_cone: 'Nose Cone',
+    launch_clamp: 'Launch Clamp', antenna: 'Antenna', sensor: 'Sensor',
+    instrument: 'Instrument', grabbing_arm: 'Grabbing Arm',
   };
 
-  const typeLbl = TYPE_LABEL[def.type] ?? def.type;
+  const typeLbl = TYPE_LABEL[def.type.toLowerCase()]
+    ?? def.type.toLowerCase().replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   const stats = [
     ['Mass',  `${def.mass.toLocaleString('en-US')} kg`],
     ['Cost',  fmt$(def.cost)],
