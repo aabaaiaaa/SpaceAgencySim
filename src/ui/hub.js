@@ -569,32 +569,30 @@ const HUB_STYLES = `
   gap: 4px;
 }
 
-/* ── Weather panel ──────────────────────────────────────────────────────── */
+/* ── Weather panel (compact bar) ────────────────────────────────────────── */
 #weather-panel {
-  padding: var(--space-md) 18px;
-  background: rgba(10, 20, 40, 0.88);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 20px;
+  background: rgba(10, 20, 40, 0.85);
   border: 1px solid #304868;
-  border-radius: var(--radius-lg);
+  border-radius: 8px;
   color: #c8dce8;
   font-size: 0.82rem;
   pointer-events: auto;
-  min-width: 180px;
-  line-height: 1.5;
 }
 
-#weather-panel .weather-title {
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: #6090b0;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  margin-bottom: 6px;
+#weather-panel .weather-info {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 #weather-panel .weather-description {
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 600;
-  margin-bottom: 6px;
 }
 
 #weather-panel .weather-description.weather-extreme {
@@ -610,11 +608,9 @@ const HUB_STYLES = `
 }
 
 #weather-panel .weather-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  padding: 2px 0;
+  color: #7090a0;
   font-size: 0.82rem;
+  white-space: nowrap;
 }
 
 #weather-panel .weather-label {
@@ -627,29 +623,27 @@ const HUB_STYLES = `
 }
 
 #weather-panel .weather-forecast {
-  margin-top: 8px;
-  padding-top: 6px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  gap: 12px;
   font-size: 0.75rem;
   color: #6080a0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 6px;
 }
 
 #weather-panel .weather-forecast-day {
-  display: flex;
-  justify-content: space-between;
-  padding: 1px 0;
+  white-space: nowrap;
 }
 
 #weather-panel .weather-warning {
-  margin-top: 6px;
-  padding: 4px 8px;
+  padding: 3px 10px;
   background: rgba(160, 40, 40, 0.4);
   border: 1px solid rgba(255, 80, 80, 0.3);
   border-radius: 4px;
   color: #ff8080;
   font-size: 0.78rem;
   font-weight: 600;
-  text-align: center;
+  white-space: nowrap;
 }
 
 /* ── Building hit areas ───────────────────────────────────────────────────── */
@@ -1515,7 +1509,8 @@ function _renderReputationBadge(parent) {
 }
 
 /**
- * Render the weather conditions panel on the hub screen.
+ * Render the weather conditions as a compact inline bar on the hub screen.
+ * Matches the Launch Pad's compact weather bar format.
  * Initialises weather state if not already present.
  * @param {HTMLElement} parent  Container element to append to.
  */
@@ -1542,14 +1537,12 @@ function _renderWeatherPanel(parent) {
   const panel = document.createElement('div');
   panel.id = 'weather-panel';
 
-  // Title
-  const title = document.createElement('div');
-  title.className = 'weather-title';
-  title.textContent = 'Launch Conditions';
-  panel.appendChild(title);
+  // Main info row — compact inline bar with description + stats
+  const info = document.createElement('div');
+  info.className = 'weather-info';
 
   // Description
-  const desc = document.createElement('div');
+  const desc = document.createElement('span');
   desc.className = 'weather-description';
   if (weather.extreme) {
     desc.classList.add('weather-extreme');
@@ -1559,55 +1552,43 @@ function _renderWeatherPanel(parent) {
     desc.classList.add('weather-moderate');
   }
   desc.textContent = weather.description;
-  panel.appendChild(desc);
+  info.appendChild(desc);
 
   // Wind speed
-  _addWeatherRow(panel, 'Wind', `${weather.windSpeed.toFixed(1)} m/s`);
+  _addWeatherRow(info, 'Wind', `${weather.windSpeed.toFixed(1)} m/s`);
 
   // Temperature (ISP effect)
   const tempPct = ((weather.temperature - 1) * 100).toFixed(1);
   const tempStr = weather.temperature >= 1 ? `+${tempPct}%` : `${tempPct}%`;
-  _addWeatherRow(panel, 'ISP Effect', tempStr);
+  _addWeatherRow(info, 'ISP Effect', tempStr);
 
   // Visibility
   const visLabels = ['Clear', 'Light haze', 'Moderate haze', 'Heavy haze', 'Dense fog'];
   const visIdx = Math.min(4, Math.floor(weather.visibility * 5));
-  _addWeatherRow(panel, 'Visibility', visLabels[visIdx]);
+  _addWeatherRow(info, 'Visibility', visLabels[visIdx]);
 
-  // Extreme weather warning
+  // Extreme weather warning (inline)
   if (weather.extreme) {
-    const warn = document.createElement('div');
+    const warn = document.createElement('span');
     warn.className = 'weather-warning';
     warn.textContent = 'EXTREME — Launch not recommended';
-    panel.appendChild(warn);
+    info.appendChild(warn);
   }
 
-  // Forecast (if weather satellites provide data AND Tracking Station tier 2+)
+  panel.appendChild(info);
+
+  // Forecast row (if weather satellites provide data AND Tracking Station tier 2+)
   const forecast = isWeatherPredictionAvailable(_state) ? getWeatherForecast(_state, 'EARTH', 3) : [];
   if (forecast.length > 0) {
     const fcSection = document.createElement('div');
     fcSection.className = 'weather-forecast';
 
-    const fcTitle = document.createElement('div');
-    fcTitle.style.fontWeight = '600';
-    fcTitle.style.marginBottom = '2px';
-    fcTitle.textContent = 'Forecast';
-    fcSection.appendChild(fcTitle);
-
     forecast.forEach((fc, i) => {
-      const row = document.createElement('div');
-      row.className = 'weather-forecast-day';
-
-      const dayLabel = document.createElement('span');
-      dayLabel.textContent = `Skip ${i + 1}`;
-      row.appendChild(dayLabel);
-
-      const dayDesc = document.createElement('span');
-      dayDesc.textContent = `${fc.description} (${fc.windSpeed.toFixed(0)} m/s)`;
-      if (fc.extreme) dayDesc.style.color = '#ff6060';
-      row.appendChild(dayDesc);
-
-      fcSection.appendChild(row);
+      const day = document.createElement('span');
+      day.className = 'weather-forecast-day';
+      day.textContent = `Skip ${i + 1}: ${fc.description} (${fc.windSpeed.toFixed(0)} m/s)`;
+      if (fc.extreme) day.style.color = '#ff6060';
+      fcSection.appendChild(day);
     });
 
     panel.appendChild(fcSection);
@@ -1620,18 +1601,18 @@ function _renderWeatherPanel(parent) {
 }
 
 /**
- * Helper: add a label–value row to the weather panel.
+ * Helper: add a compact label: value item to a weather info row.
  * @param {HTMLElement} parent
  * @param {string} label
  * @param {string} value
  */
 function _addWeatherRow(parent, label, value) {
-  const row = document.createElement('div');
+  const row = document.createElement('span');
   row.className = 'weather-row';
 
   const lbl = document.createElement('span');
   lbl.className = 'weather-label';
-  lbl.textContent = label;
+  lbl.textContent = `${label}: `;
   row.appendChild(lbl);
 
   const val = document.createElement('span');

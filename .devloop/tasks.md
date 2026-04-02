@@ -49,7 +49,7 @@
 - **Verification**: Run `npm run test:unit` — all tests pass. Then run `npx playwright test e2e/missions.spec.js e2e/mission-progression.spec.js` to verify mission UI still works and blocking indicators appear correctly in tutorial mode.
 
 ### TASK-009: Standardise weather display format between hub and Launch Pad
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: The hub shows weather in a full panel with header/title; the Launch Pad shows a compact inline bar. Standardise both to use the compact format since weather is supplementary information. See requirements Section 3.2.
 - **Verification**: Run `npm run test:unit` — all tests pass. Then run `npx playwright test e2e/launchpad.spec.js` to verify Launch Pad UI still works correctly.
