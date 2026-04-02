@@ -127,7 +127,7 @@
 - **Verification**: Grep for `waitForTimeout` in `e2e/` — count should be reduced to ≤10 (only genuinely necessary animation waits). Run each modified spec file individually to confirm it passes (e.g., `npx playwright test e2e/additional-systems.spec.js`, etc.).
 
 ### TASK-022: Add E2E failure-path tests
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-018, TASK-019
 - **Description**: Add E2E tests for failure scenarios: (1) malfunction during flight — part fails, UI appears, flight log records it; (2) crew KIA on crash — death recorded, fine applied, crew admin reflects loss; (3) contract deadline expiry — penalty applied, contract removed; (4) loan default/bankruptcy — game-over flow triggers. See requirements Section 5.4.
 - **Verification**: Run `npx playwright test e2e/failure-paths.spec.js` (or whatever the new spec is named) — all tests pass.

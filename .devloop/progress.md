@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 28
-- **Completed**: 21
-- **Remaining**: 7
-- **Last Updated**: 2026-04-02T15:49:29.972Z
+- **Completed**: 22
+- **Remaining**: 6
+- **Last Updated**: 2026-04-02T16:01:26.740Z
 
 ## Iteration Log
 
@@ -196,4 +196,13 @@
 - **Exit Status**: success
 - **Tokens**: 154,086 total (3 in, 16 out, 331 cache-create, 153,736 cache-read)
 - **Cost**: $12.5567
+
+### Iteration 22 - 2026-04-02T15:49:33.259Z
+- **Task Attempted**: TASK-022
+- **Task Completed**: TASK-022
+- **Summary**: Completed Add E2E failure-path tests
+- **Duration**: 11m 53s
+- **Exit Status**: success
+- **Tokens**: 3,257,671 total (836 in, 19,184 out, 197,211 cache-create, 3,040,440 cache-read)
+- **Cost**: $3.5539
 
