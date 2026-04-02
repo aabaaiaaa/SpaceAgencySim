@@ -5,6 +5,8 @@
  */
 
 import { acceptMission } from '../../core/missions.js';
+import { getFacilityDef } from '../../core/construction.js';
+import { getPartById } from '../../data/parts.js';
 import { refreshTopBarMissions } from '../topbar.js';
 import { getMCState } from './_state.js';
 import { fmtCash, fmtDate, buildRewardsEl, isTutorialPhase, getContent } from './_shell.js';
@@ -127,9 +129,98 @@ function _handleAccept(missionId) {
     // Re-render the Available tab to reflect the updated state.
     renderAvailableTab();
     refreshTopBarMissions();
+
+    // Show notification modal for facility and/or part unlocks.
+    if (result.awardedFacility || (result.unlockedParts && result.unlockedParts.length > 0)) {
+      _showUnlockNotification(result.awardedFacility, result.unlockedParts);
+    }
   } else {
     console.warn('[Mission Control UI] acceptMission failed:', result.error);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Unlock notification modal
+// ---------------------------------------------------------------------------
+
+/**
+ * Show a prominent modal notifying the player of facility and/or part unlocks.
+ *
+ * @param {string|null} facilityId  The awarded facility ID, or null.
+ * @param {string[]}    partIds     Part IDs that were unlocked.
+ */
+function _showUnlockNotification(facilityId, partIds) {
+  // Remove any existing unlock notification.
+  const existing = document.getElementById('unlock-notification-backdrop');
+  if (existing) existing.remove();
+
+  const backdrop = document.createElement('div');
+  backdrop.id = 'unlock-notification-backdrop';
+  backdrop.className = 'topbar-modal-backdrop';
+  backdrop.style.zIndex = '300';
+
+  const modal = document.createElement('div');
+  modal.className = 'topbar-modal';
+  modal.setAttribute('role', 'alertdialog');
+  modal.setAttribute('aria-modal', 'true');
+  modal.style.maxWidth = '460px';
+  modal.style.textAlign = 'center';
+
+  const dismiss = () => backdrop.remove();
+
+  // ── Facility section ─────────────────────────────────────────────────────
+  if (facilityId) {
+    const def = getFacilityDef(facilityId);
+    const facilityName = def?.name ?? facilityId;
+
+    const title = document.createElement('h2');
+    title.style.cssText = 'margin:0 0 8px; font-size:1.5rem; color:#4fc3f7;';
+    title.textContent = `${facilityName} Unlocked!`;
+    modal.appendChild(title);
+
+    if (def?.description) {
+      const desc = document.createElement('p');
+      desc.style.cssText = 'margin:0 0 16px; color:#ccc; font-size:0.95rem;';
+      desc.textContent = def.description;
+      modal.appendChild(desc);
+    }
+  }
+
+  // ── Unlocked parts section ───────────────────────────────────────────────
+  if (partIds && partIds.length > 0) {
+    const partsTitle = document.createElement('p');
+    partsTitle.style.cssText = 'margin:0 0 8px; color:#aaa; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.05em;';
+    partsTitle.textContent = partIds.length === 1 ? 'New Part Available' : 'New Parts Available';
+    modal.appendChild(partsTitle);
+
+    const partsList = document.createElement('ul');
+    partsList.style.cssText = 'list-style:none; padding:0; margin:0 0 16px;';
+    for (const id of partIds) {
+      const li = document.createElement('li');
+      li.style.cssText = 'color:#e0e0e0; font-size:1rem; padding:4px 0;';
+      const partDef = getPartById(id);
+      li.textContent = partDef?.name ?? id;
+      partsList.appendChild(li);
+    }
+    modal.appendChild(partsList);
+  }
+
+  // ── Dismiss button ───────────────────────────────────────────────────────
+  const btnRow = document.createElement('div');
+  btnRow.style.cssText = 'margin-top:12px;';
+
+  const btn = document.createElement('button');
+  btn.className = 'confirm-btn confirm-btn-primary';
+  btn.textContent = 'Continue';
+  btn.addEventListener('click', dismiss);
+  btnRow.appendChild(btn);
+
+  modal.appendChild(btnRow);
+  backdrop.appendChild(modal);
+  document.body.appendChild(backdrop);
+
+  // Focus the button for keyboard accessibility.
+  btn.focus();
 }
 
 // ---------------------------------------------------------------------------

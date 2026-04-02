@@ -28,6 +28,7 @@ import {
   canUpgradeFacility, upgradeFacility, getFacilityTier,
   getDiscountedMoneyCost,
 } from '../core/construction.js';
+import { getPartById } from '../data/parts.js';
 import { isBankrupt } from '../core/finance.js';
 import { initWeather, getCurrentWeather, getWeatherForecast } from '../core/weather.js';
 import { isWeatherPredictionAvailable } from '../core/mapView.js';
@@ -1171,7 +1172,8 @@ export function showReturnResultsOverlay(container, summary, onDismiss) {
 
     for (const partId of allUnlockedParts) {
       const li = document.createElement('li');
-      li.textContent = partId;
+      const partDef = getPartById(partId);
+      li.textContent = partDef?.name ?? partId;
       list.appendChild(li);
     }
 

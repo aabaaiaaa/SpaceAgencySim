@@ -1,0 +1,48 @@
+- generic [ref=e2]:
+  - generic:
+    - generic [ref=e30]:
+      - generic [ref=e31]: Test Agency
+      - generic [ref=e134]: Flight 5
+      - button "View loan details" [ref=e32] [cursor=pointer]: $2,060,000
+      - button "View accepted missions" [ref=e33] [cursor=pointer]: Missions
+      - button "Open menu" [ref=e34] [cursor=pointer]: ☰
+    - generic [ref=e136]:
+      - generic [ref=e137]:
+        - button "← Hub" [ref=e138] [cursor=pointer]
+        - heading "Mission Control Centre — Tier 1 (Basic)" [level=1] [ref=e139]
+      - generic [ref=e140]:
+        - button "Missions" [ref=e141] [cursor=pointer]
+        - button "Accepted" [ref=e142] [cursor=pointer]
+        - button "Completed" [ref=e143] [cursor=pointer]
+        - button "Contracts" [ref=e145] [cursor=pointer]
+        - button "Active" [ref=e146] [cursor=pointer]
+        - button "Challenges" [ref=e148] [cursor=pointer]
+        - button "Achievements" [ref=e149] [cursor=pointer]
+      - generic [ref=e151]:
+        - generic [ref=e152]:
+          - generic [ref=e153]:
+            - heading "Safe Return I" [level=3] [ref=e154]
+            - generic [ref=e155]: $35,000
+          - paragraph [ref=e156]: Hardware is expensive. We cannot afford to lose rockets on every flight. Fit a parachute to your rocket and demonstrate a controlled descent — land at less than 10 m/s to protect the vehicle and any future crew.
+          - paragraph [ref=e157]: "Rewards: Mk2 Parachute, Science Module Mk1, thermometer-mk1"
+          - button "Accept Mission" [ref=e159] [cursor=pointer]
+        - generic [ref=e160]:
+          - generic [ref=e161]:
+            - heading "Controlled Descent" [level=3] [ref=e162]
+            - generic [ref=e163]: $40,000
+          - paragraph [ref=e164]: Parachutes are reliable, but for precision landings and future reusability we need propulsive descent capability. Build a rocket that can throttle its engine down and touch down at less than 5 m/s under engine power alone — no parachutes allowed on this flight.
+          - paragraph [ref=e165]: "Rewards: Small Landing Leg"
+          - button "Accept Mission" [ref=e167] [cursor=pointer]
+        - generic [ref=e168]:
+          - generic [ref=e169]:
+            - heading "Leg Day" [level=3] [ref=e170]
+            - generic [ref=e171]: $40,000
+          - paragraph [ref=e172]: Landing legs allow the rocket to stand upright after touchdown and protect the engine bell from ground impact. Deploy your landing legs in flight and prove they can absorb the impact of a safe landing.
+          - paragraph [ref=e173]: "Rewards: Large Landing Leg"
+          - button "Accept Mission" [ref=e175] [cursor=pointer]
+        - generic [ref=e176]:
+          - generic [ref=e177]:
+            - heading "First Crew Flight" [level=3] [ref=e178]
+            - generic [ref=e179]: $60,000
+          - paragraph [ref=e180]: "Your probe programme has proven our rocket technology is sound. It is time to put people in the sky. Accepting this mission will establish your Crew Administration building and grant access to the Mk1 Command Module. Visit the Crew Admin facility to recruit your first astronaut, then build a rocket with the command module, assign a crew member, and bring them home safely. Tip: open the Construction Menu from the hub to see all your facilities and available upgrades."
+          - button "Accept Mission" [ref=e182] [cursor=pointer]

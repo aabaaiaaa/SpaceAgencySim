@@ -1,0 +1,101 @@
+- generic [ref=e2]:
+  - generic:
+    - generic [ref=e30]:
+      - generic [ref=e31]: Test Agency
+      - button "View loan details" [ref=e32] [cursor=pointer]: $2,000,000
+      - button "View accepted missions" [ref=e33] [cursor=pointer]: Missions
+      - button "Open menu" [ref=e34] [cursor=pointer]: ☰
+    - generic:
+      - button "Launch Pad" [ref=e35] [cursor=pointer]:
+        - generic: Launch Pad
+      - button "Vehicle Assembly Building" [ref=e36] [cursor=pointer]:
+        - generic: Vehicle Assembly Building
+      - button "Mission Control Centre" [ref=e37] [cursor=pointer]:
+        - generic: Mission Control Centre
+      - button "Open construction menu" [ref=e38] [cursor=pointer]: Construction
+      - button "Open game settings" [ref=e39] [cursor=pointer]: Settings
+      - button "Open debug save menu" [active] [ref=e40] [cursor=pointer]: Debug Saves
+      - generic [ref=e41]:
+        - generic [ref=e42]: Reputation
+        - generic [ref=e43]: "50"
+        - generic [ref=e44]: Good
+      - generic [ref=e47]:
+        - generic [ref=e48]: Launch Conditions
+        - generic [ref=e49]: Clear skies
+        - generic [ref=e50]:
+          - generic [ref=e51]: Wind
+          - generic [ref=e52]: 1.4 m/s
+        - generic [ref=e53]:
+          - generic [ref=e54]: ISP Effect
+          - generic [ref=e55]: +1.3%
+        - generic [ref=e56]:
+          - generic [ref=e57]: Visibility
+          - generic [ref=e58]: Clear
+    - generic [ref=e66]:
+      - heading "Debug Saves" [level=1] [ref=e67]
+      - paragraph [ref=e68]: Load a pre-built game state for testing
+      - paragraph [ref=e69]: Loading a debug state replaces ALL current game data. Unsaved progress will be lost.
+      - generic [ref=e70]:
+        - heading "Early Game" [level=2] [ref=e71]
+        - generic [ref=e72] [cursor=pointer]:
+          - generic [ref=e73]:
+            - paragraph [ref=e74]: Fresh Start
+            - paragraph [ref=e75]: Brand-new tutorial game with starter parts only.
+          - 'button "Load debug save: Fresh Start" [ref=e76]': Load
+        - generic [ref=e77] [cursor=pointer]:
+          - generic [ref=e78]:
+            - paragraph [ref=e79]: Post-Tutorial Basics (Mission 4 Done)
+            - paragraph [ref=e80]: Missions 1-4 complete. Science, recovery, and crew tracks unlocked.
+          - 'button "Load debug save: Post-Tutorial Basics (Mission 4 Done)" [ref=e81]': Load
+        - generic [ref=e82] [cursor=pointer]:
+          - generic [ref=e83]:
+            - paragraph [ref=e84]: Post-Tutorial All Parts (Mission 10 Done)
+            - paragraph [ref=e85]: Science track complete through mission 10. Engine Poodle unlocked. R&D Lab available.
+          - 'button "Load debug save: Post-Tutorial All Parts (Mission 10 Done)" [ref=e86]': Load
+      - generic [ref=e87]:
+        - heading "Mid Game" [level=2] [ref=e88]
+        - generic [ref=e89] [cursor=pointer]:
+          - generic [ref=e90]:
+            - paragraph [ref=e91]: First Orbit Achieved (Mission 16 Done)
+            - paragraph [ref=e92]: Orbital milestone reached. Large tank and Reliant unlocked. Tracking station available next.
+          - 'button "Load debug save: First Orbit Achieved (Mission 16 Done)" [ref=e93]': Load
+        - generic [ref=e94] [cursor=pointer]:
+          - generic [ref=e95]:
+            - paragraph [ref=e96]: Orbital Operations (Mission 20 Done)
+            - paragraph [ref=e97]: Tracking Station online. Docking port unlocked. Satellite deployment available.
+          - 'button "Load debug save: Orbital Operations (Mission 20 Done)" [ref=e98]': Load
+      - generic [ref=e99]:
+        - heading "Late Game" [level=2] [ref=e100]
+        - generic [ref=e101] [cursor=pointer]:
+          - generic [ref=e102]:
+            - paragraph [ref=e103]: All Facilities Unlocked
+            - paragraph [ref=e104]: All tutorial missions done. Every facility built. Mid-tier tech researched.
+          - 'button "Load debug save: All Facilities Unlocked" [ref=e105]': Load
+        - generic [ref=e106] [cursor=pointer]:
+          - generic [ref=e107]:
+            - paragraph [ref=e108]: Late Game — Wealthy Agency
+            - paragraph [ref=e109]: All missions done, loan paid off, high reputation, tier-3 tech across all branches.
+          - 'button "Load debug save: Late Game — Wealthy Agency" [ref=e110]': Load
+      - generic [ref=e111]:
+        - heading "Special" [level=2] [ref=e112]
+        - generic [ref=e113] [cursor=pointer]:
+          - generic [ref=e114]:
+            - paragraph [ref=e115]: Sandbox — Everything Unlocked
+            - paragraph [ref=e116]: Sandbox mode with infinite money, all parts, all facilities, full tech tree.
+          - 'button "Load debug save: Sandbox — Everything Unlocked" [ref=e117]': Load
+        - generic [ref=e118] [cursor=pointer]:
+          - generic [ref=e119]:
+            - paragraph [ref=e120]: Near Bankruptcy
+            - paragraph [ref=e121]: Very low funds, high loan, struggling agency. Tests financial pressure UI.
+          - 'button "Load debug save: Near Bankruptcy" [ref=e122]': Load
+        - generic [ref=e123] [cursor=pointer]:
+          - generic [ref=e124]:
+            - paragraph [ref=e125]: Lunar Orbit Capable
+            - paragraph [ref=e126]: Advanced orbital agency with Moon transfer capability. Satellites deployed, docking available.
+          - 'button "Load debug save: Lunar Orbit Capable" [ref=e127]': Load
+        - generic [ref=e128] [cursor=pointer]:
+          - generic [ref=e129]:
+            - paragraph [ref=e130]: Freeplay — Mid Progress
+            - paragraph [ref=e131]: Non-tutorial freeplay game at mid-progression. Contracts active, some tech researched.
+          - 'button "Load debug save: Freeplay — Mid Progress" [ref=e132]': Load
+      - button "Close debug save menu" [ref=e133] [cursor=pointer]: Close

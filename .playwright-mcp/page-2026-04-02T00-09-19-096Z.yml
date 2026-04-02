@@ -1,0 +1,42 @@
+- generic [ref=e2]:
+  - generic:
+    - generic [ref=e30]:
+      - generic [ref=e31]: Test Agency
+      - generic [ref=e134]: Flight 5
+      - button "View loan details" [ref=e32] [cursor=pointer]: $2,060,000
+      - button "View accepted missions" [ref=e33] [cursor=pointer]: Missions (1)
+      - button "Open menu" [ref=e34] [cursor=pointer]: ☰
+    - generic [ref=e136]:
+      - generic [ref=e137]:
+        - button "← Hub" [ref=e138] [cursor=pointer]
+        - heading "Mission Control Centre — Tier 1 (Basic)" [level=1] [ref=e139]
+      - generic [ref=e140]:
+        - button "Missions" [ref=e141] [cursor=pointer]
+        - button "Accepted" [ref=e142] [cursor=pointer]
+        - button "Completed" [ref=e143] [cursor=pointer]
+        - button "Contracts" [ref=e145] [cursor=pointer]
+        - button "Active" [ref=e146] [cursor=pointer]
+        - button "Challenges" [ref=e148] [cursor=pointer]
+        - button "Achievements" [ref=e149] [cursor=pointer]
+      - generic [ref=e183]:
+        - generic [ref=e184]:
+          - generic [ref=e185]:
+            - heading "Safe Return I" [level=3] [ref=e186]
+            - generic [ref=e187]: $35,000
+          - paragraph [ref=e188]: Hardware is expensive. We cannot afford to lose rockets on every flight. Fit a parachute to your rocket and demonstrate a controlled descent — land at less than 10 m/s to protect the vehicle and any future crew.
+          - paragraph [ref=e189]: "Rewards: Mk2 Parachute, Science Module Mk1, thermometer-mk1"
+          - button "Accept Mission" [ref=e191] [cursor=pointer]
+        - generic [ref=e192]:
+          - generic [ref=e193]:
+            - heading "Controlled Descent" [level=3] [ref=e194]
+            - generic [ref=e195]: $40,000
+          - paragraph [ref=e196]: Parachutes are reliable, but for precision landings and future reusability we need propulsive descent capability. Build a rocket that can throttle its engine down and touch down at less than 5 m/s under engine power alone — no parachutes allowed on this flight.
+          - paragraph [ref=e197]: "Rewards: Small Landing Leg"
+          - button "Accept Mission" [ref=e199] [cursor=pointer]
+        - generic [ref=e200]:
+          - generic [ref=e201]:
+            - heading "Leg Day" [level=3] [ref=e202]
+            - generic [ref=e203]: $40,000
+          - paragraph [ref=e204]: Landing legs allow the rocket to stand upright after touchdown and protect the engine bell from ground impact. Deploy your landing legs in flight and prove they can absorb the impact of a safe landing.
+          - paragraph [ref=e205]: "Rewards: Large Landing Leg"
+          - button "Accept Mission" [ref=e207] [cursor=pointer]

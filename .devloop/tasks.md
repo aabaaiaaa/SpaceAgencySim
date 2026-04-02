@@ -31,7 +31,7 @@
 - **Verification**: Start a new Tutorial game — a welcome modal must appear explaining the game. Dismiss it and it should not reappear.
 
 ### TASK-006: Add facility and part unlock notifications
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: When a mission is accepted that has `awardsFacilityOnAccept`, show a prominent notification modal: "[Facility Name] Unlocked!" with a description of what it does and what parts were unlocked. The four facility-awarding missions are: mission-018 (crew-admin + cmd-mk1), mission-019 (rd-lab + science-module-mk1), mission-020 (tracking-station + docking-port-std), mission-022 (satellite-ops). Also show notifications when `unlockedParts` are awarded on mission completion. See requirements section 2.2.
 - **Verification**: Accept mission-018 in MCC — a notification modal should appear saying "Crew Administration Unlocked!" and mentioning the Command Module. Dismiss to continue.

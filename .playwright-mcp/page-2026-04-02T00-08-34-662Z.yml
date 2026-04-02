@@ -1,0 +1,38 @@
+- generic [ref=e2]:
+  - generic:
+    - generic [ref=e30]:
+      - generic [ref=e31]: Test Agency
+      - button "View loan details" [ref=e32] [cursor=pointer]: $2,000,000
+      - button "View accepted missions" [ref=e33] [cursor=pointer]: Missions
+      - button "Open menu" [ref=e34] [cursor=pointer]: ☰
+    - generic:
+      - button "Launch Pad" [ref=e35] [cursor=pointer]:
+        - generic: Launch Pad
+      - button "Vehicle Assembly Building" [ref=e36] [cursor=pointer]:
+        - generic: Vehicle Assembly Building
+      - button "Mission Control Centre" [ref=e37] [cursor=pointer]:
+        - generic: Mission Control Centre
+      - button "Open construction menu" [ref=e38] [cursor=pointer]: Construction
+      - button "Open game settings" [ref=e39] [cursor=pointer]: Settings
+      - button "Open debug save menu" [ref=e40] [cursor=pointer]: Debug Saves
+      - generic [ref=e41]:
+        - generic [ref=e42]: Reputation
+        - generic [ref=e43]: "50"
+        - generic [ref=e44]: Good
+      - generic [ref=e47]:
+        - generic [ref=e48]: Launch Conditions
+        - generic [ref=e49]: Clear skies
+        - generic [ref=e50]:
+          - generic [ref=e51]: Wind
+          - generic [ref=e52]: 1.4 m/s
+        - generic [ref=e53]:
+          - generic [ref=e54]: ISP Effect
+          - generic [ref=e55]: +1.3%
+        - generic [ref=e56]:
+          - generic [ref=e57]: Visibility
+          - generic [ref=e58]: Clear
+    - generic [ref=e60]:
+      - heading "Welcome to Test Agency!" [level=1] [ref=e61]
+      - paragraph [ref=e62]: Tutorial Mode
+      - paragraph [ref=e63]: You've secured $2M in funding (matched by a $2M loan) to build a space programme from scratch. Head to Mission Control to accept your first mission, then build a rocket in the Vehicle Assembly Building and launch it from the Launch Pad. Good luck!
+      - button "Let's Go!" [ref=e64] [cursor=pointer]
