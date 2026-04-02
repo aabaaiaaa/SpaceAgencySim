@@ -91,7 +91,7 @@
 - **Verification**: Run `npx vitest run src/tests/customChallenges.test.js` — all tests pass.
 
 ### TASK-016: Add unit tests for designLibrary.js
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001
 - **Description**: Create `src/tests/designLibrary.test.js` covering design persistence, JSON import/export, cross-save sharing, and the improved error handling from TASK-001. Must be done after TASK-001 so tests cover the updated code. See requirements Section 5.1.
 - **Verification**: Run `npx vitest run src/tests/designLibrary.test.js` — all tests pass.
