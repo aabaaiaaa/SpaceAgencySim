@@ -1487,3 +1487,49 @@ describe('processFlightReturn() — life support', () => {
     expect(result.lifeSupportDeaths).toBeInstanceOf(Array);
   });
 });
+
+// ===========================================================================
+// 23. Defensive null guards on state properties
+// ===========================================================================
+
+describe('processFlightReturn() — defensive null guards', () => {
+  it('handles state.crew being null without throwing', () => {
+    state.crew = null;
+    const fs = makeFlightState(null, {
+      crewIds: ['astro-1'],
+      inOrbit: true,
+    });
+    const ps = makePhysicsState({ landed: false, crashed: false });
+
+    expect(() => processFlightReturn(state, fs, ps, null)).not.toThrow();
+  });
+
+  it('handles state.crew being undefined without throwing', () => {
+    state.crew = undefined;
+    const fs = makeFlightState(null, {
+      crewIds: ['astro-1'],
+      inOrbit: true,
+    });
+    const ps = makePhysicsState({ landed: false, crashed: false });
+
+    expect(() => processFlightReturn(state, fs, ps, null)).not.toThrow();
+  });
+
+  it('handles state.missions being null without throwing', () => {
+    state.missions = null;
+    const fs = makeFlightState(null);
+
+    expect(() => processFlightReturn(state, fs, null, null)).not.toThrow();
+    const result = processFlightReturn(state, fs, null, null);
+    expect(result.completedMissions).toEqual([]);
+  });
+
+  it('handles state.missions.accepted being undefined without throwing', () => {
+    state.missions = {};
+    const fs = makeFlightState(null);
+
+    expect(() => processFlightReturn(state, fs, null, null)).not.toThrow();
+    const result = processFlightReturn(state, fs, null, null);
+    expect(result.completedMissions).toEqual([]);
+  });
+});

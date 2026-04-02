@@ -102,6 +102,14 @@ import { processChallengeCompletion } from './challenges.js';
  * @returns {FlightReturnSummary}
  */
 export function processFlightReturn(state, flightState, ps, assembly) {
+  // Defensive guards: ensure critical state arrays exist so downstream
+  // helpers never dereference null/undefined on corrupted save data.
+  if (!Array.isArray(state.crew)) state.crew = [];
+  if (!state.missions) state.missions = { available: [], accepted: [], completed: [] };
+  if (!Array.isArray(state.missions.accepted)) state.missions.accepted = [];
+  if (!Array.isArray(state.missions.available)) state.missions.available = [];
+  if (!Array.isArray(state.missions.completed)) state.missions.completed = [];
+
   const cashBefore = state.money;
   const repBefore = state.reputation ?? 50;
 
@@ -114,7 +122,7 @@ export function processFlightReturn(state, flightState, ps, assembly) {
   // ── 1 & 2 & 3. Mission completion, rewards, and unlocks ──────────────────
   // Snapshot the accepted list before iterating, since completeMission()
   // mutates it by splicing completed missions out.
-  const acceptedSnapshot = [...state.missions.accepted];
+  const acceptedSnapshot = [...(state.missions?.accepted ?? [])];
   for (const mission of acceptedSnapshot) {
     const allObjectivesMet =
       Array.isArray(mission.objectives) &&
@@ -289,7 +297,7 @@ export function processFlightReturn(state, flightState, ps, assembly) {
       const survivingCrewIds = crewIds.filter((id) => {
         if (isCrashed && !ejectedIds.has(id)) return false;
         // Also skip crew already KIA.
-        const astro = state.crew.find((a) => a.id === id);
+        const astro = (state.crew ?? []).find((a) => a.id === id);
         return astro && astro.status !== 'kia';
       });
 

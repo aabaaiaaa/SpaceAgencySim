@@ -13,7 +13,7 @@
 - **Verification**: `npm run test:unit` passes. New unit test covers `saveDesignToLibrary()` with `state.savedDesigns` as undefined and null.
 
 ### TASK-003: Add defensive null guards to flightReturn.js
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Replace `state.crew.find(...)` at line 292 of `src/core/flightReturn.js` with `(state.crew ?? []).find(...)`. Audit the rest of flightReturn.js for similar unguarded state access patterns and fix any found. See requirements Section 1.2.
 - **Verification**: `npm run test:unit` passes. New unit test covers flight return functions with `state.crew` as null/undefined.
