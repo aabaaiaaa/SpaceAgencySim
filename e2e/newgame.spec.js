@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { SAVE_KEY, buildSaveEnvelope } from './helpers.js';
+import { SAVE_KEY, buildSaveEnvelope, dismissWelcomeModal } from './helpers.js';
 
 /**
  * E2E — App Load & New Game Flow
@@ -80,6 +80,13 @@ test.describe('App Load & New Game Flow', () => {
     // Hub overlay must appear after the menu fade-out animation.
     await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
     await expect(page.locator('#hub-overlay')).toBeVisible();
+
+    // Welcome modal should appear on first hub visit.
+    await expect(page.locator('#welcome-modal')).toBeVisible();
+
+    // Dismiss it so subsequent tests can interact with the hub.
+    await dismissWelcomeModal(page);
+    await expect(page.locator('#welcome-modal')).toHaveCount(0);
   });
 
   // ── (4) Hub top bar shows correct starting cash ──────────────────────────

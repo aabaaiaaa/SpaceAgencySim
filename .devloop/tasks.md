@@ -25,7 +25,7 @@
 - **Verification**: From the hub, click hamburger menu > Load Game — a modal should appear showing save slots (not navigate away). From the main menu, saved games should be visible and loadable.
 
 ### TASK-005: Add welcome/introduction message for new games
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-003
 - **Description**: When starting a new game, show a dismissable welcome modal/overlay on first entering the hub. Content varies by mode: Tutorial — "Welcome to [Agency Name]! You've secured $2M in funding (matched by a $2M loan) to build a space programme from scratch. Head to Mission Control to accept your first mission, then build a rocket in the Vehicle Assembly Building and launch it from the Launch Pad. Good luck!" Freeplay — brief intro about all starter parts being available. Sandbox — note that funds are unlimited and all parts/facilities are unlocked. The modal should have a "Let's Go!" button and not appear again for that save. See requirements section 2.1.
 - **Verification**: Start a new Tutorial game — a welcome modal must appear explaining the game. Dismiss it and it should not reappear.

@@ -333,6 +333,10 @@ export function loadGame(slotIndex) {
   envelope.state.difficultySettings.financialPressure    ??= DEFAULT_DIFFICULTY_SETTINGS.financialPressure;
   envelope.state.difficultySettings.injuryDuration       ??= DEFAULT_DIFFICULTY_SETTINGS.injuryDuration;
 
+  // Default welcomeShown for saves created before the welcome modal.
+  // Existing saves should not see the welcome modal, so default to true.
+  envelope.state.welcomeShown ??= true;
+
   return envelope.state;
 }
 

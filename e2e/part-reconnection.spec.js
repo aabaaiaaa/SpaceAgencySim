@@ -4,6 +4,7 @@ import {
   TOOLBAR_H, SCALE_BAR_W, PARTS_PANEL_W,
   CENTRE_X, CANVAS_CENTRE_Y,
   dragPartToCanvas, placePart, launchFromVab,
+  dismissWelcomeModal,
 } from './helpers.js';
 
 /**
@@ -36,6 +37,9 @@ test.describe('VAB — Part Disconnection & Reconnection', () => {
     await page.click('.mm-mode-option[data-mode="freeplay"]');
     await page.click('#mm-start-btn');
     await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
+
+    // Dismiss the welcome modal so buildings are clickable.
+    await dismissWelcomeModal(page);
 
     // Navigate to VAB.
     await page.click('[data-building-id="vab"]');

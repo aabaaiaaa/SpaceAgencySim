@@ -5,6 +5,7 @@ import {
   BUILD_W, BUILD_H,
   CENTRE_X, CANVAS_CENTRE_Y,
   dragPartToCanvas,
+  dismissWelcomeModal,
 } from './helpers.js';
 
 /**
@@ -65,6 +66,9 @@ test.describe('VAB — Rocket Builder Flow', () => {
 
     // After starting a new game the hub is shown first.
     await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
+
+    // Dismiss the welcome modal so buildings are clickable.
+    await dismissWelcomeModal(page);
 
     // Navigate from the hub to the Vehicle Assembly Building.
     await page.click('[data-building-id="vab"]');

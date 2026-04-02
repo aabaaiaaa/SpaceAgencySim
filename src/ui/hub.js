@@ -218,6 +218,71 @@ const HUB_STYLES = `
   background: #235a90;
 }
 
+/* ── Welcome modal ───────────────────────────────────────────────────────── */
+#welcome-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 10, 20, 0.94);
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: system-ui, sans-serif;
+  color: #d0e0f0;
+  pointer-events: auto;
+  overflow: hidden;
+}
+
+.welcome-content {
+  width: 100%;
+  max-width: 560px;
+  padding: 36px 28px 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+#welcome-modal h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 6px;
+  letter-spacing: 0.04em;
+  color: #80c8ff;
+}
+
+.welcome-subtitle {
+  font-size: 0.82rem;
+  color: #5080a0;
+  margin: 0 0 28px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.welcome-body {
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: #b0c8e0;
+  margin: 0 0 32px;
+}
+
+.welcome-dismiss-btn {
+  padding: 12px 40px;
+  background: #1a4070;
+  border: 1px solid #4080b0;
+  border-radius: 6px;
+  color: #c8e8ff;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.15s;
+  letter-spacing: 0.03em;
+}
+
+.welcome-dismiss-btn:hover {
+  background: #235a90;
+}
+
 /* ── Bankruptcy banner ───────────────────────────────────────────────────── */
 #bankruptcy-banner {
   position: absolute;
@@ -844,6 +909,91 @@ let _overlay = null;
 
 /** Cached reference to the game state for the construction panel. @type {import('../core/gameState.js').GameState | null} */
 let _state = null;
+
+// ---------------------------------------------------------------------------
+// Welcome modal — shown once on first hub visit for a new game
+// ---------------------------------------------------------------------------
+
+/**
+ * Show a welcome/introduction modal overlay on first entering the hub.
+ * Content varies by game mode. Sets `state.welcomeShown = true` on dismiss.
+ *
+ * @param {HTMLElement} container  The #ui-overlay div.
+ * @param {import('../core/gameState.js').GameState} state
+ */
+export function showWelcomeModal(container, state) {
+  // Inject styles if not already present.
+  if (!document.getElementById('hub-styles')) {
+    const styleEl = document.createElement('style');
+    styleEl.id = 'hub-styles';
+    styleEl.textContent = HUB_STYLES;
+    document.head.appendChild(styleEl);
+  }
+
+  const existing = document.getElementById('welcome-modal');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'welcome-modal';
+
+  const content = document.createElement('div');
+  content.className = 'welcome-content';
+  overlay.appendChild(content);
+
+  // ── Heading ────────────────────────────────────────────────────────────────
+  const heading = document.createElement('h1');
+  heading.textContent = `Welcome to ${state.agencyName || 'Your Space Agency'}!`;
+  content.appendChild(heading);
+
+  const subtitle = document.createElement('p');
+  subtitle.className = 'welcome-subtitle';
+  if (state.gameMode === GameMode.TUTORIAL) {
+    subtitle.textContent = 'Tutorial Mode';
+  } else if (state.gameMode === GameMode.SANDBOX) {
+    subtitle.textContent = 'Sandbox Mode';
+  } else {
+    subtitle.textContent = 'Freeplay Mode';
+  }
+  content.appendChild(subtitle);
+
+  // ── Body text — varies by game mode ────────────────────────────────────────
+  const body = document.createElement('p');
+  body.className = 'welcome-body';
+
+  if (state.gameMode === GameMode.TUTORIAL) {
+    body.textContent =
+      "You've secured $2M in funding (matched by a $2M loan) to build a space programme from scratch. " +
+      'Head to Mission Control to accept your first mission, then build a rocket in the Vehicle Assembly Building and launch it from the Launch Pad. Good luck!';
+  } else if (state.gameMode === GameMode.SANDBOX) {
+    body.textContent =
+      'Funds are unlimited and all parts and facilities are unlocked. ' +
+      'Experiment freely with rocket designs, launch missions, and explore the solar system. ' +
+      'Contracts and reputation are still active if you want objectives to pursue.';
+  } else {
+    // Freeplay
+    body.textContent =
+      "You've secured $2M in funding (matched by a $2M loan) and all starter parts are available from the start. " +
+      'Build facilities, hire crew, and launch missions to grow your agency. ' +
+      'Head to Mission Control to pick up a contract, or go straight to the VAB and start building!';
+  }
+  content.appendChild(body);
+
+  // ── Dismiss button ─────────────────────────────────────────────────────────
+  const dismissBtn = document.createElement('button');
+  dismissBtn.className = 'welcome-dismiss-btn';
+  dismissBtn.id = 'welcome-dismiss-btn';
+  dismissBtn.textContent = "Let's Go!";
+
+  dismissBtn.addEventListener('click', () => {
+    state.welcomeShown = true;
+    overlay.remove();
+  });
+
+  content.appendChild(dismissBtn);
+  container.appendChild(overlay);
+
+  console.log('[Hub UI] Welcome modal shown');
+}
 
 // ---------------------------------------------------------------------------
 // Public API

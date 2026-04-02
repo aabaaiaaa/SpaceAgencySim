@@ -5,7 +5,7 @@
 // to the canvas by default.
 
 import { initMainMenu } from './mainmenu.js';
-import { initHubUI, destroyHubUI } from './hub.js';
+import { initHubUI, destroyHubUI, showWelcomeModal } from './hub.js';
 import { initVabUI, resetVabUI } from './vab.js';
 import { initCrewAdminUI, destroyCrewAdminUI } from './crewAdmin.js';
 import { initMissionControlUI, destroyMissionControlUI } from './missionControl.js';
@@ -135,6 +135,11 @@ export function initUI(container, state) {
   initHubUI(container, state, (destination) => {
     _handleNavigation(container, state, destination);
   });
+
+  // Show welcome modal on first hub visit for a new game.
+  if (!state.welcomeShown) {
+    showWelcomeModal(container, state);
+  }
 
   console.log('[UI] Hub overlay initialized');
 }

@@ -660,6 +660,8 @@ export interface GameState {
    * Life support supplies count down each period.
    */
   fieldCraft: FieldCraft[];
+  /** True once the welcome/introduction modal has been shown for this save. */
+  welcomeShown: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -781,6 +783,9 @@ export function createGameState(): GameState {
     // Crewed vessels left in orbit or landed on non-Earth bodies.
     // Life support supplies count down each period.
     fieldCraft: [],
+
+    // Welcome modal — shown once on first hub visit for a new game.
+    welcomeShown: false,
   };
 }
 

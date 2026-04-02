@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { STARTING_MONEY, dragPartToCanvas } from './helpers.js';
+import { STARTING_MONEY, dragPartToCanvas, dismissWelcomeModal } from './helpers.js';
 
 /**
  * E2E — Save & Load Flow
@@ -48,6 +48,9 @@ test.describe('Save & Load Flow', () => {
 
     // After starting a new game the hub is shown first.
     await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
+
+    // Dismiss the welcome modal so buildings are clickable.
+    await dismissWelcomeModal(page);
 
     // Navigate from the hub to the Vehicle Assembly Building.
     await page.click('[data-building-id="vab"]');
@@ -245,6 +248,9 @@ test.describe('Save & Load Flow', () => {
     await page.fill('#mm-agency-name-input', 'Persist Test');
     await page.click('#mm-start-btn');
     await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
+
+    // Dismiss the welcome modal so buildings are clickable.
+    await dismissWelcomeModal(page);
 
     // Navigate to the VAB.
     await page.click('[data-building-id="vab"]');

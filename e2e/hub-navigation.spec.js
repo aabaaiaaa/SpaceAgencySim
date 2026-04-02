@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { dismissWelcomeModal } from './helpers.js';
 
 /**
  * E2E — Hub Navigation
@@ -51,6 +52,9 @@ test.describe('Hub Navigation', () => {
 
     // Wait for the hub overlay to appear.
     await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
+
+    // Dismiss the welcome modal so buildings are clickable.
+    await dismissWelcomeModal(page);
   });
 
   test.afterAll(async () => {

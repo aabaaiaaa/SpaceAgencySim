@@ -9,6 +9,21 @@ import { SAVE_KEY } from './_constants.js';
 // ---------------------------------------------------------------------------
 
 /**
+ * Dismiss the welcome modal if it is showing. No-ops if it is not present.
+ *
+ * @param {import('@playwright/test').Page} page
+ */
+export async function dismissWelcomeModal(page) {
+  const btn = page.locator('#welcome-dismiss-btn');
+  try {
+    await btn.waitFor({ state: 'visible', timeout: 2_000 });
+    await btn.click();
+  } catch {
+    // Modal not present — no-op.
+  }
+}
+
+/**
  * Drag a part card from the VAB parts panel and drop it at (targetX, targetY)
  * in viewport coordinates.
  *
