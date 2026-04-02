@@ -107,9 +107,9 @@ async function main() {
 
       // Disable malfunctions by default for deterministic tests.
       if (opts.malfunctionMode !== undefined) {
-        setMalfunctionMode(opts.malfunctionMode);
+        setMalfunctionMode(state, opts.malfunctionMode);
       } else {
-        setMalfunctionMode('off');
+        setMalfunctionMode(state, 'off');
       }
 
       startFlightScene(

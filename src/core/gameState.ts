@@ -12,6 +12,7 @@ import {
   FlightOutcome,
   FlightPhase,
   GameMode,
+  MalfunctionMode,
   MissionState,
   STARTING_MONEY,
   STARTING_LOAN_BALANCE,
@@ -662,6 +663,12 @@ export interface GameState {
   fieldCraft: FieldCraft[];
   /** True once the welcome/introduction modal has been shown for this save. */
   welcomeShown: boolean;
+  /**
+   * Current malfunction mode ('normal', 'off', 'forced').
+   * Controls whether part malfunctions trigger during flight.
+   * Persisted with save/load so E2E test overrides survive round-trips.
+   */
+  malfunctionMode: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -786,6 +793,9 @@ export function createGameState(): GameState {
 
     // Welcome modal — shown once on first hub visit for a new game.
     welcomeShown: false,
+
+    // Malfunction mode — 'normal' (standard rolls), 'off', or 'forced'.
+    malfunctionMode: MalfunctionMode.NORMAL,
   };
 }
 

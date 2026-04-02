@@ -317,7 +317,7 @@ function _showMenu(instanceId, def, ps, assembly, flightState, clientX, clientY)
       };
 
       _menu.appendChild(_makeButton(actionLabels[malf.type] ?? 'Attempt Recovery', () => {
-        const result = attemptRecovery(ps, instanceId);
+        const result = attemptRecovery(ps, instanceId, ps._gameState);
         // If decoupler recovery succeeded, actually fire the separation.
         if (result.success && malf.type === MalfunctionType.DECOUPLER_STUCK) {
           const debris = activatePartDirect(ps, _getAssembly(), _getFlightState(), instanceId);

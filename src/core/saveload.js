@@ -254,6 +254,9 @@ export function loadGame(slotIndex) {
   // Default savedDesigns for saves created before this feature existed.
   envelope.state.savedDesigns ??= [];
 
+  // Default malfunctionMode for saves created before it moved to gameState.
+  envelope.state.malfunctionMode ??= 'normal';
+
   // Migrate legacy savedDesigns: designs without a savePrivate flag are
   // migrated to the shared library (cross-save) and removed from the
   // per-slot array. Designs explicitly marked savePrivate stay in the slot.

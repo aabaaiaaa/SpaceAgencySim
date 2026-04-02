@@ -55,6 +55,9 @@ import { getPartById, PARTS } from '../data/parts.js';
 // Shared helpers
 // ---------------------------------------------------------------------------
 
+/** Shared game state for malfunction mode — reset before each top-level suite. */
+let gs;
+
 function makeFlightState() {
   return createFlightState({
     missionId: 'test-mission',
@@ -97,21 +100,22 @@ function makePhysicsState(assembly) {
 
 describe('Malfunction mode control', () => {
   beforeEach(() => {
-    setMalfunctionMode(MalfunctionMode.NORMAL);
+    gs = createGameState();
+    setMalfunctionMode(gs, MalfunctionMode.NORMAL);
   });
 
   it('defaults to normal mode', () => {
-    expect(getMalfunctionMode()).toBe(MalfunctionMode.NORMAL);
+    expect(getMalfunctionMode(gs)).toBe(MalfunctionMode.NORMAL);
   });
 
   it('can set to off mode', () => {
-    setMalfunctionMode(MalfunctionMode.OFF);
-    expect(getMalfunctionMode()).toBe(MalfunctionMode.OFF);
+    setMalfunctionMode(gs, MalfunctionMode.OFF);
+    expect(getMalfunctionMode(gs)).toBe(MalfunctionMode.OFF);
   });
 
   it('can set to forced mode', () => {
-    setMalfunctionMode(MalfunctionMode.FORCED);
-    expect(getMalfunctionMode()).toBe(MalfunctionMode.FORCED);
+    setMalfunctionMode(gs, MalfunctionMode.FORCED);
+    expect(getMalfunctionMode(gs)).toBe(MalfunctionMode.FORCED);
   });
 });
 
@@ -200,25 +204,26 @@ describe('hasMalfunction() / getMalfunction()', () => {
 
 describe('checkMalfunctions()', () => {
   beforeEach(() => {
-    setMalfunctionMode(MalfunctionMode.NORMAL);
+    gs = createGameState();
+    setMalfunctionMode(gs, MalfunctionMode.NORMAL);
   });
 
   it('does nothing in OFF mode', () => {
-    setMalfunctionMode(MalfunctionMode.OFF);
+    setMalfunctionMode(gs, MalfunctionMode.OFF);
     const { assembly, engineId } = makeSimpleRocket();
     const { ps, fs } = makePhysicsState(assembly);
 
-    checkMalfunctions(ps, assembly, fs, null);
+    checkMalfunctions(ps, assembly, fs, gs);
 
     expect(ps.malfunctions.size).toBe(0);
   });
 
   it('forces malfunctions on all applicable parts in FORCED mode', () => {
-    setMalfunctionMode(MalfunctionMode.FORCED);
+    setMalfunctionMode(gs, MalfunctionMode.FORCED);
     const { assembly, engineId, tankId } = makeSimpleRocket();
     const { ps, fs } = makePhysicsState(assembly);
 
-    checkMalfunctions(ps, assembly, fs, null);
+    checkMalfunctions(ps, assembly, fs, gs);
 
     // Engine and tank should be malfunctioned (probe core has no applicable types).
     expect(ps.malfunctions.has(engineId)).toBe(true);
@@ -226,25 +231,25 @@ describe('checkMalfunctions()', () => {
   });
 
   it('marks parts as checked so they are not re-rolled', () => {
-    setMalfunctionMode(MalfunctionMode.FORCED);
+    setMalfunctionMode(gs, MalfunctionMode.FORCED);
     const { assembly, engineId } = makeSimpleRocket();
     const { ps, fs } = makePhysicsState(assembly);
 
-    checkMalfunctions(ps, assembly, fs, null);
+    checkMalfunctions(ps, assembly, fs, gs);
     const firstMalf = getMalfunction(ps, engineId);
 
     // Second check should not add new malfunctions (already checked).
     const sizeAfterFirst = ps.malfunctions.size;
-    checkMalfunctions(ps, assembly, fs, null);
+    checkMalfunctions(ps, assembly, fs, gs);
     expect(ps.malfunctions.size).toBe(sizeAfterFirst);
   });
 
   it('emits PART_MALFUNCTION flight events', () => {
-    setMalfunctionMode(MalfunctionMode.FORCED);
+    setMalfunctionMode(gs, MalfunctionMode.FORCED);
     const { assembly } = makeSimpleRocket();
     const { ps, fs } = makePhysicsState(assembly);
 
-    checkMalfunctions(ps, assembly, fs, null);
+    checkMalfunctions(ps, assembly, fs, gs);
 
     const malfEvents = fs.events.filter(e => e.type === 'PART_MALFUNCTION');
     expect(malfEvents.length).toBeGreaterThan(0);
@@ -264,27 +269,27 @@ describe('checkMalfunctions()', () => {
       crewIds: ['crew-1'],
     });
     const ps = createPhysicsState(assembly, fs);
-    const gameState = createGameState();
-    gameState.crew.push(createCrewMember({
+    gs.crew.push(createCrewMember({
       id: 'crew-1',
       name: 'Test Engineer',
       salary: 5000,
     }));
-    gameState.crew[0].skills.engineering = 100;
+    gs.crew[0].skills.engineering = 100;
 
-    setMalfunctionMode(MalfunctionMode.NORMAL);
+    setMalfunctionMode(gs, MalfunctionMode.NORMAL);
     // Just verify it runs without error.
-    checkMalfunctions(ps, assembly, fs, gameState);
+    checkMalfunctions(ps, assembly, fs, gs);
   });
 });
 
 describe('Malfunction effects', () => {
   beforeEach(() => {
-    setMalfunctionMode(MalfunctionMode.FORCED);
+    gs = createGameState();
+    setMalfunctionMode(gs, MalfunctionMode.FORCED);
   });
 
   afterEach(() => {
-    setMalfunctionMode(MalfunctionMode.NORMAL);
+    setMalfunctionMode(gs, MalfunctionMode.NORMAL);
   });
 
   it('ENGINE_FLAMEOUT removes engine from firingEngines', () => {
@@ -374,14 +379,15 @@ describe('tickMalfunctions()', () => {
 
 describe('attemptRecovery()', () => {
   beforeEach(() => {
-    setMalfunctionMode(MalfunctionMode.NORMAL);
+    gs = createGameState();
+    setMalfunctionMode(gs, MalfunctionMode.NORMAL);
   });
 
   it('returns failure when no malfunction exists', () => {
     const { assembly, engineId } = makeSimpleRocket();
     const { ps } = makePhysicsState(assembly);
 
-    const result = attemptRecovery(ps, engineId);
+    const result = attemptRecovery(ps, engineId, gs);
     expect(result.success).toBe(false);
   });
 
@@ -401,7 +407,7 @@ describe('attemptRecovery()', () => {
       recovered: false,
     });
 
-    const result = attemptRecovery(ps, decId);
+    const result = attemptRecovery(ps, decId, gs);
     expect(result.success).toBe(true);
     expect(ps.malfunctions.get(decId).recovered).toBe(true);
   });
@@ -415,7 +421,7 @@ describe('attemptRecovery()', () => {
       recovered: false,
     });
 
-    const result = attemptRecovery(ps, engineId);
+    const result = attemptRecovery(ps, engineId, gs);
     expect(result.success).toBe(false);
   });
 
@@ -435,7 +441,7 @@ describe('attemptRecovery()', () => {
       recovered: false,
     });
 
-    const result = attemptRecovery(ps, chuteId);
+    const result = attemptRecovery(ps, chuteId, gs);
     expect(result.success).toBe(false);
   });
 
@@ -455,7 +461,7 @@ describe('attemptRecovery()', () => {
       recovered: false,
     });
 
-    const result = attemptRecovery(ps, srbId);
+    const result = attemptRecovery(ps, srbId, gs);
     expect(result.success).toBe(false);
   });
 
@@ -474,7 +480,7 @@ describe('attemptRecovery()', () => {
     // Simulate a successful recovery by calling the function.
     // The function uses Math.random() < 0.5 for success.
     // We'll just verify the function runs and returns the expected shape.
-    const result = attemptRecovery(ps, engineId);
+    const result = attemptRecovery(ps, engineId, gs);
     expect(result).toHaveProperty('success');
     expect(result).toHaveProperty('message');
     expect(typeof result.message).toBe('string');
@@ -551,5 +557,35 @@ describe('MalfunctionMode enum', () => {
     expect(MalfunctionMode.NORMAL).toBe('normal');
     expect(MalfunctionMode.OFF).toBe('off');
     expect(MalfunctionMode.FORCED).toBe('forced');
+  });
+});
+
+describe('malfunctionMode save/load round-trip', () => {
+  it('persists malfunctionMode through JSON serialisation', () => {
+    const state = createGameState();
+    expect(state.malfunctionMode).toBe(MalfunctionMode.NORMAL);
+
+    // Change to OFF, serialise, and deserialise.
+    setMalfunctionMode(state, MalfunctionMode.OFF);
+    const json = JSON.stringify(state);
+    const restored = JSON.parse(json);
+
+    expect(restored.malfunctionMode).toBe(MalfunctionMode.OFF);
+    expect(getMalfunctionMode(restored)).toBe(MalfunctionMode.OFF);
+  });
+
+  it('persists FORCED mode through JSON serialisation', () => {
+    const state = createGameState();
+    setMalfunctionMode(state, MalfunctionMode.FORCED);
+    const restored = JSON.parse(JSON.stringify(state));
+
+    expect(getMalfunctionMode(restored)).toBe(MalfunctionMode.FORCED);
+  });
+
+  it('defaults to NORMAL when malfunctionMode is missing (legacy saves)', () => {
+    const state = createGameState();
+    delete state.malfunctionMode;
+
+    expect(getMalfunctionMode(state)).toBe(MalfunctionMode.NORMAL);
   });
 });

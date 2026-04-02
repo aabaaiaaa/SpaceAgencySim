@@ -24,8 +24,8 @@
  *   hasMalfunction(ps, instanceId)
  *   getMalfunction(ps, instanceId)
  *   attemptRecovery(ps, instanceId)
- *   setMalfunctionMode(mode)
- *   getMalfunctionMode()
+ *   setMalfunctionMode(gameState, mode)
+ *   getMalfunctionMode(gameState)
  *   getPartReliability(def)
  *   MALFUNCTION_RECOVERY_TIPS
  *
@@ -45,16 +45,6 @@ import {
   MAX_ENGINEERING_MALFUNCTION_REDUCTION,
 } from './constants.js';
 import { getMalfunctionMultiplier } from './settings.js';
-
-// ---------------------------------------------------------------------------
-// Module state
-// ---------------------------------------------------------------------------
-
-/**
- * Current malfunction mode (normal / off / forced).
- * @type {string}
- */
-let _malfunctionMode = MalfunctionMode.NORMAL;
 
 // ---------------------------------------------------------------------------
 // Recovery tips (shown in context menu)
@@ -104,19 +94,21 @@ export const MALFUNCTION_LABELS = Object.freeze({
 // ---------------------------------------------------------------------------
 
 /**
- * Set the malfunction mode (for E2E testing).
+ * Set the malfunction mode on the game state.
+ * @param {import('./gameState.js').GameState} gameState
  * @param {string} mode  MalfunctionMode value ('normal', 'off', 'forced').
  */
-export function setMalfunctionMode(mode) {
-  _malfunctionMode = mode;
+export function setMalfunctionMode(gameState, mode) {
+  gameState.malfunctionMode = mode;
 }
 
 /**
- * Get the current malfunction mode.
+ * Get the current malfunction mode from the game state.
+ * @param {import('./gameState.js').GameState} gameState
  * @returns {string}
  */
-export function getMalfunctionMode() {
-  return _malfunctionMode;
+export function getMalfunctionMode(gameState) {
+  return gameState.malfunctionMode ?? MalfunctionMode.NORMAL;
 }
 
 // ---------------------------------------------------------------------------
@@ -199,7 +191,8 @@ export function getPartReliability(def) {
  * @param {object} [gameState] GameState (for crew skill lookup); optional.
  */
 export function checkMalfunctions(ps, assembly, flightState, gameState) {
-  if (_malfunctionMode === MalfunctionMode.OFF) return;
+  const mode = gameState?.malfunctionMode ?? MalfunctionMode.NORMAL;
+  if (mode === MalfunctionMode.OFF) return;
   // Sandbox mode with malfunctions disabled: skip all checks.
   if (gameState?.gameMode === GameMode.SANDBOX &&
       !gameState.sandboxSettings?.malfunctionsEnabled) return;
@@ -240,7 +233,7 @@ export function checkMalfunctions(ps, assembly, flightState, gameState) {
     const failureChance = (1 - baseReliability) * (1 - engineeringReduction) * malfunctionMult;
 
     let malfunctioned = false;
-    if (_malfunctionMode === MalfunctionMode.FORCED) {
+    if (mode === MalfunctionMode.FORCED) {
       malfunctioned = true;
     } else {
       malfunctioned = Math.random() < failureChance;
@@ -302,15 +295,17 @@ export function tickMalfunctions(ps, assembly, dt) {
  *
  * @param {object} ps            PhysicsState
  * @param {string} instanceId
+ * @param {import('./gameState.js').GameState} [gameState]  GameState (for mode lookup); optional.
  * @returns {{ success: boolean, message: string }}
  */
-export function attemptRecovery(ps, instanceId) {
+export function attemptRecovery(ps, instanceId, gameState) {
   const entry = ps.malfunctions?.get(instanceId);
   if (!entry || entry.recovered) {
     return { success: false, message: 'No active malfunction.' };
   }
 
-  const roll = (_malfunctionMode === MalfunctionMode.FORCED) ? 1.0 : Math.random();
+  const mode = gameState?.malfunctionMode ?? ps._gameState?.malfunctionMode ?? MalfunctionMode.NORMAL;
+  const roll = (mode === MalfunctionMode.FORCED) ? 1.0 : Math.random();
 
   switch (entry.type) {
     case MalfunctionType.ENGINE_FLAMEOUT:

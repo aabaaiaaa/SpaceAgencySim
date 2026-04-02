@@ -25,7 +25,7 @@
 - **Verification**: Run `npm run test:unit` — all tests pass. No E2E needed — trivial one-line fix in debug tooling.
 
 ### TASK-005: Move _malfunctionMode from module variable to gameState
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: `src/core/malfunction.js` stores `_malfunctionMode` as a module-level variable rather than in `gameState`. Move it into the game state object so it follows the same state mutation pattern as everything else and can be persisted/restored with save/load. Update all read/write sites and any E2E test hooks that toggle malfunction mode. See requirements (review item, not in a numbered section — architectural consistency).
 - **Verification**: Run `npm run test:unit` — all tests pass. Then run `npx playwright test e2e/reliability-risk.spec.js` to verify malfunction E2E tests still work with the new state location. Verify malfunction mode survives save/load cycle via unit test.

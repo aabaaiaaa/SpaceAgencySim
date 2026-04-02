@@ -168,8 +168,8 @@ export function startFlightScene(
     window.__flightPs       = s.ps;
     window.__flightAssembly = s.assembly;
     window.__flightState    = flightState;
-    window.__setMalfunctionMode = setMalfunctionMode;
-    window.__getMalfunctionMode = getMalfunctionMode;
+    window.__setMalfunctionMode = (mode) => setMalfunctionMode(s.state, mode);
+    window.__getMalfunctionMode = () => getMalfunctionMode(s.state);
   }
 
   // Boot the PixiJS flight renderer.
