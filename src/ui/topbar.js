@@ -32,6 +32,7 @@ import { GameMode, MAX_LOAN_BALANCE } from '../core/constants.js';
 import { getPartById } from '../data/parts.js';
 import { syncVabToGameState } from '../ui/vab.js';
 import { openHelpPanel } from './help.js';
+import { createListenerTracker } from './listenerTracker.js';
 
 // ---------------------------------------------------------------------------
 // Module state
@@ -76,6 +77,9 @@ let _onDropdownToggle = null;
  * @type {string}
  */
 let _currentScreen = 'hub';
+
+/** Tracks all event listeners registered by the topbar so they can be bulk-removed on destroy. */
+let _tracker = createListenerTracker();
 
 // ---------------------------------------------------------------------------
 // CSS
@@ -710,7 +714,7 @@ export function initTopBar(container, state, { onExitToMenu, onLoadGame }) {
   cash.title = 'View loan details';
   cash.textContent = _fmtCash(state.money ?? 0);
   cash.style.color = _moneyColor(state.money ?? 0);
-  cash.addEventListener('click', () => _openLoanModal());
+  _tracker.add(cash, 'click', () => _openLoanModal());
 
   // Hamburger button — right
   const menuBtn = document.createElement('button');
@@ -719,7 +723,7 @@ export function initTopBar(container, state, { onExitToMenu, onLoadGame }) {
   menuBtn.setAttribute('aria-label', 'Open menu');
   menuBtn.title = 'Menu';
   menuBtn.textContent = '☰';
-  menuBtn.addEventListener('click', (e) => {
+  _tracker.add(menuBtn, 'click', (e) => {
     e.stopPropagation();
     _toggleDropdown();
   });
@@ -731,7 +735,7 @@ export function initTopBar(container, state, { onExitToMenu, onLoadGame }) {
   missionsBtn.setAttribute('aria-label', 'View accepted missions');
   missionsBtn.title = 'Accepted Missions';
   missionsBtn.textContent = 'Missions';
-  missionsBtn.addEventListener('click', (e) => {
+  _tracker.add(missionsBtn, 'click', (e) => {
     e.stopPropagation();
     _toggleMissionsDropdown();
   });
@@ -768,7 +772,7 @@ export function initTopBar(container, state, { onExitToMenu, onLoadGame }) {
   _refreshMissionsBtn();
 
   // Close dropdown when clicking anywhere outside it.
-  document.addEventListener('click', _onDocClick, true);
+  _tracker.add(document, 'click', _onDocClick, true);
 
   console.log('[TopBar] Initialized');
 }
@@ -778,7 +782,8 @@ export function initTopBar(container, state, { onExitToMenu, onLoadGame }) {
  * Call before returning to the main menu.
  */
 export function destroyTopBar() {
-  document.removeEventListener('click', _onDocClick, true);
+  _tracker.removeAll();
+  _tracker = createListenerTracker();
   _closeAllModals();
   _closeDropdown();
   _closeMissionsDropdown();

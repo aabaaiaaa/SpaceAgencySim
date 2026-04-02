@@ -31,7 +31,7 @@
 - **Verification**: Run `npm run test:unit` — all tests pass. Then run `npx playwright test e2e/reliability-risk.spec.js` to verify malfunction E2E tests still work with the new state location. Verify malfunction mode survives save/load cycle via unit test.
 
 ### TASK-006: Implement event listener cleanup in UI modules
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Fix event listener accumulation in `src/ui/help.js`, `src/ui/settings.js`, `src/ui/debugSaves.js`, and `src/ui/topbar.js`. Create a lightweight listener tracking helper that modules can use to register listeners and clean them up on panel close/teardown. Apply it to the four affected modules. See requirements Section 2.1.
 - **Verification**: Run `npm run test:unit` — all tests pass. Then run `npx playwright test e2e/help.spec.js e2e/hub-navigation.spec.js` to verify help and hub panel interactions still work.

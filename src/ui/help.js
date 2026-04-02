@@ -8,6 +8,8 @@
  * @module ui/help
  */
 
+import { createListenerTracker } from './listenerTracker.js';
+
 // ---------------------------------------------------------------------------
 // Section definitions
 // ---------------------------------------------------------------------------
@@ -661,6 +663,14 @@ export function openHelpPanel(container, _state, defaultSection = 'overview') {
     document.head.appendChild(styleEl);
   }
 
+  const tracker = createListenerTracker();
+
+  /** Remove all tracked listeners, then remove the panel from the DOM. */
+  function closePanel() {
+    tracker.removeAll();
+    panel.remove();
+  }
+
   const panel = document.createElement('div');
   panel.id = 'help-panel';
 
@@ -684,7 +694,7 @@ export function openHelpPanel(container, _state, defaultSection = 'overview') {
   closeX.className = 'help-close-x';
   closeX.textContent = '\u00D7';
   closeX.title = 'Close help';
-  closeX.addEventListener('click', () => panel.remove());
+  tracker.add(closeX, 'click', () => closePanel());
   topbar.appendChild(closeX);
   contentWrapper.appendChild(topbar);
 
@@ -717,7 +727,7 @@ export function openHelpPanel(container, _state, defaultSection = 'overview') {
     const closeBtn = document.createElement('button');
     closeBtn.className = 'help-close-btn';
     closeBtn.textContent = '\u2190 Close Help';
-    closeBtn.addEventListener('click', () => panel.remove());
+    tracker.add(closeBtn, 'click', () => closePanel());
     content.appendChild(closeBtn);
 
     // Scroll to top.
@@ -730,7 +740,7 @@ export function openHelpPanel(container, _state, defaultSection = 'overview') {
     btn.className = 'help-sidebar-item';
     btn.dataset.section = section.id;
     btn.textContent = section.label;
-    btn.addEventListener('click', () => showSection(section.id));
+    tracker.add(btn, 'click', () => showSection(section.id));
     sidebar.appendChild(btn);
   }
 

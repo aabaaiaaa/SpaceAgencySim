@@ -21,6 +21,7 @@ import {
   InjuryDuration,
 } from '../core/constants.js';
 import { getDifficultySettings, updateDifficultySettings } from '../core/settings.js';
+import { createListenerTracker } from './listenerTracker.js';
 
 // ---------------------------------------------------------------------------
 // CSS
@@ -214,6 +215,14 @@ export function openSettingsPanel(container, state) {
     document.head.appendChild(styleEl);
   }
 
+  const tracker = createListenerTracker();
+
+  /** Remove all tracked listeners, then remove the panel from the DOM. */
+  function closePanel() {
+    tracker.removeAll();
+    panel.remove();
+  }
+
   const panel = document.createElement('div');
   panel.id = 'settings-panel';
 
@@ -262,7 +271,7 @@ export function openSettingsPanel(container, state) {
         btn.classList.add('active');
       }
 
-      btn.addEventListener('click', () => {
+      tracker.add(btn, 'click', () => {
         // Update state.
         updateDifficultySettings(state, { [def.key]: opt.value });
 
@@ -284,9 +293,7 @@ export function openSettingsPanel(container, state) {
   const closeBtn = document.createElement('button');
   closeBtn.className = 'settings-close-btn';
   closeBtn.textContent = '\u2190 Hub';
-  closeBtn.addEventListener('click', () => {
-    panel.remove();
-  });
+  tracker.add(closeBtn, 'click', () => closePanel());
   content.appendChild(closeBtn);
 
   container.appendChild(panel);

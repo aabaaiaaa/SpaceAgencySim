@@ -14,6 +14,7 @@
 import { DEBUG_SAVE_DEFINITIONS } from '../core/debugSaves.js';
 import { getUnlockedMissions, reconcileParts } from '../core/missions.js';
 import { refreshTopBar } from './topbar.js';
+import { createListenerTracker } from './listenerTracker.js';
 
 // ---------------------------------------------------------------------------
 // CSS
@@ -202,6 +203,14 @@ export function openDebugSavePanel(container, state) {
     document.head.appendChild(styleEl);
   }
 
+  const tracker = createListenerTracker();
+
+  /** Remove all tracked listeners, then remove the panel from the DOM. */
+  function closePanel() {
+    tracker.removeAll();
+    panel.remove();
+  }
+
   const panel = document.createElement('div');
   panel.id = 'debug-save-panel';
 
@@ -272,12 +281,12 @@ export function openDebugSavePanel(container, state) {
       loadBtn.textContent = 'Load';
       loadBtn.setAttribute('aria-label', `Load debug save: ${def.name}`);
 
-      loadBtn.addEventListener('click', (e) => {
+      tracker.add(loadBtn, 'click', (e) => {
         e.stopPropagation();
         _loadDebugState(state, def, feedback);
       });
 
-      card.addEventListener('click', () => {
+      tracker.add(card, 'click', () => {
         _loadDebugState(state, def, feedback);
       });
 
@@ -293,9 +302,7 @@ export function openDebugSavePanel(container, state) {
   closeBtn.className = 'debug-save-close-btn';
   closeBtn.textContent = 'Close';
   closeBtn.setAttribute('aria-label', 'Close debug save menu');
-  closeBtn.addEventListener('click', () => {
-    panel.remove();
-  });
+  tracker.add(closeBtn, 'click', () => closePanel());
   content.appendChild(closeBtn);
 
   container.appendChild(panel);
