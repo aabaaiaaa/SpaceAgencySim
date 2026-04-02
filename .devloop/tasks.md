@@ -163,7 +163,7 @@
 - **Verification**: Grep for `TODO` in the four TS files — count is 0 (all resolved). Run `npm run typecheck` — no errors.
 
 ### TASK-028: Verification pass — run all checks
-- **Status**: pending
+- **Status**: in-progress
 - **Dependencies**: TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-007, TASK-008, TASK-009, TASK-010, TASK-011, TASK-012, TASK-013, TASK-014, TASK-015, TASK-016, TASK-017, TASK-018, TASK-019, TASK-020, TASK-021, TASK-022, TASK-023, TASK-024, TASK-025, TASK-026, TASK-027
 - **Description**: Run the full verification suite: `npm run typecheck`, `npm run lint`, `npm run test:unit`, `npm run test:e2e`, and `npm run test:coverage`. All must pass with no errors. See requirements Section 9.
 - **Verification**: All five commands pass cleanly. Coverage meets or exceeds raised thresholds from TASK-024.
