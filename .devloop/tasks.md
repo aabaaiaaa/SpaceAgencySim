@@ -79,7 +79,7 @@
 - **Verification**: Run `npx vitest run src/tests/flightReturn.test.js` — all tests pass. Coverage of `flightReturn.js` should be ≥80% lines/branches.
 
 ### TASK-014: Add unit tests for sciencemodule.js
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Create `src/tests/sciencemodule.test.js` covering science module activation, data collection, yield calculation, and edge cases. See requirements Section 5.1.
 - **Verification**: Run `npx vitest run src/tests/sciencemodule.test.js` — all tests pass.
