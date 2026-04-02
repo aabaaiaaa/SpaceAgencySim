@@ -103,7 +103,7 @@
 - **Verification**: Run the parachute test file — all tests pass, including new deployment trigger tests.
 
 ### TASK-018: Add programmatic time warp API for E2E tests
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Expose a testing-only API (e.g., `window.__testSetTimeWarp(speedMultiplier)`) that lets E2E tests set arbitrary simulation speeds not limited to the player-facing time warp increments. This is needed by TASK-019 and TASK-020 for running physics through transitions at high speed. See requirements Section 5.2.1.
 - **Verification**: Write a small E2E test (in `e2e/test-infrastructure.spec.js` or a new spec) that sets time warp to 100x, verifies simulation time advances faster than real time, then resets to 1x. Run `npx playwright test e2e/test-infrastructure.spec.js` — passes.

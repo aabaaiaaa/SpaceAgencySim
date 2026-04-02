@@ -11,6 +11,8 @@ import {
   startTestFlight,
   setMalfunctionMode,
   getMalfunctionMode,
+  setTestTimeWarp,
+  getTestTimeWarp,
   getGameState,
   getPhysicsSnapshot,
   waitForAltitude,
@@ -343,5 +345,93 @@ test.describe('E2E Infrastructure — Full State Coverage', () => {
     expect(gs.contracts.completed).toHaveLength(1);
 
     await page.close();
+  });
+});
+
+// ==========================================================================
+// Suite 6: Programmatic time warp API
+// ==========================================================================
+
+test.describe('E2E Infrastructure — Time Warp API', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  /** @type {import('@playwright/test').Page} */
+  let page;
+
+  test.beforeAll(async ({ browser }) => {
+    test.setTimeout(60_000);
+    page = await browser.newPage();
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+
+    const envelope = freshStartFixture({ parts: ALL_PARTS });
+    await seedAndLoadSave(page, envelope);
+
+    // Start a flight (grounded on the pad, engines off)
+    await startTestFlight(page, ['probe-core-mk1', 'tank-small', 'engine-spark']);
+  });
+
+  test.afterAll(async () => {
+    await page.close();
+  });
+
+  test('(1) time warp API is exposed during flight', async () => {
+    const hasSet = await page.evaluate(() => typeof window.__testSetTimeWarp === 'function');
+    const hasGet = await page.evaluate(() => typeof window.__testGetTimeWarp === 'function');
+    expect(hasSet).toBe(true);
+    expect(hasGet).toBe(true);
+  });
+
+  test('(2) default time warp is 1x', async () => {
+    const warp = await getTestTimeWarp(page);
+    expect(warp).toBe(1);
+  });
+
+  test('(3) can set time warp to 100x and simulation time advances faster than real time', async () => {
+    // Record starting simulation time
+    const startSimTime = await page.evaluate(() => {
+      const fs = window.__flightState;
+      return fs ? fs.timeElapsed : 0;
+    });
+
+    // Set time warp to 100x
+    await setTestTimeWarp(page, 100);
+    const warp = await getTestTimeWarp(page);
+    expect(warp).toBe(100);
+
+    // Stage the rocket so it's flying (physics advances timeElapsed only when not idle-landed)
+    await page.keyboard.press('Space');
+
+    // Wait a short real-time period for physics to advance
+    const realStartMs = Date.now();
+    await page.waitForFunction(
+      (startTime) => {
+        const fs = window.__flightState;
+        // Wait until at least 5 sim-seconds have elapsed beyond our start
+        return fs && (fs.timeElapsed - startTime) >= 5;
+      },
+      startSimTime,
+      { timeout: 10_000 },
+    );
+    const realElapsedMs = Date.now() - realStartMs;
+
+    // Read final simulation time
+    const endSimTime = await page.evaluate(() => {
+      const fs = window.__flightState;
+      return fs ? fs.timeElapsed : 0;
+    });
+
+    const simElapsed = endSimTime - startSimTime;
+
+    // Simulation time should have advanced much faster than real time.
+    // With 100x warp, 5 sim-seconds should take ~50ms real time (plus overhead).
+    // We just verify that sim time advanced at least 10x faster than real time.
+    const realElapsedSec = realElapsedMs / 1000;
+    expect(simElapsed).toBeGreaterThan(realElapsedSec * 10);
+  });
+
+  test('(4) can reset time warp back to 1x', async () => {
+    await setTestTimeWarp(page, 1);
+    const warp = await getTestTimeWarp(page);
+    expect(warp).toBe(1);
   });
 });

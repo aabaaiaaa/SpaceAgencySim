@@ -166,6 +166,13 @@ export function startFlightScene(
     window.__flightState    = flightState;
     window.__setMalfunctionMode = (mode) => setMalfunctionMode(s.state, mode);
     window.__getMalfunctionMode = () => getMalfunctionMode(s.state);
+
+    // Programmatic time warp API for E2E tests — allows arbitrary multipliers
+    // not limited to the player-facing warp level buttons.
+    window.__testSetTimeWarp = (speedMultiplier) => {
+      s.timeWarp = speedMultiplier;
+    };
+    window.__testGetTimeWarp = () => s.timeWarp;
   }
 
   // Boot the PixiJS flight renderer.
@@ -293,6 +300,8 @@ export function stopFlightScene() {
     window.__flightPs       = null;
     window.__flightAssembly = null;
     window.__flightState    = null;
+    window.__testSetTimeWarp = undefined;
+    window.__testGetTimeWarp = undefined;
   }
 
   // Reset all state.
