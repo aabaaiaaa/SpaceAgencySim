@@ -166,7 +166,7 @@ export function meanAnomalyToTrue(M: number, e: number): number {
   const cosE = Math.cos(E);
   const sinE = Math.sin(E);
   const theta = Math.atan2(
-    Math.sqrt(1 - e * e) * sinE,
+    Math.sqrt(Math.max(0, 1 - e * e)) * sinE,
     cosE - e,
   );
   return ((theta % TWO_PI) + TWO_PI) % TWO_PI;
@@ -183,7 +183,7 @@ export function trueToEccentricAnomaly(theta: number, e: number): number {
   if (e < CIRCULAR_THRESHOLD) return ((theta % TWO_PI) + TWO_PI) % TWO_PI;
 
   const E = Math.atan2(
-    Math.sqrt(1 - e * e) * Math.sin(theta),
+    Math.sqrt(Math.max(0, 1 - e * e)) * Math.sin(theta),
     e + Math.cos(theta),
   );
   return ((E % TWO_PI) + TWO_PI) % TWO_PI;

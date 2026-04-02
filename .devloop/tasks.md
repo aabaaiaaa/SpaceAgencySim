@@ -19,7 +19,7 @@
 - **Verification**: `npm run test:unit` passes. New unit test covers flight return functions with `state.crew` as null/undefined.
 
 ### TASK-004: Clamp sqrt arguments in orbital mechanics functions
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/core/orbit.ts`, add `Math.max(0, 1 - e * e)` before `Math.sqrt(1 - e * e)` in `meanAnomalyToTrue()` (line 169) and `trueToEccentricAnomaly()` (line 186). See requirements Section 1.3.
 - **Verification**: `npm run test:unit` passes. New unit tests verify `meanAnomalyToTrue()` and `trueToEccentricAnomaly()` with e values at 0.9999, 1.0, and 1.001 return finite numbers (no NaN).

@@ -165,6 +165,36 @@ describe('anomaly conversions', () => {
     const rhs = Math.sqrt((1 + e) / (1 - e)) * Math.tan(E / 2);
     expect(lhs).toBeCloseTo(rhs, 8);
   });
+
+  it('meanAnomalyToTrue returns finite for near-parabolic e=0.9999', () => {
+    const result = meanAnomalyToTrue(1.0, 0.9999);
+    expect(Number.isFinite(result)).toBe(true);
+  });
+
+  it('meanAnomalyToTrue returns finite for e=1.0 (parabolic)', () => {
+    const result = meanAnomalyToTrue(1.0, 1.0);
+    expect(Number.isFinite(result)).toBe(true);
+  });
+
+  it('meanAnomalyToTrue returns finite for e=1.001 (hyperbolic)', () => {
+    const result = meanAnomalyToTrue(1.0, 1.001);
+    expect(Number.isFinite(result)).toBe(true);
+  });
+
+  it('trueToEccentricAnomaly returns finite for near-parabolic e=0.9999', () => {
+    const result = trueToEccentricAnomaly(1.0, 0.9999);
+    expect(Number.isFinite(result)).toBe(true);
+  });
+
+  it('trueToEccentricAnomaly returns finite for e=1.0 (parabolic)', () => {
+    const result = trueToEccentricAnomaly(1.0, 1.0);
+    expect(Number.isFinite(result)).toBe(true);
+  });
+
+  it('trueToEccentricAnomaly returns finite for e=1.001 (hyperbolic)', () => {
+    const result = trueToEccentricAnomaly(1.0, 1.001);
+    expect(Number.isFinite(result)).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------
