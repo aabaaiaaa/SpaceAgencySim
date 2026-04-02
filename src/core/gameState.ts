@@ -32,10 +32,9 @@ import type {
 } from './constants.js';
 
 // ---------------------------------------------------------------------------
-// Cross-module types (from files still in .js)
+// Cross-module types (standalone definitions for JS module shapes)
 // ---------------------------------------------------------------------------
 
-// TODO: type properly when flightPhase.js is converted to TypeScript
 /** A log entry recording a phase transition during flight. */
 export interface PhaseTransition {
   from: string;
@@ -45,7 +44,6 @@ export interface PhaseTransition {
   meta?: Record<string, unknown>;
 }
 
-// TODO: type properly when docking.js is converted to TypeScript
 /** Persistent docking state carried on the FlightState. */
 export interface DockingSystemState {
   state: string;
@@ -60,7 +58,6 @@ export interface DockingSystemState {
   dockedObjectIds: string[];
 }
 
-// TODO: type properly when power.js is converted to TypeScript
 /** Power state tracked per physics tick on an active flight. */
 export interface PowerState {
   batteryCapacity: number;
@@ -72,7 +69,6 @@ export interface PowerState {
   solarPanelArea: number;
 }
 
-// TODO: type properly when comms.js is converted to TypeScript
 /** Communication link state. */
 export interface CommsState {
   status: string;
@@ -81,7 +77,6 @@ export interface CommsState {
   controlLocked: boolean;
 }
 
-// TODO: type properly when weather.js is converted to TypeScript
 /** Weather conditions for a single day at a launch site. */
 export interface WeatherConditions {
   windSpeed: number;
@@ -93,7 +88,6 @@ export interface WeatherConditions {
   bodyId: string;
 }
 
-// TODO: type properly when weather.js is converted to TypeScript
 /** Weather state stored in the game state. */
 export interface WeatherState {
   current: WeatherConditions;
@@ -101,7 +95,6 @@ export interface WeatherState {
   seed: number;
 }
 
-// TODO: type properly when data/missions.js is converted to TypeScript
 /** A single mission objective. */
 export interface ObjectiveDef {
   id: string;
@@ -109,6 +102,43 @@ export interface ObjectiveDef {
   target: Record<string, unknown>;
   completed: boolean;
   description: string;
+}
+
+/** Medal thresholds for challenge scoring. */
+export interface MedalThresholds {
+  bronze: number;
+  silver: number;
+  gold: number;
+}
+
+/** A challenge definition (hand-crafted or player-created). */
+export interface ChallengeDef {
+  /** Unique challenge identifier. */
+  id: string;
+  /** Display name. */
+  title: string;
+  /** Flavour text explaining the challenge. */
+  description: string;
+  /** Short constraint summary shown on the card. */
+  briefing: string;
+  /** Required objectives (all must pass). */
+  objectives: ObjectiveDef[];
+  /** FlightState field to measure for scoring. */
+  scoreMetric: string;
+  /** Human-readable label for the metric. */
+  scoreLabel: string;
+  /** Unit suffix (e.g. 'm/s', '$', 'parts'). */
+  scoreUnit: string;
+  /** Whether lower or higher values are better ('lower' | 'higher'). */
+  scoreDirection: string;
+  /** Threshold values for each medal. */
+  medals: MedalThresholds;
+  /** Cash reward per medal tier. */
+  rewards: { bronze: number; silver: number; gold: number };
+  /** Mission IDs that must be completed to unlock this challenge. */
+  requiredMissions?: string[];
+  /** True if this is a player-created custom challenge. */
+  custom?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -557,8 +587,7 @@ export interface ChallengeResultEntry {
 /** Challenge system state. */
 export interface ChallengesState {
   /** Currently accepted challenge instance (max 1), or null. */
-  // TODO: type properly when challenges.js is converted to TypeScript
-  active: Record<string, unknown> | null;
+  active: ChallengeDef | null;
   /** Best result per challenge: { [id]: { medal, score, attempts } }. */
   results: Record<string, ChallengeResultEntry>;
 }
@@ -654,8 +683,7 @@ export interface GameState {
   /** Challenge missions — replayable hand-crafted missions with medal scoring. */
   challenges: ChallengesState;
   /** Player-created custom challenges (same shape as ChallengeDef + custom: true). */
-  // TODO: type properly when data/challenges.js is converted to TypeScript
-  customChallenges: Record<string, unknown>[];
+  customChallenges: ChallengeDef[];
   /**
    * Crewed vessels left in the field (orbit or landed on non-Earth bodies).
    * Life support supplies count down each period.

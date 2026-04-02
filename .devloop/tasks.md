@@ -157,7 +157,7 @@
 - **Verification**: Read `package.json` and confirm `engines` field is present with a reasonable Node.js version constraint.
 
 ### TASK-027: Address all 17 TypeScript TODOs in existing TS files
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Address the 17 TODO comments in `src/core/constants.ts`, `src/core/gameState.ts`, `src/core/physics.ts`, and `src/core/orbit.ts` that mark places where JS module imports need proper type definitions. Add proper type imports, `.d.ts` declaration files, or JSDoc annotations as appropriate to resolve each TODO. See requirements Section 7.1.
 - **Verification**: Grep for `TODO` in the four TS files — count is 0 (all resolved). Run `npm run typecheck` — no errors.

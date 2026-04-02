@@ -101,44 +101,213 @@ import type { AltitudeBand, ControlMode as ControlModeType } from './constants.j
 import type { FlightState, OrbitalElements, PowerState, GameState } from './gameState.js';
 
 // ---------------------------------------------------------------------------
-// Types for modules still in .js — use `any` with TODO markers
+// Types for modules still in .js
 // ---------------------------------------------------------------------------
 
-// TODO: type properly when rocketbuilder.js is converted to TypeScript
-/** A placed part in the assembly: { partId, x, y, ... }. */
-type PlacedPart = any;
+/** A placed part in the assembly. */
+interface PlacedPart {
+  /** Unique ID for this instance in the build session. */
+  instanceId: string;
+  /** Part catalog ID referencing a PartDef. */
+  partId: string;
+  /** World X of part centre. */
+  x: number;
+  /** World Y of part centre (Y-up world space). */
+  y: number;
+  /** Instrument IDs loaded in this part (science modules only). */
+  instruments?: string[];
+}
 
-// TODO: type properly when rocketbuilder.js is converted to TypeScript
-/** The full rocket assembly: { parts: Map<string, PlacedPart>, ... }. */
-type RocketAssembly = any;
+/** One edge in the rocket part graph. */
+interface PartConnection {
+  fromInstanceId: string;
+  /** Index into the source part's snapPoints array. */
+  fromSnapIndex: number;
+  toInstanceId: string;
+  /** Index into the target part's snapPoints array. */
+  toSnapIndex: number;
+}
 
-// TODO: type properly when rocketbuilder.js is converted to TypeScript
-/** Staging configuration for a rocket design. */
-type StagingConfig = any;
+/** The full rocket assembly. */
+interface RocketAssembly {
+  /** Instance ID → PlacedPart. */
+  parts: Map<string, PlacedPart>;
+  /** Array of connections between parts. */
+  connections: PartConnection[];
+  /** Internal ID counter for generating instanceIds. */
+  _nextId: number;
+  /** Pairs of mirrored instance IDs [id1, id2]. */
+  symmetryPairs: Array<[string, string]>;
+}
 
-// TODO: type properly when data/parts.js is converted to TypeScript
+/** One stage in a staging configuration. */
+interface StageData {
+  /** Instance IDs of activatable parts assigned to this stage. */
+  instanceIds: string[];
+}
+
+/** Staging configuration for a rocket assembly. */
+interface StagingConfig {
+  /** Ordered stage slots. Index 0 = Stage 1 (fires first). */
+  stages: StageData[];
+  /** Instance IDs of activatable parts not yet staged. */
+  unstaged: string[];
+  /** 0-based index of the next stage to fire (used in flight). */
+  currentStageIdx: number;
+}
+
+/** One attachment socket on a part definition. */
+interface SnapPoint {
+  /** Which face of the part this socket sits on. */
+  side: 'top' | 'bottom' | 'left' | 'right';
+  /** Horizontal offset from the part's centre in pixels (positive = right). */
+  offsetX: number;
+  /** Vertical offset from the part's centre in pixels (positive = down). */
+  offsetY: number;
+  /** PartType values that may connect at this socket. */
+  accepts: string[];
+}
+
 /** A part definition from the catalog. */
-type PartDef = any;
+interface PartDef {
+  /** Stable unique identifier. */
+  id: string;
+  /** Human-readable label. */
+  name: string;
+  /** Short description shown in detail panel. */
+  description?: string;
+  /** Part category (PartType enum value). */
+  type: string;
+  /** Dry mass in kg. */
+  mass: number;
+  /** Purchase price in dollars. */
+  cost: number;
+  /** Rendered width in pixels at 1× zoom. */
+  width: number;
+  /** Rendered height in pixels at 1× zoom. */
+  height: number;
+  /** Attachment sockets. */
+  snapPoints: SnapPoint[];
+  /** Named visual states for the renderer. */
+  animationStates: string[];
+  /** True if the player can manually trigger this part in flight. */
+  activatable: boolean;
+  /** How the part responds when activated (ActivationBehaviour enum value). */
+  activationBehaviour: string;
+  /** Base reliability rating (0.0–1.0). Defaults to 1.0. */
+  reliability?: number;
+  /** Type-specific values (thrust, fuel, seats, drag, etc.). */
+  properties: Record<string, any>;
+}
 
-// TODO: type properly when staging.js is converted to TypeScript
 /** A debris fragment simulated after stage separation. */
-type DebrisState = any;
+interface DebrisState {
+  /** Unique fragment identifier (e.g. 'debris-1'). */
+  id: string;
+  /** Instance IDs of parts in this fragment. */
+  activeParts: Set<string>;
+  /** Instance IDs of engines/SRBs still burning. */
+  firingEngines: Set<string>;
+  /** Remaining propellant (kg) per instance ID. */
+  fuelStore: Map<string, number>;
+  /** Instance IDs of deployed parachutes/legs. */
+  deployedParts: Set<string>;
+  /** Parachute lifecycle states per instance ID. */
+  parachuteStates: Map<string, ParachuteEntry>;
+  /** Landing leg lifecycle states per instance ID. */
+  legStates: Map<string, LegEntry>;
+  /** Accumulated reentry heat per instance ID. */
+  heatMap: Map<string, number>;
+  /** Horizontal position (m). */
+  posX: number;
+  /** Vertical position (m, 0 = ground). */
+  posY: number;
+  /** Horizontal velocity (m/s). */
+  velX: number;
+  /** Vertical velocity (m/s). */
+  velY: number;
+  /** Orientation (radians, 0 = straight up). */
+  angle: number;
+  /** Throttle (always 1.0 for debris). */
+  throttle: number;
+  /** Angular velocity (rad/s). */
+  angularVelocity: number;
+  /** True when on ground and tilted. */
+  isTipping: boolean;
+  /** Ground contact pivot X (VAB local pixels). */
+  tippingContactX: number;
+  /** Ground contact pivot Y (VAB local pixels). */
+  tippingContactY: number;
+  /** True after safe touchdown. */
+  landed: boolean;
+  /** True after high-speed impact. */
+  crashed: boolean;
+}
 
-// TODO: type properly when parachute.js is converted to TypeScript
 /** Per-parachute lifecycle entry. */
-type ParachuteEntry = any;
+interface ParachuteEntry {
+  /** Lifecycle state: 'packed' | 'deploying' | 'deployed' | 'failed'. */
+  state: string;
+  /** Seconds remaining in deploying animation. */
+  deployTimer: number;
+  /** Independent canopy orientation (radians, 0 = upright). */
+  canopyAngle: number;
+  /** Angular velocity of canopy (rad/s). */
+  canopyAngularVel: number;
+  /** Seconds remaining until auto-stow (post-landing). */
+  stowTimer?: number;
+}
 
-// TODO: type properly when legs.js is converted to TypeScript
 /** Per-landing-leg lifecycle entry. */
-type LegEntry = any;
+interface LegEntry {
+  /** Lifecycle state: 'retracted' | 'deploying' | 'deployed'. */
+  state: string;
+  /** Seconds remaining in deploying animation. */
+  deployTimer: number;
+}
 
-// TODO: type properly when sciencemodule.js is converted to TypeScript
 /** Per-instrument experiment lifecycle entry. */
-type InstrumentStateEntry = any;
+interface InstrumentStateEntry {
+  /** ID of the instrument definition. */
+  instrumentId: string;
+  /** Instance ID of the parent science module. */
+  moduleInstanceId: string;
+  /** 0-based slot position within the module. */
+  slotIndex: number;
+  /** Lifecycle state: 'idle' | 'running' | 'complete' | 'data_returned' | 'transmitted'. */
+  state: string;
+  /** Countdown in seconds (positive while running). */
+  timer: number;
+  /** Data type: 'SAMPLE' or 'ANALYSIS'. */
+  dataType: string;
+  /** Base science points from the instrument definition. */
+  baseYield: number;
+  /** Biome ID where experiment was started. */
+  startBiome: string | null;
+  /** Biome ID where experiment completed. */
+  completeBiome: string | null;
+  /** Biome science multiplier at completion. */
+  scienceMultiplier: number;
+}
 
-// TODO: type properly when malfunction.js is converted to TypeScript
 /** Malfunction entry for a part. */
-type MalfunctionEntry = any;
+interface MalfunctionEntry {
+  /** MalfunctionType enum value describing the malfunction kind. */
+  type: MalfunctionType;
+  /** True if the malfunction has been successfully recovered. */
+  recovered: boolean;
+}
+
+/**
+ * Subset of PhysicsState / DebrisState fields shared by mass/geometry helpers.
+ * Both PhysicsState and DebrisState satisfy this constraint so that
+ * _computeTotalMass, _computeCoMLocal, and _computeMomentOfInertia can
+ * operate on either.
+ */
+interface MassQueryable {
+  activeParts: Set<string>;
+  fuelStore: Map<string, number>;
+}
 
 // ---------------------------------------------------------------------------
 // PhysicsState interface
@@ -437,7 +606,7 @@ export function createPhysicsState(assembly: RocketAssembly, flightState: Flight
   let totalFuel = 0;
 
   for (const [instanceId, placed] of assembly.parts) {
-    const def: PartDef = getPartById(placed.partId);
+    const def: PartDef | undefined = getPartById(placed.partId);
     if (!def) continue;
     const fuelMass: number = def.properties?.fuelMass ?? 0;
     if (fuelMass > 0) {
@@ -498,7 +667,7 @@ export function createPhysicsState(assembly: RocketAssembly, flightState: Flight
 
   // Detect launch clamps in the assembly.
   for (const [instanceId, placed] of assembly.parts) {
-    const clampDef: PartDef = getPartById(placed.partId);
+    const clampDef: PartDef | undefined = getPartById(placed.partId);
     if (clampDef && clampDef.type === PartType.LAUNCH_CLAMP) {
       ps.hasLaunchClamps = true;
       break;
@@ -523,7 +692,7 @@ export function createPhysicsState(assembly: RocketAssembly, flightState: Flight
 
   // Initialise docking port states.
   for (const [instanceId, placed] of assembly.parts) {
-    const def: PartDef = getPartById(placed.partId);
+    const def: PartDef | undefined = getPartById(placed.partId);
     if (def && def.type === PartType.DOCKING_PORT) {
       ps.dockingPortStates.set(instanceId, 'retracted');
     }
@@ -795,7 +964,7 @@ function _updateThrottleFromTWR(ps: PhysicsState, assembly: RocketAssembly, body
 
   for (const [instanceId, placed] of assembly.parts) {
     if (!ps.activeParts.has(instanceId)) continue;
-    const def: PartDef = getPartById(placed.partId);
+    const def: PartDef | undefined = getPartById(placed.partId);
     if (!def) continue;
 
     totalMass += (def.mass ?? 0) + (ps.fuelStore.get(instanceId) ?? 0);
@@ -1036,7 +1205,7 @@ function _integrate(ps: PhysicsState, assembly: RocketAssembly, flightState: Fli
     let clampsRemain = false;
     for (const instanceId of ps.activeParts) {
       const placed = assembly.parts.get(instanceId);
-      const cDef: PartDef = placed ? getPartById(placed.partId) : null;
+      const cDef: PartDef | null | undefined = placed ? getPartById(placed.partId) : null;
       if (cDef && cDef.type === PartType.LAUNCH_CLAMP) {
         clampsRemain = true;
         break;
@@ -1073,13 +1242,13 @@ function _integrate(ps: PhysicsState, assembly: RocketAssembly, flightState: Fli
  * Compute the current total mass (dry + remaining propellant) of all parts
  * still attached to the rocket.
  */
-function _computeTotalMass(ps: PhysicsState, assembly: RocketAssembly): number {
+function _computeTotalMass(ps: MassQueryable, assembly: RocketAssembly): number {
   let mass = 0;
 
   for (const instanceId of ps.activeParts) {
     const placed = assembly.parts.get(instanceId);
     if (!placed) continue;
-    const def: PartDef = getPartById(placed.partId);
+    const def: PartDef | undefined = getPartById(placed.partId);
     if (!def) continue;
     // Dry mass of the part itself.
     mass += def.mass ?? 0;
@@ -1102,7 +1271,7 @@ function _computeTotalMass(ps: PhysicsState, assembly: RocketAssembly): number {
 /**
  * Compute the centre of mass in VAB local pixel coordinates.
  */
-function _computeCoMLocal(ps: PhysicsState, assembly: RocketAssembly): Point2D {
+function _computeCoMLocal(ps: MassQueryable, assembly: RocketAssembly): Point2D {
   let totalMass = 0;
   let comX = 0;
   let comY = 0;
@@ -1110,7 +1279,7 @@ function _computeCoMLocal(ps: PhysicsState, assembly: RocketAssembly): Point2D {
   for (const instanceId of ps.activeParts) {
     const placed = assembly.parts.get(instanceId);
     if (!placed) continue;
-    const def: PartDef = getPartById(placed.partId);
+    const def: PartDef | undefined = getPartById(placed.partId);
     if (!def) continue;
     const fuelMass: number = ps.fuelStore.get(instanceId) ?? 0;
     const mass: number = (def.mass ?? 1) + fuelMass;
@@ -1138,7 +1307,7 @@ function _computeGroundContactPoint(ps: PhysicsState, assembly: RocketAssembly, 
   for (const instanceId of ps.activeParts) {
     const placed = assembly.parts.get(instanceId);
     if (!placed) continue;
-    const def: PartDef = getPartById(placed.partId);
+    const def: PartDef | undefined = getPartById(placed.partId);
     if (!def) continue;
     const halfH: number = (def.height ?? 40) / 2;
     let halfW: number = (def.width ?? 40) / 2;
@@ -1177,13 +1346,13 @@ function _computeGroundContactPoint(ps: PhysicsState, assembly: RocketAssembly, 
  * I = sum(m_i × r_i²) where r_i is the distance from each part's centre to
  * the pivot, converted to metres.
  */
-function _computeMomentOfInertia(ps: PhysicsState, assembly: RocketAssembly, pivot: Point2D): number {
+function _computeMomentOfInertia(ps: MassQueryable, assembly: RocketAssembly, pivot: Point2D): number {
   let I = 0;
 
   for (const instanceId of ps.activeParts) {
     const placed = assembly.parts.get(instanceId);
     if (!placed) continue;
-    const def: PartDef = getPartById(placed.partId);
+    const def: PartDef | undefined = getPartById(placed.partId);
     if (!def) continue;
     const fuelMass: number = ps.fuelStore.get(instanceId) ?? 0;
     const mass: number = (def.mass ?? 1) + fuelMass;
@@ -1225,7 +1394,7 @@ function _computeThrust(ps: PhysicsState, assembly: RocketAssembly, density: num
     const placed = assembly.parts.get(instanceId);
     if (!placed) { exhausted.push(instanceId); continue; }
 
-    const def: PartDef = getPartById(placed.partId);
+    const def: PartDef | undefined = getPartById(placed.partId);
     if (!def)   { exhausted.push(instanceId); continue; }
 
     const props = def.properties ?? {};
@@ -1306,7 +1475,7 @@ function _computeDragForce(ps: PhysicsState, assembly: RocketAssembly, density: 
   for (const instanceId of ps.activeParts) {
     const placed = assembly.parts.get(instanceId);
     if (!placed) continue;
-    const def: PartDef = getPartById(placed.partId);
+    const def: PartDef | undefined = getPartById(placed.partId);
     if (!def) continue;
     const props  = def.properties ?? {};
     const widthM: number = (def.width ?? 40) * SCALE_M_PER_PX;
@@ -1369,7 +1538,7 @@ function _computeParachuteTorque(
 
     const placed = assembly.parts.get(instanceId);
     if (!placed) continue;
-    const def: PartDef = getPartById(placed.partId);
+    const def: PartDef | undefined = getPartById(placed.partId);
     if (!def) continue;
 
     // Chute CdA (same formula as _computeDragForce).
@@ -1656,7 +1825,7 @@ function _applyGroundedSteering(
   for (const instanceId of ps.activeParts) {
     const placed = assembly.parts.get(instanceId);
     if (!placed) continue;
-    const def: PartDef = getPartById(placed.partId);
+    const def: PartDef | undefined = getPartById(placed.partId);
     if (!def) continue;
     const hw: number = (def.width  ?? 40) / 2;
     const hh: number = (def.height ?? 40) / 2;
@@ -1794,7 +1963,7 @@ function _checkToppleCrash(ps: PhysicsState, assembly: RocketAssembly, flightSta
   for (const instanceId of ps.activeParts) {
     const placed = assembly.parts.get(instanceId);
     if (!placed) continue;
-    const def: PartDef = getPartById(placed.partId);
+    const def: PartDef | undefined = getPartById(placed.partId);
     if (!def) continue;
     const hw: number = (def.width  ?? 40) / 2;
     const hh: number = (def.height ?? 40) / 2;
@@ -1891,7 +2060,7 @@ export function tickDebrisGround(debris: DebrisState, assembly: RocketAssembly, 
   for (const instanceId of debris.activeParts) {
     const placed = assembly.parts.get(instanceId);
     if (!placed) continue;
-    const def: PartDef = getPartById(placed.partId);
+    const def: PartDef | undefined = getPartById(placed.partId);
     if (!def) continue;
     let halfW: number = (def.width ?? 40) / 2;
     let bottomHH: number = (def.height ?? 40) / 2;
@@ -1975,7 +2144,7 @@ export function tickDebrisGround(debris: DebrisState, assembly: RocketAssembly, 
     for (const instanceId of debris.activeParts) {
       const placed = assembly.parts.get(instanceId);
       if (!placed) continue;
-      const def: PartDef = getPartById(placed.partId);
+      const def: PartDef | undefined = getPartById(placed.partId);
       if (!def) continue;
       const hw: number = (def.width ?? 40) / 2;
       const hh: number = (def.height ?? 40) / 2;
@@ -2005,7 +2174,7 @@ export function tickDebrisGround(debris: DebrisState, assembly: RocketAssembly, 
 function _hasRcs(ps: PhysicsState, assembly: RocketAssembly): boolean {
   for (const instanceId of ps.activeParts) {
     const placed = assembly.parts.get(instanceId);
-    const def: PartDef    = placed ? getPartById(placed.partId) : null;
+    const def: PartDef | null | undefined = placed ? getPartById(placed.partId) : null;
     if (def && def.properties?.hasRcs === true) return true;
   }
   return false;
@@ -2153,7 +2322,7 @@ function _getBottomPartLayer(ps: PhysicsState, assembly: RocketAssembly): Bottom
   for (const instanceId of ps.activeParts) {
     const placed = assembly.parts.get(instanceId);
     if (!placed) continue;
-    const def: PartDef = getPartById(placed.partId);
+    const def: PartDef | undefined = getPartById(placed.partId);
     if (!def) continue;
     const halfH: number   = (def.height ?? 40) / 2;
     let bottomY: number = placed.y - halfH;
@@ -2196,7 +2365,7 @@ function _getLowestBottomEdge(ps: PhysicsState, assembly: RocketAssembly): numbe
   for (const instanceId of ps.activeParts) {
     const placed = assembly.parts.get(instanceId);
     if (!placed) continue;
-    const def: PartDef = getPartById(placed.partId);
+    const def: PartDef | undefined = getPartById(placed.partId);
     if (!def) continue;
     let bottomY: number = placed.y - (def.height ?? 40) / 2;
     if (def.type === PartType.LANDING_LEGS || def.type === PartType.LANDING_LEG) {
@@ -2216,7 +2385,7 @@ function _getLowestBottomEdge(ps: PhysicsState, assembly: RocketAssembly): numbe
 function _allCommandModulesGone(ps: PhysicsState, assembly: RocketAssembly): boolean {
   let hadCmd = false;
   for (const [instanceId, placed] of assembly.parts) {
-    const def: PartDef = getPartById(placed.partId);
+    const def: PartDef | undefined = getPartById(placed.partId);
     if (!def) continue;
     if (def.type === PartType.COMMAND_MODULE || def.type === PartType.COMPUTER_MODULE) {
       hadCmd = true;
@@ -2309,7 +2478,7 @@ function _estimateDeltaV(ps: PhysicsState, assembly: RocketAssembly): number {
 
   for (const instanceId of ps.activeParts) {
     const placed = assembly.parts.get(instanceId);
-    const def: PartDef    = placed ? getPartById(placed.partId) : null;
+    const def: PartDef | null | undefined = placed ? getPartById(placed.partId) : null;
     if (!def) continue;
 
     dryMass += def.mass ?? 0;
@@ -2320,7 +2489,7 @@ function _estimateDeltaV(ps: PhysicsState, assembly: RocketAssembly): number {
   // Average Isp from all active engines/SRBs (vacuum, for deltaV budget).
   for (const instanceId of ps.firingEngines) {
     const placed = assembly.parts.get(instanceId);
-    const def: PartDef    = placed ? getPartById(placed.partId) : null;
+    const def: PartDef | null | undefined = placed ? getPartById(placed.partId) : null;
     if (!def) continue;
     const isp: number   = def.properties?.ispVac ?? def.properties?.isp ?? 300;
     const thrust: number = (def.properties?.thrustVac ?? def.properties?.thrust ?? 0) * 1_000;
