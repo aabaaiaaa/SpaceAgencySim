@@ -25,7 +25,7 @@ import {
 } from './_trails.js';
 import { renderDebris, renderDockingTarget, renderEjectedCrew } from './_debris.js';
 import { onMouseMove, onWheel } from './_input.js';
-import { drainPools } from './_pool.js';
+import { drainPools, releaseGraphics } from './_pool.js';
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -202,7 +202,7 @@ export function destroyFlightRenderer() {
   if (s.canopyContainer)      app.stage.removeChild(s.canopyContainer);
   if (s.biomeLabelContainer)  app.stage.removeChild(s.biomeLabelContainer);
   if (s.hazeGraphics)         app.stage.removeChild(s.hazeGraphics);
-  if (s.dockingTargetGfx)     app.stage.removeChild(s.dockingTargetGfx);
+  releaseGraphics(s.dockingTargetGfx);
 
   s.skyGraphics           = null;
   s.starsContainer        = null;

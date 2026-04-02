@@ -82,7 +82,7 @@ export function renderDockingTarget(ps, w, h) {
 
   // Lazy-create the graphics object.
   if (!s.dockingTargetGfx) {
-    s.dockingTargetGfx = new PIXI.Graphics();
+    s.dockingTargetGfx = acquireGraphics();
     const app = getApp();
     const rocketIdx = app.stage.getChildIndex(s.rocketContainer);
     app.stage.addChildAt(s.dockingTargetGfx, rocketIdx);

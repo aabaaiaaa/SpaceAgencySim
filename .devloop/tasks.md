@@ -31,7 +31,7 @@
 - **Verification**: `npm run test:unit` passes. New unit test verifies synodic period calculation with nearly-equal orbital periods (periodDiff 0.01–0.1) produces a reasonable search duration.
 
 ### TASK-006: Route dockingTargetGfx through PixiJS object pool
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/render/flight/_debris.js:85`, replace `new PIXI.Graphics()` for `dockingTargetGfx` with `acquireGraphics()` from `_pool.js`. Ensure it is released during cleanup. See requirements Section 1.4.
 - **Verification**: `npm run test:unit` passes. Grep for `new PIXI.Graphics()` in `_debris.js` returns no results.
