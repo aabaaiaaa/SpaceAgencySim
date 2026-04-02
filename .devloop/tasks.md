@@ -151,7 +151,7 @@
 - **Verification**: Run `npm run lint` — no errors. Grep for bare `console.log` in `src/` (excluding tests) — none found. No E2E needed — config and lint fixes only.
 
 ### TASK-026: Add engines field to package.json
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Add an `engines` field to `package.json` specifying the minimum required Node.js version based on the dependency requirements (TypeScript 6, Vite 6, ESLint 10, Vitest 3). See requirements Section 6.2.
 - **Verification**: Read `package.json` and confirm `engines` field is present with a reasonable Node.js version constraint.

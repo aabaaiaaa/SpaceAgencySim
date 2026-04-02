@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "Browser-based 2D space agency simulation game",
   "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
