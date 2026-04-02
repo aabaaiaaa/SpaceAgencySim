@@ -136,10 +136,13 @@ export function loop(timestamp) {
   // Update the docking guidance HUD if active.
   updateDockingHud();
 
-  // Auto-trigger the post-flight summary when the rocket crashes or all
-  // command modules are destroyed.
-  if (!s.summaryShown && (!ps.grounded || ps.crashed)) {
-    const shouldAutoTrigger = ps.crashed || _allCommandModulesDestroyed();
+  // Auto-trigger the post-flight summary when the rocket crashes, all
+  // command modules are destroyed, or the craft lands safely.
+  if (!s.summaryShown) {
+    const shouldAutoTrigger =
+      ps.crashed ||
+      _allCommandModulesDestroyed() ||
+      (ps.landed && ps.grounded && !ps.crashed);
     if (shouldAutoTrigger) {
       s.summaryShown = true;
       showPostFlightSummary(

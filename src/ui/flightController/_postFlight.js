@@ -215,6 +215,19 @@ export function showPostFlightSummary(ps, assembly, flightState, state, onFlight
       }
 
       section.appendChild(objList);
+
+      // Show reward info if all objectives are completed.
+      const allComplete = mission.objectives.every((o) => o.completed);
+      if (allComplete && mission.reward > 0) {
+        const rewardEl = document.createElement('div');
+        rewardEl.style.cssText =
+          'margin-top:8px;padding:6px 10px;background:rgba(40,100,40,0.3);' +
+          'border:1px solid #40a040;border-radius:4px;font-size:0.9rem;' +
+          'color:#60e060;font-weight:600;';
+        rewardEl.textContent = `Mission reward: +$${mission.reward.toLocaleString('en-US')}`;
+        section.appendChild(rewardEl);
+      }
+
       content.appendChild(section);
     }
   }

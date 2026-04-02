@@ -16,7 +16,7 @@
  */
 
 import { getPartById } from '../data/parts.js';
-import { PartType, FacilityId, LAUNCH_PAD_MAX_MASS, LAUNCH_PAD_TIER_LABELS } from '../core/constants.js';
+import { PartType, FacilityId, LAUNCH_PAD_MAX_MASS, LAUNCH_PAD_TIER_LABELS, DEATH_FINE_PER_ASTRONAUT } from '../core/constants.js';
 import { getCurrentWeather, getWeatherSkipCost, skipWeather } from '../core/weather.js';
 import {
   createRocketAssembly,
@@ -966,12 +966,28 @@ function _showCrewDialog(totalSeats, design, assembly, stagingConfig) {
     : `<p style="font-size:10px;color:#3a6080;margin-bottom:12px;line-height:1.6;">` +
       `Assign crew to seats before launch.<br>Seats may be left empty.</p>`;
 
+  // Show a crew death risk warning if the player hasn't done a crewed flight yet.
+  const hadCrewedFlight = (_state.flightHistory ?? []).some(
+    (f) => Array.isArray(f.crewIds) && f.crewIds.length > 0,
+  );
+  const fineStr = `$${DEATH_FINE_PER_ASTRONAUT.toLocaleString('en-US')}`;
+  const crewWarning = !hadCrewedFlight
+    ? `<div style="background:rgba(120,80,20,0.4);border:1px solid #c09030;` +
+      `border-radius:6px;padding:8px 10px;margin-bottom:10px;font-size:10px;` +
+      `color:#e0c080;line-height:1.5;">` +
+      `<strong style="color:#ffcc40;">Crew Risk Warning:</strong> ` +
+      `If a crewed rocket is destroyed, each astronaut killed incurs a ` +
+      `<strong style="color:#ff8060;">${fineStr}</strong> fine. ` +
+      `Consider launching uncrewed first to test your design.</div>`
+    : '';
+
   const overlay = document.createElement('div');
   overlay.id = 'lp-crew-overlay';
   overlay.innerHTML =
     `<div id="lp-crew-dialog">` +
       `<div class="lp-crew-dlg-hdr">Crew Assignment</div>` +
       `<div class="lp-crew-dlg-body">` +
+        crewWarning +
         infoMsg +
         seatRows.join('') +
       `</div>` +

@@ -109,7 +109,7 @@
 - **Verification**: Start each game mode — the mode should be visible on the hub. Sandbox should not show weather panel.
 
 ### TASK-019: Improve post-flight and crash screen UX
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: (a) Ensure the return-results overlay appears after every flight return, showing: period advanced, operating costs deducted, mission rewards earned, parts recovered, crew status. (b) On the crash screen, if mission objectives were completed, show the reward the player will receive alongside the crash costs. (c) Add a warning about crew death risk before the first crewed flight (either in the mission description or a pre-launch dialog). See requirements section 4.
 - **Verification**: Complete a mission and return — a summary overlay should appear showing rewards and costs. Crash with completed objectives — the crash screen should mention the mission reward.
