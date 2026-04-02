@@ -133,7 +133,7 @@
 - **Verification**: Click R&D Lab on hub, then launch a flight — no yellow highlight should be visible.
 
 ### TASK-023: Fix achievements count and library records data
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Library shows "Achievements: 3/12" but the Achievements tab shows only 10 milestones — the denominator should match actual defined achievements. Also investigate why Library records (Peak Altitude, Peak Speed, Heaviest Rocket, Longest Flight) show "None" in the Late Game debug save despite 30 successful flights. See requirements section 9.
 - **Verification**: Check Library stats — achievement denominator should match actual achievement count. Late Game save should show non-"None" records.

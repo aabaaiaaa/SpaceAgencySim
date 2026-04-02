@@ -10,6 +10,7 @@
 
 import { FlightOutcome, CrewStatus } from './constants.js';
 import { CELESTIAL_BODIES, ALL_BODY_IDS, getBodyDef } from '../data/bodies.js';
+import { ACHIEVEMENTS } from './achievements.js';
 
 // ---------------------------------------------------------------------------
 // Agency Statistics
@@ -63,7 +64,7 @@ export function getAgencyStats(state) {
     currentPeriod: state.currentPeriod ?? 0,
     sciencePoints: state.sciencePoints ?? 0,
     achievementsEarned: (state.achievements ?? []).length,
-    totalAchievements: 12, // Total defined achievements
+    totalAchievements: ACHIEVEMENTS.length,
     satellitesDeployed: (state.satelliteNetwork?.satellites ?? []).length,
     activeCrew: crew.filter((c) => c.status !== CrewStatus.DEAD && c.status !== 'kia').length,
     totalCrewHired: crew.length,

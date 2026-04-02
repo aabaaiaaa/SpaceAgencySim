@@ -69,17 +69,21 @@ function makeCrew(id, name, salary, skills = {}) {
 /**
  * Creates a flight history entry.
  */
-function flightRecord(id, missionId, outcome, revenue = 0) {
+function flightRecord(id, missionId, outcome, revenue = 0, extras = {}) {
   return {
     id,
     missionId,
-    rocketId: 'rocket-debug-001',
-    crewIds: [],
-    launchDate: '2026-01-02T00:00:00.000Z',
+    rocketId: extras.rocketId ?? 'rocket-debug-001',
+    rocketName: extras.rocketName ?? 'Debug Rocket',
+    crewIds: extras.crewIds ?? [],
+    launchDate: extras.launchDate ?? '2026-01-02T00:00:00.000Z',
     outcome,
-    deltaVUsed: 0,
+    deltaVUsed: extras.deltaVUsed ?? 0,
     revenue,
-    notes: 'Debug save flight record',
+    maxAltitude: extras.maxAltitude ?? 0,
+    maxSpeed: extras.maxSpeed ?? 0,
+    duration: extras.duration ?? 0,
+    notes: extras.notes ?? 'Debug save flight record',
   };
 }
 
@@ -664,8 +668,25 @@ export const DEBUG_SAVE_DEFINITIONS = [
         { id: 'first-satellite', earnedPeriod: 22 },
       ];
 
-      s.flightHistory = Array.from({ length: 30 }, (_, i) =>
-        flightRecord(`fr-${String(i + 1).padStart(3, '0')}`, i < 22 ? `mission-${String(i + 1).padStart(3, '0')}` : `contract-flight-${i}`, 'SUCCESS'));
+      s.flightHistory = Array.from({ length: 30 }, (_, i) => {
+        // Simulate progressively more ambitious flights
+        const altitudes = [100, 500, 1000, 2000, 5000, 10000, 20000, 40000, 70000, 100000, 150000, 200000, 250000, 300000, 150000, 200000, 180000, 5000, 120000, 250000, 350000, 200000, 180000, 150000, 200000, 300000, 250000, 180000, 220000, 280000];
+        const speeds = [50, 100, 200, 400, 800, 1200, 1800, 2400, 3000, 4000, 5000, 6000, 7000, 7800, 5500, 6500, 6000, 400, 4500, 7200, 8000, 6500, 6000, 5500, 6500, 7500, 7000, 6000, 6800, 7400];
+        const durations = [30, 45, 60, 90, 120, 180, 240, 300, 360, 420, 480, 540, 600, 720, 500, 600, 550, 90, 450, 660, 900, 600, 550, 500, 600, 780, 700, 550, 640, 740];
+        return flightRecord(
+          `fr-${String(i + 1).padStart(3, '0')}`,
+          i < 22 ? `mission-${String(i + 1).padStart(3, '0')}` : `contract-flight-${i}`,
+          'SUCCESS',
+          0,
+          { maxAltitude: altitudes[i], maxSpeed: speeds[i], duration: durations[i], rocketName: `Rocket Mk${Math.min(Math.floor(i / 5) + 1, 6)}` },
+        );
+      });
+
+      s.savedDesigns = [
+        { id: 'design-001', name: 'Explorer I', totalMass: 2500 },
+        { id: 'design-002', name: 'Lifter II', totalMass: 8500 },
+        { id: 'design-003', name: 'Orbital III', totalMass: 15000 },
+      ];
 
       s.reputation = 95;
       s.playTimeSeconds = 18_000;
