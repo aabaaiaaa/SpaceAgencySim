@@ -646,7 +646,14 @@ export function warpToTarget(craftElements: OrbitalElements, targetElements: Orb
     } else {
       // Synodic period: time between successive alignments.
       const T_syn = Math.abs(T_craft * T_target / (T_craft - T_target));
-      maxSearchTime = 2 * T_syn;
+      const maxPeriod = Math.max(T_craft, T_target);
+      // Cap synodic period to prevent extremely long searches when
+      // T_craft ≈ T_target (periodDiff in 0.01–0.1 range).
+      if (!Number.isFinite(T_syn) || T_syn > 10 * maxPeriod) {
+        maxSearchTime = maxPeriod;
+      } else {
+        maxSearchTime = 2 * T_syn;
+      }
     }
     // Hard cap to prevent absurdly long searches.
     maxSearchTime = Math.min(maxSearchTime, 365.25 * 24 * 3600); // 1 year

@@ -25,7 +25,7 @@
 - **Verification**: `npm run test:unit` passes. New unit tests verify `meanAnomalyToTrue()` and `trueToEccentricAnomaly()` with e values at 0.9999, 1.0, and 1.001 return finite numbers (no NaN).
 
 ### TASK-005: Cap synodic period search duration in orbit.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/core/orbit.ts` at line 648, add a `Number.isFinite(T_syn)` check and cap T_syn at `10 * Math.max(T_craft, T_target)`. If exceeded, fall back to `Math.max(T_craft, T_target)`. See requirements Section 1.3.
 - **Verification**: `npm run test:unit` passes. New unit test verifies synodic period calculation with nearly-equal orbital periods (periodDiff 0.01–0.1) produces a reasonable search duration.

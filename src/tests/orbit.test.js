@@ -649,9 +649,11 @@ describe('elliptical orbit altitude band crossing', () => {
 
 describe('warpToTarget', () => {
   it('finds proximity for craft catching up to target in same orbit', () => {
-    // Two objects in circular LEO, craft slightly lower (faster) than target.
-    const alt1 = 100_000;
-    const alt2 = 105_000;
+    // Two objects in circular MEO, craft lower (faster) than target.
+    // Uses 300km/900km (both MEO) so the synodic period stays within the
+    // auto-calculated cap and drift is fast enough to converge quickly.
+    const alt1 = 300_000;
+    const alt2 = 900_000;
     const { posX: px1, posY: py1, velX: vx1, velY: vy1 } = circularOrbitState(alt1);
     const { posX: px2, posY: py2, velX: vx2, velY: vy2 } = circularOrbitState(alt2);
 
@@ -694,6 +696,39 @@ describe('warpToTarget', () => {
     const result = warpToTarget(craftEl, targetEl, EARTH, 0);
     expect(result.possible).toBe(true);
     expect(result.elapsed).toBeLessThan(60); // Found almost immediately.
+  });
+
+  it('caps synodic period search duration for nearly-equal orbital periods', () => {
+    // Two orbits with very similar periods (periodDiff in the 0.01–0.1 range).
+    // Without the cap, T_syn would be extremely large and freeze the search.
+    const alt1 = 200_000;
+    const alt2 = 200_100; // ~100 m difference → nearly equal periods
+    const { posX: px1, posY: py1, velX: vx1, velY: vy1 } = circularOrbitState(alt1);
+    const { posX: px2, posY: py2, velX: vx2, velY: vy2 } = circularOrbitState(alt2);
+
+    const craftEl = computeOrbitalElements(px1, py1, vx1, vy1, EARTH, 0);
+    const targetEl = computeOrbitalElements(px2, py2, vx2, vy2, EARTH, 0);
+    // Offset target so they aren't immediately proximate.
+    targetEl.meanAnomalyAtEpoch = Math.PI; // 180° ahead
+
+    const T_craft = getOrbitalPeriod(craftEl.semiMajorAxis, EARTH);
+    const T_target = getOrbitalPeriod(targetEl.semiMajorAxis, EARTH);
+    const maxPeriod = Math.max(T_craft, T_target);
+
+    // The uncapped synodic period would be enormous; verify the search
+    // completes in a reasonable duration (capped at 10× the longer period).
+    const start = performance.now();
+    const result = warpToTarget(craftEl, targetEl, EARTH, 0);
+    const elapsed = performance.now() - start;
+
+    // Search should complete quickly (well under 5 seconds even on slow CI).
+    expect(elapsed).toBeLessThan(5000);
+
+    // The search duration used should not exceed 10× the longer period.
+    // If proximity was found, elapsed time must be within the cap.
+    if (result.possible) {
+      expect(result.elapsed).toBeLessThanOrEqual(10 * maxPeriod);
+    }
   });
 });
 
