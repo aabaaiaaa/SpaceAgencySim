@@ -61,7 +61,7 @@
 - **Verification**: Run `npm run test:unit` — all tests pass. Then run `npx playwright test e2e/flight.spec.js` to verify flight rendering still works. No visual regressions.
 
 ### TASK-011: Optimize hit testing in _rocket.js
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: `hitTestFlightPart()` in `src/render/flight/_rocket.js` iterates all parts on every mouse move (O(n)). Add bounding-box pre-filtering or spatial indexing to reduce the number of detailed hit tests for rockets with many parts. See requirements Section 4.2.
 - **Verification**: Run `npm run test:unit` — all tests pass. Then run `npx playwright test e2e/flight.spec.js` to verify part hover/click behavior during flight still works.
