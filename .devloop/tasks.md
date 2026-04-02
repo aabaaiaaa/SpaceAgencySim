@@ -97,7 +97,7 @@
 - **Verification**: Click any part in the VAB — the type should show in readable format, not SCREAMING_SNAKE_CASE.
 
 ### TASK-017: Fix debug saves to populate available missions
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: All debug saves have empty `available` and `accepted` mission arrays. After loading a debug save, the mission unlock evaluation must run to populate available missions based on completed missions and their `unlocksAfter` dependency chains. Check the debug save generation code in `src/ui/debugSaves.js` and the mission unlock logic. See requirements section 1.6.
 - **Verification**: Load "Post-Tutorial Basics (Mission 4 Done)" debug save, go to MCC — missions 5, 6, 7, and 18 should be available to accept.

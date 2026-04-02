@@ -12,6 +12,7 @@
  */
 
 import { DEBUG_SAVE_DEFINITIONS } from '../core/debugSaves.js';
+import { getUnlockedMissions, reconcileParts } from '../core/missions.js';
 import { refreshTopBar } from './topbar.js';
 
 // ---------------------------------------------------------------------------
@@ -320,6 +321,10 @@ function _loadDebugState(liveState, def, feedbackEl) {
     delete liveState[key];
   }
   Object.assign(liveState, snapshot);
+
+  // Populate available missions based on completed missions and dependency chains.
+  getUnlockedMissions(liveState);
+  reconcileParts(liveState);
 
   // Update window.__gameState for e2e test access.
   if (typeof window !== 'undefined') {
