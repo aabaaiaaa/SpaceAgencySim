@@ -2265,7 +2265,7 @@ function _syncFlightState(ps: PhysicsState, assembly: RocketAssembly, flightStat
         fromBiome:   prevBiome,
         toBiome:     newBiome,
         altitude:    flightState.altitude,
-        description: `Entered ${newBiome.replace(/_/g, ' ').toLowerCase()} biome at ${flightState.altitude.toFixed(0)} m.`,
+        description: `Entered ${newBiome.replace(/_/g, ' ').toLowerCase()} biome at ${flightState.altitude >= 1000 ? `${(flightState.altitude / 1000).toFixed(0)} km` : `${flightState.altitude.toFixed(0)} m`}.`,
       } as any);
 
       // Schedule a malfunction check with a small random delay (0.5–2.0 s)

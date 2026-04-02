@@ -55,7 +55,7 @@
 - **Verification**: Crash a rocket — the flight log and Rocket Destroyed screen should show specific part names, not "PART_DESTROYED".
 
 ### TASK-010: Format altitude in flight log entries
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Flight log entries show raw meters for high altitudes: "Entered low orbit biome at 150000 m." Format altitudes >= 1000m as km: "Entered low orbit biome at 150 km." See requirements section 3.7.
 - **Verification**: Fly to orbit — biome transition log entries should show "km" for altitudes above 1000m.
