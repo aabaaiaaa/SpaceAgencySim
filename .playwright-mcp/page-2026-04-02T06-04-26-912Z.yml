@@ -1,0 +1,48 @@
+- generic [ref=e4]:
+  - generic [ref=e5]:
+    - img "Space Agency Logo" [ref=e6]
+    - heading "Space Agency" [level=1] [ref=e7]
+    - paragraph [ref=e8]: Simulation
+  - generic [ref=e9]:
+    - heading "Select Save" [level=2] [ref=e10]
+    - generic [ref=e11]:
+      - generic [ref=e12]:
+        - paragraph [ref=e13]: Verification Agency TUTORIAL
+        - paragraph [ref=e14]: Verification Agency
+        - paragraph [ref=e15]: Saved Apr 2, 2026, 07:03 AM
+        - generic [ref=e16]:
+          - generic [ref=e17]:
+            - generic [ref=e18]: Cash
+            - generic [ref=e19]: $2,000,000
+          - generic [ref=e20]:
+            - generic [ref=e21]: Time Played
+            - generic [ref=e22]: 0:01:38
+          - generic [ref=e23]:
+            - generic [ref=e24]: Flight Time
+            - generic [ref=e25]: 0:00:00
+          - generic [ref=e26]:
+            - generic [ref=e27]: Missions Done
+            - generic [ref=e28]: "0"
+          - generic [ref=e29]:
+            - generic [ref=e30]: Accepted
+            - generic [ref=e31]: "1"
+          - generic [ref=e32]:
+            - generic [ref=e33]: Total Flights
+            - generic [ref=e34]: "0"
+          - generic [ref=e35]:
+            - generic [ref=e36]: Crew
+            - generic [ref=e37]: "0"
+          - generic [ref=e38]:
+            - generic [ref=e39]: KIA
+            - generic [ref=e40]: "0"
+        - generic [ref=e41]:
+          - button "Load" [ref=e42] [cursor=pointer]
+          - button "Export" [ref=e43] [cursor=pointer]
+          - button "Delete" [ref=e44] [cursor=pointer]
+      - generic [ref=e46]: Empty Slot 2
+      - generic [ref=e48]: Empty Slot 3
+      - generic [ref=e50]: Empty Slot 4
+      - generic [ref=e52]: Empty Slot 5
+    - generic [ref=e53]:
+      - button "New Game" [ref=e54] [cursor=pointer]
+      - button "Import Save" [ref=e55] [cursor=pointer]

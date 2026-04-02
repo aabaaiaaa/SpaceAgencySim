@@ -1,0 +1,38 @@
+- generic [ref=e2]:
+  - generic:
+    - generic [ref=e30]:
+      - generic [ref=e31]: Verification Agency
+      - generic [ref=e32]: TUTORIAL
+      - generic [ref=e33]: Flight 0
+      - button "View loan details" [ref=e34] [cursor=pointer]: $2,000,000
+      - button "View accepted missions" [ref=e35] [cursor=pointer]: Missions
+      - button "Open menu" [ref=e36] [cursor=pointer]: ☰
+    - generic:
+      - button "Launch Pad" [ref=e37] [cursor=pointer]:
+        - generic: Launch Pad
+      - button "Vehicle Assembly Building" [ref=e38] [cursor=pointer]:
+        - generic: Vehicle Assembly Building
+      - button "Mission Control Centre" [ref=e39] [cursor=pointer]:
+        - generic: Mission Control Centre
+      - generic:
+        - generic [ref=e40]:
+          - generic [ref=e41]: Reputation
+          - generic [ref=e42]: "50"
+          - generic [ref=e43]: Good
+        - generic [ref=e46]:
+          - generic [ref=e47]: Launch Conditions
+          - generic [ref=e48]: Clear skies
+          - generic [ref=e49]:
+            - generic [ref=e50]: Wind
+            - generic [ref=e51]: 0.6 m/s
+          - generic [ref=e52]:
+            - generic [ref=e53]: ISP Effect
+            - generic [ref=e54]: "-0.9%"
+          - generic [ref=e55]:
+            - generic [ref=e56]: Visibility
+            - generic [ref=e57]: Clear
+    - generic [ref=e59]:
+      - heading "Welcome to Verification Agency!" [level=1] [ref=e60]
+      - paragraph [ref=e61]: Tutorial Mode
+      - paragraph [ref=e62]: You've secured $2M in funding (matched by a $2M loan) to build a space programme from scratch. Head to Mission Control to accept your first mission, then build a rocket in the Vehicle Assembly Building and launch it from the Launch Pad. Good luck!
+      - button "Let's Go!" [ref=e63] [cursor=pointer]

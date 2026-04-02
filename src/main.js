@@ -6,7 +6,7 @@
 import { initRenderer } from './render/index.js';
 import { initVabRenderer } from './render/vab.js';
 import { initHubRenderer } from './render/hub.js';
-import { showMainMenu, initUI } from './ui/index.js';
+import { showMainMenu, initUI, returnToHubFromFlight } from './ui/index.js';
 import { buildTestRocket } from './core/testFlightBuilder.js';
 import { startFlightScene, stopFlightScene } from './ui/flightController.js';
 import { createFlightState } from './core/gameState.js';
@@ -118,7 +118,9 @@ async function main() {
         assembly,
         stagingConfig,
         flightState,
-        () => { /* no-op end callback for test flights */ },
+        (_s, returnResults) => {
+          returnToHubFromFlight(uiOverlay, state, returnResults);
+        },
       );
     };
 

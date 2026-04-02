@@ -139,7 +139,7 @@
 - **Verification**: Check Library stats — achievement denominator should match actual achievement count. Late Game save should show non-"None" records.
 
 ### TASK-024: Verification pass — complete tutorial playthrough via Playwright MCP
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-007, TASK-008, TASK-009, TASK-010, TASK-011, TASK-012, TASK-013, TASK-014, TASK-015, TASK-016, TASK-017, TASK-018, TASK-019, TASK-020, TASK-021, TASK-022, TASK-023
 - **Description**: Using Playwright MCP against http://localhost:5173/, perform a complete tutorial playthrough from fresh start verifying all fixes. Check: (1) welcome message appears, (2) only 3 buildings visible initially, (3) only starter parts in VAB, (4) mission-001 completable, (5) missions unlock correctly through the chain, (6) facility unlock notifications appear when accepting mission-018/019/020/022, (7) new buildings appear on hub after unlock, (8) new parts appear in VAB after unlock, (9) flight view has no hub bleed-through or weather in space, (10) back navigation works from all facilities, (11) R&D Lab/tech tree accessible, (12) save/load works, (13) post-flight summaries appear, (14) consistent styling throughout. Fix any issues found. See requirements section 10.
 - **Verification**: A complete clean tutorial playthrough succeeds with no UX issues — all 12 verification criteria from requirements section 10 pass.

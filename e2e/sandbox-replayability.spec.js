@@ -117,13 +117,19 @@ test.describe('Sandbox mode', () => {
     await page.waitForSelector('#topbar-dropdown', { state: 'visible', timeout: 3_000 });
     await page.locator('#topbar-dropdown').getByText('Return to Space Agency').click();
 
-    // Wait for either post-flight summary or hub
-    try {
-      await page.waitForSelector('#post-flight-summary', { state: 'visible', timeout: 10_000 });
-      await page.click('#post-flight-return-btn');
-    } catch {
-      // May go straight to hub
+    // Dismiss abort confirmation dialog if it appears (mid-flight abort).
+    const abortBtn = page.locator('[data-testid="abort-confirm-btn"]');
+    if (await abortBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
+      await abortBtn.click();
     }
+
+    // Dismiss return-results overlay if present.
+    try {
+      const dismissBtn = page.locator('#return-results-dismiss-btn');
+      await dismissBtn.waitFor({ state: 'visible', timeout: 10_000 });
+      await dismissBtn.click();
+    } catch { /* no return results overlay */ }
+
     await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
   });
 

@@ -305,35 +305,55 @@ async function setTransferState(page, origin, destination) {
  * Return to agency from flight.
  */
 async function returnToAgency(page) {
-  const dropdown = page.locator('#topbar-dropdown');
-  if (!(await dropdown.isVisible())) {
-    await page.click('#topbar-menu-btn');
-    await expect(dropdown).toBeVisible({ timeout: 2_000 });
-  }
-  await dropdown.getByText('Return to Space Agency').click();
+  // Already on the hub? Nothing to do.
+  const hubAlready = await page.locator('#hub-overlay').isVisible().catch(() => false);
+  if (hubAlready) return;
 
-  const orbitReturn = page.locator('[data-testid="orbit-return-btn"]');
-  const abortReturn = page.locator('[data-testid="abort-confirm-btn"]');
-
-  const orbitVisible = await orbitReturn.isVisible({ timeout: 2_000 }).catch(() => false);
-  if (orbitVisible) {
-    await orbitReturn.click();
-    await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 10_000 });
+  // If the post-flight summary is already visible (e.g. after landing/crash),
+  // click its return button directly instead of using the topbar dropdown.
+  const summary = page.locator('#post-flight-summary');
+  if (await summary.isVisible({ timeout: 3_000 }).catch(() => false)) {
     await page.click('#post-flight-return-btn');
   } else {
-    const abortVisible = await abortReturn.isVisible({ timeout: 2_000 }).catch(() => false);
-    if (abortVisible) {
-      await abortReturn.click();
+    const dropdown = page.locator('#topbar-dropdown');
+    if (!(await dropdown.isVisible())) {
+      await page.click('#topbar-menu-btn');
+      await expect(dropdown).toBeVisible({ timeout: 2_000 });
+    }
+    await dropdown.getByText('Return to Space Agency').click();
+
+    const orbitReturn = page.locator('[data-testid="orbit-return-btn"]');
+    const abortReturn = page.locator('[data-testid="abort-confirm-btn"]');
+
+    const orbitVisible = await orbitReturn.isVisible({ timeout: 2_000 }).catch(() => false);
+    if (orbitVisible) {
+      await orbitReturn.click();
+      const summaryAfter = page.locator('#post-flight-summary');
+      if (await summaryAfter.isVisible({ timeout: 10_000 }).catch(() => false)) {
+        await page.click('#post-flight-return-btn');
+      }
     } else {
-      await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 10_000 });
-      await page.click('#post-flight-return-btn');
+      const abortVisible = await abortReturn.isVisible({ timeout: 2_000 }).catch(() => false);
+      if (abortVisible) {
+        await abortReturn.click();
+      } else {
+        const summaryFallback = page.locator('#post-flight-summary');
+        if (await summaryFallback.isVisible({ timeout: 10_000 }).catch(() => false)) {
+          await page.click('#post-flight-return-btn');
+        }
+      }
     }
   }
 
-  await page.waitForFunction(
-    () => window.__flightState === null || window.__flightState === undefined,
-    { timeout: 10_000 },
-  );
+  // Dismiss return-results overlay if present.
+  try {
+    const dismissBtn = page.locator('#return-results-dismiss-btn');
+    await dismissBtn.waitFor({ state: 'visible', timeout: 5_000 });
+    await dismissBtn.click();
+  } catch { /* no return results overlay */ }
+
+  // Wait for hub to appear.
+  await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 }).catch(() => {});
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

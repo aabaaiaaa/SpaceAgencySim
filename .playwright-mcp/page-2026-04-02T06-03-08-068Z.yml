@@ -1,0 +1,22 @@
+- generic [ref=e2]:
+  - generic:
+    - generic [ref=e30]:
+      - generic [ref=e31]: Verification Agency
+      - generic [ref=e32]: TUTORIAL
+      - generic [ref=e33]: Flight 0
+      - button "View loan details" [ref=e34] [cursor=pointer]: $2,000,000
+      - button "View accepted missions" [ref=e35] [cursor=pointer]: Missions (1)
+      - button "Open menu" [ref=e36] [cursor=pointer]: ☰
+    - generic [ref=e64]:
+      - generic [ref=e65]:
+        - button "← Hub" [ref=e66] [cursor=pointer]
+        - heading "Mission Control Centre — Tier 1 (Basic)" [level=1] [ref=e67]
+      - generic [ref=e68]:
+        - button "Missions" [ref=e69] [cursor=pointer]
+        - button "Accepted" [ref=e70] [cursor=pointer]
+        - button "Completed" [ref=e71] [cursor=pointer]
+        - button "Contracts" [ref=e73] [cursor=pointer]
+        - button "Active" [ref=e74] [cursor=pointer]
+        - button "Challenges" [ref=e76] [cursor=pointer]
+        - button "Achievements" [ref=e77] [cursor=pointer]
+      - paragraph [ref=e87]: No missions currently available. Complete your active missions to unlock more.

@@ -5,7 +5,7 @@
 // to the canvas by default.
 
 import { initMainMenu } from './mainmenu.js';
-import { initHubUI, destroyHubUI, showWelcomeModal } from './hub.js';
+import { initHubUI, destroyHubUI, showWelcomeModal, showReturnResultsOverlay } from './hub.js';
 import { initVabUI, resetVabUI } from './vab.js';
 import { initCrewAdminUI, destroyCrewAdminUI } from './crewAdmin.js';
 import { initMissionControlUI, destroyMissionControlUI } from './missionControl.js';
@@ -23,6 +23,7 @@ import { GameMode } from '../core/constants.js';
 import { injectDesignTokens } from './design-tokens.js';
 
 export { initFlightHud, destroyFlightHud } from './flightHud.js';
+export { showReturnResultsOverlay } from './hub.js';
 
 // Inject design tokens (CSS custom properties) as early as possible.
 injectDesignTokens();
@@ -146,6 +147,27 @@ export function initUI(container, state) {
   }
 
   console.log('[UI] Hub overlay initialized');
+}
+
+/**
+ * Re-show the hub after a flight ends (used by the E2E test flight API).
+ * Assumes the flight scene has already been stopped and the topbar is still
+ * mounted.
+ *
+ * @param {HTMLElement} container
+ * @param {import('../core/gameState.js').GameState} state
+ * @param {object|null} returnResults  Flight return summary (may be null).
+ */
+export function returnToHubFromFlight(container, state, returnResults) {
+  showHubScene();
+  setCurrentScreen('hub');
+  refreshTopBar();
+  initHubUI(container, state, (destination) => {
+    _handleNavigation(container, state, destination);
+  });
+  if (returnResults) {
+    showReturnResultsOverlay(container, returnResults);
+  }
 }
 
 // ---------------------------------------------------------------------------

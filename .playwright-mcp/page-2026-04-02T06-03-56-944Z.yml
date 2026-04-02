@@ -1,0 +1,33 @@
+- generic [ref=e2]:
+  - generic:
+    - generic [ref=e30]:
+      - generic [ref=e31]: Verification Agency
+      - generic [ref=e32]: TUTORIAL
+      - generic [ref=e33]: Flight 0
+      - button "View loan details" [ref=e34] [cursor=pointer]: $2,000,000
+      - button "View accepted missions" [ref=e35] [cursor=pointer]: Missions (1)
+      - button "Open menu" [ref=e36] [cursor=pointer]: ☰
+    - generic:
+      - button "Launch Pad" [ref=e164] [cursor=pointer]:
+        - generic: Launch Pad
+      - button "Vehicle Assembly Building" [ref=e165] [cursor=pointer]:
+        - generic: Vehicle Assembly Building
+      - button "Mission Control Centre" [ref=e166] [cursor=pointer]:
+        - generic: Mission Control Centre
+      - generic:
+        - generic [ref=e167]:
+          - generic [ref=e168]: Reputation
+          - generic [ref=e169]: "50"
+          - generic [ref=e170]: Good
+        - generic [ref=e173]:
+          - generic [ref=e174]: Launch Conditions
+          - generic [ref=e175]: Clear skies
+          - generic [ref=e176]:
+            - generic [ref=e177]: Wind
+            - generic [ref=e178]: 0.6 m/s
+          - generic [ref=e179]:
+            - generic [ref=e180]: ISP Effect
+            - generic [ref=e181]: "-0.9%"
+          - generic [ref=e182]:
+            - generic [ref=e183]: Visibility
+            - generic [ref=e184]: Clear

@@ -1,0 +1,26 @@
+- generic [ref=e4]:
+  - generic [ref=e5]:
+    - img "Space Agency Logo" [ref=e6]
+    - heading "Space Agency" [level=1] [ref=e7]
+    - paragraph [ref=e8]: Simulation
+  - generic [ref=e9]:
+    - heading "New Game" [level=2] [ref=e10]
+    - generic [ref=e11]:
+      - paragraph [ref=e12]: You are founding a new space agency with $2,000,000 in seed funding (matched by a $2,000,000 loan). Choose a game mode, name your agency, and begin your space programme.
+      - generic [ref=e13]:
+        - generic [ref=e14]: Agency Name
+        - textbox "Agency Name" [active] [ref=e15]:
+          - /placeholder: e.g. Kerbal Space Program
+      - generic [ref=e16]:
+        - generic [ref=e17]: Game Mode
+        - generic [ref=e18]:
+          - generic [ref=e19] [cursor=pointer]:
+            - generic [ref=e20]: Tutorial
+            - generic [ref=e21]: Guided missions unlock parts and facilities step by step.
+          - generic [ref=e22] [cursor=pointer]:
+            - generic [ref=e23]: Free Play
+            - generic [ref=e24]: All starter parts and facility building available from the start.
+          - generic [ref=e25] [cursor=pointer]:
+            - generic [ref=e26]: Sandbox
+            - generic [ref=e27]: Everything unlocked, unlimited funds. Contracts and reputation still active.
+      - button "Start Game" [ref=e29] [cursor=pointer]
