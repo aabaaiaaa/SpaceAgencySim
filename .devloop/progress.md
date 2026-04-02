@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 24
-- **Completed**: 13
-- **Remaining**: 11
-- **Last Updated**: 2026-04-02T02:14:59.400Z
+- **Completed**: 14
+- **Remaining**: 10
+- **Last Updated**: 2026-04-02T02:18:39.194Z
 
 ## Iteration Log
 
@@ -124,4 +124,13 @@
 - **Exit Status**: success
 - **Tokens**: 19,297,509 total (2,559 in, 53,592 out, 167,210 cache-create, 19,074,148 cache-read)
 - **Cost**: $13.7547
+
+### Iteration 14 - 2026-04-02T02:15:03.244Z
+- **Task Attempted**: TASK-014
+- **Task Completed**: TASK-014
+- **Summary**: Completed Fix overlay bleed-through on Settings, Construction, Help, Design Library
+- **Duration**: 3m 36s
+- **Exit Status**: success
+- **Tokens**: 778,251 total (20 in, 5,189 out, 37,438 cache-create, 735,604 cache-read)
+- **Cost**: $0.8733
 

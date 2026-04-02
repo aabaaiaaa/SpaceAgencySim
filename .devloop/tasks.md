@@ -79,7 +79,7 @@
 - **Verification**: Visual inspection of hub, MCC, Crew Admin, VAB, and flight HUD — buttons should use consistent colors, panels should have consistent backgrounds, border-radius should be uniform for same-type elements.
 
 ### TASK-014: Fix overlay bleed-through on Settings, Construction, Help, Design Library
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: The Settings, Construction, Debug Saves, Help, and Design Library panels all allow hub elements to show through behind them. Each overlay needs either a fully opaque background covering the viewport or the underlying hub elements need to be hidden while the overlay is active. See requirements section 6.8.
 - **Verification**: Open Settings from hub — no hub buildings or weather panel should be visible behind it. Repeat for Construction, Help, and VAB Design Library.

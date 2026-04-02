@@ -1098,7 +1098,7 @@ export const VAB_CSS = `
 #vab-load-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(10, 12, 20, 0.96);
+  background: rgb(10, 12, 20);
   z-index: 300;
   display: flex;
   flex-direction: column;

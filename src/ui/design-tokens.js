@@ -27,13 +27,13 @@ const DESIGN_TOKENS = `
 
   /* Backgrounds */
   --color-base:            #0a0e18;
-  --color-surface:         rgba(10, 12, 20, 0.96);
+  --color-surface:         rgb(10, 12, 20);
   --color-surface-raised:  rgba(255, 255, 255, 0.04);
   --color-surface-hover:   rgba(255, 255, 255, 0.06);
   --color-topbar-bg:       rgba(4, 8, 20, 0.92);
   --color-modal-backdrop:  rgba(0, 0, 0, 0.62);
   --color-modal-bg:        #0d1520;
-  --color-overlay-bg:      rgba(5, 10, 20, 0.94);
+  --color-overlay-bg:      rgb(5, 10, 20);
 
   /* Text */
   --color-text-primary:    #e8e8e8;
