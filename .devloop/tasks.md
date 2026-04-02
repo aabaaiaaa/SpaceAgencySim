@@ -43,7 +43,7 @@
 - **Verification**: `npm run test:unit` passes. Unit tests verify: saves include version field, version-0 saves load with migrations, future-version saves trigger warning.
 
 ### TASK-008: Implement IndexedDB backup storage layer
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007
 - **Description**: Create an IndexedDB key-value store module that mirrors localStorage save operations. Use raw IndexedDB API — one database, one object store. Keys match localStorage keys. Mirror all saves (manual and auto) to IndexedDB. On load, check both layers and use most recent valid save. Handle IndexedDB unavailability gracefully. See requirements Section 2.2.
 - **Verification**: `npm run test:unit` passes. Unit tests verify: writes go to both localStorage and IndexedDB, reads check both and use most recent, IndexedDB unavailability falls back to localStorage-only.
