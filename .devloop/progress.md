@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 24
-- **Completed**: 20
-- **Remaining**: 4
-- **Last Updated**: 2026-04-02T03:00:03.269Z
+- **Completed**: 21
+- **Remaining**: 3
+- **Last Updated**: 2026-04-02T03:03:36.678Z
 
 ## Iteration Log
 
@@ -187,4 +187,13 @@
 - **Exit Status**: success
 - **Tokens**: 700,512 total (16 in, 3,729 out, 45,302 cache-create, 651,465 cache-read)
 - **Cost**: $0.7022
+
+### Iteration 21 - 2026-04-02T03:00:06.402Z
+- **Task Attempted**: TASK-021
+- **Task Completed**: TASK-021
+- **Summary**: Completed Fix flight counter and topbar layout consistency
+- **Duration**: 3m 30s
+- **Exit Status**: success
+- **Tokens**: 592,234 total (17 in, 2,878 out, 32,142 cache-create, 557,197 cache-read)
+- **Cost**: $0.5515
 

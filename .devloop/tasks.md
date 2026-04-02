@@ -121,7 +121,7 @@
 - **Verification**: Toggle between flight and map view — the label should look like status text, not a button.
 
 ### TASK-021: Fix flight counter and topbar layout consistency
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Fresh games show no flight counter in the topbar; it only appears after the first flight as "Flight 1", causing the topbar layout to shift. Either always show "Flight 0" on fresh games or ensure the topbar layout doesn't jump when the counter appears. See requirements section 5.3.
 - **Verification**: Start a fresh game — the topbar layout should be stable. Complete a flight — the counter should update without layout shift.

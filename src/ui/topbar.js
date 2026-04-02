@@ -700,7 +700,7 @@ export function initTopBar(container, state, { onExitToMenu, onLoadGame }) {
   const flightCounter = document.createElement('span');
   flightCounter.id = 'topbar-flight';
   const period = state.currentPeriod ?? 0;
-  flightCounter.textContent = period > 0 ? `Flight ${period}` : '';
+  flightCounter.textContent = `Flight ${period}`;
 
   // Cash button — centre
   const cash = document.createElement('button');
@@ -807,7 +807,7 @@ export function refreshTopBar() {
   const flightEl = document.getElementById('topbar-flight');
   if (flightEl) {
     const period = _state.currentPeriod ?? 0;
-    flightEl.textContent = period > 0 ? `Flight ${period}` : '';
+    flightEl.textContent = `Flight ${period}`;
   }
   _refreshMissionsBtn();
 }
