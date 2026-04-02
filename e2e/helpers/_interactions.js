@@ -279,3 +279,26 @@ export async function getPhysicsSnapshot(page) {
     };
   });
 }
+
+/**
+ * Open the construction panel via the hamburger menu.
+ * Construction is now a menu item, not a floating button.
+ *
+ * @param {import('@playwright/test').Page} page
+ */
+export async function openConstructionPanel(page) {
+  await page.click('#topbar-menu-btn');
+  await page.click('#hub-construction-btn');
+  await page.waitForSelector('#construction-panel', { state: 'visible', timeout: 5_000 });
+}
+
+/**
+ * Open the settings panel via the hamburger menu.
+ * Settings is now a menu item, not a floating button.
+ *
+ * @param {import('@playwright/test').Page} page
+ */
+export async function openSettingsPanel(page) {
+  await page.click('#topbar-menu-btn');
+  await page.click('#hub-settings-btn');
+}

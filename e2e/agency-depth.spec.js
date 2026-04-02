@@ -36,6 +36,7 @@ import {
   ALL_FACILITIES,
   STARTER_FACILITIES,
   FacilityId,
+  openConstructionPanel,
 } from './helpers.js';
 import {
   freshStartFixture,
@@ -141,9 +142,8 @@ test.describe('Construction menu — building a facility', () => {
   });
 
   test('(2) can build crew admin from construction menu', async () => {
-    // Open construction panel
-    await page.click('#hub-construction-btn');
-    await page.waitForSelector('#construction-panel', { state: 'visible', timeout: 5_000 });
+    // Open construction panel via hamburger menu
+    await openConstructionPanel(page);
 
     // Find the crew-admin build button and click it
     const buildBtn = page.locator('.cp-facility-item').filter({ hasText: 'Crew Administration' }).locator('.cp-build-btn');
@@ -188,8 +188,7 @@ test.describe('Construction menu — tutorial mode lock', () => {
   test.afterAll(async () => { await page.close(); });
 
   test('(1) construction menu shows locked state in tutorial mode', async () => {
-    await page.click('#hub-construction-btn');
-    await page.waitForSelector('#construction-panel', { state: 'visible', timeout: 5_000 });
+    await openConstructionPanel(page);
 
     // Non-starter facilities should show locked or have disabled build buttons
     const crewAdminItem = page.locator('.cp-facility-item').filter({ hasText: 'Crew Administration' });

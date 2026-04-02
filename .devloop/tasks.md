@@ -37,7 +37,7 @@
 - **Verification**: Accept mission-018 in MCC — a notification modal should appear saying "Crew Administration Unlocked!" and mentioning the Command Module. Dismiss to continue.
 
 ### TASK-007: Fix weather/reputation overlap and hub HUD layout
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: The Launch Conditions panel completely covers the Reputation widget. Reposition these widgets so they don't overlap — weather top-left, reputation below it or in a different location. Also move the Construction/Settings buttons into the hamburger menu or a more integrated position instead of floating disconnected in the top-right. Hide the Debug Saves button entirely (or put it behind Ctrl+Shift+D). See requirements sections 2.4, 2.5, 2.6.
 - **Verification**: On the hub, both the weather panel and reputation indicator should be fully visible without overlapping. Debug Saves button should not be visible. Settings and Construction should be accessible but not floating disconnected.

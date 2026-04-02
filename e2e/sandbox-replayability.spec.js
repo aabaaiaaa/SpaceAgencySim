@@ -22,6 +22,7 @@ import {
   getPhysicsSnapshot,
   buildCrewMember,
   ALL_FACILITIES,
+  openSettingsPanel,
 } from './helpers.js';
 import {
   orbitalFixture,
@@ -654,13 +655,16 @@ test.describe('Game settings — difficulty options', () => {
 
   test.afterAll(async () => { await page?.close(); });
 
-  test('settings button is visible on hub', async () => {
+  test('settings button is visible in hamburger menu', async () => {
+    await page.click('#topbar-menu-btn');
     const settingsBtn = page.locator('#hub-settings-btn');
     await expect(settingsBtn).toBeVisible();
+    // Close menu
+    await page.click('#topbar-menu-btn');
   });
 
   test('clicking settings opens settings panel', async () => {
-    await page.click('#hub-settings-btn');
+    await openSettingsPanel(page);
     await page.waitForSelector('#settings-panel', { state: 'visible', timeout: 5_000 });
 
     // Panel has heading
@@ -774,7 +778,7 @@ test.describe('Game settings — difficulty options', () => {
   });
 
   test('settings panel can be reopened with values persisted', async () => {
-    await page.click('#hub-settings-btn');
+    await openSettingsPanel(page);
     await page.waitForSelector('#settings-panel', { state: 'visible', timeout: 5_000 });
 
     // Verify the previously set values are still active

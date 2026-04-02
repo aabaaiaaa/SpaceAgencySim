@@ -57,6 +57,13 @@ let _onLoadGame = null;
 let _flightMenuItems = [];
 
 /**
+ * Optional hub-specific menu items injected by the hub UI.
+ * Each entry: { label: string, onClick: () => void, id?: string }
+ * @type {Array<{ label: string, onClick: () => void, id?: string }>}
+ */
+let _hubMenuItems = [];
+
+/**
  * Optional callback fired when the dropdown opens or closes.
  * Receives `true` when opening, `false` when closing.
  * @type {((isOpen: boolean) => void) | null}
@@ -790,6 +797,24 @@ export function clearTopBarFlightItems() {
 }
 
 /**
+ * Register hub-specific items to be shown at the top of the topbar
+ * dropdown while the hub is displayed. Call `clearTopBarHubItems()`
+ * to remove them when navigating away from the hub.
+ *
+ * @param {Array<{ label: string, onClick: () => void, id?: string }>} items
+ */
+export function setTopBarHubItems(items) {
+  _hubMenuItems = items ?? [];
+}
+
+/**
+ * Remove all hub-specific items previously added via `setTopBarHubItems`.
+ */
+export function clearTopBarHubItems() {
+  _hubMenuItems = [];
+}
+
+/**
  * Register a callback that fires when the hamburger dropdown opens or closes.
  * @param {((isOpen: boolean) => void) | null} cb
  */
@@ -861,6 +886,26 @@ function _openDropdown() {
       btn.setAttribute('role', 'menuitem');
       btn.textContent = item.label;
       if (item.title) btn.title = item.title;
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        _closeDropdown();
+        item.onClick();
+      });
+      menu.appendChild(btn);
+    }
+    const sep = document.createElement('hr');
+    sep.className = 'topbar-dropdown-sep';
+    menu.appendChild(sep);
+  }
+
+  // Inject hub-specific items (Construction, Settings) when on the hub screen.
+  if (_hubMenuItems.length > 0) {
+    for (const item of _hubMenuItems) {
+      const btn = document.createElement('button');
+      btn.className = 'topbar-dropdown-item';
+      btn.setAttribute('role', 'menuitem');
+      btn.textContent = item.label;
+      if (item.id) btn.id = item.id;
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         _closeDropdown();

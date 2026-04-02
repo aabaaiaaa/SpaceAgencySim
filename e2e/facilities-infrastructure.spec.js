@@ -32,6 +32,7 @@ import {
   ALL_FACILITIES,
   STARTER_FACILITIES,
   FacilityId,
+  openConstructionPanel,
 } from './helpers.js';
 import {
   freshStartFixture,
@@ -129,8 +130,7 @@ test.describe('Facility upgrade purchase from construction menu', () => {
   test.afterAll(async () => { await page.close(); });
 
   test('(1) upgrade button visible for upgradeable facility', async () => {
-    await page.click('#hub-construction-btn');
-    await page.waitForSelector('#construction-panel', { state: 'visible', timeout: 5_000 });
+    await openConstructionPanel(page);
 
     // Find the Launch Pad entry — it should show an upgrade button
     const launchPadItem = page.locator('.cp-facility-item').filter({ hasText: 'Launch Pad' });
@@ -144,8 +144,7 @@ test.describe('Facility upgrade purchase from construction menu', () => {
     const gsBefore = await getGameState(page);
     const moneyBefore = gsBefore.money;
 
-    await page.click('#hub-construction-btn');
-    await page.waitForSelector('#construction-panel', { state: 'visible', timeout: 5_000 });
+    await openConstructionPanel(page);
 
     const launchPadItem = page.locator('.cp-facility-item').filter({ hasText: 'Launch Pad' });
     const upgradeBtn = launchPadItem.locator('.cp-upgrade-btn');
@@ -162,8 +161,7 @@ test.describe('Facility upgrade purchase from construction menu', () => {
   });
 
   test('(3) purchasing VAB upgrade to tier 2', async () => {
-    await page.click('#hub-construction-btn');
-    await page.waitForSelector('#construction-panel', { state: 'visible', timeout: 5_000 });
+    await openConstructionPanel(page);
 
     const vabItem = page.locator('.cp-facility-item').filter({ hasText: 'Vehicle Assembly' });
     const upgradeBtn = vabItem.locator('.cp-upgrade-btn');
@@ -176,8 +174,7 @@ test.describe('Facility upgrade purchase from construction menu', () => {
   });
 
   test('(4) purchasing Mission Control upgrade to tier 2', async () => {
-    await page.click('#hub-construction-btn');
-    await page.waitForSelector('#construction-panel', { state: 'visible', timeout: 5_000 });
+    await openConstructionPanel(page);
 
     const mccItem = page.locator('.cp-facility-item').filter({ hasText: 'Mission Control' });
     const upgradeBtn = mccItem.locator('.cp-upgrade-btn');
@@ -191,8 +188,7 @@ test.describe('Facility upgrade purchase from construction menu', () => {
 
   test('(5) max tier facility shows no upgrade button', async () => {
     // Upgrade Launch Pad to tier 3
-    await page.click('#hub-construction-btn');
-    await page.waitForSelector('#construction-panel', { state: 'visible', timeout: 5_000 });
+    await openConstructionPanel(page);
 
     const lpItem = page.locator('.cp-facility-item').filter({ hasText: 'Launch Pad' });
     const upgradeBtn = lpItem.locator('.cp-upgrade-btn');
@@ -1005,8 +1001,7 @@ test.describe('Library — free construction', () => {
     const moneyBefore = gsBefore.money;
 
     // Build Library via construction menu
-    await page.click('#hub-construction-btn');
-    await page.waitForSelector('#construction-panel', { state: 'visible', timeout: 5_000 });
+    await openConstructionPanel(page);
 
     const libraryItem = page.locator('.cp-facility-item').filter({ hasText: 'Library' });
     await expect(libraryItem).toBeVisible({ timeout: 3_000 });
@@ -1507,8 +1502,7 @@ test.describe('Facility upgrade — insufficient funds handling', () => {
   test.afterAll(async () => { await page.close(); });
 
   test('upgrade blocked when player cannot afford it', async () => {
-    await page.click('#hub-construction-btn');
-    await page.waitForSelector('#construction-panel', { state: 'visible', timeout: 5_000 });
+    await openConstructionPanel(page);
 
     // Launch Pad tier 2 costs $200k — we only have $10k
     const lpItem = page.locator('.cp-facility-item').filter({ hasText: 'Launch Pad' });

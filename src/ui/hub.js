@@ -23,6 +23,7 @@ import { showHubScene, hideHubScene, setHubWeather, setBuiltFacilities } from '.
 import { FACILITY_DEFINITIONS, FacilityId, FACILITY_UPGRADE_DEFS, getFacilityUpgradeDef, getReputationTier, GameMode } from '../core/constants.js';
 import { openSettingsPanel } from './settings.js';
 import { openDebugSavePanel } from './debugSaves.js';
+import { setTopBarHubItems, clearTopBarHubItems } from './topbar.js';
 import {
   hasFacility, canBuildFacility, buildFacility,
   canUpgradeFacility, upgradeFacility, getFacilityTier,
@@ -324,72 +325,16 @@ const HUB_STYLES = `
   50% { border-color: #ff8080; }
 }
 
-/* ── Construction button ─────────────────────────────────────────────────── */
-#hub-construction-btn {
+/* ── Hub left info panel (reputation + weather stacked) ────────────────── */
+#hub-left-panel {
   position: absolute;
   top: 60px;
-  right: 16px;
-  padding: 10px 20px;
-  background: #1a4070;
-  border: 1px solid #4080b0;
-  border-radius: 6px;
-  color: #c8e8ff;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  pointer-events: auto;
-  transition: background 0.15s;
-  letter-spacing: 0.03em;
+  left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
   z-index: 20;
-}
-
-#hub-construction-btn:hover {
-  background: #235a90;
-}
-
-/* ── Settings button ───────────────────────────────────────────────────── */
-#hub-settings-btn {
-  position: absolute;
-  top: 60px;
-  right: 160px;
-  padding: 10px 20px;
-  background: #1a3050;
-  border: 1px solid #4070a0;
-  border-radius: 6px;
-  color: #a8c8e0;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  pointer-events: auto;
-  transition: background 0.15s;
-  letter-spacing: 0.03em;
-  z-index: 20;
-}
-
-#hub-settings-btn:hover {
-  background: #235070;
-}
-
-#hub-debug-saves-btn {
-  position: absolute;
-  top: 60px;
-  right: 280px;
-  padding: 10px 20px;
-  background: #3a2810;
-  border: 1px solid #906830;
-  border-radius: 6px;
-  color: #ffb060;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  pointer-events: auto;
-  transition: background 0.15s;
-  letter-spacing: 0.03em;
-  z-index: 20;
-}
-
-#hub-debug-saves-btn:hover {
-  background: #5a3818;
 }
 
 /* ── Construction panel overlay ──────────────────────────────────────────── */
@@ -625,9 +570,6 @@ const HUB_STYLES = `
 
 /* ── Weather panel ──────────────────────────────────────────────────────── */
 #weather-panel {
-  position: absolute;
-  top: 60px;
-  left: 16px;
   padding: 12px 18px;
   background: rgba(10, 20, 40, 0.88);
   border: 1px solid #304868;
@@ -635,7 +577,6 @@ const HUB_STYLES = `
   color: #c8dce8;
   font-size: 0.82rem;
   pointer-events: auto;
-  z-index: 20;
   min-width: 180px;
   line-height: 1.5;
 }
@@ -773,9 +714,6 @@ const HUB_STYLES = `
 
 /* ── Reputation badge (hub) ────────────────────────────────────────────── */
 #hub-reputation-badge {
-  position: absolute;
-  top: 60px;
-  left: 16px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -784,7 +722,6 @@ const HUB_STYLES = `
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 6px;
   pointer-events: auto;
-  z-index: 20;
   font-family: system-ui, sans-serif;
 }
 
@@ -1043,12 +980,10 @@ export function initHubUI(container, state, onNavigate) {
   }
 
   _renderBuildings(onNavigate);
-  _renderConstructionButton(container);
-  _renderSettingsButton(container);
-  _renderDebugSavesButton(container);
   _renderBankruptcyBanner();
-  _renderReputationBadge();
-  _renderWeatherPanel();
+  _renderLeftPanel(container);
+  _registerHubMenuItems(container);
+  _bindDebugSavesShortcut(container);
 
   // Show the PixiJS background.
   showHubScene();
@@ -1068,6 +1003,10 @@ export function destroyHubUI() {
   // Remove debug save panel if open.
   const debugPanel = document.getElementById('debug-save-panel');
   if (debugPanel) debugPanel.remove();
+
+  // Clean up hub-specific topbar items and keyboard shortcuts.
+  clearTopBarHubItems();
+  _unbindDebugSavesShortcut();
 
   if (_overlay) {
     _overlay.remove();
@@ -1511,11 +1450,32 @@ function _renderBankruptcyBanner() {
 }
 
 /**
+ * Create the left-side info panel containing the reputation badge and weather.
+ * @param {HTMLElement} container  The #ui-overlay div.
+ */
+function _renderLeftPanel(container) {
+  if (!_overlay || !_state) return;
+
+  // Remove stale left panel.
+  const existingPanel = document.getElementById('hub-left-panel');
+  if (existingPanel) existingPanel.remove();
+
+  const leftPanel = document.createElement('div');
+  leftPanel.id = 'hub-left-panel';
+
+  _renderReputationBadge(leftPanel);
+  _renderWeatherPanel(leftPanel);
+
+  _overlay.appendChild(leftPanel);
+}
+
+/**
  * Render the reputation badge on the hub screen.
  * Shows current reputation value, tier label (colour-coded), and a progress bar.
+ * @param {HTMLElement} parent  Container element to append to.
  */
-function _renderReputationBadge() {
-  if (!_overlay || !_state) return;
+function _renderReputationBadge(parent) {
+  if (!_state) return;
 
   // Remove existing badge if present (for refresh).
   const existing = document.getElementById('hub-reputation-badge');
@@ -1559,15 +1519,16 @@ function _renderReputationBadge() {
   track.appendChild(fill);
   badge.appendChild(track);
 
-  _overlay.appendChild(badge);
+  parent.appendChild(badge);
 }
 
 /**
  * Render the weather conditions panel on the hub screen.
  * Initialises weather state if not already present.
+ * @param {HTMLElement} parent  Container element to append to.
  */
-function _renderWeatherPanel() {
-  if (!_overlay || !_state) return;
+function _renderWeatherPanel(parent) {
+  if (!_state) return;
 
   // Remove any stale panel.
   const existing = document.getElementById('weather-panel');
@@ -1657,7 +1618,7 @@ function _renderWeatherPanel() {
     panel.appendChild(fcSection);
   }
 
-  _overlay.appendChild(panel);
+  parent.appendChild(panel);
 
   // Update the PixiJS hub renderer with weather visuals.
   setHubWeather(weather.visibility, weather.extreme);
@@ -1739,63 +1700,50 @@ function _renderBuildings(onNavigate) {
 }
 
 /**
- * Render the "Construction" button in the hub overlay.
- *
+ * Register Construction and Settings as hub-specific items in the topbar
+ * hamburger menu. Cleared automatically when the hub is destroyed.
  * @param {HTMLElement} container  The #ui-overlay div.
  */
-function _renderConstructionButton(container) {
-  if (!_overlay) return;
+function _registerHubMenuItems(container) {
+  setTopBarHubItems([
+    {
+      label: 'Construction',
+      id: 'hub-construction-btn',
+      onClick: () => _openConstructionPanel(container),
+    },
+    {
+      label: 'Settings',
+      id: 'hub-settings-btn',
+      onClick: () => openSettingsPanel(container, _state),
+    },
+  ]);
+}
 
-  const btn = document.createElement('button');
-  btn.id          = 'hub-construction-btn';
-  btn.textContent = 'Construction';
-  btn.setAttribute('aria-label', 'Open construction menu');
+/** Keyboard handler reference for cleanup. */
+let _debugSavesHandler = null;
 
-  btn.addEventListener('click', () => {
-    _openConstructionPanel(container);
-  });
-
-  _overlay.appendChild(btn);
+/**
+ * Bind Ctrl+Shift+D to open the debug saves panel.
+ * @param {HTMLElement} container  The #ui-overlay div.
+ */
+function _bindDebugSavesShortcut(container) {
+  _debugSavesHandler = (e) => {
+    if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+      e.preventDefault();
+      openDebugSavePanel(container, _state);
+    }
+  };
+  document.addEventListener('keydown', _debugSavesHandler);
 }
 
 /**
- * Render the "Settings" button in the hub overlay.
- *
- * @param {HTMLElement} container  The #ui-overlay div.
+ * Remove the debug saves keyboard shortcut.
  */
-function _renderSettingsButton(container) {
-  if (!_overlay) return;
-
-  const btn = document.createElement('button');
-  btn.id          = 'hub-settings-btn';
-  btn.textContent = 'Settings';
-  btn.setAttribute('aria-label', 'Open game settings');
-
-  btn.addEventListener('click', () => {
-    openSettingsPanel(container, _state);
-  });
-
-  _overlay.appendChild(btn);
-}
-
-/**
- * Render the "Debug Saves" button in the hub overlay.
- *
- * @param {HTMLElement} container  The #ui-overlay div.
- */
-function _renderDebugSavesButton(container) {
-  if (!_overlay) return;
-
-  const btn = document.createElement('button');
-  btn.id          = 'hub-debug-saves-btn';
-  btn.textContent = 'Debug Saves';
-  btn.setAttribute('aria-label', 'Open debug save menu');
-
-  btn.addEventListener('click', () => {
-    openDebugSavePanel(container, _state);
-  });
-
-  _overlay.appendChild(btn);
+function _unbindDebugSavesShortcut() {
+  if (_debugSavesHandler) {
+    document.removeEventListener('keydown', _debugSavesHandler);
+    _debugSavesHandler = null;
+  }
 }
 
 /**
