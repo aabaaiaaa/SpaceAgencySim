@@ -97,7 +97,7 @@
 - **Verification**: Run `npx vitest run src/tests/designLibrary.test.js` — all tests pass.
 
 ### TASK-017: Add unit tests for parachute.js deployment triggers
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Add tests to an existing or new test file covering parachute deployment trigger logic — when parachutes activate, altitude/speed conditions, and edge cases. Currently only descent/landing physics are tested. See requirements Section 5.1.
 - **Verification**: Run the parachute test file — all tests pass, including new deployment trigger tests.
