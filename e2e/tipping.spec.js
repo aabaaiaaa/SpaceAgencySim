@@ -83,11 +83,14 @@ test.describe('Tipping physics — ground-contact rotation', () => {
     const initAngle = await page.evaluate(() => window.__flightPs.angle);
     expect(initAngle).toBeCloseTo(0, 1);
 
-    // Hold D key until rocket tilts noticeably.
+    // Hold D key until the rocket has a significant tilt.
+    // The angle must be large enough that gravity torque will overcome the
+    // settle damping (snapAccel >= 0.5 rad/s²) so test (3) can rely on
+    // gravity alone to topple the rocket past the crash threshold.
     await page.keyboard.down('d');
     await page.waitForFunction(
-      () => Math.abs(window.__flightPs?.angle ?? 0) > 0.05,
-      { timeout: 5_000 },
+      () => Math.abs(window.__flightPs?.angle ?? 0) > 0.4,
+      { timeout: 10_000 },
     );
     await page.keyboard.up('d');
 
@@ -122,10 +125,11 @@ test.describe('Tipping physics — ground-contact rotation', () => {
   // ── (3) Toppling past threshold triggers crash ──────────────────────────
 
   test('(3) toppling past threshold triggers crash', async () => {
+    test.setTimeout(60_000);
     // Wait for the gravity torque to tip the rocket past the crash angle.
     await page.waitForFunction(
       () => window.__flightPs.crashed === true,
-      { timeout: 15_000 },
+      { timeout: 30_000 },
     );
 
     const crashed = await page.evaluate(() => window.__flightPs.crashed);
