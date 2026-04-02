@@ -149,7 +149,12 @@ test.describe('Thermal system', () => {
     await teleportCraft(page, { posY: 50_000, velY: -2000 });
 
     // Wait a bit for heat to accumulate.
-    await page.waitForTimeout(2000);
+    await page.waitForFunction(() => {
+      const ps = window.__flightPs;
+      if (!ps?.heatMap) return false;
+      for (const h of ps.heatMap.values()) { if (h > 0) return true; }
+      return false;
+    }, { timeout: 10_000 });
 
     const heatData = await page.evaluate(() => {
       const ps = window.__flightPs;
@@ -173,7 +178,12 @@ test.describe('Thermal system', () => {
 
     // First accumulate heat.
     await teleportCraft(page, { posY: 50_000, velY: -2000 });
-    await page.waitForTimeout(1500);
+    await page.waitForFunction(() => {
+      const ps = window.__flightPs;
+      if (!ps?.heatMap) return false;
+      for (const h of ps.heatMap.values()) { if (h > 0) return true; }
+      return false;
+    }, { timeout: 10_000 });
 
     const beforeHeat = await page.evaluate(() => {
       const ps = window.__flightPs;
@@ -189,7 +199,13 @@ test.describe('Thermal system', () => {
       ps.velY = -100;   // Slow
     });
 
-    await page.waitForTimeout(2000);
+    await page.waitForFunction((bh) => {
+      const ps = window.__flightPs;
+      if (!ps?.heatMap) return false;
+      let t = 0;
+      for (const h of ps.heatMap.values()) t += h;
+      return t < bh;
+    }, beforeHeat, { timeout: 10_000 });
 
     const afterHeat = await page.evaluate(() => {
       const ps = window.__flightPs;
@@ -244,7 +260,12 @@ test.describe('Thermal system', () => {
 
     // Set descending reentry conditions.
     await teleportCraft(page, { posY: 50_000, velY: -2500 });
-    await page.waitForTimeout(2000);
+    await page.waitForFunction(() => {
+      const ps = window.__flightPs;
+      if (!ps?.heatMap) return false;
+      for (const h of ps.heatMap.values()) { if (h > 0) return true; }
+      return false;
+    }, { timeout: 10_000 });
 
     // The heat shield should be leading face (lowest Y); parts above (probe, tank, engine)
     // should be shielded and accumulate less or zero heat.
@@ -286,7 +307,12 @@ test.describe('Thermal system', () => {
     // Set ascending through atmosphere at high speed.
     await teleportCraft(page, { posY: 30_000, velY: 3000 }); // 30 km, ascending at 3000 m/s.
 
-    await page.waitForTimeout(2000);
+    await page.waitForFunction(() => {
+      const ps = window.__flightPs;
+      if (!ps?.heatMap) return false;
+      for (const h of ps.heatMap.values()) { if (h > 0) return true; }
+      return false;
+    }, { timeout: 10_000 });
 
     const ascendingHeat = await page.evaluate(() => {
       const ps = window.__flightPs;
@@ -355,7 +381,11 @@ test.describe('Thermal system', () => {
     // Set descending at high speed on the Moon.
     await teleportCraft(page, { posY: 20_000, velY: -2000, bodyId: 'MOON' });
 
-    await page.waitForTimeout(1500);
+    // Wait for physics to run several frames (gravity pulls craft down, proving sim is running)
+    await page.waitForFunction(
+      () => (window.__flightPs?.posY ?? 20_000) < 19_500,
+      { timeout: 10_000 },
+    );
 
     const heatOnMoon = await page.evaluate(() => {
       const ps = window.__flightPs;
@@ -399,7 +429,13 @@ test.describe('Thermal system', () => {
       }
     });
 
-    await page.waitForTimeout(500);
+    // Wait for render frame to process the heat state
+    await page.waitForFunction(() => {
+      const ps = window.__flightPs;
+      if (!ps?.heatMap) return false;
+      for (const h of ps.heatMap.values()) { if (h > 0) return true; }
+      return false;
+    }, { timeout: 5_000 });
 
     // The heat glow is a PixiJS rendering effect. We verify indirectly that
     // the heat ratio is above the 0.1 threshold for rendering.
@@ -552,11 +588,14 @@ test.describe('Tech tree parts', () => {
 
     // Cut engine and stage parachute.
     await page.keyboard.press('x');
-    await page.waitForTimeout(500);
+    await page.waitForFunction(() => (window.__flightPs?.throttle ?? 1) === 0, { timeout: 5_000 });
     await page.keyboard.press('Space');
 
     // Wait for descent — velocity should slow.
-    await page.waitForTimeout(3000);
+    await page.waitForFunction(
+      () => Math.abs(window.__flightPs?.velY ?? 999) < 200,
+      { timeout: 15_000 },
+    );
 
     const snap = await getPhysicsSnapshot(page);
     // Parachute should have slowed descent — velY should be manageable.
@@ -888,7 +927,10 @@ test.describe('Satellite components', () => {
     // Teleport to orbit where power system is active.
     await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
     await waitForOrbit(page);
-    await page.waitForTimeout(1000);
+    await page.waitForFunction(
+      () => window.__flightPs?.powerState?.solarPanelArea > 0,
+      { timeout: 10_000 },
+    );
 
     const power = await page.evaluate(() => {
       const ps = window.__flightPs;
@@ -1120,7 +1162,10 @@ test.describe('Comms range', () => {
     // Teleport to LEO on Earth — should have direct comms.
     await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
     await waitForOrbit(page);
-    await page.waitForTimeout(500);
+    await page.waitForFunction(
+      () => (window.__flightState?.commsState?.status ?? window.__flightState?.comms?.status) != null,
+      { timeout: 10_000 },
+    );
 
     const comms = await page.evaluate(() => {
       const ps = window.__flightPs;
@@ -1159,7 +1204,10 @@ test.describe('Comms range', () => {
     // Teleport to Moon orbit — beyond direct range (40,000 km).
     await teleportCraft(page, { posY: 20_000, velX: 1671, bodyId: 'MOON' });
     await waitForOrbit(page);
-    await page.waitForTimeout(1000);
+    await page.waitForFunction(
+      () => (window.__flightState?.commsState?.status ?? window.__flightState?.comms?.status) != null,
+      { timeout: 10_000 },
+    );
 
     const comms = await page.evaluate(() => {
       const fs = window.__flightState;
@@ -1195,7 +1243,10 @@ test.describe('Comms range', () => {
     // BODY_RADIUS[EARTH] = 6,371,000 + 100,000,000 = 106,371,000 < 500,000,000 T3 range.
     await teleportCraft(page, { posY: 100_000_000, velX: 2000, bodyId: 'EARTH' });
     await waitForOrbit(page);
-    await page.waitForTimeout(1000);
+    await page.waitForFunction(
+      () => (window.__flightState?.commsState?.status ?? window.__flightState?.comms?.status) != null,
+      { timeout: 10_000 },
+    );
 
     const comms = await page.evaluate(() => {
       const fs = window.__flightState;
@@ -1237,7 +1288,10 @@ test.describe('Comms range', () => {
 
     await teleportCraft(page, { posY: 20_000, velX: 1671, bodyId: 'MOON' });
     await waitForOrbit(page);
-    await page.waitForTimeout(1000);
+    await page.waitForFunction(
+      () => (window.__flightState?.commsState?.status ?? window.__flightState?.comms?.status) != null,
+      { timeout: 10_000 },
+    );
 
     const comms = await page.evaluate(() => {
       const fs = window.__flightState;
@@ -1315,7 +1369,10 @@ test.describe('Comms range', () => {
 
     await teleportCraft(page, { posY: 100_000, velX: 3503, bodyId: 'MARS' });
     await waitForOrbit(page);
-    await page.waitForTimeout(1000);
+    await page.waitForFunction(
+      () => (window.__flightState?.commsState?.status ?? window.__flightState?.comms?.status) != null,
+      { timeout: 10_000 },
+    );
 
     const comms = await page.evaluate(() => {
       const fs = window.__flightState;
@@ -1385,7 +1442,10 @@ test.describe('Comms range', () => {
     // Teleport probe to Mars orbit — no relay infrastructure.
     await teleportCraft(page, { posY: 100_000, velX: 3503, bodyId: 'MARS' });
     await waitForOrbit(page);
-    await page.waitForTimeout(1000);
+    await page.waitForFunction(
+      () => (window.__flightState?.commsState?.status ?? window.__flightState?.comms?.status) != null,
+      { timeout: 10_000 },
+    );
 
     const comms = await page.evaluate(() => {
       const fs = window.__flightState;
@@ -1420,7 +1480,10 @@ test.describe('Comms range', () => {
 
     await teleportCraft(page, { posY: 100_000, velX: 3503, bodyId: 'MARS' });
     await waitForOrbit(page);
-    await page.waitForTimeout(500);
+    await page.waitForFunction(
+      () => (window.__flightState?.commsState?.status ?? window.__flightState?.comms?.status) != null,
+      { timeout: 10_000 },
+    );
 
     // Inject relay satellites into the game state.
     await page.evaluate(() => {
@@ -1435,8 +1498,14 @@ test.describe('Comms range', () => {
       ];
     });
 
-    // Wait for comms re-evaluation.
-    await page.waitForTimeout(1500);
+    // Wait for comms re-evaluation after injecting satellite infrastructure.
+    await page.waitForFunction(
+      () => {
+        const s = window.__flightState?.commsState?.status ?? window.__flightState?.comms?.status;
+        return s === 'CONNECTED';
+      },
+      { timeout: 15_000 },
+    );
 
     const comms = await page.evaluate(() => {
       const fs = window.__flightState;
@@ -1467,7 +1536,10 @@ test.describe('Comms range', () => {
 
     await teleportCraft(page, { posY: 100_000, velX: 3503, bodyId: 'MARS' });
     await waitForOrbit(page);
-    await page.waitForTimeout(1000);
+    await page.waitForFunction(
+      () => (window.__flightState?.commsState?.status ?? window.__flightState?.comms?.status) != null,
+      { timeout: 10_000 },
+    );
 
     const comms = await page.evaluate(() => {
       const fs = window.__flightState;

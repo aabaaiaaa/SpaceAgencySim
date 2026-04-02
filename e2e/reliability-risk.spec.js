@@ -148,7 +148,11 @@ test.describe('Malfunction toggle and biome-transition triggering', () => {
     await page.keyboard.press('Space');
     await page.keyboard.press('z');
     await waitForAltitude(page, 150, 20_000);
-    await page.waitForTimeout(500);
+    // Wait for physics to process across the biome boundary
+    await page.waitForFunction(
+      () => (window.__flightPs?.posY ?? 0) > 160,
+      { timeout: 5_000 },
+    );
 
     // No malfunctions should have triggered
     const malfCount = await page.evaluate(() => {
@@ -327,7 +331,21 @@ test.describe('Fuel tank leak malfunction', () => {
     expect(beforeFuel).toBeGreaterThan(0);
 
     // Wait for the leak to drain some fuel (tick runs every frame)
-    await page.waitForTimeout(2000);
+    await page.waitForFunction(
+      (initFuel) => {
+        const ps = window.__flightPs;
+        const assembly = window.__flightAssembly;
+        if (!ps || !assembly) return false;
+        let tankId = null;
+        for (const [id, placed] of assembly.parts) {
+          if (placed.partId.includes('tank')) { tankId = id; break; }
+        }
+        if (!tankId) return false;
+        return (ps.fuelStore?.get(tankId) ?? initFuel) < initFuel;
+      },
+      beforeFuel,
+      { timeout: 10_000 },
+    );
 
     const afterFuel = await page.evaluate(() => {
       const ps = window.__flightPs;
@@ -442,7 +460,10 @@ test.describe('SRB early burnout malfunction', () => {
     await page.keyboard.press('Space'); // stage SRB
 
     // Wait for SRB to start firing
-    await page.waitForTimeout(500);
+    await page.waitForFunction(
+      () => (window.__flightPs?.firingEngines?.size ?? 0) > 0,
+      { timeout: 5_000 },
+    );
 
     const result = await page.evaluate(() => {
       const ps = window.__flightPs;
@@ -872,8 +893,12 @@ test.describe('VAB inventory tab — refurbish and scrap', () => {
     await expect(refurbBtn).toBeVisible({ timeout: 3_000 });
     await refurbBtn.click();
 
-    // Wait for UI to update
-    await page.waitForTimeout(500);
+    // Wait for state to update (money changes after refurbish)
+    await page.waitForFunction(
+      (m0) => (window.__gameState?.money ?? m0) !== m0,
+      moneyBefore,
+      { timeout: 5_000 },
+    );
 
     const gsAfter = await getGameState(page);
     // Money should decrease (refurbish costs 30% of base part cost)
@@ -896,7 +921,11 @@ test.describe('VAB inventory tab — refurbish and scrap', () => {
     await expect(scrapBtn).toBeVisible({ timeout: 3_000 });
     await scrapBtn.click();
 
-    await page.waitForTimeout(500);
+    await page.waitForFunction(
+      (m0) => (window.__gameState?.money ?? m0) !== m0,
+      moneyBefore,
+      { timeout: 5_000 },
+    );
 
     const gsAfter = await getGameState(page);
     // Money should increase (scrap gives 15% of base cost)
@@ -1010,7 +1039,11 @@ test.describe('Wind force during flight and ISP modifier', () => {
 
     // Check that the rocket has some horizontal velocity from wind
     // (wind angle 0 = east, so windFX should be positive)
-    await page.waitForTimeout(1000);
+    // Wait for wind to produce measurable displacement
+    await page.waitForFunction(
+      () => Math.abs(window.__flightPs?.posX ?? 0) > 0.01,
+      { timeout: 10_000 },
+    );
 
     const snapshot = await getPhysicsSnapshot(page);
     // With 10 m/s wind, the rocket should have some horizontal displacement
@@ -1152,7 +1185,10 @@ test.describe('Extreme weather warning', () => {
     // Return to hub
     await page.click('#vab-back-btn');
     await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
-    await page.waitForTimeout(300);
+    await page.waitForFunction(
+      () => document.querySelector('#hub-overlay')?.children.length > 0,
+      { timeout: 5_000 },
+    );
 
     // Re-inject extreme weather again (hub may have re-initialized)
     await page.evaluate(() => {
@@ -1180,7 +1216,10 @@ test.describe('Extreme weather warning', () => {
     await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 10_000 });
     await page.click('#vab-back-btn');
     await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
-    await page.waitForTimeout(300);
+    await page.waitForFunction(
+      () => document.querySelector('#hub-overlay')?.children.length > 0,
+      { timeout: 5_000 },
+    );
 
     // Immediately re-inject the extreme weather and manually recreate the panel
     const hasExtreme = await page.evaluate(() => {
@@ -1449,7 +1488,10 @@ test.describe('Reputation tier effects', () => {
     await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 10_000 });
     await page.click('#vab-back-btn');
     await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
-    await page.waitForTimeout(300);
+    await page.waitForFunction(
+      () => document.querySelector('.hub-rep-tier') !== null,
+      { timeout: 5_000 },
+    );
 
     const tierText = await page.locator('.hub-rep-tier').textContent();
     expect(tierText).toBe('Elite');

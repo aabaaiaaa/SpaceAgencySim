@@ -72,8 +72,11 @@ test.describe('Biome label transitions', () => {
     await page.keyboard.press('z'); // full throttle (default TWR=1.1 is too slow)
     await waitForAltitude(page, 150, 20_000);
 
-    // Small delay for the HUD to update after crossing the biome boundary.
-    await page.waitForTimeout(200);
+    // Wait for HUD biome label to update
+    await page.waitForFunction(
+      () => document.querySelector('#hud-biome')?.textContent === 'Low Atmosphere',
+      { timeout: 5_000 },
+    );
 
     const biomeText = await page.locator('#hud-biome').textContent();
     expect(biomeText).toBe('Low Atmosphere');
@@ -828,8 +831,15 @@ test.describe('Instrument biome validity', () => {
     await page.keyboard.press('Space'); // Stage 1: engine
     await page.keyboard.press('Space'); // Stage 2: science module
 
-    // Wait a moment for the activation attempt.
-    await page.waitForTimeout(1000);
+    // Wait for instrument state to be set (activation attempt should fail at ground level)
+    await page.waitForFunction(() => {
+      const ps = window.__flightPs;
+      if (!ps?.instrumentStates) return false;
+      for (const [, entry] of ps.instrumentStates) {
+        if (entry.instrumentId === 'barometer') return true;
+      }
+      return false;
+    }, { timeout: 10_000 });
 
     // Check for INSTRUMENT_INVALID_BIOME event.
     const invalidBiomeEvent = await page.evaluate(() => {
@@ -880,7 +890,14 @@ test.describe('Instrument biome validity', () => {
     await page.keyboard.press('Space'); // engine
     await page.keyboard.press('Space'); // science module
 
-    await page.waitForTimeout(1000);
+    await page.waitForFunction(() => {
+      const ps = window.__flightPs;
+      if (!ps?.instrumentStates) return false;
+      for (const [, entry] of ps.instrumentStates) {
+        if (entry.instrumentId === 'radiation-detector') return true;
+      }
+      return false;
+    }, { timeout: 10_000 });
 
     const radState = await page.evaluate(() => {
       const ps = window.__flightPs;

@@ -164,7 +164,13 @@ test.describe('Period does NOT advance during time warp', () => {
       { timeout: 10_000 },
     );
     await page.click('.hud-warp-btn[data-warp="5"]');
-    await page.waitForTimeout(2_000);
+    // Wait for warp to be active and altitude to change (proves sim advanced)
+    const _alt1 = await page.evaluate(() => window.__flightPs?.posY ?? 0);
+    await page.waitForFunction(
+      (y0) => Math.abs((window.__flightPs?.posY ?? y0) - y0) > 50,
+      _alt1,
+      { timeout: 10_000 },
+    );
 
     const gsAfter = await getGameState(page);
     expect(gsAfter.currentPeriod).toBe(10);
@@ -200,7 +206,12 @@ test.describe('Period does NOT advance during time warp', () => {
       { timeout: 10_000 },
     );
     await page.click('.hud-warp-btn[data-warp="10"]');
-    await page.waitForTimeout(2_000);
+    const _posX2 = await page.evaluate(() => window.__flightPs?.posX ?? 0);
+    await page.waitForFunction(
+      (x0) => Math.abs((window.__flightPs?.posX ?? x0) - x0) > 100,
+      _posX2,
+      { timeout: 10_000 },
+    );
 
     const gsAfterWarp = await getGameState(page);
     expect(gsAfterWarp.currentPeriod).toBe(periodBefore);
@@ -540,7 +551,15 @@ test.describe('RCS mode directional translation', () => {
     }));
 
     await page.keyboard.down('w');
-    await page.waitForTimeout(500);
+    await page.waitForFunction(
+      (v0) => {
+        const ps = window.__flightPs;
+        if (!ps) return false;
+        return Math.abs(ps.velX - v0.x) + Math.abs(ps.velY - v0.y) > 0.001;
+      },
+      { x: before.velX, y: before.velY },
+      { timeout: 5_000 },
+    );
     await page.keyboard.up('w');
 
     const after = await page.evaluate(() => ({
@@ -557,12 +576,22 @@ test.describe('RCS mode directional translation', () => {
     const angleBefore = await page.evaluate(() => window.__flightPs?.angle ?? 0);
 
     await page.keyboard.down('a');
-    await page.waitForTimeout(300);
+    // Wait for physics to process input (position changes in orbit even without rotation)
+    await page.waitForFunction(
+      (y0) => (window.__flightPs?.posY ?? y0) !== y0,
+      await page.evaluate(() => window.__flightPs?.posY ?? 0),
+      { timeout: 5_000 },
+    );
     await page.keyboard.up('a');
     await page.keyboard.down('d');
-    await page.waitForTimeout(300);
+    await page.waitForFunction(
+      (y0) => (window.__flightPs?.posY ?? y0) !== y0,
+      await page.evaluate(() => window.__flightPs?.posY ?? 0),
+      { timeout: 5_000 },
+    );
     await page.keyboard.up('d');
-    await page.waitForTimeout(100);
+    // Wait one frame for physics to settle
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(r)));
 
     const angleAfter = await page.evaluate(() => window.__flightPs?.angle ?? 0);
     expect(Math.abs(angleAfter - angleBefore)).toBeLessThan(0.01);
@@ -619,19 +648,28 @@ test.describe('Map view toggle and controls', () => {
     expect(throttleBefore).toBe(0);
 
     await page.keyboard.down('w');
-    await page.waitForTimeout(500);
+    await page.waitForFunction(
+      () => (window.__flightPs?.throttle ?? 0) > 0,
+      { timeout: 5_000 },
+    );
     const throttleDuring = await page.evaluate(() => window.__flightPs?.throttle ?? -1);
     expect(throttleDuring).toBeGreaterThan(0);
 
     await page.keyboard.up('w');
-    await page.waitForTimeout(200);
+    await page.waitForFunction(
+      () => (window.__flightPs?.throttle ?? -1) === 0,
+      { timeout: 5_000 },
+    );
     const throttleAfter = await page.evaluate(() => window.__flightPs?.throttle ?? -1);
     expect(throttleAfter).toBe(0);
   });
 
   test('(5) S key sets retrograde thrust direction in map view', async () => {
     await page.keyboard.down('s');
-    await page.waitForTimeout(300);
+    await page.waitForFunction(
+      () => (window.__flightPs?.throttle ?? 0) > 0,
+      { timeout: 5_000 },
+    );
 
     // Retrograde: angle = atan2(-velX, -velY). With velX≈7848, velY≈0 → angle ≈ -π/2.
     const state = await page.evaluate(() => ({
@@ -643,14 +681,20 @@ test.describe('Map view toggle and controls', () => {
     expect(Math.abs(state.angle - (-Math.PI / 2))).toBeLessThan(0.5);
 
     await page.keyboard.up('s');
-    await page.waitForTimeout(200);
+    await page.waitForFunction(
+      () => (window.__flightPs?.throttle ?? -1) === 0,
+      { timeout: 5_000 },
+    );
     const throttleAfter = await page.evaluate(() => window.__flightPs?.throttle ?? -1);
     expect(throttleAfter).toBe(0);
   });
 
   test('(6) A key sets radial-in thrust direction in map view', async () => {
     await page.keyboard.down('a');
-    await page.waitForTimeout(300);
+    await page.waitForFunction(
+      () => (window.__flightPs?.throttle ?? 0) > 0,
+      { timeout: 5_000 },
+    );
 
     // Radial-in: thrust directed toward the body centre.
     // At position (0, 100_000) body-centred (0, 6_471_000), radial-in points down.
@@ -664,7 +708,10 @@ test.describe('Map view toggle and controls', () => {
     expect(Math.abs(Math.abs(state.angle) - Math.PI)).toBeLessThan(0.5);
 
     await page.keyboard.up('a');
-    await page.waitForTimeout(200);
+    await page.waitForFunction(
+      () => (window.__flightPs?.throttle ?? -1) === 0,
+      { timeout: 5_000 },
+    );
     const throttleAfter = await page.evaluate(() => window.__flightPs?.throttle ?? -1);
     expect(throttleAfter).toBe(0);
   });

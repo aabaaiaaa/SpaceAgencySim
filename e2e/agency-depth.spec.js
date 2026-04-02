@@ -150,8 +150,11 @@ test.describe('Construction menu — building a facility', () => {
     await expect(buildBtn).toBeVisible({ timeout: 3_000 });
     await buildBtn.click();
 
-    // Wait a moment for the state update
-    await page.waitForTimeout(500);
+    // Wait for facility to be built in game state
+    await page.waitForFunction(
+      () => window.__gameState?.facilities?.['crew-admin']?.built === true,
+      { timeout: 5_000 },
+    );
 
     // Close construction panel
     await page.click('.cp-close-btn');
@@ -612,8 +615,12 @@ test.describe('Contract BUDGET_LIMIT and MAX_PARTS constraints', () => {
       fs.partCount = 3;        // Well under 10
     });
 
-    // Wait for the objectives to be checked on next tick
-    await page.waitForTimeout(2_000);
+    // Wait for the constraint objectives to be checked
+    await page.waitForFunction(() => {
+      const gs = window.__gameState;
+      const contract = gs?.contracts?.active?.find(c => c.id === 'contract-constraints');
+      return contract?.objectives?.some(o => o.completed === true);
+    }, { timeout: 10_000 });
 
     const gs = await getGameState(page);
     const contract = gs.contracts.active.find(c => c.id === 'contract-constraints');
@@ -672,8 +679,12 @@ test.describe('Contract over-performance bonus', () => {
     // Wait for both main and bonus altitude to be reached
     await waitForAltitude(page, 100, 30_000);
 
-    // Give time for contract objective check to run
-    await page.waitForTimeout(1_000);
+    // Wait for contract objective to be evaluated
+    await page.waitForFunction(() => {
+      const gs = window.__gameState;
+      const contract = gs?.contracts?.active?.find(c => c.id === 'contract-bonus');
+      return contract?.objectives?.[0]?.completed === true;
+    }, { timeout: 10_000 });
 
     const gs = await getGameState(page);
     const contract = gs.contracts.active.find(c => c.id === 'contract-bonus');
@@ -1708,7 +1719,11 @@ test.describe('Contract RESTRICT_PART constraint objective', () => {
       fs.partTypes = ['COMPUTER_MODULE', 'FUEL_TANK', 'ENGINE'];
     });
 
-    await page.waitForTimeout(2_000);
+    await page.waitForFunction(() => {
+      const gs = window.__gameState;
+      const contract = gs?.contracts?.active?.find(c => c.id === 'contract-restrict');
+      return contract?.objectives?.[0]?.completed === true;
+    }, { timeout: 10_000 });
 
     const gs = await getGameState(page);
     const contract = gs.contracts.active.find(c => c.id === 'contract-restrict');
@@ -1767,7 +1782,11 @@ test.describe('Contract MINIMUM_CREW constraint objective', () => {
       fs.crewCount = fs.crewIds?.length ?? 0;
     });
 
-    await page.waitForTimeout(2_000);
+    await page.waitForFunction(() => {
+      const gs = window.__gameState;
+      const contract = gs?.contracts?.active?.find(c => c.id === 'contract-mincrew');
+      return contract?.objectives?.[0]?.completed === true;
+    }, { timeout: 10_000 });
 
     const gs = await getGameState(page);
     const contract = gs.contracts.active.find(c => c.id === 'contract-mincrew');

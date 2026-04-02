@@ -121,7 +121,7 @@
 - **Verification**: Run `npx playwright test e2e/phase-transitions.spec.js` (or whatever the new spec is named) — all tests pass. Each test verifies the phase transition fires through the real physics pipeline, not via direct state mutation.
 
 ### TASK-021: Replace waitForTimeout with conditional waits in E2E tests
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Replace the 76 `waitForTimeout()` calls across 10 E2E spec files with `page.waitForFunction(() => condition)`, `page.waitForSelector()`, or other deterministic waits. The heaviest offender is `additional-systems.spec.js` (19 occurrences). Some waits for animations may remain, but most should be converted. See requirements Section 5.3.
 - **Verification**: Grep for `waitForTimeout` in `e2e/` — count should be reduced to ≤10 (only genuinely necessary animation waits). Run each modified spec file individually to confirm it passes (e.g., `npx playwright test e2e/additional-systems.spec.js`, etc.).

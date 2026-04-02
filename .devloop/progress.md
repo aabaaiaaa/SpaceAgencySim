@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 28
-- **Completed**: 20
-- **Remaining**: 8
-- **Last Updated**: 2026-04-02T14:54:00.032Z
+- **Completed**: 21
+- **Remaining**: 7
+- **Last Updated**: 2026-04-02T15:49:29.972Z
 
 ## Iteration Log
 
@@ -187,4 +187,13 @@
 - **Exit Status**: success
 - **Tokens**: 3,440,831 total (2,426 in, 36,632 out, 120,714 cache-create, 3,281,059 cache-read)
 - **Cost**: $3.5251
+
+### Iteration 21 - 2026-04-02T14:54:03.569Z
+- **Task Attempted**: TASK-021
+- **Task Completed**: TASK-021
+- **Summary**: Completed Replace waitForTimeout with conditional waits in E2E tests
+- **Duration**: 55m 26s
+- **Exit Status**: success
+- **Tokens**: 154,086 total (3 in, 16 out, 331 cache-create, 153,736 cache-read)
+- **Cost**: $12.5567
 

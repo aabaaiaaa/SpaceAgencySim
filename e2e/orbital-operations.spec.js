@@ -353,8 +353,11 @@ test.describe('Orbital manoeuvres', () => {
       { timeout: 10_000 },
     );
 
-    // Let burn run briefly.
-    await page.waitForTimeout(1500);
+    // Let burn run for several physics frames.
+    await page.evaluate(() => new Promise(resolve => {
+      let frames = 0;
+      (function tick() { if (++frames >= 60) resolve(); else requestAnimationFrame(tick); })();
+    }));
 
     // Record velocity after burn.
     const velDuringBurn = await page.evaluate(() => window.__flightPs?.velX ?? 0);
@@ -395,7 +398,12 @@ test.describe('Orbital manoeuvres', () => {
       ps.velX -= 200; // Retrograde impulse.
     });
 
-    await page.waitForTimeout(500);
+    // Wait for physics to process the velocity change
+    await page.waitForFunction(
+      (v0) => (window.__flightPs?.velX ?? v0) < v0,
+      velBefore,
+      { timeout: 5_000 },
+    );
 
     // Velocity should be lower.
     const velAfter = await page.evaluate(() => window.__flightPs?.velX ?? 0);
@@ -432,7 +440,10 @@ test.describe('Docking mode local positioning', () => {
 
     // Press V to enter docking mode.
     await page.keyboard.press('v');
-    await page.waitForTimeout(500);
+    await page.waitForFunction(
+      () => window.__flightPs?.controlMode === 'DOCKING',
+      { timeout: 5_000 },
+    );
 
     const modeAfter = await page.evaluate(() => window.__flightPs?.controlMode);
     expect(modeAfter).toBe('DOCKING');
@@ -447,9 +458,15 @@ test.describe('Docking mode local positioning', () => {
 
     // Toggle docking mode off then on — throttle should be cut.
     await page.keyboard.press('v'); // Exit docking
-    await page.waitForTimeout(300);
+    await page.waitForFunction(
+      () => window.__flightPs?.controlMode !== 'DOCKING',
+      { timeout: 5_000 },
+    );
     await page.keyboard.press('v'); // Enter docking
-    await page.waitForTimeout(300);
+    await page.waitForFunction(
+      () => window.__flightPs?.controlMode === 'DOCKING',
+      { timeout: 5_000 },
+    );
 
     const throttle = await page.evaluate(() => window.__flightPs?.throttle ?? -1);
     expect(throttle).toBe(0);
@@ -458,14 +475,20 @@ test.describe('Docking mode local positioning', () => {
   test('(3) RCS mode is available inside docking mode', async () => {
     // Already in docking mode. Press R for RCS.
     await page.keyboard.press('r');
-    await page.waitForTimeout(500);
+    await page.waitForFunction(
+      () => window.__flightPs?.controlMode === 'RCS',
+      { timeout: 5_000 },
+    );
 
     const mode = await page.evaluate(() => window.__flightPs?.controlMode);
     expect(mode).toBe('RCS');
 
     // Toggle back.
     await page.keyboard.press('r');
-    await page.waitForTimeout(300);
+    await page.waitForFunction(
+      () => window.__flightPs?.controlMode !== 'RCS',
+      { timeout: 5_000 },
+    );
   });
 });
 
@@ -1189,7 +1212,10 @@ test.describe('Power system', () => {
     await waitForOrbit(page);
 
     // Wait for power state to be populated.
-    await page.waitForTimeout(1500);
+    await page.waitForFunction(
+      () => window.__flightPs?.powerState?.solarPanelArea > 0,
+      { timeout: 10_000 },
+    );
 
     const powerInfo = await page.evaluate(() => {
       const ps = window.__flightPs;
@@ -1208,7 +1234,10 @@ test.describe('Power system', () => {
   });
 
   test('(2) solar generation is positive when craft is sunlit', async () => {
-    await page.waitForTimeout(1000);
+    await page.waitForFunction(
+      () => window.__flightPs?.powerState != null,
+      { timeout: 10_000 },
+    );
 
     const generation = await page.evaluate(() => {
       const ps = window.__flightPs;
@@ -1262,7 +1291,10 @@ test.describe('Power system', () => {
     await startTestFlight(page, BASIC_PROBE);
     await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
     await waitForOrbit(page);
-    await page.waitForTimeout(1500);
+    await page.waitForFunction(
+      () => window.__flightPs?.powerState != null,
+      { timeout: 10_000 },
+    );
 
     const powerInfo = await page.evaluate(() => {
       const ps = window.__flightPs;
@@ -1680,7 +1712,10 @@ test.describe('Power system eclipse behaviour', () => {
     await startTestFlight(page, SOLAR_PROBE);
     await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
     await waitForOrbit(page);
-    await page.waitForTimeout(1500);
+    await page.waitForFunction(
+      () => window.__flightPs?.powerState != null,
+      { timeout: 10_000 },
+    );
 
     const sunlitInfo = await page.evaluate(() => {
       const ps = window.__flightPs;
@@ -1708,7 +1743,10 @@ test.describe('Power system eclipse behaviour', () => {
       ps.powerState.batteryCharge = ps.powerState.batteryCapacity * 0.5;
     });
 
-    await page.waitForTimeout(500);
+    await page.waitForFunction(
+      () => window.__flightPs?.powerState?.batteryCharge > 0,
+      { timeout: 5_000 },
+    );
 
     const eclipseInfo = await page.evaluate(() => {
       const ps = window.__flightPs;

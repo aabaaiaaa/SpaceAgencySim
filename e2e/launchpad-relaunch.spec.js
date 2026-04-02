@@ -109,8 +109,11 @@ async function fireStageAndVerifyLiftoff(page) {
   // Press spacebar to fire Stage 1.
   await page.keyboard.press('Space');
 
-  // Wait for physics to process staging + at least one fuel-system tick.
-  await page.waitForTimeout(500);
+  // Wait for engine to start firing after staging.
+  await page.waitForFunction(
+    () => (window.__flightPs?.firingEngines?.size ?? 0) > 0,
+    { timeout: 5_000 },
+  );
 
   // The engine should still be firing (not flamed out due to missing fuel
   // connections).  This is the core assertion that catches the bug.

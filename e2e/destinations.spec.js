@@ -322,7 +322,12 @@ test.describe('Celestial body data drives physics and rendering', () => {
     // decrease much except from gravity (no atmospheric drag).
     await page.keyboard.press('x');
     const ps1 = await getPhysicsSnapshot(page);
-    await page.waitForTimeout(500);
+    // Wait for physics to run a few frames (position changes due to gravity)
+    await page.waitForFunction(
+      (y0) => (window.__flightPs?.posY ?? y0) !== y0,
+      ps1.posY,
+      { timeout: 5_000 },
+    );
     const ps2 = await getPhysicsSnapshot(page);
 
     // Velocity change should be purely gravitational (small, only vertical).
@@ -359,7 +364,13 @@ test.describe('Sun destruction altitude and escalating heat damage', () => {
 
     // Teleport above the heat start altitude.
     await teleportCraft(page, { posY: SUN_HEAT_START_ALTITUDE + 1_000_000_000, bodyId: 'SUN' });
-    await page.waitForTimeout(1_000);
+    // Wait for physics sim to run (gravity changes posY)
+    const _sunPosY1 = await page.evaluate(() => window.__flightPs?.posY ?? 0);
+    await page.waitForFunction(
+      (y0) => (window.__flightPs?.posY ?? y0) !== y0,
+      _sunPosY1,
+      { timeout: 10_000 },
+    );
 
     // Check that no heat-related events fired.
     const events = await page.evaluate(() => {
@@ -382,7 +393,20 @@ test.describe('Sun destruction altitude and escalating heat damage', () => {
 
     // Teleport inside the heat zone but above destruction.
     await teleportCraft(page, { posY: 5_000_000_000, bodyId: 'SUN' });
-    await page.waitForTimeout(3_000);
+    // Wait for heat to accumulate or parts to be destroyed
+    await page.waitForFunction(() => {
+      const ps = window.__flightPs;
+      if (!ps) return false;
+      // Check heatMap for accumulated heat
+      if (ps.heatMap?.size > 0) {
+        for (const h of ps.heatMap.values()) { if (h > 0) return true; }
+      }
+      // Or check for destruction events
+      const fs = window.__flightState;
+      return (fs?.events ?? []).some(e =>
+        e.type === 'PART_DESTROYED' || e.type === 'HEAT_DAMAGE'
+      );
+    }, { timeout: 15_000 });
 
     // Check for heat-related effects — parts should accumulate heat.
     // Heat is tracked in ps.heatMap (Map<string, number>).
@@ -418,7 +442,13 @@ test.describe('Sun destruction altitude and escalating heat damage', () => {
 
     // Teleport below destruction altitude.
     await teleportCraft(page, { posY: SUN_DESTRUCTION_ALTITUDE - 100_000_000, bodyId: 'SUN' });
-    await page.waitForTimeout(2_000);
+    // Wait for craft to be destroyed
+    await page.waitForFunction(() => {
+      const ps = window.__flightPs;
+      const fs = window.__flightState;
+      return ps?.crashed === true ||
+        (fs?.events ?? []).some(e => e.type === 'PART_DESTROYED');
+    }, { timeout: 10_000 });
 
     // All parts should be destroyed — check for crash or destruction state.
     const state = await page.evaluate(() => {
@@ -448,7 +478,13 @@ test.describe('Sun destruction altitude and escalating heat damage', () => {
 
     // Teleport to inner corona — should survive longer with solar shield.
     await teleportCraft(page, { posY: 3_000_000_000, bodyId: 'SUN' });
-    await page.waitForTimeout(2_000);
+    // Wait for physics to process several frames near the Sun
+    const _sunPosY2 = await page.evaluate(() => window.__flightPs?.posY ?? 0);
+    await page.waitForFunction(
+      (y0) => Math.abs((window.__flightPs?.posY ?? y0) - y0) > 1000,
+      _sunPosY2,
+      { timeout: 15_000 },
+    );
 
     const shieldState = await page.evaluate(() => {
       const ps = window.__flightPs;
@@ -518,7 +554,13 @@ test.describe('Transfer gameplay mechanics', () => {
     const warpExists = await warpBtn.isVisible({ timeout: 3_000 }).catch(() => false);
     if (warpExists) {
       await warpBtn.click();
-      await page.waitForTimeout(2_000);
+      // Wait for simulation to advance at warp speed
+      const _tPosX = await page.evaluate(() => window.__flightPs?.posX ?? 0);
+      await page.waitForFunction(
+        (x0) => Math.abs((window.__flightPs?.posX ?? x0) - x0) > 100,
+        _tPosX,
+        { timeout: 10_000 },
+      );
     }
 
     const gsAfter = await getGameState(page);
@@ -1738,7 +1780,8 @@ test.describe('Map view controls during transfer', () => {
 
     // Toggle map view (key 'c' or 'm' depending on implementation).
     await page.keyboard.press('c');
-    await page.waitForTimeout(500);
+    // Wait for map view state to change
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
 
     // Check if map view is active.
     const mapActive = await page.evaluate(() => {
@@ -1749,7 +1792,7 @@ test.describe('Map view controls during transfer', () => {
 
     // Toggle back.
     await page.keyboard.press('c');
-    await page.waitForTimeout(500);
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
 
     // Reset transfer state to orbit so we can return cleanly.
     await page.evaluate(() => {

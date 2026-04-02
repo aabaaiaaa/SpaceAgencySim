@@ -149,7 +149,10 @@ test.describe('Facility upgrade purchase from construction menu', () => {
     const launchPadItem = page.locator('.cp-facility-item').filter({ hasText: 'Launch Pad' });
     const upgradeBtn = launchPadItem.locator('.cp-upgrade-btn');
     await upgradeBtn.click();
-    await page.waitForTimeout(500);
+    await page.waitForFunction(
+      () => window.__gameState?.facilities?.['launch-pad']?.tier === 2,
+      { timeout: 5_000 },
+    );
     await page.click('.cp-close-btn');
 
     const gsAfter = await getGameState(page);
@@ -166,7 +169,10 @@ test.describe('Facility upgrade purchase from construction menu', () => {
     const vabItem = page.locator('.cp-facility-item').filter({ hasText: 'Vehicle Assembly' });
     const upgradeBtn = vabItem.locator('.cp-upgrade-btn');
     await upgradeBtn.click();
-    await page.waitForTimeout(500);
+    await page.waitForFunction(
+      () => window.__gameState?.facilities?.['vab']?.tier === 2,
+      { timeout: 5_000 },
+    );
     await page.click('.cp-close-btn');
 
     const gs = await getGameState(page);
@@ -179,7 +185,10 @@ test.describe('Facility upgrade purchase from construction menu', () => {
     const mccItem = page.locator('.cp-facility-item').filter({ hasText: 'Mission Control' });
     const upgradeBtn = mccItem.locator('.cp-upgrade-btn');
     await upgradeBtn.click();
-    await page.waitForTimeout(500);
+    await page.waitForFunction(
+      () => window.__gameState?.facilities?.['mission-control']?.tier === 2,
+      { timeout: 5_000 },
+    );
     await page.click('.cp-close-btn');
 
     const gs = await getGameState(page);
@@ -193,7 +202,10 @@ test.describe('Facility upgrade purchase from construction menu', () => {
     const lpItem = page.locator('.cp-facility-item').filter({ hasText: 'Launch Pad' });
     const upgradeBtn = lpItem.locator('.cp-upgrade-btn');
     await upgradeBtn.click();
-    await page.waitForTimeout(500);
+    await page.waitForFunction(
+      () => window.__gameState?.facilities?.['launch-pad']?.tier === 3,
+      { timeout: 5_000 },
+    );
 
     const gs = await getGameState(page);
     expect(gs.facilities[FacilityId.LAUNCH_PAD].tier).toBe(3);
@@ -1007,7 +1019,10 @@ test.describe('Library — free construction', () => {
     await expect(libraryItem).toBeVisible({ timeout: 3_000 });
     const buildBtn = libraryItem.locator('.cp-build-btn');
     await buildBtn.click();
-    await page.waitForTimeout(500);
+    await page.waitForFunction(
+      () => window.__gameState?.facilities?.['library']?.built === true,
+      { timeout: 5_000 },
+    );
     await page.click('.cp-close-btn');
 
     const gsAfter = await getGameState(page);
@@ -1516,7 +1531,7 @@ test.describe('Facility upgrade — insufficient funds handling', () => {
       const disabled = await upgradeBtn.isDisabled().catch(() => false);
       if (!disabled) {
         await upgradeBtn.click();
-        await page.waitForTimeout(300);
+        await page.evaluate(() => new Promise(r => requestAnimationFrame(r)));
       }
     }
 

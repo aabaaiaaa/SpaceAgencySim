@@ -1016,7 +1016,8 @@ test.describe('Tutorial Revisions', () => {
 
       // Release first satellite (decoupler stage).
       await stage(page);
-      await page.waitForTimeout(500);
+      // Wait for decoupler separation
+      await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
 
       // Release second satellite (decoupler stage).
       await stage(page);
