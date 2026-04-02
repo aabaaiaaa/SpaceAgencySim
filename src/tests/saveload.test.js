@@ -20,6 +20,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createGameState } from '../core/gameState.js';
 import {
   SAVE_SLOT_COUNT,
+  SAVE_VERSION,
   saveGame,
   loadGame,
   deleteSave,
@@ -774,5 +775,105 @@ describe('exportSave()', () => {
     vi.unstubAllGlobals();
     // Re-apply the localStorage mock so afterEach() cleanup works.
     vi.stubGlobal('localStorage', mockStorage);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Save format version field (TASK-007)
+// ---------------------------------------------------------------------------
+
+describe('Save format version field', () => {
+  it('SAVE_VERSION is a positive integer', () => {
+    expect(Number.isInteger(SAVE_VERSION)).toBe(true);
+    expect(SAVE_VERSION).toBeGreaterThanOrEqual(1);
+  });
+
+  it('saveGame() includes the version field in the stored envelope', () => {
+    saveGame(freshState(), 0, 'versioned');
+    const raw = localStorage.getItem('spaceAgencySave_0');
+    const envelope = JSON.parse(raw);
+    expect(envelope.version).toBe(SAVE_VERSION);
+  });
+
+  it('loadGame() loads a version-0 (no version field) save with all migrations applied', () => {
+    // Simulate a pre-versioning save: no version field, missing fields that
+    // the migration logic defaults via ??=.
+    const state = freshState();
+    delete state.malfunctionMode;
+    delete state.savedDesigns;
+    delete state.welcomeShown;
+    const legacyEnvelope = {
+      saveName: 'Legacy',
+      timestamp: new Date(0).toISOString(),
+      // Intentionally no "version" field
+      state: JSON.parse(JSON.stringify(state)),
+    };
+    localStorage.setItem('spaceAgencySave_0', JSON.stringify(legacyEnvelope));
+
+    const restored = loadGame(0);
+    // Migrations should have run — check fields that get defaulted by ??=.
+    expect(restored.malfunctionMode).toBe('normal');
+    expect(Array.isArray(restored.savedDesigns)).toBe(true);
+    expect(restored.welcomeShown).toBe(true);
+  });
+
+  it('loadGame() loads a save matching the current version without warnings', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    saveGame(freshState(), 0, 'current version');
+    const restored = loadGame(0);
+
+    expect(restored).toBeDefined();
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it('loadGame() warns when save version is higher than current', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    // Create a save with a future version number.
+    const state = freshState();
+    const futureEnvelope = {
+      saveName: 'Future',
+      timestamp: new Date(0).toISOString(),
+      version: SAVE_VERSION + 5,
+      state: JSON.parse(JSON.stringify(state)),
+    };
+    localStorage.setItem('spaceAgencySave_0', JSON.stringify(futureEnvelope));
+
+    const restored = loadGame(0);
+    expect(restored).toBeDefined();
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0][0]).toMatch(/newer version/i);
+    warnSpy.mockRestore();
+  });
+
+  it('loadGame() still returns valid state from a future-version save', () => {
+    const state = freshState();
+    state.money = 42_000;
+    const futureEnvelope = {
+      saveName: 'Future OK',
+      timestamp: new Date(0).toISOString(),
+      version: SAVE_VERSION + 1,
+      state: JSON.parse(JSON.stringify(state)),
+    };
+    localStorage.setItem('spaceAgencySave_1', JSON.stringify(futureEnvelope));
+
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const restored = loadGame(1);
+    expect(restored.money).toBe(42_000);
+    vi.restoreAllMocks();
+  });
+
+  it('round-trip save/load preserves the version field in storage', () => {
+    const state = freshState();
+    saveGame(state, 2, 'round-trip');
+    const raw = localStorage.getItem('spaceAgencySave_2');
+    const envelope = JSON.parse(raw);
+    expect(envelope.version).toBe(SAVE_VERSION);
+
+    // Load succeeds and the envelope in storage still has the version.
+    const restored = loadGame(2);
+    expect(restored).toBeDefined();
   });
 });

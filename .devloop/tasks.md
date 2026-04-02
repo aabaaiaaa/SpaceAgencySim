@@ -37,7 +37,7 @@
 - **Verification**: `npm run test:unit` passes. Grep for `new PIXI.Graphics()` in `_debris.js` returns no results.
 
 ### TASK-007: Add save format version field
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Add a `version` integer field (starting at 1) to the save envelope in `src/core/saveload.js`. On load: missing version = version 0 (apply all migrations), matching version = load directly, higher version = warn user. See requirements Section 2.1.
 - **Verification**: `npm run test:unit` passes. Unit tests verify: saves include version field, version-0 saves load with migrations, future-version saves trigger warning.

@@ -26,6 +26,13 @@ export const SAVE_SLOT_COUNT = 5;
 /** Prefix for localStorage keys. Full key = prefix + slotIndex. */
 const SAVE_KEY_PREFIX = 'spaceAgencySave_';
 
+/**
+ * Current save format version. Bump this whenever the save envelope or
+ * state schema changes in a way that requires new migration logic.
+ * @type {number}
+ */
+export const SAVE_VERSION = 1;
+
 // ---------------------------------------------------------------------------
 // Session Time Tracking
 // ---------------------------------------------------------------------------
@@ -197,6 +204,7 @@ export function saveGame(state, slotIndex, saveName = 'New Save') {
   const envelope = {
     saveName: String(saveName),
     timestamp: new Date().toISOString(),
+    version: SAVE_VERSION,
     // Deep-clone via JSON round-trip so the stored snapshot is immutable and
     // unaffected by subsequent in-memory mutations.
     state: JSON.parse(JSON.stringify(state)),
@@ -245,6 +253,17 @@ export function loadGame(slotIndex) {
 
   if (!envelope || typeof envelope !== 'object' || !envelope.state) {
     throw new Error(`Save slot ${slotIndex} contains corrupt data (missing state field).`);
+  }
+
+  // Determine the save format version.  Pre-versioning saves have no version
+  // field; treat them as version 0 so all migrations run.
+  const saveVersion = typeof envelope.version === 'number' ? envelope.version : 0;
+
+  if (saveVersion > SAVE_VERSION) {
+    console.warn(
+      `Save slot ${slotIndex} was created by a newer version (v${saveVersion}, ` +
+      `current is v${SAVE_VERSION}). It may not load correctly.`
+    );
   }
 
   // Reset the timer so play time accumulated before this load is not
