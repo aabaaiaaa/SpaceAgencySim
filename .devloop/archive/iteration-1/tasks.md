@@ -1,145 +1,169 @@
-# UX Polish Tasks
+# Iteration 2 — Tasks
 
-### TASK-001: Fix "Back" button destroying hub for Tracking Station, Satellite Ops, Library
+### TASK-001: Handle localStorage quota errors and improve error logging in saveload.js and designLibrary.js
 - **Status**: done
 - **Dependencies**: none
-- **Description**: Clicking "Back" from Tracking Station, Satellite Ops, or Library leaves a blank screen with only the topbar. The onBack callbacks in `src/ui/index.js` call `showHubScene()` and `initHubUI()` but the facility UI modules aren't cleaning up properly. Compare the working cleanup pattern used by Crew Admin and Mission Control (which use `← Hub` and work correctly) with the broken pattern in these three facilities. Fix the teardown/cleanup in each module so the hub re-renders correctly. See requirements section 1.1.
-- **Verification**: Start game, load "All Facilities Unlocked" debug save, click Tracking Station then "Back" — hub must render fully. Repeat for Satellite Ops and Library. All three must return to a fully functional hub.
+- **Description**: Wrap all `localStorage.setItem()` calls in `src/core/saveload.js` and `src/core/designLibrary.js` with try-catch for `QuotaExceededError`. Surface a user-friendly "Storage full" message on quota failure. Also add `console.warn()` to the silent JSON.parse catch blocks in `designLibrary.js` (around lines 125-132) so corrupt data is logged rather than silently swallowed. See requirements Section 1.1 and 1.2.
+- **Verification**: Write a unit test that mocks `localStorage.setItem` to throw `QuotaExceededError` and verify the error is caught gracefully (no unhandled exception). Verify `console.warn` is called on corrupt JSON parse. Run `npm run test:unit` — all tests pass. No E2E needed — pure core logic.
 
-### TASK-002: Add R&D Lab navigation handler and tech tree panel
+### TASK-002: Add try-catch to flight HUD requestAnimationFrame loop
 - **Status**: done
 - **Dependencies**: none
-- **Description**: `_handleNavigation()` in `src/ui/index.js` has no `if (destination === 'rd-lab')` case — the tech tree is completely inaccessible from the hub. Add a handler following the same pattern as other facilities. Check if an `initRdLabUI` function already exists; if not, create a tech tree panel that displays the tech tree data from `src/data/techtree.js` and allows purchasing nodes with science points + funds. See requirements section 1.2.
-- **Verification**: Click R&D Lab on the hub — a tech tree panel must open showing available and researched nodes. Click "Back"/"← Hub" to return to hub without breaking it.
+- **Description**: Add error handling around the flight HUD's `requestAnimationFrame` callback so that invalid physics state (NaN, missing references) doesn't crash the entire HUD. Log errors, attempt to continue on transient failures, and if errors repeat (e.g., 5+ consecutive frames), offer the player a way to abort to the hub. See requirements Section 1.3.
+- **Verification**: Run `npm run test:unit` — all tests pass. Then run `npx playwright test e2e/flight.spec.js` to verify flight still works normally.
 
-### TASK-003: Hide unbuilt facilities on hub in tutorial mode
+### TASK-003: Add ordering dependency comment to flightPhase.js transition logic
 - **Status**: done
 - **Dependencies**: none
-- **Description**: `_renderBuildings()` in `src/ui/hub.js` (lines 1532-1572) renders all 8 buildings unconditionally. It must check `hasFacility(state, buildingId)` and only render built facilities. Unbuilt facilities should be hidden entirely (not greyed out — just absent). The navigation handler in `src/ui/index.js` should also check facility lock state and show a tooltip/message if the player somehow clicks a locked facility. In non-tutorial mode (Freeplay), facilities that haven't been built yet via the Construction menu should also not appear. In Sandbox mode, all facilities are always built so all should show. See requirements section 1.3.
-- **Verification**: Start a fresh Tutorial game — only Launch Pad, VAB, and MCC should be visible on the hub. Accept mission-018 (First Crew Flight) — Crew Admin should appear on the hub after accepting.
+- **Description**: Add a clear comment in `src/core/flightPhase.js` (around lines 222-255) explaining why the MANOEUVRE exit handler checks escape trajectory first with an early return, and that removing the early return would cause double-mutation. See requirements Section 1.4.
+- **Verification**: Read the comment in the code and confirm it explains the ordering dependency and the early-return requirement. No tests needed — comment-only change.
 
-### TASK-004: Fix Load Game functionality
+### TASK-004: Fix timer stacking in debugSaves.js
 - **Status**: done
 - **Dependencies**: none
-- **Description**: The "Load Game" option in the hamburger menu currently exits to the main menu (which has no load UI), destroying unsaved progress without warning. Fix in two parts: (a) Add a Load Game dialog as a modal overlay within the hub, matching the Save Game dialog style — show 5 slots with saved game info and "Load" buttons. (b) Add a "Load Game" section to the main menu below the New Game form. If any save slots contain data, show them with a "Load" button. See requirements sections 1.4 and 1.5.
-- **Verification**: From the hub, click hamburger menu > Load Game — a modal should appear showing save slots (not navigate away). From the main menu, saved games should be visible and loadable.
+- **Description**: In `src/ui/debugSaves.js` (around line 343), clear the previous timeout stored on `feedbackEl._timer` before setting a new one. Use `clearTimeout(feedbackEl._timer)` before the new `setTimeout` assignment. See requirements Section 1.5.
+- **Verification**: Run `npm run test:unit` — all tests pass. No E2E needed — trivial one-line fix in debug tooling.
 
-### TASK-005: Add welcome/introduction message for new games
-- **Status**: done
-- **Dependencies**: TASK-003
-- **Description**: When starting a new game, show a dismissable welcome modal/overlay on first entering the hub. Content varies by mode: Tutorial — "Welcome to [Agency Name]! You've secured $2M in funding (matched by a $2M loan) to build a space programme from scratch. Head to Mission Control to accept your first mission, then build a rocket in the Vehicle Assembly Building and launch it from the Launch Pad. Good luck!" Freeplay — brief intro about all starter parts being available. Sandbox — note that funds are unlimited and all parts/facilities are unlocked. The modal should have a "Let's Go!" button and not appear again for that save. See requirements section 2.1.
-- **Verification**: Start a new Tutorial game — a welcome modal must appear explaining the game. Dismiss it and it should not reappear.
-
-### TASK-006: Add facility and part unlock notifications
+### TASK-005: Move _malfunctionMode from module variable to gameState
 - **Status**: done
 - **Dependencies**: none
-- **Description**: When a mission is accepted that has `awardsFacilityOnAccept`, show a prominent notification modal: "[Facility Name] Unlocked!" with a description of what it does and what parts were unlocked. The four facility-awarding missions are: mission-018 (crew-admin + cmd-mk1), mission-019 (rd-lab + science-module-mk1), mission-020 (tracking-station + docking-port-std), mission-022 (satellite-ops). Also show notifications when `unlockedParts` are awarded on mission completion. See requirements section 2.2.
-- **Verification**: Accept mission-018 in MCC — a notification modal should appear saying "Crew Administration Unlocked!" and mentioning the Command Module. Dismiss to continue.
+- **Description**: `src/core/malfunction.js` stores `_malfunctionMode` as a module-level variable rather than in `gameState`. Move it into the game state object so it follows the same state mutation pattern as everything else and can be persisted/restored with save/load. Update all read/write sites and any E2E test hooks that toggle malfunction mode. See requirements (review item, not in a numbered section — architectural consistency).
+- **Verification**: Run `npm run test:unit` — all tests pass. Then run `npx playwright test e2e/reliability-risk.spec.js` to verify malfunction E2E tests still work with the new state location. Verify malfunction mode survives save/load cycle via unit test.
 
-### TASK-007: Fix weather/reputation overlap and hub HUD layout
+### TASK-006: Implement event listener cleanup in UI modules
 - **Status**: done
 - **Dependencies**: none
-- **Description**: The Launch Conditions panel completely covers the Reputation widget. Reposition these widgets so they don't overlap — weather top-left, reputation below it or in a different location. Also move the Construction/Settings buttons into the hamburger menu or a more integrated position instead of floating disconnected in the top-right. Hide the Debug Saves button entirely (or put it behind Ctrl+Shift+D). See requirements sections 2.4, 2.5, 2.6.
-- **Verification**: On the hub, both the weather panel and reputation indicator should be fully visible without overlapping. Debug Saves button should not be visible. Settings and Construction should be accessible but not floating disconnected.
+- **Description**: Fix event listener accumulation in `src/ui/help.js`, `src/ui/settings.js`, `src/ui/debugSaves.js`, and `src/ui/topbar.js`. Create a lightweight listener tracking helper that modules can use to register listeners and clean them up on panel close/teardown. Apply it to the four affected modules. See requirements Section 2.1.
+- **Verification**: Run `npm run test:unit` — all tests pass. Then run `npx playwright test e2e/help.spec.js e2e/hub-navigation.spec.js` to verify help and hub panel interactions still work.
 
-### TASK-008: Hide hub elements during flight
+### TASK-007: Fix style element accumulation across game sessions
 - **Status**: done
 - **Dependencies**: none
-- **Description**: During flight, the hub building labels (Launch Pad, VAB, MCC, etc.), weather panel, reputation widget, and hub action buttons (Debug Saves, Settings, Construction) are all visible behind the flight view. When entering flight mode, fully hide the hub overlay DOM elements. When returning to the hub, re-show them. Also hide the weather panel during ORBIT phase (weather is irrelevant in space). See requirements sections 3.1, 3.2, 3.3.
-- **Verification**: Launch a flight — no hub building labels, weather panel, or hub buttons should be visible at any altitude (ground, atmosphere, orbit, map view).
+- **Description**: Multiple UI modules inject `<style>` elements into `document.head` on initialization but never remove them. Implement idempotent style injection — check for an existing style element (by ID or data attribute) before injecting, and reuse it if present. Apply across all UI modules that inject styles. See requirements Section 2.2.
+- **Verification**: Run `npm run test:unit` — all tests pass. Then run `npx playwright test e2e/smoke.spec.js` as a basic sanity check that the game still starts and renders.
 
-### TASK-009: Fix PART_DESTROYED raw enum in flight log
+### TASK-008: Add tutorial mission blocking indicators
 - **Status**: done
 - **Dependencies**: none
-- **Description**: When parts are destroyed on crash, the flight log shows "PART_DESTROYED" instead of human-readable messages. Find where crash events are logged and replace the raw enum with the part name: "Probe Core Mk1 destroyed", "Small Tank destroyed", etc. See requirements section 3.5.
-- **Verification**: Crash a rocket — the flight log and Rocket Destroyed screen should show specific part names, not "PART_DESTROYED".
+- **Description**: In Tutorial mode, missions that are prerequisites for other uncompleted tutorial missions should display a visual indicator (e.g., "Unlocks next step" label or chain icon). This should be data-driven: check whether the mission's completion is in the dependency chain of any other uncompleted tutorial mission. Non-blocking tutorial missions should NOT get the indicator. Only applies in Tutorial mode — Freeplay and Sandbox are unaffected. See requirements Section 3.1.
+- **Verification**: Run `npm run test:unit` — all tests pass. Then run `npx playwright test e2e/missions.spec.js e2e/mission-progression.spec.js` to verify mission UI still works and blocking indicators appear correctly in tutorial mode.
 
-### TASK-010: Format altitude in flight log entries
+### TASK-009: Standardise weather display format between hub and Launch Pad
 - **Status**: done
 - **Dependencies**: none
-- **Description**: Flight log entries show raw meters for high altitudes: "Entered low orbit biome at 150000 m." Format altitudes >= 1000m as km: "Entered low orbit biome at 150 km." See requirements section 3.7.
-- **Verification**: Fly to orbit — biome transition log entries should show "km" for altitudes above 1000m.
+- **Description**: The hub shows weather in a full panel with header/title; the Launch Pad shows a compact inline bar. Standardise both to use the compact format since weather is supplementary information. See requirements Section 3.2.
+- **Verification**: Run `npm run test:unit` — all tests pass. Then run `npx playwright test e2e/launchpad.spec.js` to verify Launch Pad UI still works correctly.
 
-### TASK-011: Standardise back button text across all screens
+### TASK-010: Implement PixiJS object pooling for flight renderer
+- **Status**: done
+- **Dependencies**: none
+- **Description**: Create a simple array-based object pool for `PIXI.Graphics` and `PIXI.Text` objects. Integrate it into `src/render/flight/_trails.js`, `_debris.js`, `_rocket.js`, `_sky.js`, and `_ground.js` — replace per-frame `new PIXI.Graphics()` / `new PIXI.Text()` calls with pool acquire/release. Reset graphics state on reuse. See requirements Section 4.1.
+- **Verification**: Run `npm run test:unit` — all tests pass. Then run `npx playwright test e2e/flight.spec.js` to verify flight rendering still works. No visual regressions.
+
+### TASK-011: Optimize hit testing in _rocket.js
+- **Status**: done
+- **Dependencies**: none
+- **Description**: `hitTestFlightPart()` in `src/render/flight/_rocket.js` iterates all parts on every mouse move (O(n)). Add bounding-box pre-filtering or spatial indexing to reduce the number of detailed hit tests for rockets with many parts. See requirements Section 4.2.
+- **Verification**: Run `npm run test:unit` — all tests pass. Then run `npx playwright test e2e/flight.spec.js` to verify part hover/click behavior during flight still works.
+
+### TASK-012: Convert mission/contract Array.find lookups to Map
+- **Status**: done
+- **Dependencies**: none
+- **Description**: Mission and contract lookups in `src/data/missions.js` and `src/data/contracts.js` (and any core modules that look up by ID) use `Array.find()` O(n). Build `Map` objects keyed by ID at module load time and export them alongside the arrays. Update all lookup sites to use the maps. See requirements Section 4.3.
+- **Verification**: Run `npm run test:unit` — all tests pass. Grep for `.find(` in mission/contract lookup paths and verify they've been replaced. No E2E needed — data layer only, unit tests cover mission/contract logic.
+
+### TASK-013: Add unit tests for flightReturn.js
+- **Status**: done
+- **Dependencies**: none
+- **Description**: Create `src/tests/flightReturn.test.js` with comprehensive tests for mission completion, objective validation, contract rewards, crew recovery, part recovery, and financial transactions. This is the highest-priority untested module. See requirements Section 5.1.
+- **Verification**: Run `npx vitest run src/tests/flightReturn.test.js` — all tests pass. Coverage of `flightReturn.js` should be ≥80% lines/branches.
+
+### TASK-014: Add unit tests for sciencemodule.js
+- **Status**: done
+- **Dependencies**: none
+- **Description**: Create `src/tests/sciencemodule.test.js` covering science module activation, data collection, yield calculation, and edge cases. See requirements Section 5.1.
+- **Verification**: Run `npx vitest run src/tests/sciencemodule.test.js` — all tests pass.
+
+### TASK-015: Add unit tests for customChallenges.js
+- **Status**: done
+- **Dependencies**: none
+- **Description**: Create `src/tests/customChallenges.test.js` covering challenge creation, validation, completion detection, and edge cases. See requirements Section 5.1.
+- **Verification**: Run `npx vitest run src/tests/customChallenges.test.js` — all tests pass.
+
+### TASK-016: Add unit tests for designLibrary.js
 - **Status**: done
 - **Dependencies**: TASK-001
-- **Description**: Normalise all back-navigation buttons to use "← Hub" for facility screens. Currently Tracking Station, Satellite Ops, and Library use "Back"; Settings and Construction use "← Back to Hub". Change all to "← Hub" for consistency. Help can keep "← Close Help". See requirements section 5.1.
-- **Verification**: Visit every facility screen — all should show "← Hub" as the back button.
+- **Description**: Create `src/tests/designLibrary.test.js` covering design persistence, JSON import/export, cross-save sharing, and the improved error handling from TASK-001. Must be done after TASK-001 so tests cover the updated code. See requirements Section 5.1.
+- **Verification**: Run `npx vitest run src/tests/designLibrary.test.js` — all tests pass.
 
-### TASK-012: Standardise facility header format
+### TASK-017: Add unit tests for parachute.js deployment triggers
 - **Status**: done
 - **Dependencies**: none
-- **Description**: Each facility displays its tier differently. MCC uses inline "— Tier 1 (Basic)"; Tracking Station uses a separate badge; Satellite Ops uses a badge; Crew Admin sometimes shows no tier; Launch Pad puts it on the right. Standardise to: `[Facility Name] — Tier X (Tier Label)` inline in the H1, matching the MCC pattern. See requirements section 5.2.
-- **Verification**: Visit each facility — all should show tier in the same format.
+- **Description**: Add tests to an existing or new test file covering parachute deployment trigger logic — when parachutes activate, altitude/speed conditions, and edge cases. Currently only descent/landing physics are tested. See requirements Section 5.1.
+- **Verification**: Run the parachute test file — all tests pass, including new deployment trigger tests.
 
-### TASK-013: Create CSS design tokens and standardise styles
+### TASK-018: Add programmatic time warp API for E2E tests
 - **Status**: done
 - **Dependencies**: none
-- **Description**: Create a `src/ui/design-tokens.js` (or CSS custom properties file) defining the shared design system: color palette, spacing scale, typography scale, border-radius values (4px/6px/8px), z-index layers, and button variants. Then progressively migrate the most visible inconsistencies — button backgrounds, panel backgrounds, border-radius, font sizes, and modal padding — to use the shared tokens. Focus on the hub, MCC, Crew Admin, VAB toolbar, and flight HUD first. See requirements section 6.
-- **Verification**: Visual inspection of hub, MCC, Crew Admin, VAB, and flight HUD — buttons should use consistent colors, panels should have consistent backgrounds, border-radius should be uniform for same-type elements.
+- **Description**: Expose a testing-only API (e.g., `window.__testSetTimeWarp(speedMultiplier)`) that lets E2E tests set arbitrary simulation speeds not limited to the player-facing time warp increments. This is needed by TASK-019 and TASK-020 for running physics through transitions at high speed. See requirements Section 5.2.1.
+- **Verification**: Write a small E2E test (in `e2e/test-infrastructure.spec.js` or a new spec) that sets time warp to 100x, verifies simulation time advances faster than real time, then resets to 1x. Run `npx playwright test e2e/test-infrastructure.spec.js` — passes.
 
-### TASK-014: Fix overlay bleed-through on Settings, Construction, Help, Design Library
+### TASK-019: Upgrade E2E teleport helper to set velocity
+- **Status**: done
+- **Dependencies**: TASK-018
+- **Description**: Upgrade the teleport helpers across all 7 spec files that use them. The new helper should set position (posX, posY) AND velocity (velX, velY) plus basic flags (grounded, landed, crashed, throttle), but should NOT manually set phase or orbital elements — let the physics simulation compute those from position/velocity. Replace the current helpers that manually set `fs.phase`, `fs.orbitalElements`, and fake phase log entries. See requirements Section 5.2.2.
+- **Verification**: Run the spec files that use teleport: `npx playwright test e2e/core-mechanics.spec.js e2e/orbital-operations.spec.js e2e/destinations.spec.js e2e/additional-systems.spec.js e2e/tutorial-revisions.spec.js e2e/mission-progression.spec.js e2e/relaunch.spec.js` — all pass. Grep for manual `fs.phase =` and `fs.orbitalElements =` in teleport helpers and verify they're removed.
+
+### TASK-020: Add E2E phase transition tests
+- **Status**: done
+- **Dependencies**: TASK-018, TASK-019
+- **Description**: Add one dedicated E2E test per unique flight phase transition that runs through real physics. Use teleport+velocity to get near the transition point, then let physics run at high time warp through the actual transition. Transitions to cover: PRELAUNCH→LAUNCH (ignition), LAUNCH→FLIGHT (liftoff), FLIGHT→ORBIT (orbital velocity + checkOrbitStatus), ORBIT→MANOEUVRE (burn initiation), MANOEUVRE→TRANSFER (escape trajectory), reentry (atmospheric interface), landing (parachute + ground contact), crash (impact detection). See requirements Section 5.2.3.
+- **Verification**: Run `npx playwright test e2e/phase-transitions.spec.js` (or whatever the new spec is named) — all tests pass. Each test verifies the phase transition fires through the real physics pipeline, not via direct state mutation.
+
+### TASK-021: Replace waitForTimeout with conditional waits in E2E tests
 - **Status**: done
 - **Dependencies**: none
-- **Description**: The Settings, Construction, Debug Saves, Help, and Design Library panels all allow hub elements to show through behind them. Each overlay needs either a fully opaque background covering the viewport or the underlying hub elements need to be hidden while the overlay is active. See requirements section 6.8.
-- **Verification**: Open Settings from hub — no hub buildings or weather panel should be visible behind it. Repeat for Construction, Help, and VAB Design Library.
+- **Description**: Replace the 76 `waitForTimeout()` calls across 10 E2E spec files with `page.waitForFunction(() => condition)`, `page.waitForSelector()`, or other deterministic waits. The heaviest offender is `additional-systems.spec.js` (19 occurrences). Some waits for animations may remain, but most should be converted. See requirements Section 5.3.
+- **Verification**: Grep for `waitForTimeout` in `e2e/` — count should be reduced to ≤10 (only genuinely necessary animation waits). Run each modified spec file individually to confirm it passes (e.g., `npx playwright test e2e/additional-systems.spec.js`, etc.).
 
-### TASK-015: Fix money color logic
+### TASK-022: Add E2E failure-path tests
+- **Status**: done
+- **Dependencies**: TASK-018, TASK-019
+- **Description**: Add E2E tests for failure scenarios: (1) malfunction during flight — part fails, UI appears, flight log records it; (2) crew KIA on crash — death recorded, fine applied, crew admin reflects loss; (3) contract deadline expiry — penalty applied, contract removed; (4) loan default/bankruptcy — game-over flow triggers. See requirements Section 5.4.
+- **Verification**: Run `npx playwright test e2e/failure-paths.spec.js` (or whatever the new spec is named) — all tests pass.
+
+### TASK-023: Configure Vitest coverage with 80% thresholds
 - **Status**: done
 - **Dependencies**: none
-- **Description**: Money displayed in red/orange even with $2M starting funds (healthy amount). The color should reflect actual financial health: green when funds > reasonable threshold (e.g., > $500k or > next rocket cost), amber when tight (< $100k), red when near bankruptcy (< $20k or can't afford any rocket). See requirements section 7.1.
-- **Verification**: Fresh game with $2M — money should be green. Near Bankruptcy save with $15k — money should be red. Mid-game with healthy funds — money should be green.
+- **Description**: Add `v8` coverage provider to Vitest config. Set 80% thresholds for lines, branches, and functions. Add `npm run test:coverage` script to `package.json`. See requirements Section 5.5.
+- **Verification**: Run `npm run test:coverage` — completes successfully, reports coverage percentages, and enforces 80% thresholds.
 
-### TASK-016: Fix part type enum display in VAB
+### TASK-024: Assess coverage and raise thresholds
+- **Status**: done
+- **Dependencies**: TASK-013, TASK-014, TASK-015, TASK-016, TASK-017, TASK-023
+- **Description**: After all new unit tests are written and coverage is configured, run `npm run test:coverage` to assess actual coverage. Raise thresholds in Vitest config to match or slightly exceed actual coverage, locking in the higher numbers to prevent regression. Document the final thresholds. See requirements Section 5.5.
+- **Verification**: Run `npm run test:coverage` — passes with the raised thresholds. Thresholds are higher than the initial 80% where actual coverage exceeds it.
+
+### TASK-025: Add no-console and async/await error handling ESLint rules
 - **Status**: done
 - **Dependencies**: none
-- **Description**: Part detail panel in VAB shows raw enum names like "COMPUTER_MODULE". Add a display name formatter that converts enums to readable text: COMPUTER_MODULE → "Computer Module", FUEL_TANK → "Fuel Tank", etc. See requirements section 8.1.
-- **Verification**: Click any part in the VAB — the type should show in readable format, not SCREAMING_SNAKE_CASE.
+- **Description**: Add `no-console` rule (error level, with exceptions for `console.warn` and `console.error`) and async/await error handling rules to `eslint.config.js`. Fix any existing violations in production source code (not test files — exclude test directories from `no-console`). See requirements Section 6.1.
+- **Verification**: Run `npm run lint` — no errors. Grep for bare `console.log` in `src/` (excluding tests) — none found. No E2E needed — config and lint fixes only.
 
-### TASK-017: Fix debug saves to populate available missions
+### TASK-026: Add engines field to package.json
 - **Status**: done
 - **Dependencies**: none
-- **Description**: All debug saves have empty `available` and `accepted` mission arrays. After loading a debug save, the mission unlock evaluation must run to populate available missions based on completed missions and their `unlocksAfter` dependency chains. Check the debug save generation code in `src/ui/debugSaves.js` and the mission unlock logic. See requirements section 1.6.
-- **Verification**: Load "Post-Tutorial Basics (Mission 4 Done)" debug save, go to MCC — missions 5, 6, 7, and 18 should be available to accept.
+- **Description**: Add an `engines` field to `package.json` specifying the minimum required Node.js version based on the dependency requirements (TypeScript 6, Vite 6, ESLint 10, Vitest 3). See requirements Section 6.2.
+- **Verification**: Read `package.json` and confirm `engines` field is present with a reasonable Node.js version constraint.
 
-### TASK-018: Add game mode indicator and sandbox weather fix
+### TASK-027: Address all 17 TypeScript TODOs in existing TS files
 - **Status**: done
 - **Dependencies**: none
-- **Description**: Add a subtle game mode indicator on the hub (e.g., small badge near the agency name showing "Tutorial" / "Freeplay" / "Sandbox"). Also fix sandbox mode to hide the weather panel when `sandboxSettings.weatherEnabled` is false. See requirements sections 2.7 and 2.8.
-- **Verification**: Start each game mode — the mode should be visible on the hub. Sandbox should not show weather panel.
+- **Description**: Address the 17 TODO comments in `src/core/constants.ts`, `src/core/gameState.ts`, `src/core/physics.ts`, and `src/core/orbit.ts` that mark places where JS module imports need proper type definitions. Add proper type imports, `.d.ts` declaration files, or JSDoc annotations as appropriate to resolve each TODO. See requirements Section 7.1.
+- **Verification**: Grep for `TODO` in the four TS files — count is 0 (all resolved). Run `npm run typecheck` — no errors.
 
-### TASK-019: Improve post-flight and crash screen UX
+### TASK-028: Verification pass — run all checks
 - **Status**: done
-- **Dependencies**: none
-- **Description**: (a) Ensure the return-results overlay appears after every flight return, showing: period advanced, operating costs deducted, mission rewards earned, parts recovered, crew status. (b) On the crash screen, if mission objectives were completed, show the reward the player will receive alongside the crash costs. (c) Add a warning about crew death risk before the first crewed flight (either in the mission description or a pre-launch dialog). See requirements section 4.
-- **Verification**: Complete a mission and return — a summary overlay should appear showing rewards and costs. Crash with completed objectives — the crash screen should mention the mission reward.
-
-### TASK-020: Style "Flight View"/"Map View" labels as status indicators
-- **Status**: done
-- **Dependencies**: none
-- **Description**: The "Flight View" and "Map View" labels shown during flight look like clickable buttons but are just status indicators. Restyle them as passive text — smaller, no border, no hover effect, perhaps with a subtle icon. See requirements section 3.6.
-- **Verification**: Toggle between flight and map view — the label should look like status text, not a button.
-
-### TASK-021: Fix flight counter and topbar layout consistency
-- **Status**: done
-- **Dependencies**: none
-- **Description**: Fresh games show no flight counter in the topbar; it only appears after the first flight as "Flight 1", causing the topbar layout to shift. Either always show "Flight 0" on fresh games or ensure the topbar layout doesn't jump when the counter appears. See requirements section 5.3.
-- **Verification**: Start a fresh game — the topbar layout should be stable. Complete a flight — the counter should update without layout shift.
-
-### TASK-022: Clear building selection highlight when leaving hub
-- **Status**: done
-- **Dependencies**: none
-- **Description**: Clicking R&D Lab on the hub adds a yellow highlight border that persists into flight mode (visible behind the flight view). Building selection state must be cleared when navigating away from the hub to any other screen. See requirements section 3.8.
-- **Verification**: Click R&D Lab on hub, then launch a flight — no yellow highlight should be visible.
-
-### TASK-023: Fix achievements count and library records data
-- **Status**: done
-- **Dependencies**: none
-- **Description**: Library shows "Achievements: 3/12" but the Achievements tab shows only 10 milestones — the denominator should match actual defined achievements. Also investigate why Library records (Peak Altitude, Peak Speed, Heaviest Rocket, Longest Flight) show "None" in the Late Game debug save despite 30 successful flights. See requirements section 9.
-- **Verification**: Check Library stats — achievement denominator should match actual achievement count. Late Game save should show non-"None" records.
-
-### TASK-024: Verification pass — complete tutorial playthrough via Playwright MCP
-- **Status**: done
-- **Dependencies**: TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-007, TASK-008, TASK-009, TASK-010, TASK-011, TASK-012, TASK-013, TASK-014, TASK-015, TASK-016, TASK-017, TASK-018, TASK-019, TASK-020, TASK-021, TASK-022, TASK-023
-- **Description**: Using Playwright MCP against http://localhost:5173/, perform a complete tutorial playthrough from fresh start verifying all fixes. Check: (1) welcome message appears, (2) only 3 buildings visible initially, (3) only starter parts in VAB, (4) mission-001 completable, (5) missions unlock correctly through the chain, (6) facility unlock notifications appear when accepting mission-018/019/020/022, (7) new buildings appear on hub after unlock, (8) new parts appear in VAB after unlock, (9) flight view has no hub bleed-through or weather in space, (10) back navigation works from all facilities, (11) R&D Lab/tech tree accessible, (12) save/load works, (13) post-flight summaries appear, (14) consistent styling throughout. Fix any issues found. See requirements section 10.
-- **Verification**: A complete clean tutorial playthrough succeeds with no UX issues — all 12 verification criteria from requirements section 10 pass.
+- **Dependencies**: TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-007, TASK-008, TASK-009, TASK-010, TASK-011, TASK-012, TASK-013, TASK-014, TASK-015, TASK-016, TASK-017, TASK-018, TASK-019, TASK-020, TASK-021, TASK-022, TASK-023, TASK-024, TASK-025, TASK-026, TASK-027
+- **Description**: Run the full verification suite: `npm run typecheck`, `npm run lint`, `npm run test:unit`, `npm run test:e2e`, and `npm run test:coverage`. All must pass with no errors. See requirements Section 9.
+- **Verification**: All five commands pass cleanly. Coverage meets or exceeds raised thresholds from TASK-024.

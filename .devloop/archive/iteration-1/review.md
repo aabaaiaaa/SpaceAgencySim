@@ -1,344 +1,229 @@
-# SpaceAgencySim — Final Code Review
+# Iteration 2 Code Review Report
 
-**Date:** 2 April 2026
-**Scope:** Full codebase review — 66,000 lines of source code, 52,000 lines of tests
-**Branch:** master (commit 1007175)
-
----
-
-## Executive Summary
-
-SpaceAgencySim is a well-architected browser-based space agency management game built with Vite, PixiJS, and vanilla ES modules. The codebase spans ~66,000 lines of source across three cleanly separated layers (core/render/UI) with comprehensive test coverage (2,271 unit tests across 52 files, 31 E2E spec files). All 2,271 unit tests pass.
-
-The most recent iteration (24 tasks) focused on UX polish — fixing navigation bugs, standardising CSS, adding welcome flows, and eliminating visual bleed-through during flight. All tasks are marked done.
-
-**Overall Assessment:** The project is in solid shape for a simulation game of this complexity. The main areas requiring attention before production readiness are: (1) localStorage quota handling, (2) event listener lifecycle management in UI modules, (3) PixiJS object pooling for long flight sessions, and (4) coverage gaps in a handful of critical core modules.
+**Date:** 2026-04-02
+**Scope:** Code quality, resilience, test coverage, and UX improvements (Iteration 2)
+**Codebase:** ~66,500 lines of source across 150+ files
+**Test Suite:** 2,550 unit tests, 608 E2E tests across 33 specs
 
 ---
 
-## 1. Requirements vs Implementation
+## Requirements vs Implementation
 
-### 1.1 Requirements Coverage — UX Polish Iteration
+### All 28 Tasks Completed
 
-The current requirements document (`.devloop/requirements.md`) describes 10 categories of UX issues found during a Playwright audit. All 24 tasks in `tasks.md` are marked **done**.
+All tasks in `tasks.md` are marked `done`. Below is a per-requirement verification with gaps noted.
 
-| Requirement Section | Status | Notes |
-|---|---|---|
-| 1.1 Back button destroys hub (TS/SatOps/Library) | Done (TASK-001) | |
-| 1.2 R&D Lab inaccessible | Done (TASK-002) | `rdLab.js` created, navigation handler added |
-| 1.3 All buildings visible in tutorial mode | Done (TASK-003) | Hub now filters by `hasFacility()` |
-| 1.4/1.5 Load Game exits to menu / no load UI | Done (TASK-004) | Modal overlay + main menu load section |
-| 1.6 Debug saves don't populate missions | Done (TASK-017) | Mission unlock logic now runs post-load |
-| 2.1 No welcome message | Done (TASK-005) | Mode-specific welcome modal |
-| 2.2 No facility unlock notifications | Done (TASK-006) | Notification modal on facility-awarding missions |
-| 2.3 Multiple missions unlock without guidance | Partial | Welcome message added but no priority indicators on simultaneous unlocks |
-| 2.4-2.6 Weather/reputation overlap, debug button, floating buttons | Done (TASK-007) | Hub layout reorganised |
-| 2.7-2.8 No game mode indicator, sandbox weather shown | Done (TASK-018) | |
-| 3.1-3.3 Hub elements visible during flight | Done (TASK-008) | Hub overlay hidden in flight |
-| 3.5 PART_DESTROYED raw enum | Done (TASK-009) | |
-| 3.6 Flight/Map labels look like buttons | Done (TASK-020) | Restyled as status indicators |
-| 3.7 Raw altitude in biome transitions | Done (TASK-010) | Formatted to km above 1000m |
-| 3.8 R&D Lab highlight persists into flight | Done (TASK-022) | Selection cleared on hub exit |
-| 4.1-4.3 Post-flight/crash UX | Done (TASK-019) | Return overlay, crash rewards, crew death warning |
-| 5.1-5.4 Navigation consistency | Done (TASK-011, TASK-012, TASK-021) | Back buttons standardised to "← Hub", consistent header format |
-| 6.1-6.8 CSS/styling inconsistencies | Done (TASK-013, TASK-014) | Design tokens created, overlay bleed-through fixed |
-| 7.1 Money color misleading | Done (TASK-015) | Health-based coloring |
-| 8.1 COMPUTER_MODULE raw enum in VAB | Done (TASK-016) | |
-| 9.1-9.2 Achievement count / library records | Done (TASK-023) | |
-| 10 Verification pass | Done (TASK-024) | Playwright playthrough completed |
+| Requirement | Task(s) | Status | Notes |
+|---|---|---|---|
+| 1.1 localStorage quota handling | TASK-001 | Implemented | `saveload.js` and `designLibrary.js` both wrap `setItem` in try-catch for `QuotaExceededError` |
+| 1.2 Silent error swallowing | TASK-001 | Implemented | `console.warn()` added to `designLibrary.js` catch blocks |
+| 1.3 Flight HUD RAF crash recovery | TASK-002 | Implemented | `flightHud.js:1621-1645` has try-catch with consecutive error tracking and abort banner |
+| 1.4 Flight phase transition comment | TASK-003 | Implemented | Comment present at `flightPhase.js:222-230` |
+| 1.5 Timer stacking in debugSaves | TASK-004 | Implemented | `clearTimeout` before new timeout |
+| 2.1 Event listener cleanup | TASK-006 | Implemented | `listenerTracker.js` created and used in help, settings, debugSaves, topbar |
+| 2.2 Style element accumulation | TASK-007 | Implemented | `injectStyleOnce()` in `injectStyle.js` with ID-based dedup |
+| 3.1 Tutorial mission blocking indicators | TASK-008 | Implemented | Data-driven indicators in Tutorial mode only |
+| 3.2 Weather display consistency | TASK-009 | Implemented | Standardised to compact format |
+| 4.1 PixiJS object pooling | TASK-010 | Implemented | `_pool.js` with `acquireGraphics/Text`, used consistently in all 5 flight render modules |
+| 4.2 Hit testing optimisation | TASK-011 | Implemented | Spatial grid with bounding-box pre-filtering in `_rocket.js:478-688` |
+| 4.3 Mission/contract Map lookups | TASK-012 | Implemented | `MISSIONS_BY_ID` and `CONTRACT_TEMPLATES_BY_ID` Maps exported |
+| 5.1 Unit tests for untested modules | TASK-013-017 | Implemented | flightReturn, sciencemodule, customChallenges, designLibrary, parachute-deploy all have test files |
+| 5.2 E2E teleport + time warp overhaul | TASK-018-020 | Implemented | `__testSetTimeWarp` API, velocity-aware teleport, phase-transitions.spec.js |
+| 5.3 Replace waitForTimeout | TASK-021 | Implemented | Zero `waitForTimeout` calls remain in E2E specs |
+| 5.4 E2E failure-path tests | TASK-022 | Implemented | failure-paths.spec.js covers malfunction, crew KIA, contract expiry, bankruptcy |
+| 5.5 Vitest coverage | TASK-023-024 | Implemented | v8 provider, thresholds: 91% lines, 89% functions |
+| 6.1 ESLint rules | TASK-025 | Implemented | `no-console` error (allow warn/error), `no-floating-promises`, `no-misused-promises` |
+| 6.2 Node.js engines field | TASK-026 | Implemented | `"node": ">=20.0.0"` in package.json |
+| 7.1 TypeScript TODOs | TASK-027 | Implemented | Zero TODO/FIXME comments remain in TS files |
+| 9. Verification pass | TASK-028 | Implemented | typecheck, lint, unit, E2E all passing |
 
-**Gaps identified:**
-- **Requirement 2.3** (mission priority hints in tutorial mode when multiple missions unlock) is not fully addressed. The welcome message helps orient new players, but no per-mission priority indicators were added.
-- **Requirement 5.4** (weather display format differs between hub and Launch Pad) is not called out as a separate task. This may have been addressed as part of TASK-007's hub layout work but is not explicitly verified.
+### Gaps and Partial Implementations
 
-### 1.2 Prior Iteration Requirements (69 tasks — all done)
+**1. Branch coverage threshold is 78%, below the stated 80% target (Req 5.5)**
 
-The full game was built in a prior iteration covering Phases 0-7 plus additional systems. All 69 tasks are marked done. The scope is enormous — orbital mechanics, satellite networks, tech trees, crew management, contracts, science, facilities, celestial bodies, docking, power systems, communications, and more.
+`vite.config.js:50` sets `branches: 78`. The requirements state "80% threshold for lines, branches, and functions." Lines (91%) and functions (89%) exceed the target, but branches fall 2 points short. This may have been a deliberate trade-off documented in TASK-024 ("raise thresholds to match or slightly exceed actual coverage"), but it does not meet the original spec.
 
-### 1.3 Scope Creep
+**2. Main flight controller RAF loop has no error handling**
 
-No features were identified that fall outside the requirements. The codebase stays within the documented scope.
+The requirement (1.3) specifies "The flight HUD's requestAnimationFrame loop." This was implemented in `flightHud.js:1621-1645` (the HUD display loop). However, the main flight controller loop in `flightController/_loop.js:58-158` — which calls physics tick, phase evaluation, rendering, and objective checks — has no try-catch at all. If physics throws (NaN propagation, invalid state), the entire game loop silently stops. The HUD loop is a secondary display loop; the primary simulation loop is unprotected.
 
----
+**3. Input validation requirement (Req 8.1) has no dedicated task**
 
-## 2. Code Quality
+Requirement 8.1 specifies player string length validation with "reasonable max-length constraints (e.g., 40-50 characters for names) with visible character counters or truncation." Implementation exists but only via HTML `maxlength` attributes:
+- Agency name: 48 chars (`mainmenu.js`)
+- Crew name: 60 chars (`crewAdmin.js`)
+- Design name: 60 chars (`vab/_designLibrary.js`)
 
-### 2.1 Architecture — Strengths
+No character counters or truncation feedback were added. No dedicated task was created for this requirement.
 
-The three-layer separation is well-maintained:
+### Scope Creep
 
-- **Core** (`src/core/`, 42 modules): Pure game logic, no DOM/canvas. State mutations happen here.
-- **Render** (`src/render/`, 13 modules): PixiJS rendering, read-only access to game state. Render-local state (camera, trails) is properly isolated in `_state.js`.
-- **UI** (`src/ui/`, 33 modules): DOM overlays, event handling. Calls core functions then triggers re-renders.
-- **Data** (`src/data/`, 8 modules): Immutable catalogs. Never mutated at runtime.
-
-Barrel re-exports keep the public API clean while allowing internal module splitting (flightController, vab, missionControl).
-
-### 2.2 Bugs and Logic Errors
-
-**No critical bugs found.** The following are notable concerns:
-
-1. **localStorage quota not handled** (`src/core/saveload.js:205, 502`, `src/core/designLibrary.js:140`)
-   - `localStorage.setItem()` can throw `QuotaExceededError` if the player accumulates many save files or large rocket designs. Currently unhandled — would cause a silent crash with potential data loss.
-   - **Severity:** Medium. Easy to hit on games with extensive design libraries.
-   - **Fix:** Wrap `setItem` calls in try-catch and surface a user-friendly quota warning.
-
-2. **Module-level mutable state for malfunction mode** (`src/core/malfunction.js:57`)
-   - `_malfunctionMode` is stored as a module variable rather than in `gameState`. This is a global setting that affects all flight logic and can't be persisted/restored with save/load.
-   - **Severity:** Low. Works correctly in practice since it's only toggled via settings UI or E2E tests. But architecturally, it should live in `gameState` for consistency with the state mutation pattern.
-
-3. **Flight phase transition sequencing** (`src/core/flightPhase.js:222-255`)
-   - The MANOEUVRE exit handler checks for escape trajectory first, transitions through ORBIT to TRANSFER, and returns early (line 252). The normal manoeuvre exit is checked second (line 258). The early return prevents double-mutation, so this is **correct but fragile** — a future change that removes the early return would introduce a bug. A comment explaining the ordering dependency would help.
-
-4. **Silent JSON.parse error swallowing** (`src/core/designLibrary.js:125-132`)
-   - Corrupt design library data silently returns `[]` with no logging. This hides data corruption from the developer.
-   - **Severity:** Low. `saveload.js` handles this better by throwing on corrupt data.
-
-### 2.3 XSS and Input Sanitization
-
-**Mostly well-handled.** Key findings:
-
-- `src/ui/mainmenu.js` uses `_escapeHtml()` for user-supplied strings (agency name, save name) before innerHTML interpolation (line 872). This is the correct approach.
-- `src/ui/library.js` and `src/ui/crewAdmin.js` use `textContent` for user-generated crew/rocket names — safe against XSS.
-- **38 innerHTML template literal assignments** exist across 11 UI files, but grep analysis shows all interpolated values are either escaped, numeric, or from trusted internal data (enum labels, formatted numbers, mission names from static data).
-- **No unescaped user input in innerHTML** was found. The codebase handles this correctly.
-
-**Remaining concern:** Player-input strings (agency name, crew names, design names) have no length validation. Extremely long names could cause layout issues but not security problems.
-
-### 2.4 Error Handling
-
-- **Save/load:** Properly validates JSON and envelope structure. Throws descriptive errors on corrupt data. Corrupt slots in `listSaves()` are silently treated as empty (acceptable UX choice).
-- **Missing:** No try-catch around `localStorage.setItem` for quota errors (see 2.2.1).
-- **Missing:** No try-catch in the flight HUD's `requestAnimationFrame` loop. If physics state becomes invalid mid-flight, the HUD could crash without recovery.
-- **Crypto fallback:** `crypto.randomUUID()` has a `Math.random()` fallback for environments without crypto. This is fine for a single-player game (IDs don't need to be cryptographically secure).
-
-### 2.5 TypeScript Migration Status
-
-Four core modules are TypeScript: `constants.ts`, `gameState.ts`, `physics.ts`, `orbit.ts`. Strict mode is enabled. The rest of the codebase is JavaScript.
-
-17 TODO comments in the TypeScript files mark future typing work for JS module imports. The Vite plugin `jsToTsResolve` bridges the migration gap cleanly.
+**None detected.** The implementation tightly follows the requirements without adding unrequested features.
 
 ---
 
-## 3. Testing
+## Code Quality
 
-### 3.1 Unit Tests — Strong Foundation
+### Critical Issues
 
-- **52 test files, 2,271 tests, all passing** (34.95s runtime)
-- Test setup (`src/tests/setup.js`) provides a clean in-memory `localStorage` mock.
-- **High-quality test suites:**
-  - `physics.test.js` (197 tests) — comprehensive fixture builders, launch/staging/fuel/drag/landing
-  - `orbit.test.js` (98 tests) — Kepler solver convergence, orbital element computation, anomaly wrapping
-  - `atmosphere.test.js` (92 tests) — heat model, shield protection, leading part selection
-  - `contracts.test.js` — generation, completion, deadlines, cancellation
-  - `crew.test.js` (112 tests) — status transitions, skills, hiring/firing
+**1. Orbital mechanics: synodic period near-zero denominator (`orbit.ts:648`)**
 
-### 3.2 Unit Test Coverage Gaps
+```typescript
+const T_syn = Math.abs(T_craft * T_target / (T_craft - T_target));
+```
 
-**Modules with no unit test file:**
+When `T_craft` and `T_target` are nearly equal but `periodDiff >= 0.01`, the denominator can be very small, producing an extremely large `T_syn`. The hard cap at line 652 (`Math.min(maxSearchTime, 365.25 * 24 * 3600)`) mitigates the Infinity case, but the search could still run for up to a year of simulated time with tiny step sizes, causing a long freeze. The guard at line 642 only handles `periodDiff < 0.01`, leaving a gap where `0.01 <= periodDiff < ~0.1` produces multi-month search durations.
 
-| Module | Risk | Notes |
-|---|---|---|
-| `flightReturn.js` | **High** | Processes mission completion, objective validation, contract rewards, crew recovery — core gameplay logic |
-| `sciencemodule.js` | Medium | Science module activation, data collection, yield calculation |
-| `customChallenges.js` | Medium | Custom challenge creation and validation |
-| `designLibrary.js` | Medium | Rocket design persistence, cross-save sharing |
-| `parachute.js` (deployment) | Medium | Only descent/landing tests exist, not deployment trigger logic |
-| `debugSaves.js` | Low | Test infrastructure; not player-facing |
-| `settings.js` | Low | Simple settings management |
-| `library.js` | Low | Statistics tracking |
-| `testFlightBuilder.js` | Low | Test helper |
+**2. Orbital mechanics: unguarded `sqrt(1 - e*e)` (`orbit.ts:169, 186`)**
 
-**`flightReturn.js` is the most significant gap** — it's the module that processes everything that happens when a flight ends (mission rewards, contract completion, part recovery, crew status updates, financial transactions). This complex logic path is only covered indirectly by E2E tests.
+`meanAnomalyToTrue()` and `trueToEccentricAnomaly()` both compute `Math.sqrt(1 - e * e)` without verifying `e < 1`. The caller `computeOrbitalElements()` rejects unbound orbits at line 243 (`epsilon >= 0 return null`), and line 252 clamps eSquared with `Math.max(0, ...)`. However, these anomaly conversion functions are public exports — any external caller passing `e >= 1` would get NaN propagation. Defensive clamping on the sqrt argument would be safer.
 
-### 3.3 E2E Tests — Good Coverage with Reliability Concerns
+**3. `designLibrary.js:204` assumes `state.savedDesigns` is always an array**
 
-- **31 spec files** covering all game phases plus UX scenarios
-- Well-structured helper infrastructure: fixtures at multiple progression points, save factory, assertion helpers, interaction helpers
-- Progression snapshots (`fixtures.js`) allow E2E tests to start at any game stage without replaying earlier content
+`saveDesignToLibrary()` calls `state.savedDesigns.findIndex(...)` without a null guard. While `createGameState()` in `gameState.ts:733` initialises `savedDesigns: []`, a corrupted save loaded without the migration path (or external state manipulation) could leave it undefined.
 
-**Reliability concerns:**
+### Minor Issues
 
-1. **76 `waitForTimeout()` calls** across 10 E2E spec files — these are arbitrary delays rather than condition-based waits. The heaviest offender is `additional-systems.spec.js` (19 occurrences). This pattern makes tests flaky under load.
-   - **Fix:** Replace with `page.waitForFunction(() => condition)` where possible.
+**4. `flightReturn.js:292` — unsafe `state.crew.find()` access**
 
-2. **Teleport pattern in `core-mechanics.spec.js`** — directly mutates `window.__flightPs` and `window.__flightState` to teleport to orbit, bypassing actual flight physics. This means the orbit entry transition code path is never E2E tested in realistic conditions.
+No null guard on `state.crew` before calling `.find()`. A corrupted or incomplete state object would throw TypeError.
 
-3. **Happy-path bias** — E2E specs focus on successful missions, correct docking, proper satellite deployment. Missing: malfunction during flight, crew KIA recovery flow, contract deadline expiry, loan default/bankruptcy.
+**5. No save format version field (`saveload.js`)**
 
-### 3.4 Test Infrastructure Quality
+Save envelopes contain `saveName`, `timestamp`, and `state` but no schema version. The migration logic at load time (lines 254-300) handles missing fields with `??=` defaults, but a version field would allow explicit migration paths and detect incompatible save formats.
 
-- Vitest configured in `vite.config.js` with `node` environment (appropriate for non-graphics unit tests)
-- **Missing:** No code coverage configuration, no coverage thresholds, no `test:coverage` npm script
-- Playwright targets only Chromium — no Firefox or WebKit
+**6. `dockingTargetGfx` created outside pool (`render/flight/_debris.js:85`)**
+
+A `PIXI.Graphics` object is created directly rather than through the pool system, potentially bypassing cleanup on renderer destroy.
+
+### Good Patterns Observed
+
+- Three-layer architecture (core/render/UI) is consistently respected. No render-layer mutations of game state detected.
+- HTML escaping (`_escapeHtml()`) applied to user-supplied strings before innerHTML insertion.
+- `textContent` used instead of `innerHTML` in most user-facing text assignments.
+- Immutable data catalogs (`Object.freeze()`) in the data layer.
+- Idempotent style injection prevents CSS accumulation.
+- Listener tracker pattern enables clean panel lifecycle management.
 
 ---
 
-## 4. Performance and Resource Management
+## Testing
 
-### 4.1 PixiJS Object Allocation
+### Unit Tests — Excellent
 
-The flight renderer creates new `PIXI.Graphics()` objects every frame in multiple sub-modules:
-- `_trails.js`: plumes (line 216), trails (line 373), RCS plumes (line 436), Mach effects (line 552)
-- `_debris.js`: containers and graphics per debris fragment (lines 40, 47)
-- `_rocket.js`: rocket part graphics (line 450)
-- `_sky.js`: star graphics (line 160)
-- `_ground.js`: biome label text objects (lines 162, 180)
+- **2,550 tests** across 58 test files covering all core modules.
+- Test quality is high: factory functions for fixtures, proper state isolation with `beforeEach`/`afterEach`, edge case coverage (null inputs, validation errors, round-trip serialization).
+- `storageErrors.test.js` specifically tests `QuotaExceededError` with mocked localStorage.
+- `flightReturn.test.js` covers mission completion, objective validation, part recovery, crew recovery, and financial transactions.
 
-Container children are properly cleared each frame before re-adding, so there are no memory leaks. However, the constant create-destroy cycle puts pressure on the garbage collector. For short flights this is fine; for long orbital sessions with time warp, it could cause periodic frame drops during GC pauses.
+### E2E Tests — Excellent
 
-**Recommendation:** Implement graphics object pooling for frequently created rendering elements.
+- **608 tests** across 33 spec files including dedicated `phase-transitions.spec.js` and `failure-paths.spec.js`.
+- Zero `waitForTimeout` calls — all waits are condition-based (`waitForFunction`, `waitForSelector`).
+- Teleport helper properly upgraded to set position + velocity without manually setting phase or orbital elements.
+- Programmatic time warp API enables fast physics-based testing.
 
-### 4.2 Hit Testing
+### Coverage Configuration
 
-`_rocket.js` `hitTestFlightPart()` iterates all parts on every mouse move (O(n)). For rockets with 30+ parts, this could cause perceptible lag.
+- v8 provider configured correctly.
+- Thresholds: **91% lines, 78% branches, 89% functions**.
+- `debugSaves.js` and `library.js` reasonably excluded from coverage.
 
-### 4.3 Data Lookups
+### Untested Areas and Edge Cases
 
-Mission and contract lookups use `Array.find()` (O(n)) in code paths that run per-flight. Building a `Map` by ID at module load would eliminate these repeated scans.
+1. **Main flight controller loop failure modes** — No tests verify what happens when `tick()` throws mid-frame in the controller loop (as opposed to the HUD loop which is protected).
 
----
+2. **Save migration edge cases** — The `loadGame()` migration logic (lines 254-300) handles many edge cases, but there are no unit tests for:
+   - Loading a save with `savedDesigns: null` (vs missing/undefined)
+   - Loading a save where `saveSharedLibrary()` throws during migration (line 283)
+   - Loading a save with invalid `malfunctionMode` values
 
-## 5. UI Module Lifecycle
+3. **Orbital edge cases** — No unit tests for the synodic period calculation when `T_craft ≈ T_target` (the near-zero denominator case).
 
-### 5.1 Event Listener Management
-
-Several UI modules add event listeners without corresponding cleanup:
-
-- **`topbar.js`**: Click handlers on menu items, cash button — stored in arrays but cleanup path not verified for all cases
-- **`help.js`**: Tab click handlers created every time help opens; not removed on close
-- **`settings.js`**: Difficulty option click handlers not removed when panel closes
-- **`debugSaves.js`**: Load button handlers not explicitly removed (relies on `panel.remove()` garbage collection)
-
-In a long-running single-page app (which a game is), accumulated listeners can cause memory pressure and unexpected behavior when stale handlers fire.
-
-### 5.2 Style Element Accumulation
-
-Multiple UI modules inject `<style>` elements into `document.head` on initialization but never remove them during teardown. On repeated game sessions (main menu → game → exit → new game), style elements accumulate. Each cycle adds ~10KB of CSS that persists until page reload.
-
-### 5.3 Timer Management
-
-`debugSaves.js:343` stores a timeout on a DOM element property (`feedbackEl._timer`) but never clears the previous timeout before setting a new one. Rapid debug save loads stack timers.
+4. **Design library with uninitialised `state.savedDesigns`** — No test covers calling `saveDesignToLibrary()` when `state.savedDesigns` is undefined.
 
 ---
 
-## 6. Build and Configuration
+## Security
 
-### 6.1 Dependencies
+**No significant security concerns.** This is a single-player browser game with no server-side component, no authentication, and no network communication beyond loading static assets.
 
-- **Production:** Only `pixi.js@^8.0.0` — appropriate and minimal
-- **Dev dependencies:** All correctly categorised. Using very recent major versions (TypeScript 6, Vite 6, ESLint 10, Vitest 3)
-- **Risk:** These recent major versions may have undiscovered issues. Pin or test thoroughly.
-- **Missing:** No `engines` field in `package.json` to specify required Node.js version
-
-### 6.2 Build Configuration
-
-- No explicit Vite `build` section — relies on defaults
-- No sourcemap configuration for production
-- No code-splitting strategy
-- Custom `jsToTsResolve` plugin works well for migration but adds filesystem lookups at bundle time
-
-### 6.3 ESLint
-
-- Comprehensive correctness rules with separate configs for JS, TS, E2E, and unit tests
-- **Missing:** No `no-console` rule — debug logs won't be caught in production code
-- **Missing:** No async/await error handling rules
-
-### 6.4 Playwright
-
-- Only Chromium tested — missing Firefox and WebKit for a game that uses Canvas/WebGL
-- HTML reporter only — should include console/list reporter for CI visibility
-- Per-test timeout not explicitly set
+- User input (agency names, crew names, design names) is HTML-escaped before DOM insertion via `_escapeHtml()`.
+- No `eval()`, `Function()`, or `new Function()` usage detected.
+- `textContent` used for safe text rendering in most cases.
+- `innerHTML` usage reviewed — all instances use either static templates or escaped/numeric values.
+- `maxlength` attributes on input fields prevent extreme-length inputs.
 
 ---
 
-## 7. Recommendations
+## Recommendations
 
-### 7.1 Pre-Production (High Priority)
+### Must Fix Before Production
 
-1. **Handle localStorage quota errors.** Wrap `localStorage.setItem()` in try-catch in `saveload.js` and `designLibrary.js`. Surface a user-friendly "Storage full" message. This is the most likely production failure mode.
+1. **Add try-catch to the main flight controller loop** (`flightController/_loop.js:58-158`). The HUD loop has error recovery, but the primary simulation loop does not. A physics exception silently kills the game with no recovery path. Wrap the loop body (physics tick through render) in try-catch with a consecutive error counter and abort-to-hub fallback, matching the pattern in `flightHud.js`.
 
-2. **Add unit tests for `flightReturn.js`.** This module processes mission completion, contract rewards, and crew recovery — core gameplay with complex branching logic that currently has no direct test coverage.
+2. **Raise branch coverage threshold to 80%** or document the rationale for accepting 78%. The requirements specify 80% for all three metrics.
 
-3. **Replace `waitForTimeout` with conditional waits in E2E tests.** The 76 arbitrary delays make the test suite flaky. Replace with `page.waitForFunction(() => condition)` for deterministic behavior.
+### Should Fix
 
-4. **Add coverage configuration to Vitest.** Configure `v8` coverage provider with thresholds (suggest 80% line/branch/function) and add `npm run test:coverage` script.
+3. **Add defensive guards to `designLibrary.js:204`** — `if (!Array.isArray(state.savedDesigns)) state.savedDesigns = [];` before accessing `.findIndex()` and `.filter()`.
 
-### 7.2 Quality Improvements (Medium Priority)
+4. **Clamp `sqrt(1 - e*e)` arguments in orbital functions** — Add `Math.max(0, 1 - e * e)` before the square root in `meanAnomalyToTrue()` and `trueToEccentricAnomaly()` to prevent NaN from floating-point eccentricity values slightly exceeding 1.0.
 
-5. **Implement event listener cleanup** in `help.js`, `settings.js`, `debugSaves.js`. Create a helper that tracks listeners and clears them on panel close.
+5. **Cap effective synodic search duration** — In the warp-to-target search (`orbit.ts:648`), add a `Number.isFinite(T_syn)` check and fall back to `Math.max(T_craft, T_target)` if the synodic period is unreasonably large (not just infinite).
 
-6. **Add Firefox and WebKit** to Playwright projects. Canvas rendering and WebGL behavior can differ across browsers.
+6. **Add null guard to `flightReturn.js:292`** — Use `(state.crew ?? []).find(...)` to prevent TypeError on corrupted state.
 
-7. **Add explicit Vite build configuration** — sourcemaps, minification strategy, code-splitting.
+### Nice to Have
 
-8. **Add `no-console` ESLint rule** (or a project-specific logger) to prevent debug output in production.
+7. **Add a save format version field** to the save envelope in `saveload.js`. Current migration works via `??=` defaults, but a version number would enable explicit migration logic for breaking changes.
 
-9. **Add input length validation** for player-supplied strings (agency name, crew names, design names) to prevent layout issues.
+8. **Add character counter feedback** to name input fields (agency, crew, design) per Requirement 8.1. The `maxlength` attributes are set but users get no visual feedback about remaining characters.
 
-### 7.3 Polish (Low Priority)
-
-10. **Move `_malfunctionMode` from module variable to `gameState`** for consistency with the state management pattern and save/load compatibility.
-
-11. **Add `console.warn()` to silent error catches** in `designLibrary.js` JSON parsing.
-
-12. **Add `engines` field to `package.json`** to document Node.js version requirement.
-
-13. **Address the 17 TypeScript TODOs** as the JS→TS migration continues.
+9. **Add unit tests for save migration edge cases** — corrupted `savedDesigns`, failed `saveSharedLibrary()` during migration, invalid `malfunctionMode` enum values.
 
 ---
 
-## 8. Future Considerations
+## Future Considerations
 
-### 8.1 Features and Improvements
+### Features and Improvements
 
-- **Multiplayer/sharing:** The design library's cross-save JSON export/import is a natural foundation for sharing rocket designs online. A community sharing feature could be a compelling addition.
-- **Accessibility:** No keyboard navigation or screen reader support exists. The Canvas+DOM architecture makes this achievable but would require significant work in the UI layer.
-- **Mobile/touch support:** The game uses mouse/keyboard exclusively. Touch support would open up tablet play but would require rethinking the flight controls and VAB interaction model.
-- **Modding support:** The data-driven architecture (parts, bodies, missions, instruments all defined in `src/data/`) is well-suited for modding. An external data loading system could enable community content.
-- **Performance monitoring:** No runtime performance metrics are collected. Adding a simple FPS counter and memory tracking would help identify performance regressions.
+1. **Accessibility** — No ARIA attributes, keyboard navigation, or screen reader support detected in the UI layer. As the game matures, adding basic accessibility (focus management, ARIA labels on interactive elements, keyboard-navigable menus) would broaden the player base.
 
-### 8.2 Architectural Considerations
+2. **Undo/redo in VAB** — The Vehicle Assembly Building has no undo capability. For complex rocket designs, this is a significant UX gap.
 
-- **TypeScript migration:** Only 4 of 42 core modules are TypeScript. The strict-mode TypeScript files (`physics.ts`, `orbit.ts`) benefit significantly from type safety in complex numerical code. Prioritise converting `flightReturn.js`, `contracts.js`, and `missions.js` next — these have complex state manipulation that would benefit most from type checking.
-- **State management scale:** The central `gameState` object works well now but will become unwieldy if more systems are added. Consider an event/message bus for decoupled communication between subsystems if the game grows significantly.
-- **Render layer object pooling:** The per-frame Graphics allocation pattern works but won't scale to complex scenes (space stations, large debris fields). Implementing a simple object pool for PIXI.Graphics and PIXI.Text would improve GC behavior significantly.
-- **CSS-in-JS approach:** Design tokens are defined in JavaScript (`design-tokens.js`) and injected as CSS custom properties. This works but means styles are duplicated between JS and CSS. As the UI grows, consider a build-time CSS generation step or moving to CSS modules.
+3. **Performance monitoring** — The object pooling and spatial grid optimisations are well-implemented, but there's no runtime performance monitoring. A lightweight FPS counter or frame-time tracker (debug-mode only) would help identify regressions.
 
-### 8.3 Technical Debt
+4. **Automated save backups** — With localStorage as the only persistence layer, a single corruption event loses all progress. Consider periodic backup to IndexedDB or offering a file-based export on every save.
 
-| Item | Location | Impact |
-|---|---|---|
-| 17 TypeScript TODOs | `gameState.ts`, `physics.ts` | Blocks full type safety across module boundaries |
-| 76 `waitForTimeout` calls in E2E | 10 spec files | Flaky CI, non-deterministic test results |
-| No coverage configuration | `vite.config.js` | Coverage regressions go undetected |
-| Style element accumulation | Multiple UI modules | Memory growth across game sessions |
-| Per-frame PixiJS allocations | `_trails.js`, `_debris.js`, `_rocket.js` | GC pressure on long flights |
-| Module-level malfunction mode | `malfunction.js:57` | Inconsistent with gameState pattern |
-| Single-browser E2E | `playwright.config.js` | Missing cross-browser validation |
-| Missing `flightReturn.js` tests | `src/tests/` | Core gameplay logic untested directly |
+### Architectural Decisions to Revisit
+
+1. **localStorage as sole persistence** — localStorage has a ~5-10MB quota depending on browser. With extensive saves, design libraries, and potentially large state objects, this will eventually hit limits. IndexedDB offers much higher quotas and structured storage. The `QuotaExceededError` handling added in this iteration is a good stopgap, but migration to IndexedDB should be planned.
+
+2. **Gradual TypeScript migration** — Only 4 of ~50 core/data modules are TypeScript. The `jsToTsResolve` Vite plugin enables incremental migration, and the TypeScript config is well-set-up. Prioritise converting `flightPhase.js`, `flightReturn.js`, and `missions.js` next — these are the most complex modules with the most cross-module interaction.
+
+3. **Render layer coupling** — The render layer reads game state directly (by reference) rather than receiving serialised snapshots. This works for a single-threaded game but would block future optimisations like Web Worker-based physics. Consider introducing a state snapshot interface between core and render.
+
+4. **CSS-in-JS vs stylesheet** — All CSS is injected via JavaScript template literals in UI modules. The `design-tokens.js` system provides consistency, but the approach means CSS isn't cacheable, isn't inspectable in devtools source maps, and adds ~10KB of JS per module. As the project grows, migrating to actual `.css` files with CSS custom properties (matching the token values) would improve debuggability and load performance.
+
+### Technical Debt
+
+1. **Mixed JS/TS codebase** — The 4 TypeScript files are clean, but the remaining ~46 core/data modules rely on JSDoc for type safety. JSDoc types are less rigorous than TypeScript interfaces and harder to refactor. Each module converted to TypeScript reduces the risk of type-related bugs.
+
+2. **Inline styles in error/modal UI** — `flightHud.js:1656-1658`, `_showErrorBanner()`, and similar runtime UI elements use inline `style.cssText` strings rather than the design token system. These should use the established CSS class patterns.
+
+3. **No structured logging** — Error handling uses `console.warn()` and `console.error()` with ad-hoc message formats. A lightweight structured logger (even just a wrapper that adds timestamps and categories) would make debugging production issues easier.
+
+4. **E2E test helpers have grown complex** — `_interactions.js` is 415 lines with teleport, time warp, flight control, and state seeding functions. Consider splitting into focused helper modules (e.g., `_flight.js`, `_state.js`, `_timewarp.js`).
 
 ---
 
-## 9. Summary Statistics
+## Summary
 
-| Metric | Value |
-|---|---|
-| Source lines (core/render/UI/data) | ~66,000 |
-| Test lines (unit + E2E) | ~52,000 |
-| Unit test files | 52 |
-| Unit tests | 2,271 (all passing) |
-| E2E spec files | 31 |
-| Core modules | 42 |
-| UI modules | 33 |
-| Render modules | 13 |
-| Data modules | 8 |
-| TypeScript modules | 4 (strict mode) |
-| Production dependencies | 1 (pixi.js) |
-| Dev dependencies | 9 |
-| Requirements tasks (iteration 1) | 69 (all done) |
-| Requirements tasks (iteration 2 — UX polish) | 24 (all done) |
-| Critical bugs found | 0 |
-| High-priority recommendations | 4 |
-| Medium-priority recommendations | 5 |
-| Low-priority recommendations | 4 |
+The Iteration 2 work is **well-executed**. All 28 tasks are complete, the error handling and resilience improvements are solid, the object pooling and performance optimisations are consistently applied, and the test suite is comprehensive with excellent practices (no brittle timeouts, condition-based waits, proper fixtures).
+
+The two items that should be addressed before considering this production-ready are:
+1. Adding error handling to the main flight controller RAF loop (the primary simulation loop is unprotected)
+2. Resolving the branch coverage threshold gap (78% vs 80% requirement)
+
+Everything else is either a defensive hardening measure or a future improvement.
