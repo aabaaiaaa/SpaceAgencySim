@@ -23,6 +23,7 @@ import { CELESTIAL_BODIES, isLandable } from './data/bodies.js';
 import { getPartById } from './data/parts.js';
 import { autoSaveImmediate } from './ui/autoSaveToast.js';
 import { isAutoSaveEnabled, AUTO_SAVE_KEY } from './core/autoSave.js';
+import { logger } from './core/logger.js';
 
 // E2E test API options for programmatic flight launches.
 interface E2eFlightOpts {
@@ -59,6 +60,7 @@ declare global {
 }
 
 async function main() {
+  logger.debug('app', 'Game starting');
   const canvas    = document.getElementById('game-canvas') as HTMLCanvasElement;
   const uiOverlay = document.getElementById('ui-overlay')!;
 
@@ -218,5 +220,5 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error('[SpaceAgencySim] Fatal startup error:', err);
+  logger.error('app', 'Fatal startup error', { error: String(err) });
 });

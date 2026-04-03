@@ -12,6 +12,7 @@
  */
 
 import { getPartById } from '../data/parts.js';
+import { logger } from './logger.js';
 import {
   createRocketAssembly,
   addPartToAssembly,
@@ -55,7 +56,7 @@ export function buildTestRocket(partIds: string[]): TestRocketResult {
   for (const partId of partIds) {
     const def = getPartById(partId);
     if (!def) {
-      console.warn(`[testFlightBuilder] Unknown part ID: ${partId}`);
+      logger.warn('testFlightBuilder', 'Unknown part ID', { partId });
       continue;
     }
 

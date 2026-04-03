@@ -33,6 +33,7 @@ import { getPartById } from '../data/parts.js';
 import { syncVabToGameState } from '../ui/vab.js';
 import { openHelpPanel } from './help.js';
 import { createListenerTracker } from './listenerTracker.js';
+import { logger } from '../core/logger.js';
 import './topbar.css';
 import type { GameState } from '../core/gameState.js';
 import type { ListenerTracker } from './listenerTracker.js';
@@ -1062,7 +1063,7 @@ function _confirmAndLoad(slotIndex: number, loadBackdrop: HTMLElement): void {
         _onLoadGame(loadedState);
       }
     } catch (err: unknown) {
-      console.error('[TopBar] Load failed:', err);
+      logger.error('topbar', 'Load failed', { error: String(err) });
     }
   });
 

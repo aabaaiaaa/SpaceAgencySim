@@ -9,6 +9,7 @@ import { acceptContract, cancelContract, getContractCaps, getActiveConflicts, ge
 import { CONTRACT_CATEGORY_ICONS, MCC_TIER_FEATURES, getReputationTier } from '../../core/constants.js';
 import { getMCState } from './_state.js';
 import { fmtCash, getContent } from './_shell.js';
+import { logger } from '../../core/logger.js';
 
 /**
  * Extended contract shape that includes bonus objectives, bonus reward,
@@ -278,7 +279,7 @@ function _handleAcceptContract(contractId: string): void {
   if (result.success) {
     renderContractsBoardTab();
   } else {
-    console.warn('[Mission Control UI] acceptContract failed:', result.error);
+    logger.warn('missionControl', 'acceptContract failed', { error: result.error });
   }
 }
 
@@ -482,6 +483,6 @@ function _handleCancelContract(contractId: string): void {
   if (result.success) {
     renderActiveContractsTab();
   } else {
-    console.warn('[Mission Control UI] cancelContract failed:', result.error);
+    logger.warn('missionControl', 'cancelContract failed', { error: result.error });
   }
 }

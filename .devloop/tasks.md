@@ -157,7 +157,7 @@
 - **Verification**: `npm run test:e2e` passes. Grep for `style.cssText` in `src/ui/` returns zero results (or only in cases where truly dynamic per-instance styles are needed).
 
 ### TASK-026: Implement structured logger
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Create `src/core/logger.ts` with log levels (debug, info, warn, error), categories, timestamps, and optional data objects. Output to console.log/warn/error. Configurable minimum level (warn in production, debug in dev). Replace existing console.warn/error calls in error handling paths (saveload, designLibrary, flightHud — whether .js or .ts at time of execution) with logger calls. Add logger.debug at key lifecycle points. See requirements Section 4.3.
 - **Verification**: `npm run typecheck` passes. `npm run test:unit` passes. `npm run lint` passes. Grep for bare `console.warn` and `console.error` in `src/core/` and `src/ui/` returns only the logger module itself.

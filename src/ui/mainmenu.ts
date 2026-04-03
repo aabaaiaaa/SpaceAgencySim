@@ -34,6 +34,7 @@ import { initializeMissions, reconcileParts } from '../core/missions.js';
 import { GameMode, FACILITY_DEFINITIONS, SANDBOX_STARTING_MONEY } from '../core/constants.js';
 import { getAllParts } from '../data/parts.js';
 import { TECH_NODES } from '../data/techtree.js';
+import { logger } from '../core/logger.js';
 import './mainmenu.css';
 import type { GameState, SandboxSettings } from '../core/gameState.js';
 import type { SaveSlotSummary } from '../core/saveload.js';
@@ -559,7 +560,7 @@ function _handleLoad(slotIndex: number): void {
     reconcileParts(state);
     _beginGame(state);
   } catch (err: unknown) {
-    console.error('[MainMenu] Load failed:', err);
+    logger.error('mainMenu', 'Load failed', { error: String(err) });
     _showGlobalError(`Failed to load save: ${(err as Error).message}`);
   }
 }
@@ -571,7 +572,7 @@ function _handleExport(slotIndex: number): void {
   try {
     exportSave(slotIndex);
   } catch (err: unknown) {
-    console.error('[MainMenu] Export failed:', err);
+    logger.error('mainMenu', 'Export failed', { error: String(err) });
     _showGlobalError(`Export failed: ${(err as Error).message}`);
   }
 }
@@ -596,7 +597,7 @@ function _handleDeleteConfirm(slotIndex: number, saveName: string): void {
           _switchScreen('newgame', false);
         }
       } catch (err: unknown) {
-        console.error('[MainMenu] Delete failed:', err);
+        logger.error('mainMenu', 'Delete failed', { error: String(err) });
         _showGlobalError(`Delete failed: ${(err as Error).message}`);
       }
     }
@@ -683,7 +684,7 @@ function _wireImportButton(screen: HTMLElement): void {
         // Refresh the load screen to show the imported save.
         _switchScreen('load', false);
       } catch (err: unknown) {
-        console.error('[MainMenu] Import failed:', err);
+        logger.error('mainMenu', 'Import failed', { error: String(err) });
         _showGlobalError(`Import failed: ${(err as Error).message}`);
       }
     };

@@ -13,6 +13,7 @@ import { GameMode } from '../../core/constants.js';
 import { refreshTopBarMissions } from '../topbar.js';
 import { getMCState } from './_state.js';
 import { fmtCash, fmtDate, buildRewardsEl, isTutorialPhase, getContent } from './_shell.js';
+import { logger } from '../../core/logger.js';
 
 /**
  * Shape of a mission instance stored in game state.
@@ -184,7 +185,7 @@ function _handleAccept(missionId: string): void {
       _showUnlockNotification(result.awardedFacility ?? null, result.unlockedParts ?? []);
     }
   } else {
-    console.warn('[Mission Control UI] acceptMission failed:', result.error);
+    logger.warn('missionControl', 'acceptMission failed', { error: result.error });
   }
 }
 

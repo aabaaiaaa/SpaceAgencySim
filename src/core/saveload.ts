@@ -15,6 +15,7 @@
 
 import { CrewStatus, FACILITY_DEFINITIONS, GameMode, DEFAULT_DIFFICULTY_SETTINGS } from './constants.js';
 import { loadSharedLibrary, saveSharedLibrary } from './designLibrary.js';
+import { logger } from './logger.js';
 import { idbSet, idbGet, idbDelete, isIdbAvailable } from './idbStorage.js';
 
 import type { GameState } from './gameState.js';
@@ -190,6 +191,7 @@ function summaryFromEnvelope(slotIndex: number, envelope: SaveEnvelope): SaveSlo
  * @throws {RangeError} If slotIndex is out of bounds.
  */
 export function saveGame(state: GameState, slotIndex: number, saveName: string = 'New Save'): SaveSlotSummary {
+  logger.debug('save', 'Saving game', { slotIndex, saveName });
   assertValidSlot(slotIndex);
 
   // Accumulate elapsed session time before serialising so the stored value
@@ -244,6 +246,7 @@ export function saveGame(state: GameState, slotIndex: number, saveName: string =
  * @throws {Error}      If the slot is empty or the stored data is corrupt.
  */
 export function loadGame(slotIndex: number): GameState {
+  logger.debug('save', 'Loading game', { slotIndex });
   assertValidSlot(slotIndex);
 
   const raw = localStorage.getItem(slotKey(slotIndex));
@@ -267,10 +270,7 @@ export function loadGame(slotIndex: number): GameState {
   const saveVersion = typeof envelope.version === 'number' ? envelope.version : 0;
 
   if (saveVersion > SAVE_VERSION) {
-    console.warn(
-      `Save slot ${slotIndex} was created by a newer version (v${saveVersion}, ` +
-      `current is v${SAVE_VERSION}). It may not load correctly.`
-    );
+    logger.warn('save', `Save slot ${slotIndex} was created by a newer version`, { saveVersion, currentVersion: SAVE_VERSION });
   }
 
   // Reset the timer so play time accumulated before this load is not

@@ -1038,7 +1038,7 @@ describe('Save migration edge cases', () => {
 
     // A warning should have been logged about the newer version.
     expect(warnSpy).toHaveBeenCalledTimes(1);
-    expect(warnSpy.mock.calls[0][0]).toContain(`v${SAVE_VERSION + 10}`);
+    expect(warnSpy.mock.calls[0][0]).toContain(`"saveVersion":${SAVE_VERSION + 10}`);
     expect(warnSpy.mock.calls[0][0]).toMatch(/newer version/i);
 
     warnSpy.mockRestore();

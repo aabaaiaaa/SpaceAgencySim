@@ -18,6 +18,7 @@ import { PartType } from '../../core/constants.js';
 import { getPartById } from '../../data/parts.js';
 import { getFCState } from './_state.js';
 import { recordFrame } from '../fpsMonitor.js';
+import { logger } from '../../core/logger.js';
 import { checkTimeWarpResets, applyTimeWarp } from './_timeWarp.js';
 import { applyMapThrust, updateMapHud } from './_mapView.js';
 import { applyNormalOrbitRcs } from './_orbitRcs.js';
@@ -161,7 +162,7 @@ export function loop(timestamp: number): void {
     s.loopConsecutiveErrors = 0;
   } catch (err) {
     s.loopConsecutiveErrors++;
-    console.error(`[Flight Loop] Error (${s.loopConsecutiveErrors} consecutive):`, err);
+    logger.error('flightLoop', `Error (${s.loopConsecutiveErrors} consecutive)`, { error: String(err) });
     if (s.loopConsecutiveErrors >= MAX_CONSECUTIVE_LOOP_ERRORS && !s.loopErrorBanner) {
       _showLoopErrorBanner(s);
     }

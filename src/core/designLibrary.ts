@@ -19,6 +19,7 @@
 
 import { getPartById } from '../data/parts.js';
 import { PartType } from './constants.js';
+import { logger } from './logger.js';
 import { TECH_NODES } from '../data/techtree.js';
 import type { PartDef } from '../data/parts.js';
 import type { TechNodeDef } from '../data/techtree.js';
@@ -105,7 +106,7 @@ export function loadSharedLibrary(): RocketDesign[] {
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
   } catch (err) {
-    console.warn('designLibrary: failed to parse shared library from localStorage:', err);
+    logger.warn('designLibrary', 'Failed to parse shared library from localStorage', { error: String(err) });
     return [];
   }
 }

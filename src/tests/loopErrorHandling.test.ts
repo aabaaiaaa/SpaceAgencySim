@@ -161,7 +161,7 @@ describe('Flight controller loop error handling', () => {
     const s = getFCState();
     expect(s.loopConsecutiveErrors).toBe(1);
     expect(spy).toHaveBeenCalledOnce();
-    expect(spy.mock.calls[0][0]).toContain('[Flight Loop]');
+    expect(spy.mock.calls[0][0]).toContain('[flightLoop]');
     spy.mockRestore();
   });
 

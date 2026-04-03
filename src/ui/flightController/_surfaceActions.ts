@@ -11,6 +11,7 @@ import {
   deployBeacon,
 } from '../../core/surfaceOps.js';
 import { getFCState } from './_state.js';
+import { logger } from '../../core/logger.js';
 
 /**
  * Callback invoked by the surface operations panel when the player clicks
@@ -39,6 +40,6 @@ export function onSurfaceAction(actionId: string): void {
   }
 
   if (!result.success) {
-    console.warn(`[Surface Ops] ${actionId} failed: ${result.reason}`);
+    logger.warn('surfaceOps', `${actionId} failed`, { reason: result.reason });
   }
 }

@@ -32,6 +32,7 @@ import {
   handleAbortReturnToAgency,
   handleMenuFlightLog,
 } from './_menuActions.js';
+import { logger } from '../../core/logger.js';
 
 import type { PhysicsState } from '../../core/physics.js';
 import type { RocketAssembly, StagingConfig, PlacedPart } from '../../core/rocketbuilder.js';
@@ -104,6 +105,7 @@ export function startFlightScene(
   flightState: FlightState,
   onFlightEnd: (state: GameState | null, results?: unknown, dest?: string) => void,
 ): void {
+  logger.debug('flight', 'Starting flight scene', { missionId: flightState.missionId, bodyId: flightState.bodyId });
   const s = getFCState();
 
   // Ensure hub overlay is fully hidden during flight. In the normal gameplay
@@ -275,6 +277,7 @@ export function startFlightScene(
  * Safe to call even if startFlightScene was never called.
  */
 export function stopFlightScene(): void {
+  logger.debug('flight', 'Stopping flight scene');
   const s = getFCState();
 
   if (s.rafId !== null) {

@@ -38,6 +38,7 @@
 
 import { getPartById } from '../data/parts.js';
 import { PartType, ControlMode } from '../core/constants.js';
+import { logger } from '../core/logger.js';
 import { getControlModeLabel, checkBandLimitWarning } from '../core/controlMode.js';
 import { ObjectiveType } from '../data/missions.js';
 import { countDeployedLegs } from '../core/legs.js';
@@ -939,7 +940,7 @@ function _tick(): void {
       _consecutiveErrors = 0;
     } catch (err) {
       _consecutiveErrors++;
-      console.error(`[Flight HUD] Tick error (${_consecutiveErrors} consecutive):`, err);
+      logger.error('flightHud', `Tick error (${_consecutiveErrors} consecutive)`, { error: String(err) });
       if (_consecutiveErrors >= _MAX_CONSECUTIVE_ERRORS && !_errorBanner) {
         _showErrorBanner();
       }
