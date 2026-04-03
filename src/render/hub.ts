@@ -1,5 +1,5 @@
 /**
- * hub.js — PixiJS rendering for the Space Agency Hub scene.
+ * hub.ts — PixiJS rendering for the Space Agency Hub scene.
  *
  * Renders a 2D side-on landscape background:
  *   - Blue sky filling the top 70 % of the screen.
@@ -7,11 +7,6 @@
  *   - A solid horizontal ground line at the boundary.
  *   - Placeholder coloured rectangles for each of the four hub buildings,
  *     sitting on the ground line.
- *
- * Interactive hit-testing (clicks, hover) is handled by transparent HTML
- * `<div>` elements in src/ui/hub.js that are positioned to sit exactly on
- * top of the PixiJS building rectangles.  This keeps the buildings
- * accessible to Playwright and screen readers.
  *
  * VISIBILITY
  * ==========
@@ -26,41 +21,26 @@ import { getApp } from './index.js';
 // Colours
 // ---------------------------------------------------------------------------
 
-/** Sky colour — light blue (#87CEEB). */
 const SKY_COLOR    = 0x87CEEB;
-
-/** Desert ground colour — sandy tan (#C2A165). */
 const GROUND_COLOR = 0xC2A165;
-
-/** Ground line colour — a slightly darker earth tone. */
 const GROUND_LINE_COLOR = 0x8B6914;
 
 // ---------------------------------------------------------------------------
 // Layout
 // ---------------------------------------------------------------------------
 
-/**
- * The ground sits at this fraction of the viewport height from the top.
- * Must match GROUND_Y_PCT in src/ui/hub.js.
- */
 const GROUND_Y_PCT = 0.70;
 
-/**
- * Building visual definitions.
- * xCenterPct / widthPct / heightPct are expressed as fractions of the
- * viewport width/height.  These values must be kept in sync with the
- * matching BUILDINGS array in src/ui/hub.js.
- *
- * @type {Array<{
- *   id: string,
- *   colorFill: number,
- *   colorStroke: number,
- *   widthPct: number,
- *   heightPct: number,
- *   xCenterPct: number,
- * }>}
- */
-const BUILDINGS = [
+interface BuildingDef {
+  id: string;
+  colorFill: number;
+  colorStroke: number;
+  widthPct: number;
+  heightPct: number;
+  xCenterPct: number;
+}
+
+const BUILDINGS: BuildingDef[] = [
   {
     id:           'launch-pad',
     colorFill:    0x7a6a5a,
@@ -131,37 +111,23 @@ const BUILDINGS = [
 // Module state
 // ---------------------------------------------------------------------------
 
-/** Root PixiJS container for all hub scene layers. @type {PIXI.Container | null} */
-let _hubRoot = null;
-
-/** Cached weather visibility for rendering (0 = clear, 1 = dense fog). */
+let _hubRoot: PIXI.Container | null = null;
 let _weatherVisibility = 0;
-
-/** Cached weather sky tint: true for storm/extreme, false normal. */
 let _weatherExtreme = false;
-
-/** Set of facility IDs that are built (null = show all). @type {Set<string> | null} */
-let _builtFacilities = null;
+let _builtFacilities: Set<string> | null = null;
 
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
-/**
- * Initialise the hub PixiJS scene.
- * Must be called after initRenderer() has resolved.
- * The scene starts hidden; call showHubScene() to display it.
- */
-export function initHubRenderer() {
+export function initHubRenderer(): void {
   const app = getApp();
 
   _hubRoot = new PIXI.Container();
   _hubRoot.visible = false;
 
-  // Insert at index 0 so the hub background sits behind the VAB layers.
   app.stage.addChildAt(_hubRoot, 0);
 
-  // Redraw on resize so percentages remain accurate.
   window.addEventListener('resize', () => {
     if (_hubRoot && _hubRoot.visible) {
       _drawScene();
@@ -170,14 +136,7 @@ export function initHubRenderer() {
 
 }
 
-/**
- * Update the hub renderer's weather state for visual effects.
- * Call this after weather changes (init, skip).
- *
- * @param {number} visibility  Fog/haze level (0 = clear, 1 = dense).
- * @param {boolean} extreme    True for extreme weather.
- */
-export function setHubWeather(visibility, extreme) {
+export function setHubWeather(visibility: number, extreme: boolean): void {
   _weatherVisibility = visibility;
   _weatherExtreme = extreme;
   if (_hubRoot && _hubRoot.visible) {
@@ -185,27 +144,16 @@ export function setHubWeather(visibility, extreme) {
   }
 }
 
-/**
- * Update the set of built facility IDs so only those buildings are rendered.
- * Pass null to show all buildings (e.g. sandbox mode).
- *
- * @param {Set<string> | null} builtIds
- */
-export function setBuiltFacilities(builtIds) {
+export function setBuiltFacilities(builtIds: Set<string> | null): void {
   _builtFacilities = builtIds;
   if (_hubRoot && _hubRoot.visible) {
     _drawScene();
   }
 }
 
-/**
- * Make the hub scene visible and draw it.
- * Call this when navigating to the hub screen.
- */
-export function showHubScene() {
+export function showHubScene(): void {
   if (!_hubRoot) return;
   const app = getApp();
-  // Re-attach if the container was orphaned by a flight renderer teardown.
   if (!_hubRoot.parent) {
     app.stage.addChildAt(_hubRoot, 0);
   }
@@ -213,11 +161,7 @@ export function showHubScene() {
   _drawScene();
 }
 
-/**
- * Hide the hub scene.
- * Call this when navigating away from the hub (e.g. to the VAB).
- */
-export function hideHubScene() {
+export function hideHubScene(): void {
   if (!_hubRoot) return;
   _hubRoot.visible = false;
 }
@@ -226,14 +170,9 @@ export function hideHubScene() {
 // Private — scene drawing
 // ---------------------------------------------------------------------------
 
-/**
- * (Re)draw all hub scene elements into _hubRoot.
- * Safe to call multiple times (removes existing children first).
- */
-function _drawScene() {
+function _drawScene(): void {
   if (!_hubRoot) return;
 
-  // Clear previous draw.
   _hubRoot.removeChildren();
 
   const app     = getApp();
@@ -241,28 +180,23 @@ function _drawScene() {
   const H       = app.screen.height;
   const groundY = Math.round(H * GROUND_Y_PCT);
 
-  // ── Sky ────────────────────────────────────────────────────────────────────
   const sky = new PIXI.Graphics();
   sky.rect(0, 0, W, groundY);
   sky.fill(SKY_COLOR);
   _hubRoot.addChild(sky);
 
-  // ── Ground ─────────────────────────────────────────────────────────────────
   const ground = new PIXI.Graphics();
   ground.rect(0, groundY, W, H - groundY);
   ground.fill(GROUND_COLOR);
   _hubRoot.addChild(ground);
 
-  // ── Ground line ─────────────────────────────────────────────────────────────
   const groundLine = new PIXI.Graphics();
   groundLine.moveTo(0, groundY);
   groundLine.lineTo(W, groundY);
   groundLine.stroke({ color: GROUND_LINE_COLOR, width: 2 });
   _hubRoot.addChild(groundLine);
 
-  // ── Building rectangles ─────────────────────────────────────────────────────
   for (const bld of BUILDINGS) {
-    // Skip unbuilt facilities when a filter is active.
     if (_builtFacilities && !_builtFacilities.has(bld.id)) continue;
 
     const bldW = W * bld.widthPct;
@@ -277,7 +211,6 @@ function _drawScene() {
     _hubRoot.addChild(g);
   }
 
-  // ── Weather haze overlay ──────────────────────────────────────────────────
   if (_weatherVisibility > 0.01) {
     const hazeAlpha = Math.min(0.6, _weatherVisibility * 0.6);
     const hazeColor = _weatherExtreme ? 0x604030 : 0xc0c0c0;

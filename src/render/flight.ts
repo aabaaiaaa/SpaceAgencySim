@@ -1,11 +1,9 @@
 /**
- * flight.js — Barrel re-export for the flight renderer sub-modules.
+ * flight.ts — Barrel re-export for the flight renderer sub-modules.
  *
  * The implementation has been split into focused sub-modules inside
  * `src/render/flight/`.  This file re-exports the public API so that
  * no external imports need to change.
- *
- * @module render/flight
  */
 
 export {

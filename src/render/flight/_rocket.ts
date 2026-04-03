@@ -1,18 +1,19 @@
 /**
- * _rocket.js — Rocket assembly rendering.
+ * _rocket.ts — Rocket assembly rendering.
  *
  * Part rectangles with labels, parachute canopy drawing, landing leg drawing,
  * malfunction overlays, heat glow overlays.
- *
- * @module render/flight/_rocket
  */
 
 import * as PIXI from 'pixi.js';
 import { getPartById } from '../../data/parts.js';
+import type { PartDef } from '../../data/parts.js';
 import { PartType } from '../../core/constants.js';
 import { getHeatRatio } from '../../core/atmosphere.js';
 import { DEPLOY_DURATION } from '../../core/parachute.js';
 import { LegState, LEG_DEPLOY_DURATION, getDeployedLegFootOffset } from '../../core/legs.js';
+import type { PhysicsState } from '../../core/physics.js';
+import type { RocketAssembly, PlacedPart } from '../../core/rocketbuilder.js';
 import { getFlightRenderState } from './_state.js';
 import { ppm, worldToScreen, computeCoM } from './_camera.js';
 import { SCALE_M_PER_PX, PART_FILL, PART_STROKE, FLIGHT_PIXELS_PER_METRE } from './_constants.js';
@@ -24,13 +25,8 @@ import { acquireGraphics, acquireText, releaseContainerChildren } from './_pool.
 
 /**
  * Draw a single part rectangle into `g` in the container's local coordinate space.
- *
- * @param {PIXI.Graphics}                                    g
- * @param {import('../../core/rocketbuilder.js').PlacedPart}  placed
- * @param {import('../../data/parts.js').PartDef}             def
- * @param {number}                                            [alpha=1]
  */
-export function drawPartRect(g, placed, def, alpha = 1) {
+export function drawPartRect(g: PIXI.Graphics, placed: PlacedPart, def: PartDef, alpha = 1): void {
   const lx = placed.x;
   const ly = -placed.y;
   const pw = def.width  ?? 40;
@@ -46,12 +42,8 @@ export function drawPartRect(g, placed, def, alpha = 1) {
 
 /**
  * Draw pulsing warning overlays on all parts with active malfunctions.
- *
- * @param {PIXI.Graphics}                                    g
- * @param {import('../../core/physics.js').PhysicsState}      ps
- * @param {import('../../core/rocketbuilder.js').RocketAssembly} assembly
  */
-export function drawMalfunctionOverlays(g, ps, assembly) {
+export function drawMalfunctionOverlays(g: PIXI.Graphics, ps: PhysicsState, assembly: RocketAssembly): void {
   if (!ps.malfunctions || ps.malfunctions.size === 0) return;
 
   const pulse = 0.30 + 0.15 * Math.sin(Date.now() * 0.012);
@@ -86,12 +78,8 @@ export function drawMalfunctionOverlays(g, ps, assembly) {
 
 /**
  * Draw heat glow overlays on parts experiencing atmospheric heating.
- *
- * @param {PIXI.Graphics}                                    g
- * @param {import('../../core/physics.js').PhysicsState}      ps
- * @param {import('../../core/rocketbuilder.js').RocketAssembly} assembly
  */
-export function drawHeatGlowOverlays(g, ps, assembly) {
+export function drawHeatGlowOverlays(g: PIXI.Graphics, ps: PhysicsState, assembly: RocketAssembly): void {
   if (!ps.heatMap || ps.heatMap.size === 0) return;
 
   const now = Date.now();
@@ -113,7 +101,7 @@ export function drawHeatGlowOverlays(g, ps, assembly) {
     const freq = 1.5 + ratio * 2.5;
     const pulse = 0.5 + 0.5 * Math.sin(now * freq * 0.006);
 
-    let color;
+    let color: number;
     if (ratio < 0.4) {
       color = 0xff6600;
     } else if (ratio < 0.7) {
@@ -140,17 +128,14 @@ export function drawHeatGlowOverlays(g, ps, assembly) {
 // Landing leg helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Determine which side of the rocket a landing leg is attached to.
- *
- * @param {import('../../core/rocketbuilder.js').PlacedPart}    placed
- * @param {import('../../core/rocketbuilder.js').RocketAssembly} assembly
- * @returns {number}  +1 (right) or -1 (left).
- */
-function _getLegSide(placed, assembly) {
+interface LegLikeState {
+  legStates?: Map<string, { state: string; deployTimer: number }>;
+}
+
+function _getLegSide(placed: PlacedPart, assembly: RocketAssembly): number {
   if (assembly?.connections) {
     for (const conn of assembly.connections) {
-      let parentInstanceId, parentSnapIndex;
+      let parentInstanceId: string | undefined, parentSnapIndex: number | undefined;
       if (conn.fromInstanceId === placed.instanceId) {
         parentInstanceId = conn.toInstanceId;
         parentSnapIndex  = conn.toSnapIndex;
@@ -160,11 +145,11 @@ function _getLegSide(placed, assembly) {
       } else {
         continue;
       }
-      const parentPlaced = assembly.parts.get(parentInstanceId);
+      const parentPlaced = assembly.parts.get(parentInstanceId!);
       if (!parentPlaced) continue;
       const parentDef = getPartById(parentPlaced.partId);
       if (!parentDef) continue;
-      const snap = parentDef.snapPoints[parentSnapIndex];
+      const snap = parentDef.snapPoints[parentSnapIndex!];
       if (snap) {
         if (snap.side === 'left')  return -1;
         if (snap.side === 'right') return  1;
@@ -176,15 +161,15 @@ function _getLegSide(placed, assembly) {
 
 /**
  * Draw a landing leg with state-aware deployment animation.
- *
- * @param {PIXI.Graphics}                                    g
- * @param {import('../../core/rocketbuilder.js').PlacedPart}  placed
- * @param {import('../../data/parts.js').PartDef}             def
- * @param {object}                                            ps      PhysicsState or debris.
- * @param {import('../../core/rocketbuilder.js').RocketAssembly} assembly
- * @param {number}                                            [alpha=1]
  */
-export function drawLandingLeg(g, placed, def, ps, assembly, alpha = 1) {
+export function drawLandingLeg(
+  g: PIXI.Graphics,
+  placed: PlacedPart,
+  def: PartDef,
+  ps: LegLikeState,
+  assembly: RocketAssembly,
+  alpha = 1,
+): void {
   const lx = placed.x;
   const ly = -placed.y;
   const pw = def.width  ?? 40;
@@ -233,13 +218,8 @@ export function drawLandingLeg(g, placed, def, ps, assembly, alpha = 1) {
 
 /**
  * Create a PIXI.Text label for a part.
- *
- * @param {import('../../core/rocketbuilder.js').PlacedPart}  placed
- * @param {import('../../data/parts.js').PartDef}             def
- * @param {number}                                            [alpha=1]
- * @returns {PIXI.Text}
  */
-export function makePartLabel(placed, def, alpha = 1) {
+export function makePartLabel(placed: PlacedPart, def: PartDef, alpha = 1): PIXI.Text {
   const label = acquireText();
   label.text = def.name;
   label.style = new PIXI.TextStyle({
@@ -263,13 +243,8 @@ export function makePartLabel(placed, def, alpha = 1) {
 
 /**
  * Draw deployed canopies above every deploying or deployed PARACHUTE part.
- *
- * @param {import('../../core/physics.js').PhysicsState}          ps
- * @param {import('../../core/rocketbuilder.js').RocketAssembly}  assembly
- * @param {number}                                                w  Canvas width.
- * @param {number}                                                h  Canvas height.
  */
-export function drawParachuteCanopies(ps, assembly, w, h) {
+export function drawParachuteCanopies(ps: PhysicsState, assembly: RocketAssembly, w: number, h: number): void {
   const s = getFlightRenderState();
   if (!s.canopyContainer) return;
 
@@ -283,7 +258,7 @@ export function drawParachuteCanopies(ps, assembly, w, h) {
   for (const instanceId of ps.activeParts) {
     const placed = assembly.parts.get(instanceId);
     const def    = placed ? getPartById(placed.partId) : null;
-    if (!def || def.type !== PartType.PARACHUTE) continue;
+    if (!placed || !def || def.type !== PartType.PARACHUTE) continue;
 
     const entry = ps.parachuteStates?.get(instanceId);
     if (!entry || entry.state === 'packed' || entry.state === 'failed') continue;
@@ -298,7 +273,7 @@ export function drawParachuteCanopies(ps, assembly, w, h) {
     const canopyAngle = entry.canopyAngle ?? 0;
 
     const stowedW    = def.width ?? 20;
-    const deployedW  = (props.deployedDiameter ?? 10) / SCALE_M_PER_PX;
+    const deployedW  = ((props as Record<string, unknown>).deployedDiameter as number ?? 10) / SCALE_M_PER_PX;
     const currentW   = stowedW + (deployedW - stowedW) * progress;
     const halfW      = currentW / 2;
 
@@ -367,13 +342,8 @@ export function drawParachuteCanopies(ps, assembly, w, h) {
 
 /**
  * Render the main active rocket into _rocketContainer.
- *
- * @param {import('../../core/physics.js').PhysicsState}           ps
- * @param {import('../../core/rocketbuilder.js').RocketAssembly}   assembly
- * @param {number}                                                 w  Canvas width.
- * @param {number}                                                 h  Canvas height.
  */
-export function renderRocket(ps, assembly, w, h) {
+export function renderRocket(ps: PhysicsState, assembly: RocketAssembly, w: number, h: number): void {
   const s = getFlightRenderState();
   if (!s.rocketContainer) return;
 
@@ -389,7 +359,7 @@ export function renderRocket(ps, assembly, w, h) {
     for (const instanceId of ps.activeParts) {
       const placed = assembly.parts.get(instanceId);
       const def    = placed ? getPartById(placed.partId) : null;
-      if (!def) continue;
+      if (!placed || !def) continue;
       let bottom = placed.y - (def.height ?? 40) / 2;
       if (def.type === PartType.LANDING_LEGS || def.type === PartType.LANDING_LEG) {
         const { dy } = getDeployedLegFootOffset(instanceId, def, ps.legStates);
@@ -418,7 +388,7 @@ export function renderRocket(ps, assembly, w, h) {
     for (const instanceId of ps.activeParts) {
       const placed = assembly.parts.get(instanceId);
       const def    = placed ? getPartById(placed.partId) : null;
-      if (!def) continue;
+      if (!placed || !def) continue;
       const hw = (def.width  ?? 40) / 2;
       const hh = (def.height ?? 40) / 2;
       let effHW = hw, effBottomH = hh;
@@ -427,7 +397,7 @@ export function renderRocket(ps, assembly, w, h) {
         effHW = Math.max(hw, dx);
         effBottomH = Math.max(hh, dy);
       }
-      const corners = [
+      const corners: [number, number][] = [
         [placed.x - effHW, placed.y - effBottomH],
         [placed.x + effHW, placed.y - effBottomH],
         [placed.x - effHW, placed.y + hh],
@@ -453,7 +423,7 @@ export function renderRocket(ps, assembly, w, h) {
   for (const instanceId of ps.activeParts) {
     const placed = assembly.parts.get(instanceId);
     const def    = placed ? getPartById(placed.partId) : null;
-    if (!def) continue;
+    if (!placed || !def) continue;
     if (def.type === PartType.LANDING_LEGS || def.type === PartType.LANDING_LEG) {
       drawLandingLeg(g, placed, def, ps, assembly, 0.9);
     } else {
@@ -468,7 +438,7 @@ export function renderRocket(ps, assembly, w, h) {
   for (const instanceId of ps.activeParts) {
     const placed = assembly.parts.get(instanceId);
     const def    = placed ? getPartById(placed.partId) : null;
-    if (!def) continue;
+    if (!placed || !def) continue;
     s.rocketContainer.addChild(makePartLabel(placed, def, 1));
   }
 }
@@ -477,26 +447,31 @@ export function renderRocket(ps, assembly, w, h) {
 // Hit test — spatial grid cache
 // ---------------------------------------------------------------------------
 
-/** @typedef {{ instanceId: string, x0: number, y0: number, x1: number, y1: number }} HitEntry */
-/** @typedef {{ minX: number, maxX: number, minY: number, maxY: number, grid: Map<number, HitEntry[]>, cols: number, cellSize: number }} HitGrid */
+interface HitEntry {
+  instanceId: string;
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
 
-const HIT_GRID_CELL_SIZE = 60; // local-space pixels per grid cell
+interface HitGrid {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  grid: Map<number, HitEntry[]>;
+  cols: number;
+  cellSize: number;
+}
 
-/** @type {HitGrid|null} */
-let _hitGrid = null;
-/** @type {Set<string>|null} */
-let _hitGridPartsRef = null;
+const HIT_GRID_CELL_SIZE = 60;
+
+let _hitGrid: HitGrid | null = null;
+let _hitGridPartsRef: Set<string> | null = null;
 let _hitGridPartsSize = -1;
 
-/**
- * Build or return a cached spatial grid for the active parts.
- * Invalidated when the activeParts set reference or size changes (staging).
- *
- * @param {Set<string>}  activeParts
- * @param {import('../../core/rocketbuilder.js').RocketAssembly} assembly
- * @returns {HitGrid}
- */
-function _ensureHitGrid(activeParts, assembly) {
+function _ensureHitGrid(activeParts: Set<string>, assembly: RocketAssembly): HitGrid {
   if (_hitGrid && _hitGridPartsRef === activeParts && _hitGridPartsSize === activeParts.size) {
     return _hitGrid;
   }
@@ -504,13 +479,12 @@ function _ensureHitGrid(activeParts, assembly) {
   let minX = Infinity, maxX = -Infinity;
   let minY = Infinity, maxY = -Infinity;
 
-  /** @type {HitEntry[]} */
-  const entries = [];
+  const entries: HitEntry[] = [];
 
   for (const instanceId of activeParts) {
     const placed = assembly.parts.get(instanceId);
     const def    = placed ? getPartById(placed.partId) : null;
-    if (!def) continue;
+    if (!placed || !def) continue;
 
     const pw = def.width  ?? 40;
     const ph = def.height ?? 20;
@@ -543,8 +517,7 @@ function _ensureHitGrid(activeParts, assembly) {
   const cols = Math.max(1, Math.ceil((maxX - minX) / cellSize));
   const rows = Math.max(1, Math.ceil((maxY - minY) / cellSize));
 
-  /** @type {Map<number, HitEntry[]>} */
-  const grid = new Map();
+  const grid = new Map<number, HitEntry[]>();
 
   for (const entry of entries) {
     const col0 = Math.max(0, Math.floor((entry.x0 - minX) / cellSize));
@@ -572,20 +545,7 @@ function _ensureHitGrid(activeParts, assembly) {
 // Hit test
 // ---------------------------------------------------------------------------
 
-/**
- * Hit-test a screen-space pointer position against all active parts on the
- * main rocket (not debris).
- *
- * Uses a cached spatial grid to avoid O(n) per-part iteration on every mouse
- * move. The grid is rebuilt only when the active part set changes (staging).
- *
- * @param {number}                                              screenX
- * @param {number}                                              screenY
- * @param {import('../../core/physics.js').PhysicsState}        ps
- * @param {import('../../core/rocketbuilder.js').RocketAssembly} assembly
- * @returns {string|null}  The hit part's instanceId, or null.
- */
-export function hitTestFlightPart(screenX, screenY, ps, assembly) {
+export function hitTestFlightPart(screenX: number, screenY: number, ps: PhysicsState, assembly: RocketAssembly): string | null {
   if (!ps || !assembly) return null;
 
   const w = window.innerWidth;
@@ -602,7 +562,7 @@ export function hitTestFlightPart(screenX, screenY, ps, assembly) {
     for (const instanceId of ps.activeParts) {
       const placed = assembly.parts.get(instanceId);
       const def    = placed ? getPartById(placed.partId) : null;
-      if (!def) continue;
+      if (!placed || !def) continue;
       let bottom = placed.y - (def.height ?? 40) / 2;
       if (def.type === PartType.LANDING_LEGS || def.type === PartType.LANDING_LEG) {
         const { dy } = getDeployedLegFootOffset(instanceId, def, ps.legStates);
@@ -613,7 +573,7 @@ export function hitTestFlightPart(screenX, screenY, ps, assembly) {
     }
   }
 
-  let pivotX, pivotY, containerX, containerY;
+  let pivotX: number, pivotY: number, containerX: number, containerY: number;
   if ((ps.grounded || ps.landed) && ps.isTipping) {
     pivotX     =  ps.tippingContactX;
     pivotY     = -ps.tippingContactY;
@@ -624,7 +584,7 @@ export function hitTestFlightPart(screenX, screenY, ps, assembly) {
     for (const instanceId of ps.activeParts) {
       const placed = assembly.parts.get(instanceId);
       const def    = placed ? getPartById(placed.partId) : null;
-      if (!def) continue;
+      if (!placed || !def) continue;
       const hw = (def.width  ?? 40) / 2;
       const hh = (def.height ?? 40) / 2;
       let effHW = hw, effBottomH = hh;
@@ -633,7 +593,7 @@ export function hitTestFlightPart(screenX, screenY, ps, assembly) {
         effHW = Math.max(hw, dx);
         effBottomH = Math.max(hh, dy);
       }
-      const corners = [
+      const corners: [number, number][] = [
         [placed.x - effHW, placed.y - effBottomH],
         [placed.x + effHW, placed.y - effBottomH],
         [placed.x - effHW, placed.y + hh],
@@ -664,18 +624,15 @@ export function hitTestFlightPart(screenX, screenY, ps, assembly) {
   // --- Spatial grid lookup (replaces O(n) linear scan) ---
   const hg = _ensureHitGrid(ps.activeParts, assembly);
 
-  // Quick-reject: cursor outside the overall bounding box of all parts
   if (localX < hg.minX || localX > hg.maxX || localY < hg.minY || localY > hg.maxY) {
     return null;
   }
 
-  // Look up the single grid cell containing the cursor
   const col = Math.floor((localX - hg.minX) / hg.cellSize);
   const row = Math.floor((localY - hg.minY) / hg.cellSize);
   const cell = hg.grid.get(row * hg.cols + col);
   if (!cell) return null;
 
-  // Only test the (few) parts whose bounding boxes overlap this cell
   for (let i = cell.length - 1; i >= 0; i--) {
     const entry = cell[i];
     if (localX >= entry.x0 && localX <= entry.x1 &&

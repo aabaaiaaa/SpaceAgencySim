@@ -1,17 +1,18 @@
 /**
- * _init.js — Orchestrator containing all 11 public exports.
+ * _init.ts — Orchestrator containing all 11 public exports.
  *
  * initFlightRenderer creates PixiJS containers and sets up handlers.
  * renderFlightFrame calls sub-module render functions in order.
  * destroyFlightRenderer cleans up.
- *
- * @module render/flight/_init
  */
 
 import * as PIXI from 'pixi.js';
 import { getApp } from '../index.js';
 import { airDensity } from '../../core/atmosphere.js';
 import { getAirDensity as bodyAirDensity } from '../../data/bodies.js';
+import type { PhysicsState } from '../../core/physics.js';
+import type { RocketAssembly } from '../../core/rocketbuilder.js';
+import type { SurfaceItem } from '../../core/gameState.js';
 import { getFlightRenderState } from './_state.js';
 import { MIN_ZOOM, MAX_ZOOM } from './_constants.js';
 import { updateCamera } from './_camera.js';
@@ -33,10 +34,8 @@ import { drainPools, releaseGraphics } from './_pool.js';
 
 /**
  * Initialise the flight scene PixiJS layers.
- *
- * Call once when transitioning from the lobby/VAB into an active flight.
  */
-export function initFlightRenderer() {
+export function initFlightRenderer(): void {
   const s   = getFlightRenderState();
   const app = getApp();
 
@@ -53,8 +52,6 @@ export function initFlightRenderer() {
   if (s.biomeLabelContainer)  app.stage.removeChild(s.biomeLabelContainer);
   if (s.hazeGraphics)         app.stage.removeChild(s.hazeGraphics);
 
-  // Layer order (bottom -> top):
-  //   sky -> stars -> horizon -> ground -> surface items -> debris -> engine trails -> active rocket -> canopies -> haze -> biome label
   s.skyGraphics           = new PIXI.Graphics();
   s.starsContainer        = new PIXI.Container();
   s.horizonGraphics       = new PIXI.Graphics();
@@ -79,15 +76,12 @@ export function initFlightRenderer() {
   app.stage.addChild(s.hazeGraphics);
   app.stage.addChild(s.biomeLabelContainer);
 
-  // Pre-generate the deterministic star field.
   generateStars();
 
-  // Reset trail and plume state.
   s.trailSegments = [];
   s.lastTrailTime = null;
   s.plumeStates   = new Map();
 
-  // Reset camera to launch-pad origin.
   s.camWorldX   = 0;
   s.camWorldY   = 0;
   s.lastCamTime = null;
@@ -97,16 +91,13 @@ export function initFlightRenderer() {
   s.camOffsetX  = 0;
   s.camOffsetY  = 0;
 
-  // Reset biome label state.
   s.currentBiomeName = null;
   s.biomeLabelAlpha  = 0;
 
-  // Reset zoom and initialise mouse tracking.
   s.zoomLevel = 1.0;
   s.mouseX    = window.innerWidth  / 2;
   s.mouseY    = window.innerHeight / 2;
 
-  // Register zoom input handlers.
   s.wheelHandler     = onWheel;
   s.mouseMoveHandler = onMouseMove;
   window.addEventListener('wheel',     s.wheelHandler,     { passive: false });
@@ -114,46 +105,41 @@ export function initFlightRenderer() {
 
 }
 
+interface FlightStateArg {
+  bodyId?: string;
+}
+
 /**
  * Render a single flight frame.
- *
- * @param {import('../../core/physics.js').PhysicsState}           ps
- * @param {import('../../core/rocketbuilder.js').RocketAssembly}   assembly
- * @param {object}                                                 flightState
- * @param {Array}                                                  surfaceItems
  */
-export function renderFlightFrame(ps, assembly, flightState, surfaceItems) {
+export function renderFlightFrame(
+  ps: PhysicsState,
+  assembly: RocketAssembly,
+  flightState: FlightStateArg,
+  surfaceItems: SurfaceItem[],
+): void {
   const w        = window.innerWidth;
   const h        = window.innerHeight;
   const altitude = Math.max(0, ps.posY);
   const bodyId   = flightState?.bodyId;
 
-  // Update per-body sky/ground/star visuals.
   updateBodyVisuals(bodyId);
 
-  // 1. Update camera to follow the relevant object's CoM.
   updateCamera(ps, assembly);
 
-  // 2. Sky background.
   renderSky(altitude, w, h);
 
-  // 3. Stars.
   renderStars(altitude, w, h);
 
-  // 4a. Horizon curvature.
   renderHorizon(altitude, w, h);
 
-  // 4b. Ground band.
   if (altitude < 5_000) {
     renderGround(w, h);
-    // 4c. Deployed surface items.
     renderSurfaceItems(surfaceItems, w, h);
   }
 
-  // 5. Debris fragments.
   renderDebris(ps.debris, assembly, w, h);
 
-  // 6. Engine exhaust.
   const trailDensity = bodyId ? bodyAirDensity(altitude, bodyId) : airDensity(altitude);
   const dt           = trailDt();
   emitSmokeSegments(ps, assembly, trailDensity);
@@ -162,32 +148,25 @@ export function renderFlightFrame(ps, assembly, flightState, surfaceItems) {
   updatePlumeStates(ps, assembly, dt);
   renderPlumes(ps, assembly, trailDensity, w, h);
 
-  // 6b. RCS plumes.
   renderRcsPlumes(ps, assembly, w, h);
 
-  // 6c. Ejected crew capsules.
   renderEjectedCrew(ps, w, h);
 
-  // 7. Active rocket.
   renderRocket(ps, assembly, w, h);
 
-  // 7b. Docking target.
   renderDockingTarget(ps, w, h);
 
-  // 8. Mach effects.
   renderMachEffects(ps, assembly, trailDensity, w, h, dt);
 
-  // 9. Biome label.
   renderBiomeLabel(altitude, w, h, dt, bodyId);
 
-  // 10. Weather haze overlay.
   renderWeatherHaze(altitude, w, h, bodyId);
 }
 
 /**
  * Tear down the flight scene.
  */
-export function destroyFlightRenderer() {
+export function destroyFlightRenderer(): void {
   const s   = getFlightRenderState();
   const app = getApp();
 
@@ -249,10 +228,7 @@ export function destroyFlightRenderer() {
 
 }
 
-/**
- * Hide all flight-scene containers (used when the map view is active).
- */
-export function hideFlightScene() {
+export function hideFlightScene(): void {
   const s = getFlightRenderState();
   if (s.skyGraphics)          s.skyGraphics.visible = false;
   if (s.starsContainer)       s.starsContainer.visible = false;
@@ -267,10 +243,7 @@ export function hideFlightScene() {
   if (s.hazeGraphics)         s.hazeGraphics.visible = false;
 }
 
-/**
- * Show all flight-scene containers (used when returning from the map view).
- */
-export function showFlightScene() {
+export function showFlightScene(): void {
   const s = getFlightRenderState();
   if (s.skyGraphics)          s.skyGraphics.visible = true;
   if (s.starsContainer)       s.starsContainer.visible = true;
@@ -285,64 +258,31 @@ export function showFlightScene() {
   if (s.hazeGraphics)         s.hazeGraphics.visible = true;
 }
 
-/**
- * Enable or disable flight-specific input handling.
- *
- * @param {boolean} enabled
- */
-export function setFlightInputEnabled(enabled) {
+export function setFlightInputEnabled(enabled: boolean): void {
   const s = getFlightRenderState();
   s.inputEnabled = enabled;
 }
 
-/**
- * Set the flight renderer's weather visibility for fog/haze effects.
- * @param {number} visibility  0 = clear, 1 = dense fog.
- */
-export function setFlightWeather(visibility) {
+export function setFlightWeather(visibility: number): void {
   const s = getFlightRenderState();
   s.weatherVisibility = visibility;
 }
 
-/**
- * Read-only snapshot of the camera's current world-space position.
- *
- * @returns {{ x: number, y: number }}
- */
-export function flightGetCamera() {
+export function flightGetCamera(): { x: number; y: number } {
   const s = getFlightRenderState();
   return { x: s.camWorldX, y: s.camWorldY };
 }
 
-/**
- * Get the current zoom level.
- *
- * @returns {number}
- */
-export function getZoomLevel() {
+export function getZoomLevel(): number {
   const s = getFlightRenderState();
   return s.zoomLevel;
 }
 
-/**
- * Hit-test a screen-space pointer position against all active parts.
- *
- * @param {number} screenX
- * @param {number} screenY
- * @param {import('../../core/physics.js').PhysicsState} ps
- * @param {import('../../core/rocketbuilder.js').RocketAssembly} assembly
- * @returns {string|null}
- */
-export function hitTestFlightPart(screenX, screenY, ps, assembly) {
+export function hitTestFlightPart(screenX: number, screenY: number, ps: PhysicsState, assembly: RocketAssembly): string | null {
   return _hitTestFlightPart(screenX, screenY, ps, assembly);
 }
 
-/**
- * Programmatically set the zoom level, clamped to [MIN_ZOOM, MAX_ZOOM].
- *
- * @param {number} zoom
- */
-export function setZoomLevel(zoom) {
+export function setZoomLevel(zoom: number): void {
   const s = getFlightRenderState();
   s.zoomLevel = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
 }

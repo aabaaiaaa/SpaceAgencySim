@@ -1,10 +1,7 @@
 /**
- * _sky.js — Sky gradient, star field, horizon curvature, and weather haze.
- *
- * @module render/flight/_sky
+ * _sky.ts — Sky gradient, star field, horizon curvature, and weather haze.
  */
 
-import * as PIXI from 'pixi.js';
 import { getSkyVisual, getGroundVisual, getAtmosphereTop } from '../../data/bodies.js';
 import { getFlightRenderState } from './_state.js';
 import { ppm } from './_camera.js';
@@ -21,13 +18,8 @@ import {
 
 /**
  * Linearly interpolate between two packed-RGB hex colours.
- *
- * @param {number} c1  Start colour (0xRRGGBB).
- * @param {number} c2  End colour   (0xRRGGBB).
- * @param {number} t   Factor in [0, 1].
- * @returns {number}   Interpolated packed-RGB colour.
  */
-export function lerpColor(c1, c2, t) {
+export function lerpColor(c1: number, c2: number, t: number): number {
   const r1 = (c1 >> 16) & 0xff,  g1 = (c1 >> 8) & 0xff,  b1 = c1 & 0xff;
   const r2 = (c2 >> 16) & 0xff,  g2 = (c2 >> 8) & 0xff,  b2 = c2 & 0xff;
   const r  = Math.round(r1 + (r2 - r1) * t);
@@ -43,10 +35,8 @@ export function lerpColor(c1, c2, t) {
 /**
  * Update the body visual overrides based on a celestial body ID.
  * Falls back to Earth defaults when bodyId is undefined or 'EARTH'.
- *
- * @param {string|undefined} bodyId
  */
-export function updateBodyVisuals(bodyId) {
+export function updateBodyVisuals(bodyId: string | undefined): void {
   const s = getFlightRenderState();
   const sky = bodyId ? getSkyVisual(bodyId) : null;
   const gnd = bodyId ? getGroundVisual(bodyId) : null;
@@ -65,11 +55,8 @@ export function updateBodyVisuals(bodyId) {
 
 /**
  * Return the sky background colour for a given altitude.
- *
- * @param {number} altitude  Altitude in metres.
- * @returns {number}         Packed 0xRRGGBB colour.
  */
-export function skyColor(altitude) {
+export function skyColor(altitude: number): number {
   const s = getFlightRenderState();
   const { seaLevel, highAlt, space, starStart, starEnd } = s.bodyVisuals;
 
@@ -94,12 +81,8 @@ export function skyColor(altitude) {
 /**
  * Redraw the sky background rectangle with the colour appropriate for the
  * current camera altitude.
- *
- * @param {number} altitude  Camera altitude in metres.
- * @param {number} w         Canvas width in pixels.
- * @param {number} h         Canvas height in pixels.
  */
-export function renderSky(altitude, w, h) {
+export function renderSky(altitude: number, w: number, h: number): void {
   const s = getFlightRenderState();
   if (!s.skyGraphics) return;
   s.skyGraphics.clear();
@@ -115,11 +98,11 @@ export function renderSky(altitude, w, h) {
 /**
  * Pre-generate the star field using a deterministic LCG sequence.
  */
-export function generateStars() {
+export function generateStars(): void {
   const s = getFlightRenderState();
   s.stars = [];
   let seed = 0xdeadbeef;
-  function rand() {
+  function rand(): number {
     seed = Math.imul(seed, 1664525) + 1013904223 | 0;
     return (seed >>> 0) / 0x100000000;
   }
@@ -134,18 +117,14 @@ export function generateStars() {
 
 /**
  * Render the star field, fading in as altitude rises.
- *
- * @param {number} altitude  Current camera altitude in metres.
- * @param {number} w         Canvas width in pixels.
- * @param {number} h         Canvas height in pixels.
  */
-export function renderStars(altitude, w, h) {
+export function renderStars(altitude: number, w: number, h: number): void {
   const s = getFlightRenderState();
   if (!s.starsContainer) return;
 
   const { starStart, starEnd } = s.bodyVisuals;
 
-  let alpha;
+  let alpha: number;
   if (starEnd <= 0) {
     alpha = 1;
   } else {
@@ -173,12 +152,8 @@ export function renderStars(altitude, w, h) {
 
 /**
  * Render a curved horizon effect at high altitudes.
- *
- * @param {number} altitude  Camera altitude in metres.
- * @param {number} w         Canvas width.
- * @param {number} h         Canvas height.
  */
-export function renderHorizon(altitude, w, h) {
+export function renderHorizon(altitude: number, w: number, h: number): void {
   const s = getFlightRenderState();
   if (!s.horizonGraphics) return;
   s.horizonGraphics.clear();
@@ -223,13 +198,8 @@ export function renderHorizon(altitude, w, h) {
 
 /**
  * Render a cosmetic fog/haze overlay that fades out with altitude.
- *
- * @param {number} altitude  Current altitude in metres.
- * @param {number} w         Viewport width.
- * @param {number} h         Viewport height.
- * @param {string} [bodyId]  Celestial body ID.
  */
-export function renderWeatherHaze(altitude, w, h, bodyId) {
+export function renderWeatherHaze(altitude: number, w: number, h: number, bodyId?: string): void {
   const s = getFlightRenderState();
   if (!s.hazeGraphics) return;
   s.hazeGraphics.clear();

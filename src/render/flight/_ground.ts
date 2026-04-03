@@ -1,12 +1,11 @@
 /**
- * _ground.js — Ground band rendering, surface items, and biome labels.
- *
- * @module render/flight/_ground
+ * _ground.ts — Ground band rendering, surface items, and biome labels.
  */
 
 import * as PIXI from 'pixi.js';
 import { SurfaceItemType } from '../../core/constants.js';
 import { getBiome, getBiomeTransition } from '../../core/biomes.js';
+import type { SurfaceItem } from '../../core/gameState.js';
 import { getFlightRenderState } from './_state.js';
 import { ppm } from './_camera.js';
 import { acquireText, releaseContainerChildren } from './_pool.js';
@@ -18,11 +17,8 @@ import { SURFACE_ITEM_COLORS, BIOME_LABEL_FADE_SPEED } from './_constants.js';
 
 /**
  * Draw the ground band below world Y = 0.
- *
- * @param {number} w  Canvas width in pixels.
- * @param {number} h  Canvas height in pixels.
  */
-export function renderGround(w, h) {
+export function renderGround(w: number, h: number): void {
   const s = getFlightRenderState();
   if (!s.groundGraphics) return;
   s.groundGraphics.clear();
@@ -43,12 +39,8 @@ export function renderGround(w, h) {
 
 /**
  * Render deployed surface items on the ground surface.
- *
- * @param {import('../../core/gameState.js').SurfaceItem[]} items
- * @param {number} w  Canvas width in pixels.
- * @param {number} h  Canvas height in pixels.
  */
-export function renderSurfaceItems(items, w, h) {
+export function renderSurfaceItems(items: SurfaceItem[], w: number, h: number): void {
   const s = getFlightRenderState();
   if (!s.surfaceItemsGraphics) return;
   s.surfaceItemsGraphics.clear();
@@ -114,14 +106,8 @@ export function renderSurfaceItems(items, w, h) {
 
 /**
  * Render the current biome name as a centered label at the top of the screen.
- *
- * @param {number} altitude  Current altitude in metres.
- * @param {number} w         Canvas width.
- * @param {number} h         Canvas height.
- * @param {number} dt        Delta time in seconds.
- * @param {string} [bodyId]  Current celestial body ID.
  */
-export function renderBiomeLabel(altitude, w, h, dt, bodyId) {
+export function renderBiomeLabel(altitude: number, w: number, h: number, dt: number, bodyId?: string): void {
   const s = getFlightRenderState();
   if (!s.biomeLabelContainer) return;
 
@@ -167,10 +153,11 @@ export function renderBiomeLabel(altitude, w, h, dt, bodyId) {
     fontSize: 16,
     fontFamily: 'system-ui, sans-serif',
     fontWeight: 'bold',
-    dropShadow: true,
-    dropShadowColor: '#000000',
-    dropShadowBlur: 4,
-    dropShadowDistance: 1,
+    dropShadow: {
+      color: '#000000',
+      blur: 4,
+      distance: 1,
+    },
   });
   label.anchor.set(0.5, 0);
   label.x = w / 2;
@@ -183,10 +170,11 @@ export function renderBiomeLabel(altitude, w, h, dt, bodyId) {
     fill: '#70b880',
     fontSize: 11,
     fontFamily: 'system-ui, sans-serif',
-    dropShadow: true,
-    dropShadowColor: '#000000',
-    dropShadowBlur: 3,
-    dropShadowDistance: 1,
+    dropShadow: {
+      color: '#000000',
+      blur: 3,
+      distance: 1,
+    },
   });
   subLabel.anchor.set(0.5, 0);
   subLabel.x = w / 2;

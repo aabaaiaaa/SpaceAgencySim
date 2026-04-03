@@ -1,10 +1,9 @@
 /**
- * _constants.js — All constant values for the flight renderer.
+ * _constants.ts — All constant values for the flight renderer.
  *
  * Colour tables, scale factors, zoom limits, trail/plume parameters,
  * camera constants, star count, etc.
  *
- * @module render/flight/_constants
  */
 
 import { PartType, SurfaceItemType } from '../../core/constants.js';
@@ -104,7 +103,7 @@ export const CAM_OFFSET_DECAY_RATE = 2.0;
 // Part-type fill colours (identical palette to vab.js for visual consistency)
 // ---------------------------------------------------------------------------
 
-export const PART_FILL = {
+export const PART_FILL: Record<string, number> = {
   [PartType.COMMAND_MODULE]:       0x1a3860,
   [PartType.COMPUTER_MODULE]:      0x122848,
   [PartType.SERVICE_MODULE]:       0x1c2c58,
@@ -124,7 +123,7 @@ export const PART_FILL = {
   [PartType.LAUNCH_CLAMP]:         0x2a2818,
 };
 
-export const PART_STROKE = {
+export const PART_STROKE: Record<string, number> = {
   [PartType.COMMAND_MODULE]:       0x4080c0,
   [PartType.COMPUTER_MODULE]:      0x2870a0,
   [PartType.SERVICE_MODULE]:       0x3860b0,
@@ -148,7 +147,7 @@ export const PART_STROKE = {
 // Surface item colours
 // ---------------------------------------------------------------------------
 
-export const SURFACE_ITEM_COLORS = {
+export const SURFACE_ITEM_COLORS: Record<string, number> = {
   [SurfaceItemType.FLAG]:               0xff4444,
   [SurfaceItemType.SURFACE_SAMPLE]:     0xddcc88,
   [SurfaceItemType.SURFACE_INSTRUMENT]: 0x44aaff,

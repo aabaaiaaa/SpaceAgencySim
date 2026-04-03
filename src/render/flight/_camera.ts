@@ -1,14 +1,14 @@
 /**
- * _camera.js — Camera follow logic and coordinate transforms.
+ * _camera.ts — Camera follow logic and coordinate transforms.
  *
  * Provides worldToScreen(), ppm(), centre-of-mass computation,
  * command module finder, and camera update logic.
- *
- * @module render/flight/_camera
  */
 
 import { getPartById } from '../../data/parts.js';
 import { PartType } from '../../core/constants.js';
+import type { PhysicsState } from '../../core/physics.js';
+import type { RocketAssembly } from '../../core/rocketbuilder.js';
 import { getFlightRenderState } from './_state.js';
 import {
   FLIGHT_PIXELS_PER_METRE,
@@ -22,23 +22,21 @@ import {
 
 /**
  * Return the effective pixels-per-metre for the current zoom level.
- * @returns {number}
  */
-export function ppm() {
+export function ppm(): number {
   const s = getFlightRenderState();
   return FLIGHT_PIXELS_PER_METRE * s.zoomLevel;
 }
 
 /**
  * Convert a world-space position (metres, Y-up) to canvas pixels (Y-down).
- *
- * @param {number} worldX   World X in metres.
- * @param {number} worldY   World Y in metres (positive = up).
- * @param {number} screenW  Canvas width in pixels.
- * @param {number} screenH  Canvas height in pixels.
- * @returns {{ sx: number, sy: number }}  Canvas pixel coordinates.
  */
-export function worldToScreen(worldX, worldY, screenW, screenH) {
+export function worldToScreen(
+  worldX: number,
+  worldY: number,
+  screenW: number,
+  screenH: number,
+): { sx: number; sy: number } {
   const s = getFlightRenderState();
   const p = FLIGHT_PIXELS_PER_METRE * s.zoomLevel;
   return {
@@ -54,12 +52,8 @@ export function worldToScreen(worldX, worldY, screenW, screenH) {
 /**
  * Return true if the given part set contains at least one COMMAND_MODULE or
  * COMPUTER_MODULE.
- *
- * @param {Set<string>}                                         partSet
- * @param {import('../../core/rocketbuilder.js').RocketAssembly} assembly
- * @returns {boolean}
  */
-export function hasCommandModule(partSet, assembly) {
+export function hasCommandModule(partSet: Set<string>, assembly: RocketAssembly): boolean {
   for (const instanceId of partSet) {
     const placed = assembly.parts.get(instanceId);
     const def    = placed ? getPartById(placed.partId) : null;
@@ -76,15 +70,14 @@ export function hasCommandModule(partSet, assembly) {
 
 /**
  * Compute the mass-weighted centre of mass for a set of parts.
- *
- * @param {Map<string, number>}                                 fuelStore
- * @param {import('../../core/rocketbuilder.js').RocketAssembly} assembly
- * @param {Set<string>}                                        partSet
- * @param {number}                                             originX  World X (m).
- * @param {number}                                             originY  World Y (m).
- * @returns {{ x: number, y: number }}  CoM world position in metres.
  */
-export function computeCoM(fuelStore, assembly, partSet, originX, originY) {
+export function computeCoM(
+  fuelStore: Map<string, number>,
+  assembly: RocketAssembly,
+  partSet: Set<string>,
+  originX: number,
+  originY: number,
+): { x: number; y: number } {
   let totalMass = 0;
   let comX      = 0;
   let comY      = 0;
@@ -92,7 +85,7 @@ export function computeCoM(fuelStore, assembly, partSet, originX, originY) {
   for (const instanceId of partSet) {
     const placed = assembly.parts.get(instanceId);
     const def    = placed ? getPartById(placed.partId) : null;
-    if (!def) continue;
+    if (!placed || !def) continue;
 
     const fuelMass = fuelStore?.get(instanceId) ?? 0;
     const mass     = (def.mass ?? 1) + fuelMass;
@@ -117,15 +110,12 @@ export function computeCoM(fuelStore, assembly, partSet, originX, originY) {
 
 /**
  * Update the camera to follow the rocket's centre of mass.
- *
- * @param {import('../../core/physics.js').PhysicsState}           ps
- * @param {import('../../core/rocketbuilder.js').RocketAssembly}   assembly
  */
-export function updateCamera(ps, assembly) {
+export function updateCamera(ps: PhysicsState, assembly: RocketAssembly): void {
   const s = getFlightRenderState();
 
-  let targetX, targetY;
-  let refX, refY;
+  let targetX: number, targetY: number;
+  let refX: number, refY: number;
 
   if (hasCommandModule(ps.activeParts, assembly)) {
     const com = computeCoM(ps.fuelStore, assembly, ps.activeParts, ps.posX, ps.posY);
@@ -155,11 +145,11 @@ export function updateCamera(ps, assembly) {
   }
 
   // Detect CoM jumps relative to the rocket body.
-  const relX = targetX - refX;
-  const relY = targetY - refY;
+  const relX = targetX! - refX!;
+  const relY = targetY! - refY!;
   if (s.prevTargetX !== null) {
     const jumpX = relX - s.prevTargetX;
-    const jumpY = relY - s.prevTargetY;
+    const jumpY = relY - s.prevTargetY!;
     if (Math.abs(jumpX) > 0.05 || Math.abs(jumpY) > 0.05) {
       s.camOffsetX -= jumpX;
       s.camOffsetY -= jumpY;
@@ -189,13 +179,13 @@ export function updateCamera(ps, assembly) {
   }
 
   if (s.camSnap || dt === 0) {
-    s.camWorldX  = targetX;
-    s.camWorldY  = targetY;
+    s.camWorldX  = targetX!;
+    s.camWorldY  = targetY!;
     s.camSnap    = false;
     s.camOffsetX = 0;
     s.camOffsetY = 0;
   } else {
-    s.camWorldX = targetX + s.camOffsetX;
-    s.camWorldY = targetY + s.camOffsetY;
+    s.camWorldX = targetX! + s.camOffsetX;
+    s.camWorldY = targetY! + s.camOffsetY;
   }
 }

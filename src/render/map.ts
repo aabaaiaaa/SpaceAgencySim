@@ -1,5 +1,5 @@
 /**
- * map.js — PixiJS rendering for the top-down orbital map view.
+ * map.ts — PixiJS rendering for the top-down orbital map view.
  *
  * Draws a 2D body-centred map showing:
  *   - The central body (Earth) as a filled circle.
@@ -17,8 +17,6 @@
  *
  *   screenX = centreX + worldX × scale
  *   screenY = centreY − worldY × scale   (Y flipped)
- *
- * @module render/map
  */
 
 import * as PIXI from 'pixi.js';
@@ -51,6 +49,9 @@ import { FlightPhase } from '../core/constants.js';
 import { SOI_RADIUS } from '../core/manoeuvre.js';
 import { getCommsCoverageInfo } from '../core/comms.js';
 
+import type { PhysicsState } from '../core/physics.js';
+import type { FlightState, GameState, OrbitalElements } from '../core/gameState.js';
+
 // ---------------------------------------------------------------------------
 // Colour palette
 // ---------------------------------------------------------------------------
@@ -77,7 +78,7 @@ const DEST_BODY_COLOR       = 0xff8844;
 const SOI_BOUNDARY_COLOR    = 0x334455;
 const ASSIST_BODY_COLOR     = 0x88cc44;
 
-const BAND_COLORS = {
+const BAND_COLORS: Record<string, number> = {
   LEO: 0x104020,
   MEO: 0x403020,
   HEO: 0x401020,
@@ -97,39 +98,38 @@ const MAX_LABELS = 24;
 // ---------------------------------------------------------------------------
 
 /** Root container added to app.stage; toggled visible/invisible. */
-let _mapRoot = null;
+let _mapRoot: PIXI.Container | null = null;
 
 // Graphics objects — cleared and redrawn each frame.
-let _bgGraphics       = null;
-let _bandsGraphics    = null;
-let _orbitsGraphics   = null;
-let _bodyGraphics     = null;
-let _shadowGraphics   = null;
-let _objectsGraphics  = null;
-let _craftGraphics    = null;
-let _transferGraphics = null;
-let _surfaceGraphics  = null;
-let _commsGraphics    = null;
+let _bgGraphics: PIXI.Graphics | null       = null;
+let _bandsGraphics: PIXI.Graphics | null     = null;
+let _orbitsGraphics: PIXI.Graphics | null    = null;
+let _bodyGraphics: PIXI.Graphics | null      = null;
+let _shadowGraphics: PIXI.Graphics | null    = null;
+let _objectsGraphics: PIXI.Graphics | null   = null;
+let _craftGraphics: PIXI.Graphics | null     = null;
+let _transferGraphics: PIXI.Graphics | null  = null;
+let _surfaceGraphics: PIXI.Graphics | null   = null;
+let _commsGraphics: PIXI.Graphics | null     = null;
 
 /** Container for reusable PIXI.Text labels. */
-let _labelContainer = null;
-/** @type {PIXI.Text[]} */
-let _labelPool = [];
-let _nextLabel = 0;
+let _labelContainer: PIXI.Container | null = null;
+let _labelPool: PIXI.Text[] = [];
+let _nextLabel: number = 0;
 
 // Zoom / view state
-let _currentZoom     = MapZoom.ORBIT_DETAIL;
-let _viewRadius      = 10_000_000;
-let _customViewRadius = null;
-let _selectedTarget  = null;
-let _showShadow      = false;
-let _showCommsOverlay = false;
+let _currentZoom: string     = MapZoom.ORBIT_DETAIL;
+let _viewRadius: number      = 10_000_000;
+let _customViewRadius: number | null = null;
+let _selectedTarget: string | null  = null;
+let _showShadow: boolean      = false;
+let _showCommsOverlay: boolean = false;
 
-/** Currently selected transfer route target body ID. @type {string|null} */
-let _selectedTransferTarget = null;
+/** Currently selected transfer route target body ID. */
+let _selectedTransferTarget: string | null = null;
 
 // Input handlers
-let _wheelHandler = null;
+let _wheelHandler: ((e: WheelEvent) => void) | null = null;
 
 // ---------------------------------------------------------------------------
 // Public API — lifecycle
@@ -139,7 +139,7 @@ let _wheelHandler = null;
  * Create all PixiJS containers for the map scene and add them to the stage
  * (hidden by default).  Call once when the flight scene starts.
  */
-export function initMapRenderer() {
+export function initMapRenderer(): void {
   const app = getApp();
 
   // Defensive cleanup.
@@ -204,7 +204,7 @@ export function initMapRenderer() {
  * Make the map scene visible.
  * Registers the map-specific scroll-wheel zoom handler.
  */
-export function showMapScene() {
+export function showMapScene(): void {
   if (!_mapRoot) return;
   _mapRoot.visible = true;
   if (!_wheelHandler) {
@@ -218,7 +218,7 @@ export function showMapScene() {
  * Unregisters the scroll-wheel zoom handler so it doesn't conflict with
  * the flight renderer's zoom.
  */
-export function hideMapScene() {
+export function hideMapScene(): void {
   if (!_mapRoot) return;
   _mapRoot.visible = false;
   if (_wheelHandler) {
@@ -227,15 +227,14 @@ export function hideMapScene() {
   }
 }
 
-/** @returns {boolean} */
-export function isMapVisible() {
+export function isMapVisible(): boolean {
   return _mapRoot ? _mapRoot.visible : false;
 }
 
 /**
  * Tear down the map renderer and remove all PixiJS objects.
  */
-export function destroyMapRenderer() {
+export function destroyMapRenderer(): void {
   if (_wheelHandler) {
     window.removeEventListener('wheel', _wheelHandler);
     _wheelHandler = null;
@@ -271,36 +270,35 @@ export function destroyMapRenderer() {
 // ---------------------------------------------------------------------------
 
 /** Set the zoom level to a named preset. Resets any manual scroll zoom. */
-export function setMapZoomLevel(level) {
+export function setMapZoomLevel(level: string): void {
   _currentZoom = level;
   _customViewRadius = null;
 }
 
-/** @returns {string} Current MapZoom value. */
-export function getMapZoomLevel() {
+/** Current MapZoom value. */
+export function getMapZoomLevel(): string {
   return _currentZoom;
 }
 
 /** Cycle to the next zoom level preset (wraps around). */
-export function cycleMapZoom() {
+export function cycleMapZoom(): void {
   const levels = [
     MapZoom.ORBIT_DETAIL,
     MapZoom.LOCAL_BODY,
     MapZoom.CRAFT_TO_TARGET,
     MapZoom.SOLAR_SYSTEM,
   ];
-  const idx = levels.indexOf(_currentZoom);
+  const idx = levels.indexOf(_currentZoom as MapZoom);
   _currentZoom = levels[(idx + 1) % levels.length];
   _customViewRadius = null;
 }
 
 /** Set the selected target orbital object ID (for craft-to-target zoom and warp). */
-export function setMapTarget(targetId) {
+export function setMapTarget(targetId: string | null): void {
   _selectedTarget = targetId;
 }
 
-/** @returns {string|null} */
-export function getMapTarget() {
+export function getMapTarget(): string | null {
   return _selectedTarget;
 }
 
@@ -308,20 +306,20 @@ export function getMapTarget() {
  * Cycle the selected target through all orbital objects for the given body.
  * Returns the new target ID (or null if none available).
  */
-export function cycleMapTarget(orbitalObjects, bodyId) {
-  const candidates = (orbitalObjects || []).filter(o => o.bodyId === bodyId);
+export function cycleMapTarget(orbitalObjects: any[], bodyId: string): string | null {
+  const candidates = (orbitalObjects || []).filter((o: any) => o.bodyId === bodyId);
   if (candidates.length === 0) {
     _selectedTarget = null;
     return null;
   }
-  const idx = candidates.findIndex(o => o.id === _selectedTarget);
+  const idx = candidates.findIndex((o: any) => o.id === _selectedTarget);
   const next = candidates[(idx + 1) % candidates.length];
   _selectedTarget = next.id;
   return _selectedTarget;
 }
 
 /** Toggle the day/night shadow overlay. */
-export function toggleMapShadow() {
+export function toggleMapShadow(): void {
   _showShadow = !_showShadow;
 }
 
@@ -329,33 +327,32 @@ export function toggleMapShadow() {
  * Toggle the comms coverage overlay on the map.
  * Shows connected zones (green) and dead zones (red) around the body.
  */
-export function toggleMapCommsOverlay() {
+export function toggleMapCommsOverlay(): void {
   _showCommsOverlay = !_showCommsOverlay;
 }
 
 /**
  * Check whether the comms overlay is currently shown.
- * @returns {boolean}
  */
-export function isCommsOverlayVisible() {
+export function isCommsOverlayVisible(): boolean {
   return _showCommsOverlay;
 }
 
 /**
  * Cycle through transfer target bodies (for route planning).
  *
- * @param {string} bodyId  Current celestial body.
- * @param {number} altitude  Current orbital altitude (m).
- * @param {string} phase  Current flight phase.
- * @returns {string|null}  New selected transfer target body ID.
+ * @param bodyId  Current celestial body.
+ * @param altitude  Current orbital altitude (m).
+ * @param phase  Current flight phase.
+ * @returns New selected transfer target body ID.
  */
-export function cycleTransferTarget(bodyId, altitude, phase) {
+export function cycleTransferTarget(bodyId: string, altitude: number, phase: string): string | null {
   const targets = getMapTransferTargets(bodyId, altitude, phase);
   if (targets.length === 0) {
     _selectedTransferTarget = null;
     return null;
   }
-  const idx = targets.findIndex(t => t.bodyId === _selectedTransferTarget);
+  const idx = targets.findIndex((t: any) => t.bodyId === _selectedTransferTarget);
   if (idx < 0) {
     // Nothing selected — select the first.
     _selectedTransferTarget = targets[0].bodyId;
@@ -369,18 +366,17 @@ export function cycleTransferTarget(bodyId, altitude, phase) {
   return _selectedTransferTarget;
 }
 
-/** @returns {string|null} Currently selected transfer target body ID. */
-export function getSelectedTransferTarget() {
+/** Currently selected transfer target body ID. */
+export function getSelectedTransferTarget(): string | null {
   return _selectedTransferTarget;
 }
 
 /** Set the selected transfer target body ID. */
-export function setSelectedTransferTarget(bodyId) {
+export function setSelectedTransferTarget(bodyId: string | null): void {
   _selectedTransferTarget = bodyId;
 }
 
-/** @returns {boolean} */
-export function isMapShadowEnabled() {
+export function isMapShadowEnabled(): boolean {
   return _showShadow;
 }
 
@@ -390,14 +386,14 @@ export function isMapShadowEnabled() {
 
 /**
  * Render one frame of the map view.
- *
- * @param {import('../core/physics.js').PhysicsState}     ps
- * @param {import('../core/gameState.js').FlightState}    flightState
- * @param {import('../core/gameState.js').GameState}      state
- * @param {string}                                        [bodyId='EARTH']
- * @param {{ showDebris?: boolean }}                      [options]
  */
-export function renderMapFrame(ps, flightState, state, bodyId = 'EARTH', options) {
+export function renderMapFrame(
+  ps: PhysicsState,
+  flightState: FlightState,
+  state: GameState,
+  bodyId: string = 'EARTH',
+  options?: { showDebris?: boolean },
+): void {
   if (!_mapRoot || !_mapRoot.visible) return;
 
   const w  = window.innerWidth;
@@ -411,9 +407,9 @@ export function renderMapFrame(ps, flightState, state, bodyId = 'EARTH', options
   const transferState = flightState.transferState;
 
   // Resolve target elements.
-  let targetElements = null;
+  let targetElements: OrbitalElements | null = null;
   if (_selectedTarget && state.orbitalObjects) {
-    const target = state.orbitalObjects.find(o => o.id === _selectedTarget);
+    const target = state.orbitalObjects.find((o: any) => o.id === _selectedTarget);
     if (target) targetElements = target.elements;
   }
 
@@ -430,9 +426,9 @@ export function renderMapFrame(ps, flightState, state, bodyId = 'EARTH', options
   _resetLabels();
 
   // 1. Background.
-  _bgGraphics.clear();
-  _bgGraphics.rect(0, 0, w, h);
-  _bgGraphics.fill(MAP_BG);
+  _bgGraphics!.clear();
+  _bgGraphics!.rect(0, 0, w, h);
+  _bgGraphics!.fill(MAP_BG);
 
   // 2. Altitude bands.
   _drawBands(bodyId, cx, cy, scale);
@@ -470,7 +466,7 @@ export function renderMapFrame(ps, flightState, state, bodyId = 'EARTH', options
 // Private — label pool helpers
 // ---------------------------------------------------------------------------
 
-function _resetLabels() {
+function _resetLabels(): void {
   _nextLabel = 0;
   for (const l of _labelPool) l.visible = false;
 }
@@ -479,7 +475,7 @@ function _resetLabels() {
  * Claim the next label from the pool, configure it, and make it visible.
  * Returns null if the pool is exhausted.
  */
-function _useLabel(text, x, y, color) {
+function _useLabel(text: string, x: number, y: number, color: number | string): PIXI.Text | null {
   if (_nextLabel >= MAX_LABELS) return null;
   const l = _labelPool[_nextLabel++];
   l.text = text;
@@ -494,36 +490,36 @@ function _useLabel(text, x, y, color) {
 // Private — drawing helpers
 // ---------------------------------------------------------------------------
 
-function _drawBody(cx, cy, scale, R) {
-  _bodyGraphics.clear();
+function _drawBody(cx: number, cy: number, scale: number, R: number): void {
+  _bodyGraphics!.clear();
 
   const bodyPxR = R * scale;
 
   if (bodyPxR < 2) {
     // Too small — draw a dot.
-    _bodyGraphics.circle(cx, cy, 3);
-    _bodyGraphics.fill(BODY_COLOR);
+    _bodyGraphics!.circle(cx, cy, 3);
+    _bodyGraphics!.fill(BODY_COLOR);
     return;
   }
 
   // Atmosphere glow.
   if (bodyPxR > 10) {
     const atmosR = (R + ATMOSPHERE_VISUAL_HEIGHT) * scale;
-    _bodyGraphics.circle(cx, cy, atmosR);
-    _bodyGraphics.fill({ color: BODY_ATMOSPHERE, alpha: 0.08 });
+    _bodyGraphics!.circle(cx, cy, atmosR);
+    _bodyGraphics!.fill({ color: BODY_ATMOSPHERE, alpha: 0.08 });
   }
 
   // Solid body.
-  _bodyGraphics.circle(cx, cy, bodyPxR);
-  _bodyGraphics.fill(BODY_COLOR);
+  _bodyGraphics!.circle(cx, cy, bodyPxR);
+  _bodyGraphics!.fill(BODY_COLOR);
 
   // Edge highlight.
-  _bodyGraphics.circle(cx, cy, bodyPxR);
-  _bodyGraphics.stroke({ color: BODY_ATMOSPHERE, width: 1, alpha: 0.4 });
+  _bodyGraphics!.circle(cx, cy, bodyPxR);
+  _bodyGraphics!.stroke({ color: BODY_ATMOSPHERE, width: 1, alpha: 0.4 });
 }
 
 /** Map colours for each surface item type. */
-const MAP_SURFACE_COLORS = {
+const MAP_SURFACE_COLORS: Record<string, number> = {
   [SurfaceItemType.FLAG]:               0xff4444,
   [SurfaceItemType.SURFACE_SAMPLE]:     0xddcc88,
   [SurfaceItemType.SURFACE_INSTRUMENT]: 0x44aaff,
@@ -531,7 +527,7 @@ const MAP_SURFACE_COLORS = {
 };
 
 /** Map glyph labels for each surface item type. */
-const MAP_SURFACE_GLYPHS = {
+const MAP_SURFACE_GLYPHS: Record<string, string> = {
   [SurfaceItemType.FLAG]:               '\u2691',  // ⚑
   [SurfaceItemType.SURFACE_SAMPLE]:     '\u25CF',  // ●
   [SurfaceItemType.SURFACE_INSTRUMENT]: '\u25B2',  // ▲
@@ -545,7 +541,7 @@ const MAP_SURFACE_GLYPHS = {
  *
  * Only visible if GPS coverage exists for the body (or it's Earth).
  */
-function _drawSurfaceItems(state, bodyId, cx, cy, scale, R) {
+function _drawSurfaceItems(state: GameState, bodyId: string, cx: number, cy: number, scale: number, R: number): void {
   if (!_surfaceGraphics) return;
   _surfaceGraphics.clear();
 
@@ -577,8 +573,8 @@ function _drawSurfaceItems(state, bodyId, cx, cy, scale, R) {
   }
 }
 
-function _drawBands(bodyId, cx, cy, scale) {
-  _bandsGraphics.clear();
+function _drawBands(bodyId: string, cx: number, cy: number, scale: number): void {
+  _bandsGraphics!.clear();
 
   const bands = ALTITUDE_BANDS[bodyId];
   const R     = BODY_RADIUS[bodyId];
@@ -596,10 +592,10 @@ function _drawBands(bodyId, cx, cy, scale) {
     // Semi-transparent fill for the band zone.
     // Draw outer filled circle then punch the inner with the background.
     // PixiJS doesn't easily support donut shapes, so we draw boundary lines only.
-    _bandsGraphics.circle(cx, cy, innerPx);
-    _bandsGraphics.stroke({ color, width: 1, alpha: 0.35 });
-    _bandsGraphics.circle(cx, cy, outerPx);
-    _bandsGraphics.stroke({ color, width: 1, alpha: 0.2 });
+    _bandsGraphics!.circle(cx, cy, innerPx);
+    _bandsGraphics!.stroke({ color, width: 1, alpha: 0.35 });
+    _bandsGraphics!.circle(cx, cy, outerPx);
+    _bandsGraphics!.stroke({ color, width: 1, alpha: 0.2 });
 
     // Band name label.
     if (innerPx > 30 && innerPx < window.innerWidth) {
@@ -608,8 +604,16 @@ function _drawBands(bodyId, cx, cy, scale) {
   }
 }
 
-function _drawOrbitalObjects(state, flightState, cx, cy, scale, bodyId, options) {
-  _objectsGraphics.clear();
+function _drawOrbitalObjects(
+  state: GameState,
+  flightState: FlightState,
+  cx: number,
+  cy: number,
+  scale: number,
+  bodyId: string,
+  options?: { showDebris?: boolean },
+): void {
+  _objectsGraphics!.clear();
 
   if (!state.orbitalObjects || state.orbitalObjects.length === 0) return;
 
@@ -626,7 +630,7 @@ function _drawOrbitalObjects(state, flightState, cx, cy, scale, bodyId, options)
     const dotColor   = isTarget ? TARGET_COLOR : OBJECT_COLOR;
 
     // Orbit path.
-    _drawOrbitEllipse(_objectsGraphics, obj.elements, bodyId, cx, cy, scale,
+    _drawOrbitEllipse(_objectsGraphics!, obj.elements, bodyId, cx, cy, scale,
       orbitColor, isTarget ? 1.5 : 1, isTarget ? 0.6 : 0.3);
 
     // Position dot.
@@ -635,8 +639,8 @@ function _drawOrbitalObjects(state, flightState, cx, cy, scale, bodyId, options)
     const sy  = cy - pos.y * scale;
     const dotSize = isTarget ? 5 : 3;
 
-    _objectsGraphics.circle(sx, sy, dotSize);
-    _objectsGraphics.fill(dotColor);
+    _objectsGraphics!.circle(sx, sy, dotSize);
+    _objectsGraphics!.fill(dotColor);
 
     // Label (target always labelled; others only if not too dense).
     if (isTarget) {
@@ -645,23 +649,23 @@ function _drawOrbitalObjects(state, flightState, cx, cy, scale, bodyId, options)
       // Docking indicator ring — pulsing circle around the selected target.
       if (obj.type === 'CRAFT' || obj.type === 'STATION') {
         const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 300);
-        _objectsGraphics.circle(sx, sy, dotSize + 6 + pulse * 3);
-        _objectsGraphics.stroke({ color: 0x00ccff, width: 1.5, alpha: 0.4 + pulse * 0.3 });
+        _objectsGraphics!.circle(sx, sy, dotSize + 6 + pulse * 3);
+        _objectsGraphics!.stroke({ color: 0x00ccff, width: 1.5, alpha: 0.4 + pulse * 0.3 });
       }
     }
   }
 }
 
-function _drawCraft(ps, flightState, cx, cy, scale, bodyId) {
-  _orbitsGraphics.clear();
-  _craftGraphics.clear();
+function _drawCraft(ps: PhysicsState, flightState: FlightState, cx: number, cy: number, scale: number, bodyId: string): void {
+  _orbitsGraphics!.clear();
+  _craftGraphics!.clear();
 
   const R = BODY_RADIUS[bodyId];
 
   // --- Orbit path ---
   if (flightState.orbitalElements) {
     // Stable orbit — draw the full ellipse.
-    _drawOrbitEllipse(_orbitsGraphics, flightState.orbitalElements, bodyId,
+    _drawOrbitEllipse(_orbitsGraphics!, flightState.orbitalElements, bodyId,
       cx, cy, scale, CRAFT_ORBIT_COLOR, 2, 0.7);
 
     // Prediction ticks along the orbit.
@@ -673,8 +677,8 @@ function _drawCraft(ps, flightState, cx, cy, scale, bodyId) {
       const px    = cx + p.x * scale;
       const py    = cy - p.y * scale;
       const alpha = 0.6 - (i / preds.length) * 0.45;
-      _orbitsGraphics.circle(px, py, 1.5);
-      _orbitsGraphics.fill({ color: PREDICTION_COLOR, alpha });
+      _orbitsGraphics!.circle(px, py, 1.5);
+      _orbitsGraphics!.fill({ color: PREDICTION_COLOR, alpha });
     }
 
     // Periapsis & apoapsis markers.
@@ -694,17 +698,17 @@ function _drawCraft(ps, flightState, cx, cy, scale, bodyId) {
           const px = cx + path[i].x * scale;
           const py = cy - path[i].y * scale;
           if (!started) {
-            _orbitsGraphics.moveTo(px, py);
+            _orbitsGraphics!.moveTo(px, py);
             started = true;
           } else {
-            _orbitsGraphics.lineTo(px, py);
+            _orbitsGraphics!.lineTo(px, py);
           }
         } else {
           started = false;
         }
       }
       if (started) {
-        _orbitsGraphics.stroke({ color: CRAFT_ORBIT_COLOR, width: 1.5, alpha: 0.4 });
+        _orbitsGraphics!.stroke({ color: CRAFT_ORBIT_COLOR, width: 1.5, alpha: 0.4 });
       }
     }
   }
@@ -715,12 +719,12 @@ function _drawCraft(ps, flightState, cx, cy, scale, bodyId) {
   const sy = cy - craftPos.y * scale;
 
   // Outer glow.
-  _craftGraphics.circle(sx, sy, 8);
-  _craftGraphics.fill({ color: CRAFT_COLOR, alpha: 0.15 });
+  _craftGraphics!.circle(sx, sy, 8);
+  _craftGraphics!.fill({ color: CRAFT_COLOR, alpha: 0.15 });
 
   // Inner dot.
-  _craftGraphics.circle(sx, sy, 4);
-  _craftGraphics.fill(CRAFT_COLOR);
+  _craftGraphics!.circle(sx, sy, 4);
+  _craftGraphics!.fill(CRAFT_COLOR);
 
   // Velocity direction indicator (prograde arrow).
   const speed = Math.hypot(ps.velX, ps.velY);
@@ -729,16 +733,16 @@ function _drawCraft(ps, flightState, cx, cy, scale, bodyId) {
     const arrowLen = 18;
     const tipX     = sx + Math.sin(vAngle) * arrowLen;
     const tipY     = sy - Math.cos(vAngle) * arrowLen;
-    _craftGraphics.moveTo(sx, sy);
-    _craftGraphics.lineTo(tipX, tipY);
-    _craftGraphics.stroke({ color: CRAFT_COLOR, width: 1.5, alpha: 0.8 });
+    _craftGraphics!.moveTo(sx, sy);
+    _craftGraphics!.lineTo(tipX, tipY);
+    _craftGraphics!.stroke({ color: CRAFT_COLOR, width: 1.5, alpha: 0.8 });
   }
 
   // Label.
   _useLabel('CRAFT', sx + 10, sy - 5, CRAFT_COLOR);
 }
 
-function _drawApsides(elements, bodyId, cx, cy, scale) {
+function _drawApsides(elements: OrbitalElements, bodyId: string, cx: number, cy: number, scale: number): void {
   const { semiMajorAxis: a, eccentricity: e, argPeriapsis: omega } = elements;
   const R = BODY_RADIUS[bodyId];
 
@@ -748,8 +752,8 @@ function _drawApsides(elements, bodyId, cx, cy, scale) {
   const peY  = cy - rPe * Math.sin(omega) * scale;
   const peAlt = rPe - R;
 
-  _orbitsGraphics.circle(peX, peY, 3);
-  _orbitsGraphics.stroke({ color: PE_COLOR, width: 1.5 });
+  _orbitsGraphics!.circle(peX, peY, 3);
+  _orbitsGraphics!.stroke({ color: PE_COLOR, width: 1.5 });
   _useLabel(`Pe ${_fmtAlt(peAlt)}`, peX + 6, peY - 5, PE_COLOR);
 
   // Apoapsis (true anomaly = π).
@@ -758,15 +762,25 @@ function _drawApsides(elements, bodyId, cx, cy, scale) {
   const apY  = cy - rAp * Math.sin(omega + Math.PI) * scale;
   const apAlt = rAp - R;
 
-  _orbitsGraphics.circle(apX, apY, 3);
-  _orbitsGraphics.stroke({ color: AP_COLOR, width: 1.5 });
+  _orbitsGraphics!.circle(apX, apY, 3);
+  _orbitsGraphics!.stroke({ color: AP_COLOR, width: 1.5 });
   _useLabel(`Ap ${_fmtAlt(apAlt)}`, apX + 6, apY - 5, AP_COLOR);
 }
 
 /**
  * Draw an orbit ellipse by sampling it at many points.
  */
-function _drawOrbitEllipse(g, elements, bodyId, cx, cy, scale, color, width, alpha) {
+function _drawOrbitEllipse(
+  g: PIXI.Graphics,
+  elements: OrbitalElements,
+  bodyId: string,
+  cx: number,
+  cy: number,
+  scale: number,
+  color: number,
+  width: number,
+  alpha: number,
+): void {
   const path = generateOrbitPath(elements, bodyId, 180);
   if (path.length < 2) return;
 
@@ -777,8 +791,8 @@ function _drawOrbitEllipse(g, elements, bodyId, cx, cy, scale, color, width, alp
   g.stroke({ color, width, alpha });
 }
 
-function _drawTransferTargets(ps, flightState, cx, cy, scale, bodyId) {
-  _transferGraphics.clear();
+function _drawTransferTargets(ps: PhysicsState, flightState: FlightState, cx: number, cy: number, scale: number, bodyId: string): void {
+  _transferGraphics!.clear();
 
   const altitude = Math.max(0, ps.posY);
   const phase = flightState.phase;
@@ -797,10 +811,10 @@ function _drawTransferTargets(ps, flightState, cx, cy, scale, bodyId) {
       for (let i = 0; i < segments; i += 2) {
         const a1 = (Math.PI * 2 * i) / segments;
         const a2 = (Math.PI * 2 * (i + 1)) / segments;
-        _transferGraphics.moveTo(cx + orbitPxR * Math.cos(a1), cy - orbitPxR * Math.sin(a1));
-        _transferGraphics.lineTo(cx + orbitPxR * Math.cos(a2), cy - orbitPxR * Math.sin(a2));
+        _transferGraphics!.moveTo(cx + orbitPxR * Math.cos(a1), cy - orbitPxR * Math.sin(a1));
+        _transferGraphics!.lineTo(cx + orbitPxR * Math.cos(a2), cy - orbitPxR * Math.sin(a2));
       }
-      _transferGraphics.stroke({
+      _transferGraphics!.stroke({
         color: isSelected ? TRANSFER_TARGET_COLOR : 0x555533,
         width: isSelected ? 1.5 : 0.5,
         alpha: isSelected ? 0.6 : 0.2,
@@ -813,8 +827,8 @@ function _drawTransferTargets(ps, flightState, cx, cy, scale, bodyId) {
     const dotR = isSelected ? 8 : 5;
 
     // Body dot.
-    _transferGraphics.circle(sx, sy, dotR);
-    _transferGraphics.fill(isSelected ? TRANSFER_TARGET_COLOR : MOON_BODY_COLOR);
+    _transferGraphics!.circle(sx, sy, dotR);
+    _transferGraphics!.fill(isSelected ? TRANSFER_TARGET_COLOR : MOON_BODY_COLOR);
 
     // Label with delta-v info.
     if (isSelected) {
@@ -840,20 +854,20 @@ function _drawTransferTargets(ps, flightState, cx, cy, scale, bodyId) {
     if (isSelected && flightState.orbitalElements) {
       const route = getMapTransferRoute(
         bodyId, target.bodyId, altitude, flightState.orbitalElements,
-      );
+      ) as any;
       if (route && route.transferPath.length > 1) {
         const path = route.transferPath;
-        _transferGraphics.moveTo(
+        _transferGraphics!.moveTo(
           cx + path[0].x * scale,
           cy - path[0].y * scale,
         );
         for (let i = 1; i < path.length; i++) {
-          _transferGraphics.lineTo(
+          _transferGraphics!.lineTo(
             cx + path[i].x * scale,
             cy - path[i].y * scale,
           );
         }
-        _transferGraphics.stroke({
+        _transferGraphics!.stroke({
           color: TRANSFER_ROUTE_COLOR,
           width: 2,
           alpha: 0.5,
@@ -874,22 +888,22 @@ function _drawTransferTargets(ps, flightState, cx, cy, scale, bodyId) {
  * Draw the predicted transfer trajectory during TRANSFER/CAPTURE phase.
  * Shows the craft's projected path as a dotted/fading line.
  */
-function _drawTransferTrajectory(ps, flightState, cx, cy, scale, bodyId) {
+function _drawTransferTrajectory(ps: PhysicsState, flightState: FlightState, cx: number, cy: number, scale: number, bodyId: string): void {
   const points = generateTransferTrajectory(ps, bodyId, 120);
   if (points.length < 2) return;
 
   // Draw the trajectory as a fading line.
-  _transferGraphics.moveTo(
+  _transferGraphics!.moveTo(
     cx + points[0].x * scale,
     cy - points[0].y * scale,
   );
   for (let i = 1; i < points.length; i++) {
-    _transferGraphics.lineTo(
+    _transferGraphics!.lineTo(
       cx + points[i].x * scale,
       cy - points[i].y * scale,
     );
   }
-  _transferGraphics.stroke({
+  _transferGraphics!.stroke({
     color: TRANSFER_TRAJECTORY_COLOR,
     width: 2,
     alpha: 0.6,
@@ -901,15 +915,15 @@ function _drawTransferTrajectory(ps, flightState, cx, cy, scale, bodyId) {
     const px = cx + points[i].x * scale;
     const py = cy - points[i].y * scale;
     const alpha = 0.7 - (i / points.length) * 0.5;
-    _transferGraphics.circle(px, py, 2);
-    _transferGraphics.fill({ color: TRANSFER_TRAJECTORY_COLOR, alpha });
+    _transferGraphics!.circle(px, py, 2);
+    _transferGraphics!.fill({ color: TRANSFER_TRAJECTORY_COLOR, alpha });
   }
 }
 
 /**
  * Draw celestial bodies relevant during transfer (destination, intermediate bodies).
  */
-function _drawCelestialBodies(flightState, cx, cy, scale, bodyId) {
+function _drawCelestialBodies(flightState: FlightState, cx: number, cy: number, scale: number, bodyId: string): void {
   const bodies = getMapCelestialBodies(bodyId, flightState.transferState);
 
   for (const body of bodies) {
@@ -923,14 +937,14 @@ function _drawCelestialBodies(flightState, cx, cy, scale, bodyId) {
       for (let i = 0; i < segments; i += 2) {
         const a1 = (Math.PI * 2 * i) / segments;
         const a2 = (Math.PI * 2 * (i + 1)) / segments;
-        _transferGraphics.moveTo(cx + orbitPxR * Math.cos(a1), cy - orbitPxR * Math.sin(a1));
-        _transferGraphics.lineTo(cx + orbitPxR * Math.cos(a2), cy - orbitPxR * Math.sin(a2));
+        _transferGraphics!.moveTo(cx + orbitPxR * Math.cos(a1), cy - orbitPxR * Math.sin(a1));
+        _transferGraphics!.lineTo(cx + orbitPxR * Math.cos(a2), cy - orbitPxR * Math.sin(a2));
       }
 
       const isDestination = flightState.transferState &&
         body.bodyId === flightState.transferState.destinationBodyId;
 
-      _transferGraphics.stroke({
+      _transferGraphics!.stroke({
         color: isDestination ? DEST_BODY_COLOR : SOI_BOUNDARY_COLOR,
         width: isDestination ? 1.5 : 0.5,
         alpha: isDestination ? 0.5 : 0.2,
@@ -944,8 +958,8 @@ function _drawCelestialBodies(flightState, cx, cy, scale, bodyId) {
     const dotR = Math.max(4, Math.min(12, bodyR * scale));
     const color = isDestination ? DEST_BODY_COLOR : MOON_BODY_COLOR;
 
-    _transferGraphics.circle(sx, sy, dotR);
-    _transferGraphics.fill(color);
+    _transferGraphics!.circle(sx, sy, dotR);
+    _transferGraphics!.fill(color);
 
     // Label.
     _useLabel(body.name, sx + dotR + 4, sy - 6, color);
@@ -953,8 +967,8 @@ function _drawCelestialBodies(flightState, cx, cy, scale, bodyId) {
     // If destination, add a pulsing highlight ring.
     if (isDestination) {
       const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 400);
-      _transferGraphics.circle(sx, sy, dotR + 4 + pulse * 3);
-      _transferGraphics.stroke({ color: DEST_BODY_COLOR, width: 1.5, alpha: 0.3 + pulse * 0.3 });
+      _transferGraphics!.circle(sx, sy, dotR + 4 + pulse * 3);
+      _transferGraphics!.stroke({ color: DEST_BODY_COLOR, width: 1.5, alpha: 0.3 + pulse * 0.3 });
     }
   }
 
@@ -963,8 +977,8 @@ function _drawCelestialBodies(flightState, cx, cy, scale, bodyId) {
   if (soiR && soiR !== Infinity) {
     const soiPx = soiR * scale;
     if (soiPx > 10 && soiPx < window.innerWidth * 3) {
-      _transferGraphics.circle(cx, cy, soiPx);
-      _transferGraphics.stroke({ color: SOI_BOUNDARY_COLOR, width: 1, alpha: 0.3 });
+      _transferGraphics!.circle(cx, cy, soiPx);
+      _transferGraphics!.stroke({ color: SOI_BOUNDARY_COLOR, width: 1, alpha: 0.3 });
       _useLabel('SOI Boundary', cx + soiPx + 4, cy - 8, SOI_BOUNDARY_COLOR);
     }
   }
@@ -973,7 +987,7 @@ function _drawCelestialBodies(flightState, cx, cy, scale, bodyId) {
 /**
  * Draw transfer progress indicator (ETA, progress bar, destination info).
  */
-function _drawTransferProgress(flightState, w, h) {
+function _drawTransferProgress(flightState: FlightState, w: number, h: number): void {
   const info = getTransferProgressInfo(flightState.transferState, flightState.timeElapsed);
   if (!info) return;
 
@@ -984,12 +998,12 @@ function _drawTransferProgress(flightState, w, h) {
   const barY = 60;
 
   // Background.
-  _transferGraphics.rect(barX, barY, barW, barH);
-  _transferGraphics.fill({ color: 0x222233, alpha: 0.8 });
+  _transferGraphics!.rect(barX, barY, barW, barH);
+  _transferGraphics!.fill({ color: 0x222233, alpha: 0.8 });
 
   // Fill.
-  _transferGraphics.rect(barX, barY, barW * info.progress, barH);
-  _transferGraphics.fill({ color: TRANSFER_TRAJECTORY_COLOR, alpha: 0.9 });
+  _transferGraphics!.rect(barX, barY, barW * info.progress, barH);
+  _transferGraphics!.fill({ color: TRANSFER_TRAJECTORY_COLOR, alpha: 0.9 });
 
   // Labels.
   _useLabel(
@@ -1004,8 +1018,8 @@ function _drawTransferProgress(flightState, w, h) {
   );
 }
 
-function _drawShadow(cx, cy, scale, R, timeElapsed) {
-  _shadowGraphics.clear();
+function _drawShadow(cx: number, cy: number, scale: number, R: number, timeElapsed: number): void {
+  _shadowGraphics!.clear();
   if (!_showShadow) return;
 
   const bodyPxR = R * scale;
@@ -1016,10 +1030,10 @@ function _drawShadow(cx, cy, scale, R, timeElapsed) {
   const nightAngle = sunAngle + Math.PI;
 
   // Semi-circle shadow on the night side.
-  _shadowGraphics.moveTo(cx, cy);
-  _shadowGraphics.arc(cx, cy, bodyPxR, nightAngle - Math.PI / 2, nightAngle + Math.PI / 2);
-  _shadowGraphics.closePath();
-  _shadowGraphics.fill({ color: SHADOW_COLOR, alpha: 0.4 });
+  _shadowGraphics!.moveTo(cx, cy);
+  _shadowGraphics!.arc(cx, cy, bodyPxR, nightAngle - Math.PI / 2, nightAngle + Math.PI / 2);
+  _shadowGraphics!.closePath();
+  _shadowGraphics!.fill({ color: SHADOW_COLOR, alpha: 0.4 });
 }
 
 // ---------------------------------------------------------------------------
@@ -1034,7 +1048,7 @@ const COMMS_DIRECT_COLOR    = 0x4488ff;
  * Draw comms coverage zones on the map.
  * Connected zones shown in green, dead zones in red.
  */
-function _drawCommsOverlay(state, bodyId, cx, cy, scale, R) {
+function _drawCommsOverlay(state: GameState, bodyId: string, cx: number, cy: number, scale: number, R: number): void {
   if (!_commsGraphics) return;
   _commsGraphics.clear();
   if (!_showCommsOverlay) return;
@@ -1097,7 +1111,7 @@ function _drawCommsOverlay(state, bodyId, cx, cy, scale, R) {
 // Private — input
 // ---------------------------------------------------------------------------
 
-function _onWheel(e) {
+function _onWheel(e: WheelEvent): void {
   if (!_mapRoot || !_mapRoot.visible) return;
   e.preventDefault();
 
@@ -1118,7 +1132,7 @@ function _onWheel(e) {
 // Private — formatting
 // ---------------------------------------------------------------------------
 
-function _fmtAlt(metres) {
+function _fmtAlt(metres: number): string {
   if (metres >= 1_000_000) return `${(metres / 1_000_000).toFixed(0)} Mm`;
   if (metres >= 1_000)     return `${(metres / 1_000).toFixed(0)} km`;
   return `${metres.toFixed(0)} m`;

@@ -1,7 +1,5 @@
 /**
- * _input.js — Mouse move handler and wheel zoom handler.
- *
- * @module render/flight/_input
+ * _input.ts — Mouse move handler and wheel zoom handler.
  */
 
 import { getFlightRenderState } from './_state.js';
@@ -10,10 +8,8 @@ import { MIN_ZOOM, MAX_ZOOM } from './_constants.js';
 /**
  * Track the current mouse position so the wheel handler can compute the
  * world coordinate under the cursor.
- *
- * @param {MouseEvent} e
  */
-export function onMouseMove(e) {
+export function onMouseMove(e: MouseEvent): void {
   const s = getFlightRenderState();
   s.mouseX = e.clientX;
   s.mouseY = e.clientY;
@@ -21,10 +17,8 @@ export function onMouseMove(e) {
 
 /**
  * Handle mouse-wheel scroll to zoom the camera in / out.
- *
- * @param {WheelEvent} e
  */
-export function onWheel(e) {
+export function onWheel(e: WheelEvent): void {
   const s = getFlightRenderState();
   if (!s.inputEnabled) return;
   e.preventDefault();

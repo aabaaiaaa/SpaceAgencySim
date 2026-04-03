@@ -121,7 +121,7 @@
 - **Verification**: `npm run typecheck` passes. `npm run test:unit` passes. No `.js` files remain in `src/core/`.
 
 ### TASK-020: Convert render layer to TypeScript (src/render/)
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-019
 - **Description**: Convert all 17 JS files in `src/render/` to TypeScript: flight.js, hub.js, index.js, map.js, vab.js, and all 12 files in `src/render/flight/`. Use PixiJS types from the `pixi.js` package. See requirements Section 4.1.
 - **Verification**: `npm run typecheck` passes. `npm run test:unit` passes. No `.js` files remain in `src/render/`.

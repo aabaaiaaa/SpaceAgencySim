@@ -4,15 +4,18 @@
 
 import * as PIXI from 'pixi.js';
 
-/** @type {PIXI.Application | null} */
-let app = null;
+declare global {
+  interface Window {
+    __pixiApp?: PIXI.Application;
+  }
+}
+
+let app: PIXI.Application | null = null;
 
 /**
  * Initialize the PixiJS Application and attach it to the provided canvas.
- * @param {HTMLCanvasElement} canvas
- * @returns {Promise<void>}
  */
-export async function initRenderer(canvas) {
+export async function initRenderer(canvas: HTMLCanvasElement): Promise<void> {
   app = new PIXI.Application();
 
   await app.init({
@@ -31,9 +34,8 @@ export async function initRenderer(canvas) {
 
 /**
  * Return the active PixiJS Application instance.
- * @returns {PIXI.Application}
  */
-export function getApp() {
+export function getApp(): PIXI.Application {
   if (!app) throw new Error('Renderer not initialized — call initRenderer() first.');
   return app;
 }

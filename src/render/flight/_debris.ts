@@ -1,12 +1,13 @@
 /**
- * _debris.js — Debris fragment rendering, docking target marker, ejected crew.
- *
- * @module render/flight/_debris
+ * _debris.ts — Debris fragment rendering, docking target marker, ejected crew.
  */
 
 import * as PIXI from 'pixi.js';
 import { getPartById } from '../../data/parts.js';
 import { PartType, ControlMode } from '../../core/constants.js';
+import type { PhysicsState } from '../../core/physics.js';
+import type { DebrisState } from '../../core/staging.js';
+import type { RocketAssembly } from '../../core/rocketbuilder.js';
 import { getFlightRenderState } from './_state.js';
 import { ppm, worldToScreen } from './_camera.js';
 import { getApp } from '../index.js';
@@ -18,15 +19,7 @@ import { acquireGraphics, releaseContainerChildren } from './_pool.js';
 // Debris rendering
 // ---------------------------------------------------------------------------
 
-/**
- * Render all debris fragments into _debrisContainer.
- *
- * @param {import('../../core/staging.js').DebrisState[]}          debrisList
- * @param {import('../../core/rocketbuilder.js').RocketAssembly}   assembly
- * @param {number}                                                 w  Canvas width.
- * @param {number}                                                 h  Canvas height.
- */
-export function renderDebris(debrisList, assembly, w, h) {
+export function renderDebris(debrisList: DebrisState[], assembly: RocketAssembly, w: number, h: number): void {
   const s = getFlightRenderState();
   if (!s.debrisContainer) return;
 
@@ -51,7 +44,7 @@ export function renderDebris(debrisList, assembly, w, h) {
     for (const instanceId of debris.activeParts) {
       const placed = assembly.parts.get(instanceId);
       const def    = placed ? getPartById(placed.partId) : null;
-      if (!def) continue;
+      if (!placed || !def) continue;
       if (def.type === PartType.LANDING_LEGS || def.type === PartType.LANDING_LEG) {
         drawLandingLeg(g, placed, def, debris, assembly, 0.5);
       } else {
@@ -62,7 +55,7 @@ export function renderDebris(debrisList, assembly, w, h) {
     for (const instanceId of debris.activeParts) {
       const placed = assembly.parts.get(instanceId);
       const def    = placed ? getPartById(placed.partId) : null;
-      if (!def) continue;
+      if (!placed || !def) continue;
       fragContainer.addChild(makePartLabel(placed, def, 0.5));
     }
   }
@@ -72,11 +65,7 @@ export function renderDebris(debrisList, assembly, w, h) {
 // Docking target rendering
 // ---------------------------------------------------------------------------
 
-/**
- * Render a docking target marker when the craft is in docking/RCS mode
- * and has a docking target selected.
- */
-export function renderDockingTarget(ps, w, h) {
+export function renderDockingTarget(ps: PhysicsState, w: number, h: number): void {
   const s = getFlightRenderState();
   if (!s.rocketContainer) return;
 
@@ -126,12 +115,12 @@ export function renderDockingTarget(ps, w, h) {
   const g = s.dockingTargetGfx;
 
   if (isOffScreen) {
-    g.beginFill(0x00ccff, 0.7);
-    g.drawCircle(clampedX, clampedY, 8);
-    g.endFill();
+    (g as PIXI.Graphics & { beginFill: Function }).beginFill(0x00ccff, 0.7);
+    (g as PIXI.Graphics & { drawCircle: Function }).drawCircle(clampedX, clampedY, 8);
+    (g as PIXI.Graphics & { endFill: Function }).endFill();
   } else {
     const size = 16;
-    g.lineStyle(2, 0x00ccff, 0.9);
+    (g as PIXI.Graphics & { lineStyle: Function }).lineStyle(2, 0x00ccff, 0.9);
 
     g.moveTo(targetSX, targetSY - size);
     g.lineTo(targetSX + size, targetSY);
@@ -147,10 +136,10 @@ export function renderDockingTarget(ps, w, h) {
 
     for (const [, portState] of (ps.dockingPortStates || new Map())) {
       if (portState === 'docked') {
-        g.lineStyle(0);
-        g.beginFill(0x44ff44, 0.6);
-        g.drawCircle(targetSX, targetSY, 6);
-        g.endFill();
+        (g as PIXI.Graphics & { lineStyle: Function }).lineStyle(0);
+        (g as PIXI.Graphics & { beginFill: Function }).beginFill(0x44ff44, 0.6);
+        (g as PIXI.Graphics & { drawCircle: Function }).drawCircle(targetSX, targetSY, 6);
+        (g as PIXI.Graphics & { endFill: Function }).endFill();
         break;
       }
     }
@@ -161,14 +150,7 @@ export function renderDockingTarget(ps, w, h) {
 // Ejected crew rendering
 // ---------------------------------------------------------------------------
 
-/**
- * Render ejected crew capsules as small rectangles with parachute canopies.
- *
- * @param {import('../../core/physics.js').PhysicsState} ps
- * @param {number} w  Canvas width.
- * @param {number} h  Canvas height.
- */
-export function renderEjectedCrew(ps, w, h) {
+export function renderEjectedCrew(ps: PhysicsState, w: number, h: number): void {
   if (!ps.ejectedCrew || ps.ejectedCrew.length === 0) return;
   const s = getFlightRenderState();
   if (!s.debrisContainer) return;

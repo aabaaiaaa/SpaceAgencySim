@@ -1,14 +1,16 @@
 /**
- * _trails.js — Engine exhaust trail segments, sine-wave plumes, RCS plumes,
+ * _trails.ts — Engine exhaust trail segments, sine-wave plumes, RCS plumes,
  *              and Mach cone effects.
- *
- * @module render/flight/_trails
  */
 
 import * as PIXI from 'pixi.js';
 import { getPartById } from '../../data/parts.js';
+import type { PartDef } from '../../data/parts.js';
 import { PartType, ControlMode } from '../../core/constants.js';
+import type { PhysicsState } from '../../core/physics.js';
+import type { RocketAssembly, PlacedPart } from '../../core/rocketbuilder.js';
 import { getFlightRenderState } from './_state.js';
+import type { PlumeState } from './_state.js';
 import { ppm, worldToScreen, computeCoM } from './_camera.js';
 import { lerpColor } from './_sky.js';
 import { acquireGraphics, releaseGraphics, releaseContainerChildren } from './_pool.js';
@@ -34,16 +36,12 @@ import {
 // Nozzle position helper
 // ---------------------------------------------------------------------------
 
-/**
- * Compute the world-space position of an engine's nozzle exit.
- *
- * @param {import('../../core/physics.js').PhysicsState}         ps
- * @param {import('../../core/rocketbuilder.js').PlacedPart}     placed
- * @param {import('../../data/parts.js').PartDef}                def
- * @param {{ x: number, y: number }}                             comBody
- * @returns {{ x: number, y: number }}
- */
-function _nozzleWorldPos(ps, placed, def, comBody) {
+function _nozzleWorldPos(
+  ps: PhysicsState,
+  placed: PlacedPart,
+  def: PartDef,
+  comBody: { x: number; y: number },
+): { x: number; y: number } {
   const nozzleX = placed.x * SCALE_M_PER_PX;
   const nozzleY = (placed.y - (def.height ?? 20) / 2) * SCALE_M_PER_PX;
   const dx   = nozzleX - comBody.x;
@@ -60,10 +58,7 @@ function _nozzleWorldPos(ps, placed, def, comBody) {
 // Plume helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Return outer/mid/core plume colours interpolated by atmospheric density.
- */
-function _plumeColors(isSRB, densityRatio) {
+function _plumeColors(isSRB: boolean, densityRatio: number): { outer: number; mid: number; core: number } {
   if (isSRB) {
     return {
       outer: lerpColor(0xff5500, 0xff3300, densityRatio),
@@ -78,12 +73,23 @@ function _plumeColors(isSRB, densityRatio) {
   };
 }
 
-/**
- * Compute plume geometry parameters.
- */
-function _computePlumeParams(def, effectiveThrottle, densityRatio, plumeState) {
+interface PlumeParams {
+  length: number;
+  baseWidth: number;
+  tipWidth: number;
+  sineFreq: number;
+  sineAmp: number;
+  phase: number;
+  diamondCount: number;
+  diamondAlpha: number;
+  isSRB: boolean;
+  throttle: number;
+  densityRatio: number;
+}
+
+function _computePlumeParams(def: PartDef, effectiveThrottle: number, densityRatio: number, plumeState: PlumeState): PlumeParams {
   const isSRB = def.type === PartType.SOLID_ROCKET_BOOSTER;
-  const thrustKN = def.properties?.thrust ?? 60;
+  const thrustKN = (def.properties?.thrust as number | undefined) ?? 60;
 
   const sizeFactor = thrustKN / 120;
   const throttleLengthScale = 0.4 + 0.6 * effectiveThrottle;
@@ -111,11 +117,15 @@ function _computePlumeParams(def, effectiveThrottle, densityRatio, plumeState) {
   };
 }
 
-/**
- * Draw a sine-wave plume polygon path into a Graphics object.
- */
-function _drawPlumePath(g, nsx, nsy, exDirX, exDirY, bendX, bendY, pLength, pBaseW, pTipW, sineAmpPx, sineFreq, phase, segs) {
-  function _sample(t) {
+function _drawPlumePath(
+  g: PIXI.Graphics,
+  nsx: number, nsy: number,
+  exDirX: number, exDirY: number,
+  bendX: number, bendY: number,
+  pLength: number, pBaseW: number, pTipW: number,
+  sineAmpPx: number, sineFreq: number, phase: number, segs: number,
+): void {
+  function _sample(t: number): { cx: number; cy: number; px: number; py: number } {
     const t2 = t * t;
     const cx = nsx + exDirX * t * pLength + bendX * t2;
     const cy = nsy + exDirY * t * pLength + bendY * t2;
@@ -160,12 +170,9 @@ function _drawPlumePath(g, nsx, nsy, exDirX, exDirY, bendX, bendY, pLength, pBas
 // Plume state management
 // ---------------------------------------------------------------------------
 
-/**
- * Update per-engine plume animation state.
- */
-export function updatePlumeStates(ps, assembly, dt) {
+export function updatePlumeStates(ps: PhysicsState, assembly: RocketAssembly, dt: number): void {
   const s = getFlightRenderState();
-  const firingEngines = new Set();
+  const firingEngines = new Set<string>();
 
   for (const [instanceId, placed] of assembly.parts) {
     if (!ps.activeParts.has(instanceId)) continue;
@@ -182,7 +189,7 @@ export function updatePlumeStates(ps, assembly, dt) {
     if (!s.plumeStates.has(instanceId)) {
       s.plumeStates.set(instanceId, { phase: Math.random() * Math.PI * 2 });
     }
-    const state = s.plumeStates.get(instanceId);
+    const state = s.plumeStates.get(instanceId)!;
     const rate = isSRB ? PLUME_PHASE_RATE_SRB : PLUME_PHASE_RATE_LIQUID;
     state.phase += dt * rate;
   }
@@ -195,7 +202,7 @@ export function updatePlumeStates(ps, assembly, dt) {
 /**
  * Render sine-wave engine plumes for all firing engines.
  */
-export function renderPlumes(ps, assembly, density, w, h) {
+export function renderPlumes(ps: PhysicsState, assembly: RocketAssembly, density: number, w: number, h: number): void {
   const s = getFlightRenderState();
   if (!s.trailContainer || s.plumeStates.size === 0) return;
 
@@ -220,7 +227,7 @@ export function renderPlumes(ps, assembly, density, w, h) {
   for (const [instanceId, plumeState] of s.plumeStates) {
     const placed = assembly.parts.get(instanceId);
     const def = placed ? getPartById(placed.partId) : null;
-    if (!def) continue;
+    if (!placed || !def) continue;
 
     const isSRB = def.type === PartType.SOLID_ROCKET_BOOSTER;
     const isFiring = ps.firingEngines && ps.firingEngines.has(instanceId);
@@ -278,10 +285,7 @@ export function renderPlumes(ps, assembly, density, w, h) {
 // Smoke trail emission, aging, and rendering
 // ---------------------------------------------------------------------------
 
-/**
- * Emit trail segments for all engines this frame.
- */
-export function emitSmokeSegments(ps, assembly, density) {
+export function emitSmokeSegments(ps: PhysicsState, assembly: RocketAssembly, density: number): void {
   const s = getFlightRenderState();
   if (density <= TRAIL_DENSITY_THRESHOLD) return;
 
@@ -345,7 +349,7 @@ export function emitSmokeSegments(ps, assembly, density) {
 /**
  * Advance every trail segment by `dt` seconds and discard expired ones.
  */
-export function updateTrails(dt) {
+export function updateTrails(dt: number): void {
   const s = getFlightRenderState();
   for (const seg of s.trailSegments) {
     seg.age    += dt;
@@ -365,7 +369,7 @@ export function updateTrails(dt) {
 /**
  * Draw all live trail segments into _trailContainer.
  */
-export function renderTrails(w, h) {
+export function renderTrails(w: number, h: number): void {
   const s = getFlightRenderState();
   if (!s.trailContainer) return;
   releaseContainerChildren(s.trailContainer);
@@ -379,7 +383,7 @@ export function renderTrails(w, h) {
     const t      = seg.age / maxAge;
     const alpha  = Math.max(0, 1 - t);
 
-    let color;
+    let color: number;
     if (seg.isSmoke) {
       color = t < 0.5
         ? lerpColor(0x888888, 0x444444, t / 0.5)
@@ -405,7 +409,7 @@ export function renderTrails(w, h) {
 /**
  * Compute elapsed seconds since the last call, advancing lastTrailTime.
  */
-export function trailDt() {
+export function trailDt(): number {
   const s = getFlightRenderState();
   const now = performance.now();
   if (s.lastTrailTime === null) {
@@ -421,10 +425,7 @@ export function trailDt() {
 // RCS plumes
 // ---------------------------------------------------------------------------
 
-/**
- * Render small RCS plumes around the craft in docking/RCS mode.
- */
-export function renderRcsPlumes(ps, assembly, w, h) {
+export function renderRcsPlumes(ps: PhysicsState, assembly: RocketAssembly, w: number, h: number): void {
   const s = getFlightRenderState();
   if (!s.trailContainer) return;
   if (ps.controlMode !== ControlMode.RCS && ps.controlMode !== ControlMode.DOCKING) return;
@@ -448,7 +449,7 @@ export function renderRcsPlumes(ps, assembly, w, h) {
   const rtSy = sinA;
 
   for (const dir of ps.rcsActiveDirections) {
-    let plumeDirSx, plumeDirSy;
+    let plumeDirSx: number, plumeDirSy: number;
     switch (dir) {
       case 'up':    plumeDirSx = -upSx; plumeDirSy = -upSy; break;
       case 'down':  plumeDirSx =  upSx; plumeDirSy =  upSy; break;
@@ -494,10 +495,7 @@ export function renderRcsPlumes(ps, assembly, w, h) {
 // Mach effects
 // ---------------------------------------------------------------------------
 
-/**
- * Render transonic/supersonic visual effects around the rocket.
- */
-export function renderMachEffects(ps, assembly, density, w, h, dt) {
+export function renderMachEffects(ps: PhysicsState, assembly: RocketAssembly, density: number, w: number, h: number, dt: number): void {
   const s = getFlightRenderState();
   const speed = Math.hypot(ps.velX, ps.velY);
   const mach  = speed / MACH_1;

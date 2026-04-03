@@ -1,30 +1,22 @@
 /**
- * _pool.js — Simple array-based object pools for PIXI.Graphics and PIXI.Text.
+ * _pool.ts — Simple array-based object pools for PIXI.Graphics and PIXI.Text.
  *
  * Avoids per-frame allocation churn by reusing PixiJS display objects.
  * Each pool is a flat array used as a free-list.
- *
- * @module render/flight/_pool
  */
 
 import * as PIXI from 'pixi.js';
 
-/** @type {PIXI.Graphics[]} */
-const _graphicsPool = [];
-
-/** @type {PIXI.Text[]} */
-const _textPool = [];
+const _graphicsPool: PIXI.Graphics[] = [];
+const _textPool: PIXI.Text[] = [];
 
 /**
  * Acquire a PIXI.Graphics object from the pool.
  * Creates a new one if the pool is empty.
- * The returned object has its graphics state cleared and is ready to draw into.
- *
- * @returns {PIXI.Graphics}
  */
-export function acquireGraphics() {
+export function acquireGraphics(): PIXI.Graphics {
   if (_graphicsPool.length > 0) {
-    const g = _graphicsPool.pop();
+    const g = _graphicsPool.pop()!;
     g.clear();
     g.visible = true;
     g.alpha = 1;
@@ -39,10 +31,8 @@ export function acquireGraphics() {
 /**
  * Release a PIXI.Graphics object back to the pool.
  * Detaches it from any parent container first.
- *
- * @param {PIXI.Graphics} g
  */
-export function releaseGraphics(g) {
+export function releaseGraphics(g: PIXI.Graphics | null): void {
   if (!g) return;
   g.clear();
   if (g.parent) g.parent.removeChild(g);
@@ -52,13 +42,10 @@ export function releaseGraphics(g) {
 /**
  * Acquire a PIXI.Text object from the pool.
  * Creates a new one if the pool is empty.
- * The returned object has sensible defaults reset.
- *
- * @returns {PIXI.Text}
  */
-export function acquireText() {
+export function acquireText(): PIXI.Text {
   if (_textPool.length > 0) {
-    const t = _textPool.pop();
+    const t = _textPool.pop()!;
     t.visible = true;
     t.alpha = 1;
     t.position.set(0, 0);
@@ -73,10 +60,8 @@ export function acquireText() {
 /**
  * Release a PIXI.Text object back to the pool.
  * Detaches it from any parent container first.
- *
- * @param {PIXI.Text} t
  */
-export function releaseText(t) {
+export function releaseText(t: PIXI.Text | null): void {
   if (!t) return;
   if (t.parent) t.parent.removeChild(t);
   _textPool.push(t);
@@ -85,11 +70,8 @@ export function releaseText(t) {
 /**
  * Release all children of a PIXI.Container back into the appropriate pool,
  * then remove them from the container.
- * This is the standard "clear container for next frame" operation.
- *
- * @param {PIXI.Container|null} container
  */
-export function releaseContainerChildren(container) {
+export function releaseContainerChildren(container: PIXI.Container | null): void {
   if (!container) return;
   while (container.children.length) {
     const child = container.children[0];
@@ -102,7 +84,6 @@ export function releaseContainerChildren(container) {
     } else if (child instanceof PIXI.Container) {
       // Recursively release nested container children (e.g. debris fragments)
       releaseContainerChildren(child);
-      // The container itself is not pooled — it will be GC'd.
     }
   }
 }
@@ -111,7 +92,7 @@ export function releaseContainerChildren(container) {
  * Drain both pools completely. Call on flight renderer destroy
  * so the objects can be garbage-collected.
  */
-export function drainPools() {
+export function drainPools(): void {
   _graphicsPool.length = 0;
   _textPool.length = 0;
 }
