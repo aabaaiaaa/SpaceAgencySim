@@ -996,6 +996,7 @@ describe('Save migration edge cases', () => {
     delete state.savedDesigns;
     delete state.welcomeShown;
     delete state.autoSaveEnabled;
+    delete state.debugMode;
     delete state.sciencePoints;
     delete state.scienceLog;
     delete state.achievements;
@@ -1016,6 +1017,7 @@ describe('Save migration edge cases', () => {
     expect(Array.isArray(restored.savedDesigns)).toBe(true);
     expect(restored.welcomeShown).toBe(true);
     expect(restored.autoSaveEnabled).toBe(true);
+    expect(restored.debugMode).toBe(false);
     expect(restored.sciencePoints).toBe(0);
     expect(Array.isArray(restored.scienceLog)).toBe(true);
     expect(Array.isArray(restored.achievements)).toBe(true);

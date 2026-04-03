@@ -699,6 +699,8 @@ export interface GameState {
   malfunctionMode: string;
   /** Whether auto-save is enabled (saves at end of flight and return to hub). */
   autoSaveEnabled: boolean;
+  /** Whether debug mode is enabled (debug saves, FPS monitor, etc.). Default: off. */
+  debugMode: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -829,6 +831,9 @@ export function createGameState(): GameState {
 
     // Auto-save — enabled by default.
     autoSaveEnabled: true,
+
+    // Debug mode — disabled by default.
+    debugMode: false,
   };
 }
 

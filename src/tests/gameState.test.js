@@ -97,6 +97,10 @@ describe('createGameState()', () => {
     expect(state.currentFlight).toBeNull();
   });
 
+  it('initialises debugMode to false', () => {
+    expect(state.debugMode).toBe(false);
+  });
+
   it('returns independent objects on each call', () => {
     const stateA = createGameState();
     const stateB = createGameState();

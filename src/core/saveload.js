@@ -383,6 +383,9 @@ export function loadGame(slotIndex) {
   // Default autoSaveEnabled for saves created before the auto-save system.
   envelope.state.autoSaveEnabled ??= true;
 
+  // Default debugMode for saves created before the debug mode toggle.
+  envelope.state.debugMode ??= false;
+
   return envelope.state;
 }
 

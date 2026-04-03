@@ -172,6 +172,9 @@ async function main() {
     window.__isAutoSaveEnabled = () => isAutoSaveEnabled(state);
     window.__autoSaveKey = AUTO_SAVE_KEY;
 
+    // Debug mode E2E helper.
+    window.__enableDebugMode = () => { state.debugMode = true; };
+
   });
 }
 

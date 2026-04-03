@@ -91,7 +91,7 @@
 - **Verification**: `npm run test:e2e` passes. E2E test verifies: monitor not visible with debug off, visible with debug on during flight, `window.__perfStats` contains fps and frameTime values.
 
 ### TASK-015: Add debug mode toggle to settings
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Add a "Debug Mode" toggle to game settings (`src/ui/settings.js`). Default: off. Persists across sessions. When off: Ctrl+Shift+D shortcut does nothing, debug saves inaccessible, FPS monitor hidden. When on: all debug features accessible. Expose `window.__enableDebugMode()` for E2E tests. See requirements Section 3.5.
 - **Verification**: `npm run test:unit` passes. Setting toggles correctly and persists in game state.

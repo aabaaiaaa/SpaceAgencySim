@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 31
-- **Completed**: 12
-- **Remaining**: 19
-- **Last Updated**: 2026-04-03T01:59:55.182Z
+- **Completed**: 13
+- **Remaining**: 18
+- **Last Updated**: 2026-04-03T02:04:42.645Z
 
 ## Iteration Log
 
@@ -115,4 +115,13 @@
 - **Exit Status**: success
 - **Tokens**: 8,879,728 total (84 in, 55,120 out, 143,566 cache-create, 8,680,958 cache-read)
 - **Cost**: $6.8360
+
+### Iteration 13 - 2026-04-03T01:59:57.354Z
+- **Task Attempted**: TASK-015
+- **Task Completed**: TASK-015
+- **Summary**: Completed Add debug mode toggle to settings
+- **Duration**: 4m 45s
+- **Exit Status**: success
+- **Tokens**: 2,186,273 total (1,236 in, 11,619 out, 71,650 cache-create, 2,101,768 cache-read)
+- **Cost**: $1.7954
 

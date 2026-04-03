@@ -339,6 +339,60 @@ export function openSettingsPanel(container, state) {
     content.appendChild(group);
   }
 
+  // ── Debug Mode toggle ────────────────────────────────────────────────────
+  {
+    const group = document.createElement('div');
+    group.className = 'settings-group';
+
+    const labelEl = document.createElement('p');
+    labelEl.className = 'settings-group-label';
+    labelEl.textContent = 'Debug Mode';
+    group.appendChild(labelEl);
+
+    const hintEl = document.createElement('p');
+    hintEl.className = 'settings-group-hint';
+    hintEl.textContent = 'Enable debug features: debug saves (Ctrl+Shift+D), FPS monitor.';
+    group.appendChild(hintEl);
+
+    const optionsRow = document.createElement('div');
+    optionsRow.className = 'settings-options';
+
+    const onBtn = document.createElement('button');
+    onBtn.className = 'settings-option-btn';
+    onBtn.textContent = 'On';
+    onBtn.setAttribute('data-setting', 'debugMode');
+    onBtn.setAttribute('data-value', 'on');
+
+    const offBtn = document.createElement('button');
+    offBtn.className = 'settings-option-btn';
+    offBtn.textContent = 'Off';
+    offBtn.setAttribute('data-setting', 'debugMode');
+    offBtn.setAttribute('data-value', 'off');
+
+    if (state.debugMode) {
+      onBtn.classList.add('active');
+    } else {
+      offBtn.classList.add('active');
+    }
+
+    tracker.add(onBtn, 'click', () => {
+      state.debugMode = true;
+      onBtn.classList.add('active');
+      offBtn.classList.remove('active');
+    });
+
+    tracker.add(offBtn, 'click', () => {
+      state.debugMode = false;
+      offBtn.classList.add('active');
+      onBtn.classList.remove('active');
+    });
+
+    optionsRow.appendChild(onBtn);
+    optionsRow.appendChild(offBtn);
+    group.appendChild(optionsRow);
+    content.appendChild(group);
+  }
+
   // ── Close button ───────────────────────────────────────────────────────
   const closeBtn = document.createElement('button');
   closeBtn.className = 'settings-close-btn';

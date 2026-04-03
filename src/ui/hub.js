@@ -1700,7 +1700,9 @@ function _bindDebugSavesShortcut(container) {
   _debugSavesHandler = (e) => {
     if (e.ctrlKey && e.shiftKey && e.key === 'D') {
       e.preventDefault();
-      openDebugSavePanel(container, _state);
+      if (_state && _state.debugMode) {
+        openDebugSavePanel(container, _state);
+      }
     }
   };
   document.addEventListener('keydown', _debugSavesHandler);
