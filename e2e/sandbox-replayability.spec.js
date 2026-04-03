@@ -681,7 +681,7 @@ test.describe('Game settings — difficulty options', () => {
   test('settings panel shows all four difficulty categories', async () => {
     const groups = page.locator('.settings-group');
     const count = await groups.count();
-    expect(count).toBe(5);
+    expect(count).toBe(6);
 
     // Verify labels
     const labels = await page.locator('.settings-group-label').allInnerTexts();
@@ -690,18 +690,20 @@ test.describe('Game settings — difficulty options', () => {
     expect(labels).toContain('Financial Pressure');
     expect(labels).toContain('Crew Injury Duration');
     expect(labels).toContain('Auto-Save');
+    expect(labels).toContain('Debug Mode');
   });
 
   test('Normal is selected by default for all settings', async () => {
     // Check each difficulty setting group has "Normal" active.
     // The Auto-Save group defaults to "On" (not "Normal").
+    // The Debug Mode group defaults to "Off".
     const groups = page.locator('.settings-group');
     const count = await groups.count();
     for (let i = 0; i < count; i++) {
       const group = groups.nth(i);
       const activeBtn = group.locator('.settings-option-btn.active');
       const text = await activeBtn.innerText();
-      expect(['Normal', 'On']).toContain(text);
+      expect(['Normal', 'On', 'Off']).toContain(text);
     }
   });
 

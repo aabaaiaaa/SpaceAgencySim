@@ -97,7 +97,7 @@
 - **Verification**: `npm run test:unit` passes. Setting toggles correctly and persists in game state.
 
 ### TASK-016: Gate all debug features behind debug mode setting
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-015
 - **Description**: Update `src/ui/hub.js` to check debug mode before binding Ctrl+Shift+D. Update any other debug UI to check the setting. Update all E2E tests that use debug features to call `window.__enableDebugMode()` first. See requirements Section 3.5.
 - **Verification**: `npm run test:e2e` passes. E2E tests verify: Ctrl+Shift+D does nothing when debug off, works when debug on, setting persists across save/load.
