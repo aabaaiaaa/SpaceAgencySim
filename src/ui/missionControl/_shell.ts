@@ -1,10 +1,11 @@
 /**
- * _shell.js — Shell layout, tab switching, and shared formatting helpers
+ * _shell.ts — Shell layout, tab switching, and shared formatting helpers
  * for the Mission Control UI.
  *
  * @module missionControl/_shell
  */
 
+import type { GameState } from '../../core/gameState.js';
 import { getMissionControlTier } from '../../core/contracts.js';
 import { MCC_TIER_FEATURES } from '../../core/constants.js';
 import { getPartById } from '../../data/parts.js';
@@ -19,7 +20,7 @@ import { getMCState } from './_state.js';
  * in state.missions.completed, the single-accept restriction is lifted and
  * the player may accept multiple missions simultaneously.
  */
-export const TUTORIAL_GATE_MISSION_ID = 'mission-004';
+export const TUTORIAL_GATE_MISSION_ID: string = 'mission-004';
 
 // ---------------------------------------------------------------------------
 // Formatting helpers
@@ -27,10 +28,8 @@ export const TUTORIAL_GATE_MISSION_ID = 'mission-004';
 
 /**
  * Format an ISO 8601 date string to a readable short date.
- * @param {string|null|undefined} iso
- * @returns {string}
  */
-export function fmtDate(iso) {
+export function fmtDate(iso: string | null | undefined): string {
   if (!iso) return '\u2014';
   try {
     return new Date(iso).toLocaleDateString(undefined, {
@@ -45,21 +44,16 @@ export function fmtDate(iso) {
 
 /**
  * Format a cash amount as a dollar string.
- * @param {number} amount
- * @returns {string}
  */
-export function fmtCash(amount) {
+export function fmtCash(amount: number): string {
   return '$' + amount.toLocaleString();
 }
 
 /**
  * Build a rewards paragraph element listing unlocked part names.
  * Returns null if the mission has no unlockedParts.
- *
- * @param {import('../../data/missions.js').MissionDef} mission
- * @returns {HTMLElement|null}
  */
-export function buildRewardsEl(mission) {
+export function buildRewardsEl(mission: { unlockedParts?: string[] }): HTMLElement | null {
   if (!Array.isArray(mission.unlockedParts) || mission.unlockedParts.length === 0) {
     return null;
   }
@@ -72,7 +66,7 @@ export function buildRewardsEl(mission) {
   el.appendChild(label);
 
   const partNames = mission.unlockedParts
-    .map((id) => getPartById(id)?.name ?? id)
+    .map((id: string) => getPartById(id)?.name ?? id)
     .join(', ');
   el.appendChild(document.createTextNode(' ' + partNames));
   return el;
@@ -88,11 +82,8 @@ export function buildRewardsEl(mission) {
  * The tutorial phase ends once `mission-004` appears in
  * `state.missions.completed`.  During the tutorial, at most one mission may
  * be accepted at a time.
- *
- * @param {import('../../core/gameState.js').GameState} state
- * @returns {boolean}
  */
-export function isTutorialPhase(state) {
+export function isTutorialPhase(state: GameState): boolean {
   return !state.missions.completed.some((m) => m.id === TUTORIAL_GATE_MISSION_ID);
 }
 
@@ -100,36 +91,30 @@ export function isTutorialPhase(state) {
 // Shell layout
 // ---------------------------------------------------------------------------
 
-/** @type {((tabId: string) => void) | null} */
-let _tabSwitchHandler = null;
+let _tabSwitchHandler: ((tabId: string) => void) | null = null;
 
-/** @type {(() => void) | null} */
-let _destroyHandler = null;
+let _destroyHandler: (() => void) | null = null;
 
 /**
  * Register the function that handles switching tabs.
- * Called once by _init.js during initialization to wire the dispatch.
- *
- * @param {(tabId: string) => void} handler
+ * Called once by _init.ts during initialization to wire the dispatch.
  */
-export function registerTabSwitchHandler(handler) {
+export function registerTabSwitchHandler(handler: (tabId: string) => void): void {
   _tabSwitchHandler = handler;
 }
 
 /**
  * Register the destroy function so the back button can tear down the overlay
- * without a circular static import from _init.js.
- *
- * @param {() => void} handler
+ * without a circular static import from _init.ts.
  */
-export function registerDestroyHandler(handler) {
+export function registerDestroyHandler(handler: () => void): void {
   _destroyHandler = handler;
 }
 
 /**
  * Build the static shell: header + tab bar + empty content area.
  */
-export function renderShell() {
+export function renderShell(): void {
   const mc = getMCState();
   if (!mc.overlay) return;
 
@@ -160,7 +145,7 @@ export function renderShell() {
   const tabBar = document.createElement('div');
   tabBar.id = 'mission-control-tabs';
 
-  const tabs = [
+  const tabs: Array<{ id: string; label: string }> = [
     { id: 'available', label: 'Missions' },
     { id: 'accepted',  label: 'Accepted'  },
     { id: 'completed', label: 'Completed' },
@@ -199,24 +184,22 @@ export function renderShell() {
 
 /**
  * Update tab button active class when switching tabs.
- * @param {string} tabId
  */
-export function updateActiveTabClass(tabId) {
+export function updateActiveTabClass(tabId: string): void {
   const mc = getMCState();
   if (mc.overlay) {
     mc.overlay.querySelectorAll('.mc-tab').forEach((btn) => {
-      btn.classList.toggle('active', /** @type {HTMLElement} */ (btn).dataset.tabId === tabId);
+      btn.classList.toggle('active', (btn as HTMLElement).dataset.tabId === tabId);
     });
   }
 }
 
 /**
  * Get the #mission-control-content element and clear it.
- * @returns {HTMLElement | null}
  */
-export function getContent() {
+export function getContent(): HTMLElement | null {
   const mc = getMCState();
   const el = mc.overlay ? mc.overlay.querySelector('#mission-control-content') : null;
   if (el) el.innerHTML = '';
-  return el;
+  return el as HTMLElement | null;
 }

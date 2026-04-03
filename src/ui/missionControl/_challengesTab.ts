@@ -1,5 +1,5 @@
 /**
- * _challengesTab.js — Challenges tab with custom challenge creator form,
+ * _challengesTab.ts — Challenges tab with custom challenge creator form,
  * objective row building, import/export dialogs.
  *
  * @module missionControl/_challengesTab
@@ -20,7 +20,7 @@ import { fmtCash, getContent } from './_shell.js';
 // ---------------------------------------------------------------------------
 
 /** Medal display icons. */
-const _MEDAL_ICONS = {
+const _MEDAL_ICONS: Record<string, string> = {
   [MedalTier.GOLD]:   '\u{1F947}',
   [MedalTier.SILVER]: '\u{1F948}',
   [MedalTier.BRONZE]: '\u{1F949}',
@@ -29,12 +29,8 @@ const _MEDAL_ICONS = {
 
 /**
  * Format a score value for display with appropriate unit.
- * @param {number} score
- * @param {string} unit
- * @param {string} metric
- * @returns {string}
  */
-function _fmtScore(score, unit, metric) {
+function _fmtScore(score: number, unit: string, _metric: string): string {
   if (unit === '$') return fmtCash(score);
   if (unit === '%') return `${score}%`;
   if (unit === 'm' && score >= 1000) return `${(score / 1000).toFixed(1)} km`;
@@ -44,11 +40,9 @@ function _fmtScore(score, unit, metric) {
 
 /**
  * Convert medal tier string to a numeric rank for comparison.
- * @param {string} medal
- * @returns {number}
  */
-function _medalRank(medal) {
-  const ranks = { none: 0, bronze: 1, silver: 2, gold: 3 };
+function _medalRank(medal: string): number {
+  const ranks: Record<string, number> = { none: 0, bronze: 1, silver: 2, gold: 3 };
   return ranks[medal] ?? 0;
 }
 
@@ -56,7 +50,7 @@ function _medalRank(medal) {
 // Challenges tab
 // ---------------------------------------------------------------------------
 
-export function renderChallengesTab() {
+export function renderChallengesTab(): void {
   const content = getContent();
   const mc = getMCState();
   if (!content || !mc.state) return;
@@ -185,7 +179,7 @@ export function renderChallengesTab() {
     const medalsRow = document.createElement('div');
     medalsRow.className = 'mc-challenge-medals-row';
 
-    const tiers = [
+    const tiers: Array<{ key: 'bronze' | 'silver' | 'gold'; label: string; icon: string }> = [
       { key: 'bronze', label: 'Bronze', icon: _MEDAL_ICONS[MedalTier.BRONZE] },
       { key: 'silver', label: 'Silver', icon: _MEDAL_ICONS[MedalTier.SILVER] },
       { key: 'gold',   label: 'Gold',   icon: _MEDAL_ICONS[MedalTier.GOLD] },
@@ -240,7 +234,7 @@ export function renderChallengesTab() {
       abandonBtn.className = 'mc-challenge-abandon-btn';
       abandonBtn.textContent = 'Abandon';
       abandonBtn.addEventListener('click', () => {
-        abandonChallenge(mc.state);
+        abandonChallenge(mc.state!);
         renderChallengesTab();
       });
       actions.appendChild(abandonBtn);
@@ -249,7 +243,7 @@ export function renderChallengesTab() {
       acceptBtn.className = 'mc-challenge-accept-btn';
       acceptBtn.textContent = result ? 'Replay' : 'Accept';
       acceptBtn.addEventListener('click', () => {
-        const res = acceptChallenge(mc.state, ch.id);
+        const res = acceptChallenge(mc.state!, ch.id);
         if (res.success) {
           renderChallengesTab();
         }
@@ -272,7 +266,7 @@ export function renderChallengesTab() {
       delBtn.className = 'mc-challenge-delete-btn';
       delBtn.textContent = 'Delete';
       delBtn.addEventListener('click', () => {
-        deleteCustomChallenge(mc.state, ch.id);
+        deleteCustomChallenge(mc.state!, ch.id);
         renderChallengesTab();
       });
       actions.appendChild(delBtn);
@@ -291,9 +285,8 @@ export function renderChallengesTab() {
 
 /**
  * Build the inline creator form for defining a custom challenge.
- * @returns {HTMLElement}
  */
-function _buildCreatorForm() {
+function _buildCreatorForm(): HTMLElement {
   const form = document.createElement('div');
   form.className = 'mc-creator-form';
 
@@ -426,13 +419,11 @@ function _buildCreatorForm() {
 
 /**
  * Build a single objective row for the creator form.
- * @param {number} idx
- * @returns {HTMLElement}
  */
-function _buildObjectiveRow(idx) {
+function _buildObjectiveRow(idx: number): HTMLElement {
   const row = document.createElement('div');
   row.className = 'mc-creator-obj-entry';
-  row.dataset.objIdx = idx;
+  row.dataset.objIdx = String(idx);
 
   // Type selector
   const typeSelect = document.createElement('select');
@@ -470,10 +461,8 @@ function _buildObjectiveRow(idx) {
 
 /**
  * Rebuild the target input fields for an objective row when the type changes.
- * @param {HTMLElement} row
- * @param {string} type
  */
-function _rebuildObjTargetFields(row, type) {
+function _rebuildObjTargetFields(row: HTMLElement, type: string): void {
   const container = row.querySelector('.cc-obj-fields');
   if (!container) return;
   container.innerHTML = '';
@@ -488,7 +477,7 @@ function _rebuildObjTargetFields(row, type) {
     input.title = field.label;
     input.className = 'cc-obj-target';
     input.dataset.targetKey = field.key;
-    input.min = field.min ?? '';
+    input.min = String(field.min ?? '');
     input.style.width = '110px';
     container.appendChild(input);
   }
@@ -496,13 +485,8 @@ function _rebuildObjTargetFields(row, type) {
 
 /**
  * Create a simple labelled input field.
- * @param {string} labelText
- * @param {string} inputType
- * @param {string} id
- * @param {string} placeholder
- * @returns {HTMLElement}
  */
-function _makeField(labelText, inputType, id, placeholder) {
+function _makeField(labelText: string, inputType: string, id: string, placeholder: string): HTMLElement {
   const wrapper = document.createElement('div');
   wrapper.className = 'mc-creator-field';
   const label = document.createElement('label');
@@ -518,30 +502,30 @@ function _makeField(labelText, inputType, id, placeholder) {
 }
 
 /**
- * Handle the Create button click — gather form data and create the challenge.
+ * Handle the Create button click -- gather form data and create the challenge.
  */
-function _handleCreateSubmit() {
+function _handleCreateSubmit(): void {
   const mc = getMCState();
   if (!mc.state) return;
 
   const errorEl = document.getElementById('cc-error');
-  const setError = (msg) => { if (errorEl) errorEl.textContent = msg; };
+  const setError = (msg: string): void => { if (errorEl) errorEl.textContent = msg; };
 
-  const title = /** @type {HTMLInputElement} */ (document.getElementById('cc-title'))?.value ?? '';
-  const description = /** @type {HTMLTextAreaElement} */ (document.getElementById('cc-description'))?.value ?? '';
+  const title = (document.getElementById('cc-title') as HTMLInputElement | null)?.value ?? '';
+  const description = (document.getElementById('cc-description') as HTMLTextAreaElement | null)?.value ?? '';
 
   // Gather objectives
   const objRows = document.querySelectorAll('#cc-obj-container .mc-creator-obj-entry');
-  const objectives = [];
+  const objectives: Array<{ type: string; target: Record<string, number> }> = [];
   for (const row of objRows) {
     const typeSelect = row.querySelector('.cc-obj-type');
     if (!typeSelect) continue;
-    const type = /** @type {HTMLSelectElement} */ (typeSelect).value;
-    const target = {};
+    const type = (typeSelect as HTMLSelectElement).value;
+    const target: Record<string, number> = {};
     const targetInputs = row.querySelectorAll('.cc-obj-target');
     for (const inp of targetInputs) {
-      const key = /** @type {HTMLElement} */ (inp).dataset.targetKey;
-      const val = /** @type {HTMLInputElement} */ (inp).value;
+      const key = (inp as HTMLInputElement).dataset.targetKey;
+      const val = (inp as HTMLInputElement).value;
       if (key && val !== '') {
         target[key] = Number(val);
       }
@@ -550,20 +534,20 @@ function _handleCreateSubmit() {
   }
 
   // Gather metric
-  const scoreMetric = /** @type {HTMLSelectElement} */ (document.getElementById('cc-metric'))?.value ?? '';
+  const scoreMetric = (document.getElementById('cc-metric') as HTMLSelectElement | null)?.value ?? '';
 
   // Gather medals
   const medals = {
-    bronze: Number(/** @type {HTMLInputElement} */ (document.getElementById('cc-medal-bronze'))?.value) || 0,
-    silver: Number(/** @type {HTMLInputElement} */ (document.getElementById('cc-medal-silver'))?.value) || 0,
-    gold:   Number(/** @type {HTMLInputElement} */ (document.getElementById('cc-medal-gold'))?.value) || 0,
+    bronze: Number((document.getElementById('cc-medal-bronze') as HTMLInputElement | null)?.value) || 0,
+    silver: Number((document.getElementById('cc-medal-silver') as HTMLInputElement | null)?.value) || 0,
+    gold:   Number((document.getElementById('cc-medal-gold') as HTMLInputElement | null)?.value) || 0,
   };
 
   // Gather rewards
   const rewards = {
-    bronze: Number(/** @type {HTMLInputElement} */ (document.getElementById('cc-reward-bronze'))?.value) || 0,
-    silver: Number(/** @type {HTMLInputElement} */ (document.getElementById('cc-reward-silver'))?.value) || 0,
-    gold:   Number(/** @type {HTMLInputElement} */ (document.getElementById('cc-reward-gold'))?.value) || 0,
+    bronze: Number((document.getElementById('cc-reward-bronze') as HTMLInputElement | null)?.value) || 0,
+    silver: Number((document.getElementById('cc-reward-silver') as HTMLInputElement | null)?.value) || 0,
+    gold:   Number((document.getElementById('cc-reward-gold') as HTMLInputElement | null)?.value) || 0,
   };
 
   const result = createCustomChallenge(mc.state, {
@@ -591,7 +575,7 @@ function _handleCreateSubmit() {
 /**
  * Show a modal dialog for importing a challenge from JSON.
  */
-function _showImportDialog() {
+function _showImportDialog(): void {
   const overlay = document.createElement('div');
   overlay.className = 'mc-import-overlay';
 
@@ -644,7 +628,7 @@ function _showImportDialog() {
   overlay.appendChild(dialog);
 
   // Close on backdrop click
-  overlay.addEventListener('click', (e) => {
+  overlay.addEventListener('click', (e: MouseEvent) => {
     if (e.target === overlay) overlay.remove();
   });
 
@@ -653,9 +637,8 @@ function _showImportDialog() {
 
 /**
  * Show a modal dialog with exported JSON (for copying).
- * @param {string} json
  */
-function _showExportDialog(json) {
+function _showExportDialog(json: string): void {
   const overlay = document.createElement('div');
   overlay.className = 'mc-import-overlay';
 
@@ -684,7 +667,7 @@ function _showExportDialog(json) {
   copyBtn.textContent = 'Copy to Clipboard';
   copyBtn.addEventListener('click', () => {
     textarea.select();
-    navigator.clipboard.writeText(json).then(() => {
+    void navigator.clipboard.writeText(json).then(() => {
       copyBtn.textContent = 'Copied!';
       setTimeout(() => { copyBtn.textContent = 'Copy to Clipboard'; }, 1500);
     });
@@ -700,7 +683,7 @@ function _showExportDialog(json) {
   dialog.appendChild(actions);
   overlay.appendChild(dialog);
 
-  overlay.addEventListener('click', (e) => {
+  overlay.addEventListener('click', (e: MouseEvent) => {
     if (e.target === overlay) overlay.remove();
   });
 

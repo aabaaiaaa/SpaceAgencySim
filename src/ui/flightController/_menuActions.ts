@@ -1,5 +1,5 @@
 /**
- * _menuActions.js — Menu handlers: save game, restart flight, adjust build,
+ * _menuActions.ts — Menu handlers: save game, restart flight, adjust build,
  * return to agency, abort return, flight log.
  *
  * @module ui/flightController/_menuActions
@@ -17,11 +17,14 @@ import { showPhaseNotification } from './_flightPhase.js';
 import { showPostFlightSummary, buildFlightEventList } from './_postFlight.js';
 import { stopFlightScene, startFlightScene } from './_init.js';
 
+import type { RocketAssembly } from '../../core/rocketbuilder.js';
+import type { GameState } from '../../core/gameState.js';
+
 /**
  * Save the current game to the first available (empty) slot, or slot 0 as a
  * fallback if all slots are occupied.
  */
-export function handleSaveGame() {
+export function handleSaveGame(): void {
   const s = getFCState();
   if (!s.state) return;
 
@@ -29,7 +32,7 @@ export function handleSaveGame() {
   let   targetSlot = saves.findIndex((sv) => sv === null);
   if (targetSlot < 0) targetSlot = 0;
 
-  const saveName = `${s.state.agencyName || 'Agency'} \u2014 In-Flight`;
+  const saveName: string = `${s.state.agencyName || 'Agency'} \u2014 In-Flight`;
   saveGame(s.state, targetSlot, saveName);
 }
 
@@ -38,7 +41,7 @@ export function handleSaveGame() {
  * rocket and staging. Deducts cost of lost parts, deep-clones the original
  * assembly, then calls startFlightScene.
  */
-export function handleMenuRestart() {
+export function handleMenuRestart(): void {
   const s = getFCState();
 
   // Remove post-flight summary if it's showing (e.g. after a crash).
@@ -59,35 +62,35 @@ export function handleMenuRestart() {
   s.preMenuTimeWarp = s.timeWarp;
   s.timeWarp = 0;
 
-  const host = document.getElementById('ui-overlay') ?? document.body;
-  const backdrop = document.createElement('div');
+  const host: HTMLElement = document.getElementById('ui-overlay') ?? document.body;
+  const backdrop: HTMLDivElement = document.createElement('div');
   backdrop.id = 'restart-flight-backdrop';
   backdrop.className = 'topbar-modal-backdrop';
 
-  const modal = document.createElement('div');
+  const modal: HTMLDivElement = document.createElement('div');
   modal.className = 'topbar-modal';
   modal.setAttribute('role', 'alertdialog');
   modal.setAttribute('aria-modal', 'true');
   modal.setAttribute('aria-label', 'Restart Flight');
-  modal.addEventListener('click', (e) => e.stopPropagation());
+  modal.addEventListener('click', (e: MouseEvent) => e.stopPropagation());
 
   // Title
-  const titleRow = document.createElement('div');
+  const titleRow: HTMLDivElement = document.createElement('div');
   titleRow.className = 'topbar-modal-title-row';
-  const h2 = document.createElement('h2');
+  const h2: HTMLHeadingElement = document.createElement('h2');
   h2.className = 'topbar-modal-title';
   h2.textContent = 'Restart from Launch?';
   titleRow.appendChild(h2);
   modal.appendChild(titleRow);
 
   // Message
-  const msg = document.createElement('p');
+  const msg: HTMLParagraphElement = document.createElement('p');
   msg.className = 'confirm-msg';
   msg.textContent = 'This will end the current flight and rebuild the rocket from scratch.';
   modal.appendChild(msg);
 
   if (totalRocketCost > 0) {
-    const costLine = document.createElement('p');
+    const costLine: HTMLParagraphElement = document.createElement('p');
     costLine.className = 'confirm-msg';
     costLine.style.fontWeight = '600';
     costLine.style.marginTop = '-12px';
@@ -96,10 +99,10 @@ export function handleMenuRestart() {
   }
 
   // Buttons
-  const btnRow = document.createElement('div');
+  const btnRow: HTMLDivElement = document.createElement('div');
   btnRow.className = 'confirm-btn-row';
 
-  const cancelBtn = document.createElement('button');
+  const cancelBtn: HTMLButtonElement = document.createElement('button');
   cancelBtn.className = 'confirm-btn confirm-btn-cancel';
   cancelBtn.textContent = 'Cancel';
   cancelBtn.addEventListener('click', () => {
@@ -107,7 +110,7 @@ export function handleMenuRestart() {
     backdrop.remove();
   });
 
-  const confirmBtn = document.createElement('button');
+  const confirmBtn: HTMLButtonElement = document.createElement('button');
   confirmBtn.className = 'confirm-btn confirm-btn-danger';
   confirmBtn.textContent = 'Restart';
   confirmBtn.addEventListener('click', () => {
@@ -129,9 +132,8 @@ export function handleMenuRestart() {
 
 /**
  * Execute the restart-from-launch action after confirmation.
- * @param {number} rebuildCost  Total rocket cost to deduct.
  */
-function _executeRestart(rebuildCost) {
+function _executeRestart(rebuildCost: number): void {
   const s = getFCState();
 
   if (rebuildCost > 0 && s.state) {
@@ -160,14 +162,15 @@ function _executeRestart(rebuildCost) {
   let totalFuel = 0;
   for (const placed of origAssembly.parts.values()) {
     const def = getPartById(placed.partId);
-    if (def) totalFuel += def.properties?.fuelMass ?? 0;
+    if (def) totalFuel += (def.properties?.fuelMass as number) ?? 0;
   }
 
   // Reset ALL accepted mission objectives so they re-evaluate on the fresh flight.
   if (gs.missions?.accepted) {
     for (const mission of gs.missions.accepted) {
-      if (!mission.objectives) continue;
-      for (const obj of mission.objectives) {
+      const objectives = (mission as any).objectives;
+      if (!objectives) continue;
+      for (const obj of objectives) {
         obj.completed = false;
         delete obj._holdEnteredAt;
       }
@@ -188,23 +191,23 @@ function _executeRestart(rebuildCost) {
   const freshAssembly = {
     parts:         new Map([...origAssembly.parts].map(([id, p]) => [id, { ...p, ...(p.instruments ? { instruments: [...p.instruments] } : {}) }])),
     connections:   origAssembly.connections.map(c => ({ ...c })),
-    symmetryPairs: origAssembly.symmetryPairs.map(sp => [...sp]),
+    symmetryPairs: origAssembly.symmetryPairs.map(sp => [...sp] as [string, string]),
     _nextId:       origAssembly._nextId,
   };
   const freshStaging = {
-    stages:          origStaging.stages.map(s => ({ instanceIds: [...s.instanceIds] })),
+    stages:          origStaging.stages.map(stg => ({ instanceIds: [...stg.instanceIds] })),
     unstaged:        [...origStaging.unstaged],
     currentStageIdx: 0,
   };
 
-  startFlightScene(ctr, gs, freshAssembly, freshStaging, gs.currentFlight, endCb);
+  startFlightScene(ctr, gs, freshAssembly as RocketAssembly, freshStaging, gs.currentFlight!, endCb as (state: GameState | null, results?: unknown, dest?: string) => void);
 }
 
 /**
  * Menu action: return to the VAB with the current rocket design loaded so the
  * player can tweak parts/staging and re-launch.
  */
-export function handleMenuAdjustBuild() {
+export function handleMenuAdjustBuild(): void {
   const s = getFCState();
 
   // Remove post-flight summary if it's showing.
@@ -226,14 +229,14 @@ export function handleMenuAdjustBuild() {
       _nextId:       origAssembly._nextId,
     };
     gs.vabStagingConfig = origStaging ? {
-      stages:          origStaging.stages.map(s => ({ instanceIds: [...s.instanceIds] })),
+      stages:          origStaging.stages.map(stg => ({ instanceIds: [...stg.instanceIds] })),
       unstaged:        [...origStaging.unstaged],
       currentStageIdx: 0,
     } : null;
   }
 
   stopFlightScene();
-  if (endCb) endCb(gs, null, 'vab');
+  if (endCb) (endCb as (state: unknown, results?: unknown, dest?: string) => void)(gs, null, 'vab');
 }
 
 /**
@@ -245,9 +248,9 @@ export function handleMenuAdjustBuild() {
  *   - FLIGHT / LAUNCH / PRELAUNCH: abort warning (parts at risk).
  *   - Landed / Crashed: go straight to summary.
  */
-export function handleMenuReturnToAgency() {
+export function handleMenuReturnToAgency(): void {
   const s = getFCState();
-  const phase = s.flightState ? s.flightState.phase : null;
+  const phase: string | null = s.flightState ? s.flightState.phase : null;
 
   // --- Block return during TRANSFER / CAPTURE (player locked) ---
   if (s.ps && phase && isPlayerLocked(phase)) {
@@ -260,36 +263,36 @@ export function handleMenuReturnToAgency() {
     s.preMenuTimeWarp = s.timeWarp;
     s.timeWarp = 0;
 
-    const host = document.getElementById('ui-overlay') ?? document.body;
-    const backdrop = document.createElement('div');
+    const host: HTMLElement = document.getElementById('ui-overlay') ?? document.body;
+    const backdrop: HTMLDivElement = document.createElement('div');
     backdrop.id = 'abort-flight-backdrop';
     backdrop.className = 'topbar-modal-backdrop';
 
-    const modal = document.createElement('div');
+    const modal: HTMLDivElement = document.createElement('div');
     modal.className = 'topbar-modal';
     modal.setAttribute('role', 'alertdialog');
     modal.setAttribute('aria-modal', 'true');
     modal.setAttribute('aria-label', 'Return from Orbit');
-    modal.addEventListener('click', (e) => e.stopPropagation());
+    modal.addEventListener('click', (e: MouseEvent) => e.stopPropagation());
 
-    const titleRow = document.createElement('div');
+    const titleRow: HTMLDivElement = document.createElement('div');
     titleRow.className = 'topbar-modal-title-row';
-    const h2 = document.createElement('h2');
+    const h2: HTMLHeadingElement = document.createElement('h2');
     h2.className = 'topbar-modal-title';
     h2.textContent = 'Return from Orbit?';
     titleRow.appendChild(h2);
     modal.appendChild(titleRow);
 
-    const msg = document.createElement('p');
+    const msg: HTMLParagraphElement = document.createElement('p');
     msg.className = 'confirm-msg';
     msg.textContent =
       'Your craft is in a stable orbit. Returning to the agency will complete this flight period. The craft will remain in orbit.';
     modal.appendChild(msg);
 
-    const btnRow = document.createElement('div');
+    const btnRow: HTMLDivElement = document.createElement('div');
     btnRow.className = 'confirm-btn-row';
 
-    const continueBtn = document.createElement('button');
+    const continueBtn: HTMLButtonElement = document.createElement('button');
     continueBtn.className = 'confirm-btn confirm-btn-cancel';
     continueBtn.textContent = 'Stay in Orbit';
     continueBtn.dataset.testid = 'abort-continue-btn';
@@ -298,7 +301,7 @@ export function handleMenuReturnToAgency() {
       backdrop.remove();
     });
 
-    const returnBtn = document.createElement('button');
+    const returnBtn: HTMLButtonElement = document.createElement('button');
     returnBtn.className = 'confirm-btn confirm-btn-primary';
     returnBtn.textContent = 'Return to Agency';
     returnBtn.dataset.testid = 'orbit-return-btn';
@@ -335,36 +338,36 @@ export function handleMenuReturnToAgency() {
       }
     }
 
-    const host = document.getElementById('ui-overlay') ?? document.body;
-    const backdrop = document.createElement('div');
+    const host: HTMLElement = document.getElementById('ui-overlay') ?? document.body;
+    const backdrop: HTMLDivElement = document.createElement('div');
     backdrop.id = 'abort-flight-backdrop';
     backdrop.className = 'topbar-modal-backdrop';
 
-    const modal = document.createElement('div');
+    const modal: HTMLDivElement = document.createElement('div');
     modal.className = 'topbar-modal';
     modal.setAttribute('role', 'alertdialog');
     modal.setAttribute('aria-modal', 'true');
     modal.setAttribute('aria-label', 'Abort Flight');
-    modal.addEventListener('click', (e) => e.stopPropagation());
+    modal.addEventListener('click', (e: MouseEvent) => e.stopPropagation());
 
     // Title
-    const titleRow = document.createElement('div');
+    const titleRow: HTMLDivElement = document.createElement('div');
     titleRow.className = 'topbar-modal-title-row';
-    const h2 = document.createElement('h2');
+    const h2: HTMLHeadingElement = document.createElement('h2');
     h2.className = 'topbar-modal-title';
     h2.textContent = 'Abort Flight?';
     titleRow.appendChild(h2);
     modal.appendChild(titleRow);
 
     // Message
-    const msg = document.createElement('p');
+    const msg: HTMLParagraphElement = document.createElement('p');
     msg.className = 'confirm-msg';
-    const costStr = '$' + Math.round(totalCost).toLocaleString('en-US');
+    const costStr: string = '$' + Math.round(totalCost).toLocaleString('en-US');
     msg.textContent =
       'Your rocket is still in flight. Returning now means no parts will be recovered.';
     modal.appendChild(msg);
 
-    const costLine = document.createElement('p');
+    const costLine: HTMLParagraphElement = document.createElement('p');
     costLine.className = 'confirm-msg';
     costLine.style.fontWeight = '600';
     costLine.style.marginTop = '-12px';
@@ -372,10 +375,10 @@ export function handleMenuReturnToAgency() {
     modal.appendChild(costLine);
 
     // Buttons
-    const btnRow = document.createElement('div');
+    const btnRow: HTMLDivElement = document.createElement('div');
     btnRow.className = 'confirm-btn-row';
 
-    const continueBtn = document.createElement('button');
+    const continueBtn: HTMLButtonElement = document.createElement('button');
     continueBtn.className = 'confirm-btn confirm-btn-cancel';
     continueBtn.textContent = 'Continue Flying';
     continueBtn.dataset.testid = 'abort-continue-btn';
@@ -384,7 +387,7 @@ export function handleMenuReturnToAgency() {
       backdrop.remove();
     });
 
-    const abortBtn = document.createElement('button');
+    const abortBtn: HTMLButtonElement = document.createElement('button');
     abortBtn.className = 'confirm-btn confirm-btn-danger';
     abortBtn.textContent = 'Abort & Return';
     abortBtn.dataset.testid = 'abort-confirm-btn';
@@ -406,14 +409,14 @@ export function handleMenuReturnToAgency() {
     return;
   }
 
-  // Already landed or crashed — go straight to the summary.
+  // Already landed or crashed -- go straight to the summary.
   _handleReturnToAgency();
 }
 
 /**
  * Show the post-flight summary.
  */
-function _handleReturnToAgency() {
+function _handleReturnToAgency(): void {
   const s = getFCState();
   if (s.summaryShown) return;
   s.summaryShown = true;
@@ -423,7 +426,7 @@ function _handleReturnToAgency() {
 /**
  * Handle abort: skip the post-flight summary and return directly to the hub.
  */
-export function handleAbortReturnToAgency() {
+export function handleAbortReturnToAgency(): void {
   const s = getFCState();
   if (s.summaryShown) return;
   s.summaryShown = true;
@@ -435,39 +438,41 @@ export function handleAbortReturnToAgency() {
   const assembly    = s.assembly;
   const onFlightEnd = s.onFlightEnd;
 
-  let returnResults = null;
+  let returnResults: ReturnType<typeof processFlightReturn> | null = null;
   if (state && flightState) {
     returnResults = processFlightReturn(state, flightState, ps, assembly);
   }
 
   refreshTopBar();
   stopFlightScene();
-  if (onFlightEnd) onFlightEnd(state, returnResults);
+  if (onFlightEnd) (onFlightEnd as (state: unknown, results?: unknown) => void)(state, returnResults);
 }
 
-/** Menu action: show the flight log overlay. */
-export function handleMenuFlightLog() {
+/**
+ * Menu action: show the flight log overlay.
+ */
+export function handleMenuFlightLog(): void {
   const s = getFCState();
-  const host = document.getElementById('ui-overlay') ?? document.body;
+  const host: HTMLElement = document.getElementById('ui-overlay') ?? document.body;
 
   // Remove any existing log overlay.
   const existing = document.getElementById('flight-log-overlay');
   if (existing) existing.remove();
 
   // Ensure game stays paused.
-  const savedWarp = s.preMenuTimeWarp;
+  const savedWarp: number = s.preMenuTimeWarp;
   s.timeWarp = 0;
 
-  // ── Root overlay ─────────────────────────────────────────────────────────
-  const overlay = document.createElement('div');
+  // -- Root overlay --
+  const overlay: HTMLDivElement = document.createElement('div');
   overlay.id = 'flight-log-overlay';
 
-  const content = document.createElement('div');
+  const content: HTMLDivElement = document.createElement('div');
   content.className = 'fl-content';
   overlay.appendChild(content);
 
   // Heading
-  const heading = document.createElement('h1');
+  const heading: HTMLHeadingElement = document.createElement('h1');
   heading.textContent = 'Flight Log';
   content.appendChild(heading);
 
@@ -476,7 +481,7 @@ export function handleMenuFlightLog() {
   content.appendChild(buildFlightEventList(events));
 
   // Close button
-  const closeBtn = document.createElement('button');
+  const closeBtn: HTMLButtonElement = document.createElement('button');
   closeBtn.className = 'fl-close-btn';
   closeBtn.textContent = 'Close';
   closeBtn.addEventListener('click', () => {
@@ -490,7 +495,7 @@ export function handleMenuFlightLog() {
     overlay.remove();
     s.timeWarp = savedWarp || 1;
   });
-  content.addEventListener('click', (e) => e.stopPropagation());
+  content.addEventListener('click', (e: MouseEvent) => e.stopPropagation());
 
   host.appendChild(overlay);
 }

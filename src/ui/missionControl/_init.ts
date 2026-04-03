@@ -1,5 +1,5 @@
 /**
- * _init.js — Orchestrator for the Mission Control UI.
+ * _init.ts — Orchestrator for the Mission Control UI.
  *
  * Contains initMissionControlUI and destroyMissionControlUI, which are the
  * only public API surface.  Wires tab switching to the individual tab
@@ -8,6 +8,7 @@
  * @module missionControl/_init
  */
 
+import type { GameState } from '../../core/gameState.js';
 import { getUnlockedMissions } from '../../core/missions.js';
 import { getMCState, setMCState } from './_state.js';
 import { MISSION_CONTROL_STYLES } from './_css.js';
@@ -24,9 +25,8 @@ import { injectStyleOnce } from '../injectStyle.js';
 
 /**
  * Switch to a different tab and re-render its content.
- * @param {string} tabId
  */
-function _switchTab(tabId) {
+function _switchTab(tabId: string): void {
   setMCState({ activeTab: tabId });
   updateActiveTabClass(tabId);
 
@@ -45,12 +45,12 @@ function _switchTab(tabId) {
 
 /**
  * Mount the Mission Control overlay and recalculate mission unlock state.
- *
- * @param {HTMLElement} container   The #ui-overlay div.
- * @param {import('../../core/gameState.js').GameState} state
- * @param {{ onBack: () => void }} callbacks
  */
-export function initMissionControlUI(container, state, { onBack }) {
+export function initMissionControlUI(
+  container: HTMLElement,
+  state: GameState,
+  { onBack }: { onBack: () => void },
+): void {
   setMCState({
     state,
     onBack,
@@ -75,14 +75,12 @@ export function initMissionControlUI(container, state, { onBack }) {
 
   renderShell();
   renderAvailableTab();
-
-
 }
 
 /**
  * Remove the Mission Control overlay from the DOM.
  */
-export function destroyMissionControlUI() {
+export function destroyMissionControlUI(): void {
   const mc = getMCState();
   if (mc.overlay) {
     mc.overlay.remove();
@@ -92,5 +90,4 @@ export function destroyMissionControlUI() {
     state:   null,
     onBack:  null,
   });
-
 }

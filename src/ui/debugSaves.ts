@@ -1,5 +1,5 @@
 /**
- * debugSaves.js — Debug Save Menu UI panel.
+ * debugSaves.ts — Debug Save Menu UI panel.
  *
  * Provides a full-screen overlay (separate from normal save slots) listing
  * pre-built game states at various progression points.  Clicking a state
@@ -12,16 +12,18 @@
  */
 
 import { DEBUG_SAVE_DEFINITIONS } from '../core/debugSaves.js';
+import type { DebugSaveDefinition } from '../core/debugSaves.js';
 import { getUnlockedMissions, reconcileParts } from '../core/missions.js';
 import { refreshTopBar } from './topbar.js';
 import { createListenerTracker } from './listenerTracker.js';
 import { injectStyleOnce } from './injectStyle.js';
+import type { GameState } from '../core/gameState.js';
 
 // ---------------------------------------------------------------------------
 // CSS
 // ---------------------------------------------------------------------------
 
-const DEBUG_SAVE_STYLES = `
+const DEBUG_SAVE_STYLES: string = `
 /* ── Debug save panel overlay ────────────────────────────────────────────── */
 #debug-save-panel {
   position: fixed;
@@ -183,16 +185,24 @@ const DEBUG_SAVE_STYLES = `
 `;
 
 // ---------------------------------------------------------------------------
+// Augment HTMLElement to support the _timer property used for feedback
+// ---------------------------------------------------------------------------
+
+interface FeedbackElement extends HTMLElement {
+  _timer?: ReturnType<typeof setTimeout>;
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
 /**
  * Opens the debug save menu panel.
  *
- * @param {HTMLElement} container  The #ui-overlay div.
- * @param {import('../core/gameState.js').GameState} state  Current live game state (will be mutated on load).
+ * @param container  The #ui-overlay div.
+ * @param state      Current live game state (will be mutated on load).
  */
-export function openDebugSavePanel(container, state) {
+export function openDebugSavePanel(container: HTMLElement, state: GameState): void {
   // Prevent duplicate.
   if (document.getElementById('debug-save-panel')) return;
 
@@ -202,7 +212,7 @@ export function openDebugSavePanel(container, state) {
   const tracker = createListenerTracker();
 
   /** Remove all tracked listeners, then remove the panel from the DOM. */
-  function closePanel() {
+  function closePanel(): void {
     tracker.removeAll();
     panel.remove();
   }
@@ -230,18 +240,18 @@ export function openDebugSavePanel(container, state) {
   content.appendChild(warning);
 
   // ── Feedback banner (hidden initially) ───────────────────────────────────
-  const feedback = document.createElement('p');
+  const feedback = document.createElement('p') as FeedbackElement;
   feedback.className = 'debug-save-loaded';
   feedback.style.display = 'none';
   content.appendChild(feedback);
 
   // ── Group definitions by category ────────────────────────────────────────
-  const categories = new Map();
+  const categories = new Map<string, DebugSaveDefinition[]>();
   for (const def of DEBUG_SAVE_DEFINITIONS) {
     if (!categories.has(def.category)) {
       categories.set(def.category, []);
     }
-    categories.get(def.category).push(def);
+    categories.get(def.category)!.push(def);
   }
 
   for (const [category, defs] of categories) {
@@ -277,8 +287,8 @@ export function openDebugSavePanel(container, state) {
       loadBtn.textContent = 'Load';
       loadBtn.setAttribute('aria-label', `Load debug save: ${def.name}`);
 
-      tracker.add(loadBtn, 'click', (e) => {
-        e.stopPropagation();
+      tracker.add(loadBtn, 'click', (e: Event) => {
+        (e as MouseEvent).stopPropagation();
         _loadDebugState(state, def, feedback);
       });
 
@@ -310,18 +320,14 @@ export function openDebugSavePanel(container, state) {
 
 /**
  * Generates a debug state and copies all properties onto the live state object.
- *
- * @param {import('../core/gameState.js').GameState} liveState
- * @param {import('../core/debugSaves.js').DebugSaveDefinition} def
- * @param {HTMLElement} feedbackEl
  */
-function _loadDebugState(liveState, def, feedbackEl) {
+function _loadDebugState(liveState: GameState, def: DebugSaveDefinition, feedbackEl: FeedbackElement): void {
   const snapshot = def.generate();
 
   // Wipe all existing keys on the live state, then copy snapshot keys in.
   // This preserves the same object reference that the rest of the app holds.
   for (const key of Object.keys(liveState)) {
-    delete liveState[key];
+    delete (liveState as unknown as Record<string, unknown>)[key];
   }
   Object.assign(liveState, snapshot);
 
@@ -331,7 +337,7 @@ function _loadDebugState(liveState, def, feedbackEl) {
 
   // Update window.__gameState for e2e test access.
   if (typeof window !== 'undefined') {
-    window.__gameState = liveState;
+    (window as unknown as Record<string, unknown>).__gameState = liveState;
   }
 
   // Refresh the top bar to show new money/agency name.

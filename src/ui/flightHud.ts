@@ -1,15 +1,15 @@
 /**
- * flightHud.js — In-flight HTML overlay HUD.
+ * flightHud.ts — In-flight HTML overlay HUD.
  *
  * Renders a heads-up display on top of the PixiJS flight canvas showing
  * real-time telemetry and mission status:
  *
  *   LEFT EDGE
- *     - Throttle bar: vertical bar showing 0–100 %, updated live.
+ *     - Throttle bar: vertical bar showing 0-100 %, updated live.
  *       Keyboard: W / ArrowUp   +5 %  (handled by physics.js handleKeyDown)
  *                 S / ArrowDown -5 %  (handled by physics.js handleKeyDown)
- *                 X             → 0 % (handled here via direct ps.throttle write)
- *                 Z             → 100 %(handled here via direct ps.throttle write)
+ *                 X             -> 0 % (handled here via direct ps.throttle write)
+ *                 Z             -> 100 %(handled here via direct ps.throttle write)
  *
  *   TOP LEFT (beside throttle bar)
  *     - Altitude (m, thousands separator)
@@ -20,7 +20,7 @@
  *
  *   TOP RIGHT
  *     - Mission objectives from the accepted mission, each with a completion
- *       indicator (✓ when met, ○ while pending).
+ *       indicator (checkmark when met, circle while pending).
  *
  *   BOTTOM RIGHT
  *     - Per-tank fuel remaining (active tanks only, mass in kg).
@@ -44,19 +44,22 @@ import { countDeployedLegs } from '../core/legs.js';
 import { getBiome } from '../core/biomes.js';
 import { getAvailableSurfaceActions } from '../core/surfaceOps.js';
 import { injectStyleOnce } from './injectStyle.js';
+import type { PhysicsState } from '../core/physics.js';
+import type { RocketAssembly, StagingConfig } from '../core/rocketbuilder.js';
+import type { FlightState, GameState } from '../core/gameState.js';
 
 // ---------------------------------------------------------------------------
 // Physics constant
 // ---------------------------------------------------------------------------
 
-/** Standard gravity (m/s²) — used for ballistic apoapsis estimate. */
-const G0 = 9.81;
+/** Standard gravity (m/s^2) — used for ballistic apoapsis estimate. */
+const G0: number = 9.81;
 
 // ---------------------------------------------------------------------------
 // CSS
 // ---------------------------------------------------------------------------
 
-const FLIGHT_HUD_STYLES = `
+const FLIGHT_HUD_STYLES: string = `
 /* ═══════════════════════════════════════════════════════════════════════════
    Flight HUD — root overlay
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -743,81 +746,81 @@ const FLIGHT_HUD_STYLES = `
 // Module state
 // ---------------------------------------------------------------------------
 
-/** Root overlay element. @type {HTMLElement|null} */
-let _hud = null;
+/** Root overlay element. */
+let _hud: HTMLElement | null = null;
 
-/** requestAnimationFrame handle. @type {number|null} */
-let _rafId = null;
+/** requestAnimationFrame handle. */
+let _rafId: number | null = null;
 
 /** Live references to sim objects (set on init, cleared on destroy). */
-let _ps            = null;
-let _assembly      = null;
-let _stagingConfig = null;
-let _flightState   = null;
-let _state         = null;
+let _ps: PhysicsState | null = null;
+let _assembly: RocketAssembly | null = null;
+let _stagingConfig: StagingConfig | null = null;
+let _flightState: FlightState | null = null;
+let _state: GameState | null = null;
 
-/** Keyboard handler for X/Z throttle cut/full. @type {((e: KeyboardEvent) => void)|null} */
-let _keyHandler = null;
+/** Keyboard handler for X/Z throttle cut/full. */
+let _keyHandler: ((e: KeyboardEvent) => void) | null = null;
 
-/** Callback invoked with the chosen warp level when a warp button is clicked. @type {((level: number) => void)|null} */
-let _onTimeWarpChange = null;
+/** Callback invoked with the chosen warp level when a warp button is clicked. */
+let _onTimeWarpChange: ((level: number) => void) | null = null;
 
-/** Callback invoked when the player clicks "Abort to Hub" after repeated HUD errors. @type {(() => void)|null} */
-let _onAbort = null;
+/** Callback invoked when the player clicks "Abort to Hub" after repeated HUD errors. */
+let _onAbort: (() => void) | null = null;
 
 /** Count of consecutive _tick errors (reset to 0 on each successful frame). */
-let _consecutiveErrors = 0;
+let _consecutiveErrors: number = 0;
 
-/** Whether the error banner is currently visible. @type {HTMLElement|null} */
-let _errorBanner = null;
+/** Whether the error banner is currently visible. */
+let _errorBanner: HTMLElement | null = null;
 
 /** Current active time warp level (1, 2, 5, 10, or 50). */
-let _timeWarp = 1;
+let _timeWarp: number = 1;
 
 /** Whether the warp buttons are locked out (e.g. during a staging sequence). */
-let _warpLocked = false;
+let _warpLocked: boolean = false;
 
-/** Surface operations panel. @type {HTMLElement|null} */
-let _elSurfacePanel = null;
+/** Surface operations panel. */
+let _elSurfacePanel: HTMLElement | null = null;
 
-/** Callback invoked with the surface action id when a surface button is clicked. @type {((actionId: string) => void)|null} */
-let _onSurfaceAction = null;
+/** Callback invoked with the surface action id when a surface button is clicked. */
+let _onSurfaceAction: ((actionId: string) => void) | null = null;
 
-/** Array of warp-level button DOM elements (kept for highlight updates). @type {HTMLButtonElement[]} */
-let _warpButtons = [];
+/** Array of warp-level button DOM elements (kept for highlight updates). */
+let _warpButtons: HTMLButtonElement[] = [];
 
 // DOM nodes updated on every frame:
-let _elThrottleFill  = null;   // left-panel throttle bar fill
-let _elThrottlePct   = null;   // left-panel throttle % (id: flight-hud-throttle-pct)
-let _elTWR           = null;   // left-panel TWR value
-let _elAlt           = null;   // left-panel altitude (id: hud-alt)
-let _elVelY          = null;   // left-panel vertical speed (id: hud-vely)
-let _elVelX          = null;   // left-panel horizontal speed (id: hud-velx)
-let _elApo           = null;   // left-panel apoapsis (id: hud-apo)
-let _elStagingList   = null;   // left-panel staging container
-let _elFuelList      = null;   // left-panel fuel list
-let _elObjList       = null;   // objectives panel (top-right, unchanged)
-let _elLaunchTip     = null;   // launch pad "press space" tip
-let _launchTipHidden = false;  // once hidden, stays hidden
+let _elThrottleFill: HTMLElement | null = null;   // left-panel throttle bar fill
+let _elThrottlePct: HTMLElement | null = null;    // left-panel throttle % (id: flight-hud-throttle-pct)
+let _elTWR: HTMLElement | null = null;            // left-panel TWR value
+let _elAlt: HTMLElement | null = null;            // left-panel altitude (id: hud-alt)
+let _elVelY: HTMLElement | null = null;           // left-panel vertical speed (id: hud-vely)
+let _elVelX: HTMLElement | null = null;           // left-panel horizontal speed (id: hud-velx)
+let _elApo: HTMLElement | null = null;            // left-panel apoapsis (id: hud-apo)
+let _elStagingList: HTMLElement | null = null;    // left-panel staging container
+let _elFuelList: HTMLElement | null = null;       // left-panel fuel list
+let _elObjList: HTMLElement | null = null;        // objectives panel (top-right, unchanged)
+let _elLaunchTip: HTMLElement | null = null;      // launch pad "press space" tip
+let _launchTipHidden: boolean = false;            // once hidden, stays hidden
 
 // Altitude tape elements:
-let _elAltTape       = null;   // altitude tape container
-let _elAltTapeTicks  = null;   // altitude tape ticks container
+let _elAltTape: HTMLElement | null = null;        // altitude tape container
+let _elAltTapeTicks: HTMLElement | null = null;   // altitude tape ticks container
 
 // TWR bar elements:
-let _elModeToggle    = null;   // TWR/ABS mode toggle button
-let _elTwrBarFillUp  = null;   // TWR bar green fill (>1)
-let _elTwrBarFillDn  = null;   // TWR bar orange fill (<1)
-let _elTwrBarValue   = null;   // TWR bar centered value text
-let _elTargetTwrRow  = null;   // "Target" info row (visible only in TWR mode)
-let _elTargetTwrVal  = null;   // Target TWR value text
+let _elModeToggle: HTMLButtonElement | null = null;   // TWR/ABS mode toggle button
+let _elTwrBarFillUp: HTMLElement | null = null;       // TWR bar green fill (>1)
+let _elTwrBarFillDn: HTMLElement | null = null;       // TWR bar orange fill (<1)
+let _elTwrBarValue: HTMLElement | null = null;        // TWR bar centered value text
+let _elTargetTwrRow: HTMLElement | null = null;       // "Target" info row (visible only in TWR mode)
+let _elTargetTwrVal: HTMLElement | null = null;       // Target TWR value text
 
 // Control mode indicator elements:
-let _elControlMode   = null;   // control mode badge (shows ORBIT / DOCKING / RCS)
-let _elBandWarning   = null;   // altitude band limit warning text
-let _elBiome         = null;   // biome name in status section
-let _elCrewList      = null;   // left-panel crew list
-let _elCommsStatus   = null;   // comms status indicator in status section
+let _elControlMode: HTMLElement | null = null;    // control mode badge (shows ORBIT / DOCKING / RCS)
+let _elBandWarning: HTMLElement | null = null;    // altitude band limit warning text
+let _elBiome: HTMLElement | null = null;          // biome name in status section
+let _elCrewList: HTMLElement | null = null;       // left-panel crew list
+let _elCommsStatus: HTMLElement | null = null;    // comms status indicator in status section
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -828,20 +831,18 @@ let _elCommsStatus   = null;   // comms status indicator in status section
  *
  * Holds live references to the mutable sim objects — no data is copied.
  * All DOM updates read the live object state on each animation frame.
- *
- * @param {HTMLElement}                                             container       #ui-overlay div.
- * @param {import('../core/physics.js').PhysicsState}               ps
- * @param {import('../core/rocketbuilder.js').RocketAssembly}       assembly
- * @param {import('../core/rocketbuilder.js').StagingConfig}        stagingConfig
- * @param {import('../core/gameState.js').FlightState}              flightState
- * @param {import('../core/gameState.js').GameState}                state
- * @param {((level: number) => void)|null}                          [onTimeWarpChange]
- *   Called with the new warp level whenever the player clicks a time-warp button.
- * @param {((actionId: string) => void)|null}                       [onSurfaceAction]
- * @param {(() => void)|null}                                       [onAbort]
- *   Called when the player clicks "Abort to Hub" after repeated HUD errors.
  */
-export function initFlightHud(container, ps, assembly, stagingConfig, flightState, state, onTimeWarpChange, onSurfaceAction, onAbort) {
+export function initFlightHud(
+  container: HTMLElement,
+  ps: PhysicsState,
+  assembly: RocketAssembly,
+  stagingConfig: StagingConfig,
+  flightState: FlightState,
+  state: GameState,
+  onTimeWarpChange?: ((level: number) => void) | null,
+  onSurfaceAction?: ((actionId: string) => void) | null,
+  onAbort?: (() => void) | null,
+): void {
   _ps               = ps;
   _assembly         = assembly;
   _stagingConfig    = stagingConfig;
@@ -872,21 +873,21 @@ export function initFlightHud(container, ps, assembly, stagingConfig, flightStat
   _buildControlModeIndicator();
   _buildSurfacePanel();
 
-  // X → throttle 0 %, Z → throttle 100 %.
+  // X -> throttle 0 %, Z -> throttle 100 %.
   // W/S/ArrowUp/ArrowDown are handled by physics.js handleKeyDown when the
   // flight loop calls it; X/Z are handled here to keep the HUD self-contained.
-  _keyHandler = (e) => {
+  _keyHandler = (e: KeyboardEvent): void => {
     if (!_ps) return;
     const k = e.key;
-    const twrMode = _ps.throttleMode === 'twr';
+    const twrMode = (_ps as unknown as Record<string, unknown>).throttleMode === 'twr';
     if (k === 'x' || k === 'X') {
       if (twrMode) {
-        _ps.targetTWR = 0;
+        (_ps as unknown as Record<string, unknown>).targetTWR = 0;
       }
       _ps.throttle = 0;
     } else if (k === 'z' || k === 'Z') {
       if (twrMode) {
-        _ps.targetTWR = Infinity;
+        (_ps as unknown as Record<string, unknown>).targetTWR = Infinity;
       }
       _ps.throttle = 1;
     }
@@ -903,7 +904,7 @@ export function initFlightHud(container, ps, assembly, stagingConfig, flightStat
  * Tear down the flight HUD — removes the DOM overlay and cancels the loop.
  * Safe to call even if initFlightHud was never called.
  */
-export function destroyFlightHud() {
+export function destroyFlightHud(): void {
   if (_rafId !== null) {
     cancelAnimationFrame(_rafId);
     _rafId = null;
@@ -974,10 +975,8 @@ export function destroyFlightHud() {
  * Update the active-button highlight and internal warp state to match `level`.
  * Call this from the flight controller when the warp level changes for any
  * reason (button click, automatic reset, etc.).
- *
- * @param {number} level  New warp multiplier (0 = pause, 0.25, 0.5, 1, 2, 5, 10, or 50).
  */
-export function setHudTimeWarp(level) {
+export function setHudTimeWarp(level: number): void {
   _timeWarp = level;
   for (const btn of _warpButtons) {
     const btnLevel = parseFloat(btn.dataset.warp ?? '1');
@@ -990,10 +989,8 @@ export function setHudTimeWarp(level) {
  *
  * While locked (e.g. during an active staging sequence) the buttons are
  * rendered as disabled so the player cannot change the warp level.
- *
- * @param {boolean} locked  true = lock; false = unlock.
  */
-export function lockTimeWarp(locked) {
+export function lockTimeWarp(locked: boolean): void {
   _warpLocked = locked;
   for (const btn of _warpButtons) {
     btn.disabled = locked;
@@ -1007,7 +1004,7 @@ export function lockTimeWarp(locked) {
 /**
  * Build the unified left panel containing throttle, staging, and fuel sections.
  */
-function _buildLeftPanel() {
+function _buildLeftPanel(): void {
   const panel = document.createElement('div');
   panel.id = 'flight-left-panel';
 
@@ -1067,7 +1064,7 @@ function _buildLeftPanel() {
   _elApo = document.createElement('div');
   _elApo.id = 'hud-apo';
   _elApo.className = 'flight-lp-val';
-  _elApo.textContent = '—';
+  _elApo.textContent = '\u2014';
   apoRow.appendChild(apoLbl);
   apoRow.appendChild(_elApo);
   statusSec.appendChild(apoRow);
@@ -1121,17 +1118,18 @@ function _buildLeftPanel() {
   _elModeToggle.title = 'Toggle throttle mode: TWR (auto-adjust) / ABS (manual)';
   _elModeToggle.addEventListener('click', () => {
     if (!_ps) return;
-    if (_ps.throttleMode === 'twr') {
-      _ps.throttleMode = 'absolute';
-      _elModeToggle.textContent = 'ABS';
-      _elModeToggle.classList.remove('active');
+    const psAny = _ps as unknown as Record<string, unknown>;
+    if (psAny.throttleMode === 'twr') {
+      psAny.throttleMode = 'absolute';
+      _elModeToggle!.textContent = 'ABS';
+      _elModeToggle!.classList.remove('active');
     } else {
       // Switching to TWR mode — snapshot current TWR as target to prevent jump
       const currentTWR = _computeTWR();
-      _ps.targetTWR = currentTWR > 0 ? currentTWR : 1.0;
-      _ps.throttleMode = 'twr';
-      _elModeToggle.textContent = 'TWR';
-      _elModeToggle.classList.add('active');
+      psAny.targetTWR = currentTWR > 0 ? currentTWR : 1.0;
+      psAny.throttleMode = 'twr';
+      _elModeToggle!.textContent = 'TWR';
+      _elModeToggle!.classList.add('active');
     }
   });
   titleRow.appendChild(_elModeToggle);
@@ -1162,7 +1160,7 @@ function _buildLeftPanel() {
   _elTwrBarFillDn.style.height = '0%';
   _elTwrBarValue = document.createElement('div');
   _elTwrBarValue.className = 'flight-lp-twr-bar-value';
-  _elTwrBarValue.textContent = '—';
+  _elTwrBarValue.textContent = '\u2014';
   twrBar.appendChild(_elTwrBarFillUp);
   twrBar.appendChild(_elTwrBarFillDn);
   twrBar.appendChild(twrBarCenter);
@@ -1186,7 +1184,7 @@ function _buildLeftPanel() {
   twrLbl.textContent = 'TWR';
   _elTWR = document.createElement('div');
   _elTWR.className = 'flight-lp-val';
-  _elTWR.textContent = '—';
+  _elTWR.textContent = '\u2014';
   twrRow.appendChild(twrLbl);
   twrRow.appendChild(_elTWR);
   info.appendChild(twrRow);
@@ -1217,8 +1215,9 @@ function _buildLeftPanel() {
   setTWR1Btn.title = 'Set throttle so thrust-to-weight ratio equals 1';
   setTWR1Btn.addEventListener('click', () => {
     if (!_ps) return;
-    if (_ps.throttleMode === 'twr') {
-      _ps.targetTWR = 1.0;
+    const psAny = _ps as unknown as Record<string, unknown>;
+    if (psAny.throttleMode === 'twr') {
+      psAny.targetTWR = 1.0;
     } else {
       _setThrottleForTWR1();
     }
@@ -1227,14 +1226,15 @@ function _buildLeftPanel() {
 
   const minusBtn = document.createElement('button');
   minusBtn.className = 'flight-lp-btn';
-  minusBtn.textContent = '−0.1';
+  minusBtn.textContent = '\u22120.1';
   minusBtn.title = 'Decrease throttle/TWR by 0.1';
   minusBtn.addEventListener('click', () => {
     if (!_ps) return;
-    if (_ps.throttleMode === 'twr') {
-      _ps.targetTWR = _ps.targetTWR === Infinity
+    const psAny = _ps as unknown as Record<string, unknown>;
+    if (psAny.throttleMode === 'twr') {
+      psAny.targetTWR = (psAny.targetTWR as number) === Infinity
         ? Math.max(0, 10 - 0.1)
-        : Math.max(0, Math.round((_ps.targetTWR - 0.1) * 10) / 10);
+        : Math.max(0, Math.round(((psAny.targetTWR as number) - 0.1) * 10) / 10);
     } else {
       _ps.throttle = Math.max(0, Math.round((_ps.throttle - 0.1) * 10) / 10);
     }
@@ -1247,9 +1247,10 @@ function _buildLeftPanel() {
   plusBtn.title = 'Increase throttle/TWR by 0.1';
   plusBtn.addEventListener('click', () => {
     if (!_ps) return;
-    if (_ps.throttleMode === 'twr') {
-      if (_ps.targetTWR !== Infinity) {
-        _ps.targetTWR = Math.round((_ps.targetTWR + 0.1) * 10) / 10;
+    const psAny = _ps as unknown as Record<string, unknown>;
+    if (psAny.throttleMode === 'twr') {
+      if ((psAny.targetTWR as number) !== Infinity) {
+        psAny.targetTWR = Math.round(((psAny.targetTWR as number) + 0.1) * 10) / 10;
       }
     } else {
       _ps.throttle = Math.min(1, Math.round((_ps.throttle + 0.1) * 10) / 10);
@@ -1306,19 +1307,19 @@ function _buildLeftPanel() {
 
   panel.appendChild(crewSec);
 
-  _hud.appendChild(panel);
+  _hud!.appendChild(panel);
 
   // ── Launch pad tip ────────────────────────────────────────────────────────
   _elLaunchTip = document.createElement('div');
   _elLaunchTip.id = 'flight-launch-tip';
   _elLaunchTip.textContent = 'Press [Space] to activate Stage 1';
-  _hud.appendChild(_elLaunchTip);
+  _hud!.appendChild(_elLaunchTip);
 }
 
 /**
  * Build the mission objectives panel (top-right).
  */
-function _buildObjectivesPanel() {
+function _buildObjectivesPanel(): void {
   const panel = document.createElement('div');
   panel.id = 'flight-hud-objectives';
 
@@ -1326,17 +1327,17 @@ function _buildObjectivesPanel() {
   _elObjList.id = 'flight-hud-obj-list';
   panel.appendChild(_elObjList);
 
-  _hud.appendChild(panel);
+  _hud!.appendChild(panel);
 }
 
 /**
  * Build the time-warp control panel (bottom-centre).
  *
- * Renders a row of buttons labelled 1×, 2×, 5×, 10×, 50×.  Clicking a button
+ * Renders a row of buttons labelled 1x, 2x, 5x, 10x, 50x.  Clicking a button
  * invokes `_onTimeWarpChange(level)` so the flight controller can apply the
  * new warp multiplier to the physics loop.
  */
-function _buildTimeWarpPanel() {
+function _buildTimeWarpPanel(): void {
   const panel = document.createElement('div');
   panel.id = 'flight-hud-timewarp';
 
@@ -1345,14 +1346,14 @@ function _buildTimeWarpPanel() {
   label.textContent = 'Warp:';
   panel.appendChild(label);
 
-  const WARP_LEVELS = [0, 0.25, 0.5, 1, 2, 5, 10, 50];
+  const WARP_LEVELS: number[] = [0, 0.25, 0.5, 1, 2, 5, 10, 50];
   for (const level of WARP_LEVELS) {
-    const btn = /** @type {HTMLButtonElement} */ (document.createElement('button'));
-    const label = level === 0 ? 'PAUSE' : level === 0.25 ? '¼×' : level === 0.5 ? '½×' : `${level}×`;
+    const btn = document.createElement('button') as HTMLButtonElement;
+    const btnLabel = level === 0 ? 'PAUSE' : level === 0.25 ? '\u00BC\u00D7' : level === 0.5 ? '\u00BD\u00D7' : `${level}\u00D7`;
     btn.className       = 'hud-warp-btn' + (level === 1 ? ' active' : '');
-    btn.textContent     = label;
+    btn.textContent     = btnLabel;
     btn.dataset.warp    = String(level);
-    btn.setAttribute('aria-label', level === 0 ? 'Pause' : `Time warp ${label}`);
+    btn.setAttribute('aria-label', level === 0 ? 'Pause' : `Time warp ${btnLabel}`);
     btn.addEventListener('click', () => {
       if (_warpLocked) return;
       if (_onTimeWarpChange) _onTimeWarpChange(level);
@@ -1361,14 +1362,14 @@ function _buildTimeWarpPanel() {
     panel.appendChild(btn);
   }
 
-  _hud.appendChild(panel);
+  _hud!.appendChild(panel);
 }
 
 /**
  * Show the launch pad tip ("Press [Space] to activate Stage 1").
  * Called by the flight controller after initFlightHud.
  */
-export function showLaunchTip() {
+export function showLaunchTip(): void {
   _launchTipHidden = false;
   if (_elLaunchTip) _elLaunchTip.hidden = false;
 }
@@ -1376,7 +1377,7 @@ export function showLaunchTip() {
 /**
  * Permanently hide the launch tip (e.g. after first spacebar press fires Stage 1).
  */
-export function hideLaunchTip() {
+export function hideLaunchTip(): void {
   _launchTipHidden = true;
   if (_elLaunchTip) _elLaunchTip.hidden = true;
 }
@@ -1388,7 +1389,7 @@ export function hideLaunchTip() {
 /**
  * Build the altitude tape DOM structure and append to HUD.
  */
-function _buildAltTape() {
+function _buildAltTape(): void {
   const tape = document.createElement('div');
   tape.id = 'flight-alt-tape';
 
@@ -1402,17 +1403,15 @@ function _buildAltTape() {
     + '<span class="alt-tape-indicator-val"></span>';
   tape.appendChild(indicator);
 
-  _hud.appendChild(tape);
+  _hud!.appendChild(tape);
   _elAltTape      = tape;
   _elAltTapeTicks = ticks;
 }
 
 /**
  * Return scale parameters based on current altitude.
- * @param {number} alt — current altitude in metres
- * @returns {{ range: number, minorTick: number, majorTick: number }}
  */
-function _altTapeScale(alt) {
+function _altTapeScale(alt: number): { range: number; minorTick: number; majorTick: number } {
   const a = Math.abs(alt);
   if (a < 500)    return { range: 200,    minorTick: 10,    majorTick: 50 };
   if (a < 2000)   return { range: 1000,   minorTick: 50,    majorTick: 200 };
@@ -1424,10 +1423,8 @@ function _altTapeScale(alt) {
 
 /**
  * Format altitude for tick labels.
- * @param {number} m — altitude in metres
- * @returns {string}
  */
-function _fmtAltLabel(m) {
+function _fmtAltLabel(m: number): string {
   const a = Math.abs(m);
   const sign = m < 0 ? '-' : '';
   if (a >= 1000) return sign + (a / 1000).toFixed(a % 1000 === 0 ? 0 : 1) + 'k';
@@ -1437,7 +1434,7 @@ function _fmtAltLabel(m) {
 /**
  * Update altitude tape every frame.
  */
-function _updateAltTape() {
+function _updateAltTape(): void {
   if (!_elAltTape || !_ps) return;
 
   const alt   = _ps.posY;
@@ -1445,7 +1442,6 @@ function _updateAltTape() {
   const halfRange = scale.range / 2;
   const altMin = alt - halfRange;
   const altMax = alt + halfRange;
-  const tapeH  = _elAltTape.clientHeight || 1;
 
   let html = '';
 
@@ -1470,7 +1466,7 @@ function _updateAltTape() {
     html += `<div class="alt-tape-ground" style="height:${groundPct.toFixed(2)}%"></div>`;
   }
 
-  _elAltTapeTicks.innerHTML = html;
+  _elAltTapeTicks!.innerHTML = html;
 
   // Update centre indicator value
   const valEl = _elAltTape.querySelector('.alt-tape-indicator-val');
@@ -1485,36 +1481,34 @@ function _updateAltTape() {
 }
 
 // ---------------------------------------------------------------------------
-// Private — update loop
-// ---------------------------------------------------------------------------
 // Private — control mode indicator
 // ---------------------------------------------------------------------------
 
 /**
  * Build the control mode indicator badge and band warning overlay.
  */
-function _buildControlModeIndicator() {
+function _buildControlModeIndicator(): void {
   _elControlMode = document.createElement('div');
   _elControlMode.id = 'hud-control-mode';
   _elControlMode.dataset.mode = 'NORMAL';
   _elControlMode.textContent = 'Orbit';
-  _hud.appendChild(_elControlMode);
+  _hud!.appendChild(_elControlMode);
 
   _elBandWarning = document.createElement('div');
   _elBandWarning.id = 'hud-band-warning';
   _elBandWarning.className = 'hidden';
   _elBandWarning.textContent = '';
-  _hud.appendChild(_elBandWarning);
+  _hud!.appendChild(_elBandWarning);
 }
 
 /**
  * Update the control mode indicator badge every frame.
  * Only visible when in ORBIT phase (or docking/RCS sub-modes).
  */
-function _updateControlModeIndicator() {
+function _updateControlModeIndicator(): void {
   if (!_elControlMode || !_ps || !_flightState) return;
 
-  const mode = _ps.controlMode ?? ControlMode.NORMAL;
+  const mode = (_ps as unknown as Record<string, unknown>).controlMode as string ?? ControlMode.NORMAL;
   const label = getControlModeLabel(mode);
 
   _elControlMode.dataset.mode = mode;
@@ -1548,7 +1542,7 @@ function _updateControlModeIndicator() {
  * Build the surface operations panel (bottom-left, hidden by default).
  * Shows action buttons when the rocket is landed.
  */
-function _buildSurfacePanel() {
+function _buildSurfacePanel(): void {
   const panel = document.createElement('div');
   panel.id = 'flight-hud-surface';
   panel.classList.add('hidden');
@@ -1559,14 +1553,14 @@ function _buildSurfacePanel() {
   panel.appendChild(title);
 
   _elSurfacePanel = panel;
-  _hud.appendChild(panel);
+  _hud!.appendChild(panel);
 }
 
 /**
  * Update the surface operations panel: show/hide based on landed state,
  * rebuild action buttons to reflect current availability.
  */
-function _updateSurfacePanel() {
+function _updateSurfacePanel(): void {
   if (!_elSurfacePanel || !_ps || !_flightState || !_state) return;
 
   // Only show when landed.
@@ -1577,16 +1571,16 @@ function _updateSurfacePanel() {
 
   _elSurfacePanel.classList.remove('hidden');
 
-  const actions = getAvailableSurfaceActions(_state, _flightState, _ps, _assembly);
+  const actions = getAvailableSurfaceActions(_state, _flightState, _ps, _assembly!);
 
   // Rebuild buttons only when the action list changes (avoid constant DOM churn).
-  const key = actions.map(a => `${a.id}:${a.enabled}`).join('|');
+  const key = actions.map((a: { id: string; enabled: boolean }) => `${a.id}:${a.enabled}`).join('|');
   if (_elSurfacePanel.dataset.key === key) return;
   _elSurfacePanel.dataset.key = key;
 
   // Remove old buttons (keep the title).
   while (_elSurfacePanel.children.length > 1) {
-    _elSurfacePanel.removeChild(_elSurfacePanel.lastChild);
+    _elSurfacePanel.removeChild(_elSurfacePanel.lastChild!);
   }
 
   for (const action of actions) {
@@ -1594,16 +1588,14 @@ function _updateSurfacePanel() {
     btn.className = 'surface-btn';
     btn.disabled = !action.enabled;
 
-    let label = action.label;
     if (!action.enabled && action.reason) {
-      label += ` `;
       const reason = document.createElement('span');
       reason.className = 'surface-btn-reason';
       reason.textContent = `(${action.reason})`;
       btn.textContent = action.label;
       btn.appendChild(reason);
     } else {
-      btn.textContent = label;
+      btn.textContent = action.label;
     }
 
     if (action.enabled) {
@@ -1619,12 +1611,12 @@ function _updateSurfacePanel() {
 // ---------------------------------------------------------------------------
 
 /** Maximum consecutive errors before showing the abort banner. */
-const _MAX_CONSECUTIVE_ERRORS = 5;
+const _MAX_CONSECUTIVE_ERRORS: number = 5;
 
 /**
  * One animation frame: update every HUD panel, then re-schedule.
  */
-function _tick() {
+function _tick(): void {
   if (_hud && _ps) {
     try {
       _updateLeftPanel();
@@ -1649,7 +1641,7 @@ function _tick() {
  * Show an error banner offering the player a way to abort to the hub.
  * Only shown after repeated consecutive errors.
  */
-function _showErrorBanner() {
+function _showErrorBanner(): void {
   if (!_hud || _errorBanner) return;
 
   _errorBanner = document.createElement('div');
@@ -1698,7 +1690,7 @@ function _showErrorBanner() {
 // Private — comms link label
 // ---------------------------------------------------------------------------
 
-function _getCommsLinkLabel(linkType) {
+function _getCommsLinkLabel(linkType: string): string {
   switch (linkType) {
     case 'DIRECT':            return 'Direct Link';
     case 'TRACKING_STATION':  return 'Tracking Station';
@@ -1714,44 +1706,42 @@ function _getCommsLinkLabel(linkType) {
 // Private — landing speed safety indicator
 // ---------------------------------------------------------------------------
 
-const _COLOR_SAFE    = '#a0ffc0';
-const _COLOR_CAUTION = '#ffc080';
-const _COLOR_DANGER  = '#ff6060';
-const _COLOR_DEFAULT = '#a0d8b0';
+const _COLOR_SAFE: string    = '#a0ffc0';
+const _COLOR_CAUTION: string = '#ffc080';
+const _COLOR_DANGER: string  = '#ff6060';
+const _COLOR_DEFAULT: string = '#a0d8b0';
 
 /**
  * Determine the landing-safety color for the vertical speed display
  * and whether to show total speed. Mirrors the thresholds in
  * physics.js `_handleGroundContact`.
- *
- * @returns {{ color: string, totalSpeed: number|null }}
  */
-function _getLandingSpeedInfo() {
-  const vy = _ps.velY ?? 0;
-  const vx = _ps.velX ?? 0;
+function _getLandingSpeedInfo(): { color: string; totalSpeed: number | null } {
+  const vy = _ps!.velY ?? 0;
+  const vx = _ps!.velX ?? 0;
 
-  // Not descending, or already grounded/landed/crashed → default color
-  if (vy >= 0 || _ps.landed || _ps.crashed || _ps.grounded) {
+  // Not descending, or already grounded/landed/crashed -> default color
+  if (vy >= 0 || _ps!.landed || _ps!.crashed || _ps!.grounded) {
     return { color: _COLOR_DEFAULT, totalSpeed: null };
   }
 
   const totalSpeed = Math.hypot(vx, vy);
-  const legs = countDeployedLegs(_ps);
+  const legs = countDeployedLegs(_ps!);
 
-  let color;
+  let color: string;
   if (legs >= 2) {
-    // With legs: safe < 10, caution 10–29, danger ≥ 30
+    // With legs: safe < 10, caution 10-29, danger >= 30
     if (totalSpeed < 10)       color = _COLOR_SAFE;
     else if (totalSpeed < 30)  color = _COLOR_CAUTION;
     else                       color = _COLOR_DANGER;
   } else {
-    // No/insufficient legs: safe ≤ 5, danger > 5
+    // No/insufficient legs: safe <= 5, danger > 5
     if (totalSpeed <= 5)  color = _COLOR_SAFE;
     else                  color = _COLOR_DANGER;
   }
 
   // Show total speed in parens when below 500 m and there's horizontal velocity
-  const alt = _ps.posY ?? 0;
+  const alt = _ps!.posY ?? 0;
   const showTotal = (alt < 500 && Math.abs(vx) > 0.1) ? totalSpeed : null;
 
   return { color, totalSpeed: showTotal };
@@ -1764,16 +1754,16 @@ function _getLandingSpeedInfo() {
 /**
  * Update all sections of the unified left panel (throttle, staging, fuel).
  */
-function _updateLeftPanel() {
+function _updateLeftPanel(): void {
   // ── Status (altitude + vertical speed) ───────────────────────────────────
   if (_elAlt) {
-    const alt = _ps.posY ?? 0;
+    const alt = _ps!.posY ?? 0;
     _elAlt.textContent = alt >= 1000
       ? `${(alt / 1000).toFixed(1)} km`
       : `${Math.round(alt)} m`;
   }
   if (_elVelY) {
-    const vy = _ps.velY ?? 0;
+    const vy = _ps!.velY ?? 0;
     const { color, totalSpeed } = _getLandingSpeedInfo();
     let text = `${vy >= 0 ? '+' : ''}${vy.toFixed(1)} m/s`;
     if (totalSpeed !== null) text += ` (${Math.round(totalSpeed)})`;
@@ -1781,25 +1771,25 @@ function _updateLeftPanel() {
     _elVelY.style.color = color;
   }
   if (_elVelX) {
-    const vx = _ps.velX ?? 0;
+    const vx = _ps!.velX ?? 0;
     _elVelX.textContent = `${vx >= 0 ? '+' : ''}${vx.toFixed(1)} m/s`;
   }
   if (_elApo) {
-    const alt = Math.max(0, _ps.posY ?? 0);
-    const vy  = _ps.velY ?? 0;
+    const alt = Math.max(0, _ps!.posY ?? 0);
+    const vy  = _ps!.velY ?? 0;
     const apo = _estimateApoapsis(alt, vy);
     if (apo > alt + 10) {
       _elApo.textContent = apo >= 1000
         ? `${(apo / 1000).toFixed(1)} km`
         : `${Math.round(apo)} m`;
     } else {
-      _elApo.textContent = '—';
+      _elApo.textContent = '\u2014';
     }
   }
   if (_elBiome) {
-    const alt = Math.max(0, _ps.posY ?? 0);
+    const alt = Math.max(0, _ps!.posY ?? 0);
     const biome = getBiome(alt, 'EARTH');
-    _elBiome.textContent = biome ? biome.name : '—';
+    _elBiome.textContent = biome ? biome.name : '\u2014';
   }
   if (_elCommsStatus && _flightState) {
     const comms = _flightState.commsState;
@@ -1815,14 +1805,14 @@ function _updateLeftPanel() {
   }
 
   // ── Throttle ──────────────────────────────────────────────────────────────
-  const pct = Math.round((_ps.throttle ?? 0) * 100);
+  const pct = Math.round((_ps!.throttle ?? 0) * 100);
   if (_elThrottleFill) _elThrottleFill.style.height = `${pct}%`;
   if (_elThrottlePct)  _elThrottlePct.textContent   = `${pct}%`;
 
   // ── TWR ───────────────────────────────────────────────────────────────────
   const twr = _computeTWR();
   if (_elTWR) {
-    _elTWR.textContent = twr > 0 ? twr.toFixed(2) : '—';
+    _elTWR.textContent = twr > 0 ? twr.toFixed(2) : '\u2014';
     _elTWR.style.color = twr >= 1 ? '#a0ffc0' : twr > 0 ? '#ffc080' : '#a0d8b0';
   }
 
@@ -1842,17 +1832,18 @@ function _updateLeftPanel() {
       _elTwrBarFillUp.style.height = '0%';
       _elTwrBarFillDn.style.height = '0%';
     }
-    _elTwrBarValue.textContent = twr > 0 ? twr.toFixed(1) : '—';
+    _elTwrBarValue.textContent = twr > 0 ? twr.toFixed(1) : '\u2014';
   }
 
   // ── Target TWR row (TWR mode only) ──────────────────────────────────────
   if (_elTargetTwrRow && _elTargetTwrVal) {
-    const isTwrMode = _ps.throttleMode === 'twr';
+    const psAny = _ps as unknown as Record<string, unknown>;
+    const isTwrMode = psAny.throttleMode === 'twr';
     _elTargetTwrRow.style.display = isTwrMode ? '' : 'none';
     if (isTwrMode) {
-      _elTargetTwrVal.textContent = _ps.targetTWR === Infinity
+      _elTargetTwrVal.textContent = (psAny.targetTWR as number) === Infinity
         ? 'MAX'
-        : _ps.targetTWR.toFixed(1);
+        : (psAny.targetTWR as number).toFixed(1);
     }
   }
 
@@ -1877,12 +1868,14 @@ function _updateLeftPanel() {
  * Only reconstructs the inner HTML when the number of objectives has changed
  * or a completion status has changed; otherwise leaves the DOM untouched.
  */
-function _updateObjectivesPanel() {
+function _updateObjectivesPanel(): void {
   if (!_elObjList || !_state) return;
 
   // Gather all accepted missions that have objectives.
-  const missions = (_state.missions.accepted ?? []).filter(
-    (m) => Array.isArray(m.objectives) && m.objectives.length > 0,
+  // Use `any` for dynamic mission shape — the Mission interface doesn't include runtime `objectives` array.
+  const allAccepted = (_state.missions.accepted ?? []) as unknown as Array<Record<string, unknown>>;
+  const missions = allAccepted.filter(
+    (m) => Array.isArray(m.objectives) && (m.objectives as unknown[]).length > 0,
   );
 
   // No accepted missions with objectives — hide the panel entirely.
@@ -1899,13 +1892,16 @@ function _updateObjectivesPanel() {
   // Build a compact fingerprint: missionId + completion bits + hold timer state.
   const now = _flightState?.timeElapsed ?? 0;
   const fingerprint = missions.map(
-    (m) => m.id + ':' + m.objectives.map((o) => {
-      if (o.completed) return '1';
-      if (o.type === ObjectiveType.HOLD_ALTITUDE && o._holdEnteredAt != null) {
-        return 'H' + Math.floor(now - o._holdEnteredAt);
-      }
-      return '0';
-    }).join(''),
+    (m) => {
+      const objectives = m.objectives as Array<Record<string, unknown>>;
+      return (m.id as string) + ':' + objectives.map((o) => {
+        if (o.completed) return '1';
+        if (o.type === ObjectiveType.HOLD_ALTITUDE && o._holdEnteredAt != null) {
+          return 'H' + Math.floor(now - (o._holdEnteredAt as number));
+        }
+        return '0';
+      }).join('');
+    },
   ).join('|');
   if (_elObjList.dataset.fp === fingerprint) return; // Nothing changed — skip.
   _elObjList.dataset.fp = fingerprint;
@@ -1917,37 +1913,38 @@ function _updateObjectivesPanel() {
 
     const title = document.createElement('div');
     title.className = 'hud-obj-mission-title';
-    title.textContent = mission.title;
+    title.textContent = mission.title as string;
     group.appendChild(title);
 
-    for (const obj of mission.objectives) {
+    for (const obj of mission.objectives as Array<Record<string, unknown>>) {
       const item = document.createElement('div');
       item.className = 'hud-obj-item';
 
       const icon = document.createElement('span');
       icon.className = `hud-obj-icon ${obj.completed ? 'met' : 'pending'}`;
-      icon.textContent = obj.completed ? '✓' : '○';
+      icon.textContent = obj.completed ? '\u2713' : '\u25CB';
 
       const descWrap = document.createElement('div');
 
       const desc = document.createElement('span');
       desc.className = `hud-obj-desc${obj.completed ? ' met' : ''}`;
-      desc.textContent = obj.description ?? obj.type;
+      desc.textContent = (obj.description as string | undefined) ?? (obj.type as string);
       descWrap.appendChild(desc);
 
       // Show countdown timer for duration-based objectives.
-      if (obj.type === ObjectiveType.HOLD_ALTITUDE && !obj.completed && obj.target?.duration) {
+      const objTarget = obj.target as Record<string, unknown> | undefined;
+      if (obj.type === ObjectiveType.HOLD_ALTITUDE && !obj.completed && objTarget?.duration) {
         const timer = document.createElement('div');
         timer.className = 'hud-obj-timer';
         timer.dataset.testid = 'hud-obj-hold-timer';
 
         if (obj._holdEnteredAt != null) {
-          const elapsed = Math.max(0, now - obj._holdEnteredAt);
-          const remaining = Math.max(0, obj.target.duration - elapsed);
+          const elapsed = Math.max(0, now - (obj._holdEnteredAt as number));
+          const remaining = Math.max(0, (objTarget.duration as number) - elapsed);
           timer.textContent = `${Math.ceil(remaining)}s remaining`;
         } else {
           timer.className += ' inactive';
-          timer.textContent = `0 / ${obj.target.duration}s`;
+          timer.textContent = `0 / ${objTarget.duration as number}s`;
         }
         descWrap.appendChild(timer);
       }
@@ -1964,7 +1961,7 @@ function _updateObjectivesPanel() {
 /**
  * Rebuild the staging list (stages shown bottom-to-top = stage 1 at bottom).
  */
-function _updateStagingList() {
+function _updateStagingList(): void {
   if (!_elStagingList || !_stagingConfig || !_assembly || !_ps) return;
 
   const stages    = _stagingConfig.stages;
@@ -1991,13 +1988,13 @@ function _updateStagingList() {
 
     const lbl = document.createElement('div');
     lbl.className = 'flight-lp-stage-label';
-    lbl.textContent = `Stage ${i + 1}${isActive ? ' ▶' : ''}`;
+    lbl.textContent = `Stage ${i + 1}${isActive ? ' \u25B6' : ''}`;
     item.appendChild(lbl);
 
     // Part names for this stage.
-    const partNames = [];
+    const partNames: string[] = [];
     for (const instanceId of stage.instanceIds) {
-      const placed = _assembly.parts.get(instanceId);
+      const placed = _assembly!.parts.get(instanceId);
       const def    = placed ? getPartById(placed.partId) : null;
       if (def) partNames.push(def.name);
     }
@@ -2011,7 +2008,7 @@ function _updateStagingList() {
     const dv    = _computeStageDeltaV(i);
     const dvEl  = document.createElement('div');
     dvEl.className = 'flight-lp-stage-dv';
-    dvEl.textContent = dv > 0 ? `ΔV ~${Math.round(dv)} m/s` : '';
+    dvEl.textContent = dv > 0 ? `\u0394V ~${Math.round(dv)} m/s` : '';
     item.appendChild(dvEl);
 
     _elStagingList.appendChild(item);
@@ -2021,10 +2018,10 @@ function _updateStagingList() {
 /**
  * Rebuild the fuel list showing active tanks.
  */
-function _updateFuelList() {
+function _updateFuelList(): void {
   if (!_elFuelList || !_ps || !_assembly) return;
 
-  const entries = [];
+  const entries: { instanceId: string; fuelKg: number }[] = [];
   for (const [instanceId, fuelKg] of _ps.fuelStore) {
     if (!_ps.activeParts.has(instanceId)) continue;
     if (fuelKg < 0.1) continue;
@@ -2046,7 +2043,7 @@ function _updateFuelList() {
   }
 
   for (const { instanceId, fuelKg } of entries) {
-    const placed = _assembly.parts.get(instanceId);
+    const placed = _assembly!.parts.get(instanceId);
     const def    = placed ? getPartById(placed.partId) : null;
     const name   = def?.name ?? placed?.partId ?? instanceId;
 
@@ -2071,10 +2068,10 @@ function _updateFuelList() {
  * Update crew list in the left panel.
  * Shows names and status of crew aboard the flight.
  */
-function _updateCrewList() {
+function _updateCrewList(): void {
   if (!_elCrewList || !_flightState || !_state) return;
 
-  const crewIds = _flightState.crewIds ?? [];
+  const crewIds: string[] = _flightState.crewIds ?? [];
   const crewSection = _elCrewList.parentElement;
 
   if (crewIds.length === 0) {
@@ -2089,10 +2086,10 @@ function _updateCrewList() {
   _elCrewList.dataset.fp = fingerprint;
   _elCrewList.innerHTML = '';
 
-  const ejectedIds = _ps?.ejectedCrewIds ?? new Set();
+  const ejectedIds: Set<string> = (_ps as unknown as Record<string, unknown>)?.ejectedCrewIds as Set<string> ?? new Set<string>();
 
   for (const crewId of crewIds) {
-    const member = _state.crew?.find((c) => c.id === crewId);
+    const member = _state.crew?.find((c: { id: string }) => c.id === crewId);
     if (!member) continue;
 
     const row = document.createElement('div');
@@ -2125,7 +2122,7 @@ function _updateCrewList() {
  * Update visibility of the launch pad tip.
  * Hide it once the rocket has left the pad or a stage has been fired.
  */
-function _updateLaunchTip() {
+function _updateLaunchTip(): void {
   if (_launchTipHidden || !_elLaunchTip) return;
   // Hide if rocket has moved or staging has advanced beyond stage 0.
   const launched = _ps && (!_ps.grounded || (_stagingConfig && _stagingConfig.currentStageIdx > 0));
@@ -2142,9 +2139,8 @@ function _updateLaunchTip() {
 /**
  * Compute the current thrust-to-weight ratio.
  * Uses firing engines at current throttle; 0 if nothing is firing.
- * @returns {number}
  */
-function _computeTWR() {
+function _computeTWR(): number {
   if (!_ps || !_assembly) return 0;
   let totalThrust = 0;
   let totalMass   = 0;
@@ -2157,7 +2153,7 @@ function _computeTWR() {
     totalMass += _ps.fuelStore.get(instanceId) ?? 0;
     if (_ps.firingEngines && _ps.firingEngines.has(instanceId)) {
       const isSRB      = def.type === PartType.SOLID_ROCKET_BOOSTER;
-      const thrustN    = (def.properties?.thrust ?? 0) * 1_000; // kN → N
+      const thrustN    = ((def.properties?.thrust as number) ?? 0) * 1_000; // kN -> N
       const thrust     = thrustN * (isSRB ? 1 : (_ps.throttle ?? 0));
       totalThrust     += thrust;
     }
@@ -2169,12 +2165,9 @@ function _computeTWR() {
 
 /**
  * Compute the estimated delta-V for a given stage index using the
- * Tsiolkovsky rocket equation:  ΔV = Isp × g × ln(m0 / mf)
- *
- * @param {number} stageIdx
- * @returns {number}  Delta-V in m/s; 0 if data is missing.
+ * Tsiolkovsky rocket equation:  dV = Isp x g x ln(m0 / mf)
  */
-function _computeStageDeltaV(stageIdx) {
+function _computeStageDeltaV(stageIdx: number): number {
   if (!_ps || !_assembly || !_stagingConfig) return 0;
   const stage = _stagingConfig.stages[stageIdx];
   if (!stage) return 0;
@@ -2200,9 +2193,9 @@ function _computeStageDeltaV(stageIdx) {
     const placed = _assembly.parts.get(instanceId);
     const def    = placed ? getPartById(placed.partId) : null;
     if (!def) continue;
-    const thrust = def.properties?.thrust ?? 0;
+    const thrust = (def.properties?.thrust as number) ?? 0;
     if (thrust > 0) {
-      const isp = def.properties?.isp ?? 300;
+      const isp = (def.properties?.isp as number) ?? 300;
       thrustTotal    += thrust;
       ispTimesThrust += isp * thrust;
     }
@@ -2218,7 +2211,7 @@ function _computeStageDeltaV(stageIdx) {
 /**
  * Adjust throttle so the current TWR equals 1 (if enough thrust available).
  */
-function _setThrottleForTWR1() {
+function _setThrottleForTWR1(): void {
   if (!_ps || !_assembly) return;
 
   // Total dry+fuel mass (all active parts).
@@ -2233,7 +2226,7 @@ function _setThrottleForTWR1() {
     totalMass += def.mass ?? 0;
     totalMass += _ps.fuelStore.get(instanceId) ?? 0;
 
-    const thrustN = (def.properties?.thrust ?? 0) * 1_000; // kN → N
+    const thrustN = ((def.properties?.thrust as number) ?? 0) * 1_000; // kN -> N
     if (def.type === PartType.SOLID_ROCKET_BOOSTER) {
       // SRBs contribute fixed thrust only if actively burning.
       if (_ps.firingEngines && _ps.firingEngines.has(instanceId)) {
@@ -2257,19 +2250,15 @@ function _setThrottleForTWR1() {
 
 /**
  * Format a number with a thousands separator.
- * @param {number} n
- * @returns {string}
  */
-function _fmtAlt(n) {
+function _fmtAlt(n: number): string {
   return Math.round(n).toLocaleString('en-US');
 }
 
 /**
  * Format a signed speed value (+NNN.N or -NNN.N).
- * @param {number} ms  Speed in m/s.
- * @returns {string}
  */
-function _fmtSigned(ms) {
+function _fmtSigned(ms: number): string {
   const sign = ms >= 0 ? '+' : '';
   return `${sign}${ms.toFixed(1)}`;
 }
@@ -2280,14 +2269,10 @@ function _fmtSigned(ms) {
  * Ignores ongoing thrust and atmospheric drag — this is an instantaneous
  * "coasting" estimate suitable for a real-time HUD readout.
  *
- * Formula:  apoapsis = altitude + velY² / (2 × g)   (when velY > 0)
- * When descending (velY ≤ 0) the current altitude IS the apoapsis.
- *
- * @param {number} altitude  Current altitude (m, ≥ 0).
- * @param {number} velY      Vertical velocity (m/s; positive = ascending).
- * @returns {number}         Estimated apoapsis altitude in metres.
+ * Formula:  apoapsis = altitude + velY^2 / (2 x g)   (when velY > 0)
+ * When descending (velY <= 0) the current altitude IS the apoapsis.
  */
-function _estimateApoapsis(altitude, velY) {
+function _estimateApoapsis(altitude: number, velY: number): number {
   if (velY <= 0) return altitude;
   return altitude + (velY * velY) / (2 * G0);
 }

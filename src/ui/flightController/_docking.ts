@@ -1,5 +1,5 @@
 /**
- * _docking.js — Docking system tick, docking target cycling, undock handler,
+ * _docking.ts — Docking system tick, docking target cycling, undock handler,
  * fuel transfer, docking HUD.
  *
  * @module ui/flightController/_docking
@@ -24,9 +24,8 @@ import { setMapTarget } from './_mapView.js';
 
 /**
  * Tick the docking system each frame.
- * @param {number} dt  Real delta time (seconds).
  */
-export function tickDockingSystem(dt) {
+export function tickDockingSystem(dt: number): void {
   const s = getFCState();
   if (!s.ps || !s.assembly || !s.flightState || !s.state) return;
 
@@ -42,7 +41,7 @@ export function tickDockingSystem(dt) {
   }
 
   // Update combined mass on physics state for thrust calculations.
-  s.ps._dockedCombinedMass = dockingState.combinedMass;
+  s.ps._dockedCombinedMass = (dockingState as any).combinedMass;
 
   const result = tickDocking(dockingState, s.ps, s.assembly, s.flightState, s.state, dt);
 
@@ -64,7 +63,7 @@ export function tickDockingSystem(dt) {
 /**
  * Cycle through available docking targets in visual range.
  */
-export function cycleDockingTarget() {
+export function cycleDockingTarget(): void {
   const s = getFCState();
   if (!s.ps || !s.assembly || !s.flightState || !s.state) return;
 
@@ -115,7 +114,7 @@ export function cycleDockingTarget() {
 /**
  * Handle undocking from the current docked vessel.
  */
-export function handleUndock() {
+export function handleUndock(): void {
   const s = getFCState();
   if (!s.ps || !s.assembly || !s.flightState || !s.state) return;
 
@@ -138,7 +137,7 @@ export function handleUndock() {
 /**
  * Handle fuel transfer from docked depot.
  */
-export function handleFuelTransfer() {
+export function handleFuelTransfer(): void {
   const s = getFCState();
   if (!s.ps || !s.assembly || !s.flightState) return;
 
@@ -157,7 +156,7 @@ export function handleFuelTransfer() {
 /**
  * Build or update the docking guidance HUD overlay.
  */
-export function updateDockingHud() {
+export function updateDockingHud(): void {
   const s = getFCState();
   if (!s.flightState || !s.flightState.dockingState) {
     destroyDockingHud();
@@ -192,7 +191,7 @@ export function updateDockingHud() {
   const redStyle   = 'color: #f44; font-weight: bold;';
   const whiteStyle = 'color: #fff;';
 
-  let stateLabel;
+  let stateLabel: string;
   switch (guidance.state) {
     case DockingState.APPROACHING:   stateLabel = 'APPROACHING'; break;
     case DockingState.ALIGNING:      stateLabel = 'ALIGNING'; break;
@@ -201,13 +200,13 @@ export function updateDockingHud() {
     default:                         stateLabel = guidance.state;
   }
 
-  const distStr = guidance.distance < 1000
+  const distStr: string = guidance.distance < 1000
     ? `${guidance.distance.toFixed(1)} m`
     : `${(guidance.distance / 1000).toFixed(2)} km`;
 
-  const speedColor = guidance.speedOk ? greenStyle : redStyle;
-  const oriColor   = guidance.orientationOk ? greenStyle : redStyle;
-  const latColor   = guidance.lateralOk ? greenStyle : redStyle;
+  const speedColor: string = guidance.speedOk ? greenStyle : redStyle;
+  const oriColor: string   = guidance.orientationOk ? greenStyle : redStyle;
+  const latColor: string   = guidance.lateralOk ? greenStyle : redStyle;
 
   let html = `<div style="${whiteStyle}; margin-bottom: 6px; font-size: 14px; border-bottom: 1px solid #555; padding-bottom: 4px;">
     DOCKING \u2014 ${stateLabel}
@@ -237,7 +236,7 @@ export function updateDockingHud() {
 /**
  * Remove the docking guidance HUD.
  */
-export function destroyDockingHud() {
+export function destroyDockingHud(): void {
   const s = getFCState();
   if (s.dockingHud) {
     s.dockingHud.remove();

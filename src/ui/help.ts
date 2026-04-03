@@ -1,5 +1,5 @@
 /**
- * help.js — In-game help panel.
+ * help.ts — In-game help panel.
  *
  * Full-screen overlay with a sidebar of topic sections and a scrollable
  * content area.  Accessible from the hamburger menu on every screen.
@@ -15,7 +15,12 @@ import { injectStyleOnce } from './injectStyle.js';
 // Section definitions
 // ---------------------------------------------------------------------------
 
-const SECTIONS = [
+interface HelpSection {
+  id: string;
+  label: string;
+}
+
+const SECTIONS: HelpSection[] = [
   { id: 'overview',    label: 'Getting Started' },
   { id: 'hub',         label: 'Space Agency Hub' },
   { id: 'vab',         label: 'Vehicle Assembly' },
@@ -33,7 +38,7 @@ const SECTIONS = [
 // Section content builders
 // ---------------------------------------------------------------------------
 
-function _buildOverviewSection() {
+function _buildOverviewSection(): HTMLDivElement {
   const el = document.createElement('div');
   el.innerHTML = `
     <h2>Getting Started</h2>
@@ -64,7 +69,7 @@ function _buildOverviewSection() {
   return el;
 }
 
-function _buildHubSection() {
+function _buildHubSection(): HTMLDivElement {
   const el = document.createElement('div');
   el.innerHTML = `
     <h2>Space Agency Hub</h2>
@@ -89,7 +94,7 @@ function _buildHubSection() {
   return el;
 }
 
-function _buildVabSection() {
+function _buildVabSection(): HTMLDivElement {
   const el = document.createElement('div');
   el.innerHTML = `
     <h2>Vehicle Assembly Building</h2>
@@ -129,7 +134,7 @@ function _buildVabSection() {
   return el;
 }
 
-function _buildFlightSection() {
+function _buildFlightSection(): HTMLDivElement {
   const el = document.createElement('div');
   el.innerHTML = `
     <h2>Flight Controls</h2>
@@ -181,7 +186,7 @@ function _buildFlightSection() {
   return el;
 }
 
-function _buildOrbitSection() {
+function _buildOrbitSection(): HTMLDivElement {
   const el = document.createElement('div');
   el.innerHTML = `
     <h2>Orbital Mechanics</h2>
@@ -219,7 +224,7 @@ function _buildOrbitSection() {
   return el;
 }
 
-function _buildMissionsSection() {
+function _buildMissionsSection(): HTMLDivElement {
   const el = document.createElement('div');
   el.innerHTML = `
     <h2>Missions & Contracts</h2>
@@ -254,7 +259,7 @@ function _buildMissionsSection() {
   return el;
 }
 
-function _buildCrewSection() {
+function _buildCrewSection(): HTMLDivElement {
   const el = document.createElement('div');
   el.innerHTML = `
     <h2>Crew Management</h2>
@@ -286,7 +291,7 @@ function _buildCrewSection() {
   return el;
 }
 
-function _buildFinanceSection() {
+function _buildFinanceSection(): HTMLDivElement {
   const el = document.createElement('div');
   el.innerHTML = `
     <h2>Finance & Economy</h2>
@@ -324,7 +329,7 @@ function _buildFinanceSection() {
   return el;
 }
 
-function _buildFacilitiesSection() {
+function _buildFacilitiesSection(): HTMLDivElement {
   const el = document.createElement('div');
   el.innerHTML = `
     <h2>Facilities & Upgrades</h2>
@@ -354,7 +359,7 @@ function _buildFacilitiesSection() {
   return el;
 }
 
-function _buildSatellitesSection() {
+function _buildSatellitesSection(): HTMLDivElement {
   const el = document.createElement('div');
   el.innerHTML = `
     <h2>Satellites & Science</h2>
@@ -386,7 +391,7 @@ function _buildSatellitesSection() {
   return el;
 }
 
-function _buildAdvancedSection() {
+function _buildAdvancedSection(): HTMLDivElement {
   const el = document.createElement('div');
   el.innerHTML = `
     <h2>Advanced Systems</h2>
@@ -429,8 +434,8 @@ function _buildAdvancedSection() {
   return el;
 }
 
-// Map section ID → builder function
-const SECTION_BUILDERS = {
+// Map section ID to builder function
+const SECTION_BUILDERS: Record<string, () => HTMLDivElement> = {
   overview:   _buildOverviewSection,
   hub:        _buildHubSection,
   vab:        _buildVabSection,
@@ -448,7 +453,7 @@ const SECTION_BUILDERS = {
 // CSS
 // ---------------------------------------------------------------------------
 
-const HELP_STYLES = `
+const HELP_STYLES: string = `
 /* ── Help panel overlay ─────────────────────────────────────────────────── */
 #help-panel {
   position: fixed;
@@ -648,11 +653,11 @@ const HELP_STYLES = `
 /**
  * Open the help panel overlay.
  *
- * @param {HTMLElement}  container       The #ui-overlay div (or document.body).
- * @param {object|null}  _state         Game state (unused for now, reserved).
- * @param {string}       [defaultSection='overview']  Section ID to show initially.
+ * @param container       The #ui-overlay div (or document.body).
+ * @param _state          Game state (unused for now, reserved).
+ * @param defaultSection  Section ID to show initially.
  */
-export function openHelpPanel(container, _state, defaultSection = 'overview') {
+export function openHelpPanel(container: HTMLElement, _state: unknown, defaultSection: string = 'overview'): void {
   // Prevent duplicate.
   if (document.getElementById('help-panel')) return;
 
@@ -662,7 +667,7 @@ export function openHelpPanel(container, _state, defaultSection = 'overview') {
   const tracker = createListenerTracker();
 
   /** Remove all tracked listeners, then remove the panel from the DOM. */
-  function closePanel() {
+  function closePanel(): void {
     tracker.removeAll();
     panel.remove();
   }
@@ -683,7 +688,7 @@ export function openHelpPanel(container, _state, defaultSection = 'overview') {
   const contentWrapper = document.createElement('div');
   contentWrapper.className = 'help-content-wrapper';
 
-  // Close × button
+  // Close x button
   const topbar = document.createElement('div');
   topbar.className = 'help-topbar';
   const closeX = document.createElement('button');
@@ -700,16 +705,16 @@ export function openHelpPanel(container, _state, defaultSection = 'overview') {
   contentWrapper.appendChild(content);
 
   // ── Section switching ───────────────────────────────────────────────────
-  let activeId = SECTIONS.some((s) => s.id === defaultSection)
+  let activeId: string = SECTIONS.some((s) => s.id === defaultSection)
     ? defaultSection
     : 'overview';
 
-  function showSection(sectionId) {
+  function showSection(sectionId: string): void {
     activeId = sectionId;
 
     // Update sidebar active state.
     for (const btn of sidebar.querySelectorAll('.help-sidebar-item')) {
-      btn.classList.toggle('active', btn.dataset.section === sectionId);
+      (btn as HTMLElement).classList.toggle('active', (btn as HTMLElement).dataset.section === sectionId);
     }
 
     // Render content.

@@ -1,5 +1,5 @@
 /**
- * _init.js — Orchestrator containing startFlightScene and stopFlightScene.
+ * _init.ts — Orchestrator containing startFlightScene and stopFlightScene.
  * Imports from all sub-modules and wires everything together.
  *
  * @module ui/flightController/_init
@@ -34,6 +34,23 @@ import {
   handleMenuFlightLog,
 } from './_menuActions.js';
 
+import type { PhysicsState } from '../../core/physics.js';
+import type { RocketAssembly, StagingConfig, PlacedPart } from '../../core/rocketbuilder.js';
+import type { GameState, FlightState } from '../../core/gameState.js';
+
+// E2E test globals attached to window.
+declare global {
+  interface Window {
+    __flightPs: PhysicsState | null;
+    __flightAssembly: RocketAssembly | null;
+    __flightState: FlightState | null;
+    __setMalfunctionMode: ((mode: string) => void) | undefined;
+    __getMalfunctionMode: (() => string) | undefined;
+    __testSetTimeWarp: ((speedMultiplier: number) => void) | undefined;
+    __testGetTimeWarp: (() => number) | undefined;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -41,11 +58,8 @@ import {
 /**
  * Returns a shallow copy of `assembly` where every part's Y position is shifted
  * so the lowest part's bottom edge sits exactly at world Y = 0 (the launch pad).
- *
- * @param {import('../../core/rocketbuilder.js').RocketAssembly} assembly
- * @returns {import('../../core/rocketbuilder.js').RocketAssembly}
  */
-function _normalizeAssemblyToGround(assembly) {
+function _normalizeAssemblyToGround(assembly: RocketAssembly): RocketAssembly {
   let lowestBottom = Infinity;
   for (const placed of assembly.parts.values()) {
     const def = getPartById(placed.partId);
@@ -55,7 +69,7 @@ function _normalizeAssemblyToGround(assembly) {
 
   if (!isFinite(lowestBottom) || lowestBottom === 0) return assembly;
 
-  const normalizedParts = new Map();
+  const normalizedParts = new Map<string, PlacedPart>();
   for (const [id, placed] of assembly.parts) {
     normalizedParts.set(id, { ...placed, y: placed.y - lowestBottom });
   }
@@ -64,10 +78,9 @@ function _normalizeAssemblyToGround(assembly) {
 
 /**
  * Build the in-flight control overlay.
- * @param {HTMLElement} container
  */
-function _buildFlightOverlay(container) {
-  const overlay = document.createElement('div');
+function _buildFlightOverlay(container: HTMLElement): void {
+  const overlay: HTMLDivElement = document.createElement('div');
   overlay.id = 'flight-overlay';
   const s = getFCState();
   s.flightOverlay = overlay;
@@ -83,22 +96,15 @@ function _buildFlightOverlay(container) {
  *
  * Initialises the PixiJS renderer, creates the physics state, mounts the HUD
  * overlay, builds the in-flight control overlay, and starts the game loop.
- *
- * @param {HTMLElement}                                              container    #ui-overlay div.
- * @param {import('../../core/gameState.js').GameState}              state
- * @param {import('../../core/rocketbuilder.js').RocketAssembly}     assembly
- * @param {import('../../core/rocketbuilder.js').StagingConfig}      stagingConfig
- * @param {import('../../core/gameState.js').FlightState}            flightState
- * @param {(state: import('../../core/gameState.js').GameState) => void} onFlightEnd
  */
 export function startFlightScene(
-  container,
-  state,
-  assembly,
-  stagingConfig,
-  flightState,
-  onFlightEnd,
-) {
+  container: HTMLElement,
+  state: GameState,
+  assembly: RocketAssembly,
+  stagingConfig: StagingConfig,
+  flightState: FlightState,
+  onFlightEnd: (state: GameState | null, results?: unknown, dest?: string) => void,
+): void {
   const s = getFCState();
 
   // Ensure hub overlay is fully hidden during flight. In the normal gameplay
@@ -124,7 +130,7 @@ export function startFlightScene(
   s.originalAssembly = {
     parts:         new Map([...assembly.parts].map(([id, p]) => [id, { ...p, ...(p.instruments ? { instruments: [...p.instruments] } : {}) }])),
     connections:   assembly.connections.map(c => ({ ...c })),
-    symmetryPairs: assembly.symmetryPairs.map(sp => [...sp]),
+    symmetryPairs: assembly.symmetryPairs.map(sp => [...sp] as [string, string]),
     _nextId:       assembly._nextId,
   };
   s.originalStagingConfig = {
@@ -158,19 +164,19 @@ export function startFlightScene(
   }
 
   // Attach inventory-sourced part data for wear tracking on recovery.
-  s.ps._usedInventoryParts = getVabInventoryUsedParts();
+  (s.ps as any)._usedInventoryParts = getVabInventoryUsedParts();
 
-  // Expose for E2E testing — Playwright reads live physics values here.
+  // Expose for E2E testing -- Playwright reads live physics values here.
   if (typeof window !== 'undefined') {
     window.__flightPs       = s.ps;
     window.__flightAssembly = s.assembly;
     window.__flightState    = flightState;
-    window.__setMalfunctionMode = (mode) => setMalfunctionMode(s.state, mode);
-    window.__getMalfunctionMode = () => getMalfunctionMode(s.state);
+    window.__setMalfunctionMode = (mode: string) => setMalfunctionMode(s.state!, mode);
+    window.__getMalfunctionMode = () => getMalfunctionMode(s.state!);
 
-    // Programmatic time warp API for E2E tests — allows arbitrary multipliers
+    // Programmatic time warp API for E2E tests -- allows arbitrary multipliers
     // not limited to the player-facing warp level buttons.
-    window.__testSetTimeWarp = (speedMultiplier) => {
+    window.__testSetTimeWarp = (speedMultiplier: number) => {
       s.timeWarp = speedMultiplier;
     };
     window.__testGetTimeWarp = () => s.timeWarp;
@@ -218,7 +224,7 @@ export function startFlightScene(
   ]);
 
   // Pause physics while the hamburger dropdown is open.
-  setTopBarDropdownToggleCallback((isOpen) => {
+  setTopBarDropdownToggleCallback((isOpen: boolean) => {
     const st = getFCState();
     if (isOpen) {
       st.preMenuTimeWarp = st.timeWarp;
@@ -272,7 +278,7 @@ export function startFlightScene(
  *
  * Safe to call even if startFlightScene was never called.
  */
-export function stopFlightScene() {
+export function stopFlightScene(): void {
   const s = getFCState();
 
   if (s.rafId !== null) {

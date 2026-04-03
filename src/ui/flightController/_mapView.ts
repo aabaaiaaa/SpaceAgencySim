@@ -1,5 +1,5 @@
 /**
- * _mapView.js — Map view toggle, map HUD building/updating/destroying,
+ * _mapView.ts — Map view toggle, map HUD building/updating/destroying,
  * map thrust application, warp to target.
  *
  * @module ui/flightController/_mapView
@@ -38,7 +38,7 @@ import { showPhaseNotification } from './_flightPhase.js';
 export { setMapTarget };
 
 /** Human-readable zoom level names. */
-const ZOOM_LABELS = {
+const ZOOM_LABELS: Record<string, string> = {
   [MapZoom.ORBIT_DETAIL]:    'Orbit Detail',
   [MapZoom.LOCAL_BODY]:      'Local Body',
   [MapZoom.CRAFT_TO_TARGET]: 'Craft \u2192 Target',
@@ -49,7 +49,7 @@ const ZOOM_LABELS = {
  * Toggle between the flight view and the top-down orbital map view.
  * Shows a control-tip notification each time the view is swapped.
  */
-export function toggleMapView() {
+export function toggleMapView(): void {
   const s = getFCState();
   if (!s.ps || !s.flightState) return;
 
@@ -60,7 +60,7 @@ export function toggleMapView() {
   }
 
   // Check availability (Tracking Station facility).
-  if (!s.mapActive && !isMapViewAvailable(s.state)) {
+  if (!s.mapActive && !isMapViewAvailable(s.state!)) {
     showPhaseNotification('Tracking Station required');
     return;
   }
@@ -96,12 +96,12 @@ export function toggleMapView() {
  * Apply orbital-relative thrust based on map-held keys.
  * Only effective during ORBIT phase when the map view is active.
  */
-export function applyMapThrust() {
+export function applyMapThrust(): void {
   const s = getFCState();
   if (!s.mapActive || !s.ps || !s.flightState) return;
 
   // Apply orbital thrust in ORBIT, MANOEUVRE, TRANSFER, or CAPTURE phases.
-  const phase = s.flightState.phase;
+  const phase: string = s.flightState.phase;
   if (phase !== FlightPhase.ORBIT && phase !== FlightPhase.MANOEUVRE &&
       phase !== FlightPhase.TRANSFER && phase !== FlightPhase.CAPTURE) {
     if (s.mapThrusting) {
@@ -112,20 +112,20 @@ export function applyMapThrust() {
   }
 
   // Determine thrust direction from held keys (priority order).
-  let direction = null;
+  let direction: string | null = null;
   if (s.mapHeldKeys.has('w'))      direction = MapThrustDir.PROGRADE;
   else if (s.mapHeldKeys.has('s')) direction = MapThrustDir.RETROGRADE;
   else if (s.mapHeldKeys.has('a')) direction = MapThrustDir.RADIAL_IN;
   else if (s.mapHeldKeys.has('d')) direction = MapThrustDir.RADIAL_OUT;
 
-  const bodyId = s.flightState.bodyId || 'EARTH';
+  const bodyId: string = s.flightState.bodyId || 'EARTH';
 
   if (direction) {
     s.ps.angle = computeOrbitalThrustAngle(s.ps, bodyId, direction);
     if (s.ps.throttle === 0) s.ps.throttle = 1;
     s.mapThrusting = true;
   } else if (s.mapThrusting) {
-    // No keys held — cut thrust.
+    // No keys held -- cut thrust.
     s.ps.throttle = 0;
     s.mapThrusting = false;
   }
@@ -134,11 +134,11 @@ export function applyMapThrust() {
 /**
  * Handle the "Warp to target" action.
  */
-export function handleWarpToTarget() {
+export function handleWarpToTarget(): void {
   const s = getFCState();
   if (!s.flightState || !s.flightState.orbitalElements || !s.state) return;
 
-  const targetId = getMapTarget();
+  const targetId: string | null = getMapTarget();
   if (!targetId) {
     showPhaseNotification('No target selected \u2014 press T to select');
     return;
@@ -150,7 +150,7 @@ export function handleWarpToTarget() {
     return;
   }
 
-  const warpBodyId = (s.flightState && s.flightState.bodyId) || 'EARTH';
+  const warpBodyId: string = (s.flightState && s.flightState.bodyId) || 'EARTH';
   const result = warpToTarget(
     s.flightState.orbitalElements,
     targetObj.elements,
@@ -164,13 +164,13 @@ export function handleWarpToTarget() {
   }
 
   // Advance the flight time.
-  s.flightState.timeElapsed = result.time;
+  s.flightState.timeElapsed = result.time!;
 
   // Log the warp event.
   s.flightState.events.push({
-    time: result.time,
+    time: result.time!,
     type: 'TIME_WARP',
-    description: `Warped ${(result.elapsed / 60).toFixed(1)} min to target "${targetObj.name}"`,
+    description: `Warped ${(result.elapsed! / 60).toFixed(1)} min to target "${targetObj.name}"`,
   });
 
   showPhaseNotification(`Warped to ${targetObj.name}`);
@@ -183,15 +183,15 @@ export function handleWarpToTarget() {
 /**
  * Build the map-view HUD overlay: info panel, controls hint, and warp button.
  */
-export function buildMapHud() {
+export function buildMapHud(): void {
   const s = getFCState();
   if (s.mapHud) return;
 
-  const hud = document.createElement('div');
+  const hud: HTMLDivElement = document.createElement('div');
   hud.id = 'map-hud';
 
   // Info panel (top-left).
-  const info = document.createElement('div');
+  const info: HTMLDivElement = document.createElement('div');
   info.id = 'map-hud-info';
   info.innerHTML = `
     <div class="map-label">MAP VIEW</div>
@@ -205,7 +205,7 @@ export function buildMapHud() {
   hud.appendChild(info);
 
   // Controls hint (bottom-centre).
-  const controls = document.createElement('div');
+  const controls: HTMLDivElement = document.createElement('div');
   controls.id = 'map-hud-controls';
   controls.innerHTML =
     '<kbd>M</kbd> Flight view \u00b7 ' +
@@ -220,7 +220,7 @@ export function buildMapHud() {
   hud.appendChild(controls);
 
   // Warp to target button (top-right).
-  const warpBtn = document.createElement('button');
+  const warpBtn: HTMLButtonElement = document.createElement('button');
   warpBtn.id = 'map-warp-btn';
   warpBtn.className = 'hidden';
   warpBtn.textContent = 'Warp to Target';
@@ -228,7 +228,7 @@ export function buildMapHud() {
   hud.appendChild(warpBtn);
 
   s.mapHud = hud;
-  const host = s.container || document.getElementById('ui-overlay') || document.body;
+  const host: HTMLElement = s.container || document.getElementById('ui-overlay') || document.body;
   host.appendChild(hud);
 
   updateMapHud();
@@ -237,7 +237,7 @@ export function buildMapHud() {
 /**
  * Update the map HUD readouts to reflect current state.
  */
-export function updateMapHud() {
+export function updateMapHud(): void {
   const s = getFCState();
   if (!s.mapHud || !s.flightState) return;
 
@@ -246,21 +246,21 @@ export function updateMapHud() {
   const targetEl     = s.mapHud.querySelector('[data-field="target"]');
   const phaseEl      = s.mapHud.querySelector('[data-field="phase"]');
   const warpBtn      = s.mapHud.querySelector('#map-warp-btn');
-  const transferEl   = s.mapHud.querySelector('[data-field="transfer-info"]');
-  const progressEl   = s.mapHud.querySelector('[data-field="transfer-progress"]');
+  const transferEl   = s.mapHud.querySelector('[data-field="transfer-info"]') as HTMLElement | null;
+  const progressEl   = s.mapHud.querySelector('[data-field="transfer-progress"]') as HTMLElement | null;
 
   if (zoomEl)   zoomEl.textContent = ZOOM_LABELS[getMapZoomLevel()] || getMapZoomLevel();
   if (phaseEl)  phaseEl.textContent = `${getPhaseLabel(s.flightState.phase)}${s.timeWarp > 1 ? ` (${s.timeWarp}\u00d7)` : ''}`;
 
   // Show current celestial body.
-  const bodyId = s.flightState.bodyId || 'EARTH';
-  const bodyNames = {
+  const bodyId: string = s.flightState.bodyId || 'EARTH';
+  const bodyNames: Record<string, string> = {
     SUN: 'Sun', MERCURY: 'Mercury', VENUS: 'Venus', EARTH: 'Earth',
     MOON: 'Moon', MARS: 'Mars', PHOBOS: 'Phobos', DEIMOS: 'Deimos',
   };
   if (bodyEl) bodyEl.textContent = bodyNames[bodyId] || bodyId;
 
-  const targetId = getMapTarget();
+  const targetId: string | null = getMapTarget();
   const targetObj = targetId && s.state
     ? (s.state.orbitalObjects || []).find(o => o.id === targetId)
     : null;
@@ -272,9 +272,9 @@ export function updateMapHud() {
 
   // Transfer target route info.
   if (transferEl) {
-    const transferTarget = getSelectedTransferTarget();
+    const transferTarget: string | null = getSelectedTransferTarget();
     if (transferTarget && s.ps) {
-      const alt = Math.max(0, s.ps.posY);
+      const alt: number = Math.max(0, s.ps.posY);
       const targets = getMapTransferTargets(bodyId, alt, s.flightState.phase);
       const t = targets.find(tt => tt.bodyId === transferTarget);
       if (t) {
@@ -292,7 +292,7 @@ export function updateMapHud() {
   if (progressEl) {
     const info = getTransferProgressInfo(s.flightState.transferState, s.flightState.timeElapsed);
     if (info) {
-      const pct = Math.round(info.progress * 100);
+      const pct: number = Math.round(info.progress * 100);
       progressEl.textContent = `Transfer: ${info.originName} \u2192 ${info.destName} \u2014 ${pct}% \u2014 ETA: ${info.etaStr}`;
       progressEl.style.display = '';
     } else {
@@ -304,7 +304,7 @@ export function updateMapHud() {
 /**
  * Remove the map HUD overlay.
  */
-export function destroyMapHud() {
+export function destroyMapHud(): void {
   const s = getFCState();
   if (s.mapHud) {
     s.mapHud.remove();

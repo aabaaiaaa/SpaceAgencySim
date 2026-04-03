@@ -1,5 +1,5 @@
 /**
- * _keyboard.js — onKeyDown and onKeyUp handlers, warp level constants.
+ * _keyboard.ts — onKeyDown and onKeyUp handlers, warp level constants.
  *
  * @module ui/flightController/_keyboard
  */
@@ -29,10 +29,9 @@ import { toggleDockingMode, toggleRcsModeHandler } from './_orbitRcs.js';
 import { showPhaseNotification } from './_flightPhase.js';
 
 /** Ordered warp levels for < / > key stepping. */
-export const WARP_LEVELS_ORDERED = [0, 0.25, 0.5, 1, 2, 5, 10, 50];
+export const WARP_LEVELS_ORDERED: number[] = [0, 0.25, 0.5, 1, 2, 5, 10, 50];
 
-/** @param {KeyboardEvent} e */
-export function onKeyDown(e) {
+export function onKeyDown(e: KeyboardEvent): void {
   const s = getFCState();
   if (!s.ps || !s.assembly || !s.stagingConfig || !s.flightState) return;
 
@@ -48,7 +47,7 @@ export function onKeyDown(e) {
     // Tab — cycle zoom level (filtered by Tracking Station tier).
     if (e.code === 'Tab') {
       e.preventDefault();
-      const allowed = getAllowedMapZooms(s.state);
+      const allowed = getAllowedMapZooms(s.state!);
       const current = getMapZoomLevel();
       const idx = allowed.indexOf(current);
       const next = allowed[(idx + 1) % allowed.length];
@@ -68,8 +67,8 @@ export function onKeyDown(e) {
     }
     // T — cycle target selection.
     if (e.code === 'KeyT' && !e.ctrlKey) {
-      const tBodyId = (s.flightState && s.flightState.bodyId) || 'EARTH';
-      cycleMapTarget(s.state.orbitalObjects, tBodyId);
+      const tBodyId: string = (s.flightState && s.flightState.bodyId) || 'EARTH';
+      cycleMapTarget(s.state!.orbitalObjects, tBodyId);
       updateMapHud();
       return;
     }
@@ -80,13 +79,13 @@ export function onKeyDown(e) {
     }
     // B — cycle transfer target (route planning, requires Tracking Station tier 3).
     if (e.code === 'KeyB') {
-      if (!isTransferPlanningAvailable(s.state)) {
+      if (!isTransferPlanningAvailable(s.state!)) {
         showPhaseNotification('Tracking Station Tier 3 required for transfer planning');
         return;
       }
       if (s.flightState) {
-        const bodyId = s.flightState.bodyId || 'EARTH';
-        const alt = Math.max(0, s.ps.posY);
+        const bodyId: string = s.flightState.bodyId || 'EARTH';
+        const alt: number = Math.max(0, s.ps.posY);
         const selected = cycleTransferTarget(bodyId, alt, s.flightState.phase);
         if (selected) {
           showPhaseNotification(`Transfer target: ${selected}`);
@@ -206,8 +205,7 @@ export function onKeyDown(e) {
   handleKeyDown(s.ps, s.assembly, e.key);
 }
 
-/** @param {KeyboardEvent} e */
-export function onKeyUp(e) {
+export function onKeyUp(e: KeyboardEvent): void {
   const s = getFCState();
   if (!s.ps) return;
 

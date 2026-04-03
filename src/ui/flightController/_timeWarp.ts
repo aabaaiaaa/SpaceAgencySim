@@ -1,5 +1,5 @@
 /**
- * _timeWarp.js — Time warp controls, auto-reset logic, warp button click handler.
+ * _timeWarp.ts — Time warp controls, auto-reset logic, warp button click handler.
  *
  * @module ui/flightController/_timeWarp
  */
@@ -12,10 +12,8 @@ import { getFCState } from './_state.js';
 /**
  * Apply a new time-warp multiplier: update internal state and synchronise the
  * HUD button highlight.
- *
- * @param {number} level  Desired warp multiplier (1, 2, 5, 10, or 50).
  */
-export function applyTimeWarp(level) {
+export function applyTimeWarp(level: number): void {
   const s = getFCState();
   s.timeWarp = level;
   setHudTimeWarp(level);
@@ -25,10 +23,8 @@ export function applyTimeWarp(level) {
  * Called once per frame to check whether any automatic time-warp reset
  * condition has been triggered (landing, reentry) and whether the staging
  * lockout has expired.
- *
- * @param {number} timestamp  Current performance.now() value from rAF.
  */
-export function checkTimeWarpResets(timestamp) {
+export function checkTimeWarpResets(timestamp: number): void {
   const s = getFCState();
   if (!s.ps || !s.flightState) return;
 
@@ -39,8 +35,8 @@ export function checkTimeWarpResets(timestamp) {
   }
 
   // Body-aware atmosphere top for space detection.
-  const _twBodyId = (s.flightState && s.flightState.bodyId) || 'EARTH';
-  const _twAtmoTop = getBodyAtmosphereTop(_twBodyId) || ATMOSPHERE_TOP;
+  const _twBodyId: string = (s.flightState && s.flightState.bodyId) || 'EARTH';
+  const _twAtmoTop: number = getBodyAtmosphereTop(_twBodyId) || ATMOSPHERE_TOP;
 
   // No automatic resets needed if we're already at 1x.
   if (s.timeWarp === 1) {
@@ -49,9 +45,9 @@ export function checkTimeWarpResets(timestamp) {
     return;
   }
 
-  const altitude = Math.max(0, s.ps.posY);
-  const speed    = Math.hypot(s.ps.velX, s.ps.velY);
-  const inSpace  = altitude >= _twAtmoTop;
+  const altitude: number = Math.max(0, s.ps.posY);
+  const speed: number    = Math.hypot(s.ps.velX, s.ps.velY);
+  const inSpace: boolean = altitude >= _twAtmoTop;
 
   // Reset on successful landing or crash.
   if (s.ps.landed || s.ps.crashed) {
@@ -70,10 +66,8 @@ export function checkTimeWarpResets(timestamp) {
 /**
  * Callback passed to `initFlightHud`: invoked when the player clicks a
  * time-warp button in the HUD.
- *
- * @param {number} level  Requested warp level.
  */
-export function onTimeWarpButtonClick(level) {
+export function onTimeWarpButtonClick(level: number): void {
   const s = getFCState();
   // Prevent warp changes during the staging lockout window.
   if (s.stagingLockoutUntil > 0 && performance.now() < s.stagingLockoutUntil) return;

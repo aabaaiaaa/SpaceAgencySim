@@ -1,5 +1,5 @@
 /**
- * _flightPhase.js — Flight phase transition evaluation, deorbit warning,
+ * _flightPhase.ts — Flight phase transition evaluation, deorbit warning,
  * phase notification display.
  *
  * @module ui/flightController/_flightPhase
@@ -28,19 +28,19 @@ import { toggleMapView } from './_mapView.js';
  * phase changes (e.g. "Low Earth Orbit", "Re-Entry").  The label fades out
  * after 3 s.
  *
- * @param {string} label  Text to display.
- * @param {'info'|'warning'|'status'} [style='info']  Visual style — 'warning'
- *   uses an amber colour scheme for deorbit warnings; 'status' uses a subtle
- *   passive text style for view indicators.
+ * @param label  Text to display.
+ * @param style  Visual style -- 'warning' uses an amber colour scheme for
+ *   deorbit warnings; 'status' uses a subtle passive text style for view
+ *   indicators.
  */
-export function showPhaseNotification(label, style = 'info') {
-  const host = document.getElementById('ui-overlay') ?? document.body;
+export function showPhaseNotification(label: string, style: 'info' | 'warning' | 'status' = 'info'): void {
+  const host: HTMLElement = document.getElementById('ui-overlay') ?? document.body;
 
   // Remove any existing notification.
   const existing = host.querySelector('.phase-notification');
   if (existing) existing.remove();
 
-  const el = document.createElement('div');
+  const el: HTMLDivElement = document.createElement('div');
   el.className = 'phase-notification';
   if (style === 'warning') el.classList.add('phase-notification-warning');
   if (style === 'status') el.classList.add('phase-notification-status');
@@ -60,15 +60,13 @@ export function showPhaseNotification(label, style = 'info') {
  * Show a brief deorbit warning notification before transitioning from ORBIT
  * to REENTRY.  The warning stays visible for 2 seconds, then the phase
  * transitions automatically.  Player retains engine control throughout.
- *
- * @param {string} bodyId  Celestial body ID.
  */
-function _showDeorbitWarning(bodyId) {
+function _showDeorbitWarning(bodyId: string): void {
   const s = getFCState();
   if (s.deorbitWarningActive) return;
   s.deorbitWarningActive = true;
 
-  const warningMsg = getDeorbitWarningMessage(bodyId);
+  const warningMsg: string = getDeorbitWarningMessage(bodyId);
   showPhaseNotification(warningMsg, 'warning');
 
   // After a brief delay, execute the REENTRY transition.
@@ -107,12 +105,12 @@ function _showDeorbitWarning(bodyId) {
  * Shows a notification label on phase transitions, including the named altitude
  * band on orbit entry (e.g. "Low Earth Orbit" instead of "Orbit").
  */
-export function evaluateFlightPhase() {
+export function evaluateFlightPhase(): void {
   const s = getFCState();
   if (!s.ps || !s.flightState) return;
 
-  const bodyId = s.flightState.bodyId || 'EARTH';
-  const minOrbitAlt = getMinOrbitAltitude(bodyId);
+  const bodyId: string = s.flightState.bodyId || 'EARTH';
+  const minOrbitAlt: number = getMinOrbitAltitude(bodyId);
 
   // Only compute orbit status when above the minimum orbit altitude.
   let orbitStatus = null;
@@ -121,7 +119,7 @@ export function evaluateFlightPhase() {
   }
 
   // --- Continuous orbit recalculation during MANOEUVRE / TRANSFER / CAPTURE ---
-  const phase = s.flightState.phase;
+  const phase: string = s.flightState.phase;
   if (phase === FlightPhase.MANOEUVRE ||
       phase === FlightPhase.TRANSFER ||
       phase === FlightPhase.CAPTURE ||
@@ -147,7 +145,7 @@ export function evaluateFlightPhase() {
 
   if (transition) {
     if (transition.to === FlightPhase.ORBIT && orbitStatus) {
-      const label = getOrbitEntryLabel(orbitStatus);
+      const label: string = getOrbitEntryLabel(orbitStatus);
       showPhaseNotification(label);
 
       s.flightState.inOrbit = true;
@@ -176,7 +174,7 @@ export function evaluateFlightPhase() {
   if (s.ps.controlMode !== ControlMode.NORMAL &&
       s.flightState.phase !== FlightPhase.ORBIT &&
       s.flightState.phase !== FlightPhase.MANOEUVRE) {
-    const wasReset = resetControlModeIfNeeded(s.ps, s.flightState, bodyId);
+    const wasReset: boolean = resetControlModeIfNeeded(s.ps, s.flightState, bodyId);
     if (wasReset) {
       showPhaseNotification(CONTROL_MODE_TIPS[ControlMode.NORMAL]);
     }

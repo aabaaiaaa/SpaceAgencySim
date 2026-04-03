@@ -1,16 +1,16 @@
 /**
- * flightContextMenu.js — Right-click context menu for rocket parts in flight.
+ * flightContextMenu.ts — Right-click context menu for rocket parts in flight.
  *
  * Provides a context menu that appears when the player right-clicks a part
  * that belongs to the active rocket (not debris) during flight.  The menu
  * items shown depend on the part type:
  *
- *   ALL activatable parts  → "Activate [Part Name]" / "Already Activated"
- *   FUEL_TANK              → "Fuel: X kg remaining" (read-only)
- *   SERVICE_MODULE         → "Activate Experiment" / "Experiment Status: Complete"
- *   LANDING_LEGS           → "Deploy Legs" (retracted) / "Retract Legs" (deployed)
- *   PARACHUTE              → "Deploy Parachute" / status label
- *   COMMAND_MODULE (crewed)→ "Activate Ejector Seat" / "Ejector Seat: Activated"
+ *   ALL activatable parts  -> "Activate [Part Name]" / "Already Activated"
+ *   FUEL_TANK              -> "Fuel: X kg remaining" (read-only)
+ *   SERVICE_MODULE         -> "Activate Experiment" / "Experiment Status: Complete"
+ *   LANDING_LEGS           -> "Deploy Legs" (retracted) / "Retract Legs" (deployed)
+ *   PARACHUTE              -> "Deploy Parachute" / status label
+ *   COMMAND_MODULE (crewed)-> "Activate Ejector Seat" / "Ejector Seat: Activated"
  *
  * The menu closes on any click outside it.
  * Parts already activated (one-time only) show "Already Activated" greyed out.
@@ -25,6 +25,7 @@
 import { hitTestFlightPart }                                  from '../render/flight.js';
 import { PartType }                                           from '../core/constants.js';
 import { getPartById }                                        from '../data/parts.js';
+import type { PartDef }                                       from '../data/parts.js';
 import { deployParachute, getParachuteStatus, ParachuteState } from '../core/parachute.js';
 import { deployLandingLeg, getLegStatus, LegState, retractLandingLeg } from '../core/legs.js';
 import { getMirrorPartId } from '../core/rocketbuilder.js';
@@ -51,12 +52,15 @@ import {
 }                                                             from '../core/malfunction.js';
 import { MalfunctionType }                                    from '../core/constants.js';
 import { injectStyleOnce }                                    from './injectStyle.js';
+import type { PhysicsState }                                  from '../core/physics.js';
+import type { RocketAssembly }                                from '../core/rocketbuilder.js';
+import type { FlightState, FlightEvent, GameState }             from '../core/gameState.js';
 
 // ---------------------------------------------------------------------------
 // CSS
 // ---------------------------------------------------------------------------
 
-const CTX_MENU_CSS = `
+const CTX_MENU_CSS: string = `
 /* ── Flight part context menu ──────────────────────────────────────────── */
 #flight-part-ctx-menu {
   position: fixed;
@@ -127,23 +131,23 @@ const CTX_MENU_CSS = `
 // Module state
 // ---------------------------------------------------------------------------
 
-/** The context menu DOM element. @type {HTMLElement|null} */
-let _menu = null;
+/** The context menu DOM element. */
+let _menu: HTMLDivElement | null = null;
 
-/** contextmenu event handler reference. @type {((e: MouseEvent) => void)|null} */
-let _contextMenuHandler = null;
+/** contextmenu event handler reference. */
+let _contextMenuHandler: ((e: MouseEvent) => void) | null = null;
 
-/** document click handler for closing the menu. @type {((e: MouseEvent) => void)|null} */
-let _outsideClickHandler = null;
+/** document click handler for closing the menu. */
+let _outsideClickHandler: ((e: MouseEvent) => void) | null = null;
 
-/** Getter for the current physics state. @type {(() => import('../core/physics.js').PhysicsState|null)|null} */
-let _getPs = null;
+/** Getter for the current physics state. */
+let _getPs: (() => PhysicsState | null) | null = null;
 
-/** Getter for the rocket assembly. @type {(() => import('../core/rocketbuilder.js').RocketAssembly|null)|null} */
-let _getAssembly = null;
+/** Getter for the rocket assembly. */
+let _getAssembly: (() => RocketAssembly | null) | null = null;
 
-/** Getter for the flight state. @type {(() => import('../core/gameState.js').FlightState|null)|null} */
-let _getFlightState = null;
+/** Getter for the flight state. */
+let _getFlightState: (() => FlightState | null) | null = null;
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -154,12 +158,12 @@ let _getFlightState = null;
  *
  * Injects the required CSS, creates the menu DOM element, and registers
  * event listeners for right-click and outside-click handling.
- *
- * @param {() => import('../core/physics.js').PhysicsState|null}           getPs
- * @param {() => import('../core/rocketbuilder.js').RocketAssembly|null}   getAssembly
- * @param {() => import('../core/gameState.js').FlightState|null}          getFlightState
  */
-export function initFlightContextMenu(getPs, getAssembly, getFlightState) {
+export function initFlightContextMenu(
+  getPs: () => PhysicsState | null,
+  getAssembly: () => RocketAssembly | null,
+  getFlightState: () => FlightState | null,
+): void {
   _getPs          = getPs;
   _getAssembly    = getAssembly;
   _getFlightState = getFlightState;
@@ -173,13 +177,13 @@ export function initFlightContextMenu(getPs, getAssembly, getFlightState) {
   _menu.setAttribute('hidden', '');
   document.body.appendChild(_menu);
 
-  // Right-click → show menu.
+  // Right-click -> show menu.
   _contextMenuHandler = _onContextMenu;
-  window.addEventListener('contextmenu', _contextMenuHandler);
+  window.addEventListener('contextmenu', _contextMenuHandler as EventListener);
 
-  // Click anywhere outside → close menu.
+  // Click anywhere outside -> close menu.
   _outsideClickHandler = _onOutsideClick;
-  document.addEventListener('click', _outsideClickHandler, true);
+  document.addEventListener('click', _outsideClickHandler as EventListener, true);
 
 
 }
@@ -189,13 +193,13 @@ export function initFlightContextMenu(getPs, getAssembly, getFlightState) {
  *
  * Removes the menu DOM element and all event listeners.
  */
-export function destroyFlightContextMenu() {
+export function destroyFlightContextMenu(): void {
   if (_contextMenuHandler) {
-    window.removeEventListener('contextmenu', _contextMenuHandler);
+    window.removeEventListener('contextmenu', _contextMenuHandler as EventListener);
     _contextMenuHandler = null;
   }
   if (_outsideClickHandler) {
-    document.removeEventListener('click', _outsideClickHandler, true);
+    document.removeEventListener('click', _outsideClickHandler as EventListener, true);
     _outsideClickHandler = null;
   }
   if (_menu) {
@@ -214,15 +218,13 @@ export function destroyFlightContextMenu() {
 // Private — event handlers
 // ---------------------------------------------------------------------------
 
-/** @param {MouseEvent} e */
-function _onOutsideClick(e) {
-  if (_menu && !_menu.hasAttribute('hidden') && !_menu.contains(/** @type {Node} */ (e.target))) {
+function _onOutsideClick(e: MouseEvent): void {
+  if (_menu && !_menu.hasAttribute('hidden') && !_menu.contains(e.target as Node)) {
     _hideMenu();
   }
 }
 
-/** @param {MouseEvent} e */
-function _onContextMenu(e) {
+function _onContextMenu(e: MouseEvent): void {
   const ps          = _getPs?.();
   const assembly    = _getAssembly?.();
   const flightState = _getFlightState?.();
@@ -249,16 +251,15 @@ function _onContextMenu(e) {
 // Private — menu display
 // ---------------------------------------------------------------------------
 
-/**
- * @param {string}   instanceId
- * @param {object}   def           Part definition.
- * @param {object}   ps            PhysicsState.
- * @param {object}   assembly      RocketAssembly.
- * @param {object}   flightState   FlightState.
- * @param {number}   clientX
- * @param {number}   clientY
- */
-function _showMenu(instanceId, def, ps, assembly, flightState, clientX, clientY) {
+function _showMenu(
+  instanceId: string,
+  def: PartDef,
+  ps: PhysicsState,
+  assembly: RocketAssembly,
+  flightState: FlightState,
+  clientX: number,
+  clientY: number,
+): void {
   if (!_menu) return;
 
   _menu.innerHTML = '';
@@ -277,7 +278,7 @@ function _showMenu(instanceId, def, ps, assembly, flightState, clientX, clientY)
 
   // ── MALFUNCTION STATUS & RECOVERY ────────────────────────────────────────
   if (hasMalfunction(ps, instanceId)) {
-    const malf = getMalfunction(ps, instanceId);
+    const malf = getMalfunction(ps, instanceId)!;
     const label = MALFUNCTION_LABELS[malf.type] ?? malf.type;
     const tip = MALFUNCTION_RECOVERY_TIPS[malf.type] ?? '';
 
@@ -295,7 +296,7 @@ function _showMenu(instanceId, def, ps, assembly, flightState, clientX, clientY)
     }
 
     // Recovery actions based on type.
-    const recoverable = [
+    const recoverable: string[] = [
       MalfunctionType.ENGINE_FLAMEOUT,
       MalfunctionType.FUEL_TANK_LEAK,
       MalfunctionType.DECOUPLER_STUCK,
@@ -304,7 +305,7 @@ function _showMenu(instanceId, def, ps, assembly, flightState, clientX, clientY)
     ];
 
     if (recoverable.includes(malf.type)) {
-      const actionLabels = {
+      const actionLabels: Record<string, string> = {
         [MalfunctionType.ENGINE_FLAMEOUT]:           'Attempt Reignition',
         [MalfunctionType.FUEL_TANK_LEAK]:            'Attempt Seal Leak',
         [MalfunctionType.DECOUPLER_STUCK]:           'Manual Decouple',
@@ -313,12 +314,16 @@ function _showMenu(instanceId, def, ps, assembly, flightState, clientX, clientY)
       };
 
       _menu.appendChild(_makeButton(actionLabels[malf.type] ?? 'Attempt Recovery', () => {
-        const result = attemptRecovery(ps, instanceId, ps._gameState);
+        const result = attemptRecovery(ps, instanceId, (ps as unknown as Record<string, unknown>)._gameState as GameState | undefined);
         // If decoupler recovery succeeded, actually fire the separation.
         if (result.success && malf.type === MalfunctionType.DECOUPLER_STUCK) {
-          const debris = activatePartDirect(ps, _getAssembly(), _getFlightState(), instanceId);
-          for (const frag of debris) {
-            ps.debris.push(frag);
+          const currentAssembly = _getAssembly?.();
+          const currentFlightState = _getFlightState?.();
+          if (currentAssembly && currentFlightState) {
+            const debris = activatePartDirect(ps, currentAssembly, currentFlightState, instanceId);
+            for (const frag of debris) {
+              ps.debris.push(frag);
+            }
           }
         }
         // If landing legs recovery succeeded, deploy them.
@@ -404,11 +409,11 @@ function _showMenu(instanceId, def, ps, assembly, flightState, clientX, clientY)
             break;
 
           case ScienceModuleState.DATA_RETURNED:
-            _menu.appendChild(_makeReadOnly(`${instrName}: Data Returned ✓`));
+            _menu.appendChild(_makeReadOnly(`${instrName}: Data Returned \u2713`));
             break;
 
           case ScienceModuleState.TRANSMITTED:
-            _menu.appendChild(_makeReadOnly(`${instrName}: Transmitted ✓`));
+            _menu.appendChild(_makeReadOnly(`${instrName}: Transmitted \u2713`));
             break;
 
           default:
@@ -467,7 +472,7 @@ function _showMenu(instanceId, def, ps, assembly, flightState, clientX, clientY)
     const legsStuck = legMalf && !legMalf.recovered &&
       legMalf.type === MalfunctionType.LANDING_LEGS_STUCK;
 
-    const _emitLegActivated = (id) => {
+    const _emitLegActivated = (id: string): void => {
       if (flightState?.events) {
         flightState.events.push({
           type: 'PART_ACTIVATED',
@@ -475,7 +480,7 @@ function _showMenu(instanceId, def, ps, assembly, flightState, clientX, clientY)
           instanceId: id,
           partType: def.type,
           description: `${def.name} manually deployed.`,
-        });
+        } as FlightEvent & { instanceId: string; partType: string });
       }
     };
 
@@ -486,9 +491,9 @@ function _showMenu(instanceId, def, ps, assembly, flightState, clientX, clientY)
       if (hasMirror && mirrorStatus === LegState.RETRACTED) {
         _menu.appendChild(_makeButton('Deploy Both Legs', () => {
           deployLandingLeg(ps, instanceId);
-          deployLandingLeg(ps, mirrorId);
+          deployLandingLeg(ps, mirrorId!);
           _emitLegActivated(instanceId);
-          _emitLegActivated(mirrorId);
+          _emitLegActivated(mirrorId!);
           _hideMenu();
         }));
         _menu.appendChild(_makeButton('Deploy This Leg Only', () => {
@@ -507,7 +512,7 @@ function _showMenu(instanceId, def, ps, assembly, flightState, clientX, clientY)
       if (hasMirror && mirrorStatus === LegState.DEPLOYED) {
         _menu.appendChild(_makeButton('Retract Both Legs', () => {
           retractLandingLeg(ps, instanceId);
-          retractLandingLeg(ps, mirrorId);
+          retractLandingLeg(ps, mirrorId!);
           _hideMenu();
         }));
         _menu.appendChild(_makeButton('Retract This Leg Only', () => {
@@ -522,7 +527,7 @@ function _showMenu(instanceId, def, ps, assembly, flightState, clientX, clientY)
       }
     } else {
       // DEPLOYING state — show status only.
-      _menu.appendChild(_makeReadOnly('Legs: Deploying…'));
+      _menu.appendChild(_makeReadOnly('Legs: Deploying\u2026'));
     }
     hasItems = true;
   }
@@ -536,8 +541,8 @@ function _showMenu(instanceId, def, ps, assembly, flightState, clientX, clientY)
         _hideMenu();
       }));
     } else {
-      const labels = {
-        [ParachuteState.DEPLOYING]: 'Parachute: Deploying…',
+      const labels: Record<string, string> = {
+        [ParachuteState.DEPLOYING]: 'Parachute: Deploying\u2026',
         [ParachuteState.DEPLOYED]:  'Parachute: Deployed',
         [ParachuteState.FAILED]:    'Parachute: Failed',
       };
@@ -551,7 +556,7 @@ function _showMenu(instanceId, def, ps, assembly, flightState, clientX, clientY)
     const ejectStatus = getEjectorSeatStatus(ps, instanceId);
     if (ejectStatus === EjectorState.ARMED) {
       _menu.appendChild(_makeButton('Activate Ejector Seat', () => {
-        activateEjectorSeat(ps, assembly, flightState, instanceId);
+        (activateEjectorSeat as Function)(ps, assembly, flightState, instanceId);
         _hideMenu();
       }));
     } else {
@@ -563,7 +568,7 @@ function _showMenu(instanceId, def, ps, assembly, flightState, clientX, clientY)
   // ── General activatable parts (not handled by a specific type above) ──────
   // Covers: ENGINE, SRB (ignition), DECOUPLER (separation), SATELLITE (release),
   // and any other activatable part not already represented above.
-  const SPECIFIC_TYPES = [
+  const SPECIFIC_TYPES: string[] = [
     PartType.FUEL_TANK,
     PartType.SOLID_ROCKET_BOOSTER,
     PartType.SERVICE_MODULE,
@@ -619,7 +624,7 @@ function _showMenu(instanceId, def, ps, assembly, flightState, clientX, clientY)
 /**
  * Hide the context menu.
  */
-function _hideMenu() {
+function _hideMenu(): void {
   if (_menu) _menu.setAttribute('hidden', '');
 }
 
@@ -630,16 +635,15 @@ function _hideMenu() {
 /**
  * Create a clickable button menu item.
  *
- * @param {string}        label
- * @param {(() => void)|null} onClick  null = disabled / no-op.
- * @returns {HTMLButtonElement}
+ * @param label
+ * @param onClick  null = disabled / no-op.
  */
-function _makeButton(label, onClick) {
+function _makeButton(label: string, onClick: (() => void) | null): HTMLButtonElement {
   const btn = document.createElement('button');
   btn.className   = 'fctx-item';
   btn.textContent = label;
   if (onClick) {
-    btn.addEventListener('click', (e) => {
+    btn.addEventListener('click', (e: MouseEvent) => {
       e.stopPropagation();
       onClick();
     }, { once: true });
@@ -649,11 +653,8 @@ function _makeButton(label, onClick) {
 
 /**
  * Create a read-only (non-interactive) info row.
- *
- * @param {string} text
- * @returns {HTMLDivElement}
  */
-function _makeReadOnly(text) {
+function _makeReadOnly(text: string): HTMLDivElement {
   const div = document.createElement('div');
   div.className   = 'fctx-readonly';
   div.textContent = text;
@@ -669,17 +670,11 @@ function _makeReadOnly(text) {
  * should be shown as "Already Activated".
  *
  * Rules:
- *   - ENGINE / SRB already in ps.firingEngines → currently firing (not re-activatable).
+ *   - ENGINE / SRB already in ps.firingEngines -> currently firing (not re-activatable).
  *   - One-time parts activated via `activatePartDirect` will have a PART_ACTIVATED
  *     event with their instanceId recorded in flightState.events.
- *
- * @param {string} instanceId
- * @param {object} def         Part definition.
- * @param {object} ps          PhysicsState.
- * @param {object} flightState FlightState.
- * @returns {boolean}
  */
-function _isPartAlreadyActivated(instanceId, def, ps, flightState) {
+function _isPartAlreadyActivated(instanceId: string, def: PartDef, ps: PhysicsState, flightState: FlightState): boolean {
   // Engines / SRBs that are currently firing.
   if (
     def.type === PartType.ENGINE ||
@@ -691,6 +686,6 @@ function _isPartAlreadyActivated(instanceId, def, ps, flightState) {
   // Other one-time activatable parts — check the events log.
   if (!flightState?.events) return false;
   return flightState.events.some(
-    (e) => e.type === 'PART_ACTIVATED' && e.instanceId === instanceId,
+    (e) => e.type === 'PART_ACTIVATED' && (e as FlightEvent & { instanceId?: string }).instanceId === instanceId,
   );
 }

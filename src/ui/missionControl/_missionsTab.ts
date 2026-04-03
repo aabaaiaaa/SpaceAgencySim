@@ -1,9 +1,10 @@
 /**
- * _missionsTab.js — Available, Accepted, and Completed mission tabs.
+ * _missionsTab.ts — Available, Accepted, and Completed mission tabs.
  *
  * @module missionControl/_missionsTab
  */
 
+import type { GameState, ObjectiveDef } from '../../core/gameState.js';
 import { acceptMission } from '../../core/missions.js';
 import { getFacilityDef } from '../../core/construction.js';
 import { getPartById } from '../../data/parts.js';
@@ -13,6 +14,20 @@ import { refreshTopBarMissions } from '../topbar.js';
 import { getMCState } from './_state.js';
 import { fmtCash, fmtDate, buildRewardsEl, isTutorialPhase, getContent } from './_shell.js';
 
+/**
+ * Shape of a mission instance stored in game state.
+ * At runtime these are deep copies of MissionDef with additional live fields.
+ */
+interface MissionInstance {
+  id: string;
+  title: string;
+  description: string;
+  reward: number;
+  objectives: ObjectiveDef[];
+  unlockedParts?: string[];
+  completedDate?: string;
+}
+
 // ---------------------------------------------------------------------------
 // Tutorial blocking indicator helpers
 // ---------------------------------------------------------------------------
@@ -21,13 +36,9 @@ import { fmtCash, fmtDate, buildRewardsEl, isTutorialPhase, getContent } from '.
  * Return true if completing `missionId` is required (directly or transitively)
  * to unlock any other tutorial mission that has not yet been completed.
  *
- * Only meaningful in Tutorial mode — always returns false otherwise.
- *
- * @param {import('../../core/gameState.js').GameState} state
- * @param {string} missionId
- * @returns {boolean}
+ * Only meaningful in Tutorial mode -- always returns false otherwise.
  */
-function isTutorialBlockingMission(state, missionId) {
+function isTutorialBlockingMission(state: GameState, missionId: string): boolean {
   if (state.gameMode !== GameMode.TUTORIAL) return false;
 
   const completedIds = new Set(state.missions.completed.map((m) => m.id));
@@ -45,12 +56,12 @@ function isTutorialBlockingMission(state, missionId) {
 // Available tab
 // ---------------------------------------------------------------------------
 
-export function renderAvailableTab() {
+export function renderAvailableTab(): void {
   const content = getContent();
   const mc = getMCState();
   if (!content || !mc.state) return;
 
-  const missions = mc.state.missions.available;
+  const missions = mc.state.missions.available as unknown as MissionInstance[];
 
   if (missions.length === 0) {
     const msg = document.createElement('p');
@@ -79,14 +90,13 @@ export function renderAvailableTab() {
 
 /**
  * Build a mission card for the Available tab.
- *
- * @param {import('../../data/missions.js').MissionDef} mission
- * @param {boolean} blockAccept  True if the Accept button should be disabled.
- * @param {boolean} tutorialPhase  True while in the early tutorial.
- * @param {boolean} isBlocking  True if this mission gates other tutorial missions.
- * @returns {HTMLElement}
  */
-function _buildAvailableMissionCard(mission, blockAccept, tutorialPhase, isBlocking) {
+function _buildAvailableMissionCard(
+  mission: MissionInstance,
+  blockAccept: boolean,
+  tutorialPhase: boolean,
+  isBlocking: boolean,
+): HTMLElement {
   const card = document.createElement('div');
   card.className = 'mc-mission-card';
   card.dataset.missionId = mission.id;
@@ -157,9 +167,8 @@ function _buildAvailableMissionCard(mission, blockAccept, tutorialPhase, isBlock
 
 /**
  * Handle clicking the Accept button for a mission.
- * @param {string} missionId
  */
-function _handleAccept(missionId) {
+function _handleAccept(missionId: string): void {
   const mc = getMCState();
   if (!mc.state) return;
 
@@ -172,7 +181,7 @@ function _handleAccept(missionId) {
 
     // Show notification modal for facility and/or part unlocks.
     if (result.awardedFacility || (result.unlockedParts && result.unlockedParts.length > 0)) {
-      _showUnlockNotification(result.awardedFacility, result.unlockedParts);
+      _showUnlockNotification(result.awardedFacility ?? null, result.unlockedParts ?? []);
     }
   } else {
     console.warn('[Mission Control UI] acceptMission failed:', result.error);
@@ -185,11 +194,8 @@ function _handleAccept(missionId) {
 
 /**
  * Show a prominent modal notifying the player of facility and/or part unlocks.
- *
- * @param {string|null} facilityId  The awarded facility ID, or null.
- * @param {string[]}    partIds     Part IDs that were unlocked.
  */
-function _showUnlockNotification(facilityId, partIds) {
+function _showUnlockNotification(facilityId: string | null, partIds: string[]): void {
   // Remove any existing unlock notification.
   const existing = document.getElementById('unlock-notification-backdrop');
   if (existing) existing.remove();
@@ -206,9 +212,9 @@ function _showUnlockNotification(facilityId, partIds) {
   modal.style.maxWidth = '460px';
   modal.style.textAlign = 'center';
 
-  const dismiss = () => backdrop.remove();
+  const dismiss = (): void => backdrop.remove();
 
-  // ── Facility section ─────────────────────────────────────────────────────
+  // -- Facility section -----------------------------------------------------
   if (facilityId) {
     const def = getFacilityDef(facilityId);
     const facilityName = def?.name ?? facilityId;
@@ -226,7 +232,7 @@ function _showUnlockNotification(facilityId, partIds) {
     }
   }
 
-  // ── Unlocked parts section ───────────────────────────────────────────────
+  // -- Unlocked parts section -----------------------------------------------
   if (partIds && partIds.length > 0) {
     const partsTitle = document.createElement('p');
     partsTitle.style.cssText = 'margin:0 0 8px; color:#aaa; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.05em;';
@@ -245,7 +251,7 @@ function _showUnlockNotification(facilityId, partIds) {
     modal.appendChild(partsList);
   }
 
-  // ── Dismiss button ───────────────────────────────────────────────────────
+  // -- Dismiss button -------------------------------------------------------
   const btnRow = document.createElement('div');
   btnRow.style.cssText = 'margin-top:12px;';
 
@@ -267,12 +273,12 @@ function _showUnlockNotification(facilityId, partIds) {
 // Accepted tab
 // ---------------------------------------------------------------------------
 
-export function renderAcceptedTab() {
+export function renderAcceptedTab(): void {
   const content = getContent();
   const mc = getMCState();
   if (!content || !mc.state) return;
 
-  const missions = mc.state.missions.accepted;
+  const missions = mc.state.missions.accepted as unknown as MissionInstance[];
 
   if (missions.length === 0) {
     const msg = document.createElement('p');
@@ -295,11 +301,8 @@ export function renderAcceptedTab() {
 
 /**
  * Build a mission card for the Accepted tab, including objectives.
- *
- * @param {import('../../data/missions.js').MissionDef} mission
- * @returns {HTMLElement}
  */
-function _buildAcceptedMissionCard(mission) {
+function _buildAcceptedMissionCard(mission: MissionInstance): HTMLElement {
   const card = document.createElement('div');
   card.className = 'mc-mission-card';
   card.dataset.missionId = mission.id;
@@ -369,12 +372,12 @@ function _buildAcceptedMissionCard(mission) {
 // Completed tab
 // ---------------------------------------------------------------------------
 
-export function renderCompletedTab() {
+export function renderCompletedTab(): void {
   const content = getContent();
   const mc = getMCState();
   if (!content || !mc.state) return;
 
-  const missions = mc.state.missions.completed;
+  const missions = mc.state.missions.completed as unknown as MissionInstance[];
 
   if (missions.length === 0) {
     const msg = document.createElement('p');
@@ -401,11 +404,8 @@ export function renderCompletedTab() {
  * Build a mission card for the Completed tab.
  * Matches the layout of accepted cards but with all objectives checked
  * and a completion date shown.
- *
- * @param {import('../../data/missions.js').MissionDef} mission
- * @returns {HTMLElement}
  */
-function _buildCompletedMissionCard(mission) {
+function _buildCompletedMissionCard(mission: MissionInstance): HTMLElement {
   const card = document.createElement('div');
   card.className = 'mc-mission-card mc-mission-card-completed';
   card.dataset.missionId = mission.id;

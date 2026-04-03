@@ -127,7 +127,7 @@
 - **Verification**: `npm run typecheck` passes. `npm run test:unit` passes. No `.js` files remain in `src/render/`.
 
 ### TASK-021: Convert UI layer to TypeScript (src/ui/) — batch 1
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-020
 - **Description**: Convert the first batch of UI files to TypeScript (~25 files): all files in `src/ui/flightController/` EXCEPT `_css.js` (12 files), all files in `src/ui/missionControl/` EXCEPT `_css.js` (8 files including barrel), plus crewAdmin.js, debugSaves.js, design-tokens.js, flightContextMenu.js, flightHud.js, help.js. Skip `_css.js` files — they will be replaced by `.css` files in TASK-024. Use proper DOM types. See requirements Section 4.1.
 - **Verification**: `npm run typecheck` passes. `npm run test:unit` passes. All listed files are now `.ts`.

@@ -1,5 +1,5 @@
 /**
- * crewAdmin.js — Crew Administration Building HTML overlay UI.
+ * crewAdmin.ts — Crew Administration Building HTML overlay UI.
  *
  * Four tabs (Training tab visible at Crew Admin Tier 2+):
  *   - Active Crew  : Lists active astronauts with name, missions/flights, Fire button.
@@ -25,12 +25,13 @@ import {
 import { getFacilityTier } from '../core/construction.js';
 import { refreshTopBar } from './topbar.js';
 import { injectStyleOnce } from './injectStyle.js';
+import type { GameState } from '../core/gameState.js';
 
 // ---------------------------------------------------------------------------
 // CSS
 // ---------------------------------------------------------------------------
 
-const CREW_ADMIN_STYLES = `
+const CREW_ADMIN_STYLES: string = `
 /* ── Crew Admin overlay ────────────────────────────────────────────────────── */
 #crew-admin-overlay {
   position: fixed;
@@ -610,14 +611,14 @@ const CREW_ADMIN_STYLES = `
 // Random name pool
 // ---------------------------------------------------------------------------
 
-const FIRST_NAMES = [
+const FIRST_NAMES: string[] = [
   'Alex', 'Sam', 'Jordan', 'Casey', 'Morgan', 'Taylor', 'Drew', 'Riley',
   'Quinn', 'Avery', 'Skyler', 'Blake', 'Reese', 'Jamie', 'Rowan', 'Sage',
   'Finley', 'Parker', 'Harper', 'Dallas', 'Remy', 'Lennox', 'Arden', 'Ellis',
   'Ivan', 'Omar', 'Priya', 'Yuki', 'Nadia', 'Kofi', 'Leila', 'Soren',
 ];
 
-const LAST_NAMES = [
+const LAST_NAMES: string[] = [
   'Armstrong', 'Glenn', 'Aldrin', 'Collins', 'Lovell', 'Shepard', 'Conrad',
   'Bean', 'Mitchell', 'Scott', 'Irwin', 'Young', 'Cernan', 'Evans',
   'Stafford', 'Cooper', 'Gordon', 'Schweickart', 'Anders', 'Borman',
@@ -627,9 +628,8 @@ const LAST_NAMES = [
 
 /**
  * Generate a random astronaut name.
- * @returns {string}
  */
-function generateRandomName() {
+function generateRandomName(): string {
   const first = FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)];
   const last  = LAST_NAMES[Math.floor(Math.random() * LAST_NAMES.length)];
   return `${first} ${last}`;
@@ -641,11 +641,9 @@ function generateRandomName() {
 
 /**
  * Format an ISO 8601 date string to a readable short date.
- * @param {string|null} iso
- * @returns {string}
  */
-function fmtDate(iso) {
-  if (!iso) return '—';
+function fmtDate(iso: string | null): string {
+  if (!iso) return '\u2014';
   try {
     return new Date(iso).toLocaleDateString(undefined, {
       year:  'numeric',
@@ -659,10 +657,8 @@ function fmtDate(iso) {
 
 /**
  * Format a cash amount as a dollar string.
- * @param {number} amount
- * @returns {string}
  */
-function fmtCash(amount) {
+function fmtCash(amount: number): string {
   return '$' + amount.toLocaleString();
 }
 
@@ -670,17 +666,17 @@ function fmtCash(amount) {
 // Module state
 // ---------------------------------------------------------------------------
 
-/** The root overlay element. @type {HTMLElement | null} */
-let _overlay = null;
+/** The root overlay element. */
+let _overlay: HTMLElement | null = null;
 
-/** Reference to the game state. @type {import('../core/gameState.js').GameState | null} */
-let _state = null;
+/** Reference to the game state. */
+let _state: GameState | null = null;
 
-/** Callback to navigate back to the hub. @type {(() => void) | null} */
-let _onBack = null;
+/** Callback to navigate back to the hub. */
+let _onBack: (() => void) | null = null;
 
-/** Currently active tab id: 'active' | 'hire' | 'history' */
-let _activeTab = 'active';
+/** Currently active tab id: 'active' | 'hire' | 'history' | 'training' */
+let _activeTab: string = 'active';
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -688,12 +684,8 @@ let _activeTab = 'active';
 
 /**
  * Mount the Crew Administration overlay.
- *
- * @param {HTMLElement} container   The #ui-overlay div.
- * @param {import('../core/gameState.js').GameState} state
- * @param {{ onBack: () => void }} callbacks
  */
-export function initCrewAdminUI(container, state, { onBack }) {
+export function initCrewAdminUI(container: HTMLElement, state: GameState, { onBack }: { onBack: () => void }): void {
   _state   = state;
   _onBack  = onBack;
   _activeTab = 'active';
@@ -714,7 +706,7 @@ export function initCrewAdminUI(container, state, { onBack }) {
 /**
  * Remove the Crew Administration overlay from the DOM.
  */
-export function destroyCrewAdminUI() {
+export function destroyCrewAdminUI(): void {
   if (_overlay) {
     _overlay.remove();
     _overlay = null;
@@ -732,7 +724,7 @@ export function destroyCrewAdminUI() {
  * Build the static shell: header + tab bar + empty content area.
  * Tab content is rendered separately.
  */
-function _renderShell() {
+function _renderShell(): void {
   if (!_overlay) return;
 
   // Header
@@ -741,7 +733,7 @@ function _renderShell() {
 
   const backBtn = document.createElement('button');
   backBtn.id = 'crew-admin-back-btn';
-  backBtn.textContent = '← Hub';
+  backBtn.textContent = '\u2190 Hub';
   backBtn.addEventListener('click', () => {
     const onBack = _onBack; // capture before destroy nulls it
     destroyCrewAdminUI();
@@ -779,7 +771,7 @@ function _renderShell() {
   const tabBar = document.createElement('div');
   tabBar.id = 'crew-admin-tabs';
 
-  const tabs = [
+  const tabs: { id: string; label: string }[] = [
     { id: 'active',  label: 'Active Crew' },
     { id: 'hire',    label: 'Hire' },
   ];
@@ -810,15 +802,14 @@ function _renderShell() {
 
 /**
  * Switch to a different tab and re-render content.
- * @param {string} tabId
  */
-function _switchTab(tabId) {
+function _switchTab(tabId: string): void {
   _activeTab = tabId;
 
   // Update tab button active state.
   if (_overlay) {
     _overlay.querySelectorAll('.crew-admin-tab').forEach((btn) => {
-      btn.classList.toggle('active', btn.dataset.tabId === tabId);
+      (btn as HTMLElement).classList.toggle('active', (btn as HTMLElement).dataset.tabId === tabId);
     });
   }
 
@@ -831,10 +822,9 @@ function _switchTab(tabId) {
 
 /**
  * Get the content div and clear it.
- * @returns {HTMLElement | null}
  */
-function _getContent() {
-  const el = _overlay ? _overlay.querySelector('#crew-admin-content') : null;
+function _getContent(): HTMLElement | null {
+  const el = _overlay ? _overlay.querySelector('#crew-admin-content') as HTMLElement | null : null;
   if (el) el.innerHTML = '';
   return el;
 }
@@ -843,7 +833,7 @@ function _getContent() {
 // Private — Active Crew tab
 // ---------------------------------------------------------------------------
 
-function _renderActiveTab() {
+function _renderActiveTab(): void {
   const content = _getContent();
   if (!content || !_state) return;
 
@@ -893,9 +883,9 @@ function _renderActiveTab() {
 
     // Status column — injury, training, or ready
     const statusTd = document.createElement('td');
-    const injured = isCrewInjured(_state, astronaut.id);
+    const injured = isCrewInjured(_state!, astronaut.id);
     if (injured) {
-      const remaining = (astronaut.injuryEnds ?? 0) - (_state.currentPeriod ?? 0);
+      const remaining = (astronaut.injuryEnds ?? 0) - (_state!.currentPeriod ?? 0);
       const badge = document.createElement('span');
       badge.className = 'crew-injury-badge';
       badge.textContent = `Injured (${remaining} flights)`;
@@ -907,8 +897,8 @@ function _renderActiveTab() {
       medBtn.textContent = crewAdminTier >= 3 ? 'Adv. Medical' : 'Medical';
       medBtn.addEventListener('click', () => {
         const result = crewAdminTier >= 3
-          ? payAdvancedMedicalCare(_state, astronaut.id)
-          : payMedicalCare(_state, astronaut.id);
+          ? payAdvancedMedicalCare(_state!, astronaut.id)
+          : payMedicalCare(_state!, astronaut.id);
         if (result.success) {
           refreshTopBar();
           _renderActiveTab();
@@ -918,7 +908,7 @@ function _renderActiveTab() {
     } else if (astronaut.trainingSkill) {
       const badge = document.createElement('span');
       badge.className = 'crew-training-badge';
-      const periodsLeft = Math.max(0, (astronaut.trainingEnds ?? 0) - (_state.currentPeriod ?? 0));
+      const periodsLeft = Math.max(0, (astronaut.trainingEnds ?? 0) - (_state!.currentPeriod ?? 0));
       badge.textContent = `Training: ${astronaut.trainingSkill} (${periodsLeft} left)`;
       statusTd.appendChild(badge);
     } else {
@@ -953,10 +943,8 @@ function _renderActiveTab() {
 
 /**
  * Render skill bars with effect descriptions for a crew member.
- * @param {{ piloting: number, engineering: number, science: number }} skills
- * @returns {string}  HTML string.
  */
-function _renderSkillBars(skills) {
+function _renderSkillBars(skills: { piloting: number; engineering: number; science: number }): string {
   const p = Math.round(skills.piloting);
   const e = Math.round(skills.engineering);
   const s = Math.round(skills.science);
@@ -990,9 +978,8 @@ function _renderSkillBars(skills) {
 
 /**
  * Handle the "Fire" button for an astronaut.
- * @param {string} id  Astronaut ID.
  */
-function _handleFire(id) {
+function _handleFire(id: string): void {
   if (!_state) return;
   const ok = fireCrew(_state, id);
   if (ok) {
@@ -1005,7 +992,7 @@ function _handleFire(id) {
 // Private — Hire tab
 // ---------------------------------------------------------------------------
 
-function _renderHireTab() {
+function _renderHireTab(): void {
   const content = _getContent();
   if (!content || !_state) return;
 
@@ -1073,7 +1060,7 @@ function _renderHireTab() {
   const hireBtn = document.createElement('button');
   hireBtn.className = 'hire-btn';
   hireBtn.disabled = !canAfford;
-  hireBtn.textContent = `Hire Astronaut — ${fmtCash(hireCost)}`;
+  hireBtn.textContent = `Hire Astronaut \u2014 ${fmtCash(hireCost)}`;
   panel.appendChild(hireBtn);
 
   // Feedback message
@@ -1089,7 +1076,7 @@ function _renderHireTab() {
 
     if (result.success) {
       feedback.className = 'hire-feedback success';
-      feedback.textContent = `${result.astronaut.name} has joined the crew!`;
+      feedback.textContent = `${result.astronaut!.name} has joined the crew!`;
       nameInput.value = '';
       // Sync the persistent top bar cash display.
       refreshTopBar();
@@ -1099,7 +1086,7 @@ function _renderHireTab() {
       const newFeedback = content.querySelector('.hire-feedback');
       if (newFeedback) {
         newFeedback.className = 'hire-feedback success';
-        newFeedback.textContent = `${result.astronaut.name} has joined the crew!`;
+        newFeedback.textContent = `${result.astronaut!.name} has joined the crew!`;
       }
     } else {
       feedback.className = 'hire-feedback error';
@@ -1120,7 +1107,7 @@ function _renderHireTab() {
 
     const expDesc = document.createElement('p');
     expDesc.className = 'exp-hire-desc';
-    expDesc.textContent = 'Experienced recruits start with skills between 10–30 in all areas, but cost significantly more to hire.';
+    expDesc.textContent = 'Experienced recruits start with skills between 10\u201330 in all areas, but cost significantly more to hire.';
     expSection.appendChild(expDesc);
 
     const expCost = getExperiencedHireCost(_state.reputation ?? 50);
@@ -1149,7 +1136,7 @@ function _renderHireTab() {
     expBtn.style.background = 'rgba(200, 160, 40, 0.25)';
     expBtn.style.borderColor = 'rgba(200, 160, 40, 0.5)';
     expBtn.style.color = '#ddcc66';
-    expBtn.textContent = `Hire Experienced — ${fmtCash(expCost)}`;
+    expBtn.textContent = `Hire Experienced \u2014 ${fmtCash(expCost)}`;
     expSection.appendChild(expBtn);
 
     const expFeedback = document.createElement('p');
@@ -1163,9 +1150,9 @@ function _renderHireTab() {
       const result = hireExperiencedCrew(_state, name);
 
       if (result.success) {
-        const sk = result.astronaut.skills;
+        const sk = result.astronaut!.skills;
         expFeedback.className = 'hire-feedback success';
-        expFeedback.textContent = `${result.astronaut.name} joined (P:${Math.round(sk.piloting)} E:${Math.round(sk.engineering)} S:${Math.round(sk.science)})!`;
+        expFeedback.textContent = `${result.astronaut!.name} joined (P:${Math.round(sk.piloting)} E:${Math.round(sk.engineering)} S:${Math.round(sk.science)})!`;
         expNameInput.value = '';
         refreshTopBar();
         _renderHireTab();
@@ -1173,7 +1160,7 @@ function _renderHireTab() {
         const newFb = content.querySelector('.exp-hire-section .hire-feedback');
         if (newFb) {
           newFb.className = 'hire-feedback success';
-          newFb.textContent = `${result.astronaut.name} joined!`;
+          newFb.textContent = `${result.astronaut!.name} joined!`;
         }
       } else {
         expFeedback.className = 'hire-feedback error';
@@ -1191,7 +1178,7 @@ function _renderHireTab() {
 // Private — Training tab (Tier 2+)
 // ---------------------------------------------------------------------------
 
-function _renderTrainingTab() {
+function _renderTrainingTab(): void {
   const content = _getContent();
   if (!content || !_state) return;
 
@@ -1246,16 +1233,16 @@ function _renderTrainingTab() {
       const periodsLeft = (astronaut.trainingEnds ?? 0) - currentPeriod;
       const status = document.createElement('span');
       status.className = 'training-status';
-      status.textContent = `${astronaut.trainingSkill} — ${Math.max(0, periodsLeft)} flight${periodsLeft !== 1 ? 's' : ''} remaining`;
+      status.textContent = `${astronaut.trainingSkill} \u2014 ${Math.max(0, periodsLeft)} flight${periodsLeft !== 1 ? 's' : ''} remaining`;
       item.appendChild(status);
 
       const cancelBtn = document.createElement('button');
       cancelBtn.className = 'training-cancel-btn';
       cancelBtn.textContent = 'Cancel Course';
       cancelBtn.addEventListener('click', () => {
-        cancelTraining(_state, astronaut.id);
+        cancelTraining(_state!, astronaut.id);
         _renderTrainingTab();
-        refreshTopBar(_state);
+        refreshTopBar();
       });
       item.appendChild(cancelBtn);
 
@@ -1269,7 +1256,7 @@ function _renderTrainingTab() {
   const availableForTraining = activeCrew.filter((a) => {
     if (a.trainingSkill) return false; // already training
     if (a.assignedRocketId) return false; // assigned to rocket
-    if (isCrewInjured(_state, a.id)) return false; // injured
+    if (isCrewInjured(_state!, a.id)) return false; // injured
     return true;
   });
 
@@ -1308,7 +1295,7 @@ function _renderTrainingTab() {
       for (const skill of ['piloting', 'engineering', 'science']) {
         const opt = document.createElement('option');
         opt.value = skill;
-        const currentVal = Math.round(astronaut.skills?.[skill] ?? 0);
+        const currentVal = Math.round(astronaut.skills?.[skill as keyof typeof astronaut.skills] ?? 0);
         opt.textContent = `${skill.charAt(0).toUpperCase() + skill.slice(1)} (${currentVal})`;
         select.appendChild(opt);
       }
@@ -1319,10 +1306,10 @@ function _renderTrainingTab() {
       assignBtn.textContent = `Enrol (${fmtCash(TRAINING_COURSE_COST)})`;
       assignBtn.disabled = !slotsAvailable;
       assignBtn.addEventListener('click', () => {
-        const result = assignToTraining(_state, astronaut.id, select.value);
+        const result = assignToTraining(_state!, astronaut.id, select.value as 'piloting' | 'engineering' | 'science');
         if (result.success) {
           _renderTrainingTab();
-          refreshTopBar(_state);
+          refreshTopBar();
         }
       });
       item.appendChild(assignBtn);
@@ -1338,7 +1325,7 @@ function _renderTrainingTab() {
 // Private — History tab
 // ---------------------------------------------------------------------------
 
-function _renderHistoryTab() {
+function _renderHistoryTab(): void {
   const content = _getContent();
   if (!content || !_state) return;
 
@@ -1390,7 +1377,7 @@ function _renderHistoryTab() {
     if (isKia) {
       const marker = document.createElement('span');
       marker.className = 'kia-marker';
-      marker.textContent = '†';
+      marker.textContent = '\u2020';
       marker.title = 'Killed in Action';
       nameTd.appendChild(marker);
     }
@@ -1428,10 +1415,10 @@ function _renderHistoryTab() {
         astronaut.deathCause || null,
       ]
         .filter(Boolean)
-        .join(' — ');
-      detailsTd.textContent = deathInfo || '—';
+        .join(' \u2014 ');
+      detailsTd.textContent = deathInfo || '\u2014';
     } else {
-      detailsTd.textContent = '—';
+      detailsTd.textContent = '\u2014';
     }
     tr.appendChild(detailsTd);
 

@@ -1,5 +1,5 @@
 /**
- * design-tokens.js — Shared design system for the Space Agency Sim UI.
+ * design-tokens.ts — Shared design system for the Space Agency Sim UI.
  *
  * Defines CSS custom properties for colors, spacing, typography, border-radius,
  * z-index layers, and button variants. All UI modules should reference these
@@ -21,7 +21,7 @@
 // CSS custom properties — injected onto :root
 // ---------------------------------------------------------------------------
 
-const DESIGN_TOKENS = `
+const DESIGN_TOKENS: string = `
 :root {
   /* ── Color palette ─────────────────────────────────────────────────────── */
 
@@ -160,7 +160,7 @@ const DESIGN_TOKENS = `
 // Reusable CSS class snippets for common button variants
 // ---------------------------------------------------------------------------
 
-const BUTTON_VARIANTS = `
+const BUTTON_VARIANTS: string = `
 /* ═══════════════════════════════════════════════════════════════════════════
    Shared button variants — import design-tokens.js to get these globally
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -400,7 +400,7 @@ const BUTTON_VARIANTS = `
  * Injects the design tokens and shared utility classes into the document head.
  * Safe to call multiple times — only injects once (checks DOM, not just a flag).
  */
-export function injectDesignTokens() {
+export function injectDesignTokens(): void {
   if (document.getElementById('design-tokens')) return;
 
   const style = document.createElement('style');

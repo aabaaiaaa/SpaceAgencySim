@@ -1,5 +1,5 @@
 /**
- * _achievementsTab.js — Achievements display tab with icons.
+ * _achievementsTab.ts — Achievements display tab with icons.
  *
  * @module missionControl/_achievementsTab
  */
@@ -12,8 +12,8 @@ import { fmtCash, getContent } from './_shell.js';
 // Achievement icons
 // ---------------------------------------------------------------------------
 
-/** Achievement icon map — earned vs locked. */
-const _ACHIEVEMENT_ICONS = {
+/** Achievement icon map -- earned vs locked. */
+const _ACHIEVEMENT_ICONS: Record<string, { earned: string; locked: string }> = {
   FIRST_ORBIT:          { earned: '\u{1F30D}', locked: '\u{1F311}' },
   FIRST_SATELLITE:      { earned: '\u{1F6F0}', locked: '\u{1F311}' },
   FIRST_CONSTELLATION:  { earned: '\u{2728}',  locked: '\u{1F311}' },
@@ -30,7 +30,7 @@ const _ACHIEVEMENT_ICONS = {
 // Achievements tab
 // ---------------------------------------------------------------------------
 
-export function renderAchievementsTab() {
+export function renderAchievementsTab(): void {
   const content = getContent();
   const mc = getMCState();
   if (!content || !mc.state) return;

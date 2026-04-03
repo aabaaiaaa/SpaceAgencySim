@@ -1,5 +1,5 @@
 /**
- * _postFlight.js — Post-flight summary screen rendering, flight event
+ * _postFlight.ts — Post-flight summary screen rendering, flight event
  * formatting, flight log.
  *
  * @module ui/flightController/_postFlight
@@ -14,19 +14,23 @@ import { getFCState } from './_state.js';
 import { stopFlightScene, startFlightScene } from './_init.js';
 import { triggerAutoSave } from '../autoSaveToast.js';
 
+import type { PhysicsState } from '../../core/physics.js';
+import type { RocketAssembly } from '../../core/rocketbuilder.js';
+import type { FlightState, GameState, FlightEvent } from '../../core/gameState.js';
+
 // ---------------------------------------------------------------------------
 // Flight event formatting helpers
 // ---------------------------------------------------------------------------
 
 /** Format elapsed flight seconds as `T+MM:SS`. */
-export function formatFlightTime(seconds) {
+export function formatFlightTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = Math.floor(seconds % 60);
   return `T+${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
 /** Colour for the event-type dot in the flight log. */
-export function eventDotColor(type) {
+export function eventDotColor(type: string): string {
   switch (type) {
     case 'PART_ACTIVATED':
     case 'LEG_DEPLOYED':
@@ -54,7 +58,7 @@ export function eventDotColor(type) {
  * Produce a human-readable label for events that lack a `description` field.
  * For PART_DESTROYED events this resolves the part name from the catalogue.
  */
-function _formatEventFallback(evt) {
+function _formatEventFallback(evt: FlightEvent & { partId?: string }): string {
   if (evt.type === 'PART_DESTROYED' && evt.partId) {
     const def = getPartById(evt.partId);
     if (def) return `${def.name} destroyed`;
@@ -64,35 +68,33 @@ function _formatEventFallback(evt) {
 
 /**
  * Build the flight event list DOM element from an array of events.
- * @param {Array<object>} events
- * @returns {HTMLElement}  A <ul> or <p> element.
  */
-export function buildFlightEventList(events) {
+export function buildFlightEventList(events: FlightEvent[]): HTMLElement {
   if (!events || events.length === 0) {
-    const empty = document.createElement('p');
+    const empty: HTMLParagraphElement = document.createElement('p');
     empty.className = 'fl-empty';
     empty.textContent = 'No events recorded.';
     return empty;
   }
 
-  const list = document.createElement('ul');
+  const list: HTMLUListElement = document.createElement('ul');
   list.className = 'fl-list';
 
   for (const evt of events) {
-    const li = document.createElement('li');
+    const li: HTMLLIElement = document.createElement('li');
     li.className = 'fl-event';
 
-    const dot = document.createElement('span');
+    const dot: HTMLSpanElement = document.createElement('span');
     dot.className = 'fl-event-dot';
     dot.style.background = eventDotColor(evt.type);
 
-    const time = document.createElement('span');
+    const time: HTMLSpanElement = document.createElement('span');
     time.className = 'fl-event-time';
     time.textContent = formatFlightTime(evt.time ?? 0);
 
-    const desc = document.createElement('span');
+    const desc: HTMLSpanElement = document.createElement('span');
     desc.className = 'fl-event-desc';
-    desc.textContent = evt.description ?? _formatEventFallback(evt);
+    desc.textContent = evt.description ?? _formatEventFallback(evt as FlightEvent & { partId?: string });
 
     li.appendChild(dot);
     li.appendChild(time);
@@ -110,12 +112,8 @@ export function buildFlightEventList(events) {
 /**
  * Returns true when all COMMAND_MODULE parts in the given assembly are absent
  * from `ps.activeParts`.
- *
- * @param {import('../../core/physics.js').PhysicsState|null} ps
- * @param {import('../../core/rocketbuilder.js').RocketAssembly|null} assembly
- * @returns {boolean}
  */
-export function allCommandModulesDestroyedFor(ps, assembly) {
+export function allCommandModulesDestroyedFor(ps: PhysicsState | null, assembly: RocketAssembly | null): boolean {
   if (!assembly || !ps) return false;
 
   let hadCommandModule = false;
@@ -134,41 +132,41 @@ export function allCommandModulesDestroyedFor(ps, assembly) {
 
 /**
  * Build and display the post-flight summary overlay.
- *
- * @param {import('../../core/physics.js').PhysicsState|null}           ps
- * @param {import('../../core/rocketbuilder.js').RocketAssembly|null}   assembly
- * @param {import('../../core/gameState.js').FlightState|null}          flightState
- * @param {import('../../core/gameState.js').GameState|null}            state
- * @param {((state: any) => void)|null}                                 onFlightEnd
  */
-export function showPostFlightSummary(ps, assembly, flightState, state, onFlightEnd) {
+export function showPostFlightSummary(
+  ps: PhysicsState | null,
+  assembly: RocketAssembly | null,
+  flightState: FlightState | null,
+  state: GameState | null,
+  onFlightEnd: ((state: GameState | null, results?: unknown, dest?: string) => void) | null,
+): void {
   const s = getFCState();
   // Use the #ui-overlay container; fall back to document.body.
-  const host = document.getElementById('ui-overlay') ?? document.body;
+  const host: HTMLElement = document.getElementById('ui-overlay') ?? document.body;
 
   // Remove any stale summary overlay.
   const existing = document.getElementById('post-flight-summary');
   if (existing) existing.remove();
 
   // Hide the flight HUD while the summary is displayed.
-  const hudEl = document.getElementById('flight-hud');
+  const hudEl = document.getElementById('flight-hud') as HTMLElement | null;
   if (hudEl) hudEl.style.display = 'none';
 
-  // ── Determine outcome ────────────────────────────────────────────────────
-  const isLanded    = !!(ps && ps.landed && !ps.crashed);
-  const isCrashed   = !!(ps && ps.crashed);
+  // -- Determine outcome --
+  const isLanded: boolean    = !!(ps && ps.landed && !ps.crashed);
+  const isCrashed: boolean   = !!(ps && ps.crashed);
 
-  // ── Root overlay ─────────────────────────────────────────────────────────
-  const overlay = document.createElement('div');
+  // -- Root overlay --
+  const overlay: HTMLDivElement = document.createElement('div');
   overlay.id = 'post-flight-summary';
 
   // Scrollable content wrapper.
-  const content = document.createElement('div');
+  const content: HTMLDivElement = document.createElement('div');
   content.className = 'pf-content';
   overlay.appendChild(content);
 
-  // ── 1. Flight outcome heading ─────────────────────────────────────────────
-  const heading = document.createElement('h1');
+  // -- 1. Flight outcome heading --
+  const heading: HTMLHeadingElement = document.createElement('h1');
   if (isCrashed) {
     heading.textContent  = 'Rocket Destroyed';
     heading.style.color  = '#ff6040';
@@ -181,33 +179,34 @@ export function showPostFlightSummary(ps, assembly, flightState, state, onFlight
   }
   content.appendChild(heading);
 
-  // ── 2. Mission objectives ────────────────────────────────────────────────
+  // -- 2. Mission objectives --
   if (state) {
     const allMissions = [...(state.missions?.accepted ?? [])];
     const missionsWithObjectives = allMissions.filter(
-      (m) => Array.isArray(m.objectives) && m.objectives.length > 0,
+      (m) => Array.isArray((m as any).objectives) && (m as any).objectives.length > 0,
     );
 
     for (const mission of missionsWithObjectives) {
-      const section = document.createElement('div');
+      const section: HTMLDivElement = document.createElement('div');
       section.className = 'pf-section';
 
-      const sectionTitle = document.createElement('h2');
+      const sectionTitle: HTMLHeadingElement = document.createElement('h2');
       sectionTitle.textContent = `Mission: ${mission.title}`;
       section.appendChild(sectionTitle);
 
-      const objList = document.createElement('ul');
+      const missionObjectives: Array<{ completed: boolean; description?: string; type: string }> = (mission as any).objectives;
+      const objList: HTMLUListElement = document.createElement('ul');
       objList.className = 'pf-obj-list';
 
-      for (const obj of mission.objectives) {
-        const li = document.createElement('li');
+      for (const obj of missionObjectives) {
+        const li: HTMLLIElement = document.createElement('li');
         li.className = obj.completed ? 'pf-obj-complete' : 'pf-obj-incomplete';
 
-        const check = document.createElement('span');
+        const check: HTMLSpanElement = document.createElement('span');
         check.className = 'pf-obj-check';
         check.textContent = obj.completed ? '\u2713' : '\u2717';
 
-        const desc = document.createElement('span');
+        const desc: HTMLSpanElement = document.createElement('span');
         desc.textContent = obj.description ?? String(obj.type);
 
         li.appendChild(check);
@@ -218,9 +217,9 @@ export function showPostFlightSummary(ps, assembly, flightState, state, onFlight
       section.appendChild(objList);
 
       // Show reward info if all objectives are completed.
-      const allComplete = mission.objectives.every((o) => o.completed);
+      const allComplete: boolean = missionObjectives.every((o) => o.completed);
       if (allComplete && mission.reward > 0) {
-        const rewardEl = document.createElement('div');
+        const rewardEl: HTMLDivElement = document.createElement('div');
         rewardEl.style.cssText =
           'margin-top:8px;padding:6px 10px;background:rgba(40,100,40,0.3);' +
           'border:1px solid #40a040;border-radius:4px;font-size:0.9rem;' +
@@ -233,23 +232,23 @@ export function showPostFlightSummary(ps, assembly, flightState, state, onFlight
     }
   }
 
-  // ── 3. Part recovery table (landed safely only) ───────────────────────────
+  // -- 3. Part recovery table (landed safely only) --
   if (isLanded && assembly && ps) {
-    const section = document.createElement('div');
+    const section: HTMLDivElement = document.createElement('div');
     section.className = 'pf-section';
 
-    const sectionTitle = document.createElement('h2');
+    const sectionTitle: HTMLHeadingElement = document.createElement('h2');
     sectionTitle.textContent = 'Part Recovery (60 % of cost)';
     section.appendChild(sectionTitle);
 
-    const table = document.createElement('table');
+    const table: HTMLTableElement = document.createElement('table');
     table.className = 'pf-recovery-table';
 
     // Header row.
-    const thead = document.createElement('thead');
-    const headerRow = document.createElement('tr');
+    const thead: HTMLTableSectionElement = document.createElement('thead');
+    const headerRow: HTMLTableRowElement = document.createElement('tr');
     ['Part', 'Recovery Value'].forEach((text) => {
-      const th = document.createElement('th');
+      const th: HTMLTableCellElement = document.createElement('th');
       th.textContent = text;
       headerRow.appendChild(th);
     });
@@ -257,7 +256,7 @@ export function showPostFlightSummary(ps, assembly, flightState, state, onFlight
     table.appendChild(thead);
 
     // Body rows.
-    const tbody = document.createElement('tbody');
+    const tbody: HTMLTableSectionElement = document.createElement('tbody');
     let totalRecovery = 0;
 
     for (const [instanceId, placed] of assembly.parts) {
@@ -265,15 +264,15 @@ export function showPostFlightSummary(ps, assembly, flightState, state, onFlight
       const def = getPartById(placed.partId);
       if (!def) continue;
 
-      const recoveryValue = Math.round((def.cost ?? 0) * 0.6);
+      const recoveryValue: number = Math.round((def.cost ?? 0) * 0.6);
       totalRecovery += recoveryValue;
 
-      const row = document.createElement('tr');
+      const row: HTMLTableRowElement = document.createElement('tr');
 
-      const nameTd = document.createElement('td');
+      const nameTd: HTMLTableCellElement = document.createElement('td');
       nameTd.textContent = def.name;
 
-      const valueTd = document.createElement('td');
+      const valueTd: HTMLTableCellElement = document.createElement('td');
       valueTd.textContent = `$${recoveryValue.toLocaleString('en-US')}`;
 
       row.appendChild(nameTd);
@@ -282,13 +281,13 @@ export function showPostFlightSummary(ps, assembly, flightState, state, onFlight
     }
 
     // Total row.
-    const totalRow = document.createElement('tr');
+    const totalRow: HTMLTableRowElement = document.createElement('tr');
     totalRow.className = 'pf-recovery-total';
 
-    const totalLabelTd = document.createElement('td');
+    const totalLabelTd: HTMLTableCellElement = document.createElement('td');
     totalLabelTd.textContent = 'Total Recovery';
 
-    const totalValueTd = document.createElement('td');
+    const totalValueTd: HTMLTableCellElement = document.createElement('td');
     totalValueTd.textContent = `$${totalRecovery.toLocaleString('en-US')}`;
 
     totalRow.appendChild(totalLabelTd);
@@ -300,10 +299,10 @@ export function showPostFlightSummary(ps, assembly, flightState, state, onFlight
     content.appendChild(section);
   }
 
-  // ── 4. Crew KIA with fines ────────────────────────────────────────────────
+  // -- 4. Crew KIA with fines --
   if (flightState && Array.isArray(flightState.crewIds) && flightState.crewIds.length > 0 && state) {
-    const ejectedIds = ps?.ejectedCrewIds ?? new Set();
-    const kiaMembers = [];
+    const ejectedIds: Set<string> = ps?.ejectedCrewIds ?? new Set();
+    const kiaMembers: Array<{ id: string; name: string }> = [];
 
     if (isCrashed || allCommandModulesDestroyedFor(ps, assembly)) {
       for (const crewId of flightState.crewIds) {
@@ -314,23 +313,23 @@ export function showPostFlightSummary(ps, assembly, flightState, state, onFlight
     }
 
     if (kiaMembers.length > 0) {
-      const section = document.createElement('div');
+      const section: HTMLDivElement = document.createElement('div');
       section.className = 'pf-section pf-section-danger';
 
-      const sectionTitle = document.createElement('h2');
+      const sectionTitle: HTMLHeadingElement = document.createElement('h2');
       sectionTitle.textContent = 'Crew KIA';
       section.appendChild(sectionTitle);
 
-      const kiaList = document.createElement('ul');
+      const kiaList: HTMLUListElement = document.createElement('ul');
       kiaList.className = 'pf-kia-list';
 
       for (const member of kiaMembers) {
-        const li = document.createElement('li');
+        const li: HTMLLIElement = document.createElement('li');
 
-        const nameSp = document.createElement('span');
+        const nameSp: HTMLSpanElement = document.createElement('span');
         nameSp.textContent = member.name;
 
-        const fineSp = document.createElement('span');
+        const fineSp: HTMLSpanElement = document.createElement('span');
         fineSp.className = 'pf-kia-fine';
         fineSp.textContent = `\u2212$${DEATH_FINE_PER_ASTRONAUT.toLocaleString('en-US')} fine`;
 
@@ -341,8 +340,8 @@ export function showPostFlightSummary(ps, assembly, flightState, state, onFlight
 
       section.appendChild(kiaList);
 
-      const totalFine = kiaMembers.length * DEATH_FINE_PER_ASTRONAUT;
-      const totalEl = document.createElement('div');
+      const totalFine: number = kiaMembers.length * DEATH_FINE_PER_ASTRONAUT;
+      const totalEl: HTMLDivElement = document.createElement('div');
       totalEl.className = 'pf-kia-total';
       totalEl.textContent = `Total fines: \u2212$${totalFine.toLocaleString('en-US')}`;
       section.appendChild(totalEl);
@@ -351,18 +350,18 @@ export function showPostFlightSummary(ps, assembly, flightState, state, onFlight
     }
   }
 
-  // ── 4b. Flight log ────────────────────────────────────────────────────────
-  if (flightState?.events?.length > 0) {
-    const logSection = document.createElement('div');
+  // -- 4b. Flight log --
+  if (flightState && flightState.events && flightState.events.length > 0) {
+    const logSection: HTMLDivElement = document.createElement('div');
     logSection.className = 'pf-section';
-    const logTitle = document.createElement('h2');
+    const logTitle: HTMLHeadingElement = document.createElement('h2');
     logTitle.textContent = 'Flight Log';
     logSection.appendChild(logTitle);
     logSection.appendChild(buildFlightEventList(flightState.events));
     content.appendChild(logSection);
   }
 
-  // ── 5. Action buttons ─────────────────────────────────────────────────────
+  // -- 5. Action buttons --
 
   let totalRocketCost = 0;
   let recoveryValue = 0;
@@ -377,18 +376,18 @@ export function showPostFlightSummary(ps, assembly, flightState, state, onFlight
     }
   }
 
-  const buttonsEl = document.createElement('div');
+  const buttonsEl: HTMLDivElement = document.createElement('div');
   buttonsEl.className = 'pf-buttons';
 
   // Helper: create a button with an optional cost subtitle line.
-  function _pfBtn(label, costText, cls) {
-    const btn = document.createElement('button');
+  function _pfBtn(label: string, costText: string | null, cls: string): HTMLButtonElement {
+    const btn: HTMLButtonElement = document.createElement('button');
     btn.className = `pf-btn ${cls}`;
-    const labelSpan = document.createElement('span');
+    const labelSpan: HTMLSpanElement = document.createElement('span');
     labelSpan.textContent = label;
     btn.appendChild(labelSpan);
     if (costText) {
-      const costSpan = document.createElement('span');
+      const costSpan: HTMLSpanElement = document.createElement('span');
       costSpan.className = 'pf-btn-cost';
       costSpan.textContent = costText;
       btn.appendChild(costSpan);
@@ -396,17 +395,17 @@ export function showPostFlightSummary(ps, assembly, flightState, state, onFlight
     return btn;
   }
 
-  const costStr = totalRocketCost > 0
+  const costStr: string | null = totalRocketCost > 0
     ? `\u2212$${totalRocketCost.toLocaleString('en-US')}`
     : null;
 
-  // ── Row of secondary actions (side by side) ────────────────────────────────
-  const secondaryRow = document.createElement('div');
+  // -- Row of secondary actions (side by side) --
+  const secondaryRow: HTMLDivElement = document.createElement('div');
   secondaryRow.className = 'pf-btn-row';
 
   if (isCrashed) {
-    // ── "Restart from Launch" ──────────────────────────────────────────────
-    const restartBtn = _pfBtn('Restart from Launch', costStr, 'pf-btn-secondary');
+    // -- "Restart from Launch" --
+    const restartBtn: HTMLButtonElement = _pfBtn('Restart from Launch', costStr, 'pf-btn-secondary');
     restartBtn.id    = 'post-flight-restart-btn';
     restartBtn.title = 'Rebuild the rocket and restart this flight from the launch pad.';
 
@@ -435,14 +434,15 @@ export function showPostFlightSummary(ps, assembly, flightState, state, onFlight
       let totalFuel = 0;
       for (const placed of origAssembly.parts.values()) {
         const def = getPartById(placed.partId);
-        if (def) totalFuel += def.properties?.fuelMass ?? 0;
+        if (def) totalFuel += (def.properties?.fuelMass as number) ?? 0;
       }
 
       // Reset ALL accepted mission objectives.
       if (gs.missions?.accepted) {
         for (const mission of gs.missions.accepted) {
-          if (!mission.objectives) continue;
-          for (const obj of mission.objectives) {
+          const objectives = (mission as any).objectives;
+          if (!objectives) continue;
+          for (const obj of objectives) {
             obj.completed = false;
             delete obj._holdEnteredAt;
           }
@@ -458,37 +458,37 @@ export function showPostFlightSummary(ps, assembly, flightState, state, onFlight
       const freshAssembly = {
         parts:         new Map([...origAssembly.parts].map(([id, p]) => [id, { ...p, ...(p.instruments ? { instruments: [...p.instruments] } : {}) }])),
         connections:   origAssembly.connections.map(c => ({ ...c })),
-        symmetryPairs: origAssembly.symmetryPairs.map(sp => [...sp]),
+        symmetryPairs: origAssembly.symmetryPairs.map(sp => [...sp] as [string, string]),
         _nextId:       origAssembly._nextId,
       };
       const freshStaging = {
-        stages:          origStaging.stages.map(s => ({ instanceIds: [...s.instanceIds] })),
+        stages:          origStaging.stages.map(stg => ({ instanceIds: [...stg.instanceIds] })),
         unstaged:        [...origStaging.unstaged],
         currentStageIdx: 0,
       };
 
-      startFlightScene(ctr, gs, freshAssembly, freshStaging, gs.currentFlight, endCb);
+      startFlightScene(ctr, gs, freshAssembly as RocketAssembly, freshStaging, gs.currentFlight!, endCb as (state: GameState | null, results?: unknown, dest?: string) => void);
     });
     secondaryRow.appendChild(restartBtn);
   }
 
   if (!isCrashed) {
-    // ── "Continue Flying" ─────────────────────────────────────────────────
-    const continueBtn = _pfBtn('Continue Flying', null, 'pf-btn-secondary');
+    // -- "Continue Flying" --
+    const continueBtn: HTMLButtonElement = _pfBtn('Continue Flying', null, 'pf-btn-secondary');
     continueBtn.id    = 'post-flight-continue-btn';
     continueBtn.title = 'Close this summary and continue controlling the landed rocket.';
     continueBtn.addEventListener('click', () => {
       s.summaryShown = false;
       overlay.remove();
-      const hud = document.getElementById('flight-hud');
+      const hud = document.getElementById('flight-hud') as HTMLElement | null;
       if (hud) hud.style.display = '';
     });
     secondaryRow.appendChild(continueBtn);
   }
 
-  // ── "Adjust Build" ────────────────────────────────────────────────────────
+  // -- "Adjust Build" --
   {
-    const adjustBtn = _pfBtn('Adjust Build', costStr, 'pf-btn-secondary');
+    const adjustBtn: HTMLButtonElement = _pfBtn('Adjust Build', costStr, 'pf-btn-secondary');
     adjustBtn.id    = 'post-flight-adjust-btn';
     adjustBtn.title = 'Return to the Vehicle Assembly Building with this rocket loaded so you can tweak and re-launch.';
     adjustBtn.addEventListener('click', () => {
@@ -506,7 +506,7 @@ export function showPostFlightSummary(ps, assembly, flightState, state, onFlight
           _nextId:       origAssembly._nextId,
         };
         state.vabStagingConfig = origStaging ? {
-          stages:          origStaging.stages.map(s => ({ instanceIds: [...s.instanceIds] })),
+          stages:          origStaging.stages.map(stg => ({ instanceIds: [...stg.instanceIds] })),
           unstaged:        [...origStaging.unstaged],
           currentStageIdx: 0,
         } : null;
@@ -521,15 +521,15 @@ export function showPostFlightSummary(ps, assembly, flightState, state, onFlight
 
   buttonsEl.appendChild(secondaryRow);
 
-  // ── "Return to Space Agency" button (full width, primary) ─────────────────
-  const recoveryCostStr = recoveryValue > 0
+  // -- "Return to Space Agency" button (full width, primary) --
+  const recoveryCostStr: string | null = recoveryValue > 0
     ? `+$${recoveryValue.toLocaleString('en-US')} part recovery`
     : null;
-  const returnBtn = _pfBtn('Return to Space Agency', recoveryCostStr, 'pf-btn-primary');
+  const returnBtn: HTMLButtonElement = _pfBtn('Return to Space Agency', recoveryCostStr, 'pf-btn-primary');
   returnBtn.id    = 'post-flight-return-btn';
   returnBtn.title = 'End this flight, process mission results and part recovery, and return to your Space Agency hub.';
   returnBtn.addEventListener('click', () => {
-    let returnResults = null;
+    let returnResults: ReturnType<typeof processFlightReturn> | null = null;
     if (state && flightState) {
       returnResults = processFlightReturn(state, flightState, ps, assembly);
     }
@@ -544,12 +544,12 @@ export function showPostFlightSummary(ps, assembly, flightState, state, onFlight
   content.appendChild(buttonsEl);
 
   // Backdrop-click handling.
-  content.addEventListener('click', (e) => e.stopPropagation());
+  content.addEventListener('click', (e: MouseEvent) => e.stopPropagation());
   if (!isCrashed) {
     overlay.addEventListener('click', () => {
       s.summaryShown = false;
       overlay.remove();
-      const hud = document.getElementById('flight-hud');
+      const hud = document.getElementById('flight-hud') as HTMLElement | null;
       if (hud) hud.style.display = '';
     });
   }

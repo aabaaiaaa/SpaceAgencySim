@@ -1,13 +1,24 @@
 /**
- * _contractsTab.js — Contracts Board and Active Contracts tabs.
+ * _contractsTab.ts — Contracts Board and Active Contracts tabs.
  *
  * @module missionControl/_contractsTab
  */
 
+import type { Contract, ObjectiveDef } from '../../core/gameState.js';
 import { acceptContract, cancelContract, getContractCaps, getActiveConflicts, getMissionControlTier } from '../../core/contracts.js';
 import { CONTRACT_CATEGORY_ICONS, MCC_TIER_FEATURES, getReputationTier } from '../../core/constants.js';
 import { getMCState } from './_state.js';
 import { fmtCash, getContent } from './_shell.js';
+
+/**
+ * Extended contract shape that includes bonus objectives, bonus reward,
+ * and conflict tags added by the contract generator.
+ */
+interface ExtendedContract extends Contract {
+  bonusObjectives?: (ObjectiveDef & { bonus?: boolean })[];
+  bonusReward?: number;
+  conflictTags?: string[];
+}
 
 // ---------------------------------------------------------------------------
 // Category helpers
@@ -15,11 +26,9 @@ import { fmtCash, getContent } from './_shell.js';
 
 /**
  * Format a ContractCategory enum value as a readable label.
- * @param {string} category
- * @returns {string}
  */
-function _categoryLabel(category) {
-  const labels = {
+function _categoryLabel(category: string): string {
+  const labels: Record<string, string> = {
     ALTITUDE_RECORD: 'Altitude',
     SPEED_RECORD: 'Speed',
     SCIENCE_SURVEY: 'Science',
@@ -33,10 +42,8 @@ function _categoryLabel(category) {
 
 /**
  * Get the icon glyph for a contract category.
- * @param {string} category
- * @returns {string}
  */
-function _categoryIcon(category) {
+function _categoryIcon(category: string): string {
   return CONTRACT_CATEGORY_ICONS[category] ?? '';
 }
 
@@ -44,12 +51,12 @@ function _categoryIcon(category) {
 // Contracts Board tab
 // ---------------------------------------------------------------------------
 
-export function renderContractsBoardTab() {
+export function renderContractsBoardTab(): void {
   const content = getContent();
   const mc = getMCState();
   if (!content || !mc.state) return;
 
-  const contracts = mc.state.contracts?.board ?? [];
+  const contracts = (mc.state.contracts?.board ?? []) as ExtendedContract[];
   const caps = getContractCaps(mc.state);
   const mccTier = getMissionControlTier(mc.state);
   const tierInfo = MCC_TIER_FEATURES[mccTier];
@@ -113,12 +120,8 @@ export function renderContractsBoardTab() {
 
 /**
  * Build a contract card for the Board tab.
- *
- * @param {import('../../core/gameState.js').Contract} contract
- * @param {boolean} canAcceptMore
- * @returns {HTMLElement}
  */
-function _buildContractBoardCard(contract, canAcceptMore) {
+function _buildContractBoardCard(contract: ExtendedContract, canAcceptMore: boolean): HTMLElement {
   const mc = getMCState();
   const card = document.createElement('div');
   card.className = 'mc-mission-card';
@@ -206,7 +209,7 @@ function _buildContractBoardCard(contract, canAcceptMore) {
 
       const indicator = document.createElement('span');
       indicator.className = 'mc-objective-indicator pending';
-      indicator.textContent = '\u2606'; // ☆
+      indicator.textContent = '\u2606'; // empty star
       item.appendChild(indicator);
 
       const textEl = document.createElement('span');
@@ -266,9 +269,8 @@ function _buildContractBoardCard(contract, canAcceptMore) {
 
 /**
  * Handle clicking Accept on a board contract.
- * @param {string} contractId
  */
-function _handleAcceptContract(contractId) {
+function _handleAcceptContract(contractId: string): void {
   const mc = getMCState();
   if (!mc.state) return;
 
@@ -284,12 +286,12 @@ function _handleAcceptContract(contractId) {
 // Active Contracts tab
 // ---------------------------------------------------------------------------
 
-export function renderActiveContractsTab() {
+export function renderActiveContractsTab(): void {
   const content = getContent();
   const mc = getMCState();
   if (!content || !mc.state) return;
 
-  const contracts = mc.state.contracts?.active ?? [];
+  const contracts = (mc.state.contracts?.active ?? []) as ExtendedContract[];
   const caps = getContractCaps(mc.state);
 
   // Caps info bar
@@ -318,11 +320,8 @@ export function renderActiveContractsTab() {
 
 /**
  * Build a card for an active contract (objectives + cancel button).
- *
- * @param {import('../../core/gameState.js').Contract} contract
- * @returns {HTMLElement}
  */
-function _buildActiveContractCard(contract) {
+function _buildActiveContractCard(contract: ExtendedContract): HTMLElement {
   const mc = getMCState();
   const card = document.createElement('div');
   card.className = 'mc-mission-card';
@@ -394,7 +393,7 @@ function _buildActiveContractCard(contract) {
     card.appendChild(objList);
   }
 
-  // Bonus objectives (active contract — show progress)
+  // Bonus objectives (active contract -- show progress)
   if (Array.isArray(contract.bonusObjectives) && contract.bonusObjectives.length > 0) {
     const bonusLabel = document.createElement('p');
     bonusLabel.className = 'mc-bonus-label';
@@ -410,7 +409,7 @@ function _buildActiveContractCard(contract) {
 
       const indicator = document.createElement('span');
       indicator.className = `mc-objective-indicator ${obj.completed ? 'completed' : 'pending'}`;
-      indicator.textContent = obj.completed ? '\u2605' : '\u2606'; // ★ or ☆
+      indicator.textContent = obj.completed ? '\u2605' : '\u2606'; // filled or empty star
       item.appendChild(indicator);
 
       const textEl = document.createElement('span');
@@ -441,7 +440,7 @@ function _buildActiveContractCard(contract) {
         c.contractA === contract.id ? c.contractB : c.contractA,
       );
       const otherTitles = otherIds.map((id) => {
-        const other = mc.state.contracts.active.find((ac) => ac.id === id);
+        const other = (mc.state!.contracts.active as ExtendedContract[]).find((ac) => ac.id === id);
         return other ? other.title : id;
       });
       const warning = document.createElement('div');
@@ -474,9 +473,8 @@ function _buildActiveContractCard(contract) {
 
 /**
  * Handle clicking Cancel on an active contract.
- * @param {string} contractId
  */
-function _handleCancelContract(contractId) {
+function _handleCancelContract(contractId: string): void {
   const mc = getMCState();
   if (!mc.state) return;
 

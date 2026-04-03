@@ -1,5 +1,5 @@
 /**
- * _loop.js — The RAF game loop function and related helpers.
+ * _loop.ts — The RAF game loop function and related helpers.
  *
  * @module ui/flightController/_loop
  */
@@ -27,17 +27,15 @@ import { showPostFlightSummary } from './_postFlight.js';
 import { handleAbortReturnToAgency } from './_menuActions.js';
 
 /** Maximum consecutive loop errors before showing the abort banner. */
-export const MAX_CONSECUTIVE_LOOP_ERRORS = 5;
+export const MAX_CONSECUTIVE_LOOP_ERRORS: number = 5;
 
 /**
  * Returns true when the assembly contains at least one COMMAND_MODULE part
  * and ALL of them have been removed from `ps.activeParts` (destroyed or
  * separated).  Returns false while the rocket is still on the launch pad
  * or if no command modules were ever present.
- *
- * @returns {boolean}
  */
-function _allCommandModulesDestroyed() {
+function _allCommandModulesDestroyed(): boolean {
   const s = getFCState();
   if (!s.assembly || !s.ps) return false;
 
@@ -58,18 +56,17 @@ function _allCommandModulesDestroyed() {
 
 /**
  * One animation frame: advance physics, render scene, re-schedule.
- * @param {number} timestamp  Performance.now() value from rAF.
  */
-export function loop(timestamp) {
+export function loop(timestamp: number): void {
   // Destructure state once at the top of the hot path to avoid repeated
   // getFCState() calls at 60fps.
   const s = getFCState();
-  const { ps, assembly, stagingConfig, flightState, state, mapActive, timeWarp } = s;
+  const { ps, assembly, stagingConfig, flightState, state } = s;
 
   // Guard against stale callbacks after stopFlightScene().
   if (!ps || !assembly || !stagingConfig || !flightState) return;
 
-  const realDt = Math.min((timestamp - s.lastTs) / 1000, 0.1);
+  const realDt: number = Math.min((timestamp - (s.lastTs as number)) / 1000, 0.1);
   s.lastTs = timestamp;
 
   // Feed frame timing to the FPS monitor (no-ops if not initialised).
@@ -79,7 +76,7 @@ export function loop(timestamp) {
     // Evaluate time-warp reset conditions before advancing physics.
     checkTimeWarpResets(timestamp);
 
-    // When the map is active during non-ORBIT phases, force 1x warp —
+    // When the map is active during non-ORBIT phases, force 1x warp --
     // EXCEPT during TRANSFER and CAPTURE phases where time warp is allowed.
     if (s.mapActive &&
         flightState.phase !== FlightPhase.ORBIT &&
@@ -91,7 +88,7 @@ export function loop(timestamp) {
     // --- Communication range evaluation ---
     if (flightState && state) {
       const comms = evaluateComms(state, flightState, ps ? {
-        altitude: ps.posY + (ps.surfaceAltitude ?? 0),
+        altitude: ps.posY + ((ps as any).surfaceAltitude ?? 0),
         posX: ps.posX,
         posY: ps.posY,
       } : undefined);
@@ -112,7 +109,7 @@ export function loop(timestamp) {
     }
 
     // Reset per-frame science flag before sub-steps.
-    flightState.scienceModuleRunning = false;
+    (flightState as any).scienceModuleRunning = false;
 
     // Advance physics simulation with the current warp multiplier.
     tick(ps, assembly, stagingConfig, flightState, realDt, s.timeWarp);
@@ -124,15 +121,15 @@ export function loop(timestamp) {
     tickDockingSystem(realDt);
 
     // Check mission, contract, and challenge objective completion.
-    checkObjectiveCompletion(state, flightState);
-    checkContractObjectives(state, flightState);
-    checkChallengeObjectives(state, flightState);
+    checkObjectiveCompletion(state!, flightState);
+    checkContractObjectives(state!, flightState);
+    checkChallengeObjectives(state!, flightState);
 
     // Render the active scene.
     if (s.mapActive) {
-      const mapBodyId = (flightState && flightState.bodyId) || 'EARTH';
-      renderMapFrame(ps, flightState, state, mapBodyId, {
-        showDebris: isDebrisTrackingAvailable(state),
+      const mapBodyId: string = (flightState && flightState.bodyId) || 'EARTH';
+      renderMapFrame(ps, flightState, state!, mapBodyId, {
+        showDebris: isDebrisTrackingAvailable(state!),
       });
     } else {
       const _surfItems = state ? getSurfaceItemsAtBody(state, flightState.bodyId) : [];
@@ -148,7 +145,7 @@ export function loop(timestamp) {
     // Auto-trigger the post-flight summary when the rocket crashes, all
     // command modules are destroyed, or the craft lands safely.
     if (!s.summaryShown) {
-      const shouldAutoTrigger =
+      const shouldAutoTrigger: boolean =
         ps.crashed ||
         _allCommandModulesDestroyed() ||
         (ps.landed && ps.grounded && !ps.crashed);
@@ -160,7 +157,7 @@ export function loop(timestamp) {
       }
     }
 
-    // Successful frame — reset error counter.
+    // Successful frame -- reset error counter.
     s.loopConsecutiveErrors = 0;
   } catch (err) {
     s.loopConsecutiveErrors++;
@@ -179,13 +176,12 @@ export function loop(timestamp) {
 /**
  * Show an error banner offering the player a way to abort to the hub.
  * Matches the pattern used in flightHud.js.
- * @param {object} s  The flight controller state object.
  */
-function _showLoopErrorBanner(s) {
-  const host = s.container ?? document.body;
+function _showLoopErrorBanner(s: ReturnType<typeof getFCState>): void {
+  const host: HTMLElement = s.container ?? document.body;
   if (s.loopErrorBanner) return;
 
-  const banner = document.createElement('div');
+  const banner: HTMLDivElement = document.createElement('div');
   banner.dataset.testid = 'loop-error-banner';
   banner.style.cssText =
     'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);' +
@@ -193,15 +189,15 @@ function _showLoopErrorBanner(s) {
     'padding:20px 28px;z-index:9999;text-align:center;color:#fff;' +
     'font-family:inherit;max-width:400px;';
 
-  const msg = document.createElement('p');
+  const msg: HTMLParagraphElement = document.createElement('p');
   msg.style.cssText = 'margin:0 0 16px 0;font-size:1rem;line-height:1.4;';
   msg.textContent = 'The flight simulation encountered repeated errors. You can try to continue or abort to the hub.';
   banner.appendChild(msg);
 
-  const btnRow = document.createElement('div');
+  const btnRow: HTMLDivElement = document.createElement('div');
   btnRow.style.cssText = 'display:flex;gap:12px;justify-content:center;';
 
-  const continueBtn = document.createElement('button');
+  const continueBtn: HTMLButtonElement = document.createElement('button');
   continueBtn.textContent = 'Try to Continue';
   continueBtn.style.cssText =
     'padding:8px 16px;border:1px solid #888;border-radius:4px;' +
@@ -211,7 +207,7 @@ function _showLoopErrorBanner(s) {
     if (s.loopErrorBanner) { s.loopErrorBanner.remove(); s.loopErrorBanner = null; }
   });
 
-  const abortBtn = document.createElement('button');
+  const abortBtn: HTMLButtonElement = document.createElement('button');
   abortBtn.textContent = 'Abort to Hub';
   abortBtn.dataset.testid = 'loop-error-abort-btn';
   abortBtn.style.cssText =
