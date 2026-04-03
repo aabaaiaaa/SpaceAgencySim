@@ -1,16 +1,18 @@
 /**
- * _engineerPanel.js — Rocket engineer validation panel rendering.
+ * _engineerPanel.ts — Rocket engineer validation panel rendering.
  */
 
 import { runValidation } from '../../core/rocketvalidator.js';
 import { getVabState } from './_state.js';
 
+import type { ValidationCheck } from '../../core/rocketvalidator.js';
+
 /**
  * Populate the Rocket Engineer side panel with the latest validation result.
  */
-export function renderEngineerPanel() {
+export function renderEngineerPanel(): void {
   const S = getVabState();
-  const body = /** @type {HTMLElement|null} */ (document.getElementById('vab-engineer-body'));
+  const body = document.getElementById('vab-engineer-body');
   if (!body) return;
 
   if (!S.assembly || !S.stagingConfig || !S.gameState) {
@@ -19,7 +21,7 @@ export function renderEngineerPanel() {
   }
 
   const result = S.lastValidation ?? runValidation(S.assembly, S.stagingConfig, S.gameState);
-  const html   = [];
+  const html: string[] = [];
 
   // ── Stats ─────────────────────────────────────────────────────────────────
   html.push('<div class="vab-val-stats">');
@@ -47,7 +49,7 @@ export function renderEngineerPanel() {
   // ── Checks ────────────────────────────────────────────────────────────────
   html.push('<div class="vab-val-checks">');
   for (const check of result.checks) {
-    let iconClass, iconChar, msgClass;
+    let iconClass: string, iconChar: string, msgClass: string;
     if (check.pass) {
       iconClass = 'vab-val-icon-pass';
       iconChar  = '&#x2713;';
@@ -84,10 +86,8 @@ export function renderEngineerPanel() {
 /**
  * Run the rocket validation, cache the result, update the Launch button, and
  * refresh the Rocket Engineer panel if it is currently visible.
- *
- * @param {(valid: boolean) => void} vabSetLaunchEnabled
  */
-export function runAndRenderValidation(vabSetLaunchEnabled) {
+export function runAndRenderValidation(vabSetLaunchEnabled: (valid: boolean) => void): void {
   const S = getVabState();
   if (!S.assembly || !S.stagingConfig || !S.gameState) {
     vabSetLaunchEnabled(false);

@@ -1,5 +1,5 @@
 /**
- * hub.js — Space Agency Hub HTML overlay UI.
+ * hub.ts — Space Agency Hub HTML overlay UI.
  *
  * Renders the hub screen chrome over the PixiJS canvas:
  *   - Four clickable building divs positioned to sit on top of the
@@ -34,12 +34,14 @@ import { isBankrupt } from '../core/finance.js';
 import { initWeather, getCurrentWeather, getWeatherForecast } from '../core/weather.js';
 import { isWeatherPredictionAvailable } from '../core/mapView.js';
 import { injectStyleOnce } from './injectStyle.js';
+import type { GameState } from '../core/gameState.js';
+import type { FlightReturnSummary } from '../core/flightReturn.js';
 
 // ---------------------------------------------------------------------------
 // CSS
 // ---------------------------------------------------------------------------
 
-const HUB_STYLES = `
+const HUB_STYLES: string = `
 /* ── Hub overlay ──────────────────────────────────────────────────────────── */
 #hub-overlay {
   position: fixed;
@@ -761,20 +763,15 @@ const HUB_STYLES = `
 // Layout constants — must match src/render/hub.js
 // ---------------------------------------------------------------------------
 
-/**
- * Building definitions.
- * Geometry fractions (x, width, height) are relative to viewport dimensions.
- * They must be kept in sync with the BUILDINGS array in src/render/hub.js.
- *
- * @type {Array<{
- *   id: string,
- *   label: string,
- *   xCenterPct: number,
- *   widthPct: number,
- *   heightPct: number,
- * }>}
- */
-const BUILDINGS = [
+interface BuildingDef {
+  id: string;
+  label: string;
+  xCenterPct: number;
+  widthPct: number;
+  heightPct: number;
+}
+
+const BUILDINGS: readonly BuildingDef[] = [
   {
     id:         'launch-pad',
     label:      'Launch Pad',
@@ -837,11 +834,11 @@ const BUILDINGS = [
 // Module state
 // ---------------------------------------------------------------------------
 
-/** The hub overlay root element. @type {HTMLElement | null} */
-let _overlay = null;
+/** The hub overlay root element. */
+let _overlay: HTMLElement | null = null;
 
-/** Cached reference to the game state for the construction panel. @type {import('../core/gameState.js').GameState | null} */
-let _state = null;
+/** Cached reference to the game state for the construction panel. */
+let _state: GameState | null = null;
 
 // ---------------------------------------------------------------------------
 // Welcome modal — shown once on first hub visit for a new game
@@ -850,30 +847,27 @@ let _state = null;
 /**
  * Show a welcome/introduction modal overlay on first entering the hub.
  * Content varies by game mode. Sets `state.welcomeShown = true` on dismiss.
- *
- * @param {HTMLElement} container  The #ui-overlay div.
- * @param {import('../core/gameState.js').GameState} state
  */
-export function showWelcomeModal(container, state) {
+export function showWelcomeModal(container: HTMLElement, state: GameState): void {
   // Inject styles if not already present.
   injectStyleOnce('hub-styles', HUB_STYLES);
 
   const existing = document.getElementById('welcome-modal');
   if (existing) existing.remove();
 
-  const overlay = document.createElement('div');
+  const overlay: HTMLDivElement = document.createElement('div');
   overlay.id = 'welcome-modal';
 
-  const content = document.createElement('div');
+  const content: HTMLDivElement = document.createElement('div');
   content.className = 'welcome-content';
   overlay.appendChild(content);
 
   // ── Heading ────────────────────────────────────────────────────────────────
-  const heading = document.createElement('h1');
+  const heading: HTMLHeadingElement = document.createElement('h1');
   heading.textContent = `Welcome to ${state.agencyName || 'Your Space Agency'}!`;
   content.appendChild(heading);
 
-  const subtitle = document.createElement('p');
+  const subtitle: HTMLParagraphElement = document.createElement('p');
   subtitle.className = 'welcome-subtitle';
   if (state.gameMode === GameMode.TUTORIAL) {
     subtitle.textContent = 'Tutorial Mode';
@@ -885,7 +879,7 @@ export function showWelcomeModal(container, state) {
   content.appendChild(subtitle);
 
   // ── Body text — varies by game mode ────────────────────────────────────────
-  const body = document.createElement('p');
+  const body: HTMLParagraphElement = document.createElement('p');
   body.className = 'welcome-body';
 
   if (state.gameMode === GameMode.TUTORIAL) {
@@ -907,7 +901,7 @@ export function showWelcomeModal(container, state) {
   content.appendChild(body);
 
   // ── Dismiss button ─────────────────────────────────────────────────────────
-  const dismissBtn = document.createElement('button');
+  const dismissBtn: HTMLButtonElement = document.createElement('button');
   dismissBtn.className = 'welcome-dismiss-btn';
   dismissBtn.id = 'welcome-dismiss-btn';
   dismissBtn.textContent = "Let's Go!";
@@ -931,18 +925,8 @@ export function showWelcomeModal(container, state) {
  * The persistent top bar (agency name, cash, hamburger menu) is provided by
  * src/ui/topbar.js and must be mounted separately via initTopBar() before
  * calling this function.
- *
- * @param {HTMLElement} container
- *   The #ui-overlay div from index.html.
- * @param {import('../core/gameState.js').GameState} _state
- *   The current game state (unused here; passed to maintain a consistent
- *   screen API signature).
- * @param {(destination: string) => void} onNavigate
- *   Callback invoked when a building is clicked.
- *   Possible destination values: 'vab', 'mission-control', 'crew-admin',
- *   'launch-pad'.
  */
-export function initHubUI(container, state, onNavigate) {
+export function initHubUI(container: HTMLElement, state: GameState, onNavigate: (destination: string) => void): void {
   _state = state;
 
   // Inject styles once.
@@ -976,7 +960,7 @@ export function initHubUI(container, state, onNavigate) {
  * Remove the hub HTML overlay and hide the PixiJS background.
  * Call this before mounting a different screen (e.g. the VAB).
  */
-export function destroyHubUI() {
+export function destroyHubUI(): void {
   // Remove construction panel if open.
   const panel = document.getElementById('construction-panel');
   if (panel) panel.remove();
@@ -992,7 +976,7 @@ export function destroyHubUI() {
   // Clear any focused building to prevent selection highlight leaking into
   // other screens (e.g. flight view).
   if (_overlay && document.activeElement && _overlay.contains(document.activeElement)) {
-    /** @type {HTMLElement} */ (document.activeElement).blur();
+    (document.activeElement as HTMLElement).blur();
   }
 
   if (_overlay) {
@@ -1012,15 +996,8 @@ export function destroyHubUI() {
  *
  * Safe to call immediately after `initHubUI` — the overlay appends to
  * `container` (the #ui-overlay div) and stacks above the hub at z-index 500.
- *
- * @param {HTMLElement} container
- *   The #ui-overlay div.
- * @param {import('../core/flightReturn.js').FlightReturnSummary} summary
- *   The result of `processFlightReturn()`.
- * @param {() => void} [onDismiss]
- *   Called when the player dismisses the overlay.
  */
-export function showReturnResultsOverlay(container, summary, onDismiss) {
+export function showReturnResultsOverlay(container: HTMLElement, summary: FlightReturnSummary, onDismiss?: () => void): void {
   // Inject styles if not already present (hub-styles covers these).
   injectStyleOnce('hub-styles', HUB_STYLES);
 
@@ -1028,43 +1005,43 @@ export function showReturnResultsOverlay(container, summary, onDismiss) {
   const existing = document.getElementById('return-results-overlay');
   if (existing) existing.remove();
 
-  const overlay = document.createElement('div');
+  const overlay: HTMLDivElement = document.createElement('div');
   overlay.id = 'return-results-overlay';
 
-  const content = document.createElement('div');
+  const content: HTMLDivElement = document.createElement('div');
   content.className = 'rr-content';
   overlay.appendChild(content);
 
   // ── Heading ───────────────────────────────────────────────────────────────
-  const heading = document.createElement('h1');
+  const heading: HTMLHeadingElement = document.createElement('h1');
   heading.textContent = 'Return to Agency';
   content.appendChild(heading);
 
-  const subtitle = document.createElement('p');
+  const subtitle: HTMLParagraphElement = document.createElement('p');
   subtitle.className = 'rr-subtitle';
   subtitle.textContent = `Flight ${summary.currentPeriod ?? summary.totalFlights} summary`;
   content.appendChild(subtitle);
 
   // ── Missions completed ────────────────────────────────────────────────────
   if (summary.completedMissions.length > 0) {
-    const section = document.createElement('div');
+    const section: HTMLDivElement = document.createElement('div');
     section.className = 'rr-section';
 
-    const sectionTitle = document.createElement('h2');
+    const sectionTitle: HTMLHeadingElement = document.createElement('h2');
     sectionTitle.textContent = 'Missions Completed';
     section.appendChild(sectionTitle);
 
-    const list = document.createElement('ul');
+    const list: HTMLUListElement = document.createElement('ul');
     list.className = 'rr-missions-list';
 
     for (const entry of summary.completedMissions) {
-      const li = document.createElement('li');
+      const li: HTMLLIElement = document.createElement('li');
 
-      const titleSpan = document.createElement('span');
+      const titleSpan: HTMLSpanElement = document.createElement('span');
       titleSpan.className = 'rr-mission-title';
       titleSpan.textContent = entry.mission.title;
 
-      const rewardSpan = document.createElement('span');
+      const rewardSpan: HTMLSpanElement = document.createElement('span');
       rewardSpan.className = 'rr-mission-reward';
       rewardSpan.textContent = `+$${entry.reward.toLocaleString('en-US')}`;
 
@@ -1078,20 +1055,20 @@ export function showReturnResultsOverlay(container, summary, onDismiss) {
   }
 
   // ── Parts unlocked ────────────────────────────────────────────────────────
-  const allUnlockedParts = summary.completedMissions.flatMap((e) => e.unlockedParts);
+  const allUnlockedParts: string[] = summary.completedMissions.flatMap((e) => e.unlockedParts);
   if (allUnlockedParts.length > 0) {
-    const section = document.createElement('div');
+    const section: HTMLDivElement = document.createElement('div');
     section.className = 'rr-section';
 
-    const sectionTitle = document.createElement('h2');
+    const sectionTitle: HTMLHeadingElement = document.createElement('h2');
     sectionTitle.textContent = 'Parts Unlocked';
     section.appendChild(sectionTitle);
 
-    const list = document.createElement('ul');
+    const list: HTMLUListElement = document.createElement('ul');
     list.className = 'rr-parts-list';
 
     for (const partId of allUnlockedParts) {
-      const li = document.createElement('li');
+      const li: HTMLLIElement = document.createElement('li');
       const partDef = getPartById(partId);
       li.textContent = partDef?.name ?? partId;
       list.appendChild(li);
@@ -1102,14 +1079,14 @@ export function showReturnResultsOverlay(container, summary, onDismiss) {
   }
 
   // ── Financial summary ─────────────────────────────────────────────────────
-  const finSection = document.createElement('div');
+  const finSection: HTMLDivElement = document.createElement('div');
   finSection.className = 'rr-section';
 
-  const finTitle = document.createElement('h2');
+  const finTitle: HTMLHeadingElement = document.createElement('h2');
   finTitle.textContent = 'Financial Summary';
   finSection.appendChild(finTitle);
 
-  const missionRewardTotal = summary.completedMissions.reduce((s, e) => s + e.reward, 0);
+  const missionRewardTotal: number = summary.completedMissions.reduce((s, e) => s + e.reward, 0);
 
   // Mission rewards row.
   if (missionRewardTotal > 0) {
@@ -1131,8 +1108,8 @@ export function showReturnResultsOverlay(container, summary, onDismiss) {
 
   // Interest row (shows loan balance alongside).
   if (summary.interestCharged > 0) {
-    const loanBalance = summary.loanBalance ?? 0;
-    const interestLabel = loanBalance > 0
+    const loanBalance: number = summary.loanBalance ?? 0;
+    const interestLabel: string = loanBalance > 0
       ? `Loan interest (balance: $${Math.round(loanBalance).toLocaleString('en-US')})`
       : 'Loan interest';
     finSection.appendChild(_rrRow(
@@ -1154,7 +1131,7 @@ export function showReturnResultsOverlay(container, summary, onDismiss) {
   // Operating costs rows.
   if (summary.operatingCosts > 0) {
     if (summary.crewSalaryCost > 0) {
-      const crewLabel = summary.activeCrewCount === 1
+      const crewLabel: string = summary.activeCrewCount === 1
         ? 'Crew salaries (1 astronaut)'
         : `Crew salaries (${summary.activeCrewCount} astronauts)`;
       finSection.appendChild(_rrRow(
@@ -1173,16 +1150,16 @@ export function showReturnResultsOverlay(container, summary, onDismiss) {
   }
 
   // Net cash change.
-  const netEl = document.createElement('div');
+  const netEl: HTMLDivElement = document.createElement('div');
   netEl.className = 'rr-net-change';
 
-  const netLabel = document.createElement('span');
+  const netLabel: HTMLSpanElement = document.createElement('span');
   netLabel.className = 'rr-label';
   netLabel.textContent = 'Net cash change';
 
-  const netValue = document.createElement('span');
+  const netValue: HTMLSpanElement = document.createElement('span');
   netValue.className = `rr-value ${summary.netCashChange >= 0 ? 'rr-value-positive' : 'rr-value-negative'}`;
-  const sign = summary.netCashChange >= 0 ? '+' : '−';
+  const sign: string = summary.netCashChange >= 0 ? '+' : '−';
   netValue.textContent = `${sign}$${Math.abs(Math.round(summary.netCashChange)).toLocaleString('en-US')}`;
 
   netEl.appendChild(netLabel);
@@ -1193,34 +1170,34 @@ export function showReturnResultsOverlay(container, summary, onDismiss) {
 
   // ── Reputation change (if any) ──────────────────────────────────────────
   if (typeof summary.reputationChange === 'number' && summary.reputationChange !== 0) {
-    const repSection = document.createElement('div');
+    const repSection: HTMLDivElement = document.createElement('div');
     repSection.className = 'rr-section';
 
-    const repTitle = document.createElement('h2');
+    const repTitle: HTMLHeadingElement = document.createElement('h2');
     repTitle.textContent = 'Reputation';
     repSection.appendChild(repTitle);
 
     const repTier = getReputationTier(summary.reputationAfter ?? 50);
 
-    const repRow = document.createElement('div');
+    const repRow: HTMLDivElement = document.createElement('div');
     repRow.className = 'rr-row';
-    const repLabel = document.createElement('span');
+    const repLabel: HTMLSpanElement = document.createElement('span');
     repLabel.className = 'rr-label';
     repLabel.textContent = 'Change';
-    const repValue = document.createElement('span');
-    const repSign = summary.reputationChange >= 0 ? '+' : '';
+    const repValue: HTMLSpanElement = document.createElement('span');
+    const repSign: string = summary.reputationChange >= 0 ? '+' : '';
     repValue.className = `rr-value ${summary.reputationChange >= 0 ? 'rr-value-positive' : 'rr-value-negative'}`;
     repValue.textContent = `${repSign}${summary.reputationChange}`;
     repRow.appendChild(repLabel);
     repRow.appendChild(repValue);
     repSection.appendChild(repRow);
 
-    const repNowRow = document.createElement('div');
+    const repNowRow: HTMLDivElement = document.createElement('div');
     repNowRow.className = 'rr-row';
-    const repNowLabel = document.createElement('span');
+    const repNowLabel: HTMLSpanElement = document.createElement('span');
     repNowLabel.className = 'rr-label';
     repNowLabel.textContent = 'Current';
-    const repNowValue = document.createElement('span');
+    const repNowValue: HTMLSpanElement = document.createElement('span');
     repNowValue.className = 'rr-value';
     repNowValue.style.color = repTier.color;
     repNowValue.textContent = `${Math.round(summary.reputationAfter ?? 50)} — ${repTier.label}`;
@@ -1233,16 +1210,16 @@ export function showReturnResultsOverlay(container, summary, onDismiss) {
 
   // ── Deployed field craft (crew left in orbit/landed) ──────────────────────
   if (summary.deployedFieldCraft) {
-    const fcSection = document.createElement('div');
+    const fcSection: HTMLDivElement = document.createElement('div');
     fcSection.className = 'rr-section';
 
-    const fcTitle = document.createElement('h2');
+    const fcTitle: HTMLHeadingElement = document.createElement('h2');
     fcTitle.textContent = 'Crew Deployed in Field';
     fcSection.appendChild(fcTitle);
 
     const fc = summary.deployedFieldCraft;
-    const statusLabel = fc.status === 'IN_ORBIT' ? 'In orbit' : 'Landed';
-    const supplyLabel = fc.hasExtendedLifeSupport
+    const statusLabel: string = fc.status === 'IN_ORBIT' ? 'In orbit' : 'Landed';
+    const supplyLabel: string = fc.hasExtendedLifeSupport
       ? 'Supplies: Unlimited (Extended Mission Module)'
       : `Supplies: ${fc.suppliesRemaining} flights remaining`;
 
@@ -1255,27 +1232,27 @@ export function showReturnResultsOverlay(container, summary, onDismiss) {
 
   // ── Life support deaths (crew died from supply exhaustion) ──────────────
   if (Array.isArray(summary.lifeSupportDeaths) && summary.lifeSupportDeaths.length > 0) {
-    const deathSection = document.createElement('div');
+    const deathSection: HTMLDivElement = document.createElement('div');
     deathSection.className = 'rr-section';
     deathSection.style.background = 'rgba(120, 20, 20, 0.5)';
     deathSection.style.border = '1px solid #ff4040';
     deathSection.style.borderRadius = '6px';
     deathSection.style.padding = '14px 16px';
 
-    const deathTitle = document.createElement('h2');
+    const deathTitle: HTMLHeadingElement = document.createElement('h2');
     deathTitle.textContent = 'Life Support Exhausted';
     deathTitle.style.color = '#ff6060';
     deathTitle.style.borderBottom = 'none';
     deathSection.appendChild(deathTitle);
 
     for (const d of summary.lifeSupportDeaths) {
-      const row = document.createElement('div');
+      const row: HTMLDivElement = document.createElement('div');
       row.className = 'rr-row';
-      const label = document.createElement('span');
+      const label: HTMLSpanElement = document.createElement('span');
       label.className = 'rr-label';
       label.textContent = `${d.crewName} — ${d.craftName}`;
       label.style.color = '#ffc0c0';
-      const value = document.createElement('span');
+      const value: HTMLSpanElement = document.createElement('span');
       value.className = 'rr-value rr-value-negative';
       value.textContent = 'KIA';
       row.appendChild(label);
@@ -1288,27 +1265,27 @@ export function showReturnResultsOverlay(container, summary, onDismiss) {
 
   // ── Life support warnings (supplies critically low) ────────────────────
   if (Array.isArray(summary.lifeSupportWarnings) && summary.lifeSupportWarnings.length > 0) {
-    const warnSection = document.createElement('div');
+    const warnSection: HTMLDivElement = document.createElement('div');
     warnSection.className = 'rr-section';
     warnSection.style.background = 'rgba(120, 100, 20, 0.4)';
     warnSection.style.border = '1px solid #ffaa30';
     warnSection.style.borderRadius = '6px';
     warnSection.style.padding = '14px 16px';
 
-    const warnTitle = document.createElement('h2');
+    const warnTitle: HTMLHeadingElement = document.createElement('h2');
     warnTitle.textContent = 'Life Support Warning';
     warnTitle.style.color = '#ffcc40';
     warnTitle.style.borderBottom = 'none';
     warnSection.appendChild(warnTitle);
 
     for (const w of summary.lifeSupportWarnings) {
-      const row = document.createElement('div');
+      const row: HTMLDivElement = document.createElement('div');
       row.className = 'rr-row';
-      const label = document.createElement('span');
+      const label: HTMLSpanElement = document.createElement('span');
       label.className = 'rr-label';
       label.textContent = `${w.craftName} — ${w.crewIds.length} crew`;
       label.style.color = '#ffe0a0';
-      const value = document.createElement('span');
+      const value: HTMLSpanElement = document.createElement('span');
       value.className = 'rr-value';
       value.style.color = '#ffcc40';
       value.textContent = `${w.suppliesRemaining} flight${w.suppliesRemaining !== 1 ? 's' : ''} of supplies left`;
@@ -1317,7 +1294,7 @@ export function showReturnResultsOverlay(container, summary, onDismiss) {
       warnSection.appendChild(row);
     }
 
-    const warnMsg = document.createElement('p');
+    const warnMsg: HTMLParagraphElement = document.createElement('p');
     warnMsg.style.fontSize = '0.85rem';
     warnMsg.style.color = '#ffe0a0';
     warnMsg.style.margin = '8px 0 0';
@@ -1329,20 +1306,20 @@ export function showReturnResultsOverlay(container, summary, onDismiss) {
 
   // ── Bankruptcy warning (if applicable) ────────────────────────────────────
   if (summary.bankrupt) {
-    const bankruptSection = document.createElement('div');
+    const bankruptSection: HTMLDivElement = document.createElement('div');
     bankruptSection.className = 'rr-section';
     bankruptSection.style.background = 'rgba(120, 20, 20, 0.5)';
     bankruptSection.style.border = '1px solid #ff4040';
     bankruptSection.style.borderRadius = '6px';
     bankruptSection.style.padding = '14px 16px';
 
-    const bankruptTitle = document.createElement('h2');
+    const bankruptTitle: HTMLHeadingElement = document.createElement('h2');
     bankruptTitle.textContent = 'Agency Bankrupt';
     bankruptTitle.style.color = '#ff6060';
     bankruptTitle.style.borderBottom = 'none';
     bankruptSection.appendChild(bankruptTitle);
 
-    const bankruptMsg = document.createElement('p');
+    const bankruptMsg: HTMLParagraphElement = document.createElement('p');
     bankruptMsg.style.fontSize = '0.88rem';
     bankruptMsg.style.color = '#ffc0c0';
     bankruptMsg.style.margin = '0';
@@ -1353,7 +1330,7 @@ export function showReturnResultsOverlay(container, summary, onDismiss) {
   }
 
   // ── Dismiss button ────────────────────────────────────────────────────────
-  const dismissBtn = document.createElement('button');
+  const dismissBtn: HTMLButtonElement = document.createElement('button');
   dismissBtn.id        = 'return-results-dismiss-btn';
   dismissBtn.className = 'rr-dismiss-btn';
   dismissBtn.textContent = '← Return to Hub';
@@ -1373,21 +1350,16 @@ export function showReturnResultsOverlay(container, summary, onDismiss) {
 
 /**
  * Build a single financial summary row `<div>`.
- *
- * @param {string} label
- * @param {string} value
- * @param {'positive'|'negative'|'neutral'} [tone='neutral']
- * @returns {HTMLElement}
  */
-function _rrRow(label, value, tone = 'neutral') {
-  const row = document.createElement('div');
+function _rrRow(label: string, value: string, tone: 'positive' | 'negative' | 'neutral' = 'neutral'): HTMLDivElement {
+  const row: HTMLDivElement = document.createElement('div');
   row.className = 'rr-row';
 
-  const labelEl = document.createElement('span');
+  const labelEl: HTMLSpanElement = document.createElement('span');
   labelEl.className = 'rr-label';
   labelEl.textContent = label;
 
-  const valueEl = document.createElement('span');
+  const valueEl: HTMLSpanElement = document.createElement('span');
   valueEl.className = `rr-value rr-value-${tone}`;
   valueEl.textContent = value;
 
@@ -1399,7 +1371,7 @@ function _rrRow(label, value, tone = 'neutral') {
 /**
  * Show a bankruptcy warning banner if the player cannot afford any rocket.
  */
-function _renderBankruptcyBanner() {
+function _renderBankruptcyBanner(): void {
   if (!_overlay || !_state) return;
 
   // Remove any stale banner.
@@ -1408,19 +1380,19 @@ function _renderBankruptcyBanner() {
 
   if (!isBankrupt(_state)) return;
 
-  const banner = document.createElement('div');
+  const banner: HTMLDivElement = document.createElement('div');
   banner.id = 'bankruptcy-banner';
 
-  const title = document.createElement('div');
+  const title: HTMLDivElement = document.createElement('div');
   title.className = 'bankruptcy-title';
   title.textContent = 'Agency Bankrupt';
   banner.appendChild(title);
 
-  const msg = document.createElement('div');
+  const msg: HTMLDivElement = document.createElement('div');
   msg.textContent = 'You cannot afford to build even the cheapest rocket.';
   banner.appendChild(msg);
 
-  const hint = document.createElement('div');
+  const hint: HTMLDivElement = document.createElement('div');
   hint.className = 'bankruptcy-hint';
   hint.textContent = 'Fire crew to reduce salaries, take out a loan, or accept cheaper contracts.';
   banner.appendChild(hint);
@@ -1430,16 +1402,15 @@ function _renderBankruptcyBanner() {
 
 /**
  * Create the left-side info panel containing the reputation badge and weather.
- * @param {HTMLElement} container  The #ui-overlay div.
  */
-function _renderLeftPanel(container) {
+function _renderLeftPanel(container: HTMLElement): void {
   if (!_overlay || !_state) return;
 
   // Remove stale left panel.
   const existingPanel = document.getElementById('hub-left-panel');
   if (existingPanel) existingPanel.remove();
 
-  const leftPanel = document.createElement('div');
+  const leftPanel: HTMLDivElement = document.createElement('div');
   leftPanel.id = 'hub-left-panel';
 
   _renderReputationBadge(leftPanel);
@@ -1451,36 +1422,35 @@ function _renderLeftPanel(container) {
 /**
  * Render the reputation badge on the hub screen.
  * Shows current reputation value, tier label (colour-coded), and a progress bar.
- * @param {HTMLElement} parent  Container element to append to.
  */
-function _renderReputationBadge(parent) {
+function _renderReputationBadge(parent: HTMLElement): void {
   if (!_state) return;
 
   // Remove existing badge if present (for refresh).
   const existing = document.getElementById('hub-reputation-badge');
   if (existing) existing.remove();
 
-  const rep = _state.reputation ?? 50;
+  const rep: number = _state.reputation ?? 50;
   const tier = getReputationTier(rep);
 
-  const badge = document.createElement('div');
+  const badge: HTMLDivElement = document.createElement('div');
   badge.id = 'hub-reputation-badge';
 
   // Label
-  const label = document.createElement('span');
+  const label: HTMLSpanElement = document.createElement('span');
   label.className = 'hub-rep-label';
   label.textContent = 'Reputation';
   badge.appendChild(label);
 
   // Value
-  const value = document.createElement('span');
+  const value: HTMLSpanElement = document.createElement('span');
   value.className = 'hub-rep-value';
   value.style.color = tier.color;
   value.textContent = `${Math.round(rep)}`;
   badge.appendChild(value);
 
   // Tier chip
-  const tierChip = document.createElement('span');
+  const tierChip: HTMLSpanElement = document.createElement('span');
   tierChip.className = 'hub-rep-tier';
   tierChip.style.color = tier.color;
   tierChip.style.background = `${tier.color}22`;
@@ -1489,9 +1459,9 @@ function _renderReputationBadge(parent) {
   badge.appendChild(tierChip);
 
   // Progress track
-  const track = document.createElement('div');
+  const track: HTMLDivElement = document.createElement('div');
   track.className = 'hub-rep-track';
-  const fill = document.createElement('div');
+  const fill: HTMLDivElement = document.createElement('div');
   fill.className = 'hub-rep-fill';
   fill.style.width = `${Math.max(0, Math.min(100, rep))}%`;
   fill.style.backgroundColor = tier.color;
@@ -1505,9 +1475,8 @@ function _renderReputationBadge(parent) {
  * Render the weather conditions as a compact inline bar on the hub screen.
  * Matches the Launch Pad's compact weather bar format.
  * Initialises weather state if not already present.
- * @param {HTMLElement} parent  Container element to append to.
  */
-function _renderWeatherPanel(parent) {
+function _renderWeatherPanel(parent: HTMLElement): void {
   if (!_state) return;
 
   // Remove any stale panel.
@@ -1527,15 +1496,15 @@ function _renderWeatherPanel(parent) {
   // Don't show panel for airless bodies.
   if (weather.description === 'No atmosphere') return;
 
-  const panel = document.createElement('div');
+  const panel: HTMLDivElement = document.createElement('div');
   panel.id = 'weather-panel';
 
   // Main info row — compact inline bar with description + stats
-  const info = document.createElement('div');
+  const info: HTMLDivElement = document.createElement('div');
   info.className = 'weather-info';
 
   // Description
-  const desc = document.createElement('span');
+  const desc: HTMLSpanElement = document.createElement('span');
   desc.className = 'weather-description';
   if (weather.extreme) {
     desc.classList.add('weather-extreme');
@@ -1551,18 +1520,18 @@ function _renderWeatherPanel(parent) {
   _addWeatherRow(info, 'Wind', `${weather.windSpeed.toFixed(1)} m/s`);
 
   // Temperature (ISP effect)
-  const tempPct = ((weather.temperature - 1) * 100).toFixed(1);
-  const tempStr = weather.temperature >= 1 ? `+${tempPct}%` : `${tempPct}%`;
+  const tempPct: string = ((weather.temperature - 1) * 100).toFixed(1);
+  const tempStr: string = weather.temperature >= 1 ? `+${tempPct}%` : `${tempPct}%`;
   _addWeatherRow(info, 'ISP Effect', tempStr);
 
   // Visibility
-  const visLabels = ['Clear', 'Light haze', 'Moderate haze', 'Heavy haze', 'Dense fog'];
-  const visIdx = Math.min(4, Math.floor(weather.visibility * 5));
+  const visLabels: string[] = ['Clear', 'Light haze', 'Moderate haze', 'Heavy haze', 'Dense fog'];
+  const visIdx: number = Math.min(4, Math.floor(weather.visibility * 5));
   _addWeatherRow(info, 'Visibility', visLabels[visIdx]);
 
   // Extreme weather warning (inline)
   if (weather.extreme) {
-    const warn = document.createElement('span');
+    const warn: HTMLSpanElement = document.createElement('span');
     warn.className = 'weather-warning';
     warn.textContent = 'EXTREME — Launch not recommended';
     info.appendChild(warn);
@@ -1573,11 +1542,11 @@ function _renderWeatherPanel(parent) {
   // Forecast row (if weather satellites provide data AND Tracking Station tier 2+)
   const forecast = isWeatherPredictionAvailable(_state) ? getWeatherForecast(_state, 'EARTH', 3) : [];
   if (forecast.length > 0) {
-    const fcSection = document.createElement('div');
+    const fcSection: HTMLDivElement = document.createElement('div');
     fcSection.className = 'weather-forecast';
 
-    forecast.forEach((fc, i) => {
-      const day = document.createElement('span');
+    forecast.forEach((fc: { description: string; windSpeed: number; extreme: boolean }, i: number) => {
+      const day: HTMLSpanElement = document.createElement('span');
       day.className = 'weather-forecast-day';
       day.textContent = `Skip ${i + 1}: ${fc.description} (${fc.windSpeed.toFixed(0)} m/s)`;
       if (fc.extreme) day.style.color = '#ff6060';
@@ -1595,20 +1564,17 @@ function _renderWeatherPanel(parent) {
 
 /**
  * Helper: add a compact label: value item to a weather info row.
- * @param {HTMLElement} parent
- * @param {string} label
- * @param {string} value
  */
-function _addWeatherRow(parent, label, value) {
-  const row = document.createElement('span');
+function _addWeatherRow(parent: HTMLElement, label: string, value: string): void {
+  const row: HTMLSpanElement = document.createElement('span');
   row.className = 'weather-row';
 
-  const lbl = document.createElement('span');
+  const lbl: HTMLSpanElement = document.createElement('span');
   lbl.className = 'weather-label';
   lbl.textContent = `${label}: `;
   row.appendChild(lbl);
 
-  const val = document.createElement('span');
+  const val: HTMLSpanElement = document.createElement('span');
   val.className = 'weather-value';
   val.textContent = value;
   row.appendChild(val);
@@ -1618,10 +1584,8 @@ function _addWeatherRow(parent, label, value) {
 
 /**
  * Create and append one `<div>` per building inside the overlay.
- *
- * @param {(destination: string) => void} onNavigate
  */
-function _renderBuildings(onNavigate) {
+function _renderBuildings(onNavigate: (destination: string) => void): void {
   if (!_overlay) return;
 
   for (const bld of BUILDINGS) {
@@ -1630,7 +1594,7 @@ function _renderBuildings(onNavigate) {
     if (_state && _state.gameMode !== GameMode.SANDBOX && !hasFacility(_state, bld.id)) {
       continue;
     }
-    const el = document.createElement('div');
+    const el: HTMLDivElement = document.createElement('div');
     el.className    = 'hub-building';
     el.dataset.buildingId = bld.id;
     el.setAttribute('role',       'button');
@@ -1638,14 +1602,14 @@ function _renderBuildings(onNavigate) {
     el.setAttribute('aria-label', bld.label);
 
     // Position: left edge and width as % of viewport width.
-    const leftPct  = (bld.xCenterPct - bld.widthPct / 2) * 100;
+    const leftPct: number  = (bld.xCenterPct - bld.widthPct / 2) * 100;
     el.style.left   = `${leftPct.toFixed(4)}%`;
     el.style.width  = `${(bld.widthPct  * 100).toFixed(4)}%`;
     // Height extends upward from the ground line.
     el.style.height = `${(bld.heightPct * 100).toFixed(4)}%`;
 
     // Label
-    const label = document.createElement('span');
+    const label: HTMLSpanElement = document.createElement('span');
     label.className   = 'hub-building-label';
     label.textContent = bld.label;
     el.appendChild(label);
@@ -1657,7 +1621,7 @@ function _renderBuildings(onNavigate) {
     });
 
     // Keyboard handler (Enter / Space)
-    el.addEventListener('keydown', (e) => {
+    el.addEventListener('keydown', (e: KeyboardEvent) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         el.blur();
@@ -1672,9 +1636,8 @@ function _renderBuildings(onNavigate) {
 /**
  * Register Construction and Settings as hub-specific items in the topbar
  * hamburger menu. Cleared automatically when the hub is destroyed.
- * @param {HTMLElement} container  The #ui-overlay div.
  */
-function _registerHubMenuItems(container) {
+function _registerHubMenuItems(container: HTMLElement): void {
   setTopBarHubItems([
     {
       label: 'Construction',
@@ -1684,20 +1647,19 @@ function _registerHubMenuItems(container) {
     {
       label: 'Settings',
       id: 'hub-settings-btn',
-      onClick: () => openSettingsPanel(container, _state),
+      onClick: () => openSettingsPanel(container, _state!),
     },
   ]);
 }
 
 /** Keyboard handler reference for cleanup. */
-let _debugSavesHandler = null;
+let _debugSavesHandler: ((e: KeyboardEvent) => void) | null = null;
 
 /**
  * Bind Ctrl+Shift+D to open the debug saves panel.
- * @param {HTMLElement} container  The #ui-overlay div.
  */
-function _bindDebugSavesShortcut(container) {
-  _debugSavesHandler = (e) => {
+function _bindDebugSavesShortcut(container: HTMLElement): void {
+  _debugSavesHandler = (e: KeyboardEvent) => {
     if (e.ctrlKey && e.shiftKey && e.key === 'D') {
       e.preventDefault();
       if (_state && _state.debugMode) {
@@ -1711,7 +1673,7 @@ function _bindDebugSavesShortcut(container) {
 /**
  * Remove the debug saves keyboard shortcut.
  */
-function _unbindDebugSavesShortcut() {
+function _unbindDebugSavesShortcut(): void {
   if (_debugSavesHandler) {
     document.removeEventListener('keydown', _debugSavesHandler);
     _debugSavesHandler = null;
@@ -1720,27 +1682,25 @@ function _unbindDebugSavesShortcut() {
 
 /**
  * Open the construction panel overlay.
- *
- * @param {HTMLElement} container  The #ui-overlay div.
  */
-function _openConstructionPanel(container) {
+function _openConstructionPanel(container: HTMLElement): void {
   // Prevent duplicate.
   if (document.getElementById('construction-panel')) return;
   if (!_state) return;
 
-  const panel = document.createElement('div');
+  const panel: HTMLDivElement = document.createElement('div');
   panel.id = 'construction-panel';
 
-  const content = document.createElement('div');
+  const content: HTMLDivElement = document.createElement('div');
   content.className = 'cp-content';
   panel.appendChild(content);
 
   // ── Heading ────────────────────────────────────────────────────────────
-  const heading = document.createElement('h1');
+  const heading: HTMLHeadingElement = document.createElement('h1');
   heading.textContent = 'Construction';
   content.appendChild(heading);
 
-  const subtitle = document.createElement('p');
+  const subtitle: HTMLParagraphElement = document.createElement('p');
   subtitle.className = 'cp-subtitle';
   subtitle.textContent = _state.tutorialMode
     ? 'Tutorial Mode — Facilities unlocked via missions'
@@ -1748,26 +1708,26 @@ function _openConstructionPanel(container) {
   content.appendChild(subtitle);
 
   // ── Facility list ──────────────────────────────────────────────────────
-  const list = document.createElement('ul');
+  const list: HTMLUListElement = document.createElement('ul');
   list.className = 'cp-facility-list';
 
   for (const def of FACILITY_DEFINITIONS) {
-    const item = document.createElement('li');
+    const item: HTMLLIElement = document.createElement('li');
     item.className = 'cp-facility-item';
 
     // Info column.
-    const info = document.createElement('div');
+    const info: HTMLDivElement = document.createElement('div');
     info.className = 'cp-facility-info';
 
-    const nameEl = document.createElement('p');
+    const nameEl: HTMLParagraphElement = document.createElement('p');
     nameEl.className = 'cp-facility-name';
     nameEl.textContent = def.name;
 
     // Show tier badge for built, upgradeable facilities.
     const upgradeDef = getFacilityUpgradeDef(def.id);
     if (hasFacility(_state, def.id) && upgradeDef) {
-      const tier = getFacilityTier(_state, def.id);
-      const tierBadge = document.createElement('span');
+      const tier: number = getFacilityTier(_state, def.id);
+      const tierBadge: HTMLSpanElement = document.createElement('span');
       tierBadge.className = 'cp-tier-badge';
       tierBadge.textContent = `Tier ${tier}`;
       nameEl.appendChild(tierBadge);
@@ -1775,7 +1735,7 @@ function _openConstructionPanel(container) {
 
     info.appendChild(nameEl);
 
-    const descEl = document.createElement('p');
+    const descEl: HTMLParagraphElement = document.createElement('p');
     descEl.className = 'cp-facility-desc';
     descEl.textContent = def.description;
     info.appendChild(descEl);
@@ -1783,23 +1743,23 @@ function _openConstructionPanel(container) {
     item.appendChild(info);
 
     // ── Cost + Action columns ──────────────────────────────────────────
-    const isBuilt = hasFacility(_state, def.id);
+    const isBuilt: boolean = hasFacility(_state, def.id);
 
     if (isBuilt) {
       // Check if upgradeable (R&D Lab).
       const upgrade = canUpgradeFacility(_state, def.id);
       if (upgrade.nextTier > 0) {
         // Show upgrade cost.
-        const costGroup = document.createElement('div');
+        const costGroup: HTMLDivElement = document.createElement('div');
         costGroup.className = 'cp-cost-group';
 
-        const moneyCostEl = document.createElement('span');
+        const moneyCostEl: HTMLSpanElement = document.createElement('span');
         moneyCostEl.className = 'cp-facility-cost';
         moneyCostEl.textContent = `$${upgrade.moneyCost.toLocaleString('en-US')}`;
         costGroup.appendChild(moneyCostEl);
 
         if (upgrade.scienceCost > 0) {
-          const sciCostEl = document.createElement('span');
+          const sciCostEl: HTMLSpanElement = document.createElement('span');
           sciCostEl.className = 'cp-facility-cost-science';
           sciCostEl.textContent = `${upgrade.scienceCost} science`;
           costGroup.appendChild(sciCostEl);
@@ -1808,10 +1768,10 @@ function _openConstructionPanel(container) {
         item.appendChild(costGroup);
 
         // Upgrade action.
-        const actionGroup = document.createElement('div');
+        const actionGroup: HTMLDivElement = document.createElement('div');
         actionGroup.className = 'cp-action-group';
 
-        const btn = document.createElement('button');
+        const btn: HTMLButtonElement = document.createElement('button');
         btn.className = 'cp-upgrade-btn';
         btn.textContent = `Upgrade to Tier ${upgrade.nextTier}`;
         btn.disabled = !upgrade.allowed;
@@ -1819,7 +1779,7 @@ function _openConstructionPanel(container) {
           btn.title = upgrade.reason;
         }
         btn.addEventListener('click', () => {
-          const result = upgradeFacility(_state, def.id);
+          const result = upgradeFacility(_state!, def.id);
           if (result.success) {
             panel.remove();
             _openConstructionPanel(container);
@@ -1828,7 +1788,7 @@ function _openConstructionPanel(container) {
         actionGroup.appendChild(btn);
 
         if (upgrade.description) {
-          const descNote = document.createElement('p');
+          const descNote: HTMLParagraphElement = document.createElement('p');
           descNote.className = 'cp-upgrade-desc';
           descNote.textContent = upgrade.description;
           actionGroup.appendChild(descNote);
@@ -1837,36 +1797,36 @@ function _openConstructionPanel(container) {
         item.appendChild(actionGroup);
       } else {
         // Built, no upgrades available (or max tier).
-        const costEl = document.createElement('span');
+        const costEl: HTMLSpanElement = document.createElement('span');
         costEl.className = 'cp-facility-cost cp-facility-cost-free';
         costEl.textContent = '';
         item.appendChild(costEl);
 
-        const badge = document.createElement('span');
+        const badge: HTMLSpanElement = document.createElement('span');
         badge.className = 'cp-built-badge';
         badge.textContent = upgradeDef ? 'Max Tier' : 'Built';
         item.appendChild(badge);
       }
     } else if (_state.tutorialMode) {
       // Cost column (informational).
-      const costEl = document.createElement('span');
+      const costEl: HTMLSpanElement = document.createElement('span');
       costEl.className = 'cp-facility-cost';
       costEl.textContent = '';
       item.appendChild(costEl);
 
-      const badge = document.createElement('span');
+      const badge: HTMLSpanElement = document.createElement('span');
       badge.className = 'cp-locked-badge';
       badge.textContent = 'Locked — complete missions to unlock';
       item.appendChild(badge);
     } else {
       // Not built, not tutorial — show build cost + button.
-      const costGroup = document.createElement('div');
+      const costGroup: HTMLDivElement = document.createElement('div');
       costGroup.className = 'cp-cost-group';
 
-      const discountedCost = getDiscountedMoneyCost(def.cost, _state.reputation ?? 50);
-      const hasDiscount = def.cost > 0 && discountedCost < def.cost;
+      const discountedCost: number = getDiscountedMoneyCost(def.cost, _state.reputation ?? 50);
+      const hasDiscount: boolean = def.cost > 0 && discountedCost < def.cost;
 
-      const moneyCostEl = document.createElement('span');
+      const moneyCostEl: HTMLSpanElement = document.createElement('span');
       moneyCostEl.className = def.cost === 0
         ? 'cp-facility-cost cp-facility-cost-free'
         : 'cp-facility-cost';
@@ -1876,14 +1836,14 @@ function _openConstructionPanel(container) {
       costGroup.appendChild(moneyCostEl);
 
       if (hasDiscount) {
-        const discountNote = document.createElement('span');
+        const discountNote: HTMLSpanElement = document.createElement('span');
         discountNote.className = 'cp-discount-note';
         discountNote.textContent = `(was $${def.cost.toLocaleString('en-US')})`;
         costGroup.appendChild(discountNote);
       }
 
       if ((def.scienceCost ?? 0) > 0) {
-        const sciCostEl = document.createElement('span');
+        const sciCostEl: HTMLSpanElement = document.createElement('span');
         sciCostEl.className = 'cp-facility-cost-science';
         sciCostEl.textContent = `${def.scienceCost} science`;
         costGroup.appendChild(sciCostEl);
@@ -1893,7 +1853,7 @@ function _openConstructionPanel(container) {
 
       // Build button.
       const check = canBuildFacility(_state, def.id);
-      const btn = document.createElement('button');
+      const btn: HTMLButtonElement = document.createElement('button');
       btn.className = 'cp-build-btn';
       btn.textContent = 'Build';
       btn.disabled = !check.allowed;
@@ -1901,7 +1861,7 @@ function _openConstructionPanel(container) {
         btn.title = check.reason;
       }
       btn.addEventListener('click', () => {
-        const result = buildFacility(_state, def.id);
+        const result = buildFacility(_state!, def.id);
         if (result.success) {
           // Re-render the panel to reflect the change.
           panel.remove();
@@ -1917,7 +1877,7 @@ function _openConstructionPanel(container) {
   content.appendChild(list);
 
   // ── Close button ───────────────────────────────────────────────────────
-  const closeBtn = document.createElement('button');
+  const closeBtn: HTMLButtonElement = document.createElement('button');
   closeBtn.className = 'cp-close-btn';
   closeBtn.textContent = '← Hub';
   closeBtn.addEventListener('click', () => {

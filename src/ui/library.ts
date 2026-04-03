@@ -1,5 +1,5 @@
 /**
- * library.js — Library facility HTML overlay UI.
+ * library.ts — Library facility HTML overlay UI.
  *
  * Displays three tabbed sections:
  *   1. Statistics & Records — total flights, records, crew careers, finances,
@@ -24,6 +24,7 @@ import {
   getFrequentRockets,
 } from '../core/library.js';
 import { injectStyleOnce } from './injectStyle.js';
+import type { GameState } from '../core/gameState.js';
 
 // ---------------------------------------------------------------------------
 // CSS
@@ -384,13 +385,24 @@ const LIB_STYLES = `
 `;
 
 // ---------------------------------------------------------------------------
+// Tab ID type
+// ---------------------------------------------------------------------------
+
+type LibraryTab = 'stats' | 'bodies' | 'rockets';
+
+interface TabDef {
+  id: LibraryTab;
+  label: string;
+}
+
+// ---------------------------------------------------------------------------
 // Module state
 // ---------------------------------------------------------------------------
 
-let _overlay = null;
-let _state = null;
-let _onBack = null;
-let _activeTab = 'stats';
+let _overlay: HTMLDivElement | null = null;
+let _state: GameState | null = null;
+let _onBack: (() => void) | null = null;
+let _activeTab: LibraryTab = 'stats';
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -399,11 +411,15 @@ let _activeTab = 'stats';
 /**
  * Mount the Library overlay.
  *
- * @param {HTMLElement} container  The #ui-overlay div.
- * @param {import('../core/gameState.js').GameState} state
- * @param {{ onBack: () => void }} opts
+ * @param container  The #ui-overlay div.
+ * @param state
+ * @param opts
  */
-export function initLibraryUI(container, state, { onBack }) {
+export function initLibraryUI(
+  container: HTMLElement,
+  state: GameState,
+  { onBack }: { onBack: () => void },
+): void {
   _state = state;
   _onBack = onBack;
   _activeTab = 'stats';
@@ -416,38 +432,35 @@ export function initLibraryUI(container, state, { onBack }) {
   container.appendChild(_overlay);
 
   _render();
-
-
 }
 
 /**
  * Remove the Library overlay.
  */
-export function destroyLibraryUI() {
+export function destroyLibraryUI(): void {
   if (_overlay) {
     _overlay.remove();
     _overlay = null;
   }
   _state = null;
   _onBack = null;
-
 }
 
 // ---------------------------------------------------------------------------
 // Rendering — Main
 // ---------------------------------------------------------------------------
 
-function _render() {
+function _render(): void {
   if (!_overlay || !_state) return;
   _overlay.innerHTML = '';
 
   // Header.
-  const header = document.createElement('div');
+  const header: HTMLDivElement = document.createElement('div');
   header.id = 'lib-header';
 
-  const backBtn = document.createElement('button');
+  const backBtn: HTMLButtonElement = document.createElement('button');
   backBtn.id = 'lib-back-btn';
-  backBtn.textContent = '← Hub';
+  backBtn.textContent = '\u2190 Hub';
   backBtn.addEventListener('click', () => {
     const onBack = _onBack; // capture before destroy nulls it
     destroyLibraryUI();
@@ -455,7 +468,7 @@ function _render() {
   });
   header.appendChild(backBtn);
 
-  const title = document.createElement('h1');
+  const title: HTMLHeadingElement = document.createElement('h1');
   title.id = 'lib-title';
   title.textContent = 'Agency Library';
   header.appendChild(title);
@@ -463,17 +476,17 @@ function _render() {
   _overlay.appendChild(header);
 
   // Tabs.
-  const tabs = document.createElement('div');
+  const tabs: HTMLDivElement = document.createElement('div');
   tabs.id = 'lib-tabs';
 
-  const tabDefs = [
+  const tabDefs: TabDef[] = [
     { id: 'stats',   label: 'Statistics & Records' },
     { id: 'bodies',  label: 'Celestial Bodies' },
     { id: 'rockets', label: 'Frequent Rockets' },
   ];
 
   for (const def of tabDefs) {
-    const tab = document.createElement('button');
+    const tab: HTMLButtonElement = document.createElement('button');
     tab.className = `lib-tab${def.id === _activeTab ? ' active' : ''}`;
     tab.textContent = def.label;
     tab.addEventListener('click', () => {
@@ -486,7 +499,7 @@ function _render() {
   _overlay.appendChild(tabs);
 
   // Content.
-  const content = document.createElement('div');
+  const content: HTMLDivElement = document.createElement('div');
   content.id = 'lib-content';
 
   switch (_activeTab) {
@@ -508,17 +521,17 @@ function _render() {
 // Tab 1 — Statistics & Records
 // ---------------------------------------------------------------------------
 
-function _renderStatsTab(content) {
-  const stats = getAgencyStats(_state);
-  const records = getRecords(_state);
-  const financial = getFinancialSummary(_state);
-  const exploration = getExplorationProgress(_state);
-  const crewCareers = getCrewCareers(_state);
+function _renderStatsTab(content: HTMLDivElement): void {
+  const stats = getAgencyStats(_state!);
+  const records = getRecords(_state!);
+  const financial = getFinancialSummary(_state!);
+  const exploration = getExplorationProgress(_state!);
+  const crewCareers = getCrewCareers(_state!);
 
-  // ── Overview stats ──────────────────────────────────────────────────────
+  // -- Overview stats --
   {
     const section = _makeSection('Agency Overview');
-    const grid = document.createElement('div');
+    const grid: HTMLDivElement = document.createElement('div');
     grid.className = 'lib-stat-grid';
 
     grid.appendChild(_makeStatCard('Total Flights', stats.totalFlights.toString(),
@@ -534,10 +547,10 @@ function _renderStatsTab(content) {
     content.appendChild(section);
   }
 
-  // ── Records ─────────────────────────────────────────────────────────────
+  // -- Records --
   {
     const section = _makeSection('Records');
-    const grid = document.createElement('div');
+    const grid: HTMLDivElement = document.createElement('div');
     grid.className = 'lib-record-grid';
 
     grid.appendChild(_makeRecordCard('Peak Altitude',
@@ -566,7 +579,7 @@ function _renderStatsTab(content) {
     content.appendChild(section);
   }
 
-  // ── Exploration per body ────────────────────────────────────────────────
+  // -- Exploration per body --
   {
     const section = _makeSection('Exploration Progress');
 
@@ -575,7 +588,7 @@ function _renderStatsTab(content) {
     const pctBiomes = exploration.totalBiomes > 0
       ? Math.round((exploration.biomesExplored / exploration.totalBiomes) * 100) : 0;
 
-    const grid = document.createElement('div');
+    const grid: HTMLDivElement = document.createElement('div');
     grid.className = 'lib-stat-grid';
     grid.appendChild(_makeStatCard('Bodies Discovered',
       `${exploration.discoveredBodies.length} / ${exploration.totalBodies}`));
@@ -586,22 +599,22 @@ function _renderStatsTab(content) {
 
     // Body status table.
     const bodyRecords = records.recordsByBody;
-    const table = document.createElement('table');
+    const table: HTMLTableElement = document.createElement('table');
     table.className = 'lib-table';
     table.innerHTML = `<thead><tr>
       <th>Body</th><th>Visited</th><th>Orbited</th><th>Landed</th>
     </tr></thead>`;
-    const tbody = document.createElement('tbody');
+    const tbody: HTMLTableSectionElement = document.createElement('tbody');
 
     for (const bodyId of Object.keys(bodyRecords)) {
       const rec = bodyRecords[bodyId];
       if (!rec.visited) continue;
-      const tr = document.createElement('tr');
+      const tr: HTMLTableRowElement = document.createElement('tr');
       tr.innerHTML = `
         <td style="font-weight:600">${bodyId}</td>
-        <td>${rec.visited ? _badge('visited', 'Visited') : '—'}</td>
-        <td>${rec.orbited ? _badge('orbited', 'Orbited') : '—'}</td>
-        <td>${rec.landed ? _badge('landed', 'Landed') : '—'}</td>
+        <td>${rec.visited ? _badge('visited', 'Visited') : '\u2014'}</td>
+        <td>${rec.orbited ? _badge('orbited', 'Orbited') : '\u2014'}</td>
+        <td>${rec.landed ? _badge('landed', 'Landed') : '\u2014'}</td>
       `;
       tbody.appendChild(tr);
     }
@@ -611,10 +624,10 @@ function _renderStatsTab(content) {
     content.appendChild(section);
   }
 
-  // ── Financial summary ───────────────────────────────────────────────────
+  // -- Financial summary --
   {
     const section = _makeSection('Financial History');
-    const grid = document.createElement('div');
+    const grid: HTMLDivElement = document.createElement('div');
     grid.className = 'lib-stat-grid';
 
     grid.appendChild(_makeStatCard('Current Balance', _fmtMoney(financial.currentBalance)));
@@ -628,24 +641,24 @@ function _renderStatsTab(content) {
     content.appendChild(section);
   }
 
-  // ── Crew careers ────────────────────────────────────────────────────────
+  // -- Crew careers --
   {
     const section = _makeSection('Crew Careers');
 
     if (crewCareers.length === 0) {
-      const empty = document.createElement('p');
+      const empty: HTMLParagraphElement = document.createElement('p');
       empty.className = 'lib-empty';
       empty.textContent = 'No astronauts hired yet.';
       section.appendChild(empty);
     } else {
-      const table = document.createElement('table');
+      const table: HTMLTableElement = document.createElement('table');
       table.className = 'lib-table';
       table.innerHTML = `<thead><tr>
         <th>Name</th><th>Status</th><th class="num">Flights</th>
         <th class="num">Piloting</th><th class="num">Engineering</th>
         <th class="num">Science</th>
       </tr></thead>`;
-      const tbody = document.createElement('tbody');
+      const tbody: HTMLTableSectionElement = document.createElement('tbody');
 
       // Sort: active crew first, then by flights.
       const sorted = [...crewCareers].sort((a, b) => {
@@ -656,7 +669,7 @@ function _renderStatsTab(content) {
       });
 
       for (const c of sorted) {
-        const tr = document.createElement('tr');
+        const tr: HTMLTableRowElement = document.createElement('tr');
         const statusColor = c.status === 'DEAD' || c.status === 'kia'
           ? '#ff6060' : c.status === 'INJURED' ? '#ffaa30' : '#60dd80';
         tr.innerHTML = `
@@ -681,11 +694,11 @@ function _renderStatsTab(content) {
 // Tab 2 — Celestial Body Knowledge
 // ---------------------------------------------------------------------------
 
-function _renderBodiesTab(content) {
-  const bodies = getCelestialBodyKnowledge(_state);
+function _renderBodiesTab(content: HTMLDivElement): void {
+  const bodies = getCelestialBodyKnowledge(_state!);
 
   if (bodies.length === 0) {
-    const empty = document.createElement('p');
+    const empty: HTMLParagraphElement = document.createElement('p');
     empty.className = 'lib-empty';
     empty.textContent = 'No celestial bodies discovered yet. Complete flights to discover new worlds.';
     content.appendChild(empty);
@@ -693,28 +706,28 @@ function _renderBodiesTab(content) {
   }
 
   const section = _makeSection('Discovered Bodies');
-  const desc = document.createElement('p');
+  const desc: HTMLParagraphElement = document.createElement('p');
   desc.style.cssText = 'font-size:0.85rem;color:#8899aa;margin:0 0 14px';
   desc.textContent = 'Physical properties of bodies your agency has visited. Use this data to plan future missions.';
   section.appendChild(desc);
 
-  const grid = document.createElement('div');
+  const grid: HTMLDivElement = document.createElement('div');
   grid.className = 'lib-body-grid';
 
   for (const body of bodies) {
-    const card = document.createElement('div');
+    const card: HTMLDivElement = document.createElement('div');
     card.className = 'lib-body-card';
 
-    const name = document.createElement('div');
+    const name: HTMLDivElement = document.createElement('div');
     name.className = 'body-name';
     name.textContent = body.name;
     card.appendChild(name);
 
-    const props = document.createElement('div');
+    const props: HTMLDivElement = document.createElement('div');
     props.className = 'body-props';
 
-    const propData = [
-      ['Surface Gravity', `${body.surfaceGravity} m/s²`],
+    const propData: [string, string][] = [
+      ['Surface Gravity', `${body.surfaceGravity} m/s\u00B2`],
       ['Radius', _fmtDist(body.radius)],
       ['Atmosphere', body.hasAtmosphere ? `Yes (${_fmtDist(body.atmosphereTop)} top)` : 'None'],
       ['Landable', body.landable ? 'Yes' : 'No'],
@@ -730,12 +743,12 @@ function _renderBodiesTab(content) {
     }
 
     for (const [label, value] of propData) {
-      const lbl = document.createElement('span');
+      const lbl: HTMLSpanElement = document.createElement('span');
       lbl.className = 'prop-label';
       lbl.textContent = label;
       props.appendChild(lbl);
 
-      const val = document.createElement('span');
+      const val: HTMLSpanElement = document.createElement('span');
       val.className = 'prop-value';
       val.textContent = value;
       props.appendChild(val);
@@ -753,11 +766,11 @@ function _renderBodiesTab(content) {
 // Tab 3 — Frequently Flown Rockets
 // ---------------------------------------------------------------------------
 
-function _renderRocketsTab(content) {
-  const rockets = getFrequentRockets(_state);
+function _renderRocketsTab(content: HTMLDivElement): void {
+  const rockets = getFrequentRockets(_state!);
 
   if (rockets.length === 0) {
-    const empty = document.createElement('p');
+    const empty: HTMLParagraphElement = document.createElement('p');
     empty.className = 'lib-empty';
     empty.textContent = 'No flights recorded yet. Complete flights to see your most-used rocket designs.';
     content.appendChild(empty);
@@ -765,28 +778,28 @@ function _renderRocketsTab(content) {
   }
 
   const section = _makeSection('Top 5 Most-Flown Rockets');
-  const list = document.createElement('div');
+  const list: HTMLDivElement = document.createElement('div');
   list.className = 'lib-rocket-list';
 
   for (let i = 0; i < rockets.length; i++) {
     const r = rockets[i];
-    const card = document.createElement('div');
+    const card: HTMLDivElement = document.createElement('div');
     card.className = 'lib-rocket-card';
 
-    const rank = document.createElement('div');
+    const rank: HTMLDivElement = document.createElement('div');
     rank.className = 'lib-rocket-rank';
     rank.textContent = `#${i + 1}`;
     card.appendChild(rank);
 
-    const info = document.createElement('div');
+    const info: HTMLDivElement = document.createElement('div');
     info.className = 'lib-rocket-info';
 
-    const name = document.createElement('div');
+    const name: HTMLDivElement = document.createElement('div');
     name.className = 'lib-rocket-name';
     name.textContent = r.rocketName || 'Unnamed Rocket';
     info.appendChild(name);
 
-    const stats = document.createElement('div');
+    const stats: HTMLDivElement = document.createElement('div');
     stats.className = 'lib-rocket-stats';
     stats.innerHTML = `
       <span>Flights: <span class="stat-val">${r.flightCount}</span></span>
@@ -808,31 +821,31 @@ function _renderRocketsTab(content) {
 // DOM helpers
 // ---------------------------------------------------------------------------
 
-function _makeSection(title) {
-  const section = document.createElement('div');
+function _makeSection(title: string): HTMLDivElement {
+  const section: HTMLDivElement = document.createElement('div');
   section.className = 'lib-section';
-  const h2 = document.createElement('h2');
+  const h2: HTMLHeadingElement = document.createElement('h2');
   h2.textContent = title;
   section.appendChild(h2);
   return section;
 }
 
-function _makeStatCard(label, value, sub) {
-  const card = document.createElement('div');
+function _makeStatCard(label: string, value: string, sub?: string): HTMLDivElement {
+  const card: HTMLDivElement = document.createElement('div');
   card.className = 'lib-stat-card';
 
-  const lbl = document.createElement('div');
+  const lbl: HTMLDivElement = document.createElement('div');
   lbl.className = 'label';
   lbl.textContent = label;
   card.appendChild(lbl);
 
-  const val = document.createElement('div');
+  const val: HTMLDivElement = document.createElement('div');
   val.className = 'value';
   val.textContent = value;
   card.appendChild(val);
 
   if (sub) {
-    const s = document.createElement('div');
+    const s: HTMLDivElement = document.createElement('div');
     s.className = 'sub';
     s.textContent = sub;
     card.appendChild(s);
@@ -841,22 +854,22 @@ function _makeStatCard(label, value, sub) {
   return card;
 }
 
-function _makeRecordCard(label, value, detail) {
-  const card = document.createElement('div');
+function _makeRecordCard(label: string, value: string, detail?: string): HTMLDivElement {
+  const card: HTMLDivElement = document.createElement('div');
   card.className = 'lib-record-card';
 
-  const lbl = document.createElement('div');
+  const lbl: HTMLDivElement = document.createElement('div');
   lbl.className = 'rec-label';
   lbl.textContent = label;
   card.appendChild(lbl);
 
-  const val = document.createElement('div');
+  const val: HTMLDivElement = document.createElement('div');
   val.className = 'rec-value';
   val.textContent = value;
   card.appendChild(val);
 
   if (detail) {
-    const d = document.createElement('div');
+    const d: HTMLDivElement = document.createElement('div');
     d.className = 'rec-detail';
     d.textContent = detail;
     card.appendChild(d);
@@ -865,7 +878,7 @@ function _makeRecordCard(label, value, detail) {
   return card;
 }
 
-function _badge(cls, text) {
+function _badge(cls: string, text: string): string {
   return `<span class="lib-badge ${cls}">${text}</span>`;
 }
 
@@ -873,33 +886,33 @@ function _badge(cls, text) {
 // Formatting helpers
 // ---------------------------------------------------------------------------
 
-function _fmtNum(n) {
+function _fmtNum(n: number): string {
   return n.toLocaleString();
 }
 
-function _fmtMoney(n) {
+function _fmtMoney(n: number): string {
   if (Math.abs(n) >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
   if (Math.abs(n) >= 1_000) return `$${(n / 1_000).toFixed(0)}k`;
   return `$${n.toLocaleString()}`;
 }
 
-function _fmtAlt(m) {
+function _fmtAlt(m: number): string {
   if (m >= 1_000_000) return `${(m / 1_000).toFixed(0)} km`;
   if (m >= 10_000) return `${(m / 1_000).toFixed(1)} km`;
   return `${m.toFixed(0)} m`;
 }
 
-function _fmtSpeed(mps) {
+function _fmtSpeed(mps: number): string {
   if (mps >= 1_000) return `${(mps / 1_000).toFixed(2)} km/s`;
   return `${mps.toFixed(0)} m/s`;
 }
 
-function _fmtMass(kg) {
+function _fmtMass(kg: number): string {
   if (kg >= 1_000) return `${(kg / 1_000).toFixed(1)} t`;
   return `${kg.toFixed(0)} kg`;
 }
 
-function _fmtTime(seconds) {
+function _fmtTime(seconds: number): string {
   if (seconds <= 0) return '0s';
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
@@ -909,31 +922,31 @@ function _fmtTime(seconds) {
   return `${s}s`;
 }
 
-function _fmtDist(m) {
+function _fmtDist(m: number): string {
   if (m >= 1_000_000) return `${(m / 1_000).toFixed(0)} km`;
   if (m >= 1_000) return `${(m / 1_000).toFixed(1)} km`;
   return `${m.toFixed(0)} m`;
 }
 
-function _fmtDistLong(m) {
+function _fmtDistLong(m: number): string {
   if (m >= 1e12) return `${(m / 1e9).toFixed(0)} Gm`;
   if (m >= 1e9) return `${(m / 1e9).toFixed(1)} Gm`;
   if (m >= 1e6) return `${(m / 1e6).toFixed(0)} Mm`;
   return `${(m / 1_000).toFixed(0)} km`;
 }
 
-function _fmtDate(isoStr) {
-  if (!isoStr) return '—';
+function _fmtDate(isoStr: string): string {
+  if (!isoStr) return '\u2014';
   try {
     const d = new Date(isoStr);
     return d.toLocaleDateString();
   } catch {
-    return '—';
+    return '\u2014';
   }
 }
 
-function _esc(str) {
-  const div = document.createElement('div');
+function _esc(str: string): string {
+  const div: HTMLDivElement = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
 }

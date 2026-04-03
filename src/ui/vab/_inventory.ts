@@ -1,5 +1,5 @@
 /**
- * _inventory.js — Inventory panel rendering, part refund/return logic.
+ * _inventory.ts — Inventory panel rendering, part refund/return logic.
  */
 
 import { getPartById } from '../../data/parts.js';
@@ -11,14 +11,17 @@ import { refreshTopBar } from '../topbar.js';
 import { getVabState } from './_state.js';
 import { fmt$ } from './_partsPanel.js';
 
+import type { GameState, InventoryPart } from '../../core/gameState.js';
+
 /**
  * Refund cash or return inventory part when removing a placed part.
  * If the part came from inventory, return it instead of refunding cash.
- * @param {string} instanceId
- * @param {string} partId
- * @param {(state: import('../../core/gameState.js').GameState) => void} vabRefreshParts
  */
-export function refundOrReturnPart(instanceId, partId, vabRefreshParts) {
+export function refundOrReturnPart(
+  instanceId: string,
+  partId: string,
+  vabRefreshParts: (state: GameState) => void,
+): void {
   const S = getVabState();
   if (!S.gameState) return;
   const invEntry = S.inventoryUsedParts.get(instanceId);
@@ -39,23 +42,21 @@ export function refundOrReturnPart(instanceId, partId, vabRefreshParts) {
 /**
  * Build the inventory panel HTML listing all recovered parts with
  * wear levels and refurbish/scrap actions.
- * @returns {string}
  */
-export function buildInventoryHTML() {
+export function buildInventoryHTML(): string {
   const S = getVabState();
   if (!S.gameState || !Array.isArray(S.gameState.partInventory) || S.gameState.partInventory.length === 0) {
     return `<p class="vab-inv-empty">No recovered parts.<br>Land safely to recover<br>parts from flights.</p>`;
   }
 
   // Group by partId.
-  /** @type {Map<string, import('../../core/gameState.js').InventoryPart[]>} */
-  const groups = new Map();
+  const groups = new Map<string, InventoryPart[]>();
   for (const entry of S.gameState.partInventory) {
     if (!groups.has(entry.partId)) groups.set(entry.partId, []);
-    groups.get(entry.partId).push(entry);
+    groups.get(entry.partId)!.push(entry);
   }
 
-  const rows = [];
+  const rows: string[] = [];
   for (const [partId, entries] of groups) {
     const def = getPartById(partId);
     if (!def) continue;
@@ -98,7 +99,7 @@ export function buildInventoryHTML() {
 /**
  * Render (or re-render) the inventory panel body.
  */
-export function renderInventoryPanel() {
+export function renderInventoryPanel(): void {
   const body = document.getElementById('vab-inventory-body');
   if (!body) return;
   body.innerHTML = buildInventoryHTML();
@@ -107,7 +108,7 @@ export function renderInventoryPanel() {
 /**
  * Refresh the inventory panel if it's open.
  */
-export function refreshInventoryPanel() {
+export function refreshInventoryPanel(): void {
   const S = getVabState();
   if (S.openPanels.has('inventory')) {
     renderInventoryPanel();

@@ -1,5 +1,5 @@
 /**
- * mainmenu.js — Main Menu & Load Screen HTML overlay UI.
+ * mainmenu.ts — Main Menu & Load Screen HTML overlay UI.
  *
  * Entry point for the game. Shown before the VAB or any other screen.
  *
@@ -35,62 +35,63 @@ import { GameMode, FACILITY_DEFINITIONS, SANDBOX_STARTING_MONEY } from '../core/
 import { getAllParts } from '../data/parts.js';
 import { TECH_NODES } from '../data/techtree.js';
 import { injectStyleOnce } from './injectStyle.js';
+import type { GameState, SandboxSettings } from '../core/gameState.js';
+import type { SaveSlotSummary } from '../core/saveload.js';
 
 // ---------------------------------------------------------------------------
 // Shooting stars
 // ---------------------------------------------------------------------------
 
-/** @type {number|null} */
-let _shootingStarTimer = null;
+let _shootingStarTimer: ReturnType<typeof setTimeout> | null = null;
 
-function _startShootingStars() {
+function _startShootingStars(): void {
   _stopShootingStars();
   _spawnShootingStar();
   _scheduleNext();
 }
 
-function _scheduleNext() {
-  const delay = 1500 + Math.random() * 4000; // 1.5–5.5s between stars
+function _scheduleNext(): void {
+  const delay: number = 1500 + Math.random() * 4000; // 1.5–5.5s between stars
   _shootingStarTimer = setTimeout(() => {
     _spawnShootingStar();
     _scheduleNext();
   }, delay);
 }
 
-function _stopShootingStars() {
+function _stopShootingStars(): void {
   if (_shootingStarTimer !== null) {
     clearTimeout(_shootingStarTimer);
     _shootingStarTimer = null;
   }
 }
 
-function _spawnShootingStar() {
+function _spawnShootingStar(): void {
   if (!_overlay) return;
 
-  const star = document.createElement('div');
+  const star: HTMLDivElement = document.createElement('div');
   star.className = 'mm-shooting-star';
 
-  const w = window.innerWidth;
-  const h = window.innerHeight;
+  const w: number = window.innerWidth;
+  const h: number = window.innerHeight;
 
   // Random start in the upper 80% of the screen
-  const x = Math.random() * w;
-  const y = Math.random() * h * 0.8;
+  const x: number = Math.random() * w;
+  const y: number = Math.random() * h * 0.8;
 
   // Random angle — mostly downward, can go left or right
   // Range: 100°–250° (broadly downward, left-to-right or right-to-left)
-  const angleDeg = 100 + Math.random() * 150;
-  const angleRad = angleDeg * Math.PI / 180;
+  const angleDeg: number = 100 + Math.random() * 150;
+  const angleRad: number = angleDeg * Math.PI / 180;
 
   // Direction vector
-  const dx = Math.cos(angleRad);
-  const dy = Math.sin(angleRad);
+  const dx: number = Math.cos(angleRad);
+  const dy: number = Math.sin(angleRad);
 
   // Random travel distance and tail length
-  const travel = 150 + Math.random() * 350;
-  const tailLen = 30 + Math.random() * 100;
-  const thickness = Math.random() < 0.3 ? 2 : 1;
-  const duration = 0.4 + Math.random() * 0.8;
+  const travel: number = 150 + Math.random() * 350;
+  const tailLen: number = 30 + Math.random() * 100;
+  const thickness: number = Math.random() < 0.3 ? 2 : 1;
+  const duration: number = 0.4 + Math.random() * 0.8;
 
   // The tail gradient points opposite to travel direction
   star.style.width = tailLen + 'px';
@@ -105,10 +106,10 @@ function _spawnShootingStar() {
   star.style.background = `linear-gradient(90deg, transparent, rgba(255,255,255,${0.5 + Math.random() * 0.4}))`;
 
   // Animate using JS for true directional movement
-  const endX = x + dx * travel;
-  const endY = y + dy * travel;
+  const endX: number = x + dx * travel;
+  const endY: number = y + dy * travel;
 
-  const anim = star.animate([
+  const anim: Animation = star.animate([
     { left: x + 'px', top: y + 'px', opacity: 0 },
     { opacity: 1, offset: 0.1 },
     { opacity: 0.7, offset: 0.6 },
@@ -134,9 +135,8 @@ function _spawnShootingStar() {
  * Part IDs available at the start of a tutorial game.
  * cmd-mk1, science-module-mk1, and thermometer-mk1 are gated behind
  * tutorial mission rewards (see missions.js).
- * @type {string[]}
  */
-const TUTORIAL_STARTER_PARTS = [
+const TUTORIAL_STARTER_PARTS: string[] = [
   'probe-core-mk1', // Uncrewed probe core
   'tank-small',      // Small fuel tank
   'engine-spark',    // Starter liquid engine
@@ -146,9 +146,8 @@ const TUTORIAL_STARTER_PARTS = [
 /**
  * Part IDs available at the start of a non-tutorial (free play) game.
  * All starter-tier parts are unlocked immediately.
- * @type {string[]}
  */
-const FREE_STARTER_PARTS = [
+const FREE_STARTER_PARTS: string[] = [
   'probe-core-mk1',     // Uncrewed probe core
   'tank-small',          // Small fuel tank
   'engine-spark',        // Starter liquid engine
@@ -165,38 +164,29 @@ const FREE_STARTER_PARTS = [
 /**
  * Formats a dollar amount with commas and a dollar sign.
  * e.g. 2000000 → "$2,000,000"
- *
- * @param {number} amount
- * @returns {string}
  */
-function formatMoney(amount) {
+function formatMoney(amount: number): string {
   return '$' + Math.round(amount).toLocaleString('en-US');
 }
 
 /**
  * Formats seconds as h:mm:ss.
  * e.g. 3725 → "1:02:05"
- *
- * @param {number} totalSeconds
- * @returns {string}
  */
-function formatPlayTime(totalSeconds) {
-  const s = Math.max(0, Math.floor(totalSeconds));
-  const hours   = Math.floor(s / 3600);
-  const minutes = Math.floor((s % 3600) / 60);
-  const secs    = s % 60;
-  const mm = String(minutes).padStart(2, '0');
-  const ss = String(secs).padStart(2, '0');
+function formatPlayTime(totalSeconds: number): string {
+  const s: number = Math.max(0, Math.floor(totalSeconds));
+  const hours: number   = Math.floor(s / 3600);
+  const minutes: number = Math.floor((s % 3600) / 60);
+  const secs: number    = s % 60;
+  const mm: string = String(minutes).padStart(2, '0');
+  const ss: string = String(secs).padStart(2, '0');
   return `${hours}:${mm}:${ss}`;
 }
 
 /**
  * Formats an ISO 8601 timestamp as a localised short date + time string.
- *
- * @param {string} isoTimestamp
- * @returns {string}
  */
-function formatDate(isoTimestamp) {
+function formatDate(isoTimestamp: string): string {
   try {
     const d = new Date(isoTimestamp);
     return d.toLocaleString('en-US', {
@@ -215,7 +205,7 @@ function formatDate(isoTimestamp) {
 // CSS injection
 // ---------------------------------------------------------------------------
 
-const MENU_STYLES = `
+const MENU_STYLES: string = `
 /* ── Main Menu Overlay ──────────────────────────────────────────────────── */
 #main-menu-overlay {
   position: fixed;
@@ -741,11 +731,11 @@ const MENU_STYLES = `
 // Module state
 // ---------------------------------------------------------------------------
 
-/** The root overlay element. @type {HTMLElement | null} */
-let _overlay = null;
+/** The root overlay element. */
+let _overlay: HTMLElement | null = null;
 
-/** Callback invoked when the player has chosen a game to play. @type {Function | null} */
-let _onGameReady = null;
+/** Callback invoked when the player has chosen a game to play. */
+let _onGameReady: ((state: GameState) => void) | null = null;
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -753,13 +743,8 @@ let _onGameReady = null;
 
 /**
  * Mounts the main menu into the given container and begins the entry flow.
- *
- * @param {HTMLElement} container  The #ui-overlay div.
- * @param {(state: import('../core/gameState.js').GameState) => void} onGameReady
- *   Called with the fully-initialised game state once the player starts or
- *   loads a game.  The caller should then boot the VAB and hide this menu.
  */
-export function initMainMenu(container, onGameReady) {
+export function initMainMenu(container: HTMLElement, onGameReady: (state: GameState) => void): void {
   _onGameReady = onGameReady;
 
   // Inject styles once.
@@ -772,7 +757,7 @@ export function initMainMenu(container, onGameReady) {
 
   // Decide which screen to show first.
   const saves = listSaves();
-  const hasAnySave = saves.some((s) => s !== null);
+  const hasAnySave: boolean = saves.some((s) => s !== null);
 
   _renderTitle(_overlay);
 
@@ -793,11 +778,9 @@ export function initMainMenu(container, onGameReady) {
 
 /**
  * Renders the game title block.
- *
- * @param {HTMLElement} overlay
  */
-function _renderTitle(overlay) {
-  const block = document.createElement('div');
+function _renderTitle(overlay: HTMLElement): void {
+  const block: HTMLDivElement = document.createElement('div');
   block.className = 'mm-title-block';
   block.innerHTML = `
     <img class="mm-logo" src="/favicon.svg" alt="Space Agency Logo" />
@@ -809,12 +792,9 @@ function _renderTitle(overlay) {
 
 /**
  * Renders the load/save-selection screen.
- *
- * @param {HTMLElement} overlay
- * @param {(import('../core/saveload.js').SaveSlotSummary | null)[]} saves
  */
-function _renderLoadScreen(overlay, saves) {
-  const screen = document.createElement('div');
+function _renderLoadScreen(overlay: HTMLElement, saves: (SaveSlotSummary | null)[]): void {
+  const screen: HTMLDivElement = document.createElement('div');
   screen.className = 'mm-screen';
   screen.id = 'mm-load-screen';
   screen.setAttribute('data-screen', 'load');
@@ -822,7 +802,7 @@ function _renderLoadScreen(overlay, saves) {
   screen.innerHTML = `<h2 class="mm-screen-title">Select Save</h2>`;
 
   // Build the saves grid.
-  const grid = document.createElement('div');
+  const grid: HTMLDivElement = document.createElement('div');
   grid.className = 'mm-saves-grid';
 
   for (let i = 0; i < SAVE_SLOT_COUNT; i++) {
@@ -835,7 +815,7 @@ function _renderLoadScreen(overlay, saves) {
   screen.appendChild(grid);
 
   // Global actions row.
-  const actions = document.createElement('div');
+  const actions: HTMLDivElement = document.createElement('div');
   actions.className = 'mm-global-actions';
   actions.innerHTML = `
     <button class="mm-btn mm-btn-primary mm-btn-large" id="mm-new-game-btn">New Game</button>
@@ -847,7 +827,7 @@ function _renderLoadScreen(overlay, saves) {
   overlay.appendChild(screen);
 
   // Wire up global actions.
-  screen.querySelector('#mm-new-game-btn').addEventListener('click', () => {
+  screen.querySelector('#mm-new-game-btn')!.addEventListener('click', () => {
     _switchScreen('newgame', true);
   });
 
@@ -856,18 +836,15 @@ function _renderLoadScreen(overlay, saves) {
 
 /**
  * Builds a populated save-slot card element.
- *
- * @param {import('../core/saveload.js').SaveSlotSummary} summary
- * @returns {HTMLElement}
  */
-function _buildSaveCard(summary) {
-  const card = document.createElement('div');
+function _buildSaveCard(summary: SaveSlotSummary): HTMLDivElement {
+  const card: HTMLDivElement = document.createElement('div');
   card.className = 'mm-save-card';
   card.setAttribute('data-slot', String(summary.slotIndex));
 
-  const kiaClass = summary.crewKIA > 0 ? 'mm-stat-kia' : '';
+  const kiaClass: string = summary.crewKIA > 0 ? 'mm-stat-kia' : '';
 
-  const modeBadge = summary.gameMode === 'sandbox'
+  const modeBadge: string = summary.gameMode === 'sandbox'
     ? '<span class="mm-mode-badge mm-mode-sandbox">SANDBOX</span>'
     : summary.gameMode === 'tutorial'
       ? '<span class="mm-mode-badge mm-mode-tutorial">TUTORIAL</span>'
@@ -919,11 +896,11 @@ function _buildSaveCard(summary) {
   `;
 
   // Wire card-level actions.
-  card.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-action]');
+  card.addEventListener('click', (e: MouseEvent) => {
+    const btn = (e.target as HTMLElement).closest('[data-action]') as HTMLElement | null;
     if (!btn) return;
-    const action = btn.dataset.action;
-    const slot   = Number(btn.dataset.slot);
+    const action: string | undefined = btn.dataset.action;
+    const slot: number   = Number(btn.dataset.slot);
     if (action === 'load')   { _handleLoad(slot); }
     if (action === 'export') { _handleExport(slot); }
     if (action === 'delete') { _handleDeleteConfirm(slot, summary.saveName); }
@@ -934,12 +911,9 @@ function _buildSaveCard(summary) {
 
 /**
  * Builds a placeholder card for an empty save slot.
- *
- * @param {number} slotIndex
- * @returns {HTMLElement}
  */
-function _buildEmptySlotCard(slotIndex) {
-  const card = document.createElement('div');
+function _buildEmptySlotCard(slotIndex: number): HTMLDivElement {
+  const card: HTMLDivElement = document.createElement('div');
   card.className = 'mm-save-card mm-empty-slot';
   card.setAttribute('data-slot', String(slotIndex));
   card.innerHTML = `<span class="mm-empty-slot-label">Empty Slot ${slotIndex + 1}</span>`;
@@ -948,12 +922,9 @@ function _buildEmptySlotCard(slotIndex) {
 
 /**
  * Renders the New Game / agency-name prompt screen.
- *
- * @param {HTMLElement} overlay
- * @param {boolean} canGoBack  Whether a back button to the load screen is shown.
  */
-function _renderNewGameScreen(overlay, canGoBack) {
-  const screen = document.createElement('div');
+function _renderNewGameScreen(overlay: HTMLElement, canGoBack: boolean): void {
+  const screen: HTMLDivElement = document.createElement('div');
   screen.className = 'mm-screen';
   screen.id = 'mm-newgame-screen';
   screen.setAttribute('data-screen', 'newgame');
@@ -1020,30 +991,30 @@ function _renderNewGameScreen(overlay, canGoBack) {
 
   overlay.appendChild(screen);
 
-  const nameInput  = screen.querySelector('#mm-agency-name-input');
-  const startBtn   = screen.querySelector('#mm-start-btn');
-  const backBtn    = screen.querySelector('#mm-back-btn');
-  const errorDiv   = screen.querySelector('#mm-newgame-error');
+  const nameInput  = screen.querySelector('#mm-agency-name-input') as HTMLInputElement;
+  const startBtn   = screen.querySelector('#mm-start-btn') as HTMLButtonElement;
+  const backBtn    = screen.querySelector('#mm-back-btn') as HTMLButtonElement | null;
+  const errorDiv   = screen.querySelector('#mm-newgame-error') as HTMLElement;
 
   // Wire up game mode toggle cards.
   const modeOptions = screen.querySelectorAll('.mm-mode-option');
-  const sandboxOpts = screen.querySelector('#mm-sandbox-options');
+  const sandboxOpts = screen.querySelector('#mm-sandbox-options') as HTMLElement | null;
   for (const opt of modeOptions) {
     opt.addEventListener('click', () => {
       for (const o of modeOptions) o.classList.remove('selected');
       opt.classList.add('selected');
-      opt.querySelector('input[type="radio"]').checked = true;
+      (opt.querySelector('input[type="radio"]') as HTMLInputElement).checked = true;
       // Show/hide sandbox-specific options.
       if (sandboxOpts) {
-        sandboxOpts.style.display = opt.dataset.mode === 'sandbox' ? '' : 'none';
+        sandboxOpts.style.display = (opt as HTMLElement).dataset.mode === 'sandbox' ? '' : 'none';
       }
     });
   }
 
   // Character counter for agency name.
-  const nameCounter = screen.querySelector('#mm-agency-name-counter');
-  const updateNameCounter = () => {
-    const len = nameInput.value.length;
+  const nameCounter = screen.querySelector('#mm-agency-name-counter') as HTMLElement;
+  const updateNameCounter = (): void => {
+    const len: number = nameInput.value.length;
     nameCounter.textContent = `${len} / 48`;
     nameCounter.classList.toggle('warning', len >= 43);
   };
@@ -1053,21 +1024,21 @@ function _renderNewGameScreen(overlay, canGoBack) {
   setTimeout(() => nameInput.focus(), 50);
 
   // Allow pressing Enter to start.
-  nameInput.addEventListener('keydown', (e) => {
+  nameInput.addEventListener('keydown', (e: KeyboardEvent) => {
     if (e.key === 'Enter') startBtn.click();
   });
 
   startBtn.addEventListener('click', () => {
-    const agencyName = nameInput.value.trim();
+    const agencyName: string = nameInput.value.trim();
     if (!agencyName) {
       _showMessage(errorDiv, 'Please enter an agency name.', 'error');
       nameInput.focus();
       return;
     }
-    const selectedMode = screen.querySelector('input[name="mm-game-mode"]:checked').value;
-    const sandboxOptions = selectedMode === 'sandbox' ? {
-      malfunctionsEnabled: screen.querySelector('#mm-sandbox-malfunctions')?.checked ?? false,
-      weatherEnabled: screen.querySelector('#mm-sandbox-weather')?.checked ?? false,
+    const selectedMode: string = (screen.querySelector('input[name="mm-game-mode"]:checked') as HTMLInputElement).value;
+    const sandboxOptions: SandboxSettings | null = selectedMode === 'sandbox' ? {
+      malfunctionsEnabled: (screen.querySelector('#mm-sandbox-malfunctions') as HTMLInputElement | null)?.checked ?? false,
+      weatherEnabled: (screen.querySelector('#mm-sandbox-weather') as HTMLInputElement | null)?.checked ?? false,
     } : null;
     _startNewGame(agencyName, selectedMode, sandboxOptions);
   });
@@ -1084,15 +1055,12 @@ function _renderNewGameScreen(overlay, canGoBack) {
 /**
  * Replaces the current screen content (everything after the title block)
  * with a fresh render of the target screen.
- *
- * @param {'load' | 'newgame'} target
- * @param {boolean} canGoBack
  */
-function _switchScreen(target, canGoBack) {
+function _switchScreen(target: 'load' | 'newgame', canGoBack: boolean): void {
   if (!_overlay) return;
 
   // Remove all but the title block.
-  const children = Array.from(_overlay.children);
+  const children: Element[] = Array.from(_overlay.children);
   for (const child of children) {
     if (!child.classList.contains('mm-title-block')) {
       child.remove();
@@ -1113,41 +1081,34 @@ function _switchScreen(target, canGoBack) {
 
 /**
  * Loads the game from the given save slot and begins the game.
- *
- * @param {number} slotIndex
  */
-function _handleLoad(slotIndex) {
+function _handleLoad(slotIndex: number): void {
   try {
     const state = loadGame(slotIndex);
     reconcileParts(state);
     _beginGame(state);
-  } catch (err) {
+  } catch (err: unknown) {
     console.error('[MainMenu] Load failed:', err);
-    _showGlobalError(`Failed to load save: ${err.message}`);
+    _showGlobalError(`Failed to load save: ${(err as Error).message}`);
   }
 }
 
 /**
  * Exports the save in the given slot as a JSON file download.
- *
- * @param {number} slotIndex
  */
-function _handleExport(slotIndex) {
+function _handleExport(slotIndex: number): void {
   try {
     exportSave(slotIndex);
-  } catch (err) {
+  } catch (err: unknown) {
     console.error('[MainMenu] Export failed:', err);
-    _showGlobalError(`Export failed: ${err.message}`);
+    _showGlobalError(`Export failed: ${(err as Error).message}`);
   }
 }
 
 /**
  * Shows a confirmation dialog then deletes the save if confirmed.
- *
- * @param {number} slotIndex
- * @param {string} saveName  Human-readable name shown in the dialog.
  */
-function _handleDeleteConfirm(slotIndex, saveName) {
+function _handleDeleteConfirm(slotIndex: number, saveName: string): void {
   _showConfirmModal(
     'Delete Save',
     `Are you sure you want to delete "${_escapeHtml(saveName)}"? This cannot be undone.`,
@@ -1158,14 +1119,14 @@ function _handleDeleteConfirm(slotIndex, saveName) {
         // Refresh the load screen.
         _switchScreen('load', false);
         const saves = listSaves();
-        const hasAnySave = saves.some((s) => s !== null);
+        const hasAnySave: boolean = saves.some((s) => s !== null);
         if (!hasAnySave) {
           // All saves deleted — go straight to new game.
           _switchScreen('newgame', false);
         }
-      } catch (err) {
+      } catch (err: unknown) {
         console.error('[MainMenu] Delete failed:', err);
-        _showGlobalError(`Delete failed: ${err.message}`);
+        _showGlobalError(`Delete failed: ${(err as Error).message}`);
       }
     }
   );
@@ -1173,16 +1134,12 @@ function _handleDeleteConfirm(slotIndex, saveName) {
 
 /**
  * Creates a fresh game state for a new game and begins playing.
- *
- * @param {string} agencyName
- * @param {string} selectedMode  GameMode enum value ('tutorial', 'freeplay', 'sandbox').
- * @param {import('../core/gameState.js').SandboxSettings|null} sandboxOptions  Sandbox toggle settings (null if not sandbox).
  */
-function _startNewGame(agencyName, selectedMode, sandboxOptions = null) {
+function _startNewGame(agencyName: string, selectedMode: string, sandboxOptions: SandboxSettings | null = null): void {
   const state = createGameState();
   state.agencyName = agencyName;
   state.tutorialMode = selectedMode === GameMode.TUTORIAL;
-  state.gameMode = selectedMode;
+  state.gameMode = selectedMode as GameMode;
 
   if (selectedMode === GameMode.SANDBOX) {
     // -- Sandbox initialisation -----------------------------------------------
@@ -1201,11 +1158,11 @@ function _startNewGame(agencyName, selectedMode, sandboxOptions = null) {
     }
 
     // All parts unlocked.
-    state.parts = getAllParts().map((p) => p.id);
+    state.parts = getAllParts().map((p: { id: string }) => p.id);
 
     // All tech tree nodes researched and instruments unlocked.
-    const researched = [];
-    const instruments = [];
+    const researched: string[] = [];
+    const instruments: string[] = [];
     for (const node of TECH_NODES) {
       researched.push(node.id);
       for (const iid of node.unlocksInstruments) {
@@ -1229,36 +1186,34 @@ function _startNewGame(agencyName, selectedMode, sandboxOptions = null) {
 
 /**
  * Wires up the "Import Save" button and hidden file input.
- *
- * @param {HTMLElement} screen
  */
-function _wireImportButton(screen) {
-  const importBtn   = screen.querySelector('#mm-import-btn');
-  const fileInput   = screen.querySelector('#mm-import-file-input');
+function _wireImportButton(screen: HTMLElement): void {
+  const importBtn   = screen.querySelector('#mm-import-btn') as HTMLButtonElement;
+  const fileInput   = screen.querySelector('#mm-import-file-input') as HTMLInputElement;
 
   importBtn.addEventListener('click', () => fileInput.click());
 
   fileInput.addEventListener('change', () => {
-    const file = fileInput.files && fileInput.files[0];
+    const file: File | undefined = fileInput.files?.[0];
     if (!file) return;
     fileInput.value = ''; // Reset so the same file can be re-imported.
 
     const reader = new FileReader();
-    reader.onload = (event) => {
-      const jsonString = event.target.result;
+    reader.onload = (event: ProgressEvent<FileReader>) => {
+      const jsonString = event.target?.result as string;
 
       // Find the first empty slot; if all are full, use slot 0 (overwrites oldest).
       const saves = listSaves();
-      let targetSlot = saves.findIndex((s) => s === null);
+      let targetSlot: number = saves.findIndex((s) => s === null);
       if (targetSlot === -1) targetSlot = 0;
 
       try {
         importSave(jsonString, targetSlot);
         // Refresh the load screen to show the imported save.
         _switchScreen('load', false);
-      } catch (err) {
+      } catch (err: unknown) {
         console.error('[MainMenu] Import failed:', err);
-        _showGlobalError(`Import failed: ${err.message}`);
+        _showGlobalError(`Import failed: ${(err as Error).message}`);
       }
     };
     reader.onerror = () => {
@@ -1270,10 +1225,8 @@ function _wireImportButton(screen) {
 
 /**
  * Fades out the menu and invokes the onGameReady callback.
- *
- * @param {import('../core/gameState.js').GameState} state
  */
-function _beginGame(state) {
+function _beginGame(state: GameState): void {
   if (!_overlay) return;
 
   _stopShootingStars();
@@ -1296,14 +1249,9 @@ function _beginGame(state) {
 
 /**
  * Shows a confirm/cancel modal dialog.
- *
- * @param {string}   title       Modal heading.
- * @param {string}   body        Body text (HTML-escaped internally).
- * @param {string}   confirmText Label for the confirm button.
- * @param {Function} onConfirm   Called if the player confirms.
  */
-function _showConfirmModal(title, body, confirmText, onConfirm) {
-  const backdrop = document.createElement('div');
+function _showConfirmModal(title: string, body: string, confirmText: string, onConfirm: () => void): void {
+  const backdrop: HTMLDivElement = document.createElement('div');
   backdrop.className = 'mm-modal-backdrop';
   backdrop.innerHTML = `
     <div class="mm-modal" role="dialog" aria-modal="true">
@@ -1317,31 +1265,29 @@ function _showConfirmModal(title, body, confirmText, onConfirm) {
   `;
   document.body.appendChild(backdrop);
 
-  const remove = () => backdrop.remove();
+  const remove = (): void => backdrop.remove();
 
-  backdrop.querySelector('#mm-modal-confirm').addEventListener('click', () => {
+  backdrop.querySelector('#mm-modal-confirm')!.addEventListener('click', () => {
     remove();
     onConfirm();
   });
-  backdrop.querySelector('#mm-modal-cancel').addEventListener('click', remove);
-  backdrop.addEventListener('click', (e) => {
+  backdrop.querySelector('#mm-modal-cancel')!.addEventListener('click', remove);
+  backdrop.addEventListener('click', (e: MouseEvent) => {
     if (e.target === backdrop) remove();
   });
 }
 
 /**
  * Displays an error message banner at the top of the current screen.
- *
- * @param {string} message
  */
-function _showGlobalError(message) {
+function _showGlobalError(message: string): void {
   if (!_overlay) return;
 
   // Remove any previous global error banner.
   const existing = _overlay.querySelector('.mm-global-error');
   if (existing) existing.remove();
 
-  const banner = document.createElement('div');
+  const banner: HTMLDivElement = document.createElement('div');
   banner.className = 'mm-message mm-message-error mm-global-error';
   banner.textContent = message;
 
@@ -1356,12 +1302,8 @@ function _showGlobalError(message) {
 
 /**
  * Shows an inline message (error or info) inside a target container.
- *
- * @param {HTMLElement} container
- * @param {string}      message
- * @param {'error'|'info'} type
  */
-function _showMessage(container, message, type) {
+function _showMessage(container: HTMLElement, message: string, type: 'error' | 'info'): void {
   container.className = `mm-message mm-message-${type}`;
   container.textContent = message;
 }
@@ -1372,11 +1314,8 @@ function _showMessage(container, message, type) {
 
 /**
  * Escapes a string for safe insertion as HTML text content.
- *
- * @param {string} str
- * @returns {string}
  */
-function _escapeHtml(str) {
+function _escapeHtml(str: string): string {
   return String(str)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')

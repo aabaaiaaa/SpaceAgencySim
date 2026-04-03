@@ -1,5 +1,5 @@
 /**
- * satelliteOps.js — Satellite Network Operations Centre HTML overlay UI.
+ * satelliteOps.ts — Satellite Network Operations Centre HTML overlay UI.
  *
  * Displays:
  *   - Network overview: total active satellites, capacity, constellation status.
@@ -16,16 +16,14 @@
  * @module satelliteOps
  */
 
+import type { GameState, SatelliteRecord } from '../core/gameState.js';
 import {
   SatelliteType,
   SATELLITE_VALID_BANDS,
   CONSTELLATION_THRESHOLD,
   SATELLITE_AUTO_MAINTENANCE_COST,
   SATELLITE_DEGRADED_THRESHOLD,
-  SATELLITE_LEASE_INCOME,
-  SATELLITE_LEASE_INCOME_DEFAULT,
   SATELLITE_REPOSITION_COST,
-  SATELLITE_REPOSITION_HEALTH_COST,
   SATELLITE_OPS_TIER_LABELS,
 } from '../core/constants.js';
 import {
@@ -38,6 +36,33 @@ import {
   getRepositionTargets,
 } from '../core/satellites.js';
 import { injectStyleOnce } from './injectStyle.js';
+
+// ---------------------------------------------------------------------------
+// Local type for the network summary returned by getNetworkSummary.
+// The interface is not exported from satellites.ts so we replicate it here.
+// ---------------------------------------------------------------------------
+
+interface NetworkBenefits {
+  transmitYieldBonus: number;
+  weatherSkipDiscount: number;
+  forecastAccuracy: number;
+  sciencePerPeriod: number;
+  landingThresholdBonus: number;
+  recoveryBonus: number;
+  deepSpaceComms: boolean;
+}
+
+interface NetworkSummary {
+  totalActive: number;
+  capacity: number;
+  tier: number;
+  leasedCount: number;
+  totalLeaseIncome: number;
+  byType: Record<string, { count: number; constellation: boolean }>;
+  benefits: NetworkBenefits;
+  satellites: SatelliteRecord[];
+  satellitePowerInfo: Record<string, { sunlitFraction: number; avgGeneration: number; altitude: number }>;
+}
 
 // ---------------------------------------------------------------------------
 // CSS
@@ -415,15 +440,15 @@ const SAT_OPS_STYLES = `
 // Module state
 // ---------------------------------------------------------------------------
 
-let _overlay = null;
-let _state = null;
-let _onBack = null;
+let _overlay: HTMLDivElement | null = null;
+let _state: GameState | null = null;
+let _onBack: (() => void) | null = null;
 
 // ---------------------------------------------------------------------------
 // Satellite type display helpers
 // ---------------------------------------------------------------------------
 
-const SAT_TYPE_LABELS = {
+const SAT_TYPE_LABELS: Record<string, string> = {
   [SatelliteType.COMMUNICATION]: 'Communication',
   [SatelliteType.WEATHER]:       'Weather',
   [SatelliteType.SCIENCE]:       'Science',
@@ -432,7 +457,7 @@ const SAT_TYPE_LABELS = {
   GENERIC:                       'Generic',
 };
 
-const SAT_TYPE_ICONS = {
+const SAT_TYPE_ICONS: Record<string, string> = {
   [SatelliteType.COMMUNICATION]: '\u{1F4E1}',
   [SatelliteType.WEATHER]:       '\u{1F327}',
   [SatelliteType.SCIENCE]:       '\u{1F52C}',
@@ -447,12 +472,12 @@ const SAT_TYPE_ICONS = {
 
 /**
  * Mount the Satellite Operations Centre overlay.
- *
- * @param {HTMLElement} container  The #ui-overlay div.
- * @param {import('../core/gameState.js').GameState} state
- * @param {{ onBack: () => void }} opts
  */
-export function initSatelliteOpsUI(container, state, { onBack }) {
+export function initSatelliteOpsUI(
+  container: HTMLElement,
+  state: GameState,
+  { onBack }: { onBack: () => void },
+): void {
   _state = state;
   _onBack = onBack;
 
@@ -464,31 +489,28 @@ export function initSatelliteOpsUI(container, state, { onBack }) {
   container.appendChild(_overlay);
 
   _render();
-
-
 }
 
 /**
  * Remove the Satellite Operations Centre overlay.
  */
-export function destroySatelliteOpsUI() {
+export function destroySatelliteOpsUI(): void {
   if (_overlay) {
     _overlay.remove();
     _overlay = null;
   }
   _state = null;
   _onBack = null;
-
 }
 
 // ---------------------------------------------------------------------------
 // Rendering
 // ---------------------------------------------------------------------------
 
-function _render() {
+function _render(): void {
   if (!_overlay || !_state) return;
 
-  const summary = getNetworkSummary(_state);
+  const summary = getNetworkSummary(_state) as NetworkSummary;
 
   _overlay.innerHTML = '';
 
@@ -498,7 +520,7 @@ function _render() {
 
   const backBtn = document.createElement('button');
   backBtn.id = 'sat-ops-back-btn';
-  backBtn.textContent = '← Hub';
+  backBtn.textContent = '\u2190 Hub';
   backBtn.addEventListener('click', () => {
     const onBack = _onBack; // capture before destroy nulls it
     destroySatelliteOpsUI();
@@ -508,7 +530,7 @@ function _render() {
 
   const title = document.createElement('h1');
   title.id = 'sat-ops-title';
-  const satTierLabel = SATELLITE_OPS_TIER_LABELS[summary.tier] || '';
+  const satTierLabel = (SATELLITE_OPS_TIER_LABELS as Record<number, string>)[summary.tier] || '';
   title.textContent = `Satellite Network Operations \u2014 Tier ${summary.tier}` + (satTierLabel ? ` (${satTierLabel})` : '');
   header.appendChild(title);
 
@@ -548,7 +570,7 @@ function _render() {
 /**
  * Render the overview cards (active count, capacity, constellation status).
  */
-function _renderOverview(summary) {
+function _renderOverview(summary: NetworkSummary): HTMLDivElement {
   const section = document.createElement('div');
   section.className = 'sat-section';
 
@@ -598,7 +620,7 @@ function _renderOverview(summary) {
 /**
  * Render the aggregate benefits table.
  */
-function _renderBenefits(summary) {
+function _renderBenefits(summary: NetworkSummary): HTMLDivElement {
   const section = document.createElement('div');
   section.className = 'sat-section';
 
@@ -616,7 +638,7 @@ function _renderBenefits(summary) {
   const tbody = document.createElement('tbody');
   const b = summary.benefits;
 
-  const rows = [
+  const rows: [string, boolean, string][] = [
     ['Science Transmit Bonus', b.transmitYieldBonus > 0, `+${(b.transmitYieldBonus * 100).toFixed(0)}%`],
     ['Weather Skip Discount', b.weatherSkipDiscount > 0, `${(b.weatherSkipDiscount * 100).toFixed(0)}% off`],
     ['Forecast Accuracy', b.forecastAccuracy > 0, `+${(b.forecastAccuracy * 100).toFixed(0)}%`],
@@ -647,7 +669,7 @@ function _renderBenefits(summary) {
  * Render constellation management panel (Tier 2+).
  * Shows each satellite type, its count, constellation status, and benefits.
  */
-function _renderConstellationManagement(summary) {
+function _renderConstellationManagement(summary: NetworkSummary): HTMLDivElement {
   const section = document.createElement('div');
   section.className = 'sat-section';
 
@@ -684,7 +706,7 @@ function _renderConstellationManagement(summary) {
     card.appendChild(statusLbl);
 
     // Show valid bands.
-    const validBands = SATELLITE_VALID_BANDS[type];
+    const validBands = (SATELLITE_VALID_BANDS as Record<string, string[]>)[type];
     if (validBands) {
       const bandsLbl = document.createElement('div');
       bandsLbl.style.cssText = 'font-size:0.72rem;color:#667;margin-top:4px';
@@ -703,7 +725,7 @@ function _renderConstellationManagement(summary) {
  * Render network planning view (Tier 3).
  * Shows satellites grouped by altitude band and body.
  */
-function _renderNetworkPlanning(summary) {
+function _renderNetworkPlanning(summary: NetworkSummary): HTMLDivElement {
   const section = document.createElement('div');
   section.className = 'sat-section';
 
@@ -711,9 +733,9 @@ function _renderNetworkPlanning(summary) {
   h2.textContent = 'Network Planning';
   section.appendChild(h2);
 
-  // Group active satellites by body → band.
+  // Group active satellites by body -> band.
   const activeSats = summary.satellites.filter(s => s.health > 0);
-  const byBody = {};
+  const byBody: Record<string, Record<string, SatelliteRecord[]>> = {};
   for (const sat of activeSats) {
     if (!byBody[sat.bodyId]) byBody[sat.bodyId] = {};
     if (!byBody[sat.bodyId][sat.bandId]) byBody[sat.bodyId][sat.bandId] = [];
@@ -748,7 +770,7 @@ function _renderNetworkPlanning(summary) {
 
       const countLbl = document.createElement('div');
       countLbl.className = 'sat-count';
-      const types = {};
+      const types: Record<string, number> = {};
       for (const s of sats) {
         const t = SAT_TYPE_LABELS[s.satelliteType] || 'Generic';
         types[t] = (types[t] || 0) + 1;
@@ -787,7 +809,7 @@ function _renderNetworkPlanning(summary) {
  * Tier 3 feature: visualises which fraction of each satellite's orbit is in
  * shadow vs sunlight with a simple bar chart.
  */
-function _renderShadowOverlay(summary) {
+function _renderShadowOverlay(summary: NetworkSummary): HTMLDivElement {
   const section = document.createElement('div');
   section.className = 'sat-section';
 
@@ -858,7 +880,7 @@ function _renderShadowOverlay(summary) {
 /**
  * Render the list of all satellites (active and decommissioned).
  */
-function _renderSatelliteList(summary) {
+function _renderSatelliteList(summary: NetworkSummary): HTMLDivElement {
   const section = document.createElement('div');
   section.className = 'sat-section';
 
@@ -888,7 +910,11 @@ function _renderSatelliteList(summary) {
 /**
  * Render a single satellite card.
  */
-function _renderSatCard(sat, facilityTier, powerInfo) {
+function _renderSatCard(
+  sat: SatelliteRecord,
+  facilityTier: number,
+  powerInfo: { sunlitFraction: number; avgGeneration: number; altitude: number } | null,
+): HTMLDivElement {
   const card = document.createElement('div');
   let cardClass = 'sat-card';
   if (sat.health <= 0) cardClass += ' decommissioned';
@@ -957,7 +983,7 @@ function _renderSatCard(sat, facilityTier, powerInfo) {
     checkbox.type = 'checkbox';
     checkbox.checked = sat.autoMaintain;
     checkbox.addEventListener('change', () => {
-      setAutoMaintenance(_state, sat.id, checkbox.checked);
+      setAutoMaintenance(_state!, sat.id, checkbox.checked);
       _render();
     });
     toggle.appendChild(checkbox);
@@ -972,7 +998,7 @@ function _renderSatCard(sat, facilityTier, powerInfo) {
       leaseBtn.className = 'sat-lease-btn' + (sat.leased ? ' active' : '');
       leaseBtn.textContent = sat.leased ? 'End Lease' : 'Lease';
       leaseBtn.addEventListener('click', () => {
-        setSatelliteLease(_state, sat.id, !sat.leased);
+        setSatelliteLease(_state!, sat.id, !sat.leased);
         _render();
       });
       controls.appendChild(leaseBtn);
@@ -980,11 +1006,11 @@ function _renderSatCard(sat, facilityTier, powerInfo) {
 
     // Reposition (Tier 3).
     if (facilityTier >= 3) {
-      const targets = getRepositionTargets(_state, sat.id);
+      const targets = getRepositionTargets(_state!, sat.id);
       if (targets.length > 0) {
         const reposBtn = document.createElement('button');
         reposBtn.className = 'sat-reposition-btn';
-        reposBtn.textContent = `Reposition ($${(SATELLITE_REPOSITION_COST.SAME_BODY / 1000).toFixed(0)}k)`;
+        reposBtn.textContent = `Reposition ($${((SATELLITE_REPOSITION_COST as Record<string, number>).SAME_BODY / 1000).toFixed(0)}k)`;
         reposBtn.addEventListener('click', () => {
           _showRepositionDropdown(card, sat, targets, reposBtn);
         });
@@ -997,7 +1023,7 @@ function _renderSatCard(sat, facilityTier, powerInfo) {
     decommBtn.className = 'sat-decommission-btn';
     decommBtn.textContent = 'Decommission';
     decommBtn.addEventListener('click', () => {
-      decommissionSatellite(_state, sat.id);
+      decommissionSatellite(_state!, sat.id);
       _render();
     });
     controls.appendChild(decommBtn);
@@ -1011,7 +1037,12 @@ function _renderSatCard(sat, facilityTier, powerInfo) {
 /**
  * Show a dropdown to select repositioning target band.
  */
-function _showRepositionDropdown(card, sat, targets, triggerBtn) {
+function _showRepositionDropdown(
+  card: HTMLDivElement,
+  sat: SatelliteRecord,
+  targets: Array<{ id: string; name: string }>,
+  triggerBtn: HTMLButtonElement,
+): void {
   // Remove any existing dropdown.
   const existing = card.querySelector('.sat-reposition-select');
   if (existing) {
@@ -1036,7 +1067,7 @@ function _showRepositionDropdown(card, sat, targets, triggerBtn) {
 
   select.addEventListener('change', () => {
     if (!select.value) return;
-    const result = repositionSatellite(_state, sat.id, select.value);
+    const result = repositionSatellite(_state!, sat.id, select.value);
     if (!result.success) {
       alert(result.reason);
     }
@@ -1044,14 +1075,14 @@ function _showRepositionDropdown(card, sat, targets, triggerBtn) {
   });
 
   // Insert after the trigger button.
-  triggerBtn.parentElement.insertBefore(select, triggerBtn.nextSibling);
+  triggerBtn.parentElement!.insertBefore(select, triggerBtn.nextSibling);
 }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function _card(label, value, isConstellation = false, isIncome = false) {
+function _card(label: string, value: string, isConstellation: boolean = false, isIncome: boolean = false): HTMLDivElement {
   const card = document.createElement('div');
   card.className = 'sat-overview-card';
   let valueClass = 'value';

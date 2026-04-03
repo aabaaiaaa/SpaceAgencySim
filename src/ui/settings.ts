@@ -1,5 +1,5 @@
 /**
- * settings.js — Game Settings (Difficulty) panel UI.
+ * settings.ts — Game Settings (Difficulty) panel UI.
  *
  * Renders a full-screen overlay accessible from the hub that lets the player
  * adjust difficulty options mid-game:
@@ -23,13 +23,15 @@ import {
 import { getDifficultySettings, updateDifficultySettings } from '../core/settings.js';
 import { createListenerTracker } from './listenerTracker.js';
 import { injectStyleOnce } from './injectStyle.js';
+import type { GameState } from '../core/gameState.js';
+import type { DifficultySettings } from '../core/constants.js';
 
 // ---------------------------------------------------------------------------
 // CSS
 // ---------------------------------------------------------------------------
 
 const SETTINGS_STYLES = `
-/* ── Settings panel overlay ──────────────────────────────────────────────── */
+/* -- Settings panel overlay -- */
 #settings-panel {
   position: fixed;
   inset: 0;
@@ -71,7 +73,7 @@ const SETTINGS_STYLES = `
   text-transform: uppercase;
 }
 
-/* ── Setting row ─────────────────────────────────────────────────────────── */
+/* -- Setting row -- */
 .settings-group {
   width: 100%;
   margin-bottom: 22px;
@@ -125,7 +127,7 @@ const SETTINGS_STYLES = `
   font-weight: 600;
 }
 
-/* ── Close button ────────────────────────────────────────────────────────── */
+/* -- Close button -- */
 .settings-close-btn {
   margin-top: var(--space-xl);
   padding: var(--btn-padding-xl);
@@ -149,7 +151,19 @@ const SETTINGS_STYLES = `
 // Setting definitions
 // ---------------------------------------------------------------------------
 
-const SETTING_DEFS = [
+interface SettingOption {
+  value: string;
+  label: string;
+}
+
+interface SettingDef {
+  key: keyof DifficultySettings;
+  label: string;
+  hint: string;
+  options: SettingOption[];
+}
+
+const SETTING_DEFS: SettingDef[] = [
   {
     key: 'malfunctionFrequency',
     label: 'Malfunction Frequency',
@@ -201,10 +215,10 @@ const SETTING_DEFS = [
 /**
  * Open the settings panel overlay.
  *
- * @param {HTMLElement} container  The #ui-overlay div.
- * @param {import('../core/gameState.js').GameState} state
+ * @param container  The #ui-overlay div.
+ * @param state
  */
-export function openSettingsPanel(container, state) {
+export function openSettingsPanel(container: HTMLElement, state: GameState): void {
   // Prevent duplicate.
   if (document.getElementById('settings-panel')) return;
 
@@ -214,50 +228,50 @@ export function openSettingsPanel(container, state) {
   const tracker = createListenerTracker();
 
   /** Remove all tracked listeners, then remove the panel from the DOM. */
-  function closePanel() {
+  function closePanel(): void {
     tracker.removeAll();
     panel.remove();
   }
 
-  const panel = document.createElement('div');
+  const panel: HTMLDivElement = document.createElement('div');
   panel.id = 'settings-panel';
 
-  const content = document.createElement('div');
+  const content: HTMLDivElement = document.createElement('div');
   content.className = 'settings-content';
   panel.appendChild(content);
 
-  // ── Heading ────────────────────────────────────────────────────────────
-  const heading = document.createElement('h1');
+  // -- Heading --
+  const heading: HTMLHeadingElement = document.createElement('h1');
   heading.textContent = 'Game Settings';
   content.appendChild(heading);
 
-  const subtitle = document.createElement('p');
+  const subtitle: HTMLParagraphElement = document.createElement('p');
   subtitle.className = 'settings-subtitle';
-  subtitle.textContent = 'Difficulty options — changes take effect immediately';
+  subtitle.textContent = 'Difficulty options \u2014 changes take effect immediately';
   content.appendChild(subtitle);
 
-  // ── Setting groups ─────────────────────────────────────────────────────
+  // -- Setting groups --
   const current = getDifficultySettings(state);
 
   for (const def of SETTING_DEFS) {
-    const group = document.createElement('div');
+    const group: HTMLDivElement = document.createElement('div');
     group.className = 'settings-group';
 
-    const labelEl = document.createElement('p');
+    const labelEl: HTMLParagraphElement = document.createElement('p');
     labelEl.className = 'settings-group-label';
     labelEl.textContent = def.label;
     group.appendChild(labelEl);
 
-    const hintEl = document.createElement('p');
+    const hintEl: HTMLParagraphElement = document.createElement('p');
     hintEl.className = 'settings-group-hint';
     hintEl.textContent = def.hint;
     group.appendChild(hintEl);
 
-    const optionsRow = document.createElement('div');
+    const optionsRow: HTMLDivElement = document.createElement('div');
     optionsRow.className = 'settings-options';
 
     for (const opt of def.options) {
-      const btn = document.createElement('button');
+      const btn: HTMLButtonElement = document.createElement('button');
       btn.className = 'settings-option-btn';
       btn.textContent = opt.label;
       btn.setAttribute('data-setting', def.key);
@@ -269,7 +283,7 @@ export function openSettingsPanel(container, state) {
 
       tracker.add(btn, 'click', () => {
         // Update state.
-        updateDifficultySettings(state, { [def.key]: opt.value });
+        updateDifficultySettings(state, { [def.key]: opt.value } as Partial<DifficultySettings>);
 
         // Update UI — deactivate siblings, activate clicked.
         for (const sibling of optionsRow.querySelectorAll('.settings-option-btn')) {
@@ -285,31 +299,31 @@ export function openSettingsPanel(container, state) {
     content.appendChild(group);
   }
 
-  // ── Auto-save toggle ────────────────────────────────────────────────────
+  // -- Auto-save toggle --
   {
-    const group = document.createElement('div');
+    const group: HTMLDivElement = document.createElement('div');
     group.className = 'settings-group';
 
-    const labelEl = document.createElement('p');
+    const labelEl: HTMLParagraphElement = document.createElement('p');
     labelEl.className = 'settings-group-label';
     labelEl.textContent = 'Auto-Save';
     group.appendChild(labelEl);
 
-    const hintEl = document.createElement('p');
+    const hintEl: HTMLParagraphElement = document.createElement('p');
     hintEl.className = 'settings-group-hint';
     hintEl.textContent = 'Automatically save at end of flight and on return to hub.';
     group.appendChild(hintEl);
 
-    const optionsRow = document.createElement('div');
+    const optionsRow: HTMLDivElement = document.createElement('div');
     optionsRow.className = 'settings-options';
 
-    const onBtn = document.createElement('button');
+    const onBtn: HTMLButtonElement = document.createElement('button');
     onBtn.className = 'settings-option-btn';
     onBtn.textContent = 'On';
     onBtn.setAttribute('data-setting', 'autoSave');
     onBtn.setAttribute('data-value', 'on');
 
-    const offBtn = document.createElement('button');
+    const offBtn: HTMLButtonElement = document.createElement('button');
     offBtn.className = 'settings-option-btn';
     offBtn.textContent = 'Off';
     offBtn.setAttribute('data-setting', 'autoSave');
@@ -339,31 +353,31 @@ export function openSettingsPanel(container, state) {
     content.appendChild(group);
   }
 
-  // ── Debug Mode toggle ────────────────────────────────────────────────────
+  // -- Debug Mode toggle --
   {
-    const group = document.createElement('div');
+    const group: HTMLDivElement = document.createElement('div');
     group.className = 'settings-group';
 
-    const labelEl = document.createElement('p');
+    const labelEl: HTMLParagraphElement = document.createElement('p');
     labelEl.className = 'settings-group-label';
     labelEl.textContent = 'Debug Mode';
     group.appendChild(labelEl);
 
-    const hintEl = document.createElement('p');
+    const hintEl: HTMLParagraphElement = document.createElement('p');
     hintEl.className = 'settings-group-hint';
     hintEl.textContent = 'Enable debug features: debug saves (Ctrl+Shift+D), FPS monitor.';
     group.appendChild(hintEl);
 
-    const optionsRow = document.createElement('div');
+    const optionsRow: HTMLDivElement = document.createElement('div');
     optionsRow.className = 'settings-options';
 
-    const onBtn = document.createElement('button');
+    const onBtn: HTMLButtonElement = document.createElement('button');
     onBtn.className = 'settings-option-btn';
     onBtn.textContent = 'On';
     onBtn.setAttribute('data-setting', 'debugMode');
     onBtn.setAttribute('data-value', 'on');
 
-    const offBtn = document.createElement('button');
+    const offBtn: HTMLButtonElement = document.createElement('button');
     offBtn.className = 'settings-option-btn';
     offBtn.textContent = 'Off';
     offBtn.setAttribute('data-setting', 'debugMode');
@@ -393,8 +407,8 @@ export function openSettingsPanel(container, state) {
     content.appendChild(group);
   }
 
-  // ── Close button ───────────────────────────────────────────────────────
-  const closeBtn = document.createElement('button');
+  // -- Close button --
+  const closeBtn: HTMLButtonElement = document.createElement('button');
   closeBtn.className = 'settings-close-btn';
   closeBtn.textContent = '\u2190 Hub';
   tracker.add(closeBtn, 'click', () => closePanel());

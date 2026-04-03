@@ -1,5 +1,5 @@
 /**
- * _designLibrary.js — Save/load design overlays, library card building, design import into VAB.
+ * _designLibrary.ts — Save/load design overlays, library card building, design import into VAB.
  */
 
 import { getPartById } from '../../data/parts.js';
@@ -10,7 +10,9 @@ import {
   createStagingConfig,
   syncStagingWithAssembly,
 } from '../../core/rocketbuilder.js';
+import type { RocketAssembly } from '../../core/rocketbuilder.js';
 import { createRocketDesign } from '../../core/gameState.js';
+import type { GameState, RocketDesign } from '../../core/gameState.js';
 import { injectStyleOnce } from '../injectStyle.js';
 import {
   getAllDesigns,
@@ -23,6 +25,7 @@ import {
   getDesignGroupDefs,
   filterDesignsByGroup,
 } from '../../core/designLibrary.js';
+import type { CostBreakdown, CompatibilityResult } from '../../core/designLibrary.js';
 import {
   vabSetAssembly,
   vabRenderParts,
@@ -35,14 +38,14 @@ import { clearUndoRedo } from '../../core/undoRedo.js';
 // ---------------------------------------------------------------------------
 // Forward references — set by _init.js to break circular deps
 // ---------------------------------------------------------------------------
-let _renderStagingPanelFn = () => {};
-let _runAndRenderValidationFn = () => {};
-let _updateStatusBarFn = () => {};
-let _updateScaleBarExtentsFn = () => {};
-let _updateOffscreenIndicatorsFn = () => {};
-let _setSelectedPartFn = (_id) => {};
-let _refundOrReturnPartFn = (_instId, _partId) => {};
-let _vabRefreshPartsFn = (_state) => {};
+let _renderStagingPanelFn: () => void = () => {};
+let _runAndRenderValidationFn: () => void = () => {};
+let _updateStatusBarFn: () => void = () => {};
+let _updateScaleBarExtentsFn: () => void = () => {};
+let _updateOffscreenIndicatorsFn: () => void = () => {};
+let _setSelectedPartFn: (id: string | null) => void = (_id: string | null) => {};
+let _refundOrReturnPartFn: (instId: string, partId: string) => void = (_instId: string, _partId: string) => {};
+let _vabRefreshPartsFn: (state: GameState) => void = (_state: GameState) => {};
 
 export function setDesignLibraryCallbacks({
   renderStagingPanel,
@@ -53,7 +56,16 @@ export function setDesignLibraryCallbacks({
   setSelectedPart,
   refundOrReturnPart,
   vabRefreshParts,
-}) {
+}: {
+  renderStagingPanel: () => void;
+  runAndRenderValidation: () => void;
+  updateStatusBar: () => void;
+  updateScaleBarExtents: () => void;
+  updateOffscreenIndicators: () => void;
+  setSelectedPart: (id: string | null) => void;
+  refundOrReturnPart: (instId: string, partId: string) => void;
+  vabRefreshParts: (state: GameState) => void;
+}): void {
   _renderStagingPanelFn = renderStagingPanel;
   _runAndRenderValidationFn = runAndRenderValidation;
   _updateStatusBarFn = updateStatusBar;
@@ -66,9 +78,8 @@ export function setDesignLibraryCallbacks({
 
 /**
  * Show a brief toast message near the top of the VAB.
- * @param {string} msg
  */
-export function showToast(msg) {
+export function showToast(msg: string): void {
   const toast = document.createElement('div');
   toast.textContent = msg;
   toast.style.cssText =
@@ -84,7 +95,7 @@ export function showToast(msg) {
 /**
  * Show a save-name prompt and persist the current assembly as a saved design.
  */
-export function handleSaveDesign() {
+export function handleSaveDesign(): void {
   const S = getVabState();
   if (!S.assembly || S.assembly.parts.size === 0 || !S.gameState) {
     alert('Nothing to save.');
@@ -99,7 +110,7 @@ export function handleSaveDesign() {
   const defaultName = S.currentDesignName || 'Rocket Design ' + new Date().toLocaleDateString();
 
   const existingDesign = S.currentDesignId
-    ? getAllDesigns(S.gameState).find(d => d.id === S.currentDesignId)
+    ? getAllDesigns(S.gameState).find((d: RocketDesign) => d.id === S.currentDesignId)
     : null;
   const wasPrivate = existingDesign?.savePrivate ?? false;
 
@@ -120,11 +131,11 @@ export function handleSaveDesign() {
 
   document.body.appendChild(overlay);
 
-  const nameInput = /** @type {HTMLInputElement} */ (overlay.querySelector('#vab-save-name'));
+  const nameInput = overlay.querySelector('#vab-save-name') as HTMLInputElement | null;
   nameInput?.select();
 
   const saveNameCounter = overlay.querySelector('#vab-save-name-counter');
-  const updateSaveNameCounter = () => {
+  const updateSaveNameCounter = (): void => {
     const len = nameInput?.value.length ?? 0;
     if (saveNameCounter) {
       saveNameCounter.textContent = `${len} / 60`;
@@ -133,28 +144,28 @@ export function handleSaveDesign() {
   };
   nameInput?.addEventListener('input', updateSaveNameCounter);
 
-  overlay.addEventListener('pointerdown', (e) => {
+  overlay.addEventListener('pointerdown', (e: PointerEvent) => {
     if (e.target === overlay) overlay.remove();
   });
 
   overlay.querySelector('#vab-save-cancel')?.addEventListener('click', () => overlay.remove());
 
-  const doSave = () => {
+  const doSave = (): void => {
     const name = nameInput?.value.trim() || defaultName;
     const designId = S.currentDesignId || ('design-' + Date.now());
-    const isPrivate = /** @type {HTMLInputElement} */ (overlay.querySelector('#vab-save-private'))?.checked ?? false;
+    const isPrivate = (overlay.querySelector('#vab-save-private') as HTMLInputElement | null)?.checked ?? false;
 
     const design = createRocketDesign({
       id:          designId,
       name,
-      parts:       [...S.assembly.parts.values()].map(p => ({ partId: p.partId, position: { x: p.x, y: p.y }, ...(p.instruments?.length ? { instruments: [...p.instruments] } : {}) })),
-      staging:     { stages: S.stagingConfig.stages.map(s => [...s.instanceIds]), unstaged: [...S.stagingConfig.unstaged] },
+      parts:       [...S.assembly!.parts.values()].map(p => ({ partId: p.partId, position: { x: p.x, y: p.y }, ...(p.instruments?.length ? { instruments: [...p.instruments] } : {}) })),
+      staging:     { stages: S.stagingConfig!.stages.map(s => [...s.instanceIds]) as unknown as number[][], unstaged: [...S.stagingConfig!.unstaged] as unknown as number[] },
       totalMass:   S.lastValidation?.totalMassKg ?? 0,
       totalThrust: S.lastValidation?.stage1Thrust ?? 0,
       savePrivate: isPrivate,
     });
 
-    saveDesignToLibrary(S.gameState, design);
+    saveDesignToLibrary(S.gameState!, design);
     S.currentDesignId   = designId;
     S.currentDesignName = name;
 
@@ -163,7 +174,7 @@ export function handleSaveDesign() {
   };
 
   overlay.querySelector('#vab-save-confirm')?.addEventListener('click', doSave);
-  nameInput?.addEventListener('keydown', (e) => {
+  nameInput?.addEventListener('keydown', (e: KeyboardEvent) => {
     if (e.key === 'Enter') doSave();
   });
 }
@@ -331,23 +342,21 @@ const VAB_LIBRARY_CSS = `
 /**
  * Inject design library CSS (idempotent).
  */
-function injectLibraryCSS() {
+function injectLibraryCSS(): void {
   injectStyleOnce('vab-library-css', VAB_LIBRARY_CSS);
 }
 
 /**
  * Format a cost value as a dollar string.
- * @param {number} n
- * @returns {string}
  */
-function fmtCost(n) {
+function fmtCost(n: number): string {
   return '$' + Math.floor(n).toLocaleString('en-US');
 }
 
 /**
  * Show the full design library overlay.
  */
-export function handleLoadDesign() {
+export function handleLoadDesign(): void {
   const S = getVabState();
   if (!S.gameState) return;
 
@@ -375,7 +384,7 @@ export function handleLoadDesign() {
   filterBar.appendChild(searchInput);
 
   const groupDefs = getDesignGroupDefs();
-  let activeGroupId = null;
+  let activeGroupId: string | null = null;
 
   const groupBar = document.createElement('div');
   groupBar.className = 'vab-lib-group-bar';
@@ -408,10 +417,10 @@ export function handleLoadDesign() {
   filterBar.appendChild(groupBar);
   overlay.appendChild(filterBar);
 
-  function _updateGroupBtns() {
+  function _updateGroupBtns(): void {
     const btns = groupBar.querySelectorAll('.vab-lib-group-btn');
     btns.forEach((b) => {
-      const gid = b.dataset.groupId ?? null;
+      const gid = (b as HTMLElement).dataset.groupId ?? null;
       b.classList.toggle('active', gid === activeGroupId || (!gid && !activeGroupId));
     });
   }
@@ -420,22 +429,22 @@ export function handleLoadDesign() {
   list.className = 'vab-load-list';
   overlay.appendChild(list);
 
-  const renderList = () => {
+  const renderList = (): void => {
     list.innerHTML = '';
-    let designs = getAllDesigns(S.gameState);
+    let designs = getAllDesigns(S.gameState!);
 
     designs = filterDesignsByGroup(designs, activeGroupId);
 
     const query = searchInput.value.trim().toLowerCase();
     if (query) {
-      designs = designs.filter(d => d.name.toLowerCase().includes(query));
+      designs = designs.filter((d: RocketDesign) => d.name.toLowerCase().includes(query));
     }
 
-    const allDesigns = getAllDesigns(S.gameState);
+    const allDesigns = getAllDesigns(S.gameState!);
     const grouped = groupDesigns(allDesigns);
-    const activeGroups = new Set(grouped.map(g => g.groupId));
+    const activeGroups = new Set(grouped.map((g) => g.groupId));
     groupBar.querySelectorAll('.vab-lib-group-btn[data-group-id]').forEach((btn) => {
-      btn.style.display = activeGroups.has(btn.dataset.groupId) ? '' : 'none';
+      (btn as HTMLElement).style.display = activeGroups.has((btn as HTMLElement).dataset.groupId!) ? '' : 'none';
     });
 
     if (designs.length === 0) {
@@ -449,7 +458,7 @@ export function handleLoadDesign() {
     }
 
     for (const design of designs) {
-      const compat = checkDesignCompatibility(design, S.gameState);
+      const compat = checkDesignCompatibility(design, S.gameState!);
       const costInfo = calculateCostBreakdown(design);
       const card = buildLibraryCard(design, compat, costInfo, overlay, renderList);
       list.appendChild(card);
@@ -474,16 +483,22 @@ export function handleLoadDesign() {
  * Build a library card with compatibility indicator, cost breakdown,
  * and action buttons (Load, Duplicate, Delete).
  */
-function buildLibraryCard(design, compat, costInfo, overlay, rerender) {
+function buildLibraryCard(
+  design: RocketDesign,
+  compat: CompatibilityResult,
+  costInfo: CostBreakdown,
+  overlay: HTMLDivElement,
+  rerender: () => void,
+): HTMLElement {
   const S = getVabState();
   const card = buildRocketCard(design, []);
 
   const compatDot = document.createElement('span');
   compatDot.className = `vab-lib-compat vab-lib-compat-${compat.status}`;
-  const compatLabels = { green: 'Compatible', yellow: 'Partial', red: 'Locked parts' };
+  const compatLabels: Record<string, string> = { green: 'Compatible', yellow: 'Partial', red: 'Locked parts' };
   compatDot.title = compat.status === 'green'
     ? 'All parts unlocked'
-    : compat.lockedDetails.map(d => `${d.partName} (${d.techNodeName})`).join(', ');
+    : compat.lockedDetails.map((d) => `${d.partName} (${d.techNodeName})`).join(', ');
   compatDot.textContent = compatLabels[compat.status];
 
   const infoEl = card.querySelector('.rocket-card-info');
@@ -503,7 +518,7 @@ function buildLibraryCard(design, compat, costInfo, overlay, rerender) {
   if (compat.lockedDetails.length > 0) {
     const lockedEl = document.createElement('div');
     lockedEl.className = 'vab-lib-locked';
-    lockedEl.innerHTML = compat.lockedDetails.map(d =>
+    lockedEl.innerHTML = compat.lockedDetails.map((d) =>
       `<span class="vab-lib-locked-part">${d.partName} <span class="vab-lib-locked-node">(${d.techNodeName})</span></span>`
     ).join('');
     if (infoEl) infoEl.appendChild(lockedEl);
@@ -530,7 +545,7 @@ function buildLibraryCard(design, compat, costInfo, overlay, rerender) {
   if (compat.status === 'red') {
     loadBtn.title = 'Some parts are locked — rocket will fail validation until all parts are unlocked';
   }
-  loadBtn.addEventListener('click', (e) => {
+  loadBtn.addEventListener('click', (e: MouseEvent) => {
     e.stopPropagation();
     loadDesignIntoVab(design);
     overlay.remove();
@@ -540,10 +555,10 @@ function buildLibraryCard(design, compat, costInfo, overlay, rerender) {
   const dupBtn = document.createElement('button');
   dupBtn.type = 'button';
   dupBtn.textContent = 'Duplicate';
-  dupBtn.addEventListener('click', (e) => {
+  dupBtn.addEventListener('click', (e: MouseEvent) => {
     e.stopPropagation();
     const copy = duplicateDesign(design);
-    saveDesignToLibrary(S.gameState, copy);
+    saveDesignToLibrary(S.gameState!, copy);
     rerender();
     showToast('Design duplicated.');
   });
@@ -553,10 +568,10 @@ function buildLibraryCard(design, compat, costInfo, overlay, rerender) {
   delBtn.type = 'button';
   delBtn.className = 'vab-load-card-delete-btn';
   delBtn.textContent = 'Delete';
-  delBtn.addEventListener('click', (e) => {
+  delBtn.addEventListener('click', (e: MouseEvent) => {
     e.stopPropagation();
     if (!confirm(`Delete "${design.name}"?`)) return;
-    deleteDesignFromLibrary(S.gameState, design.id);
+    deleteDesignFromLibrary(S.gameState!, design.id);
     if (S.currentDesignId === design.id) {
       S.currentDesignId = null;
       S.currentDesignName = '';
@@ -574,9 +589,8 @@ function buildLibraryCard(design, compat, costInfo, overlay, rerender) {
 
 /**
  * Restore a saved RocketDesign into the VAB assembly and staging.
- * @param {import('../../core/gameState.js').RocketDesign} design
  */
-export function loadDesignIntoVab(design) {
+export function loadDesignIntoVab(design: RocketDesign): void {
   const S = getVabState();
   if (!S.gameState) return;
 
@@ -597,9 +611,10 @@ export function loadDesignIntoVab(design) {
     const def = getPartById(p.partId);
     if (def) S.gameState.money -= def.cost;
     const instId = addPartToAssembly(S.assembly, p.partId, p.position.x, p.position.y);
-    if (p.instruments?.length) {
+    const pWithInstr = p as unknown as { instruments?: string[] };
+    if (pWithInstr.instruments?.length) {
       const placed = S.assembly.parts.get(instId);
-      if (placed) placed.instruments = [...p.instruments];
+      if (placed) placed.instruments = [...pWithInstr.instruments];
     }
   }
 
@@ -607,10 +622,10 @@ export function loadDesignIntoVab(design) {
 
   if (design.staging && Array.isArray(design.staging.stages)) {
     S.stagingConfig = {
-      stages:          design.staging.stages.map(ids => ({
-        instanceIds: Array.isArray(ids) ? [...ids] : [],
+      stages:          design.staging.stages.map((ids: number[] | string[]) => ({
+        instanceIds: Array.isArray(ids) ? [...ids] as string[] : [],
       })),
-      unstaged:        Array.isArray(design.staging.unstaged) ? [...design.staging.unstaged] : [],
+      unstaged:        Array.isArray(design.staging.unstaged) ? [...design.staging.unstaged] as unknown as string[] : [],
       currentStageIdx: 0,
     };
   }
@@ -635,13 +650,12 @@ export function loadDesignIntoVab(design) {
 
 /**
  * Rebuild part connections by checking snap-point overlap.
- * @param {import('../../core/rocketbuilder.js').RocketAssembly} assembly
  */
-function rebuildConnectionsFromSnaps(assembly) {
-  const OPPOSITE_SIDE = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' };
+function rebuildConnectionsFromSnaps(assembly: RocketAssembly): void {
+  const OPPOSITE_SIDE: Record<string, string> = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' };
   const SNAP_TOLERANCE = 1;
   const parts = [...assembly.parts.values()];
-  const occupied = new Set();
+  const occupied = new Set<string>();
 
   for (let i = 0; i < parts.length; i++) {
     const pA = parts[i];

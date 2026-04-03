@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 31
-- **Completed**: 20
-- **Remaining**: 11
-- **Last Updated**: 2026-04-03T06:15:07.762Z
+- **Completed**: 21
+- **Remaining**: 10
+- **Last Updated**: 2026-04-03T06:40:17.184Z
 
 ## Iteration Log
 
@@ -187,4 +187,13 @@
 - **Exit Status**: success
 - **Tokens**: 1,565,507 total (10,057 in, 15,145 out, 252,753 cache-create, 1,287,552 cache-read)
 - **Cost**: $25.6372
+
+### Iteration 21 - 2026-04-03T06:15:09.999Z
+- **Task Attempted**: TASK-022
+- **Task Completed**: TASK-022
+- **Summary**: Completed Convert UI layer to TypeScript (src/ui/) — batch 2
+- **Duration**: 25m 7s
+- **Exit Status**: success
+- **Tokens**: 407,370 total (11 in, 11,189 out, 86,073 cache-create, 310,097 cache-read)
+- **Cost**: $21.4304
 

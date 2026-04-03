@@ -1,5 +1,5 @@
 /**
- * _staging.js — Staging panel rendering, delta-v computation, staging drag-and-drop reorder.
+ * _staging.ts — Staging panel rendering, delta-v computation, staging drag-and-drop reorder.
  */
 
 import { getPartById } from '../../data/parts.js';
@@ -20,11 +20,11 @@ import { snapshotStaging, recordStagingChange } from './_undoActions.js';
 // ---------------------------------------------------------------------------
 // Forward references — set by _init.js to break circular deps
 // ---------------------------------------------------------------------------
-let _runAndRenderValidationFn = () => {};
-let _updateStatusBarFn = () => {};
-let _updateScaleBarExtentsFn = () => {};
-let _updateOffscreenIndicatorsFn = () => {};
-let _doZoomToFitFn = () => {};
+let _runAndRenderValidationFn: () => void = () => {};
+let _updateStatusBarFn: () => void = () => {};
+let _updateScaleBarExtentsFn: () => void = () => {};
+let _updateOffscreenIndicatorsFn: () => void = () => {};
+let _doZoomToFitFn: () => void = () => {};
 
 export function setStagingCallbacks({
   runAndRenderValidation,
@@ -32,7 +32,13 @@ export function setStagingCallbacks({
   updateScaleBarExtents,
   updateOffscreenIndicators,
   doZoomToFit,
-}) {
+}: {
+  runAndRenderValidation: () => void;
+  updateStatusBar: () => void;
+  updateScaleBarExtents: () => void;
+  updateOffscreenIndicators: () => void;
+  doZoomToFit: () => void;
+}): void {
   _runAndRenderValidationFn = runAndRenderValidation;
   _updateStatusBarFn = updateStatusBar;
   _updateScaleBarExtentsFn = updateScaleBarExtents;
@@ -44,7 +50,7 @@ export function setStagingCallbacks({
  * Sync staging config with the current assembly and re-render the staging panel.
  * Call after any part add or remove operation.
  */
-export function syncAndRenderStaging() {
+export function syncAndRenderStaging(): void {
   const S = getVabState();
   if (S.assembly && S.stagingConfig) {
     syncStagingWithAssembly(S.assembly, S.stagingConfig);
@@ -59,10 +65,8 @@ export function syncAndRenderStaging() {
 
 /**
  * Compute the delta-v for a given stage index in the VAB.
- * @param {number} stageIdx
- * @returns {{ dv: number, twr?: number, engines: boolean }}
  */
-function computeVabStageDeltaV(stageIdx) {
+function computeVabStageDeltaV(stageIdx: number): { dv: number; twr?: number; engines: boolean } {
   const S = getVabState();
   if (!S.assembly || !S.stagingConfig) return { dv: 0, engines: false };
   const stage = S.stagingConfig.stages[stageIdx];
@@ -73,7 +77,7 @@ function computeVabStageDeltaV(stageIdx) {
   const density = airDensity(S.dvAltitude);
   const atmFrac = Math.min(1, density / SEA_LEVEL_DENSITY);
 
-  const jettisoned = new Set();
+  const jettisoned = new Set<string>();
   for (let s = 0; s < stageIdx; s++) {
     for (const id of S.stagingConfig.stages[s].instanceIds) {
       jettisoned.add(id);
@@ -86,7 +90,7 @@ function computeVabStageDeltaV(stageIdx) {
     if (jettisoned.has(instanceId)) continue;
     const def = getPartById(placed.partId);
     if (!def) continue;
-    const fuelMass = def.properties?.fuelMass ?? 0;
+    const fuelMass = (def.properties?.fuelMass as number) ?? 0;
     totalMass += (def.mass ?? 0) + fuelMass;
     if (fuelMass > 0) totalFuel += fuelMass;
   }
@@ -99,12 +103,12 @@ function computeVabStageDeltaV(stageIdx) {
     const placed = S.assembly.parts.get(instanceId);
     const def    = placed ? getPartById(placed.partId) : null;
     if (!def) continue;
-    const thrustKN = def.properties?.thrust ?? 0;
+    const thrustKN = (def.properties?.thrust as number) ?? 0;
     if (thrustKN > 0) {
       hasEngines = true;
       const thrustN = thrustKN * 1000;
-      const ispSL  = def.properties?.isp    ?? 300;
-      const ispVac = def.properties?.ispVac ?? ispSL;
+      const ispSL  = (def.properties?.isp as number)    ?? 300;
+      const ispVac = (def.properties?.ispVac as number) ?? ispSL;
       const isp = ispSL * atmFrac + ispVac * (1 - atmFrac);
       thrustTotal    += thrustN;
       ispTimesThrust += isp * thrustN;
@@ -128,15 +132,14 @@ function computeVabStageDeltaV(stageIdx) {
 
 /**
  * Update only the delta-v values and altitude label in the staging panel.
- * @param {HTMLElement} body
  */
-function updateStagingDvValues(body) {
+function updateStagingDvValues(body: HTMLElement): void {
   const S = getVabState();
   if (!S.stagingConfig || !S.assembly) return;
 
   const numStages = S.stagingConfig.stages.length;
   let totalDv = 0;
-  const stageDvs = [];
+  const stageDvs: Array<{ dv: number; twr?: number; engines: boolean }> = [];
   for (let i = 0; i < numStages; i++) {
     const result = computeVabStageDeltaV(i);
     stageDvs.push(result);
@@ -158,7 +161,7 @@ function updateStagingDvValues(body) {
   }
 
   body.querySelectorAll('.vab-staging-stage').forEach((stageEl) => {
-    const idx = parseInt(/** @type {HTMLElement} */ (stageEl).dataset.stageIndex ?? '0', 10);
+    const idx = parseInt((stageEl as HTMLElement).dataset.stageIndex ?? '0', 10);
     const sdv = stageDvs[idx];
     const dvEl = stageEl.querySelector('.vab-stage-dv');
     if (dvEl) {
@@ -168,8 +171,8 @@ function updateStagingDvValues(body) {
     }
     const twrEl = stageEl.querySelector('.vab-stage-twr');
     if (twrEl && sdv) {
-      twrEl.textContent = sdv.twr > 0 ? `TWR ${sdv.twr.toFixed(2)}` : '';
-      twrEl.className = sdv.twr > 0 && sdv.twr < 1
+      twrEl.textContent = sdv.twr !== undefined && sdv.twr > 0 ? `TWR ${sdv.twr.toFixed(2)}` : '';
+      twrEl.className = sdv.twr !== undefined && sdv.twr > 0 && sdv.twr < 1
         ? 'vab-stage-twr warn'
         : 'vab-stage-twr';
     }
@@ -179,9 +182,9 @@ function updateStagingDvValues(body) {
 /**
  * Build and inject the staging panel's inner HTML.
  */
-export function renderStagingPanel() {
+export function renderStagingPanel(): void {
   const S = getVabState();
-  const body = /** @type {HTMLElement|null} */ (document.getElementById('vab-staging-body'));
+  const body = document.getElementById('vab-staging-body') as HTMLElement | null;
   if (!body) return;
 
   if (!S.stagingConfig || !S.assembly) {
@@ -191,11 +194,11 @@ export function renderStagingPanel() {
 
   const warnings  = validateStagingConfig(S.assembly, S.stagingConfig);
   const numStages = S.stagingConfig.stages.length;
-  const html      = [];
+  const html: string[]      = [];
 
   // ── Delta-V altitude slider + total ────────────────────────────────────────
   let totalDv = 0;
-  const stageDvs = [];
+  const stageDvs: Array<{ dv: number; twr?: number; engines: boolean }> = [];
   for (let i = 0; i < numStages; i++) {
     const result = computeVabStageDeltaV(i);
     stageDvs.push(result);
@@ -287,12 +290,12 @@ export function renderStagingPanel() {
     html.push('</div>');
 
     const sdv = stageDvs[i];
-    if (sdv && (sdv.dv > 0 || sdv.twr > 0)) {
+    if (sdv && (sdv.dv > 0 || (sdv.twr !== undefined && sdv.twr > 0))) {
       html.push('<div class="vab-stage-stats">');
       if (sdv.dv > 0) {
         html.push(`<span class="vab-stage-dv">\u0394V ~${Math.round(sdv.dv).toLocaleString()} m/s</span>`);
       }
-      if (sdv.twr > 0) {
+      if (sdv.twr !== undefined && sdv.twr > 0) {
         const twrClass = sdv.twr < 1 ? 'vab-stage-twr warn' : 'vab-stage-twr';
         html.push(`<span class="${twrClass}">TWR ${sdv.twr.toFixed(2)}</span>`);
       }
@@ -339,22 +342,22 @@ export function renderStagingPanel() {
 
   // Re-attach button listeners.
   body.querySelector('#vab-staging-add')?.addEventListener('click', () => {
-    addStageToConfig(S.stagingConfig);
+    addStageToConfig(S.stagingConfig!);
     renderStagingPanel();
   });
   const altSlider = body.querySelector('#vab-dv-alt-slider');
   if (altSlider) {
-    altSlider.addEventListener('input', (e) => {
-      S.dvAltitude = parseInt(/** @type {HTMLInputElement} */ (e.target).value, 10);
+    altSlider.addEventListener('input', (e: Event) => {
+      S.dvAltitude = parseInt((e.target as HTMLInputElement).value, 10);
       updateStagingDvValues(body);
     });
   }
 
   body.querySelectorAll('.vab-staging-del').forEach((btn) => {
-    const el = /** @type {HTMLElement} */ (btn);
+    const el = btn as HTMLElement;
     el.addEventListener('click', () => {
       const idx = parseInt(el.dataset.stageIndex ?? '0', 10);
-      removeStageFromConfig(S.stagingConfig, idx);
+      removeStageFromConfig(S.stagingConfig!, idx);
       renderStagingPanel();
     });
   });
@@ -362,63 +365,58 @@ export function renderStagingPanel() {
 
 /**
  * Set up HTML5 drag-and-drop event delegation on the staging panel body.
- * @param {HTMLElement} panelBody
  */
-export function setupStagingDnD(panelBody) {
+export function setupStagingDnD(panelBody: HTMLElement): void {
   const S = getVabState();
 
-  panelBody.addEventListener('dragstart', (e) => {
-    const handle = /** @type {HTMLElement} */ (
-      /** @type {Element} */ (e.target).closest?.('.vab-stage-drag-handle')
-    );
+  panelBody.addEventListener('dragstart', (e: DragEvent) => {
+    const handle = (e.target as Element)?.closest?.('.vab-stage-drag-handle') as HTMLElement | null;
     if (handle) {
       const stageIdx = handle.dataset.stageIndex ?? '';
-      e.dataTransfer.setData('text/plain', `stage-reorder|${stageIdx}`);
-      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer!.setData('text/plain', `stage-reorder|${stageIdx}`);
+      e.dataTransfer!.effectAllowed = 'move';
       const stageEl = handle.closest('.vab-staging-stage');
       if (stageEl) stageEl.classList.add('dragging');
       return;
     }
 
-    const chip = /** @type {HTMLElement} */ (
-      /** @type {Element} */ (e.target).closest?.('.vab-stage-chip')
-    );
+    const chip = (e.target as Element)?.closest?.('.vab-stage-chip') as HTMLElement | null;
     if (!chip) return;
     const instanceId = chip.dataset.instanceId ?? '';
     const source     = chip.dataset.source     ?? '';
-    e.dataTransfer.setData('text/plain', `${instanceId}|${source}`);
-    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer!.setData('text/plain', `${instanceId}|${source}`);
+    e.dataTransfer!.effectAllowed = 'move';
     chip.classList.add('dragging');
   });
 
-  panelBody.addEventListener('dragend', (e) => {
-    const chip = /** @type {Element} */ (e.target).closest?.('.vab-stage-chip');
+  panelBody.addEventListener('dragend', (e: DragEvent) => {
+    const chip = (e.target as Element)?.closest?.('.vab-stage-chip');
     if (chip) chip.classList.remove('dragging');
-    const stageEl = /** @type {Element} */ (e.target).closest?.('.vab-staging-stage');
+    const stageEl = (e.target as Element)?.closest?.('.vab-staging-stage');
     if (stageEl) stageEl.classList.remove('dragging');
     panelBody.querySelectorAll('.drag-over').forEach((el) => el.classList.remove('drag-over'));
   });
 
-  panelBody.addEventListener('dragover', (e) => {
-    const zone = /** @type {Element} */ (e.target).closest?.('.vab-staging-zone, .vab-staging-stage');
+  panelBody.addEventListener('dragover', (e: DragEvent) => {
+    const zone = (e.target as Element)?.closest?.('.vab-staging-zone, .vab-staging-stage');
     if (!zone) return;
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
+    e.dataTransfer!.dropEffect = 'move';
     zone.classList.add('drag-over');
   });
 
-  panelBody.addEventListener('dragleave', (e) => {
-    const zone = /** @type {Element} */ (e.target).closest?.('.vab-staging-zone, .vab-staging-stage');
+  panelBody.addEventListener('dragleave', (e: DragEvent) => {
+    const zone = (e.target as Element)?.closest?.('.vab-staging-zone, .vab-staging-stage');
     if (!zone) return;
-    if (!zone.contains(/** @type {Node} */ (e.relatedTarget))) {
+    if (!zone.contains(e.relatedTarget as Node)) {
       zone.classList.remove('drag-over');
     }
   });
 
-  panelBody.addEventListener('drop', (e) => {
+  panelBody.addEventListener('drop', (e: DragEvent) => {
     if (!S.stagingConfig) return;
 
-    const raw = e.dataTransfer.getData('text/plain');
+    const raw = e.dataTransfer!.getData('text/plain');
     if (!raw) return;
 
     const pipeIdx = raw.indexOf('|');
@@ -426,9 +424,7 @@ export function setupStagingDnD(panelBody) {
     const suffix  = raw.slice(pipeIdx + 1);
 
     if (prefix === 'stage-reorder') {
-      const targetStage = /** @type {HTMLElement} */ (
-        /** @type {Element} */ (e.target).closest?.('.vab-staging-stage')
-      );
+      const targetStage = (e.target as Element)?.closest?.('.vab-staging-stage') as HTMLElement | null;
       if (!targetStage) return;
       e.preventDefault();
       panelBody.querySelectorAll('.drag-over').forEach((el) => el.classList.remove('drag-over'));
@@ -445,9 +441,7 @@ export function setupStagingDnD(panelBody) {
       return;
     }
 
-    const zone = /** @type {HTMLElement} */ (
-      /** @type {Element} */ (e.target).closest?.('.vab-staging-zone')
-    );
+    const zone = (e.target as Element)?.closest?.('.vab-staging-zone') as HTMLElement | null;
     if (!zone) return;
     e.preventDefault();
     zone.classList.remove('drag-over');

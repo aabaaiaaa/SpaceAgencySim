@@ -1,5 +1,5 @@
 /**
- * _panels.js — Panel toggling, button bindings, status bar updates.
+ * _panels.ts — Panel toggling, button bindings, status bar updates.
  */
 
 import { getPartById } from '../../data/parts.js';
@@ -8,7 +8,6 @@ import { getFacilityTier } from '../../core/construction.js';
 import { getTotalMass } from '../../core/rocketvalidator.js';
 import {
   VAB_SCALE_BAR_WIDTH,
-  vabGetCamera,
   vabSetZoomCentred,
   vabRenderParts,
 } from '../../render/vab.js';
@@ -38,7 +37,6 @@ import {
   setSelectedPart,
   updateOffscreenIndicators,
   doZoomToFit,
-  syncZoomSlider,
   getRocketCenter,
 } from './_canvasInteraction.js';
 import {
@@ -47,17 +45,19 @@ import {
   recordClearAll,
 } from './_undoActions.js';
 
+import type { GameState } from '../../core/gameState.js';
+
 // ---------------------------------------------------------------------------
 // Forward references — set by _init.js to break circular deps
 // ---------------------------------------------------------------------------
-let _renderStagingPanelFn = () => {};
-let _runAndRenderValidationFn = () => {};
-let _syncAndRenderStagingFn = () => {};
-let _renderEngineerPanelFn = () => {};
-let _handleSaveDesignFn = () => {};
-let _handleLoadDesignFn = () => {};
-let _handleLaunchClickedFn = () => {};
-let _vabRefreshPartsFn = (_state) => {};
+let _renderStagingPanelFn: () => void = () => {};
+let _runAndRenderValidationFn: () => void = () => {};
+let _syncAndRenderStagingFn: () => void = () => {};
+let _renderEngineerPanelFn: () => void = () => {};
+let _handleSaveDesignFn: () => void = () => {};
+let _handleLoadDesignFn: () => void = () => {};
+let _handleLaunchClickedFn: () => void = () => {};
+let _vabRefreshPartsFn: (state: GameState) => void = (_state: GameState) => {};
 
 export function setPanelCallbacks({
   renderStagingPanel,
@@ -68,7 +68,16 @@ export function setPanelCallbacks({
   handleLoadDesign,
   handleLaunchClicked,
   vabRefreshParts,
-}) {
+}: {
+  renderStagingPanel: () => void;
+  runAndRenderValidation: () => void;
+  syncAndRenderStaging: () => void;
+  renderEngineerPanel: () => void;
+  handleSaveDesign: () => void;
+  handleLoadDesign: () => void;
+  handleLaunchClicked: () => void;
+  vabRefreshParts: (state: GameState) => void;
+}): void {
   _renderStagingPanelFn = renderStagingPanel;
   _runAndRenderValidationFn = runAndRenderValidation;
   _syncAndRenderStagingFn = syncAndRenderStaging;
@@ -86,7 +95,7 @@ export function setPanelCallbacks({
 /**
  * Update the parts count and cost readout in the status bar.
  */
-export function updateStatusBar() {
+export function updateStatusBar(): void {
   const S = getVabState();
   const partsEl = document.getElementById('vab-status-parts');
   const costEl  = document.getElementById('vab-status-cost');
@@ -124,12 +133,12 @@ export function updateStatusBar() {
 /**
  * Recompute positions of all open side panels and the canvas area offset.
  */
-export function recomputePanelPositions() {
+export function recomputePanelPositions(): void {
   const S = getVabState();
   const root = document.getElementById('vab-main');
   if (!root) return;
 
-  const panelMap = {
+  const panelMap: Record<string, HTMLElement | null> = {
     inventory: document.getElementById('vab-inventory-panel'),
     engineer:  document.getElementById('vab-engineer-panel'),
     staging:   document.getElementById('vab-staging-panel'),
@@ -153,12 +162,10 @@ export function recomputePanelPositions() {
 
 /**
  * Toggle a named side panel.
- * @param {string} panelId
- * @param {() => void} [onOpen]
  */
-export function togglePanel(panelId, onOpen) {
+export function togglePanel(panelId: string, onOpen?: () => void): void {
   const S = getVabState();
-  const panelMap = {
+  const panelMap: Record<string, HTMLElement | null> = {
     inventory: document.getElementById('vab-inventory-panel'),
     engineer:  document.getElementById('vab-engineer-panel'),
     staging:   document.getElementById('vab-staging-panel'),
@@ -180,10 +187,7 @@ export function togglePanel(panelId, onOpen) {
 // Button event bindings
 // ---------------------------------------------------------------------------
 
-/**
- * @param {HTMLElement} root
- */
-export function bindButtons(root) {
+export function bindButtons(root: HTMLElement): void {
   const S = getVabState();
 
   // ── "Hub" button ──
@@ -202,8 +206,8 @@ export function bindButtons(root) {
   });
 
   // Inventory panel: refurbish / scrap actions (event delegation).
-  root.querySelector('#vab-inventory-body')?.addEventListener('click', (e) => {
-    const btn = /** @type {HTMLElement} */ (e.target)?.closest?.('.vab-inv-btn');
+  root.querySelector('#vab-inventory-body')?.addEventListener('click', (e: Event) => {
+    const btn = (e.target as HTMLElement)?.closest?.('.vab-inv-btn') as HTMLElement | null;
     if (!btn || !S.gameState) return;
     const invId = btn.dataset.invId;
     if (!invId) return;
@@ -246,7 +250,7 @@ export function bindButtons(root) {
   });
 
   // ── Symmetry toggle ──
-  const symmetryBtn = /** @type {HTMLButtonElement|null} */ (root.querySelector('#vab-btn-symmetry'));
+  const symmetryBtn = root.querySelector('#vab-btn-symmetry') as HTMLButtonElement | null;
   if (symmetryBtn) {
     symmetryBtn.setAttribute('aria-pressed', String(S.symmetryMode));
     symmetryBtn.addEventListener('click', () => {
@@ -324,14 +328,14 @@ export function bindButtons(root) {
   });
 
   // ── Auto-zoom checkbox ──
-  root.querySelector('#vab-chk-autozoom')?.addEventListener('change', (e) => {
-    S.autoZoomEnabled = /** @type {HTMLInputElement} */ (e.target).checked;
+  root.querySelector('#vab-chk-autozoom')?.addEventListener('change', (e: Event) => {
+    S.autoZoomEnabled = (e.target as HTMLInputElement).checked;
     if (S.autoZoomEnabled) doZoomToFit();
   });
 
   // ── Zoom slider ──
-  root.querySelector('#vab-zoom-slider')?.addEventListener('input', (e) => {
-    const value = parseFloat(/** @type {HTMLInputElement} */ (e.target).value);
+  root.querySelector('#vab-zoom-slider')?.addEventListener('input', (e: Event) => {
+    const value = parseFloat((e.target as HTMLInputElement).value);
     const c = getRocketCenter();
     vabSetZoomCentred(value, c.x, c.y);
     drawScaleTicks();
@@ -343,11 +347,11 @@ export function bindButtons(root) {
 /**
  * Bind Delete/Backspace key to remove selected part and Spacebar for staging.
  */
-export function bindKeyboardShortcuts() {
+export function bindKeyboardShortcuts(): void {
   const S = getVabState();
 
   // Delete / Backspace: remove selected part.
-  window.addEventListener('keydown', (e) => {
+  window.addEventListener('keydown', (e: KeyboardEvent) => {
     if ((e.code !== 'Delete' && e.code !== 'Backspace') || !S.selectedInstanceId || !S.assembly) return;
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
     e.preventDefault();
@@ -366,7 +370,7 @@ export function bindKeyboardShortcuts() {
   });
 
   // Ctrl+Z: undo. Ctrl+Y / Ctrl+Shift+Z: redo.
-  window.addEventListener('keydown', (e) => {
+  window.addEventListener('keydown', (e: KeyboardEvent) => {
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
     if (!S.assembly || !S.stagingConfig) return;
 
@@ -389,10 +393,10 @@ export function bindKeyboardShortcuts() {
   });
 
   // Spacebar: fire next stage during flight.
-  window.addEventListener('keydown', (e) => {
+  window.addEventListener('keydown', (e: KeyboardEvent) => {
     if (e.code !== 'Space' || !S.flightActive || !S.stagingConfig) return;
     e.preventDefault();
-    const result = fireStagingStep(S.stagingConfig);
+    fireStagingStep(S.stagingConfig);
     _renderStagingPanelFn();
   });
 }
@@ -400,7 +404,7 @@ export function bindKeyboardShortcuts() {
 /**
  * Refresh all VAB UI elements after an undo/redo operation.
  */
-function _refreshAfterUndoRedo() {
+function _refreshAfterUndoRedo(): void {
   vabRenderParts();
   _renderStagingPanelFn();
   _runAndRenderValidationFn();
@@ -415,9 +419,9 @@ function _refreshAfterUndoRedo() {
 /**
  * Update undo/redo toolbar button states (disabled + title).
  */
-export function updateUndoRedoButtons() {
-  const undoBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById('vab-btn-undo'));
-  const redoBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById('vab-btn-redo'));
+export function updateUndoRedoButtons(): void {
+  const undoBtn = document.getElementById('vab-btn-undo') as HTMLButtonElement | null;
+  const redoBtn = document.getElementById('vab-btn-redo') as HTMLButtonElement | null;
   if (undoBtn) {
     undoBtn.disabled = !canUndo();
     const label = peekUndoLabel();

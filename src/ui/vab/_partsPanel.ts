@@ -1,8 +1,9 @@
 /**
- * _partsPanel.js — Parts browsing, filtering, detail popup, drag-from-panel logic.
+ * _partsPanel.ts — Parts browsing, filtering, detail popup, drag-from-panel logic.
  */
 
 import { PARTS, getPartById } from '../../data/parts.js';
+import type { PartDef } from '../../data/parts.js';
 import { PartType } from '../../core/constants.js';
 import {
   getInventoryCount,
@@ -11,12 +12,14 @@ import {
 } from '../../core/partInventory.js';
 import { getVabState } from './_state.js';
 
+import type { GameState } from '../../core/gameState.js';
+
 // ---------------------------------------------------------------------------
 // Part-type display helpers
 // ---------------------------------------------------------------------------
 
 /** Human-readable category label for each PartType value. */
-const TYPE_LABELS = {
+const TYPE_LABELS: Record<string, string> = {
   [PartType.COMMAND_MODULE]:       'Command Modules',
   [PartType.COMPUTER_MODULE]:      'Computer Modules',
   [PartType.SERVICE_MODULE]:       'Service Modules',
@@ -37,7 +40,7 @@ const TYPE_LABELS = {
 };
 
 /** Top-to-bottom display order for part-type groups in the panel. */
-const TYPE_ORDER = [
+const TYPE_ORDER: string[] = [
   PartType.COMMAND_MODULE,
   PartType.COMPUTER_MODULE,
   PartType.SERVICE_MODULE,
@@ -59,8 +62,8 @@ const TYPE_ORDER = [
 
 // Per-type colours for part cards — matches the PART_FILL / PART_STROKE maps
 // in src/render/vab.js so the menu previews look like the placed parts.
-const _hex = (n) => '#' + n.toString(16).padStart(6, '0');
-const _CARD_FILL = {
+const _hex = (n: number): string => '#' + n.toString(16).padStart(6, '0');
+const _CARD_FILL: Record<string, string> = {
   [PartType.COMMAND_MODULE]:       _hex(0x1a3860),
   [PartType.COMPUTER_MODULE]:      _hex(0x122848),
   [PartType.SERVICE_MODULE]:       _hex(0x1c2c58),
@@ -79,7 +82,7 @@ const _CARD_FILL = {
   [PartType.SOLAR_PANEL]:          _hex(0x0a2810),
   [PartType.LAUNCH_CLAMP]:         _hex(0x2a2818),
 };
-const _CARD_STROKE = {
+const _CARD_STROKE: Record<string, string> = {
   [PartType.COMMAND_MODULE]:       _hex(0x4080c0),
   [PartType.COMPUTER_MODULE]:      _hex(0x2870a0),
   [PartType.SERVICE_MODULE]:       _hex(0x3860b0),
@@ -103,39 +106,34 @@ const _CARD_STROKE_DEFAULT = '#4090d0';
 
 /**
  * Format a dollar amount with $ prefix, commas, and no decimal places.
- * @param {number} n
- * @returns {string}
  */
-export function fmt$(n) {
+export function fmt$(n: number): string {
   return '$' + Math.floor(n).toLocaleString('en-US');
 }
 
 /**
  * Build the inner HTML for the parts list from the current game state.
- * @param {import('../../core/gameState.js').GameState} state
- * @returns {string}
  */
-export function buildPartsHTML(state) {
+export function buildPartsHTML(state: GameState): string {
   const unlocked = new Set(state.parts);
-  const available = PARTS.filter((p) => unlocked.has(p.id));
+  const available = PARTS.filter((p: PartDef) => unlocked.has(p.id));
 
   // Group parts by display label, preserving TYPE_ORDER.
-  /** @type {Map<string, import('../../data/parts.js').PartDef[]>} */
-  const groups = new Map();
+  const groups: Map<string, PartDef[]> = new Map();
   for (const type of TYPE_ORDER) {
     const label = TYPE_LABELS[type];
     if (!label) continue;
-    const matching = available.filter((p) => p.type === type);
+    const matching = available.filter((p: PartDef) => p.type === type);
     if (matching.length === 0) continue;
     if (!groups.has(label)) groups.set(label, []);
-    for (const p of matching) groups.get(label).push(p);
+    for (const p of matching) groups.get(label)!.push(p);
   }
 
   if (groups.size === 0) {
     return `<p class="vab-parts-empty">No parts unlocked yet.<br>Complete missions to<br>unlock rocket components.</p>`;
   }
 
-  const rows = [];
+  const rows: string[] = [];
   for (const [label, parts] of groups) {
     rows.push(`<div class="vab-parts-group-hdr">${label}</div>`);
     for (const p of parts) {
@@ -171,9 +169,8 @@ export function buildPartsHTML(state) {
 
 /**
  * Show part details in the detail panel at the bottom of the parts list.
- * @param {string} partId
  */
-export function showPartDetail(partId) {
+export function showPartDetail(partId: string): void {
   const S = getVabState();
   const detailEl = document.getElementById('vab-part-detail');
   if (!detailEl) return;
@@ -184,7 +181,7 @@ export function showPartDetail(partId) {
     return;
   }
 
-  const TYPE_LABEL = {
+  const TYPE_LABEL: Record<string, string> = {
     command_module: 'Command Module', computer_module: 'Computer Module',
     service_module: 'Service Module', fuel_tank: 'Fuel Tank',
     engine: 'Engine', solid_rocket_booster: 'Solid Rocket Booster',
@@ -199,8 +196,8 @@ export function showPartDetail(partId) {
   };
 
   const typeLbl = TYPE_LABEL[def.type.toLowerCase()]
-    ?? def.type.toLowerCase().replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-  const stats = [
+    ?? def.type.toLowerCase().replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+  const stats: [string, string][] = [
     ['Mass',  `${def.mass.toLocaleString('en-US')} kg`],
     ['Cost',  fmt$(def.cost)],
   ];
@@ -212,13 +209,13 @@ export function showPartDetail(partId) {
   if (p.isp         !== undefined) stats.push(['Isp (atm)', `${p.isp} s`]);
   if (p.ispVac      !== undefined) stats.push(['Isp (vac)', `${p.ispVac} s`]);
   if (p.throttleable !== undefined) stats.push(['Throttle', p.throttleable ? 'Yes' : 'No (SRB)']);
-  if (p.fuelMass     !== undefined) stats.push(['Fuel mass', `${p.fuelMass.toLocaleString('en-US')} kg`]);
-  if (p.maxSafeMass  !== undefined) stats.push(['Max safe mass', `${p.maxSafeMass.toLocaleString('en-US')} kg`]);
+  if (p.fuelMass     !== undefined) stats.push(['Fuel mass', `${(p.fuelMass as number).toLocaleString('en-US')} kg`]);
+  if (p.maxSafeMass  !== undefined) stats.push(['Max safe mass', `${(p.maxSafeMass as number).toLocaleString('en-US')} kg`]);
   if (p.maxLandingSpeed !== undefined) stats.push(['Max landing speed', `${p.maxLandingSpeed} m/s`]);
   if (p.seats !== undefined) stats.push(['Crew seats', String(p.seats)]);
   if (p.experimentDuration !== undefined) stats.push(['Experiment time', `${p.experimentDuration} s`]);
   if (p.crashThreshold !== undefined) stats.push(['Crash rating', `${p.crashThreshold} m/s`]);
-  if (p.heatTolerance !== undefined) stats.push(['Heat tolerance', `${p.heatTolerance.toLocaleString('en-US')}`]);
+  if (p.heatTolerance !== undefined) stats.push(['Heat tolerance', `${(p.heatTolerance as number).toLocaleString('en-US')}`]);
 
   // Reliability rating (from malfunction system).
   if (def.reliability !== undefined) {
@@ -264,13 +261,14 @@ export function showPartDetail(partId) {
 /**
  * Attach pointerdown listeners to the parts panel so clicking a part card
  * initiates a drag.
- * @param {HTMLElement} partsPanel
- * @param {(partId: string, instanceId: string|null, clientX: number, clientY: number) => void} startDrag
  */
-export function setupPanelDrag(partsPanel, startDrag) {
-  partsPanel.addEventListener('pointerdown', (e) => {
+export function setupPanelDrag(
+  partsPanel: HTMLElement,
+  startDrag: (partId: string, instanceId: string | null, clientX: number, clientY: number) => void,
+): void {
+  partsPanel.addEventListener('pointerdown', (e: PointerEvent) => {
     if (e.button !== 0) return;
-    const card = /** @type {HTMLElement} */ (e.target)?.closest?.('.vab-part-card');
+    const card = (e.target as HTMLElement)?.closest?.('.vab-part-card') as HTMLElement | null;
     if (!card) return;
     const partId = card.dataset.partId;
     if (!partId) return;

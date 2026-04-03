@@ -1,9 +1,10 @@
 /**
- * _canvasInteraction.js — Hit-testing placed parts, drag/drop on canvas,
+ * _canvasInteraction.ts — Hit-testing placed parts, drag/drop on canvas,
  * snap highlights, context menu, part selection/highlight.
  */
 
 import { getPartById } from '../../data/parts.js';
+import type { PartDef } from '../../data/parts.js';
 import { PartType } from '../../core/constants.js';
 import {
   VAB_TOOLBAR_HEIGHT,
@@ -36,6 +37,7 @@ import {
   getMirrorPartId,
   autoStageNewPart,
 } from '../../core/rocketbuilder.js';
+import type { PlacedPart, PartConnection } from '../../core/rocketbuilder.js';
 import { FacilityId, VAB_MAX_PARTS } from '../../core/constants.js';
 import { getFacilityTier } from '../../core/construction.js';
 import { useInventoryPart } from '../../core/partInventory.js';
@@ -52,23 +54,24 @@ import {
   recordMove,
 } from './_undoActions.js';
 
+import type { GameState } from '../../core/gameState.js';
+
 // ---------------------------------------------------------------------------
 // Forward references — set by _init.js to break circular deps
 // ---------------------------------------------------------------------------
-let _renderStagingPanelFn = () => {};
-let _runAndRenderValidationFn = () => {};
-let _syncAndRenderStagingFn = () => {};
-let _updateStatusBarFn = () => {};
-let _updateOffscreenIndicatorsFn = () => {};
-let _showToastFn = (_msg) => {};
-let _vabRefreshPartsFn = (_state) => {};
+let _renderStagingPanelFn: () => void = () => {};
+let _runAndRenderValidationFn: () => void = () => {};
+let _syncAndRenderStagingFn: () => void = () => {};
+let _updateStatusBarFn: () => void = () => {};
+let _updateOffscreenIndicatorsFn: () => void = () => {};
+let _showToastFn: (msg: string) => void = (_msg: string) => {};
+let _vabRefreshPartsFn: (state: GameState) => void = (_state: GameState) => {};
 
 /**
  * Pre-move state captured when a placed part is picked up, before
  * disconnectPart() severs its connections.
- * @type {{ oldX: number, oldY: number, oldConnections: object[] } | null}
  */
-let _preMoveData = null;
+let _preMoveData: { oldX: number; oldY: number; oldConnections: PartConnection[] } | null = null;
 
 export function setCanvasCallbacks({
   renderStagingPanel,
@@ -78,7 +81,15 @@ export function setCanvasCallbacks({
   updateOffscreenIndicators,
   showToast,
   vabRefreshParts,
-}) {
+}: {
+  renderStagingPanel: () => void;
+  runAndRenderValidation: () => void;
+  syncAndRenderStaging: () => void;
+  updateStatusBar: () => void;
+  updateOffscreenIndicators: () => void;
+  showToast: (msg: string) => void;
+  vabRefreshParts: (state: GameState) => void;
+}): void {
   _renderStagingPanelFn = renderStagingPanel;
   _runAndRenderValidationFn = runAndRenderValidation;
   _syncAndRenderStagingFn = syncAndRenderStaging;
@@ -94,11 +105,8 @@ export function setCanvasCallbacks({
 
 /**
  * Find the topmost placed part whose bounding rectangle contains worldX/Y.
- * @param {number} worldX
- * @param {number} worldY
- * @returns {import('../../core/rocketbuilder.js').PlacedPart | null}
  */
-export function hitTestPlacedPart(worldX, worldY) {
+export function hitTestPlacedPart(worldX: number, worldY: number): PlacedPart | null {
   const S = getVabState();
   if (!S.assembly) return null;
   const all = [...S.assembly.parts.values()];
@@ -124,9 +132,8 @@ export function hitTestPlacedPart(worldX, worldY) {
 
 /**
  * Select or deselect a placed part by instanceId.
- * @param {string | null} instanceId
  */
-export function setSelectedPart(instanceId) {
+export function setSelectedPart(instanceId: string | null): void {
   const S = getVabState();
   S.selectedInstanceId = instanceId;
   const highlight = document.getElementById('vab-selection-highlight');
@@ -162,11 +169,8 @@ export function setSelectedPart(instanceId) {
 
 /**
  * Reposition the selection highlight div over the selected part.
- * @param {import('../../core/rocketbuilder.js').PlacedPart} placed
- * @param {import('../../data/parts.js').PartDef} def
- * @param {HTMLElement} highlight
  */
-function updateSelectionHighlight(placed, def, highlight) {
+function updateSelectionHighlight(placed: PlacedPart, def: PartDef, highlight: HTMLElement): void {
   const { zoom, x: camX, y: camY } = vabGetCamera();
 
   const S = getVabState();
@@ -190,7 +194,7 @@ function updateSelectionHighlight(placed, def, highlight) {
 // ---------------------------------------------------------------------------
 
 /** Return the world-space centre of the current rocket, or (0,0) if empty. */
-export function getRocketCenter() {
+export function getRocketCenter(): { x: number; y: number } {
   const S = getVabState();
   if (!S.assembly) return { x: 0, y: 0 };
   const bounds = getRocketBounds(S.assembly);
@@ -201,7 +205,7 @@ export function getRocketCenter() {
   };
 }
 
-export function doZoomToFit() {
+export function doZoomToFit(): void {
   const S = getVabState();
   if (!S.assembly) return;
   const bounds = getRocketBounds(S.assembly);
@@ -212,8 +216,8 @@ export function doZoomToFit() {
 /**
  * Sync the zoom slider value with the current camera zoom level.
  */
-export function syncZoomSlider() {
-  const slider = /** @type {HTMLInputElement|null} */ (document.getElementById('vab-zoom-slider'));
+export function syncZoomSlider(): void {
+  const slider = document.getElementById('vab-zoom-slider') as HTMLInputElement | null;
   if (slider) slider.value = String(vabGetCamera().zoom);
 }
 
@@ -224,7 +228,7 @@ export function syncZoomSlider() {
 /**
  * Update the arrow indicators for any placed parts outside the visible canvas.
  */
-export function updateOffscreenIndicators() {
+export function updateOffscreenIndicators(): void {
   const S = getVabState();
   if (!S.canvasArea || !S.assembly) return;
 
@@ -285,7 +289,7 @@ export function updateOffscreenIndicators() {
 /**
  * Initialise the right-click context menu DOM element (created once).
  */
-export function initContextMenu() {
+export function initContextMenu(): void {
   const S = getVabState();
   S.ctxMenu = document.createElement('div');
   S.ctxMenu.id = 'vab-ctx-menu';
@@ -293,8 +297,8 @@ export function initContextMenu() {
   document.body.appendChild(S.ctxMenu);
 
   // Clicking anywhere outside the menu dismisses it.
-  document.addEventListener('pointerdown', (e) => {
-    if (S.ctxMenu && !S.ctxMenu.contains(e.target)) {
+  document.addEventListener('pointerdown', (e: PointerEvent) => {
+    if (S.ctxMenu && !S.ctxMenu.contains(e.target as Node)) {
       S.ctxMenu.setAttribute('hidden', '');
     }
   }, { capture: true });
@@ -302,11 +306,8 @@ export function initContextMenu() {
 
 /**
  * Show the context menu for a placed part.
- * @param {import('../../core/rocketbuilder.js').PlacedPart} placed
- * @param {number} clientX
- * @param {number} clientY
  */
-function showPartContextMenu(placed, clientX, clientY) {
+function showPartContextMenu(placed: PlacedPart, clientX: number, clientY: number): void {
   const S = getVabState();
   if (!S.ctxMenu) return;
 
@@ -332,13 +333,13 @@ function showPartContextMenu(placed, clientX, clientY) {
   S.ctxMenu.removeAttribute('hidden');
 
   S.ctxMenu.querySelector('#vab-ctx-remove')?.addEventListener('click', () => {
-    S.ctxMenu.setAttribute('hidden', '');
+    S.ctxMenu!.setAttribute('hidden', '');
     const stagingBefore = snapshotStaging();
     const costRefund = getPartById(placed.partId)?.cost ?? 0;
     recordDeletion([placed.instanceId], costRefund, stagingBefore);
     refundOrReturnPart(placed.instanceId, placed.partId, _vabRefreshPartsFn);
     if (S.selectedInstanceId === placed.instanceId) setSelectedPart(null);
-    removePartFromAssembly(S.assembly, placed.instanceId);
+    removePartFromAssembly(S.assembly!, placed.instanceId);
     _syncAndRenderStagingFn();
     vabRenderParts();
     refreshInventoryPanel();
@@ -346,17 +347,17 @@ function showPartContextMenu(placed, clientX, clientY) {
 
   if (mirrorId) {
     S.ctxMenu.querySelector('#vab-ctx-remove-both')?.addEventListener('click', () => {
-      S.ctxMenu.setAttribute('hidden', '');
+      S.ctxMenu!.setAttribute('hidden', '');
       const stagingBefore = snapshotStaging();
-      const mirrorPlaced = S.assembly.parts.get(mirrorId);
+      const mirrorPlaced = S.assembly!.parts.get(mirrorId);
       const cost1 = getPartById(placed.partId)?.cost ?? 0;
       const cost2 = getPartById(mirrorPlaced?.partId ?? placed.partId)?.cost ?? 0;
       recordDeletion([placed.instanceId, mirrorId], cost1 + cost2, stagingBefore);
       refundOrReturnPart(placed.instanceId, placed.partId, _vabRefreshPartsFn);
       refundOrReturnPart(mirrorId, mirrorPlaced?.partId ?? placed.partId, _vabRefreshPartsFn);
       if (S.selectedInstanceId === placed.instanceId || S.selectedInstanceId === mirrorId) setSelectedPart(null);
-      removePartFromAssembly(S.assembly, placed.instanceId);
-      removePartFromAssembly(S.assembly, mirrorId);
+      removePartFromAssembly(S.assembly!, placed.instanceId);
+      removePartFromAssembly(S.assembly!, mirrorId);
       _syncAndRenderStagingFn();
       vabRenderParts();
       refreshInventoryPanel();
@@ -370,12 +371,8 @@ function showPartContextMenu(placed, clientX, clientY) {
 
 /**
  * Begin dragging a part (from panel or by picking up a placed part).
- * @param {string}      partId
- * @param {string|null} instanceId
- * @param {number}      clientX
- * @param {number}      clientY
  */
-export function startDrag(partId, instanceId, clientX, clientY) {
+export function startDrag(partId: string, instanceId: string | null, clientX: number, clientY: number): void {
   const S = getVabState();
   S.dragState = { partId, instanceId, startX: clientX, startY: clientY, hasMoved: false };
   if (instanceId !== null) {
@@ -389,7 +386,7 @@ export function startDrag(partId, instanceId, clientX, clientY) {
 /**
  * Cancel an in-progress drag.
  */
-function cancelDrag() {
+function cancelDrag(): void {
   const S = getVabState();
   if (!S.dragState && !S.pendingPickup) return;
   window.removeEventListener('pointermove',  onDragMove,  { capture: true });
@@ -410,9 +407,8 @@ function cancelDrag() {
 
 /**
  * Global pointermove handler during a drag.
- * @param {PointerEvent} e
  */
-function onDragMove(e) {
+function onDragMove(e: PointerEvent): void {
   const S = getVabState();
   if (!S.dragState) return;
 
@@ -431,13 +427,13 @@ function onDragMove(e) {
   const { worldX, worldY } = vabScreenToWorld(e.clientX, e.clientY);
   const { zoom } = vabGetCamera();
   const candidates = findSnapCandidates(
-    S.assembly, S.dragState.partId, worldX, worldY, zoom,
+    S.assembly!, S.dragState.partId, worldX, worldY, zoom,
   );
 
   if (candidates.length > 0) {
     vabShowSnapHighlights(candidates);
     if (S.symmetryMode) {
-      const mirror = findMirrorCandidate(S.assembly, candidates[0], S.dragState.partId);
+      const mirror = findMirrorCandidate(S.assembly!, candidates[0], S.dragState.partId);
       if (mirror) {
         vabSetMirrorGhost(S.dragState.partId, mirror.mirrorWorldX, mirror.mirrorWorldY);
       } else {
@@ -454,9 +450,8 @@ function onDragMove(e) {
 
 /**
  * Global pointerup handler — drop the part.
- * @param {PointerEvent} e
  */
-function onDragEnd(e) {
+function onDragEnd(e: PointerEvent): void {
   const S = getVabState();
   if (!S.dragState) return;
 
@@ -493,25 +488,25 @@ function onDragEnd(e) {
         const costRefund = getPartById(partId)?.cost ?? 0;
         // Re-add the old connections temporarily so recordDeletion can capture them.
         if (_preMoveData) {
-          for (const c of _preMoveData.oldConnections) S.assembly.connections.push({ ...c });
+          for (const c of _preMoveData.oldConnections) S.assembly!.connections.push({ ...c });
           // Restore old position temporarily for accurate snapshot.
-          const p = S.assembly.parts.get(instanceId);
+          const p = S.assembly!.parts.get(instanceId);
           if (p) { p.x = _preMoveData.oldX; p.y = _preMoveData.oldY; }
         }
         recordDeletion([instanceId], costRefund, stagingBefore);
         // Remove the temporary connections before the actual removal.
         if (_preMoveData) {
-          for (let i = S.assembly.connections.length - 1; i >= 0; i--) {
-            const c = S.assembly.connections[i];
+          for (let i = S.assembly!.connections.length - 1; i >= 0; i--) {
+            const c = S.assembly!.connections[i];
             if (c.fromInstanceId === instanceId || c.toInstanceId === instanceId) {
-              S.assembly.connections.splice(i, 1);
+              S.assembly!.connections.splice(i, 1);
             }
           }
         }
         _preMoveData = null;
         refundOrReturnPart(instanceId, partId, _vabRefreshPartsFn);
         if (S.selectedInstanceId === instanceId) setSelectedPart(null);
-        removePartFromAssembly(S.assembly, instanceId);
+        removePartFromAssembly(S.assembly!, instanceId);
         _syncAndRenderStagingFn();
         _runAndRenderValidationFn();
         refreshInventoryPanel();
@@ -525,13 +520,12 @@ function onDragEnd(e) {
   const { worldX, worldY } = vabScreenToWorld(e.clientX, e.clientY);
   const { zoom } = vabGetCamera();
 
-  const candidates = findSnapCandidates(S.assembly, partId, worldX, worldY, zoom);
+  const candidates = findSnapCandidates(S.assembly!, partId, worldX, worldY, zoom);
   let finalX = worldX;
   let finalY = worldY;
-  let bestCandidate = null;
+  let bestCandidate = candidates.length > 0 ? candidates[0] : null;
 
-  if (candidates.length > 0) {
-    bestCandidate = candidates[0];
+  if (bestCandidate) {
     finalX = bestCandidate.snapWorldX;
     finalY = bestCandidate.snapWorldY;
   }
@@ -544,10 +538,10 @@ function onDragEnd(e) {
     _preMoveData = null;
 
     // Re-place an already-placed part at new position.
-    movePlacedPart(S.assembly, instanceId, finalX, finalY);
+    movePlacedPart(S.assembly!, instanceId, finalX, finalY);
     if (bestCandidate) {
       connectParts(
-        S.assembly,
+        S.assembly!,
         instanceId,                 bestCandidate.dragSnapIndex,
         bestCandidate.targetInstanceId, bestCandidate.targetSnapIndex,
       );
@@ -555,22 +549,22 @@ function onDragEnd(e) {
       for (const c of candidates) {
         if (usedDragSnaps.has(c.dragSnapIndex)) continue;
         if (c.targetInstanceId === bestCandidate.targetInstanceId) continue;
-        connectParts(S.assembly, instanceId, c.dragSnapIndex, c.targetInstanceId, c.targetSnapIndex);
+        connectParts(S.assembly!, instanceId, c.dragSnapIndex, c.targetInstanceId, c.targetSnapIndex);
         usedDragSnaps.add(c.dragSnapIndex);
       }
       // Symmetry: if placing onto a radial socket and symmetry is on, mirror it.
       if (S.symmetryMode) {
-        const mirror = findMirrorCandidate(S.assembly, bestCandidate, partId);
+        const mirror = findMirrorCandidate(S.assembly!, bestCandidate, partId);
         if (mirror) {
-          const mirrorId = addPartToAssembly(S.assembly, partId, mirror.mirrorWorldX, mirror.mirrorWorldY);
+          const mirrorId = addPartToAssembly(S.assembly!, partId, mirror.mirrorWorldX, mirror.mirrorWorldY);
           connectParts(
-            S.assembly,
+            S.assembly!,
             mirrorId,                          mirror.mirrorDragSnapIndex,
             bestCandidate.targetInstanceId,    mirror.mirrorTargetSnapIndex,
           );
-          addSymmetryPair(S.assembly, instanceId, mirrorId);
+          addSymmetryPair(S.assembly!, instanceId, mirrorId);
           _syncAndRenderStagingFn();
-          autoStageNewPart(S.assembly, S.stagingConfig, mirrorId);
+          autoStageNewPart(S.assembly!, S.stagingConfig!, mirrorId);
           _renderStagingPanelFn();
           _runAndRenderValidationFn();
           // Deduct cost for the mirror copy (or use inventory).
@@ -579,8 +573,8 @@ function onDragEnd(e) {
             const mirrorInv = useInventoryPart(S.gameState, partId);
             if (mirrorInv) {
               S.inventoryUsedParts.set(mirrorId, mirrorInv);
-              const mirrorPlaced = S.assembly.parts.get(mirrorId);
-              if (mirrorPlaced) mirrorPlaced._fromInventory = true;
+              const mirrorPlaced = S.assembly!.parts.get(mirrorId);
+              if (mirrorPlaced) (mirrorPlaced as PlacedPart & { _fromInventory?: boolean })._fromInventory = true;
             } else {
               S.gameState.money -= def.cost;
             }
@@ -591,7 +585,7 @@ function onDragEnd(e) {
     }
 
     // Capture new connections after the move and record undo action.
-    const moveNewConns = S.assembly.connections
+    const moveNewConns = S.assembly!.connections
       .filter(c => c.fromInstanceId === instanceId || c.toInstanceId === instanceId)
       .map(c => ({ ...c }));
     recordMove(instanceId, moveOldX, moveOldY, finalX, finalY, moveOldConns, moveNewConns);
@@ -603,7 +597,7 @@ function onDragEnd(e) {
       const vabTier = getFacilityTier(S.gameState, FacilityId.VAB);
       const maxParts = VAB_MAX_PARTS[vabTier] ?? VAB_MAX_PARTS[1];
       const partsToAdd = S.symmetryMode ? 2 : 1;
-      if (S.assembly.parts.size + partsToAdd > maxParts) {
+      if (S.assembly!.parts.size + partsToAdd > maxParts) {
         _showToastFn(`Part limit reached (${maxParts}). Upgrade the VAB for more parts.`);
         vabRenderParts();
         return;
@@ -616,23 +610,24 @@ function onDragEnd(e) {
 
     // New part from the panel — use inventory (free) or buy new (deduct cost).
     const def = getPartById(partId);
+    let invPart = null as ReturnType<typeof useInventoryPart>;
     if (def && S.gameState) {
-      var invPart = useInventoryPart(S.gameState, partId);
+      invPart = useInventoryPart(S.gameState, partId);
       if (!invPart) {
         S.gameState.money -= def.cost;
       }
       refreshTopBar();
     }
-    const newId = addPartToAssembly(S.assembly, partId, finalX, finalY);
+    const newId = addPartToAssembly(S.assembly!, partId, finalX, finalY);
     // Track inventory-sourced part.
     if (invPart) {
       S.inventoryUsedParts.set(newId, invPart);
-      const placed = S.assembly.parts.get(newId);
-      if (placed) placed._fromInventory = true;
+      const placed = S.assembly!.parts.get(newId);
+      if (placed) (placed as PlacedPart & { _fromInventory?: boolean })._fromInventory = true;
     }
     if (bestCandidate) {
       connectParts(
-        S.assembly,
+        S.assembly!,
         newId,                          bestCandidate.dragSnapIndex,
         bestCandidate.targetInstanceId, bestCandidate.targetSnapIndex,
       );
@@ -640,27 +635,27 @@ function onDragEnd(e) {
       for (const c of candidates) {
         if (usedDragSnaps2.has(c.dragSnapIndex)) continue;
         if (c.targetInstanceId === bestCandidate.targetInstanceId) continue;
-        connectParts(S.assembly, newId, c.dragSnapIndex, c.targetInstanceId, c.targetSnapIndex);
+        connectParts(S.assembly!, newId, c.dragSnapIndex, c.targetInstanceId, c.targetSnapIndex);
         usedDragSnaps2.add(c.dragSnapIndex);
       }
       // Symmetry: if placing onto a radial socket and symmetry is on, mirror it.
       if (S.symmetryMode) {
-        const mirror = findMirrorCandidate(S.assembly, bestCandidate, partId);
+        const mirror = findMirrorCandidate(S.assembly!, bestCandidate, partId);
         if (mirror) {
-          const mirrorId = addPartToAssembly(S.assembly, partId, mirror.mirrorWorldX, mirror.mirrorWorldY);
+          const mirrorId = addPartToAssembly(S.assembly!, partId, mirror.mirrorWorldX, mirror.mirrorWorldY);
           connectParts(
-            S.assembly,
+            S.assembly!,
             mirrorId,                          mirror.mirrorDragSnapIndex,
             bestCandidate.targetInstanceId,    mirror.mirrorTargetSnapIndex,
           );
-          addSymmetryPair(S.assembly, newId, mirrorId);
+          addSymmetryPair(S.assembly!, newId, mirrorId);
           // Deduct cost for the mirror copy (or use inventory).
           if (def && S.gameState) {
             const mirrorInv = useInventoryPart(S.gameState, partId);
             if (mirrorInv) {
               S.inventoryUsedParts.set(mirrorId, mirrorInv);
-              const mirrorPlaced = S.assembly.parts.get(mirrorId);
-              if (mirrorPlaced) mirrorPlaced._fromInventory = true;
+              const mirrorPlaced = S.assembly!.parts.get(mirrorId);
+              if (mirrorPlaced) (mirrorPlaced as PlacedPart & { _fromInventory?: boolean })._fromInventory = true;
             } else {
               S.gameState.money -= def.cost;
             }
@@ -672,14 +667,14 @@ function onDragEnd(e) {
     // Sync staging — new activatable part(s) appear in the unstaged pool,
     // then auto-stage based on activation behaviour.
     _syncAndRenderStagingFn();
-    autoStageNewPart(S.assembly, S.stagingConfig, newId);
+    autoStageNewPart(S.assembly!, S.stagingConfig!, newId);
     if (S.symmetryMode) {
-      const mirrorPair = S.assembly.symmetryPairs.find(
+      const mirrorPair = S.assembly!.symmetryPairs.find(
         ([a, b]) => a === newId || b === newId,
       );
       if (mirrorPair) {
         const mirrorId = mirrorPair[0] === newId ? mirrorPair[1] : mirrorPair[0];
-        autoStageNewPart(S.assembly, S.stagingConfig, mirrorId);
+        autoStageNewPart(S.assembly!, S.stagingConfig!, mirrorId);
       }
     }
     _renderStagingPanelFn();
@@ -687,7 +682,7 @@ function onDragEnd(e) {
 
     // Record the placement for undo.
     const addedIds = [newId];
-    const mirrorPairForUndo = S.assembly.symmetryPairs.find(
+    const mirrorPairForUndo = S.assembly!.symmetryPairs.find(
       ([a, b]) => a === newId || b === newId,
     );
     if (mirrorPairForUndo) {
@@ -710,16 +705,15 @@ function onDragEnd(e) {
 
 /**
  * Attach all pointer interactions to the build-canvas overlay div.
- * @param {HTMLElement} canvasArea
  */
-export function setupCanvas(canvasArea) {
+export function setupCanvas(canvasArea: HTMLElement): void {
   const S = getVabState();
   S.canvasArea = canvasArea;
   let panning = false;
   let lastX = 0;
   let lastY = 0;
 
-  canvasArea.addEventListener('pointerdown', (e) => {
+  canvasArea.addEventListener('pointerdown', (e: PointerEvent) => {
     if (e.button !== 0) return;
 
     const { worldX, worldY } = vabScreenToWorld(e.clientX, e.clientY);
@@ -739,7 +733,7 @@ export function setupCanvas(canvasArea) {
     canvasArea.classList.add('panning');
   });
 
-  canvasArea.addEventListener('pointermove', (e) => {
+  canvasArea.addEventListener('pointermove', (e: PointerEvent) => {
     if (S.pendingPickup) {
       const dx = e.clientX - S.pendingPickup.startX;
       const dy = e.clientY - S.pendingPickup.startY;
@@ -750,11 +744,11 @@ export function setupCanvas(canvasArea) {
         _preMoveData = {
           oldX: hit.x,
           oldY: hit.y,
-          oldConnections: S.assembly.connections
+          oldConnections: S.assembly!.connections
             .filter(c => c.fromInstanceId === hit.instanceId || c.toInstanceId === hit.instanceId)
             .map(c => ({ ...c })),
         };
-        disconnectPart(S.assembly, hit.instanceId);
+        disconnectPart(S.assembly!, hit.instanceId);
         startDrag(hit.partId, hit.instanceId, e.clientX, e.clientY);
       }
       return;
@@ -769,7 +763,7 @@ export function setupCanvas(canvasArea) {
     updateOffscreenIndicators();
   });
 
-  const _stopPan = (e) => {
+  const _stopPan = (_e: PointerEvent): void => {
     if (S.pendingPickup) {
       setSelectedPart(S.pendingPickup.hit.instanceId);
       S.pendingPickup = null;
@@ -786,7 +780,7 @@ export function setupCanvas(canvasArea) {
   });
 
   // Right-click context menu for placed parts.
-  canvasArea.addEventListener('contextmenu', (e) => {
+  canvasArea.addEventListener('contextmenu', (e: MouseEvent) => {
     e.preventDefault();
     const { worldX, worldY } = vabScreenToWorld(e.clientX, e.clientY);
     const hit = hitTestPlacedPart(worldX, worldY);
@@ -796,7 +790,7 @@ export function setupCanvas(canvasArea) {
   });
 
   // Scroll-wheel zoom.
-  canvasArea.addEventListener('wheel', (e) => {
+  canvasArea.addEventListener('wheel', (e: WheelEvent) => {
     e.preventDefault();
     const factor = e.deltaY < 0 ? 1.1 : 0.9;
     const { zoom } = vabGetCamera();

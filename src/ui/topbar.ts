@@ -1,5 +1,5 @@
 /**
- * topbar.js — Persistent HTML top bar overlay, shown on all in-game screens.
+ * topbar.ts — Persistent HTML top bar overlay, shown on all in-game screens.
  *
  * Layout:
  *   Left   — agency name
@@ -34,59 +34,82 @@ import { syncVabToGameState } from '../ui/vab.js';
 import { openHelpPanel } from './help.js';
 import { createListenerTracker } from './listenerTracker.js';
 import { injectStyleOnce } from './injectStyle.js';
+import type { GameState } from '../core/gameState.js';
+import type { ListenerTracker } from './listenerTracker.js';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface FlightMenuItem {
+  label: string;
+  onClick: () => void;
+  title?: string;
+}
+
+interface HubMenuItem {
+  label: string;
+  onClick: () => void;
+  id?: string;
+}
+
+interface DropdownItem {
+  label: string;
+  action: () => void;
+  danger?: boolean;
+}
+
+interface TopBarCallbacks {
+  onExitToMenu: () => void;
+  onLoadGame?: (state: GameState) => void;
+}
 
 // ---------------------------------------------------------------------------
 // Module state
 // ---------------------------------------------------------------------------
 
-/** The top bar root element. @type {HTMLElement | null} */
-let _root = null;
+/** The top bar root element. */
+let _root: HTMLElement | null = null;
 
-/** The game state reference. @type {import('../core/gameState.js').GameState | null} */
-let _state = null;
+/** The game state reference. */
+let _state: GameState | null = null;
 
-/** Callback invoked when the player wants to exit to the main menu. @type {(() => void) | null} */
-let _onExitToMenu = null;
+/** Callback invoked when the player wants to exit to the main menu. */
+let _onExitToMenu: (() => void) | null = null;
 
-/** Callback invoked when the player loads a game from the in-game modal. @type {((state: import('../core/gameState.js').GameState) => void) | null} */
-let _onLoadGame = null;
+/** Callback invoked when the player loads a game from the in-game modal. */
+let _onLoadGame: ((state: GameState) => void) | null = null;
 
 /**
  * Optional flight-specific menu items injected by the flight controller.
- * Each entry: { label: string, onClick: () => void, title?: string }
- * @type {Array<{ label: string, onClick: () => void, title?: string }>}
  */
-let _flightMenuItems = [];
+let _flightMenuItems: FlightMenuItem[] = [];
 
 /**
  * Optional hub-specific menu items injected by the hub UI.
- * Each entry: { label: string, onClick: () => void, id?: string }
- * @type {Array<{ label: string, onClick: () => void, id?: string }>}
  */
-let _hubMenuItems = [];
+let _hubMenuItems: HubMenuItem[] = [];
 
 /**
  * Optional callback fired when the dropdown opens or closes.
  * Receives `true` when opening, `false` when closing.
- * @type {((isOpen: boolean) => void) | null}
  */
-let _onDropdownToggle = null;
+let _onDropdownToggle: ((isOpen: boolean) => void) | null = null;
 
 /**
  * Current screen identifier, set by the navigation handler in index.js.
  * Used to determine the default help section.
- * @type {string}
  */
-let _currentScreen = 'hub';
+let _currentScreen: string = 'hub';
 
 /** Tracks all event listeners registered by the topbar so they can be bulk-removed on destroy. */
-let _tracker = createListenerTracker();
+let _tracker: ListenerTracker = createListenerTracker();
 
 // ---------------------------------------------------------------------------
 // CSS
 // ---------------------------------------------------------------------------
 
-const TOPBAR_STYLES = `
+const TOPBAR_STYLES: string = `
 /* ══════════════════════════════════════════════════════════════════
    Game Top Bar — fixed 44 px strip visible on every in-game screen
    ══════════════════════════════════════════════════════════════════ */
@@ -637,20 +660,16 @@ const TOPBAR_STYLES = `
 
 /**
  * Format a dollar amount as $X,XXX,XXX.
- * @param {number} n
- * @returns {string}
  */
-function _fmtCash(n) {
+function _fmtCash(n: number): string {
   return '$' + Math.round(n).toLocaleString('en-US');
 }
 
 /**
  * Return a CSS color string reflecting financial health.
  * Green = healthy (>= $100k), amber = tight (< $100k), red = near bankruptcy (< $20k).
- * @param {number} funds
- * @returns {string}
  */
-function _moneyColor(funds) {
+function _moneyColor(funds: number): string {
   if (funds < 20_000)  return 'var(--color-danger-text)';   // red
   if (funds < 100_000) return 'var(--color-warning)';       // amber
   return 'var(--color-money)';                              // green
@@ -658,10 +677,8 @@ function _moneyColor(funds) {
 
 /**
  * Format an interest rate decimal as a percentage string.
- * @param {number} r  e.g. 0.03
- * @returns {string}  e.g. "3%"
  */
-function _fmtRate(r) {
+function _fmtRate(r: number): string {
   return (r * 100).toFixed(0) + '%';
 }
 
@@ -671,16 +688,8 @@ function _fmtRate(r) {
 
 /**
  * Mount the persistent top bar above all in-game screens.
- *
- * @param {HTMLElement} container
- *   The #ui-overlay div from index.html.
- * @param {import('../core/gameState.js').GameState} state
- *   The current game state.
- * @param {{ onExitToMenu: () => void, onLoadGame?: (state: import('../core/gameState.js').GameState) => void }} callbacks
- *   `onExitToMenu` is called when the player confirms they want to leave.
- *   `onLoadGame` is called with the loaded state when the player loads a save from the in-game modal.
  */
-export function initTopBar(container, state, { onExitToMenu, onLoadGame }) {
+export function initTopBar(container: HTMLElement, state: GameState, { onExitToMenu, onLoadGame }: TopBarCallbacks): void {
   _state = state;
   _onExitToMenu = onExitToMenu;
   _onLoadGame = onLoadGame || null;
@@ -692,18 +701,18 @@ export function initTopBar(container, state, { onExitToMenu, onLoadGame }) {
   _root.id = 'game-topbar';
 
   // Agency name — left
-  const agency = document.createElement('span');
+  const agency: HTMLSpanElement = document.createElement('span');
   agency.id = 'topbar-agency';
   agency.textContent = state.agencyName || 'Space Agency';
 
   // Flight (period) counter
-  const flightCounter = document.createElement('span');
+  const flightCounter: HTMLSpanElement = document.createElement('span');
   flightCounter.id = 'topbar-flight';
-  const period = state.currentPeriod ?? 0;
+  const period: number = state.currentPeriod ?? 0;
   flightCounter.textContent = `Flight ${period}`;
 
   // Cash button — centre
-  const cash = document.createElement('button');
+  const cash: HTMLButtonElement = document.createElement('button');
   cash.id = 'topbar-cash';
   cash.dataset.testid = 'topbar-cash';
   cash.setAttribute('aria-label', 'View loan details');
@@ -713,37 +722,37 @@ export function initTopBar(container, state, { onExitToMenu, onLoadGame }) {
   _tracker.add(cash, 'click', () => _openLoanModal());
 
   // Hamburger button — right
-  const menuBtn = document.createElement('button');
+  const menuBtn: HTMLButtonElement = document.createElement('button');
   menuBtn.id = 'topbar-menu-btn';
   menuBtn.dataset.testid = 'topbar-menu-btn';
   menuBtn.setAttribute('aria-label', 'Open menu');
   menuBtn.title = 'Menu';
-  menuBtn.textContent = '☰';
-  _tracker.add(menuBtn, 'click', (e) => {
+  menuBtn.textContent = '\u2630';
+  _tracker.add(menuBtn, 'click', (e: Event) => {
     e.stopPropagation();
     _toggleDropdown();
   });
 
   // Missions button
-  const missionsBtn = document.createElement('button');
+  const missionsBtn: HTMLButtonElement = document.createElement('button');
   missionsBtn.id = 'topbar-missions-btn';
   missionsBtn.dataset.testid = 'topbar-missions-btn';
   missionsBtn.setAttribute('aria-label', 'View accepted missions');
   missionsBtn.title = 'Accepted Missions';
   missionsBtn.textContent = 'Missions';
-  _tracker.add(missionsBtn, 'click', (e) => {
+  _tracker.add(missionsBtn, 'click', (e: Event) => {
     e.stopPropagation();
     _toggleMissionsDropdown();
   });
 
-  const spacer = document.createElement('div');
+  const spacer: HTMLDivElement = document.createElement('div');
   spacer.id = 'topbar-spacer';
 
   _root.appendChild(agency);
 
   // Game mode badge — always shown.
   {
-    const badge = document.createElement('span');
+    const badge: HTMLSpanElement = document.createElement('span');
     badge.id = 'topbar-mode-badge';
     if (state.gameMode === GameMode.SANDBOX) {
       badge.className = 'mode-sandbox';
@@ -777,7 +786,7 @@ export function initTopBar(container, state, { onExitToMenu, onLoadGame }) {
  * Remove the top bar and all associated dropdowns/modals from the DOM.
  * Call before returning to the main menu.
  */
-export function destroyTopBar() {
+export function destroyTopBar(): void {
   _tracker.removeAll();
   _tracker = createListenerTracker();
   _closeAllModals();
@@ -798,7 +807,7 @@ export function destroyTopBar() {
  * Call this after any operation that changes the player's cash balance
  * (part purchases, mission rewards, loan payments, etc.).
  */
-export function refreshTopBar() {
+export function refreshTopBar(): void {
   if (!_state) return;
   const cashEl = document.getElementById('topbar-cash');
   if (cashEl) {
@@ -807,7 +816,7 @@ export function refreshTopBar() {
   }
   const flightEl = document.getElementById('topbar-flight');
   if (flightEl) {
-    const period = _state.currentPeriod ?? 0;
+    const period: number = _state.currentPeriod ?? 0;
     flightEl.textContent = `Flight ${period}`;
   }
   _refreshMissionsBtn();
@@ -817,17 +826,15 @@ export function refreshTopBar() {
  * Register flight-specific items to be shown at the top of the topbar
  * dropdown while a flight is in progress. Call `clearTopBarFlightItems()`
  * to remove them when the flight ends.
- *
- * @param {Array<{ label: string, onClick: () => void, title?: string }>} items
  */
-export function setTopBarFlightItems(items) {
+export function setTopBarFlightItems(items: FlightMenuItem[]): void {
   _flightMenuItems = items ?? [];
 }
 
 /**
  * Remove all flight-specific items previously added via `setTopBarFlightItems`.
  */
-export function clearTopBarFlightItems() {
+export function clearTopBarFlightItems(): void {
   _flightMenuItems = [];
   _onDropdownToggle = null;
 }
@@ -836,34 +843,30 @@ export function clearTopBarFlightItems() {
  * Register hub-specific items to be shown at the top of the topbar
  * dropdown while the hub is displayed. Call `clearTopBarHubItems()`
  * to remove them when navigating away from the hub.
- *
- * @param {Array<{ label: string, onClick: () => void, id?: string }>} items
  */
-export function setTopBarHubItems(items) {
+export function setTopBarHubItems(items: HubMenuItem[]): void {
   _hubMenuItems = items ?? [];
 }
 
 /**
  * Remove all hub-specific items previously added via `setTopBarHubItems`.
  */
-export function clearTopBarHubItems() {
+export function clearTopBarHubItems(): void {
   _hubMenuItems = [];
 }
 
 /**
  * Register a callback that fires when the hamburger dropdown opens or closes.
- * @param {((isOpen: boolean) => void) | null} cb
  */
-export function setTopBarDropdownToggleCallback(cb) {
+export function setTopBarDropdownToggleCallback(cb: ((isOpen: boolean) => void) | null): void {
   _onDropdownToggle = cb;
 }
 
 /**
  * Set the current screen identifier so the help panel can open to the
  * relevant section by default.
- * @param {string} screenId  e.g. 'hub', 'vab', 'flight', 'mission-control', etc.
  */
-export function setCurrentScreen(screenId) {
+export function setCurrentScreen(screenId: string): void {
   _currentScreen = screenId;
 }
 
@@ -876,7 +879,7 @@ export function setCurrentScreen(screenId) {
 // ---------------------------------------------------------------------------
 
 /** Screen ID → default help section mapping. */
-const _SCREEN_TO_HELP_SECTION = {
+const _SCREEN_TO_HELP_SECTION: Record<string, string> = {
   'hub':              'overview',
   'vab':              'vab',
   'flight':           'flight',
@@ -889,9 +892,9 @@ const _SCREEN_TO_HELP_SECTION = {
   'library':          'facilities',
 };
 
-function _openHelp() {
-  const section = _SCREEN_TO_HELP_SECTION[_currentScreen] || 'overview';
-  const container = _root?.parentElement || document.body;
+function _openHelp(): void {
+  const section: string = _SCREEN_TO_HELP_SECTION[_currentScreen] || 'overview';
+  const container: HTMLElement = _root?.parentElement || document.body;
   openHelpPanel(container, _state, section);
 }
 
@@ -899,7 +902,7 @@ function _openHelp() {
 // Dropdown
 // ---------------------------------------------------------------------------
 
-function _toggleDropdown() {
+function _toggleDropdown(): void {
   const existing = document.getElementById('topbar-dropdown');
   if (existing) {
     _closeDropdown();
@@ -908,28 +911,28 @@ function _toggleDropdown() {
   }
 }
 
-function _openDropdown() {
+function _openDropdown(): void {
   _onDropdownToggle?.(true);
-  const menu = document.createElement('div');
+  const menu: HTMLDivElement = document.createElement('div');
   menu.id = 'topbar-dropdown';
   menu.setAttribute('role', 'menu');
 
   // Inject flight-specific items (e.g. "Return to Space Agency") when in flight.
   if (_flightMenuItems.length > 0) {
     for (const item of _flightMenuItems) {
-      const btn = document.createElement('button');
+      const btn: HTMLButtonElement = document.createElement('button');
       btn.className = 'topbar-dropdown-item';
       btn.setAttribute('role', 'menuitem');
       btn.textContent = item.label;
       if (item.title) btn.title = item.title;
-      btn.addEventListener('click', (e) => {
+      btn.addEventListener('click', (e: MouseEvent) => {
         e.stopPropagation();
         _closeDropdown();
         item.onClick();
       });
       menu.appendChild(btn);
     }
-    const sep = document.createElement('hr');
+    const sep: HTMLHRElement = document.createElement('hr');
     sep.className = 'topbar-dropdown-sep';
     menu.appendChild(sep);
   }
@@ -937,24 +940,24 @@ function _openDropdown() {
   // Inject hub-specific items (Construction, Settings) when on the hub screen.
   if (_hubMenuItems.length > 0) {
     for (const item of _hubMenuItems) {
-      const btn = document.createElement('button');
+      const btn: HTMLButtonElement = document.createElement('button');
       btn.className = 'topbar-dropdown-item';
       btn.setAttribute('role', 'menuitem');
       btn.textContent = item.label;
       if (item.id) btn.id = item.id;
-      btn.addEventListener('click', (e) => {
+      btn.addEventListener('click', (e: MouseEvent) => {
         e.stopPropagation();
         _closeDropdown();
         item.onClick();
       });
       menu.appendChild(btn);
     }
-    const sep = document.createElement('hr');
+    const sep: HTMLHRElement = document.createElement('hr');
     sep.className = 'topbar-dropdown-sep';
     menu.appendChild(sep);
   }
 
-  const items = [
+  const items: (DropdownItem | null)[] = [
     { label: 'Save Game',    action: _openSaveSlotPicker },
     { label: 'Load Game',    action: _doLoadGame        },
   ];
@@ -972,16 +975,16 @@ function _openDropdown() {
 
   for (const item of items) {
     if (item === null) {
-      const sep = document.createElement('hr');
+      const sep: HTMLHRElement = document.createElement('hr');
       sep.className = 'topbar-dropdown-sep';
       menu.appendChild(sep);
       continue;
     }
-    const btn = document.createElement('button');
+    const btn: HTMLButtonElement = document.createElement('button');
     btn.className = 'topbar-dropdown-item' + (item.danger ? ' danger' : '');
     btn.setAttribute('role', 'menuitem');
     btn.textContent = item.label;
-    btn.addEventListener('click', (e) => {
+    btn.addEventListener('click', (e: MouseEvent) => {
       e.stopPropagation();
       _closeDropdown();
       item.action();
@@ -992,7 +995,7 @@ function _openDropdown() {
   document.body.appendChild(menu);
 }
 
-function _closeDropdown() {
+function _closeDropdown(): void {
   const d = document.getElementById('topbar-dropdown');
   if (d) {
     _onDropdownToggle?.(false);
@@ -1003,13 +1006,12 @@ function _closeDropdown() {
 /**
  * Capture-phase document click handler — closes the dropdown when the user
  * clicks anywhere that isn't the menu button or the dropdown itself.
- * @param {MouseEvent} e
  */
-function _onDocClick(e) {
+function _onDocClick(e: Event): void {
   const dropdown = document.getElementById('topbar-dropdown');
   if (dropdown) {
     const btn = document.getElementById('topbar-menu-btn');
-    if (!(btn && btn.contains(e.target)) && !dropdown.contains(e.target)) {
+    if (!(btn && btn.contains(e.target as Node)) && !dropdown.contains(e.target as Node)) {
       _closeDropdown();
     }
   }
@@ -1017,7 +1019,7 @@ function _onDocClick(e) {
   const mDropdown = document.getElementById('topbar-missions-dropdown');
   if (mDropdown) {
     const mBtn = document.getElementById('topbar-missions-btn');
-    if (!(mBtn && mBtn.contains(e.target)) && !mDropdown.contains(e.target)) {
+    if (!(mBtn && mBtn.contains(e.target as Node)) && !mDropdown.contains(e.target as Node)) {
       _closeMissionsDropdown();
     }
   }
@@ -1027,7 +1029,7 @@ function _onDocClick(e) {
 // Missions Dropdown
 // ---------------------------------------------------------------------------
 
-function _toggleMissionsDropdown() {
+function _toggleMissionsDropdown(): void {
   const existing = document.getElementById('topbar-missions-dropdown');
   if (existing) {
     _closeMissionsDropdown();
@@ -1036,16 +1038,16 @@ function _toggleMissionsDropdown() {
   }
 }
 
-function _openMissionsDropdown() {
+function _openMissionsDropdown(): void {
   _closeDropdown(); // close hamburger if open
-  const panel = document.createElement('div');
+  const panel: HTMLDivElement = document.createElement('div');
   panel.id = 'topbar-missions-dropdown';
   _buildMissionsContent(panel);
 
   // Position below the missions button
   const btn = document.getElementById('topbar-missions-btn');
   if (btn) {
-    const rect = btn.getBoundingClientRect();
+    const rect: DOMRect = btn.getBoundingClientRect();
     panel.style.right = 'auto';
     panel.style.left = rect.left + 'px';
     panel.style.transform = 'none';
@@ -1054,70 +1056,73 @@ function _openMissionsDropdown() {
   document.body.appendChild(panel);
 }
 
-function _closeMissionsDropdown() {
+function _closeMissionsDropdown(): void {
   const d = document.getElementById('topbar-missions-dropdown');
   if (d) d.remove();
 }
 
-function _buildMissionsContent(container) {
+function _buildMissionsContent(container: HTMLElement): void {
   container.innerHTML = '';
   if (!_state) return;
   const accepted = _state.missions?.accepted ?? [];
   if (accepted.length === 0) {
-    const empty = document.createElement('div');
+    const empty: HTMLDivElement = document.createElement('div');
     empty.className = 'topbar-missions-empty';
     empty.textContent = 'No missions accepted.';
     container.appendChild(empty);
     return;
   }
   for (const m of accepted) {
-    const card = document.createElement('div');
+    // Accepted missions carry MissionDef fields (objectives, unlockedParts)
+    // that are not on the base Mission interface. Use `as any` for access.
+    const mAny = m as any;
+    const card: HTMLDivElement = document.createElement('div');
     card.className = 'topbar-mission-card';
 
-    const title = document.createElement('div');
+    const title: HTMLDivElement = document.createElement('div');
     title.className = 'topbar-mission-title';
     title.textContent = m.title;
     card.appendChild(title);
 
-    const reward = document.createElement('div');
+    const reward: HTMLDivElement = document.createElement('div');
     reward.className = 'topbar-mission-reward';
     reward.textContent = 'Reward: ' + _fmtCash(m.reward);
     card.appendChild(reward);
 
-    if (Array.isArray(m.unlockedParts) && m.unlockedParts.length > 0) {
-      const parts = document.createElement('div');
+    if (Array.isArray(mAny.unlockedParts) && mAny.unlockedParts.length > 0) {
+      const parts: HTMLDivElement = document.createElement('div');
       parts.className = 'topbar-mission-reward-parts';
-      parts.textContent = 'Unlocks: ' + m.unlockedParts
-        .map((id) => getPartById(id)?.name ?? id)
+      parts.textContent = 'Unlocks: ' + mAny.unlockedParts
+        .map((id: string) => getPartById(id)?.name ?? id)
         .join(', ');
       card.appendChild(parts);
     }
 
-    const desc = document.createElement('div');
+    const desc: HTMLDivElement = document.createElement('div');
     desc.className = 'topbar-mission-desc';
     desc.textContent = m.description;
     card.appendChild(desc);
 
     // Objectives
-    if (Array.isArray(m.objectives) && m.objectives.length > 0) {
-      const objLabel = document.createElement('div');
+    if (Array.isArray(mAny.objectives) && mAny.objectives.length > 0) {
+      const objLabel: HTMLDivElement = document.createElement('div');
       objLabel.className = 'topbar-mission-obj-label';
       objLabel.textContent = 'Objectives';
       card.appendChild(objLabel);
 
-      const objList = document.createElement('ul');
+      const objList: HTMLUListElement = document.createElement('ul');
       objList.className = 'topbar-mission-obj-list';
 
-      for (const obj of m.objectives) {
-        const item = document.createElement('li');
+      for (const obj of mAny.objectives) {
+        const item: HTMLLIElement = document.createElement('li');
         item.className = 'topbar-mission-obj-item';
 
-        const indicator = document.createElement('span');
+        const indicator: HTMLSpanElement = document.createElement('span');
         indicator.className = `topbar-mission-obj-indicator ${obj.completed ? 'completed' : 'pending'}`;
-        indicator.textContent = obj.completed ? '✓' : '○';
+        indicator.textContent = obj.completed ? '\u2713' : '\u25CB';
         item.appendChild(indicator);
 
-        const text = document.createElement('span');
+        const text: HTMLSpanElement = document.createElement('span');
         text.className = `topbar-mission-obj-text ${obj.completed ? 'completed' : 'pending'}`;
         text.textContent = obj.description;
         item.appendChild(text);
@@ -1135,10 +1140,10 @@ function _buildMissionsContent(container) {
 /**
  * Update the missions button label (with count) and refresh dropdown if open.
  */
-function _refreshMissionsBtn() {
+function _refreshMissionsBtn(): void {
   const btn = document.getElementById('topbar-missions-btn');
   if (!btn || !_state) return;
-  const count = _state.missions?.accepted?.length ?? 0;
+  const count: number = _state.missions?.accepted?.length ?? 0;
   btn.textContent = count > 0 ? `Missions (${count})` : 'Missions';
   btn.classList.toggle('has-missions', count > 0);
 
@@ -1151,7 +1156,7 @@ function _refreshMissionsBtn() {
  * Refresh the missions button and dropdown from the current game state.
  * Call after accepting/completing missions.
  */
-export function refreshTopBarMissions() {
+export function refreshTopBarMissions(): void {
   _refreshMissionsBtn();
 }
 
@@ -1159,24 +1164,24 @@ export function refreshTopBarMissions() {
 // Loan Modal
 // ---------------------------------------------------------------------------
 
-function _openLoanModal() {
+function _openLoanModal(): void {
   if (!_state) return;
   _closeAllModals();
 
-  const backdrop = _makeBackdrop('loan-modal-backdrop');
+  const backdrop: HTMLDivElement = _makeBackdrop('loan-modal-backdrop');
 
-  const modal = document.createElement('div');
+  const modal: HTMLDivElement = document.createElement('div');
   modal.className = 'topbar-modal';
   modal.setAttribute('role', 'dialog');
   modal.setAttribute('aria-modal', 'true');
   modal.setAttribute('aria-label', 'Loan Details');
-  modal.addEventListener('click', (e) => e.stopPropagation());
+  modal.addEventListener('click', (e: MouseEvent) => e.stopPropagation());
 
   // Title row
   modal.appendChild(_makeTitleRow('Loan Details', () => backdrop.remove()));
 
   // Stats section — given an id so pay/borrow can refresh it in-place
-  const stats = _buildLoanStats();
+  const stats: HTMLDivElement = _buildLoanStats();
   modal.appendChild(stats);
 
   // Pay Down section
@@ -1194,18 +1199,16 @@ function _openLoanModal() {
  * Build the read-only stats rows for the loan modal.
  * The container is given id="loan-stats-container" so it can be swapped out
  * after a pay-down or borrow operation.
- *
- * @returns {HTMLElement}
  */
-function _buildLoanStats() {
-  const s = _state;
-  const container = document.createElement('div');
+function _buildLoanStats(): HTMLDivElement {
+  const s = _state!;
+  const container: HTMLDivElement = document.createElement('div');
   container.id = 'loan-stats-container';
 
-  const interestNext = s.loan.balance * s.loan.interestRate;
-  const totalAccrued = s.loan.totalInterestAccrued ?? 0;
+  const interestNext: number = s.loan.balance * s.loan.interestRate;
+  const totalAccrued: number = s.loan.totalInterestAccrued ?? 0;
 
-  const rows = [
+  const rows: Array<{ label: string; value: string; negative: boolean }> = [
     { label: 'Outstanding balance',      value: _fmtCash(s.loan.balance),      negative: s.loan.balance > 0  },
     { label: 'Interest rate',            value: _fmtRate(s.loan.interestRate) + ' per mission', negative: false },
     { label: 'Interest on next mission', value: _fmtCash(interestNext),         negative: interestNext > 0    },
@@ -1213,14 +1216,14 @@ function _buildLoanStats() {
   ];
 
   for (const { label, value, negative } of rows) {
-    const row = document.createElement('div');
+    const row: HTMLDivElement = document.createElement('div');
     row.className = 'loan-stat-row';
 
-    const lbl = document.createElement('span');
+    const lbl: HTMLSpanElement = document.createElement('span');
     lbl.className = 'loan-stat-label';
     lbl.textContent = label;
 
-    const val = document.createElement('span');
+    const val: HTMLSpanElement = document.createElement('span');
     val.className = 'loan-stat-value' + (negative ? ' negative' : '');
     val.textContent = value;
 
@@ -1235,7 +1238,7 @@ function _buildLoanStats() {
 /**
  * Replace the existing loan stats container with freshly-computed values.
  */
-function _refreshLoanStats() {
+function _refreshLoanStats(): void {
   const old = document.getElementById('loan-stats-container');
   if (!old || !_state) return;
   old.replaceWith(_buildLoanStats());
@@ -1243,25 +1246,24 @@ function _refreshLoanStats() {
 
 /**
  * Build the "Pay Down Loan" action section.
- * @returns {HTMLElement}
  */
-function _buildPaySection() {
-  const section = document.createElement('div');
+function _buildPaySection(): HTMLDivElement {
+  const section: HTMLDivElement = document.createElement('div');
   section.className = 'loan-action';
 
-  const lbl = document.createElement('span');
+  const lbl: HTMLSpanElement = document.createElement('span');
   lbl.className = 'loan-action-label';
   lbl.textContent = 'Pay Down Loan';
 
-  const hint = document.createElement('div');
+  const hint: HTMLDivElement = document.createElement('div');
   hint.className = 'loan-action-hint';
   hint.id = 'pay-hint';
   hint.textContent = `Available cash: ${_fmtCash(_state?.money ?? 0)}`;
 
-  const row = document.createElement('div');
+  const row: HTMLDivElement = document.createElement('div');
   row.className = 'loan-action-row';
 
-  const input = document.createElement('input');
+  const input: HTMLInputElement = document.createElement('input');
   input.className = 'loan-action-input';
   input.type = 'number';
   input.min = '1';
@@ -1269,17 +1271,17 @@ function _buildPaySection() {
   input.placeholder = 'Amount ($)';
   input.dataset.testid = 'loan-pay-input';
 
-  const btn = document.createElement('button');
+  const btn: HTMLButtonElement = document.createElement('button');
   btn.className = 'loan-action-btn loan-pay-btn';
   btn.textContent = 'Pay Down';
   btn.dataset.testid = 'loan-pay-btn';
 
-  const feedback = document.createElement('div');
+  const feedback: HTMLDivElement = document.createElement('div');
   feedback.className = 'loan-feedback';
   feedback.id = 'pay-feedback';
 
   btn.addEventListener('click', () => {
-    const amount = parseFloat(input.value);
+    const amount: number = parseFloat(input.value);
     if (!_state) return;
 
     if (!amount || amount <= 0) {
@@ -1323,27 +1325,26 @@ function _buildPaySection() {
 
 /**
  * Build the "Borrow More" action section.
- * @returns {HTMLElement}
  */
-function _buildBorrowSection() {
-  const section = document.createElement('div');
+function _buildBorrowSection(): HTMLDivElement {
+  const section: HTMLDivElement = document.createElement('div');
   section.className = 'loan-action';
 
-  const lbl = document.createElement('span');
+  const lbl: HTMLSpanElement = document.createElement('span');
   lbl.className = 'loan-action-label';
   lbl.textContent = 'Borrow More';
 
-  const headroom = Math.max(0, MAX_LOAN_BALANCE - (_state?.loan.balance ?? 0));
+  const headroom: number = Math.max(0, MAX_LOAN_BALANCE - (_state?.loan.balance ?? 0));
 
-  const hint = document.createElement('div');
+  const hint: HTMLDivElement = document.createElement('div');
   hint.className = 'loan-action-hint';
   hint.id = 'borrow-hint';
   hint.textContent = `Max additional: ${_fmtCash(headroom)}  (limit ${_fmtCash(MAX_LOAN_BALANCE)})`;
 
-  const row = document.createElement('div');
+  const row: HTMLDivElement = document.createElement('div');
   row.className = 'loan-action-row';
 
-  const input = document.createElement('input');
+  const input: HTMLInputElement = document.createElement('input');
   input.className = 'loan-action-input';
   input.type = 'number';
   input.min = '1';
@@ -1351,18 +1352,18 @@ function _buildBorrowSection() {
   input.placeholder = 'Amount ($)';
   input.dataset.testid = 'loan-borrow-input';
 
-  const btn = document.createElement('button');
+  const btn: HTMLButtonElement = document.createElement('button');
   btn.className = 'loan-action-btn loan-borrow-btn';
   btn.textContent = 'Borrow';
   btn.dataset.testid = 'loan-borrow-btn';
   if (headroom <= 0) btn.disabled = true;
 
-  const feedback = document.createElement('div');
+  const feedback: HTMLDivElement = document.createElement('div');
   feedback.className = 'loan-feedback';
   feedback.id = 'borrow-feedback';
 
   btn.addEventListener('click', () => {
-    const amount = parseFloat(input.value);
+    const amount: number = parseFloat(input.value);
     if (!_state) return;
 
     if (!amount || amount <= 0) {
@@ -1370,7 +1371,7 @@ function _buildBorrowSection() {
       return;
     }
 
-    const currentHeadroom = Math.max(0, MAX_LOAN_BALANCE - _state.loan.balance);
+    const currentHeadroom: number = Math.max(0, MAX_LOAN_BALANCE - _state.loan.balance);
     if (currentHeadroom <= 0) {
       feedback.textContent = 'Maximum loan limit reached.';
       btn.disabled = true;
@@ -1381,7 +1382,7 @@ function _buildBorrowSection() {
     refreshTopBar();
     _refreshLoanStats();
 
-    const newHeadroom = Math.max(0, MAX_LOAN_BALANCE - _state.loan.balance);
+    const newHeadroom: number = Math.max(0, MAX_LOAN_BALANCE - _state.loan.balance);
     const h = document.getElementById('borrow-hint');
     if (h) h.textContent = `Max additional: ${_fmtCash(newHeadroom)}  (limit ${_fmtCash(MAX_LOAN_BALANCE)})`;
     if (newHeadroom <= 0) btn.disabled = true;
@@ -1407,18 +1408,18 @@ function _buildBorrowSection() {
 // Save Slot Picker Modal
 // ---------------------------------------------------------------------------
 
-function _openSaveSlotPicker() {
+function _openSaveSlotPicker(): void {
   if (!_state) return;
   _closeAllModals();
 
-  const backdrop = _makeBackdrop('save-modal-backdrop');
+  const backdrop: HTMLDivElement = _makeBackdrop('save-modal-backdrop');
 
-  const modal = document.createElement('div');
+  const modal: HTMLDivElement = document.createElement('div');
   modal.className = 'topbar-modal';
   modal.setAttribute('role', 'dialog');
   modal.setAttribute('aria-modal', 'true');
   modal.setAttribute('aria-label', 'Save Game');
-  modal.addEventListener('click', (e) => e.stopPropagation());
+  modal.addEventListener('click', (e: MouseEvent) => e.stopPropagation());
 
   modal.appendChild(_makeTitleRow('Save Game', () => backdrop.remove()));
 
@@ -1426,28 +1427,28 @@ function _openSaveSlotPicker() {
 
   for (let i = 0; i < SAVE_SLOT_COUNT; i++) {
     const slot = saves[i];
-    const card = document.createElement('div');
+    const card: HTMLDivElement = document.createElement('div');
     card.className = 'save-slot-card';
     card.dataset.testid = `save-slot-${i}`;
 
-    const info = document.createElement('div');
+    const info: HTMLDivElement = document.createElement('div');
     info.className = 'save-slot-info';
 
     if (slot) {
-      const name = document.createElement('strong');
+      const name: HTMLElement = document.createElement('strong');
       name.textContent = slot.saveName || `Slot ${i + 1}`;
 
-      const detail = document.createElement('span');
-      const ts = new Date(slot.timestamp).toLocaleString();
-      detail.textContent = `${slot.agencyName} · ${ts}`;
+      const detail: HTMLSpanElement = document.createElement('span');
+      const ts: string = new Date(slot.timestamp).toLocaleString();
+      detail.textContent = `${slot.agencyName} \u00B7 ${ts}`;
 
       info.appendChild(name);
       info.appendChild(detail);
     } else {
-      const name = document.createElement('strong');
+      const name: HTMLElement = document.createElement('strong');
       name.textContent = `Slot ${i + 1}`;
 
-      const detail = document.createElement('span');
+      const detail: HTMLSpanElement = document.createElement('span');
       detail.className = 'empty-slot';
       detail.textContent = 'Empty';
 
@@ -1455,7 +1456,7 @@ function _openSaveSlotPicker() {
       info.appendChild(detail);
     }
 
-    const tag = document.createElement('span');
+    const tag: HTMLSpanElement = document.createElement('span');
     tag.className = 'save-slot-action-tag';
     tag.textContent = slot ? 'Overwrite' : 'Save here';
 
@@ -1463,11 +1464,11 @@ function _openSaveSlotPicker() {
     card.appendChild(tag);
 
     // Capture slot index in closure
-    const slotIndex = i;
+    const slotIndex: number = i;
     card.addEventListener('click', () => {
-      const saveName = _state.agencyName || 'New Save';
+      const saveName: string = _state!.agencyName || 'New Save';
       syncVabToGameState();
-      saveGame(_state, slotIndex, saveName);
+      saveGame(_state!, slotIndex, saveName);
       backdrop.remove();
 
     });
@@ -1484,48 +1485,48 @@ function _openSaveSlotPicker() {
 // Load Game — modal overlay with save slots
 // ---------------------------------------------------------------------------
 
-function _doLoadGame() {
+function _doLoadGame(): void {
   _closeAllModals();
 
-  const backdrop = _makeBackdrop('load-modal-backdrop');
+  const backdrop: HTMLDivElement = _makeBackdrop('load-modal-backdrop');
 
-  const modal = document.createElement('div');
+  const modal: HTMLDivElement = document.createElement('div');
   modal.className = 'topbar-modal';
   modal.setAttribute('role', 'dialog');
   modal.setAttribute('aria-modal', 'true');
   modal.setAttribute('aria-label', 'Load Game');
-  modal.addEventListener('click', (e) => e.stopPropagation());
+  modal.addEventListener('click', (e: MouseEvent) => e.stopPropagation());
 
   modal.appendChild(_makeTitleRow('Load Game', () => backdrop.remove()));
 
   const saves = listSaves();
-  let hasAnySave = false;
+  let hasAnySave: boolean = false;
 
   for (let i = 0; i < SAVE_SLOT_COUNT; i++) {
     const slot = saves[i];
-    const card = document.createElement('div');
+    const card: HTMLDivElement = document.createElement('div');
     card.className = 'save-slot-card';
     card.dataset.testid = `load-slot-${i}`;
 
-    const info = document.createElement('div');
+    const info: HTMLDivElement = document.createElement('div');
     info.className = 'save-slot-info';
 
     if (slot) {
       hasAnySave = true;
-      const name = document.createElement('strong');
+      const name: HTMLElement = document.createElement('strong');
       name.textContent = slot.saveName || `Slot ${i + 1}`;
 
-      const detail = document.createElement('span');
-      const ts = new Date(slot.timestamp).toLocaleString();
-      detail.textContent = `${slot.agencyName} · ${ts}`;
+      const detail: HTMLSpanElement = document.createElement('span');
+      const ts: string = new Date(slot.timestamp).toLocaleString();
+      detail.textContent = `${slot.agencyName} \u00B7 ${ts}`;
 
       info.appendChild(name);
       info.appendChild(detail);
     } else {
-      const name = document.createElement('strong');
+      const name: HTMLElement = document.createElement('strong');
       name.textContent = `Slot ${i + 1}`;
 
-      const detail = document.createElement('span');
+      const detail: HTMLSpanElement = document.createElement('span');
       detail.className = 'empty-slot';
       detail.textContent = 'Empty';
 
@@ -1533,13 +1534,13 @@ function _doLoadGame() {
       info.appendChild(detail);
     }
 
-    const tag = document.createElement('span');
+    const tag: HTMLSpanElement = document.createElement('span');
     tag.className = 'save-slot-action-tag';
     if (slot) {
       tag.textContent = 'Load';
       tag.classList.add('load-action');
     } else {
-      tag.textContent = '—';
+      tag.textContent = '\u2014';
       tag.style.opacity = '0.3';
     }
 
@@ -1547,7 +1548,7 @@ function _doLoadGame() {
     card.appendChild(tag);
 
     if (slot) {
-      const slotIndex = i;
+      const slotIndex: number = i;
       card.style.cursor = 'pointer';
       card.addEventListener('click', () => {
         _confirmAndLoad(slotIndex, backdrop);
@@ -1561,7 +1562,7 @@ function _doLoadGame() {
   }
 
   if (!hasAnySave) {
-    const empty = document.createElement('p');
+    const empty: HTMLParagraphElement = document.createElement('p');
     empty.style.cssText = 'text-align:center;color:#8899aa;padding:12px 0;';
     empty.textContent = 'No saved games found.';
     modal.appendChild(empty);
@@ -1574,35 +1575,33 @@ function _doLoadGame() {
 
 /**
  * Show a confirmation dialog, then load the save and reinitialize the game.
- * @param {number} slotIndex
- * @param {HTMLElement} loadBackdrop  The load modal backdrop to remove on confirm.
  */
-function _confirmAndLoad(slotIndex, loadBackdrop) {
+function _confirmAndLoad(slotIndex: number, loadBackdrop: HTMLElement): void {
   loadBackdrop.remove();
 
-  const backdrop = _makeBackdrop('load-confirm-backdrop');
-  const modal = document.createElement('div');
+  const backdrop: HTMLDivElement = _makeBackdrop('load-confirm-backdrop');
+  const modal: HTMLDivElement = document.createElement('div');
   modal.className = 'topbar-modal';
   modal.setAttribute('role', 'alertdialog');
   modal.setAttribute('aria-modal', 'true');
-  modal.addEventListener('click', (e) => e.stopPropagation());
+  modal.addEventListener('click', (e: MouseEvent) => e.stopPropagation());
 
   modal.appendChild(_makeTitleRow('Load Game', () => backdrop.remove()));
 
-  const msg = document.createElement('p');
+  const msg: HTMLParagraphElement = document.createElement('p');
   msg.className = 'confirm-msg';
   msg.textContent = 'Any unsaved progress will be lost. Are you sure you want to load this save?';
   modal.appendChild(msg);
 
-  const btnRow = document.createElement('div');
+  const btnRow: HTMLDivElement = document.createElement('div');
   btnRow.className = 'confirm-btn-row';
 
-  const cancelBtn = document.createElement('button');
+  const cancelBtn: HTMLButtonElement = document.createElement('button');
   cancelBtn.className = 'confirm-btn confirm-btn-cancel';
   cancelBtn.textContent = 'Cancel';
   cancelBtn.addEventListener('click', () => backdrop.remove());
 
-  const confirmBtn = document.createElement('button');
+  const confirmBtn: HTMLButtonElement = document.createElement('button');
   confirmBtn.className = 'confirm-btn confirm-btn-primary';
   confirmBtn.dataset.testid = 'load-confirm-btn';
   confirmBtn.textContent = 'Load Game';
@@ -1614,7 +1613,7 @@ function _confirmAndLoad(slotIndex, loadBackdrop) {
       if (_onLoadGame) {
         _onLoadGame(loadedState);
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('[TopBar] Load failed:', err);
     }
   });
@@ -1635,29 +1634,29 @@ function _confirmAndLoad(slotIndex, loadBackdrop) {
 /**
  * Opens the sandbox settings modal (malfunctions/weather toggles).
  */
-function _openSandboxSettings() {
+function _openSandboxSettings(): void {
   _closeAllModals();
   if (!_state || _state.gameMode !== GameMode.SANDBOX) return;
 
-  const backdrop = _makeBackdrop('sandbox-settings-backdrop');
-  const modal = document.createElement('div');
+  const backdrop: HTMLDivElement = _makeBackdrop('sandbox-settings-backdrop');
+  const modal: HTMLDivElement = document.createElement('div');
   modal.className = 'topbar-modal';
   modal.setAttribute('role', 'dialog');
   modal.setAttribute('aria-modal', 'true');
   modal.setAttribute('aria-label', 'Sandbox Settings');
-  modal.addEventListener('click', (e) => e.stopPropagation());
+  modal.addEventListener('click', (e: MouseEvent) => e.stopPropagation());
 
   modal.appendChild(_makeTitleRow('Sandbox Settings', () => backdrop.remove()));
 
   const settings = _state.sandboxSettings || { malfunctionsEnabled: false, weatherEnabled: false };
 
-  const form = document.createElement('div');
+  const form: HTMLDivElement = document.createElement('div');
   form.style.cssText = 'display:flex;flex-direction:column;gap:12px;padding:8px 0';
 
   // Malfunctions toggle
-  const malfLabel = document.createElement('label');
+  const malfLabel: HTMLLabelElement = document.createElement('label');
   malfLabel.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:0.85rem;color:#b0c4d8;cursor:pointer';
-  const malfCheck = document.createElement('input');
+  const malfCheck: HTMLInputElement = document.createElement('input');
   malfCheck.type = 'checkbox';
   malfCheck.checked = settings.malfunctionsEnabled;
   malfCheck.style.cssText = 'width:16px;height:16px;accent-color:#4a90d9';
@@ -1669,9 +1668,9 @@ function _openSandboxSettings() {
   form.appendChild(malfLabel);
 
   // Weather toggle
-  const wxLabel = document.createElement('label');
+  const wxLabel: HTMLLabelElement = document.createElement('label');
   wxLabel.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:0.85rem;color:#b0c4d8;cursor:pointer';
-  const wxCheck = document.createElement('input');
+  const wxCheck: HTMLInputElement = document.createElement('input');
   wxCheck.type = 'checkbox';
   wxCheck.checked = settings.weatherEnabled;
   wxCheck.style.cssText = 'width:16px;height:16px;accent-color:#4a90d9';
@@ -1684,7 +1683,7 @@ function _openSandboxSettings() {
 
   modal.appendChild(form);
 
-  const closeBtn = document.createElement('button');
+  const closeBtn: HTMLButtonElement = document.createElement('button');
   closeBtn.className = 'confirm-btn confirm-btn-cancel';
   closeBtn.textContent = 'Close';
   closeBtn.style.marginTop = '8px';
@@ -1696,35 +1695,35 @@ function _openSandboxSettings() {
   document.body.appendChild(backdrop);
 }
 
-function _doExitToMenu() {
+function _doExitToMenu(): void {
   _closeAllModals();
 
-  const backdrop = _makeBackdrop('exit-confirm-backdrop');
+  const backdrop: HTMLDivElement = _makeBackdrop('exit-confirm-backdrop');
 
-  const modal = document.createElement('div');
+  const modal: HTMLDivElement = document.createElement('div');
   modal.className = 'topbar-modal';
   modal.setAttribute('role', 'alertdialog');
   modal.setAttribute('aria-modal', 'true');
   modal.setAttribute('aria-label', 'Exit to Menu');
-  modal.addEventListener('click', (e) => e.stopPropagation());
+  modal.addEventListener('click', (e: MouseEvent) => e.stopPropagation());
 
   modal.appendChild(_makeTitleRow('Exit to Menu', () => backdrop.remove()));
 
-  const msg = document.createElement('p');
+  const msg: HTMLParagraphElement = document.createElement('p');
   msg.className = 'confirm-msg';
   msg.textContent =
     'Any unsaved progress will be lost. Are you sure you want to return to the main menu?';
   modal.appendChild(msg);
 
-  const btnRow = document.createElement('div');
+  const btnRow: HTMLDivElement = document.createElement('div');
   btnRow.className = 'confirm-btn-row';
 
-  const cancelBtn = document.createElement('button');
+  const cancelBtn: HTMLButtonElement = document.createElement('button');
   cancelBtn.className = 'confirm-btn confirm-btn-cancel';
   cancelBtn.textContent = 'Stay';
   cancelBtn.addEventListener('click', () => backdrop.remove());
 
-  const confirmBtn = document.createElement('button');
+  const confirmBtn: HTMLButtonElement = document.createElement('button');
   confirmBtn.className = 'confirm-btn confirm-btn-danger';
   confirmBtn.textContent = 'Exit to Menu';
   confirmBtn.dataset.testid = 'exit-confirm-btn';
@@ -1748,11 +1747,9 @@ function _doExitToMenu() {
 
 /**
  * Create a backdrop div with the given id and the shared class.
- * @param {string} id
- * @returns {HTMLElement}
  */
-function _makeBackdrop(id) {
-  const el = document.createElement('div');
+function _makeBackdrop(id: string): HTMLDivElement {
+  const el: HTMLDivElement = document.createElement('div');
   el.id = id;
   el.className = 'topbar-modal-backdrop';
   return el;
@@ -1760,21 +1757,18 @@ function _makeBackdrop(id) {
 
 /**
  * Create a modal title row with a close button.
- * @param {string} title
- * @param {() => void} onClose
- * @returns {HTMLElement}
  */
-function _makeTitleRow(title, onClose) {
-  const row = document.createElement('div');
+function _makeTitleRow(title: string, onClose: () => void): HTMLDivElement {
+  const row: HTMLDivElement = document.createElement('div');
   row.className = 'topbar-modal-title-row';
 
-  const h2 = document.createElement('h2');
+  const h2: HTMLHeadingElement = document.createElement('h2');
   h2.className = 'topbar-modal-title';
   h2.textContent = title;
 
-  const closeBtn = document.createElement('button');
+  const closeBtn: HTMLButtonElement = document.createElement('button');
   closeBtn.className = 'topbar-modal-close';
-  closeBtn.textContent = '✕';
+  closeBtn.textContent = '\u2715';
   closeBtn.title = 'Close';
   closeBtn.addEventListener('click', onClose);
 
@@ -1786,7 +1780,7 @@ function _makeTitleRow(title, onClose) {
 /**
  * Remove all open topbar modals from the DOM.
  */
-function _closeAllModals() {
+function _closeAllModals(): void {
   for (const id of ['loan-modal-backdrop', 'save-modal-backdrop', 'load-modal-backdrop', 'load-confirm-backdrop', 'exit-confirm-backdrop', 'sandbox-settings-backdrop']) {
     const el = document.getElementById(id);
     if (el) el.remove();

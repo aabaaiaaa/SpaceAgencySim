@@ -1,5 +1,5 @@
 /**
- * _launchFlow.js — Launch button handler, weather warning, crew assignment
+ * _launchFlow.ts — Launch button handler, weather warning, crew assignment
  * dialog, flight initiation.
  */
 
@@ -8,6 +8,8 @@ import { PartType, DEATH_FINE_PER_ASTRONAUT } from '../../core/constants.js';
 import { getCurrentWeather } from '../../core/weather.js';
 import { getActiveCrew } from '../../core/crew.js';
 import { createRocketDesign, createFlightState } from '../../core/gameState.js';
+import type { GameState } from '../../core/gameState.js';
+import type { FlightReturnSummary } from '../../core/flightReturn.js';
 import { startFlightScene } from '../flightController.js';
 import { showReturnResultsOverlay } from '../hub.js';
 import { getVabState } from './_state.js';
@@ -15,13 +17,16 @@ import { getVabState } from './_state.js';
 // ---------------------------------------------------------------------------
 // Forward references — set by _init.js to break circular deps
 // ---------------------------------------------------------------------------
-let _renderStagingPanelFn = () => {};
-let _runAndRenderValidationFn = () => {};
+let _renderStagingPanelFn: () => void = () => {};
+let _runAndRenderValidationFn: () => void = () => {};
 
 export function setLaunchFlowCallbacks({
   renderStagingPanel,
   runAndRenderValidation,
-}) {
+}: {
+  renderStagingPanel: () => void;
+  runAndRenderValidation: () => void;
+}): void {
   _renderStagingPanelFn = renderStagingPanel;
   _runAndRenderValidationFn = runAndRenderValidation;
 }
@@ -29,7 +34,7 @@ export function setLaunchFlowCallbacks({
 /**
  * Entry point called when the enabled Launch button is clicked.
  */
-export function handleLaunchClicked() {
+export function handleLaunchClicked(): void {
   const S = getVabState();
   if (!S.assembly || !S.gameState || !S.lastValidation?.canLaunch) return;
 
@@ -45,7 +50,7 @@ export function handleLaunchClicked() {
 /**
  * Continue the VAB launch flow after weather checks.
  */
-function proceedVabLaunch() {
+function proceedVabLaunch(): void {
   const S = getVabState();
   if (!S.assembly || !S.gameState) return;
 
@@ -53,7 +58,7 @@ function proceedVabLaunch() {
   for (const placed of S.assembly.parts.values()) {
     const def = getPartById(placed.partId);
     if (def?.type === PartType.COMMAND_MODULE) {
-      totalSeats += def.properties?.seats ?? 0;
+      totalSeats += (def.properties?.seats as number) ?? 0;
     }
   }
 
@@ -67,9 +72,9 @@ function proceedVabLaunch() {
 /**
  * Show a warning dialog when launching from VAB in extreme weather.
  */
-function showVabWeatherWarning() {
+function showVabWeatherWarning(): void {
   const S = getVabState();
-  const weather = getCurrentWeather(S.gameState);
+  const weather = getCurrentWeather(S.gameState!);
 
   const overlay = document.createElement('div');
   overlay.id = 'vab-weather-warning-overlay';
@@ -111,16 +116,15 @@ function showVabWeatherWarning() {
     proceedVabLaunch();
   });
 
-  overlay.addEventListener('pointerdown', (e) => {
+  overlay.addEventListener('pointerdown', (e: PointerEvent) => {
     if (e.target === overlay) overlay.remove();
   });
 }
 
 /**
  * Show the crew assignment modal.
- * @param {number} totalSeats
  */
-function showCrewDialog(totalSeats) {
+function showCrewDialog(totalSeats: number): void {
   const S = getVabState();
   if (!S.gameState) return;
 
@@ -130,7 +134,7 @@ function showCrewDialog(totalSeats) {
     (c) => `<option value="${c.id}">${c.name}</option>`,
   ).join('');
 
-  const seatRows = [];
+  const seatRows: string[] = [];
   for (let i = 0; i < totalSeats; i++) {
     seatRows.push(
       `<div class="vab-crew-seat-row">` +
@@ -182,7 +186,7 @@ function showCrewDialog(totalSeats) {
 
   document.body.appendChild(overlay);
 
-  overlay.addEventListener('pointerdown', (e) => {
+  overlay.addEventListener('pointerdown', (e: PointerEvent) => {
     if (e.target === overlay) overlay.remove();
   });
 
@@ -192,10 +196,10 @@ function showCrewDialog(totalSeats) {
 
   overlay.querySelector('#vab-crew-confirm')?.addEventListener('click', () => {
     const selects  = overlay.querySelectorAll('.vab-crew-seat-select');
-    const crewIds  = [];
-    const seen     = new Set();
+    const crewIds: string[]  = [];
+    const seen     = new Set<string>();
     for (const sel of selects) {
-      const id = /** @type {HTMLSelectElement} */ (sel).value;
+      const id = (sel as HTMLSelectElement).value;
       if (id && !seen.has(id)) {
         crewIds.push(id);
         seen.add(id);
@@ -209,9 +213,8 @@ function showCrewDialog(totalSeats) {
 /**
  * Create the initial FlightState, store it in game state, and transition to
  * the flight scene.
- * @param {string[]} crewIds
  */
-function doLaunch(crewIds) {
+function doLaunch(crewIds: string[]): void {
   const S = getVabState();
   if (!S.gameState || !S.assembly) return;
 
@@ -220,14 +223,14 @@ function doLaunch(crewIds) {
   let totalFuel = 0;
   for (const placed of S.assembly.parts.values()) {
     const def = getPartById(placed.partId);
-    if (def) totalFuel += def.properties?.fuelMass ?? 0;
+    if (def) totalFuel += (def.properties?.fuelMass as number) ?? 0;
   }
 
   const launchDesign = createRocketDesign({
     id:          'launch-' + Date.now(),
     name:        'VAB Launch ' + new Date().toLocaleDateString(),
     parts:       [...S.assembly.parts.values()].map(p => ({ partId: p.partId, position: { x: p.x, y: p.y }, ...(p.instruments?.length ? { instruments: [...p.instruments] } : {}) })),
-    staging:     { stages: S.stagingConfig.stages.map(s => [...s.instanceIds]), unstaged: [...S.stagingConfig.unstaged] },
+    staging:     { stages: S.stagingConfig!.stages.map(s => [...s.instanceIds]) as unknown as number[][], unstaged: [...S.stagingConfig!.unstaged] as unknown as number[] },
     totalMass:   S.lastValidation?.totalMassKg ?? 0,
     totalThrust: S.lastValidation?.stage1Thrust ?? 0,
   });
@@ -245,9 +248,9 @@ function doLaunch(crewIds) {
   if (vabRoot) vabRoot.style.display = 'none';
 
   const flightStagingConfig = {
-    stages:          S.stagingConfig.stages.map(s => ({ instanceIds: [...s.instanceIds] })),
-    unstaged:        [...S.stagingConfig.unstaged],
-    currentStageIdx: S.stagingConfig.currentStageIdx,
+    stages:          S.stagingConfig!.stages.map(s => ({ instanceIds: [...s.instanceIds] })),
+    unstaged:        [...S.stagingConfig!.unstaged],
+    currentStageIdx: S.stagingConfig!.currentStageIdx,
   };
 
   const container = S.container ?? document.getElementById('ui-overlay');
@@ -258,7 +261,7 @@ function doLaunch(crewIds) {
       S.assembly,
       flightStagingConfig,
       S.gameState.currentFlight,
-      (_state, returnResults, navigateTo) => {
+      (_state: GameState | null, returnResults?: unknown, navigateTo?: string) => {
         if (navigateTo === 'vab') {
           if (vabRoot) vabRoot.style.display = '';
           _renderStagingPanelFn();
@@ -271,7 +274,7 @@ function doLaunch(crewIds) {
 
         if (returnResults) {
           const uiOverlay = container;
-          showReturnResultsOverlay(uiOverlay, returnResults);
+          showReturnResultsOverlay(uiOverlay, returnResults as FlightReturnSummary);
         }
       },
     );
@@ -281,7 +284,7 @@ function doLaunch(crewIds) {
 /**
  * Display a temporary "launch initiated" overlay (placeholder).
  */
-export function showLaunchInitiatedOverlay() {
+export function showLaunchInitiatedOverlay(): void {
   const S = getVabState();
   const banner = document.createElement('div');
   banner.id = 'vab-launch-banner';

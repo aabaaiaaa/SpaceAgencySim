@@ -1,17 +1,17 @@
 /**
- * _init.js — Orchestrator: initVabUI, resetVabUI, syncVabToGameState,
+ * _init.ts — Orchestrator: initVabUI, resetVabUI, syncVabToGameState,
  * vabRefreshParts, getVabInventoryUsedParts, vabSetLaunchEnabled,
  * and the state restore logic.
  *
  * Imports from all other sub-modules and wires everything together.
  */
 
-import { getPartById } from '../../data/parts.js';
 import {
   createRocketAssembly,
   createStagingConfig,
   syncStagingWithAssembly,
 } from '../../core/rocketbuilder.js';
+import type { PlacedPart, RocketAssembly, StagingConfig } from '../../core/rocketbuilder.js';
 import {
   VAB_TOOLBAR_HEIGHT,
   vabSetAssembly,
@@ -19,7 +19,9 @@ import {
 } from '../../render/vab.js';
 import { injectRocketCardCSS } from '../rocketCardUtil.js';
 
-import { getVabState, setVabState } from './_state.js';
+import type { GameState, InventoryPart } from '../../core/gameState.js';
+
+import { getVabState } from './_state.js';
 import { VAB_CSS } from './_css.js';
 import { injectStyleOnce } from '../injectStyle.js';
 import { buildPartsHTML, setupPanelDrag } from './_partsPanel.js';
@@ -33,7 +35,7 @@ import {
   setCanvasCallbacks,
   startDrag,
 } from './_canvasInteraction.js';
-import { renderInventoryPanel, refundOrReturnPart } from './_inventory.js';
+import { refundOrReturnPart } from './_inventory.js';
 import { renderStagingPanel, setupStagingDnD, syncAndRenderStaging, setStagingCallbacks } from './_staging.js';
 import { renderEngineerPanel, runAndRenderValidation as rawRunAndRenderValidation } from './_engineerPanel.js';
 import {
@@ -60,12 +62,12 @@ import { setUndoRedoChangeCallback, clearUndoRedo } from '../../core/undoRedo.js
 // ---------------------------------------------------------------------------
 
 /** Wrapper: runAndRenderValidation with the vabSetLaunchEnabled arg. */
-function _runAndRenderValidation() {
+function _runAndRenderValidation(): void {
   rawRunAndRenderValidation(vabSetLaunchEnabled);
 }
 
 /** Wrapper: refundOrReturnPart with the vabRefreshParts arg. */
-function _refundOrReturnPart(instanceId, partId) {
+function _refundOrReturnPart(instanceId: string, partId: string): void {
   refundOrReturnPart(instanceId, partId, vabRefreshParts);
 }
 
@@ -126,7 +128,7 @@ setPanelCallbacks({
  * Serialise the current VAB assembly and staging config onto `_gameState` so
  * that the next save call captures them.
  */
-export function syncVabToGameState() {
+export function syncVabToGameState(): void {
   const S = getVabState();
   if (!S.assembly || !S.gameState) return;
   S.gameState.vabAssembly = {
@@ -141,22 +143,26 @@ export function syncVabToGameState() {
 /**
  * If the supplied game state carries a serialised VAB assembly, restore it
  * into the module-level state.
- * @param {import('../../core/gameState.js').GameState} state
  */
-function _restoreVabFromGameState(state) {
+function _restoreVabFromGameState(state: GameState): void {
   const S = getVabState();
-  const saved = state.vabAssembly;
+  const saved = state.vabAssembly as {
+    parts: PlacedPart[];
+    connections?: RocketAssembly['connections'];
+    symmetryPairs?: RocketAssembly['symmetryPairs'];
+    _nextId?: number;
+  } | null;
   if (!saved || !Array.isArray(saved.parts) || saved.parts.length === 0) return;
 
   S.assembly = {
-    parts:         new Map(saved.parts.map(p => [p.instanceId, p])),
+    parts:         new Map(saved.parts.map((p: PlacedPart) => [p.instanceId, p])),
     connections:   saved.connections   ?? [],
     symmetryPairs: saved.symmetryPairs ?? [],
     _nextId:       saved._nextId       ?? 1,
   };
 
   if (state.vabStagingConfig) {
-    S.stagingConfig = state.vabStagingConfig;
+    S.stagingConfig = state.vabStagingConfig as StagingConfig;
   }
 
   if (S.assembly && S.stagingConfig) {
@@ -170,11 +176,12 @@ function _restoreVabFromGameState(state) {
 
 /**
  * Initialize the VAB HTML overlay.
- *
- * @param {HTMLElement} container
- * @param {import('../../core/gameState.js').GameState} state
  */
-export function initVabUI(container, state, { onBack } = {}) {
+export function initVabUI(
+  container: HTMLElement,
+  state: GameState,
+  { onBack }: { onBack?: (() => void) | null } = {},
+): void {
   const S = getVabState();
   S.onBack    = onBack ?? null;
   S.container = container;
@@ -293,7 +300,7 @@ export function initVabUI(container, state, { onBack } = {}) {
 
   // ── Scale bar ─────────────────────────────────────────────────────────────
   S.scaleTicks = root.querySelector('#vab-scale-ticks');
-  const canvasArea = /** @type {HTMLElement} */ (root.querySelector('#vab-canvas-area'));
+  const canvasArea = root.querySelector('#vab-canvas-area') as HTMLElement;
 
   const ro = new ResizeObserver(() => {
     S.buildAreaHeight = canvasArea.offsetHeight;
@@ -319,9 +326,9 @@ export function initVabUI(container, state, { onBack } = {}) {
   }
 
   // Expose internals for e2e testing.
-  window.__vabAssembly      = S.assembly;
-  window.__vabStagingConfig = S.stagingConfig;
-  const stagingBody = /** @type {HTMLElement} */ (root.querySelector('#vab-staging-body'));
+  (window as unknown as Record<string, unknown>).__vabAssembly      = S.assembly;
+  (window as unknown as Record<string, unknown>).__vabStagingConfig = S.stagingConfig;
+  const stagingBody = root.querySelector('#vab-staging-body') as HTMLElement | null;
   if (stagingBody) {
     setupStagingDnD(stagingBody);
     renderStagingPanel();
@@ -334,7 +341,7 @@ export function initVabUI(container, state, { onBack } = {}) {
   setupCanvas(canvasArea);
 
   // ── Panel drag (new parts → canvas) ──────────────────────────────────────
-  const partsPanel = /** @type {HTMLElement} */ (root.querySelector('#vab-parts-panel'));
+  const partsPanel = root.querySelector('#vab-parts-panel') as HTMLElement;
   setupPanelDrag(partsPanel, startDrag);
 
   // ── Context menu ─────────────────────────────────────────────────────────
@@ -349,7 +356,7 @@ export function initVabUI(container, state, { onBack } = {}) {
 
   // ── Restore visual state if returning to a previous assembly ─────────────
   if (S.assembly.parts.size > 0) {
-    vabRenderParts(S.assembly, S.selectedInstanceId);
+    vabRenderParts();
     updateStatusBar();
     updateOffscreenIndicators();
     if (S.autoZoomEnabled) doZoomToFit();
@@ -364,7 +371,7 @@ export function initVabUI(container, state, { onBack } = {}) {
  * Reset VAB session state so the next call to `initVabUI` creates a fresh
  * empty rocket.
  */
-export function resetVabUI() {
+export function resetVabUI(): void {
   const S = getVabState();
   S.assembly         = null;
   S.stagingConfig    = null;
@@ -379,9 +386,8 @@ export function resetVabUI() {
 
 /**
  * Refresh the parts list from an updated game state.
- * @param {import('../../core/gameState.js').GameState} state
  */
-export function vabRefreshParts(state) {
+export function vabRefreshParts(state: GameState): void {
   const el = document.getElementById('vab-parts-list');
   if (el) el.innerHTML = buildPartsHTML(state);
 }
@@ -389,17 +395,15 @@ export function vabRefreshParts(state) {
 /**
  * Returns the current map of instanceId → InventoryPart for parts placed
  * from inventory in the VAB.
- * @returns {Map<string, import('../../core/gameState.js').InventoryPart>}
  */
-export function getVabInventoryUsedParts() {
+export function getVabInventoryUsedParts(): Map<string, InventoryPart> {
   return getVabState().inventoryUsedParts;
 }
 
 /**
  * Enable or disable the Launch button.
- * @param {boolean} valid
  */
-export function vabSetLaunchEnabled(valid) {
-  const btn = /** @type {HTMLButtonElement|null} */ (document.getElementById('vab-btn-launch'));
+export function vabSetLaunchEnabled(valid: boolean): void {
+  const btn = document.getElementById('vab-btn-launch') as HTMLButtonElement | null;
   if (btn) btn.disabled = !valid;
 }

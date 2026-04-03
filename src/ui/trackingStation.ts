@@ -1,5 +1,5 @@
 /**
- * trackingStation.js — Tracking Station HTML overlay UI.
+ * trackingStation.ts — Tracking Station HTML overlay UI.
  *
  * Displays:
  *   - Current tier and feature list.
@@ -12,6 +12,8 @@
  * @module trackingStation
  */
 
+import type { GameState } from '../core/gameState.js';
+import type { TierFeatureSet } from '../core/constants.js';
 import {
   FacilityId,
   TRACKING_STATION_TIER_FEATURES,
@@ -332,15 +334,15 @@ const TS_STYLES = `
 // Module state
 // ---------------------------------------------------------------------------
 
-let _overlay = null;
-let _state = null;
-let _onBack = null;
+let _overlay: HTMLDivElement | null = null;
+let _state: GameState | null = null;
+let _onBack: (() => void) | null = null;
 
 // ---------------------------------------------------------------------------
 // Object type display helpers
 // ---------------------------------------------------------------------------
 
-const OBJ_TYPE_LABELS = {
+const OBJ_TYPE_LABELS: Record<string, string> = {
   [OrbitalObjectType.CRAFT]:     'Craft',
   [OrbitalObjectType.SATELLITE]: 'Satellite',
   [OrbitalObjectType.DEBRIS]:    'Debris',
@@ -353,12 +355,12 @@ const OBJ_TYPE_LABELS = {
 
 /**
  * Mount the Tracking Station overlay.
- *
- * @param {HTMLElement} container  The #ui-overlay div.
- * @param {import('../core/gameState.js').GameState} state
- * @param {{ onBack: () => void }} opts
  */
-export function initTrackingStationUI(container, state, { onBack }) {
+export function initTrackingStationUI(
+  container: HTMLElement,
+  state: GameState,
+  { onBack }: { onBack: () => void },
+): void {
   _state = state;
   _onBack = onBack;
 
@@ -370,28 +372,25 @@ export function initTrackingStationUI(container, state, { onBack }) {
   container.appendChild(_overlay);
 
   _render();
-
-
 }
 
 /**
  * Remove the Tracking Station overlay.
  */
-export function destroyTrackingStationUI() {
+export function destroyTrackingStationUI(): void {
   if (_overlay) {
     _overlay.remove();
     _overlay = null;
   }
   _state = null;
   _onBack = null;
-
 }
 
 // ---------------------------------------------------------------------------
 // Rendering
 // ---------------------------------------------------------------------------
 
-function _render() {
+function _render(): void {
   if (!_overlay || !_state) return;
 
   const tier = getFacilityTier(_state, FacilityId.TRACKING_STATION);
@@ -476,7 +475,7 @@ function _render() {
 /**
  * Render current-tier feature list.
  */
-function _renderFeatures(tierInfo) {
+function _renderFeatures(tierInfo: TierFeatureSet): HTMLDivElement {
   const section = document.createElement('div');
   section.className = 'ts-section';
 
@@ -499,7 +498,7 @@ function _renderFeatures(tierInfo) {
 /**
  * Render overview cards (counts of objects by type).
  */
-function _renderObjectOverview(tier) {
+function _renderObjectOverview(tier: number): HTMLDivElement {
   const section = document.createElement('div');
   section.className = 'ts-section';
 
@@ -507,7 +506,7 @@ function _renderObjectOverview(tier) {
   h2.textContent = 'Orbital Overview';
   section.appendChild(h2);
 
-  const objects = _state.orbitalObjects || [];
+  const objects = _state!.orbitalObjects || [];
 
   const satellites = objects.filter(o => o.type === OrbitalObjectType.SATELLITE).length;
   const stations = objects.filter(o => o.type === OrbitalObjectType.STATION).length;
@@ -523,7 +522,7 @@ function _renderObjectOverview(tier) {
 
   if (tier >= 2) {
     const debrisCard = _makeCard('Debris', String(debris));
-    debrisCard.querySelector('.value').classList.add('debris-count');
+    debrisCard.querySelector('.value')!.classList.add('debris-count');
     cards.appendChild(debrisCard);
   } else {
     cards.appendChild(_makeCard('Debris', '???'));
@@ -537,7 +536,7 @@ function _renderObjectOverview(tier) {
 /**
  * Render the tracked objects list.
  */
-function _renderObjectList(tier) {
+function _renderObjectList(tier: number): HTMLDivElement {
   const section = document.createElement('div');
   section.className = 'ts-section';
 
@@ -545,7 +544,7 @@ function _renderObjectList(tier) {
   h2.textContent = 'Tracked Objects';
   section.appendChild(h2);
 
-  const objects = _state.orbitalObjects || [];
+  const objects = _state!.orbitalObjects || [];
 
   if (objects.length === 0) {
     const empty = document.createElement('div');
@@ -592,7 +591,7 @@ function _renderObjectList(tier) {
 /**
  * Render weather forecast section (Tier 2+).
  */
-function _renderWeatherForecast() {
+function _renderWeatherForecast(): HTMLDivElement {
   const section = document.createElement('div');
   section.className = 'ts-section';
 
@@ -600,7 +599,7 @@ function _renderWeatherForecast() {
   h2.textContent = 'Weather Window Predictions';
   section.appendChild(h2);
 
-  const forecast = getWeatherForecast(_state, 'EARTH', 5);
+  const forecast = getWeatherForecast(_state!, 'EARTH', 5);
   if (forecast.length === 0) {
     const msg = document.createElement('div');
     msg.className = 'ts-tier-locked';
@@ -612,7 +611,7 @@ function _renderWeatherForecast() {
   const grid = document.createElement('div');
   grid.className = 'ts-forecast-grid';
 
-  forecast.forEach((fc, i) => {
+  forecast.forEach((fc: { extreme?: boolean; description: string; windSpeed: number }, i: number) => {
     const card = document.createElement('div');
     card.className = 'ts-forecast-card';
 
@@ -638,7 +637,7 @@ function _renderWeatherForecast() {
 /**
  * Render transfer route planning section (Tier 3).
  */
-function _renderTransferRoutes() {
+function _renderTransferRoutes(): HTMLDivElement {
   const section = document.createElement('div');
   section.className = 'ts-section';
 
@@ -647,7 +646,7 @@ function _renderTransferRoutes() {
   section.appendChild(h2);
 
   // Show available transfer destinations from Earth orbit.
-  let targets;
+  let targets: Array<{ bodyId: string; name: string; departureDV: number }>;
   try {
     targets = getTransferTargets('EARTH', 200_000);
   } catch {
@@ -691,7 +690,7 @@ function _renderTransferRoutes() {
 /**
  * Render crewed vessels in the field with life support status.
  */
-function _renderFieldCraft() {
+function _renderFieldCraft(): HTMLDivElement {
   const section = document.createElement('div');
   section.className = 'ts-section';
 
@@ -699,7 +698,7 @@ function _renderFieldCraft() {
   h2.textContent = 'Crewed Vessels';
   section.appendChild(h2);
 
-  const fieldCraft = _state.fieldCraft || [];
+  const fieldCraft = _state!.fieldCraft || [];
   if (fieldCraft.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'ts-tier-locked';
@@ -751,10 +750,10 @@ function _renderFieldCraft() {
     crewEl.textContent = `Crew: ${crewCount}`;
 
     // Show crew names if available.
-    if (crewCount > 0 && _state.crew) {
+    if (crewCount > 0 && _state!.crew) {
       const names = craft.crewIds
-        .map((id) => {
-          const a = _state.crew.find((c) => c.id === id);
+        .map((id: string) => {
+          const a = _state!.crew.find((c) => c.id === id);
           return a ? a.name : '???';
         })
         .join(', ');
@@ -806,7 +805,7 @@ function _renderFieldCraft() {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function _makeCard(label, value) {
+function _makeCard(label: string, value: string): HTMLDivElement {
   const card = document.createElement('div');
   card.className = 'ts-overview-card';
 

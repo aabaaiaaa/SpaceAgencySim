@@ -4,6 +4,8 @@
 // the root overlay container keeps pointer-events:none so clicks pass through
 // to the canvas by default.
 
+import type { GameState } from '../core/gameState.js';
+import type { FlightReturnSummary } from '../core/flightReturn.js';
 import { initMainMenu } from './mainmenu.js';
 import { initHubUI, destroyHubUI, showWelcomeModal, showReturnResultsOverlay } from './hub.js';
 import { initVabUI, resetVabUI } from './vab.js';
@@ -38,56 +40,55 @@ injectDesignTokens();
  * Prevents re-creating the overlay if the player returns to the VAB from the
  * hub later.
  */
-let _vabInitialized = false;
+let _vabInitialized: boolean = false;
 
 /**
  * True while the Crew Admin screen is open.
  * Used to guard against double-mounting.
  */
-let _crewAdminOpen = false;
+let _crewAdminOpen: boolean = false;
 
 /**
  * True while the Mission Control screen is open.
  * Used to guard against double-mounting.
  */
-let _missionControlOpen = false;
+let _missionControlOpen: boolean = false;
 
 /**
  * True while the Launch Pad screen is open.
  * Used to guard against double-mounting.
  */
-let _launchPadOpen = false;
+let _launchPadOpen: boolean = false;
 
 /**
  * True while the Satellite Ops screen is open.
  * Used to guard against double-mounting.
  */
-let _satelliteOpsOpen = false;
+let _satelliteOpsOpen: boolean = false;
 
 /**
  * True while the Tracking Station screen is open.
  * Used to guard against double-mounting.
  */
-let _trackingStationOpen = false;
+let _trackingStationOpen: boolean = false;
 
 /**
  * True while the Library screen is open.
  * Used to guard against double-mounting.
  */
-let _libraryOpen = false;
+let _libraryOpen: boolean = false;
 
 /**
  * True while the R&D Lab screen is open.
  * Used to guard against double-mounting.
  */
-let _rdLabOpen = false;
+let _rdLabOpen: boolean = false;
 
 /**
  * The #ui-overlay container, stored so _handleExitToMenu can re-mount the
  * main menu without needing it passed through every callback.
- * @type {HTMLElement | null}
  */
-let _container = null;
+let _container: HTMLElement | null = null;
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -99,11 +100,11 @@ let _container = null;
  * When the player selects or starts a game the menu fades out and
  * `onGameReady` is called with the initialised game state.  The caller
  * should then invoke `initUI` to boot the in-game overlay.
- *
- * @param {HTMLElement} container  The #ui-overlay div from index.html.
- * @param {(state: import('../core/gameState.js').GameState) => void} onGameReady
  */
-export function showMainMenu(container, onGameReady) {
+export function showMainMenu(
+  container: HTMLElement,
+  onGameReady: (state: GameState) => void,
+): void {
   // Reset VAB state so a new game gets a fresh VAB session.
   _vabInitialized = false;
   resetVabUI();
@@ -115,11 +116,8 @@ export function showMainMenu(container, onGameReady) {
  * Called after the player has chosen a game via the main menu.
  *
  * Mounts the persistent top bar (visible on all screens), then the hub.
- *
- * @param {HTMLElement} container  The #ui-overlay div from index.html.
- * @param {import('../core/gameState.js').GameState} state
  */
-export function initUI(container, state) {
+export function initUI(container: HTMLElement, state: GameState): void {
   _container = container;
   _vabInitialized     = false;
   _crewAdminOpen      = false;
@@ -133,11 +131,11 @@ export function initUI(container, state) {
   // Mount the persistent top bar — visible on all in-game screens.
   initTopBar(container, state, {
     onExitToMenu: () => _handleExitToMenu(),
-    onLoadGame: (loadedState) => _handleLoadGame(loadedState),
+    onLoadGame: (loadedState: GameState) => _handleLoadGame(loadedState),
   });
 
   setCurrentScreen('hub');
-  initHubUI(container, state, (destination) => {
+  initHubUI(container, state, (destination: string) => {
     _handleNavigation(container, state, destination);
   });
 
@@ -145,27 +143,26 @@ export function initUI(container, state) {
   if (!state.welcomeShown) {
     showWelcomeModal(container, state);
   }
-
 }
 
 /**
  * Re-show the hub after a flight ends (used by the E2E test flight API).
  * Assumes the flight scene has already been stopped and the topbar is still
  * mounted.
- *
- * @param {HTMLElement} container
- * @param {import('../core/gameState.js').GameState} state
- * @param {object|null} returnResults  Flight return summary (may be null).
  */
-export function returnToHubFromFlight(container, state, returnResults) {
+export function returnToHubFromFlight(
+  container: HTMLElement,
+  state: GameState,
+  returnResults: unknown,
+): void {
   showHubScene();
   setCurrentScreen('hub');
   refreshTopBar();
-  initHubUI(container, state, (destination) => {
+  initHubUI(container, state, (destination: string) => {
     _handleNavigation(container, state, destination);
   });
   if (returnResults) {
-    showReturnResultsOverlay(container, returnResults);
+    showReturnResultsOverlay(container, returnResults as FlightReturnSummary);
   }
 
   // Trigger auto-save on return to hub from flight.
@@ -183,7 +180,7 @@ export function returnToHubFromFlight(container, state, returnResults) {
  * Called when the player chooses "Exit to Menu" or "Load Game" from the
  * hamburger dropdown in the top bar.
  */
-function _handleExitToMenu() {
+function _handleExitToMenu(): void {
   stopFlightScene(); // safe to call even if no flight is active
   hideVabScene();    // hide VAB PixiJS container (no-op if already hidden)
   destroyTopBar();
@@ -225,24 +222,21 @@ function _handleExitToMenu() {
 
   // Re-show the main menu.  onGameReady wires up a fresh game session.
   if (_container) {
-    showMainMenu(_container, (newState) => {
+    showMainMenu(_container, (newState: GameState) => {
       // Keep window.__gameState in sync for e2e test access.
       if (typeof window !== 'undefined') {
-        window.__gameState = newState;
+        (window as unknown as Record<string, unknown>).__gameState = newState;
       }
-      initUI(_container, newState);
+      initUI(_container!, newState);
     });
   }
-
 }
 
 /**
  * Tear down all in-game UI and reinitialize with the loaded game state.
  * Called when the player loads a save from the in-game hamburger menu modal.
- *
- * @param {import('../core/gameState.js').GameState} loadedState
  */
-function _handleLoadGame(loadedState) {
+function _handleLoadGame(loadedState: GameState): void {
   stopFlightScene();
   hideVabScene();
   destroyTopBar();
@@ -262,14 +256,13 @@ function _handleLoadGame(loadedState) {
 
   // Keep window.__gameState in sync for e2e test access.
   if (typeof window !== 'undefined') {
-    window.__gameState = loadedState;
+    (window as unknown as Record<string, unknown>).__gameState = loadedState;
   }
 
   // Reinitialize the game UI with the loaded state.
   if (_container) {
     initUI(_container, loadedState);
   }
-
 }
 
 // ---------------------------------------------------------------------------
@@ -278,12 +271,8 @@ function _handleLoadGame(loadedState) {
 
 /**
  * Handle a navigation request from the hub.
- *
- * @param {HTMLElement} container
- * @param {import('../core/gameState.js').GameState} state
- * @param {string} destination  Building ID: 'vab' | 'mission-control' | 'crew-admin' | 'launch-pad'
  */
-function _handleNavigation(container, state, destination) {
+function _handleNavigation(container: HTMLElement, state: GameState, destination: string): void {
   // Block navigation to unbuilt facilities (except in sandbox where all are built).
   if (state.gameMode !== GameMode.SANDBOX && !hasFacility(state, destination)) {
     // Show a brief tooltip message on the hub overlay.
@@ -318,10 +307,9 @@ function _handleNavigation(container, state, destination) {
           showHubScene();
           setCurrentScreen('hub');
           refreshTopBar();
-          initHubUI(container, state, (dest) => {
+          initHubUI(container, state, (dest: string) => {
             _handleNavigation(container, state, dest);
           });
-
         },
       });
       _vabInitialized = true;
@@ -342,10 +330,9 @@ function _handleNavigation(container, state, destination) {
           _crewAdminOpen = false;
           setCurrentScreen('hub');
           showHubScene();
-          initHubUI(container, state, (dest) => {
+          initHubUI(container, state, (dest: string) => {
             _handleNavigation(container, state, dest);
           });
-
         },
       });
       _crewAdminOpen = true;
@@ -366,10 +353,9 @@ function _handleNavigation(container, state, destination) {
           _missionControlOpen = false;
           setCurrentScreen('hub');
           showHubScene();
-          initHubUI(container, state, (dest) => {
+          initHubUI(container, state, (dest: string) => {
             _handleNavigation(container, state, dest);
           });
-
         },
       });
       _missionControlOpen = true;
@@ -390,10 +376,9 @@ function _handleNavigation(container, state, destination) {
           _launchPadOpen = false;
           setCurrentScreen('hub');
           showHubScene();
-          initHubUI(container, state, (dest) => {
+          initHubUI(container, state, (dest: string) => {
             _handleNavigation(container, state, dest);
           });
-
         },
       });
       _launchPadOpen = true;
@@ -413,10 +398,9 @@ function _handleNavigation(container, state, destination) {
           _satelliteOpsOpen = false;
           setCurrentScreen('hub');
           showHubScene();
-          initHubUI(container, state, (dest) => {
+          initHubUI(container, state, (dest: string) => {
             _handleNavigation(container, state, dest);
           });
-
         },
       });
       _satelliteOpsOpen = true;
@@ -436,10 +420,9 @@ function _handleNavigation(container, state, destination) {
           _trackingStationOpen = false;
           setCurrentScreen('hub');
           showHubScene();
-          initHubUI(container, state, (dest) => {
+          initHubUI(container, state, (dest: string) => {
             _handleNavigation(container, state, dest);
           });
-
         },
       });
       _trackingStationOpen = true;
@@ -458,10 +441,9 @@ function _handleNavigation(container, state, destination) {
           _libraryOpen = false;
           setCurrentScreen('hub');
           showHubScene();
-          initHubUI(container, state, (dest) => {
+          initHubUI(container, state, (dest: string) => {
             _handleNavigation(container, state, dest);
           });
-
         },
       });
       _libraryOpen = true;
@@ -480,10 +462,9 @@ function _handleNavigation(container, state, destination) {
           _rdLabOpen = false;
           setCurrentScreen('hub');
           showHubScene();
-          initHubUI(container, state, (dest) => {
+          initHubUI(container, state, (dest: string) => {
             _handleNavigation(container, state, dest);
           });
-
         },
       });
       _rdLabOpen = true;

@@ -1,5 +1,5 @@
 /**
- * rocketCardUtil.js — Shared rocket preview renderer and card builder.
+ * rocketCardUtil.ts — Shared rocket preview renderer and card builder.
  *
  * Extracted from launchPad.js so the same card UI can be reused in the
  * VAB's save/load screen.
@@ -10,13 +10,15 @@
 import { getPartById } from '../data/parts.js';
 import { PartType } from '../core/constants.js';
 import { injectStyleOnce } from './injectStyle.js';
+import type { RocketDesign } from '../core/gameState.js';
+import type { PartDef } from '../data/parts.js';
 
 // ---------------------------------------------------------------------------
 // Preview rendering constants
 // ---------------------------------------------------------------------------
 
 /** Part fill colours keyed by PartType (CSS hex strings). */
-const PART_FILL = {
+const PART_FILL: Record<string, string> = {
   [PartType.COMMAND_MODULE]:       '#1a3860',
   [PartType.COMPUTER_MODULE]:      '#122848',
   [PartType.SERVICE_MODULE]:       '#1c2c58',
@@ -37,7 +39,7 @@ const PART_FILL = {
 };
 
 /** Part stroke colours keyed by PartType (CSS hex strings). */
-const PART_STROKE = {
+const PART_STROKE: Record<string, string> = {
   [PartType.COMMAND_MODULE]:       '#4080c0',
   [PartType.COMPUTER_MODULE]:      '#2870a0',
   [PartType.SERVICE_MODULE]:       '#3860b0',
@@ -136,7 +138,7 @@ const ROCKET_CARD_CSS = `
 /**
  * Inject shared rocket card CSS into the document head (idempotent).
  */
-export function injectRocketCardCSS() {
+export function injectRocketCardCSS(): void {
   injectStyleOnce('rocket-card-css', ROCKET_CARD_CSS);
 }
 
@@ -144,13 +146,19 @@ export function injectRocketCardCSS() {
 // Preview renderer
 // ---------------------------------------------------------------------------
 
+/** Resolved part data for preview rendering. */
+interface ResolvedPart {
+  px: number;
+  py: number;
+  hw: number;
+  hh: number;
+  def: PartDef;
+}
+
 /**
  * Draw a miniature rocket preview onto a 2D canvas element.
- *
- * @param {HTMLCanvasElement} canvas
- * @param {import('../core/gameState.js').RocketDesign} design
  */
-export function renderRocketPreview(canvas, design) {
+export function renderRocketPreview(canvas: HTMLCanvasElement, design: RocketDesign): void {
   canvas.width  = PREVIEW_W;
   canvas.height = PREVIEW_H;
   canvas.className = 'rocket-card-preview';
@@ -158,7 +166,7 @@ export function renderRocketPreview(canvas, design) {
   const ctx = canvas.getContext('2d');
   if (!ctx || !design.parts || design.parts.length === 0) return;
 
-  const resolved = [];
+  const resolved: ResolvedPart[] = [];
   let minX = Infinity, maxX = -Infinity;
   let minY = Infinity, maxY = -Infinity;
 
@@ -210,42 +218,43 @@ export function renderRocketPreview(canvas, design) {
 
 /**
  * Format a number with commas.
- * @param {number} n
- * @returns {string}
  */
-function _fmt(n) {
+function _fmt(n: number): string {
   return n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+}
+
+/** Action button definition for a rocket card. */
+export interface RocketCardAction {
+  label: string;
+  className?: string;
+  onClick: () => void;
 }
 
 /**
  * Build a rocket design card element.
- *
- * @param {import('../core/gameState.js').RocketDesign} design
- * @param {{ label: string, className?: string, onClick: () => void }[]} actions
- * @returns {HTMLElement}
  */
-export function buildRocketCard(design, actions) {
+export function buildRocketCard(design: RocketDesign, actions: RocketCardAction[]): HTMLDivElement {
   injectRocketCardCSS();
 
-  const card = document.createElement('div');
+  const card: HTMLDivElement = document.createElement('div');
   card.className = 'rocket-card';
   card.dataset.rocketId = design.id;
 
   // Preview thumbnail
-  const previewCanvas = document.createElement('canvas');
+  const previewCanvas: HTMLCanvasElement = document.createElement('canvas');
   renderRocketPreview(previewCanvas, design);
   card.appendChild(previewCanvas);
 
   // Info column
-  const info = document.createElement('div');
+  const info: HTMLDivElement = document.createElement('div');
   info.className = 'rocket-card-info';
 
-  const name = document.createElement('div');
+  const name: HTMLDivElement = document.createElement('div');
   name.className = 'rocket-card-name';
   name.textContent = design.name || 'Unnamed Rocket';
   info.appendChild(name);
 
-  const stats = document.createElement('div');
+  const stats: HTMLDivElement = document.createElement('div');
   stats.className = 'rocket-card-stats';
   stats.innerHTML =
     `<span>Parts: ${design.parts?.length ?? 0}</span>` +
@@ -253,7 +262,7 @@ export function buildRocketCard(design, actions) {
     `<span>Thrust: ${_fmt(design.totalThrust)} kN</span>`;
   info.appendChild(stats);
 
-  const date = document.createElement('div');
+  const date: HTMLDivElement = document.createElement('div');
   date.className = 'rocket-card-date';
   if (design.createdDate) {
     const d = new Date(design.createdDate);
@@ -265,14 +274,14 @@ export function buildRocketCard(design, actions) {
 
   // Action buttons
   if (actions && actions.length > 0) {
-    const actionsEl = document.createElement('div');
+    const actionsEl: HTMLDivElement = document.createElement('div');
     actionsEl.className = 'rocket-card-actions';
     for (const action of actions) {
-      const btn = document.createElement('button');
+      const btn: HTMLButtonElement = document.createElement('button');
       btn.type = 'button';
       btn.textContent = action.label;
       if (action.className) btn.className = action.className;
-      btn.addEventListener('click', (e) => {
+      btn.addEventListener('click', (e: MouseEvent) => {
         e.stopPropagation();
         action.onClick();
       });

@@ -1,5 +1,5 @@
 /**
- * launchPad.js — Launch Pad Building HTML overlay UI.
+ * launchPad.ts — Launch Pad Building HTML overlay UI.
  *
  * Displays previously launched rocket designs and allows the player to
  * relaunch them directly.  Each saved design (stored in gameState.rockets)
@@ -15,6 +15,10 @@
  * @module launchPad
  */
 
+import type { GameState, RocketDesign } from '../core/gameState.js';
+import type { RocketAssembly, StagingConfig } from '../core/rocketbuilder.js';
+import type { FlightReturnSummary } from '../core/flightReturn.js';
+import type { PartDef } from '../data/parts.js';
 import { getPartById } from '../data/parts.js';
 import { PartType, FacilityId, LAUNCH_PAD_MAX_MASS, LAUNCH_PAD_TIER_LABELS, DEATH_FINE_PER_ASTRONAUT } from '../core/constants.js';
 import { getCurrentWeather, getWeatherSkipCost, skipWeather } from '../core/weather.js';
@@ -31,7 +35,7 @@ import { getTotalMass } from '../core/rocketvalidator.js';
 import { createFlightState } from '../core/gameState.js';
 import { startFlightScene } from './flightController.js';
 import { showReturnResultsOverlay } from './hub.js';
-import { renderRocketPreview, buildRocketCard, injectRocketCardCSS } from './rocketCardUtil.js';
+import { buildRocketCard, injectRocketCardCSS } from './rocketCardUtil.js';
 import { injectStyleOnce } from './injectStyle.js';
 
 // ---------------------------------------------------------------------------
@@ -274,17 +278,17 @@ const LAUNCH_PAD_STYLES = `
 // Module state
 // ---------------------------------------------------------------------------
 
-/** The root overlay element. @type {HTMLElement | null} */
-let _overlay = null;
+/** The root overlay element. */
+let _overlay: HTMLDivElement | null = null;
 
-/** The #ui-overlay container reference. @type {HTMLElement | null} */
-let _container = null;
+/** The #ui-overlay container reference. */
+let _container: HTMLElement | null = null;
 
-/** The game state reference. @type {import('../core/gameState.js').GameState | null} */
-let _state = null;
+/** The game state reference. */
+let _state: GameState | null = null;
 
-/** Callback to navigate back to the hub. @type {(() => void) | null} */
-let _onBack = null;
+/** Callback to navigate back to the hub. */
+let _onBack: (() => void) | null = null;
 
 // ---------------------------------------------------------------------------
 // Formatting helpers
@@ -292,28 +296,22 @@ let _onBack = null;
 
 /**
  * Format a number with commas.
- * @param {number} n
- * @returns {string}
  */
-function _fmt(n) {
+function _fmt(n: number): string {
   return n.toLocaleString('en-US', { maximumFractionDigits: 0 });
 }
 
 /**
  * Format a dollar amount.
- * @param {number} n
- * @returns {string}
  */
-function _fmt$(n) {
+function _fmt$(n: number): string {
   return '$' + Math.floor(n).toLocaleString('en-US');
 }
 
 /**
  * Compute the total cost of a rocket design by summing part costs.
- * @param {import('../core/gameState.js').RocketDesign} design
- * @returns {number}
  */
-function _computeDesignCost(design) {
+function _computeDesignCost(design: RocketDesign): number {
   let total = 0;
   for (const part of design.parts) {
     const def = getPartById(part.partId);
@@ -327,7 +325,7 @@ function _computeDesignCost(design) {
 // ---------------------------------------------------------------------------
 
 /** Part fill colours keyed by PartType (CSS hex strings). */
-const PART_FILL = {
+const PART_FILL: Record<string, string> = {
   [PartType.COMMAND_MODULE]:       '#1a3860',
   [PartType.COMPUTER_MODULE]:      '#122848',
   [PartType.SERVICE_MODULE]:       '#1c2c58',
@@ -348,7 +346,7 @@ const PART_FILL = {
 };
 
 /** Part stroke colours keyed by PartType (CSS hex strings). */
-const PART_STROKE = {
+const PART_STROKE: Record<string, string> = {
   [PartType.COMMAND_MODULE]:       '#4080c0',
   [PartType.COMPUTER_MODULE]:      '#2870a0',
   [PartType.SERVICE_MODULE]:       '#3860b0',
@@ -365,7 +363,7 @@ const PART_STROKE = {
   [PartType.HEAT_SHIELD]:          '#a04010',
   [PartType.RCS_THRUSTER]:         '#2890a0',
   [PartType.SOLAR_PANEL]:          '#20a040',
-  [PartType.LAUNCH_CLAMP]:         '#807040',
+  [PartType.LAUNCH_CLAMP]:        '#807040',
 };
 
 const PREVIEW_W = 80;
@@ -374,11 +372,8 @@ const PREVIEW_PAD = 6;
 
 /**
  * Draw a miniature rocket preview onto a 2D canvas element.
- *
- * @param {HTMLCanvasElement} canvas
- * @param {import('../core/gameState.js').RocketDesign} design
  */
-function _renderRocketPreview(canvas, design) {
+function _renderRocketPreview(canvas: HTMLCanvasElement, design: RocketDesign): void {
   canvas.width  = PREVIEW_W;
   canvas.height = PREVIEW_H;
   canvas.className = 'lp-rocket-preview';
@@ -387,7 +382,7 @@ function _renderRocketPreview(canvas, design) {
   if (!ctx || !design.parts || design.parts.length === 0) return;
 
   // Resolve part defs and compute bounding box.
-  const resolved = [];
+  const resolved: Array<{ px: number; py: number; hw: number; hh: number; def: PartDef }> = [];
   let minX = Infinity, maxX = -Infinity;
   let minY = Infinity, maxY = -Infinity;
 
@@ -441,12 +436,12 @@ function _renderRocketPreview(canvas, design) {
 
 /**
  * Mount the Launch Pad overlay.
- *
- * @param {HTMLElement} container   The #ui-overlay div.
- * @param {import('../core/gameState.js').GameState} state
- * @param {{ onBack: () => void }} callbacks
  */
-export function initLaunchPadUI(container, state, { onBack }) {
+export function initLaunchPadUI(
+  container: HTMLElement,
+  state: GameState,
+  { onBack }: { onBack: () => void },
+): void {
   _container = container;
   _state     = state;
   _onBack    = onBack;
@@ -460,14 +455,12 @@ export function initLaunchPadUI(container, state, { onBack }) {
   container.appendChild(_overlay);
 
   _renderShell();
-
-
 }
 
 /**
  * Remove the Launch Pad overlay from the DOM.
  */
-export function destroyLaunchPadUI() {
+export function destroyLaunchPadUI(): void {
   if (_overlay) {
     _overlay.remove();
     _overlay = null;
@@ -475,7 +468,6 @@ export function destroyLaunchPadUI() {
   _container = null;
   _state     = null;
   _onBack    = null;
-
 }
 
 // ---------------------------------------------------------------------------
@@ -486,7 +478,7 @@ export function destroyLaunchPadUI() {
  * Build the screen layout: header with back button + rocket list or
  * empty-state placeholder.
  */
-function _renderShell() {
+function _renderShell(): void {
   if (!_overlay || !_state) return;
 
   // Header
@@ -504,21 +496,21 @@ function _renderShell() {
   header.appendChild(backBtn);
 
   const padTier = getFacilityTier(_state, FacilityId.LAUNCH_PAD);
-  const padTierLabel = LAUNCH_PAD_TIER_LABELS[padTier] || '';
+  const padTierLabel = (LAUNCH_PAD_TIER_LABELS as Record<number, string>)[padTier] || '';
   const title = document.createElement('h1');
   title.id = 'launch-pad-title';
   title.textContent = `Launch Pad \u2014 Tier ${padTier}` + (padTierLabel ? ` (${padTierLabel})` : '');
   header.appendChild(title);
 
   // Show pad capability details
-  const maxMass = LAUNCH_PAD_MAX_MASS[padTier] ?? LAUNCH_PAD_MAX_MASS[1];
+  const maxMass = (LAUNCH_PAD_MAX_MASS as Record<number, number>)[padTier] ?? (LAUNCH_PAD_MAX_MASS as Record<number, number>)[1];
   const tierInfo = document.createElement('span');
   tierInfo.style.cssText =
     'font-size:0.82rem;color:#6888a8;margin-left:auto;padding:4px 12px;' +
     'background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);' +
     'border-radius:4px;white-space:nowrap;';
   const massLabel = isFinite(maxMass) ? `${(maxMass / 1000).toFixed(0)}t` : 'Unlimited';
-  const features = [];
+  const features: string[] = [];
   if (padTier >= 2) features.push('Fuel Top-Off');
   if (padTier >= 3) features.push('Launch Clamps');
   const featureStr = features.length > 0 ? ` | ${features.join(', ')}` : '';
@@ -567,7 +559,7 @@ function _renderShell() {
 /**
  * Render a compact weather info bar at the top of the launch pad with a Skip Day button.
  */
-function _renderWeatherBar() {
+function _renderWeatherBar(): void {
   if (!_overlay || !_state) return;
 
   // Remove stale bar.
@@ -652,11 +644,8 @@ function _renderWeatherBar() {
  *
  * Uses the shared `buildRocketCard` from rocketCardUtil for the base layout,
  * then appends launch-pad-specific cost info and a Launch button.
- *
- * @param {import('../core/gameState.js').RocketDesign} design
- * @returns {HTMLElement}
  */
-function _buildRocketCard(design) {
+function _buildRocketCard(design: RocketDesign): HTMLElement {
   const cost      = _computeDesignCost(design);
   const canAfford = _state ? _state.money >= cost : false;
 
@@ -664,7 +653,7 @@ function _buildRocketCard(design) {
   const assembly = _designToAssembly(design);
   const rocketMass = getTotalMass(assembly);
   const padTier = _state ? getFacilityTier(_state, FacilityId.LAUNCH_PAD) : 1;
-  const maxMass = LAUNCH_PAD_MAX_MASS[padTier] ?? LAUNCH_PAD_MAX_MASS[1];
+  const maxMass = (LAUNCH_PAD_MAX_MASS as Record<number, number>)[padTier] ?? (LAUNCH_PAD_MAX_MASS as Record<number, number>)[1];
   const tooHeavy = rocketMass > maxMass;
 
   const card = buildRocketCard(design, []);
@@ -712,8 +701,7 @@ function _buildRocketCard(design) {
 // Private — launch flow
 // ---------------------------------------------------------------------------
 
-/** @type {Readonly<Record<string, string>>} */
-const OPPOSITE_SIDE = Object.freeze({
+const OPPOSITE_SIDE: Readonly<Record<string, string>> = Object.freeze({
   top: 'bottom', bottom: 'top', left: 'right', right: 'left',
 });
 
@@ -728,11 +716,8 @@ const SNAP_TOLERANCE = 1;
  * After placing parts, connections are rebuilt by finding pairs of snap points
  * that coincide positionally — this is required for the fuel system's BFS
  * traversal to route propellant from tanks to engines.
- *
- * @param {import('../core/gameState.js').RocketDesign} design
- * @returns {import('../core/rocketbuilder.js').RocketAssembly}
  */
-function _designToAssembly(design) {
+function _designToAssembly(design: RocketDesign): RocketAssembly {
   const assembly = createRocketAssembly();
   for (const part of design.parts) {
     addPartToAssembly(assembly, part.partId, part.position.x, part.position.y);
@@ -751,12 +736,10 @@ function _designToAssembly(design) {
  * (within tolerance) with a complementary-side snap point from the other.
  * When a match is found, record a connection so the fuel system can traverse
  * the assembly graph.
- *
- * @param {import('../core/rocketbuilder.js').RocketAssembly} assembly
  */
-function _rebuildConnections(assembly) {
+function _rebuildConnections(assembly: RocketAssembly): void {
   const parts = [...assembly.parts.values()];
-  const occupied = new Set(); // "instanceId:snapIndex" → already connected
+  const occupied = new Set<string>(); // "instanceId:snapIndex" -> already connected
 
   for (let i = 0; i < parts.length; i++) {
     const pA = parts[i];
@@ -803,20 +786,16 @@ function _rebuildConnections(assembly) {
 /**
  * Reconstruct a live StagingConfig from a saved RocketDesign's staging data.
  * Falls back to a default single-stage config if staging data is missing.
- *
- * @param {import('../core/gameState.js').RocketDesign} design
- * @param {import('../core/rocketbuilder.js').RocketAssembly} assembly
- * @returns {import('../core/rocketbuilder.js').StagingConfig}
  */
-function _designToStagingConfig(design, assembly) {
+function _designToStagingConfig(design: RocketDesign, assembly: RocketAssembly): StagingConfig {
   const staging = design.staging;
 
   if (staging && Array.isArray(staging.stages)) {
-    const config = {
-      stages:          staging.stages.map(ids => ({
-        instanceIds: Array.isArray(ids) ? [...ids] : [],
+    const config: StagingConfig = {
+      stages:          staging.stages.map((ids) => ({
+        instanceIds: Array.isArray(ids) ? ids.map(String) : [],
       })),
-      unstaged:        Array.isArray(staging.unstaged) ? [...staging.unstaged] : [],
+      unstaged:        Array.isArray(staging.unstaged) ? staging.unstaged.map(String) : [],
       currentStageIdx: 0,
     };
     // Clean up any stale references.
@@ -833,10 +812,8 @@ function _designToStagingConfig(design, assembly) {
 /**
  * Handle clicking Launch on a rocket design card.
  * Checks for crew seats and shows a crew dialog if needed.
- *
- * @param {import('../core/gameState.js').RocketDesign} design
  */
-function _handleLaunch(design) {
+function _handleLaunch(design: RocketDesign): void {
   if (!_state) return;
 
   const assembly      = _designToAssembly(design);
@@ -856,7 +833,7 @@ function _handleLaunch(design) {
  * Continue the launch flow after weather checks.
  * Counts crew seats and shows crew dialog if needed.
  */
-function _proceedToLaunch(design, assembly, stagingConfig) {
+function _proceedToLaunch(design: RocketDesign, assembly: RocketAssembly, stagingConfig: StagingConfig): void {
   if (!_state) return;
 
   // Count crew seats across command modules.
@@ -864,7 +841,7 @@ function _proceedToLaunch(design, assembly, stagingConfig) {
   for (const placed of assembly.parts.values()) {
     const def = getPartById(placed.partId);
     if (def?.type === PartType.COMMAND_MODULE) {
-      totalSeats += def.properties?.seats ?? 0;
+      totalSeats += (def.properties?.seats as number) ?? 0;
     }
   }
 
@@ -878,8 +855,8 @@ function _proceedToLaunch(design, assembly, stagingConfig) {
 /**
  * Show a warning dialog when launching in extreme weather.
  */
-function _showExtremeWeatherWarning(design, assembly, stagingConfig) {
-  const weather = getCurrentWeather(_state);
+function _showExtremeWeatherWarning(design: RocketDesign, assembly: RocketAssembly, stagingConfig: StagingConfig): void {
+  const weather = getCurrentWeather(_state!);
 
   const overlay = document.createElement('div');
   overlay.id = 'lp-weather-warning-overlay';
@@ -921,20 +898,20 @@ function _showExtremeWeatherWarning(design, assembly, stagingConfig) {
     _proceedToLaunch(design, assembly, stagingConfig);
   });
 
-  overlay.addEventListener('pointerdown', (e) => {
+  overlay.addEventListener('pointerdown', (e: Event) => {
     if (e.target === overlay) overlay.remove();
   });
 }
 
 /**
  * Show a crew assignment dialog before launch.
- *
- * @param {number} totalSeats
- * @param {import('../core/gameState.js').RocketDesign} design
- * @param {import('../core/rocketbuilder.js').RocketAssembly} assembly
- * @param {import('../core/rocketbuilder.js').StagingConfig} stagingConfig
  */
-function _showCrewDialog(totalSeats, design, assembly, stagingConfig) {
+function _showCrewDialog(
+  totalSeats: number,
+  design: RocketDesign,
+  assembly: RocketAssembly,
+  stagingConfig: StagingConfig,
+): void {
   if (!_state) return;
 
   const activeCrew = getActiveCrew(_state);
@@ -943,7 +920,7 @@ function _showCrewDialog(totalSeats, design, assembly, stagingConfig) {
     (c) => `<option value="${c.id}">${c.name}</option>`,
   ).join('');
 
-  const seatRows = [];
+  const seatRows: string[] = [];
   for (let i = 0; i < totalSeats; i++) {
     seatRows.push(
       `<div class="lp-crew-seat-row">` +
@@ -995,7 +972,7 @@ function _showCrewDialog(totalSeats, design, assembly, stagingConfig) {
 
   document.body.appendChild(overlay);
 
-  overlay.addEventListener('pointerdown', (e) => {
+  overlay.addEventListener('pointerdown', (e: Event) => {
     if (e.target === overlay) overlay.remove();
   });
 
@@ -1005,10 +982,10 @@ function _showCrewDialog(totalSeats, design, assembly, stagingConfig) {
 
   overlay.querySelector('.lp-crew-confirm-btn')?.addEventListener('click', () => {
     const selects = overlay.querySelectorAll('.lp-crew-seat-select');
-    const crewIds = [];
-    const seen    = new Set();
+    const crewIds: string[] = [];
+    const seen    = new Set<string>();
     for (const sel of selects) {
-      const id = /** @type {HTMLSelectElement} */ (sel).value;
+      const id = (sel as HTMLSelectElement).value;
       if (id && !seen.has(id)) {
         crewIds.push(id);
         seen.add(id);
@@ -1021,13 +998,13 @@ function _showCrewDialog(totalSeats, design, assembly, stagingConfig) {
 
 /**
  * Create the FlightState and transition to the flight scene.
- *
- * @param {string[]} crewIds
- * @param {import('../core/gameState.js').RocketDesign} design
- * @param {import('../core/rocketbuilder.js').RocketAssembly} assembly
- * @param {import('../core/rocketbuilder.js').StagingConfig} stagingConfig
  */
-function _doLaunch(crewIds, design, assembly, stagingConfig) {
+function _doLaunch(
+  crewIds: string[],
+  design: RocketDesign,
+  assembly: RocketAssembly,
+  stagingConfig: StagingConfig,
+): void {
   if (!_state) return;
 
   // Deduct the launch cost (re-purchasing the parts for this flight).
@@ -1041,7 +1018,7 @@ function _doLaunch(crewIds, design, assembly, stagingConfig) {
   let totalFuel = 0;
   for (const placed of assembly.parts.values()) {
     const def = getPartById(placed.partId);
-    if (def) totalFuel += def.properties?.fuelMass ?? 0;
+    if (def) totalFuel += (def.properties?.fuelMass as number) ?? 0;
   }
 
   // Write the live flight state.
@@ -1067,21 +1044,21 @@ function _doLaunch(crewIds, design, assembly, stagingConfig) {
       state,
       assembly,
       stagingConfig,
-      state.currentFlight,
+      state.currentFlight!,
       (_finalState, returnResults, navigateTo) => {
         // Return to hub.
         if (onBack) onBack();
 
         // Show the post-flight results overlay if applicable.
         if (returnResults) {
-          showReturnResultsOverlay(container, returnResults);
+          showReturnResultsOverlay(container, returnResults as FlightReturnSummary);
         }
 
         // "Retry with Same Design" — auto-navigate to the VAB.  The hub
         // is already mounted by onBack(); click the VAB building to enter.
         if (navigateTo === 'vab') {
           const vabEl = document.querySelector('[data-building-id="vab"]');
-          if (vabEl) /** @type {HTMLElement} */ (vabEl).click();
+          if (vabEl) (vabEl as HTMLElement).click();
         }
       },
     );

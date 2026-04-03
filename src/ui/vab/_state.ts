@@ -1,42 +1,58 @@
 /**
- * _state.js — Shared mutable state for the VAB UI sub-modules.
+ * _state.ts — Shared mutable state for the VAB UI sub-modules.
  *
  * All module-level `let _xxx` variables from the original vab.js are
  * consolidated here.  Sub-modules access them via getVabState() and
  * mutate them via setVabState(patch).
  */
 
+import type { RocketAssembly, StagingConfig, PlacedPart } from '../../core/rocketbuilder.js';
+import type { GameState, InventoryPart } from '../../core/gameState.js';
+import type { ValidationResult } from '../../core/rocketvalidator.js';
+
 /** The panel width for each side panel. */
-export const SIDE_PANEL_WIDTH = 300;
+export const SIDE_PANEL_WIDTH: number = 300;
 
-/**
- * @typedef {Object} VabState
- * @property {import('../../core/rocketbuilder.js').RocketAssembly | null} assembly
- * @property {import('../../core/gameState.js').GameState | null} gameState
- * @property {HTMLElement | null} container
- * @property {{ partId: string, instanceId: string | null, startX: number, startY: number, hasMoved: boolean } | null} dragState
- * @property {HTMLElement | null} ctxMenu
- * @property {import('../../core/rocketbuilder.js').StagingConfig | null} stagingConfig
- * @property {number} dvAltitude
- * @property {boolean} flightActive
- * @property {import('../../core/rocketvalidator.js').ValidationResult | null} lastValidation
- * @property {(() => void) | null} onBack
- * @property {boolean} autoZoomEnabled
- * @property {boolean} symmetryMode
- * @property {string | null} selectedInstanceId
- * @property {string | null} currentDesignId
- * @property {string} currentDesignName
- * @property {Set<string>} openPanels
- * @property {Map<string, import('../../core/gameState.js').InventoryPart>} inventoryUsedParts
- * @property {HTMLElement | null} canvasArea
- * @property {{ hit: any, startX: number, startY: number } | null} pendingPickup
- * @property {HTMLElement | null} scaleTicks
- * @property {number} buildAreaHeight
- * @property {boolean} libraryCssInjected
- */
+export interface VabDragState {
+  partId: string;
+  instanceId: string | null;
+  startX: number;
+  startY: number;
+  hasMoved: boolean;
+}
 
-/** @type {VabState} */
-const _state = {
+export interface VabPendingPickup {
+  hit: PlacedPart;
+  startX: number;
+  startY: number;
+}
+
+export interface VabState {
+  assembly: RocketAssembly | null;
+  gameState: GameState | null;
+  container: HTMLElement | null;
+  dragState: VabDragState | null;
+  ctxMenu: HTMLElement | null;
+  stagingConfig: StagingConfig | null;
+  dvAltitude: number;
+  flightActive: boolean;
+  lastValidation: ValidationResult | null;
+  onBack: (() => void) | null;
+  autoZoomEnabled: boolean;
+  symmetryMode: boolean;
+  selectedInstanceId: string | null;
+  currentDesignId: string | null;
+  currentDesignName: string;
+  openPanels: Set<string>;
+  inventoryUsedParts: Map<string, InventoryPart>;
+  canvasArea: HTMLElement | null;
+  pendingPickup: VabPendingPickup | null;
+  scaleTicks: HTMLElement | null;
+  buildAreaHeight: number;
+  libraryCssInjected: boolean;
+}
+
+const _state: VabState = {
   assembly:            null,
   gameState:           null,
   container:           null,
@@ -63,24 +79,22 @@ const _state = {
 
 /**
  * Get the current VAB state object (read/write — callers may mutate directly).
- * @returns {VabState}
  */
-export function getVabState() {
+export function getVabState(): VabState {
   return _state;
 }
 
 /**
  * Patch the VAB state with the supplied key/value pairs.
- * @param {Partial<VabState>} patch
  */
-export function setVabState(patch) {
+export function setVabState(patch: Partial<VabState>): void {
   Object.assign(_state, patch);
 }
 
 /**
  * Reset all VAB state to initial values.
  */
-export function resetVabState() {
+export function resetVabState(): void {
   _state.assembly            = null;
   _state.gameState           = null;
   _state.container           = null;

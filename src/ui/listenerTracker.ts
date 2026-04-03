@@ -1,5 +1,5 @@
 /**
- * listenerTracker.js — Lightweight event listener tracking utility.
+ * listenerTracker.ts — Lightweight event listener tracking utility.
  *
  * UI panel modules (help, settings, debugSaves, topbar) create DOM elements
  * with event listeners that must be cleaned up when the panel closes.
@@ -16,26 +16,44 @@
  * @module ui/listenerTracker
  */
 
+/** A single tracked listener entry. */
+interface TrackedListener {
+  target: EventTarget;
+  event: string;
+  handler: EventListenerOrEventListenerObject;
+  options?: boolean | AddEventListenerOptions;
+}
+
+/** The object returned by {@link createListenerTracker}. */
+export interface ListenerTracker {
+  /** Register and attach an event listener, tracking it for later removal. */
+  add(
+    target: EventTarget,
+    event: string,
+    handler: EventListenerOrEventListenerObject,
+    options?: boolean | AddEventListenerOptions,
+  ): void;
+  /** Remove all tracked listeners and clear the internal list. */
+  removeAll(): void;
+}
+
 /**
  * Create a new listener tracker instance.
- *
- * @returns {{ add: (target: EventTarget, event: string, handler: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions) => void, removeAll: () => void }}
  */
-export function createListenerTracker() {
-  /** @type {Array<{ target: EventTarget, event: string, handler: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions }>} */
-  const _listeners = [];
+export function createListenerTracker(): ListenerTracker {
+  const _listeners: TrackedListener[] = [];
 
   return {
     /**
      * Register and attach an event listener. The listener is tracked so it
      * can be removed later via `removeAll()`.
-     *
-     * @param {EventTarget} target
-     * @param {string} event
-     * @param {EventListenerOrEventListenerObject} handler
-     * @param {boolean|AddEventListenerOptions} [options]
      */
-    add(target, event, handler, options) {
+    add(
+      target: EventTarget,
+      event: string,
+      handler: EventListenerOrEventListenerObject,
+      options?: boolean | AddEventListenerOptions,
+    ): void {
       target.addEventListener(event, handler, options);
       _listeners.push({ target, event, handler, options });
     },
@@ -43,7 +61,7 @@ export function createListenerTracker() {
     /**
      * Remove all tracked listeners and clear the internal list.
      */
-    removeAll() {
+    removeAll(): void {
       for (const { target, event, handler, options } of _listeners) {
         target.removeEventListener(event, handler, options);
       }

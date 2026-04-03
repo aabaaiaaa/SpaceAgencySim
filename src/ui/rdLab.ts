@@ -1,5 +1,5 @@
 /**
- * rdLab.js — R&D Lab / Tech Tree HTML overlay UI.
+ * rdLab.ts — R&D Lab / Tech Tree HTML overlay UI.
  *
  * Displays the technology tree organised by branch (Propulsion, Structural,
  * Recovery, Science) with 5 tiers each.  Nodes can be researched by spending
@@ -18,6 +18,7 @@ import { FacilityId, RD_LAB_TIER_LABELS } from '../core/constants.js';
 import { getFacilityTier } from '../core/construction.js';
 import { refreshTopBar } from './topbar.js';
 import { injectStyleOnce } from './injectStyle.js';
+import type { GameState } from '../core/gameState.js';
 
 // ---------------------------------------------------------------------------
 // CSS
@@ -251,17 +252,10 @@ const RD_STYLES = `
 // Module State
 // ---------------------------------------------------------------------------
 
-/** @type {import('../core/gameState.js').GameState | null} */
-let _state = null;
-
-/** @type {(() => void) | null} */
-let _onBack = null;
-
-/** @type {HTMLElement | null} */
-let _overlay = null;
-
-/** @type {string} */
-let _activeBranch = TechBranch.PROPULSION;
+let _state: GameState | null = null;
+let _onBack: (() => void) | null = null;
+let _overlay: HTMLDivElement | null = null;
+let _activeBranch: string = TechBranch.PROPULSION;
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -269,12 +263,12 @@ let _activeBranch = TechBranch.PROPULSION;
 
 /**
  * Mount the R&D Lab / Tech Tree overlay.
- *
- * @param {HTMLElement} container
- * @param {import('../core/gameState.js').GameState} state
- * @param {{ onBack: () => void }} opts
  */
-export function initRdLabUI(container, state, { onBack }) {
+export function initRdLabUI(
+  container: HTMLElement,
+  state: GameState,
+  { onBack }: { onBack: () => void },
+): void {
   _state = state;
   _onBack = onBack;
   _activeBranch = TechBranch.PROPULSION;
@@ -287,36 +281,33 @@ export function initRdLabUI(container, state, { onBack }) {
   container.appendChild(_overlay);
 
   _render();
-
-
 }
 
 /**
  * Remove the R&D Lab overlay.
  */
-export function destroyRdLabUI() {
+export function destroyRdLabUI(): void {
   if (_overlay) {
     _overlay.remove();
     _overlay = null;
   }
   _state = null;
   _onBack = null;
-
 }
 
 // ---------------------------------------------------------------------------
 // Rendering
 // ---------------------------------------------------------------------------
 
-function _render() {
+function _render(): void {
   if (!_overlay || !_state) return;
   _overlay.innerHTML = '';
 
   // Header
-  const header = document.createElement('div');
+  const header: HTMLDivElement = document.createElement('div');
   header.id = 'rd-header';
 
-  const backBtn = document.createElement('button');
+  const backBtn: HTMLButtonElement = document.createElement('button');
   backBtn.id = 'rd-back-btn';
   backBtn.textContent = '\u2190 Hub';
   backBtn.addEventListener('click', () => {
@@ -328,13 +319,13 @@ function _render() {
 
   const rdTier = _state ? getFacilityTier(_state, FacilityId.RD_LAB) : 1;
   const rdTierLabel = RD_LAB_TIER_LABELS[rdTier] || '';
-  const title = document.createElement('h1');
+  const title: HTMLHeadingElement = document.createElement('h1');
   title.id = 'rd-title';
   title.textContent = `R&D Lab \u2014 Tier ${rdTier}` + (rdTierLabel ? ` (${rdTierLabel})` : '');
   header.appendChild(title);
 
   // Resource display
-  const resources = document.createElement('div');
+  const resources: HTMLDivElement = document.createElement('div');
   resources.id = 'rd-resources';
   resources.innerHTML =
     `Science: <span class="rd-res-val">${Math.floor(_state.sciencePoints ?? 0)}</span>` +
@@ -345,11 +336,11 @@ function _render() {
   _overlay.appendChild(header);
 
   // Branch tabs
-  const tabs = document.createElement('div');
+  const tabs: HTMLDivElement = document.createElement('div');
   tabs.id = 'rd-tabs';
-  const branches = [TechBranch.PROPULSION, TechBranch.STRUCTURAL, TechBranch.RECOVERY, TechBranch.SCIENCE];
+  const branches: string[] = [TechBranch.PROPULSION, TechBranch.STRUCTURAL, TechBranch.RECOVERY, TechBranch.SCIENCE];
   for (const branch of branches) {
-    const tab = document.createElement('button');
+    const tab: HTMLButtonElement = document.createElement('button');
     tab.className = 'rd-tab' + (branch === _activeBranch ? ' active' : '');
     tab.textContent = BRANCH_NAMES[branch];
     tab.dataset.branch = branch;
@@ -362,7 +353,7 @@ function _render() {
   _overlay.appendChild(tabs);
 
   // Content
-  const content = document.createElement('div');
+  const content: HTMLDivElement = document.createElement('div');
   content.id = 'rd-content';
   _overlay.appendChild(content);
 
@@ -371,14 +362,13 @@ function _render() {
 
 /**
  * Render the nodes for the active branch.
- * @param {HTMLElement} content
  */
-function _renderBranch(content) {
+function _renderBranch(content: HTMLDivElement): void {
   if (!_state) return;
 
   const maxTier = getMaxResearchableTier(_state);
   if (maxTier > 0) {
-    const note = document.createElement('div');
+    const note: HTMLDivElement = document.createElement('div');
     note.className = 'rd-max-tier-note';
     note.textContent = `R&D Lab supports up to Tier ${maxTier} research`;
     content.appendChild(note);
@@ -389,31 +379,31 @@ function _renderBranch(content) {
     .filter((n) => n.branch === _activeBranch)
     .sort((a, b) => a.tier - b.tier);
 
-  const list = document.createElement('div');
+  const list: HTMLDivElement = document.createElement('div');
   list.className = 'rd-node-list';
 
   for (const node of branchNodes) {
-    const card = document.createElement('div');
+    const card: HTMLDivElement = document.createElement('div');
     card.className = 'rd-node';
     if (node.researched) card.classList.add('researched');
     else if (node.tutorialUnlocked) card.classList.add('tutorial-unlocked');
     else if (node.canResearch) card.classList.add('available');
 
     // Header row: tier badge, name, status
-    const headerRow = document.createElement('div');
+    const headerRow: HTMLDivElement = document.createElement('div');
     headerRow.className = 'rd-node-header';
 
-    const tierBadge = document.createElement('span');
+    const tierBadge: HTMLSpanElement = document.createElement('span');
     tierBadge.className = 'rd-node-tier';
     tierBadge.textContent = `Tier ${node.tier}`;
     headerRow.appendChild(tierBadge);
 
-    const name = document.createElement('span');
+    const name: HTMLSpanElement = document.createElement('span');
     name.className = 'rd-node-name';
     name.textContent = node.name;
     headerRow.appendChild(name);
 
-    const statusBadge = document.createElement('span');
+    const statusBadge: HTMLSpanElement = document.createElement('span');
     statusBadge.className = 'rd-node-status';
     if (node.researched) {
       statusBadge.classList.add('researched');
@@ -430,13 +420,13 @@ function _renderBranch(content) {
     card.appendChild(headerRow);
 
     // Description
-    const desc = document.createElement('div');
+    const desc: HTMLDivElement = document.createElement('div');
     desc.className = 'rd-node-desc';
     desc.textContent = node.description;
     card.appendChild(desc);
 
     // Unlocks
-    const unlocks = [];
+    const unlocks: string[] = [];
     if (node.unlocksParts.length > 0) {
       unlocks.push(`Parts: ${node.unlocksParts.join(', ')}`);
     }
@@ -444,7 +434,7 @@ function _renderBranch(content) {
       unlocks.push(`Instruments: ${node.unlocksInstruments.join(', ')}`);
     }
     if (unlocks.length > 0) {
-      const unlocksEl = document.createElement('div');
+      const unlocksEl: HTMLDivElement = document.createElement('div');
       unlocksEl.className = 'rd-node-unlocks';
       unlocksEl.innerHTML = `<strong>Unlocks:</strong> ${unlocks.join(' | ')}`;
       card.appendChild(unlocksEl);
@@ -452,7 +442,7 @@ function _renderBranch(content) {
 
     // Cost (show for non-unlocked nodes)
     if (!node.researched && !node.tutorialUnlocked) {
-      const costEl = document.createElement('div');
+      const costEl: HTMLDivElement = document.createElement('div');
       costEl.className = 'rd-node-cost';
       costEl.innerHTML =
         `<span class="rd-sci">${node.scienceCost} Science</span>` +
@@ -460,14 +450,14 @@ function _renderBranch(content) {
       card.appendChild(costEl);
 
       if (node.canResearch) {
-        const btn = document.createElement('button');
+        const btn: HTMLButtonElement = document.createElement('button');
         btn.className = 'rd-research-btn';
         btn.textContent = 'Research';
         btn.dataset.nodeId = node.id;
         btn.addEventListener('click', () => _handleResearch(node.id));
         card.appendChild(btn);
       } else if (node.reason) {
-        const reason = document.createElement('div');
+        const reason: HTMLDivElement = document.createElement('div');
         reason.className = 'rd-node-reason';
         reason.textContent = node.reason;
         card.appendChild(reason);
@@ -482,9 +472,8 @@ function _renderBranch(content) {
 
 /**
  * Handle clicking the Research button on a node.
- * @param {string} nodeId
  */
-function _handleResearch(nodeId) {
+function _handleResearch(nodeId: string): void {
   if (!_state) return;
   const result = researchNode(_state, nodeId);
   if (result.success) {

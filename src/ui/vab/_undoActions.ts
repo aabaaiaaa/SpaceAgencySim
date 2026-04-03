@@ -1,5 +1,5 @@
 /**
- * _undoActions.js — VAB undo/redo action recording.
+ * _undoActions.ts — VAB undo/redo action recording.
  *
  * Provides functions to record each type of VAB mutation as an undo/redo
  * action. Each action captures the minimum data needed to reverse (undo)
@@ -12,16 +12,16 @@ import { pushUndoAction, clearUndoRedo } from '../../core/undoRedo.js';
 import { getPartById } from '../../data/parts.js';
 import { getVabState } from './_state.js';
 
+import type { StagingConfig, PlacedPart, PartConnection } from '../../core/rocketbuilder.js';
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 /**
  * Deep-clone a StagingConfig (stages arrays + unstaged array + index).
- * @param {import('../../core/rocketbuilder.js').StagingConfig} config
- * @returns {import('../../core/rocketbuilder.js').StagingConfig}
  */
-function cloneStaging(config) {
+function cloneStaging(config: StagingConfig): StagingConfig {
   return {
     stages: config.stages.map(s => ({ instanceIds: [...s.instanceIds] })),
     unstaged: [...config.unstaged],
@@ -32,10 +32,8 @@ function cloneStaging(config) {
 /**
  * Overwrite the contents of `target` with a clone of `source`.
  * Preserves the object reference (important for VAB state).
- * @param {import('../../core/rocketbuilder.js').StagingConfig} target
- * @param {import('../../core/rocketbuilder.js').StagingConfig} source
  */
-function restoreStaging(target, source) {
+function restoreStaging(target: StagingConfig, source: StagingConfig): void {
   target.stages = source.stages.map(s => ({ instanceIds: [...s.instanceIds] }));
   target.unstaged = [...source.unstaged];
   target.currentStageIdx = source.currentStageIdx;
@@ -43,11 +41,10 @@ function restoreStaging(target, source) {
 
 /**
  * Capture a before-snapshot of staging config. Call BEFORE the operation.
- * @returns {import('../../core/rocketbuilder.js').StagingConfig}
  */
-export function snapshotStaging() {
+export function snapshotStaging(): StagingConfig {
   const S = getVabState();
-  return cloneStaging(S.stagingConfig);
+  return cloneStaging(S.stagingConfig!);
 }
 
 // ---------------------------------------------------------------------------
@@ -56,19 +53,19 @@ export function snapshotStaging() {
 
 /**
  * Record an undo action for placing new part(s) from the parts panel.
- *
- * @param {string[]} addedIds — instanceIds of parts that were added (main + mirror)
- * @param {number} costDelta — total cost deducted (positive = amount spent)
- * @param {import('../../core/rocketbuilder.js').StagingConfig} stagingBefore
  */
-export function recordPlacement(addedIds, costDelta, stagingBefore) {
+export function recordPlacement(
+  addedIds: string[],
+  costDelta: number,
+  stagingBefore: StagingConfig,
+): void {
   const S = getVabState();
-  const assembly = S.assembly;
-  const stagingConfig = S.stagingConfig;
+  const assembly = S.assembly!;
+  const stagingConfig = S.stagingConfig!;
   const addedIdSet = new Set(addedIds);
 
   // Capture placed part data.
-  const partDatas = addedIds.map(id => ({ ...assembly.parts.get(id) }));
+  const partDatas = addedIds.map(id => ({ ...assembly.parts.get(id)! }));
 
   // Capture connections involving any added part.
   const newConnections = assembly.connections
@@ -78,7 +75,7 @@ export function recordPlacement(addedIds, costDelta, stagingBefore) {
   // Capture symmetry pairs involving any added part.
   const newSymmetry = assembly.symmetryPairs
     .filter(([a, b]) => addedIdSet.has(a) || addedIdSet.has(b))
-    .map(([a, b]) => [a, b]);
+    .map(([a, b]): [string, string] => [a, b]);
 
   // Snapshot staging after placement.
   const stagingAfter = cloneStaging(stagingConfig);
@@ -140,19 +137,19 @@ export function recordPlacement(addedIds, costDelta, stagingBefore) {
 /**
  * Record an undo action for deleting part(s).
  * Call BEFORE the parts are removed from the assembly.
- *
- * @param {string[]} removedIds — instanceIds to be removed
- * @param {number} costRefund — total cost refunded (positive = amount refunded)
- * @param {import('../../core/rocketbuilder.js').StagingConfig} stagingBefore
  */
-export function recordDeletion(removedIds, costRefund, stagingBefore) {
+export function recordDeletion(
+  removedIds: string[],
+  costRefund: number,
+  stagingBefore: StagingConfig,
+): void {
   const S = getVabState();
-  const assembly = S.assembly;
-  const stagingConfig = S.stagingConfig;
+  const assembly = S.assembly!;
+  const stagingConfig = S.stagingConfig!;
   const removedIdSet = new Set(removedIds);
 
   // Capture part data before removal.
-  const partDatas = removedIds.map(id => ({ ...assembly.parts.get(id) }));
+  const partDatas = removedIds.map(id => ({ ...assembly.parts.get(id)! }));
 
   // Capture connections involving removed parts.
   const removedConnections = assembly.connections
@@ -162,7 +159,7 @@ export function recordDeletion(removedIds, costRefund, stagingBefore) {
   // Capture symmetry pairs involving removed parts.
   const removedSymmetry = assembly.symmetryPairs
     .filter(([a, b]) => removedIdSet.has(a) || removedIdSet.has(b))
-    .map(([a, b]) => [a, b]);
+    .map(([a, b]): [string, string] => [a, b]);
 
   const stagingBeforeClone = cloneStaging(stagingBefore);
 
@@ -222,24 +219,24 @@ export function recordDeletion(removedIds, costRefund, stagingBefore) {
 
 /**
  * Record an undo action for moving a placed part to a new position.
- *
- * @param {string} instanceId
- * @param {number} oldX
- * @param {number} oldY
- * @param {number} newX
- * @param {number} newY
- * @param {{ fromInstanceId: string, fromSnapIndex: number, toInstanceId: string, toSnapIndex: number }[]} oldConnections
- * @param {{ fromInstanceId: string, fromSnapIndex: number, toInstanceId: string, toSnapIndex: number }[]} newConnections
  */
-export function recordMove(instanceId, oldX, oldY, newX, newY, oldConnections, newConnections) {
+export function recordMove(
+  instanceId: string,
+  oldX: number,
+  oldY: number,
+  newX: number,
+  newY: number,
+  oldConnections: PartConnection[],
+  newConnections: PartConnection[],
+): void {
   const S = getVabState();
-  const assembly = S.assembly;
+  const assembly = S.assembly!;
 
   const oldConns = oldConnections.map(c => ({ ...c }));
   const newConns = newConnections.map(c => ({ ...c }));
 
   const def = assembly.parts.get(instanceId);
-  const label = `Move ${getPartById(def?.partId)?.name ?? 'Part'}`;
+  const label = `Move ${getPartById(def?.partId ?? '')?.name ?? 'Part'}`;
 
   pushUndoAction({
     type: 'move',
@@ -279,12 +276,10 @@ export function recordMove(instanceId, oldX, oldY, newX, newY, oldConnections, n
 
 /**
  * Record an undo action for a staging panel drag-and-drop change.
- *
- * @param {import('../../core/rocketbuilder.js').StagingConfig} stagingBefore
  */
-export function recordStagingChange(stagingBefore) {
+export function recordStagingChange(stagingBefore: StagingConfig): void {
   const S = getVabState();
-  const stagingConfig = S.stagingConfig;
+  const stagingConfig = S.stagingConfig!;
   const before = cloneStaging(stagingBefore);
   const after = cloneStaging(stagingConfig);
 
@@ -307,19 +302,16 @@ export function recordStagingChange(stagingBefore) {
 /**
  * Record an undo action for the Clear All operation.
  * Call BEFORE clearing the assembly.
- *
- * @param {number} totalCostRefund — total cost being refunded
- * @param {import('../../core/rocketbuilder.js').StagingConfig} stagingBefore
  */
-export function recordClearAll(totalCostRefund, stagingBefore) {
+export function recordClearAll(totalCostRefund: number, stagingBefore: StagingConfig): void {
   const S = getVabState();
-  const assembly = S.assembly;
-  const stagingConfig = S.stagingConfig;
+  const assembly = S.assembly!;
+  const stagingConfig = S.stagingConfig!;
 
   // Capture full assembly state.
-  const savedParts = [...assembly.parts.entries()].map(([k, v]) => [k, { ...v }]);
+  const savedParts = [...assembly.parts.entries()].map(([k, v]): [string, PlacedPart] => [k, { ...v }]);
   const savedConnections = assembly.connections.map(c => ({ ...c }));
-  const savedSymmetry = assembly.symmetryPairs.map(([a, b]) => [a, b]);
+  const savedSymmetry = assembly.symmetryPairs.map(([a, b]): [string, string] => [a, b]);
   const savedNextId = assembly._nextId;
   const savedStaging = cloneStaging(stagingBefore);
 
@@ -335,7 +327,7 @@ export function recordClearAll(totalCostRefund, stagingBefore) {
       assembly.connections.push(...savedConnections.map(c => ({ ...c })));
       // Restore symmetry.
       assembly.symmetryPairs.length = 0;
-      assembly.symmetryPairs.push(...savedSymmetry.map(([a, b]) => [a, b]));
+      assembly.symmetryPairs.push(...savedSymmetry.map(([a, b]): [string, string] => [a, b]));
       assembly._nextId = savedNextId;
       // Restore staging.
       restoreStaging(stagingConfig, savedStaging);

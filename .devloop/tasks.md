@@ -133,7 +133,7 @@
 - **Verification**: `npm run typecheck` passes. `npm run test:unit` passes. All listed files are now `.ts`.
 
 ### TASK-022: Convert UI layer to TypeScript (src/ui/) — batch 2
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-021
 - **Description**: Convert the second batch of UI files to TypeScript (~25 files): all files in `src/ui/vab/` EXCEPT `_css.js` (12 files including barrel), plus hub.js, index.js, injectStyle.js, launchPad.js, library.js, listenerTracker.js, mainmenu.js, missionControl.js, rdLab.js, rocketCardUtil.js, satelliteOps.js, settings.js, topbar.js, trackingStation.js, flightController.js. Skip `_css.js` files — they will be replaced by `.css` files in TASK-024. See requirements Section 4.1.
 - **Verification**: `npm run typecheck` passes. `npm run test:unit` passes. All listed files are now `.ts`.

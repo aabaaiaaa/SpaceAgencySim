@@ -1,5 +1,5 @@
 /**
- * _scalebar.js — Scale bar tick drawing and extent updates.
+ * _scalebar.ts — Scale bar tick drawing and extent updates.
  */
 
 import { getPartById } from '../../data/parts.js';
@@ -14,7 +14,7 @@ import { getVabState } from './_state.js';
  * Regenerate the scale-bar tick marks to match the current camera state.
  * This is called on init, on window resize, and whenever the camera moves.
  */
-export function drawScaleTicks() {
+export function drawScaleTicks(): void {
   const S = getVabState();
   if (!S.scaleTicks || S.buildAreaHeight === 0) return;
 
@@ -43,7 +43,7 @@ export function drawScaleTicks() {
   const startM = Math.ceil(botM  / tickM) * tickM;
   const endM   = Math.floor(topM / tickM) * tickM;
 
-  const frags = [];
+  const frags: string[] = [];
   let idx = 0;
 
   // Always show 0m tick if it's on screen.
@@ -82,7 +82,7 @@ export function drawScaleTicks() {
  * Draw 'Top' and 'Bottom' extent markers on the scale bar based on placed parts.
  * Also draws a mid-point bracket label showing total rocket height.
  */
-export function updateScaleBarExtents() {
+export function updateScaleBarExtents(): void {
   const S = getVabState();
 
   // Remove existing extent elements.
