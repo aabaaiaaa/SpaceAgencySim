@@ -220,13 +220,13 @@ function _showUnlockNotification(facilityId: string | null, partIds: string[]): 
     const facilityName = def?.name ?? facilityId;
 
     const title = document.createElement('h2');
-    title.style.cssText = 'margin:0 0 8px; font-size:1.5rem; color:#4fc3f7;';
+    title.className = 'mc-unlock-title';
     title.textContent = `${facilityName} Unlocked!`;
     modal.appendChild(title);
 
     if (def?.description) {
       const desc = document.createElement('p');
-      desc.style.cssText = 'margin:0 0 16px; color:#ccc; font-size:0.95rem;';
+      desc.className = 'mc-unlock-desc';
       desc.textContent = def.description;
       modal.appendChild(desc);
     }
@@ -235,15 +235,15 @@ function _showUnlockNotification(facilityId: string | null, partIds: string[]): 
   // -- Unlocked parts section -----------------------------------------------
   if (partIds && partIds.length > 0) {
     const partsTitle = document.createElement('p');
-    partsTitle.style.cssText = 'margin:0 0 8px; color:#aaa; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.05em;';
+    partsTitle.className = 'mc-parts-heading';
     partsTitle.textContent = partIds.length === 1 ? 'New Part Available' : 'New Parts Available';
     modal.appendChild(partsTitle);
 
     const partsList = document.createElement('ul');
-    partsList.style.cssText = 'list-style:none; padding:0; margin:0 0 16px;';
+    partsList.className = 'mc-parts-list';
     for (const id of partIds) {
       const li = document.createElement('li');
-      li.style.cssText = 'color:#e0e0e0; font-size:1rem; padding:4px 0;';
+      li.className = 'mc-part-item';
       const partDef = getPartById(id);
       li.textContent = partDef?.name ?? id;
       partsList.appendChild(li);
@@ -253,7 +253,7 @@ function _showUnlockNotification(facilityId: string | null, partIds: string[]): 
 
   // -- Dismiss button -------------------------------------------------------
   const btnRow = document.createElement('div');
-  btnRow.style.cssText = 'margin-top:12px;';
+  btnRow.className = 'mc-button-row';
 
   const btn = document.createElement('button');
   btn.className = 'confirm-btn confirm-btn-primary';

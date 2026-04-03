@@ -69,7 +69,7 @@ export function renderContractsBoardTab(): void {
   if (mccTier < 3 && MCC_TIER_FEATURES[mccTier + 1]) {
     const nextInfo = MCC_TIER_FEATURES[mccTier + 1];
     const hint = document.createElement('span');
-    hint.style.cssText = 'margin-left:8px;font-size:0.72rem;opacity:0.7';
+    hint.className = 'mc-mcc-hint';
     hint.textContent = `Upgrade to unlock: ${nextInfo.features[nextInfo.features.length - 1]}`;
     tierBar.appendChild(hint);
   }

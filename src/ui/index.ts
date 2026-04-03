@@ -280,7 +280,6 @@ function _handleNavigation(container: HTMLElement, state: GameState, destination
       const msg = document.createElement('div');
       msg.className = 'hub-locked-msg';
       msg.textContent = 'This facility has not been built yet.';
-      msg.style.cssText = 'position:absolute;top:40%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.85);color:#ffcc00;padding:12px 24px;border-radius:6px;font-size:16px;z-index:9999;pointer-events:none;';
       overlay.appendChild(msg);
       setTimeout(() => msg.remove(), 2000);
     }

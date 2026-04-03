@@ -155,3 +155,22 @@
   opacity: 0.35;
   cursor: not-allowed;
 }
+
+/* ── Toast notification ──────────────────────────────────────────────── */
+.vab-toast {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1a3a28;
+  color: #80d0a0;
+  border: 1px solid #2a6040;
+  padding: var(--space-sm) var(--space-xl);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-label);
+  z-index: var(--z-overlay);
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.4s;
+  font-family: var(--font-family);
+}

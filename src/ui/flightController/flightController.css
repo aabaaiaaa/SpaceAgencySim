@@ -552,3 +552,32 @@
 #map-warp-btn.hidden {
   display: none;
 }
+
+/* ── Docking guidance HUD ────────────────────────────────────────────── */
+#docking-guidance-hud {
+  position: fixed;
+  top: 80px;
+  right: 16px;
+  z-index: var(--z-return);
+  background: rgba(0, 0, 0, 0.85);
+  border: 1px solid #444;
+  border-radius: var(--radius-md);
+  padding: var(--space-md) var(--space-lg);
+  min-width: 220px;
+  font-family: monospace;
+  font-size: 13px;
+  color: #ccc;
+  pointer-events: none;
+}
+
+/* ── Post-flight mission reward box ──────────────────────────────────── */
+.pf-reward-box {
+  margin-top: var(--space-sm);
+  padding: 6px 10px;
+  background: rgba(40, 100, 40, 0.3);
+  border: 1px solid #40a040;
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  color: #60e060;
+  font-weight: 600;
+}

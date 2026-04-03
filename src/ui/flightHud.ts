@@ -416,7 +416,7 @@ function _buildLeftPanel(): void {
 
   // Title row: "Throttle" + mode toggle button
   const titleRow = document.createElement('div');
-  titleRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;';
+  titleRow.className = 'flight-throttle-title-row';
   const throttleTitle = document.createElement('div');
   throttleTitle.className = 'flight-lp-title';
   throttleTitle.style.marginBottom = '0';
@@ -956,25 +956,19 @@ function _showErrorBanner(): void {
   if (!_hud || _errorBanner) return;
 
   _errorBanner = document.createElement('div');
-  _errorBanner.style.cssText =
-    'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);' +
-    'background:rgba(30,10,10,0.95);border:2px solid #ff4444;border-radius:8px;' +
-    'padding:20px 28px;z-index:9999;text-align:center;color:#fff;' +
-    'font-family:inherit;max-width:400px;';
+  _errorBanner.className = 'error-banner';
 
   const msg = document.createElement('p');
-  msg.style.cssText = 'margin:0 0 16px 0;font-size:1rem;line-height:1.4;';
+  msg.className = 'error-banner-msg';
   msg.textContent = 'The flight display encountered repeated errors. You can try to continue or abort to the hub.';
   _errorBanner.appendChild(msg);
 
   const btnRow = document.createElement('div');
-  btnRow.style.cssText = 'display:flex;gap:12px;justify-content:center;';
+  btnRow.className = 'error-banner-buttons';
 
   const continueBtn = document.createElement('button');
   continueBtn.textContent = 'Try to Continue';
-  continueBtn.style.cssText =
-    'padding:8px 16px;border:1px solid #888;border-radius:4px;' +
-    'background:#333;color:#fff;cursor:pointer;font-size:0.9rem;';
+  continueBtn.className = 'error-banner-btn-continue';
   continueBtn.addEventListener('click', () => {
     _consecutiveErrors = 0;
     if (_errorBanner) { _errorBanner.remove(); _errorBanner = null; }
@@ -983,9 +977,7 @@ function _showErrorBanner(): void {
   const abortBtn = document.createElement('button');
   abortBtn.textContent = 'Abort to Hub';
   abortBtn.dataset.testid = 'hud-error-abort-btn';
-  abortBtn.style.cssText =
-    'padding:8px 16px;border:1px solid #ff4444;border-radius:4px;' +
-    'background:#882222;color:#fff;cursor:pointer;font-size:0.9rem;';
+  abortBtn.className = 'error-banner-btn-abort';
   abortBtn.addEventListener('click', () => {
     if (_errorBanner) { _errorBanner.remove(); _errorBanner = null; }
     if (_onAbort) _onAbort();
@@ -1404,23 +1396,23 @@ function _updateCrewList(): void {
     if (!member) continue;
 
     const row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:3px;font-size:0.78rem;';
+    row.className = 'flight-crew-row';
 
     const ejected = ejectedIds.has(crewId);
     const statusDot = document.createElement('span');
-    statusDot.style.cssText = `width:6px;height:6px;border-radius:50%;flex-shrink:0;background:${ejected ? '#e8a030' : '#60d080'};`;
+    statusDot.className = 'flight-crew-status-dot' + (ejected ? ' ejected' : '');
     statusDot.title = ejected ? 'Ejected' : 'Aboard';
     row.appendChild(statusDot);
 
     const nameEl = document.createElement('span');
-    nameEl.style.cssText = 'flex:1;color:#c0d8c0;';
+    nameEl.className = 'flight-crew-name';
     nameEl.textContent = member.name;
     row.appendChild(nameEl);
 
     // Compact skill display.
     const skills = member.skills ?? { piloting: 0, engineering: 0, science: 0 };
     const skillEl = document.createElement('span');
-    skillEl.style.cssText = 'color:#6a8a6a;font-size:0.68rem;white-space:nowrap;';
+    skillEl.className = 'flight-crew-skills';
     skillEl.textContent = `P${Math.round(skills.piloting)} E${Math.round(skills.engineering)} S${Math.round(skills.science)}`;
     skillEl.title = `Piloting ${Math.round(skills.piloting)}, Engineering ${Math.round(skills.engineering)}, Science ${Math.round(skills.science)}`;
     row.appendChild(skillEl);

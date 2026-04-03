@@ -174,13 +174,6 @@ export function updateDockingHud(): void {
   if (!s.dockingHud && s.container) {
     s.dockingHud = document.createElement('div');
     s.dockingHud.id = 'docking-guidance-hud';
-    s.dockingHud.style.cssText = `
-      position: fixed; top: 80px; right: 16px; z-index: 500;
-      background: rgba(0, 0, 0, 0.85); border: 1px solid #444;
-      border-radius: 6px; padding: 12px 16px; min-width: 220px;
-      font-family: monospace; font-size: 13px; color: #ccc;
-      pointer-events: none;
-    `;
     s.container.appendChild(s.dockingHud);
   }
 

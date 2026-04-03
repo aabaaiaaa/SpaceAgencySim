@@ -82,11 +82,7 @@ export function setDesignLibraryCallbacks({
 export function showToast(msg: string): void {
   const toast = document.createElement('div');
   toast.textContent = msg;
-  toast.style.cssText =
-    'position:fixed;top:60px;left:50%;transform:translateX(-50%);' +
-    'background:#1a3a28;color:#80d0a0;border:1px solid #2a6040;' +
-    'padding:8px 20px;border-radius:6px;font-size:0.85rem;z-index:400;' +
-    'pointer-events:none;opacity:1;transition:opacity 0.4s;font-family:system-ui,sans-serif;';
+  toast.className = 'vab-toast';
   document.body.appendChild(toast);
   setTimeout(() => { toast.style.opacity = '0'; }, 1200);
   setTimeout(() => { toast.remove(); }, 1700);

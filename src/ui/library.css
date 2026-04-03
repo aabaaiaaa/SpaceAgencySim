@@ -349,3 +349,10 @@
   font-size: 0.88rem;
   padding: 12px 0;
 }
+
+/* ── Section description ─────────────────────────────────────────────── */
+.lib-section-desc {
+  font-size: var(--font-size-label);
+  color: var(--color-text-secondary);
+  margin: 0 0 14px;
+}

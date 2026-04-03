@@ -540,3 +540,33 @@
   color: #4a6880;
   text-align: center;
 }
+
+/* ── No saves message ────────────────────────────────────────────────── */
+.topbar-empty-msg {
+  text-align: center;
+  color: var(--color-text-secondary);
+  padding: var(--space-md) 0;
+}
+
+/* ── Sandbox settings form ───────────────────────────────────────────── */
+.topbar-settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-sm) 0;
+}
+
+.topbar-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-size-label);
+  color: #b0c4d8;
+  cursor: pointer;
+}
+
+.topbar-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: #4a90d9;
+}

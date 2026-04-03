@@ -935,3 +935,61 @@
   gap: 10px;
   margin-top: 12px;
 }
+
+/* ── Mission unlock modal ────────────────────────────────────────────── */
+.mc-unlock-title {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--font-size-h1);
+  color: #4fc3f7;
+}
+
+.mc-unlock-desc {
+  margin: 0 0 var(--space-lg);
+  color: #ccc;
+  font-size: 0.95rem;
+}
+
+.mc-parts-heading {
+  margin: 0 0 var(--space-sm);
+  color: #aaa;
+  font-size: var(--font-size-label);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.mc-parts-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--space-lg);
+}
+
+.mc-part-item {
+  color: var(--color-text-primary);
+  font-size: 1rem;
+  padding: var(--space-xs) 0;
+}
+
+.mc-button-row {
+  margin-top: var(--space-md);
+}
+
+/* ── Challenge form headings ─────────────────────────────────────────── */
+.mc-form-sub-heading {
+  margin: var(--space-md) 0 var(--space-sm);
+  font-size: var(--font-size-label);
+  color: var(--color-tab-text);
+}
+
+/* ── Import/export description ───────────────────────────────────────── */
+.mc-import-desc {
+  font-size: var(--font-size-caption);
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--space-md);
+}
+
+/* ── Contracts MCC hint ──────────────────────────────────────────────── */
+.mc-mcc-hint {
+  margin-left: var(--space-sm);
+  font-size: var(--font-size-tiny);
+  opacity: 0.7;
+}

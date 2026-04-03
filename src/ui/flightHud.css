@@ -678,3 +678,47 @@
   color: #707070;
   margin-left: 4px;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Throttle title row
+   ═══════════════════════════════════════════════════════════════════════════ */
+.flight-throttle-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 7px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Crew list (inside objectives panel)
+   ═══════════════════════════════════════════════════════════════════════════ */
+.flight-crew-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 3px;
+  font-size: var(--font-size-small);
+}
+
+.flight-crew-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #60d080;
+}
+
+.flight-crew-status-dot.ejected {
+  background: #e8a030;
+}
+
+.flight-crew-name {
+  flex: 1;
+  color: #c0d8c0;
+}
+
+.flight-crew-skills {
+  color: #6a8a6a;
+  font-size: 0.68rem;
+  white-space: nowrap;
+}

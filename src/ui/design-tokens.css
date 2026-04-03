@@ -360,3 +360,99 @@
   font-family: var(--font-family);
   color: #cce4f8;
 }
+
+/* ===========================================================================
+   Error banner (shared: flightHud, flightController loop)
+   =========================================================================== */
+
+.error-banner {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(30, 10, 10, 0.95);
+  border: 2px solid var(--color-danger);
+  border-radius: var(--radius-lg);
+  padding: var(--space-xl) 28px;
+  z-index: 9999;
+  text-align: center;
+  color: #fff;
+  font-family: inherit;
+  max-width: 400px;
+}
+
+.error-banner-msg {
+  margin: 0 0 var(--space-lg) 0;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.error-banner-buttons {
+  display: flex;
+  gap: var(--space-md);
+  justify-content: center;
+}
+
+.error-banner-btn-continue {
+  padding: var(--space-sm) var(--space-lg);
+  border: 1px solid #888;
+  border-radius: var(--radius-sm);
+  background: #333;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.error-banner-btn-abort {
+  padding: var(--space-sm) var(--space-lg);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-sm);
+  background: #882222;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+/* ===========================================================================
+   Weather warning overlay (shared: launchPad, vab/_launchFlow)
+   =========================================================================== */
+
+.weather-warning-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 0, 0, 0.85);
+  z-index: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-family);
+  pointer-events: auto;
+}
+
+.weather-warning-dialog {
+  background: #1a1020;
+  border: 2px solid #ff4040;
+  border-radius: var(--radius-lg);
+  padding: 28px 36px;
+  max-width: 400px;
+  text-align: center;
+  color: #e0d0d0;
+}
+
+/* ===========================================================================
+   Shared inline utility classes
+   =========================================================================== */
+
+/* Sub-section heading (muted blue-gray, small caps) */
+.sub-heading-muted {
+  font-size: var(--font-size-label);
+  color: var(--color-text-secondary);
+  margin: var(--space-md) 0 var(--space-sm);
+}
+
+/* Description text (secondary color, small) */
+.description-text {
+  font-size: var(--font-size-caption);
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--space-md);
+}

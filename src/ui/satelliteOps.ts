@@ -334,7 +334,7 @@ function _renderConstellationManagement(summary: NetworkSummary): HTMLDivElement
     const validBands = (SATELLITE_VALID_BANDS as Record<string, string[]>)[type];
     if (validBands) {
       const bandsLbl = document.createElement('div');
-      bandsLbl.style.cssText = 'font-size:0.72rem;color:#667;margin-top:4px';
+      bandsLbl.className = 'sat-valid-bands';
       bandsLbl.textContent = `Bands: ${validBands.join(', ')}`;
       card.appendChild(bandsLbl);
     }
@@ -377,7 +377,7 @@ function _renderNetworkPlanning(summary: NetworkSummary): HTMLDivElement {
 
   for (const [bodyId, bands] of Object.entries(byBody)) {
     const bodyH3 = document.createElement('h3');
-    bodyH3.style.cssText = 'font-size:0.95rem;color:#c0d8f0;margin:12px 0 6px;font-weight:600';
+    bodyH3.className = 'sat-body-heading';
     bodyH3.textContent = bodyId;
     section.appendChild(bodyH3);
 
@@ -407,7 +407,7 @@ function _renderNetworkPlanning(summary: NetworkSummary): HTMLDivElement {
       // Average health.
       const avgHealth = Math.round(sats.reduce((s, sat) => s + sat.health, 0) / sats.length);
       const healthLbl = document.createElement('div');
-      healthLbl.style.cssText = `font-size:0.75rem;margin-top:4px;color:${avgHealth > 60 ? '#60dd80' : avgHealth > 30 ? '#ddaa40' : '#dd4040'}`;
+      healthLbl.className = 'sat-health-label ' + (avgHealth > 60 ? 'good' : avgHealth > 30 ? 'warn' : 'bad');
       healthLbl.textContent = `Avg health: ${avgHealth}%`;
       card.appendChild(healthLbl);
 
@@ -415,7 +415,7 @@ function _renderNetworkPlanning(summary: NetworkSummary): HTMLDivElement {
       const leasedInBand = sats.filter(s => s.leased).length;
       if (leasedInBand > 0) {
         const leaseLbl = document.createElement('div');
-        leaseLbl.style.cssText = 'font-size:0.72rem;color:#ddcc40;margin-top:2px';
+        leaseLbl.className = 'sat-leased-label';
         leaseLbl.textContent = `${leasedInBand} leased`;
         card.appendChild(leaseLbl);
       }
@@ -443,7 +443,7 @@ function _renderShadowOverlay(summary: NetworkSummary): HTMLDivElement {
   section.appendChild(h2);
 
   const desc = document.createElement('div');
-  desc.style.cssText = 'font-size:0.8rem;color:#8899aa;margin-bottom:10px';
+  desc.className = 'sat-shadow-desc';
   desc.textContent = 'Shows the sunlit fraction of each satellite\'s orbit. Higher orbits spend less time in eclipse.';
   section.appendChild(desc);
 
@@ -457,33 +457,34 @@ function _renderShadowOverlay(summary: NetworkSummary): HTMLDivElement {
   }
 
   const grid = document.createElement('div');
-  grid.style.cssText = 'display:flex;flex-direction:column;gap:8px';
+  grid.className = 'sat-shadow-grid';
 
   for (const sat of activeSats) {
     const pi = summary.satellitePowerInfo?.[sat.id];
     if (!pi) continue;
 
     const row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;gap:10px';
+    row.className = 'sat-shadow-row';
 
     const label = document.createElement('div');
-    label.style.cssText = 'min-width:120px;font-size:0.82rem;color:#c0d8f0';
+    label.className = 'sat-shadow-label';
     const icon = SAT_TYPE_ICONS[sat.satelliteType] || SAT_TYPE_ICONS.GENERIC;
     label.textContent = `${icon} ${sat.bandId}`;
     row.appendChild(label);
 
     // Sunlit bar.
     const barOuter = document.createElement('div');
-    barOuter.style.cssText = 'flex:1;height:16px;background:rgba(20,20,40,0.8);border-radius:3px;overflow:hidden;position:relative';
+    barOuter.className = 'sat-power-bar-outer';
 
     const sunlit = document.createElement('div');
     const pct = Math.max(0, Math.min(100, pi.sunlitFraction * 100));
-    sunlit.style.cssText = `width:${pct}%;height:100%;background:linear-gradient(90deg,#ffcc00,#ff9900);border-radius:3px 0 0 3px`;
+    sunlit.className = 'sat-sunlit-bar';
+    sunlit.style.width = `${pct}%`;
     barOuter.appendChild(sunlit);
 
     // Shadow portion label.
     const shadowLabel = document.createElement('div');
-    shadowLabel.style.cssText = 'position:absolute;right:4px;top:0;height:100%;display:flex;align-items:center;font-size:0.7rem;color:#8899aa';
+    shadowLabel.className = 'sat-eclipse-label';
     shadowLabel.textContent = `${(100 - pct).toFixed(0)}% eclipse`;
     barOuter.appendChild(shadowLabel);
 
@@ -491,7 +492,7 @@ function _renderShadowOverlay(summary: NetworkSummary): HTMLDivElement {
 
     // Percentage label.
     const pctLabel = document.createElement('div');
-    pctLabel.style.cssText = 'min-width:50px;text-align:right;font-size:0.82rem;color:#ffcc00;font-weight:600';
+    pctLabel.className = 'sat-sunlit-pct';
     pctLabel.textContent = `${pct.toFixed(0)}%`;
     row.appendChild(pctLabel);
 
@@ -593,7 +594,7 @@ function _renderSatCard(
 
   // Health text
   const healthText = document.createElement('span');
-  healthText.style.cssText = 'font-size:0.78rem;color:#8899aa;min-width:40px;text-align:right';
+  healthText.className = 'sat-health-text';
   healthText.textContent = sat.health > 0 ? `${sat.health}%` : 'Dead';
   card.appendChild(healthText);
 

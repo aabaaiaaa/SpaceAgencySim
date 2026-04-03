@@ -346,7 +346,7 @@ function _renderBodiesTab(content: HTMLDivElement): void {
 
   const section = _makeSection('Discovered Bodies');
   const desc: HTMLParagraphElement = document.createElement('p');
-  desc.style.cssText = 'font-size:0.85rem;color:#8899aa;margin:0 0 14px';
+  desc.className = 'lib-section-desc';
   desc.textContent = 'Physical properties of bodies your agency has visited. Use this data to plan future missions.';
   section.appendChild(desc);
 

@@ -571,3 +571,23 @@
   border-radius: 3px;
   margin-left: 6px;
 }
+
+/* ── Capacity message override ────────────────────────────────────────── */
+.crew-capacity-msg {
+  margin: 0;
+  padding: var(--space-lg) 0;
+  text-align: left;
+}
+
+/* ── Training section headings ────────────────────────────────────────── */
+.crew-section-title {
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+  margin: var(--space-lg) 0 var(--space-md);
+}
+
+.crew-section-title-lg {
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+  margin: var(--space-xl) 0 var(--space-md);
+}

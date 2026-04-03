@@ -362,7 +362,7 @@ function _buildCreatorForm(): HTMLElement {
   // Medal thresholds
   const medalHeading = document.createElement('h4');
   medalHeading.textContent = 'Medal Thresholds';
-  medalHeading.style.cssText = 'margin: 12px 0 6px; font-size: 0.85rem; color: #9aa0b0;';
+  medalHeading.className = 'mc-form-sub-heading';
   form.appendChild(medalHeading);
 
   const medalRow = document.createElement('div');
@@ -375,7 +375,7 @@ function _buildCreatorForm(): HTMLElement {
   // Rewards
   const rewardHeading = document.createElement('h4');
   rewardHeading.textContent = 'Rewards ($)';
-  rewardHeading.style.cssText = 'margin: 12px 0 6px; font-size: 0.85rem; color: #9aa0b0;';
+  rewardHeading.className = 'mc-form-sub-heading';
   form.appendChild(rewardHeading);
 
   const rewardRow = document.createElement('div');
@@ -587,7 +587,7 @@ function _showImportDialog(): void {
   dialog.appendChild(heading);
 
   const desc = document.createElement('p');
-  desc.style.cssText = 'font-size: 0.82rem; color: #8898b0; margin: 0 0 10px;';
+  desc.className = 'mc-import-desc';
   desc.textContent = 'Paste a challenge JSON export below:';
   dialog.appendChild(desc);
 
@@ -650,7 +650,7 @@ function _showExportDialog(json: string): void {
   dialog.appendChild(heading);
 
   const desc = document.createElement('p');
-  desc.style.cssText = 'font-size: 0.82rem; color: #8898b0; margin: 0 0 10px;';
+  desc.className = 'mc-import-desc';
   desc.textContent = 'Copy the JSON below to share this challenge:';
   dialog.appendChild(desc);
 

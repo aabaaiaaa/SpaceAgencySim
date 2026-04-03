@@ -265,10 +265,7 @@ function _renderShell(): void {
   // Show pad capability details
   const maxMass = (LAUNCH_PAD_MAX_MASS as Record<number, number>)[padTier] ?? (LAUNCH_PAD_MAX_MASS as Record<number, number>)[1];
   const tierInfo = document.createElement('span');
-  tierInfo.style.cssText =
-    'font-size:0.82rem;color:#6888a8;margin-left:auto;padding:4px 12px;' +
-    'background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);' +
-    'border-radius:4px;white-space:nowrap;';
+  tierInfo.className = 'lp-tier-info';
   const massLabel = isFinite(maxMass) ? `${(maxMass / 1000).toFixed(0)}t` : 'Unlimited';
   const features: string[] = [];
   if (padTier >= 2) features.push('Fuel Top-Off');
@@ -331,15 +328,10 @@ function _renderWeatherBar(): void {
 
   const bar = document.createElement('div');
   bar.id = 'lp-weather-bar';
-  bar.style.cssText =
-    'display:flex;align-items:center;justify-content:space-between;gap:16px;' +
-    'padding:10px 20px;margin:0 20px 8px;' +
-    'background:rgba(10,20,40,0.85);border:1px solid #304868;border-radius:8px;' +
-    'color:#c8dce8;font-size:0.82rem;font-family:system-ui,sans-serif;';
 
   // Weather summary
   const info = document.createElement('div');
-  info.style.cssText = 'display:flex;gap:16px;align-items:center;flex-wrap:wrap;';
+  info.className = 'lp-weather-info';
 
   const descSpan = document.createElement('span');
   descSpan.style.fontWeight = '600';
@@ -373,10 +365,6 @@ function _renderWeatherBar(): void {
 
   const skipBtn = document.createElement('button');
   skipBtn.id = 'lp-weather-skip-btn';
-  skipBtn.style.cssText =
-    'padding:7px 18px;background:#1a3060;border:1px solid #3070b0;border-radius:6px;' +
-    'color:#a0c8f0;font-size:0.82rem;font-weight:600;cursor:pointer;white-space:nowrap;' +
-    'transition:background 0.15s;';
   skipBtn.textContent = `Skip Day ($${(skipCost / 1000).toFixed(0)}k)`;
 
   if (!canAfford) {
@@ -430,7 +418,7 @@ function _buildRocketCard(design: RocketDesign): HTMLElement {
 
     // Show mass and limit info.
     const massEl = document.createElement('div');
-    massEl.style.cssText = `font-size:0.75rem;color:${tooHeavy ? '#c06040' : '#607888'};`;
+    massEl.className = 'lp-rocket-mass' + (tooHeavy ? ' over-limit' : '');
     const massStr = _fmt(Math.round(rocketMass));
     const limitStr = isFinite(maxMass) ? _fmt(maxMass) : 'Unlimited';
     massEl.textContent = `Mass: ${massStr} kg / ${limitStr} kg`;
@@ -620,15 +608,10 @@ function _showExtremeWeatherWarning(design: RocketDesign, assembly: RocketAssemb
 
   const overlay = document.createElement('div');
   overlay.id = 'lp-weather-warning-overlay';
-  overlay.style.cssText =
-    'position:fixed;inset:0;background:rgba(20,0,0,0.85);z-index:600;' +
-    'display:flex;align-items:center;justify-content:center;' +
-    'font-family:system-ui,sans-serif;pointer-events:auto;';
+  overlay.className = 'weather-warning-overlay';
 
   const dialog = document.createElement('div');
-  dialog.style.cssText =
-    'background:#1a1020;border:2px solid #ff4040;border-radius:12px;' +
-    'padding:28px 36px;max-width:400px;text-align:center;color:#e0d0d0;';
+  dialog.className = 'weather-warning-dialog';
 
   dialog.innerHTML =
     `<div style="font-size:1.2rem;font-weight:700;color:#ff5050;margin-bottom:8px;">` +

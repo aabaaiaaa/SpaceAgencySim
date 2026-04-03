@@ -1011,7 +1011,7 @@ function _doLoadGame(): void {
 
   if (!hasAnySave) {
     const empty: HTMLParagraphElement = document.createElement('p');
-    empty.style.cssText = 'text-align:center;color:#8899aa;padding:12px 0;';
+    empty.className = 'topbar-empty-msg';
     empty.textContent = 'No saved games found.';
     modal.appendChild(empty);
   }
@@ -1099,15 +1099,15 @@ function _openSandboxSettings(): void {
   const settings = _state.sandboxSettings || { malfunctionsEnabled: false, weatherEnabled: false };
 
   const form: HTMLDivElement = document.createElement('div');
-  form.style.cssText = 'display:flex;flex-direction:column;gap:12px;padding:8px 0';
+  form.className = 'topbar-settings-form';
 
   // Malfunctions toggle
   const malfLabel: HTMLLabelElement = document.createElement('label');
-  malfLabel.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:0.85rem;color:#b0c4d8;cursor:pointer';
+  malfLabel.className = 'topbar-toggle-label';
   const malfCheck: HTMLInputElement = document.createElement('input');
   malfCheck.type = 'checkbox';
   malfCheck.checked = settings.malfunctionsEnabled;
-  malfCheck.style.cssText = 'width:16px;height:16px;accent-color:#4a90d9';
+  malfCheck.className = 'topbar-checkbox';
   malfCheck.addEventListener('change', () => {
     if (_state?.sandboxSettings) _state.sandboxSettings.malfunctionsEnabled = malfCheck.checked;
   });
@@ -1117,11 +1117,11 @@ function _openSandboxSettings(): void {
 
   // Weather toggle
   const wxLabel: HTMLLabelElement = document.createElement('label');
-  wxLabel.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:0.85rem;color:#b0c4d8;cursor:pointer';
+  wxLabel.className = 'topbar-toggle-label';
   const wxCheck: HTMLInputElement = document.createElement('input');
   wxCheck.type = 'checkbox';
   wxCheck.checked = settings.weatherEnabled;
-  wxCheck.style.cssText = 'width:16px;height:16px;accent-color:#4a90d9';
+  wxCheck.className = 'topbar-checkbox';
   wxCheck.addEventListener('change', () => {
     if (_state?.sandboxSettings) _state.sandboxSettings.weatherEnabled = wxCheck.checked;
   });

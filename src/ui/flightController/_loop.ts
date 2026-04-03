@@ -183,25 +183,19 @@ function _showLoopErrorBanner(s: ReturnType<typeof getFCState>): void {
 
   const banner: HTMLDivElement = document.createElement('div');
   banner.dataset.testid = 'loop-error-banner';
-  banner.style.cssText =
-    'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);' +
-    'background:rgba(30,10,10,0.95);border:2px solid #ff4444;border-radius:8px;' +
-    'padding:20px 28px;z-index:9999;text-align:center;color:#fff;' +
-    'font-family:inherit;max-width:400px;';
+  banner.className = 'error-banner';
 
   const msg: HTMLParagraphElement = document.createElement('p');
-  msg.style.cssText = 'margin:0 0 16px 0;font-size:1rem;line-height:1.4;';
+  msg.className = 'error-banner-msg';
   msg.textContent = 'The flight simulation encountered repeated errors. You can try to continue or abort to the hub.';
   banner.appendChild(msg);
 
   const btnRow: HTMLDivElement = document.createElement('div');
-  btnRow.style.cssText = 'display:flex;gap:12px;justify-content:center;';
+  btnRow.className = 'error-banner-buttons';
 
   const continueBtn: HTMLButtonElement = document.createElement('button');
   continueBtn.textContent = 'Try to Continue';
-  continueBtn.style.cssText =
-    'padding:8px 16px;border:1px solid #888;border-radius:4px;' +
-    'background:#333;color:#fff;cursor:pointer;font-size:0.9rem;';
+  continueBtn.className = 'error-banner-btn-continue';
   continueBtn.addEventListener('click', () => {
     s.loopConsecutiveErrors = 0;
     if (s.loopErrorBanner) { s.loopErrorBanner.remove(); s.loopErrorBanner = null; }
@@ -210,9 +204,7 @@ function _showLoopErrorBanner(s: ReturnType<typeof getFCState>): void {
   const abortBtn: HTMLButtonElement = document.createElement('button');
   abortBtn.textContent = 'Abort to Hub';
   abortBtn.dataset.testid = 'loop-error-abort-btn';
-  abortBtn.style.cssText =
-    'padding:8px 16px;border:1px solid #ff4444;border-radius:4px;' +
-    'background:#882222;color:#fff;cursor:pointer;font-size:0.9rem;';
+  abortBtn.className = 'error-banner-btn-abort';
   abortBtn.addEventListener('click', () => {
     if (s.loopErrorBanner) { s.loopErrorBanner.remove(); s.loopErrorBanner = null; }
     handleAbortReturnToAgency();

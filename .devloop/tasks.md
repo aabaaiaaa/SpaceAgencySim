@@ -151,7 +151,7 @@
 - **Verification**: `npm run build` succeeds. `npm run test:e2e` passes. Grep for `injectStyleOnce` returns zero results in `src/`. All UI modules import `.css` files instead. No `_css.js` files remain.
 
 ### TASK-025: Migrate inline styles to CSS classes using design tokens
-- **Status**: pending
+- **Status**: in-progress
 - **Dependencies**: TASK-024
 - **Description**: Replace inline `style.cssText` strings in runtime UI elements (error banners, abort overlays, modals in flightHud.js, _showErrorBanner, etc.) with CSS classes defined in the module's .css file. Classes should reference design token custom properties. See requirements Section 4.4.
 - **Verification**: `npm run test:e2e` passes. Grep for `style.cssText` in `src/ui/` returns zero results (or only in cases where truly dynamic per-instance styles are needed).

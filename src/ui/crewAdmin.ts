@@ -435,8 +435,7 @@ function _renderHireTab(): void {
 
   if (atCapacity) {
     const capMsg = document.createElement('p');
-    capMsg.className = 'crew-empty-msg';
-    capMsg.style.cssText = 'margin: 0; padding: 16px 0; text-align: left;';
+    capMsg.className = 'crew-empty-msg crew-capacity-msg';
     capMsg.textContent = 'Crew roster is full (20 astronauts maximum).';
     panel.appendChild(capMsg);
     content.appendChild(panel);
@@ -634,7 +633,7 @@ function _renderTrainingTab(): void {
   const trainingCrew = getTrainingCrew(_state);
   if (trainingCrew.length > 0) {
     const sectionTitle = document.createElement('h3');
-    sectionTitle.style.cssText = 'color: #a0aab8; font-size: 0.9rem; margin: 16px 0 10px;';
+    sectionTitle.className = 'crew-section-title';
     sectionTitle.textContent = `Currently Training (${trainingCrew.length})`;
     panel.appendChild(sectionTitle);
 
@@ -679,7 +678,7 @@ function _renderTrainingTab(): void {
   });
 
   const availTitle = document.createElement('h3');
-  availTitle.style.cssText = 'color: #a0aab8; font-size: 0.9rem; margin: 20px 0 10px;';
+  availTitle.className = 'crew-section-title-lg';
   availTitle.textContent = `Available for Training (${availableForTraining.length})`;
   panel.appendChild(availTitle);
 

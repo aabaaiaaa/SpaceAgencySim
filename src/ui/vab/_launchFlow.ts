@@ -78,15 +78,10 @@ function showVabWeatherWarning(): void {
 
   const overlay = document.createElement('div');
   overlay.id = 'vab-weather-warning-overlay';
-  overlay.style.cssText =
-    'position:fixed;inset:0;background:rgba(20,0,0,0.85);z-index:600;' +
-    'display:flex;align-items:center;justify-content:center;' +
-    'font-family:system-ui,sans-serif;pointer-events:auto;';
+  overlay.className = 'weather-warning-overlay';
 
   const dialog = document.createElement('div');
-  dialog.style.cssText =
-    'background:#1a1020;border:2px solid #ff4040;border-radius:12px;' +
-    'padding:28px 36px;max-width:400px;text-align:center;color:#e0d0d0;';
+  dialog.className = 'weather-warning-dialog';
 
   dialog.innerHTML =
     `<div style="font-size:1.2rem;font-weight:700;color:#ff5050;margin-bottom:8px;">` +

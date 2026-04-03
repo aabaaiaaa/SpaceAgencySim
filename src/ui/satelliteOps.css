@@ -363,3 +363,101 @@
   font-size: 0.85rem;
   padding: 8px 0;
 }
+
+/* ── Valid bands label ───────────────────────────────────────────────── */
+.sat-valid-bands {
+  font-size: var(--font-size-tiny);
+  color: #667;
+  margin-top: var(--space-xs);
+}
+
+/* ── Network planning body heading ───────────────────────────────────── */
+.sat-body-heading {
+  font-size: 0.95rem;
+  color: var(--color-text-body);
+  margin: var(--space-md) 0 var(--space-sm);
+  font-weight: 600;
+}
+
+/* ── Health label (color via modifier classes) ────────────────────────── */
+.sat-health-label {
+  font-size: 0.75rem;
+  margin-top: var(--space-xs);
+}
+.sat-health-label.good   { color: #60dd80; }
+.sat-health-label.warn   { color: #ddaa40; }
+.sat-health-label.bad    { color: #dd4040; }
+
+/* ── Leased label ────────────────────────────────────────────────────── */
+.sat-leased-label {
+  font-size: var(--font-size-tiny);
+  color: #ddcc40;
+  margin-top: 2px;
+}
+
+/* ── Shadow overlay section ──────────────────────────────────────────── */
+.sat-shadow-desc {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-md);
+}
+
+.sat-shadow-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.sat-shadow-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sat-shadow-label {
+  min-width: 120px;
+  font-size: var(--font-size-caption);
+  color: var(--color-text-body);
+}
+
+.sat-power-bar-outer {
+  flex: 1;
+  height: 16px;
+  background: rgba(20, 20, 40, 0.8);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+
+.sat-sunlit-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #ffcc00, #ff9900);
+  border-radius: 3px 0 0 3px;
+}
+
+.sat-eclipse-label {
+  position: absolute;
+  right: 4px;
+  top: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  font-size: 0.7rem;
+  color: var(--color-text-secondary);
+}
+
+.sat-sunlit-pct {
+  min-width: 50px;
+  text-align: right;
+  font-size: var(--font-size-caption);
+  color: #ffcc00;
+  font-weight: 600;
+}
+
+/* ── Health text in satellite card ────────────────────────────────────── */
+.sat-health-text {
+  font-size: var(--font-size-small);
+  color: var(--color-text-secondary);
+  min-width: 40px;
+  text-align: right;
+}
