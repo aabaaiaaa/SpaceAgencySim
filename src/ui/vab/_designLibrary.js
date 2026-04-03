@@ -106,6 +106,7 @@ export function handleSaveDesign() {
     `<div class="vab-save-dialog">` +
       `<h3>Save Design</h3>` +
       `<input type="text" id="vab-save-name" value="${defaultName.replace(/"/g, '&quot;')}" maxlength="60" />` +
+      `<div id="vab-save-name-counter" class="vab-save-char-counter">${defaultName.length} / 60</div>` +
       `<label class="vab-save-private-label">` +
         `<input type="checkbox" id="vab-save-private" ${wasPrivate ? 'checked' : ''} />` +
         `<span>Save-private (this save slot only)</span>` +
@@ -120,6 +121,16 @@ export function handleSaveDesign() {
 
   const nameInput = /** @type {HTMLInputElement} */ (overlay.querySelector('#vab-save-name'));
   nameInput?.select();
+
+  const saveNameCounter = overlay.querySelector('#vab-save-name-counter');
+  const updateSaveNameCounter = () => {
+    const len = nameInput?.value.length ?? 0;
+    if (saveNameCounter) {
+      saveNameCounter.textContent = `${len} / 60`;
+      saveNameCounter.classList.toggle('warning', len >= 55);
+    }
+  };
+  nameInput?.addEventListener('input', updateSaveNameCounter);
 
   overlay.addEventListener('pointerdown', (e) => {
     if (e.target === overlay) overlay.remove();
@@ -280,6 +291,18 @@ const VAB_LIBRARY_CSS = `
   border: 1px solid rgba(100, 60, 160, 0.3);
   margin-left: 6px;
   vertical-align: middle;
+}
+
+/* ── Save name character counter ────────────────────────────────── */
+.vab-save-char-counter {
+  font-size: 0.72rem;
+  color: var(--color-text-muted, #6080a0);
+  margin-top: 4px;
+  margin-bottom: 8px;
+  text-align: right;
+}
+.vab-save-char-counter.warning {
+  color: var(--color-warning, #d8b860);
 }
 
 /* ── Save-private label in save dialog ──────────────────────────── */

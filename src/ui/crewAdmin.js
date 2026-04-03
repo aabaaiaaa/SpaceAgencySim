@@ -311,6 +311,16 @@ const CREW_ADMIN_STYLES = `
   border-color: rgba(100, 160, 255, 0.5);
 }
 
+.hire-char-counter {
+  font-size: 0.72rem;
+  color: var(--color-text-muted, #6080a0);
+  margin-top: 4px;
+  text-align: right;
+}
+.hire-char-counter.warning {
+  color: var(--color-warning, #d8b860);
+}
+
 .hire-btn {
   width: 100%;
   background: var(--color-primary-bg);
@@ -1045,6 +1055,17 @@ function _renderHireTab() {
   nameInput.placeholder = 'Leave blank for a random name';
   nameInput.maxLength = 60;
   formGroup.appendChild(nameInput);
+
+  const nameCounter = document.createElement('div');
+  nameCounter.className = 'hire-char-counter';
+  nameCounter.textContent = '0 / 60';
+  formGroup.appendChild(nameCounter);
+
+  nameInput.addEventListener('input', () => {
+    const len = nameInput.value.length;
+    nameCounter.textContent = `${len} / 60`;
+    nameCounter.classList.toggle('warning', len >= 55);
+  });
 
   panel.appendChild(formGroup);
 

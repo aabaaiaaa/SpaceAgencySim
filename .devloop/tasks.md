@@ -61,7 +61,7 @@
 - **Verification**: `npm run test:unit` passes. All 6 edge case tests exist and pass.
 
 ### TASK-011: Add character counters to name input fields
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Add "X / Y" character counters below/beside name inputs in: agency name (`src/ui/mainmenu.js`, max 48), crew names (`src/ui/crewAdmin.js`, max 60), design name (`src/ui/vab/_designLibrary.js`, max 60). Update on every keystroke. Use muted text style. Change to `--color-warning` when within 5 characters of limit. See requirements Section 3.1.
 - **Verification**: `npm run test:e2e` passes. Visual inspection confirms counters appear, update on input, and change color near limit.

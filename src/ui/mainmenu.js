@@ -552,6 +552,16 @@ const MENU_STYLES = `
   color: #3a5570;
 }
 
+.mm-char-counter {
+  font-size: 0.72rem;
+  color: var(--color-text-muted, #6080a0);
+  margin-top: 4px;
+  text-align: right;
+}
+.mm-char-counter.warning {
+  color: var(--color-warning, #d8b860);
+}
+
 .mm-newgame-desc {
   font-size: 0.82rem;
   color: #4e6e88;
@@ -965,6 +975,7 @@ function _renderNewGameScreen(overlay, canGoBack) {
           placeholder="e.g. Kerbal Space Program"
           autocomplete="off"
         />
+        <div id="mm-agency-name-counter" class="mm-char-counter">0 / 48</div>
       </div>
       <div class="mm-mode-toggle">
         <label>Game Mode</label>
@@ -1028,6 +1039,15 @@ function _renderNewGameScreen(overlay, canGoBack) {
       }
     });
   }
+
+  // Character counter for agency name.
+  const nameCounter = screen.querySelector('#mm-agency-name-counter');
+  const updateNameCounter = () => {
+    const len = nameInput.value.length;
+    nameCounter.textContent = `${len} / 48`;
+    nameCounter.classList.toggle('warning', len >= 43);
+  };
+  nameInput.addEventListener('input', updateNameCounter);
 
   // Focus the name field immediately.
   setTimeout(() => nameInput.focus(), 50);
