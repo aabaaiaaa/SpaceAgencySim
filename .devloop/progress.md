@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 31
-- **Completed**: 27
-- **Remaining**: 4
-- **Last Updated**: 2026-04-03T21:36:13.282Z
+- **Completed**: 28
+- **Remaining**: 3
+- **Last Updated**: 2026-04-03T22:41:24.636Z
 
 ## Iteration Log
 
@@ -250,4 +250,13 @@
 - **Exit Status**: success
 - **Tokens**: 65,445 total (3 in, 27 out, 611 cache-create, 64,804 cache-read)
 - **Cost**: $1.4897
+
+### Iteration 28 - 2026-04-03T21:36:15.822Z
+- **Task Attempted**: TASK-029
+- **Task Completed**: TASK-029
+- **Summary**: Completed Add E2E tests for debug mode toggle
+- **Duration**: 1h 5m 9s
+- **Exit Status**: success
+- **Tokens**: 63,866 total (3 in, 88 out, 52,639 cache-create, 11,136 cache-read)
+- **Cost**: $2.3794
 

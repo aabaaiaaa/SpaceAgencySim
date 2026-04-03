@@ -175,7 +175,7 @@
 - **Verification**: `npm run test:e2e` passes. `_interactions.js` no longer exists. Each sub-module is under 150 lines.
 
 ### TASK-029: Add E2E tests for debug mode toggle
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-016
 - **Description**: Add E2E tests verifying: Ctrl+Shift+D does nothing with debug off, enabling debug in settings makes it work, setting persists across save/load, FPS monitor only visible in debug mode during flight, E2E helper enables debug mode programmatically. See requirements Section 5.4.
 - **Verification**: `npm run test:e2e` passes. New debug-mode E2E spec has at least 5 passing tests.
