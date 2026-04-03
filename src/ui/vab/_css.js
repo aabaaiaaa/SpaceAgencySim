@@ -158,6 +158,17 @@ export const VAB_CSS = `
   color: #e08080;
 }
 
+/* ── Undo/Redo buttons ───────────────────────────────────────────── */
+.vab-btn-undo,
+.vab-btn-redo {
+  font-size: 0.8rem;
+}
+.vab-btn-undo:disabled,
+.vab-btn-redo:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 /* ── Main row (toolbar bottom to window bottom) ───────────────────── */
 #vab-main {
   flex: 1;

@@ -15,6 +15,7 @@ import {
 } from '../../core/rocketbuilder.js';
 import { airDensity, SEA_LEVEL_DENSITY } from '../../core/atmosphere.js';
 import { getVabState } from './_state.js';
+import { snapshotStaging, recordStagingChange } from './_undoActions.js';
 
 // ---------------------------------------------------------------------------
 // Forward references — set by _init.js to break circular deps
@@ -435,7 +436,9 @@ export function setupStagingDnD(panelBody) {
       const fromIndex = parseInt(suffix, 10);
       const toIndex   = parseInt(targetStage.dataset.stageIndex ?? '0', 10);
       if (fromIndex !== toIndex) {
+        const stagingBefore = snapshotStaging();
         moveStage(S.stagingConfig, fromIndex, toIndex);
+        recordStagingChange(stagingBefore);
         renderStagingPanel();
         _runAndRenderValidationFn();
       }
@@ -455,6 +458,8 @@ export function setupStagingDnD(panelBody) {
 
     if (target === source) return;
 
+    const stagingBefore = snapshotStaging();
+
     if (target === 'unstaged') {
       returnPartToUnstaged(S.stagingConfig, instanceId);
     } else if (target.startsWith('stage-')) {
@@ -467,6 +472,7 @@ export function setupStagingDnD(panelBody) {
       }
     }
 
+    recordStagingChange(stagingBefore);
     renderStagingPanel();
     _runAndRenderValidationFn();
   });

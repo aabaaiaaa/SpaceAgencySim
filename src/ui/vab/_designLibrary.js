@@ -30,6 +30,7 @@ import {
 import { buildRocketCard, injectRocketCardCSS } from '../rocketCardUtil.js';
 import { getVabState } from './_state.js';
 import { fmt$ } from './_partsPanel.js';
+import { clearUndoRedo } from '../../core/undoRedo.js';
 
 // ---------------------------------------------------------------------------
 // Forward references — set by _init.js to break circular deps
@@ -578,6 +579,9 @@ function buildLibraryCard(design, compat, costInfo, overlay, rerender) {
 export function loadDesignIntoVab(design) {
   const S = getVabState();
   if (!S.gameState) return;
+
+  // Loading a design is a new starting point — clear undo/redo stack.
+  clearUndoRedo();
 
   // Refund current assembly parts before clearing (or return inventory parts).
   if (S.assembly) {

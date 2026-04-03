@@ -15,7 +15,16 @@ import {
 import {
   removePartFromAssembly,
   fireStagingStep,
+  syncStagingWithAssembly,
 } from '../../core/rocketbuilder.js';
+import {
+  undo as undoAction,
+  redo as redoAction,
+  canUndo,
+  canRedo,
+  peekUndoLabel,
+  peekRedoLabel,
+} from '../../core/undoRedo.js';
 import {
   refurbishPart,
   scrapPart,
@@ -32,6 +41,11 @@ import {
   syncZoomSlider,
   getRocketCenter,
 } from './_canvasInteraction.js';
+import {
+  snapshotStaging,
+  recordDeletion,
+  recordClearAll,
+} from './_undoActions.js';
 
 // ---------------------------------------------------------------------------
 // Forward references — set by _init.js to break circular deps
@@ -245,6 +259,14 @@ export function bindButtons(root) {
   root.querySelector('#vab-btn-clear-all')?.addEventListener('click', () => {
     if (!S.assembly || S.assembly.parts.size === 0) return;
     if (!confirm('Remove all parts? This will refund their cost.')) return;
+    // Compute total cost for undo and snapshot staging.
+    let totalCost = 0;
+    for (const placed of S.assembly.parts.values()) {
+      const def = getPartById(placed.partId);
+      if (def) totalCost += def.cost;
+    }
+    const stagingBefore = snapshotStaging();
+    recordClearAll(totalCost, stagingBefore);
     for (const [instId, placed] of S.assembly.parts) {
       refundOrReturnPart(instId, placed.partId, _vabRefreshPartsFn);
     }
@@ -262,6 +284,22 @@ export function bindButtons(root) {
     refreshInventoryPanel();
     const cashEl = document.getElementById('vab-cash');
     if (cashEl && S.gameState) cashEl.textContent = fmt$(S.gameState.money);
+  });
+
+  // ── Undo ──
+  root.querySelector('#vab-btn-undo')?.addEventListener('click', () => {
+    if (!canUndo() || !S.assembly || !S.stagingConfig) return;
+    undoAction();
+    syncStagingWithAssembly(S.assembly, S.stagingConfig);
+    _refreshAfterUndoRedo();
+  });
+
+  // ── Redo ──
+  root.querySelector('#vab-btn-redo')?.addEventListener('click', () => {
+    if (!canRedo() || !S.assembly || !S.stagingConfig) return;
+    redoAction();
+    syncStagingWithAssembly(S.assembly, S.stagingConfig);
+    _refreshAfterUndoRedo();
   });
 
   // ── Save design ──
@@ -314,6 +352,10 @@ export function bindKeyboardShortcuts() {
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
     e.preventDefault();
     const idToRemove = S.selectedInstanceId;
+    const placed = S.assembly.parts.get(idToRemove);
+    const costRefund = placed ? (getPartById(placed.partId)?.cost ?? 0) : 0;
+    const stagingBefore = snapshotStaging();
+    recordDeletion([idToRemove], costRefund, stagingBefore);
     setSelectedPart(null);
     removePartFromAssembly(S.assembly, idToRemove);
     _syncAndRenderStagingFn();
@@ -323,6 +365,29 @@ export function bindKeyboardShortcuts() {
     updateOffscreenIndicators();
   });
 
+  // Ctrl+Z: undo. Ctrl+Y / Ctrl+Shift+Z: redo.
+  window.addEventListener('keydown', (e) => {
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+    if (!S.assembly || !S.stagingConfig) return;
+
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === 'KeyZ') {
+      e.preventDefault();
+      if (!canUndo()) return;
+      undoAction();
+      syncStagingWithAssembly(S.assembly, S.stagingConfig);
+      _refreshAfterUndoRedo();
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && (e.code === 'KeyY' || (e.shiftKey && e.code === 'KeyZ'))) {
+      e.preventDefault();
+      if (!canRedo()) return;
+      redoAction();
+      syncStagingWithAssembly(S.assembly, S.stagingConfig);
+      _refreshAfterUndoRedo();
+      return;
+    }
+  });
+
   // Spacebar: fire next stage during flight.
   window.addEventListener('keydown', (e) => {
     if (e.code !== 'Space' || !S.flightActive || !S.stagingConfig) return;
@@ -330,4 +395,37 @@ export function bindKeyboardShortcuts() {
     const result = fireStagingStep(S.stagingConfig);
     _renderStagingPanelFn();
   });
+}
+
+/**
+ * Refresh all VAB UI elements after an undo/redo operation.
+ */
+function _refreshAfterUndoRedo() {
+  vabRenderParts();
+  _renderStagingPanelFn();
+  _runAndRenderValidationFn();
+  updateStatusBar();
+  updateScaleBarExtents();
+  updateOffscreenIndicators();
+  refreshInventoryPanel();
+  updateUndoRedoButtons();
+  refreshTopBar();
+}
+
+/**
+ * Update undo/redo toolbar button states (disabled + title).
+ */
+export function updateUndoRedoButtons() {
+  const undoBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById('vab-btn-undo'));
+  const redoBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById('vab-btn-redo'));
+  if (undoBtn) {
+    undoBtn.disabled = !canUndo();
+    const label = peekUndoLabel();
+    undoBtn.title = label ? `Undo: ${label}` : 'Undo (Ctrl+Z)';
+  }
+  if (redoBtn) {
+    redoBtn.disabled = !canRedo();
+    const label = peekRedoLabel();
+    redoBtn.title = label ? `Redo: ${label}` : 'Redo (Ctrl+Y)';
+  }
 }

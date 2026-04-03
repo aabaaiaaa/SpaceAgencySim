@@ -45,6 +45,12 @@ import { getVabState } from './_state.js';
 import { showPartDetail, fmt$ } from './_partsPanel.js';
 import { drawScaleTicks, updateScaleBarExtents } from './_scalebar.js';
 import { refreshInventoryPanel, refundOrReturnPart } from './_inventory.js';
+import {
+  snapshotStaging,
+  recordPlacement,
+  recordDeletion,
+  recordMove,
+} from './_undoActions.js';
 
 // ---------------------------------------------------------------------------
 // Forward references — set by _init.js to break circular deps
@@ -56,6 +62,13 @@ let _updateStatusBarFn = () => {};
 let _updateOffscreenIndicatorsFn = () => {};
 let _showToastFn = (_msg) => {};
 let _vabRefreshPartsFn = (_state) => {};
+
+/**
+ * Pre-move state captured when a placed part is picked up, before
+ * disconnectPart() severs its connections.
+ * @type {{ oldX: number, oldY: number, oldConnections: object[] } | null}
+ */
+let _preMoveData = null;
 
 export function setCanvasCallbacks({
   renderStagingPanel,
@@ -320,6 +333,9 @@ function showPartContextMenu(placed, clientX, clientY) {
 
   S.ctxMenu.querySelector('#vab-ctx-remove')?.addEventListener('click', () => {
     S.ctxMenu.setAttribute('hidden', '');
+    const stagingBefore = snapshotStaging();
+    const costRefund = getPartById(placed.partId)?.cost ?? 0;
+    recordDeletion([placed.instanceId], costRefund, stagingBefore);
     refundOrReturnPart(placed.instanceId, placed.partId, _vabRefreshPartsFn);
     if (S.selectedInstanceId === placed.instanceId) setSelectedPart(null);
     removePartFromAssembly(S.assembly, placed.instanceId);
@@ -331,8 +347,12 @@ function showPartContextMenu(placed, clientX, clientY) {
   if (mirrorId) {
     S.ctxMenu.querySelector('#vab-ctx-remove-both')?.addEventListener('click', () => {
       S.ctxMenu.setAttribute('hidden', '');
-      refundOrReturnPart(placed.instanceId, placed.partId, _vabRefreshPartsFn);
+      const stagingBefore = snapshotStaging();
       const mirrorPlaced = S.assembly.parts.get(mirrorId);
+      const cost1 = getPartById(placed.partId)?.cost ?? 0;
+      const cost2 = getPartById(mirrorPlaced?.partId ?? placed.partId)?.cost ?? 0;
+      recordDeletion([placed.instanceId, mirrorId], cost1 + cost2, stagingBefore);
+      refundOrReturnPart(placed.instanceId, placed.partId, _vabRefreshPartsFn);
       refundOrReturnPart(mirrorId, mirrorPlaced?.partId ?? placed.partId, _vabRefreshPartsFn);
       if (S.selectedInstanceId === placed.instanceId || S.selectedInstanceId === mirrorId) setSelectedPart(null);
       removePartFromAssembly(S.assembly, placed.instanceId);
@@ -468,6 +488,27 @@ function onDragEnd(e) {
     );
     if (overPanel) {
       if (instanceId !== null) {
+        // Record deletion undo BEFORE removing (uses pre-move connections).
+        const stagingBefore = snapshotStaging();
+        const costRefund = getPartById(partId)?.cost ?? 0;
+        // Re-add the old connections temporarily so recordDeletion can capture them.
+        if (_preMoveData) {
+          for (const c of _preMoveData.oldConnections) S.assembly.connections.push({ ...c });
+          // Restore old position temporarily for accurate snapshot.
+          const p = S.assembly.parts.get(instanceId);
+          if (p) { p.x = _preMoveData.oldX; p.y = _preMoveData.oldY; }
+        }
+        recordDeletion([instanceId], costRefund, stagingBefore);
+        // Remove the temporary connections before the actual removal.
+        if (_preMoveData) {
+          for (let i = S.assembly.connections.length - 1; i >= 0; i--) {
+            const c = S.assembly.connections[i];
+            if (c.fromInstanceId === instanceId || c.toInstanceId === instanceId) {
+              S.assembly.connections.splice(i, 1);
+            }
+          }
+        }
+        _preMoveData = null;
         refundOrReturnPart(instanceId, partId, _vabRefreshPartsFn);
         if (S.selectedInstanceId === instanceId) setSelectedPart(null);
         removePartFromAssembly(S.assembly, instanceId);
@@ -496,6 +537,12 @@ function onDragEnd(e) {
   }
 
   if (instanceId !== null) {
+    // Capture pre-move data for undo.
+    const moveOldX = _preMoveData ? _preMoveData.oldX : finalX;
+    const moveOldY = _preMoveData ? _preMoveData.oldY : finalY;
+    const moveOldConns = _preMoveData ? _preMoveData.oldConnections : [];
+    _preMoveData = null;
+
     // Re-place an already-placed part at new position.
     movePlacedPart(S.assembly, instanceId, finalX, finalY);
     if (bestCandidate) {
@@ -542,6 +589,13 @@ function onDragEnd(e) {
         }
       }
     }
+
+    // Capture new connections after the move and record undo action.
+    const moveNewConns = S.assembly.connections
+      .filter(c => c.fromInstanceId === instanceId || c.toInstanceId === instanceId)
+      .map(c => ({ ...c }));
+    recordMove(instanceId, moveOldX, moveOldY, finalX, finalY, moveOldConns, moveNewConns);
+
     _runAndRenderValidationFn();
   } else {
     // ── VAB tier part-count gate ──────────────────────────────────────────
@@ -555,6 +609,10 @@ function onDragEnd(e) {
         return;
       }
     }
+
+    // Snapshot staging before placement for undo.
+    const stagingBefore = snapshotStaging();
+    const moneyBefore = S.gameState ? S.gameState.money : 0;
 
     // New part from the panel — use inventory (free) or buy new (deduct cost).
     const def = getPartById(partId);
@@ -626,6 +684,18 @@ function onDragEnd(e) {
     }
     _renderStagingPanelFn();
     _runAndRenderValidationFn();
+
+    // Record the placement for undo.
+    const addedIds = [newId];
+    const mirrorPairForUndo = S.assembly.symmetryPairs.find(
+      ([a, b]) => a === newId || b === newId,
+    );
+    if (mirrorPairForUndo) {
+      const mId = mirrorPairForUndo[0] === newId ? mirrorPairForUndo[1] : mirrorPairForUndo[0];
+      addedIds.push(mId);
+    }
+    const costDelta = moneyBefore - (S.gameState ? S.gameState.money : 0);
+    recordPlacement(addedIds, costDelta, stagingBefore);
   }
 
   vabRenderParts();
@@ -676,6 +746,14 @@ export function setupCanvas(canvasArea) {
       if (Math.hypot(dx, dy) > 8) {
         const { hit } = S.pendingPickup;
         S.pendingPickup = null;
+        // Capture pre-move state before disconnecting.
+        _preMoveData = {
+          oldX: hit.x,
+          oldY: hit.y,
+          oldConnections: S.assembly.connections
+            .filter(c => c.fromInstanceId === hit.instanceId || c.toInstanceId === hit.instanceId)
+            .map(c => ({ ...c })),
+        };
         disconnectPart(S.assembly, hit.instanceId);
         startDrag(hit.partId, hit.instanceId, e.clientX, e.clientY);
       }

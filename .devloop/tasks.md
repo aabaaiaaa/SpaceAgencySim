@@ -79,7 +79,7 @@
 - **Verification**: `npm run test:e2e` passes. E2E test verifies Tab cycles through interactive elements on VAB and Mission Control panels.
 
 ### TASK-013: Implement VAB undo/redo stack
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Implement a delta-based undo/redo stack for the VAB. Track: part placement, deletion, movement, staging changes. Record inverse operations. Depth limit of 50 actions. Ctrl+Z = undo, Ctrl+Y = redo. Add undo/redo buttons to VAB toolbar (greyed when empty). Loading a design clears the stack. See requirements Section 3.3.
 - **Verification**: `npm run test:unit` passes. Unit tests verify: undo reverses placement/deletion/move/staging, redo re-applies, stack depth limit works, new action after undo clears redo stack. E2E test verifies Ctrl+Z undoes a part placement.

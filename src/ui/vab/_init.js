@@ -51,7 +51,9 @@ import {
   bindButtons,
   bindKeyboardShortcuts,
   setPanelCallbacks,
+  updateUndoRedoButtons,
 } from './_panels.js';
+import { setUndoRedoChangeCallback, clearUndoRedo } from '../../core/undoRedo.js';
 
 // ---------------------------------------------------------------------------
 // Wrapped helpers that close over the public API
@@ -206,6 +208,14 @@ export function initVabUI(container, state, { onBack } = {}) {
                 title="Remove all parts from the rocket (refunds cost)">
           Clear All
         </button>
+        <button class="vab-btn vab-btn-undo" id="vab-btn-undo" type="button"
+                title="Undo (Ctrl+Z)" disabled>
+          &#x21B6; Undo
+        </button>
+        <button class="vab-btn vab-btn-redo" id="vab-btn-redo" type="button"
+                title="Redo (Ctrl+Y)" disabled>
+          Redo &#x21B7;
+        </button>
         <button class="vab-btn" id="vab-btn-save" type="button">Save</button>
         <button class="vab-btn" id="vab-btn-load" type="button">Library</button>
         <button class="vab-btn vab-btn-launch" id="vab-btn-launch" type="button" disabled>
@@ -332,6 +342,10 @@ export function initVabUI(container, state, { onBack } = {}) {
 
   // ── Toolbar buttons ──────────────────────────────────────────────────────
   bindButtons(root);
+
+  // ── Undo/redo button click handlers + change callback ───────────────────
+  setUndoRedoChangeCallback(updateUndoRedoButtons);
+  clearUndoRedo();
 
   // ── Restore visual state if returning to a previous assembly ─────────────
   if (S.assembly.parts.size > 0) {
