@@ -5,7 +5,7 @@
 import * as PIXI from 'pixi.js';
 import { SurfaceItemType } from '../../core/constants.js';
 import { getBiome, getBiomeTransition } from '../../core/biomes.js';
-import type { SurfaceItem } from '../../core/gameState.js';
+import type { ReadonlySurfaceItem } from '../types.js';
 import { getFlightRenderState } from './_state.js';
 import { ppm } from './_camera.js';
 import { acquireText, releaseContainerChildren } from './_pool.js';
@@ -40,7 +40,7 @@ export function renderGround(w: number, h: number): void {
 /**
  * Render deployed surface items on the ground surface.
  */
-export function renderSurfaceItems(items: SurfaceItem[], w: number, h: number): void {
+export function renderSurfaceItems(items: readonly ReadonlySurfaceItem[], w: number, h: number): void {
   const s = getFlightRenderState();
   if (!s.surfaceItemsGraphics) return;
   s.surfaceItemsGraphics.clear();

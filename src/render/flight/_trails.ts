@@ -7,8 +7,8 @@ import * as PIXI from 'pixi.js';
 import { getPartById } from '../../data/parts.js';
 import type { PartDef } from '../../data/parts.js';
 import { PartType, ControlMode } from '../../core/constants.js';
-import type { PhysicsState } from '../../core/physics.js';
-import type { RocketAssembly, PlacedPart } from '../../core/rocketbuilder.js';
+import type { ReadonlyPhysicsState, ReadonlyAssembly } from '../types.js';
+import type { PlacedPart } from '../../core/rocketbuilder.js';
 import { getFlightRenderState } from './_state.js';
 import type { PlumeState } from './_state.js';
 import { ppm, worldToScreen, computeCoM } from './_camera.js';
@@ -37,7 +37,7 @@ import {
 // ---------------------------------------------------------------------------
 
 function _nozzleWorldPos(
-  ps: PhysicsState,
+  ps: ReadonlyPhysicsState,
   placed: PlacedPart,
   def: PartDef,
   comBody: { x: number; y: number },
@@ -170,7 +170,7 @@ function _drawPlumePath(
 // Plume state management
 // ---------------------------------------------------------------------------
 
-export function updatePlumeStates(ps: PhysicsState, assembly: RocketAssembly, dt: number): void {
+export function updatePlumeStates(ps: ReadonlyPhysicsState, assembly: ReadonlyAssembly, dt: number): void {
   const s = getFlightRenderState();
   const firingEngines = new Set<string>();
 
@@ -202,7 +202,7 @@ export function updatePlumeStates(ps: PhysicsState, assembly: RocketAssembly, dt
 /**
  * Render sine-wave engine plumes for all firing engines.
  */
-export function renderPlumes(ps: PhysicsState, assembly: RocketAssembly, density: number, w: number, h: number): void {
+export function renderPlumes(ps: ReadonlyPhysicsState, assembly: ReadonlyAssembly, density: number, w: number, h: number): void {
   const s = getFlightRenderState();
   if (!s.trailContainer || s.plumeStates.size === 0) return;
 
@@ -285,7 +285,7 @@ export function renderPlumes(ps: PhysicsState, assembly: RocketAssembly, density
 // Smoke trail emission, aging, and rendering
 // ---------------------------------------------------------------------------
 
-export function emitSmokeSegments(ps: PhysicsState, assembly: RocketAssembly, density: number): void {
+export function emitSmokeSegments(ps: ReadonlyPhysicsState, assembly: ReadonlyAssembly, density: number): void {
   const s = getFlightRenderState();
   if (density <= TRAIL_DENSITY_THRESHOLD) return;
 
@@ -425,7 +425,7 @@ export function trailDt(): number {
 // RCS plumes
 // ---------------------------------------------------------------------------
 
-export function renderRcsPlumes(ps: PhysicsState, assembly: RocketAssembly, w: number, h: number): void {
+export function renderRcsPlumes(ps: ReadonlyPhysicsState, assembly: ReadonlyAssembly, w: number, h: number): void {
   const s = getFlightRenderState();
   if (!s.trailContainer) return;
   if (ps.controlMode !== ControlMode.RCS && ps.controlMode !== ControlMode.DOCKING) return;
@@ -495,7 +495,7 @@ export function renderRcsPlumes(ps: PhysicsState, assembly: RocketAssembly, w: n
 // Mach effects
 // ---------------------------------------------------------------------------
 
-export function renderMachEffects(ps: PhysicsState, assembly: RocketAssembly, density: number, w: number, h: number, dt: number): void {
+export function renderMachEffects(ps: ReadonlyPhysicsState, assembly: ReadonlyAssembly, density: number, w: number, h: number, dt: number): void {
   const s = getFlightRenderState();
   const speed = Math.hypot(ps.velX, ps.velY);
   const mach  = speed / MACH_1;

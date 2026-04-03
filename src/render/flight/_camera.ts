@@ -7,8 +7,7 @@
 
 import { getPartById } from '../../data/parts.js';
 import { PartType } from '../../core/constants.js';
-import type { PhysicsState } from '../../core/physics.js';
-import type { RocketAssembly } from '../../core/rocketbuilder.js';
+import type { ReadonlyPhysicsState, ReadonlyAssembly } from '../types.js';
 import { getFlightRenderState } from './_state.js';
 import {
   FLIGHT_PIXELS_PER_METRE,
@@ -53,7 +52,7 @@ export function worldToScreen(
  * Return true if the given part set contains at least one COMMAND_MODULE or
  * COMPUTER_MODULE.
  */
-export function hasCommandModule(partSet: Set<string>, assembly: RocketAssembly): boolean {
+export function hasCommandModule(partSet: ReadonlySet<string>, assembly: ReadonlyAssembly): boolean {
   for (const instanceId of partSet) {
     const placed = assembly.parts.get(instanceId);
     const def    = placed ? getPartById(placed.partId) : null;
@@ -72,9 +71,9 @@ export function hasCommandModule(partSet: Set<string>, assembly: RocketAssembly)
  * Compute the mass-weighted centre of mass for a set of parts.
  */
 export function computeCoM(
-  fuelStore: Map<string, number>,
-  assembly: RocketAssembly,
-  partSet: Set<string>,
+  fuelStore: ReadonlyMap<string, number>,
+  assembly: ReadonlyAssembly,
+  partSet: ReadonlySet<string>,
   originX: number,
   originY: number,
 ): { x: number; y: number } {
@@ -111,7 +110,7 @@ export function computeCoM(
 /**
  * Update the camera to follow the rocket's centre of mass.
  */
-export function updateCamera(ps: PhysicsState, assembly: RocketAssembly): void {
+export function updateCamera(ps: ReadonlyPhysicsState, assembly: ReadonlyAssembly): void {
   const s = getFlightRenderState();
 
   let targetX: number, targetY: number;

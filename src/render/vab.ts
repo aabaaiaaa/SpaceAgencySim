@@ -29,7 +29,8 @@ import * as PIXI from 'pixi.js';
 import { getApp } from './index.js';
 import { PartType } from '../core/constants.js';
 import { getPartById } from '../data/parts.js';
-import type { RocketAssembly, PlacedPart, SnapCandidate } from '../core/rocketbuilder.js';
+import type { PlacedPart, SnapCandidate } from '../core/rocketbuilder.js';
+import type { ReadonlyAssembly } from './types.js';
 import type { PartDef } from '../data/parts.js';
 
 declare global {
@@ -117,7 +118,7 @@ let _snapContainer: PIXI.Container | null = null;
 // Part rendering state
 // ---------------------------------------------------------------------------
 
-let _assembly: RocketAssembly | null = null;
+let _assembly: ReadonlyAssembly | null = null;
 
 /** Part ID currently being dragged (for ghost rendering), or null. */
 let _ghostPartId: string | null = null;
@@ -834,7 +835,7 @@ export function vabZoomToFit(bounds: { minX: number; maxX: number; minY: number;
  * Call once after creating the assembly in the UI layer; after that all
  * mutations to the assembly are picked up by the next vabRenderParts() call.
  */
-export function vabSetAssembly(assembly: RocketAssembly): void {
+export function vabSetAssembly(assembly: ReadonlyAssembly): void {
   _assembly = assembly;
 }
 

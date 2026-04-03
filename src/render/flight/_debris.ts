@@ -5,9 +5,8 @@
 import * as PIXI from 'pixi.js';
 import { getPartById } from '../../data/parts.js';
 import { PartType, ControlMode } from '../../core/constants.js';
-import type { PhysicsState } from '../../core/physics.js';
+import type { ReadonlyPhysicsState, ReadonlyAssembly } from '../types.js';
 import type { DebrisState } from '../../core/staging.js';
-import type { RocketAssembly } from '../../core/rocketbuilder.js';
 import { getFlightRenderState } from './_state.js';
 import { ppm, worldToScreen } from './_camera.js';
 import { getApp } from '../index.js';
@@ -19,7 +18,7 @@ import { acquireGraphics, releaseContainerChildren } from './_pool.js';
 // Debris rendering
 // ---------------------------------------------------------------------------
 
-export function renderDebris(debrisList: DebrisState[], assembly: RocketAssembly, w: number, h: number): void {
+export function renderDebris(debrisList: readonly DebrisState[], assembly: ReadonlyAssembly, w: number, h: number): void {
   const s = getFlightRenderState();
   if (!s.debrisContainer) return;
 
@@ -65,7 +64,7 @@ export function renderDebris(debrisList: DebrisState[], assembly: RocketAssembly
 // Docking target rendering
 // ---------------------------------------------------------------------------
 
-export function renderDockingTarget(ps: PhysicsState, w: number, h: number): void {
+export function renderDockingTarget(ps: ReadonlyPhysicsState, w: number, h: number): void {
   const s = getFlightRenderState();
   if (!s.rocketContainer) return;
 
@@ -150,7 +149,7 @@ export function renderDockingTarget(ps: PhysicsState, w: number, h: number): voi
 // Ejected crew rendering
 // ---------------------------------------------------------------------------
 
-export function renderEjectedCrew(ps: PhysicsState, w: number, h: number): void {
+export function renderEjectedCrew(ps: ReadonlyPhysicsState, w: number, h: number): void {
   if (!ps.ejectedCrew || ps.ejectedCrew.length === 0) return;
   const s = getFlightRenderState();
   if (!s.debrisContainer) return;

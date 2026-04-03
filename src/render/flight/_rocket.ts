@@ -12,8 +12,8 @@ import { PartType } from '../../core/constants.js';
 import { getHeatRatio } from '../../core/atmosphere.js';
 import { DEPLOY_DURATION } from '../../core/parachute.js';
 import { LegState, LEG_DEPLOY_DURATION, getDeployedLegFootOffset } from '../../core/legs.js';
-import type { PhysicsState } from '../../core/physics.js';
-import type { RocketAssembly, PlacedPart } from '../../core/rocketbuilder.js';
+import type { ReadonlyPhysicsState, ReadonlyAssembly } from '../types.js';
+import type { PlacedPart } from '../../core/rocketbuilder.js';
 import { getFlightRenderState } from './_state.js';
 import { ppm, worldToScreen, computeCoM } from './_camera.js';
 import { SCALE_M_PER_PX, PART_FILL, PART_STROKE, FLIGHT_PIXELS_PER_METRE } from './_constants.js';
@@ -43,7 +43,7 @@ export function drawPartRect(g: PIXI.Graphics, placed: PlacedPart, def: PartDef,
 /**
  * Draw pulsing warning overlays on all parts with active malfunctions.
  */
-export function drawMalfunctionOverlays(g: PIXI.Graphics, ps: PhysicsState, assembly: RocketAssembly): void {
+export function drawMalfunctionOverlays(g: PIXI.Graphics, ps: ReadonlyPhysicsState, assembly: ReadonlyAssembly): void {
   if (!ps.malfunctions || ps.malfunctions.size === 0) return;
 
   const pulse = 0.30 + 0.15 * Math.sin(Date.now() * 0.012);
@@ -79,7 +79,7 @@ export function drawMalfunctionOverlays(g: PIXI.Graphics, ps: PhysicsState, asse
 /**
  * Draw heat glow overlays on parts experiencing atmospheric heating.
  */
-export function drawHeatGlowOverlays(g: PIXI.Graphics, ps: PhysicsState, assembly: RocketAssembly): void {
+export function drawHeatGlowOverlays(g: PIXI.Graphics, ps: ReadonlyPhysicsState, assembly: ReadonlyAssembly): void {
   if (!ps.heatMap || ps.heatMap.size === 0) return;
 
   const now = Date.now();
@@ -132,7 +132,7 @@ interface LegLikeState {
   legStates?: Map<string, { state: string; deployTimer: number }>;
 }
 
-function _getLegSide(placed: PlacedPart, assembly: RocketAssembly): number {
+function _getLegSide(placed: PlacedPart, assembly: ReadonlyAssembly): number {
   if (assembly?.connections) {
     for (const conn of assembly.connections) {
       let parentInstanceId: string | undefined, parentSnapIndex: number | undefined;
@@ -167,7 +167,7 @@ export function drawLandingLeg(
   placed: PlacedPart,
   def: PartDef,
   ps: LegLikeState,
-  assembly: RocketAssembly,
+  assembly: ReadonlyAssembly,
   alpha = 1,
 ): void {
   const lx = placed.x;
@@ -244,7 +244,7 @@ export function makePartLabel(placed: PlacedPart, def: PartDef, alpha = 1): PIXI
 /**
  * Draw deployed canopies above every deploying or deployed PARACHUTE part.
  */
-export function drawParachuteCanopies(ps: PhysicsState, assembly: RocketAssembly, w: number, h: number): void {
+export function drawParachuteCanopies(ps: ReadonlyPhysicsState, assembly: ReadonlyAssembly, w: number, h: number): void {
   const s = getFlightRenderState();
   if (!s.canopyContainer) return;
 
@@ -343,7 +343,7 @@ export function drawParachuteCanopies(ps: PhysicsState, assembly: RocketAssembly
 /**
  * Render the main active rocket into _rocketContainer.
  */
-export function renderRocket(ps: PhysicsState, assembly: RocketAssembly, w: number, h: number): void {
+export function renderRocket(ps: ReadonlyPhysicsState, assembly: ReadonlyAssembly, w: number, h: number): void {
   const s = getFlightRenderState();
   if (!s.rocketContainer) return;
 
@@ -468,10 +468,10 @@ interface HitGrid {
 const HIT_GRID_CELL_SIZE = 60;
 
 let _hitGrid: HitGrid | null = null;
-let _hitGridPartsRef: Set<string> | null = null;
+let _hitGridPartsRef: ReadonlySet<string> | null = null;
 let _hitGridPartsSize = -1;
 
-function _ensureHitGrid(activeParts: Set<string>, assembly: RocketAssembly): HitGrid {
+function _ensureHitGrid(activeParts: ReadonlySet<string>, assembly: ReadonlyAssembly): HitGrid {
   if (_hitGrid && _hitGridPartsRef === activeParts && _hitGridPartsSize === activeParts.size) {
     return _hitGrid;
   }
@@ -545,7 +545,7 @@ function _ensureHitGrid(activeParts: Set<string>, assembly: RocketAssembly): Hit
 // Hit test
 // ---------------------------------------------------------------------------
 
-export function hitTestFlightPart(screenX: number, screenY: number, ps: PhysicsState, assembly: RocketAssembly): string | null {
+export function hitTestFlightPart(screenX: number, screenY: number, ps: ReadonlyPhysicsState, assembly: ReadonlyAssembly): string | null {
   if (!ps || !assembly) return null;
 
   const w = window.innerWidth;

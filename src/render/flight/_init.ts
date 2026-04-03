@@ -10,9 +10,7 @@ import * as PIXI from 'pixi.js';
 import { getApp } from '../index.js';
 import { airDensity } from '../../core/atmosphere.js';
 import { getAirDensity as bodyAirDensity } from '../../data/bodies.js';
-import type { PhysicsState } from '../../core/physics.js';
-import type { RocketAssembly } from '../../core/rocketbuilder.js';
-import type { SurfaceItem } from '../../core/gameState.js';
+import type { ReadonlyPhysicsState, ReadonlyAssembly, ReadonlySurfaceItem } from '../types.js';
 import { getFlightRenderState } from './_state.js';
 import { MIN_ZOOM, MAX_ZOOM } from './_constants.js';
 import { updateCamera } from './_camera.js';
@@ -106,17 +104,17 @@ export function initFlightRenderer(): void {
 }
 
 interface FlightStateArg {
-  bodyId?: string;
+  readonly bodyId?: string;
 }
 
 /**
  * Render a single flight frame.
  */
 export function renderFlightFrame(
-  ps: PhysicsState,
-  assembly: RocketAssembly,
+  ps: ReadonlyPhysicsState,
+  assembly: ReadonlyAssembly,
   flightState: FlightStateArg,
-  surfaceItems: SurfaceItem[],
+  surfaceItems: readonly ReadonlySurfaceItem[],
 ): void {
   const w        = window.innerWidth;
   const h        = window.innerHeight;
@@ -278,7 +276,7 @@ export function getZoomLevel(): number {
   return s.zoomLevel;
 }
 
-export function hitTestFlightPart(screenX: number, screenY: number, ps: PhysicsState, assembly: RocketAssembly): string | null {
+export function hitTestFlightPart(screenX: number, screenY: number, ps: ReadonlyPhysicsState, assembly: ReadonlyAssembly): string | null {
   return _hitTestFlightPart(screenX, screenY, ps, assembly);
 }
 

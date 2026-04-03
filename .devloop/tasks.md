@@ -163,7 +163,7 @@
 - **Verification**: `npm run typecheck` passes. `npm run test:unit` passes. `npm run lint` passes. Grep for bare `console.warn` and `console.error` in `src/core/` and `src/ui/` returns only the logger module itself.
 
 ### TASK-027: Define readonly render snapshot interfaces
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-020
 - **Description**: Define `ReadonlyPhysicsState`, `ReadonlyFlightState`, `ReadonlyGameState`, and `ReadonlyAssembly` interfaces in `src/render/types.ts`. Update render function signatures in all render modules to accept these readonly types. Callers pass mutable state (TS allows mutable→readonly). See requirements Section 4.5.
 - **Verification**: `npm run typecheck` passes. `npm run test:unit` passes. Attempting to add a state mutation in a render module causes a TypeScript error.

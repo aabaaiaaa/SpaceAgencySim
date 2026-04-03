@@ -49,8 +49,8 @@ import { FlightPhase } from '../core/constants.js';
 import { SOI_RADIUS } from '../core/manoeuvre.js';
 import { getCommsCoverageInfo } from '../core/comms.js';
 
-import type { PhysicsState } from '../core/physics.js';
-import type { FlightState, GameState, OrbitalElements } from '../core/gameState.js';
+import type { ReadonlyPhysicsState, ReadonlyFlightState, ReadonlyGameState } from './types.js';
+import type { OrbitalElements } from '../core/gameState.js';
 
 // ---------------------------------------------------------------------------
 // Colour palette
@@ -388,9 +388,9 @@ export function isMapShadowEnabled(): boolean {
  * Render one frame of the map view.
  */
 export function renderMapFrame(
-  ps: PhysicsState,
-  flightState: FlightState,
-  state: GameState,
+  ps: ReadonlyPhysicsState,
+  flightState: ReadonlyFlightState,
+  state: ReadonlyGameState,
   bodyId: string = 'EARTH',
   options?: { showDebris?: boolean },
 ): void {
@@ -541,7 +541,7 @@ const MAP_SURFACE_GLYPHS: Record<string, string> = {
  *
  * Only visible if GPS coverage exists for the body (or it's Earth).
  */
-function _drawSurfaceItems(state: GameState, bodyId: string, cx: number, cy: number, scale: number, R: number): void {
+function _drawSurfaceItems(state: ReadonlyGameState, bodyId: string, cx: number, cy: number, scale: number, R: number): void {
   if (!_surfaceGraphics) return;
   _surfaceGraphics.clear();
 
@@ -605,8 +605,8 @@ function _drawBands(bodyId: string, cx: number, cy: number, scale: number): void
 }
 
 function _drawOrbitalObjects(
-  state: GameState,
-  flightState: FlightState,
+  state: ReadonlyGameState,
+  flightState: ReadonlyFlightState,
   cx: number,
   cy: number,
   scale: number,
@@ -656,7 +656,7 @@ function _drawOrbitalObjects(
   }
 }
 
-function _drawCraft(ps: PhysicsState, flightState: FlightState, cx: number, cy: number, scale: number, bodyId: string): void {
+function _drawCraft(ps: ReadonlyPhysicsState, flightState: ReadonlyFlightState, cx: number, cy: number, scale: number, bodyId: string): void {
   _orbitsGraphics!.clear();
   _craftGraphics!.clear();
 
@@ -791,7 +791,7 @@ function _drawOrbitEllipse(
   g.stroke({ color, width, alpha });
 }
 
-function _drawTransferTargets(ps: PhysicsState, flightState: FlightState, cx: number, cy: number, scale: number, bodyId: string): void {
+function _drawTransferTargets(ps: ReadonlyPhysicsState, flightState: ReadonlyFlightState, cx: number, cy: number, scale: number, bodyId: string): void {
   _transferGraphics!.clear();
 
   const altitude = Math.max(0, ps.posY);
@@ -888,7 +888,7 @@ function _drawTransferTargets(ps: PhysicsState, flightState: FlightState, cx: nu
  * Draw the predicted transfer trajectory during TRANSFER/CAPTURE phase.
  * Shows the craft's projected path as a dotted/fading line.
  */
-function _drawTransferTrajectory(ps: PhysicsState, flightState: FlightState, cx: number, cy: number, scale: number, bodyId: string): void {
+function _drawTransferTrajectory(ps: ReadonlyPhysicsState, flightState: ReadonlyFlightState, cx: number, cy: number, scale: number, bodyId: string): void {
   const points = generateTransferTrajectory(ps, bodyId, 120);
   if (points.length < 2) return;
 
@@ -923,7 +923,7 @@ function _drawTransferTrajectory(ps: PhysicsState, flightState: FlightState, cx:
 /**
  * Draw celestial bodies relevant during transfer (destination, intermediate bodies).
  */
-function _drawCelestialBodies(flightState: FlightState, cx: number, cy: number, scale: number, bodyId: string): void {
+function _drawCelestialBodies(flightState: ReadonlyFlightState, cx: number, cy: number, scale: number, bodyId: string): void {
   const bodies = getMapCelestialBodies(bodyId, flightState.transferState);
 
   for (const body of bodies) {
@@ -987,7 +987,7 @@ function _drawCelestialBodies(flightState: FlightState, cx: number, cy: number, 
 /**
  * Draw transfer progress indicator (ETA, progress bar, destination info).
  */
-function _drawTransferProgress(flightState: FlightState, w: number, h: number): void {
+function _drawTransferProgress(flightState: ReadonlyFlightState, w: number, h: number): void {
   const info = getTransferProgressInfo(flightState.transferState, flightState.timeElapsed);
   if (!info) return;
 
@@ -1048,7 +1048,7 @@ const COMMS_DIRECT_COLOR    = 0x4488ff;
  * Draw comms coverage zones on the map.
  * Connected zones shown in green, dead zones in red.
  */
-function _drawCommsOverlay(state: GameState, bodyId: string, cx: number, cy: number, scale: number, R: number): void {
+function _drawCommsOverlay(state: ReadonlyGameState, bodyId: string, cx: number, cy: number, scale: number, R: number): void {
   if (!_commsGraphics) return;
   _commsGraphics.clear();
   if (!_showCommsOverlay) return;
