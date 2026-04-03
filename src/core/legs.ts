@@ -1,23 +1,23 @@
 /**
- * legs.js — Landing leg state machine and deployment mechanics.
+ * legs.ts — Landing leg state machine and deployment mechanics.
  *
  * Implements the full landing leg lifecycle:
  *
- *   retracted  ──[deploy trigger]──►  deploying  ──[1.5 s timer]──►  deployed
+ *   retracted  --[deploy trigger]-->  deploying  --[1.5 s timer]-->  deployed
  *
  * DEPLOYMENT
  *   Deployment takes 1.5 seconds (LEG_DEPLOY_DURATION).  During the deploying
  *   phase the leg is extending outward and downward.  Once fully deployed the
  *   effective landing footprint is widened.
  *
- * LANDING DETECTION (handled in physics.js)
- *   physics.js counts legs whose state is 'deployed' when a ground contact
+ * LANDING DETECTION (handled in physics.ts)
+ *   physics.ts counts legs whose state is 'deployed' when a ground contact
  *   event fires:
- *     - ≥ 2 deployed legs AND vertical speed < 10 m/s  → controlled landing
- *     - ≥ 1 deployed leg  AND speed 10–30 m/s          → hard landing (legs destroyed)
- *     - speed ≥ 30 m/s (any leg state)                 → full destruction / crash
- *     - 0 deployed legs   AND speed > 5 m/s            → crash (bottom parts damaged)
- *     - speed ≤ 5 m/s  (no legs)                       → safe landing
+ *     - >= 2 deployed legs AND vertical speed < 10 m/s  -> controlled landing
+ *     - >= 1 deployed leg  AND speed 10-30 m/s          -> hard landing (legs destroyed)
+ *     - speed >= 30 m/s (any leg state)                 -> full destruction / crash
+ *     - 0 deployed legs   AND speed > 5 m/s             -> crash (bottom parts damaged)
+ *     - speed <= 5 m/s  (no legs)                       -> safe landing
  *
  * CONTEXT MENU
  *   `getLegContextMenuItems(ps, assembly)` returns a list of objects describing
@@ -26,11 +26,11 @@
  * PUBLIC API
  *   LegState                                                       {enum}
  *   LEG_DEPLOY_DURATION                                            {number}
- *   initLegStates(ps, assembly)                                   → void
- *   deployLandingLeg(ps, instanceId)                              → void
- *   tickLegs(ps, assembly, flightState, dt)                       → void
- *   getLegStatus(ps, instanceId)                                  → string
- *   getLegContextMenuItems(ps, assembly)                          → Object[]
+ *   initLegStates(ps, assembly)                                   -> void
+ *   deployLandingLeg(ps, instanceId)                              -> void
+ *   tickLegs(ps, assembly, flightState, dt)                       -> void
+ *   getLegStatus(ps, instanceId)                                  -> string
+ *   getLegContextMenuItems(ps, assembly)                          -> Object[]
  *
  * @module legs
  */
@@ -38,50 +38,50 @@
 import { getPartById } from '../data/parts.js';
 import { PartType }    from './constants.js';
 
+import type { LegEntry } from './physics.js';
+import type { PartDef } from '../data/parts.js';
+
+// ---------------------------------------------------------------------------
+// Public types
+// ---------------------------------------------------------------------------
+
+/** Context menu item describing one landing leg's state and available actions. */
+export interface LegContextMenuItem {
+  instanceId:  string;
+  name:        string;
+  state:       string;
+  statusLabel: string;
+  canDeploy:   boolean;
+  deployTimer: number | null;
+}
+
 // ---------------------------------------------------------------------------
 // Public constants
 // ---------------------------------------------------------------------------
 
-/**
- * Landing leg lifecycle states.
- * @enum {string}
- */
+/** Landing leg lifecycle states. */
 export const LegState = Object.freeze({
-  /** Stowed — retracted against the rocket body; no landing protection. */
+  /** Stowed -- retracted against the rocket body; no landing protection. */
   RETRACTED: 'retracted',
-  /** Extending — leg is in motion (animation window, 1.5 s). */
+  /** Extending -- leg is in motion (animation window, 1.5 s). */
   DEPLOYING: 'deploying',
-  /** Fully extended — leg is deployed and providing landing protection. */
+  /** Fully extended -- leg is deployed and providing landing protection. */
   DEPLOYED:  'deployed',
-});
+} as const);
 
-/** Duration of the deploying → deployed animation transition in seconds. */
-export const LEG_DEPLOY_DURATION = 1.5;
+export type LegState = (typeof LegState)[keyof typeof LegState];
 
-// ---------------------------------------------------------------------------
-// Type Definitions (JSDoc)
-// ---------------------------------------------------------------------------
-
-/**
- * Per-leg entry stored in PhysicsState.legStates.
- *
- * @typedef {Object} LegEntry
- * @property {string} state        One of the {@link LegState} values.
- * @property {number} deployTimer  Seconds remaining in the deploying animation.
- *                                 0 when not in the DEPLOYING state.
- */
+/** Duration of the deploying -> deployed animation transition in seconds. */
+export const LEG_DEPLOY_DURATION: number = 1.5;
 
 // ---------------------------------------------------------------------------
-// Internal helper — is this a landing leg type?
+// Internal helper -- is this a landing leg type?
 // ---------------------------------------------------------------------------
 
 /**
  * Return true if the given part definition is a landing leg part.
- *
- * @param {import('../data/parts.js').PartDef|null} def
- * @returns {boolean}
  */
-function _isLegType(def) {
+function _isLegType(def: PartDef | null | undefined): boolean {
   return (
     def !== null &&
     def !== undefined &&
@@ -98,13 +98,12 @@ function _isLegType(def) {
  * LANDING_LEG part currently in `ps.activeParts`.
  *
  * Call this once inside `createPhysicsState` after the state object has been
- * constructed.  Safe to call again — existing entries are preserved.
- *
- * @param {{ legStates: Map<string, LegEntry>,
- *           activeParts: Set<string> }}                            ps
- * @param {{ parts: Map<string, { partId: string }> }}              assembly
+ * constructed.  Safe to call again -- existing entries are preserved.
  */
-export function initLegStates(ps, assembly) {
+export function initLegStates(
+  ps: { legStates: Map<string, LegEntry>; activeParts: Set<string> },
+  assembly: { parts: Map<string, { partId: string }> },
+): void {
   for (const [instanceId, placed] of assembly.parts) {
     if (!ps.activeParts.has(instanceId)) continue;
     if (ps.legStates.has(instanceId)) continue; // already initialised
@@ -124,18 +123,18 @@ export function initLegStates(ps, assembly) {
 /**
  * Initiate deployment of the specified landing leg.
  *
- * Transitions the leg from `retracted` → `deploying` and starts the
- * {@link LEG_DEPLOY_DURATION} countdown.  If the leg is already in any other
+ * Transitions the leg from `retracted` -> `deploying` and starts the
+ * LEG_DEPLOY_DURATION countdown.  If the leg is already in any other
  * state (deploying or deployed) this function is a no-op.
  *
  * Can be called from:
  *   - staging.js when an in-flight stage fires a DEPLOY activation.
  *   - A flight-scene context menu when the player manually deploys the leg.
- *
- * @param {{ legStates: Map<string, LegEntry> }} ps
- * @param {string} instanceId  Instance ID of the LANDING_LEGS/LANDING_LEG part.
  */
-export function deployLandingLeg(ps, instanceId) {
+export function deployLandingLeg(
+  ps: { legStates: Map<string, LegEntry> },
+  instanceId: string,
+): void {
   if (!ps.legStates) return;
 
   let entry = ps.legStates.get(instanceId);
@@ -163,15 +162,14 @@ export function deployLandingLeg(ps, instanceId) {
  *   - When the timer reaches zero, transitions to DEPLOYED and emits a
  *     LEG_DEPLOYED event to `flightState.events`.
  *
- * Call once per fixed integration step from `_integrate` in physics.js.
- *
- * @param {{ legStates: Map<string, LegEntry>,
- *           posY:      number }}                                   ps
- * @param {{ parts: Map<string, { partId: string }> }}              assembly
- * @param {{ events: Array<object>, timeElapsed: number }}          flightState
- * @param {number} dt  Fixed timestep in seconds.
+ * Call once per fixed integration step from `_integrate` in physics.ts.
  */
-export function tickLegs(ps, assembly, flightState, dt) {
+export function tickLegs(
+  ps: { legStates: Map<string, LegEntry>; posY: number },
+  assembly: { parts: Map<string, { partId: string }> },
+  flightState: { events: any[]; timeElapsed: number },
+  dt: number,
+): void {
   if (!ps.legStates) return;
 
   for (const [instanceId, entry] of ps.legStates) {
@@ -209,48 +207,35 @@ export function tickLegs(ps, assembly, flightState, dt) {
 /**
  * Return the current state string for the given landing leg instance.
  *
- * Returns {@link LegState.RETRACTED} when:
+ * Returns LegState.RETRACTED when:
  *   - `ps.legStates` is absent (debris without state map).
  *   - The instance ID is not tracked.
- *
- * @param {{ legStates?: Map<string, LegEntry> }} ps
- * @param {string} instanceId  Landing leg part instance ID.
- * @returns {string}  One of the {@link LegState} values.
  */
-export function getLegStatus(ps, instanceId) {
+export function getLegStatus(
+  ps: { legStates?: Map<string, LegEntry> },
+  instanceId: string,
+): string {
   if (!ps.legStates) return LegState.RETRACTED;
   const entry = ps.legStates.get(instanceId);
   return entry ? entry.state : LegState.RETRACTED;
 }
 
 // ---------------------------------------------------------------------------
-// Count helper
+// Foot offset helper
 // ---------------------------------------------------------------------------
 
-/**
- * Return the number of landing leg instances that are currently in the
- * DEPLOYED state.
- *
- * Used by physics.js `_handleGroundContact` to determine whether the rocket
- * has sufficient leg support for a controlled landing.
- *
- * @param {{ legStates?: Map<string, LegEntry>,
- *           activeParts: Set<string> }}          ps
- * @returns {number}  Count of deployed legs (≥ 0).
- */
 /**
  * Compute the deployed foot offset for a landing leg instance.
  *
  * Returns { dx, dy, t } where dx/dy are unsigned pixel offsets from the
  * leg's centre position.  dy = downward extension, dx = outward extension.
  * The caller applies the appropriate side sign to dx.
- *
- * @param {string}                            instanceId
- * @param {{ width?: number, height?: number }} def  Part definition.
- * @param {Map<string, LegEntry>|undefined}   legStates
- * @returns {{ dx: number, dy: number, t: number }}
  */
-export function getDeployedLegFootOffset(instanceId, def, legStates) {
+export function getDeployedLegFootOffset(
+  instanceId: string,
+  def: { width?: number; height?: number },
+  legStates: Map<string, LegEntry> | undefined,
+): { dx: number; dy: number; t: number } {
   let t = 0;
   const entry = legStates?.get(instanceId);
   if (entry) {
@@ -265,7 +250,20 @@ export function getDeployedLegFootOffset(instanceId, def, legStates) {
   return { dx: pw * 1.0 * t, dy: ph * 3.0 * t, t };
 }
 
-export function countDeployedLegs(ps) {
+// ---------------------------------------------------------------------------
+// Count helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Return the number of landing leg instances that are currently in the
+ * DEPLOYED state.
+ *
+ * Used by physics.ts `_handleGroundContact` to determine whether the rocket
+ * has sufficient leg support for a controlled landing.
+ */
+export function countDeployedLegs(
+  ps: { legStates?: Map<string, LegEntry> },
+): number {
   if (!ps.legStates) return 0;
   let count = 0;
   for (const [, entry] of ps.legStates) {
@@ -281,14 +279,14 @@ export function countDeployedLegs(ps) {
 /**
  * Retract a previously-deployed landing leg, returning it to the stowed position.
  *
- * Transitions the leg from `deployed` → `retracted`.  This allows the player
+ * Transitions the leg from `deployed` -> `retracted`.  This allows the player
  * to reposition legs before final touchdown.  If the leg is already retracted
  * or still deploying this function is a no-op.
- *
- * @param {{ legStates: Map<string, LegEntry> }} ps
- * @param {string} instanceId  Instance ID of the LANDING_LEGS/LANDING_LEG part.
  */
-export function retractLandingLeg(ps, instanceId) {
+export function retractLandingLeg(
+  ps: { legStates: Map<string, LegEntry> },
+  instanceId: string,
+): void {
   if (!ps.legStates) return;
 
   const entry = ps.legStates.get(instanceId);
@@ -311,33 +309,12 @@ export function retractLandingLeg(ps, instanceId) {
  * Each item describes the current state of one leg and optionally provides a
  * deployable action.  The flight UI layer calls this function to populate a
  * right-click or action panel menu.
- *
- * Returned item schema:
- * ```
- * {
- *   instanceId:  string,     // part instance ID
- *   name:        string,     // human-readable part name
- *   state:       string,     // LegState value
- *   statusLabel: string,     // display text for the status chip
- *   canDeploy:   boolean,    // true when state is 'retracted'
- *   deployTimer: number|null // seconds remaining in deploying state, or null
- * }
- * ```
- *
- * @param {{ legStates?: Map<string, LegEntry>,
- *           activeParts: Set<string> }}                 ps
- * @param {{ parts: Map<string, { partId: string }> }}   assembly
- * @returns {Array<{
- *   instanceId:  string,
- *   name:        string,
- *   state:       string,
- *   statusLabel: string,
- *   canDeploy:   boolean,
- *   deployTimer: number|null,
- * }>}
  */
-export function getLegContextMenuItems(ps, assembly) {
-  const items = [];
+export function getLegContextMenuItems(
+  ps: { legStates?: Map<string, LegEntry>; activeParts: Set<string> },
+  assembly: { parts: Map<string, { partId: string }> },
+): LegContextMenuItem[] {
+  const items: LegContextMenuItem[] = [];
 
   for (const instanceId of ps.activeParts) {
     const placed = assembly.parts.get(instanceId);
@@ -347,8 +324,8 @@ export function getLegContextMenuItems(ps, assembly) {
 
     const state = getLegStatus(ps, instanceId);
 
-    let statusLabel;
-    let deployTimer = null;
+    let statusLabel: string;
+    let deployTimer: number | null = null;
     switch (state) {
       case LegState.RETRACTED:
         statusLabel = 'Retracted (ready)';
@@ -357,8 +334,8 @@ export function getLegContextMenuItems(ps, assembly) {
         const entry = ps.legStates?.get(instanceId);
         deployTimer = entry ? Math.max(0, entry.deployTimer) : null;
         statusLabel = deployTimer !== null
-          ? `Deploying… (${deployTimer.toFixed(1)} s)`
-          : 'Deploying…';
+          ? `Deploying\u2026 (${deployTimer.toFixed(1)} s)`
+          : 'Deploying\u2026';
         break;
       }
       case LegState.DEPLOYED:
@@ -370,7 +347,7 @@ export function getLegContextMenuItems(ps, assembly) {
 
     items.push({
       instanceId,
-      name:        def.name,
+      name:        def!.name,
       state,
       statusLabel,
       canDeploy:   state === LegState.RETRACTED,

@@ -1,5 +1,5 @@
 /**
- * atmosphere.js — Atmosphere model and reentry/ascent heat simulation.
+ * atmosphere.ts — Atmosphere model and reentry/ascent heat simulation.
  *
  * Provides:
  *   - Exponential air density curve (ISA-inspired, simplified)
@@ -11,16 +11,16 @@
  *   - Multi-body atmosphere support (Earth, Mars, Venus, etc.)
  *
  * ATMOSPHERE MODEL
- *   density(alt) = 1.225 × exp(−alt / 8500)  kg/m³   (Earth default)
+ *   density(alt) = 1.225 x exp(-alt / 8500)  kg/m^3   (Earth default)
  *   Multi-body: uses per-body seaLevelDensity / scaleHeight / topAltitude.
- *   Effective vacuum above topAltitude (density < 0.0001 kg/m³).
+ *   Effective vacuum above topAltitude (density < 0.0001 kg/m^3).
  *
  * HEATING CONDITIONS
  *   Active when: inside body's atmosphere AND speed > 1 500 m/s
  *   Applies during both ascent and reentry.
  *
  * HEAT RULES (per fixed-timestep tick)
- *   heatRate = (speed − 1500) × density × 0.01
+ *   heatRate = (speed - 1500) x density x 0.01
  *   Leading-face part: accumulates full heatRate.
  *   Other exposed parts (not behind a heat shield): accumulate 40% heatRate.
  *   Shielded parts (behind a heat shield relative to travel direction): no heat.
@@ -29,22 +29,22 @@
  *
  * HEAT SHIELD PROTECTION
  *   During descent (velY < 0): shield protects parts with Y > shield.Y (above it).
- *   During ascent  (velY ≥ 0): shield protects parts with Y < shield.Y (below it).
+ *   During ascent  (velY >= 0): shield protects parts with Y < shield.Y (below it).
  *   Only active heat shields (in ps.activeParts) provide protection.
  *
  * PUBLIC API
- *   airDensity(altitude)                                          → number
- *   airDensityForBody(altitude, bodyId)                           → number
- *   atmosphereTopForBody(bodyId)                                  → number
- *   isReentryConditionForBody(altitude, speed, bodyId)            → boolean
- *   terminalVelocity(mass, gravity, density, Cd, area)           → number
- *   isReentryCondition(altitude, speed)                          → boolean
- *   computeHeatRate(speed, density)                              → number
- *   getLeadingPartId(ps, assembly)                               → string|null
- *   getShieldedPartIds(ps, assembly)                             → Set<string>
- *   getHeatTolerance(def)                                        → number
- *   getHeatRatio(ps, instanceId, assembly)                       → number
- *   updateHeat(ps, assembly, flightState, speed, altitude, density) → void
+ *   airDensity(altitude)                                          -> number
+ *   airDensityForBody(altitude, bodyId)                           -> number
+ *   atmosphereTopForBody(bodyId)                                  -> number
+ *   isReentryConditionForBody(altitude, speed, bodyId)            -> boolean
+ *   terminalVelocity(mass, gravity, density, Cd, area)           -> number
+ *   isReentryCondition(altitude, speed)                          -> boolean
+ *   computeHeatRate(speed, density)                              -> number
+ *   getLeadingPartId(ps, assembly)                               -> string|null
+ *   getShieldedPartIds(ps, assembly)                             -> Set<string>
+ *   getHeatTolerance(def)                                        -> number
+ *   getHeatRatio(ps, instanceId, assembly)                       -> number
+ *   updateHeat(ps, assembly, flightState, speed, altitude, density) -> void
  *
  * @module atmosphere
  */
@@ -60,36 +60,66 @@ import {
 } from './constants.js';
 import { getAirDensity as _bodyAirDensity, getAtmosphereTop as _bodyAtmoTop, hasAtmosphere } from '../data/bodies.js';
 
+import type { PartDef } from '../data/parts.js';
+import type { PhysicsState, RocketAssembly } from './physics.js';
+import type { FlightState } from './gameState.js';
+
+// ---------------------------------------------------------------------------
+// Minimal duck-type interfaces for function parameters
+// ---------------------------------------------------------------------------
+
+/** Minimal physics state required by leading-part and shielding helpers. */
+interface HeatQueryPhysics {
+  velY: number;
+  activeParts: Set<string>;
+}
+
+/** Minimal assembly shape required by leading-part and shielding helpers. */
+interface HeatQueryAssembly {
+  parts: Map<string, { x: number; y: number; partId: string }>;
+}
+
+/** Minimal physics state for heat-ratio queries. */
+interface HeatRatioPhysics {
+  heatMap: Map<string, number>;
+  activeParts: Set<string>;
+}
+
+/** Minimal assembly shape for heat-ratio queries. */
+interface HeatRatioAssembly {
+  parts: Map<string, { partId: string }>;
+}
+
 // ---------------------------------------------------------------------------
 // Constants (exported so physics.js and tests can reference the same values)
 // ---------------------------------------------------------------------------
 
 /** Altitude above which air density is effectively zero (metres). */
-export const ATMOSPHERE_TOP = 70_000;
+export const ATMOSPHERE_TOP: number = 70_000;
 
-/** Air density at sea level (kg/m³). */
-export const SEA_LEVEL_DENSITY = 1.225;
+/** Air density at sea level (kg/m^3). */
+export const SEA_LEVEL_DENSITY: number = 1.225;
 
 /** Atmospheric scale height (metres). Controls how quickly density falls off. */
-export const SCALE_HEIGHT = 8_500;
+export const SCALE_HEIGHT: number = 8_500;
 
 /** Speed threshold above which atmospheric heating begins (m/s). */
-export const REENTRY_SPEED_THRESHOLD = 1_500;
+export const REENTRY_SPEED_THRESHOLD: number = 1_500;
 
-/** Heat rate scalar: heatRate = (speed − threshold) × density × HEAT_RATE_COEFF. */
-export const HEAT_RATE_COEFF = 0.01;
+/** Heat rate scalar: heatRate = (speed - threshold) x density x HEAT_RATE_COEFF. */
+export const HEAT_RATE_COEFF: number = 0.01;
 
 /** Heat units dissipated per tick when not under thermal stress. */
-export const HEAT_DISSIPATION_PER_TICK = 5;
+export const HEAT_DISSIPATION_PER_TICK: number = 5;
 
 /** Default heat tolerance for structural parts (arbitrary heat units). */
-export const DEFAULT_HEAT_TOLERANCE = 1_200;
+export const DEFAULT_HEAT_TOLERANCE: number = 1_200;
 
 /** Default heat tolerance for heat shield parts. */
-export const HEAT_SHIELD_TOLERANCE = 3_000;
+export const HEAT_SHIELD_TOLERANCE: number = 3_000;
 
 /** Fraction of heat rate applied to non-leading exposed parts. */
-export const EXPOSED_HEAT_FRACTION = 0.4;
+export const EXPOSED_HEAT_FRACTION: number = 0.4;
 
 // ---------------------------------------------------------------------------
 // Air density model
@@ -97,16 +127,11 @@ export const EXPOSED_HEAT_FRACTION = 0.4;
 
 /**
  * Compute air density at the given altitude using the exponential atmosphere
- * model:
+ * model.
  *
- *   density = SEA_LEVEL_DENSITY × exp(−altitude / SCALE_HEIGHT)
- *
- * Returns 0 at or above {@link ATMOSPHERE_TOP} (effective vacuum).
- *
- * @param {number} altitude  Metres above sea level (clamped to ≥ 0 internally).
- * @returns {number}  Air density in kg/m³.
+ * Returns 0 at or above ATMOSPHERE_TOP (effective vacuum).
  */
-export function airDensity(altitude) {
+export function airDensity(altitude: number): number {
   if (altitude >= ATMOSPHERE_TOP) return 0;
   const clamped = Math.max(0, altitude);
   return SEA_LEVEL_DENSITY * Math.exp(-clamped / SCALE_HEIGHT);
@@ -116,34 +141,23 @@ export function airDensity(altitude) {
  * Compute air density for any celestial body at the given altitude.
  * Uses the body's atmosphere profile from the celestial body data system.
  * Returns 0 for airless bodies or altitudes above the atmosphere top.
- *
- * @param {number} altitude  Metres above body surface.
- * @param {string} bodyId    Celestial body ID (e.g., 'EARTH', 'MARS', 'VENUS').
- * @returns {number}  Air density in kg/m³.
  */
-export function airDensityForBody(altitude, bodyId) {
+export function airDensityForBody(altitude: number, bodyId: string): number {
   return _bodyAirDensity(altitude, bodyId);
 }
 
 /**
  * Get the atmosphere top altitude for a body. Returns 0 for airless bodies.
- * @param {string} bodyId
- * @returns {number}
  */
-export function atmosphereTopForBody(bodyId) {
+export function atmosphereTopForBody(bodyId: string): number {
   return _bodyAtmoTop(bodyId);
 }
 
 /**
  * Check heating condition for any celestial body.
  * Uses the body's atmosphere top instead of the hardcoded Earth value.
- *
- * @param {number} altitude  Metres above body surface.
- * @param {number} speed     Rocket speed magnitude (m/s).
- * @param {string} bodyId    Celestial body ID.
- * @returns {boolean}
  */
-export function isReentryConditionForBody(altitude, speed, bodyId) {
+export function isReentryConditionForBody(altitude: number, speed: number, bodyId: string): boolean {
   const top = _bodyAtmoTop(bodyId);
   if (top <= 0) return false; // Airless bodies have no reentry heating
   return altitude < top && speed > REENTRY_SPEED_THRESHOLD;
@@ -156,21 +170,9 @@ export function isReentryConditionForBody(altitude, speed, bodyId) {
 /**
  * Compute the terminal (maximum free-fall) velocity at the given conditions.
  *
- *   v_terminal = √( 2 × mass × gravity / (density × Cd × area) )
- *
- * This is purely informational — drag automatically enforces terminal velocity
- * without any hard speed clamp being needed.
- *
- * Returns {@link Infinity} in vacuum (density ≤ 0) or when area/Cd is zero.
- *
- * @param {number} mass     Total rocket mass (kg).
- * @param {number} gravity  Gravitational acceleration (m/s²).
- * @param {number} density  Air density at current altitude (kg/m³).
- * @param {number} Cd       Drag coefficient (dimensionless).
- * @param {number} area     Cross-sectional reference area (m²).
- * @returns {number}  Terminal velocity in m/s.
+ * Returns Infinity in vacuum (density <= 0) or when area/Cd is zero.
  */
-export function terminalVelocity(mass, gravity, density, Cd, area) {
+export function terminalVelocity(mass: number, gravity: number, density: number, Cd: number, area: number): number {
   const denominator = density * Cd * area;
   if (denominator <= 0) return Infinity;
   return Math.sqrt((2 * mass * gravity) / denominator);
@@ -182,14 +184,8 @@ export function terminalVelocity(mass, gravity, density, Cd, area) {
 
 /**
  * Return true when flight conditions require atmospheric heat to be applied.
- *
- * Conditions: altitude < {@link ATMOSPHERE_TOP}  AND  speed > {@link REENTRY_SPEED_THRESHOLD}
- *
- * @param {number} altitude  Metres above sea level.
- * @param {number} speed     Rocket speed magnitude (m/s).
- * @returns {boolean}
  */
-export function isReentryCondition(altitude, speed) {
+export function isReentryCondition(altitude: number, speed: number): boolean {
   return altitude < ATMOSPHERE_TOP && speed > REENTRY_SPEED_THRESHOLD;
 }
 
@@ -197,15 +193,9 @@ export function isReentryCondition(altitude, speed) {
  * Compute the heat rate for a single fixed-timestep tick under atmospheric
  * heating conditions.
  *
- *   heatRate = (speed − REENTRY_SPEED_THRESHOLD) × density × HEAT_RATE_COEFF
- *
  * Returns 0 if speed is at or below the threshold.
- *
- * @param {number} speed    Rocket speed magnitude (m/s).
- * @param {number} density  Air density at current altitude (kg/m³).
- * @returns {number}  Heat units added per tick.
  */
-export function computeHeatRate(speed, density) {
+export function computeHeatRate(speed: number, density: number): number {
   if (speed <= REENTRY_SPEED_THRESHOLD) return 0;
   return (speed - REENTRY_SPEED_THRESHOLD) * density * HEAT_RATE_COEFF;
 }
@@ -218,23 +208,15 @@ export function computeHeatRate(speed, density) {
  * Return the instance ID of the part currently at the "leading face" of travel.
  *
  * The leading face is the portion of the rocket that meets oncoming air first:
- *
- *   Descending (velY < 0)  → lowest-Y part in world space (bottom of stack).
- *   Ascending  (velY ≥ 0)  → highest-Y part in world space (nose / top of stack).
- *
- * Parts use Y-up world-space coordinates (from rocketbuilder.js), so higher
- * `placed.y` values correspond to higher physical positions on the rocket.
+ *   Descending (velY < 0)  -> lowest-Y part in world space (bottom of stack).
+ *   Ascending  (velY >= 0) -> highest-Y part in world space (nose / top of stack).
  *
  * Falls back to the first active part when `activeParts` contains only one
  * element, or returns null if no active parts exist.
- *
- * @param {{ velY: number, activeParts: Set<string> }} ps  Physics state (minimal duck-type).
- * @param {{ parts: Map<string, { y: number }> }}    assembly
- * @returns {string|null}  Instance ID of the leading part, or null.
  */
-export function getLeadingPartId(ps, assembly) {
+export function getLeadingPartId(ps: HeatQueryPhysics, assembly: HeatQueryAssembly): string | null {
   const descending = ps.velY < 0;
-  let leadingId = null;
+  let leadingId: string | null = null;
   let extremeY  = descending ? Infinity : -Infinity;
 
   for (const instanceId of ps.activeParts) {
@@ -259,24 +241,19 @@ export function getLeadingPartId(ps, assembly) {
  *
  * A heat shield protects parts that are "behind" it relative to the direction
  * of travel:
- *   Descending (velY < 0): leading face is bottom → shield protects parts
+ *   Descending (velY < 0): leading face is bottom -> shield protects parts
  *     with Y > shield.Y (above the shield in the stack).
- *   Ascending  (velY ≥ 0): leading face is top → shield protects parts
+ *   Ascending  (velY >= 0): leading face is top -> shield protects parts
  *     with Y < shield.Y (below the shield in the stack).
  *
  * Only active heat shields (present in ps.activeParts) provide protection.
- * Radial parts are not protected — only stack-aligned parts behind the shield.
- *
- * @param {{ velY: number, activeParts: Set<string> }} ps
- * @param {{ parts: Map<string, { y: number, partId: string }> }} assembly
- * @returns {Set<string>}  Instance IDs of shielded parts.
  */
-export function getShieldedPartIds(ps, assembly) {
-  const shielded = new Set();
+export function getShieldedPartIds(ps: HeatQueryPhysics, assembly: HeatQueryAssembly): Set<string> {
+  const shielded = new Set<string>();
   const descending = ps.velY < 0;
 
   // Find all active heat shields.
-  const shields = [];
+  const shields: { instanceId: string; y: number; halfWidth: number; x: number }[] = [];
   for (const instanceId of ps.activeParts) {
     const placed = assembly.parts.get(instanceId);
     if (!placed) continue;
@@ -331,16 +308,13 @@ export function getShieldedPartIds(ps, assembly) {
  *
  * Priority order:
  *   1. `def.properties.heatTolerance` if explicitly set on the part.
- *   2. {@link HEAT_SHIELD_TOLERANCE} for HEAT_SHIELD type parts.
- *   3. {@link DEFAULT_HEAT_TOLERANCE} for all other parts.
- *
- * @param {import('../data/parts.js').PartDef|null|undefined} def
- * @returns {number}  Heat tolerance in arbitrary heat units.
+ *   2. HEAT_SHIELD_TOLERANCE for HEAT_SHIELD type parts.
+ *   3. DEFAULT_HEAT_TOLERANCE for all other parts.
  */
-export function getHeatTolerance(def) {
+export function getHeatTolerance(def: PartDef | null | undefined): number {
   if (!def) return DEFAULT_HEAT_TOLERANCE;
   if (Object.prototype.hasOwnProperty.call(def.properties ?? {}, 'heatTolerance')) {
-    return def.properties.heatTolerance;
+    return def.properties.heatTolerance as number;
   }
   if (def.type === PartType.HEAT_SHIELD) {
     return HEAT_SHIELD_TOLERANCE;
@@ -353,15 +327,10 @@ export function getHeatTolerance(def) {
 // ---------------------------------------------------------------------------
 
 /**
- * Return the heat ratio (0–1) for a given part, where 0 is cold and 1 is at
+ * Return the heat ratio (0-1) for a given part, where 0 is cold and 1 is at
  * the part's thermal tolerance limit. Used by the renderer for glow intensity.
- *
- * @param {{ heatMap: Map<string, number>, activeParts: Set<string> }} ps
- * @param {string} instanceId
- * @param {{ parts: Map<string, { partId: string }> }} assembly
- * @returns {number}  Heat ratio clamped to [0, 1].
  */
-export function getHeatRatio(ps, instanceId, assembly) {
+export function getHeatRatio(ps: HeatRatioPhysics, instanceId: string, assembly: HeatRatioAssembly): number {
   const heat = ps.heatMap.get(instanceId) ?? 0;
   if (heat <= 0) return 0;
   const placed = assembly.parts.get(instanceId);
@@ -380,25 +349,15 @@ export function getHeatRatio(ps, instanceId, assembly) {
  * tolerance.
  *
  * Call once per fixed-timestep integration step (typically dt = 1/60 s).
- *
- * Heat rules per tick:
- *   IN heating zone → leading part: `currentHeat += heatRate`
- *                     other exposed parts: `currentHeat += heatRate × 0.4`
- *                     shielded parts: `currentHeat = max(0, currentHeat − 5)`
- *   NOT in heating zone → all parts: `currentHeat = max(0, currentHeat − 5)`
- *
- * Destruction: when `currentHeat > heatTolerance`, the part is removed from
- * `ps.activeParts` and `ps.firingEngines`, its heat entry is deleted, and a
- * `PART_DESTROYED` event is appended to `flightState.events`.
- *
- * @param {import('./physics.js').PhysicsState}            ps
- * @param {import('./rocketbuilder.js').RocketAssembly}    assembly
- * @param {import('./gameState.js').FlightState}           flightState
- * @param {number} speed     Rocket speed magnitude (m/s).
- * @param {number} altitude  Altitude above sea level (m).
- * @param {number} density   Air density at current altitude (kg/m³).
  */
-export function updateHeat(ps, assembly, flightState, speed, altitude, density) {
+export function updateHeat(
+  ps: PhysicsState,
+  assembly: RocketAssembly,
+  flightState: FlightState,
+  speed: number,
+  altitude: number,
+  density: number,
+): void {
   const reentry  = isReentryCondition(altitude, speed);
   const heatRate = reentry ? computeHeatRate(speed, density) : 0;
 
@@ -406,9 +365,9 @@ export function updateHeat(ps, assembly, flightState, speed, altitude, density) 
   const leadingId = reentry ? getLeadingPartId(ps, assembly) : null;
 
   // Determine which parts are protected by heat shields.
-  const shielded = reentry ? getShieldedPartIds(ps, assembly) : new Set();
+  const shielded = reentry ? getShieldedPartIds(ps, assembly) : new Set<string>();
 
-  const toDestroy = [];
+  const toDestroy: { instanceId: string; name: string }[] = [];
 
   for (const instanceId of ps.activeParts) {
     let heat = ps.heatMap.get(instanceId) ?? 0;
@@ -452,7 +411,7 @@ export function updateHeat(ps, assembly, flightState, speed, altitude, density) 
       partName:    name,
       altitude,
       description: `${name} destroyed by atmospheric heating at ${altitude.toFixed(0)} m.`,
-    });
+    } as any);
   }
 }
 
@@ -463,18 +422,10 @@ export function updateHeat(ps, assembly, flightState, speed, altitude, density) 
 /**
  * Compute the solar heat rate at a given altitude above the Sun's surface.
  *
- * Uses inverse-square scaling from the Sun's centre:
- *   heatRate = BASE × (startDist / dist)²
- *
- * where `startDist` = SUN_HEAT_START_ALTITUDE + Sun radius
- *   and `dist`      = altitude + Sun radius.
- *
+ * Uses inverse-square scaling from the Sun's centre.
  * Returns 0 when the altitude is above SUN_HEAT_START_ALTITUDE.
- *
- * @param {number} altitude  Altitude above Sun surface in metres.
- * @returns {number}  Heat units per tick.
  */
-export function computeSolarHeatRate(altitude) {
+export function computeSolarHeatRate(altitude: number): number {
   if (altitude >= SUN_HEAT_START_ALTITUDE) return 0;
 
   const sunRadius = BODY_RADIUS.SUN;
@@ -490,14 +441,13 @@ export function computeSolarHeatRate(altitude) {
  * Return the best solar heat resistance among active heat shields.
  *
  * Heat shields with the `solarHeatResistance` property (e.g. Solar Heat
- * Shield) provide their declared resistance (0–1).  Standard heat shields
+ * Shield) provide their declared resistance (0-1).  Standard heat shields
  * without the property provide STANDARD_SHIELD_SOLAR_RESISTANCE (0.3).
- *
- * @param {Set<string>} activeParts
- * @param {Map<string, { partId: string }>} assemblyParts
- * @returns {number}  Best resistance factor (0–1), or 0 if no shields.
  */
-function _getBestSolarShieldResistance(activeParts, assemblyParts) {
+function _getBestSolarShieldResistance(
+  activeParts: Set<string>,
+  assemblyParts: Map<string, { partId: string }>,
+): number {
   let best = 0;
   for (const instanceId of activeParts) {
     const placed = assemblyParts.get(instanceId);
@@ -505,7 +455,7 @@ function _getBestSolarShieldResistance(activeParts, assemblyParts) {
     const def = getPartById(placed.partId);
     if (!def || def.type !== PartType.HEAT_SHIELD) continue;
 
-    const resistance = def.properties?.solarHeatResistance ?? STANDARD_SHIELD_SOLAR_RESISTANCE;
+    const resistance = (def.properties?.solarHeatResistance as number) ?? STANDARD_SHIELD_SOLAR_RESISTANCE;
     if (resistance > best) best = resistance;
   }
   return best;
@@ -523,13 +473,13 @@ function _getBestSolarShieldResistance(activeParts, assemblyParts) {
  * DESTRUCTION ZONE: If altitude < SUN_DESTRUCTION_ALTITUDE, ALL parts are
  * instantly destroyed — the craft is vaporised.  This is the point of no
  * return.
- *
- * @param {import('./physics.js').PhysicsState}          ps
- * @param {import('./rocketbuilder.js').RocketAssembly}  assembly
- * @param {import('./gameState.js').FlightState}         flightState
- * @param {number} altitude  Altitude above Sun surface (m).
  */
-export function updateSolarHeat(ps, assembly, flightState, altitude) {
+export function updateSolarHeat(
+  ps: PhysicsState,
+  assembly: RocketAssembly,
+  flightState: FlightState,
+  altitude: number,
+): void {
   // Only applies when orbiting / flying near the Sun.
   if (altitude >= SUN_HEAT_START_ALTITUDE) return;
 
@@ -552,7 +502,7 @@ export function updateSolarHeat(ps, assembly, flightState, altitude) {
         partName:    name,
         altitude,
         description: `${name} vaporised by solar inferno at ${(altitude / 1_000_000).toFixed(0)} Mm altitude.`,
-      });
+      } as any);
     }
     return;
   }
@@ -563,9 +513,9 @@ export function updateSolarHeat(ps, assembly, flightState, altitude) {
 
   // Determine shield protection.
   const shieldResistance = _getBestSolarShieldResistance(ps.activeParts, assembly.parts);
-  const shielded = shieldResistance > 0 ? getShieldedPartIds(ps, assembly) : new Set();
+  const shielded = shieldResistance > 0 ? getShieldedPartIds(ps, assembly) : new Set<string>();
 
-  const toDestroy = [];
+  const toDestroy: { instanceId: string; name: string }[] = [];
 
   for (const instanceId of ps.activeParts) {
     let heat = ps.heatMap.get(instanceId) ?? 0;
@@ -601,6 +551,6 @@ export function updateSolarHeat(ps, assembly, flightState, altitude) {
       partName:    name,
       altitude,
       description: `${name} destroyed by solar radiation at ${(altitude / 1_000_000).toFixed(0)} Mm from the Sun.`,
-    });
+    } as any);
   }
 }

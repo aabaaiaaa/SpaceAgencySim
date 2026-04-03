@@ -1,5 +1,5 @@
 /**
- * collision.js — Collision detection, response, and separation impulse.
+ * collision.ts — Collision detection, response, and separation impulse.
  *
  * Handles:
  *   - AABB (axis-aligned bounding box) computation for rocket/debris bodies
@@ -21,10 +21,10 @@
  *   forward and the lower stage backward.
  *
  * PUBLIC API
- *   computeAABB(activeParts, assemblyParts, posX, posY, angle)  → AABB
- *   testAABBOverlap(a, b)                                       → boolean
- *   tickCollisions(ps, assembly, dt)                             → void
- *   applySeparationImpulse(ps, debris, assembly)                 → void
+ *   computeAABB(activeParts, assemblyParts, posX, posY, angle)  -> AABB
+ *   testAABBOverlap(a, b)                                       -> boolean
+ *   tickCollisions(ps, assembly, dt)                             -> void
+ *   applySeparationImpulse(ps, debris, assembly)                 -> void
  *
  * @module collision
  */
@@ -32,35 +32,82 @@
 import { getPartById } from '../data/parts.js';
 import { airDensity }  from './atmosphere.js';
 
+import type { PhysicsState, RocketAssembly } from './physics.js';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+/** Axis-aligned bounding box. */
+export interface AABB {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+}
+
+/** Minimal placed-part shape needed by collision helpers. */
+interface PlacedPartLike {
+  x: number;
+  y: number;
+  partId: string;
+}
+
+/** A debris-like body with position, velocity, angular velocity, and active parts. */
+interface DebrisLike {
+  activeParts: Set<string>;
+  fuelStore: Map<string, number>;
+  posX: number;
+  posY: number;
+  velX: number;
+  velY: number;
+  angle: number;
+  angularVelocity: number;
+  landed: boolean;
+  crashed: boolean;
+  collisionCooldown?: number;
+}
+
+/** Internal body wrapper used during collision tick. */
+interface CollisionBody {
+  type: string;
+  ref: { posX: number; posY: number; velX: number; velY: number; angle: number; angularVelocity?: number };
+  activeParts: Set<string>;
+  fuelStore: Map<string, number>;
+  cooldown: number;
+  aabb?: AABB;
+  mass?: number;
+}
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-/** N·s impulse applied at decoupling to push stages apart. */
-const SEPARATION_IMPULSE = 2000;
+/** N*s impulse applied at decoupling to push stages apart. */
+const SEPARATION_IMPULSE: number = 2000;
 
 /** Bounciness coefficient (0 = inelastic, 1 = perfectly elastic). */
-const BASE_RESTITUTION = 0.3;
+const BASE_RESTITUTION: number = 0.3;
 
 /** How much atmospheric density reduces restitution. */
-const DENSITY_DAMPING_COEFF = 0.16;
+const DENSITY_DAMPING_COEFF: number = 0.16;
 
 /** Minimum restitution floor to prevent fully dead collisions. */
-const MIN_RESTITUTION = 0.05;
+const MIN_RESTITUTION: number = 0.05;
 
 /** Metres of allowed overlap before positional correction kicks in. */
-const POSITION_SLOP = 0.01;
+const POSITION_SLOP: number = 0.01;
 
 /** Fraction of penetration corrected per tick. */
-const POSITION_CORRECTION_RATE = 0.5;
+const POSITION_CORRECTION_RATE: number = 0.5;
 
 /** Number of ticks (~1s at 60 Hz) to skip collisions after separation.
  *  Must be long enough for the separation impulse + any active thrust to
  *  physically separate the two bodies before collision detection activates. */
-const SEPARATION_COOLDOWN_TICKS = 10;
+const SEPARATION_COOLDOWN_TICKS: number = 10;
 
-/** Scale factor: metres per pixel at default 1× zoom. */
-const SCALE_M_PER_PX = 0.05;
+/** Scale factor: metres per pixel at default 1x zoom. */
+const SCALE_M_PER_PX: number = 0.05;
 
 // ---------------------------------------------------------------------------
 // Private helpers
@@ -68,32 +115,32 @@ const SCALE_M_PER_PX = 0.05;
 
 /**
  * Compute total mass (dry + fuel) for a set of active parts.
- * @param {Set<string>} activeParts
- * @param {Map<string,number>} fuelStore
- * @param {Map<string,object>} assemblyParts
- * @returns {number} Mass in kg (min 1).
  */
-function _bodyMass(activeParts, fuelStore, assemblyParts) {
+function _bodyMass(
+  activeParts: Set<string>,
+  fuelStore: Map<string, number>,
+  assemblyParts: Map<string, PlacedPartLike>,
+): number {
   let mass = 0;
   for (const id of activeParts) {
     const placed = assemblyParts.get(id);
     const def = placed ? getPartById(placed.partId) : null;
     if (def) mass += def.mass ?? 0;
     const fuel = fuelStore.get(id);
-    if (fuel > 0) mass += fuel;
+    if (fuel != null && fuel > 0) mass += fuel;
   }
   return Math.max(1, mass);
 }
 
 /**
  * Compute moment of inertia about CoM using point-mass approximation.
- * I = Σ(m_i × r_i²)  where r_i is distance from part centre to CoM.
- * @param {Set<string>} activeParts
- * @param {Map<string,number>} fuelStore
- * @param {Map<string,object>} assemblyParts
- * @returns {number} Moment of inertia in kg·m² (min 1).
+ * I = Sum(m_i * r_i^2)  where r_i is distance from part centre to CoM.
  */
-function _bodyMoI(activeParts, fuelStore, assemblyParts) {
+function _bodyMoI(
+  activeParts: Set<string>,
+  fuelStore: Map<string, number>,
+  assemblyParts: Map<string, PlacedPartLike>,
+): number {
   // First pass: find CoM
   let totalMass = 0;
   let comX = 0;
@@ -111,7 +158,7 @@ function _bodyMoI(activeParts, fuelStore, assemblyParts) {
   comX /= totalMass;
   comY /= totalMass;
 
-  // Second pass: sum I = Σ m_i * r_i²
+  // Second pass: sum I = Sum m_i * r_i^2
   let I = 0;
   for (const id of activeParts) {
     const placed = assemblyParts.get(id);
@@ -128,11 +175,11 @@ function _bodyMoI(activeParts, fuelStore, assemblyParts) {
 /**
  * Average Y position (in VAB pixels) of a body's active parts.
  * Used to determine which fragment is "above" vs "below".
- * @param {Set<string>} activeParts
- * @param {Map<string,object>} assemblyParts
- * @returns {number}
  */
-function _averagePartY(activeParts, assemblyParts) {
+function _averagePartY(
+  activeParts: Set<string>,
+  assemblyParts: Map<string, PlacedPartLike>,
+): number {
   let sum = 0;
   let count = 0;
   for (const id of activeParts) {
@@ -152,17 +199,16 @@ function _averagePartY(activeParts, assemblyParts) {
 /**
  * Compute an axis-aligned bounding box for a body in world-space metres.
  *
- * For each active part: get 4 corners from placed.x/y ± halfW/halfH (pixels),
+ * For each active part: get 4 corners from placed.x/y +/- halfW/halfH (pixels),
  * rotate by the body's angle, scale to metres, and offset by posX/posY.
- *
- * @param {Set<string>} activeParts
- * @param {Map<string,object>} assemblyParts
- * @param {number} posX  Body world X (metres).
- * @param {number} posY  Body world Y (metres).
- * @param {number} angle Body orientation (radians, 0 = up).
- * @returns {{ minX: number, maxX: number, minY: number, maxY: number }}
  */
-export function computeAABB(activeParts, assemblyParts, posX, posY, angle) {
+export function computeAABB(
+  activeParts: Set<string>,
+  assemblyParts: Map<string, PlacedPartLike>,
+  posX: number,
+  posY: number,
+  angle: number,
+): AABB {
   let minX = Infinity;
   let maxX = -Infinity;
   let minY = Infinity;
@@ -179,7 +225,7 @@ export function computeAABB(activeParts, assemblyParts, posX, posY, angle) {
     const halfW = ((def.width ?? 40) / 2) * SCALE_M_PER_PX;
     const halfH = ((def.height ?? 40) / 2) * SCALE_M_PER_PX;
 
-    // Part centre in local metres (VAB Y-up → world Y-up)
+    // Part centre in local metres (VAB Y-up -> world Y-up)
     const cx = placed.x * SCALE_M_PER_PX;
     const cy = placed.y * SCALE_M_PER_PX;
 
@@ -193,9 +239,6 @@ export function computeAABB(activeParts, assemblyParts, posX, posY, angle) {
 
     for (const { lx, ly } of corners) {
       // Rotate around origin (body pivot), then translate to world pos.
-      // angle=0 is up (+Y), rotation is clockwise.
-      // World X = posX + lx*cos(angle) + ly*sin(angle)
-      // World Y = posY - lx*sin(angle) + ly*cos(angle)
       const wx = posX + lx * cosA + ly * sinA;
       const wy = posY - lx * sinA + ly * cosA;
 
@@ -215,11 +258,8 @@ export function computeAABB(activeParts, assemblyParts, posX, posY, angle) {
 
 /**
  * Test whether two AABBs overlap.
- * @param {{ minX: number, maxX: number, minY: number, maxY: number }} a
- * @param {{ minX: number, maxX: number, minY: number, maxY: number }} b
- * @returns {boolean}
  */
-export function testAABBOverlap(a, b) {
+export function testAABBOverlap(a: AABB, b: AABB): boolean {
   return a.minX <= b.maxX && a.maxX >= b.minX &&
          a.minY <= b.maxY && a.maxY >= b.minY;
 }
@@ -232,21 +272,17 @@ export function testAABBOverlap(a, b) {
  * Run collision detection and response for all active flight bodies.
  *
  * Called once per FIXED_DT from the physics tick loop.
- *
- * @param {import('./physics.js').PhysicsState} ps
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @param {number} dt  Fixed timestep in seconds.
  */
-export function tickCollisions(ps, assembly, dt) {
+export function tickCollisions(ps: PhysicsState, assembly: RocketAssembly, dt: number): void {
   // 1. Decrement collision cooldowns on all debris.
   for (const debris of ps.debris) {
-    if (debris.collisionCooldown > 0) {
-      debris.collisionCooldown--;
+    if ((debris as any).collisionCooldown > 0) {
+      (debris as any).collisionCooldown--;
     }
   }
 
   // 2. Collect active bodies: main rocket + non-landed/crashed debris.
-  const bodies = [];
+  const bodies: CollisionBody[] = [];
 
   // Main rocket (only if still flying)
   if (!ps.landed && !ps.crashed && ps.activeParts.size > 0) {
@@ -266,7 +302,7 @@ export function tickCollisions(ps, assembly, dt) {
       ref: debris,
       activeParts: debris.activeParts,
       fuelStore: debris.fuelStore,
-      cooldown: debris.collisionCooldown ?? 0,
+      cooldown: (debris as any).collisionCooldown ?? 0,
     });
   }
 
@@ -277,12 +313,12 @@ export function tickCollisions(ps, assembly, dt) {
   for (const body of bodies) {
     body.aabb = computeAABB(
       body.activeParts,
-      assembly.parts,
+      assembly.parts as Map<string, PlacedPartLike>,
       body.ref.posX,
       body.ref.posY,
       body.ref.angle,
     );
-    body.mass = _bodyMass(body.activeParts, body.fuelStore, assembly.parts);
+    body.mass = _bodyMass(body.activeParts, body.fuelStore, assembly.parts as Map<string, PlacedPartLike>);
   }
 
   // 5. Test all pairs.
@@ -295,7 +331,7 @@ export function tickCollisions(ps, assembly, dt) {
       if (a.cooldown > 0 || b.cooldown > 0) continue;
 
       // 7. Test overlap.
-      if (!testAABBOverlap(a.aabb, b.aabb)) continue;
+      if (!testAABBOverlap(a.aabb!, b.aabb!)) continue;
 
       // Resolve collision.
       _resolveCollision(a, b, assembly, dt);
@@ -312,14 +348,10 @@ export function tickCollisions(ps, assembly, dt) {
  * debris fragment apart.
  *
  * Called from staging.js immediately after debris creation.
- *
- * @param {import('./physics.js').PhysicsState} ps
- * @param {import('./staging.js').DebrisState} debris
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
  */
-export function applySeparationImpulse(ps, debris, assembly) {
-  const rocketMass = _bodyMass(ps.activeParts, ps.fuelStore, assembly.parts);
-  const debrisMass = _bodyMass(debris.activeParts, debris.fuelStore, assembly.parts);
+export function applySeparationImpulse(ps: PhysicsState, debris: DebrisLike, assembly: RocketAssembly): void {
+  const rocketMass = _bodyMass(ps.activeParts, ps.fuelStore, assembly.parts as Map<string, PlacedPartLike>);
+  const debrisMass = _bodyMass(debris.activeParts, debris.fuelStore, assembly.parts as Map<string, PlacedPartLike>);
 
   // Direction: along rocket's orientation axis.
   // angle=0 means pointing up, so forward = (sin(angle), cos(angle)).
@@ -328,8 +360,8 @@ export function applySeparationImpulse(ps, debris, assembly) {
 
   // Determine which fragment is "above" (higher average Y in VAB space).
   // Higher Y = further forward along the rocket.
-  const rocketAvgY = _averagePartY(ps.activeParts, assembly.parts);
-  const debrisAvgY = _averagePartY(debris.activeParts, assembly.parts);
+  const rocketAvgY = _averagePartY(ps.activeParts, assembly.parts as Map<string, PlacedPartLike>);
+  const debrisAvgY = _averagePartY(debris.activeParts, assembly.parts as Map<string, PlacedPartLike>);
 
   // If debris is the lower stage (lower avgY), push it backward.
   // If debris is the upper stage (higher avgY), push it forward.
@@ -337,7 +369,7 @@ export function applySeparationImpulse(ps, debris, assembly) {
   const debrisSign = debrisIsLower ? -1 : 1;
   const rocketSign = -debrisSign;
 
-  // Apply impulse: Δv = impulse / mass (lighter body moves more).
+  // Apply impulse: dv = impulse / mass (lighter body moves more).
   const debrisDv = SEPARATION_IMPULSE / debrisMass;
   const rocketDv = SEPARATION_IMPULSE / rocketMass;
 
@@ -353,14 +385,10 @@ export function applySeparationImpulse(ps, debris, assembly) {
 
 /**
  * Resolve a collision between two overlapping bodies.
- * @param {object} a  Body wrapper { ref, aabb, mass, activeParts, fuelStore }
- * @param {object} b  Body wrapper
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @param {number} dt
  */
-function _resolveCollision(a, b, assembly, dt) {
-  const aabbA = a.aabb;
-  const aabbB = b.aabb;
+function _resolveCollision(a: CollisionBody, b: CollisionBody, assembly: RocketAssembly, dt: number): void {
+  const aabbA = a.aabb!;
+  const aabbB = b.aabb!;
 
   // Find penetration on each axis.
   const overlapX1 = aabbA.maxX - aabbB.minX;
@@ -374,7 +402,7 @@ function _resolveCollision(a, b, assembly, dt) {
   // Collision normal: axis of minimum penetration.
   let nx = 0;
   let ny = 0;
-  let penetration;
+  let penetration: number;
 
   if (minOverlapX < minOverlapY) {
     penetration = minOverlapX;
@@ -398,14 +426,14 @@ function _resolveCollision(a, b, assembly, dt) {
   const e = Math.max(MIN_RESTITUTION, BASE_RESTITUTION - DENSITY_DAMPING_COEFF * density);
 
   // Impulse magnitude.
-  const invMassSum = 1 / a.mass + 1 / b.mass;
+  const invMassSum = 1 / a.mass! + 1 / b.mass!;
   const j = -(1 + e) * relVelNormal / invMassSum;
 
   // Apply velocity impulse (Newton's third law).
-  a.ref.velX += (j / a.mass) * nx;
-  a.ref.velY += (j / a.mass) * ny;
-  b.ref.velX -= (j / b.mass) * nx;
-  b.ref.velY -= (j / b.mass) * ny;
+  a.ref.velX += (j / a.mass!) * nx;
+  a.ref.velY += (j / a.mass!) * ny;
+  b.ref.velX -= (j / b.mass!) * nx;
+  b.ref.velY -= (j / b.mass!) * ny;
 
   // Angular impulse from off-centre contact.
   // Contact point at overlap centre.
@@ -424,19 +452,19 @@ function _resolveCollision(a, b, assembly, dt) {
   const rBx = contactX - centreBX;
   const rBy = contactY - centreBY;
 
-  // Torque = r × F (2D cross product: rx*Fy - ry*Fx)
+  // Torque = r x F (2D cross product: rx*Fy - ry*Fx)
   const forceX = j * nx;
   const forceY = j * ny;
   const torqueA = rAx * forceY - rAy * forceX;
   const torqueB = rBx * (-forceY) - rBy * (-forceX);
 
-  // Apply angular impulse: Δω = torque × dt / I
+  // Apply angular impulse: dw = torque * dt / I
   if (a.ref.angularVelocity != null) {
-    const Ia = _bodyMoI(a.activeParts, a.fuelStore, assembly.parts);
+    const Ia = _bodyMoI(a.activeParts, a.fuelStore, assembly.parts as Map<string, PlacedPartLike>);
     a.ref.angularVelocity += torqueA * dt / Ia;
   }
   if (b.ref.angularVelocity != null) {
-    const Ib = _bodyMoI(b.activeParts, b.fuelStore, assembly.parts);
+    const Ib = _bodyMoI(b.activeParts, b.fuelStore, assembly.parts as Map<string, PlacedPartLike>);
     b.ref.angularVelocity += torqueB * dt / Ib;
   }
 
@@ -444,9 +472,9 @@ function _resolveCollision(a, b, assembly, dt) {
   const correction = Math.max(0, penetration - POSITION_SLOP) * POSITION_CORRECTION_RATE;
   if (correction > 0) {
     const totalInvMass = invMassSum;
-    a.ref.posX += (correction / totalInvMass) * (1 / a.mass) * nx;
-    a.ref.posY += (correction / totalInvMass) * (1 / a.mass) * ny;
-    b.ref.posX -= (correction / totalInvMass) * (1 / b.mass) * nx;
-    b.ref.posY -= (correction / totalInvMass) * (1 / b.mass) * ny;
+    a.ref.posX += (correction / totalInvMass) * (1 / a.mass!) * nx;
+    a.ref.posY += (correction / totalInvMass) * (1 / a.mass!) * ny;
+    b.ref.posX -= (correction / totalInvMass) * (1 / b.mass!) * nx;
+    b.ref.posY -= (correction / totalInvMass) * (1 / b.mass!) * ny;
   }
 }

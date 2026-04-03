@@ -1,8 +1,8 @@
 /**
- * finance.js — Financial system: money, loans, and financial events.
+ * finance.ts — Financial system: money, loans, and financial events.
  *
  * All functions accept the central GameState object as their first argument
- * and mutate it in-place, consistent with the patterns in gameState.js.
+ * and mutate it in-place, consistent with the patterns in gameState.ts.
  *
  * Starting position:
  *   - Cash:         $2,000,000  (the initial loan proceeds)
@@ -22,6 +22,9 @@ import {
 import { getPartById } from '../data/parts.js';
 import { getFinancialMultipliers } from './settings.js';
 
+import type { GameState } from './gameState.js';
+import type { PartDef } from '../data/parts.js';
+
 // ---------------------------------------------------------------------------
 // Interest
 // ---------------------------------------------------------------------------
@@ -31,11 +34,8 @@ import { getFinancialMultipliers } from './settings.js';
  *
  * Call this each time the player completes a mission and returns to the
  * space agency.  Interest compounds: `balance *= 1.03`.
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {void}
  */
-export function applyInterest(state) {
+export function applyInterest(state: GameState): void {
   const interest = state.loan.balance * state.loan.interestRate;
   const paid = Math.min(interest, Math.max(0, state.money));
   state.money -= paid;
@@ -56,13 +56,11 @@ export function applyInterest(state) {
  *   - the player's available cash (cannot pay what you don't have)
  *
  * Both `state.loan.balance` and `state.money` are reduced by the amount paid.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {number} amount  Desired payment amount in dollars.
- * @returns {{ paid: number, newBalance: number, newCash: number }}
- *   `paid` is the amount actually deducted (may be less than `amount`).
  */
-export function payDownLoan(state, amount) {
+export function payDownLoan(
+  state: GameState,
+  amount: number,
+): { paid: number; newBalance: number; newCash: number } {
   const paid = Math.min(amount, state.loan.balance, state.money);
   state.loan.balance -= paid;
   state.money -= paid;
@@ -75,13 +73,11 @@ export function payDownLoan(state, amount) {
  * The total loan balance cannot exceed MAX_LOAN_BALANCE ($10,000,000).
  * If `amount` would push the balance over the cap, only the headroom
  * remaining is disbursed.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {number} amount  Desired borrow amount in dollars.
- * @returns {{ borrowed: number, newBalance: number, newCash: number }}
- *   `borrowed` is the amount actually added (may be less than `amount`).
  */
-export function borrowMore(state, amount) {
+export function borrowMore(
+  state: GameState,
+  amount: number,
+): { borrowed: number; newBalance: number; newCash: number } {
   const headroom = Math.max(0, MAX_LOAN_BALANCE - state.loan.balance);
   const borrowed = Math.min(amount, headroom);
   state.loan.balance += borrowed;
@@ -98,12 +94,8 @@ export function borrowMore(state, amount) {
  *
  * Returns `false` without modifying state if the player has insufficient
  * funds (cash cannot go below $0 via this function).
- *
- * @param {import('./gameState.js').GameState} state
- * @param {number} amount  Amount to deduct in dollars.
- * @returns {boolean}  `true` if the purchase succeeded, `false` otherwise.
  */
-export function spend(state, amount) {
+export function spend(state: GameState, amount: number): boolean {
   if (amount > state.money) return false;
   state.money -= amount;
   return true;
@@ -113,12 +105,8 @@ export function spend(state, amount) {
  * Add earned revenue to the player's cash balance.
  *
  * Used for mission rewards, contract bonuses, and any other income.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {number} amount  Amount to add in dollars.
- * @returns {void}
  */
-export function earn(state, amount) {
+export function earn(state: GameState, amount: number): void {
   state.money += amount;
 }
 
@@ -128,12 +116,8 @@ export function earn(state, amount) {
  * Use this instead of `earn()` for mission rewards, contract payouts,
  * achievement bonuses, and other gameplay rewards.  Non-reward income
  * (part sales, recovery value) should still use `earn()` directly.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {number} amount  Base reward amount in dollars.
- * @returns {number}  Actual amount earned after the difficulty multiplier.
  */
-export function earnReward(state, amount) {
+export function earnReward(state: GameState, amount: number): number {
   const { rewardMult } = getFinancialMultipliers(state);
   const adjusted = Math.round(amount * rewardMult);
   state.money += adjusted;
@@ -150,12 +134,8 @@ export function earnReward(state, amount) {
  * Deducts $500,000 per KIA from the player's cash.  Unlike `spend()`, this
  * fine is always applied even if it drives cash below $0, reflecting that
  * the player cannot refuse a government penalty.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {number} killedCount  Number of astronauts killed on this flight.
- * @returns {void}
  */
-export function applyDeathFine(state, killedCount) {
+export function applyDeathFine(state: GameState, killedCount: number): void {
   state.money -= DEATH_FINE_PER_ASTRONAUT * killedCount;
 }
 
@@ -172,18 +152,15 @@ export function applyDeathFine(state, killedCount) {
  *   - One thrust source: an ENGINE + FUEL_TANK pair, or a SOLID_ROCKET_BOOSTER
  *
  * Returns `Infinity` if the player doesn't have the parts to build any rocket.
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {number}  Minimum cost in dollars, or Infinity if impossible.
  */
-export function getMinimumRocketCost(state) {
+export function getMinimumRocketCost(state: GameState): number {
   const unlocked = state.parts ?? [];
   if (unlocked.length === 0) return Infinity;
 
   // Find cheapest command/computer module.
   let cheapestCommand = Infinity;
   for (const partId of unlocked) {
-    const def = getPartById(partId);
+    const def: PartDef | undefined = getPartById(partId);
     if (!def) continue;
     if (def.type === PartType.COMMAND_MODULE || def.type === PartType.COMPUTER_MODULE) {
       cheapestCommand = Math.min(cheapestCommand, def.cost);
@@ -197,7 +174,7 @@ export function getMinimumRocketCost(state) {
   let cheapestTank = Infinity;
 
   for (const partId of unlocked) {
-    const def = getPartById(partId);
+    const def: PartDef | undefined = getPartById(partId);
     if (!def) continue;
     if (def.type === PartType.SOLID_ROCKET_BOOSTER) {
       cheapestSRB = Math.min(cheapestSRB, def.cost);
@@ -225,11 +202,8 @@ export function getMinimumRocketCost(state) {
  * Bankruptcy occurs when the player's available purchasing power (current
  * cash + remaining borrowing capacity) is less than the cost of the
  * cheapest buildable rocket.
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {boolean}  True if the player is bankrupt.
  */
-export function isBankrupt(state) {
+export function isBankrupt(state: GameState): boolean {
   const minCost = getMinimumRocketCost(state);
   if (minCost === Infinity) return false; // No parts = not bankruptcy, just early game.
 

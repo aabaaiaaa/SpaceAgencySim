@@ -105,7 +105,7 @@ import type { FlightState, OrbitalElements, PowerState, GameState } from './game
 // ---------------------------------------------------------------------------
 
 /** A placed part in the assembly. */
-interface PlacedPart {
+export interface PlacedPart {
   /** Unique ID for this instance in the build session. */
   instanceId: string;
   /** Part catalog ID referencing a PartDef. */
@@ -119,7 +119,7 @@ interface PlacedPart {
 }
 
 /** One edge in the rocket part graph. */
-interface PartConnection {
+export interface PartConnection {
   fromInstanceId: string;
   /** Index into the source part's snapPoints array. */
   fromSnapIndex: number;
@@ -129,7 +129,7 @@ interface PartConnection {
 }
 
 /** The full rocket assembly. */
-interface RocketAssembly {
+export interface RocketAssembly {
   /** Instance ID → PlacedPart. */
   parts: Map<string, PlacedPart>;
   /** Array of connections between parts. */
@@ -259,7 +259,7 @@ interface ParachuteEntry {
 }
 
 /** Per-landing-leg lifecycle entry. */
-interface LegEntry {
+export interface LegEntry {
   /** Lifecycle state: 'retracted' | 'deploying' | 'deployed'. */
   state: string;
   /** Seconds remaining in deploying animation. */

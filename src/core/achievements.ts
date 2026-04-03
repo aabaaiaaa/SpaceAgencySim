@@ -1,5 +1,5 @@
 /**
- * achievements.js — Prestige milestones and one-time achievement system.
+ * achievements.ts — Prestige milestones and one-time achievement system.
  *
  * Tracks major firsts (first orbit, first satellite, first lunar landing, etc.)
  * and awards one-time cash + reputation bonuses when they are achieved.
@@ -15,41 +15,39 @@ import { earnReward } from './finance.js';
 import { adjustReputation } from './reputation.js';
 import { CelestialBody, CONSTELLATION_THRESHOLD, SatelliteType } from './constants.js';
 
+import type { GameState, FlightState } from './gameState.js';
+import type { PhysicsState } from './physics.js';
+
 // ---------------------------------------------------------------------------
 // Achievement Definitions
 // ---------------------------------------------------------------------------
 
-/**
- * @typedef {Object} AchievementDef
- * @property {string}   id          - Unique identifier.
- * @property {string}   title       - Display name.
- * @property {string}   description - How to earn this achievement.
- * @property {number}   cashReward  - One-time cash bonus (dollars).
- * @property {number}   repReward   - One-time reputation bonus.
- * @property {function(import('./gameState.js').GameState, AchievementCheckContext): boolean} check
- *           - Returns true if the achievement criteria are met right now.
- */
+/** Context passed to achievement check functions with info about the just-completed flight. */
+export interface AchievementCheckContext {
+  flightState: FlightState | null;
+  ps: PhysicsState | null;
+  isLanded: boolean;
+  landingBodyId: string;
+}
 
-/**
- * Context passed to achievement check functions with info about the
- * just-completed flight.
- *
- * @typedef {Object} AchievementCheckContext
- * @property {import('./gameState.js').FlightState|null} flightState
- * @property {import('./physics.js').PhysicsState|null}  ps
- * @property {boolean} isLanded     - True if the craft landed safely.
- * @property {string}  landingBodyId - Body ID where the craft ended up.
- */
+/** Definition for a single achievement. */
+export interface AchievementDef {
+  id: string;
+  title: string;
+  description: string;
+  cashReward: number;
+  repReward: number;
+  check: (state: GameState, ctx: AchievementCheckContext) => boolean;
+}
 
-/** @type {AchievementDef[]} */
-export const ACHIEVEMENTS = [
+export const ACHIEVEMENTS: AchievementDef[] = [
   {
     id: 'FIRST_ORBIT',
     title: 'First Orbit',
     description: 'Achieve a stable orbit around Earth.',
     cashReward: 200_000,
     repReward: 20,
-    check: (state, ctx) => {
+    check: (state: GameState, ctx: AchievementCheckContext): boolean => {
       // The flight reached orbit at any point (flightHistory records it,
       // or the current flight was in orbit). We check flight history for
       // any flight where the craft entered orbit around Earth.
@@ -62,7 +60,7 @@ export const ACHIEVEMENTS = [
     description: 'Deploy a satellite into orbit.',
     cashReward: 150_000,
     repReward: 15,
-    check: (state) => {
+    check: (state: GameState): boolean => {
       return (state.satelliteNetwork?.satellites?.length ?? 0) >= 1;
     },
   },
@@ -72,7 +70,7 @@ export const ACHIEVEMENTS = [
     description: `Deploy ${CONSTELLATION_THRESHOLD}+ satellites of the same type.`,
     cashReward: 300_000,
     repReward: 25,
-    check: (state) => {
+    check: (state: GameState): boolean => {
       return _hasAnyConstellation(state);
     },
   },
@@ -82,7 +80,7 @@ export const ACHIEVEMENTS = [
     description: 'Send a craft to the Moon\'s sphere of influence.',
     cashReward: 500_000,
     repReward: 30,
-    check: (state) => {
+    check: (state: GameState): boolean => {
       return _anyFlightVisitedBody(state, CelestialBody.MOON);
     },
   },
@@ -92,7 +90,7 @@ export const ACHIEVEMENTS = [
     description: 'Achieve a stable orbit around the Moon.',
     cashReward: 750_000,
     repReward: 35,
-    check: (state) => {
+    check: (state: GameState): boolean => {
       return _anyFlightReachedOrbit(state, CelestialBody.MOON);
     },
   },
@@ -102,7 +100,7 @@ export const ACHIEVEMENTS = [
     description: 'Land safely on the Moon.',
     cashReward: 1_000_000,
     repReward: 40,
-    check: (state) => {
+    check: (state: GameState): boolean => {
       return _anyFlightLandedOn(state, CelestialBody.MOON);
     },
   },
@@ -112,7 +110,7 @@ export const ACHIEVEMENTS = [
     description: 'Land on the Moon and return safely to Earth.',
     cashReward: 2_000_000,
     repReward: 50,
-    check: (state, ctx) => {
+    check: (state: GameState, ctx: AchievementCheckContext): boolean => {
       // Must have landed on the Moon (flag or surface item as proof)
       // AND have completed a flight that ended with a safe Earth landing
       // after visiting the Moon.
@@ -125,7 +123,7 @@ export const ACHIEVEMENTS = [
     description: 'Achieve a stable orbit around Mars.',
     cashReward: 3_000_000,
     repReward: 50,
-    check: (state) => {
+    check: (state: GameState): boolean => {
       return _anyFlightReachedOrbit(state, CelestialBody.MARS);
     },
   },
@@ -135,7 +133,7 @@ export const ACHIEVEMENTS = [
     description: 'Land safely on Mars.',
     cashReward: 5_000_000,
     repReward: 60,
-    check: (state) => {
+    check: (state: GameState): boolean => {
       return _anyFlightLandedOn(state, CelestialBody.MARS);
     },
   },
@@ -145,7 +143,7 @@ export const ACHIEVEMENTS = [
     description: 'Collect science data near the Sun.',
     cashReward: 4_000_000,
     repReward: 50,
-    check: (state) => {
+    check: (state: GameState): boolean => {
       return _hasCollectedSolarScience(state);
     },
   },
@@ -155,23 +153,28 @@ export const ACHIEVEMENTS = [
 // Public API
 // ---------------------------------------------------------------------------
 
+/** Info about a newly awarded achievement. */
+export interface AwardedAchievement {
+  id: string;
+  title: string;
+  cashReward: number;
+  repReward: number;
+}
+
 /**
  * Check all achievements against current state and award any newly-earned ones.
  * Called after every flight return.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {AchievementCheckContext}            ctx
- * @returns {{ id: string, title: string, cashReward: number, repReward: number }[]}
- *          List of achievements newly awarded this call.
  */
-export function checkAchievements(state, ctx) {
+export function checkAchievements(
+  state: GameState,
+  ctx: AchievementCheckContext,
+): AwardedAchievement[] {
   if (!Array.isArray(state.achievements)) {
     state.achievements = [];
   }
 
   const earned = new Set(state.achievements.map((a) => a.id));
-  /** @type {{ id: string, title: string, cashReward: number, repReward: number }[]} */
-  const newlyAwarded = [];
+  const newlyAwarded: AwardedAchievement[] = [];
 
   for (const def of ACHIEVEMENTS) {
     if (earned.has(def.id)) continue;
@@ -207,14 +210,22 @@ export function checkAchievements(state, ctx) {
   return newlyAwarded;
 }
 
+/** Achievement status entry with earned info. */
+export interface AchievementStatusEntry {
+  id: string;
+  title: string;
+  description: string;
+  cashReward: number;
+  repReward: number;
+  earned: boolean;
+  earnedPeriod: number | null;
+}
+
 /**
  * Returns the full list of achievement definitions with earned status.
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {{ id: string, title: string, description: string, cashReward: number, repReward: number, earned: boolean, earnedPeriod: number|null }[]}
  */
-export function getAchievementStatus(state) {
-  const earnedMap = new Map(
+export function getAchievementStatus(state: GameState): AchievementStatusEntry[] {
+  const earnedMap = new Map<string, number>(
     (state.achievements ?? []).map((a) => [a.id, a.earnedPeriod]),
   );
 
@@ -238,7 +249,7 @@ export function getAchievementStatus(state) {
  * OR if the current flight is/was in orbit there.
  * We look at orbital objects (satellites stay in orbit) and flight events.
  */
-function _anyFlightReachedOrbit(state, bodyId) {
+function _anyFlightReachedOrbit(state: GameState, bodyId: string): boolean {
   // Check orbital objects — if any orbits this body, someone achieved orbit there.
   const hasOrbitalObject = (state.orbitalObjects ?? []).some(
     (obj) => obj.bodyId === bodyId,
@@ -266,8 +277,8 @@ function _anyFlightReachedOrbit(state, bodyId) {
   // For Earth orbit: check if any mission was completed that required orbit.
   if (bodyId === CelestialBody.EARTH) {
     const orbitMissions = (state.missions?.completed ?? []).some(
-      (m) => Array.isArray(m.objectives) &&
-             m.objectives.some((o) => o.type === 'REACH_ORBIT' && o.completed),
+      (m: any) => Array.isArray(m.objectives) &&
+             m.objectives.some((o: any) => o.type === 'REACH_ORBIT' && o.completed),
     );
     if (orbitMissions) return true;
 
@@ -285,7 +296,7 @@ function _anyFlightReachedOrbit(state, bodyId) {
  * Checks if any flight has visited the given body (transfer/flyby).
  * Evidence: surface items, orbital objects, flight history, or satellite presence.
  */
-function _anyFlightVisitedBody(state, bodyId) {
+function _anyFlightVisitedBody(state: GameState, bodyId: string): boolean {
   // Surface items on the body.
   if ((state.surfaceItems ?? []).some((item) => item.bodyId === bodyId)) return true;
 
@@ -305,7 +316,7 @@ function _anyFlightVisitedBody(state, bodyId) {
  * Checks if any flight successfully landed on the given body.
  * Evidence: surface items (flags, samples, instruments) on that body.
  */
-function _anyFlightLandedOn(state, bodyId) {
+function _anyFlightLandedOn(state: GameState, bodyId: string): boolean {
   // Flags are the strongest evidence of landing.
   if ((state.surfaceItems ?? []).some(
     (item) => item.bodyId === bodyId && item.type === 'FLAG',
@@ -324,7 +335,7 @@ function _anyFlightLandedOn(state, bodyId) {
  * Evidence: has surface items on the Moon AND a flight that ended with safe Earth landing
  * that had visited the Moon (transfer to Moon and back).
  */
-function _hasLunarReturn(state, ctx) {
+function _hasLunarReturn(state: GameState, ctx: AchievementCheckContext): boolean {
   // Must have evidence of a Moon landing.
   if (!_anyFlightLandedOn(state, CelestialBody.MOON)) return false;
 
@@ -360,7 +371,7 @@ function _hasLunarReturn(state, ctx) {
   // A simpler heuristic: if there's a flag on the Moon and a surface sample from the Moon
   // that was collected (returned), that implies a lunar return.
   const moonSamplesReturned = (state.surfaceItems ?? []).some(
-    (item) => item.bodyId === CelestialBody.MOON &&
+    (item: any) => item.bodyId === CelestialBody.MOON &&
               item.type === 'SURFACE_SAMPLE' &&
               item.collected,
   );
@@ -372,8 +383,8 @@ function _hasLunarReturn(state, ctx) {
 /**
  * Checks if any constellation exists (3+ satellites of the same type).
  */
-function _hasAnyConstellation(state) {
-  const typeCounts = {};
+function _hasAnyConstellation(state: GameState): boolean {
+  const typeCounts: Record<string, number> = {};
   for (const sat of state.satelliteNetwork?.satellites ?? []) {
     const t = sat.satelliteType || 'GENERIC';
     typeCounts[t] = (typeCounts[t] || 0) + 1;
@@ -387,7 +398,7 @@ function _hasAnyConstellation(state) {
  * Evidence: science log entries with Sun-related biome IDs,
  * or completed science experiments at the Sun.
  */
-function _hasCollectedSolarScience(state) {
+function _hasCollectedSolarScience(state: GameState): boolean {
   // Check science log for Sun biomes.
   for (const entry of state.scienceLog ?? []) {
     if (entry.biomeId && entry.biomeId.startsWith('SUN_')) return true;

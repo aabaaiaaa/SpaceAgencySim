@@ -1,5 +1,5 @@
 /**
- * challenges.js — Challenge mission lifecycle management.
+ * challenges.ts — Challenge mission lifecycle management.
  *
  * Challenges are hand-crafted replayable missions with medal-based scoring.
  * Unlike regular missions (one-time) and contracts (procedural), challenges
@@ -14,8 +14,8 @@
  *
  * LIFECYCLE
  * =========
- * 1. Player opens Challenges tab → sees all unlocked challenges + best medals
- * 2. Player accepts a challenge → copied into state.challenges.active
+ * 1. Player opens Challenges tab -> sees all unlocked challenges + best medals
+ * 2. Player accepts a challenge -> copied into state.challenges.active
  * 3. During flight: objectives are checked each tick (reuses contract objective logic)
  * 4. On flight return: if all objectives met, score is computed and medal awarded
  * 5. Best medal per challenge is persisted in state.challenges.results
@@ -27,6 +27,23 @@
 import { CHALLENGES, MedalTier, ScoreDirection } from '../data/challenges.js';
 import { earnReward } from './finance.js';
 import { ensureCustomChallengeState } from './customChallenges.js';
+import type { GameState, FlightState, ChallengeDef, ObjectiveDef, ChallengeResultEntry } from './gameState.js';
+import type { PhysicsState } from './physics.js';
+
+// ---------------------------------------------------------------------------
+// Local types
+// ---------------------------------------------------------------------------
+
+interface ChallengeCompletionResult {
+  completed: boolean;
+  challengeId?: string;
+  challengeTitle?: string;
+  score?: number;
+  medal?: string;
+  previousMedal?: string;
+  isNewBest?: boolean;
+  reward?: number;
+}
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -34,11 +51,8 @@ import { ensureCustomChallengeState } from './customChallenges.js';
 
 /**
  * Deep-copy a challenge definition for use as a live instance.
- *
- * @param {import('../data/challenges.js').ChallengeDef} def
- * @returns {import('../data/challenges.js').ChallengeDef}
  */
-function _copyChallenge(def) {
+function _copyChallenge(def: ChallengeDef): ChallengeDef {
   return {
     id: def.id,
     title: def.title,
@@ -61,10 +75,8 @@ function _copyChallenge(def) {
 
 /**
  * Ensure state.challenges exists with the correct shape.
- *
- * @param {import('./gameState.js').GameState} state
  */
-export function ensureChallengeState(state) {
+export function ensureChallengeState(state: GameState): void {
   if (!state.challenges || typeof state.challenges !== 'object') {
     state.challenges = { active: null, results: {} };
   }
@@ -79,11 +91,8 @@ export function ensureChallengeState(state) {
 
 /**
  * Return all challenges the player has unlocked (prerequisites met).
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {import('../data/challenges.js').ChallengeDef[]}
  */
-export function getUnlockedChallenges(state) {
+export function getUnlockedChallenges(state: GameState): ChallengeDef[] {
   ensureChallengeState(state);
   const completedMissionIds = new Set(
     (state.missions?.completed ?? []).map((m) => m.id),
@@ -103,23 +112,16 @@ export function getUnlockedChallenges(state) {
 
 /**
  * Get the player's best result for a specific challenge.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {string} challengeId
- * @returns {{ medal: string, score: number, attempts: number } | null}
  */
-export function getChallengeResult(state, challengeId) {
+export function getChallengeResult(state: GameState, challengeId: string): ChallengeResultEntry | null {
   ensureChallengeState(state);
   return state.challenges.results[challengeId] ?? null;
 }
 
 /**
  * Get the currently active challenge (if any).
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {import('../data/challenges.js').ChallengeDef | null}
  */
-export function getActiveChallenge(state) {
+export function getActiveChallenge(state: GameState): ChallengeDef | null {
   ensureChallengeState(state);
   return state.challenges.active;
 }
@@ -133,16 +135,12 @@ export function getActiveChallenge(state) {
  *
  * Only one challenge can be active at a time. Accepting a new challenge
  * replaces any currently active one.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {string} challengeId
- * @returns {{ success: boolean, challenge?: object, error?: string }}
  */
-export function acceptChallenge(state, challengeId) {
+export function acceptChallenge(state: GameState, challengeId: string): { success: boolean; challenge?: ChallengeDef; error?: string } {
   ensureChallengeState(state);
 
   // Search official challenges first, then custom.
-  let def = CHALLENGES.find((ch) => ch.id === challengeId);
+  let def: ChallengeDef | undefined = CHALLENGES.find((ch) => ch.id === challengeId);
   if (!def) {
     ensureCustomChallengeState(state);
     def = (state.customChallenges ?? []).find((ch) => ch.id === challengeId);
@@ -171,11 +169,8 @@ export function acceptChallenge(state, challengeId) {
 
 /**
  * Abandon the currently active challenge without scoring.
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {{ success: boolean }}
  */
-export function abandonChallenge(state) {
+export function abandonChallenge(state: GameState): { success: boolean } {
   ensureChallengeState(state);
   state.challenges.active = null;
   return { success: true };
@@ -190,11 +185,8 @@ export function abandonChallenge(state) {
  *
  * Uses the same objective types as missions/contracts. Called from the
  * main objective checking loop alongside mission and contract checks.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {import('./gameState.js').FlightState} flightState
  */
-export function checkChallengeObjectives(state, flightState) {
+export function checkChallengeObjectives(state: GameState, flightState: FlightState): void {
   if (!flightState) return;
   ensureChallengeState(state);
 
@@ -210,23 +202,24 @@ export function checkChallengeObjectives(state, flightState) {
 /**
  * Check a single objective against the current flight state.
  * Mirrors the switch in contracts.js _checkSingleObjective().
- *
- * @param {import('../data/missions.js').ObjectiveDef} obj
- * @param {import('./gameState.js').FlightState} flightState
  */
-function _checkSingleObjective(obj, flightState) {
+function _checkSingleObjective(obj: ObjectiveDef, flightState: FlightState): void {
+  // Use `as any` for dynamic target property access and runtime-only _holdEnteredAt
+  const objAny = obj as any;
+  const t = obj.target as any;
+
   switch (obj.type) {
     case 'REACH_ALTITUDE':
-      if (flightState.altitude >= obj.target.altitude) obj.completed = true;
+      if (flightState.altitude >= t.altitude) obj.completed = true;
       break;
 
     case 'REACH_SPEED':
-      if (flightState.velocity >= obj.target.speed) obj.completed = true;
+      if (flightState.velocity >= t.speed) obj.completed = true;
       break;
 
     case 'SAFE_LANDING': {
       const landing = flightState.events.find(
-        (e) => e.type === 'LANDING' && typeof e.speed === 'number' && e.speed <= obj.target.maxLandingSpeed,
+        (e: any) => e.type === 'LANDING' && typeof e.speed === 'number' && e.speed <= t.maxLandingSpeed,
       );
       if (landing) obj.completed = true;
       break;
@@ -234,7 +227,7 @@ function _checkSingleObjective(obj, flightState) {
 
     case 'ACTIVATE_PART': {
       const activation = flightState.events.find(
-        (e) => e.type === 'PART_ACTIVATED' && e.partType === obj.target.partType,
+        (e: any) => e.type === 'PART_ACTIVATED' && e.partType === t.partType,
       );
       if (activation) obj.completed = true;
       break;
@@ -242,24 +235,24 @@ function _checkSingleObjective(obj, flightState) {
 
     case 'HOLD_ALTITUDE': {
       const inRange =
-        flightState.altitude >= obj.target.minAltitude &&
-        flightState.altitude <= obj.target.maxAltitude;
+        flightState.altitude >= t.minAltitude &&
+        flightState.altitude <= t.maxAltitude;
       if (inRange) {
-        if (obj._holdEnteredAt == null) {
-          obj._holdEnteredAt = flightState.timeElapsed;
-        } else if (flightState.timeElapsed - obj._holdEnteredAt >= obj.target.duration) {
+        if (objAny._holdEnteredAt == null) {
+          objAny._holdEnteredAt = flightState.timeElapsed;
+        } else if (flightState.timeElapsed - objAny._holdEnteredAt >= t.duration) {
           obj.completed = true;
         }
       } else {
-        obj._holdEnteredAt = null;
+        objAny._holdEnteredAt = null;
       }
       break;
     }
 
     case 'RETURN_SCIENCE_DATA': {
-      const scienceCollected = flightState.events.some((e) => e.type === 'SCIENCE_COLLECTED');
+      const scienceCollected = flightState.events.some((e: any) => e.type === 'SCIENCE_COLLECTED');
       const safeLanding = flightState.events.some(
-        (e) => e.type === 'LANDING' && typeof e.speed === 'number' && e.speed <= 10,
+        (e: any) => e.type === 'LANDING' && typeof e.speed === 'number' && e.speed <= 10,
       );
       if (scienceCollected && safeLanding) obj.completed = true;
       break;
@@ -267,8 +260,8 @@ function _checkSingleObjective(obj, flightState) {
 
     case 'CONTROLLED_CRASH': {
       const crash = flightState.events.find(
-        (e) => (e.type === 'LANDING' || e.type === 'CRASH') &&
-               typeof e.speed === 'number' && e.speed >= obj.target.minCrashSpeed,
+        (e: any) => (e.type === 'LANDING' || e.type === 'CRASH') &&
+               typeof e.speed === 'number' && e.speed >= t.minCrashSpeed,
       );
       if (crash) obj.completed = true;
       break;
@@ -276,7 +269,7 @@ function _checkSingleObjective(obj, flightState) {
 
     case 'EJECT_CREW': {
       const eject = flightState.events.find(
-        (e) => e.type === 'CREW_EJECTED' && typeof e.altitude === 'number' && e.altitude >= obj.target.minAltitude,
+        (e: any) => e.type === 'CREW_EJECTED' && typeof e.altitude === 'number' && e.altitude >= t.minAltitude,
       );
       if (eject) obj.completed = true;
       break;
@@ -284,55 +277,55 @@ function _checkSingleObjective(obj, flightState) {
 
     case 'RELEASE_SATELLITE': {
       const release = flightState.events.find(
-        (e) => e.type === 'SATELLITE_RELEASED' &&
-               typeof e.altitude === 'number' && e.altitude >= obj.target.minAltitude &&
-               (obj.target.minVelocity == null ||
-                 (typeof e.velocity === 'number' && e.velocity >= obj.target.minVelocity)),
+        (e: any) => e.type === 'SATELLITE_RELEASED' &&
+               typeof e.altitude === 'number' && e.altitude >= t.minAltitude &&
+               (t.minVelocity == null ||
+                 (typeof e.velocity === 'number' && e.velocity >= t.minVelocity)),
       );
       if (release) obj.completed = true;
       break;
     }
 
     case 'REACH_ORBIT':
-      if (flightState.altitude >= obj.target.orbitAltitude &&
-          flightState.velocity >= obj.target.orbitalVelocity) {
+      if (flightState.altitude >= t.orbitAltitude &&
+          flightState.velocity >= t.orbitalVelocity) {
         obj.completed = true;
       }
       break;
 
     case 'BUDGET_LIMIT':
-      if (typeof flightState.rocketCost === 'number' &&
-          flightState.rocketCost <= obj.target.maxCost) {
+      if (typeof (flightState as any).rocketCost === 'number' &&
+          (flightState as any).rocketCost <= t.maxCost) {
         obj.completed = true;
       }
       break;
 
     case 'MAX_PARTS':
-      if (typeof flightState.partCount === 'number' &&
-          flightState.partCount <= obj.target.maxParts) {
+      if (typeof (flightState as any).partCount === 'number' &&
+          (flightState as any).partCount <= t.maxParts) {
         obj.completed = true;
       }
       break;
 
     case 'RESTRICT_PART':
-      if (Array.isArray(flightState.partTypes) &&
-          !flightState.partTypes.includes(obj.target.forbiddenType)) {
+      if (Array.isArray((flightState as any).partTypes) &&
+          !(flightState as any).partTypes.includes(t.forbiddenType)) {
         obj.completed = true;
       }
       break;
 
     case 'MULTI_SATELLITE': {
       const releases = flightState.events.filter(
-        (e) => e.type === 'SATELLITE_RELEASED' &&
-               typeof e.altitude === 'number' && e.altitude >= obj.target.minAltitude,
+        (e: any) => e.type === 'SATELLITE_RELEASED' &&
+               typeof e.altitude === 'number' && e.altitude >= t.minAltitude,
       );
-      if (releases.length >= obj.target.count) obj.completed = true;
+      if (releases.length >= t.count) obj.completed = true;
       break;
     }
 
     case 'MINIMUM_CREW':
       if (typeof flightState.crewCount === 'number' &&
-          flightState.crewCount >= obj.target.minCrew) {
+          flightState.crewCount >= t.minCrew) {
         obj.completed = true;
       }
       break;
@@ -348,26 +341,23 @@ function _checkSingleObjective(obj, flightState) {
 
 /**
  * Extract the scoring metric value from a flight state.
- *
- * @param {string} metric  - The scoreMetric field name.
- * @param {import('./gameState.js').FlightState} flightState
- * @param {import('./physics.js').PhysicsState|null} ps
- * @returns {number|null}  The metric value, or null if unavailable.
  */
-export function extractScoreMetric(metric, flightState, ps) {
+export function extractScoreMetric(metric: string, flightState: FlightState, ps: PhysicsState | null): number | null {
+  const fs = flightState as any;
+
   switch (metric) {
     case 'rocketCost':
-      return typeof flightState.rocketCost === 'number' ? flightState.rocketCost : null;
+      return typeof fs.rocketCost === 'number' ? fs.rocketCost : null;
 
     case 'landingSpeed': {
       const landingEvent = (flightState.events ?? []).find(
-        (e) => e.type === 'LANDING' && typeof e.speed === 'number',
+        (e: any) => e.type === 'LANDING' && typeof e.speed === 'number',
       );
-      return landingEvent ? landingEvent.speed : null;
+      return landingEvent ? (landingEvent as any).speed : null;
     }
 
     case 'partCount':
-      return typeof flightState.partCount === 'number' ? flightState.partCount : null;
+      return typeof fs.partCount === 'number' ? fs.partCount : null;
 
     case 'maxAltitude':
       return typeof flightState.maxAltitude === 'number'
@@ -383,19 +373,19 @@ export function extractScoreMetric(metric, flightState, ps) {
       return typeof flightState.timeElapsed === 'number' ? flightState.timeElapsed : null;
 
     case 'fuelRemaining': {
-      // Return as a percentage (0–100).
-      if (ps && typeof ps.totalFuel === 'number' && typeof ps.maxFuel === 'number' && ps.maxFuel > 0) {
-        return Math.round((ps.totalFuel / ps.maxFuel) * 100);
+      // Return as a percentage (0-100).
+      if (ps && typeof (ps as any).totalFuel === 'number' && typeof (ps as any).maxFuel === 'number' && (ps as any).maxFuel > 0) {
+        return Math.round(((ps as any).totalFuel / (ps as any).maxFuel) * 100);
       }
-      if (typeof flightState.fuelFraction === 'number') {
-        return Math.round(flightState.fuelFraction * 100);
+      if (typeof fs.fuelFraction === 'number') {
+        return Math.round(fs.fuelFraction * 100);
       }
       return null;
     }
 
     case 'satellitesDeployed': {
       const releases = (flightState.events ?? []).filter(
-        (e) => e.type === 'SATELLITE_RELEASED',
+        (e: any) => e.type === 'SATELLITE_RELEASED',
       );
       return releases.length;
     }
@@ -407,12 +397,8 @@ export function extractScoreMetric(metric, flightState, ps) {
 
 /**
  * Determine what medal a score earns for a given challenge definition.
- *
- * @param {import('../data/challenges.js').ChallengeDef} challenge
- * @param {number} score
- * @returns {string}  MedalTier value.
  */
-export function computeMedal(challenge, score) {
+export function computeMedal(challenge: ChallengeDef, score: number): string {
   const { medals, scoreDirection } = challenge;
 
   if (scoreDirection === ScoreDirection.LOWER_IS_BETTER) {
@@ -431,9 +417,8 @@ export function computeMedal(challenge, score) {
 
 /**
  * Medal tier ordering for comparison.
- * @type {Object<string, number>}
  */
-const MEDAL_RANK = {
+const MEDAL_RANK: Record<string, number> = {
   [MedalTier.NONE]:   0,
   [MedalTier.BRONZE]: 1,
   [MedalTier.SILVER]: 2,
@@ -442,12 +427,8 @@ const MEDAL_RANK = {
 
 /**
  * Returns true if medalA is strictly better than medalB.
- *
- * @param {string} medalA
- * @param {string} medalB
- * @returns {boolean}
  */
-export function isBetterMedal(medalA, medalB) {
+export function isBetterMedal(medalA: string, medalB: string): boolean {
   return (MEDAL_RANK[medalA] ?? 0) > (MEDAL_RANK[medalB] ?? 0);
 }
 
@@ -460,22 +441,8 @@ export function isBetterMedal(medalA, medalB) {
  *
  * If the active challenge's objectives are all met, computes the score and
  * medal, updates the best result, awards cash, and clears the active slot.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {import('./gameState.js').FlightState} flightState
- * @param {import('./physics.js').PhysicsState|null} ps
- * @returns {{
- *   completed: boolean,
- *   challengeId?: string,
- *   challengeTitle?: string,
- *   score?: number,
- *   medal?: string,
- *   previousMedal?: string,
- *   isNewBest?: boolean,
- *   reward?: number,
- * }}
  */
-export function processChallengeCompletion(state, flightState, ps) {
+export function processChallengeCompletion(state: GameState, flightState: FlightState, ps: PhysicsState | null): ChallengeCompletionResult {
   ensureChallengeState(state);
 
   const challenge = state.challenges.active;
@@ -507,9 +474,9 @@ export function processChallengeCompletion(state, flightState, ps) {
   // Determine reward: only pay the delta between new and old medal tier.
   let reward = 0;
   if (medal !== MedalTier.NONE) {
-    const newReward = challenge.rewards[medal] ?? 0;
+    const newReward = (challenge.rewards as any)[medal] ?? 0;
     const oldReward = previousMedal !== MedalTier.NONE
-      ? (challenge.rewards[previousMedal] ?? 0)
+      ? ((challenge.rewards as any)[previousMedal] ?? 0)
       : 0;
     reward = Math.max(0, newReward - oldReward);
   }

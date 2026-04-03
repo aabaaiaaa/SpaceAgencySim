@@ -1,18 +1,18 @@
 /**
- * ejector.js — Ejector seat state machine and crew casualty resolution.
+ * ejector.ts — Ejector seat state machine and crew casualty resolution.
  *
  * Tracks the armed/activated state for the ejector seat of each crewed command
  * module (parts with `properties.hasEjectorSeat = true`) and provides helpers
  * for the flight-scene context menu.
  *
  * EJECTOR SEAT LIFECYCLE
- *   armed  ──[activate trigger]──►  activated
+ *   armed  --[activate trigger]-->  activated
  *
  * On activation:
  *   - The CREW_EJECTED flight event is emitted.
  *   - All crew listed in `flightState.crewIds` are added to `ps.ejectedCrewIds`
  *     so `resolveCrewCasualties()` knows they survived.
- *   - The command module part REMAINS in `ps.activeParts` — ejection does not
+ *   - The command module part REMAINS in `ps.activeParts` -- ejection does not
  *     physically destroy the capsule.
  *
  * CREW CASUALTY RESOLUTION
@@ -22,17 +22,17 @@
  *   aboard a command module that was destroyed without prior ejection.
  *
  *   Two destruction paths are handled:
- *     1. Crash  (`ps.crashed = true`)           — catastrophic or hard impact.
- *     2. Heat   (PART_DESTROYED event for a     — command module destroyed by
+ *     1. Crash  (`ps.crashed = true`)           -- catastrophic or hard impact.
+ *     2. Heat   (PART_DESTROYED event for a     -- command module destroyed by
  *                COMMAND_MODULE part)              reentry heating.
  *
  * PUBLIC API
  *   EjectorState                                                   {enum}
- *   initEjectorStates(ps, assembly)                               → void
- *   activateEjectorSeat(ps, assembly, flightState, instanceId)    → boolean
- *   getEjectorSeatStatus(ps, instanceId)                          → string
- *   getEjectorSeatContextMenuItems(ps, assembly)                  → Object[]
- *   resolveCrewCasualties(state, ps, assembly, flightState)       → string[]
+ *   initEjectorStates(ps, assembly)                               -> void
+ *   activateEjectorSeat(ps, assembly, flightState, instanceId)    -> boolean
+ *   getEjectorSeatStatus(ps, instanceId)                          -> string
+ *   getEjectorSeatContextMenuItems(ps, assembly)                  -> Object[]
+ *   resolveCrewCasualties(state, ps, assembly, flightState)       -> string[]
  *
  * @module ejector
  */
@@ -41,20 +41,82 @@ import { getPartById } from '../data/parts.js';
 import { PartType }    from './constants.js';
 import { recordKIA }   from './crew.js';
 
+import type { GameState } from './gameState.js';
+import type { PartDef } from '../data/parts.js';
+
+// ---------------------------------------------------------------------------
+// Local type aliases for duck-typed physics/flight state parameters
+// ---------------------------------------------------------------------------
+
+/** Subset of PhysicsState used by initEjectorStates. */
+interface InitEjectorPs {
+  ejectorStates: Map<string, string>;
+  activeParts: Set<string>;
+}
+
+/** Subset of PhysicsState used by activateEjectorSeat. */
+interface ActivateEjectorPs {
+  ejectorStates?: Map<string, string>;
+  ejectedCrewIds?: Set<string>;
+  ejectedCrew?: Array<{
+    x: number; y: number;
+    velX: number; velY: number;
+    hasChute: boolean; chuteOpen: boolean; chuteTimer: number;
+  }>;
+  posX: number;
+  posY: number;
+  velX: number;
+  velY: number;
+  angle: number;
+}
+
+/** Subset of FlightState used by activateEjectorSeat. */
+interface ActivateFlightState {
+  events: Array<Record<string, unknown>>;
+  timeElapsed: number;
+  crewIds: string[];
+}
+
+/** Subset of PhysicsState used by resolveCrewCasualties. */
+interface CasualtyPs {
+  crashed: boolean;
+  ejectorStates?: Map<string, string>;
+  ejectedCrewIds?: Set<string>;
+}
+
+/** Subset of FlightState used by resolveCrewCasualties. */
+interface CasualtyFlightState {
+  crewIds: string[];
+  events: Array<Record<string, any>>;
+}
+
+/** Assembly shape used throughout. */
+interface AssemblyLike {
+  parts: Map<string, { partId: string; x: number; y: number }>;
+}
+
+/** Context menu item for an ejector seat. */
+export interface EjectorContextMenuItem {
+  instanceId: string;
+  name: string;
+  state: string;
+  statusLabel: string;
+  canActivate: boolean;
+}
+
 // ---------------------------------------------------------------------------
 // Public constants
 // ---------------------------------------------------------------------------
 
-/**
- * Ejector seat lifecycle states.
- * @enum {string}
- */
+/** Ejector seat lifecycle states. */
 export const EjectorState = Object.freeze({
   /** Seat is armed and ready to fire. */
   ARMED:     'armed',
   /** Seat has been activated; crew were safely ejected. */
   ACTIVATED: 'activated',
-});
+} as const);
+
+export type EjectorState = (typeof EjectorState)[keyof typeof EjectorState];
 
 // ---------------------------------------------------------------------------
 // Initialisation
@@ -66,20 +128,19 @@ export const EjectorState = Object.freeze({
  * `ps.activeParts`.
  *
  * Call this once inside `createPhysicsState` after the state object has been
- * constructed.  Safe to call again — existing entries are preserved.
- *
- * @param {{ ejectorStates: Map<string, string>,
- *           activeParts:   Set<string> }}                  ps
- * @param {{ parts: Map<string, { partId: string }> }}      assembly
+ * constructed.  Safe to call again -- existing entries are preserved.
  */
-export function initEjectorStates(ps, assembly) {
+export function initEjectorStates(
+  ps: InitEjectorPs,
+  assembly: AssemblyLike,
+): void {
   if (!ps.ejectorStates) return;
 
   for (const [instanceId, placed] of assembly.parts) {
     if (!ps.activeParts.has(instanceId)) continue;
     if (ps.ejectorStates.has(instanceId)) continue; // already initialised
 
-    const def = getPartById(placed.partId);
+    const def: PartDef | undefined = getPartById(placed.partId);
     if (!def || def.type !== PartType.COMMAND_MODULE) continue;
     if (!def.properties?.hasEjectorSeat) continue;
 
@@ -94,7 +155,7 @@ export function initEjectorStates(ps, assembly) {
 /**
  * Fire the ejector seat in the specified command module.
  *
- * Transitions the ejector seat from `armed` → `activated`, adds all crew
+ * Transitions the ejector seat from `armed` -> `activated`, adds all crew
  * listed in `flightState.crewIds` to `ps.ejectedCrewIds`, and emits a
  * CREW_EJECTED event to `flightState.events`.
  *
@@ -104,24 +165,18 @@ export function initEjectorStates(ps, assembly) {
  * Can be called from:
  *   - `staging.js` when the player fires an EJECT stage via Spacebar.
  *   - A flight-scene context menu when the player manually activates the seat.
- *
- * @param {{ ejectorStates?:  Map<string, string>,
- *           ejectedCrewIds?: Set<string>,
- *           posY:            number }}                        ps
- * @param {{ parts: Map<string, { partId: string }> }}        assembly
- * @param {{ events:      Array<object>,
- *           timeElapsed: number,
- *           crewIds:     string[] }}                          flightState
- * @param {string} instanceId  Instance ID of the COMMAND_MODULE part.
- * @returns {boolean}  `true` if the seat was successfully activated; `false`
- *   if it was already fired or not tracked.
  */
-export function activateEjectorSeat(ps, assembly, flightState, instanceId) {
+export function activateEjectorSeat(
+  ps: ActivateEjectorPs,
+  assembly: AssemblyLike,
+  flightState: ActivateFlightState,
+  instanceId: string,
+): boolean {
   if (!ps.ejectorStates) return false;
 
   const currentState = ps.ejectorStates.get(instanceId);
 
-  // Already activated — do nothing.
+  // Already activated -- do nothing.
   if (currentState === EjectorState.ACTIVATED) return false;
 
   // Mark the ejector as activated.
@@ -175,15 +230,14 @@ export function activateEjectorSeat(ps, assembly, flightState, instanceId) {
 /**
  * Return the current ejector seat state for the given command module instance.
  *
- * Returns {@link EjectorState.ARMED} when:
+ * Returns EjectorState.ARMED when:
  *   - `ps.ejectorStates` is absent.
  *   - The instance ID is not tracked.
- *
- * @param {{ ejectorStates?: Map<string, string> }} ps
- * @param {string} instanceId  Command module instance ID.
- * @returns {string}  One of the {@link EjectorState} values.
  */
-export function getEjectorSeatStatus(ps, instanceId) {
+export function getEjectorSeatStatus(
+  ps: { ejectorStates?: Map<string, string> },
+  instanceId: string,
+): string {
   if (!ps.ejectorStates) return EjectorState.ARMED;
   return ps.ejectorStates.get(instanceId) ?? EjectorState.ARMED;
 }
@@ -199,49 +253,30 @@ export function getEjectorSeatStatus(ps, instanceId) {
  * Each item describes the current state of one command module's ejector seat
  * and whether the player can activate it.  The flight UI layer calls this
  * function to populate an action panel or right-click menu.
- *
- * Returned item schema:
- * ```
- * {
- *   instanceId:  string,   // part instance ID
- *   name:        string,   // human-readable part name (e.g. 'Mk1 Command Module')
- *   state:       string,   // EjectorState value
- *   statusLabel: string,   // display text for the status chip
- *   canActivate: boolean,  // true when state is 'armed' (seat not yet fired)
- * }
- * ```
- *
- * @param {{ ejectorStates?: Map<string, string>,
- *           activeParts:    Set<string> }}                  ps
- * @param {{ parts: Map<string, { partId: string }> }}       assembly
- * @returns {Array<{
- *   instanceId:  string,
- *   name:        string,
- *   state:       string,
- *   statusLabel: string,
- *   canActivate: boolean,
- * }>}
  */
-export function getEjectorSeatContextMenuItems(ps, assembly) {
-  const items = [];
+export function getEjectorSeatContextMenuItems(
+  ps: { ejectorStates?: Map<string, string>; activeParts: Set<string> },
+  assembly: AssemblyLike,
+): EjectorContextMenuItem[] {
+  const items: EjectorContextMenuItem[] = [];
 
   for (const instanceId of ps.activeParts) {
     const placed = assembly.parts.get(instanceId);
     if (!placed) continue;
 
-    const def = getPartById(placed.partId);
+    const def: PartDef | undefined = getPartById(placed.partId);
     if (!def || def.type !== PartType.COMMAND_MODULE) continue;
     if (!def.properties?.hasEjectorSeat) continue;
 
     const state = getEjectorSeatStatus(ps, instanceId);
 
-    let statusLabel;
+    let statusLabel: string;
     switch (state) {
       case EjectorState.ARMED:
         statusLabel = 'Armed (ready to fire)';
         break;
       case EjectorState.ACTIVATED:
-        statusLabel = 'Activated — crew ejected';
+        statusLabel = 'Activated \u2014 crew ejected';
         break;
       default:
         statusLabel = state;
@@ -272,13 +307,13 @@ export function getEjectorSeatContextMenuItems(ps, assembly) {
  *
  * Checks two destruction paths:
  *
- * **1. Crash** (`ps.crashed = true`):
+ * 1. Crash (`ps.crashed = true`):
  *   Every crew member in `flightState.crewIds` who is NOT in
  *   `ps.ejectedCrewIds` is marked KIA.  The assumption is that a crashed
- *   rocket destroys all command modules — crew who had already ejected are
+ *   rocket destroys all command modules -- crew who had already ejected are
  *   safely clear of the vehicle.
  *
- * **2. Heat** (PART_DESTROYED events):
+ * 2. Heat (PART_DESTROYED events):
  *   Scans `flightState.events` for `PART_DESTROYED` events where the
  *   destroyed part is a COMMAND_MODULE with `hasEjectorSeat`.  If the
  *   module's ejector seat was NOT activated before destruction, any crew
@@ -288,30 +323,26 @@ export function getEjectorSeatContextMenuItems(ps, assembly) {
  *   - Sets the astronaut's status to 'kia'.
  *   - Records the cause and timestamp.
  *   - Applies the $500,000 government fine via `applyDeathFine()`.
- *
- * @param {import('./gameState.js').GameState}             state
- * @param {{ crashed:          boolean,
- *           ejectorStates?:   Map<string, string>,
- *           ejectedCrewIds?:  Set<string> }}               ps
- * @param {import('./rocketbuilder.js').RocketAssembly}     assembly
- * @param {{ crewIds: string[],
- *           events:  Array<object> }}                       flightState
- * @returns {string[]}  IDs of astronauts newly marked KIA.
  */
-export function resolveCrewCasualties(state, ps, assembly, flightState) {
+export function resolveCrewCasualties(
+  state: GameState,
+  ps: CasualtyPs,
+  assembly: AssemblyLike,
+  flightState: CasualtyFlightState,
+): string[] {
   if (!flightState.crewIds || flightState.crewIds.length === 0) return [];
 
-  const ejectedCrewIds = ps.ejectedCrewIds ?? new Set();
-  const newKia = [];
+  const ejectedCrewIds = ps.ejectedCrewIds ?? new Set<string>();
+  const newKia: string[] = [];
 
-  // --- Case 1: Rocket crashed — all non-ejected crew are KIA ---------------
+  // --- Case 1: Rocket crashed -- all non-ejected crew are KIA ---------------
   if (ps.crashed) {
     for (const crewId of flightState.crewIds) {
       if (!ejectedCrewIds.has(crewId)) {
         const ok = recordKIA(
           state,
           crewId,
-          'Rocket destroyed — crew not ejected before impact',
+          'Rocket destroyed \u2014 crew not ejected before impact',
         );
         if (ok) newKia.push(crewId);
       }
@@ -334,13 +365,13 @@ export function resolveCrewCasualties(state, ps, assembly, flightState) {
       ps.ejectorStates?.get(event.instanceId) === EjectorState.ACTIVATED;
     if (ejectorActivated) continue;
 
-    // Crew in this module were not safely ejected — mark them KIA.
+    // Crew in this module were not safely ejected -- mark them KIA.
     for (const crewId of flightState.crewIds) {
       if (!ejectedCrewIds.has(crewId)) {
         const ok = recordKIA(
           state,
           crewId,
-          'Command module destroyed by reentry heat — crew not ejected',
+          'Command module destroyed by reentry heat \u2014 crew not ejected',
         );
         if (ok) newKia.push(crewId);
       }

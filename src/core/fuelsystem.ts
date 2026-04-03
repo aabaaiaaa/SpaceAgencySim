@@ -1,8 +1,8 @@
 /**
- * fuelsystem.js — Segment-aware fuel system and engine thrust management.
+ * fuelsystem.ts — Segment-aware fuel system and engine thrust management.
  *
  * Each liquid engine draws fuel only from tanks in the same rocket
- * segment — the sub-graph reachable from the engine without crossing a
+ * segment -- the sub-graph reachable from the engine without crossing a
  * decoupler boundary.  SRBs carry integral solid propellant and burn at a
  * fixed rate regardless of throttle.
  *
@@ -18,8 +18,8 @@
  *     FUEL_TANK nodes encountered.
  *
  * FUEL CONSUMPTION FORMULA
- *   Liquid engine:  ṁ = (thrust_effective × throttle) / (Isp × g₀)   kg/s
- *   SRB:            ṁ = thrust_full / (Isp × g₀)   kg/s  (or explicit burnRate)
+ *   Liquid engine:  mdot = (thrust_effective * throttle) / (Isp * g0)   kg/s
+ *   SRB:            mdot = thrust_full / (Isp * g0)   kg/s  (or explicit burnRate)
  *
  * PART MASS TRACKING
  *   Tank/SRB part mass is tracked live via the PhysicsState.fuelStore map.
@@ -33,9 +33,9 @@
  *   thrust calculations by the physics engine.
  *
  * PUBLIC API
- *   getConnectedTanks(engineInstanceId, assembly, activeParts) → string[]
- *   computeEngineFlowRate(def, throttle, density)              → number
- *   tickFuelSystem(ps, assembly, dt, density)                  → void
+ *   getConnectedTanks(engineInstanceId, assembly, activeParts) -> string[]
+ *   computeEngineFlowRate(def, throttle, density)              -> number
+ *   tickFuelSystem(ps, assembly, dt, density)                  -> void
  *
  * @module fuelsystem
  */
@@ -44,26 +44,28 @@ import { getPartById } from '../data/parts.js';
 import { PartType }    from './constants.js';
 import { SEA_LEVEL_DENSITY } from './atmosphere.js';
 
+import type { PhysicsState, RocketAssembly } from './physics.js';
+import type { PartDef } from '../data/parts.js';
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-/** Standard gravity (m/s²). */
-const G0 = 9.81;
+/** Standard gravity (m/s^2). */
+const G0: number = 9.81;
 
 /**
  * Part types that form fuel-segment boundaries.
  * The BFS traversal in getConnectedTanks will NOT cross these node types.
- * @type {ReadonlySet<string>}
  */
-const DECOUPLER_TYPES = Object.freeze(new Set([
+const DECOUPLER_TYPES: ReadonlySet<string> = Object.freeze(new Set([
   PartType.DECOUPLER,
   PartType.STACK_DECOUPLER,
   PartType.RADIAL_DECOUPLER,
 ]));
 
 // ---------------------------------------------------------------------------
-// Public API — getConnectedTanks
+// Public API -- getConnectedTanks
 // ---------------------------------------------------------------------------
 
 /**
@@ -79,30 +81,28 @@ const DECOUPLER_TYPES = Object.freeze(new Set([
  *      it is visited).
  *   5. Collects every FUEL_TANK node encountered.
  *
- * For SRBs, this function is not needed — they carry integral fuel stored
+ * For SRBs, this function is not needed -- they carry integral fuel stored
  * under their own instanceId in PhysicsState.fuelStore.
- *
- * @param {string}                                         engineInstanceId
- * @param {import('./rocketbuilder.js').RocketAssembly}    assembly
- * @param {Set<string>}                                    activeParts
- *   Live set of non-jettisoned part instance IDs.
- * @returns {string[]}  Instance IDs of fuel tanks in the same segment.
  */
-export function getConnectedTanks(engineInstanceId, assembly, activeParts) {
-  const visited = new Set();
-  const tanks   = [];
-  const queue   = [engineInstanceId];
+export function getConnectedTanks(
+  engineInstanceId: string,
+  assembly: RocketAssembly,
+  activeParts: Set<string>,
+): string[] {
+  const visited = new Set<string>();
+  const tanks: string[] = [];
+  const queue: string[] = [engineInstanceId];
   visited.add(engineInstanceId);
 
   while (queue.length > 0) {
-    const current = queue.shift();
+    const current = queue.shift()!;
 
     // Ignore jettisoned parts.
     if (!activeParts.has(current)) continue;
 
     const placed = assembly.parts.get(current);
     if (!placed) continue;
-    const def = getPartById(placed.partId);
+    const def: PartDef | undefined = getPartById(placed.partId);
     if (!def) continue;
 
     // Collect fuel tanks (skip the engine itself).
@@ -110,7 +110,7 @@ export function getConnectedTanks(engineInstanceId, assembly, activeParts) {
       tanks.push(current);
     }
 
-    // Decouplers form hard segment boundaries — do not traverse through them.
+    // Decouplers form hard segment boundaries -- do not traverse through them.
     // The decoupler node itself was already visited; we just don't expand it.
     if (current !== engineInstanceId && DECOUPLER_TYPES.has(def.type)) {
       continue;
@@ -118,7 +118,7 @@ export function getConnectedTanks(engineInstanceId, assembly, activeParts) {
 
     // Expand to all neighbours via the connection list.
     for (const conn of assembly.connections) {
-      let neighbor = null;
+      let neighbor: string | null = null;
       if (conn.fromInstanceId === current) {
         neighbor = conn.toInstanceId;
       } else if (conn.toInstanceId === current) {
@@ -135,17 +135,17 @@ export function getConnectedTanks(engineInstanceId, assembly, activeParts) {
 }
 
 // ---------------------------------------------------------------------------
-// Public API — computeEngineFlowRate
+// Public API -- computeEngineFlowRate
 // ---------------------------------------------------------------------------
 
 /**
  * Compute the propellant mass-flow rate (kg/s) for a single engine.
  *
- * Formula:  ṁ = F_effective / (Isp × g₀)
+ * Formula:  mdot = F_effective / (Isp * g0)
  *
  * Thrust and Isp are linearly interpolated between sea-level and vacuum
  * values using the current air-density ratio:
- *   value = ratio × seaLevel + (1 − ratio) × vacuum
+ *   value = ratio * seaLevel + (1 - ratio) * vacuum
  * where ratio = clamp(density / SEA_LEVEL_DENSITY, 0, 1).
  *
  * SRB rules:
@@ -153,17 +153,12 @@ export function getConnectedTanks(engineInstanceId, assembly, activeParts) {
  *     that value is returned as-is (fixed manufacturer-specified burn rate).
  *   - Otherwise the rate is derived from the thrust/Isp formula at full
  *     throttle (throttle argument is ignored for SRBs).
- *
- * @param {import('../data/parts.js').PartDef} def
- *   Engine or SRB part definition.
- * @param {number} throttle
- *   Current throttle level (0 – 1).  Liquid engines scale thrust by this
- *   value; SRBs always run at 100 % and this parameter is ignored.
- * @param {number} density
- *   Current atmospheric density (kg/m³).  0 = perfect vacuum.
- * @returns {number}  Propellant mass-flow rate in kg/s (≥ 0).
  */
-export function computeEngineFlowRate(def, throttle, density) {
+export function computeEngineFlowRate(
+  def: PartDef,
+  throttle: number,
+  density: number,
+): number {
   const props        = def.properties ?? {};
   const isSRB        = def.type === PartType.SOLID_ROCKET_BOOSTER;
   const densityRatio = Math.max(0, Math.min(1, density / SEA_LEVEL_DENSITY));
@@ -171,25 +166,25 @@ export function computeEngineFlowRate(def, throttle, density) {
   if (isSRB) {
     // Explicit fixed burn rate takes highest priority.
     if (props.burnRate != null) {
-      return Math.max(0, props.burnRate);
+      return Math.max(0, props.burnRate as number);
     }
 
     // Derive from thrust/Isp at full throttle.
-    const thrustSL  = (props.thrust    ?? 0) * 1_000; // kN → N
-    const thrustVac = (props.thrustVac ?? props.thrust ?? 0) * 1_000;
+    const thrustSL  = ((props.thrust ?? 0) as number) * 1_000; // kN -> N
+    const thrustVac = ((props.thrustVac ?? props.thrust ?? 0) as number) * 1_000;
     const thrustN   = densityRatio * thrustSL + (1 - densityRatio) * thrustVac;
-    const ispSL     = props.isp    ?? 200;
-    const ispVac    = props.ispVac ?? props.isp ?? 200;
+    const ispSL     = (props.isp ?? 200) as number;
+    const ispVac    = (props.ispVac ?? props.isp ?? 200) as number;
     const isp       = densityRatio * ispSL + (1 - densityRatio) * ispVac;
     return isp > 0 ? thrustN / (isp * G0) : 0;
   }
 
   // Liquid engine.
-  const thrustSL  = (props.thrust    ?? 0) * 1_000;
-  const thrustVac = (props.thrustVac ?? props.thrust ?? 0) * 1_000;
+  const thrustSL  = ((props.thrust ?? 0) as number) * 1_000;
+  const thrustVac = ((props.thrustVac ?? props.thrust ?? 0) as number) * 1_000;
   const thrustN   = densityRatio * thrustSL + (1 - densityRatio) * thrustVac;
-  const ispSL     = props.isp    ?? 300;
-  const ispVac    = props.ispVac ?? props.isp ?? 300;
+  const ispSL     = (props.isp ?? 300) as number;
+  const ispVac    = (props.ispVac ?? props.isp ?? 300) as number;
   const isp       = densityRatio * ispSL + (1 - densityRatio) * ispVac;
 
   const effectiveThrustN = thrustN * Math.max(0, Math.min(1, throttle));
@@ -197,7 +192,7 @@ export function computeEngineFlowRate(def, throttle, density) {
 }
 
 // ---------------------------------------------------------------------------
-// Public API — tickFuelSystem
+// Public API -- tickFuelSystem
 // ---------------------------------------------------------------------------
 
 /**
@@ -208,12 +203,12 @@ export function computeEngineFlowRate(def, throttle, density) {
  *
  * For each engine in `ps.firingEngines`:
  *
- *   SRBs —
+ *   SRBs --
  *     Drain their own integral fuelStore entry at the computed burn rate.
  *     When the integral fuel reaches 0, the SRB is removed from
  *     `ps.firingEngines` immediately so the next tick sees 0 thrust.
  *
- *   Liquid engines —
+ *   Liquid engines --
  *     Collect all FUEL_TANK parts connected to the engine in the same
  *     segment (via getConnectedTanks).  Drain fuel evenly across all tanks
  *     that still have propellant, so they empty at the same rate.
@@ -223,7 +218,7 @@ export function computeEngineFlowRate(def, throttle, density) {
  * Part mass updates automatically:
  *   The physics engine's mass computation reads `ps.fuelStore` directly
  *   (`partMass = dryMass + fuelStore.get(instanceId)`), so no extra work
- *   is needed here — fuel drain is reflected in total mass on the very
+ *   is needed here -- fuel drain is reflected in total mass on the very
  *   next integration step.
  *
  * Detached-part invariant:
@@ -231,18 +226,18 @@ export function computeEngineFlowRate(def, throttle, density) {
  *   and are cleaned from `ps.firingEngines` at the start of this function.
  *   Their fuelStore entries are preserved (they retain whatever fuel they
  *   had when jettisoned) but are never drained or counted toward thrust.
- *
- * @param {import('./physics.js').PhysicsState}               ps
- * @param {import('./rocketbuilder.js').RocketAssembly}        assembly
- * @param {number} dt       Fixed timestep in seconds.
- * @param {number} density  Current atmospheric density (kg/m³).
  */
-export function tickFuelSystem(ps, assembly, dt, density) {
-  const toRemove = [];
+export function tickFuelSystem(
+  ps: PhysicsState,
+  assembly: RocketAssembly,
+  dt: number,
+  density: number,
+): void {
+  const toRemove: string[] = [];
 
   for (const engineId of ps.firingEngines) {
 
-    // Jettisoned engine — clean up the set.
+    // Jettisoned engine -- clean up the set.
     if (!ps.activeParts.has(engineId)) {
       toRemove.push(engineId);
       continue;
@@ -250,14 +245,14 @@ export function tickFuelSystem(ps, assembly, dt, density) {
 
     const placed = assembly.parts.get(engineId);
     if (!placed) { toRemove.push(engineId); continue; }
-    const def = getPartById(placed.partId);
+    const def: PartDef | undefined = getPartById(placed.partId);
     if (!def)  { toRemove.push(engineId); continue; }
 
     const isSRB = def.type === PartType.SOLID_ROCKET_BOOSTER;
 
     if (isSRB) {
       // -------------------------------------------------------------------
-      // SRB — drain integral fuel; fixed burn rate, ignores throttle.
+      // SRB -- drain integral fuel; fixed burn rate, ignores throttle.
       // -------------------------------------------------------------------
       const fuelLeft = ps.fuelStore.get(engineId) ?? 0;
       if (fuelLeft <= 0) {
@@ -275,7 +270,7 @@ export function tickFuelSystem(ps, assembly, dt, density) {
 
     } else {
       // -------------------------------------------------------------------
-      // Liquid engine — drain evenly from connected tanks in same segment.
+      // Liquid engine -- drain evenly from connected tanks in same segment.
       // -------------------------------------------------------------------
       const connected   = getConnectedTanks(engineId, assembly, ps.activeParts);
       const availTanks  = connected.filter(
@@ -283,7 +278,7 @@ export function tickFuelSystem(ps, assembly, dt, density) {
       );
 
       if (availTanks.length === 0) {
-        // No propellant available — flame out.
+        // No propellant available -- flame out.
         toRemove.push(engineId);
         continue;
       }

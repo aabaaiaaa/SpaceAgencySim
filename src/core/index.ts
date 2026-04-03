@@ -1,4 +1,4 @@
-// Core game logic — pure JavaScript, no DOM or canvas dependencies.
+// Core game logic — pure TypeScript/JavaScript, no DOM or canvas dependencies.
 //
 // All game systems live here:
 //   constants.js     — shared enums and magic numbers (PartType, MissionState, etc.)

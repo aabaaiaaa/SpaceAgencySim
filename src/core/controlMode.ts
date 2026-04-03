@@ -1,5 +1,5 @@
 /**
- * controlMode.js — Control mode state machine for orbital flight.
+ * controlMode.ts — Control mode state machine for orbital flight.
  *
  * Three control modes exist during the ORBIT phase:
  *
@@ -33,32 +33,57 @@ import { computeOrbitalElements } from './orbit.js';
 import { getPartById } from '../data/parts.js';
 import { PartType, BODY_RADIUS, ALTITUDE_BANDS } from './constants.js';
 
+import type { ControlMode as ControlModeType, AltitudeBand } from './constants.js';
+import type { PhysicsState, RocketAssembly } from './physics.js';
+import type { FlightState } from './gameState.js';
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
 /** RCS translation thrust (N) — small for precision. */
-export const RCS_TRANSLATION_THRUST = 500;
+export const RCS_TRANSLATION_THRUST: number = 500;
 
 /** Docking mode translation thrust (N) — moderate for slot positioning. */
-export const DOCKING_THRUST = 2000;
+export const DOCKING_THRUST: number = 2000;
 
 /**
  * Distance (m) from altitude band edge at which a warning fires.
  * Used for band-limit warnings in docking mode.
  */
-export const BAND_WARNING_MARGIN = 5000;
+export const BAND_WARNING_MARGIN: number = 5000;
 
 // ---------------------------------------------------------------------------
 // Control mode tips — shown on every mode switch
 // ---------------------------------------------------------------------------
 
-/** @type {Record<string, string>} */
-export const CONTROL_MODE_TIPS = Object.freeze({
+export const CONTROL_MODE_TIPS: Readonly<Record<string, string>> = Object.freeze({
   [ControlMode.NORMAL]:  'Orbit Mode: W/S throttle, A/D rotate, Space stage',
   [ControlMode.DOCKING]: 'Docking Mode: A/D along-track, W/S radial — orbit frozen',
   [ControlMode.RCS]:     'RCS Mode: WASD translate — no rotation',
 });
+
+// ---------------------------------------------------------------------------
+// Result types
+// ---------------------------------------------------------------------------
+
+/** Result from a mode transition attempt. */
+export interface ModeTransitionResult {
+  success: boolean;
+  reason?: string;
+}
+
+/** Result from a band-limit warning check. */
+export interface BandWarningResult {
+  warning: boolean;
+  message: string;
+}
+
+/** Docking thrust direction vectors. */
+export interface DockingThrustDirections {
+  alongTrackAngle: number;
+  radialOutAngle: number;
+}
 
 // ---------------------------------------------------------------------------
 // Queries
@@ -67,22 +92,15 @@ export const CONTROL_MODE_TIPS = Object.freeze({
 /**
  * Check whether the craft can enter docking mode.
  * Requires ORBIT phase.
- *
- * @param {string} phase  Current FlightPhase value.
- * @returns {boolean}
  */
-export function canEnterDockingMode(phase) {
+export function canEnterDockingMode(phase: string): boolean {
   return phase === FlightPhase.ORBIT;
 }
 
 /**
  * Check whether the assembly has at least one active RCS thruster part.
- *
- * @param {import('./physics.js').PhysicsState}          ps
- * @param {import('./rocketbuilder.js').RocketAssembly}  assembly
- * @returns {boolean}
  */
-export function hasRcsThrusters(ps, assembly) {
+export function hasRcsThrusters(ps: PhysicsState, assembly: RocketAssembly): boolean {
   for (const instanceId of ps.activeParts) {
     const placed = assembly.parts.get(instanceId);
     if (!placed) continue;
@@ -97,21 +115,15 @@ export function hasRcsThrusters(ps, assembly) {
 /**
  * Check whether the craft can enter RCS mode.
  * Requires being in DOCKING mode and having RCS thrusters.
- *
- * @param {import('./physics.js').PhysicsState}          ps
- * @param {import('./rocketbuilder.js').RocketAssembly}  assembly
- * @returns {boolean}
  */
-export function canEnterRcsMode(ps, assembly) {
+export function canEnterRcsMode(ps: PhysicsState, assembly: RocketAssembly): boolean {
   return ps.controlMode === ControlMode.DOCKING && hasRcsThrusters(ps, assembly);
 }
 
 /**
  * Return a human-readable label for a control mode.
- * @param {string} mode  ControlMode value.
- * @returns {string}
  */
-export function getControlModeLabel(mode) {
+export function getControlModeLabel(mode: string): string {
   switch (mode) {
     case ControlMode.NORMAL:  return 'Orbit';
     case ControlMode.DOCKING: return 'Docking';
@@ -127,13 +139,8 @@ export function getControlModeLabel(mode) {
 /**
  * Enter docking mode from NORMAL.
  * Freezes the current orbit, cuts thrust to zero.
- *
- * @param {import('./physics.js').PhysicsState}     ps
- * @param {import('./gameState.js').FlightState}    flightState
- * @param {string} bodyId  Celestial body (e.g. 'EARTH').
- * @returns {{ success: boolean, reason?: string }}
  */
-export function enterDockingMode(ps, flightState, bodyId) {
+export function enterDockingMode(ps: PhysicsState, flightState: FlightState, bodyId: string): ModeTransitionResult {
   if (!canEnterDockingMode(flightState.phase)) {
     return { success: false, reason: 'Must be in ORBIT phase' };
   }
@@ -166,13 +173,8 @@ export function enterDockingMode(ps, flightState, bodyId) {
 /**
  * Exit docking mode, returning to NORMAL.
  * Applies the accumulated docking offset as a small orbit adjustment.
- *
- * @param {import('./physics.js').PhysicsState}     ps
- * @param {import('./gameState.js').FlightState}    flightState
- * @param {string} bodyId
- * @returns {{ success: boolean, reason?: string }}
  */
-export function exitDockingMode(ps, flightState, bodyId) {
+export function exitDockingMode(ps: PhysicsState, flightState: FlightState, bodyId: string): ModeTransitionResult {
   if (ps.controlMode !== ControlMode.DOCKING && ps.controlMode !== ControlMode.RCS) {
     return { success: false, reason: 'Not in docking mode' };
   }
@@ -195,14 +197,10 @@ export function exitDockingMode(ps, flightState, bodyId) {
 
 /**
  * Toggle RCS mode on/off within docking mode.
- *
- * @param {import('./physics.js').PhysicsState}          ps
- * @param {import('./rocketbuilder.js').RocketAssembly}  assembly
- * @returns {{ success: boolean, reason?: string }}
  */
-export function toggleRcsMode(ps, assembly) {
+export function toggleRcsMode(ps: PhysicsState, assembly: RocketAssembly): ModeTransitionResult {
   if (ps.controlMode === ControlMode.RCS) {
-    // Exit RCS → back to DOCKING.
+    // Exit RCS -> back to DOCKING.
     ps.controlMode = ControlMode.DOCKING;
     return { success: true };
   }
@@ -225,12 +223,8 @@ export function toggleRcsMode(ps, assembly) {
 /**
  * Check whether the craft is near the edge of its altitude band and return
  * a warning if so.
- *
- * @param {import('./physics.js').PhysicsState} ps
- * @param {string} bodyId
- * @returns {{ warning: boolean, message: string }}
  */
-export function checkBandLimitWarning(ps, bodyId) {
+export function checkBandLimitWarning(ps: PhysicsState, bodyId: string): BandWarningResult {
   if (ps.controlMode !== ControlMode.DOCKING && ps.controlMode !== ControlMode.RCS) {
     return { warning: false, message: '' };
   }
@@ -253,13 +247,8 @@ export function checkBandLimitWarning(ps, bodyId) {
 /**
  * Clamp a radial velocity delta so the craft doesn't leave its altitude band
  * in docking mode.
- *
- * @param {import('./physics.js').PhysicsState} ps
- * @param {number} deltaVelY  Proposed radial velocity change (m/s).
- * @param {string} bodyId
- * @returns {number}  Clamped deltaVelY.
  */
-export function clampDockingRadial(ps, deltaVelY, bodyId) {
+export function clampDockingRadial(ps: PhysicsState, deltaVelY: number, bodyId: string): number {
   const band = ps.dockingAltitudeBand;
   if (!band) return deltaVelY;
 
@@ -280,12 +269,8 @@ export function clampDockingRadial(ps, deltaVelY, bodyId) {
  * Compute the orbital-relative thrust direction vectors for docking mode.
  * Along-track = tangent to orbit (velocity direction).
  * Radial = perpendicular to orbit (toward/away from body).
- *
- * @param {import('./physics.js').PhysicsState} ps
- * @param {string} bodyId
- * @returns {{ alongTrackAngle: number, radialOutAngle: number }}
  */
-export function getDockingThrustDirections(ps, bodyId) {
+export function getDockingThrustDirections(ps: PhysicsState, bodyId: string): DockingThrustDirections {
   const R = BODY_RADIUS[bodyId];
   const px = ps.posX;
   const py = ps.posY + R;
@@ -303,13 +288,8 @@ export function getDockingThrustDirections(ps, bodyId) {
 /**
  * Force the control mode back to NORMAL if the flight phase leaves ORBIT.
  * Called by the flight controller when phase changes.
- *
- * @param {import('./physics.js').PhysicsState}  ps
- * @param {import('./gameState.js').FlightState} flightState
- * @param {string} bodyId
- * @returns {boolean}  True if the mode was reset.
  */
-export function resetControlModeIfNeeded(ps, flightState, bodyId) {
+export function resetControlModeIfNeeded(ps: PhysicsState, flightState: FlightState, bodyId: string): boolean {
   if (ps.controlMode === ControlMode.NORMAL) return false;
   if (flightState.phase === FlightPhase.ORBIT) return false;
   // Allow docking mode to persist during MANOEUVRE (burn from docking is local only).

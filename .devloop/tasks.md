@@ -109,7 +109,7 @@
 - **Verification**: `npm run typecheck` passes. `npm run test:unit` passes. No `.js` files remain in `src/data/`.
 
 ### TASK-018: Convert core layer to TypeScript (src/core/) — batch 1
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-017
 - **Description**: Convert the first half of remaining core JS files to TypeScript (~22 files): achievements.js, atmosphere.js, biomes.js, challenges.js, collision.js, comms.js, construction.js, contracts.js, controlMode.js, crew.js, customChallenges.js, debugSaves.js, designLibrary.js, docking.js, ejector.js, finance.js, flightPhase.js, flightReturn.js, fuelsystem.js, grabbing.js, index.js, legs.js. Add proper type annotations. See requirements Section 4.1.
 - **Verification**: `npm run typecheck` passes. `npm run test:unit` passes. All listed files are now `.ts`.

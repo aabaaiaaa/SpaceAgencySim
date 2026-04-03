@@ -1,5 +1,5 @@
 /**
- * customChallenges.js — Player-created custom challenge management.
+ * customChallenges.ts — Player-created custom challenge management.
  *
  * Custom challenges are personal challenges that players define themselves.
  * They use the same objective types and scoring metrics as official challenges
@@ -18,6 +18,49 @@
 
 import { ObjectiveType } from '../data/missions.js';
 import { MedalTier, ScoreDirection } from '../data/challenges.js';
+import type { GameState, ChallengeDef, ObjectiveDef } from './gameState.js';
+
+// ---------------------------------------------------------------------------
+// Local types
+// ---------------------------------------------------------------------------
+
+interface ObjectiveTypeField {
+  key: string;
+  label: string;
+  type: string;
+  min: number;
+  optional?: boolean;
+}
+
+interface ObjectiveTypeMeta {
+  label: string;
+  fields: ObjectiveTypeField[];
+  describe: (target: Record<string, any>) => string;
+}
+
+interface ScoreMetricOption {
+  value: string;
+  label: string;
+  unit: string;
+  direction: string;
+}
+
+interface CustomChallengeDef {
+  title: string;
+  description?: string;
+  briefing?: string;
+  objectives: Array<{ type: string; target: Record<string, any>; description?: string }>;
+  scoreMetric: string;
+  scoreDirection?: string;
+  medals: { bronze: number; silver: number; gold: number };
+  rewards: { bronze: number; silver: number; gold: number };
+}
+
+interface CreateResult {
+  success: boolean;
+  challenge?: ChallengeDef;
+  error?: string;
+}
 
 // ---------------------------------------------------------------------------
 // Objective type metadata — drives the creator form
@@ -27,21 +70,21 @@ import { MedalTier, ScoreDirection } from '../data/challenges.js';
  * Metadata for each objective type describing what target fields it needs
  * and how to auto-generate a description.
  */
-export const OBJECTIVE_TYPE_META = {
+export const OBJECTIVE_TYPE_META: Record<string, ObjectiveTypeMeta> = {
   [ObjectiveType.REACH_ALTITUDE]: {
     label: 'Reach Altitude',
     fields: [{ key: 'altitude', label: 'Altitude (m)', type: 'number', min: 1 }],
-    describe: (t) => `Reach ${t.altitude.toLocaleString()} m altitude`,
+    describe: (t: Record<string, any>) => `Reach ${t.altitude.toLocaleString()} m altitude`,
   },
   [ObjectiveType.REACH_SPEED]: {
     label: 'Reach Speed',
     fields: [{ key: 'speed', label: 'Speed (m/s)', type: 'number', min: 1 }],
-    describe: (t) => `Reach ${t.speed.toLocaleString()} m/s`,
+    describe: (t: Record<string, any>) => `Reach ${t.speed.toLocaleString()} m/s`,
   },
   [ObjectiveType.SAFE_LANDING]: {
     label: 'Safe Landing',
     fields: [{ key: 'maxLandingSpeed', label: 'Max landing speed (m/s)', type: 'number', min: 0.1 }],
-    describe: (t) => `Land safely (< ${t.maxLandingSpeed} m/s)`,
+    describe: (t: Record<string, any>) => `Land safely (< ${t.maxLandingSpeed} m/s)`,
   },
   [ObjectiveType.HOLD_ALTITUDE]: {
     label: 'Hold Altitude',
@@ -50,7 +93,7 @@ export const OBJECTIVE_TYPE_META = {
       { key: 'maxAltitude', label: 'Max altitude (m)', type: 'number', min: 1 },
       { key: 'duration', label: 'Duration (seconds)', type: 'number', min: 1 },
     ],
-    describe: (t) => `Hold ${t.minAltitude.toLocaleString()}–${t.maxAltitude.toLocaleString()} m for ${t.duration}s`,
+    describe: (t: Record<string, any>) => `Hold ${t.minAltitude.toLocaleString()}–${t.maxAltitude.toLocaleString()} m for ${t.duration}s`,
   },
   [ObjectiveType.RETURN_SCIENCE_DATA]: {
     label: 'Return Science Data',
@@ -60,12 +103,12 @@ export const OBJECTIVE_TYPE_META = {
   [ObjectiveType.CONTROLLED_CRASH]: {
     label: 'Controlled Crash',
     fields: [{ key: 'minCrashSpeed', label: 'Min crash speed (m/s)', type: 'number', min: 1 }],
-    describe: (t) => `Crash at >= ${t.minCrashSpeed} m/s`,
+    describe: (t: Record<string, any>) => `Crash at >= ${t.minCrashSpeed} m/s`,
   },
   [ObjectiveType.EJECT_CREW]: {
     label: 'Eject Crew',
     fields: [{ key: 'minAltitude', label: 'Min altitude (m)', type: 'number', min: 0 }],
-    describe: (t) => `Eject crew above ${t.minAltitude.toLocaleString()} m`,
+    describe: (t: Record<string, any>) => `Eject crew above ${t.minAltitude.toLocaleString()} m`,
   },
   [ObjectiveType.RELEASE_SATELLITE]: {
     label: 'Release Satellite',
@@ -73,7 +116,7 @@ export const OBJECTIVE_TYPE_META = {
       { key: 'minAltitude', label: 'Min altitude (m)', type: 'number', min: 1 },
       { key: 'minVelocity', label: 'Min velocity (m/s, optional)', type: 'number', min: 0, optional: true },
     ],
-    describe: (t) => `Release satellite above ${t.minAltitude.toLocaleString()} m` +
+    describe: (t: Record<string, any>) => `Release satellite above ${t.minAltitude.toLocaleString()} m` +
       (t.minVelocity ? ` at >= ${t.minVelocity} m/s` : ''),
   },
   [ObjectiveType.REACH_ORBIT]: {
@@ -82,17 +125,17 @@ export const OBJECTIVE_TYPE_META = {
       { key: 'orbitAltitude', label: 'Orbit altitude (m)', type: 'number', min: 1 },
       { key: 'orbitalVelocity', label: 'Orbital velocity (m/s)', type: 'number', min: 1 },
     ],
-    describe: (t) => `Reach orbit (${(t.orbitAltitude / 1000).toFixed(0)} km+, ${t.orbitalVelocity}+ m/s)`,
+    describe: (t: Record<string, any>) => `Reach orbit (${(t.orbitAltitude / 1000).toFixed(0)} km+, ${t.orbitalVelocity}+ m/s)`,
   },
   [ObjectiveType.BUDGET_LIMIT]: {
     label: 'Budget Limit',
     fields: [{ key: 'maxCost', label: 'Max cost ($)', type: 'number', min: 1 }],
-    describe: (t) => `Spend no more than $${t.maxCost.toLocaleString()}`,
+    describe: (t: Record<string, any>) => `Spend no more than $${t.maxCost.toLocaleString()}`,
   },
   [ObjectiveType.MAX_PARTS]: {
     label: 'Max Parts',
     fields: [{ key: 'maxParts', label: 'Max parts', type: 'number', min: 1 }],
-    describe: (t) => `Use no more than ${t.maxParts} parts`,
+    describe: (t: Record<string, any>) => `Use no more than ${t.maxParts} parts`,
   },
   [ObjectiveType.MULTI_SATELLITE]: {
     label: 'Multi Satellite',
@@ -100,19 +143,19 @@ export const OBJECTIVE_TYPE_META = {
       { key: 'count', label: 'Satellite count', type: 'number', min: 2 },
       { key: 'minAltitude', label: 'Min altitude (m)', type: 'number', min: 1 },
     ],
-    describe: (t) => `Deploy ${t.count} satellites above ${t.minAltitude.toLocaleString()} m`,
+    describe: (t: Record<string, any>) => `Deploy ${t.count} satellites above ${t.minAltitude.toLocaleString()} m`,
   },
   [ObjectiveType.MINIMUM_CREW]: {
     label: 'Minimum Crew',
     fields: [{ key: 'minCrew', label: 'Min crew', type: 'number', min: 1 }],
-    describe: (t) => `Fly with at least ${t.minCrew} crew`,
+    describe: (t: Record<string, any>) => `Fly with at least ${t.minCrew} crew`,
   },
 };
 
 /**
  * Score metrics available in the creator form.
  */
-export const SCORE_METRIC_OPTIONS = [
+export const SCORE_METRIC_OPTIONS: ScoreMetricOption[] = [
   { value: 'rocketCost',         label: 'Rocket Cost',         unit: '$',          direction: ScoreDirection.LOWER_IS_BETTER },
   { value: 'landingSpeed',       label: 'Landing Speed',       unit: 'm/s',        direction: ScoreDirection.LOWER_IS_BETTER },
   { value: 'partCount',          label: 'Part Count',          unit: 'parts',      direction: ScoreDirection.LOWER_IS_BETTER },
@@ -129,9 +172,8 @@ export const SCORE_METRIC_OPTIONS = [
 
 /**
  * Ensure state.customChallenges exists.
- * @param {import('./gameState.js').GameState} state
  */
-export function ensureCustomChallengeState(state) {
+export function ensureCustomChallengeState(state: GameState): void {
   if (!Array.isArray(state.customChallenges)) {
     state.customChallenges = [];
   }
@@ -143,9 +185,8 @@ export function ensureCustomChallengeState(state) {
 
 /**
  * Generate a unique ID for a custom challenge.
- * @returns {string}
  */
-function _generateId() {
+function _generateId(): string {
   return 'custom-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
 }
 
@@ -154,19 +195,8 @@ function _generateId() {
  *
  * Accepts a partial definition — fills in defaults and generates an ID.
  * No validation beyond basic structure; broken missions are accepted per spec.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {Object} def - Partial challenge definition from the creator form.
- * @param {string} def.title
- * @param {string} [def.description]
- * @param {string} [def.briefing]
- * @param {Array} def.objectives
- * @param {string} def.scoreMetric
- * @param {Object} def.medals - { bronze, silver, gold }
- * @param {Object} def.rewards - { bronze, silver, gold }
- * @returns {{ success: boolean, challenge?: object, error?: string }}
  */
-export function createCustomChallenge(state, def) {
+export function createCustomChallenge(state: GameState, def: CustomChallengeDef): CreateResult {
   ensureCustomChallengeState(state);
 
   if (!def.title || !def.title.trim()) {
@@ -181,13 +211,13 @@ export function createCustomChallenge(state, def) {
 
   const metricInfo = SCORE_METRIC_OPTIONS.find((m) => m.value === def.scoreMetric);
 
-  const challenge = {
+  const challenge: ChallengeDef = {
     id: _generateId(),
     custom: true,
     title: def.title.trim(),
     description: (def.description || '').trim() || 'A custom challenge.',
     briefing: (def.briefing || '').trim() || '',
-    objectives: def.objectives.map((obj, i) => ({
+    objectives: def.objectives.map((obj, i): ObjectiveDef => ({
       id: `custom-obj-${i}`,
       type: obj.type,
       target: { ...obj.target },
@@ -217,11 +247,8 @@ export function createCustomChallenge(state, def) {
 
 /**
  * Auto-generate an objective description from type + target.
- * @param {string} type
- * @param {Object} target
- * @returns {string}
  */
-function _autoDescription(type, target) {
+function _autoDescription(type: string, target: Record<string, any>): string {
   const meta = OBJECTIVE_TYPE_META[type];
   if (meta && meta.describe) {
     try { return meta.describe(target); } catch { /* fall through */ }
@@ -233,12 +260,8 @@ function _autoDescription(type, target) {
  * Delete a custom challenge by ID.
  *
  * Also clears it from active slot and results if present.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {string} challengeId
- * @returns {{ success: boolean, error?: string }}
  */
-export function deleteCustomChallenge(state, challengeId) {
+export function deleteCustomChallenge(state: GameState, challengeId: string): { success: boolean; error?: string } {
   ensureCustomChallengeState(state);
 
   const idx = state.customChallenges.findIndex((c) => c.id === challengeId);
@@ -271,11 +294,8 @@ const EXPORT_VERSION = 1;
  * Export a single custom challenge as a shareable JSON string.
  *
  * Strips runtime fields (id, custom flag is kept for re-import detection).
- *
- * @param {Object} challenge
- * @returns {string} JSON string
  */
-export function exportChallengeJSON(challenge) {
+export function exportChallengeJSON(challenge: ChallengeDef): string {
   const exportData = {
     _format: 'SpaceAgencySim-CustomChallenge',
     _version: EXPORT_VERSION,
@@ -302,18 +322,14 @@ export function exportChallengeJSON(challenge) {
  *
  * Performs basic structural validation but accepts potentially broken
  * configurations per the spec ("assumes player understands what they're doing").
- *
- * @param {import('./gameState.js').GameState} state
- * @param {string} jsonStr
- * @returns {{ success: boolean, challenge?: object, error?: string }}
  */
-export function importChallengeJSON(state, jsonStr) {
+export function importChallengeJSON(state: GameState, jsonStr: string): CreateResult {
   ensureCustomChallengeState(state);
 
-  let data;
+  let data: any;
   try {
     data = JSON.parse(jsonStr);
-  } catch (e) {
+  } catch (e: any) {
     return { success: false, error: 'Invalid JSON: ' + e.message };
   }
 
@@ -340,7 +356,7 @@ export function importChallengeJSON(state, jsonStr) {
     title: data.title,
     description: data.description || '',
     briefing: data.briefing || '',
-    objectives: data.objectives.map((obj) => ({
+    objectives: data.objectives.map((obj: any) => ({
       type: obj.type || 'REACH_ALTITUDE',
       target: obj.target || {},
       description: obj.description || '',
