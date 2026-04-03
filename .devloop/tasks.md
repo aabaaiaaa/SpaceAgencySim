@@ -85,7 +85,7 @@
 - **Verification**: `npm run test:unit` passes. Unit tests verify: undo reverses placement/deletion/move/staging, redo re-applies, stack depth limit works, new action after undo clears redo stack. E2E test verifies Ctrl+Z undoes a part placement.
 
 ### TASK-014: Add debug FPS/frame-time monitor
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-016
 - **Description**: Create a lightweight FPS/frame-time overlay for flight mode. Shows FPS, frame time (ms), and a mini graph of last ~60 frame times. Updates every ~500ms. Semi-transparent background, top-right corner. Only visible when debug mode is enabled. Expose data on `window.__perfStats`. No per-frame allocations. See requirements Section 3.4.
 - **Verification**: `npm run test:e2e` passes. E2E test verifies: monitor not visible with debug off, visible with debug on during flight, `window.__perfStats` contains fps and frameTime values.

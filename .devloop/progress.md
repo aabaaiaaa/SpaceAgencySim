@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 31
-- **Completed**: 14
-- **Remaining**: 17
-- **Last Updated**: 2026-04-03T02:45:15.208Z
+- **Completed**: 15
+- **Remaining**: 16
+- **Last Updated**: 2026-04-03T03:22:00.034Z
 
 ## Iteration Log
 
@@ -133,4 +133,13 @@
 - **Exit Status**: success
 - **Tokens**: 1,409,237 total (15 in, 3,063 out, 15,250 cache-create, 1,390,909 cache-read)
 - **Cost**: $4.5325
+
+### Iteration 15 - 2026-04-03T02:45:17.357Z
+- **Task Attempted**: TASK-014
+- **Task Completed**: TASK-014
+- **Summary**: Completed Add debug FPS/frame-time monitor
+- **Duration**: 36m 43s
+- **Exit Status**: success
+- **Tokens**: 86,374 total (3 in, 26 out, 411 cache-create, 85,934 cache-read)
+- **Cost**: $2.6198
 

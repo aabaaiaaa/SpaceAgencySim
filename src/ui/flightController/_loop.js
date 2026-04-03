@@ -17,6 +17,7 @@ import { FlightPhase } from '../../core/constants.js';
 import { PartType } from '../../core/constants.js';
 import { getPartById } from '../../data/parts.js';
 import { getFCState } from './_state.js';
+import { recordFrame } from '../fpsMonitor.js';
 import { checkTimeWarpResets, applyTimeWarp } from './_timeWarp.js';
 import { applyMapThrust, updateMapHud } from './_mapView.js';
 import { applyNormalOrbitRcs } from './_orbitRcs.js';
@@ -70,6 +71,9 @@ export function loop(timestamp) {
 
   const realDt = Math.min((timestamp - s.lastTs) / 1000, 0.1);
   s.lastTs = timestamp;
+
+  // Feed frame timing to the FPS monitor (no-ops if not initialised).
+  recordFrame(realDt * 1000, timestamp);
 
   try {
     // Evaluate time-warp reset conditions before advancing physics.

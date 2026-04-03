@@ -25,6 +25,7 @@ import { onSurfaceAction } from './_surfaceActions.js';
 import { destroyMapHud } from './_mapView.js';
 import { destroyDockingHud } from './_docking.js';
 import { loop } from './_loop.js';
+import { initFpsMonitor, showFpsMonitor, hideFpsMonitor, destroyFpsMonitor } from '../fpsMonitor.js';
 import {
   handleMenuRestart,
   handleMenuAdjustBuild,
@@ -181,6 +182,11 @@ export function startFlightScene(
   // Mount the HUD overlay.
   initFlightHud(container, s.ps, s.assembly, stagingConfig, flightState, state, onTimeWarpButtonClick, onSurfaceAction, handleAbortReturnToAgency);
 
+  // Initialise the FPS monitor (visible only when debug mode is on).
+  initFpsMonitor();
+  if (state.debugMode) showFpsMonitor();
+  else hideFpsMonitor();
+
   // Build the in-flight control overlay.
   _buildFlightOverlay(container);
 
@@ -283,6 +289,7 @@ export function stopFlightScene() {
     s.keyupHandler = null;
   }
 
+  destroyFpsMonitor();
   destroyFlightHud();
   destroyFlightContextMenu();
   destroyDockingHud();
