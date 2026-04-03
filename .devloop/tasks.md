@@ -169,7 +169,7 @@
 - **Verification**: `npm run typecheck` passes. `npm run test:unit` passes. Attempting to add a state mutation in a render module causes a TypeScript error.
 
 ### TASK-028: Split E2E test helpers into focused sub-modules
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Split `e2e/helpers/_interactions.js` (415 lines) into: `_flight.js` (teleport, flight control), `_timewarp.js` (time warp API, wait helpers), `_state.js` (state seeding, queries), `_navigation.js` (screen navigation). Maintain barrel re-export at `e2e/helpers.js`. See requirements Section 5.3.
 - **Verification**: `npm run test:e2e` passes. `_interactions.js` no longer exists. Each sub-module is under 150 lines.

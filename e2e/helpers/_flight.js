@@ -1,0 +1,143 @@
+/**
+ * Flight control helpers for E2E tests — teleport, launch, malfunctions.
+ */
+
+// ---------------------------------------------------------------------------
+// Programmatic test flight (bypasses VAB UI)
+// ---------------------------------------------------------------------------
+
+/**
+ * Start a flight programmatically by building a rocket from part IDs.
+ * Bypasses the VAB UI entirely. Malfunctions disabled by default.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {string[]} partIds  Part catalog IDs (top → bottom).
+ * @param {object} [opts]  Options: missionId, crewIds, bodyId, malfunctionMode.
+ */
+export async function startTestFlight(page, partIds, opts = {}) {
+  await page.waitForFunction(
+    () => typeof window.__e2eStartFlight === 'function',
+    { timeout: 15_000 },
+  );
+
+  await page.evaluate(
+    ({ parts, options }) => window.__e2eStartFlight(parts, options),
+    { parts: partIds, options: opts },
+  );
+
+  // Wait for flight scene to be ready.
+  await page.waitForSelector('#flight-hud', { state: 'visible', timeout: 15_000 });
+  await page.waitForFunction(
+    () => typeof window.__flightPs !== 'undefined' && window.__flightPs !== null,
+    { timeout: 10_000 },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Malfunction mode control
+// ---------------------------------------------------------------------------
+
+/**
+ * Set the malfunction mode for deterministic testing.
+ *
+ * Must be called AFTER the flight scene is loaded (window.__setMalfunctionMode
+ * is only available during flight).
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {'off'|'forced'|'normal'} mode
+ */
+export async function setMalfunctionMode(page, mode) {
+  await page.evaluate((m) => {
+    if (typeof window.__setMalfunctionMode === 'function') {
+      window.__setMalfunctionMode(m);
+    }
+  }, mode);
+}
+
+/**
+ * Get the current malfunction mode from the running game.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @returns {Promise<string>}
+ */
+export async function getMalfunctionMode(page) {
+  return page.evaluate(() => {
+    if (typeof window.__getMalfunctionMode === 'function') {
+      return window.__getMalfunctionMode();
+    }
+    return 'unknown';
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Teleport helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Teleport the craft to a specific position with velocity.
+ *
+ * Sets position, velocity, and basic flags.  The physics simulation
+ * computes phase transitions (FLIGHT → ORBIT, etc.) and orbital elements
+ * automatically on the next frame — callers should follow with
+ * {@link waitForOrbit} or similar condition checks as needed.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {object} opts
+ * @param {number} [opts.posX=0]         Position X (metres).
+ * @param {number} opts.posY             Position Y / altitude (metres).
+ * @param {number} [opts.velX=0]         Velocity X (m/s).
+ * @param {number} [opts.velY=0]         Velocity Y (m/s).
+ * @param {boolean} [opts.grounded=false]
+ * @param {boolean} [opts.landed=false]
+ * @param {boolean} [opts.crashed=false]
+ * @param {number}  [opts.throttle=0]
+ * @param {string}  [opts.bodyId]        Celestial body ID (e.g. 'EARTH', 'MOON').
+ */
+export async function teleportCraft(page, opts) {
+  await page.evaluate((o) => {
+    const ps = window.__flightPs;
+    const fs = window.__flightState;
+    if (!ps || !fs) return;
+
+    // Position and velocity.
+    ps.posX = o.posX ?? 0;
+    ps.posY = o.posY;
+    ps.velX = o.velX ?? 0;
+    ps.velY = o.velY ?? 0;
+
+    // Basic flags.
+    ps.grounded = o.grounded ?? false;
+    ps.landed   = o.landed ?? false;
+    ps.crashed  = o.crashed ?? false;
+    ps.throttle = o.throttle ?? 0;
+    ps.firingEngines.clear();
+
+    // Body.
+    if (o.bodyId) fs.bodyId = o.bodyId;
+
+    // Reset to airborne FLIGHT state so the physics auto-detection can
+    // compute the correct phase (ORBIT, etc.) and orbital elements from
+    // the position/velocity on the next simulation frame.
+    fs.phase = 'FLIGHT';
+    fs.inOrbit = false;
+    fs.orbitalElements = null;
+
+    // Defensive initialisation.
+    if (!fs.phaseLog) fs.phaseLog = [];
+    if (!fs.events) fs.events = [];
+  }, opts);
+}
+
+/**
+ * Wait for the physics simulation to detect a valid orbit and transition
+ * the flight phase to ORBIT.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {number} [timeout=10_000]
+ */
+export async function waitForOrbit(page, timeout = 10_000) {
+  await page.waitForFunction(
+    () => window.__flightState?.phase === 'ORBIT' && window.__flightState?.inOrbit === true,
+    { timeout },
+  );
+}

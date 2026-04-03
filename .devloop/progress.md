@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 31
-- **Completed**: 26
-- **Remaining**: 5
-- **Last Updated**: 2026-04-03T21:05:12.198Z
+- **Completed**: 27
+- **Remaining**: 4
+- **Last Updated**: 2026-04-03T21:36:13.282Z
 
 ## Iteration Log
 
@@ -241,4 +241,13 @@
 - **Exit Status**: success
 - **Tokens**: 10,353,168 total (1,473 in, 44,848 out, 121,612 cache-create, 10,185,235 cache-read)
 - **Cost**: $7.1819
+
+### Iteration 27 - 2026-04-03T21:05:14.715Z
+- **Task Attempted**: TASK-028
+- **Task Completed**: TASK-028
+- **Summary**: Completed Split E2E test helpers into focused sub-modules
+- **Duration**: 30m 59s
+- **Exit Status**: success
+- **Tokens**: 65,445 total (3 in, 27 out, 611 cache-create, 64,804 cache-read)
+- **Cost**: $1.4897
 
