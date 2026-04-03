@@ -21,6 +21,7 @@ import { showHubScene } from '../render/hub.js';
 import { hasFacility } from '../core/construction.js';
 import { GameMode } from '../core/constants.js';
 import { injectDesignTokens } from './design-tokens.js';
+import { triggerAutoSave } from './autoSaveToast.js';
 
 export { initFlightHud, destroyFlightHud } from './flightHud.js';
 export { showReturnResultsOverlay } from './hub.js';
@@ -165,6 +166,11 @@ export function returnToHubFromFlight(container, state, returnResults) {
   });
   if (returnResults) {
     showReturnResultsOverlay(container, returnResults);
+  }
+
+  // Trigger auto-save on return to hub from flight.
+  if (state) {
+    triggerAutoSave(state, 'hub-return');
   }
 }
 

@@ -16,6 +16,8 @@ import { checkAchievements } from './core/achievements.js';
 import { computeTransferDeltaV } from './core/manoeuvre.js';
 import { CELESTIAL_BODIES, isLandable } from './data/bodies.js';
 import { getPartById } from './data/parts.js';
+import { autoSaveImmediate } from './ui/autoSaveToast.js';
+import { isAutoSaveEnabled, AUTO_SAVE_KEY } from './core/autoSave.js';
 
 async function main() {
   const canvas    = document.getElementById('game-canvas');
@@ -164,6 +166,11 @@ async function main() {
       const p = getPartById(id);
       return p ? JSON.parse(JSON.stringify(p)) : null;
     };
+
+    // Auto-save E2E helpers.
+    window.__autoSaveImmediate = () => autoSaveImmediate(state);
+    window.__isAutoSaveEnabled = () => isAutoSaveEnabled(state);
+    window.__autoSaveKey = AUTO_SAVE_KEY;
 
   });
 }

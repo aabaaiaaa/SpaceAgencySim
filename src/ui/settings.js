@@ -285,6 +285,60 @@ export function openSettingsPanel(container, state) {
     content.appendChild(group);
   }
 
+  // ── Auto-save toggle ────────────────────────────────────────────────────
+  {
+    const group = document.createElement('div');
+    group.className = 'settings-group';
+
+    const labelEl = document.createElement('p');
+    labelEl.className = 'settings-group-label';
+    labelEl.textContent = 'Auto-Save';
+    group.appendChild(labelEl);
+
+    const hintEl = document.createElement('p');
+    hintEl.className = 'settings-group-hint';
+    hintEl.textContent = 'Automatically save at end of flight and on return to hub.';
+    group.appendChild(hintEl);
+
+    const optionsRow = document.createElement('div');
+    optionsRow.className = 'settings-options';
+
+    const onBtn = document.createElement('button');
+    onBtn.className = 'settings-option-btn';
+    onBtn.textContent = 'On';
+    onBtn.setAttribute('data-setting', 'autoSave');
+    onBtn.setAttribute('data-value', 'on');
+
+    const offBtn = document.createElement('button');
+    offBtn.className = 'settings-option-btn';
+    offBtn.textContent = 'Off';
+    offBtn.setAttribute('data-setting', 'autoSave');
+    offBtn.setAttribute('data-value', 'off');
+
+    if (state.autoSaveEnabled !== false) {
+      onBtn.classList.add('active');
+    } else {
+      offBtn.classList.add('active');
+    }
+
+    tracker.add(onBtn, 'click', () => {
+      state.autoSaveEnabled = true;
+      onBtn.classList.add('active');
+      offBtn.classList.remove('active');
+    });
+
+    tracker.add(offBtn, 'click', () => {
+      state.autoSaveEnabled = false;
+      offBtn.classList.add('active');
+      onBtn.classList.remove('active');
+    });
+
+    optionsRow.appendChild(onBtn);
+    optionsRow.appendChild(offBtn);
+    group.appendChild(optionsRow);
+    content.appendChild(group);
+  }
+
   // ── Close button ───────────────────────────────────────────────────────
   const closeBtn = document.createElement('button');
   closeBtn.className = 'settings-close-btn';

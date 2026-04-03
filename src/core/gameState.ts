@@ -697,6 +697,8 @@ export interface GameState {
    * Persisted with save/load so E2E test overrides survive round-trips.
    */
   malfunctionMode: string;
+  /** Whether auto-save is enabled (saves at end of flight and return to hub). */
+  autoSaveEnabled: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -824,6 +826,9 @@ export function createGameState(): GameState {
 
     // Malfunction mode — 'normal' (standard rolls), 'off', or 'forced'.
     malfunctionMode: MalfunctionMode.NORMAL,
+
+    // Auto-save — enabled by default.
+    autoSaveEnabled: true,
   };
 }
 

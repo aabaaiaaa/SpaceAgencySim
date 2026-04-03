@@ -12,6 +12,7 @@ import { createFlightState } from '../../core/gameState.js';
 import { refreshTopBar } from '../topbar.js';
 import { getFCState } from './_state.js';
 import { stopFlightScene, startFlightScene } from './_init.js';
+import { triggerAutoSave } from '../autoSaveToast.js';
 
 // ---------------------------------------------------------------------------
 // Flight event formatting helpers
@@ -554,4 +555,9 @@ export function showPostFlightSummary(ps, assembly, flightState, state, onFlight
   }
 
   host.appendChild(overlay);
+
+  // Trigger auto-save when the post-flight summary appears.
+  if (state) {
+    triggerAutoSave(state, 'post-flight');
+  }
 }

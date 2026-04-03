@@ -51,6 +51,7 @@ export function buildSaveEnvelope({
   challenges      = { active: null, results: {} },
   customChallenges= [],
   fieldCraft      = [],
+  autoSaveEnabled = true,
 } = {}) {
   return {
     saveName,
@@ -90,6 +91,7 @@ export function buildSaveEnvelope({
       challenges,
       customChallenges,
       fieldCraft,
+      autoSaveEnabled,
     },
   };
 }

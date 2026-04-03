@@ -49,7 +49,7 @@
 - **Verification**: `npm run test:unit` passes. Unit tests verify: writes go to both localStorage and IndexedDB, reads check both and use most recent, IndexedDB unavailability falls back to localStorage-only.
 
 ### TASK-009: Implement auto-save system with cancel UI
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-008
 - **Description**: Implement auto-save triggers at end of flight (when post-flight summary appears) and on return to hub. Use a dedicated auto-save slot separate from manual saves. Display a small toast notification with cancel button for 3-5 seconds before saving. Add "Auto-save" toggle to settings panel (enabled by default, persists across sessions). See requirements Section 2.2.
 - **Verification**: `npm run test:unit` passes. `npm run test:e2e` passes. E2E test verifies: auto-save fires after flight, cancel button prevents save, toggle in settings disables auto-save.

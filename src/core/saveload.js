@@ -380,6 +380,9 @@ export function loadGame(slotIndex) {
   // Existing saves should not see the welcome modal, so default to true.
   envelope.state.welcomeShown ??= true;
 
+  // Default autoSaveEnabled for saves created before the auto-save system.
+  envelope.state.autoSaveEnabled ??= true;
+
   return envelope.state;
 }
 
