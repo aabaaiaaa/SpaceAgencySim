@@ -1,0 +1,886 @@
+// @ts-nocheck
+/**
+ * collision.test.js — Unit tests for the collision detection and response system.
+ *
+ * Tests cover:
+ *   computeAABB()          — bounding box computation for single/multi-part bodies
+ *   testAABBOverlap()      — overlap detection
+ *   Collision response      — momentum conservation, Newton's third law, restitution
+ *   applySeparationImpulse — mass-dependent separation at decoupling
+ *   tickCollisions          — integration with physics loop, cooldowns
+ */
+
+import { describe, it, expect } from 'vitest';
+import {
+  computeAABB,
+  testAABBOverlap,
+  tickCollisions,
+  applySeparationImpulse,
+} from '../core/collision.js';
+import {
+  createPhysicsState,
+  tick,
+  fireNextStage,
+} from '../core/physics.js';
+import {
+  createRocketAssembly,
+  addPartToAssembly,
+  connectParts,
+  createStagingConfig,
+  syncStagingWithAssembly,
+  assignPartToStage,
+  addStageToConfig,
+} from '../core/rocketbuilder.js';
+import { createFlightState } from '../core/gameState.js';
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function makeFlightState() {
+  return createFlightState({
+    missionId: 'test-collision',
+    rocketId:  'test-rocket',
+  });
+}
+
+/**
+ * Two-stage rocket:
+ *   Probe Core (top) → Decoupler → Small Tank → Spark Engine (bottom)
+ *   Stage 0: engine ignition.  Stage 1: decoupler separation.
+ */
+function makeTwoStageRocket() {
+  const assembly = createRocketAssembly();
+  const staging  = createStagingConfig();
+
+  const probeId   = addPartToAssembly(assembly, 'probe-core-mk1',       0,  100);
+  const decId     = addPartToAssembly(assembly, 'decoupler-stack-tr18', 0,   60);
+  const tankId    = addPartToAssembly(assembly, 'tank-small',           0,    0);
+  const engineId  = addPartToAssembly(assembly, 'engine-spark',         0,  -55);
+
+  connectParts(assembly, probeId, 1, decId,    0);
+  connectParts(assembly, decId,   1, tankId,   0);
+  connectParts(assembly, tankId,  1, engineId, 0);
+
+  syncStagingWithAssembly(assembly, staging);
+  assignPartToStage(staging, engineId, 0);
+  addStageToConfig(staging);
+  assignPartToStage(staging, decId, 1);
+
+  return { assembly, staging, probeId, decId, tankId, engineId };
+}
+
+// ---------------------------------------------------------------------------
+// AABB Computation
+// ---------------------------------------------------------------------------
+
+describe('computeAABB()', () => {
+  it('computes correct bounds for a single part at origin with angle=0', () => {
+    const assembly = createRocketAssembly();
+    // probe-core-mk1 is 20×10 px → 1.0×0.5 m at 0.05 m/px
+    // halfW = 0.5, halfH = 0.25
+    const id = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
+    const activeParts = new Set([id]);
+
+    const aabb = computeAABB(activeParts, assembly.parts, 0, 0, 0);
+
+    expect(aabb.minX).toBeCloseTo(-0.5, 2);
+    expect(aabb.maxX).toBeCloseTo(0.5, 2);
+    expect(aabb.minY).toBeCloseTo(-0.25, 2);
+    expect(aabb.maxY).toBeCloseTo(0.25, 2);
+  });
+
+  it('encompasses all parts in a vertical stack', () => {
+    const assembly = createRocketAssembly();
+    // probe-core-mk1 is 20×10 px → 1.0×0.5 m; halfW=0.5, halfH=0.25
+    // id1 at y=0px (0m), id2 at y=80px (4m)
+    const id1 = addPartToAssembly(assembly, 'probe-core-mk1', 0,  0);
+    const id2 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 80);
+    const activeParts = new Set([id1, id2]);
+
+    const aabb = computeAABB(activeParts, assembly.parts, 0, 0, 0);
+
+    // id1 centre at 0m: Y range [-0.25, 0.25]
+    // id2 centre at 4m: Y range [3.75, 4.25]
+    // Combined: [-0.25, 4.25]
+    expect(aabb.minY).toBeCloseTo(-0.25, 2);
+    expect(aabb.maxY).toBeCloseTo(4.25, 2);
+    // Width stays the same as one part
+    expect(aabb.minX).toBeCloseTo(-0.5, 2);
+    expect(aabb.maxX).toBeCloseTo(0.5, 2);
+  });
+
+  it('rotation swaps effective width and height for a non-square part', () => {
+    const assembly = createRocketAssembly();
+    // tank-small is 20×40 px → 1.0×2.0 m
+    const id = addPartToAssembly(assembly, 'tank-small', 0, 0);
+    const activeParts = new Set([id]);
+
+    const noRot = computeAABB(activeParts, assembly.parts, 0, 0, 0);
+    const rot90 = computeAABB(activeParts, assembly.parts, 0, 0, Math.PI / 2);
+
+    // At 0°: width = 2m, height = 4m
+    const widthNoRot = noRot.maxX - noRot.minX;
+    const heightNoRot = noRot.maxY - noRot.minY;
+
+    // At 90°: effective width ≈ height, effective height ≈ width
+    const widthRot = rot90.maxX - rot90.minX;
+    const heightRot = rot90.maxY - rot90.minY;
+
+    expect(widthRot).toBeCloseTo(heightNoRot, 0);
+    expect(heightRot).toBeCloseTo(widthNoRot, 0);
+  });
+
+  it('offset parts produce a wider AABB', () => {
+    const assembly = createRocketAssembly();
+    // probe-core-mk1: 20×10 px → halfW=0.5m
+    const id1 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
+    const id2 = addPartToAssembly(assembly, 'probe-core-mk1', 80, 0); // offset right 80px = 4m
+    const activeParts = new Set([id1, id2]);
+
+    const aabb = computeAABB(activeParts, assembly.parts, 0, 0, 0);
+
+    // id1 X range: [-0.5, 0.5], id2 X range: [3.5, 4.5]
+    // Combined: [-0.5, 4.5]
+    expect(aabb.minX).toBeCloseTo(-0.5, 2);
+    expect(aabb.maxX).toBeCloseTo(4.5, 2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Overlap Detection
+// ---------------------------------------------------------------------------
+
+describe('testAABBOverlap()', () => {
+  it('returns true for overlapping boxes', () => {
+    const a = { minX: 0, maxX: 2, minY: 0, maxY: 2 };
+    const b = { minX: 1, maxX: 3, minY: 1, maxY: 3 };
+    expect(testAABBOverlap(a, b)).toBe(true);
+  });
+
+  it('returns false for separated boxes', () => {
+    const a = { minX: 0, maxX: 1, minY: 0, maxY: 1 };
+    const b = { minX: 5, maxX: 6, minY: 5, maxY: 6 };
+    expect(testAABBOverlap(a, b)).toBe(false);
+  });
+
+  it('returns true for edge-touching boxes', () => {
+    const a = { minX: 0, maxX: 2, minY: 0, maxY: 2 };
+    const b = { minX: 2, maxX: 4, minY: 0, maxY: 2 };
+    expect(testAABBOverlap(a, b)).toBe(true);
+  });
+
+  it('returns false for Y-only separation', () => {
+    const a = { minX: 0, maxX: 2, minY: 0, maxY: 1 };
+    const b = { minX: 0, maxX: 2, minY: 5, maxY: 6 };
+    expect(testAABBOverlap(a, b)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Collision Response
+// ---------------------------------------------------------------------------
+
+describe('Collision response', () => {
+  /**
+   * Helper: create two overlapping debris-like bodies and run tickCollisions.
+   */
+  function makeTwoBodyCollision({
+    mass1 = 100, mass2 = 100,
+    vel1X = 0, vel1Y = -5,
+    vel2X = 0, vel2Y = 5,
+    pos1Y = 100.5, pos2Y = 100,
+    altitude = 100,
+  } = {}) {
+    // Use a minimal assembly with parts at known positions.
+    const assembly = createRocketAssembly();
+    const id1 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
+    const id2 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
+
+    // Create a fake physics state with one body being the main rocket,
+    // one being debris.
+    const ps = {
+      posX: 0, posY: pos1Y, velX: vel1X, velY: vel1Y, angle: 0,
+      angularVelocity: 0,
+      landed: false, crashed: false,
+      activeParts: new Set([id1]),
+      fuelStore: new Map(),
+      firingEngines: new Set(),
+      debris: [{
+        id: 'debris-test',
+        posX: 0, posY: pos2Y, velX: vel2X, velY: vel2Y, angle: 0,
+        angularVelocity: 0,
+        landed: false, crashed: false,
+        activeParts: new Set([id2]),
+        fuelStore: new Map(),
+        firingEngines: new Set(),
+        collisionCooldown: 0,
+      }],
+    };
+
+    // Momentum before.
+    // probe-core-mk1 has mass 50 kg
+    const m1 = 50; // actual part mass
+    const m2 = 50;
+    const pBefore = m1 * ps.velY + m2 * ps.debris[0].velY;
+
+    tickCollisions(ps, assembly, 1 / 60);
+
+    const pAfter = m1 * ps.velY + m2 * ps.debris[0].velY;
+
+    return { ps, assembly, pBefore, pAfter, m1, m2 };
+  }
+
+  it('conserves momentum after collision', () => {
+    const { pBefore, pAfter } = makeTwoBodyCollision();
+    expect(pAfter).toBeCloseTo(pBefore, 0);
+  });
+
+  it('lighter body gets larger velocity change', () => {
+    // Use asymmetric masses: probe-core-mk1 (50kg) vs tank-small (~50kg dry)
+    // We'll use the same parts but add fuel to one.
+    const assembly = createRocketAssembly();
+    const lightId = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
+    const heavyId = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
+
+    const ps = {
+      posX: 0, posY: 100.5, velX: 0, velY: -5, angle: 0,
+      angularVelocity: 0,
+      landed: false, crashed: false,
+      activeParts: new Set([lightId]),
+      fuelStore: new Map(),
+      firingEngines: new Set(),
+      debris: [{
+        id: 'debris-heavy',
+        posX: 0, posY: 100, velX: 0, velY: 5, angle: 0,
+        angularVelocity: 0,
+        landed: false, crashed: false,
+        activeParts: new Set([heavyId]),
+        fuelStore: new Map([[heavyId, 500]]),  // Heavy: 50 + 500 = 550 kg
+        firingEngines: new Set(),
+        collisionCooldown: 0,
+      }],
+    };
+
+    const lightVelBefore = ps.velY;
+    const heavyVelBefore = ps.debris[0].velY;
+
+    tickCollisions(ps, assembly, 1 / 60);
+
+    const lightDv = Math.abs(ps.velY - lightVelBefore);
+    const heavyDv = Math.abs(ps.debris[0].velY - heavyVelBefore);
+
+    // Lighter body should have larger velocity change.
+    expect(lightDv).toBeGreaterThan(heavyDv);
+  });
+
+  it('applies equal and opposite impulses (Newton\'s third law)', () => {
+    const assembly = createRocketAssembly();
+    const id1 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
+    const id2 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
+
+    const ps = {
+      posX: 0, posY: 100.5, velX: 0, velY: -5, angle: 0,
+      angularVelocity: 0,
+      landed: false, crashed: false,
+      activeParts: new Set([id1]),
+      fuelStore: new Map(),
+      firingEngines: new Set(),
+      debris: [{
+        id: 'debris-test',
+        posX: 0, posY: 100, velX: 0, velY: 5, angle: 0,
+        angularVelocity: 0,
+        landed: false, crashed: false,
+        activeParts: new Set([id2]),
+        fuelStore: new Map(),
+        firingEngines: new Set(),
+        collisionCooldown: 0,
+      }],
+    };
+
+    // Both have equal mass (50 kg probe-core-mk1)
+    const m = 50;
+    tickCollisions(ps, assembly, 1 / 60);
+
+    // Equal mass → velocity changes should be equal and opposite.
+    // After collision with equal mass head-on, they should swap velocities
+    // (modified by restitution).
+    // The impulse on body A along Y = m * Δv_A.
+    // The impulse on body B along Y = m * Δv_B.
+    // These should sum to zero (Newton's third law).
+    // Original: A.velY=-5, B.velY=5
+    // Momentum sum should be unchanged.
+    const totalP = m * ps.velY + m * ps.debris[0].velY;
+    expect(totalP).toBeCloseTo(0, 1); // was -5*50 + 5*50 = 0
+  });
+
+  it('sea-level restitution is lower than vacuum restitution', () => {
+    // At sea level (altitude 0): higher density → lower restitution
+    // At vacuum (altitude 80000): density 0 → full base restitution
+    const assembly = createRocketAssembly();
+    const id1a = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
+    const id2a = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
+
+    // Sea level collision
+    const psSL = {
+      posX: 0, posY: 1.5, velX: 0, velY: -10, angle: 0,
+      angularVelocity: 0,
+      landed: false, crashed: false,
+      activeParts: new Set([id1a]),
+      fuelStore: new Map(),
+      firingEngines: new Set(),
+      debris: [{
+        id: 'debris-sl',
+        posX: 0, posY: 1, velX: 0, velY: 10, angle: 0,
+        angularVelocity: 0,
+        landed: false, crashed: false,
+        activeParts: new Set([id2a]),
+        fuelStore: new Map(),
+        firingEngines: new Set(),
+        collisionCooldown: 0,
+      }],
+    };
+
+    tickCollisions(psSL, assembly, 1 / 60);
+    const bounceSpeedSL = Math.abs(psSL.velY - psSL.debris[0].velY);
+
+    // Vacuum collision — need new assembly and parts
+    const assembly2 = createRocketAssembly();
+    const id1b = addPartToAssembly(assembly2, 'probe-core-mk1', 0, 0);
+    const id2b = addPartToAssembly(assembly2, 'probe-core-mk1', 0, 0);
+
+    const psVac = {
+      posX: 0, posY: 80000.5, velX: 0, velY: -10, angle: 0,
+      angularVelocity: 0,
+      landed: false, crashed: false,
+      activeParts: new Set([id1b]),
+      fuelStore: new Map(),
+      firingEngines: new Set(),
+      debris: [{
+        id: 'debris-vac',
+        posX: 0, posY: 80000, velX: 0, velY: 10, angle: 0,
+        angularVelocity: 0,
+        landed: false, crashed: false,
+        activeParts: new Set([id2b]),
+        fuelStore: new Map(),
+        firingEngines: new Set(),
+        collisionCooldown: 0,
+      }],
+    };
+
+    tickCollisions(psVac, assembly2, 1 / 60);
+    const bounceSpeedVac = Math.abs(psVac.velY - psVac.debris[0].velY);
+
+    // Vacuum should have bouncier (higher relative speed) collision.
+    expect(bounceSpeedVac).toBeGreaterThan(bounceSpeedSL);
+  });
+
+  it('separating bodies are not pushed together', () => {
+    const assembly = createRocketAssembly();
+    const id1 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
+    const id2 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
+
+    // Bodies overlapping but already moving apart.
+    const ps = {
+      posX: 0, posY: 100.5, velX: 0, velY: 5, angle: 0,  // moving up
+      angularVelocity: 0,
+      landed: false, crashed: false,
+      activeParts: new Set([id1]),
+      fuelStore: new Map(),
+      firingEngines: new Set(),
+      debris: [{
+        id: 'debris-sep',
+        posX: 0, posY: 100, velX: 0, velY: -5, angle: 0,  // moving down
+        angularVelocity: 0,
+        landed: false, crashed: false,
+        activeParts: new Set([id2]),
+        fuelStore: new Map(),
+        firingEngines: new Set(),
+        collisionCooldown: 0,
+      }],
+    };
+
+    const velBefore = ps.velY;
+    tickCollisions(ps, assembly, 1 / 60);
+
+    // Velocities should remain unchanged — they were already separating.
+    expect(ps.velY).toBe(velBefore);
+  });
+
+  it('positional correction separates overlapping bodies', () => {
+    const assembly = createRocketAssembly();
+    const id1 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
+    const id2 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
+
+    // Bodies almost exactly on top of each other, approaching.
+    const ps = {
+      posX: 0, posY: 100.3, velX: 0, velY: -3, angle: 0,
+      angularVelocity: 0,
+      landed: false, crashed: false,
+      activeParts: new Set([id1]),
+      fuelStore: new Map(),
+      firingEngines: new Set(),
+      debris: [{
+        id: 'debris-overlap',
+        posX: 0, posY: 100, velX: 0, velY: 3, angle: 0,
+        angularVelocity: 0,
+        landed: false, crashed: false,
+        activeParts: new Set([id2]),
+        fuelStore: new Map(),
+        firingEngines: new Set(),
+        collisionCooldown: 0,
+      }],
+    };
+
+    const gapBefore = ps.posY - ps.debris[0].posY;
+    tickCollisions(ps, assembly, 1 / 60);
+    const gapAfter = ps.posY - ps.debris[0].posY;
+
+    // Bodies should be pushed further apart.
+    expect(gapAfter).toBeGreaterThan(gapBefore);
+  });
+
+  it('off-centre impact changes angular velocity', () => {
+    const assembly = createRocketAssembly();
+    const id1 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
+    const id2 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
+
+    // Body A offset horizontally, approaching B from the side.
+    const ps = {
+      posX: 1.5, posY: 100, velX: -5, velY: 0, angle: 0,
+      angularVelocity: 0,
+      landed: false, crashed: false,
+      activeParts: new Set([id1]),
+      fuelStore: new Map(),
+      firingEngines: new Set(),
+      debris: [{
+        id: 'debris-angular',
+        posX: 0, posY: 100, velX: 5, velY: 0, angle: 0,
+        angularVelocity: 0,
+        landed: false, crashed: false,
+        activeParts: new Set([id2]),
+        fuelStore: new Map(),
+        firingEngines: new Set(),
+        collisionCooldown: 0,
+      }],
+    };
+
+    tickCollisions(ps, assembly, 1 / 60);
+
+    // At minimum, the collision should produce some angular change on one or
+    // both bodies (depending on contact offset from centre).
+    // With a single centred part, the torque might be small, but the system
+    // should not crash. The main thing is that angularVelocity is modified
+    // when impact is off-centre relative to AABB centre.
+    // This test just verifies the code path runs without error.
+    expect(typeof ps.angularVelocity).toBe('number');
+    expect(typeof ps.debris[0].angularVelocity).toBe('number');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Separation Impulse
+// ---------------------------------------------------------------------------
+
+describe('applySeparationImpulse()', () => {
+  it('lighter body gets larger delta-v', () => {
+    const assembly = createRocketAssembly();
+    const lightId = addPartToAssembly(assembly, 'probe-core-mk1', 0, 100);  // 50 kg, higher Y
+    const heavyId = addPartToAssembly(assembly, 'tank-small',     0,   0);   // 50 kg dry + fuel
+
+    const ps = {
+      posX: 0, posY: 1000, velX: 0, velY: 100, angle: 0,
+      activeParts: new Set([lightId]),
+      fuelStore: new Map(),
+    };
+
+    const debris = {
+      id: 'debris-sep',
+      posX: 0, posY: 1000, velX: 0, velY: 100, angle: 0,
+      activeParts: new Set([heavyId]),
+      fuelStore: new Map([[heavyId, 400]]),  // 50 + 400 = 450 kg
+    };
+
+    applySeparationImpulse(ps, debris, assembly);
+
+    const rocketDv = Math.abs(ps.velY - 100);
+    const debrisDv = Math.abs(debris.velY - 100);
+
+    // Light rocket (50 kg) should have larger Δv than heavy debris (450 kg).
+    expect(rocketDv).toBeGreaterThan(debrisDv);
+  });
+
+  it('impulse direction follows rocket angle', () => {
+    const assembly = createRocketAssembly();
+    const id1 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 50);
+    const id2 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
+
+    const ps = {
+      posX: 0, posY: 1000, velX: 0, velY: 0,
+      angle: Math.PI / 4,  // 45° tilt
+      activeParts: new Set([id1]),
+      fuelStore: new Map(),
+    };
+
+    const debris = {
+      id: 'debris-angle',
+      posX: 0, posY: 1000, velX: 0, velY: 0, angle: Math.PI / 4,
+      activeParts: new Set([id2]),
+      fuelStore: new Map(),
+    };
+
+    applySeparationImpulse(ps, debris, assembly);
+
+    // At 45°, sin(π/4) ≈ 0.707, cos(π/4) ≈ 0.707
+    // Both X and Y should have non-zero impulse components.
+    expect(Math.abs(ps.velX)).toBeGreaterThan(0);
+    expect(Math.abs(ps.velY)).toBeGreaterThan(0);
+    // X and Y components should be approximately equal in magnitude.
+    expect(Math.abs(ps.velX)).toBeCloseTo(Math.abs(ps.velY), 0);
+  });
+
+  it('bodies are pushed apart, not together', () => {
+    const assembly = createRocketAssembly();
+    const topId = addPartToAssembly(assembly, 'probe-core-mk1', 0, 100); // higher = top
+    const botId = addPartToAssembly(assembly, 'probe-core-mk1', 0,   0); // lower = bottom
+
+    const ps = {
+      posX: 0, posY: 1000, velX: 0, velY: 50, angle: 0,
+      activeParts: new Set([topId]),
+      fuelStore: new Map(),
+    };
+
+    const debris = {
+      id: 'debris-apart',
+      posX: 0, posY: 1000, velX: 0, velY: 50, angle: 0,
+      activeParts: new Set([botId]),
+      fuelStore: new Map(),
+    };
+
+    applySeparationImpulse(ps, debris, assembly);
+
+    // Top part (rocket) should be pushed forward (higher velY).
+    // Bottom part (debris) should be pushed backward (lower velY).
+    expect(ps.velY).toBeGreaterThan(50);
+    expect(debris.velY).toBeLessThan(50);
+  });
+
+  it('lower stage pushed backward, upper forward', () => {
+    const assembly = createRocketAssembly();
+    const upperId = addPartToAssembly(assembly, 'probe-core-mk1', 0, 100);
+    const lowerId = addPartToAssembly(assembly, 'probe-core-mk1', 0,   0);
+
+    const ps = {
+      posX: 0, posY: 500, velX: 0, velY: 0, angle: 0,
+      activeParts: new Set([upperId]),
+      fuelStore: new Map(),
+    };
+
+    const debris = {
+      id: 'debris-lower',
+      posX: 0, posY: 500, velX: 0, velY: 0, angle: 0,
+      activeParts: new Set([lowerId]),
+      fuelStore: new Map(),
+    };
+
+    applySeparationImpulse(ps, debris, assembly);
+
+    // Upper stage (rocket) pushed forward (positive Y with angle=0).
+    expect(ps.velY).toBeGreaterThan(0);
+    // Lower stage (debris) pushed backward (negative Y with angle=0).
+    expect(debris.velY).toBeLessThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Separation impulse magnitude
+// ---------------------------------------------------------------------------
+
+describe('applySeparationImpulse() — reduced impulse magnitude', () => {
+  it('produces delta-v proportional to 2000 N·s impulse', () => {
+    const assembly = createRocketAssembly();
+    // probe-core-mk1 is 50 kg
+    const id1 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 100);
+    const id2 = addPartToAssembly(assembly, 'probe-core-mk1', 0,   0);
+
+    const ps = {
+      posX: 0, posY: 1000, velX: 0, velY: 0, angle: 0,
+      activeParts: new Set([id1]),
+      fuelStore: new Map(),
+    };
+
+    const debris = {
+      id: 'debris-dv',
+      posX: 0, posY: 1000, velX: 0, velY: 0, angle: 0,
+      activeParts: new Set([id2]),
+      fuelStore: new Map(),
+    };
+
+    applySeparationImpulse(ps, debris, assembly);
+
+    // Both 50 kg → Δv = 2000 N·s / 50 kg = 40 m/s each
+    expect(Math.abs(ps.velY)).toBeCloseTo(40.0, 0);
+    expect(Math.abs(debris.velY)).toBeCloseTo(40.0, 0);
+  });
+
+  it('heavy stage gets proportionally smaller delta-v', () => {
+    const assembly = createRocketAssembly();
+    const lightId = addPartToAssembly(assembly, 'probe-core-mk1', 0, 100); // 50 kg
+    const heavyId = addPartToAssembly(assembly, 'tank-small',     0,   0); // 50 kg dry
+
+    const ps = {
+      posX: 0, posY: 1000, velX: 0, velY: 0, angle: 0,
+      activeParts: new Set([lightId]),
+      fuelStore: new Map(),
+    };
+
+    const debris = {
+      id: 'debris-heavy-dv',
+      posX: 0, posY: 1000, velX: 0, velY: 0, angle: 0,
+      activeParts: new Set([heavyId]),
+      fuelStore: new Map([[heavyId, 400]]), // 50 + 400 = 450 kg
+    };
+
+    applySeparationImpulse(ps, debris, assembly);
+
+    // Light (50 kg): Δv = 2000/50 = 40.0 m/s
+    // Heavy (450 kg): Δv = 2000/450 ≈ 4.44 m/s
+    expect(Math.abs(ps.velY)).toBeCloseTo(40.0, 0);
+    expect(Math.abs(debris.velY)).toBeCloseTo(2000 / 450, 1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Collision cooldown timing
+// ---------------------------------------------------------------------------
+
+describe('collision cooldown at reduced value', () => {
+  it('cooldown of 10 prevents collision for 9 ticks then allows it on tick 10', () => {
+    const assembly = createRocketAssembly();
+    const id1 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
+    const id2 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
+
+    const ps = {
+      posX: 0, posY: 9999, velX: 0, velY: 0, angle: 0,
+      angularVelocity: 0,
+      landed: true, crashed: false,
+      activeParts: new Set(),
+      fuelStore: new Map(),
+      firingEngines: new Set(),
+      debris: [{
+        id: 'debris-cd10',
+        posX: 0, posY: 200, velX: 0, velY: 3, angle: 0,
+        angularVelocity: 0,
+        landed: false, crashed: false,
+        activeParts: new Set([id1]),
+        fuelStore: new Map(),
+        firingEngines: new Set(),
+        collisionCooldown: 10,
+      }, {
+        id: 'debris-cd10b',
+        posX: 0, posY: 200.3, velX: 0, velY: -3, angle: 0,
+        angularVelocity: 0,
+        landed: false, crashed: false,
+        activeParts: new Set([id2]),
+        fuelStore: new Map(),
+        firingEngines: new Set(),
+        collisionCooldown: 10,
+      }],
+    };
+
+    // After 9 ticks, cooldown should be 1 and no collision yet.
+    for (let i = 0; i < 9; i++) {
+      tickCollisions(ps, assembly, 1 / 60);
+    }
+    expect(ps.debris[0].collisionCooldown).toBe(1);
+    expect(ps.debris[1].velY).toBe(-3); // unchanged — still in cooldown
+
+    // Tick 10: cooldown decrements to 0, collision fires immediately.
+    tickCollisions(ps, assembly, 1 / 60);
+    expect(ps.debris[0].collisionCooldown).toBe(0);
+    expect(ps.debris[1].velY).not.toBe(-3); // velocity changed by collision
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Integration — tickCollisions in tick loop
+// ---------------------------------------------------------------------------
+
+describe('tickCollisions integration', () => {
+  it('cooldown prevents collision during grace period', () => {
+    const assembly = createRocketAssembly();
+    const id1 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
+    const id2 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
+
+    const ps = {
+      posX: 0, posY: 100.5, velX: 0, velY: -5, angle: 0,
+      angularVelocity: 0,
+      landed: false, crashed: false,
+      activeParts: new Set([id1]),
+      fuelStore: new Map(),
+      firingEngines: new Set(),
+      debris: [{
+        id: 'debris-cd',
+        posX: 0, posY: 100, velX: 0, velY: 5, angle: 0,
+        angularVelocity: 0,
+        landed: false, crashed: false,
+        activeParts: new Set([id2]),
+        fuelStore: new Map(),
+        firingEngines: new Set(),
+        collisionCooldown: 5,
+      }],
+    };
+
+    const velBefore = ps.velY;
+    tickCollisions(ps, assembly, 1 / 60);
+
+    // Velocity should not change — cooldown active.
+    expect(ps.velY).toBe(velBefore);
+    // Cooldown should have decremented.
+    expect(ps.debris[0].collisionCooldown).toBe(4);
+  });
+
+  it('collision applies after cooldown expires', () => {
+    const assembly = createRocketAssembly();
+    const id1 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
+    const id2 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
+
+    const ps = {
+      posX: 0, posY: 100.5, velX: 0, velY: -5, angle: 0,
+      angularVelocity: 0,
+      landed: false, crashed: false,
+      activeParts: new Set([id1]),
+      fuelStore: new Map(),
+      firingEngines: new Set(),
+      debris: [{
+        id: 'debris-cd-expired',
+        posX: 0, posY: 100, velX: 0, velY: 5, angle: 0,
+        angularVelocity: 0,
+        landed: false, crashed: false,
+        activeParts: new Set([id2]),
+        fuelStore: new Map(),
+        firingEngines: new Set(),
+        collisionCooldown: 0,
+      }],
+    };
+
+    const velBefore = ps.velY;
+    tickCollisions(ps, assembly, 1 / 60);
+
+    // Velocity should have changed — collision resolved.
+    expect(ps.velY).not.toBe(velBefore);
+  });
+
+  it('two-stage rocket: after separation, bodies diverge over 60 ticks', () => {
+    const { assembly, staging } = makeTwoStageRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    // Fire Stage 0 (engine ignition).
+    fireNextStage(ps, assembly, staging, fs);
+
+    // Simulate 2 seconds of flight to gain altitude.
+    for (let i = 0; i < 120; i++) {
+      tick(ps, assembly, staging, fs, 1 / 60, 1);
+    }
+
+    // Fire Stage 1 (decoupler separation).
+    fireNextStage(ps, assembly, staging, fs);
+    expect(ps.debris.length).toBeGreaterThan(0);
+
+    const debris = ps.debris[0];
+
+    // Let cooldown and a few physics ticks stabilise, then measure distance.
+    for (let i = 0; i < 15; i++) {
+      tick(ps, assembly, staging, fs, 1 / 60, 1);
+    }
+    const distEarly = Math.abs(ps.posY - debris.posY);
+
+    // Simulate 60 more ticks (1 second).
+    for (let i = 0; i < 60; i++) {
+      tick(ps, assembly, staging, fs, 1 / 60, 1);
+    }
+
+    const distLater = Math.abs(ps.posY - debris.posY);
+    // Bodies should be diverging: distance increases over time.
+    expect(distLater).toBeGreaterThan(distEarly);
+  });
+
+  it('no collision with already-landed debris', () => {
+    const assembly = createRocketAssembly();
+    const id1 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
+    const id2 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
+
+    const ps = {
+      posX: 0, posY: 0.5, velX: 0, velY: -5, angle: 0,
+      angularVelocity: 0,
+      landed: false, crashed: false,
+      activeParts: new Set([id1]),
+      fuelStore: new Map(),
+      firingEngines: new Set(),
+      debris: [{
+        id: 'debris-landed',
+        posX: 0, posY: 0, velX: 0, velY: 0, angle: 0,
+        angularVelocity: 0,
+        landed: true,  // Already landed
+        crashed: false,
+        activeParts: new Set([id2]),
+        fuelStore: new Map(),
+        firingEngines: new Set(),
+        collisionCooldown: 0,
+      }],
+    };
+
+    const velBefore = ps.velY;
+    tickCollisions(ps, assembly, 1 / 60);
+
+    // Velocity unchanged — landed debris is excluded from collision.
+    expect(ps.velY).toBe(velBefore);
+  });
+
+  it('debris-to-debris collision works', () => {
+    const assembly = createRocketAssembly();
+    const id1 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
+    const id2 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
+
+    const ps = {
+      posX: 0, posY: 9999, velX: 0, velY: 0, angle: 0,
+      angularVelocity: 0,
+      landed: true,  // Main rocket landed (excluded)
+      crashed: false,
+      activeParts: new Set(),
+      fuelStore: new Map(),
+      firingEngines: new Set(),
+      debris: [
+        {
+          id: 'debris-a',
+          posX: 0, posY: 200.5, velX: 0, velY: -5, angle: 0,
+          angularVelocity: 0,
+          landed: false, crashed: false,
+          activeParts: new Set([id1]),
+          fuelStore: new Map(),
+          firingEngines: new Set(),
+          collisionCooldown: 0,
+        },
+        {
+          id: 'debris-b',
+          posX: 0, posY: 200, velX: 0, velY: 5, angle: 0,
+          angularVelocity: 0,
+          landed: false, crashed: false,
+          activeParts: new Set([id2]),
+          fuelStore: new Map(),
+          firingEngines: new Set(),
+          collisionCooldown: 0,
+        },
+      ],
+    };
+
+    const vel1Before = ps.debris[0].velY;
+    const vel2Before = ps.debris[1].velY;
+    tickCollisions(ps, assembly, 1 / 60);
+
+    // Both debris should have changed velocity.
+    expect(ps.debris[0].velY).not.toBe(vel1Before);
+    expect(ps.debris[1].velY).not.toBe(vel2Before);
+  });
+});

@@ -139,7 +139,7 @@
 - **Verification**: `npm run typecheck` passes. `npm run test:unit` passes. All listed files are now `.ts`.
 
 ### TASK-023: Convert entry point and test files to TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-022
 - **Description**: Convert `src/main.js` to TypeScript. Convert all 60 test files in `src/tests/` from `.test.js` to `.test.ts`. Test files may use looser typing (any for fixtures, partial state). Do NOT convert E2E test files or Playwright config. See requirements Section 4.1.
 - **Verification**: `npm run typecheck` passes. `npm run test:unit` passes. No `.js` files remain in `src/` (excluding E2E files in `e2e/`).

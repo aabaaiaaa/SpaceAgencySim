@@ -44,7 +44,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/core/**'],
-      exclude: ['src/core/debugSaves.js', 'src/core/library.js'],
+      exclude: ['src/core/debugSaves.ts', 'src/core/library.ts'],
       thresholds: {
         lines: 91,
         branches: 78,
