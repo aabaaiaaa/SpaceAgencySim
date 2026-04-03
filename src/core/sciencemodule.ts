@@ -1,5 +1,5 @@
 /**
- * sciencemodule.js — Per-instrument science experiment state machine.
+ * sciencemodule.ts — Per-instrument science experiment state machine.
  *
  * Science modules are containers with limited instrument slots.  The player
  * loads instruments into modules in the VAB.  During flight, each instrument
@@ -30,39 +30,6 @@
  *   diminishingReturn (per instrument+biome pair, persistent across flights):
  *     1st → 100 %, 2nd → 25 %, 3rd → 10 %, 4th+ → 0 %
  *
- * INTEGRATION POINTS
- * ==================
- * 1. `createPhysicsState` (physics.js) must:
- *      a. Include `instrumentStates: new Map()` in PhysicsState.
- *      b. Call `initInstrumentStates(ps, assembly)` during initialisation.
- * 2. `_integrate` (physics.js) must call `tickInstruments(ps, assembly,
- *    flightState, FIXED_DT)` each step.
- * 3. `_handleGroundContact` (physics.js) must call `onSafeLanding(ps,
- *    assembly, flightState)` when landing speed is below the safe threshold.
- * 4. `COLLECT_SCIENCE` case in `staging.js` must call
- *    `activateAllInstruments` or `activateInstrument`.
- *
- * PUBLIC API
- * ==========
- *   ScienceModuleState                                         {enum}
- *   initInstrumentStates(ps, assembly)                       → void
- *   activateInstrument(ps, assembly, flightState, key)       → boolean
- *   activateAllInstruments(ps, assembly, flightState, modId) → number
- *   activateScienceModule(ps, assembly, flightState, modId)  → boolean
- *   tickInstruments(ps, assembly, flightState, dt)           → void
- *   tickScienceModules(ps, assembly, flightState, dt)        → void
- *   transmitInstrument(ps, assembly, flightState, key, gameState) → number
- *   getScienceModuleStatus(ps, instanceId)                   → string
- *   getScienceModuleTimer(ps, instanceId)                    → number
- *   getInstrumentStatus(ps, key)                             → string
- *   getInstrumentTimer(ps, key)                              → number
- *   getModuleInstrumentKeys(ps, moduleInstanceId)            → string[]
- *   onSafeLanding(ps, assembly, flightState, gameState)      → void
- *   hasAnyRunningExperiment(ps)                              → boolean
- *   calculateYield(instrumentId, biomeId, biomeMultiplier,
- *                  scienceSkill, gameState)                   → number
- *   getInstrumentKey(moduleInstanceId, slotIndex)            → string
- *
  * @module sciencemodule
  */
 
@@ -75,13 +42,14 @@ import { getBiome, getBiomeId, getScienceMultiplier } from './biomes.js';
 import { hasMalfunction } from './malfunction.js';
 import { MalfunctionType } from './constants.js';
 
+import type { GameState, ScienceLogEntry } from './gameState.js';
+
 // ---------------------------------------------------------------------------
 // Public constants
 // ---------------------------------------------------------------------------
 
 /**
  * Instrument / experiment lifecycle states.
- * @enum {string}
  */
 export const ScienceModuleState = Object.freeze({
   /** Instrument is idle; experiment has not started. */
@@ -96,25 +64,59 @@ export const ScienceModuleState = Object.freeze({
   TRANSMITTED:   'transmitted',
 });
 
+export type ScienceModuleStateValue = (typeof ScienceModuleState)[keyof typeof ScienceModuleState];
+
 // ---------------------------------------------------------------------------
-// Type definitions (JSDoc)
+// Type definitions
 // ---------------------------------------------------------------------------
 
-/**
- * State tracking for a single instrument loaded into a science module.
- *
- * @typedef {Object} InstrumentStateEntry
- * @property {string}      instrumentId      ID of the instrument definition.
- * @property {string}      moduleInstanceId  Instance ID of the parent science module.
- * @property {number}      slotIndex         0-based slot position within the module.
- * @property {string}      state             One of {@link ScienceModuleState} values.
- * @property {number}      timer             Countdown in seconds; positive while `running`.
- * @property {string}      dataType          'SAMPLE' or 'ANALYSIS'.
- * @property {number}      baseYield         Base science points from the instrument def.
- * @property {string|null} startBiome        Biome ID where experiment was started.
- * @property {string|null} completeBiome     Biome ID where experiment completed.
- * @property {number}      scienceMultiplier Biome science multiplier at completion.
- */
+/** State tracking for a single instrument loaded into a science module. */
+export interface InstrumentStateEntry {
+  /** ID of the instrument definition. */
+  instrumentId: string;
+  /** Instance ID of the parent science module. */
+  moduleInstanceId: string;
+  /** 0-based slot position within the module. */
+  slotIndex: number;
+  /** One of ScienceModuleState values. */
+  state: string;
+  /** Countdown in seconds; positive while `running`. */
+  timer: number;
+  /** 'SAMPLE' or 'ANALYSIS'. */
+  dataType: string;
+  /** Base science points from the instrument def. */
+  baseYield: number;
+  /** Biome ID where experiment was started. */
+  startBiome: string | null;
+  /** Biome ID where experiment completed. */
+  completeBiome: string | null;
+  /** Biome science multiplier at completion. */
+  scienceMultiplier: number;
+}
+
+/** Minimal shape of the physics state needed by science module functions. */
+interface SciencePhysicsState {
+  instrumentStates?: Map<string, InstrumentStateEntry>;
+  scienceModuleStates?: Map<string, any>;
+  activeParts: Set<string>;
+  posY: number;
+  malfunctions?: Map<string, any>;
+  _gameState?: GameState;
+}
+
+/** Minimal shape of flight state needed by science module functions. */
+interface ScienceFlightState {
+  events: any[];
+  timeElapsed: number;
+  scienceModuleRunning?: boolean;
+  inOrbit?: boolean;
+  crewIds?: string[];
+}
+
+/** Assembly shape needed by science module functions. */
+interface ScienceAssembly {
+  parts: Map<string, { partId: string; instruments?: string[]; [key: string]: any }>;
+}
 
 // ---------------------------------------------------------------------------
 // Key helpers
@@ -123,21 +125,15 @@ export const ScienceModuleState = Object.freeze({
 /**
  * Build a unique key for an instrument slot within a module.
  * Format: `{moduleInstanceId}:instr:{slotIndex}`
- *
- * @param {string} moduleInstanceId
- * @param {number} slotIndex
- * @returns {string}
  */
-export function getInstrumentKey(moduleInstanceId, slotIndex) {
+export function getInstrumentKey(moduleInstanceId: string, slotIndex: number): string {
   return `${moduleInstanceId}:instr:${slotIndex}`;
 }
 
 /**
  * Parse an instrument key back into its components.
- * @param {string} key
- * @returns {{ moduleInstanceId: string, slotIndex: number }|null}
  */
-export function parseInstrumentKey(key) {
+export function parseInstrumentKey(key: string): { moduleInstanceId: string; slotIndex: number } | null {
   const match = key.match(/^(.+):instr:(\d+)$/);
   if (!match) return null;
   return { moduleInstanceId: match[1], slotIndex: parseInt(match[2], 10) };
@@ -153,13 +149,8 @@ export function parseInstrumentKey(key) {
  *
  * Also populates the legacy `ps.scienceModuleStates` map for backward
  * compatibility with mission objective checks.
- *
- * @param {{ instrumentStates: Map<string, InstrumentStateEntry>,
- *           scienceModuleStates: Map<string, object>,
- *           activeParts: Set<string> }}  ps
- * @param {{ parts: Map<string, { partId: string, instruments?: string[] }> }} assembly
  */
-export function initInstrumentStates(ps, assembly) {
+export function initInstrumentStates(ps: SciencePhysicsState, assembly: ScienceAssembly): void {
   if (!ps.instrumentStates) return;
 
   for (const [instanceId, placed] of assembly.parts) {
@@ -169,7 +160,7 @@ export function initInstrumentStates(ps, assembly) {
     if (!def || def.type !== PartType.SERVICE_MODULE) continue;
     if (def.activationBehaviour !== ActivationBehaviour.COLLECT_SCIENCE) continue;
 
-    const instruments = placed.instruments ?? [];
+    const instruments: string[] = placed.instruments ?? [];
 
     // Register each loaded instrument.
     for (let i = 0; i < instruments.length; i++) {
@@ -197,8 +188,8 @@ export function initInstrumentStates(ps, assembly) {
     // Always populate scienceModuleStates for backward compatibility with
     // mission objectives and legacy tests. This entry tracks the module's
     // overall status regardless of whether instruments are loaded.
-    if (!ps.scienceModuleStates.has(instanceId)) {
-      ps.scienceModuleStates.set(instanceId, {
+    if (!ps.scienceModuleStates!.has(instanceId)) {
+      ps.scienceModuleStates!.set(instanceId, {
         state:             ScienceModuleState.IDLE,
         timer:             0,
         startBiome:        null,
@@ -209,8 +200,8 @@ export function initInstrumentStates(ps, assembly) {
   }
 }
 
-// Backward-compatible alias — called by physics.js init.
-export function initScienceModuleStates(ps, assembly) {
+/** Backward-compatible alias — called by physics.js init. */
+export function initScienceModuleStates(ps: SciencePhysicsState, assembly: ScienceAssembly): void {
   initInstrumentStates(ps, assembly);
 }
 
@@ -221,22 +212,21 @@ export function initScienceModuleStates(ps, assembly) {
 /**
  * Start a specific instrument's experiment — transition idle → running.
  *
- * @param {{ instrumentStates?: Map<string, InstrumentStateEntry>,
- *           scienceModuleStates?: Map<string, object>,
- *           activeParts: Set<string>, posY: number }} ps
- * @param {{ parts: Map<string, { partId: string, instruments?: string[] }> }} assembly
- * @param {{ events: Array<object>, timeElapsed: number }} flightState
- * @param {string} key  Instrument key (`moduleInstanceId:instr:slotIndex`).
- * @returns {boolean}  True if the experiment started successfully.
+ * @returns True if the experiment started successfully.
  */
-export function activateInstrument(ps, assembly, flightState, key) {
+export function activateInstrument(
+  ps: SciencePhysicsState,
+  assembly: ScienceAssembly,
+  flightState: ScienceFlightState,
+  key: string,
+): boolean {
   const entry = ps.instrumentStates?.get(key);
   if (!entry) return false;
   if (entry.state !== ScienceModuleState.IDLE) return false;
   if (!ps.activeParts.has(entry.moduleInstanceId)) return false;
 
   // Block activation if the parent science module has an instrument failure.
-  if (hasMalfunction(ps, entry.moduleInstanceId)) {
+  if (hasMalfunction(ps as any, entry.moduleInstanceId)) {
     const malf = ps.malfunctions?.get(entry.moduleInstanceId);
     if (malf && malf.type === MalfunctionType.SCIENCE_INSTRUMENT_FAILURE) {
       return false;
@@ -248,11 +238,11 @@ export function activateInstrument(ps, assembly, flightState, key) {
 
   const altitude = Math.max(0, ps.posY);
   const biome = getBiome(altitude, 'EARTH');
-  const biomeId = biome ? biome.id : null;
-  const biomeName = biome ? biome.name : 'Unknown';
+  const biomeId: string | null = biome ? biome.id : null;
+  const biomeName: string = biome ? biome.name : 'Unknown';
 
   // Biome validation — instrument can only collect data in its valid biomes.
-  if (!isInstrumentValidForBiome(entry.instrumentId, biomeId)) {
+  if (!isInstrumentValidForBiome(entry.instrumentId, biomeId as string)) {
     flightState.events.push({
       type:         'INSTRUMENT_INVALID_BIOME',
       time:         flightState.timeElapsed,
@@ -268,7 +258,7 @@ export function activateInstrument(ps, assembly, flightState, key) {
 
   entry.state = ScienceModuleState.RUNNING;
   // Science skill reduces experiment duration: 0 skill = 100%, 100 skill = 66.7% (30s→20s).
-  const sciSkill = _getCrewScienceSkill(flightState, ps?._gameState);
+  const sciSkill = _getCrewScienceSkill(flightState, ps?._gameState ?? null);
   const durationFactor = 1 - (sciSkill / 100) * (1 / 3);
   entry.timer = instrDef.experimentDuration * durationFactor;
   entry.startBiome = biomeId;
@@ -294,15 +284,14 @@ export function activateInstrument(ps, assembly, flightState, key) {
  * Activate all idle instruments in a science module at once.
  * Called when the module itself is staged.
  *
- * @param {{ instrumentStates?: Map<string, InstrumentStateEntry>,
- *           scienceModuleStates?: Map<string, object>,
- *           activeParts: Set<string>, posY: number }} ps
- * @param {{ parts: Map<string, { partId: string, instruments?: string[] }> }} assembly
- * @param {{ events: Array<object>, timeElapsed: number }} flightState
- * @param {string} moduleInstanceId
- * @returns {number}  Number of instruments that were activated.
+ * @returns Number of instruments that were activated.
  */
-export function activateAllInstruments(ps, assembly, flightState, moduleInstanceId) {
+export function activateAllInstruments(
+  ps: SciencePhysicsState,
+  assembly: ScienceAssembly,
+  flightState: ScienceFlightState,
+  moduleInstanceId: string,
+): number {
   if (!ps.instrumentStates) return 0;
   let count = 0;
 
@@ -318,15 +307,14 @@ export function activateAllInstruments(ps, assembly, flightState, moduleInstance
  * Backward-compatible activation — activates all instruments in a module.
  * Called by staging.js COLLECT_SCIENCE handler.
  *
- * @param {{ instrumentStates?: Map<string, InstrumentStateEntry>,
- *           scienceModuleStates?: Map<string, object>,
- *           activeParts: Set<string>, posY: number }} ps
- * @param {{ parts: Map<string, { partId: string, instruments?: string[] }> }} assembly
- * @param {{ events: Array<object>, timeElapsed: number }} flightState
- * @param {string} instanceId  Module instance ID.
- * @returns {boolean}  True if at least one instrument was activated.
+ * @returns True if at least one instrument was activated.
  */
-export function activateScienceModule(ps, assembly, flightState, instanceId) {
+export function activateScienceModule(
+  ps: SciencePhysicsState,
+  assembly: ScienceAssembly,
+  flightState: ScienceFlightState,
+  instanceId: string,
+): boolean {
   // If module has loaded instruments, activate them all.
   if (ps.instrumentStates && ps.instrumentStates.size > 0) {
     const count = activateAllInstruments(ps, assembly, flightState, instanceId);
@@ -343,10 +331,10 @@ export function activateScienceModule(ps, assembly, flightState, instanceId) {
 
     const altitude = Math.max(0, ps.posY);
     const biome = getBiome(altitude, 'EARTH');
-    const biomeId = biome ? biome.id : null;
-    const biomeName = biome ? biome.name : 'Unknown';
+    const biomeId: string | null = biome ? biome.id : null;
+    const biomeName: string = biome ? biome.name : 'Unknown';
 
-    const duration = def.properties?.experimentDuration ?? 30;
+    const duration: number = (def.properties as any)?.experimentDuration ?? 30;
     legacyEntry.state = ScienceModuleState.RUNNING;
     legacyEntry.timer = duration;
     legacyEntry.startBiome = biomeId;
@@ -374,15 +362,15 @@ export function activateScienceModule(ps, assembly, flightState, instanceId) {
  * Transmit an ANALYSIS instrument's data from orbit.
  * Returns reduced yield (40–60 %) and transitions to `transmitted`.
  *
- * @param {{ instrumentStates?: Map<string, InstrumentStateEntry>,
- *           activeParts: Set<string> }} ps
- * @param {{ parts: Map<string, object> }} assembly
- * @param {{ events: Array<object>, timeElapsed: number, inOrbit?: boolean }} flightState
- * @param {string} key  Instrument key.
- * @param {object|null} gameState  Full game state for diminishing-return tracking.
- * @returns {number}  Science yield awarded (0 if transmission failed).
+ * @returns Science yield awarded (0 if transmission failed).
  */
-export function transmitInstrument(ps, assembly, flightState, key, gameState) {
+export function transmitInstrument(
+  ps: SciencePhysicsState,
+  assembly: ScienceAssembly,
+  flightState: ScienceFlightState,
+  key: string,
+  gameState: GameState | null,
+): number {
   const entry = ps.instrumentStates?.get(key);
   if (!entry) return 0;
   if (entry.state !== ScienceModuleState.COMPLETE) return 0;
@@ -440,16 +428,13 @@ export function transmitInstrument(ps, assembly, flightState, key, gameState) {
  *
  * Updates `flightState.scienceModuleRunning` to reflect whether any
  * instrument is currently running (consumed by HOLD_ALTITUDE objective).
- *
- * @param {{ instrumentStates?: Map<string, InstrumentStateEntry>,
- *           scienceModuleStates?: Map<string, object>,
- *           activeParts: Set<string>, posY: number }} ps
- * @param {{ parts: Map<string, { partId: string, instruments?: string[] }> }} assembly
- * @param {{ events: Array<object>, timeElapsed: number,
- *           scienceModuleRunning?: boolean }} flightState
- * @param {number} dt  Fixed integration timestep in seconds.
  */
-export function tickInstruments(ps, assembly, flightState, dt) {
+export function tickInstruments(
+  ps: SciencePhysicsState,
+  assembly: ScienceAssembly,
+  flightState: ScienceFlightState,
+  dt: number,
+): void {
   if (!ps.instrumentStates) return;
 
   // Check running status BEFORE processing expirations.
@@ -475,8 +460,8 @@ export function tickInstruments(ps, assembly, flightState, dt) {
       const instrDef = getInstrumentById(entry.instrumentId);
       const altitude = Math.max(0, ps.posY);
       const biome = getBiome(altitude, 'EARTH');
-      const biomeId = biome ? biome.id : null;
-      const biomeName = biome ? biome.name : 'Unknown';
+      const biomeId: string | null = biome ? biome.id : null;
+      const biomeName: string = biome ? biome.name : 'Unknown';
       const multiplier = getScienceMultiplier(altitude, 'EARTH');
 
       entry.completeBiome = biomeId;
@@ -508,10 +493,13 @@ export function tickInstruments(ps, assembly, flightState, dt) {
   _tickLegacyModules(ps, assembly, flightState, dt);
 }
 
-/**
- * Backward-compatible alias — called by physics.js tick.
- */
-export function tickScienceModules(ps, assembly, flightState, dt) {
+/** Backward-compatible alias — called by physics.js tick. */
+export function tickScienceModules(
+  ps: SciencePhysicsState,
+  assembly: ScienceAssembly,
+  flightState: ScienceFlightState,
+  dt: number,
+): void {
   tickInstruments(ps, assembly, flightState, dt);
 }
 
@@ -521,22 +509,16 @@ export function tickScienceModules(ps, assembly, flightState, dt) {
 
 /**
  * Return the instrument state for a given key.
- * @param {{ instrumentStates?: Map<string, InstrumentStateEntry> }} ps
- * @param {string} key
- * @returns {string}
  */
-export function getInstrumentStatus(ps, key) {
+export function getInstrumentStatus(ps: SciencePhysicsState, key: string): string {
   if (!ps.instrumentStates) return ScienceModuleState.IDLE;
   return ps.instrumentStates.get(key)?.state ?? ScienceModuleState.IDLE;
 }
 
 /**
  * Return the remaining timer for a running instrument.
- * @param {{ instrumentStates?: Map<string, InstrumentStateEntry> }} ps
- * @param {string} key
- * @returns {number}
  */
-export function getInstrumentTimer(ps, key) {
+export function getInstrumentTimer(ps: SciencePhysicsState, key: string): number {
   if (!ps.instrumentStates) return 0;
   const entry = ps.instrumentStates.get(key);
   return entry?.state === ScienceModuleState.RUNNING ? entry.timer : 0;
@@ -544,13 +526,10 @@ export function getInstrumentTimer(ps, key) {
 
 /**
  * Return all instrument keys belonging to a specific science module.
- * @param {{ instrumentStates?: Map<string, InstrumentStateEntry> }} ps
- * @param {string} moduleInstanceId
- * @returns {string[]}
  */
-export function getModuleInstrumentKeys(ps, moduleInstanceId) {
+export function getModuleInstrumentKeys(ps: SciencePhysicsState, moduleInstanceId: string): string[] {
   if (!ps.instrumentStates) return [];
-  const keys = [];
+  const keys: string[] = [];
   for (const [key, entry] of ps.instrumentStates) {
     if (entry.moduleInstanceId === moduleInstanceId) keys.push(key);
   }
@@ -561,18 +540,13 @@ export function getModuleInstrumentKeys(ps, moduleInstanceId) {
  * Return the overall status of a science module (legacy API).
  * Reports the "worst" state among all instruments:
  *   data_returned > transmitted > complete > running > idle
- *
- * @param {{ scienceModuleStates?: Map<string, object>,
- *           instrumentStates?: Map<string, InstrumentStateEntry> }} ps
- * @param {string} instanceId
- * @returns {string}
  */
-export function getScienceModuleStatus(ps, instanceId) {
+export function getScienceModuleStatus(ps: SciencePhysicsState, instanceId: string): string {
   // Check instrument states first.
   if (ps.instrumentStates && ps.instrumentStates.size > 0) {
     const keys = getModuleInstrumentKeys(ps, instanceId);
     if (keys.length > 0) {
-      const states = keys.map((k) => ps.instrumentStates.get(k)?.state ?? ScienceModuleState.IDLE);
+      const states = keys.map((k) => ps.instrumentStates!.get(k)?.state ?? ScienceModuleState.IDLE);
       // Priority order for "summary" status.
       if (states.some((s) => s === ScienceModuleState.RUNNING)) return ScienceModuleState.RUNNING;
       if (states.some((s) => s === ScienceModuleState.COMPLETE)) return ScienceModuleState.COMPLETE;
@@ -590,13 +564,8 @@ export function getScienceModuleStatus(ps, instanceId) {
 /**
  * Return remaining timer for a science module (legacy API).
  * Returns the max timer across all running instruments.
- *
- * @param {{ scienceModuleStates?: Map<string, object>,
- *           instrumentStates?: Map<string, InstrumentStateEntry> }} ps
- * @param {string} instanceId
- * @returns {number}
  */
-export function getScienceModuleTimer(ps, instanceId) {
+export function getScienceModuleTimer(ps: SciencePhysicsState, instanceId: string): number {
   if (ps.instrumentStates && ps.instrumentStates.size > 0) {
     const keys = getModuleInstrumentKeys(ps, instanceId);
     let maxTimer = 0;
@@ -621,15 +590,13 @@ export function getScienceModuleTimer(ps, instanceId) {
 /**
  * Recover science data from all completed instruments via safe landing.
  * Awards full yield for both SAMPLE and ANALYSIS data.
- *
- * @param {{ instrumentStates?: Map<string, InstrumentStateEntry>,
- *           scienceModuleStates?: Map<string, object>,
- *           activeParts: Set<string> }} ps
- * @param {{ parts: Map<string, object> }} assembly
- * @param {{ events: Array<object>, timeElapsed: number, crewIds?: string[] }} flightState
- * @param {object|null} [gameState]  Full game state for diminishing-return tracking.
  */
-export function onSafeLanding(ps, assembly, flightState, gameState) {
+export function onSafeLanding(
+  ps: SciencePhysicsState,
+  assembly: ScienceAssembly,
+  flightState: ScienceFlightState,
+  gameState?: GameState | null,
+): void {
   // Process instrument-based modules.
   if (ps.instrumentStates) {
     for (const [key, entry] of ps.instrumentStates) {
@@ -643,8 +610,8 @@ export function onSafeLanding(ps, assembly, flightState, gameState) {
         entry.instrumentId,
         entry.completeBiome,
         entry.scienceMultiplier,
-        _getCrewScienceSkill(flightState, gameState),
-        gameState,
+        _getCrewScienceSkill(flightState, gameState ?? null),
+        gameState ?? null,
       );
 
       // Record for diminishing returns.
@@ -700,13 +667,8 @@ export function onSafeLanding(ps, assembly, flightState, gameState) {
 
 /**
  * Return `true` if any instrument or legacy module is currently running.
- *
- * @param {{ instrumentStates?: Map<string, InstrumentStateEntry>,
- *           scienceModuleStates?: Map<string, object>,
- *           activeParts: Set<string> }} ps
- * @returns {boolean}
  */
-export function hasAnyRunningExperiment(ps) {
+export function hasAnyRunningExperiment(ps: SciencePhysicsState): boolean {
   if (ps.instrumentStates) {
     for (const [, entry] of ps.instrumentStates) {
       if (!ps.activeParts.has(entry.moduleInstanceId)) continue;
@@ -730,27 +692,26 @@ export function hasAnyRunningExperiment(ps) {
  * Calculate the final science yield for an instrument collection.
  *
  * Formula: baseYield × biomeMultiplier × scienceSkillBonus × diminishingReturn
- *
- * @param {string}      instrumentId     Instrument definition ID.
- * @param {string|null}  biomeId          Biome where data was collected.
- * @param {number}       biomeMultiplier  Science multiplier from the biome.
- * @param {number}       scienceSkill     Crew science skill (0–100).
- * @param {object|null}  gameState        Game state for diminishing-return lookup.
- * @returns {number}  Final science yield (may be 0 if fully diminished).
  */
-export function calculateYield(instrumentId, biomeId, biomeMultiplier, scienceSkill, gameState) {
+export function calculateYield(
+  instrumentId: string,
+  biomeId: string | null,
+  biomeMultiplier: number,
+  scienceSkill: number,
+  gameState: GameState | null,
+): number {
   const instrDef = getInstrumentById(instrumentId);
   if (!instrDef) return 0;
 
-  const baseYield = instrDef.baseYield;
+  const baseYield: number = instrDef.baseYield;
 
   // Science skill bonus: 0 skill = 1.0×, 100 skill = 1.5×.
   const scienceSkillBonus = 1.0 + (scienceSkill / 100) * 0.5;
 
   // Diminishing return based on prior collections of this (instrument, biome) pair.
   const priorCount = _getPriorCollectionCount(gameState, instrumentId, biomeId);
-  const diminishingReturn = priorCount < DIMINISHING_RETURNS.length
-    ? DIMINISHING_RETURNS[priorCount]
+  const diminishingReturn = priorCount < (DIMINISHING_RETURNS as readonly number[]).length
+    ? (DIMINISHING_RETURNS as readonly number[])[priorCount]
     : 0;
 
   // R&D Lab science yield bonus based on facility tier.
@@ -762,15 +723,14 @@ export function calculateYield(instrumentId, biomeId, biomeMultiplier, scienceSk
 /**
  * Get the R&D Lab science yield bonus based on the current facility tier.
  *
- * @param {import('./gameState.js').GameState|null} gameState
- * @returns {number}  Bonus fraction (e.g. 0.10 for +10%).
+ * @returns Bonus fraction (e.g. 0.10 for +10%).
  */
-function _getRdLabScienceBonus(gameState) {
+function _getRdLabScienceBonus(gameState: GameState | null): number {
   if (!gameState) return 0;
-  const fac = gameState.facilities?.[FacilityId.RD_LAB];
+  const fac = (gameState.facilities as any)?.[FacilityId.RD_LAB];
   if (!fac?.built) return 0;
-  const tier = fac.tier ?? 1;
-  return RD_LAB_SCIENCE_BONUS[tier] ?? 0;
+  const tier: number = fac.tier ?? 1;
+  return (RD_LAB_SCIENCE_BONUS as Record<number, number>)[tier] ?? 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -781,7 +741,7 @@ function _getRdLabScienceBonus(gameState) {
  * Synchronise the legacy `ps.scienceModuleStates` entry for a module based
  * on the current state of its instruments.
  */
-function _syncLegacyModuleState(ps, moduleInstanceId) {
+function _syncLegacyModuleState(ps: SciencePhysicsState, moduleInstanceId: string): void {
   if (!ps.scienceModuleStates || !ps.instrumentStates) return;
 
   const keys = getModuleInstrumentKeys(ps, moduleInstanceId);
@@ -791,7 +751,7 @@ function _syncLegacyModuleState(ps, moduleInstanceId) {
   if (!legacyEntry) return;
 
   // Summarise instrument states into the module-level legacy state.
-  const states = keys.map((k) => ps.instrumentStates.get(k)?.state ?? ScienceModuleState.IDLE);
+  const states = keys.map((k) => ps.instrumentStates!.get(k)?.state ?? ScienceModuleState.IDLE);
 
   if (states.some((s) => s === ScienceModuleState.RUNNING)) {
     legacyEntry.state = ScienceModuleState.RUNNING;
@@ -818,7 +778,12 @@ function _syncLegacyModuleState(ps, moduleInstanceId) {
  * Tick legacy module entries that have no instruments loaded.
  * These modules behave exactly as the old single-experiment model.
  */
-function _tickLegacyModules(ps, assembly, flightState, dt) {
+function _tickLegacyModules(
+  ps: SciencePhysicsState,
+  assembly: ScienceAssembly,
+  flightState: ScienceFlightState,
+  dt: number,
+): void {
   if (!ps.scienceModuleStates) return;
 
   for (const [instanceId, entry] of ps.scienceModuleStates) {
@@ -840,8 +805,8 @@ function _tickLegacyModules(ps, assembly, flightState, dt) {
         const def = placed ? getPartById(placed.partId) : null;
         const altitude = Math.max(0, ps.posY);
         const biome = getBiome(altitude, 'EARTH');
-        const biomeId = biome ? biome.id : null;
-        const biomeName = biome ? biome.name : 'Unknown';
+        const biomeId: string | null = biome ? biome.id : null;
+        const biomeName: string = biome ? biome.name : 'Unknown';
         const multiplier = getScienceMultiplier(altitude, 'EARTH');
 
         entry.completeBiome = biomeId;
@@ -867,31 +832,32 @@ function _tickLegacyModules(ps, assembly, flightState, dt) {
 
 /**
  * Get the number of prior collections for an (instrument, biome) pair.
- * @param {object|null} gameState
- * @param {string}      instrumentId
- * @param {string|null}  biomeId
- * @returns {number}
  */
-function _getPriorCollectionCount(gameState, instrumentId, biomeId) {
+function _getPriorCollectionCount(
+  gameState: GameState | null,
+  instrumentId: string,
+  biomeId: string | null,
+): number {
   if (!gameState?.scienceLog) return 0;
   const entry = gameState.scienceLog.find(
-    (e) => e.instrumentId === instrumentId && e.biomeId === (biomeId ?? ''),
+    (e: ScienceLogEntry) => e.instrumentId === instrumentId && e.biomeId === (biomeId ?? ''),
   );
   return entry ? entry.count : 0;
 }
 
 /**
  * Record a successful science collection for diminishing-return tracking.
- * @param {object} gameState
- * @param {string} instrumentId
- * @param {string|null} biomeId
  */
-function _recordCollection(gameState, instrumentId, biomeId) {
+function _recordCollection(
+  gameState: GameState,
+  instrumentId: string,
+  biomeId: string | null,
+): void {
   if (!gameState.scienceLog) gameState.scienceLog = [];
   const normalizedBiome = biomeId ?? '';
 
   const existing = gameState.scienceLog.find(
-    (e) => e.instrumentId === instrumentId && e.biomeId === normalizedBiome,
+    (e: ScienceLogEntry) => e.instrumentId === instrumentId && e.biomeId === normalizedBiome,
   );
 
   if (existing) {
@@ -911,12 +877,11 @@ function _recordCollection(gameState, instrumentId, biomeId) {
 
 /**
  * Get the best crew science skill from the flight's crew.
- * @param {{ crewIds?: string[] }} flightState
- * @returns {number}  Science skill 0–100 (0 if no crew or no data).
+ *
+ * @returns Science skill 0–100 (0 if no crew or no data).
  */
-function _getCrewScienceSkill(flightState, gameState) {
-  // Look up the highest science skill among the flight's crew.
-  const gs = gameState || flightState?._gameState;
+function _getCrewScienceSkill(flightState: ScienceFlightState, gameState: GameState | null): number {
+  const gs = gameState;
   const crewIds = flightState?.crewIds;
   if (!gs || !crewIds || !crewIds.length) return 0;
 

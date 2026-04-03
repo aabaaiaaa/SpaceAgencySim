@@ -1,5 +1,5 @@
 /**
- * saveload.js — Save/Load system for the Space Agency simulation.
+ * saveload.ts — Save/Load system for the Space Agency simulation.
  *
  * Supports up to 5 named save slots in localStorage.
  * Storage keys: `spaceAgencySave_0` through `spaceAgencySave_4`.
@@ -17,6 +17,8 @@ import { CrewStatus, FACILITY_DEFINITIONS, GameMode, DEFAULT_DIFFICULTY_SETTINGS
 import { loadSharedLibrary, saveSharedLibrary } from './designLibrary.js';
 import { idbSet, idbGet, idbDelete, isIdbAvailable } from './idbStorage.js';
 
+import type { GameState } from './gameState.js';
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -30,7 +32,6 @@ const SAVE_KEY_PREFIX = 'spaceAgencySave_';
 /**
  * Current save format version. Bump this whenever the save envelope or
  * state schema changes in a way that requires new migration logic.
- * @type {number}
  */
 export const SAVE_VERSION = 1;
 
@@ -42,18 +43,14 @@ export const SAVE_VERSION = 1;
  * Timestamp (ms since epoch) marking the start of the current session.
  * Mutated on every save and load so that only new time is accumulated
  * on subsequent saves.
- *
- * @type {number}
  */
-let _sessionStartTime = Date.now();
+let _sessionStartTime: number = Date.now();
 
 /**
  * Returns elapsed seconds since the session timer was last reset
  * (module load, last save, or last load — whichever is most recent).
- *
- * @returns {number}
  */
-function getSessionSeconds() {
+function getSessionSeconds(): number {
   return (Date.now() - _sessionStartTime) / 1000;
 }
 
@@ -61,43 +58,61 @@ function getSessionSeconds() {
  * Resets the session timer to right now.
  * Called after every save and load.
  */
-function resetSessionTimer() {
+function resetSessionTimer(): void {
   _sessionStartTime = Date.now();
 }
 
 /**
  * Overrides the session start time.
  * Exported ONLY for unit testing — do not call from game logic.
- *
- * @param {number} timestampMs  - Value to assign to the internal timer (ms).
- * @returns {void}
  */
-export function _setSessionStartTimeForTesting(timestampMs) {
+export function _setSessionStartTimeForTesting(timestampMs: number): void {
   _sessionStartTime = timestampMs;
 }
 
 // ---------------------------------------------------------------------------
-// Type Definitions (JSDoc)
+// Type Definitions
 // ---------------------------------------------------------------------------
 
 /**
  * A lightweight summary of one save slot shown in the UI.
- *
- * @typedef {Object} SaveSlotSummary
- * @property {number}  slotIndex            - Slot index (0–4).
- * @property {string}  saveName             - Player-assigned label.
- * @property {string}  agencyName           - Player's agency name.
- * @property {string}  timestamp            - ISO 8601 date/time of the save.
- * @property {number}  missionsCompleted    - Count of completed missions.
- * @property {number}  money                - Cash balance at save time.
- * @property {number}  acceptedMissionCount - Count of currently accepted missions.
- * @property {number}  totalFlights         - Entries in flightHistory.
- * @property {number}  crewCount            - Living (non-dead) crew members.
- * @property {number}  crewKIA              - Crew killed in action.
- * @property {number}  playTimeSeconds      - Cumulative real-world play time in seconds.
- * @property {number}  flightTimeSeconds    - Cumulative in-game flight time in seconds.
- * @property {string}  gameMode             - Game mode ('tutorial', 'freeplay', or 'sandbox').
  */
+export interface SaveSlotSummary {
+  /** Slot index (0–4). */
+  slotIndex: number;
+  /** Player-assigned label. */
+  saveName: string;
+  /** Player's agency name. */
+  agencyName: string;
+  /** ISO 8601 date/time of the save. */
+  timestamp: string;
+  /** Count of completed missions. */
+  missionsCompleted: number;
+  /** Cash balance at save time. */
+  money: number;
+  /** Count of currently accepted missions. */
+  acceptedMissionCount: number;
+  /** Entries in flightHistory. */
+  totalFlights: number;
+  /** Living (non-dead) crew members. */
+  crewCount: number;
+  /** Crew killed in action. */
+  crewKIA: number;
+  /** Cumulative real-world play time in seconds. */
+  playTimeSeconds: number;
+  /** Cumulative in-game flight time in seconds. */
+  flightTimeSeconds: number;
+  /** Game mode ('tutorial', 'freeplay', or 'sandbox'). */
+  gameMode: string;
+}
+
+/** Raw save envelope stored in localStorage. */
+interface SaveEnvelope {
+  saveName: string;
+  timestamp: string;
+  version?: number;
+  state: any;
+}
 
 // ---------------------------------------------------------------------------
 // Private Helpers
@@ -105,21 +120,15 @@ export function _setSessionStartTimeForTesting(timestampMs) {
 
 /**
  * Returns the localStorage key for a given slot index.
- *
- * @param {number} slotIndex
- * @returns {string}
  */
-function slotKey(slotIndex) {
+function slotKey(slotIndex: number): string {
   return `${SAVE_KEY_PREFIX}${slotIndex}`;
 }
 
 /**
  * Throws a RangeError if `slotIndex` is not a valid slot (0–SAVE_SLOT_COUNT-1).
- *
- * @param {number} slotIndex
- * @throws {RangeError}
  */
-function assertValidSlot(slotIndex) {
+function assertValidSlot(slotIndex: number): void {
   if (
     !Number.isInteger(slotIndex) ||
     slotIndex < 0 ||
@@ -133,32 +142,22 @@ function assertValidSlot(slotIndex) {
 
 /**
  * Returns the count of crew members with status DEAD (KIA).
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {number}
  */
-function countKIA(state) {
-  return (state.crew ?? []).filter((c) => c.status === CrewStatus.DEAD).length;
+function countKIA(state: any): number {
+  return (state.crew ?? []).filter((c: any) => c.status === CrewStatus.DEAD).length;
 }
 
 /**
  * Returns the count of living (non-dead) crew members.
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {number}
  */
-function countLivingCrew(state) {
-  return (state.crew ?? []).filter((c) => c.status !== CrewStatus.DEAD).length;
+function countLivingCrew(state: any): number {
+  return (state.crew ?? []).filter((c: any) => c.status !== CrewStatus.DEAD).length;
 }
 
 /**
  * Builds a SaveSlotSummary from an envelope object read from localStorage.
- *
- * @param {number} slotIndex
- * @param {{ saveName: string, timestamp: string, state: object }} envelope
- * @returns {SaveSlotSummary}
  */
-function summaryFromEnvelope(slotIndex, envelope) {
+function summaryFromEnvelope(slotIndex: number, envelope: SaveEnvelope): SaveSlotSummary {
   const s = envelope.state;
   return {
     slotIndex,
@@ -188,13 +187,9 @@ function summaryFromEnvelope(slotIndex, envelope) {
  * serialisation, and the session timer is reset so that the next save
  * only counts new time.
  *
- * @param {import('./gameState.js').GameState} state  Game state to persist.
- * @param {number} slotIndex   Destination slot index (0–4).
- * @param {string} [saveName]  Human-readable label for the save (default: 'New Save').
- * @returns {SaveSlotSummary}  Summary of the slot that was just written.
  * @throws {RangeError} If slotIndex is out of bounds.
  */
-export function saveGame(state, slotIndex, saveName = 'New Save') {
+export function saveGame(state: GameState, slotIndex: number, saveName: string = 'New Save'): SaveSlotSummary {
   assertValidSlot(slotIndex);
 
   // Accumulate elapsed session time before serialising so the stored value
@@ -202,7 +197,7 @@ export function saveGame(state, slotIndex, saveName = 'New Save') {
   state.playTimeSeconds = (state.playTimeSeconds ?? 0) + getSessionSeconds();
   resetSessionTimer();
 
-  const envelope = {
+  const envelope: SaveEnvelope = {
     saveName: String(saveName),
     timestamp: new Date().toISOString(),
     version: SAVE_VERSION,
@@ -216,7 +211,7 @@ export function saveGame(state, slotIndex, saveName = 'New Save') {
 
   try {
     localStorage.setItem(key, json);
-  } catch (err) {
+  } catch (err: any) {
     if (err?.name === 'QuotaExceededError') {
       // localStorage full — attempt IndexedDB as fallback.
       if (isIdbAvailable()) {
@@ -245,12 +240,10 @@ export function saveGame(state, slotIndex, saveName = 'New Save') {
  * The session timer is reset after loading so that play time continues
  * to accumulate correctly from this point forward.
  *
- * @param {number} slotIndex  Source slot index (0–4).
- * @returns {import('./gameState.js').GameState}  The restored game state.
  * @throws {RangeError} If slotIndex is out of bounds.
  * @throws {Error}      If the slot is empty or the stored data is corrupt.
  */
-export function loadGame(slotIndex) {
+export function loadGame(slotIndex: number): GameState {
   assertValidSlot(slotIndex);
 
   const raw = localStorage.getItem(slotKey(slotIndex));
@@ -258,7 +251,7 @@ export function loadGame(slotIndex) {
     throw new Error(`Save slot ${slotIndex} is empty.`);
   }
 
-  let envelope;
+  let envelope: SaveEnvelope;
   try {
     envelope = JSON.parse(raw);
   } catch {
@@ -293,8 +286,8 @@ export function loadGame(slotIndex) {
   // Migrate legacy savedDesigns: designs without a savePrivate flag are
   // migrated to the shared library (cross-save) and removed from the
   // per-slot array. Designs explicitly marked savePrivate stay in the slot.
-  const toMigrate = [];
-  const toKeep = [];
+  const toMigrate: any[] = [];
+  const toKeep: any[] = [];
   for (const d of envelope.state.savedDesigns) {
     if (d.savePrivate === undefined || d.savePrivate === null) {
       d.savePrivate = false;
@@ -307,7 +300,7 @@ export function loadGame(slotIndex) {
   }
   if (toMigrate.length > 0) {
     const shared = loadSharedLibrary();
-    const existingIds = new Set(shared.map(s => s.id));
+    const existingIds = new Set(shared.map((s: any) => s.id));
     for (const d of toMigrate) {
       if (!existingIds.has(d.id)) {
         shared.push(d);
@@ -386,7 +379,7 @@ export function loadGame(slotIndex) {
   // Default debugMode for saves created before the debug mode toggle.
   envelope.state.debugMode ??= false;
 
-  return envelope.state;
+  return envelope.state as GameState;
 }
 
 // ---------------------------------------------------------------------------
@@ -396,16 +389,13 @@ export function loadGame(slotIndex) {
 /**
  * Parses a raw JSON envelope string and returns the parsed envelope object,
  * or null if the data is missing, corrupt, or structurally invalid.
- *
- * @param {string | null} raw
- * @returns {{ saveName: string, timestamp: string, version?: number, state: object } | null}
  */
-function parseEnvelope(raw) {
+function parseEnvelope(raw: string | null): SaveEnvelope | null {
   if (raw === null) return null;
   try {
     const envelope = JSON.parse(raw);
     if (envelope && typeof envelope === 'object' && envelope.state && envelope.timestamp) {
-      return envelope;
+      return envelope as SaveEnvelope;
     }
     return null;
   } catch {
@@ -421,20 +411,18 @@ function parseEnvelope(raw) {
  * If both layers have a save for the same slot, the one with the more
  * recent timestamp is used.
  *
- * @param {number} slotIndex  Source slot index (0–4).
- * @returns {Promise<import('./gameState.js').GameState>} The restored game state.
  * @throws {RangeError} If slotIndex is out of bounds.
  * @throws {Error}      If both layers are empty or corrupt.
  */
-export async function loadGameAsync(slotIndex) {
+export async function loadGameAsync(slotIndex: number): Promise<GameState> {
   assertValidSlot(slotIndex);
 
   const key = slotKey(slotIndex);
   const lsRaw = localStorage.getItem(key);
   const lsEnvelope = parseEnvelope(lsRaw);
 
-  let idbEnvelope = null;
-  let idbRaw = null;
+  let idbEnvelope: SaveEnvelope | null = null;
+  let idbRaw: string | null = null;
   if (isIdbAvailable()) {
     try {
       idbRaw = await idbGet(key);
@@ -445,7 +433,7 @@ export async function loadGameAsync(slotIndex) {
   }
 
   // Pick the most recent valid envelope.
-  let chosen = null;
+  let chosen: SaveEnvelope | null = null;
   if (lsEnvelope && idbEnvelope) {
     const lsTime = new Date(lsEnvelope.timestamp).getTime();
     const idbTime = new Date(idbEnvelope.timestamp).getTime();
@@ -491,11 +479,9 @@ export async function loadGameAsync(slotIndex) {
  *
  * No-ops silently if the slot is already empty.
  *
- * @param {number} slotIndex  Slot to clear (0–4).
- * @returns {void}
  * @throws {RangeError} If slotIndex is out of bounds.
  */
-export function deleteSave(slotIndex) {
+export function deleteSave(slotIndex: number): void {
   assertValidSlot(slotIndex);
   const key = slotKey(slotIndex);
   localStorage.removeItem(key);
@@ -515,11 +501,9 @@ export function deleteSave(slotIndex) {
  *
  * The array always has exactly `SAVE_SLOT_COUNT` (5) entries, one per slot.
  * Empty or corrupt slots are represented as `null`.
- *
- * @returns {(SaveSlotSummary | null)[]}
  */
-export function listSaves() {
-  const result = [];
+export function listSaves(): (SaveSlotSummary | null)[] {
+  const result: (SaveSlotSummary | null)[] = [];
 
   for (let i = 0; i < SAVE_SLOT_COUNT; i++) {
     const raw = localStorage.getItem(slotKey(i));
@@ -555,12 +539,10 @@ export function listSaves() {
  * `URL.createObjectURL`).  Calling it in a non-browser environment (e.g.
  * a Node.js test runner) throws an informative error.
  *
- * @param {number} slotIndex  Slot to export (0–4).
- * @returns {void}
  * @throws {RangeError} If slotIndex is out of bounds.
  * @throws {Error}      If the slot is empty, corrupt, or no DOM is available.
  */
-export function exportSave(slotIndex) {
+export function exportSave(slotIndex: number): void {
   assertValidSlot(slotIndex);
 
   const raw = localStorage.getItem(slotKey(slotIndex));
@@ -568,7 +550,7 @@ export function exportSave(slotIndex) {
     throw new Error(`Save slot ${slotIndex} is empty; nothing to export.`);
   }
 
-  let envelope;
+  let envelope: SaveEnvelope;
   try {
     envelope = JSON.parse(raw);
   } catch {
@@ -611,17 +593,14 @@ export function exportSave(slotIndex) {
  * correct types before anything is written to localStorage; invalid input
  * is rejected with a descriptive error.
  *
- * @param {string} jsonString  Raw JSON string (e.g. from a file-upload reader).
- * @param {number} slotIndex   Destination slot (0–4).
- * @returns {SaveSlotSummary}  Summary of the imported slot.
  * @throws {RangeError} If slotIndex is out of bounds.
  * @throws {Error}      If the JSON is malformed or required fields are absent.
  */
-export function importSave(jsonString, slotIndex) {
+export function importSave(jsonString: string, slotIndex: number): SaveSlotSummary {
   assertValidSlot(slotIndex);
 
   // --- Parse ----------------------------------------------------------------
-  let envelope;
+  let envelope: SaveEnvelope;
   try {
     envelope = JSON.parse(jsonString);
   } catch {
@@ -651,7 +630,7 @@ export function importSave(jsonString, slotIndex) {
   const key = slotKey(slotIndex);
   try {
     localStorage.setItem(key, json);
-  } catch (err) {
+  } catch (err: any) {
     if (err?.name === 'QuotaExceededError') {
       throw new Error('Storage full — unable to import save. Delete old saves to free space.', { cause: err });
     }
@@ -677,11 +656,9 @@ export function importSave(jsonString, slotIndex) {
  * Exported with an underscore prefix so it can be tested independently;
  * treat it as an internal implementation detail.
  *
- * @param {unknown} state
- * @returns {void}
  * @throws {Error} Describing the first validation failure found.
  */
-export function _validateState(state) {
+export function _validateState(state: any): void {
   // Numeric top-level fields.
   for (const field of ['money', 'playTimeSeconds']) {
     if (typeof state[field] !== 'number') {

@@ -1,5 +1,5 @@
 /**
- * satellites.js — Satellite network management system.
+ * satellites.ts — Satellite network management system.
  *
  * Manages the deployment, tracking, degradation, maintenance, and benefit
  * calculation for the satellite network.
@@ -33,7 +33,6 @@ import {
   CONSTELLATION_MULTIPLIER,
   SATELLITE_BENEFITS,
   SATELLITE_DEGRADATION_PER_PERIOD,
-  SATELLITE_DEGRADED_THRESHOLD,
   SATELLITE_AUTO_MAINTENANCE_COST,
   SATELLITE_AUTO_MAINTENANCE_HEAL,
   SATELLITE_OPS_TIER_CAPS,
@@ -52,27 +51,36 @@ import { hasFacility, getFacilityTier } from './construction.js';
 import { getPartById } from '../data/parts.js';
 import { getSunlitFraction, getSatellitePowerInfo } from './power.js';
 
+import type { GameState, SatelliteRecord, OrbitalElements } from './gameState.js';
+
 // ---------------------------------------------------------------------------
 // Deployment
 // ---------------------------------------------------------------------------
+
+interface DeploySatelliteOptions {
+  partId: string;
+  bodyId: string;
+  elements: OrbitalElements;
+  name?: string;
+  altitude: number;
+}
+
+interface DeployResult {
+  success: boolean;
+  reason?: string;
+  satelliteId?: string;
+}
 
 /**
  * Deploy a satellite into the network.
  *
  * Creates an OrbitalObject for map tracking and a SatelliteRecord for
  * network benefit tracking.  Requires the Satellite Ops facility.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {{
- *   partId: string,
- *   bodyId: string,
- *   elements: import('./orbit.js').OrbitalElements,
- *   name?: string,
- *   altitude: number,
- * }} opts
- * @returns {{ success: boolean, reason?: string, satelliteId?: string }}
  */
-export function deploySatellite(state, { partId, bodyId, elements, name, altitude }) {
+export function deploySatellite(
+  state: GameState,
+  { partId, bodyId, elements, name, altitude }: DeploySatelliteOptions,
+): DeployResult {
   // Require Satellite Ops facility.
   if (!hasFacility(state, FacilityId.SATELLITE_OPS)) {
     return { success: false, reason: 'Satellite Operations Centre not built.' };
@@ -80,7 +88,7 @@ export function deploySatellite(state, { partId, bodyId, elements, name, altitud
 
   // Check capacity.
   const tier = getFacilityTier(state, FacilityId.SATELLITE_OPS);
-  const cap = SATELLITE_OPS_TIER_CAPS[tier] ?? 6;
+  const cap = (SATELLITE_OPS_TIER_CAPS as Record<number, number>)[tier] ?? 6;
   const activeSats = state.satelliteNetwork.satellites.filter(s => s.health > 0);
   if (activeSats.length >= cap) {
     return { success: false, reason: `Satellite capacity reached (${cap}). Upgrade Satellite Ops for more slots.` };
@@ -92,7 +100,7 @@ export function deploySatellite(state, { partId, bodyId, elements, name, altitud
     return { success: false, reason: `Unknown part: ${partId}` };
   }
 
-  const satelliteType = partDef.properties?.satelliteType ?? 'GENERIC';
+  const satelliteType: string = (partDef.properties as any)?.satelliteType ?? 'GENERIC';
 
   // Determine altitude band.
   const bandId = getAltitudeBandId(altitude, bodyId);
@@ -102,7 +110,7 @@ export function deploySatellite(state, { partId, bodyId, elements, name, altitud
 
   // Validate band for typed satellites.
   if (satelliteType !== 'GENERIC') {
-    const validBands = SATELLITE_VALID_BANDS[satelliteType];
+    const validBands = (SATELLITE_VALID_BANDS as Record<string, readonly string[]>)[satelliteType];
     if (validBands && !validBands.includes(bandId)) {
       return {
         success: false,
@@ -127,11 +135,10 @@ export function deploySatellite(state, { partId, bodyId, elements, name, altitud
   state.orbitalObjects.push(orbObj);
 
   // Create satellite record.
-  /** @type {import('./gameState.js').SatelliteRecord} */
-  const record = {
+  const record: SatelliteRecord = {
     id: satId,
     orbitalObjectId: orbObjId,
-    satelliteType,
+    satelliteType: satelliteType as any,
     partId,
     bodyId,
     bandId,
@@ -152,26 +159,25 @@ export function deploySatellite(state, { partId, bodyId, elements, name, altitud
  * altitude), deploys the satellite into the network.
  *
  * Called from `processFlightReturn()`.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {import('./gameState.js').FlightState|null} flightState
- * @returns {Array<{satelliteId: string, satelliteType: string}>}
  */
-export function deploySatellitesFromFlight(state, flightState) {
+export function deploySatellitesFromFlight(
+  state: GameState,
+  flightState: import('./gameState.js').FlightState | null,
+): Array<{ satelliteId: string | undefined; satelliteType: string }> {
   if (!flightState) return [];
   if (!state.satelliteNetwork) {
     state.satelliteNetwork = { satellites: [] };
   }
 
-  const deployed = [];
-  const releaseEvents = (flightState.events ?? []).filter(
+  const deployed: Array<{ satelliteId: string | undefined; satelliteType: string }> = [];
+  const releaseEvents = ((flightState.events ?? []) as any[]).filter(
     (e) => e.type === 'SATELLITE_RELEASED',
   );
 
   for (const event of releaseEvents) {
-    const partId = event.partId ?? 'satellite-mk1';
-    const altitude = event.altitude ?? 0;
-    const bodyId = flightState.bodyId ?? 'EARTH';
+    const partId: string = event.partId ?? 'satellite-mk1';
+    const altitude: number = event.altitude ?? 0;
+    const bodyId: string = flightState.bodyId ?? 'EARTH';
 
     // Only deploy if released at orbital altitude.
     const minAlt = getMinOrbitAltitude(bodyId);
@@ -193,7 +199,7 @@ export function deploySatellitesFromFlight(state, flightState) {
 
     if (result.success) {
       const partDef = getPartById(partId);
-      const satType = partDef?.properties?.satelliteType ?? 'GENERIC';
+      const satType: string = (partDef?.properties as any)?.satelliteType ?? 'GENERIC';
       deployed.push({ satelliteId: result.satelliteId, satelliteType: satType });
     }
   }
@@ -204,14 +210,13 @@ export function deploySatellitesFromFlight(state, flightState) {
 /**
  * Create synthetic circular orbital elements for a satellite at a given altitude.
  * Used when the flight's orbital elements aren't available.
- *
- * @param {number} altitude  Metres above surface.
- * @param {string} bodyId
- * @param {number} epoch
- * @returns {import('./orbit.js').OrbitalElements}
  */
-function _syntheticCircularElements(altitude, bodyId, epoch) {
-  const R = BODY_RADIUS[bodyId];
+function _syntheticCircularElements(
+  altitude: number,
+  bodyId: string,
+  epoch: number,
+): OrbitalElements | null {
+  const R = (BODY_RADIUS as Record<string, number>)[bodyId];
   if (!R) return null;
   return {
     semiMajorAxis: R + altitude,
@@ -228,45 +233,30 @@ function _syntheticCircularElements(altitude, bodyId, epoch) {
 
 /**
  * Get all active (health > 0) satellite records.
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {import('./gameState.js').SatelliteRecord[]}
  */
-export function getActiveSatellites(state) {
+export function getActiveSatellites(state: GameState): SatelliteRecord[] {
   return (state.satelliteNetwork?.satellites ?? []).filter(s => s.health > 0);
 }
 
 /**
  * Get active satellites of a specific type.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {string} satelliteType  SatelliteType enum value.
- * @returns {import('./gameState.js').SatelliteRecord[]}
  */
-export function getSatellitesByType(state, satelliteType) {
+export function getSatellitesByType(state: GameState, satelliteType: string): SatelliteRecord[] {
   return getActiveSatellites(state).filter(s => s.satelliteType === satelliteType);
 }
 
 /**
  * Count operational (health > 0) satellites of a given type.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {string} satelliteType
- * @returns {number}
  */
-export function countSatellitesByType(state, satelliteType) {
+export function countSatellitesByType(state: GameState, satelliteType: string): number {
   return getSatellitesByType(state, satelliteType).length;
 }
 
 /**
  * Check if the constellation bonus is active for a satellite type.
  * Requires CONSTELLATION_THRESHOLD (3) or more operational satellites.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {string} satelliteType
- * @returns {boolean}
  */
-export function hasConstellationBonus(state, satelliteType) {
+export function hasConstellationBonus(state: GameState, satelliteType: string): boolean {
   return countSatellitesByType(state, satelliteType) >= CONSTELLATION_THRESHOLD;
 }
 
@@ -279,12 +269,8 @@ export function hasConstellationBonus(state, satelliteType) {
  *   - Degraded satellites (health < threshold) contribute 0.5× each.
  *
  * Returns 0 if no operational satellites of that type exist.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {string} satelliteType
- * @returns {number}  Effective multiplier (0, 1, or 2 with constellation).
  */
-export function getBenefitMultiplier(state, satelliteType) {
+export function getBenefitMultiplier(state: GameState, satelliteType: string): number {
   const sats = getSatellitesByType(state, satelliteType);
   if (sats.length === 0) return 0;
 
@@ -310,24 +296,23 @@ export function getBenefitMultiplier(state, satelliteType) {
   return multiplier;
 }
 
+interface NetworkBenefits {
+  transmitYieldBonus: number;
+  weatherSkipDiscount: number;
+  forecastAccuracy: number;
+  sciencePerPeriod: number;
+  landingThresholdBonus: number;
+  recoveryBonus: number;
+  deepSpaceComms: boolean;
+}
+
 /**
  * Compute the aggregate network benefits across all satellite types.
  *
  * Returns an object with all benefit keys and their effective values.
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {{
- *   transmitYieldBonus: number,
- *   weatherSkipDiscount: number,
- *   forecastAccuracy: number,
- *   sciencePerPeriod: number,
- *   landingThresholdBonus: number,
- *   recoveryBonus: number,
- *   deepSpaceComms: boolean,
- * }}
  */
-export function getNetworkBenefits(state) {
-  const result = {
+export function getNetworkBenefits(state: GameState): NetworkBenefits {
+  const result: NetworkBenefits = {
     transmitYieldBonus: 0,
     weatherSkipDiscount: 0,
     forecastAccuracy: 0,
@@ -341,26 +326,26 @@ export function getNetworkBenefits(state) {
     const mult = getBenefitMultiplier(state, type);
     if (mult === 0) continue;
 
-    const benefits = SATELLITE_BENEFITS[type];
+    const benefits = (SATELLITE_BENEFITS as Record<string, Record<string, number | boolean>>)[type];
     if (!benefits) continue;
 
     if (benefits.transmitYieldBonus) {
-      result.transmitYieldBonus += benefits.transmitYieldBonus * mult;
+      result.transmitYieldBonus += (benefits.transmitYieldBonus as number) * mult;
     }
     if (benefits.weatherSkipDiscount) {
-      result.weatherSkipDiscount += benefits.weatherSkipDiscount * mult;
+      result.weatherSkipDiscount += (benefits.weatherSkipDiscount as number) * mult;
     }
     if (benefits.forecastAccuracy) {
-      result.forecastAccuracy += benefits.forecastAccuracy * mult;
+      result.forecastAccuracy += (benefits.forecastAccuracy as number) * mult;
     }
     if (benefits.sciencePerPeriod) {
-      result.sciencePerPeriod += benefits.sciencePerPeriod * mult;
+      result.sciencePerPeriod += (benefits.sciencePerPeriod as number) * mult;
     }
     if (benefits.landingThresholdBonus) {
-      result.landingThresholdBonus += benefits.landingThresholdBonus * mult;
+      result.landingThresholdBonus += (benefits.landingThresholdBonus as number) * mult;
     }
     if (benefits.recoveryBonus) {
-      result.recoveryBonus += benefits.recoveryBonus * mult;
+      result.recoveryBonus += (benefits.recoveryBonus as number) * mult;
     }
     if (benefits.deepSpaceComms) {
       result.deepSpaceComms = true;
@@ -374,6 +359,13 @@ export function getNetworkBenefits(state) {
 // Degradation & Maintenance (called per period)
 // ---------------------------------------------------------------------------
 
+interface SatelliteNetworkResult {
+  maintenanceCost: number;
+  scienceEarned: number;
+  leaseIncome: number;
+  decommissioned: string[];
+}
+
 /**
  * Process satellite degradation and auto-maintenance for one period.
  *
@@ -384,16 +376,8 @@ export function getNetworkBenefits(state) {
  *   2. Degrade all active satellites by SATELLITE_DEGRADATION_PER_PERIOD.
  *   3. Decommission satellites that reach 0 health.
  *   4. Award passive science from Science satellites.
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {{
- *   maintenanceCost: number,
- *   scienceEarned: number,
- *   leaseIncome: number,
- *   decommissioned: string[],
- * }}
  */
-export function processSatelliteNetwork(state) {
+export function processSatelliteNetwork(state: GameState): SatelliteNetworkResult {
   const network = state.satelliteNetwork;
   if (!network || !network.satellites) {
     return { maintenanceCost: 0, scienceEarned: 0, leaseIncome: 0, decommissioned: [] };
@@ -401,7 +385,7 @@ export function processSatelliteNetwork(state) {
 
   let maintenanceCost = 0;
   let leaseIncome = 0;
-  const decommissioned = [];
+  const decommissioned: string[] = [];
 
   // Step 1 & 2: Maintenance + degradation for each active satellite.
   for (const sat of network.satellites) {
@@ -444,15 +428,16 @@ export function processSatelliteNetwork(state) {
 // Maintenance missions
 // ---------------------------------------------------------------------------
 
+interface SuccessResult {
+  success: boolean;
+  reason?: string;
+}
+
 /**
  * Manually maintain a satellite (from a maintenance mission).
  * Restores health to 100.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {string} satelliteId
- * @returns {{ success: boolean, reason?: string }}
  */
-export function maintainSatellite(state, satelliteId) {
+export function maintainSatellite(state: GameState, satelliteId: string): SuccessResult {
   const sat = state.satelliteNetwork.satellites.find(s => s.id === satelliteId);
   if (!sat) return { success: false, reason: 'Satellite not found.' };
   if (sat.health <= 0) return { success: false, reason: 'Satellite is decommissioned.' };
@@ -463,13 +448,8 @@ export function maintainSatellite(state, satelliteId) {
 
 /**
  * Toggle auto-maintenance for a satellite.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {string} satelliteId
- * @param {boolean} enabled
- * @returns {{ success: boolean, reason?: string }}
  */
-export function setAutoMaintenance(state, satelliteId, enabled) {
+export function setAutoMaintenance(state: GameState, satelliteId: string, enabled: boolean): SuccessResult {
   const sat = state.satelliteNetwork.satellites.find(s => s.id === satelliteId);
   if (!sat) return { success: false, reason: 'Satellite not found.' };
   if (sat.health <= 0) return { success: false, reason: 'Satellite is decommissioned.' };
@@ -486,13 +466,8 @@ export function setAutoMaintenance(state, satelliteId, enabled) {
  * Toggle satellite lease status.
  * Leased satellites earn income per period but provide reduced network benefits.
  * Requires Satellite Ops Tier 2+.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {string} satelliteId
- * @param {boolean} leased
- * @returns {{ success: boolean, reason?: string }}
  */
-export function setSatelliteLease(state, satelliteId, leased) {
+export function setSatelliteLease(state: GameState, satelliteId: string, leased: boolean): SuccessResult {
   const tier = getFacilityTier(state, FacilityId.SATELLITE_OPS);
   if (tier < 2) {
     return { success: false, reason: 'Satellite Ops Tier 2 required for leasing.' };
@@ -509,21 +484,17 @@ export function setSatelliteLease(state, satelliteId, leased) {
 /**
  * Get the per-period lease income for a single satellite.
  *
- * @param {import('./gameState.js').SatelliteRecord} sat
- * @returns {number}  Income in dollars (0 if not leased or dead).
+ * @returns Income in dollars (0 if not leased or dead).
  */
-export function getSatelliteLeaseIncome(sat) {
+export function getSatelliteLeaseIncome(sat: SatelliteRecord): number {
   if (!sat.leased || sat.health <= 0) return 0;
-  return SATELLITE_LEASE_INCOME[sat.satelliteType] ?? SATELLITE_LEASE_INCOME_DEFAULT;
+  return (SATELLITE_LEASE_INCOME as Record<string, number>)[sat.satelliteType as string] ?? SATELLITE_LEASE_INCOME_DEFAULT;
 }
 
 /**
  * Get total lease income across the entire network per period.
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {number}
  */
-export function getTotalLeaseIncome(state) {
+export function getTotalLeaseIncome(state: GameState): number {
   const sats = state.satelliteNetwork?.satellites ?? [];
   let total = 0;
   for (const sat of sats) {
@@ -539,13 +510,8 @@ export function getTotalLeaseIncome(state) {
 /**
  * Reposition a satellite to a different altitude band on the same body.
  * Requires Satellite Ops Tier 3. Costs money and satellite health.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {string} satelliteId
- * @param {string} targetBandId  Target altitude band ID (e.g. 'MEO').
- * @returns {{ success: boolean, reason?: string }}
  */
-export function repositionSatellite(state, satelliteId, targetBandId) {
+export function repositionSatellite(state: GameState, satelliteId: string, targetBandId: string): SuccessResult {
   const tier = getFacilityTier(state, FacilityId.SATELLITE_OPS);
   if (tier < 3) {
     return { success: false, reason: 'Satellite Ops Tier 3 required for repositioning.' };
@@ -560,7 +526,7 @@ export function repositionSatellite(state, satelliteId, targetBandId) {
   }
 
   // Validate target band exists for this body.
-  const bodyBands = ALTITUDE_BANDS[sat.bodyId];
+  const bodyBands = (ALTITUDE_BANDS as Record<string, ReadonlyArray<{ id: string; name: string; min: number; max: number }>>)[sat.bodyId];
   if (!bodyBands) return { success: false, reason: 'Unknown celestial body.' };
   const targetBand = bodyBands.find(b => b.id === targetBandId);
   if (!targetBand) {
@@ -569,7 +535,7 @@ export function repositionSatellite(state, satelliteId, targetBandId) {
 
   // Validate typed satellites can operate in the target band.
   if (sat.satelliteType !== 'GENERIC') {
-    const validBands = SATELLITE_VALID_BANDS[sat.satelliteType];
+    const validBands = (SATELLITE_VALID_BANDS as Record<string, readonly string[]>)[sat.satelliteType as string];
     if (validBands && !validBands.includes(targetBandId)) {
       return {
         success: false,
@@ -579,7 +545,7 @@ export function repositionSatellite(state, satelliteId, targetBandId) {
   }
 
   // Check cost.
-  const cost = SATELLITE_REPOSITION_COST.SAME_BODY;
+  const cost = (SATELLITE_REPOSITION_COST as Record<string, number>).SAME_BODY;
   if (state.money < cost) {
     return { success: false, reason: `Insufficient funds. Repositioning costs $${(cost / 1000).toFixed(0)}k.` };
   }
@@ -598,7 +564,7 @@ export function repositionSatellite(state, satelliteId, targetBandId) {
   const orbObj = state.orbitalObjects.find(o => o.id === sat.orbitalObjectId);
   if (orbObj) {
     const midAlt = (targetBand.min + targetBand.max) / 2;
-    const R = BODY_RADIUS[sat.bodyId] ?? 6_371_000;
+    const R = (BODY_RADIUS as Record<string, number>)[sat.bodyId] ?? 6_371_000;
     orbObj.elements.semiMajorAxis = R + midAlt;
     orbObj.elements.eccentricity = 0;
   }
@@ -609,20 +575,16 @@ export function repositionSatellite(state, satelliteId, targetBandId) {
 /**
  * Get valid repositioning targets for a satellite.
  * Returns bands the satellite can move to (excluding current band).
- *
- * @param {import('./gameState.js').GameState} state
- * @param {string} satelliteId
- * @returns {Array<{ id: string, name: string }>}
  */
-export function getRepositionTargets(state, satelliteId) {
+export function getRepositionTargets(state: GameState, satelliteId: string): Array<{ id: string; name: string }> {
   const sat = state.satelliteNetwork.satellites.find(s => s.id === satelliteId);
   if (!sat || sat.health <= 0) return [];
 
-  const bodyBands = ALTITUDE_BANDS[sat.bodyId];
+  const bodyBands = (ALTITUDE_BANDS as Record<string, ReadonlyArray<{ id: string; name: string; min: number; max: number }>>)[sat.bodyId];
   if (!bodyBands) return [];
 
   const validBands = (sat.satelliteType !== 'GENERIC')
-    ? SATELLITE_VALID_BANDS[sat.satelliteType]
+    ? (SATELLITE_VALID_BANDS as Record<string, readonly string[]>)[sat.satelliteType as string]
     : null;
 
   return bodyBands
@@ -638,12 +600,8 @@ export function getRepositionTargets(state, satelliteId) {
 /**
  * Manually decommission a satellite (remove from active network).
  * Sets health to 0 but keeps the record for history.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {string} satelliteId
- * @returns {{ success: boolean, reason?: string }}
  */
-export function decommissionSatellite(state, satelliteId) {
+export function decommissionSatellite(state: GameState, satelliteId: string): SuccessResult {
   const sat = state.satelliteNetwork.satellites.find(s => s.id === satelliteId);
   if (!sat) return { success: false, reason: 'Satellite not found.' };
 
@@ -657,30 +615,30 @@ export function decommissionSatellite(state, satelliteId) {
 // Satellite network summary (for UI)
 // ---------------------------------------------------------------------------
 
+interface NetworkSummary {
+  totalActive: number;
+  capacity: number;
+  tier: number;
+  leasedCount: number;
+  totalLeaseIncome: number;
+  byType: Record<string, { count: number; constellation: boolean }>;
+  benefits: NetworkBenefits;
+  satellites: SatelliteRecord[];
+  satellitePowerInfo: Record<string, { sunlitFraction: number; avgGeneration: number; altitude: number }>;
+}
+
 /**
  * Build a summary of the satellite network for the Satellite Ops panel.
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {{
- *   totalActive: number,
- *   capacity: number,
- *   tier: number,
- *   leasedCount: number,
- *   totalLeaseIncome: number,
- *   byType: Record<string, { count: number, constellation: boolean }>,
- *   benefits: ReturnType<typeof getNetworkBenefits>,
- *   satellites: import('./gameState.js').SatelliteRecord[],
- * }}
  */
-export function getNetworkSummary(state) {
+export function getNetworkSummary(state: GameState): NetworkSummary {
   const tier = hasFacility(state, FacilityId.SATELLITE_OPS)
     ? getFacilityTier(state, FacilityId.SATELLITE_OPS)
     : 0;
-  const capacity = tier > 0 ? (SATELLITE_OPS_TIER_CAPS[tier] ?? 6) : 0;
+  const capacity = tier > 0 ? ((SATELLITE_OPS_TIER_CAPS as Record<number, number>)[tier] ?? 6) : 0;
 
   const active = getActiveSatellites(state);
 
-  const byType = {};
+  const byType: Record<string, { count: number; constellation: boolean }> = {};
   for (const type of Object.values(SatelliteType)) {
     const count = countSatellitesByType(state, type);
     byType[type] = {
@@ -693,13 +651,13 @@ export function getNetworkSummary(state) {
 
   // Compute sunlit fraction and power info per satellite for UI display.
   const allSats = state.satelliteNetwork?.satellites ?? [];
-  const satellitePowerInfo = {};
+  const satellitePowerInfo: Record<string, { sunlitFraction: number; avgGeneration: number; altitude: number }> = {};
   for (const sat of allSats) {
     if (sat.health <= 0) continue;
     // Look up the orbit altitude from the corresponding OrbitalObject.
     const oo = state.orbitalObjects?.find(o => o.id === sat.orbitalObjectId);
     if (oo && oo.elements) {
-      const altitude = oo.elements.semiMajorAxis - (BODY_RADIUS[sat.bodyId] ?? 6_371_000);
+      const altitude = oo.elements.semiMajorAxis - ((BODY_RADIUS as Record<string, number>)[sat.bodyId] ?? 6_371_000);
       const fraction = getSunlitFraction(altitude, sat.bodyId);
       const powerInfo = getSatellitePowerInfo(altitude, sat.bodyId);
       satellitePowerInfo[sat.id] = {

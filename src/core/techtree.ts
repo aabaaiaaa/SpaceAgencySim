@@ -1,5 +1,5 @@
 /**
- * techtree.js — Technology tree research system.
+ * techtree.ts — Technology tree research system.
  *
  * Manages researching tech nodes using science points and funds.
  * Research unlocks new parts and instruments for use in the VAB.
@@ -27,6 +27,35 @@ import {
   getTechNodeById,
   getNodeByBranchAndTier,
 } from '../data/techtree.js';
+import type { TechNodeDef } from '../data/techtree.js';
+import type { GameState } from './gameState.js';
+
+// ---------------------------------------------------------------------------
+// Local types (shapes from data modules)
+// ---------------------------------------------------------------------------
+
+// TechNode is an alias for TechNodeDef from the data module.
+type TechNode = TechNodeDef;
+
+interface ResearchCheck {
+  allowed: boolean;
+  reason: string;
+}
+
+interface ResearchResult {
+  success: boolean;
+  reason: string;
+  unlockedParts: string[];
+  unlockedInstruments: string[];
+}
+
+interface TechNodeStatus extends TechNodeDef {
+  researched: boolean;
+  tutorialUnlocked: boolean;
+  unlocked: boolean;
+  canResearch: boolean;
+  reason: string;
+}
 
 // ---------------------------------------------------------------------------
 // Queries
@@ -34,12 +63,8 @@ import {
 
 /**
  * Check whether a tech node has been explicitly researched by the player.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {string} nodeId
- * @returns {boolean}
  */
-export function isNodeResearched(state, nodeId) {
+export function isNodeResearched(state: GameState, nodeId: string): boolean {
   return (state.techTree?.researched ?? []).includes(nodeId);
 }
 
@@ -54,15 +79,11 @@ export function isNodeResearched(state, nodeId) {
  *      `state.techTree.unlockedInstruments`.
  *   4. The node actually unlocks something (empty nodes can't be
  *      tutorial-unlocked).
- *
- * @param {import('./gameState.js').GameState} state
- * @param {string} nodeId
- * @returns {boolean}
  */
-export function isNodeTutorialUnlocked(state, nodeId) {
+export function isNodeTutorialUnlocked(state: GameState, nodeId: string): boolean {
   if (isNodeResearched(state, nodeId)) return false;
 
-  const node = getTechNodeById(nodeId);
+  const node = getTechNodeById(nodeId) ?? null;
   if (!node) return false;
 
   const hasSomething =
@@ -72,24 +93,20 @@ export function isNodeTutorialUnlocked(state, nodeId) {
   const ownedParts = new Set(state.parts ?? []);
   const partsOk =
     node.unlocksParts.length === 0 ||
-    node.unlocksParts.every((pid) => ownedParts.has(pid));
+    node.unlocksParts.every((pid: string) => ownedParts.has(pid));
 
   const ownedInstruments = new Set(state.techTree?.unlockedInstruments ?? []);
   const instrumentsOk =
     node.unlocksInstruments.length === 0 ||
-    node.unlocksInstruments.every((iid) => ownedInstruments.has(iid));
+    node.unlocksInstruments.every((iid: string) => ownedInstruments.has(iid));
 
   return partsOk && instrumentsOk;
 }
 
 /**
  * A node is "unlocked" if it has been researched OR is tutorial-unlocked.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {string} nodeId
- * @returns {boolean}
  */
-export function isNodeUnlocked(state, nodeId) {
+export function isNodeUnlocked(state: GameState, nodeId: string): boolean {
   return isNodeResearched(state, nodeId) || isNodeTutorialUnlocked(state, nodeId);
 }
 
@@ -98,25 +115,18 @@ export function isNodeUnlocked(state, nodeId) {
  * based on their R&D Lab facility tier.
  *
  * Returns 0 if the R&D Lab is not built.
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {number}
  */
-export function getMaxResearchableTier(state) {
+export function getMaxResearchableTier(state: GameState): number {
   if (!hasFacility(state, FacilityId.RD_LAB)) return 0;
   const rdTier = state.facilities[FacilityId.RD_LAB]?.tier ?? 1;
-  return RD_TIER_MAX_TECH[rdTier] ?? 5;
+  return (RD_TIER_MAX_TECH as Record<number, number>)[rdTier] ?? 5;
 }
 
 /**
  * Check whether the player can research a specific node right now.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {string} nodeId
- * @returns {{ allowed: boolean, reason: string }}
  */
-export function canResearchNode(state, nodeId) {
-  const node = getTechNodeById(nodeId);
+export function canResearchNode(state: GameState, nodeId: string): ResearchCheck {
+  const node = getTechNodeById(nodeId) ?? null;
   if (!node) {
     return { allowed: false, reason: 'Unknown tech node.' };
   }
@@ -151,7 +161,7 @@ export function canResearchNode(state, nodeId) {
 
   // Previous tier in the same branch must be unlocked.
   if (node.tier > 1) {
-    const prevNode = getNodeByBranchAndTier(node.branch, node.tier - 1);
+    const prevNode = getNodeByBranchAndTier(node.branch, node.tier - 1) ?? null;
     if (prevNode && !isNodeUnlocked(state, prevNode.id)) {
       return {
         allowed: false,
@@ -188,17 +198,8 @@ export function canResearchNode(state, nodeId) {
  *
  * Unlocked parts are added to `state.parts`; unlocked instruments are
  * added to `state.techTree.unlockedInstruments`.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {string} nodeId
- * @returns {{
- *   success: boolean,
- *   reason: string,
- *   unlockedParts: string[],
- *   unlockedInstruments: string[]
- * }}
  */
-export function researchNode(state, nodeId) {
+export function researchNode(state: GameState, nodeId: string): ResearchResult {
   const check = canResearchNode(state, nodeId);
   if (!check.allowed) {
     return {
@@ -209,7 +210,7 @@ export function researchNode(state, nodeId) {
     };
   }
 
-  const node = getTechNodeById(nodeId);
+  const node = getTechNodeById(nodeId)!;
 
   // Sandbox mode: skip cost deductions.
   if (state.gameMode !== GameMode.SANDBOX) {
@@ -242,7 +243,7 @@ export function researchNode(state, nodeId) {
 
   // Unlock parts.
   const ownedParts = new Set(state.parts);
-  const unlockedParts = [];
+  const unlockedParts: string[] = [];
   for (const partId of node.unlocksParts) {
     if (!ownedParts.has(partId)) {
       state.parts.push(partId);
@@ -253,7 +254,7 @@ export function researchNode(state, nodeId) {
 
   // Unlock instruments.
   const ownedInstruments = new Set(state.techTree.unlockedInstruments);
-  const unlockedInstruments = [];
+  const unlockedInstruments: string[] = [];
   for (const instId of node.unlocksInstruments) {
     if (!ownedInstruments.has(instId)) {
       state.techTree.unlockedInstruments.push(instId);
@@ -271,15 +272,12 @@ export function researchNode(state, nodeId) {
 
 /**
  * Return all part IDs unlocked via researched tech tree nodes.
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {string[]}
  */
-export function getTechTreeUnlockedParts(state) {
+export function getTechTreeUnlockedParts(state: GameState): string[] {
   const researched = state.techTree?.researched ?? [];
-  const parts = new Set();
+  const parts = new Set<string>();
   for (const nodeId of researched) {
-    const node = getTechNodeById(nodeId);
+    const node = getTechNodeById(nodeId) ?? null;
     if (node) {
       for (const pid of node.unlocksParts) {
         parts.add(pid);
@@ -291,11 +289,8 @@ export function getTechTreeUnlockedParts(state) {
 
 /**
  * Return all instrument IDs unlocked via the tech tree.
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {string[]}
  */
-export function getTechTreeUnlockedInstruments(state) {
+export function getTechTreeUnlockedInstruments(state: GameState): string[] {
   return [...(state.techTree?.unlockedInstruments ?? [])];
 }
 
@@ -305,13 +300,12 @@ export function getTechTreeUnlockedInstruments(state) {
  * An instrument is available if:
  *   1. Its techTier is 0 (starter instrument), OR
  *   2. Its ID is in `state.techTree.unlockedInstruments`.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {string} instrumentId
- * @param {number} techTier  The instrument's techTier from its definition.
- * @returns {boolean}
  */
-export function isInstrumentAvailable(state, instrumentId, techTier) {
+export function isInstrumentAvailable(
+  state: GameState,
+  instrumentId: string,
+  techTier: number,
+): boolean {
   if (techTier === 0) return true;
   return (state.techTree?.unlockedInstruments ?? []).includes(instrumentId);
 }
@@ -325,18 +319,9 @@ export function isInstrumentAvailable(state, instrumentId, techTier) {
  *   - `unlocked`:         Either researched or tutorial-unlocked.
  *   - `canResearch`:      Player can research this node right now.
  *   - `reason`:           Why canResearch is false (empty if true).
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {Array<TechNodeDef & {
- *   researched: boolean,
- *   tutorialUnlocked: boolean,
- *   unlocked: boolean,
- *   canResearch: boolean,
- *   reason: string
- * }>}
  */
-export function getTechTreeStatus(state) {
-  return TECH_NODES.map((node) => {
+export function getTechTreeStatus(state: GameState): TechNodeStatus[] {
+  return [...TECH_NODES].map((node) => {
     const check = canResearchNode(state, node.id);
     return {
       ...node,

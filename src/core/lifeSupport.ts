@@ -1,5 +1,5 @@
 /**
- * lifeSupport.js — Crew life support system.
+ * lifeSupport.ts — Crew life support system.
  *
  * Tracks supply countdowns for crewed vessels left in the field (orbit or
  * landed on non-Earth bodies).  Each command module provides 5 periods of
@@ -17,25 +17,41 @@
 
 import { recordKIA } from './crew.js';
 import {
+  AstronautStatus,
   DEFAULT_LIFE_SUPPORT_PERIODS,
   LIFE_SUPPORT_WARNING_THRESHOLD,
   FieldCraftStatus,
 } from './constants.js';
 import { getPartById } from '../data/parts.js';
+import type { GameState, FieldCraft, OrbitalElements } from './gameState.js';
+import type { PhysicsState, RocketAssembly } from './physics.js';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-/**
- * @typedef {Object} LifeSupportResult
- * @property {Array<{craftId: string, craftName: string, suppliesRemaining: number, crewIds: string[]}>} warnings
- *   Craft at or below the warning threshold (1 period remaining).
- * @property {Array<{craftId: string, craftName: string, crewId: string, crewName: string}>} deaths
- *   Crew members who died from life support exhaustion this period.
- * @property {string[]} removedCraftIds
- *   IDs of field craft that were removed (all crew dead, no one left).
- */
+export interface LifeSupportWarning {
+  craftId: string;
+  craftName: string;
+  suppliesRemaining: number;
+  crewIds: string[];
+}
+
+export interface LifeSupportDeath {
+  craftId: string;
+  craftName: string;
+  crewId: string;
+  crewName: string;
+}
+
+export interface LifeSupportResult {
+  /** Craft at or below the warning threshold (1 period remaining). */
+  warnings: LifeSupportWarning[];
+  /** Crew members who died from life support exhaustion this period. */
+  deaths: LifeSupportDeath[];
+  /** IDs of field craft that were removed (all crew dead, no one left). */
+  removedCraftIds: string[];
+}
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -50,21 +66,15 @@ import { getPartById } from '../data/parts.js';
  *   3. If supplies are at the warning threshold, add to warnings.
  *
  * Field craft whose crew are all dead are removed from the array.
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {LifeSupportResult}
  */
-export function processLifeSupport(state) {
+export function processLifeSupport(state: GameState): LifeSupportResult {
   if (!Array.isArray(state.fieldCraft)) {
     state.fieldCraft = [];
   }
 
-  /** @type {LifeSupportResult['warnings']} */
-  const warnings = [];
-  /** @type {LifeSupportResult['deaths']} */
-  const deaths = [];
-  /** @type {string[]} */
-  const removedCraftIds = [];
+  const warnings: LifeSupportWarning[] = [];
+  const deaths: LifeSupportDeath[] = [];
+  const removedCraftIds: string[] = [];
 
   for (const craft of state.fieldCraft) {
     // Extended Mission Module = infinite supplies, skip countdown.
@@ -78,9 +88,10 @@ export function processLifeSupport(state) {
 
     if (craft.suppliesRemaining <= 0) {
       // Life support exhausted — all crew die.
+      const crew = state.crew as unknown as Array<{ id: string; name: string; status: string }>;
       for (const crewId of craft.crewIds) {
-        const astronaut = state.crew.find((a) => a.id === crewId);
-        if (astronaut && astronaut.status !== 'kia') {
+        const astronaut = crew.find((a) => a.id === crewId);
+        if (astronaut && astronaut.status !== AstronautStatus.KIA) {
           const crewName = astronaut.name;
           recordKIA(state, crewId, 'Life support exhausted');
           deaths.push({
@@ -105,7 +116,6 @@ export function processLifeSupport(state) {
   }
 
   // Remove field craft with no crew left.
-  const before = state.fieldCraft.length;
   state.fieldCraft = state.fieldCraft.filter((c) => {
     if (c.crewIds.length === 0) {
       removedCraftIds.push(c.id);
@@ -121,11 +131,13 @@ export function processLifeSupport(state) {
  * Check whether a rocket assembly includes the Extended Mission Module.
  * Binary check: one module = infinite support, does not stack.
  *
- * @param {import('../core/rocketbuilder.js').RocketAssembly|null} assembly
- * @param {import('../core/physics.js').PhysicsState|null} ps  - Optional physics state to check only active parts.
- * @returns {boolean}
+ * @param assembly - The rocket assembly, or null.
+ * @param ps - Optional physics state to check only active (non-destroyed) parts.
  */
-export function hasExtendedLifeSupport(assembly, ps) {
+export function hasExtendedLifeSupport(
+  assembly: RocketAssembly | null,
+  ps: PhysicsState | null,
+): boolean {
   if (!assembly) return false;
 
   for (const [instanceId, placed] of assembly.parts) {
@@ -140,20 +152,28 @@ export function hasExtendedLifeSupport(assembly, ps) {
   return false;
 }
 
+interface CreateFieldCraftOptions {
+  /** Display name of the craft. */
+  name: string;
+  /** Celestial body the craft is at. */
+  bodyId: string;
+  /** FieldCraftStatus value. */
+  status: string;
+  /** Crew member IDs aboard. */
+  crewIds: string[];
+  /** True if Extended Mission Module present. */
+  hasExtendedLifeSupport: boolean;
+  /** Current period number. */
+  deployedPeriod: number;
+  /** Orbital elements, or null if landed. */
+  orbitalElements?: OrbitalElements | null;
+  /** Altitude band, or null. */
+  orbitBandId?: string | null;
+}
+
 /**
  * Create a field craft entry when a crewed vessel is left in orbit or
  * landed on a non-Earth body upon flight return.
- *
- * @param {object} opts
- * @param {string} opts.name               - Display name of the craft.
- * @param {string} opts.bodyId             - Celestial body the craft is at.
- * @param {string} opts.status             - FieldCraftStatus value.
- * @param {string[]} opts.crewIds          - Crew member IDs aboard.
- * @param {boolean} opts.hasExtendedLifeSupport - True if Extended Mission Module present.
- * @param {number} opts.deployedPeriod     - Current period number.
- * @param {import('./gameState.js').OrbitalElements|null} [opts.orbitalElements] - Orbital elements.
- * @param {string|null} [opts.orbitBandId] - Altitude band.
- * @returns {import('./gameState.js').FieldCraft}
  */
 export function createFieldCraft({
   name,
@@ -164,13 +184,13 @@ export function createFieldCraft({
   deployedPeriod,
   orbitalElements = null,
   orbitBandId = null,
-}) {
+}: CreateFieldCraftOptions): FieldCraft {
   const id = _generateId();
   return {
     id,
     name,
     bodyId,
-    status,
+    status: status as FieldCraftStatus,
     crewIds: [...crewIds],
     suppliesRemaining: DEFAULT_LIFE_SUPPORT_PERIODS,
     hasExtendedLifeSupport: extendedSupport,
@@ -182,11 +202,8 @@ export function createFieldCraft({
 
 /**
  * Get all field craft that have a supply warning (at or below threshold).
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {import('./gameState.js').FieldCraft[]}
  */
-export function getFieldCraftWarnings(state) {
+export function getFieldCraftWarnings(state: GameState): FieldCraft[] {
   if (!Array.isArray(state.fieldCraft)) return [];
   return state.fieldCraft.filter(
     (c) =>
@@ -200,7 +217,7 @@ export function getFieldCraftWarnings(state) {
 // Private helpers
 // ---------------------------------------------------------------------------
 
-function _generateId() {
+function _generateId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
   }

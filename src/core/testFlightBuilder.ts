@@ -1,5 +1,5 @@
 /**
- * testFlightBuilder.js — Programmatic rocket builder for E2E testing.
+ * testFlightBuilder.ts — Programmatic rocket builder for E2E testing.
  *
  * Builds a valid RocketAssembly + StagingConfig from a list of part IDs,
  * stacking them vertically with proper connections. This bypasses the VAB
@@ -21,6 +21,18 @@ import {
   autoStageNewPart,
 } from './rocketbuilder.js';
 
+// Use `any` for rocketbuilder objects — the JS module's inferred JSDoc types
+// do not have .d.ts declarations, so we avoid re-declaring conflicting shapes.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type RocketAssembly = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type StagingConfig = any;
+
+export interface TestRocketResult {
+  assembly: RocketAssembly;
+  stagingConfig: StagingConfig;
+}
+
 /**
  * Build a rocket assembly and staging config from an ordered list of part IDs.
  *
@@ -31,15 +43,14 @@ import {
  * Engines and SRBs are auto-staged into Stage 1; decouplers get their own
  * stages; everything else goes to unstaged.
  *
- * @param {string[]} partIds  Ordered list of part catalog IDs (top → bottom).
- * @returns {{ assembly: import('./rocketbuilder.js').RocketAssembly, stagingConfig: import('./rocketbuilder.js').StagingConfig }}
+ * @param partIds  Ordered list of part catalog IDs (top → bottom).
  */
-export function buildTestRocket(partIds) {
-  const assembly      = createRocketAssembly();
-  const stagingConfig = createStagingConfig();
+export function buildTestRocket(partIds: string[]): TestRocketResult {
+  const assembly: RocketAssembly      = createRocketAssembly();
+  const stagingConfig: StagingConfig  = createStagingConfig();
 
   let currentY = 0;
-  let prevInstanceId = null;
+  let prevInstanceId: string | null = null;
 
   for (const partId of partIds) {
     const def = getPartById(partId);
@@ -52,14 +63,15 @@ export function buildTestRocket(partIds) {
     const halfH = def.height / 2;
     const worldY = currentY + halfH;
 
-    const instanceId = addPartToAssembly(assembly, partId, 0, worldY);
+    const instanceId: string = addPartToAssembly(assembly, partId, 0, worldY);
 
     // Connect to previous part (bottom→top).
     if (prevInstanceId) {
-      const prevDef = getPartById(assembly.parts.get(prevInstanceId).partId);
+      const prevPlaced = assembly.parts.get(prevInstanceId);
+      const prevDef = prevPlaced ? getPartById(prevPlaced.partId) : undefined;
       // Find bottom snap on prev, top snap on current.
-      const prevBottomIdx = prevDef?.snapPoints?.findIndex(s => s.side === 'bottom') ?? -1;
-      const curTopIdx     = def.snapPoints?.findIndex(s => s.side === 'top') ?? -1;
+      const prevBottomIdx = prevDef?.snapPoints?.findIndex((s) => s.side === 'bottom') ?? -1;
+      const curTopIdx     = def.snapPoints?.findIndex((s) => s.side === 'top') ?? -1;
 
       if (prevBottomIdx >= 0 && curTopIdx >= 0) {
         connectParts(assembly, prevInstanceId, prevBottomIdx, instanceId, curTopIdx);

@@ -1,5 +1,5 @@
 /**
- * library.js — Library facility statistics and knowledge computation.
+ * library.ts — Library facility statistics and knowledge computation.
  *
  * Pure functions that derive statistics, records, celestial body knowledge,
  * and rocket usage data from the game state.  The Library facility UI
@@ -11,6 +11,116 @@
 import { FlightOutcome, CrewStatus } from './constants.js';
 import { CELESTIAL_BODIES, ALL_BODY_IDS, getBodyDef } from '../data/bodies.js';
 import { ACHIEVEMENTS } from './achievements.js';
+import type { GameState, FlightResult, RocketDesign, CrewMember, SurfaceItem, FieldCraft } from './gameState.js';
+
+// ---------------------------------------------------------------------------
+// Local types for return values
+// ---------------------------------------------------------------------------
+
+interface AgencyStats {
+  totalFlights: number;
+  successfulFlights: number;
+  failedFlights: number;
+  partialSuccesses: number;
+  totalRevenue: number;
+  totalFlightTime: number;
+  currentPeriod: number;
+  sciencePoints: number;
+  achievementsEarned: number;
+  totalAchievements: number;
+  satellitesDeployed: number;
+  activeCrew: number;
+  totalCrewHired: number;
+  crewLost: number;
+}
+
+interface RecordEntry {
+  value: number;
+  flightId: string;
+  rocketName: string;
+}
+
+interface LongestFlightEntry {
+  duration: number;
+  flightId: string;
+  rocketName: string;
+}
+
+interface HeaviestRocket {
+  mass: number;
+  name: string;
+  id: string;
+}
+
+interface BodyRecord {
+  maxAltitude: number;
+  visited: boolean;
+  orbited: boolean;
+  landed: boolean;
+}
+
+interface Records {
+  maxAltitude: RecordEntry;
+  maxSpeed: RecordEntry;
+  heaviestRocket: HeaviestRocket;
+  longestFlight: LongestFlightEntry;
+  mostFlightsInRow: number;
+  recordsByBody: Record<string, BodyRecord>;
+}
+
+interface CrewCareer {
+  id: string;
+  name: string;
+  status: string;
+  flightsFlown: number;
+  skills: { piloting: number; engineering: number; science: number };
+  hiredDate: string;
+}
+
+interface FinancialSummary {
+  currentBalance: number;
+  loanBalance: number;
+  totalInterestPaid: number;
+  totalMissionRevenue: number;
+  totalContractRevenue: number;
+  reputation: number;
+}
+
+interface ExplorationProgress {
+  discoveredBodies: string[];
+  totalBodies: number;
+  biomesExplored: number;
+  totalBiomes: number;
+  surfaceItemCount: number;
+  bodiesLandedOn: string[];
+}
+
+interface BodyKnowledge {
+  id: string;
+  name: string;
+  surfaceGravity: number;
+  radius: number;
+  hasAtmosphere: boolean;
+  atmosphereTop: number;
+  landable: boolean;
+  biomeCount: number;
+  minOrbitAltitude: number;
+  orbitalDistance: number;
+  parentName: string;
+  timesVisited: number;
+  satellitesInOrbit: number;
+}
+
+interface RocketStats {
+  rocketId: string;
+  rocketName: string;
+  flightCount: number;
+  successCount: number;
+  failureCount: number;
+  totalRevenue: number;
+  lastFlown: string;
+  successRate: number;
+}
 
 // ---------------------------------------------------------------------------
 // Agency Statistics
@@ -18,26 +128,8 @@ import { ACHIEVEMENTS } from './achievements.js';
 
 /**
  * Compute overall agency statistics from the game state.
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {{
- *   totalFlights: number,
- *   successfulFlights: number,
- *   failedFlights: number,
- *   partialSuccesses: number,
- *   totalRevenue: number,
- *   totalFlightTime: number,
- *   currentPeriod: number,
- *   sciencePoints: number,
- *   achievementsEarned: number,
- *   totalAchievements: number,
- *   satellitesDeployed: number,
- *   activeCrew: number,
- *   totalCrewHired: number,
- *   crewLost: number,
- * }}
  */
-export function getAgencyStats(state) {
+export function getAgencyStats(state: GameState): AgencyStats {
   const history = state.flightHistory ?? [];
 
   let successfulFlights = 0;
@@ -66,9 +158,9 @@ export function getAgencyStats(state) {
     achievementsEarned: (state.achievements ?? []).length,
     totalAchievements: ACHIEVEMENTS.length,
     satellitesDeployed: (state.satelliteNetwork?.satellites ?? []).length,
-    activeCrew: crew.filter((c) => c.status !== CrewStatus.DEAD && c.status !== 'kia').length,
+    activeCrew: crew.filter((c) => (c.status as string) !== CrewStatus.DEAD && (c.status as string) !== 'kia').length,
     totalCrewHired: crew.length,
-    crewLost: crew.filter((c) => c.status === CrewStatus.DEAD || c.status === 'kia').length,
+    crewLost: crew.filter((c) => (c.status as string) === CrewStatus.DEAD || (c.status as string) === 'kia').length,
   };
 }
 
@@ -79,23 +171,13 @@ export function getAgencyStats(state) {
 /**
  * Compute record values (max altitude, max speed, heaviest rocket) from
  * flight history and rocket designs.
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {{
- *   maxAltitude: { value: number, flightId: string, rocketName: string },
- *   maxSpeed: { value: number, flightId: string, rocketName: string },
- *   heaviestRocket: { mass: number, name: string, id: string },
- *   longestFlight: { duration: number, flightId: string, rocketName: string },
- *   mostFlightsInRow: number,
- *   recordsByBody: Record<string, { maxAltitude: number, visited: boolean, orbited: boolean, landed: boolean }>,
- * }}
  */
-export function getRecords(state) {
+export function getRecords(state: GameState): Records {
   const history = state.flightHistory ?? [];
 
-  let maxAlt = { value: 0, flightId: '', rocketName: '' };
-  let maxSpd = { value: 0, flightId: '', rocketName: '' };
-  let longestFlt = { duration: 0, flightId: '', rocketName: '' };
+  let maxAlt: RecordEntry = { value: 0, flightId: '', rocketName: '' };
+  let maxSpd: RecordEntry = { value: 0, flightId: '', rocketName: '' };
+  let longestFlt: LongestFlightEntry = { duration: 0, flightId: '', rocketName: '' };
 
   for (const flight of history) {
     const alt = flight.maxAltitude ?? 0;
@@ -115,7 +197,7 @@ export function getRecords(state) {
   }
 
   // Heaviest rocket from saved designs.
-  let heaviest = { mass: 0, name: '', id: '' };
+  let heaviest: HeaviestRocket = { mass: 0, name: '', id: '' };
   for (const design of state.savedDesigns ?? []) {
     if ((design.totalMass ?? 0) > heaviest.mass) {
       heaviest = { mass: design.totalMass, name: design.name, id: design.id };
@@ -153,23 +235,13 @@ export function getRecords(state) {
 
 /**
  * Build crew career summaries for the Library.
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {Array<{
- *   id: string,
- *   name: string,
- *   status: string,
- *   flightsFlown: number,
- *   skills: { piloting: number, engineering: number, science: number },
- *   hiredDate: string,
- * }>}
  */
-export function getCrewCareers(state) {
+export function getCrewCareers(state: GameState): CrewCareer[] {
   const crew = state.crew ?? [];
   const history = state.flightHistory ?? [];
 
   // Count flights per crew member from flight history.
-  const flightCounts = new Map();
+  const flightCounts = new Map<string, number>();
   for (const flight of history) {
     for (const crewId of flight.crewIds ?? []) {
       flightCounts.set(crewId, (flightCounts.get(crewId) ?? 0) + 1);
@@ -192,18 +264,8 @@ export function getCrewCareers(state) {
 
 /**
  * Compute a financial summary from the game state.
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {{
- *   currentBalance: number,
- *   loanBalance: number,
- *   totalInterestPaid: number,
- *   totalMissionRevenue: number,
- *   totalContractRevenue: number,
- *   reputation: number,
- * }}
  */
-export function getFinancialSummary(state) {
+export function getFinancialSummary(state: GameState): FinancialSummary {
   const history = state.flightHistory ?? [];
   const totalMissionRevenue = history.reduce((sum, f) => sum + (f.revenue ?? 0), 0);
 
@@ -226,18 +288,8 @@ export function getFinancialSummary(state) {
 
 /**
  * Compute exploration progress — discovered bodies and biome coverage.
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {{
- *   discoveredBodies: string[],
- *   totalBodies: number,
- *   biomesExplored: number,
- *   totalBiomes: number,
- *   surfaceItemCount: number,
- *   bodiesLandedOn: string[],
- * }}
  */
-export function getExplorationProgress(state) {
+export function getExplorationProgress(state: GameState): ExplorationProgress {
   const discovered = _getDiscoveredBodies(state);
 
   // Count total biomes across all bodies.
@@ -248,13 +300,13 @@ export function getExplorationProgress(state) {
   }
 
   // Count explored biomes from science log.
-  const exploredBiomeIds = new Set();
+  const exploredBiomeIds = new Set<string>();
   for (const entry of state.scienceLog ?? []) {
     if (entry.biomeId) exploredBiomeIds.add(entry.biomeId);
   }
 
   // Bodies with surface landings.
-  const landedBodies = new Set();
+  const landedBodies = new Set<string>();
   for (const item of state.surfaceItems ?? []) {
     landedBodies.add(item.bodyId);
   }
@@ -276,30 +328,13 @@ export function getExplorationProgress(state) {
 /**
  * Return knowledge entries for discovered celestial bodies.
  * Includes physical properties useful for mission planning.
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {Array<{
- *   id: string,
- *   name: string,
- *   surfaceGravity: number,
- *   radius: number,
- *   hasAtmosphere: boolean,
- *   atmosphereTop: number,
- *   landable: boolean,
- *   biomeCount: number,
- *   minOrbitAltitude: number,
- *   orbitalDistance: number,
- *   parentName: string,
- *   timesVisited: number,
- *   satellitesInOrbit: number,
- * }>}
  */
-export function getCelestialBodyKnowledge(state) {
+export function getCelestialBodyKnowledge(state: GameState): BodyKnowledge[] {
   const discovered = _getDiscoveredBodies(state);
   const history = state.flightHistory ?? [];
 
   // Count visits per body from flight history.
-  const visitCounts = new Map();
+  const visitCounts = new Map<string, number>();
   for (const flight of history) {
     for (const bodyId of flight.bodiesVisited ?? []) {
       visitCounts.set(bodyId, (visitCounts.get(bodyId) ?? 0) + 1);
@@ -307,13 +342,13 @@ export function getCelestialBodyKnowledge(state) {
   }
 
   // Count satellites per body.
-  const satCounts = new Map();
+  const satCounts = new Map<string, number>();
   for (const sat of state.satelliteNetwork?.satellites ?? []) {
     satCounts.set(sat.bodyId, (satCounts.get(sat.bodyId) ?? 0) + 1);
   }
 
-  return discovered
-    .map((bodyId) => {
+  return [...discovered]
+    .map((bodyId: string) => {
       const body = getBodyDef(bodyId);
       if (!body) return null;
       const parent = body.parentId ? getBodyDef(body.parentId) : null;
@@ -331,9 +366,9 @@ export function getCelestialBodyKnowledge(state) {
         parentName: parent?.name ?? 'None',
         timesVisited: visitCounts.get(bodyId) ?? 0,
         satellitesInOrbit: satCounts.get(bodyId) ?? 0,
-      };
+      } as BodyKnowledge;
     })
-    .filter(Boolean);
+    .filter((entry): entry is BodyKnowledge => entry !== null);
 }
 
 // ---------------------------------------------------------------------------
@@ -342,24 +377,11 @@ export function getCelestialBodyKnowledge(state) {
 
 /**
  * Get the top 5 most frequently flown rocket configurations.
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {Array<{
- *   rocketId: string,
- *   rocketName: string,
- *   flightCount: number,
- *   successCount: number,
- *   failureCount: number,
- *   successRate: number,
- *   totalRevenue: number,
- *   lastFlown: string,
- * }>}
  */
-export function getFrequentRockets(state) {
+export function getFrequentRockets(state: GameState): RocketStats[] {
   const history = state.flightHistory ?? [];
 
-  /** @type {Map<string, { rocketId: string, rocketName: string, flightCount: number, successCount: number, failureCount: number, totalRevenue: number, lastFlown: string }>} */
-  const rocketStats = new Map();
+  const rocketStats = new Map<string, Omit<RocketStats, 'successRate'>>();
 
   for (const flight of history) {
     const rId = flight.rocketId;
@@ -413,12 +435,9 @@ export function getFrequentRockets(state) {
  * Determine which celestial bodies the player has "discovered" by examining
  * flight history, satellites, surface items, field craft, and achievements.
  * Earth is always discovered.
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {Set<string>}
  */
-function _getDiscoveredBodies(state) {
-  const bodies = new Set(['EARTH']);
+function _getDiscoveredBodies(state: GameState): Set<string> {
+  const bodies = new Set<string>(['EARTH']);
 
   // From flight history (bodiesVisited field, available on enriched records).
   for (const flight of state.flightHistory ?? []) {
@@ -459,12 +478,9 @@ function _getDiscoveredBodies(state) {
 
 /**
  * Compute per-body records from flight history, satellites, and surface items.
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {Record<string, { maxAltitude: number, visited: boolean, orbited: boolean, landed: boolean }>}
  */
-function _computeBodyRecords(state) {
-  const records = {};
+function _computeBodyRecords(state: GameState): Record<string, BodyRecord> {
+  const records: Record<string, BodyRecord> = {};
 
   for (const bodyId of ALL_BODY_IDS) {
     records[bodyId] = { maxAltitude: 0, visited: false, orbited: false, landed: false };

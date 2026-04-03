@@ -1,5 +1,5 @@
 /**
- * weather.js — Weather and launch conditions system.
+ * weather.ts — Weather and launch conditions system.
  *
  * Generates random weather per "day" visible from the hub before launching.
  * Weather conditions:
@@ -40,30 +40,22 @@ import { getBodyDef, hasAtmosphere } from '../data/bodies.js';
 import { getNetworkBenefits } from './satellites.js';
 import { spend } from './finance.js';
 import { getWeatherSeverityMultipliers } from './settings.js';
+import type { GameState, WeatherConditions, WeatherState } from './gameState.js';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-/**
- * Weather conditions for a single day at a launch site.
- * @typedef {Object} WeatherConditions
- * @property {number}  windSpeed      Wind speed in m/s (0–15, higher in extremes).
- * @property {number}  windAngle      Wind direction in radians (0 = east, π/2 = north).
- * @property {number}  temperature    ISP modifier as a multiplier (0.95–1.05).
- * @property {number}  visibility     Fog/haze level (0 = clear, 1 = dense fog).
- * @property {boolean} extreme        True if conditions are extreme (highly inadvisable).
- * @property {string}  description    Human-readable summary (e.g. "Clear skies", "Dust storm").
- * @property {string}  bodyId         Celestial body these conditions apply to.
- */
+interface SeverityMultipliers {
+  windMult?: number;
+  extremeChanceMult?: number;
+}
 
-/**
- * Weather state stored in the game state.
- * @typedef {Object} WeatherState
- * @property {WeatherConditions} current     Current day's weather.
- * @property {number}            skipCount   Consecutive skips this session (resets on launch).
- * @property {number}            seed        PRNG seed for reproducibility.
- */
+interface WeatherTier {
+  maxWind: number;
+  maxVis: number;
+  label: string;
+}
 
 // ---------------------------------------------------------------------------
 // Deterministic PRNG (simple mulberry32)
@@ -72,11 +64,8 @@ import { getWeatherSeverityMultipliers } from './settings.js';
 /**
  * Simple 32-bit PRNG (mulberry32).  Returns a function that produces
  * pseudo-random floats in [0, 1) on each call.
- *
- * @param {number} seed
- * @returns {() => number}
  */
-function _mulberry32(seed) {
+function _mulberry32(seed: number): () => number {
   let s = seed | 0;
   return () => {
     s = (s + 0x6d2b79f5) | 0;
@@ -92,35 +81,37 @@ function _mulberry32(seed) {
 
 /**
  * Weather descriptors per condition tier.
- * @type {Array<{ maxWind: number, maxVis: number, label: string }>}
  */
-const WEATHER_TIERS = [
-  { maxWind: 3,  maxVis: 0.1, label: 'Clear skies' },
+const WEATHER_TIERS: WeatherTier[] = [
+  { maxWind: 3,  maxVis: 0.1,  label: 'Clear skies' },
   { maxWind: 6,  maxVis: 0.25, label: 'Light breeze' },
-  { maxWind: 10, maxVis: 0.4, label: 'Moderate wind' },
-  { maxWind: 15, maxVis: 0.6, label: 'Strong wind' },
+  { maxWind: 10, maxVis: 0.4,  label: 'Moderate wind' },
+  { maxWind: 15, maxVis: 0.6,  label: 'Strong wind' },
 ];
 
 /**
  * Mars-specific weather descriptors.
  */
-const MARS_WEATHER_TIERS = [
+const MARS_WEATHER_TIERS: WeatherTier[] = [
   { maxWind: 5,  maxVis: 0.15, label: 'Calm, thin air' },
-  { maxWind: 10, maxVis: 0.3, label: 'Light dust haze' },
-  { maxWind: 20, maxVis: 0.5, label: 'Moderate dust' },
-  { maxWind: 30, maxVis: 0.7, label: 'Heavy dust' },
+  { maxWind: 10, maxVis: 0.3,  label: 'Light dust haze' },
+  { maxWind: 20, maxVis: 0.5,  label: 'Moderate dust' },
+  { maxWind: 30, maxVis: 0.7,  label: 'Heavy dust' },
 ];
 
 /**
  * Generate weather conditions for a specific body.
  *
- * @param {string} bodyId  Celestial body ID.
- * @param {number} seed    PRNG seed.
- * @param {{ windMult?: number, extremeChanceMult?: number }} [severityMults]
- *   Optional difficulty severity multipliers.  Defaults to 1.0 for both.
- * @returns {WeatherConditions}
+ * @param bodyId  Celestial body ID.
+ * @param seed    PRNG seed.
+ * @param severityMults  Optional difficulty severity multipliers.
+ * @returns WeatherConditions
  */
-export function generateWeather(bodyId, seed, severityMults) {
+export function generateWeather(
+  bodyId: string,
+  seed: number,
+  severityMults?: SeverityMultipliers,
+): WeatherConditions {
   const windMult = severityMults?.windMult ?? 1.0;
   const extremeChanceMult = severityMults?.extremeChanceMult ?? 1.0;
   const body = getBodyDef(bodyId);
@@ -156,7 +147,11 @@ export function generateWeather(bodyId, seed, severityMults) {
   // Determine if this is an extreme weather event (scaled by severity).
   const isExtreme = rand() < WEATHER_EXTREME_CHANCE * extremeChanceMult;
 
-  let windSpeed, windAngle, temperature, visibility, description;
+  let windSpeed: number;
+  let windAngle: number;
+  let temperature: number;
+  let visibility: number;
+  let description: string;
 
   if (bodyId === 'MARS') {
     // Mars: dust storms are the dominant weather pattern.
@@ -216,11 +211,8 @@ export function generateWeather(bodyId, seed, severityMults) {
 /**
  * Initialise or refresh the weather state on the game state.
  * Called when the player first enters the hub or after flight return.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {string} [bodyId='EARTH']  Body to generate weather for.
  */
-export function initWeather(state, bodyId = 'EARTH') {
+export function initWeather(state: GameState, bodyId: string = 'EARTH'): void {
   // Sandbox mode with weather disabled: always perfect conditions.
   if (state.gameMode === GameMode.SANDBOX && !state.sandboxSettings?.weatherEnabled) {
     state.weather = {
@@ -250,11 +242,8 @@ export function initWeather(state, bodyId = 'EARTH') {
 /**
  * Get the current weather conditions.  Returns a no-weather default
  * if weather state is not initialised.
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {WeatherConditions}
  */
-export function getCurrentWeather(state) {
+export function getCurrentWeather(state: GameState): WeatherConditions {
   if (state.weather?.current) return state.weather.current;
   return {
     windSpeed: 0,
@@ -273,10 +262,9 @@ export function getCurrentWeather(state) {
  * Base cost escalates with consecutive skips.
  * Weather satellites reduce the cost.
  *
- * @param {import('./gameState.js').GameState} state
- * @returns {number}  Cost in dollars.
+ * @returns Cost in dollars.
  */
-export function getWeatherSkipCost(state) {
+export function getWeatherSkipCost(state: GameState): number {
   // Sandbox mode: weather skip is always free.
   if (state.gameMode === GameMode.SANDBOX) return 0;
 
@@ -292,12 +280,11 @@ export function getWeatherSkipCost(state) {
 /**
  * Skip the current day's weather — pay a fee and reroll.
  * Does NOT advance the period counter.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {string} [bodyId='EARTH']
- * @returns {{ success: boolean, cost: number, newWeather: WeatherConditions|null }}
  */
-export function skipWeather(state, bodyId = 'EARTH') {
+export function skipWeather(
+  state: GameState,
+  bodyId: string = 'EARTH',
+): { success: boolean; cost: number; newWeather: WeatherConditions | null } {
   const cost = getWeatherSkipCost(state);
   if (!spend(state, cost)) {
     return { success: false, cost, newWeather: null };
@@ -320,19 +307,18 @@ export function skipWeather(state, bodyId = 'EARTH') {
 /**
  * Get a weather forecast (next few days) if the player has weather satellites.
  * Returns empty array if no forecast data is available.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {string} [bodyId='EARTH']
- * @param {number} [days=3]
- * @returns {WeatherConditions[]}
  */
-export function getWeatherForecast(state, bodyId = 'EARTH', days = 3) {
+export function getWeatherForecast(
+  state: GameState,
+  bodyId: string = 'EARTH',
+  days: number = 3,
+): WeatherConditions[] {
   const benefits = getNetworkBenefits(state);
   if (benefits.forecastAccuracy <= 0) return [];
 
   const baseSeed = state.weather?.seed ?? 0;
   const skipCount = state.weather?.skipCount ?? 0;
-  const forecast = [];
+  const forecast: WeatherConditions[] = [];
 
   const sevMults = getWeatherSeverityMultipliers(state);
   for (let i = 1; i <= days; i++) {
@@ -347,13 +333,12 @@ export function getWeatherForecast(state, bodyId = 'EARTH', days = 3) {
  * Compute the wind force components at a given altitude.
  * Wind decreases linearly with altitude and reaches zero at the atmosphere top.
  * Returns {windFX, windFY} in Newtons per unit mass (i.e., acceleration).
- *
- * @param {WeatherConditions} weather
- * @param {number} altitude   Current altitude in metres.
- * @param {string} bodyId     Celestial body ID.
- * @returns {{ windFX: number, windFY: number }}
  */
-export function getWindForce(weather, altitude, bodyId) {
+export function getWindForce(
+  weather: WeatherConditions,
+  altitude: number,
+  bodyId: string,
+): { windFX: number; windFY: number } {
   if (!weather || weather.windSpeed <= 0) return { windFX: 0, windFY: 0 };
 
   const body = getBodyDef(bodyId);
@@ -381,10 +366,9 @@ export function getWindForce(weather, altitude, bodyId) {
 /**
  * Get the ISP temperature modifier from current weather.
  *
- * @param {WeatherConditions} weather
- * @returns {number}  Multiplier to apply to ISP (e.g. 0.95 to 1.05).
+ * @returns Multiplier to apply to ISP (e.g. 0.95 to 1.05).
  */
-export function getIspModifier(weather) {
+export function getIspModifier(weather: WeatherConditions | null): number {
   if (!weather) return 1.0;
   return weather.temperature;
 }

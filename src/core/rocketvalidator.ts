@@ -1,5 +1,5 @@
 /**
- * rocketvalidator.js — Rocket Engineer validation checks.
+ * rocketvalidator.ts — Rocket Engineer validation checks.
  *
  * Pure core module: no DOM or canvas dependencies.
  * Call `runValidation()` after every assembly or staging change to get an
@@ -22,6 +22,9 @@ import { PartType, FacilityId, LAUNCH_PAD_MAX_MASS, VAB_MAX_PARTS, VAB_MAX_HEIGH
 import { TECH_NODES } from '../data/techtree.js';
 import { getFacilityTier } from './construction.js';
 
+import type { GameState } from './gameState.js';
+import type { RocketAssembly, StagingConfig } from './rocketbuilder.js';
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -31,39 +34,49 @@ const G = 9.81;
 
 /**
  * Format a mass value for human display.
- * @param {number} kg  Mass in kilograms.
- * @returns {string}  e.g. "18,000 kg" or "80,000 kg".
  */
-function _fmtMass(kg) {
+function _fmtMass(kg: number): string {
   if (!isFinite(kg)) return 'unlimited';
   return kg.toLocaleString('en-US', { maximumFractionDigits: 0 }) + ' kg';
 }
 
 // ---------------------------------------------------------------------------
-// Type Definitions (JSDoc)
+// Type Definitions
 // ---------------------------------------------------------------------------
 
 /**
  * One check's result within a ValidationResult.
- *
- * @typedef {Object} ValidationCheck
- * @property {string}  id        Unique check identifier (stable string key).
- * @property {string}  label     Short heading shown in the Rocket Engineer panel.
- * @property {boolean} pass      Whether this check passed.
- * @property {boolean} warn      If true, a failure is a warning and does NOT block launch.
- * @property {string}  message   Human-readable result message (1–2 sentences).
  */
+export interface ValidationCheck {
+  /** Unique check identifier (stable string key). */
+  id: string;
+  /** Short heading shown in the Rocket Engineer panel. */
+  label: string;
+  /** Whether this check passed. */
+  pass: boolean;
+  /** If true, a failure is a warning and does NOT block launch. */
+  warn: boolean;
+  /** Human-readable result message (1–2 sentences). */
+  message: string;
+}
 
 /**
- * Complete result returned by {@link runValidation}.
- *
- * @typedef {Object} ValidationResult
- * @property {ValidationCheck[]} checks        All performed checks in display order.
- * @property {boolean}           canLaunch     True when every blocking check passes.
- * @property {number}            totalMassKg   Wet mass of the rocket in kg (dry + fuel).
- * @property {number}            stage1Thrust  Sea-level thrust of Stage-1 engines (kN).
- * @property {number}            twr           Stage-1 thrust-to-weight ratio.
+ * Complete result returned by runValidation.
  */
+export interface ValidationResult {
+  /** All performed checks in display order. */
+  checks: ValidationCheck[];
+  /** True when every blocking check passes. */
+  canLaunch: boolean;
+  /** Wet mass of the rocket in kg (dry + fuel). */
+  totalMassKg: number;
+  /** Sea-level thrust of Stage-1 engines (kN). */
+  stage1Thrust: number;
+  /** Stage-1 thrust-to-weight ratio. */
+  twr: number;
+  /** Whether the assembly contains launch clamp parts. */
+  hasLaunchClamp: boolean;
+}
 
 // ---------------------------------------------------------------------------
 // Mass / thrust helpers (exported for display in the UI and for tests)
@@ -75,16 +88,13 @@ function _fmtMass(kg) {
  * For every placed part the wet mass is: `def.mass + (def.properties.fuelMass ?? 0)`.
  * Fuel tanks and SRBs carry `fuelMass` in their `properties` object; engines and
  * structural parts do not, so they contribute only their dry `mass`.
- *
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @returns {number}  Total wet mass in kg.
  */
-export function getTotalMass(assembly) {
+export function getTotalMass(assembly: RocketAssembly): number {
   let total = 0;
   for (const placed of assembly.parts.values()) {
     const def = getPartById(placed.partId);
     if (!def) continue;
-    total += def.mass + (def.properties?.fuelMass ?? 0);
+    total += def.mass + ((def.properties?.fuelMass as number) ?? 0);
   }
   return total;
 }
@@ -94,12 +104,8 @@ export function getTotalMass(assembly) {
  *
  * Only parts assigned to `stagingConfig.stages[0]` with
  * `activationBehaviour === ActivationBehaviour.IGNITE` contribute.
- *
- * @param {import('./rocketbuilder.js').RocketAssembly}  assembly
- * @param {import('./rocketbuilder.js').StagingConfig}   stagingConfig
- * @returns {number}  Total sea-level thrust in kN.
  */
-export function getStage1Thrust(assembly, stagingConfig) {
+export function getStage1Thrust(assembly: RocketAssembly, stagingConfig: StagingConfig): number {
   const stage1 = stagingConfig.stages[0];
   if (!stage1) return 0;
 
@@ -108,7 +114,7 @@ export function getStage1Thrust(assembly, stagingConfig) {
     const placed = assembly.parts.get(id);
     const def = placed ? getPartById(placed.partId) : null;
     if (!def || def.activationBehaviour !== ActivationBehaviour.IGNITE) continue;
-    total += def.properties?.thrust ?? 0;
+    total += (def.properties?.thrust as number) ?? 0;
   }
   return total;
 }
@@ -119,12 +125,8 @@ export function getStage1Thrust(assembly, stagingConfig) {
  * TWR = (stage1Thrust_kN × 1000) / (totalMass_kg × G)
  *
  * Returns 0 when totalMass is 0 (empty assembly).
- *
- * @param {import('./rocketbuilder.js').RocketAssembly}  assembly
- * @param {import('./rocketbuilder.js').StagingConfig}   stagingConfig
- * @returns {number}  Dimensionless TWR value.
  */
-export function calculateTWR(assembly, stagingConfig) {
+export function calculateTWR(assembly: RocketAssembly, stagingConfig: StagingConfig): number {
   const totalMass = getTotalMass(assembly);
   if (totalMass === 0) return 0;
   const thrust = getStage1Thrust(assembly, stagingConfig);
@@ -138,11 +140,11 @@ export function calculateTWR(assembly, stagingConfig) {
 /**
  * Calculate the axis-aligned bounding box of all placed parts in the assembly.
  *
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @returns {{ minX: number, maxX: number, minY: number, maxY: number } | null}
- *   Null when the assembly has no parts.
+ * Returns null when the assembly has no parts.
  */
-export function getRocketBounds(assembly) {
+export function getRocketBounds(
+  assembly: RocketAssembly,
+): { minX: number; maxX: number; minY: number; maxY: number } | null {
   if (!assembly || assembly.parts.size === 0) return null;
 
   let minX = Infinity, maxX = -Infinity;
@@ -173,13 +175,9 @@ export function getRocketBounds(assembly) {
  * Every connection edge `fromInstanceId ↔ toInstanceId` is stored in both
  * directions so the BFS can traverse the graph regardless of how the edge
  * was registered.
- *
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @returns {Map<string, Set<string>>}
  */
-function _buildAdjacency(assembly) {
-  /** @type {Map<string, Set<string>>} */
-  const adj = new Map();
+function _buildAdjacency(assembly: RocketAssembly): Map<string, Set<string>> {
+  const adj = new Map<string, Set<string>>();
 
   // Pre-populate every known node with an empty neighbour set.
   for (const id of assembly.parts.keys()) {
@@ -197,16 +195,14 @@ function _buildAdjacency(assembly) {
 /**
  * BFS from `startId` through `adjacency`.
  *
- * @param {string}                         startId
- * @param {Map<string, Set<string>>}       adjacency
- * @returns {Set<string>}  IDs of all reachable nodes (including startId).
+ * @returns IDs of all reachable nodes (including startId).
  */
-function _bfsReachable(startId, adjacency) {
+function _bfsReachable(startId: string, adjacency: Map<string, Set<string>>): Set<string> {
   const visited = new Set([startId]);
   const queue   = [startId];
 
   while (queue.length > 0) {
-    const current = /** @type {string} */ (queue.shift());
+    const current = queue.shift() as string;
     for (const neighbour of (adjacency.get(current) ?? [])) {
       if (!visited.has(neighbour)) {
         visited.add(neighbour);
@@ -224,25 +220,23 @@ function _bfsReachable(startId, adjacency) {
 
 /**
  * Run all validation checks against the current rocket assembly and staging
- * configuration, returning a {@link ValidationResult}.
+ * configuration, returning a ValidationResult.
  *
  * This function has no side-effects and may be called as frequently as needed
  * (e.g. after every part add/remove or staging change).
- *
- * @param {import('./rocketbuilder.js').RocketAssembly}  assembly
- * @param {import('./rocketbuilder.js').StagingConfig}   stagingConfig
- * @param {import('./gameState.js').GameState}            gameState
- * @returns {ValidationResult}
  */
-export function runValidation(assembly, stagingConfig, gameState) {
-  /** @type {ValidationCheck[]} */
-  const checks = [];
+export function runValidation(
+  assembly: RocketAssembly,
+  stagingConfig: StagingConfig,
+  gameState: GameState,
+): ValidationResult {
+  const checks: ValidationCheck[] = [];
 
   // ── Pre-scan assembly for part types ──────────────────────────────────────
   let hasCrewedModule   = false; // COMMAND_MODULE with seats > 0
   let hasComputerModule = false; // COMPUTER_MODULE
-  let commandModuleId   = null;  // First COMMAND_MODULE instance ID (root for connectivity)
-  let computerModuleId  = null;  // First COMPUTER_MODULE instance ID (fallback root)
+  let commandModuleId: string | null   = null;  // First COMMAND_MODULE instance ID (root for connectivity)
+  let computerModuleId: string | null  = null;  // First COMPUTER_MODULE instance ID (fallback root)
 
   for (const placed of assembly.parts.values()) {
     const def = getPartById(placed.partId);
@@ -278,8 +272,8 @@ export function runValidation(assembly, stagingConfig, gameState) {
   // ── CHECK 2: All parts connected to root (no floating parts) ─────────────
   const allIds     = new Set(assembly.parts.keys());
   const totalParts = allIds.size;
-  let check2Pass;
-  let check2Msg;
+  let check2Pass: boolean;
+  let check2Msg: string;
 
   if (totalParts === 0) {
     check2Pass = false;
@@ -339,7 +333,7 @@ export function runValidation(assembly, stagingConfig, gameState) {
   const twr          = calculateTWR(assembly, stagingConfig);
   const twrPass      = twr > 1.0;
 
-  let twrMsg;
+  let twrMsg: string;
   if (totalMassKg === 0) {
     twrMsg = 'Assembly is empty.';
   } else if (stage1Thrust === 0) {
@@ -363,7 +357,7 @@ export function runValidation(assembly, stagingConfig, gameState) {
   // This is informational only and does not block launch.
   if (hasCommandModule) {
     const hasAcceptedCrewedMission = gameState.missions.accepted.some(
-      (m) => (m.requirements?.minCrewCount ?? 0) > 0,
+      (m) => ((m as unknown as { requirements?: { minCrewCount?: number } }).requirements?.minCrewCount ?? 0) > 0,
     );
 
     if (hasAcceptedCrewedMission && onlyComputer) {
@@ -394,7 +388,7 @@ export function runValidation(assembly, stagingConfig, gameState) {
 
   // ── CHECK 5c: Launch clamps require Tier 3 launch pad ──────────────────
   let hasLaunchClamp = false;
-  const clampInstanceIds = [];
+  const clampInstanceIds: string[] = [];
   for (const placed of assembly.parts.values()) {
     const def = getPartById(placed.partId);
     if (def && def.type === PartType.LAUNCH_CLAMP) {
@@ -417,7 +411,7 @@ export function runValidation(assembly, stagingConfig, gameState) {
   // If clamps are present, at least one must be assigned to a stage so
   // the rocket can be released.
   if (hasLaunchClamp) {
-    const allStagedIds = new Set();
+    const allStagedIds = new Set<string>();
     for (const stage of stagingConfig.stages) {
       for (const id of stage.instanceIds) {
         allStagedIds.add(id);
@@ -481,7 +475,7 @@ export function runValidation(assembly, stagingConfig, gameState) {
   // ── CHECK 6: All parts unlocked via tech tree ────────────────────────────
   // Build a quick lookup: partId → tech node name.
   const unlockedParts = new Set(gameState.parts ?? []);
-  const lockedParts = [];
+  const lockedParts: Array<{ name: string; nodeName: string }> = [];
   for (const placed of assembly.parts.values()) {
     const partId = placed.partId;
     if (unlockedParts.has(partId)) continue;
@@ -518,11 +512,8 @@ export function runValidation(assembly, stagingConfig, gameState) {
 
 /**
  * Check whether a rocket assembly contains any launch clamp parts.
- *
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @returns {boolean}
  */
-export function hasLaunchClamps(assembly) {
+export function hasLaunchClamps(assembly: RocketAssembly): boolean {
   for (const placed of assembly.parts.values()) {
     const def = getPartById(placed.partId);
     if (def && def.type === PartType.LAUNCH_CLAMP) return true;

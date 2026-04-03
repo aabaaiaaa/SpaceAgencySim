@@ -1,5 +1,5 @@
 /**
- * rocketbuilder.js — Core rocket assembly logic for the VAB.
+ * rocketbuilder.ts — Core rocket assembly logic for the VAB.
  *
  * The rocket being built is represented as a directed graph:
  *   Nodes  — PlacedPart instances: unique instanceId + catalog partId + world position.
@@ -8,7 +8,7 @@
  * COORDINATE CONVENTIONS
  * ======================
  * World space: X = 0 is the rocket centreline, Y increases upward.
- * Snap-point offsets (from parts.js) use screen-style Y (positive = downward),
+ * Snap-point offsets (from parts.ts) use screen-style Y (positive = downward),
  * so the world Y of a snap socket is:  worldSnapY = partCentreY − offsetY
  *
  * This module has no DOM or canvas dependencies and can be unit-tested headlessly.
@@ -24,8 +24,7 @@ import { getInstrumentKey }                from './sciencemodule.js';
 /** Screen pixels within which a dragged socket "snaps" to a target socket. */
 export const SNAP_DISTANCE_PX = 30;
 
-/** @type {Readonly<Record<string, string>>} */
-const OPPOSITE_SIDE = Object.freeze({
+const OPPOSITE_SIDE: Readonly<Record<string, string>> = Object.freeze({
   top:    'bottom',
   bottom: 'top',
   left:   'right',
@@ -33,45 +32,122 @@ const OPPOSITE_SIDE = Object.freeze({
 });
 
 // ---------------------------------------------------------------------------
-// Type Definitions (JSDoc)
+// Type Definitions
 // ---------------------------------------------------------------------------
 
 /**
- * @typedef {Object} PlacedPart
- * @property {string} instanceId  Unique ID for this instance in the build session.
- * @property {string} partId      Part catalog ID referencing a PartDef.
- * @property {number} x           World X of part centre.
- * @property {number} y           World Y of part centre (Y-up world space).
+ * A placed part in the rocket assembly.
  */
+export interface PlacedPart {
+  /** Unique ID for this instance in the build session. */
+  instanceId: string;
+  /** Part catalog ID referencing a PartDef. */
+  partId: string;
+  /** World X of part centre. */
+  x: number;
+  /** World Y of part centre (Y-up world space). */
+  y: number;
+  /** Instrument IDs loaded in this part (science modules only). */
+  instruments?: string[];
+}
 
 /**
  * One edge in the rocket part graph.
- * @typedef {Object} PartConnection
- * @property {string} fromInstanceId
- * @property {number} fromSnapIndex   Index into the source part's snapPoints array.
- * @property {string} toInstanceId
- * @property {number} toSnapIndex     Index into the target part's snapPoints array.
  */
+export interface PartConnection {
+  fromInstanceId: string;
+  /** Index into the source part's snapPoints array. */
+  fromSnapIndex: number;
+  toInstanceId: string;
+  /** Index into the target part's snapPoints array. */
+  toSnapIndex: number;
+}
 
 /**
- * @typedef {Object} RocketAssembly
- * @property {Map<string, PlacedPart>} parts
- * @property {PartConnection[]}        connections
- * @property {number}                  _nextId       Internal ID counter.
- * @property {Array<[string, string]>} symmetryPairs Pairs of mirrored instance IDs.
+ * The full rocket assembly.
  */
+export interface RocketAssembly {
+  /** Instance ID → PlacedPart. */
+  parts: Map<string, PlacedPart>;
+  /** Array of connections between parts. */
+  connections: PartConnection[];
+  /** Internal ID counter for generating instanceIds. */
+  _nextId: number;
+  /** Pairs of mirrored instance IDs [id1, id2]. */
+  symmetryPairs: Array<[string, string]>;
+}
 
 /**
- * @typedef {Object} SnapCandidate
- * @property {string} targetInstanceId   Placed part the dragged part would attach to.
- * @property {number} targetSnapIndex    Socket index on the target part.
- * @property {number} dragSnapIndex      Socket index on the dragged part (complementary side).
- * @property {number} snapWorldX         World X the dragged part's centre would land at.
- * @property {number} snapWorldY         World Y the dragged part's centre would land at.
- * @property {number} targetSnapWorldX   World X of the target socket (for highlight rendering).
- * @property {number} targetSnapWorldY   World Y of the target socket (for highlight rendering).
- * @property {number} screenDist         Screen-pixel distance between the two sockets.
+ * A snap candidate for placing a part.
  */
+export interface SnapCandidate {
+  /** Placed part the dragged part would attach to. */
+  targetInstanceId: string;
+  /** Socket index on the target part. */
+  targetSnapIndex: number;
+  /** Socket index on the dragged part (complementary side). */
+  dragSnapIndex: number;
+  /** World X the dragged part's centre would land at. */
+  snapWorldX: number;
+  /** World Y the dragged part's centre would land at. */
+  snapWorldY: number;
+  /** World X of the target socket (for highlight rendering). */
+  targetSnapWorldX: number;
+  /** World Y of the target socket (for highlight rendering). */
+  targetSnapWorldY: number;
+  /** Screen-pixel distance between the two sockets. */
+  screenDist: number;
+}
+
+/**
+ * A mirror snap candidate.
+ */
+export interface MirrorCandidate {
+  /** Snap index on the parent for the mirror. */
+  mirrorTargetSnapIndex: number;
+  /** Snap index on the drag part for the mirror. */
+  mirrorDragSnapIndex: number;
+  /** World X where the mirror part centre lands. */
+  mirrorWorldX: number;
+  /** World Y where the mirror part centre lands. */
+  mirrorWorldY: number;
+}
+
+/**
+ * One stage in a staging configuration.
+ */
+export interface StageData {
+  /** Instance IDs of activatable parts assigned to this stage. */
+  instanceIds: string[];
+}
+
+/**
+ * Staging configuration for a rocket assembly.
+ *
+ * stages[0] = Stage 1 (fires first).
+ * stages[n-1] = Stage n (fires last).
+ * Visually, Stage 1 is at the bottom; higher stages are above it.
+ */
+export interface StagingConfig {
+  /** Ordered stage slots. Index 0 = Stage 1 (fires first). */
+  stages: StageData[];
+  /** Instance IDs of activatable parts not yet staged. */
+  unstaged: string[];
+  /** 0-based index of the next stage to fire (used in flight). */
+  currentStageIdx: number;
+}
+
+/**
+ * Result of firing a staging step.
+ */
+export interface StagingStepResult {
+  /** 0-based index of the stage that was just activated. */
+  firedStageIndex: number;
+  /** 0-based index of the next stage, or null when all stages spent. */
+  nextStageIndex: number | null;
+  /** Parts from the fired stage to activate in the physics sim. */
+  instanceIds: string[];
+}
 
 // ---------------------------------------------------------------------------
 // Assembly factory
@@ -79,9 +155,8 @@ const OPPOSITE_SIDE = Object.freeze({
 
 /**
  * Create an empty rocket assembly for a new build session.
- * @returns {RocketAssembly}
  */
-export function createRocketAssembly() {
+export function createRocketAssembly(): RocketAssembly {
   return {
     parts:         new Map(),
     connections:   [],
@@ -96,13 +171,14 @@ export function createRocketAssembly() {
 
 /**
  * Add a new part to the assembly at the given world position.
- * @param {RocketAssembly} assembly
- * @param {string} partId
- * @param {number} worldX
- * @param {number} worldY
- * @returns {string}  The new instanceId.
+ * @returns The new instanceId.
  */
-export function addPartToAssembly(assembly, partId, worldX, worldY) {
+export function addPartToAssembly(
+  assembly: RocketAssembly,
+  partId: string,
+  worldX: number,
+  worldY: number,
+): string {
   const instanceId = `inst-${assembly._nextId++}`;
   assembly.parts.set(instanceId, { instanceId, partId, x: worldX, y: worldY });
   return instanceId;
@@ -110,10 +186,11 @@ export function addPartToAssembly(assembly, partId, worldX, worldY) {
 
 /**
  * Remove a part from the assembly, severing all its connections.
- * @param {RocketAssembly} assembly
- * @param {string} instanceId
  */
-export function removePartFromAssembly(assembly, instanceId) {
+export function removePartFromAssembly(
+  assembly: RocketAssembly,
+  instanceId: string,
+): void {
   assembly.parts.delete(instanceId);
   _pruneConnections(assembly, instanceId);
   _pruneSymmetryPairs(assembly, instanceId);
@@ -122,12 +199,13 @@ export function removePartFromAssembly(assembly, instanceId) {
 /**
  * Update the world position of a placed part (called after re-dropping a
  * picked-up part at a new location).
- * @param {RocketAssembly} assembly
- * @param {string} instanceId
- * @param {number} worldX
- * @param {number} worldY
  */
-export function movePlacedPart(assembly, instanceId, worldX, worldY) {
+export function movePlacedPart(
+  assembly: RocketAssembly,
+  instanceId: string,
+  worldX: number,
+  worldY: number,
+): void {
   const p = assembly.parts.get(instanceId);
   if (p) { p.x = worldX; p.y = worldY; }
 }
@@ -135,26 +213,24 @@ export function movePlacedPart(assembly, instanceId, worldX, worldY) {
 /**
  * Sever all connections for a part instance (called when picking it up for
  * repositioning).
- * @param {RocketAssembly} assembly
- * @param {string} instanceId
  */
-export function disconnectPart(assembly, instanceId) {
+export function disconnectPart(
+  assembly: RocketAssembly,
+  instanceId: string,
+): void {
   _pruneConnections(assembly, instanceId);
 }
 
 /**
  * Register a snap connection between two parts.
- * @param {RocketAssembly} assembly
- * @param {string} fromInstanceId
- * @param {number} fromSnapIndex
- * @param {string} toInstanceId
- * @param {number} toSnapIndex
  */
 export function connectParts(
-  assembly,
-  fromInstanceId, fromSnapIndex,
-  toInstanceId,   toSnapIndex,
-) {
+  assembly: RocketAssembly,
+  fromInstanceId: string,
+  fromSnapIndex: number,
+  toInstanceId: string,
+  toSnapIndex: number,
+): void {
   assembly.connections.push({
     fromInstanceId, fromSnapIndex,
     toInstanceId,   toSnapIndex,
@@ -175,20 +251,19 @@ export function connectParts(
  *   3. The target socket is not already occupied by an existing connection.
  *   4. Screen-space distance between the two sockets ≤ SNAP_DISTANCE_PX.
  *
- * @param {RocketAssembly} assembly
- * @param {string}  dragPartId    Part catalog ID of the piece being dragged.
- * @param {number}  dragWorldX    Current world X of the dragged part's centre.
- * @param {number}  dragWorldY    Current world Y of the dragged part's centre.
- * @param {number}  zoom          Current camera zoom (world-unit → screen-pixel scale).
- * @returns {SnapCandidate[]}  Sorted nearest-first.
+ * @returns Sorted nearest-first.
  */
 export function findSnapCandidates(
-  assembly, dragPartId, dragWorldX, dragWorldY, zoom,
-) {
+  assembly: RocketAssembly,
+  dragPartId: string,
+  dragWorldX: number,
+  dragWorldY: number,
+  zoom: number,
+): SnapCandidate[] {
   const dragDef = getPartById(dragPartId);
   if (!dragDef || assembly.parts.size === 0) return [];
 
-  const results = [];
+  const results: SnapCandidate[] = [];
 
   for (const placed of assembly.parts.values()) {
     const placedDef = getPartById(placed.partId);
@@ -254,20 +329,20 @@ export function findSnapCandidates(
 // Private helpers
 // ---------------------------------------------------------------------------
 
-function _pruneConnections(assembly, instanceId) {
+function _pruneConnections(assembly: RocketAssembly, instanceId: string): void {
   assembly.connections = assembly.connections.filter(
     (c) => c.fromInstanceId !== instanceId && c.toInstanceId !== instanceId,
   );
 }
 
-function _pruneSymmetryPairs(assembly, instanceId) {
+function _pruneSymmetryPairs(assembly: RocketAssembly, instanceId: string): void {
   if (!assembly.symmetryPairs) return;
   assembly.symmetryPairs = assembly.symmetryPairs.filter(
     ([a, b]) => a !== instanceId && b !== instanceId,
   );
 }
 
-function _snapOccupied(assembly, instanceId, snapIndex) {
+function _snapOccupied(assembly: RocketAssembly, instanceId: string, snapIndex: number): boolean {
   return assembly.connections.some(
     (c) =>
       (c.fromInstanceId === instanceId && c.fromSnapIndex === snapIndex) ||
@@ -281,22 +356,23 @@ function _snapOccupied(assembly, instanceId, snapIndex) {
 
 /**
  * Record a symmetry (mirror) relationship between two placed parts.
- * @param {RocketAssembly} assembly
- * @param {string} id1
- * @param {string} id2
  */
-export function addSymmetryPair(assembly, id1, id2) {
+export function addSymmetryPair(
+  assembly: RocketAssembly,
+  id1: string,
+  id2: string,
+): void {
   if (!assembly.symmetryPairs) assembly.symmetryPairs = [];
   assembly.symmetryPairs.push([id1, id2]);
 }
 
 /**
  * Return the instance ID of the mirror partner of the given part, or null.
- * @param {RocketAssembly} assembly
- * @param {string} instanceId
- * @returns {string | null}
  */
-export function getMirrorPartId(assembly, instanceId) {
+export function getMirrorPartId(
+  assembly: RocketAssembly,
+  instanceId: string,
+): string | null {
   if (!assembly.symmetryPairs) return null;
   for (const [a, b] of assembly.symmetryPairs) {
     if (a === instanceId) return b;
@@ -310,14 +386,6 @@ export function getMirrorPartId(assembly, instanceId) {
 // ---------------------------------------------------------------------------
 
 /**
- * @typedef {Object} MirrorCandidate
- * @property {number} mirrorTargetSnapIndex  Snap index on the parent for the mirror.
- * @property {number} mirrorDragSnapIndex    Snap index on the drag part for the mirror.
- * @property {number} mirrorWorldX           World X where the mirror part centre lands.
- * @property {number} mirrorWorldY           World Y where the mirror part centre lands.
- */
-
-/**
  * Given a radial snap candidate, compute the mirror snap position on the
  * opposite side of the same parent part.
  *
@@ -327,13 +395,12 @@ export function getMirrorPartId(assembly, instanceId) {
  *     part type.
  *   - The opposite-side socket is already occupied.
  *   - The dragged part has no socket on the complementary side.
- *
- * @param {RocketAssembly} assembly
- * @param {SnapCandidate}  candidate   The primary snap candidate.
- * @param {string}         dragPartId  Part catalog ID being placed.
- * @returns {MirrorCandidate | null}
  */
-export function findMirrorCandidate(assembly, candidate, dragPartId) {
+export function findMirrorCandidate(
+  assembly: RocketAssembly,
+  candidate: SnapCandidate,
+  dragPartId: string,
+): MirrorCandidate | null {
   const parentPlaced = assembly.parts.get(candidate.targetInstanceId);
   if (!parentPlaced) return null;
 
@@ -389,29 +456,9 @@ export function findMirrorCandidate(assembly, candidate, dragPartId) {
 // ---------------------------------------------------------------------------
 
 /**
- * One stage in a staging configuration.
- * @typedef {Object} StageData
- * @property {string[]} instanceIds  Instance IDs of activatable parts assigned here.
- */
-
-/**
- * Staging configuration for a rocket assembly.
- *
- * stages[0] = Stage 1 (fires first).
- * stages[n-1] = Stage n (fires last).
- * Visually, Stage 1 is at the bottom; higher stages are above it.
- *
- * @typedef {Object} StagingConfig
- * @property {StageData[]} stages           Ordered stage slots. Index 0 = Stage 1.
- * @property {string[]}    unstaged         Instance IDs of activatable parts not yet staged.
- * @property {number}      currentStageIdx  0-based index of the next stage to fire (used in flight).
- */
-
-/**
  * Create a fresh staging configuration with one empty stage.
- * @returns {StagingConfig}
  */
-export function createStagingConfig() {
+export function createStagingConfig(): StagingConfig {
   return {
     stages:          [{ instanceIds: [] }],
     unstaged:        [],
@@ -426,11 +473,11 @@ export function createStagingConfig() {
  * - References to removed parts are pruned from all stage slots and `unstaged`.
  *
  * Call this after every {@link addPartToAssembly} or {@link removePartFromAssembly}.
- *
- * @param {RocketAssembly} assembly
- * @param {StagingConfig}  config
  */
-export function syncStagingWithAssembly(assembly, config) {
+export function syncStagingWithAssembly(
+  assembly: RocketAssembly,
+  config: StagingConfig,
+): void {
   const live = new Set(assembly.parts.keys());
 
   // Build the set of all valid IDs: live parts + instrument keys.
@@ -458,8 +505,8 @@ export function syncStagingWithAssembly(assembly, config) {
         // For science modules with instruments, register each instrument
         // as a separate stageable entity instead of the module itself.
         if (def.activationBehaviour === ActivationBehaviour.COLLECT_SCIENCE
-            && placed.instruments?.length) {
-          for (let i = 0; i < placed.instruments.length; i++) {
+            && placed!.instruments?.length) {
+          for (let i = 0; i < placed!.instruments!.length; i++) {
             const instrKey = getInstrumentKey(id, i);
             if (!tracked.has(instrKey)) config.unstaged.push(instrKey);
           }
@@ -493,10 +540,9 @@ export function syncStagingWithAssembly(assembly, config) {
 
 /**
  * Add a new empty stage at the top (highest number, fires last).
- * @param {StagingConfig} config
- * @returns {number}  1-based number of the new stage.
+ * @returns 1-based number of the new stage.
  */
-export function addStageToConfig(config) {
+export function addStageToConfig(config: StagingConfig): number {
   config.stages.push({ instanceIds: [] });
   return config.stages.length;
 }
@@ -505,11 +551,12 @@ export function addStageToConfig(config) {
  * Remove an empty stage by its 0-based array index.
  * Refuses if the stage contains parts or is the last remaining stage.
  *
- * @param {StagingConfig} config
- * @param {number}        stageIndex  0-based index (0 = Stage 1).
- * @returns {boolean}  True if removed; false otherwise.
+ * @returns True if removed; false otherwise.
  */
-export function removeStageFromConfig(config, stageIndex) {
+export function removeStageFromConfig(
+  config: StagingConfig,
+  stageIndex: number,
+): boolean {
   if (stageIndex < 0 || stageIndex >= config.stages.length) return false;
   if (config.stages.length <= 1)                              return false;
   if (config.stages[stageIndex].instanceIds.length > 0)      return false;
@@ -520,12 +567,13 @@ export function removeStageFromConfig(config, stageIndex) {
 
 /**
  * Move a part from the unstaged pool into a specific stage.
- * @param {StagingConfig} config
- * @param {string}        instanceId
- * @param {number}        stageIndex  0-based target stage.
- * @returns {boolean}  True if moved.
+ * @returns True if moved.
  */
-export function assignPartToStage(config, instanceId, stageIndex) {
+export function assignPartToStage(
+  config: StagingConfig,
+  instanceId: string,
+  stageIndex: number,
+): boolean {
   if (stageIndex < 0 || stageIndex >= config.stages.length) return false;
   const pos = config.unstaged.indexOf(instanceId);
   if (pos === -1) return false;
@@ -536,13 +584,13 @@ export function assignPartToStage(config, instanceId, stageIndex) {
 
 /**
  * Move a part from one stage to another.
- * @param {StagingConfig} config
- * @param {string}        instanceId
- * @param {number}        fromIndex
- * @param {number}        toIndex
- * @returns {boolean}
  */
-export function movePartBetweenStages(config, instanceId, fromIndex, toIndex) {
+export function movePartBetweenStages(
+  config: StagingConfig,
+  instanceId: string,
+  fromIndex: number,
+  toIndex: number,
+): boolean {
   if (fromIndex === toIndex)                               return false;
   if (fromIndex < 0 || fromIndex >= config.stages.length) return false;
   if (toIndex   < 0 || toIndex   >= config.stages.length) return false;
@@ -556,11 +604,11 @@ export function movePartBetweenStages(config, instanceId, fromIndex, toIndex) {
 
 /**
  * Return a staged part to the unstaged pool.
- * @param {StagingConfig} config
- * @param {string}        instanceId
- * @returns {boolean}
  */
-export function returnPartToUnstaged(config, instanceId) {
+export function returnPartToUnstaged(
+  config: StagingConfig,
+  instanceId: string,
+): boolean {
   for (const stage of config.stages) {
     const pos = stage.instanceIds.indexOf(instanceId);
     if (pos !== -1) {
@@ -581,12 +629,12 @@ export function returnPartToUnstaged(config, instanceId) {
  *
  * The part must already be in the `unstaged` pool (placed by
  * syncStagingWithAssembly) before calling this function.
- *
- * @param {RocketAssembly} assembly
- * @param {StagingConfig}  config
- * @param {string}         instanceId
  */
-export function autoStageNewPart(assembly, config, instanceId) {
+export function autoStageNewPart(
+  assembly: RocketAssembly,
+  config: StagingConfig,
+  instanceId: string,
+): void {
   const placed = assembly.parts.get(instanceId);
   if (!placed) return;
   const def = getPartById(placed.partId);
@@ -613,12 +661,13 @@ export function autoStageNewPart(assembly, config, instanceId) {
 /**
  * Reorder stages by moving a stage from one index to another.
  *
- * @param {StagingConfig} config
- * @param {number}        fromIndex  0-based source index.
- * @param {number}        toIndex    0-based destination index.
- * @returns {boolean}  True if the move was performed.
+ * @returns True if the move was performed.
  */
-export function moveStage(config, fromIndex, toIndex) {
+export function moveStage(
+  config: StagingConfig,
+  fromIndex: number,
+  toIndex: number,
+): boolean {
   if (fromIndex === toIndex) return false;
   if (fromIndex < 0 || fromIndex >= config.stages.length) return false;
   if (toIndex   < 0 || toIndex   >= config.stages.length) return false;
@@ -638,12 +687,13 @@ export function moveStage(config, fromIndex, toIndex) {
  * contain at least one part with IGNITE behaviour (an engine or SRB) or the
  * rocket will not lift off.
  *
- * @param {RocketAssembly} assembly
- * @param {StagingConfig}  config
- * @returns {string[]}  Warning strings, or an empty array when all clear.
+ * @returns Warning strings, or an empty array when all clear.
  */
-export function validateStagingConfig(assembly, config) {
-  const warnings = [];
+export function validateStagingConfig(
+  assembly: RocketAssembly,
+  config: StagingConfig,
+): string[] {
+  const warnings: string[] = [];
 
   // Only warn if there are activatable parts in the assembly.
   let hasActivatable = false;
@@ -672,20 +722,15 @@ export function validateStagingConfig(assembly, config) {
  * Advance to the next stage. Called by the flight system when the player
  * presses Spacebar.
  *
- * @param {StagingConfig} config
- * @returns {{
- *   firedStageIndex: number,
- *   nextStageIndex:  number | null,
- *   instanceIds:     string[]
- * }}
+ * Returns:
  *   `firedStageIndex` — 0-based index of the stage that was just activated.
  *   `nextStageIndex`  — 0-based index of the next stage, or null when all stages spent.
  *   `instanceIds`     — Parts from the fired stage to activate in the physics sim.
  */
-export function fireStagingStep(config) {
+export function fireStagingStep(config: StagingConfig): StagingStepResult {
   const firedStageIndex = config.currentStageIdx;
   const instanceIds     = [...(config.stages[firedStageIndex]?.instanceIds ?? [])];
-  const nextStageIndex  =
+  const nextStageIndex: number | null  =
     firedStageIndex + 1 < config.stages.length ? firedStageIndex + 1 : null;
   if (nextStageIndex !== null) {
     config.currentStageIdx = nextStageIndex;

@@ -115,7 +115,7 @@
 - **Verification**: `npm run typecheck` passes. `npm run test:unit` passes. All listed files are now `.ts`.
 
 ### TASK-019: Convert core layer to TypeScript (src/core/) — batch 2
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-018
 - **Description**: Convert remaining core JS files to TypeScript (~22 files): library.js, lifeSupport.js, malfunction.js, manoeuvre.js, mapView.js, missions.js, parachute.js, partInventory.js, period.js, power.js, reputation.js, rocketbuilder.js, rocketvalidator.js, satellites.js, saveload.js, sciencemodule.js, settings.js, staging.js, surfaceOps.js, techtree.js, testFlightBuilder.js, weather.js. See requirements Section 4.1.
 - **Verification**: `npm run typecheck` passes. `npm run test:unit` passes. No `.js` files remain in `src/core/`.

@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 31
-- **Completed**: 17
-- **Remaining**: 14
-- **Last Updated**: 2026-04-03T04:51:25.029Z
+- **Completed**: 18
+- **Remaining**: 13
+- **Last Updated**: 2026-04-03T05:15:16.592Z
 
 ## Iteration Log
 
@@ -160,4 +160,13 @@
 - **Exit Status**: success
 - **Tokens**: 8,870,888 total (1,137 in, 22,629 out, 350,195 cache-create, 8,496,927 cache-read)
 - **Cost**: $45.8629
+
+### Iteration 18 - 2026-04-03T04:51:27.232Z
+- **Task Attempted**: TASK-019
+- **Task Completed**: TASK-019
+- **Summary**: Completed Convert core layer to TypeScript (src/core/) — batch 2
+- **Duration**: 23m 49s
+- **Exit Status**: success
+- **Tokens**: 531,985 total (1,410 in, 7,420 out, 85,259 cache-create, 437,896 cache-read)
+- **Cost**: $12.1667
 

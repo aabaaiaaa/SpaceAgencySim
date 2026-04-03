@@ -1,5 +1,5 @@
 /**
- * power.js — Power generation, storage, and consumption system.
+ * power.ts — Power generation, storage, and consumption system.
  *
  * Models solar panel generation (position-dependent day/night), battery
  * charge/discharge, and power consumers (science instruments, comms,
@@ -39,6 +39,8 @@ import {
   SOLAR_IRRADIANCE_1AU,
 } from './constants.js';
 import { getPartById } from '../data/parts.js';
+import type { PowerState } from './gameState.js';
+import type { RocketAssembly } from './physics.js';
 
 // ---------------------------------------------------------------------------
 // Shadow / Sunlight
@@ -50,10 +52,10 @@ import { getPartById } from '../data/parts.js';
  * The sun direction rotates slowly to model the apparent shadow-cone motion.
  * This is a simplified 2D model — the angle increases linearly with time.
  *
- * @param {number} gameTimeSeconds  Cumulative game time (e.g. flightTimeSeconds).
- * @returns {number}  Sun angle in degrees [0, 360).
+ * @param gameTimeSeconds - Cumulative game time (e.g. flightTimeSeconds).
+ * @returns Sun angle in degrees [0, 360).
  */
-export function getSunAngle(gameTimeSeconds) {
+export function getSunAngle(gameTimeSeconds: number): number {
   return ((gameTimeSeconds * SUN_ROTATION_RATE) % 360 + 360) % 360;
 }
 
@@ -64,11 +66,11 @@ export function getSunAngle(gameTimeSeconds) {
  * Uses the geometric relation: shadowHalfAngle = arcsin(R_body / r_orbit).
  * Higher orbits have narrower shadow cones (less time in eclipse).
  *
- * @param {number} altitude  Altitude above the body surface (metres).
- * @param {string} bodyId    Celestial body identifier.
- * @returns {number}  Shadow half-angle in degrees.
+ * @param altitude - Altitude above the body surface (metres).
+ * @param bodyId - Celestial body identifier.
+ * @returns Shadow half-angle in degrees.
  */
-export function getShadowHalfAngle(altitude, bodyId) {
+export function getShadowHalfAngle(altitude: number, bodyId: string): number {
   const R = BODY_RADIUS[bodyId] ?? 6_371_000;
   const r = R + Math.max(0, altitude);
   if (r <= R) return 180; // on the surface, always in shadow on the dark side
@@ -83,12 +85,16 @@ export function getShadowHalfAngle(altitude, bodyId) {
  * A position is in shadow if its angular distance from the anti-sun point
  * is less than the shadow half-angle.
  *
- * @param {number} angularPositionDeg  Object's angular position (degrees, 0–360).
- * @param {number} sunAngleDeg         Sun direction angle (degrees, 0–360).
- * @param {number} shadowHalfAngleDeg  Shadow cone half-angle (degrees).
- * @returns {boolean}  True if the position is sunlit (NOT in shadow).
+ * @param angularPositionDeg - Object's angular position (degrees, 0–360).
+ * @param sunAngleDeg - Sun direction angle (degrees, 0–360).
+ * @param shadowHalfAngleDeg - Shadow cone half-angle (degrees).
+ * @returns True if the position is sunlit (NOT in shadow).
  */
-export function isSunlit(angularPositionDeg, sunAngleDeg, shadowHalfAngleDeg) {
+export function isSunlit(
+  angularPositionDeg: number,
+  sunAngleDeg: number,
+  shadowHalfAngleDeg: number,
+): boolean {
   // Anti-sun direction.
   const antiSun = (sunAngleDeg + 180) % 360;
   // Angular distance between the object and the anti-sun point.
@@ -103,11 +109,11 @@ export function isSunlit(angularPositionDeg, sunAngleDeg, shadowHalfAngleDeg) {
  * This is the fraction of angular positions that are NOT in shadow.
  * Used for period-based satellite power calculations.
  *
- * @param {number} altitude  Altitude above body surface (metres).
- * @param {string} bodyId    Celestial body identifier.
- * @returns {number}  Fraction of the orbit that is sunlit (0–1).
+ * @param altitude - Altitude above body surface (metres).
+ * @param bodyId - Celestial body identifier.
+ * @returns Fraction of the orbit that is sunlit (0–1).
  */
-export function getSunlitFraction(altitude, bodyId) {
+export function getSunlitFraction(altitude: number, bodyId: string): number {
   const halfAngle = getShadowHalfAngle(altitude, bodyId);
   // Sunlit fraction = 1 − (shadow arc / full circle).
   return Math.max(0, Math.min(1, 1 - halfAngle / 180));
@@ -124,11 +130,11 @@ export function getSunlitFraction(altitude, bodyId) {
  *
  * For bodies other than the Sun, returns the pre-defined per-body constant.
  *
- * @param {number} altitude  Altitude above body surface (metres).
- * @param {string} bodyId    Celestial body identifier.
- * @returns {number}  Irradiance scale factor (1.0 = Earth distance).
+ * @param altitude - Altitude above body surface (metres).
+ * @param bodyId - Celestial body identifier.
+ * @returns Irradiance scale factor (1.0 = Earth distance).
  */
-export function getSolarIrradianceScale(altitude, bodyId) {
+export function getSolarIrradianceScale(altitude: number, bodyId: string): number {
   if (bodyId === 'SUN') {
     const sunRadius = BODY_RADIUS.SUN;
     const dist = sunRadius + Math.max(0, altitude);
@@ -144,19 +150,6 @@ export function getSolarIrradianceScale(altitude, bodyId) {
 // ---------------------------------------------------------------------------
 
 /**
- * Power state tracked per physics tick on an active flight.
- *
- * @typedef {Object} PowerState
- * @property {number} batteryCapacity   Total battery capacity (Wh).
- * @property {number} batteryCharge     Current charge (Wh), 0 ≤ charge ≤ capacity.
- * @property {number} solarGeneration   Current solar power generation (W).
- * @property {number} powerDraw         Current total power draw (W).
- * @property {boolean} sunlit           Whether the craft is currently in sunlight.
- * @property {boolean} hasPower         Whether there is enough power for systems.
- * @property {number} solarPanelArea    Total solar panel area (m²).
- */
-
-/**
  * Initialise power state from a rocket assembly.
  *
  * Scans all active parts for:
@@ -164,11 +157,11 @@ export function getSolarIrradianceScale(altitude, bodyId) {
  *   - Batteries (standalone and built-in) → batteryCapacity
  *   - Command/probe modules with builtInBattery → batteryCapacity
  *
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @param {Set<string>} activeParts  Instance IDs of parts still attached.
- * @returns {PowerState}
+ * @param assembly - The rocket assembly.
+ * @param activeParts - Instance IDs of parts still attached.
+ * @returns Initial power state.
  */
-export function initPowerState(assembly, activeParts) {
+export function initPowerState(assembly: RocketAssembly, activeParts: Set<string>): PowerState {
   let batteryCapacity = 0;
   let solarPanelArea = 0;
 
@@ -177,16 +170,16 @@ export function initPowerState(assembly, activeParts) {
     const def = getPartById(placed.partId);
     if (!def) continue;
 
-    const props = def.properties || {};
+    const props: Record<string, unknown> = def.properties || {};
 
     // Solar panels contribute area.
     if (props.solarPanelArea) {
-      solarPanelArea += props.solarPanelArea;
+      solarPanelArea += props.solarPanelArea as number;
     }
 
     // Battery capacity: standalone batteries and built-in batteries.
     if (props.batteryCapacity) {
-      batteryCapacity += props.batteryCapacity;
+      batteryCapacity += props.batteryCapacity as number;
     }
   }
 
@@ -207,11 +200,15 @@ export function initPowerState(assembly, activeParts) {
  *
  * Preserves the current charge level, clamping it to the new capacity.
  *
- * @param {PowerState}     powerState
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @param {Set<string>}    activeParts
+ * @param powerState - The power state to update in-place.
+ * @param assembly - The rocket assembly.
+ * @param activeParts - Instance IDs of currently active parts.
  */
-export function recalcPowerState(powerState, assembly, activeParts) {
+export function recalcPowerState(
+  powerState: PowerState,
+  assembly: RocketAssembly,
+  activeParts: Set<string>,
+): void {
   let batteryCapacity = 0;
   let solarPanelArea = 0;
 
@@ -220,9 +217,9 @@ export function recalcPowerState(powerState, assembly, activeParts) {
     const def = getPartById(placed.partId);
     if (!def) continue;
 
-    const props = def.properties || {};
-    if (props.solarPanelArea) solarPanelArea += props.solarPanelArea;
-    if (props.batteryCapacity) batteryCapacity += props.batteryCapacity;
+    const props: Record<string, unknown> = def.properties || {};
+    if (props.solarPanelArea) solarPanelArea += props.solarPanelArea as number;
+    if (props.batteryCapacity) batteryCapacity += props.batteryCapacity as number;
   }
 
   powerState.batteryCapacity = batteryCapacity;
@@ -235,6 +232,27 @@ export function recalcPowerState(powerState, assembly, activeParts) {
 // Power Tick
 // ---------------------------------------------------------------------------
 
+interface TickPowerOpts {
+  /** Physics timestep (seconds). */
+  dt: number;
+  /** Current altitude (metres). */
+  altitude: number;
+  /** Celestial body. */
+  bodyId: string;
+  /** Cumulative game time. */
+  gameTimeSeconds: number;
+  /** Angular position for orbital sunlight check. */
+  angularPositionDeg?: number;
+  /** Whether the craft is in stable orbit. */
+  inOrbit?: boolean;
+  /** Whether science instruments are actively running. */
+  scienceRunning?: boolean;
+  /** Number of actively running instruments. */
+  activeScienceCount?: number;
+  /** Whether comms are active. */
+  commsActive?: boolean;
+}
+
 /**
  * Advance the power system by one physics timestep.
  *
@@ -243,20 +261,8 @@ export function recalcPowerState(powerState, assembly, activeParts) {
  * 3. Calculate total power draw from active consumers.
  * 4. Net = generation − draw.  Charge or discharge battery.
  * 5. Set hasPower flag; consumers check this to enable/disable.
- *
- * @param {PowerState}   powerState
- * @param {object}       opts
- * @param {number}       opts.dt                Physics timestep (seconds).
- * @param {number}       opts.altitude           Current altitude (metres).
- * @param {string}       opts.bodyId             Celestial body.
- * @param {number}       opts.gameTimeSeconds    Cumulative game time.
- * @param {number}       [opts.angularPositionDeg]  Angular position for orbital sunlight check.
- * @param {boolean}      [opts.inOrbit]          Whether the craft is in stable orbit.
- * @param {boolean}      [opts.scienceRunning]   Whether science instruments are actively running.
- * @param {number}       [opts.activeScienceCount]  Number of actively running instruments.
- * @param {boolean}      [opts.commsActive]      Whether comms are active.
  */
-export function tickPower(powerState, opts) {
+export function tickPower(powerState: PowerState, opts: TickPowerOpts): void {
   const {
     dt,
     altitude,
@@ -325,13 +331,18 @@ export function tickPower(powerState, opts) {
   );
 
   // --- Power availability ---
-  powerState.hasPower = powerState.batteryCharge > POWER_CRITICAL_THRESHOLD ||
-                        powerState.solarGeneration > draw;
+  powerState.hasPower =
+    powerState.batteryCharge > POWER_CRITICAL_THRESHOLD || powerState.solarGeneration > draw;
 }
 
 // ---------------------------------------------------------------------------
 // Satellite Power Helpers
 // ---------------------------------------------------------------------------
+
+export interface SatellitePowerInfo {
+  avgGeneration: number;
+  sunlitFraction: number;
+}
 
 /**
  * Compute average solar generation for a satellite at a given orbit.
@@ -339,12 +350,16 @@ export function tickPower(powerState, opts) {
  * Uses the sunlit fraction and irradiance at the body's distance from the sun.
  * Pre-made satellites with builtInPower are assumed to have adequate generation.
  *
- * @param {number} altitude   Orbit altitude (metres above surface).
- * @param {string} bodyId     Celestial body identifier.
- * @param {number} panelArea  Solar panel area (m²).  For builtInPower, use a default.
- * @returns {{ avgGeneration: number, sunlitFraction: number }}
+ * @param altitude - Orbit altitude (metres above surface).
+ * @param bodyId - Celestial body identifier.
+ * @param panelArea - Solar panel area (m²). For builtInPower, use a default.
+ * @returns Average generation (W) and sunlit fraction.
  */
-export function getSatellitePowerInfo(altitude, bodyId, panelArea = 2.0) {
+export function getSatellitePowerInfo(
+  altitude: number,
+  bodyId: string,
+  panelArea: number = 2.0,
+): SatellitePowerInfo {
   const fraction = bodyId === 'SUN' ? 1.0 : getSunlitFraction(altitude, bodyId);
   const irradianceScale = getSolarIrradianceScale(altitude, bodyId);
   const rawPower = panelArea * irradianceScale * SOLAR_IRRADIANCE_1AU * SOLAR_PANEL_EFFICIENCY;
@@ -361,18 +376,22 @@ export function getSatellitePowerInfo(altitude, bodyId, panelArea = 2.0) {
  * and batteries are sized for normal operation).  Custom satellites may
  * not have enough panels.
  *
- * @param {string}  partId    Part definition ID.
- * @param {number}  altitude  Orbit altitude (metres).
- * @param {string}  bodyId    Celestial body.
- * @returns {boolean}
+ * @param partId - Part definition ID.
+ * @param altitude - Orbit altitude (metres).
+ * @param bodyId - Celestial body.
+ * @returns True if average power meets draw requirements.
  */
-export function hasSufficientSatellitePower(partId, altitude, bodyId) {
+export function hasSufficientSatellitePower(
+  partId: string,
+  altitude: number,
+  bodyId: string,
+): boolean {
   const def = getPartById(partId);
   if (!def) return false;
   if (def.properties?.builtInPower) return true;
 
   // Custom satellite: check panel area vs draw.
-  const panelArea = def.properties?.solarPanelArea ?? 0;
+  const panelArea = (def.properties?.solarPanelArea as number | undefined) ?? 0;
   if (panelArea === 0) return false;
 
   const { avgGeneration } = getSatellitePowerInfo(altitude, bodyId, panelArea);

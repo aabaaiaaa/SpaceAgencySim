@@ -1,5 +1,5 @@
 /**
- * period.js — Period (flight) advancement and operating costs.
+ * period.ts — Period (flight) advancement and operating costs.
  *
  * A "period" equals one completed flight.  The period counter advances only
  * when the player finishes a flight and returns to the Space Agency hub.
@@ -25,31 +25,61 @@ import { processSurfaceOps } from './surfaceOps.js';
 import { processLifeSupport } from './lifeSupport.js';
 import { getFinancialMultipliers } from './settings.js';
 
+import type { GameState, CrewMember } from './gameState.js';
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-/**
- * @typedef {Object} PeriodSummary
- * @property {number} newPeriod        - The period number after advancement.
- * @property {number} crewSalaryCost   - Total crew salary charged this period.
- * @property {number} facilityUpkeep   - Facility upkeep charged this period.
- * @property {number} totalOperatingCost - Sum of all operating costs.
- * @property {number} activeCrewCount  - Number of active crew members charged.
- * @property {string[]} expiredMissionIds - IDs of missions that expired this period.
- * @property {string[]} expiredBoardContractIds - Board contract IDs that expired this period.
- * @property {string[]} expiredActiveContractIds - Active contract IDs that expired this period.
- * @property {number}   satelliteMaintenanceCost - Satellite auto-maintenance cost this period.
- * @property {number}   satelliteScienceEarned  - Passive science from Science satellites.
- * @property {number}   satelliteLeaseIncome    - Income from leased satellites this period.
- * @property {string[]} decommissionedSatellites - Satellite IDs that reached 0 health.
- * @property {string[]} healedCrewIds  - IDs of crew members whose injuries were cleared.
- * @property {number}   trainingCost  - Total crew training cost this period (0 — courses are paid upfront).
- * @property {Array<{id: string, name: string, skill: string, gain: number, completed: boolean}>} trainees - Training status; completed entries received their skill gain.
- * @property {Array<{craftId: string, craftName: string, suppliesRemaining: number, crewIds: string[]}>} lifeSupportWarnings - Field craft with critically low supplies.
- * @property {Array<{craftId: string, craftName: string, crewId: string, crewName: string}>} lifeSupportDeaths - Crew who died from life support exhaustion.
- * @property {boolean} bankrupt        - True if the player is bankrupt after this period.
- */
+/** Astronaut record as it actually appears in state at runtime (uses AstronautStatus values). */
+interface AstronautRecord extends Omit<CrewMember, 'status'> {
+  status: string;
+  salary: number;
+}
+
+export interface TraineeInfo {
+  id: string;
+  name: string;
+  skill: string;
+  gain: number;
+  completed: boolean;
+}
+
+export interface LifeSupportWarning {
+  craftId: string;
+  craftName: string;
+  suppliesRemaining: number;
+  crewIds: string[];
+}
+
+export interface LifeSupportDeath {
+  craftId: string;
+  craftName: string;
+  crewId: string;
+  crewName: string;
+}
+
+export interface PeriodSummary {
+  newPeriod: number;
+  crewSalaryCost: number;
+  facilityUpkeep: number;
+  totalOperatingCost: number;
+  activeCrewCount: number;
+  expiredMissionIds: string[];
+  expiredBoardContractIds: string[];
+  expiredActiveContractIds: string[];
+  satelliteMaintenanceCost: number;
+  satelliteScienceEarned: number;
+  satelliteLeaseIncome: number;
+  decommissionedSatellites: string[];
+  healedCrewIds: string[];
+  trainingCost: number;
+  trainees: TraineeInfo[];
+  surfaceScienceEarned: number;
+  lifeSupportWarnings: LifeSupportWarning[];
+  lifeSupportDeaths: LifeSupportDeath[];
+  bankrupt: boolean;
+}
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -66,17 +96,15 @@ import { getFinancialMultipliers } from './settings.js';
  *     These deductions are mandatory and can drive cash below zero.
  *   - Moves deadline-expired accepted missions to the EXPIRED state
  *     (infrastructure ready for TASK-008 contract system).
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {PeriodSummary}
  */
-export function advancePeriod(state) {
+export function advancePeriod(state: GameState): PeriodSummary {
   // ── 1. Increment the period counter ────────────────────────────────────
   state.currentPeriod = (state.currentPeriod ?? 0) + 1;
 
   // ── 2. Crew salaries (use per-astronaut salary, fallback to constant) ──
   const { costMult } = getFinancialMultipliers(state);
-  const activeCrew = state.crew.filter(
+  const crew = state.crew as unknown as AstronautRecord[];
+  const activeCrew = crew.filter(
     (c) => c.status === AstronautStatus.ACTIVE,
   );
   const crewSalaryCost = Math.round(activeCrew.reduce(
@@ -98,21 +126,22 @@ export function advancePeriod(state) {
   //    Missions store a `deadlinePeriod` (number) once the contract system
   //    (TASK-008) is implemented.  For now, check if the field exists and
   //    expire any missions whose deadline period has been reached.
-  const expiredMissionIds = [];
+  const expiredMissionIds: string[] = [];
   if (Array.isArray(state.missions.accepted)) {
     for (const mission of state.missions.accepted) {
+      const m = mission as unknown as { deadlinePeriod?: number; state?: string; id: string };
       if (
-        typeof mission.deadlinePeriod === 'number' &&
-        state.currentPeriod > mission.deadlinePeriod
+        typeof m.deadlinePeriod === 'number' &&
+        state.currentPeriod > m.deadlinePeriod
       ) {
-        mission.state = 'EXPIRED';
-        expiredMissionIds.push(mission.id);
+        m.state = 'EXPIRED';
+        expiredMissionIds.push(m.id);
       }
     }
     // Remove expired missions from the accepted list.
     if (expiredMissionIds.length > 0) {
       state.missions.accepted = state.missions.accepted.filter(
-        (m) => !expiredMissionIds.includes(m.id),
+        (m) => !expiredMissionIds.includes((m as unknown as { id: string }).id),
       );
     }
   }
@@ -122,20 +151,30 @@ export function advancePeriod(state) {
   const expiredActiveContractIds = expireActiveContracts(state);
 
   // ── 7. Satellite network — degradation, maintenance, passive science ─
-  const satResult = processSatelliteNetwork(state);
+  const satResult = processSatelliteNetwork(state) as {
+    maintenanceCost: number;
+    scienceEarned: number;
+    leaseIncome: number;
+    decommissioned: string[];
+  };
 
   // ── 8. Crew injury recovery — clear injuries whose period has elapsed ─
   const healedCrewIds = checkInjuryRecovery(state);
 
   // ── 9. Crew training — award XP and charge training costs (Tier 2+) ──
   const crewAdminTier = getFacilityTier(state, FacilityId.CREW_ADMIN);
-  const trainingResult = crewAdminTier >= 2 ? processTraining(state) : { trainingCost: 0, trainees: [] };
+  const trainingResult = crewAdminTier >= 2
+    ? processTraining(state)
+    : { trainingCost: 0, trainees: [] as TraineeInfo[] };
 
   // ── 10. Surface operations — passive science from deployed instruments ─
-  const surfaceResult = processSurfaceOps(state);
+  const surfaceResult = processSurfaceOps(state) as { scienceEarned: number };
 
   // ── 11. Life support — tick down supplies for crewed field vessels ─────
-  const lifeSupportResult = processLifeSupport(state);
+  const lifeSupportResult = processLifeSupport(state) as {
+    warnings: LifeSupportWarning[];
+    deaths: LifeSupportDeath[];
+  };
 
   // ── 12. Bankruptcy check ──────────────────────────────────────────────
   const bankrupt = isBankrupt(state);
@@ -155,7 +194,7 @@ export function advancePeriod(state) {
     decommissionedSatellites: satResult.decommissioned,
     healedCrewIds,
     trainingCost: trainingResult.trainingCost,
-    trainees: trainingResult.trainees,
+    trainees: trainingResult.trainees as TraineeInfo[],
     surfaceScienceEarned: surfaceResult.scienceEarned,
     lifeSupportWarnings: lifeSupportResult.warnings,
     lifeSupportDeaths: lifeSupportResult.deaths,

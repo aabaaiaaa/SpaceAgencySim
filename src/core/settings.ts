@@ -1,5 +1,5 @@
 /**
- * settings.js — Difficulty settings helpers.
+ * settings.ts — Difficulty settings helpers.
  *
  * Reads the `difficultySettings` object on game state and returns the
  * corresponding multipliers for each system.  All game systems that are
@@ -19,7 +19,12 @@ import {
   FinancialPressure,
   INJURY_DURATION_MULTIPLIERS,
   InjuryDuration,
+  DifficultySettings,
+  WeatherSeverityMultiplier,
+  FinancialPressureMultiplier,
 } from './constants.js';
+
+import type { GameState } from './gameState.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -28,11 +33,8 @@ import {
 /**
  * Returns the current difficulty settings, falling back to defaults
  * for any missing fields.
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {import('./gameState.js').DifficultySettings}
  */
-export function getDifficultySettings(state) {
+export function getDifficultySettings(state: GameState): DifficultySettings {
   const ds = state?.difficultySettings;
   if (!ds) return { ...DEFAULT_DIFFICULTY_SETTINGS };
   return {
@@ -50,11 +52,8 @@ export function getDifficultySettings(state) {
 /**
  * Returns the malfunction failure-chance multiplier for the current setting.
  * 0 = malfunctions disabled, 1 = normal, 2 = double chance.
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {number}
  */
-export function getMalfunctionMultiplier(state) {
+export function getMalfunctionMultiplier(state: GameState): number {
   const freq = getDifficultySettings(state).malfunctionFrequency;
   return MALFUNCTION_FREQUENCY_MULTIPLIERS[freq] ?? 1.0;
 }
@@ -65,11 +64,8 @@ export function getMalfunctionMultiplier(state) {
 
 /**
  * Returns the weather severity multipliers (wind and extreme chance).
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {{ windMult: number, extremeChanceMult: number }}
  */
-export function getWeatherSeverityMultipliers(state) {
+export function getWeatherSeverityMultipliers(state: GameState): WeatherSeverityMultiplier {
   const sev = getDifficultySettings(state).weatherSeverity;
   return WEATHER_SEVERITY_MULTIPLIERS[sev] ?? WEATHER_SEVERITY_MULTIPLIERS[WeatherSeverity.NORMAL];
 }
@@ -80,11 +76,8 @@ export function getWeatherSeverityMultipliers(state) {
 
 /**
  * Returns the financial pressure multipliers (reward and cost).
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {{ rewardMult: number, costMult: number }}
  */
-export function getFinancialMultipliers(state) {
+export function getFinancialMultipliers(state: GameState): FinancialPressureMultiplier {
   const fp = getDifficultySettings(state).financialPressure;
   return FINANCIAL_PRESSURE_MULTIPLIERS[fp] ?? FINANCIAL_PRESSURE_MULTIPLIERS[FinancialPressure.NORMAL];
 }
@@ -96,11 +89,8 @@ export function getFinancialMultipliers(state) {
 /**
  * Returns the injury duration multiplier.
  * 0.5 = half duration, 1 = normal, 2 = double.
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {number}
  */
-export function getInjuryDurationMultiplier(state) {
+export function getInjuryDurationMultiplier(state: GameState): number {
   const dur = getDifficultySettings(state).injuryDuration;
   return INJURY_DURATION_MULTIPLIERS[dur] ?? 1.0;
 }
@@ -111,11 +101,11 @@ export function getInjuryDurationMultiplier(state) {
 
 /**
  * Update one or more difficulty settings on the game state.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {Partial<import('./gameState.js').DifficultySettings>} changes
  */
-export function updateDifficultySettings(state, changes) {
+export function updateDifficultySettings(
+  state: GameState,
+  changes: Partial<DifficultySettings>,
+): void {
   if (!state.difficultySettings) {
     state.difficultySettings = { ...DEFAULT_DIFFICULTY_SETTINGS };
   }

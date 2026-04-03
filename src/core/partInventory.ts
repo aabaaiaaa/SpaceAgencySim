@@ -1,5 +1,5 @@
 /**
- * partInventory.js — Part wear and reusability system.
+ * partInventory.ts — Part wear and reusability system.
  *
  * Recovered parts go into `state.partInventory` with wear tracking.
  * Each flight adds wear based on stress:
@@ -28,6 +28,8 @@ import {
   SCRAP_VALUE_FRACTION,
 } from './constants.js';
 import { earn, spend } from './finance.js';
+import type { GameState, InventoryPart } from './gameState.js';
+import type { RocketAssembly, PhysicsState } from './physics.js';
 
 // ---------------------------------------------------------------------------
 // Wear calculation
@@ -36,10 +38,10 @@ import { earn, spend } from './finance.js';
 /**
  * Calculate the wear to add for a single flight based on part type.
  *
- * @param {string} partType  PartType enum value.
- * @returns {number}  Wear percentage points to add (0–100 scale).
+ * @param partType - PartType enum value.
+ * @returns Wear percentage points to add (0–100 scale).
  */
-export function getFlightWear(partType) {
+export function getFlightWear(partType: string): number {
   switch (partType) {
     case PartType.ENGINE:
       return WEAR_PER_FLIGHT_ENGINE;
@@ -53,11 +55,11 @@ export function getFlightWear(partType) {
 /**
  * Compute effective reliability for a part given its base reliability and wear.
  *
- * @param {number} baseReliability  Part catalog reliability (0–1).
- * @param {number} wear             Current wear level (0–100).
- * @returns {number}  Effective reliability (0–1).
+ * @param baseReliability - Part catalog reliability (0–1).
+ * @param wear - Current wear level (0–100).
+ * @returns Effective reliability (0–1).
  */
-export function getEffectiveReliability(baseReliability, wear) {
+export function getEffectiveReliability(baseReliability: number, wear: number): number {
   return baseReliability * (1 - (wear / 100) * WEAR_RELIABILITY_FACTOR);
 }
 
@@ -67,9 +69,8 @@ export function getEffectiveReliability(baseReliability, wear) {
 
 /**
  * Generate a unique inventory entry ID.
- * @returns {string}
  */
-function _generateId() {
+function _generateId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return `inv-${crypto.randomUUID()}`;
   }
@@ -79,17 +80,22 @@ function _generateId() {
 /**
  * Add a recovered part to the player's inventory.
  *
- * @param {import('./gameState.js').GameState} state
- * @param {string} partId        Catalog part ID.
- * @param {number} wear          Wear level (0–100).
- * @param {number} [flights=1]   Number of flights the part has been through.
- * @returns {import('./gameState.js').InventoryPart}  The created inventory entry.
+ * @param state - Game state.
+ * @param partId - Catalog part ID.
+ * @param wear - Wear level (0–100).
+ * @param flights - Number of flights the part has been through.
+ * @returns The created inventory entry.
  */
-export function addToInventory(state, partId, wear, flights = 1) {
+export function addToInventory(
+  state: GameState,
+  partId: string,
+  wear: number,
+  flights: number = 1,
+): InventoryPart {
   if (!Array.isArray(state.partInventory)) {
     state.partInventory = [];
   }
-  const entry = {
+  const entry: InventoryPart = {
     id: _generateId(),
     partId,
     wear: Math.min(100, Math.max(0, wear)),
@@ -102,11 +108,11 @@ export function addToInventory(state, partId, wear, flights = 1) {
 /**
  * Remove an inventory entry by its unique ID.
  *
- * @param {import('./gameState.js').GameState} state
- * @param {string} inventoryId
- * @returns {import('./gameState.js').InventoryPart | null}  The removed entry, or null.
+ * @param state - Game state.
+ * @param inventoryId - Unique ID of the inventory entry.
+ * @returns The removed entry, or null.
  */
-export function removeFromInventory(state, inventoryId) {
+export function removeFromInventory(state: GameState, inventoryId: string): InventoryPart | null {
   if (!Array.isArray(state.partInventory)) return null;
   const idx = state.partInventory.findIndex((e) => e.id === inventoryId);
   if (idx < 0) return null;
@@ -115,12 +121,8 @@ export function removeFromInventory(state, inventoryId) {
 
 /**
  * Get the count of inventory parts for a specific catalog part ID.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {string} partId
- * @returns {number}
  */
-export function getInventoryCount(state, partId) {
+export function getInventoryCount(state: GameState, partId: string): number {
   if (!Array.isArray(state.partInventory)) return 0;
   return state.partInventory.filter((e) => e.partId === partId).length;
 }
@@ -128,26 +130,24 @@ export function getInventoryCount(state, partId) {
 /**
  * Get all inventory entries for a specific catalog part ID, sorted by wear
  * (lowest wear first — best condition first).
- *
- * @param {import('./gameState.js').GameState} state
- * @param {string} partId
- * @returns {import('./gameState.js').InventoryPart[]}
  */
-export function getInventoryForPart(state, partId) {
+export function getInventoryForPart(state: GameState, partId: string): InventoryPart[] {
   if (!Array.isArray(state.partInventory)) return [];
   return state.partInventory
     .filter((e) => e.partId === partId)
     .sort((a, b) => a.wear - b.wear);
 }
 
+export interface RefurbishResult {
+  success: boolean;
+  cost?: number;
+  entry?: InventoryPart;
+}
+
 /**
  * Refurbish an inventory part: pay 30 % of base cost, reset wear to 10 %.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {string} inventoryId
- * @returns {{ success: boolean, cost?: number, entry?: import('./gameState.js').InventoryPart }}
  */
-export function refurbishPart(state, inventoryId) {
+export function refurbishPart(state: GameState, inventoryId: string): RefurbishResult {
   if (!Array.isArray(state.partInventory)) return { success: false };
   const entry = state.partInventory.find((e) => e.id === inventoryId);
   if (!entry) return { success: false };
@@ -162,14 +162,15 @@ export function refurbishPart(state, inventoryId) {
   return { success: true, cost, entry };
 }
 
+export interface ScrapResult {
+  success: boolean;
+  value?: number;
+}
+
 /**
  * Scrap an inventory part: remove it and earn 15 % of base cost.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {string} inventoryId
- * @returns {{ success: boolean, value?: number }}
  */
-export function scrapPart(state, inventoryId) {
+export function scrapPart(state: GameState, inventoryId: string): ScrapResult {
   const entry = removeFromInventory(state, inventoryId);
   if (!entry) return { success: false };
 
@@ -184,32 +185,36 @@ export function scrapPart(state, inventoryId) {
 /**
  * Use (consume) the best-condition inventory part of the given catalog ID.
  * Returns the entry that was removed, or null if none available.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {string} partId
- * @returns {import('./gameState.js').InventoryPart | null}
  */
-export function useInventoryPart(state, partId) {
+export function useInventoryPart(state: GameState, partId: string): InventoryPart | null {
   const available = getInventoryForPart(state, partId);
   if (available.length === 0) return null;
   // Use the lowest-wear part first.
   return removeFromInventory(state, available[0].id);
 }
 
+export interface RecoverPartsResult {
+  partsRecovered: number;
+  entries: InventoryPart[];
+}
+
 /**
  * Recover parts from a completed flight into inventory.
  * Called from flightReturn.js when the rocket lands safely.
  *
- * @param {import('./gameState.js').GameState}                     state
- * @param {import('./rocketbuilder.js').RocketAssembly}            assembly
- * @param {import('./physics.js').PhysicsState}                    ps
- * @param {Map<string, import('./gameState.js').InventoryPart>|null} usedInventoryParts
- *   Map of instanceId → InventoryPart for parts that came from inventory
- *   (so we accumulate wear on top of their existing wear).
- * @returns {{ partsRecovered: number, entries: import('./gameState.js').InventoryPart[] }}
+ * @param state - Game state.
+ * @param assembly - The rocket assembly.
+ * @param ps - Physics state for active part filtering.
+ * @param usedInventoryParts - Map of instanceId → InventoryPart for parts that came from
+ *   inventory (so we accumulate wear on top of their existing wear).
  */
-export function recoverPartsToInventory(state, assembly, ps, usedInventoryParts) {
-  const entries = [];
+export function recoverPartsToInventory(
+  state: GameState,
+  assembly: RocketAssembly,
+  ps: PhysicsState,
+  usedInventoryParts: Map<string, InventoryPart> | null,
+): RecoverPartsResult {
+  const entries: InventoryPart[] = [];
   let partsRecovered = 0;
 
   for (const [instanceId, placed] of assembly.parts) {

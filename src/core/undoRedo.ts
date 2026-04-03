@@ -1,5 +1,5 @@
 /**
- * undoRedo.js — Delta-based undo/redo stack for the VAB.
+ * undoRedo.ts — Delta-based undo/redo stack for the VAB.
  *
  * Each action records a forward operation and its inverse. Undo applies the
  * inverse; redo re-applies the forward operation.
@@ -7,44 +7,41 @@
  * Stack depth is capped at MAX_DEPTH to bound memory usage.
  */
 
-/** @typedef {'place' | 'delete' | 'move' | 'staging' | 'clearAll'} ActionType */
+export type ActionType = 'place' | 'delete' | 'move' | 'staging' | 'clearAll';
 
-/**
- * @typedef {Object} UndoAction
- * @property {ActionType} type
- * @property {string} label  — Human-readable description (e.g. "Place Fuel Tank")
- * @property {() => void} undo  — Applies the inverse operation
- * @property {() => void} redo  — Re-applies the forward operation
- */
+export interface UndoAction {
+  type: ActionType;
+  /** Human-readable description (e.g. "Place Fuel Tank"). */
+  label: string;
+  /** Applies the inverse operation. */
+  undo: () => void;
+  /** Re-applies the forward operation. */
+  redo: () => void;
+}
 
 const MAX_DEPTH = 50;
 
-/** @type {UndoAction[]} */
-let _undoStack = [];
+let _undoStack: UndoAction[] = [];
 
-/** @type {UndoAction[]} */
-let _redoStack = [];
+let _redoStack: UndoAction[] = [];
 
-/** @type {(() => void) | null} */
-let _onChangeCallback = null;
+let _onChangeCallback: (() => void) | null = null;
 
 /**
  * Register a callback invoked whenever the stack changes (push/undo/redo/clear).
- * @param {() => void} cb
  */
-export function setUndoRedoChangeCallback(cb) {
+export function setUndoRedoChangeCallback(cb: () => void): void {
   _onChangeCallback = cb;
 }
 
-function _notifyChange() {
+function _notifyChange(): void {
   if (_onChangeCallback) _onChangeCallback();
 }
 
 /**
  * Push a new action onto the undo stack. Clears the redo stack.
- * @param {UndoAction} action
  */
-export function pushUndoAction(action) {
+export function pushUndoAction(action: UndoAction): void {
   _undoStack.push(action);
   if (_undoStack.length > MAX_DEPTH) {
     _undoStack.shift();
@@ -55,9 +52,8 @@ export function pushUndoAction(action) {
 
 /**
  * Undo the last action. Returns the action that was undone, or null.
- * @returns {UndoAction | null}
  */
-export function undo() {
+export function undo(): UndoAction | null {
   const action = _undoStack.pop();
   if (!action) return null;
   action.undo();
@@ -68,9 +64,8 @@ export function undo() {
 
 /**
  * Redo the last undone action. Returns the action that was redone, or null.
- * @returns {UndoAction | null}
  */
-export function redo() {
+export function redo(): UndoAction | null {
   const action = _redoStack.pop();
   if (!action) return null;
   action.redo();
@@ -85,45 +80,39 @@ export function redo() {
 /**
  * Clear both undo and redo stacks.
  */
-export function clearUndoRedo() {
+export function clearUndoRedo(): void {
   _undoStack.length = 0;
   _redoStack.length = 0;
   _notifyChange();
 }
 
-/** @returns {boolean} */
-export function canUndo() {
+export function canUndo(): boolean {
   return _undoStack.length > 0;
 }
 
-/** @returns {boolean} */
-export function canRedo() {
+export function canRedo(): boolean {
   return _redoStack.length > 0;
 }
 
-/** @returns {number} */
-export function undoStackSize() {
+export function undoStackSize(): number {
   return _undoStack.length;
 }
 
-/** @returns {number} */
-export function redoStackSize() {
+export function redoStackSize(): number {
   return _redoStack.length;
 }
 
 /**
  * Return the label of the next undo action, or null.
- * @returns {string | null}
  */
-export function peekUndoLabel() {
+export function peekUndoLabel(): string | null {
   return _undoStack.length > 0 ? _undoStack[_undoStack.length - 1].label : null;
 }
 
 /**
  * Return the label of the next redo action, or null.
- * @returns {string | null}
  */
-export function peekRedoLabel() {
+export function peekRedoLabel(): string | null {
   return _redoStack.length > 0 ? _redoStack[_redoStack.length - 1].label : null;
 }
 

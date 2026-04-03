@@ -1,5 +1,5 @@
 /**
- * malfunction.js — Part reliability and malfunction system.
+ * malfunction.ts — Part reliability and malfunction system.
  *
  * Each part has a reliability rating (0.0–1.0).  On biome transitions (with a
  * small random offset for unpredictability), every active part is checked.  If
@@ -45,6 +45,35 @@ import {
   MAX_ENGINEERING_MALFUNCTION_REDUCTION,
 } from './constants.js';
 import { getMalfunctionMultiplier } from './settings.js';
+import type { GameState, FlightState } from './gameState.js';
+import type { PhysicsState, RocketAssembly } from './physics.js';
+import type { PartDef } from '../data/parts.js';
+
+// ---------------------------------------------------------------------------
+// Local types
+// ---------------------------------------------------------------------------
+
+interface MalfunctionEntry {
+  type: string;
+  recovered: boolean;
+}
+
+interface InventoryPartEntry {
+  wear: number;
+  [key: string]: unknown;
+}
+
+// Extend PhysicsState with the malfunction-specific fields that are not
+// in the exported interface (set dynamically at runtime).
+type PhysicsStateWithMalfunctions = PhysicsState & {
+  malfunctions?: Map<string, MalfunctionEntry>;
+  malfunctionChecked?: Set<string>;
+  _lastBiomeForMalfunction?: string | null;
+  _malfunctionCheckPending?: boolean;
+  _malfunctionCheckTimer?: number;
+  _usedInventoryParts?: Map<string, InventoryPartEntry>;
+  _gameState?: GameState;
+};
 
 // ---------------------------------------------------------------------------
 // Recovery tips (shown in context menu)
@@ -53,9 +82,8 @@ import { getMalfunctionMultiplier } from './settings.js';
 /**
  * Human-readable recovery tips for each malfunction type.
  * Shown in the context menu when a malfunction is active.
- * @type {Readonly<Record<string, string>>}
  */
-export const MALFUNCTION_RECOVERY_TIPS = Object.freeze({
+export const MALFUNCTION_RECOVERY_TIPS: Readonly<Record<string, string>> = Object.freeze({
   [MalfunctionType.ENGINE_FLAMEOUT]:
     'Engine has flamed out. Try reignition via the context menu.',
   [MalfunctionType.ENGINE_REDUCED_THRUST]:
@@ -76,17 +104,16 @@ export const MALFUNCTION_RECOVERY_TIPS = Object.freeze({
 
 /**
  * Human-readable short labels for malfunction types.
- * @type {Readonly<Record<string, string>>}
  */
-export const MALFUNCTION_LABELS = Object.freeze({
-  [MalfunctionType.ENGINE_FLAMEOUT]:           'FLAMEOUT',
-  [MalfunctionType.ENGINE_REDUCED_THRUST]:     'REDUCED THRUST',
-  [MalfunctionType.FUEL_TANK_LEAK]:            'FUEL LEAK',
-  [MalfunctionType.DECOUPLER_STUCK]:           'STUCK',
-  [MalfunctionType.PARACHUTE_PARTIAL]:         'PARTIAL DEPLOY',
-  [MalfunctionType.SRB_EARLY_BURNOUT]:         'EARLY BURNOUT',
-  [MalfunctionType.SCIENCE_INSTRUMENT_FAILURE]:'INSTR. FAILURE',
-  [MalfunctionType.LANDING_LEGS_STUCK]:        'STUCK',
+export const MALFUNCTION_LABELS: Readonly<Record<string, string>> = Object.freeze({
+  [MalfunctionType.ENGINE_FLAMEOUT]:            'FLAMEOUT',
+  [MalfunctionType.ENGINE_REDUCED_THRUST]:      'REDUCED THRUST',
+  [MalfunctionType.FUEL_TANK_LEAK]:             'FUEL LEAK',
+  [MalfunctionType.DECOUPLER_STUCK]:            'STUCK',
+  [MalfunctionType.PARACHUTE_PARTIAL]:          'PARTIAL DEPLOY',
+  [MalfunctionType.SRB_EARLY_BURNOUT]:          'EARLY BURNOUT',
+  [MalfunctionType.SCIENCE_INSTRUMENT_FAILURE]: 'INSTR. FAILURE',
+  [MalfunctionType.LANDING_LEGS_STUCK]:         'STUCK',
 });
 
 // ---------------------------------------------------------------------------
@@ -95,19 +122,15 @@ export const MALFUNCTION_LABELS = Object.freeze({
 
 /**
  * Set the malfunction mode on the game state.
- * @param {import('./gameState.js').GameState} gameState
- * @param {string} mode  MalfunctionMode value ('normal', 'off', 'forced').
  */
-export function setMalfunctionMode(gameState, mode) {
+export function setMalfunctionMode(gameState: GameState, mode: string): void {
   gameState.malfunctionMode = mode;
 }
 
 /**
  * Get the current malfunction mode from the game state.
- * @param {import('./gameState.js').GameState} gameState
- * @returns {string}
  */
-export function getMalfunctionMode(gameState) {
+export function getMalfunctionMode(gameState: GameState): string {
   return gameState.malfunctionMode ?? MalfunctionMode.NORMAL;
 }
 
@@ -118,11 +141,11 @@ export function getMalfunctionMode(gameState) {
 /**
  * Initialise malfunction tracking state on the PhysicsState.
  * Called once at launch from createPhysicsState.
- *
- * @param {import('./physics.js').PhysicsState}            ps
- * @param {import('./rocketbuilder.js').RocketAssembly}   assembly
  */
-export function initMalfunctionState(ps, assembly) {
+export function initMalfunctionState(
+  ps: PhysicsStateWithMalfunctions,
+  _assembly: RocketAssembly,
+): void {
   // Map<instanceId, { type: MalfunctionType, recovered: boolean }>
   ps.malfunctions = new Map();
   // Set of instanceIds that have already been checked (no re-roll).
@@ -140,32 +163,27 @@ export function initMalfunctionState(ps, assembly) {
 
 /**
  * Check if a part currently has an active (non-recovered) malfunction.
- * @param {object} ps  PhysicsState.
- * @param {string} instanceId
- * @returns {boolean}
  */
-export function hasMalfunction(ps, instanceId) {
+export function hasMalfunction(ps: PhysicsStateWithMalfunctions, instanceId: string): boolean {
   const entry = ps.malfunctions?.get(instanceId);
   return entry != null && !entry.recovered;
 }
 
 /**
  * Get the malfunction entry for a part, or null.
- * @param {object} ps
- * @param {string} instanceId
- * @returns {{ type: string, recovered: boolean } | null}
  */
-export function getMalfunction(ps, instanceId) {
+export function getMalfunction(
+  ps: PhysicsStateWithMalfunctions,
+  instanceId: string,
+): { type: string; recovered: boolean } | null {
   return ps.malfunctions?.get(instanceId) ?? null;
 }
 
 /**
  * Return the effective reliability for a part definition.
  * Falls back to 1.0 (never malfunctions) if no reliability field.
- * @param {import('../data/parts.js').PartDef} def
- * @returns {number}
  */
-export function getPartReliability(def) {
+export function getPartReliability(def: PartDef): number {
   return def.reliability ?? 1.0;
 }
 
@@ -184,20 +202,20 @@ export function getPartReliability(def) {
  *
  * A random roll is compared against the part's reliability, adjusted
  * by crew engineering skill.
- *
- * @param {object} ps          PhysicsState
- * @param {object} assembly    RocketAssembly
- * @param {object} flightState FlightState
- * @param {object} [gameState] GameState (for crew skill lookup); optional.
  */
-export function checkMalfunctions(ps, assembly, flightState, gameState) {
+export function checkMalfunctions(
+  ps: PhysicsStateWithMalfunctions,
+  assembly: RocketAssembly,
+  flightState: FlightState,
+  gameState?: GameState,
+): void {
   const mode = gameState?.malfunctionMode ?? MalfunctionMode.NORMAL;
   if (mode === MalfunctionMode.OFF) return;
   // Sandbox mode with malfunctions disabled: skip all checks.
   if (gameState?.gameMode === GameMode.SANDBOX &&
       !gameState.sandboxSettings?.malfunctionsEnabled) return;
   // Difficulty setting: malfunctions off.
-  const malfunctionMult = getMalfunctionMultiplier(gameState);
+  const malfunctionMult = gameState ? getMalfunctionMultiplier(gameState) : 1;
   if (malfunctionMult <= 0) return;
   if (!ps.malfunctions) return;
 
@@ -206,7 +224,7 @@ export function checkMalfunctions(ps, assembly, flightState, gameState) {
 
   for (const instanceId of ps.activeParts) {
     // Skip parts already checked or already malfunctioning.
-    if (ps.malfunctionChecked.has(instanceId)) continue;
+    if (ps.malfunctionChecked?.has(instanceId)) continue;
     if (ps.malfunctions.has(instanceId)) continue;
 
     const placed = assembly.parts.get(instanceId);
@@ -215,11 +233,11 @@ export function checkMalfunctions(ps, assembly, flightState, gameState) {
     if (!def) continue;
 
     // Only parts with applicable malfunction types can malfunction.
-    const applicableTypes = MALFUNCTION_TYPE_MAP[def.type];
+    const applicableTypes = (MALFUNCTION_TYPE_MAP as Record<string, readonly string[]>)[def.type];
     if (!applicableTypes || applicableTypes.length === 0) continue;
 
     // Mark as checked so it won't be re-rolled on the next biome transition.
-    ps.malfunctionChecked.add(instanceId);
+    ps.malfunctionChecked?.add(instanceId);
 
     // Reliability check — account for part wear from inventory reuse.
     let baseReliability = getPartReliability(def);
@@ -254,12 +272,12 @@ export function checkMalfunctions(ps, assembly, flightState, gameState) {
 /**
  * Advance continuous malfunction effects by one timestep.
  * Currently handles FUEL_TANK_LEAK draining.
- *
- * @param {object} ps        PhysicsState
- * @param {object} assembly  RocketAssembly
- * @param {number} dt        Timestep in seconds.
  */
-export function tickMalfunctions(ps, assembly, dt) {
+export function tickMalfunctions(
+  ps: PhysicsStateWithMalfunctions,
+  _assembly: RocketAssembly,
+  dt: number,
+): void {
   if (!ps.malfunctions) return;
 
   for (const [instanceId, entry] of ps.malfunctions) {
@@ -292,13 +310,12 @@ export function tickMalfunctions(ps, assembly, dt) {
  *   SRB_EARLY_BURNOUT          → no recovery possible
  *   SCIENCE_INSTRUMENT_FAILURE → reboot (40 % success)
  *   LANDING_LEGS_STUCK         → manual deploy (70 % success)
- *
- * @param {object} ps            PhysicsState
- * @param {string} instanceId
- * @param {import('./gameState.js').GameState} [gameState]  GameState (for mode lookup); optional.
- * @returns {{ success: boolean, message: string }}
  */
-export function attemptRecovery(ps, instanceId, gameState) {
+export function attemptRecovery(
+  ps: PhysicsStateWithMalfunctions,
+  instanceId: string,
+  gameState?: GameState,
+): { success: boolean; message: string } {
   const entry = ps.malfunctions?.get(instanceId);
   if (!entry || entry.recovered) {
     return { success: false, message: 'No active malfunction.' };
@@ -363,26 +380,28 @@ export function attemptRecovery(ps, instanceId, gameState) {
 /**
  * Apply a specific malfunction to a part, modifying physics state and
  * emitting a flight event.
- *
- * @param {object} ps
- * @param {object} assembly
- * @param {object} flightState
- * @param {string} instanceId
- * @param {object} def          Part definition.
- * @param {string} type         MalfunctionType value.
  */
-function _applyMalfunction(ps, assembly, flightState, instanceId, def, type) {
-  ps.malfunctions.set(instanceId, { type, recovered: false });
+function _applyMalfunction(
+  ps: PhysicsStateWithMalfunctions,
+  _assembly: RocketAssembly,
+  flightState: FlightState,
+  instanceId: string,
+  def: PartDef,
+  type: string,
+): void {
+  ps.malfunctions!.set(instanceId, { type, recovered: false });
 
   // Emit flight event.
   if (flightState?.events) {
-    flightState.events.push({
-      type:        'PART_MALFUNCTION',
-      time:        flightState.timeElapsed,
+    // Cast to any: extra fields (instanceId, partName, malfunctionType) are
+    // not in the FlightEvent interface but are consumed by the render layer.
+    (flightState.events as any[]).push({
+      type:           'PART_MALFUNCTION',
+      time:           flightState.timeElapsed,
       instanceId,
-      partName:    def.name,
+      partName:       def.name,
       malfunctionType: type,
-      description: `${def.name}: ${MALFUNCTION_LABELS[type] ?? type}`,
+      description:    `${def.name}: ${MALFUNCTION_LABELS[type] ?? type}`,
     });
   }
 
@@ -436,16 +455,17 @@ function _applyMalfunction(ps, assembly, flightState, instanceId, def, type) {
  * Engineering skill 100 → 30 % reduction; skill 0 → 0 % reduction.
  * Uncrewed flights get no bonus.
  *
- * @param {object} flightState
- * @param {object} [gameState]
- * @returns {number}  Reduction fraction (0.0 – 0.30).
+ * @returns Reduction fraction (0.0 – 0.30).
  */
-function _getCrewEngineeringReduction(flightState, gameState) {
+function _getCrewEngineeringReduction(
+  flightState: FlightState,
+  gameState?: GameState,
+): number {
   if (!gameState || !flightState?.crewIds?.length) return 0;
 
   let maxEngineering = 0;
   for (const crewId of flightState.crewIds) {
-    const member = gameState.crew?.find(c => c.id === crewId);
+    const member = gameState.crew?.find((c) => c.id === crewId);
     if (member?.skills?.engineering != null) {
       maxEngineering = Math.max(maxEngineering, member.skills.engineering);
     }

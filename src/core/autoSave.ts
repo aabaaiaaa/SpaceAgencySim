@@ -1,5 +1,5 @@
 /**
- * autoSave.js — Auto-save system.
+ * autoSave.ts — Auto-save system.
  *
  * Saves to a dedicated auto-save slot (separate from the 5 manual save slots)
  * whenever a flight ends or the player returns to the hub. The save is preceded
@@ -9,6 +9,8 @@
  */
 
 import { idbSet, idbDelete, isIdbAvailable } from './idbStorage.js';
+
+import type { GameState } from './gameState.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -24,21 +26,20 @@ const SAVE_VERSION = 1;
 // Session time (mirrors saveload.js pattern)
 // ---------------------------------------------------------------------------
 
-let _sessionStartTime = Date.now();
+let _sessionStartTime: number = Date.now();
 
-function getSessionSeconds() {
+function getSessionSeconds(): number {
   return (Date.now() - _sessionStartTime) / 1000;
 }
 
-function resetSessionTimer() {
+function resetSessionTimer(): void {
   _sessionStartTime = Date.now();
 }
 
 /**
  * Exported ONLY for unit testing — do not call from game logic.
- * @param {number} ts
  */
-export function _setSessionStartTimeForTesting(ts) {
+export function _setSessionStartTimeForTesting(ts: number): void {
   _sessionStartTime = ts;
 }
 
@@ -48,11 +49,8 @@ export function _setSessionStartTimeForTesting(ts) {
 
 /**
  * Returns true if auto-save is enabled on the given game state.
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {boolean}
  */
-export function isAutoSaveEnabled(state) {
+export function isAutoSaveEnabled(state: GameState | null | undefined): boolean {
   if (!state) return false;
   return state.autoSaveEnabled !== false;
 }
@@ -63,11 +61,10 @@ export function isAutoSaveEnabled(state) {
  * Accumulates session play time, serialises the state, and writes to
  * localStorage (with IndexedDB mirror). If localStorage throws
  * QuotaExceededError, falls back to IndexedDB only.
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {{ success: boolean, error?: string }}
  */
-export function performAutoSave(state) {
+export function performAutoSave(
+  state: GameState | null | undefined,
+): { success: boolean; error?: string } {
   if (!state) return { success: false, error: 'No state provided' };
 
   // Accumulate elapsed session time.
@@ -85,8 +82,9 @@ export function performAutoSave(state) {
 
   try {
     localStorage.setItem(AUTO_SAVE_KEY, json);
-  } catch (err) {
-    if (err?.name === 'QuotaExceededError') {
+  } catch (err: unknown) {
+    const error = err as { name?: string; message?: string };
+    if (error?.name === 'QuotaExceededError') {
       // Attempt IndexedDB as fallback.
       if (isIdbAvailable()) {
         idbSet(AUTO_SAVE_KEY, json).catch(() => {});
@@ -94,7 +92,7 @@ export function performAutoSave(state) {
       }
       return { success: false, error: 'Storage full' };
     }
-    return { success: false, error: err?.message ?? 'Unknown error' };
+    return { success: false, error: error?.message ?? 'Unknown error' };
   }
 
   // Mirror to IndexedDB (fire-and-forget).
@@ -107,17 +105,15 @@ export function performAutoSave(state) {
 
 /**
  * Checks whether an auto-save exists in localStorage.
- *
- * @returns {boolean}
  */
-export function hasAutoSave() {
+export function hasAutoSave(): boolean {
   return localStorage.getItem(AUTO_SAVE_KEY) !== null;
 }
 
 /**
  * Deletes the auto-save from localStorage and IndexedDB.
  */
-export function deleteAutoSave() {
+export function deleteAutoSave(): void {
   localStorage.removeItem(AUTO_SAVE_KEY);
   if (isIdbAvailable()) {
     idbDelete(AUTO_SAVE_KEY).catch(() => {});

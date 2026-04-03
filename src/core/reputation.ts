@@ -1,5 +1,5 @@
 /**
- * reputation.js — Agency reputation system.
+ * reputation.ts — Agency reputation system.
  *
  * Reputation is a score from 0 to 100 that affects:
  *   - Contract quality (tier-based filtering handled by contracts.js)
@@ -28,27 +28,27 @@ import {
   getReputationTier,
 } from './constants.js';
 
+import type { GameState } from './gameState.js';
+
 // ---------------------------------------------------------------------------
 // Core helpers
 // ---------------------------------------------------------------------------
 
 /**
  * Clamp reputation to [0, 100].
- * @param {number} rep
- * @returns {number}
  */
-function clampRep(rep) {
+function clampRep(rep: number): number {
   return Math.max(0, Math.min(100, rep));
 }
 
 /**
  * Adjust the agency reputation by `delta` and clamp to [0, 100].
  *
- * @param {import('./gameState.js').GameState} state
- * @param {number} delta  Amount to add (positive) or subtract (negative).
- * @returns {number}  The new reputation value after clamping.
+ * @param state
+ * @param delta  Amount to add (positive) or subtract (negative).
+ * @returns The new reputation value after clamping.
  */
-export function adjustReputation(state, delta) {
+export function adjustReputation(state: GameState, delta: number): number {
   state.reputation = clampRep((state.reputation ?? STARTING_REPUTATION) + delta);
   return state.reputation;
 }
@@ -62,11 +62,11 @@ export function adjustReputation(state, delta) {
  *
  * −10 reputation per crew member killed.
  *
- * @param {import('./gameState.js').GameState} state
- * @param {number} kiaCount  Number of crew members killed.
- * @returns {number}  Total reputation change (negative).
+ * @param state
+ * @param kiaCount  Number of crew members killed.
+ * @returns Total reputation change (negative).
  */
-export function applyCrewDeathReputation(state, kiaCount) {
+export function applyCrewDeathReputation(state: GameState, kiaCount: number): number {
   if (kiaCount <= 0) return 0;
   const delta = -REP_LOSS_CREW_DEATH * kiaCount;
   adjustReputation(state, delta);
@@ -78,11 +78,14 @@ export function applyCrewDeathReputation(state, kiaCount) {
  *
  * +1 reputation per surviving crew member on a safe landing.
  *
- * @param {import('./gameState.js').GameState} state
- * @param {number} survivingCrewCount  Number of crew safely returned.
- * @returns {number}  Total reputation change (positive).
+ * @param state
+ * @param survivingCrewCount  Number of crew safely returned.
+ * @returns Total reputation change (positive).
  */
-export function applySafeCrewReturnReputation(state, survivingCrewCount) {
+export function applySafeCrewReturnReputation(
+  state: GameState,
+  survivingCrewCount: number,
+): number {
   if (survivingCrewCount <= 0) return 0;
   const delta = REP_GAIN_SAFE_CREW_RETURN * survivingCrewCount;
   adjustReputation(state, delta);
@@ -95,10 +98,9 @@ export function applySafeCrewReturnReputation(state, survivingCrewCount) {
  *
  * −3 reputation.
  *
- * @param {import('./gameState.js').GameState} state
- * @returns {number}  Reputation change (−3).
+ * @returns Reputation change (−3).
  */
-export function applyMissionFailureReputation(state) {
+export function applyMissionFailureReputation(state: GameState): number {
   const delta = -REP_LOSS_MISSION_FAILURE;
   adjustReputation(state, delta);
   return delta;
@@ -109,10 +111,9 @@ export function applyMissionFailureReputation(state) {
  *
  * −2 reputation.
  *
- * @param {import('./gameState.js').GameState} state
- * @returns {number}  Reputation change (−2).
+ * @returns Reputation change (−2).
  */
-export function applyRocketDestructionReputation(state) {
+export function applyRocketDestructionReputation(state: GameState): number {
   const delta = -REP_LOSS_ROCKET_DESTRUCTION;
   adjustReputation(state, delta);
   return delta;
@@ -123,10 +124,9 @@ export function applyRocketDestructionReputation(state) {
  *
  * +10 reputation.
  *
- * @param {import('./gameState.js').GameState} state
- * @returns {number}  Reputation change (+10).
+ * @returns Reputation change (+10).
  */
-export function applyMilestoneReputation(state) {
+export function applyMilestoneReputation(state: GameState): number {
   const delta = REP_GAIN_MILESTONE;
   adjustReputation(state, delta);
   return delta;

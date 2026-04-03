@@ -1,5 +1,5 @@
 /**
- * staging.js — Flight staging and stage separation logic.
+ * staging.ts — Flight staging and stage separation logic.
  *
  * This module is the authoritative implementation of the in-flight staging
  * sequence.  It handles activating each part in a stage, creating DebrisState
@@ -26,15 +26,6 @@
  *   The player has no control over debris — no steering, no throttle, no
  *   further staging.
  *
- *   Each debris fragment maintains its own position, velocity, and angle,
- *   all inherited from the parent rocket at the moment of separation.
- *
- * GRAPH RECOMPUTATION
- *   After a decoupler fires, `recomputeActiveGraph` performs a BFS from every
- *   COMMAND_MODULE and COMPUTER_MODULE still in `ps.activeParts`.  Any part
- *   not reachable from a command module is moved out of `ps.activeParts` into
- *   a new DebrisState returned by the function.
- *
  * PUBLIC API
  *   activateCurrentStage(ps, assembly, stagingConfig, flightState) → DebrisState[]
  *   recomputeActiveGraph(ps, assembly)                             → DebrisState[]
@@ -54,6 +45,9 @@ import { activateScienceModule, activateInstrument, parseInstrumentKey } from '.
 import { applySeparationImpulse } from './collision.js';
 import { hasMalfunction, getMalfunction } from './malfunction.js';
 import { MalfunctionType } from './constants.js';
+
+import type { PhysicsState, RocketAssembly, PlacedPart } from './physics.js';
+import type { FlightState } from './gameState.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -79,8 +73,23 @@ const SEPARATION_COOLDOWN_TICKS = 10;
 let _debrisNextId = 1;
 
 // ---------------------------------------------------------------------------
-// Type Definitions (JSDoc)
+// Type Definitions
 // ---------------------------------------------------------------------------
+
+/** Per-parachute lifecycle entry (mirrored from physics.ts). */
+interface ParachuteEntry {
+  state: string;
+  deployTimer: number;
+  canopyAngle: number;
+  canopyAngularVel: number;
+  stowTimer?: number;
+}
+
+/** Per-landing-leg lifecycle entry (mirrored from physics.ts). */
+interface LegEntry {
+  state: string;
+  deployTimer: number;
+}
 
 /**
  * A jettisoned rocket fragment that continues to be simulated physically
@@ -89,55 +98,69 @@ let _debrisNextId = 1;
  * control over debris — there is no steering, throttle, or further staging.
  *
  * The property names deliberately mirror those of PhysicsState so that helper
- * functions such as {@link tickFuelSystem} can operate on a DebrisState
+ * functions such as tickFuelSystem can operate on a DebrisState
  * without modification.
- *
- * @typedef {Object} DebrisState
- * @property {string}              id            Unique fragment identifier
- *   (e.g. 'debris-1').
- * @property {Set<string>}         activeParts   Instance IDs of parts
- *   currently belonging to this fragment.
- * @property {Set<string>}         firingEngines Instance IDs of engines /
- *   SRBs that were burning at the moment of separation and are still active.
- * @property {Map<string,number>}  fuelStore     Remaining propellant (kg)
- *   per part instance ID.
- * @property {Set<string>}         deployedParts Instance IDs of parachutes
- *   or legs that were deployed at separation time.
- * @property {Map<string, import('./parachute.js').ParachuteEntry>} parachuteStates
- *   Parachute lifecycle states inherited from the parent rocket at separation.
- *   Keyed by instance ID.  An empty map when the debris has no parachutes.
- * @property {Map<string, import('./legs.js').LegEntry>} legStates
- *   Landing leg lifecycle states inherited from the parent rocket at separation.
- *   Keyed by instance ID.  An empty map when the debris has no landing legs.
- * @property {Map<string,number>}  heatMap       Accumulated reentry heat per
- *   part instance ID (heat units).
- * @property {number}              posX          Horizontal position (m;
- *   inherited from parent rocket at separation).
- * @property {number}              posY          Vertical position (m; 0 =
- *   ground; inherited from parent rocket).
- * @property {number}              velX          Horizontal velocity (m/s;
- *   inherited from parent rocket at separation).
- * @property {number}              velY          Vertical velocity (m/s;
- *   inherited from parent rocket at separation).
- * @property {number}              angle         Orientation (radians; 0 =
- *   pointing straight up; inherited from parent).
- * @property {number}              throttle      Always 1.0 — SRBs ignore
- *   throttle.  Liquid engines are removed from firingEngines at separation
- *   (no command module to control them).
- * @property {number}              angularVelocity  Angular velocity (rad/s;
- *   positive = clockwise).  Inherited from the parent rocket at separation
- *   plus a small random perturbation.
- * @property {boolean}             isTipping     True when the debris fragment
- *   is on the ground and tilted — rotation is around the ground contact point.
- * @property {number}              tippingContactX  Ground contact pivot X in
- *   VAB local pixels (only meaningful when `isTipping` is true).
- * @property {number}              tippingContactY  Ground contact pivot Y in
- *   VAB local pixels (only meaningful when `isTipping` is true).
- * @property {boolean}             landed        True after a safe touchdown
- *   (speed ≤ {@link DEFAULT_SAFE_LANDING_SPEED}).
- * @property {boolean}             crashed       True after a high-speed
- *   ground impact.
  */
+export interface DebrisState {
+  /** Unique fragment identifier (e.g. 'debris-1'). */
+  id: string;
+  /** Instance IDs of parts currently belonging to this fragment. */
+  activeParts: Set<string>;
+  /** Instance IDs of engines/SRBs that were burning at the moment of separation and are still active. */
+  firingEngines: Set<string>;
+  /** Remaining propellant (kg) per part instance ID. */
+  fuelStore: Map<string, number>;
+  /** Instance IDs of parachutes or legs that were deployed at separation time. */
+  deployedParts: Set<string>;
+  /** Parachute lifecycle states inherited from the parent rocket at separation. */
+  parachuteStates: Map<string, ParachuteEntry>;
+  /** Landing leg lifecycle states inherited from the parent rocket at separation. */
+  legStates: Map<string, LegEntry>;
+  /** Accumulated reentry heat per part instance ID (heat units). */
+  heatMap: Map<string, number>;
+  /** Horizontal position (m; inherited from parent rocket at separation). */
+  posX: number;
+  /** Vertical position (m; 0 = ground; inherited from parent rocket). */
+  posY: number;
+  /** Horizontal velocity (m/s; inherited from parent rocket at separation). */
+  velX: number;
+  /** Vertical velocity (m/s; inherited from parent rocket at separation). */
+  velY: number;
+  /** Orientation (radians; 0 = pointing straight up; inherited from parent). */
+  angle: number;
+  /** Always 1.0 — SRBs ignore throttle. */
+  throttle: number;
+  /** Angular velocity (rad/s; positive = clockwise). */
+  angularVelocity: number;
+  /** True when the debris fragment is on the ground and tilted. */
+  isTipping: boolean;
+  /** Ground contact pivot X in VAB local pixels. */
+  tippingContactX: number;
+  /** Ground contact pivot Y in VAB local pixels. */
+  tippingContactY: number;
+  /** True after a safe touchdown. */
+  landed: boolean;
+  /** True after a high-speed ground impact. */
+  crashed: boolean;
+  /** Collision cooldown ticks remaining after separation. */
+  collisionCooldown?: number;
+}
+
+/** One stage in a staging configuration. */
+interface StageData {
+  /** Instance IDs of activatable parts assigned to this stage. */
+  instanceIds: string[];
+}
+
+/** Staging configuration for a rocket assembly. */
+interface StagingConfig {
+  /** Ordered stage slots. Index 0 = Stage 1 (fires first). */
+  stages: StageData[];
+  /** Instance IDs of activatable parts not yet staged. */
+  unstaged: string[];
+  /** 0-based index of the next stage to fire (used in flight). */
+  currentStageIdx: number;
+}
 
 // ---------------------------------------------------------------------------
 // Public API — activateCurrentStage
@@ -147,42 +170,31 @@ let _debrisNextId = 1;
  * Fire the current stage of the rocket.
  *
  * Reads all parts assigned to `stagingConfig.stages[currentStageIdx]` and
- * activates each according to its `activationBehaviour`:
- *
- * - **IGNITE** (ENGINE, SRB): add to `ps.firingEngines`, emit PART_ACTIVATED.
- * - **SEPARATE** (any decoupler): remove decoupler from `ps.activeParts`,
- *   then call {@link recomputeActiveGraph} to identify any rocket sections now
- *   disconnected from a command module.  Those sections are collected into
- *   new {@link DebrisState} objects and returned.
- * - **DEPLOY** (parachute, landing legs): add to `ps.deployedParts`, emit
- *   PART_ACTIVATED.
- * - **EJECT**: emit CREW_EJECTED event.
- * - **RELEASE**: emit SATELLITE_RELEASED event.
- * - **COLLECT_SCIENCE**: emit PART_ACTIVATED and SCIENCE_COLLECTED events.
+ * activates each according to its `activationBehaviour`.
  *
  * After all activations, `stagingConfig.currentStageIdx` is incremented
  * (unless already at the final stage).
  *
- * @param {import('./physics.js').PhysicsState}             ps
- * @param {import('./rocketbuilder.js').RocketAssembly}     assembly
- * @param {import('./rocketbuilder.js').StagingConfig}      stagingConfig
- * @param {import('./gameState.js').FlightState}            flightState
- * @returns {DebrisState[]}  Newly created debris fragments (empty array when
- *   no decouplers fired this stage).
+ * @returns Newly created debris fragments (empty array when no decouplers fired this stage).
  */
-export function activateCurrentStage(ps, assembly, stagingConfig, flightState) {
+export function activateCurrentStage(
+  ps: PhysicsState,
+  assembly: RocketAssembly,
+  stagingConfig: StagingConfig,
+  flightState: FlightState,
+): DebrisState[] {
   const idx = stagingConfig.currentStageIdx;
   const stageData = stagingConfig.stages[idx];
   if (!stageData) return [];
 
   const instanceIds = [...stageData.instanceIds];
-  const newDebris = [];
+  const newDebris: DebrisState[] = [];
 
   for (const instanceId of instanceIds) {
     // Handle individual instrument activation keys (moduleId:instr:N).
     const instrParsed = parseInstrumentKey(instanceId);
     if (instrParsed) {
-      activateInstrument(ps, assembly, flightState, instanceId);
+      activateInstrument(ps as any, assembly as any, flightState as any, instanceId);
       continue;
     }
 
@@ -211,7 +223,7 @@ export function activateCurrentStage(ps, assembly, stagingConfig, flightState) {
       case 'SEPARATE': {
         // DECOUPLER_STUCK malfunction: skip automatic staging (player must
         // manually decouple via context menu).
-        const decMalf = getMalfunction(ps, instanceId);
+        const decMalf = getMalfunction(ps as any, instanceId);
         if (decMalf && !decMalf.recovered && decMalf.type === MalfunctionType.DECOUPLER_STUCK) {
           _emitEvent(flightState, {
             type:        'MALFUNCTION_BLOCKED',
@@ -248,7 +260,7 @@ export function activateCurrentStage(ps, assembly, stagingConfig, flightState) {
         if (isClamp) {
           const clampPlaced = assembly.parts.get(instanceId);
           // Swing away from the rocket centre: if clamp is to the left, push left; else push right.
-          const lateralDir = (clampPlaced && clampPlaced.x < 0) ? -1 : 1;
+          const lateralDir = (clampPlaced && (clampPlaced as any).x < 0) ? -1 : 1;
           decouplerDebris.velX += lateralDir * 3;  // 3 m/s lateral swing
           decouplerDebris.velY += 0.5;             // slight upward before falling
           decouplerDebris.angularVelocity = lateralDir * 2.0; // visual rotation
@@ -259,7 +271,7 @@ export function activateCurrentStage(ps, assembly, stagingConfig, flightState) {
         // collect newly disconnected sections as debris.
         const fragments = recomputeActiveGraph(ps, assembly);
         for (const frag of fragments) {
-          applySeparationImpulse(ps, frag, assembly);
+          applySeparationImpulse(ps as any, frag as any, assembly as any);
         }
         newDebris.push(...fragments);
 
@@ -285,7 +297,7 @@ export function activateCurrentStage(ps, assembly, stagingConfig, flightState) {
 
       case 'DEPLOY': {
         // Check for LANDING_LEGS_STUCK malfunction: block deployment via staging.
-        const legMalf = getMalfunction(ps, instanceId);
+        const legMalf = getMalfunction(ps as any, instanceId);
         if (legMalf && !legMalf.recovered && legMalf.type === MalfunctionType.LANDING_LEGS_STUCK) {
           _emitEvent(flightState, {
             type:        'MALFUNCTION_BLOCKED',
@@ -298,17 +310,14 @@ export function activateCurrentStage(ps, assembly, stagingConfig, flightState) {
         }
 
         // PARACHUTE or LANDING_LEGS — deploy / extend.
-        // Both types start a state-machine transition:
-        //   PARACHUTE    → deploying (2 s animation) → deployed
-        //   LANDING_LEGS → deploying (1.5 s animation) → deployed
         ps.deployedParts.add(instanceId);
         if (def.type === PartType.PARACHUTE) {
-          deployParachute(ps, instanceId);
+          deployParachute(ps as any, instanceId);
         } else if (
           def.type === PartType.LANDING_LEGS ||
           def.type === PartType.LANDING_LEG
         ) {
-          deployLandingLeg(ps, instanceId);
+          deployLandingLeg(ps as any, instanceId);
         }
         _emitEvent(flightState, {
           type:        'PART_ACTIVATED',
@@ -321,15 +330,11 @@ export function activateCurrentStage(ps, assembly, stagingConfig, flightState) {
 
       case 'EJECT':
         // COMMAND_MODULE ejector seat — emergency crew escape.
-        // Delegates to ejector.js which tracks activation state, records
-        // ejected crew, and emits the CREW_EJECTED event.
-        activateEjectorSeat(ps, assembly, flightState, instanceId);
+        activateEjectorSeat(ps as any, assembly as any, flightState as any, instanceId);
         break;
 
       case 'RELEASE': {
         // SATELLITE — release into free flight as a detached physics object.
-        // Package the satellite into its own debris fragment so it continues
-        // to be simulated independently (position, velocity, drag).
         const releaseVelocity = Math.hypot(ps.velX, ps.velY);
         const satelliteDebris = _createDebrisFromParts(ps, [instanceId], assembly);
         newDebris.push(satelliteDebris);
@@ -344,7 +349,7 @@ export function activateCurrentStage(ps, assembly, stagingConfig, flightState) {
           time,
           altitude,
           velocity:    releaseVelocity,
-          partId:      placed.partId,
+          partId:      placed!.partId,
           description: `Satellite released at ${altitude.toFixed(0)} m.`,
         });
         break;
@@ -352,10 +357,7 @@ export function activateCurrentStage(ps, assembly, stagingConfig, flightState) {
 
       case 'COLLECT_SCIENCE':
         // SERVICE_MODULE science instrument — start the timed experiment.
-        // The SCIENCE_COLLECTED event fires later (when the timer expires in
-        // sciencemodule.tickScienceModules).  PART_ACTIVATED is emitted by
-        // activateScienceModule itself when the experiment begins.
-        activateScienceModule(ps, assembly, flightState, instanceId);
+        activateScienceModule(ps as any, assembly as any, flightState as any, instanceId);
         break;
 
       default:
@@ -384,25 +386,23 @@ export function activateCurrentStage(ps, assembly, stagingConfig, flightState) {
 /**
  * Activate a single part immediately, bypassing the stage queue.
  *
- * Fires the same activation logic as {@link activateCurrentStage} but for a
+ * Fires the same activation logic as activateCurrentStage but for a
  * specific part instance selected from outside the staging system (e.g. a
  * flight-scene right-click context menu).  Only activatable parts that are
  * currently in `ps.activeParts` can be activated this way.
  *
- * Returned debris fragments (from SEPARATE activations) should be appended to
- * `ps.debris` by the caller.
- *
- * @param {import('./physics.js').PhysicsState}             ps
- * @param {import('./rocketbuilder.js').RocketAssembly}     assembly
- * @param {import('./gameState.js').FlightState}            flightState
- * @param {string}                                          instanceId
- * @returns {DebrisState[]}  Newly created debris fragments, or an empty array.
+ * @returns Newly created debris fragments, or an empty array.
  */
-export function activatePartDirect(ps, assembly, flightState, instanceId) {
+export function activatePartDirect(
+  ps: PhysicsState,
+  assembly: RocketAssembly,
+  flightState: FlightState,
+  instanceId: string,
+): DebrisState[] {
   // Handle individual instrument activation keys (moduleId:instr:N).
   const instrParsed = parseInstrumentKey(instanceId);
   if (instrParsed) {
-    activateInstrument(ps, assembly, flightState, instanceId);
+    activateInstrument(ps as any, assembly as any, flightState as any, instanceId);
     return [];
   }
 
@@ -415,7 +415,7 @@ export function activatePartDirect(ps, assembly, flightState, instanceId) {
   const behaviour = def.activationBehaviour;
   const time      = flightState.timeElapsed;
   const altitude  = Math.max(0, ps.posY);
-  const newDebris = [];
+  const newDebris: DebrisState[] = [];
 
   switch (behaviour) {
     case 'IGNITE':
@@ -449,7 +449,7 @@ export function activatePartDirect(ps, assembly, flightState, instanceId) {
 
       const fragments = recomputeActiveGraph(ps, assembly);
       for (const frag of fragments) {
-        applySeparationImpulse(ps, frag, assembly);
+        applySeparationImpulse(ps as any, frag as any, assembly as any);
       }
       newDebris.push(...fragments);
 
@@ -477,12 +477,12 @@ export function activatePartDirect(ps, assembly, flightState, instanceId) {
       // PARACHUTE or LANDING_LEGS — deploy / extend.
       ps.deployedParts.add(instanceId);
       if (def.type === PartType.PARACHUTE) {
-        deployParachute(ps, instanceId);
+        deployParachute(ps as any, instanceId);
       } else if (
         def.type === PartType.LANDING_LEGS ||
         def.type === PartType.LANDING_LEG
       ) {
-        deployLandingLeg(ps, instanceId);
+        deployLandingLeg(ps as any, instanceId);
       }
       _emitEvent(flightState, {
         type:        'PART_ACTIVATED',
@@ -495,7 +495,7 @@ export function activatePartDirect(ps, assembly, flightState, instanceId) {
 
     case 'EJECT':
       // COMMAND_MODULE ejector seat — emergency crew escape.
-      activateEjectorSeat(ps, assembly, flightState, instanceId);
+      activateEjectorSeat(ps as any, assembly as any, flightState as any, instanceId);
       break;
 
     case 'RELEASE': {
@@ -514,7 +514,7 @@ export function activatePartDirect(ps, assembly, flightState, instanceId) {
         instanceId,
         altitude,
         velocity:    directReleaseVelocity,
-        partId:      placed.partId,
+        partId:      placed!.partId,
         description: `Satellite released at ${altitude.toFixed(0)} m.`,
       });
       break;
@@ -522,10 +522,7 @@ export function activatePartDirect(ps, assembly, flightState, instanceId) {
 
     case 'COLLECT_SCIENCE':
       // SERVICE_MODULE science instrument — start the timed experiment.
-      // The SCIENCE_COLLECTED event fires later (when the timer expires in
-      // sciencemodule.tickScienceModules).  PART_ACTIVATED is emitted by
-      // activateScienceModule itself when the experiment begins.
-      activateScienceModule(ps, assembly, flightState, instanceId);
+      activateScienceModule(ps as any, assembly as any, flightState as any, instanceId);
       break;
 
     default:
@@ -548,24 +545,12 @@ export function activatePartDirect(ps, assembly, flightState, instanceId) {
  * Performs a BFS starting from every COMMAND_MODULE and COMPUTER_MODULE still
  * in `ps.activeParts`.  Any part not reachable from at least one command
  * module is considered disconnected: it is removed from `ps.activeParts` and
- * `ps.firingEngines`, and collected into a single new {@link DebrisState}.
+ * `ps.firingEngines`, and collected into a single new DebrisState.
  *
- * Call this after any structural severance (decoupler firing) to keep
- * `ps.activeParts` accurate and to produce the debris objects for the renderer
- * and physics simulation.
- *
- * Edge case — no command modules:
- *   If there are no COMMAND_MODULE or COMPUTER_MODULE parts in `ps.activeParts`
- *   (e.g. the command module was in the separated stage), the first active part
- *   is used as a fallback root so that the remaining rocket is not mistakenly
- *   turned into debris.
- *
- * @param {import('./physics.js').PhysicsState}         ps
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @returns {DebrisState[]}  Newly created debris fragments.  Empty array when
- *   all active parts remain connected to a command module.
+ * @returns Newly created debris fragments.  Empty array when all active parts
+ *   remain connected to a command module.
  */
-export function recomputeActiveGraph(ps, assembly) {
+export function recomputeActiveGraph(ps: PhysicsState, assembly: RocketAssembly): DebrisState[] {
   // Seed the BFS queue with all command / computer module roots.
   let roots = _findAllCommandModules(ps, assembly);
 
@@ -589,13 +574,13 @@ export function recomputeActiveGraph(ps, assembly) {
   const queue = [...roots];
 
   while (queue.length > 0) {
-    const id = queue.shift();
+    const id = queue.shift()!;
 
     // Only expand from parts that are still in the active set.
     if (!ps.activeParts.has(id)) continue;
 
     for (const conn of assembly.connections) {
-      let neighbor = null;
+      let neighbor: string | null = null;
       if (conn.fromInstanceId === id)      neighbor = conn.toInstanceId;
       else if (conn.toInstanceId === id)   neighbor = conn.fromInstanceId;
 
@@ -611,7 +596,7 @@ export function recomputeActiveGraph(ps, assembly) {
   }
 
   // Collect parts not reachable from any command module.
-  const disconnected = [];
+  const disconnected: string[] = [];
   for (const id of ps.activeParts) {
     if (!reachable.has(id)) disconnected.push(id);
   }
@@ -633,26 +618,14 @@ export function recomputeActiveGraph(ps, assembly) {
  *
  * Simulates:
  *   - Gravitational acceleration: G0 downward.
- *   - Atmospheric drag: proportional to density × speed² × CdA (summed over
- *     all parts in the fragment; deployed parachutes add 80× Cd).
- *   - SRB thrust (if any SRBs were burning at separation and have not yet
- *     exhausted their fuel).  Liquid engines on detached stages flame out
- *     immediately because their tanks were severed.
- *   - Fuel consumption via `tickFuelSystem`.
- *   - Ground contact: sets `debris.landed` or `debris.crashed` and zeroes
- *     velocity.
- *
- * The player has no control over debris — there is no steering and no staging.
- * The fragment's angle is held fixed at the value inherited from the parent
- * rocket at separation.
+ *   - Atmospheric drag: proportional to density × speed² × CdA.
+ *   - SRB thrust (if any SRBs were burning at separation).
+ *   - Fuel consumption via tickFuelSystem.
+ *   - Ground contact: sets `debris.landed` or `debris.crashed`.
  *
  * This function is a no-op once `debris.landed` or `debris.crashed` is true.
- *
- * @param {DebrisState}                                  debris
- * @param {import('./rocketbuilder.js').RocketAssembly}  assembly
- * @param {number} dt  Fixed timestep in seconds (typically 1/60).
  */
-export function tickDebris(debris, assembly, dt) {
+export function tickDebris(debris: DebrisState, assembly: RocketAssembly, dt: number): void {
   if (debris.landed || debris.crashed) return;
 
   const altitude = Math.max(0, debris.posY);
@@ -662,8 +635,6 @@ export function tickDebris(debris, assembly, dt) {
   const totalMass = _debrisMass(debris, assembly);
 
   // --- 2. SRB thrust (only SRBs; liquid engines are excluded) --------------
-  // Liquid engines flame out immediately on debris (no command module).
-  // tickFuelSystem (step 6) drains fuel and removes exhausted SRBs.
   let thrustX = 0;
   let thrustY = 0;
 
@@ -682,7 +653,7 @@ export function tickDebris(debris, assembly, dt) {
     if (fuelLeft <= 0) continue; // Exhausted — tickFuelSystem will remove it.
 
     // Interpolate thrust between sea-level and vacuum values.
-    const props        = def.properties ?? {};
+    const props        = (def.properties as any) ?? {};
     const densityRatio = density > 0
       ? Math.min(1, density / SEA_LEVEL_DENSITY)
       : 0;
@@ -719,9 +690,7 @@ export function tickDebris(debris, assembly, dt) {
   debris.posY += debris.velY * dt;
 
   // --- 6. Fuel consumption (SRBs via tickFuelSystem) -----------------------
-  // tickFuelSystem is compatible with DebrisState because both objects expose
-  // the same field names: activeParts, firingEngines, fuelStore, throttle.
-  tickFuelSystem(debris, assembly, dt, density);
+  tickFuelSystem(debris as any, assembly as any, dt, density);
 
   // --- 6b. Angular dynamics (airborne) ------------------------------------
   if (debris.angularVelocity != null) {
@@ -759,19 +728,13 @@ export function tickDebris(debris, assembly, dt) {
  * After a stage separation removes parts from the active rocket, the assembly
  * origin may no longer coincide with the lowest active part's bottom edge.
  * This shifts `posY` upward (in world space) and every remaining active
- * part's `placed.y` downward by the same amount so that:
- *
- *   1. The lowest active part's bottom sits at assembly Y = 0.
- *   2. Every part's absolute world position is unchanged (no visual jump).
- *   3. Ground collision at `posY ≤ 0` means the rocket's bottom touches the
- *      ground, regardless of how many lower stages were jettisoned.
- *
- * No-op when the lowest active bottom is already at Y = 0 (or below).
- *
- * @param {import('./physics.js').PhysicsState}           ps
- * @param {import('./rocketbuilder.js').RocketAssembly}   assembly
+ * part's `placed.y` downward by the same amount.
  */
-function _renormalizeAfterSeparation(ps, assembly, extraDebris = []) {
+function _renormalizeAfterSeparation(
+  ps: PhysicsState,
+  assembly: RocketAssembly,
+  extraDebris: DebrisState[] = [],
+): void {
   if (ps.activeParts.size === 0) return;
 
   // Find the lowest bottom edge (assembly Y-up, pixels) among active parts.
@@ -780,11 +743,11 @@ function _renormalizeAfterSeparation(ps, assembly, extraDebris = []) {
     const placed = assembly.parts.get(instanceId);
     const def    = placed ? getPartById(placed.partId) : null;
     if (!def) continue;
-    let bottom = placed.y - (def.height ?? 40) / 2;
+    let bottom = (placed as any).y - (def.height ?? 40) / 2;
     // Deployed legs extend below their bounding box.
     if (def.type === PartType.LANDING_LEGS || def.type === PartType.LANDING_LEG) {
-      const { dy } = getDeployedLegFootOffset(instanceId, def, ps.legStates);
-      const footY = placed.y - dy;
+      const { dy } = getDeployedLegFootOffset(instanceId, def as any, ps.legStates as any);
+      const footY = (placed as any).y - dy;
       if (footY < bottom) bottom = footY;
     }
     lowestBottom = Math.min(lowestBottom, bottom);
@@ -803,12 +766,12 @@ function _renormalizeAfterSeparation(ps, assembly, extraDebris = []) {
   // just active ones) because debris rendering still references the same
   // placed objects.
   for (const [, placed] of assembly.parts) {
-    placed.y -= lowestBottom;
+    (placed as any).y -= lowestBottom;
   }
 
   // Debris fragments also reference the same placed objects, so their posY
   // must be compensated by the same world-space offset to stay correct.
-  for (const debris of ps.debris) {
+  for (const debris of (ps as any).debris as DebrisState[]) {
     debris.posY += offsetM;
   }
 
@@ -823,26 +786,21 @@ function _renormalizeAfterSeparation(ps, assembly, extraDebris = []) {
 // ---------------------------------------------------------------------------
 
 /**
- * Create a new {@link DebrisState} from a set of part instance IDs, extracting
- * their simulation data from the parent {@link PhysicsState}.
- *
- * The fragment inherits the parent rocket's current position, velocity, and
- * angle (stage separation is instantaneous).  All specified parts are removed
- * from `ps.activeParts` and `ps.firingEngines`.
- *
- * @param {import('./physics.js').PhysicsState} ps
- * @param {string[]}                            partIds  Part IDs to transfer.
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @returns {DebrisState}
+ * Create a new DebrisState from a set of part instance IDs, extracting
+ * their simulation data from the parent PhysicsState.
  */
-function _createDebrisFromParts(ps, partIds, assembly) {
+function _createDebrisFromParts(
+  ps: PhysicsState,
+  partIds: string[],
+  assembly: RocketAssembly,
+): DebrisState {
   const activeParts     = new Set(partIds);
-  const firingEngines   = new Set();
-  const fuelStore       = new Map();
-  const deployedParts   = new Set();
-  const parachuteStates = new Map();
-  const legStates       = new Map();
-  const heatMap         = new Map();
+  const firingEngines   = new Set<string>();
+  const fuelStore       = new Map<string, number>();
+  const deployedParts   = new Set<string>();
+  const parachuteStates = new Map<string, ParachuteEntry>();
+  const legStates       = new Map<string, LegEntry>();
+  const heatMap         = new Map<string, number>();
 
   for (const id of partIds) {
     // Transfer firing engine state.
@@ -859,7 +817,7 @@ function _createDebrisFromParts(ps, partIds, assembly) {
 
     // Transfer remaining fuel.
     if (ps.fuelStore.has(id)) {
-      fuelStore.set(id, ps.fuelStore.get(id));
+      fuelStore.set(id, ps.fuelStore.get(id)!);
     }
 
     // Transfer deployed state (chutes, legs).
@@ -870,19 +828,25 @@ function _createDebrisFromParts(ps, partIds, assembly) {
     // Transfer parachute state machine entry so debris chutes keep animating.
     if (ps.parachuteStates?.has(id)) {
       // Deep-copy the entry so the debris state evolves independently.
-      const src = ps.parachuteStates.get(id);
-      parachuteStates.set(id, { state: src.state, deployTimer: src.deployTimer });
+      const src = ps.parachuteStates.get(id)!;
+      parachuteStates.set(id, {
+        state: src.state,
+        deployTimer: src.deployTimer,
+        canopyAngle: (src as any).canopyAngle ?? 0,
+        canopyAngularVel: (src as any).canopyAngularVel ?? 0,
+        stowTimer: (src as any).stowTimer,
+      });
     }
 
     // Transfer landing leg state machine entry.
     if (ps.legStates?.has(id)) {
-      const src = ps.legStates.get(id);
+      const src = ps.legStates.get(id)!;
       legStates.set(id, { state: src.state, deployTimer: src.deployTimer });
     }
 
     // Transfer heat accumulation.
     if (ps.heatMap.has(id)) {
-      heatMap.set(id, ps.heatMap.get(id));
+      heatMap.set(id, ps.heatMap.get(id)!);
     }
 
     // Remove the part from the parent rocket's active set.
@@ -917,13 +881,9 @@ function _createDebrisFromParts(ps, partIds, assembly) {
 /**
  * Return the instance IDs of all COMMAND_MODULE and COMPUTER_MODULE parts
  * currently in `ps.activeParts`.
- *
- * @param {import('./physics.js').PhysicsState}         ps
- * @param {import('./rocketbuilder.js').RocketAssembly} assembly
- * @returns {string[]}
  */
-function _findAllCommandModules(ps, assembly) {
-  const roots = [];
+function _findAllCommandModules(ps: PhysicsState, assembly: RocketAssembly): string[] {
+  const roots: string[] = [];
   for (const instanceId of ps.activeParts) {
     const placed = assembly.parts.get(instanceId);
     const def    = placed ? getPartById(placed.partId) : null;
@@ -941,17 +901,15 @@ function _findAllCommandModules(ps, assembly) {
 /**
  * Compute the total mass (dry + remaining fuel) of a debris fragment.
  *
- * @param {DebrisState}                                  debris
- * @param {import('./rocketbuilder.js').RocketAssembly}  assembly
- * @returns {number}  Mass in kilograms (minimum 1 kg to avoid division by zero).
+ * @returns Mass in kilograms (minimum 1 kg to avoid division by zero).
  */
-function _debrisMass(debris, assembly) {
+function _debrisMass(debris: DebrisState, assembly: RocketAssembly): number {
   let mass = 0;
 
   for (const id of debris.activeParts) {
     const placed = assembly.parts.get(id);
     const def    = placed ? getPartById(placed.partId) : null;
-    if (def) mass += def.mass ?? 0;
+    if (def) mass += (def as any).mass ?? 0;
   }
 
   for (const [id, fuel] of debris.fuelStore) {
@@ -962,28 +920,13 @@ function _debrisMass(debris, assembly) {
 }
 
 /**
- * Compute the aerodynamic drag force magnitude (Newtons) for a debris fragment.
- *
- * dragForce = 0.5 × ρ × v² × ΣCdA  (summed over all active parts in fragment)
- *
- * Open parachutes contribute 80× their stowed drag coefficient.
- *
- * @param {DebrisState}                                  debris
- * @param {import('./rocketbuilder.js').RocketAssembly}  assembly
- * @param {number} density  Air density (kg/m³).
- * @param {number} speed    Fragment speed (m/s).
- * @returns {number}  Drag force in Newtons.
- */
-/**
  * Return the deployment progress for a parachute on a debris fragment.
  * Mirrors the same helper in physics.js but uses the debris's own parachuteStates.
  * Falls back to the binary deployedParts set for older debris objects.
  *
- * @param {DebrisState} debris
- * @param {string}      instanceId
- * @returns {number}  0 = packed, 0→1 = deploying, 1 = deployed.
+ * @returns 0 = packed, 0→1 = deploying, 1 = deployed.
  */
-function _getDebrisChuteDeployProgress(debris, instanceId) {
+function _getDebrisChuteDeployProgress(debris: DebrisState, instanceId: string): number {
   const entry = debris.parachuteStates?.get(instanceId);
   if (!entry) {
     return debris.deployedParts?.has(instanceId) ? 1 : 0;
@@ -995,7 +938,12 @@ function _getDebrisChuteDeployProgress(debris, instanceId) {
   }
 }
 
-function _debrisDrag(debris, assembly, density, speed) {
+/**
+ * Compute the aerodynamic drag force magnitude (Newtons) for a debris fragment.
+ *
+ * dragForce = 0.5 × ρ × v² × ΣCdA  (summed over all active parts in fragment)
+ */
+function _debrisDrag(debris: DebrisState, assembly: RocketAssembly, density: number, speed: number): number {
   if (density <= 0 || speed <= 0) return 0;
 
   let totalCdA = 0;
@@ -1005,7 +953,7 @@ function _debrisDrag(debris, assembly, density, speed) {
     const def    = placed ? getPartById(placed.partId) : null;
     if (!def) continue;
 
-    const props  = def.properties ?? {};
+    const props  = (def.properties as any) ?? {};
     const widthM = (def.width ?? 40) * SCALE_M_PER_PX;
     const area   = Math.PI * (widthM / 2) ** 2; // stowed circular cross-section
 
@@ -1026,47 +974,21 @@ function _debrisDrag(debris, assembly, density, speed) {
 }
 
 /**
- * Return true if the given debris fragment contains at least one SATELLITE part.
- *
- * Used after a decoupler fires to detect when a satellite has been released into
- * free flight so that a SATELLITE_RELEASED mission event can be emitted.
- *
- * @param {DebrisState}                                  debris
- * @param {import('./rocketbuilder.js').RocketAssembly}  assembly
- * @returns {boolean}
- */
-function _fragmentContainsSatellite(debris, assembly) {
-  for (const partId of debris.activeParts) {
-    const placed = assembly.parts.get(partId);
-    const def    = placed ? getPartById(placed.partId) : null;
-    if (def && def.type === PartType.SATELLITE) return true;
-  }
-  return false;
-}
-
-/**
  * Return the part definition ID of the first SATELLITE part in a debris fragment,
  * or null if none found.
- *
- * @param {DebrisState}                                  debris
- * @param {import('./rocketbuilder.js').RocketAssembly}  assembly
- * @returns {string|null}
  */
-function _getFragmentSatellitePartId(debris, assembly) {
+function _getFragmentSatellitePartId(debris: DebrisState, assembly: RocketAssembly): string | null {
   for (const instanceId of debris.activeParts) {
     const placed = assembly.parts.get(instanceId);
     const def    = placed ? getPartById(placed.partId) : null;
-    if (def && def.type === PartType.SATELLITE) return placed.partId;
+    if (def && def.type === PartType.SATELLITE) return placed!.partId;
   }
   return null;
 }
 
 /**
  * Append a flight event to a FlightState event log.
- *
- * @param {import('./gameState.js').FlightState} flightState
- * @param {object} event  Must include at minimum `type` and `time`.
  */
-function _emitEvent(flightState, event) {
-  flightState.events.push(event);
+function _emitEvent(flightState: FlightState, event: Record<string, unknown>): void {
+  (flightState.events as any[]).push(event);
 }

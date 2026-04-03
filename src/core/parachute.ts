@@ -1,5 +1,5 @@
 /**
- * parachute.js — Parachute state machine and deployment mechanics.
+ * parachute.ts — Parachute state machine and deployment mechanics.
  *
  * Implements the full parachute lifecycle:
  *
@@ -57,7 +57,6 @@ import { PartType }    from './constants.js';
 
 /**
  * Parachute lifecycle states.
- * @enum {string}
  */
 export const ParachuteState = Object.freeze({
   /** Stowed — not yet deployed; only the normal aerodynamic profile applies. */
@@ -68,7 +67,9 @@ export const ParachuteState = Object.freeze({
   DEPLOYED:  'deployed',
   /** Deployment failed — rocket mass exceeded maxSafeMass; no drag applied. */
   FAILED:    'failed',
-});
+} as const);
+
+export type ParachuteState = (typeof ParachuteState)[keyof typeof ParachuteState];
 
 /** Duration of the deploying → deployed animation transition in seconds. */
 export const DEPLOY_DURATION = 1.5;
@@ -94,20 +95,62 @@ export const LOW_DENSITY_THRESHOLD = 0.1;
 const CHUTE_DRAG_MULTIPLIER = 80;
 
 // ---------------------------------------------------------------------------
-// Type Definitions (JSDoc)
+// Type Definitions
 // ---------------------------------------------------------------------------
 
 /**
  * Per-parachute entry stored in PhysicsState.parachuteStates.
- *
- * @typedef {Object} ParachuteEntry
- * @property {string} state            One of the {@link ParachuteState} values.
- * @property {number} deployTimer      Seconds remaining in the deploying animation.
- *                                     0 when not in the DEPLOYING state.
- * @property {number} canopyAngle      Independent canopy orientation (radians).
- *                                     0 = upright. Initialised to rocket angle on deploy.
- * @property {number} canopyAngularVel Angular velocity of the canopy (rad/s).
  */
+export interface ParachuteEntry {
+  /** One of the ParachuteState values. */
+  state: string;
+  /** Seconds remaining in the deploying animation. 0 when not DEPLOYING. */
+  deployTimer: number;
+  /** Independent canopy orientation (radians). 0 = upright. */
+  canopyAngle: number;
+  /** Angular velocity of the canopy (rad/s). */
+  canopyAngularVel: number;
+  /** Seconds remaining until auto-stow (post-landing). 0 or undefined when not active. */
+  stowTimer?: number;
+}
+
+/**
+ * Minimal physics state shape required by parachute functions.
+ */
+interface ParachutePhysicsState {
+  parachuteStates: Map<string, ParachuteEntry>;
+  activeParts: Set<string>;
+  deployedParts?: Set<string>;
+  posY?: number;
+  angle?: number;
+}
+
+/**
+ * Minimal physics state shape that may lack parachuteStates (e.g. debris).
+ */
+interface PartialParachuteState {
+  parachuteStates?: Map<string, ParachuteEntry>;
+  activeParts: Set<string>;
+  deployedParts?: Set<string>;
+  posY?: number;
+  angle?: number;
+}
+
+/**
+ * Minimal assembly shape required by parachute functions.
+ */
+interface ParachuteAssembly {
+  parts: Map<string, { partId: string }>;
+}
+
+/**
+ * Minimal flight state shape required by parachute functions.
+ */
+interface ParachuteFlightState {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  events: Array<any>;
+  timeElapsed: number;
+}
 
 // ---------------------------------------------------------------------------
 // Initialisation
@@ -119,12 +162,11 @@ const CHUTE_DRAG_MULTIPLIER = 80;
  *
  * Call this once inside `createPhysicsState` after the state object has been
  * constructed.  Safe to call again — existing entries are preserved.
- *
- * @param {{ parachuteStates: Map<string, ParachuteEntry>,
- *           activeParts:     Set<string> }}                         ps
- * @param {{ parts: Map<string, { partId: string }> }}               assembly
  */
-export function initParachuteStates(ps, assembly) {
+export function initParachuteStates(
+  ps: ParachutePhysicsState,
+  assembly: ParachuteAssembly,
+): void {
   for (const [instanceId, placed] of assembly.parts) {
     if (!ps.activeParts.has(instanceId)) continue;
     if (ps.parachuteStates.has(instanceId)) continue; // already initialised
@@ -154,11 +196,11 @@ export function initParachuteStates(ps, assembly) {
  * Can be called from:
  *   - staging.js when an in-flight stage fires a DEPLOY activation.
  *   - A flight-scene context menu when the player manually deploys the chute.
- *
- * @param {{ parachuteStates: Map<string, ParachuteEntry> }} ps
- * @param {string} instanceId  Instance ID of the PARACHUTE part.
  */
-export function deployParachute(ps, instanceId) {
+export function deployParachute(
+  ps: PartialParachuteState,
+  instanceId: string,
+): void {
   if (!ps.parachuteStates) return;
 
   let entry = ps.parachuteStates.get(instanceId);
@@ -197,17 +239,14 @@ export function deployParachute(ps, instanceId) {
  *         appended.
  *
  * Call once per fixed integration step from `_integrate` in physics.js.
- *
- * @param {{ parachuteStates: Map<string, ParachuteEntry>,
- *           activeParts:     Set<string>,
- *           deployedParts:   Set<string>,
- *           posY:            number }}                            ps
- * @param {{ parts: Map<string, { partId: string }> }}            assembly
- * @param {{ events: Array<object>, timeElapsed: number }}        flightState
- * @param {number} dt         Fixed timestep in seconds.
- * @param {number} totalMass  Current total rocket mass in kg (dry + fuel).
  */
-export function tickParachutes(ps, assembly, flightState, dt, totalMass) {
+export function tickParachutes(
+  ps: ParachutePhysicsState & { deployedParts: Set<string> },
+  assembly: ParachuteAssembly,
+  flightState: ParachuteFlightState,
+  dt: number,
+  totalMass: number,
+): void {
   if (!ps.parachuteStates) return;
 
   for (const [instanceId, entry] of ps.parachuteStates) {
@@ -221,8 +260,8 @@ export function tickParachutes(ps, assembly, flightState, dt, totalMass) {
     const placed = assembly.parts.get(instanceId);
     const def    = placed ? getPartById(placed.partId) : null;
 
-    const maxSafeMass = def?.properties?.maxSafeMass ?? Infinity;
-    const altitude    = Math.max(0, ps.posY);
+    const maxSafeMass = (def?.properties?.maxSafeMass as number) ?? Infinity;
+    const altitude    = Math.max(0, ps.posY ?? 0);
     const time        = flightState.timeElapsed;
     const partName    = def?.name ?? 'Parachute';
 
@@ -274,11 +313,11 @@ const CANOPY_DAMPING  = 8.0;
  *
  * The canopy is treated as a light object that quickly orients upward
  * (angle → 0) via a strong spring + damping, independent of the rocket body.
- *
- * @param {{ parachuteStates: Map<string, ParachuteEntry> }} ps
- * @param {number} dt  Fixed timestep in seconds.
  */
-export function tickCanopyAngles(ps, dt) {
+export function tickCanopyAngles(
+  ps: PartialParachuteState,
+  dt: number,
+): void {
   if (!ps.parachuteStates) return;
 
   for (const [, entry] of ps.parachuteStates) {
@@ -301,11 +340,11 @@ export function tickCanopyAngles(ps, dt) {
  * Springs the canopy angle toward PI (hanging straight down under gravity)
  * and counts down the stow timer.  When the timer expires, the parachute
  * resets to PACKED so it can be reused on a subsequent flight.
- *
- * @param {{ parachuteStates: Map<string, ParachuteEntry> }} ps
- * @param {number} dt  Fixed timestep in seconds.
  */
-export function tickLandedParachutes(ps, dt) {
+export function tickLandedParachutes(
+  ps: PartialParachuteState,
+  dt: number,
+): void {
   if (!ps.parachuteStates) return;
 
   for (const [, entry] of ps.parachuteStates) {
@@ -318,11 +357,11 @@ export function tickLandedParachutes(ps, dt) {
     entry.canopyAngle      += entry.canopyAngularVel * dt;
 
     // Lazily start stow timer on first landed tick.
-    if (!(entry.stowTimer > 0)) {
+    if (!((entry.stowTimer ?? 0) > 0)) {
       entry.stowTimer = POST_LANDING_STOW_DELAY;
     }
 
-    entry.stowTimer -= dt;
+    entry.stowTimer = (entry.stowTimer ?? 0) - dt;
     if (entry.stowTimer <= 0) {
       // Auto-stow: reset to packed state for reuse.
       entry.state            = ParachuteState.PACKED;
@@ -362,14 +401,12 @@ export function tickLandedParachutes(ps, dt) {
  *
  * Falls back to a binary deployed/stowed check using `ps.deployedParts` when
  * `ps.parachuteStates` is absent (e.g., legacy debris fragments).
- *
- * @param {{ parachuteStates?: Map<string, ParachuteEntry>,
- *           deployedParts?:   Set<string> }}                ps
- * @param {string} instanceId  Parachute part instance ID.
- * @param {number} density     Current air density (kg/m³).
- * @returns {number}  Effective Cd multiplier (≥ 1).
  */
-export function getChuteMultiplier(ps, instanceId, density) {
+export function getChuteMultiplier(
+  ps: PartialParachuteState,
+  instanceId: string,
+  density: number,
+): number {
   // --- Legacy fallback for debris fragments without parachuteStates ---
   if (!ps.parachuteStates) {
     return ps.deployedParts?.has(instanceId) ? CHUTE_DRAG_MULTIPLIER : 1;
@@ -382,7 +419,7 @@ export function getChuteMultiplier(ps, instanceId, density) {
   }
 
   // --- Compute base multiplier from current state ---
-  let baseMult;
+  let baseMult: number;
   switch (entry.state) {
     case ParachuteState.PACKED:
     case ParachuteState.FAILED:
@@ -425,12 +462,11 @@ export function getChuteMultiplier(ps, instanceId, density) {
  * Returns {@link ParachuteState.PACKED} when:
  *   - `ps.parachuteStates` is absent (debris without state map).
  *   - The instance ID is not tracked.
- *
- * @param {{ parachuteStates?: Map<string, ParachuteEntry> }} ps
- * @param {string} instanceId  Parachute part instance ID.
- * @returns {string}  One of the {@link ParachuteState} values.
  */
-export function getParachuteStatus(ps, instanceId) {
+export function getParachuteStatus(
+  ps: PartialParachuteState,
+  instanceId: string,
+): string {
   if (!ps.parachuteStates) return ParachuteState.PACKED;
   const entry = ps.parachuteStates.get(instanceId);
   return entry ? entry.state : ParachuteState.PACKED;
@@ -440,39 +476,28 @@ export function getParachuteStatus(ps, instanceId) {
 // Context menu helpers
 // ---------------------------------------------------------------------------
 
+/** Shape of one context menu item returned by getParachuteContextMenuItems. */
+export interface ParachuteContextMenuItem {
+  instanceId:  string;
+  name:        string;
+  state:       string;
+  statusLabel: string;
+  canDeploy:   boolean;
+  deployTimer: number | null;
+}
+
 /**
  * Build a list of context menu items for all PARACHUTE parts in the rocket.
  *
  * Each item describes the current state of one parachute and optionally
  * provides a deployable action.  The flight UI layer calls this function to
  * populate a right-click or action panel menu.
- *
- * Returned item schema:
- * ```
- * {
- *   instanceId:  string,     // part instance ID
- *   name:        string,     // human-readable part name
- *   state:       string,     // ParachuteState value
- *   statusLabel: string,     // display text for the status chip
- *   canDeploy:   boolean,    // true when state is 'packed'
- *   deployTimer: number|null // seconds remaining in deploying state, or null
- * }
- * ```
- *
- * @param {{ parachuteStates?: Map<string, ParachuteEntry>,
- *           activeParts:      Set<string> }}                 ps
- * @param {{ parts: Map<string, { partId: string }> }}        assembly
- * @returns {Array<{
- *   instanceId:  string,
- *   name:        string,
- *   state:       string,
- *   statusLabel: string,
- *   canDeploy:   boolean,
- *   deployTimer: number|null,
- * }>}
  */
-export function getParachuteContextMenuItems(ps, assembly) {
-  const items = [];
+export function getParachuteContextMenuItems(
+  ps: PartialParachuteState,
+  assembly: ParachuteAssembly,
+): ParachuteContextMenuItem[] {
+  const items: ParachuteContextMenuItem[] = [];
 
   for (const instanceId of ps.activeParts) {
     const placed = assembly.parts.get(instanceId);
@@ -482,8 +507,8 @@ export function getParachuteContextMenuItems(ps, assembly) {
 
     const state = getParachuteStatus(ps, instanceId);
 
-    let statusLabel;
-    let deployTimer = null;
+    let statusLabel: string;
+    let deployTimer: number | null = null;
     switch (state) {
       case ParachuteState.PACKED:
         statusLabel = 'Packed (ready)';

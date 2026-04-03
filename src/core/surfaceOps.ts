@@ -1,5 +1,5 @@
 /**
- * surfaceOps.js — Surface operations system.
+ * surfaceOps.ts — Surface operations system.
  *
  * Handles all activities performed while landed on a celestial body's surface:
  *   - Plant flag      (one per body, crewed only, milestone bonus)
@@ -27,6 +27,26 @@ import {
 import { earnReward } from './finance.js';
 import { getActiveSatellites } from './satellites.js';
 import { getPartById } from '../data/parts.js';
+import type { GameState, FlightState, SurfaceItem } from './gameState.js';
+import type { PhysicsState, RocketAssembly } from './physics.js';
+import type { PartDef } from '../data/parts.js';
+
+// ---------------------------------------------------------------------------
+// Local types
+// ---------------------------------------------------------------------------
+
+interface SurfaceActionResult {
+  success: boolean;
+  reason?: string;
+  item?: SurfaceItem;
+}
+
+interface SurfaceAction {
+  id: string;
+  label: string;
+  enabled: boolean;
+  reason?: string;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -35,52 +55,37 @@ import { getPartById } from '../data/parts.js';
 let _nextId = 1;
 
 /** Generate a unique surface-item ID. */
-function _generateId() {
+function _generateId(): string {
   return `surface-${Date.now()}-${_nextId++}`;
 }
 
 /**
  * Get all surface items on a specific body.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {string} bodyId
- * @returns {import('./gameState.js').SurfaceItem[]}
  */
-export function getSurfaceItemsAtBody(state, bodyId) {
-  return (state.surfaceItems ?? []).filter(i => i.bodyId === bodyId);
+export function getSurfaceItemsAtBody(state: GameState, bodyId: string): SurfaceItem[] {
+  return (state.surfaceItems ?? []).filter((i) => i.bodyId === bodyId);
 }
 
 /**
  * Check if a flag has already been planted on a body.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {string} bodyId
- * @returns {boolean}
  */
-export function hasFlag(state, bodyId) {
+export function hasFlag(state: GameState, bodyId: string): boolean {
   return (state.surfaceItems ?? []).some(
-    i => i.type === SurfaceItemType.FLAG && i.bodyId === bodyId,
+    (i) => i.type === SurfaceItemType.FLAG && i.bodyId === bodyId,
   );
 }
 
 /**
  * Check if the current flight has crew aboard (command module with crewIds).
- *
- * @param {import('./gameState.js').FlightState} flightState
- * @returns {boolean}
  */
-export function isCrewedFlight(flightState) {
-  return flightState.crewIds && flightState.crewIds.length > 0;
+export function isCrewedFlight(flightState: FlightState): boolean {
+  return !!(flightState.crewIds && flightState.crewIds.length > 0);
 }
 
 /**
  * Check if the rocket assembly contains a science module (SERVICE_MODULE).
- *
- * @param {import('../core/rocketbuilder.js').RocketAssembly} assembly
- * @param {import('../core/physics.js').PhysicsState} ps
- * @returns {boolean}
  */
-export function hasScienceModule(assembly, ps) {
+export function hasScienceModule(assembly: RocketAssembly, ps: PhysicsState): boolean {
   if (!assembly || !ps) return false;
   for (const [idx, placed] of assembly.parts.entries()) {
     if (!ps.activeParts.has(idx)) continue;
@@ -98,16 +103,12 @@ export function hasScienceModule(assembly, ps) {
  * Visibility requires either:
  *   - The body is EARTH (direct line of sight to agency hub)
  *   - GPS satellite(s) in orbit around that body
- *
- * @param {import('./gameState.js').GameState} state
- * @param {string} bodyId
- * @returns {boolean}
  */
-export function areSurfaceItemsVisible(state, bodyId) {
+export function areSurfaceItemsVisible(state: GameState, bodyId: string): boolean {
   if (bodyId === CelestialBody.EARTH) return true;
 
   const gpsSats = getActiveSatellites(state).filter(
-    s => s.satelliteType === SatelliteType.GPS && s.bodyId === bodyId,
+    (s: any) => s.satelliteType === SatelliteType.GPS && s.bodyId === bodyId,
   );
   return gpsSats.length >= GPS_VISIBILITY_THRESHOLD;
 }
@@ -125,13 +126,12 @@ export function areSurfaceItemsVisible(state, bodyId) {
  *   - No flag already planted on this body
  *
  * Awards milestone bonus (cash + reputation) on first flag per body.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {import('./gameState.js').FlightState} flightState
- * @param {import('../core/physics.js').PhysicsState} ps
- * @returns {{ success: boolean, reason?: string, item?: import('./gameState.js').SurfaceItem }}
  */
-export function plantFlag(state, flightState, ps) {
+export function plantFlag(
+  state: GameState,
+  flightState: FlightState,
+  ps: PhysicsState,
+): SurfaceActionResult {
   if (!ps || !ps.landed) {
     return { success: false, reason: 'Must be landed on a surface.' };
   }
@@ -145,7 +145,7 @@ export function plantFlag(state, flightState, ps) {
 
   if (!state.surfaceItems) state.surfaceItems = [];
 
-  const item = {
+  const item: SurfaceItem = {
     id: _generateId(),
     type: SurfaceItemType.FLAG,
     bodyId,
@@ -179,13 +179,12 @@ export function plantFlag(state, flightState, ps) {
  *
  * The sample is stored but NOT yet returned — it must be physically
  * brought back to the R&D lab (safe landing on Earth) for science yield.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {import('./gameState.js').FlightState} flightState
- * @param {import('../core/physics.js').PhysicsState} ps
- * @returns {{ success: boolean, reason?: string, item?: import('./gameState.js').SurfaceItem }}
  */
-export function collectSurfaceSample(state, flightState, ps) {
+export function collectSurfaceSample(
+  state: GameState,
+  flightState: FlightState,
+  ps: PhysicsState,
+): SurfaceActionResult {
   if (!ps || !ps.landed) {
     return { success: false, reason: 'Must be landed on a surface.' };
   }
@@ -196,7 +195,7 @@ export function collectSurfaceSample(state, flightState, ps) {
   if (!state.surfaceItems) state.surfaceItems = [];
   const bodyId = flightState.bodyId;
 
-  const item = {
+  const item: SurfaceItem = {
     id: _generateId(),
     type: SurfaceItemType.SURFACE_SAMPLE,
     bodyId,
@@ -225,14 +224,13 @@ export function collectSurfaceSample(state, flightState, ps) {
  *   - Rocket has a surviving science module (SERVICE_MODULE)
  *
  * Generates passive science per period while deployed.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {import('./gameState.js').FlightState} flightState
- * @param {import('../core/physics.js').PhysicsState} ps
- * @param {import('../core/rocketbuilder.js').RocketAssembly} assembly
- * @returns {{ success: boolean, reason?: string, item?: import('./gameState.js').SurfaceItem }}
  */
-export function deploySurfaceInstrument(state, flightState, ps, assembly) {
+export function deploySurfaceInstrument(
+  state: GameState,
+  flightState: FlightState,
+  ps: PhysicsState,
+  assembly: RocketAssembly,
+): SurfaceActionResult {
   if (!ps || !ps.landed) {
     return { success: false, reason: 'Must be landed on a surface.' };
   }
@@ -243,7 +241,7 @@ export function deploySurfaceInstrument(state, flightState, ps, assembly) {
   if (!state.surfaceItems) state.surfaceItems = [];
   const bodyId = flightState.bodyId;
 
-  const item = {
+  const item: SurfaceItem = {
     id: _generateId(),
     type: SurfaceItemType.SURFACE_INSTRUMENT,
     bodyId,
@@ -270,14 +268,13 @@ export function deploySurfaceInstrument(state, flightState, ps, assembly) {
  *   - Landed on a body
  *
  * Marks the landing site on the map so the player can return.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {import('./gameState.js').FlightState} flightState
- * @param {import('../core/physics.js').PhysicsState} ps
- * @param {string} [beaconName]  Optional custom name for the beacon.
- * @returns {{ success: boolean, reason?: string, item?: import('./gameState.js').SurfaceItem }}
  */
-export function deployBeacon(state, flightState, ps, beaconName) {
+export function deployBeacon(
+  state: GameState,
+  flightState: FlightState,
+  ps: PhysicsState,
+  beaconName?: string,
+): SurfaceActionResult {
   if (!ps || !ps.landed) {
     return { success: false, reason: 'Must be landed on a surface.' };
   }
@@ -285,7 +282,7 @@ export function deployBeacon(state, flightState, ps, beaconName) {
   if (!state.surfaceItems) state.surfaceItems = [];
   const bodyId = flightState.bodyId;
 
-  const item = {
+  const item: SurfaceItem = {
     id: _generateId(),
     type: SurfaceItemType.BEACON,
     bodyId,
@@ -313,11 +310,8 @@ export function deployBeacon(state, flightState, ps, beaconName) {
  * Process surface operations for a new period.
  *
  * Awards passive science from deployed surface instruments.
- *
- * @param {import('./gameState.js').GameState} state
- * @returns {{ scienceEarned: number }}
  */
-export function processSurfaceOps(state) {
+export function processSurfaceOps(state: GameState): { scienceEarned: number } {
   const items = state.surfaceItems ?? [];
   let scienceEarned = 0;
 
@@ -340,12 +334,11 @@ export function processSurfaceOps(state) {
  *
  * Any uncollected samples collected during flights that ended with a
  * safe Earth landing are marked as collected, and science is awarded.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {string} landingBodyId  Body where the craft landed.
- * @returns {{ samplesReturned: number, scienceEarned: number }}
  */
-export function processSampleReturns(state, landingBodyId) {
+export function processSampleReturns(
+  state: GameState,
+  landingBodyId: string,
+): { samplesReturned: number; scienceEarned: number } {
   if (landingBodyId !== CelestialBody.EARTH) {
     return { samplesReturned: 0, scienceEarned: 0 };
   }
@@ -372,14 +365,13 @@ export function processSampleReturns(state, landingBodyId) {
 
 /**
  * Get the list of surface actions available to the player in the current state.
- *
- * @param {import('./gameState.js').GameState} state
- * @param {import('./gameState.js').FlightState} flightState
- * @param {import('../core/physics.js').PhysicsState} ps
- * @param {import('../core/rocketbuilder.js').RocketAssembly} assembly
- * @returns {Array<{ id: string, label: string, enabled: boolean, reason?: string }>}
  */
-export function getAvailableSurfaceActions(state, flightState, ps, assembly) {
+export function getAvailableSurfaceActions(
+  state: GameState,
+  flightState: FlightState,
+  ps: PhysicsState,
+  assembly: RocketAssembly,
+): SurfaceAction[] {
   if (!ps || !ps.landed || !flightState) return [];
 
   const bodyId = flightState.bodyId;
@@ -387,7 +379,7 @@ export function getAvailableSurfaceActions(state, flightState, ps, assembly) {
   const hasSciMod = hasScienceModule(assembly, ps);
   const flagPlanted = hasFlag(state, bodyId);
 
-  const actions = [];
+  const actions: SurfaceAction[] = [];
 
   // Plant Flag
   actions.push({

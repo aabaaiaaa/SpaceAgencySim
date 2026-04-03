@@ -1,5 +1,5 @@
 /**
- * idbStorage.js — IndexedDB key-value store that mirrors localStorage saves.
+ * idbStorage.ts — IndexedDB key-value store that mirrors localStorage saves.
  *
  * Provides a simple async key-value interface over a single IndexedDB database
  * and object store. Keys match localStorage keys for consistency.
@@ -22,29 +22,25 @@ const STORE_NAME = 'saves';
 // Database Connection
 // ---------------------------------------------------------------------------
 
-/** @type {IDBDatabase | null} */
-let _db = null;
+let _db: IDBDatabase | null = null;
 
-/** @type {Promise<IDBDatabase> | null} */
-let _dbPromise = null;
+let _dbPromise: Promise<IDBDatabase> | null = null;
 
 /**
  * Opens (or returns the cached) IndexedDB database connection.
  * Creates the object store on first open.
- *
- * @returns {Promise<IDBDatabase>}
  */
-function openDB() {
+function openDB(): Promise<IDBDatabase> {
   if (_db) return Promise.resolve(_db);
   if (_dbPromise) return _dbPromise;
 
-  _dbPromise = new Promise((resolve, reject) => {
+  _dbPromise = new Promise<IDBDatabase>((resolve, reject) => {
     if (typeof indexedDB === 'undefined') {
       reject(new Error('IndexedDB is not available'));
       return;
     }
 
-    let request;
+    let request: IDBOpenDBRequest;
     try {
       request = indexedDB.open(DB_NAME, DB_VERSION);
     } catch {
@@ -81,25 +77,22 @@ function openDB() {
 /**
  * Returns true if IndexedDB appears to be available in this environment.
  * Does not guarantee operations will succeed (e.g. quota, permissions).
- *
- * @returns {boolean}
  */
-export function isIdbAvailable() {
+export function isIdbAvailable(): boolean {
   return typeof indexedDB !== 'undefined';
 }
 
 /**
  * Stores a value in IndexedDB under the given key.
  *
- * @param {string} key
- * @param {string} value - JSON string to store.
- * @returns {Promise<void>}
+ * @param key - The key to store under.
+ * @param value - JSON string to store.
  */
-export async function idbSet(key, value) {
+export async function idbSet(key: string, value: string): Promise<void> {
   const db = await openDB();
-  return new Promise((resolve, reject) => {
+  return new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
+    const store: IDBObjectStore = tx.objectStore(STORE_NAME);
     const request = store.put(value, key);
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
@@ -109,16 +102,16 @@ export async function idbSet(key, value) {
 /**
  * Retrieves a value from IndexedDB by key.
  *
- * @param {string} key
- * @returns {Promise<string | null>} The stored JSON string, or null if not found.
+ * @param key - The key to retrieve.
+ * @returns The stored JSON string, or null if not found.
  */
-export async function idbGet(key) {
+export async function idbGet(key: string): Promise<string | null> {
   const db = await openDB();
-  return new Promise((resolve, reject) => {
+  return new Promise<string | null>((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readonly');
-    const store = tx.objectStore(STORE_NAME);
+    const store: IDBObjectStore = tx.objectStore(STORE_NAME);
     const request = store.get(key);
-    request.onsuccess = () => resolve(request.result ?? null);
+    request.onsuccess = () => resolve((request.result as string | undefined) ?? null);
     request.onerror = () => reject(request.error);
   });
 }
@@ -126,14 +119,13 @@ export async function idbGet(key) {
 /**
  * Deletes a key from IndexedDB.
  *
- * @param {string} key
- * @returns {Promise<void>}
+ * @param key - The key to delete.
  */
-export async function idbDelete(key) {
+export async function idbDelete(key: string): Promise<void> {
   const db = await openDB();
-  return new Promise((resolve, reject) => {
+  return new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
+    const store: IDBObjectStore = tx.objectStore(STORE_NAME);
     const request = store.delete(key);
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
@@ -144,7 +136,7 @@ export async function idbDelete(key) {
  * Resets the cached DB connection. Exported only for testing — do not call
  * from game logic.
  */
-export function _resetDbForTesting() {
+export function _resetDbForTesting(): void {
   if (_db) {
     _db.close();
   }
