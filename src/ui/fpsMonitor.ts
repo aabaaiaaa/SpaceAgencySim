@@ -11,7 +11,7 @@
  * @module ui/fpsMonitor
  */
 
-import { injectStyleOnce } from './injectStyle.js';
+import './fpsMonitor.css';
 
 interface PerfStats {
   fps: number;
@@ -35,32 +35,6 @@ const DISPLAY_INTERVAL_MS = 500;
 const GRAPH_W = 120;
 const GRAPH_H = 30;
 
-// ---------------------------------------------------------------------------
-// CSS
-// ---------------------------------------------------------------------------
-
-const FPS_MONITOR_CSS = `
-#fps-monitor {
-  position: fixed;
-  top: calc(var(--topbar-height, 40px) + 8px);
-  right: 8px;
-  z-index: calc(var(--z-flight-hud, 90) + 1);
-  background: rgba(0, 0, 0, 0.6);
-  border: 1px solid rgba(100, 200, 100, 0.3);
-  border-radius: var(--radius-sm, 4px);
-  padding: 6px 8px;
-  font-family: var(--font-family, monospace);
-  font-size: var(--font-size-tiny, 0.72rem);
-  color: #a8e8c0;
-  pointer-events: none;
-  user-select: none;
-  line-height: 1.4;
-}
-#fps-monitor-graph {
-  display: block;
-  margin-top: 3px;
-}
-`;
 
 // ---------------------------------------------------------------------------
 // Module state (pre-allocated, no per-frame allocs)
@@ -94,8 +68,6 @@ let _active = false;
  */
 export function initFpsMonitor(): void {
   if (_container) return; // already initialised
-
-  injectStyleOnce('fps-monitor-css', FPS_MONITOR_CSS);
 
   _container = document.createElement('div');
   _container.id = 'fps-monitor';

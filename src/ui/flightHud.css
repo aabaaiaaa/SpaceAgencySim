@@ -1,0 +1,680 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Flight HUD — root overlay
+   ═══════════════════════════════════════════════════════════════════════════ */
+#flight-hud {
+  position: fixed;
+  inset: var(--topbar-height) 0 0;
+  pointer-events: none;
+  z-index: var(--z-flight-hud);
+  font-family: var(--font-family);
+  color: #a8e8c0;
+  user-select: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Left panel — throttle + staging + fuel (replaces old throttle + telem + fuel)
+   ═══════════════════════════════════════════════════════════════════════════ */
+#flight-left-panel {
+  position: absolute;
+  left: 58px;
+  bottom: 60px;
+  width: 230px;
+  background: rgba(0, 8, 0, 0.78);
+  border: 1px solid #284828;
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+  max-height: calc(100% - 120px);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.flight-lp-section {
+  padding: 8px 10px 7px;
+  border-bottom: 1px solid rgba(40, 72, 40, 0.5);
+  flex-shrink: 0;
+}
+
+.flight-lp-section:last-child {
+  border-bottom: none;
+}
+
+.flight-lp-title {
+  font-size: 8px;
+  color: #507860;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 7px;
+}
+
+/* Throttle subsection */
+.flight-lp-throttle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.flight-lp-throttle-track {
+  width: 10px;
+  height: 80px;
+  border: 1px solid #305030;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.55);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.flight-lp-throttle-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to top, #20c040, #60ff80);
+  transition: height 0.06s linear;
+}
+
+.flight-lp-throttle-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.flight-lp-pct {
+  font-size: 14px;
+  color: #c0ffd8;
+  letter-spacing: 0.02em;
+}
+
+.flight-lp-twr-row {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.flight-lp-lbl {
+  font-size: 8px;
+  color: #507860;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.flight-lp-val {
+  font-size: 11px;
+  color: #a0d8b0;
+}
+
+.flight-lp-btn-row {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 5px;
+}
+
+.flight-lp-btn {
+  padding: 2px 7px;
+  background: rgba(0, 16, 0, 0.8);
+  border: 1px solid #305030;
+  border-radius: 3px;
+  color: #70a880;
+  font-size: 9px;
+  font-family: system-ui, sans-serif;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.flight-lp-btn:hover {
+  background: rgba(0, 36, 0, 0.9);
+  border-color: #407840;
+  color: #a0d8b0;
+}
+
+/* Staging subsection — stages stacked bottom-to-top (rendered top-to-bottom,
+   but visually labeled in reverse so Stage 1 appears at the bottom of the list) */
+.flight-lp-stage-item {
+  padding: 4px 6px;
+  border: 1px solid #1a3020;
+  border-radius: 3px;
+  margin-bottom: 4px;
+}
+
+.flight-lp-stage-item:last-child {
+  margin-bottom: 0;
+}
+
+.flight-lp-stage-item.active {
+  border-color: #40c060;
+  background: rgba(16, 48, 16, 0.4);
+}
+
+.flight-lp-stage-item.spent {
+  opacity: 0.35;
+}
+
+.flight-lp-stage-label {
+  font-size: 8px;
+  color: #507860;
+  margin-bottom: 2px;
+}
+
+.flight-lp-stage-item.active .flight-lp-stage-label {
+  color: #60c070;
+}
+
+.flight-lp-stage-parts {
+  font-size: 8px;
+  color: #88c8a0;
+  margin-bottom: 1px;
+  word-break: break-word;
+}
+
+.flight-lp-stage-dv {
+  font-size: 9px;
+  color: #c0ffd8;
+}
+
+/* Fuel subsection */
+.flight-lp-fuel-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 3px;
+  font-size: 10px;
+}
+
+.flight-lp-fuel-row:last-child {
+  margin-bottom: 0;
+}
+
+.flight-lp-fuel-name {
+  color: #80c090;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 140px;
+}
+
+.flight-lp-fuel-kg {
+  color: #c0ffd8;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-left: 6px;
+}
+
+/* ─── Launch tip ─────────────────────────────────────────────────────────── */
+#flight-launch-tip {
+  position: absolute;
+  bottom: 120px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(4, 20, 8, 0.90);
+  border: 1px solid #407840;
+  border-radius: var(--radius-md);
+  padding: 10px 22px;
+  color: #a0e8a0;
+  font-size: 13px;
+  pointer-events: none;
+  white-space: nowrap;
+  animation: flight-tip-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes flight-tip-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.45; }
+}
+
+/* Shared row/val helpers (kept for objectives panel) */
+.hud-row {
+  margin-bottom: 5px;
+}
+
+.hud-row:last-child {
+  margin-bottom: 0;
+}
+
+.hud-lbl {
+  font-size: 9px;
+  color: #507860;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+}
+
+.hud-val {
+  font-size: 14px;
+  color: #d0ffd8;
+  line-height: 1.25;
+  letter-spacing: 0.02em;
+}
+
+.hud-val-sm {
+  font-size: 11px;
+  color: #a0d8b0;
+  line-height: 1.25;
+  letter-spacing: 0.02em;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Mission objectives panel — top-right
+   ═══════════════════════════════════════════════════════════════════════════ */
+#flight-hud-objectives {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  background: rgba(0, 8, 0, 0.68);
+  border: 1px solid #284828;
+  border-radius: var(--radius-sm);
+  padding: 8px 12px 6px;
+  min-width: 180px;
+  max-width: 280px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.hud-obj-mission-title {
+  font-size: 9px;
+  color: #40c070;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 5px;
+}
+
+.hud-obj-mission-group:not(:first-child) {
+  border-top: 1px solid rgba(40, 72, 40, 0.5);
+  margin-top: 6px;
+  padding-top: 6px;
+}
+
+.hud-panel-title {
+  font-size: 9px;
+  color: #507860;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 7px;
+}
+
+.hud-obj-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 5px;
+}
+
+.hud-obj-item:last-child {
+  margin-bottom: 0;
+}
+
+.hud-obj-icon {
+  flex-shrink: 0;
+  font-size: 11px;
+  line-height: 1.2;
+  margin-top: 1px;
+}
+
+.hud-obj-icon.met     { color: #40ff70; }
+.hud-obj-icon.pending { color: #405840; }
+
+.hud-obj-desc {
+  font-size: 10px;
+  color: #88c8a0;
+  line-height: 1.4;
+}
+
+.hud-obj-desc.met {
+  color: #60d080;
+}
+
+.hud-obj-timer {
+  font-size: 9px;
+  color: #60c0ff;
+  font-variant-numeric: tabular-nums;
+  margin-top: 1px;
+}
+
+.hud-obj-timer.inactive {
+  color: #506060;
+}
+
+.hud-empty {
+  color: #405840;
+  font-size: 10px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Time warp panel — bottom-centre
+   ═══════════════════════════════════════════════════════════════════════════ */
+#flight-hud-timewarp {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 8, 0, 0.68);
+  border: 1px solid #284828;
+  border-radius: 4px;
+  padding: 5px 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: auto;
+  white-space: nowrap;
+}
+
+.hud-warp-label {
+  font-size: 9px;
+  color: #507860;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-right: 2px;
+}
+
+.hud-warp-btn {
+  padding: 3px 7px;
+  background: rgba(0, 16, 0, 0.8);
+  border: 1px solid #305030;
+  border-radius: 3px;
+  color: #70a880;
+  font-size: 10px;
+  font-family: system-ui, sans-serif;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s, color 0.1s;
+  min-width: 30px;
+  text-align: center;
+}
+
+.hud-warp-btn:hover:not(:disabled) {
+  background: rgba(0, 36, 0, 0.9);
+  border-color: #407840;
+  color: #a0d8b0;
+}
+
+.hud-warp-btn.active {
+  background: rgba(16, 72, 16, 0.9);
+  border-color: #60c060;
+  color: #c0ffd8;
+  font-weight: bold;
+}
+
+.hud-warp-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TWR bar + mode toggle
+   ═══════════════════════════════════════════════════════════════════════════ */
+.flight-lp-mode-toggle {
+  padding: 1px 5px;
+  background: rgba(0, 16, 0, 0.8);
+  border: 1px solid #305030;
+  border-radius: 3px;
+  color: #507860;
+  font-size: 8px;
+  font-family: system-ui, sans-serif;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  transition: background 0.1s, border-color 0.1s, color 0.1s;
+  line-height: 1.4;
+}
+
+.flight-lp-mode-toggle.active {
+  background: rgba(16, 72, 16, 0.7);
+  border-color: #40a050;
+  color: #a0ffc0;
+}
+
+.flight-lp-twr-bar {
+  width: 10px;
+  height: 80px;
+  border: 1px solid #305030;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.55);
+  position: relative;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.flight-lp-twr-bar-center {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: #507860;
+  pointer-events: none;
+}
+
+.flight-lp-twr-bar-fill-up {
+  position: absolute;
+  bottom: 50%;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to top, #20c040, #60ff80);
+  transition: height 0.06s linear;
+}
+
+.flight-lp-twr-bar-fill-dn {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to bottom, #c08020, #ff9040);
+  transition: height 0.06s linear;
+}
+
+.flight-lp-twr-bar-value {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 7px;
+  color: #fff;
+  text-shadow: 0 0 3px #000, 0 0 3px #000;
+  pointer-events: none;
+  writing-mode: vertical-lr;
+  text-orientation: mixed;
+  letter-spacing: 0.02em;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Altitude tape — vertical scrolling scale beside the rocket
+   ═══════════════════════════════════════════════════════════════════════════ */
+#flight-alt-tape {
+  position: absolute;
+  left: 6px;
+  bottom: 60px;
+  width: 48px;
+  height: calc(100% - 120px);
+  background: rgba(0, 8, 0, 0.78);
+  border: 1px solid #284828;
+  border-radius: 4px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.alt-tape-ticks {
+  position: absolute;
+  inset: 0;
+}
+
+.alt-tape-tick-minor {
+  position: absolute;
+  right: 0;
+  width: 8px;
+  height: 1px;
+  background: #406040;
+}
+
+.alt-tape-tick-major {
+  position: absolute;
+  right: 0;
+  width: 16px;
+  height: 1px;
+  background: #70b080;
+}
+
+.alt-tape-tick-label {
+  position: absolute;
+  right: 18px;
+  font-size: 8px;
+  color: #90c8a0;
+  white-space: nowrap;
+  transform: translateY(-50%);
+}
+
+.alt-tape-indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.alt-tape-indicator-line {
+  width: 100%;
+  height: 2px;
+  background: #40ff80;
+  box-shadow: 0 0 6px #40ff80;
+}
+
+.alt-tape-indicator-val {
+  position: absolute;
+  right: 2px;
+  top: 3px;
+  font-size: 9px;
+  font-weight: bold;
+  color: #40ff80;
+  text-shadow: 0 0 4px #000;
+  white-space: nowrap;
+}
+
+.alt-tape-ground {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(80, 60, 20, 0.5) 0px,
+    rgba(80, 60, 20, 0.5) 3px,
+    rgba(40, 30, 10, 0.5) 3px,
+    rgba(40, 30, 10, 0.5) 6px
+  );
+  border-top: 1px solid #806020;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Control mode indicator
+   ═══════════════════════════════════════════════════════════════════════════ */
+#hud-control-mode {
+  position: absolute;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px 16px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  pointer-events: none;
+  z-index: 110;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+#hud-control-mode[data-mode="NORMAL"] {
+  background: rgba(20, 60, 40, 0.7);
+  border: 1px solid rgba(80, 180, 120, 0.4);
+  color: #80d8a0;
+}
+
+#hud-control-mode[data-mode="DOCKING"] {
+  background: rgba(60, 50, 10, 0.8);
+  border: 1px solid rgba(220, 180, 60, 0.6);
+  color: #ffe080;
+}
+
+#hud-control-mode[data-mode="RCS"] {
+  background: rgba(40, 20, 60, 0.8);
+  border: 1px solid rgba(180, 100, 220, 0.6);
+  color: #d0a0ff;
+}
+
+#hud-band-warning {
+  position: absolute;
+  top: 86px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 14px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(120, 40, 20, 0.85);
+  border: 1px solid rgba(255, 100, 60, 0.6);
+  color: #ff9070;
+  pointer-events: none;
+  z-index: 110;
+  white-space: nowrap;
+}
+
+#hud-band-warning.hidden { display: none; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Surface Operations panel — bottom-left, visible only when landed
+   ═══════════════════════════════════════════════════════════════════════════ */
+#flight-hud-surface {
+  position: absolute;
+  bottom: 10px;
+  left: 70px;
+  background: rgba(0, 8, 0, 0.78);
+  border: 1px solid #486828;
+  border-radius: 4px;
+  padding: 8px 10px;
+  pointer-events: auto;
+  max-width: 200px;
+}
+
+#flight-hud-surface.hidden { display: none; }
+
+#flight-hud-surface .surface-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #6a8a4a;
+  margin-bottom: 6px;
+}
+
+#flight-hud-surface .surface-btn {
+  display: block;
+  width: 100%;
+  padding: 5px 8px;
+  margin-bottom: 3px;
+  font-size: 11px;
+  font-family: system-ui, sans-serif;
+  border: 1px solid #486828;
+  border-radius: 3px;
+  background: rgba(20, 40, 10, 0.9);
+  color: #a0d8b0;
+  cursor: pointer;
+  text-align: left;
+}
+
+#flight-hud-surface .surface-btn:hover:not(:disabled) {
+  background: rgba(40, 80, 20, 0.9);
+  border-color: #6a8a4a;
+}
+
+#flight-hud-surface .surface-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+#flight-hud-surface .surface-btn-reason {
+  font-size: 9px;
+  color: #707070;
+  margin-left: 4px;
+}

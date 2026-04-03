@@ -1,17 +1,5 @@
-/**
- * _css.js — VAB CSS template literal.
- *
- * Extracted from the original vab.js so other sub-modules don't carry
- * the weight of the large style block.
- */
+/* VAB layout constants: toolbar=52px, parts-panel=280px, scale-bar=66px (from src/render/vab.ts) */
 
-import {
-  VAB_TOOLBAR_HEIGHT,
-  VAB_PARTS_PANEL_WIDTH,
-  VAB_SCALE_BAR_WIDTH,
-} from '../../render/vab.js';
-
-export const VAB_CSS = `
 /* ── VAB root ───────────────────────────────────────────────────────── */
 #vab-root {
   position: absolute;
@@ -30,8 +18,8 @@ export const VAB_CSS = `
 
 /* ── Toolbar ─────────────────────────────────────────────────────────── */
 #vab-toolbar {
-  height: ${VAB_TOOLBAR_HEIGHT}px;
-  min-height: ${VAB_TOOLBAR_HEIGHT}px;
+  height: 52px;
+  min-height: 52px;
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -180,8 +168,8 @@ export const VAB_CSS = `
 
 /* ── Scale bar ───────────────────────────────────────────────────────── */
 #vab-scale-bar {
-  width: ${VAB_SCALE_BAR_WIDTH}px;
-  min-width: ${VAB_SCALE_BAR_WIDTH}px;
+  width: 66px;
+  min-width: 66px;
   flex-shrink: 0;
   background: rgba(3, 6, 16, 0.92);
   border-right: 1px solid #0e1e30;
@@ -246,8 +234,8 @@ export const VAB_CSS = `
 
 /* ── Parts panel ─────────────────────────────────────────────────────── */
 #vab-parts-panel {
-  width: ${VAB_PARTS_PANEL_WIDTH}px;
-  min-width: ${VAB_PARTS_PANEL_WIDTH}px;
+  width: 280px;
+  min-width: 280px;
   flex-shrink: 0;
   background: rgba(3, 6, 18, 0.97);
   border-left: 1px solid #162c48;
@@ -543,7 +531,7 @@ export const VAB_CSS = `
   position: absolute;
   top: 0;
   bottom: 0;
-  left: ${VAB_SCALE_BAR_WIDTH}px;
+  left: 66px;
   width: 300px;
   background: rgba(3, 6, 18, 0.98);
   border-right: 1px solid #162c48;
@@ -1168,5 +1156,3 @@ export const VAB_CSS = `
 .vab-load-card-delete-btn:hover {
   background: rgba(100,30,30,0.9) !important;
 }
-
-`;

@@ -1,29 +1,5 @@
-/**
- * design-tokens.ts — Shared design system for the Space Agency Sim UI.
- *
- * Defines CSS custom properties for colors, spacing, typography, border-radius,
- * z-index layers, and button variants. All UI modules should reference these
- * tokens instead of hardcoding values.
- *
- * Usage:
- *   import { injectDesignTokens } from './design-tokens.js';
- *   // Call once at app startup:
- *   injectDesignTokens();
- *
- *   // Then reference in CSS template literals:
- *   `background: var(--panel-bg);`
- *   `border-radius: var(--radius-md);`
- *
- * @module ui/design-tokens
- */
-
-// ---------------------------------------------------------------------------
-// CSS custom properties — injected onto :root
-// ---------------------------------------------------------------------------
-
-const DESIGN_TOKENS: string = `
 :root {
-  /* ── Color palette ─────────────────────────────────────────────────────── */
+  /* -- Color palette -------------------------------------------------------- */
 
   /* Backgrounds */
   --color-base:            #0a0e18;
@@ -96,7 +72,7 @@ const DESIGN_TOKENS: string = `
   --color-card-border:     rgba(255, 255, 255, 0.10);
   --color-card-bg-hover:   rgba(255, 255, 255, 0.03);
 
-  /* ── Typography ────────────────────────────────────────────────────────── */
+  /* -- Typography ----------------------------------------------------------- */
   --font-family:           system-ui, sans-serif;
 
   --font-size-display:     1.7rem;    /* large headings, overlay titles */
@@ -110,7 +86,7 @@ const DESIGN_TOKENS: string = `
   --font-size-small:       0.78rem;   /* section headers, meta text */
   --font-size-tiny:        0.72rem;   /* badges, fine print */
 
-  /* ── Spacing scale ─────────────────────────────────────────────────────── */
+  /* -- Spacing scale -------------------------------------------------------- */
   --space-xs:   4px;
   --space-sm:   8px;
   --space-md:   12px;
@@ -130,12 +106,12 @@ const DESIGN_TOKENS: string = `
   --btn-padding-xl:        10px 32px;
   --modal-padding:         26px 30px 22px;
 
-  /* ── Border radius ─────────────────────────────────────────────────────── */
+  /* -- Border radius -------------------------------------------------------- */
   --radius-sm:  4px;   /* buttons, small elements */
   --radius-md:  6px;   /* cards, panels, dropdowns */
   --radius-lg:  8px;   /* modals, large cards */
 
-  /* ── Z-index layers ────────────────────────────────────────────────────── */
+  /* -- Z-index layers ------------------------------------------------------- */
   --z-base:       1;
   --z-hub:        10;
   --z-hub-widget: 20;
@@ -147,23 +123,17 @@ const DESIGN_TOKENS: string = `
   --z-overlay:    400;
   --z-return:     500;
 
-  /* ── Topbar ────────────────────────────────────────────────────────────── */
+  /* -- Topbar --------------------------------------------------------------- */
   --topbar-height: 44px;
 
-  /* ── Transitions ───────────────────────────────────────────────────────── */
+  /* -- Transitions ---------------------------------------------------------- */
   --transition-fast: 0.1s;
   --transition-default: 0.15s;
 }
-`;
 
-// ---------------------------------------------------------------------------
-// Reusable CSS class snippets for common button variants
-// ---------------------------------------------------------------------------
-
-const BUTTON_VARIANTS: string = `
-/* ═══════════════════════════════════════════════════════════════════════════
-   Shared button variants — import design-tokens.js to get these globally
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* ===========================================================================
+   Shared button variants
+   =========================================================================== */
 
 /* Primary action button (blue) */
 .btn-primary {
@@ -258,9 +228,9 @@ const BUTTON_VARIANTS: string = `
   color: var(--color-text-primary);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   Shared facility screen base — common overlay + header pattern
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* ===========================================================================
+   Shared facility screen base -- common overlay + header pattern
+   =========================================================================== */
 
 /* Facility overlay base */
 .facility-overlay {
@@ -389,23 +359,4 @@ const BUTTON_VARIANTS: string = `
   pointer-events: auto;
   font-family: var(--font-family);
   color: #cce4f8;
-}
-`;
-
-// ---------------------------------------------------------------------------
-// Injection
-// ---------------------------------------------------------------------------
-
-/**
- * Injects the design tokens and shared utility classes into the document head.
- * Safe to call multiple times — only injects once (checks DOM, not just a flag).
- */
-export function injectDesignTokens(): void {
-  if (document.getElementById('design-tokens')) return;
-
-  const style = document.createElement('style');
-  style.id = 'design-tokens';
-  style.textContent = DESIGN_TOKENS + BUTTON_VARIANTS;
-  // Prepend so tokens are available before any module styles
-  document.head.insertBefore(style, document.head.firstChild);
 }

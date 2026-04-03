@@ -145,7 +145,7 @@
 - **Verification**: `npm run typecheck` passes. `npm run test:unit` passes. No `.js` files remain in `src/` (excluding E2E files in `e2e/`).
 
 ### TASK-024: Extract CSS from JS template literals into .css files
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: For each of the 18 UI modules using `injectStyleOnce()`, extract the CSS into co-located `.css` files and import via Vite's CSS import. Replace dedicated CSS modules (`vab/_css.js`, `flightController/_css.js`, `missionControl/_css.js`) entirely with `.css` files and delete the JS originals. Migrate design-tokens.js `:root` properties and utility classes to `design-tokens.css`. Handle dynamic interpolations by hardcoding constants or using CSS custom properties. Note: the `_css.js` files were deliberately excluded from TS migration (TASK-021/022) since they are replaced here. See requirements Section 4.2.
 - **Verification**: `npm run build` succeeds. `npm run test:e2e` passes. Grep for `injectStyleOnce` returns zero results in `src/`. All UI modules import `.css` files instead. No `_css.js` files remain.

@@ -51,81 +51,11 @@ import {
   MALFUNCTION_LABELS,
 }                                                             from '../core/malfunction.js';
 import { MalfunctionType }                                    from '../core/constants.js';
-import { injectStyleOnce }                                    from './injectStyle.js';
+import './flightContextMenu.css';
 import type { PhysicsState }                                  from '../core/physics.js';
 import type { RocketAssembly }                                from '../core/rocketbuilder.js';
 import type { FlightState, FlightEvent, GameState }             from '../core/gameState.js';
 
-// ---------------------------------------------------------------------------
-// CSS
-// ---------------------------------------------------------------------------
-
-const CTX_MENU_CSS: string = `
-/* ── Flight part context menu ──────────────────────────────────────────── */
-#flight-part-ctx-menu {
-  position: fixed;
-  background: rgba(10, 14, 24, 0.96);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 6px;
-  padding: 4px 0;
-  min-width: 210px;
-  max-width: 280px;
-  z-index: 350;
-  font-family: system-ui, sans-serif;
-}
-
-#flight-part-ctx-menu[hidden] {
-  display: none;
-}
-
-.fctx-header {
-  color: #5888a8;
-  font-size: 11px;
-  padding: 7px 14px 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-weight: 600;
-}
-
-.fctx-divider {
-  height: 1px;
-  background: rgba(255, 255, 255, 0.1);
-  margin: 3px 0;
-}
-
-.fctx-item {
-  display: block;
-  width: 100%;
-  padding: 9px 14px;
-  text-align: left;
-  background: none;
-  border: none;
-  color: #d8e0f0;
-  font-size: 13px;
-  cursor: pointer;
-  transition: background 0.1s;
-  box-sizing: border-box;
-}
-
-.fctx-item:hover {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.fctx-item-disabled {
-  color: #4a6070 !important;
-  cursor: default !important;
-}
-
-.fctx-item-disabled:hover {
-  background: none !important;
-}
-
-.fctx-readonly {
-  color: #7898b0;
-  font-size: 13px;
-  padding: 8px 14px;
-}
-`;
 
 // ---------------------------------------------------------------------------
 // Module state
@@ -167,9 +97,6 @@ export function initFlightContextMenu(
   _getPs          = getPs;
   _getAssembly    = getAssembly;
   _getFlightState = getFlightState;
-
-  // Inject CSS once per page load.
-  injectStyleOnce('flight-ctx-css', CTX_MENU_CSS);
 
   // Create the menu DOM element.
   _menu = document.createElement('div');

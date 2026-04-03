@@ -11,13 +11,12 @@
 import type { GameState } from '../../core/gameState.js';
 import { getUnlockedMissions } from '../../core/missions.js';
 import { getMCState, setMCState } from './_state.js';
-import { MISSION_CONTROL_STYLES } from './_css.js';
+import './missionControl.css';
 import { renderShell, updateActiveTabClass, registerTabSwitchHandler, registerDestroyHandler } from './_shell.js';
 import { renderAvailableTab, renderAcceptedTab, renderCompletedTab } from './_missionsTab.js';
 import { renderContractsBoardTab, renderActiveContractsTab } from './_contractsTab.js';
 import { renderChallengesTab } from './_challengesTab.js';
 import { renderAchievementsTab } from './_achievementsTab.js';
-import { injectStyleOnce } from '../injectStyle.js';
 
 // ---------------------------------------------------------------------------
 // Tab dispatch
@@ -60,9 +59,6 @@ export function initMissionControlUI(
 
   // Recalculate mission unlock state on every open.
   getUnlockedMissions(state);
-
-  // Inject CSS once.
-  injectStyleOnce('mission-control-styles', MISSION_CONTROL_STYLES);
 
   const overlay = document.createElement('div');
   overlay.id = 'mission-control-overlay';

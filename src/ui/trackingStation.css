@@ -1,0 +1,297 @@
+/* -- Tracking Station overlay -------------------------------------------- */
+#ts-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--color-surface);
+  z-index: var(--z-facility);
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+  font-family: var(--font-family);
+  color: var(--color-text-primary);
+  padding-top: var(--topbar-height);
+}
+
+#ts-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  padding: var(--header-padding);
+  flex-shrink: 0;
+}
+
+#ts-back-btn {
+  background: var(--color-secondary-bg);
+  border: 1px solid var(--color-secondary-border);
+  color: var(--color-secondary-text);
+  font-size: var(--font-size-label);
+  padding: var(--btn-padding-md);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-default);
+  white-space: nowrap;
+}
+#ts-back-btn:hover {
+  background: var(--color-secondary-bg-hover);
+}
+
+#ts-title {
+  font-size: var(--font-size-h2);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--color-text-heading);
+  margin: 0;
+}
+
+/* -- Content ------------------------------------------------------------- */
+#ts-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px 40px;
+}
+
+.ts-section {
+  margin-bottom: 24px;
+}
+
+.ts-section h2 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #80c8ff;
+  margin: 0 0 10px;
+  letter-spacing: 0.02em;
+}
+
+/* -- Overview cards ------------------------------------------------------ */
+.ts-overview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.ts-overview-card {
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-card-border);
+  border-radius: 6px;
+  padding: 12px 16px;
+  min-width: 140px;
+  flex: 1;
+}
+
+.ts-overview-card .label {
+  font-size: 0.75rem;
+  color: #8899aa;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.ts-overview-card .value {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #e0f0ff;
+}
+
+.ts-overview-card .value.debris-count {
+  color: #ff9060;
+}
+
+/* -- Feature list -------------------------------------------------------- */
+.ts-features {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.ts-features li {
+  padding: 4px 0;
+  font-size: 0.88rem;
+  color: #c0d0e0;
+}
+
+.ts-features li::before {
+  content: '\2713 ';
+  color: #60dd80;
+  font-weight: 700;
+  margin-right: 6px;
+}
+
+/* -- Object list --------------------------------------------------------- */
+.ts-obj-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ts-obj-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 5px;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+}
+
+.ts-obj-row .obj-name {
+  font-weight: 600;
+  color: #e0f0ff;
+  flex: 1;
+  min-width: 120px;
+}
+
+.ts-obj-row .obj-type {
+  color: #8899aa;
+  font-size: 0.78rem;
+  min-width: 80px;
+}
+
+.ts-obj-row .obj-body {
+  color: #8899aa;
+  font-size: 0.78rem;
+}
+
+.ts-obj-row.debris .obj-name {
+  color: #ff9060;
+}
+
+/* -- Weather forecast ---------------------------------------------------- */
+.ts-forecast-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.ts-forecast-card {
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-card-border);
+  border-radius: 6px;
+  padding: 10px 14px;
+}
+
+.ts-forecast-card .day-label {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #e0f0ff;
+  margin-bottom: 4px;
+}
+
+.ts-forecast-card .day-desc {
+  font-size: 0.82rem;
+  color: #b0c0d0;
+}
+
+.ts-forecast-card .day-desc.extreme {
+  color: #ff6060;
+  font-weight: 600;
+}
+
+/* -- Transfer routes ----------------------------------------------------- */
+.ts-transfer-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.ts-transfer-card {
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-card-border);
+  border-radius: 6px;
+  padding: 10px 14px;
+}
+
+.ts-transfer-card .body-name {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #e0f0ff;
+  margin-bottom: 2px;
+}
+
+.ts-transfer-card .route-info {
+  font-size: 0.82rem;
+  color: #b0c0d0;
+}
+
+.ts-tier-locked {
+  color: #556;
+  font-style: italic;
+  font-size: 0.85rem;
+  padding: 8px 0;
+}
+
+/* -- Field craft (crewed vessels) ---------------------------------------- */
+.ts-field-craft-card {
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-card-border);
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin-bottom: 8px;
+}
+
+.ts-field-craft-card.warning {
+  border-color: rgba(255,170,48,0.5);
+  background: rgba(120,100,20,0.15);
+}
+
+.ts-field-craft-card.critical {
+  border-color: rgba(255,64,64,0.5);
+  background: rgba(120,20,20,0.15);
+}
+
+.ts-field-craft-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.ts-field-craft-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #e0f0ff;
+}
+
+.ts-field-craft-status {
+  font-size: 0.78rem;
+  color: #8899aa;
+}
+
+.ts-field-craft-detail {
+  display: flex;
+  gap: 20px;
+  font-size: 0.82rem;
+  color: #b0c0d0;
+}
+
+.ts-supply-bar {
+  display: inline-flex;
+  gap: 3px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.ts-supply-pip {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: rgba(96,221,128,0.8);
+  border: 1px solid rgba(96,221,128,0.4);
+}
+
+.ts-supply-pip.empty {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.15);
+}
+
+.ts-supply-pip.warning {
+  background: rgba(255,170,48,0.8);
+  border-color: rgba(255,170,48,0.4);
+}
+
+.ts-supply-infinite {
+  font-size: 0.82rem;
+  color: #60dd80;
+  font-weight: 600;
+}

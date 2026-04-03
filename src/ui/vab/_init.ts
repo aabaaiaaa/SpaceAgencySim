@@ -17,13 +17,11 @@ import {
   vabSetAssembly,
   vabRenderParts,
 } from '../../render/vab.js';
-import { injectRocketCardCSS } from '../rocketCardUtil.js';
 
 import type { GameState, InventoryPart } from '../../core/gameState.js';
 
 import { getVabState } from './_state.js';
-import { VAB_CSS } from './_css.js';
-import { injectStyleOnce } from '../injectStyle.js';
+import './vab.css';
 import { buildPartsHTML, setupPanelDrag } from './_partsPanel.js';
 import { drawScaleTicks, updateScaleBarExtents } from './_scalebar.js';
 import {
@@ -186,9 +184,6 @@ export function initVabUI(
   S.onBack    = onBack ?? null;
   S.container = container;
 
-  // Inject styles once.
-  injectRocketCardCSS();
-  injectStyleOnce('vab-css', VAB_CSS);
 
   // ── Root DOM ──────────────────────────────────────────────────────────────
   const root = document.createElement('div');

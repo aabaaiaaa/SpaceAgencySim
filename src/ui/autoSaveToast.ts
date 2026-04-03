@@ -9,77 +9,7 @@
 
 import type { GameState } from '../core/gameState.js';
 import { isAutoSaveEnabled, performAutoSave } from '../core/autoSave.js';
-import { injectStyleOnce } from './injectStyle.js';
-
-// ---------------------------------------------------------------------------
-// CSS
-// ---------------------------------------------------------------------------
-
-const TOAST_STYLES = `
-.auto-save-toast {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  background: rgba(20, 32, 48, 0.92);
-  border: 1px solid rgba(80, 140, 200, 0.35);
-  border-radius: var(--radius-md, 6px);
-  padding: 10px 16px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  z-index: 600;
-  font-family: var(--font-family, system-ui, sans-serif);
-  font-size: 0.82rem;
-  color: #b0d0f0;
-  pointer-events: auto;
-  opacity: 1;
-  transition: opacity 0.3s;
-}
-
-.auto-save-toast.fade-out {
-  opacity: 0;
-}
-
-.auto-save-toast-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.auto-save-toast-spinner {
-  width: 14px;
-  height: 14px;
-  border: 2px solid rgba(80, 140, 200, 0.3);
-  border-top-color: #60a8e0;
-  border-radius: 50%;
-  animation: auto-save-spin 0.8s linear infinite;
-}
-
-@keyframes auto-save-spin {
-  to { transform: rotate(360deg); }
-}
-
-.auto-save-toast-cancel {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: var(--radius-sm, 4px);
-  color: #90b0c8;
-  font-size: 0.78rem;
-  padding: 3px 10px;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-
-.auto-save-toast-cancel:hover {
-  background: rgba(255, 80, 80, 0.15);
-  color: #ff9090;
-  border-color: rgba(255, 80, 80, 0.3);
-}
-
-.auto-save-toast-done {
-  color: var(--color-success-text, #50d870);
-}
-`;
+import './autoSaveToast.css';
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -108,8 +38,6 @@ let _pendingTimer: number | null = null;
 export function triggerAutoSave(state: GameState, _trigger?: string): void {
   if (!isAutoSaveEnabled(state)) return;
   if (_activeToast) return; // debounce
-
-  injectStyleOnce('auto-save-toast-styles', TOAST_STYLES);
 
   // Build toast element.
   const toast = document.createElement('div');

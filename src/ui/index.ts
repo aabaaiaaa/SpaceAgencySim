@@ -22,14 +22,11 @@ import { showVabScene, hideVabScene } from '../render/vab.js';
 import { showHubScene } from '../render/hub.js';
 import { hasFacility } from '../core/construction.js';
 import { GameMode } from '../core/constants.js';
-import { injectDesignTokens } from './design-tokens.js';
+import './design-tokens.css';
 import { triggerAutoSave } from './autoSaveToast.js';
 
 export { initFlightHud, destroyFlightHud } from './flightHud.js';
 export { showReturnResultsOverlay } from './hub.js';
-
-// Inject design tokens (CSS custom properties) as early as possible.
-injectDesignTokens();
 
 // ---------------------------------------------------------------------------
 // Screen routing state

@@ -22,130 +22,9 @@ import {
 } from '../core/constants.js';
 import { getDifficultySettings, updateDifficultySettings } from '../core/settings.js';
 import { createListenerTracker } from './listenerTracker.js';
-import { injectStyleOnce } from './injectStyle.js';
+import './settings.css';
 import type { GameState } from '../core/gameState.js';
 import type { DifficultySettings } from '../core/constants.js';
-
-// ---------------------------------------------------------------------------
-// CSS
-// ---------------------------------------------------------------------------
-
-const SETTINGS_STYLES = `
-/* -- Settings panel overlay -- */
-#settings-panel {
-  position: fixed;
-  inset: 0;
-  background: var(--color-overlay-bg);
-  z-index: var(--z-overlay);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  font-family: var(--font-family);
-  color: var(--color-text-light);
-  pointer-events: auto;
-  overflow: hidden;
-}
-
-.settings-content {
-  width: 100%;
-  max-width: 560px;
-  padding: 36px 24px 44px;
-  overflow-y: auto;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-#settings-panel h1 {
-  font-size: var(--font-size-h1);
-  font-weight: 700;
-  margin: 0 0 6px;
-  letter-spacing: 0.04em;
-  color: var(--color-text-accent);
-}
-
-.settings-subtitle {
-  font-size: 0.82rem;
-  color: #5080a0;
-  margin: 0 0 28px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-/* -- Setting row -- */
-.settings-group {
-  width: 100%;
-  margin-bottom: 22px;
-  background: var(--color-card-bg);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-lg);
-  padding: var(--card-padding);
-}
-
-.settings-group-label {
-  font-size: 0.92rem;
-  font-weight: 600;
-  color: #c0d8f0;
-  margin: 0 0 4px;
-}
-
-.settings-group-hint {
-  font-size: 0.75rem;
-  color: #6090b0;
-  margin: 0 0 12px;
-}
-
-.settings-options {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.settings-option-btn {
-  padding: var(--btn-padding-lg);
-  background: var(--color-surface-hover);
-  border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-sm);
-  color: #90b0c8;
-  font-size: 0.82rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-}
-
-.settings-option-btn:hover {
-  background: rgba(255, 255, 255, 0.10);
-  border-color: rgba(255, 255, 255, 0.20);
-  color: #c0d8f0;
-}
-
-.settings-option-btn.active {
-  background: var(--color-primary-solid);
-  border-color: var(--color-primary-solid-border);
-  color: #c8e8ff;
-  font-weight: 600;
-}
-
-/* -- Close button -- */
-.settings-close-btn {
-  margin-top: var(--space-xl);
-  padding: var(--btn-padding-xl);
-  background: var(--color-primary-solid);
-  border: 1px solid var(--color-primary-solid-border);
-  border-radius: var(--radius-md);
-  color: #c8e8ff;
-  font-size: var(--font-size-body-sm);
-  font-weight: 600;
-  cursor: pointer;
-  transition: background var(--transition-default);
-  letter-spacing: 0.03em;
-}
-
-.settings-close-btn:hover {
-  background: var(--color-primary-solid-hover);
-}
-`;
 
 // ---------------------------------------------------------------------------
 // Setting definitions
@@ -221,9 +100,6 @@ const SETTING_DEFS: SettingDef[] = [
 export function openSettingsPanel(container: HTMLElement, state: GameState): void {
   // Prevent duplicate.
   if (document.getElementById('settings-panel')) return;
-
-  // Inject styles once.
-  injectStyleOnce('settings-styles', SETTINGS_STYLES);
 
   const tracker = createListenerTracker();
 

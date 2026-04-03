@@ -17,8 +17,7 @@ import { createDockingState } from '../../core/docking.js';
 import { getPartById } from '../../data/parts.js';
 import { getVabInventoryUsedParts } from '../vab.js';
 import { getFCState, setFCState, resetFCState } from './_state.js';
-import { FLIGHT_CTRL_CSS } from './_css.js';
-import { injectStyleOnce } from '../injectStyle.js';
+import './flightController.css';
 import { onKeyDown, onKeyUp } from './_keyboard.js';
 import { onTimeWarpButtonClick } from './_timeWarp.js';
 import { onSurfaceAction } from './_surfaceActions.js';
@@ -138,9 +137,6 @@ export function startFlightScene(
     unstaged:        [...stagingConfig.unstaged],
     currentStageIdx: 0,
   };
-
-  // Inject CSS once per page load.
-  injectStyleOnce('flight-ctrl-css', FLIGHT_CTRL_CSS);
 
   // Reset time-warp and summary state.
   s.timeWarp            = 1;

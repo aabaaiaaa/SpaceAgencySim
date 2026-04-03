@@ -1,0 +1,229 @@
+/* ── Launch Pad overlay ────────────────────────────────────────────────────── */
+#launch-pad-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--color-surface);
+  z-index: var(--z-facility);
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+  font-family: var(--font-family);
+  color: var(--color-text-primary);
+  padding-top: var(--topbar-height);
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+#launch-pad-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  padding: var(--header-padding);
+  flex-shrink: 0;
+}
+
+#launch-pad-back-btn {
+  background: var(--color-secondary-bg);
+  border: 1px solid var(--color-secondary-border);
+  color: var(--color-secondary-text);
+  font-size: var(--font-size-label);
+  padding: var(--btn-padding-md);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-default);
+  white-space: nowrap;
+}
+#launch-pad-back-btn:hover {
+  background: var(--color-secondary-bg-hover);
+}
+
+#launch-pad-title {
+  font-size: var(--font-size-h2);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--color-text-heading);
+  margin: 0;
+}
+
+/* ── Content area ────────────────────────────────────────────────────────── */
+#launch-pad-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  gap: 16px;
+  overflow-y: auto;
+}
+
+#launch-pad-status {
+  font-size: 1.1rem;
+  color: #8090a8;
+  text-align: center;
+}
+
+#launch-pad-hint {
+  font-size: 0.88rem;
+  color: #5a6880;
+  text-align: center;
+  font-style: italic;
+  max-width: 420px;
+  line-height: 1.55;
+}
+
+/* ── Rocket list ─────────────────────────────────────────────────────────── */
+#launch-pad-rocket-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 600px;
+}
+
+.lp-rocket-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  transition: background 0.15s;
+}
+.lp-rocket-card:hover {
+  background: rgba(255,255,255,0.07);
+}
+
+.lp-rocket-preview {
+  flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 4px;
+  background: rgba(0,0,0,0.3);
+}
+
+.lp-rocket-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.lp-rocket-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #e8e8e8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lp-rocket-stats {
+  font-size: 0.78rem;
+  color: #7888a0;
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.lp-rocket-date {
+  font-size: 0.72rem;
+  color: #5a6880;
+}
+
+.lp-launch-btn {
+  background: #2a6040;
+  border: 1px solid rgba(255,255,255,0.15);
+  color: #e8e8e8;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 8px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.lp-launch-btn:hover:not(:disabled) {
+  background: #357a50;
+}
+.lp-launch-btn:disabled {
+  background: #3a3a3a;
+  color: #666;
+  cursor: not-allowed;
+  border-color: rgba(255,255,255,0.08);
+}
+
+.lp-rocket-cost {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #80c8a0;
+}
+.lp-rocket-cost-insufficient {
+  color: #c07040;
+}
+
+/* ── Crew dialog ─────────────────────────────────────────────────────────── */
+#lp-crew-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#lp-crew-dialog {
+  background: #1a1e28;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 10px;
+  padding: 20px;
+  min-width: 280px;
+  max-width: 360px;
+  color: #e8e8e8;
+  font-family: system-ui, sans-serif;
+}
+.lp-crew-dlg-hdr {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+  text-align: center;
+}
+.lp-crew-seat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.lp-crew-seat-label {
+  font-size: 0.85rem;
+  color: #a0b0c0;
+}
+.lp-crew-seat-select {
+  background: #222838;
+  border: 1px solid rgba(255,255,255,0.15);
+  color: #e8e8e8;
+  font-size: 0.82rem;
+  padding: 4px 8px;
+  border-radius: 4px;
+  max-width: 180px;
+}
+.lp-crew-dlg-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+}
+.lp-crew-dlg-footer button {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.18);
+  color: #e8e8e8;
+  font-size: 0.82rem;
+  padding: 6px 16px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.lp-crew-dlg-footer .lp-crew-confirm-btn {
+  background: #2a6040;
+}
+.lp-crew-dlg-footer .lp-crew-confirm-btn:hover {
+  background: #357a50;
+}

@@ -1,0 +1,573 @@
+/* ── Crew Admin overlay ────────────────────────────────────────────────────── */
+#crew-admin-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--color-surface);
+  z-index: var(--z-facility);
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+  font-family: var(--font-family);
+  color: var(--color-text-primary);
+  padding-top: var(--topbar-height);
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────────── */
+#crew-admin-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  padding: var(--header-padding);
+  flex-shrink: 0;
+}
+
+#crew-admin-back-btn {
+  background: var(--color-secondary-bg);
+  border: 1px solid var(--color-secondary-border);
+  color: var(--color-secondary-text);
+  font-size: var(--font-size-label);
+  padding: var(--btn-padding-md);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-default);
+  white-space: nowrap;
+}
+#crew-admin-back-btn:hover {
+  background: var(--color-secondary-bg-hover);
+}
+
+#crew-admin-title {
+  font-size: var(--font-size-h2);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--color-text-heading);
+  margin: 0;
+}
+
+/* ── Tab bar ─────────────────────────────────────────────────────────────────── */
+#crew-admin-tabs {
+  display: flex;
+  gap: var(--space-xs);
+  padding: var(--space-md) var(--space-xl) 0;
+  border-bottom: 2px solid var(--color-border-tab);
+  flex-shrink: 0;
+}
+
+.crew-admin-tab {
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: none;
+  color: var(--color-tab-text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: var(--space-sm) 18px;
+  cursor: pointer;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  transition: color var(--transition-default), background var(--transition-default);
+  position: relative;
+  bottom: -2px;
+}
+.crew-admin-tab:hover {
+  color: var(--color-tab-text-hover);
+  background: var(--color-tab-bg-hover);
+}
+.crew-admin-tab.active {
+  color: var(--color-tab-text-active);
+  background: var(--color-tab-bg-active);
+  border-color: var(--color-tab-border-active);
+  border-bottom-color: var(--color-surface);
+}
+
+/* ── Tab content area ────────────────────────────────────────────────────────── */
+#crew-admin-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--panel-padding);
+}
+
+/* ── Active Crew tab ─────────────────────────────────────────────────────────── */
+.crew-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.crew-table th {
+  text-align: left;
+  padding: 8px 12px;
+  font-weight: 600;
+  color: #8090a8;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  white-space: nowrap;
+}
+
+.crew-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  vertical-align: middle;
+}
+
+.crew-table tr:last-child td {
+  border-bottom: none;
+}
+
+.crew-table tr:hover td {
+  background: rgba(255,255,255,0.03);
+}
+
+.crew-name-cell {
+  font-weight: 600;
+  color: #d4e0f0;
+}
+
+.crew-fire-btn {
+  background: var(--color-danger-bg);
+  border: 1px solid var(--color-danger-border);
+  color: var(--color-danger);
+  font-size: 0.8rem;
+  padding: var(--btn-padding-sm);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-default), border-color var(--transition-default);
+  white-space: nowrap;
+}
+.crew-fire-btn:hover {
+  background: rgba(220, 60, 60, 0.3);
+  border-color: rgba(220, 60, 60, 0.7);
+}
+
+.crew-empty-msg {
+  color: var(--color-text-disabled);
+  font-style: italic;
+  text-align: center;
+  padding: var(--space-4xl) var(--space-xl);
+  font-size: 0.9rem;
+}
+
+/* ── Skill bars ──────────────────────────────────────────────────────────────── */
+.crew-skills-cell {
+  min-width: 180px;
+}
+
+.crew-skill-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 3px;
+  font-size: 0.78rem;
+}
+
+.crew-skill-row:last-child {
+  margin-bottom: 0;
+}
+
+.crew-skill-label {
+  width: 52px;
+  text-align: right;
+  color: #8090a8;
+  flex-shrink: 0;
+}
+
+.crew-skill-bar-bg {
+  flex: 1;
+  height: 8px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 4px;
+  overflow: hidden;
+  min-width: 80px;
+}
+
+.crew-skill-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s;
+}
+
+.crew-skill-bar-fill.piloting {
+  background: linear-gradient(90deg, #4488cc, #66aaee);
+}
+
+.crew-skill-bar-fill.engineering {
+  background: linear-gradient(90deg, #cc8844, #eeaa66);
+}
+
+.crew-skill-bar-fill.science {
+  background: linear-gradient(90deg, #44aa66, #66dd88);
+}
+
+.crew-skill-value {
+  width: 28px;
+  text-align: right;
+  color: #a0aab8;
+  font-size: 0.72rem;
+  flex-shrink: 0;
+}
+
+.crew-skill-effect {
+  font-size: 0.7rem;
+  color: #6a7a8a;
+  margin-left: 58px;
+  margin-top: -1px;
+  margin-bottom: 4px;
+}
+
+/* ── Hire tab ────────────────────────────────────────────────────────────────── */
+#crew-hire-panel {
+  max-width: 460px;
+  margin: 20px auto 0;
+}
+
+.hire-cash-display {
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-lg);
+  padding: 14px 18px;
+  margin-bottom: 22px;
+  font-size: 0.9rem;
+}
+
+.hire-cash-label {
+  color: #8090a8;
+  margin-bottom: 4px;
+}
+
+.hire-cash-amount {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #7dd87d;
+}
+
+.hire-cash-amount.insufficient {
+  color: #e86060;
+}
+
+.hire-cost-note {
+  color: #8090a8;
+  font-size: 0.8rem;
+  margin-top: 6px;
+}
+
+.hire-form-group {
+  margin-bottom: 18px;
+}
+
+.hire-form-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #a0aab8;
+  margin-bottom: 6px;
+}
+
+.hire-form-input {
+  width: 100%;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  color: #e8e8e8;
+  font-size: 0.9rem;
+  padding: 9px 12px;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.hire-form-input::placeholder {
+  color: #5a6070;
+}
+.hire-form-input:focus {
+  border-color: rgba(100, 160, 255, 0.5);
+}
+
+.hire-char-counter {
+  font-size: 0.72rem;
+  color: var(--color-text-muted, #6080a0);
+  margin-top: 4px;
+  text-align: right;
+}
+.hire-char-counter.warning {
+  color: var(--color-warning, #d8b860);
+}
+
+.hire-btn {
+  width: 100%;
+  background: var(--color-primary-bg);
+  border: 1px solid var(--color-primary-border);
+  color: var(--color-primary-text);
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 11px 20px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-default), border-color var(--transition-default);
+  letter-spacing: 0.03em;
+}
+.hire-btn:hover:not(:disabled) {
+  background: var(--color-primary-bg-hover);
+  border-color: var(--color-primary-border-hover);
+}
+.hire-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.hire-feedback {
+  margin-top: 12px;
+  font-size: 0.85rem;
+  min-height: 1.2em;
+  text-align: center;
+}
+.hire-feedback.success { color: #7dd87d; }
+.hire-feedback.error   { color: #e86060; }
+
+/* ── History tab ─────────────────────────────────────────────────────────────── */
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.history-table th {
+  text-align: left;
+  padding: 8px 10px;
+  font-weight: 600;
+  color: #8090a8;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  white-space: nowrap;
+}
+
+.history-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  vertical-align: top;
+}
+
+.history-table tr:last-child td {
+  border-bottom: none;
+}
+
+.history-row-active td {
+  color: #d4e0f0;
+}
+.history-row-active .hist-name-cell {
+  font-weight: 600;
+}
+
+.history-row-fired td {
+  color: #7a8090;
+}
+
+.history-row-kia td {
+  color: #e07070;
+}
+.history-row-kia .hist-name-cell {
+  font-weight: 600;
+}
+
+.kia-marker {
+  margin-right: 5px;
+  font-size: 0.85em;
+}
+
+.hist-status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.hist-status-badge.active {
+  background: rgba(60, 180, 80, 0.2);
+  color: #7dd87d;
+  border: 1px solid rgba(60, 180, 80, 0.35);
+}
+.hist-status-badge.fired {
+  background: rgba(130, 130, 130, 0.15);
+  color: #999;
+  border: 1px solid rgba(130, 130, 130, 0.3);
+}
+.hist-status-badge.kia {
+  background: rgba(220, 60, 60, 0.2);
+  color: #e86060;
+  border: 1px solid rgba(220, 60, 60, 0.35);
+}
+
+.hist-cause-cell {
+  font-size: 0.8rem;
+  color: #c07070;
+  font-style: italic;
+}
+
+.history-empty-msg {
+  color: var(--color-text-disabled);
+  font-style: italic;
+  text-align: center;
+  padding: var(--space-4xl) var(--space-xl);
+  font-size: 0.9rem;
+}
+
+/* ── Tier info bar ─────────────────────────────────────────────────────────── */
+.crew-tier-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  background: rgba(255,255,255,0.03);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  font-size: 0.82rem;
+  color: #8090a8;
+  flex-shrink: 0;
+}
+
+.crew-tier-features {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.crew-tier-feature {
+  color: #6a7a8a;
+  font-size: 0.78rem;
+}
+
+/* ── Training tab ──────────────────────────────────────────────────────────── */
+.training-panel {
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.training-info-box {
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-lg);
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  font-size: 0.85rem;
+  color: #8090a8;
+}
+
+.training-cost-note {
+  color: #ccaa44;
+  font-size: 0.8rem;
+  margin-top: 6px;
+}
+
+.training-crew-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: 10px 14px;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  margin-bottom: 8px;
+}
+
+.training-crew-name {
+  font-weight: 600;
+  color: #d4e0f0;
+  min-width: 140px;
+}
+
+.training-skill-select {
+  background: rgba(255,255,255,0.07);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  color: #e8e8e8;
+  font-size: 0.82rem;
+  padding: 5px 8px;
+}
+
+.training-assign-btn,
+.training-cancel-btn {
+  font-size: 0.8rem;
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.training-assign-btn {
+  background: rgba(60, 180, 80, 0.15);
+  border: 1px solid rgba(60, 180, 80, 0.4);
+  color: #7dd87d;
+}
+.training-assign-btn:hover {
+  background: rgba(60, 180, 80, 0.3);
+}
+
+.training-cancel-btn {
+  background: rgba(220, 160, 60, 0.15);
+  border: 1px solid rgba(220, 160, 60, 0.4);
+  color: #ddaa44;
+}
+.training-cancel-btn:hover {
+  background: rgba(220, 160, 60, 0.3);
+}
+
+.training-status {
+  font-size: 0.8rem;
+  color: #66dd88;
+  font-style: italic;
+}
+
+/* ── Experienced hire section ──────────────────────────────────────────────── */
+.exp-hire-section {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+.exp-hire-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #ccaa44;
+  margin-bottom: 12px;
+}
+
+.exp-hire-desc {
+  font-size: 0.82rem;
+  color: #8090a8;
+  margin-bottom: 14px;
+}
+
+/* ── Medical buttons ──────────────────────────────────────────────────────── */
+.crew-medical-btn {
+  background: rgba(60, 180, 120, 0.15);
+  border: 1px solid rgba(60, 180, 120, 0.4);
+  color: #66cc88;
+  font-size: 0.75rem;
+  padding: 3px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+  margin-left: 6px;
+}
+.crew-medical-btn:hover {
+  background: rgba(60, 180, 120, 0.3);
+}
+
+.crew-injury-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  color: #e0a040;
+  background: rgba(220, 160, 60, 0.15);
+  border: 1px solid rgba(220, 160, 60, 0.3);
+  padding: 1px 8px;
+  border-radius: 3px;
+  margin-left: 6px;
+}
+
+.crew-training-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  color: #66dd88;
+  background: rgba(60, 180, 80, 0.12);
+  border: 1px solid rgba(60, 180, 80, 0.3);
+  padding: 1px 8px;
+  border-radius: 3px;
+  margin-left: 6px;
+}
