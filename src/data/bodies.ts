@@ -1,5 +1,5 @@
 /**
- * bodies.js — Celestial body definitions for the solar system.
+ * bodies.ts — Celestial body definitions for the solar system.
  *
  * Each body is a data object parameterising physics and rendering:
  *   - Physical: surface gravity, radius, GM, atmosphere profile
@@ -19,97 +19,125 @@
  */
 
 // ---------------------------------------------------------------------------
-// Atmosphere profile helper — returns null for airless bodies
+// Type Definitions
 // ---------------------------------------------------------------------------
 
-/**
- * @typedef {Object} AtmosphereProfile
- * @property {number} seaLevelDensity   Air density at surface (kg/m³).
- * @property {number} scaleHeight       Exponential scale height (m).
- * @property {number} topAltitude       Altitude above which density is zero (m).
- * @property {string} [composition]     Dominant gas(es) for flavour text.
- */
+export interface AtmosphereProfile {
+  /** Air density at surface (kg/m³). */
+  seaLevelDensity: number;
+  /** Exponential scale height (m). */
+  scaleHeight: number;
+  /** Altitude above which density is zero (m). */
+  topAltitude: number;
+  /** Dominant gas(es) for flavour text. */
+  composition?: string;
+}
 
-/**
- * @typedef {Object} SkyVisual
- * @property {number} seaLevelColor     Hex colour at ground level.
- * @property {number} highAltColor      Hex colour at upper atmosphere / space.
- * @property {number} spaceColor        Hex colour in vacuum.
- * @property {number} starFadeStart     Altitude (m) where stars begin to appear.
- * @property {number} starFadeEnd       Altitude (m) where stars are fully visible.
- */
+export interface SkyVisual {
+  /** Hex colour at ground level. */
+  seaLevelColor: number;
+  /** Hex colour at upper atmosphere / space. */
+  highAltColor: number;
+  /** Hex colour in vacuum. */
+  spaceColor: number;
+  /** Altitude (m) where stars begin to appear. */
+  starFadeStart: number;
+  /** Altitude (m) where stars are fully visible. */
+  starFadeEnd: number;
+}
 
-/**
- * @typedef {Object} GroundVisual
- * @property {number} color             Primary surface colour (hex).
- * @property {string} description       Short flavour text for rendering hints.
- */
+export interface GroundVisual {
+  /** Primary surface colour (hex). */
+  color: number;
+  /** Short flavour text for rendering hints. */
+  description: string;
+}
 
-/**
- * @typedef {Object} BiomeDef
- * @property {string} id                Machine-readable identifier.
- * @property {string} name              Human-readable display name.
- * @property {number} min               Minimum altitude in metres (surface-relative).
- * @property {number} max               Maximum altitude in metres (Infinity for top).
- * @property {number} scienceMultiplier Multiplier applied to science experiment value.
- * @property {number} color             Tint colour (hex) for label rendering.
- */
+export interface BiomeDef {
+  /** Machine-readable identifier. */
+  id: string;
+  /** Human-readable display name. */
+  name: string;
+  /** Minimum altitude in metres (surface-relative). */
+  min: number;
+  /** Maximum altitude in metres (Infinity for top). */
+  max: number;
+  /** Multiplier applied to science experiment value. */
+  scienceMultiplier: number;
+  /** Tint colour (hex) for label rendering. */
+  color: number;
+}
 
-/**
- * @typedef {Object} AltitudeBand
- * @property {string} id    Band identifier (e.g., 'LEO', 'LLO').
- * @property {string} name  Human-readable band name.
- * @property {number} min   Minimum altitude in metres.
- * @property {number} max   Maximum altitude in metres.
- */
+export interface AltitudeBand {
+  /** Band identifier (e.g., 'LEO', 'LLO'). */
+  id: string;
+  /** Human-readable band name. */
+  name: string;
+  /** Minimum altitude in metres. */
+  min: number;
+  /** Maximum altitude in metres. */
+  max: number;
+}
 
-/**
- * @typedef {Object} CelestialBodyDef
- * @property {string}               id              Unique body identifier (matches CelestialBody enum).
- * @property {string}               name            Human-readable name.
- * @property {number}               surfaceGravity  Surface gravitational acceleration (m/s²).
- * @property {number}               radius          Mean radius in metres.
- * @property {number}               gm              Gravitational parameter μ = G×M (m³/s²).
- * @property {AtmosphereProfile|null} atmosphere     Atmosphere profile or null if airless.
- * @property {number}               orbitalDistance  Mean distance from parent body (m). 0 for the Sun.
- * @property {number}               orbitalPeriod   Orbital period in seconds. 0 for the Sun.
- * @property {BiomeDef[]}           biomes          Altitude-based biome definitions.
- * @property {AltitudeBand[]}       altitudeBands   Orbital altitude band definitions.
- * @property {GroundVisual}         groundVisual    Ground/surface rendering hints.
- * @property {SkyVisual}            skyVisual       Sky gradient rendering hints.
- * @property {string|null}          weather         Weather type or null (e.g., 'dust_storms').
- * @property {boolean}              landable        Whether craft can land (false for Sun, gas giants).
- * @property {number}               soiRadius       Sphere of Influence radius from body centre (m).
- * @property {string|null}          parentId        Parent body ID or null for the Sun.
- * @property {string[]}             childIds        IDs of bodies orbiting this one.
- * @property {number}               minOrbitAltitude Minimum stable orbit altitude (m above surface).
- * @property {string|null}          destructionZone  Description of destruction hazard or null.
- */
+export interface CelestialBodyDef {
+  /** Unique body identifier (matches CelestialBody enum). */
+  id: string;
+  /** Human-readable name. */
+  name: string;
+  /** Surface gravitational acceleration (m/s²). */
+  surfaceGravity: number;
+  /** Mean radius in metres. */
+  radius: number;
+  /** Gravitational parameter μ = G×M (m³/s²). */
+  gm: number;
+  /** Atmosphere profile or null if airless. */
+  atmosphere: AtmosphereProfile | null;
+  /** Mean distance from parent body (m). 0 for the Sun. */
+  orbitalDistance: number;
+  /** Orbital period in seconds. 0 for the Sun. */
+  orbitalPeriod: number;
+  /** Altitude-based biome definitions. */
+  biomes: BiomeDef[];
+  /** Orbital altitude band definitions. */
+  altitudeBands: AltitudeBand[];
+  /** Ground/surface rendering hints. */
+  groundVisual: GroundVisual;
+  /** Sky gradient rendering hints. */
+  skyVisual: SkyVisual;
+  /** Weather type or null (e.g., 'dust_storms'). */
+  weather: string | null;
+  /** Whether craft can land (false for Sun, gas giants). */
+  landable: boolean;
+  /** Sphere of Influence radius from body centre (m). */
+  soiRadius: number;
+  /** Parent body ID or null for the Sun. */
+  parentId: string | null;
+  /** IDs of bodies orbiting this one. */
+  childIds: string[];
+  /** Minimum stable orbit altitude (m above surface). */
+  minOrbitAltitude: number;
+  /** Description of destruction hazard or null. */
+  destructionZone: string | null;
+}
 
 // ---------------------------------------------------------------------------
 // Body definitions
 // ---------------------------------------------------------------------------
 
-/** @type {CelestialBodyDef} */
-const SUN = {
+const SUN: CelestialBodyDef = {
   id: 'SUN',
   name: 'Sun',
   surfaceGravity: 274,
   radius: 695_700_000,
   gm: 1.32712440018e20,
-  atmosphere: null, // Plasma, not a conventional atmosphere
+  atmosphere: null,
   orbitalDistance: 0,
   orbitalPeriod: 0,
   biomes: [
-    // Destruction zone — craft is instantly vaporised (point of no return).
     { id: 'SUN_INFERNO',         name: 'Solar Inferno',        min: 0,                max: 500_000_000,     scienceMultiplier: 0,    color: 0xffffff },
-    // Inner corona — extreme heat, only advanced solar heat shields survive.
     { id: 'SUN_INNER_CORONA',    name: 'Inner Corona',         min: 500_000_000,      max: 2_000_000_000,   scienceMultiplier: 12.0, color: 0xffee44 },
-    // Outer corona — heavy heat damage, good heat shields required.
     { id: 'SUN_OUTER_CORONA',    name: 'Outer Corona',         min: 2_000_000_000,    max: 10_000_000_000,  scienceMultiplier: 8.0,  color: 0xffaa22 },
-    // Near Sun space — moderate heat damage escalating on approach.
     { id: 'SUN_NEAR_SPACE',      name: 'Near Sun Space',       min: 10_000_000_000,   max: 30_000_000_000,  scienceMultiplier: 5.0,  color: 0xff8800 },
-    // Solar orbit — safe interplanetary space. Planetary orbits are within this zone.
     { id: 'SUN_SOLAR_ORBIT',     name: 'Solar Orbit',          min: 30_000_000_000,   max: Infinity,        scienceMultiplier: 3.0,  color: 0x332200 },
   ],
   altitudeBands: [
@@ -128,23 +156,22 @@ const SUN = {
   },
   weather: null,
   landable: false,
-  soiRadius: Infinity, // Sun's SOI encompasses the entire solar system
+  soiRadius: Infinity,
   parentId: null,
   childIds: ['MERCURY', 'VENUS', 'EARTH', 'MARS'],
-  minOrbitAltitude: 2_000_000_000, // Well above the corona
-  destructionZone: 'extreme_heat', // Craft destroyed below destruction altitude
+  minOrbitAltitude: 2_000_000_000,
+  destructionZone: 'extreme_heat',
 };
 
-/** @type {CelestialBodyDef} */
-const MERCURY = {
+const MERCURY: CelestialBodyDef = {
   id: 'MERCURY',
   name: 'Mercury',
   surfaceGravity: 3.7,
   radius: 2_439_700,
   gm: 2.2032e13,
-  atmosphere: null, // Essentially no atmosphere
-  orbitalDistance: 57_909_000_000, // ~57.9 million km from Sun
-  orbitalPeriod: 7_600_521, // ~87.97 days in seconds
+  atmosphere: null,
+  orbitalDistance: 57_909_000_000,
+  orbitalPeriod: 7_600_521,
   biomes: [
     { id: 'MERCURY_SURFACE',     name: 'Mercury Surface',      min: 0,       max: 100,       scienceMultiplier: 2.0,  color: 0x8a8a8a },
     { id: 'MERCURY_NEAR',        name: 'Near Surface',         min: 100,     max: 5_000,     scienceMultiplier: 2.5,  color: 0x707070 },
@@ -159,36 +186,35 @@ const MERCURY = {
   ],
   groundVisual: { color: 0x8a8a8a, description: 'Cratered grey regolith' },
   skyVisual: {
-    seaLevelColor: 0x000005, // No atmosphere — always black sky
+    seaLevelColor: 0x000005,
     highAltColor: 0x000005,
     spaceColor: 0x000005,
     starFadeStart: 0,
-    starFadeEnd: 0, // Stars always visible
+    starFadeEnd: 0,
   },
   weather: null,
   landable: true,
-  soiRadius: 112_000_000, // ~112,000 km Hill sphere
+  soiRadius: 112_000_000,
   parentId: 'SUN',
   childIds: [],
   minOrbitAltitude: 20_000,
   destructionZone: null,
 };
 
-/** @type {CelestialBodyDef} */
-const VENUS = {
+const VENUS: CelestialBodyDef = {
   id: 'VENUS',
   name: 'Venus',
   surfaceGravity: 8.87,
   radius: 6_051_800,
   gm: 3.24859e14,
   atmosphere: {
-    seaLevelDensity: 65.0, // ~65 kg/m³ — extremely dense CO₂ atmosphere
+    seaLevelDensity: 65.0,
     scaleHeight: 15_900,
     topAltitude: 250_000,
     composition: 'CO₂ (96.5%), N₂ (3.5%)',
   },
-  orbitalDistance: 108_208_000_000, // ~108.2 million km from Sun
-  orbitalPeriod: 19_414_149, // ~224.7 days in seconds
+  orbitalDistance: 108_208_000_000,
+  orbitalPeriod: 19_414_149,
   biomes: [
     { id: 'VENUS_SURFACE',       name: 'Venus Surface',        min: 0,       max: 100,       scienceMultiplier: 3.0,  color: 0xd4a04a },
     { id: 'VENUS_LOW_ATMO',      name: 'Low Atmosphere',       min: 100,     max: 10_000,    scienceMultiplier: 2.5,  color: 0xcc9944 },
@@ -205,7 +231,7 @@ const VENUS = {
   ],
   groundVisual: { color: 0xd4a04a, description: 'Volcanic basalt plains, orange haze' },
   skyVisual: {
-    seaLevelColor: 0xd4a04a, // Thick orange haze
+    seaLevelColor: 0xd4a04a,
     highAltColor: 0x886622,
     spaceColor: 0x000005,
     starFadeStart: 150_000,
@@ -213,15 +239,14 @@ const VENUS = {
   },
   weather: null,
   landable: true,
-  soiRadius: 616_000_000, // ~616,000 km
+  soiRadius: 616_000_000,
   parentId: 'SUN',
   childIds: [],
-  minOrbitAltitude: 250_000, // Above the dense atmosphere
+  minOrbitAltitude: 250_000,
   destructionZone: null,
 };
 
-/** @type {CelestialBodyDef} */
-const EARTH = {
+const EARTH: CelestialBodyDef = {
   id: 'EARTH',
   name: 'Earth',
   surfaceGravity: 9.81,
@@ -233,8 +258,8 @@ const EARTH = {
     topAltitude: 70_000,
     composition: 'N₂ (78%), O₂ (21%)',
   },
-  orbitalDistance: 149_598_000_000, // ~149.6 million km from Sun (1 AU)
-  orbitalPeriod: 31_557_600, // ~365.25 days in seconds
+  orbitalDistance: 149_598_000_000,
+  orbitalPeriod: 31_557_600,
   biomes: [
     { id: 'GROUND',           name: 'Ground',           min: 0,       max: 100,       scienceMultiplier: 0.5, color: 0xc4a882 },
     { id: 'LOW_ATMOSPHERE',   name: 'Low Atmosphere',   min: 100,     max: 2_000,     scienceMultiplier: 1.0, color: 0x87ceeb },
@@ -267,16 +292,15 @@ const EARTH = {
   destructionZone: null,
 };
 
-/** @type {CelestialBodyDef} */
-const MOON = {
+const MOON: CelestialBodyDef = {
   id: 'MOON',
   name: 'Moon',
   surfaceGravity: 1.62,
   radius: 1_737_400,
   gm: 4.9048695e12,
-  atmosphere: null, // No atmosphere
-  orbitalDistance: 384_400_000, // ~384,400 km from Earth
-  orbitalPeriod: 2_360_591, // ~27.32 days in seconds
+  atmosphere: null,
+  orbitalDistance: 384_400_000,
+  orbitalPeriod: 2_360_591,
   biomes: [
     { id: 'LUNAR_SURFACE',    name: 'Lunar Surface',     min: 0,       max: 100,       scienceMultiplier: 1.0, color: 0xa0a0a0 },
     { id: 'NEAR_SURFACE',     name: 'Near Surface',      min: 100,     max: 5_000,     scienceMultiplier: 1.5, color: 0x808080 },
@@ -306,21 +330,20 @@ const MOON = {
   destructionZone: null,
 };
 
-/** @type {CelestialBodyDef} */
-const MARS = {
+const MARS: CelestialBodyDef = {
   id: 'MARS',
   name: 'Mars',
   surfaceGravity: 3.72,
   radius: 3_389_500,
   gm: 4.282837e13,
   atmosphere: {
-    seaLevelDensity: 0.020, // ~0.02 kg/m³ — very thin CO₂ atmosphere
+    seaLevelDensity: 0.020,
     scaleHeight: 11_100,
     topAltitude: 80_000,
     composition: 'CO₂ (95%), N₂ (2.7%)',
   },
-  orbitalDistance: 227_939_000_000, // ~228 million km from Sun
-  orbitalPeriod: 59_354_294, // ~687 days in seconds
+  orbitalDistance: 227_939_000_000,
+  orbitalPeriod: 59_354_294,
   biomes: [
     { id: 'MARS_SURFACE',       name: 'Mars Surface',        min: 0,       max: 100,       scienceMultiplier: 2.0,  color: 0xc1440e },
     { id: 'MARS_LOW_ATMO',      name: 'Low Atmosphere',      min: 100,     max: 5_000,     scienceMultiplier: 2.5,  color: 0xb0550e },
@@ -337,7 +360,7 @@ const MARS = {
   ],
   groundVisual: { color: 0xc1440e, description: 'Red iron-oxide desert' },
   skyVisual: {
-    seaLevelColor: 0xd4a574, // Butterscotch / salmon pink Martian sky
+    seaLevelColor: 0xd4a574,
     highAltColor: 0x4a2a10,
     spaceColor: 0x000005,
     starFadeStart: 50_000,
@@ -345,23 +368,22 @@ const MARS = {
   },
   weather: 'dust_storms',
   landable: true,
-  soiRadius: 577_000_000, // ~577,000 km
+  soiRadius: 577_000_000,
   parentId: 'SUN',
   childIds: ['PHOBOS', 'DEIMOS'],
-  minOrbitAltitude: 80_000, // Above the thin atmosphere
+  minOrbitAltitude: 80_000,
   destructionZone: null,
 };
 
-/** @type {CelestialBodyDef} */
-const PHOBOS = {
+const PHOBOS: CelestialBodyDef = {
   id: 'PHOBOS',
   name: 'Phobos',
   surfaceGravity: 0.0057,
-  radius: 11_267, // Mean radius (~11.267 km, irregular shape)
-  gm: 7.112e5, // ~0.0007112 km³/s² → 711,200 m³/s²
+  radius: 11_267,
+  gm: 7.112e5,
   atmosphere: null,
-  orbitalDistance: 9_376_000, // ~9,376 km from Mars centre
-  orbitalPeriod: 27_554, // ~7.66 hours in seconds
+  orbitalDistance: 9_376_000,
+  orbitalPeriod: 27_554,
   biomes: [
     { id: 'PHOBOS_SURFACE',     name: 'Phobos Surface',      min: 0,      max: 50,        scienceMultiplier: 3.0, color: 0x6a6a60 },
     { id: 'PHOBOS_NEAR',        name: 'Near Phobos',         min: 50,     max: 1_000,     scienceMultiplier: 3.5, color: 0x505050 },
@@ -381,23 +403,22 @@ const PHOBOS = {
   },
   weather: null,
   landable: true,
-  soiRadius: 170_000, // Very small SOI due to tiny mass and close to Mars
+  soiRadius: 170_000,
   parentId: 'MARS',
   childIds: [],
   minOrbitAltitude: 1_000,
   destructionZone: null,
 };
 
-/** @type {CelestialBodyDef} */
-const DEIMOS = {
+const DEIMOS: CelestialBodyDef = {
   id: 'DEIMOS',
   name: 'Deimos',
   surfaceGravity: 0.003,
-  radius: 6_200, // Mean radius (~6.2 km, irregular shape)
-  gm: 9.8e4, // ~0.000098 km³/s² → 98,000 m³/s²
+  radius: 6_200,
+  gm: 9.8e4,
   atmosphere: null,
-  orbitalDistance: 23_463_000, // ~23,463 km from Mars centre
-  orbitalPeriod: 109_075, // ~30.3 hours in seconds
+  orbitalDistance: 23_463_000,
+  orbitalPeriod: 109_075,
   biomes: [
     { id: 'DEIMOS_SURFACE',     name: 'Deimos Surface',      min: 0,      max: 50,        scienceMultiplier: 3.0, color: 0x7a7a70 },
     { id: 'DEIMOS_NEAR',        name: 'Near Deimos',         min: 50,     max: 1_000,     scienceMultiplier: 3.5, color: 0x606060 },
@@ -417,7 +438,7 @@ const DEIMOS = {
   },
   weather: null,
   landable: true,
-  soiRadius: 500_000, // Very small SOI
+  soiRadius: 500_000,
   parentId: 'MARS',
   childIds: [],
   minOrbitAltitude: 500,
@@ -428,11 +449,8 @@ const DEIMOS = {
 // Exports
 // ---------------------------------------------------------------------------
 
-/**
- * Complete catalog of all celestial bodies, keyed by body ID.
- * @type {Readonly<Record<string, Readonly<CelestialBodyDef>>>}
- */
-export const CELESTIAL_BODIES = Object.freeze({
+/** Complete catalog of all celestial bodies, keyed by body ID. */
+export const CELESTIAL_BODIES: Readonly<Record<string, Readonly<CelestialBodyDef>>> = Object.freeze({
   SUN: Object.freeze(SUN),
   MERCURY: Object.freeze(MERCURY),
   VENUS: Object.freeze(VENUS),
@@ -443,27 +461,16 @@ export const CELESTIAL_BODIES = Object.freeze({
   DEIMOS: Object.freeze(DEIMOS),
 });
 
-/**
- * Ordered list of all body IDs for iteration.
- * @type {readonly string[]}
- */
-export const ALL_BODY_IDS = Object.freeze(Object.keys(CELESTIAL_BODIES));
+/** Ordered list of all body IDs for iteration. */
+export const ALL_BODY_IDS: readonly string[] = Object.freeze(Object.keys(CELESTIAL_BODIES));
 
-/**
- * Get a celestial body definition by ID.
- * @param {string} bodyId
- * @returns {CelestialBodyDef|undefined}
- */
-export function getBodyDef(bodyId) {
+/** Get a celestial body definition by ID. */
+export function getBodyDef(bodyId: string): CelestialBodyDef | undefined {
   return CELESTIAL_BODIES[bodyId];
 }
 
-/**
- * Get the atmosphere profile for a body, or null if airless.
- * @param {string} bodyId
- * @returns {AtmosphereProfile|null}
- */
-export function getBodyAtmosphere(bodyId) {
+/** Get the atmosphere profile for a body, or null if airless. */
+export function getBodyAtmosphere(bodyId: string): AtmosphereProfile | null {
   const body = CELESTIAL_BODIES[bodyId];
   return body ? body.atmosphere : null;
 }
@@ -472,12 +479,8 @@ export function getBodyAtmosphere(bodyId) {
  * Get air density at a given altitude for any body.
  * Uses the body's atmosphere profile (exponential model).
  * Returns 0 for airless bodies or altitudes above the atmosphere top.
- *
- * @param {number} altitude  Metres above body surface.
- * @param {string} bodyId    Celestial body ID.
- * @returns {number} Air density in kg/m³.
  */
-export function getAirDensity(altitude, bodyId) {
+export function getAirDensity(altitude: number, bodyId: string): number {
   const body = CELESTIAL_BODIES[bodyId];
   if (!body || !body.atmosphere) return 0;
 
@@ -487,73 +490,45 @@ export function getAirDensity(altitude, bodyId) {
   return atmo.seaLevelDensity * Math.exp(-clamped / atmo.scaleHeight);
 }
 
-/**
- * Get the atmosphere top altitude for a body. Returns 0 for airless bodies.
- * @param {string} bodyId
- * @returns {number}
- */
-export function getAtmosphereTop(bodyId) {
+/** Get the atmosphere top altitude for a body. Returns 0 for airless bodies. */
+export function getAtmosphereTop(bodyId: string): number {
   const body = CELESTIAL_BODIES[bodyId];
   if (!body || !body.atmosphere) return 0;
   return body.atmosphere.topAltitude;
 }
 
-/**
- * Check if a body has an atmosphere.
- * @param {string} bodyId
- * @returns {boolean}
- */
-export function hasAtmosphere(bodyId) {
+/** Check if a body has an atmosphere. */
+export function hasAtmosphere(bodyId: string): boolean {
   const body = CELESTIAL_BODIES[bodyId];
   return !!(body && body.atmosphere);
 }
 
-/**
- * Get the surface gravity for a body.
- * @param {string} bodyId
- * @returns {number} Surface gravity in m/s², or 9.81 as fallback.
- */
-export function getSurfaceGravity(bodyId) {
+/** Get the surface gravity for a body. */
+export function getSurfaceGravity(bodyId: string): number {
   const body = CELESTIAL_BODIES[bodyId];
   return body ? body.surfaceGravity : 9.81;
 }
 
-/**
- * Get the sky visual parameters for a body.
- * @param {string} bodyId
- * @returns {SkyVisual|null}
- */
-export function getSkyVisual(bodyId) {
+/** Get the sky visual parameters for a body. */
+export function getSkyVisual(bodyId: string): SkyVisual | null {
   const body = CELESTIAL_BODIES[bodyId];
   return body ? body.skyVisual : null;
 }
 
-/**
- * Get the ground visual parameters for a body.
- * @param {string} bodyId
- * @returns {GroundVisual|null}
- */
-export function getGroundVisual(bodyId) {
+/** Get the ground visual parameters for a body. */
+export function getGroundVisual(bodyId: string): GroundVisual | null {
   const body = CELESTIAL_BODIES[bodyId];
   return body ? body.groundVisual : null;
 }
 
-/**
- * Check if a body is landable (safe for craft to touch down).
- * @param {string} bodyId
- * @returns {boolean}
- */
-export function isLandable(bodyId) {
+/** Check if a body is landable (safe for craft to touch down). */
+export function isLandable(bodyId: string): boolean {
   const body = CELESTIAL_BODIES[bodyId];
   return body ? body.landable : false;
 }
 
-/**
- * Check if a body has a destruction zone (e.g., Sun's extreme heat).
- * @param {string} bodyId
- * @returns {string|null} Destruction zone type or null.
- */
-export function getDestructionZone(bodyId) {
+/** Check if a body has a destruction zone (e.g., Sun's extreme heat). */
+export function getDestructionZone(bodyId: string): string | null {
   const body = CELESTIAL_BODIES[bodyId];
   return body ? body.destructionZone : null;
 }
@@ -561,10 +536,9 @@ export function getDestructionZone(bodyId) {
 /**
  * Get the full body hierarchy as parent → children mapping.
  * Useful for tree traversal and SOI nesting.
- * @returns {Record<string, string[]>}
  */
-export function getBodyHierarchy() {
-  const hierarchy = {};
+export function getBodyHierarchy(): Record<string, string[]> {
+  const hierarchy: Record<string, string[]> = {};
   for (const [id, body] of Object.entries(CELESTIAL_BODIES)) {
     hierarchy[id] = [...body.childIds];
   }
@@ -575,12 +549,8 @@ export function getBodyHierarchy() {
  * Find the path from one body to another through the hierarchy.
  * Returns an array of body IDs representing the route, or empty array
  * if no path exists.
- *
- * @param {string} fromId  Starting body ID.
- * @param {string} toId    Target body ID.
- * @returns {string[]}  Path of body IDs from start to target (inclusive).
  */
-export function findBodyPath(fromId, toId) {
+export function findBodyPath(fromId: string, toId: string): string[] {
   if (fromId === toId) return [fromId];
 
   // Build ancestry chains to root (Sun).
@@ -589,7 +559,7 @@ export function findBodyPath(fromId, toId) {
 
   // Find lowest common ancestor.
   const fromSet = new Set(fromChain);
-  let lca = null;
+  let lca: string | null = null;
   for (const id of toChain) {
     if (fromSet.has(id)) {
       lca = id;
@@ -599,12 +569,12 @@ export function findBodyPath(fromId, toId) {
   if (!lca) return [];
 
   // Build path: fromId → ... → LCA → ... → toId.
-  const upPath = [];
+  const upPath: string[] = [];
   for (const id of fromChain) {
     upPath.push(id);
     if (id === lca) break;
   }
-  const downPath = [];
+  const downPath: string[] = [];
   for (const id of toChain) {
     if (id === lca) break;
     downPath.push(id);
@@ -614,17 +584,13 @@ export function findBodyPath(fromId, toId) {
   return [...upPath, ...downPath];
 }
 
-/**
- * Build ancestry chain from body to root (Sun).
- * @param {string} bodyId
- * @returns {string[]}
- */
-function _ancestryChain(bodyId) {
-  const chain = [];
-  let current = bodyId;
+/** Build ancestry chain from body to root (Sun). */
+function _ancestryChain(bodyId: string): string[] {
+  const chain: string[] = [];
+  let current: string | null = bodyId;
   while (current) {
     chain.push(current);
-    const body = CELESTIAL_BODIES[current];
+    const body: Readonly<CelestialBodyDef> | undefined = CELESTIAL_BODIES[current];
     current = body ? body.parentId : null;
   }
   return chain;

@@ -1,5 +1,5 @@
 /**
- * missions.js — Mission template catalog and data-layer types.
+ * missions.ts — Mission template catalog and data-layer types.
  *
  * This file defines the static mission templates used throughout the game.
  * The MISSIONS array is populated by TASK-013 (Tutorial Mission Set).
@@ -27,6 +27,9 @@
  *      `/src/core/missions.js`.
  */
 
+import { PartType, FacilityId } from '../core/constants.js';
+import type { ObjectiveDef } from '../core/gameState.js';
+
 // ---------------------------------------------------------------------------
 // Enums
 // ---------------------------------------------------------------------------
@@ -37,8 +40,6 @@
  * Each type maps to a specific check performed by `checkObjectiveCompletion()`
  * on every physics tick.  The `target` field on each objective carries the
  * type-specific threshold values documented below.
- *
- * @enum {string}
  */
 export const ObjectiveType = Object.freeze({
   /**
@@ -147,7 +148,10 @@ export const ObjectiveType = Object.freeze({
    * target: { minCrew: number }
    */
   MINIMUM_CREW: 'MINIMUM_CREW',
-});
+} as const);
+
+/** Union type of all ObjectiveType values. */
+export type ObjectiveType = (typeof ObjectiveType)[keyof typeof ObjectiveType];
 
 /**
  * Initial status values for mission definitions.
@@ -155,8 +159,6 @@ export const ObjectiveType = Object.freeze({
  *
  * Note: 'accepted' and 'completed' are live states managed by the core
  * missions module and are not used in static template definitions.
- *
- * @enum {string}
  */
 export const MissionStatus = Object.freeze({
   /** Prerequisites not yet met; mission is not visible on the board. */
@@ -167,64 +169,44 @@ export const MissionStatus = Object.freeze({
   ACCEPTED: 'accepted',
   /** All objectives met and reward collected. */
   COMPLETED: 'completed',
-});
+} as const);
+
+/** Union type of all MissionStatus values. */
+export type MissionStatus = (typeof MissionStatus)[keyof typeof MissionStatus];
 
 // ---------------------------------------------------------------------------
-// Type Definitions (JSDoc)
+// Type Definitions
 // ---------------------------------------------------------------------------
-
-/**
- * Type-specific threshold values for a mission objective.
- * The shape depends on the `type` field of the objective:
- *
- *   REACH_ALTITUDE      → { altitude: number }
- *   REACH_SPEED         → { speed: number }
- *   SAFE_LANDING        → { maxLandingSpeed: number }
- *   ACTIVATE_PART       → { partType: string }
- *   HOLD_ALTITUDE       → { minAltitude: number, maxAltitude: number, duration: number }
- *   RETURN_SCIENCE_DATA → {}
- *   CONTROLLED_CRASH    → { minCrashSpeed: number }
- *   EJECT_CREW          → { minAltitude: number }
- *   RELEASE_SATELLITE   → { minAltitude: number, minVelocity?: number }
- *   REACH_ORBIT         → { orbitAltitude: number, orbitalVelocity: number }
- *
- * @typedef {Object} ObjectiveTarget
- */
-
-/**
- * A single mission objective.
- *
- * @typedef {Object} ObjectiveDef
- * @property {string}                                    id          - Unique within the parent mission.
- * @property {import('./missions.js').ObjectiveType}     type        - What action must be performed.
- * @property {ObjectiveTarget}                           target      - Type-specific threshold values.
- * @property {boolean}                                   completed   - Starts false; set true when met.
- * @property {string}                                    description - Player-facing description.
- */
 
 /**
  * A mission template definition (static; lives in the MISSIONS array).
- *
- * @typedef {Object} MissionDef
- * @property {string}         id            - Unique mission identifier (e.g. 'mission-001').
- * @property {string}         title         - Short display name shown on the mission board.
- * @property {string}         description   - Longer flavour text explaining the mission.
- * @property {'desert'}       location      - Launch site / environment.
- * @property {ObjectiveDef[]} objectives    - Ordered list of objectives to complete.
- * @property {number}         reward        - Cash payout on successful completion (dollars).
- * @property {string[]}       unlocksAfter  - IDs of missions that must be completed first.
- *                                            Empty array means available from game start.
- * @property {string[]}       unlockedParts  - Part IDs added to state.parts on completion.
- * @property {string[]}       [requiredParts] - Part IDs unlocked when the mission is accepted.
- * @property {string|null}    [unlocksFacility] - FacilityId awarded on completion (tutorial mode).
- * @property {string|null}    [awardsFacilityOnAccept] - FacilityId awarded when the mission is
- *                                            accepted (tutorial mode).  Used for tutorial missions
- *                                            that require the facility to be built before the
- *                                            player can complete the objectives.
- * @property {MissionStatus}  status         - Initial status: 'locked' or 'available'.
  */
-
-import { PartType, FacilityId } from '../core/constants.js';
+export interface MissionDef {
+  /** Unique mission identifier (e.g. 'mission-001'). */
+  id: string;
+  /** Short display name shown on the mission board. */
+  title: string;
+  /** Longer flavour text explaining the mission. */
+  description: string;
+  /** Launch site / environment. */
+  location: string;
+  /** Ordered list of objectives to complete. */
+  objectives: ObjectiveDef[];
+  /** Cash payout on successful completion (dollars). */
+  reward: number;
+  /** IDs of missions that must be completed first. Empty array means available from game start. */
+  unlocksAfter: string[];
+  /** Part IDs added to state.parts on completion. */
+  unlockedParts: string[];
+  /** Part IDs unlocked when the mission is accepted. */
+  requiredParts?: string[];
+  /** FacilityId awarded on completion (tutorial mode). */
+  unlocksFacility?: FacilityId | null;
+  /** FacilityId awarded when the mission is accepted (tutorial mode). */
+  awardsFacilityOnAccept?: FacilityId;
+  /** Initial status: 'locked' or 'available'. */
+  status: MissionStatus;
+}
 
 // ---------------------------------------------------------------------------
 // Mission Catalog
@@ -271,10 +253,8 @@ import { PartType, FacilityId } from '../core/constants.js';
  *   AND mission 20 — ensuring the player has both satellite deployment
  *   experience and Tracking Station access.
  * After mission 17: Mission 22 (Satellite Network Ops tutorial) unlocks.
- *
- * @type {MissionDef[]}
  */
-export const MISSIONS = [
+export const MISSIONS: MissionDef[] = [
 
   // =========================================================================
   // LINEAR TUTORIAL CHAIN — missions 1-4 (one at a time)
@@ -726,14 +706,14 @@ export const MISSIONS = [
   },
 
   /**
-   * Mission 14 — Kármán Line Approach
+   * Mission 14 — Karman Line Approach
    * Altitude push: approach the edge of space at 60 km.
    * At this altitude the player is on the threshold of orbital flight.
    * Unlocks: Mission 16, Nerv Vacuum Engine part, SRB Large part.
    */
   {
     id: 'mission-014',
-    title: 'Kármán Line Approach',
+    title: 'Karman Line Approach',
     description:
       'The internationally recognised boundary of space sits at 100 km. We are ' +
       'not there yet — but reaching 60 kilometres will demonstrate that our rocket ' +
@@ -783,7 +763,7 @@ export const MISSIONS = [
         type: ObjectiveType.REACH_ORBIT,
         target: { orbitAltitude: 80_000, orbitalVelocity: 7_800 },
         completed: false,
-        description: 'Reach Low Earth Orbit (>80,000 m at ≥7,800 m/s)',
+        description: 'Reach Low Earth Orbit (>80,000 m at >=7,800 m/s)',
       },
       {
         id: 'obj-015-2',
@@ -831,7 +811,7 @@ export const MISSIONS = [
         type: ObjectiveType.REACH_ORBIT,
         target: { orbitAltitude: 80_000, orbitalVelocity: 7_800 },
         completed: false,
-        description: 'Reach orbital altitude (>80,000 m) at ≥7,800 m/s horizontal speed',
+        description: 'Reach orbital altitude (>80,000 m) at >=7,800 m/s horizontal speed',
       },
     ],
     reward: 500_000,
@@ -868,7 +848,7 @@ export const MISSIONS = [
         type: ObjectiveType.REACH_ORBIT,
         target: { orbitAltitude: 80_000, orbitalVelocity: 7_800 },
         completed: false,
-        description: 'Reach Low Earth Orbit (>80,000 m at ≥7,800 m/s)',
+        description: 'Reach Low Earth Orbit (>80,000 m at >=7,800 m/s)',
       },
       {
         id: 'obj-017-2',
@@ -1105,16 +1085,14 @@ export const MISSIONS = [
  * Built at module load time from the MISSIONS array.
  * Call `rebuildMissionsIndex()` if the MISSIONS array is mutated at runtime
  * (e.g. during tests).
- *
- * @type {Map<string, MissionDef>}
  */
-export const MISSIONS_BY_ID = new Map(MISSIONS.map((m) => [m.id, m]));
+export const MISSIONS_BY_ID: Map<string, MissionDef> = new Map(MISSIONS.map((m) => [m.id, m]));
 
 /**
  * Rebuild the MISSIONS_BY_ID index after the MISSIONS array has been mutated.
  * Only needed for test fixtures that splice the array.
  */
-export function rebuildMissionsIndex() {
+export function rebuildMissionsIndex(): void {
   MISSIONS_BY_ID.clear();
   for (const m of MISSIONS) {
     MISSIONS_BY_ID.set(m.id, m);

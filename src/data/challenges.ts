@@ -1,5 +1,5 @@
 /**
- * challenges.js — Hand-crafted challenge mission definitions with medal scoring.
+ * challenges.ts — Hand-crafted challenge mission definitions with medal scoring.
  *
  * Challenges are replayable missions with constraints and a scoring metric.
  * Each challenge awards Bronze, Silver, or Gold medals based on performance.
@@ -28,6 +28,7 @@
 
 import { ObjectiveType } from './missions.js';
 import { PartType } from '../core/constants.js';
+import type { ChallengeDef, MedalThresholds, ObjectiveDef } from '../core/gameState.js';
 
 // ---------------------------------------------------------------------------
 // Enums
@@ -35,57 +36,31 @@ import { PartType } from '../core/constants.js';
 
 /**
  * Medal tiers for challenge scoring.
- * @enum {string}
  */
 export const MedalTier = Object.freeze({
   NONE:   'none',
   BRONZE: 'bronze',
   SILVER: 'silver',
   GOLD:   'gold',
-});
+} as const);
+
+export type MedalTier = (typeof MedalTier)[keyof typeof MedalTier];
 
 /**
  * Scoring direction — whether lower or higher values are better.
- * @enum {string}
  */
 export const ScoreDirection = Object.freeze({
   LOWER_IS_BETTER:  'lower',
   HIGHER_IS_BETTER: 'higher',
-});
+} as const);
 
-// ---------------------------------------------------------------------------
-// Type Definitions (JSDoc)
-// ---------------------------------------------------------------------------
-
-/**
- * @typedef {Object} MedalThresholds
- * @property {number} bronze - Threshold for bronze medal.
- * @property {number} silver - Threshold for silver medal.
- * @property {number} gold   - Threshold for gold medal.
- */
-
-/**
- * @typedef {Object} ChallengeDef
- * @property {string}            id          - Unique challenge identifier.
- * @property {string}            title       - Display name.
- * @property {string}            description - Flavour text explaining the challenge.
- * @property {string}            briefing    - Short constraint summary shown on the card.
- * @property {import('./missions.js').ObjectiveDef[]} objectives - Required objectives (all must pass).
- * @property {string}            scoreMetric   - FlightState field to measure.
- * @property {string}            scoreLabel    - Human-readable label for the metric.
- * @property {string}            scoreUnit     - Unit suffix (e.g. 'm/s', '$', 'parts').
- * @property {ScoreDirection}    scoreDirection - Whether lower or higher is better.
- * @property {MedalThresholds}   medals      - Threshold values for each medal.
- * @property {{ bronze: number, silver: number, gold: number }} rewards - Cash reward per tier.
- * @property {string[]}          [requiredMissions] - Mission IDs that must be completed to unlock.
- */
+export type ScoreDirection = (typeof ScoreDirection)[keyof typeof ScoreDirection];
 
 // ---------------------------------------------------------------------------
 // Challenge Catalog
 // ---------------------------------------------------------------------------
 
-/** @type {ChallengeDef[]} */
-export const CHALLENGES = [
+export const CHALLENGES: ChallengeDef[] = [
 
   // =========================================================================
   // 1. Penny Pincher — reach 10 km on a tight budget

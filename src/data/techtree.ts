@@ -1,5 +1,5 @@
 /**
- * techtree.js — Technology tree node definitions.
+ * techtree.ts — Technology tree node definitions.
  *
  * The tech tree has 4 branches, each with 5 tiers.  Nodes are unlocked
  * by spending science points AND funds at the R&D Lab facility.
@@ -38,22 +38,18 @@
 // Branch IDs
 // ---------------------------------------------------------------------------
 
-/**
- * Tech tree branch identifiers.
- * @enum {string}
- */
+/** Tech tree branch identifiers. */
 export const TechBranch = Object.freeze({
   PROPULSION: 'propulsion',
   STRUCTURAL: 'structural',
   RECOVERY:   'recovery',
   SCIENCE:    'science',
-});
+} as const);
 
-/**
- * Human-readable branch names for UI display.
- * @type {Readonly<Record<string, string>>}
- */
-export const BRANCH_NAMES = Object.freeze({
+export type TechBranch = (typeof TechBranch)[keyof typeof TechBranch];
+
+/** Human-readable branch names for UI display. */
+export const BRANCH_NAMES: Readonly<Record<string, string>> = Object.freeze({
   [TechBranch.PROPULSION]: 'Propulsion',
   [TechBranch.STRUCTURAL]: 'Structural',
   [TechBranch.RECOVERY]:   'Recovery',
@@ -64,11 +60,8 @@ export const BRANCH_NAMES = Object.freeze({
 // Tier Cost Table
 // ---------------------------------------------------------------------------
 
-/**
- * Uniform cost per tier — every node at the same tier costs the same.
- * @type {Readonly<Record<number, Readonly<{science: number, funds: number}>>>}
- */
-export const TIER_COSTS = Object.freeze({
+/** Uniform cost per tier — every node at the same tier costs the same. */
+export const TIER_COSTS: Readonly<Record<number, Readonly<{ science: number; funds: number }>>> = Object.freeze({
   1: Object.freeze({ science: 15,  funds: 50_000 }),
   2: Object.freeze({ science: 30,  funds: 100_000 }),
   3: Object.freeze({ science: 60,  funds: 200_000 }),
@@ -77,33 +70,37 @@ export const TIER_COSTS = Object.freeze({
 });
 
 // ---------------------------------------------------------------------------
-// Type Definitions (JSDoc)
+// Type Definitions
 // ---------------------------------------------------------------------------
 
-/**
- * A single node in the technology tree.
- *
- * @typedef {Object} TechNodeDef
- * @property {string}   id                  Unique node identifier (e.g. 'prop-t1').
- * @property {string}   name                Human-readable display name.
- * @property {string}   branch              TechBranch value.
- * @property {number}   tier                Tech tier (1–5).
- * @property {number}   scienceCost         Science points required to research.
- * @property {number}   fundsCost           Funds required to research.
- * @property {string[]} unlocksParts        Part IDs unlocked by researching this node.
- * @property {string[]} unlocksInstruments  Instrument IDs unlocked by researching this node.
- * @property {string}   description         Flavour text / tooltip.
- */
+/** A single node in the technology tree. */
+export interface TechNodeDef {
+  /** Unique node identifier (e.g. 'prop-t1'). */
+  id: string;
+  /** Human-readable display name. */
+  name: string;
+  /** TechBranch value. */
+  branch: TechBranch;
+  /** Tech tier (1–5). */
+  tier: number;
+  /** Science points required to research. */
+  scienceCost: number;
+  /** Funds required to research. */
+  fundsCost: number;
+  /** Part IDs unlocked by researching this node. */
+  unlocksParts: string[];
+  /** Instrument IDs unlocked by researching this node. */
+  unlocksInstruments: string[];
+  /** Flavour text / tooltip. */
+  description: string;
+}
 
 // ---------------------------------------------------------------------------
 // Node Definitions
 // ---------------------------------------------------------------------------
 
-/**
- * Complete tech tree: 4 branches × 5 tiers = 20 nodes.
- * @type {ReadonlyArray<Readonly<TechNodeDef>>}
- */
-export const TECH_NODES = Object.freeze([
+/** Complete tech tree: 4 branches × 5 tiers = 20 nodes. */
+export const TECH_NODES: ReadonlyArray<Readonly<TechNodeDef>> = Object.freeze([
 
   // ── Propulsion Branch ────────────────────────────────────────────────────
 
@@ -359,42 +356,25 @@ export const TECH_NODES = Object.freeze([
 // Lookup helpers
 // ---------------------------------------------------------------------------
 
-/** @type {Map<string, TechNodeDef>} */
-const _byId = new Map(TECH_NODES.map((n) => [n.id, n]));
+const _byId = new Map<string, TechNodeDef>(TECH_NODES.map((n) => [n.id, n]));
 
-/**
- * Look up a tech node definition by ID.
- * @param {string} id
- * @returns {TechNodeDef|undefined}
- */
-export function getTechNodeById(id) {
+/** Look up a tech node definition by ID. */
+export function getTechNodeById(id: string): TechNodeDef | undefined {
   return _byId.get(id);
 }
 
-/**
- * Return all nodes in a given branch, sorted by tier ascending.
- * @param {string} branch  TechBranch value.
- * @returns {TechNodeDef[]}
- */
-export function getNodesByBranch(branch) {
+/** Return all nodes in a given branch, sorted by tier ascending. */
+export function getNodesByBranch(branch: string): TechNodeDef[] {
   return TECH_NODES.filter((n) => n.branch === branch)
     .sort((a, b) => a.tier - b.tier);
 }
 
-/**
- * Return the node in a given branch at a specific tier, or undefined.
- * @param {string} branch  TechBranch value.
- * @param {number} tier    Tier number (1–5).
- * @returns {TechNodeDef|undefined}
- */
-export function getNodeByBranchAndTier(branch, tier) {
+/** Return the node in a given branch at a specific tier, or undefined. */
+export function getNodeByBranchAndTier(branch: string, tier: number): TechNodeDef | undefined {
   return TECH_NODES.find((n) => n.branch === branch && n.tier === tier);
 }
 
-/**
- * Return all tech node definitions.
- * @returns {ReadonlyArray<Readonly<TechNodeDef>>}
- */
-export function getAllTechNodes() {
+/** Return all tech node definitions. */
+export function getAllTechNodes(): ReadonlyArray<Readonly<TechNodeDef>> {
   return TECH_NODES;
 }

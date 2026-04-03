@@ -1,5 +1,5 @@
 /**
- * contracts.js — Contract generation templates and scaling rules.
+ * contracts.ts — Contract generation templates and scaling rules.
  *
  * Procedurally generated contracts are built from templates that define the
  * objective types, parameter ranges, and reward formulas.  Each template
@@ -16,9 +16,38 @@
  * @module data/contracts
  */
 
-import { ContractCategory, CONTRACT_CONFLICT_TAGS, CONTRACT_BONUS_REWARD_RATE } from '../core/constants.js';
+import { ContractCategory, CONTRACT_CONFLICT_TAGS, CONTRACT_BONUS_REWARD_RATE, PartType } from '../core/constants.js';
 import { ObjectiveType } from './missions.js';
-import { PartType } from '../core/constants.js';
+import type { GameState, ObjectiveDef } from '../core/gameState.js';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export interface GeneratedContract {
+  title: string;
+  description: string;
+  category: string;
+  objectives: ObjectiveDef[];
+  bonusObjectives?: (ObjectiveDef & { bonus?: boolean })[];
+  bonusReward?: number;
+  reward: number;
+  deadlineFlights: number | null;
+  chainId: string | null;
+  chainPart: number | null;
+  chainTotal: number | null;
+  conflictTags?: string[];
+}
+
+export interface ContractTemplate {
+  id: string;
+  category: string;
+  minTier: number;
+  maxTier?: number;
+  minMccTier: number;
+  canGenerate: (state: GameState, rand?: number) => boolean;
+  generate: (state: GameState, rand: number) => GeneratedContract;
+}
 
 // ---------------------------------------------------------------------------
 // Progression Thresholds
@@ -33,11 +62,8 @@ import { PartType } from '../core/constants.js';
  * Tier 3: advanced (8-11 missions)
  * Tier 4: late game (12-14 missions)
  * Tier 5: endgame (15+ missions, orbital capable)
- *
- * @param {import('../core/gameState.js').GameState} state
- * @returns {number}
  */
-export function getProgressionTier(state) {
+export function getProgressionTier(state: GameState): number {
   const completed = state.missions.completed.length;
   if (completed >= 15) return 5;
   if (completed >= 12) return 4;
@@ -50,23 +76,23 @@ export function getProgressionTier(state) {
 /**
  * Get the player's highest achieved altitude from flight history and
  * completed mission objectives.
- *
- * @param {import('../core/gameState.js').GameState} state
- * @returns {number} Highest altitude in metres.
  */
-export function getHighestAltitude(state) {
+export function getHighestAltitude(state: GameState): number {
   let max = 100; // baseline
   for (const mission of state.missions.completed) {
-    if (!mission.objectives) continue;
-    for (const obj of mission.objectives) {
+    // Completed missions carry objectives at runtime, but the Mission
+    // interface doesn't declare them (they originate from mission templates).
+    const objectives = (mission as unknown as { objectives?: ObjectiveDef[] }).objectives;
+    if (!objectives) continue;
+    for (const obj of objectives) {
       if (obj.type === ObjectiveType.REACH_ALTITUDE && obj.target?.altitude) {
-        max = Math.max(max, obj.target.altitude);
+        max = Math.max(max, obj.target.altitude as number);
       }
       if (obj.type === ObjectiveType.REACH_ORBIT && obj.target?.orbitAltitude) {
-        max = Math.max(max, obj.target.orbitAltitude);
+        max = Math.max(max, obj.target.orbitAltitude as number);
       }
       if (obj.type === ObjectiveType.HOLD_ALTITUDE && obj.target?.maxAltitude) {
-        max = Math.max(max, obj.target.maxAltitude);
+        max = Math.max(max, obj.target.maxAltitude as number);
       }
     }
   }
@@ -75,33 +101,27 @@ export function getHighestAltitude(state) {
 
 /**
  * Check if the player has orbital capability (completed an orbit mission).
- *
- * @param {import('../core/gameState.js').GameState} state
- * @returns {boolean}
  */
-export function hasOrbitalCapability(state) {
+export function hasOrbitalCapability(state: GameState): boolean {
   return state.missions.completed.some(
-    (m) => m.objectives?.some((o) => o.type === ObjectiveType.REACH_ORBIT && o.completed),
+    (m) => {
+      const objectives = (m as unknown as { objectives?: ObjectiveDef[] }).objectives;
+      return objectives?.some((o) => o.type === ObjectiveType.REACH_ORBIT && o.completed);
+    },
   );
 }
 
 /**
  * Check if the player has satellite deployment capability.
- *
- * @param {import('../core/gameState.js').GameState} state
- * @returns {boolean}
  */
-export function hasSatelliteCapability(state) {
+export function hasSatelliteCapability(state: GameState): boolean {
   return state.parts.includes('satellite-mk1');
 }
 
 /**
  * Check if the player has science module capability.
- *
- * @param {import('../core/gameState.js').GameState} state
- * @returns {boolean}
  */
-export function hasScienceCapability(state) {
+export function hasScienceCapability(state: GameState): boolean {
   return state.parts.includes('science-module-mk1');
 }
 
@@ -110,39 +130,9 @@ export function hasScienceCapability(state) {
 // ---------------------------------------------------------------------------
 
 /**
- * @typedef {Object} ContractTemplate
- * @property {string}   id        - Template identifier.
- * @property {string}   category  - ContractCategory value.
- * @property {number}   minTier   - Minimum progression tier to generate this.
- * @property {number}   [maxTier] - Maximum progression tier (inclusive), or undefined.
- * @property {number}   minMccTier - Minimum Mission Control Centre tier required (1, 2, or 3).
- * @property {function(import('../core/gameState.js').GameState, number): boolean} canGenerate
- *   Extra check beyond minTier (e.g. "has science module").
- * @property {function(import('../core/gameState.js').GameState, number): GeneratedContract} generate
- *   Produces the contract data given state and a random seed factor (0-1).
- */
-
-/**
- * @typedef {Object} GeneratedContract
- * @property {string}   title
- * @property {string}   description
- * @property {string}   category
- * @property {import('./missions.js').ObjectiveDef[]} objectives
- * @property {import('./missions.js').ObjectiveDef[]} [bonusObjectives] - Optional over-performance targets.
- * @property {number}   [bonusReward] - Extra cash awarded when all bonus objectives are met.
- * @property {number}   reward
- * @property {number|null} deadlineFlights - Flights until deadline, or null for open-ended.
- * @property {string|null} chainId
- * @property {number|null} chainPart
- * @property {number|null} chainTotal
- * @property {string[]} [conflictTags] - Tags indicating potential conflict with other contracts.
- */
-
-/**
  * All contract generation templates.
- * @type {ContractTemplate[]}
  */
-export const CONTRACT_TEMPLATES = [
+export const CONTRACT_TEMPLATES: ContractTemplate[] = [
 
   // ── Altitude Records ─────────────────────────────────────────────────────
   {
@@ -151,7 +141,7 @@ export const CONTRACT_TEMPLATES = [
     minTier: 1,
     minMccTier: 1,
     canGenerate: () => true,
-    generate(state, rand) {
+    generate(state: GameState, rand: number): GeneratedContract {
       const highest = getHighestAltitude(state);
       // Push 20-80% beyond current record
       const factor = 1.2 + rand * 0.6;
@@ -197,7 +187,7 @@ export const CONTRACT_TEMPLATES = [
     minTier: 2,
     minMccTier: 2,
     canGenerate: () => true,
-    generate(state, rand) {
+    generate(state: GameState, rand: number): GeneratedContract {
       const tier = getProgressionTier(state);
       const baseSpeed = [100, 200, 500, 1000, 3000, 7000][Math.min(tier, 5)];
       const target = Math.round(baseSpeed * (1.0 + rand * 0.5));
@@ -242,7 +232,7 @@ export const CONTRACT_TEMPLATES = [
     minTier: 1,
     minMccTier: 1,
     canGenerate: () => true,
-    generate(state, rand) {
+    generate(state: GameState, rand: number): GeneratedContract {
       const tier = getProgressionTier(state);
       const maxSpeeds = [10, 8, 6, 5, 4, 3];
       const maxSpeed = maxSpeeds[Math.min(tier, 5)];
@@ -287,8 +277,8 @@ export const CONTRACT_TEMPLATES = [
     category: ContractCategory.SCIENCE_SURVEY,
     minTier: 2,
     minMccTier: 2,
-    canGenerate: (state) => hasScienceCapability(state),
-    generate(state, rand) {
+    canGenerate: (state: GameState) => hasScienceCapability(state),
+    generate(state: GameState, rand: number): GeneratedContract {
       const highest = getHighestAltitude(state);
       const minAlt = Math.round((200 + rand * highest * 0.6) / 100) * 100;
       const maxAlt = minAlt + Math.round((200 + rand * 400) / 100) * 100;
@@ -330,8 +320,8 @@ export const CONTRACT_TEMPLATES = [
     category: ContractCategory.SCIENCE_SURVEY,
     minTier: 3,
     minMccTier: 3,
-    canGenerate: (state) => hasScienceCapability(state),
-    generate(state, rand) {
+    canGenerate: (state: GameState) => hasScienceCapability(state),
+    generate(state: GameState, rand: number): GeneratedContract {
       const chainId = `chain-sci-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
       // Part 1 of 3 — low altitude survey
       const minAlt = 400 + Math.floor(rand * 600);
@@ -373,8 +363,8 @@ export const CONTRACT_TEMPLATES = [
     category: ContractCategory.SATELLITE_DEPLOY,
     minTier: 3,
     minMccTier: 3,
-    canGenerate: (state) => hasSatelliteCapability(state),
-    generate(state, rand) {
+    canGenerate: (state: GameState) => hasSatelliteCapability(state),
+    generate(state: GameState, rand: number): GeneratedContract {
       const highest = getHighestAltitude(state);
       const minAlt = Math.round(Math.max(5_000, highest * (0.3 + rand * 0.5)) / 1000) * 1000;
       const reward = Math.round(80_000 + minAlt * 1.5);
@@ -406,7 +396,7 @@ export const CONTRACT_TEMPLATES = [
     minTier: 2,
     minMccTier: 2,
     canGenerate: () => true,
-    generate(state, rand) {
+    generate(state: GameState, rand: number): GeneratedContract {
       const tier = getProgressionTier(state);
       const minSpeed = 30 + Math.floor(tier * 20 + rand * 30);
       const reward = Math.round(25_000 + minSpeed * 300);
@@ -438,8 +428,8 @@ export const CONTRACT_TEMPLATES = [
     category: ContractCategory.ORBITAL,
     minTier: 5,
     minMccTier: 3,
-    canGenerate: (state) => hasOrbitalCapability(state),
-    generate(state, rand) {
+    canGenerate: (state: GameState) => hasOrbitalCapability(state),
+    generate(state: GameState, rand: number): GeneratedContract {
       const reward = Math.round(200_000 + rand * 300_000);
 
       return {
@@ -468,8 +458,8 @@ export const CONTRACT_TEMPLATES = [
     category: ContractCategory.SATELLITE_DEPLOY,
     minTier: 5,
     minMccTier: 3,
-    canGenerate: (state) => hasOrbitalCapability(state) && hasSatelliteCapability(state),
-    generate(state, rand) {
+    canGenerate: (state: GameState) => hasOrbitalCapability(state) && hasSatelliteCapability(state),
+    generate(state: GameState, rand: number): GeneratedContract {
       const reward = Math.round(350_000 + rand * 200_000);
 
       return {
@@ -508,7 +498,7 @@ export const CONTRACT_TEMPLATES = [
     minTier: 1,
     minMccTier: 1,
     canGenerate: () => true,
-    generate(state, rand) {
+    generate(state: GameState, rand: number): GeneratedContract {
       const highest = getHighestAltitude(state);
       const target = Math.round(highest * (0.6 + rand * 0.4) / 100) * 100;
       const maxCost = Math.round((30_000 + target * 3) * (0.7 + rand * 0.3));
@@ -551,7 +541,7 @@ export const CONTRACT_TEMPLATES = [
     minTier: 2,
     minMccTier: 2,
     canGenerate: () => true,
-    generate(state, rand) {
+    generate(state: GameState, rand: number): GeneratedContract {
       const tier = getProgressionTier(state);
       const maxParts = 3 + Math.floor(rand * 2); // 3-4 parts
       const altTarget = Math.round((300 + tier * 200 + rand * 500) / 100) * 100;
@@ -594,7 +584,7 @@ export const CONTRACT_TEMPLATES = [
     minTier: 2,
     minMccTier: 2,
     canGenerate: () => true,
-    generate(state, rand) {
+    generate(state: GameState, rand: number): GeneratedContract {
       const tier = getProgressionTier(state);
       const maxSpeed = 8 + Math.floor((5 - Math.min(tier, 4)) * 1.5);
       const altTarget = Math.round((200 + tier * 150 + rand * 300) / 100) * 100;
@@ -643,8 +633,8 @@ export const CONTRACT_TEMPLATES = [
     category: ContractCategory.SATELLITE_DEPLOY,
     minTier: 4,
     minMccTier: 3,
-    canGenerate: (state) => hasSatelliteCapability(state),
-    generate(state, rand) {
+    canGenerate: (state: GameState) => hasSatelliteCapability(state),
+    generate(state: GameState, rand: number): GeneratedContract {
       const count = 2 + Math.floor(rand * 2); // 2-3 satellites
       const highest = getHighestAltitude(state);
       const minAlt = Math.round(Math.max(3_000, highest * (0.2 + rand * 0.3)) / 1000) * 1000;
@@ -676,8 +666,8 @@ export const CONTRACT_TEMPLATES = [
     category: ContractCategory.ORBITAL,
     minTier: 5,
     minMccTier: 3,
-    canGenerate: (state) => hasOrbitalCapability(state),
-    generate(state, rand) {
+    canGenerate: (state: GameState) => hasOrbitalCapability(state),
+    generate(state: GameState, rand: number): GeneratedContract {
       const minCrew = 1 + Math.floor(rand * 2); // 1-2 crew
       const reward = Math.round(250_000 + minCrew * 100_000 + rand * 150_000);
 
@@ -717,8 +707,8 @@ export const CONTRACT_TEMPLATES = [
     category: ContractCategory.ORBITAL,
     minTier: 5,
     minMccTier: 3,
-    canGenerate: (state) => hasOrbitalCapability(state),
-    generate(state, rand) {
+    canGenerate: (state: GameState) => hasOrbitalCapability(state),
+    generate(state: GameState, rand: number): GeneratedContract {
       const maxCost = Math.round(300_000 + rand * 200_000);
       const reward = Math.round(350_000 + rand * 200_000);
 
@@ -756,10 +746,8 @@ export const CONTRACT_TEMPLATES = [
 /**
  * Contract templates indexed by ID for O(1) lookups.
  * Built once at module load time from the CONTRACT_TEMPLATES array.
- *
- * @type {Map<string, ContractTemplate>}
  */
-export const CONTRACT_TEMPLATES_BY_ID = new Map(CONTRACT_TEMPLATES.map((t) => [t.id, t]));
+export const CONTRACT_TEMPLATES_BY_ID: Map<string, ContractTemplate> = new Map(CONTRACT_TEMPLATES.map((t) => [t.id, t]));
 
 // ---------------------------------------------------------------------------
 // Chain continuation templates
@@ -767,13 +755,8 @@ export const CONTRACT_TEMPLATES_BY_ID = new Map(CONTRACT_TEMPLATES.map((t) => [t
 
 /**
  * Generates the next part of a science survey chain contract.
- *
- * @param {string} chainId - The chain identifier from part 1.
- * @param {number} partNumber - Which part to generate (2 or 3).
- * @param {number} rand - Random factor 0-1.
- * @returns {GeneratedContract}
  */
-export function generateChainContinuation(chainId, partNumber, rand) {
+export function generateChainContinuation(chainId: string, partNumber: number, rand: number): GeneratedContract {
   const altMultiplier = partNumber === 2 ? 3 : 8;
   const minAlt = Math.round((500 * altMultiplier + rand * 2000) / 100) * 100;
   const maxAlt = minAlt + 600;
@@ -819,10 +802,8 @@ export function generateChainContinuation(chainId, partNumber, rand) {
 
 /**
  * Format altitude for display.
- * @param {number} alt - Altitude in metres.
- * @returns {string}
  */
-function _fmtAlt(alt) {
+function _fmtAlt(alt: number): string {
   if (alt >= 1000) {
     return `${(alt / 1000).toFixed(alt % 1000 === 0 ? 0 : 1)} km`;
   }
@@ -831,9 +812,7 @@ function _fmtAlt(alt) {
 
 /**
  * Format a cash amount as a dollar string.
- * @param {number} amount
- * @returns {string}
  */
-function _fmtCash(amount) {
+function _fmtCash(amount: number): string {
   return '$' + amount.toLocaleString();
 }

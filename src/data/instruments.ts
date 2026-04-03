@@ -1,5 +1,5 @@
 /**
- * instruments.js — Science instrument definition catalog.
+ * instruments.ts — Science instrument definition catalog.
  *
  * Instruments are loaded into science module containers in the VAB.
  * Each science module has a limited number of instrument slots; the player
@@ -49,36 +49,43 @@
  * @module data/instruments
  */
 
+import type { GameState } from '../core/gameState.js';
+import type { ScienceDataType } from '../core/constants.js';
+
 // ---------------------------------------------------------------------------
-// Type Definitions (JSDoc)
+// Type Definitions
 // ---------------------------------------------------------------------------
 
-/**
- * Complete definition for a single science instrument.
- *
- * @typedef {Object} InstrumentDef
- * @property {string}   id                  Stable unique identifier.
- * @property {string}   name                Human-readable display name.
- * @property {string}   description         Short description shown in the VAB.
- * @property {string}   dataType            'SAMPLE' or 'ANALYSIS'.
- * @property {number}   baseYield           Base science points produced on completion.
- * @property {number}   experimentDuration  Seconds the experiment takes to run.
- * @property {number}   mass                Mass in kilograms added to the module.
- * @property {number}   cost                Purchase price in dollars.
- * @property {string[]} validBiomes         Biome IDs where the instrument produces data.
- * @property {number}   techTier            Tech tree tier required (0 = starter).
- */
+/** Complete definition for a single science instrument. */
+export interface InstrumentDef {
+  /** Stable unique identifier. */
+  id: string;
+  /** Human-readable display name. */
+  name: string;
+  /** Short description shown in the VAB. */
+  description: string;
+  /** 'SAMPLE' or 'ANALYSIS'. */
+  dataType: ScienceDataType;
+  /** Base science points produced on completion. */
+  baseYield: number;
+  /** Seconds the experiment takes to run. */
+  experimentDuration: number;
+  /** Mass in kilograms added to the module. */
+  mass: number;
+  /** Purchase price in dollars. */
+  cost: number;
+  /** Biome IDs where the instrument produces data. */
+  validBiomes: string[];
+  /** Tech tree tier required (0 = starter). */
+  techTier: number;
+}
 
 // ---------------------------------------------------------------------------
 // Instrument Catalog
 // ---------------------------------------------------------------------------
 
-/**
- * Authoritative list of every science instrument in the game.
- *
- * @type {InstrumentDef[]}
- */
-export const INSTRUMENTS = [
+/** Authoritative list of every science instrument in the game. */
+export const INSTRUMENTS: InstrumentDef[] = [
 
   // ── Starter instruments (Tech Tier 0) ───────────────────────────────────
 
@@ -204,32 +211,20 @@ export const INSTRUMENTS = [
 // Lookup helpers
 // ---------------------------------------------------------------------------
 
-/** @type {Map<string, InstrumentDef>} */
-const _byId = new Map(INSTRUMENTS.map((i) => [i.id, i]));
+const _byId = new Map<string, InstrumentDef>(INSTRUMENTS.map((i) => [i.id, i]));
 
-/**
- * Look up an instrument definition by its ID.
- * @param {string} id
- * @returns {InstrumentDef|undefined}
- */
-export function getInstrumentById(id) {
+/** Look up an instrument definition by its ID. */
+export function getInstrumentById(id: string): InstrumentDef | undefined {
   return _byId.get(id);
 }
 
-/**
- * Return all instrument definitions.
- * @returns {InstrumentDef[]}
- */
-export function getAllInstruments() {
+/** Return all instrument definitions. */
+export function getAllInstruments(): InstrumentDef[] {
   return INSTRUMENTS;
 }
 
-/**
- * Return instruments available at a given tech tier (and below).
- * @param {number} maxTier  Maximum unlocked tech tier.
- * @returns {InstrumentDef[]}
- */
-export function getInstrumentsByTier(maxTier) {
+/** Return instruments available at a given tech tier (and below). */
+export function getInstrumentsByTier(maxTier: number): InstrumentDef[] {
   return INSTRUMENTS.filter((i) => i.techTier <= maxTier);
 }
 
@@ -239,24 +234,16 @@ export function getInstrumentsByTier(maxTier) {
  * An instrument is available if:
  *   1. Its `techTier` is 0 (starter — always available), OR
  *   2. Its ID appears in `state.techTree.unlockedInstruments`.
- *
- * @param {import('../core/gameState.js').GameState} state
- * @returns {InstrumentDef[]}
  */
-export function getAvailableInstruments(state) {
+export function getAvailableInstruments(state: GameState): InstrumentDef[] {
   const unlocked = new Set(state.techTree?.unlockedInstruments ?? []);
   return INSTRUMENTS.filter(
     (i) => i.techTier === 0 || unlocked.has(i.id),
   );
 }
 
-/**
- * Check whether an instrument can produce data in the given biome.
- * @param {string} instrumentId
- * @param {string} biomeId
- * @returns {boolean}
- */
-export function isInstrumentValidForBiome(instrumentId, biomeId) {
+/** Check whether an instrument can produce data in the given biome. */
+export function isInstrumentValidForBiome(instrumentId: string, biomeId: string): boolean {
   const def = _byId.get(instrumentId);
   if (!def) return false;
   if (!def.validBiomes || def.validBiomes.length === 0) return true;

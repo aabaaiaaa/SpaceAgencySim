@@ -1,5 +1,5 @@
 /**
- * parts.js — Rocket part definition catalog.
+ * parts.ts — Rocket part definition catalog.
  *
  * EXTENSIBILITY
  * =============
@@ -8,7 +8,7 @@
  * to change for new parts.
  *
  * Exception — if a brand-new part *category* is introduced:
- *   1. Add the type string to PartType in /src/core/constants.js.
+ *   1. Add the type string to PartType in /src/core/constants.ts.
  *   2. Add an ActivationBehaviour entry below if the category has unique
  *      interactive behaviour.
  *   3. Decide which snap-point type sets (STACK_TYPES / RADIAL_TYPES) the
@@ -41,7 +41,6 @@ import { PartType, FuelType, RELIABILITY_TIERS, SatelliteType } from '../core/co
 
 /**
  * What happens when the player triggers the action/staging button for a part.
- * @enum {string}
  */
 export const ActivationBehaviour = Object.freeze({
   /** Part has no interactive activation (structural / passive). */
@@ -82,111 +81,64 @@ export const ActivationBehaviour = Object.freeze({
 
   /** Grabbing arm: extend, grab a satellite, or release a grabbed satellite. */
   GRAB: 'GRAB',
-});
+} as const);
+
+export type ActivationBehaviour = (typeof ActivationBehaviour)[keyof typeof ActivationBehaviour];
 
 // ---------------------------------------------------------------------------
-// Type Definitions (JSDoc)
+// Type Definitions
 // ---------------------------------------------------------------------------
 
 /**
  * One attachment socket on a part.
- *
- * @typedef {Object} SnapPoint
- * @property {'top'|'bottom'|'left'|'right'} side
- *   Which face of the part this socket sits on.
- * @property {number} offsetX
- *   Horizontal offset from the part's centre in pixels (at base 1× scale).
- *   Positive values are to the right.
- * @property {number} offsetY
- *   Vertical offset from the part's centre in pixels (at base 1× scale).
- *   Positive values are downward (canvas / screen space).
- * @property {string[]} accepts
- *   PartType values that may connect at this socket.
- *   An empty array means nothing can attach here.
  */
+export interface SnapPoint {
+  /** Which face of the part this socket sits on. */
+  side: 'top' | 'bottom' | 'left' | 'right';
+  /** Horizontal offset from the part's centre in pixels (at base 1× scale). Positive values are to the right. */
+  offsetX: number;
+  /** Vertical offset from the part's centre in pixels (at base 1× scale). Positive values are downward (canvas / screen space). */
+  offsetY: number;
+  /** PartType values that may connect at this socket. An empty array means nothing can attach here. */
+  accepts: string[];
+}
 
 /**
  * Complete definition for a single rocket component.
  *
  * All fields are required unless noted.  Keep values deterministic and
  * serialisation-safe (plain numbers, strings, arrays — no functions).
- *
- * @typedef {Object} PartDef
- *
- * @property {string} id
- *   Stable unique identifier.  **Never rename** — saved rocket designs
- *   reference parts by ID, so changing an ID breaks existing saves.
- *
- * @property {string} name
- *   Human-readable label shown in the parts panel and on-screen tooltips.
- *
- * @property {string} [description]
- *   Short description of the part shown in the detail panel.
- *
- * @property {string} type
- *   Part category.  Must be a value from the PartType enum
- *   (src/core/constants.js).
- *
- * @property {number} mass
- *   Dry mass in kilograms.  For tanks and SRBs this is the empty mass;
- *   propellant mass is stored separately in `properties.fuelMass`.
- *
- * @property {number} cost
- *   Purchase price in dollars shown in the parts panel and VAB toolbar.
- *
- * @property {number} width
- *   Rendered width in pixels at the default 1× zoom level.
- *   (1 px ≈ 0.05 m, so 40 px ≈ 2 m diameter.)
- *
- * @property {number} height
- *   Rendered height in pixels at the default 1× zoom level.
- *
- * @property {SnapPoint[]} snapPoints
- *   Attachment sockets.  The builder uses these to highlight valid drop
- *   targets and to register connections in the rocket part graph.
- *
- * @property {string[]} animationStates
- *   Named visual states for the renderer.  The first entry is always the
- *   initial (idle) state.  The renderer switches between these strings
- *   when the part is activated, deployed, exhausted, etc.
- *   Example: ['idle', 'firing', 'burnt-out'].
- *
- * @property {boolean} activatable
- *   True if the player can manually trigger this part in flight (via the
- *   staging strip or an action-group key).
- *
- * @property {string} activationBehaviour
- *   How the part responds when activated.  Must be a value from
- *   ActivationBehaviour (defined above).  Ignored when activatable is false.
- *
- * @property {Object} properties
- *   Type-specific numeric or string values consumed by game-logic modules.
- *   Keys vary by part type — see the inline comments on each part entry.
- *   Common keys:
- *     - thrust          {number}  Sea-level thrust in kN (engines / SRBs).
- *     - thrustVac       {number}  Vacuum thrust in kN (engines / SRBs).
- *     - isp             {number}  Specific impulse at sea level, seconds.
- *     - ispVac          {number}  Specific impulse in vacuum, seconds.
- *     - throttleable    {boolean} Whether thrust can be varied (false = SRB).
- *     - fuelMass        {number}  Full propellant load in kg (tanks / SRBs).
- *     - fuelType        {string}  FuelType enum value.
- *     - seats           {number}  Crew seats (command modules only).
- *     - hasRcs          {boolean} Built-in RCS thrusters.
- *     - hasEjectorSeat  {boolean} Crew escape system.
- *     - maxSafeMass     {number}  Max supported rocket mass in kg (chutes/legs).
- *     - maxLandingSpeed {number}  Speed in m/s above which landing is unsafe.
- *     - experimentDuration {number} Seconds the science experiment runs.
- *     - dragCoefficient {number}  Aerodynamic drag (dimensionless).
- *     - heatTolerance   {number}  Max temperature in K before part fails.
- *     - crashThreshold  {number}  Impact speed (m/s) the part can survive.
- *
- * @property {number} [reliability]
- *   Base reliability rating (0.0 – 1.0).  Determines the probability that the
- *   part will NOT malfunction when checked (higher = more reliable).  Defaults
- *   to 1.0 (no malfunctions) if not specified.
- *   Starter parts: 0.92, Mid-tier: 0.96, High-tier: 0.98.
- *   Tech-tree upgrades add +0.02.
  */
+export interface PartDef {
+  /** Stable unique identifier.  **Never rename** — saved rocket designs reference parts by ID. */
+  id: string;
+  /** Human-readable label shown in the parts panel and on-screen tooltips. */
+  name: string;
+  /** Short description of the part shown in the detail panel. */
+  description?: string;
+  /** Part category.  Must be a value from the PartType enum. */
+  type: string;
+  /** Dry mass in kilograms. */
+  mass: number;
+  /** Purchase price in dollars. */
+  cost: number;
+  /** Rendered width in pixels at the default 1× zoom level. */
+  width: number;
+  /** Rendered height in pixels at the default 1× zoom level. */
+  height: number;
+  /** Attachment sockets. */
+  snapPoints: SnapPoint[];
+  /** Named visual states for the renderer. */
+  animationStates: string[];
+  /** True if the player can manually trigger this part in flight. */
+  activatable: boolean;
+  /** How the part responds when activated. */
+  activationBehaviour: string;
+  /** Type-specific numeric or string values consumed by game-logic modules. */
+  properties: Record<string, number | boolean | string>;
+  /** Base reliability rating (0.0 – 1.0). */
+  reliability?: number;
+}
 
 // ---------------------------------------------------------------------------
 // Snap-point helper sets
@@ -196,9 +148,8 @@ export const ActivationBehaviour = Object.freeze({
  * Part types that participate in axial (top / bottom) stacking.
  * A top or bottom socket on any part should list these as accepted types
  * unless a more specific restriction applies.
- * @type {string[]}
  */
-export const STACK_TYPES = Object.freeze([
+export const STACK_TYPES: readonly string[] = Object.freeze([
   PartType.COMMAND_MODULE,
   PartType.COMPUTER_MODULE,
   PartType.SERVICE_MODULE,
@@ -219,9 +170,8 @@ export const STACK_TYPES = Object.freeze([
 /**
  * Part types that attach radially (to the left or right side of a stack part).
  * A left or right socket should list these as accepted types.
- * @type {string[]}
  */
-export const RADIAL_TYPES = Object.freeze([
+export const RADIAL_TYPES: readonly string[] = Object.freeze([
   PartType.SOLID_ROCKET_BOOSTER,
   PartType.RADIAL_DECOUPLER,
   PartType.LANDING_LEGS,
@@ -244,14 +194,13 @@ export const RADIAL_TYPES = Object.freeze([
 /**
  * Constructs a SnapPoint object.  Used inside part definitions to keep the
  * array entries concise.
- *
- * @param {'top'|'bottom'|'left'|'right'} side
- * @param {number} offsetX  Pixels right of centre (negative = left).
- * @param {number} offsetY  Pixels below centre   (negative = up).
- * @param {string[]} accepts  PartType values that may connect here.
- * @returns {SnapPoint}
  */
-export function makeSnapPoint(side, offsetX, offsetY, accepts) {
+export function makeSnapPoint(
+  side: 'top' | 'bottom' | 'left' | 'right',
+  offsetX: number,
+  offsetY: number,
+  accepts: readonly string[],
+): SnapPoint {
   return { side, offsetX, offsetY, accepts: Array.from(accepts) };
 }
 
@@ -267,10 +216,8 @@ export function makeSnapPoint(side, offsetX, offsetY, accepts) {
  *
  * ADDING PARTS: Append to this array.  The array index has no gameplay
  * meaning — the `id` field is the stable reference used everywhere.
- *
- * @type {PartDef[]}
  */
-export const PARTS = [
+export const PARTS: PartDef[] = [
 
   // =========================================================================
   // COMMAND MODULES (crewed)
@@ -1187,11 +1134,8 @@ export const PARTS = [
     activatable: true,
     activationBehaviour: ActivationBehaviour.DOCK,
     properties: {
-      /** Docking port size class — must match for two ports to dock. */
       portSize: 'STANDARD',
-      /** Whether the port extends a probe outward for alignment. */
       hasProbe: true,
-      /** Extension distance in metres when probe is extended. */
       probeExtension: 1.0,
       dragCoefficient: 0.05,
       heatTolerance: 1800,
@@ -2367,7 +2311,7 @@ export const PARTS = [
     activationBehaviour: ActivationBehaviour.NONE,
     properties: {
       instrumentType: 'telescope',
-      scienceMultiplier: 3.0,      // 3× science yield vs standard sensor
+      scienceMultiplier: 3.0,      // 3x science yield vs standard sensor
       powerDraw: 50,               // 50 W when active
       dragCoefficient: 0.08,
       heatTolerance: 1000,
@@ -2452,9 +2396,7 @@ export const PARTS = [
     activatable: true,
     activationBehaviour: ActivationBehaviour.GRAB,
     properties: {
-      /** Maximum reach of the arm in metres (matching GRAB_ARM_RANGE constant). */
       armReach: 25,
-      /** Maximum relative speed (m/s) at which the arm can safely grab. */
       maxGrabSpeed: 1.0,
       dragCoefficient: 0.04,
       heatTolerance: 1600,
@@ -2471,47 +2413,35 @@ export const PARTS = [
 /**
  * Internal index built once at module load time.
  * O(1) lookup by part ID.
- * @type {Map<string, PartDef>}
  */
-const _partsById = new Map(PARTS.map((p) => [p.id, p]));
+const _partsById: Map<string, PartDef> = new Map(PARTS.map((p) => [p.id, p]));
 
 /**
  * Look up a single part definition by its stable string ID.
- *
- * @param {string} id  The part's `id` field.
- * @returns {PartDef|undefined}  The definition, or undefined if not found.
  */
-export function getPartById(id) {
+export function getPartById(id: string): PartDef | undefined {
   return _partsById.get(id);
 }
 
 /**
  * Return all part definitions whose `type` matches the given PartType value.
- *
- * @param {string} type  A PartType enum value.
- * @returns {PartDef[]}  Possibly empty array — never throws.
  */
-export function getPartsByType(type) {
+export function getPartsByType(type: string): PartDef[] {
   return PARTS.filter((p) => p.type === type);
 }
 
 /**
  * Return a shallow copy of the full parts catalog.
  * Callers should not mutate the returned array or any definition objects.
- *
- * @returns {PartDef[]}
  */
-export function getAllParts() {
+export function getAllParts(): PartDef[] {
   return PARTS.slice();
 }
 
 /**
  * Return the IDs of all parts whose `type` matches the given PartType value.
  * Convenience wrapper used by the unlock system, which works with ID strings.
- *
- * @param {string} type  A PartType enum value.
- * @returns {string[]}
  */
-export function getPartIdsByType(type) {
+export function getPartIdsByType(type: string): string[] {
   return PARTS.filter((p) => p.type === type).map((p) => p.id);
 }

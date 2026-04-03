@@ -103,7 +103,7 @@
 - **Verification**: `npm run test:e2e` passes. E2E tests verify: Ctrl+Shift+D does nothing when debug off, works when debug on, setting persists across save/load.
 
 ### TASK-017: Convert data layer to TypeScript (src/data/)
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Convert all 8 JS files in `src/data/` to TypeScript: bodies.js, challenges.js, contracts.js, index.js, instruments.js, missions.js, parts.js, techtree.js. Add proper type annotations. Use existing types from `gameState.ts` and `constants.ts`. Don't refactor logic. See requirements Section 4.1.
 - **Verification**: `npm run typecheck` passes. `npm run test:unit` passes. No `.js` files remain in `src/data/`.
