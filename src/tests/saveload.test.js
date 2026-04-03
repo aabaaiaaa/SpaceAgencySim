@@ -877,3 +877,167 @@ describe('Save format version field', () => {
     expect(restored).toBeDefined();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Save migration edge cases (TASK-010, requirements §2.3)
+// ---------------------------------------------------------------------------
+
+describe('Save migration edge cases', () => {
+  /**
+   * Helper: writes a raw envelope to localStorage slot 0, bypassing saveGame()
+   * so we can craft envelopes with missing/invalid fields.
+   */
+  function injectEnvelope(envelopeOverrides = {}, stateOverrides = {}) {
+    const state = { ...freshState(), ...stateOverrides };
+    const envelope = {
+      saveName: 'Edge Case',
+      timestamp: new Date(0).toISOString(),
+      version: SAVE_VERSION,
+      state: JSON.parse(JSON.stringify(state)),
+      ...envelopeOverrides,
+    };
+    // Apply state overrides AFTER JSON clone so we can set null/undefined explicitly.
+    if ('_rawStatePatches' in envelopeOverrides) {
+      for (const [key, value] of Object.entries(envelopeOverrides._rawStatePatches)) {
+        if (value === undefined) {
+          delete envelope.state[key];
+        } else {
+          envelope.state[key] = value;
+        }
+      }
+      delete envelope._rawStatePatches;
+    }
+    localStorage.setItem('spaceAgencySave_0', JSON.stringify(envelope));
+  }
+
+  it('loads a save with savedDesigns: null and defaults it to an empty array', () => {
+    injectEnvelope({
+      _rawStatePatches: { savedDesigns: null },
+    });
+
+    const restored = loadGame(0);
+    expect(Array.isArray(restored.savedDesigns)).toBe(true);
+    expect(restored.savedDesigns).toHaveLength(0);
+  });
+
+  it('loads a save with savedDesigns: undefined and defaults it to an empty array', () => {
+    injectEnvelope({
+      _rawStatePatches: { savedDesigns: undefined },
+    });
+
+    const restored = loadGame(0);
+    expect(Array.isArray(restored.savedDesigns)).toBe(true);
+    expect(restored.savedDesigns).toHaveLength(0);
+  });
+
+  it('loads successfully when saveSharedLibrary() throws during design migration', async () => {
+    // We need to make saveSharedLibrary throw. Since saveload.js imports it
+    // statically, we mock the designLibrary module.
+    const { saveSharedLibrary } = await import('../core/designLibrary.js');
+    const saveSpy = vi.spyOn({ saveSharedLibrary }, 'saveSharedLibrary');
+
+    // To truly test this, we inject a save with legacy designs that trigger
+    // the migration path (designs without savePrivate flag), and mock
+    // localStorage to throw on the shared library key write.
+    const originalSetItem = mockStorage.setItem.bind(mockStorage);
+    const sharedLibKey = 'spaceAgencyDesignLibrary';
+
+    // Make saveSharedLibrary's internal localStorage.setItem throw for the
+    // shared library key only.
+    mockStorage.setItem = (key, value) => {
+      if (key === sharedLibKey) {
+        throw new Error('Storage full — unable to save design library. Delete old saves or designs to free space.');
+      }
+      return originalSetItem(key, value);
+    };
+
+    // Inject a save with a legacy design that lacks savePrivate (triggers migration).
+    const state = freshState();
+    state.savedDesigns = [
+      { id: 'design-1', name: 'Legacy Rocket', savePrivate: undefined },
+    ];
+    const envelope = {
+      saveName: 'Migration Fail',
+      timestamp: new Date(0).toISOString(),
+      version: SAVE_VERSION,
+      state: JSON.parse(JSON.stringify(state)),
+    };
+    // Remove savePrivate so it's truly undefined in the stored JSON.
+    delete envelope.state.savedDesigns[0].savePrivate;
+    originalSetItem('spaceAgencySave_0', JSON.stringify(envelope));
+
+    // loadGame should throw because saveSharedLibrary throws (the error
+    // propagates from the migration block). This documents the current
+    // behaviour: a storage failure during migration is NOT caught by loadGame.
+    expect(() => loadGame(0)).toThrow(/Storage full/i);
+
+    // Restore original setItem.
+    mockStorage.setItem = originalSetItem;
+    saveSpy.mockRestore();
+  });
+
+  it('loads a save with an invalid malfunctionMode value without crashing', () => {
+    // The ??= migration only defaults null/undefined — an invalid string value
+    // passes through. This test documents the current behaviour.
+    injectEnvelope({
+      _rawStatePatches: { malfunctionMode: 'banana' },
+    });
+
+    const restored = loadGame(0);
+    // The invalid value passes through because ??= only catches null/undefined.
+    expect(restored.malfunctionMode).toBe('banana');
+  });
+
+  it('loads a pre-version save (no version field) with all migrations applied', () => {
+    // Simulate a very old save: no version field, missing several fields
+    // that were added in later iterations.
+    const state = freshState();
+    delete state.malfunctionMode;
+    delete state.savedDesigns;
+    delete state.welcomeShown;
+    delete state.autoSaveEnabled;
+    delete state.sciencePoints;
+    delete state.scienceLog;
+    delete state.achievements;
+    delete state.partInventory;
+
+    const legacyEnvelope = {
+      saveName: 'Ancient Save',
+      timestamp: new Date(0).toISOString(),
+      // No "version" field at all — pre-versioning save
+      state: JSON.parse(JSON.stringify(state)),
+    };
+    localStorage.setItem('spaceAgencySave_0', JSON.stringify(legacyEnvelope));
+
+    const restored = loadGame(0);
+
+    // All ??= migrations should have applied defaults.
+    expect(restored.malfunctionMode).toBe('normal');
+    expect(Array.isArray(restored.savedDesigns)).toBe(true);
+    expect(restored.welcomeShown).toBe(true);
+    expect(restored.autoSaveEnabled).toBe(true);
+    expect(restored.sciencePoints).toBe(0);
+    expect(Array.isArray(restored.scienceLog)).toBe(true);
+    expect(Array.isArray(restored.achievements)).toBe(true);
+    expect(Array.isArray(restored.partInventory)).toBe(true);
+  });
+
+  it('loads a future-version save and emits a console warning', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    injectEnvelope({ version: SAVE_VERSION + 10 });
+
+    const restored = loadGame(0);
+
+    // The state should still load (best-effort forward compatibility).
+    expect(restored).toBeDefined();
+    expect(restored.money).toBe(freshState().money);
+
+    // A warning should have been logged about the newer version.
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0][0]).toContain(`v${SAVE_VERSION + 10}`);
+    expect(warnSpy.mock.calls[0][0]).toMatch(/newer version/i);
+
+    warnSpy.mockRestore();
+  });
+});

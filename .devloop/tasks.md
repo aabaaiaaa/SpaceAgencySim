@@ -55,7 +55,7 @@
 - **Verification**: `npm run test:unit` passes. `npm run test:e2e` passes. E2E test verifies: auto-save fires after flight, cancel button prevents save, toggle in settings disables auto-save.
 
 ### TASK-010: Add save migration edge case unit tests
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007
 - **Description**: Add unit tests for `loadGame()` migration paths: savedDesigns as null, savedDesigns as undefined, saveSharedLibrary() throwing during migration, invalid malfunctionMode values, pre-version saves, future-version saves. See requirements Section 2.3.
 - **Verification**: `npm run test:unit` passes. All 6 edge case tests exist and pass.
