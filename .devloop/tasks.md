@@ -182,12 +182,12 @@
 
 ### TASK-030: Achieve 80%+ branch coverage and lock thresholds
 - **Status**: pending
-- **Dependencies**: TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-007, TASK-008, TASK-009, TASK-010, TASK-011, TASK-012, TASK-012b, TASK-013, TASK-014, TASK-015, TASK-016, TASK-017, TASK-018, TASK-019, TASK-020, TASK-021, TASK-022, TASK-023, TASK-024, TASK-025, TASK-026, TASK-027, TASK-028, TASK-029
+- **Dependencies**: TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-007, TASK-008, TASK-009, TASK-010, TASK-011, TASK-012, TASK-032, TASK-013, TASK-014, TASK-015, TASK-016, TASK-017, TASK-018, TASK-019, TASK-020, TASK-021, TASK-022, TASK-023, TASK-024, TASK-025, TASK-026, TASK-027, TASK-028, TASK-029
 - **Description**: Run coverage analysis after all code and test tasks are complete. Identify modules with lowest branch coverage. Write targeted tests to bring branches above 80%. Set all three thresholds (lines, branches, functions) to match actual coverage — 80% floor minimum. If coverage exceeds 80%, set thresholds at the higher value. See requirements Section 5.1.
 - **Verification**: `npm run test:coverage` passes. All three thresholds are >= 80%. Thresholds match or are within 1% of actual coverage.
 
 ### TASK-031: Verification pass — run all checks
 - **Status**: pending
-- **Dependencies**: TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-007, TASK-008, TASK-009, TASK-010, TASK-011, TASK-012, TASK-012b, TASK-013, TASK-014, TASK-015, TASK-016, TASK-017, TASK-018, TASK-019, TASK-020, TASK-021, TASK-022, TASK-023, TASK-024, TASK-025, TASK-026, TASK-027, TASK-028, TASK-029, TASK-030
+- **Dependencies**: TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-007, TASK-008, TASK-009, TASK-010, TASK-011, TASK-012, TASK-032, TASK-013, TASK-014, TASK-015, TASK-016, TASK-017, TASK-018, TASK-019, TASK-020, TASK-021, TASK-022, TASK-023, TASK-024, TASK-025, TASK-026, TASK-027, TASK-028, TASK-029, TASK-030
 - **Description**: Run all verification checks from requirements Section 6: typecheck, lint, unit tests, E2E tests, coverage thresholds. Fix any failures found. Also check for any `.js` files in `src/` — after the full TypeScript migration (TASK-023), any `.js` file in `src/` is unintended and should be converted to TypeScript with proper type annotations. E2E files in `e2e/` are excluded from this check.
 - **Verification**: All 5 commands pass: `npm run typecheck`, `npm run lint`, `npm run test:unit`, `npm run test:e2e`, `npm run test:coverage`. Glob for `src/**/*.js` returns zero results.
