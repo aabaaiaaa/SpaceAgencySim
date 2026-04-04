@@ -58,6 +58,10 @@
   border-left-color: #4090d0;
   font-weight: 600;
 }
+.help-sidebar-item:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: calc(-1 * var(--focus-ring-offset));
+}
 
 /* ── Content area ───────────────────────────────────────────────────────── */
 .help-content-wrapper {

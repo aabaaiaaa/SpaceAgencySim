@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { dismissWelcomeModal } from './helpers.js';
+import { dismissWelcomeModal, navigateToVab } from './helpers.js';
 
 /**
  * E2E — Keyboard Navigation
@@ -205,5 +205,124 @@ test.describe('Keyboard Navigation', () => {
     // Escape closes the settings panel.
     await page.keyboard.press('Escape');
     await expect(page.locator('#settings-panel')).not.toBeVisible();
+  });
+
+  test('Tab cycles through VAB toolbar buttons and part cards', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('#mm-agency-name-input', {
+      state: 'visible',
+      timeout: 15_000,
+    });
+
+    // Start a sandbox game then navigate to VAB.
+    await page.fill('#mm-agency-name-input', 'Keyboard VAB');
+    await page.click('.mm-mode-option[data-mode="sandbox"]');
+    await page.click('#mm-start-btn');
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
+    await dismissWelcomeModal(page);
+    await navigateToVab(page);
+
+    // Tab through toolbar buttons — collect focused element IDs.
+    const focusedIds = [];
+    for (let i = 0; i < 20; i++) {
+      await page.keyboard.press('Tab');
+      const id = await page.evaluate(() => document.activeElement?.id || null);
+      if (id && !focusedIds.includes(id)) focusedIds.push(id);
+    }
+
+    // Should have cycled through at least the back button and a few toolbar buttons.
+    expect(focusedIds.length).toBeGreaterThanOrEqual(3);
+
+    // At least one toolbar button should be among the focused elements.
+    const hasToolbarBtn = focusedIds.some((id) =>
+      id.startsWith('vab-btn-') || id.startsWith('vab-back')
+    );
+    expect(hasToolbarBtn).toBe(true);
+
+    // Tab into the parts panel — part cards should be focusable.
+    let foundPartCard = false;
+    for (let i = 0; i < 30; i++) {
+      await page.keyboard.press('Tab');
+      const isPartCard = await page.evaluate(() =>
+        document.activeElement?.classList.contains('vab-part-card') ?? false
+      );
+      if (isPartCard) {
+        foundPartCard = true;
+        break;
+      }
+    }
+    expect(foundPartCard).toBe(true);
+
+    // Verify the part card has :focus-visible.
+    const matchesFocusVisible = await page.evaluate(() =>
+      document.activeElement?.matches(':focus-visible') ?? false
+    );
+    expect(matchesFocusVisible).toBe(true);
+  });
+
+  test('Tab cycles through Mission Control tabs and items', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('#mm-agency-name-input', {
+      state: 'visible',
+      timeout: 15_000,
+    });
+
+    // Start a sandbox game.
+    await page.fill('#mm-agency-name-input', 'Keyboard MC');
+    await page.click('.mm-mode-option[data-mode="sandbox"]');
+    await page.click('#mm-start-btn');
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
+    await dismissWelcomeModal(page);
+
+    // Navigate to Mission Control.
+    await page.click('[data-building-id="mission-control"]');
+    await page.waitForSelector('#mission-control-overlay', {
+      state: 'visible',
+      timeout: 15_000,
+    });
+
+    // Tab through — should reach a tab button.
+    let foundMcTab = false;
+    for (let i = 0; i < 20; i++) {
+      await page.keyboard.press('Tab');
+      const isMcTab = await page.evaluate(() =>
+        document.activeElement?.classList.contains('mc-tab') ?? false
+      );
+      if (isMcTab) {
+        foundMcTab = true;
+        break;
+      }
+    }
+    expect(foundMcTab).toBe(true);
+
+    // Verify focus ring is active on the tab.
+    const matchesFocusVisible = await page.evaluate(() =>
+      document.activeElement?.matches(':focus-visible') ?? false
+    );
+    expect(matchesFocusVisible).toBe(true);
+
+    // Tab further and collect more focused mc-tab buttons.
+    const tabLabels = [];
+    const firstLabel = await page.evaluate(() => document.activeElement?.textContent || null);
+    if (firstLabel) tabLabels.push(firstLabel);
+
+    for (let i = 0; i < 10; i++) {
+      await page.keyboard.press('Tab');
+      const isMcTab = await page.evaluate(() =>
+        document.activeElement?.classList.contains('mc-tab') ?? false
+      );
+      if (isMcTab) {
+        const label = await page.evaluate(() => document.activeElement?.textContent || null);
+        if (label && !tabLabels.includes(label)) tabLabels.push(label);
+      }
+    }
+
+    // Should have focused at least 2 different tabs.
+    expect(tabLabels.length).toBeGreaterThanOrEqual(2);
+
+    // Escape closes Mission Control and returns to hub.
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#mission-control-overlay')).not.toBeVisible();
+    await expect(page.locator('#hub-overlay')).toBeVisible();
   });
 });

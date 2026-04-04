@@ -71,6 +71,17 @@ export function initMissionControlUI(
 
   renderShell();
   renderAvailableTab();
+
+  // Escape key closes the panel.
+  const onEscape = (e: KeyboardEvent): void => {
+    if (e.key !== 'Escape') return;
+    e.preventDefault();
+    const onBack = getMCState().onBack;
+    destroyMissionControlUI();
+    if (onBack) onBack();
+  };
+  document.addEventListener('keydown', onEscape);
+  setMCState({ _escapeHandler: onEscape });
 }
 
 /**
@@ -78,6 +89,9 @@ export function initMissionControlUI(
  */
 export function destroyMissionControlUI(): void {
   const mc = getMCState();
+  if (mc._escapeHandler) {
+    document.removeEventListener('keydown', mc._escapeHandler);
+  }
   if (mc.overlay) {
     mc.overlay.remove();
   }
@@ -85,5 +99,6 @@ export function destroyMissionControlUI(): void {
     overlay: null,
     state:   null,
     onBack:  null,
+    _escapeHandler: null,
   });
 }

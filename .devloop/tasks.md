@@ -73,7 +73,7 @@
 - **Verification**: `npm run test:e2e` passes. E2E test verifies Tab cycles through interactive elements on main menu and hub. Focus ring is visible on focused elements.
 
 ### TASK-032: Add keyboard navigation — VAB, Mission Control, Crew Admin, Help
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-012
 - **Description**: Extend keyboard navigation to remaining panels: VAB (parts panel, staging panel, toolbar buttons), Mission Control (tabs then items within each tab), Crew Admin (crew cards and action buttons), Help panel (section tabs). Reuse the focus ring style from TASK-012. See requirements Section 3.2.
 - **Verification**: `npm run test:e2e` passes. E2E test verifies Tab cycles through interactive elements on VAB and Mission Control panels.

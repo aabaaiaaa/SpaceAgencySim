@@ -244,7 +244,7 @@ export function renderStagingPanel(): void {
       const def    = placed ? getPartById(placed.partId) : null;
       if (!def) continue;
       html.push(
-        `<div class="vab-stage-chip" draggable="true" ` +
+        `<div class="vab-stage-chip" draggable="true" tabindex="0" ` +
         `data-instance-id="${id}" data-source="unstaged" ` +
         `title="${def.name}">${def.name}</div>`,
       );
@@ -311,7 +311,7 @@ export function renderStagingPanel(): void {
         const def    = placed ? getPartById(placed.partId) : null;
         if (!def) continue;
         html.push(
-          `<div class="vab-stage-chip" draggable="true" ` +
+          `<div class="vab-stage-chip" draggable="true" tabindex="0" ` +
           `data-instance-id="${id}" data-source="stage-${i}" ` +
           `title="${def.name}">${def.name}</div>`,
         );

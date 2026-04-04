@@ -99,6 +99,9 @@ let _onBack: (() => void) | null = null;
 /** Currently active tab id: 'active' | 'hire' | 'history' | 'training' */
 let _activeTab: string = 'active';
 
+/** Stored Escape key handler for cleanup. */
+let _escapeHandler: ((e: KeyboardEvent) => void) | null = null;
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -118,20 +121,31 @@ export function initCrewAdminUI(container: HTMLElement, state: GameState, { onBa
   _renderShell();
   _renderActiveTab();
 
-
+  // Escape key closes the panel.
+  _escapeHandler = (e: KeyboardEvent): void => {
+    if (e.key !== 'Escape') return;
+    e.preventDefault();
+    const onBack = _onBack;
+    destroyCrewAdminUI();
+    if (onBack) onBack();
+  };
+  document.addEventListener('keydown', _escapeHandler);
 }
 
 /**
  * Remove the Crew Administration overlay from the DOM.
  */
 export function destroyCrewAdminUI(): void {
+  if (_escapeHandler) {
+    document.removeEventListener('keydown', _escapeHandler);
+    _escapeHandler = null;
+  }
   if (_overlay) {
     _overlay.remove();
     _overlay = null;
   }
   _state   = null;
   _onBack  = null;
-
 }
 
 // ---------------------------------------------------------------------------

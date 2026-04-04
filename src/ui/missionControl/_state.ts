@@ -16,6 +16,7 @@ export interface MCState {
   onBack: (() => void) | null;
   activeTab: string;
   creatorFormOpen: boolean;
+  _escapeHandler: ((e: KeyboardEvent) => void) | null;
 }
 
 const _mcState: MCState = {
@@ -24,6 +25,7 @@ const _mcState: MCState = {
   onBack:          null,
   activeTab:       'available',
   creatorFormOpen:  false,
+  _escapeHandler:  null,
 };
 
 /**

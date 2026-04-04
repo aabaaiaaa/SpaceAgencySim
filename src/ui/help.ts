@@ -549,6 +549,11 @@ export function openHelpPanel(container: HTMLElement, _state: unknown, defaultSe
   panel.appendChild(contentWrapper);
   container.appendChild(panel);
 
+  // Escape key closes the help panel.
+  tracker.add(document, 'keydown', ((e: KeyboardEvent) => {
+    if (e.key === 'Escape') closePanel();
+  }) as EventListener);
+
   // Show the initial section.
   showSection(activeId);
 }

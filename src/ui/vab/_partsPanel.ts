@@ -149,7 +149,7 @@ export function buildPartsHTML(state: GameState): string {
         ? `<span class="vab-part-cost-free">Free</span><span class="vab-part-cost-orig">${fmt$(p.cost)}</span>`
         : `<span>${fmt$(p.cost)}</span>`;
       rows.push(
-        `<div class="vab-part-card" data-part-id="${p.id}" ` +
+        `<div class="vab-part-card" data-part-id="${p.id}" tabindex="0" ` +
             `title="${p.name} — ${p.mass} kg · ${invCount > 0 ? 'Free (inventory)' : fmt$(p.cost)}">` +
           `<div class="vab-part-rect" style="width:${rw}px;height:${rh}px;` +
               `background:${_CARD_FILL[p.type] ?? _CARD_FILL_DEFAULT};` +
@@ -275,5 +275,16 @@ export function setupPanelDrag(
 
     e.preventDefault();
     startDrag(partId, null, e.clientX, e.clientY);
+  });
+
+  // Keyboard: Enter/Space on a part card shows its detail panel.
+  partsPanel.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const card = (e.target as HTMLElement)?.closest?.('.vab-part-card') as HTMLElement | null;
+    if (!card) return;
+    const partId = card.dataset.partId;
+    if (!partId) return;
+    e.preventDefault();
+    showPartDetail(partId);
   });
 }
