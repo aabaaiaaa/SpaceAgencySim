@@ -433,7 +433,7 @@ export async function loadGameAsync(slotIndex: number): Promise<GameState> {
   }
 
   // Pick the most recent valid envelope.
-  let chosen: SaveEnvelope | null = null;
+  let chosen: SaveEnvelope | null;
   if (lsEnvelope && idbEnvelope) {
     const lsTime = new Date(lsEnvelope.timestamp).getTime();
     const idbTime = new Date(idbEnvelope.timestamp).getTime();

@@ -250,12 +250,9 @@ export function checkMalfunctions(
     // Adjusted failure chance: (1 - reliability) * (1 - engineering reduction) * difficulty mult.
     const failureChance = (1 - baseReliability) * (1 - engineeringReduction) * malfunctionMult;
 
-    let malfunctioned = false;
-    if (mode === MalfunctionMode.FORCED) {
-      malfunctioned = true;
-    } else {
-      malfunctioned = Math.random() < failureChance;
-    }
+    const malfunctioned = mode === MalfunctionMode.FORCED
+      ? true
+      : Math.random() < failureChance;
 
     if (malfunctioned) {
       // Pick a random malfunction type from the applicable set.

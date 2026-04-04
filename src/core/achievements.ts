@@ -179,7 +179,7 @@ export function checkAchievements(
   for (const def of ACHIEVEMENTS) {
     if (earned.has(def.id)) continue;
 
-    let met = false;
+    let met: boolean;
     try {
       met = def.check(state, ctx);
     } catch {
