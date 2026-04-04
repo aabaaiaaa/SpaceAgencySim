@@ -72,7 +72,7 @@
 - **Description**: Define a global focus ring CSS style using design tokens. Add keyboard navigation (Tab/Shift+Tab, Enter/Space activation, Escape to close) to: main menu, hub, settings, and topbar menu. Arrow keys for topbar menu items. See requirements Section 3.2.
 - **Verification**: `npm run test:e2e` passes. E2E test verifies Tab cycles through interactive elements on main menu and hub. Focus ring is visible on focused elements.
 
-### TASK-012b: Add keyboard navigation — VAB, Mission Control, Crew Admin, Help
+### TASK-032: Add keyboard navigation — VAB, Mission Control, Crew Admin, Help
 - **Status**: pending
 - **Dependencies**: TASK-012
 - **Description**: Extend keyboard navigation to remaining panels: VAB (parts panel, staging panel, toolbar buttons), Mission Control (tabs then items within each tab), Crew Admin (crew cards and action buttons), Help panel (section tabs). Reuse the focus ring style from TASK-012. See requirements Section 3.2.
