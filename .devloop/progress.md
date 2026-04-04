@@ -1,10 +1,10 @@
 # DevLoop Progress Log
 
 ## Summary
-- **Total Tasks**: 31
-- **Completed**: 28
+- **Total Tasks**: 32
+- **Completed**: 29
 - **Remaining**: 3
-- **Last Updated**: 2026-04-03T22:41:24.636Z
+- **Last Updated**: 2026-04-04T08:56:30.535Z
 
 ## Iteration Log
 
@@ -259,4 +259,13 @@
 - **Exit Status**: success
 - **Tokens**: 63,866 total (3 in, 88 out, 52,639 cache-create, 11,136 cache-read)
 - **Cost**: $2.3794
+
+### Iteration 29 - 2026-04-04T08:22:21.507Z
+- **Task Attempted**: TASK-012
+- **Task Completed**: TASK-012
+- **Summary**: Completed Add keyboard navigation — focus ring style and core panels
+- **Duration**: 34m 8s
+- **Exit Status**: success
+- **Tokens**: 137,496 total (3 in, 94 out, 1,143 cache-create, 136,256 cache-read)
+- **Cost**: $5.2914
 

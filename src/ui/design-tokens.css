@@ -126,9 +126,28 @@
   /* -- Topbar --------------------------------------------------------------- */
   --topbar-height: 44px;
 
+  /* -- Focus ring ----------------------------------------------------------- */
+  --focus-ring-color:  rgba(100, 180, 255, 0.7);
+  --focus-ring-offset: 2px;
+  --focus-ring-width:  2px;
+
   /* -- Transitions ---------------------------------------------------------- */
   --transition-fast: 0.1s;
   --transition-default: 0.15s;
+}
+
+/* ===========================================================================
+   Global focus-visible ring — keyboard navigation indicator
+   =========================================================================== */
+
+:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* Elements that provide their own focus styling can opt out */
+.no-focus-ring:focus-visible {
+  outline: none;
 }
 
 /* ===========================================================================

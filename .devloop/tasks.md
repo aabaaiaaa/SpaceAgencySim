@@ -67,7 +67,7 @@
 - **Verification**: `npm run test:e2e` passes. Visual inspection confirms counters appear, update on input, and change color near limit.
 
 ### TASK-012: Add keyboard navigation — focus ring style and core panels
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Define a global focus ring CSS style using design tokens. Add keyboard navigation (Tab/Shift+Tab, Enter/Space activation, Escape to close) to: main menu, hub, settings, and topbar menu. Arrow keys for topbar menu items. See requirements Section 3.2.
 - **Verification**: `npm run test:e2e` passes. E2E test verifies Tab cycles through interactive elements on main menu and hub. Focus ring is visible on focused elements.

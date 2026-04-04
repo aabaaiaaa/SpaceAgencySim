@@ -290,5 +290,10 @@ export function openSettingsPanel(container: HTMLElement, state: GameState): voi
   tracker.add(closeBtn, 'click', () => closePanel());
   content.appendChild(closeBtn);
 
+  // Escape key closes the settings panel.
+  tracker.add(document, 'keydown', ((e: KeyboardEvent) => {
+    if (e.key === 'Escape') closePanel();
+  }) as EventListener);
+
   container.appendChild(panel);
 }

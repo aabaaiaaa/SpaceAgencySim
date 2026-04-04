@@ -472,13 +472,33 @@ function _renderNewGameScreen(overlay: HTMLElement, canGoBack: boolean): void {
   const modeOptions = screen.querySelectorAll('.mm-mode-option');
   const sandboxOpts = screen.querySelector('#mm-sandbox-options') as HTMLElement | null;
   for (const opt of modeOptions) {
-    opt.addEventListener('click', () => {
-      for (const o of modeOptions) o.classList.remove('selected');
+    // Make cards keyboard-focusable.
+    (opt as HTMLElement).setAttribute('tabindex', '0');
+    (opt as HTMLElement).setAttribute('role', 'radio');
+    (opt as HTMLElement).setAttribute('aria-checked', opt.classList.contains('selected') ? 'true' : 'false');
+
+    const selectOption = (): void => {
+      for (const o of modeOptions) {
+        o.classList.remove('selected');
+        (o as HTMLElement).setAttribute('aria-checked', 'false');
+      }
       opt.classList.add('selected');
+      (opt as HTMLElement).setAttribute('aria-checked', 'true');
       (opt.querySelector('input[type="radio"]') as HTMLInputElement).checked = true;
       // Show/hide sandbox-specific options.
       if (sandboxOpts) {
         sandboxOpts.style.display = (opt as HTMLElement).dataset.mode === 'sandbox' ? '' : 'none';
+      }
+    };
+
+    opt.addEventListener('click', selectOption);
+
+    // Keyboard activation: Enter or Space selects the option.
+    opt.addEventListener('keydown', (e: Event) => {
+      const ke = e as KeyboardEvent;
+      if (ke.key === 'Enter' || ke.key === ' ') {
+        ke.preventDefault();
+        selectOption();
       }
     });
   }
@@ -737,7 +757,15 @@ function _showConfirmModal(title: string, body: string, confirmText: string, onC
   `;
   document.body.appendChild(backdrop);
 
-  const remove = (): void => backdrop.remove();
+  const remove = (): void => {
+    document.removeEventListener('keydown', onEscape);
+    backdrop.remove();
+  };
+
+  const onEscape = (e: KeyboardEvent): void => {
+    if (e.key === 'Escape') remove();
+  };
+  document.addEventListener('keydown', onEscape);
 
   backdrop.querySelector('#mm-modal-confirm')!.addEventListener('click', () => {
     remove();
@@ -747,6 +775,9 @@ function _showConfirmModal(title: string, body: string, confirmText: string, onC
   backdrop.addEventListener('click', (e: MouseEvent) => {
     if (e.target === backdrop) remove();
   });
+
+  // Focus the cancel button so Escape works immediately and focus is trapped.
+  (backdrop.querySelector('#mm-modal-cancel') as HTMLElement)?.focus();
 }
 
 /**

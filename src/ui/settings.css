@@ -94,6 +94,11 @@
   font-weight: 600;
 }
 
+.settings-option-btn:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
 /* -- Close button -- */
 .settings-close-btn {
   margin-top: var(--space-xl);

@@ -227,7 +227,6 @@
   cursor: pointer;
   text-transform: uppercase;
   transition: background 0.15s, transform 0.1s, opacity 0.15s;
-  outline: none;
 }
 
 .mm-btn:active {
@@ -393,6 +392,11 @@
 .mm-mode-option.selected {
   border-color: rgba(100,180,255,0.7);
   background: rgba(100,180,255,0.08);
+}
+
+.mm-mode-option:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
 }
 
 .mm-mode-option input[type="radio"] {

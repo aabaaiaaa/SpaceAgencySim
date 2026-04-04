@@ -228,7 +228,8 @@ export function initTopBar(container: HTMLElement, state: GameState, { onExitToM
   // Close dropdown when clicking anywhere outside it.
   _tracker.add(document, 'click', _onDocClick, true);
 
-
+  // Escape key closes dropdowns and modals.
+  _tracker.add(document, 'keydown', _onDocKeydown as EventListener);
 }
 
 /**
@@ -441,7 +442,30 @@ function _openDropdown(): void {
     menu.appendChild(btn);
   }
 
+  // Arrow key navigation within the dropdown.
+  menu.addEventListener('keydown', (e: KeyboardEvent) => {
+    const items = Array.from(menu.querySelectorAll('.topbar-dropdown-item')) as HTMLElement[];
+    if (items.length === 0) return;
+
+    const current = document.activeElement as HTMLElement;
+    const idx = items.indexOf(current);
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const next = idx < items.length - 1 ? idx + 1 : 0;
+      items[next].focus();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const prev = idx > 0 ? idx - 1 : items.length - 1;
+      items[prev].focus();
+    }
+  });
+
   document.body.appendChild(menu);
+
+  // Focus the first menu item so arrow keys work immediately.
+  const firstItem = menu.querySelector('.topbar-dropdown-item') as HTMLElement | null;
+  if (firstItem) firstItem.focus();
 }
 
 function _closeDropdown(): void {
@@ -449,6 +473,37 @@ function _closeDropdown(): void {
   if (d) {
     _onDropdownToggle?.(false);
     d.remove();
+  }
+}
+
+/**
+ * Keyboard handler — Escape closes dropdowns and modals.
+ */
+function _onDocKeydown(e: KeyboardEvent): void {
+  if (e.key !== 'Escape') return;
+
+  // Close dropdowns first (they sit above modals in visual hierarchy).
+  const dropdown = document.getElementById('topbar-dropdown');
+  if (dropdown) {
+    _closeDropdown();
+    document.getElementById('topbar-menu-btn')?.focus();
+    return;
+  }
+
+  const mDropdown = document.getElementById('topbar-missions-dropdown');
+  if (mDropdown) {
+    _closeMissionsDropdown();
+    document.getElementById('topbar-missions-btn')?.focus();
+    return;
+  }
+
+  // Close any open topbar modal.
+  for (const id of ['loan-modal-backdrop', 'save-modal-backdrop', 'load-modal-backdrop', 'load-confirm-backdrop', 'exit-confirm-backdrop', 'sandbox-settings-backdrop']) {
+    const el = document.getElementById(id);
+    if (el) {
+      el.remove();
+      return;
+    }
   }
 }
 
