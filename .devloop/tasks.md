@@ -181,7 +181,7 @@
 - **Verification**: `npm run test:e2e` passes. New debug-mode E2E spec has at least 5 passing tests.
 
 ### TASK-030: Achieve 80%+ branch coverage and lock thresholds
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-007, TASK-008, TASK-009, TASK-010, TASK-011, TASK-012, TASK-032, TASK-013, TASK-014, TASK-015, TASK-016, TASK-017, TASK-018, TASK-019, TASK-020, TASK-021, TASK-022, TASK-023, TASK-024, TASK-025, TASK-026, TASK-027, TASK-028, TASK-029
 - **Description**: Run coverage analysis after all code and test tasks are complete. Identify modules with lowest branch coverage. Write targeted tests to bring branches above 80%. Set all three thresholds (lines, branches, functions) to match actual coverage — 80% floor minimum. If coverage exceeds 80%, set thresholds at the higher value. See requirements Section 5.1.
 - **Verification**: `npm run test:coverage` passes. All three thresholds are >= 80%. Thresholds match or are within 1% of actual coverage.

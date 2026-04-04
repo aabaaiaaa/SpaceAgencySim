@@ -46,9 +46,9 @@ export default defineConfig({
       include: ['src/core/**'],
       exclude: ['src/core/debugSaves.ts', 'src/core/library.ts'],
       thresholds: {
-        lines: 91,
-        branches: 78,
-        functions: 89,
+        lines: 89,
+        branches: 80,
+        functions: 91,
       },
     },
   },
