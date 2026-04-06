@@ -1,286 +1,298 @@
 # DevLoop Progress Log
 
 ## Summary
-- **Total Tasks**: 28
-- **Completed**: 28
+- **Total Tasks**: 32
+- **Completed**: 32
 - **Remaining**: 0
-- **Last Updated**: 2026-04-02T20:44:02.149Z
+- **Last Updated**: 2026-04-04T11:41:23.158Z
 
 ## Iteration Log
 
-### Iteration 1 - 2026-04-02T09:30:14.498Z
+### Iteration 1 - 2026-04-02T22:26:54.660Z
 - **Task Attempted**: TASK-001
 - **Task Completed**: TASK-001
-- **Summary**: Completed Handle localStorage quota errors and improve error logging in saveload.js and designLibrary.js
-- **Duration**: 2m 38s
+- **Summary**: Completed Add try-catch error handling to the flight controller RAF loop
+- **Duration**: 7m 53s
 - **Exit Status**: success
-- **Tokens**: 423,502 total (12 in, 4,492 out, 42,757 cache-create, 376,241 cache-read)
-- **Cost**: $0.5677
+- **Tokens**: 1,221,759 total (1,478 in, 17,801 out, 51,688 cache-create, 1,150,792 cache-read)
+- **Cost**: $1.3509
 
-### Iteration 2 - 2026-04-02T09:32:55.773Z
+### Iteration 2 - 2026-04-02T22:34:50.316Z
 - **Task Attempted**: TASK-002
 - **Task Completed**: TASK-002
-- **Summary**: Completed Add try-catch to flight HUD requestAnimationFrame loop
-- **Duration**: 4m 58s
+- **Summary**: Completed Add defensive null guards to designLibrary.js
+- **Duration**: 1m 54s
 - **Exit Status**: success
-- **Tokens**: 1,473,624 total (37 in, 9,197 out, 45,483 cache-create, 1,418,907 cache-read)
-- **Cost**: $1.2238
+- **Tokens**: 401,034 total (12 in, 3,093 out, 37,844 cache-create, 360,085 cache-read)
+- **Cost**: $0.4940
 
-### Iteration 3 - 2026-04-02T09:37:57.149Z
+### Iteration 3 - 2026-04-02T22:36:46.834Z
 - **Task Attempted**: TASK-003
 - **Task Completed**: TASK-003
-- **Summary**: Completed Add ordering dependency comment to flightPhase.js transition logic
-- **Duration**: 41s
+- **Summary**: Completed Add defensive null guards to flightReturn.js
+- **Duration**: 3m 46s
 - **Exit Status**: success
-- **Tokens**: 166,180 total (8 in, 1,537 out, 18,249 cache-create, 146,386 cache-read)
-- **Cost**: $0.2257
+- **Tokens**: 699,002 total (19 in, 5,807 out, 43,675 cache-create, 649,501 cache-read)
+- **Cost**: $0.7654
 
-### Iteration 4 - 2026-04-02T09:38:41.523Z
+### Iteration 4 - 2026-04-02T22:40:34.607Z
 - **Task Attempted**: TASK-004
 - **Task Completed**: TASK-004
-- **Summary**: Completed Fix timer stacking in debugSaves.js
-- **Duration**: 1m 14s
+- **Summary**: Completed Clamp sqrt arguments in orbital mechanics functions
+- **Duration**: 1m 44s
 - **Exit Status**: success
-- **Tokens**: 124,905 total (7 in, 663 out, 17,378 cache-create, 106,857 cache-read)
-- **Cost**: $0.1787
+- **Tokens**: 231,116 total (10 in, 2,506 out, 20,515 cache-create, 208,085 cache-read)
+- **Cost**: $0.2950
 
-### Iteration 5 - 2026-04-02T09:39:57.975Z
+### Iteration 5 - 2026-04-02T22:42:21.528Z
 - **Task Attempted**: TASK-005
 - **Task Completed**: TASK-005
-- **Summary**: Completed Move _malfunctionMode from module variable to gameState
-- **Duration**: 9m 26s
+- **Summary**: Completed Cap synodic period search duration in orbit.ts
+- **Duration**: 9m 14s
 - **Exit Status**: success
-- **Tokens**: 4,504,498 total (1,169 in, 19,979 out, 86,700 cache-create, 4,396,650 cache-read)
-- **Cost**: $3.2455
+- **Tokens**: 1,411,601 total (580 in, 24,091 out, 63,381 cache-create, 1,323,549 cache-read)
+- **Cost**: $1.6631
 
-### Iteration 6 - 2026-04-02T09:49:28.158Z
+### Iteration 6 - 2026-04-02T22:51:39.313Z
 - **Task Attempted**: TASK-006
 - **Task Completed**: TASK-006
-- **Summary**: Completed Implement event listener cleanup in UI modules
-- **Duration**: 6m 34s
+- **Summary**: Completed Route dockingTargetGfx through PixiJS object pool
+- **Duration**: 1m 32s
 - **Exit Status**: success
-- **Tokens**: 2,504,070 total (935 in, 15,724 out, 91,664 cache-create, 2,395,747 cache-read)
-- **Cost**: $2.1685
+- **Tokens**: 309,114 total (13 in, 2,178 out, 19,710 cache-create, 287,213 cache-read)
+- **Cost**: $0.3213
 
-### Iteration 7 - 2026-04-02T09:56:05.034Z
+### Iteration 7 - 2026-04-02T22:53:14.141Z
 - **Task Attempted**: TASK-007
 - **Task Completed**: TASK-007
-- **Summary**: Completed Fix style element accumulation across game sessions
-- **Duration**: 8m 49s
+- **Summary**: Completed Add save format version field
+- **Duration**: 2m 55s
 - **Exit Status**: success
-- **Tokens**: 3,497,763 total (62 in, 29,039 out, 77,880 cache-create, 3,390,782 cache-read)
-- **Cost**: $2.9084
+- **Tokens**: 710,814 total (18 in, 5,196 out, 47,574 cache-create, 658,026 cache-read)
+- **Cost**: $0.7563
 
-### Iteration 8 - 2026-04-02T10:04:56.783Z
+### Iteration 8 - 2026-04-02T22:56:10.868Z
 - **Task Attempted**: TASK-008
 - **Task Completed**: TASK-008
-- **Summary**: Completed Add tutorial mission blocking indicators
-- **Duration**: 13m 51s
+- **Summary**: Completed Implement IndexedDB backup storage layer
+- **Duration**: 5m 7s
 - **Exit Status**: success
-- **Tokens**: 77,531 total (3 in, 22 out, 1,047 cache-create, 76,459 cache-read)
-- **Cost**: $1.7373
+- **Tokens**: 1,523,941 total (28 in, 12,566 out, 65,778 cache-create, 1,445,569 cache-read)
+- **Cost**: $1.4482
 
-### Iteration 9 - 2026-04-02T10:18:50.812Z
+### Iteration 9 - 2026-04-02T23:01:20.462Z
 - **Task Attempted**: TASK-009
 - **Task Completed**: TASK-009
-- **Summary**: Completed Standardise weather display format between hub and Launch Pad
-- **Duration**: 7m 20s
+- **Summary**: Completed Implement auto-save system with cancel UI
+- **Duration**: 2h 5m 55s
 - **Exit Status**: success
-- **Tokens**: 1,042,674 total (26 in, 12,370 out, 44,504 cache-create, 985,774 cache-read)
-- **Cost**: $1.2243
+- **Tokens**: 170,726 total (3 in, 73 out, 479 cache-create, 170,171 cache-read)
+- **Cost**: $11.1575
 
-### Iteration 10 - 2026-04-02T10:26:13.743Z
+### Iteration 10 - 2026-04-03T01:07:17.695Z
 - **Task Attempted**: TASK-010
 - **Task Completed**: TASK-010
-- **Summary**: Completed Implement PixiJS object pooling for flight renderer
-- **Duration**: 5m 54s
+- **Summary**: Completed Add save migration edge case unit tests
+- **Duration**: 2m 38s
 - **Exit Status**: success
-- **Tokens**: 3,178,782 total (1,937 in, 15,061 out, 74,371 cache-create, 3,087,413 cache-read)
-- **Cost**: $2.3947
+- **Tokens**: 628,208 total (87 in, 4,703 out, 49,440 cache-create, 573,978 cache-read)
+- **Cost**: $0.7140
 
-### Iteration 11 - 2026-04-02T10:32:10.945Z
+### Iteration 11 - 2026-04-03T01:09:58.142Z
 - **Task Attempted**: TASK-011
 - **Task Completed**: TASK-011
-- **Summary**: Completed Optimize hit testing in _rocket.js
-- **Duration**: 3m 52s
+- **Summary**: Completed Add character counters to name input fields
+- **Duration**: 30m 12s
 - **Exit Status**: success
-- **Tokens**: 505,922 total (13 in, 9,349 out, 43,144 cache-create, 453,416 cache-read)
-- **Cost**: $0.7301
+- **Tokens**: 66,369 total (3 in, 23 out, 1,044 cache-create, 65,299 cache-read)
+- **Cost**: $1.5606
 
-### Iteration 12 - 2026-04-02T10:36:06.654Z
-- **Task Attempted**: TASK-012
-- **Task Completed**: TASK-012
-- **Summary**: Completed Convert mission/contract Array.find lookups to Map
-- **Duration**: 6m 8s
-- **Exit Status**: success
-- **Tokens**: 2,084,705 total (36 in, 7,932 out, 71,043 cache-create, 2,005,694 cache-read)
-- **Cost**: $1.6453
-
-### Iteration 13 - 2026-04-02T10:42:19.330Z
+### Iteration 12 - 2026-04-03T01:40:11.907Z
 - **Task Attempted**: TASK-013
 - **Task Completed**: TASK-013
-- **Summary**: Completed Add unit tests for flightReturn.js
-- **Duration**: 16m 6s
+- **Summary**: Completed Implement VAB undo/redo stack
+- **Duration**: 19m 43s
 - **Exit Status**: success
-- **Tokens**: 1,864,829 total (97 in, 43,573 out, 76,697 cache-create, 1,744,462 cache-read)
-- **Cost**: $2.8100
+- **Tokens**: 8,879,728 total (84 in, 55,120 out, 143,566 cache-create, 8,680,958 cache-read)
+- **Cost**: $6.8360
 
-### Iteration 14 - 2026-04-02T10:58:30.075Z
-- **Task Attempted**: TASK-014
-- **Task Completed**: TASK-014
-- **Summary**: Completed Add unit tests for sciencemodule.js
-- **Duration**: 5m 52s
-- **Exit Status**: success
-- **Tokens**: 1,012,589 total (2,149 in, 22,846 out, 70,776 cache-create, 916,818 cache-read)
-- **Cost**: $1.4827
-
-### Iteration 15 - 2026-04-02T11:04:25.961Z
+### Iteration 13 - 2026-04-03T01:59:57.354Z
 - **Task Attempted**: TASK-015
 - **Task Completed**: TASK-015
-- **Summary**: Completed Add unit tests for customChallenges.js
-- **Duration**: 2m 59s
+- **Summary**: Completed Add debug mode toggle to settings
+- **Duration**: 4m 45s
 - **Exit Status**: success
-- **Tokens**: 328,158 total (10 in, 8,845 out, 41,321 cache-create, 277,982 cache-read)
-- **Cost**: $0.7069
+- **Tokens**: 2,186,273 total (1,236 in, 11,619 out, 71,650 cache-create, 2,101,768 cache-read)
+- **Cost**: $1.7954
 
-### Iteration 16 - 2026-04-02T11:07:29.206Z
+### Iteration 14 - 2026-04-03T02:04:44.862Z
 - **Task Attempted**: TASK-016
 - **Task Completed**: TASK-016
-- **Summary**: Completed Add unit tests for designLibrary.js
-- **Duration**: 6m 0s
+- **Summary**: Completed Gate all debug features behind debug mode setting
+- **Duration**: 40m 30s
 - **Exit Status**: success
-- **Tokens**: 779,179 total (17 in, 19,593 out, 56,140 cache-create, 703,429 cache-read)
-- **Cost**: $1.2789
+- **Tokens**: 1,409,237 total (15 in, 3,063 out, 15,250 cache-create, 1,390,909 cache-read)
+- **Cost**: $4.5325
 
-### Iteration 17 - 2026-04-02T11:13:33.725Z
+### Iteration 15 - 2026-04-03T02:45:17.357Z
+- **Task Attempted**: TASK-014
+- **Task Completed**: TASK-014
+- **Summary**: Completed Add debug FPS/frame-time monitor
+- **Duration**: 36m 43s
+- **Exit Status**: success
+- **Tokens**: 86,374 total (3 in, 26 out, 411 cache-create, 85,934 cache-read)
+- **Cost**: $2.6198
+
+### Iteration 16 - 2026-04-03T03:22:02.176Z
 - **Task Attempted**: TASK-017
 - **Task Completed**: TASK-017
-- **Summary**: Completed Add unit tests for parachute.js deployment triggers
-- **Duration**: 4m 37s
+- **Summary**: Completed Convert data layer to TypeScript (src/data/)
+- **Duration**: 29m 39s
 - **Exit Status**: success
-- **Tokens**: 436,223 total (11 in, 17,997 out, 49,755 cache-create, 368,460 cache-read)
-- **Cost**: $0.9452
+- **Tokens**: 4,311,675 total (3,486 in, 34,908 out, 135,019 cache-create, 4,138,262 cache-read)
+- **Cost**: $9.5444
 
-### Iteration 18 - 2026-04-02T11:18:14.238Z
+### Iteration 17 - 2026-04-03T03:51:43.845Z
 - **Task Attempted**: TASK-018
 - **Task Completed**: TASK-018
-- **Summary**: Completed Add programmatic time warp API for E2E tests
-- **Duration**: 4m 53s
+- **Summary**: Completed Convert core layer to TypeScript (src/core/) — batch 1
+- **Duration**: 59m 41s
 - **Exit Status**: success
-- **Tokens**: 1,023,914 total (2,141 in, 6,237 out, 49,214 cache-create, 966,322 cache-read)
-- **Cost**: $1.1119
+- **Tokens**: 8,870,888 total (1,137 in, 22,629 out, 350,195 cache-create, 8,496,927 cache-read)
+- **Cost**: $45.8629
 
-### Iteration 19 - 2026-04-02T11:23:12.137Z
+### Iteration 18 - 2026-04-03T04:51:27.232Z
 - **Task Attempted**: TASK-019
 - **Task Completed**: TASK-019
-- **Summary**: Completed Upgrade E2E teleport helper to set velocity
-- **Duration**: 3h 14m 31s
+- **Summary**: Completed Convert core layer to TypeScript (src/core/) — batch 2
+- **Duration**: 23m 49s
 - **Exit Status**: success
-- **Tokens**: 192,248 total (3 in, 87 out, 444 cache-create, 191,714 cache-read)
-- **Cost**: $23.3221
+- **Tokens**: 531,985 total (1,410 in, 7,420 out, 85,259 cache-create, 437,896 cache-read)
+- **Cost**: $12.1667
 
-### Iteration 20 - 2026-04-02T14:37:46.168Z
+### Iteration 19 - 2026-04-03T05:15:18.843Z
 - **Task Attempted**: TASK-020
 - **Task Completed**: TASK-020
-- **Summary**: Completed Add E2E phase transition tests
-- **Duration**: 16m 14s
+- **Summary**: Completed Convert render layer to TypeScript (src/render/)
+- **Duration**: 26m 29s
 - **Exit Status**: success
-- **Tokens**: 3,440,831 total (2,426 in, 36,632 out, 120,714 cache-create, 3,281,059 cache-read)
-- **Cost**: $3.5251
+- **Tokens**: 8,017,694 total (2,946 in, 69,341 out, 443,358 cache-create, 7,502,049 cache-read)
+- **Cost**: $11.2233
 
-### Iteration 21 - 2026-04-02T14:54:03.569Z
+### Iteration 20 - 2026-04-03T05:41:50.073Z
 - **Task Attempted**: TASK-021
 - **Task Completed**: TASK-021
-- **Summary**: Completed Replace waitForTimeout with conditional waits in E2E tests
-- **Duration**: 55m 26s
+- **Summary**: Completed Convert UI layer to TypeScript (src/ui/) — batch 1
+- **Duration**: 33m 18s
 - **Exit Status**: success
-- **Tokens**: 154,086 total (3 in, 16 out, 331 cache-create, 153,736 cache-read)
-- **Cost**: $12.5567
+- **Tokens**: 1,565,507 total (10,057 in, 15,145 out, 252,753 cache-create, 1,287,552 cache-read)
+- **Cost**: $25.6372
 
-### Iteration 22 - 2026-04-02T15:49:33.259Z
+### Iteration 21 - 2026-04-03T06:15:09.999Z
 - **Task Attempted**: TASK-022
 - **Task Completed**: TASK-022
-- **Summary**: Completed Add E2E failure-path tests
-- **Duration**: 11m 53s
+- **Summary**: Completed Convert UI layer to TypeScript (src/ui/) — batch 2
+- **Duration**: 25m 7s
 - **Exit Status**: success
-- **Tokens**: 3,257,671 total (836 in, 19,184 out, 197,211 cache-create, 3,040,440 cache-read)
-- **Cost**: $3.5539
+- **Tokens**: 407,370 total (11 in, 11,189 out, 86,073 cache-create, 310,097 cache-read)
+- **Cost**: $21.4304
 
-### Iteration 23 - 2026-04-02T16:01:29.166Z
+### Iteration 22 - 2026-04-03T06:40:19.480Z
 - **Task Attempted**: TASK-023
 - **Task Completed**: TASK-023
-- **Summary**: Completed Configure Vitest coverage with 80% thresholds
-- **Duration**: 7m 24s
+- **Summary**: Completed Convert entry point and test files to TypeScript
+- **Duration**: 10m 17s
 - **Exit Status**: success
-- **Tokens**: 832,909 total (24 in, 7,386 out, 50,114 cache-create, 775,385 cache-read)
-- **Cost**: $0.8857
+- **Tokens**: 3,220,121 total (2,870 in, 22,250 out, 77,636 cache-create, 3,117,365 cache-read)
+- **Cost**: $2.6145
 
-### Iteration 24 - 2026-04-02T16:08:56.410Z
+### Iteration 23 - 2026-04-03T06:50:39.077Z
 - **Task Attempted**: TASK-024
 - **Task Completed**: TASK-024
-- **Summary**: Completed Assess coverage and raise thresholds
-- **Duration**: 3m 36s
+- **Summary**: Completed Extract CSS from JS template literals into .css files
+- **Duration**: 1h 0m 33s
 - **Exit Status**: success
-- **Tokens**: 283,786 total (10 in, 1,528 out, 27,513 cache-create, 254,735 cache-read)
-- **Cost**: $0.3376
+- **Tokens**: 136,545 total (3 in, 88 out, 1,083 cache-create, 135,371 cache-read)
+- **Cost**: $17.6122
 
-### Iteration 25 - 2026-04-02T16:12:35.727Z
+### Iteration 24 - 2026-04-03T18:53:49.793Z
 - **Task Attempted**: TASK-025
 - **Task Completed**: TASK-025
-- **Summary**: Completed Add no-console and async/await error handling ESLint rules
-- **Duration**: 7m 41s
+- **Summary**: Completed Migrate inline styles to CSS classes using design tokens
+- **Duration**: 29m 40s
 - **Exit Status**: success
-- **Tokens**: 58,037 total (3 in, 61 out, 1,101 cache-create, 56,872 cache-read)
-- **Cost**: $5.3106
+- **Tokens**: 125,785 total (4 in, 628 out, 2,028 cache-create, 123,125 cache-read)
+- **Cost**: $1.4089
 
-### Iteration 26 - 2026-04-02T16:20:19.640Z
+### Iteration 25 - 2026-04-03T20:39:39.707Z
 - **Task Attempted**: TASK-026
 - **Task Completed**: TASK-026
-- **Summary**: Completed Add engines field to package.json
-- **Duration**: 47s
+- **Summary**: Completed Implement structured logger
+- **Duration**: 8m 33s
 - **Exit Status**: success
-- **Tokens**: 157,051 total (8 in, 1,345 out, 16,213 cache-create, 139,485 cache-read)
-- **Cost**: $0.2047
+- **Tokens**: 3,249,196 total (4,593 in, 18,861 out, 119,521 cache-create, 3,106,221 cache-read)
+- **Cost**: $2.7946
 
-### Iteration 27 - 2026-04-02T16:21:09.944Z
+### Iteration 26 - 2026-04-03T20:48:14.846Z
 - **Task Attempted**: TASK-027
 - **Task Completed**: TASK-027
-- **Summary**: Completed Address all 17 TypeScript TODOs in existing TS files
-- **Duration**: 10m 13s
+- **Summary**: Completed Define readonly render snapshot interfaces
+- **Duration**: 16m 57s
 - **Exit Status**: success
-- **Tokens**: 4,034,102 total (2,102 in, 24,862 out, 84,489 cache-create, 3,922,649 cache-read)
-- **Cost**: $3.3185
+- **Tokens**: 10,353,168 total (1,473 in, 44,848 out, 121,612 cache-create, 10,185,235 cache-read)
+- **Cost**: $7.1819
 
-### Iteration 28 - 2026-04-02T16:31:25.886Z
-- **Task Attempted**: TASK-028
-- **Task Completed**: none
-- **Summary**: Failed: Exit code: 4294967295
-- **Duration**: 2m 9s
-- **Exit Status**: error
-- **Error Type**: rate_limit
-- **Error Detail**:
-```
-Exit code: 4294967295
-```
-
-### Iteration 29 - 2026-04-02T17:51:03.806Z
-- **Task Attempted**: TASK-028
-- **Task Completed**: none
-- **Summary**: Failed: Exit code: 1
-- **Duration**: 31m 17s
-- **Exit Status**: error
-- **Error Type**: task_failure
-- **Error Detail**:
-```
-Exit code: 1
-```
-
-### Iteration 30 - 2026-04-02T18:22:25.217Z
+### Iteration 27 - 2026-04-03T21:05:14.715Z
 - **Task Attempted**: TASK-028
 - **Task Completed**: TASK-028
-- **Summary**: Completed Verification pass — run all checks
-- **Duration**: 2h 21m 37s
+- **Summary**: Completed Split E2E test helpers into focused sub-modules
+- **Duration**: 30m 59s
 - **Exit Status**: success
-- **Tokens**: 87,758 total (3 in, 32 out, 446 cache-create, 87,277 cache-read)
-- **Cost**: $5.3047
+- **Tokens**: 65,445 total (3 in, 27 out, 611 cache-create, 64,804 cache-read)
+- **Cost**: $1.4897
+
+### Iteration 28 - 2026-04-03T21:36:15.822Z
+- **Task Attempted**: TASK-029
+- **Task Completed**: TASK-029
+- **Summary**: Completed Add E2E tests for debug mode toggle
+- **Duration**: 1h 5m 9s
+- **Exit Status**: success
+- **Tokens**: 63,866 total (3 in, 88 out, 52,639 cache-create, 11,136 cache-read)
+- **Cost**: $2.3794
+
+### Iteration 29 - 2026-04-04T08:22:21.507Z
+- **Task Attempted**: TASK-012
+- **Task Completed**: TASK-012
+- **Summary**: Completed Add keyboard navigation — focus ring style and core panels
+- **Duration**: 34m 8s
+- **Exit Status**: success
+- **Tokens**: 137,496 total (3 in, 94 out, 1,143 cache-create, 136,256 cache-read)
+- **Cost**: $5.2914
+
+### Iteration 30 - 2026-04-04T08:56:33.089Z
+- **Task Attempted**: TASK-032
+- **Task Completed**: TASK-032
+- **Summary**: Completed Add keyboard navigation — VAB, Mission Control, Crew Admin, Help
+- **Duration**: 36m 6s
+- **Exit Status**: success
+- **Tokens**: 302,280 total (4 in, 343 out, 140,460 cache-create, 161,473 cache-read)
+- **Cost**: $9.1540
+
+### Iteration 31 - 2026-04-04T10:39:43.416Z
+- **Task Attempted**: TASK-030
+- **Task Completed**: TASK-030
+- **Summary**: Completed Achieve 80%+ branch coverage and lock thresholds
+- **Duration**: 25m 10s
+- **Exit Status**: success
+- **Tokens**: 11,293,312 total (102 in, 55,643 out, 154,161 cache-create, 11,083,406 cache-read)
+- **Cost**: $8.5466
+
+### Iteration 32 - 2026-04-04T11:04:56.992Z
+- **Task Attempted**: TASK-031
+- **Task Completed**: TASK-031
+- **Summary**: Completed Verification pass — run all checks
+- **Duration**: 36m 26s
+- **Exit Status**: success
+- **Tokens**: 111,394 total (3 in, 124 out, 577 cache-create, 110,690 cache-read)
+- **Cost**: $5.4392
 

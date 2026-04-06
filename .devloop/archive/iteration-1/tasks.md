@@ -1,169 +1,193 @@
-# Iteration 2 — Tasks
+# Iteration 3 — Tasks
 
-### TASK-001: Handle localStorage quota errors and improve error logging in saveload.js and designLibrary.js
+### TASK-001: Add try-catch error handling to the flight controller RAF loop
 - **Status**: done
 - **Dependencies**: none
-- **Description**: Wrap all `localStorage.setItem()` calls in `src/core/saveload.js` and `src/core/designLibrary.js` with try-catch for `QuotaExceededError`. Surface a user-friendly "Storage full" message on quota failure. Also add `console.warn()` to the silent JSON.parse catch blocks in `designLibrary.js` (around lines 125-132) so corrupt data is logged rather than silently swallowed. See requirements Section 1.1 and 1.2.
-- **Verification**: Write a unit test that mocks `localStorage.setItem` to throw `QuotaExceededError` and verify the error is caught gracefully (no unhandled exception). Verify `console.warn` is called on corrupt JSON parse. Run `npm run test:unit` — all tests pass. No E2E needed — pure core logic.
+- **Description**: Wrap the main simulation loop body in `src/ui/flightController/_loop.js:58-158` (physics tick through render call) in try-catch. Add a consecutive error counter that resets on successful frames. After 5 consecutive errors, display an abort-to-hub banner matching the pattern in `flightHud.js`. Log errors with `console.error()`. On non-consecutive errors, log and continue. See requirements Section 1.1.
+- **Verification**: `npm run test:unit` passes. New unit tests verify: tick() throwing is caught, consecutive errors trigger abort path, intermittent errors allow recovery.
 
-### TASK-002: Add try-catch to flight HUD requestAnimationFrame loop
+### TASK-002: Add defensive null guards to designLibrary.js
 - **Status**: done
 - **Dependencies**: none
-- **Description**: Add error handling around the flight HUD's `requestAnimationFrame` callback so that invalid physics state (NaN, missing references) doesn't crash the entire HUD. Log errors, attempt to continue on transient failures, and if errors repeat (e.g., 5+ consecutive frames), offer the player a way to abort to the hub. See requirements Section 1.3.
-- **Verification**: Run `npm run test:unit` — all tests pass. Then run `npx playwright test e2e/flight.spec.js` to verify flight still works normally.
+- **Description**: Add `if (!Array.isArray(state.savedDesigns)) state.savedDesigns = [];` before all `.findIndex()`, `.filter()`, and `.push()` calls on `state.savedDesigns` in `src/core/designLibrary.js`. Audit all functions in the file for this pattern. See requirements Section 1.2.
+- **Verification**: `npm run test:unit` passes. New unit test covers `saveDesignToLibrary()` with `state.savedDesigns` as undefined and null.
 
-### TASK-003: Add ordering dependency comment to flightPhase.js transition logic
+### TASK-003: Add defensive null guards to flightReturn.js
 - **Status**: done
 - **Dependencies**: none
-- **Description**: Add a clear comment in `src/core/flightPhase.js` (around lines 222-255) explaining why the MANOEUVRE exit handler checks escape trajectory first with an early return, and that removing the early return would cause double-mutation. See requirements Section 1.4.
-- **Verification**: Read the comment in the code and confirm it explains the ordering dependency and the early-return requirement. No tests needed — comment-only change.
+- **Description**: Replace `state.crew.find(...)` at line 292 of `src/core/flightReturn.js` with `(state.crew ?? []).find(...)`. Audit the rest of flightReturn.js for similar unguarded state access patterns and fix any found. See requirements Section 1.2.
+- **Verification**: `npm run test:unit` passes. New unit test covers flight return functions with `state.crew` as null/undefined.
 
-### TASK-004: Fix timer stacking in debugSaves.js
+### TASK-004: Clamp sqrt arguments in orbital mechanics functions
 - **Status**: done
 - **Dependencies**: none
-- **Description**: In `src/ui/debugSaves.js` (around line 343), clear the previous timeout stored on `feedbackEl._timer` before setting a new one. Use `clearTimeout(feedbackEl._timer)` before the new `setTimeout` assignment. See requirements Section 1.5.
-- **Verification**: Run `npm run test:unit` — all tests pass. No E2E needed — trivial one-line fix in debug tooling.
+- **Description**: In `src/core/orbit.ts`, add `Math.max(0, 1 - e * e)` before `Math.sqrt(1 - e * e)` in `meanAnomalyToTrue()` (line 169) and `trueToEccentricAnomaly()` (line 186). See requirements Section 1.3.
+- **Verification**: `npm run test:unit` passes. New unit tests verify `meanAnomalyToTrue()` and `trueToEccentricAnomaly()` with e values at 0.9999, 1.0, and 1.001 return finite numbers (no NaN).
 
-### TASK-005: Move _malfunctionMode from module variable to gameState
+### TASK-005: Cap synodic period search duration in orbit.ts
 - **Status**: done
 - **Dependencies**: none
-- **Description**: `src/core/malfunction.js` stores `_malfunctionMode` as a module-level variable rather than in `gameState`. Move it into the game state object so it follows the same state mutation pattern as everything else and can be persisted/restored with save/load. Update all read/write sites and any E2E test hooks that toggle malfunction mode. See requirements (review item, not in a numbered section — architectural consistency).
-- **Verification**: Run `npm run test:unit` — all tests pass. Then run `npx playwright test e2e/reliability-risk.spec.js` to verify malfunction E2E tests still work with the new state location. Verify malfunction mode survives save/load cycle via unit test.
+- **Description**: In `src/core/orbit.ts` at line 648, add a `Number.isFinite(T_syn)` check and cap T_syn at `10 * Math.max(T_craft, T_target)`. If exceeded, fall back to `Math.max(T_craft, T_target)`. See requirements Section 1.3.
+- **Verification**: `npm run test:unit` passes. New unit test verifies synodic period calculation with nearly-equal orbital periods (periodDiff 0.01–0.1) produces a reasonable search duration.
 
-### TASK-006: Implement event listener cleanup in UI modules
+### TASK-006: Route dockingTargetGfx through PixiJS object pool
 - **Status**: done
 - **Dependencies**: none
-- **Description**: Fix event listener accumulation in `src/ui/help.js`, `src/ui/settings.js`, `src/ui/debugSaves.js`, and `src/ui/topbar.js`. Create a lightweight listener tracking helper that modules can use to register listeners and clean them up on panel close/teardown. Apply it to the four affected modules. See requirements Section 2.1.
-- **Verification**: Run `npm run test:unit` — all tests pass. Then run `npx playwright test e2e/help.spec.js e2e/hub-navigation.spec.js` to verify help and hub panel interactions still work.
+- **Description**: In `src/render/flight/_debris.js:85`, replace `new PIXI.Graphics()` for `dockingTargetGfx` with `acquireGraphics()` from `_pool.js`. Ensure it is released during cleanup. See requirements Section 1.4.
+- **Verification**: `npm run test:unit` passes. Grep for `new PIXI.Graphics()` in `_debris.js` returns no results.
 
-### TASK-007: Fix style element accumulation across game sessions
+### TASK-007: Add save format version field
 - **Status**: done
 - **Dependencies**: none
-- **Description**: Multiple UI modules inject `<style>` elements into `document.head` on initialization but never remove them. Implement idempotent style injection — check for an existing style element (by ID or data attribute) before injecting, and reuse it if present. Apply across all UI modules that inject styles. See requirements Section 2.2.
-- **Verification**: Run `npm run test:unit` — all tests pass. Then run `npx playwright test e2e/smoke.spec.js` as a basic sanity check that the game still starts and renders.
+- **Description**: Add a `version` integer field (starting at 1) to the save envelope in `src/core/saveload.js`. On load: missing version = version 0 (apply all migrations), matching version = load directly, higher version = warn user. See requirements Section 2.1.
+- **Verification**: `npm run test:unit` passes. Unit tests verify: saves include version field, version-0 saves load with migrations, future-version saves trigger warning.
 
-### TASK-008: Add tutorial mission blocking indicators
+### TASK-008: Implement IndexedDB backup storage layer
+- **Status**: done
+- **Dependencies**: TASK-007
+- **Description**: Create an IndexedDB key-value store module that mirrors localStorage save operations. Use raw IndexedDB API — one database, one object store. Keys match localStorage keys. Mirror all saves (manual and auto) to IndexedDB. On load, check both layers and use most recent valid save. Handle IndexedDB unavailability gracefully. See requirements Section 2.2.
+- **Verification**: `npm run test:unit` passes. Unit tests verify: writes go to both localStorage and IndexedDB, reads check both and use most recent, IndexedDB unavailability falls back to localStorage-only.
+
+### TASK-009: Implement auto-save system with cancel UI
+- **Status**: done
+- **Dependencies**: TASK-008
+- **Description**: Implement auto-save triggers at end of flight (when post-flight summary appears) and on return to hub. Use a dedicated auto-save slot separate from manual saves. Display a small toast notification with cancel button for 3-5 seconds before saving. Add "Auto-save" toggle to settings panel (enabled by default, persists across sessions). See requirements Section 2.2.
+- **Verification**: `npm run test:unit` passes. `npm run test:e2e` passes. E2E test verifies: auto-save fires after flight, cancel button prevents save, toggle in settings disables auto-save.
+
+### TASK-010: Add save migration edge case unit tests
+- **Status**: done
+- **Dependencies**: TASK-007
+- **Description**: Add unit tests for `loadGame()` migration paths: savedDesigns as null, savedDesigns as undefined, saveSharedLibrary() throwing during migration, invalid malfunctionMode values, pre-version saves, future-version saves. See requirements Section 2.3.
+- **Verification**: `npm run test:unit` passes. All 6 edge case tests exist and pass.
+
+### TASK-011: Add character counters to name input fields
 - **Status**: done
 - **Dependencies**: none
-- **Description**: In Tutorial mode, missions that are prerequisites for other uncompleted tutorial missions should display a visual indicator (e.g., "Unlocks next step" label or chain icon). This should be data-driven: check whether the mission's completion is in the dependency chain of any other uncompleted tutorial mission. Non-blocking tutorial missions should NOT get the indicator. Only applies in Tutorial mode — Freeplay and Sandbox are unaffected. See requirements Section 3.1.
-- **Verification**: Run `npm run test:unit` — all tests pass. Then run `npx playwright test e2e/missions.spec.js e2e/mission-progression.spec.js` to verify mission UI still works and blocking indicators appear correctly in tutorial mode.
+- **Description**: Add "X / Y" character counters below/beside name inputs in: agency name (`src/ui/mainmenu.js`, max 48), crew names (`src/ui/crewAdmin.js`, max 60), design name (`src/ui/vab/_designLibrary.js`, max 60). Update on every keystroke. Use muted text style. Change to `--color-warning` when within 5 characters of limit. See requirements Section 3.1.
+- **Verification**: `npm run test:e2e` passes. Visual inspection confirms counters appear, update on input, and change color near limit.
 
-### TASK-009: Standardise weather display format between hub and Launch Pad
+### TASK-012: Add keyboard navigation — focus ring style and core panels
 - **Status**: done
 - **Dependencies**: none
-- **Description**: The hub shows weather in a full panel with header/title; the Launch Pad shows a compact inline bar. Standardise both to use the compact format since weather is supplementary information. See requirements Section 3.2.
-- **Verification**: Run `npm run test:unit` — all tests pass. Then run `npx playwright test e2e/launchpad.spec.js` to verify Launch Pad UI still works correctly.
+- **Description**: Define a global focus ring CSS style using design tokens. Add keyboard navigation (Tab/Shift+Tab, Enter/Space activation, Escape to close) to: main menu, hub, settings, and topbar menu. Arrow keys for topbar menu items. See requirements Section 3.2.
+- **Verification**: `npm run test:e2e` passes. E2E test verifies Tab cycles through interactive elements on main menu and hub. Focus ring is visible on focused elements.
 
-### TASK-010: Implement PixiJS object pooling for flight renderer
+### TASK-032: Add keyboard navigation — VAB, Mission Control, Crew Admin, Help
+- **Status**: done
+- **Dependencies**: TASK-012
+- **Description**: Extend keyboard navigation to remaining panels: VAB (parts panel, staging panel, toolbar buttons), Mission Control (tabs then items within each tab), Crew Admin (crew cards and action buttons), Help panel (section tabs). Reuse the focus ring style from TASK-012. See requirements Section 3.2.
+- **Verification**: `npm run test:e2e` passes. E2E test verifies Tab cycles through interactive elements on VAB and Mission Control panels.
+
+### TASK-013: Implement VAB undo/redo stack
 - **Status**: done
 - **Dependencies**: none
-- **Description**: Create a simple array-based object pool for `PIXI.Graphics` and `PIXI.Text` objects. Integrate it into `src/render/flight/_trails.js`, `_debris.js`, `_rocket.js`, `_sky.js`, and `_ground.js` — replace per-frame `new PIXI.Graphics()` / `new PIXI.Text()` calls with pool acquire/release. Reset graphics state on reuse. See requirements Section 4.1.
-- **Verification**: Run `npm run test:unit` — all tests pass. Then run `npx playwright test e2e/flight.spec.js` to verify flight rendering still works. No visual regressions.
+- **Description**: Implement a delta-based undo/redo stack for the VAB. Track: part placement, deletion, movement, staging changes. Record inverse operations. Depth limit of 50 actions. Ctrl+Z = undo, Ctrl+Y = redo. Add undo/redo buttons to VAB toolbar (greyed when empty). Loading a design clears the stack. See requirements Section 3.3.
+- **Verification**: `npm run test:unit` passes. Unit tests verify: undo reverses placement/deletion/move/staging, redo re-applies, stack depth limit works, new action after undo clears redo stack. E2E test verifies Ctrl+Z undoes a part placement.
 
-### TASK-011: Optimize hit testing in _rocket.js
+### TASK-014: Add debug FPS/frame-time monitor
+- **Status**: done
+- **Dependencies**: TASK-016
+- **Description**: Create a lightweight FPS/frame-time overlay for flight mode. Shows FPS, frame time (ms), and a mini graph of last ~60 frame times. Updates every ~500ms. Semi-transparent background, top-right corner. Only visible when debug mode is enabled. Expose data on `window.__perfStats`. No per-frame allocations. See requirements Section 3.4.
+- **Verification**: `npm run test:e2e` passes. E2E test verifies: monitor not visible with debug off, visible with debug on during flight, `window.__perfStats` contains fps and frameTime values.
+
+### TASK-015: Add debug mode toggle to settings
 - **Status**: done
 - **Dependencies**: none
-- **Description**: `hitTestFlightPart()` in `src/render/flight/_rocket.js` iterates all parts on every mouse move (O(n)). Add bounding-box pre-filtering or spatial indexing to reduce the number of detailed hit tests for rockets with many parts. See requirements Section 4.2.
-- **Verification**: Run `npm run test:unit` — all tests pass. Then run `npx playwright test e2e/flight.spec.js` to verify part hover/click behavior during flight still works.
+- **Description**: Add a "Debug Mode" toggle to game settings (`src/ui/settings.js`). Default: off. Persists across sessions. When off: Ctrl+Shift+D shortcut does nothing, debug saves inaccessible, FPS monitor hidden. When on: all debug features accessible. Expose `window.__enableDebugMode()` for E2E tests. See requirements Section 3.5.
+- **Verification**: `npm run test:unit` passes. Setting toggles correctly and persists in game state.
 
-### TASK-012: Convert mission/contract Array.find lookups to Map
+### TASK-016: Gate all debug features behind debug mode setting
+- **Status**: done
+- **Dependencies**: TASK-015
+- **Description**: Update `src/ui/hub.js` to check debug mode before binding Ctrl+Shift+D. Update any other debug UI to check the setting. Update all E2E tests that use debug features to call `window.__enableDebugMode()` first. See requirements Section 3.5.
+- **Verification**: `npm run test:e2e` passes. E2E tests verify: Ctrl+Shift+D does nothing when debug off, works when debug on, setting persists across save/load.
+
+### TASK-017: Convert data layer to TypeScript (src/data/)
 - **Status**: done
 - **Dependencies**: none
-- **Description**: Mission and contract lookups in `src/data/missions.js` and `src/data/contracts.js` (and any core modules that look up by ID) use `Array.find()` O(n). Build `Map` objects keyed by ID at module load time and export them alongside the arrays. Update all lookup sites to use the maps. See requirements Section 4.3.
-- **Verification**: Run `npm run test:unit` — all tests pass. Grep for `.find(` in mission/contract lookup paths and verify they've been replaced. No E2E needed — data layer only, unit tests cover mission/contract logic.
+- **Description**: Convert all 8 JS files in `src/data/` to TypeScript: bodies.js, challenges.js, contracts.js, index.js, instruments.js, missions.js, parts.js, techtree.js. Add proper type annotations. Use existing types from `gameState.ts` and `constants.ts`. Don't refactor logic. See requirements Section 4.1.
+- **Verification**: `npm run typecheck` passes. `npm run test:unit` passes. No `.js` files remain in `src/data/`.
 
-### TASK-013: Add unit tests for flightReturn.js
+### TASK-018: Convert core layer to TypeScript (src/core/) — batch 1
 - **Status**: done
-- **Dependencies**: none
-- **Description**: Create `src/tests/flightReturn.test.js` with comprehensive tests for mission completion, objective validation, contract rewards, crew recovery, part recovery, and financial transactions. This is the highest-priority untested module. See requirements Section 5.1.
-- **Verification**: Run `npx vitest run src/tests/flightReturn.test.js` — all tests pass. Coverage of `flightReturn.js` should be ≥80% lines/branches.
+- **Dependencies**: TASK-017
+- **Description**: Convert the first half of remaining core JS files to TypeScript (~22 files): achievements.js, atmosphere.js, biomes.js, challenges.js, collision.js, comms.js, construction.js, contracts.js, controlMode.js, crew.js, customChallenges.js, debugSaves.js, designLibrary.js, docking.js, ejector.js, finance.js, flightPhase.js, flightReturn.js, fuelsystem.js, grabbing.js, index.js, legs.js. Add proper type annotations. See requirements Section 4.1.
+- **Verification**: `npm run typecheck` passes. `npm run test:unit` passes. All listed files are now `.ts`.
 
-### TASK-014: Add unit tests for sciencemodule.js
-- **Status**: done
-- **Dependencies**: none
-- **Description**: Create `src/tests/sciencemodule.test.js` covering science module activation, data collection, yield calculation, and edge cases. See requirements Section 5.1.
-- **Verification**: Run `npx vitest run src/tests/sciencemodule.test.js` — all tests pass.
-
-### TASK-015: Add unit tests for customChallenges.js
-- **Status**: done
-- **Dependencies**: none
-- **Description**: Create `src/tests/customChallenges.test.js` covering challenge creation, validation, completion detection, and edge cases. See requirements Section 5.1.
-- **Verification**: Run `npx vitest run src/tests/customChallenges.test.js` — all tests pass.
-
-### TASK-016: Add unit tests for designLibrary.js
-- **Status**: done
-- **Dependencies**: TASK-001
-- **Description**: Create `src/tests/designLibrary.test.js` covering design persistence, JSON import/export, cross-save sharing, and the improved error handling from TASK-001. Must be done after TASK-001 so tests cover the updated code. See requirements Section 5.1.
-- **Verification**: Run `npx vitest run src/tests/designLibrary.test.js` — all tests pass.
-
-### TASK-017: Add unit tests for parachute.js deployment triggers
-- **Status**: done
-- **Dependencies**: none
-- **Description**: Add tests to an existing or new test file covering parachute deployment trigger logic — when parachutes activate, altitude/speed conditions, and edge cases. Currently only descent/landing physics are tested. See requirements Section 5.1.
-- **Verification**: Run the parachute test file — all tests pass, including new deployment trigger tests.
-
-### TASK-018: Add programmatic time warp API for E2E tests
-- **Status**: done
-- **Dependencies**: none
-- **Description**: Expose a testing-only API (e.g., `window.__testSetTimeWarp(speedMultiplier)`) that lets E2E tests set arbitrary simulation speeds not limited to the player-facing time warp increments. This is needed by TASK-019 and TASK-020 for running physics through transitions at high speed. See requirements Section 5.2.1.
-- **Verification**: Write a small E2E test (in `e2e/test-infrastructure.spec.js` or a new spec) that sets time warp to 100x, verifies simulation time advances faster than real time, then resets to 1x. Run `npx playwright test e2e/test-infrastructure.spec.js` — passes.
-
-### TASK-019: Upgrade E2E teleport helper to set velocity
+### TASK-019: Convert core layer to TypeScript (src/core/) — batch 2
 - **Status**: done
 - **Dependencies**: TASK-018
-- **Description**: Upgrade the teleport helpers across all 7 spec files that use them. The new helper should set position (posX, posY) AND velocity (velX, velY) plus basic flags (grounded, landed, crashed, throttle), but should NOT manually set phase or orbital elements — let the physics simulation compute those from position/velocity. Replace the current helpers that manually set `fs.phase`, `fs.orbitalElements`, and fake phase log entries. See requirements Section 5.2.2.
-- **Verification**: Run the spec files that use teleport: `npx playwright test e2e/core-mechanics.spec.js e2e/orbital-operations.spec.js e2e/destinations.spec.js e2e/additional-systems.spec.js e2e/tutorial-revisions.spec.js e2e/mission-progression.spec.js e2e/relaunch.spec.js` — all pass. Grep for manual `fs.phase =` and `fs.orbitalElements =` in teleport helpers and verify they're removed.
+- **Description**: Convert remaining core JS files to TypeScript (~22 files): library.js, lifeSupport.js, malfunction.js, manoeuvre.js, mapView.js, missions.js, parachute.js, partInventory.js, period.js, power.js, reputation.js, rocketbuilder.js, rocketvalidator.js, satellites.js, saveload.js, sciencemodule.js, settings.js, staging.js, surfaceOps.js, techtree.js, testFlightBuilder.js, weather.js. See requirements Section 4.1.
+- **Verification**: `npm run typecheck` passes. `npm run test:unit` passes. No `.js` files remain in `src/core/`.
 
-### TASK-020: Add E2E phase transition tests
+### TASK-020: Convert render layer to TypeScript (src/render/)
 - **Status**: done
-- **Dependencies**: TASK-018, TASK-019
-- **Description**: Add one dedicated E2E test per unique flight phase transition that runs through real physics. Use teleport+velocity to get near the transition point, then let physics run at high time warp through the actual transition. Transitions to cover: PRELAUNCH→LAUNCH (ignition), LAUNCH→FLIGHT (liftoff), FLIGHT→ORBIT (orbital velocity + checkOrbitStatus), ORBIT→MANOEUVRE (burn initiation), MANOEUVRE→TRANSFER (escape trajectory), reentry (atmospheric interface), landing (parachute + ground contact), crash (impact detection). See requirements Section 5.2.3.
-- **Verification**: Run `npx playwright test e2e/phase-transitions.spec.js` (or whatever the new spec is named) — all tests pass. Each test verifies the phase transition fires through the real physics pipeline, not via direct state mutation.
+- **Dependencies**: TASK-019
+- **Description**: Convert all 17 JS files in `src/render/` to TypeScript: flight.js, hub.js, index.js, map.js, vab.js, and all 12 files in `src/render/flight/`. Use PixiJS types from the `pixi.js` package. See requirements Section 4.1.
+- **Verification**: `npm run typecheck` passes. `npm run test:unit` passes. No `.js` files remain in `src/render/`.
 
-### TASK-021: Replace waitForTimeout with conditional waits in E2E tests
+### TASK-021: Convert UI layer to TypeScript (src/ui/) — batch 1
 - **Status**: done
-- **Dependencies**: none
-- **Description**: Replace the 76 `waitForTimeout()` calls across 10 E2E spec files with `page.waitForFunction(() => condition)`, `page.waitForSelector()`, or other deterministic waits. The heaviest offender is `additional-systems.spec.js` (19 occurrences). Some waits for animations may remain, but most should be converted. See requirements Section 5.3.
-- **Verification**: Grep for `waitForTimeout` in `e2e/` — count should be reduced to ≤10 (only genuinely necessary animation waits). Run each modified spec file individually to confirm it passes (e.g., `npx playwright test e2e/additional-systems.spec.js`, etc.).
+- **Dependencies**: TASK-020
+- **Description**: Convert the first batch of UI files to TypeScript (~25 files): all files in `src/ui/flightController/` EXCEPT `_css.js` (12 files), all files in `src/ui/missionControl/` EXCEPT `_css.js` (8 files including barrel), plus crewAdmin.js, debugSaves.js, design-tokens.js, flightContextMenu.js, flightHud.js, help.js. Skip `_css.js` files — they will be replaced by `.css` files in TASK-024. Use proper DOM types. See requirements Section 4.1.
+- **Verification**: `npm run typecheck` passes. `npm run test:unit` passes. All listed files are now `.ts`.
 
-### TASK-022: Add E2E failure-path tests
+### TASK-022: Convert UI layer to TypeScript (src/ui/) — batch 2
 - **Status**: done
-- **Dependencies**: TASK-018, TASK-019
-- **Description**: Add E2E tests for failure scenarios: (1) malfunction during flight — part fails, UI appears, flight log records it; (2) crew KIA on crash — death recorded, fine applied, crew admin reflects loss; (3) contract deadline expiry — penalty applied, contract removed; (4) loan default/bankruptcy — game-over flow triggers. See requirements Section 5.4.
-- **Verification**: Run `npx playwright test e2e/failure-paths.spec.js` (or whatever the new spec is named) — all tests pass.
+- **Dependencies**: TASK-021
+- **Description**: Convert the second batch of UI files to TypeScript (~25 files): all files in `src/ui/vab/` EXCEPT `_css.js` (12 files including barrel), plus hub.js, index.js, injectStyle.js, launchPad.js, library.js, listenerTracker.js, mainmenu.js, missionControl.js, rdLab.js, rocketCardUtil.js, satelliteOps.js, settings.js, topbar.js, trackingStation.js, flightController.js. Skip `_css.js` files — they will be replaced by `.css` files in TASK-024. See requirements Section 4.1.
+- **Verification**: `npm run typecheck` passes. `npm run test:unit` passes. All listed files are now `.ts`.
 
-### TASK-023: Configure Vitest coverage with 80% thresholds
+### TASK-023: Convert entry point and test files to TypeScript
 - **Status**: done
-- **Dependencies**: none
-- **Description**: Add `v8` coverage provider to Vitest config. Set 80% thresholds for lines, branches, and functions. Add `npm run test:coverage` script to `package.json`. See requirements Section 5.5.
-- **Verification**: Run `npm run test:coverage` — completes successfully, reports coverage percentages, and enforces 80% thresholds.
+- **Dependencies**: TASK-022
+- **Description**: Convert `src/main.js` to TypeScript. Convert all 60 test files in `src/tests/` from `.test.js` to `.test.ts`. Test files may use looser typing (any for fixtures, partial state). Do NOT convert E2E test files or Playwright config. See requirements Section 4.1.
+- **Verification**: `npm run typecheck` passes. `npm run test:unit` passes. No `.js` files remain in `src/` (excluding E2E files in `e2e/`).
 
-### TASK-024: Assess coverage and raise thresholds
-- **Status**: done
-- **Dependencies**: TASK-013, TASK-014, TASK-015, TASK-016, TASK-017, TASK-023
-- **Description**: After all new unit tests are written and coverage is configured, run `npm run test:coverage` to assess actual coverage. Raise thresholds in Vitest config to match or slightly exceed actual coverage, locking in the higher numbers to prevent regression. Document the final thresholds. See requirements Section 5.5.
-- **Verification**: Run `npm run test:coverage` — passes with the raised thresholds. Thresholds are higher than the initial 80% where actual coverage exceeds it.
-
-### TASK-025: Add no-console and async/await error handling ESLint rules
+### TASK-024: Extract CSS from JS template literals into .css files
 - **Status**: done
 - **Dependencies**: none
-- **Description**: Add `no-console` rule (error level, with exceptions for `console.warn` and `console.error`) and async/await error handling rules to `eslint.config.js`. Fix any existing violations in production source code (not test files — exclude test directories from `no-console`). See requirements Section 6.1.
-- **Verification**: Run `npm run lint` — no errors. Grep for bare `console.log` in `src/` (excluding tests) — none found. No E2E needed — config and lint fixes only.
+- **Description**: For each of the 18 UI modules using `injectStyleOnce()`, extract the CSS into co-located `.css` files and import via Vite's CSS import. Replace dedicated CSS modules (`vab/_css.js`, `flightController/_css.js`, `missionControl/_css.js`) entirely with `.css` files and delete the JS originals. Migrate design-tokens.js `:root` properties and utility classes to `design-tokens.css`. Handle dynamic interpolations by hardcoding constants or using CSS custom properties. Note: the `_css.js` files were deliberately excluded from TS migration (TASK-021/022) since they are replaced here. See requirements Section 4.2.
+- **Verification**: `npm run build` succeeds. `npm run test:e2e` passes. Grep for `injectStyleOnce` returns zero results in `src/`. All UI modules import `.css` files instead. No `_css.js` files remain.
 
-### TASK-026: Add engines field to package.json
+### TASK-025: Migrate inline styles to CSS classes using design tokens
+- **Status**: done
+- **Dependencies**: TASK-024
+- **Description**: Replace inline `style.cssText` strings in runtime UI elements (error banners, abort overlays, modals in flightHud.js, _showErrorBanner, etc.) with CSS classes defined in the module's .css file. Classes should reference design token custom properties. See requirements Section 4.4.
+- **Verification**: `npm run test:e2e` passes. Grep for `style.cssText` in `src/ui/` returns zero results (or only in cases where truly dynamic per-instance styles are needed).
+
+### TASK-026: Implement structured logger
 - **Status**: done
 - **Dependencies**: none
-- **Description**: Add an `engines` field to `package.json` specifying the minimum required Node.js version based on the dependency requirements (TypeScript 6, Vite 6, ESLint 10, Vitest 3). See requirements Section 6.2.
-- **Verification**: Read `package.json` and confirm `engines` field is present with a reasonable Node.js version constraint.
+- **Description**: Create `src/core/logger.ts` with log levels (debug, info, warn, error), categories, timestamps, and optional data objects. Output to console.log/warn/error. Configurable minimum level (warn in production, debug in dev). Replace existing console.warn/error calls in error handling paths (saveload, designLibrary, flightHud — whether .js or .ts at time of execution) with logger calls. Add logger.debug at key lifecycle points. See requirements Section 4.3.
+- **Verification**: `npm run typecheck` passes. `npm run test:unit` passes. `npm run lint` passes. Grep for bare `console.warn` and `console.error` in `src/core/` and `src/ui/` returns only the logger module itself.
 
-### TASK-027: Address all 17 TypeScript TODOs in existing TS files
+### TASK-027: Define readonly render snapshot interfaces
+- **Status**: done
+- **Dependencies**: TASK-020
+- **Description**: Define `ReadonlyPhysicsState`, `ReadonlyFlightState`, `ReadonlyGameState`, and `ReadonlyAssembly` interfaces in `src/render/types.ts`. Update render function signatures in all render modules to accept these readonly types. Callers pass mutable state (TS allows mutable→readonly). See requirements Section 4.5.
+- **Verification**: `npm run typecheck` passes. `npm run test:unit` passes. Attempting to add a state mutation in a render module causes a TypeScript error.
+
+### TASK-028: Split E2E test helpers into focused sub-modules
 - **Status**: done
 - **Dependencies**: none
-- **Description**: Address the 17 TODO comments in `src/core/constants.ts`, `src/core/gameState.ts`, `src/core/physics.ts`, and `src/core/orbit.ts` that mark places where JS module imports need proper type definitions. Add proper type imports, `.d.ts` declaration files, or JSDoc annotations as appropriate to resolve each TODO. See requirements Section 7.1.
-- **Verification**: Grep for `TODO` in the four TS files — count is 0 (all resolved). Run `npm run typecheck` — no errors.
+- **Description**: Split `e2e/helpers/_interactions.js` (415 lines) into: `_flight.js` (teleport, flight control), `_timewarp.js` (time warp API, wait helpers), `_state.js` (state seeding, queries), `_navigation.js` (screen navigation). Maintain barrel re-export at `e2e/helpers.js`. See requirements Section 5.3.
+- **Verification**: `npm run test:e2e` passes. `_interactions.js` no longer exists. Each sub-module is under 150 lines.
 
-### TASK-028: Verification pass — run all checks
+### TASK-029: Add E2E tests for debug mode toggle
 - **Status**: done
-- **Dependencies**: TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-007, TASK-008, TASK-009, TASK-010, TASK-011, TASK-012, TASK-013, TASK-014, TASK-015, TASK-016, TASK-017, TASK-018, TASK-019, TASK-020, TASK-021, TASK-022, TASK-023, TASK-024, TASK-025, TASK-026, TASK-027
-- **Description**: Run the full verification suite: `npm run typecheck`, `npm run lint`, `npm run test:unit`, `npm run test:e2e`, and `npm run test:coverage`. All must pass with no errors. See requirements Section 9.
-- **Verification**: All five commands pass cleanly. Coverage meets or exceeds raised thresholds from TASK-024.
+- **Dependencies**: TASK-016
+- **Description**: Add E2E tests verifying: Ctrl+Shift+D does nothing with debug off, enabling debug in settings makes it work, setting persists across save/load, FPS monitor only visible in debug mode during flight, E2E helper enables debug mode programmatically. See requirements Section 5.4.
+- **Verification**: `npm run test:e2e` passes. New debug-mode E2E spec has at least 5 passing tests.
+
+### TASK-030: Achieve 80%+ branch coverage and lock thresholds
+- **Status**: done
+- **Dependencies**: TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-007, TASK-008, TASK-009, TASK-010, TASK-011, TASK-012, TASK-032, TASK-013, TASK-014, TASK-015, TASK-016, TASK-017, TASK-018, TASK-019, TASK-020, TASK-021, TASK-022, TASK-023, TASK-024, TASK-025, TASK-026, TASK-027, TASK-028, TASK-029
+- **Description**: Run coverage analysis after all code and test tasks are complete. Identify modules with lowest branch coverage. Write targeted tests to bring branches above 80%. Set all three thresholds (lines, branches, functions) to match actual coverage — 80% floor minimum. If coverage exceeds 80%, set thresholds at the higher value. See requirements Section 5.1.
+- **Verification**: `npm run test:coverage` passes. All three thresholds are >= 80%. Thresholds match or are within 1% of actual coverage.
+
+### TASK-031: Verification pass — run all checks
+- **Status**: done
+- **Dependencies**: TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-007, TASK-008, TASK-009, TASK-010, TASK-011, TASK-012, TASK-032, TASK-013, TASK-014, TASK-015, TASK-016, TASK-017, TASK-018, TASK-019, TASK-020, TASK-021, TASK-022, TASK-023, TASK-024, TASK-025, TASK-026, TASK-027, TASK-028, TASK-029, TASK-030
+- **Description**: Run all verification checks from requirements Section 6: typecheck, lint, unit tests, E2E tests, coverage thresholds. Fix any failures found. Also check for any `.js` files in `src/` — after the full TypeScript migration (TASK-023), any `.js` file in `src/` is unintended and should be converted to TypeScript with proper type annotations. E2E files in `e2e/` are excluded from this check.
+- **Verification**: All 5 commands pass: `npm run typecheck`, `npm run lint`, `npm run test:unit`, `npm run test:e2e`, `npm run test:coverage`. Glob for `src/**/*.js` returns zero results.
