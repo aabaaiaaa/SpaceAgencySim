@@ -49,3 +49,6 @@ current-issues.txt
 # Misc
 *.bak
 *.tmp
+
+# Added by DevLoop
+.worktrees/
