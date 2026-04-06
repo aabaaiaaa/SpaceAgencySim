@@ -1,7 +1,7 @@
 # Iteration 4 — Task List
 
 ### TASK-001: Fix deprecated PixiJS v7 API in _debris.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Replace PixiJS v7 methods (`beginFill`, `endFill`, `drawCircle`, `lineStyle`) with v8 equivalents (`circle()`, `fill()`, `stroke()`) in `src/render/flight/_debris.ts:117-141`. Remove the unsafe type casts. See requirements Section 1.1.
 - **Verification**: `npm run typecheck` passes with no cast workarounds in `_debris.ts`. Docking E2E test passes without runtime errors. If no docking E2E test covers this code path, add one and verify it passes.

@@ -114,12 +114,10 @@ export function renderDockingTarget(ps: ReadonlyPhysicsState, w: number, h: numb
   const g = s.dockingTargetGfx;
 
   if (isOffScreen) {
-    (g as PIXI.Graphics & { beginFill: Function }).beginFill(0x00ccff, 0.7);
-    (g as PIXI.Graphics & { drawCircle: Function }).drawCircle(clampedX, clampedY, 8);
-    (g as PIXI.Graphics & { endFill: Function }).endFill();
+    g.circle(clampedX, clampedY, 8);
+    g.fill({ color: 0x00ccff, alpha: 0.7 });
   } else {
     const size = 16;
-    (g as PIXI.Graphics & { lineStyle: Function }).lineStyle(2, 0x00ccff, 0.9);
 
     g.moveTo(targetSX, targetSY - size);
     g.lineTo(targetSX + size, targetSY);
@@ -132,13 +130,12 @@ export function renderDockingTarget(ps: ReadonlyPhysicsState, w: number, h: numb
     g.lineTo(targetSX + inner, targetSY);
     g.moveTo(targetSX, targetSY - inner);
     g.lineTo(targetSX, targetSY + inner);
+    g.stroke({ width: 2, color: 0x00ccff, alpha: 0.9 });
 
     for (const [, portState] of (ps.dockingPortStates || new Map())) {
       if (portState === 'docked') {
-        (g as PIXI.Graphics & { lineStyle: Function }).lineStyle(0);
-        (g as PIXI.Graphics & { beginFill: Function }).beginFill(0x44ff44, 0.6);
-        (g as PIXI.Graphics & { drawCircle: Function }).drawCircle(targetSX, targetSY, 6);
-        (g as PIXI.Graphics & { endFill: Function }).endFill();
+        g.circle(targetSX, targetSY, 6);
+        g.fill({ color: 0x44ff44, alpha: 0.6 });
         break;
       }
     }

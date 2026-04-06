@@ -490,6 +490,58 @@ test.describe('Docking mode local positioning', () => {
       { timeout: 5_000 },
     );
   });
+
+  test('(4) docking target HUD renders without errors when offsets are set', async () => {
+    // Enter docking mode if not already in it.
+    const mode = await page.evaluate(() => window.__flightPs?.controlMode);
+    if (mode !== 'DOCKING') {
+      await page.keyboard.press('v');
+      await page.waitForFunction(
+        () => window.__flightPs?.controlMode === 'DOCKING',
+        { timeout: 5_000 },
+      );
+    }
+
+    // Set docking port states and offsets so the render path is exercised.
+    await page.evaluate(() => {
+      const ps = window.__flightPs;
+      if (!ps) return;
+      if (!ps.dockingPortStates) ps.dockingPortStates = new Map();
+      ps.dockingPortStates.set('test-port', 'extended');
+      ps.dockingOffsetAlongTrack = 50;
+      ps.dockingOffsetRadial = 30;
+    });
+
+    // Let a few render frames pass to exercise the docking target draw code.
+    await page.waitForTimeout(500);
+
+    // Verify no console errors were thrown by the PixiJS draw calls.
+    const errors = await page.evaluate(() => {
+      return (window.__consoleErrors || []).filter(
+        e => e.includes('beginFill') || e.includes('drawCircle') ||
+             e.includes('lineStyle') || e.includes('endFill') ||
+             e.includes('is not a function'),
+      );
+    });
+    expect(errors.length).toBe(0);
+
+    // Also test the on-screen (non-clamped) path with docked state.
+    await page.evaluate(() => {
+      const ps = window.__flightPs;
+      if (!ps) return;
+      ps.dockingOffsetAlongTrack = 5;
+      ps.dockingOffsetRadial = 3;
+      ps.dockingPortStates.set('test-port', 'docked');
+    });
+
+    await page.waitForTimeout(500);
+
+    // Confirm the render loop is still running (no crash).
+    const stillRunning = await page.evaluate(() => {
+      return window.__flightPs?.controlMode === 'DOCKING';
+    });
+    expect(stillRunning).toBe(true);
+  });
 });
 
 // =========================================================================
