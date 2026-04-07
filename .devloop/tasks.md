@@ -73,7 +73,7 @@
 - **Verification**: `npm run typecheck -- --noEmit src/ui/flightController/_workerBridge.ts && npx vitest run src/tests/workerBridge.test.ts`
 
 ### TASK-012: Refactor _loop.ts to pass readonly snapshot to render/UI
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-011
 - **Description**: In `_loop.ts`, change the frame processing to use the readonly snapshot from `consumeSnapshot()` instead of reading from mutable `ps` and `flightState` in FCState. Pass the snapshot (or its sub-objects) to render functions (`renderFlightFrame`, `renderMapFrame`) and UI update functions. Control inputs (throttle, angle) should still be read from their separate storage in FCState. For the main-thread fallback (no worker), call `createSnapshotFromState()` after `tick()` to produce a snapshot in the same format. Phase transition detection should compare old vs. new snapshot phase values. See requirements Sections 3.3-3.4.
 - **Verification**: `npm run typecheck -- --noEmit src/ui/flightController/_loop.ts && npx playwright test e2e/flight.spec.js e2e/phase-transitions.spec.js`

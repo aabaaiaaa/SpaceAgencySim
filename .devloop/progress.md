@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 21
-- **Completed**: 11
-- **Remaining**: 10
-- **Last Updated**: 2026-04-07T16:14:44.961Z
+- **Completed**: 12
+- **Remaining**: 9
+- **Last Updated**: 2026-04-07T16:26:30.216Z
 
 ## Iteration Log
 
@@ -106,4 +106,13 @@
 - **Exit Status**: success
 - **Tokens**: 805,383 total (20 in, 4,450 out, 41,010 cache-create, 759,903 cache-read)
 - **Cost**: $0.7476
+
+### Iteration 12 - 2026-04-07T16:26:30.215Z
+- **Task Attempted**: TASK-012
+- **Task Completed**: TASK-012
+- **Summary**: Completed Refactor _loop.ts to pass readonly snapshot to render/UI
+- **Duration**: 11m 43s
+- **Exit Status**: success
+- **Tokens**: 1,578,379 total (24 in, 36,246 out, 82,694 cache-create, 1,459,415 cache-read)
+- **Cost**: $2.1528
 

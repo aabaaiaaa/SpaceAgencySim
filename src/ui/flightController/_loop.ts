@@ -39,7 +39,7 @@ import { handleAbortReturnToAgency } from './_menuActions.ts';
 import {
   isWorkerReady,
   hasWorkerError,
-  consumeSnapshot,
+  consumeMainThreadSnapshot,
   sendTick,
   sendThrottle,
   sendAngle,
@@ -47,9 +47,15 @@ import {
   applyFlightSnapshot,
   terminatePhysicsWorker,
 } from './_workerBridge.ts';
+import { createSnapshotFromState } from '../../core/snapshotFactory.ts';
+import type { MainThreadSnapshot } from '../../core/physicsWorkerProtocol.ts';
+import type { PhysicsSnapshot } from '../../core/physicsWorkerProtocol.ts';
 
 /** Maximum consecutive loop errors before showing the abort banner. */
 export const MAX_CONSECUTIVE_LOOP_ERRORS: number = 5;
+
+/** Monotonic frame counter for the main-thread fallback snapshot path. */
+let _fallbackFrame = 0;
 
 /**
  * Returns true when the assembly contains at least one COMMAND_MODULE part
@@ -81,14 +87,21 @@ function _allCommandModulesDestroyed(): boolean {
  * UI notification.  This mirrors the logic in `evaluateFlightPhase()` but
  * is driven by comparing the previous and current phases rather than by the
  * return value of `evaluateAutoTransitions()`.
+ *
+ * Reads position and body data from the snapshot rather than mutable FCState.
  */
-function _handleWorkerPhaseTransition(prevPhase: string, newPhase: string): void {
-  const s = getFCState();
-  if (!s.ps || !s.flightState) return;
-
+function _handleWorkerPhaseTransition(
+  prevPhase: string,
+  newPhase: string,
+  snap: MainThreadSnapshot,
+): void {
   if (newPhase === FlightPhase.ORBIT) {
-    const bodyId = s.flightState.bodyId || 'EARTH';
-    const orbitStatus = checkOrbitStatus(s.ps.posX, s.ps.posY, s.ps.velX, s.ps.velY, bodyId);
+    const bodyId = snap.flight.bodyId || 'EARTH';
+    const orbitStatus = checkOrbitStatus(
+      snap.physics.posX, snap.physics.posY,
+      snap.physics.velX, snap.physics.velY,
+      bodyId,
+    );
     if (orbitStatus) {
       showPhaseNotification(getOrbitEntryLabel(orbitStatus));
     } else {
@@ -101,7 +114,7 @@ function _handleWorkerPhaseTransition(prevPhase: string, newPhase: string): void
     showPhaseNotification('Transfer Injection');
     applyTimeWarp(1);
   } else if (newPhase === FlightPhase.CAPTURE) {
-    showPhaseNotification(`Entering ${s.flightState.bodyId || 'destination'} SOI`);
+    showPhaseNotification(`Entering ${snap.flight.bodyId || 'destination'} SOI`);
     applyTimeWarp(1);
   } else if (newPhase === FlightPhase.REENTRY) {
     showPhaseNotification('Re-Entry');
@@ -149,20 +162,26 @@ export function loop(timestamp: number): void {
 
   try {
     // ---- Worker snapshot application (FIRST) ----
-    // Apply the latest snapshot from the worker BEFORE any per-frame control
-    // processing.  This ensures control inputs (keyboard, HUD buttons, comms
-    // lockout, map thrust, orbit RCS) operate on the latest physics state and
-    // are not overwritten by a stale snapshot.
+    // Consume the readonly snapshot from the worker BEFORE any per-frame
+    // control processing.  This ensures control inputs (keyboard, HUD
+    // buttons, comms lockout, map thrust, orbit RCS) operate on the latest
+    // physics state and are not overwritten by a stale snapshot.
     if (s.workerActive && isWorkerReady()) {
-      const snap = consumeSnapshot();
+      const snap = consumeMainThreadSnapshot();
       if (snap) {
         const prevPhase = flightState.phase;
-        applyPhysicsSnapshot(ps, snap.physics);
+
+        // Temporary: apply snapshot to mutable state for render compatibility.
+        // The worker snapshot includes control input fields at runtime even
+        // though ReadonlyPhysicsSnapshot hides them via Omit<>.  The cast is
+        // safe and will be removed when render functions accept snapshot types
+        // directly (TASK-013a/b).
+        applyPhysicsSnapshot(ps, snap.physics as unknown as PhysicsSnapshot);
         applyFlightSnapshot(flightState, snap.flight);
 
-        // Detect phase transition from the worker snapshot.
-        if (flightState.phase !== prevPhase) {
-          _handleWorkerPhaseTransition(prevPhase, flightState.phase);
+        // Detect phase transition from snapshot values (not mutable state).
+        if (snap.flight.phase !== prevPhase) {
+          _handleWorkerPhaseTransition(prevPhase, snap.flight.phase, snap);
         }
       }
     }
@@ -228,6 +247,12 @@ export function loop(timestamp: number): void {
     } else {
       // Main-thread physics — direct tick.
       tick(ps, assembly, stagingConfig, flightState, realDt, s.timeWarp);
+
+      // Create a readonly snapshot in the same format as the worker path.
+      // This ensures both paths produce MainThreadSnapshot, giving render/UI
+      // a single code path once they migrate to snapshot types (TASK-013a/b).
+      createSnapshotFromState(ps, flightState, _fallbackFrame++);
+
       evaluateFlightPhase();
     }
 
