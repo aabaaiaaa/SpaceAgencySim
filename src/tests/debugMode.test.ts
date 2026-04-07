@@ -91,24 +91,24 @@ describe('debugMode toggle', () => {
 // ---------------------------------------------------------------------------
 
 describe('debugMode persistence', () => {
-  it('persists debugMode=true through save/load round-trip', () => {
+  it('persists debugMode=true through save/load round-trip', async () => {
     const state = freshState();
     state.debugMode = true;
     state.agencyName = 'Debug Test Agency';
 
-    saveGame(state, 0);
-    const restored = loadGame(0);
+    await saveGame(state, 0);
+    const restored = await loadGame(0);
 
     expect(restored.debugMode).toBe(true);
   });
 
-  it('persists debugMode=false through save/load round-trip', () => {
+  it('persists debugMode=false through save/load round-trip', async () => {
     const state = freshState();
     state.debugMode = false;
     state.agencyName = 'No Debug Agency';
 
-    saveGame(state, 0);
-    const restored = loadGame(0);
+    await saveGame(state, 0);
+    const restored = await loadGame(0);
 
     expect(restored.debugMode).toBe(false);
   });
@@ -119,7 +119,7 @@ describe('debugMode persistence', () => {
 // ---------------------------------------------------------------------------
 
 describe('debugMode save migration', () => {
-  it('defaults debugMode to false for legacy saves missing the field', () => {
+  it('defaults debugMode to false for legacy saves missing the field', async () => {
     const state = freshState();
     delete state.debugMode;
     state.agencyName = 'Legacy Agency';
@@ -132,11 +132,11 @@ describe('debugMode save migration', () => {
     };
     localStorage.setItem('spaceAgencySave_0', JSON.stringify(legacyEnvelope));
 
-    const restored = loadGame(0);
+    const restored = await loadGame(0);
     expect(restored.debugMode).toBe(false);
   });
 
-  it('preserves debugMode=true from existing saves', () => {
+  it('preserves debugMode=true from existing saves', async () => {
     const state = freshState();
     state.debugMode = true;
     state.agencyName = 'Debug Agency';
@@ -149,7 +149,7 @@ describe('debugMode save migration', () => {
     };
     localStorage.setItem('spaceAgencySave_0', JSON.stringify(envelope));
 
-    const restored = loadGame(0);
+    const restored = await loadGame(0);
     expect(restored.debugMode).toBe(true);
   });
 });

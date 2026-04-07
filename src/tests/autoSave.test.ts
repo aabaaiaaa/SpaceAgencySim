@@ -100,11 +100,11 @@ describe('isAutoSaveEnabled', () => {
 // ---------------------------------------------------------------------------
 
 describe('performAutoSave', () => {
-  it('saves to localStorage under the auto-save key', () => {
+  it('saves to localStorage under the auto-save key', async () => {
     const state = freshState();
     state.agencyName = 'Test Agency';
 
-    const result = performAutoSave(state);
+    const result = await performAutoSave(state);
 
     expect(result.success).toBe(true);
     const raw = mockStorage.getItem(AUTO_SAVE_KEY);
@@ -117,59 +117,59 @@ describe('performAutoSave', () => {
     expect(envelope.version).toBe(1);
   });
 
-  it('accumulates session play time', () => {
+  it('accumulates session play time', async () => {
     const state = freshState();
     state.playTimeSeconds = 100;
 
     // Advance 30 seconds.
     vi.advanceTimersByTime(30_000);
 
-    performAutoSave(state);
+    await performAutoSave(state);
 
     expect(state.playTimeSeconds).toBe(130);
   });
 
-  it('mirrors to IndexedDB when available', () => {
+  it('mirrors to IndexedDB when available', async () => {
     const state = freshState();
-    performAutoSave(state);
+    await performAutoSave(state);
 
     expect(idbSet).toHaveBeenCalledWith(AUTO_SAVE_KEY, expect.any(String));
   });
 
-  it('returns failure for null state', () => {
-    const result = performAutoSave(null);
+  it('returns failure for null state', async () => {
+    const result = await performAutoSave(null);
     expect(result.success).toBe(false);
     expect(result.error).toBe('No state provided');
   });
 
-  it('falls back to IndexedDB on QuotaExceededError', () => {
+  it('falls back to IndexedDB on QuotaExceededError', async () => {
     const state = freshState();
     const quotaError = new DOMException('quota exceeded', 'QuotaExceededError');
     mockStorage.setItem = vi.fn(() => { throw quotaError; });
 
-    const result = performAutoSave(state);
+    const result = await performAutoSave(state);
 
     expect(result.success).toBe(true);
     expect(idbSet).toHaveBeenCalled();
   });
 
-  it('returns failure when localStorage full and IDB unavailable', () => {
+  it('returns failure when localStorage full and IDB unavailable', async () => {
     const state = freshState();
     const quotaError = new DOMException('quota exceeded', 'QuotaExceededError');
     mockStorage.setItem = vi.fn(() => { throw quotaError; });
     isIdbAvailable.mockReturnValue(false);
 
-    const result = performAutoSave(state);
+    const result = await performAutoSave(state);
 
     expect(result.success).toBe(false);
     expect(result.error).toBe('Storage full');
   });
 
-  it('creates a deep clone of state in the envelope', () => {
+  it('creates a deep clone of state in the envelope', async () => {
     const state = freshState();
     state.agencyName = 'Before';
 
-    performAutoSave(state);
+    await performAutoSave(state);
 
     // Mutate state after save.
     state.agencyName = 'After';
@@ -188,8 +188,8 @@ describe('hasAutoSave', () => {
     expect(hasAutoSave()).toBe(false);
   });
 
-  it('returns true after an auto-save', () => {
-    performAutoSave(freshState());
+  it('returns true after an auto-save', async () => {
+    await performAutoSave(freshState());
     expect(hasAutoSave()).toBe(true);
   });
 });
@@ -199,16 +199,16 @@ describe('hasAutoSave', () => {
 // ---------------------------------------------------------------------------
 
 describe('deleteAutoSave', () => {
-  it('removes the auto-save from localStorage', () => {
-    performAutoSave(freshState());
+  it('removes the auto-save from localStorage', async () => {
+    await performAutoSave(freshState());
     expect(hasAutoSave()).toBe(true);
 
     deleteAutoSave();
     expect(hasAutoSave()).toBe(false);
   });
 
-  it('also deletes from IndexedDB', () => {
-    performAutoSave(freshState());
+  it('also deletes from IndexedDB', async () => {
+    await performAutoSave(freshState());
     deleteAutoSave();
 
     expect(idbDelete).toHaveBeenCalledWith(AUTO_SAVE_KEY);

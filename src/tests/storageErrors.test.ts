@@ -83,23 +83,23 @@ function minimalEnvelopeJSON() {
 // ---------------------------------------------------------------------------
 
 describe('saveGame() quota handling', () => {
-  it('throws a user-friendly message on QuotaExceededError', () => {
+  it('throws a user-friendly message on QuotaExceededError', async () => {
     vi.spyOn(mockStorage, 'setItem').mockImplementation(() => {
       throw makeQuotaError();
     });
 
-    expect(() => saveGame(freshState(), 0, 'test')).toThrow(
+    await expect(saveGame(freshState(), 0, 'test')).rejects.toThrow(
       /storage full/i,
     );
   });
 
-  it('does not swallow non-quota errors', () => {
+  it('does not swallow non-quota errors', async () => {
     const otherError = new TypeError('something else broke');
     vi.spyOn(mockStorage, 'setItem').mockImplementation(() => {
       throw otherError;
     });
 
-    expect(() => saveGame(freshState(), 0, 'test')).toThrow(otherError);
+    await expect(saveGame(freshState(), 0, 'test')).rejects.toThrow(otherError);
   });
 });
 

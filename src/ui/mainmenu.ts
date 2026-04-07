@@ -574,9 +574,9 @@ function _switchScreen(target: 'load' | 'newgame', canGoBack: boolean): void {
 /**
  * Loads the game from the given save slot and begins the game.
  */
-function _handleLoad(slotIndex: number): void {
+async function _handleLoad(slotIndex: number): Promise<void> {
   try {
-    const state = loadGame(slotIndex);
+    const state = await loadGame(slotIndex);
     reconcileParts(state);
     _beginGame(state);
   } catch (err: unknown) {

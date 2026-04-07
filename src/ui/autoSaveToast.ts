@@ -78,11 +78,11 @@ export function triggerAutoSave(state: GameState, _trigger?: string): void {
   _activeToast = toast;
 
   // Schedule the actual save after the delay.
-  _pendingTimer = window.setTimeout(() => {
+  _pendingTimer = window.setTimeout(async () => {
     _pendingTimer = null;
     if (cancelled) return;
 
-    const result = performAutoSave(state);
+    const result = await performAutoSave(state);
 
     // Update toast to show completion or error.
     if (result.success) {
@@ -114,7 +114,7 @@ export function triggerAutoSave(state: GameState, _trigger?: string): void {
  * Immediately performs an auto-save without the toast UI.
  * Used by E2E tests that need deterministic saves without waiting.
  */
-export function autoSaveImmediate(state: GameState): { success: boolean; error?: string } {
+export async function autoSaveImmediate(state: GameState): Promise<{ success: boolean; error?: string }> {
   if (!isAutoSaveEnabled(state)) return { success: false, error: 'Disabled' };
   return performAutoSave(state);
 }

@@ -62,9 +62,9 @@ export function isAutoSaveEnabled(state: GameState | null | undefined): boolean 
  * localStorage (with IndexedDB mirror). If localStorage throws
  * QuotaExceededError, falls back to IndexedDB only.
  */
-export function performAutoSave(
+export async function performAutoSave(
   state: GameState | null | undefined,
-): { success: boolean; error?: string } {
+): Promise<{ success: boolean; error?: string }> {
   if (!state) return { success: false, error: 'No state provided' };
 
   // Accumulate elapsed session time.
@@ -85,9 +85,9 @@ export function performAutoSave(
   } catch (err: unknown) {
     const error = err as { name?: string; message?: string };
     if (error?.name === 'QuotaExceededError') {
-      // Attempt IndexedDB as fallback.
+      // Attempt IndexedDB as fallback — await to ensure the save completes.
       if (isIdbAvailable()) {
-        idbSet(AUTO_SAVE_KEY, json).catch(() => {});
+        await idbSet(AUTO_SAVE_KEY, json);
         return { success: true };
       }
       return { success: false, error: 'Storage full' };
@@ -95,7 +95,7 @@ export function performAutoSave(
     return { success: false, error: error?.message ?? 'Unknown error' };
   }
 
-  // Mirror to IndexedDB (fire-and-forget).
+  // Mirror to IndexedDB (fire-and-forget — LS already has the data).
   if (isIdbAvailable()) {
     idbSet(AUTO_SAVE_KEY, json).catch(() => {});
   }

@@ -25,7 +25,7 @@
 - **Verification**: New unit test passes: calling `logger.error()` with a circular-reference object does not throw and produces output containing the fallback string. `npm run test:unit` passes.
 
 ### TASK-005: Convert save API to fully async
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Make `saveGame()` and `loadGame()` in `src/core/saveload.ts` async, returning Promises. The IndexedDB fallback path (localStorage full) must be awaited. Update all callers throughout the codebase to await save/load calls: auto-save, manual save UI, design library, debug saves, E2E helpers. See requirements Section 2.1.
 - **Verification**: `npm run typecheck` passes. `npm run test:unit` passes. `npm run test:e2e` passes. No fire-and-forget `idbSet()` calls remain on the fallback path in `saveload.ts`.

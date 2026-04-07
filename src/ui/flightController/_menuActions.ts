@@ -24,7 +24,7 @@ import type { GameState } from '../../core/gameState.js';
  * Save the current game to the first available (empty) slot, or slot 0 as a
  * fallback if all slots are occupied.
  */
-export function handleSaveGame(): void {
+export async function handleSaveGame(): Promise<void> {
   const s = getFCState();
   if (!s.state) return;
 
@@ -33,7 +33,7 @@ export function handleSaveGame(): void {
   if (targetSlot < 0) targetSlot = 0;
 
   const saveName: string = `${s.state.agencyName || 'Agency'} \u2014 In-Flight`;
-  saveGame(s.state, targetSlot, saveName);
+  await saveGame(s.state, targetSlot, saveName);
 }
 
 /**

@@ -52,7 +52,7 @@ declare global {
     __celestialBodies: Readonly<Record<string, Readonly<CelestialBodyDef>>>;
     __isLandable: (bodyId: string) => boolean;
     __getPartById: (id: string) => unknown;
-    __autoSaveImmediate: () => { success: boolean; error?: string };
+    __autoSaveImmediate: () => Promise<{ success: boolean; error?: string }>;
     __isAutoSaveEnabled: () => boolean;
     __autoSaveKey: string;
     __enableDebugMode: () => void;

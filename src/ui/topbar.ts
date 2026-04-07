@@ -969,10 +969,10 @@ function _openSaveSlotPicker(): void {
 
     // Capture slot index in closure
     const slotIndex: number = i;
-    card.addEventListener('click', () => {
+    card.addEventListener('click', async () => {
       const saveName: string = _state!.agencyName || 'New Save';
       syncVabToGameState();
-      saveGame(_state!, slotIndex, saveName);
+      await saveGame(_state!, slotIndex, saveName);
       backdrop.remove();
 
     });
@@ -1109,10 +1109,10 @@ function _confirmAndLoad(slotIndex: number, loadBackdrop: HTMLElement): void {
   confirmBtn.className = 'confirm-btn confirm-btn-primary';
   confirmBtn.dataset.testid = 'load-confirm-btn';
   confirmBtn.textContent = 'Load Game';
-  confirmBtn.addEventListener('click', () => {
+  confirmBtn.addEventListener('click', async () => {
     backdrop.remove();
     try {
-      const loadedState = loadGame(slotIndex);
+      const loadedState = await loadGame(slotIndex);
       reconcileParts(loadedState);
       if (_onLoadGame) {
         _onLoadGame(loadedState);

@@ -94,7 +94,7 @@ function minimalEnvelopeJSON(overrides = {}) {
 // ---------------------------------------------------------------------------
 
 describe('Round-trip: save and load a complex state', () => {
-  it('deep-equals original state with multiple crew, missions, and rockets', () => {
+  it('deep-equals original state with multiple crew, missions, and rockets', async () => {
     const state = freshState();
 
     // Multiple crew members with varying statuses.
@@ -196,8 +196,8 @@ describe('Round-trip: save and load a complex state', () => {
     state.parts = ['command_pod_mk1', 'engine_liquid_1', 'fuel_tank_small'];
     state.playTimeSeconds = 300;
 
-    saveGame(state, 0, 'Complex Save');
-    const restored = loadGame(0);
+    await saveGame(state, 0, 'Complex Save');
+    const restored = await loadGame(0);
 
     // Top-level scalar fields.
     expect(restored.money).toBe(state.money);
@@ -239,27 +239,27 @@ describe('Round-trip: save and load a complex state', () => {
 // ---------------------------------------------------------------------------
 
 describe('Slot index validation', () => {
-  it('accepts slot indices 0 through SAVE_SLOT_COUNT-1', () => {
+  it('accepts slot indices 0 through SAVE_SLOT_COUNT-1', async () => {
     const state = freshState();
     for (let i = 0; i < SAVE_SLOT_COUNT; i++) {
-      expect(() => saveGame(state, i, 'ok')).not.toThrow();
+      await expect(saveGame(state, i, 'ok')).resolves.toBeDefined();
     }
   });
 
-  it('throws RangeError for index -1', () => {
-    expect(() => saveGame(freshState(), -1)).toThrow(RangeError);
+  it('throws RangeError for index -1', async () => {
+    await expect(saveGame(freshState(), -1)).rejects.toThrow(RangeError);
   });
 
-  it('throws RangeError for index equal to SAVE_SLOT_COUNT', () => {
-    expect(() => saveGame(freshState(), SAVE_SLOT_COUNT)).toThrow(RangeError);
+  it('throws RangeError for index equal to SAVE_SLOT_COUNT', async () => {
+    await expect(saveGame(freshState(), SAVE_SLOT_COUNT)).rejects.toThrow(RangeError);
   });
 
-  it('throws RangeError for a float index', () => {
-    expect(() => saveGame(freshState(), 1.5)).toThrow(RangeError);
+  it('throws RangeError for a float index', async () => {
+    await expect(saveGame(freshState(), 1.5)).rejects.toThrow(RangeError);
   });
 
-  it('throws RangeError for a string index', () => {
-    expect(() => saveGame(freshState(), '0')).toThrow(RangeError);
+  it('throws RangeError for a string index', async () => {
+    await expect(saveGame(freshState(), '0')).rejects.toThrow(RangeError);
   });
 });
 
@@ -268,139 +268,139 @@ describe('Slot index validation', () => {
 // ---------------------------------------------------------------------------
 
 describe('saveGame()', () => {
-  it('writes JSON to the correct localStorage key', () => {
+  it('writes JSON to the correct localStorage key', async () => {
     const state = freshState();
-    saveGame(state, 2, 'My Agency');
+    await saveGame(state, 2, 'My Agency');
     const raw = localStorage.getItem('spaceAgencySave_2');
     expect(raw).not.toBeNull();
     const envelope = JSON.parse(raw);
     expect(envelope.saveName).toBe('My Agency');
   });
 
-  it('returns a SaveSlotSummary with the correct slotIndex and saveName', () => {
+  it('returns a SaveSlotSummary with the correct slotIndex and saveName', async () => {
     const state = freshState();
-    const summary = saveGame(state, 0, 'First Save');
+    const summary = await saveGame(state, 0, 'First Save');
     expect(summary.slotIndex).toBe(0);
     expect(summary.saveName).toBe('First Save');
   });
 
-  it('summary includes a timestamp string', () => {
-    const summary = saveGame(freshState(), 0, 'ts test');
+  it('summary includes a timestamp string', async () => {
+    const summary = await saveGame(freshState(), 0, 'ts test');
     expect(typeof summary.timestamp).toBe('string');
     expect(summary.timestamp.length).toBeGreaterThan(0);
   });
 
-  it('summary.money matches state.money', () => {
+  it('summary.money matches state.money', async () => {
     const state = freshState();
     state.money = 1_234_567;
-    const summary = saveGame(state, 0);
+    const summary = await saveGame(state, 0);
     expect(summary.money).toBe(1_234_567);
   });
 
-  it('summary.missionsCompleted counts completed missions', () => {
+  it('summary.missionsCompleted counts completed missions', async () => {
     const state = freshState();
     state.missions.completed = [{ id: 'm1' }, { id: 'm2' }];
-    const summary = saveGame(state, 0);
+    const summary = await saveGame(state, 0);
     expect(summary.missionsCompleted).toBe(2);
   });
 
-  it('summary.acceptedMissionCount counts accepted missions', () => {
+  it('summary.acceptedMissionCount counts accepted missions', async () => {
     const state = freshState();
     state.missions.accepted = [{ id: 'm1' }];
-    const summary = saveGame(state, 0);
+    const summary = await saveGame(state, 0);
     expect(summary.acceptedMissionCount).toBe(1);
   });
 
-  it('summary.totalFlights counts flightHistory entries', () => {
+  it('summary.totalFlights counts flightHistory entries', async () => {
     const state = freshState();
     state.flightHistory = [{ id: 'f1' }, { id: 'f2' }, { id: 'f3' }];
-    const summary = saveGame(state, 0);
+    const summary = await saveGame(state, 0);
     expect(summary.totalFlights).toBe(3);
   });
 
-  it('summary.crewCount counts living crew members', () => {
+  it('summary.crewCount counts living crew members', async () => {
     const state = freshState();
     state.crew = [
       { id: 'c1', status: CrewStatus.IDLE },
       { id: 'c2', status: CrewStatus.ON_MISSION },
       { id: 'c3', status: CrewStatus.DEAD },
     ];
-    const summary = saveGame(state, 0);
+    const summary = await saveGame(state, 0);
     expect(summary.crewCount).toBe(2);
   });
 
-  it('summary.crewKIA counts crew with DEAD status', () => {
+  it('summary.crewKIA counts crew with DEAD status', async () => {
     const state = freshState();
     state.crew = [
       { id: 'c1', status: CrewStatus.DEAD },
       { id: 'c2', status: CrewStatus.DEAD },
       { id: 'c3', status: CrewStatus.IDLE },
     ];
-    const summary = saveGame(state, 0);
+    const summary = await saveGame(state, 0);
     expect(summary.crewKIA).toBe(2);
   });
 
-  it('accumulates session time into state.playTimeSeconds', () => {
+  it('accumulates session time into state.playTimeSeconds', async () => {
     const state = freshState();
     state.playTimeSeconds = 100;
 
     // Advance clock by 5 seconds.
     vi.advanceTimersByTime(5_000);
 
-    saveGame(state, 0);
+    await saveGame(state, 0);
 
     // playTimeSeconds should now be 100 + 5.
     expect(state.playTimeSeconds).toBeCloseTo(105, 1);
   });
 
-  it('does not double-count time across two consecutive saves', () => {
+  it('does not double-count time across two consecutive saves', async () => {
     const state = freshState();
     state.playTimeSeconds = 0;
 
     vi.advanceTimersByTime(3_000);
-    saveGame(state, 0); // +3 s
+    await saveGame(state, 0); // +3 s
 
     vi.advanceTimersByTime(2_000);
-    saveGame(state, 0); // +2 s more
+    await saveGame(state, 0); // +2 s more
 
     // Total should be ~5 s, not ~8 s.
     expect(state.playTimeSeconds).toBeCloseTo(5, 1);
   });
 
-  it('stores a deep clone of state (mutations after save do not affect stored data)', () => {
+  it('stores a deep clone of state (mutations after save do not affect stored data)', async () => {
     const state = freshState();
-    saveGame(state, 0, 'before');
+    await saveGame(state, 0, 'before');
     state.money = 9_999_999; // mutate after save
 
-    const restored = loadGame(0);
+    const restored = await loadGame(0);
     expect(restored.money).toBe(2_000_000); // original value
   });
 
-  it('default saveName is "New Save"', () => {
-    const summary = saveGame(freshState(), 0);
+  it('default saveName is "New Save"', async () => {
+    const summary = await saveGame(freshState(), 0);
     expect(summary.saveName).toBe('New Save');
   });
 
-  it('coerces non-string saveName to string', () => {
-    const summary = saveGame(freshState(), 0, 42);
+  it('coerces non-string saveName to string', async () => {
+    const summary = await saveGame(freshState(), 0, 42);
     expect(summary.saveName).toBe('42');
   });
 
-  it('saving to slot 2 does not overwrite slot 0', () => {
+  it('saving to slot 2 does not overwrite slot 0', async () => {
     const stateA = freshState();
     stateA.money = 111_111;
-    saveGame(stateA, 0, 'Slot Zero');
+    await saveGame(stateA, 0, 'Slot Zero');
 
     const stateB = freshState();
     stateB.money = 222_222;
-    saveGame(stateB, 2, 'Slot Two');
+    await saveGame(stateB, 2, 'Slot Two');
 
     // Slot 0 must still contain the original save.
-    const restoredA = loadGame(0);
+    const restoredA = await loadGame(0);
     expect(restoredA.money).toBe(111_111);
 
     // Slot 2 must contain the new save.
-    const restoredB = loadGame(2);
+    const restoredB = await loadGame(2);
     expect(restoredB.money).toBe(222_222);
 
     // Slots 1, 3, 4 must remain empty.
@@ -416,42 +416,42 @@ describe('saveGame()', () => {
 // ---------------------------------------------------------------------------
 
 describe('loadGame()', () => {
-  it('returns the game state previously written by saveGame', () => {
+  it('returns the game state previously written by saveGame', async () => {
     const state = freshState();
     state.money = 777_000;
-    saveGame(state, 1, 'load test');
+    await saveGame(state, 1, 'load test');
 
-    const restored = loadGame(1);
+    const restored = await loadGame(1);
     expect(restored.money).toBe(777_000);
   });
 
-  it('throws on an empty slot', () => {
-    expect(() => loadGame(3)).toThrow(/empty/i);
+  it('throws on an empty slot', async () => {
+    await expect(loadGame(3)).rejects.toThrow(/empty/i);
   });
 
-  it('throws on corrupt JSON', () => {
+  it('throws on corrupt JSON', async () => {
     localStorage.setItem('spaceAgencySave_0', 'not { valid json');
-    expect(() => loadGame(0)).toThrow(/corrupt/i);
+    await expect(loadGame(0)).rejects.toThrow(/corrupt/i);
   });
 
-  it('throws when stored envelope is missing the state field', () => {
+  it('throws when stored envelope is missing the state field', async () => {
     localStorage.setItem('spaceAgencySave_0', JSON.stringify({ saveName: 'x', timestamp: 't' }));
-    expect(() => loadGame(0)).toThrow(/corrupt/i);
+    await expect(loadGame(0)).rejects.toThrow(/corrupt/i);
   });
 
-  it('restores nested objects correctly', () => {
+  it('restores nested objects correctly', async () => {
     const state = freshState();
     state.loan.balance = 500_000;
     state.crew = [{ id: 'c1', status: CrewStatus.IDLE, name: 'Alice' }];
-    saveGame(state, 0);
+    await saveGame(state, 0);
 
-    const restored = loadGame(0);
+    const restored = await loadGame(0);
     expect(restored.loan.balance).toBe(500_000);
     expect(restored.crew[0].name).toBe('Alice');
   });
 
-  it('throws RangeError for an out-of-bounds slot', () => {
-    expect(() => loadGame(5)).toThrow(RangeError);
+  it('throws RangeError for an out-of-bounds slot', async () => {
+    await expect(loadGame(5)).rejects.toThrow(RangeError);
   });
 });
 
@@ -460,8 +460,8 @@ describe('loadGame()', () => {
 // ---------------------------------------------------------------------------
 
 describe('deleteSave()', () => {
-  it('removes the save so that listSaves returns null for that slot', () => {
-    saveGame(freshState(), 2, 'to delete');
+  it('removes the save so that listSaves returns null for that slot', async () => {
+    await saveGame(freshState(), 2, 'to delete');
     deleteSave(2);
     const saves = listSaves();
     expect(saves[2]).toBeNull();
@@ -471,9 +471,9 @@ describe('deleteSave()', () => {
     expect(() => deleteSave(4)).not.toThrow();
   });
 
-  it('only removes the targeted slot', () => {
-    saveGame(freshState(), 0, 'keep me');
-    saveGame(freshState(), 1, 'delete me');
+  it('only removes the targeted slot', async () => {
+    await saveGame(freshState(), 0, 'keep me');
+    await saveGame(freshState(), 1, 'delete me');
     deleteSave(1);
     const saves = listSaves();
     expect(saves[0]).not.toBeNull();
@@ -500,9 +500,9 @@ describe('listSaves()', () => {
     expect(saves.every((s) => s === null)).toBe(true);
   });
 
-  it('returns a summary for occupied slots and null for empty slots', () => {
-    saveGame(freshState(), 0, 'slot 0');
-    saveGame(freshState(), 3, 'slot 3');
+  it('returns a summary for occupied slots and null for empty slots', async () => {
+    await saveGame(freshState(), 0, 'slot 0');
+    await saveGame(freshState(), 3, 'slot 3');
 
     const saves = listSaves();
     expect(saves[0]).not.toBeNull();
@@ -520,8 +520,8 @@ describe('listSaves()', () => {
     expect(saves[1]).toBeNull();
   });
 
-  it('returned summaries include all required fields', () => {
-    saveGame(freshState(), 0, 'full test');
+  it('returned summaries include all required fields', async () => {
+    await saveGame(freshState(), 0, 'full test');
     const summary = listSaves()[0];
     const expectedFields = [
       'slotIndex', 'saveName', 'timestamp', 'missionsCompleted',
@@ -558,9 +558,9 @@ describe('importSave()', () => {
     expect(() => importSave('{{not json', 0)).toThrow(/not valid JSON/i);
   });
 
-  it('does not write to the slot when JSON is malformed', () => {
+  it('does not write to the slot when JSON is malformed', async () => {
     // Pre-populate the slot so we can confirm it was not overwritten.
-    saveGame(freshState(), 2, 'original');
+    await saveGame(freshState(), 2, 'original');
     const before = localStorage.getItem('spaceAgencySave_2');
 
     expect(() => importSave('{broken json}}', 2)).toThrow();
@@ -570,8 +570,8 @@ describe('importSave()', () => {
     expect(after).toBe(before);
   });
 
-  it('does not write to the slot when the envelope is structurally invalid', () => {
-    saveGame(freshState(), 3, 'keep me');
+  it('does not write to the slot when the envelope is structurally invalid', async () => {
+    await saveGame(freshState(), 3, 'keep me');
     const before = localStorage.getItem('spaceAgencySave_3');
 
     // Missing the required "state" field.
@@ -605,8 +605,8 @@ describe('importSave()', () => {
     expect(() => importSave(minimalEnvelopeJSON(), 10)).toThrow(RangeError);
   });
 
-  it('overwrites an existing save in the target slot', () => {
-    saveGame(freshState(), 0, 'original');
+  it('overwrites an existing save in the target slot', async () => {
+    await saveGame(freshState(), 0, 'original');
     const imported = { saveName: 'replacement', timestamp: 'T', state: freshState() };
     importSave(JSON.stringify(imported), 0);
     expect(listSaves()[0].saveName).toBe('replacement');
@@ -694,9 +694,9 @@ describe('_validateState()', () => {
 // ---------------------------------------------------------------------------
 
 describe('exportSave()', () => {
-  it('throws an informative error in a non-browser environment', () => {
+  it('throws an informative error in a non-browser environment', async () => {
     // Node has no document or Blob — this exercises the DOM guard.
-    saveGame(freshState(), 0, 'export test');
+    await saveGame(freshState(), 0, 'export test');
     expect(() => exportSave(0)).toThrow(/browser environment/i);
   });
 
@@ -708,7 +708,7 @@ describe('exportSave()', () => {
     expect(() => exportSave(-1)).toThrow(RangeError);
   });
 
-  it('the data stored for export is a valid JSON string containing the full state', () => {
+  it('the data stored for export is a valid JSON string containing the full state', async () => {
     // exportSave() reads the raw JSON from localStorage and sends it to the
     // user as a file. Verify that the underlying storage contains well-formed
     // JSON whose envelope.state matches the state that was saved.
@@ -716,7 +716,7 @@ describe('exportSave()', () => {
     state.money = 987_654;
     state.crew = [{ id: 'c1', status: CrewStatus.IDLE, name: 'Dana' }];
     state.missions.completed = [{ id: 'm1', title: 'First orbit' }];
-    saveGame(state, 0, 'Export Test');
+    await saveGame(state, 0, 'Export Test');
 
     // Read what exportSave would send to the browser.
     const raw = localStorage.getItem('spaceAgencySave_0');
@@ -737,12 +737,12 @@ describe('exportSave()', () => {
     expect(envelope.state.missions.completed[0].title).toBe('First orbit');
   });
 
-  it('the exported JSON from a browser-mocked environment is parseable and contains full state', () => {
+  it('the exported JSON from a browser-mocked environment is parseable and contains full state', async () => {
     // Mock the minimum browser APIs needed to exercise the DOM code path.
     const state = freshState();
     state.money = 555_000;
     state.rockets = [{ id: 'r1', name: 'Mock Rocket', parts: [], staging: { stages: [[]], unstaged: [] }, totalMass: 100, totalThrust: 50 }];
-    saveGame(state, 1, 'Browser Export');
+    await saveGame(state, 1, 'Browser Export');
 
     // Capture what Blob is constructed with.
     let capturedBlobContent = null;
@@ -789,14 +789,14 @@ describe('Save format version field', () => {
     expect(SAVE_VERSION).toBeGreaterThanOrEqual(1);
   });
 
-  it('saveGame() includes the version field in the stored envelope', () => {
-    saveGame(freshState(), 0, 'versioned');
+  it('saveGame() includes the version field in the stored envelope', async () => {
+    await saveGame(freshState(), 0, 'versioned');
     const raw = localStorage.getItem('spaceAgencySave_0');
     const envelope = JSON.parse(raw);
     expect(envelope.version).toBe(SAVE_VERSION);
   });
 
-  it('loadGame() loads a version-0 (no version field) save with all migrations applied', () => {
+  it('loadGame() loads a version-0 (no version field) save with all migrations applied', async () => {
     // Simulate a pre-versioning save: no version field, missing fields that
     // the migration logic defaults via ??=.
     const state = freshState();
@@ -811,25 +811,25 @@ describe('Save format version field', () => {
     };
     localStorage.setItem('spaceAgencySave_0', JSON.stringify(legacyEnvelope));
 
-    const restored = loadGame(0);
+    const restored = await loadGame(0);
     // Migrations should have run — check fields that get defaulted by ??=.
     expect(restored.malfunctionMode).toBe('normal');
     expect(Array.isArray(restored.savedDesigns)).toBe(true);
     expect(restored.welcomeShown).toBe(true);
   });
 
-  it('loadGame() loads a save matching the current version without warnings', () => {
+  it('loadGame() loads a save matching the current version without warnings', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    saveGame(freshState(), 0, 'current version');
-    const restored = loadGame(0);
+    await saveGame(freshState(), 0, 'current version');
+    const restored = await loadGame(0);
 
     expect(restored).toBeDefined();
     expect(warnSpy).not.toHaveBeenCalled();
     warnSpy.mockRestore();
   });
 
-  it('loadGame() warns when save version is higher than current', () => {
+  it('loadGame() warns when save version is higher than current', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     // Create a save with a future version number.
@@ -842,14 +842,14 @@ describe('Save format version field', () => {
     };
     localStorage.setItem('spaceAgencySave_0', JSON.stringify(futureEnvelope));
 
-    const restored = loadGame(0);
+    const restored = await loadGame(0);
     expect(restored).toBeDefined();
     expect(warnSpy).toHaveBeenCalledTimes(1);
     expect(warnSpy.mock.calls[0][0]).toMatch(/newer version/i);
     warnSpy.mockRestore();
   });
 
-  it('loadGame() still returns valid state from a future-version save', () => {
+  it('loadGame() still returns valid state from a future-version save', async () => {
     const state = freshState();
     state.money = 42_000;
     const futureEnvelope = {
@@ -861,20 +861,20 @@ describe('Save format version field', () => {
     localStorage.setItem('spaceAgencySave_1', JSON.stringify(futureEnvelope));
 
     vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const restored = loadGame(1);
+    const restored = await loadGame(1);
     expect(restored.money).toBe(42_000);
     vi.restoreAllMocks();
   });
 
-  it('round-trip save/load preserves the version field in storage', () => {
+  it('round-trip save/load preserves the version field in storage', async () => {
     const state = freshState();
-    saveGame(state, 2, 'round-trip');
+    await saveGame(state, 2, 'round-trip');
     const raw = localStorage.getItem('spaceAgencySave_2');
     const envelope = JSON.parse(raw);
     expect(envelope.version).toBe(SAVE_VERSION);
 
     // Load succeeds and the envelope in storage still has the version.
-    const restored = loadGame(2);
+    const restored = await loadGame(2);
     expect(restored).toBeDefined();
   });
 });
@@ -911,22 +911,22 @@ describe('Save migration edge cases', () => {
     localStorage.setItem('spaceAgencySave_0', JSON.stringify(envelope));
   }
 
-  it('loads a save with savedDesigns: null and defaults it to an empty array', () => {
+  it('loads a save with savedDesigns: null and defaults it to an empty array', async () => {
     injectEnvelope({
       _rawStatePatches: { savedDesigns: null },
     });
 
-    const restored = loadGame(0);
+    const restored = await loadGame(0);
     expect(Array.isArray(restored.savedDesigns)).toBe(true);
     expect(restored.savedDesigns).toHaveLength(0);
   });
 
-  it('loads a save with savedDesigns: undefined and defaults it to an empty array', () => {
+  it('loads a save with savedDesigns: undefined and defaults it to an empty array', async () => {
     injectEnvelope({
       _rawStatePatches: { savedDesigns: undefined },
     });
 
-    const restored = loadGame(0);
+    const restored = await loadGame(0);
     expect(Array.isArray(restored.savedDesigns)).toBe(true);
     expect(restored.savedDesigns).toHaveLength(0);
   });
@@ -970,26 +970,26 @@ describe('Save migration edge cases', () => {
     // loadGame should throw because saveSharedLibrary throws (the error
     // propagates from the migration block). This documents the current
     // behaviour: a storage failure during migration is NOT caught by loadGame.
-    expect(() => loadGame(0)).toThrow(/Storage full/i);
+    await expect(loadGame(0)).rejects.toThrow(/Storage full/i);
 
     // Restore original setItem.
     mockStorage.setItem = originalSetItem;
     saveSpy.mockRestore();
   });
 
-  it('loads a save with an invalid malfunctionMode value without crashing', () => {
+  it('loads a save with an invalid malfunctionMode value without crashing', async () => {
     // The ??= migration only defaults null/undefined — an invalid string value
     // passes through. This test documents the current behaviour.
     injectEnvelope({
       _rawStatePatches: { malfunctionMode: 'banana' },
     });
 
-    const restored = loadGame(0);
+    const restored = await loadGame(0);
     // The invalid value passes through because ??= only catches null/undefined.
     expect(restored.malfunctionMode).toBe('banana');
   });
 
-  it('loads a pre-version save (no version field) with all migrations applied', () => {
+  it('loads a pre-version save (no version field) with all migrations applied', async () => {
     // Simulate a very old save: no version field, missing several fields
     // that were added in later iterations.
     const state = freshState();
@@ -1011,7 +1011,7 @@ describe('Save migration edge cases', () => {
     };
     localStorage.setItem('spaceAgencySave_0', JSON.stringify(legacyEnvelope));
 
-    const restored = loadGame(0);
+    const restored = await loadGame(0);
 
     // All ??= migrations should have applied defaults.
     expect(restored.malfunctionMode).toBe('normal');
@@ -1025,12 +1025,12 @@ describe('Save migration edge cases', () => {
     expect(Array.isArray(restored.partInventory)).toBe(true);
   });
 
-  it('loads a future-version save and emits a console warning', () => {
+  it('loads a future-version save and emits a console warning', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     injectEnvelope({ version: SAVE_VERSION + 10 });
 
-    const restored = loadGame(0);
+    const restored = await loadGame(0);
 
     // The state should still load (best-effort forward compatibility).
     expect(restored).toBeDefined();

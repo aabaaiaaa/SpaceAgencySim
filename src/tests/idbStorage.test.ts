@@ -250,7 +250,7 @@ describe('saveGame() IndexedDB mirroring', () => {
   it('writes to both localStorage and IndexedDB', async () => {
     const state = freshState();
     state.money = 42_000;
-    saveGame(state, 0, 'Mirror Test');
+    await saveGame(state, 0, 'Mirror Test');
 
     // localStorage should have the save immediately.
     const lsRaw = localStorage.getItem('spaceAgencySave_0');
@@ -265,13 +265,13 @@ describe('saveGame() IndexedDB mirroring', () => {
     expect(idbEnvelope.state.money).toBe(42_000);
   });
 
-  it('still saves to localStorage when IndexedDB is unavailable', () => {
+  it('still saves to localStorage when IndexedDB is unavailable', async () => {
     vi.stubGlobal('indexedDB', undefined);
     _resetDbForTesting();
 
     const state = freshState();
     state.money = 99_000;
-    saveGame(state, 0, 'LS Only');
+    await saveGame(state, 0, 'LS Only');
 
     const raw = localStorage.getItem('spaceAgencySave_0');
     expect(raw).not.toBeNull();
@@ -287,7 +287,7 @@ describe('saveGame() IndexedDB mirroring', () => {
 describe('deleteSave() IndexedDB mirroring', () => {
   it('removes from both localStorage and IndexedDB', async () => {
     const state = freshState();
-    saveGame(state, 1, 'To Delete');
+    await saveGame(state, 1, 'To Delete');
     await vi.runAllTimersAsync();
 
     // Verify both have the save.
@@ -310,7 +310,7 @@ describe('loadGameAsync()', () => {
   it('loads from localStorage when both layers have the same save', async () => {
     const state = freshState();
     state.money = 50_000;
-    saveGame(state, 0, 'Dual');
+    await saveGame(state, 0, 'Dual');
     await vi.runAllTimersAsync();
 
     const restored = await loadGameAsync(0);
@@ -390,7 +390,7 @@ describe('loadGameAsync()', () => {
     const state = freshState();
     state.money = 33_000;
     // Save while IDB is available.
-    saveGame(state, 0, 'LS Fallback');
+    await saveGame(state, 0, 'LS Fallback');
     await vi.runAllTimersAsync();
 
     // Now make IDB unavailable.
@@ -425,8 +425,8 @@ describe('loadGameAsync()', () => {
     // loadGameAsync should write it back to localStorage.
     await loadGameAsync(0);
 
-    // Now sync loadGame should work.
-    const syncRestored = loadGame(0);
+    // Now loadGame should work.
+    const syncRestored = await loadGame(0);
     expect(syncRestored.money).toBe(55_000);
   });
 });

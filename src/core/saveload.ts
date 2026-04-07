@@ -190,7 +190,7 @@ function summaryFromEnvelope(slotIndex: number, envelope: SaveEnvelope): SaveSlo
  *
  * @throws {RangeError} If slotIndex is out of bounds.
  */
-export function saveGame(state: GameState, slotIndex: number, saveName: string = 'New Save'): SaveSlotSummary {
+export async function saveGame(state: GameState, slotIndex: number, saveName: string = 'New Save'): Promise<SaveSlotSummary> {
   logger.debug('save', 'Saving game', { slotIndex, saveName });
   assertValidSlot(slotIndex);
 
@@ -217,7 +217,8 @@ export function saveGame(state: GameState, slotIndex: number, saveName: string =
     if (err?.name === 'QuotaExceededError') {
       // localStorage full — attempt IndexedDB as fallback.
       if (isIdbAvailable()) {
-        idbSet(key, json).catch(() => {});
+        await idbSet(key, json);
+        return summaryFromEnvelope(slotIndex, envelope);
       }
       throw new Error('Storage full — unable to save. Delete old saves to free space.', { cause: err });
     }
@@ -237,7 +238,27 @@ export function saveGame(state: GameState, slotIndex: number, saveName: string =
 // ---------------------------------------------------------------------------
 
 /**
+ * Parses a raw JSON envelope string and returns the parsed envelope object,
+ * or null if the data is missing, corrupt, or structurally invalid.
+ */
+function parseEnvelope(raw: string | null): SaveEnvelope | null {
+  if (raw === null) return null;
+  try {
+    const envelope = JSON.parse(raw);
+    if (envelope && typeof envelope === 'object' && envelope.state) {
+      return envelope as SaveEnvelope;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Loads and returns the full game state stored in the specified slot.
+ *
+ * Checks both localStorage and IndexedDB, using the most recent valid save.
+ * Falls back to localStorage-only if IndexedDB is unavailable or errors.
  *
  * The session timer is reset after loading so that play time continues
  * to accumulate correctly from this point forward.
@@ -245,24 +266,66 @@ export function saveGame(state: GameState, slotIndex: number, saveName: string =
  * @throws {RangeError} If slotIndex is out of bounds.
  * @throws {Error}      If the slot is empty or the stored data is corrupt.
  */
-export function loadGame(slotIndex: number): GameState {
+export async function loadGame(slotIndex: number): Promise<GameState> {
   logger.debug('save', 'Loading game', { slotIndex });
   assertValidSlot(slotIndex);
 
-  const raw = localStorage.getItem(slotKey(slotIndex));
-  if (raw === null) {
-    throw new Error(`Save slot ${slotIndex} is empty.`);
+  const key = slotKey(slotIndex);
+
+  // Check localStorage.
+  const lsRaw = localStorage.getItem(key);
+  const lsEnvelope = parseEnvelope(lsRaw);
+
+  // Check IndexedDB for a potentially newer or fallback save.
+  let idbEnvelope: SaveEnvelope | null = null;
+  let idbRaw: string | null = null;
+  if (isIdbAvailable()) {
+    try {
+      idbRaw = await idbGet(key);
+      idbEnvelope = parseEnvelope(idbRaw);
+    } catch {
+      // IndexedDB failed — proceed with localStorage only.
+    }
   }
 
-  let envelope: SaveEnvelope;
-  try {
-    envelope = JSON.parse(raw);
-  } catch {
-    throw new Error(`Save slot ${slotIndex} contains corrupt data (invalid JSON).`);
+  // Pick the most recent valid envelope.
+  let envelope: SaveEnvelope | null;
+  if (lsEnvelope && idbEnvelope) {
+    const lsTime = new Date(lsEnvelope.timestamp).getTime();
+    const idbTime = new Date(idbEnvelope.timestamp).getTime();
+    envelope = idbTime > lsTime ? idbEnvelope : lsEnvelope;
+  } else {
+    envelope = lsEnvelope ?? idbEnvelope;
   }
 
-  if (!envelope || typeof envelope !== 'object' || !envelope.state) {
-    throw new Error(`Save slot ${slotIndex} contains corrupt data (missing state field).`);
+  if (!envelope) {
+    // Provide specific error messages matching original behaviour.
+    if (lsRaw === null) {
+      throw new Error(`Save slot ${slotIndex} is empty.`);
+    }
+    // localStorage had data but it was invalid — determine why.
+    try {
+      const parsed = JSON.parse(lsRaw);
+      if (!parsed || typeof parsed !== 'object' || !parsed.state) {
+        throw new Error(`Save slot ${slotIndex} contains corrupt data (missing state field).`);
+      }
+    } catch (e) {
+      if (e instanceof SyntaxError) {
+        throw new Error(`Save slot ${slotIndex} contains corrupt data (invalid JSON).`);
+      }
+      throw e;
+    }
+    throw new Error(`Save slot ${slotIndex} contains corrupt data.`);
+  }
+
+  // Write the chosen envelope back to localStorage if it came from IDB and
+  // localStorage was missing or stale, so subsequent loads see it.
+  if (envelope === idbEnvelope && envelope !== lsEnvelope && idbRaw) {
+    try {
+      localStorage.setItem(key, idbRaw);
+    } catch {
+      // Storage full — not critical, we already have the data.
+    }
   }
 
   // Determine the save format version.  Pre-versioning saves have no version
@@ -382,93 +445,11 @@ export function loadGame(slotIndex: number): GameState {
   return envelope.state as GameState;
 }
 
-// ---------------------------------------------------------------------------
-// Async Load (IndexedDB + localStorage)
-// ---------------------------------------------------------------------------
-
 /**
- * Parses a raw JSON envelope string and returns the parsed envelope object,
- * or null if the data is missing, corrupt, or structurally invalid.
+ * Backward-compatible alias for loadGame.
+ * @deprecated Use loadGame() directly — it now checks both localStorage and IndexedDB.
  */
-function parseEnvelope(raw: string | null): SaveEnvelope | null {
-  if (raw === null) return null;
-  try {
-    const envelope = JSON.parse(raw);
-    if (envelope && typeof envelope === 'object' && envelope.state && envelope.timestamp) {
-      return envelope as SaveEnvelope;
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Async version of loadGame that checks both localStorage and IndexedDB,
- * using the most recent valid save.
- *
- * Falls back to localStorage-only if IndexedDB is unavailable or errors.
- * If both layers have a save for the same slot, the one with the more
- * recent timestamp is used.
- *
- * @throws {RangeError} If slotIndex is out of bounds.
- * @throws {Error}      If both layers are empty or corrupt.
- */
-export async function loadGameAsync(slotIndex: number): Promise<GameState> {
-  assertValidSlot(slotIndex);
-
-  const key = slotKey(slotIndex);
-  const lsRaw = localStorage.getItem(key);
-  const lsEnvelope = parseEnvelope(lsRaw);
-
-  let idbEnvelope: SaveEnvelope | null = null;
-  let idbRaw: string | null = null;
-  if (isIdbAvailable()) {
-    try {
-      idbRaw = await idbGet(key);
-      idbEnvelope = parseEnvelope(idbRaw);
-    } catch {
-      // IndexedDB failed — proceed with localStorage only.
-    }
-  }
-
-  // Pick the most recent valid envelope.
-  let chosen: SaveEnvelope | null;
-  if (lsEnvelope && idbEnvelope) {
-    const lsTime = new Date(lsEnvelope.timestamp).getTime();
-    const idbTime = new Date(idbEnvelope.timestamp).getTime();
-    chosen = idbTime > lsTime ? idbEnvelope : lsEnvelope;
-  } else {
-    chosen = lsEnvelope ?? idbEnvelope;
-  }
-
-  if (!chosen) {
-    throw new Error(`Save slot ${slotIndex} is empty.`);
-  }
-
-  // Write the chosen envelope back to localStorage if it came from IDB and
-  // localStorage was missing or stale, so subsequent sync loads see it.
-  if (chosen === idbEnvelope && chosen !== lsEnvelope && idbRaw) {
-    try {
-      localStorage.setItem(key, idbRaw);
-    } catch {
-      // Storage full — not critical, we already have the data.
-    }
-  }
-
-  // Run the same migration and loading logic as the sync loadGame.
-  // Temporarily inject the chosen envelope into localStorage so loadGame
-  // can process it (it reads from localStorage).
-  if (chosen === idbEnvelope && idbRaw) {
-    try {
-      localStorage.setItem(key, JSON.stringify(chosen));
-    } catch {
-      // If we can't write it, loadGame may still work if lsEnvelope was valid.
-    }
-  }
-
-  return loadGame(slotIndex);
-}
+export const loadGameAsync = loadGame;
 
 // ---------------------------------------------------------------------------
 // Delete
