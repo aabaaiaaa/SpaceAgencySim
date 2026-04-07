@@ -127,7 +127,7 @@
 - **Verification**: `npm run test:coverage` shows all three modules at >= 80% branch/line coverage.
 
 ### TASK-022: Write tests for all new iteration 4 code
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-003, TASK-004, TASK-005, TASK-007, TASK-008, TASK-009, TASK-010, TASK-011
 - **Description**: Ensure all new code from this iteration has adequate test coverage. This includes: Web Worker message protocol, save compression round-trip, async save error propagation, deeper save validation, undo/redo error handling, logger circular reference, object pool in hub/VAB. See requirements Section 6.2. Tests specified inline in each section should already exist; this task is a verification sweep to catch any gaps.
 - **Verification**: `npm run test:unit` passes. `npm run test:coverage` shows new code is covered. No new module is below 80% branch coverage.

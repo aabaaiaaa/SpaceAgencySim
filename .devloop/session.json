@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 20,
+  "lastIteration": 21,
   "startedAt": "2026-04-06T23:44:48.505Z",
   "iteration": 1,
   "devloopVersion": "3.2.0",
   "activeTask": {
-    "taskId": "TASK-021",
-    "taskTitle": "Raise branch coverage for mapView.ts, atmosphere.ts, and grabbing.ts",
-    "iterationNumber": 21,
-    "startedAt": "2026-04-07T11:29:43.217Z"
+    "taskId": "TASK-022",
+    "taskTitle": "Write tests for all new iteration 4 code",
+    "iterationNumber": 22,
+    "startedAt": "2026-04-07T11:36:56.733Z"
   }
 }
