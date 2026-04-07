@@ -12,7 +12,7 @@ import { FlightPhase } from '../../core/constants.ts';
 import { isPlayerLocked, getPhaseLabel } from '../../core/flightPhase.ts';
 import { processFlightReturn } from '../../core/flightReturn.ts';
 import { refreshTopBar } from '../topbar.ts';
-import { getFCState } from './_state.ts';
+import { getFCState, getPhysicsState, getFlightState } from './_state.ts';
 import { showPhaseNotification } from './_flightPhase.ts';
 import { showPostFlightSummary, buildFlightEventList } from './_postFlight.ts';
 import { stopFlightScene, startFlightScene } from './_init.ts';
@@ -146,9 +146,10 @@ function _executeRestart(rebuildCost: number): void {
   const ctr          = s.container;
   const gs           = s.state;
   const endCb        = s.onFlightEnd;
-  const missionId    = s.flightState?.missionId ?? '';
-  const rocketId     = s.flightState?.rocketId  ?? '';
-  const crewIds      = s.flightState?.crewIds   ?? [];
+  const curFs        = getFlightState();
+  const missionId    = curFs?.missionId ?? '';
+  const rocketId     = curFs?.rocketId  ?? '';
+  const crewIds      = curFs?.crewIds   ?? [];
 
   stopFlightScene();
 
@@ -184,7 +185,7 @@ function _executeRestart(rebuildCost: number): void {
     crewIds,
     fuelRemaining:   totalFuel,
     deltaVRemaining: 0,
-    bodyId:          s.flightState?.bodyId ?? 'EARTH',
+    bodyId:          curFs?.bodyId ?? 'EARTH',
   });
 
   // Deep-clone the originals so the new flight gets pristine copies.
@@ -250,16 +251,18 @@ export function handleMenuAdjustBuild(): void {
  */
 export function handleMenuReturnToAgency(): void {
   const s = getFCState();
-  const phase: string | null = s.flightState ? s.flightState.phase : null;
+  const ps = getPhysicsState();
+  const flightState = getFlightState();
+  const phase: string | null = flightState ? flightState.phase : null;
 
   // --- Block return during TRANSFER / CAPTURE (player locked) ---
-  if (s.ps && phase && isPlayerLocked(phase)) {
+  if (ps && phase && isPlayerLocked(phase)) {
     showPhaseNotification('Cannot leave during ' + getPhaseLabel(phase));
     return;
   }
 
   // --- ORBIT: direct return with a brief warning ---
-  if (s.ps && phase === FlightPhase.ORBIT && !s.ps.landed && !s.ps.crashed) {
+  if (ps && phase === FlightPhase.ORBIT && !ps.landed && !ps.crashed) {
     s.preMenuTimeWarp = s.timeWarp;
     s.timeWarp = 0;
 
@@ -324,7 +327,7 @@ export function handleMenuReturnToAgency(): void {
   }
 
   // --- Mid-flight abort: warn about lost parts ---
-  if (s.ps && !s.ps.landed && !s.ps.crashed) {
+  if (ps && !ps.landed && !ps.crashed) {
     s.preMenuTimeWarp = s.timeWarp;
     s.timeWarp = 0;
 
@@ -332,7 +335,7 @@ export function handleMenuReturnToAgency(): void {
     let totalCost = 0;
     if (s.assembly) {
       for (const [instanceId, placed] of s.assembly.parts) {
-        if (!s.ps.activeParts.has(instanceId)) continue;
+        if (!ps.activeParts.has(instanceId)) continue;
         const def = getPartById(placed.partId);
         if (def) totalCost += def.cost ?? 0;
       }
@@ -420,7 +423,7 @@ function _handleReturnToAgency(): void {
   const s = getFCState();
   if (s.summaryShown) return;
   s.summaryShown = true;
-  showPostFlightSummary(s.ps, s.assembly, s.flightState, s.state, s.onFlightEnd);
+  showPostFlightSummary(getPhysicsState(), s.assembly, getFlightState(), s.state, s.onFlightEnd);
 }
 
 /**
@@ -433,8 +436,8 @@ export function handleAbortReturnToAgency(): void {
 
   // Capture references before stopFlightScene nulls them.
   const state       = s.state;
-  const flightState = s.flightState;
-  const ps          = s.ps;
+  const flightState = getFlightState();
+  const ps          = getPhysicsState();
   const assembly    = s.assembly;
   const onFlightEnd = s.onFlightEnd;
 
@@ -477,7 +480,8 @@ export function handleMenuFlightLog(): void {
   content.appendChild(heading);
 
   // Event list
-  const events = s.flightState ? s.flightState.events : [];
+  const menuFs = getFlightState();
+  const events = menuFs ? menuFs.events : [];
   content.appendChild(buildFlightEventList(events));
 
   // Close button

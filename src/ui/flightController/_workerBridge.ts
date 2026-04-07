@@ -1,9 +1,10 @@
 /**
  * _workerBridge.ts — Manages the physics Web Worker lifecycle.
  *
- * Creates / terminates the worker, sends commands, receives snapshots,
- * and applies snapshot data back to the main-thread mutable state objects
- * so that the render layer and UI continue to work unchanged.
+ * Creates / terminates the worker, sends commands, receives readonly
+ * snapshots for main-thread consumption.  The worker is the sole owner
+ * of mutable physics state; the main thread stores only the latest
+ * readonly snapshot.
  *
  * @module ui/flightController/_workerBridge
  */
@@ -14,8 +15,10 @@ import {
   setToArray,
 } from '../../core/physicsWorkerProtocol.ts';
 
-import type { PhysicsState, InstrumentStateEntry, ScienceModuleStateEntry } from '../../core/physics.ts';
+import type { PhysicsState } from '../../core/physics.ts';
 import type { FlightState } from '../../core/gameState.ts';
+// Note: PhysicsState and FlightState types are still needed for the
+// serialisation helpers used by initPhysicsWorker() and resyncWorkerState().
 import type { RocketAssembly, StagingConfig, PlacedPart } from '../../core/rocketbuilder.ts';
 import type {
   WorkerCommand,
@@ -36,9 +39,6 @@ let _worker: Worker | null = null;
 let _ready = false;
 let _error = false;
 let _errorMessage = '';
-let _latestPhysics: PhysicsSnapshot | null = null;
-let _latestFlight: FlightSnapshot | null = null;
-let _latestFrame = -1;
 /** Composite readonly snapshot stored directly from the worker (no field-by-field copy). */
 let _latestSnapshot: MainThreadSnapshot | null = null;
 let _readyResolve: (() => void) | null = null;
@@ -160,9 +160,6 @@ export function resyncWorkerState(
   return new Promise<void>((resolve) => {
     _ready = false;
     _readyResolve = resolve;
-    _latestPhysics = null;
-    _latestFlight = null;
-    _latestFrame = -1;
     _latestSnapshot = null;
 
     // partsCatalog and bodiesCatalog are sent as empty placeholders because the
@@ -214,19 +211,6 @@ export function sendKeyUp(key: string): void {
 }
 
 /**
- * Consume the latest physics and flight snapshots.  Returns the snapshots
- * and clears them so the same data is not applied twice.  Returns null if
- * no new snapshot is available.
- */
-export function consumeSnapshot(): { physics: PhysicsSnapshot; flight: FlightSnapshot; frame: number } | null {
-  if (_latestPhysics === null || _latestFlight === null) return null;
-  const result = { physics: _latestPhysics, flight: _latestFlight, frame: _latestFrame };
-  _latestPhysics = null;
-  _latestFlight = null;
-  return result;
-}
-
-/**
  * Consume the latest MainThreadSnapshot directly.  Returns the snapshot
  * object (or null if none available) and clears it so the same data is not
  * consumed twice.  The snapshot is stored directly from the worker message
@@ -252,129 +236,10 @@ export function terminatePhysicsWorker(): void {
   _ready = false;
   _error = false;
   _errorMessage = '';
-  _latestPhysics = null;
-  _latestFlight = null;
-  _latestFrame = -1;
   _latestSnapshot = null;
   _readyResolve = null;
   _readyReject = null;
   _clearReadyTimeout();
-}
-
-// ---------------------------------------------------------------------------
-// Snapshot application — update mutable main-thread objects in place
-// ---------------------------------------------------------------------------
-
-/**
- * Apply a physics snapshot to the mutable PhysicsState on the main thread.
- * This updates the object in place so that all existing references (HUD,
- * render layer, E2E globals) continue to work.
- *
- * NOTE: throttle, throttleMode, and targetTWR are deliberately NOT applied
- * from the snapshot.  The main thread is the authority for control inputs
- * and syncs them to the worker via sendThrottle()/sendAngle() commands.
- * Applying them from the snapshot would overwrite keyboard/button changes
- * that occurred between frames.
- */
-export function applyPhysicsSnapshot(ps: PhysicsState, snap: PhysicsSnapshot): void {
-  ps.posX = snap.posX;
-  ps.posY = snap.posY;
-  ps.velX = snap.velX;
-  ps.velY = snap.velY;
-  ps.angle = snap.angle;
-  // ps.throttle — NOT applied; main thread is authority for control inputs
-  // ps.throttleMode — NOT applied; main thread is authority
-  // ps.targetTWR — NOT applied; main thread is authority
-
-  ps.firingEngines = new Set(snap.firingEngines);
-  ps.activeParts = new Set(snap.activeParts);
-  ps.deployedParts = new Set(snap.deployedParts);
-  ps.ejectedCrewIds = new Set(snap.ejectedCrewIds);
-  ps.rcsActiveDirections = new Set(snap.rcsActiveDirections);
-
-  ps.fuelStore = new Map(Object.entries(snap.fuelStore));
-  ps.heatMap = new Map(Object.entries(snap.heatMap));
-  ps.parachuteStates = new Map(Object.entries(snap.parachuteStates));
-  ps.legStates = new Map(Object.entries(snap.legStates));
-  ps.ejectorStates = new Map(Object.entries(snap.ejectorStates));
-  ps.instrumentStates = new Map(Object.entries(snap.instrumentStates as Record<string, InstrumentStateEntry>));
-  ps.scienceModuleStates = new Map(Object.entries(snap.scienceModuleStates as Record<string, ScienceModuleStateEntry>));
-  ps.dockingPortStates = new Map(Object.entries(snap.dockingPortStates));
-
-  ps.ejectedCrew = snap.ejectedCrew.map(e => ({ ...e }));
-  ps.debris = snap.debris.map(d => ({
-    id: d.id,
-    activeParts: new Set(d.activeParts),
-    firingEngines: new Set(d.firingEngines),
-    fuelStore: new Map(Object.entries(d.fuelStore)),
-    deployedParts: new Set(d.deployedParts),
-    parachuteStates: new Map(Object.entries(d.parachuteStates)),
-    legStates: new Map(Object.entries(d.legStates)),
-    heatMap: new Map(Object.entries(d.heatMap)),
-    posX: d.posX, posY: d.posY,
-    velX: d.velX, velY: d.velY,
-    angle: d.angle, throttle: d.throttle,
-    angularVelocity: d.angularVelocity,
-    isTipping: d.isTipping,
-    tippingContactX: d.tippingContactX,
-    tippingContactY: d.tippingContactY,
-    landed: d.landed, crashed: d.crashed,
-  }));
-
-  ps.landed = snap.landed;
-  ps.crashed = snap.crashed;
-  ps.grounded = snap.grounded;
-  ps.angularVelocity = snap.angularVelocity;
-  ps.isTipping = snap.isTipping;
-  ps.tippingContactX = snap.tippingContactX;
-  ps.tippingContactY = snap.tippingContactY;
-  ps.controlMode = snap.controlMode;
-  ps.baseOrbit = snap.baseOrbit;
-  ps.dockingAltitudeBand = snap.dockingAltitudeBand;
-  ps.dockingOffsetAlongTrack = snap.dockingOffsetAlongTrack;
-  ps.dockingOffsetRadial = snap.dockingOffsetRadial;
-  ps.weatherIspModifier = snap.weatherIspModifier;
-  ps.hasLaunchClamps = snap.hasLaunchClamps;
-  ps.powerState = snap.powerState;
-
-  if (snap.malfunctions) {
-    ps.malfunctions = new Map(
-      Object.entries(snap.malfunctions).map(([k, v]) => [k, v]),
-    );
-  } else {
-    ps.malfunctions = undefined;
-  }
-}
-
-/**
- * Apply a flight snapshot to the mutable FlightState on the main thread.
- */
-export function applyFlightSnapshot(fs: FlightState, snap: FlightSnapshot): void {
-  fs.missionId = snap.missionId;
-  fs.rocketId = snap.rocketId;
-  fs.crewIds = [...snap.crewIds];
-  fs.crewCount = snap.crewCount;
-  fs.timeElapsed = snap.timeElapsed;
-  fs.altitude = snap.altitude;
-  fs.velocity = snap.velocity;
-  fs.fuelRemaining = snap.fuelRemaining;
-  fs.deltaVRemaining = snap.deltaVRemaining;
-  fs.events = snap.events.map(e => ({ ...e }));
-  fs.aborted = snap.aborted;
-  fs.phase = snap.phase;
-  fs.phaseLog = snap.phaseLog.map(p => ({ ...p }));
-  fs.inOrbit = snap.inOrbit;
-  fs.orbitalElements = snap.orbitalElements ? { ...snap.orbitalElements } : null;
-  fs.bodyId = snap.bodyId;
-  fs.orbitBandId = snap.orbitBandId;
-  fs.currentBiome = snap.currentBiome;
-  fs.biomesVisited = [...snap.biomesVisited];
-  fs.maxAltitude = snap.maxAltitude;
-  fs.maxVelocity = snap.maxVelocity;
-  fs.dockingState = snap.dockingState ? { ...snap.dockingState } : null;
-  fs.transferState = snap.transferState ? { ...snap.transferState } : null;
-  fs.powerState = snap.powerState ? { ...snap.powerState } : null;
-  // Note: commsState is evaluated on the main thread, not in the worker.
 }
 
 // ---------------------------------------------------------------------------
@@ -408,11 +273,6 @@ function _handleMessage(msg: WorkerMessage): void {
       break;
 
     case 'snapshot':
-      // Legacy per-field storage (kept until all consumers migrate to consumeMainThreadSnapshot).
-      _latestPhysics = msg.physics;
-      _latestFlight = msg.flight;
-      _latestFrame = msg.frame;
-
       // Direct snapshot storage — no field-by-field copy.
       // The PhysicsSnapshot from the worker includes control input fields
       // (throttle, throttleMode, targetTWR, angle) but ReadonlyPhysicsSnapshot

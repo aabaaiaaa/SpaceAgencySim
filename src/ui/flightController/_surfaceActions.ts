@@ -10,7 +10,7 @@ import {
   deploySurfaceInstrument,
   deployBeacon,
 } from '../../core/surfaceOps.ts';
-import { getFCState } from './_state.ts';
+import { getFCState, getPhysicsState, getFlightState } from './_state.ts';
 import { logger } from '../../core/logger.ts';
 
 /**
@@ -19,21 +19,23 @@ import { logger } from '../../core/logger.ts';
  */
 export function onSurfaceAction(actionId: string): void {
   const s = getFCState();
-  if (!s.state || !s.flightState || !s.ps) return;
+  const ps = getPhysicsState();
+  const flightState = getFlightState();
+  if (!s.state || !flightState || !ps) return;
 
   let result;
   switch (actionId) {
     case 'plant-flag':
-      result = plantFlag(s.state, s.flightState, s.ps);
+      result = plantFlag(s.state, flightState, ps);
       break;
     case 'collect-sample':
-      result = collectSurfaceSample(s.state, s.flightState, s.ps);
+      result = collectSurfaceSample(s.state, flightState, ps);
       break;
     case 'deploy-instrument':
-      result = deploySurfaceInstrument(s.state, s.flightState, s.ps, s.assembly!);
+      result = deploySurfaceInstrument(s.state, flightState, ps, s.assembly!);
       break;
     case 'deploy-beacon':
-      result = deployBeacon(s.state, s.flightState, s.ps);
+      result = deployBeacon(s.state, flightState, ps);
       break;
     default:
       return;

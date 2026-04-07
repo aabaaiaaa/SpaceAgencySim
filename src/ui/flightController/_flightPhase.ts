@@ -19,7 +19,7 @@ import {
   isEscapeTrajectory,
 } from '../../core/manoeuvre.ts';
 import { resetControlModeIfNeeded, CONTROL_MODE_TIPS } from '../../core/controlMode.ts';
-import { getFCState } from './_state.ts';
+import { getFCState, getPhysicsState, getFlightState } from './_state.ts';
 import { applyTimeWarp } from './_timeWarp.ts';
 import { toggleMapView } from './_mapView.ts';
 
@@ -72,17 +72,19 @@ function _showDeorbitWarning(bodyId: string): void {
   // After a brief delay, execute the REENTRY transition.
   setTimeout(() => {
     const s2 = getFCState();
-    if (!s2.flightState || !s2.ps) { s2.deorbitWarningActive = false; return; }
+    const s2Fs = getFlightState();
+    const s2Ps = getPhysicsState();
+    if (!s2Fs || !s2Ps) { s2.deorbitWarningActive = false; return; }
 
     const result = transitionPhase(
-      s2.flightState, FlightPhase.REENTRY,
+      s2Fs, FlightPhase.REENTRY,
       'De-orbit — periapsis below minimum stable orbit altitude',
     );
 
     if (result.success) {
-      s2.flightState.inOrbit = false;
-      s2.flightState.orbitalElements = null;
-      s2.flightState.orbitBandId = null;
+      s2Fs.inOrbit = false;
+      s2Fs.orbitalElements = null;
+      s2Fs.orbitBandId = null;
 
       // Force-close the map view on deorbit — other orbital objects are no
       // longer visible once the craft leaves the orbital model.
@@ -113,51 +115,53 @@ function _showDeorbitWarning(bodyId: string): void {
  */
 export function evaluateFlightPhase(skipAutoTransitions = false): void {
   const s = getFCState();
-  if (!s.ps || !s.flightState) return;
+  const ps = getPhysicsState();
+  const flightState = getFlightState();
+  if (!ps || !flightState) return;
 
-  const bodyId: string = s.flightState.bodyId || 'EARTH';
+  const bodyId: string = flightState.bodyId || 'EARTH';
   const minOrbitAlt: number = getMinOrbitAltitude(bodyId);
 
   // Only compute orbit status when above the minimum orbit altitude.
   let orbitStatus = null;
-  if (s.ps.posY >= minOrbitAlt && !s.ps.landed && !s.ps.crashed) {
-    orbitStatus = checkOrbitStatus(s.ps.posX, s.ps.posY, s.ps.velX, s.ps.velY, bodyId);
+  if (ps.posY >= minOrbitAlt && !ps.landed && !ps.crashed) {
+    orbitStatus = checkOrbitStatus(ps.posX, ps.posY, ps.velX, ps.velY, bodyId);
   }
 
   // --- Continuous orbit recalculation during MANOEUVRE / TRANSFER / CAPTURE ---
-  const phase: string = s.flightState.phase;
+  const phase: string = flightState.phase;
   if (phase === FlightPhase.MANOEUVRE ||
       phase === FlightPhase.TRANSFER ||
       phase === FlightPhase.CAPTURE ||
-      (phase === FlightPhase.ORBIT && isOrbitalBurnActive(s.ps))) {
-    const newElements = recalculateOrbit(s.ps, bodyId, s.flightState.timeElapsed);
+      (phase === FlightPhase.ORBIT && isOrbitalBurnActive(ps))) {
+    const newElements = recalculateOrbit(ps, bodyId, flightState.timeElapsed);
     if (newElements) {
-      s.flightState.orbitalElements = newElements;
+      flightState.orbitalElements = newElements;
     } else {
-      s.flightState.orbitalElements = null;
+      flightState.orbitalElements = null;
     }
   }
 
   if (!skipAutoTransitions) {
     // Detect REENTRY: if we're in ORBIT and periapsis drops below the minimum
     // orbit altitude, the player has initiated a de-orbit burn.
-    if (s.flightState.phase === FlightPhase.ORBIT && orbitStatus && !orbitStatus.valid) {
-      if (!isEscapeTrajectory(s.ps, bodyId)) {
+    if (flightState.phase === FlightPhase.ORBIT && orbitStatus && !orbitStatus.valid) {
+      if (!isEscapeTrajectory(ps, bodyId)) {
         _showDeorbitWarning(bodyId);
         return;
       }
     }
 
-    const transition = evaluateAutoTransitions(s.flightState, s.ps, orbitStatus);
+    const transition = evaluateAutoTransitions(flightState, ps, orbitStatus);
 
     if (transition) {
       if (transition.to === FlightPhase.ORBIT && orbitStatus) {
         const label: string = getOrbitEntryLabel(orbitStatus);
         showPhaseNotification(label);
 
-        s.flightState.inOrbit = true;
-        s.flightState.orbitalElements = orbitStatus.elements;
-        s.flightState.orbitBandId = orbitStatus.altitudeBand ? orbitStatus.altitudeBand.id : null;
+        flightState.inOrbit = true;
+        flightState.orbitalElements = orbitStatus.elements;
+        flightState.orbitBandId = orbitStatus.altitudeBand ? orbitStatus.altitudeBand.id : null;
       } else if (transition.to === FlightPhase.MANOEUVRE) {
         showPhaseNotification('Manoeuvre');
         applyTimeWarp(1);
@@ -170,7 +174,7 @@ export function evaluateFlightPhase(skipAutoTransitions = false): void {
           toggleMapView();
         }
       } else if (transition.to === FlightPhase.CAPTURE) {
-        showPhaseNotification(`Entering ${s.flightState.bodyId || 'destination'} SOI`);
+        showPhaseNotification(`Entering ${flightState.bodyId || 'destination'} SOI`);
         applyTimeWarp(1);
       } else {
         showPhaseNotification(getPhaseLabel(transition.to));
@@ -179,10 +183,10 @@ export function evaluateFlightPhase(skipAutoTransitions = false): void {
   }
 
   // Reset control mode when flight phase leaves ORBIT (but allow MANOEUVRE).
-  if (s.ps.controlMode !== ControlMode.NORMAL &&
-      s.flightState.phase !== FlightPhase.ORBIT &&
-      s.flightState.phase !== FlightPhase.MANOEUVRE) {
-    const wasReset: boolean = resetControlModeIfNeeded(s.ps, s.flightState, bodyId);
+  if (ps.controlMode !== ControlMode.NORMAL &&
+      flightState.phase !== FlightPhase.ORBIT &&
+      flightState.phase !== FlightPhase.MANOEUVRE) {
+    const wasReset: boolean = resetControlModeIfNeeded(ps, flightState, bodyId);
     if (wasReset) {
       showPhaseNotification(CONTROL_MODE_TIPS[ControlMode.NORMAL]);
     }

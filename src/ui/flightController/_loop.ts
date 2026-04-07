@@ -26,7 +26,7 @@ import { PartType } from '../../core/constants.ts';
 import { getPartById } from '../../data/parts.ts';
 import { getPhaseLabel } from '../../core/flightPhase.ts';
 import { getOrbitEntryLabel, checkOrbitStatus } from '../../core/orbit.ts';
-import { getFCState } from './_state.ts';
+import { getFCState, getPhysicsState, getFlightState } from './_state.ts';
 import { recordFrame } from '../fpsMonitor.ts';
 import { logger } from '../../core/logger.ts';
 import { checkTimeWarpResets, applyTimeWarp } from './_timeWarp.ts';
@@ -43,13 +43,10 @@ import {
   sendTick,
   sendThrottle,
   sendAngle,
-  applyPhysicsSnapshot,
-  applyFlightSnapshot,
   terminatePhysicsWorker,
 } from './_workerBridge.ts';
 import { createSnapshotFromState } from '../../core/snapshotFactory.ts';
 import type { MainThreadSnapshot } from '../../core/physicsWorkerProtocol.ts';
-import type { PhysicsSnapshot } from '../../core/physicsWorkerProtocol.ts';
 
 /** Maximum consecutive loop errors before showing the abort banner. */
 export const MAX_CONSECUTIVE_LOOP_ERRORS: number = 5;
@@ -65,7 +62,8 @@ let _fallbackFrame = 0;
  */
 function _allCommandModulesDestroyed(): boolean {
   const s = getFCState();
-  if (!s.assembly || !s.ps) return false;
+  const ps = getPhysicsState();
+  if (!s.assembly || !ps) return false;
 
   let hadCommandModule = false;
 
@@ -74,7 +72,7 @@ function _allCommandModulesDestroyed(): boolean {
     if (!def || def.type !== PartType.COMMAND_MODULE) continue;
 
     hadCommandModule = true;
-    if (s.ps.activeParts.has(instanceId)) {
+    if (ps.activeParts.has(instanceId)) {
       return false;
     }
   }
@@ -144,7 +142,9 @@ export function loop(timestamp: number): void {
   // Destructure state once at the top of the hot path to avoid repeated
   // getFCState() calls at 60fps.
   const s = getFCState();
-  const { ps, assembly, stagingConfig, flightState, state } = s;
+  const ps = getPhysicsState();
+  const flightState = getFlightState();
+  const { assembly, stagingConfig, state } = s;
 
   // Guard against stale callbacks after stopFlightScene().
   if (!ps || !assembly || !stagingConfig || !flightState) return;
@@ -171,15 +171,7 @@ export function loop(timestamp: number): void {
       if (snap) {
         const prevPhase = flightState.phase;
 
-        // Temporary: apply snapshot to mutable state for render compatibility.
-        // The worker snapshot includes control input fields at runtime even
-        // though ReadonlyPhysicsSnapshot hides them via Omit<>.  The cast is
-        // safe and will be removed when render functions accept snapshot types
-        // directly (TASK-013a/b).
-        applyPhysicsSnapshot(ps, snap.physics as unknown as PhysicsSnapshot);
-        applyFlightSnapshot(flightState, snap.flight);
-
-        // Detect phase transition from snapshot values (not mutable state).
+        // Detect phase transition from snapshot values.
         if (snap.flight.phase !== prevPhase) {
           _handleWorkerPhaseTransition(prevPhase, snap.flight.phase, snap);
         }

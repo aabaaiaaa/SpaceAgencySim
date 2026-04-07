@@ -5,12 +5,35 @@
  * flightController.js are collected here as properties of a single object.
  * Sub-modules access them via getFCState() and mutate via setFCState(patch).
  *
+ * Physics state (`PhysicsState`) and flight state (`FlightState`) are stored
+ * separately from FCState — they are the worker's authority and are only
+ * needed on the main thread for the fallback tick path, worker init/resync,
+ * and control-input writes.  Access them via `getPhysicsState()` /
+ * `getFlightState()` and their corresponding setters.
+ *
  * @module ui/flightController/_state
  */
 
 import type { PhysicsState } from '../../core/physics.ts';
 import type { GameState, FlightState } from '../../core/gameState.ts';
 import type { RocketAssembly, StagingConfig } from '../../core/rocketbuilder.ts';
+
+// ---------------------------------------------------------------------------
+// Mutable physics / flight state (separate from FCState)
+// ---------------------------------------------------------------------------
+
+let _physicsState: PhysicsState | null = null;
+let _flightState: FlightState | null = null;
+
+/** Get the mutable PhysicsState (used for control inputs, worker init, fallback tick). */
+export function getPhysicsState(): PhysicsState | null { return _physicsState; }
+/** Set the mutable PhysicsState. */
+export function setPhysicsState(ps: PhysicsState | null): void { _physicsState = ps; }
+
+/** Get the mutable FlightState (used for worker init, phase evaluation, core function calls). */
+export function getFlightState(): FlightState | null { return _flightState; }
+/** Set the mutable FlightState. */
+export function setFlightState(fs: FlightState | null): void { _flightState = fs; }
 
 // ---------------------------------------------------------------------------
 // FCState interface
@@ -20,10 +43,8 @@ export interface FCState {
   // Core references
   /** requestAnimationFrame handle. */
   rafId: number | null;
-  ps: PhysicsState | null;
   assembly: RocketAssembly | null;
   stagingConfig: StagingConfig | null;
-  flightState: FlightState | null;
   state: GameState | null;
   /** The #ui-overlay container. */
   container: HTMLElement | null;
@@ -100,10 +121,8 @@ function _createDefaultState(): FCState {
   return {
     // Core references
     rafId: null,
-    ps: null,
     assembly: null,
     stagingConfig: null,
-    flightState: null,
     state: null,
     container: null,
     onFlightEnd: null,
@@ -178,4 +197,6 @@ export function setFCState(patch: Partial<FCState>): void {
  */
 export function resetFCState(): void {
   _fcState = _createDefaultState();
+  _physicsState = null;
+  _flightState = null;
 }

@@ -16,7 +16,7 @@ import { setMalfunctionMode, getMalfunctionMode } from '../../core/malfunction.t
 import { createDockingState } from '../../core/docking.ts';
 import { getPartById } from '../../data/parts.ts';
 import { getVabInventoryUsedParts } from '../vab.ts';
-import { getFCState, resetFCState } from './_state.ts';
+import { getFCState, resetFCState, getPhysicsState, setPhysicsState, getFlightState, setFlightState } from './_state.ts';
 import './flightController.css';
 import { onKeyDown, onKeyUp } from './_keyboard.ts';
 import { onTimeWarpButtonClick } from './_timeWarp.ts';
@@ -123,7 +123,7 @@ export function startFlightScene(
   s.state         = state;
   s.assembly      = _normalizeAssemblyToGround(assembly);
   s.stagingConfig = stagingConfig;
-  s.flightState   = flightState;
+  setFlightState(flightState);
   s.onFlightEnd   = onFlightEnd;
 
   // Guarantee staging starts at Stage 1 regardless of prior flight state.
@@ -151,25 +151,26 @@ export function startFlightScene(
   s.summaryShown        = false;
 
   // Create the physics state from the (normalised) assembly and initial flight state.
-  s.ps = createPhysicsState(s.assembly, flightState);
+  const ps = createPhysicsState(s.assembly, flightState);
+  setPhysicsState(ps);
 
   // Store a reference to the top-level game state so the malfunction system
   // can look up crew engineering skills during reliability checks.
-  s.ps._gameState = s.state;
+  ps._gameState = s.state;
 
   // Apply weather effects (temperature -> ISP, visibility -> fog/haze).
   if (s.state.weather?.current) {
     const w = s.state.weather.current;
-    if (w.temperature != null) s.ps.weatherIspModifier = w.temperature;
+    if (w.temperature != null) ps.weatherIspModifier = w.temperature;
     setFlightWeather(w.visibility ?? 0);
   }
 
   // Attach inventory-sourced part data for wear tracking on recovery.
-  s.ps._usedInventoryParts = getVabInventoryUsedParts();
+  ps._usedInventoryParts = getVabInventoryUsedParts();
 
   // Expose for E2E testing -- Playwright reads live physics values here.
   if (typeof window !== 'undefined') {
-    window.__flightPs       = s.ps;
+    window.__flightPs       = ps;
     window.__flightAssembly = s.assembly;
     window.__flightState    = flightState;
     window.__setMalfunctionMode = (mode: string) => setMalfunctionMode(s.state!, mode);
@@ -186,8 +187,10 @@ export function startFlightScene(
     // (e.g. teleportCraft), call this to push the updated state to the worker.
     window.__resyncPhysicsWorker = async () => {
       const st = getFCState();
-      if (st.workerActive && st.ps && st.assembly && st.stagingConfig && st.flightState) {
-        await resyncWorkerState(st.ps, st.assembly, st.stagingConfig, st.flightState);
+      const stPs = getPhysicsState();
+      const stFs = getFlightState();
+      if (st.workerActive && stPs && st.assembly && st.stagingConfig && stFs) {
+        await resyncWorkerState(stPs, st.assembly, st.stagingConfig, stFs);
       }
     };
   }
@@ -196,7 +199,7 @@ export function startFlightScene(
   initFlightRenderer();
 
   // Mount the HUD overlay.
-  initFlightHud(container, s.ps, s.assembly, stagingConfig, flightState, state, onTimeWarpButtonClick, onSurfaceAction, handleAbortReturnToAgency);
+  initFlightHud(container, ps, s.assembly, stagingConfig, flightState, state, onTimeWarpButtonClick, onSurfaceAction, handleAbortReturnToAgency);
 
   // Initialise the FPS monitor (visible only when debug mode is on).
   initFpsMonitor();
@@ -257,16 +260,16 @@ export function startFlightScene(
   initMapRenderer();
 
   // Initialise the docking system state on the flight state.
-  if (!s.flightState.dockingState) {
-    s.flightState.dockingState = createDockingState();
+  if (!flightState.dockingState) {
+    flightState.dockingState = createDockingState();
   }
   s.dockingHud = null;
 
   // Initialise the right-click part context menu.
   initFlightContextMenu(
-    () => getFCState().ps,
+    () => getPhysicsState(),
     () => getFCState().assembly,
-    () => getFCState().flightState,
+    () => getFlightState(),
   );
 
   // Bind keyboard handlers.
@@ -281,21 +284,24 @@ export function startFlightScene(
 
   // Initialise the physics worker if the setting is enabled.
   if (state.useWorkerPhysics !== false && typeof Worker !== 'undefined') {
-    initPhysicsWorker(s.ps, s.assembly, s.stagingConfig, flightState)
+    initPhysicsWorker(ps, s.assembly, s.stagingConfig, flightState)
       .then(() => {
         // The worker loaded with the initial state, but the main-thread may
         // have advanced physics or processed staging while the worker was
         // loading.  Re-init the worker with the CURRENT state so it starts
         // from the exact same point as the main-thread.
         const current = getFCState();
-        if (current.ps && current.assembly && current.stagingConfig && current.flightState) {
-          return resyncWorkerState(current.ps, current.assembly, current.stagingConfig, current.flightState);
+        const curPs = getPhysicsState();
+        const curFs = getFlightState();
+        if (curPs && current.assembly && current.stagingConfig && curFs) {
+          return resyncWorkerState(curPs, current.assembly, current.stagingConfig, curFs);
         }
       })
       .then(() => {
         // Mark worker as active — the loop will use it from the next frame.
         const current = getFCState();
-        if (current.ps && current.assembly) {
+        const curPs = getPhysicsState();
+        if (curPs && current.assembly) {
           current.workerActive = true;
           logger.debug('flight', 'Physics worker initialised and active');
         }

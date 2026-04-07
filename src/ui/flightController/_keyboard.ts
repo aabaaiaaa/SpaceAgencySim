@@ -26,7 +26,7 @@ import {
   isDebrisTrackingAvailable,
 } from '../../core/mapView.ts';
 import { FlightPhase, ControlMode, DockingState } from '../../core/constants.ts';
-import { getFCState } from './_state.ts';
+import { getFCState, getPhysicsState, getFlightState } from './_state.ts';
 import { applyTimeWarp, onTimeWarpButtonClick } from './_timeWarp.ts';
 import { toggleMapView, updateMapHud, handleWarpToTarget } from './_mapView.ts';
 import { cycleDockingTarget, handleUndock, handleFuelTransfer } from './_docking.ts';
@@ -38,7 +38,9 @@ export const WARP_LEVELS_ORDERED: number[] = [0, 0.25, 0.5, 1, 2, 5, 10, 50];
 
 export function onKeyDown(e: KeyboardEvent): void {
   const s = getFCState();
-  if (!s.ps || !s.assembly || !s.stagingConfig || !s.flightState) return;
+  const ps = getPhysicsState();
+  const flightState = getFlightState();
+  if (!ps || !s.assembly || !s.stagingConfig || !flightState) return;
 
   // M — toggle map view.
   if (e.code === 'KeyM') {
@@ -72,7 +74,7 @@ export function onKeyDown(e: KeyboardEvent): void {
     }
     // T — cycle target selection.
     if (e.code === 'KeyT' && !e.ctrlKey) {
-      const tBodyId: string = (s.flightState && s.flightState.bodyId) || 'EARTH';
+      const tBodyId: string = (flightState && flightState.bodyId) || 'EARTH';
       cycleMapTarget(s.state!.orbitalObjects, tBodyId);
       updateMapHud();
       return;
@@ -88,10 +90,10 @@ export function onKeyDown(e: KeyboardEvent): void {
         showPhaseNotification('Tracking Station Tier 3 required for transfer planning');
         return;
       }
-      if (s.flightState) {
-        const bodyId: string = s.flightState.bodyId || 'EARTH';
-        const alt: number = Math.max(0, s.ps.posY);
-        const selected = cycleTransferTarget(bodyId, alt, s.flightState.phase);
+      if (flightState) {
+        const bodyId: string = flightState.bodyId || 'EARTH';
+        const alt: number = Math.max(0, ps.posY);
+        const selected = cycleTransferTarget(bodyId, alt, flightState.phase);
         if (selected) {
           showPhaseNotification(`Transfer target: ${selected}`);
         } else {
@@ -111,7 +113,7 @@ export function onKeyDown(e: KeyboardEvent): void {
 
   // T — cycle docking target (in docking/RCS mode, flight view).
   if (e.code === 'KeyT' && !s.mapActive &&
-      (s.ps.controlMode === ControlMode.DOCKING || s.ps.controlMode === ControlMode.RCS)) {
+      (ps.controlMode === ControlMode.DOCKING || ps.controlMode === ControlMode.RCS)) {
     e.preventDefault();
     cycleDockingTarget();
     return;
@@ -126,7 +128,7 @@ export function onKeyDown(e: KeyboardEvent): void {
 
   // F — transfer fuel from docked depot.
   if (e.code === 'KeyF' && !s.mapActive && !e.ctrlKey) {
-    if (s.flightState?.dockingState?.state === DockingState.DOCKED) {
+    if (flightState?.dockingState?.state === DockingState.DOCKED) {
       e.preventDefault();
       handleFuelTransfer();
       return;
@@ -141,7 +143,7 @@ export function onKeyDown(e: KeyboardEvent): void {
   }
 
   // --- Comms control lockout ---
-  if (s.flightState.commsState?.controlLocked) {
+  if (flightState.commsState?.controlLocked) {
     if (e.code !== 'KeyM' && e.code !== 'Comma' && e.code !== 'Period' &&
         e.code !== 'Tab' && e.code !== 'KeyN' && e.code !== 'KeyT' &&
         e.code !== 'KeyG' && e.code !== 'KeyB' && e.code !== 'KeyC') {
@@ -162,7 +164,7 @@ export function onKeyDown(e: KeyboardEvent): void {
     e.preventDefault();
 
     // Block staging in docking/RCS mode.
-    if (s.ps.controlMode === ControlMode.DOCKING || s.ps.controlMode === ControlMode.RCS) {
+    if (ps.controlMode === ControlMode.DOCKING || ps.controlMode === ControlMode.RCS) {
       return;
     }
 
@@ -174,7 +176,7 @@ export function onKeyDown(e: KeyboardEvent): void {
     if (s.workerActive) {
       workerStage();
     } else {
-      fireNextStage(s.ps, s.assembly, s.stagingConfig, s.flightState);
+      fireNextStage(ps, s.assembly, s.stagingConfig, flightState);
     }
     hideLaunchTip();
     return;
@@ -202,8 +204,8 @@ export function onKeyDown(e: KeyboardEvent): void {
   }
 
   // In NORMAL orbit mode (not docking/RCS), WASD applies orbital-relative thrust.
-  if (!s.mapActive && s.ps.controlMode === ControlMode.NORMAL &&
-      (s.flightState.phase === FlightPhase.ORBIT || s.flightState.phase === FlightPhase.MANOEUVRE)) {
+  if (!s.mapActive && ps.controlMode === ControlMode.NORMAL &&
+      (flightState.phase === FlightPhase.ORBIT || flightState.phase === FlightPhase.MANOEUVRE)) {
     const lower = e.key.toLowerCase();
     if (lower === 'w' || lower === 's' || lower === 'a' || lower === 'd') {
       s.normalOrbitHeldKeys.add(lower);
@@ -214,12 +216,13 @@ export function onKeyDown(e: KeyboardEvent): void {
   if (s.workerActive) {
     workerKeyDown(e.key);
   }
-  handleKeyDown(s.ps, s.assembly, e.key);
+  handleKeyDown(ps, s.assembly, e.key);
 }
 
 export function onKeyUp(e: KeyboardEvent): void {
   const s = getFCState();
-  if (!s.ps) return;
+  const ps = getPhysicsState();
+  if (!ps) return;
 
   // Release map thrust keys.
   if (s.mapActive) {
@@ -236,5 +239,5 @@ export function onKeyUp(e: KeyboardEvent): void {
   if (s.workerActive) {
     workerKeyUp(e.key);
   }
-  handleKeyUp(s.ps, e.key);
+  handleKeyUp(ps, e.key);
 }

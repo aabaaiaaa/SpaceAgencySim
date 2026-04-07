@@ -7,7 +7,7 @@
 import { setHudTimeWarp, lockTimeWarp } from '../flightHud.ts';
 import { ATMOSPHERE_TOP } from '../../core/atmosphere.ts';
 import { getAtmosphereTop as getBodyAtmosphereTop } from '../../data/bodies.ts';
-import { getFCState } from './_state.ts';
+import { getFCState, getPhysicsState, getFlightState } from './_state.ts';
 
 /**
  * Apply a new time-warp multiplier: update internal state and synchronise the
@@ -26,7 +26,9 @@ export function applyTimeWarp(level: number): void {
  */
 export function checkTimeWarpResets(timestamp: number): void {
   const s = getFCState();
-  if (!s.ps || !s.flightState) return;
+  const ps = getPhysicsState();
+  const flightState = getFlightState();
+  if (!ps || !flightState) return;
 
   // Manage staging lockout expiry.
   if (s.stagingLockoutUntil > 0 && timestamp >= s.stagingLockoutUntil) {
@@ -35,22 +37,22 @@ export function checkTimeWarpResets(timestamp: number): void {
   }
 
   // Body-aware atmosphere top for space detection.
-  const _twBodyId: string = (s.flightState && s.flightState.bodyId) || 'EARTH';
+  const _twBodyId: string = (flightState && flightState.bodyId) || 'EARTH';
   const _twAtmoTop: number = getBodyAtmosphereTop(_twBodyId) || ATMOSPHERE_TOP;
 
   // No automatic resets needed if we're already at 1x.
   if (s.timeWarp === 1) {
-    s.prevAltitude = Math.max(0, s.ps.posY);
+    s.prevAltitude = Math.max(0, ps.posY);
     s.prevInSpace  = s.prevAltitude >= _twAtmoTop;
     return;
   }
 
-  const altitude: number = Math.max(0, s.ps.posY);
-  const speed: number    = Math.hypot(s.ps.velX, s.ps.velY);
+  const altitude: number = Math.max(0, ps.posY);
+  const speed: number    = Math.hypot(ps.velX, ps.velY);
   const inSpace: boolean = altitude >= _twAtmoTop;
 
   // Reset on successful landing or crash.
-  if (s.ps.landed || s.ps.crashed) {
+  if (ps.landed || ps.crashed) {
     applyTimeWarp(1);
   }
   // Reset on reentry: rocket was in space last frame, now below atmosphere

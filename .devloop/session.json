@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 14,
+  "lastIteration": 15,
   "startedAt": "2026-04-07T15:37:33.988Z",
   "iteration": 2,
   "devloopVersion": "3.4.0",
   "activeTask": {
-    "taskId": "TASK-014a",
-    "taskTitle": "Update flightHud and flightController UI to read from readonly snapshot",
-    "iterationNumber": 15,
-    "startedAt": "2026-04-07T16:43:10.845Z"
+    "taskId": "TASK-014b",
+    "taskTitle": "Remove dual state — clean up FCState and delete apply functions",
+    "iterationNumber": 16,
+    "startedAt": "2026-04-07T17:02:20.707Z"
   }
 }

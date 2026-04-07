@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 21
-- **Completed**: 15
-- **Remaining**: 6
-- **Last Updated**: 2026-04-07T17:02:18.778Z
+- **Completed**: 16
+- **Remaining**: 5
+- **Last Updated**: 2026-04-07T17:18:49.155Z
 
 ## Iteration Log
 
@@ -142,4 +142,13 @@
 - **Exit Status**: success
 - **Tokens**: 1,133,792 total (4,013 in, 11,605 out, 103,100 cache-create, 1,015,074 cache-read)
 - **Cost**: $1.7151
+
+### Iteration 16 - 2026-04-07T17:18:49.153Z
+- **Task Attempted**: TASK-014b
+- **Task Completed**: TASK-014b
+- **Summary**: Completed Remove dual state — clean up FCState and delete apply functions
+- **Duration**: 16m 28s
+- **Exit Status**: success
+- **Tokens**: 14,857,665 total (108 in, 51,421 out, 160,322 cache-create, 14,645,814 cache-read)
+- **Cost**: $9.6110
 

@@ -18,7 +18,7 @@ import {
   undock,
   transferFuel,
 } from '../../core/docking.ts';
-import { getFCState } from './_state.ts';
+import { getFCState, getPhysicsState, getFlightState } from './_state.ts';
 import { showPhaseNotification } from './_flightPhase.ts';
 import { setMapTarget } from './_mapView.ts';
 
@@ -27,13 +27,15 @@ import { setMapTarget } from './_mapView.ts';
  */
 export function tickDockingSystem(dt: number): void {
   const s = getFCState();
-  if (!s.ps || !s.assembly || !s.flightState || !s.state) return;
+  const ps = getPhysicsState();
+  const flightState = getFlightState();
+  if (!ps || !s.assembly || !flightState || !s.state) return;
 
-  const dockingState = s.flightState.dockingState;
+  const dockingState = flightState.dockingState;
   if (!dockingState) return;
 
   // Only tick docking when in ORBIT phase.
-  if (s.flightState.phase !== FlightPhase.ORBIT) {
+  if (flightState.phase !== FlightPhase.ORBIT) {
     if (dockingState.state !== DockingState.IDLE && dockingState.state !== DockingState.DOCKED) {
       clearDockingTarget(dockingState);
     }
@@ -41,16 +43,16 @@ export function tickDockingSystem(dt: number): void {
   }
 
   // Update combined mass on physics state for thrust calculations.
-  s.ps._dockedCombinedMass = dockingState.combinedMass;
+  ps._dockedCombinedMass = dockingState.combinedMass;
 
-  const result = tickDocking(dockingState, s.ps, s.assembly, s.flightState, s.state, dt);
+  const result = tickDocking(dockingState, ps, s.assembly, flightState, s.state, dt);
 
   if (result.docked) {
     showPhaseNotification('Docking Complete!');
     // Set all docking ports to 'docked' state.
-    for (const [instanceId, portState] of s.ps.dockingPortStates) {
+    for (const [instanceId, portState] of ps.dockingPortStates) {
       if (portState === 'extended') {
-        s.ps.dockingPortStates.set(instanceId, 'docked');
+        ps.dockingPortStates.set(instanceId, 'docked');
       }
     }
   }
@@ -65,9 +67,11 @@ export function tickDockingSystem(dt: number): void {
  */
 export function cycleDockingTarget(): void {
   const s = getFCState();
-  if (!s.ps || !s.assembly || !s.flightState || !s.state) return;
+  const ps = getPhysicsState();
+  const flightState = getFlightState();
+  if (!ps || !s.assembly || !flightState || !s.state) return;
 
-  const dockingState = s.flightState.dockingState;
+  const dockingState = flightState.dockingState;
   if (!dockingState) return;
 
   // If already docked, can't select new target.
@@ -76,12 +80,12 @@ export function cycleDockingTarget(): void {
     return;
   }
 
-  if (!hasDockingPort(s.ps, s.assembly)) {
+  if (!hasDockingPort(ps, s.assembly)) {
     showPhaseNotification('No docking port on craft');
     return;
   }
 
-  const targets = getTargetsInVisualRange(s.ps, s.flightState, s.state);
+  const targets = getTargetsInVisualRange(ps, flightState, s.state);
   const dockable = targets.filter(t => canDockWith(t.object));
 
   if (dockable.length === 0) {
@@ -95,13 +99,13 @@ export function cycleDockingTarget(): void {
   const nextIdx = (currentIdx + 1) % dockable.length;
   const nextTarget = dockable[nextIdx];
 
-  const result = selectDockingTarget(dockingState, nextTarget.object.id, s.ps, s.assembly);
+  const result = selectDockingTarget(dockingState, nextTarget.object.id, ps, s.assembly);
   if (result.success) {
     showPhaseNotification(`Docking target: ${nextTarget.object.name} (${Math.round(nextTarget.distance)} m)`);
     // Extend docking ports.
-    for (const [instanceId, portState] of s.ps.dockingPortStates) {
+    for (const [instanceId, portState] of ps.dockingPortStates) {
       if (portState === 'retracted') {
-        s.ps.dockingPortStates.set(instanceId, 'extended');
+        ps.dockingPortStates.set(instanceId, 'extended');
       }
     }
     // Also set this as the map target for visibility.
@@ -116,21 +120,23 @@ export function cycleDockingTarget(): void {
  */
 export function handleUndock(): void {
   const s = getFCState();
-  if (!s.ps || !s.assembly || !s.flightState || !s.state) return;
+  const ps = getPhysicsState();
+  const flightState = getFlightState();
+  if (!ps || !s.assembly || !flightState || !s.state) return;
 
-  const dockingState = s.flightState.dockingState;
+  const dockingState = flightState.dockingState;
   if (!dockingState || dockingState.state !== DockingState.DOCKED) {
     return;
   }
 
-  const result = undock(dockingState, s.ps, s.assembly, s.flightState, s.state);
+  const result = undock(dockingState, ps, s.assembly, flightState, s.state);
   if (result.success) {
     showPhaseNotification('Undocked');
     // Reset docking port states.
-    for (const [instanceId] of s.ps.dockingPortStates) {
-      s.ps.dockingPortStates.set(instanceId, 'retracted');
+    for (const [instanceId] of ps.dockingPortStates) {
+      ps.dockingPortStates.set(instanceId, 'retracted');
     }
-    s.ps._dockedCombinedMass = 0;
+    ps._dockedCombinedMass = 0;
   }
 }
 
@@ -139,13 +145,15 @@ export function handleUndock(): void {
  */
 export function handleFuelTransfer(): void {
   const s = getFCState();
-  if (!s.ps || !s.assembly || !s.flightState) return;
+  const ps = getPhysicsState();
+  const flightState = getFlightState();
+  if (!ps || !s.assembly || !flightState) return;
 
-  const dockingState = s.flightState.dockingState;
+  const dockingState = flightState.dockingState;
   if (!dockingState) return;
 
   // Transfer up to 500 kg at a time.
-  const result = transferFuel(dockingState, s.ps, s.assembly, s.flightState, 500);
+  const result = transferFuel(dockingState, ps, s.assembly, flightState, 500);
   if (result.success && result.transferred > 0) {
     showPhaseNotification(`Transferred ${Math.round(result.transferred)} kg fuel`);
   } else if (result.transferred === 0) {
@@ -158,12 +166,13 @@ export function handleFuelTransfer(): void {
  */
 export function updateDockingHud(): void {
   const s = getFCState();
-  if (!s.flightState || !s.flightState.dockingState) {
+  const flightState = getFlightState();
+  if (!flightState || !flightState.dockingState) {
     destroyDockingHud();
     return;
   }
 
-  const guidance = getDockingGuidance(s.flightState.dockingState);
+  const guidance = getDockingGuidance(flightState.dockingState);
 
   if (!guidance.active) {
     destroyDockingHud();

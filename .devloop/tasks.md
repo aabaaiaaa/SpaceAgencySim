@@ -97,7 +97,7 @@
 - **Verification**: `npm run typecheck -- --noEmit src/ui/flightHud.ts src/ui/flightController/_keyboard.ts src/ui/flightController/_docking.ts && npx playwright test e2e/flight.spec.js e2e/collision.spec.js`
 
 ### TASK-014b: Remove dual state — clean up FCState and delete apply functions
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-013a, TASK-013b, TASK-014a
 - **Description**: Now that all consumers read from the readonly snapshot: (1) Remove `applyPhysicsSnapshot()` and `applyFlightSnapshot()` from `_workerBridge.ts`. (2) Remove mutable `ps: PhysicsState` and `flightState: FlightState` from `FCState` in `_state.ts`. (3) Remove imports of `PhysicsState`/`FlightState` from any UI/render modules that no longer need them. (4) Verify no code path still attempts to read from the old mutable state. See requirements Section 3.5.
 - **Verification**: `npm run typecheck && npx vitest run src/tests/workerBridge.test.ts && npx playwright test e2e/flight.spec.js e2e/phase-transitions.spec.js e2e/orbital-operations.spec.js`

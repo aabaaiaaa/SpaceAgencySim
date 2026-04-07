@@ -31,7 +31,7 @@ import {
 import { warpToTarget } from '../../core/orbit.ts';
 import { FlightPhase } from '../../core/constants.ts';
 import { isPlayerLocked, getPhaseLabel } from '../../core/flightPhase.ts';
-import { getFCState } from './_state.ts';
+import { getFCState, getPhysicsState, getFlightState } from './_state.ts';
 import { showPhaseNotification } from './_flightPhase.ts';
 
 // Re-export setMapTarget for use by _docking.js.
@@ -51,11 +51,13 @@ const ZOOM_LABELS: Record<string, string> = {
  */
 export function toggleMapView(): void {
   const s = getFCState();
-  if (!s.ps || !s.flightState) return;
+  const ps = getPhysicsState();
+  const flightState = getFlightState();
+  if (!ps || !flightState) return;
 
   // During TRANSFER/CAPTURE, the player cannot leave the map view.
-  if (s.mapActive && isPlayerLocked(s.flightState.phase)) {
-    showPhaseNotification('Cannot leave map during ' + getPhaseLabel(s.flightState.phase));
+  if (s.mapActive && isPlayerLocked(flightState.phase)) {
+    showPhaseNotification('Cannot leave map during ' + getPhaseLabel(flightState.phase));
     return;
   }
 
@@ -83,7 +85,7 @@ export function toggleMapView(): void {
 
     // Cut any map thrust that was in progress.
     if (s.mapThrusting) {
-      s.ps.throttle = 0;
+      ps.throttle = 0;
       s.mapThrusting = false;
     }
     s.mapHeldKeys.clear();
@@ -98,14 +100,16 @@ export function toggleMapView(): void {
  */
 export function applyMapThrust(): void {
   const s = getFCState();
-  if (!s.mapActive || !s.ps || !s.flightState) return;
+  const ps = getPhysicsState();
+  const flightState = getFlightState();
+  if (!s.mapActive || !ps || !flightState) return;
 
   // Apply orbital thrust in ORBIT, MANOEUVRE, TRANSFER, or CAPTURE phases.
-  const phase: string = s.flightState.phase;
+  const phase: string = flightState.phase;
   if (phase !== FlightPhase.ORBIT && phase !== FlightPhase.MANOEUVRE &&
       phase !== FlightPhase.TRANSFER && phase !== FlightPhase.CAPTURE) {
     if (s.mapThrusting) {
-      s.ps.throttle = 0;
+      ps.throttle = 0;
       s.mapThrusting = false;
     }
     return;
@@ -118,15 +122,15 @@ export function applyMapThrust(): void {
   else if (s.mapHeldKeys.has('a')) direction = MapThrustDir.RADIAL_IN;
   else if (s.mapHeldKeys.has('d')) direction = MapThrustDir.RADIAL_OUT;
 
-  const bodyId: string = s.flightState.bodyId || 'EARTH';
+  const bodyId: string = flightState.bodyId || 'EARTH';
 
   if (direction) {
-    s.ps.angle = computeOrbitalThrustAngle(s.ps, bodyId, direction);
-    if (s.ps.throttle === 0) s.ps.throttle = 1;
+    ps.angle = computeOrbitalThrustAngle(ps, bodyId, direction);
+    if (ps.throttle === 0) ps.throttle = 1;
     s.mapThrusting = true;
   } else if (s.mapThrusting) {
     // No keys held -- cut thrust.
-    s.ps.throttle = 0;
+    ps.throttle = 0;
     s.mapThrusting = false;
   }
 }
@@ -136,7 +140,8 @@ export function applyMapThrust(): void {
  */
 export function handleWarpToTarget(): void {
   const s = getFCState();
-  if (!s.flightState || !s.flightState.orbitalElements || !s.state) return;
+  const flightState = getFlightState();
+  if (!flightState || !flightState.orbitalElements || !s.state) return;
 
   const targetId: string | null = getMapTarget();
   if (!targetId) {
@@ -150,12 +155,12 @@ export function handleWarpToTarget(): void {
     return;
   }
 
-  const warpBodyId: string = (s.flightState && s.flightState.bodyId) || 'EARTH';
+  const warpBodyId: string = (flightState && flightState.bodyId) || 'EARTH';
   const result = warpToTarget(
-    s.flightState.orbitalElements,
+    flightState.orbitalElements,
     targetObj.elements,
     warpBodyId,
-    s.flightState.timeElapsed,
+    flightState.timeElapsed,
   );
 
   if (!result.possible) {
@@ -164,10 +169,10 @@ export function handleWarpToTarget(): void {
   }
 
   // Advance the flight time.
-  s.flightState.timeElapsed = result.time!;
+  flightState.timeElapsed = result.time!;
 
   // Log the warp event.
-  s.flightState.events.push({
+  flightState.events.push({
     time: result.time!,
     type: 'TIME_WARP',
     description: `Warped ${(result.elapsed! / 60).toFixed(1)} min to target "${targetObj.name}"`,
@@ -239,7 +244,9 @@ export function buildMapHud(): void {
  */
 export function updateMapHud(): void {
   const s = getFCState();
-  if (!s.mapHud || !s.flightState) return;
+  const ps = getPhysicsState();
+  const flightState = getFlightState();
+  if (!s.mapHud || !flightState) return;
 
   const zoomEl       = s.mapHud.querySelector('[data-field="zoom"]');
   const bodyEl       = s.mapHud.querySelector('[data-field="body"]');
@@ -250,10 +257,10 @@ export function updateMapHud(): void {
   const progressEl   = s.mapHud.querySelector('[data-field="transfer-progress"]') as HTMLElement | null;
 
   if (zoomEl)   zoomEl.textContent = ZOOM_LABELS[getMapZoomLevel()] || getMapZoomLevel();
-  if (phaseEl)  phaseEl.textContent = `${getPhaseLabel(s.flightState.phase)}${s.timeWarp > 1 ? ` (${s.timeWarp}\u00d7)` : ''}`;
+  if (phaseEl)  phaseEl.textContent = `${getPhaseLabel(flightState.phase)}${s.timeWarp > 1 ? ` (${s.timeWarp}\u00d7)` : ''}`;
 
   // Show current celestial body.
-  const bodyId: string = s.flightState.bodyId || 'EARTH';
+  const bodyId: string = flightState.bodyId || 'EARTH';
   const bodyNames: Record<string, string> = {
     SUN: 'Sun', MERCURY: 'Mercury', VENUS: 'Venus', EARTH: 'Earth',
     MOON: 'Moon', MARS: 'Mars', PHOBOS: 'Phobos', DEIMOS: 'Deimos',
@@ -267,15 +274,15 @@ export function updateMapHud(): void {
   if (targetEl)  targetEl.textContent = targetObj ? targetObj.name : 'None';
   if (warpBtn) {
     warpBtn.classList.toggle('hidden',
-      !targetObj || !s.flightState.orbitalElements || s.flightState.phase !== FlightPhase.ORBIT);
+      !targetObj || !flightState.orbitalElements || flightState.phase !== FlightPhase.ORBIT);
   }
 
   // Transfer target route info.
   if (transferEl) {
     const transferTarget: string | null = getSelectedTransferTarget();
-    if (transferTarget && s.ps) {
-      const alt: number = Math.max(0, s.ps.posY);
-      const targets = getMapTransferTargets(bodyId, alt, s.flightState.phase);
+    if (transferTarget && ps) {
+      const alt: number = Math.max(0, ps.posY);
+      const targets = getMapTransferTargets(bodyId, alt, flightState.phase);
       const t = targets.find(tt => tt.bodyId === transferTarget);
       if (t) {
         transferEl.textContent = `Route: ${t.name} \u2014 Depart \u0394v ${t.departureDVStr} \u2014 ${t.transferTimeStr}`;
@@ -290,7 +297,7 @@ export function updateMapHud(): void {
 
   // Transfer progress during active TRANSFER/CAPTURE phase.
   if (progressEl) {
-    const info = getTransferProgressInfo(s.flightState.transferState, s.flightState.timeElapsed);
+    const info = getTransferProgressInfo(flightState.transferState, flightState.timeElapsed);
     if (info) {
       const pct: number = Math.round(info.progress * 100);
       progressEl.textContent = `Transfer: ${info.originName} \u2192 ${info.destName} \u2014 ${pct}% \u2014 ETA: ${info.etaStr}`;

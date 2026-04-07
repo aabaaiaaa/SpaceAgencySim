@@ -13,7 +13,7 @@ import {
   toggleRcsMode,
   CONTROL_MODE_TIPS,
 } from '../../core/controlMode.ts';
-import { getFCState } from './_state.ts';
+import { getFCState, getPhysicsState, getFlightState } from './_state.ts';
 import { showPhaseNotification } from './_flightPhase.ts';
 import { applyTimeWarp } from './_timeWarp.ts';
 
@@ -24,18 +24,20 @@ import { applyTimeWarp } from './_timeWarp.ts';
  */
 export function applyNormalOrbitRcs(): void {
   const s = getFCState();
-  if (s.mapActive || !s.ps || !s.flightState) return;
-  if (s.ps.controlMode !== ControlMode.NORMAL) {
+  const ps = getPhysicsState();
+  const flightState = getFlightState();
+  if (s.mapActive || !ps || !flightState) return;
+  if (ps.controlMode !== ControlMode.NORMAL) {
     if (s.normalOrbitThrusting) {
-      s.ps.throttle = 0;
+      ps.throttle = 0;
       s.normalOrbitThrusting = false;
     }
     s.normalOrbitHeldKeys.clear();
     return;
   }
-  if (s.flightState.phase !== FlightPhase.ORBIT && s.flightState.phase !== FlightPhase.MANOEUVRE) {
+  if (flightState.phase !== FlightPhase.ORBIT && flightState.phase !== FlightPhase.MANOEUVRE) {
     if (s.normalOrbitThrusting) {
-      s.ps.throttle = 0;
+      ps.throttle = 0;
       s.normalOrbitThrusting = false;
     }
     s.normalOrbitHeldKeys.clear();
@@ -48,14 +50,14 @@ export function applyNormalOrbitRcs(): void {
   else if (s.normalOrbitHeldKeys.has('a')) direction = MapThrustDir.RADIAL_IN;
   else if (s.normalOrbitHeldKeys.has('d')) direction = MapThrustDir.RADIAL_OUT;
 
-  const nBodyId: string = (s.flightState && s.flightState.bodyId) || 'EARTH';
+  const nBodyId: string = (flightState && flightState.bodyId) || 'EARTH';
 
   if (direction) {
-    s.ps.angle = computeOrbitalThrustAngle(s.ps, nBodyId, direction);
-    if (s.ps.throttle === 0) s.ps.throttle = 1;
+    ps.angle = computeOrbitalThrustAngle(ps, nBodyId, direction);
+    if (ps.throttle === 0) ps.throttle = 1;
     s.normalOrbitThrusting = true;
   } else if (s.normalOrbitThrusting) {
-    s.ps.throttle = 0;
+    ps.throttle = 0;
     s.normalOrbitThrusting = false;
   }
 }
@@ -66,12 +68,14 @@ export function applyNormalOrbitRcs(): void {
  */
 export function toggleDockingMode(): void {
   const s = getFCState();
-  if (!s.ps || !s.flightState) return;
+  const ps = getPhysicsState();
+  const flightState = getFlightState();
+  if (!ps || !flightState) return;
 
-  if (s.ps.controlMode === ControlMode.DOCKING || s.ps.controlMode === ControlMode.RCS) {
+  if (ps.controlMode === ControlMode.DOCKING || ps.controlMode === ControlMode.RCS) {
     // Exit docking mode -> NORMAL.
-    const dockBodyId: string = (s.flightState && s.flightState.bodyId) || 'EARTH';
-    const result = exitDockingMode(s.ps, s.flightState, dockBodyId);
+    const dockBodyId: string = (flightState && flightState.bodyId) || 'EARTH';
+    const result = exitDockingMode(ps, flightState, dockBodyId);
     if (result.success) {
       showPhaseNotification(CONTROL_MODE_TIPS[ControlMode.NORMAL]);
       s.normalOrbitHeldKeys.clear();
@@ -79,8 +83,8 @@ export function toggleDockingMode(): void {
     }
   } else {
     // Enter docking mode.
-    const dockBodyId: string = (s.flightState && s.flightState.bodyId) || 'EARTH';
-    const result = enterDockingMode(s.ps, s.flightState, dockBodyId);
+    const dockBodyId: string = (flightState && flightState.bodyId) || 'EARTH';
+    const result = enterDockingMode(ps, flightState, dockBodyId);
     if (result.success) {
       showPhaseNotification(CONTROL_MODE_TIPS[ControlMode.DOCKING]);
       // Force warp to 1x in docking mode.
@@ -98,17 +102,19 @@ export function toggleDockingMode(): void {
  */
 export function toggleRcsModeHandler(): void {
   const s = getFCState();
-  if (!s.ps || !s.assembly || !s.flightState) return;
+  const ps = getPhysicsState();
+  const flightState = getFlightState();
+  if (!ps || !s.assembly || !flightState) return;
 
-  if (s.ps.controlMode === ControlMode.DOCKING || s.ps.controlMode === ControlMode.RCS) {
+  if (ps.controlMode === ControlMode.DOCKING || ps.controlMode === ControlMode.RCS) {
     // Toggle RCS within docking mode.
-    const result = toggleRcsMode(s.ps, s.assembly);
+    const result = toggleRcsMode(ps, s.assembly);
     if (result.success) {
-      showPhaseNotification(CONTROL_MODE_TIPS[s.ps.controlMode]);
+      showPhaseNotification(CONTROL_MODE_TIPS[ps.controlMode]);
     } else {
       showPhaseNotification(result.reason || 'Cannot toggle RCS');
     }
-  } else if (s.flightState.phase === FlightPhase.ORBIT) {
+  } else if (flightState.phase === FlightPhase.ORBIT) {
     // In NORMAL orbit mode, R shows the RCS orbit tip.
     showPhaseNotification('RCS Orbit: W prograde, S retrograde, A radial-in, D radial-out');
   }
