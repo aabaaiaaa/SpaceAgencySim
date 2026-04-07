@@ -47,7 +47,7 @@
 - **Verification**: `npx vitest run --coverage 2>&1 | grep -A5 "src/render"`
 
 ### TASK-008: Write unit tests for UI layer modules
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-006
 - **Description**: Write targeted unit tests for testable modules in `src/ui/` to reach 50% line coverage and 40% branch coverage. Focus on extractable logic: event handler calculations, state management, utility functions, validation logic. Do NOT attempt to mock complex DOM trees. Candidates include: `escapeHtml.ts`, flight controller logic helpers, mission control calculation functions, and any UI utility modules. Create test files in `src/tests/` following existing naming conventions. See requirements Section 2.1.
 - **Verification**: `npx vitest run --coverage 2>&1 | grep -A5 "src/ui"`

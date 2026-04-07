@@ -1,0 +1,325 @@
+// @ts-nocheck
+/**
+ * ui-vabUndoActions.test.ts — Unit tests for VAB undo action snapshot logic.
+ *
+ * Tests the staging clone/restore helpers and the recordStagingChange(),
+ * recordPlacement(), recordDeletion(), recordMove(), recordClearAll() actions.
+ */
+
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+// ---------------------------------------------------------------------------
+// Mocks
+// ---------------------------------------------------------------------------
+
+vi.mock('../data/parts.ts', () => ({
+  getPartById: vi.fn((id) => {
+    const catalog = {
+      'engine-1': { name: 'Merlin', mass: 500, cost: 1000, type: 'ENGINE', properties: { thrust: 100 } },
+      'tank-1': { name: 'Fuel Tank', mass: 200, cost: 500, type: 'FUEL_TANK', properties: { fuelMass: 800 } },
+      'cmd-1': { name: 'Command Pod', mass: 100, cost: 2000, type: 'COMMAND_MODULE' },
+    };
+    return catalog[id] || null;
+  }),
+}));
+
+import { setVabState, resetVabState } from '../ui/vab/_state.ts';
+import {
+  snapshotStaging,
+  recordPlacement,
+  recordDeletion,
+  recordMove,
+  recordStagingChange,
+  recordClearAll,
+  clearUndoRedo,
+} from '../ui/vab/_undoActions.ts';
+import { undo, redo, canUndo } from '../core/undoRedo.ts';
+
+/** Create a minimal RocketAssembly for testing. */
+function createTestAssembly(partsMap) {
+  return {
+    parts: partsMap instanceof Map ? partsMap : new Map(Object.entries(partsMap)),
+    connections: [],
+    symmetryPairs: [],
+    _nextId: 10,
+  };
+}
+
+/** Create a minimal StagingConfig for testing. */
+function createTestStaging(stages = [[]], unstaged = [], currentIdx = 0) {
+  return {
+    stages: stages.map(ids => ({ instanceIds: [...ids] })),
+    unstaged: [...unstaged],
+    currentStageIdx: currentIdx,
+  };
+}
+
+describe('VAB Undo Actions', () => {
+  beforeEach(() => {
+    resetVabState();
+    clearUndoRedo();
+  });
+
+  describe('snapshotStaging()', () => {
+    it('captures a deep clone of the current staging config', () => {
+      const staging = createTestStaging([['p1', 'p2']], ['p3']);
+      setVabState({
+        assembly: createTestAssembly({}),
+        stagingConfig: staging,
+      });
+
+      const snapshot = snapshotStaging();
+
+      // Should be a deep clone, not the same reference
+      expect(snapshot).not.toBe(staging);
+      expect(snapshot.stages[0]).not.toBe(staging.stages[0]);
+      expect(snapshot.stages[0].instanceIds).not.toBe(staging.stages[0].instanceIds);
+      expect(snapshot.unstaged).not.toBe(staging.unstaged);
+
+      // Values should match
+      expect(snapshot.stages[0].instanceIds).toEqual(['p1', 'p2']);
+      expect(snapshot.unstaged).toEqual(['p3']);
+      expect(snapshot.currentStageIdx).toBe(0);
+    });
+
+    it('snapshot is not affected by subsequent mutations', () => {
+      const staging = createTestStaging([['p1']], []);
+      setVabState({
+        assembly: createTestAssembly({}),
+        stagingConfig: staging,
+      });
+
+      const snapshot = snapshotStaging();
+      staging.stages[0].instanceIds.push('p2');
+      staging.unstaged.push('p3');
+
+      expect(snapshot.stages[0].instanceIds).toEqual(['p1']);
+      expect(snapshot.unstaged).toEqual([]);
+    });
+  });
+
+  describe('recordStagingChange()', () => {
+    it('pushes an undo action for staging changes', () => {
+      const staging = createTestStaging([['p1']], ['p2']);
+      setVabState({
+        assembly: createTestAssembly({}),
+        stagingConfig: staging,
+      });
+
+      const before = snapshotStaging();
+
+      // Simulate a staging change
+      staging.stages[0].instanceIds.push('p2');
+      staging.unstaged = [];
+
+      recordStagingChange(before);
+
+      expect(canUndo()).toBe(true);
+    });
+
+    it('undo restores previous staging state', () => {
+      const staging = createTestStaging([['p1']], ['p2']);
+      setVabState({
+        assembly: createTestAssembly({}),
+        stagingConfig: staging,
+      });
+
+      const before = snapshotStaging();
+
+      // Mutate staging
+      staging.stages[0].instanceIds.push('p2');
+      staging.unstaged = [];
+
+      recordStagingChange(before);
+      undo();
+
+      expect(staging.stages[0].instanceIds).toEqual(['p1']);
+      expect(staging.unstaged).toEqual(['p2']);
+    });
+
+    it('redo reapplies the staging change', () => {
+      const staging = createTestStaging([['p1']], ['p2']);
+      setVabState({
+        assembly: createTestAssembly({}),
+        stagingConfig: staging,
+      });
+
+      const before = snapshotStaging();
+
+      staging.stages[0].instanceIds.push('p2');
+      staging.unstaged = [];
+
+      recordStagingChange(before);
+      undo();
+      redo();
+
+      expect(staging.stages[0].instanceIds).toEqual(['p1', 'p2']);
+      expect(staging.unstaged).toEqual([]);
+    });
+  });
+
+  describe('recordPlacement()', () => {
+    it('records a placement that can be undone', () => {
+      const parts = new Map([
+        ['p1', { instanceId: 'p1', partId: 'engine-1', x: 0, y: 0 }],
+      ]);
+      const assembly = createTestAssembly(parts);
+      assembly._nextId = 2;
+      const staging = createTestStaging([['p1']], []);
+      const gameState = { money: 5000 };
+
+      setVabState({ assembly, stagingConfig: staging, gameState });
+
+      const stagingBefore = createTestStaging([[]], []);
+      recordPlacement(['p1'], 1000, stagingBefore);
+
+      expect(canUndo()).toBe(true);
+
+      // Undo should remove the part and refund cost
+      undo();
+      expect(assembly.parts.has('p1')).toBe(false);
+      expect(gameState.money).toBe(6000); // 5000 + 1000 refund
+    });
+
+    it('redo re-adds the placed part', () => {
+      const parts = new Map([
+        ['p1', { instanceId: 'p1', partId: 'engine-1', x: 0, y: 0 }],
+      ]);
+      const assembly = createTestAssembly(parts);
+      assembly._nextId = 2;
+      const staging = createTestStaging([['p1']], []);
+      const gameState = { money: 5000 };
+
+      setVabState({ assembly, stagingConfig: staging, gameState });
+
+      const stagingBefore = createTestStaging([[]], []);
+      recordPlacement(['p1'], 1000, stagingBefore);
+
+      undo();
+      expect(assembly.parts.has('p1')).toBe(false);
+
+      redo();
+      expect(assembly.parts.has('p1')).toBe(true);
+      expect(gameState.money).toBe(4000); // 6000 - 1000 re-deduction (net: 5000 - 1000)
+    });
+  });
+
+  describe('recordDeletion()', () => {
+    it('records a deletion that can be undone', () => {
+      const parts = new Map([
+        ['p1', { instanceId: 'p1', partId: 'engine-1', x: 0, y: 0 }],
+      ]);
+      const assembly = createTestAssembly(parts);
+      const staging = createTestStaging([['p1']], []);
+      const gameState = { money: 5000 };
+
+      setVabState({ assembly, stagingConfig: staging, gameState });
+
+      const stagingBefore = snapshotStaging();
+      recordDeletion(['p1'], 1000, stagingBefore);
+
+      // Now actually remove the part (recordDeletion is called BEFORE removal)
+      assembly.parts.delete('p1');
+
+      expect(canUndo()).toBe(true);
+
+      // Undo should re-add the part and reverse the refund
+      undo();
+      expect(assembly.parts.has('p1')).toBe(true);
+      expect(gameState.money).toBe(4000); // 5000 - 1000 (reverse refund)
+    });
+  });
+
+  describe('recordMove()', () => {
+    it('records a move that can be undone', () => {
+      const parts = new Map([
+        ['p1', { instanceId: 'p1', partId: 'engine-1', x: 100, y: 200 }],
+      ]);
+      const assembly = createTestAssembly(parts);
+
+      setVabState({ assembly, stagingConfig: createTestStaging() });
+
+      const oldConns = [];
+      const newConns = [];
+      recordMove('p1', 0, 0, 100, 200, oldConns, newConns);
+
+      expect(canUndo()).toBe(true);
+
+      undo();
+      const p = assembly.parts.get('p1');
+      expect(p.x).toBe(0);
+      expect(p.y).toBe(0);
+    });
+
+    it('redo restores the new position', () => {
+      const parts = new Map([
+        ['p1', { instanceId: 'p1', partId: 'engine-1', x: 100, y: 200 }],
+      ]);
+      const assembly = createTestAssembly(parts);
+
+      setVabState({ assembly, stagingConfig: createTestStaging() });
+
+      recordMove('p1', 0, 0, 100, 200, [], []);
+
+      undo();
+      redo();
+
+      const p = assembly.parts.get('p1');
+      expect(p.x).toBe(100);
+      expect(p.y).toBe(200);
+    });
+  });
+
+  describe('recordClearAll()', () => {
+    it('records a clear-all that can be undone', () => {
+      const parts = new Map([
+        ['p1', { instanceId: 'p1', partId: 'engine-1', x: 0, y: 0 }],
+        ['p2', { instanceId: 'p2', partId: 'tank-1', x: 0, y: 50 }],
+      ]);
+      const assembly = createTestAssembly(parts);
+      assembly.connections = [{ fromInstanceId: 'p1', toInstanceId: 'p2', fromNode: 'top', toNode: 'bottom' }];
+      const staging = createTestStaging([['p1', 'p2']], []);
+      const gameState = { money: 3000 };
+
+      setVabState({ assembly, stagingConfig: staging, gameState });
+
+      const stagingBefore = snapshotStaging();
+      recordClearAll(1500, stagingBefore);
+
+      // Simulate clear
+      assembly.parts.clear();
+      assembly.connections.length = 0;
+
+      expect(canUndo()).toBe(true);
+
+      // Undo restores all parts
+      undo();
+      expect(assembly.parts.size).toBe(2);
+      expect(assembly.parts.has('p1')).toBe(true);
+      expect(assembly.parts.has('p2')).toBe(true);
+      expect(assembly.connections.length).toBe(1);
+      expect(gameState.money).toBe(1500); // 3000 - 1500 (reverse refund)
+    });
+
+    it('redo clears everything again', () => {
+      const parts = new Map([
+        ['p1', { instanceId: 'p1', partId: 'engine-1', x: 0, y: 0 }],
+      ]);
+      const assembly = createTestAssembly(parts);
+      const staging = createTestStaging([['p1']], []);
+      const gameState = { money: 3000 };
+
+      setVabState({ assembly, stagingConfig: staging, gameState });
+
+      recordClearAll(1000, snapshotStaging());
+      assembly.parts.clear();
+
+      undo();
+      expect(assembly.parts.size).toBe(1);
+
+      redo();
+      expect(assembly.parts.size).toBe(0);
+      expect(gameState.money).toBe(3000); // back to original after undo+redo
+    });
+  });
+});
