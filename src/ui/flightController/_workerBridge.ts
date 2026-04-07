@@ -39,6 +39,8 @@ let _latestPhysics: PhysicsSnapshot | null = null;
 let _latestFlight: FlightSnapshot | null = null;
 let _latestFrame = -1;
 let _readyResolve: (() => void) | null = null;
+let _readyReject: ((err: Error) => void) | null = null;
+let _readyTimeout: ReturnType<typeof setTimeout> | null = null;
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -92,6 +94,19 @@ export function initPhysicsWorker(
     }
 
     _readyResolve = resolve;
+    _readyReject = reject;
+
+    // Reject if the worker doesn't respond within 10 seconds.
+    _readyTimeout = setTimeout(() => {
+      _readyTimeout = null;
+      if (_readyResolve) {
+        _readyResolve = null;
+        _readyReject = null;
+        const msg = 'Physics worker did not respond within 10s';
+        logger.warn('workerBridge', msg);
+        reject(new Error(msg));
+      }
+    }, 10_000);
 
     _worker.onmessage = (event: MessageEvent<WorkerMessage>) => {
       _handleMessage(event.data);
@@ -103,6 +118,8 @@ export function initPhysicsWorker(
       logger.error('workerBridge', 'Worker onerror', { message: _errorMessage });
       if (_readyResolve) {
         _readyResolve = null;
+        _readyReject = null;
+        _clearReadyTimeout();
         reject(new Error(_errorMessage));
       }
     };
@@ -217,6 +234,8 @@ export function terminatePhysicsWorker(): void {
   _latestFlight = null;
   _latestFrame = -1;
   _readyResolve = null;
+  _readyReject = null;
+  _clearReadyTimeout();
 }
 
 // ---------------------------------------------------------------------------
@@ -339,6 +358,13 @@ export function applyFlightSnapshot(fs: FlightState, snap: FlightSnapshot): void
 // Internal helpers
 // ---------------------------------------------------------------------------
 
+function _clearReadyTimeout(): void {
+  if (_readyTimeout !== null) {
+    clearTimeout(_readyTimeout);
+    _readyTimeout = null;
+  }
+}
+
 function _post(cmd: WorkerCommand): void {
   if (_worker && !_error) {
     _worker.postMessage(cmd);
@@ -349,9 +375,11 @@ function _handleMessage(msg: WorkerMessage): void {
   switch (msg.type) {
     case 'ready':
       _ready = true;
+      _clearReadyTimeout();
       if (_readyResolve) {
         const r = _readyResolve;
         _readyResolve = null;
+        _readyReject = null;
         r();
       }
       break;

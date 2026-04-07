@@ -3,7 +3,7 @@
 ## Quick Wins (Review Fixes)
 
 ### TASK-001: Add timeout to Web Worker ready Promise
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/ui/flightController/_workerBridge.ts`, the `initPhysicsWorker()` ready Promise (lines 71-122) can hang indefinitely if the worker never sends `'ready'`. Add a 10-second `setTimeout` that rejects the Promise with `"Physics worker did not respond within 10s"`. Clear the timeout on successful `'ready'` or `onerror`. The flight controller's existing fallback logic catches the rejection and falls back to main-thread physics. Log a warning via `logger.warn()` on timeout. See requirements Section 1.1.
 - **Verification**: `npx vitest run src/tests/workerBridge.test.ts`

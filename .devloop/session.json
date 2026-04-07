@@ -1,8 +1,14 @@
 {
-  "phase": "init",
+  "phase": "run",
   "sessionId": null,
   "lastIteration": 0,
-  "startedAt": "2026-04-07T15:14:50.757Z",
+  "startedAt": "2026-04-07T15:37:33.988Z",
   "iteration": 2,
-  "devloopVersion": "3.4.0"
+  "devloopVersion": "3.4.0",
+  "activeTask": {
+    "taskId": "TASK-001",
+    "taskTitle": "Add timeout to Web Worker ready Promise",
+    "iterationNumber": 1,
+    "startedAt": "2026-04-07T15:37:34.018Z"
+  }
 }
