@@ -29,6 +29,7 @@ import {
   importSave,
   exportSave,
   _validateState,
+  _validateNestedStructures,
   _setSessionStartTimeForTesting,
 } from '../core/saveload.js';
 import { CrewStatus } from '../core/constants.js';
@@ -442,7 +443,7 @@ describe('loadGame()', () => {
   it('restores nested objects correctly', async () => {
     const state = freshState();
     state.loan.balance = 500_000;
-    state.crew = [{ id: 'c1', status: CrewStatus.IDLE, name: 'Alice' }];
+    state.crew = [{ id: 'c1', status: CrewStatus.IDLE, name: 'Alice', skills: { piloting: 50, engineering: 50, science: 50 } }];
     await saveGame(state, 0);
 
     const restored = await loadGame(0);
@@ -1041,6 +1042,273 @@ describe('Save migration edge cases', () => {
     expect(warnSpy.mock.calls[0][0]).toContain(`"saveVersion":${SAVE_VERSION + 10}`);
     expect(warnSpy.mock.calls[0][0]).toMatch(/newer version/i);
 
+    warnSpy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// _validateNestedStructures — deeper save validation (TASK-007)
+// ---------------------------------------------------------------------------
+
+describe('_validateNestedStructures()', () => {
+  // Helper: a valid mission entry.
+  function validMission(id = 'mission-1') {
+    return { id, title: 'Test Mission', reward: 5000, description: 'desc', deadline: '2025-12-31' };
+  }
+
+  // Helper: a valid crew entry.
+  function validCrew(name = 'Alice') {
+    return { id: 'crew-1', name, status: CrewStatus.IDLE, skills: { piloting: 50, engineering: 50, science: 50 }, salary: 5000, hiredDate: '2025-01-01' };
+  }
+
+  // Helper: a valid orbital object entry.
+  function validOrbitalObject(id = 'obj-1') {
+    return { id, bodyId: 'EARTH', type: 'SATELLITE', name: 'Sat-1', elements: { a: 7000, e: 0.01, i: 0 } };
+  }
+
+  // Helper: a valid saved design entry.
+  function validDesign(name = 'Rocket-1') {
+    return { id: 'design-1', name, parts: [{ partId: 'pod', position: { x: 0, y: 0 } }], staging: { stages: [], unstaged: [] }, totalMass: 100, totalThrust: 50 };
+  }
+
+  // Helper: a valid contract entry.
+  function validContract(id = 'contract-1') {
+    return { id, title: 'Test Contract', reward: 10000, category: 'LAUNCH', objectives: [] };
+  }
+
+  // --- Missions ---
+
+  it('filters out corrupted missions.accepted entries (missing id)', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const state = freshState();
+    state.missions.accepted = [
+      validMission('m1'),
+      { title: 'No ID', reward: 100 }, // missing id
+      validMission('m3'),
+    ];
+
+    _validateNestedStructures(state);
+
+    expect(state.missions.accepted).toHaveLength(2);
+    expect(state.missions.accepted[0].id).toBe('m1');
+    expect(state.missions.accepted[1].id).toBe('m3');
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it('filters out corrupted missions.completed entries (missing reward)', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const state = freshState();
+    state.missions.completed = [
+      validMission('m1'),
+      { id: 'm2', title: 'No Reward' }, // missing reward
+    ];
+
+    _validateNestedStructures(state);
+
+    expect(state.missions.completed).toHaveLength(1);
+    expect(state.missions.completed[0].id).toBe('m1');
+    warnSpy.mockRestore();
+  });
+
+  it('filters out null and non-object mission entries', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const state = freshState();
+    state.missions.accepted = [null, 42, 'garbage', validMission('m1')];
+
+    _validateNestedStructures(state);
+
+    expect(state.missions.accepted).toHaveLength(1);
+    expect(state.missions.accepted[0].id).toBe('m1');
+    warnSpy.mockRestore();
+  });
+
+  // --- Crew ---
+
+  it('filters out corrupted crew entries (missing name)', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const state = freshState();
+    state.crew = [
+      validCrew('Alice'),
+      { id: 'c2', status: CrewStatus.IDLE, skills: { piloting: 10, engineering: 10, science: 10 } }, // missing name
+      validCrew('Bob'),
+    ];
+
+    _validateNestedStructures(state);
+
+    expect(state.crew).toHaveLength(2);
+    expect(state.crew[0].name).toBe('Alice');
+    expect(state.crew[1].name).toBe('Bob');
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it('filters out crew entries with null status', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const state = freshState();
+    state.crew = [
+      validCrew('Alice'),
+      { id: 'c2', name: 'Bad Status', status: null, skills: { piloting: 0, engineering: 0, science: 0 } },
+    ];
+
+    _validateNestedStructures(state);
+
+    expect(state.crew).toHaveLength(1);
+    expect(state.crew[0].name).toBe('Alice');
+    warnSpy.mockRestore();
+  });
+
+  it('filters out crew entries with missing skills object', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const state = freshState();
+    state.crew = [
+      { id: 'c1', name: 'NoSkills', status: CrewStatus.IDLE, skills: null },
+      validCrew('Bob'),
+    ];
+
+    _validateNestedStructures(state);
+
+    expect(state.crew).toHaveLength(1);
+    expect(state.crew[0].name).toBe('Bob');
+    warnSpy.mockRestore();
+  });
+
+  // --- Orbital objects ---
+
+  it('filters out corrupted orbital object entries', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const state = freshState();
+    state.orbitalObjects = [
+      validOrbitalObject('o1'),
+      { id: 'o2', bodyId: 'EARTH' }, // missing elements
+      validOrbitalObject('o3'),
+    ];
+
+    _validateNestedStructures(state);
+
+    expect(state.orbitalObjects).toHaveLength(2);
+    expect(state.orbitalObjects[0].id).toBe('o1');
+    expect(state.orbitalObjects[1].id).toBe('o3');
+    warnSpy.mockRestore();
+  });
+
+  // --- Saved designs ---
+
+  it('filters out corrupted saved design entries (missing parts array)', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const state = freshState();
+    state.savedDesigns = [
+      validDesign('Rocket-1'),
+      { id: 'd2', name: 'No Parts' }, // missing parts
+    ];
+
+    _validateNestedStructures(state);
+
+    expect(state.savedDesigns).toHaveLength(1);
+    expect(state.savedDesigns[0].name).toBe('Rocket-1');
+    warnSpy.mockRestore();
+  });
+
+  // --- Contracts ---
+
+  it('filters out corrupted contracts.active entries', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const state = freshState();
+    state.contracts = { board: [], active: [
+      validContract('c1'),
+      { id: 'c2' }, // missing reward
+      validContract('c3'),
+    ], completed: [], failed: [] };
+
+    _validateNestedStructures(state);
+
+    expect(state.contracts.active).toHaveLength(2);
+    expect(state.contracts.active[0].id).toBe('c1');
+    expect(state.contracts.active[1].id).toBe('c3');
+    warnSpy.mockRestore();
+  });
+
+  // --- Valid data preserved ---
+
+  it('preserves all valid entries when nothing is corrupted', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const state = freshState();
+    state.missions.accepted = [validMission('m1'), validMission('m2')];
+    state.missions.completed = [validMission('m3')];
+    state.crew = [validCrew('Alice'), validCrew('Bob')];
+    state.orbitalObjects = [validOrbitalObject('o1')];
+    state.savedDesigns = [validDesign('R1')];
+    state.contracts = { board: [], active: [validContract('c1')], completed: [], failed: [] };
+
+    _validateNestedStructures(state);
+
+    expect(state.missions.accepted).toHaveLength(2);
+    expect(state.missions.completed).toHaveLength(1);
+    expect(state.crew).toHaveLength(2);
+    expect(state.orbitalObjects).toHaveLength(1);
+    expect(state.savedDesigns).toHaveLength(1);
+    expect(state.contracts.active).toHaveLength(1);
+    // No warnings logged when all entries are valid.
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  // --- Skips missing optional arrays ---
+
+  it('does not crash when optional arrays are absent', () => {
+    const state = freshState();
+    delete state.orbitalObjects;
+    delete state.savedDesigns;
+    delete state.contracts;
+
+    expect(() => _validateNestedStructures(state)).not.toThrow();
+  });
+
+  // --- Integration: _validateState calls nested validation ---
+
+  it('_validateState also filters corrupted nested entries', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const state = freshState();
+    state.crew = [
+      validCrew('Alice'),
+      { id: 'bad', name: 123, status: CrewStatus.IDLE, skills: {} }, // name is not a string
+    ];
+
+    _validateState(state);
+
+    expect(state.crew).toHaveLength(1);
+    expect(state.crew[0].name).toBe('Alice');
+    warnSpy.mockRestore();
+  });
+
+  // --- Integration: loadGame filters corrupted entries ---
+
+  it('loadGame filters corrupted crew and mission entries from a save', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const state = freshState();
+    state.missions.accepted = [
+      validMission('m1'),
+      { title: 'Corrupt', reward: 'not a number' }, // invalid
+    ];
+    state.crew = [
+      validCrew('Good'),
+      null, // invalid
+    ];
+
+    const envelope = {
+      saveName: 'Nested Validation',
+      timestamp: new Date(0).toISOString(),
+      version: SAVE_VERSION,
+      state: JSON.parse(JSON.stringify(state)),
+    };
+    localStorage.setItem('spaceAgencySave_0', JSON.stringify(envelope));
+
+    const restored = await loadGame(0);
+
+    expect(restored.missions.accepted).toHaveLength(1);
+    expect(restored.missions.accepted[0].id).toBe('m1');
+    expect(restored.crew).toHaveLength(1);
+    expect(restored.crew[0].name).toBe('Good');
     warnSpy.mockRestore();
   });
 });

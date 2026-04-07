@@ -37,7 +37,7 @@
 - **Verification**: E2E test or manual verification: a save from a different version displays the version mismatch indicator. A save from the current version shows no warning. `npm run test:e2e` passes.
 
 ### TASK-007: Implement deeper save validation for nested structures
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-005
 - **Description**: Extend `_validateState()` in `src/core/saveload.ts` to validate critical nested structures: `missions.accepted`, `missions.completed`, `crew`, `orbitalObjects`, `savedDesigns`, `contracts.active`. Filter out corrupted entries rather than failing the load. Log warnings for removed entries. See requirements Section 2.3.
 - **Verification**: New unit tests pass: corrupted mission entry is filtered out, corrupted crew member is filtered out, valid entries are preserved. `npm run test:unit` passes.
