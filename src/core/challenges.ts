@@ -34,6 +34,37 @@ import type { PhysicsState } from './physics.js';
 // Local types
 // ---------------------------------------------------------------------------
 
+/** All possible objective target fields across objective types. */
+interface ObjectiveTarget {
+  altitude?: number;
+  speed?: number;
+  maxLandingSpeed?: number;
+  partType?: string;
+  minAltitude?: number;
+  maxAltitude?: number;
+  duration?: number;
+  minCrashSpeed?: number;
+  orbitAltitude?: number;
+  orbitalVelocity?: number;
+  maxCost?: number;
+  maxParts?: number;
+  forbiddenType?: string;
+  minVelocity?: number;
+  count?: number;
+  minCrew?: number;
+}
+
+/** Objective with runtime-only hold tracking property. */
+interface ObjectiveWithHold extends ObjectiveDef {
+  _holdEnteredAt?: number | null;
+}
+
+/** PhysicsState augmented with optional scoring metrics. */
+interface ScoringPhysicsState extends PhysicsState {
+  totalFuel?: number;
+  maxFuel?: number;
+}
+
 interface ChallengeCompletionResult {
   completed: boolean;
   challengeId?: string;
@@ -204,22 +235,21 @@ export function checkChallengeObjectives(state: GameState, flightState: FlightSt
  * Mirrors the switch in contracts.js _checkSingleObjective().
  */
 function _checkSingleObjective(obj: ObjectiveDef, flightState: FlightState): void {
-  // Use `as any` for dynamic target property access and runtime-only _holdEnteredAt
-  const objAny = obj as any;
-  const t = obj.target as any;
+  const objHold = obj as ObjectiveWithHold;
+  const t = obj.target as ObjectiveTarget;
 
   switch (obj.type) {
     case 'REACH_ALTITUDE':
-      if (flightState.altitude >= t.altitude) obj.completed = true;
+      if (t.altitude != null && flightState.altitude >= t.altitude) obj.completed = true;
       break;
 
     case 'REACH_SPEED':
-      if (flightState.velocity >= t.speed) obj.completed = true;
+      if (t.speed != null && flightState.velocity >= t.speed) obj.completed = true;
       break;
 
     case 'SAFE_LANDING': {
       const landing = flightState.events.find(
-        (e: any) => e.type === 'LANDING' && typeof e.speed === 'number' && e.speed <= t.maxLandingSpeed,
+        (e) => e.type === 'LANDING' && typeof e.speed === 'number' && (e.speed as number) <= (t.maxLandingSpeed ?? Infinity),
       );
       if (landing) obj.completed = true;
       break;
@@ -227,7 +257,7 @@ function _checkSingleObjective(obj: ObjectiveDef, flightState: FlightState): voi
 
     case 'ACTIVATE_PART': {
       const activation = flightState.events.find(
-        (e: any) => e.type === 'PART_ACTIVATED' && e.partType === t.partType,
+        (e) => e.type === 'PART_ACTIVATED' && e.partType === t.partType,
       );
       if (activation) obj.completed = true;
       break;
@@ -235,24 +265,25 @@ function _checkSingleObjective(obj: ObjectiveDef, flightState: FlightState): voi
 
     case 'HOLD_ALTITUDE': {
       const inRange =
+        t.minAltitude != null && t.maxAltitude != null &&
         flightState.altitude >= t.minAltitude &&
         flightState.altitude <= t.maxAltitude;
       if (inRange) {
-        if (objAny._holdEnteredAt == null) {
-          objAny._holdEnteredAt = flightState.timeElapsed;
-        } else if (flightState.timeElapsed - objAny._holdEnteredAt >= t.duration) {
+        if (objHold._holdEnteredAt == null) {
+          objHold._holdEnteredAt = flightState.timeElapsed;
+        } else if (t.duration != null && flightState.timeElapsed - objHold._holdEnteredAt >= t.duration) {
           obj.completed = true;
         }
       } else {
-        objAny._holdEnteredAt = null;
+        objHold._holdEnteredAt = null;
       }
       break;
     }
 
     case 'RETURN_SCIENCE_DATA': {
-      const scienceCollected = flightState.events.some((e: any) => e.type === 'SCIENCE_COLLECTED');
+      const scienceCollected = flightState.events.some((e) => e.type === 'SCIENCE_COLLECTED');
       const safeLanding = flightState.events.some(
-        (e: any) => e.type === 'LANDING' && typeof e.speed === 'number' && e.speed <= 10,
+        (e) => e.type === 'LANDING' && typeof e.speed === 'number' && (e.speed as number) <= 10,
       );
       if (scienceCollected && safeLanding) obj.completed = true;
       break;
@@ -260,8 +291,8 @@ function _checkSingleObjective(obj: ObjectiveDef, flightState: FlightState): voi
 
     case 'CONTROLLED_CRASH': {
       const crash = flightState.events.find(
-        (e: any) => (e.type === 'LANDING' || e.type === 'CRASH') &&
-               typeof e.speed === 'number' && e.speed >= t.minCrashSpeed,
+        (e) => (e.type === 'LANDING' || e.type === 'CRASH') &&
+               typeof e.speed === 'number' && (e.speed as number) >= (t.minCrashSpeed ?? 0),
       );
       if (crash) obj.completed = true;
       break;
@@ -269,7 +300,7 @@ function _checkSingleObjective(obj: ObjectiveDef, flightState: FlightState): voi
 
     case 'EJECT_CREW': {
       const eject = flightState.events.find(
-        (e: any) => e.type === 'CREW_EJECTED' && typeof e.altitude === 'number' && e.altitude >= t.minAltitude,
+        (e) => e.type === 'CREW_EJECTED' && typeof e.altitude === 'number' && (e.altitude as number) >= (t.minAltitude ?? 0),
       );
       if (eject) obj.completed = true;
       break;
@@ -277,55 +308,56 @@ function _checkSingleObjective(obj: ObjectiveDef, flightState: FlightState): voi
 
     case 'RELEASE_SATELLITE': {
       const release = flightState.events.find(
-        (e: any) => e.type === 'SATELLITE_RELEASED' &&
-               typeof e.altitude === 'number' && e.altitude >= t.minAltitude &&
+        (e) => e.type === 'SATELLITE_RELEASED' &&
+               typeof e.altitude === 'number' && (e.altitude as number) >= (t.minAltitude ?? 0) &&
                (t.minVelocity == null ||
-                 (typeof e.velocity === 'number' && e.velocity >= t.minVelocity)),
+                 (typeof e.velocity === 'number' && (e.velocity as number) >= t.minVelocity)),
       );
       if (release) obj.completed = true;
       break;
     }
 
     case 'REACH_ORBIT':
-      if (flightState.altitude >= t.orbitAltitude &&
+      if (t.orbitAltitude != null && t.orbitalVelocity != null &&
+          flightState.altitude >= t.orbitAltitude &&
           flightState.velocity >= t.orbitalVelocity) {
         obj.completed = true;
       }
       break;
 
     case 'BUDGET_LIMIT':
-      if (typeof (flightState as any).rocketCost === 'number' &&
-          (flightState as any).rocketCost <= t.maxCost) {
+      if (typeof flightState.rocketCost === 'number' &&
+          t.maxCost != null && flightState.rocketCost <= t.maxCost) {
         obj.completed = true;
       }
       break;
 
     case 'MAX_PARTS':
-      if (typeof (flightState as any).partCount === 'number' &&
-          (flightState as any).partCount <= t.maxParts) {
+      if (typeof flightState.partCount === 'number' &&
+          t.maxParts != null && flightState.partCount <= t.maxParts) {
         obj.completed = true;
       }
       break;
 
     case 'RESTRICT_PART':
-      if (Array.isArray((flightState as any).partTypes) &&
-          !(flightState as any).partTypes.includes(t.forbiddenType)) {
+      if (Array.isArray(flightState.partTypes) &&
+          t.forbiddenType != null && !flightState.partTypes.includes(t.forbiddenType)) {
         obj.completed = true;
       }
       break;
 
     case 'MULTI_SATELLITE': {
       const releases = flightState.events.filter(
-        (e: any) => e.type === 'SATELLITE_RELEASED' &&
-               typeof e.altitude === 'number' && e.altitude >= t.minAltitude,
+        (e) => e.type === 'SATELLITE_RELEASED' &&
+               typeof e.altitude === 'number' && (e.altitude as number) >= (t.minAltitude ?? 0),
       );
-      if (releases.length >= t.count) obj.completed = true;
+      if (t.count != null && releases.length >= t.count) obj.completed = true;
       break;
     }
 
     case 'MINIMUM_CREW':
       if (typeof flightState.crewCount === 'number' &&
-          flightState.crewCount >= t.minCrew) {
+          t.minCrew != null && flightState.crewCount >= t.minCrew) {
         obj.completed = true;
       }
       break;
@@ -343,21 +375,19 @@ function _checkSingleObjective(obj: ObjectiveDef, flightState: FlightState): voi
  * Extract the scoring metric value from a flight state.
  */
 export function extractScoreMetric(metric: string, flightState: FlightState, ps: PhysicsState | null): number | null {
-  const fs = flightState as any;
-
   switch (metric) {
     case 'rocketCost':
-      return typeof fs.rocketCost === 'number' ? fs.rocketCost : null;
+      return typeof flightState.rocketCost === 'number' ? flightState.rocketCost : null;
 
     case 'landingSpeed': {
       const landingEvent = (flightState.events ?? []).find(
-        (e: any) => e.type === 'LANDING' && typeof e.speed === 'number',
+        (e) => e.type === 'LANDING' && typeof e.speed === 'number',
       );
-      return landingEvent ? (landingEvent as any).speed : null;
+      return landingEvent && typeof landingEvent.speed === 'number' ? landingEvent.speed : null;
     }
 
     case 'partCount':
-      return typeof fs.partCount === 'number' ? fs.partCount : null;
+      return typeof flightState.partCount === 'number' ? flightState.partCount : null;
 
     case 'maxAltitude':
       return typeof flightState.maxAltitude === 'number'
@@ -374,18 +404,19 @@ export function extractScoreMetric(metric: string, flightState: FlightState, ps:
 
     case 'fuelRemaining': {
       // Return as a percentage (0-100).
-      if (ps && typeof (ps as any).totalFuel === 'number' && typeof (ps as any).maxFuel === 'number' && (ps as any).maxFuel > 0) {
-        return Math.round(((ps as any).totalFuel / (ps as any).maxFuel) * 100);
+      const psExt = ps as ScoringPhysicsState | null;
+      if (psExt && typeof psExt.totalFuel === 'number' && typeof psExt.maxFuel === 'number' && psExt.maxFuel > 0) {
+        return Math.round((psExt.totalFuel / psExt.maxFuel) * 100);
       }
-      if (typeof fs.fuelFraction === 'number') {
-        return Math.round(fs.fuelFraction * 100);
+      if (typeof flightState.fuelFraction === 'number') {
+        return Math.round(flightState.fuelFraction * 100);
       }
       return null;
     }
 
     case 'satellitesDeployed': {
       const releases = (flightState.events ?? []).filter(
-        (e: any) => e.type === 'SATELLITE_RELEASED',
+        (e) => e.type === 'SATELLITE_RELEASED',
       );
       return releases.length;
     }
@@ -474,9 +505,10 @@ export function processChallengeCompletion(state: GameState, flightState: Flight
   // Determine reward: only pay the delta between new and old medal tier.
   let reward = 0;
   if (medal !== MedalTier.NONE) {
-    const newReward = (challenge.rewards as any)[medal] ?? 0;
+    const rewardsMap = challenge.rewards as Record<string, number>;
+    const newReward = rewardsMap[medal] ?? 0;
     const oldReward = previousMedal !== MedalTier.NONE
-      ? ((challenge.rewards as any)[previousMedal] ?? 0)
+      ? (rewardsMap[previousMedal] ?? 0)
       : 0;
     reward = Math.max(0, newReward - oldReward);
   }

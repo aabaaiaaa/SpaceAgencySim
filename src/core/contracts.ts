@@ -18,9 +18,35 @@ import {
   CONTRACT_BOARD_EXPIRY_FLIGHTS, CONTRACT_CANCEL_PENALTY_RATE, CONTRACT_REP_GAIN_MIN,
   CONTRACT_REP_GAIN_MAX, CONTRACT_REP_LOSS_CANCEL, CONTRACT_REP_LOSS_FAIL, CONTRACT_BONUS_REWARD_RATE,
 } from './constants.js';
+import type { ContractCategory } from './constants.js';
 import { earnReward } from './finance.js';
 import { CONTRACT_TEMPLATES, generateChainContinuation, getProgressionTier } from '../data/contracts.js';
 import type { GameState, FlightState, Contract, ObjectiveDef } from './gameState.js';
+
+/** All possible objective target fields across objective types. */
+interface ObjectiveTarget {
+  altitude?: number;
+  speed?: number;
+  maxLandingSpeed?: number;
+  partType?: string;
+  minAltitude?: number;
+  maxAltitude?: number;
+  duration?: number;
+  minCrashSpeed?: number;
+  orbitAltitude?: number;
+  orbitalVelocity?: number;
+  maxCost?: number;
+  maxParts?: number;
+  forbiddenType?: string;
+  minVelocity?: number;
+  count?: number;
+  minCrew?: number;
+}
+
+/** Objective with runtime-only hold tracking property. */
+interface ObjectiveWithHold extends ObjectiveDef {
+  _holdEnteredAt?: number | null;
+}
 
 interface ExtendedContract extends Contract {
   bonusObjectives?: (ObjectiveDef & { bonus?: boolean })[];
@@ -34,6 +60,22 @@ interface CancelResult { success: boolean; contract?: ExtendedContract; penaltyF
 interface ContractConflict { contractA: string; contractB: string; tag: string; }
 interface CompletionEntry { contract: ExtendedContract | undefined; reward: number | undefined; nextChainContract?: ExtendedContract | null; }
 interface ProcessCompletionsResult { completedContracts: CompletionEntry[]; }
+
+/** Shape returned by contract template generate() functions. */
+interface ContractGenerationData {
+  title: string;
+  description: string;
+  category: string;
+  objectives: ObjectiveDef[];
+  bonusObjectives?: (ObjectiveDef & { bonus?: boolean })[];
+  bonusReward?: number;
+  reward: number;
+  deadlineFlights?: number | null;
+  chainId?: string | null;
+  chainPart?: number | null;
+  chainTotal?: number | null;
+  conflictTags?: string[];
+}
 
 function _generateId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return `contract-${crypto.randomUUID()}`;
@@ -53,9 +95,9 @@ export function getContractCaps(state: GameState): ContractCaps {
 
 function _clampRep(rep: number): number { return Math.max(0, Math.min(100, rep)); }
 
-function _buildContract(data: any, state: GameState): ExtendedContract {
+function _buildContract(data: ContractGenerationData, state: GameState): ExtendedContract {
   return {
-    id: _generateId(), title: data.title, description: data.description, category: data.category as any,
+    id: _generateId(), title: data.title, description: data.description, category: data.category as ContractCategory,
     objectives: data.objectives, bonusObjectives: data.bonusObjectives ?? [], bonusReward: data.bonusReward ?? 0,
     reward: data.reward, penaltyFee: Math.round(data.reward * CONTRACT_CANCEL_PENALTY_RATE),
     reputationReward: CONTRACT_REP_GAIN_MIN + Math.floor(Math.random() * (CONTRACT_REP_GAIN_MAX - CONTRACT_REP_GAIN_MIN + 1)),
@@ -63,7 +105,7 @@ function _buildContract(data: any, state: GameState): ExtendedContract {
     deadlinePeriod: data.deadlineFlights != null ? state.currentPeriod + data.deadlineFlights : null,
     boardExpiryPeriod: state.currentPeriod + CONTRACT_BOARD_EXPIRY_FLIGHTS,
     generatedPeriod: state.currentPeriod, acceptedPeriod: null,
-    chainId: data.chainId, chainPart: data.chainPart, chainTotal: data.chainTotal,
+    chainId: data.chainId ?? null, chainPart: data.chainPart ?? null, chainTotal: data.chainTotal ?? null,
     conflictTags: data.conflictTags ?? [],
   };
 }
@@ -86,7 +128,7 @@ export function generateContracts(state: GameState): ExtendedContract[] {
     const template = pool[Math.floor(Math.random() * pool.length)];
     const data = template.generate(state, Math.random());
     const contract = _buildContract(data, state);
-    state.contracts.board.push(contract as Contract);
+    state.contracts.board.push(contract);
     generated.push(contract);
     usedTemplateIds.add(template.id);
   }
@@ -113,6 +155,7 @@ export function acceptContract(state: GameState, contractId: string): AcceptResu
   contract.acceptedPeriod = state.currentPeriod;
   state.contracts.active.push(contract);
   return { success: true, contract: contract as ExtendedContract };
+
 }
 
 export function completeContract(state: GameState, contractId: string): CompleteResult {
@@ -179,30 +222,29 @@ export function checkContractObjectives(state: GameState, flightState: FlightSta
 }
 
 function _checkSingleObjective(obj: ObjectiveDef, flightState: FlightState): void {
-  const target = obj.target as Record<string, any>;
-  const objAny = obj as any;
-  const fs = flightState as any;
+  const target = obj.target as ObjectiveTarget;
+  const objHold = obj as ObjectiveWithHold;
   switch (obj.type) {
-    case 'REACH_ALTITUDE': if (flightState.altitude >= target.altitude) obj.completed = true; break;
-    case 'REACH_SPEED': if (flightState.velocity >= target.speed) obj.completed = true; break;
-    case 'SAFE_LANDING': { if (flightState.events.find((e) => e.type === 'LANDING' && typeof (e as any).speed === 'number' && (e as any).speed <= target.maxLandingSpeed)) obj.completed = true; break; }
-    case 'ACTIVATE_PART': { if (flightState.events.find((e) => e.type === 'PART_ACTIVATED' && (e as any).partType === target.partType)) obj.completed = true; break; }
+    case 'REACH_ALTITUDE': if (target.altitude != null && flightState.altitude >= target.altitude) obj.completed = true; break;
+    case 'REACH_SPEED': if (target.speed != null && flightState.velocity >= target.speed) obj.completed = true; break;
+    case 'SAFE_LANDING': { if (flightState.events.find((e) => e.type === 'LANDING' && typeof e.speed === 'number' && (e.speed as number) <= (target.maxLandingSpeed ?? Infinity))) obj.completed = true; break; }
+    case 'ACTIVATE_PART': { if (flightState.events.find((e) => e.type === 'PART_ACTIVATED' && e.partType === target.partType)) obj.completed = true; break; }
     case 'HOLD_ALTITUDE': {
-      const inRange = flightState.altitude >= target.minAltitude && flightState.altitude <= target.maxAltitude;
-      const experimentOk = !fs.hasScienceModules || fs.scienceModuleRunning === true || flightState.events.some((e) => e.type === 'SCIENCE_COLLECTED');
-      if (inRange && experimentOk) { if (objAny._holdEnteredAt == null) objAny._holdEnteredAt = flightState.timeElapsed; else if (flightState.timeElapsed - objAny._holdEnteredAt >= target.duration) obj.completed = true; } else { objAny._holdEnteredAt = null; }
+      const inRange = target.minAltitude != null && target.maxAltitude != null && flightState.altitude >= target.minAltitude && flightState.altitude <= target.maxAltitude;
+      const experimentOk = !flightState.hasScienceModules || flightState.scienceModuleRunning === true || flightState.events.some((e) => e.type === 'SCIENCE_COLLECTED');
+      if (inRange && experimentOk) { if (objHold._holdEnteredAt == null) objHold._holdEnteredAt = flightState.timeElapsed; else if (target.duration != null && flightState.timeElapsed - objHold._holdEnteredAt >= target.duration) obj.completed = true; } else { objHold._holdEnteredAt = null; }
       break;
     }
-    case 'RETURN_SCIENCE_DATA': { if (flightState.events.some((e) => e.type === 'SCIENCE_COLLECTED') && flightState.events.some((e) => e.type === 'LANDING' && typeof (e as any).speed === 'number' && (e as any).speed <= 10)) obj.completed = true; break; }
-    case 'CONTROLLED_CRASH': { if (flightState.events.find((e) => (e.type === 'LANDING' || e.type === 'CRASH') && typeof (e as any).speed === 'number' && (e as any).speed >= target.minCrashSpeed)) obj.completed = true; break; }
-    case 'EJECT_CREW': { if (flightState.events.find((e) => e.type === 'CREW_EJECTED' && typeof (e as any).altitude === 'number' && (e as any).altitude >= target.minAltitude)) obj.completed = true; break; }
-    case 'RELEASE_SATELLITE': { if (flightState.events.find((e) => e.type === 'SATELLITE_RELEASED' && typeof (e as any).altitude === 'number' && (e as any).altitude >= target.minAltitude && (target.minVelocity == null || (typeof (e as any).velocity === 'number' && (e as any).velocity >= target.minVelocity)))) obj.completed = true; break; }
-    case 'REACH_ORBIT': if (flightState.altitude >= target.orbitAltitude && flightState.velocity >= target.orbitalVelocity) obj.completed = true; break;
-    case 'BUDGET_LIMIT': if (typeof fs.rocketCost === 'number' && fs.rocketCost <= target.maxCost) obj.completed = true; break;
-    case 'MAX_PARTS': if (typeof fs.partCount === 'number' && fs.partCount <= target.maxParts) obj.completed = true; break;
-    case 'RESTRICT_PART': if (Array.isArray(fs.partTypes) && !fs.partTypes.includes(target.forbiddenType)) obj.completed = true; break;
-    case 'MULTI_SATELLITE': { if (flightState.events.filter((e) => e.type === 'SATELLITE_RELEASED' && typeof (e as any).altitude === 'number' && (e as any).altitude >= target.minAltitude).length >= target.count) obj.completed = true; break; }
-    case 'MINIMUM_CREW': if (typeof fs.crewCount === 'number' && fs.crewCount >= target.minCrew) obj.completed = true; break;
+    case 'RETURN_SCIENCE_DATA': { if (flightState.events.some((e) => e.type === 'SCIENCE_COLLECTED') && flightState.events.some((e) => e.type === 'LANDING' && typeof e.speed === 'number' && (e.speed as number) <= 10)) obj.completed = true; break; }
+    case 'CONTROLLED_CRASH': { if (flightState.events.find((e) => (e.type === 'LANDING' || e.type === 'CRASH') && typeof e.speed === 'number' && (e.speed as number) >= (target.minCrashSpeed ?? 0))) obj.completed = true; break; }
+    case 'EJECT_CREW': { if (flightState.events.find((e) => e.type === 'CREW_EJECTED' && typeof e.altitude === 'number' && (e.altitude as number) >= (target.minAltitude ?? 0))) obj.completed = true; break; }
+    case 'RELEASE_SATELLITE': { if (flightState.events.find((e) => e.type === 'SATELLITE_RELEASED' && typeof e.altitude === 'number' && (e.altitude as number) >= (target.minAltitude ?? 0) && (target.minVelocity == null || (typeof e.velocity === 'number' && (e.velocity as number) >= target.minVelocity)))) obj.completed = true; break; }
+    case 'REACH_ORBIT': if (target.orbitAltitude != null && target.orbitalVelocity != null && flightState.altitude >= target.orbitAltitude && flightState.velocity >= target.orbitalVelocity) obj.completed = true; break;
+    case 'BUDGET_LIMIT': if (typeof flightState.rocketCost === 'number' && target.maxCost != null && flightState.rocketCost <= target.maxCost) obj.completed = true; break;
+    case 'MAX_PARTS': if (typeof flightState.partCount === 'number' && target.maxParts != null && flightState.partCount <= target.maxParts) obj.completed = true; break;
+    case 'RESTRICT_PART': if (Array.isArray(flightState.partTypes) && target.forbiddenType != null && !flightState.partTypes.includes(target.forbiddenType)) obj.completed = true; break;
+    case 'MULTI_SATELLITE': { if (target.count != null && flightState.events.filter((e) => e.type === 'SATELLITE_RELEASED' && typeof e.altitude === 'number' && (e.altitude as number) >= (target.minAltitude ?? 0)).length >= target.count) obj.completed = true; break; }
+    case 'MINIMUM_CREW': if (typeof flightState.crewCount === 'number' && target.minCrew != null && flightState.crewCount >= target.minCrew) obj.completed = true; break;
     default: break;
   }
 }
@@ -236,7 +278,7 @@ export function getActiveConflicts(state: GameState): ContractConflict[] {
 }
 
 function _ensureContracts(state: GameState): void {
-  if (!state.contracts) (state as any).contracts = { board: [], active: [], completed: [], failed: [] };
+  if (!state.contracts) state.contracts = { board: [], active: [], completed: [], failed: [] };
   if (!Array.isArray(state.contracts.board)) state.contracts.board = [];
   if (!Array.isArray(state.contracts.active)) state.contracts.active = [];
   if (!Array.isArray(state.contracts.completed)) state.contracts.completed = [];

@@ -44,8 +44,19 @@ import { getPartById } from '../data/parts.js';
 import { PartType }    from './constants.js';
 import { SEA_LEVEL_DENSITY } from './atmosphere.js';
 
-import type { PhysicsState, RocketAssembly } from './physics.js';
+import type { RocketAssembly } from './physics.js';
 import type { PartDef } from '../data/parts.js';
+
+/**
+ * Structural subset of PhysicsState that tickFuelSystem actually reads/writes.
+ * Both PhysicsState and DebrisState (from staging.ts) satisfy this interface.
+ */
+export interface FuelSystemState {
+  firingEngines: Set<string>;
+  activeParts: Set<string>;
+  fuelStore: Map<string, number>;
+  throttle: number;
+}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -228,7 +239,7 @@ export function computeEngineFlowRate(
  *   had when jettisoned) but are never drained or counted toward thrust.
  */
 export function tickFuelSystem(
-  ps: PhysicsState,
+  ps: FuelSystemState,
   assembly: RocketAssembly,
   dt: number,
   density: number,

@@ -43,11 +43,11 @@ import { deployLandingLeg, getDeployedLegFootOffset } from './legs.js';
 import { activateEjectorSeat } from './ejector.js';
 import { activateScienceModule, activateInstrument, parseInstrumentKey } from './sciencemodule.js';
 import { applySeparationImpulse } from './collision.js';
-import { hasMalfunction, getMalfunction } from './malfunction.js';
+import { getMalfunction } from './malfunction.js';
 import { MalfunctionType } from './constants.js';
 
-import type { PhysicsState, RocketAssembly, PlacedPart } from './physics.js';
-import type { FlightState } from './gameState.js';
+import type { PhysicsState, RocketAssembly } from './physics.js';
+import type { FlightState, FlightEvent } from './gameState.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -194,7 +194,7 @@ export function activateCurrentStage(
     // Handle individual instrument activation keys (moduleId:instr:N).
     const instrParsed = parseInstrumentKey(instanceId);
     if (instrParsed) {
-      activateInstrument(ps as any, assembly as any, flightState as any, instanceId);
+      activateInstrument(ps, assembly, flightState, instanceId);
       continue;
     }
 
@@ -223,7 +223,7 @@ export function activateCurrentStage(
       case 'SEPARATE': {
         // DECOUPLER_STUCK malfunction: skip automatic staging (player must
         // manually decouple via context menu).
-        const decMalf = getMalfunction(ps as any, instanceId);
+        const decMalf = getMalfunction(ps, instanceId);
         if (decMalf && !decMalf.recovered && decMalf.type === MalfunctionType.DECOUPLER_STUCK) {
           _emitEvent(flightState, {
             type:        'MALFUNCTION_BLOCKED',
@@ -260,7 +260,7 @@ export function activateCurrentStage(
         if (isClamp) {
           const clampPlaced = assembly.parts.get(instanceId);
           // Swing away from the rocket centre: if clamp is to the left, push left; else push right.
-          const lateralDir = (clampPlaced && (clampPlaced as any).x < 0) ? -1 : 1;
+          const lateralDir = (clampPlaced && clampPlaced.x < 0) ? -1 : 1;
           decouplerDebris.velX += lateralDir * 3;  // 3 m/s lateral swing
           decouplerDebris.velY += 0.5;             // slight upward before falling
           decouplerDebris.angularVelocity = lateralDir * 2.0; // visual rotation
@@ -271,7 +271,7 @@ export function activateCurrentStage(
         // collect newly disconnected sections as debris.
         const fragments = recomputeActiveGraph(ps, assembly);
         for (const frag of fragments) {
-          applySeparationImpulse(ps as any, frag as any, assembly as any);
+          applySeparationImpulse(ps, frag, assembly);
         }
         newDebris.push(...fragments);
 
@@ -297,7 +297,7 @@ export function activateCurrentStage(
 
       case 'DEPLOY': {
         // Check for LANDING_LEGS_STUCK malfunction: block deployment via staging.
-        const legMalf = getMalfunction(ps as any, instanceId);
+        const legMalf = getMalfunction(ps, instanceId);
         if (legMalf && !legMalf.recovered && legMalf.type === MalfunctionType.LANDING_LEGS_STUCK) {
           _emitEvent(flightState, {
             type:        'MALFUNCTION_BLOCKED',
@@ -312,12 +312,12 @@ export function activateCurrentStage(
         // PARACHUTE or LANDING_LEGS — deploy / extend.
         ps.deployedParts.add(instanceId);
         if (def.type === PartType.PARACHUTE) {
-          deployParachute(ps as any, instanceId);
+          deployParachute(ps, instanceId);
         } else if (
           def.type === PartType.LANDING_LEGS ||
           def.type === PartType.LANDING_LEG
         ) {
-          deployLandingLeg(ps as any, instanceId);
+          deployLandingLeg(ps, instanceId);
         }
         _emitEvent(flightState, {
           type:        'PART_ACTIVATED',
@@ -330,7 +330,7 @@ export function activateCurrentStage(
 
       case 'EJECT':
         // COMMAND_MODULE ejector seat — emergency crew escape.
-        activateEjectorSeat(ps as any, assembly as any, flightState as any, instanceId);
+        activateEjectorSeat(ps, assembly, flightState, instanceId);
         break;
 
       case 'RELEASE': {
@@ -357,7 +357,7 @@ export function activateCurrentStage(
 
       case 'COLLECT_SCIENCE':
         // SERVICE_MODULE science instrument — start the timed experiment.
-        activateScienceModule(ps as any, assembly as any, flightState as any, instanceId);
+        activateScienceModule(ps, assembly, flightState, instanceId);
         break;
 
       default:
@@ -402,7 +402,7 @@ export function activatePartDirect(
   // Handle individual instrument activation keys (moduleId:instr:N).
   const instrParsed = parseInstrumentKey(instanceId);
   if (instrParsed) {
-    activateInstrument(ps as any, assembly as any, flightState as any, instanceId);
+    activateInstrument(ps, assembly, flightState, instanceId);
     return [];
   }
 
@@ -449,7 +449,7 @@ export function activatePartDirect(
 
       const fragments = recomputeActiveGraph(ps, assembly);
       for (const frag of fragments) {
-        applySeparationImpulse(ps as any, frag as any, assembly as any);
+        applySeparationImpulse(ps, frag, assembly);
       }
       newDebris.push(...fragments);
 
@@ -477,12 +477,12 @@ export function activatePartDirect(
       // PARACHUTE or LANDING_LEGS — deploy / extend.
       ps.deployedParts.add(instanceId);
       if (def.type === PartType.PARACHUTE) {
-        deployParachute(ps as any, instanceId);
+        deployParachute(ps, instanceId);
       } else if (
         def.type === PartType.LANDING_LEGS ||
         def.type === PartType.LANDING_LEG
       ) {
-        deployLandingLeg(ps as any, instanceId);
+        deployLandingLeg(ps, instanceId);
       }
       _emitEvent(flightState, {
         type:        'PART_ACTIVATED',
@@ -495,7 +495,7 @@ export function activatePartDirect(
 
     case 'EJECT':
       // COMMAND_MODULE ejector seat — emergency crew escape.
-      activateEjectorSeat(ps as any, assembly as any, flightState as any, instanceId);
+      activateEjectorSeat(ps, assembly, flightState, instanceId);
       break;
 
     case 'RELEASE': {
@@ -522,7 +522,7 @@ export function activatePartDirect(
 
     case 'COLLECT_SCIENCE':
       // SERVICE_MODULE science instrument — start the timed experiment.
-      activateScienceModule(ps as any, assembly as any, flightState as any, instanceId);
+      activateScienceModule(ps, assembly, flightState, instanceId);
       break;
 
     default:
@@ -653,7 +653,7 @@ export function tickDebris(debris: DebrisState, assembly: RocketAssembly, dt: nu
     if (fuelLeft <= 0) continue; // Exhausted — tickFuelSystem will remove it.
 
     // Interpolate thrust between sea-level and vacuum values.
-    const props        = (def.properties as any) ?? {};
+    const props        = (def.properties ?? {}) as Record<string, number>;
     const densityRatio = density > 0
       ? Math.min(1, density / SEA_LEVEL_DENSITY)
       : 0;
@@ -690,7 +690,7 @@ export function tickDebris(debris: DebrisState, assembly: RocketAssembly, dt: nu
   debris.posY += debris.velY * dt;
 
   // --- 6. Fuel consumption (SRBs via tickFuelSystem) -----------------------
-  tickFuelSystem(debris as any, assembly as any, dt, density);
+  tickFuelSystem(debris, assembly, dt, density);
 
   // --- 6b. Angular dynamics (airborne) ------------------------------------
   if (debris.angularVelocity != null) {
@@ -743,11 +743,11 @@ function _renormalizeAfterSeparation(
     const placed = assembly.parts.get(instanceId);
     const def    = placed ? getPartById(placed.partId) : null;
     if (!def) continue;
-    let bottom = (placed as any).y - (def.height ?? 40) / 2;
+    let bottom = placed!.y - (def.height ?? 40) / 2;
     // Deployed legs extend below their bounding box.
     if (def.type === PartType.LANDING_LEGS || def.type === PartType.LANDING_LEG) {
-      const { dy } = getDeployedLegFootOffset(instanceId, def as any, ps.legStates as any);
-      const footY = (placed as any).y - dy;
+      const { dy } = getDeployedLegFootOffset(instanceId, def, ps.legStates);
+      const footY = placed!.y - dy;
       if (footY < bottom) bottom = footY;
     }
     lowestBottom = Math.min(lowestBottom, bottom);
@@ -766,12 +766,12 @@ function _renormalizeAfterSeparation(
   // just active ones) because debris rendering still references the same
   // placed objects.
   for (const [, placed] of assembly.parts) {
-    (placed as any).y -= lowestBottom;
+    placed.y -= lowestBottom;
   }
 
   // Debris fragments also reference the same placed objects, so their posY
   // must be compensated by the same world-space offset to stay correct.
-  for (const debris of (ps as any).debris as DebrisState[]) {
+  for (const debris of ps.debris) {
     debris.posY += offsetM;
   }
 
@@ -832,9 +832,9 @@ function _createDebrisFromParts(
       parachuteStates.set(id, {
         state: src.state,
         deployTimer: src.deployTimer,
-        canopyAngle: (src as any).canopyAngle ?? 0,
-        canopyAngularVel: (src as any).canopyAngularVel ?? 0,
-        stowTimer: (src as any).stowTimer,
+        canopyAngle: src.canopyAngle ?? 0,
+        canopyAngularVel: src.canopyAngularVel ?? 0,
+        stowTimer: src.stowTimer,
       });
     }
 
@@ -909,7 +909,7 @@ function _debrisMass(debris: DebrisState, assembly: RocketAssembly): number {
   for (const id of debris.activeParts) {
     const placed = assembly.parts.get(id);
     const def    = placed ? getPartById(placed.partId) : null;
-    if (def) mass += (def as any).mass ?? 0;
+    if (def) mass += def.mass ?? 0;
   }
 
   for (const [id, fuel] of debris.fuelStore) {
@@ -953,7 +953,7 @@ function _debrisDrag(debris: DebrisState, assembly: RocketAssembly, density: num
     const def    = placed ? getPartById(placed.partId) : null;
     if (!def) continue;
 
-    const props  = (def.properties as any) ?? {};
+    const props  = (def.properties ?? {}) as Record<string, number>;
     const widthM = (def.width ?? 40) * SCALE_M_PER_PX;
     const area   = Math.PI * (widthM / 2) ** 2; // stowed circular cross-section
 
@@ -989,6 +989,6 @@ function _getFragmentSatellitePartId(debris: DebrisState, assembly: RocketAssemb
 /**
  * Append a flight event to a FlightState event log.
  */
-function _emitEvent(flightState: FlightState, event: Record<string, unknown>): void {
-  (flightState.events as any[]).push(event);
+function _emitEvent(flightState: FlightState, event: FlightEvent): void {
+  flightState.events.push(event);
 }

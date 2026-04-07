@@ -67,7 +67,7 @@
 - **Verification**: Run a few e2e tests that would use the Web Worker physics. Flight simulation works correctly during normal flight and time warp. Fallback to main-thread physics works when worker is disabled.
 
 ### TASK-012: Eliminate `as any` casts — staging.ts, challenges.ts, contracts.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Remove all `as any` casts from `staging.ts` (28), `challenges.ts` (15), and `contracts.ts` (11) by adding proper type definitions, extending interfaces, or using type guards. Do not change runtime behaviour. See requirements Section 4.1.
 - **Verification**: `grep "as any" src/core/staging.ts src/core/challenges.ts src/core/contracts.ts` returns no matches. `npm run typecheck` passes. `npm run test:unit` passes.

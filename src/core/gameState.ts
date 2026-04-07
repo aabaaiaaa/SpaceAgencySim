@@ -305,6 +305,8 @@ export interface FlightEvent {
   type: string;
   /** Human-readable detail. */
   description: string;
+  /** Additional event-specific payload fields. */
+  [key: string]: unknown;
 }
 
 /** Keplerian orbital elements for a 2D orbit. */
@@ -454,6 +456,18 @@ export interface FlightState {
   powerState: PowerState | null;
   /** Communication link state (status, link type, control lockout). */
   commsState: CommsState | null;
+  /** Total rocket build cost (set at flight start for challenge scoring). */
+  rocketCost?: number;
+  /** Number of parts in the rocket (set at flight start for challenge scoring). */
+  partCount?: number;
+  /** Array of part type IDs in the rocket (set at flight start for challenge scoring). */
+  partTypes?: string[];
+  /** Fuel fraction remaining (0–1), for challenge scoring. */
+  fuelFraction?: number;
+  /** True when at least one science module is aboard. */
+  hasScienceModules?: boolean;
+  /** True while a science module experiment is running. */
+  scienceModuleRunning?: boolean;
 }
 
 /** A record of an earned achievement. */

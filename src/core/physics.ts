@@ -424,6 +424,7 @@ interface EjectedCrewEntry {
   y: number;
   velX: number;
   velY: number;
+  hasChute?: boolean;
   chuteOpen: boolean;
   chuteTimer: number;
 }

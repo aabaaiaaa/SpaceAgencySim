@@ -61,7 +61,7 @@ interface ActivateEjectorPs {
   ejectedCrew?: Array<{
     x: number; y: number;
     velX: number; velY: number;
-    hasChute: boolean; chuteOpen: boolean; chuteTimer: number;
+    hasChute?: boolean; chuteOpen: boolean; chuteTimer: number;
   }>;
   posX: number;
   posY: number;
