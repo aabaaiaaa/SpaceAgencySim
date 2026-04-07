@@ -133,7 +133,7 @@
 - **Verification**: `npm run test:unit` passes. `npm run test:coverage` shows new code is covered. No new module is below 80% branch coverage.
 
 ### TASK-023: Update coverage thresholds and lock gains
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-020, TASK-021, TASK-022
 - **Description**: After all new tests are written, run coverage analysis. Set all three thresholds (lines, branches, functions) in `vite.config.js` to match actual coverage or slightly below, with 80% as the absolute floor. If coverage exceeds previous thresholds, lock the higher values. See requirements Section 6.1.
 - **Verification**: `npm run test:coverage` passes with the new thresholds. Thresholds are >= previous values (lines 89%, branches 80%, functions 91%).
