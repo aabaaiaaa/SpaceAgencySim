@@ -16,14 +16,14 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createGameState, createFlightState } from '../core/gameState.js';
+import { createGameState, createFlightState } from '../core/gameState.ts';
 import {
   evaluateComms,
   createCommsState,
   getCommsCoverageInfo,
   getCommsLinkLabel,
   isCrewedCraft,
-} from '../core/comms.js';
+} from '../core/comms.ts';
 import {
   CommsStatus,
   CommsLinkType,
@@ -34,8 +34,8 @@ import {
   FlightPhase,
   CelestialBody,
   BODY_RADIUS,
-} from '../core/constants.js';
-import { deploySatellite } from '../core/satellites.js';
+} from '../core/constants.ts';
+import { deploySatellite } from '../core/satellites.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers

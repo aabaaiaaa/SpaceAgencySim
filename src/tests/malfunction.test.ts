@@ -29,7 +29,7 @@ import {
   getPartReliability,
   MALFUNCTION_RECOVERY_TIPS,
   MALFUNCTION_LABELS,
-} from '../core/malfunction.js';
+} from '../core/malfunction.ts';
 import {
   MalfunctionType,
   MalfunctionMode,
@@ -39,7 +39,7 @@ import {
   PARTIAL_CHUTE_FACTOR,
   RELIABILITY_TIERS,
   PartType,
-} from '../core/constants.js';
+} from '../core/constants.ts';
 import {
   createRocketAssembly,
   addPartToAssembly,
@@ -47,10 +47,10 @@ import {
   createStagingConfig,
   syncStagingWithAssembly,
   assignPartToStage,
-} from '../core/rocketbuilder.js';
-import { createPhysicsState } from '../core/physics.js';
-import { createFlightState, createGameState, createCrewMember } from '../core/gameState.js';
-import { getPartById, PARTS } from '../data/parts.js';
+} from '../core/rocketbuilder.ts';
+import { createPhysicsState } from '../core/physics.ts';
+import { createFlightState, createGameState, createCrewMember } from '../core/gameState.ts';
+import { getPartById, PARTS } from '../data/parts.ts';
 
 // ---------------------------------------------------------------------------
 // Shared helpers

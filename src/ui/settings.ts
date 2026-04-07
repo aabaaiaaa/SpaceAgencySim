@@ -19,12 +19,12 @@ import {
   WeatherSeverity,
   FinancialPressure,
   InjuryDuration,
-} from '../core/constants.js';
-import { getDifficultySettings, updateDifficultySettings } from '../core/settings.js';
-import { createListenerTracker } from './listenerTracker.js';
+} from '../core/constants.ts';
+import { getDifficultySettings, updateDifficultySettings } from '../core/settings.ts';
+import { createListenerTracker } from './listenerTracker.ts';
 import './settings.css';
-import type { GameState } from '../core/gameState.js';
-import type { DifficultySettings } from '../core/constants.js';
+import type { GameState } from '../core/gameState.ts';
+import type { DifficultySettings } from '../core/constants.ts';
 
 // ---------------------------------------------------------------------------
 // Setting definitions

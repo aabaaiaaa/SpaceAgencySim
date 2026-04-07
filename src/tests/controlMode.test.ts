@@ -16,8 +16,8 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createFlightState } from '../core/gameState.js';
-import { FlightPhase, ControlMode, PartType } from '../core/constants.js';
+import { createFlightState } from '../core/gameState.ts';
+import { FlightPhase, ControlMode, PartType } from '../core/constants.ts';
 import {
   canEnterDockingMode,
   enterDockingMode,
@@ -30,8 +30,8 @@ import {
   getControlModeLabel,
   CONTROL_MODE_TIPS,
   BAND_WARNING_MARGIN,
-} from '../core/controlMode.js';
-import { handleKeyDown } from '../core/physics.js';
+} from '../core/controlMode.ts';
+import { handleKeyDown } from '../core/physics.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -4,13 +4,13 @@
  * @module ui/flightController/_keyboard
  */
 
-import { handleKeyDown, handleKeyUp, fireNextStage } from '../../core/physics.js';
-import { hideLaunchTip, lockTimeWarp } from '../flightHud.js';
+import { handleKeyDown, handleKeyUp, fireNextStage } from '../../core/physics.ts';
+import { hideLaunchTip, lockTimeWarp } from '../flightHud.ts';
 import {
   sendKeyDown as workerKeyDown,
   sendKeyUp as workerKeyUp,
   sendStage as workerStage,
-} from './_workerBridge.js';
+} from './_workerBridge.ts';
 import {
   cycleMapZoom,
   getMapZoomLevel,
@@ -19,19 +19,19 @@ import {
   toggleMapShadow,
   cycleTransferTarget,
   toggleMapCommsOverlay,
-} from '../../render/map.js';
+} from '../../render/map.ts';
 import {
   isTransferPlanningAvailable,
   getAllowedMapZooms,
   isDebrisTrackingAvailable,
-} from '../../core/mapView.js';
-import { FlightPhase, ControlMode, DockingState } from '../../core/constants.js';
-import { getFCState } from './_state.js';
-import { applyTimeWarp, onTimeWarpButtonClick } from './_timeWarp.js';
-import { toggleMapView, updateMapHud, handleWarpToTarget } from './_mapView.js';
-import { cycleDockingTarget, handleUndock, handleFuelTransfer } from './_docking.js';
-import { toggleDockingMode, toggleRcsModeHandler } from './_orbitRcs.js';
-import { showPhaseNotification } from './_flightPhase.js';
+} from '../../core/mapView.ts';
+import { FlightPhase, ControlMode, DockingState } from '../../core/constants.ts';
+import { getFCState } from './_state.ts';
+import { applyTimeWarp, onTimeWarpButtonClick } from './_timeWarp.ts';
+import { toggleMapView, updateMapHud, handleWarpToTarget } from './_mapView.ts';
+import { cycleDockingTarget, handleUndock, handleFuelTransfer } from './_docking.ts';
+import { toggleDockingMode, toggleRcsModeHandler } from './_orbitRcs.ts';
+import { showPhaseNotification } from './_flightPhase.ts';
 
 /** Ordered warp levels for < / > key stepping. */
 export const WARP_LEVELS_ORDERED: number[] = [0, 0.25, 0.5, 1, 2, 5, 10, 50];

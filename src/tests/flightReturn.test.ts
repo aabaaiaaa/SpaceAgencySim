@@ -17,9 +17,9 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { createGameState } from '../core/gameState.js';
-import { processFlightReturn } from '../core/flightReturn.js';
-import { MISSIONS, ObjectiveType, MissionStatus, rebuildMissionsIndex } from '../data/missions.js';
+import { createGameState } from '../core/gameState.ts';
+import { processFlightReturn } from '../core/flightReturn.ts';
+import { MISSIONS, ObjectiveType, MissionStatus, rebuildMissionsIndex } from '../data/missions.ts';
 import {
   PartType,
   DEATH_FINE_PER_ASTRONAUT,
@@ -28,8 +28,8 @@ import {
   STARTING_LOAN_BALANCE,
   STARTING_REPUTATION,
   FieldCraftStatus,
-} from '../core/constants.js';
-import { getPartById } from '../data/parts.js';
+} from '../core/constants.ts';
+import { getPartById } from '../data/parts.ts';
 
 // ---------------------------------------------------------------------------
 // Test fixture helpers

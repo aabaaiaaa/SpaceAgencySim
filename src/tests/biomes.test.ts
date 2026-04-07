@@ -21,8 +21,8 @@ import {
   getOrbitalBiomes,
   hasBiomeChanged,
   BIOME_FADE_RANGE,
-} from '../core/biomes.js';
-import { BIOME_DEFINITIONS } from '../core/constants.js';
+} from '../core/biomes.ts';
+import { BIOME_DEFINITIONS } from '../core/constants.ts';
 
 // ---------------------------------------------------------------------------
 // BIOME_DEFINITIONS validation

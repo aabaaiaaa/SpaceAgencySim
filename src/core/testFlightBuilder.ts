@@ -11,8 +11,8 @@
  * @module testFlightBuilder
  */
 
-import { getPartById } from '../data/parts.js';
-import { logger } from './logger.js';
+import { getPartById } from '../data/parts.ts';
+import { logger } from './logger.ts';
 import {
   createRocketAssembly,
   addPartToAssembly,
@@ -20,7 +20,7 @@ import {
   createStagingConfig,
   syncStagingWithAssembly,
   autoStageNewPart,
-} from './rocketbuilder.js';
+} from './rocketbuilder.ts';
 
 // Use `any` for rocketbuilder objects — the JS module's inferred JSDoc types
 // do not have .d.ts declarations, so we avoid re-declaring conflicting shapes.

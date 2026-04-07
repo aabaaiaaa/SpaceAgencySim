@@ -37,10 +37,10 @@ import {
   ONE_AU,
   MAX_SOLAR_IRRADIANCE_MULTIPLIER,
   SOLAR_IRRADIANCE_1AU,
-} from './constants.js';
-import { getPartById } from '../data/parts.js';
-import type { PowerState } from './gameState.js';
-import type { RocketAssembly } from './physics.js';
+} from './constants.ts';
+import { getPartById } from '../data/parts.ts';
+import type { PowerState } from './gameState.ts';
+import type { RocketAssembly } from './physics.ts';
 
 // ---------------------------------------------------------------------------
 // Shadow / Sunlight

@@ -29,16 +29,16 @@ import {
   findSnapCandidates,
   findMirrorCandidate,
   validateStagingConfig,
-} from '../core/rocketbuilder.js';
+} from '../core/rocketbuilder.ts';
 import {
   getTotalMass,
   getStage1Thrust,
   calculateTWR,
   runValidation,
-} from '../core/rocketvalidator.js';
-import { getConnectedTanks } from '../core/fuelsystem.js';
-import { createGameState }   from '../core/gameState.js';
-import { getPartById }       from '../data/parts.js';
+} from '../core/rocketvalidator.ts';
+import { getConnectedTanks } from '../core/fuelsystem.ts';
+import { createGameState }   from '../core/gameState.ts';
+import { getPartById }       from '../data/parts.ts';
 
 // ---------------------------------------------------------------------------
 // Test 1 — Part graph structure

@@ -11,12 +11,12 @@
  * @module core/achievements
  */
 
-import { earnReward } from './finance.js';
-import { adjustReputation } from './reputation.js';
-import { CelestialBody, CONSTELLATION_THRESHOLD, SatelliteType } from './constants.js';
+import { earnReward } from './finance.ts';
+import { adjustReputation } from './reputation.ts';
+import { CelestialBody, CONSTELLATION_THRESHOLD, SatelliteType } from './constants.ts';
 
-import type { GameState, FlightState } from './gameState.js';
-import type { PhysicsState } from './physics.js';
+import type { GameState, FlightState } from './gameState.ts';
+import type { PhysicsState } from './physics.ts';
 
 // ---------------------------------------------------------------------------
 // Achievement Definitions

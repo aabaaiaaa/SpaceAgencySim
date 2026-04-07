@@ -17,13 +17,13 @@
  * @module core/designLibrary
  */
 
-import { getPartById } from '../data/parts.js';
-import { PartType } from './constants.js';
-import { logger } from './logger.js';
-import { TECH_NODES } from '../data/techtree.js';
-import type { PartDef } from '../data/parts.js';
-import type { TechNodeDef } from '../data/techtree.js';
-import type { GameState, RocketDesign } from './gameState.js';
+import { getPartById } from '../data/parts.ts';
+import { PartType } from './constants.ts';
+import { logger } from './logger.ts';
+import { TECH_NODES } from '../data/techtree.ts';
+import type { PartDef } from '../data/parts.ts';
+import type { TechNodeDef } from '../data/techtree.ts';
+import type { GameState, RocketDesign } from './gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Constants

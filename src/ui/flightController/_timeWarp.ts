@@ -4,10 +4,10 @@
  * @module ui/flightController/_timeWarp
  */
 
-import { setHudTimeWarp, lockTimeWarp } from '../flightHud.js';
-import { ATMOSPHERE_TOP } from '../../core/atmosphere.js';
-import { getAtmosphereTop as getBodyAtmosphereTop } from '../../data/bodies.js';
-import { getFCState } from './_state.js';
+import { setHudTimeWarp, lockTimeWarp } from '../flightHud.ts';
+import { ATMOSPHERE_TOP } from '../../core/atmosphere.ts';
+import { getAtmosphereTop as getBodyAtmosphereTop } from '../../data/bodies.ts';
+import { getFCState } from './_state.ts';
 
 /**
  * Apply a new time-warp multiplier: update internal state and synchronise the

@@ -9,9 +9,9 @@ import {
   collectSurfaceSample,
   deploySurfaceInstrument,
   deployBeacon,
-} from '../../core/surfaceOps.js';
-import { getFCState } from './_state.js';
-import { logger } from '../../core/logger.js';
+} from '../../core/surfaceOps.ts';
+import { getFCState } from './_state.ts';
+import { logger } from '../../core/logger.ts';
 
 /**
  * Callback invoked by the surface operations panel when the player clicks

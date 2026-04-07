@@ -19,16 +19,16 @@
  * @module core/techtree
  */
 
-import { FacilityId, GameMode, RD_TIER_MAX_TECH } from './constants.js';
-import { hasFacility } from './construction.js';
-import { spend } from './finance.js';
+import { FacilityId, GameMode, RD_TIER_MAX_TECH } from './constants.ts';
+import { hasFacility } from './construction.ts';
+import { spend } from './finance.ts';
 import {
   TECH_NODES,
   getTechNodeById,
   getNodeByBranchAndTier,
-} from '../data/techtree.js';
-import type { TechNodeDef } from '../data/techtree.js';
-import type { GameState } from './gameState.js';
+} from '../data/techtree.ts';
+import type { TechNodeDef } from '../data/techtree.ts';
+import type { GameState } from './gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Local types (shapes from data modules)

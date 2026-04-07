@@ -27,15 +27,15 @@
  * @module core/controlMode
  */
 
-import { ControlMode, FlightPhase } from './constants.js';
-import { getAltitudeBand } from './orbit.js';
-import { computeOrbitalElements } from './orbit.js';
-import { getPartById } from '../data/parts.js';
-import { PartType, BODY_RADIUS, ALTITUDE_BANDS } from './constants.js';
+import { ControlMode, FlightPhase } from './constants.ts';
+import { getAltitudeBand } from './orbit.ts';
+import { computeOrbitalElements } from './orbit.ts';
+import { getPartById } from '../data/parts.ts';
+import { PartType, BODY_RADIUS, ALTITUDE_BANDS } from './constants.ts';
 
-import type { ControlMode as ControlModeType, AltitudeBand } from './constants.js';
-import type { PhysicsState, RocketAssembly } from './physics.js';
-import type { FlightState } from './gameState.js';
+import type { ControlMode as ControlModeType, AltitudeBand } from './constants.ts';
+import type { PhysicsState, RocketAssembly } from './physics.ts';
+import type { FlightState } from './gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Constants

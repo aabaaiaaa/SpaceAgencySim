@@ -21,7 +21,7 @@ import {
   getConnectedTanks,
   computeEngineFlowRate,
   tickFuelSystem,
-} from '../core/fuelsystem.js';
+} from '../core/fuelsystem.ts';
 import {
   createRocketAssembly,
   addPartToAssembly,
@@ -30,11 +30,11 @@ import {
   syncStagingWithAssembly,
   assignPartToStage,
   addStageToConfig,
-} from '../core/rocketbuilder.js';
-import { createPhysicsState } from '../core/physics.js';
-import { createFlightState }  from '../core/gameState.js';
-import { getPartById }        from '../data/parts.js';
-import { SEA_LEVEL_DENSITY }  from '../core/atmosphere.js';
+} from '../core/rocketbuilder.ts';
+import { createPhysicsState } from '../core/physics.ts';
+import { createFlightState }  from '../core/gameState.ts';
+import { getPartById }        from '../data/parts.ts';
+import { SEA_LEVEL_DENSITY }  from '../core/atmosphere.ts';
 
 // ---------------------------------------------------------------------------
 // Shared helpers

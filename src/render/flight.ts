@@ -18,4 +18,4 @@ export {
   getZoomLevel,
   hitTestFlightPart,
   setZoomLevel,
-} from './flight/_init.js';
+} from './flight/_init.ts';

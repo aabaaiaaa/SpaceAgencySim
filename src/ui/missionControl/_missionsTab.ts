@@ -4,16 +4,16 @@
  * @module missionControl/_missionsTab
  */
 
-import type { GameState, ObjectiveDef } from '../../core/gameState.js';
-import { acceptMission } from '../../core/missions.js';
-import { getFacilityDef } from '../../core/construction.js';
-import { getPartById } from '../../data/parts.js';
-import { MISSIONS } from '../../data/missions.js';
-import { GameMode } from '../../core/constants.js';
-import { refreshTopBarMissions } from '../topbar.js';
-import { getMCState } from './_state.js';
-import { fmtCash, fmtDate, buildRewardsEl, isTutorialPhase, getContent } from './_shell.js';
-import { logger } from '../../core/logger.js';
+import type { GameState, ObjectiveDef } from '../../core/gameState.ts';
+import { acceptMission } from '../../core/missions.ts';
+import { getFacilityDef } from '../../core/construction.ts';
+import { getPartById } from '../../data/parts.ts';
+import { MISSIONS } from '../../data/missions.ts';
+import { GameMode } from '../../core/constants.ts';
+import { refreshTopBarMissions } from '../topbar.ts';
+import { getMCState } from './_state.ts';
+import { fmtCash, fmtDate, buildRewardsEl, isTutorialPhase, getContent } from './_shell.ts';
+import { logger } from '../../core/logger.ts';
 
 /**
  * Shape of a mission instance stored in game state.

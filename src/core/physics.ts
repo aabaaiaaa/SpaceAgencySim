@@ -43,8 +43,8 @@
  * @module physics
  */
 
-import { getPartById } from '../data/parts.js';
-import { PartType, ControlMode, BODY_RADIUS } from './constants.js';
+import { getPartById } from '../data/parts.ts';
+import { PartType, ControlMode, BODY_RADIUS } from './constants.ts';
 import {
   airDensity,
   airDensityForBody,
@@ -52,16 +52,16 @@ import {
   SEA_LEVEL_DENSITY,
   updateHeat,
   updateSolarHeat,
-} from './atmosphere.js';
+} from './atmosphere.ts';
 import {
   getSurfaceGravity,
   hasAtmosphere,
   getAtmosphereTop,
   getAirDensity as bodyAirDensity,
-} from '../data/bodies.js';
-import { tickFuelSystem } from './fuelsystem.js';
-import { activateCurrentStage, tickDebris } from './staging.js';
-import { tickCollisions } from './collision.js';
+} from '../data/bodies.ts';
+import { tickFuelSystem } from './fuelsystem.ts';
+import { activateCurrentStage, tickDebris } from './staging.ts';
+import { tickCollisions } from './collision.ts';
 import {
   initParachuteStates,
   tickParachutes,
@@ -70,35 +70,35 @@ import {
   ParachuteState,
   DEPLOY_DURATION,
   LOW_DENSITY_THRESHOLD,
-} from './parachute.js';
+} from './parachute.ts';
 import {
   initLegStates,
   tickLegs,
   countDeployedLegs,
   getDeployedLegFootOffset,
   LegState,
-} from './legs.js';
-import { initEjectorStates } from './ejector.js';
+} from './legs.ts';
+import { initEjectorStates } from './ejector.ts';
 import {
   initScienceModuleStates,
   tickScienceModules,
   onSafeLanding,
-} from './sciencemodule.js';
-import { getBiomeId } from './biomes.js';
+} from './sciencemodule.ts';
+import { getBiomeId } from './biomes.ts';
 import {
   initMalfunctionState,
   checkMalfunctions,
   tickMalfunctions,
   hasMalfunction,
   getMalfunction,
-} from './malfunction.js';
-import { MalfunctionType, REDUCED_THRUST_FACTOR, PARTIAL_CHUTE_FACTOR } from './constants.js';
-import { getWindForce, getCurrentWeather } from './weather.js';
-import { initPowerState, tickPower, recalcPowerState } from './power.js';
-import { getOrbitalStateAtTime } from './orbit.js';
+} from './malfunction.ts';
+import { MalfunctionType, REDUCED_THRUST_FACTOR, PARTIAL_CHUTE_FACTOR } from './constants.ts';
+import { getWindForce, getCurrentWeather } from './weather.ts';
+import { initPowerState, tickPower, recalcPowerState } from './power.ts';
+import { getOrbitalStateAtTime } from './orbit.ts';
 
-import type { AltitudeBand, ControlMode as ControlModeType } from './constants.js';
-import type { FlightState, FlightEvent, OrbitalElements, PowerState, GameState, InventoryPart } from './gameState.js';
+import type { AltitudeBand, ControlMode as ControlModeType } from './constants.ts';
+import type { FlightState, FlightEvent, OrbitalElements, PowerState, GameState, InventoryPart } from './gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Types for modules still in .js

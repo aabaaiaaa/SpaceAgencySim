@@ -17,15 +17,15 @@ import {
   assignToTraining, cancelTraining, getTrainingCrew, getTrainingSlotInfo,
   hireExperiencedCrew, getExperiencedHireCost,
   payMedicalCare, payAdvancedMedicalCare, isCrewInjured,
-} from '../core/crew.js';
+} from '../core/crew.ts';
 import {
   AstronautStatus, FacilityId,
   CREW_ADMIN_TIER_FEATURES, TRAINING_COURSE_COST, TRAINING_COURSE_DURATION, TRAINING_SKILL_GAIN,
-} from '../core/constants.js';
-import { getFacilityTier } from '../core/construction.js';
-import { refreshTopBar } from './topbar.js';
+} from '../core/constants.ts';
+import { getFacilityTier } from '../core/construction.ts';
+import { refreshTopBar } from './topbar.ts';
 import './crewAdmin.css';
-import type { GameState } from '../core/gameState.js';
+import type { GameState } from '../core/gameState.ts';
 
 
 // ---------------------------------------------------------------------------

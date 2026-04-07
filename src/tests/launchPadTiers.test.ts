@@ -17,7 +17,7 @@ import {
   getTotalMass,
   runValidation,
   hasLaunchClamps,
-} from '../core/rocketvalidator.js';
+} from '../core/rocketvalidator.ts';
 import {
   createRocketAssembly,
   addPartToAssembly,
@@ -25,15 +25,15 @@ import {
   createStagingConfig,
   assignPartToStage,
   syncStagingWithAssembly,
-} from '../core/rocketbuilder.js';
-import { createGameState } from '../core/gameState.js';
-import { createPhysicsState } from '../core/physics.js';
+} from '../core/rocketbuilder.ts';
+import { createGameState } from '../core/gameState.ts';
+import { createPhysicsState } from '../core/physics.ts';
 import {
   FacilityId,
   LAUNCH_PAD_MAX_MASS,
   PartType,
-} from '../core/constants.js';
-import { getPartById } from '../data/parts.js';
+} from '../core/constants.ts';
+import { getPartById } from '../data/parts.ts';
 
 // ---------------------------------------------------------------------------
 // Test helpers

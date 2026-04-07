@@ -14,7 +14,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createGameState } from '../core/gameState.js';
+import { createGameState } from '../core/gameState.ts';
 import {
   isNodeResearched,
   isNodeTutorialUnlocked,
@@ -26,7 +26,7 @@ import {
   getTechTreeUnlockedInstruments,
   isInstrumentAvailable,
   getTechTreeStatus,
-} from '../core/techtree.js';
+} from '../core/techtree.ts';
 import {
   TECH_NODES,
   TechBranch,
@@ -36,14 +36,14 @@ import {
   getNodesByBranch,
   getNodeByBranchAndTier,
   getAllTechNodes,
-} from '../data/techtree.js';
+} from '../data/techtree.ts';
 import {
   getAvailableInstruments,
   getInstrumentsByTier,
-} from '../data/instruments.js';
-import { getUnlockedParts } from '../core/missions.js';
-import { FacilityId, RD_TIER_MAX_TECH } from '../core/constants.js';
-import { buildFacility } from '../core/construction.js';
+} from '../data/instruments.ts';
+import { getUnlockedParts } from '../core/missions.ts';
+import { FacilityId, RD_TIER_MAX_TECH } from '../core/constants.ts';
+import { buildFacility } from '../core/construction.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers

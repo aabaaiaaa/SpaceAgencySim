@@ -6,9 +6,9 @@
  * mutate them via setVabState(patch).
  */
 
-import type { RocketAssembly, StagingConfig, PlacedPart } from '../../core/rocketbuilder.js';
-import type { GameState, InventoryPart } from '../../core/gameState.js';
-import type { ValidationResult } from '../../core/rocketvalidator.js';
+import type { RocketAssembly, StagingConfig, PlacedPart } from '../../core/rocketbuilder.ts';
+import type { GameState, InventoryPart } from '../../core/gameState.ts';
+import type { ValidationResult } from '../../core/rocketvalidator.ts';
 
 /** The panel width for each side panel. */
 export const SIDE_PANEL_WIDTH: number = 300;

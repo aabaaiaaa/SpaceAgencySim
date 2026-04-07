@@ -4,12 +4,12 @@
  * @module missionControl/_contractsTab
  */
 
-import type { Contract, ObjectiveDef } from '../../core/gameState.js';
-import { acceptContract, cancelContract, getContractCaps, getActiveConflicts, getMissionControlTier } from '../../core/contracts.js';
-import { CONTRACT_CATEGORY_ICONS, MCC_TIER_FEATURES, getReputationTier } from '../../core/constants.js';
-import { getMCState } from './_state.js';
-import { fmtCash, getContent } from './_shell.js';
-import { logger } from '../../core/logger.js';
+import type { Contract, ObjectiveDef } from '../../core/gameState.ts';
+import { acceptContract, cancelContract, getContractCaps, getActiveConflicts, getMissionControlTier } from '../../core/contracts.ts';
+import { CONTRACT_CATEGORY_ICONS, MCC_TIER_FEATURES, getReputationTier } from '../../core/constants.ts';
+import { getMCState } from './_state.ts';
+import { fmtCash, getContent } from './_shell.ts';
+import { logger } from '../../core/logger.ts';
 
 /**
  * Extended contract shape that includes bonus objectives, bonus reward,

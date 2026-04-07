@@ -19,32 +19,32 @@
  * @module core/flightReturn
  */
 
-import { completeMission } from './missions.js';
-import { earn, applyInterest, applyDeathFine } from './finance.js';
-import { advancePeriod } from './period.js';
-import { initWeather } from './weather.js';
-import { getPartById } from '../data/parts.js';
-import { PartType, DEATH_FINE_PER_ASTRONAUT, FlightOutcome } from './constants.js';
-import { processContractCompletions, generateContracts } from './contracts.js';
-import { deploySatellitesFromFlight } from './satellites.js';
-import { awardFlightXP, getMaxCrewSkill, processFlightInjuries } from './crew.js';
-import { recoverPartsToInventory } from './partInventory.js';
+import { completeMission } from './missions.ts';
+import { earn, applyInterest, applyDeathFine } from './finance.ts';
+import { advancePeriod } from './period.ts';
+import { initWeather } from './weather.ts';
+import { getPartById } from '../data/parts.ts';
+import { PartType, DEATH_FINE_PER_ASTRONAUT, FlightOutcome } from './constants.ts';
+import { processContractCompletions, generateContracts } from './contracts.ts';
+import { deploySatellitesFromFlight } from './satellites.ts';
+import { awardFlightXP, getMaxCrewSkill, processFlightInjuries } from './crew.ts';
+import { recoverPartsToInventory } from './partInventory.ts';
 import {
   applyCrewDeathReputation, applySafeCrewReturnReputation,
   applyMissionFailureReputation, applyRocketDestructionReputation,
-} from './reputation.js';
-import { processSampleReturns } from './surfaceOps.js';
-import { checkAchievements } from './achievements.js';
-import { createFieldCraft, hasExtendedLifeSupport } from './lifeSupport.js';
-import { FieldCraftStatus } from './constants.js';
-import { processChallengeCompletion } from './challenges.js';
-import type { GameState, FlightState, FlightResult, FlightEvent, InventoryPart, Contract, FieldCraft } from './gameState.js';
-import type { PhysicsState, RocketAssembly } from './physics.js';
-import type { CompleteMissionResult } from './missions.js';
-import type { MissionDef } from '../data/missions.js';
-import type { RecoverPartsResult } from './partInventory.js';
-import type { PeriodSummary } from './period.js';
-import type { AwardedAchievement } from './achievements.js';
+} from './reputation.ts';
+import { processSampleReturns } from './surfaceOps.ts';
+import { checkAchievements } from './achievements.ts';
+import { createFieldCraft, hasExtendedLifeSupport } from './lifeSupport.ts';
+import { FieldCraftStatus } from './constants.ts';
+import { processChallengeCompletion } from './challenges.ts';
+import type { GameState, FlightState, FlightResult, FlightEvent, InventoryPart, Contract, FieldCraft } from './gameState.ts';
+import type { PhysicsState, RocketAssembly } from './physics.ts';
+import type { CompleteMissionResult } from './missions.ts';
+import type { MissionDef } from '../data/missions.ts';
+import type { RecoverPartsResult } from './partInventory.ts';
+import type { PeriodSummary } from './period.ts';
+import type { AwardedAchievement } from './achievements.ts';
 
 // ---------------------------------------------------------------------------
 // Interfaces

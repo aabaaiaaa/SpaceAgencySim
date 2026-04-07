@@ -10,12 +10,12 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { createGameState } from '../core/gameState.js';
+import { createGameState } from '../core/gameState.ts';
 import {
   saveGame,
   loadGame,
   _setSessionStartTimeForTesting,
-} from '../core/saveload.js';
+} from '../core/saveload.ts';
 
 // ---------------------------------------------------------------------------
 // localStorage mock (same pattern as saveload.test.js)

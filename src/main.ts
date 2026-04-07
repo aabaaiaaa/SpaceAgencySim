@@ -3,28 +3,28 @@
 // Core game logic (src/core/) is kept free of DOM/canvas dependencies so it
 // can be exercised by headless Vitest tests without a browser environment.
 
-import { initRenderer } from './render/index.js';
-import { initVabRenderer } from './render/vab.js';
-import { initHubRenderer } from './render/hub.js';
-import { showMainMenu, initUI, returnToHubFromFlight } from './ui/index.js';
-import { buildTestRocket } from './core/testFlightBuilder.js';
-import { startFlightScene, stopFlightScene } from './ui/flightController.js';
-import { createFlightState } from './core/gameState.js';
-import type { GameState, FlightState } from './core/gameState.js';
-import type { RocketAssembly } from './core/rocketbuilder.js';
-import type { PhysicsState } from './core/physics.js';
-import type { CelestialBodyDef } from './data/bodies.js';
-import type { CelestialBody } from './core/constants.js';
-import { setMalfunctionMode } from './core/malfunction.js';
-import { plantFlag, collectSurfaceSample, deploySurfaceInstrument, deployBeacon, processSurfaceOps, processSampleReturns, areSurfaceItemsVisible } from './core/surfaceOps.js';
-import { checkAchievements } from './core/achievements.js';
-import type { AchievementCheckContext } from './core/achievements.js';
-import { computeTransferDeltaV } from './core/manoeuvre.js';
-import { CELESTIAL_BODIES, isLandable } from './data/bodies.js';
-import { getPartById } from './data/parts.js';
-import { autoSaveImmediate } from './ui/autoSaveToast.js';
-import { isAutoSaveEnabled, AUTO_SAVE_KEY } from './core/autoSave.js';
-import { logger } from './core/logger.js';
+import { initRenderer } from './render/index.ts';
+import { initVabRenderer } from './render/vab.ts';
+import { initHubRenderer } from './render/hub.ts';
+import { showMainMenu, initUI, returnToHubFromFlight } from './ui/index.ts';
+import { buildTestRocket } from './core/testFlightBuilder.ts';
+import { startFlightScene, stopFlightScene } from './ui/flightController.ts';
+import { createFlightState } from './core/gameState.ts';
+import type { GameState, FlightState } from './core/gameState.ts';
+import type { RocketAssembly } from './core/rocketbuilder.ts';
+import type { PhysicsState } from './core/physics.ts';
+import type { CelestialBodyDef } from './data/bodies.ts';
+import type { CelestialBody } from './core/constants.ts';
+import { setMalfunctionMode } from './core/malfunction.ts';
+import { plantFlag, collectSurfaceSample, deploySurfaceInstrument, deployBeacon, processSurfaceOps, processSampleReturns, areSurfaceItemsVisible } from './core/surfaceOps.ts';
+import { checkAchievements } from './core/achievements.ts';
+import type { AchievementCheckContext } from './core/achievements.ts';
+import { computeTransferDeltaV } from './core/manoeuvre.ts';
+import { CELESTIAL_BODIES, isLandable } from './data/bodies.ts';
+import { getPartById } from './data/parts.ts';
+import { autoSaveImmediate } from './ui/autoSaveToast.ts';
+import { isAutoSaveEnabled, AUTO_SAVE_KEY } from './core/autoSave.ts';
+import { logger } from './core/logger.ts';
 
 // E2E test API options for programmatic flight launches.
 interface E2eFlightOpts {

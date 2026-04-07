@@ -49,20 +49,20 @@
  * @module atmosphere
  */
 
-import { getPartById } from '../data/parts.js';
-import { PartType } from './constants.js';
+import { getPartById } from '../data/parts.ts';
+import { PartType } from './constants.ts';
 import {
   SUN_DESTRUCTION_ALTITUDE,
   SUN_HEAT_START_ALTITUDE,
   SUN_HEAT_RATE_BASE,
   STANDARD_SHIELD_SOLAR_RESISTANCE,
   BODY_RADIUS,
-} from './constants.js';
-import { getAirDensity as _bodyAirDensity, getAtmosphereTop as _bodyAtmoTop, hasAtmosphere } from '../data/bodies.js';
+} from './constants.ts';
+import { getAirDensity as _bodyAirDensity, getAtmosphereTop as _bodyAtmoTop, hasAtmosphere } from '../data/bodies.ts';
 
-import type { PartDef } from '../data/parts.js';
-import type { PhysicsState, RocketAssembly } from './physics.js';
-import type { FlightState } from './gameState.js';
+import type { PartDef } from '../data/parts.ts';
+import type { PhysicsState, RocketAssembly } from './physics.ts';
+import type { FlightState } from './gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Minimal duck-type interfaces for function parameters

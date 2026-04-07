@@ -5,18 +5,18 @@
  * @module ui/flightController/_postFlight
  */
 
-import { getPartById } from '../../data/parts.js';
-import { PartType, DEATH_FINE_PER_ASTRONAUT } from '../../core/constants.js';
-import { processFlightReturn } from '../../core/flightReturn.js';
-import { createFlightState } from '../../core/gameState.js';
-import { refreshTopBar } from '../topbar.js';
-import { getFCState } from './_state.js';
-import { stopFlightScene, startFlightScene } from './_init.js';
-import { triggerAutoSave } from '../autoSaveToast.js';
+import { getPartById } from '../../data/parts.ts';
+import { PartType, DEATH_FINE_PER_ASTRONAUT } from '../../core/constants.ts';
+import { processFlightReturn } from '../../core/flightReturn.ts';
+import { createFlightState } from '../../core/gameState.ts';
+import { refreshTopBar } from '../topbar.ts';
+import { getFCState } from './_state.ts';
+import { stopFlightScene, startFlightScene } from './_init.ts';
+import { triggerAutoSave } from '../autoSaveToast.ts';
 
-import type { PhysicsState } from '../../core/physics.js';
-import type { RocketAssembly } from '../../core/rocketbuilder.js';
-import type { FlightState, GameState, FlightEvent } from '../../core/gameState.js';
+import type { PhysicsState } from '../../core/physics.ts';
+import type { RocketAssembly } from '../../core/rocketbuilder.ts';
+import type { FlightState, GameState, FlightEvent } from '../../core/gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Flight event formatting helpers

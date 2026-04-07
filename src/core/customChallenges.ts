@@ -16,9 +16,9 @@
  * @module core/customChallenges
  */
 
-import { ObjectiveType } from '../data/missions.js';
-import { MedalTier, ScoreDirection } from '../data/challenges.js';
-import type { GameState, ChallengeDef, ObjectiveDef } from './gameState.js';
+import { ObjectiveType } from '../data/missions.ts';
+import { MedalTier, ScoreDirection } from '../data/challenges.ts';
+import type { GameState, ChallengeDef, ObjectiveDef } from './gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Local types

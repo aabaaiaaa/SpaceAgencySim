@@ -10,7 +10,7 @@ import {
   tickLandedParachutes,
   deployParachute,
   POST_LANDING_STOW_DELAY,
-} from '../core/parachute.js';
+} from '../core/parachute.ts';
 
 /** Create a minimal physics state with one parachute entry. */
 function makePsWithChute(overrides = {}) {

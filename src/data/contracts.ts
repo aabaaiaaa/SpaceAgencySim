@@ -16,9 +16,9 @@
  * @module data/contracts
  */
 
-import { ContractCategory, CONTRACT_CONFLICT_TAGS, CONTRACT_BONUS_REWARD_RATE, PartType } from '../core/constants.js';
-import { ObjectiveType } from './missions.js';
-import type { GameState, ObjectiveDef } from '../core/gameState.js';
+import { ContractCategory, CONTRACT_CONFLICT_TAGS, CONTRACT_BONUS_REWARD_RATE, PartType } from '../core/constants.ts';
+import { ObjectiveType } from './missions.ts';
+import type { GameState, ObjectiveDef } from '../core/gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Types

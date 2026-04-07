@@ -9,4 +9,4 @@
  * @module missionControl
  */
 
-export { initMissionControlUI, destroyMissionControlUI } from './missionControl/_init.js';
+export { initMissionControlUI, destroyMissionControlUI } from './missionControl/_init.ts';

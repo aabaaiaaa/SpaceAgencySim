@@ -29,16 +29,16 @@ import {
   importSave,
   SAVE_SLOT_COUNT,
   SAVE_VERSION,
-} from '../core/saveload.js';
-import { createGameState } from '../core/gameState.js';
-import { initializeMissions, reconcileParts } from '../core/missions.js';
-import { GameMode, FACILITY_DEFINITIONS, SANDBOX_STARTING_MONEY } from '../core/constants.js';
-import { getAllParts } from '../data/parts.js';
-import { TECH_NODES } from '../data/techtree.js';
-import { logger } from '../core/logger.js';
+} from '../core/saveload.ts';
+import { createGameState } from '../core/gameState.ts';
+import { initializeMissions, reconcileParts } from '../core/missions.ts';
+import { GameMode, FACILITY_DEFINITIONS, SANDBOX_STARTING_MONEY } from '../core/constants.ts';
+import { getAllParts } from '../data/parts.ts';
+import { TECH_NODES } from '../data/techtree.ts';
+import { logger } from '../core/logger.ts';
 import './mainmenu.css';
-import type { GameState, SandboxSettings } from '../core/gameState.js';
-import type { SaveSlotSummary } from '../core/saveload.js';
+import type { GameState, SandboxSettings } from '../core/gameState.ts';
+import type { SaveSlotSummary } from '../core/saveload.ts';
 
 // ---------------------------------------------------------------------------
 // Shooting stars

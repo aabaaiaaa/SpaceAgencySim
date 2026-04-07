@@ -12,15 +12,15 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createGameState } from '../core/gameState.js';
-import { advancePeriod } from '../core/period.js';
+import { createGameState } from '../core/gameState.ts';
+import { advancePeriod } from '../core/period.ts';
 import {
   CREW_SALARY_PER_PERIOD,
   FACILITY_UPKEEP_PER_PERIOD,
   FACILITY_DEFINITIONS,
   AstronautStatus,
   STARTING_MONEY,
-} from '../core/constants.js';
+} from '../core/constants.ts';
 
 /** Number of starter facilities pre-built in a fresh game. */
 const STARTER_COUNT = FACILITY_DEFINITIONS.filter((f) => f.starter).length;

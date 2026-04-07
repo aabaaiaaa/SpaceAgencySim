@@ -27,7 +27,7 @@ import {
   scrapPart,
   useInventoryPart,
   recoverPartsToInventory,
-} from '../core/partInventory.js';
+} from '../core/partInventory.ts';
 import {
   PartType,
   WEAR_PER_FLIGHT_PASSIVE,
@@ -37,14 +37,14 @@ import {
   WEAR_AFTER_REFURBISH,
   REFURBISH_COST_FRACTION,
   SCRAP_VALUE_FRACTION,
-} from '../core/constants.js';
-import { createGameState } from '../core/gameState.js';
-import { getPartById } from '../data/parts.js';
+} from '../core/constants.ts';
+import { createGameState } from '../core/gameState.ts';
+import { getPartById } from '../data/parts.ts';
 import {
   createRocketAssembly,
   addPartToAssembly,
   connectParts,
-} from '../core/rocketbuilder.js';
+} from '../core/rocketbuilder.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers

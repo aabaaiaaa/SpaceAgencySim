@@ -9,7 +9,7 @@
  * contain enough data for every subsystem to function correctly.
  */
 
-import { createGameState, createCrewMember } from './gameState.js';
+import { createGameState, createCrewMember } from './gameState.ts';
 import {
   STARTING_MONEY,
   GameMode,
@@ -19,9 +19,9 @@ import {
   SatelliteType,
   ContractCategory,
   FlightOutcome,
-} from './constants.js';
+} from './constants.ts';
 
-import type { GameState, CrewMember, CrewSkills, RocketDesign, Mission, FlightResult } from './gameState.js';
+import type { GameState, CrewMember, CrewSkills, RocketDesign, Mission, FlightResult } from './gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers

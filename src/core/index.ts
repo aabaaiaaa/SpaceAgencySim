@@ -14,9 +14,9 @@
 // Because this layer has no browser dependencies it can be unit-tested
 // headlessly via Vitest (see src/tests/).
 
-export * from './constants.js';
-export * from './gameState.js';
-export * from './finance.js';
-export * from './saveload.js';
-export * from './crew.js';
-export * from './missions.js';
+export * from './constants.ts';
+export * from './gameState.ts';
+export * from './finance.ts';
+export * from './saveload.ts';
+export * from './crew.ts';
+export * from './missions.ts';

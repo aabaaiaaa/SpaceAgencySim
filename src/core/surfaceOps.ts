@@ -23,13 +23,13 @@ import {
   SatelliteType,
   CelestialBody,
   PartType,
-} from './constants.js';
-import { earnReward } from './finance.js';
-import { getActiveSatellites } from './satellites.js';
-import { getPartById } from '../data/parts.js';
-import type { GameState, FlightState, SurfaceItem } from './gameState.js';
-import type { PhysicsState, RocketAssembly } from './physics.js';
-import type { PartDef } from '../data/parts.js';
+} from './constants.ts';
+import { earnReward } from './finance.ts';
+import { getActiveSatellites } from './satellites.ts';
+import { getPartById } from '../data/parts.ts';
+import type { GameState, FlightState, SurfaceItem } from './gameState.ts';
+import type { PhysicsState, RocketAssembly } from './physics.ts';
+import type { PartDef } from '../data/parts.ts';
 
 // ---------------------------------------------------------------------------
 // Local types

@@ -3,16 +3,16 @@
  * dialog, flight initiation.
  */
 
-import { getPartById } from '../../data/parts.js';
-import { PartType, DEATH_FINE_PER_ASTRONAUT } from '../../core/constants.js';
-import { getCurrentWeather } from '../../core/weather.js';
-import { getActiveCrew } from '../../core/crew.js';
-import { createRocketDesign, createFlightState } from '../../core/gameState.js';
-import type { GameState } from '../../core/gameState.js';
-import type { FlightReturnSummary } from '../../core/flightReturn.js';
-import { startFlightScene } from '../flightController.js';
-import { showReturnResultsOverlay } from '../hub.js';
-import { getVabState } from './_state.js';
+import { getPartById } from '../../data/parts.ts';
+import { PartType, DEATH_FINE_PER_ASTRONAUT } from '../../core/constants.ts';
+import { getCurrentWeather } from '../../core/weather.ts';
+import { getActiveCrew } from '../../core/crew.ts';
+import { createRocketDesign, createFlightState } from '../../core/gameState.ts';
+import type { GameState } from '../../core/gameState.ts';
+import type { FlightReturnSummary } from '../../core/flightReturn.ts';
+import { startFlightScene } from '../flightController.ts';
+import { showReturnResultsOverlay } from '../hub.ts';
+import { getVabState } from './_state.ts';
 
 // ---------------------------------------------------------------------------
 // Forward references — set by _init.js to break circular deps

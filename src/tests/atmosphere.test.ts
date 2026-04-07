@@ -40,7 +40,7 @@ import {
   HEAT_SHIELD_TOLERANCE,
   HEAT_DISSIPATION_PER_TICK,
   EXPOSED_HEAT_FRACTION,
-} from '../core/atmosphere.js';
+} from '../core/atmosphere.ts';
 import {
   createRocketAssembly,
   addPartToAssembly,
@@ -48,10 +48,10 @@ import {
   createStagingConfig,
   syncStagingWithAssembly,
   assignPartToStage,
-} from '../core/rocketbuilder.js';
-import { getPartById } from '../data/parts.js';
-import { createFlightState } from '../core/gameState.js';
-import { createPhysicsState, tick } from '../core/physics.js';
+} from '../core/rocketbuilder.ts';
+import { getPartById } from '../data/parts.ts';
+import { createFlightState } from '../core/gameState.ts';
+import { createPhysicsState, tick } from '../core/physics.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers

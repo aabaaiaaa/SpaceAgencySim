@@ -5,20 +5,20 @@
  * @module ui/flightController/_menuActions
  */
 
-import { saveGame, listSaves } from '../../core/saveload.js';
-import { getPartById } from '../../data/parts.js';
-import { createFlightState } from '../../core/gameState.js';
-import { FlightPhase } from '../../core/constants.js';
-import { isPlayerLocked, getPhaseLabel } from '../../core/flightPhase.js';
-import { processFlightReturn } from '../../core/flightReturn.js';
-import { refreshTopBar } from '../topbar.js';
-import { getFCState } from './_state.js';
-import { showPhaseNotification } from './_flightPhase.js';
-import { showPostFlightSummary, buildFlightEventList } from './_postFlight.js';
-import { stopFlightScene, startFlightScene } from './_init.js';
+import { saveGame, listSaves } from '../../core/saveload.ts';
+import { getPartById } from '../../data/parts.ts';
+import { createFlightState } from '../../core/gameState.ts';
+import { FlightPhase } from '../../core/constants.ts';
+import { isPlayerLocked, getPhaseLabel } from '../../core/flightPhase.ts';
+import { processFlightReturn } from '../../core/flightReturn.ts';
+import { refreshTopBar } from '../topbar.ts';
+import { getFCState } from './_state.ts';
+import { showPhaseNotification } from './_flightPhase.ts';
+import { showPostFlightSummary, buildFlightEventList } from './_postFlight.ts';
+import { stopFlightScene, startFlightScene } from './_init.ts';
 
-import type { RocketAssembly } from '../../core/rocketbuilder.js';
-import type { GameState } from '../../core/gameState.js';
+import type { RocketAssembly } from '../../core/rocketbuilder.ts';
+import type { GameState } from '../../core/gameState.ts';
 
 /**
  * Save the current game to the first available (empty) slot, or slot 0 as a

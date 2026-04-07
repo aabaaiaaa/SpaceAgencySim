@@ -2,17 +2,17 @@
  * _partsPanel.ts — Parts browsing, filtering, detail popup, drag-from-panel logic.
  */
 
-import { PARTS, getPartById } from '../../data/parts.js';
-import type { PartDef } from '../../data/parts.js';
-import { PartType } from '../../core/constants.js';
+import { PARTS, getPartById } from '../../data/parts.ts';
+import type { PartDef } from '../../data/parts.ts';
+import { PartType } from '../../core/constants.ts';
 import {
   getInventoryCount,
   getInventoryForPart,
   getEffectiveReliability,
-} from '../../core/partInventory.js';
-import { getVabState } from './_state.js';
+} from '../../core/partInventory.ts';
+import { getVabState } from './_state.ts';
 
-import type { GameState } from '../../core/gameState.js';
+import type { GameState } from '../../core/gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Part-type display helpers

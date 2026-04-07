@@ -34,20 +34,20 @@
  * @module staging
  */
 
-import { getPartById }              from '../data/parts.js';
-import { PartType }                 from './constants.js';
-import { airDensity, SEA_LEVEL_DENSITY } from './atmosphere.js';
-import { tickFuelSystem }           from './fuelsystem.js';
-import { deployParachute, DEPLOY_DURATION, LOW_DENSITY_THRESHOLD } from './parachute.js';
-import { deployLandingLeg, getDeployedLegFootOffset } from './legs.js';
-import { activateEjectorSeat } from './ejector.js';
-import { activateScienceModule, activateInstrument, parseInstrumentKey } from './sciencemodule.js';
-import { applySeparationImpulse } from './collision.js';
-import { getMalfunction } from './malfunction.js';
-import { MalfunctionType } from './constants.js';
+import { getPartById }              from '../data/parts.ts';
+import { PartType }                 from './constants.ts';
+import { airDensity, SEA_LEVEL_DENSITY } from './atmosphere.ts';
+import { tickFuelSystem }           from './fuelsystem.ts';
+import { deployParachute, DEPLOY_DURATION, LOW_DENSITY_THRESHOLD } from './parachute.ts';
+import { deployLandingLeg, getDeployedLegFootOffset } from './legs.ts';
+import { activateEjectorSeat } from './ejector.ts';
+import { activateScienceModule, activateInstrument, parseInstrumentKey } from './sciencemodule.ts';
+import { applySeparationImpulse } from './collision.ts';
+import { getMalfunction } from './malfunction.ts';
+import { MalfunctionType } from './constants.ts';
 
-import type { PhysicsState, RocketAssembly } from './physics.js';
-import type { FlightState, FlightEvent } from './gameState.js';
+import type { PhysicsState, RocketAssembly } from './physics.ts';
+import type { FlightState, FlightEvent } from './gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Constants

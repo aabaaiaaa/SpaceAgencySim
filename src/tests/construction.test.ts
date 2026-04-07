@@ -15,7 +15,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createGameState } from '../core/gameState.js';
+import { createGameState } from '../core/gameState.ts';
 import {
   hasFacility,
   getFacilityDef,
@@ -26,7 +26,7 @@ import {
   canUpgradeFacility,
   upgradeFacility,
   getDiscountedMoneyCost,
-} from '../core/construction.js';
+} from '../core/construction.ts';
 import {
   FacilityId,
   FACILITY_DEFINITIONS,
@@ -36,7 +36,7 @@ import {
   getFacilityUpgradeDef,
   STARTING_REPUTATION,
   getReputationDiscount,
-} from '../core/constants.js';
+} from '../core/constants.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers

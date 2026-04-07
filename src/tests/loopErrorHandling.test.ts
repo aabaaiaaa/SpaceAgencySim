@@ -72,8 +72,8 @@ vi.mock('../ui/flightController/_menuActions.js', () => ({
 // vi.mock calls, but this makes the intent clear).
 // ---------------------------------------------------------------------------
 
-import { loop, MAX_CONSECUTIVE_LOOP_ERRORS } from '../ui/flightController/_loop.js';
-import { getFCState, setFCState, resetFCState } from '../ui/flightController/_state.js';
+import { loop, MAX_CONSECUTIVE_LOOP_ERRORS } from '../ui/flightController/_loop.ts';
+import { getFCState, setFCState, resetFCState } from '../ui/flightController/_state.ts';
 
 // ---------------------------------------------------------------------------
 // Minimal DOM stubs (the test environment is Node, not jsdom).

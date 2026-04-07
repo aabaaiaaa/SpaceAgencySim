@@ -26,9 +26,9 @@ import {
   REP_LOSS_MISSION_FAILURE,
   REP_LOSS_ROCKET_DESTRUCTION,
   getReputationTier,
-} from './constants.js';
+} from './constants.ts';
 
-import type { GameState } from './gameState.js';
+import type { GameState } from './gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Core helpers

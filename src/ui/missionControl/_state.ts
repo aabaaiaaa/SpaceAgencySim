@@ -8,7 +8,7 @@
  * @module missionControl/_state
  */
 
-import type { GameState } from '../../core/gameState.js';
+import type { GameState } from '../../core/gameState.ts';
 
 export interface MCState {
   overlay: HTMLElement | null;

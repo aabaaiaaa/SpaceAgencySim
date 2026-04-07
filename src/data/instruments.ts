@@ -49,8 +49,8 @@
  * @module data/instruments
  */
 
-import type { GameState } from '../core/gameState.js';
-import type { ScienceDataType } from '../core/constants.js';
+import type { GameState } from '../core/gameState.ts';
+import type { ScienceDataType } from '../core/constants.ts';
 
 // ---------------------------------------------------------------------------
 // Type Definitions

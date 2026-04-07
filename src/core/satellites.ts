@@ -45,13 +45,13 @@ import {
   OrbitalObjectType,
   FacilityId,
   BODY_RADIUS,
-} from './constants.js';
-import { createOrbitalObject, getAltitudeBandId, getMinOrbitAltitude } from './orbit.js';
-import { hasFacility, getFacilityTier } from './construction.js';
-import { getPartById } from '../data/parts.js';
-import { getSunlitFraction, getSatellitePowerInfo } from './power.js';
+} from './constants.ts';
+import { createOrbitalObject, getAltitudeBandId, getMinOrbitAltitude } from './orbit.ts';
+import { hasFacility, getFacilityTier } from './construction.ts';
+import { getPartById } from '../data/parts.ts';
+import { getSunlitFraction, getSatellitePowerInfo } from './power.ts';
 
-import type { GameState, SatelliteRecord, OrbitalElements } from './gameState.js';
+import type { GameState, SatelliteRecord, OrbitalElements } from './gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Deployment

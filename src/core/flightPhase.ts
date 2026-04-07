@@ -24,16 +24,16 @@
  * @module core/flightPhase
  */
 
-import { FlightPhase, MIN_ORBIT_ALTITUDE, ControlMode } from './constants.js';
-import type { CelestialBody } from './constants.js';
+import { FlightPhase, MIN_ORBIT_ALTITUDE, ControlMode } from './constants.ts';
+import type { CelestialBody } from './constants.ts';
 import {
   isOrbitalBurnActive, shouldEnterManoeuvre, shouldExitManoeuvre,
   shouldEnterTransfer, isEscapeTrajectory, checkSOITransition,
   getTransferTargets, computeTransferDeltaV,
-} from './manoeuvre.js';
-import { checkOrbitStatus, computeOrbitalElements } from './orbit.js';
-import type { FlightState, PhaseTransition, OrbitalElements } from './gameState.js';
-import type { PhysicsState } from './physics.js';
+} from './manoeuvre.ts';
+import { checkOrbitStatus, computeOrbitalElements } from './orbit.ts';
+import type { FlightState, PhaseTransition, OrbitalElements } from './gameState.ts';
+import type { PhysicsState } from './physics.ts';
 
 // ---------------------------------------------------------------------------
 // Local types

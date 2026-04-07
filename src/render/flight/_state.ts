@@ -11,7 +11,7 @@ import * as PIXI from 'pixi.js';
 import {
   SKY_SEA_LEVEL, SKY_HIGH_ALT, SKY_SPACE,
   STAR_FADE_START, STAR_FADE_FULL, GROUND_COLOR,
-} from './_constants.js';
+} from './_constants.ts';
 
 export interface TrailSegment {
   worldX: number;

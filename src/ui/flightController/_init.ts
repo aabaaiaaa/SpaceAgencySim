@@ -5,39 +5,39 @@
  * @module ui/flightController/_init
  */
 
-import { initFlightRenderer, destroyFlightRenderer, setFlightWeather } from '../../render/flight.js';
-import { hideHubScene } from '../../render/hub.js';
-import { initMapRenderer, destroyMapRenderer } from '../../render/map.js';
-import { createPhysicsState } from '../../core/physics.js';
-import { initFlightHud, destroyFlightHud, showLaunchTip } from '../flightHud.js';
-import { initFlightContextMenu, destroyFlightContextMenu } from '../flightContextMenu.js';
-import { setTopBarFlightItems, clearTopBarFlightItems, clearTopBarHubItems, setTopBarDropdownToggleCallback, setCurrentScreen } from '../topbar.js';
-import { setMalfunctionMode, getMalfunctionMode } from '../../core/malfunction.js';
-import { createDockingState } from '../../core/docking.js';
-import { getPartById } from '../../data/parts.js';
-import { getVabInventoryUsedParts } from '../vab.js';
-import { getFCState, resetFCState } from './_state.js';
+import { initFlightRenderer, destroyFlightRenderer, setFlightWeather } from '../../render/flight.ts';
+import { hideHubScene } from '../../render/hub.ts';
+import { initMapRenderer, destroyMapRenderer } from '../../render/map.ts';
+import { createPhysicsState } from '../../core/physics.ts';
+import { initFlightHud, destroyFlightHud, showLaunchTip } from '../flightHud.ts';
+import { initFlightContextMenu, destroyFlightContextMenu } from '../flightContextMenu.ts';
+import { setTopBarFlightItems, clearTopBarFlightItems, clearTopBarHubItems, setTopBarDropdownToggleCallback, setCurrentScreen } from '../topbar.ts';
+import { setMalfunctionMode, getMalfunctionMode } from '../../core/malfunction.ts';
+import { createDockingState } from '../../core/docking.ts';
+import { getPartById } from '../../data/parts.ts';
+import { getVabInventoryUsedParts } from '../vab.ts';
+import { getFCState, resetFCState } from './_state.ts';
 import './flightController.css';
-import { onKeyDown, onKeyUp } from './_keyboard.js';
-import { onTimeWarpButtonClick } from './_timeWarp.js';
-import { onSurfaceAction } from './_surfaceActions.js';
-import { destroyMapHud } from './_mapView.js';
-import { destroyDockingHud } from './_docking.js';
-import { loop } from './_loop.js';
-import { initFpsMonitor, showFpsMonitor, hideFpsMonitor, destroyFpsMonitor } from '../fpsMonitor.js';
+import { onKeyDown, onKeyUp } from './_keyboard.ts';
+import { onTimeWarpButtonClick } from './_timeWarp.ts';
+import { onSurfaceAction } from './_surfaceActions.ts';
+import { destroyMapHud } from './_mapView.ts';
+import { destroyDockingHud } from './_docking.ts';
+import { loop } from './_loop.ts';
+import { initFpsMonitor, showFpsMonitor, hideFpsMonitor, destroyFpsMonitor } from '../fpsMonitor.ts';
 import {
   handleMenuRestart,
   handleMenuAdjustBuild,
   handleMenuReturnToAgency,
   handleAbortReturnToAgency,
   handleMenuFlightLog,
-} from './_menuActions.js';
-import { logger } from '../../core/logger.js';
-import { initPhysicsWorker, resyncWorkerState, terminatePhysicsWorker } from './_workerBridge.js';
+} from './_menuActions.ts';
+import { logger } from '../../core/logger.ts';
+import { initPhysicsWorker, resyncWorkerState, terminatePhysicsWorker } from './_workerBridge.ts';
 
-import type { PhysicsState } from '../../core/physics.js';
-import type { RocketAssembly, StagingConfig, PlacedPart } from '../../core/rocketbuilder.js';
-import type { GameState, FlightState } from '../../core/gameState.js';
+import type { PhysicsState } from '../../core/physics.ts';
+import type { RocketAssembly, StagingConfig, PlacedPart } from '../../core/rocketbuilder.ts';
+import type { GameState, FlightState } from '../../core/gameState.ts';
 
 // E2E test globals attached to window.
 declare global {

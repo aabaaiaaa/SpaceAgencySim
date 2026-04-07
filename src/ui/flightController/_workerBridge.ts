@@ -8,15 +8,15 @@
  * @module ui/flightController/_workerBridge
  */
 
-import { logger } from '../../core/logger.js';
+import { logger } from '../../core/logger.ts';
 import {
   mapToRecord,
   setToArray,
-} from '../../core/physicsWorkerProtocol.js';
+} from '../../core/physicsWorkerProtocol.ts';
 
-import type { PhysicsState, InstrumentStateEntry, ScienceModuleStateEntry } from '../../core/physics.js';
-import type { FlightState } from '../../core/gameState.js';
-import type { RocketAssembly, StagingConfig, PlacedPart } from '../../core/rocketbuilder.js';
+import type { PhysicsState, InstrumentStateEntry, ScienceModuleStateEntry } from '../../core/physics.ts';
+import type { FlightState } from '../../core/gameState.ts';
+import type { RocketAssembly, StagingConfig, PlacedPart } from '../../core/rocketbuilder.ts';
 import type {
   WorkerCommand,
   WorkerMessage,
@@ -25,7 +25,7 @@ import type {
   SerialisedAssembly,
   SerialisedStagingConfig,
   SerialisedParachuteEntry,
-} from '../../core/physicsWorkerProtocol.js';
+} from '../../core/physicsWorkerProtocol.ts';
 
 // ---------------------------------------------------------------------------
 // Module state

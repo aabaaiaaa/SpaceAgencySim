@@ -7,4 +7,4 @@
  * @module ui/flightController
  */
 
-export { startFlightScene, stopFlightScene } from './flightController/_init.js';
+export { startFlightScene, stopFlightScene } from './flightController/_init.ts';

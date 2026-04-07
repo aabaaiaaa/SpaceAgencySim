@@ -12,7 +12,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createGameState } from '../core/gameState.js';
+import { createGameState } from '../core/gameState.ts';
 import {
   applyInterest,
   payDownLoan,
@@ -20,14 +20,14 @@ import {
   spend,
   earn,
   applyDeathFine,
-} from '../core/finance.js';
+} from '../core/finance.ts';
 import {
   STARTING_MONEY,
   STARTING_LOAN_BALANCE,
   DEFAULT_LOAN_INTEREST_RATE,
   DEATH_FINE_PER_ASTRONAUT,
   MAX_LOAN_BALANCE,
-} from '../core/constants.js';
+} from '../core/constants.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers

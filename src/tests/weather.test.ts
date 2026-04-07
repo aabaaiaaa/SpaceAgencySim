@@ -15,7 +15,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createGameState } from '../core/gameState.js';
+import { createGameState } from '../core/gameState.ts';
 import {
   generateWeather,
   initWeather,
@@ -25,12 +25,12 @@ import {
   getWindForce,
   getIspModifier,
   getWeatherForecast,
-} from '../core/weather.js';
+} from '../core/weather.ts';
 import {
   WEATHER_BASE_SKIP_COST,
   WEATHER_SKIP_ESCALATION,
   WEATHER_ISP_RANGE,
-} from '../core/constants.js';
+} from '../core/constants.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers

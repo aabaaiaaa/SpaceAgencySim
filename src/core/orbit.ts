@@ -42,10 +42,10 @@ import {
   MIN_ORBIT_ALTITUDE,
   ORBIT_SEGMENTS,
   PROXIMITY_ANGLE_DEG,
-} from './constants.js';
+} from './constants.ts';
 
-import type { AltitudeBand } from './constants.js';
-import type { OrbitalElements, OrbitalObject } from './gameState.js';
+import type { AltitudeBand } from './constants.ts';
+import type { OrbitalElements, OrbitalObject } from './gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Interfaces for complex return types

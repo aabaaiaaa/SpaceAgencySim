@@ -22,10 +22,10 @@ import {
   getEjectorSeatStatus,
   getEjectorSeatContextMenuItems,
   resolveCrewCasualties,
-} from '../core/ejector.js';
+} from '../core/ejector.ts';
 import {
   createPhysicsState,
-} from '../core/physics.js';
+} from '../core/physics.ts';
 import {
   createRocketAssembly,
   addPartToAssembly,
@@ -33,11 +33,11 @@ import {
   createStagingConfig,
   syncStagingWithAssembly,
   assignPartToStage,
-} from '../core/rocketbuilder.js';
-import { activateCurrentStage } from '../core/staging.js';
-import { createFlightState, createGameState } from '../core/gameState.js';
-import { hireCrew } from '../core/crew.js';
-import { AstronautStatus } from '../core/constants.js';
+} from '../core/rocketbuilder.ts';
+import { activateCurrentStage } from '../core/staging.ts';
+import { createFlightState, createGameState } from '../core/gameState.ts';
+import { hireCrew } from '../core/crew.ts';
+import { AstronautStatus } from '../core/constants.ts';
 
 // ---------------------------------------------------------------------------
 // Shared fixture helpers

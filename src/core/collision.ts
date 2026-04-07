@@ -29,10 +29,10 @@
  * @module collision
  */
 
-import { getPartById } from '../data/parts.js';
-import { airDensity }  from './atmosphere.js';
+import { getPartById } from '../data/parts.ts';
+import { airDensity }  from './atmosphere.ts';
 
-import type { PhysicsState, RocketAssembly } from './physics.js';
+import type { PhysicsState, RocketAssembly } from './physics.ts';
 
 // ---------------------------------------------------------------------------
 // Types

@@ -36,18 +36,18 @@
  * @module ui/flightHud
  */
 
-import { getPartById } from '../data/parts.js';
-import { PartType, ControlMode } from '../core/constants.js';
-import { logger } from '../core/logger.js';
-import { getControlModeLabel, checkBandLimitWarning } from '../core/controlMode.js';
-import { ObjectiveType } from '../data/missions.js';
-import { countDeployedLegs } from '../core/legs.js';
-import { getBiome } from '../core/biomes.js';
-import { getAvailableSurfaceActions } from '../core/surfaceOps.js';
+import { getPartById } from '../data/parts.ts';
+import { PartType, ControlMode } from '../core/constants.ts';
+import { logger } from '../core/logger.ts';
+import { getControlModeLabel, checkBandLimitWarning } from '../core/controlMode.ts';
+import { ObjectiveType } from '../data/missions.ts';
+import { countDeployedLegs } from '../core/legs.ts';
+import { getBiome } from '../core/biomes.ts';
+import { getAvailableSurfaceActions } from '../core/surfaceOps.ts';
 import './flightHud.css';
-import type { PhysicsState } from '../core/physics.js';
-import type { RocketAssembly, StagingConfig } from '../core/rocketbuilder.js';
-import type { FlightState, GameState } from '../core/gameState.js';
+import type { PhysicsState } from '../core/physics.ts';
+import type { RocketAssembly, StagingConfig } from '../core/rocketbuilder.ts';
+import type { FlightState, GameState } from '../core/gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Physics constant

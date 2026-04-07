@@ -16,7 +16,7 @@
  * @module core/partInventory
  */
 
-import { getPartById } from '../data/parts.js';
+import { getPartById } from '../data/parts.ts';
 import {
   PartType,
   WEAR_PER_FLIGHT_PASSIVE,
@@ -26,10 +26,10 @@ import {
   REFURBISH_COST_FRACTION,
   WEAR_AFTER_REFURBISH,
   SCRAP_VALUE_FRACTION,
-} from './constants.js';
-import { earn, spend } from './finance.js';
-import type { GameState, InventoryPart } from './gameState.js';
-import type { RocketAssembly, PhysicsState } from './physics.js';
+} from './constants.ts';
+import { earn, spend } from './finance.ts';
+import type { GameState, InventoryPart } from './gameState.ts';
+import type { RocketAssembly, PhysicsState } from './physics.ts';
 
 // ---------------------------------------------------------------------------
 // Wear calculation

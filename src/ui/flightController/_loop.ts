@@ -12,30 +12,30 @@
  * @module ui/flightController/_loop
  */
 
-import { tick } from '../../core/physics.js';
-import { checkObjectiveCompletion } from '../../core/missions.js';
-import { checkContractObjectives } from '../../core/contracts.js';
-import { checkChallengeObjectives } from '../../core/challenges.js';
-import { renderFlightFrame } from '../../render/flight.js';
-import { renderMapFrame } from '../../render/map.js';
-import { isDebrisTrackingAvailable } from '../../core/mapView.js';
-import { getSurfaceItemsAtBody } from '../../core/surfaceOps.js';
-import { evaluateComms } from '../../core/comms.js';
-import { FlightPhase } from '../../core/constants.js';
-import { PartType } from '../../core/constants.js';
-import { getPartById } from '../../data/parts.js';
-import { getPhaseLabel } from '../../core/flightPhase.js';
-import { getOrbitEntryLabel, checkOrbitStatus } from '../../core/orbit.js';
-import { getFCState } from './_state.js';
-import { recordFrame } from '../fpsMonitor.js';
-import { logger } from '../../core/logger.js';
-import { checkTimeWarpResets, applyTimeWarp } from './_timeWarp.js';
-import { applyMapThrust, updateMapHud } from './_mapView.js';
-import { applyNormalOrbitRcs } from './_orbitRcs.js';
-import { evaluateFlightPhase, showPhaseNotification } from './_flightPhase.js';
-import { tickDockingSystem, updateDockingHud } from './_docking.js';
-import { showPostFlightSummary } from './_postFlight.js';
-import { handleAbortReturnToAgency } from './_menuActions.js';
+import { tick } from '../../core/physics.ts';
+import { checkObjectiveCompletion } from '../../core/missions.ts';
+import { checkContractObjectives } from '../../core/contracts.ts';
+import { checkChallengeObjectives } from '../../core/challenges.ts';
+import { renderFlightFrame } from '../../render/flight.ts';
+import { renderMapFrame } from '../../render/map.ts';
+import { isDebrisTrackingAvailable } from '../../core/mapView.ts';
+import { getSurfaceItemsAtBody } from '../../core/surfaceOps.ts';
+import { evaluateComms } from '../../core/comms.ts';
+import { FlightPhase } from '../../core/constants.ts';
+import { PartType } from '../../core/constants.ts';
+import { getPartById } from '../../data/parts.ts';
+import { getPhaseLabel } from '../../core/flightPhase.ts';
+import { getOrbitEntryLabel, checkOrbitStatus } from '../../core/orbit.ts';
+import { getFCState } from './_state.ts';
+import { recordFrame } from '../fpsMonitor.ts';
+import { logger } from '../../core/logger.ts';
+import { checkTimeWarpResets, applyTimeWarp } from './_timeWarp.ts';
+import { applyMapThrust, updateMapHud } from './_mapView.ts';
+import { applyNormalOrbitRcs } from './_orbitRcs.ts';
+import { evaluateFlightPhase, showPhaseNotification } from './_flightPhase.ts';
+import { tickDockingSystem, updateDockingHud } from './_docking.ts';
+import { showPostFlightSummary } from './_postFlight.ts';
+import { handleAbortReturnToAgency } from './_menuActions.ts';
 import {
   isWorkerReady,
   hasWorkerError,
@@ -46,7 +46,7 @@ import {
   applyPhysicsSnapshot,
   applyFlightSnapshot,
   terminatePhysicsWorker,
-} from './_workerBridge.js';
+} from './_workerBridge.ts';
 
 /** Maximum consecutive loop errors before showing the abort banner. */
 export const MAX_CONSECUTIVE_LOOP_ERRORS: number = 5;

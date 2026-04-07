@@ -15,16 +15,16 @@
  * @module core/lifeSupport
  */
 
-import { recordKIA } from './crew.js';
+import { recordKIA } from './crew.ts';
 import {
   AstronautStatus,
   DEFAULT_LIFE_SUPPORT_PERIODS,
   LIFE_SUPPORT_WARNING_THRESHOLD,
   FieldCraftStatus,
-} from './constants.js';
-import { getPartById } from '../data/parts.js';
-import type { GameState, FieldCraft, OrbitalElements } from './gameState.js';
-import type { PhysicsState, RocketAssembly } from './physics.js';
+} from './constants.ts';
+import { getPartById } from '../data/parts.ts';
+import type { GameState, FieldCraft, OrbitalElements } from './gameState.ts';
+import type { PhysicsState, RocketAssembly } from './physics.ts';
 
 // ---------------------------------------------------------------------------
 // Types

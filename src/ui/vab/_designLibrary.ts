@@ -2,17 +2,17 @@
  * _designLibrary.ts — Save/load design overlays, library card building, design import into VAB.
  */
 
-import { getPartById } from '../../data/parts.js';
+import { getPartById } from '../../data/parts.ts';
 import {
   createRocketAssembly,
   addPartToAssembly,
   connectParts,
   createStagingConfig,
   syncStagingWithAssembly,
-} from '../../core/rocketbuilder.js';
-import type { RocketAssembly } from '../../core/rocketbuilder.js';
-import { createRocketDesign } from '../../core/gameState.js';
-import type { GameState, RocketDesign } from '../../core/gameState.js';
+} from '../../core/rocketbuilder.ts';
+import type { RocketAssembly } from '../../core/rocketbuilder.ts';
+import { createRocketDesign } from '../../core/gameState.ts';
+import type { GameState, RocketDesign } from '../../core/gameState.ts';
 import './_designLibrary.css';
 import {
   getAllDesigns,
@@ -24,16 +24,16 @@ import {
   groupDesigns,
   getDesignGroupDefs,
   filterDesignsByGroup,
-} from '../../core/designLibrary.js';
-import type { CostBreakdown, CompatibilityResult } from '../../core/designLibrary.js';
+} from '../../core/designLibrary.ts';
+import type { CostBreakdown, CompatibilityResult } from '../../core/designLibrary.ts';
 import {
   vabSetAssembly,
   vabRenderParts,
-} from '../../render/vab.js';
-import { buildRocketCard } from '../rocketCardUtil.js';
-import { getVabState } from './_state.js';
-import { fmt$ } from './_partsPanel.js';
-import { clearUndoRedo } from '../../core/undoRedo.js';
+} from '../../render/vab.ts';
+import { buildRocketCard } from '../rocketCardUtil.ts';
+import { getVabState } from './_state.ts';
+import { fmt$ } from './_partsPanel.ts';
+import { clearUndoRedo } from '../../core/undoRedo.ts';
 
 // ---------------------------------------------------------------------------
 // Forward references — set by _init.js to break circular deps

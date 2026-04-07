@@ -12,7 +12,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { createGameState } from '../core/gameState.js';
+import { createGameState } from '../core/gameState.ts';
 
 // Mock idbStorage before importing autoSave.
 vi.mock('../core/idbStorage.js', () => ({
@@ -29,10 +29,10 @@ import {
   deleteAutoSave,
   AUTO_SAVE_KEY,
   _setSessionStartTimeForTesting,
-} from '../core/autoSave.js';
+} from '../core/autoSave.ts';
 
-import { decompressSaveData } from '../core/saveload.js';
-import { idbSet, idbDelete, isIdbAvailable } from '../core/idbStorage.js';
+import { decompressSaveData } from '../core/saveload.ts';
+import { idbSet, idbDelete, isIdbAvailable } from '../core/idbStorage.ts';
 
 // ---------------------------------------------------------------------------
 // localStorage mock

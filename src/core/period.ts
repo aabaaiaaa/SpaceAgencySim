@@ -15,17 +15,17 @@
  * @module core/period
  */
 
-import { AstronautStatus, CREW_SALARY_PER_PERIOD, FACILITY_UPKEEP_PER_PERIOD, FacilityId } from './constants.js';
-import { expireBoardContracts, expireActiveContracts } from './contracts.js';
-import { isBankrupt } from './finance.js';
-import { processSatelliteNetwork } from './satellites.js';
-import { checkInjuryRecovery, processTraining } from './crew.js';
-import { getFacilityTier } from './construction.js';
-import { processSurfaceOps } from './surfaceOps.js';
-import { processLifeSupport } from './lifeSupport.js';
-import { getFinancialMultipliers } from './settings.js';
+import { AstronautStatus, CREW_SALARY_PER_PERIOD, FACILITY_UPKEEP_PER_PERIOD, FacilityId } from './constants.ts';
+import { expireBoardContracts, expireActiveContracts } from './contracts.ts';
+import { isBankrupt } from './finance.ts';
+import { processSatelliteNetwork } from './satellites.ts';
+import { checkInjuryRecovery, processTraining } from './crew.ts';
+import { getFacilityTier } from './construction.ts';
+import { processSurfaceOps } from './surfaceOps.ts';
+import { processLifeSupport } from './lifeSupport.ts';
+import { getFinancialMultipliers } from './settings.ts';
 
-import type { GameState, CrewMember } from './gameState.js';
+import type { GameState, CrewMember } from './gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Types

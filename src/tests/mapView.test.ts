@@ -22,9 +22,9 @@ import {
   computeOrbitalThrustAngle,
   generateOrbitPredictions,
   isMapViewAvailable,
-} from '../core/mapView.js';
-import { BODY_RADIUS, ALTITUDE_BANDS } from '../core/constants.js';
-import { computeOrbitalElements, circularOrbitVelocity } from '../core/orbit.js';
+} from '../core/mapView.ts';
+import { BODY_RADIUS, ALTITUDE_BANDS } from '../core/constants.ts';
+import { computeOrbitalElements, circularOrbitVelocity } from '../core/orbit.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers

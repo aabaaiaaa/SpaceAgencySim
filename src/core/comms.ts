@@ -27,12 +27,12 @@ import {
   COMMS_LOCAL_NETWORK_RANGE, COMMS_FULL_COVERAGE_THRESHOLD, COMMS_RELAY_RANGE,
   COMMS_SHADOW_HALF_ANGLE_DEG, SatelliteType, CelestialBody, BODY_RADIUS,
   FacilityId, FlightPhase,
-} from './constants.js';
-import { hasFacility, getFacilityTier } from './construction.js';
-import { getSatellitesByType } from './satellites.js';
-import { BODY_PARENT, BODY_CHILDREN, BODY_ORBIT_RADIUS } from './manoeuvre.js';
-import { getPartById } from '../data/parts.js';
-import type { GameState, FlightState, CommsState } from './gameState.js';
+} from './constants.ts';
+import { hasFacility, getFacilityTier } from './construction.ts';
+import { getSatellitesByType } from './satellites.ts';
+import { BODY_PARENT, BODY_CHILDREN, BODY_ORBIT_RADIUS } from './manoeuvre.ts';
+import { getPartById } from '../data/parts.ts';
+import type { GameState, FlightState, CommsState } from './gameState.ts';
 
 interface CraftPos { altitude?: number; posX?: number; posY?: number; }
 

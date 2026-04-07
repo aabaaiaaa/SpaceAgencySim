@@ -35,22 +35,22 @@ import {
   hasAnyRunningExperiment,
   calculateYield,
   getInstrumentKey,
-} from '../core/sciencemodule.js';
-import { getInstrumentById } from '../data/instruments.js';
+} from '../core/sciencemodule.ts';
+import { getInstrumentById } from '../data/instruments.ts';
 import {
   ScienceDataType,
   DIMINISHING_RETURNS,
   FacilityId,
   RD_LAB_SCIENCE_BONUS,
   MalfunctionType,
-} from '../core/constants.js';
+} from '../core/constants.ts';
 import {
   createRocketAssembly,
   addPartToAssembly,
   connectParts,
-} from '../core/rocketbuilder.js';
-import { createPhysicsState } from '../core/physics.js';
-import { createFlightState } from '../core/gameState.js';
+} from '../core/rocketbuilder.ts';
+import { createPhysicsState } from '../core/physics.ts';
+import { createFlightState } from '../core/gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Shared helpers

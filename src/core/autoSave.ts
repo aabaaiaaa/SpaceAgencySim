@@ -8,10 +8,10 @@
  * @module autoSave
  */
 
-import { idbSet, idbDelete, isIdbAvailable } from './idbStorage.js';
-import { compressSaveData } from './saveload.js';
+import { idbSet, idbDelete, isIdbAvailable } from './idbStorage.ts';
+import { compressSaveData } from './saveload.ts';
 
-import type { GameState } from './gameState.js';
+import type { GameState } from './gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Constants

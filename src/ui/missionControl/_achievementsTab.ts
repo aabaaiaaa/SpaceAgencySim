@@ -4,9 +4,9 @@
  * @module missionControl/_achievementsTab
  */
 
-import { getAchievementStatus } from '../../core/achievements.js';
-import { getMCState } from './_state.js';
-import { fmtCash, getContent } from './_shell.js';
+import { getAchievementStatus } from '../../core/achievements.ts';
+import { getMCState } from './_state.ts';
+import { fmtCash, getContent } from './_shell.ts';
 
 // ---------------------------------------------------------------------------
 // Achievement icons

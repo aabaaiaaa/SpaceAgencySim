@@ -36,15 +36,15 @@ import {
   BODY_ORBIT_RADIUS,
   BODY_PARENT,
   BODY_CHILDREN,
-} from '../core/manoeuvre.js';
+} from '../core/manoeuvre.ts';
 import {
   CelestialBody,
   BODY_GM,
   BODY_RADIUS,
   FlightPhase,
   ControlMode,
-} from '../core/constants.js';
-import { circularOrbitVelocity } from '../core/orbit.js';
+} from '../core/constants.ts';
+import { circularOrbitVelocity } from '../core/orbit.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers

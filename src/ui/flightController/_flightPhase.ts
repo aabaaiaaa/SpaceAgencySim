@@ -5,23 +5,23 @@
  * @module ui/flightController/_flightPhase
  */
 
-import { FlightPhase, ControlMode } from '../../core/constants.js';
+import { FlightPhase, ControlMode } from '../../core/constants.ts';
 import {
   evaluateAutoTransitions,
   getPhaseLabel,
   transitionPhase,
   getDeorbitWarningMessage,
-} from '../../core/flightPhase.js';
-import { checkOrbitStatus, getMinOrbitAltitude, getOrbitEntryLabel } from '../../core/orbit.js';
+} from '../../core/flightPhase.ts';
+import { checkOrbitStatus, getMinOrbitAltitude, getOrbitEntryLabel } from '../../core/orbit.ts';
 import {
   recalculateOrbit,
   isOrbitalBurnActive,
   isEscapeTrajectory,
-} from '../../core/manoeuvre.js';
-import { resetControlModeIfNeeded, CONTROL_MODE_TIPS } from '../../core/controlMode.js';
-import { getFCState } from './_state.js';
-import { applyTimeWarp } from './_timeWarp.js';
-import { toggleMapView } from './_mapView.js';
+} from '../../core/manoeuvre.ts';
+import { resetControlModeIfNeeded, CONTROL_MODE_TIPS } from '../../core/controlMode.ts';
+import { getFCState } from './_state.ts';
+import { applyTimeWarp } from './_timeWarp.ts';
+import { toggleMapView } from './_mapView.ts';
 
 /**
  * Show a brief notification label at the top of the screen when the flight

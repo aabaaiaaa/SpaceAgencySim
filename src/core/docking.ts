@@ -23,12 +23,12 @@ import {
   DOCKING_VISUAL_RANGE_DEG, DOCKING_GUIDANCE_RANGE, DOCKING_AUTO_RANGE,
   DOCKING_MAX_RELATIVE_SPEED, DOCKING_MAX_ORIENTATION_DIFF, DOCKING_MAX_LATERAL_OFFSET,
   DOCKING_AUTO_APPROACH_SPEED, UNDOCKING_SEPARATION_SPEED, BODY_RADIUS,
-} from './constants.js';
-import { getOrbitalStateAtTime, checkProximity, angularDistance, computeOrbitalElements, getAltitudeBand } from './orbit.js';
-import { getPartById } from '../data/parts.js';
-import type { PartDef } from '../data/parts.js';
-import type { PhysicsState, RocketAssembly } from './physics.js';
-import type { FlightState, GameState, OrbitalObject, DockingSystemState, OrbitalElements } from './gameState.js';
+} from './constants.ts';
+import { getOrbitalStateAtTime, checkProximity, angularDistance, computeOrbitalElements, getAltitudeBand } from './orbit.ts';
+import { getPartById } from '../data/parts.ts';
+import type { PartDef } from '../data/parts.ts';
+import type { PhysicsState, RocketAssembly } from './physics.ts';
+import type { FlightState, GameState, OrbitalObject, DockingSystemState, OrbitalElements } from './gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Factory

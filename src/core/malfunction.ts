@@ -32,7 +32,7 @@
  * @module malfunction
  */
 
-import { getPartById } from '../data/parts.js';
+import { getPartById } from '../data/parts.ts';
 import {
   PartType,
   GameMode,
@@ -43,11 +43,11 @@ import {
   REDUCED_THRUST_FACTOR,
   PARTIAL_CHUTE_FACTOR,
   MAX_ENGINEERING_MALFUNCTION_REDUCTION,
-} from './constants.js';
-import { getMalfunctionMultiplier } from './settings.js';
-import type { GameState, FlightState, InventoryPart } from './gameState.js';
-import type { PhysicsState, RocketAssembly } from './physics.js';
-import type { PartDef } from '../data/parts.js';
+} from './constants.ts';
+import { getMalfunctionMultiplier } from './settings.ts';
+import type { GameState, FlightState, InventoryPart } from './gameState.ts';
+import type { PhysicsState, RocketAssembly } from './physics.ts';
+import type { PartDef } from '../data/parts.ts';
 
 // ---------------------------------------------------------------------------
 // Local types

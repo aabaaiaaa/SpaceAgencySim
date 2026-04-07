@@ -19,17 +19,17 @@ import {
   LEG_DEPLOY_DURATION,
   tickLegs,
   retractLandingLeg,
-} from '../core/legs.js';
+} from '../core/legs.ts';
 import {
   createRocketAssembly,
   addPartToAssembly,
   addSymmetryPair,
   getMirrorPartId,
-} from '../core/rocketbuilder.js';
-import { checkObjectiveCompletion } from '../core/missions.js';
-import { createGameState } from '../core/gameState.js';
-import { ObjectiveType, MissionStatus } from '../data/missions.js';
-import { PartType } from '../core/constants.js';
+} from '../core/rocketbuilder.ts';
+import { checkObjectiveCompletion } from '../core/missions.ts';
+import { createGameState } from '../core/gameState.ts';
+import { ObjectiveType, MissionStatus } from '../data/missions.ts';
+import { PartType } from '../core/constants.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers

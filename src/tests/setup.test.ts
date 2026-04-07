@@ -3,7 +3,7 @@
 // All core-logic unit tests live alongside this file in src/tests/.
 
 import { describe, it, expect } from 'vitest';
-import * as core from '../core/index.js';
+import * as core from '../core/index.ts';
 
 describe('project setup', () => {
   it('test runner is operational', () => {

@@ -18,11 +18,11 @@
  * @module biomes
  */
 
-import { BIOME_DEFINITIONS } from './constants.js';
-import { getPeriapsisAltitude, getApoapsisAltitude } from './orbit.js';
+import { BIOME_DEFINITIONS } from './constants.ts';
+import { getPeriapsisAltitude, getApoapsisAltitude } from './orbit.ts';
 
-import type { BiomeDefinition } from './constants.js';
-import type { OrbitalElements } from './gameState.js';
+import type { BiomeDefinition } from './constants.ts';
+import type { OrbitalElements } from './gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Constants

@@ -18,7 +18,7 @@ import {
   recordToMap,
   setToArray,
   arrayToSet,
-} from '../core/physicsWorkerProtocol.js';
+} from '../core/physicsWorkerProtocol.ts';
 import type {
   PhysicsSnapshot,
   FlightSnapshot,
@@ -39,7 +39,7 @@ import type {
   ReadyMessage,
   ErrorMessage,
   StoppedMessage,
-} from '../core/physicsWorkerProtocol.js';
+} from '../core/physicsWorkerProtocol.ts';
 import {
   serialisePhysicsState,
   deserialisePhysicsState,
@@ -48,7 +48,7 @@ import {
   deserialiseAssembly,
   serialiseDebris,
   deserialiseDebris,
-} from '../core/physicsWorker.js';
+} from '../core/physicsWorker.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers: build minimal valid state objects for testing

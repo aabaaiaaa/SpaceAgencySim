@@ -48,8 +48,8 @@
  * @module parachute
  */
 
-import { getPartById } from '../data/parts.js';
-import { PartType }    from './constants.js';
+import { getPartById } from '../data/parts.ts';
+import { PartType }    from './constants.ts';
 
 // ---------------------------------------------------------------------------
 // Public constants

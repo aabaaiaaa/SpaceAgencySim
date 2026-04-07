@@ -13,7 +13,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { createGameState } from '../core/gameState.js';
+import { createGameState } from '../core/gameState.ts';
 import {
   OBJECTIVE_TYPE_META,
   SCORE_METRIC_OPTIONS,
@@ -22,9 +22,9 @@ import {
   deleteCustomChallenge,
   exportChallengeJSON,
   importChallengeJSON,
-} from '../core/customChallenges.js';
-import { ObjectiveType } from '../data/missions.js';
-import { ScoreDirection } from '../data/challenges.js';
+} from '../core/customChallenges.ts';
+import { ObjectiveType } from '../data/missions.ts';
+import { ScoreDirection } from '../data/challenges.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers

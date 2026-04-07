@@ -8,9 +8,9 @@
  * @module ui/flightController/_state
  */
 
-import type { PhysicsState } from '../../core/physics.js';
-import type { GameState, FlightState } from '../../core/gameState.js';
-import type { RocketAssembly, StagingConfig } from '../../core/rocketbuilder.js';
+import type { PhysicsState } from '../../core/physics.ts';
+import type { GameState, FlightState } from '../../core/gameState.ts';
+import type { RocketAssembly, StagingConfig } from '../../core/rocketbuilder.ts';
 
 // ---------------------------------------------------------------------------
 // FCState interface

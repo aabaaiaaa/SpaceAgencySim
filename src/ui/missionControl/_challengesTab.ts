@@ -5,15 +5,15 @@
  * @module missionControl/_challengesTab
  */
 
-import { getUnlockedChallenges, getChallengeResult, getActiveChallenge, acceptChallenge, abandonChallenge } from '../../core/challenges.js';
-import { MedalTier, ScoreDirection } from '../../data/challenges.js';
+import { getUnlockedChallenges, getChallengeResult, getActiveChallenge, acceptChallenge, abandonChallenge } from '../../core/challenges.ts';
+import { MedalTier, ScoreDirection } from '../../data/challenges.ts';
 import {
   createCustomChallenge, deleteCustomChallenge,
   exportChallengeJSON, importChallengeJSON,
   OBJECTIVE_TYPE_META, SCORE_METRIC_OPTIONS,
-} from '../../core/customChallenges.js';
-import { getMCState } from './_state.js';
-import { fmtCash, getContent } from './_shell.js';
+} from '../../core/customChallenges.ts';
+import { getMCState } from './_state.ts';
+import { fmtCash, getContent } from './_shell.ts';
 
 // ---------------------------------------------------------------------------
 // Medal helpers

@@ -15,7 +15,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createGameState } from '../core/gameState.js';
+import { createGameState } from '../core/gameState.ts';
 import {
   plantFlag,
   collectSurfaceSample,
@@ -27,7 +27,7 @@ import {
   areSurfaceItemsVisible,
   getSurfaceItemsAtBody,
   hasFlag,
-} from '../core/surfaceOps.js';
+} from '../core/surfaceOps.ts';
 import {
   SurfaceItemType,
   FLAG_MILESTONE_BONUS,
@@ -38,7 +38,7 @@ import {
   PartType,
   STARTING_MONEY,
   SatelliteType,
-} from '../core/constants.js';
+} from '../core/constants.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers

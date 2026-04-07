@@ -27,8 +27,8 @@ import {
   getPartsByType,
   getAllParts,
   getPartIdsByType,
-} from '../data/parts.js';
-import { PartType } from '../core/constants.js';
+} from '../data/parts.ts';
+import { PartType } from '../core/constants.ts';
 
 // ---------------------------------------------------------------------------
 // ActivationBehaviour enum

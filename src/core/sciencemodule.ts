@@ -33,17 +33,17 @@
  * @module sciencemodule
  */
 
-import { getPartById, ActivationBehaviour } from '../data/parts.js';
-import { getInstrumentById, isInstrumentValidForBiome } from '../data/instruments.js';
+import { getPartById, ActivationBehaviour } from '../data/parts.ts';
+import { getInstrumentById, isInstrumentValidForBiome } from '../data/instruments.ts';
 import { PartType, ScienceDataType, DIMINISHING_RETURNS,
          ANALYSIS_TRANSMIT_YIELD_MIN, ANALYSIS_TRANSMIT_YIELD_MAX,
-         FacilityId, RD_LAB_SCIENCE_BONUS } from './constants.js';
-import { getBiome, getBiomeId, getScienceMultiplier } from './biomes.js';
+         FacilityId, RD_LAB_SCIENCE_BONUS } from './constants.ts';
+import { getBiome, getBiomeId, getScienceMultiplier } from './biomes.ts';
 // hasMalfunction not used directly — inline check avoids PhysicsStateWithMalfunctions type mismatch
-import { MalfunctionType } from './constants.js';
+import { MalfunctionType } from './constants.ts';
 
-import type { GameState, ScienceLogEntry, FlightEvent } from './gameState.js';
-import type { ScienceModuleStateEntry } from './physics.js';
+import type { GameState, ScienceLogEntry, FlightEvent } from './gameState.ts';
+import type { ScienceModuleStateEntry } from './physics.ts';
 
 // ---------------------------------------------------------------------------
 // Public constants

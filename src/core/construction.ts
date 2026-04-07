@@ -28,11 +28,11 @@ import {
   FACILITY_UPGRADE_DEFS,
   getFacilityUpgradeDef,
   getReputationDiscount,
-} from './constants.js';
-import { spend } from './finance.js';
+} from './constants.ts';
+import { spend } from './finance.ts';
 
-import type { FacilityDefinition } from './constants.js';
-import type { GameState } from './gameState.js';
+import type { FacilityDefinition } from './constants.ts';
+import type { GameState } from './gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Result types

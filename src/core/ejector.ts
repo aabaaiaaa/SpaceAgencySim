@@ -37,12 +37,12 @@
  * @module ejector
  */
 
-import { getPartById } from '../data/parts.js';
-import { PartType }    from './constants.js';
-import { recordKIA }   from './crew.js';
+import { getPartById } from '../data/parts.ts';
+import { PartType }    from './constants.ts';
+import { recordKIA }   from './crew.ts';
 
-import type { GameState, FlightEvent } from './gameState.js';
-import type { PartDef } from '../data/parts.js';
+import type { GameState, FlightEvent } from './gameState.ts';
+import type { PartDef } from '../data/parts.ts';
 
 // ---------------------------------------------------------------------------
 // Local type aliases for duck-typed physics/flight state parameters

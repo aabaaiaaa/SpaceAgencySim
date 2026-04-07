@@ -5,11 +5,11 @@
  * @module missionControl/_shell
  */
 
-import type { GameState } from '../../core/gameState.js';
-import { getMissionControlTier } from '../../core/contracts.js';
-import { MCC_TIER_FEATURES } from '../../core/constants.js';
-import { getPartById } from '../../data/parts.js';
-import { getMCState } from './_state.js';
+import type { GameState } from '../../core/gameState.ts';
+import { getMissionControlTier } from '../../core/contracts.ts';
+import { MCC_TIER_FEATURES } from '../../core/constants.ts';
+import { getPartById } from '../../data/parts.ts';
+import { getMCState } from './_state.ts';
 
 // ---------------------------------------------------------------------------
 // Constants

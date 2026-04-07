@@ -26,13 +26,13 @@
  */
 
 import * as PIXI from 'pixi.js';
-import { getApp } from './index.js';
-import { PartType } from '../core/constants.js';
-import { getPartById } from '../data/parts.js';
-import { RendererPool } from './pool.js';
-import type { PlacedPart, SnapCandidate } from '../core/rocketbuilder.js';
-import type { ReadonlyAssembly } from './types.js';
-import type { PartDef } from '../data/parts.js';
+import { getApp } from './index.ts';
+import { PartType } from '../core/constants.ts';
+import { getPartById } from '../data/parts.ts';
+import { RendererPool } from './pool.ts';
+import type { PlacedPart, SnapCandidate } from '../core/rocketbuilder.ts';
+import type { ReadonlyAssembly } from './types.ts';
+import type { PartDef } from '../data/parts.ts';
 
 declare global {
   interface Window {

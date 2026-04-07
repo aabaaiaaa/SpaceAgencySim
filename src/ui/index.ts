@@ -4,29 +4,29 @@
 // the root overlay container keeps pointer-events:none so clicks pass through
 // to the canvas by default.
 
-import type { GameState } from '../core/gameState.js';
-import type { FlightReturnSummary } from '../core/flightReturn.js';
-import { initMainMenu } from './mainmenu.js';
-import { initHubUI, destroyHubUI, showWelcomeModal, showReturnResultsOverlay } from './hub.js';
-import { initVabUI, resetVabUI } from './vab.js';
-import { initCrewAdminUI, destroyCrewAdminUI } from './crewAdmin.js';
-import { initMissionControlUI, destroyMissionControlUI } from './missionControl.js';
-import { initLaunchPadUI, destroyLaunchPadUI } from './launchPad.js';
-import { initSatelliteOpsUI, destroySatelliteOpsUI } from './satelliteOps.js';
-import { initTrackingStationUI, destroyTrackingStationUI } from './trackingStation.js';
-import { initLibraryUI, destroyLibraryUI } from './library.js';
-import { initRdLabUI, destroyRdLabUI } from './rdLab.js';
-import { stopFlightScene } from './flightController.js';
-import { initTopBar, destroyTopBar, refreshTopBar, setCurrentScreen } from './topbar.js';
-import { showVabScene, hideVabScene } from '../render/vab.js';
-import { showHubScene } from '../render/hub.js';
-import { hasFacility } from '../core/construction.js';
-import { GameMode } from '../core/constants.js';
+import type { GameState } from '../core/gameState.ts';
+import type { FlightReturnSummary } from '../core/flightReturn.ts';
+import { initMainMenu } from './mainmenu.ts';
+import { initHubUI, destroyHubUI, showWelcomeModal, showReturnResultsOverlay } from './hub.ts';
+import { initVabUI, resetVabUI } from './vab.ts';
+import { initCrewAdminUI, destroyCrewAdminUI } from './crewAdmin.ts';
+import { initMissionControlUI, destroyMissionControlUI } from './missionControl.ts';
+import { initLaunchPadUI, destroyLaunchPadUI } from './launchPad.ts';
+import { initSatelliteOpsUI, destroySatelliteOpsUI } from './satelliteOps.ts';
+import { initTrackingStationUI, destroyTrackingStationUI } from './trackingStation.ts';
+import { initLibraryUI, destroyLibraryUI } from './library.ts';
+import { initRdLabUI, destroyRdLabUI } from './rdLab.ts';
+import { stopFlightScene } from './flightController.ts';
+import { initTopBar, destroyTopBar, refreshTopBar, setCurrentScreen } from './topbar.ts';
+import { showVabScene, hideVabScene } from '../render/vab.ts';
+import { showHubScene } from '../render/hub.ts';
+import { hasFacility } from '../core/construction.ts';
+import { GameMode } from '../core/constants.ts';
 import './design-tokens.css';
-import { triggerAutoSave } from './autoSaveToast.js';
+import { triggerAutoSave } from './autoSaveToast.ts';
 
-export { initFlightHud, destroyFlightHud } from './flightHud.js';
-export { showReturnResultsOverlay } from './hub.js';
+export { initFlightHud, destroyFlightHud } from './flightHud.ts';
+export { showReturnResultsOverlay } from './hub.ts';
 
 // ---------------------------------------------------------------------------
 // Screen routing state

@@ -9,18 +9,18 @@
  * it in-place, consistent with the patterns in finance.ts.
  */
 
-import { spend, applyDeathFine } from './finance.js';
+import { spend, applyDeathFine } from './finance.ts';
 import {
   AstronautStatus, HIRE_COST, CREW_SALARY_PER_PERIOD, HARD_LANDING_SPEED_MIN,
   HARD_LANDING_SPEED_MAX, HARD_LANDING_INJURY_MIN, HARD_LANDING_INJURY_MAX,
   EJECTION_INJURY_PERIODS, MEDICAL_CARE_COST, TRAINING_COURSE_COST, TRAINING_COURSE_DURATION,
   TRAINING_SKILL_GAIN, TRAINING_SLOTS_BY_TIER, EXPERIENCED_CREW_SKILL_RANGE,
   EXPERIENCED_HIRE_COST_MULTIPLIER, FacilityId, getCrewCostModifier,
-} from './constants.js';
-import { getFacilityTier } from './construction.js';
-import { getInjuryDurationMultiplier } from './settings.js';
-import type { GameState, FlightState, CrewSkills } from './gameState.js';
-import type { PhysicsState } from './physics.js';
+} from './constants.ts';
+import { getFacilityTier } from './construction.ts';
+import { getInjuryDurationMultiplier } from './settings.ts';
+import type { GameState, FlightState, CrewSkills } from './gameState.ts';
+import type { PhysicsState } from './physics.ts';
 
 export interface Astronaut {
   id: string; name: string; hireDate: string; status: string; salary: number;

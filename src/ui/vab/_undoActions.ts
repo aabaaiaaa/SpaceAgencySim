@@ -8,11 +8,11 @@
  * Callers must invoke refreshVabAfterUndoRedo() after calling undo()/redo().
  */
 
-import { pushUndoAction, clearUndoRedo } from '../../core/undoRedo.js';
-import { getPartById } from '../../data/parts.js';
-import { getVabState } from './_state.js';
+import { pushUndoAction, clearUndoRedo } from '../../core/undoRedo.ts';
+import { getPartById } from '../../data/parts.ts';
+import { getVabState } from './_state.ts';
 
-import type { StagingConfig, PlacedPart, PartConnection } from '../../core/rocketbuilder.js';
+import type { StagingConfig, PlacedPart, PartConnection } from '../../core/rocketbuilder.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers

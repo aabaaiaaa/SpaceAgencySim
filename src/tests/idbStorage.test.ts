@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { createGameState } from '../core/gameState.js';
+import { createGameState } from '../core/gameState.ts';
 import {
   saveGame,
   loadGame,
@@ -18,14 +18,14 @@ import {
   deleteSave,
   _setSessionStartTimeForTesting,
   decompressSaveData,
-} from '../core/saveload.js';
+} from '../core/saveload.ts';
 import {
   idbSet,
   idbGet,
   idbDelete,
   isIdbAvailable,
   _resetDbForTesting,
-} from '../core/idbStorage.js';
+} from '../core/idbStorage.ts';
 
 // ---------------------------------------------------------------------------
 // IndexedDB mock — in-memory implementation for Node.js

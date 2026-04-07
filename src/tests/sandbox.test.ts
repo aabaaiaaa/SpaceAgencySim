@@ -13,7 +13,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createGameState } from '../core/gameState.js';
+import { createGameState } from '../core/gameState.ts';
 import {
   GameMode,
   FacilityId,
@@ -21,7 +21,7 @@ import {
   SANDBOX_STARTING_MONEY,
   STARTING_MONEY,
   MalfunctionMode,
-} from '../core/constants.js';
+} from '../core/constants.ts';
 import {
   hasFacility,
   canBuildFacility,
@@ -29,15 +29,15 @@ import {
   canUpgradeFacility,
   upgradeFacility,
   getFacilityTier,
-} from '../core/construction.js';
+} from '../core/construction.ts';
 import {
   canResearchNode,
   researchNode,
   isNodeResearched,
-} from '../core/techtree.js';
-import { TECH_NODES } from '../data/techtree.js';
-import { initWeather, getCurrentWeather, getWeatherSkipCost } from '../core/weather.js';
-import { getAllParts } from '../data/parts.js';
+} from '../core/techtree.ts';
+import { TECH_NODES } from '../data/techtree.ts';
+import { initWeather, getCurrentWeather, getWeatherSkipCost } from '../core/weather.ts';
+import { getAllParts } from '../data/parts.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -21,7 +21,7 @@ import {
   getStage1Thrust,
   calculateTWR,
   runValidation,
-} from '../core/rocketvalidator.js';
+} from '../core/rocketvalidator.ts';
 import {
   createRocketAssembly,
   addPartToAssembly,
@@ -29,8 +29,8 @@ import {
   createStagingConfig,
   assignPartToStage,
   syncStagingWithAssembly,
-} from '../core/rocketbuilder.js';
-import { createGameState } from '../core/gameState.js';
+} from '../core/rocketbuilder.ts';
+import { createGameState } from '../core/gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Test helpers

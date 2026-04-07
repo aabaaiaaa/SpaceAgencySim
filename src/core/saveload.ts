@@ -14,12 +14,12 @@
  */
 
 import { compressToUTF16, decompressFromUTF16 } from 'lz-string';
-import { CrewStatus, FACILITY_DEFINITIONS, GameMode, DEFAULT_DIFFICULTY_SETTINGS } from './constants.js';
-import { loadSharedLibrary, saveSharedLibrary } from './designLibrary.js';
-import { logger } from './logger.js';
-import { idbSet, idbGet, idbDelete, isIdbAvailable } from './idbStorage.js';
+import { CrewStatus, FACILITY_DEFINITIONS, GameMode, DEFAULT_DIFFICULTY_SETTINGS } from './constants.ts';
+import { loadSharedLibrary, saveSharedLibrary } from './designLibrary.ts';
+import { logger } from './logger.ts';
+import { idbSet, idbGet, idbDelete, isIdbAvailable } from './idbStorage.ts';
 
-import type { GameState, RocketDesign } from './gameState.js';
+import type { GameState, RocketDesign } from './gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Constants

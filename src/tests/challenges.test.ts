@@ -13,7 +13,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createGameState } from '../core/gameState.js';
+import { createGameState } from '../core/gameState.ts';
 import {
   ensureChallengeState,
   getUnlockedChallenges,
@@ -26,9 +26,9 @@ import {
   computeMedal,
   isBetterMedal,
   processChallengeCompletion,
-} from '../core/challenges.js';
-import { CHALLENGES, MedalTier, ScoreDirection } from '../data/challenges.js';
-import { ObjectiveType } from '../data/missions.js';
+} from '../core/challenges.ts';
+import { CHALLENGES, MedalTier, ScoreDirection } from '../data/challenges.ts';
+import { ObjectiveType } from '../data/missions.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -18,7 +18,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createGameState } from '../core/gameState.js';
+import { createGameState } from '../core/gameState.ts';
 import {
   deploySatellite,
   getActiveSatellites,
@@ -38,8 +38,8 @@ import {
   getTotalLeaseIncome,
   repositionSatellite,
   getRepositionTargets,
-} from '../core/satellites.js';
-import { advancePeriod } from '../core/period.js';
+} from '../core/satellites.ts';
+import { advancePeriod } from '../core/period.ts';
 import {
   SatelliteType,
   FacilityId,
@@ -53,7 +53,7 @@ import {
   SATELLITE_LEASE_BENEFIT_PENALTY,
   SATELLITE_REPOSITION_COST,
   SATELLITE_REPOSITION_HEALTH_COST,
-} from '../core/constants.js';
+} from '../core/constants.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers

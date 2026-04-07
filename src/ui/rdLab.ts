@@ -8,17 +8,17 @@
  * @module ui/rdLab
  */
 
-import { TECH_NODES, TechBranch, BRANCH_NAMES } from '../data/techtree.js';
+import { TECH_NODES, TechBranch, BRANCH_NAMES } from '../data/techtree.ts';
 import {
   getTechTreeStatus,
   researchNode,
   getMaxResearchableTier,
-} from '../core/techtree.js';
-import { FacilityId, RD_LAB_TIER_LABELS } from '../core/constants.js';
-import { getFacilityTier } from '../core/construction.js';
-import { refreshTopBar } from './topbar.js';
+} from '../core/techtree.ts';
+import { FacilityId, RD_LAB_TIER_LABELS } from '../core/constants.ts';
+import { getFacilityTier } from '../core/construction.ts';
+import { refreshTopBar } from './topbar.ts';
 import './rdLab.css';
-import type { GameState } from '../core/gameState.js';
+import type { GameState } from '../core/gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Module State

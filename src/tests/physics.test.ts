@@ -24,7 +24,7 @@ import {
   handleKeyDown,
   handleKeyUp,
   fireNextStage,
-} from '../core/physics.js';
+} from '../core/physics.ts';
 import {
   LegState,
   LEG_DEPLOY_DURATION,
@@ -32,8 +32,8 @@ import {
   getLegStatus,
   getLegContextMenuItems,
   getDeployedLegFootOffset,
-} from '../core/legs.js';
-import { getPartById } from '../data/parts.js';
+} from '../core/legs.ts';
+import { getPartById } from '../data/parts.ts';
 import {
   createRocketAssembly,
   addPartToAssembly,
@@ -42,8 +42,8 @@ import {
   syncStagingWithAssembly,
   assignPartToStage,
   addStageToConfig,
-} from '../core/rocketbuilder.js';
-import { createFlightState } from '../core/gameState.js';
+} from '../core/rocketbuilder.ts';
+import { createFlightState } from '../core/gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Shared test fixtures

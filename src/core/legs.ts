@@ -35,12 +35,12 @@
  * @module legs
  */
 
-import { getPartById } from '../data/parts.js';
-import { PartType }    from './constants.js';
+import { getPartById } from '../data/parts.ts';
+import { PartType }    from './constants.ts';
 
-import type { LegEntry } from './physics.js';
-import type { PartDef } from '../data/parts.js';
-import type { FlightEvent } from './gameState.js';
+import type { LegEntry } from './physics.ts';
+import type { PartDef } from '../data/parts.ts';
+import type { FlightEvent } from './gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Public types

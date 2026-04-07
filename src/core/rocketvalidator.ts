@@ -16,14 +16,14 @@
  *  6. All parts unlocked via tech tree         (blocking)
  */
 
-import { getPartById } from '../data/parts.js';
-import { ActivationBehaviour } from '../data/parts.js';
-import { PartType, FacilityId, LAUNCH_PAD_MAX_MASS, VAB_MAX_PARTS, VAB_MAX_HEIGHT, VAB_MAX_WIDTH } from './constants.js';
-import { TECH_NODES } from '../data/techtree.js';
-import { getFacilityTier } from './construction.js';
+import { getPartById } from '../data/parts.ts';
+import { ActivationBehaviour } from '../data/parts.ts';
+import { PartType, FacilityId, LAUNCH_PAD_MAX_MASS, VAB_MAX_PARTS, VAB_MAX_HEIGHT, VAB_MAX_WIDTH } from './constants.ts';
+import { TECH_NODES } from '../data/techtree.ts';
+import { getFacilityTier } from './construction.ts';
 
-import type { GameState } from './gameState.js';
-import type { RocketAssembly, StagingConfig } from './rocketbuilder.js';
+import type { GameState } from './gameState.ts';
+import type { RocketAssembly, StagingConfig } from './rocketbuilder.ts';
 
 // ---------------------------------------------------------------------------
 // Constants

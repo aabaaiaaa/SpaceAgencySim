@@ -15,7 +15,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { createGameState } from '../core/gameState.js';
+import { createGameState } from '../core/gameState.ts';
 import {
   loadSharedLibrary,
   saveSharedLibrary,
@@ -30,7 +30,7 @@ import {
   groupDesigns,
   getDesignGroupDefs,
   filterDesignsByGroup,
-} from '../core/designLibrary.js';
+} from '../core/designLibrary.ts';
 
 // ---------------------------------------------------------------------------
 // localStorage mock

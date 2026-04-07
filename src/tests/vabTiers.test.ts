@@ -14,7 +14,7 @@ import { describe, it, expect } from 'vitest';
 import {
   runValidation,
   getRocketBounds,
-} from '../core/rocketvalidator.js';
+} from '../core/rocketvalidator.ts';
 import {
   createRocketAssembly,
   addPartToAssembly,
@@ -22,14 +22,14 @@ import {
   createStagingConfig,
   syncStagingWithAssembly,
   assignPartToStage,
-} from '../core/rocketbuilder.js';
-import { createGameState } from '../core/gameState.js';
+} from '../core/rocketbuilder.ts';
+import { createGameState } from '../core/gameState.ts';
 import {
   FacilityId,
   VAB_MAX_PARTS,
   VAB_MAX_HEIGHT,
   VAB_MAX_WIDTH,
-} from '../core/constants.js';
+} from '../core/constants.ts';
 
 // ---------------------------------------------------------------------------
 // Test helpers

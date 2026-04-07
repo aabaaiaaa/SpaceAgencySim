@@ -7,24 +7,24 @@
  */
 
 import * as PIXI from 'pixi.js';
-import { getApp } from '../index.js';
-import { airDensity } from '../../core/atmosphere.js';
-import { getAirDensity as bodyAirDensity } from '../../data/bodies.js';
-import type { ReadonlyPhysicsState, ReadonlyAssembly, ReadonlySurfaceItem } from '../types.js';
-import { getFlightRenderState } from './_state.js';
-import { MIN_ZOOM, MAX_ZOOM } from './_constants.js';
-import { updateCamera } from './_camera.js';
-import { updateBodyVisuals, renderSky, renderStars, renderHorizon, renderWeatherHaze, generateStars } from './_sky.js';
-import { renderGround, renderSurfaceItems, renderBiomeLabel } from './_ground.js';
-import { renderRocket, hitTestFlightPart as _hitTestFlightPart } from './_rocket.js';
+import { getApp } from '../index.ts';
+import { airDensity } from '../../core/atmosphere.ts';
+import { getAirDensity as bodyAirDensity } from '../../data/bodies.ts';
+import type { ReadonlyPhysicsState, ReadonlyAssembly, ReadonlySurfaceItem } from '../types.ts';
+import { getFlightRenderState } from './_state.ts';
+import { MIN_ZOOM, MAX_ZOOM } from './_constants.ts';
+import { updateCamera } from './_camera.ts';
+import { updateBodyVisuals, renderSky, renderStars, renderHorizon, renderWeatherHaze, generateStars } from './_sky.ts';
+import { renderGround, renderSurfaceItems, renderBiomeLabel } from './_ground.ts';
+import { renderRocket, hitTestFlightPart as _hitTestFlightPart } from './_rocket.ts';
 import {
   emitSmokeSegments, updateTrails, renderTrails,
   updatePlumeStates, renderPlumes,
   renderRcsPlumes, renderMachEffects, trailDt,
-} from './_trails.js';
-import { renderDebris, renderDockingTarget, renderEjectedCrew } from './_debris.js';
-import { onMouseMove, onWheel } from './_input.js';
-import { drainPools, releaseGraphics } from './_pool.js';
+} from './_trails.ts';
+import { renderDebris, renderDockingTarget, renderEjectedCrew } from './_debris.ts';
+import { onMouseMove, onWheel } from './_input.ts';
+import { drainPools, releaseGraphics } from './_pool.ts';
 
 // ---------------------------------------------------------------------------
 // Public API

@@ -12,4 +12,4 @@ export {
   vabRefreshParts,
   getVabInventoryUsedParts,
   vabSetLaunchEnabled,
-} from './vab/_init.js';
+} from './vab/_init.ts';

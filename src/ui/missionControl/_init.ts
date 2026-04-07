@@ -8,15 +8,15 @@
  * @module missionControl/_init
  */
 
-import type { GameState } from '../../core/gameState.js';
-import { getUnlockedMissions } from '../../core/missions.js';
-import { getMCState, setMCState } from './_state.js';
+import type { GameState } from '../../core/gameState.ts';
+import { getUnlockedMissions } from '../../core/missions.ts';
+import { getMCState, setMCState } from './_state.ts';
 import './missionControl.css';
-import { renderShell, updateActiveTabClass, registerTabSwitchHandler, registerDestroyHandler } from './_shell.js';
-import { renderAvailableTab, renderAcceptedTab, renderCompletedTab } from './_missionsTab.js';
-import { renderContractsBoardTab, renderActiveContractsTab } from './_contractsTab.js';
-import { renderChallengesTab } from './_challengesTab.js';
-import { renderAchievementsTab } from './_achievementsTab.js';
+import { renderShell, updateActiveTabClass, registerTabSwitchHandler, registerDestroyHandler } from './_shell.ts';
+import { renderAvailableTab, renderAcceptedTab, renderCompletedTab } from './_missionsTab.ts';
+import { renderContractsBoardTab, renderActiveContractsTab } from './_contractsTab.ts';
+import { renderChallengesTab } from './_challengesTab.ts';
+import { renderAchievementsTab } from './_achievementsTab.ts';
 
 // ---------------------------------------------------------------------------
 // Tab dispatch

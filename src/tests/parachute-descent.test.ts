@@ -15,7 +15,7 @@ import {
   tick,
   handleKeyDown,
   handleKeyUp,
-} from '../core/physics.js';
+} from '../core/physics.ts';
 import {
   createRocketAssembly,
   addPartToAssembly,
@@ -24,10 +24,10 @@ import {
   syncStagingWithAssembly,
   assignPartToStage,
   addStageToConfig,
-} from '../core/rocketbuilder.js';
-import { createFlightState } from '../core/gameState.js';
-import { deployParachute } from '../core/parachute.js';
-import { getPartById } from '../data/parts.js';
+} from '../core/rocketbuilder.ts';
+import { createFlightState } from '../core/gameState.ts';
+import { deployParachute } from '../core/parachute.ts';
+import { getPartById } from '../data/parts.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers

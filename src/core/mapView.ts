@@ -13,16 +13,16 @@
  * @module core/mapView
  */
 
-import { BODY_RADIUS, BODY_GM, ALTITUDE_BANDS, FlightPhase, FacilityId } from './constants.js';
-import { hasFacility, getFacilityTier } from './construction.js';
-import { getSunAngle, getShadowHalfAngle } from './power.js';
+import { BODY_RADIUS, BODY_GM, ALTITUDE_BANDS, FlightPhase, FacilityId } from './constants.ts';
+import { hasFacility, getFacilityTier } from './construction.ts';
+import { getSunAngle, getShadowHalfAngle } from './power.ts';
 import {
   getOrbitalStateAtTime,
   getOrbitalPeriod,
   getPeriapsisAltitude,
   getApoapsisAltitude,
   computeOrbitalElements,
-} from './orbit.js';
+} from './orbit.ts';
 import {
   getTransferTargets,
   computeTransferRoute,
@@ -34,11 +34,11 @@ import {
   BODY_CHILDREN,
   SOI_RADIUS,
   computeGravityAssist,
-} from './manoeuvre.js';
+} from './manoeuvre.ts';
 
-import type { OrbitalElements } from './gameState.js';
-import type { PhysicsState } from './physics.js';
-import type { GameState, TransferState } from './gameState.js';
+import type { OrbitalElements } from './gameState.ts';
+import type { PhysicsState } from './physics.ts';
+import type { GameState, TransferState } from './gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Constants

@@ -2,13 +2,13 @@
  * _scalebar.ts — Scale bar tick drawing and extent updates.
  */
 
-import { getPartById } from '../../data/parts.js';
+import { getPartById } from '../../data/parts.ts';
 import {
   VAB_TOOLBAR_HEIGHT,
   VAB_PIXELS_PER_METRE,
   vabGetCamera,
-} from '../../render/vab.js';
-import { getVabState } from './_state.js';
+} from '../../render/vab.ts';
+import { getVabState } from './_state.ts';
 
 /**
  * Regenerate the scale-bar tick marks to match the current camera state.

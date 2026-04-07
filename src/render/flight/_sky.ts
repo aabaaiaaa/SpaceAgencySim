@@ -2,15 +2,15 @@
  * _sky.ts — Sky gradient, star field, horizon curvature, and weather haze.
  */
 
-import { getSkyVisual, getGroundVisual, getAtmosphereTop } from '../../data/bodies.js';
-import { getFlightRenderState } from './_state.js';
-import { ppm } from './_camera.js';
-import { acquireGraphics, releaseContainerChildren } from './_pool.js';
+import { getSkyVisual, getGroundVisual, getAtmosphereTop } from '../../data/bodies.ts';
+import { getFlightRenderState } from './_state.ts';
+import { ppm } from './_camera.ts';
+import { acquireGraphics, releaseContainerChildren } from './_pool.ts';
 import {
   SKY_SEA_LEVEL, SKY_HIGH_ALT, SKY_SPACE,
   STAR_FADE_START, STAR_FADE_FULL, GROUND_COLOR,
   STAR_COUNT,
-} from './_constants.js';
+} from './_constants.ts';
 
 // ---------------------------------------------------------------------------
 // Colour utilities

@@ -7,7 +7,7 @@
  * Stack depth is capped at MAX_DEPTH to bound memory usage.
  */
 
-import { logger } from './logger.js';
+import { logger } from './logger.ts';
 
 export type ActionType = 'place' | 'delete' | 'move' | 'staging' | 'clearAll';
 

@@ -32,8 +32,8 @@ import {
   getWeatherSeverityMultipliers,
   getFinancialMultipliers,
   getInjuryDurationMultiplier,
-} from '../core/settings.js';
-import { DEFAULT_DIFFICULTY_SETTINGS } from '../core/constants.js';
+} from '../core/settings.ts';
+import { DEFAULT_DIFFICULTY_SETTINGS } from '../core/constants.ts';
 
 describe('settings.ts branch coverage', () => {
   it('updateDifficultySettings initialises from defaults when difficultySettings is null', () => {
@@ -71,7 +71,7 @@ describe('settings.ts branch coverage', () => {
 // logger.ts — log level filtering, setLevel, getLevel
 // ---------------------------------------------------------------------------
 
-import { logger } from '../core/logger.js';
+import { logger } from '../core/logger.ts';
 
 describe('logger.ts branch coverage', () => {
   let originalLevel;
@@ -172,7 +172,7 @@ import {
   tickFuelSystem,
   getConnectedTanks,
   computeEngineFlowRate,
-} from '../core/fuelsystem.js';
+} from '../core/fuelsystem.ts';
 import {
   createRocketAssembly,
   addPartToAssembly,
@@ -181,9 +181,9 @@ import {
   syncStagingWithAssembly,
   assignPartToStage,
   addStageToConfig,
-} from '../core/rocketbuilder.js';
-import { getPartById } from '../data/parts.js';
-import { PartType, ControlMode, MalfunctionMode, MalfunctionType, GameMode } from '../core/constants.js';
+} from '../core/rocketbuilder.ts';
+import { getPartById } from '../data/parts.ts';
+import { PartType, ControlMode, MalfunctionMode, MalfunctionType, GameMode } from '../core/constants.ts';
 
 describe('fuelsystem.ts branch coverage', () => {
   it('SRB with zero fuel is removed immediately from firingEngines', () => {
@@ -256,7 +256,7 @@ import {
   getDeployedLegFootOffset,
   countDeployedLegs,
   initLegStates,
-} from '../core/legs.js';
+} from '../core/legs.ts';
 
 describe('legs.ts branch coverage', () => {
   it('deployLandingLeg late-initialises a missing leg entry', () => {
@@ -417,9 +417,9 @@ import {
   setMalfunctionMode,
   getMalfunctionMode,
   getPartReliability,
-} from '../core/malfunction.js';
-import { createPhysicsState, tick, handleKeyDown, handleKeyUp, fireNextStage } from '../core/physics.js';
-import { createFlightState, createGameState, createCrewMember } from '../core/gameState.js';
+} from '../core/malfunction.ts';
+import { createPhysicsState, tick, handleKeyDown, handleKeyUp, fireNextStage } from '../core/physics.ts';
+import { createFlightState, createGameState, createCrewMember } from '../core/gameState.ts';
 
 /** Helper to create a minimal FlightState for tests. */
 function makeFlightState(overrides = {}) {
@@ -891,7 +891,7 @@ describe('physics.ts branch coverage', () => {
 // staging.ts — debris angular damping, tipping, launch clamp
 // ---------------------------------------------------------------------------
 
-import { activateCurrentStage, recomputeActiveGraph, tickDebris } from '../core/staging.js';
+import { activateCurrentStage, recomputeActiveGraph, tickDebris } from '../core/staging.ts';
 
 describe('staging.ts branch coverage', () => {
   describe('tickDebris angular damping', () => {
@@ -1129,7 +1129,7 @@ describe('staging.ts branch coverage', () => {
 // power.ts — commsActive draw, insufficient satellite power
 // ---------------------------------------------------------------------------
 
-import { tickPower, hasSufficientSatellitePower, initPowerState, recalcPowerState } from '../core/power.js';
+import { tickPower, hasSufficientSatellitePower, initPowerState, recalcPowerState } from '../core/power.ts';
 
 describe('power.ts branch coverage', () => {
   it('tickPower includes POWER_DRAW_COMMS when commsActive is true', () => {
@@ -1209,7 +1209,7 @@ describe('power.ts branch coverage', () => {
 // collision.ts — Y-axis minimum penetration path
 // ---------------------------------------------------------------------------
 
-import { tickCollisions } from '../core/collision.js';
+import { tickCollisions } from '../core/collision.ts';
 
 describe('collision.ts branch coverage', () => {
   it('handles collision where Y-axis overlap is smaller than X (horizontal collision)', () => {
@@ -1255,7 +1255,7 @@ describe('collision.ts branch coverage', () => {
 // mapView.ts — transfer state bodies, custom maxRadius
 // ---------------------------------------------------------------------------
 
-import { getMapCelestialBodies, getShadowOverlayGeometry } from '../core/mapView.js';
+import { getMapCelestialBodies, getShadowOverlayGeometry } from '../core/mapView.ts';
 
 describe('mapView.ts branch coverage', () => {
   it('getMapCelestialBodies includes transfer destination when transferState exists', () => {
@@ -1495,7 +1495,7 @@ describe('settings.ts additional branch coverage', () => {
 // Additional challenges.ts — edge cases
 // ---------------------------------------------------------------------------
 
-import { extractScoreMetric, computeMedal, isBetterMedal } from '../core/challenges.js';
+import { extractScoreMetric, computeMedal, isBetterMedal } from '../core/challenges.ts';
 
 describe('challenges.ts branch coverage', () => {
   it('extractScoreMetric returns null for unknown metric', () => {

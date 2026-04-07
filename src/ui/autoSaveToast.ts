@@ -7,8 +7,8 @@
  * @module ui/autoSaveToast
  */
 
-import type { GameState } from '../core/gameState.js';
-import { isAutoSaveEnabled, performAutoSave } from '../core/autoSave.js';
+import type { GameState } from '../core/gameState.ts';
+import { isAutoSaveEnabled, performAutoSave } from '../core/autoSave.ts';
 import './autoSaveToast.css';
 
 // ---------------------------------------------------------------------------

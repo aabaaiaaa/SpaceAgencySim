@@ -32,7 +32,7 @@ import {
   findCrewById,
   findMissionById,
   findRocketById,
-} from '../core/gameState.js';
+} from '../core/gameState.ts';
 import {
   PartType,
   MissionState,
@@ -42,7 +42,7 @@ import {
   STARTING_MONEY,
   STARTING_LOAN_BALANCE,
   DEFAULT_LOAN_INTEREST_RATE,
-} from '../core/constants.js';
+} from '../core/constants.ts';
 
 // ---------------------------------------------------------------------------
 // createGameState

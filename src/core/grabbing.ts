@@ -23,12 +23,12 @@ import {
   GRAB_VISUAL_RANGE_DEG, GRAB_GUIDANCE_RANGE, GRAB_ARM_RANGE,
   GRAB_MAX_RELATIVE_SPEED, GRAB_MAX_LATERAL_OFFSET, GRAB_REPAIR_HEALTH,
   GRAB_RELEASE_SPEED, BODY_RADIUS,
-} from './constants.js';
-import { getOrbitalStateAtTime, angularDistance, getAltitudeBand, circularOrbitVelocity } from './orbit.js';
-import { getPartById } from '../data/parts.js';
-import type { PartDef } from '../data/parts.js';
-import type { PhysicsState, RocketAssembly } from './physics.js';
-import type { FlightState, FlightEvent, GameState, OrbitalObject, SatelliteRecord } from './gameState.js';
+} from './constants.ts';
+import { getOrbitalStateAtTime, angularDistance, getAltitudeBand, circularOrbitVelocity } from './orbit.ts';
+import { getPartById } from '../data/parts.ts';
+import type { PartDef } from '../data/parts.ts';
+import type { PhysicsState, RocketAssembly } from './physics.ts';
+import type { FlightState, FlightEvent, GameState, OrbitalObject, SatelliteRecord } from './gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Grab system state interface

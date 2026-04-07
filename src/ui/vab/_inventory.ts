@@ -2,16 +2,16 @@
  * _inventory.ts — Inventory panel rendering, part refund/return logic.
  */
 
-import { getPartById } from '../../data/parts.js';
+import { getPartById } from '../../data/parts.ts';
 import {
   addToInventory,
   getEffectiveReliability,
-} from '../../core/partInventory.js';
-import { refreshTopBar } from '../topbar.js';
-import { getVabState } from './_state.js';
-import { fmt$ } from './_partsPanel.js';
+} from '../../core/partInventory.ts';
+import { refreshTopBar } from '../topbar.ts';
+import { getVabState } from './_state.ts';
+import { fmt$ } from './_partsPanel.ts';
 
-import type { GameState, InventoryPart } from '../../core/gameState.js';
+import type { GameState, InventoryPart } from '../../core/gameState.ts';
 
 /**
  * Refund cash or return inventory part when removing a placed part.

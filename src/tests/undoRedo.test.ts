@@ -25,7 +25,7 @@ import {
   setUndoRedoChangeCallback,
   setUndoRedoErrorCallback,
   UNDO_MAX_DEPTH,
-} from '../core/undoRedo.js';
+} from '../core/undoRedo.ts';
 import {
   createRocketAssembly,
   addPartToAssembly,
@@ -37,7 +37,7 @@ import {
   assignPartToStage,
   movePartBetweenStages,
   returnPartToUnstaged,
-} from '../core/rocketbuilder.js';
+} from '../core/rocketbuilder.ts';
 
 // ---------------------------------------------------------------------------
 // Setup

@@ -42,13 +42,13 @@ import {
   rebaseEpoch,
   warpToTarget,
   orbitOverlapsBand,
-} from '../core/orbit.js';
+} from '../core/orbit.ts';
 import {
   CelestialBody,
   BODY_GM,
   BODY_RADIUS,
   MIN_ORBIT_ALTITUDE,
-} from '../core/constants.js';
+} from '../core/constants.ts';
 
 const EARTH = CelestialBody.EARTH;
 const R_EARTH = BODY_RADIUS.EARTH;

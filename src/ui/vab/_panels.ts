@@ -2,20 +2,20 @@
  * _panels.ts — Panel toggling, button bindings, status bar updates.
  */
 
-import { getPartById } from '../../data/parts.js';
-import { FacilityId, VAB_MAX_PARTS } from '../../core/constants.js';
-import { getFacilityTier } from '../../core/construction.js';
-import { getTotalMass } from '../../core/rocketvalidator.js';
+import { getPartById } from '../../data/parts.ts';
+import { FacilityId, VAB_MAX_PARTS } from '../../core/constants.ts';
+import { getFacilityTier } from '../../core/construction.ts';
+import { getTotalMass } from '../../core/rocketvalidator.ts';
 import {
   VAB_SCALE_BAR_WIDTH,
   vabSetZoomCentred,
   vabRenderParts,
-} from '../../render/vab.js';
+} from '../../render/vab.ts';
 import {
   removePartFromAssembly,
   fireStagingStep,
   syncStagingWithAssembly,
-} from '../../core/rocketbuilder.js';
+} from '../../core/rocketbuilder.ts';
 import {
   undo as undoAction,
   redo as redoAction,
@@ -23,29 +23,29 @@ import {
   canRedo,
   peekUndoLabel,
   peekRedoLabel,
-} from '../../core/undoRedo.js';
+} from '../../core/undoRedo.ts';
 import {
   refurbishPart,
   scrapPart,
-} from '../../core/partInventory.js';
-import { refreshTopBar } from '../topbar.js';
-import { getVabState, SIDE_PANEL_WIDTH } from './_state.js';
-import { fmt$ } from './_partsPanel.js';
-import { drawScaleTicks, updateScaleBarExtents } from './_scalebar.js';
-import { renderInventoryPanel, refreshInventoryPanel, refundOrReturnPart } from './_inventory.js';
+} from '../../core/partInventory.ts';
+import { refreshTopBar } from '../topbar.ts';
+import { getVabState, SIDE_PANEL_WIDTH } from './_state.ts';
+import { fmt$ } from './_partsPanel.ts';
+import { drawScaleTicks, updateScaleBarExtents } from './_scalebar.ts';
+import { renderInventoryPanel, refreshInventoryPanel, refundOrReturnPart } from './_inventory.ts';
 import {
   setSelectedPart,
   updateOffscreenIndicators,
   doZoomToFit,
   getRocketCenter,
-} from './_canvasInteraction.js';
+} from './_canvasInteraction.ts';
 import {
   snapshotStaging,
   recordDeletion,
   recordClearAll,
-} from './_undoActions.js';
+} from './_undoActions.ts';
 
-import type { GameState } from '../../core/gameState.js';
+import type { GameState } from '../../core/gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Forward references — set by _init.js to break circular deps

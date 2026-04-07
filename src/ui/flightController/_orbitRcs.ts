@@ -5,17 +5,17 @@
  * @module ui/flightController/_orbitRcs
  */
 
-import { FlightPhase, ControlMode } from '../../core/constants.js';
-import { MapThrustDir, computeOrbitalThrustAngle } from '../../core/mapView.js';
+import { FlightPhase, ControlMode } from '../../core/constants.ts';
+import { MapThrustDir, computeOrbitalThrustAngle } from '../../core/mapView.ts';
 import {
   enterDockingMode,
   exitDockingMode,
   toggleRcsMode,
   CONTROL_MODE_TIPS,
-} from '../../core/controlMode.js';
-import { getFCState } from './_state.js';
-import { showPhaseNotification } from './_flightPhase.js';
-import { applyTimeWarp } from './_timeWarp.js';
+} from '../../core/controlMode.ts';
+import { getFCState } from './_state.ts';
+import { showPhaseNotification } from './_flightPhase.ts';
+import { applyTimeWarp } from './_timeWarp.ts';
 
 /**
  * Apply orbital-relative thrust from WASD in NORMAL orbit mode (flight view).

@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 14,
+  "lastIteration": 15,
   "startedAt": "2026-04-06T23:44:48.505Z",
   "iteration": 1,
   "devloopVersion": "3.2.0",
   "activeTask": {
-    "taskId": "TASK-015",
-    "taskTitle": "Add ESLint rule to prevent new `as any` usage",
-    "iterationNumber": 15,
-    "startedAt": "2026-04-07T10:47:34.248Z"
+    "taskId": "TASK-016",
+    "taskTitle": "Update all import specifiers from .js to .ts extensions",
+    "iterationNumber": 16,
+    "startedAt": "2026-04-07T11:14:33.289Z"
   }
 }

@@ -8,10 +8,10 @@
  * @module core/library
  */
 
-import { FlightOutcome, CrewStatus } from './constants.js';
-import { CELESTIAL_BODIES, ALL_BODY_IDS, getBodyDef } from '../data/bodies.js';
-import { ACHIEVEMENTS } from './achievements.js';
-import type { GameState, FlightResult, RocketDesign, CrewMember, SurfaceItem, FieldCraft } from './gameState.js';
+import { FlightOutcome, CrewStatus } from './constants.ts';
+import { CELESTIAL_BODIES, ALL_BODY_IDS, getBodyDef } from '../data/bodies.ts';
+import { ACHIEVEMENTS } from './achievements.ts';
+import type { GameState, FlightResult, RocketDesign, CrewMember, SurfaceItem, FieldCraft } from './gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Local types for return values

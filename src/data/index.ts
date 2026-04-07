@@ -6,6 +6,6 @@
 //   missions.ts  — mission templates with objectives, rewards, and requirements
 //   bodies.ts    — celestial body definitions (physics, visuals, biomes, SOI)
 
-export * from './parts.js';
-export * from './missions.js';
-export * from './bodies.js';
+export * from './parts.ts';
+export * from './missions.ts';
+export * from './bodies.ts';

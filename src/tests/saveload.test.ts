@@ -18,7 +18,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { createGameState } from '../core/gameState.js';
+import { createGameState } from '../core/gameState.ts';
 import {
   SAVE_SLOT_COUNT,
   SAVE_VERSION,
@@ -33,8 +33,8 @@ import {
   _setSessionStartTimeForTesting,
   compressSaveData,
   decompressSaveData,
-} from '../core/saveload.js';
-import { CrewStatus } from '../core/constants.js';
+} from '../core/saveload.ts';
+import { CrewStatus } from '../core/constants.ts';
 
 // ---------------------------------------------------------------------------
 // localStorage mock

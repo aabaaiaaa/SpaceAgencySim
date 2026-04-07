@@ -10,12 +10,12 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { getRocketBounds } from '../core/rocketvalidator.js';
+import { getRocketBounds } from '../core/rocketvalidator.ts';
 import {
   createRocketAssembly,
   addPartToAssembly,
-} from '../core/rocketbuilder.js';
-import { getPartById } from '../data/parts.js';
+} from '../core/rocketbuilder.ts';
+import { getPartById } from '../data/parts.ts';
 
 // ---------------------------------------------------------------------------
 // getRocketBounds()

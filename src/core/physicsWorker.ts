@@ -18,12 +18,12 @@
  * @module core/physicsWorker
  */
 
-import { tick, handleKeyDown, handleKeyUp, fireNextStage } from './physics.js';
-import { evaluateAutoTransitions } from './flightPhase.js';
-import { checkOrbitStatus } from './orbit.js';
-import type { PhysicsState, RocketAssembly, PlacedPart, InstrumentStateEntry, ParachuteEntry, LegEntry, ScienceModuleStateEntry } from './physics.js';
-import type { StagingConfig } from './rocketbuilder.js';
-import type { FlightState } from './gameState.js';
+import { tick, handleKeyDown, handleKeyUp, fireNextStage } from './physics.ts';
+import { evaluateAutoTransitions } from './flightPhase.ts';
+import { checkOrbitStatus } from './orbit.ts';
+import type { PhysicsState, RocketAssembly, PlacedPart, InstrumentStateEntry, ParachuteEntry, LegEntry, ScienceModuleStateEntry } from './physics.ts';
+import type { StagingConfig } from './rocketbuilder.ts';
+import type { FlightState } from './gameState.ts';
 import type {
   WorkerCommand,
   WorkerMessage,
@@ -34,7 +34,7 @@ import type {
   SerialisedParachuteEntry,
   SerialisedDebrisState,
   InitCommand,
-} from './physicsWorkerProtocol.js';
+} from './physicsWorkerProtocol.ts';
 
 // Re-import helpers as values (the type-only imports above are erased).
 import {
@@ -42,7 +42,7 @@ import {
   recordToMap as _recordToMap,
   setToArray as _setToArray,
   arrayToSet as _arrayToSet,
-} from './physicsWorkerProtocol.js';
+} from './physicsWorkerProtocol.ts';
 
 // ---------------------------------------------------------------------------
 // Worker state

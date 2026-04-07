@@ -26,9 +26,9 @@
  * @module data/challenges
  */
 
-import { ObjectiveType } from './missions.js';
-import { PartType } from '../core/constants.js';
-import type { ChallengeDef, MedalThresholds, ObjectiveDef } from '../core/gameState.js';
+import { ObjectiveType } from './missions.ts';
+import { PartType } from '../core/constants.ts';
+import type { ChallengeDef, MedalThresholds, ObjectiveDef } from '../core/gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Enums

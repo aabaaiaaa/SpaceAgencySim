@@ -7,11 +7,11 @@
  * @module rocketCardUtil
  */
 
-import { getPartById } from '../data/parts.js';
-import { PartType } from '../core/constants.js';
+import { getPartById } from '../data/parts.ts';
+import { PartType } from '../core/constants.ts';
 import './rocketCardUtil.css';
-import type { RocketDesign } from '../core/gameState.js';
-import type { PartDef } from '../data/parts.js';
+import type { RocketDesign } from '../core/gameState.ts';
+import type { PartDef } from '../data/parts.ts';
 
 // ---------------------------------------------------------------------------
 // Preview rendering constants

@@ -6,7 +6,7 @@
  *
  */
 
-import { PartType, SurfaceItemType } from '../../core/constants.js';
+import { PartType, SurfaceItemType } from '../../core/constants.ts';
 
 // ---------------------------------------------------------------------------
 // Scale constants

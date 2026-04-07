@@ -91,7 +91,7 @@
 - **Verification**: `npm run lint` passes. Adding a new `as any` cast to any file triggers the lint rule. No existing files violate the rule.
 
 ### TASK-016: Update all import specifiers from .js to .ts extensions
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Update all import specifiers across the source codebase from `.js` extensions to `.ts` extensions. This is a mechanical find-and-replace. Do not update E2E test files or Playwright config. See requirements Section 4.2.
 - **Verification**: `grep -r "from '.*\.js'" src/ | grep -v node_modules` returns no matches. `npm run typecheck` passes.

@@ -10,20 +10,20 @@ import {
   createRocketAssembly,
   createStagingConfig,
   syncStagingWithAssembly,
-} from '../../core/rocketbuilder.js';
-import type { PlacedPart, RocketAssembly, StagingConfig } from '../../core/rocketbuilder.js';
+} from '../../core/rocketbuilder.ts';
+import type { PlacedPart, RocketAssembly, StagingConfig } from '../../core/rocketbuilder.ts';
 import {
   VAB_TOOLBAR_HEIGHT,
   vabSetAssembly,
   vabRenderParts,
-} from '../../render/vab.js';
+} from '../../render/vab.ts';
 
-import type { GameState, InventoryPart } from '../../core/gameState.js';
+import type { GameState, InventoryPart } from '../../core/gameState.ts';
 
-import { getVabState } from './_state.js';
+import { getVabState } from './_state.ts';
 import './vab.css';
-import { buildPartsHTML, setupPanelDrag } from './_partsPanel.js';
-import { drawScaleTicks, updateScaleBarExtents } from './_scalebar.js';
+import { buildPartsHTML, setupPanelDrag } from './_partsPanel.ts';
+import { drawScaleTicks, updateScaleBarExtents } from './_scalebar.ts';
 import {
   setupCanvas,
   initContextMenu,
@@ -32,28 +32,28 @@ import {
   updateOffscreenIndicators,
   setCanvasCallbacks,
   startDrag,
-} from './_canvasInteraction.js';
-import { refundOrReturnPart } from './_inventory.js';
-import { renderStagingPanel, setupStagingDnD, syncAndRenderStaging, setStagingCallbacks } from './_staging.js';
-import { renderEngineerPanel, runAndRenderValidation as rawRunAndRenderValidation } from './_engineerPanel.js';
+} from './_canvasInteraction.ts';
+import { refundOrReturnPart } from './_inventory.ts';
+import { renderStagingPanel, setupStagingDnD, syncAndRenderStaging, setStagingCallbacks } from './_staging.ts';
+import { renderEngineerPanel, runAndRenderValidation as rawRunAndRenderValidation } from './_engineerPanel.ts';
 import {
   handleSaveDesign,
   handleLoadDesign,
   showToast,
   setDesignLibraryCallbacks,
-} from './_designLibrary.js';
+} from './_designLibrary.ts';
 import {
   handleLaunchClicked,
   setLaunchFlowCallbacks,
-} from './_launchFlow.js';
+} from './_launchFlow.ts';
 import {
   updateStatusBar,
   bindButtons,
   bindKeyboardShortcuts,
   setPanelCallbacks,
   updateUndoRedoButtons,
-} from './_panels.js';
-import { setUndoRedoChangeCallback, setUndoRedoErrorCallback, clearUndoRedo } from '../../core/undoRedo.js';
+} from './_panels.ts';
+import { setUndoRedoChangeCallback, setUndoRedoErrorCallback, clearUndoRedo } from '../../core/undoRedo.ts';
 
 // ---------------------------------------------------------------------------
 // Wrapped helpers that close over the public API

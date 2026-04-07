@@ -40,12 +40,12 @@
  * @module fuelsystem
  */
 
-import { getPartById } from '../data/parts.js';
-import { PartType }    from './constants.js';
-import { SEA_LEVEL_DENSITY } from './atmosphere.js';
+import { getPartById } from '../data/parts.ts';
+import { PartType }    from './constants.ts';
+import { SEA_LEVEL_DENSITY } from './atmosphere.ts';
 
-import type { RocketAssembly } from './physics.js';
-import type { PartDef } from '../data/parts.js';
+import type { RocketAssembly } from './physics.ts';
+import type { PartDef } from '../data/parts.ts';
 
 /**
  * Structural subset of PhysicsState that tickFuelSystem actually reads/writes.

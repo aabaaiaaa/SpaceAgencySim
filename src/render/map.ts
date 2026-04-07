@@ -20,13 +20,13 @@
  */
 
 import * as PIXI from 'pixi.js';
-import { getApp } from './index.js';
+import { getApp } from './index.ts';
 import {
   BODY_RADIUS,
   ALTITUDE_BANDS,
   SurfaceItemType,
-} from '../core/constants.js';
-import { getSurfaceItemsAtBody, areSurfaceItemsVisible } from '../core/surfaceOps.js';
+} from '../core/constants.ts';
+import { getSurfaceItemsAtBody, areSurfaceItemsVisible } from '../core/surfaceOps.ts';
 import {
   generateOrbitPath,
   getCraftMapPosition,
@@ -39,18 +39,18 @@ import {
   generateTransferTrajectory,
   getMapCelestialBodies,
   getTransferProgressInfo,
-} from '../core/mapView.js';
+} from '../core/mapView.ts';
 import {
   getApoapsisAltitude,
   getPeriapsisAltitude,
   computeOrbitalElements,
-} from '../core/orbit.js';
-import { FlightPhase } from '../core/constants.js';
-import { SOI_RADIUS } from '../core/manoeuvre.js';
-import { getCommsCoverageInfo } from '../core/comms.js';
+} from '../core/orbit.ts';
+import { FlightPhase } from '../core/constants.ts';
+import { SOI_RADIUS } from '../core/manoeuvre.ts';
+import { getCommsCoverageInfo } from '../core/comms.ts';
 
-import type { ReadonlyPhysicsState, ReadonlyFlightState, ReadonlyGameState } from './types.js';
-import type { OrbitalElements, OrbitalObject } from '../core/gameState.js';
+import type { ReadonlyPhysicsState, ReadonlyFlightState, ReadonlyGameState } from './types.ts';
+import type { OrbitalElements, OrbitalObject } from '../core/gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Colour palette

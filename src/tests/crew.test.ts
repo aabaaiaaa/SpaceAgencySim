@@ -15,7 +15,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createGameState } from '../core/gameState.js';
+import { createGameState } from '../core/gameState.ts';
 import {
   hireCrew,
   fireCrew,
@@ -30,7 +30,7 @@ import {
   checkInjuryRecovery,
   getAssignableCrew,
   processFlightInjuries,
-} from '../core/crew.js';
+} from '../core/crew.ts';
 import {
   AstronautStatus,
   HIRE_COST,
@@ -40,7 +40,7 @@ import {
   HARD_LANDING_SPEED_MIN,
   HARD_LANDING_SPEED_MAX,
   EJECTION_INJURY_PERIODS,
-} from '../core/constants.js';
+} from '../core/constants.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers

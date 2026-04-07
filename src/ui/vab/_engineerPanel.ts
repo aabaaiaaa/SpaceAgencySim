@@ -2,10 +2,10 @@
  * _engineerPanel.ts — Rocket engineer validation panel rendering.
  */
 
-import { runValidation } from '../../core/rocketvalidator.js';
-import { getVabState } from './_state.js';
+import { runValidation } from '../../core/rocketvalidator.ts';
+import { getVabState } from './_state.ts';
 
-import type { ValidationCheck } from '../../core/rocketvalidator.js';
+import type { ValidationCheck } from '../../core/rocketvalidator.ts';
 
 /**
  * Populate the Rocket Engineer side panel with the latest validation result.

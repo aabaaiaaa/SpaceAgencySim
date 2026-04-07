@@ -11,9 +11,9 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createGameState } from '../core/gameState.js';
-import { checkAchievements, getAchievementStatus, ACHIEVEMENTS } from '../core/achievements.js';
-import { CelestialBody, SatelliteType } from '../core/constants.js';
+import { createGameState } from '../core/gameState.ts';
+import { checkAchievements, getAchievementStatus, ACHIEVEMENTS } from '../core/achievements.ts';
+import { CelestialBody, SatelliteType } from '../core/constants.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers

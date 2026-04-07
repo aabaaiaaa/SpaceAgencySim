@@ -19,23 +19,23 @@
  * @module hub
  */
 
-import { showHubScene, hideHubScene, setHubWeather, setBuiltFacilities } from '../render/hub.js';
-import { FACILITY_DEFINITIONS, FacilityId, FACILITY_UPGRADE_DEFS, getFacilityUpgradeDef, getReputationTier, GameMode } from '../core/constants.js';
-import { openSettingsPanel } from './settings.js';
-import { openDebugSavePanel } from './debugSaves.js';
-import { setTopBarHubItems, clearTopBarHubItems } from './topbar.js';
+import { showHubScene, hideHubScene, setHubWeather, setBuiltFacilities } from '../render/hub.ts';
+import { FACILITY_DEFINITIONS, FacilityId, FACILITY_UPGRADE_DEFS, getFacilityUpgradeDef, getReputationTier, GameMode } from '../core/constants.ts';
+import { openSettingsPanel } from './settings.ts';
+import { openDebugSavePanel } from './debugSaves.ts';
+import { setTopBarHubItems, clearTopBarHubItems } from './topbar.ts';
 import {
   hasFacility, canBuildFacility, buildFacility,
   canUpgradeFacility, upgradeFacility, getFacilityTier,
   getDiscountedMoneyCost,
-} from '../core/construction.js';
-import { getPartById } from '../data/parts.js';
-import { isBankrupt } from '../core/finance.js';
-import { initWeather, getCurrentWeather, getWeatherForecast } from '../core/weather.js';
-import { isWeatherPredictionAvailable } from '../core/mapView.js';
+} from '../core/construction.ts';
+import { getPartById } from '../data/parts.ts';
+import { isBankrupt } from '../core/finance.ts';
+import { initWeather, getCurrentWeather, getWeatherForecast } from '../core/weather.ts';
+import { isWeatherPredictionAvailable } from '../core/mapView.ts';
 import './hub.css';
-import type { GameState } from '../core/gameState.js';
-import type { FlightReturnSummary } from '../core/flightReturn.js';
+import type { GameState } from '../core/gameState.ts';
+import type { FlightReturnSummary } from '../core/flightReturn.ts';
 
 // ---------------------------------------------------------------------------
 // Layout constants — must match src/render/hub.js

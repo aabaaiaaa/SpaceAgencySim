@@ -33,7 +33,7 @@
  * 40 px wide.  Use this as a guide when sizing new parts.
  */
 
-import { PartType, FuelType, RELIABILITY_TIERS, SatelliteType } from '../core/constants.js';
+import { PartType, FuelType, RELIABILITY_TIERS, SatelliteType } from '../core/constants.ts';
 
 // ---------------------------------------------------------------------------
 // Activation Behaviour Enum

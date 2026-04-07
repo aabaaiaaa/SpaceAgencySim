@@ -3,13 +3,13 @@
  */
 
 import * as PIXI from 'pixi.js';
-import { SurfaceItemType } from '../../core/constants.js';
-import { getBiome, getBiomeTransition } from '../../core/biomes.js';
-import type { ReadonlySurfaceItem } from '../types.js';
-import { getFlightRenderState } from './_state.js';
-import { ppm } from './_camera.js';
-import { acquireText, releaseContainerChildren } from './_pool.js';
-import { SURFACE_ITEM_COLORS, BIOME_LABEL_FADE_SPEED } from './_constants.js';
+import { SurfaceItemType } from '../../core/constants.ts';
+import { getBiome, getBiomeTransition } from '../../core/biomes.ts';
+import type { ReadonlySurfaceItem } from '../types.ts';
+import { getFlightRenderState } from './_state.ts';
+import { ppm } from './_camera.ts';
+import { acquireText, releaseContainerChildren } from './_pool.ts';
+import { SURFACE_ITEM_COLORS, BIOME_LABEL_FADE_SPEED } from './_constants.ts';
 
 // ---------------------------------------------------------------------------
 // Ground rendering

@@ -22,9 +22,9 @@ import {
   getExplorationProgress,
   getCelestialBodyKnowledge,
   getFrequentRockets,
-} from '../core/library.js';
+} from '../core/library.ts';
 import './library.css';
-import type { GameState } from '../core/gameState.js';
+import type { GameState } from '../core/gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Tab ID type

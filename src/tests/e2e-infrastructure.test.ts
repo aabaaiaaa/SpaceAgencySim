@@ -12,9 +12,9 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { _validateState } from '../core/saveload.js';
-import { MalfunctionMode } from '../core/constants.js';
-import { buildTestRocket } from '../core/testFlightBuilder.js';
+import { _validateState } from '../core/saveload.ts';
+import { MalfunctionMode } from '../core/constants.ts';
+import { buildTestRocket } from '../core/testFlightBuilder.ts';
 
 // Import the E2E helpers and fixtures (they are plain JS, no browser APIs needed).
 // We use a dynamic import approach since e2e/ is outside src/tests/ — Vitest
@@ -27,7 +27,7 @@ import {
   STARTING_MONEY,
   STARTER_FACILITIES,
   ALL_FACILITIES,
-} from '../../e2e/helpers.js';
+} from '../../e2e/helpers.ts';
 
 import {
   freshStartFixture,
@@ -40,7 +40,7 @@ import {
   EARLY_PARTS,
   MID_PARTS,
   ALL_PARTS,
-} from '../../e2e/fixtures.js';
+} from '../../e2e/fixtures.ts';
 
 // ---------------------------------------------------------------------------
 // Suite 1: buildSaveEnvelope structure

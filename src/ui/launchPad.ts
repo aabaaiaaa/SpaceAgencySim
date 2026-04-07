@@ -15,27 +15,27 @@
  * @module launchPad
  */
 
-import type { GameState, RocketDesign } from '../core/gameState.js';
-import type { RocketAssembly, StagingConfig } from '../core/rocketbuilder.js';
-import type { FlightReturnSummary } from '../core/flightReturn.js';
-import type { PartDef } from '../data/parts.js';
-import { getPartById } from '../data/parts.js';
-import { PartType, FacilityId, LAUNCH_PAD_MAX_MASS, LAUNCH_PAD_TIER_LABELS, DEATH_FINE_PER_ASTRONAUT } from '../core/constants.js';
-import { getCurrentWeather, getWeatherSkipCost, skipWeather } from '../core/weather.js';
+import type { GameState, RocketDesign } from '../core/gameState.ts';
+import type { RocketAssembly, StagingConfig } from '../core/rocketbuilder.ts';
+import type { FlightReturnSummary } from '../core/flightReturn.ts';
+import type { PartDef } from '../data/parts.ts';
+import { getPartById } from '../data/parts.ts';
+import { PartType, FacilityId, LAUNCH_PAD_MAX_MASS, LAUNCH_PAD_TIER_LABELS, DEATH_FINE_PER_ASTRONAUT } from '../core/constants.ts';
+import { getCurrentWeather, getWeatherSkipCost, skipWeather } from '../core/weather.ts';
 import {
   createRocketAssembly,
   addPartToAssembly,
   connectParts,
   createStagingConfig,
   syncStagingWithAssembly,
-} from '../core/rocketbuilder.js';
-import { getActiveCrew } from '../core/crew.js';
-import { getFacilityTier } from '../core/construction.js';
-import { getTotalMass } from '../core/rocketvalidator.js';
-import { createFlightState } from '../core/gameState.js';
-import { startFlightScene } from './flightController.js';
-import { showReturnResultsOverlay } from './hub.js';
-import { buildRocketCard } from './rocketCardUtil.js';
+} from '../core/rocketbuilder.ts';
+import { getActiveCrew } from '../core/crew.ts';
+import { getFacilityTier } from '../core/construction.ts';
+import { getTotalMass } from '../core/rocketvalidator.ts';
+import { createFlightState } from '../core/gameState.ts';
+import { startFlightScene } from './flightController.ts';
+import { showReturnResultsOverlay } from './hub.ts';
+import { buildRocketCard } from './rocketCardUtil.ts';
 import './launchPad.css';
 
 // ---------------------------------------------------------------------------

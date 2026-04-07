@@ -31,13 +31,13 @@
  * @module missions
  */
 
-import { MISSIONS, MISSIONS_BY_ID, MissionStatus, ObjectiveType } from '../data/missions.js';
-import type { MissionDef } from '../data/missions.js';
-import { earnReward } from './finance.js';
-import { getTechTreeUnlockedParts } from './techtree.js';
-import { awardFacility } from './construction.js';
+import { MISSIONS, MISSIONS_BY_ID, MissionStatus, ObjectiveType } from '../data/missions.ts';
+import type { MissionDef } from '../data/missions.ts';
+import { earnReward } from './finance.ts';
+import { getTechTreeUnlockedParts } from './techtree.ts';
+import { awardFacility } from './construction.ts';
 
-import type { GameState, FlightState, Mission } from './gameState.js';
+import type { GameState, FlightState, Mission } from './gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Internal helpers

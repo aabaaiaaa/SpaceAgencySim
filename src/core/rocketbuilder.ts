@@ -14,8 +14,8 @@
  * This module has no DOM or canvas dependencies and can be unit-tested headlessly.
  */
 
-import { getPartById, ActivationBehaviour } from '../data/parts.js';
-import { getInstrumentKey }                from './sciencemodule.js';
+import { getPartById, ActivationBehaviour } from '../data/parts.ts';
+import { getInstrumentKey }                from './sciencemodule.ts';
 
 // ---------------------------------------------------------------------------
 // Constants

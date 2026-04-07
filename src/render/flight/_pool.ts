@@ -6,7 +6,7 @@
  */
 
 import * as PIXI from 'pixi.js';
-import { RendererPool } from '../pool.js';
+import { RendererPool } from '../pool.ts';
 
 const _pool = new RendererPool();
 

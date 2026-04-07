@@ -23,7 +23,7 @@ import {
   FlightPhase,
   ControlMode,
   MIN_ORBIT_ALTITUDE,
-} from './constants.js';
+} from './constants.ts';
 import {
   computeOrbitalElements,
   checkOrbitStatus,
@@ -31,10 +31,10 @@ import {
   circularOrbitVelocity,
   getPeriapsisAltitude,
   getApoapsisAltitude,
-} from './orbit.js';
+} from './orbit.ts';
 
-import type { FlightState, OrbitalElements } from './gameState.js';
-import type { PhysicsState } from './physics.js';
+import type { FlightState, OrbitalElements } from './gameState.ts';
+import type { PhysicsState } from './physics.ts';
 
 // ---------------------------------------------------------------------------
 // Celestial body hierarchy and SOI data

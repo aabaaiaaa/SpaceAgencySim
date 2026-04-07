@@ -22,9 +22,9 @@ import {
   DifficultySettings,
   WeatherSeverityMultiplier,
   FinancialPressureMultiplier,
-} from './constants.js';
+} from './constants.ts';
 
-import type { GameState } from './gameState.js';
+import type { GameState } from './gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers

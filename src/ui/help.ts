@@ -8,7 +8,7 @@
  * @module ui/help
  */
 
-import { createListenerTracker } from './listenerTracker.js';
+import { createListenerTracker } from './listenerTracker.ts';
 import './help.css';
 
 // ---------------------------------------------------------------------------

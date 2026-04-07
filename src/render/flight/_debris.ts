@@ -3,16 +3,16 @@
  */
 
 import * as PIXI from 'pixi.js';
-import { getPartById } from '../../data/parts.js';
-import { PartType, ControlMode } from '../../core/constants.js';
-import type { ReadonlyPhysicsState, ReadonlyAssembly } from '../types.js';
-import type { DebrisState } from '../../core/staging.js';
-import { getFlightRenderState } from './_state.js';
-import { ppm, worldToScreen } from './_camera.js';
-import { getApp } from '../index.js';
-import { SCALE_M_PER_PX, FLIGHT_PIXELS_PER_METRE } from './_constants.js';
-import { drawPartRect, drawLandingLeg, makePartLabel } from './_rocket.js';
-import { acquireGraphics, releaseContainerChildren } from './_pool.js';
+import { getPartById } from '../../data/parts.ts';
+import { PartType, ControlMode } from '../../core/constants.ts';
+import type { ReadonlyPhysicsState, ReadonlyAssembly } from '../types.ts';
+import type { DebrisState } from '../../core/staging.ts';
+import { getFlightRenderState } from './_state.ts';
+import { ppm, worldToScreen } from './_camera.ts';
+import { getApp } from '../index.ts';
+import { SCALE_M_PER_PX, FLIGHT_PIXELS_PER_METRE } from './_constants.ts';
+import { drawPartRect, drawLandingLeg, makePartLabel } from './_rocket.ts';
+import { acquireGraphics, releaseContainerChildren } from './_pool.ts';
 
 // ---------------------------------------------------------------------------
 // Debris rendering

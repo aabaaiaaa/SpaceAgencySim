@@ -20,7 +20,7 @@ import {
   FACILITY_DEFINITIONS,
   STARTING_REPUTATION,
   DEFAULT_DIFFICULTY_SETTINGS,
-} from './constants.js';
+} from './constants.ts';
 
 import type {
   CelestialBody,
@@ -29,7 +29,7 @@ import type {
   FieldCraftStatus,
   SatelliteType,
   SurfaceItemType,
-} from './constants.js';
+} from './constants.ts';
 
 // ---------------------------------------------------------------------------
 // Cross-module types (standalone definitions for JS module shapes)

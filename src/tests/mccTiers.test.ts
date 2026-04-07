@@ -14,20 +14,20 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createGameState } from '../core/gameState.js';
+import { createGameState } from '../core/gameState.ts';
 import {
   generateContracts,
   getMissionControlTier,
   getContractCaps,
-} from '../core/contracts.js';
+} from '../core/contracts.ts';
 import {
   FacilityId,
   CONTRACT_TIER_CAPS,
   MCC_TIER_FEATURES,
   FACILITY_UPGRADE_DEFS,
-} from '../core/constants.js';
-import { CONTRACT_TEMPLATES } from '../data/contracts.js';
-import { ObjectiveType } from '../data/missions.js';
+} from '../core/constants.ts';
+import { CONTRACT_TEMPLATES } from '../data/contracts.ts';
+import { ObjectiveType } from '../data/missions.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers

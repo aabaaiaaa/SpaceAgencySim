@@ -9,7 +9,7 @@ import {
   hideFlightScene,
   showFlightScene,
   setFlightInputEnabled,
-} from '../../render/flight.js';
+} from '../../render/flight.ts';
 import {
   showMapScene,
   hideMapScene,
@@ -18,7 +18,7 @@ import {
   getMapTarget,
   setMapTarget,
   getSelectedTransferTarget,
-} from '../../render/map.js';
+} from '../../render/map.ts';
 import {
   MapZoom,
   MapThrustDir,
@@ -27,12 +27,12 @@ import {
   getMapTransferTargets,
   getTransferProgressInfo,
   getAllowedMapZooms,
-} from '../../core/mapView.js';
-import { warpToTarget } from '../../core/orbit.js';
-import { FlightPhase } from '../../core/constants.js';
-import { isPlayerLocked, getPhaseLabel } from '../../core/flightPhase.js';
-import { getFCState } from './_state.js';
-import { showPhaseNotification } from './_flightPhase.js';
+} from '../../core/mapView.ts';
+import { warpToTarget } from '../../core/orbit.ts';
+import { FlightPhase } from '../../core/constants.ts';
+import { isPlayerLocked, getPhaseLabel } from '../../core/flightPhase.ts';
+import { getFCState } from './_state.ts';
+import { showPhaseNotification } from './_flightPhase.ts';
 
 // Re-export setMapTarget for use by _docking.js.
 export { setMapTarget };

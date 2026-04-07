@@ -5,15 +5,15 @@
  * command module finder, and camera update logic.
  */
 
-import { getPartById } from '../../data/parts.js';
-import { PartType } from '../../core/constants.js';
-import type { ReadonlyPhysicsState, ReadonlyAssembly } from '../types.js';
-import { getFlightRenderState } from './_state.js';
+import { getPartById } from '../../data/parts.ts';
+import { PartType } from '../../core/constants.ts';
+import type { ReadonlyPhysicsState, ReadonlyAssembly } from '../types.ts';
+import { getFlightRenderState } from './_state.ts';
 import {
   FLIGHT_PIXELS_PER_METRE,
   SCALE_M_PER_PX,
   CAM_OFFSET_DECAY_RATE,
-} from './_constants.js';
+} from './_constants.ts';
 
 // ---------------------------------------------------------------------------
 // Coordinate helpers

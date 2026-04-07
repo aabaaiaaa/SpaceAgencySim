@@ -17,11 +17,11 @@ import {
   FacilityId, CONTRACT_TIER_CAPS, CONTRACTS_PER_FLIGHT_MIN, CONTRACTS_PER_FLIGHT_MAX,
   CONTRACT_BOARD_EXPIRY_FLIGHTS, CONTRACT_CANCEL_PENALTY_RATE, CONTRACT_REP_GAIN_MIN,
   CONTRACT_REP_GAIN_MAX, CONTRACT_REP_LOSS_CANCEL, CONTRACT_REP_LOSS_FAIL, CONTRACT_BONUS_REWARD_RATE,
-} from './constants.js';
-import type { ContractCategory } from './constants.js';
-import { earnReward } from './finance.js';
-import { CONTRACT_TEMPLATES, generateChainContinuation, getProgressionTier } from '../data/contracts.js';
-import type { GameState, FlightState, Contract, ObjectiveDef } from './gameState.js';
+} from './constants.ts';
+import type { ContractCategory } from './constants.ts';
+import { earnReward } from './finance.ts';
+import { CONTRACT_TEMPLATES, generateChainContinuation, getProgressionTier } from '../data/contracts.ts';
+import type { GameState, FlightState, Contract, ObjectiveDef } from './gameState.ts';
 
 /** All possible objective target fields across objective types. */
 interface ObjectiveTarget {

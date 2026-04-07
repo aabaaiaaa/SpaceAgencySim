@@ -6,18 +6,18 @@
  */
 
 import * as PIXI from 'pixi.js';
-import { getPartById } from '../../data/parts.js';
-import type { PartDef } from '../../data/parts.js';
-import { PartType } from '../../core/constants.js';
-import { getHeatRatio } from '../../core/atmosphere.js';
-import { DEPLOY_DURATION } from '../../core/parachute.js';
-import { LegState, LEG_DEPLOY_DURATION, getDeployedLegFootOffset } from '../../core/legs.js';
-import type { ReadonlyPhysicsState, ReadonlyAssembly } from '../types.js';
-import type { PlacedPart } from '../../core/rocketbuilder.js';
-import { getFlightRenderState } from './_state.js';
-import { ppm, worldToScreen, computeCoM } from './_camera.js';
-import { SCALE_M_PER_PX, PART_FILL, PART_STROKE, FLIGHT_PIXELS_PER_METRE } from './_constants.js';
-import { acquireGraphics, acquireText, releaseContainerChildren } from './_pool.js';
+import { getPartById } from '../../data/parts.ts';
+import type { PartDef } from '../../data/parts.ts';
+import { PartType } from '../../core/constants.ts';
+import { getHeatRatio } from '../../core/atmosphere.ts';
+import { DEPLOY_DURATION } from '../../core/parachute.ts';
+import { LegState, LEG_DEPLOY_DURATION, getDeployedLegFootOffset } from '../../core/legs.ts';
+import type { ReadonlyPhysicsState, ReadonlyAssembly } from '../types.ts';
+import type { PlacedPart } from '../../core/rocketbuilder.ts';
+import { getFlightRenderState } from './_state.ts';
+import { ppm, worldToScreen, computeCoM } from './_camera.ts';
+import { SCALE_M_PER_PX, PART_FILL, PART_STROKE, FLIGHT_PIXELS_PER_METRE } from './_constants.ts';
+import { acquireGraphics, acquireText, releaseContainerChildren } from './_pool.ts';
 
 // ---------------------------------------------------------------------------
 // Part drawing helpers

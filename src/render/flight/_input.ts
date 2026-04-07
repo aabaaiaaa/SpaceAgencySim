@@ -2,8 +2,8 @@
  * _input.ts — Mouse move handler and wheel zoom handler.
  */
 
-import { getFlightRenderState } from './_state.js';
-import { MIN_ZOOM, MAX_ZOOM } from './_constants.js';
+import { getFlightRenderState } from './_state.ts';
+import { MIN_ZOOM, MAX_ZOOM } from './_constants.ts';
 
 /**
  * Track the current mouse position so the wheel handler can compute the

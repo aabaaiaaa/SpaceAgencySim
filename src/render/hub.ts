@@ -15,8 +15,8 @@
  */
 
 import * as PIXI from 'pixi.js';
-import { getApp } from './index.js';
-import { RendererPool } from './pool.js';
+import { getApp } from './index.ts';
+import { RendererPool } from './pool.ts';
 
 // ---------------------------------------------------------------------------
 // Colours

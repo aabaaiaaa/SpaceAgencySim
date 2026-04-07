@@ -16,7 +16,7 @@
  * @module satelliteOps
  */
 
-import type { GameState, SatelliteRecord } from '../core/gameState.js';
+import type { GameState, SatelliteRecord } from '../core/gameState.ts';
 import {
   SatelliteType,
   SATELLITE_VALID_BANDS,
@@ -25,7 +25,7 @@ import {
   SATELLITE_DEGRADED_THRESHOLD,
   SATELLITE_REPOSITION_COST,
   SATELLITE_OPS_TIER_LABELS,
-} from '../core/constants.js';
+} from '../core/constants.ts';
 import {
   getNetworkSummary,
   setAutoMaintenance,
@@ -34,7 +34,7 @@ import {
   getSatelliteLeaseIncome,
   repositionSatellite,
   getRepositionTargets,
-} from '../core/satellites.js';
+} from '../core/satellites.ts';
 import './satelliteOps.css';
 
 // ---------------------------------------------------------------------------

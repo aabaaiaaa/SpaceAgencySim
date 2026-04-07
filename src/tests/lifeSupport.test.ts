@@ -13,16 +13,16 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createGameState } from '../core/gameState.js';
-import { processLifeSupport, createFieldCraft, hasExtendedLifeSupport } from '../core/lifeSupport.js';
-import { advancePeriod } from '../core/period.js';
+import { createGameState } from '../core/gameState.ts';
+import { processLifeSupport, createFieldCraft, hasExtendedLifeSupport } from '../core/lifeSupport.ts';
+import { advancePeriod } from '../core/period.ts';
 import {
   AstronautStatus,
   DEFAULT_LIFE_SUPPORT_PERIODS,
   LIFE_SUPPORT_WARNING_THRESHOLD,
   FieldCraftStatus,
   CREW_SALARY_PER_PERIOD,
-} from '../core/constants.js';
+} from '../core/constants.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers

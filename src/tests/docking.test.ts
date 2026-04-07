@@ -18,7 +18,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createFlightState, createGameState } from '../core/gameState.js';
+import { createFlightState, createGameState } from '../core/gameState.ts';
 import {
   FlightPhase,
   ControlMode,
@@ -31,7 +31,7 @@ import {
   DOCKING_MAX_RELATIVE_SPEED,
   DOCKING_MAX_ORIENTATION_DIFF,
   DOCKING_MAX_LATERAL_OFFSET,
-} from '../core/constants.js';
+} from '../core/constants.ts';
 import {
   createDockingState,
   hasDockingPort,
@@ -45,7 +45,7 @@ import {
   getDockingGuidance,
   getTargetsInVisualRange,
   canDockWith,
-} from '../core/docking.js';
+} from '../core/docking.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers

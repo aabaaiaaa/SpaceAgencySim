@@ -4,16 +4,16 @@
  */
 
 import * as PIXI from 'pixi.js';
-import { getPartById } from '../../data/parts.js';
-import type { PartDef } from '../../data/parts.js';
-import { PartType, ControlMode } from '../../core/constants.js';
-import type { ReadonlyPhysicsState, ReadonlyAssembly } from '../types.js';
-import type { PlacedPart } from '../../core/rocketbuilder.js';
-import { getFlightRenderState } from './_state.js';
-import type { PlumeState } from './_state.js';
-import { ppm, worldToScreen, computeCoM } from './_camera.js';
-import { lerpColor } from './_sky.js';
-import { acquireGraphics, releaseGraphics, releaseContainerChildren } from './_pool.js';
+import { getPartById } from '../../data/parts.ts';
+import type { PartDef } from '../../data/parts.ts';
+import { PartType, ControlMode } from '../../core/constants.ts';
+import type { ReadonlyPhysicsState, ReadonlyAssembly } from '../types.ts';
+import type { PlacedPart } from '../../core/rocketbuilder.ts';
+import { getFlightRenderState } from './_state.ts';
+import type { PlumeState } from './_state.ts';
+import { ppm, worldToScreen, computeCoM } from './_camera.ts';
+import { lerpColor } from './_sky.ts';
+import { acquireGraphics, releaseGraphics, releaseContainerChildren } from './_pool.ts';
 import {
   SCALE_M_PER_PX,
   FLIGHT_PIXELS_PER_METRE,
@@ -30,7 +30,7 @@ import {
   RCS_PLUME_LENGTH,
   RCS_PLUME_HALF_WIDTH,
   MACH_1,
-} from './_constants.js';
+} from './_constants.ts';
 
 // ---------------------------------------------------------------------------
 // Nozzle position helper

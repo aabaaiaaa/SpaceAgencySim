@@ -27,8 +27,8 @@
  *      `/src/core/missions.js`.
  */
 
-import { PartType, FacilityId } from '../core/constants.js';
-import type { ObjectiveDef } from '../core/gameState.js';
+import { PartType, FacilityId } from '../core/constants.ts';
+import type { ObjectiveDef } from '../core/gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Enums

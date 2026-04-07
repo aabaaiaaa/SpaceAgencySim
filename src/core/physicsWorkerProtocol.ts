@@ -15,9 +15,9 @@
  * @module core/physicsWorkerProtocol
  */
 
-import type { OrbitalElements, FlightEvent, PhaseTransition, DockingSystemState, TransferState, PowerState, CommsState } from './gameState.js';
-import type { PlacedPart, PartConnection, LegEntry } from './physics.js';
-import type { FlightPhase, CelestialBody, ControlMode, AltitudeBand, MalfunctionType } from './constants.js';
+import type { OrbitalElements, FlightEvent, PhaseTransition, DockingSystemState, TransferState, PowerState, CommsState } from './gameState.ts';
+import type { PlacedPart, PartConnection, LegEntry } from './physics.ts';
+import type { FlightPhase, CelestialBody, ControlMode, AltitudeBand, MalfunctionType } from './constants.ts';
 
 // ---------------------------------------------------------------------------
 // Serialised state shapes (structured-clone-safe)

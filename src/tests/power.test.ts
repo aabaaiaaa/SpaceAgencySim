@@ -26,10 +26,10 @@ import {
   recalcPowerState,
   getSatellitePowerInfo,
   hasSufficientSatellitePower,
-} from '../core/power.js';
-import { getPartById } from '../data/parts.js';
-import { PartType, SUN_ROTATION_RATE, POWER_DRAW_ROTATION, POWER_DRAW_SCIENCE, POWER_CRITICAL_THRESHOLD } from '../core/constants.js';
-import { getShadowOverlayGeometry } from '../core/mapView.js';
+} from '../core/power.ts';
+import { getPartById } from '../data/parts.ts';
+import { PartType, SUN_ROTATION_RATE, POWER_DRAW_ROTATION, POWER_DRAW_SCIENCE, POWER_CRITICAL_THRESHOLD } from '../core/constants.ts';
+import { getShadowOverlayGeometry } from '../core/mapView.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers

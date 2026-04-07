@@ -24,11 +24,11 @@
  * @module core/challenges
  */
 
-import { CHALLENGES, MedalTier, ScoreDirection } from '../data/challenges.js';
-import { earnReward } from './finance.js';
-import { ensureCustomChallengeState } from './customChallenges.js';
-import type { GameState, FlightState, ChallengeDef, ObjectiveDef, ChallengeResultEntry } from './gameState.js';
-import type { PhysicsState } from './physics.js';
+import { CHALLENGES, MedalTier, ScoreDirection } from '../data/challenges.ts';
+import { earnReward } from './finance.ts';
+import { ensureCustomChallengeState } from './customChallenges.ts';
+import type { GameState, FlightState, ChallengeDef, ObjectiveDef, ChallengeResultEntry } from './gameState.ts';
+import type { PhysicsState } from './physics.ts';
 
 // ---------------------------------------------------------------------------
 // Local types

@@ -16,12 +16,12 @@ import {
   testAABBOverlap,
   tickCollisions,
   applySeparationImpulse,
-} from '../core/collision.js';
+} from '../core/collision.ts';
 import {
   createPhysicsState,
   tick,
   fireNextStage,
-} from '../core/physics.js';
+} from '../core/physics.ts';
 import {
   createRocketAssembly,
   addPartToAssembly,
@@ -30,8 +30,8 @@ import {
   syncStagingWithAssembly,
   assignPartToStage,
   addStageToConfig,
-} from '../core/rocketbuilder.js';
-import { createFlightState } from '../core/gameState.js';
+} from '../core/rocketbuilder.ts';
+import { createFlightState } from '../core/gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers

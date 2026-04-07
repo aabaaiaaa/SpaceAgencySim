@@ -6,9 +6,9 @@
  * the UI layer pass mutable state — TypeScript allows mutable → readonly.
  */
 
-import type { PhysicsState } from '../core/physics.js';
-import type { FlightState, GameState, SurfaceItem } from '../core/gameState.js';
-import type { RocketAssembly } from '../core/rocketbuilder.js';
+import type { PhysicsState } from '../core/physics.ts';
+import type { FlightState, GameState, SurfaceItem } from '../core/gameState.ts';
+import type { RocketAssembly } from '../core/rocketbuilder.ts';
 
 /** Read-only view of PhysicsState for render functions. */
 export type ReadonlyPhysicsState = Readonly<PhysicsState>;

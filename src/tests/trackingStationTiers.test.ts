@@ -11,12 +11,12 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { createGameState } from '../core/gameState.js';
+import { createGameState } from '../core/gameState.ts';
 import {
   FacilityId,
   TRACKING_STATION_TIER_FEATURES,
   FACILITY_UPGRADE_DEFS,
-} from '../core/constants.js';
+} from '../core/constants.ts';
 import {
   isMapViewAvailable,
   getTrackingStationTier,
@@ -27,7 +27,7 @@ import {
   isDeepSpaceCommsAvailable,
   getAllowedMapZooms,
   MapZoom,
-} from '../core/mapView.js';
+} from '../core/mapView.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers

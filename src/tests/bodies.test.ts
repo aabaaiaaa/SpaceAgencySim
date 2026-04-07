@@ -32,14 +32,14 @@ import {
   getDestructionZone,
   getBodyHierarchy,
   findBodyPath,
-} from '../data/bodies.js';
-import { CelestialBody, BODY_GM, BODY_RADIUS, MIN_ORBIT_ALTITUDE, ALTITUDE_BANDS, BIOME_DEFINITIONS } from '../core/constants.js';
-import { SOI_RADIUS, BODY_PARENT, BODY_CHILDREN, BODY_ORBIT_RADIUS } from '../core/manoeuvre.js';
+} from '../data/bodies.ts';
+import { CelestialBody, BODY_GM, BODY_RADIUS, MIN_ORBIT_ALTITUDE, ALTITUDE_BANDS, BIOME_DEFINITIONS } from '../core/constants.ts';
+import { SOI_RADIUS, BODY_PARENT, BODY_CHILDREN, BODY_ORBIT_RADIUS } from '../core/manoeuvre.ts';
 import {
   airDensityForBody,
   atmosphereTopForBody,
   isReentryConditionForBody,
-} from '../core/atmosphere.js';
+} from '../core/atmosphere.ts';
 
 // ---------------------------------------------------------------------------
 // Catalog completeness

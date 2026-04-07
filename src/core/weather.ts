@@ -35,12 +35,12 @@ import {
   WEATHER_EXTREME_WIND_MIN,
   WEATHER_EXTREME_VISIBILITY_MAX,
   WeatherSeverity,
-} from './constants.js';
-import { getBodyDef, hasAtmosphere } from '../data/bodies.js';
-import { getNetworkBenefits } from './satellites.js';
-import { spend } from './finance.js';
-import { getWeatherSeverityMultipliers } from './settings.js';
-import type { GameState, WeatherConditions, WeatherState } from './gameState.js';
+} from './constants.ts';
+import { getBodyDef, hasAtmosphere } from '../data/bodies.ts';
+import { getNetworkBenefits } from './satellites.ts';
+import { spend } from './finance.ts';
+import { getWeatherSeverityMultipliers } from './settings.ts';
+import type { GameState, WeatherConditions, WeatherState } from './gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Types

@@ -18,7 +18,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createGameState } from '../core/gameState.js';
+import { createGameState } from '../core/gameState.ts';
 import {
   generateContracts,
   acceptContract,
@@ -31,7 +31,7 @@ import {
   getContractCaps,
   getMissionControlTier,
   getActiveConflicts,
-} from '../core/contracts.js';
+} from '../core/contracts.ts';
 import {
   CONTRACT_TIER_CAPS,
   CONTRACTS_PER_FLIGHT_MIN,
@@ -48,8 +48,8 @@ import {
   CONTRACT_BONUS_REWARD_RATE,
   CONTRACT_CONFLICT_TAGS,
   PartType,
-} from '../core/constants.js';
-import { ObjectiveType } from '../data/missions.js';
+} from '../core/constants.ts';
+import { ObjectiveType } from '../data/missions.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers

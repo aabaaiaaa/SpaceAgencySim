@@ -11,13 +11,13 @@
  * @module ui/debugSaves
  */
 
-import { DEBUG_SAVE_DEFINITIONS } from '../core/debugSaves.js';
-import type { DebugSaveDefinition } from '../core/debugSaves.js';
-import { getUnlockedMissions, reconcileParts } from '../core/missions.js';
-import { refreshTopBar } from './topbar.js';
-import { createListenerTracker } from './listenerTracker.js';
+import { DEBUG_SAVE_DEFINITIONS } from '../core/debugSaves.ts';
+import type { DebugSaveDefinition } from '../core/debugSaves.ts';
+import { getUnlockedMissions, reconcileParts } from '../core/missions.ts';
+import { refreshTopBar } from './topbar.ts';
+import { createListenerTracker } from './listenerTracker.ts';
 import './debugSaves.css';
-import type { GameState } from '../core/gameState.js';
+import type { GameState } from '../core/gameState.ts';
 
 
 // ---------------------------------------------------------------------------

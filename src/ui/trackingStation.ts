@@ -12,18 +12,18 @@
  * @module trackingStation
  */
 
-import type { GameState } from '../core/gameState.js';
-import type { TierFeatureSet } from '../core/constants.js';
+import type { GameState } from '../core/gameState.ts';
+import type { TierFeatureSet } from '../core/constants.ts';
 import {
   FacilityId,
   TRACKING_STATION_TIER_FEATURES,
   OrbitalObjectType,
   DEFAULT_LIFE_SUPPORT_PERIODS,
   LIFE_SUPPORT_WARNING_THRESHOLD,
-} from '../core/constants.js';
-import { getFacilityTier } from '../core/construction.js';
-import { getWeatherForecast } from '../core/weather.js';
-import { getTransferTargets } from '../core/manoeuvre.js';
+} from '../core/constants.ts';
+import { getFacilityTier } from '../core/construction.ts';
+import { getWeatherForecast } from '../core/weather.ts';
+import { getTransferTargets } from '../core/manoeuvre.ts';
 import './trackingStation.css';
 
 // ---------------------------------------------------------------------------

@@ -5,8 +5,8 @@
  * @module ui/flightController/_docking
  */
 
-import { FlightPhase } from '../../core/constants.js';
-import { DockingState } from '../../core/constants.js';
+import { FlightPhase } from '../../core/constants.ts';
+import { DockingState } from '../../core/constants.ts';
 import {
   tickDocking,
   getDockingGuidance,
@@ -17,10 +17,10 @@ import {
   canDockWith,
   undock,
   transferFuel,
-} from '../../core/docking.js';
-import { getFCState } from './_state.js';
-import { showPhaseNotification } from './_flightPhase.js';
-import { setMapTarget } from './_mapView.js';
+} from '../../core/docking.ts';
+import { getFCState } from './_state.ts';
+import { showPhaseNotification } from './_flightPhase.ts';
+import { setMapTarget } from './_mapView.ts';
 
 /**
  * Tick the docking system each frame.

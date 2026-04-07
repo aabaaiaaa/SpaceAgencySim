@@ -18,12 +18,12 @@ import {
   DEATH_FINE_PER_ASTRONAUT,
   MAX_LOAN_BALANCE,
   PartType,
-} from './constants.js';
-import { getPartById } from '../data/parts.js';
-import { getFinancialMultipliers } from './settings.js';
+} from './constants.ts';
+import { getPartById } from '../data/parts.ts';
+import { getFinancialMultipliers } from './settings.ts';
 
-import type { GameState } from './gameState.js';
-import type { PartDef } from '../data/parts.js';
+import type { GameState } from './gameState.ts';
+import type { PartDef } from '../data/parts.ts';
 
 // ---------------------------------------------------------------------------
 // Interest

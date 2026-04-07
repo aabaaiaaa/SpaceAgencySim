@@ -16,7 +16,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createFlightState, createGameState } from '../core/gameState.js';
+import { createFlightState, createGameState } from '../core/gameState.ts';
 import {
   FlightPhase,
   ControlMode,
@@ -30,7 +30,7 @@ import {
   GRAB_MAX_RELATIVE_SPEED,
   GRAB_MAX_LATERAL_OFFSET,
   GRAB_REPAIR_HEALTH,
-} from '../core/constants.js';
+} from '../core/constants.ts';
 import {
   createGrabState,
   hasGrabbingArm,
@@ -42,8 +42,8 @@ import {
   releaseGrabbedSatellite,
   processGrabRepairsFromFlight,
   getGrabTargetsInRange,
-} from '../core/grabbing.js';
-import { getPartById } from '../data/parts.js';
+} from '../core/grabbing.ts';
+import { getPartById } from '../data/parts.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers

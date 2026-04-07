@@ -10,16 +10,16 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createGameState } from '../core/gameState.js';
-import { advancePeriod } from '../core/period.js';
-import { getMinimumRocketCost, isBankrupt } from '../core/finance.js';
+import { createGameState } from '../core/gameState.ts';
+import { advancePeriod } from '../core/period.ts';
+import { getMinimumRocketCost, isBankrupt } from '../core/finance.ts';
 import {
   CREW_SALARY_PER_PERIOD,
   FACILITY_UPKEEP_PER_PERIOD,
   MAX_LOAN_BALANCE,
   AstronautStatus,
   STARTING_MONEY,
-} from '../core/constants.js';
+} from '../core/constants.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers

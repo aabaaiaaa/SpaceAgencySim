@@ -33,21 +33,21 @@ import {
   calculateYield,
   getInstrumentKey,
   parseInstrumentKey,
-} from '../core/sciencemodule.js';
+} from '../core/sciencemodule.ts';
 import {
   getInstrumentById,
   getAllInstruments,
   getInstrumentsByTier,
   isInstrumentValidForBiome,
   INSTRUMENTS,
-} from '../data/instruments.js';
-import { getPartById } from '../data/parts.js';
+} from '../data/instruments.ts';
+import { getPartById } from '../data/parts.ts';
 import {
   ScienceDataType,
   DIMINISHING_RETURNS,
   ANALYSIS_TRANSMIT_YIELD_MIN,
   ANALYSIS_TRANSMIT_YIELD_MAX,
-} from '../core/constants.js';
+} from '../core/constants.ts';
 import {
   createRocketAssembly,
   addPartToAssembly,
@@ -55,10 +55,10 @@ import {
   createStagingConfig,
   syncStagingWithAssembly,
   assignPartToStage,
-} from '../core/rocketbuilder.js';
-import { createPhysicsState } from '../core/physics.js';
-import { createFlightState } from '../core/gameState.js';
-import { activateCurrentStage } from '../core/staging.js';
+} from '../core/rocketbuilder.ts';
+import { createPhysicsState } from '../core/physics.ts';
+import { createFlightState } from '../core/gameState.ts';
+import { activateCurrentStage } from '../core/staging.ts';
 
 // ---------------------------------------------------------------------------
 // Shared helpers

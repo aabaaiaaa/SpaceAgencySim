@@ -28,8 +28,8 @@ import {
   getChuteMultiplier,
   getParachuteStatus,
   getParachuteContextMenuItems,
-} from '../core/parachute.js';
-import { PartType } from '../core/constants.js';
+} from '../core/parachute.ts';
+import { PartType } from '../core/constants.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers

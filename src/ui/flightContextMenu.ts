@@ -22,15 +22,15 @@
  * @module ui/flightContextMenu
  */
 
-import { hitTestFlightPart }                                  from '../render/flight.js';
-import { PartType }                                           from '../core/constants.js';
-import { getPartById }                                        from '../data/parts.js';
-import type { PartDef }                                       from '../data/parts.js';
-import { deployParachute, getParachuteStatus, ParachuteState } from '../core/parachute.js';
-import { deployLandingLeg, getLegStatus, LegState, retractLandingLeg } from '../core/legs.js';
-import { getMirrorPartId } from '../core/rocketbuilder.js';
-import { activateEjectorSeat, getEjectorSeatStatus, EjectorState } from '../core/ejector.js';
-import { activatePartDirect }                                 from '../core/staging.js';
+import { hitTestFlightPart }                                  from '../render/flight.ts';
+import { PartType }                                           from '../core/constants.ts';
+import { getPartById }                                        from '../data/parts.ts';
+import type { PartDef }                                       from '../data/parts.ts';
+import { deployParachute, getParachuteStatus, ParachuteState } from '../core/parachute.ts';
+import { deployLandingLeg, getLegStatus, LegState, retractLandingLeg } from '../core/legs.ts';
+import { getMirrorPartId } from '../core/rocketbuilder.ts';
+import { activateEjectorSeat, getEjectorSeatStatus, EjectorState } from '../core/ejector.ts';
+import { activatePartDirect }                                 from '../core/staging.ts';
 import {
   getScienceModuleStatus,
   getScienceModuleTimer,
@@ -40,21 +40,21 @@ import {
   getInstrumentTimer,
   activateInstrument,
   transmitInstrument,
-}                                                             from '../core/sciencemodule.js';
-import { getInstrumentById }                                  from '../data/instruments.js';
-import { ScienceDataType }                                    from '../core/constants.js';
+}                                                             from '../core/sciencemodule.ts';
+import { getInstrumentById }                                  from '../data/instruments.ts';
+import { ScienceDataType }                                    from '../core/constants.ts';
 import {
   hasMalfunction,
   getMalfunction,
   attemptRecovery,
   MALFUNCTION_RECOVERY_TIPS,
   MALFUNCTION_LABELS,
-}                                                             from '../core/malfunction.js';
-import { MalfunctionType }                                    from '../core/constants.js';
+}                                                             from '../core/malfunction.ts';
+import { MalfunctionType }                                    from '../core/constants.ts';
 import './flightContextMenu.css';
-import type { PhysicsState }                                  from '../core/physics.js';
-import type { RocketAssembly }                                from '../core/rocketbuilder.js';
-import type { FlightState, FlightEvent, GameState }             from '../core/gameState.js';
+import type { PhysicsState }                                  from '../core/physics.ts';
+import type { RocketAssembly }                                from '../core/rocketbuilder.ts';
+import type { FlightState, FlightEvent, GameState }             from '../core/gameState.ts';
 
 
 // ---------------------------------------------------------------------------

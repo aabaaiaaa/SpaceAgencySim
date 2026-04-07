@@ -25,18 +25,18 @@
  * @module topbar
  */
 
-import { payDownLoan, borrowMore } from '../core/finance.js';
-import { saveGame, loadGame, listSaves, SAVE_SLOT_COUNT, SAVE_VERSION } from '../core/saveload.js';
-import { reconcileParts } from '../core/missions.js';
-import { GameMode, MAX_LOAN_BALANCE } from '../core/constants.js';
-import { getPartById } from '../data/parts.js';
-import { syncVabToGameState } from '../ui/vab.js';
-import { openHelpPanel } from './help.js';
-import { createListenerTracker } from './listenerTracker.js';
-import { logger } from '../core/logger.js';
+import { payDownLoan, borrowMore } from '../core/finance.ts';
+import { saveGame, loadGame, listSaves, SAVE_SLOT_COUNT, SAVE_VERSION } from '../core/saveload.ts';
+import { reconcileParts } from '../core/missions.ts';
+import { GameMode, MAX_LOAN_BALANCE } from '../core/constants.ts';
+import { getPartById } from '../data/parts.ts';
+import { syncVabToGameState } from '../ui/vab.ts';
+import { openHelpPanel } from './help.ts';
+import { createListenerTracker } from './listenerTracker.ts';
+import { logger } from '../core/logger.ts';
 import './topbar.css';
-import type { GameState } from '../core/gameState.js';
-import type { ListenerTracker } from './listenerTracker.js';
+import type { GameState } from '../core/gameState.ts';
+import type { ListenerTracker } from './listenerTracker.ts';
 
 // ---------------------------------------------------------------------------
 // Types

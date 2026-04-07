@@ -15,7 +15,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { createGameState } from '../core/gameState.js';
+import { createGameState } from '../core/gameState.ts';
 import {
   initializeMissions,
   getAvailableMissions,
@@ -24,9 +24,9 @@ import {
   getUnlockedMissions,
   getUnlockedParts,
   checkObjectiveCompletion,
-} from '../core/missions.js';
-import { processFlightReturn } from '../core/flightReturn.js';
-import { MISSIONS, ObjectiveType, MissionStatus, rebuildMissionsIndex } from '../data/missions.js';
+} from '../core/missions.ts';
+import { processFlightReturn } from '../core/flightReturn.ts';
+import { MISSIONS, ObjectiveType, MissionStatus, rebuildMissionsIndex } from '../data/missions.ts';
 
 // ---------------------------------------------------------------------------
 // Test fixture helpers

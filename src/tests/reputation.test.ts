@@ -12,7 +12,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createGameState } from '../core/gameState.js';
+import { createGameState } from '../core/gameState.ts';
 import {
   STARTING_REPUTATION,
   getReputationTier,
@@ -25,7 +25,7 @@ import {
   REP_LOSS_MISSION_FAILURE,
   REP_LOSS_ROCKET_DESTRUCTION,
   REP_GAIN_MILESTONE,
-} from '../core/constants.js';
+} from '../core/constants.ts';
 import {
   adjustReputation,
   applyCrewDeathReputation,
@@ -33,8 +33,8 @@ import {
   applyMissionFailureReputation,
   applyRocketDestructionReputation,
   applyMilestoneReputation,
-} from '../core/reputation.js';
-import { getAdjustedHireCost } from '../core/crew.js';
+} from '../core/reputation.ts';
+import { getAdjustedHireCost } from '../core/crew.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers

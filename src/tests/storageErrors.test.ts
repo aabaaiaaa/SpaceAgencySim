@@ -12,16 +12,16 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { createGameState } from '../core/gameState.js';
+import { createGameState } from '../core/gameState.ts';
 import {
   saveGame,
   importSave,
   _setSessionStartTimeForTesting,
-} from '../core/saveload.js';
+} from '../core/saveload.ts';
 import {
   saveSharedLibrary,
   loadSharedLibrary,
-} from '../core/designLibrary.js';
+} from '../core/designLibrary.ts';
 
 // ---------------------------------------------------------------------------
 // localStorage mock with configurable setItem behavior

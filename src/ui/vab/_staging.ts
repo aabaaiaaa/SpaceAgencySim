@@ -2,7 +2,7 @@
  * _staging.ts — Staging panel rendering, delta-v computation, staging drag-and-drop reorder.
  */
 
-import { getPartById } from '../../data/parts.js';
+import { getPartById } from '../../data/parts.ts';
 import {
   syncStagingWithAssembly,
   addStageToConfig,
@@ -12,10 +12,10 @@ import {
   returnPartToUnstaged,
   validateStagingConfig,
   moveStage,
-} from '../../core/rocketbuilder.js';
-import { airDensity, SEA_LEVEL_DENSITY } from '../../core/atmosphere.js';
-import { getVabState } from './_state.js';
-import { snapshotStaging, recordStagingChange } from './_undoActions.js';
+} from '../../core/rocketbuilder.ts';
+import { airDensity, SEA_LEVEL_DENSITY } from '../../core/atmosphere.ts';
+import { getVabState } from './_state.ts';
+import { snapshotStaging, recordStagingChange } from './_undoActions.ts';
 
 // ---------------------------------------------------------------------------
 // Forward references — set by _init.js to break circular deps
