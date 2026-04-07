@@ -349,10 +349,11 @@ describe('generateTransferTrajectory', () => {
   });
 
   it('stops early if trajectory leaves SOI', () => {
-    // Very high velocity to escape SOI quickly.
-    const ps = { posX: 0, posY: 200_000, velX: 50_000, velY: 50_000 };
+    // Start near the SOI boundary with high velocity to guarantee escape
+    // within the integration window (break condition is r > soiR * 1.1).
+    const ps = { posX: 0, posY: 910_000_000, velX: 50_000, velY: 50_000 };
     const pts = generateTransferTrajectory(ps, 'EARTH', 200);
-    // Should stop before 201 points (escaped SOI).
+    // Should stop well before 201 points (escaped SOI).
     expect(pts.length).toBeLessThan(201);
   });
 
@@ -535,7 +536,7 @@ describe('getShadowOverlayGeometry', () => {
 
   it('returns different sun angles at different game times', () => {
     const geo1 = getShadowOverlayGeometry('EARTH', 0);
-    const geo2 = getShadowOverlayGeometry('EARTH', 43200); // 12 hours later
+    const geo2 = getShadowOverlayGeometry('EARTH', 2700); // half a sun rotation (180°)
     expect(geo1.sunAngleDeg).not.toBe(geo2.sunAngleDeg);
   });
 });

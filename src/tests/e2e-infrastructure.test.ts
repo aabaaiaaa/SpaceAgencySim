@@ -27,7 +27,7 @@ import {
   STARTING_MONEY,
   STARTER_FACILITIES,
   ALL_FACILITIES,
-} from '../../e2e/helpers.ts';
+} from '../../e2e/helpers.js';
 
 import {
   freshStartFixture,
@@ -40,7 +40,7 @@ import {
   EARLY_PARTS,
   MID_PARTS,
   ALL_PARTS,
-} from '../../e2e/fixtures.ts';
+} from '../../e2e/fixtures.js';
 
 // ---------------------------------------------------------------------------
 // Suite 1: buildSaveEnvelope structure

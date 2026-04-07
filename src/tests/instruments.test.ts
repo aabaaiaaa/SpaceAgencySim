@@ -96,6 +96,7 @@ function makeGameState() {
     scienceLog: [],
     sciencePoints: 0,
     crew: [],
+    facilities: {},
   };
 }
 

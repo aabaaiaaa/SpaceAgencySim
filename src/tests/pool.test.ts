@@ -15,47 +15,52 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ---------------------------------------------------------------------------
 // Mock pixi.js — minimal classes for pool testing
+// vi.hoisted() ensures these are available when vi.mock factory runs (hoisted)
 // ---------------------------------------------------------------------------
 
-class MockGraphics {
-  visible = true;
-  alpha = 1;
-  position = { set: vi.fn() };
-  scale = { set: vi.fn() };
-  rotation = 0;
-  label = '';
-  parent = null;
-  clear = vi.fn();
-}
-
-class MockTextStyle {}
-
-class MockText {
-  visible = true;
-  alpha = 1;
-  position = { set: vi.fn() };
-  scale = { set: vi.fn() };
-  rotation = 0;
-  label = '';
-  anchor = { set: vi.fn() };
-  parent = null;
-
-  constructor(_opts) {
-    // Mimic PIXI.Text constructor
+const { MockGraphics, MockTextStyle, MockText, MockContainer } = vi.hoisted(() => {
+  class MockGraphics {
+    visible = true;
+    alpha = 1;
+    position = { set: vi.fn() };
+    scale = { set: vi.fn() };
+    rotation = 0;
+    label = '';
+    parent = null;
+    clear = vi.fn();
   }
-}
 
-class MockContainer {
-  children = [];
-  removeChildAt(index) {
-    return this.children.splice(index, 1)[0];
+  class MockTextStyle {}
+
+  class MockText {
+    visible = true;
+    alpha = 1;
+    position = { set: vi.fn() };
+    scale = { set: vi.fn() };
+    rotation = 0;
+    label = '';
+    anchor = { set: vi.fn() };
+    parent = null;
+
+    constructor(_opts) {
+      // Mimic PIXI.Text constructor
+    }
   }
-  removeChild(child) {
-    const idx = this.children.indexOf(child);
-    if (idx >= 0) this.children.splice(idx, 1);
-    return child;
+
+  class MockContainer {
+    children = [];
+    removeChildAt(index) {
+      return this.children.splice(index, 1)[0];
+    }
+    removeChild(child) {
+      const idx = this.children.indexOf(child);
+      if (idx >= 0) this.children.splice(idx, 1);
+      return child;
+    }
   }
-}
+
+  return { MockGraphics, MockTextStyle, MockText, MockContainer };
+});
 
 vi.mock('pixi.js', () => ({
   Graphics: MockGraphics,
