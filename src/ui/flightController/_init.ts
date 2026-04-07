@@ -16,7 +16,7 @@ import { setMalfunctionMode, getMalfunctionMode } from '../../core/malfunction.j
 import { createDockingState } from '../../core/docking.js';
 import { getPartById } from '../../data/parts.js';
 import { getVabInventoryUsedParts } from '../vab.js';
-import { getFCState, setFCState, resetFCState } from './_state.js';
+import { getFCState, resetFCState } from './_state.js';
 import './flightController.css';
 import { onKeyDown, onKeyUp } from './_keyboard.js';
 import { onTimeWarpButtonClick } from './_timeWarp.js';

@@ -61,7 +61,7 @@
 - **Verification**: New unit tests pass for the message protocol: command→snapshot round trip works correctly. Worker module compiles and loads without errors.
 
 ### TASK-011: Integrate Web Worker physics with flight controller
-- **Status**: in-progress
+- **Status**: done
 - **Dependencies**: TASK-010
 - **Description**: Refactor the flight controller loop to send commands to the physics worker and receive state snapshots for rendering, instead of calling `tick()` directly. Handle time warp (worker runs multiple ticks, main thread renders latest snapshot). Handle worker errors with fallback to main-thread physics. Add a settings flag to control worker vs main-thread mode. See requirements Section 3.2.
 - **Verification**: Run a few e2e tests that would use the Web Worker physics. Flight simulation works correctly during normal flight and time warp. Fallback to main-thread physics works when worker is disabled.

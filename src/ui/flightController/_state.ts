@@ -90,8 +90,6 @@ export interface FCState {
   // Worker physics
   /** True when the physics worker is active and handling ticks. */
   workerActive: boolean;
-  /** Flight phase on the previous frame — used to detect phase transitions from worker snapshots. */
-  prevWorkerPhase: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -152,7 +150,6 @@ function _createDefaultState(): FCState {
 
     // Worker physics
     workerActive: false,
-    prevWorkerPhase: null,
   };
 }
 

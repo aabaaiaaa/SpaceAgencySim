@@ -18,10 +18,10 @@
  * @module core/physicsWorker
  */
 
-import { tick, createPhysicsState, handleKeyDown, handleKeyUp, fireNextStage } from './physics.js';
+import { tick, handleKeyDown, handleKeyUp, fireNextStage } from './physics.js';
 import { evaluateAutoTransitions } from './flightPhase.js';
 import { checkOrbitStatus } from './orbit.js';
-import type { PhysicsState, RocketAssembly, PlacedPart, PartConnection } from './physics.js';
+import type { PhysicsState, RocketAssembly, PlacedPart } from './physics.js';
 import type { FlightState } from './gameState.js';
 import type {
   WorkerCommand,
@@ -30,10 +30,8 @@ import type {
   PhysicsSnapshot,
   FlightSnapshot,
   SerialisedAssembly,
-  SerialisedStagingConfig,
   SerialisedParachuteEntry,
   SerialisedDebrisState,
-  SerialisedEjectedCrewEntry,
   InitCommand,
 } from './physicsWorkerProtocol.js';
 
@@ -64,8 +62,6 @@ let stagingConfig: { stages: { instanceIds: string[] }[]; unstaged: string[]; cu
 /** Frame counter for snapshot sequencing. */
 let frameCounter = 0;
 
-/** Whether the worker has been initialised. */
-let initialised = false;
 
 // ---------------------------------------------------------------------------
 // Deserialisation: snapshot → mutable state
@@ -352,7 +348,6 @@ function handleInit(cmd: InitCommand, post: (msg: WorkerMessage) => void): void 
     currentStageIdx: cmd.stagingConfig.currentStageIdx,
   };
   frameCounter = 0;
-  initialised = true;
 
   post({ type: 'ready' });
 }
@@ -443,7 +438,6 @@ export function handleCommand(cmd: WorkerCommand, post: (msg: WorkerMessage) => 
         flightState = null;
         assembly = null;
         stagingConfig = null;
-        initialised = false;
         frameCounter = 0;
         post({ type: 'stopped' });
         break;
