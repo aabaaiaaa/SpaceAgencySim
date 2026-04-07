@@ -79,7 +79,7 @@
 - **Verification**: `grep "as any"` on these four files returns no matches. `npm run typecheck` passes. `npm run test:unit` passes.
 
 ### TASK-014: Eliminate `as any` casts — grabbing.ts, physics.ts, and remaining 17 files
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Remove all `as any` casts from `grabbing.ts` (7), `physics.ts` (5), and the remaining ~17 files (~33 casts total). See requirements Section 4.1.
 - **Verification**: `grep -r "as any" src/` returns no matches (or only justified exceptions documented with comments). `npm run typecheck` passes. `npm run test:unit` passes.

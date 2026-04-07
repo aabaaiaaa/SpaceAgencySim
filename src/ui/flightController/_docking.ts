@@ -41,7 +41,7 @@ export function tickDockingSystem(dt: number): void {
   }
 
   // Update combined mass on physics state for thrust calculations.
-  s.ps._dockedCombinedMass = (dockingState as any).combinedMass;
+  s.ps._dockedCombinedMass = dockingState.combinedMass;
 
   const result = tickDocking(dockingState, s.ps, s.assembly, s.flightState, s.state, dt);
 

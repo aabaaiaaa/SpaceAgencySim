@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 24
-- **Completed**: 13
-- **Remaining**: 11
-- **Last Updated**: 2026-04-07T10:25:18.043Z
+- **Completed**: 14
+- **Remaining**: 10
+- **Last Updated**: 2026-04-07T10:47:30.930Z
 
 ## Iteration Log
 
@@ -140,4 +140,13 @@
 - **Exit Status**: success
 - **Tokens**: 6,279,463 total (79 in, 22,462 out, 93,100 cache-create, 6,163,822 cache-read)
 - **Cost**: $4.2257
+
+### Iteration 14 - 2026-04-07T10:47:30.925Z
+- **Task Attempted**: TASK-014
+- **Task Completed**: TASK-014
+- **Summary**: Completed Eliminate `as any` casts — grabbing.ts, physics.ts, and remaining 17 files
+- **Duration**: 22m 11s
+- **Exit Status**: success
+- **Tokens**: 20,714,736 total (5,323 in, 62,355 out, 162,997 cache-create, 20,484,061 cache-read)
+- **Cost**: $13.0576
 

@@ -37,7 +37,7 @@ import { earnReward } from './finance.js';
 import { getTechTreeUnlockedParts } from './techtree.js';
 import { awardFacility } from './construction.js';
 
-import type { GameState, FlightState } from './gameState.js';
+import type { GameState, FlightState, Mission } from './gameState.js';
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -81,8 +81,7 @@ export function initializeMissions(state: GameState): void {
     if (def.unlocksAfter.length === 0 || def.status === MissionStatus.AVAILABLE) {
       // MissionDef is stored in state.missions.available; the runtime type is a
       // superset of Mission, so we cast here at the boundary.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      state.missions.available.push(_copyMission(def) as any);
+      state.missions.available.push(_copyMission(def) as unknown as Mission);
     }
   }
 }

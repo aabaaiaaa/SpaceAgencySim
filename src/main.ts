@@ -18,6 +18,7 @@ import type { CelestialBody } from './core/constants.js';
 import { setMalfunctionMode } from './core/malfunction.js';
 import { plantFlag, collectSurfaceSample, deploySurfaceInstrument, deployBeacon, processSurfaceOps, processSampleReturns, areSurfaceItemsVisible } from './core/surfaceOps.js';
 import { checkAchievements } from './core/achievements.js';
+import type { AchievementCheckContext } from './core/achievements.js';
 import { computeTransferDeltaV } from './core/manoeuvre.js';
 import { CELESTIAL_BODIES, isLandable } from './data/bodies.js';
 import { getPartById } from './data/parts.js';
@@ -193,7 +194,7 @@ async function main() {
     window.__areSurfaceItemsVisible = (bodyId: string) => areSurfaceItemsVisible(state, bodyId);
 
     // Achievements.
-    window.__checkAchievements = (ctx: unknown) => checkAchievements(state, ctx as any);
+    window.__checkAchievements = (ctx: unknown) => checkAchievements(state, ctx as AchievementCheckContext);
 
     // Transfer delta-v.
     window.__computeTransferDeltaV = (from: string, to: string, alt: number) => computeTransferDeltaV(from, to, alt);

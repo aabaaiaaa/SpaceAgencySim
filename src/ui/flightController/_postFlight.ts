@@ -183,7 +183,7 @@ export function showPostFlightSummary(
   if (state) {
     const allMissions = [...(state.missions?.accepted ?? [])];
     const missionsWithObjectives = allMissions.filter(
-      (m) => Array.isArray((m as any).objectives) && (m as any).objectives.length > 0,
+      (m) => Array.isArray(m.objectives) && m.objectives.length > 0,
     );
 
     for (const mission of missionsWithObjectives) {
@@ -194,7 +194,7 @@ export function showPostFlightSummary(
       sectionTitle.textContent = `Mission: ${mission.title}`;
       section.appendChild(sectionTitle);
 
-      const missionObjectives: Array<{ completed: boolean; description?: string; type: string }> = (mission as any).objectives;
+      const missionObjectives = mission.objectives!;
       const objList: HTMLUListElement = document.createElement('ul');
       objList.className = 'pf-obj-list';
 
@@ -217,7 +217,7 @@ export function showPostFlightSummary(
       section.appendChild(objList);
 
       // Show reward info if all objectives are completed.
-      const allComplete: boolean = missionObjectives.every((o) => o.completed);
+      const allComplete: boolean = missionObjectives!.every((o) => o.completed);
       if (allComplete && mission.reward > 0) {
         const rewardEl: HTMLDivElement = document.createElement('div');
         rewardEl.className = 'pf-reward-box';
@@ -437,7 +437,7 @@ export function showPostFlightSummary(
       // Reset ALL accepted mission objectives.
       if (gs.missions?.accepted) {
         for (const mission of gs.missions.accepted) {
-          const objectives = (mission as any).objectives;
+          const objectives = mission.objectives;
           if (!objectives) continue;
           for (const obj of objectives) {
             obj.completed = false;

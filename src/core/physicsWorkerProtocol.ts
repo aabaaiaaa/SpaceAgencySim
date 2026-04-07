@@ -17,7 +17,7 @@
 
 import type { OrbitalElements, FlightEvent, PhaseTransition, DockingSystemState, TransferState, PowerState, CommsState } from './gameState.js';
 import type { PlacedPart, PartConnection, LegEntry } from './physics.js';
-import type { FlightPhase, CelestialBody } from './constants.js';
+import type { FlightPhase, CelestialBody, ControlMode, AltitudeBand, MalfunctionType } from './constants.js';
 
 // ---------------------------------------------------------------------------
 // Serialised state shapes (structured-clone-safe)
@@ -106,9 +106,9 @@ export interface PhysicsSnapshot {
   isTipping: boolean;
   tippingContactX: number;
   tippingContactY: number;
-  controlMode: string;
+  controlMode: ControlMode;
   baseOrbit: OrbitalElements | null;
-  dockingAltitudeBand: { id: string; name: string } | null;
+  dockingAltitudeBand: AltitudeBand | null;
   dockingOffsetAlongTrack: number;
   dockingOffsetRadial: number;
   rcsActiveDirections: string[];
@@ -116,7 +116,7 @@ export interface PhysicsSnapshot {
   weatherIspModifier: number;
   hasLaunchClamps: boolean;
   powerState: PowerState | null;
-  malfunctions: Record<string, { type: string; recovered: boolean }> | null;
+  malfunctions: Record<string, { type: MalfunctionType; recovered: boolean }> | null;
 }
 
 /**

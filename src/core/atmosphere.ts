@@ -411,7 +411,7 @@ export function updateHeat(
       partName:    name,
       altitude,
       description: `${name} destroyed by atmospheric heating at ${altitude.toFixed(0)} m.`,
-    } as any);
+    });
   }
 }
 
@@ -502,7 +502,7 @@ export function updateSolarHeat(
         partName:    name,
         altitude,
         description: `${name} vaporised by solar inferno at ${(altitude / 1_000_000).toFixed(0)} Mm altitude.`,
-      } as any);
+      });
     }
     return;
   }
@@ -551,6 +551,6 @@ export function updateSolarHeat(
       partName:    name,
       altitude,
       description: `${name} destroyed by solar radiation at ${(altitude / 1_000_000).toFixed(0)} Mm from the Sun.`,
-    } as any);
+    });
   }
 }

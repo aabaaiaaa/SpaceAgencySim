@@ -182,7 +182,7 @@ export function loop(timestamp: number): void {
     // --- Communication range evaluation ---
     if (flightState && state) {
       const comms = evaluateComms(state, flightState, ps ? {
-        altitude: ps.posY + ((ps as any).surfaceAltitude ?? 0),
+        altitude: ps.posY,
         posX: ps.posX,
         posY: ps.posY,
       } : undefined);
@@ -203,7 +203,7 @@ export function loop(timestamp: number): void {
     }
 
     // Reset per-frame science flag before sub-steps.
-    (flightState as any).scienceModuleRunning = false;
+    flightState.scienceModuleRunning = false;
 
     // ---- Physics tick: worker or main-thread ----
     if (s.workerActive && isWorkerReady()) {

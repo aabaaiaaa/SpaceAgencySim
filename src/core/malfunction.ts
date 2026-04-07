@@ -385,9 +385,7 @@ function _applyMalfunction(
 
   // Emit flight event.
   if (flightState?.events) {
-    // Cast to any: extra fields (instanceId, partName, malfunctionType) are
-    // not in the FlightEvent interface but are consumed by the render layer.
-    (flightState.events as any[]).push({
+    flightState.events.push({
       type:           'PART_MALFUNCTION',
       time:           flightState.timeElapsed,
       instanceId,

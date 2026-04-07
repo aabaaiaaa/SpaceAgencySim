@@ -98,7 +98,7 @@ import { initPowerState, tickPower, recalcPowerState } from './power.js';
 import { getOrbitalStateAtTime } from './orbit.js';
 
 import type { AltitudeBand, ControlMode as ControlModeType } from './constants.js';
-import type { FlightState, OrbitalElements, PowerState, GameState, InventoryPart } from './gameState.js';
+import type { FlightState, FlightEvent, OrbitalElements, PowerState, GameState, InventoryPart } from './gameState.js';
 
 // ---------------------------------------------------------------------------
 // Types for modules still in .js
@@ -242,6 +242,8 @@ interface DebrisState {
   landed: boolean;
   /** True after high-speed impact. */
   crashed: boolean;
+  /** Collision cooldown ticks remaining after separation. */
+  collisionCooldown?: number;
 }
 
 /** Per-parachute lifecycle entry. */
@@ -707,8 +709,8 @@ export function createPhysicsState(assembly: RocketAssembly, flightState: Flight
   // Flag on flightState so mission objective checking knows whether science
   // modules are present (used to gate HOLD_ALTITUDE time accumulation).
   if (flightState) {
-    (flightState as any).hasScienceModules = ps.scienceModuleStates.size > 0 || ps.instrumentStates.size > 0;
-    (flightState as any).scienceModuleRunning = false;
+    flightState.hasScienceModules = ps.scienceModuleStates.size > 0 || ps.instrumentStates.size > 0;
+    flightState.scienceModuleRunning = false;
     flightState.powerState = ps.powerState;
   }
 
@@ -1149,7 +1151,7 @@ function _integrate(ps: PhysicsState, assembly: RocketAssembly, flightState: Fli
       gameTimeSeconds: flightState.timeElapsed,
       angularPositionDeg,
       inOrbit: flightState.inOrbit,
-      scienceRunning: (flightState as any).scienceModuleRunning,
+      scienceRunning: flightState.scienceModuleRunning,
       activeScienceCount,
       commsActive: false, // comms are passive for player craft
     });
@@ -2438,7 +2440,7 @@ function _syncFlightState(ps: PhysicsState, assembly: RocketAssembly, flightStat
         toBiome:     newBiome,
         altitude:    flightState.altitude,
         description: `Entered ${newBiome.replace(/_/g, ' ').toLowerCase()} biome at ${flightState.altitude >= 1000 ? `${(flightState.altitude / 1000).toFixed(0)} km` : `${flightState.altitude.toFixed(0)} m`}.`,
-      } as any);
+      });
 
       // Schedule a malfunction check with a small random delay (0.5–2.0 s)
       if (ps._malfunctionCheckPending !== true) {
@@ -2514,6 +2516,7 @@ function _estimateDeltaV(ps: PhysicsState, assembly: RocketAssembly): number {
 /**
  * Append a flight event to the FlightState event log.
  */
-function _emitEvent(flightState: FlightState, event: Record<string, unknown>): void {
-  flightState.events.push(event as any);
+function _emitEvent(flightState: FlightState, event: { time: number; type: string; [key: string]: unknown }): void {
+  const withDesc: FlightEvent = { description: '', ...event };
+  flightState.events.push(withDesc);
 }

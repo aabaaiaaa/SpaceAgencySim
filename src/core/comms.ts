@@ -89,7 +89,7 @@ function _hasOnboardRelay(state: GameState, flightState: FlightState): boolean {
   for (const rocketPart of rocket.parts) {
     const partDef = getPartById(rocketPart.partId);
     if (!partDef) continue;
-    if ((partDef.properties as any)?.relayAntenna || (partDef.properties as any)?.deepSpaceComms) return true;
+    if (partDef.properties.relayAntenna || partDef.properties.deepSpaceComms) return true;
   }
   return false;
 }

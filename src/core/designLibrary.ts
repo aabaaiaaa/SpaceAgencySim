@@ -194,8 +194,8 @@ export function calculateCostBreakdown(design: RocketDesign): CostBreakdown {
     const existing = partMap.get(def.id);
     if (existing) { existing.count++; existing.cost += def.cost; }
     else { partMap.set(def.id, { partId: def.id, name: def.name, cost: def.cost, count: 1 }); }
-    const fuelMass = (def.properties as any)?.fuelMass ?? 0;
-    const fuelType = (def.properties as any)?.fuelType ?? 'LIQUID';
+    const fuelMass = (def.properties.fuelMass as number) ?? 0;
+    const fuelType = (def.properties.fuelType as string) ?? 'LIQUID';
     if (fuelMass > 0) { fuelCost += fuelMass * (FUEL_COST_PER_KG[fuelType] ?? FUEL_COST_PER_KG.LIQUID); }
   }
 

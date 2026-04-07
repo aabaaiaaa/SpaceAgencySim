@@ -22,6 +22,7 @@ import { tick, handleKeyDown, handleKeyUp, fireNextStage } from './physics.js';
 import { evaluateAutoTransitions } from './flightPhase.js';
 import { checkOrbitStatus } from './orbit.js';
 import type { PhysicsState, RocketAssembly, PlacedPart } from './physics.js';
+import type { StagingConfig } from './rocketbuilder.js';
 import type { FlightState } from './gameState.js';
 import type {
   WorkerCommand,
@@ -57,7 +58,7 @@ let flightState: FlightState | null = null;
 let assembly: RocketAssembly | null = null;
 
 /** Staging config (mutated by fireNextStage). */
-let stagingConfig: { stages: { instanceIds: string[] }[]; unstaged: string[]; currentStageIdx: number } | null = null;
+let stagingConfig: StagingConfig | null = null;
 
 /** Frame counter for snapshot sequencing. */
 let frameCounter = 0;
@@ -102,9 +103,9 @@ function deserialisePhysicsState(snap: PhysicsSnapshot): PhysicsState {
     tippingContactY: snap.tippingContactY,
     _heldKeys: new Set<string>(),
     _accumulator: 0,
-    controlMode: snap.controlMode as any,
+    controlMode: snap.controlMode,
     baseOrbit: snap.baseOrbit,
-    dockingAltitudeBand: snap.dockingAltitudeBand as any,
+    dockingAltitudeBand: snap.dockingAltitudeBand,
     dockingOffsetAlongTrack: snap.dockingOffsetAlongTrack,
     dockingOffsetRadial: snap.dockingOffsetRadial,
     rcsActiveDirections: _arrayToSet(snap.rcsActiveDirections),
@@ -114,9 +115,7 @@ function deserialisePhysicsState(snap: PhysicsSnapshot): PhysicsState {
     hasLaunchClamps: snap.hasLaunchClamps,
     powerState: snap.powerState,
     malfunctions: snap.malfunctions
-      ? _recordToMap(Object.fromEntries(
-          Object.entries(snap.malfunctions).map(([k, v]) => [k, v as any]),
-        ) as Record<string, any>)
+      ? _recordToMap(snap.malfunctions)
       : undefined,
   };
 }
@@ -238,9 +237,9 @@ function serialisePhysicsState(ps: PhysicsState): PhysicsSnapshot {
     isTipping: ps.isTipping,
     tippingContactX: ps.tippingContactX,
     tippingContactY: ps.tippingContactY,
-    controlMode: ps.controlMode as string,
+    controlMode: ps.controlMode,
     baseOrbit: ps.baseOrbit,
-    dockingAltitudeBand: ps.dockingAltitudeBand as { id: string; name: string } | null,
+    dockingAltitudeBand: ps.dockingAltitudeBand,
     dockingOffsetAlongTrack: ps.dockingOffsetAlongTrack,
     dockingOffsetRadial: ps.dockingOffsetRadial,
     rcsActiveDirections: _setToArray(ps.rcsActiveDirections),
@@ -249,7 +248,7 @@ function serialisePhysicsState(ps: PhysicsState): PhysicsSnapshot {
     hasLaunchClamps: ps.hasLaunchClamps,
     powerState: ps.powerState,
     malfunctions: ps.malfunctions
-      ? _mapToRecord(ps.malfunctions) as Record<string, { type: string; recovered: boolean }>
+      ? _mapToRecord(ps.malfunctions) as PhysicsSnapshot['malfunctions']
       : null,
   };
 }
@@ -359,7 +358,7 @@ function handleTick(realDeltaTime: number, timeWarp: number, post: (msg: WorkerM
   if (!ps || !assembly || !stagingConfig || !flightState) return;
 
   // Advance physics simulation.
-  tick(ps, assembly, stagingConfig as any, flightState, realDeltaTime, timeWarp);
+  tick(ps, assembly, stagingConfig, flightState, realDeltaTime, timeWarp);
 
   // Evaluate flight phase transitions.
   const orbitStatus = checkOrbitStatus(
@@ -412,7 +411,7 @@ export function handleCommand(cmd: WorkerCommand, post: (msg: WorkerMessage) => 
 
       case 'stage':
         if (ps && assembly && stagingConfig && flightState) {
-          fireNextStage(ps, assembly, stagingConfig as any, flightState);
+          fireNextStage(ps, assembly, stagingConfig, flightState);
         }
         break;
 

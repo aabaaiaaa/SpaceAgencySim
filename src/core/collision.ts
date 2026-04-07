@@ -276,8 +276,8 @@ export function testAABBOverlap(a: AABB, b: AABB): boolean {
 export function tickCollisions(ps: PhysicsState, assembly: RocketAssembly, dt: number): void {
   // 1. Decrement collision cooldowns on all debris.
   for (const debris of ps.debris) {
-    if ((debris as any).collisionCooldown > 0) {
-      (debris as any).collisionCooldown--;
+    if (debris.collisionCooldown != null && debris.collisionCooldown > 0) {
+      debris.collisionCooldown--;
     }
   }
 
@@ -302,7 +302,7 @@ export function tickCollisions(ps: PhysicsState, assembly: RocketAssembly, dt: n
       ref: debris,
       activeParts: debris.activeParts,
       fuelStore: debris.fuelStore,
-      cooldown: (debris as any).collisionCooldown ?? 0,
+      cooldown: debris.collisionCooldown ?? 0,
     });
   }
 

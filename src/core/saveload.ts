@@ -755,8 +755,8 @@ export function _validateNestedStructures(state: any): void {
   if (state.missions && typeof state.missions === 'object') {
     for (const bucket of ['accepted', 'completed']) {
       if (!Array.isArray(state.missions[bucket])) continue;
-      const original = state.missions[bucket] as any[];
-      const filtered = original.filter((entry: any) => {
+      const original = state.missions[bucket];
+      const filtered = original.filter((entry: Record<string, unknown>) => {
         if (!entry || typeof entry !== 'object') return false;
         if (typeof entry.id !== 'string') return false;
         if (typeof entry.title !== 'string') return false;
@@ -776,8 +776,8 @@ export function _validateNestedStructures(state: any): void {
 
   // Crew: each entry must have name (string), status (defined), skills (object).
   if (Array.isArray(state.crew)) {
-    const original = state.crew as any[];
-    const filtered = original.filter((entry: any) => {
+    const original = state.crew;
+    const filtered = original.filter((entry: Record<string, unknown>) => {
       if (!entry || typeof entry !== 'object') return false;
       if (typeof entry.name !== 'string') return false;
       if (entry.status === undefined || entry.status === null) return false;
@@ -796,8 +796,8 @@ export function _validateNestedStructures(state: any): void {
 
   // Orbital objects: each entry must have id (string), bodyId (string), elements (object).
   if (Array.isArray(state.orbitalObjects)) {
-    const original = state.orbitalObjects as any[];
-    const filtered = original.filter((entry: any) => {
+    const original = state.orbitalObjects;
+    const filtered = original.filter((entry: Record<string, unknown>) => {
       if (!entry || typeof entry !== 'object') return false;
       if (typeof entry.id !== 'string') return false;
       if (typeof entry.bodyId !== 'string') return false;
@@ -816,8 +816,8 @@ export function _validateNestedStructures(state: any): void {
 
   // Saved designs: each entry must have name (string), parts (array).
   if (Array.isArray(state.savedDesigns)) {
-    const original = state.savedDesigns as any[];
-    const filtered = original.filter((entry: any) => {
+    const original = state.savedDesigns;
+    const filtered = original.filter((entry: Record<string, unknown>) => {
       if (!entry || typeof entry !== 'object') return false;
       if (typeof entry.name !== 'string') return false;
       if (!Array.isArray(entry.parts)) return false;
@@ -835,8 +835,8 @@ export function _validateNestedStructures(state: any): void {
 
   // Contracts active: each entry must have id (string), reward (number).
   if (state.contracts && typeof state.contracts === 'object' && Array.isArray(state.contracts.active)) {
-    const original = state.contracts.active as any[];
-    const filtered = original.filter((entry: any) => {
+    const original = state.contracts.active;
+    const filtered = original.filter((entry: Record<string, unknown>) => {
       if (!entry || typeof entry !== 'object') return false;
       if (typeof entry.id !== 'string') return false;
       if (typeof entry.reward !== 'number') return false;

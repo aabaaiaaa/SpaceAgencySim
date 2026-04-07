@@ -25,6 +25,7 @@
  */
 
 import { FlightPhase, MIN_ORBIT_ALTITUDE, ControlMode } from './constants.js';
+import type { CelestialBody } from './constants.js';
 import {
   isOrbitalBurnActive, shouldEnterManoeuvre, shouldExitManoeuvre,
   shouldEnterTransfer, isEscapeTrajectory, checkSOITransition,
@@ -82,11 +83,11 @@ export function transitionPhase(flightState: FlightState, newPhase: string, reas
   const from = flightState.phase;
   if (from === newPhase) return { success: false, from, to: newPhase, reason: 'Already in this phase' };
   if (!isValidTransition(from, newPhase)) return { success: false, from, to: newPhase, reason: `Invalid transition: ${from} → ${newPhase}` };
-  flightState.phase = newPhase as any;
+  flightState.phase = newPhase as FlightPhase;
   const entry: PhaseTransition = { from, to: newPhase, time: flightState.timeElapsed, reason: reason || `${from} → ${newPhase}` };
   if (meta) entry.meta = meta;
   flightState.phaseLog.push(entry);
-  flightState.events.push({ time: flightState.timeElapsed, type: 'PHASE_CHANGE', description: reason || `Phase: ${_phaseLabel(newPhase)}` } as any);
+  flightState.events.push({ time: flightState.timeElapsed, type: 'PHASE_CHANGE', description: reason || `Phase: ${_phaseLabel(newPhase)}` });
   return { success: true, from, to: newPhase, meta };
 }
 
@@ -196,7 +197,7 @@ export function evaluateAutoTransitions(flightState: FlightState, ps: PhysicsSta
     if (soiCheck.transition && soiCheck.newBodyId) {
       const result = transitionPhase(flightState, FlightPhase.CAPTURE, soiCheck.reason);
       if (result.success) {
-        flightState.bodyId = soiCheck.newBodyId as any;
+        flightState.bodyId = soiCheck.newBodyId as CelestialBody;
         return flightState.phaseLog[flightState.phaseLog.length - 1];
       }
     }

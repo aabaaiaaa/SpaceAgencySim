@@ -165,7 +165,7 @@ export function startFlightScene(
   }
 
   // Attach inventory-sourced part data for wear tracking on recovery.
-  (s.ps as any)._usedInventoryParts = getVabInventoryUsedParts();
+  s.ps._usedInventoryParts = getVabInventoryUsedParts();
 
   // Expose for E2E testing -- Playwright reads live physics values here.
   if (typeof window !== 'undefined') {

@@ -100,7 +100,7 @@ export function deploySatellite(
     return { success: false, reason: `Unknown part: ${partId}` };
   }
 
-  const satelliteType: string = (partDef.properties as any)?.satelliteType ?? 'GENERIC';
+  const satelliteType: string = (partDef.properties.satelliteType as string) ?? 'GENERIC';
 
   // Determine altitude band.
   const bandId = getAltitudeBandId(altitude, bodyId);
@@ -138,7 +138,7 @@ export function deploySatellite(
   const record: SatelliteRecord = {
     id: satId,
     orbitalObjectId: orbObjId,
-    satelliteType: satelliteType as any,
+    satelliteType: satelliteType as SatelliteType | 'GENERIC',
     partId,
     bodyId,
     bandId,
@@ -170,13 +170,13 @@ export function deploySatellitesFromFlight(
   }
 
   const deployed: Array<{ satelliteId: string | undefined; satelliteType: string }> = [];
-  const releaseEvents = ((flightState.events ?? []) as any[]).filter(
+  const releaseEvents = (flightState.events ?? []).filter(
     (e) => e.type === 'SATELLITE_RELEASED',
   );
 
   for (const event of releaseEvents) {
-    const partId: string = event.partId ?? 'satellite-mk1';
-    const altitude: number = event.altitude ?? 0;
+    const partId: string = (event.partId as string) ?? 'satellite-mk1';
+    const altitude: number = (event.altitude as number) ?? 0;
     const bodyId: string = flightState.bodyId ?? 'EARTH';
 
     // Only deploy if released at orbital altitude.
@@ -199,7 +199,7 @@ export function deploySatellitesFromFlight(
 
     if (result.success) {
       const partDef = getPartById(partId);
-      const satType: string = (partDef?.properties as any)?.satelliteType ?? 'GENERIC';
+      const satType: string = (partDef?.properties.satelliteType as string) ?? 'GENERIC';
       deployed.push({ satelliteId: result.satelliteId, satelliteType: satType });
     }
   }

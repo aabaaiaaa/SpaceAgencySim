@@ -39,7 +39,7 @@ import { PartType, ScienceDataType, DIMINISHING_RETURNS,
          ANALYSIS_TRANSMIT_YIELD_MIN, ANALYSIS_TRANSMIT_YIELD_MAX,
          FacilityId, RD_LAB_SCIENCE_BONUS } from './constants.js';
 import { getBiome, getBiomeId, getScienceMultiplier } from './biomes.js';
-import { hasMalfunction } from './malfunction.js';
+// hasMalfunction not used directly — inline check avoids PhysicsStateWithMalfunctions type mismatch
 import { MalfunctionType } from './constants.js';
 
 import type { GameState, ScienceLogEntry } from './gameState.js';
@@ -226,11 +226,9 @@ export function activateInstrument(
   if (!ps.activeParts.has(entry.moduleInstanceId)) return false;
 
   // Block activation if the parent science module has an instrument failure.
-  if (hasMalfunction(ps as any, entry.moduleInstanceId)) {
-    const malf = ps.malfunctions?.get(entry.moduleInstanceId);
-    if (malf && malf.type === MalfunctionType.SCIENCE_INSTRUMENT_FAILURE) {
-      return false;
-    }
+  const malf = ps.malfunctions?.get(entry.moduleInstanceId);
+  if (malf && !malf.recovered && malf.type === MalfunctionType.SCIENCE_INSTRUMENT_FAILURE) {
+    return false;
   }
 
   const instrDef = getInstrumentById(entry.instrumentId);
@@ -334,7 +332,7 @@ export function activateScienceModule(
     const biomeId: string | null = biome ? biome.id : null;
     const biomeName: string = biome ? biome.name : 'Unknown';
 
-    const duration: number = (def.properties as any)?.experimentDuration ?? 30;
+    const duration: number = (def.properties.experimentDuration as number) ?? 30;
     legacyEntry.state = ScienceModuleState.RUNNING;
     legacyEntry.timer = duration;
     legacyEntry.startBiome = biomeId;
@@ -727,7 +725,7 @@ export function calculateYield(
  */
 function _getRdLabScienceBonus(gameState: GameState | null): number {
   if (!gameState) return 0;
-  const fac = (gameState.facilities as any)?.[FacilityId.RD_LAB];
+  const fac = gameState.facilities[FacilityId.RD_LAB];
   if (!fac?.built) return 0;
   const tier: number = fac.tier ?? 1;
   return (RD_LAB_SCIENCE_BONUS as Record<number, number>)[tier] ?? 0;

@@ -577,9 +577,6 @@ function _buildMissionsContent(container: HTMLElement): void {
     return;
   }
   for (const m of accepted) {
-    // Accepted missions carry MissionDef fields (objectives, unlockedParts)
-    // that are not on the base Mission interface. Use `as any` for access.
-    const mAny = m as any;
     const card: HTMLDivElement = document.createElement('div');
     card.className = 'topbar-mission-card';
 
@@ -593,10 +590,10 @@ function _buildMissionsContent(container: HTMLElement): void {
     reward.textContent = 'Reward: ' + _fmtCash(m.reward);
     card.appendChild(reward);
 
-    if (Array.isArray(mAny.unlockedParts) && mAny.unlockedParts.length > 0) {
+    if (Array.isArray(m.unlockedParts) && m.unlockedParts.length > 0) {
       const parts: HTMLDivElement = document.createElement('div');
       parts.className = 'topbar-mission-reward-parts';
-      parts.textContent = 'Unlocks: ' + mAny.unlockedParts
+      parts.textContent = 'Unlocks: ' + m.unlockedParts
         .map((id: string) => getPartById(id)?.name ?? id)
         .join(', ');
       card.appendChild(parts);
@@ -608,7 +605,7 @@ function _buildMissionsContent(container: HTMLElement): void {
     card.appendChild(desc);
 
     // Objectives
-    if (Array.isArray(mAny.objectives) && mAny.objectives.length > 0) {
+    if (Array.isArray(m.objectives) && m.objectives.length > 0) {
       const objLabel: HTMLDivElement = document.createElement('div');
       objLabel.className = 'topbar-mission-obj-label';
       objLabel.textContent = 'Objectives';
@@ -617,7 +614,7 @@ function _buildMissionsContent(container: HTMLElement): void {
       const objList: HTMLUListElement = document.createElement('ul');
       objList.className = 'topbar-mission-obj-list';
 
-      for (const obj of mAny.objectives) {
+      for (const obj of m.objectives) {
         const item: HTMLLIElement = document.createElement('li');
         item.className = 'topbar-mission-obj-item';
 

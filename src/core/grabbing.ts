@@ -24,11 +24,11 @@ import {
   GRAB_MAX_RELATIVE_SPEED, GRAB_MAX_LATERAL_OFFSET, GRAB_REPAIR_HEALTH,
   GRAB_RELEASE_SPEED, BODY_RADIUS,
 } from './constants.js';
-import { getOrbitalStateAtTime, angularDistance, getAltitudeBand } from './orbit.js';
+import { getOrbitalStateAtTime, angularDistance, getAltitudeBand, circularOrbitVelocity } from './orbit.js';
 import { getPartById } from '../data/parts.js';
 import type { PartDef } from '../data/parts.js';
 import type { PhysicsState, RocketAssembly } from './physics.js';
-import type { FlightState, GameState, OrbitalObject } from './gameState.js';
+import type { FlightState, FlightEvent, GameState, OrbitalObject, SatelliteRecord } from './gameState.js';
 
 // ---------------------------------------------------------------------------
 // Grab system state interface
@@ -77,11 +77,11 @@ export function getGrabbingArms(ps: PhysicsState, assembly: RocketAssembly): Arr
   return arms;
 }
 
-export function getGrabTargetsInRange(ps: PhysicsState, flightState: FlightState, state: GameState): Array<{ object: OrbitalObject; distance: number; angularDist: number; satelliteRecord: any | null }> {
+export function getGrabTargetsInRange(ps: PhysicsState, flightState: FlightState, state: GameState): Array<{ object: OrbitalObject; distance: number; angularDist: number; satelliteRecord: SatelliteRecord | null }> {
   if (!flightState.inOrbit || !flightState.orbitalElements) return [];
   const bodyId = flightState.bodyId; const t = flightState.timeElapsed;
   const craftState = getOrbitalStateAtTime(flightState.orbitalElements, t, bodyId);
-  const results: Array<{ object: OrbitalObject; distance: number; angularDist: number; satelliteRecord: any | null }> = [];
+  const results: Array<{ object: OrbitalObject; distance: number; angularDist: number; satelliteRecord: SatelliteRecord | null }> = [];
   for (const obj of state.orbitalObjects) {
     if (obj.bodyId !== bodyId) continue;
     if (obj.type !== OrbitalObjectType.SATELLITE) continue;
@@ -95,7 +95,7 @@ export function getGrabTargetsInRange(ps: PhysicsState, flightState: FlightState
         const arcDist = (angleDist * Math.PI / 180) * (R + avgAlt);
         const altDist = Math.abs(craftState.altitude - objState.altitude);
         const dist = Math.sqrt(arcDist * arcDist + altDist * altDist);
-        const satRecord = ((state as any).satelliteNetwork?.satellites ?? []).find((s: any) => s.orbitalObjectId === obj.id && s.health > 0) ?? null;
+        const satRecord = (state.satelliteNetwork?.satellites ?? []).find((s) => s.orbitalObjectId === obj.id && s.health > 0) ?? null;
         results.push({ object: obj, distance: dist, angularDist: angleDist, satelliteRecord: satRecord });
       }
     }
@@ -144,7 +144,9 @@ export function updateGrabState(grabState: GrabSystemState, ps: PhysicsState, fl
   const arcDist = (angleDist * Math.PI / 180) * (R + avgAlt);
   const altDist = Math.abs(craftOrbState.altitude - targetOrbState.altitude);
   const dist = Math.sqrt(arcDist * arcDist + altDist * altDist);
-  const relSpeed = Math.abs(((craftOrbState as any).velocity ?? 0) - ((targetOrbState as any).velocity ?? 0));
+  const craftVel = circularOrbitVelocity(craftOrbState.altitude, bodyId);
+  const targetVel = circularOrbitVelocity(targetOrbState.altitude, bodyId);
+  const relSpeed = Math.abs(craftVel - targetVel);
   const lateral = altDist;
   grabState.targetDistance = dist; grabState.targetRelSpeed = relSpeed; grabState.targetLateral = lateral;
   grabState.speedOk = relSpeed <= GRAB_MAX_RELATIVE_SPEED; grabState.lateralOk = lateral <= GRAB_MAX_LATERAL_OFFSET;
@@ -162,7 +164,7 @@ export function updateGrabState(grabState: GrabSystemState, ps: PhysicsState, fl
 }
 
 function _completeGrab(grabState: GrabSystemState, target: OrbitalObject, state: GameState): void {
-  const satRecord = ((state as any).satelliteNetwork?.satellites ?? []).find((s: any) => s.orbitalObjectId === target.id && s.health > 0);
+  const satRecord = (state.satelliteNetwork?.satellites ?? []).find((s) => s.orbitalObjectId === target.id && s.health > 0);
   grabState.state = GrabState.GRABBED; grabState.grabbedSatelliteId = satRecord ? satRecord.id : null;
 }
 
@@ -173,7 +175,7 @@ function _completeGrab(grabState: GrabSystemState, target: OrbitalObject, state:
 export function repairGrabbedSatellite(grabState: GrabSystemState, state: GameState): { success: boolean; reason?: string; healthBefore?: number } {
   if (grabState.state !== GrabState.GRABBED) return { success: false, reason: 'Arm is not grabbing a satellite.' };
   if (!grabState.grabbedSatelliteId) return { success: false, reason: 'No satellite record attached.' };
-  const sat = ((state as any).satelliteNetwork?.satellites ?? []).find((s: any) => s.id === grabState.grabbedSatelliteId);
+  const sat = (state.satelliteNetwork?.satellites ?? []).find((s) => s.id === grabState.grabbedSatelliteId);
   if (!sat) return { success: false, reason: 'Satellite record not found.' };
   if (sat.health <= 0) return { success: false, reason: 'Satellite is decommissioned and cannot be repaired.' };
   const healthBefore = sat.health; sat.health = Math.min(100, sat.health + GRAB_REPAIR_HEALTH);
@@ -192,12 +194,12 @@ export function releaseGrabbedSatellite(grabState: GrabSystemState): { success: 
 
 export function processGrabRepairsFromFlight(state: GameState, flightState: FlightState | null): Array<{ satelliteId: string; healthBefore: number }> {
   if (!flightState) return [];
-  if (!(state as any).satelliteNetwork) return [];
+  if (!state.satelliteNetwork) return [];
   const repaired: Array<{ satelliteId: string; healthBefore: number }> = [];
-  const repairEvents = (flightState.events ?? []).filter((e: any) => e.type === 'SATELLITE_REPAIRED');
+  const repairEvents = (flightState.events ?? []).filter((e: FlightEvent) => e.type === 'SATELLITE_REPAIRED');
   for (const event of repairEvents) {
-    const satId = (event as any).satelliteId; if (!satId) continue;
-    const sat = (state as any).satelliteNetwork.satellites.find((s: any) => s.id === satId);
+    const satId = event.satelliteId as string | undefined; if (!satId) continue;
+    const sat = state.satelliteNetwork.satellites.find((s) => s.id === satId);
     if (!sat || sat.health <= 0) continue;
     const healthBefore = sat.health; sat.health = Math.min(100, sat.health + GRAB_REPAIR_HEALTH);
     repaired.push({ satelliteId: satId, healthBefore });

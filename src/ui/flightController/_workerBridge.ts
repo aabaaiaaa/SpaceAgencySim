@@ -286,9 +286,9 @@ export function applyPhysicsSnapshot(ps: PhysicsState, snap: PhysicsSnapshot): v
   ps.isTipping = snap.isTipping;
   ps.tippingContactX = snap.tippingContactX;
   ps.tippingContactY = snap.tippingContactY;
-  ps.controlMode = snap.controlMode as any;
+  ps.controlMode = snap.controlMode;
   ps.baseOrbit = snap.baseOrbit;
-  ps.dockingAltitudeBand = snap.dockingAltitudeBand as any;
+  ps.dockingAltitudeBand = snap.dockingAltitudeBand;
   ps.dockingOffsetAlongTrack = snap.dockingOffsetAlongTrack;
   ps.dockingOffsetRadial = snap.dockingOffsetRadial;
   ps.weatherIspModifier = snap.weatherIspModifier;
@@ -297,7 +297,7 @@ export function applyPhysicsSnapshot(ps: PhysicsState, snap: PhysicsSnapshot): v
 
   if (snap.malfunctions) {
     ps.malfunctions = new Map(
-      Object.entries(snap.malfunctions).map(([k, v]) => [k, v as any]),
+      Object.entries(snap.malfunctions).map(([k, v]) => [k, v]),
     );
   } else {
     ps.malfunctions = undefined;
@@ -428,9 +428,9 @@ function _serialisePhysicsState(ps: PhysicsState): PhysicsSnapshot {
     isTipping: ps.isTipping,
     tippingContactX: ps.tippingContactX,
     tippingContactY: ps.tippingContactY,
-    controlMode: ps.controlMode as string,
+    controlMode: ps.controlMode,
     baseOrbit: ps.baseOrbit,
-    dockingAltitudeBand: ps.dockingAltitudeBand as { id: string; name: string } | null,
+    dockingAltitudeBand: ps.dockingAltitudeBand,
     dockingOffsetAlongTrack: ps.dockingOffsetAlongTrack,
     dockingOffsetRadial: ps.dockingOffsetRadial,
     rcsActiveDirections: setToArray(ps.rcsActiveDirections),
@@ -439,7 +439,7 @@ function _serialisePhysicsState(ps: PhysicsState): PhysicsSnapshot {
     hasLaunchClamps: ps.hasLaunchClamps,
     powerState: ps.powerState,
     malfunctions: ps.malfunctions
-      ? mapToRecord(ps.malfunctions) as Record<string, { type: string; recovered: boolean }>
+      ? mapToRecord(ps.malfunctions) as PhysicsSnapshot['malfunctions']
       : null,
   };
 }

@@ -103,6 +103,8 @@ export interface ObjectiveDef {
   target: Record<string, unknown>;
   completed: boolean;
   description: string;
+  /** Runtime-only: flight time when HOLD_ALTITUDE objective entered the valid band. */
+  _holdEnteredAt?: number | null;
 }
 
 /** Medal thresholds for challenge scoring. */
@@ -219,6 +221,10 @@ export interface Mission {
   acceptedDate: string | null;
   /** ISO 8601 date completed, or null. */
   completedDate: string | null;
+  /** Ordered objectives (present on MissionDef-sourced missions). */
+  objectives?: ObjectiveDef[];
+  /** Part IDs unlocked on completion (present on MissionDef-sourced missions). */
+  unlockedParts?: string[];
 }
 
 /** One component placed on a rocket in the builder. */

@@ -854,7 +854,7 @@ function _drawTransferTargets(ps: ReadonlyPhysicsState, flightState: ReadonlyFli
     if (isSelected && flightState.orbitalElements) {
       const route = getMapTransferRoute(
         bodyId, target.bodyId, altitude, flightState.orbitalElements,
-      ) as any;
+      );
       if (route && route.transferPath.length > 1) {
         const path = route.transferPath;
         _transferGraphics!.moveTo(

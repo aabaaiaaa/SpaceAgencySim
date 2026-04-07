@@ -26,6 +26,7 @@ import {
 import {
   getTransferTargets,
   computeTransferRoute,
+  type TransferRoute,
   formatTransferTime,
   formatDeltaV,
   BODY_ORBIT_RADIUS,
@@ -379,7 +380,7 @@ export function getMapTransferRoute(
   toBodyId: string,
   altitude: number,
   craftElements: OrbitalElements | null,
-): unknown {
+): TransferRoute | null {
   return computeTransferRoute(fromBodyId, toBodyId, altitude, craftElements);
 }
 

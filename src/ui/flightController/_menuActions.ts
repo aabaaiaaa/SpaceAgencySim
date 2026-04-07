@@ -168,7 +168,7 @@ function _executeRestart(rebuildCost: number): void {
   // Reset ALL accepted mission objectives so they re-evaluate on the fresh flight.
   if (gs.missions?.accepted) {
     for (const mission of gs.missions.accepted) {
-      const objectives = (mission as any).objectives;
+      const objectives = mission.objectives;
       if (!objectives) continue;
       for (const obj of objectives) {
         obj.completed = false;
