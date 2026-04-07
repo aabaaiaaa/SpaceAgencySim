@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 18,
+  "lastIteration": 19,
   "startedAt": "2026-04-06T23:44:48.505Z",
   "iteration": 1,
   "devloopVersion": "3.2.0",
   "activeTask": {
-    "taskId": "TASK-019",
-    "taskTitle": "Migrate remaining inline styles to CSS classes",
-    "iterationNumber": 19,
-    "startedAt": "2026-04-07T11:20:04.939Z"
+    "taskId": "TASK-020",
+    "taskTitle": "Raise branch coverage for fuelsystem.ts and staging.ts",
+    "iterationNumber": 20,
+    "startedAt": "2026-04-07T11:22:26.711Z"
   }
 }

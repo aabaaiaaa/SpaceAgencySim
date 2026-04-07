@@ -115,7 +115,7 @@
 - **Verification**: `grep -n "\.style\." src/ui/crewAdmin.ts src/ui/autoSaveToast.ts src/ui/flightController/flightHud.ts` returns no inline style assignments for the identified lines. Crew admin panel e2e tests pass.
 
 ### TASK-020: Raise branch coverage for fuelsystem.ts and staging.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Identify uncovered branches in `fuelsystem.ts` (67% branches, SRB edge cases) and `staging.ts` (67% branches, debris physics, landing legs). Write targeted unit tests to bring both modules to >= 80% branch coverage. See requirements Section 6.1.
 - **Verification**: `npm run test:coverage` shows both `fuelsystem.ts` and `staging.ts` at >= 80% branch coverage.

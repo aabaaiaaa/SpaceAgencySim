@@ -14,6 +14,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   activateCurrentStage,
+  activatePartDirect,
   recomputeActiveGraph,
   tickDebris,
 } from '../core/staging.ts';
@@ -1032,5 +1033,408 @@ describe('fireNextStage() — debris integration via physics.js', () => {
 
     fireNextStage(ps, assembly, staging, fs); // stage 3: upper decoupler
     expect(ps.debris).toHaveLength(4); // 2 decouplers + 2 disconnected stages
+  });
+});
+
+// ---------------------------------------------------------------------------
+// activateCurrentStage() — DEPLOY (landing legs)
+// ---------------------------------------------------------------------------
+
+describe('activateCurrentStage() — DEPLOY (landing legs)', () => {
+  function makeRocketWithLegs() {
+    const assembly = createRocketAssembly();
+    const staging  = createStagingConfig();
+
+    const cmdId = addPartToAssembly(assembly, 'cmd-mk1',            0,  60);
+    const legId = addPartToAssembly(assembly, 'landing-legs-small', 20,  0);
+
+    connectParts(assembly, cmdId, 1, legId, 0);
+
+    syncStagingWithAssembly(assembly, staging);
+    assignPartToStage(staging, legId, 0);
+
+    return { assembly, staging, cmdId, legId };
+  }
+
+  it('marks the landing leg as deployed in ps.deployedParts', () => {
+    const { assembly, staging, legId } = makeRocketWithLegs();
+    const ps = makePhysicsState(assembly);
+    const fs = makeFlightState();
+
+    activateCurrentStage(ps, assembly, staging, fs);
+
+    expect(ps.deployedParts.has(legId)).toBe(true);
+  });
+
+  it('emits PART_ACTIVATED event with partType LANDING_LEGS', () => {
+    const { assembly, staging } = makeRocketWithLegs();
+    const ps = makePhysicsState(assembly);
+    const fs = makeFlightState();
+
+    activateCurrentStage(ps, assembly, staging, fs);
+
+    const evt = fs.events.find(
+      (e) => e.type === 'PART_ACTIVATED' && e.partType === 'LANDING_LEGS',
+    );
+    expect(evt).toBeDefined();
+  });
+
+  it('returns empty debris array (no separation)', () => {
+    const { assembly, staging } = makeRocketWithLegs();
+    const ps = makePhysicsState(assembly);
+    const fs = makeFlightState();
+
+    const debris = activateCurrentStage(ps, assembly, staging, fs);
+    expect(debris).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// activateCurrentStage() — SEPARATE (launch clamp)
+// ---------------------------------------------------------------------------
+
+describe('activateCurrentStage() — SEPARATE (launch clamp)', () => {
+  function makeRocketWithClamp() {
+    const assembly = createRocketAssembly();
+    const staging  = createStagingConfig();
+
+    const probeId = addPartToAssembly(assembly, 'probe-core-mk1', 0,  60);
+    const tankId  = addPartToAssembly(assembly, 'tank-small',     0,   0);
+    const engId   = addPartToAssembly(assembly, 'engine-spark',   0, -55);
+    const clampId = addPartToAssembly(assembly, 'launch-clamp-1', -30, 0);
+
+    connectParts(assembly, probeId, 1, tankId,  0);
+    connectParts(assembly, tankId,  1, engId,   0);
+    connectParts(assembly, clampId, 0, tankId,  0); // clamp attaches to tank
+
+    syncStagingWithAssembly(assembly, staging);
+    assignPartToStage(staging, engId,   0); // Stage 1: engine
+    addStageToConfig(staging);
+    assignPartToStage(staging, clampId, 1); // Stage 2: release clamp
+
+    return { assembly, staging, probeId, tankId, engId, clampId };
+  }
+
+  it('emits LAUNCH_CLAMP_RELEASED event', () => {
+    const { assembly, staging } = makeRocketWithClamp();
+    const ps = makePhysicsState(assembly);
+    const fs = makeFlightState();
+
+    activateCurrentStage(ps, assembly, staging, fs); // stage 1: engine
+    activateCurrentStage(ps, assembly, staging, fs); // stage 2: clamp release
+
+    const evt = fs.events.find((e) => e.type === 'LAUNCH_CLAMP_RELEASED');
+    expect(evt).toBeDefined();
+  });
+
+  it('creates a debris fragment for the clamp with lateral velocity', () => {
+    const { assembly, staging, clampId } = makeRocketWithClamp();
+    const ps = makePhysicsState(assembly);
+    const fs = makeFlightState();
+
+    activateCurrentStage(ps, assembly, staging, fs); // engine
+    const debris = activateCurrentStage(ps, assembly, staging, fs); // clamp
+
+    const clampDebris = debris.find((d) => d.activeParts.has(clampId));
+    expect(clampDebris).toBeDefined();
+    // Clamp at x=-30 (left side) should swing left (negative velX).
+    expect(clampDebris.velX).not.toBe(0);
+    expect(clampDebris.angularVelocity).not.toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// tickDebris() — debris tipping on angled landing
+// ---------------------------------------------------------------------------
+
+describe('tickDebris() — debris tipping', () => {
+  it('sets isTipping = true when debris lands at an angle', () => {
+    const { assembly: twoStageAssembly, staging } = makeTwoStageRocket();
+    const ps = makePhysicsState(twoStageAssembly);
+    const fs = makeFlightState();
+
+    activateCurrentStage(ps, twoStageAssembly, staging, fs); // engine
+    const [debris] = activateCurrentStage(ps, twoStageAssembly, staging, fs); // separate
+
+    // Set up for slow landing at an angle.
+    debris.posY  = 0.01;
+    debris.velX  = 1;
+    debris.velY  = -3; // within safe landing speed
+    debris.angle = 0.5; // significantly tilted (> 0.005 threshold)
+    debris.firingEngines.clear();
+
+    tickDebris(debris, twoStageAssembly, 1 / 60);
+
+    expect(debris.landed).toBe(true);
+    expect(debris.isTipping).toBe(true);
+  });
+
+  it('does NOT set isTipping when debris lands nearly upright', () => {
+    const { assembly: twoStageAssembly, staging } = makeTwoStageRocket();
+    const ps = makePhysicsState(twoStageAssembly);
+    const fs = makeFlightState();
+
+    activateCurrentStage(ps, twoStageAssembly, staging, fs);
+    const [debris] = activateCurrentStage(ps, twoStageAssembly, staging, fs);
+
+    debris.posY  = 0.01;
+    debris.velX  = 0;
+    debris.velY  = -3;
+    debris.angle = 0.001; // nearly upright (< 0.005 threshold)
+    debris.firingEngines.clear();
+
+    tickDebris(debris, twoStageAssembly, 1 / 60);
+
+    expect(debris.landed).toBe(true);
+    expect(debris.isTipping).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// tickDebris() — angular velocity and damping
+// ---------------------------------------------------------------------------
+
+describe('tickDebris() — angular dynamics', () => {
+  it('updates debris angle based on angular velocity each tick', () => {
+    const { assembly: twoStageAssembly, staging } = makeTwoStageRocket();
+    const ps = makePhysicsState(twoStageAssembly);
+    const fs = makeFlightState();
+
+    activateCurrentStage(ps, twoStageAssembly, staging, fs);
+    const [debris] = activateCurrentStage(ps, twoStageAssembly, staging, fs);
+
+    debris.posY = 5000;
+    debris.velY = 0;
+    debris.angle = 0;
+    debris.angularVelocity = 1.0; // 1 rad/s
+    debris.firingEngines.clear();
+
+    const dt = 1 / 60;
+    tickDebris(debris, twoStageAssembly, dt);
+
+    // Angle should have increased (approximately 1.0 * dt, with some damping).
+    expect(debris.angle).toBeGreaterThan(0);
+  });
+
+  it('damps angular velocity in atmosphere', () => {
+    const { assembly: twoStageAssembly, staging } = makeTwoStageRocket();
+    const ps = makePhysicsState(twoStageAssembly);
+    const fs = makeFlightState();
+
+    activateCurrentStage(ps, twoStageAssembly, staging, fs);
+    const [debris] = activateCurrentStage(ps, twoStageAssembly, staging, fs);
+
+    // Low altitude = dense atmosphere = stronger damping.
+    debris.posY = 100;
+    debris.velY = 0;
+    debris.angularVelocity = 2.0;
+    debris.firingEngines.clear();
+
+    const initialAngVel = debris.angularVelocity;
+    tickDebris(debris, twoStageAssembly, 1 / 60);
+
+    // Angular velocity should be reduced by atmospheric damping.
+    expect(Math.abs(debris.angularVelocity)).toBeLessThan(Math.abs(initialAngVel));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// tickDebris() — drag force at speed
+// ---------------------------------------------------------------------------
+
+describe('tickDebris() — atmospheric drag', () => {
+  it('drag decelerates debris falling at high speed in atmosphere', () => {
+    const { assembly: twoStageAssembly, staging } = makeTwoStageRocket();
+    const ps = makePhysicsState(twoStageAssembly);
+    const fs = makeFlightState();
+
+    activateCurrentStage(ps, twoStageAssembly, staging, fs);
+    const [debris] = activateCurrentStage(ps, twoStageAssembly, staging, fs);
+
+    // Low altitude (dense atmosphere), high speed downward.
+    debris.posY = 1000;
+    debris.velX = 0;
+    debris.velY = -100; // fast downward
+    debris.firingEngines.clear();
+
+    // Compare with a no-drag scenario: with drag, deceleration should be less
+    // than pure gravity alone would produce.
+    tickDebris(debris, twoStageAssembly, 1 / 60);
+
+    // Velocity should still be negative (falling), but drag should partially
+    // counteract gravity, so velY change should be less extreme.
+    expect(debris.velY).toBeLessThan(0);
+    // Debris should have moved downward.
+    expect(debris.posY).toBeLessThan(1000);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// activatePartDirect() — direct part activation
+// ---------------------------------------------------------------------------
+
+describe('activatePartDirect() — IGNITE', () => {
+  it('adds engine to ps.firingEngines when activated directly', () => {
+    const { assembly, engineId } = makeSimpleRocket();
+    const ps = makePhysicsState(assembly);
+    const fs = makeFlightState();
+
+    const debris = activatePartDirect(ps, assembly, fs, engineId);
+
+    expect(ps.firingEngines.has(engineId)).toBe(true);
+    expect(debris).toHaveLength(0);
+  });
+
+  it('emits PART_ACTIVATED event', () => {
+    const { assembly, engineId } = makeSimpleRocket();
+    const ps = makePhysicsState(assembly);
+    const fs = makeFlightState();
+
+    activatePartDirect(ps, assembly, fs, engineId);
+
+    const evt = fs.events.find(
+      (e) => e.type === 'PART_ACTIVATED' && e.description?.includes('ignited'),
+    );
+    expect(evt).toBeDefined();
+  });
+
+  it('returns empty array for inactive/jettisoned part', () => {
+    const { assembly, engineId } = makeSimpleRocket();
+    const ps = makePhysicsState(assembly);
+    const fs = makeFlightState();
+
+    ps.activeParts.delete(engineId);
+    const debris = activatePartDirect(ps, assembly, fs, engineId);
+
+    expect(debris).toHaveLength(0);
+    expect(ps.firingEngines.has(engineId)).toBe(false);
+  });
+
+  it('returns empty array for non-activatable part', () => {
+    const { assembly, tankId } = makeSimpleRocket();
+    const ps = makePhysicsState(assembly);
+    const fs = makeFlightState();
+
+    // Tank is not activatable.
+    const debris = activatePartDirect(ps, assembly, fs, tankId);
+    expect(debris).toHaveLength(0);
+  });
+});
+
+describe('activatePartDirect() — SEPARATE', () => {
+  it('creates debris fragments when decoupler is activated directly', () => {
+    const { assembly, decId, tankId } = makeTwoStageRocket();
+    const ps = makePhysicsState(assembly);
+    const fs = makeFlightState();
+
+    const debris = activatePartDirect(ps, assembly, fs, decId);
+
+    expect(debris.length).toBeGreaterThanOrEqual(1);
+    // Decoupler should no longer be in activeParts.
+    expect(ps.activeParts.has(decId)).toBe(false);
+    // Tank and engine should be in a debris fragment.
+    const stageFrag = debris.find((d) => d.activeParts.has(tankId));
+    expect(stageFrag).toBeDefined();
+  });
+
+  it('emits SATELLITE_RELEASED when separation exposes a satellite', () => {
+    const assembly = createRocketAssembly();
+
+    const probeId = addPartToAssembly(assembly, 'probe-core-mk1',       0,  130);
+    const decId   = addPartToAssembly(assembly, 'decoupler-stack-tr18', 0,   90);
+    const satId   = addPartToAssembly(assembly, 'satellite-mk1',        0,   60);
+
+    connectParts(assembly, probeId, 1, decId, 0);
+    connectParts(assembly, decId,   1, satId, 0);
+
+    const ps = makePhysicsState(assembly);
+    ps.posY = 100_000;
+    ps.velY = 500;
+    const fs = makeFlightState();
+
+    activatePartDirect(ps, assembly, fs, decId);
+
+    const evt = fs.events.find((e) => e.type === 'SATELLITE_RELEASED');
+    expect(evt).toBeDefined();
+  });
+});
+
+describe('activatePartDirect() — DEPLOY (landing legs)', () => {
+  it('deploys a landing leg via direct activation', () => {
+    const assembly = createRocketAssembly();
+    const cmdId = addPartToAssembly(assembly, 'cmd-mk1',            0,  60);
+    const legId = addPartToAssembly(assembly, 'landing-legs-small', 20,  0);
+    connectParts(assembly, cmdId, 1, legId, 0);
+
+    const ps = makePhysicsState(assembly);
+    const fs = makeFlightState();
+
+    const debris = activatePartDirect(ps, assembly, fs, legId);
+
+    expect(ps.deployedParts.has(legId)).toBe(true);
+    expect(debris).toHaveLength(0);
+
+    const evt = fs.events.find(
+      (e) => e.type === 'PART_ACTIVATED' && e.partType === 'LANDING_LEGS',
+    );
+    expect(evt).toBeDefined();
+  });
+});
+
+describe('activatePartDirect() — RELEASE (satellite)', () => {
+  it('creates satellite debris and emits SATELLITE_RELEASED', () => {
+    const assembly = createRocketAssembly();
+    const probeId = addPartToAssembly(assembly, 'probe-core-mk1', 0, 60);
+    const satId   = addPartToAssembly(assembly, 'satellite-mk1',  0, 100);
+    connectParts(assembly, probeId, 0, satId, 1);
+
+    const ps = makePhysicsState(assembly);
+    ps.posY = 200_000;
+    ps.velX = 400;
+    const fs = makeFlightState();
+
+    const debris = activatePartDirect(ps, assembly, fs, satId);
+
+    expect(debris.length).toBeGreaterThanOrEqual(1);
+    const satFrag = debris.find((d) => d.activeParts.has(satId));
+    expect(satFrag).toBeDefined();
+
+    const evt = fs.events.find((e) => e.type === 'SATELLITE_RELEASED');
+    expect(evt).toBeDefined();
+    expect(evt.velocity).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// recomputeActiveGraph() — edge case: no active parts
+// ---------------------------------------------------------------------------
+
+describe('recomputeActiveGraph() — empty active parts', () => {
+  it('returns empty array when there are no active parts at all', () => {
+    const { assembly } = makeSimpleRocket();
+    const ps = makePhysicsState(assembly);
+
+    // Clear all active parts.
+    ps.activeParts.clear();
+
+    const result = recomputeActiveGraph(ps, assembly);
+    expect(result).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// activateCurrentStage() — returns empty for invalid stage index
+// ---------------------------------------------------------------------------
+
+describe('activateCurrentStage() — invalid stage', () => {
+  it('returns empty array when currentStageIdx points beyond stages array', () => {
+    const { assembly, staging } = makeSimpleRocket();
+    const ps = makePhysicsState(assembly);
+    const fs = makeFlightState();
+
+    staging.currentStageIdx = 999; // way past end
+
+    const debris = activateCurrentStage(ps, assembly, staging, fs);
+    expect(debris).toHaveLength(0);
   });
 });

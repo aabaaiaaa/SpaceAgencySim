@@ -657,3 +657,176 @@ describe('part mass tracking — fuel drain decreases total rocket mass', () => 
     expect(sumFuelBefore - sumFuelAfter).toBeCloseTo(expectedDelta, 5);
   });
 });
+
+// ---------------------------------------------------------------------------
+// computeEngineFlowRate() — edge cases for branch coverage
+// ---------------------------------------------------------------------------
+
+describe('computeEngineFlowRate() — edge cases', () => {
+  it('returns 0 for SRB when isp is 0 (zero denominator branch)', () => {
+    const fakeDef = {
+      type: 'SOLID_ROCKET_BOOSTER',
+      properties: { thrust: 100, isp: 0 },
+    };
+    const rate = computeEngineFlowRate(fakeDef, 1.0, SEA_LEVEL_DENSITY);
+    expect(rate).toBe(0);
+  });
+
+  it('returns 0 for liquid engine when isp is 0 (zero denominator branch)', () => {
+    const fakeDef = {
+      type: 'ENGINE',
+      properties: { thrust: 100, isp: 0 },
+    };
+    const rate = computeEngineFlowRate(fakeDef, 1.0, SEA_LEVEL_DENSITY);
+    expect(rate).toBe(0);
+  });
+
+  it('returns 0 for SRB with negative burnRate (clamped to 0)', () => {
+    const fakeDef = {
+      type: 'SOLID_ROCKET_BOOSTER',
+      properties: { burnRate: -5 },
+    };
+    const rate = computeEngineFlowRate(fakeDef, 1.0, SEA_LEVEL_DENSITY);
+    expect(rate).toBe(0);
+  });
+
+  it('handles negative density gracefully (clamped to 0)', () => {
+    const engineDef = getPartById('engine-spark');
+    // Negative density should be clamped to ratio 0, giving vacuum performance.
+    const rateNeg = computeEngineFlowRate(engineDef, 1.0, -1);
+    const rateVac = computeEngineFlowRate(engineDef, 1.0, 0);
+    expect(rateNeg).toBe(rateVac);
+    expect(rateNeg).toBeGreaterThan(0);
+  });
+
+  it('SRB uses vacuum thrust/isp when thrustVac is specified', () => {
+    const fakeDef = {
+      type: 'SOLID_ROCKET_BOOSTER',
+      properties: { thrust: 100, thrustVac: 120, isp: 200, ispVac: 250 },
+    };
+    const rateVac = computeEngineFlowRate(fakeDef, 1.0, 0);
+    // In vacuum: thrust = 120 kN = 120_000 N, isp = 250 s
+    const expected = 120_000 / (250 * 9.81);
+    expect(rateVac).toBeCloseTo(expected, 4);
+  });
+
+  it('liquid engine clamps throttle to [0,1] range', () => {
+    const engineDef = getPartById('engine-spark');
+    const rateOver = computeEngineFlowRate(engineDef, 2.0, SEA_LEVEL_DENSITY);
+    const rateFull = computeEngineFlowRate(engineDef, 1.0, SEA_LEVEL_DENSITY);
+    // Throttle > 1 is clamped to 1.
+    expect(rateOver).toBeCloseTo(rateFull, 6);
+  });
+
+  it('liquid engine returns 0 for negative throttle (clamped to 0)', () => {
+    const engineDef = getPartById('engine-spark');
+    const rate = computeEngineFlowRate(engineDef, -0.5, SEA_LEVEL_DENSITY);
+    expect(rate).toBe(0);
+  });
+
+  it('handles missing properties object gracefully', () => {
+    const fakeDef = { type: 'ENGINE' };
+    const rate = computeEngineFlowRate(fakeDef, 1.0, SEA_LEVEL_DENSITY);
+    // All properties default to 0 thrust / 300 isp → 0 thrust → 0 rate.
+    expect(rate).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// tickFuelSystem() — engine with missing placement/definition
+// ---------------------------------------------------------------------------
+
+describe('tickFuelSystem() — engine with missing assembly data', () => {
+  it('removes engine from firingEngines when not found in assembly.parts', () => {
+    const { assembly } = makeSimpleRocket();
+    const ps = makePS(assembly);
+
+    // Add a phantom engine ID that is active but has no placement.
+    const phantomId = 'phantom-engine-999';
+    ps.activeParts.add(phantomId);
+    ps.firingEngines.add(phantomId);
+
+    tickFuelSystem(ps, assembly, 1 / 60, SEA_LEVEL_DENSITY);
+
+    // Phantom engine should be cleaned up.
+    expect(ps.firingEngines.has(phantomId)).toBe(false);
+  });
+
+  it('removes engine from firingEngines when part definition is not found', () => {
+    const { assembly } = makeSimpleRocket();
+    const ps = makePS(assembly);
+
+    // Add a part with valid placement but invalid partId.
+    const badId = 'bad-engine-123';
+    ps.activeParts.add(badId);
+    ps.firingEngines.add(badId);
+    assembly.parts.set(badId, { partId: 'nonexistent-part', x: 0, y: 0 });
+
+    tickFuelSystem(ps, assembly, 1 / 60, SEA_LEVEL_DENSITY);
+
+    expect(ps.firingEngines.has(badId)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// tickFuelSystem() — SRB with zero fuel at tick start
+// ---------------------------------------------------------------------------
+
+describe('tickFuelSystem() — SRB already depleted at tick start', () => {
+  it('removes SRB from firingEngines when fuelStore is 0 before drain', () => {
+    const assembly = createRocketAssembly();
+    addPartToAssembly(assembly, 'probe-core-mk1', 0, 60);
+    const srbId = addPartToAssembly(assembly, 'srb-small', 50, 0);
+    const ps = makePS(assembly);
+
+    ps.fuelStore.set(srbId, 0);
+    ps.firingEngines.add(srbId);
+
+    tickFuelSystem(ps, assembly, 1 / 60, SEA_LEVEL_DENSITY);
+
+    expect(ps.firingEngines.has(srbId)).toBe(false);
+  });
+
+  it('removes SRB from firingEngines when fuelStore entry is missing', () => {
+    const assembly = createRocketAssembly();
+    addPartToAssembly(assembly, 'probe-core-mk1', 0, 60);
+    const srbId = addPartToAssembly(assembly, 'srb-small', 50, 0);
+    const ps = makePS(assembly);
+
+    ps.fuelStore.delete(srbId); // No fuel entry at all.
+    ps.firingEngines.add(srbId);
+
+    tickFuelSystem(ps, assembly, 1 / 60, SEA_LEVEL_DENSITY);
+
+    expect(ps.firingEngines.has(srbId)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getConnectedTanks() — parts with missing definition
+// ---------------------------------------------------------------------------
+
+describe('getConnectedTanks() — parts with missing data', () => {
+  it('skips parts whose placement is missing from assembly.parts', () => {
+    const { assembly, engineId, tankId } = makeSimpleRocket();
+    const ps = makePS(assembly);
+
+    // Remove tank placement from assembly but keep it in activeParts.
+    assembly.parts.delete(tankId);
+
+    const tanks = getConnectedTanks(engineId, assembly, ps.activeParts);
+    // Tank should not appear because its placement is gone.
+    expect(tanks).not.toContain(tankId);
+  });
+
+  it('skips parts whose partId resolves to no definition', () => {
+    const { assembly, engineId, tankId } = makeSimpleRocket();
+    const ps = makePS(assembly);
+
+    // Replace tank's partId with a nonexistent one.
+    assembly.parts.set(tankId, { ...assembly.parts.get(tankId), partId: 'fake-part' });
+
+    const tanks = getConnectedTanks(engineId, assembly, ps.activeParts);
+    expect(tanks).not.toContain(tankId);
+  });
+});
