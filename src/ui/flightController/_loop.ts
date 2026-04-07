@@ -28,6 +28,7 @@ import { getPhaseLabel } from '../../core/flightPhase.ts';
 import { getOrbitEntryLabel, checkOrbitStatus } from '../../core/orbit.ts';
 import { getFCState, getPhysicsState, getFlightState } from './_state.ts';
 import { recordFrame } from '../fpsMonitor.ts';
+import { beginFrame as perfBeginFrame, endFrame as perfEndFrame } from '../../core/perfMonitor.ts';
 import { logger } from '../../core/logger.ts';
 import { checkTimeWarpResets, applyTimeWarp } from './_timeWarp.ts';
 import { applyMapThrust, updateMapHud } from './_mapView.ts';
@@ -139,6 +140,9 @@ function _fallbackToMainThread(): void {
  * One animation frame: advance physics, render scene, re-schedule.
  */
 export function loop(timestamp: number): void {
+  // Mark the start of this frame for the performance monitor.
+  perfBeginFrame();
+
   // Destructure state once at the top of the hot path to avoid repeated
   // getFCState() calls at 60fps.
   const s = getFCState();
@@ -297,6 +301,9 @@ export function loop(timestamp: number): void {
       _showLoopErrorBanner(s);
     }
   }
+
+  // Mark the end of this frame for the performance monitor.
+  perfEndFrame();
 
   // Reschedule unless the loop was cancelled.
   if (s.rafId !== null) {

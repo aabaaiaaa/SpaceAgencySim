@@ -117,7 +117,7 @@
 - **Verification**: `npx vitest run src/tests/perfDashboard.test.ts`
 
 ### TASK-017: Integrate perf monitor into game loops and worker bridge
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-015, TASK-016
 - **Description**: (1) In `_loop.ts`: call `beginFrame()` at the start of the flight loop and `endFrame()` at the end. (2) In `_workerBridge.ts`: call `recordWorkerSend()` when posting a tick command and `recordWorkerReceive()` when a snapshot arrives. (3) In hub and VAB render loops (if they exist): add `beginFrame()`/`endFrame()` calls. (4) Add `showPerfDashboard: boolean` to `GameState.settings` (default `false`). (5) Wire the dashboard toggle to a keyboard shortcut (F3 — verify no conflict) and to the settings/debug menu. (6) On settings load, show/hide the dashboard accordingly. See requirements Sections 4.3-4.4.
 - **Verification**: `npm run typecheck -- --noEmit src/ui/flightController/_loop.ts src/ui/flightController/_workerBridge.ts src/core/gameState.ts && npx playwright test e2e/flight.spec.js e2e/fps-monitor.spec.js`

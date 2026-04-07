@@ -726,6 +726,8 @@ export interface GameState {
   debugMode: boolean;
   /** Whether physics runs in a Web Worker (true) or on the main thread (false). Default: on. */
   useWorkerPhysics: boolean;
+  /** Whether the performance dashboard overlay is visible. Default: off. */
+  showPerfDashboard: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -862,6 +864,9 @@ export function createGameState(): GameState {
 
     // Worker physics — enabled by default.
     useWorkerPhysics: true,
+
+    // Performance dashboard — disabled by default.
+    showPerfDashboard: false,
   };
 }
 

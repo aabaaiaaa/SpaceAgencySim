@@ -10,6 +10,7 @@
  */
 
 import { logger } from '../../core/logger.ts';
+import { recordWorkerSend, recordWorkerReceive } from '../../core/perfMonitor.ts';
 import {
   mapToRecord,
   setToArray,
@@ -177,6 +178,7 @@ export function resyncWorkerState(
 
 /** Send a tick command to the worker. */
 export function sendTick(realDeltaTime: number, timeWarp: number): void {
+  recordWorkerSend();
   _post({ type: 'tick', realDeltaTime, timeWarp });
 }
 
@@ -273,6 +275,8 @@ function _handleMessage(msg: WorkerMessage): void {
       break;
 
     case 'snapshot':
+      // Record worker round-trip latency for the performance monitor.
+      recordWorkerReceive();
       // Direct snapshot storage — no field-by-field copy.
       // The PhysicsSnapshot from the worker includes control input fields
       // (throttle, throttleMode, targetTWR, angle) but ReadonlyPhysicsSnapshot

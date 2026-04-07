@@ -22,6 +22,7 @@ import {
 } from '../core/constants.ts';
 import { getDifficultySettings, updateDifficultySettings } from '../core/settings.ts';
 import { createListenerTracker } from './listenerTracker.ts';
+import { showPerfDashboard, hidePerfDashboard } from './perfDashboard.ts';
 import './settings.css';
 import type { GameState } from '../core/gameState.ts';
 import type { DifficultySettings } from '../core/constants.ts';
@@ -327,6 +328,62 @@ export function openSettingsPanel(container: HTMLElement, state: GameState): voi
 
     tracker.add(offBtn, 'click', () => {
       state.useWorkerPhysics = false;
+      offBtn.classList.add('active');
+      onBtn.classList.remove('active');
+    });
+
+    optionsRow.appendChild(onBtn);
+    optionsRow.appendChild(offBtn);
+    group.appendChild(optionsRow);
+    content.appendChild(group);
+  }
+
+  // -- Performance Dashboard toggle --
+  {
+    const group: HTMLDivElement = document.createElement('div');
+    group.className = 'settings-group';
+
+    const labelEl: HTMLParagraphElement = document.createElement('p');
+    labelEl.className = 'settings-group-label';
+    labelEl.textContent = 'Performance Dashboard';
+    group.appendChild(labelEl);
+
+    const hintEl: HTMLParagraphElement = document.createElement('p');
+    hintEl.className = 'settings-group-hint';
+    hintEl.textContent = 'Show an overlay with FPS, frame time, worker latency, and memory stats. Toggle with F3.';
+    group.appendChild(hintEl);
+
+    const optionsRow: HTMLDivElement = document.createElement('div');
+    optionsRow.className = 'settings-options';
+
+    const onBtn: HTMLButtonElement = document.createElement('button');
+    onBtn.className = 'settings-option-btn';
+    onBtn.textContent = 'On';
+    onBtn.setAttribute('data-setting', 'perfDashboard');
+    onBtn.setAttribute('data-value', 'on');
+
+    const offBtn: HTMLButtonElement = document.createElement('button');
+    offBtn.className = 'settings-option-btn';
+    offBtn.textContent = 'Off';
+    offBtn.setAttribute('data-setting', 'perfDashboard');
+    offBtn.setAttribute('data-value', 'off');
+
+    if (state.showPerfDashboard) {
+      onBtn.classList.add('active');
+    } else {
+      offBtn.classList.add('active');
+    }
+
+    tracker.add(onBtn, 'click', () => {
+      state.showPerfDashboard = true;
+      showPerfDashboard();
+      onBtn.classList.add('active');
+      offBtn.classList.remove('active');
+    });
+
+    tracker.add(offBtn, 'click', () => {
+      state.showPerfDashboard = false;
+      hidePerfDashboard();
       offBtn.classList.add('active');
       onBtn.classList.remove('active');
     });

@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 17,
+  "lastIteration": 18,
   "startedAt": "2026-04-07T15:37:33.988Z",
   "iteration": 2,
   "devloopVersion": "3.4.0",
   "activeTask": {
-    "taskId": "TASK-016",
-    "taskTitle": "Create performance dashboard UI overlay",
-    "iterationNumber": 18,
-    "startedAt": "2026-04-07T17:21:57.987Z"
+    "taskId": "TASK-017",
+    "taskTitle": "Integrate perf monitor into game loops and worker bridge",
+    "iterationNumber": 19,
+    "startedAt": "2026-04-07T17:24:56.512Z"
   }
 }

@@ -493,6 +493,9 @@ export async function loadGame(slotIndex: number): Promise<GameState> {
   // Default useWorkerPhysics for saves created before the worker physics toggle.
   envelope.state.useWorkerPhysics ??= true;
 
+  // Default showPerfDashboard for saves created before the perf dashboard feature.
+  envelope.state.showPerfDashboard ??= false;
+
   // Validate and filter corrupted nested entries (missions, crew, etc.).
   _validateNestedStructures(envelope.state);
 

@@ -25,6 +25,7 @@ import { destroyMapHud } from './_mapView.ts';
 import { destroyDockingHud } from './_docking.ts';
 import { loop } from './_loop.ts';
 import { initFpsMonitor, showFpsMonitor, hideFpsMonitor, destroyFpsMonitor } from '../fpsMonitor.ts';
+import { showPerfDashboard, hidePerfDashboard, destroyPerfDashboard } from '../perfDashboard.ts';
 import {
   handleMenuRestart,
   handleMenuAdjustBuild,
@@ -206,6 +207,10 @@ export function startFlightScene(
   if (state.debugMode) showFpsMonitor();
   else hideFpsMonitor();
 
+  // Show the performance dashboard if the setting is enabled.
+  if (state.showPerfDashboard) showPerfDashboard();
+  else hidePerfDashboard();
+
   // Build the in-flight control overlay.
   _buildFlightOverlay(container);
 
@@ -345,6 +350,7 @@ export function stopFlightScene(): void {
   }
 
   destroyFpsMonitor();
+  destroyPerfDashboard();
   destroyFlightHud();
   destroyFlightContextMenu();
   destroyDockingHud();

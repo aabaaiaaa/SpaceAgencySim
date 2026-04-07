@@ -32,6 +32,7 @@ import { toggleMapView, updateMapHud, handleWarpToTarget } from './_mapView.ts';
 import { cycleDockingTarget, handleUndock, handleFuelTransfer } from './_docking.ts';
 import { toggleDockingMode, toggleRcsModeHandler } from './_orbitRcs.ts';
 import { showPhaseNotification } from './_flightPhase.ts';
+import { togglePerfDashboard } from '../perfDashboard.ts';
 
 /** Ordered warp levels for < / > key stepping. */
 export const WARP_LEVELS_ORDERED: number[] = [0, 0.25, 0.5, 1, 2, 5, 10, 50];
@@ -41,6 +42,16 @@ export function onKeyDown(e: KeyboardEvent): void {
   const ps = getPhysicsState();
   const flightState = getFlightState();
   if (!ps || !s.assembly || !s.stagingConfig || !flightState) return;
+
+  // F3 — toggle performance dashboard.
+  if (e.code === 'F3') {
+    e.preventDefault();
+    if (s.state) {
+      s.state.showPerfDashboard = !s.state.showPerfDashboard;
+    }
+    togglePerfDashboard();
+    return;
+  }
 
   // M — toggle map view.
   if (e.code === 'KeyM') {
