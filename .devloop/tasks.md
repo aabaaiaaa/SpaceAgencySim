@@ -91,7 +91,7 @@
 - **Verification**: `npm run typecheck -- --noEmit src/render/map.ts && npx playwright test e2e/orbital-operations.spec.js`
 
 ### TASK-014a: Update flightHud and flightController UI to read from readonly snapshot
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-012
 - **Description**: Update `src/ui/flightHud.ts` and flightController sub-modules (`_keyboard.ts`, `_docking.ts`, `_postFlight.ts`, `_mapView.ts`) to read from the readonly snapshot instead of mutable state objects. The HUD displays altitude, velocity, fuel, TWR, phase, etc. — all must come from the snapshot. Control inputs (throttle, angle) continue to be read/written from FCState's separate control storage. See requirements Section 3.3.
 - **Verification**: `npm run typecheck -- --noEmit src/ui/flightHud.ts src/ui/flightController/_keyboard.ts src/ui/flightController/_docking.ts && npx playwright test e2e/flight.spec.js e2e/collision.spec.js`
