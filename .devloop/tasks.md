@@ -85,7 +85,7 @@
 - **Verification**: `npm run typecheck -- --noEmit src/render/flight.ts && npx playwright test e2e/flight.spec.js e2e/landing.spec.js`
 
 ### TASK-013b: Update map render to accept readonly snapshots
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-012
 - **Description**: Update `src/render/map.ts` (and any sub-modules) to accept readonly snapshot types instead of mutable state. Update all parameter types and internal reads. The map view reads orbital data and body positions — ensure the snapshot type provides these fields. See requirements Section 3.3.
 - **Verification**: `npm run typecheck -- --noEmit src/render/map.ts && npx playwright test e2e/orbital-operations.spec.js`

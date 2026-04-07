@@ -10,8 +10,8 @@
  * type contract regardless of physics mode.
  */
 
-import type { ControlMode } from '../core/constants.ts';
-import type { OrbitalElements, PowerState, FlightState, GameState, SurfaceItem } from '../core/gameState.ts';
+import type { ControlMode, FlightPhase } from '../core/constants.ts';
+import type { OrbitalElements, PowerState, TransferState, GameState, SurfaceItem } from '../core/gameState.ts';
 import type { PlacedPart, PartConnection, LegEntry, ParachuteEntry } from '../core/physics.ts';
 
 // ---------------------------------------------------------------------------
@@ -111,12 +111,18 @@ export interface ReadonlyPhysicsState {
 // ---------------------------------------------------------------------------
 
 /**
- * Read-only view of FlightState for render functions.
- * Kept as Readonly<FlightState> for backward compatibility with the map
- * renderer.  The flight renderer narrows to a minimal `FlightStateArg`
- * locally.  TASK-013b will define explicit fields when migrating the map.
+ * Read-only view of FlightState for the map renderer.
+ *
+ * Contains only the fields the map actually reads.  The flight renderer
+ * uses its own narrower `FlightStateArg` locally.  Both the mutable
+ * `FlightState` and reconstituted worker snapshots satisfy this interface.
  */
-export type ReadonlyFlightState = Readonly<FlightState>;
+export interface ReadonlyFlightState {
+  readonly phase: FlightPhase;
+  readonly transferState: Readonly<TransferState> | null;
+  readonly orbitalElements: Readonly<OrbitalElements> | null;
+  readonly timeElapsed: number;
+}
 
 // ---------------------------------------------------------------------------
 // Assembly

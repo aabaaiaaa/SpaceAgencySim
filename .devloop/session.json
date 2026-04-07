@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 12,
+  "lastIteration": 13,
   "startedAt": "2026-04-07T15:37:33.988Z",
   "iteration": 2,
   "devloopVersion": "3.4.0",
   "activeTask": {
-    "taskId": "TASK-013a",
-    "taskTitle": "Update flight render functions to accept readonly snapshots",
-    "iterationNumber": 13,
-    "startedAt": "2026-04-07T16:26:32.315Z"
+    "taskId": "TASK-013b",
+    "taskTitle": "Update map render to accept readonly snapshots",
+    "iterationNumber": 14,
+    "startedAt": "2026-04-07T16:38:26.129Z"
   }
 }
