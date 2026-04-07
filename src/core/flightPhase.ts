@@ -32,7 +32,7 @@ import {
   getTransferTargets, computeTransferDeltaV,
 } from './manoeuvre.js';
 import { checkOrbitStatus, computeOrbitalElements } from './orbit.js';
-import type { FlightState, PhaseTransition } from './gameState.js';
+import type { FlightState, PhaseTransition, OrbitalElements } from './gameState.js';
 import type { PhysicsState } from './physics.js';
 
 // ---------------------------------------------------------------------------
@@ -41,7 +41,7 @@ import type { PhysicsState } from './physics.js';
 
 interface OrbitStatus {
   valid: boolean;
-  elements?: any;
+  elements?: OrbitalElements | null;
   periapsisAlt?: number;
   apoapsisAlt?: number;
   altitudeBand?: { id: string; name: string } | null;
@@ -117,7 +117,7 @@ export function evaluateAutoTransitions(flightState: FlightState, ps: PhysicsSta
       const meta = orbitStatus.altitudeBand ? { altitudeBand: orbitStatus.altitudeBand } : null;
       const result = transitionPhase(flightState, FlightPhase.ORBIT, `${bandName} achieved`, meta);
       if (result.success) {
-        flightState.inOrbit = true; flightState.orbitalElements = orbitStatus.elements;
+        flightState.inOrbit = true; flightState.orbitalElements = orbitStatus.elements ?? null;
         return flightState.phaseLog[flightState.phaseLog.length - 1];
       }
     }
@@ -210,7 +210,7 @@ export function evaluateAutoTransitions(flightState: FlightState, ps: PhysicsSta
       const meta = orbitStatus.altitudeBand ? { altitudeBand: orbitStatus.altitudeBand } : null;
       const result = transitionPhase(flightState, FlightPhase.ORBIT, `${bandName} captured`, meta);
       if (result.success) {
-        flightState.inOrbit = true; flightState.orbitalElements = orbitStatus.elements;
+        flightState.inOrbit = true; flightState.orbitalElements = orbitStatus.elements ?? null;
         flightState.transferState = null;
         return flightState.phaseLog[flightState.phaseLog.length - 1];
       }

@@ -19,7 +19,7 @@ import { loadSharedLibrary, saveSharedLibrary } from './designLibrary.js';
 import { logger } from './logger.js';
 import { idbSet, idbGet, idbDelete, isIdbAvailable } from './idbStorage.js';
 
-import type { GameState } from './gameState.js';
+import type { GameState, RocketDesign } from './gameState.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -116,6 +116,7 @@ interface SaveEnvelope {
   timestamp: string;
   version?: number;
   compressed?: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- deserialized JSON with unknown shape before migration
   state: any;
 }
 
@@ -155,15 +156,15 @@ function assertValidSlot(slotIndex: number): void {
 /**
  * Returns the count of crew members with status DEAD (KIA).
  */
-function countKIA(state: any): number {
-  return (state.crew ?? []).filter((c: any) => c.status === CrewStatus.DEAD).length;
+function countKIA(state: { crew?: Array<{ status: string }> }): number {
+  return (state.crew ?? []).filter((c) => c.status === CrewStatus.DEAD).length;
 }
 
 /**
  * Returns the count of living (non-dead) crew members.
  */
-function countLivingCrew(state: any): number {
-  return (state.crew ?? []).filter((c: any) => c.status !== CrewStatus.DEAD).length;
+function countLivingCrew(state: { crew?: Array<{ status: string }> }): number {
+  return (state.crew ?? []).filter((c) => c.status !== CrewStatus.DEAD).length;
 }
 
 /**
@@ -232,8 +233,8 @@ export async function saveGame(state: GameState, slotIndex: number, saveName: st
 
   try {
     localStorage.setItem(key, compressed);
-  } catch (err: any) {
-    if (err?.name === 'QuotaExceededError') {
+  } catch (err: unknown) {
+    if (err instanceof DOMException && err.name === 'QuotaExceededError') {
       // localStorage full — attempt IndexedDB as fallback.
       if (isIdbAvailable()) {
         await idbSet(key, compressed);
@@ -396,8 +397,8 @@ export async function loadGame(slotIndex: number): Promise<GameState> {
   // Migrate legacy savedDesigns: designs without a savePrivate flag are
   // migrated to the shared library (cross-save) and removed from the
   // per-slot array. Designs explicitly marked savePrivate stay in the slot.
-  const toMigrate: any[] = [];
-  const toKeep: any[] = [];
+  const toMigrate: RocketDesign[] = [];
+  const toKeep: RocketDesign[] = [];
   for (const d of envelope.state.savedDesigns) {
     if (d.savePrivate === undefined || d.savePrivate === null) {
       d.savePrivate = false;
@@ -410,7 +411,7 @@ export async function loadGame(slotIndex: number): Promise<GameState> {
   }
   if (toMigrate.length > 0) {
     const shared = loadSharedLibrary();
-    const existingIds = new Set(shared.map((s: any) => s.id));
+    const existingIds = new Set(shared.map((s) => s.id));
     for (const d of toMigrate) {
       if (!existingIds.has(d.id)) {
         shared.push(d);
@@ -669,8 +670,8 @@ export function importSave(jsonString: string, slotIndex: number): SaveSlotSumma
   const key = slotKey(slotIndex);
   try {
     localStorage.setItem(key, compressed);
-  } catch (err: any) {
-    if (err?.name === 'QuotaExceededError') {
+  } catch (err: unknown) {
+    if (err instanceof DOMException && err.name === 'QuotaExceededError') {
       throw new Error('Storage full — unable to import save. Delete old saves to free space.', { cause: err });
     }
     throw err;
@@ -699,6 +700,7 @@ export function importSave(jsonString: string, slotIndex: number): SaveSlotSumma
  *
  * @throws {Error} Describing the first validation failure found.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- validates untrusted deserialized JSON
 export function _validateState(state: any): void {
   // Numeric top-level fields.
   for (const field of ['money', 'playTimeSeconds']) {
@@ -750,6 +752,7 @@ export function _validateState(state: any): void {
  *
  * Exported with an underscore prefix for testing; treat as internal.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- validates untrusted deserialized JSON
 export function _validateNestedStructures(state: any): void {
   // Missions: accepted and completed entries must have id (string), title (string), reward (number).
   if (state.missions && typeof state.missions === 'object') {

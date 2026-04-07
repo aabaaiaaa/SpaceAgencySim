@@ -32,10 +32,13 @@ interface ObjectiveTypeField {
   optional?: boolean;
 }
 
+/** Target values used in challenge objectives (e.g., altitude, speed, counts). */
+type ObjectiveTarget = Record<string, number>;
+
 interface ObjectiveTypeMeta {
   label: string;
   fields: ObjectiveTypeField[];
-  describe: (target: Record<string, any>) => string;
+  describe: (target: ObjectiveTarget) => string;
 }
 
 interface ScoreMetricOption {
@@ -49,7 +52,7 @@ interface CustomChallengeDef {
   title: string;
   description?: string;
   briefing?: string;
-  objectives: Array<{ type: string; target: Record<string, any>; description?: string }>;
+  objectives: Array<{ type: string; target: ObjectiveTarget; description?: string }>;
   scoreMetric: string;
   scoreDirection?: string;
   medals: { bronze: number; silver: number; gold: number };
@@ -74,17 +77,17 @@ export const OBJECTIVE_TYPE_META: Record<string, ObjectiveTypeMeta> = {
   [ObjectiveType.REACH_ALTITUDE]: {
     label: 'Reach Altitude',
     fields: [{ key: 'altitude', label: 'Altitude (m)', type: 'number', min: 1 }],
-    describe: (t: Record<string, any>) => `Reach ${t.altitude.toLocaleString()} m altitude`,
+    describe: (t: ObjectiveTarget) => `Reach ${t.altitude.toLocaleString()} m altitude`,
   },
   [ObjectiveType.REACH_SPEED]: {
     label: 'Reach Speed',
     fields: [{ key: 'speed', label: 'Speed (m/s)', type: 'number', min: 1 }],
-    describe: (t: Record<string, any>) => `Reach ${t.speed.toLocaleString()} m/s`,
+    describe: (t: ObjectiveTarget) => `Reach ${t.speed.toLocaleString()} m/s`,
   },
   [ObjectiveType.SAFE_LANDING]: {
     label: 'Safe Landing',
     fields: [{ key: 'maxLandingSpeed', label: 'Max landing speed (m/s)', type: 'number', min: 0.1 }],
-    describe: (t: Record<string, any>) => `Land safely (< ${t.maxLandingSpeed} m/s)`,
+    describe: (t: ObjectiveTarget) => `Land safely (< ${t.maxLandingSpeed} m/s)`,
   },
   [ObjectiveType.HOLD_ALTITUDE]: {
     label: 'Hold Altitude',
@@ -93,7 +96,7 @@ export const OBJECTIVE_TYPE_META: Record<string, ObjectiveTypeMeta> = {
       { key: 'maxAltitude', label: 'Max altitude (m)', type: 'number', min: 1 },
       { key: 'duration', label: 'Duration (seconds)', type: 'number', min: 1 },
     ],
-    describe: (t: Record<string, any>) => `Hold ${t.minAltitude.toLocaleString()}–${t.maxAltitude.toLocaleString()} m for ${t.duration}s`,
+    describe: (t: ObjectiveTarget) => `Hold ${t.minAltitude.toLocaleString()}–${t.maxAltitude.toLocaleString()} m for ${t.duration}s`,
   },
   [ObjectiveType.RETURN_SCIENCE_DATA]: {
     label: 'Return Science Data',
@@ -103,12 +106,12 @@ export const OBJECTIVE_TYPE_META: Record<string, ObjectiveTypeMeta> = {
   [ObjectiveType.CONTROLLED_CRASH]: {
     label: 'Controlled Crash',
     fields: [{ key: 'minCrashSpeed', label: 'Min crash speed (m/s)', type: 'number', min: 1 }],
-    describe: (t: Record<string, any>) => `Crash at >= ${t.minCrashSpeed} m/s`,
+    describe: (t: ObjectiveTarget) => `Crash at >= ${t.minCrashSpeed} m/s`,
   },
   [ObjectiveType.EJECT_CREW]: {
     label: 'Eject Crew',
     fields: [{ key: 'minAltitude', label: 'Min altitude (m)', type: 'number', min: 0 }],
-    describe: (t: Record<string, any>) => `Eject crew above ${t.minAltitude.toLocaleString()} m`,
+    describe: (t: ObjectiveTarget) => `Eject crew above ${t.minAltitude.toLocaleString()} m`,
   },
   [ObjectiveType.RELEASE_SATELLITE]: {
     label: 'Release Satellite',
@@ -116,7 +119,7 @@ export const OBJECTIVE_TYPE_META: Record<string, ObjectiveTypeMeta> = {
       { key: 'minAltitude', label: 'Min altitude (m)', type: 'number', min: 1 },
       { key: 'minVelocity', label: 'Min velocity (m/s, optional)', type: 'number', min: 0, optional: true },
     ],
-    describe: (t: Record<string, any>) => `Release satellite above ${t.minAltitude.toLocaleString()} m` +
+    describe: (t: ObjectiveTarget) => `Release satellite above ${t.minAltitude.toLocaleString()} m` +
       (t.minVelocity ? ` at >= ${t.minVelocity} m/s` : ''),
   },
   [ObjectiveType.REACH_ORBIT]: {
@@ -125,17 +128,17 @@ export const OBJECTIVE_TYPE_META: Record<string, ObjectiveTypeMeta> = {
       { key: 'orbitAltitude', label: 'Orbit altitude (m)', type: 'number', min: 1 },
       { key: 'orbitalVelocity', label: 'Orbital velocity (m/s)', type: 'number', min: 1 },
     ],
-    describe: (t: Record<string, any>) => `Reach orbit (${(t.orbitAltitude / 1000).toFixed(0)} km+, ${t.orbitalVelocity}+ m/s)`,
+    describe: (t: ObjectiveTarget) => `Reach orbit (${(t.orbitAltitude / 1000).toFixed(0)} km+, ${t.orbitalVelocity}+ m/s)`,
   },
   [ObjectiveType.BUDGET_LIMIT]: {
     label: 'Budget Limit',
     fields: [{ key: 'maxCost', label: 'Max cost ($)', type: 'number', min: 1 }],
-    describe: (t: Record<string, any>) => `Spend no more than $${t.maxCost.toLocaleString()}`,
+    describe: (t: ObjectiveTarget) => `Spend no more than $${t.maxCost.toLocaleString()}`,
   },
   [ObjectiveType.MAX_PARTS]: {
     label: 'Max Parts',
     fields: [{ key: 'maxParts', label: 'Max parts', type: 'number', min: 1 }],
-    describe: (t: Record<string, any>) => `Use no more than ${t.maxParts} parts`,
+    describe: (t: ObjectiveTarget) => `Use no more than ${t.maxParts} parts`,
   },
   [ObjectiveType.MULTI_SATELLITE]: {
     label: 'Multi Satellite',
@@ -143,12 +146,12 @@ export const OBJECTIVE_TYPE_META: Record<string, ObjectiveTypeMeta> = {
       { key: 'count', label: 'Satellite count', type: 'number', min: 2 },
       { key: 'minAltitude', label: 'Min altitude (m)', type: 'number', min: 1 },
     ],
-    describe: (t: Record<string, any>) => `Deploy ${t.count} satellites above ${t.minAltitude.toLocaleString()} m`,
+    describe: (t: ObjectiveTarget) => `Deploy ${t.count} satellites above ${t.minAltitude.toLocaleString()} m`,
   },
   [ObjectiveType.MINIMUM_CREW]: {
     label: 'Minimum Crew',
     fields: [{ key: 'minCrew', label: 'Min crew', type: 'number', min: 1 }],
-    describe: (t: Record<string, any>) => `Fly with at least ${t.minCrew} crew`,
+    describe: (t: ObjectiveTarget) => `Fly with at least ${t.minCrew} crew`,
   },
 };
 
@@ -248,7 +251,7 @@ export function createCustomChallenge(state: GameState, def: CustomChallengeDef)
 /**
  * Auto-generate an objective description from type + target.
  */
-function _autoDescription(type: string, target: Record<string, any>): string {
+function _autoDescription(type: string, target: ObjectiveTarget): string {
   const meta = OBJECTIVE_TYPE_META[type];
   if (meta && meta.describe) {
     try { return meta.describe(target); } catch { /* fall through */ }
@@ -326,11 +329,11 @@ export function exportChallengeJSON(challenge: ChallengeDef): string {
 export function importChallengeJSON(state: GameState, jsonStr: string): CreateResult {
   ensureCustomChallengeState(state);
 
-  let data: any;
+  let data: Record<string, unknown>;
   try {
     data = JSON.parse(jsonStr);
-  } catch (e: any) {
-    return { success: false, error: 'Invalid JSON: ' + e.message };
+  } catch (e: unknown) {
+    return { success: false, error: 'Invalid JSON: ' + (e instanceof Error ? e.message : String(e)) };
   }
 
   if (!data || typeof data !== 'object') {
@@ -353,17 +356,17 @@ export function importChallengeJSON(state: GameState, jsonStr: string): CreateRe
   }
 
   return createCustomChallenge(state, {
-    title: data.title,
-    description: data.description || '',
-    briefing: data.briefing || '',
-    objectives: data.objectives.map((obj: any) => ({
-      type: obj.type || 'REACH_ALTITUDE',
-      target: obj.target || {},
-      description: obj.description || '',
+    title: data.title as string,
+    description: (data.description as string) || '',
+    briefing: (data.briefing as string) || '',
+    objectives: (data.objectives as Array<Record<string, unknown>>).map((obj) => ({
+      type: (obj.type as string) || 'REACH_ALTITUDE',
+      target: (obj.target as ObjectiveTarget) || {},
+      description: (obj.description as string) || '',
     })),
-    scoreMetric: data.scoreMetric,
-    scoreDirection: data.scoreDirection,
-    medals: data.medals || { bronze: 0, silver: 0, gold: 0 },
-    rewards: data.rewards || { bronze: 0, silver: 0, gold: 0 },
+    scoreMetric: data.scoreMetric as string,
+    scoreDirection: data.scoreDirection as string | undefined,
+    medals: (data.medals as { bronze: number; silver: number; gold: number }) || { bronze: 0, silver: 0, gold: 0 },
+    rewards: (data.rewards as { bronze: number; silver: number; gold: number }) || { bronze: 0, silver: 0, gold: 0 },
   });
 }

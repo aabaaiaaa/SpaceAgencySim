@@ -41,7 +41,7 @@ import { getPartById } from '../data/parts.js';
 import { PartType }    from './constants.js';
 import { recordKIA }   from './crew.js';
 
-import type { GameState } from './gameState.js';
+import type { GameState, FlightEvent } from './gameState.js';
 import type { PartDef } from '../data/parts.js';
 
 // ---------------------------------------------------------------------------
@@ -87,7 +87,7 @@ interface CasualtyPs {
 /** Subset of FlightState used by resolveCrewCasualties. */
 interface CasualtyFlightState {
   crewIds: string[];
-  events: Array<Record<string, any>>;
+  events: FlightEvent[];
 }
 
 /** Assembly shape used throughout. */
@@ -355,14 +355,15 @@ export function resolveCrewCasualties(
   for (const event of flightState.events) {
     if (event.type !== 'PART_DESTROYED') continue;
 
-    const placed = assembly.parts.get(event.instanceId);
+    const instanceId = event.instanceId as string;
+    const placed = assembly.parts.get(instanceId);
     const def    = placed ? getPartById(placed.partId) : null;
     if (!def || def.type !== PartType.COMMAND_MODULE) continue;
     if (!def.properties?.hasEjectorSeat) continue;
 
     // Was the ejector seat activated before the module was destroyed?
     const ejectorActivated =
-      ps.ejectorStates?.get(event.instanceId) === EjectorState.ACTIVATED;
+      ps.ejectorStates?.get(instanceId) === EjectorState.ACTIVATED;
     if (ejectorActivated) continue;
 
     // Crew in this module were not safely ejected -- mark them KIA.

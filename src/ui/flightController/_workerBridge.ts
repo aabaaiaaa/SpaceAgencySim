@@ -14,9 +14,9 @@ import {
   setToArray,
 } from '../../core/physicsWorkerProtocol.js';
 
-import type { PhysicsState } from '../../core/physics.js';
+import type { PhysicsState, InstrumentStateEntry, ScienceModuleStateEntry } from '../../core/physics.js';
 import type { FlightState } from '../../core/gameState.js';
-import type { RocketAssembly, StagingConfig } from '../../core/rocketbuilder.js';
+import type { RocketAssembly, StagingConfig, PlacedPart } from '../../core/rocketbuilder.js';
 import type {
   WorkerCommand,
   WorkerMessage,
@@ -255,8 +255,8 @@ export function applyPhysicsSnapshot(ps: PhysicsState, snap: PhysicsSnapshot): v
   ps.parachuteStates = new Map(Object.entries(snap.parachuteStates));
   ps.legStates = new Map(Object.entries(snap.legStates));
   ps.ejectorStates = new Map(Object.entries(snap.ejectorStates));
-  ps.instrumentStates = new Map(Object.entries(snap.instrumentStates as Record<string, any>));
-  ps.scienceModuleStates = new Map(Object.entries(snap.scienceModuleStates as Record<string, object>));
+  ps.instrumentStates = new Map(Object.entries(snap.instrumentStates as Record<string, InstrumentStateEntry>));
+  ps.scienceModuleStates = new Map(Object.entries(snap.scienceModuleStates as Record<string, ScienceModuleStateEntry>));
   ps.dockingPortStates = new Map(Object.entries(snap.dockingPortStates));
 
   ps.ejectedCrew = snap.ejectedCrew.map(e => ({ ...e }));
@@ -475,7 +475,7 @@ function _serialiseFlightState(fs: FlightState): FlightSnapshot {
 }
 
 function _serialiseAssembly(assembly: RocketAssembly): SerialisedAssembly {
-  const parts: Record<string, any> = Object.create(null);
+  const parts: Record<string, PlacedPart> = Object.create(null);
   for (const [id, placed] of assembly.parts) {
     parts[id] = { ...placed };
   }

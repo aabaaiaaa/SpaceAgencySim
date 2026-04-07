@@ -50,7 +50,7 @@ import { SOI_RADIUS } from '../core/manoeuvre.js';
 import { getCommsCoverageInfo } from '../core/comms.js';
 
 import type { ReadonlyPhysicsState, ReadonlyFlightState, ReadonlyGameState } from './types.js';
-import type { OrbitalElements } from '../core/gameState.js';
+import type { OrbitalElements, OrbitalObject } from '../core/gameState.js';
 
 // ---------------------------------------------------------------------------
 // Colour palette
@@ -306,13 +306,13 @@ export function getMapTarget(): string | null {
  * Cycle the selected target through all orbital objects for the given body.
  * Returns the new target ID (or null if none available).
  */
-export function cycleMapTarget(orbitalObjects: any[], bodyId: string): string | null {
-  const candidates = (orbitalObjects || []).filter((o: any) => o.bodyId === bodyId);
+export function cycleMapTarget(orbitalObjects: OrbitalObject[], bodyId: string): string | null {
+  const candidates = (orbitalObjects || []).filter((o) => o.bodyId === bodyId);
   if (candidates.length === 0) {
     _selectedTarget = null;
     return null;
   }
-  const idx = candidates.findIndex((o: any) => o.id === _selectedTarget);
+  const idx = candidates.findIndex((o) => o.id === _selectedTarget);
   const next = candidates[(idx + 1) % candidates.length];
   _selectedTarget = next.id;
   return _selectedTarget;
@@ -352,7 +352,7 @@ export function cycleTransferTarget(bodyId: string, altitude: number, phase: str
     _selectedTransferTarget = null;
     return null;
   }
-  const idx = targets.findIndex((t: any) => t.bodyId === _selectedTransferTarget);
+  const idx = targets.findIndex((t) => t.bodyId === _selectedTransferTarget);
   if (idx < 0) {
     // Nothing selected — select the first.
     _selectedTransferTarget = targets[0].bodyId;
@@ -409,7 +409,7 @@ export function renderMapFrame(
   // Resolve target elements.
   let targetElements: OrbitalElements | null = null;
   if (_selectedTarget && state.orbitalObjects) {
-    const target = state.orbitalObjects.find((o: any) => o.id === _selectedTarget);
+    const target = state.orbitalObjects.find((o) => o.id === _selectedTarget);
     if (target) targetElements = target.elements;
   }
 

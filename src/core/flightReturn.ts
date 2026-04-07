@@ -38,18 +38,23 @@ import { checkAchievements } from './achievements.js';
 import { createFieldCraft, hasExtendedLifeSupport } from './lifeSupport.js';
 import { FieldCraftStatus } from './constants.js';
 import { processChallengeCompletion } from './challenges.js';
-import type { GameState, FlightState, FlightResult, InventoryPart, Contract, FieldCraft } from './gameState.js';
+import type { GameState, FlightState, FlightResult, FlightEvent, InventoryPart, Contract, FieldCraft } from './gameState.js';
 import type { PhysicsState, RocketAssembly } from './physics.js';
+import type { CompleteMissionResult } from './missions.js';
+import type { MissionDef } from '../data/missions.js';
+import type { RecoverPartsResult } from './partInventory.js';
+import type { PeriodSummary } from './period.js';
+import type { AwardedAchievement } from './achievements.js';
 
 // ---------------------------------------------------------------------------
 // Interfaces
 // ---------------------------------------------------------------------------
 
 export interface CompletedMissionEntry {
-  mission: any;
+  mission: MissionDef;
   reward: number;
   unlockedParts: string[];
-  newlyAvailableMissions: any[];
+  newlyAvailableMissions: MissionDef[];
 }
 
 export interface FlightReturnSummary {
@@ -66,10 +71,10 @@ export interface FlightReturnSummary {
   totalFlights: number;
   currentPeriod: number;
   expiredMissionIds: string[];
-  completedContracts: Array<{ contract: Contract; reward: number }>;
+  completedContracts: Array<{ contract: Contract | undefined; reward: number | undefined }>;
   newContracts: Contract[];
   bankrupt: boolean;
-  deployedSatellites: Array<{ satelliteId: string; satelliteType: string }>;
+  deployedSatellites: Array<{ satelliteId: string | undefined; satelliteType: string }>;
   crewXPGains: Array<{ id: string; name: string; piloting: number; engineering: number; science: number }>;
   crewInjuries: Array<{ crewId: string; crewName: string; cause: string; periods: number; altitude: number }>;
   recoveredParts: InventoryPart[];
@@ -109,8 +114,8 @@ export function processFlightReturn(state: GameState, flightState: FlightState, 
     const missionWithObj = mission as unknown as { objectives?: Array<{ completed: boolean }> };
     const allObjectivesMet = Array.isArray(missionWithObj.objectives) && missionWithObj.objectives.length > 0 && missionWithObj.objectives.every((obj) => obj.completed);
     if (allObjectivesMet) {
-      const result: any = completeMission(state, mission.id);
-      if (result.success) completedMissions.push({ mission: result.mission, reward: result.reward, unlockedParts: result.unlockedParts, newlyAvailableMissions: result.newlyUnlockedMissions });
+      const result: CompleteMissionResult = completeMission(state, mission.id);
+      if (result.success) completedMissions.push({ mission: result.mission!, reward: result.reward!, unlockedParts: result.unlockedParts!, newlyAvailableMissions: result.newlyUnlockedMissions! });
     }
   }
 
@@ -129,24 +134,24 @@ export function processFlightReturn(state: GameState, flightState: FlightState, 
     }
     if (recoveryValue > 0) earn(state, recoveryValue);
     const usedInventoryParts = ps._usedInventoryParts ?? null;
-    const result: any = recoverPartsToInventory(state, assembly, ps!, usedInventoryParts);
+    const result: RecoverPartsResult = recoverPartsToInventory(state, assembly, ps!, usedInventoryParts);
     partsRecovered = result.partsRecovered; recoveredParts = result.entries;
   }
 
   // -- 4b. Crew skill XP --
   const flightEvents = flightState?.events ?? [];
-  const stagingEvents = flightEvents.filter((e: any) => e.type === 'PART_ACTIVATED').length;
-  const scienceActivations = flightEvents.filter((e: any) => e.type === 'PART_ACTIVATED' && e.partType === PartType.SERVICE_MODULE).length;
-  const scienceReturns = flightEvents.filter((e: any) => e.type === 'SCIENCE_DATA_RETURNED' || e.type === 'SCIENCE_TRANSMITTED').length;
+  const stagingEvents = flightEvents.filter((e: FlightEvent) => e.type === 'PART_ACTIVATED').length;
+  const scienceActivations = flightEvents.filter((e: FlightEvent) => e.type === 'PART_ACTIVATED' && e.partType === PartType.SERVICE_MODULE).length;
+  const scienceReturns = flightEvents.filter((e: FlightEvent) => e.type === 'SCIENCE_DATA_RETURNED' || e.type === 'SCIENCE_TRANSMITTED').length;
   const survivingCrewIds = (flightState?.crewIds ?? []).filter((id: string) => {
     const ejectedIds = ps?.ejectedCrewIds ?? new Set<string>();
     if (ps?.crashed && !ejectedIds.has(id)) return false;
     return true;
   });
-  const crewXPGains: any = awardFlightXP(state, survivingCrewIds, { safeLanding: isLanded, stagingEvents, partsRecovered, scienceReturns, scienceActivations });
+  const crewXPGains = awardFlightXP(state, survivingCrewIds, { safeLanding: isLanded, stagingEvents, partsRecovered, scienceReturns, scienceActivations });
 
   // -- 4c. Crew injuries --
-  const crewInjuries: any = processFlightInjuries(state, flightState, ps);
+  const crewInjuries = processFlightInjuries(state, flightState, ps);
 
   // -- 5. Loan interest --
   if (state.loan && state.loan.balance > 0) {
@@ -182,23 +187,23 @@ export function processFlightReturn(state: GameState, flightState: FlightState, 
   }
 
   // -- 6b. Contract completions --
-  const contractResult: any = processContractCompletions(state);
+  const contractResult = processContractCompletions(state);
 
   // -- 6b2. Challenge completion --
   const challengeResult = processChallengeCompletion(state, flightState, ps);
 
   // -- 6c. Advance period --
-  const periodSummary: any = advancePeriod(state);
+  const periodSummary: PeriodSummary = advancePeriod(state);
 
   // -- 6d. Generate contracts --
-  const newContracts: any = generateContracts(state);
+  const newContracts = generateContracts(state);
 
   // -- 6e. Deploy satellites --
-  const deployedSatellites: any = deploySatellitesFromFlight(state, flightState);
+  const deployedSatellites = deploySatellitesFromFlight(state, flightState);
 
   // -- 6e2. Surface samples --
   const landingBodyId = flightState?.bodyId ?? 'EARTH';
-  const sampleResult: any = isLanded ? processSampleReturns(state, landingBodyId) : { samplesReturned: 0, scienceEarned: 0 };
+  const sampleResult = isLanded ? processSampleReturns(state, landingBodyId) : { samplesReturned: 0, scienceEarned: 0 };
 
   // -- 6e3. Field craft --
   let deployedFieldCraft: FieldCraft | null = null;
@@ -252,7 +257,7 @@ export function processFlightReturn(state: GameState, flightState: FlightState, 
   state.flightHistory.push(flightResult);
 
   // -- 8. Achievements --
-  const newAchievements: any = checkAchievements(state, { flightState, ps, isLanded, landingBodyId });
+  const newAchievements: AwardedAchievement[] = checkAchievements(state, { flightState, ps, isLanded, landingBodyId });
   state.currentFlight = null;
 
   return {

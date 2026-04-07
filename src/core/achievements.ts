@@ -277,8 +277,8 @@ function _anyFlightReachedOrbit(state: GameState, bodyId: string): boolean {
   // For Earth orbit: check if any mission was completed that required orbit.
   if (bodyId === CelestialBody.EARTH) {
     const orbitMissions = (state.missions?.completed ?? []).some(
-      (m: any) => Array.isArray(m.objectives) &&
-             m.objectives.some((o: any) => o.type === 'REACH_ORBIT' && o.completed),
+      (m) => Array.isArray(m.objectives) &&
+             m.objectives.some((o) => o.type === 'REACH_ORBIT' && o.completed),
     );
     if (orbitMissions) return true;
 
@@ -371,7 +371,7 @@ function _hasLunarReturn(state: GameState, ctx: AchievementCheckContext): boolea
   // A simpler heuristic: if there's a flag on the Moon and a surface sample from the Moon
   // that was collected (returned), that implies a lunar return.
   const moonSamplesReturned = (state.surfaceItems ?? []).some(
-    (item: any) => item.bodyId === CelestialBody.MOON &&
+    (item) => item.bodyId === CelestialBody.MOON &&
               item.type === 'SURFACE_SAMPLE' &&
               item.collected,
   );

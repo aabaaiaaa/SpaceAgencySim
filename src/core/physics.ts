@@ -197,6 +197,7 @@ interface PartDef {
   /** Base reliability rating (0.0–1.0). Defaults to 1.0. */
   reliability?: number;
   /** Type-specific values (thrust, fuel, seats, drag, etc.). */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- unstructured property bag varies by part type
   properties: Record<string, any>;
 }
 
@@ -247,7 +248,7 @@ interface DebrisState {
 }
 
 /** Per-parachute lifecycle entry. */
-interface ParachuteEntry {
+export interface ParachuteEntry {
   /** Lifecycle state: 'packed' | 'deploying' | 'deployed' | 'failed'. */
   state: string;
   /** Seconds remaining in deploying animation. */
@@ -269,7 +270,7 @@ export interface LegEntry {
 }
 
 /** Per-instrument experiment lifecycle entry. */
-interface InstrumentStateEntry {
+export interface InstrumentStateEntry {
   /** ID of the instrument definition. */
   instrumentId: string;
   /** Instance ID of the parent science module. */
@@ -290,6 +291,17 @@ interface InstrumentStateEntry {
   completeBiome: string | null;
   /** Biome science multiplier at completion. */
   scienceMultiplier: number;
+}
+
+/** Legacy science module state entry. Keyed by module instance ID. */
+export interface ScienceModuleStateEntry {
+  state: string;
+  timer: number;
+  startBiome?: string | null;
+  completeBiome?: string | null;
+  scienceMultiplier?: number;
+  recovered?: boolean;
+  type?: string;
 }
 
 /** Malfunction entry for a part. */
@@ -361,7 +373,7 @@ export interface PhysicsState {
   /** Per-instrument experiment lifecycle state. Keyed by compound key. */
   instrumentStates: Map<string, InstrumentStateEntry>;
   /** Legacy module-level summary state. Keyed by module instance ID. */
-  scienceModuleStates: Map<string, object>;
+  scienceModuleStates: Map<string, ScienceModuleStateEntry>;
   /** Accumulated reentry heat per part (heat units). Keyed by instance ID. */
   heatMap: Map<string, number>;
   /** Jettisoned stage fragments simulated independently. */

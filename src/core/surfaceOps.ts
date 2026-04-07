@@ -108,7 +108,7 @@ export function areSurfaceItemsVisible(state: GameState, bodyId: string): boolea
   if (bodyId === CelestialBody.EARTH) return true;
 
   const gpsSats = getActiveSatellites(state).filter(
-    (s: any) => s.satelliteType === SatelliteType.GPS && s.bodyId === bodyId,
+    (s) => s.satelliteType === SatelliteType.GPS && s.bodyId === bodyId,
   );
   return gpsSats.length >= GPS_VISIBILITY_THRESHOLD;
 }

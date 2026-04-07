@@ -82,7 +82,7 @@ const DESIGN_GROUPS: DesignGroup[] = [
 function _countStages(design: RocketDesign): number {
   if (!design.staging?.stages) return 1;
   const nonEmpty = design.staging.stages.filter(
-    (s: any) => (Array.isArray(s) ? s.length : (s?.instanceIds?.length ?? 0)) > 0,
+    (s) => (Array.isArray(s) ? s.length : 0) > 0,
   );
   return Math.max(nonEmpty.length, 1);
 }
@@ -114,8 +114,8 @@ export function loadSharedLibrary(): RocketDesign[] {
 export function saveSharedLibrary(designs: RocketDesign[]): void {
   try {
     localStorage.setItem(SHARED_LIBRARY_KEY, JSON.stringify(designs));
-  } catch (err: any) {
-    if (err?.name === 'QuotaExceededError') {
+  } catch (err: unknown) {
+    if (err instanceof DOMException && err.name === 'QuotaExceededError') {
       throw new Error('Storage full — unable to save design library. Delete old saves or designs to free space.', { cause: err });
     }
     throw err;

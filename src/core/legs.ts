@@ -40,6 +40,7 @@ import { PartType }    from './constants.js';
 
 import type { LegEntry } from './physics.js';
 import type { PartDef } from '../data/parts.js';
+import type { FlightEvent } from './gameState.js';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -167,7 +168,7 @@ export function deployLandingLeg(
 export function tickLegs(
   ps: { legStates: Map<string, LegEntry>; posY: number },
   assembly: { parts: Map<string, { partId: string }> },
-  flightState: { events: any[]; timeElapsed: number },
+  flightState: { events: FlightEvent[]; timeElapsed: number },
   dt: number,
 ): void {
   if (!ps.legStates) return;

@@ -99,7 +99,7 @@ function _hasTrackingStationT3(state: GameState): boolean {
 }
 
 function _hasLocalCoverage(state: GameState, bodyId: string, altitude: number, craftPos?: CraftPos): boolean {
-  const localCommSats = getSatellitesByType(state, SatelliteType.COMMUNICATION).filter((s: any) => s.bodyId === bodyId);
+  const localCommSats = getSatellitesByType(state, SatelliteType.COMMUNICATION).filter((s) => s.bodyId === bodyId);
   if (localCommSats.length === 0) return false;
   if (BODY_RADIUS[bodyId] + altitude > COMMS_LOCAL_NETWORK_RANGE) return false;
   if (localCommSats.length >= COMMS_FULL_COVERAGE_THRESHOLD) return true;
@@ -130,7 +130,7 @@ function _canBodyLinkToEarth(state: GameState, bodyId: string): boolean {
   if (bodyId === CelestialBody.EARTH) return true;
   if (bodyId === CelestialBody.MOON) {
     if (_hasTrackingStationT3(state)) return true;
-    return getSatellitesByType(state, SatelliteType.COMMUNICATION).filter((s: any) => s.bodyId === CelestialBody.EARTH).length > 0;
+    return getSatellitesByType(state, SatelliteType.COMMUNICATION).filter((s) => s.bodyId === CelestialBody.EARTH).length > 0;
   }
   return _hasRelayChain(state, bodyId);
 }
@@ -153,11 +153,11 @@ function _walkRelayChain(state: GameState, bodyId: string, visited: Set<string>)
 }
 
 function _hasRelaySatsAtBody(state: GameState, bodyId: string): boolean {
-  return getSatellitesByType(state, SatelliteType.RELAY).filter((s: any) => s.bodyId === bodyId).length > 0;
+  return getSatellitesByType(state, SatelliteType.RELAY).filter((s) => s.bodyId === bodyId).length > 0;
 }
 
 function _isWithinRelaySatRange(state: GameState, bodyId: string, altitude: number): boolean {
-  if (getSatellitesByType(state, SatelliteType.RELAY).filter((s: any) => s.bodyId === bodyId).length === 0) return false;
+  if (getSatellitesByType(state, SatelliteType.RELAY).filter((s) => s.bodyId === bodyId).length === 0) return false;
   return BODY_RADIUS[bodyId] + altitude <= COMMS_LOCAL_NETWORK_RANGE;
 }
 
@@ -187,7 +187,7 @@ export function getCommsCoverageInfo(state: GameState, bodyId: string): CommsCov
   const isEarth = bodyId === CelestialBody.EARTH;
   let hasDirectCoverage = false, directRange = 0;
   if (isEarth) { hasDirectCoverage = true; directRange = _hasTrackingStationT3(state) ? COMMS_TRACKING_T3_RANGE : COMMS_DIRECT_RANGE; }
-  const localCommSats = getSatellitesByType(state, SatelliteType.COMMUNICATION).filter((s: any) => s.bodyId === bodyId);
+  const localCommSats = getSatellitesByType(state, SatelliteType.COMMUNICATION).filter((s) => s.bodyId === bodyId);
   const hasLocalNetwork = localCommSats.length > 0;
   const fullCoverage = localCommSats.length >= COMMS_FULL_COVERAGE_THRESHOLD;
   const hasRelayCoverage = _hasRelaySatsAtBody(state, bodyId);

@@ -42,7 +42,8 @@ import { getBiome, getBiomeId, getScienceMultiplier } from './biomes.js';
 // hasMalfunction not used directly — inline check avoids PhysicsStateWithMalfunctions type mismatch
 import { MalfunctionType } from './constants.js';
 
-import type { GameState, ScienceLogEntry } from './gameState.js';
+import type { GameState, ScienceLogEntry, FlightEvent } from './gameState.js';
+import type { ScienceModuleStateEntry } from './physics.js';
 
 // ---------------------------------------------------------------------------
 // Public constants
@@ -94,19 +95,25 @@ export interface InstrumentStateEntry {
   scienceMultiplier: number;
 }
 
+/** Malfunction entry shape used by science module checks. */
+interface MalfunctionEntryLike {
+  recovered?: boolean;
+  type?: string;
+}
+
 /** Minimal shape of the physics state needed by science module functions. */
 interface SciencePhysicsState {
   instrumentStates?: Map<string, InstrumentStateEntry>;
-  scienceModuleStates?: Map<string, any>;
+  scienceModuleStates?: Map<string, ScienceModuleStateEntry>;
   activeParts: Set<string>;
   posY: number;
-  malfunctions?: Map<string, any>;
+  malfunctions?: Map<string, MalfunctionEntryLike>;
   _gameState?: GameState;
 }
 
 /** Minimal shape of flight state needed by science module functions. */
 interface ScienceFlightState {
-  events: any[];
+  events: FlightEvent[];
   timeElapsed: number;
   scienceModuleRunning?: boolean;
   inOrbit?: boolean;
@@ -115,6 +122,7 @@ interface ScienceFlightState {
 
 /** Assembly shape needed by science module functions. */
 interface ScienceAssembly {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- PlacedPart has dynamic properties per part type
   parts: Map<string, { partId: string; instruments?: string[]; [key: string]: any }>;
 }
 

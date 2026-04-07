@@ -18,15 +18,16 @@ import {
   STARTING_REPUTATION,
   SatelliteType,
   ContractCategory,
+  FlightOutcome,
 } from './constants.js';
 
-import type { GameState, CrewMember, CrewSkills, RocketDesign } from './gameState.js';
+import type { GameState, CrewMember, CrewSkills, RocketDesign, Mission, FlightResult } from './gameState.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function completedMission(id: string, title: string, reward: number): any {
+function completedMission(id: string, title: string, reward: number): Mission {
   return {
     id, title, description: '', reward,
     deadline: '2099-12-31T00:00:00.000Z',
@@ -43,7 +44,7 @@ function makeCrew(id: string, name: string, salary: number, skills: Partial<Crew
   return c;
 }
 
-function flightRecord(id: string, missionId: string, outcome: string, revenue: number = 0, extras: Record<string, any> = {}): any {
+function flightRecord(id: string, missionId: string, outcome: FlightOutcome, revenue: number = 0, extras: Partial<FlightResult> = {}): FlightResult {
   return {
     id, missionId,
     rocketId: extras.rocketId ?? 'rocket-debug-001',

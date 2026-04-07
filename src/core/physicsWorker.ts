@@ -21,7 +21,7 @@
 import { tick, handleKeyDown, handleKeyUp, fireNextStage } from './physics.js';
 import { evaluateAutoTransitions } from './flightPhase.js';
 import { checkOrbitStatus } from './orbit.js';
-import type { PhysicsState, RocketAssembly, PlacedPart } from './physics.js';
+import type { PhysicsState, RocketAssembly, PlacedPart, InstrumentStateEntry, ParachuteEntry, LegEntry, ScienceModuleStateEntry } from './physics.js';
 import type { StagingConfig } from './rocketbuilder.js';
 import type { FlightState } from './gameState.js';
 import type {
@@ -90,8 +90,8 @@ function deserialisePhysicsState(snap: PhysicsSnapshot): PhysicsState {
     ejectorStates: _recordToMap(snap.ejectorStates),
     ejectedCrewIds: _arrayToSet(snap.ejectedCrewIds),
     ejectedCrew: snap.ejectedCrew.map(e => ({ ...e })),
-    instrumentStates: _recordToMap(snap.instrumentStates as Record<string, any>),
-    scienceModuleStates: _recordToMap(snap.scienceModuleStates as Record<string, object>),
+    instrumentStates: _recordToMap(snap.instrumentStates as Record<string, InstrumentStateEntry>),
+    scienceModuleStates: _recordToMap(snap.scienceModuleStates as Record<string, ScienceModuleStateEntry>),
     heatMap: _recordToMap(snap.heatMap),
     debris: snap.debris.map(deserialiseDebris),
     landed: snap.landed,
@@ -295,8 +295,8 @@ function serialiseDebris(d: {
   firingEngines: Set<string>;
   fuelStore: Map<string, number>;
   deployedParts: Set<string>;
-  parachuteStates: Map<string, any>;
-  legStates: Map<string, any>;
+  parachuteStates: Map<string, ParachuteEntry>;
+  legStates: Map<string, LegEntry>;
   heatMap: Map<string, number>;
   posX: number; posY: number;
   velX: number; velY: number;

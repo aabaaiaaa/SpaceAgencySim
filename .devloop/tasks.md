@@ -85,7 +85,7 @@
 - **Verification**: `grep -r "as any" src/` returns no matches (or only justified exceptions documented with comments). `npm run typecheck` passes. `npm run test:unit` passes.
 
 ### TASK-015: Add ESLint rule to prevent new `as any` usage
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-012, TASK-013, TASK-014
 - **Description**: Add `@typescript-eslint/no-explicit-any` as a warning (or error) in the ESLint configuration to prevent new `as any` casts from being introduced. See requirements Section 4.1.
 - **Verification**: `npm run lint` passes. Adding a new `as any` cast to any file triggers the lint rule. No existing files violate the rule.
