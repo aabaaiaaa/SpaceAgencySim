@@ -2,25 +2,144 @@
  * types.ts — Read-only snapshot interfaces for the render layer.
  *
  * The render layer receives game state by reference but must never mutate it.
- * These Readonly wrappers enforce that contract at compile time.  Callers in
- * the UI layer pass mutable state — TypeScript allows mutable → readonly.
+ * These interfaces enforce that contract at compile time using ReadonlySet and
+ * ReadonlyMap, which strip mutation methods (add, delete, set, clear).
+ *
+ * Both the mutable PhysicsState (main-thread fallback) and reconstituted
+ * worker snapshots satisfy these interfaces, so render code has a single
+ * type contract regardless of physics mode.
  */
 
-import type { PhysicsState } from '../core/physics.ts';
-import type { FlightState, GameState, SurfaceItem } from '../core/gameState.ts';
-import type { RocketAssembly } from '../core/rocketbuilder.ts';
+import type { ControlMode } from '../core/constants.ts';
+import type { OrbitalElements, PowerState, FlightState, GameState, SurfaceItem } from '../core/gameState.ts';
+import type { PlacedPart, PartConnection, LegEntry, ParachuteEntry } from '../core/physics.ts';
+
+// ---------------------------------------------------------------------------
+// Ejected crew
+// ---------------------------------------------------------------------------
+
+/** Visible ejected crew capsule in the flight scene. */
+export interface ReadonlyEjectedCrew {
+  readonly x: number;
+  readonly y: number;
+  readonly velX: number;
+  readonly velY: number;
+  readonly chuteOpen: boolean;
+  readonly chuteTimer: number;
+}
+
+// ---------------------------------------------------------------------------
+// Malfunction entry
+// ---------------------------------------------------------------------------
+
+/** Per-part malfunction data for render overlays. */
+export interface ReadonlyMalfunctionEntry {
+  readonly type: string;
+  readonly recovered: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Debris
+// ---------------------------------------------------------------------------
+
+/** Read-only debris fragment for render functions. */
+export interface ReadonlyDebrisState {
+  readonly id: string;
+  readonly activeParts: ReadonlySet<string>;
+  readonly firingEngines: ReadonlySet<string>;
+  readonly fuelStore: ReadonlyMap<string, number>;
+  readonly deployedParts: ReadonlySet<string>;
+  readonly parachuteStates: ReadonlyMap<string, ParachuteEntry>;
+  readonly legStates: ReadonlyMap<string, LegEntry>;
+  readonly heatMap: ReadonlyMap<string, number>;
+  readonly posX: number;
+  readonly posY: number;
+  readonly velX: number;
+  readonly velY: number;
+  readonly angle: number;
+  readonly throttle: number;
+  readonly angularVelocity: number;
+  readonly isTipping: boolean;
+  readonly tippingContactX: number;
+  readonly tippingContactY: number;
+  readonly landed: boolean;
+  readonly crashed: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Physics state
+// ---------------------------------------------------------------------------
 
 /** Read-only view of PhysicsState for render functions. */
-export type ReadonlyPhysicsState = Readonly<PhysicsState>;
+export interface ReadonlyPhysicsState {
+  readonly posX: number;
+  readonly posY: number;
+  readonly velX: number;
+  readonly velY: number;
+  readonly angle: number;
+  readonly throttle: number;
+  readonly activeParts: ReadonlySet<string>;
+  readonly fuelStore: ReadonlyMap<string, number>;
+  readonly firingEngines: ReadonlySet<string>;
+  readonly deployedParts: ReadonlySet<string>;
+  readonly parachuteStates: ReadonlyMap<string, ParachuteEntry>;
+  readonly legStates: ReadonlyMap<string, LegEntry>;
+  readonly heatMap: ReadonlyMap<string, number>;
+  readonly malfunctions?: ReadonlyMap<string, ReadonlyMalfunctionEntry> | null;
+  readonly debris: readonly ReadonlyDebrisState[];
+  readonly ejectedCrew: readonly ReadonlyEjectedCrew[];
+  readonly grounded: boolean;
+  readonly landed: boolean;
+  readonly crashed: boolean;
+  readonly angularVelocity: number;
+  readonly isTipping: boolean;
+  readonly tippingContactX: number;
+  readonly tippingContactY: number;
+  readonly controlMode: ControlMode;
+  readonly baseOrbit: OrbitalElements | null;
+  readonly dockingOffsetAlongTrack: number;
+  readonly dockingOffsetRadial: number;
+  readonly rcsActiveDirections: ReadonlySet<string>;
+  readonly dockingPortStates: ReadonlyMap<string, string>;
+  readonly weatherIspModifier: number;
+  readonly hasLaunchClamps: boolean;
+  readonly powerState: PowerState | null;
+}
 
-/** Read-only view of FlightState for render functions. */
+// ---------------------------------------------------------------------------
+// Flight state
+// ---------------------------------------------------------------------------
+
+/**
+ * Read-only view of FlightState for render functions.
+ * Kept as Readonly<FlightState> for backward compatibility with the map
+ * renderer.  The flight renderer narrows to a minimal `FlightStateArg`
+ * locally.  TASK-013b will define explicit fields when migrating the map.
+ */
 export type ReadonlyFlightState = Readonly<FlightState>;
 
-/** Read-only view of the top-level GameState for map/overlay rendering. */
-export type ReadonlyGameState = Readonly<GameState>;
+// ---------------------------------------------------------------------------
+// Assembly
+// ---------------------------------------------------------------------------
 
 /** Read-only view of RocketAssembly for render functions. */
-export type ReadonlyAssembly = Readonly<RocketAssembly>;
+export interface ReadonlyAssembly {
+  readonly parts: ReadonlyMap<string, PlacedPart>;
+  readonly connections: readonly PartConnection[];
+}
+
+// ---------------------------------------------------------------------------
+// Game state (top-level, for map/overlay rendering)
+// ---------------------------------------------------------------------------
+
+/**
+ * Read-only view of the top-level GameState for map/overlay rendering.
+ */
+export type ReadonlyGameState = Readonly<GameState>;
+
+// ---------------------------------------------------------------------------
+// Surface items
+// ---------------------------------------------------------------------------
 
 /** Read-only view of a SurfaceItem. */
 export type ReadonlySurfaceItem = Readonly<SurfaceItem>;

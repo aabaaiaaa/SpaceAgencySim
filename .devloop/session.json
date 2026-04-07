@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 11,
+  "lastIteration": 12,
   "startedAt": "2026-04-07T15:37:33.988Z",
   "iteration": 2,
   "devloopVersion": "3.4.0",
   "activeTask": {
-    "taskId": "TASK-012",
-    "taskTitle": "Refactor _loop.ts to pass readonly snapshot to render/UI",
-    "iterationNumber": 12,
-    "startedAt": "2026-04-07T16:14:47.100Z"
+    "taskId": "TASK-013a",
+    "taskTitle": "Update flight render functions to accept readonly snapshots",
+    "iterationNumber": 13,
+    "startedAt": "2026-04-07T16:26:32.315Z"
   }
 }

@@ -81,13 +81,13 @@ interface HeatQueryAssembly {
 
 /** Minimal physics state for heat-ratio queries. */
 interface HeatRatioPhysics {
-  heatMap: Map<string, number>;
-  activeParts: Set<string>;
+  heatMap: ReadonlyMap<string, number>;
+  activeParts: ReadonlySet<string>;
 }
 
 /** Minimal assembly shape for heat-ratio queries. */
 interface HeatRatioAssembly {
-  parts: Map<string, { partId: string }>;
+  parts: ReadonlyMap<string, { partId: string }>;
 }
 
 // ---------------------------------------------------------------------------

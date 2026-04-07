@@ -5,8 +5,7 @@
 import * as PIXI from 'pixi.js';
 import { getPartById } from '../../data/parts.ts';
 import { PartType, ControlMode } from '../../core/constants.ts';
-import type { ReadonlyPhysicsState, ReadonlyAssembly } from '../types.ts';
-import type { DebrisState } from '../../core/staging.ts';
+import type { ReadonlyPhysicsState, ReadonlyAssembly, ReadonlyDebrisState } from '../types.ts';
 import { getFlightRenderState } from './_state.ts';
 import { ppm, worldToScreen } from './_camera.ts';
 import { getApp } from '../index.ts';
@@ -18,7 +17,7 @@ import { acquireGraphics, releaseContainerChildren } from './_pool.ts';
 // Debris rendering
 // ---------------------------------------------------------------------------
 
-export function renderDebris(debrisList: readonly DebrisState[], assembly: ReadonlyAssembly, w: number, h: number): void {
+export function renderDebris(debrisList: readonly ReadonlyDebrisState[], assembly: ReadonlyAssembly, w: number, h: number): void {
   const s = getFlightRenderState();
   if (!s.debrisContainer) return;
 

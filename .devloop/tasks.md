@@ -79,7 +79,7 @@
 - **Verification**: `npm run typecheck -- --noEmit src/ui/flightController/_loop.ts && npx playwright test e2e/flight.spec.js e2e/phase-transitions.spec.js`
 
 ### TASK-013a: Update flight render functions to accept readonly snapshots
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-012
 - **Description**: Update all flight render functions in `src/render/flight/` to accept readonly snapshot types instead of mutable `PhysicsState`/`FlightState`. This includes the barrel export at `src/render/flight.ts` and sub-modules: rocket, camera, sky, trails, debris, etc. Update `renderFlightFrame()` and `renderMapFrame()` signatures and all internal reads. Since these functions already receive state as parameters, the change is primarily parameter type updates. See requirements Section 3.3.
 - **Verification**: `npm run typecheck -- --noEmit src/render/flight.ts && npx playwright test e2e/flight.spec.js e2e/landing.spec.js`

@@ -129,7 +129,7 @@ export function drawHeatGlowOverlays(g: PIXI.Graphics, ps: ReadonlyPhysicsState,
 // ---------------------------------------------------------------------------
 
 interface LegLikeState {
-  legStates?: Map<string, { state: string; deployTimer: number }>;
+  legStates?: ReadonlyMap<string, { state: string; deployTimer: number }>;
 }
 
 function _getLegSide(placed: PlacedPart, assembly: ReadonlyAssembly): number {

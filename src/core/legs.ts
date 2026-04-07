@@ -235,7 +235,7 @@ export function getLegStatus(
 export function getDeployedLegFootOffset(
   instanceId: string,
   def: { width?: number; height?: number },
-  legStates: Map<string, LegEntry> | undefined,
+  legStates: ReadonlyMap<string, LegEntry> | undefined,
 ): { dx: number; dy: number; t: number } {
   let t = 0;
   const entry = legStates?.get(instanceId);
