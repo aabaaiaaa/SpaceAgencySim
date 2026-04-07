@@ -504,14 +504,14 @@ function _renderSelectedLegStruts(): void {
 
   // Remove previous selection leg graphics (tagged with __selLeg).
   for (let i = _ghostContainer.children.length - 1; i >= 0; i--) {
-    if ((_ghostContainer.children[i] as PIXI.Container & { __selLeg?: boolean }).__selLeg) {
+    if (_ghostContainer.children[i].label === '__selLeg') {
       _ghostContainer.removeChildAt(i);
     }
   }
 
   const { sx, sy } = _worldToScreen(_selLegWorldX, _selLegWorldY);
-  const g = new PIXI.Graphics() as PIXI.Graphics & { __selLeg?: boolean };
-  g.__selLeg = true;
+  const g = new PIXI.Graphics();
+  g.label = '__selLeg';
   _drawLegStruts(g, sx, sy, _selLegDef, _selLegAnimT, 0.7);
   _ghostContainer.addChild(g);
 }
@@ -539,7 +539,7 @@ export function vabClearSelectedLegAnimation(): void {
   // Remove selection leg graphics from ghost container.
   if (_ghostContainer) {
     for (let i = _ghostContainer.children.length - 1; i >= 0; i--) {
-      if ((_ghostContainer.children[i] as PIXI.Container & { __selLeg?: boolean }).__selLeg) {
+      if (_ghostContainer.children[i].label === '__selLeg') {
         _ghostContainer.removeChildAt(i);
       }
     }
@@ -887,7 +887,7 @@ export function vabClearDragGhost(): void {
   if (_ghostContainer) {
     // Preserve selected-leg graphics when clearing ghost.
     for (let i = _ghostContainer.children.length - 1; i >= 0; i--) {
-      if (!((_ghostContainer.children[i] as PIXI.Container & { __selLeg?: boolean }).__selLeg)) {
+      if (_ghostContainer.children[i].label !== '__selLeg') {
         _ghostContainer.removeChildAt(i);
       }
     }

@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 0,
+  "lastIteration": 1,
   "startedAt": "2026-04-06T23:44:48.505Z",
   "iteration": 1,
   "devloopVersion": "3.2.0",
   "activeTask": {
-    "taskId": "TASK-001",
-    "taskTitle": "Fix deprecated PixiJS v7 API in _debris.ts",
-    "iterationNumber": 1,
-    "startedAt": "2026-04-06T23:44:48.522Z"
+    "taskId": "TASK-002",
+    "taskTitle": "Full PixiJS v8 API audit across render layer",
+    "iterationNumber": 2,
+    "startedAt": "2026-04-06T23:47:38.258Z"
   }
 }

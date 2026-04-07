@@ -7,7 +7,7 @@
 - **Verification**: `npm run typecheck` passes with no cast workarounds in `_debris.ts`. Docking E2E test passes without runtime errors. If no docking E2E test covers this code path, add one and verify it passes.
 
 ### TASK-002: Full PixiJS v8 API audit across render layer
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001
 - **Description**: Audit all files in `src/render/` for deprecated PixiJS v7 API usage. Search for `beginFill`, `endFill`, `drawCircle`, `drawRect`, `drawRoundedRect`, `drawEllipse`, `drawPolygon`, `lineStyle`, `moveTo`, `lineTo`, `arcTo`, `bezierCurveTo`, `quadraticCurveTo`, and any `as PIXI.Graphics & { ... }` type casts. Fix all deprecated patterns found. See requirements Section 1.2.
 - **Verification**: `grep -r "beginFill\|endFill\|drawCircle\|drawRect\|lineStyle\|as PIXI.Graphics &" src/render/` returns no matches. `npm run typecheck` passes. `npm run test:e2e` passes.
