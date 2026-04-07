@@ -49,7 +49,7 @@
 - **Verification**: New unit tests pass: round-trip save/load with compression preserves data integrity, loading an uncompressed (pre-compression) save still works. `npm run test:unit` passes. `npm run build` succeeds.
 
 ### TASK-009: Generalize object pool for hub and VAB renderers
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Extend or generalize the flight object pool (`src/render/flight/_pool.ts`) so hub and VAB renderers can use it. Refactor `hub.ts:183-222` and `vab.ts:304,335,370` to reuse Graphics objects from the pool instead of creating new ones per frame. Ensure pool cleanup on renderer destroy. Existing flight pool behaviour must not change. See requirements Section 3.1.
 - **Verification**: `npm run test:unit` passes. `npm run test:e2e` passes. No `new PIXI.Graphics()` calls remain in `hub.ts` `_drawScene()` or VAB per-frame render paths.

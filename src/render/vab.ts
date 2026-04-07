@@ -29,6 +29,7 @@ import * as PIXI from 'pixi.js';
 import { getApp } from './index.js';
 import { PartType } from '../core/constants.js';
 import { getPartById } from '../data/parts.js';
+import { RendererPool } from './pool.js';
 import type { PlacedPart, SnapCandidate } from '../core/rocketbuilder.js';
 import type { ReadonlyAssembly } from './types.js';
 import type { PartDef } from '../data/parts.js';
@@ -100,6 +101,8 @@ const _camera: { x: number; y: number; zoom: number } = { x: 0, y: 0, zoom: 1 };
 let _vabRoot: PIXI.Container | null = null;
 
 let _grid: PIXI.Graphics | null = null;
+
+const _pool = new RendererPool();
 
 // ---------------------------------------------------------------------------
 // Part rendering objects
@@ -272,14 +275,13 @@ function _drawPart(g: PIXI.Graphics, placed: PlacedPart, def: PartDef, picked: b
 function _makePartLabel(placed: PlacedPart, def: PartDef): PIXI.Text {
   const { sx, sy } = _worldToScreen(placed.x, placed.y);
 
-  const label = new PIXI.Text({
-    text: def.name,
-    style: new PIXI.TextStyle({
-      fill: '#c0ddf0',
-      fontSize: 48,
-      fontFamily: 'Courier New, Courier, monospace',
-      fontWeight: 'bold',
-    }),
+  const label = _pool.acquireText();
+  label.text = def.name;
+  label.style = new PIXI.TextStyle({
+    fill: '#c0ddf0',
+    fontSize: 48,
+    fontFamily: 'Courier New, Courier, monospace',
+    fontWeight: 'bold',
   });
   label.anchor.set(0.5, 0.5);
   label.scale.set(10 / 48);
@@ -294,14 +296,11 @@ function _makePartLabel(placed: PlacedPart, def: PartDef): PIXI.Text {
 function _renderPartsLayer(): void {
   if (!_partsContainer) return;
 
-  // Remove all children.
-  while (_partsContainer.children.length) {
-    _partsContainer.removeChildAt(0);
-  }
+  _pool.releaseContainerChildren(_partsContainer);
 
   if (!_assembly) return;
 
-  const g = new PIXI.Graphics();
+  const g = _pool.acquireGraphics();
   _partsContainer.addChild(g);
 
   for (const placed of _assembly.parts.values()) {
@@ -323,7 +322,7 @@ function _renderPartsLayer(): void {
  */
 function _renderGhostLayer(): void {
   if (!_ghostContainer) return;
-  while (_ghostContainer.children.length) _ghostContainer.removeChildAt(0);
+  _pool.releaseContainerChildren(_ghostContainer);
   if (!_ghostPartId) return;
 
   const def = getPartById(_ghostPartId);
@@ -332,7 +331,7 @@ function _renderGhostLayer(): void {
   const sw = def.width  * _camera.zoom;
   const sh = def.height * _camera.zoom;
 
-  const g = new PIXI.Graphics();
+  const g = _pool.acquireGraphics();
   g.rect(_ghostSX - sw / 2, _ghostSY - sh / 2, sw, sh);
   g.fill({ color: PART_FILL[def.type] ?? 0x1a4080, alpha: 0.7 });
   g.stroke({ color: PART_STROKE[def.type] ?? 0x4090d0, width: 1 });
@@ -344,14 +343,13 @@ function _renderGhostLayer(): void {
 
   _ghostContainer.addChild(g);
 
-  const label = new PIXI.Text({
-    text: def.name,
-    style: new PIXI.TextStyle({
-      fill: '#c0ddf0',
-      fontSize: 48,
-      fontFamily: 'Courier New, Courier, monospace',
-      fontWeight: 'bold',
-    }),
+  const label = _pool.acquireText();
+  label.text = def.name;
+  label.style = new PIXI.TextStyle({
+    fill: '#c0ddf0',
+    fontSize: 48,
+    fontFamily: 'Courier New, Courier, monospace',
+    fontWeight: 'bold',
   });
   label.anchor.set(0.5, 0.5);
   label.scale.set(10 / 48);
@@ -367,7 +365,7 @@ function _renderGhostLayer(): void {
       const msw = mDef.width  * _camera.zoom;
       const msh = mDef.height * _camera.zoom;
 
-      const mg = new PIXI.Graphics();
+      const mg = _pool.acquireGraphics();
       mg.rect(msx - msw / 2, msy - msh / 2, msw, msh);
       mg.fill({ color: PART_FILL[mDef.type] ?? 0x1a4080, alpha: 0.4 });
       mg.stroke({ color: PART_STROKE[mDef.type] ?? 0x4090d0, width: 1, alpha: 0.5 });
@@ -379,14 +377,13 @@ function _renderGhostLayer(): void {
 
       _ghostContainer.addChild(mg);
 
-      const mLabel = new PIXI.Text({
-        text: mDef.name,
-        style: new PIXI.TextStyle({
-          fill: '#c0ddf0',
-          fontSize: 48,
-          fontFamily: 'Courier New, Courier, monospace',
-          fontWeight: 'bold',
-        }),
+      const mLabel = _pool.acquireText();
+      mLabel.text = mDef.name;
+      mLabel.style = new PIXI.TextStyle({
+        fill: '#c0ddf0',
+        fontSize: 48,
+        fontFamily: 'Courier New, Courier, monospace',
+        fontWeight: 'bold',
       });
       mLabel.anchor.set(0.5, 0.5);
       mLabel.scale.set(10 / 48);
@@ -504,13 +501,15 @@ function _renderSelectedLegStruts(): void {
 
   // Remove previous selection leg graphics (tagged with __selLeg).
   for (let i = _ghostContainer.children.length - 1; i >= 0; i--) {
-    if (_ghostContainer.children[i].label === '__selLeg') {
+    const child = _ghostContainer.children[i];
+    if (child.label === '__selLeg') {
       _ghostContainer.removeChildAt(i);
+      if (child instanceof PIXI.Graphics) _pool.releaseGraphics(child);
     }
   }
 
   const { sx, sy } = _worldToScreen(_selLegWorldX, _selLegWorldY);
-  const g = new PIXI.Graphics();
+  const g = _pool.acquireGraphics();
   g.label = '__selLeg';
   _drawLegStruts(g, sx, sy, _selLegDef, _selLegAnimT, 0.7);
   _ghostContainer.addChild(g);
@@ -539,8 +538,10 @@ export function vabClearSelectedLegAnimation(): void {
   // Remove selection leg graphics from ghost container.
   if (_ghostContainer) {
     for (let i = _ghostContainer.children.length - 1; i >= 0; i--) {
-      if (_ghostContainer.children[i].label === '__selLeg') {
+      const child = _ghostContainer.children[i];
+      if (child.label === '__selLeg') {
         _ghostContainer.removeChildAt(i);
+        if (child instanceof PIXI.Graphics) _pool.releaseGraphics(child);
       }
     }
   }
@@ -556,10 +557,10 @@ export function vabClearSelectedLegAnimation(): void {
  */
 function _renderSnapLayer(): void {
   if (!_snapContainer) return;
-  while (_snapContainer.children.length) _snapContainer.removeChildAt(0);
+  _pool.releaseContainerChildren(_snapContainer);
   if (_snapCandidates.length === 0) return;
 
-  const g = new PIXI.Graphics();
+  const g = _pool.acquireGraphics();
   _snapContainer.addChild(g);
 
   // Highlight the best (closest) candidate with a bright ring.

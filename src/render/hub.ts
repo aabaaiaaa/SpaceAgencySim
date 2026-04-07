@@ -16,6 +16,7 @@
 
 import * as PIXI from 'pixi.js';
 import { getApp } from './index.js';
+import { RendererPool } from './pool.js';
 
 // ---------------------------------------------------------------------------
 // Colours
@@ -115,6 +116,7 @@ let _hubRoot: PIXI.Container | null = null;
 let _weatherVisibility = 0;
 let _weatherExtreme = false;
 let _builtFacilities: Set<string> | null = null;
+const _pool = new RendererPool();
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -173,24 +175,24 @@ export function hideHubScene(): void {
 function _drawScene(): void {
   if (!_hubRoot) return;
 
-  _hubRoot.removeChildren();
+  _pool.releaseContainerChildren(_hubRoot);
 
   const app     = getApp();
   const W       = app.screen.width;
   const H       = app.screen.height;
   const groundY = Math.round(H * GROUND_Y_PCT);
 
-  const sky = new PIXI.Graphics();
+  const sky = _pool.acquireGraphics();
   sky.rect(0, 0, W, groundY);
   sky.fill(SKY_COLOR);
   _hubRoot.addChild(sky);
 
-  const ground = new PIXI.Graphics();
+  const ground = _pool.acquireGraphics();
   ground.rect(0, groundY, W, H - groundY);
   ground.fill(GROUND_COLOR);
   _hubRoot.addChild(ground);
 
-  const groundLine = new PIXI.Graphics();
+  const groundLine = _pool.acquireGraphics();
   groundLine.moveTo(0, groundY);
   groundLine.lineTo(W, groundY);
   groundLine.stroke({ color: GROUND_LINE_COLOR, width: 2 });
@@ -204,7 +206,7 @@ function _drawScene(): void {
     const bldX = W * bld.xCenterPct - bldW / 2;
     const bldY = groundY - bldH;
 
-    const g = new PIXI.Graphics();
+    const g = _pool.acquireGraphics();
     g.rect(bldX, bldY, bldW, bldH);
     g.fill({ color: bld.colorFill, alpha: 0.9 });
     g.stroke({ color: bld.colorStroke, width: 2 });
@@ -214,7 +216,7 @@ function _drawScene(): void {
   if (_weatherVisibility > 0.01) {
     const hazeAlpha = Math.min(0.6, _weatherVisibility * 0.6);
     const hazeColor = _weatherExtreme ? 0x604030 : 0xc0c0c0;
-    const haze = new PIXI.Graphics();
+    const haze = _pool.acquireGraphics();
     haze.rect(0, 0, W, H);
     haze.fill({ color: hazeColor, alpha: hazeAlpha });
     _hubRoot.addChild(haze);
