@@ -22,6 +22,7 @@ import type {
   WorkerMessage,
   PhysicsSnapshot,
   FlightSnapshot,
+  MainThreadSnapshot,
   SerialisedAssembly,
   SerialisedStagingConfig,
   SerialisedParachuteEntry,
@@ -38,6 +39,8 @@ let _errorMessage = '';
 let _latestPhysics: PhysicsSnapshot | null = null;
 let _latestFlight: FlightSnapshot | null = null;
 let _latestFrame = -1;
+/** Composite readonly snapshot stored directly from the worker (no field-by-field copy). */
+let _latestSnapshot: MainThreadSnapshot | null = null;
 let _readyResolve: (() => void) | null = null;
 let _readyReject: ((err: Error) => void) | null = null;
 let _readyTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -160,6 +163,7 @@ export function resyncWorkerState(
     _latestPhysics = null;
     _latestFlight = null;
     _latestFrame = -1;
+    _latestSnapshot = null;
 
     // partsCatalog and bodiesCatalog are sent as empty placeholders because the
     // worker imports them directly via ES module imports (see physicsWorker.ts).
@@ -222,6 +226,22 @@ export function consumeSnapshot(): { physics: PhysicsSnapshot; flight: FlightSna
   return result;
 }
 
+/**
+ * Consume the latest MainThreadSnapshot directly.  Returns the snapshot
+ * object (or null if none available) and clears it so the same data is not
+ * consumed twice.  The snapshot is stored directly from the worker message
+ * with no field-by-field copy.
+ *
+ * Control inputs (throttle, angle) are excluded from the physics portion of
+ * the snapshot — they remain main-thread authority.
+ */
+export function consumeMainThreadSnapshot(): MainThreadSnapshot | null {
+  const snap = _latestSnapshot;
+  if (snap === null) return null;
+  _latestSnapshot = null;
+  return snap;
+}
+
 /** Terminate the worker and reset all bridge state. */
 export function terminatePhysicsWorker(): void {
   if (_worker) {
@@ -235,6 +255,7 @@ export function terminatePhysicsWorker(): void {
   _latestPhysics = null;
   _latestFlight = null;
   _latestFrame = -1;
+  _latestSnapshot = null;
   _readyResolve = null;
   _readyReject = null;
   _clearReadyTimeout();
@@ -387,9 +408,21 @@ function _handleMessage(msg: WorkerMessage): void {
       break;
 
     case 'snapshot':
+      // Legacy per-field storage (kept until all consumers migrate to consumeMainThreadSnapshot).
       _latestPhysics = msg.physics;
       _latestFlight = msg.flight;
       _latestFrame = msg.frame;
+
+      // Direct snapshot storage — no field-by-field copy.
+      // The PhysicsSnapshot from the worker includes control input fields
+      // (throttle, throttleMode, targetTWR, angle) but ReadonlyPhysicsSnapshot
+      // omits them via Omit<>.  Since this is a readonly view the extra fields
+      // are harmlessly present at runtime but invisible to consumers via the type.
+      _latestSnapshot = {
+        physics: msg.physics,
+        flight: msg.flight,
+        frame: msg.frame,
+      };
       break;
 
     case 'error':

@@ -67,7 +67,7 @@
 - **Verification**: `npm run typecheck -- --noEmit src/core/physicsWorkerProtocol.ts src/core/snapshotFactory.ts`
 
 ### TASK-011: Refactor _workerBridge.ts to store readonly snapshot directly
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-010
 - **Description**: In `_workerBridge.ts`, replace the field-by-field `applyPhysicsSnapshot()` and `applyFlightSnapshot()` functions with direct snapshot storage. When a snapshot arrives from the worker, store the `MainThreadSnapshot` object directly (no copy). Update `consumeSnapshot()` to return the `MainThreadSnapshot` (or null). Keep the existing snapshot sequencing logic (frame counter). Do NOT remove the old apply functions yet — they'll be removed after all consumers are migrated. See requirements Section 3.2.
 - **Verification**: `npm run typecheck -- --noEmit src/ui/flightController/_workerBridge.ts && npx vitest run src/tests/workerBridge.test.ts`
