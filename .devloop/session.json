@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 0,
+  "lastIteration": 1,
   "startedAt": "2026-04-07T15:37:33.988Z",
   "iteration": 2,
   "devloopVersion": "3.4.0",
   "activeTask": {
-    "taskId": "TASK-001",
-    "taskTitle": "Add timeout to Web Worker ready Promise",
-    "iterationNumber": 1,
-    "startedAt": "2026-04-07T15:37:34.018Z"
+    "taskId": "TASK-002",
+    "taskTitle": "Extract _escapeHtml to shared utility",
+    "iterationNumber": 2,
+    "startedAt": "2026-04-07T15:39:10.228Z"
   }
 }

@@ -23,6 +23,7 @@ import {
   getCelestialBodyKnowledge,
   getFrequentRockets,
 } from '../core/library.ts';
+import { escapeHtml } from './escapeHtml.ts';
 import './library.css';
 import type { GameState } from '../core/gameState.ts';
 
@@ -312,7 +313,7 @@ function _renderStatsTab(content: HTMLDivElement): void {
         const statusColor = c.status === 'DEAD' || c.status === 'kia'
           ? '#ff6060' : c.status === 'INJURED' ? '#ffaa30' : '#60dd80';
         tr.innerHTML = `
-          <td style="font-weight:600">${_esc(c.name)}</td>
+          <td style="font-weight:600">${escapeHtml(c.name)}</td>
           <td style="color:${statusColor}">${c.status}</td>
           <td class="num">${c.flightsFlown}</td>
           <td class="num">${c.skills.piloting}</td>
@@ -582,10 +583,4 @@ function _fmtDate(isoStr: string): string {
   } catch {
     return '\u2014';
   }
-}
-
-function _esc(str: string): string {
-  const div: HTMLDivElement = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
 }

@@ -36,6 +36,7 @@ import { GameMode, FACILITY_DEFINITIONS, SANDBOX_STARTING_MONEY } from '../core/
 import { getAllParts } from '../data/parts.ts';
 import { TECH_NODES } from '../data/techtree.ts';
 import { logger } from '../core/logger.ts';
+import { escapeHtml } from './escapeHtml.ts';
 import './mainmenu.css';
 import type { GameState, SandboxSettings } from '../core/gameState.ts';
 import type { SaveSlotSummary } from '../core/saveload.ts';
@@ -329,8 +330,8 @@ function _buildSaveCard(summary: SaveSlotSummary): HTMLDivElement {
     : '';
 
   card.innerHTML = `
-    <p class="mm-save-card-name">${_escapeHtml(summary.saveName)} ${modeBadge}</p>
-    ${summary.agencyName ? `<p class="mm-save-card-agency" data-agency-name="${_escapeHtml(summary.agencyName)}">${_escapeHtml(summary.agencyName)}</p>` : ''}
+    <p class="mm-save-card-name">${escapeHtml(summary.saveName)} ${modeBadge}</p>
+    ${summary.agencyName ? `<p class="mm-save-card-agency" data-agency-name="${escapeHtml(summary.agencyName)}">${escapeHtml(summary.agencyName)}</p>` : ''}
     <p class="mm-save-card-date">Saved ${formatDate(summary.timestamp)}${versionBadge}</p>
     <div class="mm-save-card-stats">
       <div class="mm-stat">
@@ -609,7 +610,7 @@ function _handleExport(slotIndex: number): void {
 function _handleDeleteConfirm(slotIndex: number, saveName: string): void {
   _showConfirmModal(
     'Delete Save',
-    `Are you sure you want to delete "${_escapeHtml(saveName)}"? This cannot be undone.`,
+    `Are you sure you want to delete "${escapeHtml(saveName)}"? This cannot be undone.`,
     'Delete',
     () => {
       try {
@@ -753,10 +754,10 @@ function _showConfirmModal(title: string, body: string, confirmText: string, onC
   backdrop.className = 'mm-modal-backdrop';
   backdrop.innerHTML = `
     <div class="mm-modal" role="dialog" aria-modal="true">
-      <p class="mm-modal-title">${_escapeHtml(title)}</p>
+      <p class="mm-modal-title">${escapeHtml(title)}</p>
       <p class="mm-modal-body">${body}</p>
       <div class="mm-modal-actions">
-        <button class="mm-btn mm-btn-danger" id="mm-modal-confirm">${_escapeHtml(confirmText)}</button>
+        <button class="mm-btn mm-btn-danger" id="mm-modal-confirm">${escapeHtml(confirmText)}</button>
         <button class="mm-btn mm-btn-secondary" id="mm-modal-cancel">Cancel</button>
       </div>
     </div>
@@ -817,17 +818,3 @@ function _showMessage(container: HTMLElement, message: string, type: 'error' | '
   container.textContent = message;
 }
 
-// ---------------------------------------------------------------------------
-// Private — utility
-// ---------------------------------------------------------------------------
-
-/**
- * Escapes a string for safe insertion as HTML text content.
- */
-function _escapeHtml(str: string): string {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}

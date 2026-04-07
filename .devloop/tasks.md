@@ -9,7 +9,7 @@
 - **Verification**: `npx vitest run src/tests/workerBridge.test.ts`
 
 ### TASK-002: Extract _escapeHtml to shared utility
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Create `src/ui/escapeHtml.ts` exporting `escapeHtml(str: string): string` using the regex approach from `mainmenu.ts:827-833` (escapes `&`, `<`, `>`, `"`). Update `mainmenu.ts` to import from the shared utility and remove its local `_escapeHtml()`. Update `library.ts` to import from the shared utility and remove its local `_esc()`. Add a comment at the top of `escapeHtml.ts` documenting the innerHTML audit results. See requirements Section 1.2.
 - **Verification**: `npx vitest run src/tests/escapeHtml.test.ts && npx vitest run src/tests/mainmenu.test.ts && npx vitest run src/tests/library.test.ts`
