@@ -111,7 +111,7 @@
 - **Verification**: `npx vitest run src/tests/perfMonitor.test.ts`
 
 ### TASK-016: Create performance dashboard UI overlay
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-015
 - **Description**: Create `src/ui/perfDashboard.ts` and `src/ui/perfDashboard.css` with: (1) A semi-transparent overlay in the top-right corner. (2) Display: FPS (large, current/avg/min), frame time (ms), worker latency (ms), memory (MB). (3) Frame time histogram as 4 CSS bar elements. (4) Updates every 500ms via `setInterval` (not every frame). (5) `showPerfDashboard()` / `hidePerfDashboard()` / `togglePerfDashboard()` exports. (6) Lazy DOM creation — elements only created on first show. (7) Cleanup: `destroyPerfDashboard()` removes elements and clears interval. Use `createListenerTracker()` for event cleanup. See requirements Section 4.2.
 - **Verification**: `npx vitest run src/tests/perfDashboard.test.ts`

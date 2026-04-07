@@ -1,0 +1,99 @@
+/* perfDashboard.css — Performance dashboard overlay */
+
+#perf-dashboard {
+  position: fixed;
+  top: calc(var(--topbar-height, 44px) + 8px);
+  right: 8px;
+  z-index: calc(var(--z-flight-hud, 90) + 2);
+  background: rgba(0, 0, 0, 0.72);
+  border: 1px solid rgba(100, 200, 100, 0.25);
+  border-radius: var(--radius-md, 6px);
+  padding: var(--space-sm, 8px) var(--space-md, 12px);
+  font-family: monospace;
+  color: #a8e8c0;
+  pointer-events: none;
+  user-select: none;
+  min-width: 160px;
+}
+
+.perf-fps-large {
+  font-size: 1.4rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: var(--space-xs, 4px);
+}
+
+.perf-fps-details {
+  font-size: var(--font-size-tiny, 0.72rem);
+  color: var(--color-text-secondary, #8898b0);
+  line-height: 1.4;
+  margin-bottom: var(--space-sm, 8px);
+}
+
+.perf-metrics {
+  font-size: var(--font-size-tiny, 0.72rem);
+  line-height: 1.5;
+  margin-bottom: var(--space-sm, 8px);
+}
+
+.perf-metric-label {
+  color: var(--color-text-secondary, #8898b0);
+}
+
+.perf-metric-value {
+  color: #a8e8c0;
+}
+
+/* Histogram section */
+.perf-histogram {
+  margin-top: var(--space-xs, 4px);
+}
+
+.perf-histogram-title {
+  font-size: var(--font-size-tiny, 0.72rem);
+  color: var(--color-text-secondary, #8898b0);
+  margin-bottom: var(--space-xs, 4px);
+}
+
+.perf-histogram-bars {
+  display: flex;
+  gap: 3px;
+  align-items: flex-end;
+  height: 32px;
+}
+
+.perf-histogram-bar {
+  flex: 1;
+  min-height: 2px;
+  border-radius: 2px 2px 0 0;
+  transition: height 0.3s ease;
+}
+
+.perf-histogram-bar--0to8 {
+  background: #50d870;
+}
+
+.perf-histogram-bar--8to16 {
+  background: #80c8ff;
+}
+
+.perf-histogram-bar--16to33 {
+  background: #d8b860;
+}
+
+.perf-histogram-bar--33plus {
+  background: #e86060;
+}
+
+.perf-histogram-labels {
+  display: flex;
+  gap: 3px;
+  margin-top: 2px;
+}
+
+.perf-histogram-label {
+  flex: 1;
+  font-size: 0.6rem;
+  text-align: center;
+  color: var(--color-text-muted, #6080a0);
+}
