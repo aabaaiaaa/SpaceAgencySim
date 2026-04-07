@@ -24,6 +24,7 @@ import {
 } from '../core/constants.ts';
 import { getFacilityTier } from '../core/construction.ts';
 import { refreshTopBar } from './topbar.ts';
+import { createListenerTracker, type ListenerTracker } from './listenerTracker.ts';
 import './crewAdmin.css';
 import type { GameState } from '../core/gameState.ts';
 
@@ -99,8 +100,8 @@ let _onBack: (() => void) | null = null;
 /** Currently active tab id: 'active' | 'hire' | 'history' | 'training' */
 let _activeTab: string = 'active';
 
-/** Stored Escape key handler for cleanup. */
-let _escapeHandler: ((e: KeyboardEvent) => void) | null = null;
+/** Listener tracker for bulk cleanup on destroy. */
+let _tracker: ListenerTracker | null = null;
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -114,6 +115,8 @@ export function initCrewAdminUI(container: HTMLElement, state: GameState, { onBa
   _onBack  = onBack;
   _activeTab = 'active';
 
+  _tracker = createListenerTracker();
+
   _overlay = document.createElement('div');
   _overlay.id = 'crew-admin-overlay';
   container.appendChild(_overlay);
@@ -122,23 +125,22 @@ export function initCrewAdminUI(container: HTMLElement, state: GameState, { onBa
   _renderActiveTab();
 
   // Escape key closes the panel.
-  _escapeHandler = (e: KeyboardEvent): void => {
+  _tracker.add(document, 'keydown', ((e: KeyboardEvent): void => {
     if (e.key !== 'Escape') return;
     e.preventDefault();
     const onBack = _onBack;
     destroyCrewAdminUI();
     if (onBack) onBack();
-  };
-  document.addEventListener('keydown', _escapeHandler);
+  }) as EventListener);
 }
 
 /**
  * Remove the Crew Administration overlay from the DOM.
  */
 export function destroyCrewAdminUI(): void {
-  if (_escapeHandler) {
-    document.removeEventListener('keydown', _escapeHandler);
-    _escapeHandler = null;
+  if (_tracker) {
+    _tracker.removeAll();
+    _tracker = null;
   }
   if (_overlay) {
     _overlay.remove();
@@ -166,7 +168,7 @@ function _renderShell(): void {
   const backBtn = document.createElement('button');
   backBtn.id = 'crew-admin-back-btn';
   backBtn.textContent = '\u2190 Hub';
-  backBtn.addEventListener('click', () => {
+  _tracker!.add(backBtn, 'click', () => {
     const onBack = _onBack; // capture before destroy nulls it
     destroyCrewAdminUI();
     if (onBack) onBack();
@@ -220,7 +222,7 @@ function _renderShell(): void {
     btn.className = 'crew-admin-tab' + (tab.id === _activeTab ? ' active' : '');
     btn.dataset.tabId = tab.id;
     btn.textContent = tab.label;
-    btn.addEventListener('click', () => _switchTab(tab.id));
+    _tracker!.add(btn, 'click', () => _switchTab(tab.id));
     tabBar.appendChild(btn);
   }
 
@@ -327,7 +329,7 @@ function _renderActiveTab(): void {
       const medBtn = document.createElement('button');
       medBtn.className = 'crew-medical-btn';
       medBtn.textContent = crewAdminTier >= 3 ? 'Adv. Medical' : 'Medical';
-      medBtn.addEventListener('click', () => {
+      _tracker!.add(medBtn, 'click', () => {
         const result = crewAdminTier >= 3
           ? payAdvancedMedicalCare(_state!, astronaut.id)
           : payMedicalCare(_state!, astronaut.id);
@@ -362,7 +364,7 @@ function _renderActiveTab(): void {
     fireBtn.className = 'crew-fire-btn';
     fireBtn.textContent = 'Fire';
     fireBtn.dataset.crewId = astronaut.id;
-    fireBtn.addEventListener('click', () => _handleFire(astronaut.id));
+    _tracker!.add(fireBtn, 'click', () => _handleFire(astronaut.id));
     actionTd.appendChild(fireBtn);
     tr.appendChild(actionTd);
 
@@ -479,7 +481,7 @@ function _renderHireTab(): void {
   nameCounter.textContent = '0 / 60';
   formGroup.appendChild(nameCounter);
 
-  nameInput.addEventListener('input', () => {
+  _tracker!.add(nameInput, 'input', () => {
     const len = nameInput.value.length;
     nameCounter.textContent = `${len} / 60`;
     nameCounter.classList.toggle('warning', len >= 55);
@@ -499,7 +501,7 @@ function _renderHireTab(): void {
   feedback.className = 'hire-feedback';
   panel.appendChild(feedback);
 
-  hireBtn.addEventListener('click', () => {
+  _tracker!.add(hireBtn, 'click', () => {
     if (!_state) return;
     const rawName = nameInput.value.trim();
     const name    = rawName.length > 0 ? rawName : generateRandomName();
@@ -574,7 +576,7 @@ function _renderHireTab(): void {
     expFeedback.className = 'hire-feedback';
     expSection.appendChild(expFeedback);
 
-    expBtn.addEventListener('click', () => {
+    _tracker!.add(expBtn, 'click', () => {
       if (!_state) return;
       const rawName = expNameInput.value.trim();
       const name = rawName.length > 0 ? rawName : generateRandomName();
@@ -670,7 +672,7 @@ function _renderTrainingTab(): void {
       const cancelBtn = document.createElement('button');
       cancelBtn.className = 'training-cancel-btn';
       cancelBtn.textContent = 'Cancel Course';
-      cancelBtn.addEventListener('click', () => {
+      _tracker!.add(cancelBtn, 'click', () => {
         cancelTraining(_state!, astronaut.id);
         _renderTrainingTab();
         refreshTopBar();
@@ -736,7 +738,7 @@ function _renderTrainingTab(): void {
       assignBtn.className = 'training-assign-btn';
       assignBtn.textContent = `Enrol (${fmtCash(TRAINING_COURSE_COST)})`;
       assignBtn.disabled = !slotsAvailable;
-      assignBtn.addEventListener('click', () => {
+      _tracker!.add(assignBtn, 'click', () => {
         const result = assignToTraining(_state!, astronaut.id, select.value as 'piloting' | 'engineering' | 'science');
         if (result.success) {
           _renderTrainingTab();

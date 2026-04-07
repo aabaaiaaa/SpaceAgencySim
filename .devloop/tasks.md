@@ -103,7 +103,7 @@
 - **Verification**: `npm run build` succeeds. `npm run dev` starts without errors. `npm run typecheck` passes. `npm run test:unit` passes.
 
 ### TASK-018: Standardize event listener cleanup in crewAdmin.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Migrate `crewAdmin.ts` from direct `addEventListener` calls to use `createListenerTracker()`, matching the pattern used by all other UI modules. See requirements Section 5.1.
 - **Verification**: No direct `addEventListener` calls remain in `crewAdmin.ts` (only tracker-mediated calls). Crew admin panel e2e tests pass.
