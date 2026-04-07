@@ -131,7 +131,7 @@
 - **Verification**: `npx vitest run src/tests/workerBridgeTimeout.test.ts src/tests/escapeHtml.test.ts src/tests/perfMonitor.test.ts src/tests/snapshotFactory.test.ts`
 
 ### TASK-019: Verification pass — run all checks
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-009, TASK-014b, TASK-017, TASK-018
 - **Description**: Run the full verification suite: (1) `npm run typecheck` — no errors. (2) `npm run lint` — no errors. (3) `npm run test:unit` — all tests pass. (4) Targeted E2E specs covering all changed areas. (5) `npm run build` — production build succeeds. (6) Coverage meets thresholds for core (89%/80%/91%), render (50%/40%), and UI (50%/40%). Fix any failures found. See requirements Section 6.
 - **Verification**: `npm run typecheck && npm run lint && npm run test:unit && npx playwright test e2e/flight.spec.js e2e/phase-transitions.spec.js e2e/orbital-operations.spec.js e2e/collision.spec.js e2e/landing.spec.js e2e/fps-monitor.spec.js e2e/saveload.spec.js e2e/crew.spec.js && npm run build`
