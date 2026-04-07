@@ -162,6 +162,20 @@
   margin: 0 0 14px;
 }
 
+.mm-version-warning {
+  display: inline-block;
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  margin-left: 8px;
+  border-radius: 3px;
+  vertical-align: middle;
+  letter-spacing: 0.04em;
+  background: rgba(230, 160, 50, 0.2);
+  color: var(--color-warning, #e6a030);
+  border: 1px solid rgba(230, 160, 50, 0.4);
+}
+
 .mm-save-card-stats {
   display: grid;
   grid-template-columns: 1fr 1fr;

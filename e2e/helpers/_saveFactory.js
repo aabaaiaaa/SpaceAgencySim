@@ -16,6 +16,7 @@ import { STARTING_MONEY, STARTER_FACILITIES } from './_constants.js';
  * by overriding the relevant fields.
  */
 export function buildSaveEnvelope({
+  version         = 1,
   saveName        = 'E2E Test',
   money           = STARTING_MONEY,
   missions        = { available: [], accepted: [], completed: [] },
@@ -57,6 +58,7 @@ export function buildSaveEnvelope({
   return {
     saveName,
     timestamp: new Date().toISOString(),
+    version,
     state: {
       agencyName,
       money,

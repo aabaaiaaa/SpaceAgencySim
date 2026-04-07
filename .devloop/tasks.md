@@ -31,7 +31,7 @@
 - **Verification**: `npm run typecheck` passes. `npm run test:unit` passes. `npm run test:e2e` passes. No fire-and-forget `idbSet()` calls remain on the fallback path in `saveload.ts`.
 
 ### TASK-006: Add save version indicator on save slots
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-005
 - **Description**: In the save/load UI, display the save version on each save slot. If the version doesn't match the current `SAVE_VERSION`, show a visual warning indicator (badge, colour change, or label). The indicator is informational, not blocking. See requirements Section 2.2.
 - **Verification**: E2E test or manual verification: a save from a different version displays the version mismatch indicator. A save from the current version shows no warning. `npm run test:e2e` passes.

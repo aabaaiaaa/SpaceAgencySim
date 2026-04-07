@@ -105,6 +105,8 @@ export interface SaveSlotSummary {
   flightTimeSeconds: number;
   /** Game mode ('tutorial', 'freeplay', or 'sandbox'). */
   gameMode: string;
+  /** Save format version (0 for pre-versioning saves). */
+  version: number;
 }
 
 /** Raw save envelope stored in localStorage. */
@@ -174,6 +176,7 @@ function summaryFromEnvelope(slotIndex: number, envelope: SaveEnvelope): SaveSlo
     playTimeSeconds: s.playTimeSeconds ?? 0,
     flightTimeSeconds: s.flightTimeSeconds ?? 0,
     gameMode: s.gameMode ?? (s.tutorialMode ? GameMode.TUTORIAL : GameMode.FREEPLAY),
+    version: envelope.version ?? 0,
   };
 }
 

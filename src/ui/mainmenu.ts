@@ -28,6 +28,7 @@ import {
   exportSave,
   importSave,
   SAVE_SLOT_COUNT,
+  SAVE_VERSION,
 } from '../core/saveload.js';
 import { createGameState } from '../core/gameState.js';
 import { initializeMissions, reconcileParts } from '../core/missions.js';
@@ -322,10 +323,15 @@ function _buildSaveCard(summary: SaveSlotSummary): HTMLDivElement {
       ? '<span class="mm-mode-badge mm-mode-tutorial">TUTORIAL</span>'
       : '<span class="mm-mode-badge mm-mode-freeplay">FREE PLAY</span>';
 
+  const versionMismatch = summary.version !== SAVE_VERSION;
+  const versionBadge = versionMismatch
+    ? `<span class="mm-version-warning" data-testid="version-warning">v${summary.version} (current: v${SAVE_VERSION})</span>`
+    : '';
+
   card.innerHTML = `
     <p class="mm-save-card-name">${_escapeHtml(summary.saveName)} ${modeBadge}</p>
     ${summary.agencyName ? `<p class="mm-save-card-agency" data-agency-name="${_escapeHtml(summary.agencyName)}">${_escapeHtml(summary.agencyName)}</p>` : ''}
-    <p class="mm-save-card-date">Saved ${formatDate(summary.timestamp)}</p>
+    <p class="mm-save-card-date">Saved ${formatDate(summary.timestamp)}${versionBadge}</p>
     <div class="mm-save-card-stats">
       <div class="mm-stat">
         <span class="mm-stat-label">Cash</span>

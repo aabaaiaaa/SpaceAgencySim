@@ -26,7 +26,7 @@
  */
 
 import { payDownLoan, borrowMore } from '../core/finance.js';
-import { saveGame, loadGame, listSaves, SAVE_SLOT_COUNT } from '../core/saveload.js';
+import { saveGame, loadGame, listSaves, SAVE_SLOT_COUNT, SAVE_VERSION } from '../core/saveload.js';
 import { reconcileParts } from '../core/missions.js';
 import { GameMode, MAX_LOAN_BALANCE } from '../core/constants.js';
 import { getPartById } from '../data/parts.js';
@@ -948,6 +948,14 @@ function _openSaveSlotPicker(): void {
 
       info.appendChild(name);
       info.appendChild(detail);
+
+      if (slot.version !== SAVE_VERSION) {
+        const versionWarn: HTMLSpanElement = document.createElement('span');
+        versionWarn.className = 'save-version-warning';
+        versionWarn.dataset.testid = 'version-warning';
+        versionWarn.textContent = `v${slot.version} (current: v${SAVE_VERSION})`;
+        info.appendChild(versionWarn);
+      }
     } else {
       const name: HTMLElement = document.createElement('strong');
       name.textContent = `Slot ${i + 1}`;
@@ -1026,6 +1034,14 @@ function _doLoadGame(): void {
 
       info.appendChild(name);
       info.appendChild(detail);
+
+      if (slot.version !== SAVE_VERSION) {
+        const versionWarn: HTMLSpanElement = document.createElement('span');
+        versionWarn.className = 'save-version-warning';
+        versionWarn.dataset.testid = 'version-warning';
+        versionWarn.textContent = `v${slot.version} (current: v${SAVE_VERSION})`;
+        info.appendChild(versionWarn);
+      }
     } else {
       const name: HTMLElement = document.createElement('strong');
       name.textContent = `Slot ${i + 1}`;
