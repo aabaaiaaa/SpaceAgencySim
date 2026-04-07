@@ -1,287 +1,202 @@
-# Iteration 3 — Final Code Review
+# Iteration 4 — Final Code Review
 
-**Date:** 2026-04-04
-**Scope:** Full codebase review against Iteration 3 requirements
-**Codebase:** ~60,400 lines of TypeScript across 154 source modules, 64 unit test files (2,815 tests), 37 E2E spec files
-
----
-
-## 1. Requirements vs Implementation
-
-### 1.1 Requirement Completion Matrix
-
-All 32 tasks have status `done`. Below is the requirement-by-requirement assessment.
-
-| Req | Section | Description | Status | Notes |
-|-----|---------|-------------|--------|-------|
-| 1.1 | Error Handling | Flight controller loop try-catch | **Complete** | `_loop.ts` has consecutive error counter + abort banner |
-| 1.2 | Error Handling | Defensive guards in designLibrary/flightReturn | **Complete** | Null coalescing guards present |
-| 1.3 | Error Handling | Orbital mechanics safety (sqrt clamp, synodic cap) | **Complete** | `orbit.ts` uses `Math.max(0, 1 - e*e)` and caps T_syn |
-| 1.4 | Error Handling | PixiJS pool fix for dockingTargetGfx | **Complete** | Routed through pool, but see issue 2.2.1 below |
-| 2.1 | Save System | Save format version field | **Complete** | SAVE_VERSION constant, migration gating |
-| 2.2 | Save System | Auto-save with IndexedDB backup | **Complete** | Full implementation with toast UI, settings toggle |
-| 2.3 | Save System | Save migration edge case tests | **Complete** | 6+ edge case tests covering null, undefined, corrupt saves |
-| 3.1 | UX | Character counters on name inputs | **Complete** | mainmenu, crewAdmin, designLibrary all have counters |
-| 3.2 | UX | Keyboard navigation | **Complete** | Focus ring, Tab/Enter/Space/Escape across all panels |
-| 3.3 | UX | VAB undo/redo | **Complete** | Delta-based stack, Ctrl+Z/Y, 50-action depth limit |
-| 3.4 | UX | Debug FPS/frame-time monitor | **Complete** | Overlay with graph, gated by debug mode |
-| 3.5 | UX | Debug mode toggle | **Complete** | Settings toggle, `window.__enableDebugMode()` for E2E |
-| 4.1 | Architecture | Full TypeScript migration | **Complete** | Zero `.js` files in `src/`, `npm run typecheck` passes |
-| 4.2 | Architecture | CSS extraction from JS | **Complete** | Zero `injectStyleOnce` calls, 21 `.css` files, zero `style.cssText` |
-| 4.3 | Architecture | Structured logger | **Complete** | `logger.ts` with levels, categories, timestamps |
-| 4.4 | Architecture | Inline style cleanup | **Complete** | No `style.cssText` remaining |
-| 4.5 | Architecture | Readonly render snapshot interfaces | **Complete** | `types.ts` with ReadonlyPhysicsState etc. |
-| 5.1 | Testing | Coverage thresholds >= 80% | **Complete** | Lines 89%, Branches 80.09%, Functions 91% |
-| 5.2 | Testing | Unit tests for code fixes | **Complete** | All defensive guard and error handling paths tested |
-| 5.3 | Testing | E2E helper splitting | **Complete** | 8 focused sub-modules, `_interactions.js` removed |
-| 5.4 | Testing | E2E tests for debug mode | **Complete** | debug-mode.spec.js with 5+ tests |
-
-### 1.2 Gaps & Partial Implementations
-
-**No requirements are unmet.** All 32 tasks are marked done and verified. However, the following areas have implementation nuances worth noting:
-
-1. **Save version warning (Req 2.1)** — When a save from a future version is loaded, the code logs a `logger.warn()` but does **not** surface a user-visible warning dialog. The requirement says "warn the user," which could be interpreted as needing a UI toast. Current implementation only logs to console.
-
-2. **IndexedDB fallback on load (Req 2.2)** — The `loadGame()` function reads from localStorage only. The async `loadGameAsync()` checks both layers, but the primary synchronous load path doesn't fall back to IndexedDB. This is architecturally reasonable (sync vs async), but means players using the synchronous load path won't benefit from IndexedDB backup.
-
-3. **Synodic period cap (Req 1.3)** — Implemented correctly, but the cap may cause legitimate long-period transfers to be truncated. The requirement acknowledges this trade-off; a log message when capping occurs would aid debugging.
-
-### 1.3 Scope Creep Assessment
-
-No significant scope creep detected. All code changes map to documented requirements. Minor additions that weren't explicitly required but are reasonable:
-- `_resetDbForTesting()` export in `idbStorage.ts` (needed for test isolation)
-- `UNDO_MAX_DEPTH` export in `undoRedo.ts` (needed for test assertions)
-
-These are test infrastructure additions, not feature creep.
+**Date:** 2026-04-07
+**Scope:** All requirements in `.devloop/requirements.md` (Sections 1–7) and all 24 tasks in `.devloop/tasks.md`
+**Codebase:** ~60,400 lines TypeScript, 154 source modules, 92 unit test files, 38 E2E specs
 
 ---
 
-## 2. Code Quality
+## Requirements vs Implementation
 
-### 2.1 Bugs & Logic Errors
+### Fully Implemented (No Gaps)
 
-#### 2.1.1 CRITICAL: Deprecated PixiJS API Usage in `_debris.ts`
+| Requirement | Status | Notes |
+|---|---|---|
+| 1.1 Fix deprecated PixiJS v7 API in `_debris.ts` | **Complete** | Docking target rendering uses v8 API (`.circle()`, `.fill({})`, `.stroke({})`) |
+| 1.2 Full PixiJS v8 API audit | **Complete** | No deprecated v7 methods (`beginFill`, `endFill`, `drawCircle`, `drawRect`, `lineStyle`) remain. No unsafe `as PIXI.Graphics &` casts found. |
+| 1.3 Try-catch in undo/redo callbacks | **Complete** | Both `undo()` and `redo()` in `src/core/undoRedo.ts:71-108` have proper try-catch. On failure: action is pushed back to its original stack, error logged via `logger.error()`, and error callback invoked. |
+| 1.4 Circular reference protection in logger | **Complete** | `src/core/logger.ts:29-32` wraps `JSON.stringify(data)` in try-catch with `'[Unserializable data]'` fallback. |
+| 2.1 Fully async save API | **Complete** | `saveGame()` returns `Promise<SaveSlotSummary>`, `loadGame()` returns `Promise<GameState>`. IndexedDB fallback path (line 240) is properly awaited. Mirror writes are correctly fire-and-forget (line 250). |
+| 2.2 Save version indicator on save slots | **Complete** | Version badge displayed in `mainmenu.ts:326-329` and `topbar.ts:949-955,1035-1040` showing `v{save} (current: v{current})` when mismatched. |
+| 2.3 Deeper save validation | **Complete** | `_validateNestedStructures()` in `saveload.ts:755-857` validates `missions.accepted`, `missions.completed`, `crew`, `orbitalObjects`, `savedDesigns`, and `contracts.active`. Corrupted entries are filtered and logged. |
+| 2.4 Save compression | **Complete** | lz-string (`compressToUTF16`/`decompressFromUTF16`). Prefix marker `LZC:` for backward compatibility. `SAVE_VERSION` bumped to 2. Uncompressed pre-compression saves load transparently. |
+| 3.1 Object pool for hub and VAB | **Complete** | `RendererPool` class shared via `src/render/pool.ts`. Hub, VAB, and flight each maintain independent pool instances. Hub `_drawScene()` uses `acquireGraphics()`/`releaseContainerChildren()`. VAB likewise pools all per-frame Graphics objects. |
+| 3.2 Web Worker physics | **Complete** | Worker module at `src/core/physicsWorker.ts` (476 lines). Protocol at `physicsWorkerProtocol.ts` (340 lines). Bridge at `src/ui/flightController/_workerBridge.ts` (497 lines). Full command set: init, tick, setThrottle, setAngle, stage, abort, keyDown/keyUp, stop. Snapshots sent back with frame counter for sequencing. |
+| 4.1 Eliminate all `as any` casts | **Complete** | Zero `as any` casts remain in `src/`. Confirmed by grep search returning no matches. |
+| 4.1 ESLint `no-explicit-any` rule | **Complete** | `@typescript-eslint/no-explicit-any: 'warn'` in `eslint.config.js:87`. |
+| 4.2 Remove `jsToTsResolve` plugin | **Complete** | Plugin removed from `vite.config.js`. All imports updated to `.ts` extensions. Config only specifies standard Vite resolution. |
+| 5.1 Event listener cleanup in `crewAdmin.ts` | **Complete** | Uses `createListenerTracker()` (imported line 27, created line 118). All event listeners routed through tracker. Cleanup via `_tracker.removeAll()` in `destroyCrewAdminUI()`. No direct `addEventListener` calls remain. |
+| 5.2 Remaining inline styles | **Mostly Complete** | See minor findings below. |
+| 6.1 Branch coverage for low modules | **Complete** | Targeted tests written for `fuelsystem.ts`, `staging.ts`, `mapView.ts`, `atmosphere.ts`, and `grabbing.ts`. |
+| 6.2 Tests for new code | **Complete** | Tests exist for: undo/redo error handling, logger circular reference, save compression round-trip, async save, deeper save validation, Web Worker protocol, object pool. |
 
-**File:** `src/render/flight/_debris.ts:117-141`
+### Minor Gaps
 
-The docking target renderer uses PixiJS v7 API methods (`beginFill`, `endFill`, `drawCircle`, `lineStyle`) that were removed in PixiJS v8. These are accessed via unsafe type casts:
+**5.2 Inline styles — residual occurrences:**
+- `crewAdmin.ts:701,709` — Two `.style.padding` assignments on dynamically created `<p>` elements. Should be CSS classes in `crewAdmin.css`.
+- `flightHud.ts` — ~20 inline style assignments remain (`.style.height`, `.style.color`, `.style.display`). These are **acceptable** for per-frame dynamic values (throttle bar height, TWR color) where CSS classes would add unnecessary complexity. However, a few color assignments (lines 1072, 1104, 1117) could be refactored to data-attribute selectors in CSS.
+- `missionControl/_contractsTab.ts:90` — `repBar.innerHTML` contains hardcoded inline styles for reputation tier display. Should use CSS classes with design tokens.
 
-```typescript
-(g as PIXI.Graphics & { beginFill: Function }).beginFill(0x00ccff, 0.7);
-(g as PIXI.Graphics & { drawCircle: Function }).drawCircle(clampedX, clampedY, 8);
-```
-
-The project uses `pixi.js ^8.0.0`. These methods don't exist on the v8 Graphics class — the casts suppress the compiler error but the calls will throw at runtime. The modern v8 equivalent would use `g.circle()` / `g.fill()` / `g.stroke()`.
-
-**Impact:** Docking target HUD will crash when a player attempts docking operations.
-
-#### 2.1.2 HIGH: Fire-and-Forget IndexedDB Writes in `saveload.ts`
-
-**File:** `src/core/saveload.ts:220, 229`
-
-When localStorage throws `QuotaExceededError`, the fallback to IndexedDB is fire-and-forget:
-
-```typescript
-idbSet(key, json).catch(() => {});
-```
-
-The function then throws an error to the caller, but the IndexedDB write may still be in flight. If the page closes before the write completes, the save is lost entirely. The mirror write on line 229 is also fire-and-forget, which is acceptable for the mirror (localStorage succeeded), but not for the fallback path.
-
-**Impact:** Potential data loss when localStorage is full and the player closes the browser quickly after saving.
-
-#### 2.1.3 MEDIUM: `flightReturn.ts` Uses `as any` for Physics State Access
-
-**File:** `src/core/flightReturn.ts` (7 `as any` casts)
-
-Multiple `as any` casts access properties on the physics state that aren't part of the declared type. For example, `(ps as any)._usedInventoryParts` accesses a property that may not exist, silently returning `undefined`. This bypasses the TypeScript type system and could mask missing data.
-
-#### 2.1.4 LOW: Logger `JSON.stringify` Without Circular Reference Protection
-
-**File:** `src/core/logger.ts:27`
-
-```typescript
-if (data !== undefined) return `${base} ${JSON.stringify(data)}`;
-```
-
-If `data` contains circular references (e.g., a caught Error with circular cause chain), `JSON.stringify` will throw, crashing the logger itself. A try-catch around the stringify or a safe replacer function would prevent this.
-
-#### 2.1.5 LOW: Undo/Redo Callbacks Not Error-Guarded
-
-**File:** `src/core/undoRedo.ts:59, 70`
-
-The `action.undo()` and `action.redo()` calls have no try-catch. If a callback throws (e.g., due to stale state references), the undo/redo stack becomes inconsistent — the action is popped from one stack but never pushed to the other.
-
-### 2.2 Performance Concerns
-
-#### 2.2.1 Per-Frame Graphics Allocation in Hub Renderer
-
-**File:** `src/render/hub.ts:183-222`
-
-The hub renderer creates 5+ new `PIXI.Graphics()` objects every frame in `_drawScene()`. Unlike the flight renderer which uses an object pool, the hub creates and discards objects on every render tick. While the hub scene is simpler than flight, this still generates GC pressure during long hub sessions.
-
-#### 2.2.2 Per-Frame Graphics Allocation in VAB Renderer
-
-**File:** `src/render/vab.ts:304, 335, 370`
-
-The VAB renderer similarly creates new Graphics objects per frame for parts, ghost layer, and mirror mode. The VAB renders at 60fps during part dragging, making this a noticeable source of GC pauses.
-
-#### 2.2.3 Object Pool Not Used Outside Flight
-
-The object pool (`_pool.ts`) is only used in the flight render sub-modules. The hub and VAB renderers create objects directly with `new PIXI.Graphics()`. The pool system could be generalized to cover all renderers.
-
-### 2.3 Type Safety
-
-**130 `as any` casts** remain across 26 source files. The heaviest offenders:
-
-| File | Count | Notes |
-|------|-------|-------|
-| `staging.ts` | 28 | Accessing untyped part properties |
-| `challenges.ts` | 15 | Untyped mission/contract data |
-| `contracts.ts` | 11 | Untyped reward calculations |
-| `crew.ts` | 8 | Untyped crew skill data |
-| `debugSaves.ts` | 8 | Test data factories |
-| `docking.ts` | 8 | Untyped physics state |
-| `flightReturn.ts` | 7 | Untyped physics state |
-| `grabbing.ts` | 7 | Untyped collision data |
-| `physics.ts` | 5 | Cross-module type gaps |
-
-While `as any` was acceptable during the TS migration to unblock compilation, these represent type safety gaps that should be narrowed over time.
-
-### 2.4 Security Considerations
-
-1. **XSS via name inputs** — Character counter implementation in `vab/_designLibrary.ts` uses `.replace(/"/g, '&quot;')` for HTML attribute escaping. The mainmenu and crewAdmin inputs also sanitize. No XSS vectors detected.
-
-2. **localStorage injection** — `loadGame()` parses arbitrary JSON from localStorage. While localStorage is same-origin, a malicious browser extension could inject crafted JSON. The `_validateState()` function checks surface-level field types but not deeply nested shapes. Consider adding validation for critical nested objects (missions, crew arrays).
-
-3. **No eval or innerHTML with unsanitized user input** detected in the codebase.
+**No scope creep detected.** All implemented features trace directly to requirements. No extraneous features were added.
 
 ---
 
-## 3. Testing
+## Code Quality
 
-### 3.1 Coverage
+### Strengths
 
-Coverage thresholds are properly configured in `vite.config.js`:
-- **Lines: 89%** (threshold: 89) -- Exceeds 80% minimum
-- **Branches: 80.09%** (threshold: 80) -- Meets minimum
-- **Functions: 91%** (threshold: 91) -- Exceeds 80% minimum
+1. **Clean architecture.** The three-layer separation (core/render/UI) is consistently enforced. Render layer reads state through `Readonly*` interfaces (`src/render/types.ts`), preventing accidental mutations at compile time.
 
-All iteration 3 features have dedicated unit tests:
+2. **TypeScript migration complete.** Zero `.js` source files remain in `src/`. Zero `as any` casts. ESLint rule prevents regression. Import specifiers all use `.ts` extensions with the `jsToTsResolve` shim removed.
 
-| Feature | Test File | Line Coverage | Branch Coverage |
-|---------|-----------|---------------|-----------------|
-| Auto-save | `autoSave.test.ts` | 100% | 82% |
-| Undo/Redo | `undoRedo.test.ts` | 97% | 96% |
-| Debug Mode | `debugMode.test.ts` | 100% | 100% |
-| Save Versioning | `saveload.test.ts` | 89% | 81% |
-| IndexedDB | `idbStorage.test.ts` | 92% | 92% |
-| Logger | `branchCoverage.test.ts` | 100% | 88% |
+3. **Save system robustness.** Proper async/await discipline — critical IndexedDB fallback path is awaited, mirrors are fire-and-forget with explicit comments. Compression backward-compatible. Deep nested validation filters corrupted entries instead of failing the load.
 
-### 3.2 E2E Test Quality
+4. **Web Worker design.** Clean separation of concerns: worker owns mutable physics state, main thread receives readonly snapshots. Serialization handles Maps/Sets via explicit conversion helpers. Automatic fallback to main-thread physics on error.
 
-**Structure:** Excellent. The monolithic `_interactions.js` has been properly split into 8 focused sub-modules (`_flight.js`, `_timewarp.js`, `_state.js`, `_navigation.js`, `_assertions.js`, `_factories.js`, `_saveFactory.js`, `_constants.js`) with a barrel re-export at `helpers.js`.
+5. **Structured logging.** `src/core/logger.ts` (68 lines) is minimal and correct. Level-gated, environment-aware (production defaults to `warn`), safe against unserializable data. Never throws.
 
-**Flaky patterns:** Only 5 `waitForTimeout` calls remain across 37 spec files, all justified (waiting for confirmation that something does NOT appear). 242 instances of conditional `waitForFunction` waits. No blind sleep anti-patterns.
+### Issues Found
 
-**Serial test isolation:** Stateful E2E specs correctly use `test.describe.configure({ mode: 'serial' })`.
+#### Medium Severity
 
-### 3.3 Untested Edge Cases
+**1. No timeout on Web Worker ready Promise**
+`_workerBridge.ts:71-122` — `initPhysicsWorker()` creates a Promise that resolves when the worker sends a `'ready'` message. The `onerror` handler rejects on crash, but if the worker hangs without crashing or sending ready (e.g., an import deadlock), the Promise never resolves. The flight controller initialization would hang indefinitely.
 
-1. **Branch coverage below 80% in 3 core modules:**
-   - `fuelsystem.ts` — 66.66% branches (SRB edge cases untested)
-   - `staging.ts` — 67.16% branches (debris physics, landing legs)
-   - `mapView.ts` — 67.30% branches (transfer state, shadow calculations)
+*Recommendation:* Add a timeout (e.g., 5–10 seconds) that rejects the Promise and triggers the main-thread fallback.
 
-   These are excluded from the global threshold because coverage measures `src/core/**` as a whole, but they represent pockets of under-tested logic.
+**2. Coverage thresholds only apply to `src/core/`**
+`vite.config.js:13` — Coverage `include: ['src/core/**']` means the render layer (`src/render/`, ~5,900 lines) and UI layer (`src/ui/`, ~28,000 lines) have **zero coverage enforcement**. This is ~55% of the codebase with no regression protection.
 
-2. **`atmosphere.ts`** — 66.39% line coverage. High-altitude atmospheric calculations (above 100km) not fully tested.
+*Recommendation:* Extend coverage thresholds to `src/render/` and `src/ui/` in a future iteration, even at a lower floor (e.g., 50% initially).
 
-3. **`grabbing.ts`** — 53.17% line coverage. Grab mechanics edge cases sparse.
+**3. `_escapeHtml()` is module-private to `mainmenu.ts`**
+`mainmenu.ts:827-833` — The HTML escaping function is defined as a local function. Other UI modules that set `.innerHTML` with dynamic data (87 total innerHTML assignments across 29 files) don't have access to it. While most innerHTML usages appear to inject static templates or numeric values, any future addition of user-controlled text into innerHTML would lack a convenient escaping utility.
 
-4. **Concurrent save operations** — No test verifies behavior when auto-save and manual save trigger simultaneously. The shared library migration in `loadGame()` (lines 289-310) modifies arrays in place without concurrency protection.
+*Recommendation:* Extract `_escapeHtml()` to a shared UI utility (e.g., `src/ui/util.ts`) and audit all innerHTML assignments for user-controlled data.
 
-5. **IndexedDB quota exhaustion** — `idbStorage.ts` has no quota management or tests for quota-exceeded scenarios in IndexedDB itself (only localStorage quota is tested).
+#### Low Severity
 
-6. **Deprecated PixiJS API in _debris.ts** — No unit or E2E test exercises the docking target rendering code path with the deprecated v7 methods. This bug would be caught by an E2E docking test that validates the HUD renders without errors.
+**4. Data catalogs sent empty to worker**
+`_workerBridge.ts:111-121` — The init command sends empty arrays/objects for `partsCatalog` and `bodiesCatalog`, relying on the worker to import them directly via ES module imports. This works because Vite's worker bundling includes the modules, but it's fragile — if the worker were ever loaded from a different origin or context, the imports would fail silently.
+
+*Recommendation:* Document this design decision in a code comment at the init command site. (Low risk since Vite controls bundling.)
+
+**5. `import.meta` cast in logger**
+`logger.ts:17` — `const _meta = import.meta as unknown as { env?: { PROD?: boolean } }` uses an `as unknown as` escape hatch to access Vite's build-time env. This is the one justified remaining type cast in the codebase and is safe (Vite guarantees this at build time), but it could be replaced with a Vite client type reference.
 
 ---
 
-## 4. Recommendations
+## Testing
 
-### 4.1 Must Fix (Before Production)
+### Coverage
 
-1. **Fix deprecated PixiJS v7 API calls in `_debris.ts:117-141`** — Replace `beginFill`/`endFill`/`drawCircle`/`lineStyle` casts with PixiJS v8 equivalents (`circle()`, `fill()`, `stroke()`). This will crash at runtime during docking.
+| Metric | Threshold | Notes |
+|---|---|---|
+| Lines | 89% | Enforced for `src/core/` |
+| Branches | 80% | Enforced for `src/core/` |
+| Functions | 91% | Enforced for `src/core/` |
 
-2. **Await IndexedDB fallback on quota error in `saveload.ts:220`** — Either make the fallback awaitable (return a Promise) or re-throw only after confirming the IndexedDB write succeeded. Current fire-and-forget can lose saves.
+- **92 unit test files** covering core game logic, save system, physics, orbital mechanics, undo/redo, worker protocol, and more.
+- **38 E2E spec files** covering all major game flows via Playwright (Chromium only).
+- **Zero skipped tests** (`test.skip`, `describe.skip`, etc.) — all tests are active.
+- E2E helpers properly split into domain sub-modules (`_flight.js`, `_timewarp.js`, `_state.js`, `_navigation.js`, `_assertions.js`, `_factories.js`, `_saveFactory.js`, `_constants.js`) with barrel re-export at `e2e/helpers.js`.
 
-### 4.2 Should Fix (High Priority)
+### Feature-Specific Test Coverage
 
-3. **Add try-catch in `undoRedo.ts:59,70`** around `action.undo()` / `action.redo()` to prevent stack corruption on callback errors.
+| Feature | Test File | Key Coverage |
+|---|---|---|
+| Undo/redo error handling | `undoRedo.test.ts` (704 lines) | Callback throwing preserves stack integrity, error logged, error callback invoked, system recovers |
+| Logger circular ref | `logger.test.ts` (179 lines) | Circular object doesn't throw, normal data serialized correctly |
+| Save compression | `saveload.test.ts:1327-1499` | Round-trip integrity, backward compat with uncompressed saves, version bump verified |
+| Deeper save validation | `saveload.test.ts:1057-1280` | Corrupted missions/crew/orbitalObjects/designs/contracts filtered, valid entries preserved |
+| Web Worker protocol | `physicsWorker.test.ts` (619 lines), `physicsWorkerCommand.test.ts` (446 lines) | Serialization round-trips (Set/Map), snapshot integrity, command routing, error handling |
+| Object pool | `pool.test.ts` (289 lines) | Acquire/release/reuse, null safety, container children release, drain |
+| Storage errors | `storageErrors.test.ts` (189 lines) | QuotaExceededError handling for save/import/library |
+| Branch coverage boost | `branchCoverage.test.ts` (1,597 lines) | Targeted coverage for settings, logger, fuelsystem, legs, malfunction, staging, physics, power, comms, collision, mapView |
 
-4. **Add circular reference protection to `logger.ts:27`** — Wrap `JSON.stringify(data)` in try-catch with a fallback like `"[Unserializable data]"`.
+### Untested or Under-Tested Areas
 
-5. **Surface future-version save warning to UI** — The `loadGame()` path logs a warning when loading a save from a newer version, but players will never see the console. Add a toast or dialog.
+1. **Render and UI layers** — No coverage thresholds enforced. Unit tests focus on `src/core/`. Render/UI code is only exercised via E2E tests, which don't report line-level coverage.
 
-6. **Extend object pooling to hub and VAB renderers** — `hub.ts:183-222` and `vab.ts:304-370` create Graphics objects per frame. Generalizing the flight pool or implementing simple reuse patterns would reduce GC pressure.
+2. **Web Worker integration under real threading** — Unit tests mock the Worker. True multi-threaded behaviour (message timing, structured clone edge cases) is only tested via E2E flight tests.
 
-### 4.3 Should Improve (Medium Priority)
+3. **IndexedDB failure modes** — Tests mock `localStorage` errors but don't exercise real IndexedDB quota limits or corruption scenarios.
 
-7. **Narrow `as any` casts** — 130 `as any` casts across 26 files undermine the TypeScript migration. Prioritize `staging.ts` (28), `challenges.ts` (15), and `contracts.ts` (11) where type safety gaps are largest.
-
-8. **Add deeper save validation** — `_validateState()` checks top-level field types but not nested shapes. A corrupted `missions.accepted` array with missing fields could cause runtime crashes deep in game logic.
-
-9. **Raise branch coverage for low modules** — `fuelsystem.ts` (67%), `staging.ts` (67%), and `mapView.ts` (67%) are below the 80% target. Write targeted branch coverage tests.
-
-10. **Standardize event listener cleanup in `crewAdmin.ts`** — Uses direct `addEventListener` calls without `createListenerTracker()`. Other UI modules (settings, help, topbar) use the tracker pattern consistently.
-
-11. **Remaining inline styles** — A handful of inline style assignments remain in `crewAdmin.ts` (lines 348, 567-569), `autoSaveToast.ts` (line 100), and `flightHud.ts` (lines 392, 406, 423) that should use CSS classes. Not flagged by `style.cssText` search since they use individual property assignments.
+4. **Auto-save cancellation timing** — The 3-second delay window and cancel button are tested in E2E, but race conditions (rapid panel switching during the delay) are not explicitly tested.
 
 ---
 
-## 5. Future Considerations
+## Security
 
-### 5.1 Next Iteration Candidates
+| Area | Assessment | Details |
+|---|---|---|
+| XSS (innerHTML) | **Low risk** | 87 innerHTML assignments across 29 files. User-controlled data (save names, agency names) is escaped via `_escapeHtml()` in `mainmenu.ts`. Most other innerHTML usages inject static templates or numeric values. The codebase favors `.textContent` (592 usages) for dynamic text — good practice. |
+| Code injection | **No risk** | No `eval()`, `Function()`, or dynamic script loading found. |
+| Save data validation | **Good** | `JSON.parse` output is validated through `_validateState()` and `_validateNestedStructures()`. Corrupted entries filtered rather than trusted. Import path properly validates envelope structure. |
+| Web Worker isolation | **No risk** | Dedicated workers are same-origin by browser design. No cross-origin `postMessage` concerns. |
+| Storage namespace | **Acceptable** | Keys prefixed with `spaceAgency*`. No collision risk for single-player browser game. |
 
-1. **Full ARIA/Screen Reader Support** — Iteration 3 added keyboard navigation (Tab, Enter, Escape) but explicitly deferred ARIA roles, labels, and live regions. This is the natural next step for accessibility.
+**One concern:** `_escapeHtml()` being private to `mainmenu.ts` means other modules setting innerHTML with any future user-controlled data would need to independently implement escaping. Centralizing this would prevent future XSS regressions.
 
-2. **Web Worker Physics** — The readonly render interfaces (Section 4.5) were designed with this in mind. Moving `tick()` and orbital calculations to a Web Worker would prevent physics from blocking the render thread during complex time-warp scenarios.
+---
 
-3. **Save Compression** — Large save files (especially with many rocket designs) can approach localStorage's 5-10MB limit. LZ-string or similar compression before serialization would extend save capacity significantly.
+## Recommendations
 
-4. **Multiplayer/Cloud Saves** — The IndexedDB layer provides a foundation for cloud save synchronization. Adding a server-side save endpoint with conflict resolution would enable cross-device play.
+### Before Production
 
-5. **Mod/Plugin System** — The data layer (`src/data/`) contains immutable catalogs. An extension point allowing players to add custom parts, missions, and celestial bodies would significantly extend replayability.
+1. **Add a timeout to the Web Worker ready Promise** in `_workerBridge.ts`. A 5–10 second timeout with automatic fallback to main-thread physics would prevent the theoretical hang scenario. This is a small, low-risk change.
 
-### 5.2 Architectural Decisions to Revisit
+2. **Extract `_escapeHtml()` to a shared utility.** Move it from `mainmenu.ts` to a shared module (e.g., `src/ui/escapeHtml.ts`) and import it where needed. Audit all 87 innerHTML assignments to confirm no user-controlled data is injected unescaped.
 
-1. **Module-Scoped Mutable State** — Many modules store state in module-level `let` variables (e.g., `_undoStack`, `_redoStack` in undoRedo.ts; `_db` in idbStorage.ts; various `_selected*` in render modules). This works for a single-instance game but makes testing harder and prevents future multi-instance scenarios. Consider consolidating into a dependency-injected state container.
+3. **Address the 2 remaining padding inline styles** in `crewAdmin.ts:701,709`. These are trivial to convert to CSS classes in `crewAdmin.css`.
 
-2. **Synchronous vs Async Save API** — `saveGame()` and `loadGame()` are synchronous, but IndexedDB is inherently async. The current hybrid (sync localStorage + fire-and-forget async IndexedDB mirror) creates edge cases. A future iteration should consider making the save API fully async.
+### Post-Launch Improvements
 
-3. **PixiJS Version Lock** — The deprecated API casts in `_debris.ts` suggest the codebase was originally written for PixiJS v7 and partially migrated to v8. A full audit of all PixiJS API usage against v8 documentation would catch any remaining deprecated patterns.
+4. **Extend coverage thresholds to render and UI layers.** Even a 40–50% floor for `src/render/` and `src/ui/` would catch regressions. The current setup only enforces coverage on `src/core/` (~32% of the codebase by line count).
 
-4. **`jsToTsResolve` Plugin** — Now that the full TypeScript migration is complete and no `.js` source files remain, this Vite plugin is only needed for import specifiers that still use `.js` extensions. Consider updating all imports to `.ts` extensions and removing the plugin to simplify the build pipeline.
+5. **Add a no-inline-style ESLint rule** (e.g., a custom rule or comment convention) to prevent new inline styles from being introduced. The CSS extraction work from Iterations 3–4 would be protected from drift.
 
-5. **CSS Custom Properties vs Build-Time Constants** — Some CSS values that were originally JavaScript constants (e.g., toolbar heights, grid sizes) are now hardcoded in CSS with comments noting the source. If these values ever need to be configurable, they should be migrated to CSS custom properties set from JS at initialization.
+6. **Add real IndexedDB integration tests.** The current test suite mocks storage. A small integration test suite that exercises real IndexedDB operations (open, write, read, delete) would catch browser-specific issues.
 
-### 5.3 Technical Debt Introduced
+---
 
-1. **130 `as any` casts** — The TypeScript migration prioritized compilation over full type safety. Each `as any` is a potential source of runtime type errors that the compiler can't catch. These should be systematically narrowed, starting with the files that have the most casts.
+## Future Considerations
 
-2. **Deprecated PixiJS API behind type casts** — Using `as PIXI.Graphics & { beginFill: Function }` to access removed methods is active technical debt that will cause runtime failures.
+### Features for Next Iterations
 
-3. **Three core modules below 80% branch coverage** — While the global coverage meets thresholds, `fuelsystem.ts`, `staging.ts`, and `mapView.ts` have significant untested branches that could hide bugs.
+1. **Accessibility (ARIA).** Iteration 3 added keyboard navigation (focus rings, tab order). Full ARIA support (roles, labels, screen reader announcements) is the natural next step.
 
-4. **Mixed sync/async save architecture** — The dual localStorage+IndexedDB storage with fire-and-forget mirroring is pragmatic but creates subtle race conditions and data consistency risks.
+2. **Settings persistence refactor.** Settings like `debugMode`, `autoSaveEnabled`, and `useWorkerPhysics` live in `GameState` and are saved/loaded with the game. A dedicated settings store (separate from game saves) would allow settings to persist even when no save exists.
 
-5. **No quota monitoring** — Neither the localStorage nor IndexedDB layers track or report quota usage. Players have no warning when they're approaching storage limits until a save fails.
+3. **Performance monitoring in production.** The debug FPS monitor exists but is behind the debug toggle. Collecting anonymized performance data (average FPS, worst frame times, time-warp performance) via an opt-in telemetry system would help identify real-world performance issues.
+
+4. **Save export/import format.** The current import/export passes raw compressed JSON. A proper export format (e.g., with a file extension, magic bytes, and checksum) would prevent corruption and enable save sharing between players.
+
+### Architectural Considerations
+
+5. **Web Worker state ownership.** Currently the worker runs physics and sends snapshots, but the main thread still maintains its own mutable copies of `PhysicsState` and `FlightState` (applied from snapshots each frame). This dual-state model works but adds complexity. A future iteration could make the worker the sole owner of physics state, with the main thread only holding the latest readonly snapshot.
+
+6. **Coverage scope.** As the render and UI layers grow, the lack of coverage enforcement becomes a larger risk. Consider separate coverage targets per layer with increasing thresholds over time.
+
+7. **CSS-in-JS elimination tracking.** The Iteration 3–4 CSS extraction was thorough but ~20 dynamic inline styles in `flightHud.ts` remain by design. If the number grows, consider CSS custom properties set from JS (e.g., `--throttle-pct`) with CSS handling the visual mapping, which would reduce the JS/CSS coupling.
+
+### Technical Debt Introduced
+
+8. **Empty catalog transmission in worker init.** The `partsCatalog: []` / `bodiesCatalog: {}` pattern in the worker init command is a pragmatic shortcut (the worker imports catalogs directly), but it makes the protocol definition misleading — the types suggest catalogs are sent, but they're not. This should be documented or the protocol types updated.
+
+9. **`as unknown as` cast in logger.** `logger.ts:17` casts `import.meta` to access Vite's build-time env. This is the correct pattern for Vite, but adding `/// <reference types="vite/client" />` at the top of the file would eliminate the need for the cast entirely.
+
+10. **Fire-and-forget IndexedDB mirror writes.** While correctly designed (localStorage is primary, IDB is backup), silent `.catch(() => {})` swallowing means persistent IDB write failures would go undetected. Consider logging IDB mirror failures at `debug` level so they're visible during development.
 
 ---
 
 ## Summary
 
-The Iteration 3 implementation is thorough and well-executed. All 32 tasks are complete. The TypeScript migration, CSS extraction, auto-save system, undo/redo, debug mode toggle, and keyboard navigation are all functional and tested. Test coverage meets configured thresholds with 2,815 unit tests and 37 E2E specs.
+The Iteration 4 implementation is thorough and well-executed. All 24 tasks are complete. The codebase has been fully migrated to TypeScript with zero `as any` casts, the save system is robust and async, the Web Worker physics implementation provides a clean main-thread/worker separation with automatic fallback, and test coverage is solid for the core layer.
 
-**One critical bug** (deprecated PixiJS v7 API in `_debris.ts`) must be fixed before production — it will crash during docking operations. The fire-and-forget IndexedDB fallback on quota errors is a high-priority fix to prevent data loss. Beyond these, the codebase is solid, well-structured, and ready for the next iteration of development.
+The most significant remaining gaps are:
+1. Coverage enforcement limited to `src/core/` (the render and UI layers, comprising ~55% of the codebase, have no thresholds)
+2. Missing timeout on the Web Worker ready Promise
+3. `_escapeHtml()` not shared across UI modules
 
-**Overall Assessment: Ready for production** after fixing the PixiJS API issue and the IndexedDB save fallback.
+None of these are blocking issues. The codebase is production-ready with the caveats noted above.

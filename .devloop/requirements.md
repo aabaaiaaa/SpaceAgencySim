@@ -1,332 +1,279 @@
-# Iteration 4 — Bug Fixes, Save Architecture, Web Worker Physics & Polish
+# Iteration 5 — Worker State Ownership, Performance Dashboard, Coverage & Polish
 
-This iteration addresses all findings from the Iteration 3 code review, plus two new features (save compression, Web Worker physics) and architectural cleanup (async save API, PixiJS v8 audit, import path migration, `as any` elimination). The focus is fixing bugs, hardening the save system, improving render performance, and completing the TypeScript migration to full type safety.
+This iteration addresses all findings from the Iteration 4 code review, refactors the Web Worker physics to sole state ownership (eliminating the dual-state shadow pattern), adds a local-only performance monitoring dashboard, expands test coverage enforcement to the render and UI layers, and closes several small polish gaps.
 
-The codebase is ~60,400 lines of TypeScript across 154 source modules, with 2,815 unit tests and 37 E2E specs. All work builds on the existing codebase.
-
----
-
-## 1. Bug Fixes & Resilience
-
-### 1.1 Fix Deprecated PixiJS v7 API in `_debris.ts`
-
-**File:** `src/render/flight/_debris.ts:117-141`
-
-The docking target renderer uses PixiJS v7 methods (`beginFill`, `endFill`, `drawCircle`, `lineStyle`) that were removed in PixiJS v8. These are hidden behind unsafe type casts:
-
-```typescript
-(g as PIXI.Graphics & { beginFill: Function }).beginFill(0x00ccff, 0.7);
-(g as PIXI.Graphics & { drawCircle: Function }).drawCircle(clampedX, clampedY, 8);
-```
-
-The project uses `pixi.js ^8.0.0`. These methods don't exist at runtime — the casts suppress the compiler but the calls will throw when a player attempts docking.
-
-**Fix:** Replace with PixiJS v8 equivalents:
-- `beginFill(color, alpha)` + `drawCircle(x, y, r)` + `endFill()` → `g.circle(x, y, r)` then `g.fill({ color, alpha })`
-- `lineStyle(width, color, alpha)` → `g.stroke({ width, color, alpha })`
-
-Verify by running the docking E2E tests after the fix. If no docking E2E test exercises this HUD code path, add one.
-
-### 1.2 Full PixiJS v8 API Audit
-
-The deprecated API in `_debris.ts` suggests other v7 patterns may exist elsewhere. Audit all PixiJS usage across the entire render layer (`src/render/`) against the v8 API documentation.
-
-**Scope:**
-- Search for all PixiJS v7 method names that were removed or renamed in v8: `beginFill`, `endFill`, `drawCircle`, `drawRect`, `drawRoundedRect`, `drawEllipse`, `drawPolygon`, `lineStyle`, `moveTo`, `lineTo`, `arcTo`, `bezierCurveTo`, `quadraticCurveTo`, `clear` (if used with old semantics), `addChild` (signature changes), `removeChild`, `destroy` (parameter changes)
-- Check for any v7-style type casts like `as PIXI.Graphics & { methodName: Function }`
-- Check for deprecated constructor patterns or property access
-- Fix all deprecated patterns found
-- If no other issues are found beyond `_debris.ts`, document the audit was performed with clean results
-
-### 1.3 Try-Catch in Undo/Redo Callbacks
-
-**File:** `src/core/undoRedo.ts:59, 70`
-
-`action.undo()` and `action.redo()` have no try-catch. If a callback throws (stale state references, removed parts), the action is popped from one stack but never pushed to the other, silently corrupting the undo/redo system.
-
-**Fix:** Wrap both calls in try-catch:
-- On failure, push the action back to the stack it was popped from (restore previous state)
-- Log the error via the structured logger (`logger.error('undoRedo', ...)`)
-- Surface a brief toast/notification to the player: "Undo failed" / "Redo failed"
-
-Unit tests should verify:
-- Undo callback throwing doesn't corrupt the stacks (action remains on undo stack)
-- Redo callback throwing doesn't corrupt the stacks (action remains on redo stack)
-- The error is logged
-
-### 1.4 Circular Reference Protection in Logger
-
-**File:** `src/core/logger.ts:27`
-
-`JSON.stringify(data)` will throw on circular references, crashing the logger itself.
-
-**Fix:** Wrap the `JSON.stringify(data)` call in a try-catch. On failure, substitute `"[Unserializable data]"` (or similar). The logger must never throw — it's the last line of defence for error reporting.
-
-Unit test: pass an object with a circular reference to `logger.error()` and verify it doesn't throw and produces output containing the fallback string.
+The codebase is ~60,400 lines of TypeScript across 154 source modules, with ~2,815 unit tests and 38 E2E specs. All work builds on the existing codebase.
 
 ---
 
-## 2. Save System
+## 1. Quick Wins (Review Fixes)
 
-### 2.1 Fully Async Save API
+### 1.1 Add Timeout to Web Worker Ready Promise
 
-**Current state:** `saveGame()` and `loadGame()` are synchronous. IndexedDB is inherently async. The current hybrid architecture uses fire-and-forget `idbSet()` calls, creating race conditions and data loss risks (especially the fallback path in `saveload.ts:220` where IndexedDB is the only copy but isn't awaited).
+**File:** `src/ui/flightController/_workerBridge.ts:71-122`
 
-**Change:** Make the save/load API fully async:
+`initPhysicsWorker()` creates a Promise that resolves when the worker sends a `'ready'` message. The `onerror` handler rejects on crash, but if the worker hangs without crashing or sending `'ready'` (e.g., an import deadlock or infinite loop during init), the Promise never settles and the flight controller initialization hangs indefinitely.
 
-- `saveGame()` → `async saveGame()` returning `Promise<void>`
-- `loadGame()` → `async loadGame()` returning `Promise<GameState>` (or similar)
-- Update all callers throughout the codebase to `await` the save/load calls
-- The IndexedDB write on the fallback path (localStorage full) must now be awaited — if it fails, the error propagates to the caller
-- The IndexedDB mirror write (when localStorage succeeds) can remain fire-and-forget since localStorage already has the data
-
-**Callers to update:**
-- Auto-save system (`autoSave.ts`)
-- Manual save UI (`topbar.ts` or wherever the save button lives)
-- Design library save/load
-- Debug saves
-- Any E2E test helpers that call save/load
-
-**Backward compatibility:** The synchronous `loadGame()` currently returns the state directly. The async version returns a Promise. All call sites must be updated. There's no need to keep a sync version — cut over fully.
-
-### 2.2 Save Version Indicator on Save Slots
-
-**Current state:** When a save from a newer game version is loaded, `logger.warn()` is called — but players never see the console.
-
-**Change:** Instead of warning on load, show the version mismatch on the save slot itself in the save/load UI:
-
-- Each save entry in the load screen should display the version it was created with
-- If the save version doesn't match the current `SAVE_VERSION`, show a visual indicator — a warning badge, different text colour, or a small label like "v2 (current: v1)"
-- The indicator should be informational, not blocking — the player can still choose to load it
-- No dialog or toast on load needed; the information is already visible before the player clicks
-
-### 2.3 Deeper Save Validation
-
-**Current state:** `_validateState()` checks top-level field types but not nested structures. A corrupted array entry could crash deep in game logic.
-
-**Change:** Extend `_validateState()` (or add sub-validators) to check critical nested structures:
-
-- `missions.accepted` — each entry must have `id`, `destination`, `type`, `reward` (at minimum)
-- `missions.completed` — same shape validation
-- `crew` — each entry must have `name`, `status`, `skills`
-- `orbitalObjects` — each entry must have `id`, `bodyId`, `elements`
-- `savedDesigns` — each entry must have `name`, `parts`, `connections`
-- `contracts.active` — each entry must have `id`, `type`, `reward`
-
-For invalid entries:
-- Filter them out (remove corrupted entries) rather than failing the entire load
-- Log a warning via the structured logger for each removed entry
-- This approach preserves as much save data as possible
-
-Unit tests should cover:
-- Loading a save with a corrupted mission entry (missing required fields) — verify it's filtered out
-- Loading a save with a corrupted crew member — verify it's filtered out
-- Loading a save where all entries are valid — verify nothing is removed
-
-### 2.4 Save Compression
-
-Large saves (many rocket designs, long mission histories) can approach localStorage's 5-10MB limit.
-
-**Implementation:**
-- Add compression to the save pipeline: after JSON serialization, compress with a lightweight algorithm before writing to storage
-- Add decompression to the load pipeline: decompress before JSON parsing
-- Use a pure-JS compression library suitable for browser use (e.g., `lz-string`, `fflate`, or `pako`) — evaluate options during implementation for bundle size and performance
-- Handle backward compatibility: `loadGame()` must detect whether a save is compressed or uncompressed (pre-compression saves) and handle both. A simple approach: compressed saves get a prefix marker or the save envelope gets a `compressed: true` flag
-
-**Storage impact:**
-- Compression applies to both localStorage and IndexedDB writes
-- The save version should be bumped when compression is added
-- The version migration logic should handle loading uncompressed saves from older versions
+**Fix:**
+- Add a timeout (10 seconds) to the ready Promise
+- On timeout, reject the Promise with a descriptive error (e.g., `"Physics worker did not respond within 10s"`)
+- The existing fallback logic in the flight controller should catch this rejection and fall back to main-thread physics, logging a warning via the structured logger
+- The timeout should be cleared on successful ready or on error (whichever comes first)
 
 **Testing:**
-- Unit test: round-trip a save through compress → store → load → decompress and verify data integrity
-- Unit test: loading an uncompressed save (pre-compression format) still works
-- Measure and log compression ratios for typical saves to validate the approach is worthwhile
+- Unit test: mock a worker that never sends `'ready'` — verify the Promise rejects after the timeout
+- Unit test: mock a worker that sends `'ready'` before the timeout — verify the timeout is cleared and doesn't fire
+
+### 1.2 Extract `_escapeHtml()` to Shared Utility
+
+**Current state:** Two independent HTML escaping implementations exist:
+- `mainmenu.ts:827-833` — `_escapeHtml()` using regex replacement (escapes `&`, `<`, `>`, `"`)
+- `library.ts:587-591` — `_esc()` using a DOM-based approach
+
+There are ~82 `.innerHTML` assignments across 29 UI files. Most inject static templates or numeric values. Files with user-controlled data (`mainmenu.ts`, `library.ts`) already escape, but the escaping function is private to each module.
+
+**Fix:**
+- Create `src/ui/escapeHtml.ts` exporting an `escapeHtml()` function (use the regex approach from `mainmenu.ts` — it's simpler and doesn't depend on DOM availability for testing)
+- Update `mainmenu.ts` to import from the shared utility, removing the local `_escapeHtml()`
+- Update `library.ts` to import from the shared utility, removing the local `_esc()`
+- Audit all 82 innerHTML assignments and confirm no unescaped user-controlled data is injected. The audit results should be recorded in a code comment at the top of `escapeHtml.ts` (e.g., "Audited 2026-04-07: all user-controlled innerHTML data is escaped")
+
+**Files with user-controlled innerHTML data (must use escapeHtml):**
+- `mainmenu.ts` — save names, agency names (already escaping)
+- `library.ts` — crew names (already escaping)
+- `crewAdmin.ts` — crew names are set via `.textContent` (safe), no innerHTML risk currently
+
+### 1.3 Fix Remaining Inline Styles
+
+Three locations still use inline style assignments instead of CSS classes:
+
+1. **`crewAdmin.ts:701`** — `slotMsg.style.padding = '6px 0 12px'`
+2. **`crewAdmin.ts:709`** — `msg.style.padding = '12px 0'`
+3. **`missionControl/_contractsTab.ts:90`** — `repBar.innerHTML` contains hardcoded inline styles for reputation tier display
+
+**Fix:**
+- For `crewAdmin.ts`: add CSS classes (e.g., `.crew-slot-msg`, `.crew-empty-msg`) in `crewAdmin.css` and use `classList.add()` instead of `.style.padding`
+- For `_contractsTab.ts`: extract inline styles from the `repBar.innerHTML` template into CSS classes in the module's CSS file, using design token custom properties where applicable
+- The `flightHud.ts` dynamic inline styles (~20 instances for throttle bar height, TWR color, etc.) are **acceptable** — they set per-frame computed values where CSS classes would add unnecessary complexity
+
+### 1.4 Add Vite Client Type Reference to Logger
+
+**File:** `src/core/logger.ts:17`
+
+Currently: `const _meta = import.meta as unknown as { env?: { PROD?: boolean } };`
+
+This `as unknown as` cast exists because TypeScript doesn't know about Vite's `import.meta.env`. Adding a Vite client type reference eliminates the need for the cast entirely.
+
+**Fix:**
+- Add `/// <reference types="vite/client" />` at the top of `logger.ts`
+- Replace the cast with direct `import.meta.env.PROD` access
+- Remove the `_meta` intermediate variable if it's only used for this purpose
+
+### 1.5 Document Empty Catalog Pattern in Worker Init
+
+**File:** `src/ui/flightController/_workerBridge.ts:113-114`
+
+The init command sends `partsCatalog: []` and `bodiesCatalog: {}` despite the protocol types suggesting catalogs are transmitted. The worker imports catalogs directly via ES module imports (Vite bundles them into the worker).
+
+**Fix:**
+- Add a clear code comment at the init command site explaining: "Catalogs sent as empty placeholders — the worker imports them directly via ES module imports. Vite's worker bundling includes the catalog modules in the worker bundle. The protocol types include these fields for potential future use with non-Vite bundlers."
+- Update the protocol types to make `partsCatalog` and `bodiesCatalog` optional fields on the init command (with `?`), so the empty values are explicitly optional rather than misleadingly populated
+
+### 1.6 Log IndexedDB Mirror Write Failures
+
+**Current state:** IndexedDB mirror writes (when localStorage is primary) use `.catch(() => {})` which silently swallows failures. This means persistent IDB write failures go undetected.
+
+**Fix:**
+- Replace the silent `.catch(() => {})` on IDB mirror writes with `.catch(err => logger.debug('saveload', 'IDB mirror write failed', err))`
+- This ensures failures are visible during development (when log level includes debug) without alarming players in production
 
 ---
 
-## 3. Performance
+## 2. Coverage Expansion
 
-### 3.1 Extend Object Pooling to Hub and VAB Renderers
+### 2.1 Extend Coverage Thresholds to Render and UI Layers
 
-**Current state:** The flight renderer uses an object pool (`_pool.ts`) to reuse `PIXI.Graphics` objects. The hub renderer (`hub.ts:183-222`) creates 5+ new Graphics objects every frame. The VAB renderer (`vab.ts:304, 335, 370`) does the same during part dragging at 60fps. This generates GC pressure.
+**Current state:** Coverage is only enforced on `src/core/**` with thresholds: lines 89%, branches 80%, functions 91%. The render layer (`src/render/`, ~5,900 lines) and UI layer (`src/ui/`, ~28,000 lines) — comprising ~55% of the codebase — have no coverage enforcement.
 
-**Change:** Generalize the object pool to cover all renderers:
-
-- **Option A:** Extend `_pool.ts` to be a shared pool used by flight, hub, and VAB
-- **Option B:** Create a generic pool utility and have each renderer maintain its own pool instance
-
-Either approach works. The key requirements:
-- Hub's `_drawScene()` must reuse Graphics objects instead of creating new ones each frame
-- VAB's part rendering, ghost layer, and mirror mode must reuse Graphics objects
-- Pool cleanup must happen when each renderer is destroyed/unmounted
-- The existing flight pool behaviour must not change
-
-### 3.2 Web Worker Physics
-
-Move the physics simulation (`tick()` and orbital calculations) off the main thread into a Web Worker. This prevents physics from blocking the render thread during complex time-warp scenarios.
-
-**Architecture:**
-
-The readonly render snapshot interfaces from Iteration 3 (`ReadonlyPhysicsState`, `ReadonlyFlightState`, etc.) provide the boundary. The worker owns the mutable state; the main thread receives readonly snapshots for rendering.
-
-**Worker responsibilities:**
-- Run `tick()` (gravity, drag, fuel consumption, staging)
-- Run orbital mechanics calculations (Kepler solver, orbit propagation)
-- Run flight phase evaluation
-- Own the mutable physics state
-
-**Main thread responsibilities:**
-- Render using readonly state snapshots received from the worker
-- Handle user input (throttle, staging, abort) and send commands to the worker
-- Handle UI updates (HUD, map view)
-
-**Communication protocol:**
-- Main → Worker: commands (set throttle, stage, abort, set time warp, start/stop)
-- Worker → Main: state snapshots at the render frame rate (or at a fixed rate the main thread interpolates from)
-- Use `postMessage` with transferable objects where possible to minimize copy overhead
-- State snapshots should be structured to match the readonly interfaces
-
-**Considerations:**
-- The worker needs access to data catalogs (parts, bodies, missions) — these are immutable and can be sent once at worker initialization
-- Time warp is the critical scenario: at high warp, the worker runs many physics ticks per frame and sends a snapshot when done
-- If the worker falls behind (very high warp), the main thread should render the latest available snapshot rather than queuing
-- Error handling: if the worker crashes, detect it on the main thread and fall back to main-thread physics (or show an error)
-- The flight controller loop needs refactoring: currently it calls `tick()` directly — it needs to instead send a command to the worker and receive snapshots
-
-**Fallback:**
-- Keep the ability to run physics on the main thread (for browsers that don't support Web Workers, or as a debugging mode)
-- A flag in settings or a runtime check can control which mode is used
-
-**Testing:**
-- Unit tests for the worker message protocol (command → snapshot round trip)
-- The existing physics unit tests should still pass (they test the core functions directly, which don't change)
-- E2E tests should work unchanged since they interact through the UI, not directly with physics
-
----
-
-## 4. Type Safety
-
-### 4.1 Eliminate All `as any` Casts
-
-**Current state:** 130 `as any` casts across 26 source files. These bypass TypeScript's type checking and can mask runtime errors.
-
-**Full file list with cast counts:**
-
-| File | Count |
-|------|-------|
-| `staging.ts` | 28 |
-| `challenges.ts` | 15 |
-| `contracts.ts` | 11 |
-| `crew.ts` | 8 |
-| `debugSaves.ts` | 8 |
-| `docking.ts` | 8 |
-| `flightReturn.ts` | 7 |
-| `grabbing.ts` | 7 |
-| `physics.ts` | 5 |
-| Remaining 17 files | ~33 |
-
-**Approach for each cast:**
-1. Identify what type the value actually is
-2. If an interface is missing or incomplete, extend it (in `gameState.ts` or a local types file)
-3. If the property genuinely doesn't exist on the type, add it to the interface
-4. If it's a type narrowing issue, use type guards or assertion functions
-5. For test files (`debugSaves.ts`), `Partial<T>` and test-specific factory types are acceptable
-
-**Rules:**
-- Do not change runtime behaviour — this is a types-only pass
-- Do not add runtime type checks to replace casts (unless the cast was masking a genuine bug)
-- `as unknown as T` is acceptable in rare cases where the type system can't express the relationship, but prefer proper typing
-- After the sweep, add an ESLint rule or `tsconfig` setting to prevent new `as any` usage (e.g., `@typescript-eslint/no-explicit-any` as a warning)
-
-### 4.2 Remove `jsToTsResolve` Vite Plugin
-
-**Current state:** The `jsToTsResolve` plugin in `vite.config.js` resolves `.js` import specifiers to `.ts` files. It was needed during the incremental TS migration. Now that all source files are TypeScript, it's unnecessary overhead.
-
-**Change:**
-- Update all import specifiers across the codebase from `.js` extensions to `.ts` extensions
-- Remove the `jsToTsResolve` plugin from `vite.config.js`
-- Verify the build still works: `npm run build`, `npm run dev`, `npm run typecheck`
-
-**Scope:** This touches every file that imports another source file with a `.js` extension. It's mechanical (find-and-replace `.js'` → `.ts'` in import statements) but needs verification that no edge cases break (e.g., imports of actual `.js` files from `node_modules`, dynamic imports, test files).
-
-**Note:** E2E test files and Playwright config are not part of the Vite pipeline — they may keep `.js` extensions if they're not TypeScript.
-
----
-
-## 5. Code Cleanup
-
-### 5.1 Standardize Event Listener Cleanup in `crewAdmin.ts`
-
-**Current state:** `crewAdmin.ts` uses direct `addEventListener` calls. All other UI modules use `createListenerTracker()` for automatic cleanup on panel close.
-
-**Change:** Migrate `crewAdmin.ts` to use `createListenerTracker()`:
-- Create a tracker instance when the panel opens
-- Route all `addEventListener` calls through the tracker
-- Call the tracker's cleanup method when the panel closes
-- This prevents listener leaks on repeated panel open/close
-
-### 5.2 Remaining Inline Styles
-
-A few inline style assignments remain after the CSS extraction in Iteration 3:
-
-- `crewAdmin.ts` (lines 348, 567-569)
-- `autoSaveToast.ts` (line 100)
-- `flightHud.ts` (lines 392, 406, 423)
-
-These use individual property assignments (`el.style.display = 'none'`, `el.style.opacity = '0'`) rather than CSS classes.
-
-**Change:** For each inline style:
-- Define a CSS class in the module's `.css` file
-- Replace the inline style assignment with `classList.add()` / `classList.remove()` / `classList.toggle()`
-- Use design token custom properties for colours, spacing, etc. where applicable
-
----
-
-## 6. Testing
-
-### 6.1 Raise Branch Coverage for Low Modules
-
-Five modules are significantly below the 80% branch coverage target:
-
-| Module | Branch Coverage | Key Gaps |
-|--------|----------------|----------|
-| `fuelsystem.ts` | 67% | SRB edge cases |
-| `staging.ts` | 67% | Debris physics, landing legs |
-| `mapView.ts` | 67% | Transfer state, shadow calculations |
-| `atmosphere.ts` | 66% (lines) | High-altitude calculations (>100km) |
-| `grabbing.ts` | 53% (lines) | Grab mechanics edge cases |
+**Target thresholds for new layers:**
+- `src/render/`: 50% lines, 40% branches
+- `src/ui/`: 50% lines, 40% branches
 
 **Approach:**
-- Run coverage with `--reporter=lcov` or similar to identify the specific uncovered branches in each module
-- Write targeted unit tests that exercise those branches
-- Goal: bring all five modules to >= 80% branch coverage
-- After tests are written, update the global coverage thresholds if actual coverage has increased
+1. First, measure current coverage for render and UI layers by adding them to the coverage `include` pattern
+2. Identify which render/UI modules are most testable in a Node.js/Vitest environment (pure logic, state transforms, utility functions) vs. those that are DOM/canvas-dependent
+3. Write targeted unit tests for the testable modules to reach the thresholds
+4. Set the thresholds in `vite.config.js`
 
-### 6.2 Tests for New Code
+**Testable render modules (pure logic or minimal DOM):**
+- `pool.ts` — already tested (289 lines of tests)
+- Render utility/helper functions
+- State snapshot transformations
+- Any pure calculation functions in render modules
+
+**Testable UI modules (logic extractable from DOM):**
+- Event handler logic
+- State management functions
+- Utility functions in UI sub-modules
+- Validation logic
+
+**Note:** Some render/UI code is inherently DOM/canvas-dependent and can only be tested via E2E. The 50%/40% floor is set to be achievable without requiring DOM mocking gymnastics. Focus tests on logic, not on canvas drawing calls.
+
+---
+
+## 3. Worker Sole State Ownership
+
+### 3.1 Architecture Overview
+
+**Current state (dual-state shadow pattern):**
+- The worker owns mutable `PhysicsState`, `FlightState`, `RocketAssembly`, and `StagingConfig`
+- The main thread maintains **full mutable copies** of these in `FCState`
+- Each frame, `applyPhysicsSnapshot()` copies ~40+ fields from the worker's snapshot into the main-thread's mutable copies
+- Render and UI code reads from the main-thread copies
+- Control inputs (throttle, angle) are main-thread authority — updated locally and sent to the worker
+
+**Target state (sole ownership):**
+- The worker remains the sole owner of mutable physics state
+- The main thread stores **only** the latest readonly snapshot — no mutable `PhysicsState` or `FlightState` objects
+- Render and UI code reads directly from the readonly snapshot
+- Control inputs remain main-thread authority, stored separately from the snapshot
+- The `applyPhysicsSnapshot()` and `applyFlightSnapshot()` functions are removed entirely
+
+### 3.2 Readonly Snapshot as Single Source of Truth
+
+**Main-thread state model:**
+- `FCState` replaces its mutable `ps: PhysicsState` and `flightState: FlightState` with a single `snapshot: ReadonlyFlightSnapshot` (or similar composite type)
+- The snapshot type should be defined to include all fields that render and UI code needs
+- Control inputs (`throttle`, `angle`) are stored separately in FCState since they're main-thread authority and must not be overwritten by incoming snapshots
+
+**Snapshot reception:**
+- `_workerBridge.ts` stores the incoming snapshot object directly — no field-by-field copy
+- `consumeSnapshot()` returns the snapshot object (or null if none available)
+- The flight loop reads the snapshot and passes it to render/UI functions
+
+### 3.3 Render and UI Migration
+
+All render and UI code that currently reads `ps.x`, `ps.altitude`, `flightState.phase`, etc. from the mutable FCState objects must be updated to read from the readonly snapshot.
+
+**Key areas to update:**
+- `_loop.ts` — pass snapshot to render functions instead of mutable state objects
+- Flight render functions (`src/render/flight/`) — accept snapshot parameters
+- `flightHud.ts` — read HUD values from snapshot
+- `_mapView.ts` — read orbital data from snapshot
+- `_keyboard.ts` — read phase/state for input handling
+- `_docking.ts` — read docking state from snapshot
+- `_postFlight.ts` — read mission results from snapshot
+
+**Approach:** Since render functions already receive state as parameters (not via global import), the migration is primarily a parameter type change at each call site. The snapshot type should be structured so that property access patterns remain similar (e.g., `snapshot.physics.altitude` instead of `ps.altitude`), minimizing the diff.
+
+### 3.4 Main-Thread Fallback
+
+When the Web Worker is disabled (setting or browser doesn't support it), physics runs on the main thread via `tick()`. The fallback path must produce readonly snapshots in the same format as the worker.
+
+**Fix:**
+- Create a `createSnapshotFromState()` function that takes the mutable state (used only in the fallback path) and produces a readonly snapshot
+- The main-thread fallback calls `tick()`, then `createSnapshotFromState()`, and the rest of the pipeline is identical
+- This means render/UI code has a single code path regardless of worker vs. main-thread physics
+
+### 3.5 Removing Dual State
+
+After all consumers read from the snapshot:
+- Remove `applyPhysicsSnapshot()` and `applyFlightSnapshot()` from `_workerBridge.ts`
+- Remove mutable `ps`, `flightState` from `FCState` (keep `assembly` and `stagingConfig` if they're not part of the physics snapshot)
+- Remove any imports of `PhysicsState` / `FlightState` types from UI/render modules that no longer need them
+
+**Testing:**
+- Existing physics unit tests are unaffected (they test core functions, not the bridge)
+- Existing E2E flight tests verify the full pipeline end-to-end
+- New unit tests should verify:
+  - `createSnapshotFromState()` produces correct snapshot from mutable state
+  - Snapshot storage/consumption in the bridge (direct storage, no copy)
+  - Main-thread fallback produces snapshots identical to worker snapshots
+  - Control inputs (throttle/angle) are not overwritten by snapshot consumption
+
+---
+
+## 4. Performance Monitoring Dashboard
+
+### 4.1 Performance Monitor Module
+
+Create a core performance monitoring module that collects metrics during gameplay.
+
+**Metrics to collect:**
+- **FPS:** current, rolling average (last 60 frames), minimum (last 60 frames)
+- **Frame time:** current frame duration in ms, histogram buckets (0-8ms, 8-16ms, 16-33ms, 33ms+)
+- **Worker round-trip latency:** time from snapshot request to snapshot received (only when worker physics is active)
+- **Memory:** JS heap size (via `performance.memory` where available — Chrome only, graceful no-op on other browsers)
+
+**Design:**
+- Module at `src/core/perfMonitor.ts`
+- Lightweight — metrics collection must not measurably impact frame times
+- Uses a fixed-size circular buffer for history (no growing arrays)
+- Exposes `beginFrame()` / `endFrame()` lifecycle hooks and a `getMetrics()` function returning a snapshot of current values
+- The monitor is always running when enabled but does no DOM work — it only collects numbers
+
+### 4.2 Performance Dashboard UI
+
+Create an overlay panel that visualizes the performance metrics.
+
+**Layout:**
+- Semi-transparent overlay in the top-right corner of the game view (similar to debug overlays in game engines)
+- Small footprint — should not obscure gameplay
+- Displays: FPS counter (large), frame time (ms), worker latency (ms), memory (MB)
+- Frame time histogram as a simple bar chart (4 bars for the 4 buckets)
+- Updates every 500ms (not every frame) to avoid the overlay itself being a performance cost
+
+**Toggle:**
+- Accessible via the settings/debug menu
+- Bound to a keyboard shortcut (e.g., F3 or similar, check for conflicts)
+- State stored in `GameState.settings` (persists across sessions)
+
+### 4.3 Integration Points
+
+- **Flight loop** (`_loop.ts`): call `beginFrame()` at loop start, `endFrame()` at loop end
+- **Worker bridge** (`_workerBridge.ts`): record snapshot send/receive timestamps for latency calculation
+- **Hub loop** and **VAB loop**: also instrument with `beginFrame()`/`endFrame()` if they have render loops
+
+### 4.4 Settings Integration
+
+- Add `showPerfDashboard: boolean` to the settings in `GameState`
+- Default to `false`
+- Save/load with the game (it's a setting, follows existing settings persistence)
+- The dashboard CSS/HTML is only injected when enabled (lazy creation)
+
+---
+
+## 5. Testing
+
+### 5.1 Tests for New Code
 
 All new code introduced in this iteration needs tests:
 
-- **Web Worker physics** — message protocol, command handling, snapshot generation, error/fallback behaviour
-- **Save compression** — round-trip integrity, backward compatibility with uncompressed saves
-- **Async save API** — await behaviour, error propagation, IndexedDB fallback now properly awaited
-- **Deeper save validation** — corrupted nested entries filtered, valid entries preserved
-- **Undo/redo error handling** — stack integrity on callback failure
-- **Logger circular reference** — no crash on circular data
-- **Object pool in hub/VAB** — pool reuse verified, cleanup on destroy
+- **Worker ready timeout** — timeout fires and rejects, timeout cleared on success
+- **escapeHtml utility** — escapes all special characters, handles edge cases (empty string, already-escaped input, non-string input)
+- **Performance monitor** — FPS calculation, frame time histogram bucketing, circular buffer overflow, getMetrics() snapshot accuracy
+- **Readonly snapshot consumption** — direct storage, no mutation, control inputs preserved
+- **createSnapshotFromState()** — correct field mapping from mutable state to readonly snapshot
+- **Main-thread fallback snapshot generation** — produces same format as worker snapshots
 
-These are specified inline in each section above but collected here for clarity.
+### 5.2 Render/UI Layer Tests for Coverage
+
+Write targeted unit tests to bring the render and UI layers to the 50%/40% threshold. Focus on:
+- Pure logic functions in render/UI modules
+- State transformation helpers
+- Event handler logic (extracted from DOM)
+- Validation and calculation functions
 
 ---
 
-## 7. Verification
+## 6. Verification
 
 After all changes are complete, run:
 
-1. `npm run typecheck` — no errors, no `as any` casts (or only justified exceptions)
+1. `npm run typecheck` — no errors
 2. `npm run lint` — no errors
 3. `npm run test:unit` — all tests pass
 4. `npm run test:e2e` — all E2E specs pass
-5. `npm run test:coverage` — meets or exceeds thresholds, low modules now above 80%
-6. `npm run build` — production build succeeds without the `jsToTsResolve` plugin
-7. Manual verification: open the game, attempt a docking mission (verifies PixiJS fix), perform a save/load cycle (verifies async save + compression), check save slot version indicators, open VAB and test undo/redo error recovery, run a long hub session and monitor GC pauses (verifies pool), run high time-warp flight (verifies Web Worker physics)
+5. `npm run build` — production build succeeds
+6. Coverage meets or exceeds thresholds for all three layers (core, render, UI)
+7. Manual verification: start a flight with worker physics — verify the performance dashboard toggles on/off, HUD displays correct values from readonly snapshots, time-warp performance is smooth. Verify the worker timeout by temporarily breaking the worker init (should fall back to main-thread physics within 10s). Open the save/load screen and verify the flow still works with the async save pipeline.
