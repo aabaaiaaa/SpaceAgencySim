@@ -53,7 +53,7 @@ import {
   setPanelCallbacks,
   updateUndoRedoButtons,
 } from './_panels.js';
-import { setUndoRedoChangeCallback, clearUndoRedo } from '../../core/undoRedo.js';
+import { setUndoRedoChangeCallback, setUndoRedoErrorCallback, clearUndoRedo } from '../../core/undoRedo.js';
 
 // ---------------------------------------------------------------------------
 // Wrapped helpers that close over the public API
@@ -347,6 +347,7 @@ export function initVabUI(
 
   // ── Undo/redo button click handlers + change callback ───────────────────
   setUndoRedoChangeCallback(updateUndoRedoButtons);
+  setUndoRedoErrorCallback((msg) => showToast(msg));
   clearUndoRedo();
 
   // ── Restore visual state if returning to a previous assembly ─────────────

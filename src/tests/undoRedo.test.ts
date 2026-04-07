@@ -10,7 +10,7 @@
  *   - clearUndoRedo empties both stacks
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   pushUndoAction,
   undo,
@@ -23,6 +23,7 @@ import {
   peekUndoLabel,
   peekRedoLabel,
   setUndoRedoChangeCallback,
+  setUndoRedoErrorCallback,
   UNDO_MAX_DEPTH,
 } from '../core/undoRedo.js';
 import {
@@ -529,5 +530,175 @@ describe('Undo/Redo — change callback', () => {
 
     // Clean up callback.
     setUndoRedoChangeCallback(null);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Error handling — undo/redo callback throwing
+// ---------------------------------------------------------------------------
+
+describe('Undo/Redo — error handling', () => {
+  beforeEach(() => {
+    setUndoRedoErrorCallback(null);
+  });
+
+  it('undo callback throwing preserves stack integrity (action stays on undo stack)', () => {
+    pushUndoAction({
+      type: 'place',
+      label: 'Exploding undo',
+      undo() { throw new Error('undo boom'); },
+      redo() {},
+    });
+
+    expect(undoStackSize()).toBe(1);
+    expect(redoStackSize()).toBe(0);
+
+    const result = undo();
+
+    // undo() should return null on failure.
+    expect(result).toBeNull();
+    // The action should be pushed back onto the undo stack.
+    expect(undoStackSize()).toBe(1);
+    expect(redoStackSize()).toBe(0);
+    expect(peekUndoLabel()).toBe('Exploding undo');
+  });
+
+  it('redo callback throwing preserves stack integrity (action stays on redo stack)', () => {
+    pushUndoAction({
+      type: 'place',
+      label: 'Exploding redo',
+      undo() {},
+      redo() { throw new Error('redo boom'); },
+    });
+
+    // Move action to redo stack via a successful undo.
+    undo();
+    expect(undoStackSize()).toBe(0);
+    expect(redoStackSize()).toBe(1);
+
+    const result = redo();
+
+    // redo() should return null on failure.
+    expect(result).toBeNull();
+    // The action should be pushed back onto the redo stack.
+    expect(redoStackSize()).toBe(1);
+    expect(undoStackSize()).toBe(0);
+    expect(peekRedoLabel()).toBe('Exploding redo');
+  });
+
+  it('error is logged via logger.error when undo throws', async () => {
+    // Spy on the logger.
+    const { logger } = await import('../core/logger.js');
+    const spy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+
+    pushUndoAction({
+      type: 'move',
+      label: 'Bad undo',
+      undo() { throw new Error('test error'); },
+      redo() {},
+    });
+
+    undo();
+
+    expect(spy).toHaveBeenCalledWith(
+      'undoRedo',
+      'Undo callback threw',
+      expect.objectContaining({ label: 'Bad undo' }),
+    );
+
+    spy.mockRestore();
+  });
+
+  it('error is logged via logger.error when redo throws', async () => {
+    const { logger } = await import('../core/logger.js');
+    const spy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+
+    pushUndoAction({
+      type: 'move',
+      label: 'Bad redo',
+      undo() {},
+      redo() { throw new Error('test error'); },
+    });
+
+    undo();
+    redo();
+
+    expect(spy).toHaveBeenCalledWith(
+      'undoRedo',
+      'Redo callback threw',
+      expect.objectContaining({ label: 'Bad redo' }),
+    );
+
+    spy.mockRestore();
+  });
+
+  it('error callback is invoked with "Undo failed" on undo throw', () => {
+    const errorMessages: string[] = [];
+    setUndoRedoErrorCallback((msg) => errorMessages.push(msg));
+
+    pushUndoAction({
+      type: 'place',
+      label: 'Failing undo',
+      undo() { throw new Error('fail'); },
+      redo() {},
+    });
+
+    undo();
+
+    expect(errorMessages).toEqual(['Undo failed']);
+    setUndoRedoErrorCallback(null);
+  });
+
+  it('error callback is invoked with "Redo failed" on redo throw', () => {
+    const errorMessages: string[] = [];
+    setUndoRedoErrorCallback((msg) => errorMessages.push(msg));
+
+    pushUndoAction({
+      type: 'place',
+      label: 'Failing redo',
+      undo() {},
+      redo() { throw new Error('fail'); },
+    });
+
+    undo();
+    redo();
+
+    expect(errorMessages).toEqual(['Redo failed']);
+    setUndoRedoErrorCallback(null);
+  });
+
+  it('other actions still work after an undo failure', () => {
+    let value = 0;
+
+    pushUndoAction({
+      type: 'place',
+      label: 'Good action',
+      undo() { value = -1; },
+      redo() { value = 1; },
+    });
+    pushUndoAction({
+      type: 'place',
+      label: 'Bad action',
+      undo() { throw new Error('fail'); },
+      redo() {},
+    });
+
+    // Bad action fails — should remain on undo stack.
+    undo();
+    expect(undoStackSize()).toBe(2);
+    expect(value).toBe(0);
+
+    // Pop the bad action manually isn't possible, but the good action beneath
+    // is still intact. Let's verify by clearing and re-pushing.
+    clearUndoRedo();
+    pushUndoAction({
+      type: 'place',
+      label: 'Another good action',
+      undo() { value = 42; },
+      redo() { value = 99; },
+    });
+    const result = undo();
+    expect(result).not.toBeNull();
+    expect(value).toBe(42);
   });
 });

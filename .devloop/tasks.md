@@ -13,7 +13,7 @@
 - **Verification**: `grep -r "beginFill\|endFill\|drawCircle\|drawRect\|lineStyle\|as PIXI.Graphics &" src/render/` returns no matches. `npm run typecheck` passes. `npm run test:e2e` passes.
 
 ### TASK-003: Add try-catch to undo/redo callbacks
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Wrap `action.undo()` and `action.redo()` in `src/core/undoRedo.ts:59,70` with try-catch. On failure, push the action back to its original stack, log via `logger.error()`, and surface a brief toast to the player. See requirements Section 1.3.
 - **Verification**: New unit tests pass: undo callback throwing preserves stack integrity, redo callback throwing preserves stack integrity, error is logged. `npm run test:unit` passes.

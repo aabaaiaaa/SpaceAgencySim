@@ -7,6 +7,8 @@
  * Stack depth is capped at MAX_DEPTH to bound memory usage.
  */
 
+import { logger } from './logger.js';
+
 export type ActionType = 'place' | 'delete' | 'move' | 'staging' | 'clearAll';
 
 export interface UndoAction {
@@ -27,11 +29,21 @@ let _redoStack: UndoAction[] = [];
 
 let _onChangeCallback: (() => void) | null = null;
 
+let _onErrorCallback: ((message: string) => void) | null = null;
+
 /**
  * Register a callback invoked whenever the stack changes (push/undo/redo/clear).
  */
-export function setUndoRedoChangeCallback(cb: () => void): void {
+export function setUndoRedoChangeCallback(cb: (() => void) | null): void {
   _onChangeCallback = cb;
+}
+
+/**
+ * Register a callback invoked when an undo/redo callback throws.
+ * The message parameter is a user-facing string like "Undo failed" / "Redo failed".
+ */
+export function setUndoRedoErrorCallback(cb: ((message: string) => void) | null): void {
+  _onErrorCallback = cb;
 }
 
 function _notifyChange(): void {
@@ -56,7 +68,16 @@ export function pushUndoAction(action: UndoAction): void {
 export function undo(): UndoAction | null {
   const action = _undoStack.pop();
   if (!action) return null;
-  action.undo();
+  try {
+    action.undo();
+  } catch (err) {
+    // Restore the action to the undo stack so the system stays consistent.
+    _undoStack.push(action);
+    logger.error('undoRedo', 'Undo callback threw', { label: action.label, error: String(err) });
+    if (_onErrorCallback) _onErrorCallback('Undo failed');
+    _notifyChange();
+    return null;
+  }
   _redoStack.push(action);
   _notifyChange();
   return action;
@@ -68,7 +89,16 @@ export function undo(): UndoAction | null {
 export function redo(): UndoAction | null {
   const action = _redoStack.pop();
   if (!action) return null;
-  action.redo();
+  try {
+    action.redo();
+  } catch (err) {
+    // Restore the action to the redo stack so the system stays consistent.
+    _redoStack.push(action);
+    logger.error('undoRedo', 'Redo callback threw', { label: action.label, error: String(err) });
+    if (_onErrorCallback) _onErrorCallback('Redo failed');
+    _notifyChange();
+    return null;
+  }
   _undoStack.push(action);
   if (_undoStack.length > MAX_DEPTH) {
     _undoStack.shift();
