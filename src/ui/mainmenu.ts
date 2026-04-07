@@ -379,7 +379,7 @@ function _buildSaveCard(summary: SaveSlotSummary): HTMLDivElement {
     if (!btn) return;
     const action: string | undefined = btn.dataset.action;
     const slot: number   = Number(btn.dataset.slot);
-    if (action === 'load')   { _handleLoad(slot); }
+    if (action === 'load')   { void _handleLoad(slot); }
     if (action === 'export') { _handleExport(slot); }
     if (action === 'delete') { _handleDeleteConfirm(slot, summary.saveName); }
   });

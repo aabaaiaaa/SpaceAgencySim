@@ -359,7 +359,7 @@ export async function loadGame(slotIndex: number): Promise<GameState> {
       }
     } catch (e) {
       if (e instanceof SyntaxError) {
-        throw new Error(`Save slot ${slotIndex} contains corrupt data (invalid JSON).`);
+        throw new Error(`Save slot ${slotIndex} contains corrupt data (invalid JSON).`, { cause: e });
       }
       throw e;
     }

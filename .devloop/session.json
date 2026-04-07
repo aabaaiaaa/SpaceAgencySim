@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 22,
+  "lastIteration": 23,
   "startedAt": "2026-04-06T23:44:48.505Z",
   "iteration": 1,
   "devloopVersion": "3.2.0",
   "activeTask": {
-    "taskId": "TASK-023",
-    "taskTitle": "Update coverage thresholds and lock gains",
-    "iterationNumber": 23,
-    "startedAt": "2026-04-07T11:44:21.443Z"
+    "taskId": "TASK-024",
+    "taskTitle": "Verification pass — run all checks",
+    "iterationNumber": 24,
+    "startedAt": "2026-04-07T11:45:49.287Z"
   }
 }

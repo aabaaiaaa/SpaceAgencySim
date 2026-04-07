@@ -139,7 +139,7 @@
 - **Verification**: `npm run test:coverage` passes with the new thresholds. Thresholds are >= previous values (lines 89%, branches 80%, functions 91%).
 
 ### TASK-024: Verification pass — run all checks
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-007, TASK-008, TASK-009, TASK-010, TASK-011, TASK-012, TASK-013, TASK-014, TASK-015, TASK-016, TASK-017, TASK-018, TASK-019, TASK-020, TASK-021, TASK-022, TASK-023
 - **Description**: Run the full verification suite from requirements Section 7: `npm run typecheck`, `npm run lint`, `npm run test:coverage`, `npm run test:e2e` and `npm run build`. All must pass. Fix any issues found.
 - **Verification**: All six commands complete with zero errors. No `as any` casts remain (or only justified exceptions). No deprecated PixiJS v7 API usage. No `jsToTsResolve` plugin. Coverage thresholds met.

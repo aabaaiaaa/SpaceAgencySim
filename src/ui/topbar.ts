@@ -974,12 +974,12 @@ function _openSaveSlotPicker(): void {
 
     // Capture slot index in closure
     const slotIndex: number = i;
-    card.addEventListener('click', async () => {
+    card.addEventListener('click', () => {
       const saveName: string = _state!.agencyName || 'New Save';
       syncVabToGameState();
-      await saveGame(_state!, slotIndex, saveName);
-      backdrop.remove();
-
+      void saveGame(_state!, slotIndex, saveName).then(() => {
+        backdrop.remove();
+      });
     });
 
     modal.appendChild(card);
@@ -1122,17 +1122,16 @@ function _confirmAndLoad(slotIndex: number, loadBackdrop: HTMLElement): void {
   confirmBtn.className = 'confirm-btn confirm-btn-primary';
   confirmBtn.dataset.testid = 'load-confirm-btn';
   confirmBtn.textContent = 'Load Game';
-  confirmBtn.addEventListener('click', async () => {
+  confirmBtn.addEventListener('click', () => {
     backdrop.remove();
-    try {
-      const loadedState = await loadGame(slotIndex);
+    void loadGame(slotIndex).then((loadedState) => {
       reconcileParts(loadedState);
       if (_onLoadGame) {
         _onLoadGame(loadedState);
       }
-    } catch (err: unknown) {
+    }).catch((err: unknown) => {
       logger.error('topbar', 'Load failed', { error: String(err) });
-    }
+    });
   });
 
   btnRow.appendChild(cancelBtn);
