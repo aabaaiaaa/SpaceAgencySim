@@ -33,6 +33,7 @@ import {
   handleMenuFlightLog,
 } from './_menuActions.js';
 import { logger } from '../../core/logger.js';
+import { initPhysicsWorker, resyncWorkerState, terminatePhysicsWorker } from './_workerBridge.js';
 
 import type { PhysicsState } from '../../core/physics.js';
 import type { RocketAssembly, StagingConfig, PlacedPart } from '../../core/rocketbuilder.js';
@@ -48,6 +49,8 @@ declare global {
     __getMalfunctionMode: (() => string) | undefined;
     __testSetTimeWarp: ((speedMultiplier: number) => void) | undefined;
     __testGetTimeWarp: (() => number) | undefined;
+    /** Re-sync the physics worker with the current main-thread state. */
+    __resyncPhysicsWorker: (() => Promise<void>) | undefined;
   }
 }
 
@@ -178,6 +181,15 @@ export function startFlightScene(
       s.timeWarp = speedMultiplier;
     };
     window.__testGetTimeWarp = () => s.timeWarp;
+
+    // Re-sync API: after E2E helpers directly modify __flightPs / __flightState
+    // (e.g. teleportCraft), call this to push the updated state to the worker.
+    window.__resyncPhysicsWorker = async () => {
+      const st = getFCState();
+      if (st.workerActive && st.ps && st.assembly && st.stagingConfig && st.flightState) {
+        await resyncWorkerState(st.ps, st.assembly, st.stagingConfig, st.flightState);
+      }
+    };
   }
 
   // Boot the PixiJS flight renderer.
@@ -267,6 +279,32 @@ export function startFlightScene(
   s.lastTs = performance.now();
   s.rafId  = requestAnimationFrame(loop);
 
+  // Initialise the physics worker if the setting is enabled.
+  if (state.useWorkerPhysics !== false && typeof Worker !== 'undefined') {
+    initPhysicsWorker(s.ps, s.assembly, s.stagingConfig, flightState)
+      .then(() => {
+        // The worker loaded with the initial state, but the main-thread may
+        // have advanced physics or processed staging while the worker was
+        // loading.  Re-init the worker with the CURRENT state so it starts
+        // from the exact same point as the main-thread.
+        const current = getFCState();
+        if (current.ps && current.assembly && current.stagingConfig && current.flightState) {
+          return resyncWorkerState(current.ps, current.assembly, current.stagingConfig, current.flightState);
+        }
+      })
+      .then(() => {
+        // Mark worker as active — the loop will use it from the next frame.
+        const current = getFCState();
+        if (current.ps && current.assembly) {
+          current.workerActive = true;
+          logger.debug('flight', 'Physics worker initialised and active');
+        }
+      })
+      .catch((err) => {
+        // Worker failed to initialise — continue with main-thread physics.
+        logger.warn('flight', 'Physics worker failed to initialise, using main-thread physics', { error: String(err) });
+      });
+  }
 
 }
 
@@ -283,6 +321,12 @@ export function stopFlightScene(): void {
   if (s.rafId !== null) {
     cancelAnimationFrame(s.rafId);
     s.rafId = null;
+  }
+
+  // Terminate the physics worker if it was active.
+  if (s.workerActive) {
+    terminatePhysicsWorker();
+    s.workerActive = false;
   }
 
   if (s.keydownHandler) {
@@ -314,6 +358,7 @@ export function stopFlightScene(): void {
     window.__flightState    = null;
     window.__testSetTimeWarp = undefined;
     window.__testGetTimeWarp = undefined;
+    window.__resyncPhysicsWorker = undefined;
   }
 
   // Reset all state.

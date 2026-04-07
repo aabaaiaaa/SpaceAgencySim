@@ -701,6 +701,8 @@ export interface GameState {
   autoSaveEnabled: boolean;
   /** Whether debug mode is enabled (debug saves, FPS monitor, etc.). Default: off. */
   debugMode: boolean;
+  /** Whether physics runs in a Web Worker (true) or on the main thread (false). Default: on. */
+  useWorkerPhysics: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -834,6 +836,9 @@ export function createGameState(): GameState {
 
     // Debug mode — disabled by default.
     debugMode: false,
+
+    // Worker physics — enabled by default.
+    useWorkerPhysics: true,
   };
 }
 

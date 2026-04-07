@@ -1,6 +1,14 @@
 /**
  * _loop.ts — The RAF game loop function and related helpers.
  *
+ * Supports two physics modes:
+ *   1. **Main-thread** (default fallback): calls `tick()` directly each frame.
+ *   2. **Web Worker**: sends a `tick` command to the physics worker and
+ *      applies the returned snapshot to the local state for rendering.
+ *
+ * The active mode is determined by `FCState.workerActive`.  On worker error
+ * the loop automatically falls back to main-thread physics.
+ *
  * @module ui/flightController/_loop
  */
 
@@ -16,16 +24,29 @@ import { evaluateComms } from '../../core/comms.js';
 import { FlightPhase } from '../../core/constants.js';
 import { PartType } from '../../core/constants.js';
 import { getPartById } from '../../data/parts.js';
+import { getPhaseLabel } from '../../core/flightPhase.js';
+import { getOrbitEntryLabel, checkOrbitStatus } from '../../core/orbit.js';
 import { getFCState } from './_state.js';
 import { recordFrame } from '../fpsMonitor.js';
 import { logger } from '../../core/logger.js';
 import { checkTimeWarpResets, applyTimeWarp } from './_timeWarp.js';
 import { applyMapThrust, updateMapHud } from './_mapView.js';
 import { applyNormalOrbitRcs } from './_orbitRcs.js';
-import { evaluateFlightPhase } from './_flightPhase.js';
+import { evaluateFlightPhase, showPhaseNotification } from './_flightPhase.js';
 import { tickDockingSystem, updateDockingHud } from './_docking.js';
 import { showPostFlightSummary } from './_postFlight.js';
 import { handleAbortReturnToAgency } from './_menuActions.js';
+import {
+  isWorkerReady,
+  hasWorkerError,
+  consumeSnapshot,
+  sendTick,
+  sendThrottle,
+  sendAngle,
+  applyPhysicsSnapshot,
+  applyFlightSnapshot,
+  terminatePhysicsWorker,
+} from './_workerBridge.js';
 
 /** Maximum consecutive loop errors before showing the abort banner. */
 export const MAX_CONSECUTIVE_LOOP_ERRORS: number = 5;
@@ -56,6 +77,54 @@ function _allCommandModulesDestroyed(): boolean {
 }
 
 /**
+ * When a worker snapshot causes a flight-phase change, show the appropriate
+ * UI notification.  This mirrors the logic in `evaluateFlightPhase()` but
+ * is driven by comparing the previous and current phases rather than by the
+ * return value of `evaluateAutoTransitions()`.
+ */
+function _handleWorkerPhaseTransition(prevPhase: string, newPhase: string): void {
+  const s = getFCState();
+  if (!s.ps || !s.flightState) return;
+
+  if (newPhase === FlightPhase.ORBIT) {
+    const bodyId = s.flightState.bodyId || 'EARTH';
+    const orbitStatus = checkOrbitStatus(s.ps.posX, s.ps.posY, s.ps.velX, s.ps.velY, bodyId);
+    if (orbitStatus) {
+      showPhaseNotification(getOrbitEntryLabel(orbitStatus));
+    } else {
+      showPhaseNotification(getPhaseLabel(newPhase));
+    }
+  } else if (newPhase === FlightPhase.MANOEUVRE) {
+    showPhaseNotification('Manoeuvre');
+    applyTimeWarp(1);
+  } else if (newPhase === FlightPhase.TRANSFER) {
+    showPhaseNotification('Transfer Injection');
+    applyTimeWarp(1);
+  } else if (newPhase === FlightPhase.CAPTURE) {
+    showPhaseNotification(`Entering ${s.flightState.bodyId || 'destination'} SOI`);
+    applyTimeWarp(1);
+  } else if (newPhase === FlightPhase.REENTRY) {
+    showPhaseNotification('Re-Entry');
+    applyTimeWarp(1);
+  } else {
+    showPhaseNotification(getPhaseLabel(newPhase));
+  }
+}
+
+/**
+ * Fall back from worker physics to main-thread physics.
+ * Called when the worker encounters an error.
+ */
+function _fallbackToMainThread(): void {
+  const s = getFCState();
+  if (!s.workerActive) return;
+
+  logger.warn('flightLoop', 'Falling back to main-thread physics (worker error)');
+  s.workerActive = false;
+  terminatePhysicsWorker();
+}
+
+/**
  * One animation frame: advance physics, render scene, re-schedule.
  */
 export function loop(timestamp: number): void {
@@ -73,7 +142,31 @@ export function loop(timestamp: number): void {
   // Feed frame timing to the FPS monitor (no-ops if not initialised).
   recordFrame(realDt * 1000, timestamp);
 
+  // Detect worker error and fall back to main-thread physics.
+  if (s.workerActive && hasWorkerError()) {
+    _fallbackToMainThread();
+  }
+
   try {
+    // ---- Worker snapshot application (FIRST) ----
+    // Apply the latest snapshot from the worker BEFORE any per-frame control
+    // processing.  This ensures control inputs (keyboard, HUD buttons, comms
+    // lockout, map thrust, orbit RCS) operate on the latest physics state and
+    // are not overwritten by a stale snapshot.
+    if (s.workerActive && isWorkerReady()) {
+      const snap = consumeSnapshot();
+      if (snap) {
+        const prevPhase = flightState.phase;
+        applyPhysicsSnapshot(ps, snap.physics);
+        applyFlightSnapshot(flightState, snap.flight);
+
+        // Detect phase transition from the worker snapshot.
+        if (flightState.phase !== prevPhase) {
+          _handleWorkerPhaseTransition(prevPhase, flightState.phase);
+        }
+      }
+    }
+
     // Evaluate time-warp reset conditions before advancing physics.
     checkTimeWarpResets(timestamp);
 
@@ -112,11 +205,31 @@ export function loop(timestamp: number): void {
     // Reset per-frame science flag before sub-steps.
     (flightState as any).scienceModuleRunning = false;
 
-    // Advance physics simulation with the current warp multiplier.
-    tick(ps, assembly, stagingConfig, flightState, realDt, s.timeWarp);
+    // ---- Physics tick: worker or main-thread ----
+    if (s.workerActive && isWorkerReady()) {
+      // Sync throttle to worker — main thread is the authority for throttle
+      // (captures HUD buttons, keyboard events, comms lockout).
+      sendThrottle(ps.throttle);
 
-    // --- Flight phase state machine: auto-detect transitions each frame ---
-    evaluateFlightPhase();
+      // Sync angle to worker only when orbital thrust overrides the normal
+      // rotation (map thrust or orbit RCS compute orbital-relative angles).
+      // During normal flight, the worker handles A/D key rotation internally.
+      if (s.mapThrusting || s.normalOrbitThrusting) {
+        sendAngle(ps.angle);
+      }
+
+      // Send tick command to worker.
+      sendTick(realDt, s.timeWarp);
+
+      // Run supplementary flight-phase logic that is UI-only:
+      // orbit recalculation for map rendering, control mode resets.
+      // Skip evaluateAutoTransitions (worker already handled it).
+      evaluateFlightPhase(true);
+    } else {
+      // Main-thread physics — direct tick.
+      tick(ps, assembly, stagingConfig, flightState, realDt, s.timeWarp);
+      evaluateFlightPhase();
+    }
 
     // --- Docking system tick ---
     tickDockingSystem(realDt);

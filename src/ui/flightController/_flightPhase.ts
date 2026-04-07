@@ -104,8 +104,14 @@ function _showDeorbitWarning(bodyId: string): void {
  * the result to the state machine.
  * Shows a notification label on phase transitions, including the named altitude
  * band on orbit entry (e.g. "Low Earth Orbit" instead of "Orbit").
+ *
+ * @param skipAutoTransitions  When true, skip the `evaluateAutoTransitions()`
+ *   call and the associated notification logic.  Used in worker-physics mode
+ *   where the worker already handles phase transitions and the main thread
+ *   detects them from snapshot diffs.  Orbit recalculation and control mode
+ *   resets still run.
  */
-export function evaluateFlightPhase(): void {
+export function evaluateFlightPhase(skipAutoTransitions = false): void {
   const s = getFCState();
   if (!s.ps || !s.flightState) return;
 
@@ -132,41 +138,43 @@ export function evaluateFlightPhase(): void {
     }
   }
 
-  // Detect REENTRY: if we're in ORBIT and periapsis drops below the minimum
-  // orbit altitude, the player has initiated a de-orbit burn.
-  if (s.flightState.phase === FlightPhase.ORBIT && orbitStatus && !orbitStatus.valid) {
-    if (!isEscapeTrajectory(s.ps, bodyId)) {
-      _showDeorbitWarning(bodyId);
-      return;
-    }
-  }
-
-  const transition = evaluateAutoTransitions(s.flightState, s.ps, orbitStatus);
-
-  if (transition) {
-    if (transition.to === FlightPhase.ORBIT && orbitStatus) {
-      const label: string = getOrbitEntryLabel(orbitStatus);
-      showPhaseNotification(label);
-
-      s.flightState.inOrbit = true;
-      s.flightState.orbitalElements = orbitStatus.elements;
-      s.flightState.orbitBandId = orbitStatus.altitudeBand ? orbitStatus.altitudeBand.id : null;
-    } else if (transition.to === FlightPhase.MANOEUVRE) {
-      showPhaseNotification('Manoeuvre');
-      applyTimeWarp(1);
-    } else if (transition.to === FlightPhase.TRANSFER) {
-      showPhaseNotification('Transfer Injection');
-      applyTimeWarp(1);
-
-      // Auto-open map view during transfer.
-      if (!s.mapActive) {
-        toggleMapView();
+  if (!skipAutoTransitions) {
+    // Detect REENTRY: if we're in ORBIT and periapsis drops below the minimum
+    // orbit altitude, the player has initiated a de-orbit burn.
+    if (s.flightState.phase === FlightPhase.ORBIT && orbitStatus && !orbitStatus.valid) {
+      if (!isEscapeTrajectory(s.ps, bodyId)) {
+        _showDeorbitWarning(bodyId);
+        return;
       }
-    } else if (transition.to === FlightPhase.CAPTURE) {
-      showPhaseNotification(`Entering ${s.flightState.bodyId || 'destination'} SOI`);
-      applyTimeWarp(1);
-    } else {
-      showPhaseNotification(getPhaseLabel(transition.to));
+    }
+
+    const transition = evaluateAutoTransitions(s.flightState, s.ps, orbitStatus);
+
+    if (transition) {
+      if (transition.to === FlightPhase.ORBIT && orbitStatus) {
+        const label: string = getOrbitEntryLabel(orbitStatus);
+        showPhaseNotification(label);
+
+        s.flightState.inOrbit = true;
+        s.flightState.orbitalElements = orbitStatus.elements;
+        s.flightState.orbitBandId = orbitStatus.altitudeBand ? orbitStatus.altitudeBand.id : null;
+      } else if (transition.to === FlightPhase.MANOEUVRE) {
+        showPhaseNotification('Manoeuvre');
+        applyTimeWarp(1);
+      } else if (transition.to === FlightPhase.TRANSFER) {
+        showPhaseNotification('Transfer Injection');
+        applyTimeWarp(1);
+
+        // Auto-open map view during transfer.
+        if (!s.mapActive) {
+          toggleMapView();
+        }
+      } else if (transition.to === FlightPhase.CAPTURE) {
+        showPhaseNotification(`Entering ${s.flightState.bodyId || 'destination'} SOI`);
+        applyTimeWarp(1);
+      } else {
+        showPhaseNotification(getPhaseLabel(transition.to));
+      }
     }
   }
 

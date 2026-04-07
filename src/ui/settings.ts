@@ -283,6 +283,60 @@ export function openSettingsPanel(container: HTMLElement, state: GameState): voi
     content.appendChild(group);
   }
 
+  // -- Worker Physics toggle --
+  {
+    const group: HTMLDivElement = document.createElement('div');
+    group.className = 'settings-group';
+
+    const labelEl: HTMLParagraphElement = document.createElement('p');
+    labelEl.className = 'settings-group-label';
+    labelEl.textContent = 'Worker Physics';
+    group.appendChild(labelEl);
+
+    const hintEl: HTMLParagraphElement = document.createElement('p');
+    hintEl.className = 'settings-group-hint';
+    hintEl.textContent = 'Run physics simulation in a Web Worker (off-thread). Disable to fall back to main-thread physics.';
+    group.appendChild(hintEl);
+
+    const optionsRow: HTMLDivElement = document.createElement('div');
+    optionsRow.className = 'settings-options';
+
+    const onBtn: HTMLButtonElement = document.createElement('button');
+    onBtn.className = 'settings-option-btn';
+    onBtn.textContent = 'On';
+    onBtn.setAttribute('data-setting', 'workerPhysics');
+    onBtn.setAttribute('data-value', 'on');
+
+    const offBtn: HTMLButtonElement = document.createElement('button');
+    offBtn.className = 'settings-option-btn';
+    offBtn.textContent = 'Off';
+    offBtn.setAttribute('data-setting', 'workerPhysics');
+    offBtn.setAttribute('data-value', 'off');
+
+    if (state.useWorkerPhysics !== false) {
+      onBtn.classList.add('active');
+    } else {
+      offBtn.classList.add('active');
+    }
+
+    tracker.add(onBtn, 'click', () => {
+      state.useWorkerPhysics = true;
+      onBtn.classList.add('active');
+      offBtn.classList.remove('active');
+    });
+
+    tracker.add(offBtn, 'click', () => {
+      state.useWorkerPhysics = false;
+      offBtn.classList.add('active');
+      onBtn.classList.remove('active');
+    });
+
+    optionsRow.appendChild(onBtn);
+    optionsRow.appendChild(offBtn);
+    group.appendChild(optionsRow);
+    content.appendChild(group);
+  }
+
   // -- Close button --
   const closeBtn: HTMLButtonElement = document.createElement('button');
   closeBtn.className = 'settings-close-btn';

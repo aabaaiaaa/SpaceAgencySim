@@ -7,6 +7,11 @@
 import { handleKeyDown, handleKeyUp, fireNextStage } from '../../core/physics.js';
 import { hideLaunchTip, lockTimeWarp } from '../flightHud.js';
 import {
+  sendKeyDown as workerKeyDown,
+  sendKeyUp as workerKeyUp,
+  sendStage as workerStage,
+} from './_workerBridge.js';
+import {
   cycleMapZoom,
   getMapZoomLevel,
   setMapZoomLevel,
@@ -166,7 +171,11 @@ export function onKeyDown(e: KeyboardEvent): void {
     s.stagingLockoutUntil = performance.now() + 2_000;
     lockTimeWarp(true);
 
-    fireNextStage(s.ps, s.assembly, s.stagingConfig, s.flightState);
+    if (s.workerActive) {
+      workerStage();
+    } else {
+      fireNextStage(s.ps, s.assembly, s.stagingConfig, s.flightState);
+    }
     hideLaunchTip();
     return;
   }
@@ -202,6 +211,9 @@ export function onKeyDown(e: KeyboardEvent): void {
     }
   }
 
+  if (s.workerActive) {
+    workerKeyDown(e.key);
+  }
   handleKeyDown(s.ps, s.assembly, e.key);
 }
 
@@ -221,5 +233,8 @@ export function onKeyUp(e: KeyboardEvent): void {
     s.normalOrbitHeldKeys.delete(lower);
   }
 
+  if (s.workerActive) {
+    workerKeyUp(e.key);
+  }
   handleKeyUp(s.ps, e.key);
 }

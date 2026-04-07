@@ -240,6 +240,13 @@ export interface KeyUpCommand {
   key: string;
 }
 
+/** Update the rocket's orientation angle. */
+export interface SetAngleCommand {
+  type: 'setAngle';
+  /** Angle in radians (0 = straight up). */
+  angle: number;
+}
+
 /** Stop the worker and clean up. */
 export interface StopCommand {
   type: 'stop';
@@ -250,6 +257,7 @@ export type WorkerCommand =
   | InitCommand
   | TickCommand
   | SetThrottleCommand
+  | SetAngleCommand
   | StageCommand
   | AbortCommand
   | SetTimeWarpCommand

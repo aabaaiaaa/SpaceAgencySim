@@ -86,6 +86,12 @@ export interface FCState {
   loopConsecutiveErrors: number;
   /** The error-abort banner element, if visible. */
   loopErrorBanner: HTMLElement | null;
+
+  // Worker physics
+  /** True when the physics worker is active and handling ticks. */
+  workerActive: boolean;
+  /** Flight phase on the previous frame — used to detect phase transitions from worker snapshots. */
+  prevWorkerPhase: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -143,6 +149,10 @@ function _createDefaultState(): FCState {
     // Loop error tracking
     loopConsecutiveErrors: 0,
     loopErrorBanner: null,
+
+    // Worker physics
+    workerActive: false,
+    prevWorkerPhase: null,
   };
 }
 

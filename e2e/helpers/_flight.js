@@ -94,7 +94,7 @@ export async function getMalfunctionMode(page) {
  * @param {string}  [opts.bodyId]        Celestial body ID (e.g. 'EARTH', 'MOON').
  */
 export async function teleportCraft(page, opts) {
-  await page.evaluate((o) => {
+  await page.evaluate(async (o) => {
     const ps = window.__flightPs;
     const fs = window.__flightState;
     if (!ps || !fs) return;
@@ -125,6 +125,12 @@ export async function teleportCraft(page, opts) {
     // Defensive initialisation.
     if (!fs.phaseLog) fs.phaseLog = [];
     if (!fs.events) fs.events = [];
+
+    // Re-sync the physics worker with the teleported state so the worker
+    // doesn't overwrite the position/velocity on the next snapshot.
+    if (typeof window.__resyncPhysicsWorker === 'function') {
+      await window.__resyncPhysicsWorker();
+    }
   }, opts);
 }
 

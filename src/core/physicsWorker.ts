@@ -411,6 +411,10 @@ export function handleCommand(cmd: WorkerCommand, post: (msg: WorkerMessage) => 
         if (ps) ps.throttle = Math.max(0, Math.min(1, cmd.throttle));
         break;
 
+      case 'setAngle':
+        if (ps) ps.angle = cmd.angle;
+        break;
+
       case 'stage':
         if (ps && assembly && stagingConfig && flightState) {
           fireNextStage(ps, assembly, stagingConfig as any, flightState);

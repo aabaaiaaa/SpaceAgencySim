@@ -489,6 +489,9 @@ export async function loadGame(slotIndex: number): Promise<GameState> {
   // Default debugMode for saves created before the debug mode toggle.
   envelope.state.debugMode ??= false;
 
+  // Default useWorkerPhysics for saves created before the worker physics toggle.
+  envelope.state.useWorkerPhysics ??= true;
+
   // Validate and filter corrupted nested entries (missions, crew, etc.).
   _validateNestedStructures(envelope.state);
 
