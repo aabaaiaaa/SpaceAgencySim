@@ -27,7 +27,7 @@
 - **Verification**: `npm run typecheck -- --noEmit src/core/logger.ts && npx vitest run src/tests/logger.test.ts`
 
 ### TASK-005: Document empty catalog pattern and log IDB mirror failures
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Two small fixes. (1) In `_workerBridge.ts:113-114`, add a code comment explaining that catalogs are sent as empty placeholders because the worker imports them directly via ES module imports. Make `partsCatalog` and `bodiesCatalog` optional (`?`) in the init command type in `physicsWorkerProtocol.ts`. (2) In `saveload.ts`, replace silent `.catch(() => {})` on IndexedDB mirror writes with `.catch(err => logger.debug('saveload', 'IDB mirror write failed', err))`. See requirements Sections 1.5 and 1.6.
 - **Verification**: `npm run typecheck -- --noEmit src/ui/flightController/_workerBridge.ts src/core/physicsWorkerProtocol.ts src/core/saveload.ts && npx vitest run src/tests/physicsWorker.test.ts`

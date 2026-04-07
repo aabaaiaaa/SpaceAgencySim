@@ -247,7 +247,7 @@ export async function saveGame(state: GameState, slotIndex: number, saveName: st
 
   // Mirror to IndexedDB (fire-and-forget).
   if (isIdbAvailable()) {
-    idbSet(key, compressed).catch(() => {});
+    idbSet(key, compressed).catch(err => logger.debug('saveload', 'IDB mirror write failed', err));
   }
 
   return summaryFromEnvelope(slotIndex, envelope);
@@ -523,7 +523,7 @@ export function deleteSave(slotIndex: number): void {
 
   // Mirror deletion to IndexedDB (fire-and-forget).
   if (isIdbAvailable()) {
-    idbDelete(key).catch(() => {});
+    idbDelete(key).catch(err => logger.debug('saveload', 'IDB mirror delete failed', err));
   }
 }
 
@@ -679,7 +679,7 @@ export function importSave(jsonString: string, slotIndex: number): SaveSlotSumma
 
   // Mirror to IndexedDB (fire-and-forget).
   if (isIdbAvailable()) {
-    idbSet(key, compressed).catch(() => {});
+    idbSet(key, compressed).catch(err => logger.debug('saveload', 'IDB mirror write failed', err));
   }
 
   return summaryFromEnvelope(slotIndex, envelope);

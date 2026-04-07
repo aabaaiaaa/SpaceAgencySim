@@ -181,10 +181,10 @@ export interface SerialisedStagingConfig {
 /** Initialise the worker with data catalogs and initial state. */
 export interface InitCommand {
   type: 'init';
-  /** Part catalog — array of all part definitions. */
-  partsCatalog: unknown[];
-  /** Celestial body catalog — record of body definitions. */
-  bodiesCatalog: Record<string, unknown>;
+  /** Part catalog — optional; worker imports catalogs directly via ES modules. */
+  partsCatalog?: unknown[];
+  /** Celestial body catalog — optional; worker imports catalogs directly via ES modules. */
+  bodiesCatalog?: Record<string, unknown>;
   /** Initial physics state snapshot. */
   physicsState: PhysicsSnapshot;
   /** Initial flight state. */

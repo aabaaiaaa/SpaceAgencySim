@@ -125,9 +125,11 @@ export function initPhysicsWorker(
     };
 
     // Serialise and send the init command.
+    // partsCatalog and bodiesCatalog are sent as empty placeholders because the
+    // worker imports them directly via ES module imports (see physicsWorker.ts).
     const initCmd: WorkerCommand = {
       type: 'init',
-      partsCatalog: [],   // catalogs sent as empty — worker imports them directly
+      partsCatalog: [],
       bodiesCatalog: {},
       physicsState: _serialisePhysicsState(ps),
       flightState: _serialiseFlightState(flightState),
@@ -159,10 +161,10 @@ export function resyncWorkerState(
     _latestFlight = null;
     _latestFrame = -1;
 
+    // partsCatalog and bodiesCatalog are sent as empty placeholders because the
+    // worker imports them directly via ES module imports (see physicsWorker.ts).
     const initCmd: WorkerCommand = {
       type: 'init',
-      partsCatalog: [],
-      bodiesCatalog: {},
       physicsState: _serialisePhysicsState(ps),
       flightState: _serialiseFlightState(flightState),
       assembly: _serialiseAssembly(assembly),
