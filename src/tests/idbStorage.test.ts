@@ -17,6 +17,7 @@ import {
   loadGameAsync,
   deleteSave,
   _setSessionStartTimeForTesting,
+  decompressSaveData,
 } from '../core/saveload.js';
 import {
   idbSet,
@@ -261,7 +262,8 @@ describe('saveGame() IndexedDB mirroring', () => {
 
     const idbRaw = await idbGet('spaceAgencySave_0');
     expect(idbRaw).not.toBeNull();
-    const idbEnvelope = JSON.parse(idbRaw);
+    const idbJson = decompressSaveData(idbRaw);
+    const idbEnvelope = JSON.parse(idbJson);
     expect(idbEnvelope.state.money).toBe(42_000);
   });
 
@@ -275,7 +277,8 @@ describe('saveGame() IndexedDB mirroring', () => {
 
     const raw = localStorage.getItem('spaceAgencySave_0');
     expect(raw).not.toBeNull();
-    const envelope = JSON.parse(raw);
+    const json = decompressSaveData(raw);
+    const envelope = JSON.parse(json);
     expect(envelope.state.money).toBe(99_000);
   });
 });

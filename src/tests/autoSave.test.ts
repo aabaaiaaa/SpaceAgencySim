@@ -31,6 +31,7 @@ import {
   _setSessionStartTimeForTesting,
 } from '../core/autoSave.js';
 
+import { decompressSaveData } from '../core/saveload.js';
 import { idbSet, idbDelete, isIdbAvailable } from '../core/idbStorage.js';
 
 // ---------------------------------------------------------------------------
@@ -110,11 +111,12 @@ describe('performAutoSave', () => {
     const raw = mockStorage.getItem(AUTO_SAVE_KEY);
     expect(raw).not.toBeNull();
 
-    const envelope = JSON.parse(raw);
+    const json = decompressSaveData(raw);
+    const envelope = JSON.parse(json);
     expect(envelope.saveName).toBe('Auto-Save');
     expect(envelope.state.agencyName).toBe('Test Agency');
     expect(typeof envelope.timestamp).toBe('string');
-    expect(envelope.version).toBe(1);
+    expect(envelope.version).toBe(2);
   });
 
   it('accumulates session play time', async () => {
@@ -174,7 +176,8 @@ describe('performAutoSave', () => {
     // Mutate state after save.
     state.agencyName = 'After';
 
-    const envelope = JSON.parse(mockStorage.getItem(AUTO_SAVE_KEY));
+    const json = decompressSaveData(mockStorage.getItem(AUTO_SAVE_KEY));
+    const envelope = JSON.parse(json);
     expect(envelope.state.agencyName).toBe('Before');
   });
 });

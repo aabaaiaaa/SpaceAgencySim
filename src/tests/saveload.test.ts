@@ -31,6 +31,8 @@ import {
   _validateState,
   _validateNestedStructures,
   _setSessionStartTimeForTesting,
+  compressSaveData,
+  decompressSaveData,
 } from '../core/saveload.js';
 import { CrewStatus } from '../core/constants.js';
 
@@ -269,12 +271,13 @@ describe('Slot index validation', () => {
 // ---------------------------------------------------------------------------
 
 describe('saveGame()', () => {
-  it('writes JSON to the correct localStorage key', async () => {
+  it('writes compressed data to the correct localStorage key', async () => {
     const state = freshState();
     await saveGame(state, 2, 'My Agency');
     const raw = localStorage.getItem('spaceAgencySave_2');
     expect(raw).not.toBeNull();
-    const envelope = JSON.parse(raw);
+    const json = decompressSaveData(raw);
+    const envelope = JSON.parse(json);
     expect(envelope.saveName).toBe('My Agency');
   });
 
@@ -710,22 +713,24 @@ describe('exportSave()', () => {
   });
 
   it('the data stored for export is a valid JSON string containing the full state', async () => {
-    // exportSave() reads the raw JSON from localStorage and sends it to the
-    // user as a file. Verify that the underlying storage contains well-formed
-    // JSON whose envelope.state matches the state that was saved.
+    // exportSave() reads the raw (possibly compressed) data from localStorage
+    // and decompresses it before sending to the user as a file. Verify that
+    // the underlying storage decompresses to well-formed JSON whose
+    // envelope.state matches the state that was saved.
     const state = freshState();
     state.money = 987_654;
     state.crew = [{ id: 'c1', status: CrewStatus.IDLE, name: 'Dana' }];
     state.missions.completed = [{ id: 'm1', title: 'First orbit' }];
     await saveGame(state, 0, 'Export Test');
 
-    // Read what exportSave would send to the browser.
+    // Read what's in storage and decompress it.
     const raw = localStorage.getItem('spaceAgencySave_0');
     expect(typeof raw).toBe('string');
+    const json = decompressSaveData(raw);
 
     // Must be parseable JSON.
     let envelope;
-    expect(() => { envelope = JSON.parse(raw); }).not.toThrow();
+    expect(() => { envelope = JSON.parse(json); }).not.toThrow();
 
     // Must contain all top-level envelope fields.
     expect(envelope).toHaveProperty('saveName', 'Export Test');
@@ -793,7 +798,8 @@ describe('Save format version field', () => {
   it('saveGame() includes the version field in the stored envelope', async () => {
     await saveGame(freshState(), 0, 'versioned');
     const raw = localStorage.getItem('spaceAgencySave_0');
-    const envelope = JSON.parse(raw);
+    const json = decompressSaveData(raw);
+    const envelope = JSON.parse(json);
     expect(envelope.version).toBe(SAVE_VERSION);
   });
 
@@ -871,7 +877,8 @@ describe('Save format version field', () => {
     const state = freshState();
     await saveGame(state, 2, 'round-trip');
     const raw = localStorage.getItem('spaceAgencySave_2');
-    const envelope = JSON.parse(raw);
+    const json = decompressSaveData(raw);
+    const envelope = JSON.parse(json);
     expect(envelope.version).toBe(SAVE_VERSION);
 
     // Load succeeds and the envelope in storage still has the version.
@@ -1310,5 +1317,185 @@ describe('_validateNestedStructures()', () => {
     expect(restored.crew).toHaveLength(1);
     expect(restored.crew[0].name).toBe('Good');
     warnSpy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Save Compression
+// ---------------------------------------------------------------------------
+
+describe('Save compression', () => {
+  describe('compressSaveData / decompressSaveData', () => {
+    it('round-trips a JSON string through compress → decompress', () => {
+      const json = JSON.stringify({ hello: 'world', nested: { a: [1, 2, 3] } });
+      const compressed = compressSaveData(json);
+      const decompressed = decompressSaveData(compressed);
+      expect(decompressed).toBe(json);
+    });
+
+    it('compressed output starts with LZC: prefix', () => {
+      const json = JSON.stringify({ test: true });
+      const compressed = compressSaveData(json);
+      expect(compressed.startsWith('LZC:')).toBe(true);
+    });
+
+    it('compressed output differs from the raw JSON', () => {
+      const json = JSON.stringify({ data: 'some test data that should be compressed' });
+      const compressed = compressSaveData(json);
+      expect(compressed).not.toBe(json);
+    });
+
+    it('decompressSaveData passes through uncompressed JSON (no prefix)', () => {
+      const json = JSON.stringify({ saveName: 'Test', state: {} });
+      // No LZC: prefix — treated as uncompressed.
+      const result = decompressSaveData(json);
+      expect(result).toBe(json);
+    });
+  });
+
+  describe('round-trip save/load with compression', () => {
+    it('preserves full game state through compressed save/load cycle', async () => {
+      const state = freshState();
+      state.agencyName = 'Compressed Agency';
+      state.money = 999999;
+      state.crew = [
+        {
+          id: 'c1', name: 'Test Pilot', status: 'idle',
+          skills: { piloting: 80, engineering: 50, science: 60 },
+          salary: 5000, hiredDate: '2025-01-01', injuryEnds: null,
+        },
+      ];
+      state.missions.accepted = [
+        { id: 'm1', title: 'Orbital Test', reward: 50000 },
+      ];
+      state.missions.completed = [
+        { id: 'm2', title: 'First Flight', reward: 10000 },
+      ];
+
+      await saveGame(state, 0, 'Compression Test');
+
+      // Verify localStorage contains compressed data (LZC: prefix).
+      const raw = localStorage.getItem('spaceAgencySave_0');
+      expect(raw).not.toBeNull();
+      expect(raw.startsWith('LZC:')).toBe(true);
+
+      const restored = await loadGame(0);
+
+      expect(restored.agencyName).toBe('Compressed Agency');
+      expect(restored.money).toBe(999999);
+      expect(restored.crew).toHaveLength(1);
+      expect(restored.crew[0].name).toBe('Test Pilot');
+      expect(restored.missions.accepted).toHaveLength(1);
+      expect(restored.missions.accepted[0].id).toBe('m1');
+      expect(restored.missions.completed).toHaveLength(1);
+      expect(restored.missions.completed[0].id).toBe('m2');
+    });
+
+    it('listSaves reads compressed save slots correctly', async () => {
+      const state = freshState();
+      state.agencyName = 'Listed Agency';
+      await saveGame(state, 2, 'Slot 2 Save');
+
+      const saves = listSaves();
+      expect(saves[2]).not.toBeNull();
+      expect(saves[2].saveName).toBe('Slot 2 Save');
+      expect(saves[2].agencyName).toBe('Listed Agency');
+    });
+  });
+
+  describe('backward compatibility with uncompressed saves', () => {
+    it('loadGame reads an uncompressed (pre-compression) save', async () => {
+      const state = freshState();
+      state.agencyName = 'Old Agency';
+      state.money = 12345;
+
+      const envelope = {
+        saveName: 'Legacy Save',
+        timestamp: new Date(0).toISOString(),
+        version: 1, // Pre-compression version.
+        state: JSON.parse(JSON.stringify(state)),
+      };
+      // Write as uncompressed JSON (simulating old save format).
+      localStorage.setItem('spaceAgencySave_0', JSON.stringify(envelope));
+
+      const restored = await loadGame(0);
+
+      expect(restored.agencyName).toBe('Old Agency');
+      expect(restored.money).toBe(12345);
+    });
+
+    it('loadGame reads an uncompressed save with no version field (version 0)', async () => {
+      const state = freshState();
+      state.agencyName = 'Ancient Agency';
+
+      const envelope = {
+        saveName: 'Ancient Save',
+        timestamp: new Date(0).toISOString(),
+        // No version field — pre-versioning save.
+        state: JSON.parse(JSON.stringify(state)),
+      };
+      localStorage.setItem('spaceAgencySave_1', JSON.stringify(envelope));
+
+      const restored = await loadGame(1);
+
+      expect(restored.agencyName).toBe('Ancient Agency');
+    });
+
+    it('listSaves handles a mix of compressed and uncompressed slots', async () => {
+      // Slot 0: uncompressed (legacy).
+      const legacyState = freshState();
+      legacyState.agencyName = 'Legacy';
+      const legacyEnvelope = {
+        saveName: 'Legacy',
+        timestamp: new Date(0).toISOString(),
+        version: 1,
+        state: JSON.parse(JSON.stringify(legacyState)),
+      };
+      localStorage.setItem('spaceAgencySave_0', JSON.stringify(legacyEnvelope));
+
+      // Slot 1: compressed (current).
+      const newState = freshState();
+      newState.agencyName = 'Modern';
+      await saveGame(newState, 1, 'Modern');
+
+      const saves = listSaves();
+      expect(saves[0]).not.toBeNull();
+      expect(saves[0].saveName).toBe('Legacy');
+      expect(saves[1]).not.toBeNull();
+      expect(saves[1].saveName).toBe('Modern');
+    });
+
+    it('importSave compresses the imported data', () => {
+      const state = freshState();
+      const envelope = {
+        saveName: 'Imported',
+        timestamp: new Date(0).toISOString(),
+        version: 1,
+        state: JSON.parse(JSON.stringify(state)),
+      };
+      const json = JSON.stringify(envelope);
+
+      importSave(json, 3);
+
+      const raw = localStorage.getItem('spaceAgencySave_3');
+      expect(raw).not.toBeNull();
+      expect(raw.startsWith('LZC:')).toBe(true);
+    });
+  });
+
+  describe('save version bump', () => {
+    it('SAVE_VERSION is 2 (bumped for compression)', () => {
+      expect(SAVE_VERSION).toBe(2);
+    });
+
+    it('saved envelopes contain version 2', async () => {
+      const state = freshState();
+      await saveGame(state, 0, 'Version Test');
+
+      const raw = localStorage.getItem('spaceAgencySave_0');
+      const json = decompressSaveData(raw);
+      const envelope = JSON.parse(json);
+      expect(envelope.version).toBe(2);
+    });
   });
 });

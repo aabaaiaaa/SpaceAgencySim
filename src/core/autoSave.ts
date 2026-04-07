@@ -9,6 +9,7 @@
  */
 
 import { idbSet, idbDelete, isIdbAvailable } from './idbStorage.js';
+import { compressSaveData } from './saveload.js';
 
 import type { GameState } from './gameState.js';
 
@@ -19,8 +20,8 @@ import type { GameState } from './gameState.js';
 /** localStorage key for the dedicated auto-save slot. */
 export const AUTO_SAVE_KEY = 'spaceAgencySave_auto';
 
-/** Current save format version (mirrors saveload.js SAVE_VERSION). */
-const SAVE_VERSION = 1;
+/** Current save format version (mirrors saveload.ts SAVE_VERSION). */
+const SAVE_VERSION = 2;
 
 // ---------------------------------------------------------------------------
 // Session time (mirrors saveload.js pattern)
@@ -79,15 +80,16 @@ export async function performAutoSave(
   };
 
   const json = JSON.stringify(envelope);
+  const compressed = compressSaveData(json);
 
   try {
-    localStorage.setItem(AUTO_SAVE_KEY, json);
+    localStorage.setItem(AUTO_SAVE_KEY, compressed);
   } catch (err: unknown) {
     const error = err as { name?: string; message?: string };
     if (error?.name === 'QuotaExceededError') {
       // Attempt IndexedDB as fallback — await to ensure the save completes.
       if (isIdbAvailable()) {
-        await idbSet(AUTO_SAVE_KEY, json);
+        await idbSet(AUTO_SAVE_KEY, compressed);
         return { success: true };
       }
       return { success: false, error: 'Storage full' };
@@ -97,7 +99,7 @@ export async function performAutoSave(
 
   // Mirror to IndexedDB (fire-and-forget — LS already has the data).
   if (isIdbAvailable()) {
-    idbSet(AUTO_SAVE_KEY, json).catch(() => {});
+    idbSet(AUTO_SAVE_KEY, compressed).catch(() => {});
   }
 
   return { success: true };

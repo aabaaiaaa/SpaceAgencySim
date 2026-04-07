@@ -13,6 +13,7 @@
  * @module saveload
  */
 
+import { compressToUTF16, decompressFromUTF16 } from 'lz-string';
 import { CrewStatus, FACILITY_DEFINITIONS, GameMode, DEFAULT_DIFFICULTY_SETTINGS } from './constants.js';
 import { loadSharedLibrary, saveSharedLibrary } from './designLibrary.js';
 import { logger } from './logger.js';
@@ -34,7 +35,7 @@ const SAVE_KEY_PREFIX = 'spaceAgencySave_';
  * Current save format version. Bump this whenever the save envelope or
  * state schema changes in a way that requires new migration logic.
  */
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 // ---------------------------------------------------------------------------
 // Session Time Tracking
@@ -114,8 +115,16 @@ interface SaveEnvelope {
   saveName: string;
   timestamp: string;
   version?: number;
+  compressed?: boolean;
   state: any;
 }
+
+/**
+ * Prefix marker for compressed save strings in storage.
+ * Compressed saves are stored as: COMPRESSED_PREFIX + compressToUTF16(json).
+ * This allows `parseEnvelope` to detect compressed vs uncompressed data.
+ */
+const COMPRESSED_PREFIX = 'LZC:';
 
 // ---------------------------------------------------------------------------
 // Private Helpers
@@ -212,15 +221,22 @@ export async function saveGame(state: GameState, slotIndex: number, saveName: st
   };
 
   const json = JSON.stringify(envelope);
+  const compressed = compressSaveData(json);
   const key = slotKey(slotIndex);
 
+  logger.debug('save', 'Compression stats', {
+    rawSize: json.length,
+    compressedSize: compressed.length,
+    ratio: json.length > 0 ? ((1 - compressed.length / json.length) * 100).toFixed(1) + '%' : 'N/A',
+  });
+
   try {
-    localStorage.setItem(key, json);
+    localStorage.setItem(key, compressed);
   } catch (err: any) {
     if (err?.name === 'QuotaExceededError') {
       // localStorage full — attempt IndexedDB as fallback.
       if (isIdbAvailable()) {
-        await idbSet(key, json);
+        await idbSet(key, compressed);
         return summaryFromEnvelope(slotIndex, envelope);
       }
       throw new Error('Storage full — unable to save. Delete old saves to free space.', { cause: err });
@@ -230,7 +246,7 @@ export async function saveGame(state: GameState, slotIndex: number, saveName: st
 
   // Mirror to IndexedDB (fire-and-forget).
   if (isIdbAvailable()) {
-    idbSet(key, json).catch(() => {});
+    idbSet(key, compressed).catch(() => {});
   }
 
   return summaryFromEnvelope(slotIndex, envelope);
@@ -241,13 +257,40 @@ export async function saveGame(state: GameState, slotIndex: number, saveName: st
 // ---------------------------------------------------------------------------
 
 /**
- * Parses a raw JSON envelope string and returns the parsed envelope object,
- * or null if the data is missing, corrupt, or structurally invalid.
+ * Compresses a JSON string for storage using lz-string UTF-16 encoding.
+ * Returns the compressed string with a prefix marker for detection.
+ */
+export function compressSaveData(json: string): string {
+  return COMPRESSED_PREFIX + compressToUTF16(json);
+}
+
+/**
+ * Decompresses a storage string back to JSON.
+ * If the string doesn't have the compressed prefix, returns it as-is
+ * (backward compatibility with uncompressed saves).
+ */
+export function decompressSaveData(raw: string): string {
+  if (raw.startsWith(COMPRESSED_PREFIX)) {
+    const decompressed = decompressFromUTF16(raw.slice(COMPRESSED_PREFIX.length));
+    if (decompressed === null) {
+      throw new Error('Failed to decompress save data');
+    }
+    return decompressed;
+  }
+  // Uncompressed (pre-compression) save — return as-is.
+  return raw;
+}
+
+/**
+ * Parses a raw storage string (possibly compressed) and returns the parsed
+ * envelope object, or null if the data is missing, corrupt, or structurally
+ * invalid. Handles both compressed and uncompressed formats.
  */
 function parseEnvelope(raw: string | null): SaveEnvelope | null {
   if (raw === null) return null;
   try {
-    const envelope = JSON.parse(raw);
+    const json = decompressSaveData(raw);
+    const envelope = JSON.parse(json);
     if (envelope && typeof envelope === 'object' && envelope.state) {
       return envelope as SaveEnvelope;
     }
@@ -308,7 +351,8 @@ export async function loadGame(slotIndex: number): Promise<GameState> {
     }
     // localStorage had data but it was invalid — determine why.
     try {
-      const parsed = JSON.parse(lsRaw);
+      const json = decompressSaveData(lsRaw);
+      const parsed = JSON.parse(json);
       if (!parsed || typeof parsed !== 'object' || !parsed.state) {
         throw new Error(`Save slot ${slotIndex} contains corrupt data (missing state field).`);
       }
@@ -501,7 +545,8 @@ export function listSaves(): (SaveSlotSummary | null)[] {
     }
 
     try {
-      const envelope = JSON.parse(raw);
+      const json = decompressSaveData(raw);
+      const envelope = JSON.parse(json);
       if (envelope && typeof envelope === 'object' && envelope.state) {
         result.push(summaryFromEnvelope(i, envelope));
       } else {
@@ -537,9 +582,11 @@ export function exportSave(slotIndex: number): void {
     throw new Error(`Save slot ${slotIndex} is empty; nothing to export.`);
   }
 
+  let json: string;
   let envelope: SaveEnvelope;
   try {
-    envelope = JSON.parse(raw);
+    json = decompressSaveData(raw);
+    envelope = JSON.parse(json);
   } catch {
     throw new Error(`Save slot ${slotIndex} contains corrupt data (invalid JSON).`);
   }
@@ -557,7 +604,8 @@ export function exportSave(slotIndex: number): void {
   const safeName = String(envelope.saveName ?? 'save').replace(/[^a-z0-9_-]/gi, '_');
   const filename = `spaceAgency_slot${slotIndex}_${safeName}.json`;
 
-  const blob = new Blob([raw], { type: 'application/json' });
+  // Export as uncompressed JSON for portability.
+  const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
 
   const anchor = document.createElement('a');
@@ -614,9 +662,10 @@ export function importSave(jsonString: string, slotIndex: number): SaveSlotSumma
 
   // --- Persist --------------------------------------------------------------
   const json = JSON.stringify(envelope);
+  const compressed = compressSaveData(json);
   const key = slotKey(slotIndex);
   try {
-    localStorage.setItem(key, json);
+    localStorage.setItem(key, compressed);
   } catch (err: any) {
     if (err?.name === 'QuotaExceededError') {
       throw new Error('Storage full — unable to import save. Delete old saves to free space.', { cause: err });
@@ -626,7 +675,7 @@ export function importSave(jsonString: string, slotIndex: number): SaveSlotSumma
 
   // Mirror to IndexedDB (fire-and-forget).
   if (isIdbAvailable()) {
-    idbSet(key, json).catch(() => {});
+    idbSet(key, compressed).catch(() => {});
   }
 
   return summaryFromEnvelope(slotIndex, envelope);

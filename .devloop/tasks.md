@@ -43,7 +43,7 @@
 - **Verification**: New unit tests pass: corrupted mission entry is filtered out, corrupted crew member is filtered out, valid entries are preserved. `npm run test:unit` passes.
 
 ### TASK-008: Add save compression
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-005
 - **Description**: Add compression to the save pipeline (after JSON serialization, before storage write) and decompression to the load pipeline. Evaluate and select a lightweight pure-JS compression library (lz-string, fflate, or pako). Handle backward compatibility with uncompressed saves. Bump save version. See requirements Section 2.4.
 - **Verification**: New unit tests pass: round-trip save/load with compression preserves data integrity, loading an uncompressed (pre-compression) save still works. `npm run test:unit` passes. `npm run build` succeeds.
