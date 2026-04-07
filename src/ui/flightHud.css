@@ -48,6 +48,10 @@
   margin-bottom: 7px;
 }
 
+.flight-lp-title--no-mb {
+  margin-bottom: 0;
+}
+
 /* Throttle subsection */
 .flight-lp-throttle-row {
   display: flex;
@@ -103,6 +107,10 @@
 .flight-lp-val {
   font-size: 11px;
   color: #a0d8b0;
+}
+
+.flight-lp-val-sm {
+  font-size: 9px;
 }
 
 .flight-lp-btn-row {

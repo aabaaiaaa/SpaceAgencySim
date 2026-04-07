@@ -109,7 +109,7 @@
 - **Verification**: No direct `addEventListener` calls remain in `crewAdmin.ts` (only tracker-mediated calls). Crew admin panel e2e tests pass.
 
 ### TASK-019: Migrate remaining inline styles to CSS classes
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Replace inline style assignments in `crewAdmin.ts` (lines 348, 567-569), `autoSaveToast.ts` (line 100), and `flightHud.ts` (lines 392, 406, 423) with CSS classes using design token custom properties. See requirements Section 5.2.
 - **Verification**: `grep -n "\.style\." src/ui/crewAdmin.ts src/ui/autoSaveToast.ts src/ui/flightController/flightHud.ts` returns no inline style assignments for the identified lines. Crew admin panel e2e tests pass.

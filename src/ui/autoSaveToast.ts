@@ -97,7 +97,7 @@ export function triggerAutoSave(state: GameState, _trigger?: string): void {
     } else {
       label.innerHTML = '';
       const errText = document.createElement('span');
-      errText.style.color = '#ff8080';
+      errText.className = 'auto-save-toast-error';
       errText.textContent = result.error || 'Save failed';
       label.appendChild(errText);
     }

@@ -148,6 +148,11 @@
   font-size: 0.9rem;
 }
 
+/* ── Status: Ready ───────────────────────────────────────────────────────────── */
+.crew-status-ready {
+  color: #7dd87d;
+}
+
 /* ── Skill bars ──────────────────────────────────────────────────────────────── */
 .crew-skills-cell {
   min-width: 180px;
@@ -312,6 +317,15 @@
 .hire-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+.hire-btn-experienced {
+  background: rgba(200, 160, 40, 0.25);
+  border-color: rgba(200, 160, 40, 0.5);
+  color: #ddcc66;
+}
+.hire-btn-experienced:hover:not(:disabled) {
+  background: rgba(200, 160, 40, 0.4);
+  border-color: rgba(200, 160, 40, 0.7);
 }
 
 .hire-feedback {

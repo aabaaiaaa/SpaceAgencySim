@@ -347,7 +347,7 @@ function _renderActiveTab(): void {
       statusTd.appendChild(badge);
     } else {
       statusTd.textContent = 'Ready';
-      statusTd.style.color = '#7dd87d';
+      statusTd.classList.add('crew-status-ready');
     }
     tr.appendChild(statusTd);
 
@@ -564,11 +564,8 @@ function _renderHireTab(): void {
     expSection.appendChild(expNameGroup);
 
     const expBtn = document.createElement('button');
-    expBtn.className = 'hire-btn';
+    expBtn.className = 'hire-btn hire-btn-experienced';
     expBtn.disabled = !canAffordExp;
-    expBtn.style.background = 'rgba(200, 160, 40, 0.25)';
-    expBtn.style.borderColor = 'rgba(200, 160, 40, 0.5)';
-    expBtn.style.color = '#ddcc66';
     expBtn.textContent = `Hire Experienced \u2014 ${fmtCash(expCost)}`;
     expSection.appendChild(expBtn);
 

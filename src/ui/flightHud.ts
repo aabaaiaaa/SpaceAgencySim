@@ -388,8 +388,7 @@ function _buildLeftPanel(): void {
   biomeLbl.textContent = 'Biome';
   _elBiome = document.createElement('div');
   _elBiome.id = 'hud-biome';
-  _elBiome.className = 'flight-lp-val';
-  _elBiome.style.fontSize = '9px';
+  _elBiome.className = 'flight-lp-val flight-lp-val-sm';
   _elBiome.textContent = 'Ground';
   biomeRow.appendChild(biomeLbl);
   biomeRow.appendChild(_elBiome);
@@ -402,8 +401,7 @@ function _buildLeftPanel(): void {
   commsLbl.textContent = 'Comms';
   _elCommsStatus = document.createElement('div');
   _elCommsStatus.id = 'hud-comms';
-  _elCommsStatus.className = 'flight-lp-val';
-  _elCommsStatus.style.fontSize = '9px';
+  _elCommsStatus.className = 'flight-lp-val flight-lp-val-sm';
   _elCommsStatus.textContent = 'Direct Link';
   commsRow.appendChild(commsLbl);
   commsRow.appendChild(_elCommsStatus);
@@ -419,8 +417,7 @@ function _buildLeftPanel(): void {
   const titleRow = document.createElement('div');
   titleRow.className = 'flight-throttle-title-row';
   const throttleTitle = document.createElement('div');
-  throttleTitle.className = 'flight-lp-title';
-  throttleTitle.style.marginBottom = '0';
+  throttleTitle.className = 'flight-lp-title flight-lp-title--no-mb';
   throttleTitle.textContent = 'Throttle';
   titleRow.appendChild(throttleTitle);
 

@@ -61,3 +61,7 @@
 .auto-save-toast-done {
   color: var(--color-success-text, #50d870);
 }
+
+.auto-save-toast-error {
+  color: #ff8080;
+}
