@@ -55,7 +55,7 @@
 - **Verification**: `npm run test:unit` passes. `npm run test:e2e` passes. No `new PIXI.Graphics()` calls remain in `hub.ts` `_drawScene()` or VAB per-frame render paths.
 
 ### TASK-010: Implement Web Worker physics — worker module and message protocol
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Create the Web Worker module that runs `tick()`, orbital mechanics, and flight phase evaluation. Define the message protocol: Main→Worker commands (throttle, stage, abort, time warp, start/stop) and Worker→Main state snapshots matching the readonly interfaces. The worker receives immutable data catalogs on initialization. See requirements Section 3.2.
 - **Verification**: New unit tests pass for the message protocol: command→snapshot round trip works correctly. Worker module compiles and loads without errors.
