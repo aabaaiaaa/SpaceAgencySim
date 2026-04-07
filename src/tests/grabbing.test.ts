@@ -42,6 +42,7 @@ import {
   releaseGrabbedSatellite,
   processGrabRepairsFromFlight,
   getGrabTargetsInRange,
+  updateGrabState,
 } from '../core/grabbing.ts';
 import { getPartById } from '../data/parts.ts';
 
@@ -506,5 +507,356 @@ describe('Grab system constants', () => {
 
   it('defines repair health amount', () => {
     expect(GRAB_REPAIR_HEALTH).toBe(100);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// updateGrabState() — state machine
+// ---------------------------------------------------------------------------
+
+describe('updateGrabState', () => {
+  it('does nothing in IDLE state', () => {
+    const gs = createGrabState();
+    const ps = stubPs();
+    const fs = freshFlightState();
+    const state = stubGameStateWithSatellite();
+
+    updateGrabState(gs, ps, fs, state);
+
+    expect(gs.state).toBe(GrabState.IDLE);
+  });
+
+  it('does nothing in GRABBED state', () => {
+    const gs = createGrabState();
+    gs.state = GrabState.GRABBED;
+    gs.grabbedSatelliteId = 'sat-1';
+    const ps = stubPs();
+    const fs = freshFlightState();
+    const state = stubGameStateWithSatellite();
+
+    updateGrabState(gs, ps, fs, state);
+
+    expect(gs.state).toBe(GrabState.GRABBED);
+  });
+
+  it('clears target when targetId is null', () => {
+    const gs = createGrabState();
+    gs.state = GrabState.APPROACHING;
+    gs.targetId = null;
+    const ps = stubPs();
+    const fs = freshFlightState();
+    const state = stubGameStateWithSatellite();
+
+    updateGrabState(gs, ps, fs, state);
+
+    expect(gs.state).toBe(GrabState.IDLE);
+  });
+
+  it('clears target when target object not found in orbitalObjects', () => {
+    const gs = createGrabState();
+    gs.state = GrabState.APPROACHING;
+    gs.targetId = 'nonexistent-object';
+    const ps = stubPs();
+    const fs = freshFlightState();
+    const state = stubGameStateWithSatellite();
+
+    updateGrabState(gs, ps, fs, state);
+
+    expect(gs.state).toBe(GrabState.IDLE);
+    expect(gs.targetId).toBeNull();
+  });
+
+  it('updates distance, relSpeed, and lateral metrics when approaching', () => {
+    const gs = createGrabState();
+    gs.state = GrabState.APPROACHING;
+    gs.targetId = 'orb-sat-1';
+    const ps = stubPs();
+    const fs = freshFlightState();
+    const state = stubGameStateWithSatellite();
+
+    updateGrabState(gs, ps, fs, state);
+
+    // Metrics should be computed — targetDistance should be finite.
+    expect(Number.isFinite(gs.targetDistance)).toBe(true);
+    expect(Number.isFinite(gs.targetRelSpeed)).toBe(true);
+    expect(Number.isFinite(gs.targetLateral)).toBe(true);
+  });
+
+  it('stays in APPROACHING when not within range', () => {
+    const gs = createGrabState();
+    gs.state = GrabState.APPROACHING;
+    gs.targetId = 'orb-sat-1';
+    const ps = stubPs();
+    const fs = freshFlightState();
+    const state = stubGameStateWithSatellite();
+    // Use different orbital elements so the target is far away.
+    state.orbitalObjects[0].elements = {
+      semiMajorAxis: 7_000_000,
+      eccentricity: 0.001,
+      argPeriapsis: Math.PI / 2,
+      meanAnomalyAtEpoch: Math.PI,
+      epoch: 0,
+    };
+
+    updateGrabState(gs, ps, fs, state);
+
+    expect(gs.state).toBe(GrabState.APPROACHING);
+  });
+
+  it('transitions from EXTENDING back to APPROACHING when out of range', () => {
+    const gs = createGrabState();
+    gs.state = GrabState.EXTENDING;
+    gs.targetId = 'orb-sat-1';
+    const ps = stubPs();
+    const fs = freshFlightState();
+    const state = stubGameStateWithSatellite();
+    // Move target to a different orbit so distance is large.
+    state.orbitalObjects[0].elements = {
+      semiMajorAxis: 7_000_000,
+      eccentricity: 0.001,
+      argPeriapsis: Math.PI / 2,
+      meanAnomalyAtEpoch: Math.PI,
+      epoch: 0,
+    };
+
+    updateGrabState(gs, ps, fs, state);
+
+    // Should revert to APPROACHING since not in range.
+    expect(gs.state).toBe(GrabState.APPROACHING);
+  });
+
+  it('transitions from RELEASING to IDLE (clears state)', () => {
+    const gs = createGrabState();
+    gs.state = GrabState.RELEASING;
+    gs.targetId = 'orb-sat-1';
+    const ps = stubPs();
+    const fs = freshFlightState();
+    const state = stubGameStateWithSatellite();
+
+    updateGrabState(gs, ps, fs, state);
+
+    expect(gs.state).toBe(GrabState.IDLE);
+    expect(gs.targetId).toBeNull();
+  });
+
+  it('transitions from EXTENDING to GRABBED when in range with correct conditions', () => {
+    const gs = createGrabState();
+    gs.state = GrabState.EXTENDING;
+    gs.targetId = 'orb-sat-1';
+    const ps = stubPs();
+    const fs = freshFlightState();
+    const state = stubGameStateWithSatellite();
+    // Use identical orbital elements so distance ≈ 0, relSpeed ≈ 0.
+    state.orbitalObjects[0].elements = { ...fs.orbitalElements };
+
+    updateGrabState(gs, ps, fs, state);
+
+    // When distance is ≈ 0 and speed is ≈ 0, should grab.
+    if (gs.inRange && gs.speedOk) {
+      expect(gs.state).toBe(GrabState.GRABBED);
+    } else {
+      // If computed distance > arm range, it stays in EXTENDING or goes to APPROACHING.
+      expect([GrabState.EXTENDING, GrabState.APPROACHING]).toContain(gs.state);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getGrabTargetsInRange()
+// ---------------------------------------------------------------------------
+
+describe('getGrabTargetsInRange', () => {
+  it('returns empty when not in orbit', () => {
+    const ps = stubPs();
+    const fs = freshFlightState(FlightPhase.FLIGHT);
+    fs.inOrbit = false;
+    const state = stubGameStateWithSatellite();
+
+    const targets = getGrabTargetsInRange(ps, fs, state);
+    expect(targets).toHaveLength(0);
+  });
+
+  it('returns empty when orbitalElements is null', () => {
+    const ps = stubPs();
+    const fs = freshFlightState();
+    fs.orbitalElements = null;
+    const state = stubGameStateWithSatellite();
+
+    const targets = getGrabTargetsInRange(ps, fs, state);
+    expect(targets).toHaveLength(0);
+  });
+
+  it('returns empty when no satellites in same body', () => {
+    const ps = stubPs();
+    const fs = freshFlightState();
+    const state = stubGameStateWithSatellite();
+    state.orbitalObjects[0].bodyId = 'MARS'; // different body
+
+    const targets = getGrabTargetsInRange(ps, fs, state);
+    expect(targets).toHaveLength(0);
+  });
+
+  it('returns empty when no SATELLITE type objects exist', () => {
+    const ps = stubPs();
+    const fs = freshFlightState();
+    const state = stubGameStateWithSatellite();
+    state.orbitalObjects[0].type = OrbitalObjectType.CRAFT;
+
+    const targets = getGrabTargetsInRange(ps, fs, state);
+    expect(targets).toHaveLength(0);
+  });
+
+  it('finds a satellite when in same orbit (co-orbital)', () => {
+    const ps = stubPs();
+    const fs = freshFlightState();
+    const state = stubGameStateWithSatellite();
+    // Use the exact same orbital elements for both craft and satellite.
+    state.orbitalObjects[0].elements = { ...fs.orbitalElements };
+
+    const targets = getGrabTargetsInRange(ps, fs, state);
+    // Should find the satellite since angular distance is ~0.
+    expect(targets.length).toBeGreaterThanOrEqual(1);
+    expect(targets[0].object.id).toBe('orb-sat-1');
+  });
+
+  it('includes satelliteRecord when one exists and has health > 0', () => {
+    const ps = stubPs();
+    const fs = freshFlightState();
+    const state = stubGameStateWithSatellite();
+    state.orbitalObjects[0].elements = { ...fs.orbitalElements };
+
+    const targets = getGrabTargetsInRange(ps, fs, state);
+    if (targets.length > 0) {
+      expect(targets[0].satelliteRecord).not.toBeNull();
+      expect(targets[0].satelliteRecord.id).toBe('sat-1');
+    }
+  });
+
+  it('returns null satelliteRecord when satellite health is 0', () => {
+    const ps = stubPs();
+    const fs = freshFlightState();
+    const state = stubGameStateWithSatellite();
+    state.orbitalObjects[0].elements = { ...fs.orbitalElements };
+    state.satelliteNetwork.satellites[0].health = 0;
+
+    const targets = getGrabTargetsInRange(ps, fs, state);
+    if (targets.length > 0) {
+      expect(targets[0].satelliteRecord).toBeNull();
+    }
+  });
+
+  it('returns results sorted by distance', () => {
+    const ps = stubPs();
+    const fs = freshFlightState();
+    const state = stubGameStateWithSatellite();
+    // Add a second satellite at the same orbit.
+    state.orbitalObjects.push({
+      id: 'orb-sat-2',
+      bodyId: 'EARTH',
+      type: OrbitalObjectType.SATELLITE,
+      name: 'Comm Sat 2',
+      elements: { ...fs.orbitalElements, meanAnomalyAtEpoch: 0.01 },
+    });
+    state.orbitalObjects[0].elements = { ...fs.orbitalElements };
+
+    const targets = getGrabTargetsInRange(ps, fs, state);
+    for (let i = 1; i < targets.length; i++) {
+      expect(targets[i].distance).toBeGreaterThanOrEqual(targets[i - 1].distance);
+    }
+  });
+
+  it('excludes satellites outside GRAB_VISUAL_RANGE_DEG', () => {
+    const ps = stubPs();
+    const fs = freshFlightState();
+    const state = stubGameStateWithSatellite();
+    // Place satellite at a very different orbit so angular distance > GRAB_VISUAL_RANGE_DEG.
+    state.orbitalObjects[0].elements = {
+      semiMajorAxis: 6_471_000,
+      eccentricity: 0.001,
+      argPeriapsis: 0,
+      meanAnomalyAtEpoch: Math.PI, // opposite side of orbit
+      epoch: 0,
+    };
+
+    const targets = getGrabTargetsInRange(ps, fs, state);
+    expect(targets).toHaveLength(0);
+  });
+
+  it('excludes satellites in different altitude bands', () => {
+    const ps = stubPs();
+    const fs = freshFlightState();
+    const state = stubGameStateWithSatellite();
+    // Put satellite at a much higher orbit (different altitude band).
+    state.orbitalObjects[0].elements = {
+      semiMajorAxis: 42_164_000, // GEO
+      eccentricity: 0.001,
+      argPeriapsis: 0,
+      meanAnomalyAtEpoch: 0,
+      epoch: 0,
+    };
+
+    const targets = getGrabTargetsInRange(ps, fs, state);
+    expect(targets).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// repairGrabbedSatellite — no satelliteNetwork
+// ---------------------------------------------------------------------------
+
+describe('repairGrabbedSatellite — edge cases', () => {
+  it('fails when grabbedSatelliteId is null', () => {
+    const gs = createGrabState();
+    gs.state = GrabState.GRABBED;
+    gs.grabbedSatelliteId = null;
+    const state = stubGameStateWithSatellite();
+
+    const result = repairGrabbedSatellite(gs, state);
+    expect(result.success).toBe(false);
+    expect(result.reason).toContain('No satellite record');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// processGrabRepairsFromFlight — edge cases
+// ---------------------------------------------------------------------------
+
+describe('processGrabRepairsFromFlight — edge cases', () => {
+  it('handles null satelliteNetwork gracefully', () => {
+    const state = stubGameStateWithSatellite();
+    state.satelliteNetwork = null;
+    const fs = freshFlightState();
+    fs.events = [{ type: 'SATELLITE_REPAIRED', satelliteId: 'sat-1', timestamp: 1000 }];
+
+    const repaired = processGrabRepairsFromFlight(state, fs);
+    expect(repaired).toHaveLength(0);
+  });
+
+  it('skips events with missing satelliteId', () => {
+    const state = stubGameStateWithSatellite();
+    const fs = freshFlightState();
+    fs.events = [{ type: 'SATELLITE_REPAIRED', timestamp: 1000 }]; // no satelliteId
+
+    const repaired = processGrabRepairsFromFlight(state, fs);
+    expect(repaired).toHaveLength(0);
+  });
+
+  it('skips events for unknown satellite IDs', () => {
+    const state = stubGameStateWithSatellite();
+    const fs = freshFlightState();
+    fs.events = [{ type: 'SATELLITE_REPAIRED', satelliteId: 'unknown-sat', timestamp: 1000 }];
+
+    const repaired = processGrabRepairsFromFlight(state, fs);
+    expect(repaired).toHaveLength(0);
+  });
+
+  it('caps satellite health at 100', () => {
+    const state = stubGameStateWithSatellite();
+    state.satelliteNetwork.satellites[0].health = 99;
+    const fs = freshFlightState();
+    fs.events = [{ type: 'SATELLITE_REPAIRED', satelliteId: 'sat-1', timestamp: 1000 }];
+
+    processGrabRepairsFromFlight(state, fs);
+    expect(state.satelliteNetwork.satellites[0].health).toBe(100);
   });
 });

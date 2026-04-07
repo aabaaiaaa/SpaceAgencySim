@@ -121,7 +121,7 @@
 - **Verification**: `npm run test:coverage` shows both `fuelsystem.ts` and `staging.ts` at >= 80% branch coverage.
 
 ### TASK-021: Raise branch coverage for mapView.ts, atmosphere.ts, and grabbing.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Identify uncovered branches/lines in `mapView.ts` (67% branches), `atmosphere.ts` (66% lines), and `grabbing.ts` (53% lines). Write targeted unit tests to bring all three to >= 80% coverage. See requirements Section 6.1.
 - **Verification**: `npm run test:coverage` shows all three modules at >= 80% branch/line coverage.

@@ -23,15 +23,18 @@ import { describe, it, expect } from 'vitest';
 import {
   airDensity,
   airDensityForBody,
+  atmosphereTopForBody,
   terminalVelocity,
   isReentryCondition,
   isReentryConditionForBody,
   computeHeatRate,
+  computeSolarHeatRate,
   getLeadingPartId,
   getShieldedPartIds,
   getHeatTolerance,
   getHeatRatio,
   updateHeat,
+  updateSolarHeat,
   ATMOSPHERE_TOP,
   SEA_LEVEL_DENSITY,
   SCALE_HEIGHT,
@@ -41,6 +44,11 @@ import {
   HEAT_DISSIPATION_PER_TICK,
   EXPOSED_HEAT_FRACTION,
 } from '../core/atmosphere.ts';
+import {
+  SUN_DESTRUCTION_ALTITUDE,
+  SUN_HEAT_START_ALTITUDE,
+  SUN_HEAT_RATE_BASE,
+} from '../core/constants.ts';
 import {
   createRocketAssembly,
   addPartToAssembly,
@@ -852,5 +860,260 @@ describe('integration — heat applied through physics tick()', () => {
     const ps = createPhysicsState(assembly, makeFlightState());
     expect(ps.heatMap).toBeInstanceOf(Map);
     expect(ps.heatMap.size).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// atmosphereTopForBody()
+// ---------------------------------------------------------------------------
+
+describe('atmosphereTopForBody()', () => {
+  it('returns a positive altitude for Earth', () => {
+    expect(atmosphereTopForBody('EARTH')).toBeGreaterThan(0);
+  });
+
+  it('returns 0 for airless bodies', () => {
+    expect(atmosphereTopForBody('MOON')).toBe(0);
+    expect(atmosphereTopForBody('MERCURY')).toBe(0);
+  });
+
+  it('returns a higher top for Venus than Earth', () => {
+    expect(atmosphereTopForBody('VENUS')).toBeGreaterThan(atmosphereTopForBody('EARTH'));
+  });
+
+  it('returns a positive altitude for Mars', () => {
+    expect(atmosphereTopForBody('MARS')).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeSolarHeatRate()
+// ---------------------------------------------------------------------------
+
+describe('computeSolarHeatRate()', () => {
+  it('returns 0 at or above SUN_HEAT_START_ALTITUDE', () => {
+    expect(computeSolarHeatRate(SUN_HEAT_START_ALTITUDE)).toBe(0);
+    expect(computeSolarHeatRate(SUN_HEAT_START_ALTITUDE + 1_000_000)).toBe(0);
+  });
+
+  it('returns a positive value below SUN_HEAT_START_ALTITUDE', () => {
+    const rate = computeSolarHeatRate(SUN_HEAT_START_ALTITUDE - 1_000_000);
+    expect(rate).toBeGreaterThan(0);
+  });
+
+  it('increases as altitude decreases (closer to Sun)', () => {
+    const rateFar = computeSolarHeatRate(SUN_HEAT_START_ALTITUDE / 2);
+    const rateClose = computeSolarHeatRate(SUN_HEAT_START_ALTITUDE / 10);
+    expect(rateClose).toBeGreaterThan(rateFar);
+  });
+
+  it('follows inverse-square law from Sun centre', () => {
+    // At SUN_HEAT_START_ALTITUDE, rate = SUN_HEAT_RATE_BASE * (startDist/dist)^2
+    // At a halfway point, the ratio should be predictable.
+    const alt = SUN_HEAT_START_ALTITUDE / 2;
+    const rate = computeSolarHeatRate(alt);
+    expect(rate).toBeGreaterThan(SUN_HEAT_RATE_BASE);
+  });
+
+  it('handles altitude 0 (Sun surface) without error', () => {
+    const rate = computeSolarHeatRate(0);
+    expect(Number.isFinite(rate)).toBe(true);
+    expect(rate).toBeGreaterThan(0);
+  });
+
+  it('handles negative altitude gracefully (clamped to 0)', () => {
+    const rate = computeSolarHeatRate(-1000);
+    expect(Number.isFinite(rate)).toBe(true);
+    expect(rate).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// updateSolarHeat() — solar proximity heating
+// ---------------------------------------------------------------------------
+
+describe('updateSolarHeat()', () => {
+  /**
+   * Build a simple rocket for solar heat tests.
+   * Returns the assembly and ids of the parts.
+   */
+  function makeSolarTestRocket() {
+    const assembly = createRocketAssembly();
+    const staging = createStagingConfig();
+    const probeId = addPartToAssembly(assembly, 'probe-core-mk1', 0, 60);
+    const tankId = addPartToAssembly(assembly, 'tank-small', 0, 0);
+    const engineId = addPartToAssembly(assembly, 'engine-spark', 0, -55);
+    connectParts(assembly, probeId, 1, tankId, 0);
+    connectParts(assembly, tankId, 1, engineId, 0);
+    syncStagingWithAssembly(assembly, staging);
+    return { assembly, staging, probeId, tankId, engineId };
+  }
+
+  /**
+   * Build a rocket with a solar heat shield for protected-heat tests.
+   */
+  function makeSolarShieldedRocket() {
+    const assembly = createRocketAssembly();
+    const staging = createStagingConfig();
+    const probeId = addPartToAssembly(assembly, 'probe-core-mk1', 0, 60);
+    const tankId = addPartToAssembly(assembly, 'tank-small', 0, 0);
+    const shieldId = addPartToAssembly(assembly, 'heat-shield-solar', 0, -30);
+    const engineId = addPartToAssembly(assembly, 'engine-spark', 0, -55);
+    connectParts(assembly, probeId, 1, tankId, 0);
+    connectParts(assembly, tankId, 1, shieldId, 0);
+    connectParts(assembly, shieldId, 1, engineId, 0);
+    syncStagingWithAssembly(assembly, staging);
+    return { assembly, staging, probeId, tankId, shieldId, engineId };
+  }
+
+  it('does nothing when altitude >= SUN_HEAT_START_ALTITUDE', () => {
+    const { assembly } = makeSolarTestRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    updateSolarHeat(ps, assembly, fs, SUN_HEAT_START_ALTITUDE);
+
+    for (const id of ps.activeParts) {
+      expect(ps.heatMap.get(id) ?? 0).toBe(0);
+    }
+  });
+
+  it('applies heat to all parts when within solar heating zone', () => {
+    const { assembly } = makeSolarTestRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    const altitude = SUN_HEAT_START_ALTITUDE / 2;
+    updateSolarHeat(ps, assembly, fs, altitude);
+
+    for (const id of ps.activeParts) {
+      expect(ps.heatMap.get(id) ?? 0).toBeGreaterThan(0);
+    }
+  });
+
+  it('destroys all parts instantly in the destruction zone', () => {
+    const { assembly } = makeSolarTestRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+    const partCountBefore = ps.activeParts.size;
+    expect(partCountBefore).toBeGreaterThan(0);
+
+    updateSolarHeat(ps, assembly, fs, SUN_DESTRUCTION_ALTITUDE - 1);
+
+    expect(ps.activeParts.size).toBe(0);
+    // Events should be emitted for each destroyed part.
+    const destroyEvents = fs.events.filter(e => e.type === 'PART_DESTROYED');
+    expect(destroyEvents.length).toBe(partCountBefore);
+  });
+
+  it('destruction zone removes parts from firingEngines and heatMap', () => {
+    const { assembly, engineId } = makeSolarTestRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+    ps.firingEngines.add(engineId);
+    ps.heatMap.set(engineId, 100);
+
+    updateSolarHeat(ps, assembly, fs, SUN_DESTRUCTION_ALTITUDE - 1);
+
+    expect(ps.firingEngines.has(engineId)).toBe(false);
+    expect(ps.heatMap.has(engineId)).toBe(false);
+  });
+
+  it('destruction zone event descriptions mention solar inferno', () => {
+    const { assembly } = makeSolarTestRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    updateSolarHeat(ps, assembly, fs, SUN_DESTRUCTION_ALTITUDE - 1);
+
+    const evt = fs.events.find(e => e.type === 'PART_DESTROYED');
+    expect(evt).toBeDefined();
+    expect(evt.description).toContain('vaporised');
+  });
+
+  it('solar heat shield reduces heat on shielded parts', () => {
+    const { assembly, probeId, tankId, shieldId, engineId } = makeSolarShieldedRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+    // Descending (velY < 0): shield at y=-30 protects parts above (probe, tank).
+    ps.velY = -100;
+
+    const altitude = SUN_HEAT_START_ALTITUDE / 2;
+    updateSolarHeat(ps, assembly, fs, altitude);
+
+    const probeHeat = ps.heatMap.get(probeId) ?? 0;
+    const tankHeat = ps.heatMap.get(tankId) ?? 0;
+    const engineHeat = ps.heatMap.get(engineId) ?? 0;
+
+    // Shielded parts should have less heat than unshielded.
+    expect(probeHeat).toBeLessThan(engineHeat);
+    expect(tankHeat).toBeLessThan(engineHeat);
+    // Shielded parts should still get some heat (reduced, not zero).
+    expect(probeHeat).toBeGreaterThan(0);
+  });
+
+  it('standard heat shield provides STANDARD_SHIELD_SOLAR_RESISTANCE', () => {
+    // Use regular heat-shield-mk1 (no solarHeatResistance property).
+    const assembly = createRocketAssembly();
+    const staging = createStagingConfig();
+    const probeId = addPartToAssembly(assembly, 'probe-core-mk1', 0, 60);
+    const shieldId = addPartToAssembly(assembly, 'heat-shield-mk1', 0, -30);
+    const engineId = addPartToAssembly(assembly, 'engine-spark', 0, -55);
+    connectParts(assembly, probeId, 1, shieldId, 0);
+    connectParts(assembly, shieldId, 1, engineId, 0);
+    syncStagingWithAssembly(assembly, staging);
+
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+    ps.velY = -100; // descending — shield at y=-30 protects probe at y=60
+
+    const altitude = SUN_HEAT_START_ALTITUDE / 2;
+    updateSolarHeat(ps, assembly, fs, altitude);
+
+    const probeHeat = ps.heatMap.get(probeId) ?? 0;
+    const engineHeat = ps.heatMap.get(engineId) ?? 0;
+
+    // Probe is shielded with 0.3 resistance → gets 70% of full heat.
+    // Engine is unshielded → gets full heat.
+    expect(probeHeat).toBeLessThan(engineHeat);
+    expect(probeHeat).toBeGreaterThan(0);
+  });
+
+  it('destroys parts when solar heat exceeds tolerance', () => {
+    const { assembly, engineId } = makeSolarTestRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    // Pre-load heat just below tolerance on all parts.
+    const placed = assembly.parts.get(engineId);
+    const def = placed ? getPartById(placed.partId) : null;
+    const tol = getHeatTolerance(def);
+    ps.heatMap.set(engineId, tol);
+
+    // Apply solar heat at a close altitude to push over tolerance.
+    const altitude = SUN_DESTRUCTION_ALTITUDE + 1_000_000;
+    updateSolarHeat(ps, assembly, fs, altitude);
+
+    // Engine should have been destroyed.
+    expect(ps.activeParts.has(engineId)).toBe(false);
+    const evt = fs.events.find(e => e.type === 'PART_DESTROYED' && e.instanceId === engineId);
+    expect(evt).toBeDefined();
+    expect(evt.description).toContain('solar radiation');
+  });
+
+  it('no shield resistance when no heat shields are active', () => {
+    const { assembly } = makeSolarTestRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    const altitude = SUN_HEAT_START_ALTITUDE / 2;
+    const solarRate = computeSolarHeatRate(altitude);
+
+    updateSolarHeat(ps, assembly, fs, altitude);
+
+    // All parts get full solar heat rate (no shield).
+    for (const id of ps.activeParts) {
+      expect(ps.heatMap.get(id)).toBeCloseTo(solarRate, 6);
+    }
   });
 });

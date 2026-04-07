@@ -22,9 +22,22 @@ import {
   computeOrbitalThrustAngle,
   generateOrbitPredictions,
   isMapViewAvailable,
+  getMapTransferTargets,
+  generateTransferTrajectory,
+  getTransferProgressInfo,
+  getMapCelestialBodies,
+  getShadowOverlayGeometry,
+  getTrackingStationTier,
+  isSolarSystemMapAvailable,
+  isDebrisTrackingAvailable,
+  isWeatherPredictionAvailable,
+  isTransferPlanningAvailable,
+  isDeepSpaceCommsAvailable,
+  getAllowedMapZooms,
 } from '../core/mapView.ts';
-import { BODY_RADIUS, ALTITUDE_BANDS } from '../core/constants.ts';
+import { BODY_RADIUS, ALTITUDE_BANDS, FlightPhase } from '../core/constants.ts';
 import { computeOrbitalElements, circularOrbitVelocity } from '../core/orbit.ts';
+import { BODY_ORBIT_RADIUS, SOI_RADIUS } from '../core/manoeuvre.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -243,5 +256,401 @@ describe('isMapViewAvailable', () => {
       facilities: { 'tracking-station': { built: true, tier: 1 } },
     };
     expect(isMapViewAvailable(state)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getViewRadius — transfer state branches
+// ---------------------------------------------------------------------------
+
+describe('getViewRadius — transfer state branches', () => {
+  const bodyId = 'EARTH';
+
+  function makeTransferState(origin, destination) {
+    return {
+      originBodyId: origin,
+      destinationBodyId: destination,
+      departureTime: 0,
+      estimatedArrival: 86400,
+      departureDV: 1000,
+      captureDV: 500,
+      totalDV: 1500,
+      trajectoryPath: [],
+    };
+  }
+
+  it('CRAFT_TO_TARGET with transferState uses destination orbit or SOI', () => {
+    const ts = makeTransferState('EARTH', 'MOON');
+    const vr = getViewRadius(MapZoom.CRAFT_TO_TARGET, bodyId, null, null, ts);
+    const moonOrbit = BODY_ORBIT_RADIUS.MOON || 0;
+    const soiR = SOI_RADIUS[bodyId] || BODY_RADIUS[bodyId] * 5;
+    expect(vr).toBeCloseTo(Math.max(moonOrbit, soiR) * 1.3, -3);
+  });
+
+  it('CRAFT_TO_TARGET without craft or target falls back to LOCAL_BODY', () => {
+    const vr = getViewRadius(MapZoom.CRAFT_TO_TARGET, bodyId, null, null, null);
+    const localVr = getViewRadius(MapZoom.LOCAL_BODY, bodyId, null, null, null);
+    expect(vr).toBe(localVr);
+  });
+
+  it('SOLAR_SYSTEM with transferState uses max of dest and origin orbit radii', () => {
+    const ts = makeTransferState('EARTH', 'MARS');
+    const vr = getViewRadius(MapZoom.SOLAR_SYSTEM, bodyId, null, null, ts);
+    const destR = BODY_ORBIT_RADIUS.MARS || 0;
+    const originR = BODY_ORBIT_RADIUS.EARTH || 0;
+    const R = BODY_RADIUS[bodyId];
+    expect(vr).toBeCloseTo(Math.max(destR, originR, R * 5) * 1.3, -3);
+  });
+
+  it('SOLAR_SYSTEM for SUN body uses Mars orbit radius', () => {
+    const vr = getViewRadius(MapZoom.SOLAR_SYSTEM, 'SUN', null, null, null);
+    const marsR = BODY_ORBIT_RADIUS.MARS;
+    expect(vr).toBeCloseTo(marsR * 1.2, -3);
+  });
+
+  it('SOLAR_SYSTEM for body with finite SOI uses SOI * 1.3', () => {
+    const vr = getViewRadius(MapZoom.SOLAR_SYSTEM, 'EARTH', null, null, null);
+    const soiR = SOI_RADIUS.EARTH;
+    expect(vr).toBeCloseTo(soiR * 1.3, -3);
+  });
+
+  it('default zoom level returns R * 2', () => {
+    const R = BODY_RADIUS[bodyId];
+    const vr = getViewRadius('UNKNOWN_ZOOM', bodyId, null, null, null);
+    expect(vr).toBeCloseTo(R * 2, -3);
+  });
+
+  it('LOCAL_BODY without altitude bands uses 2 000 000 default', () => {
+    // Use a body that might not have bands defined — fall back to default.
+    const vr = getViewRadius(MapZoom.LOCAL_BODY, 'SUN', null, null, null);
+    const R = BODY_RADIUS.SUN;
+    // Without bands, maxAlt = 2_000_000, so vr = (R + 2_000_000) * 1.1
+    expect(vr).toBeGreaterThan(R);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// generateTransferTrajectory
+// ---------------------------------------------------------------------------
+
+describe('generateTransferTrajectory', () => {
+  it('returns at least the initial point', () => {
+    const ps = { posX: 0, posY: 100_000, velX: 7800, velY: 500 };
+    const pts = generateTransferTrajectory(ps, 'EARTH', 60);
+    expect(pts.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('first point is at the craft body-centred position', () => {
+    const R = BODY_RADIUS.EARTH;
+    const ps = { posX: 1000, posY: 200_000, velX: 8000, velY: 100 };
+    const pts = generateTransferTrajectory(ps, 'EARTH', 30);
+    expect(pts[0].x).toBe(1000);
+    expect(pts[0].y).toBe(200_000 + R);
+  });
+
+  it('stops early if trajectory leaves SOI', () => {
+    // Very high velocity to escape SOI quickly.
+    const ps = { posX: 0, posY: 200_000, velX: 50_000, velY: 50_000 };
+    const pts = generateTransferTrajectory(ps, 'EARTH', 200);
+    // Should stop before 201 points (escaped SOI).
+    expect(pts.length).toBeLessThan(201);
+  });
+
+  it('stops early if trajectory crashes into body', () => {
+    // Heading straight down at high speed.
+    const ps = { posX: 0, posY: 50_000, velX: 0, velY: -10_000 };
+    const pts = generateTransferTrajectory(ps, 'EARTH', 200);
+    // Should stop before completing all 200 points.
+    expect(pts.length).toBeLessThan(201);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getTransferProgressInfo
+// ---------------------------------------------------------------------------
+
+describe('getTransferProgressInfo', () => {
+  function makeTransferState(depTime, arrTime, origin, dest) {
+    return {
+      originBodyId: origin,
+      destinationBodyId: dest,
+      departureTime: depTime,
+      estimatedArrival: arrTime,
+      departureDV: 1000,
+      captureDV: 500,
+      totalDV: 1500,
+      trajectoryPath: [],
+    };
+  }
+
+  it('returns null when transferState is null', () => {
+    expect(getTransferProgressInfo(null, 1000)).toBeNull();
+  });
+
+  it('returns progress 0 at departure time', () => {
+    const ts = makeTransferState(100, 200, 'EARTH', 'MARS');
+    const info = getTransferProgressInfo(ts, 100);
+    expect(info).not.toBeNull();
+    expect(info.progress).toBe(0);
+  });
+
+  it('returns progress 1 at arrival time', () => {
+    const ts = makeTransferState(100, 200, 'EARTH', 'MARS');
+    const info = getTransferProgressInfo(ts, 200);
+    expect(info.progress).toBe(1);
+  });
+
+  it('returns progress 0.5 at midpoint', () => {
+    const ts = makeTransferState(100, 300, 'EARTH', 'MARS');
+    const info = getTransferProgressInfo(ts, 200);
+    expect(info.progress).toBeCloseTo(0.5, 5);
+  });
+
+  it('clamps progress to 1 past arrival', () => {
+    const ts = makeTransferState(100, 200, 'EARTH', 'MARS');
+    const info = getTransferProgressInfo(ts, 500);
+    expect(info.progress).toBe(1);
+  });
+
+  it('clamps progress to 0 before departure', () => {
+    const ts = makeTransferState(100, 200, 'EARTH', 'MARS');
+    const info = getTransferProgressInfo(ts, 50);
+    expect(info.progress).toBe(0);
+  });
+
+  it('includes formatted destination and origin names', () => {
+    const ts = makeTransferState(100, 200, 'EARTH', 'MARS');
+    const info = getTransferProgressInfo(ts, 150);
+    expect(info.destName).toBe('Mars');
+    expect(info.originName).toBe('Earth');
+  });
+
+  it('includes formatted captureDV and etaStr', () => {
+    const ts = makeTransferState(100, 200, 'EARTH', 'MARS');
+    const info = getTransferProgressInfo(ts, 150);
+    expect(typeof info.captureDV).toBe('string');
+    expect(typeof info.etaStr).toBe('string');
+  });
+
+  it('handles zero total time gracefully (progress = 0)', () => {
+    const ts = makeTransferState(100, 100, 'EARTH', 'MARS');
+    const info = getTransferProgressInfo(ts, 100);
+    expect(info.progress).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getMapCelestialBodies
+// ---------------------------------------------------------------------------
+
+describe('getMapCelestialBodies', () => {
+  it('returns child bodies for EARTH (should include MOON)', () => {
+    const bodies = getMapCelestialBodies('EARTH', null);
+    const ids = bodies.map(b => b.bodyId);
+    expect(ids).toContain('MOON');
+  });
+
+  it('returns child bodies for MARS (should include PHOBOS, DEIMOS)', () => {
+    const bodies = getMapCelestialBodies('MARS', null);
+    const ids = bodies.map(b => b.bodyId);
+    expect(ids).toContain('PHOBOS');
+    expect(ids).toContain('DEIMOS');
+  });
+
+  it('returns empty for body with no children and no transfer', () => {
+    const bodies = getMapCelestialBodies('MOON', null);
+    expect(bodies).toHaveLength(0);
+  });
+
+  it('adds destination body during transfer if not already a child', () => {
+    const ts = {
+      originBodyId: 'EARTH',
+      destinationBodyId: 'MARS',
+      departureTime: 0,
+      estimatedArrival: 86400,
+      departureDV: 1000,
+      captureDV: 500,
+      totalDV: 1500,
+      trajectoryPath: [],
+    };
+    const bodies = getMapCelestialBodies('EARTH', ts);
+    const ids = bodies.map(b => b.bodyId);
+    expect(ids).toContain('MARS');
+    expect(ids).toContain('MOON'); // child still present
+  });
+
+  it('does not duplicate destination if it is already a child', () => {
+    const ts = {
+      originBodyId: 'EARTH',
+      destinationBodyId: 'MOON',
+      departureTime: 0,
+      estimatedArrival: 86400,
+      departureDV: 1000,
+      captureDV: 500,
+      totalDV: 1500,
+      trajectoryPath: [],
+    };
+    const bodies = getMapCelestialBodies('EARTH', ts);
+    const moonEntries = bodies.filter(b => b.bodyId === 'MOON');
+    expect(moonEntries).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getShadowOverlayGeometry
+// ---------------------------------------------------------------------------
+
+describe('getShadowOverlayGeometry', () => {
+  it('returns valid shadow geometry for Earth', () => {
+    const geo = getShadowOverlayGeometry('EARTH', 0);
+    expect(geo.bodyRadius).toBe(BODY_RADIUS.EARTH);
+    expect(geo.maxRadius).toBeGreaterThan(geo.bodyRadius);
+    expect(geo.shadowArcDeg).toBeGreaterThan(0);
+    expect(geo.shadowArcDeg).toBeLessThan(360);
+  });
+
+  it('shadowStartAngleDeg is on the anti-sun side', () => {
+    const geo = getShadowOverlayGeometry('EARTH', 0);
+    // Shadow centre should be roughly 180° from sun.
+    const antiSun = (geo.sunAngleDeg + 180) % 360;
+    const shadowCentre = (geo.shadowStartAngleDeg + geo.shadowArcDeg / 2) % 360;
+    // They should be close (within the arc extent).
+    const diff = Math.abs(antiSun - shadowCentre);
+    expect(Math.min(diff, 360 - diff)).toBeLessThan(geo.shadowArcDeg);
+  });
+
+  it('respects custom maxRadius parameter', () => {
+    const customMax = 50_000_000;
+    const geo = getShadowOverlayGeometry('EARTH', 0, customMax);
+    expect(geo.maxRadius).toBe(customMax);
+  });
+
+  it('uses default maxRadius from altitude bands when not specified', () => {
+    const geo = getShadowOverlayGeometry('EARTH', 0);
+    const bands = ALTITUDE_BANDS.EARTH;
+    const highestBand = bands[bands.length - 1];
+    const expectedMax = BODY_RADIUS.EARTH + highestBand.max;
+    expect(geo.maxRadius).toBe(expectedMax);
+  });
+
+  it('returns different sun angles at different game times', () => {
+    const geo1 = getShadowOverlayGeometry('EARTH', 0);
+    const geo2 = getShadowOverlayGeometry('EARTH', 43200); // 12 hours later
+    expect(geo1.sunAngleDeg).not.toBe(geo2.sunAngleDeg);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getMapTransferTargets
+// ---------------------------------------------------------------------------
+
+describe('getMapTransferTargets', () => {
+  it('returns empty array for non-orbital phases', () => {
+    expect(getMapTransferTargets('EARTH', 200_000, FlightPhase.LAUNCH)).toEqual([]);
+    expect(getMapTransferTargets('EARTH', 200_000, FlightPhase.FLIGHT)).toEqual([]);
+    expect(getMapTransferTargets('EARTH', 200_000, FlightPhase.PRELAUNCH)).toEqual([]);
+    expect(getMapTransferTargets('EARTH', 200_000, FlightPhase.REENTRY)).toEqual([]);
+  });
+
+  it('returns results for ORBIT phase', () => {
+    const targets = getMapTransferTargets('EARTH', 200_000, FlightPhase.ORBIT);
+    // Should return some transfer targets (at least Moon from Earth).
+    expect(Array.isArray(targets)).toBe(true);
+  });
+
+  it('returns results for TRANSFER phase', () => {
+    const targets = getMapTransferTargets('EARTH', 200_000, FlightPhase.TRANSFER);
+    expect(Array.isArray(targets)).toBe(true);
+  });
+
+  it('returns results for MANOEUVRE phase', () => {
+    const targets = getMapTransferTargets('EARTH', 200_000, FlightPhase.MANOEUVRE);
+    expect(Array.isArray(targets)).toBe(true);
+  });
+
+  it('each target has formatted string fields', () => {
+    const targets = getMapTransferTargets('EARTH', 200_000, FlightPhase.ORBIT);
+    for (const t of targets) {
+      expect(typeof t.departureDVStr).toBe('string');
+      expect(typeof t.totalDVStr).toBe('string');
+      expect(typeof t.transferTimeStr).toBe('string');
+      expect(t.position).toHaveProperty('x');
+      expect(t.position).toHaveProperty('y');
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tracking Station tier-based feature availability
+// ---------------------------------------------------------------------------
+
+describe('Tracking Station tier-based features', () => {
+  function makeState(tier) {
+    if (tier === 0) return { orbitalObjects: [], facilities: {} };
+    return {
+      orbitalObjects: [],
+      facilities: { 'tracking-station': { built: true, tier } },
+    };
+  }
+
+  it('getTrackingStationTier returns 0 when not built', () => {
+    expect(getTrackingStationTier(makeState(0))).toBe(0);
+  });
+
+  it('getTrackingStationTier returns the tier when built', () => {
+    expect(getTrackingStationTier(makeState(1))).toBe(1);
+    expect(getTrackingStationTier(makeState(2))).toBe(2);
+    expect(getTrackingStationTier(makeState(3))).toBe(3);
+  });
+
+  it('isSolarSystemMapAvailable requires tier >= 2', () => {
+    expect(isSolarSystemMapAvailable(makeState(0))).toBe(false);
+    expect(isSolarSystemMapAvailable(makeState(1))).toBe(false);
+    expect(isSolarSystemMapAvailable(makeState(2))).toBe(true);
+    expect(isSolarSystemMapAvailable(makeState(3))).toBe(true);
+  });
+
+  it('isDebrisTrackingAvailable requires tier >= 2', () => {
+    expect(isDebrisTrackingAvailable(makeState(0))).toBe(false);
+    expect(isDebrisTrackingAvailable(makeState(1))).toBe(false);
+    expect(isDebrisTrackingAvailable(makeState(2))).toBe(true);
+  });
+
+  it('isWeatherPredictionAvailable requires tier >= 2', () => {
+    expect(isWeatherPredictionAvailable(makeState(0))).toBe(false);
+    expect(isWeatherPredictionAvailable(makeState(1))).toBe(false);
+    expect(isWeatherPredictionAvailable(makeState(2))).toBe(true);
+  });
+
+  it('isTransferPlanningAvailable requires tier >= 3', () => {
+    expect(isTransferPlanningAvailable(makeState(0))).toBe(false);
+    expect(isTransferPlanningAvailable(makeState(1))).toBe(false);
+    expect(isTransferPlanningAvailable(makeState(2))).toBe(false);
+    expect(isTransferPlanningAvailable(makeState(3))).toBe(true);
+  });
+
+  it('isDeepSpaceCommsAvailable requires tier >= 3', () => {
+    expect(isDeepSpaceCommsAvailable(makeState(0))).toBe(false);
+    expect(isDeepSpaceCommsAvailable(makeState(2))).toBe(false);
+    expect(isDeepSpaceCommsAvailable(makeState(3))).toBe(true);
+  });
+
+  it('getAllowedMapZooms returns 2 zooms at tier 1', () => {
+    const zooms = getAllowedMapZooms(makeState(1));
+    expect(zooms).toHaveLength(2);
+    expect(zooms).toContain(MapZoom.ORBIT_DETAIL);
+    expect(zooms).toContain(MapZoom.LOCAL_BODY);
+  });
+
+  it('getAllowedMapZooms returns all 4 zooms at tier 2+', () => {
+    const zooms = getAllowedMapZooms(makeState(2));
+    expect(zooms).toHaveLength(4);
+    expect(zooms).toContain(MapZoom.SOLAR_SYSTEM);
+    expect(zooms).toContain(MapZoom.CRAFT_TO_TARGET);
+  });
+
+  it('getAllowedMapZooms returns 2 zooms when not built', () => {
+    const zooms = getAllowedMapZooms(makeState(0));
+    expect(zooms).toHaveLength(2);
   });
 });
