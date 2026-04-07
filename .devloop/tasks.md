@@ -35,7 +35,7 @@
 ## Coverage Expansion
 
 ### TASK-006: Measure current render/UI coverage and identify testable modules
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Add `src/render/**` and `src/ui/**` to the coverage `include` pattern in `vite.config.js` (alongside the existing `src/core/**`). Run `npx vitest run --coverage` and record the current line/branch percentages for render and UI layers. Identify the top 10 most testable modules in each layer (pure logic, minimal DOM dependency) by reviewing uncovered files. Document findings as code comments in the vite.config.js coverage section to guide subsequent test-writing tasks. Do NOT set thresholds yet — that comes after tests are written.
 - **Verification**: `npx vitest run --coverage 2>&1 | head -50`
