@@ -53,7 +53,7 @@
 - **Verification**: `npx vitest run --coverage 2>&1 | grep -A5 "src/ui"`
 
 ### TASK-009: Set coverage thresholds for render and UI layers
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007, TASK-008
 - **Description**: In `vite.config.js`, configure separate coverage thresholds for `src/render/` and `src/ui/` at 50% lines and 40% branches. Keep the existing `src/core/` thresholds unchanged (89% lines, 80% branches, 91% functions). Use Vitest's per-directory threshold configuration. Verify all three layers pass their respective thresholds.
 - **Verification**: `npx vitest run --coverage`

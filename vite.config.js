@@ -40,11 +40,20 @@ export default defineConfig({
       //     9. ui/vab/_inventory.ts — wear/cost calculation logic
       //    10. ui/flightController/_flightPhase.ts — phase transition logic extractable from DOM
       //
-      // Thresholds for render/ui layers will be set after targeted tests are written.
       thresholds: {
-        lines: 89,
-        branches: 80,
-        functions: 91,
+        'src/core/**': {
+          lines: 89,
+          branches: 80,
+          functions: 91,
+        },
+        'src/render/**': {
+          lines: 50,
+          branches: 40,
+        },
+        'src/ui/**': {
+          lines: 50,
+          branches: 40,
+        },
       },
     },
   },
