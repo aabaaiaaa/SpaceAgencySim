@@ -41,7 +41,7 @@
 - **Verification**: `npx vitest run --coverage 2>&1 | head -50`
 
 ### TASK-007: Write unit tests for render layer modules
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-006
 - **Description**: Write targeted unit tests for testable modules in `src/render/` to reach 50% line coverage and 40% branch coverage. Focus on pure logic and utility functions — do NOT mock PixiJS canvas operations. Candidates include: `pool.ts` (already tested, extend if gaps), render helper/utility functions, state snapshot transformations, and any pure calculation functions. Create test files in `src/tests/` following existing naming conventions. See requirements Section 2.1.
 - **Verification**: `npx vitest run --coverage 2>&1 | grep -A5 "src/render"`
