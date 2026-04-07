@@ -62,7 +62,7 @@ export function hireCrew(state: GameState, name: string): HireResult {
   const cost = getAdjustedHireCost(state.reputation ?? 50);
   if (!spend(state, cost)) return { success: false, error: `Insufficient funds to hire astronaut (need $${cost.toLocaleString('en-US')}).` };
   const astronaut = createAstronaut({ name });
-  (_crew(state) as any[]).push(astronaut);
+  _crew(state).push(astronaut);
   return { success: true, astronaut, cost };
 }
 
@@ -144,16 +144,16 @@ export function processFlightInjuries(state: GameState, flightState: FlightState
       const a = _crew(state).find((a) => a.id === crewId);
       if (!a || a.status !== AstronautStatus.ACTIVE) continue;
       if (injureCrew(state, crewId, EJECTION_INJURY_PERIODS)) {
-        const alt = typeof (ejectionEvent as any).altitude === 'number' ? (ejectionEvent as any).altitude : 0;
+        const alt = typeof ejectionEvent.altitude === 'number' ? ejectionEvent.altitude : 0;
         injuries.push({ crewId, crewName: a.name, cause: 'Ejection', periods: EJECTION_INJURY_PERIODS, altitude: alt });
-        flightState.events.push({ time: ejectionEvent.time ?? flightState.timeElapsed, type: 'CREW_INJURED', description: `${a.name} injured from ejection at ${alt.toFixed(0)} m \u2014 recovery ${EJECTION_INJURY_PERIODS} period(s).`, crewId, altitude: alt, cause: 'Ejection' } as any);
+        flightState.events.push({ time: ejectionEvent.time ?? flightState.timeElapsed, type: 'CREW_INJURED', description: `${a.name} injured from ejection at ${alt.toFixed(0)} m \u2014 recovery ${EJECTION_INJURY_PERIODS} period(s).`, crewId, altitude: alt, cause: 'Ejection' });
       }
     }
   }
 
   const landingEvent = events.find((e) => e.type === 'LANDING');
-  if (landingEvent && typeof (landingEvent as any).speed === 'number') {
-    const speed = (landingEvent as any).speed as number;
+  if (landingEvent && typeof landingEvent.speed === 'number') {
+    const speed = landingEvent.speed;
     if (speed >= HARD_LANDING_SPEED_MIN && speed < HARD_LANDING_SPEED_MAX) {
       const t = (speed - HARD_LANDING_SPEED_MIN) / (HARD_LANDING_SPEED_MAX - HARD_LANDING_SPEED_MIN);
       const periods = Math.round(HARD_LANDING_INJURY_MIN + t * (HARD_LANDING_INJURY_MAX - HARD_LANDING_INJURY_MIN));
@@ -162,9 +162,9 @@ export function processFlightInjuries(state: GameState, flightState: FlightState
         const a = _crew(state).find((a) => a.id === crewId);
         if (!a || a.status !== AstronautStatus.ACTIVE) continue;
         if (injureCrew(state, crewId, periods)) {
-          const alt = typeof (landingEvent as any).altitude === 'number' ? (landingEvent as any).altitude : 0;
+          const alt = typeof landingEvent.altitude === 'number' ? landingEvent.altitude : 0;
           injuries.push({ crewId, crewName: a.name, cause: 'Hard landing', periods, altitude: alt });
-          flightState.events.push({ time: landingEvent.time ?? flightState.timeElapsed, type: 'CREW_INJURED', description: `${a.name} injured from hard landing at ${speed.toFixed(1)} m/s \u2014 recovery ${periods} period(s).`, crewId, altitude: alt, cause: 'Hard landing' } as any);
+          flightState.events.push({ time: landingEvent.time ?? flightState.timeElapsed, type: 'CREW_INJURED', description: `${a.name} injured from hard landing at ${speed.toFixed(1)} m/s \u2014 recovery ${periods} period(s).`, crewId, altitude: alt, cause: 'Hard landing' });
         }
       }
     }
@@ -254,7 +254,7 @@ export function hireExperiencedCrew(state: GameState, name: string): HireResult 
   const { min, max } = EXPERIENCED_CREW_SKILL_RANGE;
   const rs = (): number => min + Math.floor(Math.random() * (max - min + 1));
   const astronaut = createAstronaut({ name, skills: { piloting: rs(), engineering: rs(), science: rs() } });
-  (_crew(state) as any[]).push(astronaut);
+  _crew(state).push(astronaut);
   return { success: true, astronaut, cost };
 }
 

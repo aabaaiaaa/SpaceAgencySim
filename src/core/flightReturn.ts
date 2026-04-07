@@ -106,7 +106,8 @@ export function processFlightReturn(state: GameState, flightState: FlightState, 
   // -- 1-3. Mission completion --
   const acceptedSnapshot = [...(state.missions?.accepted ?? [])];
   for (const mission of acceptedSnapshot) {
-    const allObjectivesMet = Array.isArray((mission as any).objectives) && (mission as any).objectives.length > 0 && (mission as any).objectives.every((obj: any) => obj.completed);
+    const missionWithObj = mission as unknown as { objectives?: Array<{ completed: boolean }> };
+    const allObjectivesMet = Array.isArray(missionWithObj.objectives) && missionWithObj.objectives.length > 0 && missionWithObj.objectives.every((obj) => obj.completed);
     if (allObjectivesMet) {
       const result: any = completeMission(state, mission.id);
       if (result.success) completedMissions.push({ mission: result.mission, reward: result.reward, unlockedParts: result.unlockedParts, newlyAvailableMissions: result.newlyUnlockedMissions });
@@ -127,7 +128,7 @@ export function processFlightReturn(state: GameState, flightState: FlightState, 
       recoveryValue += Math.round((def.cost ?? 0) * recoveryFrac);
     }
     if (recoveryValue > 0) earn(state, recoveryValue);
-    const usedInventoryParts = (ps as any)._usedInventoryParts ?? null;
+    const usedInventoryParts = ps._usedInventoryParts ?? null;
     const result: any = recoverPartsToInventory(state, assembly, ps!, usedInventoryParts);
     partsRecovered = result.partsRecovered; recoveredParts = result.entries;
   }
@@ -155,7 +156,7 @@ export function processFlightReturn(state: GameState, flightState: FlightState, 
   }
 
   // -- 6. Death fines --
-  if (flightState && !(flightState as any).deathFinesApplied) {
+  if (flightState && !flightState.deathFinesApplied) {
     const isCrashed = !!(ps && ps.crashed);
     const allCmdLost = _allCommandModulesDestroyed(ps, assembly);
     if (isCrashed || allCmdLost) {
@@ -164,7 +165,7 @@ export function processFlightReturn(state: GameState, flightState: FlightState, 
       const kiaCount = crewIds.filter((id: string) => !ejectedIds.has(id)).length;
       if (kiaCount > 0) { applyDeathFine(state, kiaCount); deathFineTotal = kiaCount * DEATH_FINE_PER_ASTRONAUT; }
     }
-    (flightState as any).deathFinesApplied = true;
+    flightState.deathFinesApplied = true;
   }
 
   // -- 6a. Reputation --
@@ -215,7 +216,7 @@ export function processFlightReturn(state: GameState, flightState: FlightState, 
       });
       if (survivingIds.length > 0) {
         if (!Array.isArray(state.fieldCraft)) state.fieldCraft = [];
-        const rocketDesign = (state as any).rockets?.find((r: any) => r.id === flightState.rocketId);
+        const rocketDesign = state.rockets?.find((r) => r.id === flightState.rocketId);
         const craftName = rocketDesign?.name ?? `Craft-${(flightState.rocketId ?? '').slice(0, 6)}`;
         const fieldStatus = wasInOrbit ? FieldCraftStatus.IN_ORBIT : FieldCraftStatus.LANDED;
         deployedFieldCraft = createFieldCraft({ name: craftName, bodyId: landingBodyId, status: fieldStatus, crewIds: survivingIds, hasExtendedLifeSupport: hasExtendedLifeSupport(assembly, ps), deployedPeriod: state.currentPeriod, orbitalElements: flightState?.orbitalElements ?? null, orbitBandId: flightState?.orbitBandId ?? null });
@@ -237,11 +238,11 @@ export function processFlightReturn(state: GameState, flightState: FlightState, 
   if (flightState?.bodyId) visitedBodies.add(flightState.bodyId);
   if (flightState?.transferState?.originBodyId) visitedBodies.add(flightState.transferState.originBodyId);
   if (flightState?.transferState?.destinationBodyId) visitedBodies.add(flightState.transferState.destinationBodyId);
-  const rocketDesign = state.savedDesigns?.find((d) => d.id === flightState?.rocketId) ?? (state as any).rockets?.find((r: any) => r.id === flightState?.rocketId);
+  const rocketDesign = state.savedDesigns?.find((d) => d.id === flightState?.rocketId) ?? state.rockets?.find((r) => r.id === flightState?.rocketId);
 
   const flightResult: FlightResult = {
     id: _generateId(), missionId: flightState?.missionId ?? '', rocketId: flightState?.rocketId ?? '',
-    crewIds: flightState?.crewIds ?? [], launchDate: new Date().toISOString(), outcome: outcome as any,
+    crewIds: flightState?.crewIds ?? [], launchDate: new Date().toISOString(), outcome,
     deltaVUsed: 0, revenue: missionRevenueTotal + recoveryValue, notes: '',
     maxAltitude: flightState?.maxAltitude ?? flightState?.altitude ?? 0,
     maxSpeed: flightState?.maxVelocity ?? flightState?.velocity ?? 0,
@@ -288,7 +289,7 @@ function _allCommandModulesDestroyed(ps: PhysicsState | null, assembly: RocketAs
   return hadCommandModule;
 }
 
-function _determineOutcome(ps: PhysicsState | null, missionsCompleted: boolean): string {
+function _determineOutcome(ps: PhysicsState | null, missionsCompleted: boolean): FlightOutcome {
   if (!ps) return missionsCompleted ? FlightOutcome.SUCCESS : FlightOutcome.FAILURE;
   const landed = ps.landed && !ps.crashed;
   const crashed = ps.crashed;

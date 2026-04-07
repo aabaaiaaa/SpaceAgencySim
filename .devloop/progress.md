@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 24
-- **Completed**: 12
-- **Remaining**: 12
-- **Last Updated**: 2026-04-07T10:16:57.703Z
+- **Completed**: 13
+- **Remaining**: 11
+- **Last Updated**: 2026-04-07T10:25:18.043Z
 
 ## Iteration Log
 
@@ -131,4 +131,13 @@
 - **Exit Status**: success
 - **Tokens**: 8,204,186 total (1,584 in, 65,893 out, 130,206 cache-create, 8,006,503 cache-read)
 - **Cost**: $6.8589
+
+### Iteration 13 - 2026-04-07T10:25:18.041Z
+- **Task Attempted**: TASK-013
+- **Task Completed**: TASK-013
+- **Summary**: Completed Eliminate `as any` casts — crew.ts, debugSaves.ts, docking.ts, flightReturn.ts
+- **Duration**: 8m 18s
+- **Exit Status**: success
+- **Tokens**: 6,279,463 total (79 in, 22,462 out, 93,100 cache-create, 6,163,822 cache-read)
+- **Cost**: $4.2257
 

@@ -98,7 +98,7 @@ import { initPowerState, tickPower, recalcPowerState } from './power.js';
 import { getOrbitalStateAtTime } from './orbit.js';
 
 import type { AltitudeBand, ControlMode as ControlModeType } from './constants.js';
-import type { FlightState, OrbitalElements, PowerState, GameState } from './gameState.js';
+import type { FlightState, OrbitalElements, PowerState, GameState, InventoryPart } from './gameState.js';
 
 // ---------------------------------------------------------------------------
 // Types for modules still in .js
@@ -416,6 +416,8 @@ export interface PhysicsState {
   _malfunctionCheckPending?: boolean;
   /** Countdown timer for pending malfunction check (seconds). */
   _malfunctionCheckTimer?: number;
+  /** Map of instanceId → InventoryPart for parts sourced from inventory (wear tracking). */
+  _usedInventoryParts?: Map<string, InventoryPart>;
 }
 
 /** An ejected crew capsule tracked for physics/rendering. */

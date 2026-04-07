@@ -73,7 +73,7 @@
 - **Verification**: `grep "as any" src/core/staging.ts src/core/challenges.ts src/core/contracts.ts` returns no matches. `npm run typecheck` passes. `npm run test:unit` passes.
 
 ### TASK-013: Eliminate `as any` casts — crew.ts, debugSaves.ts, docking.ts, flightReturn.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Remove all `as any` casts from `crew.ts` (8), `debugSaves.ts` (8), `docking.ts` (8), and `flightReturn.ts` (7) by adding proper types. For `debugSaves.ts`, `Partial<T>` and test-specific factory types are acceptable. See requirements Section 4.1.
 - **Verification**: `grep "as any"` on these four files returns no matches. `npm run typecheck` passes. `npm run test:unit` passes.

@@ -45,7 +45,7 @@ import {
   MAX_ENGINEERING_MALFUNCTION_REDUCTION,
 } from './constants.js';
 import { getMalfunctionMultiplier } from './settings.js';
-import type { GameState, FlightState } from './gameState.js';
+import type { GameState, FlightState, InventoryPart } from './gameState.js';
 import type { PhysicsState, RocketAssembly } from './physics.js';
 import type { PartDef } from '../data/parts.js';
 
@@ -58,11 +58,6 @@ interface MalfunctionEntry {
   recovered: boolean;
 }
 
-interface InventoryPartEntry {
-  wear: number;
-  [key: string]: unknown;
-}
-
 // Extend PhysicsState with the malfunction-specific fields that are not
 // in the exported interface (set dynamically at runtime).
 type PhysicsStateWithMalfunctions = PhysicsState & {
@@ -71,7 +66,7 @@ type PhysicsStateWithMalfunctions = PhysicsState & {
   _lastBiomeForMalfunction?: string | null;
   _malfunctionCheckPending?: boolean;
   _malfunctionCheckTimer?: number;
-  _usedInventoryParts?: Map<string, InventoryPartEntry>;
+  _usedInventoryParts?: Map<string, InventoryPart>;
   _gameState?: GameState;
 };
 

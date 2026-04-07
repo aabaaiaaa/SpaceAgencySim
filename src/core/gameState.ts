@@ -56,6 +56,7 @@ export interface DockingSystemState {
   orientationOk: boolean;
   lateralOk: boolean;
   dockedObjectIds: string[];
+  combinedMass: number;
 }
 
 /** Power state tracked per physics tick on an active flight. */
@@ -468,6 +469,8 @@ export interface FlightState {
   hasScienceModules?: boolean;
   /** True while a science module experiment is running. */
   scienceModuleRunning?: boolean;
+  /** Whether death fines have already been applied mid-flight. */
+  deathFinesApplied?: boolean;
 }
 
 /** A record of an earned achievement. */

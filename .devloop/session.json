@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 11,
+  "lastIteration": 12,
   "startedAt": "2026-04-06T23:44:48.505Z",
   "iteration": 1,
   "devloopVersion": "3.2.0",
   "activeTask": {
-    "taskId": "TASK-012",
-    "taskTitle": "Eliminate `as any` casts — staging.ts, challenges.ts, contracts.ts",
-    "iterationNumber": 12,
-    "startedAt": "2026-04-07T09:55:18.760Z"
+    "taskId": "TASK-013",
+    "taskTitle": "Eliminate `as any` casts — crew.ts, debugSaves.ts, docking.ts, flightReturn.ts",
+    "iterationNumber": 13,
+    "startedAt": "2026-04-07T10:16:59.618Z"
   }
 }

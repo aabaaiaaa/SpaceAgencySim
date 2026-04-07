@@ -181,10 +181,10 @@ function _completeDocking(dockingState: DockingSystemState, ps: PhysicsState, as
   dockingState.state = DockingState.DOCKED; dockingState.targetDistance = 0; dockingState.targetRelSpeed = 0;
   dockingState.speedOk = true; dockingState.orientationOk = true; dockingState.lateralOk = true;
   if (!dockingState.dockedObjectIds.includes(targetObj.id)) dockingState.dockedObjectIds.push(targetObj.id);
-  (dockingState as any).combinedMass = _calculateCombinedMass(ps, assembly, dockingState, state);
+  dockingState.combinedMass = _calculateCombinedMass(ps, assembly, dockingState, state);
   const idx = state.orbitalObjects.findIndex(o => o.id === targetObj.id);
   if (idx >= 0) state.orbitalObjects.splice(idx, 1);
-  flightState.events.push({ time: flightState.timeElapsed, type: 'DOCKING_COMPLETE', description: `Docked with ${targetObj.name}` } as any);
+  flightState.events.push({ time: flightState.timeElapsed, type: 'DOCKING_COMPLETE', description: `Docked with ${targetObj.name}` });
   return { docked: true, event: 'DOCKING_COMPLETE' };
 }
 
@@ -197,7 +197,7 @@ function _calculateCombinedMass(ps: PhysicsState, assembly: RocketAssembly, dock
   for (const [, fuel] of ps.fuelStore) craftMass += fuel;
   let dockedMass = 0;
   for (const dockedId of dockingState.dockedObjectIds) {
-    const satRecord = (state as any).satelliteNetwork?.satellites?.find((s: any) => s.orbitalObjectId === dockedId);
+    const satRecord = state.satelliteNetwork?.satellites?.find((s) => s.orbitalObjectId === dockedId);
     if (satRecord) { const satDef = getPartById(satRecord.partId); dockedMass += satDef ? satDef.mass : 500; }
     else dockedMass += 2000;
   }
@@ -220,8 +220,8 @@ export function undock(dockingState: DockingSystemState, ps: PhysicsState, assem
     elements.meanAnomalyAtEpoch += 0.001;
     state.orbitalObjects.push({ id: objectId, bodyId, type: OrbitalObjectType.CRAFT, name: `Undocked-${objectId.slice(0, 6)}`, elements });
   }
-  flightState.events.push({ time: flightState.timeElapsed, type: 'UNDOCKING_COMPLETE', description: `Undocked from ${objectId}` } as any);
-  (dockingState as any).combinedMass = _calculateCombinedMass(ps, assembly, dockingState, state);
+  flightState.events.push({ time: flightState.timeElapsed, type: 'UNDOCKING_COMPLETE', description: `Undocked from ${objectId}` });
+  dockingState.combinedMass = _calculateCombinedMass(ps, assembly, dockingState, state);
   if (dockingState.dockedObjectIds.length === 0) { dockingState.state = DockingState.IDLE; dockingState.targetId = null; }
   return { success: true, undockedObjectId: objectId };
 }
@@ -239,7 +239,7 @@ export function transferCrew(dockingState: DockingSystemState, flightState: Flig
   } else {
     for (const id of crewIds) { if (!flightState.crewIds.includes(id)) { flightState.crewIds.push(id); transferred.push(id); } }
   }
-  if (transferred.length > 0) flightState.events.push({ time: flightState.timeElapsed, type: 'CREW_TRANSFER', description: `${transferred.length} crew ${direction === 'TO_STATION' ? 'transferred to station' : 'boarded from station'}` } as any);
+  if (transferred.length > 0) flightState.events.push({ time: flightState.timeElapsed, type: 'CREW_TRANSFER', description: `${transferred.length} crew ${direction === 'TO_STATION' ? 'transferred to station' : 'boarded from station'}` });
   return { success: true, transferred };
 }
 
@@ -255,14 +255,14 @@ export function transferFuel(dockingState: DockingSystemState, ps: PhysicsState,
     if (remaining <= 0) break;
     const placed = assembly.parts.get(instanceId); if (!placed) continue;
     const def = getPartById(placed.partId); if (!def || def.type !== PartType.FUEL_TANK) continue;
-    const maxFuel = (def.properties as any)?.fuelMass ?? 0;
+    const maxFuel = Number(def.properties?.fuelMass ?? 0);
     const currentFuel = ps.fuelStore.get(instanceId) ?? 0;
     const capacity = maxFuel - currentFuel;
     if (capacity > 0) { const toTransfer = Math.min(remaining, capacity); ps.fuelStore.set(instanceId, currentFuel + toTransfer); totalTransferred += toTransfer; remaining -= toTransfer; }
   }
   if (totalTransferred > 0) {
     flightState.fuelRemaining += totalTransferred;
-    flightState.events.push({ time: flightState.timeElapsed, type: 'FUEL_TRANSFER', description: `Transferred ${Math.round(totalTransferred)} kg fuel from docked depot` } as any);
+    flightState.events.push({ time: flightState.timeElapsed, type: 'FUEL_TRANSFER', description: `Transferred ${Math.round(totalTransferred)} kg fuel from docked depot` });
   }
   return { success: true, transferred: totalTransferred };
 }
