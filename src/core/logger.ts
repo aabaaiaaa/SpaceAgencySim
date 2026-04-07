@@ -24,7 +24,15 @@ function shouldLog(level: LogLevel): boolean {
 function formatEntry(level: LogLevel, category: string, message: string, data?: unknown): string {
   const ts = new Date().toISOString();
   const base = `[${ts}] [${level.toUpperCase()}] [${category}] ${message}`;
-  if (data !== undefined) return `${base} ${JSON.stringify(data)}`;
+  if (data !== undefined) {
+    let serialized: string;
+    try {
+      serialized = JSON.stringify(data);
+    } catch {
+      serialized = '[Unserializable data]';
+    }
+    return `${base} ${serialized}`;
+  }
   return base;
 }
 

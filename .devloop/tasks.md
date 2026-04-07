@@ -19,7 +19,7 @@
 - **Verification**: New unit tests pass: undo callback throwing preserves stack integrity, redo callback throwing preserves stack integrity, error is logged. `npm run test:unit` passes.
 
 ### TASK-004: Add circular reference protection to logger
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Wrap `JSON.stringify(data)` in `src/core/logger.ts:27` with try-catch. On failure, substitute `"[Unserializable data]"` or similar fallback string. See requirements Section 1.4.
 - **Verification**: New unit test passes: calling `logger.error()` with a circular-reference object does not throw and produces output containing the fallback string. `npm run test:unit` passes.
