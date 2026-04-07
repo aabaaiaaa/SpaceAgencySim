@@ -105,7 +105,7 @@
 ## Performance Monitoring Dashboard
 
 ### TASK-015: Create performance monitor module
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Create `src/core/perfMonitor.ts` with: (1) A fixed-size circular buffer (60 entries) for frame time history. (2) `beginFrame()` / `endFrame()` lifecycle hooks that record timestamps. (3) FPS calculation: current (1/frameTime), rolling average, and minimum over the buffer window. (4) Frame time histogram with 4 buckets: 0-8ms, 8-16ms, 16-33ms, 33ms+. (5) Worker round-trip latency tracking: `recordWorkerSend()` / `recordWorkerReceive()` methods. (6) Memory tracking via `performance.memory` (Chrome only, graceful no-op). (7) `getMetrics()` returning a snapshot of all current values. (8) `reset()` to clear all buffers. The module must be lightweight — no DOM, no allocations in the hot path. See requirements Section 4.1.
 - **Verification**: `npx vitest run src/tests/perfMonitor.test.ts`
