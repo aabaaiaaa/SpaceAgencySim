@@ -61,7 +61,7 @@
 ## Worker Sole State Ownership
 
 ### TASK-010: Define composite readonly snapshot type for main-thread consumption
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/core/physicsWorkerProtocol.ts`, define a `MainThreadSnapshot` type (or similar) that composites the physics and flight snapshot data into the structure that render/UI code will consume. This type should include all fields currently read by render/UI code from `PhysicsState` and `FlightState`. Control inputs (`throttle`, `angle`) must NOT be part of this snapshot — they remain main-thread authority. Also create a `createSnapshotFromState()` function (in a new file `src/core/snapshotFactory.ts` or in the protocol file) that converts mutable `PhysicsState` + `FlightState` into a `MainThreadSnapshot` — this is needed for the main-thread fallback path. See requirements Sections 3.1-3.2.
 - **Verification**: `npm run typecheck -- --noEmit src/core/physicsWorkerProtocol.ts src/core/snapshotFactory.ts`

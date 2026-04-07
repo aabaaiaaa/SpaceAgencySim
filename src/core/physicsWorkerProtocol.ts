@@ -307,6 +307,47 @@ export type WorkerMessage =
   | StoppedMessage;
 
 // ---------------------------------------------------------------------------
+// Composite readonly snapshot for main-thread consumption
+// ---------------------------------------------------------------------------
+
+/**
+ * Control input fields that remain main-thread authority.
+ * These are NOT included in the readonly snapshot consumed by render/UI.
+ */
+type PhysicsControlInputKeys = 'throttle' | 'throttleMode' | 'targetTWR' | 'angle';
+
+/**
+ * Physics snapshot with control inputs stripped — readonly data for
+ * render and UI code on the main thread.
+ */
+export type ReadonlyPhysicsSnapshot = Readonly<Omit<PhysicsSnapshot, PhysicsControlInputKeys>>;
+
+/**
+ * Flight snapshot — all fields readonly for render/UI consumption.
+ */
+export type ReadonlyFlightSnapshot = Readonly<FlightSnapshot>;
+
+/**
+ * Composite snapshot consumed by render and UI code on the main thread.
+ *
+ * This is the single source of truth for flight data on the main thread.
+ * Control inputs (throttle, angle) are NOT included — they remain
+ * main-thread authority and are stored separately in FCState.
+ *
+ * Produced by:
+ *   - Worker path: SnapshotMessage → strip control inputs
+ *   - Fallback path: createSnapshotFromState() in snapshotFactory.ts
+ */
+export interface MainThreadSnapshot {
+  /** Physics state data (control inputs excluded). */
+  readonly physics: ReadonlyPhysicsSnapshot;
+  /** Flight state data. */
+  readonly flight: ReadonlyFlightSnapshot;
+  /** Monotonic frame counter. */
+  readonly frame: number;
+}
+
+// ---------------------------------------------------------------------------
 // Serialisation helpers
 // ---------------------------------------------------------------------------
 
