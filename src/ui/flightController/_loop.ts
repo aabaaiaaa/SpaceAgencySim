@@ -56,6 +56,94 @@ export const MAX_CONSECUTIVE_LOOP_ERRORS: number = 5;
 let _fallbackFrame = 0;
 
 /**
+ * Sync a worker snapshot's scalar values back to the mutable PhysicsState and
+ * FlightState objects.  This keeps the local mutable state current for:
+ *  - Loop-internal reads (comms evaluation, post-flight auto-trigger, etc.)
+ *  - E2E test access via `window.__flightPs` / `window.__flightState`
+ *
+ * Control inputs (throttle, throttleMode, targetTWR, angle) are NOT overwritten
+ * — the main thread remains authoritative for those.
+ */
+function _syncSnapshotToMutableState(
+  snap: MainThreadSnapshot,
+  ps: ReturnType<typeof getPhysicsState>,
+  fs: ReturnType<typeof getFlightState>,
+): void {
+  if (!ps || !fs) return;
+
+  // Physics scalars
+  ps.posX = snap.physics.posX;
+  ps.posY = snap.physics.posY;
+  ps.velX = snap.physics.velX;
+  ps.velY = snap.physics.velY;
+  ps.landed = snap.physics.landed;
+  ps.crashed = snap.physics.crashed;
+  ps.grounded = snap.physics.grounded;
+  ps.angularVelocity = snap.physics.angularVelocity;
+  ps.isTipping = snap.physics.isTipping;
+  ps.tippingContactX = snap.physics.tippingContactX;
+  ps.tippingContactY = snap.physics.tippingContactY;
+  ps.controlMode = snap.physics.controlMode;
+  ps.baseOrbit = snap.physics.baseOrbit;
+  ps.hasLaunchClamps = snap.physics.hasLaunchClamps;
+  ps.weatherIspModifier = snap.physics.weatherIspModifier;
+
+  // Docking fields
+  ps.dockingAltitudeBand = snap.physics.dockingAltitudeBand;
+  ps.dockingOffsetAlongTrack = snap.physics.dockingOffsetAlongTrack;
+  ps.dockingOffsetRadial = snap.physics.dockingOffsetRadial;
+
+  // Collections — rebuild from serialised form
+  ps.firingEngines = new Set(snap.physics.firingEngines);
+  ps.activeParts = new Set(snap.physics.activeParts);
+  ps.deployedParts = new Set(snap.physics.deployedParts);
+  ps.rcsActiveDirections = new Set(snap.physics.rcsActiveDirections);
+  ps.ejectedCrewIds = new Set(snap.physics.ejectedCrewIds);
+  ps.ejectedCrew = snap.physics.ejectedCrew;
+  ps.fuelStore = new Map(Object.entries(snap.physics.fuelStore));
+  ps.heatMap = new Map(Object.entries(snap.physics.heatMap).map(([k, v]) => [k, Number(v)]));
+  ps.parachuteStates = new Map(Object.entries(snap.physics.parachuteStates));
+  ps.legStates = new Map(Object.entries(snap.physics.legStates));
+  ps.ejectorStates = new Map(Object.entries(snap.physics.ejectorStates));
+  ps.instrumentStates = new Map(Object.entries(snap.physics.instrumentStates)) as typeof ps.instrumentStates;
+  ps.scienceModuleStates = new Map(Object.entries(snap.physics.scienceModuleStates)) as typeof ps.scienceModuleStates;
+  ps.dockingPortStates = new Map(Object.entries(snap.physics.dockingPortStates));
+  ps.powerState = snap.physics.powerState;
+  ps.malfunctions = snap.physics.malfunctions
+    ? new Map(Object.entries(snap.physics.malfunctions))
+    : ps.malfunctions;
+
+  // Flight state scalars
+  fs.phase = snap.flight.phase;
+  fs.timeElapsed = snap.flight.timeElapsed;
+  fs.altitude = snap.flight.altitude;
+  fs.velocity = snap.flight.velocity;
+  fs.fuelRemaining = snap.flight.fuelRemaining;
+  fs.deltaVRemaining = snap.flight.deltaVRemaining;
+  fs.aborted = snap.flight.aborted;
+  fs.inOrbit = snap.flight.inOrbit;
+  fs.orbitalElements = snap.flight.orbitalElements;
+  fs.bodyId = snap.flight.bodyId;
+  fs.orbitBandId = snap.flight.orbitBandId;
+  fs.currentBiome = snap.flight.currentBiome;
+  fs.maxAltitude = snap.flight.maxAltitude;
+  fs.maxVelocity = snap.flight.maxVelocity;
+  fs.dockingState = snap.flight.dockingState;
+  fs.transferState = snap.flight.transferState;
+
+  // Sync arrays — the worker mutates phaseLog and events during phase
+  // transitions and objective evaluation.
+  fs.phaseLog = snap.flight.phaseLog;
+  fs.events = snap.flight.events;
+  fs.biomesVisited = snap.flight.biomesVisited;
+  fs.crewIds = snap.flight.crewIds;
+
+  // Power and comms state
+  fs.powerState = snap.flight.powerState ?? fs.powerState;
+  fs.commsState = snap.flight.commsState ?? fs.commsState;
+}
+
+/**
  * Returns true when the assembly contains at least one COMMAND_MODULE part
  * and ALL of them have been removed from `ps.activeParts` (destroyed or
  * separated).  Returns false while the rocket is still on the launch pad
@@ -174,6 +262,11 @@ export function loop(timestamp: number): void {
       const snap = consumeMainThreadSnapshot();
       if (snap) {
         const prevPhase = flightState.phase;
+
+        // Sync snapshot values to the mutable state objects so that
+        // downstream loop logic (comms, post-flight, rendering) and
+        // E2E test globals (window.__flightPs) see current values.
+        _syncSnapshotToMutableState(snap, ps, flightState);
 
         // Detect phase transition from snapshot values.
         if (snap.flight.phase !== prevPhase) {

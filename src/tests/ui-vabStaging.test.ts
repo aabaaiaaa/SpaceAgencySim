@@ -88,6 +88,16 @@ vi.mock('../ui/vab/_undoActions.ts', () => ({
   recordStagingChange: vi.fn(),
 }));
 
+// Stub document so renderStagingPanel() (which accesses document.getElementById)
+// doesn't crash in Node.js.
+vi.stubGlobal('document', {
+  getElementById: vi.fn(() => null),
+  createElement: vi.fn(() => ({
+    style: {}, className: '', textContent: '', innerHTML: '',
+    appendChild: vi.fn(), addEventListener: vi.fn(),
+  })),
+});
+
 import { setVabState, resetVabState } from '../ui/vab/_state.ts';
 import { syncStagingWithAssembly } from '../core/rocketbuilder.ts';
 import {

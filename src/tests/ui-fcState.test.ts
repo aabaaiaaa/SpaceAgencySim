@@ -30,10 +30,8 @@ describe('FCState', () => {
     it('core references are null by default', () => {
       const s = getFCState();
       expect(s.rafId).toBeNull();
-      expect(s.ps).toBeNull();
       expect(s.assembly).toBeNull();
       expect(s.stagingConfig).toBeNull();
-      expect(s.flightState).toBeNull();
       expect(s.state).toBeNull();
       expect(s.container).toBeNull();
       expect(s.onFlightEnd).toBeNull();

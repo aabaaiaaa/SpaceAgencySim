@@ -29,6 +29,16 @@ vi.mock('../data/parts.ts', () => ({
 const _mockElements = [];
 vi.stubGlobal('document', {
   createElement: vi.fn((tag) => {
+    // Create a single context per element so getContext('2d') returns
+    // the same instance every time (matching real canvas behavior).
+    const ctx = {
+      clearRect: vi.fn(),
+      fillRect: vi.fn(),
+      strokeRect: vi.fn(),
+      fillStyle: '',
+      strokeStyle: '',
+      lineWidth: 0,
+    };
     const el = {
       tag,
       id: '',
@@ -43,14 +53,7 @@ vi.stubGlobal('document', {
       children: [],
       appendChild: vi.fn(function(child) { this.children.push(child); return child; }),
       addEventListener: vi.fn(),
-      getContext: vi.fn(() => ({
-        clearRect: vi.fn(),
-        fillRect: vi.fn(),
-        strokeRect: vi.fn(),
-        fillStyle: '',
-        strokeStyle: '',
-        lineWidth: 0,
-      })),
+      getContext: vi.fn(() => ctx),
     };
     _mockElements.push(el);
     return el;

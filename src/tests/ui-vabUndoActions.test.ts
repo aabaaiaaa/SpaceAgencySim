@@ -200,7 +200,7 @@ describe('VAB Undo Actions', () => {
 
       redo();
       expect(assembly.parts.has('p1')).toBe(true);
-      expect(gameState.money).toBe(4000); // 6000 - 1000 re-deduction (net: 5000 - 1000)
+      expect(gameState.money).toBe(5000); // undo refunded to 6000, redo deducts 1000 back to 5000
     });
   });
 

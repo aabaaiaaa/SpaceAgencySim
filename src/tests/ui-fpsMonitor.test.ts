@@ -132,7 +132,8 @@ describe('fpsMonitor', () => {
       for (let i = 0; i < 60; i++) {
         recordFrame(16, 1000 + i * 16);
       }
-      expect(window.__perfStats.fps).toBeCloseTo(62.5, 0);
+      // FPS is 1000/16 = 62.5, but Math.round(62.5) = 63 in JS.
+      expect(window.__perfStats.fps).toBe(63);
     });
 
     it('ring buffer wraps correctly after more than 60 frames', () => {

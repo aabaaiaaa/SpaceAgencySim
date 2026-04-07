@@ -215,7 +215,7 @@ function _emptyMetrics(): PerfMetrics {
     frameTime: 0,
     frameTimeAverage: 0,
     histogram: { bucket0to8: 0, bucket8to16: 0, bucket16to33: 0, bucket33plus: 0 },
-    workerLatency: 0,
+    workerLatency: _workerLatency,
     memoryUsedBytes,
     memoryLimitBytes,
     frameCount: 0,

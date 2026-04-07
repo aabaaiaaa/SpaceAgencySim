@@ -52,8 +52,9 @@ export function buildSaveEnvelope({
   challenges      = { active: null, results: {} },
   customChallenges= [],
   fieldCraft      = [],
-  autoSaveEnabled = true,
-  debugMode       = false,
+  autoSaveEnabled    = true,
+  debugMode          = false,
+  useWorkerPhysics   = false,
 } = {}) {
   return {
     saveName,
@@ -96,6 +97,7 @@ export function buildSaveEnvelope({
       fieldCraft,
       autoSaveEnabled,
       debugMode,
+      useWorkerPhysics,
     },
   };
 }

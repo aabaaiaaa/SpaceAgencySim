@@ -67,13 +67,45 @@ vi.mock('../ui/flightController/_menuActions.js', () => ({
   handleAbortReturnToAgency: mockAbort,
 }));
 
+// Mock the logger so we can verify error logging without console.error.
+const { mockLoggerError } = vi.hoisted(() => ({ mockLoggerError: vi.fn() }));
+vi.mock('../core/logger.ts', () => ({
+  logger: { error: mockLoggerError, warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
+}));
+
+// Mocks for modules added during the iteration 5 refactor.
+vi.mock('../ui/fpsMonitor.ts', () => ({ recordFrame: vi.fn() }));
+vi.mock('../core/perfMonitor.ts', () => ({
+  beginFrame: vi.fn(),
+  endFrame: vi.fn(),
+}));
+vi.mock('../ui/flightController/_workerBridge.ts', () => ({
+  isWorkerReady: vi.fn(() => false),
+  hasWorkerError: vi.fn(() => false),
+  consumeMainThreadSnapshot: vi.fn(() => null),
+  sendTick: vi.fn(),
+  sendThrottle: vi.fn(),
+  sendAngle: vi.fn(),
+  terminatePhysicsWorker: vi.fn(),
+}));
+vi.mock('../core/snapshotFactory.ts', () => ({
+  createSnapshotFromState: vi.fn(),
+}));
+vi.mock('../core/flightPhase.ts', () => ({
+  getPhaseLabel: vi.fn(() => ''),
+}));
+vi.mock('../core/orbit.ts', () => ({
+  getOrbitEntryLabel: vi.fn(() => ''),
+  checkOrbitStatus: vi.fn(),
+}));
+
 // ---------------------------------------------------------------------------
 // Import the module under test AFTER mocks are declared (vitest hoists
 // vi.mock calls, but this makes the intent clear).
 // ---------------------------------------------------------------------------
 
 import { loop, MAX_CONSECUTIVE_LOOP_ERRORS } from '../ui/flightController/_loop.ts';
-import { getFCState, setFCState, resetFCState } from '../ui/flightController/_state.ts';
+import { getFCState, setFCState, resetFCState, setPhysicsState, setFlightState } from '../ui/flightController/_state.ts';
 
 // ---------------------------------------------------------------------------
 // Minimal DOM stubs (the test environment is Node, not jsdom).
@@ -98,16 +130,16 @@ function createMockElement() {
 
 /** Build a minimal flight-controller state that satisfies the loop guard. */
 function seedFCState(overrides = {}) {
+  setPhysicsState({
+    posX: 0, posY: 0, velX: 0, velY: 0,
+    throttle: 0, grounded: true, landed: false, crashed: false,
+    firingEngines: new Set(), activeParts: new Set(),
+    surfaceAltitude: 0,
+  });
+  setFlightState({ phase: 'FLIGHT', bodyId: 'EARTH', scienceModuleRunning: false });
   const defaults = {
-    ps: {
-      posX: 0, posY: 0, velX: 0, velY: 0,
-      throttle: 0, grounded: true, landed: false, crashed: false,
-      firingEngines: new Set(), activeParts: new Set(),
-      surfaceAltitude: 0,
-    },
     assembly: { parts: new Map() },
     stagingConfig: { stages: [] },
-    flightState: { phase: 'FLIGHT', bodyId: 'EARTH', scienceModuleRunning: false },
     state: { missions: [], contracts: [], challenges: [] },
     container: createMockElement(),
     rafId: 1,
@@ -127,8 +159,11 @@ function seedFCState(overrides = {}) {
 
 beforeEach(() => {
   resetFCState();
+  setPhysicsState(null);
+  setFlightState(null);
   mockTick.mockReset();
   mockAbort.mockReset();
+  mockLoggerError.mockReset();
 
   vi.stubGlobal('document', {
     createElement: () => createMockElement(),
@@ -155,14 +190,12 @@ describe('Flight controller loop error handling', () => {
     seedFCState();
     mockTick.mockImplementation(() => { throw new Error('NaN in physics'); });
 
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
     loop(16.67);
 
     const s = getFCState();
     expect(s.loopConsecutiveErrors).toBe(1);
-    expect(spy).toHaveBeenCalledOnce();
-    expect(spy.mock.calls[0][0]).toContain('[flightLoop]');
-    spy.mockRestore();
+    expect(mockLoggerError).toHaveBeenCalledOnce();
+    expect(mockLoggerError.mock.calls[0][0]).toBe('flightLoop');
   });
 
   it('resets the error counter on a successful frame after an error', () => {
@@ -178,7 +211,6 @@ describe('Flight controller loop error handling', () => {
   it('does NOT show the abort banner for fewer than 5 consecutive errors', () => {
     seedFCState();
     mockTick.mockImplementation(() => { throw new Error('boom'); });
-    vi.spyOn(console, 'error').mockImplementation(() => {});
 
     for (let i = 0; i < MAX_CONSECUTIVE_LOOP_ERRORS - 1; i++) {
       loop(16.67 * (i + 1));
@@ -187,14 +219,11 @@ describe('Flight controller loop error handling', () => {
     const s = getFCState();
     expect(s.loopConsecutiveErrors).toBe(MAX_CONSECUTIVE_LOOP_ERRORS - 1);
     expect(s.loopErrorBanner).toBeNull();
-
-    console.error.mockRestore();
   });
 
   it('shows the abort banner after 5 consecutive errors', () => {
     seedFCState();
     mockTick.mockImplementation(() => { throw new Error('boom'); });
-    vi.spyOn(console, 'error').mockImplementation(() => {});
 
     for (let i = 0; i < MAX_CONSECUTIVE_LOOP_ERRORS; i++) {
       loop(16.67 * (i + 1));
@@ -203,14 +232,11 @@ describe('Flight controller loop error handling', () => {
     const s = getFCState();
     expect(s.loopConsecutiveErrors).toBe(MAX_CONSECUTIVE_LOOP_ERRORS);
     expect(s.loopErrorBanner).not.toBeNull();
-
-    console.error.mockRestore();
   });
 
   it('does not create a second banner if one already exists', () => {
     seedFCState();
     mockTick.mockImplementation(() => { throw new Error('boom'); });
-    vi.spyOn(console, 'error').mockImplementation(() => {});
 
     // Trigger banner creation.
     for (let i = 0; i < MAX_CONSECUTIVE_LOOP_ERRORS + 2; i++) {
@@ -225,8 +251,6 @@ describe('Flight controller loop error handling', () => {
       (c) => c.dataset && c.dataset.testid === 'loop-error-banner',
     );
     expect(bannerAppends.length).toBe(1);
-
-    console.error.mockRestore();
   });
 
   it('allows recovery after intermittent (non-consecutive) errors', () => {
@@ -237,7 +261,6 @@ describe('Flight controller loop error handling', () => {
       // Fail on odd calls, succeed on even calls.
       if (callCount % 2 === 1) throw new Error('intermittent');
     });
-    vi.spyOn(console, 'error').mockImplementation(() => {});
 
     // Run 10 frames: error, success, error, success, ...
     for (let i = 0; i < 10; i++) {
@@ -250,31 +273,23 @@ describe('Flight controller loop error handling', () => {
     // The last frame (i=9, callCount=10) is even → success.
     expect(s.loopConsecutiveErrors).toBe(0);
     expect(s.loopErrorBanner).toBeNull();
-
-    console.error.mockRestore();
   });
 
   it('reschedules rAF even after an error', () => {
     seedFCState();
     mockTick.mockImplementation(() => { throw new Error('crash'); });
-    vi.spyOn(console, 'error').mockImplementation(() => {});
 
     loop(16.67);
 
     expect(requestAnimationFrame).toHaveBeenCalledWith(loop);
-
-    console.error.mockRestore();
   });
 
   it('does not reschedule rAF when rafId is null (loop cancelled)', () => {
     seedFCState({ rafId: null });
     mockTick.mockImplementation(() => { throw new Error('crash'); });
-    vi.spyOn(console, 'error').mockImplementation(() => {});
 
     loop(16.67);
 
     expect(requestAnimationFrame).not.toHaveBeenCalled();
-
-    console.error.mockRestore();
   });
 });
