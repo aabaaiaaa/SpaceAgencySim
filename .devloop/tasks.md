@@ -97,7 +97,7 @@
 - **Verification**: `grep -r "from '.*\.js'" src/ | grep -v node_modules` returns no matches. `npm run typecheck` passes.
 
 ### TASK-017: Remove jsToTsResolve Vite plugin
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-016
 - **Description**: Remove the `jsToTsResolve` plugin from `vite.config.js` now that all import specifiers use `.ts` extensions. See requirements Section 4.2.
 - **Verification**: `npm run build` succeeds. `npm run dev` starts without errors. `npm run typecheck` passes. `npm run test:unit` passes.
