@@ -87,7 +87,8 @@ export function renderContractsBoardTab(): void {
   const repTier = getReputationTier(rep);
   const repBar = document.createElement('div');
   repBar.className = 'mc-reputation-bar';
-  repBar.innerHTML = `<span>Reputation: <strong style="color:${repTier.color}">${Math.round(rep)}</strong></span><span style="font-size:0.72rem;color:${repTier.color};background:${repTier.color}22;border:1px solid ${repTier.color}44;padding:1px 6px;border-radius:3px;margin-left:4px;text-transform:uppercase;letter-spacing:0.04em;font-weight:600">${repTier.label}</span>`;
+  repBar.style.setProperty('--rep-color', repTier.color);
+  repBar.innerHTML = `<span>Reputation: <strong class="mc-rep-value">${Math.round(rep)}</strong></span><span class="mc-rep-tier-badge">${repTier.label}</span>`;
   const repTrack = document.createElement('div');
   repTrack.className = 'mc-rep-track';
   const repFill = document.createElement('div');

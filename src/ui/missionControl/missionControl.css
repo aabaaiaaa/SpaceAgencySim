@@ -340,6 +340,23 @@
   margin-bottom: 14px;
 }
 
+.mc-rep-value {
+  color: var(--rep-color);
+}
+
+.mc-rep-tier-badge {
+  font-size: var(--font-size-tiny);
+  color: var(--rep-color);
+  background: color-mix(in srgb, var(--rep-color) 13%, transparent);
+  border: 1px solid color-mix(in srgb, var(--rep-color) 27%, transparent);
+  padding: 1px var(--space-sm);
+  border-radius: var(--radius-sm);
+  margin-left: var(--space-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+
 .mc-rep-fill {
   height: 6px;
   border-radius: 3px;

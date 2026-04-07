@@ -697,16 +697,14 @@ function _renderTrainingTab(): void {
 
   if (!slotsAvailable && availableForTraining.length > 0) {
     const slotMsg = document.createElement('p');
-    slotMsg.className = 'crew-empty-msg';
-    slotMsg.style.padding = '6px 0 12px';
+    slotMsg.className = 'crew-empty-msg crew-slot-msg';
     slotMsg.textContent = 'All training slots are in use. Wait for a course to finish or upgrade Crew Admin.';
     panel.appendChild(slotMsg);
   }
 
   if (availableForTraining.length === 0) {
     const msg = document.createElement('p');
-    msg.className = 'crew-empty-msg';
-    msg.style.padding = '12px 0';
+    msg.className = 'crew-empty-msg crew-training-empty-msg';
     msg.textContent = 'No crew available. Crew must be active, uninjured, and not assigned to a rocket.';
     panel.appendChild(msg);
   } else {

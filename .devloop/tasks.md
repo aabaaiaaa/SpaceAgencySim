@@ -15,7 +15,7 @@
 - **Verification**: `npx vitest run src/tests/escapeHtml.test.ts && npx vitest run src/tests/mainmenu.test.ts && npx vitest run src/tests/library.test.ts`
 
 ### TASK-003: Fix remaining inline styles in crewAdmin and contractsTab
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `crewAdmin.ts:701,709`, replace `.style.padding` assignments with CSS classes in `crewAdmin.css` (e.g., `.crew-slot-msg { padding: 6px 0 12px }`, `.crew-empty-msg { padding: 12px 0 }`), using `classList.add()`. In `missionControl/_contractsTab.ts:90`, extract hardcoded inline styles from the `repBar.innerHTML` template into CSS classes in the module's CSS file, using design token custom properties where applicable. See requirements Section 1.3.
 - **Verification**: `npx vitest run src/tests/crewAdmin.test.ts && npm run typecheck -- --noEmit src/ui/crewAdmin.ts src/ui/missionControl/_contractsTab.ts`

@@ -148,6 +148,14 @@
   font-size: 0.9rem;
 }
 
+.crew-slot-msg {
+  padding: var(--space-sm) 0 var(--space-md);
+}
+
+.crew-training-empty-msg {
+  padding: var(--space-md) 0;
+}
+
 /* ── Status: Ready ───────────────────────────────────────────────────────────── */
 .crew-status-ready {
   color: #7dd87d;
