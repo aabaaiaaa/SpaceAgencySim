@@ -125,7 +125,7 @@
 ## Testing
 
 ### TASK-018: Write tests for all new iteration 5 code
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001, TASK-002, TASK-010, TASK-015
 - **Description**: Write unit tests for: (1) Worker ready timeout — mock worker that never sends ready, verify rejection after timeout; mock worker that sends ready in time, verify timeout cleared. (2) `escapeHtml()` — all special characters escaped, empty string, non-string coercion, already-escaped input not double-escaped. (3) `perfMonitor` — FPS calculation accuracy, histogram bucket distribution, circular buffer overflow, worker latency tracking, memory graceful fallback, `reset()` clears state. (4) `createSnapshotFromState()` — correct field mapping, control inputs excluded, round-trip consistency with worker snapshots. (5) Main-thread fallback snapshot format matches worker snapshot format. Place tests in `src/tests/` following existing naming conventions. See requirements Section 5.1.
 - **Verification**: `npx vitest run src/tests/workerBridgeTimeout.test.ts src/tests/escapeHtml.test.ts src/tests/perfMonitor.test.ts src/tests/snapshotFactory.test.ts`
