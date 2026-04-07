@@ -21,7 +21,7 @@
 - **Verification**: `npx vitest run src/tests/crewAdmin.test.ts && npm run typecheck -- --noEmit src/ui/crewAdmin.ts src/ui/missionControl/_contractsTab.ts`
 
 ### TASK-004: Add Vite client type reference to logger.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/core/logger.ts`, add `/// <reference types="vite/client" />` at the top of the file. Replace the `as unknown as { env?: { PROD?: boolean } }` cast at line 17 with direct `import.meta.env.PROD` access. Remove the `_meta` intermediate variable if it was only used for this purpose. See requirements Section 1.4.
 - **Verification**: `npm run typecheck -- --noEmit src/core/logger.ts && npx vitest run src/tests/logger.test.ts`

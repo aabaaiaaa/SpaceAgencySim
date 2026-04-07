@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 // Structured logger — lightweight wrapper around console with levels, categories,
 // and timestamps.  See requirements Section 4.3.
 
@@ -12,10 +13,7 @@ const LEVEL_ORDER: Record<LogLevel, number> = {
   error: 3,
 };
 
-// Vite inlines import.meta.env.PROD at build time.  The type for
-// ImportMeta doesn't include Vite's env, so access it via a cast.
-const _meta = import.meta as unknown as { env?: { PROD?: boolean } };
-let minLevel: LogLevel = _meta.env?.PROD ? 'warn' : 'debug';
+let minLevel: LogLevel = import.meta.env.PROD ? 'warn' : 'debug';
 
 function shouldLog(level: LogLevel): boolean {
   return LEVEL_ORDER[level] >= LEVEL_ORDER[minLevel];
