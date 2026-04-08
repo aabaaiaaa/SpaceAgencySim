@@ -111,11 +111,21 @@ export function processFlightReturn(state: GameState, flightState: FlightState, 
   // -- 1-3. Mission completion --
   const acceptedSnapshot = [...(state.missions?.accepted ?? [])];
   for (const mission of acceptedSnapshot) {
-    const missionWithObj = mission as unknown as { objectives?: Array<{ completed: boolean }> };
-    const allObjectivesMet = Array.isArray(missionWithObj.objectives) && missionWithObj.objectives.length > 0 && missionWithObj.objectives.every((obj) => obj.completed);
+    const missionWithObj = mission as unknown as { objectives?: Array<{ completed: boolean; optional?: boolean }> };
+    const allObjectivesMet = Array.isArray(missionWithObj.objectives) && missionWithObj.objectives.length > 0 && missionWithObj.objectives.filter((obj) => !obj.optional).every((obj) => obj.completed);
     if (allObjectivesMet) {
       const result: CompleteMissionResult = completeMission(state, mission.id);
       if (result.success) completedMissions.push({ mission: result.mission!, reward: result.reward!, unlockedParts: result.unlockedParts!, newlyAvailableMissions: result.newlyUnlockedMissions! });
+    }
+  }
+
+  // Reset objective progress on incomplete missions so the player starts fresh.
+  for (const mission of state.missions.accepted) {
+    const m = mission as unknown as { objectives?: Array<{ completed: boolean }> };
+    if (Array.isArray(m.objectives)) {
+      for (const obj of m.objectives) {
+        obj.completed = false;
+      }
     }
   }
 

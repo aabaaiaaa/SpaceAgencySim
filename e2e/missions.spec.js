@@ -218,8 +218,8 @@ test.describe('Mission Control Flow', () => {
     // The card must contain the mission title.
     await expect(completedCards.first()).toContainText('First Flight');
 
-    // The card must display the reward amount ($15,000).
-    await expect(p.locator('.mc-mission-reward')).toContainText('15,000');
+    // The card must display the reward amount ($25,000).
+    await expect(p.locator('.mc-mission-reward')).toContainText('25,000');
 
     await p.close();
     await ctx.close();

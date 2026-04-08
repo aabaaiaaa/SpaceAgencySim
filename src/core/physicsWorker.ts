@@ -112,6 +112,8 @@ function deserialisePhysicsState(snap: PhysicsSnapshot): PhysicsState {
     dockingPortStates: _recordToMap(snap.dockingPortStates),
     _dockedCombinedMass: 0,
     weatherIspModifier: snap.weatherIspModifier,
+    weatherWindSpeed: snap.weatherWindSpeed ?? 0,
+    weatherWindAngle: snap.weatherWindAngle ?? 0,
     hasLaunchClamps: snap.hasLaunchClamps,
     powerState: snap.powerState,
     malfunctions: snap.malfunctions
@@ -132,6 +134,7 @@ function deserialiseFlightState(snap: FlightSnapshot): FlightState {
     timeElapsed: snap.timeElapsed,
     altitude: snap.altitude,
     velocity: snap.velocity,
+    horizontalVelocity: snap.horizontalVelocity ?? 0,
     fuelRemaining: snap.fuelRemaining,
     deltaVRemaining: snap.deltaVRemaining,
     events: snap.events.map(e => ({ ...e })),
@@ -245,6 +248,8 @@ function serialisePhysicsState(ps: PhysicsState): PhysicsSnapshot {
     rcsActiveDirections: _setToArray(ps.rcsActiveDirections),
     dockingPortStates: _mapToRecord(ps.dockingPortStates),
     weatherIspModifier: ps.weatherIspModifier,
+    weatherWindSpeed: ps.weatherWindSpeed,
+    weatherWindAngle: ps.weatherWindAngle,
     hasLaunchClamps: ps.hasLaunchClamps,
     powerState: ps.powerState,
     malfunctions: ps.malfunctions
@@ -265,6 +270,7 @@ function serialiseFlightState(fs: FlightState): FlightSnapshot {
     timeElapsed: fs.timeElapsed,
     altitude: fs.altitude,
     velocity: fs.velocity,
+    horizontalVelocity: fs.horizontalVelocity,
     fuelRemaining: fs.fuelRemaining,
     deltaVRemaining: fs.deltaVRemaining,
     events: fs.events.map(e => ({ ...e })),

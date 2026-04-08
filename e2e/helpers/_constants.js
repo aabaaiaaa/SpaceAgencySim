@@ -72,7 +72,7 @@ export const FIRST_FLIGHT_MISSION = {
     completed:   false,
     description: 'Reach 100 m altitude',
   }],
-  reward:        15_000,
+  reward:        25_000,
   unlocksAfter:  [],
   unlockedParts: [],
 };

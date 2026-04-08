@@ -99,15 +99,11 @@ export function earlyGameFixture(overrides = {}) {
       available: [],
       accepted:  [],
       completed: [
-        { id: 'mission-001', title: 'First Flight',     objectives: [{ id: 'obj-001-1', type: 'REACH_ALTITUDE', target: { altitude: 100 },  completed: true }], reward: 15_000, status: 'completed' },
-        { id: 'mission-002', title: 'Higher Ground',    objectives: [{ id: 'obj-002-1', type: 'REACH_ALTITUDE', target: { altitude: 500 },  completed: true }], reward: 25_000, status: 'completed' },
-        { id: 'mission-003', title: 'Breaking Records', objectives: [{ id: 'obj-003-1', type: 'REACH_ALTITUDE', target: { altitude: 2000 }, completed: true }], reward: 40_000, status: 'completed' },
+        { id: 'mission-001', title: 'First Flight',     objectives: [{ id: 'obj-001-1', type: 'REACH_ALTITUDE', target: { altitude: 100 },  completed: true }], reward: 25_000, status: 'completed' },
       ],
     },
     flightHistory: [
       { id: 'fh-1', missionId: 'mission-001', outcome: 'SUCCESS' },
-      { id: 'fh-2', missionId: 'mission-002', outcome: 'SUCCESS' },
-      { id: 'fh-3', missionId: 'mission-003', outcome: 'SUCCESS' },
     ],
     reputation:   58,
     ...overrides,
@@ -146,21 +142,22 @@ export function midGameFixture(overrides = {}) {
       available: [],
       accepted:  [],
       completed: [
-        { id: 'mission-001', title: 'First Flight',     objectives: [], reward: 15_000, status: 'completed' },
-        { id: 'mission-002', title: 'Higher Ground',    objectives: [], reward: 25_000, status: 'completed' },
-        { id: 'mission-003', title: 'Breaking Records', objectives: [], reward: 40_000, status: 'completed' },
-        { id: 'mission-004', title: 'Crew Training',    objectives: [], reward: 50_000, status: 'completed' },
-        { id: 'mission-005', title: 'Speed Demon',      objectives: [], reward: 60_000, status: 'completed' },
+        { id: 'mission-001', title: 'First Flight',     objectives: [], reward: 25_000, status: 'completed' },
+        { id: 'mission-004', title: 'Speed Demon',      objectives: [], reward: 50_000, status: 'completed' },
+        { id: 'mission-005', title: 'Safe Return I',     objectives: [], reward: 60_000, status: 'completed' },
         { id: 'mission-006', title: 'Science Flight',   objectives: [], reward: 75_000, status: 'completed' },
         { id: 'mission-007', title: 'Return Science',   objectives: [], reward: 80_000, status: 'completed' },
         { id: 'mission-008', title: 'Crash Test',       objectives: [], reward: 90_000, status: 'completed' },
       ],
     },
-    flightHistory: Array.from({ length: 8 }, (_, i) => ({
-      id: `fh-${i + 1}`,
-      missionId: `mission-00${i + 1}`,
-      outcome: 'SUCCESS',
-    })),
+    flightHistory: [
+      { id: 'fh-1', missionId: 'mission-001', outcome: 'SUCCESS' },
+      { id: 'fh-2', missionId: 'mission-004', outcome: 'SUCCESS' },
+      { id: 'fh-3', missionId: 'mission-005', outcome: 'SUCCESS' },
+      { id: 'fh-4', missionId: 'mission-006', outcome: 'SUCCESS' },
+      { id: 'fh-5', missionId: 'mission-007', outcome: 'SUCCESS' },
+      { id: 'fh-6', missionId: 'mission-008', outcome: 'SUCCESS' },
+    ],
     reputation:     72,
     sciencePoints:  45,
     scienceLog: [
@@ -205,17 +202,17 @@ export function orbitalFixture(overrides = {}) {
     missions: {
       available: [],
       accepted:  [],
-      completed: Array.from({ length: 16 }, (_, i) => ({
-        id: `mission-${String(i + 1).padStart(3, '0')}`,
-        title: `Completed Mission ${i + 1}`,
+      completed: [1, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].map((n, i) => ({
+        id: `mission-${String(n).padStart(3, '0')}`,
+        title: `Completed Mission ${n}`,
         objectives: [],
         reward: 50_000 + i * 25_000,
         status: 'completed',
       })),
     },
-    flightHistory: Array.from({ length: 20 }, (_, i) => ({
+    flightHistory: [1, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22].map((n, i) => ({
       id: `fh-${i + 1}`,
-      missionId: i < 16 ? `mission-${String(i + 1).padStart(3, '0')}` : null,
+      missionId: n <= 16 ? `mission-${String(n).padStart(3, '0')}` : null,
       outcome: 'SUCCESS',
     })),
     reputation:     90,

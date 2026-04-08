@@ -38,9 +38,7 @@ function freshState() {
   const state = createGameState();
   // Provide completed missions to unlock challenges.
   state.missions.completed = [
-    { id: 'mission-001', title: 'M1', objectives: [], reward: 15000 },
-    { id: 'mission-002', title: 'M2', objectives: [], reward: 20000 },
-    { id: 'mission-003', title: 'M3', objectives: [], reward: 25000 },
+    { id: 'mission-001', title: 'M1', objectives: [], reward: 25000 },
     { id: 'mission-004', title: 'M4', objectives: [], reward: 30000 },
   ];
   return state;

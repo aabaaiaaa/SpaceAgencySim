@@ -65,9 +65,9 @@ test.describe('E2E Infrastructure — State Injection', () => {
 
     expect(gs.money).toBe(2_200_000);
     expect(gs.currentPeriod).toBe(3);
-    expect(gs.missions.completed).toHaveLength(3);
+    expect(gs.missions.completed).toHaveLength(1);
     expect(gs.reputation).toBe(58);
-    expect(gs.flightHistory).toHaveLength(3);
+    expect(gs.flightHistory).toHaveLength(1);
 
     await page.close();
   });
@@ -81,7 +81,7 @@ test.describe('E2E Infrastructure — State Injection', () => {
 
     expect(gs.crew).toHaveLength(3);
     expect(gs.sciencePoints).toBe(45);
-    expect(gs.missions.completed).toHaveLength(8);
+    expect(gs.missions.completed).toHaveLength(6);
     expect(gs.facilities['crew-admin']?.built).toBe(true);
     expect(gs.facilities['tracking-station']?.built).toBe(true);
     expect(gs.facilities['rd-lab']?.built).toBe(true);
@@ -97,7 +97,7 @@ test.describe('E2E Infrastructure — State Injection', () => {
     const gs = await getGameState(page);
 
     expect(gs.crew).toHaveLength(4);
-    expect(gs.missions.completed).toHaveLength(16);
+    expect(gs.missions.completed).toHaveLength(14);
     expect(gs.reputation).toBe(90);
     expect(gs.sciencePoints).toBe(120);
     expect(gs.satelliteNetwork.satellites).toHaveLength(1);

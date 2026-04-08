@@ -364,6 +364,8 @@ function _serialisePhysicsState(ps: PhysicsState): PhysicsSnapshot {
     rcsActiveDirections: setToArray(ps.rcsActiveDirections),
     dockingPortStates: mapToRecord(ps.dockingPortStates),
     weatherIspModifier: ps.weatherIspModifier,
+    weatherWindSpeed: ps.weatherWindSpeed,
+    weatherWindAngle: ps.weatherWindAngle,
     hasLaunchClamps: ps.hasLaunchClamps,
     powerState: ps.powerState,
     malfunctions: ps.malfunctions
@@ -381,6 +383,7 @@ function _serialiseFlightState(fs: FlightState): FlightSnapshot {
     timeElapsed: fs.timeElapsed,
     altitude: fs.altitude,
     velocity: fs.velocity,
+    horizontalVelocity: fs.horizontalVelocity,
     fuelRemaining: fs.fuelRemaining,
     deltaVRemaining: fs.deltaVRemaining,
     events: fs.events.map(e => ({ ...e })),

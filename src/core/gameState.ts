@@ -103,6 +103,10 @@ export interface ObjectiveDef {
   target: Record<string, unknown>;
   completed: boolean;
   description: string;
+  /** If true, this objective is not required for mission completion. */
+  optional?: boolean;
+  /** Cash bonus awarded when this optional objective is completed. */
+  bonusReward?: number;
   /** Runtime-only: flight time when HOLD_ALTITUDE objective entered the valid band. */
   _holdEnteredAt?: number | null;
 }
@@ -427,6 +431,8 @@ export interface FlightState {
   altitude: number;
   /** Current velocity (m/s). */
   velocity: number;
+  /** Current horizontal velocity (m/s). */
+  horizontalVelocity: number;
   /** Propellant remaining (kg). */
   fuelRemaining: number;
   /** Remaining Δv budget (m/s). */
@@ -1037,6 +1043,7 @@ export function createFlightState({
     biomesVisited: [],
     maxAltitude: 0,
     maxVelocity: 0,
+    horizontalVelocity: 0,
     dockingState: null,
     transferState: null,
     powerState: null,

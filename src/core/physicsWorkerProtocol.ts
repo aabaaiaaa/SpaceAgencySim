@@ -115,6 +115,8 @@ export interface PhysicsSnapshot {
   rcsActiveDirections: string[];
   dockingPortStates: Record<string, string>;
   weatherIspModifier: number;
+  weatherWindSpeed: number;
+  weatherWindAngle: number;
   hasLaunchClamps: boolean;
   powerState: PowerState | null;
   malfunctions: Record<string, { type: MalfunctionType; recovered: boolean }> | null;
@@ -131,6 +133,7 @@ export interface FlightSnapshot {
   timeElapsed: number;
   altitude: number;
   velocity: number;
+  horizontalVelocity: number;
   fuelRemaining: number;
   deltaVRemaining: number;
   events: FlightEvent[];

@@ -9,7 +9,7 @@ import {
 /**
  * E2E — Mission Progression
  *
- * Tests all 17 missions in the Desert R&D campaign.  Each test is fully
+ * Tests all 15 missions in the Desert R&D campaign.  Each test is fully
  * independent: it seeds localStorage with the exact game state needed
  * (previous missions completed, parts unlocked, money, crew, accepted mission),
  * builds a rocket in the VAB, flies it, and verifies the mission completes
@@ -79,22 +79,12 @@ const OBJ = {
   'mission-001': {
     title: 'First Flight',
     objectives: [{ id: 'obj-001-1', type: 'REACH_ALTITUDE', target: { altitude: 100 } }],
-    reward: 15_000, unlocksAfter: [], unlockedParts: [],
-  },
-  'mission-002': {
-    title: 'Higher Ambitions',
-    objectives: [{ id: 'obj-002-1', type: 'REACH_ALTITUDE', target: { altitude: 500 } }],
-    reward: 20_000, unlocksAfter: ['mission-001'], unlockedParts: [],
-  },
-  'mission-003': {
-    title: 'Breaking the Kilometre',
-    objectives: [{ id: 'obj-003-1', type: 'REACH_ALTITUDE', target: { altitude: 1_000 } }],
-    reward: 25_000, unlocksAfter: ['mission-002'], unlockedParts: [],
+    reward: 25_000, unlocksAfter: [], unlockedParts: [],
   },
   'mission-004': {
-    title: 'Speed Test Alpha',
+    title: 'Speed Demon',
     objectives: [{ id: 'obj-004-1', type: 'REACH_SPEED', target: { speed: 150 } }],
-    reward: 30_000, unlocksAfter: ['mission-003'], unlockedParts: [],
+    reward: 30_000, unlocksAfter: ['mission-001'], unlockedParts: [],
   },
   'mission-005': {
     title: 'Safe Return I',
@@ -115,7 +105,7 @@ const OBJ = {
       { id: 'obj-007-1', type: 'ACTIVATE_PART', target: { partType: 'LANDING_LEGS' } },
       { id: 'obj-007-2', type: 'SAFE_LANDING', target: { maxLandingSpeed: 10 } },
     ],
-    reward: 40_000, unlocksAfter: ['mission-004'], unlockedParts: ['landing-legs-large'],
+    reward: 40_000, unlocksAfter: ['mission-006'], unlockedParts: ['landing-legs-large'],
   },
   'mission-008': {
     title: 'Black Box Test',
@@ -455,6 +445,16 @@ async function returnToHub(page) {
     }
   }
 
+  // An unlock notification modal may appear for newly unlocked parts — dismiss it.
+  try {
+    const unlockBackdrop = page.locator('#unlock-notification-backdrop');
+    await unlockBackdrop.waitFor({ state: 'visible', timeout: 5_000 });
+    await unlockBackdrop.locator('.confirm-btn').click();
+    await unlockBackdrop.waitFor({ state: 'hidden', timeout: 3_000 }).catch(() => {});
+  } catch {
+    // No unlock notification — proceed.
+  }
+
   // A return-results overlay may appear on top of the hub — dismiss it.
   try {
     const dismissBtn = page.locator('#return-results-dismiss-btn');
@@ -547,7 +547,7 @@ test.describe('Mission Progression', () => {
   test.describe.configure({ timeout: 300_000 });
 
   // =========================================================================
-  // GROUP 1: Tutorial Chain (M001–M004)
+  // GROUP 1: Tutorial Chain (M001, M004)
   // =========================================================================
 
   test('M001 — First Flight (reach 100m)', async ({ page }) => {
@@ -575,54 +575,10 @@ test.describe('Mission Progression', () => {
     await expectCompleted(page, 'mission-001');
   });
 
-  test('M002 — Higher Ambitions (reach 500m)', async ({ page }) => {
+  test('M004 — Speed Demon (reach 150 m/s)', async ({ page }) => {
     test.setTimeout(90_000);
     const env = buildEnvelope({
       completedIds: ['mission-001'],
-      acceptedId: 'mission-002',
-      parts: STARTER_PARTS,
-    });
-    await page.setViewportSize({ width: VP_W, height: VP_H });
-    await seedAndLoadSave(page, env);
-    await navigateToVab(page);
-    await buildStack(page, ['cmd-mk1', 'tank-small', 'engine-spark']);
-    await launch(page);
-    await stage(page);
-    await page.keyboard.press('z');
-    await waitAlt(page, 500);
-    await page.keyboard.press('x');
-    await waitLanded(page);
-    await returnToHub(page);
-    await expectCompleted(page, 'mission-002');
-  });
-
-  test('M003 — Breaking the Kilometre (reach 1000m)', async ({ page }) => {
-    test.setTimeout(90_000);
-    const env = buildEnvelope({
-      completedIds: ['mission-001', 'mission-002'],
-      acceptedId: 'mission-003',
-      parts: STARTER_PARTS,
-    });
-    await page.setViewportSize({ width: VP_W, height: VP_H });
-    await seedAndLoadSave(page, env);
-    await navigateToVab(page);
-
-    // tank-small + engine-spark has enough delta-V to coast well past 1km.
-    await buildStack(page, ['cmd-mk1', 'tank-small', 'engine-spark']);
-    await launch(page);
-    await stage(page);
-    await page.keyboard.press('z');
-    await waitAlt(page, 1_000);
-    // Objective met — return via menu instead of waiting for long descent.
-    await triggerReturnViaMenu(page);
-    await returnToHub(page);
-    await expectCompleted(page, 'mission-003');
-  });
-
-  test('M004 — Speed Test Alpha (reach 150 m/s)', async ({ page }) => {
-    test.setTimeout(90_000);
-    const env = buildEnvelope({
-      completedIds: ['mission-001', 'mission-002', 'mission-003'],
       acceptedId: 'mission-004',
       parts: [...STARTER_PARTS, 'tank-medium'],
     });
@@ -646,7 +602,7 @@ test.describe('Mission Progression', () => {
 
   test('M005 — Safe Return I (land ≤10 m/s) → unlocks parachute-mk2', async ({ page }) => {
     test.setTimeout(120_000);
-    const m1to4 = ['mission-001', 'mission-002', 'mission-003', 'mission-004'];
+    const m1to4 = ['mission-001', 'mission-004'];
     const env = buildEnvelope({
       completedIds: m1to4,
       acceptedId: 'mission-005',
@@ -700,7 +656,7 @@ test.describe('Mission Progression', () => {
 
   test('M006 — Controlled Descent (engine brake, land ≤5 m/s) → unlocks landing-legs-small', async ({ page }) => {
     test.setTimeout(120_000);
-    const m1to4 = ['mission-001', 'mission-002', 'mission-003', 'mission-004'];
+    const m1to4 = ['mission-001', 'mission-004'];
     const env = buildEnvelope({
       completedIds: m1to4,
       acceptedId: 'mission-006',
@@ -747,7 +703,7 @@ test.describe('Mission Progression', () => {
 
   test('M007 — Leg Day (deploy legs + land ≤10 m/s) → unlocks landing-legs-large', async ({ page }) => {
     test.setTimeout(120_000);
-    const m1to4 = ['mission-001', 'mission-002', 'mission-003', 'mission-004'];
+    const m1to4 = ['mission-001', 'mission-004'];
     const env = buildEnvelope({
       completedIds: [...m1to4, 'mission-006'],
       acceptedId: 'mission-007',
@@ -818,7 +774,7 @@ test.describe('Mission Progression', () => {
 
   test('M008 — Black Box Test (activate science + crash ≥50 m/s)', async ({ page }) => {
     test.setTimeout(120_000);
-    const m1to4 = ['mission-001', 'mission-002', 'mission-003', 'mission-004'];
+    const m1to4 = ['mission-001', 'mission-004'];
     const env = buildEnvelope({
       completedIds: [...m1to4, 'mission-005'],
       acceptedId: 'mission-008',
@@ -850,25 +806,23 @@ test.describe('Mission Progression', () => {
 
   test('M009 — Ejector Seat Test (eject crew ≥200m)', async ({ page }) => {
     test.setTimeout(120_000);
-    const m1to4 = ['mission-001', 'mission-002', 'mission-003', 'mission-004'];
-    const crew = testCrew();
+    const m1to4 = ['mission-001', 'mission-004'];
     const env = buildEnvelope({
-      completedIds: [...m1to4, 'mission-007'],
+      completedIds: [...m1to4, 'mission-006', 'mission-007'],
       acceptedId: 'mission-009',
-      parts: STARTER_PARTS,
-      crew: [crew],
+      parts: [...STARTER_PARTS, 'probe-core-mk1', 'cmd-mk1'],
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, env);
     await navigateToVab(page);
 
-    // Build: cmd-mk1 + tank-small + engine-spark
-    await buildStack(page, ['cmd-mk1', 'tank-small', 'engine-spark']);
+    // Uncrewed test: probe-core + cmd-mk1 (for ejector seat) + tank + engine
+    await buildStack(page, ['cmd-mk1', 'probe-core-mk1', 'tank-small', 'engine-spark']);
 
     // Stage 1: engine (auto in stage-0). Stage 2: ejector seat.
     await stagePartFromUnstaged(page, 'cmd-mk1', 1);
 
-    await launch(page, { selectCrew: true });
+    await launchProbe(page);
     await stage(page); // fire engine
     await page.keyboard.press('z');
 
@@ -892,7 +846,7 @@ test.describe('Mission Progression', () => {
 
   test('M010 — Science Experiment Alpha (hold 800-1200m for 30s + return science)', async ({ page }) => {
     test.setTimeout(180_000);
-    const m1to4 = ['mission-001', 'mission-002', 'mission-003', 'mission-004'];
+    const m1to4 = ['mission-001', 'mission-004'];
     const env = buildEnvelope({
       completedIds: [...m1to4, 'mission-005', 'mission-008'],
       acceptedId: 'mission-010',
@@ -994,25 +948,23 @@ test.describe('Mission Progression', () => {
 
   test('M011 — Emergency Systems Verified (eject crew ≥100m + crash ≥50 m/s)', async ({ page }) => {
     test.setTimeout(120_000);
-    const m1to4 = ['mission-001', 'mission-002', 'mission-003', 'mission-004'];
-    const crew = testCrew();
+    const m1to4 = ['mission-001', 'mission-004'];
     const env = buildEnvelope({
-      completedIds: [...m1to4, 'mission-005', 'mission-007', 'mission-008', 'mission-009'],
+      completedIds: [...m1to4, 'mission-005', 'mission-006', 'mission-007', 'mission-008', 'mission-009'],
       acceptedId: 'mission-011',
-      parts: STARTER_PARTS,
-      crew: [crew],
+      parts: [...STARTER_PARTS, 'probe-core-mk1', 'cmd-mk1'],
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, env);
     await navigateToVab(page);
 
-    // Build: cmd-mk1 + tank-small + engine-spark
-    await buildStack(page, ['cmd-mk1', 'tank-small', 'engine-spark']);
+    // Uncrewed test: probe-core + cmd-mk1 (for ejector seat) + tank + engine
+    await buildStack(page, ['cmd-mk1', 'probe-core-mk1', 'tank-small', 'engine-spark']);
 
     // Staging: Stage 0 = engine (auto). Stage 1 = ejector seat.
     await stagePartFromUnstaged(page, 'cmd-mk1', 1);
 
-    await launch(page, { selectCrew: true });
+    await launchProbe(page);
     await stage(page); // engine
     await page.keyboard.press('z');
 
@@ -1039,7 +991,7 @@ test.describe('Mission Progression', () => {
 
   test('M012 — Stage Separation Test (reach 2000m + fire decoupler) → unlocks engine-reliant, srb-small', async ({ page }) => {
     test.setTimeout(120_000);
-    const m1to4 = ['mission-001', 'mission-002', 'mission-003', 'mission-004'];
+    const m1to4 = ['mission-001', 'mission-004'];
     const env = buildEnvelope({
       completedIds: [...m1to4, 'mission-005', 'mission-008', 'mission-010'],
       acceptedId: 'mission-012',
@@ -1095,9 +1047,9 @@ test.describe('Mission Progression', () => {
 
   test('M013 — High Altitude Record (reach 20,000m)', async ({ page }) => {
     test.setTimeout(120_000);
-    const m1to4 = ['mission-001', 'mission-002', 'mission-003', 'mission-004'];
+    const m1to4 = ['mission-001', 'mission-004'];
     const env = buildEnvelope({
-      completedIds: [...m1to4, 'mission-005', 'mission-007', 'mission-008', 'mission-009', 'mission-011'],
+      completedIds: [...m1to4, 'mission-005', 'mission-006', 'mission-007', 'mission-008', 'mission-009', 'mission-011'],
       acceptedId: 'mission-013',
       parts: [...STARTER_PARTS, 'tank-medium'],
     });
@@ -1142,7 +1094,7 @@ test.describe('Mission Progression', () => {
 
   test('M014 — Kármán Line Approach (reach 60,000m) → unlocks engine-nerv, srb-large', async ({ page }) => {
     test.setTimeout(180_000);
-    const m1to4 = ['mission-001', 'mission-002', 'mission-003', 'mission-004'];
+    const m1to4 = ['mission-001', 'mission-004'];
     const env = buildEnvelope({
       completedIds: [...m1to4, 'mission-005', 'mission-008', 'mission-010', 'mission-012'],
       acceptedId: 'mission-014',
@@ -1192,7 +1144,7 @@ test.describe('Mission Progression', () => {
 
   test('M015 — Orbital Satellite Deployment I (orbit + release satellite >80km)', async ({ page }) => {
     test.setTimeout(300_000);
-    const m1to4 = ['mission-001', 'mission-002', 'mission-003', 'mission-004'];
+    const m1to4 = ['mission-001', 'mission-004'];
     const env = buildEnvelope({
       completedIds: [
         ...m1to4, 'mission-005', 'mission-008', 'mission-010', 'mission-012',
@@ -1315,7 +1267,7 @@ test.describe('Mission Progression', () => {
 
   test('M016 — Low Earth Orbit (≥80km AND ≥7,800 m/s) → unlocks tank-large', async ({ page }) => {
     test.setTimeout(300_000);
-    const m1to4 = ['mission-001', 'mission-002', 'mission-003', 'mission-004'];
+    const m1to4 = ['mission-001', 'mission-004'];
     const env = buildEnvelope({
       completedIds: [...m1to4, 'mission-005', 'mission-008', 'mission-010', 'mission-012', 'mission-014'],
       acceptedId: 'mission-016',

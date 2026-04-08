@@ -2,7 +2,7 @@
  * E2E — Tutorial Revisions (TASK-062)
  *
  * Tests covering the revised tutorial mission chain:
- *   - Missions 1-4 completable with starter parts only
+ *   - Missions 1 and 4 completable with starter parts only
  *   - Unlock chain progression (missions unlocking after prerequisites)
  *   - Facility tutorial awards (Crew Admin, R&D Lab, Tracking Station, Satellite Ops)
  *   - Facility tutorial flights (M018, M019, M021, M022)
@@ -44,22 +44,12 @@ const MD = {
   'mission-001': {
     title: 'First Flight',
     objectives: [{ id: 'obj-001-1', type: 'REACH_ALTITUDE', target: { altitude: 100 } }],
-    reward: 15_000, unlocksAfter: [], unlockedParts: [],
-  },
-  'mission-002': {
-    title: 'Higher Ambitions',
-    objectives: [{ id: 'obj-002-1', type: 'REACH_ALTITUDE', target: { altitude: 500 } }],
-    reward: 20_000, unlocksAfter: ['mission-001'], unlockedParts: [],
-  },
-  'mission-003': {
-    title: 'Breaking the Kilometre',
-    objectives: [{ id: 'obj-003-1', type: 'REACH_ALTITUDE', target: { altitude: 1_000 } }],
-    reward: 25_000, unlocksAfter: ['mission-002'], unlockedParts: [],
+    reward: 25_000, unlocksAfter: [], unlockedParts: [],
   },
   'mission-004': {
-    title: 'Speed Test Alpha',
+    title: 'Speed Demon',
     objectives: [{ id: 'obj-004-1', type: 'REACH_SPEED', target: { speed: 150 } }],
-    reward: 30_000, unlocksAfter: ['mission-003'], unlockedParts: [],
+    reward: 30_000, unlocksAfter: ['mission-001'], unlockedParts: [],
   },
   'mission-005': {
     title: 'Safe Return I',
@@ -81,7 +71,7 @@ const MD = {
       { id: 'obj-007-1', type: 'ACTIVATE_PART', target: { partType: 'LANDING_LEGS' } },
       { id: 'obj-007-2', type: 'SAFE_LANDING', target: { maxLandingSpeed: 10 } },
     ],
-    reward: 40_000, unlocksAfter: ['mission-004'], unlockedParts: ['landing-legs-large'],
+    reward: 40_000, unlocksAfter: ['mission-006'], unlockedParts: ['landing-legs-large'],
   },
   'mission-008': {
     title: 'Black Box Test',
@@ -142,7 +132,7 @@ const MD = {
       { id: 'obj-018-1', type: 'MINIMUM_CREW', target: { minCrew: 1 } },
       { id: 'obj-018-2', type: 'SAFE_LANDING', target: { maxLandingSpeed: 10 } },
     ],
-    reward: 60_000, unlocksAfter: ['mission-004'], unlockedParts: [],
+    reward: 60_000, unlocksAfter: ['mission-009'], unlockedParts: [],
   },
   'mission-019': {
     title: 'Research Division',
@@ -298,6 +288,14 @@ async function returnToHub(page) {
     }
   }
 
+  // Dismiss unlock notification modal if present (new parts unlocked).
+  try {
+    const unlockBackdrop = page.locator('#unlock-notification-backdrop');
+    await unlockBackdrop.waitFor({ state: 'visible', timeout: 5_000 });
+    await unlockBackdrop.locator('.confirm-btn').click();
+    await unlockBackdrop.waitFor({ state: 'hidden', timeout: 3_000 }).catch(() => {});
+  } catch { /* no unlock notification */ }
+
   // Dismiss return-results overlay if present.
   try {
     const dismissBtn = page.locator('#return-results-dismiss-btn');
@@ -385,44 +383,10 @@ test.describe('Tutorial Revisions', () => {
       await expectCompleted(page, 'mission-001');
     });
 
-    test('M002 — Higher Ambitions (reach 500m) with tutorial starters', async ({ page }) => {
+    test('M004 — Speed Demon (reach 150 m/s) with tutorial starters', async ({ page }) => {
       test.setTimeout(90_000);
       const env = tutorialSave({
         completedIds: ['mission-001'],
-        acceptedId: 'mission-002',
-      });
-      await page.setViewportSize({ width: VP_W, height: VP_H });
-      await seedAndLoadSave(page, env);
-      await startTestFlight(page, TUTORIAL_STARTERS);
-      await stage(page);
-      await page.keyboard.press('z');
-      await waitForAltitude(page, 500);
-      await triggerReturnViaMenu(page);
-      await returnToHub(page);
-      await expectCompleted(page, 'mission-002');
-    });
-
-    test('M003 — Breaking the Kilometre (reach 1000m) with tutorial starters', async ({ page }) => {
-      test.setTimeout(90_000);
-      const env = tutorialSave({
-        completedIds: ['mission-001', 'mission-002'],
-        acceptedId: 'mission-003',
-      });
-      await page.setViewportSize({ width: VP_W, height: VP_H });
-      await seedAndLoadSave(page, env);
-      await startTestFlight(page, TUTORIAL_STARTERS);
-      await stage(page);
-      await page.keyboard.press('z');
-      await waitForAltitude(page, 1_000);
-      await triggerReturnViaMenu(page);
-      await returnToHub(page);
-      await expectCompleted(page, 'mission-003');
-    });
-
-    test('M004 — Speed Test Alpha (reach 150 m/s) with tutorial starters', async ({ page }) => {
-      test.setTimeout(90_000);
-      const env = tutorialSave({
-        completedIds: ['mission-001', 'mission-002', 'mission-003'],
         acceptedId: 'mission-004',
       });
       await page.setViewportSize({ width: VP_W, height: VP_H });
@@ -443,10 +407,10 @@ test.describe('Tutorial Revisions', () => {
 
   test.describe('Unlock Chain Progression', () => {
 
-    test('completing M004 unlocks M005, M006, M007, M018', async ({ page }) => {
+    test('completing M004 unlocks M005 and M006', async ({ page }) => {
       test.setTimeout(90_000);
       const env = tutorialSave({
-        completedIds: ['mission-001', 'mission-002', 'mission-003'],
+        completedIds: ['mission-001'],
         acceptedId: 'mission-004',
       });
       await page.setViewportSize({ width: VP_W, height: VP_H });
@@ -461,17 +425,15 @@ test.describe('Tutorial Revisions', () => {
       await returnToHub(page);
       await expectCompleted(page, 'mission-004');
 
-      // Verify all four parallel tracks unlocked.
+      // Verify both parallel tracks unlocked.
       await expectMissionAvailable(page, 'mission-005');
       await expectMissionAvailable(page, 'mission-006');
-      await expectMissionAvailable(page, 'mission-007');
-      await expectMissionAvailable(page, 'mission-018');
     });
 
     test('completing M005 awards parachute-mk2, science-module-mk1, thermometer-mk1', async ({ page }) => {
       test.setTimeout(120_000);
       const env = tutorialSave({
-        completedIds: missionRange(1, 4),
+        completedIds: ['mission-001', 'mission-004'],
         acceptedId: 'mission-005',
         parts: [...TUTORIAL_STARTERS, 'parachute-mk1'],
       });
@@ -506,7 +468,7 @@ test.describe('Tutorial Revisions', () => {
       test.setTimeout(180_000);
       // Seed state: M001-M005, M008 completed (M010 prerequisites).
       const env = tutorialSave({
-        completedIds: [...missionRange(1, 5), 'mission-008'],
+        completedIds: ['mission-001', 'mission-004', 'mission-005', 'mission-008'],
         acceptedId: 'mission-010',
         parts: [...TUTORIAL_STARTERS, 'parachute-mk1', 'parachute-mk2',
           'science-module-mk1', 'thermometer-mk1'],
@@ -583,7 +545,7 @@ test.describe('Tutorial Revisions', () => {
     test('completing M016 unlocks M015 and M020 (Tracking Station tutorial)', async ({ page }) => {
       test.setTimeout(120_000);
       const env = tutorialSave({
-        completedIds: [...missionRange(1, 5), 'mission-008', 'mission-010', 'mission-012', 'mission-014'],
+        completedIds: ['mission-001', 'mission-004', 'mission-005', 'mission-008', 'mission-010', 'mission-012', 'mission-014'],
         acceptedId: 'mission-016',
         parts: [...TUTORIAL_STARTERS, 'parachute-mk1', 'tank-medium',
           'engine-reliant', 'engine-nerv', 'decoupler-stack-tr18'],
@@ -621,7 +583,7 @@ test.describe('Tutorial Revisions', () => {
 
     test('completing M017 unlocks M022 (Satellite Network Ops tutorial)', async ({ page }) => {
       test.setTimeout(120_000);
-      const allPrev = [...missionRange(1, 16), 'mission-020'];
+      const allPrev = ['mission-001', ...missionRange(4, 16), 'mission-020'];
       const env = tutorialSave({
         completedIds: allPrev,
         acceptedId: 'mission-017',
@@ -679,7 +641,7 @@ test.describe('Tutorial Revisions', () => {
     test('accepting M018 awards CREW_ADMIN facility and cmd-mk1 part', async ({ page }) => {
       test.setTimeout(60_000);
       const env = tutorialSave({
-        completedIds: missionRange(1, 4),
+        completedIds: ['mission-001', 'mission-004', 'mission-006', 'mission-007', 'mission-009'],
         availableIds: ['mission-018'],
         parts: TUTORIAL_STARTERS,
       });
@@ -700,7 +662,7 @@ test.describe('Tutorial Revisions', () => {
     test('accepting M019 awards RD_LAB facility', async ({ page }) => {
       test.setTimeout(60_000);
       const env = tutorialSave({
-        completedIds: [...missionRange(1, 5), 'mission-008', 'mission-010'],
+        completedIds: ['mission-001', 'mission-004', 'mission-005', 'mission-008', 'mission-010'],
         availableIds: ['mission-019'],
         parts: [...TUTORIAL_STARTERS, 'parachute-mk1', 'science-module-mk1', 'thermometer-mk1'],
       });
@@ -717,7 +679,7 @@ test.describe('Tutorial Revisions', () => {
     test('accepting M020 awards TRACKING_STATION facility', async ({ page }) => {
       test.setTimeout(60_000);
       const env = tutorialSave({
-        completedIds: [...missionRange(1, 5), 'mission-008', 'mission-010',
+        completedIds: ['mission-001', 'mission-004', 'mission-005', 'mission-008', 'mission-010',
           'mission-012', 'mission-014', 'mission-016'],
         availableIds: ['mission-020'],
         parts: [...TUTORIAL_STARTERS, 'parachute-mk1', 'tank-medium',
@@ -737,7 +699,7 @@ test.describe('Tutorial Revisions', () => {
     test('accepting M022 awards SATELLITE_OPS facility', async ({ page }) => {
       test.setTimeout(60_000);
       const env = tutorialSave({
-        completedIds: [...missionRange(1, 17), 'mission-020'],
+        completedIds: ['mission-001', ...missionRange(4, 17), 'mission-020'],
         availableIds: ['mission-022'],
         parts: [...TUTORIAL_STARTERS, 'parachute-mk1', 'satellite-mk1',
           'decoupler-stack-tr18', 'tank-medium', 'engine-reliant',
@@ -757,7 +719,7 @@ test.describe('Tutorial Revisions', () => {
     test('completing M020 awards docking-port-std', async ({ page }) => {
       test.setTimeout(120_000);
       const env = tutorialSave({
-        completedIds: [...missionRange(1, 5), 'mission-008', 'mission-010',
+        completedIds: ['mission-001', 'mission-004', 'mission-005', 'mission-008', 'mission-010',
           'mission-012', 'mission-014', 'mission-016'],
         acceptedId: 'mission-020',
         parts: [...TUTORIAL_STARTERS, 'parachute-mk1', 'tank-medium',
@@ -801,11 +763,11 @@ test.describe('Tutorial Revisions', () => {
     test('M018 — First Crew Flight (crew + safe landing)', async ({ page }) => {
       test.setTimeout(120_000);
       const crew = [buildCrewMember({ id: 'crew-1', name: 'Test Pilot' })];
-      // Realistic state: player completed M005 first (awards parachute-mk2).
+      // Realistic state: player completed through M009 (awards cmd-mk1 via M018 prereq).
       // cmd-mk1 dry mass + crew is too heavy for parachute-mk1 (legless landing
       // requires ≤5 m/s).  parachute-mk2 provides enough drag.
       const env = tutorialSave({
-        completedIds: [...missionRange(1, 5)],
+        completedIds: ['mission-001', 'mission-004', 'mission-005', 'mission-006', 'mission-007', 'mission-009'],
         acceptedId: 'mission-018',
         parts: [...TUTORIAL_STARTERS, 'parachute-mk1', 'parachute-mk2', 'cmd-mk1'],
         crew,
@@ -852,7 +814,7 @@ test.describe('Tutorial Revisions', () => {
     test('M019 — Research Division (5000m + return science)', async ({ page }) => {
       test.setTimeout(180_000);
       const env = tutorialSave({
-        completedIds: [...missionRange(1, 5), 'mission-008', 'mission-010'],
+        completedIds: ['mission-001', 'mission-004', 'mission-005', 'mission-008', 'mission-010'],
         acceptedId: 'mission-019',
         parts: [...TUTORIAL_STARTERS, 'parachute-mk1', 'parachute-mk2',
           'science-module-mk1', 'thermometer-mk1', 'tank-medium', 'engine-poodle'],
@@ -910,7 +872,7 @@ test.describe('Tutorial Revisions', () => {
     test('M021 — Orbital Survey (orbit + return science)', async ({ page }) => {
       test.setTimeout(180_000);
       const env = tutorialSave({
-        completedIds: [...missionRange(1, 5), 'mission-008', 'mission-010',
+        completedIds: ['mission-001', 'mission-004', 'mission-005', 'mission-008', 'mission-010',
           'mission-012', 'mission-014', 'mission-016', 'mission-020'],
         acceptedId: 'mission-021',
         parts: [...TUTORIAL_STARTERS, 'parachute-mk1', 'parachute-mk2',
@@ -983,7 +945,7 @@ test.describe('Tutorial Revisions', () => {
     test('M022 — Network Control (orbit + deploy 2 satellites)', async ({ page }) => {
       test.setTimeout(120_000);
       const env = tutorialSave({
-        completedIds: [...missionRange(1, 17), 'mission-020'],
+        completedIds: ['mission-001', ...missionRange(4, 17), 'mission-020'],
         acceptedId: 'mission-022',
         parts: [...TUTORIAL_STARTERS, 'parachute-mk1', 'satellite-mk1',
           'decoupler-stack-tr18', 'tank-medium', 'engine-reliant',
@@ -1047,7 +1009,7 @@ test.describe('Tutorial Revisions', () => {
     test('M008 — Black Box Test with loaded thermometer instrument', async ({ page }) => {
       test.setTimeout(120_000);
       const env = tutorialSave({
-        completedIds: [...missionRange(1, 5)],
+        completedIds: ['mission-001', 'mission-004', 'mission-005'],
         acceptedId: 'mission-008',
         parts: [...TUTORIAL_STARTERS, 'parachute-mk1', 'parachute-mk2',
           'science-module-mk1', 'thermometer-mk1'],
@@ -1089,7 +1051,7 @@ test.describe('Tutorial Revisions', () => {
     test('M010 — Science Experiment Alpha with loaded instrument + altitude hold', async ({ page }) => {
       test.setTimeout(180_000);
       const env = tutorialSave({
-        completedIds: [...missionRange(1, 5), 'mission-008'],
+        completedIds: ['mission-001', 'mission-004', 'mission-005', 'mission-008'],
         acceptedId: 'mission-010',
         parts: [...TUTORIAL_STARTERS, 'parachute-mk1', 'parachute-mk2',
           'science-module-mk1', 'thermometer-mk1'],
@@ -1170,7 +1132,7 @@ test.describe('Tutorial Revisions', () => {
     test('M014 — Kármán Line Approach (reach 60,000m) in tutorial mode', async ({ page }) => {
       test.setTimeout(120_000);
       const env = tutorialSave({
-        completedIds: [...missionRange(1, 5), 'mission-008', 'mission-010', 'mission-012'],
+        completedIds: ['mission-001', 'mission-004', 'mission-005', 'mission-008', 'mission-010', 'mission-012'],
         acceptedId: 'mission-014',
         parts: [...TUTORIAL_STARTERS, 'parachute-mk1', 'tank-medium',
           'engine-reliant', 'decoupler-stack-tr18', 'engine-poodle',
@@ -1209,7 +1171,7 @@ test.describe('Tutorial Revisions', () => {
     test('M015 — Orbital Satellite Deployment I (orbit + release satellite)', async ({ page }) => {
       test.setTimeout(120_000);
       const env = tutorialSave({
-        completedIds: [...missionRange(1, 5), 'mission-008', 'mission-010',
+        completedIds: ['mission-001', 'mission-004', 'mission-005', 'mission-008', 'mission-010',
           'mission-012', 'mission-014', 'mission-016'],
         acceptedId: 'mission-015',
         parts: [...TUTORIAL_STARTERS, 'parachute-mk1', 'satellite-mk1',
@@ -1258,7 +1220,7 @@ test.describe('Tutorial Revisions', () => {
     test('M016 — Low Earth Orbit (≥80km AND ≥7,800 m/s) in tutorial mode', async ({ page }) => {
       test.setTimeout(120_000);
       const env = tutorialSave({
-        completedIds: [...missionRange(1, 5), 'mission-008', 'mission-010',
+        completedIds: ['mission-001', 'mission-004', 'mission-005', 'mission-008', 'mission-010',
           'mission-012', 'mission-014'],
         acceptedId: 'mission-016',
         parts: [...TUTORIAL_STARTERS, 'parachute-mk1', 'tank-medium',
@@ -1289,7 +1251,7 @@ test.describe('Tutorial Revisions', () => {
 
     test('M017 — Tracked Satellite Deployment (orbit + satellite via Tracking Station)', async ({ page }) => {
       test.setTimeout(120_000);
-      const allPrev = [...missionRange(1, 16), 'mission-020'];
+      const allPrev = ['mission-001', ...missionRange(4, 16), 'mission-020'];
       const env = tutorialSave({
         completedIds: allPrev,
         acceptedId: 'mission-017',

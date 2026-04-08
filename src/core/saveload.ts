@@ -496,6 +496,23 @@ export async function loadGame(slotIndex: number): Promise<GameState> {
   // Default showPerfDashboard for saves created before the perf dashboard feature.
   envelope.state.showPerfDashboard ??= false;
 
+  // Remove missions 002 and 003 (consolidated into mission-001 in iteration 6).
+  const removedMissionIds = new Set(['mission-002', 'mission-003']);
+  if (envelope.state.missions) {
+    for (const bucket of ['available', 'accepted', 'completed'] as const) {
+      if (Array.isArray(envelope.state.missions[bucket])) {
+        envelope.state.missions[bucket] = envelope.state.missions[bucket].filter(
+          (m: { id: string }) => !removedMissionIds.has(m.id),
+        );
+      }
+    }
+  }
+
+  // Default horizontalVelocity on in-progress flights.
+  if (envelope.state.flightState && envelope.state.flightState.horizontalVelocity == null) {
+    envelope.state.flightState.horizontalVelocity = 0;
+  }
+
   // Validate and filter corrupted nested entries (missions, crew, etc.).
   _validateNestedStructures(envelope.state);
 

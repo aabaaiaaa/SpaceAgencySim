@@ -162,10 +162,8 @@ test.describe('Challenge missions', () => {
         available: [],
         accepted: [],
         completed: [
-          { id: 'mission-001', title: 'First Flight', objectives: [], reward: 15_000, status: 'completed' },
-          { id: 'mission-002', title: 'Higher Ground', objectives: [], reward: 25_000, status: 'completed' },
-          { id: 'mission-003', title: 'Breaking Records', objectives: [], reward: 40_000, status: 'completed' },
-          { id: 'mission-004', title: 'Crew Training', objectives: [], reward: 50_000, status: 'completed' },
+          { id: 'mission-001', title: 'First Flight', objectives: [], reward: 25_000, status: 'completed' },
+          { id: 'mission-004', title: 'Speed Demon', objectives: [], reward: 50_000, status: 'completed' },
           { id: 'mission-016', title: 'Orbit Test', objectives: [], reward: 80_000, status: 'completed' },
           { id: 'mission-017', title: 'Satellite Deploy', objectives: [], reward: 90_000, status: 'completed' },
         ],
@@ -348,7 +346,7 @@ test.describe('Custom mission creator', () => {
         available: [],
         accepted: [],
         completed: [
-          { id: 'mission-004', title: 'Crew Training', objectives: [], reward: 50_000, status: 'completed' },
+          { id: 'mission-004', title: 'Speed Demon', objectives: [], reward: 50_000, status: 'completed' },
         ],
       },
     });

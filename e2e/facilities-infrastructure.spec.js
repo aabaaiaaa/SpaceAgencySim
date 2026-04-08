@@ -844,10 +844,10 @@ test.describe('Library — statistics dashboard', () => {
 
     // Build comprehensive flight history for statistics
     const flightHistory = [
-      { id: 'fh-1', missionId: 'mission-001', outcome: 'SUCCESS', rocketId: 'rocket-alpha', rocketName: 'Alpha', maxAltitude: 5000, maxSpeed: 300, duration: 120, revenue: 15000, launchDate: '2026-01-01', bodiesVisited: ['EARTH'], crewIds: ['crew-1'] },
-      { id: 'fh-2', missionId: 'mission-002', outcome: 'SUCCESS', rocketId: 'rocket-alpha', rocketName: 'Alpha', maxAltitude: 12000, maxSpeed: 600, duration: 250, revenue: 25000, launchDate: '2026-01-02', bodiesVisited: ['EARTH'], crewIds: ['crew-1', 'crew-2'] },
-      { id: 'fh-3', missionId: 'mission-003', outcome: 'FAILURE', rocketId: 'rocket-beta', rocketName: 'Beta', maxAltitude: 500, maxSpeed: 100, duration: 30, revenue: 0, launchDate: '2026-01-03', bodiesVisited: ['EARTH'], crewIds: [] },
-      { id: 'fh-4', missionId: 'mission-004', outcome: 'SUCCESS', rocketId: 'rocket-alpha', rocketName: 'Alpha', maxAltitude: 200000, maxSpeed: 7800, duration: 3600, revenue: 100000, launchDate: '2026-01-04', bodiesVisited: ['EARTH'], crewIds: ['crew-1'] },
+      { id: 'fh-1', missionId: 'mission-001', outcome: 'SUCCESS', rocketId: 'rocket-alpha', rocketName: 'Alpha', maxAltitude: 5000, maxSpeed: 300, duration: 120, revenue: 25000, launchDate: '2026-01-01', bodiesVisited: ['EARTH'], crewIds: ['crew-1'] },
+      { id: 'fh-2', missionId: 'mission-004', outcome: 'SUCCESS', rocketId: 'rocket-alpha', rocketName: 'Alpha', maxAltitude: 12000, maxSpeed: 600, duration: 250, revenue: 25000, launchDate: '2026-01-02', bodiesVisited: ['EARTH'], crewIds: ['crew-1', 'crew-2'] },
+      { id: 'fh-3', missionId: 'mission-005', outcome: 'FAILURE', rocketId: 'rocket-beta', rocketName: 'Beta', maxAltitude: 500, maxSpeed: 100, duration: 30, revenue: 0, launchDate: '2026-01-03', bodiesVisited: ['EARTH'], crewIds: [] },
+      { id: 'fh-4', missionId: 'mission-006', outcome: 'SUCCESS', rocketId: 'rocket-alpha', rocketName: 'Alpha', maxAltitude: 200000, maxSpeed: 7800, duration: 3600, revenue: 100000, launchDate: '2026-01-04', bodiesVisited: ['EARTH'], crewIds: ['crew-1'] },
       { id: 'fh-5', missionId: null, outcome: 'SUCCESS', rocketId: 'rocket-gamma', rocketName: 'Gamma', maxAltitude: 80000, maxSpeed: 2000, duration: 600, revenue: 0, launchDate: '2026-01-05', bodiesVisited: ['EARTH', 'MOON'], crewIds: ['crew-2'] },
     ];
 
@@ -905,7 +905,7 @@ test.describe('Library — statistics dashboard', () => {
     expect(stats.totalFlights).toBe(5);
     expect(stats.successfulFlights).toBe(4);
     expect(stats.failedFlights).toBe(1);
-    expect(stats.totalRevenue).toBe(140_000);
+    expect(stats.totalRevenue).toBe(150_000);
     expect(stats.satellitesDeployed).toBe(2);
   });
 
@@ -959,7 +959,7 @@ test.describe('Library — statistics dashboard', () => {
     expect(topRockets[0].rocketName).toBe('Alpha');
     expect(topRockets[0].flightCount).toBe(3);
     expect(topRockets[0].successCount).toBe(3);
-    expect(topRockets[0].totalRevenue).toBe(140_000);
+    expect(topRockets[0].totalRevenue).toBe(150_000);
   });
 
   test('(5) records: max altitude and max speed from flight history', async () => {
@@ -1069,7 +1069,7 @@ test.describe('Tutorial missions — facility awards on accept', () => {
             { id: 'obj-018-2', type: 'SAFE_LANDING', target: { maxLandingSpeed: 10 }, completed: false, description: 'Land safely at 10 m/s or less' },
           ],
           reward: 60_000,
-          unlocksAfter: ['mission-004'],
+          unlocksAfter: ['mission-009'],
           unlockedParts: [],
           requiredParts: ['cmd-mk1'],
           awardsFacilityOnAccept: 'crew-admin',
@@ -1077,10 +1077,11 @@ test.describe('Tutorial missions — facility awards on accept', () => {
         }],
         accepted: [],
         completed: [
-          { id: 'mission-001', title: 'First Flight', objectives: [], reward: 15000, status: 'completed' },
-          { id: 'mission-002', title: 'Higher Ground', objectives: [], reward: 25000, status: 'completed' },
-          { id: 'mission-003', title: 'Breaking Records', objectives: [], reward: 40000, status: 'completed' },
+          { id: 'mission-001', title: 'First Flight', objectives: [], reward: 25000, status: 'completed' },
           { id: 'mission-004', title: 'Speed Demon', objectives: [], reward: 50000, status: 'completed' },
+          { id: 'mission-006', title: 'Controlled Descent', objectives: [], reward: 40000, status: 'completed' },
+          { id: 'mission-007', title: 'Leg Day', objectives: [], reward: 40000, status: 'completed' },
+          { id: 'mission-009', title: 'Ejector Seat Test', objectives: [], reward: 45000, status: 'completed' },
         ],
       },
       facilities: { ...STARTER_FACILITIES },

@@ -37,7 +37,12 @@ let _pendingTimer: number | null = null;
  */
 export function triggerAutoSave(state: GameState, _trigger?: string): void {
   if (!isAutoSaveEnabled(state)) return;
-  if (_activeToast) return; // debounce
+
+  // If a toast is already showing, still perform the save — only skip the UI.
+  if (_activeToast) {
+    void performAutoSave(state);
+    return;
+  }
 
   // Build toast element.
   const toast = document.createElement('div');

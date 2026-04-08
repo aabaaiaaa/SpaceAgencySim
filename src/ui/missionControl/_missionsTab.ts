@@ -8,7 +8,7 @@ import type { GameState, ObjectiveDef } from '../../core/gameState.ts';
 import { acceptMission } from '../../core/missions.ts';
 import { getFacilityDef } from '../../core/construction.ts';
 import { getPartById } from '../../data/parts.ts';
-import { MISSIONS } from '../../data/missions.ts';
+import { MISSIONS, TutorialPathway } from '../../data/missions.ts';
 import { GameMode } from '../../core/constants.ts';
 import { refreshTopBarMissions } from '../topbar.ts';
 import { getMCState } from './_state.ts';
@@ -27,6 +27,32 @@ interface MissionInstance {
   objectives: ObjectiveDef[];
   unlockedParts?: string[];
   completedDate?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Pathway badge + mission catalog lookup helpers
+// ---------------------------------------------------------------------------
+
+const _MISSIONS_BY_ID = new Map(MISSIONS.map((m) => [m.id, m]));
+
+/** CSS class suffix for each pathway colour. */
+const _PATHWAY_CLASS: Record<string, string> = {
+  [TutorialPathway.RECOVERY]: 'mc-pathway-recovery',
+  [TutorialPathway.SCIENCE]: 'mc-pathway-science',
+  [TutorialPathway.SAFETY]: 'mc-pathway-safety',
+  [TutorialPathway.CREW]: 'mc-pathway-crew',
+  [TutorialPathway.ENGINEERING]: 'mc-pathway-engineering',
+  [TutorialPathway.ORBITAL]: 'mc-pathway-orbital',
+};
+
+/** Create a coloured pathway badge element, or null if no pathway. */
+function _buildPathwayBadge(missionId: string): HTMLSpanElement | null {
+  const def = _MISSIONS_BY_ID.get(missionId);
+  if (!def?.pathway) return null;
+  const badge = document.createElement('span');
+  badge.className = `mc-pathway-badge ${_PATHWAY_CLASS[def.pathway] ?? ''}`;
+  badge.textContent = def.pathway;
+  return badge;
 }
 
 // ---------------------------------------------------------------------------
@@ -111,6 +137,9 @@ function _buildAvailableMissionCard(
   titleEl.textContent = mission.title;
   cardHeader.appendChild(titleEl);
 
+  const pathwayBadge = _buildPathwayBadge(mission.id);
+  if (pathwayBadge) cardHeader.appendChild(pathwayBadge);
+
   if (isBlocking) {
     const badge = document.createElement('span');
     badge.className = 'mc-blocking-badge';
@@ -182,7 +211,7 @@ function _handleAccept(missionId: string): void {
 
     // Show notification modal for facility and/or part unlocks.
     if (result.awardedFacility || (result.unlockedParts && result.unlockedParts.length > 0)) {
-      _showUnlockNotification(result.awardedFacility ?? null, result.unlockedParts ?? []);
+      showUnlockNotification(result.awardedFacility ?? null, result.unlockedParts ?? []);
     }
   } else {
     logger.warn('missionControl', 'acceptMission failed', { error: result.error });
@@ -196,7 +225,7 @@ function _handleAccept(missionId: string): void {
 /**
  * Show a prominent modal notifying the player of facility and/or part unlocks.
  */
-function _showUnlockNotification(facilityId: string | null, partIds: string[]): void {
+export function showUnlockNotification(facilityId: string | null, partIds: string[]): void {
   // Remove any existing unlock notification.
   const existing = document.getElementById('unlock-notification-backdrop');
   if (existing) existing.remove();
@@ -317,6 +346,9 @@ function _buildAcceptedMissionCard(mission: MissionInstance): HTMLElement {
   titleEl.textContent = mission.title;
   cardHeader.appendChild(titleEl);
 
+  const acceptedPathway = _buildPathwayBadge(mission.id);
+  if (acceptedPathway) cardHeader.appendChild(acceptedPathway);
+
   const rewardEl = document.createElement('span');
   rewardEl.className = 'mc-mission-reward';
   rewardEl.textContent = fmtCash(mission.reward);
@@ -342,11 +374,10 @@ function _buildAcceptedMissionCard(mission: MissionInstance): HTMLElement {
 
     for (const obj of mission.objectives) {
       const item = document.createElement('li');
-      item.className = 'mc-objective-item';
+      item.className = `mc-objective-item${obj.optional ? ' mc-objective-bonus' : ''}`;
 
       const indicator = document.createElement('span');
       indicator.className = `mc-objective-indicator ${obj.completed ? 'completed' : 'pending'}`;
-      // Checkmark for completed, hollow circle for pending.
       indicator.textContent = obj.completed ? '\u2713' : '\u25CB';
       indicator.setAttribute('aria-label', obj.completed ? 'Completed' : 'Pending');
       item.appendChild(indicator);
@@ -354,6 +385,12 @@ function _buildAcceptedMissionCard(mission: MissionInstance): HTMLElement {
       const textEl = document.createElement('span');
       textEl.className = `mc-objective-text ${obj.completed ? 'completed' : 'pending'}`;
       textEl.textContent = obj.description;
+      if (obj.optional && obj.bonusReward) {
+        const bonusTag = document.createElement('span');
+        bonusTag.className = 'mc-bonus-reward';
+        bonusTag.textContent = ` (+${fmtCash(obj.bonusReward)})`;
+        textEl.appendChild(bonusTag);
+      }
       item.appendChild(textEl);
 
       objList.appendChild(item);
@@ -420,6 +457,9 @@ function _buildCompletedMissionCard(mission: MissionInstance): HTMLElement {
   titleEl.textContent = mission.title;
   cardHeader.appendChild(titleEl);
 
+  const completedPathway = _buildPathwayBadge(mission.id);
+  if (completedPathway) cardHeader.appendChild(completedPathway);
+
   const rewardEl = document.createElement('span');
   rewardEl.className = 'mc-mission-reward';
   rewardEl.textContent = fmtCash(mission.reward);
@@ -453,17 +493,23 @@ function _buildCompletedMissionCard(mission: MissionInstance): HTMLElement {
 
     for (const obj of mission.objectives) {
       const item = document.createElement('li');
-      item.className = 'mc-objective-item';
+      item.className = `mc-objective-item${obj.optional ? ' mc-objective-bonus' : ''}`;
 
       const indicator = document.createElement('span');
-      indicator.className = 'mc-objective-indicator completed';
-      indicator.textContent = '\u2713';
-      indicator.setAttribute('aria-label', 'Completed');
+      indicator.className = `mc-objective-indicator ${obj.completed ? 'completed' : 'pending'}`;
+      indicator.textContent = obj.completed ? '\u2713' : '\u2717';
+      indicator.setAttribute('aria-label', obj.completed ? 'Completed' : 'Missed');
       item.appendChild(indicator);
 
       const textEl = document.createElement('span');
-      textEl.className = 'mc-objective-text completed';
+      textEl.className = `mc-objective-text ${obj.completed ? 'completed' : 'pending'}`;
       textEl.textContent = obj.description;
+      if (obj.optional && obj.bonusReward) {
+        const bonusTag = document.createElement('span');
+        bonusTag.className = 'mc-bonus-reward';
+        bonusTag.textContent = obj.completed ? ` (+${fmtCash(obj.bonusReward)})` : ` (missed +${fmtCash(obj.bonusReward)})`;
+        textEl.appendChild(bonusTag);
+      }
       item.appendChild(textEl);
 
       objList.appendChild(item);

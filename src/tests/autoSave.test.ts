@@ -29,6 +29,7 @@ import {
   deleteAutoSave,
   AUTO_SAVE_KEY,
   _setSessionStartTimeForTesting,
+  _resetAutoSaveSlotForTesting,
 } from '../core/autoSave.ts';
 
 import { decompressSaveData } from '../core/saveload.ts';
@@ -56,6 +57,7 @@ beforeEach(() => {
   vi.stubGlobal('localStorage', mockStorage);
   vi.useFakeTimers();
   _setSessionStartTimeForTesting(Date.now());
+  _resetAutoSaveSlotForTesting();
   vi.clearAllMocks();
 });
 
@@ -101,14 +103,15 @@ describe('isAutoSaveEnabled', () => {
 // ---------------------------------------------------------------------------
 
 describe('performAutoSave', () => {
-  it('saves to localStorage under the auto-save key', async () => {
+  it('saves to first empty manual slot when no manual saves exist', async () => {
     const state = freshState();
     state.agencyName = 'Test Agency';
 
     const result = await performAutoSave(state);
 
     expect(result.success).toBe(true);
-    const raw = mockStorage.getItem(AUTO_SAVE_KEY);
+    // With no manual saves, auto-save goes to slot 0.
+    const raw = mockStorage.getItem('spaceAgencySave_0');
     expect(raw).not.toBeNull();
 
     const json = decompressSaveData(raw);
@@ -135,7 +138,8 @@ describe('performAutoSave', () => {
     const state = freshState();
     await performAutoSave(state);
 
-    expect(idbSet).toHaveBeenCalledWith(AUTO_SAVE_KEY, expect.any(String));
+    // With no manual saves, uses slot 0.
+    expect(idbSet).toHaveBeenCalledWith('spaceAgencySave_0', expect.any(String));
   });
 
   it('returns failure for null state', async () => {
@@ -176,9 +180,24 @@ describe('performAutoSave', () => {
     // Mutate state after save.
     state.agencyName = 'After';
 
-    const json = decompressSaveData(mockStorage.getItem(AUTO_SAVE_KEY));
+    // With no manual saves, auto-save goes to slot 0.
+    const json = decompressSaveData(mockStorage.getItem('spaceAgencySave_0'));
     const envelope = JSON.parse(json);
     expect(envelope.state.agencyName).toBe('Before');
+  });
+
+  it('uses next available slot when initial slots are occupied', async () => {
+    // Fill slots 0-4.
+    for (let i = 0; i < 5; i++) {
+      mockStorage.setItem(`spaceAgencySave_${i}`, 'occupied');
+    }
+    _resetAutoSaveSlotForTesting();
+
+    const state = freshState();
+    const result = await performAutoSave(state);
+    expect(result.success).toBe(true);
+    // Should use slot 5 (first empty beyond the occupied ones).
+    expect(mockStorage.getItem('spaceAgencySave_5')).not.toBeNull();
   });
 });
 
@@ -191,8 +210,9 @@ describe('hasAutoSave', () => {
     expect(hasAutoSave()).toBe(false);
   });
 
-  it('returns true after an auto-save', async () => {
-    await performAutoSave(freshState());
+  it('returns true when the dedicated auto-save key has data', async () => {
+    // Directly place data at the dedicated key (legacy or manual).
+    mockStorage.setItem(AUTO_SAVE_KEY, 'data');
     expect(hasAutoSave()).toBe(true);
   });
 });
@@ -203,7 +223,8 @@ describe('hasAutoSave', () => {
 
 describe('deleteAutoSave', () => {
   it('removes the auto-save from localStorage', async () => {
-    await performAutoSave(freshState());
+    // Place data at the dedicated key.
+    mockStorage.setItem(AUTO_SAVE_KEY, 'data');
     expect(hasAutoSave()).toBe(true);
 
     deleteAutoSave();

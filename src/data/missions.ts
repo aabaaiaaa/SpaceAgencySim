@@ -49,15 +49,22 @@ export const ObjectiveType = Object.freeze({
   REACH_ALTITUDE: 'REACH_ALTITUDE',
 
   /**
-   * Reach a minimum speed.
+   * Reach a minimum speed (total velocity magnitude).
    * target: { speed: number }  (m/s)
    */
   REACH_SPEED: 'REACH_SPEED',
 
   /**
+   * Reach a minimum horizontal speed.
+   * target: { speed: number }  (m/s, horizontal component only)
+   */
+  REACH_HORIZONTAL_SPEED: 'REACH_HORIZONTAL_SPEED',
+
+  /**
    * Land the rocket (or capsule) at or below a maximum impact speed.
    * Checks for a 'LANDING' flight event with `event.speed <= maxLandingSpeed`.
-   * target: { maxLandingSpeed: number }  (m/s)
+   * When `allowCrash` is true, also checks 'CRASH' events.
+   * target: { maxLandingSpeed: number, allowCrash?: boolean }  (m/s)
    */
   SAFE_LANDING: 'SAFE_LANDING',
 
@@ -174,6 +181,22 @@ export const MissionStatus = Object.freeze({
 /** Union type of all MissionStatus values. */
 export type MissionStatus = (typeof MissionStatus)[keyof typeof MissionStatus];
 
+/**
+ * Tutorial pathway labels for mission cards.
+ * Each pathway maps to a coloured badge on the mission board UI.
+ */
+export const TutorialPathway = Object.freeze({
+  RECOVERY: 'Recovery',
+  SCIENCE: 'Science',
+  SAFETY: 'Safety',
+  CREW: 'Crew',
+  ENGINEERING: 'Engineering',
+  ORBITAL: 'Orbital',
+} as const);
+
+/** Union type of all TutorialPathway values. */
+export type TutorialPathway = (typeof TutorialPathway)[keyof typeof TutorialPathway];
+
 // ---------------------------------------------------------------------------
 // Type Definitions
 // ---------------------------------------------------------------------------
@@ -204,6 +227,8 @@ export interface MissionDef {
   unlocksFacility?: FacilityId | null;
   /** FacilityId awarded when the mission is accepted (tutorial mode). */
   awardsFacilityOnAccept?: FacilityId;
+  /** Tutorial pathway badge label (e.g. 'Recovery', 'Science'). */
+  pathway?: TutorialPathway;
   /** Initial status: 'locked' or 'available'. */
   status: MissionStatus;
 }
@@ -257,125 +282,102 @@ export interface MissionDef {
 export const MISSIONS: MissionDef[] = [
 
   // =========================================================================
-  // LINEAR TUTORIAL CHAIN — missions 1-4 (one at a time)
+  // TUTORIAL CHAIN — missions 1 and 4 (one at a time during tutorial phase)
   // =========================================================================
 
   /**
    * Mission 1 — First Flight
-   * Available from game start.  Reach 100 m to prove the launch system works.
+   * Available from game start.  Consolidated from the original three
+   * sequential altitude missions.  Required objectives: reach 150 m/s and
+   * 500 m altitude.  Bonus objectives: reach 1 km, land safely.
    */
   {
     id: 'mission-001',
     title: 'First Flight',
     description:
-      'Our engineers have assembled a basic sounding rocket. Your task is simple: ' +
-      'get it off the pad and reach 100 metres altitude. This is the first step ' +
-      'in what will become a legendary space programme.',
+      'Our engineers have assembled a basic sounding rocket. Push it to the limit — ' +
+      'fly fast, fly high, and prove this programme has what it takes.',
     location: 'desert',
     objectives: [
       {
         id: 'obj-001-1',
-        type: ObjectiveType.REACH_ALTITUDE,
-        target: { altitude: 100 },
+        type: ObjectiveType.REACH_SPEED,
+        target: { speed: 150 },
         completed: false,
-        description: 'Reach 100 m altitude',
+        description: 'Reach 150 m/s',
       },
-    ],
-    reward: 15_000,
-    unlocksAfter: [],
-    // tank-small and engine-spark are available from the start of the game;
-    // they do not need to be added to state.parts via this mission.
-    unlockedParts: [],
-    status: MissionStatus.AVAILABLE,
-  },
-
-  /**
-   * Mission 2 — Higher Ambitions
-   * Unlocks after First Flight.  Push five times higher.
-   */
-  {
-    id: 'mission-002',
-    title: 'Higher Ambitions',
-    description:
-      'The first flight was a success. Now we need to push the boundary. ' +
-      'Reach 500 metres and prove our rocket can sustain powered flight ' +
-      'long enough to climb out of the lower atmosphere.',
-    location: 'desert',
-    objectives: [
       {
-        id: 'obj-002-1',
+        id: 'obj-001-2',
         type: ObjectiveType.REACH_ALTITUDE,
         target: { altitude: 500 },
         completed: false,
         description: 'Reach 500 m altitude',
       },
+      {
+        id: 'obj-001-3',
+        type: ObjectiveType.REACH_ALTITUDE,
+        target: { altitude: 1_000 },
+        completed: false,
+        description: 'BONUS: Reach 1 km altitude',
+        optional: true,
+        bonusReward: 10_000,
+      },
+      {
+        id: 'obj-001-4',
+        type: ObjectiveType.SAFE_LANDING,
+        target: { maxLandingSpeed: 10 },
+        completed: false,
+        description: 'BONUS: Land safely (under 10 m/s)',
+        optional: true,
+        bonusReward: 25_000,
+      },
     ],
-    reward: 20_000,
+    reward: 25_000,
+    unlocksAfter: [],
+    unlockedParts: [],
+    status: MissionStatus.AVAILABLE,
+  },
+
+  // Missions 002 and 003 removed — consolidated into mission-001.
+
+  /**
+   * Mission 4 — Speed Demon
+   * Unlocks after First Flight.  Horizontal speed challenge: reach 300 m/s
+   * sideways and recover (land or crash) under 30 m/s.
+   * Completing this mission opens parallel tracks (missions 5, 6).
+   */
+  {
+    id: 'mission-004',
+    title: 'Speed Demon',
+    description:
+      'Altitude alone won\'t reach orbit. We need horizontal velocity — and lots of it. ' +
+      'Tilt your rocket sideways, punch through 300 m/s, and bring it back in one piece... ' +
+      'or at least most of one piece.',
+    location: 'desert',
+    objectives: [
+      {
+        id: 'obj-004-1',
+        type: ObjectiveType.REACH_HORIZONTAL_SPEED,
+        target: { speed: 300 },
+        completed: false,
+        description: 'Reach 300 m/s horizontal speed',
+      },
+      {
+        id: 'obj-004-2',
+        type: ObjectiveType.SAFE_LANDING,
+        target: { maxLandingSpeed: 30, allowCrash: true },
+        completed: false,
+        description: 'Recover at under 30 m/s',
+      },
+    ],
+    reward: 30_000,
     unlocksAfter: ['mission-001'],
     unlockedParts: [],
     status: MissionStatus.LOCKED,
   },
 
-  /**
-   * Mission 3 — Breaking the Kilometre
-   * Unlocks after Higher Ambitions.  Crack 1 km.
-   */
-  {
-    id: 'mission-003',
-    title: 'Breaking the Kilometre',
-    description:
-      'One kilometre. A milestone that separates hobbyists from serious rocket ' +
-      'engineers. Build a bigger rocket and punch through that threshold.',
-    location: 'desert',
-    objectives: [
-      {
-        id: 'obj-003-1',
-        type: ObjectiveType.REACH_ALTITUDE,
-        target: { altitude: 1_000 },
-        completed: false,
-        description: 'Reach 1,000 m altitude',
-      },
-    ],
-    reward: 25_000,
-    unlocksAfter: ['mission-002'],
-    unlockedParts: [],
-    status: MissionStatus.LOCKED,
-  },
-
-  /**
-   * Mission 4 — Speed Test Alpha
-   * Unlocks after Breaking the Kilometre.  Prove horizontal speed capability.
-   * Completing this mission opens three parallel tracks (missions 5, 6, 7)
-   * plus the Crew Admin tutorial (mission 18).
-   */
-  {
-    id: 'mission-004',
-    title: 'Speed Test Alpha',
-    description:
-      'Altitude alone is not enough. We need to demonstrate that our rockets can ' +
-      'build horizontal velocity for eventual orbital operations. Achieve 150 m/s ' +
-      'of speed to unlock the next phase of our research programme.',
-    location: 'desert',
-    objectives: [
-      {
-        id: 'obj-004-1',
-        type: ObjectiveType.REACH_SPEED,
-        target: { speed: 150 },
-        completed: false,
-        description: 'Reach 150 m/s speed',
-      },
-    ],
-    reward: 30_000,
-    unlocksAfter: ['mission-003'],
-    // Completing mission 4 opens three parallel tracks (5, 6, 7) plus the
-    // Crew Admin tutorial (18).  The crewed command module and Crew Admin
-    // facility are now awarded by mission 18, not here.
-    unlockedParts: [],
-    status: MissionStatus.LOCKED,
-  },
-
   // =========================================================================
-  // PARALLEL TRACKS — missions 5, 6, 7 all unlock after mission 4
+  // PARALLEL TRACKS — missions 5, 6 unlock after mission 4
   // =========================================================================
 
   /**
@@ -409,6 +411,7 @@ export const MISSIONS: MissionDef[] = [
     // science parts until the player has demonstrated safe recovery.
     unlockedParts: ['parachute-mk2', 'science-module-mk1', 'thermometer-mk1'],
     requiredParts: ['parachute-mk1'],
+    pathway: TutorialPathway.RECOVERY,
     status: MissionStatus.LOCKED,
   },
 
@@ -445,6 +448,7 @@ export const MISSIONS: MissionDef[] = [
     reward: 40_000,
     unlocksAfter: ['mission-004'],
     unlockedParts: ['landing-legs-small'],
+    pathway: TutorialPathway.RECOVERY,
     status: MissionStatus.LOCKED,
   },
 
@@ -478,8 +482,9 @@ export const MISSIONS: MissionDef[] = [
       },
     ],
     reward: 40_000,
-    unlocksAfter: ['mission-004'],
+    unlocksAfter: ['mission-006'],
     unlockedParts: ['landing-legs-large'],
+    pathway: TutorialPathway.SAFETY,
     status: MissionStatus.LOCKED,
   },
 
@@ -526,22 +531,23 @@ export const MISSIONS: MissionDef[] = [
     unlocksAfter: ['mission-005'],
     unlockedParts: [],
     requiredParts: ['science-module-mk1'],
+    pathway: TutorialPathway.SCIENCE,
     status: MissionStatus.LOCKED,
   },
 
   /**
    * Mission 9 — Ejector Seat Test
-   * Crew safety track: demonstrate crew escape system at altitude.
-   * Unlocks: Mission 11.
+   * Crew safety track: uncrewed test of the crew escape system.
+   * Requires a probe core for uncrewed control + command module for ejector.
+   * Unlocks: Mission 11, Mission 18 (First Crew Flight).
    */
   {
     id: 'mission-009',
     title: 'Ejector Seat Test',
     description:
-      'Crew safety is paramount. Before we can put astronauts aboard, our escape ' +
-      'systems must be verified. Fly a crewed command module to above 200 metres ' +
-      'and fire the ejector seat. The crew must be safely propelled clear of the ' +
-      'vehicle at altitude.',
+      'Before we risk crew, we need to prove the escape system works. Build an ' +
+      'uncrewed test vehicle with a probe core and a command module — fly above ' +
+      '200 m and fire the ejector seat.',
     location: 'desert',
     objectives: [
       {
@@ -555,7 +561,8 @@ export const MISSIONS: MissionDef[] = [
     reward: 45_000,
     unlocksAfter: ['mission-007'],
     unlockedParts: [],
-    requiredParts: ['cmd-mk1'],
+    requiredParts: ['cmd-mk1', 'probe-core-mk1'],
+    pathway: TutorialPathway.SAFETY,
     status: MissionStatus.LOCKED,
   },
 
@@ -600,6 +607,7 @@ export const MISSIONS: MissionDef[] = [
     unlocksAfter: ['mission-008'],
     unlockedParts: ['engine-poodle'],
     requiredParts: ['science-module-mk1'],
+    pathway: TutorialPathway.SCIENCE,
     status: MissionStatus.LOCKED,
   },
 
@@ -637,6 +645,7 @@ export const MISSIONS: MissionDef[] = [
     reward: 55_000,
     unlocksAfter: ['mission-008', 'mission-009'],
     unlockedParts: [],
+    pathway: TutorialPathway.SAFETY,
     status: MissionStatus.LOCKED,
   },
 
@@ -673,6 +682,7 @@ export const MISSIONS: MissionDef[] = [
     unlocksAfter: ['mission-010'],
     unlockedParts: ['engine-reliant', 'srb-small'],
     requiredParts: ['decoupler-stack-tr18'],
+    pathway: TutorialPathway.ENGINEERING,
     status: MissionStatus.LOCKED,
   },
 
@@ -702,6 +712,7 @@ export const MISSIONS: MissionDef[] = [
     reward: 120_000,
     unlocksAfter: ['mission-011'],
     unlockedParts: [],
+    pathway: TutorialPathway.SAFETY,
     status: MissionStatus.LOCKED,
   },
 
@@ -733,6 +744,7 @@ export const MISSIONS: MissionDef[] = [
     reward: 200_000,
     unlocksAfter: ['mission-012'],
     unlockedParts: ['engine-nerv', 'srb-large'],
+    pathway: TutorialPathway.ENGINEERING,
     status: MissionStatus.LOCKED,
   },
 
@@ -777,6 +789,7 @@ export const MISSIONS: MissionDef[] = [
     unlocksAfter: ['mission-016'],
     unlockedParts: [],
     requiredParts: ['satellite-mk1'],
+    pathway: TutorialPathway.ORBITAL,
     status: MissionStatus.LOCKED,
   },
 
@@ -817,6 +830,7 @@ export const MISSIONS: MissionDef[] = [
     reward: 500_000,
     unlocksAfter: ['mission-014'],
     unlockedParts: ['tank-large', 'engine-reliant'],
+    pathway: TutorialPathway.ORBITAL,
     status: MissionStatus.LOCKED,
   },
 
@@ -861,6 +875,7 @@ export const MISSIONS: MissionDef[] = [
     reward: 350_000,
     unlocksAfter: ['mission-015', 'mission-020'],
     unlockedParts: [],
+    pathway: TutorialPathway.ORBITAL,
     status: MissionStatus.LOCKED,
   },
 
@@ -870,21 +885,20 @@ export const MISSIONS: MissionDef[] = [
 
   /**
    * Mission 18 — First Crew Flight (Crew Admin tutorial)
-   * Unlocks after mission 4.  Accepting this mission awards the Crew
-   * Administration building AND the crewed command module (cmd-mk1),
-   * enabling the player to hire astronauts and build crewed rockets.
+   * Unlocks after mission 9 (ejector seat test must be completed first).
+   * Accepting this mission awards the Crew Administration building AND
+   * the crewed command module (cmd-mk1), enabling the player to hire
+   * astronauts and build crewed rockets.
    */
   {
     id: 'mission-018',
     title: 'First Crew Flight',
     description:
-      'Your probe programme has proven our rocket technology is sound. It is time ' +
-      'to put people in the sky. Accepting this mission will establish your Crew ' +
-      'Administration building and grant access to the Mk1 Command Module. Visit ' +
-      'the Crew Admin facility to recruit your first astronaut, then build a ' +
+      'The ejector seat has been proven safe. It is time to put people in the sky. ' +
+      'Accepting this mission will establish your Crew Administration building. ' +
+      'Visit the Crew Admin facility to recruit your first astronaut, then build a ' +
       'rocket with the command module, assign a crew member, and bring them home ' +
-      'safely. Tip: open the Construction Menu from the hub to see all your ' +
-      'facilities and available upgrades.',
+      'safely.',
     location: 'desert',
     objectives: [
       {
@@ -903,10 +917,11 @@ export const MISSIONS: MissionDef[] = [
       },
     ],
     reward: 60_000,
-    unlocksAfter: ['mission-004'],
+    unlocksAfter: ['mission-009'],
     unlockedParts: [],
     requiredParts: ['cmd-mk1'],
     awardsFacilityOnAccept: FacilityId.CREW_ADMIN,
+    pathway: TutorialPathway.CREW,
     status: MissionStatus.LOCKED,
   },
 
@@ -949,6 +964,7 @@ export const MISSIONS: MissionDef[] = [
     unlockedParts: [],
     requiredParts: ['science-module-mk1'],
     awardsFacilityOnAccept: FacilityId.RD_LAB,
+    pathway: TutorialPathway.SCIENCE,
     status: MissionStatus.LOCKED,
   },
 
@@ -989,6 +1005,7 @@ export const MISSIONS: MissionDef[] = [
     unlocksAfter: ['mission-016'],
     unlockedParts: ['docking-port-std'],
     awardsFacilityOnAccept: FacilityId.TRACKING_STATION,
+    pathway: TutorialPathway.ORBITAL,
     status: MissionStatus.LOCKED,
   },
 
@@ -1032,6 +1049,7 @@ export const MISSIONS: MissionDef[] = [
     unlocksAfter: ['mission-020'],
     unlockedParts: [],
     requiredParts: ['science-module-mk1'],
+    pathway: TutorialPathway.ORBITAL,
     status: MissionStatus.LOCKED,
   },
 
@@ -1075,6 +1093,7 @@ export const MISSIONS: MissionDef[] = [
     unlockedParts: [],
     requiredParts: ['satellite-mk1'],
     awardsFacilityOnAccept: FacilityId.SATELLITE_OPS,
+    pathway: TutorialPathway.ORBITAL,
     status: MissionStatus.LOCKED,
   },
 

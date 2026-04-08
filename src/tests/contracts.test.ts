@@ -59,8 +59,8 @@ function freshState() {
   const state = createGameState();
   // Give the player some completed missions so contracts can generate.
   state.missions.completed = [
-    { id: 'mission-001', title: 'M1', objectives: [{ type: ObjectiveType.REACH_ALTITUDE, target: { altitude: 100 }, completed: true }], reward: 15000 },
-    { id: 'mission-002', title: 'M2', objectives: [{ type: ObjectiveType.REACH_ALTITUDE, target: { altitude: 500 }, completed: true }], reward: 20000 },
+    { id: 'mission-001', title: 'M1', objectives: [{ type: ObjectiveType.REACH_SPEED, target: { speed: 150 }, completed: true }], reward: 25000 },
+    { id: 'mission-004', title: 'M4', objectives: [{ type: ObjectiveType.REACH_HORIZONTAL_SPEED, target: { speed: 300 }, completed: true }], reward: 30000 },
   ];
   return state;
 }

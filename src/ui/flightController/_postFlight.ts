@@ -13,6 +13,7 @@ import { refreshTopBar } from '../topbar.ts';
 import { getFCState } from './_state.ts';
 import { stopFlightScene, startFlightScene } from './_init.ts';
 import { triggerAutoSave } from '../autoSaveToast.ts';
+import { showUnlockNotification } from '../missionControl/_missionsTab.ts';
 
 import type { PhysicsState } from '../../core/physics.ts';
 import type { RocketAssembly } from '../../core/rocketbuilder.ts';
@@ -216,12 +217,24 @@ export function showPostFlightSummary(
 
       section.appendChild(objList);
 
-      // Show reward info if all objectives are completed.
-      const allComplete: boolean = missionObjectives!.every((o) => o.completed);
-      if (allComplete && mission.reward > 0) {
+      // Show reward info if all required objectives are completed.
+      const requiredComplete: boolean = missionObjectives!.filter((o) => !(o as unknown as { optional?: boolean }).optional).every((o) => o.completed);
+      if (requiredComplete && mission.reward > 0) {
+        // Calculate total reward including bonus objectives.
+        let totalReward = mission.reward;
+        for (const o of missionObjectives!) {
+          const obj = o as unknown as { optional?: boolean; completed: boolean; bonusReward?: number };
+          if (obj.optional && obj.completed && obj.bonusReward) {
+            totalReward += obj.bonusReward;
+          }
+        }
         const rewardEl: HTMLDivElement = document.createElement('div');
         rewardEl.className = 'pf-reward-box';
-        rewardEl.textContent = `Mission reward: +$${mission.reward.toLocaleString('en-US')}`;
+        if (totalReward !== mission.reward) {
+          rewardEl.textContent = `Mission reward: +$${mission.reward.toLocaleString('en-US')} + $${(totalReward - mission.reward).toLocaleString('en-US')} bonus = $${totalReward.toLocaleString('en-US')}`;
+        } else {
+          rewardEl.textContent = `Mission reward: +$${mission.reward.toLocaleString('en-US')}`;
+        }
         section.appendChild(rewardEl);
       }
 
@@ -529,6 +542,14 @@ export function showPostFlightSummary(
     let returnResults: ReturnType<typeof processFlightReturn> | null = null;
     if (state && flightState) {
       returnResults = processFlightReturn(state, flightState, ps, assembly);
+    }
+
+    // Show unlock notification modal for any parts unlocked by completed missions.
+    if (returnResults) {
+      const allUnlockedParts = returnResults.completedMissions.flatMap((e) => e.unlockedParts);
+      if (allUnlockedParts.length > 0) {
+        showUnlockNotification(null, allUnlockedParts);
+      }
     }
 
     refreshTopBar();

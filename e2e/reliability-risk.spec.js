@@ -1027,12 +1027,12 @@ test.describe('Wind force during flight and ISP modifier', () => {
       const gs = window.__gameState;
       gs.weather = {
         current: {
-          windSpeed: 10,
+          windSpeed: 50,
           windAngle: 0,
           temperature: 1.03,
           visibility: 0.2,
           extreme: false,
-          description: 'Moderate wind',
+          description: 'Strong wind',
           bodyId: 'EARTH',
         },
         skipCount: 0,
@@ -1060,9 +1060,8 @@ test.describe('Wind force during flight and ISP modifier', () => {
     );
 
     const snapshot = await getPhysicsSnapshot(page);
-    // With 10 m/s wind, the rocket should have some horizontal displacement
-    // The exact value depends on frame timing, but it should be non-zero after a second
-    // Note: velX might be very small due to short flight time, so we check posX offset
+    // With 50 m/s wind, the rocket should have clear horizontal displacement
+    // Note: velX might be small due to short flight time, so we check posX offset
     expect(snapshot).not.toBeNull();
 
     await returnToAgency(page);

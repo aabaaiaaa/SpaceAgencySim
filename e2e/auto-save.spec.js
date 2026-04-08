@@ -45,10 +45,17 @@ test.describe('Auto-Save System', () => {
     );
 
     // Verify the auto-save was written to localStorage.
+    // Auto-save picks the first empty slot (spaceAgencySave_0, _1, etc.)
     // Saves are LZ-compressed (prefixed with "LZC:"), so we just check existence and non-empty.
     const autoSaveInfo = await page.evaluate(() => {
-      const raw = localStorage.getItem('spaceAgencySave_auto');
-      return { exists: raw !== null, length: raw?.length ?? 0 };
+      // Check all possible slots for an auto-save.
+      for (let i = 0; i < 10; i++) {
+        const raw = localStorage.getItem(`spaceAgencySave_${i}`);
+        if (raw !== null) return { exists: true, length: raw.length };
+      }
+      // Also check the legacy dedicated key.
+      const legacy = localStorage.getItem('spaceAgencySave_auto');
+      return { exists: legacy !== null, length: legacy?.length ?? 0 };
     });
     expect(autoSaveInfo.exists).toBe(true);
     expect(autoSaveInfo.length).toBeGreaterThan(10);

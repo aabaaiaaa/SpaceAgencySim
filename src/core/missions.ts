@@ -313,8 +313,16 @@ export function completeMission(state: GameState, id: string): CompleteMissionRe
   (mission as unknown as { completedDate: string }).completedDate = new Date().toISOString();
   state.missions.completed.push(mission);
 
-  // Award the cash reward.
-  earnReward(state, missionDef.reward);
+  // Award the cash reward (base + any completed bonus objectives).
+  let totalReward = missionDef.reward;
+  if (Array.isArray(missionDef.objectives)) {
+    for (const obj of missionDef.objectives) {
+      if (obj.optional && obj.completed && obj.bonusReward) {
+        totalReward += obj.bonusReward;
+      }
+    }
+  }
+  earnReward(state, totalReward);
 
   // Unlock any parts gated on this mission.
   // The canonical unlock list comes from the template definition so that
@@ -345,7 +353,7 @@ export function completeMission(state: GameState, id: string): CompleteMissionRe
   return {
     success: true,
     mission: missionDef,
-    reward: missionDef.reward,
+    reward: totalReward,
     unlockedParts,
     awardedFacility,
     newlyUnlockedMissions,
@@ -427,10 +435,18 @@ export function checkObjectiveCompletion(
           break;
 
         // ------------------------------------------------------------------
+        case ObjectiveType.REACH_HORIZONTAL_SPEED:
+          if (flightState.horizontalVelocity >= (obj.target.speed as number)) {
+            obj.completed = true;
+          }
+          break;
+
+        // ------------------------------------------------------------------
         case ObjectiveType.SAFE_LANDING: {
+          const allowCrash = obj.target.allowCrash as boolean | undefined;
           const landingEvent = events.find(
             (e) =>
-              e.type === 'LANDING' &&
+              (e.type === 'LANDING' || (allowCrash && e.type === 'CRASH')) &&
               typeof e.speed === 'number' &&
               e.speed <= (obj.target.maxLandingSpeed as number),
           );

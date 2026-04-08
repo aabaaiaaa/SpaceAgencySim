@@ -159,10 +159,12 @@ export function startFlightScene(
   // can look up crew engineering skills during reliability checks.
   ps._gameState = s.state;
 
-  // Apply weather effects (temperature -> ISP, visibility -> fog/haze).
+  // Apply weather effects (temperature -> ISP, wind, visibility -> fog/haze).
   if (s.state.weather?.current) {
     const w = s.state.weather.current;
     if (w.temperature != null) ps.weatherIspModifier = w.temperature;
+    ps.weatherWindSpeed = w.windSpeed ?? 0;
+    ps.weatherWindAngle = w.windAngle ?? 0;
     setFlightWeather(w.visibility ?? 0);
   }
 

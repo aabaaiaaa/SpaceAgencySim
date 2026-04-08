@@ -414,6 +414,10 @@ export interface PhysicsState {
   _dockedCombinedMass: number;
   /** Weather-based ISP modifier (0.95–1.05). */
   weatherIspModifier: number;
+  /** Weather wind speed in m/s (0 = calm). */
+  weatherWindSpeed: number;
+  /** Weather wind angle in radians (0 = east). */
+  weatherWindAngle: number;
   /** True while launch clamps are still active. */
   hasLaunchClamps: boolean;
   /** Power system state. */
@@ -678,6 +682,8 @@ export function createPhysicsState(assembly: RocketAssembly, flightState: Flight
     dockingPortStates: new Map(),
     _dockedCombinedMass: 0,
     weatherIspModifier: 1.0,
+    weatherWindSpeed: 0,
+    weatherWindAngle: 0,
     hasLaunchClamps: false,
     powerState: null,
   };
@@ -1055,9 +1061,13 @@ function _integrate(ps: PhysicsState, assembly: RocketAssembly, flightState: Fli
   // --- 4b. Wind force (weather system) -------------------------------------
   let windFX = 0;
   let windFY = 0;
-  if (density > 0 && ps._gameState?.weather?.current) {
-    const weather = ps._gameState.weather.current;
-    const windAccel = getWindForce(weather, altitude, bodyId);
+  if (density > 0 && ps.weatherWindSpeed > 0) {
+    const windWeather = {
+      windSpeed: ps.weatherWindSpeed,
+      windAngle: ps.weatherWindAngle,
+      temperature: 1, visibility: 0, extreme: false, description: '', bodyId: bodyId as string,
+    };
+    const windAccel = getWindForce(windWeather, altitude, bodyId);
     // Wind acts as a force on the rocket (acceleration × mass → force component).
     windFX = windAccel.windFX * totalMass;
     windFY = windAccel.windFY * totalMass;
@@ -2426,6 +2436,7 @@ function _allCommandModulesGone(ps: PhysicsState, assembly: RocketAssembly): boo
 function _syncFlightState(ps: PhysicsState, assembly: RocketAssembly, flightState: FlightState): void {
   flightState.altitude = Math.max(0, ps.posY);
   flightState.velocity = Math.hypot(ps.velX, ps.velY);
+  flightState.horizontalVelocity = Math.abs(ps.velX);
 
   // Track peak altitude and velocity for records/statistics.
   if (flightState.altitude > (flightState.maxAltitude ?? 0)) {

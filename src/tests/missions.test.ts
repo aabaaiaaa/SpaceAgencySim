@@ -84,6 +84,7 @@ function makeFlightState(missionId, overrides = {}) {
     timeElapsed: 0,
     altitude: 0,
     velocity: 0,
+    horizontalVelocity: 0,
     fuelRemaining: 1000,
     deltaVRemaining: 5000,
     events: [],
@@ -1227,31 +1228,31 @@ describe('Catalog (1): only Mission 1 is available at game start', () => {
   });
 });
 
-describe('Catalog (2): completing Mission 1 makes Mission 2 available', () => {
-  it('mission-002 appears in available after completing mission-001', () => {
+describe('Catalog (2): completing Mission 1 makes Mission 4 available', () => {
+  it('mission-004 appears in available after completing mission-001', () => {
     const state = freshState();
     initializeMissions(state);
     acceptMission(state, 'mission-001');
     completeMission(state, 'mission-001');
     const ids = state.missions.available.map((m) => m.id);
-    expect(ids).toContain('mission-002');
+    expect(ids).toContain('mission-004');
     expect(ids).not.toContain('mission-001');
   });
 
-  it('mission-002 is the only newly available mission after completing mission-001', () => {
+  it('mission-004 is the only newly available mission after completing mission-001', () => {
     const state = freshState();
     initializeMissions(state);
     acceptMission(state, 'mission-001');
     completeMission(state, 'mission-001');
     expect(state.missions.available).toHaveLength(1);
-    expect(state.missions.available[0].id).toBe('mission-002');
+    expect(state.missions.available[0].id).toBe('mission-004');
   });
 });
 
-describe('Catalog (3): completing Mission 4 unlocks Missions 5, 6, and 7 simultaneously', () => {
-  /** Helper: advance through the linear tutorial chain up to and including `targetId`. */
+describe('Catalog (3): completing Mission 4 unlocks Missions 5 and 6', () => {
+  /** Helper: advance through the tutorial chain up to and including `targetId`. */
   function completeTutorialChainTo(state, targetId) {
-    const chain = ['mission-001', 'mission-002', 'mission-003', 'mission-004'];
+    const chain = ['mission-001', 'mission-004'];
     for (const id of chain) {
       acceptMission(state, id);
       completeMission(state, id);
@@ -1259,26 +1260,26 @@ describe('Catalog (3): completing Mission 4 unlocks Missions 5, 6, and 7 simulta
     }
   }
 
-  it('missions 5, 6, 7, and 18 become available after mission-004 is completed', () => {
+  it('missions 5 and 6 become available after mission-004 is completed', () => {
     const state = freshState();
     initializeMissions(state);
     completeTutorialChainTo(state, 'mission-004');
     const ids = state.missions.available.map((m) => m.id);
     expect(ids).toContain('mission-005');
     expect(ids).toContain('mission-006');
-    expect(ids).toContain('mission-007');
-    expect(ids).toContain('mission-018');
-    expect(ids).toHaveLength(4);
+    // Mission 7 now requires mission 6, mission 18 requires mission 9
+    expect(ids).not.toContain('mission-007');
+    expect(ids).not.toContain('mission-018');
+    expect(ids).toHaveLength(2);
   });
 
-  it('missions 5, 6, and 7 are not available after only mission-003 is completed', () => {
+  it('missions 5 and 6 are not available after only mission-001 is completed', () => {
     const state = freshState();
     initializeMissions(state);
-    completeTutorialChainTo(state, 'mission-003');
+    completeTutorialChainTo(state, 'mission-001');
     const ids = state.missions.available.map((m) => m.id);
     expect(ids).not.toContain('mission-005');
     expect(ids).not.toContain('mission-006');
-    expect(ids).not.toContain('mission-007');
   });
 });
 
@@ -1324,8 +1325,8 @@ describe('Catalog (6): early tutorial allows only one accepted mission at a time
     initializeMissions(state);
     // Accept the only available mission (mission-001).
     acceptMission(state, 'mission-001');
-    // mission-002 is still locked — not yet in the available bucket.
-    const result = acceptMission(state, 'mission-002');
+    // mission-004 is still locked — not yet in the available bucket.
+    const result = acceptMission(state, 'mission-004');
     expect(result.success).toBe(false);
     expect(typeof result.error).toBe('string');
     // Only the first accept succeeded.
@@ -1343,33 +1344,30 @@ describe('Catalog (6): early tutorial allows only one accepted mission at a time
 describe('Catalog (7): after early tutorial, multiple missions can be accepted simultaneously', () => {
   /** Complete the linear chain so that missions 5, 6, 7 are all available. */
   function completeTutorialChain(state) {
-    for (const id of ['mission-001', 'mission-002', 'mission-003', 'mission-004']) {
+    for (const id of ['mission-001', 'mission-004']) {
       acceptMission(state, id);
       completeMission(state, id);
     }
   }
 
-  it('missions 5, 6, and 7 can all be accepted at the same time', () => {
+  it('missions 5 and 6 can both be accepted at the same time', () => {
     const state = freshState();
     initializeMissions(state);
     completeTutorialChain(state);
 
     const r5 = acceptMission(state, 'mission-005');
     const r6 = acceptMission(state, 'mission-006');
-    const r7 = acceptMission(state, 'mission-007');
 
     expect(r5.success).toBe(true);
     expect(r6.success).toBe(true);
-    expect(r7.success).toBe(true);
-    expect(state.missions.accepted).toHaveLength(3);
+    expect(state.missions.accepted).toHaveLength(2);
     const acceptedIds = state.missions.accepted.map((m) => m.id);
     expect(acceptedIds).toContain('mission-005');
     expect(acceptedIds).toContain('mission-006');
-    expect(acceptedIds).toContain('mission-007');
   });
 });
 
-describe('Catalog (8): checkObjectiveCompletion at 100 m marks mission-001 objective complete', () => {
+describe('Catalog (8): checkObjectiveCompletion marks mission-001 objectives complete', () => {
   let state;
 
   beforeEach(() => {
@@ -1378,35 +1376,37 @@ describe('Catalog (8): checkObjectiveCompletion at 100 m marks mission-001 objec
     acceptMission(state, 'mission-001');
   });
 
-  it('REACH_ALTITUDE objective is completed when altitude equals 100 m', () => {
-    checkObjectiveCompletion(state, makeFlightState('mission-001', { altitude: 100 }));
+  it('REACH_SPEED objective is completed when velocity reaches 150 m/s', () => {
+    checkObjectiveCompletion(state, makeFlightState('mission-001', { velocity: 150 }));
     const obj = state.missions.accepted[0].objectives[0];
-    expect(obj.type).toBe(ObjectiveType.REACH_ALTITUDE);
-    expect(obj.target.altitude).toBe(100);
+    expect(obj.type).toBe(ObjectiveType.REACH_SPEED);
     expect(obj.completed).toBe(true);
   });
 
-  it('REACH_ALTITUDE objective is completed when altitude exceeds 100 m', () => {
+  it('REACH_ALTITUDE objective is completed when altitude reaches 500 m', () => {
     checkObjectiveCompletion(state, makeFlightState('mission-001', { altitude: 500 }));
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(true);
+    const obj = state.missions.accepted[0].objectives[1];
+    expect(obj.type).toBe(ObjectiveType.REACH_ALTITUDE);
+    expect(obj.completed).toBe(true);
   });
 
-  it('REACH_ALTITUDE objective is NOT completed when altitude is 99 m', () => {
-    checkObjectiveCompletion(state, makeFlightState('mission-001', { altitude: 99 }));
+  it('required objectives NOT completed below threshold', () => {
+    checkObjectiveCompletion(state, makeFlightState('mission-001', { velocity: 100, altitude: 400 }));
     expect(state.missions.accepted[0].objectives[0].completed).toBe(false);
+    expect(state.missions.accepted[0].objectives[1].completed).toBe(false);
   });
 });
 
 describe('Catalog (9): completing all objectives then calling completeMission marks mission done', () => {
-  it('mission-001 moves to completed after its altitude objective is met and completeMission is called', () => {
+  it('mission-001 moves to completed after required objectives are met and completeMission is called', () => {
     const state = freshState();
     initializeMissions(state);
     acceptMission(state, 'mission-001');
 
-    // Drive the sole objective to completion via checkObjectiveCompletion.
-    checkObjectiveCompletion(state, makeFlightState('mission-001', { altitude: 100 }));
-    const obj = state.missions.accepted[0].objectives[0];
-    expect(obj.completed).toBe(true); // sanity-check: objective really is done
+    // Drive required objectives to completion.
+    checkObjectiveCompletion(state, makeFlightState('mission-001', { velocity: 150, altitude: 500 }));
+    expect(state.missions.accepted[0].objectives[0].completed).toBe(true);
+    expect(state.missions.accepted[0].objectives[1].completed).toBe(true);
 
     // Now formally complete the mission.
     const result = completeMission(state, 'mission-001');
@@ -1417,14 +1417,16 @@ describe('Catalog (9): completing all objectives then calling completeMission ma
     expect(state.missions.completed[0].status).toBe(MissionStatus.COMPLETED);
   });
 
-  it('all objective flags remain true on the completed mission instance', () => {
+  it('required objective flags remain true on the completed mission instance', () => {
     const state = freshState();
     initializeMissions(state);
     acceptMission(state, 'mission-001');
-    checkObjectiveCompletion(state, makeFlightState('mission-001', { altitude: 100 }));
+    checkObjectiveCompletion(state, makeFlightState('mission-001', { velocity: 150, altitude: 500 }));
     completeMission(state, 'mission-001');
     const completedObjs = state.missions.completed[0].objectives;
-    expect(completedObjs.every((o) => o.completed)).toBe(true);
+    // Required objectives (first two) should be completed.
+    expect(completedObjs[0].completed).toBe(true);
+    expect(completedObjs[1].completed).toBe(true);
   });
 });
 
@@ -1668,5 +1670,167 @@ describe('checkObjectiveCompletion() — only accepted missions', () => {
 
     // The completed mission's objective should remain untouched.
     expect(state.missions.completed[0].objectives[0].completed).toBe(false);
+  });
+});
+
+// ===========================================================================
+// New tests for iteration 6 features
+// ===========================================================================
+
+describe('Bonus objectives: mission completes with only required objectives', () => {
+  it('mission-001 completes when required objectives are met, even if bonus objectives are not', () => {
+    const state = freshState();
+    initializeMissions(state);
+    acceptMission(state, 'mission-001');
+
+    // Complete required objectives (speed 150 + altitude 500) but not bonus.
+    checkObjectiveCompletion(state, makeFlightState('mission-001', { velocity: 150, altitude: 500 }));
+    const objs = state.missions.accepted[0].objectives;
+    expect(objs[0].completed).toBe(true); // speed
+    expect(objs[1].completed).toBe(true); // altitude 500
+    expect(objs[2].completed).toBe(false); // bonus altitude 1000
+    expect(objs[3].completed).toBe(false); // bonus landing
+
+    const result = completeMission(state, 'mission-001');
+    expect(result.success).toBe(true);
+    expect(result.reward).toBe(25_000); // base only
+  });
+
+  it('bonus objectives add their bonusReward to the total', () => {
+    const state = freshState();
+    initializeMissions(state);
+    acceptMission(state, 'mission-001');
+
+    // Complete required + 1km bonus.
+    checkObjectiveCompletion(state, makeFlightState('mission-001', { velocity: 150, altitude: 1000 }));
+    const objs = state.missions.accepted[0].objectives;
+    expect(objs[2].completed).toBe(true); // bonus 1km
+    expect(objs[3].completed).toBe(false); // bonus landing — not triggered
+
+    const result = completeMission(state, 'mission-001');
+    expect(result.success).toBe(true);
+    expect(result.reward).toBe(35_000); // 25k + 10k bonus
+  });
+});
+
+describe('REACH_HORIZONTAL_SPEED objective type', () => {
+  it('completes when horizontalVelocity meets threshold', () => {
+    const state = freshState();
+    initializeMissions(state);
+    acceptMission(state, 'mission-001');
+    completeMission(state, 'mission-001');
+    acceptMission(state, 'mission-004');
+
+    checkObjectiveCompletion(state, makeFlightState('mission-004', { horizontalVelocity: 300 }));
+    const obj = state.missions.accepted[0].objectives[0];
+    expect(obj.type).toBe(ObjectiveType.REACH_HORIZONTAL_SPEED);
+    expect(obj.completed).toBe(true);
+  });
+
+  it('does not complete when horizontalVelocity is below threshold', () => {
+    const state = freshState();
+    initializeMissions(state);
+    acceptMission(state, 'mission-001');
+    completeMission(state, 'mission-001');
+    acceptMission(state, 'mission-004');
+
+    checkObjectiveCompletion(state, makeFlightState('mission-004', { horizontalVelocity: 299 }));
+    expect(state.missions.accepted[0].objectives[0].completed).toBe(false);
+  });
+});
+
+describe('SAFE_LANDING with allowCrash', () => {
+  it('completes on CRASH event when allowCrash is true and speed is below threshold', () => {
+    const state = freshState();
+    initializeMissions(state);
+    acceptMission(state, 'mission-001');
+    completeMission(state, 'mission-001');
+    acceptMission(state, 'mission-004');
+
+    const fs = makeFlightState('mission-004', {
+      horizontalVelocity: 300,
+      events: [{ type: 'CRASH', time: 10, speed: 25, description: 'Crashed' }],
+    });
+    checkObjectiveCompletion(state, fs);
+    const landingObj = state.missions.accepted[0].objectives[1];
+    expect(landingObj.completed).toBe(true);
+  });
+
+  it('does not complete on CRASH when speed exceeds threshold', () => {
+    const state = freshState();
+    initializeMissions(state);
+    acceptMission(state, 'mission-001');
+    completeMission(state, 'mission-001');
+    acceptMission(state, 'mission-004');
+
+    const fs = makeFlightState('mission-004', {
+      events: [{ type: 'CRASH', time: 10, speed: 35, description: 'Crashed hard' }],
+    });
+    checkObjectiveCompletion(state, fs);
+    expect(state.missions.accepted[0].objectives[1].completed).toBe(false);
+  });
+
+  it('SAFE_LANDING without allowCrash ignores CRASH events', () => {
+    const state = freshState();
+    initializeMissions(state);
+    acceptMission(state, 'mission-001');
+
+    // Mission-001 bonus landing has no allowCrash.
+    const fs = makeFlightState('mission-001', {
+      velocity: 150, altitude: 500,
+      events: [{ type: 'CRASH', time: 10, speed: 5, description: 'Soft crash' }],
+    });
+    checkObjectiveCompletion(state, fs);
+    const landingObj = state.missions.accepted[0].objectives[3]; // bonus safe landing
+    expect(landingObj.completed).toBe(false);
+  });
+});
+
+describe('Mission chain: dependency fixes', () => {
+  it('mission-007 requires mission-006 (not mission-004)', () => {
+    const state = freshState();
+    // Complete missions 001, 004 — mission 007 should NOT be available.
+    state.missions.completed = [
+      { id: 'mission-001', status: MissionStatus.COMPLETED },
+      { id: 'mission-004', status: MissionStatus.COMPLETED },
+    ];
+    const unlocked = getUnlockedMissions(state);
+    const ids = unlocked.map((m) => m.id);
+    expect(ids).not.toContain('mission-007');
+    expect(ids).toContain('mission-006'); // 006 should be available
+  });
+
+  it('mission-007 unlocks after mission-006 is completed', () => {
+    const state = freshState();
+    state.missions.completed = [
+      { id: 'mission-001', status: MissionStatus.COMPLETED },
+      { id: 'mission-004', status: MissionStatus.COMPLETED },
+      { id: 'mission-006', status: MissionStatus.COMPLETED },
+    ];
+    const unlocked = getUnlockedMissions(state);
+    expect(unlocked.map((m) => m.id)).toContain('mission-007');
+  });
+
+  it('mission-018 requires mission-009 (not mission-004)', () => {
+    const state = freshState();
+    state.missions.completed = [
+      { id: 'mission-001', status: MissionStatus.COMPLETED },
+      { id: 'mission-004', status: MissionStatus.COMPLETED },
+    ];
+    const unlocked = getUnlockedMissions(state);
+    expect(unlocked.map((m) => m.id)).not.toContain('mission-018');
+  });
+
+  it('mission-018 unlocks after mission-009 is completed', () => {
+    const state = freshState();
+    state.missions.completed = [
+      { id: 'mission-001', status: MissionStatus.COMPLETED },
+      { id: 'mission-004', status: MissionStatus.COMPLETED },
+      { id: 'mission-006', status: MissionStatus.COMPLETED },
+      { id: 'mission-007', status: MissionStatus.COMPLETED },
+      { id: 'mission-009', status: MissionStatus.COMPLETED },
+    ];
+    const unlocked = getUnlockedMissions(state);
+    expect(unlocked.map((m) => m.id)).toContain('mission-018');
   });
 });

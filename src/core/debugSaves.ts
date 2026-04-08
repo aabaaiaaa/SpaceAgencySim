@@ -92,18 +92,14 @@ export const DEBUG_SAVE_DEFINITIONS: DebugSaveDefinition[] = [
       const s = createGameState();
       s.agencyName = 'Debug Agency'; s.gameMode = GameMode.TUTORIAL; s.currentPeriod = 5;
       s.missions.completed = [
-        completedMission('mission-001', 'First Flight', 15_000),
-        completedMission('mission-002', 'Higher Ambitions', 20_000),
-        completedMission('mission-003', 'Breaking the Kilometre', 25_000),
-        completedMission('mission-004', 'Speed Test Alpha', 30_000),
+        completedMission('mission-001', 'First Flight', 25_000),
+        completedMission('mission-004', 'Speed Demon', 30_000),
       ];
       s.missions.available = []; s.missions.accepted = [];
-      s.money = STARTING_MONEY + 90_000 - 30_000; s.loan.balance = 1_950_000;
+      s.money = STARTING_MONEY + 55_000 - 30_000; s.loan.balance = 1_950_000;
       s.parts = ['probe-core-mk1', 'tank-small', 'engine-spark', 'parachute-mk1'];
       s.flightHistory = [
-        flightRecord('fr-001', 'mission-001', 'SUCCESS', 15_000),
-        flightRecord('fr-002', 'mission-002', 'SUCCESS', 20_000),
-        flightRecord('fr-003', 'mission-003', 'SUCCESS', 25_000),
+        flightRecord('fr-001', 'mission-001', 'SUCCESS', 25_000),
         flightRecord('fr-004', 'mission-004', 'SUCCESS', 30_000),
       ];
       s.reputation = STARTING_REPUTATION + 8; s.playTimeSeconds = 600; s.flightTimeSeconds = 120;
@@ -118,8 +114,8 @@ export const DEBUG_SAVE_DEFINITIONS: DebugSaveDefinition[] = [
       const s = createGameState();
       s.agencyName = 'Debug Agency'; s.gameMode = GameMode.TUTORIAL; s.currentPeriod = 12;
       s.missions.completed = [
-        completedMission('mission-001', 'First Flight', 15_000), completedMission('mission-002', 'Higher Ambitions', 20_000),
-        completedMission('mission-003', 'Breaking the Kilometre', 25_000), completedMission('mission-004', 'Speed Test Alpha', 30_000),
+        completedMission('mission-001', 'First Flight', 25_000),
+        completedMission('mission-004', 'Speed Demon', 30_000),
         completedMission('mission-005', 'Safe Return I', 35_000), completedMission('mission-006', 'Controlled Descent', 40_000),
         completedMission('mission-007', 'Leg Day', 40_000), completedMission('mission-008', 'Black Box Test', 55_000),
         completedMission('mission-009', 'Ejector Seat Test', 45_000), completedMission('mission-010', 'Science Experiment Alpha', 75_000),
@@ -146,8 +142,8 @@ export const DEBUG_SAVE_DEFINITIONS: DebugSaveDefinition[] = [
       const s = createGameState();
       s.agencyName = 'Debug Agency'; s.gameMode = GameMode.TUTORIAL; s.currentPeriod = 20;
       s.missions.completed = [
-        completedMission('mission-001', 'First Flight', 15_000), completedMission('mission-002', 'Higher Ambitions', 20_000),
-        completedMission('mission-003', 'Breaking the Kilometre', 25_000), completedMission('mission-004', 'Speed Test Alpha', 30_000),
+        completedMission('mission-001', 'First Flight', 25_000),
+        completedMission('mission-004', 'Speed Demon', 30_000),
         completedMission('mission-005', 'Safe Return I', 35_000), completedMission('mission-006', 'Controlled Descent', 40_000),
         completedMission('mission-007', 'Leg Day', 40_000), completedMission('mission-008', 'Black Box Test', 55_000),
         completedMission('mission-009', 'Ejector Seat Test', 45_000), completedMission('mission-010', 'Science Experiment Alpha', 75_000),
@@ -177,8 +173,8 @@ export const DEBUG_SAVE_DEFINITIONS: DebugSaveDefinition[] = [
       const s = createGameState();
       s.agencyName = 'Debug Agency'; s.gameMode = GameMode.TUTORIAL; s.currentPeriod = 28;
       s.missions.completed = [
-        completedMission('mission-001', 'First Flight', 15_000), completedMission('mission-002', 'Higher Ambitions', 20_000),
-        completedMission('mission-003', 'Breaking the Kilometre', 25_000), completedMission('mission-004', 'Speed Test Alpha', 30_000),
+        completedMission('mission-001', 'First Flight', 25_000),
+        completedMission('mission-004', 'Speed Demon', 30_000),
         completedMission('mission-005', 'Safe Return I', 35_000), completedMission('mission-006', 'Controlled Descent', 40_000),
         completedMission('mission-007', 'Leg Day', 40_000), completedMission('mission-008', 'Black Box Test', 55_000),
         completedMission('mission-009', 'Ejector Seat Test', 45_000), completedMission('mission-010', 'Science Experiment Alpha', 75_000),
@@ -213,7 +209,7 @@ export const DEBUG_SAVE_DEFINITIONS: DebugSaveDefinition[] = [
       const s = createGameState();
       s.agencyName = 'Debug Agency'; s.gameMode = GameMode.TUTORIAL; s.currentPeriod = 40;
       s.missions.completed = [
-        completedMission('mission-001','First Flight',15_000),completedMission('mission-002','Higher Ambitions',20_000),completedMission('mission-003','Breaking the Kilometre',25_000),completedMission('mission-004','Speed Test Alpha',30_000),completedMission('mission-005','Safe Return I',35_000),completedMission('mission-006','Controlled Descent',40_000),completedMission('mission-007','Leg Day',40_000),completedMission('mission-008','Black Box Test',55_000),completedMission('mission-009','Ejector Seat Test',45_000),completedMission('mission-010','Science Experiment Alpha',75_000),completedMission('mission-011','Emergency Systems Verified',55_000),completedMission('mission-012','Stage Separation Test',90_000),completedMission('mission-013','High Altitude Record',120_000),completedMission('mission-014','K\u00e1rm\u00e1n Line Approach',200_000),completedMission('mission-015','Orbital Satellite Deployment I',250_000),completedMission('mission-016','Low Earth Orbit',500_000),completedMission('mission-017','Tracked Satellite Deployment',350_000),completedMission('mission-018','First Crew Flight',60_000),completedMission('mission-019','Research Division',120_000),completedMission('mission-020','Eyes on the Sky',250_000),completedMission('mission-021','Orbital Survey',200_000),completedMission('mission-022','Network Control',400_000),
+        completedMission('mission-001','First Flight',25_000),completedMission('mission-004','Speed Demon',30_000),completedMission('mission-005','Safe Return I',35_000),completedMission('mission-006','Controlled Descent',40_000),completedMission('mission-007','Leg Day',40_000),completedMission('mission-008','Black Box Test',55_000),completedMission('mission-009','Ejector Seat Test',45_000),completedMission('mission-010','Science Experiment Alpha',75_000),completedMission('mission-011','Emergency Systems Verified',55_000),completedMission('mission-012','Stage Separation Test',90_000),completedMission('mission-013','High Altitude Record',120_000),completedMission('mission-014','K\u00e1rm\u00e1n Line Approach',200_000),completedMission('mission-015','Orbital Satellite Deployment I',250_000),completedMission('mission-016','Low Earth Orbit',500_000),completedMission('mission-017','Tracked Satellite Deployment',350_000),completedMission('mission-018','First Crew Flight',60_000),completedMission('mission-019','Research Division',120_000),completedMission('mission-020','Eyes on the Sky',250_000),completedMission('mission-021','Orbital Survey',200_000),completedMission('mission-022','Network Control',400_000),
       ];
       s.missions.available = []; s.missions.accepted = [];
       s.money = STARTING_MONEY + 2_975_000 - 1_200_000; s.loan.balance = 800_000;
@@ -238,7 +234,7 @@ export const DEBUG_SAVE_DEFINITIONS: DebugSaveDefinition[] = [
     generate() {
       const s = createGameState();
       s.agencyName = 'Debug Agency'; s.gameMode = GameMode.FREEPLAY; s.tutorialMode = false; s.currentPeriod = 60;
-      s.missions.completed = [completedMission('mission-001','First Flight',15_000),completedMission('mission-002','Higher Ambitions',20_000),completedMission('mission-003','Breaking the Kilometre',25_000),completedMission('mission-004','Speed Test Alpha',30_000),completedMission('mission-005','Safe Return I',35_000),completedMission('mission-006','Controlled Descent',40_000),completedMission('mission-007','Leg Day',40_000),completedMission('mission-008','Black Box Test',55_000),completedMission('mission-009','Ejector Seat Test',45_000),completedMission('mission-010','Science Experiment Alpha',75_000),completedMission('mission-011','Emergency Systems Verified',55_000),completedMission('mission-012','Stage Separation Test',90_000),completedMission('mission-013','High Altitude Record',120_000),completedMission('mission-014','K\u00e1rm\u00e1n Line Approach',200_000),completedMission('mission-015','Orbital Satellite Deployment I',250_000),completedMission('mission-016','Low Earth Orbit',500_000),completedMission('mission-017','Tracked Satellite Deployment',350_000),completedMission('mission-018','First Crew Flight',60_000),completedMission('mission-019','Research Division',120_000),completedMission('mission-020','Eyes on the Sky',250_000),completedMission('mission-021','Orbital Survey',200_000),completedMission('mission-022','Network Control',400_000)];
+      s.missions.completed = [completedMission('mission-001','First Flight',25_000),completedMission('mission-004','Speed Demon',30_000),completedMission('mission-005','Safe Return I',35_000),completedMission('mission-006','Controlled Descent',40_000),completedMission('mission-007','Leg Day',40_000),completedMission('mission-008','Black Box Test',55_000),completedMission('mission-009','Ejector Seat Test',45_000),completedMission('mission-010','Science Experiment Alpha',75_000),completedMission('mission-011','Emergency Systems Verified',55_000),completedMission('mission-012','Stage Separation Test',90_000),completedMission('mission-013','High Altitude Record',120_000),completedMission('mission-014','K\u00e1rm\u00e1n Line Approach',200_000),completedMission('mission-015','Orbital Satellite Deployment I',250_000),completedMission('mission-016','Low Earth Orbit',500_000),completedMission('mission-017','Tracked Satellite Deployment',350_000),completedMission('mission-018','First Crew Flight',60_000),completedMission('mission-019','Research Division',120_000),completedMission('mission-020','Eyes on the Sky',250_000),completedMission('mission-021','Orbital Survey',200_000),completedMission('mission-022','Network Control',400_000)];
       s.missions.available = []; s.missions.accepted = [];
       s.money = 8_000_000; s.loan = {balance:0,interestRate:0.03,totalInterestAccrued:120_000};
       s.parts = ['probe-core-mk1','tank-small','engine-spark','parachute-mk1','parachute-mk2','science-module-mk1','thermometer-mk1','landing-legs-small','landing-legs-large','engine-poodle','engine-reliant','srb-small','engine-nerv','srb-large','tank-large','cmd-mk1','decoupler-stack-tr18','docking-port-std','satellite-mk1','engine-spark-improved','tank-medium','decoupler-radial','nose-cone','tube-connector','parachute-drogue','heat-shield-mk1','heat-shield-mk2','docking-port-small','relay-antenna','satellite-comm','satellite-gps','satellite-relay','satellite-science','satellite-weather','sample-return-container','surface-instrument-package','engine-ion','landing-legs-powered','solar-panel-small','solar-panel-large','battery-small','battery-large'];
@@ -284,13 +280,13 @@ export const DEBUG_SAVE_DEFINITIONS: DebugSaveDefinition[] = [
     generate() {
       const s = createGameState();
       s.agencyName = 'Struggling Space Co'; s.gameMode = GameMode.TUTORIAL; s.currentPeriod = 15;
-      s.missions.completed = [completedMission('mission-001','First Flight',15_000),completedMission('mission-002','Higher Ambitions',20_000),completedMission('mission-003','Breaking the Kilometre',25_000),completedMission('mission-004','Speed Test Alpha',30_000)];
+      s.missions.completed = [completedMission('mission-001','First Flight',25_000),completedMission('mission-004','Speed Demon',30_000)];
       s.missions.available = []; s.missions.accepted = [];
       s.money = 15_000; s.loan = {balance:2_200_000,interestRate:0.03,totalInterestAccrued:200_000};
       s.parts = ['probe-core-mk1','tank-small','engine-spark','parachute-mk1'];
       s.crew = [makeCrew('crew-d-001','Alex Mitchell',1200,{piloting:10,engineering:5})];
       s.facilities[FacilityId.CREW_ADMIN] = { built: true, tier: 1 };
-      s.flightHistory = [flightRecord('fr-001','mission-001','SUCCESS',15_000),flightRecord('fr-002','mission-002','SUCCESS',20_000),flightRecord('fr-003','mission-003','SUCCESS',25_000),flightRecord('fr-004','mission-004','SUCCESS',30_000),flightRecord('fr-005','mission-005','FAILURE',0),flightRecord('fr-006','mission-005','FAILURE',0),flightRecord('fr-007','mission-006','FAILURE',0)];
+      s.flightHistory = [flightRecord('fr-001','mission-001','SUCCESS',25_000),flightRecord('fr-004','mission-004','SUCCESS',30_000),flightRecord('fr-005','mission-005','FAILURE',0),flightRecord('fr-006','mission-005','FAILURE',0),flightRecord('fr-007','mission-006','FAILURE',0)];
       s.reputation = 35; s.playTimeSeconds = 2400; s.flightTimeSeconds = 600;
       return s;
     },
@@ -302,7 +298,7 @@ export const DEBUG_SAVE_DEFINITIONS: DebugSaveDefinition[] = [
     generate() {
       const s = createGameState();
       s.agencyName = 'Debug Lunar Ops'; s.gameMode = GameMode.FREEPLAY; s.tutorialMode = false; s.currentPeriod = 50;
-      s.missions.completed = [completedMission('mission-001','First Flight',15_000),completedMission('mission-002','Higher Ambitions',20_000),completedMission('mission-003','Breaking the Kilometre',25_000),completedMission('mission-004','Speed Test Alpha',30_000),completedMission('mission-005','Safe Return I',35_000),completedMission('mission-006','Controlled Descent',40_000),completedMission('mission-007','Leg Day',40_000),completedMission('mission-008','Black Box Test',55_000),completedMission('mission-009','Ejector Seat Test',45_000),completedMission('mission-010','Science Experiment Alpha',75_000),completedMission('mission-011','Emergency Systems Verified',55_000),completedMission('mission-012','Stage Separation Test',90_000),completedMission('mission-013','High Altitude Record',120_000),completedMission('mission-014','K\u00e1rm\u00e1n Line Approach',200_000),completedMission('mission-015','Orbital Satellite Deployment I',250_000),completedMission('mission-016','Low Earth Orbit',500_000),completedMission('mission-017','Tracked Satellite Deployment',350_000),completedMission('mission-018','First Crew Flight',60_000),completedMission('mission-019','Research Division',120_000),completedMission('mission-020','Eyes on the Sky',250_000),completedMission('mission-021','Orbital Survey',200_000),completedMission('mission-022','Network Control',400_000)];
+      s.missions.completed = [completedMission('mission-001','First Flight',25_000),completedMission('mission-004','Speed Demon',30_000),completedMission('mission-005','Safe Return I',35_000),completedMission('mission-006','Controlled Descent',40_000),completedMission('mission-007','Leg Day',40_000),completedMission('mission-008','Black Box Test',55_000),completedMission('mission-009','Ejector Seat Test',45_000),completedMission('mission-010','Science Experiment Alpha',75_000),completedMission('mission-011','Emergency Systems Verified',55_000),completedMission('mission-012','Stage Separation Test',90_000),completedMission('mission-013','High Altitude Record',120_000),completedMission('mission-014','K\u00e1rm\u00e1n Line Approach',200_000),completedMission('mission-015','Orbital Satellite Deployment I',250_000),completedMission('mission-016','Low Earth Orbit',500_000),completedMission('mission-017','Tracked Satellite Deployment',350_000),completedMission('mission-018','First Crew Flight',60_000),completedMission('mission-019','Research Division',120_000),completedMission('mission-020','Eyes on the Sky',250_000),completedMission('mission-021','Orbital Survey',200_000),completedMission('mission-022','Network Control',400_000)];
       s.missions.available = []; s.missions.accepted = [];
       s.money = 5_500_000; s.loan = {balance:500_000,interestRate:0.03,totalInterestAccrued:80_000};
       s.parts = ['probe-core-mk1','cmd-mk1','tank-small','tank-medium','tank-large','engine-spark','engine-spark-improved','engine-reliant','engine-poodle','engine-nerv','engine-ion','srb-small','srb-large','parachute-mk1','parachute-mk2','parachute-drogue','landing-legs-small','landing-legs-large','landing-legs-powered','heat-shield-mk1','heat-shield-mk2','decoupler-stack-tr18','decoupler-radial','docking-port-std','docking-port-small','nose-cone','tube-connector','relay-antenna','satellite-mk1','satellite-comm','satellite-gps','satellite-relay','science-module-mk1','thermometer-mk1','sample-return-container','surface-instrument-package','solar-panel-small','solar-panel-large','battery-small','battery-large','mission-module-extended'];
