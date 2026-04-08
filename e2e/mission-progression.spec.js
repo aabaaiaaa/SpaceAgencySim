@@ -1259,9 +1259,10 @@ test.describe('Mission Progression', () => {
     await stage(page); // decouple + fire nerv
 
     // Set slight tilt to climb fast.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ps = window.__flightPs;
       if (ps) { ps.angle = 0.2; ps.angularVelocity = 0; }
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     // 50× warp for nerv burn.
@@ -1275,12 +1276,13 @@ test.describe('Mission Progression', () => {
     );
 
     // Inject horizontal velocity for orbit conditions.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ps = window.__flightPs;
       if (ps) {
         ps.velX = 8000;
         ps.velY = Math.max(ps.velY, 0);
       }
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     // Wait for REACH_ORBIT objective.
@@ -1355,9 +1357,10 @@ test.describe('Mission Progression', () => {
     // Set slight tilt (0.2 rad ≈ 11°) to climb fast while building some
     // horizontal speed. The nerv has TWR ~1.25 at full mass — mostly vertical
     // thrust exceeds gravity and rocket keeps climbing.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ps = window.__flightPs;
       if (ps) { ps.angle = 0.2; ps.angularVelocity = 0; }
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     // 50× warp for long nerv burn.
@@ -1373,12 +1376,13 @@ test.describe('Mission Progression', () => {
     // At 80km, inject horizontal velocity to simulate orbital insertion.
     // The game uses constant gravity so true orbit is impossible; the
     // REACH_ORBIT objective simply checks alt >= 80km AND speed >= 7800.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ps = window.__flightPs;
       if (ps) {
         ps.velX = 8000;
         ps.velY = Math.max(ps.velY, 0); // keep any upward velocity
       }
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     // Wait for objective to trigger.
@@ -1477,9 +1481,10 @@ test.describe('Mission Progression', () => {
     await stage(page); // decouple + fire nerv
 
     // Set slight tilt to climb fast.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ps = window.__flightPs;
       if (ps) { ps.angle = 0.2; ps.angularVelocity = 0; }
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     // 50× warp for nerv burn.
@@ -1493,12 +1498,13 @@ test.describe('Mission Progression', () => {
     );
 
     // Inject horizontal velocity for orbit conditions.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ps = window.__flightPs;
       if (ps) {
         ps.velX = 8000;
         ps.velY = Math.max(ps.velY, 0);
       }
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     // Wait for REACH_ORBIT objective.

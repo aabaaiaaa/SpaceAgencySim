@@ -4,12 +4,14 @@
  * @module ui/flightController/_keyboard
  */
 
-import { handleKeyDown, handleKeyUp, fireNextStage } from '../../core/physics.ts';
+import { handleKeyDown, handleKeyUp } from '../../core/physics.ts';
+import { markThrottleDirty } from './_loop.ts';
 import { hideLaunchTip, lockTimeWarp } from '../flightHud.ts';
 import {
   sendKeyDown as workerKeyDown,
   sendKeyUp as workerKeyUp,
   sendStage as workerStage,
+  resyncWorkerState,
 } from './_workerBridge.ts';
 import {
   cycleMapZoom,
@@ -150,6 +152,8 @@ export function onKeyDown(e: KeyboardEvent): void {
   if (e.code === 'KeyV') {
     e.preventDefault();
     toggleDockingMode();
+    // Resync worker so it picks up the controlMode/throttle changes.
+    _resyncControlMode(s, ps, flightState);
     return;
   }
 
@@ -167,6 +171,8 @@ export function onKeyDown(e: KeyboardEvent): void {
   if (e.code === 'KeyR') {
     e.preventDefault();
     toggleRcsModeHandler();
+    // Resync worker so it picks up the controlMode change.
+    _resyncControlMode(s, ps, flightState);
     return;
   }
 
@@ -184,11 +190,7 @@ export function onKeyDown(e: KeyboardEvent): void {
     s.stagingLockoutUntil = performance.now() + 2_000;
     lockTimeWarp(true);
 
-    if (s.workerActive) {
-      workerStage();
-    } else {
-      fireNextStage(ps, s.assembly, s.stagingConfig, flightState);
-    }
+    workerStage();
     hideLaunchTip();
     return;
   }
@@ -215,7 +217,8 @@ export function onKeyDown(e: KeyboardEvent): void {
   }
 
   // In NORMAL orbit mode (not docking/RCS), WASD applies orbital-relative thrust.
-  if (!s.mapActive && ps.controlMode === ControlMode.NORMAL &&
+  // Skip when landed — W/S should control throttle, not orbital thrust.
+  if (!s.mapActive && !ps.landed && ps.controlMode === ControlMode.NORMAL &&
       (flightState.phase === FlightPhase.ORBIT || flightState.phase === FlightPhase.MANOEUVRE)) {
     const lower = e.key.toLowerCase();
     if (lower === 'w' || lower === 's' || lower === 'a' || lower === 'd') {
@@ -224,10 +227,17 @@ export function onKeyDown(e: KeyboardEvent): void {
     }
   }
 
-  if (s.workerActive) {
-    workerKeyDown(e.key);
-  }
+  const prevThrottle = ps.throttle;
+  const prevTargetTWR = ps.targetTWR;
+  const prevThrottleMode = ps.throttleMode;
+  workerKeyDown(e.key);
   handleKeyDown(ps, s.assembly, e.key);
+  // If handleKeyDown changed any throttle-related value, mark dirty so the
+  // loop sends the override to the worker.  In TWR mode, Shift/W/S change
+  // targetTWR (not throttle directly), so check all three fields.
+  if (ps.throttle !== prevThrottle || ps.targetTWR !== prevTargetTWR || ps.throttleMode !== prevThrottleMode) {
+    markThrottleDirty();
+  }
 }
 
 export function onKeyUp(e: KeyboardEvent): void {
@@ -247,8 +257,21 @@ export function onKeyUp(e: KeyboardEvent): void {
     s.normalOrbitHeldKeys.delete(lower);
   }
 
-  if (s.workerActive) {
-    workerKeyUp(e.key);
-  }
+  workerKeyUp(e.key);
   handleKeyUp(ps, e.key);
+}
+
+/**
+ * Push the current main-thread state to the worker after a control mode
+ * change (V/R keys).  These toggles modify ps.controlMode and ps.throttle
+ * on the main thread; the worker needs to see them immediately.
+ */
+function _resyncControlMode(
+  s: ReturnType<typeof getFCState>,
+  ps: ReturnType<typeof getPhysicsState>,
+  flightState: ReturnType<typeof getFlightState>,
+): void {
+  if (ps && s.assembly && s.stagingConfig && flightState) {
+    resyncWorkerState(ps, s.assembly, s.stagingConfig, flightState).catch(() => {});
+  }
 }

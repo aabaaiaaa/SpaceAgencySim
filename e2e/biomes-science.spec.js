@@ -132,7 +132,7 @@ test.describe('Science multiplier per biome', () => {
 
     // Activate thermometer directly (science modules don't auto-stage) and
     // fast-forward the timer so it completes in the GROUND biome.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ps = window.__flightPs;
       if (!ps?.instrumentStates) return;
       for (const [key, entry] of ps.instrumentStates) {
@@ -142,6 +142,7 @@ test.describe('Science multiplier per biome', () => {
           entry.startBiome = 'GROUND';
         }
       }
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     // Wait for SCIENCE_COLLECTED event (generated when timer expires).
@@ -339,7 +340,7 @@ test.describe('Science module instruments', () => {
   test('(4) instrument activation transitions state from idle to running', async () => {
     // Activate the thermometer directly (simulating what the context menu
     // button would do when clicked).
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate(async () => {
       const ps = window.__flightPs;
       if (!ps?.instrumentStates) return { success: false, reason: 'no states' };
       for (const [key, entry] of ps.instrumentStates) {
@@ -347,6 +348,7 @@ test.describe('Science module instruments', () => {
           entry.state = 'running';
           entry.timer = 10;
           entry.startBiome = 'GROUND';
+          if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
           return { success: true, key, state: 'running' };
         }
       }
@@ -403,7 +405,7 @@ test.describe('Instrument activation via staging', () => {
     expect(stateBefore).toBe('idle');
 
     // Activate the instrument (simulate what context menu does).
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ps = window.__flightPs;
       if (!ps?.instrumentStates) return;
       for (const [key, entry] of ps.instrumentStates) {
@@ -413,6 +415,7 @@ test.describe('Instrument activation via staging', () => {
           entry.startBiome = 'GROUND';
         }
       }
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     // Verify the instrument is now running.
@@ -477,7 +480,7 @@ test.describe('Science data types', () => {
     });
 
     // Activate the thermometer (ANALYSIS type) — ground biome is valid.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ps = window.__flightPs;
       if (!ps?.instrumentStates) return;
       for (const [key, entry] of ps.instrumentStates) {
@@ -487,6 +490,7 @@ test.describe('Science data types', () => {
           entry.startBiome = 'GROUND';
         }
       }
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     // Wait for completion.
@@ -537,7 +541,7 @@ test.describe('Science data types', () => {
     });
 
     // Set surface sampler to complete state directly.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ps = window.__flightPs;
       if (!ps?.instrumentStates) return;
       for (const [key, entry] of ps.instrumentStates) {
@@ -548,6 +552,7 @@ test.describe('Science data types', () => {
           entry.scienceMultiplier = 0.5;
         }
       }
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     // Verify data type is SAMPLE.
@@ -787,7 +792,7 @@ test.describe('Instrument biome validity', () => {
     });
 
     // Activate thermometer on the ground.
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate(async () => {
       const ps = window.__flightPs;
       if (!ps?.instrumentStates) return { activated: false, reason: 'no states' };
       for (const [key, entry] of ps.instrumentStates) {
@@ -796,6 +801,7 @@ test.describe('Instrument biome validity', () => {
           entry.state = 'running';
           entry.timer = 10;
           entry.startBiome = 'GROUND';
+          if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
           return { activated: true, biome: 'GROUND' };
         }
       }
@@ -1488,7 +1494,7 @@ test.describe('Science collection integration', () => {
     });
 
     // Force thermometer to run with very short timer.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ps = window.__flightPs;
       if (!ps?.instrumentStates) return;
       for (const [key, entry] of ps.instrumentStates) {
@@ -1498,6 +1504,7 @@ test.describe('Science collection integration', () => {
           entry.startBiome = 'GROUND';
         }
       }
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     // Wait for SCIENCE_COLLECTED event.

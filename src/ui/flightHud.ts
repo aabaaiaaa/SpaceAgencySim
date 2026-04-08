@@ -45,6 +45,7 @@ import { countDeployedLegs } from '../core/legs.ts';
 import { getBiome } from '../core/biomes.ts';
 import { getAvailableSurfaceActions } from '../core/surfaceOps.ts';
 import './flightHud.css';
+import { markThrottleDirty } from './flightController/_loop.ts';
 import type { PhysicsState } from '../core/physics.ts';
 import type { RocketAssembly, StagingConfig } from '../core/rocketbuilder.ts';
 import type { FlightState, GameState } from '../core/gameState.ts';
@@ -197,11 +198,13 @@ export function initFlightHud(
         (_ps as unknown as Record<string, unknown>).targetTWR = 0;
       }
       _ps.throttle = 0;
+      markThrottleDirty();
     } else if (k === 'z' || k === 'Z') {
       if (twrMode) {
         (_ps as unknown as Record<string, unknown>).targetTWR = Infinity;
       }
       _ps.throttle = 1;
+      markThrottleDirty();
     }
   };
   window.addEventListener('keydown', _keyHandler);
@@ -440,6 +443,7 @@ function _buildLeftPanel(): void {
       _elModeToggle!.textContent = 'TWR';
       _elModeToggle!.classList.add('active');
     }
+    markThrottleDirty();
   });
   titleRow.appendChild(_elModeToggle);
   throttleSec.appendChild(titleRow);
@@ -530,6 +534,7 @@ function _buildLeftPanel(): void {
     } else {
       _setThrottleForTWR1();
     }
+    markThrottleDirty();
   });
   btnRow.appendChild(setTWR1Btn);
 
@@ -547,6 +552,7 @@ function _buildLeftPanel(): void {
     } else {
       _ps.throttle = Math.max(0, Math.round((_ps.throttle - 0.1) * 10) / 10);
     }
+    markThrottleDirty();
   });
   btnRow.appendChild(minusBtn);
 
@@ -564,6 +570,7 @@ function _buildLeftPanel(): void {
     } else {
       _ps.throttle = Math.min(1, Math.round((_ps.throttle + 0.1) * 10) / 10);
     }
+    markThrottleDirty();
   });
   btnRow.appendChild(plusBtn);
 

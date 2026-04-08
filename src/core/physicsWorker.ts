@@ -224,7 +224,7 @@ function serialisePhysicsState(ps: PhysicsState): PhysicsSnapshot {
     ejectedCrewIds: _setToArray(ps.ejectedCrewIds),
     ejectedCrew: ps.ejectedCrew.map(e => ({
       x: e.x, y: e.y, velX: e.velX, velY: e.velY,
-      chuteOpen: e.chuteOpen, chuteTimer: e.chuteTimer,
+      hasChute: e.hasChute, chuteOpen: e.chuteOpen, chuteTimer: e.chuteTimer,
     })),
     instrumentStates: _mapToRecord(ps.instrumentStates) as Record<string, unknown>,
     scienceModuleStates: _mapToRecord(ps.scienceModuleStates) as Record<string, unknown>,
@@ -283,6 +283,8 @@ function serialiseFlightState(fs: FlightState): FlightSnapshot {
     transferState: fs.transferState ? { ...fs.transferState } : null,
     powerState: fs.powerState ? { ...fs.powerState } : null,
     commsState: fs.commsState ? { ...fs.commsState } : null,
+    scienceModuleRunning: fs.scienceModuleRunning,
+    hasScienceModules: fs.hasScienceModules,
   };
 }
 
@@ -374,6 +376,7 @@ function handleTick(realDeltaTime: number, timeWarp: number, post: (msg: WorkerM
     physics: serialisePhysicsState(ps),
     flight: serialiseFlightState(flightState),
     frame: frameCounter,
+    currentStageIdx: stagingConfig ? stagingConfig.currentStageIdx : 0,
   };
   post(msg);
 }
@@ -402,7 +405,11 @@ export function handleCommand(cmd: WorkerCommand, post: (msg: WorkerMessage) => 
         break;
 
       case 'setThrottle':
-        if (ps) ps.throttle = Math.max(0, Math.min(1, cmd.throttle));
+        if (ps) {
+          ps.throttle = Math.max(0, Math.min(1, cmd.throttle));
+          if (cmd.throttleMode !== undefined) ps.throttleMode = cmd.throttleMode;
+          if (cmd.targetTWR !== undefined) ps.targetTWR = cmd.targetTWR;
+        }
         break;
 
       case 'setAngle':

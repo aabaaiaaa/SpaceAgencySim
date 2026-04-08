@@ -21,6 +21,17 @@ import {
 import { getFCState, getPhysicsState, getFlightState } from './_state.ts';
 import { showPhaseNotification } from './_flightPhase.ts';
 import { setMapTarget } from './_mapView.ts';
+import { resyncWorkerState } from './_workerBridge.ts';
+
+/** Push main-thread state to worker after a docking action. */
+function _resyncWorker(): void {
+  const s = getFCState();
+  const ps = getPhysicsState();
+  const fs = getFlightState();
+  if (ps && s.assembly && s.stagingConfig && fs) {
+    resyncWorkerState(ps, s.assembly, s.stagingConfig, fs).catch(() => {});
+  }
+}
 
 /**
  * Tick the docking system each frame.
@@ -55,6 +66,7 @@ export function tickDockingSystem(dt: number): void {
         ps.dockingPortStates.set(instanceId, 'docked');
       }
     }
+    _resyncWorker();
   }
 
   if (result.event === 'AUTO_DOCK_ABORT') {
@@ -108,6 +120,7 @@ export function cycleDockingTarget(): void {
         ps.dockingPortStates.set(instanceId, 'extended');
       }
     }
+    _resyncWorker();
     // Also set this as the map target for visibility.
     setMapTarget(nextTarget.object.id);
   } else {
@@ -137,6 +150,7 @@ export function handleUndock(): void {
       ps.dockingPortStates.set(instanceId, 'retracted');
     }
     ps._dockedCombinedMass = 0;
+    _resyncWorker();
   }
 }
 
@@ -156,6 +170,7 @@ export function handleFuelTransfer(): void {
   const result = transferFuel(dockingState, ps, s.assembly, flightState, 500);
   if (result.success && result.transferred > 0) {
     showPhaseNotification(`Transferred ${Math.round(result.transferred)} kg fuel`);
+    _resyncWorker();
   } else if (result.transferred === 0) {
     showPhaseNotification('Tanks are full');
   }

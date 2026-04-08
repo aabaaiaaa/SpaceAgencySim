@@ -182,9 +182,9 @@ export function sendTick(realDeltaTime: number, timeWarp: number): void {
   _post({ type: 'tick', realDeltaTime, timeWarp });
 }
 
-/** Forward a throttle value to the worker. */
-export function sendThrottle(throttle: number): void {
-  _post({ type: 'setThrottle', throttle });
+/** Forward throttle state to the worker. */
+export function sendThrottle(throttle: number, throttleMode?: 'twr' | 'absolute', targetTWR?: number): void {
+  _post({ type: 'setThrottle', throttle, throttleMode, targetTWR });
 }
 
 /** Forward a rocket angle to the worker. */
@@ -286,6 +286,7 @@ function _handleMessage(msg: WorkerMessage): void {
         physics: msg.physics,
         flight: msg.flight,
         frame: msg.frame,
+        currentStageIdx: msg.currentStageIdx,
       };
       break;
 

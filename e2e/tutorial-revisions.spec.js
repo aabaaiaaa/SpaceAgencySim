@@ -960,13 +960,14 @@ test.describe('Tutorial Revisions', () => {
       );
 
       // Teleport back to low altitude for safe landing.
-      await page.evaluate(() => {
+      await page.evaluate(async () => {
         const ps = window.__flightPs;
         if (ps) {
           ps.posY = 1_500;
           ps.velX = 0;
           ps.velY = -2;
         }
+        if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
       });
 
       // Deploy parachute.
@@ -1184,9 +1185,10 @@ test.describe('Tutorial Revisions', () => {
       await waitForAltitude(page, 100);
 
       // Teleport to 65km.
-      await page.evaluate(() => {
+      await page.evaluate(async () => {
         const ps = window.__flightPs;
         if (ps) { ps.posY = 65_000; }
+        if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
       });
 
       await page.waitForFunction(

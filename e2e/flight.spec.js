@@ -149,8 +149,13 @@ test.describe('Flight — Launch & Basic Flight', () => {
 
   test('(5) throttle display reflects keyboard throttle changes (W increases, S decreases)', async () => {
     // Switch to absolute throttle mode so W/S directly change the throttle %.
-    await page.evaluate(() => {
-      if (window.__flightPs) window.__flightPs.throttleMode = 'absolute';
+    await page.evaluate(async () => {
+      if (window.__flightPs) {
+        window.__flightPs.throttleMode = 'absolute';
+        if (typeof window.__resyncPhysicsWorker === 'function') {
+          await window.__resyncPhysicsWorker();
+        }
+      }
     });
 
     // Read current throttle from physics state (should be 1.0 = 100 %).
@@ -212,10 +217,13 @@ test.describe('Flight — Launch & Basic Flight', () => {
 
   test('(8) TWR=1 button sets throttle for unit thrust-to-weight ratio; ±0.1 buttons step throttle', async () => {
     // Switch to absolute mode so buttons control throttle directly.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       if (window.__flightPs) {
         window.__flightPs.throttleMode = 'absolute';
         window.__flightPs.throttle = 1.0;
+        if (typeof window.__resyncPhysicsWorker === 'function') {
+          await window.__resyncPhysicsWorker();
+        }
       }
     });
     await expect(page.locator('#flight-hud-throttle-pct')).toContainText('100%', { timeout: 2_000 });

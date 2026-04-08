@@ -59,7 +59,7 @@ describe('FCState', () => {
       expect(s.mapThrusting).toBe(false);
       expect(s.normalOrbitThrusting).toBe(false);
       expect(s.deorbitWarningActive).toBe(false);
-      expect(s.workerActive).toBe(false);
+      expect(s.workerReady).toBe(false);
     });
 
     it('numeric values default to expected values', () => {
@@ -117,7 +117,7 @@ describe('FCState', () => {
         timeWarp: 100,
         mapActive: true,
         summaryShown: true,
-        workerActive: true,
+        workerReady: true,
         loopConsecutiveErrors: 5,
       });
 
@@ -126,7 +126,7 @@ describe('FCState', () => {
       expect(s.timeWarp).toBe(1);
       expect(s.mapActive).toBe(false);
       expect(s.summaryShown).toBe(false);
-      expect(s.workerActive).toBe(false);
+      expect(s.workerReady).toBe(false);
       expect(s.loopConsecutiveErrors).toBe(0);
     });
 

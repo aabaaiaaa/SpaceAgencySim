@@ -55,7 +55,25 @@ import './flightContextMenu.css';
 import type { PhysicsState }                                  from '../core/physics.ts';
 import type { RocketAssembly }                                from '../core/rocketbuilder.ts';
 import type { FlightState, FlightEvent, GameState }             from '../core/gameState.ts';
+import { getFCState }                                          from './flightController/_state.ts';
+import { resyncWorkerState }                                   from './flightController/_workerBridge.ts';
 
+
+// ---------------------------------------------------------------------------
+// Worker resync helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Push the current main-thread physics/flight state to the worker after a
+ * context menu action (deploy parachute, deploy legs, eject, etc.).  Without
+ * this the next worker snapshot would overwrite the action.
+ */
+function _resyncAfterAction(ps: PhysicsState, assembly: RocketAssembly, flightState: FlightState): void {
+  const s = getFCState();
+  if (s.stagingConfig) {
+    resyncWorkerState(ps, assembly, s.stagingConfig, flightState).catch(() => {});
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Module state
@@ -257,6 +275,7 @@ function _showMenu(
         if (result.success && malf.type === MalfunctionType.LANDING_LEGS_STUCK) {
           deployLandingLeg(ps, instanceId);
         }
+        _resyncAfterAction(ps, assembly, flightState);
         _hideMenu();
       }));
     } else {
@@ -310,6 +329,7 @@ function _showMenu(
             } else {
               _menu.appendChild(_makeButton(`Activate ${instrName} ${dataLabel}`, () => {
                 activateInstrument(ps, assembly, flightState, key);
+                _resyncAfterAction(ps, assembly, flightState);
                 _hideMenu();
               }));
             }
@@ -328,6 +348,7 @@ function _showMenu(
               _menu.appendChild(_makeReadOnly(`${instrName}: Complete ${dataLabel}`));
               _menu.appendChild(_makeButton(`Transmit ${instrName} (40-60% yield)`, () => {
                 transmitInstrument(ps, assembly, flightState, key, null);
+                _resyncAfterAction(ps, assembly, flightState);
                 _hideMenu();
               }));
             } else {
@@ -359,6 +380,7 @@ function _showMenu(
             for (const frag of debris) {
               ps.debris.push(frag);
             }
+            _resyncAfterAction(ps, assembly, flightState);
             _hideMenu();
           }));
           break;
@@ -421,17 +443,20 @@ function _showMenu(
           deployLandingLeg(ps, mirrorId!);
           _emitLegActivated(instanceId);
           _emitLegActivated(mirrorId!);
+          _resyncAfterAction(ps, assembly, flightState);
           _hideMenu();
         }));
         _menu.appendChild(_makeButton('Deploy This Leg Only', () => {
           deployLandingLeg(ps, instanceId);
           _emitLegActivated(instanceId);
+          _resyncAfterAction(ps, assembly, flightState);
           _hideMenu();
         }));
       } else {
         _menu.appendChild(_makeButton('Deploy Legs', () => {
           deployLandingLeg(ps, instanceId);
           _emitLegActivated(instanceId);
+          _resyncAfterAction(ps, assembly, flightState);
           _hideMenu();
         }));
       }
@@ -440,15 +465,18 @@ function _showMenu(
         _menu.appendChild(_makeButton('Retract Both Legs', () => {
           retractLandingLeg(ps, instanceId);
           retractLandingLeg(ps, mirrorId!);
+          _resyncAfterAction(ps, assembly, flightState);
           _hideMenu();
         }));
         _menu.appendChild(_makeButton('Retract This Leg Only', () => {
           retractLandingLeg(ps, instanceId);
+          _resyncAfterAction(ps, assembly, flightState);
           _hideMenu();
         }));
       } else {
         _menu.appendChild(_makeButton('Retract Legs', () => {
           retractLandingLeg(ps, instanceId);
+          _resyncAfterAction(ps, assembly, flightState);
           _hideMenu();
         }));
       }
@@ -465,6 +493,7 @@ function _showMenu(
     if (chuteStatus === ParachuteState.PACKED) {
       _menu.appendChild(_makeButton('Deploy Parachute', () => {
         deployParachute(ps, instanceId);
+        _resyncAfterAction(ps, assembly, flightState);
         _hideMenu();
       }));
     } else {
@@ -484,6 +513,7 @@ function _showMenu(
     if (ejectStatus === EjectorState.ARMED) {
       _menu.appendChild(_makeButton('Activate Ejector Seat', () => {
         (activateEjectorSeat as Function)(ps, assembly, flightState, instanceId);
+        _resyncAfterAction(ps, assembly, flightState);
         _hideMenu();
       }));
     } else {
@@ -518,6 +548,7 @@ function _showMenu(
         for (const frag of debris) {
           ps.debris.push(frag);
         }
+        _resyncAfterAction(ps, assembly, flightState);
         _hideMenu();
       }));
     }

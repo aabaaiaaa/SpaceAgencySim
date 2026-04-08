@@ -69,6 +69,7 @@ export interface SerialisedEjectedCrewEntry {
   y: number;
   velX: number;
   velY: number;
+  hasChute?: boolean;
   chuteOpen: boolean;
   chuteTimer: number;
 }
@@ -148,6 +149,8 @@ export interface FlightSnapshot {
   transferState: TransferState | null;
   powerState: PowerState | null;
   commsState: CommsState | null;
+  scienceModuleRunning?: boolean;
+  hasScienceModules?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -209,6 +212,10 @@ export interface SetThrottleCommand {
   type: 'setThrottle';
   /** Throttle value 0–1. */
   throttle: number;
+  /** Throttle mode ('twr' or 'absolute'). */
+  throttleMode?: 'twr' | 'absolute';
+  /** Target TWR (only meaningful in 'twr' mode). */
+  targetTWR?: number;
 }
 
 /** Fire the next stage. */
@@ -278,6 +285,8 @@ export interface SnapshotMessage {
   flight: FlightSnapshot;
   /** Monotonic frame counter from the worker. */
   frame: number;
+  /** Current staging index — kept in sync so resyncs don't reset staging. */
+  currentStageIdx: number;
 }
 
 /** Worker initialised successfully. */
@@ -331,12 +340,8 @@ export type ReadonlyFlightSnapshot = Readonly<FlightSnapshot>;
  * Composite snapshot consumed by render and UI code on the main thread.
  *
  * This is the single source of truth for flight data on the main thread.
- * Control inputs (throttle, angle) are NOT included — they remain
- * main-thread authority and are stored separately in FCState.
  *
- * Produced by:
- *   - Worker path: SnapshotMessage → strip control inputs
- *   - Fallback path: createSnapshotFromState() in snapshotFactory.ts
+ * Produced by the physics worker: SnapshotMessage → strip control inputs.
  */
 export interface MainThreadSnapshot {
   /** Physics state data (control inputs excluded). */
@@ -345,6 +350,8 @@ export interface MainThreadSnapshot {
   readonly flight: ReadonlyFlightSnapshot;
   /** Monotonic frame counter. */
   readonly frame: number;
+  /** Current staging index from the worker. */
+  readonly currentStageIdx: number;
 }
 
 // ---------------------------------------------------------------------------

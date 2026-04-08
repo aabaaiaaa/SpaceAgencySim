@@ -190,7 +190,7 @@ export function startFlightScene(
       const st = getFCState();
       const stPs = getPhysicsState();
       const stFs = getFlightState();
-      if (st.workerActive && stPs && st.assembly && st.stagingConfig && stFs) {
+      if (st.workerReady && stPs && st.assembly && st.stagingConfig && stFs) {
         await resyncWorkerState(stPs, st.assembly, st.stagingConfig, stFs);
       }
     };
@@ -287,35 +287,31 @@ export function startFlightScene(
   s.lastTs = performance.now();
   s.rafId  = requestAnimationFrame(loop);
 
-  // Initialise the physics worker if the setting is enabled.
-  if (state.useWorkerPhysics !== false && typeof Worker !== 'undefined') {
-    initPhysicsWorker(ps, s.assembly, s.stagingConfig, flightState)
-      .then(() => {
-        // The worker loaded with the initial state, but the main-thread may
-        // have advanced physics or processed staging while the worker was
-        // loading.  Re-init the worker with the CURRENT state so it starts
-        // from the exact same point as the main-thread.
-        const current = getFCState();
-        const curPs = getPhysicsState();
-        const curFs = getFlightState();
-        if (curPs && current.assembly && current.stagingConfig && curFs) {
-          return resyncWorkerState(curPs, current.assembly, current.stagingConfig, curFs);
-        }
-      })
-      .then(() => {
-        // Mark worker as active — the loop will use it from the next frame.
-        const current = getFCState();
-        const curPs = getPhysicsState();
-        if (curPs && current.assembly) {
-          current.workerActive = true;
-          logger.debug('flight', 'Physics worker initialised and active');
-        }
-      })
-      .catch((err) => {
-        // Worker failed to initialise — continue with main-thread physics.
-        logger.warn('flight', 'Physics worker failed to initialise, using main-thread physics', { error: String(err) });
-      });
-  }
+  // Initialise the physics worker.
+  initPhysicsWorker(ps, s.assembly, s.stagingConfig, flightState)
+    .then(() => {
+      // The worker loaded with the initial state, but the main-thread may
+      // have advanced a frame while the worker was loading.  Re-init the
+      // worker with the CURRENT state so it starts from the exact same point.
+      const current = getFCState();
+      const curPs = getPhysicsState();
+      const curFs = getFlightState();
+      if (curPs && current.assembly && current.stagingConfig && curFs) {
+        return resyncWorkerState(curPs, current.assembly, current.stagingConfig, curFs);
+      }
+    })
+    .then(() => {
+      // Mark worker as ready — the loop will start sending tick commands.
+      const current = getFCState();
+      const curPs = getPhysicsState();
+      if (curPs && current.assembly) {
+        current.workerReady = true;
+        logger.debug('flight', 'Physics worker initialised and ready');
+      }
+    })
+    .catch((err) => {
+      logger.error('flight', 'Physics worker failed to initialise', { error: String(err) });
+    });
 
 }
 
@@ -334,11 +330,9 @@ export function stopFlightScene(): void {
     s.rafId = null;
   }
 
-  // Terminate the physics worker if it was active.
-  if (s.workerActive) {
-    terminatePhysicsWorker();
-    s.workerActive = false;
-  }
+  // Terminate the physics worker.
+  terminatePhysicsWorker();
+  s.workerReady = false;
 
   if (s.keydownHandler) {
     window.removeEventListener('keydown', s.keydownHandler);

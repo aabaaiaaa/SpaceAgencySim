@@ -22,6 +22,7 @@ import { resetControlModeIfNeeded, CONTROL_MODE_TIPS } from '../../core/controlM
 import { getFCState, getPhysicsState, getFlightState } from './_state.ts';
 import { applyTimeWarp } from './_timeWarp.ts';
 import { toggleMapView } from './_mapView.ts';
+import { resyncWorkerState } from './_workerBridge.ts';
 
 /**
  * Show a brief notification label at the top of the screen when the flight
@@ -94,6 +95,12 @@ function _showDeorbitWarning(bodyId: string): void {
 
       showPhaseNotification('Re-Entry');
       applyTimeWarp(1); // Force warp to 1x on reentry.
+
+      // Push the phase change to the worker so it doesn't overwrite
+      // the transition on the next snapshot sync.
+      if (s2Ps && s2.assembly && s2.stagingConfig) {
+        resyncWorkerState(s2Ps, s2.assembly, s2.stagingConfig, s2Fs).catch(() => {});
+      }
     }
 
     s2.deorbitWarningActive = false;
@@ -142,16 +149,17 @@ export function evaluateFlightPhase(skipAutoTransitions = false): void {
     }
   }
 
-  if (!skipAutoTransitions) {
-    // Detect REENTRY: if we're in ORBIT and periapsis drops below the minimum
-    // orbit altitude, the player has initiated a de-orbit burn.
-    if (flightState.phase === FlightPhase.ORBIT && orbitStatus && !orbitStatus.valid) {
-      if (!isEscapeTrajectory(ps, bodyId)) {
-        _showDeorbitWarning(bodyId);
-        return;
-      }
+  // Detect REENTRY: if we're in ORBIT and periapsis drops below the minimum
+  // orbit altitude, the player has initiated a de-orbit burn.  This check runs
+  // even in worker-physics mode because the deorbit warning UI is main-thread-only.
+  if (flightState.phase === FlightPhase.ORBIT && orbitStatus && !orbitStatus.valid) {
+    if (!isEscapeTrajectory(ps, bodyId)) {
+      _showDeorbitWarning(bodyId);
+      return;
     }
+  }
 
+  if (!skipAutoTransitions) {
     const transition = evaluateAutoTransitions(flightState, ps, orbitStatus);
 
     if (transition) {

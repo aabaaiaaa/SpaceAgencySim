@@ -275,15 +275,16 @@ test.describe('Flight phase transitions', () => {
 
   test('(2) FLIGHT → ORBIT when reaching stable orbit', async () => {
     // Cut throttle and clear engines before teleporting to avoid MANOEUVRE.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ps = window.__flightPs;
       if (!ps) return;
       ps.throttle = 0;
       ps.firingEngines.clear();
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     // Set orbital position and velocity.
-    await page.evaluate(({ alt, v }) => {
+    await page.evaluate(async ({ alt, v }) => {
       const ps = window.__flightPs;
       if (!ps) return;
       ps.posX = 0;
@@ -293,6 +294,7 @@ test.describe('Flight phase transitions', () => {
       ps.grounded = false;
       ps.landed = false;
       ps.crashed = false;
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     }, { alt: ORBIT_ALT, v: ORBIT_VEL });
 
     await page.waitForFunction(
@@ -308,7 +310,7 @@ test.describe('Flight phase transitions', () => {
 
   test('(3) ORBIT → MANOEUVRE when thrusting in orbit', async () => {
     // Activate engine thrust in NORMAL mode.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ps = window.__flightPs;
       if (!ps) return;
       ps.controlMode = 'NORMAL';
@@ -320,6 +322,7 @@ test.describe('Flight phase transitions', () => {
           break;
         }
       }
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     await page.waitForFunction(
@@ -330,11 +333,12 @@ test.describe('Flight phase transitions', () => {
   });
 
   test('(4) MANOEUVRE → ORBIT when burn ends and orbit valid', async () => {
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ps = window.__flightPs;
       if (!ps) return;
       ps.throttle = 0;
       ps.firingEngines.clear();
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     await page.waitForFunction(
@@ -346,13 +350,14 @@ test.describe('Flight phase transitions', () => {
 
   test('(5) ORBIT → REENTRY when periapsis drops below minimum', async () => {
     // Reduce velocity to make orbit decay (periapsis < 70km).
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ps = window.__flightPs;
       if (!ps) return;
       ps.velX = 6000;
       ps.velY = 0;
       ps.firingEngines.clear();
       ps.throttle = 0;
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     // Deorbit warning fires after 2s, then transitions to REENTRY.
@@ -377,7 +382,7 @@ test.describe('Flight phase transitions', () => {
     await waitForOrbit(page);
 
     // Set escape velocity and activate engine.
-    await page.evaluate(({ escVel }) => {
+    await page.evaluate(async ({ escVel }) => {
       const ps = window.__flightPs;
       if (!ps) return;
       ps.velX = escVel;
@@ -389,6 +394,7 @@ test.describe('Flight phase transitions', () => {
           break;
         }
       }
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     }, { escVel: ESCAPE_VEL });
 
     // Should go through MANOEUVRE → TRANSFER.
@@ -485,8 +491,9 @@ test.describe('Control mode switching in ORBIT', () => {
 
   test('(7) thrust cuts to zero on both enter and exit of docking mode', async () => {
     // Set throttle, enter docking mode — should cut.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       if (window.__flightPs) window.__flightPs.throttle = 0.5;
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
     await page.keyboard.press('v');
     await page.waitForFunction(
@@ -496,8 +503,9 @@ test.describe('Control mode switching in ORBIT', () => {
     expect(await page.evaluate(() => window.__flightPs?.throttle ?? -1)).toBe(0);
 
     // Set throttle in docking mode, exit — should cut again.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       if (window.__flightPs) window.__flightPs.throttle = 0.3;
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
     await page.keyboard.press('v');
     await page.waitForFunction(

@@ -245,7 +245,7 @@ test.describe('Phase Transition: ORBIT → MANOEUVRE', () => {
     // The teleport clears firingEngines, so we re-add engine parts from
     // activeParts. The actual thrust, orbit modification, and phase
     // transition all run through the real physics pipeline.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ps = window.__flightPs;
       const assembly = window.__flightAssembly;
       if (!ps || !assembly) return;
@@ -257,6 +257,9 @@ test.describe('Phase Transition: ORBIT → MANOEUVRE', () => {
             (def.includes('engine') || def.includes('srb'))) {
           ps.firingEngines.add(id);
         }
+      }
+      if (typeof window.__resyncPhysicsWorker === 'function') {
+        await window.__resyncPhysicsWorker();
       }
     });
 
@@ -299,7 +302,7 @@ test.describe('Phase Transition: MANOEUVRE → TRANSFER', () => {
     // Start a burn to get into MANOEUVRE, then boost velocity near escape.
     // The burn runs through real physics — the engine thrust pushes
     // velocity past the escape threshold naturally.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ps = window.__flightPs;
       const assembly = window.__flightAssembly;
       if (!ps || !assembly) return;
@@ -316,6 +319,9 @@ test.describe('Phase Transition: MANOEUVRE → TRANSFER', () => {
             (placed.partId.includes('engine') || placed.partId.includes('srb'))) {
           ps.firingEngines.add(id);
         }
+      }
+      if (typeof window.__resyncPhysicsWorker === 'function') {
+        await window.__resyncPhysicsWorker();
       }
     });
 
@@ -367,10 +373,13 @@ test.describe('Phase Transition: Reentry', () => {
     // Reduce velocity so periapsis drops below 70 km (min orbit altitude).
     // This simulates a retrograde burn result — the orbit check will
     // detect the orbit is no longer valid and trigger deorbit.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ps = window.__flightPs;
       if (!ps) return;
       ps.velX = ps.velX - 300;
+      if (typeof window.__resyncPhysicsWorker === 'function') {
+        await window.__resyncPhysicsWorker();
+      }
     });
 
     // The deorbit warning fires after a 2-second delay, then transitions to REENTRY.

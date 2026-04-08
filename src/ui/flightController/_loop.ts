@@ -1,18 +1,13 @@
 /**
  * _loop.ts — The RAF game loop function and related helpers.
  *
- * Supports two physics modes:
- *   1. **Main-thread** (default fallback): calls `tick()` directly each frame.
- *   2. **Web Worker**: sends a `tick` command to the physics worker and
- *      applies the returned snapshot to the local state for rendering.
- *
- * The active mode is determined by `FCState.workerActive`.  On worker error
- * the loop automatically falls back to main-thread physics.
+ * Physics runs exclusively in a Web Worker.  Each frame the loop sends a
+ * `tick` command to the worker and applies the returned snapshot to the
+ * local state for rendering.
  *
  * @module ui/flightController/_loop
  */
 
-import { tick } from '../../core/physics.ts';
 import { checkObjectiveCompletion } from '../../core/missions.ts';
 import { checkContractObjectives } from '../../core/contracts.ts';
 import { checkChallengeObjectives } from '../../core/challenges.ts';
@@ -40,20 +35,26 @@ import { handleAbortReturnToAgency } from './_menuActions.ts';
 import {
   isWorkerReady,
   hasWorkerError,
+  getWorkerErrorMessage,
   consumeMainThreadSnapshot,
   sendTick,
   sendThrottle,
   sendAngle,
-  terminatePhysicsWorker,
 } from './_workerBridge.ts';
-import { createSnapshotFromState } from '../../core/snapshotFactory.ts';
 import type { MainThreadSnapshot } from '../../core/physicsWorkerProtocol.ts';
 
 /** Maximum consecutive loop errors before showing the abort banner. */
 export const MAX_CONSECUTIVE_LOOP_ERRORS: number = 5;
 
-/** Monotonic frame counter for the main-thread fallback snapshot path. */
-let _fallbackFrame = 0;
+/**
+ * When true, the main thread has changed throttle this frame (keyboard,
+ * HUD button, comms lockout).  The loop will send the override to the
+ * worker and skip syncing throttle from the snapshot.
+ */
+let _throttleDirty = false;
+
+/** Called by the keyboard handler and HUD when throttle is changed locally. */
+export function markThrottleDirty(): void { _throttleDirty = true; }
 
 /**
  * Sync a worker snapshot's scalar values back to the mutable PhysicsState and
@@ -61,8 +62,11 @@ let _fallbackFrame = 0;
  *  - Loop-internal reads (comms evaluation, post-flight auto-trigger, etc.)
  *  - E2E test access via `window.__flightPs` / `window.__flightState`
  *
- * Control inputs (throttle, throttleMode, targetTWR, angle) are NOT overwritten
- * — the main thread remains authoritative for those.
+ * Angle and throttle ARE synced from the worker because the worker computes
+ * angle from A/D key rotation and throttle from TWR mode.  The main thread
+ * sends overrides (keyboard throttle changes, map/orbit angle overrides)
+ * via sendThrottle/sendAngle each frame AFTER the sync, so the worker
+ * always receives the latest main-thread intent.
  */
 function _syncSnapshotToMutableState(
   snap: MainThreadSnapshot,
@@ -71,11 +75,26 @@ function _syncSnapshotToMutableState(
 ): void {
   if (!ps || !fs) return;
 
-  // Physics scalars
+  // The worker snapshot includes control input fields (angle, throttle, etc.)
+  // at runtime even though ReadonlyPhysicsSnapshot strips them via Omit<>.
+  // We need angle because the worker computes rotation from A/D keys.
+  const fullSnap = snap.physics as import('../../core/physicsWorkerProtocol.ts').PhysicsSnapshot;
+
+  // Physics scalars — includes control inputs (angle, throttle, throttleMode,
+  // targetTWR) which the worker may compute/modify (e.g. TWR mode, A/D rotation).
   ps.posX = snap.physics.posX;
   ps.posY = snap.physics.posY;
   ps.velX = snap.physics.velX;
   ps.velY = snap.physics.velY;
+  ps.angle = fullSnap.angle;
+  // Sync throttle from worker only when the main thread hasn't overridden it
+  // this frame (keyboard, HUD button, comms lockout).  The worker computes
+  // throttle from TWR mode and needs to flow that back.
+  if (!_throttleDirty) {
+    ps.throttle = fullSnap.throttle;
+    ps.throttleMode = fullSnap.throttleMode;
+    ps.targetTWR = fullSnap.targetTWR;
+  }
   ps.landed = snap.physics.landed;
   ps.crashed = snap.physics.crashed;
   ps.grounded = snap.physics.grounded;
@@ -113,6 +132,31 @@ function _syncSnapshotToMutableState(
     ? new Map(Object.entries(snap.physics.malfunctions))
     : ps.malfunctions;
 
+  // Debris — rebuild Sets/Maps from serialised form so E2E tests and
+  // render code can access them via window.__flightPs.debris.
+  ps.debris = snap.physics.debris.map(d => ({
+    id: d.id,
+    activeParts: new Set(d.activeParts),
+    firingEngines: new Set(d.firingEngines),
+    fuelStore: new Map(Object.entries(d.fuelStore)),
+    deployedParts: new Set(d.deployedParts),
+    parachuteStates: new Map(Object.entries(d.parachuteStates)),
+    legStates: new Map(Object.entries(d.legStates)),
+    heatMap: new Map(Object.entries(d.heatMap).map(([k, v]) => [k, Number(v)])),
+    posX: d.posX,
+    posY: d.posY,
+    velX: d.velX,
+    velY: d.velY,
+    angle: d.angle,
+    throttle: d.throttle,
+    angularVelocity: d.angularVelocity,
+    isTipping: d.isTipping,
+    tippingContactX: d.tippingContactX,
+    tippingContactY: d.tippingContactY,
+    landed: d.landed,
+    crashed: d.crashed,
+  }));
+
   // Flight state scalars
   fs.phase = snap.flight.phase;
   fs.timeElapsed = snap.flight.timeElapsed;
@@ -141,6 +185,18 @@ function _syncSnapshotToMutableState(
   // Power and comms state
   fs.powerState = snap.flight.powerState ?? fs.powerState;
   fs.commsState = snap.flight.commsState ?? fs.commsState;
+
+  // Science / crew fields mutated by the worker's tick
+  fs.crewCount = snap.flight.crewCount;
+  fs.scienceModuleRunning = snap.flight.scienceModuleRunning ?? fs.scienceModuleRunning;
+  fs.hasScienceModules = snap.flight.hasScienceModules ?? fs.hasScienceModules;
+
+  // Staging index — keep main-thread stagingConfig in sync with the worker
+  // so that resyncs and UI display the correct stage.
+  const s = getFCState();
+  if (s.stagingConfig && snap.currentStageIdx !== undefined) {
+    s.stagingConfig.currentStageIdx = snap.currentStageIdx;
+  }
 }
 
 /**
@@ -212,19 +268,6 @@ function _handleWorkerPhaseTransition(
 }
 
 /**
- * Fall back from worker physics to main-thread physics.
- * Called when the worker encounters an error.
- */
-function _fallbackToMainThread(): void {
-  const s = getFCState();
-  if (!s.workerActive) return;
-
-  logger.warn('flightLoop', 'Falling back to main-thread physics (worker error)');
-  s.workerActive = false;
-  terminatePhysicsWorker();
-}
-
-/**
  * One animation frame: advance physics, render scene, re-schedule.
  */
 export function loop(timestamp: number): void {
@@ -247,9 +290,10 @@ export function loop(timestamp: number): void {
   // Feed frame timing to the FPS monitor (no-ops if not initialised).
   recordFrame(realDt * 1000, timestamp);
 
-  // Detect worker error and fall back to main-thread physics.
-  if (s.workerActive && hasWorkerError()) {
-    _fallbackToMainThread();
+  // Detect worker error and show error banner.
+  if (hasWorkerError() && !s.loopErrorBanner) {
+    logger.error('flightLoop', 'Physics worker error', { error: getWorkerErrorMessage() });
+    _showLoopErrorBanner(s);
   }
 
   try {
@@ -258,7 +302,7 @@ export function loop(timestamp: number): void {
     // control processing.  This ensures control inputs (keyboard, HUD
     // buttons, comms lockout, map thrust, orbit RCS) operate on the latest
     // physics state and are not overwritten by a stale snapshot.
-    if (s.workerActive && isWorkerReady()) {
+    if (isWorkerReady()) {
       const snap = consumeMainThreadSnapshot();
       if (snap) {
         const prevPhase = flightState.phase;
@@ -297,6 +341,7 @@ export function loop(timestamp: number): void {
       flightState.commsState = comms;
       if (comms.controlLocked) {
         ps.throttle = 0;
+        _throttleDirty = true;
       }
     }
 
@@ -310,14 +355,15 @@ export function loop(timestamp: number): void {
       applyNormalOrbitRcs();
     }
 
-    // Reset per-frame science flag before sub-steps.
-    flightState.scienceModuleRunning = false;
-
-    // ---- Physics tick: worker or main-thread ----
-    if (s.workerActive && isWorkerReady()) {
-      // Sync throttle to worker — main thread is the authority for throttle
-      // (captures HUD buttons, keyboard events, comms lockout).
-      sendThrottle(ps.throttle);
+    // ---- Physics tick (Web Worker) ----
+    if (isWorkerReady()) {
+      // Send throttle to worker only when the main thread changed it
+      // (keyboard, HUD button, comms lockout).  Otherwise the worker's
+      // own computation (e.g. TWR mode) stays in effect.
+      if (_throttleDirty) {
+        sendThrottle(ps.throttle, ps.throttleMode, ps.targetTWR);
+        _throttleDirty = false;
+      }
 
       // Sync angle to worker only when orbital thrust overrides the normal
       // rotation (map thrust or orbit RCS compute orbital-relative angles).
@@ -333,16 +379,6 @@ export function loop(timestamp: number): void {
       // orbit recalculation for map rendering, control mode resets.
       // Skip evaluateAutoTransitions (worker already handled it).
       evaluateFlightPhase(true);
-    } else {
-      // Main-thread physics — direct tick.
-      tick(ps, assembly, stagingConfig, flightState, realDt, s.timeWarp);
-
-      // Create a readonly snapshot in the same format as the worker path.
-      // This ensures both paths produce MainThreadSnapshot, giving render/UI
-      // a single code path once they migrate to snapshot types (TASK-013a/b).
-      createSnapshotFromState(ps, flightState, _fallbackFrame++);
-
-      evaluateFlightPhase();
     }
 
     // --- Docking system tick ---

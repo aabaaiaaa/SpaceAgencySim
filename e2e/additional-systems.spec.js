@@ -193,10 +193,11 @@ test.describe('Thermal system', () => {
     });
 
     // Now slow down below threshold — move to high altitude (vacuum).
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ps = window.__flightPs;
       ps.posY = 80_000; // Above atmosphere
       ps.velY = -100;   // Slow
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     await page.waitForFunction((bh) => {
@@ -422,11 +423,12 @@ test.describe('Thermal system', () => {
     await startTestFlight(page, BASIC_PROBE);
 
     // Apply significant heat to parts.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ps = window.__flightPs;
       for (const id of ps.activeParts) {
         ps.heatMap.set(id, 600); // ~50% of default tolerance — should trigger glow.
       }
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     // Wait for render frame to process the heat state

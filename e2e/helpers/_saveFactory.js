@@ -16,7 +16,7 @@ import { STARTING_MONEY, STARTER_FACILITIES } from './_constants.js';
  * by overriding the relevant fields.
  */
 export function buildSaveEnvelope({
-  version         = 1,
+  version         = 2,
   saveName        = 'E2E Test',
   money           = STARTING_MONEY,
   missions        = { available: [], accepted: [], completed: [] },
@@ -54,7 +54,6 @@ export function buildSaveEnvelope({
   fieldCraft      = [],
   autoSaveEnabled    = true,
   debugMode          = false,
-  useWorkerPhysics   = false,
 } = {}) {
   return {
     saveName,
@@ -97,7 +96,6 @@ export function buildSaveEnvelope({
       fieldCraft,
       autoSaveEnabled,
       debugMode,
-      useWorkerPhysics,
     },
   };
 }

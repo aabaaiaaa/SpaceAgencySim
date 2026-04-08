@@ -122,12 +122,15 @@ test.describe('Relaunch — Takeoff, Land, Takeoff Again', () => {
 
     // Teleport the rocket to just above the surface with a gentle descent
     // rate. From posY=0.1 and velY=-0.5, impact speed ≈ 1.5 m/s (< 5 m/s).
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ps = window.__flightPs;
       if (!ps) return;
       ps.posY = 0.1;
       ps.velY = -0.5;
       ps.velX = 0;
+      if (typeof window.__resyncPhysicsWorker === 'function') {
+        await window.__resyncPhysicsWorker();
+      }
     });
 
     // Wait for ps.landed = true.

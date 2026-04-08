@@ -33,6 +33,7 @@ import { FlightPhase } from '../../core/constants.ts';
 import { isPlayerLocked, getPhaseLabel } from '../../core/flightPhase.ts';
 import { getFCState, getPhysicsState, getFlightState } from './_state.ts';
 import { showPhaseNotification } from './_flightPhase.ts';
+import { resyncWorkerState } from './_workerBridge.ts';
 
 // Re-export setMapTarget for use by _docking.js.
 export { setMapTarget };
@@ -177,6 +178,13 @@ export function handleWarpToTarget(): void {
     type: 'TIME_WARP',
     description: `Warped ${(result.elapsed! / 60).toFixed(1)} min to target "${targetObj.name}"`,
   });
+
+  // Push the time advancement to the worker so it doesn't overwrite it.
+  const ps = getPhysicsState();
+  const fcState = getFCState();
+  if (ps && fcState.assembly && fcState.stagingConfig) {
+    resyncWorkerState(ps, fcState.assembly, fcState.stagingConfig, flightState).catch(() => {});
+  }
 
   showPhaseNotification(`Warped to ${targetObj.name}`);
 }

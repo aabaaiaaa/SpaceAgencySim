@@ -140,7 +140,7 @@ function phase6Fixture(overrides = {}) {
  * Set the craft into transfer phase.
  */
 async function setTransferState(page, origin, destination) {
-  await page.evaluate(({ origin, destination }) => {
+  await page.evaluate(async ({ origin, destination }) => {
     const fs = window.__flightState;
     if (!fs) return;
 
@@ -156,6 +156,7 @@ async function setTransferState(page, origin, destination) {
       totalDV: 4100,
       trajectoryPath: [{ x: 0, y: 0 }, { x: 100, y: 200 }],
     };
+    if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
   }, { origin, destination });
 
   await page.waitForFunction(
@@ -598,13 +599,14 @@ test.describe('Transfer gameplay mechanics', () => {
     expect(transferInfo.totalDV).toBeGreaterThan(0);
 
     // Reset to orbit so we can return cleanly.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const fs = window.__flightState;
       if (fs) {
         fs.phase = 'ORBIT';
         fs.inOrbit = true;
         fs.transferState = null;
       }
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     await returnToAgency(page);
@@ -853,15 +855,15 @@ test.describe('Surface operations — flag planting', () => {
     const repBefore = gsBefore.reputation;
 
     // Plant flag via game API.
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate(async () => {
+      let r = null;
       if (typeof window.__plantFlag === 'function') {
-        return window.__plantFlag();
+        r = window.__plantFlag();
+      } else if (typeof window.__surfaceAction === 'function') {
+        r = window.__surfaceAction('plant-flag');
       }
-      // Fallback: directly call the surface ops module.
-      if (typeof window.__surfaceAction === 'function') {
-        return window.__surfaceAction('plant-flag');
-      }
-      return null;
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
+      return r;
     });
 
     if (result !== null) {
@@ -890,14 +892,15 @@ test.describe('Surface operations — flag planting', () => {
   });
 
   test('(2) cannot plant second flag on same body', async () => {
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate(async () => {
+      let r = null;
       if (typeof window.__plantFlag === 'function') {
-        return window.__plantFlag();
+        r = window.__plantFlag();
+      } else if (typeof window.__surfaceAction === 'function') {
+        r = window.__surfaceAction('plant-flag');
       }
-      if (typeof window.__surfaceAction === 'function') {
-        return window.__surfaceAction('plant-flag');
-      }
-      return null;
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
+      return r;
     });
 
     if (result !== null) {
@@ -916,14 +919,15 @@ test.describe('Surface operations — flag planting', () => {
     await startTestFlight(page, BASIC_PROBE, { bodyId: 'MARS' });
     await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MARS' });
 
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate(async () => {
+      let r = null;
       if (typeof window.__plantFlag === 'function') {
-        return window.__plantFlag();
+        r = window.__plantFlag();
+      } else if (typeof window.__surfaceAction === 'function') {
+        r = window.__surfaceAction('plant-flag');
       }
-      if (typeof window.__surfaceAction === 'function') {
-        return window.__surfaceAction('plant-flag');
-      }
-      return null;
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
+      return r;
     });
 
     if (result !== null) {
@@ -959,14 +963,15 @@ test.describe('Surface operations — sample collection and return', () => {
     await startTestFlight(page, LUNAR_LANDER, { bodyId: 'MOON', crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MOON' });
 
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate(async () => {
+      let r = null;
       if (typeof window.__collectSample === 'function') {
-        return window.__collectSample();
+        r = window.__collectSample();
+      } else if (typeof window.__surfaceAction === 'function') {
+        r = window.__surfaceAction('collect-sample');
       }
-      if (typeof window.__surfaceAction === 'function') {
-        return window.__surfaceAction('collect-sample');
-      }
-      return null;
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
+      return r;
     });
 
     if (result !== null) {
@@ -1000,7 +1005,7 @@ test.describe('Surface operations — sample collection and return', () => {
     const scienceBefore = gsBefore.sciencePoints;
 
     // Inject a Moon sample that hasn't been returned yet.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const gs = window.__gameState;
       if (!gs.surfaceItems) gs.surfaceItems = [];
       // Only add if we don't already have an uncollected Moon sample.
@@ -1018,14 +1023,17 @@ test.describe('Surface operations — sample collection and return', () => {
           collected: false,
         });
       }
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     // Process sample returns (simulating safe Earth landing).
-    const returnResult = await page.evaluate(() => {
+    const returnResult = await page.evaluate(async () => {
+      let r = null;
       if (typeof window.__processSampleReturns === 'function') {
-        return window.__processSampleReturns('EARTH');
+        r = window.__processSampleReturns('EARTH');
       }
-      return null;
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
+      return r;
     });
 
     if (returnResult !== null) {
@@ -1039,7 +1047,7 @@ test.describe('Surface operations — sample collection and return', () => {
 
   test('(3) sample return on non-Earth body does NOT award science', async () => {
     // Add another uncollected sample.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const gs = window.__gameState;
       if (!gs.surfaceItems) gs.surfaceItems = [];
       gs.surfaceItems.push({
@@ -1051,13 +1059,16 @@ test.describe('Surface operations — sample collection and return', () => {
         label: 'Test sample — MARS',
         collected: false,
       });
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate(async () => {
+      let r = null;
       if (typeof window.__processSampleReturns === 'function') {
-        return window.__processSampleReturns('MARS');
+        r = window.__processSampleReturns('MARS');
       }
-      return null;
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
+      return r;
     });
 
     if (result !== null) {
@@ -1090,14 +1101,15 @@ test.describe('Surface operations — instruments and beacons', () => {
     ], { bodyId: 'MOON', crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MOON' });
 
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate(async () => {
+      let r = null;
       if (typeof window.__deployInstrument === 'function') {
-        return window.__deployInstrument();
+        r = window.__deployInstrument();
+      } else if (typeof window.__surfaceAction === 'function') {
+        r = window.__surfaceAction('deploy-instrument');
       }
-      if (typeof window.__surfaceAction === 'function') {
-        return window.__surfaceAction('deploy-instrument');
-      }
-      return null;
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
+      return r;
     });
 
     if (result !== null) {
@@ -1126,7 +1138,7 @@ test.describe('Surface operations — instruments and beacons', () => {
     } catch { /* no overlay */ }
 
     // Ensure a surface instrument exists.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const gs = window.__gameState;
       if (!gs.surfaceItems) gs.surfaceItems = [];
       const existing = gs.surfaceItems.find(
@@ -1142,17 +1154,20 @@ test.describe('Surface operations — instruments and beacons', () => {
           label: 'Science station — MOON',
         });
       }
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     const gsBefore = await getGameState(page);
     const scienceBefore = gsBefore.sciencePoints;
 
     // Process surface ops (simulating period advancement).
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate(async () => {
+      let r = null;
       if (typeof window.__processSurfaceOps === 'function') {
-        return window.__processSurfaceOps();
+        r = window.__processSurfaceOps();
       }
-      return null;
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
+      return r;
     });
 
     if (result !== null) {
@@ -1166,14 +1181,15 @@ test.describe('Surface operations — instruments and beacons', () => {
     await startTestFlight(page, BASIC_PROBE, { bodyId: 'MARS' });
     await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MARS' });
 
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate(async () => {
+      let r = null;
       if (typeof window.__deployBeacon === 'function') {
-        return window.__deployBeacon('Mars Alpha');
+        r = window.__deployBeacon('Mars Alpha');
+      } else if (typeof window.__surfaceAction === 'function') {
+        r = window.__surfaceAction('deploy-beacon');
       }
-      if (typeof window.__surfaceAction === 'function') {
-        return window.__surfaceAction('deploy-beacon');
-      }
-      return null;
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
+      return r;
     });
 
     if (result !== null) {
@@ -1795,13 +1811,14 @@ test.describe('Map view controls during transfer', () => {
     await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
 
     // Reset transfer state to orbit so we can return cleanly.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const fs = window.__flightState;
       if (fs) {
         fs.phase = 'ORBIT';
         fs.inOrbit = true;
         fs.transferState = null;
       }
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     await returnToAgency(page);
@@ -1848,26 +1865,32 @@ test.describe('Integration — full lunar mission flow', () => {
 
   test('(3) perform all surface operations', async () => {
     // Plant flag.
-    const flagResult = await page.evaluate(() => {
-      if (typeof window.__plantFlag === 'function') return window.__plantFlag();
-      if (typeof window.__surfaceAction === 'function') return window.__surfaceAction('plant-flag');
-      return { success: true };
+    const flagResult = await page.evaluate(async () => {
+      let r = { success: true };
+      if (typeof window.__plantFlag === 'function') r = window.__plantFlag();
+      else if (typeof window.__surfaceAction === 'function') r = window.__surfaceAction('plant-flag');
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
+      return r;
     });
     expect(flagResult.success).toBe(true);
 
     // Collect sample.
-    const sampleResult = await page.evaluate(() => {
-      if (typeof window.__collectSample === 'function') return window.__collectSample();
-      if (typeof window.__surfaceAction === 'function') return window.__surfaceAction('collect-sample');
-      return { success: true };
+    const sampleResult = await page.evaluate(async () => {
+      let r = { success: true };
+      if (typeof window.__collectSample === 'function') r = window.__collectSample();
+      else if (typeof window.__surfaceAction === 'function') r = window.__surfaceAction('collect-sample');
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
+      return r;
     });
     expect(sampleResult.success).toBe(true);
 
     // Deploy beacon.
-    const beaconResult = await page.evaluate(() => {
-      if (typeof window.__deployBeacon === 'function') return window.__deployBeacon('Tranquility Base');
-      if (typeof window.__surfaceAction === 'function') return window.__surfaceAction('deploy-beacon');
-      return { success: true };
+    const beaconResult = await page.evaluate(async () => {
+      let r = { success: true };
+      if (typeof window.__deployBeacon === 'function') r = window.__deployBeacon('Tranquility Base');
+      else if (typeof window.__surfaceAction === 'function') r = window.__surfaceAction('deploy-beacon');
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
+      return r;
     });
     expect(beaconResult.success).toBe(true);
   });

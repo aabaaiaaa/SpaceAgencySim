@@ -109,8 +109,8 @@ export interface FCState {
   loopErrorBanner: HTMLElement | null;
 
   // Worker physics
-  /** True when the physics worker is active and handling ticks. */
-  workerActive: boolean;
+  /** True once the physics worker has initialised and is accepting tick commands. */
+  workerReady: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -168,7 +168,7 @@ function _createDefaultState(): FCState {
     loopErrorBanner: null,
 
     // Worker physics
-    workerActive: false,
+    workerReady: false,
   };
 }
 

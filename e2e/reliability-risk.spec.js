@@ -221,7 +221,7 @@ test.describe('Engine flameout malfunction', () => {
     await waitForAltitude(page, 50, 15_000);
 
     // Manually inject an engine flameout malfunction
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate(async () => {
       const ps = window.__flightPs;
       const assembly = window.__flightAssembly;
       if (!ps || !assembly) return { error: 'no flight state' };
@@ -239,6 +239,8 @@ test.describe('Engine flameout malfunction', () => {
       // Apply flameout malfunction
       ps.malfunctions.set(engineId, { type: 'ENGINE_FLAMEOUT', recovered: false });
       ps.firingEngines.delete(engineId);
+
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
 
       return {
         engineId,
@@ -275,7 +277,7 @@ test.describe('Engine reduced thrust malfunction', () => {
     await page.keyboard.press('z');
     await waitForAltitude(page, 50, 15_000);
 
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate(async () => {
       const ps = window.__flightPs;
       const assembly = window.__flightAssembly;
       let engineId = null;
@@ -285,6 +287,7 @@ test.describe('Engine reduced thrust malfunction', () => {
       if (!engineId) return { error: 'no engine' };
 
       ps.malfunctions.set(engineId, { type: 'ENGINE_REDUCED_THRUST', recovered: false });
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
       const entry = ps.malfunctions.get(engineId);
       return { type: entry.type, recovered: entry.recovered };
     });
@@ -315,7 +318,7 @@ test.describe('Fuel tank leak malfunction', () => {
     await startTestFlight(page, ENGINE_ROCKET, { malfunctionMode: 'off' });
 
     // Inject fuel leak on the fuel tank and record fuel before/after
-    const beforeFuel = await page.evaluate(() => {
+    const beforeFuel = await page.evaluate(async () => {
       const ps = window.__flightPs;
       const assembly = window.__flightAssembly;
       let tankId = null;
@@ -325,6 +328,7 @@ test.describe('Fuel tank leak malfunction', () => {
       if (!tankId) return -1;
 
       ps.malfunctions.set(tankId, { type: 'FUEL_TANK_LEAK', recovered: false });
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
       return ps.fuelStore?.get(tankId) ?? 0;
     });
 
@@ -382,7 +386,7 @@ test.describe('Stuck decoupler malfunction', () => {
   test('(1) stuck decoupler malfunction is recorded and recoverable', async () => {
     await startTestFlight(page, DECOUPLER_ROCKET, { malfunctionMode: 'off' });
 
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate(async () => {
       const ps = window.__flightPs;
       const assembly = window.__flightAssembly;
       let decouplerId = null;
@@ -392,6 +396,7 @@ test.describe('Stuck decoupler malfunction', () => {
       if (!decouplerId) return { error: 'no decoupler' };
 
       ps.malfunctions.set(decouplerId, { type: 'DECOUPLER_STUCK', recovered: false });
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
       const entry = ps.malfunctions.get(decouplerId);
       return { type: entry.type, recovered: entry.recovered, id: decouplerId };
     });
@@ -421,7 +426,7 @@ test.describe('Partial parachute malfunction', () => {
   test('(1) partial parachute malfunction is recorded (no recovery)', async () => {
     await startTestFlight(page, CHUTE_ROCKET, { malfunctionMode: 'off' });
 
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate(async () => {
       const ps = window.__flightPs;
       const assembly = window.__flightAssembly;
       let chuteId = null;
@@ -431,6 +436,7 @@ test.describe('Partial parachute malfunction', () => {
       if (!chuteId) return { error: 'no chute' };
 
       ps.malfunctions.set(chuteId, { type: 'PARACHUTE_PARTIAL', recovered: false });
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
       return { type: ps.malfunctions.get(chuteId).type };
     });
 
@@ -465,7 +471,7 @@ test.describe('SRB early burnout malfunction', () => {
       { timeout: 5_000 },
     );
 
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate(async () => {
       const ps = window.__flightPs;
       const assembly = window.__flightAssembly;
       let srbId = null;
@@ -478,6 +484,8 @@ test.describe('SRB early burnout malfunction', () => {
       ps.malfunctions.set(srbId, { type: 'SRB_EARLY_BURNOUT', recovered: false });
       ps.fuelStore.set(srbId, 0);
       ps.firingEngines.delete(srbId);
+
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
 
       return {
         fuel: ps.fuelStore.get(srbId),
@@ -515,7 +523,7 @@ test.describe('Science instrument failure malfunction', () => {
       instruments: { 'science-module-mk1': ['thermometer-mk1'] },
     });
 
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate(async () => {
       const ps = window.__flightPs;
       const assembly = window.__flightAssembly;
       let sciId = null;
@@ -525,6 +533,7 @@ test.describe('Science instrument failure malfunction', () => {
       if (!sciId) return { error: 'no science module' };
 
       ps.malfunctions.set(sciId, { type: 'SCIENCE_INSTRUMENT_FAILURE', recovered: false });
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
       return { type: ps.malfunctions.get(sciId).type };
     });
 
@@ -552,7 +561,7 @@ test.describe('Stuck landing legs malfunction', () => {
   test('(1) stuck landing legs malfunction is recorded', async () => {
     await startTestFlight(page, LEGS_ROCKET, { malfunctionMode: 'off' });
 
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate(async () => {
       const ps = window.__flightPs;
       const assembly = window.__flightAssembly;
       let legsId = null;
@@ -562,6 +571,7 @@ test.describe('Stuck landing legs malfunction', () => {
       if (!legsId) return { error: 'no landing legs' };
 
       ps.malfunctions.set(legsId, { type: 'LANDING_LEGS_STUCK', recovered: false });
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
       return { type: ps.malfunctions.get(legsId).type };
     });
 
@@ -594,7 +604,7 @@ test.describe('Malfunction recovery via context menu', () => {
     await startTestFlight(page, DECOUPLER_ROCKET, { malfunctionMode: 'off' });
 
     // Inject stuck decoupler then attempt recovery via game API
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate(async () => {
       const ps = window.__flightPs;
       const assembly = window.__flightAssembly;
       let decouplerId = null;
@@ -611,6 +621,8 @@ test.describe('Malfunction recovery via context menu', () => {
       const entry = ps.malfunctions.get(decouplerId);
       // Decoupler recovery always succeeds
       entry.recovered = true;
+
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
 
       return {
         recovered: entry.recovered,
@@ -630,7 +642,7 @@ test.describe('Malfunction recovery via context menu', () => {
     await page.keyboard.press('Space');
 
     // Inject engine flameout and test that recovery is possible
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate(async () => {
       const ps = window.__flightPs;
       const assembly = window.__flightAssembly;
       let engineId = null;
@@ -647,6 +659,8 @@ test.describe('Malfunction recovery via context menu', () => {
       const entry = ps.malfunctions.get(engineId);
       entry.recovered = true;
       ps.firingEngines.add(engineId);
+
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
 
       return {
         recovered: entry.recovered,

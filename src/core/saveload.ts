@@ -490,8 +490,8 @@ export async function loadGame(slotIndex: number): Promise<GameState> {
   // Default debugMode for saves created before the debug mode toggle.
   envelope.state.debugMode ??= false;
 
-  // Default useWorkerPhysics for saves created before the worker physics toggle.
-  envelope.state.useWorkerPhysics ??= true;
+  // Remove obsolete useWorkerPhysics — worker physics is now the only mode.
+  delete (envelope.state as Record<string, unknown>).useWorkerPhysics;
 
   // Default showPerfDashboard for saves created before the perf dashboard feature.
   envelope.state.showPerfDashboard ??= false;

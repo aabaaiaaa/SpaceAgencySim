@@ -681,7 +681,7 @@ test.describe('Game settings — difficulty options', () => {
   test('settings panel shows all four difficulty categories', async () => {
     const groups = page.locator('.settings-group');
     const count = await groups.count();
-    expect(count).toBe(6);
+    expect(count).toBe(7);
 
     // Verify labels
     const labels = await page.locator('.settings-group-label').allInnerTexts();

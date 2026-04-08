@@ -1,6 +1,6 @@
 // @ts-nocheck
 /**
- * loopErrorHandling.test.js — Unit tests for the flight controller loop's
+ * loopErrorHandling.test.ts — Unit tests for the flight controller loop's
  * error handling: try-catch around the simulation body, consecutive error
  * counter, and abort banner trigger.
  */
@@ -11,17 +11,16 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 // Hoisted mock functions — available inside vi.mock() factories.
 // ---------------------------------------------------------------------------
 
-const { mockTick, mockAbort } = vi.hoisted(() => ({
-  mockTick: vi.fn(),
+const { mockEvaluateComms, mockAbort } = vi.hoisted(() => ({
+  mockEvaluateComms: vi.fn(() => ({ controlLocked: false })),
   mockAbort: vi.fn(),
 }));
 
 // ---------------------------------------------------------------------------
-// Mock every dependency imported by _loop.js so we can run in Node without
+// Mock every dependency imported by _loop.ts so we can run in Node without
 // PixiJS / DOM renderer / full game state.
 // ---------------------------------------------------------------------------
 
-vi.mock('../core/physics.js', () => ({ tick: mockTick }));
 vi.mock('../core/missions.js', () => ({ checkObjectiveCompletion: vi.fn() }));
 vi.mock('../core/contracts.js', () => ({ checkContractObjectives: vi.fn() }));
 vi.mock('../core/challenges.js', () => ({ checkChallengeObjectives: vi.fn() }));
@@ -30,7 +29,7 @@ vi.mock('../render/map.js', () => ({ renderMapFrame: vi.fn() }));
 vi.mock('../core/mapView.js', () => ({ isDebrisTrackingAvailable: vi.fn(() => false) }));
 vi.mock('../core/surfaceOps.js', () => ({ getSurfaceItemsAtBody: vi.fn(() => []) }));
 vi.mock('../core/comms.js', () => ({
-  evaluateComms: vi.fn(() => ({ controlLocked: false })),
+  evaluateComms: mockEvaluateComms,
 }));
 vi.mock('../core/constants.js', () => ({
   FlightPhase: {
@@ -82,14 +81,11 @@ vi.mock('../core/perfMonitor.ts', () => ({
 vi.mock('../ui/flightController/_workerBridge.ts', () => ({
   isWorkerReady: vi.fn(() => false),
   hasWorkerError: vi.fn(() => false),
+  getWorkerErrorMessage: vi.fn(() => ''),
   consumeMainThreadSnapshot: vi.fn(() => null),
   sendTick: vi.fn(),
   sendThrottle: vi.fn(),
   sendAngle: vi.fn(),
-  terminatePhysicsWorker: vi.fn(),
-}));
-vi.mock('../core/snapshotFactory.ts', () => ({
-  createSnapshotFromState: vi.fn(),
 }));
 vi.mock('../core/flightPhase.ts', () => ({
   getPhaseLabel: vi.fn(() => ''),
@@ -161,7 +157,8 @@ beforeEach(() => {
   resetFCState();
   setPhysicsState(null);
   setFlightState(null);
-  mockTick.mockReset();
+  mockEvaluateComms.mockReset();
+  mockEvaluateComms.mockReturnValue({ controlLocked: false });
   mockAbort.mockReset();
   mockLoggerError.mockReset();
 
@@ -186,9 +183,9 @@ describe('Flight controller loop error handling', () => {
     expect(MAX_CONSECUTIVE_LOOP_ERRORS).toBe(5);
   });
 
-  it('catches a tick() error and increments the consecutive error counter', () => {
+  it('catches a comms evaluation error and increments the consecutive error counter', () => {
     seedFCState();
-    mockTick.mockImplementation(() => { throw new Error('NaN in physics'); });
+    mockEvaluateComms.mockImplementation(() => { throw new Error('NaN in comms'); });
 
     loop(16.67);
 
@@ -201,8 +198,7 @@ describe('Flight controller loop error handling', () => {
   it('resets the error counter on a successful frame after an error', () => {
     seedFCState({ loopConsecutiveErrors: 3 });
 
-    // tick succeeds (default mock does nothing).
-    mockTick.mockImplementation(() => {});
+    // evaluateComms succeeds (default mock returns { controlLocked: false }).
     loop(16.67);
 
     expect(getFCState().loopConsecutiveErrors).toBe(0);
@@ -210,7 +206,7 @@ describe('Flight controller loop error handling', () => {
 
   it('does NOT show the abort banner for fewer than 5 consecutive errors', () => {
     seedFCState();
-    mockTick.mockImplementation(() => { throw new Error('boom'); });
+    mockEvaluateComms.mockImplementation(() => { throw new Error('boom'); });
 
     for (let i = 0; i < MAX_CONSECUTIVE_LOOP_ERRORS - 1; i++) {
       loop(16.67 * (i + 1));
@@ -223,7 +219,7 @@ describe('Flight controller loop error handling', () => {
 
   it('shows the abort banner after 5 consecutive errors', () => {
     seedFCState();
-    mockTick.mockImplementation(() => { throw new Error('boom'); });
+    mockEvaluateComms.mockImplementation(() => { throw new Error('boom'); });
 
     for (let i = 0; i < MAX_CONSECUTIVE_LOOP_ERRORS; i++) {
       loop(16.67 * (i + 1));
@@ -236,7 +232,7 @@ describe('Flight controller loop error handling', () => {
 
   it('does not create a second banner if one already exists', () => {
     seedFCState();
-    mockTick.mockImplementation(() => { throw new Error('boom'); });
+    mockEvaluateComms.mockImplementation(() => { throw new Error('boom'); });
 
     // Trigger banner creation.
     for (let i = 0; i < MAX_CONSECUTIVE_LOOP_ERRORS + 2; i++) {
@@ -256,10 +252,11 @@ describe('Flight controller loop error handling', () => {
   it('allows recovery after intermittent (non-consecutive) errors', () => {
     seedFCState();
     let callCount = 0;
-    mockTick.mockImplementation(() => {
+    mockEvaluateComms.mockImplementation(() => {
       callCount++;
       // Fail on odd calls, succeed on even calls.
       if (callCount % 2 === 1) throw new Error('intermittent');
+      return { controlLocked: false };
     });
 
     // Run 10 frames: error, success, error, success, ...
@@ -277,7 +274,7 @@ describe('Flight controller loop error handling', () => {
 
   it('reschedules rAF even after an error', () => {
     seedFCState();
-    mockTick.mockImplementation(() => { throw new Error('crash'); });
+    mockEvaluateComms.mockImplementation(() => { throw new Error('crash'); });
 
     loop(16.67);
 
@@ -286,7 +283,7 @@ describe('Flight controller loop error handling', () => {
 
   it('does not reschedule rAF when rafId is null (loop cancelled)', () => {
     seedFCState({ rafId: null });
-    mockTick.mockImplementation(() => { throw new Error('crash'); });
+    mockEvaluateComms.mockImplementation(() => { throw new Error('crash'); });
 
     loop(16.67);
 

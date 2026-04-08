@@ -212,15 +212,16 @@ test.describe('Orbit entry detection', () => {
     );
 
     // Cut throttle and clear engines before teleporting to avoid MANOEUVRE.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ps = window.__flightPs;
       if (!ps) return;
       ps.throttle = 0;
       ps.firingEngines.clear();
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     // Set orbital position and velocity — circular orbit at 100 km.
-    await page.evaluate(({ alt, v }) => {
+    await page.evaluate(async ({ alt, v }) => {
       const ps = window.__flightPs;
       if (!ps) return;
       ps.posX = 0;
@@ -230,6 +231,7 @@ test.describe('Orbit entry detection', () => {
       ps.grounded = false;
       ps.landed = false;
       ps.crashed = false;
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     }, { alt: EARTH_ORBIT_ALT, v: EARTH_ORBIT_VEL });
 
     // Wait for automatic orbit detection.
@@ -282,12 +284,13 @@ test.describe('Orbit exit warning and transition', () => {
     await waitForOrbit(page);
 
     // Apply a strong retrograde burn to lower periapsis below minimum orbit.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ps = window.__flightPs;
       if (!ps) return;
       // Reduce horizontal velocity significantly — periapsis drops below atmosphere.
       ps.velX = 5000; // Well below circular velocity = de-orbit.
       ps.velY = 0;
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     // Wait for phase to leave ORBIT (could go to REENTRY or FLIGHT).
@@ -334,7 +337,7 @@ test.describe('Orbital manoeuvres', () => {
     expect(velBefore).toBeGreaterThan(0);
 
     // Apply prograde thrust (increase velX in normal control mode).
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ps = window.__flightPs;
       if (!ps) return;
       ps.controlMode = 'NORMAL';
@@ -345,6 +348,7 @@ test.describe('Orbital manoeuvres', () => {
           break;
         }
       }
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     // Wait for MANOEUVRE phase.
@@ -363,11 +367,12 @@ test.describe('Orbital manoeuvres', () => {
     const velDuringBurn = await page.evaluate(() => window.__flightPs?.velX ?? 0);
 
     // Cut throttle.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ps = window.__flightPs;
       if (!ps) return;
       ps.throttle = 0;
       ps.firingEngines.clear();
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     // Wait for return to ORBIT.
@@ -392,10 +397,11 @@ test.describe('Orbital manoeuvres', () => {
     const velBefore = await page.evaluate(() => window.__flightPs?.velX ?? 0);
 
     // Apply retrograde: reduce velocity by manipulating state.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ps = window.__flightPs;
       if (!ps) return;
       ps.velX -= 200; // Retrograde impulse.
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     // Wait for physics to process the velocity change
@@ -451,9 +457,10 @@ test.describe('Docking mode local positioning', () => {
 
   test('(2) throttle is cut to zero on docking mode toggle', async () => {
     // Set throttle high first.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ps = window.__flightPs;
       if (ps) ps.throttle = 0.5;
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     // Toggle docking mode off then on — throttle should be cut.
@@ -503,13 +510,14 @@ test.describe('Docking mode local positioning', () => {
     }
 
     // Set docking port states and offsets so the render path is exercised.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ps = window.__flightPs;
       if (!ps) return;
       if (!ps.dockingPortStates) ps.dockingPortStates = new Map();
       ps.dockingPortStates.set('test-port', 'extended');
       ps.dockingOffsetAlongTrack = 50;
       ps.dockingOffsetRadial = 30;
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     // Let a few render frames pass to exercise the docking target draw code.
@@ -526,12 +534,13 @@ test.describe('Docking mode local positioning', () => {
     expect(errors.length).toBe(0);
 
     // Also test the on-screen (non-clamped) path with docked state.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ps = window.__flightPs;
       if (!ps) return;
       ps.dockingOffsetAlongTrack = 5;
       ps.dockingOffsetRadial = 3;
       ps.dockingPortStates.set('test-port', 'docked');
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     await page.waitForTimeout(500);
@@ -637,7 +646,7 @@ test.describe('Satellite deployment and benefits', () => {
     await waitForOrbit(page);
 
     // Trigger satellite deployment by adding an event to the flight log.
-    const deployed = await page.evaluate(() => {
+    const deployed = await page.evaluate(async () => {
       const fs = window.__flightState;
       const gs = window.__gameState;
       if (!fs || !gs) return false;
@@ -651,6 +660,7 @@ test.describe('Satellite deployment and benefits', () => {
         altitude: 100_000,
         description: 'Deployed CommSat to LEO',
       });
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
       return true;
     });
     expect(deployed).toBe(true);
@@ -1055,7 +1065,7 @@ test.describe('Docking approach and guidance', () => {
 
   test('(5) docked state is reached after docking completes', async () => {
     // Simulate completed docking.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ds = window.__flightState?.dockingState;
       if (!ds) return;
       ds.state = 'DOCKED';
@@ -1074,6 +1084,7 @@ test.describe('Docking approach and guidance', () => {
         targetId: 'station-1',
         description: 'Docked with Test Station',
       });
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     const docked = await page.evaluate(() => {
@@ -1126,16 +1137,17 @@ test.describe('Undocking and control assignment', () => {
     );
 
     // Set up docked state.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ds = window.__flightState?.dockingState;
       if (!ds) return;
       ds.state = 'DOCKED';
       ds.dockedObjectIds = ['station-1'];
       ds.combinedMass = 15_000;
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     // Simulate undocking.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ds = window.__flightState?.dockingState;
       if (!ds) return;
       ds.state = 'IDLE';
@@ -1149,6 +1161,7 @@ test.describe('Undocking and control assignment', () => {
         time: window.__flightState.timeElapsed,
         description: 'Undocked from station',
       });
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     const afterUndock = await page.evaluate(() => {
@@ -1196,7 +1209,7 @@ test.describe('Crew transfer and fuel transfer', () => {
     );
 
     // Set up docked state and simulate crew transfer.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ds = window.__flightState?.dockingState;
       const fs = window.__flightState;
       if (!ds || !fs) return;
@@ -1211,6 +1224,7 @@ test.describe('Crew transfer and fuel transfer', () => {
         direction: 'TO_STATION',
         description: 'Transferred Bob Kerman to station',
       });
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     const fs = await getFlightState(page);
@@ -1221,7 +1235,7 @@ test.describe('Crew transfer and fuel transfer', () => {
   });
 
   test('(2) fuel transfer event is logged during docked state', async () => {
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const fs = window.__flightState;
       if (!fs) return;
 
@@ -1231,6 +1245,7 @@ test.describe('Crew transfer and fuel transfer', () => {
         amount: 500,
         description: 'Transferred 500 units of fuel from station',
       });
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     const fs = await getFlightState(page);
@@ -1424,7 +1439,7 @@ test.describe('Grabbing arm and satellite repair', () => {
 
   test('(2) satellite repair event restores satellite health', async () => {
     // Simulate grabbing arm repair of the damaged satellite.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const fs = window.__flightState;
       const gs = window.__gameState;
       if (!fs || !gs) return;
@@ -1440,6 +1455,7 @@ test.describe('Grabbing arm and satellite repair', () => {
       // Apply the repair to satellite health.
       const sat = gs.satelliteNetwork?.satellites?.find(s => s.id === 'sat-repair-1');
       if (sat) sat.health = 100;
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     // Verify satellite health is restored.
@@ -1521,7 +1537,7 @@ test.describe('Integrated orbital operations', () => {
     await waitForOrbit(page);
 
     // Perform a brief orbital manoeuvre (prograde burn).
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ps = window.__flightPs;
       if (!ps) return;
       ps.controlMode = 'NORMAL';
@@ -1530,6 +1546,7 @@ test.describe('Integrated orbital operations', () => {
         ps.firingEngines.add(id);
         break;
       }
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     await page.waitForFunction(
@@ -1538,11 +1555,12 @@ test.describe('Integrated orbital operations', () => {
     );
 
     // Cut thrust.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ps = window.__flightPs;
       if (!ps) return;
       ps.throttle = 0;
       ps.firingEngines.clear();
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     await page.waitForFunction(
@@ -1599,12 +1617,13 @@ test.describe('Docking thresholds', () => {
       { timeout: 10_000 },
     );
 
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate(async () => {
       const ds = window.__flightState?.dockingState;
       if (!ds) return null;
       // Test speed below threshold.
       ds.targetRelSpeed = 1.5;
       ds.speedOk = ds.targetRelSpeed <= 2.0;
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
       return { speedOk: ds.speedOk, speed: ds.targetRelSpeed };
     });
 
@@ -1612,11 +1631,12 @@ test.describe('Docking thresholds', () => {
   });
 
   test('(2) speed NOT OK when relative speed > 2.0 m/s', async () => {
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate(async () => {
       const ds = window.__flightState?.dockingState;
       if (!ds) return null;
       ds.targetRelSpeed = 3.0;
       ds.speedOk = ds.targetRelSpeed <= 2.0;
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
       return { speedOk: ds.speedOk, speed: ds.targetRelSpeed };
     });
 
@@ -1624,11 +1644,12 @@ test.describe('Docking thresholds', () => {
   });
 
   test('(3) orientation OK when diff <= 0.15 rad', async () => {
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate(async () => {
       const ds = window.__flightState?.dockingState;
       if (!ds) return null;
       ds.targetOriDiff = 0.10;
       ds.orientationOk = ds.targetOriDiff <= 0.15;
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
       return { orientationOk: ds.orientationOk };
     });
 
@@ -1636,11 +1657,12 @@ test.describe('Docking thresholds', () => {
   });
 
   test('(4) lateral OK when offset <= 3.0 m', async () => {
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate(async () => {
       const ds = window.__flightState?.dockingState;
       if (!ds) return null;
       ds.targetLateral = 2.0;
       ds.lateralOk = ds.targetLateral <= 3.0;
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
       return { lateralOk: ds.lateralOk };
     });
 
@@ -1648,7 +1670,7 @@ test.describe('Docking thresholds', () => {
   });
 
   test('(5) auto-dock range is 15 m', async () => {
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate(async () => {
       const ds = window.__flightState?.dockingState;
       if (!ds) return null;
       // Verify auto-dock behaviour: within 15m with all OK → FINAL_APPROACH.
@@ -1657,6 +1679,7 @@ test.describe('Docking thresholds', () => {
       ds.orientationOk = true;
       ds.lateralOk = true;
       const wouldAutoDock = ds.targetDistance <= 15 && ds.speedOk && ds.orientationOk && ds.lateralOk;
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
       return { wouldAutoDock, distance: ds.targetDistance };
     });
 
@@ -1954,7 +1977,7 @@ test.describe('Complete orbital lifecycle', () => {
     expect(fsOrbit.inOrbit).toBe(true);
 
     // Start a manoeuvre.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ps = window.__flightPs;
       if (!ps) return;
       ps.controlMode = 'NORMAL';
@@ -1963,6 +1986,7 @@ test.describe('Complete orbital lifecycle', () => {
         ps.firingEngines.add(id);
         break;
       }
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     await page.waitForFunction(
@@ -1971,11 +1995,12 @@ test.describe('Complete orbital lifecycle', () => {
     );
 
     // End manoeuvre.
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       const ps = window.__flightPs;
       if (!ps) return;
       ps.throttle = 0;
       ps.firingEngines.clear();
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     await page.waitForFunction(
