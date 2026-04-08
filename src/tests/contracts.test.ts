@@ -542,7 +542,7 @@ describe('checkContractObjectives()', () => {
 // ---------------------------------------------------------------------------
 
 describe('processContractCompletions()', () => {
-  it('completes contracts with all objectives met', () => {
+  it('@smoke completes contracts with all objectives met', () => {
     const state = freshState();
     state.contracts.active.push(makeContract({
       id: 'c-done',

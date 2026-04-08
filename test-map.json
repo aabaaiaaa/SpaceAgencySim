@@ -1,0 +1,335 @@
+{
+  "_comment": "Maps source areas to test files. Used by scripts/run-affected.mjs. Update when adding new modules or tests.",
+  "areas": {
+    "core/physics": {
+      "sources": ["src/core/physics.ts"],
+      "unit": ["src/tests/physics.test.ts", "src/tests/physicsWorker.test.ts", "src/tests/physicsWorkerCommand.test.ts"],
+      "e2e": ["e2e/flight.spec.js", "e2e/landing.spec.js", "e2e/core-mechanics.spec.js", "e2e/phase-transitions.spec.js", "e2e/collision.spec.js"]
+    },
+    "core/physicsWorker": {
+      "sources": ["src/core/physicsWorker.ts", "src/core/physicsWorkerProtocol.ts"],
+      "unit": ["src/tests/physicsWorker.test.ts", "src/tests/physicsWorkerCommand.test.ts", "src/tests/workerBridgeTimeout.test.ts", "src/tests/loopErrorHandling.test.ts"],
+      "e2e": ["e2e/flight.spec.js", "e2e/core-mechanics.spec.js"]
+    },
+    "core/orbit": {
+      "sources": ["src/core/orbit.ts", "src/core/manoeuvre.ts"],
+      "unit": ["src/tests/orbit.test.ts", "src/tests/manoeuvre.test.ts"],
+      "e2e": ["e2e/orbital-operations.spec.js", "e2e/core-mechanics.spec.js", "e2e/phase-transitions.spec.js", "e2e/destinations.spec.js"]
+    },
+    "core/gameState": {
+      "sources": ["src/core/gameState.ts", "src/core/constants.ts"],
+      "unit": ["src/tests/gameState.test.ts"],
+      "e2e": ["e2e/newgame.spec.js", "e2e/saveload.spec.js"]
+    },
+    "core/flightPhase": {
+      "sources": ["src/core/flightPhase.ts"],
+      "unit": ["src/tests/flightPhase.test.ts"],
+      "e2e": ["e2e/phase-transitions.spec.js", "e2e/core-mechanics.spec.js", "e2e/flight.spec.js"]
+    },
+    "core/staging": {
+      "sources": ["src/core/staging.ts"],
+      "unit": ["src/tests/staging.test.ts"],
+      "e2e": ["e2e/rocketbuilder.spec.js", "e2e/flight.spec.js", "e2e/landing.spec.js", "e2e/collision.spec.js"]
+    },
+    "core/atmosphere": {
+      "sources": ["src/core/atmosphere.ts"],
+      "unit": ["src/tests/atmosphere.test.ts"],
+      "e2e": ["e2e/phase-transitions.spec.js", "e2e/destinations.spec.js"]
+    },
+    "core/parachute": {
+      "sources": ["src/core/parachute.ts", "src/core/legs.ts"],
+      "unit": ["src/tests/parachute-deploy.test.ts", "src/tests/parachute-descent.test.ts", "src/tests/parachute-landing.test.ts", "src/tests/legs.test.ts"],
+      "e2e": ["e2e/landing.spec.js", "e2e/context-menu.spec.js"]
+    },
+    "core/collision": {
+      "sources": ["src/core/collision.ts"],
+      "unit": ["src/tests/collision.test.ts"],
+      "e2e": ["e2e/collision.spec.js"]
+    },
+    "core/fuelsystem": {
+      "sources": ["src/core/fuelsystem.ts"],
+      "unit": ["src/tests/fuelsystem.test.ts"],
+      "e2e": ["e2e/flight.spec.js"]
+    },
+    "core/rocketbuilder": {
+      "sources": ["src/core/rocketbuilder.ts", "src/core/rocketvalidator.ts"],
+      "unit": ["src/tests/rocketbuilder.test.ts", "src/tests/rocketvalidator.test.ts", "src/tests/rocketbounds.test.ts"],
+      "e2e": ["e2e/rocketbuilder.spec.js", "e2e/part-reconnection.spec.js", "e2e/flight.spec.js"]
+    },
+    "core/missions": {
+      "sources": ["src/core/missions.ts"],
+      "unit": ["src/tests/missions.test.ts"],
+      "e2e": ["e2e/missions.spec.js", "e2e/flight-mission.spec.js", "e2e/mission-progression.spec.js"]
+    },
+    "core/contracts": {
+      "sources": ["src/core/contracts.ts"],
+      "unit": ["src/tests/contracts.test.ts"],
+      "e2e": ["e2e/agency-depth.spec.js"]
+    },
+    "core/challenges": {
+      "sources": ["src/core/challenges.ts", "src/core/customChallenges.ts"],
+      "unit": ["src/tests/challenges.test.ts", "src/tests/customChallenges.test.ts"],
+      "e2e": ["e2e/sandbox-replayability.spec.js"]
+    },
+    "core/crew": {
+      "sources": ["src/core/crew.ts"],
+      "unit": ["src/tests/crew.test.ts"],
+      "e2e": ["e2e/crew.spec.js", "e2e/agency-depth.spec.js"]
+    },
+    "core/finance": {
+      "sources": ["src/core/finance.ts", "src/core/period.ts"],
+      "unit": ["src/tests/finance.test.ts", "src/tests/period.test.ts", "src/tests/bankruptcy.test.ts"],
+      "e2e": ["e2e/agency-depth.spec.js", "e2e/failure-paths.spec.js"]
+    },
+    "core/reputation": {
+      "sources": ["src/core/reputation.ts"],
+      "unit": ["src/tests/reputation.test.ts"],
+      "e2e": ["e2e/reliability-risk.spec.js"]
+    },
+    "core/saveload": {
+      "sources": ["src/core/saveload.ts", "src/core/autoSave.ts", "src/core/idbStorage.ts"],
+      "unit": ["src/tests/saveload.test.ts", "src/tests/autoSave.test.ts", "src/tests/idbStorage.test.ts", "src/tests/storageErrors.test.ts"],
+      "e2e": ["e2e/saveload.spec.js", "e2e/auto-save.spec.js", "e2e/save-version.spec.js"]
+    },
+    "core/designLibrary": {
+      "sources": ["src/core/designLibrary.ts"],
+      "unit": ["src/tests/designLibrary.test.ts"],
+      "e2e": ["e2e/agency-depth.spec.js"]
+    },
+    "core/techtree": {
+      "sources": ["src/core/techtree.ts"],
+      "unit": ["src/tests/techtree.test.ts"],
+      "e2e": ["e2e/biomes-science.spec.js"]
+    },
+    "core/biomes": {
+      "sources": ["src/core/biomes.ts", "src/core/sciencemodule.ts", "src/core/surfaceOps.ts"],
+      "unit": ["src/tests/biomes.test.ts", "src/tests/sciencemodule.test.ts", "src/tests/surfaceOps.test.ts", "src/tests/instruments.test.ts"],
+      "e2e": ["e2e/biomes-science.spec.js", "e2e/destinations.spec.js"]
+    },
+    "core/satellites": {
+      "sources": ["src/core/satellites.ts", "src/core/comms.ts"],
+      "unit": ["src/tests/satellites.test.ts", "src/tests/comms.test.ts"],
+      "e2e": ["e2e/orbital-operations.spec.js", "e2e/additional-systems.spec.js"]
+    },
+    "core/docking": {
+      "sources": ["src/core/docking.ts", "src/core/grabbing.ts"],
+      "unit": ["src/tests/docking.test.ts", "src/tests/grabbing.test.ts"],
+      "e2e": ["e2e/orbital-operations.spec.js"]
+    },
+    "core/power": {
+      "sources": ["src/core/power.ts", "src/core/lifeSupport.ts"],
+      "unit": ["src/tests/power.test.ts", "src/tests/lifeSupport.test.ts"],
+      "e2e": ["e2e/additional-systems.spec.js", "e2e/orbital-operations.spec.js"]
+    },
+    "core/weather": {
+      "sources": ["src/core/weather.ts"],
+      "unit": ["src/tests/weather.test.ts"],
+      "e2e": ["e2e/reliability-risk.spec.js"]
+    },
+    "core/malfunction": {
+      "sources": ["src/core/malfunction.ts", "src/core/ejector.ts"],
+      "unit": ["src/tests/malfunction.test.ts", "src/tests/ejector.test.ts"],
+      "e2e": ["e2e/reliability-risk.spec.js", "e2e/failure-paths.spec.js"]
+    },
+    "core/controlMode": {
+      "sources": ["src/core/controlMode.ts"],
+      "unit": ["src/tests/controlMode.test.ts"],
+      "e2e": ["e2e/core-mechanics.spec.js"]
+    },
+    "core/mapView": {
+      "sources": ["src/core/mapView.ts"],
+      "unit": ["src/tests/mapView.test.ts"],
+      "e2e": ["e2e/core-mechanics.spec.js"]
+    },
+    "core/construction": {
+      "sources": ["src/core/construction.ts"],
+      "unit": ["src/tests/construction.test.ts", "src/tests/launchPadTiers.test.ts", "src/tests/vabTiers.test.ts", "src/tests/mccTiers.test.ts", "src/tests/trackingStationTiers.test.ts"],
+      "e2e": ["e2e/facilities-infrastructure.spec.js"]
+    },
+    "core/achievements": {
+      "sources": ["src/core/achievements.ts"],
+      "unit": ["src/tests/achievements.test.ts"],
+      "e2e": ["e2e/destinations.spec.js"]
+    },
+    "core/flightReturn": {
+      "sources": ["src/core/flightReturn.ts"],
+      "unit": ["src/tests/flightReturn.test.ts", "src/tests/multiBodyLanding.test.ts"],
+      "e2e": ["e2e/flight.spec.js", "e2e/landing.spec.js", "e2e/failure-paths.spec.js"]
+    },
+    "core/partInventory": {
+      "sources": ["src/core/partInventory.ts"],
+      "unit": ["src/tests/partInventory.test.ts"],
+      "e2e": ["e2e/reliability-risk.spec.js"]
+    },
+    "core/undoRedo": {
+      "sources": ["src/core/undoRedo.ts"],
+      "unit": ["src/tests/undoRedo.test.ts"],
+      "e2e": ["e2e/vab-undo.spec.js"]
+    },
+    "core/perfMonitor": {
+      "sources": ["src/core/perfMonitor.ts"],
+      "unit": ["src/tests/perfMonitor.test.ts"],
+      "e2e": ["e2e/fps-monitor.spec.js"]
+    },
+    "core/logger": {
+      "sources": ["src/core/logger.ts"],
+      "unit": ["src/tests/logger.test.ts"],
+      "e2e": []
+    },
+    "data/parts": {
+      "sources": ["src/data/parts.ts"],
+      "unit": ["src/tests/parts.test.ts"],
+      "e2e": ["e2e/rocketbuilder.spec.js", "e2e/core-mechanics.spec.js", "e2e/flight.spec.js"]
+    },
+    "data/bodies": {
+      "sources": ["src/data/bodies.ts"],
+      "unit": ["src/tests/bodies.test.ts"],
+      "e2e": ["e2e/destinations.spec.js"]
+    },
+    "data/missions": {
+      "sources": ["src/data/missions.ts"],
+      "unit": ["src/tests/missions.test.ts"],
+      "e2e": ["e2e/missions.spec.js", "e2e/mission-progression.spec.js", "e2e/tutorial-revisions.spec.js"]
+    },
+    "data/contracts": {
+      "sources": ["src/data/contracts.ts"],
+      "unit": ["src/tests/contracts.test.ts"],
+      "e2e": ["e2e/agency-depth.spec.js"]
+    },
+    "data/instruments": {
+      "sources": ["src/data/instruments.ts"],
+      "unit": ["src/tests/instruments.test.ts"],
+      "e2e": ["e2e/biomes-science.spec.js"]
+    },
+    "data/techtree": {
+      "sources": ["src/data/techtree.ts"],
+      "unit": ["src/tests/techtree.test.ts"],
+      "e2e": ["e2e/biomes-science.spec.js"]
+    },
+    "data/challenges": {
+      "sources": ["src/data/challenges.ts"],
+      "unit": ["src/tests/challenges.test.ts"],
+      "e2e": ["e2e/sandbox-replayability.spec.js"]
+    },
+    "ui/flightController": {
+      "sources": ["src/ui/flightController.ts", "src/ui/flightController/_init.ts", "src/ui/flightController/_loop.ts", "src/ui/flightController/_keyboard.ts", "src/ui/flightController/_flightPhase.ts", "src/ui/flightController/_timeWarp.ts", "src/ui/flightController/_menuActions.ts", "src/ui/flightController/_workerBridge.ts", "src/ui/flightController/_state.ts"],
+      "unit": ["src/tests/ui-fcState.test.ts", "src/tests/ui-timeWarp.test.ts", "src/tests/workerBridgeTimeout.test.ts", "src/tests/loopErrorHandling.test.ts"],
+      "e2e": ["e2e/flight.spec.js", "e2e/landing.spec.js", "e2e/core-mechanics.spec.js", "e2e/phase-transitions.spec.js"]
+    },
+    "ui/flightController/docking": {
+      "sources": ["src/ui/flightController/_docking.ts", "src/ui/flightController/_orbitRcs.ts"],
+      "unit": [],
+      "e2e": ["e2e/orbital-operations.spec.js"]
+    },
+    "ui/flightController/map": {
+      "sources": ["src/ui/flightController/_mapView.ts"],
+      "unit": [],
+      "e2e": ["e2e/core-mechanics.spec.js"]
+    },
+    "ui/flightController/surface": {
+      "sources": ["src/ui/flightController/_surfaceActions.ts", "src/ui/flightController/_postFlight.ts"],
+      "unit": [],
+      "e2e": ["e2e/destinations.spec.js", "e2e/landing.spec.js"]
+    },
+    "ui/flightHud": {
+      "sources": ["src/ui/flightHud.ts", "src/ui/flightContextMenu.ts"],
+      "unit": [],
+      "e2e": ["e2e/flight.spec.js", "e2e/context-menu.spec.js"]
+    },
+    "ui/vab": {
+      "sources": ["src/ui/vab.ts", "src/ui/vab/_init.ts", "src/ui/vab/_canvasInteraction.ts", "src/ui/vab/_panels.ts", "src/ui/vab/_partsPanel.ts", "src/ui/vab/_staging.ts", "src/ui/vab/_inventory.ts", "src/ui/vab/_state.ts", "src/ui/vab/_designLibrary.ts", "src/ui/vab/_engineerPanel.ts", "src/ui/vab/_launchFlow.ts", "src/ui/vab/_scalebar.ts", "src/ui/vab/_undoActions.ts"],
+      "unit": ["src/tests/ui-vabStaging.test.ts", "src/tests/ui-vabState.test.ts", "src/tests/ui-vabUndoActions.test.ts"],
+      "e2e": ["e2e/rocketbuilder.spec.js", "e2e/vab-undo.spec.js", "e2e/part-reconnection.spec.js"]
+    },
+    "ui/missionControl": {
+      "sources": ["src/ui/missionControl.ts", "src/ui/missionControl/_init.ts", "src/ui/missionControl/_shell.ts", "src/ui/missionControl/_state.ts", "src/ui/missionControl/_missionsTab.ts", "src/ui/missionControl/_contractsTab.ts", "src/ui/missionControl/_challengesTab.ts", "src/ui/missionControl/_achievementsTab.ts"],
+      "unit": ["src/tests/ui-mcState.test.ts"],
+      "e2e": ["e2e/missions.spec.js"]
+    },
+    "ui/crewAdmin": {
+      "sources": ["src/ui/crewAdmin.ts"],
+      "unit": [],
+      "e2e": ["e2e/crew.spec.js"]
+    },
+    "ui/hub": {
+      "sources": ["src/ui/hub.ts"],
+      "unit": [],
+      "e2e": ["e2e/newgame.spec.js", "e2e/hub-navigation.spec.js"]
+    },
+    "ui/topbar": {
+      "sources": ["src/ui/topbar.ts"],
+      "unit": [],
+      "e2e": ["e2e/saveload.spec.js", "e2e/flight.spec.js"]
+    },
+    "ui/mainmenu": {
+      "sources": ["src/ui/mainmenu.ts"],
+      "unit": [],
+      "e2e": ["e2e/newgame.spec.js", "e2e/saveload.spec.js"]
+    },
+    "ui/help": {
+      "sources": ["src/ui/help.ts"],
+      "unit": [],
+      "e2e": ["e2e/help.spec.js"]
+    },
+    "ui/launchPad": {
+      "sources": ["src/ui/launchPad.ts"],
+      "unit": [],
+      "e2e": ["e2e/launchpad.spec.js", "e2e/launchpad-relaunch.spec.js"]
+    },
+    "ui/rdLab": {
+      "sources": ["src/ui/rdLab.ts"],
+      "unit": [],
+      "e2e": ["e2e/biomes-science.spec.js"]
+    },
+    "ui/satelliteOps": {
+      "sources": ["src/ui/satelliteOps.ts"],
+      "unit": [],
+      "e2e": ["e2e/orbital-operations.spec.js"]
+    },
+    "ui/trackingStation": {
+      "sources": ["src/ui/trackingStation.ts"],
+      "unit": [],
+      "e2e": ["e2e/additional-systems.spec.js"]
+    },
+    "ui/settings": {
+      "sources": ["src/ui/settings.ts", "src/ui/perfDashboard.ts", "src/ui/fpsMonitor.ts"],
+      "unit": ["src/tests/ui-fpsMonitor.test.ts", "src/tests/perfMonitor.test.ts"],
+      "e2e": ["e2e/sandbox-replayability.spec.js", "e2e/fps-monitor.spec.js", "e2e/debug-mode.spec.js"]
+    },
+    "ui/utilities": {
+      "sources": ["src/ui/escapeHtml.ts", "src/ui/listenerTracker.ts", "src/ui/rocketCardUtil.ts", "src/ui/autoSaveToast.ts"],
+      "unit": ["src/tests/ui-escapeHtml.test.ts", "src/tests/escapeHtml.test.ts", "src/tests/ui-listenerTracker.test.ts", "src/tests/ui-rocketCardUtil.test.ts"],
+      "e2e": ["e2e/auto-save.spec.js"]
+    },
+    "render/flight": {
+      "sources": ["src/render/flight.ts", "src/render/flight/_init.ts", "src/render/flight/_camera.ts", "src/render/flight/_sky.ts", "src/render/flight/_ground.ts", "src/render/flight/_rocket.ts", "src/render/flight/_debris.ts", "src/render/flight/_trails.ts", "src/render/flight/_pool.ts", "src/render/flight/_state.ts", "src/render/flight/_input.ts", "src/render/flight/_constants.ts"],
+      "unit": ["src/tests/render-camera.test.ts", "src/tests/render-sky.test.ts", "src/tests/render-ground.test.ts", "src/tests/render-constants.test.ts", "src/tests/render-trails.test.ts", "src/tests/render-input.test.ts", "src/tests/render-flight-pool.test.ts", "src/tests/render-state.test.ts"],
+      "e2e": ["e2e/flight.spec.js", "e2e/landing.spec.js"]
+    },
+    "render/map": {
+      "sources": ["src/render/map.ts"],
+      "unit": [],
+      "e2e": ["e2e/core-mechanics.spec.js", "e2e/orbital-operations.spec.js"]
+    },
+    "render/vab": {
+      "sources": ["src/render/vab.ts"],
+      "unit": [],
+      "e2e": ["e2e/rocketbuilder.spec.js"]
+    },
+    "render/hub": {
+      "sources": ["src/render/hub.ts"],
+      "unit": [],
+      "e2e": ["e2e/newgame.spec.js", "e2e/hub-navigation.spec.js"]
+    },
+    "render/pool": {
+      "sources": ["src/render/pool.ts"],
+      "unit": ["src/tests/pool.test.ts", "src/tests/render-flight-pool.test.ts"],
+      "e2e": []
+    },
+    "e2e-infra": {
+      "sources": ["e2e/helpers.js", "e2e/helpers/", "e2e/fixtures.js"],
+      "unit": ["src/tests/e2e-infrastructure.test.ts"],
+      "e2e": ["e2e/**/*.spec.js"]
+    }
+  }
+}

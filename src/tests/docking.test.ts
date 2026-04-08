@@ -535,7 +535,7 @@ describe('tickDocking', () => {
     expect(ds.targetId).toBeNull();
   });
 
-  it('transitions from APPROACHING to ALIGNING when close enough', () => {
+  it('@smoke transitions from APPROACHING to ALIGNING when close enough', () => {
     const ds = createDockingState();
     ds.state = DockingState.APPROACHING;
     ds.targetId = 'station-1';

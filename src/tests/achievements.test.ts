@@ -372,7 +372,7 @@ describe('FIRST_SOLAR_SCIENCE', () => {
 // ---------------------------------------------------------------------------
 
 describe('multiple achievements', () => {
-  it('can award multiple achievements in a single check', () => {
+  it('@smoke can award multiple achievements in a single check', () => {
     const state = createGameState();
     // Set up state to earn FIRST_ORBIT + FIRST_SATELLITE + FIRST_LUNAR_FLYBY
     state.missions.completed.push({

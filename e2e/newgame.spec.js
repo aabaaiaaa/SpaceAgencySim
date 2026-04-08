@@ -1,108 +1,82 @@
 import { test, expect } from '@playwright/test';
-import { SAVE_KEY, buildSaveEnvelope, dismissWelcomeModal } from './helpers.js';
+import {
+  VP_W, VP_H, SAVE_KEY, STARTING_MONEY,
+  buildSaveEnvelope, seedAndLoadSave, dismissWelcomeModal,
+} from './helpers.js';
 
 /**
  * E2E — App Load & New Game Flow
  *
- * Covers the entry path from a fresh browser context through to the hub
- * screen, plus the load-screen path when a save already exists.
- *
- * Tests (1)–(5) run in serial order on a shared page instance (no saves
- * present).  Test (6) creates its own isolated browser context and injects
- * a save into localStorage before navigating, so the load screen is shown.
- *
- * Execution order:
- *   beforeAll : Create page, attach error listeners, navigate to '/'
- *   (1)       : Page loads without console errors
- *   (2)       : New Game screen is shown (no saves present)
- *   (3)       : Enter agency name → click Start Game → hub appears
- *   (4)       : Hub top bar shows $2,000,000
- *   (5)       : Hub has all four clickable buildings
- *   (6)       : Isolated context with a pre-seeded save shows load screen
+ * Each test is independent — seeds its own state and gets a fresh page.
  */
 
-test.describe.configure({ mode: 'serial' });
-
 test.describe('App Load & New Game Flow', () => {
-  /** @type {import('@playwright/test').Page} */
-  let page;
 
-  /** Console errors collected during the initial page load. */
-  const consoleErrors = [];
+  // ── (1) Page loads without console errors ───────────────────────────────
 
-  // ── Setup ────────────────────────────────────────────────────────────────
-
-  test.beforeAll(async ({ browser }) => {
-    page = await browser.newPage();
-
-    // Capture console errors and uncaught exceptions that occur during load.
+  test('(1) navigating to app root loads the page without console errors', async ({ page }) => {
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    const consoleErrors = [];
     page.on('pageerror', (err) => consoleErrors.push(err.message));
     page.on('console', (msg) => {
       if (msg.type() === 'error') consoleErrors.push(msg.text());
     });
 
     await page.goto('/');
-
-    // A fresh context has no saves, so the New Game screen should appear.
-    await page.waitForSelector('#mm-agency-name-input', {
-      state:   'visible',
-      timeout: 15_000,
-    });
-  });
-
-  test.afterAll(async () => {
-    await page.close();
-  });
-
-  // ── (1) Page loads without console errors ───────────────────────────────
-
-  test('(1) navigating to app root loads the page without console errors', async () => {
+    await page.waitForSelector('#mm-agency-name-input', { state: 'visible', timeout: 15_000 });
     expect(consoleErrors).toHaveLength(0);
   });
 
   // ── (2) No saves → New Game screen is shown ─────────────────────────────
 
-  test('(2) with no saves present, the New Game screen is shown (not the load screen)', async () => {
-    // New Game screen must be visible.
+  test('(2) with no saves present, the New Game screen is shown (not the load screen)', async ({ page }) => {
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    await page.goto('/');
+    await page.waitForSelector('#mm-agency-name-input', { state: 'visible', timeout: 15_000 });
+
     await expect(page.locator('#mm-newgame-screen')).toBeVisible();
     await expect(page.locator('[data-screen="newgame"]')).toBeVisible();
-
-    // The load screen must not be present.
     await expect(page.locator('#mm-load-screen')).toHaveCount(0);
   });
 
   // ── (3) Start a new game → hub appears ──────────────────────────────────
 
-  test('(3) entering an agency name and clicking "Start Game" navigates to the space agency hub', async () => {
+  test('(3) entering an agency name and clicking "Start Game" navigates to the space agency hub', async ({ page }) => {
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    await page.goto('/');
+    await page.waitForSelector('#mm-agency-name-input', { state: 'visible', timeout: 15_000 });
+
     await page.fill('#mm-agency-name-input', 'Galaxy Explorers');
     await page.click('#mm-start-btn');
 
-    // Hub overlay must appear after the menu fade-out animation.
     await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
     await expect(page.locator('#hub-overlay')).toBeVisible();
-
-    // Welcome modal should appear on first hub visit.
     await expect(page.locator('#welcome-modal')).toBeVisible();
-
-    // Dismiss it so subsequent tests can interact with the hub.
     await dismissWelcomeModal(page);
     await expect(page.locator('#welcome-modal')).toHaveCount(0);
   });
 
   // ── (4) Hub top bar shows correct starting cash ──────────────────────────
 
-  test('(4) the hub shows the correct starting cash ($2,000,000) in the top bar', async () => {
-    await expect(page.locator('#game-topbar')).toBeVisible();
+  test('(4) the hub shows the correct starting cash ($2,000,000) in the top bar', async ({ page }) => {
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    // Seed a save and load directly to hub instead of going through new game flow.
+    const envelope = buildSaveEnvelope({ agencyName: 'Galaxy Explorers', money: STARTING_MONEY });
+    await seedAndLoadSave(page, envelope);
+    await dismissWelcomeModal(page);
 
-    // Cash readout must contain "2,000,000" (formatted with commas).
+    await expect(page.locator('#game-topbar')).toBeVisible();
     await expect(page.locator('#topbar-cash')).toContainText('2,000,000');
   });
 
-  // ── (5) Hub shows all four clickable buildings ───────────────────────────
+  // ── (5) Hub shows starter buildings ─────────────────────────────────────
 
-  test('(5) the hub shows only the starter buildings (tutorial mode hides unbuilt facilities)', async () => {
-    // In tutorial mode, only starter facilities (Launch Pad, VAB, MCC) are
-    // pre-built — unbuilt facilities like Crew Admin are hidden.
+  test('(5) the hub shows only the starter buildings (tutorial mode hides unbuilt facilities)', async ({ page }) => {
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    const envelope = buildSaveEnvelope({ agencyName: 'Galaxy Explorers', tutorialMode: true });
+    await seedAndLoadSave(page, envelope);
+    await dismissWelcomeModal(page);
+
     const starterBuildings = [
       { id: 'launch-pad',      label: 'Launch Pad' },
       { id: 'vab',             label: 'Vehicle Assembly Building' },
@@ -115,7 +89,6 @@ test.describe('App Load & New Game Flow', () => {
       await expect(bld).toContainText(label);
     }
 
-    // Unbuilt facilities must NOT be visible.
     const unbuiltIds = ['crew-admin', 'tracking-station', 'rd-lab', 'satellite-ops', 'library'];
     for (const id of unbuiltIds) {
       await expect(page.locator(`[data-building-id="${id}"]`)).toHaveCount(0);
@@ -130,13 +103,9 @@ test.describe('App Load & New Game Flow', () => {
     const AGENCY_NAME = 'Stardust Corp';
     const MONEY       = 2_000_000;
 
-    // Create an isolated browser context so this test does not share
-    // localStorage with the page used by tests (1)–(5).
     const ctx = await browser.newContext();
     const p   = await ctx.newPage();
 
-    // Inject a save into localStorage before the page boots so that
-    // listSaves() finds it immediately and shows the load screen.
     await p.addInitScript(({ key, envelope }) => {
       localStorage.setItem(key, JSON.stringify(envelope));
     }, {
@@ -147,19 +116,14 @@ test.describe('App Load & New Game Flow', () => {
     await p.goto('/');
     await p.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
 
-    // Load screen (not New Game screen) must be the active view.
     await expect(p.locator('[data-screen="load"]')).toBeVisible();
 
-    // The save card for slot 0 must be a populated (non-empty) card.
     const card = p.locator('.mm-save-card[data-slot="0"]:not(.mm-empty-slot)');
     await expect(card).toBeVisible();
-
-    // Card must display the save name, agency name, and cash balance.
     await expect(card).toContainText(SAVE_NAME);
     await expect(card).toContainText(AGENCY_NAME);
     await expect(card).toContainText('2,000,000');
 
-    // Missions completed should show as 0.
     const missionsStat = card.locator('.mm-stat').filter({ hasText: /missions done/i });
     await expect(missionsStat).toContainText('0');
 

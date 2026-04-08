@@ -1562,7 +1562,7 @@ describe('Mission lifecycle integration', () => {
 // ---------------------------------------------------------------------------
 
 describe('processFlightReturn() — multi-mission completion', () => {
-  it('completes two missions when all objectives are met and credits both rewards', () => {
+  it('@smoke completes two missions when all objectives are met and credits both rewards', () => {
     const state = freshState();
     // Zero out any starting loan so interest doesn't affect the assertion.
     state.loan = { balance: 0, interestRate: 0 };

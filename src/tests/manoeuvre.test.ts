@@ -180,7 +180,7 @@ describe('Manoeuvre — computeTransferDeltaV', () => {
     expect(result).toBeNull();
   });
 
-  it('computes Earth → Moon transfer with reasonable delta-v', () => {
+  it('@smoke computes Earth → Moon transfer with reasonable delta-v', () => {
     const result = computeTransferDeltaV(CelestialBody.EARTH, CelestialBody.MOON, 150_000);
     expect(result).not.toBeNull();
     expect(result.departureDV).toBeGreaterThan(2000);   // ~3.1 km/s departure

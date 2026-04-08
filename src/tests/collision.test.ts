@@ -771,7 +771,7 @@ describe('tickCollisions integration', () => {
     expect(ps.velY).not.toBe(velBefore);
   });
 
-  it('two-stage rocket: after separation, bodies diverge over 60 ticks', () => {
+  it('@smoke two-stage rocket: after separation, bodies diverge over 60 ticks', () => {
     const { assembly, staging } = makeTwoStageRocket();
     const fs = makeFlightState();
     const ps = createPhysicsState(assembly, fs);

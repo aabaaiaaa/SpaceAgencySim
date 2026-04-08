@@ -997,7 +997,7 @@ describe('fireNextStage() — debris integration via physics.js', () => {
     expect(debris.posY).toBeLessThan(initialDebrisY);
   });
 
-  it('multiple stage separations each add a debris fragment', () => {
+  it('@smoke multiple stage separations each add a debris fragment', () => {
     // Build a three-stage rocket: two decouplers.
     const assembly = createRocketAssembly();
     const staging  = createStagingConfig();

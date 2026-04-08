@@ -4,6 +4,11 @@ export default defineConfig({
   resolve: {
     extensions: ['.ts', '.js', '.mjs', '.mts', '.json'],
   },
+  server: {
+    watch: {
+      ignored: ['**/src/tests/**', '**/e2e/**', '**/test-map.json', '**/scripts/**', '**/playwright-report/**', '**/test-results/**'],
+    },
+  },
   // Test configuration for Vitest (headless unit tests for core game logic)
   test: {
     environment: 'node',

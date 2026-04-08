@@ -1,147 +1,155 @@
 import { test, expect } from '@playwright/test';
-import { STARTING_MONEY, dragPartToCanvas, dismissWelcomeModal } from './helpers.js';
+import {
+  VP_W, VP_H,
+  SAVE_KEY, STARTING_MONEY,
+  buildSaveEnvelope, seedAndLoadSave, dismissWelcomeModal,
+  navigateToVab, dragPartToCanvas,
+} from './helpers.js';
 
 /**
  * E2E — Save & Load Flow
  *
- * Tests the full save/load cycle: saving from the topbar hamburger menu
- * "Save Game" slot picker, verifying the load screen, loading a save back,
- * deleting saves, and exporting.
- *
- * Tests run in serial order on a shared page instance so each test builds on
- * the state established by the previous one.
- *
- * Execution order:
- *   Setup  : New Game → enter agency name → reach VAB
- *   (1)    : Topbar Menu → Save Game shows slot picker with 5 slots
- *   (2)    : Save to slot 0 → modal closes
- *   (3)    : Navigate to '/' → load screen lists the save with agency name & stats
- *   (7)    : Export save → file download is valid JSON containing a money field
- *   (4)    : Click Load → back at hub with correct game state
- *   (5)    : Save slot 1, navigate to '/', delete slot 0 → removed from list
- *   (6)    : Delete slot 1 → navigate to '/' → New Game screen shown
- *   (8)    : VAB rocket assembly persists across save/load cycle
+ * Each test is independent — seeds its own state.
  */
 
-test.describe.configure({ mode: 'serial' });
+const AGENCY_NAME = 'Test Agency';
+
+function makeEnvelope(overrides = {}) {
+  return buildSaveEnvelope({ agencyName: AGENCY_NAME, ...overrides });
+}
+
+async function openTopbarSaveDialog(page) {
+  await page.click('#topbar-menu-btn');
+  await expect(page.locator('#topbar-dropdown')).toBeVisible();
+  await page.locator('#topbar-dropdown').getByText('Save Game').click();
+  await expect(page.locator('#save-modal-backdrop')).toBeVisible();
+}
+
+/** Start a new game and navigate to VAB. */
+async function startNewGameAndGoToVab(page) {
+  await page.setViewportSize({ width: VP_W, height: VP_H });
+  await page.goto('/');
+  await page.waitForSelector('#mm-agency-name-input', { state: 'visible', timeout: 15_000 });
+  await page.fill('#mm-agency-name-input', AGENCY_NAME);
+  await page.click('#mm-start-btn');
+  await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
+  await dismissWelcomeModal(page);
+  await page.click('[data-building-id="vab"]');
+  await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 15_000 });
+}
+
+/** Seed a save in slot 0 and navigate to the load screen. */
+async function seedSaveAndGoToLoadScreen(page, envelope) {
+  await page.setViewportSize({ width: VP_W, height: VP_H });
+  await page.addInitScript(({ key, envelope }) => {
+    localStorage.setItem(key, JSON.stringify(envelope));
+  }, { key: SAVE_KEY, envelope });
+  await page.goto('/');
+  await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
+}
 
 test.describe('Save & Load Flow', () => {
-  /** @type {import('@playwright/test').Page} */
-  let page;
 
-  const AGENCY_NAME    = 'Test Agency';
+  test('(1) opening the topbar menu and clicking Save Game shows a slot picker with 5 slots', async ({ page }) => {
+    await startNewGameAndGoToVab(page);
+    await openTopbarSaveDialog(page);
 
-  // ── Setup ──────────────────────────────────────────────────────────────────
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
-    await page.goto('/');
-
-    // Fresh context — no saves — New Game screen is shown.
-    await page.waitForSelector('#mm-agency-name-input', {
-      state: 'visible',
-      timeout: 15_000,
-    });
-    await page.fill('#mm-agency-name-input', AGENCY_NAME);
-    await page.click('#mm-start-btn');
-
-    // After starting a new game the hub is shown first.
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
-
-    // Dismiss the welcome modal so buildings are clickable.
-    await dismissWelcomeModal(page);
-
-    // Navigate from the hub to the Vehicle Assembly Building.
-    await page.click('[data-building-id="vab"]');
-
-    // Wait for the VAB to load.
-    await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 15_000 });
-    await page.waitForFunction(
-      () => typeof window.__gameState !== 'undefined',
-      { timeout: 15_000 },
-    );
-  });
-
-  test.afterAll(async () => {
-    await page.close();
-  });
-
-  // ── Helper: open the topbar Save Game slot picker ────────────────────────
-
-  async function openTopbarSaveDialog() {
-    await page.click('[data-testid="topbar-menu-btn"]');
-    await expect(page.locator('#topbar-dropdown')).toBeVisible();
-    await page.locator('#topbar-dropdown button').filter({ hasText: 'Save Game' }).click();
-    await expect(page.locator('#save-modal-backdrop')).toBeVisible();
-  }
-
-  // ── (1) Topbar Menu → Save Game shows a slot picker with 5 slots ────────
-
-  test('(1) opening the topbar menu and clicking Save Game shows a slot picker with 5 slots', async () => {
-    await openTopbarSaveDialog();
-
-    // Exactly 5 slot cards must be rendered.
     const slots = page.locator('.save-slot-card');
     await expect(slots).toHaveCount(5);
-
-    // Each slot index 0–4 should have a corresponding card.
     for (let i = 0; i < 5; i++) {
       await expect(page.locator(`[data-testid="save-slot-${i}"]`)).toBeVisible();
     }
   });
 
-  // ── (2) Saving to slot 0 succeeds and the modal closes ────────────────────
-
-  test('(2) saving to slot 0 succeeds and the modal closes', async () => {
-    // Modal is still open from test (1).
-    await expect(page.locator('#save-modal-backdrop')).toBeVisible();
-
-    // Click slot 0 — the topbar save is immediate (no name input or confirm).
+  test('(2) saving to slot 0 succeeds and the modal closes', async ({ page }) => {
+    await startNewGameAndGoToVab(page);
+    await openTopbarSaveDialog(page);
     await page.click('[data-testid="save-slot-0"]');
-
-    // The modal should close after saving.
     await expect(page.locator('#save-modal-backdrop')).toHaveCount(0, { timeout: 4_000 });
   });
 
-  // ── (3) Navigating to app root shows load screen with the save ─────────────
+  test('(3) navigating to the app root shows load screen with save, agency name, and stats', async ({ page }) => {
+    await seedSaveAndGoToLoadScreen(page, makeEnvelope());
 
-  test('(3) navigating to the app root shows load screen with save, agency name, and stats', async () => {
-    await page.goto('/');
-
-    // The main-menu overlay should display the load screen (save exists).
-    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
     await expect(page.locator('[data-screen="load"]')).toBeVisible();
-
-    // The save card for slot 0 should be present and populated.
     const slot0Card = page.locator('.mm-save-card[data-slot="0"]:not(.mm-empty-slot)');
     await expect(slot0Card).toBeVisible();
-
-    // Save name should be the agency name (topbar uses agency name automatically).
     await expect(slot0Card).toContainText(AGENCY_NAME);
-
-    // Cash — $2,000,000 (displayed as "2,000,000" somewhere in the card).
     await expect(slot0Card).toContainText('2,000,000');
 
-    // Missions completed should be 0.
     const missionsStat = slot0Card.locator('.mm-stat').filter({ hasText: /missions done/i });
     await expect(missionsStat).toContainText('0');
   });
 
-  // ── (7) Exporting a save produces a file download that is valid JSON ────────
-  // (Placed here so a save already exists in slot 0 and we are on the load screen.)
+  test('(4) clicking Load on the saved slot returns to the hub with the correct game state', async ({ page }) => {
+    await seedSaveAndGoToLoadScreen(page, makeEnvelope());
 
-  test('(7) exporting a save produces a file download that is valid JSON containing a money field', async () => {
-    // Should be on the load screen from test (3).
-    await expect(page.locator('#mm-load-screen')).toBeVisible();
+    await page.click('[data-action="load"][data-slot="0"]');
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
 
-    // Intercept the download before clicking.
+    const agencyName = await page.evaluate(() => window.__gameState?.agencyName);
+    expect(agencyName).toBe(AGENCY_NAME);
+
+    const money = await page.evaluate(() => window.__gameState?.money);
+    expect(money).toBe(STARTING_MONEY);
+  });
+
+  test('(5) deleting a save slot removes it from the load screen list', async ({ page }) => {
+    // Seed TWO saves so deleting one doesn't empty the list.
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    await page.addInitScript(({ key0, env0, key1, env1 }) => {
+      localStorage.setItem(key0, JSON.stringify(env0));
+      localStorage.setItem(key1, JSON.stringify(env1));
+    }, {
+      key0: 'spaceAgencySave_0', env0: makeEnvelope({ saveName: 'Save A' }),
+      key1: 'spaceAgencySave_1', env1: makeEnvelope({ saveName: 'Save B' }),
+    });
+    await page.goto('/');
+    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
+
+    await expect(page.locator('.mm-save-card:not(.mm-empty-slot)[data-slot="0"]')).toBeVisible();
+    await expect(page.locator('.mm-save-card:not(.mm-empty-slot)[data-slot="1"]')).toBeVisible();
+
+    await page.click('[data-action="delete"][data-slot="0"]');
+    await page.waitForSelector('#mm-modal-confirm', { state: 'visible', timeout: 5_000 });
+    await page.click('#mm-modal-confirm');
+
+    await expect(page.locator('.mm-save-card.mm-empty-slot[data-slot="0"]')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('.mm-save-card:not(.mm-empty-slot)[data-slot="1"]')).toBeVisible();
+  });
+
+  test('(6) after deleting the only save, navigating to the app root shows the New Game screen', async ({ page }) => {
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    // Seed via evaluate AFTER page loads (not addInitScript which re-seeds on every goto).
+    await page.goto('/');
+    await page.waitForSelector('#mm-newgame-screen', { state: 'visible', timeout: 15_000 });
+    await page.evaluate(({ key, envelope }) => {
+      localStorage.setItem(key, JSON.stringify(envelope));
+    }, { key: SAVE_KEY, envelope: makeEnvelope() });
+
+    // Reload to pick up the seeded save.
+    await page.goto('/');
+    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
+
+    await page.click('[data-action="delete"][data-slot="0"]');
+    await page.waitForSelector('#mm-modal-confirm', { state: 'visible', timeout: 5_000 });
+    await page.click('#mm-modal-confirm');
+
+    // Navigate again — no saves remain, so New Game screen must appear.
+    await page.goto('/');
+    await page.waitForSelector('#mm-newgame-screen', { state: 'visible', timeout: 15_000 });
+    await expect(page.locator('[data-screen="newgame"]')).toBeVisible();
+    await expect(page.locator('#mm-load-screen')).toHaveCount(0);
+  });
+
+  test('(7) exporting a save produces a file download that is valid JSON containing a money field', async ({ page }) => {
+    await seedSaveAndGoToLoadScreen(page, makeEnvelope());
+
     const [download] = await Promise.all([
       page.waitForEvent('download'),
       page.click('[data-action="export"][data-slot="0"]'),
     ]);
 
-    // Read the downloaded file as text.
     const stream  = await download.createReadStream();
     const chunks  = [];
     for await (const chunk of stream) {
@@ -149,114 +157,17 @@ test.describe('Save & Load Flow', () => {
     }
     const rawJson = Buffer.concat(chunks).toString('utf-8');
 
-    // The content must be valid JSON.
     let parsed;
     expect(() => { parsed = JSON.parse(rawJson); }).not.toThrow();
-
-    // The envelope must contain a state object with a numeric money field.
     expect(parsed).toHaveProperty('state');
     expect(parsed.state).toHaveProperty('money');
     expect(typeof parsed.state.money).toBe('number');
   });
 
-  // ── (4) Clicking Load returns to the hub with the correct game state ────────
+  test('(8) VAB rocket assembly persists across save/load cycle', async ({ page }) => {
+    await startNewGameAndGoToVab(page);
 
-  test('(4) clicking Load on the saved slot returns to the hub with the correct game state', async () => {
-    // Should still be on the load screen from test (3) / (7).
-    await expect(page.locator('#mm-load-screen')).toBeVisible();
-
-    // Click Load on slot 0.
-    await page.click('[data-action="load"][data-slot="0"]');
-
-    // Loading a game returns to the hub first (not directly to VAB).
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
-    await page.waitForFunction(
-      () => typeof window.__gameState !== 'undefined',
-      { timeout: 15_000 },
-    );
-
-    // Agency name must match.
-    const agencyName = await page.evaluate(() => window.__gameState?.agencyName);
-    expect(agencyName).toBe(AGENCY_NAME);
-
-    // Money must match starting balance ($2,000,000).
-    const money = await page.evaluate(() => window.__gameState?.money);
-    expect(money).toBe(STARTING_MONEY);
-
-    // Navigate to the VAB so test (5) can use the save controls there.
-    await page.click('[data-building-id="vab"]');
-    await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 15_000 });
-  });
-
-  // ── (5) Deleting a save slot removes it from the load screen list ───────────
-
-  test('(5) deleting a save slot removes it from the load screen list', async () => {
-    // We are back at the VAB after test (4).  First save a second slot so that
-    // deleting slot 0 does not empty the list entirely (which would switch
-    // directly to the New Game screen, skipping the load-screen assertion).
-    await openTopbarSaveDialog();
-
-    // Click slot 1 to save immediately.
-    await page.click('[data-testid="save-slot-1"]');
-    await expect(page.locator('#save-modal-backdrop')).toHaveCount(0, { timeout: 4_000 });
-
-    // Navigate to the root — load screen should list both slot 0 and slot 1.
-    await page.goto('/');
-    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
-    await expect(page.locator('.mm-save-card:not(.mm-empty-slot)[data-slot="0"]')).toBeVisible();
-    await expect(page.locator('.mm-save-card:not(.mm-empty-slot)[data-slot="1"]')).toBeVisible();
-
-    // Delete slot 0.
-    await page.click('[data-action="delete"][data-slot="0"]');
-
-    // Confirm the deletion in the modal.
-    await page.waitForSelector('#mm-modal-confirm', { state: 'visible', timeout: 5_000 });
-    await page.click('#mm-modal-confirm');
-
-    // Slot 0 should now show as an empty slot; slot 1 must remain populated.
-    await expect(page.locator('.mm-save-card.mm-empty-slot[data-slot="0"]')).toBeVisible({ timeout: 5_000 });
-    await expect(page.locator('.mm-save-card:not(.mm-empty-slot)[data-slot="1"]')).toBeVisible();
-  });
-
-  // ── (6) After deleting the only save, app root shows the New Game screen ───
-
-  test('(6) after deleting the only save, navigating to the app root shows the New Game screen', async () => {
-    // Currently on the load screen with slot 1 as the only remaining save.
-    await expect(page.locator('#mm-load-screen')).toBeVisible();
-
-    // Delete slot 1 (the last save).
-    await page.click('[data-action="delete"][data-slot="1"]');
-    await page.waitForSelector('#mm-modal-confirm', { state: 'visible', timeout: 5_000 });
-    await page.click('#mm-modal-confirm');
-
-    // Navigate to the root — no saves remain so the New Game screen must appear.
-    await page.goto('/');
-    await page.waitForSelector('#mm-newgame-screen', { state: 'visible', timeout: 15_000 });
-    await expect(page.locator('[data-screen="newgame"]')).toBeVisible();
-
-    // The load screen must not be present.
-    await expect(page.locator('#mm-load-screen')).toHaveCount(0);
-  });
-
-  // ── (8) VAB rocket assembly persists across save/load cycle ───────────────
-
-  test('(8) VAB rocket assembly persists across save/load cycle', async () => {
-    // We are on the New Game screen after test (6) deleted all saves.
-    await expect(page.locator('#mm-newgame-screen')).toBeVisible();
-
-    // Start a new game.
-    await page.fill('#mm-agency-name-input', 'Persist Test');
-    await page.click('#mm-start-btn');
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
-
-    // Dismiss the welcome modal so buildings are clickable.
-    await dismissWelcomeModal(page);
-
-    // Navigate to the VAB.
-    await page.click('[data-building-id="vab"]');
-    await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 15_000 });
-
-    // Disable auto-zoom so viewport-pixel offsets map 1:1 to world units.
+    // Disable auto-zoom.
     await page.evaluate(() => {
       const chk = document.getElementById('vab-chk-autozoom');
       if (chk && chk.checked) { chk.checked = false; chk.dispatchEvent(new Event('change')); }
@@ -264,55 +175,29 @@ test.describe('Save & Load Flow', () => {
       if (slider) { slider.value = '1'; slider.dispatchEvent(new Event('input')); }
     });
 
-    // ── Place a part onto the canvas ──────────────────────────────────────
-    // Use a starter part (probe-core-mk1) since cmd-mk1 is not unlocked
-    // in a fresh new game.
-    await page.waitForSelector('.vab-part-card[data-part-id="probe-core-mk1"]', {
-      state: 'visible',
-      timeout: 10_000,
-    });
+    await page.waitForSelector('.vab-part-card[data-part-id="probe-core-mk1"]', { state: 'visible', timeout: 10_000 });
     await dragPartToCanvas(page, 'probe-core-mk1', 525, 400);
+    await page.waitForFunction(() => (window.__vabAssembly?.parts?.size ?? 0) >= 1, { timeout: 5_000 });
 
-    // Wait for the part to be registered.
-    await page.waitForFunction(
-      () => (window.__vabAssembly?.parts?.size ?? 0) >= 1,
-      { timeout: 5_000 },
-    );
-
-    // Verify part is placed.
     const sizeBefore = await page.evaluate(() => window.__vabAssembly.parts.size);
     expect(sizeBefore).toBeGreaterThanOrEqual(1);
 
-    // ── Save the game from the topbar menu ──────────────────────────────
-    await openTopbarSaveDialog();
-
-    // Click slot 0 to save immediately.
+    await openTopbarSaveDialog(page);
     await page.click('[data-testid="save-slot-0"]');
     await expect(page.locator('#save-modal-backdrop')).toHaveCount(0, { timeout: 4_000 });
 
-    // ── Full page reload to clear in-memory state ─────────────────────────
     await page.goto('/');
     await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
-
-    // ── Load the save ─────────────────────────────────────────────────────
     await page.click('[data-action="load"][data-slot="0"]');
     await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
 
-    // ── Navigate to the VAB ───────────────────────────────────────────────
     await page.click('[data-building-id="vab"]');
     await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 15_000 });
+    await page.waitForFunction(() => (window.__vabAssembly?.parts?.size ?? 0) >= 1, { timeout: 5_000 });
 
-    // Wait for the assembly to be restored.
-    await page.waitForFunction(
-      () => (window.__vabAssembly?.parts?.size ?? 0) >= 1,
-      { timeout: 5_000 },
-    );
-
-    // ── Verify the part survived the save/load cycle ──────────────────────
     const sizeAfter = await page.evaluate(() => window.__vabAssembly.parts.size);
     expect(sizeAfter).toBeGreaterThanOrEqual(1);
 
-    // Verify the correct part type was restored.
     const hasProbe = await page.evaluate(() => {
       for (const p of window.__vabAssembly.parts.values()) {
         if (p.partId === 'probe-core-mk1') return true;

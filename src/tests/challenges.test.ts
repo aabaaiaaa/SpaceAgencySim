@@ -348,7 +348,7 @@ describe('Challenge System', () => {
   // ── Challenge completion ───────────────────────────────────────────────
 
   describe('processChallengeCompletion', () => {
-    it('completes challenge when all objectives met and awards medal', () => {
+    it('@smoke completes challenge when all objectives met and awards medal', () => {
       const state = freshState();
       acceptChallenge(state, 'challenge-penny-pincher');
 

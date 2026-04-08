@@ -264,7 +264,7 @@ describe('buildFacility', () => {
     expect(result.success).toBe(false);
   });
 
-  it('builds R&D Lab and deducts both money and science', () => {
+  it('@smoke builds R&D Lab and deducts both money and science', () => {
     const state = nonTutorialState();
     state.money = 500_000;
     state.sciencePoints = 50;

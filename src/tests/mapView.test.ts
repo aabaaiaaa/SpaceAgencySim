@@ -569,7 +569,7 @@ describe('getMapTransferTargets', () => {
     expect(Array.isArray(targets)).toBe(true);
   });
 
-  it('each target has formatted string fields', () => {
+  it('@smoke each target has formatted string fields', () => {
     const targets = getMapTransferTargets('EARTH', 200_000, FlightPhase.ORBIT);
     for (const t of targets) {
       expect(typeof t.departureDVStr).toBe('string');

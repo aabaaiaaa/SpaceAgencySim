@@ -59,7 +59,7 @@ describe('CELESTIAL_BODIES catalog', () => {
     expect(ALL_BODY_IDS).toEqual(Object.keys(CELESTIAL_BODIES));
   });
 
-  it('every body has all required fields', () => {
+  it('@smoke every body has all required fields', () => {
     const requiredFields = [
       'id', 'name', 'surfaceGravity', 'radius', 'gm',
       'atmosphere', 'orbitalDistance', 'orbitalPeriod',

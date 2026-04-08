@@ -253,7 +253,7 @@ describe('Design Library', () => {
       expect(all[0].id).toBe('priv-1');
     });
 
-    it('merges shared and private designs', () => {
+    it('@smoke merges shared and private designs', () => {
       seedSharedLibrary([makeDesign({ id: 'shared-1' })]);
       const state = freshState();
       state.savedDesigns = [makeDesign({ id: 'priv-1', savePrivate: true })];

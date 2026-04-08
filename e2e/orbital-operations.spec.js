@@ -197,7 +197,7 @@ test.describe('Orbit entry detection', () => {
 
   test.afterAll(async () => { await page.close(); });
 
-  test('(1) craft transitions to ORBIT when periapsis is above minimum altitude', async () => {
+  test('@smoke (1) craft transitions to ORBIT when periapsis is above minimum altitude', async () => {
     test.setTimeout(60_000);
     await startTestFlight(page, ORBITAL_ROCKET, { crewIds: ['crew-1'] });
 

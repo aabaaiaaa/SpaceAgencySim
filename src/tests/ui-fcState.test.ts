@@ -112,7 +112,7 @@ describe('FCState', () => {
   });
 
   describe('resetFCState()', () => {
-    it('resets all properties to defaults', () => {
+    it('@smoke resets all properties to defaults', () => {
       setFCState({
         timeWarp: 100,
         mapActive: true,

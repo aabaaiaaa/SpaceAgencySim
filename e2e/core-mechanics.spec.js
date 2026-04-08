@@ -239,7 +239,7 @@ test.describe('Flight phase transitions', () => {
 
   test.afterAll(async () => { await page.close(); });
 
-  test('(1) PRELAUNCH → LAUNCH → FLIGHT on engine staging and liftoff', async () => {
+  test('@smoke (1) PRELAUNCH → LAUNCH → FLIGHT on engine staging and liftoff', async () => {
     await startTestFlight(page, ORBITAL_ROCKET);
 
     const fsBefore = await getFlightState(page);

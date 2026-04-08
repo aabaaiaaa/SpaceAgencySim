@@ -627,7 +627,7 @@ describe('updateHeat() — reentry heating', () => {
 // ---------------------------------------------------------------------------
 
 describe('updateHeat() — heat shield protection', () => {
-  it('heat shield absorbs heat while protecting parts behind it', () => {
+  it('@smoke heat shield absorbs heat while protecting parts behind it', () => {
     const { assembly, probeId, tankId, shieldId, engineId } = makeShieldedRocket();
     const fs = makeFlightState();
     const ps = createPhysicsState(assembly, fs);

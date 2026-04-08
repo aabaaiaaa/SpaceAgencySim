@@ -451,7 +451,7 @@ describe('Tech Tree Core Logic', () => {
       expect(result.unlockedParts).toHaveLength(0);
     });
 
-    it('can chain-research a full branch (R&D Lab tier 3)', () => {
+    it('@smoke can chain-research a full branch (R&D Lab tier 3)', () => {
       const state = readyState();
       state.facilities[FacilityId.RD_LAB].tier = 3;
       state.sciencePoints = 10_000;

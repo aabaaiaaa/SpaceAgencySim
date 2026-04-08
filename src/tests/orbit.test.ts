@@ -615,7 +615,7 @@ describe('orbital object management', () => {
 // ---------------------------------------------------------------------------
 
 describe('elliptical orbit altitude band crossing', () => {
-  it('elliptical orbit passes through multiple bands', () => {
+  it('@smoke elliptical orbit passes through multiple bands', () => {
     // 100 km periapsis, high apoapsis into MEO.
     const alt = 100_000;
     const r = R_EARTH + alt;

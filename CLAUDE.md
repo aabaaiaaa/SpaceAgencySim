@@ -18,16 +18,27 @@ npm run test:e2e     # Playwright E2E tests only (auto-starts dev server)
 npm run typecheck    # TypeScript type checking (tsc --noEmit)
 npm run lint         # ESLint (correctness rules, no formatting)
 npm run lint:fix     # ESLint with auto-fix
+npm run test:smoke       # Run @smoke-tagged tests (unit + E2E)
+npm run test:smoke:unit  # Run @smoke-tagged unit tests only
+npm run test:smoke:e2e   # Run @smoke-tagged E2E tests only
+npm run test:affected    # Run @smoke tests in files affected by git changes
+npm run test:affected:full  # Run ALL tests in affected files
 ```
 
 To run a single unit test file:
 ```bash
-npx vitest run src/tests/physics.test.js
+npx vitest run src/tests/physics.test.ts
 ```
 
 To run a single E2E spec:
 ```bash
 npx playwright test e2e/flight.spec.js
+```
+
+To run affected tests for a specific branch:
+```bash
+node scripts/run-affected.mjs --base main --dry-run  # preview what would run
+node scripts/run-affected.mjs --base main             # run smoke tests in affected files
 ```
 
 ## Architecture
@@ -71,6 +82,15 @@ Immutable static catalogs: `parts.js` (part definitions), `missions.js` (mission
 - **Unit tests** (`src/tests/`) use Vitest + Chai. Environment is Node.js (no browser). Tests import core modules directly.
 - **E2E tests** (`e2e/`) use Playwright targeting Chromium only. They run against the live Vite dev server which Playwright starts automatically. E2E helpers are split into sub-modules in `e2e/helpers/` with a barrel re-export at `e2e/helpers.js`.
 - Playwright config retries 2× on CI (`process.env.CI`), no retries in dev.
+
+## Smoke Tests & Affected Tests
+
+Tests tagged with `@smoke` in their description are curated for fast coverage of critical paths. Vitest uses `--testNamePattern @smoke` and Playwright uses `--grep @smoke` to run only these tests.
+
+- **`test-map.json`** maps source areas to their relevant test files (unit + E2E). Used by `scripts/run-affected.mjs`.
+- **`scripts/run-affected.mjs`** reads git diff, looks up affected test files, and runs `@smoke` tests in them. Use `--all` to run all tests in affected files instead of just smoke.
+- When adding new source modules or test files, update `test-map.json` to keep the mapping current.
+- When writing new tests, tag 1-2 representative tests per file with `@smoke` — pick tests that exercise the broadest code paths.
 
 ## TypeScript & Linting
 

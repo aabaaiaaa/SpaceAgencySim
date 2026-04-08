@@ -1354,7 +1354,7 @@ describe('Save compression', () => {
   });
 
   describe('round-trip save/load with compression', () => {
-    it('preserves full game state through compressed save/load cycle', async () => {
+    it('@smoke preserves full game state through compressed save/load cycle', async () => {
       const state = freshState();
       state.agencyName = 'Compressed Agency';
       state.money = 999999;

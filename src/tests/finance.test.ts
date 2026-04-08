@@ -100,7 +100,7 @@ describe('applyInterest()', () => {
     expect(state.loan.balance).toBe(1_000_000);
   });
 
-  it('adds shortfall to balance when cash is insufficient', () => {
+  it('@smoke adds shortfall to balance when cash is insufficient', () => {
     state.loan.balance = 2_000_000;
     state.money = 30_000;
     state.loan.interestRate = 0.03;             // interest = 60k

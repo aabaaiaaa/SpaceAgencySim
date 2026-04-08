@@ -145,7 +145,7 @@ describe('canEnterDockingMode', () => {
 // ---------------------------------------------------------------------------
 
 describe('enterDockingMode', () => {
-  it('succeeds when in ORBIT phase with NORMAL mode', () => {
+  it('@smoke succeeds when in ORBIT phase with NORMAL mode', () => {
     const ps = stubPs();
     const fs = freshFlightState();
     const result = enterDockingMode(ps, fs, 'EARTH');

@@ -371,7 +371,7 @@ describe('tickFuelSystem() — liquid engine flames out when tanks empty', () =>
     expect(ps.firingEngines.has(engineId)).toBe(false);
   });
 
-  it('flames out after running for long enough', () => {
+  it('@smoke flames out after running for long enough', () => {
     const { assembly, engineId } = makeSimpleRocket();
     const ps = makePS(assembly);
 

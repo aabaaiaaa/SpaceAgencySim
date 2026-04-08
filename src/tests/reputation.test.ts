@@ -183,7 +183,7 @@ describe('adjustReputation', () => {
 // ---------------------------------------------------------------------------
 
 describe('applyCrewDeathReputation', () => {
-  it('applies −10 per crew death', () => {
+  it('@smoke applies −10 per crew death', () => {
     const state = freshState();
     state.reputation = 50;
     const delta = applyCrewDeathReputation(state, 2);

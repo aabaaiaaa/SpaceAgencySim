@@ -223,7 +223,7 @@ describe('initPowerState', () => {
 // ---------------------------------------------------------------------------
 
 describe('tickPower', () => {
-  it('charges battery when sunlit with solar panels', () => {
+  it('@smoke charges battery when sunlit with solar panels', () => {
     const ps = {
       batteryCapacity: 100,
       batteryCharge: 50,

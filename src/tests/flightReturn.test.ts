@@ -714,7 +714,7 @@ describe('processFlightReturn() — reputation', () => {
 // ===========================================================================
 
 describe('processFlightReturn() — flight outcome', () => {
-  it('records SUCCESS when landed with missions completed', () => {
+  it('@smoke records SUCCESS when landed with missions completed', () => {
     const def = makeMissionDef({
       id: 'fr-outcome-success',
       reward: 1000,

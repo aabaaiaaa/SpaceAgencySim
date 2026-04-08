@@ -216,7 +216,7 @@ describe('computeCoM()', () => {
     expect(result.y).toBeCloseTo(20);
   });
 
-  it('computes weighted average for two parts with different masses', () => {
+  it('@smoke computes weighted average for two parts with different masses', () => {
     const placed1 = makePlaced({ instanceId: 'p1', partId: 'part1', x: -20, y: 0 });
     const placed2 = makePlaced({ instanceId: 'p2', partId: 'part2', x: 20, y: 0 });
     const def1 = makeDef({ id: 'part1', mass: 100 });

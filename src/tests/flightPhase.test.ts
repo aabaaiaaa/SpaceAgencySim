@@ -433,7 +433,7 @@ describe('getPhaseLabel', () => {
 // ---------------------------------------------------------------------------
 
 describe('full flight lifecycle', () => {
-  it('PRELAUNCH → LAUNCH → FLIGHT → ORBIT (ascent)', () => {
+  it('@smoke PRELAUNCH → LAUNCH → FLIGHT → ORBIT (ascent)', () => {
     const fs = freshFlightState();
 
     // PRELAUNCH → LAUNCH: engine ignition.

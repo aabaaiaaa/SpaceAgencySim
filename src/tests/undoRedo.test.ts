@@ -92,7 +92,7 @@ describe('Undo/Redo Stack — core operations', () => {
     expect(peekRedoLabel()).toBe('Place Part');
   });
 
-  it('redo calls the redo function and moves action back to undo stack', () => {
+  it('@smoke redo calls the redo function and moves action back to undo stack', () => {
     let value = 0;
     pushUndoAction({
       type: 'place',

@@ -220,7 +220,7 @@ describe('tick() — launch-pad hold', () => {
 });
 
 describe('tick() — engine firing and liftoff', () => {
-  it('climbs when engine is ignited', () => {
+  it('@smoke climbs when engine is ignited', () => {
     const { assembly, staging, engineId } = makeSimpleRocket();
     const fs = makeFlightState();
     const ps = createPhysicsState(assembly, fs);

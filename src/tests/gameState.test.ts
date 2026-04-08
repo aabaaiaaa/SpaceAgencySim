@@ -102,7 +102,7 @@ describe('createGameState()', () => {
     expect(state.debugMode).toBe(false);
   });
 
-  it('returns independent objects on each call', () => {
+  it('@smoke returns independent objects on each call', () => {
     const stateA = createGameState();
     const stateB = createGameState();
     stateA.money = 999;

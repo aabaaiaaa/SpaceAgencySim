@@ -1,92 +1,36 @@
 import { test, expect } from '@playwright/test';
 import {
   VP_W, VP_H,
-  CENTRE_X, CANVAS_CENTRE_Y,
   FIRST_FLIGHT_MISSION, buildSaveEnvelope,
-  placePart, seedAndLoadSave, navigateToVab, launchFromVab,
+  seedAndLoadSave, startTestFlight,
 } from './helpers.js';
 
 /**
  * E2E — Ground-Contact Rotation & Gravity Tipping
  *
- * Tests that rockets tip from their base contact point when A/D keys are
- * pressed on the ground, that gravity torque continues tipping after key
- * release, and that exceeding the topple angle triggers a crash.
- *
- * Setup:
- *   1. Seed a save with First Flight accepted and the required parts unlocked.
- *   2. Build a rocket in the VAB: Probe Core + Small Tank + Spark Engine.
- *   3. Stage the engine, click Launch, enter flight scene.
- *
- * Tests run in serial order on a shared page instance.
+ * Each test is independent — starts its own grounded flight.
  */
-
-test.describe.configure({ mode: 'serial' });
-
-// ---------------------------------------------------------------------------
-// Drop positions (probe-core-mk1 + tank-small + engine-spark)
-// ---------------------------------------------------------------------------
-
-const CMD_DROP_Y    = CANVAS_CENTRE_Y;
-const TANK_DROP_Y   = CMD_DROP_Y + 20 + 20;   // tank-small: half-height 20
-const ENGINE_DROP_Y = TANK_DROP_Y + 20 + 15;   // engine-spark: half-height 15
 
 const UNLOCKED_PARTS = ['probe-core-mk1', 'tank-small', 'engine-spark'];
 
-// ---------------------------------------------------------------------------
-// Suite
-// ---------------------------------------------------------------------------
+async function setupGroundedFlight(page) {
+  await page.setViewportSize({ width: VP_W, height: VP_H });
+  const envelope = buildSaveEnvelope({
+    missions: { available: [], accepted: [{ ...FIRST_FLIGHT_MISSION, status: 'accepted' }], completed: [] },
+    parts: UNLOCKED_PARTS,
+  });
+  await seedAndLoadSave(page, envelope);
+  await startTestFlight(page, UNLOCKED_PARTS);
+}
 
 test.describe('Tipping physics — ground-contact rotation', () => {
-  /** @type {import('@playwright/test').Page} */
-  let page;
 
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
-    page = await browser.newPage();
-    await page.setViewportSize({ width: VP_W, height: VP_H });
+  test('(1) rocket tips clockwise when D is held on the pad', async ({ page }) => {
+    await setupGroundedFlight(page);
 
-    const envelope = buildSaveEnvelope({
-      saveName: 'Tipping E2E Test',
-      agencyName: 'Tipping Test',
-      missions: { available: [], accepted: [{ ...FIRST_FLIGHT_MISSION, status: 'accepted' }], completed: [] },
-      parts: UNLOCKED_PARTS,
-    });
-
-    await seedAndLoadSave(page, envelope);
-    await navigateToVab(page);
-
-    // Build rocket: Probe Core + Small Tank + Spark Engine.
-    await placePart(page, 'probe-core-mk1', CENTRE_X, CMD_DROP_Y, 1);
-    await placePart(page, 'tank-small', CENTRE_X, TANK_DROP_Y, 2);
-    await placePart(page, 'engine-spark', CENTRE_X, ENGINE_DROP_Y, 3);
-
-    // Stage the engine.
-    await page.click('#vab-btn-staging');
-    await expect(page.locator('#vab-staging-panel')).toBeVisible();
-    await expect(
-      page.locator('[data-drop-zone="stage-0"]').getByText('Spark Engine'),
-    ).toBeVisible({ timeout: 5_000 });
-
-    // Launch.
-    await launchFromVab(page);
-  });
-
-  test.afterAll(async () => {
-    await page.close();
-  });
-
-  // ── (1) Rocket tips clockwise when D is held on the launch pad ──────────
-
-  test('(1) rocket tips clockwise when D is held on the pad', async () => {
-    // Verify we start grounded with angle ~0.
     const initAngle = await page.evaluate(() => window.__flightPs.angle);
     expect(initAngle).toBeCloseTo(0, 1);
 
-    // Hold D key until the rocket has a significant tilt.
-    // The angle must be large enough that gravity torque will overcome the
-    // settle damping (snapAccel >= 0.5 rad/s²) so test (3) can rely on
-    // gravity alone to topple the rocket past the crash threshold.
     await page.keyboard.down('d');
     await page.waitForFunction(
       () => Math.abs(window.__flightPs?.angle ?? 0) > 0.4,
@@ -95,16 +39,23 @@ test.describe('Tipping physics — ground-contact rotation', () => {
     await page.keyboard.up('d');
 
     const angle = await page.evaluate(() => window.__flightPs.angle);
-    expect(angle).toBeGreaterThan(0); // Positive = clockwise tilt.
+    expect(angle).toBeGreaterThan(0);
   });
 
-  // ── (2) Tilted rocket continues toppling after key release ──────────────
+  test('(2) tilted rocket continues toppling from gravity torque', async ({ page }) => {
+    await setupGroundedFlight(page);
 
-  test('(2) tilted rocket continues toppling from gravity torque', async () => {
-    // The rocket already has some tilt from test (1).
+    // Pre-tilt the rocket programmatically.
+    await page.evaluate(async () => {
+      window.__flightPs.angle = 0.45;
+      window.__flightPs.angularVelocity = 0.05;
+      if (typeof window.__resyncPhysicsWorker === 'function') {
+        await window.__resyncPhysicsWorker();
+      }
+    });
+
     const angleBefore = await page.evaluate(() => window.__flightPs.angle);
 
-    // Wait without any key input — gravity should increase tilt (or crash).
     await page.waitForFunction(
       (prev) => {
         const a = Math.abs(window.__flightPs?.angle ?? 0);
@@ -115,21 +66,30 @@ test.describe('Tipping physics — ground-contact rotation', () => {
     );
 
     const angleAfter = await page.evaluate(() => window.__flightPs.angle);
-    // Should have tilted further (or crashed).
     const crashed = await page.evaluate(() => window.__flightPs.crashed);
     if (!crashed) {
       expect(angleAfter).toBeGreaterThan(angleBefore);
     }
   });
 
-  // ── (3) Toppling past threshold triggers crash ──────────────────────────
+  test('(3) toppling past threshold triggers crash', async ({ page }) => {
+    test.setTimeout(120_000);
+    await setupGroundedFlight(page);
 
-  test('(3) toppling past threshold triggers crash', async () => {
-    test.setTimeout(60_000);
-    // Wait for the gravity torque to tip the rocket past the crash angle.
+    // Tip the rocket past 0.4 rad first (same as test 1), then release and let
+    // gravity torque finish the job. This replicates the serial chain where
+    // test 1 tipped to 0.4, test 2 let gravity increase tilt, test 3 waited for crash.
+    await page.keyboard.down('d');
     await page.waitForFunction(
-      () => window.__flightPs.crashed === true,
-      { timeout: 30_000 },
+      () => Math.abs(window.__flightPs?.angle ?? 0) > 0.4,
+      { timeout: 10_000 },
+    );
+    await page.keyboard.up('d');
+
+    // Now wait for gravity torque to topple it past crash threshold.
+    await page.waitForFunction(
+      () => window.__flightPs?.crashed === true,
+      { timeout: 90_000 },
     );
 
     const crashed = await page.evaluate(() => window.__flightPs.crashed);

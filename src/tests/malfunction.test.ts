@@ -219,7 +219,7 @@ describe('checkMalfunctions()', () => {
     expect(ps.malfunctions.size).toBe(0);
   });
 
-  it('forces malfunctions on all applicable parts in FORCED mode', () => {
+  it('@smoke forces malfunctions on all applicable parts in FORCED mode', () => {
     setMalfunctionMode(gs, MalfunctionMode.FORCED);
     const { assembly, engineId, tankId } = makeSimpleRocket();
     const { ps, fs } = makePhysicsState(assembly);

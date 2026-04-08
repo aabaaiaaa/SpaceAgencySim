@@ -17,7 +17,12 @@
     "typecheck": "tsc --noEmit",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint src/ e2e/",
-    "lint:fix": "eslint src/ e2e/ --fix"
+    "lint:fix": "eslint src/ e2e/ --fix",
+    "test:smoke": "vitest run --testNamePattern @smoke && playwright test --grep @smoke",
+    "test:smoke:unit": "vitest run --testNamePattern @smoke",
+    "test:smoke:e2e": "playwright test --grep @smoke",
+    "test:affected": "node scripts/run-affected.mjs",
+    "test:affected:full": "node scripts/run-affected.mjs --all"
   },
   "dependencies": {
     "lz-string": "^1.5.0",

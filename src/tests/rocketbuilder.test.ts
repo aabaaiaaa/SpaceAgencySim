@@ -45,7 +45,7 @@ import { getPartById }       from '../data/parts.ts';
 // ---------------------------------------------------------------------------
 
 describe('Part graph — command module + fuel tank + engine', () => {
-  it('forms a valid graph with 3 nodes and 2 directed edges', () => {
+  it('@smoke forms a valid graph with 3 nodes and 2 directed edges', () => {
     const assembly = createRocketAssembly();
 
     const cmdId    = addPartToAssembly(assembly, 'cmd-mk1',      0,  60);

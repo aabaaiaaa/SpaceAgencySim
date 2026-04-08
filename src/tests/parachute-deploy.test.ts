@@ -260,7 +260,7 @@ describe('tickParachutes', () => {
     expect(entry.state).toBe(ParachuteState.DEPLOYING); // not yet expired
   });
 
-  it('transitions to DEPLOYED when timer expires and mass is safe', () => {
+  it('@smoke transitions to DEPLOYED when timer expires and mass is safe', () => {
     const ps = makePs({ state: ParachuteState.DEPLOYING, deployTimer: 0.01 });
     const assembly = makeAssembly();
     const fs = makeFlightState();

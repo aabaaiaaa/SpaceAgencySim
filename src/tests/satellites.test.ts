@@ -458,7 +458,7 @@ describe('Satellite Network — advancePeriod integration', () => {
     deploySatHelper(state, 'satellite-science', LEO_ELEMENTS);
   });
 
-  it('includes satellite maintenance and science in period summary', () => {
+  it('@smoke includes satellite maintenance and science in period summary', () => {
     state.satelliteNetwork.satellites[0].autoMaintain = true;
     const summary = advancePeriod(state);
     expect(summary.satelliteMaintenanceCost).toBe(SATELLITE_AUTO_MAINTENANCE_COST);

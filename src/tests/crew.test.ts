@@ -771,7 +771,7 @@ describe('processFlightInjuries()', () => {
   let state;
   beforeEach(() => { state = freshState(); state.currentPeriod = 5; });
 
-  it('injures crew on hard landing (5–10 m/s)', () => {
+  it('@smoke injures crew on hard landing (5–10 m/s)', () => {
     const a = hireOne(state, 'Pilot');
     const flightState = {
       crewIds: [a.id],

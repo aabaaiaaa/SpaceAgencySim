@@ -477,7 +477,7 @@ describe('runValidation() — canLaunch', () => {
     expect(result.canLaunch).toBe(false);
   });
 
-  it('is true for the fully-valid passing rocket', () => {
+  it('@smoke is true for the fully-valid passing rocket', () => {
     const { assembly, staging } = makePassingRocket();
     const result = runValidation(assembly, staging, makeState());
     expect(result.canLaunch).toBe(true);
