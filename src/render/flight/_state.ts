@@ -58,6 +58,7 @@ export interface FlightRenderState {
   hazeGraphics: PIXI.Graphics | null;
   horizonGraphics: PIXI.Graphics | null;
   transferObjectsContainer: PIXI.Container | null;
+  asteroidsContainer: PIXI.Container | null;
   dockingTargetGfx: PIXI.Graphics | null;
   machGraphics: PIXI.Graphics | null;
   weatherVisibility: number;
@@ -100,6 +101,7 @@ function _createDefaultState(): FlightRenderState {
     hazeGraphics:         null,
     horizonGraphics:      null,
     transferObjectsContainer: null,
+    asteroidsContainer:   null,
     dockingTargetGfx:     null,
     machGraphics:         null,
 

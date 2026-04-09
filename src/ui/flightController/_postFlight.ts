@@ -218,14 +218,13 @@ export function showPostFlightSummary(
       section.appendChild(objList);
 
       // Show reward info if all required objectives are completed.
-      const requiredComplete: boolean = missionObjectives!.filter((o) => !(o as unknown as { optional?: boolean }).optional).every((o) => o.completed);
+      const requiredComplete: boolean = missionObjectives!.filter((o) => !o.optional).every((o) => o.completed);
       if (requiredComplete && mission.reward > 0) {
         // Calculate total reward including bonus objectives.
         let totalReward = mission.reward;
         for (const o of missionObjectives!) {
-          const obj = o as unknown as { optional?: boolean; completed: boolean; bonusReward?: number };
-          if (obj.optional && obj.completed && obj.bonusReward) {
-            totalReward += obj.bonusReward;
+          if (o.optional && o.completed && o.bonusReward) {
+            totalReward += o.bonusReward;
           }
         }
         const rewardEl: HTMLDivElement = document.createElement('div');

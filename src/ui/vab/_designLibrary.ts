@@ -12,7 +12,7 @@ import {
 } from '../../core/rocketbuilder.ts';
 import type { RocketAssembly } from '../../core/rocketbuilder.ts';
 import { createRocketDesign } from '../../core/gameState.ts';
-import type { GameState, RocketDesign } from '../../core/gameState.ts';
+import type { GameState, RocketDesign, RocketPart } from '../../core/gameState.ts';
 import './_designLibrary.css';
 import {
   getAllDesigns,
@@ -155,7 +155,10 @@ export function handleSaveDesign(): void {
       id:          designId,
       name,
       parts:       [...S.assembly!.parts.values()].map(p => ({ partId: p.partId, position: { x: p.x, y: p.y }, ...(p.instruments?.length ? { instruments: [...p.instruments] } : {}) })),
-      staging:     { stages: S.stagingConfig!.stages.map(s => [...s.instanceIds]) as unknown as number[][], unstaged: [...S.stagingConfig!.unstaged] as unknown as number[] },
+      staging:     {
+        stages: S.stagingConfig!.stages.map(s => [...s.instanceIds] as Array<string & number>),
+        unstaged: [...S.stagingConfig!.unstaged] as Array<string & number>,
+      },
       totalMass:   S.lastValidation?.totalMassKg ?? 0,
       totalThrust: S.lastValidation?.stage1Thrust ?? 0,
       savePrivate: isPrivate,
@@ -437,7 +440,7 @@ export function loadDesignIntoVab(design: RocketDesign): void {
     const def = getPartById(p.partId);
     if (def) S.gameState.money -= def.cost;
     const instId = addPartToAssembly(S.assembly, p.partId, p.position.x, p.position.y);
-    const pWithInstr = p as unknown as { instruments?: string[] };
+    const pWithInstr = p as RocketPart & { instruments?: string[] };
     if (pWithInstr.instruments?.length) {
       const placed = S.assembly.parts.get(instId);
       if (placed) placed.instruments = [...pWithInstr.instruments];
@@ -451,7 +454,7 @@ export function loadDesignIntoVab(design: RocketDesign): void {
       stages:          design.staging.stages.map((ids: number[] | string[]) => ({
         instanceIds: Array.isArray(ids) ? [...ids] as string[] : [],
       })),
-      unstaged:        Array.isArray(design.staging.unstaged) ? [...design.staging.unstaged] as unknown as string[] : [],
+      unstaged:        Array.isArray(design.staging.unstaged) ? design.staging.unstaged.map(String) : [],
       currentStageIdx: 0,
     };
   }

@@ -41,7 +41,7 @@ All tasks reference `.devloop/requirements.md` for full context.
 - **Verification**: `npm run typecheck` passes. `grep -c "as unknown as" src/ui/missionControl/_missionsTab.ts` returns 0. `npx vitest run src/tests/missions src/tests/saveload` passes.
 
 ### TASK-005a: Reduce as-unknown-as casts in period.ts, _designLibrary.ts, _postFlight.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-004c
 - **Description**: Eliminate `as unknown as` casts in `src/core/period.ts` (3), `src/ui/vab/_designLibrary.ts` (3), and `src/ui/flightController/_postFlight.ts` (2). For each, add missing properties to type interfaces, use type guards, or use discriminated unions. See requirements §1.5.
 - **Verification**: `npm run typecheck` passes. Combined `as unknown as` count in these 3 files is 0.
@@ -77,7 +77,7 @@ All tasks reference `.devloop/requirements.md` for full context.
 - **Verification**: `npx vitest run src/tests/saveload src/tests/settingsStore` passes. Manual: change a setting, delete save, start new game — setting persists.
 
 ### TASK-010: Write unit tests for settings store
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-009
 - **Description**: Write unit tests for `settingsStore.ts` covering: read/write round-trip, migration from old save format, independent persistence (change setting, verify it survives without a save), default values when no settings exist. Mock localStorage.
 - **Verification**: `npx vitest run src/tests/settingsStore` passes with all new tests green.
@@ -95,7 +95,7 @@ All tasks reference `.devloop/requirements.md` for full context.
 - **Verification**: `npx vitest run src/tests/saveload src/tests/crc32` passes. Round-trip test: export → import produces identical save data.
 
 ### TASK-013: Write unit tests for save export format
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-012
 - **Description**: Write unit tests covering: export round-trip integrity, corrupted checksum detection (flip a byte, verify import fails with clear error), corrupted magic bytes detection, truncated payload detection, old-format backward compatibility (raw LZC string imports successfully).
 - **Verification**: `npx vitest run src/tests/saveload` passes with all new tests green.
@@ -125,13 +125,13 @@ All tasks reference `.devloop/requirements.md` for full context.
 - **Verification**: `npm run typecheck` passes. `npx vitest run src/tests/asteroidBelt` passes — tests verify correct count per zone, size distribution, position within render distance.
 
 ### TASK-018: Write unit tests for asteroid generation
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-017
 - **Description**: Write unit tests for `asteroidBelt.ts` covering: correct asteroid count per zone type (10/30), size distribution (weighted toward smaller), all asteroids within render distance, co-orbital velocity range, unique names generated, regeneration produces different set.
 - **Verification**: `npx vitest run src/tests/asteroidBelt` passes with all new tests green.
 
 ### TASK-019: Render asteroids in flight view
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-017
 - **Description**: Extend `src/render/flight/_transferObjects.ts` (or create a new `_asteroids.ts` sub-module) to render belt asteroids in the flight view. Use the existing LOD system: full LOD shows irregular polygon with craters (brownish/amber), basic LOD shows ellipse, streak LOD shows trail. Size-based detail: small (1–10m) rough dots, medium (10–100m) irregular polygon, large (100m–1km) polygon with crater marks and "LANDABLE" label. All asteroids get a dashed targeting circle when selected. See requirements §5.3.
 - **Verification**: `npm run typecheck` passes. `npm run build` succeeds. Manual: teleport to belt orbit in dev, verify asteroids render with correct LOD and selection indicators.

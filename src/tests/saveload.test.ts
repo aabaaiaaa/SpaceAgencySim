@@ -34,6 +34,7 @@ import {
   compressSaveData,
   decompressSaveData,
 } from '../core/saveload.ts';
+import { crc32 } from '../core/crc32.ts';
 import { CrewStatus } from '../core/constants.ts';
 
 // ---------------------------------------------------------------------------
@@ -1497,5 +1498,167 @@ describe('Save compression', () => {
       const envelope = JSON.parse(json);
       expect(envelope.version).toBe(2);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Save export format (binary envelope)
+// ---------------------------------------------------------------------------
+
+describe('Save export format', () => {
+  // Polyfill btoa/atob for Node.js test environment.
+  beforeEach(() => {
+    vi.stubGlobal('btoa', (str) => Buffer.from(str, 'binary').toString('base64'));
+    vi.stubGlobal('atob', (str) => Buffer.from(str, 'base64').toString('binary'));
+  });
+
+  /**
+   * Helper: builds a binary envelope from a raw LZC string, returning a
+   * base64-encoded string suitable for `importSave()`.
+   */
+  function buildTestEnvelope(rawLZC, { corruptCrc = false, badMagic = false, truncatePayload = false } = {}) {
+    const encoder = new TextEncoder();
+    const payloadBytes = encoder.encode(rawLZC);
+    const checksum = crc32(payloadBytes);
+
+    const header = new Uint8Array(14);
+    const view = new DataView(header.buffer);
+
+    // Magic bytes (0-3)
+    if (badMagic) {
+      header[0] = 0x58; header[1] = 0x58; header[2] = 0x58; header[3] = 0x58; // "XXXX"
+    } else {
+      header[0] = 0x53; header[1] = 0x41; header[2] = 0x53; header[3] = 0x56; // "SASV"
+    }
+
+    // Format version (4-5), uint16 big-endian
+    view.setUint16(4, 1, false);
+
+    // CRC-32 checksum (6-9), uint32 big-endian
+    if (corruptCrc) {
+      // Flip some bits in the checksum to make it invalid.
+      view.setUint32(6, checksum ^ 0xDEADBEEF, false);
+    } else {
+      view.setUint32(6, checksum, false);
+    }
+
+    // Payload length (10-13), uint32 big-endian
+    view.setUint32(10, payloadBytes.length, false);
+
+    // Build final envelope bytes.
+    let actualPayload = payloadBytes;
+    if (truncatePayload) {
+      // Truncate: keep the header claiming the full length but only include half.
+      actualPayload = payloadBytes.slice(0, Math.max(1, Math.floor(payloadBytes.length / 2)));
+    }
+
+    const envelope = new Uint8Array(14 + actualPayload.length);
+    envelope.set(header, 0);
+    envelope.set(actualPayload, 14);
+
+    // Base64-encode.
+    let binary = '';
+    for (let i = 0; i < envelope.length; i++) {
+      binary += String.fromCharCode(envelope[i]);
+    }
+    return btoa(binary);
+  }
+
+  it('round-trips a save through the binary envelope import path', async () => {
+    // Save a game state to slot 0 via the normal path.
+    const state = freshState();
+    state.money = 314_159;
+    state.agencyName = 'Binary Test Agency';
+    state.crew = [
+      {
+        id: 'c1', name: 'Pilot', status: CrewStatus.IDLE,
+        skills: { piloting: 90, engineering: 40, science: 50 },
+        salary: 5000, hiredDate: '2025-06-01T00:00:00.000Z', injuryEnds: null,
+      },
+    ];
+    await saveGame(state, 0, 'Binary Export Test');
+
+    // Read the raw LZC string from localStorage.
+    const rawLZC = localStorage.getItem('spaceAgencySave_0');
+    expect(rawLZC).not.toBeNull();
+
+    // Build a valid binary envelope manually and base64-encode it.
+    const base64 = buildTestEnvelope(rawLZC);
+
+    // Import the binary envelope into slot 1.
+    const summary = importSave(base64, 1);
+    expect(summary.slotIndex).toBe(1);
+    expect(summary.saveName).toBe('Binary Export Test');
+
+    // Load from slot 1 and verify key data matches.
+    const restored = await loadGame(1);
+    expect(restored.money).toBe(314_159);
+    expect(restored.agencyName).toBe('Binary Test Agency');
+    expect(restored.crew).toHaveLength(1);
+    expect(restored.crew[0].name).toBe('Pilot');
+    expect(restored.crew[0].skills.piloting).toBe(90);
+  });
+
+  it('detects corrupted CRC-32 checksum and throws', async () => {
+    // Save a game state to create a valid LZC string.
+    const state = freshState();
+    state.money = 42_000;
+    await saveGame(state, 0, 'CRC Test');
+
+    const rawLZC = localStorage.getItem('spaceAgencySave_0');
+    const base64 = buildTestEnvelope(rawLZC, { corruptCrc: true });
+
+    // importSave should throw with a message about checksum or CRC.
+    expect(() => importSave(base64, 1)).toThrow(/checksum|CRC/i);
+  });
+
+  it('falls through to legacy import on wrong magic bytes and fails on invalid JSON', async () => {
+    // Save a game state to create a valid LZC string.
+    const state = freshState();
+    await saveGame(state, 0, 'Magic Test');
+
+    const rawLZC = localStorage.getItem('spaceAgencySave_0');
+    const base64 = buildTestEnvelope(rawLZC, { badMagic: true });
+
+    // Without SASV magic bytes, importSave falls back to legacy JSON import.
+    // The base64 string is not valid JSON, so it should throw about invalid JSON.
+    expect(() => importSave(base64, 1)).toThrow(/not valid JSON|plain object/i);
+  });
+
+  it('detects truncated payload and throws', async () => {
+    // Save a game state to create a valid LZC string.
+    const state = freshState();
+    state.money = 99_000;
+    await saveGame(state, 0, 'Truncate Test');
+
+    const rawLZC = localStorage.getItem('spaceAgencySave_0');
+    const base64 = buildTestEnvelope(rawLZC, { truncatePayload: true });
+
+    // importSave should throw with a message about corrupted or payload length.
+    expect(() => importSave(base64, 1)).toThrow(/corrupted|payload length/i);
+  });
+
+  it('imports a legacy JSON envelope string (old-format backward compatibility)', () => {
+    // Create a plain JSON envelope (no binary wrapping, no LZC compression).
+    const state = freshState();
+    state.money = 88_888;
+    state.agencyName = 'Legacy Import Agency';
+
+    const legacyJSON = JSON.stringify({
+      saveName: 'Legacy Save File',
+      timestamp: new Date(0).toISOString(),
+      state: JSON.parse(JSON.stringify(state)),
+    });
+
+    // importSave should accept this as a legacy JSON import.
+    const summary = importSave(legacyJSON, 2);
+    expect(summary.slotIndex).toBe(2);
+    expect(summary.saveName).toBe('Legacy Save File');
+    expect(summary.money).toBe(88_888);
+
+    // Verify the data is persisted and can be loaded back.
+    const saves = listSaves();
+    expect(saves[2]).not.toBeNull();
+    expect(saves[2].saveName).toBe('Legacy Save File');
   });
 });

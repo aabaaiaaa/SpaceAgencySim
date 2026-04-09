@@ -25,17 +25,11 @@ import { processSurfaceOps } from './surfaceOps.ts';
 import { processLifeSupport } from './lifeSupport.ts';
 import { getFinancialMultipliers } from './settings.ts';
 
-import type { GameState, CrewMember } from './gameState.ts';
+import type { GameState, MissionInstance } from './gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-
-/** Astronaut record as it actually appears in state at runtime (uses AstronautStatus values). */
-interface AstronautRecord extends Omit<CrewMember, 'status'> {
-  status: string;
-  salary: number;
-}
 
 export interface TraineeInfo {
   id: string;
@@ -103,9 +97,9 @@ export function advancePeriod(state: GameState): PeriodSummary {
 
   // ── 2. Crew salaries (use per-astronaut salary, fallback to constant) ──
   const { costMult } = getFinancialMultipliers(state);
-  const crew = state.crew as unknown as AstronautRecord[];
+  const crew = state.crew;
   const activeCrew = crew.filter(
-    (c) => c.status === AstronautStatus.ACTIVE,
+    (c) => (c.status as string) === AstronautStatus.ACTIVE,
   );
   const crewSalaryCost = Math.round(activeCrew.reduce(
     (sum, c) => sum + (c.salary ?? CREW_SALARY_PER_PERIOD),
@@ -129,7 +123,7 @@ export function advancePeriod(state: GameState): PeriodSummary {
   const expiredMissionIds: string[] = [];
   if (Array.isArray(state.missions.accepted)) {
     for (const mission of state.missions.accepted) {
-      const m = mission as unknown as { deadlinePeriod?: number; state?: string; id: string };
+      const m = mission as MissionInstance & { deadlinePeriod?: number };
       if (
         typeof m.deadlinePeriod === 'number' &&
         state.currentPeriod > m.deadlinePeriod
@@ -141,7 +135,7 @@ export function advancePeriod(state: GameState): PeriodSummary {
     // Remove expired missions from the accepted list.
     if (expiredMissionIds.length > 0) {
       state.missions.accepted = state.missions.accepted.filter(
-        (m) => !expiredMissionIds.includes((m as unknown as { id: string }).id),
+        (m) => !expiredMissionIds.includes(m.id),
       );
     }
   }

@@ -25,6 +25,8 @@ import {
 import { renderDebris, renderDockingTarget, renderEjectedCrew } from './_debris.ts';
 import { getProximityObjects } from '../../core/transferObjects.ts';
 import { renderTransferObjects } from './_transferObjects.ts';
+import { hasAsteroids } from '../../core/asteroidBelt.ts';
+import { renderBeltAsteroids } from './_asteroids.ts';
 import { onMouseMove, onWheel } from './_input.ts';
 import { drainPools, releaseGraphics } from './_pool.ts';
 
@@ -51,6 +53,7 @@ export function initFlightRenderer(): void {
   if (s.canopyContainer)      app.stage.removeChild(s.canopyContainer);
   if (s.biomeLabelContainer)  app.stage.removeChild(s.biomeLabelContainer);
   if (s.hazeGraphics)         app.stage.removeChild(s.hazeGraphics);
+  if (s.asteroidsContainer)   app.stage.removeChild(s.asteroidsContainer);
 
   s.skyGraphics           = new PIXI.Graphics();
   s.starsContainer        = new PIXI.Container();
@@ -63,6 +66,7 @@ export function initFlightRenderer(): void {
   s.canopyContainer       = new PIXI.Container();
   s.hazeGraphics          = new PIXI.Graphics();
   s.biomeLabelContainer   = new PIXI.Container();
+  s.asteroidsContainer    = new PIXI.Container();
 
   app.stage.addChild(s.skyGraphics);
   app.stage.addChild(s.starsContainer);
@@ -70,6 +74,7 @@ export function initFlightRenderer(): void {
   app.stage.addChild(s.groundGraphics);
   app.stage.addChild(s.surfaceItemsGraphics);
   app.stage.addChild(s.debrisContainer);
+  app.stage.addChild(s.asteroidsContainer);
   app.stage.addChild(s.trailContainer);
   app.stage.addChild(s.rocketContainer);
   app.stage.addChild(s.canopyContainer);
@@ -147,6 +152,11 @@ export function renderFlightFrame(
     renderTransferObjects(proximityObjects, w, h, ps.posX, ps.posY);
   }
 
+  // Belt asteroids (visible in ORBIT phase when inside asteroid belt).
+  if (flightState?.phase === 'ORBIT' && hasAsteroids()) {
+    renderBeltAsteroids(w, h, ps.posX, ps.posY, ps.velX, ps.velY);
+  }
+
   const trailDensity = bodyId ? bodyAirDensity(altitude, bodyId) : airDensity(altitude);
   const dt           = trailDt();
   emitSmokeSegments(ps, assembly, trailDensity);
@@ -188,6 +198,7 @@ export function destroyFlightRenderer(): void {
   if (s.canopyContainer)      app.stage.removeChild(s.canopyContainer);
   if (s.biomeLabelContainer)  app.stage.removeChild(s.biomeLabelContainer);
   if (s.hazeGraphics)         app.stage.removeChild(s.hazeGraphics);
+  if (s.asteroidsContainer)   app.stage.removeChild(s.asteroidsContainer);
   releaseGraphics(s.dockingTargetGfx);
 
   s.skyGraphics           = null;
@@ -201,6 +212,7 @@ export function destroyFlightRenderer(): void {
   s.canopyContainer       = null;
   s.biomeLabelContainer   = null;
   s.hazeGraphics          = null;
+  s.asteroidsContainer    = null;
   s.weatherVisibility     = 0;
   s.stars                 = [];
   s.trailSegments         = [];
@@ -248,6 +260,7 @@ export function hideFlightScene(): void {
   if (s.canopyContainer)      s.canopyContainer.visible = false;
   if (s.biomeLabelContainer)  s.biomeLabelContainer.visible = false;
   if (s.hazeGraphics)         s.hazeGraphics.visible = false;
+  if (s.asteroidsContainer)   s.asteroidsContainer.visible = false;
 }
 
 export function showFlightScene(): void {
@@ -263,6 +276,7 @@ export function showFlightScene(): void {
   if (s.canopyContainer)      s.canopyContainer.visible = true;
   if (s.biomeLabelContainer)  s.biomeLabelContainer.visible = true;
   if (s.hazeGraphics)         s.hazeGraphics.visible = true;
+  if (s.asteroidsContainer)   s.asteroidsContainer.visible = true;
 }
 
 export function setFlightInputEnabled(enabled: boolean): void {
