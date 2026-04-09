@@ -29,6 +29,7 @@ import {
   importSave,
   SAVE_SLOT_COUNT,
   SAVE_VERSION,
+  applyPersistedSettings,
 } from '../core/saveload.ts';
 import { createGameState } from '../core/gameState.ts';
 import { initializeMissions, reconcileParts } from '../core/missions.ts';
@@ -679,6 +680,10 @@ function _startNewGame(agencyName: string, selectedMode: string, sandboxOptions:
   // Seed tutorial missions (applies to all modes for contract generation).
   initializeMissions(state);
 
+  // Apply persisted settings (difficulty, auto-save, debug, etc.) so that
+  // preferences carry over from previous games.  If no dedicated settings key
+  // exists yet this is a no-op and the defaults from createGameState() stand.
+  applyPersistedSettings(state);
 
   _beginGame(state);
 }

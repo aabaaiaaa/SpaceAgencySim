@@ -15,11 +15,14 @@
 
 import { compressToUTF16, decompressFromUTF16 } from 'lz-string';
 import { CrewStatus, FACILITY_DEFINITIONS, GameMode, DEFAULT_DIFFICULTY_SETTINGS } from './constants.ts';
+import { crc32 } from './crc32.ts';
 import { loadSharedLibrary, saveSharedLibrary } from './designLibrary.ts';
 import { logger } from './logger.ts';
 import { idbSet, idbGet, idbDelete, isIdbAvailable } from './idbStorage.ts';
+import { loadSettings, migrateSettings, saveSettings } from './settingsStore.ts';
 
 import type { GameState, RocketDesign } from './gameState.ts';
+import type { MalfunctionMode as MalfunctionModeType } from './constants.ts';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -128,6 +131,99 @@ interface SaveEnvelope {
 const COMPRESSED_PREFIX = 'LZC:';
 
 // ---------------------------------------------------------------------------
+// Binary Envelope Format (for export/import only — not internal storage)
+// ---------------------------------------------------------------------------
+// Bytes 0-3:   Magic bytes "SASV" (Space Agency Save, ASCII)
+// Bytes 4-5:   Format version (uint16, big-endian)
+// Bytes 6-9:   CRC-32 checksum of the payload (uint32, big-endian)
+// Bytes 10-13: Payload length in bytes (uint32, big-endian)
+// Bytes 14+:   Payload (LZC-compressed JSON string, UTF-8 encoded)
+// ---------------------------------------------------------------------------
+
+/** Magic bytes identifying the binary save envelope ("SASV" in ASCII). */
+const ENVELOPE_MAGIC = new Uint8Array([0x53, 0x41, 0x53, 0x56]); // S, A, S, V
+
+/** Size of the binary envelope header in bytes. */
+const ENVELOPE_HEADER_SIZE = 14;
+
+/** Current binary envelope format version. */
+const ENVELOPE_FORMAT_VERSION = 1;
+
+/**
+ * Builds a binary envelope around a payload string.
+ *
+ * Layout:
+ *   [4 bytes magic] [2 bytes version (uint16 BE)] [4 bytes CRC-32 (uint32 BE)]
+ *   [4 bytes payload length (uint32 BE)] [payload bytes]
+ *
+ * @param payload - The LZC-compressed save string to wrap.
+ * @returns The complete envelope as a Uint8Array.
+ */
+function buildBinaryEnvelope(payload: string): Uint8Array {
+  const encoder = new TextEncoder();
+  const payloadBytes = encoder.encode(payload);
+  const checksum = crc32(payloadBytes);
+
+  const envelope = new Uint8Array(ENVELOPE_HEADER_SIZE + payloadBytes.length);
+  const view = new DataView(envelope.buffer);
+
+  // Magic bytes (0-3)
+  envelope.set(ENVELOPE_MAGIC, 0);
+  // Format version (4-5), uint16 big-endian
+  view.setUint16(4, ENVELOPE_FORMAT_VERSION, false);
+  // CRC-32 checksum (6-9), uint32 big-endian
+  view.setUint32(6, checksum, false);
+  // Payload length (10-13), uint32 big-endian
+  view.setUint32(10, payloadBytes.length, false);
+  // Payload (14+)
+  envelope.set(payloadBytes, ENVELOPE_HEADER_SIZE);
+
+  return envelope;
+}
+
+/**
+ * Encodes a Uint8Array as a base64 string.
+ * Uses browser btoa() with a binary-string intermediate.
+ */
+function uint8ToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+/**
+ * Decodes a base64 string to a Uint8Array.
+ * Returns null if the input is not valid base64.
+ */
+function base64ToUint8(b64: string): Uint8Array | null {
+  try {
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Checks whether the first 4 bytes of a Uint8Array match the SASV magic bytes.
+ */
+function hasMagicBytes(bytes: Uint8Array): boolean {
+  if (bytes.length < ENVELOPE_HEADER_SIZE) return false;
+  return (
+    bytes[0] === ENVELOPE_MAGIC[0] &&
+    bytes[1] === ENVELOPE_MAGIC[1] &&
+    bytes[2] === ENVELOPE_MAGIC[2] &&
+    bytes[3] === ENVELOPE_MAGIC[3]
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Private Helpers
 // ---------------------------------------------------------------------------
 
@@ -211,6 +307,17 @@ export async function saveGame(state: GameState, slotIndex: number, saveName: st
   // reflects all time played up to this moment.
   state.playTimeSeconds = (state.playTimeSeconds ?? 0) + getSessionSeconds();
   resetSessionTimer();
+
+  // Sync current settings to the dedicated settings key on every save,
+  // ensuring the dedicated store stays up-to-date even if a settings
+  // mutation path didn't call saveSettings() directly.
+  saveSettings({
+    difficultySettings: { ...state.difficultySettings },
+    autoSaveEnabled:    state.autoSaveEnabled,
+    debugMode:          state.debugMode,
+    showPerfDashboard:  state.showPerfDashboard,
+    malfunctionMode:    state.malfunctionMode as MalfunctionModeType,
+  });
 
   const envelope: SaveEnvelope = {
     saveName: String(saveName),
@@ -516,7 +623,37 @@ export async function loadGame(slotIndex: number): Promise<GameState> {
   // Validate and filter corrupted nested entries (missions, crew, etc.).
   _validateNestedStructures(envelope.state);
 
+  // Apply persisted settings from the dedicated settings store.
+  // If no dedicated settings key exists yet (first load after this feature),
+  // migrate settings from the loaded save into the dedicated key.
+  // The dedicated key is authoritative — it overrides whatever was in the save.
+  applyPersistedSettings(envelope.state as GameState);
+
   return envelope.state as GameState;
+}
+
+/**
+ * Applies persisted settings from the dedicated settings store to the loaded
+ * game state.  If no dedicated key exists yet (pre-settingsStore saves),
+ * migrates settings from the save into the dedicated key first.
+ *
+ * The dedicated settings key is authoritative — its values override whatever
+ * was serialised in the save file so that settings persist across saves and
+ * save deletions.
+ */
+export function applyPersistedSettings(state: GameState): void {
+  // Attempt migration first: if the dedicated key doesn't exist yet,
+  // extract settings from the loaded save and write them.
+  migrateSettings(state as unknown as Record<string, unknown>);
+
+  // Now load the authoritative settings (either freshly migrated or
+  // previously persisted) and apply them to the in-memory game state.
+  const settings = loadSettings();
+  state.difficultySettings = settings.difficultySettings;
+  state.autoSaveEnabled    = settings.autoSaveEnabled;
+  state.debugMode          = settings.debugMode;
+  state.showPerfDashboard  = settings.showPerfDashboard;
+  state.malfunctionMode    = settings.malfunctionMode;
 }
 
 /**
@@ -589,7 +726,9 @@ export function listSaves(): (SaveSlotSummary | null)[] {
 // ---------------------------------------------------------------------------
 
 /**
- * Triggers a browser file-download of the specified save slot as a JSON file.
+ * Triggers a browser file-download of the specified save slot as a binary
+ * envelope file (.sav) with magic bytes, CRC-32 integrity check, and the
+ * LZC-compressed payload encoded as base64.
  *
  * This function relies on browser DOM APIs (`document`, `Blob`,
  * `URL.createObjectURL`).  Calling it in a non-browser environment (e.g.
@@ -606,10 +745,10 @@ export function exportSave(slotIndex: number): void {
     throw new Error(`Save slot ${slotIndex} is empty; nothing to export.`);
   }
 
-  let json: string;
+  // Verify the stored data is valid before exporting.
   let envelope: SaveEnvelope;
   try {
-    json = decompressSaveData(raw);
+    const json = decompressSaveData(raw);
     envelope = JSON.parse(json);
   } catch {
     throw new Error(`Save slot ${slotIndex} contains corrupt data (invalid JSON).`);
@@ -626,10 +765,14 @@ export function exportSave(slotIndex: number): void {
 
   // Build a safe filename from the save name.
   const safeName = String(envelope.saveName ?? 'save').replace(/[^a-z0-9_-]/gi, '_');
-  const filename = `spaceAgency_slot${slotIndex}_${safeName}.json`;
+  const filename = `spaceAgency_slot${slotIndex}_${safeName}.sav`;
 
-  // Export as uncompressed JSON for portability.
-  const blob = new Blob([json], { type: 'application/json' });
+  // Build binary envelope around the LZC-compressed storage string and
+  // encode as base64 for safe text-based transport (clipboard, file).
+  const envelopeBytes = buildBinaryEnvelope(raw);
+  const base64 = uint8ToBase64(envelopeBytes);
+
+  const blob = new Blob([base64], { type: 'application/octet-stream' });
   const url = URL.createObjectURL(blob);
 
   const anchor = document.createElement('a');
@@ -646,19 +789,101 @@ export function exportSave(slotIndex: number): void {
 // ---------------------------------------------------------------------------
 
 /**
- * Parses and validates a JSON string, then writes it to the specified slot.
+ * Imports a save into the specified slot.
+ *
+ * Accepts two formats:
+ * 1. **New binary envelope** (base64-encoded): starts with "SASV" magic bytes
+ *    after base64 decoding.  Contains CRC-32 integrity check and LZC payload.
+ * 2. **Legacy JSON string**: plain JSON text as exported by older versions.
  *
  * The envelope and its embedded state are checked for required fields and
  * correct types before anything is written to localStorage; invalid input
  * is rejected with a descriptive error.
  *
  * @throws {RangeError} If slotIndex is out of bounds.
- * @throws {Error}      If the JSON is malformed or required fields are absent.
+ * @throws {Error}      If the data is corrupted, malformed, or required fields are absent.
  */
-export function importSave(jsonString: string, slotIndex: number): SaveSlotSummary {
+export function importSave(inputString: string, slotIndex: number): SaveSlotSummary {
   assertValidSlot(slotIndex);
 
-  // --- Parse ----------------------------------------------------------------
+  // --- Attempt new binary envelope format -----------------------------------
+  const decoded = base64ToUint8(inputString.trim());
+  if (decoded !== null && hasMagicBytes(decoded)) {
+    return _importBinaryEnvelope(decoded, slotIndex);
+  }
+
+  // --- Fall back to legacy JSON import --------------------------------------
+  return _importLegacyJson(inputString, slotIndex);
+}
+
+/**
+ * Imports a save from the new binary envelope format.
+ *
+ * @throws {Error} If the envelope is corrupted, truncated, or contains invalid data.
+ */
+function _importBinaryEnvelope(bytes: Uint8Array, slotIndex: number): SaveSlotSummary {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+
+  // Read header fields.
+  const _version = view.getUint16(4, false);
+  const expectedCrc = view.getUint32(6, false);
+  const payloadLength = view.getUint32(10, false);
+
+  // Validate payload length matches actual remaining bytes.
+  const actualPayloadLength = bytes.length - ENVELOPE_HEADER_SIZE;
+  if (payloadLength !== actualPayloadLength) {
+    throw new Error(
+      `Import failed: save file is corrupted (payload length mismatch — ` +
+      `header says ${payloadLength} bytes, file contains ${actualPayloadLength}).`
+    );
+  }
+
+  // Extract and verify payload.
+  const payloadBytes = bytes.slice(ENVELOPE_HEADER_SIZE);
+  const actualCrc = crc32(payloadBytes);
+  if (expectedCrc !== actualCrc) {
+    throw new Error('Import failed: save file is corrupted (CRC-32 checksum mismatch).');
+  }
+
+  // Decode payload as UTF-8 to get the LZC-compressed storage string.
+  const decoder = new TextDecoder();
+  const lzcString = decoder.decode(payloadBytes);
+
+  // Decompress and parse the envelope JSON.
+  let json: string;
+  try {
+    json = decompressSaveData(lzcString);
+  } catch {
+    throw new Error('Import failed: save file payload could not be decompressed.');
+  }
+
+  let envelope: SaveEnvelope;
+  try {
+    envelope = JSON.parse(json);
+  } catch {
+    throw new Error('Import failed: save file payload is not valid JSON.');
+  }
+
+  if (!envelope || typeof envelope !== 'object' || Array.isArray(envelope)) {
+    throw new Error('Import failed: JSON root must be a plain object.');
+  }
+
+  // Validate envelope and state fields (same checks as legacy path).
+  _validateEnvelopeFields(envelope);
+  _validateState(envelope.state);
+
+  // Persist — store the LZC string directly (already compressed).
+  _persistImport(lzcString, slotIndex);
+
+  return summaryFromEnvelope(slotIndex, envelope);
+}
+
+/**
+ * Imports a save from the legacy JSON string format (backward compatibility).
+ *
+ * @throws {Error} If the JSON is malformed or required fields are absent.
+ */
+function _importLegacyJson(jsonString: string, slotIndex: number): SaveSlotSummary {
   let envelope: SaveEnvelope;
   try {
     envelope = JSON.parse(jsonString);
@@ -670,7 +895,23 @@ export function importSave(jsonString: string, slotIndex: number): SaveSlotSumma
     throw new Error('Import failed: JSON root must be a plain object.');
   }
 
-  // --- Validate envelope fields ---------------------------------------------
+  _validateEnvelopeFields(envelope);
+  _validateState(envelope.state);
+
+  // Persist — compress and store.
+  const json = JSON.stringify(envelope);
+  const compressed = compressSaveData(json);
+  _persistImport(compressed, slotIndex);
+
+  return summaryFromEnvelope(slotIndex, envelope);
+}
+
+/**
+ * Validates the top-level envelope fields (saveName, timestamp, state).
+ *
+ * @throws {Error} Describing the first validation failure found.
+ */
+function _validateEnvelopeFields(envelope: SaveEnvelope): void {
   if (typeof envelope.saveName !== 'string') {
     throw new Error('Import failed: envelope.saveName must be a string.');
   }
@@ -680,13 +921,14 @@ export function importSave(jsonString: string, slotIndex: number): SaveSlotSumma
   if (!envelope.state || typeof envelope.state !== 'object' || Array.isArray(envelope.state)) {
     throw new Error('Import failed: envelope.state must be a plain object.');
   }
+}
 
-  // --- Validate game state fields -------------------------------------------
-  _validateState(envelope.state);
-
-  // --- Persist --------------------------------------------------------------
-  const json = JSON.stringify(envelope);
-  const compressed = compressSaveData(json);
+/**
+ * Writes a compressed save string to localStorage (and mirrors to IndexedDB).
+ *
+ * @throws {Error} If localStorage is full and IndexedDB is unavailable.
+ */
+function _persistImport(compressed: string, slotIndex: number): void {
   const key = slotKey(slotIndex);
   try {
     localStorage.setItem(key, compressed);
@@ -701,8 +943,6 @@ export function importSave(jsonString: string, slotIndex: number): SaveSlotSumma
   if (isIdbAvailable()) {
     idbSet(key, compressed).catch(err => logger.debug('saveload', 'IDB mirror write failed', err));
   }
-
-  return summaryFromEnvelope(slotIndex, envelope);
 }
 
 // ---------------------------------------------------------------------------

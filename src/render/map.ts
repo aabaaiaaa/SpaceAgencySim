@@ -25,7 +25,10 @@ import {
   BODY_RADIUS,
   ALTITUDE_BANDS,
   SurfaceItemType,
+  BeltZone,
 } from '../core/constants.ts';
+import { CELESTIAL_BODIES } from '../data/bodies.ts';
+import type { AltitudeBand } from '../data/bodies.ts';
 import { getSurfaceItemsAtBody, areSurfaceItemsVisible } from '../core/surfaceOps.ts';
 import {
   generateOrbitPath,
@@ -84,6 +87,13 @@ const BAND_COLORS: Record<string, number> = {
   HEO: 0x401020,
 };
 
+// Asteroid belt colours.
+const BELT_DOT_OUTER   = 0x998877;  // brownish for outer zones
+const BELT_DOT_DENSE   = 0xcc9966;  // amber for dense zone
+const BELT_DANGER_FILL = 0x884422;  // danger zone fill
+const BELT_DANGER_EDGE = 0xaa6633;  // danger zone boundary lines
+const BELT_LABEL_COLOR = 0xddaa44;  // label text
+
 /** Visual atmosphere height (m above surface). */
 const ATMOSPHERE_VISUAL_HEIGHT = 70_000;
 
@@ -112,6 +122,8 @@ let _transferGraphics: PIXI.Graphics | null  = null;
 let _surfaceGraphics: PIXI.Graphics | null   = null;
 let _commsGraphics: PIXI.Graphics | null     = null;
 
+let _beltGraphics: PIXI.Graphics | null   = null;
+
 /** Container for reusable PIXI.Text labels. */
 let _labelContainer: PIXI.Container | null = null;
 let _labelPool: PIXI.Text[] = [];
@@ -130,6 +142,81 @@ let _selectedTransferTarget: string | null = null;
 
 // Input handlers
 let _wheelHandler: ((e: WheelEvent) => void) | null = null;
+
+// ---------------------------------------------------------------------------
+// Pre-generated asteroid belt dots
+// ---------------------------------------------------------------------------
+
+interface BeltDot {
+  /** Distance from Sun centre (metres). */
+  r: number;
+  /** Angle in radians. */
+  angle: number;
+  /** Dot radius in pixels (before zoom scaling). */
+  size: number;
+  /** Alpha (opacity). */
+  alpha: number;
+  /** Hex colour. */
+  color: number;
+}
+
+/** Cached belt dot positions — generated once, reused every frame. */
+let _beltDots: BeltDot[] | null = null;
+
+/**
+ * Deterministic pseudo-random number generator (mulberry32).
+ * Returns a function that produces values in [0, 1).
+ */
+function _seededRandom(seed: number): () => number {
+  let s = seed | 0;
+  return () => {
+    s = (s + 0x6D2B79F5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Generate asteroid belt dots deterministically.
+ * Called once on first render; cached in _beltDots.
+ */
+function _generateBeltDots(): BeltDot[] {
+  const sunDef = CELESTIAL_BODIES.SUN;
+  if (!sunDef) return [];
+
+  const R_SUN = sunDef.radius;
+  const beltBands = sunDef.altitudeBands.filter(
+    (b: AltitudeBand) => b.beltZone != null,
+  );
+  if (beltBands.length === 0) return [];
+
+  const rand = _seededRandom(42);
+  const dots: BeltDot[] = [];
+
+  for (const band of beltBands) {
+    const isDense = band.beltZone === BeltZone.DENSE;
+    // Dense zone gets more dots.
+    const count = isDense ? 180 : 100;
+    const color = isDense ? BELT_DOT_DENSE : BELT_DOT_OUTER;
+
+    const innerR = R_SUN + band.min;
+    const outerR = R_SUN + band.max;
+
+    for (let i = 0; i < count; i++) {
+      // Uniform distribution within the annular area.
+      const u = rand();
+      const r = Math.sqrt(innerR * innerR + u * (outerR * outerR - innerR * innerR));
+      const angle = rand() * Math.PI * 2;
+      const size = 1 + rand(); // 1–2 px base
+      const alpha = 0.25 + rand() * 0.45; // 0.25–0.70
+
+      dots.push({ r, angle, size, alpha, color });
+    }
+  }
+
+  return dots;
+}
 
 // ---------------------------------------------------------------------------
 // Public API — lifecycle
@@ -152,9 +239,10 @@ export function initMapRenderer(): void {
   _mapRoot.visible = false;
 
   // Layer order (bottom → top):
-  //   background → bands → transfer → orbits → body → shadow → objects → craft → labels
+  //   background → bands → belt → transfer → orbits → body → shadow → objects → craft → labels
   _bgGraphics       = new PIXI.Graphics();
   _bandsGraphics    = new PIXI.Graphics();
+  _beltGraphics     = new PIXI.Graphics();
   _transferGraphics = new PIXI.Graphics();
   _orbitsGraphics   = new PIXI.Graphics();
   _bodyGraphics     = new PIXI.Graphics();
@@ -167,6 +255,7 @@ export function initMapRenderer(): void {
 
   _mapRoot.addChild(_bgGraphics);
   _mapRoot.addChild(_bandsGraphics);
+  _mapRoot.addChild(_beltGraphics);
   _mapRoot.addChild(_transferGraphics);
   _mapRoot.addChild(_orbitsGraphics);
   _mapRoot.addChild(_bodyGraphics);
@@ -249,6 +338,7 @@ export function destroyMapRenderer(): void {
 
   _bgGraphics       = null;
   _bandsGraphics    = null;
+  _beltGraphics     = null;
   _orbitsGraphics   = null;
   _bodyGraphics     = null;
   _shadowGraphics   = null;
@@ -258,6 +348,7 @@ export function destroyMapRenderer(): void {
   _surfaceGraphics  = null;
   _labelContainer   = null;
   _labelPool        = [];
+  _beltDots         = null;
 
   _customViewRadius        = null;
   _selectedTarget          = null;
@@ -433,6 +524,9 @@ export function renderMapFrame(
   // 2. Altitude bands.
   _drawBands(bodyId, cx, cy, scale);
 
+  // 2a. Asteroid belt (Sun view only).
+  _drawAsteroidBelt(bodyId, cx, cy, scale, w, h);
+
   // 2b. Transfer targets and route.
   _drawTransferTargets(ps, flightState, cx, cy, scale, bodyId);
 
@@ -601,6 +695,109 @@ function _drawBands(bodyId: string, cx: number, cy: number, scale: number): void
     // Band name label.
     if (innerPx > 30 && innerPx < window.innerWidth) {
       _useLabel(band.name, cx + innerPx + 6, cy - 8, color);
+    }
+  }
+}
+
+/**
+ * Draw the asteroid belt when viewing the Sun's orbital system.
+ * Renders scattered dots across the three belt zones plus a danger-zone
+ * shading overlay on the dense belt.
+ */
+function _drawAsteroidBelt(bodyId: string, cx: number, cy: number, scale: number, w: number, h: number): void {
+  if (!_mapRoot) return;
+  if (!_beltGraphics) return;
+  _beltGraphics.clear();
+
+  // Only draw the belt when the central body is the Sun.
+  if (bodyId !== 'SUN') return;
+
+  const sunDef = CELESTIAL_BODIES.SUN;
+  if (!sunDef) return;
+  const R_SUN = sunDef.radius;
+
+  // Find the dense belt band for the danger zone overlay.
+  const denseBand = sunDef.altitudeBands.find(
+    (b: AltitudeBand) => b.beltZone === BeltZone.DENSE,
+  );
+
+  // Check if the belt region is even potentially visible.
+  // The innermost belt edge (Outer Belt A min).
+  const beltBands = sunDef.altitudeBands.filter(
+    (b: AltitudeBand) => b.beltZone != null,
+  );
+  if (beltBands.length === 0) return;
+
+  const beltInnerR = R_SUN + beltBands[0].min;
+  const beltOuterR = R_SUN + beltBands[beltBands.length - 1].max;
+  const beltInnerPx = beltInnerR * scale;
+  const beltOuterPx = beltOuterR * scale;
+
+  // Early out: belt entirely off-screen or entirely too small to see.
+  const screenDiag = Math.hypot(w, h);
+  if (beltInnerPx > screenDiag * 1.5) return;
+  if (beltOuterPx < 3) return;
+
+  // --- Danger zone shading (dense belt) ---
+  if (denseBand) {
+    const denseInnerR = (R_SUN + denseBand.min) * scale;
+    const denseOuterR = (R_SUN + denseBand.max) * scale;
+
+    if (denseOuterR > 3 && denseInnerR < screenDiag * 1.5) {
+      // Filled annular ring: outer circle clockwise, inner circle counter-clockwise.
+      _beltGraphics.moveTo(cx + denseOuterR, cy);
+      _beltGraphics.arc(cx, cy, denseOuterR, 0, Math.PI * 2, false);
+      _beltGraphics.closePath();
+      _beltGraphics.moveTo(cx + denseInnerR, cy);
+      _beltGraphics.arc(cx, cy, denseInnerR, 0, Math.PI * 2, true);
+      _beltGraphics.closePath();
+      _beltGraphics.fill({ color: BELT_DANGER_FILL, alpha: 0.12 });
+
+      // Dashed boundary lines at dense zone edges.
+      const dashSegments = 72;
+      for (let i = 0; i < dashSegments; i += 2) {
+        const a1 = (Math.PI * 2 * i) / dashSegments;
+        const a2 = (Math.PI * 2 * (i + 1)) / dashSegments;
+        // Inner edge dash.
+        _beltGraphics.moveTo(cx + denseInnerR * Math.cos(a1), cy - denseInnerR * Math.sin(a1));
+        _beltGraphics.lineTo(cx + denseInnerR * Math.cos(a2), cy - denseInnerR * Math.sin(a2));
+        // Outer edge dash.
+        _beltGraphics.moveTo(cx + denseOuterR * Math.cos(a1), cy - denseOuterR * Math.sin(a1));
+        _beltGraphics.lineTo(cx + denseOuterR * Math.cos(a2), cy - denseOuterR * Math.sin(a2));
+      }
+      _beltGraphics.stroke({ color: BELT_DANGER_EDGE, width: 1, alpha: 0.3 });
+    }
+  }
+
+  // --- Scattered dots ---
+  if (!_beltDots) {
+    _beltDots = _generateBeltDots();
+  }
+
+  for (const dot of _beltDots) {
+    const sx = cx + dot.r * Math.cos(dot.angle) * scale;
+    const sy = cy - dot.r * Math.sin(dot.angle) * scale;
+
+    // Cull dots that are off-screen.
+    if (sx < -10 || sx > w + 10 || sy < -10 || sy > h + 10) continue;
+
+    // Scale dot size with zoom — clamp to 0.5–3 px.
+    const dotPx = Math.max(0.5, Math.min(3, dot.size * Math.min(1, beltOuterPx / 200)));
+    _beltGraphics.circle(sx, sy, dotPx);
+    _beltGraphics.fill({ color: dot.color, alpha: dot.alpha });
+  }
+
+  // --- Label: "Warning Dense Belt" ---
+  if (denseBand) {
+    const denseMiddleR = (R_SUN + (denseBand.min + denseBand.max) / 2) * scale;
+    // Show label when the dense zone is on-screen and at a reasonable scale.
+    if (denseMiddleR > 40 && denseMiddleR < w * 1.2) {
+      _useLabel(
+        '\u26A0 Dense Belt',
+        cx + denseMiddleR * 0.7 + 8,
+        cy - denseMiddleR * 0.7 - 12,
+        BELT_LABEL_COLOR,
+      );
     }
   }
 }
@@ -1131,9 +1328,9 @@ function _onWheel(e: WheelEvent): void {
   }
   _customViewRadius *= factor;
 
-  // Clamp to reasonable bounds — wider range to support interplanetary views.
+  // Clamp to reasonable bounds — wider range to support interplanetary + belt views.
   const minR = BODY_RADIUS.EARTH * 1.02;
-  const maxR = 300_000_000_000; // ~2 AU, enough for Mars transfers.
+  const maxR = 600_000_000_000; // ~4 AU, enough for asteroid belt (3.2 AU).
   _customViewRadius = Math.max(minR, Math.min(maxR, _customViewRadius));
 }
 

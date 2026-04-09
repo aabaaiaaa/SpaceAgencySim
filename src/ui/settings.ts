@@ -21,11 +21,33 @@ import {
   InjuryDuration,
 } from '../core/constants.ts';
 import { getDifficultySettings, updateDifficultySettings } from '../core/settings.ts';
+import { saveSettings } from '../core/settingsStore.ts';
+import type { PersistedSettings } from '../core/settingsStore.ts';
 import { createListenerTracker } from './listenerTracker.ts';
 import { showPerfDashboard, hidePerfDashboard } from './perfDashboard.ts';
 import './settings.css';
 import type { GameState } from '../core/gameState.ts';
-import type { DifficultySettings } from '../core/constants.ts';
+import type { DifficultySettings, MalfunctionMode as MalfunctionModeType } from '../core/constants.ts';
+
+// ---------------------------------------------------------------------------
+// Persistence helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Gathers the settings fields from GameState and writes them to the
+ * dedicated localStorage key via settingsStore.  Called after every
+ * user-initiated change so settings survive save deletion.
+ */
+function persistCurrentSettings(state: GameState): void {
+  const persisted: PersistedSettings = {
+    difficultySettings: { ...getDifficultySettings(state) },
+    autoSaveEnabled:    state.autoSaveEnabled,
+    debugMode:          state.debugMode,
+    showPerfDashboard:  state.showPerfDashboard,
+    malfunctionMode:    state.malfunctionMode as MalfunctionModeType,
+  };
+  saveSettings(persisted);
+}
 
 // ---------------------------------------------------------------------------
 // Setting definitions
@@ -162,6 +184,9 @@ export function openSettingsPanel(container: HTMLElement, state: GameState): voi
         // Update state.
         updateDifficultySettings(state, { [def.key]: opt.value } as Partial<DifficultySettings>);
 
+        // Persist to dedicated settings key.
+        persistCurrentSettings(state);
+
         // Update UI — deactivate siblings, activate clicked.
         for (const sibling of optionsRow.querySelectorAll('.settings-option-btn')) {
           sibling.classList.remove('active');
@@ -214,12 +239,14 @@ export function openSettingsPanel(container: HTMLElement, state: GameState): voi
 
     tracker.add(onBtn, 'click', () => {
       state.autoSaveEnabled = true;
+      persistCurrentSettings(state);
       onBtn.classList.add('active');
       offBtn.classList.remove('active');
     });
 
     tracker.add(offBtn, 'click', () => {
       state.autoSaveEnabled = false;
+      persistCurrentSettings(state);
       offBtn.classList.add('active');
       onBtn.classList.remove('active');
     });
@@ -268,12 +295,14 @@ export function openSettingsPanel(container: HTMLElement, state: GameState): voi
 
     tracker.add(onBtn, 'click', () => {
       state.debugMode = true;
+      persistCurrentSettings(state);
       onBtn.classList.add('active');
       offBtn.classList.remove('active');
     });
 
     tracker.add(offBtn, 'click', () => {
       state.debugMode = false;
+      persistCurrentSettings(state);
       offBtn.classList.add('active');
       onBtn.classList.remove('active');
     });
@@ -322,6 +351,7 @@ export function openSettingsPanel(container: HTMLElement, state: GameState): voi
 
     tracker.add(onBtn, 'click', () => {
       state.showPerfDashboard = true;
+      persistCurrentSettings(state);
       showPerfDashboard();
       onBtn.classList.add('active');
       offBtn.classList.remove('active');
@@ -329,6 +359,7 @@ export function openSettingsPanel(container: HTMLElement, state: GameState): voi
 
     tracker.add(offBtn, 'click', () => {
       state.showPerfDashboard = false;
+      persistCurrentSettings(state);
       hidePerfDashboard();
       offBtn.classList.add('active');
       onBtn.classList.remove('active');

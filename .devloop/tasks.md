@@ -35,7 +35,7 @@ All tasks reference `.devloop/requirements.md` for full context.
 - **Verification**: `npm run typecheck` passes. `grep -c "as unknown as" src/core/missions.ts` returns 0 or near-0. `npx vitest run src/tests/missions` passes.
 
 ### TASK-004c: Migrate _missionsTab.ts and save/load compatibility
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-004b
 - **Description**: Update `src/ui/missionControl/_missionsTab.ts` to use the unified `MissionInstance` type, removing its 3 `as unknown as` casts. Verify save/load backward compatibility — existing saves with the old `Mission` type must load correctly into the new `MissionInstance` type. See requirements §1.4.
 - **Verification**: `npm run typecheck` passes. `grep -c "as unknown as" src/ui/missionControl/_missionsTab.ts` returns 0. `npx vitest run src/tests/missions src/tests/saveload` passes.
@@ -71,7 +71,7 @@ All tasks reference `.devloop/requirements.md` for full context.
 - **Verification**: `npm run typecheck` passes. New module exports `loadSettings()`, `saveSettings()`, and `migrateSettings()` functions.
 
 ### TASK-009: Integrate settings store with game load/save and add migration
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-008
 - **Description**: Wire `settingsStore.ts` into the game's load flow (`saveload.ts`), new game flow, and settings UI. Implement backward-compatible migration: on first load, extract settings from an existing save and write to the dedicated key. Settings changes in the UI write to both GameState and the settings store. See requirements §2.2.
 - **Verification**: `npx vitest run src/tests/saveload src/tests/settingsStore` passes. Manual: change a setting, delete save, start new game — setting persists.
@@ -89,7 +89,7 @@ All tasks reference `.devloop/requirements.md` for full context.
 - **Verification**: `npx vitest run src/tests/crc32` passes with known test vectors (empty input, "123456789" → 0xCBF43926).
 
 ### TASK-012: Implement save export envelope format
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-011
 - **Description**: Update save export/import in `src/core/saveload.ts` to use the binary envelope: magic bytes "SASV", format version uint16, CRC-32 checksum, payload length, then the existing LZC-compressed payload. Export encodes as base64. Import validates magic bytes, checksum, and payload length. Fall back to raw LZC import for old-format saves. See requirements §3.1.
 - **Verification**: `npx vitest run src/tests/saveload src/tests/crc32` passes. Round-trip test: export → import produces identical save data.
@@ -113,13 +113,13 @@ All tasks reference `.devloop/requirements.md` for full context.
 - **Verification**: `npm run typecheck` passes. The Sun body in `bodies.ts` has 3 new altitude bands with correct AU distances and belt zone identifiers.
 
 ### TASK-016: Implement asteroid belt map visualization
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-015
 - **Description**: Add a belt rendering pass to `src/render/map.ts` that draws: (1) scattered dots across all 3 zones from a fixed seed, denser in the inner zone, brownish/amber colored; (2) semi-transparent amber danger zone shading (#884422, ~12% opacity) on the dense belt only, with faint dashed boundary lines; (3) "⚠ Dense Belt" label visible at appropriate zoom. No shading on outer zones. See requirements §5.2.
 - **Verification**: `npm run typecheck` passes. `npm run build` succeeds. Manual: open solar system map in dev, verify belt dots and danger zone are visible beyond Mars orbit.
 
 ### TASK-017: Implement procedural asteroid generation
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-015
 - **Description**: Create `src/core/asteroidBelt.ts` with asteroid generation logic. When the player enters ORBIT phase within a belt zone, generate N asteroids (10 for outer, 30 for dense) with random position, co-orbital velocity, size (1m–1km, weighted small, dense zone weighted larger), shape seed, and auto-generated `AST-XXXX` name. Asteroids persist for the orbit session and regenerate on next visit. Define the asteroid data model extending or compatible with the existing `TransferObject` interface. See requirements §5.3.
 - **Verification**: `npm run typecheck` passes. `npx vitest run src/tests/asteroidBelt` passes — tests verify correct count per zone, size distribution, position within render distance.

@@ -35,6 +35,8 @@ import { cycleDockingTarget, handleUndock, handleFuelTransfer } from './_docking
 import { toggleDockingMode, toggleRcsModeHandler } from './_orbitRcs.ts';
 import { showPhaseNotification } from './_flightPhase.ts';
 import { togglePerfDashboard } from '../perfDashboard.ts';
+import { saveSettings } from '../../core/settingsStore.ts';
+import type { PersistedSettings } from '../../core/settingsStore.ts';
 
 /** Ordered warp levels for < / > key stepping. */
 export const WARP_LEVELS_ORDERED: number[] = [0, 0.25, 0.5, 1, 2, 5, 10, 50];
@@ -50,6 +52,15 @@ export function onKeyDown(e: KeyboardEvent): void {
     e.preventDefault();
     if (s.state) {
       s.state.showPerfDashboard = !s.state.showPerfDashboard;
+      // Persist the change to the dedicated settings key so it survives
+      // across saves and save deletions.
+      saveSettings({
+        difficultySettings: { ...s.state.difficultySettings },
+        autoSaveEnabled:    s.state.autoSaveEnabled,
+        debugMode:          s.state.debugMode,
+        showPerfDashboard:  s.state.showPerfDashboard,
+        malfunctionMode:    s.state.malfunctionMode,
+      } as PersistedSettings);
     }
     togglePerfDashboard();
     return;

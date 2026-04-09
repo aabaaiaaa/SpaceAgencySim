@@ -4,7 +4,7 @@
  * @module missionControl/_missionsTab
  */
 
-import type { GameState, ObjectiveDef } from '../../core/gameState.ts';
+import type { GameState, MissionInstance } from '../../core/gameState.ts';
 import { acceptMission } from '../../core/missions.ts';
 import { getFacilityDef } from '../../core/construction.ts';
 import { getPartById } from '../../data/parts.ts';
@@ -14,20 +14,6 @@ import { refreshTopBarMissions } from '../topbar.ts';
 import { getMCState } from './_state.ts';
 import { fmtCash, fmtDate, buildRewardsEl, isTutorialPhase, getContent } from './_shell.ts';
 import { logger } from '../../core/logger.ts';
-
-/**
- * Shape of a mission instance stored in game state.
- * At runtime these are deep copies of MissionDef with additional live fields.
- */
-interface MissionInstance {
-  id: string;
-  title: string;
-  description: string;
-  reward: number;
-  objectives: ObjectiveDef[];
-  unlockedParts?: string[];
-  completedDate?: string;
-}
 
 // ---------------------------------------------------------------------------
 // Pathway badge + mission catalog lookup helpers
@@ -88,7 +74,7 @@ export function renderAvailableTab(): void {
   const mc = getMCState();
   if (!content || !mc.state) return;
 
-  const missions = mc.state.missions.available as unknown as MissionInstance[];
+  const missions = mc.state.missions.available;
 
   if (missions.length === 0) {
     const msg = document.createElement('p');
@@ -308,7 +294,7 @@ export function renderAcceptedTab(): void {
   const mc = getMCState();
   if (!content || !mc.state) return;
 
-  const missions = mc.state.missions.accepted as unknown as MissionInstance[];
+  const missions = mc.state.missions.accepted;
 
   if (missions.length === 0) {
     const msg = document.createElement('p');
@@ -415,7 +401,7 @@ export function renderCompletedTab(): void {
   const mc = getMCState();
   if (!content || !mc.state) return;
 
-  const missions = mc.state.missions.completed as unknown as MissionInstance[];
+  const missions = mc.state.missions.completed;
 
   if (missions.length === 0) {
     const msg = document.createElement('p');
