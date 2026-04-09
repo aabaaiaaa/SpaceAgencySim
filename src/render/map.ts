@@ -574,6 +574,7 @@ function _drawSurfaceItems(state: ReadonlyGameState, bodyId: string, cx: number,
 }
 
 function _drawBands(bodyId: string, cx: number, cy: number, scale: number): void {
+  if (!_mapRoot) return;
   _bandsGraphics!.clear();
 
   const bands = ALTITUDE_BANDS[bodyId];
@@ -613,6 +614,7 @@ function _drawOrbitalObjects(
   bodyId: string,
   options?: { showDebris?: boolean },
 ): void {
+  if (!_mapRoot) return;
   _objectsGraphics!.clear();
 
   if (!state.orbitalObjects || state.orbitalObjects.length === 0) return;
@@ -657,6 +659,7 @@ function _drawOrbitalObjects(
 }
 
 function _drawCraft(ps: ReadonlyPhysicsState, flightState: ReadonlyFlightState, cx: number, cy: number, scale: number, bodyId: string): void {
+  if (!_mapRoot) return;
   _orbitsGraphics!.clear();
   _craftGraphics!.clear();
 
@@ -743,6 +746,7 @@ function _drawCraft(ps: ReadonlyPhysicsState, flightState: ReadonlyFlightState, 
 }
 
 function _drawApsides(elements: OrbitalElements, bodyId: string, cx: number, cy: number, scale: number): void {
+  if (!_mapRoot) return;
   const { semiMajorAxis: a, eccentricity: e, argPeriapsis: omega } = elements;
   const R = BODY_RADIUS[bodyId];
 
@@ -792,6 +796,7 @@ function _drawOrbitEllipse(
 }
 
 function _drawTransferTargets(ps: ReadonlyPhysicsState, flightState: ReadonlyFlightState, cx: number, cy: number, scale: number, bodyId: string): void {
+  if (!_mapRoot) return;
   _transferGraphics!.clear();
 
   const altitude = Math.max(0, ps.posY);
@@ -889,6 +894,7 @@ function _drawTransferTargets(ps: ReadonlyPhysicsState, flightState: ReadonlyFli
  * Shows the craft's projected path as a dotted/fading line.
  */
 function _drawTransferTrajectory(ps: ReadonlyPhysicsState, flightState: ReadonlyFlightState, cx: number, cy: number, scale: number, bodyId: string): void {
+  if (!_mapRoot) return;
   const points = generateTransferTrajectory(ps, bodyId, 120);
   if (points.length < 2) return;
 
@@ -924,6 +930,7 @@ function _drawTransferTrajectory(ps: ReadonlyPhysicsState, flightState: Readonly
  * Draw celestial bodies relevant during transfer (destination, intermediate bodies).
  */
 function _drawCelestialBodies(flightState: ReadonlyFlightState, cx: number, cy: number, scale: number, bodyId: string): void {
+  if (!_mapRoot) return;
   const bodies = getMapCelestialBodies(bodyId, flightState.transferState);
 
   for (const body of bodies) {
@@ -988,6 +995,7 @@ function _drawCelestialBodies(flightState: ReadonlyFlightState, cx: number, cy: 
  * Draw transfer progress indicator (ETA, progress bar, destination info).
  */
 function _drawTransferProgress(flightState: ReadonlyFlightState, w: number, h: number): void {
+  if (!_mapRoot) return;
   const info = getTransferProgressInfo(flightState.transferState, flightState.timeElapsed);
   if (!info) return;
 
@@ -1049,6 +1057,7 @@ const COMMS_DIRECT_COLOR    = 0x4488ff;
  * Connected zones shown in green, dead zones in red.
  */
 function _drawCommsOverlay(state: ReadonlyGameState, bodyId: string, cx: number, cy: number, scale: number, R: number): void {
+  if (!_mapRoot) return;
   if (!_commsGraphics) return;
   _commsGraphics.clear();
   if (!_showCommsOverlay) return;

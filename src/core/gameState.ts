@@ -231,6 +231,32 @@ export interface Mission {
   unlockedParts?: string[];
 }
 
+/**
+ * A mission instance combining template definition fields with runtime state.
+ *
+ * When a MissionDef template is instantiated into game state, the resulting
+ * object carries both the runtime fields from Mission (deadline, state, etc.)
+ * and the template-sourced fields (location, unlocksAfter, pathway, etc.).
+ * All template fields are optional since not every mission originates from a
+ * MissionDef template (e.g. contract-generated missions).
+ */
+export interface MissionInstance extends Mission {
+  /** Launch site / environment (from template). */
+  location?: string;
+  /** IDs of missions that must be completed first (from template). */
+  unlocksAfter?: string[];
+  /** Part IDs unlocked when the mission is accepted (from template). */
+  requiredParts?: string[];
+  /** FacilityId awarded on completion in tutorial mode (from template). */
+  unlocksFacility?: string | null;
+  /** FacilityId awarded when the mission is accepted in tutorial mode (from template). */
+  awardsFacilityOnAccept?: string;
+  /** Tutorial pathway badge label (from template). */
+  pathway?: string;
+  /** Template status: 'locked' or 'available' (from template). */
+  templateStatus?: string;
+}
+
 /** One component placed on a rocket in the builder. */
 export interface RocketPart {
   /** ID referencing the part definition catalog. */
@@ -633,9 +659,9 @@ export interface GameState {
   crew: CrewMember[];
   /** Missions across all lifecycle states. */
   missions: {
-    available: Mission[];
-    accepted: Mission[];
-    completed: Mission[];
+    available: MissionInstance[];
+    accepted: MissionInstance[];
+    completed: MissionInstance[];
   };
   /** Saved rocket blueprints. */
   rockets: RocketDesign[];
@@ -917,7 +943,7 @@ export function createMission({
   reward: number;
   deadline: string;
   requirements?: Partial<MissionRequirements>;
-}): Mission {
+}): MissionInstance {
   return {
     id,
     title,
@@ -1071,7 +1097,7 @@ export function findCrewById(state: GameState, id: string): CrewMember | null {
 }
 
 /** Finds a mission across all three buckets by ID, or null if not found. */
-export function findMissionById(state: GameState, id: string): Mission | null {
+export function findMissionById(state: GameState, id: string): MissionInstance | null {
   const all = [
     ...state.missions.available,
     ...state.missions.accepted,

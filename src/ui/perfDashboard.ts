@@ -7,14 +7,14 @@
  *
  * - Updates every 500ms via setInterval (not every frame).
  * - Lazy DOM creation — elements only created on first show.
- * - Uses createListenerTracker() for event cleanup.
+ * - Destroyed via destroyPerfDashboard() for cleanup.
  *
  * @module ui/perfDashboard
  */
 
 import './perfDashboard.css';
 import { getMetrics } from '../core/perfMonitor.ts';
-import { createListenerTracker, type ListenerTracker } from './listenerTracker.ts';
+
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -38,7 +38,6 @@ let _histBar2: HTMLDivElement | null = null;
 let _histBar3: HTMLDivElement | null = null;
 
 let _intervalId: ReturnType<typeof setInterval> | null = null;
-let _tracker: ListenerTracker | null = null;
 
 // ---------------------------------------------------------------------------
 // Internal — lazy DOM creation
@@ -46,8 +45,6 @@ let _tracker: ListenerTracker | null = null;
 
 function _createDOM(): void {
   if (_container) return;
-
-  _tracker = createListenerTracker();
 
   _container = document.createElement('div');
   _container.id = 'perf-dashboard';
@@ -236,11 +233,6 @@ export function destroyPerfDashboard(): void {
   if (_intervalId !== null) {
     clearInterval(_intervalId);
     _intervalId = null;
-  }
-
-  if (_tracker) {
-    _tracker.removeAll();
-    _tracker = null;
   }
 
   if (_container) {

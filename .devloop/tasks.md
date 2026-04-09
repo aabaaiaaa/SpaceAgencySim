@@ -5,25 +5,25 @@ All tasks reference `.devloop/requirements.md` for full context.
 ---
 
 ### TASK-001: Log IDB mirror failures in autoSave.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Replace the two silent `.catch(() => {})` handlers in `src/core/autoSave.ts` (lines 139 and 158) with `.catch(err => logger.debug('autoSave', 'IDB mirror write/delete failed', err))`, matching the pattern already used in `saveload.ts`. See requirements §1.1.
 - **Verification**: `npx vitest run src/tests/autoSave` — if no test file exists, verify with `npm run typecheck` and confirm the two catch handlers are updated by grepping for `logger.debug.*autoSave.*IDB`.
 
 ### TASK-002: Remove unnecessary type casts in flightHud.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Remove the 9 `as unknown as Record<string, unknown>` casts in `src/ui/flightHud.ts` (lines 195, 198, 204, 433, 531, 547, 565, 827, 1148) and access `throttleMode`, `targetTWR`, and `controlMode` directly on `_ps`. Use optional chaining for null checks. Also remove the `(psAny.targetTWR as number)` downcasts. See requirements §1.2.
 - **Verification**: `npm run typecheck` passes. `grep -c "as unknown as Record" src/ui/flightHud.ts` returns 0.
 
 ### TASK-003: Remove unused createListenerTracker in perfDashboard.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Remove the `createListenerTracker` import, `_tracker` variable declaration, instantiation in `_createDOM()`, and cleanup in `destroyPerfDashboard()` from `src/ui/perfDashboard.ts`. See requirements §1.3.
 - **Verification**: `npm run typecheck` passes. `grep -c "createListenerTracker\|_tracker" src/ui/perfDashboard.ts` returns 0.
 
 ### TASK-004a: Define unified MissionInstance type
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Create a `MissionInstance` type in `src/core/gameState.ts` that combines template fields from `MissionDef` (src/data/missions.ts) with runtime fields from `Mission`. Use a discriminated union or intersection type. Replace `Mission` in the `GameState` interface with `MissionInstance`. See requirements §1.4.
 - **Verification**: `npm run typecheck` passes.
@@ -59,7 +59,7 @@ All tasks reference `.devloop/requirements.md` for full context.
 - **Verification**: `npm run lint` passes with no errors. `grep -c "as any" src/tests/workerBridgeTimeout.test.ts` returns 0.
 
 ### TASK-007: Add defensive guards in map.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Add `if (!_mapRoot) return` guards at the entry point of each drawing function in `src/render/map.ts` that uses `!` non-null assertions on graphics objects: `_drawBands()`, `_drawCraft()`, `_drawTransferTargets()`, `_drawCommsOverlay()`, and any other functions with `!` assertions on `_bgGraphics`, `_orbitsGraphics`, `_transferGraphics`, or `_bandsGraphics`. See requirements §1.7.
 - **Verification**: `npm run typecheck` passes. `npx vitest run src/tests/map` passes (if test exists). No `!` assertions on graphics objects without a preceding guard in the same function.

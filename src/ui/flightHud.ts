@@ -192,16 +192,16 @@ export function initFlightHud(
   _keyHandler = (e: KeyboardEvent): void => {
     if (!_ps) return;
     const k = e.key;
-    const twrMode = (_ps as unknown as Record<string, unknown>).throttleMode === 'twr';
+    const twrMode = _ps.throttleMode === 'twr';
     if (k === 'x' || k === 'X') {
       if (twrMode) {
-        (_ps as unknown as Record<string, unknown>).targetTWR = 0;
+        _ps.targetTWR = 0;
       }
       _ps.throttle = 0;
       markThrottleDirty();
     } else if (k === 'z' || k === 'Z') {
       if (twrMode) {
-        (_ps as unknown as Record<string, unknown>).targetTWR = Infinity;
+        _ps.targetTWR = Infinity;
       }
       _ps.throttle = 1;
       markThrottleDirty();
@@ -430,16 +430,15 @@ function _buildLeftPanel(): void {
   _elModeToggle.title = 'Toggle throttle mode: TWR (auto-adjust) / ABS (manual)';
   _elModeToggle.addEventListener('click', () => {
     if (!_ps) return;
-    const psAny = _ps as unknown as Record<string, unknown>;
-    if (psAny.throttleMode === 'twr') {
-      psAny.throttleMode = 'absolute';
+    if (_ps.throttleMode === 'twr') {
+      _ps.throttleMode = 'absolute';
       _elModeToggle!.textContent = 'ABS';
       _elModeToggle!.classList.remove('active');
     } else {
       // Switching to TWR mode — snapshot current TWR as target to prevent jump
       const currentTWR = _computeTWR();
-      psAny.targetTWR = currentTWR > 0 ? currentTWR : 1.0;
-      psAny.throttleMode = 'twr';
+      _ps.targetTWR = currentTWR > 0 ? currentTWR : 1.0;
+      _ps.throttleMode = 'twr';
       _elModeToggle!.textContent = 'TWR';
       _elModeToggle!.classList.add('active');
     }
@@ -528,9 +527,8 @@ function _buildLeftPanel(): void {
   setTWR1Btn.title = 'Set throttle so thrust-to-weight ratio equals 1';
   setTWR1Btn.addEventListener('click', () => {
     if (!_ps) return;
-    const psAny = _ps as unknown as Record<string, unknown>;
-    if (psAny.throttleMode === 'twr') {
-      psAny.targetTWR = 1.0;
+    if (_ps.throttleMode === 'twr') {
+      _ps.targetTWR = 1.0;
     } else {
       _setThrottleForTWR1();
     }
@@ -544,11 +542,10 @@ function _buildLeftPanel(): void {
   minusBtn.title = 'Decrease throttle/TWR by 0.1';
   minusBtn.addEventListener('click', () => {
     if (!_ps) return;
-    const psAny = _ps as unknown as Record<string, unknown>;
-    if (psAny.throttleMode === 'twr') {
-      psAny.targetTWR = (psAny.targetTWR as number) === Infinity
+    if (_ps.throttleMode === 'twr') {
+      _ps.targetTWR = _ps.targetTWR === Infinity
         ? Math.max(0, 10 - 0.1)
-        : Math.max(0, Math.round(((psAny.targetTWR as number) - 0.1) * 10) / 10);
+        : Math.max(0, Math.round((_ps.targetTWR - 0.1) * 10) / 10);
     } else {
       _ps.throttle = Math.max(0, Math.round((_ps.throttle - 0.1) * 10) / 10);
     }
@@ -562,10 +559,9 @@ function _buildLeftPanel(): void {
   plusBtn.title = 'Increase throttle/TWR by 0.1';
   plusBtn.addEventListener('click', () => {
     if (!_ps) return;
-    const psAny = _ps as unknown as Record<string, unknown>;
-    if (psAny.throttleMode === 'twr') {
-      if ((psAny.targetTWR as number) !== Infinity) {
-        psAny.targetTWR = Math.round(((psAny.targetTWR as number) + 0.1) * 10) / 10;
+    if (_ps.throttleMode === 'twr') {
+      if (_ps.targetTWR !== Infinity) {
+        _ps.targetTWR = Math.round((_ps.targetTWR + 0.1) * 10) / 10;
       }
     } else {
       _ps.throttle = Math.min(1, Math.round((_ps.throttle + 0.1) * 10) / 10);
@@ -824,7 +820,7 @@ function _buildControlModeIndicator(): void {
 function _updateControlModeIndicator(): void {
   if (!_elControlMode || !_ps || !_flightState) return;
 
-  const mode = (_ps as unknown as Record<string, unknown>).controlMode as string ?? ControlMode.NORMAL;
+  const mode = _ps.controlMode ?? ControlMode.NORMAL;
   const label = getControlModeLabel(mode);
 
   _elControlMode.dataset.mode = mode;
@@ -1145,13 +1141,12 @@ function _updateLeftPanel(): void {
 
   // ── Target TWR row (TWR mode only) ──────────────────────────────────────
   if (_elTargetTwrRow && _elTargetTwrVal) {
-    const psAny = _ps as unknown as Record<string, unknown>;
-    const isTwrMode = psAny.throttleMode === 'twr';
+    const isTwrMode = _ps!.throttleMode === 'twr';
     _elTargetTwrRow.style.display = isTwrMode ? '' : 'none';
     if (isTwrMode) {
-      _elTargetTwrVal.textContent = (psAny.targetTWR as number) === Infinity
+      _elTargetTwrVal.textContent = _ps!.targetTWR === Infinity
         ? 'MAX'
-        : (psAny.targetTWR as number).toFixed(1);
+        : _ps!.targetTWR.toFixed(1);
     }
   }
 
@@ -1394,7 +1389,7 @@ function _updateCrewList(): void {
   _elCrewList.dataset.fp = fingerprint;
   _elCrewList.innerHTML = '';
 
-  const ejectedIds: Set<string> = (_ps as unknown as Record<string, unknown>)?.ejectedCrewIds as Set<string> ?? new Set<string>();
+  const ejectedIds: Set<string> = _ps?.ejectedCrewIds ?? new Set<string>();
 
   for (const crewId of crewIds) {
     const member = _state.crew?.find((c: { id: string }) => c.id === crewId);

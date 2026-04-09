@@ -10,6 +10,7 @@
 
 import { idbSet, idbDelete, isIdbAvailable } from './idbStorage.ts';
 import { compressSaveData } from './saveload.ts';
+import { logger } from './logger.ts';
 
 import type { GameState } from './gameState.ts';
 
@@ -136,7 +137,7 @@ export async function performAutoSave(
 
   // Mirror to IndexedDB (fire-and-forget — LS already has the data).
   if (isIdbAvailable()) {
-    idbSet(saveKey, compressed).catch(() => {});
+    idbSet(saveKey, compressed).catch(err => logger.debug('autoSave', 'IDB mirror write failed', err));
   }
 
   return { success: true };
@@ -155,6 +156,6 @@ export function hasAutoSave(): boolean {
 export function deleteAutoSave(): void {
   localStorage.removeItem(AUTO_SAVE_KEY);
   if (isIdbAvailable()) {
-    idbDelete(AUTO_SAVE_KEY).catch(() => {});
+    idbDelete(AUTO_SAVE_KEY).catch(err => logger.debug('autoSave', 'IDB mirror delete failed', err));
   }
 }
