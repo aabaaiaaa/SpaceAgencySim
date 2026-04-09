@@ -43,6 +43,9 @@ import {
   processGrabRepairsFromFlight,
   getGrabTargetsInRange,
   updateGrabState,
+  getAsteroidGrabTargetsInRange,
+  captureAsteroid,
+  releaseGrabbedAsteroid,
 } from '../core/grabbing.ts';
 import { getPartById } from '../data/parts.ts';
 
@@ -858,5 +861,273 @@ describe('processGrabRepairsFromFlight — edge cases', () => {
 
     processGrabRepairsFromFlight(state, fs);
     expect(state.satelliteNetwork.satellites[0].health).toBe(100);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Asteroid grab target helpers
+// ---------------------------------------------------------------------------
+
+function makeAsteroid(overrides = {}) {
+  return {
+    id: 'AST-0001-0',
+    type: 'asteroid' as const,
+    name: 'AST-0001',
+    posX: 0,
+    posY: 0,
+    velX: 0,
+    velY: 0,
+    radius: 50,
+    mass: 50_000,
+    shapeSeed: 12345,
+    ...overrides,
+  };
+}
+
+function stubAssemblyWithHeavyArm() {
+  const parts = new Map();
+  parts.set('part-1', { instanceId: 'part-1', partId: 'cmd-mk1', x: 0, y: 0 });
+  parts.set('arm-1', { instanceId: 'arm-1', partId: 'grabbing-arm-heavy', x: -20, y: 0 });
+  return {
+    parts,
+    connections: [],
+    symmetryPairs: [],
+    _nextId: 3,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// canGrab — asteroid support
+// ---------------------------------------------------------------------------
+
+describe('canGrab — asteroid support', () => {
+  it('returns true for asteroid type', () => {
+    expect(canGrab({ type: 'asteroid' })).toBe(true);
+  });
+
+  it('still returns true for SATELLITE type', () => {
+    expect(canGrab({ type: OrbitalObjectType.SATELLITE })).toBe(true);
+  });
+
+  it('still returns false for CRAFT type', () => {
+    expect(canGrab({ type: OrbitalObjectType.CRAFT })).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// createGrabState — grabbedAsteroid field
+// ---------------------------------------------------------------------------
+
+describe('createGrabState — grabbedAsteroid', () => {
+  it('initialises grabbedAsteroid as null', () => {
+    const gs = createGrabState();
+    expect(gs.grabbedAsteroid).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// clearGrabTarget — clears grabbedAsteroid
+// ---------------------------------------------------------------------------
+
+describe('clearGrabTarget — clears grabbedAsteroid', () => {
+  it('sets grabbedAsteroid to null when clearing', () => {
+    const gs = createGrabState();
+    gs.grabbedAsteroid = makeAsteroid();
+    gs.state = 'GRABBED';
+    clearGrabTarget(gs);
+    expect(gs.grabbedAsteroid).toBeNull();
+    expect(gs.state).toBe(GrabState.IDLE);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getAsteroidGrabTargetsInRange
+// ---------------------------------------------------------------------------
+
+describe('getAsteroidGrabTargetsInRange', () => {
+  it('returns asteroids sorted by distance', () => {
+    const ps = stubPs({ posX: 0, posY: 0, velX: 0, velY: 0 });
+    const far = makeAsteroid({ id: 'AST-FAR', posX: 300, posY: 0 });
+    const near = makeAsteroid({ id: 'AST-NEAR', posX: 100, posY: 0 });
+    const results = getAsteroidGrabTargetsInRange([far, near], ps);
+    expect(results).toHaveLength(2);
+    expect(results[0].asteroid.id).toBe('AST-NEAR');
+    expect(results[1].asteroid.id).toBe('AST-FAR');
+  });
+
+  it('returns empty when no asteroids nearby', () => {
+    const ps = stubPs({ posX: 0, posY: 0, velX: 0, velY: 0 });
+    // GRAB_ARM_RANGE is 25, visual range is 25*20 = 500
+    const farAway = makeAsteroid({ posX: 100_000, posY: 0 });
+    const results = getAsteroidGrabTargetsInRange([farAway], ps);
+    expect(results).toHaveLength(0);
+  });
+
+  it('computes relative speed', () => {
+    const ps = stubPs({ posX: 0, posY: 0, velX: 100, velY: 0 });
+    const ast = makeAsteroid({ posX: 10, posY: 0, velX: 103, velY: 4 });
+    const results = getAsteroidGrabTargetsInRange([ast], ps);
+    expect(results).toHaveLength(1);
+    expect(results[0].relativeSpeed).toBeCloseTo(5, 0); // sqrt(3^2 + 4^2) = 5
+  });
+
+  it('returns empty for an empty asteroid array', () => {
+    const ps = stubPs({ posX: 0, posY: 0, velX: 0, velY: 0 });
+    const results = getAsteroidGrabTargetsInRange([], ps);
+    expect(results).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// captureAsteroid
+// ---------------------------------------------------------------------------
+
+describe('captureAsteroid', () => {
+  it('succeeds when asteroid is in range and within mass limit', () => {
+    const gs = createGrabState();
+    const ps = stubPs({ posX: 0, posY: 0, velX: 0, velY: 0 });
+    const assembly = stubAssemblyWithArm();
+    // mass 50,000 < standard arm limit 100,000; distance 10 < GRAB_ARM_RANGE 25
+    const ast = makeAsteroid({ posX: 10, posY: 0, velX: 0, velY: 0, mass: 50_000 });
+    const result = captureAsteroid(gs, ast, ps, assembly);
+    expect(result.success).toBe(true);
+    expect(gs.state).toBe(GrabState.GRABBED);
+    expect(gs.grabbedAsteroid).toBe(ast);
+  });
+
+  it('fails when no grabbing arm', () => {
+    const gs = createGrabState();
+    const ps = stubPs({ activeParts: new Set(['part-1', 'tank-1']) });
+    const assembly = stubAssemblyNoArm();
+    const ast = makeAsteroid({ posX: 10, posY: 0 });
+    const result = captureAsteroid(gs, ast, ps, assembly);
+    expect(result.success).toBe(false);
+    expect(result.reason).toContain('No grabbing arm');
+  });
+
+  it('fails when asteroid exceeds mass limit', () => {
+    const gs = createGrabState();
+    const ps = stubPs({ posX: 0, posY: 0, velX: 0, velY: 0 });
+    const assembly = stubAssemblyWithArm(); // standard arm: 100,000 kg limit
+    const ast = makeAsteroid({ posX: 10, posY: 0, mass: 200_000 }); // exceeds 100,000
+    const result = captureAsteroid(gs, ast, ps, assembly);
+    expect(result.success).toBe(false);
+    expect(result.reason).toContain('too massive');
+  });
+
+  it('succeeds with heavy arm for larger asteroids', () => {
+    const gs = createGrabState();
+    const ps = stubPs({ posX: 0, posY: 0, velX: 0, velY: 0 });
+    const assembly = stubAssemblyWithHeavyArm(); // heavy arm: 100,000,000 kg limit
+    const ast = makeAsteroid({ posX: 10, posY: 0, mass: 50_000_000 });
+    const result = captureAsteroid(gs, ast, ps, assembly);
+    expect(result.success).toBe(true);
+  });
+
+  it('fails when asteroid is out of range', () => {
+    const gs = createGrabState();
+    const ps = stubPs({ posX: 0, posY: 0, velX: 0, velY: 0 });
+    const assembly = stubAssemblyWithArm();
+    const ast = makeAsteroid({ posX: 100, posY: 0, mass: 50_000 }); // 100m > GRAB_ARM_RANGE 25m
+    const result = captureAsteroid(gs, ast, ps, assembly);
+    expect(result.success).toBe(false);
+    expect(result.reason).toContain('out of range');
+  });
+
+  it('fails when relative speed too high', () => {
+    const gs = createGrabState();
+    const ps = stubPs({ posX: 0, posY: 0, velX: 0, velY: 0 });
+    const assembly = stubAssemblyWithArm();
+    // GRAB_MAX_RELATIVE_SPEED is 1.0 m/s; this asteroid is moving at ~5 m/s relative
+    const ast = makeAsteroid({ posX: 10, posY: 0, velX: 3, velY: 4, mass: 50_000 });
+    const result = captureAsteroid(gs, ast, ps, assembly);
+    expect(result.success).toBe(false);
+    expect(result.reason).toContain('Relative speed too high');
+  });
+
+  it('sets grabbedAsteroid on success', () => {
+    const gs = createGrabState();
+    const ps = stubPs({ posX: 0, posY: 0, velX: 0, velY: 0 });
+    const assembly = stubAssemblyWithArm();
+    const ast = makeAsteroid({ posX: 5, posY: 0, mass: 1_000 });
+    captureAsteroid(gs, ast, ps, assembly);
+    expect(gs.grabbedAsteroid).toBe(ast);
+  });
+
+  it('fails when arm is busy (GRABBED state)', () => {
+    const gs = createGrabState();
+    gs.state = GrabState.GRABBED;
+    const ps = stubPs({ posX: 0, posY: 0, velX: 0, velY: 0 });
+    const assembly = stubAssemblyWithArm();
+    const ast = makeAsteroid({ posX: 10, posY: 0, mass: 50_000 });
+    const result = captureAsteroid(gs, ast, ps, assembly);
+    expect(result.success).toBe(false);
+    expect(result.reason).toContain('Arm is busy');
+  });
+
+  it('fails when arm is busy (EXTENDING state)', () => {
+    const gs = createGrabState();
+    gs.state = GrabState.EXTENDING;
+    const ps = stubPs({ posX: 0, posY: 0, velX: 0, velY: 0 });
+    const assembly = stubAssemblyWithArm();
+    const ast = makeAsteroid({ posX: 10, posY: 0, mass: 50_000 });
+    const result = captureAsteroid(gs, ast, ps, assembly);
+    expect(result.success).toBe(false);
+    expect(result.reason).toContain('Arm is busy');
+  });
+
+  it('allows capture from APPROACHING state', () => {
+    const gs = createGrabState();
+    gs.state = GrabState.APPROACHING;
+    const ps = stubPs({ posX: 0, posY: 0, velX: 0, velY: 0 });
+    const assembly = stubAssemblyWithArm();
+    const ast = makeAsteroid({ posX: 10, posY: 0, mass: 50_000 });
+    const result = captureAsteroid(gs, ast, ps, assembly);
+    expect(result.success).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// releaseGrabbedAsteroid
+// ---------------------------------------------------------------------------
+
+describe('releaseGrabbedAsteroid', () => {
+  it('succeeds when asteroid is grabbed', () => {
+    const gs = createGrabState();
+    gs.state = GrabState.GRABBED;
+    gs.grabbedAsteroid = makeAsteroid();
+    const result = releaseGrabbedAsteroid(gs);
+    expect(result.success).toBe(true);
+    expect(gs.state).toBe(GrabState.RELEASING);
+    expect(gs.grabbedAsteroid).toBeNull();
+  });
+
+  it('fails when no asteroid grabbed', () => {
+    const gs = createGrabState();
+    gs.state = GrabState.GRABBED;
+    gs.grabbedAsteroid = null;
+    const result = releaseGrabbedAsteroid(gs);
+    expect(result.success).toBe(false);
+    expect(result.reason).toContain('No asteroid grabbed');
+  });
+
+  it('fails when not in GRABBED state', () => {
+    const gs = createGrabState();
+    gs.state = GrabState.IDLE;
+    gs.grabbedAsteroid = makeAsteroid();
+    const result = releaseGrabbedAsteroid(gs);
+    expect(result.success).toBe(false);
+    expect(result.reason).toContain('No asteroid grabbed');
+  });
+
+  it('returns the released asteroid', () => {
+    const gs = createGrabState();
+    gs.state = GrabState.GRABBED;
+    const ast = makeAsteroid({ id: 'AST-RELEASED' });
+    gs.grabbedAsteroid = ast;
+    const result = releaseGrabbedAsteroid(gs);
+    expect(result.success).toBe(true);
+    expect(result.asteroid).toBe(ast);
+    expect(result.asteroid.id).toBe('AST-RELEASED');
   });
 });

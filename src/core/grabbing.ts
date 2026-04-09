@@ -1,16 +1,19 @@
 /**
- * grabbing.ts — Grabbing arm system for satellite repair and servicing.
+ * grabbing.ts — Grabbing arm system for satellite repair, servicing, and
+ * asteroid capture.
  *
  * Handles the full grab lifecycle:
- *   1. Target selection — player selects a satellite within visual range.
+ *   1. Target selection — player selects a satellite or asteroid within range.
  *   2. Approach — guidance shows distance, speed, lateral offset.
  *   3. Extending — arm reaches out when within GRAB_ARM_RANGE.
- *   4. Grabbed — craft attached to satellite; repair/service actions available.
- *   5. Release — arm retracts and satellite is freed.
+ *   4. Grabbed — craft attached to target; repair (satellite) or capture
+ *      (asteroid) actions available.
+ *   5. Release — arm retracts and target is freed.
  *
  * The grabbing arm is distinct from docking: it targets SATELLITE-type orbital
- * objects (which cannot dock) and has looser alignment requirements.  The
- * primary use case is restoring satellite health to 100.
+ * objects (which cannot dock) and transient asteroids (from belt encounters),
+ * with looser alignment requirements.  Satellites are repaired; asteroids are
+ * captured subject to per-arm mass limits.
  *
  * ARCHITECTURE RULE: pure game logic — no DOM, no canvas.
  * Reads/mutates FlightState and GameState only.
@@ -29,6 +32,7 @@ import { getPartById } from '../data/parts.ts';
 import type { PartDef } from '../data/parts.ts';
 import type { PhysicsState, RocketAssembly } from './physics.ts';
 import type { FlightState, FlightEvent, GameState, OrbitalObject, SatelliteRecord } from './gameState.ts';
+import type { Asteroid } from './asteroidBelt.ts';
 
 // ---------------------------------------------------------------------------
 // Grab system state interface
@@ -44,6 +48,7 @@ export interface GrabSystemState {
   lateralOk: boolean;
   inRange: boolean;
   grabbedSatelliteId: string | null;
+  grabbedAsteroid: Asteroid | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -51,7 +56,7 @@ export interface GrabSystemState {
 // ---------------------------------------------------------------------------
 
 export function createGrabState(): GrabSystemState {
-  return { state: GrabState.IDLE, targetId: null, targetDistance: Infinity, targetRelSpeed: 0, targetLateral: 0, speedOk: false, lateralOk: false, inRange: false, grabbedSatelliteId: null };
+  return { state: GrabState.IDLE, targetId: null, targetDistance: Infinity, targetRelSpeed: 0, targetLateral: 0, speedOk: false, lateralOk: false, inRange: false, grabbedSatelliteId: null, grabbedAsteroid: null };
 }
 
 // ---------------------------------------------------------------------------
@@ -104,8 +109,8 @@ export function getGrabTargetsInRange(ps: PhysicsState, flightState: FlightState
   return results;
 }
 
-export function canGrab(targetObj: OrbitalObject): boolean {
-  return targetObj.type === OrbitalObjectType.SATELLITE;
+export function canGrab(targetObj: OrbitalObject | { type: string }): boolean {
+  return targetObj.type === OrbitalObjectType.SATELLITE || targetObj.type === 'asteroid';
 }
 
 // ---------------------------------------------------------------------------
@@ -123,6 +128,7 @@ export function clearGrabTarget(grabState: GrabSystemState): void {
   grabState.targetId = null; grabState.state = GrabState.IDLE; grabState.targetDistance = Infinity;
   grabState.targetRelSpeed = 0; grabState.targetLateral = 0; grabState.speedOk = false;
   grabState.lateralOk = false; grabState.inRange = false; grabState.grabbedSatelliteId = null;
+  grabState.grabbedAsteroid = null;
 }
 
 // ---------------------------------------------------------------------------
@@ -186,6 +192,107 @@ export function releaseGrabbedSatellite(grabState: GrabSystemState): { success: 
   if (grabState.state !== GrabState.GRABBED) return { success: false, reason: 'Arm is not grabbing a satellite.' };
   grabState.state = GrabState.RELEASING; grabState.grabbedSatelliteId = null;
   return { success: true };
+}
+
+// ---------------------------------------------------------------------------
+// Asteroid targeting
+// ---------------------------------------------------------------------------
+
+/**
+ * Find asteroids within broad grab visual range of the craft.
+ * Asteroids are transient (not in state.orbitalObjects), so they must be
+ * passed in directly (e.g. from getActiveAsteroids()).
+ */
+export function getAsteroidGrabTargetsInRange(
+  asteroids: readonly Asteroid[],
+  ps: PhysicsState,
+): Array<{ asteroid: Asteroid; distance: number; relativeSpeed: number }> {
+  const results: Array<{ asteroid: Asteroid; distance: number; relativeSpeed: number }> = [];
+  for (const ast of asteroids) {
+    const dx = ast.posX - ps.posX;
+    const dy = ast.posY - ps.posY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > GRAB_ARM_RANGE * 20) continue; // broad filter — within visual range
+    const dvx = ast.velX - ps.velX;
+    const dvy = ast.velY - ps.velY;
+    const relSpeed = Math.sqrt(dvx * dvx + dvy * dvy);
+    results.push({ asteroid: ast, distance: dist, relativeSpeed: relSpeed });
+  }
+  results.sort((a, b) => a.distance - b.distance);
+  return results;
+}
+
+// ---------------------------------------------------------------------------
+// Asteroid capture (instead of repair for satellites)
+// ---------------------------------------------------------------------------
+
+/**
+ * Attempt to capture an asteroid with the grabbing arm.
+ * Enforces mass limits per arm tier — uses the best (highest maxCaptureMass)
+ * arm on the craft.
+ */
+export function captureAsteroid(
+  grabState: GrabSystemState,
+  asteroid: Asteroid,
+  ps: PhysicsState,
+  assembly: RocketAssembly,
+): { success: boolean; reason?: string } {
+  if (grabState.state !== GrabState.IDLE && grabState.state !== GrabState.APPROACHING) {
+    return { success: false, reason: 'Arm is busy.' };
+  }
+  if (!hasGrabbingArm(ps, assembly)) {
+    return { success: false, reason: 'No grabbing arm on craft.' };
+  }
+
+  // Check mass limit — pick the arm with the highest maxCaptureMass.
+  const arms = getGrabbingArms(ps, assembly);
+  const bestArm = arms.reduce((best, arm) => {
+    const maxMass = Number(arm.partDef.properties?.maxCaptureMass ?? 0);
+    const bestMax = Number(best?.partDef.properties?.maxCaptureMass ?? 0);
+    return maxMass > bestMax ? arm : best;
+  }, arms[0]);
+
+  const maxCaptureMass = Number(bestArm?.partDef.properties?.maxCaptureMass ?? 0);
+  if (asteroid.mass > maxCaptureMass) {
+    return { success: false, reason: 'Asteroid too massive for this grabbing arm.' };
+  }
+
+  // Check distance.
+  const dx = asteroid.posX - ps.posX;
+  const dy = asteroid.posY - ps.posY;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist > GRAB_ARM_RANGE) {
+    return { success: false, reason: 'Asteroid out of range.' };
+  }
+
+  // Check relative speed.
+  const dvx = asteroid.velX - ps.velX;
+  const dvy = asteroid.velY - ps.velY;
+  const relSpeed = Math.sqrt(dvx * dvx + dvy * dvy);
+  if (relSpeed > GRAB_MAX_RELATIVE_SPEED) {
+    return { success: false, reason: 'Relative speed too high.' };
+  }
+
+  grabState.state = GrabState.GRABBED;
+  grabState.grabbedAsteroid = asteroid;
+  return { success: true };
+}
+
+/**
+ * Release a captured asteroid.
+ * Returns the asteroid object so the caller can restore it to the
+ * active asteroid list if needed.
+ */
+export function releaseGrabbedAsteroid(
+  grabState: GrabSystemState,
+): { success: boolean; reason?: string; asteroid?: Asteroid } {
+  if (grabState.state !== GrabState.GRABBED || !grabState.grabbedAsteroid) {
+    return { success: false, reason: 'No asteroid grabbed.' };
+  }
+  const asteroid = grabState.grabbedAsteroid;
+  grabState.grabbedAsteroid = null;
+  grabState.state = GrabState.RELEASING;
+  return { success: true, asteroid };
 }
 
 // ---------------------------------------------------------------------------

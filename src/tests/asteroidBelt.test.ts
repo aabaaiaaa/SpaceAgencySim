@@ -14,6 +14,9 @@ import {
   hasAsteroids,
   setActiveAsteroids,
   clearAsteroids,
+  asteroidSurfaceGravity,
+  isAsteroidLandable,
+  LANDABLE_MIN_RADIUS,
 } from '../core/asteroidBelt.ts';
 import { BeltZone, BODY_GM } from '../core/constants.ts';
 
@@ -364,6 +367,60 @@ describe('asteroidBelt', () => {
         expect(typeof a.shapeSeed).toBe('number');
         expect(Number.isFinite(a.shapeSeed)).toBe(true);
       }
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Asteroid surface gravity
+  // -------------------------------------------------------------------------
+
+  describe('asteroid surface gravity', () => {
+    it('computes gravity for a 1km asteroid', () => {
+      // 1000m radius, rock density 2500 kg/m³
+      const volume = (4 / 3) * Math.PI * 1000 ** 3;
+      const mass = volume * 2500;
+      const g = asteroidSurfaceGravity(mass, 1000);
+      // g should be approximately 0.0007 m/s² (microgravity)
+      expect(g).toBeGreaterThan(0.0005);
+      expect(g).toBeLessThan(0.001);
+    });
+
+    it('computes gravity for a 100m asteroid', () => {
+      const volume = (4 / 3) * Math.PI * 100 ** 3;
+      const mass = volume * 2500;
+      const g = asteroidSurfaceGravity(mass, 100);
+      expect(g).toBeGreaterThan(0);
+      expect(g).toBeLessThan(0.001);
+    });
+
+    it('returns 0 for zero radius', () => {
+      expect(asteroidSurfaceGravity(1000, 0)).toBe(0);
+    });
+
+    it('returns 0 for negative radius', () => {
+      expect(asteroidSurfaceGravity(1000, -5)).toBe(0);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // isAsteroidLandable
+  // -------------------------------------------------------------------------
+
+  describe('isAsteroidLandable', () => {
+    it('returns true for asteroid with radius >= 100m', () => {
+      expect(isAsteroidLandable({ radius: 100 })).toBe(true);
+      expect(isAsteroidLandable({ radius: 500 })).toBe(true);
+      expect(isAsteroidLandable({ radius: 1000 })).toBe(true);
+    });
+
+    it('returns false for asteroid with radius < 100m', () => {
+      expect(isAsteroidLandable({ radius: 99 })).toBe(false);
+      expect(isAsteroidLandable({ radius: 50 })).toBe(false);
+      expect(isAsteroidLandable({ radius: 1 })).toBe(false);
+    });
+
+    it('LANDABLE_MIN_RADIUS constant is 100', () => {
+      expect(LANDABLE_MIN_RADIUS).toBe(100);
     });
   });
 });

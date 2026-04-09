@@ -1234,3 +1234,304 @@ describe('checkAsteroidCollisions()', () => {
     expect(ps.crashed).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Extended Asteroid Collision Tests
+// ---------------------------------------------------------------------------
+
+/**
+ * Helper: create a 4-part rocket for quantitative damage tests.
+ * Returns assembly, physics state, flight state, and the 4 part instance IDs.
+ */
+function makeDamageTestSetup() {
+  const assembly = createRocketAssembly();
+  // 4-part rocket: probe + 2 tanks + engine
+  const probeId  = addPartToAssembly(assembly, 'probe-core-mk1', 0, 100);
+  const tank1Id  = addPartToAssembly(assembly, 'tank-small', 0, 60);
+  const tank2Id  = addPartToAssembly(assembly, 'tank-small', 0, 20);
+  const engineId = addPartToAssembly(assembly, 'engine-spark', 0, -20);
+
+  const ps = {
+    posX: 0, posY: 0, velX: 0, velY: 0,
+    angle: 0, activeParts: new Set([probeId, tank1Id, tank2Id, engineId]),
+    firingEngines: new Set(), deployedParts: new Set(),
+    fuelStore: new Map(), heatMap: new Map(),
+    landed: false, crashed: false, grounded: false,
+  };
+
+  const fs = createFlightState({ missionId: 'test', rocketId: 'test' });
+  return { assembly, ps, fs, partIds: [probeId, tank1Id, tank2Id, engineId] };
+}
+
+describe('testAABBCircleOverlap() — extended', () => {
+  it('detects overlap when circle is fully inside the AABB', () => {
+    const aabb = { minX: -10, maxX: 10, minY: -10, maxY: 10 };
+    // Small circle fully contained within the AABB
+    expect(testAABBCircleOverlap(aabb, 0, 0, 1)).toBe(true);
+    expect(testAABBCircleOverlap(aabb, 5, 5, 2)).toBe(true);
+  });
+
+  it('detects overlap when circle touches AABB edge exactly', () => {
+    const aabb = { minX: 0, maxX: 4, minY: 0, maxY: 4 };
+    // Circle at (5, 2) with radius 1 — closest point on AABB is (4, 2), distance = 1
+    expect(testAABBCircleOverlap(aabb, 5, 2, 1)).toBe(true);
+  });
+
+  it('returns false when circle is just beyond AABB edge', () => {
+    const aabb = { minX: 0, maxX: 4, minY: 0, maxY: 4 };
+    // Circle at (6, 2) with radius 1 — closest point is (4, 2), distance = 2 > 1
+    expect(testAABBCircleOverlap(aabb, 6, 2, 1)).toBe(false);
+  });
+
+  it('handles varying asteroid radii: 1m', () => {
+    const aabb = { minX: 0, maxX: 2, minY: 0, maxY: 2 };
+    // Circle just outside at (3.5, 1) radius 1 — distance from AABB = 1.5 > 1
+    expect(testAABBCircleOverlap(aabb, 3.5, 1, 1)).toBe(false);
+    // Circle close enough at (2.5, 1) radius 1 — distance from AABB = 0.5 < 1
+    expect(testAABBCircleOverlap(aabb, 2.5, 1, 1)).toBe(true);
+  });
+
+  it('handles varying asteroid radii: 100m', () => {
+    const aabb = { minX: 0, maxX: 2, minY: 0, maxY: 2 };
+    // Circle far away but with large radius 100m — distance from (102, 1) is 100
+    expect(testAABBCircleOverlap(aabb, 102, 1, 100)).toBe(true);
+    // Just outside range — distance 101 > 100
+    expect(testAABBCircleOverlap(aabb, 103, 1, 100)).toBe(false);
+  });
+
+  it('handles varying asteroid radii: 1000m', () => {
+    const aabb = { minX: 0, maxX: 2, minY: 0, maxY: 2 };
+    // Distance from AABB to (1002, 1) is 1000 — exactly touching
+    expect(testAABBCircleOverlap(aabb, 1002, 1, 1000)).toBe(true);
+    // Distance from AABB to (1003, 1) is 1001 > 1000 — no overlap
+    expect(testAABBCircleOverlap(aabb, 1003, 1, 1000)).toBe(false);
+  });
+
+  it('returns false when large circle is out of range', () => {
+    const aabb = { minX: -1, maxX: 1, minY: -1, maxY: 1 };
+    expect(testAABBCircleOverlap(aabb, 5000, 5000, 50)).toBe(false);
+  });
+});
+
+describe('computeRelativeSpeed() — extended', () => {
+  it('returns zero when both have identical velocities', () => {
+    expect(computeRelativeSpeed(42, -17, 42, -17)).toBeCloseTo(0, 10);
+  });
+
+  it('computes pure X relative speed', () => {
+    // Craft: velX=10, velY=0. Object: velX=0, velY=0
+    expect(computeRelativeSpeed(10, 0, 0, 0)).toBeCloseTo(10, 5);
+  });
+
+  it('computes pure Y relative speed', () => {
+    // Craft: velX=0, velY=15. Object: velX=0, velY=0
+    expect(computeRelativeSpeed(0, 15, 0, 0)).toBeCloseTo(15, 5);
+  });
+
+  it('computes diagonal relative speed correctly', () => {
+    // Relative: (3-0, 4-0) = (3, 4) → magnitude = 5
+    expect(computeRelativeSpeed(3, 4, 0, 0)).toBeCloseTo(5, 5);
+    // Relative: (10-7, 0-0) = (3, 0) → magnitude = 3
+    expect(computeRelativeSpeed(10, 0, 7, 0)).toBeCloseTo(3, 5);
+  });
+
+  it('handles negative velocities', () => {
+    // Relative: (-5 - 5, 0 - 0) = (-10, 0) → magnitude = 10
+    expect(computeRelativeSpeed(-5, 0, 5, 0)).toBeCloseTo(10, 5);
+  });
+});
+
+describe('classifyAsteroidDamage() — extended boundary tests', () => {
+  it('returns NONE at exactly 0 m/s', () => {
+    expect(classifyAsteroidDamage(0)).toBe(AsteroidDamageLevel.NONE);
+  });
+
+  it('returns NONE at 0.5 m/s', () => {
+    expect(classifyAsteroidDamage(0.5)).toBe(AsteroidDamageLevel.NONE);
+  });
+
+  it('returns NONE at 0.99 m/s (just below threshold)', () => {
+    expect(classifyAsteroidDamage(0.99)).toBe(AsteroidDamageLevel.NONE);
+  });
+
+  it('returns MINOR at exactly 1.0 m/s (at threshold)', () => {
+    expect(classifyAsteroidDamage(1.0)).toBe(AsteroidDamageLevel.MINOR);
+  });
+
+  it('returns MINOR at 3 m/s', () => {
+    expect(classifyAsteroidDamage(3)).toBe(AsteroidDamageLevel.MINOR);
+  });
+
+  it('returns MINOR at 4.99 m/s', () => {
+    expect(classifyAsteroidDamage(4.99)).toBe(AsteroidDamageLevel.MINOR);
+  });
+
+  it('returns SIGNIFICANT at exactly 5 m/s (at threshold)', () => {
+    expect(classifyAsteroidDamage(5)).toBe(AsteroidDamageLevel.SIGNIFICANT);
+  });
+
+  it('returns SIGNIFICANT at 10 m/s', () => {
+    expect(classifyAsteroidDamage(10)).toBe(AsteroidDamageLevel.SIGNIFICANT);
+  });
+
+  it('returns SIGNIFICANT at 19.99 m/s', () => {
+    expect(classifyAsteroidDamage(19.99)).toBe(AsteroidDamageLevel.SIGNIFICANT);
+  });
+
+  it('returns CATASTROPHIC at exactly 20 m/s (at threshold)', () => {
+    expect(classifyAsteroidDamage(20)).toBe(AsteroidDamageLevel.CATASTROPHIC);
+  });
+
+  it('returns CATASTROPHIC at 100 m/s', () => {
+    expect(classifyAsteroidDamage(100)).toBe(AsteroidDamageLevel.CATASTROPHIC);
+  });
+});
+
+describe('applyAsteroidDamage() — quantitative 4-part rocket', () => {
+  it('NONE damage: no parts removed from 4-part rocket', () => {
+    const { ps, assembly, fs } = makeDamageTestSetup();
+    expect(ps.activeParts.size).toBe(4);
+
+    applyAsteroidDamage(ps, assembly, fs, AsteroidDamageLevel.NONE, 0.5, 'AST-0001');
+
+    expect(ps.activeParts.size).toBe(4);
+    expect(ps.crashed).toBe(false);
+    expect(fs.events.length).toBe(0);
+  });
+
+  it('MINOR damage: ~25% of parts removed (1 of 4)', () => {
+    const { ps, assembly, fs } = makeDamageTestSetup();
+    expect(ps.activeParts.size).toBe(4);
+
+    applyAsteroidDamage(ps, assembly, fs, AsteroidDamageLevel.MINOR, 3, 'AST-0001');
+
+    // 25% of 4 = 1 part (ceil(4 * 0.25) = 1)
+    expect(ps.activeParts.size).toBe(3);
+    expect(ps.crashed).toBe(false);
+    expect(fs.events.filter(e => e.type === 'PART_DESTROYED').length).toBe(1);
+  });
+
+  it('SIGNIFICANT damage: ~60% of parts removed (3 of 4)', () => {
+    const { ps, assembly, fs } = makeDamageTestSetup();
+    expect(ps.activeParts.size).toBe(4);
+
+    applyAsteroidDamage(ps, assembly, fs, AsteroidDamageLevel.SIGNIFICANT, 12, 'AST-0001');
+
+    // 60% of 4 = 2.4 → ceil = 3 parts destroyed, 1 remaining
+    // But if the code uses Math.max(1, ceil(N * fraction)), with N=4 and fraction=0.6:
+    // ceil(4 * 0.6) = ceil(2.4) = 3
+    const destroyed = 4 - ps.activeParts.size;
+    expect(destroyed).toBe(3);
+    expect(ps.activeParts.size).toBe(1);
+    expect(ps.crashed).toBe(false);
+    expect(fs.events.filter(e => e.type === 'PART_DESTROYED').length).toBe(3);
+  });
+
+  it('CATASTROPHIC damage: all parts removed, craft crashes', () => {
+    const { ps, assembly, fs } = makeDamageTestSetup();
+    expect(ps.activeParts.size).toBe(4);
+
+    applyAsteroidDamage(ps, assembly, fs, AsteroidDamageLevel.CATASTROPHIC, 25, 'AST-0001');
+
+    expect(ps.activeParts.size).toBe(0);
+    expect(ps.crashed).toBe(true);
+    expect(fs.events.filter(e => e.type === 'PART_DESTROYED').length).toBe(4);
+    expect(fs.events.some(e => e.type === 'ASTEROID_IMPACT' && e.severity === 'CATASTROPHIC')).toBe(true);
+  });
+
+  it('CATASTROPHIC damage clears firingEngines and deployedParts', () => {
+    const { ps, assembly, fs, partIds } = makeDamageTestSetup();
+    // Simulate engine firing and part deployed
+    ps.firingEngines.add(partIds[3]);  // engine
+    ps.deployedParts.add(partIds[0]);  // probe
+
+    applyAsteroidDamage(ps, assembly, fs, AsteroidDamageLevel.CATASTROPHIC, 30, 'AST-0001');
+
+    expect(ps.firingEngines.size).toBe(0);
+    expect(ps.deployedParts.size).toBe(0);
+  });
+});
+
+describe('checkAsteroidCollisions() — extended', () => {
+  it('returns empty array when no asteroids are provided', () => {
+    const { ps, assembly, fs } = makeAsteroidTestCraft();
+    const results = checkAsteroidCollisions(ps, assembly, [], fs);
+    expect(results).toHaveLength(0);
+  });
+
+  it('returns empty when all asteroids are far away (no false positives)', () => {
+    const { ps, assembly, fs } = makeAsteroidTestCraft({ posX: 0, posY: 0 });
+
+    const farAsteroids = [
+      makeAsteroid({ posX: 50000, posY: 50000, radius: 10, name: 'FAR-1' }),
+      makeAsteroid({ posX: -30000, posY: 20000, radius: 50, name: 'FAR-2' }),
+      makeAsteroid({ posX: 100, posY: 100, radius: 5, name: 'FAR-3' }),
+    ];
+
+    const results = checkAsteroidCollisions(ps, assembly, farAsteroids, fs);
+    expect(results).toHaveLength(0);
+    expect(ps.crashed).toBe(false);
+  });
+
+  it('detects collision when asteroid overlaps craft position', () => {
+    const { ps, assembly, fs } = makeAsteroidTestCraft({ posX: 0, posY: 0, velX: 10, velY: 0 });
+
+    const asteroid = makeAsteroid({
+      posX: 0, posY: 0,
+      velX: 0, velY: 0,
+      radius: 100,  // Large enough to guarantee overlap
+      name: 'HIT-1',
+    });
+
+    const results = checkAsteroidCollisions(ps, assembly, [asteroid], fs);
+    expect(results).toHaveLength(1);
+    expect(results[0].asteroid.name).toBe('HIT-1');
+    expect(results[0].relativeSpeed).toBeCloseTo(10, 1);
+    expect(results[0].damage).toBe(AsteroidDamageLevel.SIGNIFICANT);
+  });
+
+  it('processes multiple asteroid collisions until craft crashes', () => {
+    const { ps, assembly, fs } = makeAsteroidTestCraft({
+      posX: 0, posY: 0,
+      velX: 3, velY: 0,  // 3 m/s → MINOR per asteroid
+    });
+
+    const partsBefore = ps.activeParts.size;
+
+    // Three overlapping asteroids — each at MINOR damage.
+    // First will damage some parts. If craft survives, second hits, etc.
+    const asteroids = [
+      makeAsteroid({ posX: 0, posY: 0, velX: 0, velY: 0, radius: 100, name: 'M-1' }),
+      makeAsteroid({ posX: 0, posY: 0, velX: 0, velY: 0, radius: 100, name: 'M-2' }),
+      makeAsteroid({ posX: 0, posY: 0, velX: 0, velY: 0, radius: 100, name: 'M-3' }),
+    ];
+
+    const results = checkAsteroidCollisions(ps, assembly, asteroids, fs);
+
+    // Should have at least 1 collision result, parts should decrease.
+    expect(results.length).toBeGreaterThanOrEqual(1);
+    expect(ps.activeParts.size).toBeLessThan(partsBefore);
+  });
+
+  it('skips collision checks when craft is already crashed', () => {
+    const { ps, assembly, fs } = makeAsteroidTestCraft();
+    ps.crashed = true;
+
+    const asteroid = makeAsteroid({ posX: 0, posY: 0, radius: 100 });
+    const results = checkAsteroidCollisions(ps, assembly, [asteroid], fs);
+
+    expect(results).toHaveLength(0);
+    expect(fs.events.length).toBe(0);
+  });
+
+  it('skips collision checks when craft is landed', () => {
+    const { ps, assembly, fs } = makeAsteroidTestCraft();
+    ps.landed = true;
+
+    const asteroid = makeAsteroid({ posX: 0, posY: 0, radius: 100 });
+    const results = checkAsteroidCollisions(ps, assembly, [asteroid], fs);
+
+    expect(results).toHaveLength(0);
+    expect(fs.events.length).toBe(0);
+  });
+});

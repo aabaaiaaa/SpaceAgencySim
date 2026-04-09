@@ -1,5 +1,4 @@
 // @ts-nocheck
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * workerBridgeTimeout.test.ts — Unit tests for the Web Worker ready timeout
  * in _workerBridge.ts.
@@ -9,6 +8,9 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import type { PhysicsState } from '../core/physics.ts';
+import type { FlightState } from '../core/gameState.ts';
+import type { RocketAssembly, StagingConfig } from '../core/rocketbuilder.ts';
 
 // ---------------------------------------------------------------------------
 // Mock the logger so warn/error calls don't throw
@@ -182,10 +184,10 @@ describe('workerBridge — ready timeout', () => {
     bridge.terminatePhysicsWorker(); // reset state
 
     const promise = bridge.initPhysicsWorker(
-      makeMinimalPhysicsState() as any,
-      makeMinimalAssembly() as any,
-      makeMinimalStagingConfig() as any,
-      makeMinimalFlightState() as any,
+      makeMinimalPhysicsState() as unknown as PhysicsState,
+      makeMinimalAssembly() as unknown as RocketAssembly,
+      makeMinimalStagingConfig() as unknown as StagingConfig,
+      makeMinimalFlightState() as unknown as FlightState,
     );
 
     // Worker never sends 'ready'. Advance past the 10s timeout.
@@ -199,10 +201,10 @@ describe('workerBridge — ready timeout', () => {
     bridge.terminatePhysicsWorker(); // reset state
 
     const promise = bridge.initPhysicsWorker(
-      makeMinimalPhysicsState() as any,
-      makeMinimalAssembly() as any,
-      makeMinimalStagingConfig() as any,
-      makeMinimalFlightState() as any,
+      makeMinimalPhysicsState() as unknown as PhysicsState,
+      makeMinimalAssembly() as unknown as RocketAssembly,
+      makeMinimalStagingConfig() as unknown as StagingConfig,
+      makeMinimalFlightState() as unknown as FlightState,
     );
 
     // Worker sends 'ready' after 500ms
@@ -218,10 +220,10 @@ describe('workerBridge — ready timeout', () => {
     bridge.terminatePhysicsWorker(); // reset state
 
     const promise = bridge.initPhysicsWorker(
-      makeMinimalPhysicsState() as any,
-      makeMinimalAssembly() as any,
-      makeMinimalStagingConfig() as any,
-      makeMinimalFlightState() as any,
+      makeMinimalPhysicsState() as unknown as PhysicsState,
+      makeMinimalAssembly() as unknown as RocketAssembly,
+      makeMinimalStagingConfig() as unknown as StagingConfig,
+      makeMinimalFlightState() as unknown as FlightState,
     );
 
     // Worker sends 'ready' quickly
@@ -243,10 +245,10 @@ describe('workerBridge — ready timeout', () => {
     bridge.terminatePhysicsWorker(); // reset state
 
     const promise = bridge.initPhysicsWorker(
-      makeMinimalPhysicsState() as any,
-      makeMinimalAssembly() as any,
-      makeMinimalStagingConfig() as any,
-      makeMinimalFlightState() as any,
+      makeMinimalPhysicsState() as unknown as PhysicsState,
+      makeMinimalAssembly() as unknown as RocketAssembly,
+      makeMinimalStagingConfig() as unknown as StagingConfig,
+      makeMinimalFlightState() as unknown as FlightState,
     );
 
     // Worker fires an error

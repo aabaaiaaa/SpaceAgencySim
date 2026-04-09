@@ -84,7 +84,7 @@ export default [
         varsIgnorePattern: '^_',
         caughtErrorsIgnorePattern: '^_',
       }],
-      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-explicit-any': 'error',
 
       // -- Correctness rules --
       'no-unreachable': 'error',
@@ -143,6 +143,19 @@ export default [
     rules: {
       'no-console': 'off',
       'require-await': 'off',
+    },
+  },
+
+  // -----------------------------------------------------------------------
+  // Test files: keep no-explicit-any as warning (not error)
+  // -----------------------------------------------------------------------
+  {
+    files: ['src/tests/**'],
+    plugins: {
+      '@typescript-eslint': tsPlugin,
+    },
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'warn',
     },
   },
 ];

@@ -34,6 +34,12 @@ export interface Asteroid extends TransferObject {
 // Constants
 // ---------------------------------------------------------------------------
 
+/** Gravitational constant in m³/(kg·s²). */
+const G = 6.674e-11;
+
+/** Minimum asteroid radius (metres) to be considered landable. */
+export const LANDABLE_MIN_RADIUS = 100;
+
 /** Number of asteroids to generate per zone type. */
 const ASTEROID_COUNT: Readonly<Record<BeltZone, number>> = {
   [BeltZone.OUTER_A]: 10,
@@ -258,4 +264,24 @@ export function setActiveAsteroids(asteroids: Asteroid[]): void {
  */
 export function clearAsteroids(): void {
   _activeAsteroids = [];
+}
+
+// ---------------------------------------------------------------------------
+// Asteroid landing helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute the surface gravity of an asteroid (m/s²).
+ * g = G * mass / radius²
+ */
+export function asteroidSurfaceGravity(mass: number, radius: number): number {
+  if (radius <= 0) return 0;
+  return G * mass / (radius * radius);
+}
+
+/**
+ * Check whether an asteroid is large enough to land on.
+ */
+export function isAsteroidLandable(asteroid: { radius: number }): boolean {
+  return asteroid.radius >= LANDABLE_MIN_RADIUS;
 }

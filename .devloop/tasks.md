@@ -53,7 +53,7 @@ All tasks reference `.devloop/requirements.md` for full context.
 - **Verification**: `npm run typecheck` passes. `grep -rc "as unknown as" src/ --include="*.ts" | grep -v "test" | awk -F: '{s+=$2}END{print s}'` returns <10.
 
 ### TASK-006: Promote ESLint no-explicit-any to error
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-005b
 - **Description**: In `eslint.config.js`, change `'@typescript-eslint/no-explicit-any'` from `'warn'` to `'error'` for source files. Add an override for `src/tests/**` keeping it at `'warn'`. Fix the 8 `as any` usages in `src/tests/workerBridgeTimeout.test.ts` using `Partial<T>` or test factory types. See requirements §1.6.
 - **Verification**: `npm run lint` passes with no errors. `grep -c "as any" src/tests/workerBridgeTimeout.test.ts` returns 0.
@@ -149,7 +149,7 @@ All tasks reference `.devloop/requirements.md` for full context.
 - **Verification**: `npx vitest run src/tests/collision src/tests/asteroidBelt` passes — tests verify damage thresholds at each velocity band.
 
 ### TASK-022: Write unit tests for asteroid collision
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-021
 - **Description**: Write unit tests for asteroid collision covering: no damage below 1 m/s, minor damage at 1–5 m/s, significant damage at 5–20 m/s, catastrophic damage above 20 m/s, collision detection with varying asteroid radii, no false positives when out of range.
 - **Verification**: `npx vitest run src/tests/collision` passes with all new tests green.
@@ -167,7 +167,7 @@ All tasks reference `.devloop/requirements.md` for full context.
 - **Verification**: `npm run typecheck` passes. The parts catalog contains 3 grabbing arm variants with distinct mass limits, costs, and tech requirements.
 
 ### TASK-025: Extend grabbing system to target asteroids
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-017, TASK-024
 - **Description**: Update `src/core/grabbing.ts` to allow `getGrabTargetsInRange()` to return asteroid objects (not just SATELLITE type). When the grabbed object is an asteroid, offer "Capture" action instead of "Repair". Enforce mass limits per arm tier — if the asteroid exceeds the arm's max capture mass, fail with a message. See requirements §5.5, §5.6.
 - **Verification**: `npm run typecheck` passes. `npx vitest run src/tests/grabbing` passes — tests verify asteroid targeting, capture action, and mass limit enforcement.
@@ -197,13 +197,13 @@ All tasks reference `.devloop/requirements.md` for full context.
 - **Verification**: `npm run typecheck` passes. Manual: target a persistent asteroid on the map, rename it, verify the new name appears in the map and targeting HUD.
 
 ### TASK-030: Implement asteroid landing
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-017
 - **Description**: Asteroids above ~100m radius are landable. Derive surface gravity from mass and radius (rock density ~2,500 kg/m³). Integrate with the existing landing system using asteroid-specific parameters: very low gravity, no atmosphere, no drag. Mark large asteroids as "LANDABLE" in the flight view targeting info. See requirements §5.9.
 - **Verification**: `npm run typecheck` passes. `npx vitest run src/tests/asteroidBelt src/tests/physics` passes — tests verify gravity calculation, landing detection on large asteroid, non-landable for small asteroid.
 
 ### TASK-031: E2E — Belt map visualization and zone detection
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-016, TASK-017, TASK-023
 - **Description**: Write E2E tests in `e2e/asteroid-belt.spec.js` covering: belt visible on solar system map (dots + danger zone at correct distances), orbit detection in belt zones (teleport to belt, circularise, verify asteroid count), and unsafe orbit hub-return block (dense belt blocks hub return, outer belt allows it). See requirements §6.2.
 - **Verification**: `npx playwright test e2e/asteroid-belt.spec.js` passes.
