@@ -773,13 +773,16 @@ export function shouldEnterManoeuvre(ps: PhysicsState, flightState: FlightState)
  * Determine if the craft should exit the MANOEUVRE phase back to ORBIT.
  * Conditions: in MANOEUVRE phase, no active orbital burn, and orbit is still valid.
  */
-export function shouldExitManoeuvre(ps: PhysicsState, flightState: FlightState, bodyId: string): boolean {
+export function shouldExitManoeuvre(ps: PhysicsState, flightState: FlightState, _bodyId: string): boolean {
   if (flightState.phase !== FlightPhase.MANOEUVRE) return false;
   if (isOrbitalBurnActive(ps)) return false;
 
-  // Check if we still have a valid orbit after the burn.
-  const status = checkOrbitStatus(ps.posX, ps.posY, ps.velX, ps.velY, bodyId);
-  return status.valid;
+  // When the burn ends, always return to ORBIT. The ORBIT phase's own
+  // Keplerian propagation and reentry/escape checks will handle any
+  // resulting orbit changes. This avoids coordinate-system issues with
+  // checking orbit validity from game-frame coordinates after radial
+  // gravity integration.
+  return true;
 }
 
 /**

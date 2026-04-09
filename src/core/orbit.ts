@@ -365,6 +365,62 @@ export function circularOrbitVelocity(altitude: number, bodyId: string): number 
 }
 
 /**
+ * Cartesian state (posX, posY, velX, velY) from orbital elements at a given time.
+ *
+ * Converts the Keplerian orbital state to the flat coordinate system used by
+ * the physics engine and renderer.  posY is altitude above the body surface;
+ * posX is lateral displacement (zero at orbit start, evolves with anomaly).
+ *
+ * In the game's 2D coordinate frame:
+ *   - posY = altitude above surface
+ *   - posX = lateral displacement
+ *   - The body centre is at (0, -R) in physics coordinates
+ */
+export function orbitalStateToCartesian(
+  elements: OrbitalElements,
+  t: number,
+  bodyId: string,
+): { posX: number; posY: number; velX: number; velY: number } {
+  const mu = BODY_GM[bodyId];
+  const R = BODY_RADIUS[bodyId];
+  const { semiMajorAxis: a, eccentricity: e, argPeriapsis: omega, meanAnomalyAtEpoch: M0, epoch } = elements;
+
+  // Mean anomaly at time t.
+  const n = getMeanMotion(a, bodyId);
+  const M = M0 + n * (t - epoch);
+
+  // True anomaly.
+  const theta = meanAnomalyToTrue(M, e);
+
+  // Radial distance from body centre.
+  const p = a * (1 - e * e);
+  const r = p / (1 + e * Math.cos(theta));
+
+  // Game coordinate conversion:
+  //   posY = altitude above surface (varies between periapsis/apoapsis for elliptical orbits)
+  //   posX = 0 (the craft's orbital motion is shown on the map view, not in the flight view)
+  // The flight view is a local frame where "down" is toward the body.
+  const altitude = r - R;
+  const posX = 0;
+  const posY = altitude;
+
+  // Velocity via vis-viva equation: v² = μ(2/r - 1/a)
+  const speed = Math.sqrt(mu * (2 / r - 1 / a));
+
+  // Flight path angle: γ = atan2(e·sin θ, 1 + e·cos θ)
+  const gamma = Math.atan2(e * Math.sin(theta), 1 + e * Math.cos(theta));
+
+  // In the game's flat frame: most velocity is horizontal (along the orbit).
+  // The radial component (velY) oscillates for elliptical orbits.
+  // velX = speed × cos(γ)  (tangential / horizontal component)
+  // velY = speed × sin(γ)  (radial / vertical component, positive = away from body)
+  const velX = speed * Math.cos(gamma);
+  const velY = speed * Math.sin(gamma);
+
+  return { posX, posY, velX, velY };
+}
+
+/**
  * Periapsis altitude (above surface).
  *
  * @param elements  Orbital elements.

@@ -29,7 +29,7 @@ import type { CelestialBody } from './constants.ts';
 import {
   isOrbitalBurnActive, shouldEnterManoeuvre, shouldExitManoeuvre,
   shouldEnterTransfer, isEscapeTrajectory, checkSOITransition,
-  getTransferTargets, computeTransferDeltaV,
+  getTransferTargets, computeTransferDeltaV, BODY_PARENT,
 } from './manoeuvre.ts';
 import { checkOrbitStatus, computeOrbitalElements } from './orbit.ts';
 import type { FlightState, PhaseTransition, OrbitalElements } from './gameState.ts';
@@ -203,7 +203,7 @@ export function evaluateAutoTransitions(flightState: FlightState, ps: PhysicsSta
     }
   }
 
-  // CAPTURE -> ORBIT
+  // CAPTURE -> ORBIT (successful capture burn)
   if (phase === FlightPhase.CAPTURE) {
     if (orbitStatus && orbitStatus.valid) {
       const bandName = orbitStatus.altitudeBand ? orbitStatus.altitudeBand.name : 'Orbit';
@@ -213,6 +213,20 @@ export function evaluateAutoTransitions(flightState: FlightState, ps: PhysicsSta
         flightState.inOrbit = true; flightState.orbitalElements = orbitStatus.elements ?? null;
         flightState.transferState = null;
         return flightState.phaseLog[flightState.phaseLog.length - 1];
+      }
+    }
+
+    // CAPTURE -> TRANSFER (fly-by: craft exits SOI without capturing)
+    const captBodyId = flightState.bodyId || 'EARTH';
+    if (isEscapeTrajectory(ps, captBodyId)) {
+      const parent = (BODY_PARENT as Record<string, string | null>)[captBodyId];
+      if (parent) {
+        const result = transitionPhase(flightState, FlightPhase.TRANSFER, `Fly-by — escaped ${captBodyId}`);
+        if (result.success) {
+          flightState.bodyId = parent as CelestialBody;
+          flightState.transferState = null;
+          return flightState.phaseLog[flightState.phaseLog.length - 1];
+        }
       }
     }
   }

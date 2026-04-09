@@ -57,6 +57,7 @@ export interface FlightRenderState {
   biomeLabelContainer: PIXI.Container | null;
   hazeGraphics: PIXI.Graphics | null;
   horizonGraphics: PIXI.Graphics | null;
+  transferObjectsContainer: PIXI.Container | null;
   dockingTargetGfx: PIXI.Graphics | null;
   machGraphics: PIXI.Graphics | null;
   weatherVisibility: number;
@@ -98,6 +99,7 @@ function _createDefaultState(): FlightRenderState {
     biomeLabelContainer:  null,
     hazeGraphics:         null,
     horizonGraphics:      null,
+    transferObjectsContainer: null,
     dockingTargetGfx:     null,
     machGraphics:         null,
 

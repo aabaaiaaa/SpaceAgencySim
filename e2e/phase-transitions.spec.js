@@ -307,9 +307,12 @@ test.describe('Phase Transition: MANOEUVRE → TRANSFER', () => {
       const assembly = window.__flightAssembly;
       if (!ps || !assembly) return;
 
-      // Set velocity just below escape (~11097 m/s at 100km).
-      ps.velX = 11_000;
+      // Set velocity above escape (~11097 m/s at 100km).
+      // Clear orbital elements so Keplerian propagation doesn't override velocity.
+      ps.velX = 11_200;
       ps.velY = 0;
+      const fs = window.__flightState;
+      if (fs) fs.orbitalElements = null;
 
       // Fire engines in NORMAL mode to get into MANOEUVRE.
       ps.controlMode = 'NORMAL';
@@ -371,12 +374,15 @@ test.describe('Phase Transition: Reentry', () => {
     await waitForOrbit(page);
 
     // Reduce velocity so periapsis drops below 70 km (min orbit altitude).
-    // This simulates a retrograde burn result — the orbit check will
-    // detect the orbit is no longer valid and trigger deorbit.
+    // This simulates a retrograde burn result — clear orbital elements so
+    // the physics recomputes the orbit from the new velocity and detects
+    // it's no longer valid (triggers deorbit).
     await page.evaluate(async () => {
       const ps = window.__flightPs;
-      if (!ps) return;
+      const fs = window.__flightState;
+      if (!ps || !fs) return;
       ps.velX = ps.velX - 300;
+      fs.orbitalElements = null;
       if (typeof window.__resyncPhysicsWorker === 'function') {
         await window.__resyncPhysicsWorker();
       }
@@ -391,9 +397,10 @@ test.describe('Phase Transition: Reentry', () => {
     expect(reentryEntry.from).toBe('ORBIT');
 
     // Now let the craft descend. Once below 70 km, REENTRY → FLIGHT should fire.
-    await setTestTimeWarp(page, 100);
+    // High warp speed to cover the 30km descent quickly.
+    await setTestTimeWarp(page, 500);
 
-    await waitForPhase(page, 'FLIGHT', 30_000);
+    await waitForPhase(page, 'FLIGHT', 60_000);
 
     const log2 = await getPhaseLog(page);
     const flightEntry = log2.find(

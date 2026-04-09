@@ -200,3 +200,36 @@ export async function waitForOrbit(page, timeout = 10_000) {
     { timeout },
   );
 }
+
+/**
+ * Spawn a transfer object near the player craft for testing proximity
+ * rendering and collision during TRANSFER phase.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {object} obj  Object definition: { id, type, name, posX, posY, velX, velY, radius, mass }
+ */
+export async function spawnTransferObject(page, obj) {
+  await page.evaluate((o) => {
+    // Import addTransferObject from the module via the global test API.
+    // The function is exposed on window for E2E testing.
+    if (typeof window.__addTransferObject === 'function') {
+      window.__addTransferObject(o);
+    }
+  }, obj);
+}
+
+/**
+ * Query which transfer objects are currently within render distance.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @returns {Promise<Array<{ id: string, distance: number, lod: string }>>}
+ */
+export async function getVisibleTransferObjects(page) {
+  return page.evaluate(() => {
+    if (typeof window.__getProximityObjects !== 'function') return [];
+    const ps = window.__flightPs;
+    if (!ps) return [];
+    return window.__getProximityObjects(ps.posX, ps.posY, ps.velX, ps.velY)
+      .map(o => ({ id: o.id, distance: o.distance, lod: o.lod, type: o.type }));
+  });
+}

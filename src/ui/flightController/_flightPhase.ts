@@ -136,11 +136,16 @@ export function evaluateFlightPhase(skipAutoTransitions = false): void {
   }
 
   // --- Continuous orbit recalculation during MANOEUVRE / TRANSFER / CAPTURE ---
+  // Skip recalculation during stable Keplerian propagation (no engines firing
+  // in ORBIT) — the frozen elements are authoritative and the game-frame
+  // coordinates are not meaningful for orbit recalculation.
   const phase: string = flightState.phase;
-  if (phase === FlightPhase.MANOEUVRE ||
+  const skipRecalc = phase === FlightPhase.ORBIT && flightState.orbitalElements && ps.firingEngines.size === 0;
+  if (!skipRecalc && (
+      phase === FlightPhase.MANOEUVRE ||
       phase === FlightPhase.TRANSFER ||
       phase === FlightPhase.CAPTURE ||
-      (phase === FlightPhase.ORBIT && isOrbitalBurnActive(ps))) {
+      (phase === FlightPhase.ORBIT && isOrbitalBurnActive(ps)))) {
     const newElements = recalculateOrbit(ps, bodyId, flightState.timeElapsed);
     if (newElements) {
       flightState.orbitalElements = newElements;
@@ -152,7 +157,12 @@ export function evaluateFlightPhase(skipAutoTransitions = false): void {
   // Detect REENTRY: if we're in ORBIT and periapsis drops below the minimum
   // orbit altitude, the player has initiated a de-orbit burn.  This check runs
   // even in worker-physics mode because the deorbit warning UI is main-thread-only.
-  if (flightState.phase === FlightPhase.ORBIT && orbitStatus && !orbitStatus.valid) {
+  // Skip this check when the craft has frozen orbital elements and no engines
+  // firing — Keplerian propagation mode keeps the orbit analytically stable,
+  // and the game-frame coordinates are not meaningful for orbit validation.
+  const isKeplerianMode = flightState.phase === FlightPhase.ORBIT &&
+    flightState.orbitalElements && ps.firingEngines.size === 0;
+  if (flightState.phase === FlightPhase.ORBIT && orbitStatus && !orbitStatus.valid && !isKeplerianMode) {
     if (!isEscapeTrajectory(ps, bodyId)) {
       _showDeorbitWarning(bodyId);
       return;

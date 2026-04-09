@@ -44,7 +44,7 @@
  */
 
 import { getPartById } from '../data/parts.ts';
-import { PartType, ControlMode, BODY_RADIUS } from './constants.ts';
+import { PartType, ControlMode, FlightPhase, BODY_RADIUS, MIN_ORBIT_ALTITUDE } from './constants.ts';
 import {
   airDensity,
   airDensityForBody,
@@ -95,7 +95,7 @@ import {
 import { MalfunctionType, REDUCED_THRUST_FACTOR, PARTIAL_CHUTE_FACTOR } from './constants.ts';
 import { getWindForce, getCurrentWeather } from './weather.ts';
 import { initPowerState, tickPower, recalcPowerState } from './power.ts';
-import { getOrbitalStateAtTime } from './orbit.ts';
+import { getOrbitalStateAtTime, orbitalStateToCartesian, computeOrbitalElements } from './orbit.ts';
 
 import type { AltitudeBand, ControlMode as ControlModeType } from './constants.ts';
 import type { FlightState, FlightEvent, OrbitalElements, PowerState, GameState, InventoryPart } from './gameState.ts';
@@ -1020,6 +1020,87 @@ function _updateThrottleFromTWR(ps: PhysicsState, assembly: RocketAssembly, body
 function _integrate(ps: PhysicsState, assembly: RocketAssembly, flightState: FlightState): void {
   const bodyId: string | undefined = flightState?.bodyId;
 
+  // --- Phase-specific physics: ORBIT uses Keplerian propagation ------------
+  // When in stable orbit with no engines firing, skip Newtonian integration
+  // and advance the craft along its frozen orbital path analytically.
+  // This gives perfectly stable orbits at any time warp speed.
+  const isDockingOrRcsEarly = ps.controlMode === ControlMode.DOCKING || ps.controlMode === ControlMode.RCS;
+  if (flightState?.phase === FlightPhase.ORBIT &&
+      ps.firingEngines.size === 0 &&
+      !isDockingOrRcsEarly &&
+      bodyId) {
+    // Compute orbital elements if not yet frozen (e.g. after teleport or burn end).
+    // Only freeze if the orbit is valid (periapsis above minimum altitude).
+    if (!flightState.orbitalElements) {
+      const elements = computeOrbitalElements(ps.posX, ps.posY, ps.velX, ps.velY, bodyId);
+      if (elements) {
+        const periR = elements.semiMajorAxis * (1 - elements.eccentricity);
+        const periAlt = periR - (BODY_RADIUS[bodyId] ?? 6_371_000);
+        const minAlt = (MIN_ORBIT_ALTITUDE as Record<string, number>)[bodyId] ?? 70_000;
+        if (periAlt >= minAlt) {
+          elements.epoch = flightState.timeElapsed;
+          flightState.orbitalElements = elements;
+        }
+      }
+    }
+    if (flightState.orbitalElements) {
+      const state = orbitalStateToCartesian(flightState.orbitalElements, flightState.timeElapsed, bodyId);
+      ps.posX = state.posX;
+      ps.posY = state.posY;
+      ps.velX = state.velX;
+      ps.velY = state.velY;
+      return;
+    }
+  }
+
+  // --- Phase-specific physics: TRANSFER has no gravity or drag ---------------
+  // The craft drifts at constant velocity in deep space. Player can fire
+  // engines for course corrections (thrust only, no gravity/drag).
+  if (flightState?.phase === FlightPhase.TRANSFER) {
+    if (ps.firingEngines.size > 0) {
+      const totalMassT = _computeTotalMass(ps, assembly);
+      const thrustResult: ThrustResult = _computeThrust(ps, assembly, 0);
+      if (totalMassT > 0) {
+        ps.velX += (thrustResult.thrustX / totalMassT) * FIXED_DT;
+        ps.velY += (thrustResult.thrustY / totalMassT) * FIXED_DT;
+      }
+      tickFuelSystem(ps, assembly, FIXED_DT, 0);
+    }
+    ps.posX += ps.velX * FIXED_DT;
+    ps.posY += ps.velY * FIXED_DT;
+    return;
+  }
+
+  // --- Phase-specific physics: CAPTURE uses radial gravity from destination ---
+  // The craft is approaching a body and must burn to slow down.
+  if (flightState?.phase === FlightPhase.CAPTURE && bodyId) {
+    _updateThrottleFromTWR(ps, assembly, bodyId);
+    const totalMassC = _computeTotalMass(ps, assembly);
+    // Thrust (no atmosphere in deep approach).
+    let txc = 0, tyc = 0;
+    if (ps.firingEngines.size > 0) {
+      const tr = _computeThrust(ps, assembly, 0);
+      txc = tr.thrustX;
+      tyc = tr.thrustY;
+      tickFuelSystem(ps, assembly, FIXED_DT, 0);
+    }
+    // Radial gravity toward destination body centre.
+    const gravAccelC = _gravityForBody(bodyId, Math.max(0, ps.posY));
+    const Rc = (BODY_RADIUS[bodyId] ?? 6_371_000);
+    const rxc = ps.posX;
+    const ryc = ps.posY + Rc;
+    const rc = Math.hypot(rxc, ryc);
+    const gxc = -gravAccelC * totalMassC * rxc / rc;
+    const gyc = -gravAccelC * totalMassC * ryc / rc;
+    if (totalMassC > 0) {
+      ps.velX += ((txc + gxc) / totalMassC) * FIXED_DT;
+      ps.velY += ((tyc + gyc) / totalMassC) * FIXED_DT;
+    }
+    ps.posX += ps.velX * FIXED_DT;
+    ps.posY += ps.velY * FIXED_DT;
+    return;
+  }
+
   // --- 0. TWR-relative throttle conversion --------------------------------
   _updateThrottleFromTWR(ps, assembly, bodyId);
 
@@ -1045,8 +1126,29 @@ function _integrate(ps: PhysicsState, assembly: RocketAssembly, flightState: Fli
 
   // --- 3. Gravity force (body-specific, inverse-square) --------------------
   const gravAccel: number = _gravityForBody(bodyId, altitude);
-  const gravFX = 0;
-  const gravFY: number = -gravAccel * totalMass;
+  let gravFX: number;
+  let gravFY: number;
+
+  // In ORBIT or MANOEUVRE phase, gravity is radial (toward body centre) so
+  // that orbital burns produce correct orbit changes.  In FLIGHT and other
+  // atmospheric phases, gravity is flat vertical (the 2D ground model).
+  const useRadialGravity =
+    flightState?.phase === FlightPhase.MANOEUVRE ||
+    (flightState?.phase === FlightPhase.ORBIT && ps.firingEngines.size > 0);
+
+  if (useRadialGravity && bodyId) {
+    const R: number = (BODY_RADIUS[bodyId] ?? 6_371_000);
+    const rx: number = ps.posX;
+    const ry: number = ps.posY + R;
+    const r: number = Math.hypot(rx, ry);
+    const gravMag: number = gravAccel * totalMass;
+    gravFX = -gravMag * rx / r;
+    gravFY = -gravMag * ry / r;
+  } else {
+    // FLIGHT phase: flat vertical gravity.
+    gravFX = 0;
+    gravFY = -gravAccel * totalMass;
+  }
 
   // --- 4. Drag force -------------------------------------------------------
   const speed: number    = Math.hypot(ps.velX, ps.velY);

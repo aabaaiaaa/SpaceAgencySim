@@ -37,10 +37,12 @@ import {
 // Constants
 // ---------------------------------------------------------------------------
 
-// Orbital parameters for a 100 km circular orbit around Earth.
-const ORBIT_ALT = 100_000;
-const ORBIT_VEL = 7848;
-const ESCAPE_VEL = 11_200;
+// Orbital parameters — use 200 km altitude for extra margin since the game's
+// constant gravity causes the craft to fall. At 200 km the craft has ~160s
+// before dropping below the 70 km minimum orbit altitude.
+const ORBIT_ALT = 200_000;
+const ORBIT_VEL = 7788;      // √(GM / (R + 200km)) ≈ 7788 m/s
+const ESCAPE_VEL = 11_100;   // √(2·GM / (R + 200km)) ≈ 11100 m/s
 
 // Rocket parts — cmd-mk1 has built-in RCS (hasRcs: true).
 const ORBITAL_ROCKET = ['cmd-mk1', 'tank-large', 'engine-reliant'];
@@ -160,8 +162,8 @@ test.describe('Period does NOT advance during time warp', () => {
     await seedAndLoadSave(page, freshStartFixture({ currentPeriod: 10 }));
 
     await startTestFlight(page, BASIC_ROCKET);
-    await page.keyboard.press('Space');
-    await page.keyboard.press('z');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', key: ' ', bubbles: true })));
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyZ', key: 'z', bubbles: true })));
     await waitForAltitude(page, 500, 20_000);
 
     const gsBefore = await getGameState(page);
@@ -210,10 +212,12 @@ test.describe('Period does NOT advance during time warp', () => {
       { timeout: 10_000 },
     );
     await page.click('.hud-warp-btn[data-warp="10"]');
-    const _posX2 = await page.evaluate(() => window.__flightPs?.posX ?? 0);
+    // Wait for simulation time to advance (proves warp is active).
+    // posX stays 0 during Keplerian propagation, so check timeElapsed instead.
+    const _t0 = await page.evaluate(() => window.__flightState?.timeElapsed ?? 0);
     await page.waitForFunction(
-      (x0) => Math.abs((window.__flightPs?.posX ?? x0) - x0) > 100,
-      _posX2,
+      (t0) => (window.__flightState?.timeElapsed ?? t0) > t0 + 5,
+      _t0,
       { timeout: 10_000 },
     );
 
@@ -242,7 +246,7 @@ test.describe('Flight phase transitions', () => {
     expect(fsBefore.phase).toBe('PRELAUNCH');
 
     // Stage engine — transitions rapidly through LAUNCH to FLIGHT.
-    await page.keyboard.press('Space');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', key: ' ', bubbles: true })));
 
     // Wait for FLIGHT phase (LAUNCH may be transient).
     await page.waitForFunction(
@@ -369,13 +373,17 @@ test.describe('Flight phase transitions', () => {
     const page = await setupOrbitalFlight(browser);
 
     // Reduce velocity to make orbit decay (periapsis < 70km).
+    // Clear orbital elements so the physics recomputes from the new velocity
+    // and detects the orbit is no longer valid (triggers reentry).
     await page.evaluate(async () => {
       const ps = window.__flightPs;
-      if (!ps) return;
+      const fs = window.__flightState;
+      if (!ps || !fs) return;
       ps.velX = 6000;
       ps.velY = 0;
       ps.firingEngines.clear();
       ps.throttle = 0;
+      fs.orbitalElements = null;
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
@@ -449,7 +457,7 @@ test.describe('Control mode switching in ORBIT', () => {
     test.setTimeout(120_000);
     const page = await setupOrbitalFlight(browser);
 
-    await page.keyboard.press('v');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
     await page.waitForFunction(
       () => window.__flightPs?.controlMode === 'DOCKING',
       { timeout: 5_000 },
@@ -467,7 +475,7 @@ test.describe('Control mode switching in ORBIT', () => {
       if (window.__flightPs) window.__flightPs.throttle = 0.5;
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
-    await page.keyboard.press('v');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
     await page.waitForFunction(
       () => window.__flightPs?.controlMode === 'DOCKING',
       { timeout: 5_000 },
@@ -482,17 +490,13 @@ test.describe('Control mode switching in ORBIT', () => {
     test.setTimeout(120_000);
     const page = await setupOrbitalFlight(browser);
 
-    // Enter docking mode first.
-    await page.evaluate(async () => {
-      if (window.__flightPs) window.__flightPs.controlMode = 'DOCKING';
-      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
-    });
+    // Enter docking mode, then toggle to RCS.
+    // Use dispatchEvent to avoid browser tab-throttling issues under parallel workers.
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
+    await page.waitForFunction(() => window.__flightPs?.controlMode === 'DOCKING', { timeout: 5_000 });
 
-    await page.keyboard.press('r');
-    await page.waitForFunction(
-      () => window.__flightPs?.controlMode === 'RCS',
-      { timeout: 5_000 },
-    );
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyR', key: 'r', bubbles: true })));
+    await page.waitForFunction(() => window.__flightPs?.controlMode === 'RCS', { timeout: 5_000 });
     expect(await page.evaluate(() => window.__flightPs?.controlMode)).toBe('RCS');
     await page.close();
   });
@@ -501,17 +505,15 @@ test.describe('Control mode switching in ORBIT', () => {
     test.setTimeout(120_000);
     const page = await setupOrbitalFlight(browser);
 
-    // Enter RCS mode first.
-    await page.evaluate(async () => {
-      if (window.__flightPs) window.__flightPs.controlMode = 'RCS';
-      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
-    });
+    // Enter DOCKING → RCS via dispatched key events.
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
+    await page.waitForFunction(() => window.__flightPs?.controlMode === 'DOCKING', { timeout: 5_000 });
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyR', key: 'r', bubbles: true })));
+    await page.waitForFunction(() => window.__flightPs?.controlMode === 'RCS', { timeout: 5_000 });
 
-    await page.keyboard.press('r');
-    await page.waitForFunction(
-      () => window.__flightPs?.controlMode === 'DOCKING',
-      { timeout: 5_000 },
-    );
+    // Now toggle back to DOCKING.
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyR', key: 'r', bubbles: true })));
+    await page.waitForFunction(() => window.__flightPs?.controlMode === 'DOCKING', { timeout: 5_000 });
     expect(await page.evaluate(() => window.__flightPs?.controlMode)).toBe('DOCKING');
     await page.close();
   });
@@ -520,17 +522,13 @@ test.describe('Control mode switching in ORBIT', () => {
     test.setTimeout(120_000);
     const page = await setupOrbitalFlight(browser);
 
-    // Enter docking mode first.
-    await page.evaluate(async () => {
-      if (window.__flightPs) window.__flightPs.controlMode = 'DOCKING';
-      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
-    });
+    // Enter docking mode.
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
+    await page.waitForFunction(() => window.__flightPs?.controlMode === 'DOCKING', { timeout: 5_000 });
 
-    await page.keyboard.press('v');
-    await page.waitForFunction(
-      () => window.__flightPs?.controlMode === 'NORMAL',
-      { timeout: 5_000 },
-    );
+    // Exit back to NORMAL.
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
+    await page.waitForFunction(() => window.__flightPs?.controlMode === 'NORMAL', { timeout: 5_000 });
     expect(await page.evaluate(() => window.__flightPs?.controlMode)).toBe('NORMAL');
     await page.close();
   });
@@ -544,7 +542,7 @@ test.describe('Control mode switching in ORBIT', () => {
       if (window.__flightPs) window.__flightPs.throttle = 0.5;
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
-    await page.keyboard.press('v');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
     await page.waitForFunction(
       () => window.__flightPs?.controlMode === 'DOCKING',
       { timeout: 5_000 },
@@ -556,7 +554,7 @@ test.describe('Control mode switching in ORBIT', () => {
       if (window.__flightPs) window.__flightPs.throttle = 0.3;
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
-    await page.keyboard.press('v');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
     await page.waitForFunction(
       () => window.__flightPs?.controlMode === 'NORMAL',
       { timeout: 5_000 },
@@ -576,12 +574,12 @@ test.describe('RCS mode directional translation', () => {
     const page = await setupOrbitalFlight(browser);
 
     // Enter docking mode then RCS mode.
-    await page.keyboard.press('v');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
     await page.waitForFunction(
       () => window.__flightPs?.controlMode === 'DOCKING',
       { timeout: 5_000 },
     );
-    await page.keyboard.press('r');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyR', key: 'r', bubbles: true })));
     await page.waitForFunction(
       () => window.__flightPs?.controlMode === 'RCS',
       { timeout: 5_000 },
@@ -592,7 +590,7 @@ test.describe('RCS mode directional translation', () => {
       velY: window.__flightPs?.velY ?? 0,
     }));
 
-    await page.keyboard.down('w');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW', key: 'w', bubbles: true })));
     await page.waitForFunction(
       (v0) => {
         const ps = window.__flightPs;
@@ -602,7 +600,7 @@ test.describe('RCS mode directional translation', () => {
       { x: before.velX, y: before.velY },
       { timeout: 5_000 },
     );
-    await page.keyboard.up('w');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW', key: 'w', bubbles: true })));
 
     const after = await page.evaluate(() => ({
       velX: window.__flightPs?.velX ?? 0,
@@ -620,12 +618,12 @@ test.describe('RCS mode directional translation', () => {
     const page = await setupOrbitalFlight(browser);
 
     // Enter docking mode then RCS mode.
-    await page.keyboard.press('v');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
     await page.waitForFunction(
       () => window.__flightPs?.controlMode === 'DOCKING',
       { timeout: 5_000 },
     );
-    await page.keyboard.press('r');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyR', key: 'r', bubbles: true })));
     await page.waitForFunction(
       () => window.__flightPs?.controlMode === 'RCS',
       { timeout: 5_000 },
@@ -633,21 +631,21 @@ test.describe('RCS mode directional translation', () => {
 
     const angleBefore = await page.evaluate(() => window.__flightPs?.angle ?? 0);
 
-    await page.keyboard.down('a');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyA', key: 'a', bubbles: true })));
     // Wait for physics to process input (position changes in orbit even without rotation)
     await page.waitForFunction(
       (y0) => (window.__flightPs?.posY ?? y0) !== y0,
       await page.evaluate(() => window.__flightPs?.posY ?? 0),
       { timeout: 5_000 },
     );
-    await page.keyboard.up('a');
-    await page.keyboard.down('d');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyA', key: 'a', bubbles: true })));
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyD', key: 'd', bubbles: true })));
     await page.waitForFunction(
       (y0) => (window.__flightPs?.posY ?? y0) !== y0,
       await page.evaluate(() => window.__flightPs?.posY ?? 0),
       { timeout: 5_000 },
     );
-    await page.keyboard.up('d');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyD', key: 'd', bubbles: true })));
     // Wait one frame for physics to settle
     await page.evaluate(() => new Promise(r => requestAnimationFrame(r)));
 
@@ -666,7 +664,7 @@ test.describe('Map view toggle and controls', () => {
     test.setTimeout(120_000);
     const page = await setupOrbitalFlight(browser);
 
-    await page.keyboard.press('m');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyM', key: 'm', bubbles: true })));
     await expect(page.locator('#map-hud')).toBeVisible({ timeout: 5_000 });
     await expect(page.locator('#map-hud-info')).toContainText('MAP VIEW');
     await page.close();
@@ -676,7 +674,7 @@ test.describe('Map view toggle and controls', () => {
     test.setTimeout(120_000);
     const page = await setupOrbitalFlight(browser);
 
-    await page.keyboard.press('m');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyM', key: 'm', bubbles: true })));
     await expect(page.locator('#map-hud')).toBeVisible({ timeout: 5_000 });
 
     const info = page.locator('#map-hud-info');
@@ -691,7 +689,7 @@ test.describe('Map view toggle and controls', () => {
     test.setTimeout(120_000);
     const page = await setupOrbitalFlight(browser);
 
-    await page.keyboard.press('m');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyM', key: 'm', bubbles: true })));
     await expect(page.locator('#map-hud')).toBeVisible({ timeout: 5_000 });
 
     const controls = page.locator('#map-hud-controls');
@@ -705,13 +703,13 @@ test.describe('Map view toggle and controls', () => {
     test.setTimeout(120_000);
     const page = await setupOrbitalFlight(browser);
 
-    await page.keyboard.press('m');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyM', key: 'm', bubbles: true })));
     await expect(page.locator('#map-hud')).toBeVisible({ timeout: 5_000 });
 
     const throttleBefore = await page.evaluate(() => window.__flightPs?.throttle ?? -1);
     expect(throttleBefore).toBe(0);
 
-    await page.keyboard.down('w');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW', key: 'w', bubbles: true })));
     await page.waitForFunction(
       () => (window.__flightPs?.throttle ?? 0) > 0,
       { timeout: 5_000 },
@@ -719,7 +717,7 @@ test.describe('Map view toggle and controls', () => {
     const throttleDuring = await page.evaluate(() => window.__flightPs?.throttle ?? -1);
     expect(throttleDuring).toBeGreaterThan(0);
 
-    await page.keyboard.up('w');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW', key: 'w', bubbles: true })));
     await page.waitForFunction(
       () => (window.__flightPs?.throttle ?? -1) === 0,
       { timeout: 5_000 },
@@ -733,10 +731,10 @@ test.describe('Map view toggle and controls', () => {
     test.setTimeout(120_000);
     const page = await setupOrbitalFlight(browser);
 
-    await page.keyboard.press('m');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyM', key: 'm', bubbles: true })));
     await expect(page.locator('#map-hud')).toBeVisible({ timeout: 5_000 });
 
-    await page.keyboard.down('s');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyS', key: 's', bubbles: true })));
     await page.waitForFunction(
       () => (window.__flightPs?.throttle ?? 0) > 0,
       { timeout: 5_000 },
@@ -751,7 +749,7 @@ test.describe('Map view toggle and controls', () => {
     // Retrograde angle should be approximately -π/2 (pointing opposite velocity).
     expect(Math.abs(state.angle - (-Math.PI / 2))).toBeLessThan(0.5);
 
-    await page.keyboard.up('s');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyS', key: 's', bubbles: true })));
     await page.waitForFunction(
       () => (window.__flightPs?.throttle ?? -1) === 0,
       { timeout: 5_000 },
@@ -765,10 +763,10 @@ test.describe('Map view toggle and controls', () => {
     test.setTimeout(120_000);
     const page = await setupOrbitalFlight(browser);
 
-    await page.keyboard.press('m');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyM', key: 'm', bubbles: true })));
     await expect(page.locator('#map-hud')).toBeVisible({ timeout: 5_000 });
 
-    await page.keyboard.down('a');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyA', key: 'a', bubbles: true })));
     await page.waitForFunction(
       () => (window.__flightPs?.throttle ?? 0) > 0,
       { timeout: 5_000 },
@@ -785,7 +783,7 @@ test.describe('Map view toggle and controls', () => {
     // Radial-in angle should be approximately π (pointing toward body centre).
     expect(Math.abs(Math.abs(state.angle) - Math.PI)).toBeLessThan(0.5);
 
-    await page.keyboard.up('a');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyA', key: 'a', bubbles: true })));
     await page.waitForFunction(
       () => (window.__flightPs?.throttle ?? -1) === 0,
       { timeout: 5_000 },
@@ -800,11 +798,11 @@ test.describe('Map view toggle and controls', () => {
     const page = await setupOrbitalFlight(browser);
 
     // Open map first.
-    await page.keyboard.press('m');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyM', key: 'm', bubbles: true })));
     await expect(page.locator('#map-hud')).toBeVisible({ timeout: 5_000 });
 
     // Close map.
-    await page.keyboard.press('m');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyM', key: 'm', bubbles: true })));
     await expect(page.locator('#map-hud')).not.toBeVisible({ timeout: 5_000 });
     await expect(page.locator('#flight-hud')).toBeVisible();
     await page.close();
@@ -847,10 +845,10 @@ test.describe('Orbit slot proximity detection and warp-to-target', () => {
     test.setTimeout(120_000);
     const page = await setupOrbitalFlight(browser, SAT_FIXTURE_OVERRIDES);
 
-    await page.keyboard.press('m');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyM', key: 'm', bubbles: true })));
     await expect(page.locator('#map-hud')).toBeVisible({ timeout: 5_000 });
 
-    await page.keyboard.press('t');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyT', key: 't', bubbles: true })));
     const targetField = page.locator('#map-hud-info [data-field="target"]');
     await expect(targetField).not.toContainText('None', { timeout: 5_000 });
     await page.close();
@@ -861,9 +859,9 @@ test.describe('Orbit slot proximity detection and warp-to-target', () => {
     const page = await setupOrbitalFlight(browser, SAT_FIXTURE_OVERRIDES);
 
     // Open map and select target.
-    await page.keyboard.press('m');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyM', key: 'm', bubbles: true })));
     await expect(page.locator('#map-hud')).toBeVisible({ timeout: 5_000 });
-    await page.keyboard.press('t');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyT', key: 't', bubbles: true })));
     const targetField = page.locator('#map-hud-info [data-field="target"]');
     await expect(targetField).not.toContainText('None', { timeout: 5_000 });
 
@@ -871,7 +869,7 @@ test.describe('Orbit slot proximity detection and warp-to-target', () => {
       () => window.__flightState?.timeElapsed ?? 0,
     );
 
-    await page.keyboard.press('g');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyG', key: 'g', bubbles: true })));
 
     await page.waitForFunction(
       (before) => (window.__flightState?.timeElapsed ?? 0) > before,
@@ -885,7 +883,7 @@ test.describe('Orbit slot proximity detection and warp-to-target', () => {
     expect(timeAfter).toBeGreaterThan(timeBefore);
 
     // Close map.
-    await page.keyboard.press('m');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyM', key: 'm', bubbles: true })));
     await expect(page.locator('#map-hud')).not.toBeVisible({ timeout: 5_000 });
     await page.close();
   });

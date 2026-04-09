@@ -23,6 +23,8 @@ import {
   renderRcsPlumes, renderMachEffects, trailDt,
 } from './_trails.ts';
 import { renderDebris, renderDockingTarget, renderEjectedCrew } from './_debris.ts';
+import { getProximityObjects } from '../../core/transferObjects.ts';
+import { renderTransferObjects } from './_transferObjects.ts';
 import { onMouseMove, onWheel } from './_input.ts';
 import { drainPools, releaseGraphics } from './_pool.ts';
 
@@ -105,6 +107,7 @@ export function initFlightRenderer(): void {
 
 interface FlightStateArg {
   readonly bodyId?: string;
+  readonly phase?: string;
 }
 
 /**
@@ -129,7 +132,7 @@ export function renderFlightFrame(
 
   renderStars(altitude, w, h);
 
-  renderHorizon(altitude, w, h);
+  renderHorizon(altitude, w, h, flightState?.phase);
 
   if (altitude < 5_000) {
     renderGround(w, h);
@@ -137,6 +140,12 @@ export function renderFlightFrame(
   }
 
   renderDebris(ps.debris, assembly, w, h);
+
+  // Transfer objects (asteroids, craft, debris during TRANSFER phase).
+  if (flightState?.phase === 'TRANSFER') {
+    const proximityObjects = getProximityObjects(ps.posX, ps.posY, ps.velX, ps.velY);
+    renderTransferObjects(proximityObjects, w, h, ps.posX, ps.posY);
+  }
 
   const trailDensity = bodyId ? bodyAirDensity(altitude, bodyId) : airDensity(altitude);
   const dt           = trailDt();

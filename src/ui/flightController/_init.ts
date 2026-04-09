@@ -13,6 +13,8 @@ import { initFlightHud, destroyFlightHud, showLaunchTip } from '../flightHud.ts'
 import { initFlightContextMenu, destroyFlightContextMenu } from '../flightContextMenu.ts';
 import { setTopBarFlightItems, clearTopBarFlightItems, clearTopBarHubItems, setTopBarDropdownToggleCallback, setCurrentScreen } from '../topbar.ts';
 import { setMalfunctionMode, getMalfunctionMode } from '../../core/malfunction.ts';
+import { addTransferObject as addTransferObjectFn, getProximityObjects as getProximityObjectsFn } from '../../core/transferObjects.ts';
+import type { TransferObject as TransferObjectArg } from '../../core/transferObjects.ts';
 import { createDockingState } from '../../core/docking.ts';
 import { getPartById } from '../../data/parts.ts';
 import { getVabInventoryUsedParts } from '../vab.ts';
@@ -52,6 +54,10 @@ declare global {
     __testGetTimeWarp: (() => number) | undefined;
     /** Re-sync the physics worker with the current main-thread state. */
     __resyncPhysicsWorker: (() => Promise<void>) | undefined;
+    /** Add a transfer object for E2E testing. */
+    __addTransferObject: ((obj: TransferObjectArg) => void) | undefined;
+    /** Get proximity objects for E2E testing. */
+    __getProximityObjects: ((px: number, py: number, vx: number, vy: number) => unknown[]) | undefined;
   }
 }
 
@@ -195,6 +201,14 @@ export function startFlightScene(
       if (st.workerReady && stPs && st.assembly && st.stagingConfig && stFs) {
         await resyncWorkerState(stPs, st.assembly, st.stagingConfig, stFs);
       }
+    };
+
+    // Transfer objects API for E2E testing.
+    window.__addTransferObject = (obj: TransferObjectArg) => {
+      addTransferObjectFn(obj);
+    };
+    window.__getProximityObjects = (px: number, py: number, vx: number, vy: number) => {
+      return getProximityObjectsFn(px, py, vx, vy);
     };
   }
 
@@ -367,6 +381,8 @@ export function stopFlightScene(): void {
     window.__testSetTimeWarp = undefined;
     window.__testGetTimeWarp = undefined;
     window.__resyncPhysicsWorker = undefined;
+    window.__addTransferObject = undefined;
+    window.__getProximityObjects = undefined;
   }
 
   // Reset all state.

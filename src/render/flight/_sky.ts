@@ -152,12 +152,62 @@ export function renderStars(altitude: number, w: number, h: number): void {
 
 /**
  * Render a curved horizon effect at high altitudes.
+ *
+ * In ORBIT/MANOEUVRE phase, renders the body as a distant curved horizon at
+ * the bottom of the screen, scaled by altitude.  Higher orbits show a smaller
+ * body arc; lower orbits show a larger one.  The ground is never reachable
+ * in orbit — the horizon is purely visual orientation ("down" = toward body).
  */
-export function renderHorizon(altitude: number, w: number, h: number): void {
+export function renderHorizon(altitude: number, w: number, h: number, phase?: string): void {
   const s = getFlightRenderState();
   if (!s.horizonGraphics) return;
   s.horizonGraphics.clear();
 
+  // --- ORBIT / MANOEUVRE / CAPTURE: distant body horizon ---
+  // In CAPTURE, the body grows from small to large as the craft approaches.
+  const isOrbital = phase === 'ORBIT' || phase === 'MANOEUVRE' || phase === 'CAPTURE';
+  if (isOrbital) {
+    // The body appears as a curved arc at the bottom of the screen.
+    // At low orbit (~80km), the arc fills most of the lower half.
+    // At high orbit (~2000km), the arc is a thin sliver at the bottom.
+    const minOrbitAlt = 70_000;
+    const highOrbitAlt = 2_000_000;
+    const orbitalT = Math.min(1, Math.max(0, (altitude - minOrbitAlt) / (highOrbitAlt - minOrbitAlt)));
+
+    // Arc radius: small radius = large body (close), large radius = small arc (far).
+    const closeRadius = w * 1.2;    // Low orbit: body fills the view
+    const farRadius   = w * 8;      // High orbit: body is a thin arc
+    const arcRadius = closeRadius + (farRadius - closeRadius) * orbitalT;
+
+    // The arc centre sits below the screen bottom. Higher orbit = further below.
+    const closeOffset = h * 0.3;    // Low orbit: arc top is 30% from bottom
+    const farOffset   = h * 0.05;   // High orbit: arc barely visible
+    const arcTopFromBottom = closeOffset + (farOffset - closeOffset) * orbitalT;
+    const cy = h - arcTopFromBottom + arcRadius;
+    const cx = w / 2;
+
+    const halfAngle = Math.asin(Math.min(1, (w * 0.7) / arcRadius));
+
+    s.horizonGraphics.moveTo(0, h);
+    s.horizonGraphics.arc(cx, cy, arcRadius, -Math.PI / 2 - halfAngle, -Math.PI / 2 + halfAngle);
+    s.horizonGraphics.lineTo(w, h);
+    s.horizonGraphics.closePath();
+    s.horizonGraphics.fill({ color: s.bodyVisuals.ground });
+
+    // Atmosphere glow along the horizon edge.
+    const glowAlpha = 0.4 - orbitalT * 0.3;
+    const glowWidth = 3 + (1 - orbitalT) * 4;
+    if (glowAlpha > 0.05) {
+      s.horizonGraphics.arc(cx, cy, arcRadius - glowWidth, -Math.PI / 2 - halfAngle, -Math.PI / 2 + halfAngle);
+      s.horizonGraphics.stroke({ width: glowWidth, color: 0x4488cc, alpha: glowAlpha });
+    }
+    return;
+  }
+
+  // --- TRANSFER: deep space, no body horizon ---
+  if (phase === 'TRANSFER') return;
+
+  // --- FLIGHT / REENTRY: camera-relative ground horizon ---
   const groundScreenY = h / 2 + s.camWorldY * ppm();
 
   if (groundScreenY < -h) return;
