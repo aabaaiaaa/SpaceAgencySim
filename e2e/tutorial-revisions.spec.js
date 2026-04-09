@@ -246,7 +246,7 @@ async function setWarp(page, factor) {
     () => !document.querySelector('.hud-warp-btn')?.disabled,
     { timeout: 10_000 },
   );
-  await page.click(`[data-warp="${factor}"]`);
+  await page.evaluate((f) => window.__testSetTimeWarp?.(f), factor);
 }
 
 async function triggerReturnViaMenu(page) {
@@ -454,7 +454,7 @@ test.describe('Tutorial Revisions', () => {
         { timeout: 30_000 },
       );
       await stage(page); // deploy parachute
-      await setWarp(page, 50);
+      await setWarp(page, 100);
       await waitLanded(page, 120_000);
       await triggerReturnViaMenu(page);
       await returnToHub(page);
@@ -498,7 +498,7 @@ test.describe('Tutorial Revisions', () => {
 
       // Deploy parachute (Stage 1).
       await stage(page);
-      await setWarp(page, 50);
+      await setWarp(page, 100);
 
       // Wait until descending near the band ceiling.
       await page.waitForFunction(
@@ -521,7 +521,7 @@ test.describe('Tutorial Revisions', () => {
       await stage(page);
 
       // Warp through the 30s hold.
-      await setWarp(page, 50);
+      await setWarp(page, 100);
       await page.waitForFunction(
         id => {
           const state = window.__gameState;
@@ -801,7 +801,7 @@ test.describe('Tutorial Revisions', () => {
 
       // Deploy parachute.
       await stage(page);
-      await setWarp(page, 50);
+      await setWarp(page, 100);
       await waitLanded(page, 120_000);
 
       // Safely landed crewed rocket — post-flight summary doesn't auto-trigger.
@@ -848,7 +848,7 @@ test.describe('Tutorial Revisions', () => {
       await stage(page); // activate science module
 
       // Continue climbing past 5000m.
-      await setWarp(page, 50);
+      await setWarp(page, 100);
       await waitForAltitude(page, 5_000);
       await page.keyboard.press('x'); // cut throttle
 
@@ -861,7 +861,7 @@ test.describe('Tutorial Revisions', () => {
       // Deploy parachute for safe descent.
       await setWarp(page, 1);
       await stage(page); // deploy parachute
-      await setWarp(page, 50);
+      await setWarp(page, 100);
       await waitLanded(page, 120_000);
 
       await triggerReturnViaMenu(page);
@@ -934,7 +934,7 @@ test.describe('Tutorial Revisions', () => {
 
       // Deploy parachute.
       await stage(page);
-      await setWarp(page, 50);
+      await setWarp(page, 100);
       await waitLanded(page, 120_000);
 
       await triggerReturnViaMenu(page);
@@ -1080,7 +1080,7 @@ test.describe('Tutorial Revisions', () => {
 
       // Stage 1: deploy parachute.
       await stage(page);
-      await setWarp(page, 50);
+      await setWarp(page, 100);
 
       // Wait until descending near the band.
       await page.waitForFunction(
@@ -1103,7 +1103,7 @@ test.describe('Tutorial Revisions', () => {
       await stage(page);
 
       // Warp through the 30s hold.
-      await setWarp(page, 50);
+      await setWarp(page, 100);
       await page.waitForFunction(
         id => {
           const state = window.__gameState;

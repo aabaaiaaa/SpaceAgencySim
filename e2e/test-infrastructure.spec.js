@@ -130,62 +130,84 @@ test.describe('E2E Infrastructure — State Injection', () => {
 // ==========================================================================
 
 test.describe('E2E Infrastructure — Test Flight & Malfunction Mode', () => {
-  test.describe.configure({ mode: 'serial' });
 
-  /** @type {import('@playwright/test').Page} */
-  let page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  /** Helper: create a page, seed, load, and start a test flight. */
+  async function setupFlight(browser) {
+    const page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
-
     const envelope = freshStartFixture({ parts: ALL_PARTS });
     await seedAndLoadSave(page, envelope);
-
-    // Start flight programmatically (bypasses VAB UI)
     await startTestFlight(page, ['probe-core-mk1', 'tank-small', 'engine-spark']);
-  });
+    return page;
+  }
 
-  test.afterAll(async () => {
-    await page.close();
-  });
+  test('(1) flight scene is active with physics state exposed', async ({ browser }) => {
+    test.setTimeout(60_000);
+    const page = await setupFlight(browser);
 
-  test('(1) flight scene is active with physics state exposed', async () => {
     const ps = await getPhysicsSnapshot(page);
     expect(ps).not.toBeNull();
     expect(ps.posY).toBeGreaterThanOrEqual(0);
     expect(ps.grounded).toBe(true);
+
+    await page.close();
   });
 
-  test('(2) malfunction mode controls are exposed during flight', async () => {
+  test('(2) malfunction mode controls are exposed during flight', async ({ browser }) => {
+    test.setTimeout(60_000);
+    const page = await setupFlight(browser);
+
     const hasSetFn = await page.evaluate(() => typeof window.__setMalfunctionMode === 'function');
     const hasGetFn = await page.evaluate(() => typeof window.__getMalfunctionMode === 'function');
     expect(hasSetFn).toBe(true);
     expect(hasGetFn).toBe(true);
+
+    await page.close();
   });
 
-  test('(3) default malfunction mode is "off" (test determinism)', async () => {
+  test('(3) default malfunction mode is "off" (test determinism)', async ({ browser }) => {
+    test.setTimeout(60_000);
+    const page = await setupFlight(browser);
+
     const mode = await getMalfunctionMode(page);
     expect(mode).toBe('off');
+
+    await page.close();
   });
 
-  test('(4) can set malfunction mode to "normal"', async () => {
+  test('(4) can set malfunction mode to "normal"', async ({ browser }) => {
+    test.setTimeout(60_000);
+    const page = await setupFlight(browser);
+
     await setMalfunctionMode(page, 'normal');
     const mode = await getMalfunctionMode(page);
     expect(mode).toBe('normal');
+
+    await page.close();
   });
 
-  test('(5) can set malfunction mode to "forced"', async () => {
+  test('(5) can set malfunction mode to "forced"', async ({ browser }) => {
+    test.setTimeout(60_000);
+    const page = await setupFlight(browser);
+
     await setMalfunctionMode(page, 'forced');
     const mode = await getMalfunctionMode(page);
     expect(mode).toBe('forced');
+
+    await page.close();
   });
 
-  test('(6) can reset malfunction mode back to "off"', async () => {
+  test('(6) can reset malfunction mode back to "off"', async ({ browser }) => {
+    test.setTimeout(60_000);
+    const page = await setupFlight(browser);
+
+    // Set to normal first, then reset to off
+    await setMalfunctionMode(page, 'normal');
     await setMalfunctionMode(page, 'off');
     const mode = await getMalfunctionMode(page);
     expect(mode).toBe('off');
+
+    await page.close();
   });
 });
 
@@ -194,10 +216,6 @@ test.describe('E2E Infrastructure — Test Flight & Malfunction Mode', () => {
 // ==========================================================================
 
 test.describe('E2E Infrastructure — Objective Verification', () => {
-  test.describe.configure({ mode: 'serial' });
-
-  /** @type {import('@playwright/test').Page} */
-  let page;
 
   const TEST_MISSION = {
     id:          'test-mission-infra',
@@ -216,11 +234,10 @@ test.describe('E2E Infrastructure — Objective Verification', () => {
     unlockedParts: [],
   };
 
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  /** Helper: create a page, seed mission fixture, load, and start flight. */
+  async function setupMissionFlight(browser) {
+    const page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
-
     const envelope = missionTestFixture(TEST_MISSION);
     await seedAndLoadSave(page, envelope);
 
@@ -231,23 +248,33 @@ test.describe('E2E Infrastructure — Objective Verification', () => {
 
     // Start flight programmatically with malfunctions off
     await startTestFlight(page, ['probe-core-mk1', 'tank-small', 'engine-spark']);
-  });
+    return page;
+  }
 
-  test.afterAll(async () => {
+  test('(1) objective starts incomplete before staging', async ({ browser }) => {
+    test.setTimeout(60_000);
+    const page = await setupMissionFlight(browser);
+
+    const complete = await areAllObjectivesComplete(page, 'test-mission-infra');
+    expect(complete).toBe(false);
+
     await page.close();
   });
 
-  test('(1) objective starts incomplete before staging', async () => {
-    const complete = await areAllObjectivesComplete(page, 'test-mission-infra');
-    expect(complete).toBe(false);
-  });
+  test('(2) malfunctions are disabled for determinism', async ({ browser }) => {
+    test.setTimeout(60_000);
+    const page = await setupMissionFlight(browser);
 
-  test('(2) malfunctions are disabled for determinism', async () => {
     const mode = await getMalfunctionMode(page);
     expect(mode).toBe('off');
+
+    await page.close();
   });
 
-  test('(3) stage rocket and wait for altitude objective', async () => {
+  test('(3) stage rocket and wait for altitude objective', async ({ browser }) => {
+    test.setTimeout(60_000);
+    const page = await setupMissionFlight(browser);
+
     await page.keyboard.press('Space');
 
     // Wait for the rocket to reach 50 m
@@ -256,13 +283,24 @@ test.describe('E2E Infrastructure — Objective Verification', () => {
     const ps = await getPhysicsSnapshot(page);
     expect(ps).not.toBeNull();
     expect(ps.posY).toBeGreaterThanOrEqual(50);
+
+    await page.close();
   });
 
-  test('(4) REACH_ALTITUDE objective completes automatically', async () => {
+  test('(4) REACH_ALTITUDE objective completes automatically', async ({ browser }) => {
+    test.setTimeout(60_000);
+    const page = await setupMissionFlight(browser);
+
+    // Stage the rocket and fly to trigger the objective
+    await page.keyboard.press('Space');
+    await waitForAltitude(page, 50, 15_000);
+
     await waitForObjectiveComplete(page, 'test-mission-infra', 'obj-infra-1', 10_000);
 
     const complete = await areAllObjectivesComplete(page, 'test-mission-infra');
     expect(complete).toBe(true);
+
+    await page.close();
   });
 });
 
@@ -353,40 +391,43 @@ test.describe('E2E Infrastructure — Full State Coverage', () => {
 // ==========================================================================
 
 test.describe('E2E Infrastructure — Time Warp API', () => {
-  test.describe.configure({ mode: 'serial' });
 
-  /** @type {import('@playwright/test').Page} */
-  let page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  /** Helper: create a page, seed, load, and start a test flight. */
+  async function setupFlight(browser) {
+    const page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
-
     const envelope = freshStartFixture({ parts: ALL_PARTS });
     await seedAndLoadSave(page, envelope);
-
-    // Start a flight (grounded on the pad, engines off)
     await startTestFlight(page, ['probe-core-mk1', 'tank-small', 'engine-spark']);
-  });
+    return page;
+  }
 
-  test.afterAll(async () => {
-    await page.close();
-  });
+  test('(1) time warp API is exposed during flight', async ({ browser }) => {
+    test.setTimeout(60_000);
+    const page = await setupFlight(browser);
 
-  test('(1) time warp API is exposed during flight', async () => {
     const hasSet = await page.evaluate(() => typeof window.__testSetTimeWarp === 'function');
     const hasGet = await page.evaluate(() => typeof window.__testGetTimeWarp === 'function');
     expect(hasSet).toBe(true);
     expect(hasGet).toBe(true);
+
+    await page.close();
   });
 
-  test('(2) default time warp is 1x', async () => {
+  test('(2) default time warp is 1x', async ({ browser }) => {
+    test.setTimeout(60_000);
+    const page = await setupFlight(browser);
+
     const warp = await getTestTimeWarp(page);
     expect(warp).toBe(1);
+
+    await page.close();
   });
 
-  test('(3) can set time warp to 100x and simulation time advances faster than real time', async () => {
+  test('(3) can set time warp to 100x and simulation time advances faster than real time', async ({ browser }) => {
+    test.setTimeout(60_000);
+    const page = await setupFlight(browser);
+
     // Record starting simulation time
     const startSimTime = await page.evaluate(() => {
       const fs = window.__flightState;
@@ -427,11 +468,20 @@ test.describe('E2E Infrastructure — Time Warp API', () => {
     // We just verify that sim time advanced at least 10x faster than real time.
     const realElapsedSec = realElapsedMs / 1000;
     expect(simElapsed).toBeGreaterThan(realElapsedSec * 10);
+
+    await page.close();
   });
 
-  test('(4) can reset time warp back to 1x', async () => {
+  test('(4) can reset time warp back to 1x', async ({ browser }) => {
+    test.setTimeout(60_000);
+    const page = await setupFlight(browser);
+
+    // Set to a different warp first, then reset
+    await setTestTimeWarp(page, 50);
     await setTestTimeWarp(page, 1);
     const warp = await getTestTimeWarp(page);
     expect(warp).toBe(1);
+
+    await page.close();
   });
 });

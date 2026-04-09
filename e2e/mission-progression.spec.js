@@ -377,7 +377,7 @@ async function waitWarpUnlocked(page) {
 
 async function setWarp(page, factor) {
   await waitWarpUnlocked(page);
-  await page.click(`[data-warp="${factor}"]`);
+  await page.evaluate((f) => window.__testSetTimeWarp?.(f), factor);
 }
 
 async function waitAlt(page, m, timeout = 60_000) {
@@ -647,9 +647,9 @@ test.describe('Mission Progression', () => {
     await waitWarpUnlocked(page);
     await stage(page);
 
-    // 50× warp for the long descent from high altitude (~14km at burnout).
+    // 100× warp for the long descent from high altitude (~14km at burnout).
     await waitWarpUnlocked(page);
-    await setWarp(page, 50);
+    await setWarp(page, 100);
 
     await waitLanded(page, 120_000);
 
@@ -697,9 +697,9 @@ test.describe('Mission Progression', () => {
     await waitWarpUnlocked(page);
     await stage(page);
 
-    // 50× warp for descent from high altitude.
+    // 100× warp for descent from high altitude.
     await waitWarpUnlocked(page);
-    await setWarp(page, 50);
+    await setWarp(page, 100);
 
     await waitLanded(page, 120_000);
     await triggerReturnViaMenu(page);
@@ -742,9 +742,9 @@ test.describe('Mission Progression', () => {
     await waitWarpUnlocked(page);
     await stage(page);
 
-    // 50× warp for descent.
+    // 100× warp for descent.
     await waitWarpUnlocked(page);
-    await setWarp(page, 50);
+    await setWarp(page, 100);
 
     await waitLanded(page, 120_000);
     await triggerReturnViaMenu(page);
@@ -820,9 +820,9 @@ test.describe('Mission Progression', () => {
     await waitWarpUnlocked(page);
     await stage(page);
 
-    // 50× warp for the rocket body to fall and crash.
+    // 100× warp for the rocket body to fall and crash.
     await waitWarpUnlocked(page);
-    await setWarp(page, 50);
+    await setWarp(page, 100);
 
     await waitLanded(page, 120_000);
     await returnToHub(page);
@@ -871,13 +871,13 @@ test.describe('Mission Progression', () => {
     // inflated.  Terminal velocity at ~880kg ≈ 4.4 m/s.
     await stage(page);
 
-    // 50× warp while descending well above the band.
+    // 100× warp while descending well above the band.
     await waitWarpUnlocked(page);
-    await setWarp(page, 50);
+    await setWarp(page, 100);
 
     // Slow to 5× near the band ceiling so the staging command can execute
     // before the rocket descends past the band (under CPU contention, the
-    // Playwright round-trip takes longer than at 50× warp the rocket needs
+    // Playwright round-trip takes longer than at 100× warp the rocket needs
     // to traverse the 400m band).
     await page.waitForFunction(
       () => {
@@ -902,10 +902,10 @@ test.describe('Mission Progression', () => {
     await expect(page.locator('[data-testid="hud-obj-hold-timer"]'))
       .toBeVisible({ timeout: 10_000 });
 
-    // 50× warp through the 30s hold + experiment.  At ~4.4 m/s descent
+    // 100× warp through the 30s hold + experiment.  At ~4.4 m/s descent
     // the rocket traverses the 400m band in ~90 s — plenty for 30 s.
     await waitWarpUnlocked(page);
-    await setWarp(page, 50);
+    await setWarp(page, 100);
 
     // Wait for HOLD_ALTITUDE objective completion.
     await page.waitForFunction(
@@ -922,7 +922,7 @@ test.describe('Mission Progression', () => {
     const holdItem = page.locator('.hud-obj-icon.met').first();
     await expect(holdItem).toBeVisible({ timeout: 5_000 });
 
-    // Continue 50× warp descent to landing.
+    // Continue 100× warp descent to landing.
     // RETURN_SCIENCE_DATA completes on safe landing (chute ≤ 5 m/s).
     await waitLanded(page);
     await triggerReturnViaMenu(page);

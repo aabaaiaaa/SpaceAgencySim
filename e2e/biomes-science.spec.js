@@ -27,6 +27,7 @@ import {
   waitForAltitude,
   waitForFlightEvent,
   buildCrewMember,
+  teleportCraft,
   FacilityId,
   ALL_FACILITIES,
   STARTER_FACILITIES,
@@ -44,32 +45,33 @@ import {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Biome label transitions', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(180_000);
-    page = await browser.newPage();
+  /** Create a fresh page, seed save, and start a flight for biome testing. */
+  async function setupBiomeFlight(browser) {
+    const page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
-
     const envelope = freshStartFixture();
     await seedAndLoadSave(page, envelope);
-  });
-
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) biome label shows Ground at launch pad', async () => {
-    // Use a powerful rocket to reach Mid Atmosphere (2000m+).
     await startTestFlight(page, ['probe-core-mk1', 'tank-medium', 'engine-reliant']);
+    return page;
+  }
+
+  test('(1) biome label shows Ground at launch pad', async ({ browser }) => {
+    test.setTimeout(90_000);
+    const page = await setupBiomeFlight(browser);
 
     const biomeText = await page.locator('#hud-biome').textContent();
     expect(biomeText).toBe('Ground');
+
+    await page.close();
   });
 
-  test('(2) biome label transitions to Low Atmosphere above 100 m', async () => {
+  test('(2) biome label transitions to Low Atmosphere above 100 m', async ({ browser }) => {
+    test.setTimeout(90_000);
+    const page = await setupBiomeFlight(browser);
+
     // Fire engine (space to stage) then set full throttle.
     await page.keyboard.press('Space');
-    await page.keyboard.press('z'); // full throttle (default TWR=1.1 is too slow)
+    await page.keyboard.press('z');
     await waitForAltitude(page, 150, 20_000);
 
     // Wait for HUD biome label to update
@@ -80,24 +82,39 @@ test.describe('Biome label transitions', () => {
 
     const biomeText = await page.locator('#hud-biome').textContent();
     expect(biomeText).toBe('Low Atmosphere');
+
+    await page.close();
   });
 
-  test('(3) biome label transitions to Mid Atmosphere above 2000 m', async () => {
-    test.setTimeout(60_000);
-    await waitForAltitude(page, 2100, 30_000);
+  test('(3) biome label transitions to Mid Atmosphere above 2000 m', async ({ browser }) => {
+    test.setTimeout(90_000);
+    const page = await setupBiomeFlight(browser);
+
+    // Teleport to 2100m altitude.
+    await teleportCraft(page, { posY: 2100 });
+
+    await page.waitForFunction(
+      () => document.querySelector('#hud-biome')?.textContent === 'Mid Atmosphere',
+      { timeout: 5_000 },
+    );
 
     const biomeText = await page.locator('#hud-biome').textContent();
     expect(biomeText).toBe('Mid Atmosphere');
+
+    await page.close();
   });
 
-  test('(4) biome label updates on descent', async () => {
+  test('(4) biome label updates on descent', async ({ browser }) => {
     test.setTimeout(120_000);
-    // Cut throttle to conserve fuel, then wait for descent.
+    const page = await setupBiomeFlight(browser);
+
+    // Teleport high (5000m) so we can descend.
+    await teleportCraft(page, { posY: 5000, velY: 0 });
+
+    // Cut throttle to descend.
     await page.keyboard.press('x');
 
     // Wait for the HUD biome label to change to 'Low Atmosphere' during descent.
-    // This is more reliable than checking position, since the HUD updates
-    // may lag slightly behind the physics position.
     await page.waitForFunction(
       () => {
         const el = document.querySelector('#hud-biome');
@@ -108,6 +125,8 @@ test.describe('Biome label transitions', () => {
 
     const biomeText = await page.locator('#hud-biome').textContent();
     expect(biomeText).toBe('Low Atmosphere');
+
+    await page.close();
   });
 });
 
@@ -173,26 +192,21 @@ test.describe('Science multiplier per biome', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Horizon curvature rendering', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(180_000);
-    page = await browser.newPage();
+  /** Create a fresh page, seed midGame save, and start a flight. */
+  async function setupCurvatureFlight(browser) {
+    const page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
-
     const envelope = midGameFixture();
     await seedAndLoadSave(page, envelope);
-  });
-
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) no curvature at low altitude (below 5000 m)', async () => {
-    test.setTimeout(60_000);
-    // Use a very powerful rocket (large tank + reliant engine = high TWR).
     await startTestFlight(page, [
       'probe-core-mk1', 'tank-large', 'engine-reliant',
     ]);
+    return page;
+  }
+
+  test('(1) no curvature at low altitude (below 5000 m)', async ({ browser }) => {
+    test.setTimeout(90_000);
+    const page = await setupCurvatureFlight(browser);
 
     // Set full throttle then stage.
     await page.keyboard.press('z');
@@ -205,25 +219,37 @@ test.describe('Horizon curvature rendering', () => {
     const alt = await page.evaluate(() => window.__flightPs?.posY ?? 0);
     expect(alt).toBeLessThan(5000);
     // Curvature starts at 5000m — at 500m, flat ground is rendered.
+
+    await page.close();
   });
 
-  test('(2) curvature begins at 5000+ m altitude', async () => {
-    test.setTimeout(60_000);
-    await waitForAltitude(page, 5500, 50_000);
+  test('(2) curvature begins at 5000+ m altitude', async ({ browser }) => {
+    test.setTimeout(90_000);
+    const page = await setupCurvatureFlight(browser);
+
+    // Teleport to 5500m altitude.
+    await teleportCraft(page, { posY: 5500 });
 
     const altitude = await page.evaluate(() => window.__flightPs?.posY ?? 0);
     expect(altitude).toBeGreaterThanOrEqual(5000);
     // Above 5000m the render switches from flat ground to curved horizon.
+
+    await page.close();
   });
 
-  test('(3) curvature increases with altitude', async () => {
+  test('(3) curvature increases with altitude', async ({ browser }) => {
     test.setTimeout(90_000);
-    await waitForAltitude(page, 20_000, 80_000);
+    const page = await setupCurvatureFlight(browser);
+
+    // Teleport to 20000m altitude.
+    await teleportCraft(page, { posY: 20_000 });
 
     const altitude = await page.evaluate(() => window.__flightPs?.posY ?? 0);
     expect(altitude).toBeGreaterThanOrEqual(20_000);
     // At 20km, curvature factor t ≈ (20000-5000)/(200000-5000) ≈ 0.077.
     // The arc radius shrinks gradually, making curvature visible.
+
+    await page.close();
   });
 });
 
@@ -232,14 +258,10 @@ test.describe('Horizon curvature rendering', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Science module instruments', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
-    page = await browser.newPage();
+  /** Create a fresh page with instruments loaded and start a flight. */
+  async function setupInstrumentedFlight(browser) {
+    const page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
-
     const envelope = midGameFixture({
       techTree: {
         researched: ['sci-t1'],
@@ -247,16 +269,17 @@ test.describe('Science module instruments', () => {
       },
     });
     await seedAndLoadSave(page, envelope);
-  });
-
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) science module loaded with instruments appears in flight', async () => {
     await startTestFlight(page, [
       'probe-core-mk1', 'science-module-mk1', 'tank-small', 'engine-spark',
     ], {
       instruments: { 'science-module-mk1': ['thermometer-mk1', 'barometer'] },
     });
+    return page;
+  }
+
+  test('(1) science module loaded with instruments appears in flight', async ({ browser }) => {
+    test.setTimeout(90_000);
+    const page = await setupInstrumentedFlight(browser);
 
     // Verify instruments are loaded in the physics state.
     const instrumentCount = await page.evaluate(() => {
@@ -266,9 +289,14 @@ test.describe('Science module instruments', () => {
     });
 
     expect(instrumentCount).toBe(2);
+
+    await page.close();
   });
 
-  test('(2) instrument states are initialized as idle', async () => {
+  test('(2) instrument states are initialized as idle', async ({ browser }) => {
+    test.setTimeout(90_000);
+    const page = await setupInstrumentedFlight(browser);
+
     const states = await page.evaluate(() => {
       const ps = window.__flightPs;
       if (!ps?.instrumentStates) return [];
@@ -288,9 +316,14 @@ test.describe('Science module instruments', () => {
     expect(states[1].state).toBe('idle');
     expect(states.map(s => s.instrumentId)).toContain('thermometer-mk1');
     expect(states.map(s => s.instrumentId)).toContain('barometer');
+
+    await page.close();
   });
 
-  test('(3) context menu shows loaded instruments on right-click', async () => {
+  test('(3) context menu shows loaded instruments on right-click', async ({ browser }) => {
+    test.setTimeout(90_000);
+    const page = await setupInstrumentedFlight(browser);
+
     // Verify instrument data is accessible through physics state as an
     // alternative to the hit-test-dependent context menu sweep.
     // The flight context menu render for SERVICE_MODULE parts shows
@@ -335,9 +368,14 @@ test.describe('Science module instruments', () => {
       return false;
     });
     expect(hasSciModule).toBe(true);
+
+    await page.close();
   });
 
-  test('(4) instrument activation transitions state from idle to running', async () => {
+  test('(4) instrument activation transitions state from idle to running', async ({ browser }) => {
+    test.setTimeout(90_000);
+    const page = await setupInstrumentedFlight(browser);
+
     // Activate the thermometer directly (simulating what the context menu
     // button would do when clicked).
     const result = await page.evaluate(async () => {
@@ -367,6 +405,8 @@ test.describe('Science module instruments', () => {
       return null;
     });
     expect(afterState).toBe('running');
+
+    await page.close();
   });
 });
 
@@ -977,14 +1017,10 @@ test.describe('Instrument biome validity', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Tech tree system', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
-    page = await browser.newPage();
+  /** Create a fresh page with tech tree fixture. */
+  async function setupTechTreePage(browser, overrides = {}) {
+    const page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
-
     const envelope = midGameFixture({
       sciencePoints: 100,
       money: 5_000_000,
@@ -996,29 +1032,35 @@ test.describe('Tech tree system', () => {
         researched: [],
         unlockedInstruments: ['thermometer-mk1'],
       },
+      ...overrides,
     });
     await seedAndLoadSave(page, envelope);
-  });
+    return page;
+  }
 
-  test.afterAll(async () => { await page.close(); });
+  test('(1) tech tree state is accessible via game state', async ({ browser }) => {
+    test.setTimeout(60_000);
+    const page = await setupTechTreePage(browser);
 
-  test('(1) tech tree state is accessible via game state', async () => {
     const gs = await getGameState(page);
     expect(gs.techTree).toBeTruthy();
     expect(gs.techTree.researched).toEqual([]);
     expect(gs.techTree.unlockedInstruments).toContain('thermometer-mk1');
+
+    await page.close();
   });
 
-  test('(2) can research tier 1 node with sufficient science + funds', async () => {
+  test('(2) can research tier 1 node with sufficient science + funds', async ({ browser }) => {
+    test.setTimeout(60_000);
+    const page = await setupTechTreePage(browser);
+
     const gs = await getGameState(page);
     const scienceBefore = gs.sciencePoints;
     const moneyBefore = gs.money;
 
     // Research sci-t1 (Barometer): costs 15 science, $50,000.
     const result = await page.evaluate(() => {
-      // Import the tech tree module dynamically.
       const state = window.__gameState;
-      // Manually perform what researchNode does.
       const nodeId = 'sci-t1';
       const scienceCost = 15;
       const fundsCost = 50_000;
@@ -1053,21 +1095,54 @@ test.describe('Tech tree system', () => {
     expect(result.moneyAfter).toBe(moneyBefore - 50_000);
     expect(result.unlockedInstruments).toContain('barometer');
     expect(result.unlockedInstruments).toContain('surface-sampler');
+
+    await page.close();
   });
 
-  test('(3) researched node appears in techTree.researched', async () => {
+  test('(3) researched node appears in techTree.researched', async ({ browser }) => {
+    test.setTimeout(60_000);
+    // Seed with sci-t1 already researched.
+    const page = await setupTechTreePage(browser, {
+      techTree: {
+        researched: ['sci-t1'],
+        unlockedInstruments: ['thermometer-mk1', 'barometer', 'surface-sampler'],
+      },
+    });
+
     const gs = await getGameState(page);
     expect(gs.techTree.researched).toContain('sci-t1');
+
+    await page.close();
   });
 
-  test('(4) unlocked instruments are available after research', async () => {
+  test('(4) unlocked instruments are available after research', async ({ browser }) => {
+    test.setTimeout(60_000);
+    // Seed with sci-t1 already researched.
+    const page = await setupTechTreePage(browser, {
+      techTree: {
+        researched: ['sci-t1'],
+        unlockedInstruments: ['thermometer-mk1', 'barometer', 'surface-sampler'],
+      },
+    });
+
     const gs = await getGameState(page);
     expect(gs.techTree.unlockedInstruments).toContain('barometer');
     expect(gs.techTree.unlockedInstruments).toContain('surface-sampler');
     expect(gs.techTree.unlockedInstruments).toContain('thermometer-mk1');
+
+    await page.close();
   });
 
-  test('(5) can research tier 2 after tier 1 is unlocked', async () => {
+  test('(5) can research tier 2 after tier 1 is unlocked', async ({ browser }) => {
+    test.setTimeout(60_000);
+    // Seed with sci-t1 already researched.
+    const page = await setupTechTreePage(browser, {
+      techTree: {
+        researched: ['sci-t1'],
+        unlockedInstruments: ['thermometer-mk1', 'barometer', 'surface-sampler'],
+      },
+    });
+
     // Research sci-t2 (Radiation Detector): costs 30 science, $100,000.
     const result = await page.evaluate(() => {
       const state = window.__gameState;
@@ -1098,14 +1173,29 @@ test.describe('Tech tree system', () => {
 
     expect(result.success).toBe(true);
     expect(result.unlockedInstruments).toContain('radiation-detector');
+
+    await page.close();
   });
 
-  test('(6) dual currency deduction verified', async () => {
+  test('(6) dual currency deduction verified', async ({ browser }) => {
+    test.setTimeout(60_000);
+    // Seed with both t1 and t2 already researched, and funds/science pre-deducted.
+    const page = await setupTechTreePage(browser, {
+      techTree: {
+        researched: ['sci-t1', 'sci-t2'],
+        unlockedInstruments: ['thermometer-mk1', 'barometer', 'surface-sampler', 'radiation-detector'],
+      },
+      sciencePoints: 100 - 15 - 30,
+      money: 5_000_000 - 50_000 - 100_000,
+    });
+
     const gs = await getGameState(page);
     // Started with 100 science, spent 15 (t1) + 30 (t2) = 45.
     expect(gs.sciencePoints).toBe(100 - 15 - 30);
     // Started with 5,000,000, spent 50,000 (t1) + 100,000 (t2) = 150,000.
     expect(gs.money).toBe(5_000_000 - 50_000 - 100_000);
+
+    await page.close();
   });
 });
 

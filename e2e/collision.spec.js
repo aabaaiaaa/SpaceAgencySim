@@ -1,9 +1,8 @@
 import { test, expect } from '@playwright/test';
 import {
   VP_W, VP_H,
-  CENTRE_X, CANVAS_CENTRE_Y,
   FIRST_FLIGHT_MISSION, buildSaveEnvelope,
-  placePart, seedAndLoadSave, navigateToVab, launchFromVab,
+  seedAndLoadSave, startTestFlight,
 } from './helpers.js';
 
 /**
@@ -15,16 +14,11 @@ import {
 // Retry once — occasionally hits Chromium WebGL crash.
 test.describe.configure({ retries: 1 });
 
-const CMD_DROP_Y       = CANVAS_CENTRE_Y - 30;
-const DECOUPLER_DROP_Y = CMD_DROP_Y + 20 + 5;
-const TANK_DROP_Y      = DECOUPLER_DROP_Y + 5 + 20;
-const ENGINE_DROP_Y    = TANK_DROP_Y + 20 + 15;
-
 const UNLOCKED_PARTS = [
   'cmd-mk1', 'tank-small', 'engine-spark', 'decoupler-stack-tr18',
 ];
 
-/** Build a two-stage rocket in the VAB and launch. */
+/** Seed a save, then start a two-stage rocket flight programmatically. */
 async function buildAndLaunch(page) {
   await page.setViewportSize({ width: VP_W, height: VP_H });
   const envelope = buildSaveEnvelope({
@@ -32,37 +26,13 @@ async function buildAndLaunch(page) {
     parts: UNLOCKED_PARTS,
   });
   await seedAndLoadSave(page, envelope);
-  await navigateToVab(page);
 
-  await placePart(page, 'cmd-mk1', CENTRE_X, CMD_DROP_Y, 1);
-  await placePart(page, 'decoupler-stack-tr18', CENTRE_X, DECOUPLER_DROP_Y, 2);
-  await placePart(page, 'tank-small', CENTRE_X, TANK_DROP_Y, 3);
-  await placePart(page, 'engine-spark', CENTRE_X, ENGINE_DROP_Y, 4);
-
-  await page.click('#vab-btn-staging');
-  await expect(page.locator('#vab-staging-panel')).toBeVisible();
-  await expect(
-    page.locator('[data-drop-zone="stage-0"]').getByText('Spark Engine'),
-  ).toBeVisible({ timeout: 5_000 });
-
-  // Add Stage 2 and assign decoupler.
-  await page.click('#vab-staging-add');
-  await page.waitForFunction(
-    () => (window.__vabStagingConfig?.stages?.length ?? 0) >= 2,
-    { timeout: 5_000 },
+  // Parts top → bottom: cmd, decoupler, tank, engine.
+  // Stage 0 fires the engine; Stage 1 fires the decoupler to separate.
+  await startTestFlight(page,
+    ['cmd-mk1', 'decoupler-stack-tr18', 'tank-small', 'engine-spark'],
+    { staging: [{ partIds: ['engine-spark'] }, { partIds: ['decoupler-stack-tr18'] }] },
   );
-  await page.evaluate(() => {
-    const assembly = window.__vabAssembly;
-    const staging  = window.__vabStagingConfig;
-    for (const [instId, placed] of assembly.parts) {
-      if (placed.partId === 'decoupler-stack-tr18') {
-        staging.stages[1].instanceIds.push(instId);
-        break;
-      }
-    }
-  });
-
-  await launchFromVab(page);
 }
 
 /** Fire engine, gain altitude, fire decoupler, wait for debris. */

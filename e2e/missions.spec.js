@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import {
-  SAVE_KEY, STARTING_MONEY,
+  STARTING_MONEY,
   FIRST_FLIGHT_MISSION, buildSaveEnvelope, seedAndLoadSave,
 } from './helpers.js';
 
@@ -11,11 +11,11 @@ import {
  * a mission, viewing objectives, cash invariant on accept, tutorial lock rules,
  * and completed missions display.
  *
- * A fresh game state is restored in-place before each test via SPA navigation
- * (no full page reload). Test (7) builds its own isolated browser context with
- * a seeded completed state.
+ * Each test receives its own Playwright page fixture. `beforeEach` seeds a
+ * fresh save and navigates to the Mission Control building. Tests (7) and (8)
+ * re-seed with custom envelopes for their specific scenarios.
  *
- * Tests (run in serial order):
+ * Tests:
  *   (1) The Available tab lists "First Flight" as the only available mission
  *       at game start.
  *   (2) Clicking "Accept" on "First Flight" moves it to the Accepted tab.
@@ -26,16 +26,16 @@ import {
  *   (6) The Completed tab is empty at game start.
  *   (7) Simulating mission completion (via seeded completed state) shows the
  *       mission in the Completed tab with its reward amount.
+ *   (8) Mission reward parts are displayed on available, accepted, and completed
+ *       mission cards.
  */
-
-test.describe.configure({ mode: 'serial' });
 
 // ---------------------------------------------------------------------------
 // Constants & helpers
 // ---------------------------------------------------------------------------
 
 /**
- * The standard fresh-game envelope used for tests (1)–(6):
+ * The standard fresh-game envelope:
  * only First Flight in the available bucket, nothing accepted or completed.
  */
 const FRESH_ENVELOPE = buildSaveEnvelope({
@@ -43,55 +43,23 @@ const FRESH_ENVELOPE = buildSaveEnvelope({
   missions: { available: [{ ...FIRST_FLIGHT_MISSION, status: 'available' }], accepted: [], completed: [] },
 });
 
-/** The state portion used to reset gameState between tests. */
-const FRESH_STATE = FRESH_ENVELOPE.state;
-
 // ---------------------------------------------------------------------------
 // Suite
 // ---------------------------------------------------------------------------
 
 test.describe('Mission Control Flow', () => {
-  /** @type {import('@playwright/test').Page} */
-  let page;
 
-  // ── Suite setup ───────────────────────────────────────────────────────────
+  // ── Per-test setup: seed save and enter Mission Control ───────────────────
 
-  test.beforeAll(async ({ browser }) => {
-    page = await browser.newPage();
-
-    // Seed save and navigate to hub.
+  test.beforeEach(async ({ page }) => {
     await seedAndLoadSave(page, FRESH_ENVELOPE);
-
-    // Enter Mission Control initially (so beforeEach can use back button).
-    await page.click('[data-building-id="mission-control"]');
-    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
-  });
-
-  test.afterAll(async () => {
-    await page.close();
-  });
-
-  // ── Per-test setup: SPA reset + re-enter building ─────────────────────────
-
-  test.beforeEach(async () => {
-    // Reset game state in-place (no page reload).
-    await page.evaluate((freshState) => {
-      const copy = JSON.parse(JSON.stringify(freshState));
-      Object.assign(window.__gameState, copy);
-    }, FRESH_STATE);
-
-    // Navigate back to hub.
-    await page.click('#mission-control-back-btn');
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 5_000 });
-
-    // Re-enter Mission Control (triggers fresh UI render from gameState).
     await page.click('[data-building-id="mission-control"]');
     await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
   });
 
   // ── (1) Available tab lists "First Flight" as the only mission at game start
 
-  test('(1) the Available tab lists "First Flight" as the only available mission at game start', async () => {
+  test('(1) the Available tab lists "First Flight" as the only available mission at game start', async ({ page }) => {
     // The Available tab is active by default when Mission Control is opened.
     await expect(page.locator('[data-tab-id="available"]')).toHaveClass(/active/);
 
@@ -105,7 +73,7 @@ test.describe('Mission Control Flow', () => {
 
   // ── (2) Clicking "Accept" moves First Flight to the Accepted tab ───────────
 
-  test('(2) clicking "Accept" on "First Flight" moves it to the Accepted tab', async () => {
+  test('(2) clicking "Accept" on "First Flight" moves it to the Accepted tab', async ({ page }) => {
     // Click the Accept Mission button on the only available card.
     await page.click('.mc-accept-btn');
 
@@ -123,7 +91,7 @@ test.describe('Mission Control Flow', () => {
 
   // ── (3) Accepted tab shows the mission's objectives ────────────────────────
 
-  test("(3) the Accepted tab shows the mission's objectives", async () => {
+  test("(3) the Accepted tab shows the mission's objectives", async ({ page }) => {
     // Accept the mission.
     await page.click('.mc-accept-btn');
 
@@ -143,7 +111,7 @@ test.describe('Mission Control Flow', () => {
 
   // ── (4) Accepting a mission does not deduct cash ───────────────────────────
 
-  test('(4) accepting a mission deducts nothing from cash (missions are free to accept)', async () => {
+  test('(4) accepting a mission deducts nothing from cash (missions are free to accept)', async ({ page }) => {
     // Read cash before accepting.
     const cashBefore = await page.evaluate(() => window.__gameState?.money);
     expect(cashBefore).toBe(STARTING_MONEY);
@@ -158,7 +126,7 @@ test.describe('Mission Control Flow', () => {
 
   // ── (5) After accepting, Available tab shows no missions ───────────────────
 
-  test('(5) when "First Flight" is accepted, no other missions are shown as available (early tutorial one-at-a-time rule)', async () => {
+  test('(5) when "First Flight" is accepted, no other missions are shown as available (early tutorial one-at-a-time rule)', async ({ page }) => {
     // Accept the only available mission (First Flight).
     await page.click('.mc-accept-btn');
 
@@ -171,7 +139,7 @@ test.describe('Mission Control Flow', () => {
 
   // ── (6) Completed tab is empty at game start ───────────────────────────────
 
-  test('(6) the Completed tab is empty at game start', async () => {
+  test('(6) the Completed tab is empty at game start', async ({ page }) => {
     // Switch to the Completed tab.
     await page.click('[data-tab-id="completed"]');
 
@@ -184,7 +152,7 @@ test.describe('Mission Control Flow', () => {
 
   // ── (7) Seeded completed state shows mission in Completed tab with reward ──
 
-  test('(7) simulating mission completion via seeded state shows the mission in the Completed tab with its reward amount', async ({ browser }) => {
+  test('(7) simulating mission completion via seeded state shows the mission in the Completed tab with its reward amount', async ({ page }) => {
     test.setTimeout(60_000);
     // Build an envelope where "First Flight" has already been completed.
     const completedFlight = {
@@ -198,36 +166,29 @@ test.describe('Mission Control Flow', () => {
       missions: { available: [], accepted: [], completed: [completedFlight] },
     });
 
-    // Use an isolated browser context so this test does not share localStorage
-    // with the shared page used by tests (1)–(6).
-    const ctx = await browser.newContext();
-    const p   = await ctx.newPage();
+    // Re-seed with the completed envelope (overrides beforeEach's fresh seed).
+    await seedAndLoadSave(page, completedEnvelope);
 
-    await seedAndLoadSave(p, completedEnvelope);
-
-    await p.click('[data-building-id="mission-control"]');
-    await p.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
+    await page.click('[data-building-id="mission-control"]');
+    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
 
     // Switch to the Completed tab.
-    await p.click('[data-tab-id="completed"]');
+    await page.click('[data-tab-id="completed"]');
 
     // Exactly one completed mission card must exist.
-    const completedCards = p.locator('.mc-mission-card-completed');
+    const completedCards = page.locator('.mc-mission-card-completed');
     await expect(completedCards).toHaveCount(1);
 
     // The card must contain the mission title.
     await expect(completedCards.first()).toContainText('First Flight');
 
     // The card must display the reward amount ($25,000).
-    await expect(p.locator('.mc-mission-reward')).toContainText('25,000');
-
-    await p.close();
-    await ctx.close();
+    await expect(page.locator('.mc-mission-reward')).toContainText('25,000');
   });
 
   // ── (8) Mission reward parts are shown on available, accepted, and completed tabs
 
-  test('(8) mission reward parts are displayed on available, accepted, and completed mission cards', async ({ browser }) => {
+  test('(8) mission reward parts are displayed on available, accepted, and completed mission cards', async ({ page }) => {
     test.setTimeout(60_000);
 
     // Use mission-005 (Safe Return I) which rewards parachute-mk2.
@@ -258,52 +219,47 @@ test.describe('Mission Control Flow', () => {
     };
 
     // ── Available tab: rewards shown before accepting ──
-    const ctx = await browser.newContext();
-    const p   = await ctx.newPage();
-
     const availEnv = buildSaveEnvelope({
       saveName: 'Rewards Available Test',
       missions: { available: [safeReturnAvailable], accepted: [], completed: [] },
     });
-    await seedAndLoadSave(p, availEnv);
-    await p.click('[data-building-id="mission-control"]');
-    await p.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
+    // Re-seed with the rewards envelope (overrides beforeEach's fresh seed).
+    await seedAndLoadSave(page, availEnv);
+    await page.click('[data-building-id="mission-control"]');
+    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
 
-    await expect(p.locator('.mc-mission-rewards')).toContainText('Mk2 Parachute');
+    await expect(page.locator('.mc-mission-rewards')).toContainText('Mk2 Parachute');
 
     // ── Accepted tab: rewards shown ──
-    await p.evaluate((state) => {
+    await page.evaluate((state) => {
       Object.assign(window.__gameState.missions, {
         available: [],
         accepted: [state],
         completed: [],
       });
     }, safeReturnAccepted);
-    await p.click('#mission-control-back-btn');
-    await p.waitForSelector('#hub-overlay', { state: 'visible', timeout: 5_000 });
-    await p.click('[data-building-id="mission-control"]');
-    await p.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
-    await p.click('[data-tab-id="accepted"]');
+    await page.click('#mission-control-back-btn');
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 5_000 });
+    await page.click('[data-building-id="mission-control"]');
+    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
+    await page.click('[data-tab-id="accepted"]');
 
-    await expect(p.locator('.mc-mission-rewards')).toContainText('Mk2 Parachute');
+    await expect(page.locator('.mc-mission-rewards')).toContainText('Mk2 Parachute');
 
     // ── Completed tab: parts unlocked column shown ──
-    await p.evaluate((state) => {
+    await page.evaluate((state) => {
       Object.assign(window.__gameState.missions, {
         available: [],
         accepted: [],
         completed: [state],
       });
     }, safeReturnCompleted);
-    await p.click('#mission-control-back-btn');
-    await p.waitForSelector('#hub-overlay', { state: 'visible', timeout: 5_000 });
-    await p.click('[data-building-id="mission-control"]');
-    await p.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
-    await p.click('[data-tab-id="completed"]');
+    await page.click('#mission-control-back-btn');
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 5_000 });
+    await page.click('[data-building-id="mission-control"]');
+    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
+    await page.click('[data-tab-id="completed"]');
 
-    await expect(p.locator('.mc-mission-rewards')).toContainText('Mk2 Parachute');
-
-    await p.close();
-    await ctx.close();
+    await expect(page.locator('.mc-mission-rewards')).toContainText('Mk2 Parachute');
   });
 });

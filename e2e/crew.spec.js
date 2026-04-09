@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import {
-  SAVE_KEY, STARTING_MONEY,
+  STARTING_MONEY,
   FIRST_FLIGHT_MISSION, buildSaveEnvelope, seedAndLoadSave,
   ALL_FACILITIES,
 } from './helpers.js';
@@ -12,13 +12,10 @@ import {
  * astronauts, verifying astronaut properties, firing astronauts, the
  * history tab, and the insufficient-funds guard.
  *
- * Tests (1)–(6) share a page instance seeded with a fresh save (no crew,
- * full starting funds).  Each test is isolated: `beforeEach` resets state
- * in-place via SPA navigation (no full page reload), so state changes in
- * one test do not bleed into the next.
- *
- * Test (7) uses its own isolated browser context seeded with a save whose
- * cash balance is below the $50,000 hire cost.
+ * Each test receives its own Playwright page fixture. `beforeEach` seeds a
+ * fresh save and navigates to the Crew Administration building, so every
+ * test starts from a clean state. Test (7) re-seeds with a low-cash
+ * envelope to verify the insufficient-funds guard.
  *
  * Tests:
  *   (1) The Active Crew tab shows an empty state message when no crew are hired.
@@ -35,8 +32,6 @@ import {
  *       as disabled and the cash display styled as insufficient.
  */
 
-test.describe.configure({ mode: 'serial' });
-
 // ---------------------------------------------------------------------------
 // Constants & helpers
 // ---------------------------------------------------------------------------
@@ -49,9 +44,6 @@ const FRESH_ENVELOPE = buildSaveEnvelope({
   missions: { available: [{ ...FIRST_FLIGHT_MISSION, status: 'available' }], accepted: [], completed: [] },
   facilities: ALL_FACILITIES,
 });
-
-/** The state portion used to reset gameState between tests. */
-const FRESH_STATE = FRESH_ENVELOPE.state;
 
 /** Broke envelope: cash below the hire cost so hire is blocked. */
 const BROKE_ENVELOPE = buildSaveEnvelope({
@@ -66,47 +58,18 @@ const BROKE_ENVELOPE = buildSaveEnvelope({
 // ---------------------------------------------------------------------------
 
 test.describe('Crew Administration Flow', () => {
-  /** @type {import('@playwright/test').Page} */
-  let page;
 
-  // ── Suite setup ───────────────────────────────────────────────────────────
+  // ── Per-test setup: seed save and enter Crew Administration ───────────────
 
-  test.beforeAll(async ({ browser }) => {
-    page = await browser.newPage();
-
-    // Seed save and navigate to hub.
+  test.beforeEach(async ({ page }) => {
     await seedAndLoadSave(page, FRESH_ENVELOPE);
-
-    // Enter Crew Administration initially (so beforeEach can use back button).
-    await page.click('[data-building-id="crew-admin"]');
-    await page.waitForSelector('#crew-admin-overlay', { state: 'visible', timeout: 10_000 });
-  });
-
-  test.afterAll(async () => {
-    await page.close();
-  });
-
-  // ── Per-test setup: SPA reset + re-enter building ─────────────────────────
-
-  test.beforeEach(async () => {
-    // Reset game state in-place (no page reload).
-    await page.evaluate((freshState) => {
-      const copy = JSON.parse(JSON.stringify(freshState));
-      Object.assign(window.__gameState, copy);
-    }, FRESH_STATE);
-
-    // Navigate back to hub.
-    await page.click('#crew-admin-back-btn');
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 5_000 });
-
-    // Re-enter Crew Administration (triggers fresh UI render from gameState).
     await page.click('[data-building-id="crew-admin"]');
     await page.waitForSelector('#crew-admin-overlay', { state: 'visible', timeout: 10_000 });
   });
 
   // ── (1) Active Crew tab shows an empty state message when no crew are hired
 
-  test('(1) the Active Crew tab shows an empty state message when no crew are hired', async () => {
+  test('(1) the Active Crew tab shows an empty state message when no crew are hired', async ({ page }) => {
     // The Active Crew tab is active by default when Crew Admin opens.
     await expect(page.locator('[data-tab-id="active"]')).toHaveClass(/active/);
 
@@ -120,7 +83,7 @@ test.describe('Crew Administration Flow', () => {
 
   // ── (2) The Hire tab shows the hire cost ($50,000) and a name field ────────
 
-  test('(2) the Hire tab shows the hire cost ($50,000) and a name field', async () => {
+  test('(2) the Hire tab shows the hire cost ($50,000) and a name field', async ({ page }) => {
     await page.click('[data-tab-id="hire"]');
 
     // The name input must be present and visible.
@@ -137,7 +100,7 @@ test.describe('Crew Administration Flow', () => {
 
   // ── (3) Hiring an astronaut deducts $50,000 from cash and adds to Active Crew
 
-  test('(3) clicking "Hire Astronaut" with a name entered deducts $50,000 from cash (visible in top bar) and adds the astronaut to the Active Crew tab', async () => {
+  test('(3) clicking "Hire Astronaut" with a name entered deducts $50,000 from cash (visible in top bar) and adds the astronaut to the Active Crew tab', async ({ page }) => {
     await page.click('[data-tab-id="hire"]');
 
     // Record cash before hiring.
@@ -166,7 +129,7 @@ test.describe('Crew Administration Flow', () => {
 
   // ── (4) Newly hired astronaut has 0 missions flown and status "active" ─────
 
-  test('(4) the newly hired astronaut appears with 0 missions flown and status "active"', async () => {
+  test('(4) the newly hired astronaut appears with 0 missions flown and status "active"', async ({ page }) => {
     // Hire a fresh astronaut for this test (beforeEach resets state).
     await page.click('[data-tab-id="hire"]');
     await page.fill('#hire-name-input', 'Yuri Gagarin');
@@ -188,7 +151,7 @@ test.describe('Crew Administration Flow', () => {
 
   // ── (5) Clicking "Fire" removes the astronaut from the Active Crew list ────
 
-  test('(5) clicking "Fire" on an active astronaut moves them out of the Active Crew list', async () => {
+  test('(5) clicking "Fire" on an active astronaut moves them out of the Active Crew list', async ({ page }) => {
     // Hire an astronaut first (fresh state from beforeEach).
     await page.click('[data-tab-id="hire"]');
     await page.fill('#hire-name-input', 'Neil Armstrong');
@@ -211,7 +174,7 @@ test.describe('Crew Administration Flow', () => {
 
   // ── (6) Fired astronauts appear in History tab with status "fired" ─────────
 
-  test('(6) fired astronauts appear in the History tab with status "fired"', async () => {
+  test('(6) fired astronauts appear in the History tab with status "fired"', async ({ page }) => {
     // Hire an astronaut (fresh state from beforeEach).
     await page.click('[data-tab-id="hire"]');
     await page.fill('#hire-name-input', 'Buzz Aldrin');
@@ -242,28 +205,21 @@ test.describe('Crew Administration Flow', () => {
 
   // ── (7) Hire button is disabled when cash is below $50,000 ────────────────
 
-  test('(7) attempting to hire when cash is below $50,000 shows the hire button as disabled', async ({ browser }) => {
-    // Use an isolated browser context seeded with the broke envelope so this
-    // test does not affect the shared page used by tests (1)–(6).
-    const ctx = await browser.newContext();
-    const p   = await ctx.newPage();
+  test('(7) attempting to hire when cash is below $50,000 shows the hire button as disabled', async ({ page }) => {
+    // Re-seed with the broke envelope (overrides beforeEach's fresh seed).
+    await seedAndLoadSave(page, BROKE_ENVELOPE);
 
-    await seedAndLoadSave(p, BROKE_ENVELOPE);
-
-    await p.click('[data-building-id="crew-admin"]');
-    await p.waitForSelector('#crew-admin-overlay', { state: 'visible', timeout: 10_000 });
+    await page.click('[data-building-id="crew-admin"]');
+    await page.waitForSelector('#crew-admin-overlay', { state: 'visible', timeout: 10_000 });
 
     // Navigate to Hire tab.
-    await p.click('[data-tab-id="hire"]');
+    await page.click('[data-tab-id="hire"]');
 
     // The hire button must be visible but disabled (insufficient funds).
-    await expect(p.locator('.hire-btn')).toBeVisible();
-    await expect(p.locator('.hire-btn')).toBeDisabled();
+    await expect(page.locator('.hire-btn')).toBeVisible();
+    await expect(page.locator('.hire-btn')).toBeDisabled();
 
     // The cash amount display must carry the "insufficient" CSS class (red text).
-    await expect(p.locator('.hire-cash-amount.insufficient')).toBeVisible();
-
-    await p.close();
-    await ctx.close();
+    await expect(page.locator('.hire-cash-amount.insufficient')).toBeVisible();
   });
 });

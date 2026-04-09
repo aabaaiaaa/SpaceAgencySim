@@ -3,13 +3,16 @@ import {
   VP_W, VP_H,
   CENTRE_X, CANVAS_CENTRE_Y,
   FIRST_FLIGHT_MISSION, buildSaveEnvelope,
-  placePart, seedAndLoadSave, navigateToVab, launchFromVab,
+  placePart, seedAndLoadSave, navigateToVab,
+  startTestFlight,
 } from './helpers.js';
 
 /**
  * E2E — First Flight Mission Completion
  *
- * Each test is independent — builds its own rocket in the VAB.
+ * Each test is fully independent with its own page, save seed, and setup.
+ * Test 1 exercises VAB auto-staging. Tests 2+ use startTestFlight() to
+ * bypass the VAB and test mission completion during flight directly.
  */
 
 const CMD_DROP_Y    = CANVAS_CENTRE_Y;
@@ -17,26 +20,28 @@ const TANK_M_DROP_Y = CMD_DROP_Y   + 20 + 30;
 const ENGINE_DROP_Y = TANK_M_DROP_Y + 30 + 15;
 
 const UNLOCKED_PARTS = ['cmd-mk1', 'tank-medium', 'engine-spark'];
+const FLIGHT_PARTS   = ['cmd-mk1', 'tank-medium', 'engine-spark'];
 
-async function setupRocketInVab(page) {
-  await page.setViewportSize({ width: VP_W, height: VP_H });
-  const envelope = buildSaveEnvelope({
+function makeMissionEnvelope(overrides = {}) {
+  return buildSaveEnvelope({
     missions: { available: [], accepted: [{ ...FIRST_FLIGHT_MISSION, status: 'accepted' }], completed: [] },
     parts: UNLOCKED_PARTS,
     loan: { balance: 0, interestRate: 0.03, totalInterestAccrued: 0 },
+    ...overrides,
   });
-  await seedAndLoadSave(page, envelope);
-  await navigateToVab(page);
-  await placePart(page, 'cmd-mk1', CENTRE_X, CMD_DROP_Y, 1);
-  await placePart(page, 'tank-medium', CENTRE_X, TANK_M_DROP_Y, 2);
-  await placePart(page, 'engine-spark', CENTRE_X, ENGINE_DROP_Y, 3);
 }
 
 test.describe('Flight — First Flight Mission Completion', () => {
 
   test('(1) engine is auto-staged into Stage 1', async ({ page }) => {
     test.setTimeout(120_000);
-    await setupRocketInVab(page);
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    await seedAndLoadSave(page, makeMissionEnvelope());
+    await navigateToVab(page);
+
+    await placePart(page, 'cmd-mk1', CENTRE_X, CMD_DROP_Y, 1);
+    await placePart(page, 'tank-medium', CENTRE_X, TANK_M_DROP_Y, 2);
+    await placePart(page, 'engine-spark', CENTRE_X, ENGINE_DROP_Y, 3);
 
     await page.click('#vab-btn-staging');
     await expect(page.locator('#vab-staging-panel')).toBeVisible();
@@ -50,8 +55,11 @@ test.describe('Flight — First Flight Mission Completion', () => {
 
   test('(2) First Flight mission completes when rocket reaches 100 m', async ({ page }) => {
     test.setTimeout(120_000);
-    await setupRocketInVab(page);
-    await launchFromVab(page);
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    await seedAndLoadSave(page, makeMissionEnvelope());
+    await startTestFlight(page, FLIGHT_PARTS, {
+      staging: [{ partIds: ['engine-spark'] }],
+    });
 
     const moneyBefore = await page.evaluate(() => window.__gameState?.money ?? 0);
 

@@ -1,12 +1,10 @@
 import { test, expect } from '@playwright/test';
 import {
   VP_W, VP_H,
-  CENTRE_X, CANVAS_CENTRE_Y,
   buildSaveEnvelope,
   seedAndLoadSave,
   navigateToVab,
-  placePart,
-  launchFromVab,
+  startTestFlight,
 } from './helpers.js';
 
 /**
@@ -78,13 +76,8 @@ test('flight scene is cleaned up after exit-to-menu and reload', async ({ page }
   await page.setViewportSize({ width: VP_W, height: VP_H });
 
   await seedAndLoadSave(page, envelope);
-  await navigateToVab(page);
 
-  await placePart(page, 'cmd-mk1',      CENTRE_X, CANVAS_CENTRE_Y,      1);
-  await placePart(page, 'tank-small',   CENTRE_X, CANVAS_CENTRE_Y + 50, 2);
-  await placePart(page, 'engine-spark', CENTRE_X, CANVAS_CENTRE_Y + 100, 3);
-
-  await launchFromVab(page);
+  await startTestFlight(page, ['cmd-mk1', 'tank-small', 'engine-spark']);
   await expect(page.locator('#flight-hud')).toBeVisible();
 
   await exitToMenu(page);

@@ -1,9 +1,8 @@
 import { test, expect } from '@playwright/test';
 import {
   VP_W, VP_H,
-  CENTRE_X, CANVAS_CENTRE_Y,
   FIRST_FLIGHT_MISSION, buildSaveEnvelope,
-  placePart, seedAndLoadSave, navigateToVab, launchFromVab,
+  seedAndLoadSave, startTestFlight,
 } from './helpers.js';
 
 /**
@@ -14,24 +13,6 @@ import {
  */
 
 // ---------------------------------------------------------------------------
-// Drop positions (5-part stack)
-// ---------------------------------------------------------------------------
-
-const CMD_DROP_Y      = CANVAS_CENTRE_Y;   // 386
-const CHUTE_DROP_Y    = 359;               // above cmd
-const DECOUPLE_DROP_Y = 411;              // below cmd
-const TANK_DROP_Y     = 436;              // below decoupler
-const ENGINE_DROP_Y   = 471;             // below tank
-
-const UNLOCKED_PARTS = [
-  'cmd-mk1',
-  'parachute-mk2',
-  'decoupler-stack-tr18',
-  'tank-small',
-  'engine-spark',
-];
-
-// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -39,42 +20,21 @@ function makeEnvelope() {
   return buildSaveEnvelope({
     saveName: 'Landing E2E Test',
     missions: { available: [], accepted: [{ ...FIRST_FLIGHT_MISSION, status: 'accepted' }], completed: [] },
-    parts: UNLOCKED_PARTS,
+    parts: ['cmd-mk1', 'parachute-mk2', 'decoupler-stack-tr18', 'tank-small', 'engine-spark'],
   });
 }
 
-/** Build the 5-part rocket in VAB with correct staging and launch. */
+/** Build the 5-part rocket programmatically and start flight. */
 async function buildAndLaunch(page) {
   await page.setViewportSize({ width: VP_W, height: VP_H });
   await seedAndLoadSave(page, makeEnvelope());
-  await navigateToVab(page);
-
-  await placePart(page, 'cmd-mk1', CENTRE_X, CMD_DROP_Y, 1);
-  await placePart(page, 'parachute-mk2', CENTRE_X, CHUTE_DROP_Y, 2);
-  await placePart(page, 'decoupler-stack-tr18', CENTRE_X, DECOUPLE_DROP_Y, 3);
-  await placePart(page, 'tank-small', CENTRE_X, TANK_DROP_Y, 4);
-  await placePart(page, 'engine-spark', CENTRE_X, ENGINE_DROP_Y, 5);
-
-  // Verify auto-staging and assign parachute to Stage 2.
-  await page.click('#vab-btn-staging');
-  await expect(page.locator('#vab-staging-panel')).toBeVisible();
-  await expect(
-    page.locator('[data-drop-zone="stage-0"]').getByText('Spark Engine'),
-  ).toBeVisible({ timeout: 5_000 });
-  await expect(
-    page.locator('[data-drop-zone="stage-1"]').getByText('Stack Decoupler TR-18'),
-  ).toBeVisible({ timeout: 5_000 });
-
-  // Move parachute to Stage 2 (same stage as decoupler).
-  await page.dragAndDrop(
-    '[data-drop-zone="unstaged"] .vab-stage-chip:has-text("Mk2 Parachute")',
-    '[data-drop-zone="stage-1"]',
+  await startTestFlight(page,
+    ['parachute-mk2', 'cmd-mk1', 'decoupler-stack-tr18', 'tank-small', 'engine-spark'],
+    { staging: [
+      { partIds: ['engine-spark'] },
+      { partIds: ['decoupler-stack-tr18', 'parachute-mk2'] },
+    ]}
   );
-  await expect(
-    page.locator('[data-drop-zone="stage-1"]').getByText('Mk2 Parachute'),
-  ).toBeVisible();
-
-  await launchFromVab(page);
 }
 
 async function waitForWarpUnlocked(page) {

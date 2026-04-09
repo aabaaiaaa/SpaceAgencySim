@@ -9,11 +9,8 @@ import { dismissWelcomeModal } from './helpers.js';
  * the player to the hub, and that the persistent top bar (cash display) is
  * visible on every building screen.
  *
- * All tests run in serial order on a shared page instance.  A new game is
- * started in `beforeAll` so that the hub is showing before any test runs.
- * Each test navigates to a building, asserts what it needs to, then returns
- * to the hub via the back button — leaving the page in the hub state for
- * the next test.
+ * Each test receives its own Playwright page fixture. `beforeEach` starts a
+ * new Sandbox game so the hub is showing before each test runs.
  *
  * Tests:
  *   (1) Clicking "Vehicle Assembly Building" loads the VAB screen
@@ -27,16 +24,11 @@ import { dismissWelcomeModal } from './helpers.js';
  *   (6) The top bar showing cash is visible on each building screen.
  */
 
-test.describe.configure({ mode: 'serial' });
-
 test.describe('Hub Navigation', () => {
-  /** @type {import('@playwright/test').Page} */
-  let page;
 
-  // ── Setup ─────────────────────────────────────────────────────────────────
+  // ── Per-test setup: start a new sandbox game ──────────────────────────────
 
-  test.beforeAll(async ({ browser }) => {
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.goto('/');
 
     // A fresh context has no saves, so the New Game screen appears.
@@ -57,19 +49,9 @@ test.describe('Hub Navigation', () => {
     await dismissWelcomeModal(page);
   });
 
-  test.afterAll(async () => {
-    await page.close();
-  });
-
-  // ── Helper: wait until the hub overlay is visible ─────────────────────────
-
-  async function waitForHub() {
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
-  }
-
   // ── (1) VAB — parts panel is visible ──────────────────────────────────────
 
-  test('(1) clicking "Vehicle Assembly Building" loads the VAB screen with a visible parts panel', async () => {
+  test('(1) clicking "Vehicle Assembly Building" loads the VAB screen with a visible parts panel', async ({ page }) => {
     await expect(page.locator('#hub-overlay')).toBeVisible();
 
     await page.click('[data-building-id="vab"]');
@@ -77,15 +59,11 @@ test.describe('Hub Navigation', () => {
 
     // The parts panel must be present and visible.
     await expect(page.locator('#vab-parts-list')).toBeVisible();
-
-    // Navigate back to hub for subsequent tests.
-    await page.click('#vab-back-btn');
-    await waitForHub();
   });
 
   // ── (2) Mission Control — available missions listed ────────────────────────
 
-  test('(2) clicking "Mission Control Centre" loads the mission control screen with at least one available mission', async () => {
+  test('(2) clicking "Mission Control Centre" loads the mission control screen with at least one available mission', async ({ page }) => {
     await expect(page.locator('#hub-overlay')).toBeVisible();
 
     await page.click('[data-building-id="mission-control"]');
@@ -93,15 +71,11 @@ test.describe('Hub Navigation', () => {
 
     // At least one mission card must be visible on the Available tab.
     await expect(page.locator('.mc-mission-card').first()).toBeVisible();
-
-    // Navigate back.
-    await page.click('#mission-control-back-btn');
-    await waitForHub();
   });
 
   // ── (3) Crew Administration — three tabs present ───────────────────────────
 
-  test('(3) clicking "Crew Administration" loads the crew admin screen with Active Crew, Hire, and History tabs', async () => {
+  test('(3) clicking "Crew Administration" loads the crew admin screen with Active Crew, Hire, and History tabs', async ({ page }) => {
     await expect(page.locator('#hub-overlay')).toBeVisible();
 
     await page.click('[data-building-id="crew-admin"]');
@@ -111,30 +85,22 @@ test.describe('Hub Navigation', () => {
     await expect(page.locator('[data-tab-id="active"]')).toBeVisible();
     await expect(page.locator('[data-tab-id="hire"]')).toBeVisible();
     await expect(page.locator('[data-tab-id="history"]')).toBeVisible();
-
-    // Navigate back.
-    await page.click('#crew-admin-back-btn');
-    await waitForHub();
   });
 
   // ── (4) Launch Pad — screen loads ─────────────────────────────────────────
 
-  test('(4) clicking "Launch Pad" loads the launch pad screen', async () => {
+  test('(4) clicking "Launch Pad" loads the launch pad screen', async ({ page }) => {
     await expect(page.locator('#hub-overlay')).toBeVisible();
 
     await page.click('[data-building-id="launch-pad"]');
     await page.waitForSelector('#launch-pad-overlay', { state: 'visible', timeout: 10_000 });
 
     await expect(page.locator('#launch-pad-overlay')).toBeVisible();
-
-    // Navigate back.
-    await page.click('#launch-pad-back-btn');
-    await waitForHub();
   });
 
   // ── (5) Each building has a back/return button that returns to the hub ─────
 
-  test('(5) each building screen has a back/return button that navigates back to the hub', async () => {
+  test('(5) each building screen has a back/return button that navigates back to the hub', async ({ page }) => {
     const buildings = [
       { id: 'vab',             overlay: '#vab-root',               backBtn: '#vab-back-btn'             },
       { id: 'mission-control', overlay: '#mission-control-overlay', backBtn: '#mission-control-back-btn' },
@@ -161,7 +127,7 @@ test.describe('Hub Navigation', () => {
 
   // ── (6) Top bar with cash is visible on every building screen ─────────────
 
-  test('(6) the top bar showing cash is visible on every building screen', async () => {
+  test('(6) the top bar showing cash is visible on every building screen', async ({ page }) => {
     const buildings = [
       { id: 'vab',             overlay: '#vab-root',               backBtn: '#vab-back-btn'             },
       { id: 'mission-control', overlay: '#mission-control-overlay', backBtn: '#mission-control-back-btn' },

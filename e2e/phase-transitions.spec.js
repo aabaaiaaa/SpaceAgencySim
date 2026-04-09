@@ -532,3 +532,88 @@ test.describe('Phase Transition: Crash', () => {
     await page.close();
   });
 });
+
+// ===========================================================================
+// 9. TRANSFER → CAPTURE → ORBIT (SOI arrival at destination)
+// ===========================================================================
+
+// Moon's orbital distance from Earth centre and SOI radius.
+const MOON_ORBIT_R  = 384_400_000;  // metres from Earth centre
+const MOON_SOI      = 66_100_000;   // metres
+const MOON_RADIUS   = 1_737_400;    // metres
+const MOON_GM       = 4.9048695e12; // m³/s²
+const MOON_MIN_ORBIT = 15_000;      // metres
+
+test.describe('Phase Transition: TRANSFER → CAPTURE → ORBIT', () => {
+  test('entering Moon SOI transitions TRANSFER → CAPTURE → ORBIT', async ({ browser }) => {
+    test.setTimeout(60_000);
+    const page = await browser.newPage();
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+
+    const envelope = phaseTestFixture();
+    await seedAndLoadSave(page, envelope);
+    await startTestFlight(page, ORBITAL_ROCKET);
+
+    // Step 1: Teleport to TRANSFER phase, just INSIDE the Moon's SOI.
+    // The SOI check uses |craftR - childOrbitR| < childSOI, so placing
+    // 100km inside the boundary triggers CAPTURE immediately.
+    const insideMoonSOI = MOON_ORBIT_R - EARTH_RADIUS - MOON_SOI + 100_000;
+    await teleportCraft(page, {
+      posY: insideMoonSOI,
+      velX: 0,
+      velY: 1000,
+      bodyId: 'EARTH',
+      phase: 'TRANSFER',
+      transferState: {
+        originBodyId: 'EARTH',
+        destinationBodyId: 'MOON',
+        departureTime: 0,
+        estimatedArrival: 100,
+        departureDV: 3200,
+        captureDV: 800,
+        totalDV: 4000,
+        trajectoryPath: [],
+      },
+    });
+
+    // CAPTURE should trigger within a few physics ticks.
+    await waitForPhaseInLog(page, 'CAPTURE', 10_000);
+
+    const log1 = await getPhaseLog(page);
+    const captureEntry = log1.find((e) => e.to === 'CAPTURE');
+    expect(captureEntry).toBeTruthy();
+
+    // After CAPTURE, bodyId should change to MOON.
+    const bodyAfterCapture = await page.evaluate(() => window.__flightState?.bodyId);
+    expect(bodyAfterCapture).toBe('MOON');
+
+    // Step 2: Set Moon-relative position + orbital velocity for ORBIT detection.
+    // Moon min orbit altitude = 15,000m.
+    const moonOrbitAlt = 50_000;
+    const moonOrbitVel = Math.round(Math.sqrt(MOON_GM / (MOON_RADIUS + moonOrbitAlt)));
+    await page.evaluate(async (v) => {
+      const ps = window.__flightPs;
+      const fs = window.__flightState;
+      if (!ps || !fs) return;
+      ps.posX = 0;
+      ps.posY = v.alt;
+      ps.velX = v.vel;
+      ps.velY = 0;
+      fs.altitude = v.alt;
+      fs.velocity = v.vel;
+      fs.horizontalVelocity = v.vel;
+      if (typeof window.__resyncPhysicsWorker === 'function') {
+        await window.__resyncPhysicsWorker();
+      }
+    }, { alt: moonOrbitAlt, vel: moonOrbitVel });
+
+    // ORBIT should be detected within a few physics ticks.
+    await waitForPhaseInLog(page, 'ORBIT', 15_000);
+
+    const log2 = await getPhaseLog(page);
+    const orbitEntry = log2.find((e) => e.to === 'ORBIT' && log2.indexOf(e) > log2.indexOf(captureEntry));
+    expect(orbitEntry).toBeTruthy();
+
+    await page.close();
+  });
+});

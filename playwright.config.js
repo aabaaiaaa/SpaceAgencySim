@@ -17,8 +17,9 @@ export default defineConfig({
   // Retry flaky timeout failures: 2× on CI, 1× in dev
   retries: process.env.CI ? 2 : 1,
 
-  // Reporter to use
-  reporter: 'html',
+  // Reporters: HTML for interactive browsing, JSON for timing analysis.
+  // Run `node scripts/e2e-timing.mjs` after a test run to see slowest tests.
+  reporter: [['html'], ['json', { outputFile: 'test-results/timing.json' }]],
 
   use: {
     // Base URL pointing to the Vite dev server

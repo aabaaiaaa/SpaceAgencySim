@@ -92,6 +92,14 @@ export async function getMalfunctionMode(page) {
  * @param {boolean} [opts.crashed=false]
  * @param {number}  [opts.throttle=0]
  * @param {string}  [opts.bodyId]        Celestial body ID (e.g. 'EARTH', 'MOON').
+ * @param {boolean} [opts.orbit]         Shorthand for phase='ORBIT'.
+ * @param {string}  [opts.phase]         Flight phase to set directly:
+ *   'FLIGHT' (default) — resets to FLIGHT, lets physics auto-detect.
+ *   'ORBIT' — sets ORBIT phase, inOrbit=true, computes velocity/altitude.
+ *   'MANOEUVRE' — sets MANOEUVRE phase, keeps orbit state.
+ *   'REENTRY' — sets REENTRY phase, clears orbit state.
+ *   'TRANSFER' — sets TRANSFER phase with transferState from opts.
+ * @param {object}  [opts.transferState] Transfer state for TRANSFER phase.
  */
 export async function teleportCraft(page, opts) {
   await page.evaluate(async (o) => {
@@ -115,21 +123,56 @@ export async function teleportCraft(page, opts) {
     // Body.
     if (o.bodyId) fs.bodyId = o.bodyId;
 
-    if (o.orbit) {
-      // Set orbit state directly — skip phase transition detection and dialogs.
-      fs.phase = 'ORBIT';
-      fs.inOrbit = true;
-      // Altitude in the FlightState needs updating too for objective checks.
-      fs.altitude = o.posY;
-      fs.velocity = Math.sqrt((o.velX ?? 0) ** 2 + (o.velY ?? 0) ** 2);
-      fs.horizontalVelocity = Math.abs(o.velX ?? 0);
-    } else {
-      // Reset to airborne FLIGHT state so the physics auto-detection can
-      // compute the correct phase (ORBIT, etc.) and orbital elements from
-      // the position/velocity on the next simulation frame.
-      fs.phase = 'FLIGHT';
-      fs.inOrbit = false;
-      fs.orbitalElements = null;
+    // Compute common derived values.
+    const vel = Math.sqrt((o.velX ?? 0) ** 2 + (o.velY ?? 0) ** 2);
+    const hVel = Math.abs(o.velX ?? 0);
+
+    // Resolve phase (orbit: true is shorthand for phase: 'ORBIT').
+    const phase = o.phase ?? (o.orbit ? 'ORBIT' : 'FLIGHT');
+
+    switch (phase) {
+      case 'ORBIT':
+        fs.phase = 'ORBIT';
+        fs.inOrbit = true;
+        fs.altitude = o.posY;
+        fs.velocity = vel;
+        fs.horizontalVelocity = hVel;
+        break;
+
+      case 'MANOEUVRE':
+        fs.phase = 'MANOEUVRE';
+        // Keep orbit state — manoeuvre is a burn within orbit.
+        fs.altitude = o.posY;
+        fs.velocity = vel;
+        fs.horizontalVelocity = hVel;
+        break;
+
+      case 'REENTRY':
+        fs.phase = 'REENTRY';
+        fs.inOrbit = false;
+        fs.orbitalElements = null;
+        fs.altitude = o.posY;
+        fs.velocity = vel;
+        fs.horizontalVelocity = hVel;
+        break;
+
+      case 'TRANSFER':
+        fs.phase = 'TRANSFER';
+        fs.inOrbit = false;
+        fs.orbitalElements = null;
+        if (o.transferState) {
+          fs.transferState = o.transferState;
+        }
+        fs.altitude = o.posY;
+        fs.velocity = vel;
+        fs.horizontalVelocity = hVel;
+        break;
+
+      default: // 'FLIGHT' or unspecified
+        fs.phase = 'FLIGHT';
+        fs.inOrbit = false;
+        fs.orbitalElements = null;
+        break;
     }
 
     // Defensive initialisation.

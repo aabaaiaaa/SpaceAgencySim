@@ -15,16 +15,13 @@ import {
  * A pre-built save is seeded into localStorage with one rocket design
  * already present in `gameState.rockets` (simulating a previous VAB launch).
  *
- * Tests run in serial order on a shared page instance.
+ * Each test seeds its own save and gets its own page instance.
  *
- * Execution order:
- *   Setup  : Seed save → load → arrive at hub
+ * Tests:
  *   (1)    : Launch pad shows saved rocket designs
  *   (2)    : Launch pad shows empty state when no rockets exist
  *   (3)    : Clicking Launch starts the flight scene from the launch pad
  */
-
-test.describe.configure({ mode: 'serial' });
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -74,21 +71,11 @@ function lpSaveEnvelope(rockets = []) {
 // ---------------------------------------------------------------------------
 
 test.describe('Launch Pad', () => {
-  /** @type {import('@playwright/test').Page} */
-  let page;
-
-  test.beforeAll(async ({ browser }) => {
-    page = await browser.newPage();
-    await page.setViewportSize({ width: VP_W, height: VP_H });
-  });
-
-  test.afterAll(async () => {
-    await page.close();
-  });
 
   // ── (1) Launch pad shows saved rocket designs ───────────────────────────
 
-  test('(1) launch pad displays previously launched rocket designs', async () => {
+  test('(1) launch pad displays previously launched rocket designs', async ({ page }) => {
+    await page.setViewportSize({ width: VP_W, height: VP_H });
     // Seed a save with one rocket design.
     await page.addInitScript(({ key, envelope }) => {
       localStorage.setItem(key, JSON.stringify(envelope));
@@ -129,15 +116,12 @@ test.describe('Launch Pad', () => {
     await expect(launchBtn).toBeVisible();
     await expect(launchBtn).toContainText('$14,800');
     await expect(launchBtn).not.toBeDisabled();
-
-    // Go back to hub for the next test.
-    await page.click('#launch-pad-back-btn');
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
   });
 
   // ── (2) Launch pad shows empty state when no rockets exist ──────────────
 
-  test('(2) launch pad shows empty state when no rockets exist', async () => {
+  test('(2) launch pad shows empty state when no rockets exist', async ({ page }) => {
+    await page.setViewportSize({ width: VP_W, height: VP_H });
     // Seed a save with NO rocket designs (overwrite the previous seed).
     await page.addInitScript(({ key, envelope }) => {
       localStorage.setItem(key, JSON.stringify(envelope));
@@ -161,15 +145,12 @@ test.describe('Launch Pad', () => {
     // No rocket cards or list.
     await expect(page.locator('#launch-pad-rocket-list')).toHaveCount(0);
     await expect(page.locator('.lp-rocket-card')).toHaveCount(0);
-
-    // Go back to hub for the next test.
-    await page.click('#launch-pad-back-btn');
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
   });
 
   // ── (3) Clicking Launch starts the flight scene from the launch pad ─────
 
-  test('(3) clicking Launch on a design starts the flight scene', async () => {
+  test('(3) clicking Launch on a design starts the flight scene', async ({ page }) => {
+    await page.setViewportSize({ width: VP_W, height: VP_H });
     // Seed a save with the test rocket design.
     await page.addInitScript(({ key, envelope }) => {
       localStorage.setItem(key, JSON.stringify(envelope));
@@ -221,7 +202,8 @@ test.describe('Launch Pad', () => {
 
   // ── (4) Launch button disabled when player can't afford the rocket ──────
 
-  test('(4) launch button is disabled when player cannot afford the rocket', async () => {
+  test('(4) launch button is disabled when player cannot afford the rocket', async ({ page }) => {
+    await page.setViewportSize({ width: VP_W, height: VP_H });
     // Seed a save with very low money — not enough to cover the $14,800 cost.
     const poorEnvelope = lpSaveEnvelope([SEEDED_DESIGN]);
     poorEnvelope.state.money = 5_000;
