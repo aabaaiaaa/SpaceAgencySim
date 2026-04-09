@@ -6,6 +6,8 @@
  *   - Overlap detection between AABBs
  *   - Collision response with atmosphere-modulated restitution
  *   - Separation impulse applied at the moment of stage decoupling
+ *   - Asteroid collision detection (craft AABB vs asteroid circle)
+ *   - Velocity-based damage model for asteroid impacts
  *
  * COLLISION MODEL
  *   After stage separation, each body (main rocket + each debris fragment)
@@ -13,6 +15,14 @@
  *   overlap.  On collision, an impulse is applied following Newton's third
  *   law: lighter bodies receive larger velocity changes.  Atmospheric density
  *   damps the bounce (lower restitution at sea level).
+ *
+ * ASTEROID COLLISION MODEL
+ *   Player craft AABB is tested against each asteroid's circular boundary.
+ *   Damage is velocity-based:
+ *     < 1 m/s:    No damage (docking/capture speed)
+ *     1–5 m/s:    Minor bump — outermost parts may be damaged
+ *     5–20 m/s:   Significant impact — outer parts destroyed
+ *     > 20 m/s:   Catastrophic — likely total craft destruction
  *
  * SEPARATION IMPULSE
  *   When a decoupler fires, a fixed-magnitude impulse is split between the
@@ -23,8 +33,13 @@
  * PUBLIC API
  *   computeAABB(activeParts, assemblyParts, posX, posY, angle)  -> AABB
  *   testAABBOverlap(a, b)                                       -> boolean
+ *   testAABBCircleOverlap(aabb, cx, cy, r)                      -> boolean
  *   tickCollisions(ps, assembly, dt)                             -> void
  *   applySeparationImpulse(ps, debris, assembly)                 -> void
+ *   checkAsteroidCollisions(ps, assembly, asteroids, flightState) -> AsteroidCollisionResult[]
+ *   computeRelativeSpeed(craftVelX, craftVelY, objVelX, objVelY)  -> number
+ *   classifyAsteroidDamage(relSpeed)                              -> AsteroidDamageLevel
+ *   applyAsteroidDamage(ps, assembly, flightState, damage, relSpeed) -> void
  *
  * @module collision
  */
@@ -33,6 +48,8 @@ import { getPartById } from '../data/parts.ts';
 import { airDensity }  from './atmosphere.ts';
 
 import type { PhysicsState, RocketAssembly } from './physics.ts';
+import type { Asteroid } from './asteroidBelt.ts';
+import type { FlightState } from './gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -80,6 +97,33 @@ interface CollisionBody {
 }
 
 // ---------------------------------------------------------------------------
+// Asteroid damage types
+// ---------------------------------------------------------------------------
+
+/**
+ * Damage severity levels for asteroid impacts.
+ * Based on relative velocity between craft and asteroid.
+ */
+export const AsteroidDamageLevel = {
+  NONE:         'NONE',
+  MINOR:        'MINOR',
+  SIGNIFICANT:  'SIGNIFICANT',
+  CATASTROPHIC: 'CATASTROPHIC',
+} as const;
+
+export type AsteroidDamageLevel = typeof AsteroidDamageLevel[keyof typeof AsteroidDamageLevel];
+
+/** Result of a single asteroid collision check. */
+export interface AsteroidCollisionResult {
+  /** The asteroid that was hit. */
+  asteroid: Asteroid;
+  /** Relative speed at impact (m/s). */
+  relativeSpeed: number;
+  /** Damage classification. */
+  damage: AsteroidDamageLevel;
+}
+
+// ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
@@ -108,6 +152,25 @@ const SEPARATION_COOLDOWN_TICKS: number = 10;
 
 /** Scale factor: metres per pixel at default 1x zoom. */
 const SCALE_M_PER_PX: number = 0.05;
+
+// --- Asteroid damage thresholds (m/s relative speed) ---
+
+/** Below this speed: no damage (docking/capture speed). */
+const ASTEROID_SPEED_NONE: number = 1;
+
+/** Below this speed: minor bump, possible outermost part damage. */
+const ASTEROID_SPEED_MINOR: number = 5;
+
+/** Below this speed: significant — outer parts destroyed. */
+const ASTEROID_SPEED_SIGNIFICANT: number = 20;
+
+/** At or above ASTEROID_SPEED_SIGNIFICANT: catastrophic — total destruction. */
+
+/** Fraction of outermost parts to damage on a MINOR impact (0–1). */
+const MINOR_DAMAGE_FRACTION: number = 0.25;
+
+/** Fraction of outer parts to destroy on a SIGNIFICANT impact (0–1). */
+const SIGNIFICANT_DAMAGE_FRACTION: number = 0.6;
 
 // ---------------------------------------------------------------------------
 // Private helpers
@@ -477,4 +540,276 @@ function _resolveCollision(a: CollisionBody, b: CollisionBody, assembly: RocketA
     b.ref.posX -= (correction / totalInvMass) * (1 / b.mass!) * nx;
     b.ref.posY -= (correction / totalInvMass) * (1 / b.mass!) * ny;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Public API — AABB vs Circle overlap (for asteroid collision)
+// ---------------------------------------------------------------------------
+
+/**
+ * Test whether an AABB overlaps a circle.
+ *
+ * Finds the closest point on the AABB to the circle centre and checks
+ * whether the distance is less than or equal to the radius.
+ */
+export function testAABBCircleOverlap(
+  aabb: AABB,
+  cx: number,
+  cy: number,
+  radius: number,
+): boolean {
+  // Clamp the circle centre to the nearest point on the AABB.
+  const closestX = Math.max(aabb.minX, Math.min(cx, aabb.maxX));
+  const closestY = Math.max(aabb.minY, Math.min(cy, aabb.maxY));
+
+  const dx = cx - closestX;
+  const dy = cy - closestY;
+
+  return (dx * dx + dy * dy) <= (radius * radius);
+}
+
+// ---------------------------------------------------------------------------
+// Public API — Asteroid damage classification
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute the relative speed between the craft and another object.
+ */
+export function computeRelativeSpeed(
+  craftVelX: number,
+  craftVelY: number,
+  objVelX: number,
+  objVelY: number,
+): number {
+  const dvx = craftVelX - objVelX;
+  const dvy = craftVelY - objVelY;
+  return Math.sqrt(dvx * dvx + dvy * dvy);
+}
+
+/**
+ * Classify damage severity based on relative impact speed (m/s).
+ *
+ * Thresholds:
+ *   < 1 m/s:   NONE        — docking/capture speed
+ *   1–5 m/s:   MINOR       — outermost parts may be damaged
+ *   5–20 m/s:  SIGNIFICANT — outer parts destroyed
+ *   >= 20 m/s: CATASTROPHIC — likely total craft destruction
+ */
+export function classifyAsteroidDamage(relSpeed: number): AsteroidDamageLevel {
+  if (relSpeed < ASTEROID_SPEED_NONE)        return AsteroidDamageLevel.NONE;
+  if (relSpeed < ASTEROID_SPEED_MINOR)       return AsteroidDamageLevel.MINOR;
+  if (relSpeed < ASTEROID_SPEED_SIGNIFICANT) return AsteroidDamageLevel.SIGNIFICANT;
+  return AsteroidDamageLevel.CATASTROPHIC;
+}
+
+// ---------------------------------------------------------------------------
+// Private — Identify outermost parts for damage targeting
+// ---------------------------------------------------------------------------
+
+/**
+ * Rank active parts by distance from AABB centre (outermost first).
+ *
+ * Parts furthest from the craft's geometric centre are the most exposed
+ * and take damage first in an asteroid impact.
+ */
+function _rankPartsByExposure(
+  activeParts: Set<string>,
+  assemblyParts: Map<string, PlacedPartLike>,
+): string[] {
+  // Compute geometric centre of all active parts (VAB pixel coords).
+  let sumX = 0;
+  let sumY = 0;
+  let count = 0;
+  for (const id of activeParts) {
+    const placed = assemblyParts.get(id);
+    if (placed) {
+      sumX += placed.x;
+      sumY += placed.y;
+      count++;
+    }
+  }
+  if (count === 0) return [];
+
+  const centreX = sumX / count;
+  const centreY = sumY / count;
+
+  // Build array with distances.
+  const items: Array<{ id: string; dist: number }> = [];
+  for (const id of activeParts) {
+    const placed = assemblyParts.get(id);
+    if (!placed) continue;
+    const dx = placed.x - centreX;
+    const dy = placed.y - centreY;
+    items.push({ id, dist: dx * dx + dy * dy });
+  }
+
+  // Sort descending by distance (outermost first).
+  items.sort((a, b) => b.dist - a.dist);
+
+  return items.map(i => i.id);
+}
+
+// ---------------------------------------------------------------------------
+// Public API — Apply asteroid damage
+// ---------------------------------------------------------------------------
+
+/**
+ * Apply asteroid impact damage to the craft.
+ *
+ * Damage model:
+ *   NONE:         No effect.
+ *   MINOR:        ~25% of outermost parts destroyed.
+ *   SIGNIFICANT:  ~60% of outer parts destroyed.
+ *   CATASTROPHIC: All parts destroyed, craft crashes.
+ *
+ * Destroyed parts are removed from activeParts and logged as FlightEvents.
+ */
+export function applyAsteroidDamage(
+  ps: PhysicsState,
+  assembly: RocketAssembly,
+  flightState: FlightState,
+  damage: AsteroidDamageLevel,
+  relSpeed: number,
+  asteroidName: string = 'asteroid',
+): void {
+  if (damage === AsteroidDamageLevel.NONE) return;
+
+  if (damage === AsteroidDamageLevel.CATASTROPHIC) {
+    // Destroy all parts and crash the craft.
+    const partIds = [...ps.activeParts];
+    for (const instanceId of partIds) {
+      const placed = assembly.parts.get(instanceId);
+      const def = placed ? getPartById(placed.partId) : null;
+      const partName = def?.name ?? 'Unknown part';
+
+      ps.activeParts.delete(instanceId);
+      ps.firingEngines.delete(instanceId);
+      ps.deployedParts.delete(instanceId);
+      ps.heatMap?.delete(instanceId);
+
+      flightState.events.push({
+        type:        'PART_DESTROYED',
+        time:        flightState.timeElapsed,
+        instanceId,
+        partName,
+        description: `${partName} destroyed by catastrophic ${asteroidName} impact at ${relSpeed.toFixed(1)} m/s.`,
+      });
+    }
+    ps.crashed = true;
+
+    flightState.events.push({
+      type:        'ASTEROID_IMPACT',
+      time:        flightState.timeElapsed,
+      severity:    'CATASTROPHIC',
+      relSpeed,
+      asteroidName,
+      description: `Catastrophic collision with ${asteroidName} at ${relSpeed.toFixed(1)} m/s — craft destroyed.`,
+    });
+    return;
+  }
+
+  // MINOR or SIGNIFICANT: destroy a fraction of outermost parts.
+  const fraction = damage === AsteroidDamageLevel.MINOR
+    ? MINOR_DAMAGE_FRACTION
+    : SIGNIFICANT_DAMAGE_FRACTION;
+
+  const ranked = _rankPartsByExposure(
+    ps.activeParts,
+    assembly.parts as Map<string, PlacedPartLike>,
+  );
+  const destroyCount = Math.max(1, Math.ceil(ranked.length * fraction));
+  const toDestroy = ranked.slice(0, destroyCount);
+
+  for (const instanceId of toDestroy) {
+    const placed = assembly.parts.get(instanceId);
+    const def = placed ? getPartById(placed.partId) : null;
+    const partName = def?.name ?? 'Unknown part';
+
+    ps.activeParts.delete(instanceId);
+    ps.firingEngines.delete(instanceId);
+    ps.deployedParts.delete(instanceId);
+    ps.heatMap?.delete(instanceId);
+
+    flightState.events.push({
+      type:        'PART_DESTROYED',
+      time:        flightState.timeElapsed,
+      instanceId,
+      partName,
+      description: `${partName} destroyed by ${asteroidName} impact at ${relSpeed.toFixed(1)} m/s.`,
+    });
+  }
+
+  const severityLabel = damage === AsteroidDamageLevel.MINOR ? 'MINOR' : 'SIGNIFICANT';
+  flightState.events.push({
+    type:        'ASTEROID_IMPACT',
+    time:        flightState.timeElapsed,
+    severity:    severityLabel,
+    relSpeed,
+    asteroidName,
+    partsDestroyed: toDestroy.length,
+    description: `${severityLabel} collision with ${asteroidName} at ${relSpeed.toFixed(1)} m/s — ${toDestroy.length} part(s) destroyed.`,
+  });
+
+  // If all active parts are gone after partial destruction, crash.
+  if (ps.activeParts.size === 0) {
+    ps.crashed = true;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Public API — Check asteroid collisions (called from flight loop)
+// ---------------------------------------------------------------------------
+
+/**
+ * Test the player craft against all provided asteroids and apply damage.
+ *
+ * Returns an array of collision results (empty if no collisions).
+ * Only checks if the craft is flying (not landed/crashed) and has active parts.
+ */
+export function checkAsteroidCollisions(
+  ps: PhysicsState,
+  assembly: RocketAssembly,
+  asteroids: readonly Asteroid[],
+  flightState: FlightState,
+): AsteroidCollisionResult[] {
+  // Skip if craft is not flying.
+  if (ps.landed || ps.crashed || ps.activeParts.size === 0) return [];
+  if (asteroids.length === 0) return [];
+
+  // Compute craft AABB once.
+  const craftAABB = computeAABB(
+    ps.activeParts,
+    assembly.parts as Map<string, PlacedPartLike>,
+    ps.posX,
+    ps.posY,
+    ps.angle,
+  );
+
+  const results: AsteroidCollisionResult[] = [];
+
+  for (const asteroid of asteroids) {
+    // AABB vs circle overlap test.
+    if (!testAABBCircleOverlap(craftAABB, asteroid.posX, asteroid.posY, asteroid.radius)) {
+      continue;
+    }
+
+    // Compute relative speed.
+    const relSpeed = computeRelativeSpeed(
+      ps.velX, ps.velY,
+      asteroid.velX, asteroid.velY,
+    );
+
+    // Classify damage.
+    const damage = classifyAsteroidDamage(relSpeed);
+
+    // Apply damage to the craft.
+    applyAsteroidDamage(ps, assembly, flightState, damage, relSpeed, asteroid.name);
+
+    results.push({ asteroid, relativeSpeed: relSpeed, damage });
+
+    // If craft is destroyed, stop checking further asteroids.
+    if (ps.crashed) break;
+  }
+
+  return results;
 }

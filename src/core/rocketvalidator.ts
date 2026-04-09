@@ -357,7 +357,7 @@ export function runValidation(
   // This is informational only and does not block launch.
   if (hasCommandModule) {
     const hasAcceptedCrewedMission = gameState.missions.accepted.some(
-      (m) => ((m as unknown as { requirements?: { minCrewCount?: number } }).requirements?.minCrewCount ?? 0) > 0,
+      (m) => (m.requirements?.minCrewCount ?? 0) > 0,
     );
 
     if (hasAcceptedCrewedMission && onlyComputer) {

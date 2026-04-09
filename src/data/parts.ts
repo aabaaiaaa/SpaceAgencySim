@@ -2398,9 +2398,78 @@ export const PARTS: PartDef[] = [
     properties: {
       armReach: 25,
       maxGrabSpeed: 1.0,
+      maxCaptureMass: 100_000, // 100 tonnes — small satellites and compact debris
       dragCoefficient: 0.04,
       heatTolerance: 1600,
       crashThreshold: 8,
+    },
+  },
+
+  /**
+   * Heavy Grabbing Arm — a reinforced arm for capturing medium-mass objects.
+   *
+   * Larger servos and structural bracing allow this arm to grab objects up to
+   * 100 million kg — sufficient for medium asteroids (~22 m radius at rock
+   * density).  Heavier and costlier than the standard Grabbing Arm.
+   */
+  {
+    id: 'grabbing-arm-heavy',
+    name: 'Heavy Grabbing Arm',
+    description: 'A reinforced robotic arm with heavy-duty servos for capturing medium-mass objects such as mid-size asteroids. Can grab targets up to 100 million kg. Heavier and longer reach than the standard arm.',
+    type: PartType.GRABBING_ARM,
+    reliability: RELIABILITY_TIERS.MID,
+    mass: 400,
+    cost: 95_000,
+    width: 16,   // 0.8 m — wider profile
+    height: 32,  // 1.6 m — longer reach
+    snapPoints: [
+      makeSnapPoint('left',  -8, 0, RADIAL_TYPES),
+      makeSnapPoint('right',  8, 0, RADIAL_TYPES),
+    ],
+    animationStates: ['stowed', 'extending', 'grabbed', 'retracting'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.GRAB,
+    properties: {
+      armReach: 35,
+      maxGrabSpeed: 0.8,
+      maxCaptureMass: 100_000_000, // 100M kg — medium asteroids
+      dragCoefficient: 0.06,
+      heatTolerance: 1800,
+      crashThreshold: 12,
+    },
+  },
+
+  /**
+   * Industrial Grabbing Arm — the heaviest-duty arm for asteroid capture.
+   *
+   * Massive hydraulic actuators and a reinforced grapple mechanism allow this
+   * arm to capture objects up to 2 trillion kg — large asteroids approaching
+   * 1 km in diameter (rock density ~2,500 kg/m³, 500 m radius ≈ 1.3T kg).
+   */
+  {
+    id: 'grabbing-arm-industrial',
+    name: 'Industrial Grabbing Arm',
+    description: 'A massive industrial-grade grapple system designed for large asteroid capture operations. Can capture objects up to 2 trillion kg — large asteroids approaching 1 km in diameter. Requires significant mounting space.',
+    type: PartType.GRABBING_ARM,
+    reliability: RELIABILITY_TIERS.HIGH,
+    mass: 1200,
+    cost: 280_000,
+    width: 24,   // 1.2 m — heavy profile
+    height: 48,  // 2.4 m — massive reach
+    snapPoints: [
+      makeSnapPoint('left',  -12, 0, RADIAL_TYPES),
+      makeSnapPoint('right',  12, 0, RADIAL_TYPES),
+    ],
+    animationStates: ['stowed', 'extending', 'grabbed', 'retracting'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.GRAB,
+    properties: {
+      armReach: 50,
+      maxGrabSpeed: 0.5,
+      maxCaptureMass: 2_000_000_000_000, // 2T kg — large asteroids up to ~1 km diameter
+      dragCoefficient: 0.10,
+      heatTolerance: 2000,
+      crashThreshold: 18,
     },
   },
 

@@ -160,7 +160,7 @@ function _loadDebugState(liveState: GameState, def: DebugSaveDefinition, feedbac
   // Wipe all existing keys on the live state, then copy snapshot keys in.
   // This preserves the same object reference that the rest of the app holds.
   for (const key of Object.keys(liveState)) {
-    delete (liveState as unknown as Record<string, unknown>)[key];
+    Reflect.deleteProperty(liveState, key);
   }
   Object.assign(liveState, snapshot);
 
@@ -170,7 +170,7 @@ function _loadDebugState(liveState: GameState, def: DebugSaveDefinition, feedbac
 
   // Update window.__gameState for e2e test access.
   if (typeof window !== 'undefined') {
-    (window as unknown as Record<string, unknown>).__gameState = liveState;
+    window.__gameState = liveState;
   }
 
   // Refresh the top bar to show new money/agency name.

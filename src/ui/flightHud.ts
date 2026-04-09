@@ -1176,10 +1176,8 @@ function _updateObjectivesPanel(): void {
   if (!_elObjList || !_state) return;
 
   // Gather all accepted missions that have objectives.
-  // Use `any` for dynamic mission shape — the Mission interface doesn't include runtime `objectives` array.
-  const allAccepted = (_state.missions.accepted ?? []) as unknown as Array<Record<string, unknown>>;
-  const missions = allAccepted.filter(
-    (m) => Array.isArray(m.objectives) && (m.objectives as unknown[]).length > 0,
+  const missions = (_state.missions.accepted ?? []).filter(
+    (m) => Array.isArray(m.objectives) && m.objectives.length > 0,
   );
 
   // No accepted missions with objectives — hide the panel entirely.
@@ -1197,11 +1195,10 @@ function _updateObjectivesPanel(): void {
   const now = _flightState?.timeElapsed ?? 0;
   const fingerprint = missions.map(
     (m) => {
-      const objectives = m.objectives as Array<Record<string, unknown>>;
-      return (m.id as string) + ':' + objectives.map((o) => {
+      return m.id + ':' + m.objectives!.map((o) => {
         if (o.completed) return '1';
         if (o.type === ObjectiveType.HOLD_ALTITUDE && o._holdEnteredAt != null) {
-          return 'H' + Math.floor(now - (o._holdEnteredAt as number));
+          return 'H' + Math.floor(now - o._holdEnteredAt);
         }
         return '0';
       }).join('');
@@ -1217,10 +1214,10 @@ function _updateObjectivesPanel(): void {
 
     const title = document.createElement('div');
     title.className = 'hud-obj-mission-title';
-    title.textContent = mission.title as string;
+    title.textContent = mission.title;
     group.appendChild(title);
 
-    for (const obj of mission.objectives as Array<Record<string, unknown>>) {
+    for (const obj of mission.objectives!) {
       const item = document.createElement('div');
       item.className = 'hud-obj-item';
 
@@ -1232,18 +1229,18 @@ function _updateObjectivesPanel(): void {
 
       const desc = document.createElement('span');
       desc.className = `hud-obj-desc${obj.completed ? ' met' : ''}`;
-      desc.textContent = (obj.description as string | undefined) ?? (obj.type as string);
+      desc.textContent = obj.description ?? obj.type;
       descWrap.appendChild(desc);
 
       // Show countdown timer for duration-based objectives.
-      const objTarget = obj.target as Record<string, unknown> | undefined;
+      const objTarget = obj.target;
       if (obj.type === ObjectiveType.HOLD_ALTITUDE && !obj.completed && objTarget?.duration) {
         const timer = document.createElement('div');
         timer.className = 'hud-obj-timer';
         timer.dataset.testid = 'hud-obj-hold-timer';
 
         if (obj._holdEnteredAt != null) {
-          const elapsed = Math.max(0, now - (obj._holdEnteredAt as number));
+          const elapsed = Math.max(0, now - obj._holdEnteredAt);
           const remaining = Math.max(0, (objTarget.duration as number) - elapsed);
           timer.textContent = `${Math.ceil(remaining)}s remaining`;
         } else {

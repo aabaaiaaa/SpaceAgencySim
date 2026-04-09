@@ -271,10 +271,10 @@ export interface RocketPart {
  * the parts assigned to that stage.  Index 0 = Stage 1 (fires first).
  */
 export interface StagingDesign {
-  /** Ordered stage slots; each is an array of part indices. */
-  stages: number[][];
-  /** Indices of activatable parts not assigned to any stage. */
-  unstaged: number[];
+  /** Ordered stage slots; each is an array of part indices or instance IDs. */
+  stages: (number | string)[][];
+  /** Indices or IDs of activatable parts not assigned to any stage. */
+  unstaged: (number | string)[];
 }
 
 /** A saved rocket design (blueprint). */

@@ -47,7 +47,7 @@ All tasks reference `.devloop/requirements.md` for full context.
 - **Verification**: `npm run typecheck` passes. Combined `as unknown as` count in these 3 files is 0.
 
 ### TASK-005b: Reduce as-unknown-as casts in remaining files
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-005a
 - **Description**: Eliminate `as unknown as` casts in `src/ui/vab/_init.ts` (2), `src/ui/index.ts` (2), `src/ui/debugSaves.ts` (2), `src/data/contracts.ts` (2), and remaining single-cast files. Keep only genuinely necessary casts (e.g., Chrome memory API in perfMonitor.ts). Target: <10 total `as unknown as` casts across all source files. See requirements §1.5.
 - **Verification**: `npm run typecheck` passes. `grep -rc "as unknown as" src/ --include="*.ts" | grep -v "test" | awk -F: '{s+=$2}END{print s}'` returns <10.
@@ -137,13 +137,13 @@ All tasks reference `.devloop/requirements.md` for full context.
 - **Verification**: `npm run typecheck` passes. `npm run build` succeeds. Manual: teleport to belt orbit in dev, verify asteroids render with correct LOD and selection indicators.
 
 ### TASK-020: Integrate asteroid selection with map targeting system
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-017, TASK-016
 - **Description**: When the player is in ORBIT phase within a belt zone, the generated asteroids should appear on the map as selectable objects near the player's position. Integrate with the existing T-key cycling (`cycleMapTarget`) and targeting system in `src/render/map.ts` and `src/ui/flightController/_keyboard.ts`. All flight-view asteroids are targetable regardless of size. Show name, size, and distance info for the selected asteroid. See requirements §5.2, §5.3.
 - **Verification**: `npm run typecheck` passes. Manual: in belt orbit, press T to cycle through asteroids, verify name/size/distance displayed in map HUD.
 
 ### TASK-021: Implement asteroid collision with player craft
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-017
 - **Description**: Extend `src/core/collision.ts` to detect collisions between the player craft AABB and asteroid circular boundaries. Implement velocity-based damage: <1 m/s no damage, 1–5 m/s minor part damage, 5–20 m/s outer parts destroyed, >20 m/s catastrophic. Asteroids only collide with the player craft (no asteroid-asteroid collision). See requirements §5.4.
 - **Verification**: `npx vitest run src/tests/collision src/tests/asteroidBelt` passes — tests verify damage thresholds at each velocity band.
@@ -155,13 +155,13 @@ All tasks reference `.devloop/requirements.md` for full context.
 - **Verification**: `npx vitest run src/tests/collision` passes with all new tests green.
 
 ### TASK-023: Implement unsafe belt orbit hub-return block
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-015
 - **Description**: Extend the "return to hub" check to block returning when the player's orbit is within the dense belt zone. Reuse the existing pattern where return-to-hub is blocked during transfer phase. Show message: "Cannot return to hub — orbit is within the dense asteroid belt. Manoeuvre to a safe orbit first." Outer belt zones and all other Sun orbits are safe. See requirements §5.1, §5.10.
 - **Verification**: `npm run typecheck` passes. `npx vitest run src/tests/flightPhase src/tests/asteroidBelt` passes — test verifies hub return blocked in dense belt, allowed in outer belt.
 
 ### TASK-024: Add heavy and industrial grabbing arm parts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-015
 - **Description**: Add two new grabbing arm variants to `src/data/parts.ts`: Heavy Grabbing Arm (medium mass limit, mid-tier tech unlock) and Industrial Grabbing Arm (large mass limit for up to 1km asteroids, high-tier tech unlock). Add corresponding `PartType` constants if needed. Add tech tree nodes in `src/data/techtree.ts` (or equivalent). The existing Grabbing Arm becomes the light tier. Define mass thresholds for each tier. See requirements §5.6.
 - **Verification**: `npm run typecheck` passes. The parts catalog contains 3 grabbing arm variants with distinct mass limits, costs, and tech requirements.

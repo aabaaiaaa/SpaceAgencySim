@@ -222,7 +222,7 @@ function _handleExitToMenu(): void {
     showMainMenu(_container, (newState: GameState) => {
       // Keep window.__gameState in sync for e2e test access.
       if (typeof window !== 'undefined') {
-        (window as unknown as Record<string, unknown>).__gameState = newState;
+        window.__gameState =newState;
       }
       initUI(_container!, newState);
     });
@@ -253,7 +253,7 @@ function _handleLoadGame(loadedState: GameState): void {
 
   // Keep window.__gameState in sync for e2e test access.
   if (typeof window !== 'undefined') {
-    (window as unknown as Record<string, unknown>).__gameState = loadedState;
+    window.__gameState =loadedState;
   }
 
   // Reinitialize the game UI with the loaded state.

@@ -24,14 +24,14 @@
  * @module core/flightPhase
  */
 
-import { FlightPhase, MIN_ORBIT_ALTITUDE, ControlMode } from './constants.ts';
+import { FlightPhase, MIN_ORBIT_ALTITUDE, ControlMode, BeltZone } from './constants.ts';
 import type { CelestialBody } from './constants.ts';
 import {
   isOrbitalBurnActive, shouldEnterManoeuvre, shouldExitManoeuvre,
   shouldEnterTransfer, isEscapeTrajectory, checkSOITransition,
   getTransferTargets, computeTransferDeltaV, BODY_PARENT,
 } from './manoeuvre.ts';
-import { checkOrbitStatus, computeOrbitalElements } from './orbit.ts';
+import { checkOrbitStatus, computeOrbitalElements, getAltitudeBand } from './orbit.ts';
 import type { FlightState, PhaseTransition, OrbitalElements } from './gameState.ts';
 import type { PhysicsState } from './physics.ts';
 
@@ -234,11 +234,28 @@ export function evaluateAutoTransitions(flightState: FlightState, ps: PhysicsSta
   return null;
 }
 
-export function canReturnToAgency(phase: string, ps: PhysicsState): boolean {
+export function canReturnToAgency(phase: string, ps: PhysicsState, bodyId?: string): boolean {
   if (ps.landed || ps.crashed) return true;
-  if (phase === FlightPhase.ORBIT) return true;
+  if (phase === FlightPhase.ORBIT) {
+    // Block return when orbiting in the dense asteroid belt zone.
+    if (bodyId && isInUnsafeBeltOrbit(ps.posY, bodyId)) return false;
+    return true;
+  }
   if (phase === FlightPhase.TRANSFER || phase === FlightPhase.CAPTURE) return false;
   return true;
+}
+
+/**
+ * Check whether the craft's current altitude places it inside an unsafe
+ * belt zone (the dense asteroid belt around the Sun).
+ *
+ * @param altitude  Altitude above the body surface (m).
+ * @param bodyId    Celestial body the craft is orbiting.
+ * @returns True if the altitude falls within a belt band marked `unsafe`.
+ */
+export function isInUnsafeBeltOrbit(altitude: number, bodyId: string): boolean {
+  const band = getAltitudeBand(altitude, bodyId);
+  return !!(band && band.unsafe);
 }
 
 export function requiresTransitionWarning(currentPhase: string, targetPhase: string): boolean {

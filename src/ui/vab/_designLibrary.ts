@@ -451,8 +451,8 @@ export function loadDesignIntoVab(design: RocketDesign): void {
 
   if (design.staging && Array.isArray(design.staging.stages)) {
     S.stagingConfig = {
-      stages:          design.staging.stages.map((ids: number[] | string[]) => ({
-        instanceIds: Array.isArray(ids) ? [...ids] as string[] : [],
+      stages:          design.staging.stages.map((ids: (number | string)[]) => ({
+        instanceIds: Array.isArray(ids) ? ids.map(String) : [],
       })),
       unstaged:        Array.isArray(design.staging.unstaged) ? design.staging.unstaged.map(String) : [],
       currentStageIdx: 0,

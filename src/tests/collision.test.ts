@@ -884,3 +884,353 @@ describe('tickCollisions integration', () => {
     expect(ps.debris[1].velY).not.toBe(vel2Before);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Asteroid Collision Detection & Damage
+// ---------------------------------------------------------------------------
+
+import {
+  testAABBCircleOverlap,
+  computeRelativeSpeed,
+  classifyAsteroidDamage,
+  AsteroidDamageLevel,
+  applyAsteroidDamage,
+  checkAsteroidCollisions,
+} from '../core/collision.ts';
+
+/**
+ * Helper: create a minimal asteroid-like object for testing.
+ */
+function makeAsteroid({
+  posX = 0, posY = 0,
+  velX = 0, velY = 0,
+  radius = 10,
+  mass = 1000,
+  name = 'AST-TEST',
+} = {}) {
+  return {
+    id: `ast-${name}`,
+    type: 'asteroid' as const,
+    name,
+    posX, posY,
+    velX, velY,
+    radius,
+    mass,
+    shapeSeed: 42,
+  };
+}
+
+/**
+ * Helper: create a minimal physics-like state and assembly for asteroid tests.
+ */
+function makeAsteroidTestCraft({
+  posX = 0, posY = 0,
+  velX = 0, velY = 0,
+} = {}) {
+  const assembly = createRocketAssembly();
+  // probe-core-mk1: 20x10 px
+  const probeId = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
+  const tankId = addPartToAssembly(assembly, 'tank-small', 0, -40);
+  connectParts(assembly, probeId, 1, tankId, 0);
+
+  const ps = {
+    posX, posY, velX, velY, angle: 0,
+    angularVelocity: 0,
+    landed: false, crashed: false,
+    activeParts: new Set([probeId, tankId]),
+    fuelStore: new Map(),
+    firingEngines: new Set(),
+    deployedParts: new Set(),
+    heatMap: new Map(),
+    debris: [],
+  };
+
+  const fs = makeFlightState();
+
+  return { assembly, ps, fs, probeId, tankId };
+}
+
+describe('testAABBCircleOverlap()', () => {
+  it('returns true when circle overlaps AABB', () => {
+    const aabb = { minX: 0, maxX: 4, minY: 0, maxY: 4 };
+    // Circle centred at (5, 2) with radius 2 — edge touches at x=4
+    expect(testAABBCircleOverlap(aabb, 5, 2, 2)).toBe(true);
+  });
+
+  it('returns true when circle centre is inside AABB', () => {
+    const aabb = { minX: 0, maxX: 4, minY: 0, maxY: 4 };
+    expect(testAABBCircleOverlap(aabb, 2, 2, 1)).toBe(true);
+  });
+
+  it('returns false when circle is far from AABB', () => {
+    const aabb = { minX: 0, maxX: 4, minY: 0, maxY: 4 };
+    expect(testAABBCircleOverlap(aabb, 20, 20, 1)).toBe(false);
+  });
+
+  it('returns true for edge-touching circle', () => {
+    const aabb = { minX: 0, maxX: 2, minY: 0, maxY: 2 };
+    // Circle at (3, 1) with radius 1 — just touches edge at x=2
+    expect(testAABBCircleOverlap(aabb, 3, 1, 1)).toBe(true);
+  });
+
+  it('handles corner proximity correctly', () => {
+    const aabb = { minX: 0, maxX: 2, minY: 0, maxY: 2 };
+    // Circle at corner (3, 3), distance = sqrt(2) ≈ 1.414
+    // Radius 1: too small to reach.
+    expect(testAABBCircleOverlap(aabb, 3, 3, 1)).toBe(false);
+    // Radius 2: reaches the corner.
+    expect(testAABBCircleOverlap(aabb, 3, 3, 2)).toBe(true);
+  });
+});
+
+describe('computeRelativeSpeed()', () => {
+  it('returns 0 for matching velocities', () => {
+    expect(computeRelativeSpeed(100, 200, 100, 200)).toBeCloseTo(0, 10);
+  });
+
+  it('computes correct magnitude for opposing velocities', () => {
+    // Craft moving right at 10, object moving left at 10 → relative = 20.
+    expect(computeRelativeSpeed(10, 0, -10, 0)).toBeCloseTo(20, 5);
+  });
+
+  it('computes correct diagonal relative speed', () => {
+    // Craft at (3, 4), object at (0, 0) → |v| = 5.
+    expect(computeRelativeSpeed(3, 4, 0, 0)).toBeCloseTo(5, 5);
+  });
+});
+
+describe('classifyAsteroidDamage()', () => {
+  it('returns NONE for speed below 1 m/s', () => {
+    expect(classifyAsteroidDamage(0)).toBe(AsteroidDamageLevel.NONE);
+    expect(classifyAsteroidDamage(0.5)).toBe(AsteroidDamageLevel.NONE);
+    expect(classifyAsteroidDamage(0.99)).toBe(AsteroidDamageLevel.NONE);
+  });
+
+  it('returns MINOR for speed between 1 and 5 m/s', () => {
+    expect(classifyAsteroidDamage(1)).toBe(AsteroidDamageLevel.MINOR);
+    expect(classifyAsteroidDamage(3)).toBe(AsteroidDamageLevel.MINOR);
+    expect(classifyAsteroidDamage(4.99)).toBe(AsteroidDamageLevel.MINOR);
+  });
+
+  it('returns SIGNIFICANT for speed between 5 and 20 m/s', () => {
+    expect(classifyAsteroidDamage(5)).toBe(AsteroidDamageLevel.SIGNIFICANT);
+    expect(classifyAsteroidDamage(10)).toBe(AsteroidDamageLevel.SIGNIFICANT);
+    expect(classifyAsteroidDamage(19.99)).toBe(AsteroidDamageLevel.SIGNIFICANT);
+  });
+
+  it('returns CATASTROPHIC for speed 20 m/s or above', () => {
+    expect(classifyAsteroidDamage(20)).toBe(AsteroidDamageLevel.CATASTROPHIC);
+    expect(classifyAsteroidDamage(50)).toBe(AsteroidDamageLevel.CATASTROPHIC);
+    expect(classifyAsteroidDamage(1000)).toBe(AsteroidDamageLevel.CATASTROPHIC);
+  });
+
+  it('@smoke covers all four damage threshold boundaries', () => {
+    // Exactly at boundaries:
+    expect(classifyAsteroidDamage(0.99)).toBe(AsteroidDamageLevel.NONE);
+    expect(classifyAsteroidDamage(1.0)).toBe(AsteroidDamageLevel.MINOR);
+    expect(classifyAsteroidDamage(4.99)).toBe(AsteroidDamageLevel.MINOR);
+    expect(classifyAsteroidDamage(5.0)).toBe(AsteroidDamageLevel.SIGNIFICANT);
+    expect(classifyAsteroidDamage(19.99)).toBe(AsteroidDamageLevel.SIGNIFICANT);
+    expect(classifyAsteroidDamage(20.0)).toBe(AsteroidDamageLevel.CATASTROPHIC);
+  });
+});
+
+describe('applyAsteroidDamage()', () => {
+  it('NONE damage does not destroy any parts', () => {
+    const { ps, assembly, fs } = makeAsteroidTestCraft();
+    const partsBefore = ps.activeParts.size;
+
+    applyAsteroidDamage(ps, assembly, fs, AsteroidDamageLevel.NONE, 0.5);
+
+    expect(ps.activeParts.size).toBe(partsBefore);
+    expect(ps.crashed).toBe(false);
+    expect(fs.events.length).toBe(0);
+  });
+
+  it('MINOR damage destroys some but not all parts', () => {
+    const { ps, assembly, fs } = makeAsteroidTestCraft();
+    const partsBefore = ps.activeParts.size;
+
+    applyAsteroidDamage(ps, assembly, fs, AsteroidDamageLevel.MINOR, 3);
+
+    // Should destroy at least 1 part but not all.
+    expect(ps.activeParts.size).toBeLessThan(partsBefore);
+    expect(ps.activeParts.size).toBeGreaterThan(0);
+    expect(ps.crashed).toBe(false);
+    // Should have PART_DESTROYED and ASTEROID_IMPACT events.
+    expect(fs.events.some(e => e.type === 'PART_DESTROYED')).toBe(true);
+    expect(fs.events.some(e => e.type === 'ASTEROID_IMPACT')).toBe(true);
+  });
+
+  it('SIGNIFICANT damage destroys more parts than MINOR', () => {
+    // Test with a craft with many parts.
+    const assembly1 = createRocketAssembly();
+    const ids1 = [];
+    for (let i = 0; i < 10; i++) {
+      ids1.push(addPartToAssembly(assembly1, 'probe-core-mk1', i * 30, 0));
+    }
+    const ps1 = {
+      posX: 0, posY: 0, velX: 0, velY: 0, angle: 0,
+      angularVelocity: 0, landed: false, crashed: false,
+      activeParts: new Set(ids1),
+      fuelStore: new Map(), firingEngines: new Set(),
+      deployedParts: new Set(), heatMap: new Map(), debris: [],
+    };
+    const fs1 = makeFlightState();
+
+    const assembly2 = createRocketAssembly();
+    const ids2 = [];
+    for (let i = 0; i < 10; i++) {
+      ids2.push(addPartToAssembly(assembly2, 'probe-core-mk1', i * 30, 0));
+    }
+    const ps2 = {
+      posX: 0, posY: 0, velX: 0, velY: 0, angle: 0,
+      angularVelocity: 0, landed: false, crashed: false,
+      activeParts: new Set(ids2),
+      fuelStore: new Map(), firingEngines: new Set(),
+      deployedParts: new Set(), heatMap: new Map(), debris: [],
+    };
+    const fs2 = makeFlightState();
+
+    applyAsteroidDamage(ps1, assembly1, fs1, AsteroidDamageLevel.MINOR, 3);
+    applyAsteroidDamage(ps2, assembly2, fs2, AsteroidDamageLevel.SIGNIFICANT, 12);
+
+    // SIGNIFICANT should destroy more parts than MINOR.
+    const minorDestroyed = 10 - ps1.activeParts.size;
+    const sigDestroyed = 10 - ps2.activeParts.size;
+    expect(sigDestroyed).toBeGreaterThan(minorDestroyed);
+  });
+
+  it('CATASTROPHIC damage destroys all parts and crashes craft', () => {
+    const { ps, assembly, fs } = makeAsteroidTestCraft();
+
+    applyAsteroidDamage(ps, assembly, fs, AsteroidDamageLevel.CATASTROPHIC, 25);
+
+    expect(ps.activeParts.size).toBe(0);
+    expect(ps.crashed).toBe(true);
+    expect(fs.events.some(e => e.type === 'ASTEROID_IMPACT' && e.severity === 'CATASTROPHIC')).toBe(true);
+  });
+
+  it('logs flight events with correct asteroid name and speed', () => {
+    const { ps, assembly, fs } = makeAsteroidTestCraft();
+
+    applyAsteroidDamage(ps, assembly, fs, AsteroidDamageLevel.MINOR, 2.5, 'AST-1234');
+
+    const impactEvent = fs.events.find(e => e.type === 'ASTEROID_IMPACT');
+    expect(impactEvent).toBeDefined();
+    expect(impactEvent.asteroidName).toBe('AST-1234');
+    expect(impactEvent.relSpeed).toBeCloseTo(2.5);
+    expect(impactEvent.severity).toBe('MINOR');
+  });
+
+  it('crashes craft if partial damage removes all remaining parts', () => {
+    // Single-part craft: even MINOR destroys the only part.
+    const assembly = createRocketAssembly();
+    const probeId = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
+
+    const ps = {
+      posX: 0, posY: 0, velX: 0, velY: 0, angle: 0,
+      angularVelocity: 0, landed: false, crashed: false,
+      activeParts: new Set([probeId]),
+      fuelStore: new Map(), firingEngines: new Set(),
+      deployedParts: new Set(), heatMap: new Map(), debris: [],
+    };
+    const fs = makeFlightState();
+
+    applyAsteroidDamage(ps, assembly, fs, AsteroidDamageLevel.MINOR, 3);
+
+    expect(ps.activeParts.size).toBe(0);
+    expect(ps.crashed).toBe(true);
+  });
+});
+
+describe('checkAsteroidCollisions()', () => {
+  it('returns empty when no asteroids overlap the craft', () => {
+    const { ps, assembly, fs } = makeAsteroidTestCraft({ posX: 0, posY: 0 });
+
+    const asteroid = makeAsteroid({ posX: 10000, posY: 10000, radius: 5 });
+    const results = checkAsteroidCollisions(ps, assembly, [asteroid], fs);
+
+    expect(results).toHaveLength(0);
+  });
+
+  it('returns empty when craft is landed', () => {
+    const { ps, assembly, fs } = makeAsteroidTestCraft();
+    ps.landed = true;
+
+    const asteroid = makeAsteroid({ posX: 0, posY: 0, radius: 100 });
+    const results = checkAsteroidCollisions(ps, assembly, [asteroid], fs);
+
+    expect(results).toHaveLength(0);
+  });
+
+  it('returns empty when craft is crashed', () => {
+    const { ps, assembly, fs } = makeAsteroidTestCraft();
+    ps.crashed = true;
+
+    const asteroid = makeAsteroid({ posX: 0, posY: 0, radius: 100 });
+    const results = checkAsteroidCollisions(ps, assembly, [asteroid], fs);
+
+    expect(results).toHaveLength(0);
+  });
+
+  it('detects collision with overlapping asteroid and applies damage', () => {
+    // Craft at origin, asteroid right on top with large radius.
+    const { ps, assembly, fs } = makeAsteroidTestCraft({
+      posX: 0, posY: 0,
+      velX: 0, velY: 0,
+    });
+
+    // Asteroid co-located but with different velocity for MINOR damage.
+    const asteroid = makeAsteroid({
+      posX: 0, posY: 0,
+      velX: 3, velY: 0,  // 3 m/s relative → MINOR
+      radius: 100,
+    });
+
+    const results = checkAsteroidCollisions(ps, assembly, [asteroid], fs);
+
+    expect(results).toHaveLength(1);
+    expect(results[0].damage).toBe(AsteroidDamageLevel.MINOR);
+    expect(results[0].relativeSpeed).toBeCloseTo(3, 1);
+  });
+
+  it('stops checking after craft is destroyed by catastrophic impact', () => {
+    const { ps, assembly, fs } = makeAsteroidTestCraft({
+      posX: 0, posY: 0,
+      velX: 30, velY: 0,
+    });
+
+    const ast1 = makeAsteroid({ posX: 0, posY: 0, velX: 0, velY: 0, radius: 100, name: 'A' });
+    const ast2 = makeAsteroid({ posX: 0, posY: 0, velX: 0, velY: 0, radius: 100, name: 'B' });
+
+    const results = checkAsteroidCollisions(ps, assembly, [ast1, ast2], fs);
+
+    // First asteroid destroys the craft (30 m/s → CATASTROPHIC).
+    // Second should not be processed.
+    expect(results).toHaveLength(1);
+    expect(ps.crashed).toBe(true);
+  });
+
+  it('@smoke detects NONE damage for co-orbital (low relative speed) asteroid', () => {
+    const { ps, assembly, fs } = makeAsteroidTestCraft({
+      posX: 0, posY: 0,
+      velX: 1000, velY: 0,
+    });
+
+    // Asteroid moving at nearly the same velocity — relative speed < 1.
+    const asteroid = makeAsteroid({
+      posX: 0, posY: 0,
+      velX: 1000.5, velY: 0,
+      radius: 100,
+    });
+
+    const partsBefore = ps.activeParts.size;
+    const results = checkAsteroidCollisions(ps, assembly, [asteroid], fs);
+
+    expect(results).toHaveLength(1);
+    expect(results[0].damage).toBe(AsteroidDamageLevel.NONE);
+    expect(ps.activeParts.size).toBe(partsBefore);
+    expect(ps.crashed).toBe(false);
+  });
+});

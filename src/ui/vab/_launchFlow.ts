@@ -225,7 +225,7 @@ function doLaunch(crewIds: string[]): void {
     id:          'launch-' + Date.now(),
     name:        'VAB Launch ' + new Date().toLocaleDateString(),
     parts:       [...S.assembly.parts.values()].map(p => ({ partId: p.partId, position: { x: p.x, y: p.y }, ...(p.instruments?.length ? { instruments: [...p.instruments] } : {}) })),
-    staging:     { stages: S.stagingConfig!.stages.map(s => [...s.instanceIds]) as unknown as number[][], unstaged: [...S.stagingConfig!.unstaged] as unknown as number[] },
+    staging:     { stages: S.stagingConfig!.stages.map(s => [...s.instanceIds]), unstaged: [...S.stagingConfig!.unstaged] },
     totalMass:   S.lastValidation?.totalMassKg ?? 0,
     totalThrust: S.lastValidation?.stage1Thrust ?? 0,
   });

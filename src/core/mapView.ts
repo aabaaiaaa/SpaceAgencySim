@@ -494,7 +494,7 @@ export function getMapCelestialBodies(
   const bodies: MapCelestialBody[] = [];
 
   // Add child bodies of current reference body.
-  const children = (BODY_CHILDREN as unknown as Record<string, string[]>)[bodyId] || [];
+  const children = BODY_CHILDREN[bodyId] || [];
   for (const childId of children) {
     const orbitR = (BODY_ORBIT_RADIUS as Record<string, number>)[childId] || 0;
     bodies.push({

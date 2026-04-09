@@ -16,6 +16,7 @@ import {
 } from './constants.ts';
 
 import type { DifficultySettings, MalfunctionMode as MalfunctionModeType } from './constants.ts';
+import type { GameState } from './gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -124,7 +125,7 @@ export function saveSettings(settings: PersistedSettings): void {
  *                   result of loading a save slot).  Missing fields are filled
  *                   from defaults.
  */
-export function migrateSettings(gameState: Record<string, unknown>): void {
+export function migrateSettings(gameState: GameState | Record<string, unknown>): void {
   // Do not overwrite an existing dedicated store.
   if (localStorage.getItem(STORAGE_KEY) !== null) return;
 

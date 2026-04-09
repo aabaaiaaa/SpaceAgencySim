@@ -51,6 +51,8 @@ import {
 import { FlightPhase } from '../core/constants.ts';
 import { SOI_RADIUS } from '../core/manoeuvre.ts';
 import { getCommsCoverageInfo } from '../core/comms.ts';
+import { getActiveAsteroids, hasAsteroids } from '../core/asteroidBelt.ts';
+import type { Asteroid } from '../core/asteroidBelt.ts';
 
 import type { ReadonlyPhysicsState, ReadonlyFlightState, ReadonlyGameState } from './types.ts';
 import type { OrbitalElements, OrbitalObject } from '../core/gameState.ts';
@@ -94,6 +96,10 @@ const BELT_DANGER_FILL = 0x884422;  // danger zone fill
 const BELT_DANGER_EDGE = 0xaa6633;  // danger zone boundary lines
 const BELT_LABEL_COLOR = 0xddaa44;  // label text
 
+// Asteroid selectable-object colours (belt encounters).
+const ASTEROID_DOT_COLOR     = 0xccaa77;  // brownish for asteroid dots
+const ASTEROID_TARGET_COLOR  = 0xffcc44;  // bright amber for selected asteroid
+
 /** Visual atmosphere height (m above surface). */
 const ATMOSPHERE_VISUAL_HEIGHT = 70_000;
 
@@ -123,6 +129,7 @@ let _surfaceGraphics: PIXI.Graphics | null   = null;
 let _commsGraphics: PIXI.Graphics | null     = null;
 
 let _beltGraphics: PIXI.Graphics | null   = null;
+let _asteroidObjGraphics: PIXI.Graphics | null = null;
 
 /** Container for reusable PIXI.Text labels. */
 let _labelContainer: PIXI.Container | null = null;
@@ -239,7 +246,7 @@ export function initMapRenderer(): void {
   _mapRoot.visible = false;
 
   // Layer order (bottom → top):
-  //   background → bands → belt → transfer → orbits → body → shadow → objects → craft → labels
+  //   background → bands → belt → transfer → orbits → body → shadow → objects → asteroidObjs → craft → labels
   _bgGraphics       = new PIXI.Graphics();
   _bandsGraphics    = new PIXI.Graphics();
   _beltGraphics     = new PIXI.Graphics();
@@ -250,6 +257,7 @@ export function initMapRenderer(): void {
   _surfaceGraphics  = new PIXI.Graphics();
   _commsGraphics    = new PIXI.Graphics();
   _objectsGraphics  = new PIXI.Graphics();
+  _asteroidObjGraphics = new PIXI.Graphics();
   _craftGraphics    = new PIXI.Graphics();
   _labelContainer   = new PIXI.Container();
 
@@ -263,6 +271,7 @@ export function initMapRenderer(): void {
   _mapRoot.addChild(_commsGraphics);
   _mapRoot.addChild(_shadowGraphics);
   _mapRoot.addChild(_objectsGraphics);
+  _mapRoot.addChild(_asteroidObjGraphics);
   _mapRoot.addChild(_craftGraphics);
   _mapRoot.addChild(_labelContainer);
 
@@ -336,19 +345,20 @@ export function destroyMapRenderer(): void {
     _mapRoot = null;
   }
 
-  _bgGraphics       = null;
-  _bandsGraphics    = null;
-  _beltGraphics     = null;
-  _orbitsGraphics   = null;
-  _bodyGraphics     = null;
-  _shadowGraphics   = null;
-  _objectsGraphics  = null;
-  _craftGraphics    = null;
-  _transferGraphics = null;
-  _surfaceGraphics  = null;
-  _labelContainer   = null;
-  _labelPool        = [];
-  _beltDots         = null;
+  _bgGraphics          = null;
+  _bandsGraphics       = null;
+  _beltGraphics        = null;
+  _orbitsGraphics      = null;
+  _bodyGraphics        = null;
+  _shadowGraphics      = null;
+  _objectsGraphics     = null;
+  _asteroidObjGraphics = null;
+  _craftGraphics       = null;
+  _transferGraphics    = null;
+  _surfaceGraphics     = null;
+  _labelContainer      = null;
+  _labelPool           = [];
+  _beltDots            = null;
 
   _customViewRadius        = null;
   _selectedTarget          = null;
@@ -394,16 +404,39 @@ export function getMapTarget(): string | null {
 }
 
 /**
+ * Get the currently selected asteroid (if the selected target is a belt asteroid).
+ * Returns the Asteroid object, or null if the target is not an asteroid.
+ */
+export function getSelectedAsteroid(): Asteroid | null {
+  if (!_selectedTarget || !hasAsteroids()) return null;
+  return getActiveAsteroids().find((a) => a.id === _selectedTarget) ?? null;
+}
+
+/**
  * Cycle the selected target through all orbital objects for the given body.
+ * When orbiting the Sun with active belt asteroids, those are included as
+ * targetable candidates after the regular orbital objects.
  * Returns the new target ID (or null if none available).
  */
 export function cycleMapTarget(orbitalObjects: OrbitalObject[], bodyId: string): string | null {
-  const candidates = (orbitalObjects || []).filter((o) => o.bodyId === bodyId);
+  const orbitalCandidates = (orbitalObjects || []).filter((o) => o.bodyId === bodyId);
+
+  // Build a unified candidate list: orbital objects first, then belt asteroids.
+  interface TargetCandidate { id: string; }
+  const candidates: TargetCandidate[] = [...orbitalCandidates];
+
+  // Include belt asteroids when viewing the Sun and asteroids are active.
+  if (bodyId === 'SUN' && hasAsteroids()) {
+    for (const ast of getActiveAsteroids()) {
+      candidates.push({ id: ast.id });
+    }
+  }
+
   if (candidates.length === 0) {
     _selectedTarget = null;
     return null;
   }
-  const idx = candidates.findIndex((o) => o.id === _selectedTarget);
+  const idx = candidates.findIndex((c) => c.id === _selectedTarget);
   const next = candidates[(idx + 1) % candidates.length];
   _selectedTarget = next.id;
   return _selectedTarget;
@@ -539,6 +572,9 @@ export function renderMapFrame(
 
   // 3. Orbital-object orbits and positions.
   _drawOrbitalObjects(state, flightState, cx, cy, scale, bodyId, options);
+
+  // 3a. Belt asteroid objects (selectable, drawn above orbital objects).
+  _drawBeltAsteroidObjects(ps, cx, cy, scale, bodyId);
 
   // 4. Craft orbit, position, and predictions.
   _drawCraft(ps, flightState, cx, cy, scale, bodyId);
@@ -851,6 +887,69 @@ function _drawOrbitalObjects(
         _objectsGraphics!.circle(sx, sy, dotSize + 6 + pulse * 3);
         _objectsGraphics!.stroke({ color: 0x00ccff, width: 1.5, alpha: 0.4 + pulse * 0.3 });
       }
+    }
+  }
+}
+
+/**
+ * Draw active belt asteroids as selectable dots on the map.
+ * Only visible when orbiting the Sun with active belt asteroids.
+ * Asteroid positions are in sun-centred coordinates (body-centred for Sun).
+ */
+function _drawBeltAsteroidObjects(
+  ps: ReadonlyPhysicsState,
+  cx: number,
+  cy: number,
+  scale: number,
+  bodyId: string,
+): void {
+  if (!_mapRoot || !_asteroidObjGraphics) return;
+  _asteroidObjGraphics.clear();
+
+  // Only draw when the central body is the Sun and asteroids are active.
+  if (bodyId !== 'SUN' || !hasAsteroids()) return;
+
+  const asteroids = getActiveAsteroids();
+  const R = BODY_RADIUS[bodyId];
+
+  // Craft position in body-centred coordinates.
+  const craftX = ps.posX;
+  const craftY = ps.posY + R;
+
+  for (const ast of asteroids) {
+    // Asteroid positions are already in sun-centred (body-centred) coordinates.
+    const sx = cx + ast.posX * scale;
+    const sy = cy - ast.posY * scale;
+
+    const isTarget = ast.id === _selectedTarget;
+    const dotColor = isTarget ? ASTEROID_TARGET_COLOR : ASTEROID_DOT_COLOR;
+    const dotSize = isTarget ? 5 : 3;
+
+    // Draw the asteroid dot.
+    _asteroidObjGraphics.circle(sx, sy, dotSize);
+    _asteroidObjGraphics.fill(dotColor);
+
+    if (isTarget) {
+      // Pulsing selection ring for selected asteroid.
+      const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 300);
+      _asteroidObjGraphics.circle(sx, sy, dotSize + 6 + pulse * 3);
+      _asteroidObjGraphics.stroke({ color: ASTEROID_TARGET_COLOR, width: 1.5, alpha: 0.4 + pulse * 0.3 });
+
+      // Compute distance from craft to asteroid.
+      const dx = ast.posX - craftX;
+      const dy = ast.posY - craftY;
+      const dist = Math.hypot(dx, dy);
+
+      // Size category label.
+      const sizeLabel = ast.radius >= 500 ? 'Large' : ast.radius >= 50 ? 'Medium' : 'Small';
+
+      // Label: name, size, distance.
+      _useLabel(
+        `${ast.name} (${sizeLabel}, ${_fmtAlt(dist)})`,
+        sx + dotSize + 6,
+        sy - 8,
+        ASTEROID_TARGET_COLOR,
+      );
     }
   }
 }

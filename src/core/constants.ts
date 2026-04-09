@@ -856,6 +856,10 @@ export interface AltitudeBand {
   readonly name: string;
   readonly min: number;
   readonly max: number;
+  /** Asteroid belt zone tag, if this band falls within the belt. */
+  readonly beltZone?: BeltZone;
+  /** Whether orbiting in this band is unsafe (e.g., high debris density). */
+  readonly unsafe?: boolean;
 }
 
 /**
@@ -868,7 +872,10 @@ export const ALTITUDE_BANDS: Readonly<Record<string, readonly AltitudeBand[]>> =
     Object.freeze({ id: 'INNER_CORONA', name: 'Inner Corona',   min: 500_000_000,     max: 2_000_000_000 }),
     Object.freeze({ id: 'OUTER_CORONA', name: 'Outer Corona',   min: 2_000_000_000,   max: 10_000_000_000 }),
     Object.freeze({ id: 'NSS',          name: 'Near Sun Space',  min: 10_000_000_000,  max: 30_000_000_000 }),
-    Object.freeze({ id: 'SOL',          name: 'Solar Orbit',     min: 30_000_000_000,  max: 300_000_000_000 }),
+    Object.freeze({ id: 'SOL',          name: 'Solar Orbit',     min: 30_000_000_000,  max: 329_000_000_000 }),
+    Object.freeze({ id: 'BELT_OUTER_A', name: 'Outer Belt A',   min: 329_000_000_000, max: 374_000_000_000, beltZone: BeltZone.OUTER_A as BeltZone }),
+    Object.freeze({ id: 'BELT_DENSE',   name: 'Dense Belt',     min: 374_000_000_000, max: 419_000_000_000, beltZone: BeltZone.DENSE as BeltZone, unsafe: true }),
+    Object.freeze({ id: 'BELT_OUTER_B', name: 'Outer Belt B',   min: 419_000_000_000, max: 479_000_000_000, beltZone: BeltZone.OUTER_B as BeltZone }),
   ]),
   MERCURY: Object.freeze([
     Object.freeze({ id: 'LMeO', name: 'Low Mercury Orbit', min: 20_000, max: 200_000 }),

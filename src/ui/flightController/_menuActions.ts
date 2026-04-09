@@ -9,7 +9,7 @@ import { saveGame, listSaves } from '../../core/saveload.ts';
 import { getPartById } from '../../data/parts.ts';
 import { createFlightState } from '../../core/gameState.ts';
 import { FlightPhase } from '../../core/constants.ts';
-import { isPlayerLocked, getPhaseLabel } from '../../core/flightPhase.ts';
+import { isPlayerLocked, getPhaseLabel, isInUnsafeBeltOrbit } from '../../core/flightPhase.ts';
 import { processFlightReturn } from '../../core/flightReturn.ts';
 import { refreshTopBar } from '../topbar.ts';
 import { getFCState, getPhysicsState, getFlightState } from './_state.ts';
@@ -259,6 +259,18 @@ export function handleMenuReturnToAgency(): void {
   if (ps && phase && isPlayerLocked(phase)) {
     showPhaseNotification('Cannot leave during ' + getPhaseLabel(phase));
     return;
+  }
+
+  // --- Block return when orbiting in the dense asteroid belt ---
+  if (ps && phase === FlightPhase.ORBIT && flightState) {
+    const bodyId: string = flightState.bodyId || 'EARTH';
+    if (isInUnsafeBeltOrbit(ps.posY, bodyId)) {
+      showPhaseNotification(
+        'Cannot return to hub \u2014 orbit is within the dense asteroid belt. Manoeuvre to a safe orbit first.',
+        'warning',
+      );
+      return;
+    }
   }
 
   // --- ORBIT: direct return with a brief warning ---

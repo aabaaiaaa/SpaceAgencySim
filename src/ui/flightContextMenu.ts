@@ -54,7 +54,7 @@ import { MalfunctionType }                                    from '../core/cons
 import './flightContextMenu.css';
 import type { PhysicsState }                                  from '../core/physics.ts';
 import type { RocketAssembly }                                from '../core/rocketbuilder.ts';
-import type { FlightState, FlightEvent, GameState }             from '../core/gameState.ts';
+import type { FlightState, FlightEvent }                        from '../core/gameState.ts';
 import { getFCState }                                          from './flightController/_state.ts';
 import { resyncWorkerState }                                   from './flightController/_workerBridge.ts';
 
@@ -259,7 +259,7 @@ function _showMenu(
       };
 
       _menu.appendChild(_makeButton(actionLabels[malf.type] ?? 'Attempt Recovery', () => {
-        const result = attemptRecovery(ps, instanceId, (ps as unknown as Record<string, unknown>)._gameState as GameState | undefined);
+        const result = attemptRecovery(ps, instanceId, ps._gameState);
         // If decoupler recovery succeeded, actually fire the separation.
         if (result.success && malf.type === MalfunctionType.DECOUPLER_STUCK) {
           const currentAssembly = _getAssembly?.();

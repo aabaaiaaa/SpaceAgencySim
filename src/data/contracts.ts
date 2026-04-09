@@ -82,7 +82,7 @@ export function getHighestAltitude(state: GameState): number {
   for (const mission of state.missions.completed) {
     // Completed missions carry objectives at runtime, but the Mission
     // interface doesn't declare them (they originate from mission templates).
-    const objectives = (mission as unknown as { objectives?: ObjectiveDef[] }).objectives;
+    const objectives = mission.objectives;
     if (!objectives) continue;
     for (const obj of objectives) {
       if (obj.type === ObjectiveType.REACH_ALTITUDE && obj.target?.altitude) {
@@ -105,7 +105,7 @@ export function getHighestAltitude(state: GameState): number {
 export function hasOrbitalCapability(state: GameState): boolean {
   return state.missions.completed.some(
     (m) => {
-      const objectives = (m as unknown as { objectives?: ObjectiveDef[] }).objectives;
+      const objectives = m.objectives;
       return objectives?.some((o) => o.type === ObjectiveType.REACH_ORBIT && o.completed);
     },
   );

@@ -18,6 +18,7 @@ import {
   getMapTarget,
   setMapTarget,
   getSelectedTransferTarget,
+  getSelectedAsteroid,
 } from '../../render/map.ts';
 import {
   MapZoom,
@@ -29,7 +30,7 @@ import {
   getAllowedMapZooms,
 } from '../../core/mapView.ts';
 import { warpToTarget } from '../../core/orbit.ts';
-import { FlightPhase } from '../../core/constants.ts';
+import { FlightPhase, BODY_RADIUS } from '../../core/constants.ts';
 import { isPlayerLocked, getPhaseLabel } from '../../core/flightPhase.ts';
 import { getFCState, getPhysicsState, getFlightState } from './_state.ts';
 import { showPhaseNotification } from './_flightPhase.ts';
@@ -279,8 +280,31 @@ export function updateMapHud(): void {
   const targetObj = targetId && s.state
     ? (s.state.orbitalObjects || []).find(o => o.id === targetId)
     : null;
-  if (targetEl)  targetEl.textContent = targetObj ? targetObj.name : 'None';
+  const targetAsteroid = !targetObj ? getSelectedAsteroid() : null;
+
+  if (targetEl) {
+    if (targetObj) {
+      targetEl.textContent = targetObj.name;
+    } else if (targetAsteroid && ps) {
+      // Show asteroid info: name, size class, and distance from craft.
+      const sizeLabel = targetAsteroid.radius >= 500 ? 'Large'
+        : targetAsteroid.radius >= 50 ? 'Medium' : 'Small';
+      const R = BODY_RADIUS[bodyId] || 0;
+      const craftX = ps.posX;
+      const craftY = ps.posY + R;
+      const dx = targetAsteroid.posX - craftX;
+      const dy = targetAsteroid.posY - craftY;
+      const dist = Math.hypot(dx, dy);
+      const distStr = dist >= 1_000_000 ? `${(dist / 1_000_000).toFixed(0)} Mm`
+        : dist >= 1_000 ? `${(dist / 1_000).toFixed(0)} km`
+        : `${dist.toFixed(0)} m`;
+      targetEl.textContent = `${targetAsteroid.name} (${sizeLabel}, ${distStr})`;
+    } else {
+      targetEl.textContent = 'None';
+    }
+  }
   if (warpBtn) {
+    // Warp button available for orbital objects; not for asteroids (they're transient).
     warpBtn.classList.toggle('hidden',
       !targetObj || !flightState.orbitalElements || flightState.phase !== FlightPhase.ORBIT);
   }

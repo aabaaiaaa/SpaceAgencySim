@@ -20,6 +20,14 @@ import {
 
 import type { GameState, InventoryPart } from '../../core/gameState.ts';
 
+// E2E test globals for VAB internals.
+declare global {
+  interface Window {
+    __vabAssembly?: RocketAssembly;
+    __vabStagingConfig?: StagingConfig;
+  }
+}
+
 import { getVabState } from './_state.ts';
 import './vab.css';
 import { buildPartsHTML, setupPanelDrag } from './_partsPanel.ts';
@@ -321,8 +329,8 @@ export function initVabUI(
   }
 
   // Expose internals for e2e testing.
-  (window as unknown as Record<string, unknown>).__vabAssembly      = S.assembly;
-  (window as unknown as Record<string, unknown>).__vabStagingConfig = S.stagingConfig;
+  window.__vabAssembly      = S.assembly;
+  window.__vabStagingConfig = S.stagingConfig;
   const stagingBody = root.querySelector('#vab-staging-body') as HTMLElement | null;
   if (stagingBody) {
     setupStagingDnD(stagingBody);

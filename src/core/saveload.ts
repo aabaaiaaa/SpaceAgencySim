@@ -644,7 +644,7 @@ export async function loadGame(slotIndex: number): Promise<GameState> {
 export function applyPersistedSettings(state: GameState): void {
   // Attempt migration first: if the dedicated key doesn't exist yet,
   // extract settings from the loaded save and write them.
-  migrateSettings(state as unknown as Record<string, unknown>);
+  migrateSettings(state);
 
   // Now load the authoritative settings (either freshly migrated or
   // previously persisted) and apply them to the in-memory game state.
