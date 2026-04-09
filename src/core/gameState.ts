@@ -372,6 +372,10 @@ export interface OrbitalObject {
   name: string;
   /** Current orbital elements. */
   elements: OrbitalElements;
+  /** Radius in metres (for asteroids). */
+  radius?: number;
+  /** Mass in kg (for asteroids). */
+  mass?: number;
 }
 
 /** State of a single built facility. */

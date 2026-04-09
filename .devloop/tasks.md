@@ -173,7 +173,7 @@ All tasks reference `.devloop/requirements.md` for full context.
 - **Verification**: `npm run typecheck` passes. `npx vitest run src/tests/grabbing` passes — tests verify asteroid targeting, capture action, and mass limit enforcement.
 
 ### TASK-026: Implement captured asteroid physics (mass + CoM shift)
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-025
 - **Description**: When an asteroid is captured, add its mass to the craft's total mass in the physics calculations (`src/core/physics.ts`). Compute the combined centre of mass based on craft mass, asteroid mass, and grapple attachment point. If thrust does not pass through the combined CoM, apply rotational torque (craft spins). See requirements §5.5, §5.7.
 - **Verification**: `npm run typecheck` passes. `npx vitest run src/tests/physics src/tests/grabbing` passes — tests verify mass increase, CoM shift, and rotational effect.
@@ -185,7 +185,7 @@ All tasks reference `.devloop/requirements.md` for full context.
 - **Verification**: `npm run typecheck` passes. `npx vitest run src/tests/grabbing` passes — tests verify alignment eliminates torque, manual rotation breaks alignment, re-align restores it.
 
 ### TASK-028: Implement captured asteroid persistence
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-025
 - **Description**: When the player releases a captured asteroid while orbiting outside all belt zones, convert it to a persistent `OrbitalObject` in `gameState.orbitalObjects` with `type: 'asteroid'`, `bodyId: 'SUN'`, computed orbital elements from the craft's current orbit, and preserved radius/mass. If released inside a belt zone, the asteroid simply detaches and returns to the procedural field. See requirements §5.8.
 - **Verification**: `npm run typecheck` passes. `npx vitest run src/tests/asteroidBelt src/tests/grabbing` passes — tests verify persistence outside belt, non-persistence inside belt, correct orbital elements.
@@ -209,7 +209,7 @@ All tasks reference `.devloop/requirements.md` for full context.
 - **Verification**: `npx playwright test e2e/asteroid-belt.spec.js` passes.
 
 ### TASK-032: E2E — Asteroid selection, collision, and transfer safety
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-020, TASK-021
 - **Description**: Add E2E tests to `e2e/asteroid-belt.spec.js` covering: all asteroids targetable via T-key cycling with name/size/distance, collision damage at speed, and transfer trajectory through belt with no asteroids spawning. See requirements §6.2.
 - **Verification**: `npx playwright test e2e/asteroid-belt.spec.js` passes.

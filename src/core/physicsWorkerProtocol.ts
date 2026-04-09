@@ -120,6 +120,10 @@ export interface PhysicsSnapshot {
   hasLaunchClamps: boolean;
   powerState: PowerState | null;
   malfunctions: Record<string, { type: MalfunctionType; recovered: boolean }> | null;
+  /** Mass of captured asteroid (kg), 0 when none captured. */
+  capturedAsteroidMass: number;
+  /** True when thrust is aligned through the combined CoM after asteroid capture. */
+  thrustAligned: boolean;
 }
 
 /**

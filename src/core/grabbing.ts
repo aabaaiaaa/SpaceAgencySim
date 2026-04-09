@@ -27,7 +27,8 @@ import {
   GRAB_MAX_RELATIVE_SPEED, GRAB_MAX_LATERAL_OFFSET, GRAB_REPAIR_HEALTH,
   GRAB_RELEASE_SPEED, BODY_RADIUS,
 } from './constants.ts';
-import { getOrbitalStateAtTime, angularDistance, getAltitudeBand, circularOrbitVelocity } from './orbit.ts';
+import { getOrbitalStateAtTime, angularDistance, getAltitudeBand, circularOrbitVelocity, computeOrbitalElements } from './orbit.ts';
+import { getBeltZoneAtAltitude } from './asteroidBelt.ts';
 import { getPartById } from '../data/parts.ts';
 import type { PartDef } from '../data/parts.ts';
 import type { PhysicsState, RocketAssembly } from './physics.ts';
@@ -293,6 +294,73 @@ export function releaseGrabbedAsteroid(
   grabState.grabbedAsteroid = null;
   grabState.state = GrabState.RELEASING;
   return { success: true, asteroid };
+}
+
+// ---------------------------------------------------------------------------
+// Asteroid persistence on release
+// ---------------------------------------------------------------------------
+
+/**
+ * After releasing a captured asteroid, decide whether to persist it as an
+ * OrbitalObject (when outside all belt zones) or simply let it return to the
+ * procedural field (when inside a belt zone).
+ *
+ * Call this *after* `releaseGrabbedAsteroid()` returns the asteroid.
+ *
+ * @param asteroid  The asteroid returned by `releaseGrabbedAsteroid()`.
+ * @param ps        Current physics state (provides craft position & velocity).
+ * @param flightState  Current flight state (provides altitude and time).
+ * @param state     Game state — `orbitalObjects` is mutated if the asteroid is
+ *                  persisted.
+ * @returns `persisted: true` with the new OrbitalObject when outside belt
+ *          zones; `persisted: false` otherwise.
+ */
+export function persistReleasedAsteroid(
+  asteroid: Asteroid,
+  ps: PhysicsState,
+  flightState: FlightState,
+  state: GameState,
+): { persisted: boolean; orbitalObject?: OrbitalObject } {
+  // Use the flight-state altitude to decide belt zone membership.
+  const altitude = flightState.altitude;
+  const beltZone = getBeltZoneAtAltitude(altitude);
+
+  if (beltZone !== null) {
+    // Inside a belt zone — asteroid simply detaches back to the procedural
+    // field; no persistent object is created.
+    return { persisted: false };
+  }
+
+  // Outside all belt zones — compute Keplerian orbital elements from the
+  // craft's current state and persist the asteroid as an OrbitalObject.
+  const bodyId = 'SUN';
+  const elements = computeOrbitalElements(
+    ps.posX,
+    ps.posY,
+    ps.velX,
+    ps.velY,
+    bodyId,
+    flightState.timeElapsed,
+  );
+
+  if (!elements) {
+    // Unable to compute a bound orbit (e.g. hyperbolic trajectory) — treat
+    // the same as a belt-zone release: no persistence.
+    return { persisted: false };
+  }
+
+  const orbitalObject: OrbitalObject = {
+    id: `AST-P-${asteroid.id}-${Date.now()}`,
+    bodyId,
+    type: 'asteroid',
+    name: asteroid.name,
+    elements,
+    radius: asteroid.radius,
+    mass: asteroid.mass,
+  };
+
+  state.orbitalObjects.push(orbitalObject);
+  return { persisted: true, orbitalObject };
 }
 
 // ---------------------------------------------------------------------------

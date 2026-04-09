@@ -321,6 +321,8 @@ interface MalfunctionEntry {
 interface MassQueryable {
   activeParts: Set<string>;
   fuelStore: Map<string, number>;
+  /** Mass of captured asteroid (kg), 0 when none captured. Optional for DebrisState. */
+  capturedAsteroidMass?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -412,6 +414,10 @@ export interface PhysicsState {
   dockingPortStates: Map<string, string>;
   /** Combined mass when docked (0 = not docked). */
   _dockedCombinedMass: number;
+  /** Mass of captured asteroid (kg), 0 when none captured. */
+  capturedAsteroidMass: number;
+  /** True when thrust is aligned through the combined CoM after asteroid capture. */
+  thrustAligned: boolean;
   /** Weather-based ISP modifier (0.95–1.05). */
   weatherIspModifier: number;
   /** Weather wind speed in m/s (0 = calm). */
@@ -681,6 +687,8 @@ export function createPhysicsState(assembly: RocketAssembly, flightState: Flight
     rcsActiveDirections: new Set(),
     dockingPortStates: new Map(),
     _dockedCombinedMass: 0,
+    capturedAsteroidMass: 0,
+    thrustAligned: false,
     weatherIspModifier: 1.0,
     weatherWindSpeed: 0,
     weatherWindAngle: 0,
@@ -1002,6 +1010,9 @@ function _updateThrottleFromTWR(ps: PhysicsState, assembly: RocketAssembly, body
     }
   }
 
+  // Include captured asteroid mass in TWR calculation.
+  totalMass += ps.capturedAsteroidMass ?? 0;
+
   if (maxLiquidThrustN <= 0) return; // can't throttle SRBs
   if (totalMass <= 0) return;
 
@@ -1064,6 +1075,13 @@ function _integrate(ps: PhysicsState, assembly: RocketAssembly, flightState: Fli
         ps.velX += (thrustResult.thrustX / totalMassT) * FIXED_DT;
         ps.velY += (thrustResult.thrustY / totalMassT) * FIXED_DT;
       }
+      // Asteroid torque in deep space — spin from off-CoM thrust.
+      const transferThrustMag = Math.hypot(thrustResult.thrustX, thrustResult.thrustY);
+      const transferAstTorque = _computeAsteroidTorque(ps, assembly, transferThrustMag);
+      if (transferAstTorque !== 0) {
+        ps.angularVelocity += transferAstTorque * FIXED_DT;
+        ps.angle += ps.angularVelocity * FIXED_DT;
+      }
       tickFuelSystem(ps, assembly, FIXED_DT, 0);
     }
     ps.posX += ps.velX * FIXED_DT;
@@ -1082,6 +1100,13 @@ function _integrate(ps: PhysicsState, assembly: RocketAssembly, flightState: Fli
       const tr = _computeThrust(ps, assembly, 0);
       txc = tr.thrustX;
       tyc = tr.thrustY;
+      // Asteroid torque during capture approach — spin from off-CoM thrust.
+      const captureThrustMag = Math.hypot(txc, tyc);
+      const captureAstTorque = _computeAsteroidTorque(ps, assembly, captureThrustMag);
+      if (captureAstTorque !== 0) {
+        ps.angularVelocity += captureAstTorque * FIXED_DT;
+        ps.angle += ps.angularVelocity * FIXED_DT;
+      }
       tickFuelSystem(ps, assembly, FIXED_DT, 0);
     }
     // Radial gravity toward destination body centre.
@@ -1207,7 +1232,7 @@ function _integrate(ps: PhysicsState, assembly: RocketAssembly, flightState: Fli
   }
 
   // --- 7. Continuous steering ----------------------------------------------
-  _applySteering(ps, assembly, altitude, FIXED_DT, bodyId, flightState);
+  _applySteering(ps, assembly, altitude, FIXED_DT, bodyId, flightState, Math.hypot(thrustX, thrustY));
 
   // --- 7b. Topple-crash check (grounded tipping) -------------------------
   if (ps.grounded) {
@@ -1389,6 +1414,9 @@ function _computeTotalMass(ps: MassQueryable, assembly: RocketAssembly): number 
       mass += fuelRemaining;
     }
   }
+
+  // Add captured asteroid mass (if any).
+  mass += ps.capturedAsteroidMass ?? 0;
 
   return Math.max(1, mass);
 }
@@ -1794,6 +1822,55 @@ function _applyDockingMovement(ps: PhysicsState, assembly: RocketAssembly, total
 }
 
 // ---------------------------------------------------------------------------
+// Captured asteroid torque (private)
+// ---------------------------------------------------------------------------
+
+/**
+ * Torque scaling constant for off-CoM thrust with a captured asteroid.
+ *
+ * When the asteroid's mass shifts the combined CoM away from the thrust axis,
+ * engines produce a torque proportional to the mass asymmetry.  This constant
+ * controls how quickly the craft spins (rad/s² per newton of thrust) and is
+ * tuned for gameplay rather than strict realism.
+ */
+const ASTEROID_TORQUE_FACTOR = 0.00002;
+
+/**
+ * Compute the angular acceleration caused by an unaligned captured asteroid.
+ *
+ * When a heavy asteroid is attached to the craft and thrust doesn't pass
+ * through the combined centre of mass, the craft experiences a rotational
+ * torque.  The torque is proportional to the thrust magnitude and the mass
+ * ratio of asteroid to total craft.
+ *
+ * Returns 0 when no asteroid is captured, thrust is aligned, or engines are
+ * not firing.
+ */
+function _computeAsteroidTorque(
+  ps: PhysicsState,
+  assembly: RocketAssembly,
+  thrustMagnitude: number,
+): number {
+  if (ps.capturedAsteroidMass <= 0) return 0;
+  if (ps.thrustAligned) return 0;
+  if (thrustMagnitude <= 0) return 0;
+
+  const totalMass = _computeTotalMass(ps, assembly);
+  if (totalMass <= 0) return 0;
+
+  // Mass ratio: how much the asteroid shifts the CoM relative to the total.
+  // When the asteroid is much heavier than the craft, the ratio approaches 1
+  // and the torque is large.  When it's light, the torque is negligible.
+  const massRatio = ps.capturedAsteroidMass / totalMass;
+
+  // Torque direction: always clockwise (+) as a simplification — the asteroid
+  // hangs off one side.  A full model would use the actual grapple attachment
+  // point, but for gameplay the consistent spin direction works well and the
+  // player can counter-steer or use the "Align Thrust" action.
+  return thrustMagnitude * massRatio * ASTEROID_TORQUE_FACTOR;
+}
+
+// ---------------------------------------------------------------------------
 // Steering (private)
 // ---------------------------------------------------------------------------
 
@@ -1804,6 +1881,7 @@ function _applySteering(
   dt: number,
   bodyId: string | undefined,
   flightState: FlightState,
+  thrustMagnitude: number = 0,
 ): void {
   // In RCS mode, rotation is disabled.
   if (ps.controlMode === ControlMode.RCS) return;
@@ -1847,7 +1925,11 @@ function _applySteering(
   let restoringAlpha: number = restoringTorque / I;
   restoringAlpha = Math.max(-MAX_CHUTE_ANGULAR_ACCEL, Math.min(MAX_CHUTE_ANGULAR_ACCEL, restoringAlpha));
 
-  const alpha: number = playerAlpha + restoringAlpha;
+  // Captured asteroid torque — when engines fire with an unaligned asteroid,
+  // the off-CoM thrust produces a rotational torque that spins the craft.
+  const asteroidAlpha: number = _computeAsteroidTorque(ps, assembly, thrustMagnitude);
+
+  const alpha: number = playerAlpha + restoringAlpha + asteroidAlpha;
   ps.angularVelocity += alpha * dt;
 
   // Parachute angular damping — applied as implicit exponential decay so it
@@ -2644,4 +2726,37 @@ function _estimateDeltaV(ps: PhysicsState, assembly: RocketAssembly): number {
 function _emitEvent(flightState: FlightState, event: { time: number; type: string; [key: string]: unknown }): void {
   const withDesc: FlightEvent = { description: '', ...event };
   flightState.events.push(withDesc);
+}
+
+// ---------------------------------------------------------------------------
+// Captured asteroid mass helpers (public API)
+// ---------------------------------------------------------------------------
+
+/**
+ * Set the captured asteroid mass on the physics state.
+ * Called by the grabbing system when an asteroid is captured.
+ * This adds the asteroid's mass to all physics calculations (thrust, gravity,
+ * drag, TWR) and enables rotational torque from off-CoM thrust.
+ */
+export function setCapturedAsteroidMass(ps: PhysicsState, mass: number): void {
+  ps.capturedAsteroidMass = Math.max(0, mass);
+  ps.thrustAligned = false; // new capture always starts unaligned
+}
+
+/**
+ * Clear the captured asteroid mass (release).
+ * Called by the grabbing system when the asteroid is released.
+ */
+export function clearCapturedAsteroidMass(ps: PhysicsState): void {
+  ps.capturedAsteroidMass = 0;
+  ps.thrustAligned = false;
+}
+
+/**
+ * Set whether thrust is aligned through the combined CoM.
+ * When true, captured asteroid torque is suppressed (no spin from engines).
+ * Called by the "Align Thrust" UI action (TASK-027).
+ */
+export function setThrustAligned(ps: PhysicsState, aligned: boolean): void {
+  ps.thrustAligned = aligned;
 }
