@@ -455,7 +455,7 @@ function _buildLeftPanel(): void {
   track.className = 'flight-lp-throttle-track';
   _elThrottleFill = document.createElement('div');
   _elThrottleFill.className = 'flight-lp-throttle-fill';
-  _elThrottleFill.style.height = '100%';
+  _elThrottleFill.style.setProperty('--throttle-pct', '100%');
   track.appendChild(_elThrottleFill);
   throttleRow.appendChild(track);
 
@@ -466,10 +466,10 @@ function _buildLeftPanel(): void {
   twrBarCenter.className = 'flight-lp-twr-bar-center';
   _elTwrBarFillUp = document.createElement('div');
   _elTwrBarFillUp.className = 'flight-lp-twr-bar-fill-up';
-  _elTwrBarFillUp.style.height = '0%';
+  _elTwrBarFillUp.style.setProperty('--twr-fill-up', '0%');
   _elTwrBarFillDn = document.createElement('div');
   _elTwrBarFillDn.className = 'flight-lp-twr-bar-fill-dn';
-  _elTwrBarFillDn.style.height = '0%';
+  _elTwrBarFillDn.style.setProperty('--twr-fill-dn', '0%');
   _elTwrBarValue = document.createElement('div');
   _elTwrBarValue.className = 'flight-lp-twr-bar-value';
   _elTwrBarValue.textContent = '\u2014';
@@ -495,6 +495,7 @@ function _buildLeftPanel(): void {
   twrLbl.className = 'flight-lp-lbl';
   twrLbl.textContent = 'TWR';
   _elTWR = document.createElement('div');
+  _elTWR.id = 'hud-twr';
   _elTWR.className = 'flight-lp-val';
   _elTWR.textContent = '\u2014';
   twrRow.appendChild(twrLbl);
@@ -1072,7 +1073,7 @@ function _updateLeftPanel(): void {
     let text = `${vy >= 0 ? '+' : ''}${vy.toFixed(1)} m/s`;
     if (totalSpeed !== null) text += ` (${Math.round(totalSpeed)})`;
     _elVelY.textContent = text;
-    _elVelY.style.color = color;
+    _elVelY.style.setProperty('--vel-y-color', color);
   }
   if (_elVelX) {
     const vx = _ps!.velX ?? 0;
@@ -1104,20 +1105,20 @@ function _updateLeftPanel(): void {
         : isConnected
           ? _getCommsLinkLabel(comms.linkType)
           : 'No Signal';
-      _elCommsStatus.style.color = isConnected ? '#a0ffc0' : '#ff6060';
+      _elCommsStatus.style.setProperty('--comms-color', isConnected ? '#a0ffc0' : '#ff6060');
     }
   }
 
   // ── Throttle ──────────────────────────────────────────────────────────────
   const pct = Math.round((_ps!.throttle ?? 0) * 100);
-  if (_elThrottleFill) _elThrottleFill.style.height = `${pct}%`;
+  if (_elThrottleFill) _elThrottleFill.style.setProperty('--throttle-pct', `${pct}%`);
   if (_elThrottlePct)  _elThrottlePct.textContent   = `${pct}%`;
 
   // ── TWR ───────────────────────────────────────────────────────────────────
   const twr = _computeTWR();
   if (_elTWR) {
     _elTWR.textContent = twr > 0 ? twr.toFixed(2) : '\u2014';
-    _elTWR.style.color = twr >= 1 ? '#a0ffc0' : twr > 0 ? '#ffc080' : '#a0d8b0';
+    _elTWR.style.setProperty('--twr-color', twr >= 1 ? '#a0ffc0' : twr > 0 ? '#ffc080' : '#a0d8b0');
   }
 
   // ── TWR bar ──────────────────────────────────────────────────────────────
@@ -1125,16 +1126,16 @@ function _updateLeftPanel(): void {
     if (twr > 1) {
       // TWR 1-3 maps to 0-50% fill height above center
       const fillPct = Math.min(50, ((twr - 1) / 2) * 50);
-      _elTwrBarFillUp.style.height = `${fillPct}%`;
-      _elTwrBarFillDn.style.height = '0%';
+      _elTwrBarFillUp.style.setProperty('--twr-fill-up', `${fillPct}%`);
+      _elTwrBarFillDn.style.setProperty('--twr-fill-dn', '0%');
     } else if (twr > 0) {
       // TWR 0-1 maps to 0-50% fill below center
       const fillPct = Math.min(50, ((1 - twr) / 1) * 50);
-      _elTwrBarFillUp.style.height = '0%';
-      _elTwrBarFillDn.style.height = `${fillPct}%`;
+      _elTwrBarFillUp.style.setProperty('--twr-fill-up', '0%');
+      _elTwrBarFillDn.style.setProperty('--twr-fill-dn', `${fillPct}%`);
     } else {
-      _elTwrBarFillUp.style.height = '0%';
-      _elTwrBarFillDn.style.height = '0%';
+      _elTwrBarFillUp.style.setProperty('--twr-fill-up', '0%');
+      _elTwrBarFillDn.style.setProperty('--twr-fill-dn', '0%');
     }
     _elTwrBarValue.textContent = twr > 0 ? twr.toFixed(1) : '\u2014';
   }

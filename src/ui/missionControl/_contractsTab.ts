@@ -64,8 +64,7 @@ export function renderContractsBoardTab(): void {
 
   // MCC Tier info bar
   const tierBar = document.createElement('div');
-  tierBar.className = 'mc-caps-info';
-  tierBar.style.marginBottom = '4px';
+  tierBar.className = 'mc-caps-info mc-caps-info--tight';
   tierBar.innerHTML = `Mission Control: <strong>Tier ${mccTier}</strong> (${tierInfo?.label ?? 'Unknown'})`;
   if (mccTier < 3 && MCC_TIER_FEATURES[mccTier + 1]) {
     const nextInfo = MCC_TIER_FEATURES[mccTier + 1];
@@ -93,8 +92,8 @@ export function renderContractsBoardTab(): void {
   repTrack.className = 'mc-rep-track';
   const repFill = document.createElement('div');
   repFill.className = 'mc-rep-fill';
-  repFill.style.width = `${Math.max(0, Math.min(100, rep))}%`;
-  repFill.style.backgroundColor = repTier.color;
+  repFill.style.setProperty('--rep-width', `${Math.max(0, Math.min(100, rep))}%`);
+  repFill.style.setProperty('--rep-bg', repTier.color);
   repTrack.appendChild(repFill);
   repBar.appendChild(repTrack);
   content.appendChild(repBar);

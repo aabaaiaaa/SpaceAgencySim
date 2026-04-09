@@ -74,6 +74,7 @@
   bottom: 0;
   left: 0;
   right: 0;
+  height: var(--throttle-pct, 0%);
   background: linear-gradient(to top, #20c040, #60ff80);
   transition: height 0.06s linear;
 }
@@ -108,6 +109,11 @@
   font-size: 11px;
   color: #a0d8b0;
 }
+
+/* Dynamic-color overrides for elements updated per-frame via custom properties */
+#hud-vely  { color: var(--vel-y-color, #a0d8b0); }
+#hud-twr   { color: var(--twr-color, #a0d8b0); }
+#hud-comms { color: var(--comms-color, #a0d8b0); }
 
 .flight-lp-val-sm {
   font-size: 9px;
@@ -458,6 +464,7 @@
   bottom: 50%;
   left: 0;
   right: 0;
+  height: var(--twr-fill-up, 0%);
   background: linear-gradient(to top, #20c040, #60ff80);
   transition: height 0.06s linear;
 }
@@ -467,6 +474,7 @@
   top: 50%;
   left: 0;
   right: 0;
+  height: var(--twr-fill-dn, 0%);
   background: linear-gradient(to bottom, #c08020, #ff9040);
   transition: height 0.06s linear;
 }

@@ -29,7 +29,7 @@ All tasks reference `.devloop/requirements.md` for full context.
 - **Verification**: `npm run typecheck` passes.
 
 ### TASK-004b: Migrate missions.ts to unified MissionInstance type
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-004a
 - **Description**: Update `src/core/missions.ts` to use the new `MissionInstance` type, removing all 11 `as unknown as` casts. Ensure `_copyMission()`, mission acceptance, completion, and objective tracking all work with the unified type. See requirements §1.4.
 - **Verification**: `npm run typecheck` passes. `grep -c "as unknown as" src/core/missions.ts` returns 0 or near-0. `npx vitest run src/tests/missions` passes.
@@ -65,7 +65,7 @@ All tasks reference `.devloop/requirements.md` for full context.
 - **Verification**: `npm run typecheck` passes. `npx vitest run src/tests/map` passes (if test exists). No `!` assertions on graphics objects without a preceding guard in the same function.
 
 ### TASK-008: Create independent settings store
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Create `src/core/settingsStore.ts` with functions to read/write settings independently of save files. Store in localStorage under `spaceAgency_settings`. On game load, read from the dedicated key and apply to GameState. On settings change, write to both GameState and the dedicated key. Settings to decouple: `difficultySettings`, `autoSaveEnabled`, `debugMode`, `showPerfDashboard`, `malfunctionMode`. See requirements §2.1.
 - **Verification**: `npm run typecheck` passes. New module exports `loadSettings()`, `saveSettings()`, and `migrateSettings()` functions.
@@ -83,7 +83,7 @@ All tasks reference `.devloop/requirements.md` for full context.
 - **Verification**: `npx vitest run src/tests/settingsStore` passes with all new tests green.
 
 ### TASK-011: Implement CRC-32 utility
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Create `src/core/crc32.ts` implementing CRC-32 using lookup-table approach (polynomial 0xEDB88320). Export a `crc32(data: Uint8Array): number` pure function. No dependencies. See requirements §3.2.
 - **Verification**: `npx vitest run src/tests/crc32` passes with known test vectors (empty input, "123456789" → 0xCBF43926).
@@ -101,13 +101,13 @@ All tasks reference `.devloop/requirements.md` for full context.
 - **Verification**: `npx vitest run src/tests/saveload` passes with all new tests green.
 
 ### TASK-014: Convert flightHud and contractsTab to CSS custom properties
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/ui/flightHud.ts`, replace `style.height` and `style.color` assignments for throttle bar, TWR bar, velocity color, comms color, and TWR color with `style.setProperty('--prop-name', value)`. Add corresponding CSS rules using `var()`. In `src/ui/missionControl/_contractsTab.ts`, convert remaining direct style assignments to CSS custom properties. Leave `style.display` toggles as-is. See requirements §4.
 - **Verification**: `npm run typecheck` passes. `npm run build` succeeds. `grep -c "\.style\.height\|\.style\.color" src/ui/flightHud.ts` returns 0 (excluding display toggles).
 
 ### TASK-015: Define asteroid belt zone data
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Add asteroid belt zone definitions to `src/data/bodies.ts` as new Sun altitude bands. Three zones: Outer Belt A (2.2–2.5 AU), Dense Belt (2.5–2.8 AU, flagged unsafe), Outer Belt B (2.8–3.2 AU). Add a `beltZone` property to the altitude band type identifying each zone. Add any new constants needed in `src/core/constants.ts` (e.g., `BeltZone` enum). See requirements §5.1.
 - **Verification**: `npm run typecheck` passes. The Sun body in `bodies.ts` has 3 new altitude bands with correct AU distances and belt zone identifiers.

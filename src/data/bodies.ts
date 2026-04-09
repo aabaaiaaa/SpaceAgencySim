@@ -18,6 +18,8 @@
  * @module data/bodies
  */
 
+import { BeltZone } from '../core/constants.js';
+
 // ---------------------------------------------------------------------------
 // Type Definitions
 // ---------------------------------------------------------------------------
@@ -77,6 +79,10 @@ export interface AltitudeBand {
   min: number;
   /** Maximum altitude in metres. */
   max: number;
+  /** Asteroid belt zone tag, if this band falls within the belt. */
+  beltZone?: BeltZone;
+  /** Whether orbiting in this band is unsafe (e.g., high debris density). */
+  unsafe?: boolean;
 }
 
 export interface CelestialBodyDef {
@@ -144,7 +150,10 @@ const SUN: CelestialBodyDef = {
     { id: 'INNER_CORONA', name: 'Inner Corona',   min: 500_000_000,     max: 2_000_000_000 },
     { id: 'OUTER_CORONA', name: 'Outer Corona',   min: 2_000_000_000,   max: 10_000_000_000 },
     { id: 'NSS',          name: 'Near Sun Space',  min: 10_000_000_000,  max: 30_000_000_000 },
-    { id: 'SOL',          name: 'Solar Orbit',     min: 30_000_000_000,  max: 300_000_000_000 },
+    { id: 'SOL',          name: 'Solar Orbit',     min: 30_000_000_000,  max: 329_000_000_000 },
+    { id: 'BELT_OUTER_A', name: 'Outer Belt A',    min: 329_000_000_000, max: 374_000_000_000, beltZone: BeltZone.OUTER_A },
+    { id: 'BELT_DENSE',   name: 'Dense Belt',      min: 374_000_000_000, max: 419_000_000_000, beltZone: BeltZone.DENSE, unsafe: true },
+    { id: 'BELT_OUTER_B', name: 'Outer Belt B',    min: 419_000_000_000, max: 479_000_000_000, beltZone: BeltZone.OUTER_B },
   ],
   groundVisual: { color: 0xffcc00, description: 'Incandescent plasma surface' },
   skyVisual: {

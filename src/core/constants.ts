@@ -784,6 +784,25 @@ export const CelestialBody = Object.freeze({
 
 export type CelestialBody = (typeof CelestialBody)[keyof typeof CelestialBody];
 
+// ---------------------------------------------------------------------------
+// Asteroid Belt Zones
+// ---------------------------------------------------------------------------
+
+/**
+ * Concentric orbital zones in the asteroid belt around the Sun,
+ * beyond Mars (~1.52 AU). Used to tag Sun altitude bands.
+ */
+export const BeltZone = Object.freeze({
+  /** Outer Belt A (2.2–2.5 AU) — safe orbit zone. */
+  OUTER_A: 'OUTER_A',
+  /** Dense Belt (2.5–2.8 AU) — high debris density, unsafe orbit zone. */
+  DENSE: 'DENSE',
+  /** Outer Belt B (2.8–3.2 AU) — safe orbit zone. */
+  OUTER_B: 'OUTER_B',
+} as const);
+
+export type BeltZone = (typeof BeltZone)[keyof typeof BeltZone];
+
 /**
  * Gravitational parameters (GM) in m^3/s^2 for each body.
  * mu = G * M, used in Keplerian orbit calculations.

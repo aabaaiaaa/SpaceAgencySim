@@ -27,6 +27,7 @@ import {
 } from '../core/missions.ts';
 import { processFlightReturn } from '../core/flightReturn.ts';
 import { MISSIONS, ObjectiveType, MissionStatus, rebuildMissionsIndex } from '../data/missions.ts';
+import { MissionState } from '../core/constants.ts';
 
 // ---------------------------------------------------------------------------
 // Test fixture helpers
@@ -229,10 +230,10 @@ describe('initializeMissions()', () => {
     expect(def.objectives[0].completed).toBe(false);
   });
 
-  it('sets status to "available" on copied instance', () => {
+  it('sets state to AVAILABLE on copied instance', () => {
     cleanup = withMissions(makeMissionDef({ id: 'x', unlocksAfter: [] }));
     initializeMissions(state);
-    expect(state.missions.available[0].status).toBe(MissionStatus.AVAILABLE);
+    expect(state.missions.available[0].state).toBe(MissionState.AVAILABLE);
   });
 });
 
@@ -293,9 +294,9 @@ describe('acceptMission()', () => {
     expect(state.missions.accepted[0].id).toBe('mission-a');
   });
 
-  it('sets mission status to "accepted"', () => {
+  it('sets mission state to ACCEPTED', () => {
     acceptMission(state, 'mission-a');
-    expect(state.missions.accepted[0].status).toBe(MissionStatus.ACCEPTED);
+    expect(state.missions.accepted[0].state).toBe(MissionState.ACCEPTED);
   });
 
   it('returns { success: false, error } for unknown id', () => {
@@ -408,13 +409,13 @@ describe('completeMission()', () => {
     expect(state.missions.completed[0].id).toBe('m1');
   });
 
-  it('sets mission status to "completed"', () => {
+  it('sets mission state to COMPLETED', () => {
     const def = makeMissionDef({ id: 'm1' });
     cleanup = withMissions(def);
     seedAcceptedMission(state, def);
 
     completeMission(state, 'm1');
-    expect(state.missions.completed[0].status).toBe(MissionStatus.COMPLETED);
+    expect(state.missions.completed[0].state).toBe(MissionState.COMPLETED);
   });
 
   it('awards the reward via earn()', () => {
@@ -1309,12 +1310,12 @@ describe('Catalog (4): two-prerequisite mission only unlocks when both prereqs a
   });
 });
 
-describe('Catalog (5): acceptMission sets mission status to accepted', () => {
-  it('mission-001 status becomes "accepted" after acceptMission is called', () => {
+describe('Catalog (5): acceptMission sets mission state to ACCEPTED', () => {
+  it('mission-001 state becomes ACCEPTED after acceptMission is called', () => {
     const state = freshState();
     initializeMissions(state);
     acceptMission(state, 'mission-001');
-    expect(state.missions.accepted[0].status).toBe(MissionStatus.ACCEPTED);
+    expect(state.missions.accepted[0].state).toBe(MissionState.ACCEPTED);
     expect(state.missions.accepted[0].id).toBe('mission-001');
   });
 });
@@ -1414,7 +1415,7 @@ describe('Catalog (9): completing all objectives then calling completeMission ma
     expect(state.missions.accepted).toHaveLength(0);
     expect(state.missions.completed).toHaveLength(1);
     expect(state.missions.completed[0].id).toBe('mission-001');
-    expect(state.missions.completed[0].status).toBe(MissionStatus.COMPLETED);
+    expect(state.missions.completed[0].state).toBe(MissionState.COMPLETED);
   });
 
   it('required objective flags remain true on the completed mission instance', () => {

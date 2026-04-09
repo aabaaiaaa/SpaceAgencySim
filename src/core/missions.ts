@@ -36,8 +36,9 @@ import type { MissionDef } from '../data/missions.ts';
 import { earnReward } from './finance.ts';
 import { getTechTreeUnlockedParts } from './techtree.ts';
 import { awardFacility } from './construction.ts';
+import { MissionState } from './constants.ts';
 
-import type { GameState, FlightState, Mission } from './gameState.ts';
+import type { GameState, FlightState, MissionInstance, FlightEvent } from './gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -45,21 +46,34 @@ import type { GameState, FlightState, Mission } from './gameState.ts';
 
 /**
  * Create a deep copy of a mission template for use as a live instance.
+ * Maps MissionDef template fields to the MissionInstance runtime shape.
  * All scalar fields are copied; arrays and nested objects are shallow-cloned
  * one level deep, which is sufficient for the mission data shape.
  */
-function _copyMission(def: MissionDef): MissionDef {
+function _copyMission(def: MissionDef): MissionInstance {
   return {
+    // --- Mission (runtime) fields ---
     id: def.id,
     title: def.title,
     description: def.description,
-    location: def.location,
-    objectives: def.objectives.map((obj) => ({ ...obj })),
     reward: def.reward,
-    unlocksAfter: [...def.unlocksAfter],
+    deadline: '',
+    state: MissionState.AVAILABLE,
+    requirements: {
+      requiredParts: def.requiredParts ? [...def.requiredParts] : [],
+    },
+    acceptedDate: null,
+    completedDate: null,
+    objectives: def.objectives.map((obj) => ({ ...obj })),
     unlockedParts: [...def.unlockedParts],
+    // --- MissionInstance (template) fields ---
+    location: def.location,
+    unlocksAfter: [...def.unlocksAfter],
     requiredParts: def.requiredParts ? [...def.requiredParts] : [],
-    status: def.status,
+    unlocksFacility: def.unlocksFacility ?? null,
+    awardsFacilityOnAccept: def.awardsFacilityOnAccept,
+    pathway: def.pathway,
+    templateStatus: def.status,
   };
 }
 
@@ -79,9 +93,7 @@ function _copyMission(def: MissionDef): MissionDef {
 export function initializeMissions(state: GameState): void {
   for (const def of MISSIONS) {
     if (def.unlocksAfter.length === 0 || def.status === MissionStatus.AVAILABLE) {
-      // MissionDef is stored in state.missions.available; the runtime type is a
-      // superset of Mission, so we cast here at the boundary.
-      state.missions.available.push(_copyMission(def) as unknown as Mission);
+      state.missions.available.push(_copyMission(def));
     }
   }
 }
@@ -93,8 +105,8 @@ export function initializeMissions(state: GameState): void {
 /**
  * Return all missions currently visible on the mission board.
  */
-export function getAvailableMissions(state: GameState): MissionDef[] {
-  return state.missions.available as unknown as MissionDef[];
+export function getAvailableMissions(state: GameState): MissionInstance[] {
+  return state.missions.available;
 }
 
 /**
@@ -151,7 +163,7 @@ export function reconcileParts(state: GameState): string[] {
     if (!def) continue;
 
     // requiredParts — unlocked on acceptance.
-    const reqParts: string[] = (mission as unknown as MissionDef).requiredParts ?? def.requiredParts ?? [];
+    const reqParts: string[] = mission.requiredParts ?? def.requiredParts ?? [];
     for (const partId of reqParts) {
       if (!owned.has(partId)) {
         state.parts.push(partId);
@@ -187,7 +199,7 @@ export function reconcileParts(state: GameState): string[] {
  *
  * @returns Newly unlocked mission instances.
  */
-export function getUnlockedMissions(state: GameState): MissionDef[] {
+export function getUnlockedMissions(state: GameState): MissionInstance[] {
   const completedIds = new Set(state.missions.completed.map((m) => m.id));
 
   // Build the full set of mission IDs already tracked in any bucket.
@@ -197,7 +209,7 @@ export function getUnlockedMissions(state: GameState): MissionDef[] {
     ...state.missions.completed.map((m) => m.id),
   ]);
 
-  const newlyUnlocked: MissionDef[] = [];
+  const newlyUnlocked: MissionInstance[] = [];
 
   for (const def of MISSIONS) {
     // Skip missions already in state.
@@ -208,8 +220,8 @@ export function getUnlockedMissions(state: GameState): MissionDef[] {
     if (!prereqsMet) continue;
 
     const instance = _copyMission(def);
-    instance.status = MissionStatus.AVAILABLE;
-    state.missions.available.push(instance as unknown as GameState['missions']['available'][number]);
+    instance.state = MissionState.AVAILABLE;
+    state.missions.available.push(instance);
     newlyUnlocked.push(instance);
   }
 
@@ -222,7 +234,7 @@ export function getUnlockedMissions(state: GameState): MissionDef[] {
 
 export interface AcceptMissionResult {
   success: boolean;
-  mission?: MissionDef;
+  mission?: MissionInstance;
   unlockedParts?: string[];
   awardedFacility?: string | null;
   error?: string;
@@ -230,11 +242,11 @@ export interface AcceptMissionResult {
 
 export interface CompleteMissionResult {
   success: boolean;
-  mission?: MissionDef;
+  mission?: MissionInstance;
   reward?: number;
   unlockedParts?: string[];
   awardedFacility?: string | null;
-  newlyUnlockedMissions?: MissionDef[];
+  newlyUnlockedMissions?: MissionInstance[];
   error?: string;
 }
 
@@ -256,13 +268,13 @@ export function acceptMission(state: GameState, id: string): AcceptMissionResult
   }
 
   const [mission] = state.missions.available.splice(idx, 1);
-  (mission as unknown as MissionDef).status = MissionStatus.ACCEPTED;
+  mission.state = MissionState.ACCEPTED;
+  mission.acceptedDate = new Date().toISOString();
   state.missions.accepted.push(mission);
 
   // Unlock any parts the mission requires to be completable.
   // Fall back to the catalog definition for saves created before requiredParts existed.
-  const missionDef = mission as unknown as MissionDef;
-  const reqParts: string[] = missionDef.requiredParts
+  const reqParts: string[] = mission.requiredParts
     ?? MISSIONS_BY_ID.get(mission.id)?.requiredParts
     ?? [];
   const unlockedParts: string[] = [];
@@ -281,15 +293,14 @@ export function acceptMission(state: GameState, id: string): AcceptMissionResult
   // Used by tutorial missions that need the facility built BEFORE the player
   // can complete the mission objectives (e.g. "use the R&D Lab").
   let awardedFacility: string | null = null;
-  const def = MISSIONS_BY_ID.get(mission.id);
-  if (def?.awardsFacilityOnAccept) {
-    const facilityResult = awardFacility(state, def.awardsFacilityOnAccept);
+  if (mission.awardsFacilityOnAccept) {
+    const facilityResult = awardFacility(state, mission.awardsFacilityOnAccept);
     if (facilityResult.success) {
-      awardedFacility = def.awardsFacilityOnAccept;
+      awardedFacility = mission.awardsFacilityOnAccept;
     }
   }
 
-  return { success: true, mission: missionDef, unlockedParts, awardedFacility };
+  return { success: true, mission, unlockedParts, awardedFacility };
 }
 
 /**
@@ -308,15 +319,14 @@ export function completeMission(state: GameState, id: string): CompleteMissionRe
   }
 
   const [mission] = state.missions.accepted.splice(idx, 1);
-  const missionDef = mission as unknown as MissionDef;
-  missionDef.status = MissionStatus.COMPLETED;
-  (mission as unknown as { completedDate: string }).completedDate = new Date().toISOString();
+  mission.state = MissionState.COMPLETED;
+  mission.completedDate = new Date().toISOString();
   state.missions.completed.push(mission);
 
   // Award the cash reward (base + any completed bonus objectives).
-  let totalReward = missionDef.reward;
-  if (Array.isArray(missionDef.objectives)) {
-    for (const obj of missionDef.objectives) {
+  let totalReward = mission.reward;
+  if (Array.isArray(mission.objectives)) {
+    for (const obj of mission.objectives) {
       if (obj.optional && obj.completed && obj.bonusReward) {
         totalReward += obj.bonusReward;
       }
@@ -352,7 +362,7 @@ export function completeMission(state: GameState, id: string): CompleteMissionRe
 
   return {
     success: true,
-    mission: missionDef,
+    mission,
     reward: totalReward,
     unlockedParts,
     awardedFacility,
@@ -363,27 +373,6 @@ export function completeMission(state: GameState, id: string): CompleteMissionRe
 // ---------------------------------------------------------------------------
 // Objective checking (called each physics tick)
 // ---------------------------------------------------------------------------
-
-/** A flight event as stored in FlightState.events (extended with mission fields). */
-interface FlightEventRecord {
-  type: string;
-  time?: number;
-  speed?: number;
-  partType?: string;
-  altitude?: number;
-  velocity?: number;
-  description?: string;
-}
-
-/** A live mission objective (may carry a private _holdEnteredAt field). */
-interface LiveObjective {
-  id: string;
-  type: string;
-  target: Record<string, unknown>;
-  completed: boolean;
-  description?: string;
-  _holdEnteredAt?: number | null;
-}
 
 /**
  * Check and update objective completion for all accepted missions.
@@ -411,13 +400,12 @@ export function checkObjectiveCompletion(
   if (!accepted || accepted.length === 0) return;
 
   for (const mission of accepted) {
-    const missionAny = mission as unknown as { objectives?: LiveObjective[] };
-    if (!missionAny.objectives || missionAny.objectives.length === 0) continue;
+    if (!mission.objectives || mission.objectives.length === 0) continue;
 
-    for (const obj of missionAny.objectives) {
+    for (const obj of mission.objectives) {
       if (obj.completed) continue;
 
-      const events = flightState.events as unknown as FlightEventRecord[];
+      const events: FlightEvent[] = flightState.events;
 
       switch (obj.type) {
         // ------------------------------------------------------------------
@@ -473,10 +461,9 @@ export function checkObjectiveCompletion(
           // running OR have already completed (SCIENCE_COLLECTED event) for
           // hold time to count.  If there are no science modules on this
           // flight, the gate is bypassed.
-          const fsAny = flightState as unknown as { hasScienceModules?: boolean; scienceModuleRunning?: boolean };
           const experimentOk =
-            !fsAny.hasScienceModules ||
-            fsAny.scienceModuleRunning === true ||
+            !flightState.hasScienceModules ||
+            flightState.scienceModuleRunning === true ||
             events.some((e) => e.type === 'SCIENCE_COLLECTED');
 
           if (inRange && experimentOk) {

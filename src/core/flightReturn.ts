@@ -38,10 +38,9 @@ import { checkAchievements } from './achievements.ts';
 import { createFieldCraft, hasExtendedLifeSupport } from './lifeSupport.ts';
 import { FieldCraftStatus } from './constants.ts';
 import { processChallengeCompletion } from './challenges.ts';
-import type { GameState, FlightState, FlightResult, FlightEvent, InventoryPart, Contract, FieldCraft } from './gameState.ts';
+import type { GameState, FlightState, FlightResult, FlightEvent, InventoryPart, Contract, FieldCraft, MissionInstance } from './gameState.ts';
 import type { PhysicsState, RocketAssembly } from './physics.ts';
 import type { CompleteMissionResult } from './missions.ts';
-import type { MissionDef } from '../data/missions.ts';
 import type { RecoverPartsResult } from './partInventory.ts';
 import type { PeriodSummary } from './period.ts';
 import type { AwardedAchievement } from './achievements.ts';
@@ -51,10 +50,10 @@ import type { AwardedAchievement } from './achievements.ts';
 // ---------------------------------------------------------------------------
 
 export interface CompletedMissionEntry {
-  mission: MissionDef;
+  mission: MissionInstance;
   reward: number;
   unlockedParts: string[];
-  newlyAvailableMissions: MissionDef[];
+  newlyAvailableMissions: MissionInstance[];
 }
 
 export interface FlightReturnSummary {

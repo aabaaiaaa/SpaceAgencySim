@@ -331,6 +331,10 @@
   margin-bottom: 14px;
 }
 
+.mc-caps-info--tight {
+  margin-bottom: 4px;
+}
+
 .mc-reputation-bar {
   display: flex;
   align-items: center;
@@ -360,7 +364,8 @@
 .mc-rep-fill {
   height: 6px;
   border-radius: 3px;
-  background: #5090d0;
+  width: var(--rep-width, 0%);
+  background: var(--rep-bg, #5090d0);
   transition: width 0.3s;
 }
 
