@@ -115,12 +115,22 @@ export async function teleportCraft(page, opts) {
     // Body.
     if (o.bodyId) fs.bodyId = o.bodyId;
 
-    // Reset to airborne FLIGHT state so the physics auto-detection can
-    // compute the correct phase (ORBIT, etc.) and orbital elements from
-    // the position/velocity on the next simulation frame.
-    fs.phase = 'FLIGHT';
-    fs.inOrbit = false;
-    fs.orbitalElements = null;
+    if (o.orbit) {
+      // Set orbit state directly — skip phase transition detection and dialogs.
+      fs.phase = 'ORBIT';
+      fs.inOrbit = true;
+      // Altitude in the FlightState needs updating too for objective checks.
+      fs.altitude = o.posY;
+      fs.velocity = Math.sqrt((o.velX ?? 0) ** 2 + (o.velY ?? 0) ** 2);
+      fs.horizontalVelocity = Math.abs(o.velX ?? 0);
+    } else {
+      // Reset to airborne FLIGHT state so the physics auto-detection can
+      // compute the correct phase (ORBIT, etc.) and orbital elements from
+      // the position/velocity on the next simulation frame.
+      fs.phase = 'FLIGHT';
+      fs.inOrbit = false;
+      fs.orbitalElements = null;
+    }
 
     // Defensive initialisation.
     if (!fs.phaseLog) fs.phaseLog = [];

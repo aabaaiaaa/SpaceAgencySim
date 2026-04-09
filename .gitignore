@@ -52,3 +52,5 @@ current-issues.txt
 
 # Added by DevLoop
 .worktrees/
+
+.playwright-mcp/

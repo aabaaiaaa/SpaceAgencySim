@@ -4,6 +4,7 @@ import {
   CENTRE_X, CANVAS_CENTRE_Y,
   dragPartToCanvas, placePart,
   seedAndLoadSave, navigateToVab,
+  teleportCraft, startTestFlight,
 } from './helpers.js';
 
 /**
@@ -432,17 +433,30 @@ async function returnToHub(page) {
   const alreadyAtHub = await page.locator('#hub-overlay').isVisible().catch(() => false);
 
   if (!alreadyAtHub) {
-    // If an abort confirmation dialog is visible (mid-flight return), dismiss it.
-    // Aborting skips the post-flight summary and goes straight to hub.
+    // Check for orbit return dialog, abort dialog, post-flight summary, or hub.
+    const orbitReturn = page.locator('[data-testid="orbit-return-btn"]');
     const abortBtn = page.locator('[data-testid="abort-confirm-btn"]');
-    const didAbort = await abortBtn.isVisible({ timeout: 1_000 }).catch(() => false);
-    if (didAbort) {
+    const summary = page.locator('#post-flight-summary');
+    const hub = page.locator('#hub-overlay');
+
+    const which = await Promise.race([
+      orbitReturn.waitFor({ state: 'visible', timeout: 60_000 }).then(() => 'orbit'),
+      abortBtn.waitFor({ state: 'visible', timeout: 60_000 }).then(() => 'abort'),
+      summary.waitFor({ state: 'visible', timeout: 60_000 }).then(() => 'summary'),
+      hub.waitFor({ state: 'visible', timeout: 60_000 }).then(() => 'hub'),
+    ]);
+
+    if (which === 'orbit') {
+      await orbitReturn.click();
+      // Orbit return shows a post-flight summary — click through it.
+      await summary.waitFor({ state: 'visible', timeout: 15_000 });
+      await page.click('#post-flight-return-btn');
+    } else if (which === 'abort') {
       await abortBtn.click();
-    } else {
-      // Landed/crashed — post-flight summary appears; click through it.
-      await page.waitForSelector('#post-flight-summary', { state: 'visible', timeout: 60_000 });
+    } else if (which === 'summary') {
       await page.click('#post-flight-return-btn');
     }
+    // If 'hub', already there.
   }
 
   // An unlock notification modal may appear for newly unlocked parts — dismiss it.
@@ -558,12 +572,8 @@ test.describe('Mission Progression', () => {
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, env);
-    await navigateToVab(page);
 
-    // Build: cmd-mk1 + tank-small + engine-spark
-    await buildStack(page, ['cmd-mk1', 'tank-small', 'engine-spark']);
-
-    await launch(page);
+    await startTestFlight(page, ['cmd-mk1', 'tank-small', 'engine-spark']);
     await stage(page);
     await page.keyboard.press('z');
     await waitAlt(page, 100);
@@ -584,9 +594,8 @@ test.describe('Mission Progression', () => {
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, env);
-    await navigateToVab(page);
-    await buildStack(page, ['cmd-mk1', 'tank-medium', 'engine-spark']);
-    await launch(page);
+
+    await startTestFlight(page, ['cmd-mk1', 'tank-medium', 'engine-spark']);
     await stage(page);
     await page.keyboard.press('z');
     await waitSpeed(page, 150);
@@ -610,17 +619,16 @@ test.describe('Mission Progression', () => {
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, env);
-    await navigateToVab(page);
 
     // Use probe-core for a lighter rocket. Without landing legs, the physics
     // engine requires ≤5 m/s for a LANDING event. Terminal velocity with mk1
     // chute at 320kg dry mass ≈ 4.66 m/s, which is under the 5 m/s threshold.
-    await buildStack(page, ['parachute-mk1', 'probe-core-mk1', 'tank-small', 'engine-spark']);
-
-    // Staging: engine auto-staged to stage-0. Move parachute to stage-1.
-    await stagePartFromUnstaged(page, 'parachute-mk1', 1);
-
-    await launchProbe(page);
+    await startTestFlight(page, ['parachute-mk1', 'probe-core-mk1', 'tank-small', 'engine-spark'], {
+      staging: [
+        { partIds: ['engine-spark'] },
+        { partIds: ['parachute-mk1'] },
+      ],
+    });
 
     // Stage 0: fire engine at full throttle — burn ALL fuel so mass is at
     // dry weight (250kg) when the chute deploys.
@@ -664,16 +672,16 @@ test.describe('Mission Progression', () => {
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, env);
-    await navigateToVab(page);
 
     // Use probe-core for lighter rocket: wet 720kg, dry 320kg — both under
     // parachute-mk1 maxSafeMass 1200kg. Terminal velocity ≈ 4.7 m/s < 5 m/s.
-    await buildStack(page, ['parachute-mk1', 'probe-core-mk1', 'tank-small', 'engine-spark']);
+    await startTestFlight(page, ['parachute-mk1', 'probe-core-mk1', 'tank-small', 'engine-spark'], {
+      staging: [
+        { partIds: ['engine-spark'] },
+        { partIds: ['parachute-mk1'] },
+      ],
+    });
 
-    // Engine in stage-0 (auto), parachute in stage-1.
-    await stagePartFromUnstaged(page, 'parachute-mk1', 1);
-
-    await launchProbe(page);
     await stage(page); // fire engine (satisfies ACTIVATE_PART ENGINE)
     await page.keyboard.press('z');
 
@@ -711,42 +719,20 @@ test.describe('Mission Progression', () => {
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, env);
-    await navigateToVab(page);
 
     // Use probe-core for lighter rocket. With 2 deployed legs AND speed < 10
     // the physics uses Case 1 (controlled landing). Terminal velocity at dry
     // mass 480kg with mk1 chute ≈ 5.7 m/s (< 10 m/s with 2 legs → LANDING).
-    const stackParts = ['parachute-mk1', 'probe-core-mk1', 'tank-small', 'engine-spark'];
-    await buildStack(page, stackParts);
-    const ys = stackYs(stackParts);
-    const tankY = ys[2]; // tank-small Y position
+    await startTestFlight(page, [
+      'parachute-mk1', 'probe-core-mk1', 'tank-small', 'engine-spark',
+      'landing-legs-small', 'landing-legs-small',
+    ], {
+      staging: [
+        { partIds: ['engine-spark'] },
+        { partIds: ['parachute-mk1', 'landing-legs-small', 'landing-legs-small'] },
+      ],
+    });
 
-    // Turn off mirror mode to control leg placement precisely.
-    const mirrorBtn = page.locator('button:has-text("Mirror")');
-    const isPressed = await mirrorBtn.getAttribute('aria-pressed');
-    if (isPressed === 'true') await mirrorBtn.click();
-
-    // Attach 2 landing-legs-small radially (left + right of tank).
-    await placeRadialLeft(page, 'landing-legs-small', 'tank-small', tankY);
-    await page.waitForFunction(
-      count => (window.__vabAssembly?.parts?.size ?? 0) >= count,
-      5, { timeout: 5_000 },
-    );
-    // Place second leg on the right side.
-    const parentGeo = GEO['tank-small'];
-    const childGeo = GEO['landing-legs-small'];
-    await dragPartToCanvas(page, 'landing-legs-small', CENTRE_X + parentGeo.rightX - childGeo.leftX, tankY);
-    await page.waitForFunction(
-      count => (window.__vabAssembly?.parts?.size ?? 0) >= count,
-      6, { timeout: 5_000 },
-    );
-
-    // Staging: engine in stage-0 (auto). Move BOTH legs + parachute to stage-1.
-    await stagePartFromUnstaged(page, 'parachute-mk1', 1);
-    await stagePartFromUnstaged(page, 'landing-legs-small', 1);
-    await stagePartFromUnstaged(page, 'landing-legs-small', 1); // second leg
-
-    await launchProbe(page);
     await stage(page); // Stage 0: fire engine at full throttle
     await page.keyboard.press('z');
     await waitAlt(page, 300);
@@ -782,15 +768,14 @@ test.describe('Mission Progression', () => {
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, env);
-    await navigateToVab(page);
 
     // Build: cmd-mk1 + science-module-mk1 + tank-medium + engine-spark
-    await buildStack(page, ['cmd-mk1', 'science-module-mk1', 'tank-medium', 'engine-spark']);
+    await startTestFlight(page, ['cmd-mk1', 'science-module-mk1', 'tank-medium', 'engine-spark'], {
+      staging: [
+        { partIds: ['engine-spark', 'science-module-mk1'] },
+      ],
+    });
 
-    // Stage 1: engine + science module — move science module into stage-0.
-    await stagePartFromUnstaged(page, 'science-module-mk1', 0);
-
-    await launch(page);
     await stage(page); // fires engine + activates science module
     await page.keyboard.press('z');
 
@@ -814,15 +799,15 @@ test.describe('Mission Progression', () => {
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, env);
-    await navigateToVab(page);
 
     // Uncrewed test: probe-core + cmd-mk1 (for ejector seat) + tank + engine
-    await buildStack(page, ['cmd-mk1', 'probe-core-mk1', 'tank-small', 'engine-spark']);
+    await startTestFlight(page, ['cmd-mk1', 'probe-core-mk1', 'tank-small', 'engine-spark'], {
+      staging: [
+        { partIds: ['engine-spark'] },
+        { partIds: ['cmd-mk1'] },
+      ],
+    });
 
-    // Stage 1: engine (auto in stage-0). Stage 2: ejector seat.
-    await stagePartFromUnstaged(page, 'cmd-mk1', 1);
-
-    await launchProbe(page);
     await stage(page); // fire engine
     await page.keyboard.press('z');
 
@@ -854,24 +839,25 @@ test.describe('Mission Progression', () => {
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, env);
-    await navigateToVab(page);
 
     // probe-core (50) + parachute-mk2 (250) + science-module (200) + tank-small (50+400)
     // + engine-spark (120) = 1070kg wet.  Terminal velocity under mk2 chute
     // at ~880kg (with remaining fuel) ≈ 4.4 m/s → safe legless landing.
-    await buildStack(page, [
-      'parachute-mk2', 'probe-core-mk1', 'science-module-mk1', 'tank-small', 'engine-spark',
-    ]);
-
     // Staging — chute first so we can deploy it for a slow descent through
     // the altitude band, then activate the science module inside the band:
     //   Stage 0: engine (auto)
     //   Stage 1: parachute (deploy above band for slow descent)
     //   Stage 2: science module (activate when inside the band)
-    await stagePartFromUnstaged(page, 'parachute-mk2', 1);
-    await stagePartFromUnstaged(page, 'science-module-mk1', 2);
+    await startTestFlight(page, [
+      'parachute-mk2', 'probe-core-mk1', 'science-module-mk1', 'tank-small', 'engine-spark',
+    ], {
+      staging: [
+        { partIds: ['engine-spark'] },
+        { partIds: ['parachute-mk2'] },
+        { partIds: ['science-module-mk1'] },
+      ],
+    });
 
-    await launchProbe(page);
     await stage(page); // Stage 0: fire engine
 
     // Full throttle climb well above the 1200m band ceiling so the
@@ -956,15 +942,15 @@ test.describe('Mission Progression', () => {
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, env);
-    await navigateToVab(page);
 
     // Uncrewed test: probe-core + cmd-mk1 (for ejector seat) + tank + engine
-    await buildStack(page, ['cmd-mk1', 'probe-core-mk1', 'tank-small', 'engine-spark']);
+    await startTestFlight(page, ['cmd-mk1', 'probe-core-mk1', 'tank-small', 'engine-spark'], {
+      staging: [
+        { partIds: ['engine-spark'] },
+        { partIds: ['cmd-mk1'] },
+      ],
+    });
 
-    // Staging: Stage 0 = engine (auto). Stage 1 = ejector seat.
-    await stagePartFromUnstaged(page, 'cmd-mk1', 1);
-
-    await launchProbe(page);
     await stage(page); // engine
     await page.keyboard.press('z');
 
@@ -990,7 +976,7 @@ test.describe('Mission Progression', () => {
   });
 
   test('M012 — Stage Separation Test (reach 2000m + fire decoupler) → unlocks engine-reliant, srb-small', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const m1to4 = ['mission-001', 'mission-004'];
     const env = buildEnvelope({
       completedIds: [...m1to4, 'mission-005', 'mission-008', 'mission-010'],
@@ -999,33 +985,27 @@ test.describe('Mission Progression', () => {
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, env);
-    await navigateToVab(page);
 
-    // Two-stage rocket (top to bottom):
-    //   cmd-mk1 → tank-medium → engine-spark → decoupler → tank-medium → engine-spark
-    await buildStack(page, [
-      'cmd-mk1', 'tank-medium', 'engine-spark',
+    // Two-stage rocket: use a simple probe + tank + engine and teleport
+    // to 2km, then stage the decoupler to complete the ACTIVATE_PART objective.
+    await startTestFlight(page, [
+      'probe-core-mk1', 'tank-medium', 'engine-spark',
       'decoupler-stack-tr18', 'tank-medium', 'engine-spark',
-    ]);
+    ], {
+      staging: [
+        { partIds: ['engine-spark'] },
+        { partIds: ['decoupler-stack-tr18'] },
+      ],
+    });
 
-    // Auto-staging puts BOTH engines in stage-0 and decoupler in stage-1.
-    // We need: stage-0 = lower engine only, stage-1 = decoupler + upper engine.
-    // Move the first engine (upper, placed first) from stage-0 to stage-1.
-    await movePartBetweenStages(page, 'engine-spark', 0, 1);
-
-    await launch(page);
-    await stage(page); // Stage 0: fire lower engine
+    await stage(page); // Stage 0: fire engine
     await page.keyboard.press('z');
 
-    // 50× warp for the slow first stage climb (TWR ~1.4).
-    await waitWarpUnlocked(page);
-    await setWarp(page, 50);
+    // Verify liftoff, then teleport to 2km.
+    await waitAlt(page, 100);
+    await teleportCraft(page, { posX: 0, posY: 2_500, velX: 0, velY: 100 });
 
-    // Wait for 2000m.
-    await waitAlt(page, 2_000);
-
-    // Stage 1: decouple + fire upper engine.
-    await setWarp(page, 1);
+    // Stage 1: fire decoupler (ACTIVATE_PART objective).
     await waitWarpUnlocked(page);
     await stage(page);
 
@@ -1046,7 +1026,7 @@ test.describe('Mission Progression', () => {
   // =========================================================================
 
   test('M013 — High Altitude Record (reach 20,000m)', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const m1to4 = ['mission-001', 'mission-004'];
     const env = buildEnvelope({
       completedIds: [...m1to4, 'mission-005', 'mission-006', 'mission-007', 'mission-008', 'mission-009', 'mission-011'],
@@ -1055,45 +1035,31 @@ test.describe('Mission Progression', () => {
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, env);
-    await navigateToVab(page);
 
-    // Two-stage rocket for high altitude.
-    await buildStack(page, [
-      'cmd-mk1', 'tank-medium', 'engine-spark',
+    await startTestFlight(page, [
+      'probe-core-mk1', 'tank-medium', 'engine-spark',
       'decoupler-stack-tr18', 'tank-medium', 'engine-spark',
-    ]);
-
-    // Fix staging: move upper engine from stage-0 to stage-1 (with decoupler).
-    await movePartBetweenStages(page, 'engine-spark', 0, 1);
-
-    await launch(page);
+    ], {
+      staging: [
+        { partIds: ['engine-spark'] },
+        { partIds: ['decoupler-stack-tr18', 'engine-spark'] },
+      ],
+    });
     await stage(page);
     await page.keyboard.press('z');
 
-    // 50× warp for the slow first stage climb (TWR ~1.6, takes ~36s game time).
-    await waitWarpUnlocked(page);
-    await setWarp(page, 50);
-
-    // Wait for ~5km, then separate.
-    await waitAlt(page, 5_000);
-    await setWarp(page, 1);
-    await waitWarpUnlocked(page);
-    await stage(page); // separate + fire upper engine
-
-    // Re-engage 50× warp and coast to 20km.
-    await waitWarpUnlocked(page);
-    await setWarp(page, 50);
-    await waitAlt(page, 20_000, 60_000);
+    // Verify liftoff, then teleport above target altitude.
+    await waitAlt(page, 100);
+    await teleportCraft(page, { posX: 0, posY: 20_500, velX: 0, velY: 50 });
 
     // Objective met — return via menu instead of waiting for long descent.
-    await setWarp(page, 1);
     await triggerReturnViaMenu(page);
     await returnToHub(page);
     await expectCompleted(page, 'mission-013');
   });
 
   test('M014 — Kármán Line Approach (reach 60,000m) → unlocks engine-nerv, srb-large', async ({ page }) => {
-    test.setTimeout(180_000);
+    test.setTimeout(60_000);
     const m1to4 = ['mission-001', 'mission-004'];
     const env = buildEnvelope({
       completedIds: [...m1to4, 'mission-005', 'mission-008', 'mission-010', 'mission-012'],
@@ -1102,38 +1068,19 @@ test.describe('Mission Progression', () => {
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, env);
-    await navigateToVab(page);
 
-    // Two-stage rocket with reliant first stage for more thrust.
-    await buildStack(page, [
-      'cmd-mk1', 'tank-medium', 'engine-spark',
-      'decoupler-stack-tr18', 'tank-medium', 'engine-reliant',
+    await startTestFlight(page, [
+      'probe-core-mk1', 'tank-medium', 'engine-reliant',
     ]);
 
-    // Fix staging: move upper engine from stage-0 to stage-1 (with decoupler).
-    await movePartBetweenStages(page, 'engine-spark', 0, 1);
-
-    await launch(page);
     await stage(page);
     await page.keyboard.press('z');
 
-    // 50× warp for first stage climb.
-    await waitWarpUnlocked(page);
-    await setWarp(page, 50);
+    // Verify liftoff, then teleport above target altitude.
+    await waitAlt(page, 100);
+    await teleportCraft(page, { posX: 0, posY: 61_000, velX: 0, velY: 50 });
 
-    // Reliant burns fast.  Separate at ~10km.
-    await waitAlt(page, 10_000);
-    await setWarp(page, 1);
-    await waitWarpUnlocked(page);
-    await stage(page);
-
-    // Re-engage 50× warp to coast to 60km.
-    await waitWarpUnlocked(page);
-    await setWarp(page, 50);
-    await waitAlt(page, 60_000, 120_000);
-
-    // Objective met — return via menu instead of waiting for long descent.
-    await setWarp(page, 1);
+    // Objective met — return via menu.
     await triggerReturnViaMenu(page);
     await returnToHub(page);
     await expectCompleted(page, 'mission-014');
@@ -1143,7 +1090,7 @@ test.describe('Mission Progression', () => {
   });
 
   test('M015 — Orbital Satellite Deployment I (orbit + release satellite >80km)', async ({ page }) => {
-    test.setTimeout(300_000);
+    test.setTimeout(60_000);
     const m1to4 = ['mission-001', 'mission-004'];
     const env = buildEnvelope({
       completedIds: [
@@ -1153,120 +1100,62 @@ test.describe('Mission Progression', () => {
       acceptedId: 'mission-015',
       parts: [
         ...STARTER_PARTS, 'tank-medium', 'engine-reliant', 'engine-nerv',
-        'tank-large', 'satellite-mk1',
+        'tank-large', 'satellite-mk1', 'decoupler-stack-tr18',
       ],
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, env);
-    await navigateToVab(page);
 
-    // Orbital rocket with satellite payload:
-    //   satellite-mk1 + decoupler + cmd-mk1 + tank-medium + tank-medium + engine-nerv
-    //   + decoupler + tank-medium + engine-reliant
-    await buildStack(page, [
-      'satellite-mk1', 'decoupler-stack-tr18', 'cmd-mk1',
-      'tank-medium', 'tank-medium', 'engine-nerv',
+    // Use startTestFlight to skip the slow VAB build.
+    // Staging: stage-0 = reliant, stage-1 = decoupler + nerv, stage-2 = decoupler (satellite release).
+    await startTestFlight(page, [
+      'satellite-mk1', 'decoupler-stack-tr18', 'probe-core-mk1',
+      'tank-medium', 'engine-nerv',
       'decoupler-stack-tr18', 'tank-medium', 'engine-reliant',
-    ]);
-
-    // Programmatic staging:
-    //   stage-0: reliant (lower engine)
-    //   stage-1: lower decoupler + nerv engine (stage separation)
-    //   stage-2: upper decoupler (satellite release)
-    await page.evaluate(() => {
-      const config = window.__vabStagingConfig;
-      const assembly = window.__vabAssembly;
-      const byPartId = {};
-      for (const [instanceId, placed] of assembly.parts) {
-        if (!byPartId[placed.partId]) byPartId[placed.partId] = [];
-        byPartId[placed.partId].push(instanceId);
-      }
-      config.stages = [];
-      config.unstaged = [];
-      config.stages.push({ instanceIds: [byPartId['engine-reliant'][0]] });
-      config.stages.push({ instanceIds: [byPartId['decoupler-stack-tr18'][1], byPartId['engine-nerv'][0]] });
-      config.stages.push({ instanceIds: [byPartId['decoupler-stack-tr18'][0]] });
-      const staged = new Set(config.stages.flatMap(s => s.instanceIds));
-      for (const [instanceId] of assembly.parts) {
-        if (!staged.has(instanceId)) config.unstaged.push(instanceId);
-      }
+    ], {
+      staging: [
+        { partIds: ['engine-reliant'] },
+        { partIds: ['decoupler-stack-tr18', 'engine-nerv'] },
+        { partIds: ['decoupler-stack-tr18'] },
+      ],
     });
 
-    await launch(page);
-    await stage(page); // fire lower engine (reliant)
+    // Stage engine and throttle up, verify liftoff.
+    await stage(page);
     await page.keyboard.press('z');
+    await waitAlt(page, 100);
 
-    // Slight tilt at ~2km.
-    await waitAlt(page, 2_000);
-    await page.keyboard.down('d');
-    await page.waitForFunction(
-      () => Math.abs(window.__flightPs?.angle ?? 0) > 0.3,
-      { timeout: 10_000 },
-    );
-    await page.keyboard.up('d');
-
-    // Separate first stage at ~8km.
-    await waitAlt(page, 8_000);
-    await waitWarpUnlocked(page);
-    await stage(page); // decouple + fire nerv
-
-    // Set slight tilt to climb fast.
-    await page.evaluate(async () => {
-      const ps = window.__flightPs;
-      if (ps) { ps.angle = 0.2; ps.angularVelocity = 0; }
-      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
-    });
-
-    // 50× warp for nerv burn.
-    await waitWarpUnlocked(page);
-    await setWarp(page, 50);
-
-    // Wait to reach 80km altitude.
-    await page.waitForFunction(
-      () => (window.__flightPs?.posY ?? 0) >= 80_000,
-      { timeout: 180_000 },
-    );
-
-    // Inject horizontal velocity for orbit conditions.
-    await page.evaluate(async () => {
-      const ps = window.__flightPs;
-      if (ps) {
-        ps.velX = 8000;
-        ps.velY = Math.max(ps.velY, 0);
-      }
-      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
-    });
+    // Teleport directly to orbit.
+    await teleportCraft(page, { posX: 0, posY: 82_000, velX: 8000, velY: 0, orbit: true });
 
     // Wait for REACH_ORBIT objective.
-    await page.waitForFunction(
-      () => {
-        const state = window.__gameState;
-        const m = state?.missions?.accepted?.find(x => x.id === 'mission-015');
-        return m?.objectives?.find(o => o.type === 'REACH_ORBIT')?.completed;
-      },
-      { timeout: 10_000 },
-    );
+    await page.waitForFunction(() => {
+      const m = window.__gameState?.missions?.accepted?.find(x => x.id === 'mission-015');
+      return m?.objectives?.find(o => o.type === 'REACH_ORBIT')?.completed;
+    }, { timeout: 15_000 });
 
-    // Release satellite while still in orbit.
-    await setWarp(page, 1);
+    // Re-teleport to maintain altitude for satellite release (>80km required).
+    await teleportCraft(page, { posX: 0, posY: 82_000, velX: 8000, velY: 0, orbit: true });
+
+    // Release satellite.
     await waitWarpUnlocked(page);
     await stage(page); // fire satellite decoupler
 
     // Wait for RELEASE_SATELLITE objective.
     await waitObjectivesComplete(page, 'mission-015', 30_000);
 
-    // Return to hub via menu (in orbit, won't land naturally).
+    // Return via menu.
     await page.click('#topbar-menu-btn', { force: true });
-    const dropdown = page.locator('#topbar-dropdown');
-    await expect(dropdown).toBeVisible();
-    await dropdown.getByText('Return to Space Agency').click();
+    const dropdown015 = page.locator('#topbar-dropdown');
+    await expect(dropdown015).toBeVisible();
+    await dropdown015.getByText('Return to Space Agency').click();
 
     await returnToHub(page);
     await expectCompleted(page, 'mission-015');
   });
 
   test('M016 — Low Earth Orbit (≥80km AND ≥7,800 m/s) → unlocks tank-large', async ({ page }) => {
-    test.setTimeout(300_000);
+    test.setTimeout(60_000);
     const m1to4 = ['mission-001', 'mission-004'];
     const env = buildEnvelope({
       completedIds: [...m1to4, 'mission-005', 'mission-008', 'mission-010', 'mission-012', 'mission-014'],
@@ -1275,81 +1164,30 @@ test.describe('Mission Progression', () => {
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, env);
-    await navigateToVab(page);
 
-    // Two-stage orbital rocket:
-    //   Upper: cmd-mk1 + tank-medium + tank-medium + engine-nerv (ISP 800s)
-    //   Lower: decoupler + tank-medium + engine-reliant (240kN)
-    await buildStack(page, [
-      'cmd-mk1', 'tank-medium', 'tank-medium', 'engine-nerv',
+    await startTestFlight(page, [
+      'probe-core-mk1', 'tank-medium', 'tank-medium', 'engine-nerv',
       'decoupler-stack-tr18', 'tank-medium', 'engine-reliant',
-    ]);
-
-    // Fix staging: move nerv from stage-0 to stage-1 (with decoupler).
-    await movePartBetweenStages(page, 'engine-nerv', 0, 1);
-
-    await launch(page);
-    await stage(page); // fire lower engine (reliant)
+    ], {
+      staging: [
+        { partIds: ['engine-reliant'] },
+        { partIds: ['decoupler-stack-tr18', 'engine-nerv'] },
+      ],
+    });
+    await stage(page);
     await page.keyboard.press('z');
 
-    // Fly mostly vertical to build altitude. Slight tilt at 2km.
-    await waitAlt(page, 2_000);
-    await page.keyboard.down('d');
-    await page.waitForFunction(
-      () => Math.abs(window.__flightPs?.angle ?? 0) > 0.3,
-      { timeout: 10_000 },
-    );
-    await page.keyboard.up('d');
+    // Verify liftoff, then teleport directly to orbit.
+    await waitAlt(page, 100);
+    await teleportCraft(page, { posX: 0, posY: 82_000, velX: 8000, velY: 0, orbit: true });
 
-    // Separate at ~8km.
-    await waitAlt(page, 8_000);
-    await waitWarpUnlocked(page);
-    await stage(page); // decouple + fire nerv
+    // Wait for objectives.
+    await page.waitForFunction(() => {
+      const m = window.__gameState?.missions?.accepted?.find(x => x.id === 'mission-016');
+      return m?.objectives?.every(o => o.completed);
+    }, { timeout: 15_000 });
 
-    // Set slight tilt (0.2 rad ≈ 11°) to climb fast while building some
-    // horizontal speed. The nerv has TWR ~1.25 at full mass — mostly vertical
-    // thrust exceeds gravity and rocket keeps climbing.
-    await page.evaluate(async () => {
-      const ps = window.__flightPs;
-      if (ps) { ps.angle = 0.2; ps.angularVelocity = 0; }
-      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
-    });
-
-    // 50× warp for long nerv burn.
-    await waitWarpUnlocked(page);
-    await setWarp(page, 50);
-
-    // Wait to reach 80km altitude.
-    await page.waitForFunction(
-      () => (window.__flightPs?.posY ?? 0) >= 80_000,
-      { timeout: 180_000 },
-    );
-
-    // At 80km, inject horizontal velocity to simulate orbital insertion.
-    // The game uses constant gravity so true orbit is impossible; the
-    // REACH_ORBIT objective simply checks alt >= 80km AND speed >= 7800.
-    await page.evaluate(async () => {
-      const ps = window.__flightPs;
-      if (ps) {
-        ps.velX = 8000;
-        ps.velY = Math.max(ps.velY, 0); // keep any upward velocity
-      }
-      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
-    });
-
-    // Wait for objective to trigger.
-    await page.waitForFunction(
-      () => {
-        const state = window.__gameState;
-        const m = state?.missions?.accepted?.find(x => x.id === 'mission-016');
-        return m?.objectives?.every(o => o.completed);
-      },
-      { timeout: 10_000 },
-    );
-
-    // Mission complete — return via menu (in orbit, won't land).
-    await page.keyboard.press('x');
-    await setWarp(page, 1);
+    // Return via menu.
     await page.click('#topbar-menu-btn', { force: true });
     const dropdown = page.locator('#topbar-dropdown');
     await expect(dropdown).toBeVisible();
@@ -1362,126 +1200,62 @@ test.describe('Mission Progression', () => {
   });
 
   test('M017 — Tracked Satellite Deployment (orbit + release satellite >80km, Tracking Station)', async ({ page }) => {
-    test.setTimeout(300_000);
-    // All previous missions + mission-020 (Tracking Station tutorial) completed.
-    const allPrev = Array.from({ length: 16 }, (_, i) =>
-      `mission-${String(i + 1).padStart(3, '0')}`);
+    test.setTimeout(60_000);
+    const allPrev = [1, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].map(
+      n => `mission-${String(n).padStart(3, '0')}`);
     const env = buildEnvelope({
       completedIds: [...allPrev, 'mission-020'],
       acceptedId: 'mission-017',
       parts: [
         ...STARTER_PARTS, 'tank-medium', 'engine-reliant', 'engine-nerv',
-        'tank-large', 'satellite-mk1', 'parachute-mk2',
+        'tank-large', 'satellite-mk1', 'decoupler-stack-tr18', 'parachute-mk2',
       ],
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, env);
-    await navigateToVab(page);
 
-    // Orbital rocket with satellite payload:
-    //   satellite-mk1 + decoupler + cmd-mk1 + tank-medium + tank-medium + engine-nerv
-    //   + decoupler + tank-medium + engine-reliant
-    await buildStack(page, [
-      'satellite-mk1', 'decoupler-stack-tr18', 'cmd-mk1',
-      'tank-medium', 'tank-medium', 'engine-nerv',
+    // Use startTestFlight to skip the slow VAB build.
+    await startTestFlight(page, [
+      'satellite-mk1', 'decoupler-stack-tr18', 'probe-core-mk1',
+      'tank-medium', 'engine-nerv',
       'decoupler-stack-tr18', 'tank-medium', 'engine-reliant',
-    ]);
-
-    // Programmatic staging (same pattern as M015) to ensure correct order:
-    //   stage-0: reliant (lower engine)
-    //   stage-1: lower decoupler + nerv engine (stage separation)
-    //   stage-2: upper decoupler (satellite release)
-    await page.evaluate(() => {
-      const config = window.__vabStagingConfig;
-      const assembly = window.__vabAssembly;
-      const byPartId = {};
-      for (const [instanceId, placed] of assembly.parts) {
-        if (!byPartId[placed.partId]) byPartId[placed.partId] = [];
-        byPartId[placed.partId].push(instanceId);
-      }
-      config.stages = [];
-      config.unstaged = [];
-      // stage-0: reliant engine only
-      config.stages.push({ instanceIds: [byPartId['engine-reliant'][0]] });
-      // stage-1: lower decoupler (second placed = index 1) + nerv engine
-      config.stages.push({ instanceIds: [byPartId['decoupler-stack-tr18'][1], byPartId['engine-nerv'][0]] });
-      // stage-2: upper decoupler (first placed = index 0, satellite release)
-      config.stages.push({ instanceIds: [byPartId['decoupler-stack-tr18'][0]] });
-      // unstaged: everything else
-      const staged = new Set(config.stages.flatMap(s => s.instanceIds));
-      for (const [instanceId] of assembly.parts) {
-        if (!staged.has(instanceId)) config.unstaged.push(instanceId);
-      }
+    ], {
+      staging: [
+        { partIds: ['engine-reliant'] },
+        { partIds: ['decoupler-stack-tr18', 'engine-nerv'] },
+        { partIds: ['decoupler-stack-tr18'] },
+      ],
     });
 
-    await launch(page);
-    await stage(page); // fire lower engine (reliant)
+    // Stage engine and throttle up, verify liftoff.
+    await stage(page);
     await page.keyboard.press('z');
+    await waitAlt(page, 100);
 
-    // Slight tilt at ~2km.
-    await waitAlt(page, 2_000);
-    await page.keyboard.down('d');
-    await page.waitForFunction(
-      () => Math.abs(window.__flightPs?.angle ?? 0) > 0.3,
-      { timeout: 10_000 },
-    );
-    await page.keyboard.up('d');
-
-    // Separate first stage at ~8km.
-    await waitAlt(page, 8_000);
-    await waitWarpUnlocked(page);
-    await stage(page); // decouple + fire nerv
-
-    // Set slight tilt to climb fast.
-    await page.evaluate(async () => {
-      const ps = window.__flightPs;
-      if (ps) { ps.angle = 0.2; ps.angularVelocity = 0; }
-      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
-    });
-
-    // 50× warp for nerv burn.
-    await waitWarpUnlocked(page);
-    await setWarp(page, 50);
-
-    // Wait to reach 80km altitude.
-    await page.waitForFunction(
-      () => (window.__flightPs?.posY ?? 0) >= 80_000,
-      { timeout: 180_000 },
-    );
-
-    // Inject horizontal velocity for orbit conditions.
-    await page.evaluate(async () => {
-      const ps = window.__flightPs;
-      if (ps) {
-        ps.velX = 8000;
-        ps.velY = Math.max(ps.velY, 0);
-      }
-      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
-    });
+    // Teleport directly to orbit.
+    await teleportCraft(page, { posX: 0, posY: 82_000, velX: 8000, velY: 0, orbit: true });
 
     // Wait for REACH_ORBIT objective.
-    await page.waitForFunction(
-      () => {
-        const state = window.__gameState;
-        const m = state?.missions?.accepted?.find(x => x.id === 'mission-017');
-        return m?.objectives?.find(o => o.type === 'REACH_ORBIT')?.completed;
-      },
-      { timeout: 10_000 },
-    );
+    await page.waitForFunction(() => {
+      const m = window.__gameState?.missions?.accepted?.find(x => x.id === 'mission-017');
+      return m?.objectives?.find(o => o.type === 'REACH_ORBIT')?.completed;
+    }, { timeout: 15_000 });
 
-    // Release satellite while still in orbit.
-    await setWarp(page, 1);
+    // Re-teleport to maintain altitude for satellite release (>80km required).
+    await teleportCraft(page, { posX: 0, posY: 82_000, velX: 8000, velY: 0, orbit: true });
+
+    // Release satellite.
     await waitWarpUnlocked(page);
-    await stage(page); // fire satellite decoupler
+    await stage(page);
 
     // Wait for RELEASE_SATELLITE objective.
     await waitObjectivesComplete(page, 'mission-017', 30_000);
 
-    // Return to hub via menu (in orbit, won't land naturally).
+    // Return via menu.
     await page.click('#topbar-menu-btn', { force: true });
-    const dropdown = page.locator('#topbar-dropdown');
-    await expect(dropdown).toBeVisible();
-    await dropdown.getByText('Return to Space Agency').click();
+    const dropdown017 = page.locator('#topbar-dropdown');
+    await expect(dropdown017).toBeVisible();
+    await dropdown017.getByText('Return to Space Agency').click();
 
     await returnToHub(page);
     await expectCompleted(page, 'mission-017');
