@@ -4,7 +4,8 @@
  * @module ui/flightController/_keyboard
  */
 
-import { handleKeyDown, handleKeyUp } from '../../core/physics.ts';
+import { handleKeyDown, handleKeyUp, setThrustAligned } from '../../core/physics.ts';
+import { breakThrustAlignment } from '../../core/grabbing.ts';
 import { markThrottleDirty } from './_loop.ts';
 import { hideLaunchTip, lockTimeWarp } from '../flightHud.ts';
 import {
@@ -18,6 +19,7 @@ import {
   getMapZoomLevel,
   setMapZoomLevel,
   cycleMapTarget,
+  getMapTarget,
   toggleMapShadow,
   cycleTransferTarget,
   toggleMapCommsOverlay,
@@ -30,7 +32,7 @@ import {
 import { FlightPhase, ControlMode, DockingState } from '../../core/constants.ts';
 import { getFCState, getPhysicsState, getFlightState } from './_state.ts';
 import { applyTimeWarp, onTimeWarpButtonClick } from './_timeWarp.ts';
-import { toggleMapView, updateMapHud, handleWarpToTarget } from './_mapView.ts';
+import { toggleMapView, updateMapHud, handleWarpToTarget, handleRenameAsteroid } from './_mapView.ts';
 import { cycleDockingTarget, handleUndock, handleFuelTransfer } from './_docking.ts';
 import { toggleDockingMode, toggleRcsModeHandler } from './_orbitRcs.ts';
 import { showPhaseNotification } from './_flightPhase.ts';
@@ -127,6 +129,18 @@ export function onKeyDown(e: KeyboardEvent): void {
       }
       return;
     }
+    // R — rename targeted persistent asteroid.
+    if (e.code === 'KeyR') {
+      const rTargetId = getMapTarget();
+      const rTargetObj = rTargetId && s.state
+        ? (s.state.orbitalObjects || []).find(o => o.id === rTargetId && o.type === 'asteroid')
+        : null;
+      if (rTargetObj) {
+        e.preventDefault();
+        handleRenameAsteroid();
+        return;
+      }
+    }
     // WASD — orbital-relative thrust (tracked separately, applied in _loop).
     const lower = e.key.toLowerCase();
     if (lower === 'w' || lower === 's' || lower === 'a' || lower === 'd') {
@@ -148,6 +162,21 @@ export function onKeyDown(e: KeyboardEvent): void {
     e.preventDefault();
     handleUndock();
     return;
+  }
+
+  // Y — align thrust through combined CoM (asteroid capture).
+  if (e.code === 'KeyY' && !s.mapActive) {
+    if (ps.capturedAsteroidMass > 0) {
+      e.preventDefault();
+      if (ps.thrustAligned) {
+        showPhaseNotification('Thrust already aligned');
+      } else {
+        setThrustAligned(ps, true);
+        resyncWorkerState(ps, s.assembly!, s.stagingConfig!, flightState!).catch(() => {});
+        showPhaseNotification('Thrust aligned through CoM');
+      }
+      return;
+    }
   }
 
   // F — transfer fuel from docked depot.
@@ -236,6 +265,15 @@ export function onKeyDown(e: KeyboardEvent): void {
       s.normalOrbitHeldKeys.add(lower);
       return;
     }
+  }
+
+  // Manual rotation breaks asteroid thrust alignment (TASK-027).
+  if ((e.key === 'a' || e.key === 'd' || e.key === 'A' || e.key === 'D' ||
+       e.key === 'ArrowLeft' || e.key === 'ArrowRight') &&
+      ps.capturedAsteroidMass > 0 && ps.thrustAligned) {
+    breakThrustAlignment(ps);
+    resyncWorkerState(ps, s.assembly!, s.stagingConfig!, flightState!).catch(() => {});
+    showPhaseNotification('Thrust alignment lost');
   }
 
   const prevThrottle = ps.throttle;

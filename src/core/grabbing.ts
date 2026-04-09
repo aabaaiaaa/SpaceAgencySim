@@ -31,6 +31,7 @@ import { getOrbitalStateAtTime, angularDistance, getAltitudeBand, circularOrbitV
 import { getBeltZoneAtAltitude } from './asteroidBelt.ts';
 import { getPartById } from '../data/parts.ts';
 import type { PartDef } from '../data/parts.ts';
+import { setThrustAligned } from './physics.ts';
 import type { PhysicsState, RocketAssembly } from './physics.ts';
 import type { FlightState, FlightEvent, GameState, OrbitalObject, SatelliteRecord } from './gameState.ts';
 import type { Asteroid } from './asteroidBelt.ts';
@@ -294,6 +295,49 @@ export function releaseGrabbedAsteroid(
   grabState.grabbedAsteroid = null;
   grabState.state = GrabState.RELEASING;
   return { success: true, asteroid };
+}
+
+// ---------------------------------------------------------------------------
+// Thrust alignment (TASK-027)
+// ---------------------------------------------------------------------------
+
+/**
+ * Align thrust through the combined CoM after asteroid capture.
+ * The grabbing arm articulates to position the asteroid so that the engine
+ * thrust vector passes through the combined centre of mass, eliminating
+ * rotational torque from off-axis thrust.
+ *
+ * @returns `{ success: true }` when alignment is set, or `{ success: false, reason }` on failure.
+ */
+export function alignThrustWithAsteroid(
+  grabState: GrabSystemState,
+  ps: PhysicsState,
+): { success: boolean; reason?: string } {
+  if (grabState.state !== GrabState.GRABBED) {
+    return { success: false, reason: 'Arm is not grabbing anything.' };
+  }
+  if (!grabState.grabbedAsteroid) {
+    return { success: false, reason: 'No asteroid captured.' };
+  }
+  if (ps.capturedAsteroidMass <= 0) {
+    return { success: false, reason: 'No captured asteroid mass.' };
+  }
+  if (ps.thrustAligned) {
+    return { success: false, reason: 'Thrust is already aligned.' };
+  }
+
+  setThrustAligned(ps, true);
+  return { success: true };
+}
+
+/**
+ * Break thrust alignment after manual rotation.
+ * Called when the player rotates the craft while an asteroid is captured.
+ */
+export function breakThrustAlignment(ps: PhysicsState): void {
+  if (ps.capturedAsteroidMass > 0 && ps.thrustAligned) {
+    setThrustAligned(ps, false);
+  }
 }
 
 // ---------------------------------------------------------------------------

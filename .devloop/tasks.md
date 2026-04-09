@@ -179,7 +179,7 @@ All tasks reference `.devloop/requirements.md` for full context.
 - **Verification**: `npm run typecheck` passes. `npx vitest run src/tests/physics src/tests/grabbing` passes — tests verify mass increase, CoM shift, and rotational effect.
 
 ### TASK-027: Implement thrust alignment action
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-026
 - **Description**: Add an "Align Thrust" player action to the grabbing arm UI. When activated, the arm articulates to position the captured asteroid so the engine thrust vector passes through the combined CoM, eliminating rotational torque. The player can still manually rotate the assembly before/after alignment. Re-aligning is needed after manual rotation. See requirements §5.7.
 - **Verification**: `npm run typecheck` passes. `npx vitest run src/tests/grabbing` passes — tests verify alignment eliminates torque, manual rotation breaks alignment, re-align restores it.
@@ -191,7 +191,7 @@ All tasks reference `.devloop/requirements.md` for full context.
 - **Verification**: `npm run typecheck` passes. `npx vitest run src/tests/asteroidBelt src/tests/grabbing` passes — tests verify persistence outside belt, non-persistence inside belt, correct orbital elements.
 
 ### TASK-029: Add asteroid rename UI
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-028
 - **Description**: Add a rename action for captured (persistent) asteroids in the map view UI. When targeting a persistent asteroid (type 'asteroid' in orbitalObjects), show a rename option. Auto-generated `AST-XXXX` name is the default. Player enters a new name. Update the orbital object's name in gameState. See requirements §5.8.
 - **Verification**: `npm run typecheck` passes. Manual: target a persistent asteroid on the map, rename it, verify the new name appears in the map and targeting HUD.

@@ -35,6 +35,7 @@ import { isPlayerLocked, getPhaseLabel } from '../../core/flightPhase.ts';
 import { getFCState, getPhysicsState, getFlightState } from './_state.ts';
 import { showPhaseNotification } from './_flightPhase.ts';
 import { resyncWorkerState } from './_workerBridge.ts';
+import { escapeHtml } from '../escapeHtml.ts';
 
 // Re-export setMapTarget for use by _docking.js.
 export { setMapTarget };
@@ -190,6 +191,79 @@ export function handleWarpToTarget(): void {
   showPhaseNotification(`Warped to ${targetObj.name}`);
 }
 
+/**
+ * Handle renaming a persistent (captured) asteroid.
+ * Shows a modal dialog prompting for a new name.
+ */
+export function handleRenameAsteroid(): void {
+  const s = getFCState();
+  if (!s.state) return;
+
+  const targetId: string | null = getMapTarget();
+  if (!targetId) {
+    showPhaseNotification('No target selected');
+    return;
+  }
+
+  const obj = (s.state.orbitalObjects || []).find(o => o.id === targetId);
+  if (!obj || obj.type !== 'asteroid') {
+    showPhaseNotification('Can only rename captured asteroids');
+    return;
+  }
+
+  // Prevent opening multiple rename dialogs.
+  if (document.getElementById('rename-asteroid-overlay')) return;
+
+  // Create a simple prompt overlay.
+  const overlay = document.createElement('div');
+  overlay.id = 'rename-asteroid-overlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:10000;';
+
+  const dialog = document.createElement('div');
+  dialog.style.cssText = 'background:#1a1a2e;border:1px solid #444;border-radius:8px;padding:20px;min-width:300px;color:#fff;';
+  dialog.innerHTML = `
+    <div style="font-size:16px;margin-bottom:12px;">Rename Asteroid</div>
+    <input type="text" id="rename-asteroid-input" value="${escapeHtml(obj.name)}"
+           style="width:100%;padding:8px;background:#0d0d1a;border:1px solid #555;color:#fff;border-radius:4px;box-sizing:border-box;font-size:14px;"
+           maxlength="32" />
+    <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end;">
+      <button id="rename-asteroid-cancel" style="padding:6px 16px;background:#333;border:1px solid #555;color:#ccc;border-radius:4px;cursor:pointer;">Cancel</button>
+      <button id="rename-asteroid-confirm" style="padding:6px 16px;background:#2a5298;border:1px solid #4a82d8;color:#fff;border-radius:4px;cursor:pointer;">Rename</button>
+    </div>
+  `;
+  overlay.appendChild(dialog);
+  document.body.appendChild(overlay);
+
+  const input = document.getElementById('rename-asteroid-input') as HTMLInputElement;
+  input.select();
+  input.focus();
+
+  function close(): void {
+    overlay.remove();
+  }
+
+  function confirm(): void {
+    const newName = input.value.trim();
+    if (newName && newName !== obj!.name) {
+      obj!.name = newName;
+      showPhaseNotification(`Renamed to "${escapeHtml(newName)}"`);
+      updateMapHud();
+    }
+    close();
+  }
+
+  document.getElementById('rename-asteroid-cancel')!.addEventListener('click', close);
+  document.getElementById('rename-asteroid-confirm')!.addEventListener('click', confirm);
+  input.addEventListener('keydown', (ev: KeyboardEvent) => {
+    if (ev.key === 'Enter') { ev.preventDefault(); confirm(); }
+    if (ev.key === 'Escape') { ev.preventDefault(); close(); }
+    ev.stopPropagation(); // prevent game keyboard handler from firing
+  });
+  overlay.addEventListener('click', (ev: MouseEvent) => {
+    if (ev.target === overlay) close();
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Map HUD overlay
 // ---------------------------------------------------------------------------
@@ -225,6 +299,7 @@ export function buildMapHud(): void {
     '<kbd>M</kbd> Flight view \u00b7 ' +
     '<kbd>Tab</kbd> Zoom \u00b7 ' +
     '<kbd>T</kbd> Target \u00b7 ' +
+    '<kbd>R</kbd> Rename \u00b7 ' +
     '<kbd>B</kbd> Transfer target \u00b7 ' +
     '<kbd>G</kbd> Warp to target \u00b7 ' +
     '<kbd>N</kbd> Shadow \u00b7 ' +
@@ -240,6 +315,14 @@ export function buildMapHud(): void {
   warpBtn.textContent = 'Warp to Target';
   warpBtn.addEventListener('click', handleWarpToTarget);
   hud.appendChild(warpBtn);
+
+  // Rename asteroid button (shown when targeting a persistent asteroid).
+  const renameBtn: HTMLButtonElement = document.createElement('button');
+  renameBtn.id = 'map-rename-btn';
+  renameBtn.className = 'hidden';
+  renameBtn.textContent = 'Rename Asteroid';
+  renameBtn.addEventListener('click', handleRenameAsteroid);
+  hud.appendChild(renameBtn);
 
   s.mapHud = hud;
   const host: HTMLElement = s.container || document.getElementById('ui-overlay') || document.body;
@@ -307,6 +390,11 @@ export function updateMapHud(): void {
     // Warp button available for orbital objects; not for asteroids (they're transient).
     warpBtn.classList.toggle('hidden',
       !targetObj || !flightState.orbitalElements || flightState.phase !== FlightPhase.ORBIT);
+  }
+  const renameBtn = s.mapHud.querySelector('#map-rename-btn');
+  if (renameBtn) {
+    // Rename button shown only when targeting a persistent (captured) asteroid.
+    renameBtn.classList.toggle('hidden', !targetObj || targetObj.type !== 'asteroid');
   }
 
   // Transfer target route info.
