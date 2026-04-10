@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * techtree.test.js — Unit tests for the technology tree system.
  *
@@ -13,8 +12,9 @@
  *   - Save/load backward compatibility
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
+import type { GameState } from '../core/gameState.ts';
 import {
   isNodeResearched,
   isNodeTutorialUnlocked,
@@ -39,10 +39,9 @@ import {
 } from '../data/techtree.ts';
 import {
   getAvailableInstruments,
-  getInstrumentsByTier,
 } from '../data/instruments.ts';
 import { getUnlockedParts } from '../core/missions.ts';
-import { FacilityId, RD_TIER_MAX_TECH } from '../core/constants.ts';
+import { FacilityId } from '../core/constants.ts';
 import { buildFacility } from '../core/construction.ts';
 
 // ---------------------------------------------------------------------------
@@ -50,7 +49,7 @@ import { buildFacility } from '../core/construction.ts';
 // ---------------------------------------------------------------------------
 
 /** Fresh game state, non-tutorial mode, with R&D Lab built. */
-function readyState() {
+function readyState(): GameState {
   const state = createGameState();
   state.tutorialMode = false;
   state.money = 10_000_000;
@@ -60,7 +59,7 @@ function readyState() {
 }
 
 /** Fresh game state, non-tutorial mode, NO R&D Lab. */
-function noLabState() {
+function noLabState(): GameState {
   const state = createGameState();
   state.tutorialMode = false;
   state.money = 10_000_000;
@@ -165,7 +164,7 @@ describe('Tech Tree Data', () => {
 
   describe('Lookup helpers', () => {
     it('getTechNodeById returns the correct node', () => {
-      const node = getTechNodeById('prop-t1');
+      const node = getTechNodeById('prop-t1')!;
       expect(node).toBeDefined();
       expect(node.name).toBe('Improved Spark');
     });
@@ -183,7 +182,7 @@ describe('Tech Tree Data', () => {
     });
 
     it('getNodeByBranchAndTier returns the correct node', () => {
-      const node = getNodeByBranchAndTier(TechBranch.SCIENCE, 3);
+      const node = getNodeByBranchAndTier(TechBranch.SCIENCE, 3)!;
       expect(node).toBeDefined();
       expect(node.id).toBe('sci-t3');
       expect(node.name).toBe('Field Instruments');
@@ -248,6 +247,7 @@ describe('Tech Tree Core Logic', () => {
 
     it('handles missing techTree gracefully', () => {
       const state = readyState();
+      // @ts-expect-error Simulating older save missing techTree
       delete state.techTree;
       expect(isNodeResearched(state, 'prop-t1')).toBe(false);
     });
@@ -485,6 +485,7 @@ describe('Tech Tree Core Logic', () => {
 
     it('handles missing techTree gracefully on older saves', () => {
       const state = readyState();
+      // @ts-expect-error Simulating older save missing techTree
       delete state.techTree;
       const result = researchNode(state, 'prop-t1');
       expect(result.success).toBe(true);
@@ -559,7 +560,7 @@ describe('Tech Tree Aggregation', () => {
       const state = readyState();
       researchNode(state, 'prop-t1');
       const status = getTechTreeStatus(state);
-      const prop1 = status.find((n) => n.id === 'prop-t1');
+      const prop1 = status.find((n) => n.id === 'prop-t1')!;
       expect(prop1.researched).toBe(true);
       expect(prop1.unlocked).toBe(true);
       expect(prop1.canResearch).toBe(false);
@@ -569,7 +570,7 @@ describe('Tech Tree Aggregation', () => {
       const state = readyState();
       state.parts.push('parachute-mk2');
       const status = getTechTreeStatus(state);
-      const recov1 = status.find((n) => n.id === 'recov-t1');
+      const recov1 = status.find((n) => n.id === 'recov-t1')!;
       expect(recov1.tutorialUnlocked).toBe(true);
       expect(recov1.unlocked).toBe(true);
       expect(recov1.researched).toBe(false);
@@ -578,7 +579,7 @@ describe('Tech Tree Aggregation', () => {
     it('marks available-to-research T1 nodes correctly', () => {
       const state = readyState();
       const status = getTechTreeStatus(state);
-      const prop1 = status.find((n) => n.id === 'prop-t1');
+      const prop1 = status.find((n) => n.id === 'prop-t1')!;
       expect(prop1.canResearch).toBe(true);
       expect(prop1.unlocked).toBe(false);
     });

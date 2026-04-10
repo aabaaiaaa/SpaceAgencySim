@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * ui-escapeHtml.test.ts — Unit tests for the shared HTML escaping utility.
  */

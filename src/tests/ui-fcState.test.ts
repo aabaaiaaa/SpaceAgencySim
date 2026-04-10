@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * ui-fcState.test.ts — Unit tests for flight controller state management.
  *

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * trackingStationTiers.test.js — Unit tests for Tracking Station facility tiers (TASK-035).
  *
@@ -29,11 +28,13 @@ import {
   MapZoom,
 } from '../core/mapView.ts';
 
+import type { GameState } from '../core/gameState.ts';
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeState(tier = 0) {
+function makeState(tier: number = 0): GameState {
   const state = createGameState();
   if (tier > 0) {
     state.facilities[FacilityId.TRACKING_STATION] = { built: true, tier };

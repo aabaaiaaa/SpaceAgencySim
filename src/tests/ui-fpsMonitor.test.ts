@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * ui-fpsMonitor.test.ts — Unit tests for the FPS monitor ring buffer stats.
  *
@@ -15,13 +14,39 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 vi.mock('../ui/fpsMonitor.css', () => ({}));
 
+interface MockCanvasContext {
+  clearRect: ReturnType<typeof vi.fn>;
+  fillRect: ReturnType<typeof vi.fn>;
+  strokeRect: ReturnType<typeof vi.fn>;
+  beginPath: ReturnType<typeof vi.fn>;
+  moveTo: ReturnType<typeof vi.fn>;
+  lineTo: ReturnType<typeof vi.fn>;
+  stroke: ReturnType<typeof vi.fn>;
+  fillStyle: string;
+  strokeStyle: string;
+  lineWidth: number;
+}
+
+interface MockElement {
+  id: string;
+  style: { display: string };
+  textContent: string;
+  className: string;
+  classList: { add: ReturnType<typeof vi.fn>; remove: ReturnType<typeof vi.fn> };
+  width: number;
+  height: number;
+  appendChild: ReturnType<typeof vi.fn>;
+  remove: ReturnType<typeof vi.fn>;
+  getContext: ReturnType<typeof vi.fn>;
+}
+
 // We need a minimal DOM for the module to function.
 // Create the minimum DOM elements it expects.
-const _elements = new Map();
+const _elements = new Map<string, MockElement>();
 
 const mockDocument = {
-  createElement: vi.fn((_tag) => {
-    const el = {
+  createElement: vi.fn((_tag: string): MockElement => {
+    const el: MockElement = {
       id: '',
       style: { display: '' },
       textContent: '',
@@ -31,7 +56,7 @@ const mockDocument = {
       height: 0,
       appendChild: vi.fn(),
       remove: vi.fn(),
-      getContext: vi.fn(() => ({
+      getContext: vi.fn((): MockCanvasContext => ({
         clearRect: vi.fn(),
         fillRect: vi.fn(),
         strokeRect: vi.fn(),
@@ -49,7 +74,7 @@ const mockDocument = {
   body: {
     appendChild: vi.fn(),
   },
-  getElementById: vi.fn(() => null),
+  getElementById: vi.fn((): null => null),
 };
 
 // Set up globals before importing the module.
@@ -83,8 +108,8 @@ describe('fpsMonitor', () => {
   describe('initFpsMonitor()', () => {
     it('sets up window.__perfStats', () => {
       expect(window.__perfStats).toBeDefined();
-      expect(window.__perfStats.fps).toBe(0);
-      expect(window.__perfStats.frameTime).toBe(0);
+      expect(window.__perfStats!.fps).toBe(0);
+      expect(window.__perfStats!.frameTime).toBe(0);
     });
 
     it('does not re-initialise if called twice', () => {
@@ -98,8 +123,8 @@ describe('fpsMonitor', () => {
     it('computes FPS from a single frame time', () => {
       recordFrame(16.67, 1000);
       expect(window.__perfStats).toBeDefined();
-      expect(window.__perfStats.fps).toBeCloseTo(60, 0);
-      expect(window.__perfStats.frameTime).toBeCloseTo(16.7, 0);
+      expect(window.__perfStats!.fps).toBeCloseTo(60, 0);
+      expect(window.__perfStats!.frameTime).toBeCloseTo(16.7, 0);
     });
 
     it('computes average frame time from multiple frames', () => {
@@ -108,9 +133,9 @@ describe('fpsMonitor', () => {
       recordFrame(30, 1050);
 
       // Average of 10, 20, 30 = 20
-      expect(window.__perfStats.frameTime).toBeCloseTo(20, 0);
+      expect(window.__perfStats!.frameTime).toBeCloseTo(20, 0);
       // FPS = 1000 / 20 = 50
-      expect(window.__perfStats.fps).toBeCloseTo(50, 0);
+      expect(window.__perfStats!.fps).toBeCloseTo(50, 0);
     });
 
     it('tracks min and max frame times', () => {
@@ -118,13 +143,13 @@ describe('fpsMonitor', () => {
       recordFrame(50, 1050);
       recordFrame(20, 1070);
 
-      expect(window.__perfStats.minFrameTime).toBeCloseTo(10, 0);
-      expect(window.__perfStats.maxFrameTime).toBeCloseTo(50, 0);
+      expect(window.__perfStats!.minFrameTime).toBeCloseTo(10, 0);
+      expect(window.__perfStats!.maxFrameTime).toBeCloseTo(50, 0);
     });
 
     it('handles zero frame time without crashing', () => {
       recordFrame(0, 1000);
-      expect(window.__perfStats.fps).toBe(0); // 1000/0 → handled
+      expect(window.__perfStats!.fps).toBe(0); // 1000/0 → handled
     });
 
     it('fills ring buffer up to 60 entries', () => {
@@ -133,7 +158,7 @@ describe('fpsMonitor', () => {
         recordFrame(16, 1000 + i * 16);
       }
       // FPS is 1000/16 = 62.5, but Math.round(62.5) = 63 in JS.
-      expect(window.__perfStats.fps).toBe(63);
+      expect(window.__perfStats!.fps).toBe(63);
     });
 
     it('ring buffer wraps correctly after more than 60 frames', () => {
@@ -141,14 +166,14 @@ describe('fpsMonitor', () => {
       for (let i = 0; i < 60; i++) {
         recordFrame(10, 1000 + i * 10);
       }
-      expect(window.__perfStats.frameTime).toBeCloseTo(10, 0);
+      expect(window.__perfStats!.frameTime).toBeCloseTo(10, 0);
 
       // Now add 30 frames at 20ms — old 10ms entries get overwritten
       for (let i = 0; i < 30; i++) {
         recordFrame(20, 2000 + i * 20);
       }
       // Buffer has 30 entries of 10ms and 30 entries of 20ms → avg = 15
-      expect(window.__perfStats.frameTime).toBeCloseTo(15, 0);
+      expect(window.__perfStats!.frameTime).toBeCloseTo(15, 0);
     });
   });
 
@@ -170,7 +195,7 @@ describe('fpsMonitor', () => {
       destroyFpsMonitor();
       initFpsMonitor();
       expect(window.__perfStats).toBeDefined();
-      expect(window.__perfStats.fps).toBe(0);
+      expect(window.__perfStats!.fps).toBe(0);
     });
   });
 });
