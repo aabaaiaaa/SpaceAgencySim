@@ -24,29 +24,18 @@
 import { test, expect, type Page } from '@playwright/test';
 import {
   VP_W, VP_H,
-  buildSaveEnvelope,
   seedAndLoadSave,
   startTestFlight,
   getGameState,
-  getFlightState,
   getPhysicsSnapshot,
-  setMalfunctionMode,
   getMalfunctionMode,
   waitForAltitude,
   buildCrewMember,
-  buildContract,
-  buildObjective,
-  ALL_FACILITIES,
-  STARTER_FACILITIES,
-  FacilityId,
   navigateToVab,
 } from './helpers.js';
 import {
   freshStartFixture,
-  earlyGameFixture,
   midGameFixture,
-  ALL_PARTS,
-  MID_PARTS,
 } from './fixtures.js';
 
 // ---------------------------------------------------------------------------
@@ -76,14 +65,6 @@ interface WeatherState {
   seed: number;
 }
 
-interface ReputationTier {
-  min: number;
-  max: number;
-  label: string;
-  crewCostModifier: number;
-  facilityDiscount: number;
-}
-
 interface GameStateSnapshot {
   money: number;
   reputation: number;
@@ -101,7 +82,6 @@ interface GameStateSnapshot {
 // ---------------------------------------------------------------------------
 
 const BASIC_ROCKET: string[]      = ['probe-core-mk1', 'tank-small', 'engine-spark'];
-const CREWED_ROCKET: string[]     = ['cmd-mk1', 'tank-small', 'engine-spark', 'parachute-mk1'];
 const ENGINE_ROCKET: string[]     = ['probe-core-mk1', 'tank-small', 'engine-spark'];
 const SRB_ROCKET: string[]        = ['probe-core-mk1', 'srb-small'];
 const CHUTE_ROCKET: string[]      = ['probe-core-mk1', 'tank-small', 'engine-spark', 'parachute-mk1'];
@@ -151,12 +131,6 @@ async function dismissReturnResults(page: Page): Promise<void> {
     await dismissBtn.waitFor({ state: 'visible', timeout: 5_000 });
     await dismissBtn.click();
   } catch { /* No overlay */ }
-}
-
-async function completeFlightCycle(page: Page, parts: string[] = BASIC_ROCKET): Promise<void> {
-  await startTestFlight(page, parts);
-  await returnToAgency(page);
-  await dismissReturnResults(page);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1402,14 +1376,13 @@ test.describe('Reputation score changes from events', () => {
       const gs = window.__gameState;
       gs.reputation = 150; // Over max
     });
-    let gs = await getGameState(page) as GameStateSnapshot;
     // The raw value may be 150 in state, but getReputationTier clamps it
     // Let's reset and verify clamp behavior
     await page.evaluate(() => {
       const gs = window.__gameState;
       gs.reputation = Math.max(0, Math.min(100, gs.reputation));
     });
-    gs = await getGameState(page) as GameStateSnapshot;
+    const gs = await getGameState(page) as GameStateSnapshot;
     expect(gs.reputation).toBe(100);
 
     // Reset to a reasonable value for subsequent tests

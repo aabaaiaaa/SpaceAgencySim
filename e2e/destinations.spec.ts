@@ -25,7 +25,6 @@ import {
   getFlightState,
   getPhysicsSnapshot,
   waitForAltitude,
-  waitForFlightEvent,
   buildCrewMember,
   ALL_FACILITIES,
   teleportCraft,
@@ -33,7 +32,6 @@ import {
 } from './helpers.js';
 import type { SaveEnvelope, SaveEnvelopeParams } from './helpers.js';
 import {
-  orbitalFixture,
   ALL_PARTS,
 } from './fixtures.js';
 
@@ -66,8 +64,6 @@ const EARTH_ORBIT_ALT: number = 100_000;
 const EARTH_ORBIT_VEL: number = 7848;
 const MOON_ORBIT_ALT: number  = 20_000;
 const MOON_ORBIT_VEL: number  = 1671;  // Circular velocity at 20 km above Moon surface
-const MARS_ORBIT_ALT: number  = 100_000;
-const MARS_ORBIT_VEL: number  = 3503;  // Circular velocity at 100 km above Mars surface
 
 // Sun constants from src/core/constants.js.
 const SUN_DESTRUCTION_ALTITUDE: number   = 500_000_000;
@@ -76,7 +72,6 @@ const SUN_HEAT_START_ALTITUDE: number    = 20_000_000_000;
 // Surface ops constants.
 const FLAG_MILESTONE_BONUS: number = 100_000;
 const FLAG_MILESTONE_REP: number   = 5;
-const SURFACE_SAMPLE_BASE_SCIENCE: number = 15;
 const SURFACE_INSTRUMENT_SCIENCE_PER_PERIOD: number = 3;
 
 // ---------------------------------------------------------------------------
@@ -311,7 +306,7 @@ test.describe('Celestial body data drives physics and rendering', () => {
   test.afterAll(async () => { await page.close(); });
 
   test('(1) body catalog is accessible and contains all expected bodies', async () => {
-    const bodies = await page.evaluate((): string[] | null => {
+    const _bodies = await page.evaluate((): string[] | null => {
       const mod = window.__celestialBodies || (window.__gameState as unknown as Record<string, unknown> | undefined)?._bodyCache;
       // Fallback: check if CELESTIAL_BODIES is exposed via any global.
       if (mod) return Object.keys(mod);
@@ -1874,7 +1869,7 @@ test.describe('Map view controls during transfer', () => {
     await page.evaluate(() => new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r()))));
 
     // Check if map view is active.
-    const mapActive: boolean = await page.evaluate((): boolean => {
+    const _mapActive: boolean = await page.evaluate((): boolean => {
       return window.__mapViewActive === true ||
              (document.querySelector('#map-overlay') as HTMLElement | null)?.style.display !== 'none' ||
              document.querySelector('[data-testid="map-view"]') !== null;

@@ -2,8 +2,6 @@ import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import {
   VP_W, VP_H,
-  CENTRE_X, CANVAS_CENTRE_Y,
-  dragPartToCanvas, placePart,
   seedAndLoadSave, navigateToVab,
   teleportCraft, startTestFlight,
 } from './helpers.js';
@@ -115,53 +113,6 @@ const STARTER_PARTS: string[] = [
   'cmd-mk1', 'probe-core-mk1', 'tank-small', 'engine-spark',
   'parachute-mk1', 'decoupler-stack-tr18',
 ];
-
-// ---------------------------------------------------------------------------
-// Part snap-point geometry  (offset from centre, screen-space)
-// ---------------------------------------------------------------------------
-
-interface PartGeometry {
-  topY?: number;
-  botY?: number;
-  leftX?: number;
-  rightX?: number;
-}
-
-const GEO: Record<string, PartGeometry> = {
-  'cmd-mk1':              { topY: -20, botY: 20,  leftX: -20, rightX: 20 },
-  'probe-core-mk1':       { topY:  -5, botY:  5 },
-  'tank-small':            { topY: -20, botY: 20,  leftX: -10, rightX: 10 },
-  'tank-medium':           { topY: -30, botY: 30,  leftX: -15, rightX: 15 },
-  'tank-large':            { topY: -50, botY: 50,  leftX: -20, rightX: 20 },
-  'engine-spark':          { topY: -15, botY: 15 },
-  'engine-reliant':        { topY: -20, botY: 20 },
-  'engine-nerv':           { topY: -20, botY: 20 },
-  'engine-poodle':         { topY: -15, botY: 15 },
-  'parachute-mk1':         { topY:  -5, botY:  5,  leftX: -10, rightX: 10 },
-  'parachute-mk2':         { topY:  -7, botY:  7,  leftX: -15, rightX: 15 },
-  'decoupler-stack-tr18':  { topY:  -5, botY:  5 },
-  'decoupler-radial':      { leftX: -5, rightX: 5 },
-  'science-module-mk1':    { topY: -10, botY: 10,  leftX: -15, rightX: 15 },
-  'satellite-mk1':         { topY: -10, botY: 10 },
-  'landing-legs-small':    { leftX: -5, rightX: 5 },
-  'landing-legs-large':    { leftX: -7, rightX: 7 },
-  'srb-small':             { topY: -40, leftX: -10, rightX: 10 },
-  'srb-large':             { topY: -60, leftX: -15, rightX: 15 },
-};
-
-/**
- * Compute screen-Y positions for a vertical stack of parts.
- * Parts are listed top-to-bottom.  The first part is placed at `anchorY`.
- */
-function stackYs(partIds: string[], anchorY: number = CANVAS_CENTRE_Y): number[] {
-  const ys: number[] = [anchorY];
-  for (let i = 1; i < partIds.length; i++) {
-    const prev = GEO[partIds[i - 1]];
-    const curr = GEO[partIds[i]];
-    ys.push(ys[i - 1] + prev.botY! - curr.topY!);
-  }
-  return ys;
-}
 
 // ---------------------------------------------------------------------------
 // Mission objective templates  (compact — only the data needed for seeding)
@@ -378,129 +329,9 @@ function buildEnvelope({ completedIds = [], acceptedId, parts, crew = [] }: Buil
   };
 }
 
-/** Minimal crew member for tests requiring crew. */
-function testCrew(): CrewMember {
-  return {
-    id: 'test-pilot-1',
-    name: 'Test Pilot',
-    hireDate: new Date().toISOString(),
-    status: 'active',
-    missionsFlown: 0,
-    flightsFlown: 0,
-    deathDate: null,
-    deathCause: null,
-    assignedRocketId: null,
-  };
-}
-
 // ---------------------------------------------------------------------------
 // Page interaction helpers
 // ---------------------------------------------------------------------------
-
-async function openStaging(page: Page): Promise<void> {
-  const panel = page.locator('#vab-staging-panel');
-  if (!await panel.isVisible()) {
-    await page.click('#vab-btn-staging');
-  }
-  await expect(panel).toBeVisible({ timeout: 3_000 });
-}
-
-async function addStage(page: Page): Promise<void> {
-  await page.click('#vab-staging-add');
-}
-
-async function dragToStage(page: Page, chipText: string, stageIdx: number): Promise<void> {
-  await page.dragAndDrop(
-    `[data-drop-zone="unstaged"] .vab-stage-chip:has-text("${chipText}")`,
-    `[data-drop-zone="stage-${stageIdx}"]`,
-  );
-}
-
-/**
- * Programmatically move an unstaged part to a stage (more reliable than drag-and-drop).
- * Creates intermediate stages if needed.
- */
-async function stagePartFromUnstaged(page: Page, partId: string, stageIdx: number): Promise<void> {
-  await page.evaluate(({ partId, stageIdx }: { partId: string; stageIdx: number }): void => {
-    const w = window as unknown as GameWindow;
-    const config = w.__vabStagingConfig!;
-    const assembly = w.__vabAssembly!;
-    const idx = config.unstaged.findIndex((instanceId: string) => {
-      const placed = assembly.parts.get(instanceId);
-      return placed?.partId === partId;
-    });
-    if (idx < 0) throw new Error(`No unstaged part found: ${partId}`);
-    const [instanceId] = config.unstaged.splice(idx, 1);
-    while (config.stages.length <= stageIdx) {
-      config.stages.push({ instanceIds: [] });
-    }
-    config.stages[stageIdx].instanceIds.push(instanceId);
-  }, { partId, stageIdx });
-}
-
-/**
- * Move a part from one stage to another.
- */
-async function movePartBetweenStages(page: Page, partId: string, fromStageIdx: number, toStageIdx: number): Promise<void> {
-  await page.evaluate(({ partId, fromStageIdx, toStageIdx }: { partId: string; fromStageIdx: number; toStageIdx: number }): void => {
-    const w = window as unknown as GameWindow;
-    const config = w.__vabStagingConfig!;
-    const assembly = w.__vabAssembly!;
-    const stage = config.stages[fromStageIdx];
-    const idx = stage.instanceIds.findIndex((instanceId: string) => {
-      const placed = assembly.parts.get(instanceId);
-      return placed?.partId === partId;
-    });
-    if (idx < 0) throw new Error(`No part ${partId} in stage ${fromStageIdx}`);
-    const [instanceId] = stage.instanceIds.splice(idx, 1);
-    while (config.stages.length <= toStageIdx) {
-      config.stages.push({ instanceIds: [] });
-    }
-    config.stages[toStageIdx].instanceIds.push(instanceId);
-  }, { partId, fromStageIdx, toStageIdx });
-}
-
-async function launch(page: Page, { selectCrew = false }: { selectCrew?: boolean } = {}): Promise<void> {
-  const btn = page.locator('#vab-btn-launch');
-  await expect(btn).not.toBeDisabled({ timeout: 5_000 });
-  await btn.click();
-  // Handle crew dialog.
-  await page.waitForSelector('#vab-crew-overlay', { state: 'visible', timeout: 5_000 });
-  if (selectCrew) {
-    await page.selectOption('.vab-crew-seat-select[data-seat="0"]', 'test-pilot-1');
-  }
-  await page.click('#vab-crew-confirm');
-  // Wait for flight.
-  await page.waitForSelector('#flight-hud', { state: 'visible', timeout: 15_000 });
-  await page.waitForFunction(
-    (): boolean => (window as unknown as GameWindow).__flightPs != null,
-    { timeout: 10_000 },
-  );
-}
-
-/** Launch from a rocket with probe core (no crew dialog). */
-async function launchProbe(page: Page): Promise<void> {
-  const btn = page.locator('#vab-btn-launch');
-  await expect(btn).not.toBeDisabled({ timeout: 5_000 });
-  await btn.click();
-  // Probe cores have no seats — no crew dialog appears. Go straight to flight.
-  // But if a cmd-mk1 is on the rocket, the dialog WILL appear.
-  // Try to detect and handle both cases.
-  const crewOverlay = page.locator('#vab-crew-overlay');
-  const flightHud   = page.locator('#flight-hud');
-  const which = await Promise.race([
-    crewOverlay.waitFor({ state: 'visible', timeout: 10_000 }).then(() => 'crew' as const),
-    flightHud.waitFor({ state: 'visible', timeout: 10_000 }).then(() => 'flight' as const),
-  ]);
-  if (which === 'crew') {
-    await page.click('#vab-crew-confirm');
-    await page.waitForSelector('#flight-hud', { state: 'visible', timeout: 15_000 });
-  }
-  await page.waitForFunction(
-    (): boolean => (window as unknown as GameWindow).__flightPs != null,
-    { timeout: 10_000 },
-  );
-}
 
 async function stage(page: Page): Promise<void> {
   await page.keyboard.press('Space');
@@ -546,17 +377,6 @@ async function waitLanded(page: Page, timeout: number = 60_000): Promise<void> {
       return ps?.landed === true || ps?.crashed === true;
     },
     { timeout },
-  );
-}
-
-async function waitOrbit(page: Page, alt: number, vel: number, timeout: number = 180_000): Promise<void> {
-  await page.waitForFunction(
-    ([a, v]: [number, number]): boolean => {
-      const ps = (window as unknown as GameWindow).__flightPs;
-      if (!ps) return false;
-      return ps.posY >= a && Math.hypot(ps.velX, ps.velY) >= v;
-    },
-    [alt, vel] as [number, number], { timeout },
   );
 }
 
@@ -665,31 +485,6 @@ async function expectPartInVab(page: Page, partId: string): Promise<void> {
   await expect(
     page.locator(`.vab-part-card[data-part-id="${partId}"]`),
   ).toBeVisible({ timeout: 5_000 });
-}
-
-// ---------------------------------------------------------------------------
-// Rocket build helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Build a vertical stack of parts in the VAB.
- * `parts` are listed top-to-bottom.  The first part is placed at anchorY.
- */
-async function buildStack(page: Page, parts: string[], anchorY: number = CANVAS_CENTRE_Y): Promise<void> {
-  const ys = stackYs(parts, anchorY);
-  for (let i = 0; i < parts.length; i++) {
-    await placePart(page, parts[i], CENTRE_X, ys[i], i + 1);
-  }
-}
-
-/**
- * Place a radial part on the LEFT side of a parent part.
- */
-async function placeRadialLeft(page: Page, radialPartId: string, parentPartId: string, parentY: number): Promise<void> {
-  const parent = GEO[parentPartId];
-  const child  = GEO[radialPartId];
-  const x = CENTRE_X + parent.leftX! - child.rightX!;
-  await dragPartToCanvas(page, radialPartId, x, parentY);
 }
 
 // ---------------------------------------------------------------------------

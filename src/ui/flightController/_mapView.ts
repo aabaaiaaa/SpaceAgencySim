@@ -285,8 +285,8 @@ export function buildMapHud(): void {
     <div>Body: <span data-field="body">Earth</span></div>
     <div>Target: <span class="map-target" data-field="target">None</span></div>
     <div>Phase: <span data-field="phase"></span></div>
-    <div data-field="transfer-info" style="color:#ffcc44;margin-top:4px;display:none"></div>
-    <div data-field="transfer-progress" style="color:#ff6644;margin-top:4px;display:none"></div>
+    <div data-field="transfer-info" class="transfer-info"></div>
+    <div data-field="transfer-progress" class="transfer-progress"></div>
   `;
   hud.appendChild(info);
 

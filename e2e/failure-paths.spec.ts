@@ -35,8 +35,6 @@ import {
 const BASIC_ROCKET: string[]  = ['probe-core-mk1', 'tank-small', 'engine-spark'];
 const CREWED_ROCKET: string[] = ['cmd-mk1', 'tank-small', 'engine-spark'];
 
-const DEATH_FINE: number = 500_000;
-
 // ---------------------------------------------------------------------------
 // Local type aliases for game state accessed via page.evaluate()
 // ---------------------------------------------------------------------------
@@ -320,7 +318,7 @@ test.describe('Crew KIA on crash', () => {
     expect(summaryText).toContain('500,000');
 
     // Record money before clicking return (flight return applies the fine).
-    const moneyBeforeReturn: number | null = await page.evaluate((): number | null => {
+    const _moneyBeforeReturn: number | null = await page.evaluate((): number | null => {
       const w = window as unknown as GameWindow;
       return (w.__gameState?.money as number) ?? null;
     });

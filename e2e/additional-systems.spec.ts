@@ -24,7 +24,6 @@ import {
   seedAndLoadSave,
   startTestFlight,
   getGameState,
-  getFlightState,
   getPhysicsSnapshot,
   waitForAltitude,
   waitForFlightEvent,
@@ -37,7 +36,6 @@ import {
 } from './helpers.js';
 import type { SaveEnvelope, SaveEnvelopeParams } from './helpers.js';
 import {
-  orbitalFixture,
   ALL_PARTS,
 } from './fixtures.js';
 
@@ -178,15 +176,10 @@ const FULL_PARTS: string[] = [
 
 const BASIC_PROBE: string[] = ['probe-core-mk1', 'tank-small', 'engine-spark'];
 const BASIC_CREWED: string[] = ['cmd-mk1', 'tank-small', 'engine-spark', 'parachute-mk1'];
-const SHIELDED_PROBE: string[] = ['probe-core-mk1', 'heat-shield-mk2', 'tank-small', 'engine-spark'];
 
 // Orbital parameters.
 const EARTH_ORBIT_ALT = 100_000;
 const EARTH_ORBIT_VEL = 7848;
-
-// Atmosphere / thermal constants from the source.
-const REENTRY_SPEED_THRESHOLD = 1_500;
-const ATMOSPHERE_TOP = 70_000;
 
 /** Shorthand to pass SaveEnvelope to seedAndLoadSave (which accepts Record). */
 function asSave(envelope: SaveEnvelope): Record<string, unknown> {

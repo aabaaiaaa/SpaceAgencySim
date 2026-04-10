@@ -19,17 +19,6 @@ import {
 // the custom __flightPs global.  The cast is erased at compile time.
 // ---------------------------------------------------------------------------
 
-interface DebrisItem {
-  posY: number;
-  velY: number;
-}
-
-interface FlightPs {
-  posY: number;
-  velY: number;
-  debris: DebrisItem[];
-}
-
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------

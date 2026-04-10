@@ -68,9 +68,25 @@ declare global {
     __vabAssembly?: _RocketAssembly;
     __vabStagingConfig?: _StagingConfig;
 
+    // -- From src/render/index.ts --
+    __pixiApp?: unknown;
+
+    // -- From src/render/vab.ts --
+    __vabPartsContainer?: unknown;
+    __vabWorldToScreen?: (x: number, y: number) => { screenX: number; screenY: number };
+
+    // -- From src/ui/fpsMonitor.ts --
+    __perfStats: { fps: number; frameTime: number; minFrameTime: number; maxFrameTime: number } | null;
+
     // -- Additional E2E test hooks (used by spec files) --
     __surfaceAction?: (action: string) => unknown;
     __mapViewActive?: boolean;
+
+    // -- Spec-only properties (referenced in evaluate callbacks but not in source) --
+    __partCatalog?: Array<{ id: string; [key: string]: unknown }>;
+    __constants?: Record<string, unknown>;
+    __crewAPI?: Record<string, unknown>;
+    __consoleErrors?: string[];
   }
 }
 

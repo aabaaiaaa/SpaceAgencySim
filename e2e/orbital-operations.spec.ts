@@ -27,9 +27,6 @@ import {
   startTestFlight,
   getGameState,
   getFlightState,
-  getPhysicsSnapshot,
-  waitForAltitude,
-  waitForFlightEvent,
   buildCrewMember,
   ALL_FACILITIES,
   FacilityId,
@@ -38,7 +35,6 @@ import {
 } from './helpers.js';
 import type { SaveEnvelope, SaveEnvelopeParams } from './helpers.js';
 import {
-  orbitalFixture,
   ALL_PARTS,
 } from './fixtures.js';
 
@@ -98,16 +94,6 @@ interface DockingStateSnapshot {
   [key: string]: unknown;
 }
 
-interface PowerStateSnapshot {
-  solarPanelArea: number;
-  batteryCapacity: number;
-  batteryCharge: number;
-  solarGeneration: number;
-  powerDraw: number;
-  sunlit: boolean;
-  hasPower: boolean;
-}
-
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -127,8 +113,6 @@ const ORBITAL_PARTS: string[] = [
 // Orbital parameters for Earth.
 const EARTH_ORBIT_ALT: number = 100_000;   // 100 km — LEO
 const EARTH_ORBIT_VEL: number = 7848;      // Circular velocity at 100 km
-const MEO_ORBIT_ALT: number = 500_000;     // 500 km — MEO
-const MEO_ORBIT_VEL: number = 7613;        // Circular velocity at 500 km
 
 // Rocket configurations.
 const BASIC_PROBE: string[]    = ['probe-core-mk1', 'tank-small', 'engine-spark'];
@@ -454,11 +438,11 @@ test.describe('Orbital manoeuvres', () => {
 
     // After a prograde burn, velocity should have increased or orbit shape changed.
     // Check velocity changed from the initial value.
-    const velAfter = await page.evaluate(() => {
+    const _velAfter = await page.evaluate(() => {
       const ps = window.__flightPs;
       return ps ? Math.sqrt(ps.velX * ps.velX + ps.velY * ps.velY) : 0;
     });
-    const velMagBefore: number = Math.abs(velBefore);
+    const _velMagBefore: number = Math.abs(velBefore);
     // At minimum, the MANOEUVRE phase was entered and exited, confirming the burn.
     expect(velDuringBurn).not.toBe(0);
   });

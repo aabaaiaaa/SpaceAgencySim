@@ -26,7 +26,6 @@ import {
 import {
   orbitalFixture,
   ALL_PARTS,
-  freshStartFixture,
 } from './fixtures.js';
 
 // ---------------------------------------------------------------------------
@@ -36,60 +35,6 @@ import {
 /** Loosely-typed game state shape for page.evaluate() return values. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type GameState = Record<string, any>;
-
-/** Shape of a challenge objective. */
-interface ChallengeObjective {
-  id: string;
-  type: string;
-  target: Record<string, unknown>;
-  completed: boolean;
-  description?: string;
-}
-
-/** Shape of medal tiers. */
-interface MedalTiers {
-  bronze: number;
-  silver: number;
-  gold: number;
-}
-
-/** Shape of a challenge in game state. */
-interface ChallengeSnapshot {
-  id: string;
-  custom?: boolean;
-  title: string;
-  description?: string;
-  briefing?: string;
-  objectives: ChallengeObjective[];
-  scoreMetric: string;
-  scoreLabel: string;
-  scoreUnit: string;
-  scoreDirection: string;
-  medals: MedalTiers;
-  rewards: MedalTiers;
-  requiredMissions: string[];
-}
-
-/** Shape of a challenge result. */
-interface ChallengeResult {
-  medal: string;
-  score: number;
-  attempts: number;
-}
-
-/** Shape of difficulty settings in game state. */
-interface DifficultySettings {
-  malfunctionFrequency: string;
-  weatherSeverity: string;
-  financialPressure: string;
-  injuryDuration: string;
-}
-
-/** Shape of sandbox settings in game state. */
-interface SandboxSettings {
-  malfunctionsEnabled: boolean;
-  weatherEnabled: boolean;
-}
 
 /**
  * Browser-context window shape for page.evaluate() callbacks.

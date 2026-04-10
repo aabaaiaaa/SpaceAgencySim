@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import {
-  VP_W, VP_H, STARTING_MONEY,
+  VP_W, VP_H,
   CENTRE_X, CANVAS_CENTRE_Y,
   FIRST_FLIGHT_MISSION, buildSaveEnvelope,
   placePart, seedAndLoadSave, navigateToVab, launchFromVab,
@@ -25,11 +25,6 @@ import {
 const CMD_DROP_Y: number    = CANVAS_CENTRE_Y;          // 386
 const TANK_M_DROP_Y: number = CMD_DROP_Y   + 20 + 30;   // 436
 const ENGINE_DROP_Y: number = TANK_M_DROP_Y + 30 + 15;   // 481
-
-// Part costs (from src/data/parts.js)
-const CMD_COST: number         = 8_000;
-const TANK_MEDIUM_COST: number = 1_600;
-const ENGINE_COST: number      = 6_000;
 
 const UNLOCKED_PARTS: string[] = ['cmd-mk1', 'tank-medium', 'engine-spark'];
 const FLIGHT_PARTS: string[] = ['cmd-mk1', 'tank-medium', 'engine-spark'];

@@ -23,11 +23,7 @@ import {
   buildCrewMember,
   seedAndLoadSave,
   startTestFlight,
-  getGameState,
   waitForAltitude,
-  waitForObjectiveComplete,
-  areAllObjectivesComplete,
-  waitForFlightEvent,
   teleportCraft,
 } from './helpers.js';
 import type { FacilityState, CrewMember, SaveEnvelope } from './helpers.js';

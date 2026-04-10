@@ -11,8 +11,8 @@ declare const Buffer: {
 import {
   VP_W, VP_H,
   SAVE_KEY, STARTING_MONEY,
-  buildSaveEnvelope, seedAndLoadSave, dismissWelcomeModal,
-  navigateToVab, dragPartToCanvas,
+  buildSaveEnvelope, dismissWelcomeModal,
+  dragPartToCanvas,
 } from './helpers.js';
 
 /**

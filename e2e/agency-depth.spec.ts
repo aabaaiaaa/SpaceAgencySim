@@ -25,11 +25,8 @@ import {
   seedAndLoadSave,
   startTestFlight,
   getGameState,
-  getFlightState,
-  getPhysicsSnapshot,
   waitForAltitude,
   waitForContractObjectiveComplete,
-  waitForFlightEvent,
   buildCrewMember,
   buildContract,
   buildObjective,
@@ -41,11 +38,9 @@ import {
 import {
   freshStartFixture,
   earlyGameFixture,
-  midGameFixture,
   contractTestFixture,
   ALL_PARTS,
   STARTER_PARTS,
-  MID_PARTS,
 } from './fixtures.js';
 
 // ---------------------------------------------------------------------------
@@ -54,7 +49,6 @@ import {
 
 const BASIC_ROCKET: string[]   = ['probe-core-mk1', 'tank-small', 'engine-spark'];
 const CREWED_ROCKET: string[]  = ['cmd-mk1', 'tank-small', 'engine-spark', 'parachute-mk1'];
-const ORBITAL_ROCKET: string[] = ['cmd-mk1', 'tank-large', 'engine-reliant'];
 
 // ---------------------------------------------------------------------------
 // Local type aliases for game state accessed via page.evaluate()
@@ -958,7 +952,6 @@ test.describe('Bankruptcy trigger', () => {
   test.afterAll(async () => { await page.close(); });
 
   test('(1) bankruptcy is detected when purchasing power < minimum rocket cost', async () => {
-    const gs = await getGameState(page) as GameState;
     // money=0, loan maxed at 10M -> no borrowing capacity
     // Cannot afford minimum rocket
     const isBankrupt = await page.evaluate(() => {

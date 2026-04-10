@@ -81,9 +81,6 @@ const EARTH_GM: number     = 3.986004418e14;  // m³/s²
 const ORBIT_ALT: number = 100_000;
 const ORBIT_VEL: number = Math.round(Math.sqrt(EARTH_GM / (EARTH_RADIUS + ORBIT_ALT))); // ~7848 m/s
 
-// Escape velocity at 100 km altitude.
-const ESCAPE_VEL: number = Math.round(Math.sqrt(2 * EARTH_GM / (EARTH_RADIUS + ORBIT_ALT))); // ~11097 m/s
-
 // Rocket configs.
 const BASIC_ROCKET: string[]    = ['probe-core-mk1', 'tank-small', 'engine-spark'];
 const CHUTE_ROCKET: string[]    = ['probe-core-mk1', 'parachute-mk1', 'tank-small', 'engine-spark'];
@@ -606,8 +603,6 @@ const MOON_ORBIT_R: number  = 384_400_000;  // metres from Earth centre
 const MOON_SOI: number      = 66_100_000;   // metres
 const MOON_RADIUS: number   = 1_737_400;    // metres
 const MOON_GM: number       = 4.9048695e12; // m³/s²
-const MOON_MIN_ORBIT: number = 15_000;      // metres
-
 test.describe('Phase Transition: TRANSFER → CAPTURE → ORBIT', () => {
   test('entering Moon SOI transitions TRANSFER → CAPTURE → ORBIT', async ({ browser }: { browser: Browser }) => {
     test.setTimeout(60_000);

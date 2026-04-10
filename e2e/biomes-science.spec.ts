@@ -19,14 +19,10 @@
 import { test, expect, type Page, type Browser } from '@playwright/test';
 import {
   VP_W, VP_H,
-  buildSaveEnvelope,
   seedAndLoadSave,
   startTestFlight,
   getGameState,
-  getPhysicsSnapshot,
   waitForAltitude,
-  waitForFlightEvent,
-  buildCrewMember,
   teleportCraft,
   FacilityId,
   ALL_FACILITIES,
@@ -35,9 +31,7 @@ import {
 import {
   freshStartFixture,
   midGameFixture,
-  ALL_PARTS,
   STARTER_PARTS,
-  MID_PARTS,
 } from './fixtures.js';
 
 // ---------------------------------------------------------------------------

@@ -23,7 +23,7 @@ See `.devloop/requirements.md` for full context and rationale behind each task.
 - **Verification**: `node scripts/generate-test-map.mjs --dry-run` runs without error and outputs valid JSON to stdout.
 
 ### TASK-003: Generate test-map.json and add npm script
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-002
 - **Description**: Run the generator to produce a fresh `test-map.json`. Review the output for completeness — check that: (1) all source areas from the old map are present, (2) no stale `.spec.js` or `.js` references remain, (3) the `e2e-infra` area references `.ts` files. Add `"test-map:generate": "node scripts/generate-test-map.mjs"` to `package.json` scripts. If the generator missed any E2E-to-source mappings that are exercised indirectly (not via direct imports), manually add them.
 - **Verification**: `node scripts/run-affected.mjs --dry-run --base HEAD~1` runs without error and resolves test file paths that exist on disk (no missing file warnings).
@@ -45,7 +45,7 @@ See `.devloop/requirements.md` for full context and rationale behind each task.
 - **Verification**: `npx eslint src/tests/ --max-warnings 0` — 0 warnings, 0 errors.
 
 ### TASK-006: Clean up lint warnings in E2E files and fix remaining warning types
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-004, TASK-005
 - **Description**: (1) Remove unused imports/variables in E2E files with warnings: additional-systems.spec.ts, agency-depth.spec.ts, biomes-science.spec.ts, collision.spec.ts, destinations.spec.ts, facilities-infrastructure.spec.ts, failure-paths.spec.ts, fixtures.ts, flight.spec.ts, mission-progression.spec.ts, orbital-operations.spec.ts, phase-transitions.spec.ts, reliability-risk.spec.ts, sandbox-replayability.spec.ts, saveload.spec.ts, tutorial-revisions.spec.ts. (2) Fix the 2 `require-await` warnings — remove the `async` keyword if the function doesn't need to be async, or add the missing `await`. (3) Fix the 1 `no-useless-assignment` — remove the dead assignment.
 - **Verification**: `npm run lint 2>&1 | tail -5` — reports "0 problems" (0 errors, 0 warnings).
@@ -61,7 +61,7 @@ See `.devloop/requirements.md` for full context and rationale behind each task.
 - **Verification**: `npx vitest run src/tests/_factories.test.ts 2>&1 || echo "No test file yet"` — file compiles without errors: `npx tsc --noEmit src/tests/_factories.ts 2>&1 | head -5` should show no errors. Also `npx eslint src/tests/_factories.ts --max-warnings 0`.
 
 ### TASK-008: Create E2E typed GameWindow helper
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Create a typed helper in `e2e/helpers/` that provides type-safe access to game globals on `window`, reducing the 382 `as unknown as GameWindow` and `as unknown as GW` casts across E2E specs. The current pattern is `(window as unknown as GameWindow).someProperty` inside `page.evaluate()` callbacks. Design a helper (e.g., a typed `evaluateGame()` wrapper or a `GameWindow` type declaration that augments the `Window` interface for E2E context) that eliminates the need for per-line casts. Update the barrel export in `e2e/helpers.ts` to include the new helper.
 - **Verification**: `npx tsc --noEmit -p e2e/tsconfig.json` — no type errors. The helper compiles and is exported from the barrel.
@@ -101,7 +101,7 @@ See `.devloop/requirements.md` for full context and rationale behind each task.
 ## Section 5+6: Small Fixes
 
 ### TASK-014: Move _mapView.ts inline styles to CSS and tighten Playwright testMatch
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Two small fixes: (1) In `src/ui/flightController/_mapView.ts` lines 290-291, replace the inline `style=""` attributes on the `transfer-info` and `transfer-progress` divs with CSS classes. The transfer-info div uses `color:#ffcc44;margin-top:4px;display:none` and transfer-progress uses `color:#ff6644;margin-top:4px;display:none`. Add CSS classes (e.g., `.transfer-info`, `.transfer-progress`) to the project stylesheet and apply them. (2) In `playwright.config.ts` line 8, change `testMatch: '**/*.spec.{js,ts}'` to `testMatch: '**/*.spec.ts'` since all specs are now TypeScript.
 - **Verification**: `npx tsc --noEmit` — no type errors. `npx playwright test --list 2>&1 | head -5` — lists specs successfully (no "no tests found" error). `grep "style=" src/ui/flightController/_mapView.ts` should return no results for those lines.
@@ -111,7 +111,7 @@ See `.devloop/requirements.md` for full context and rationale behind each task.
 ## Section 7: Coverage Overhaul
 
 ### TASK-015: Update vite.config.ts coverage exclusions
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Add untestable PixiJS-heavy and DOM-heavy files to the coverage `exclude` array in `vite.config.ts`. These are files at 0% unit test line coverage where the logic is inherently tied to canvas rendering or DOM manipulation. See the full exclusion list in requirements.md section 7.3 — it includes render barrels/init/rocket/debris/hub/vab, UI barrels/screens (crewAdmin, mainmenu, help, launchPad, topbar, settings, perfDashboard, satelliteOps, trackingStation, rdLab, library, etc.), flightController sub-modules (init, keyboard, menuActions, docking, orbitRcs, postFlight, surfaceActions, flightPhase), missionControl sub-modules (init, shell, tabs), and vab sub-modules (init, canvasInteraction, panels, partsPanel, designLibrary, engineerPanel, launchFlow, scalebar, inventory). Keep all files that currently have non-zero line coverage.
 - **Verification**: `npx vitest run --coverage 2>&1 | grep "ERROR"` — no coverage threshold errors (exclusions should bring actual coverage above the current aspirational thresholds for the remaining files).

@@ -5,7 +5,7 @@ export default defineConfig({
   testDir: './e2e',
 
   // Accept both .js and .ts spec files during the transition
-  testMatch: '**/*.spec.{js,ts}',
+  testMatch: '**/*.spec.ts',
 
   // Run all tests in parallel
   fullyParallel: true,

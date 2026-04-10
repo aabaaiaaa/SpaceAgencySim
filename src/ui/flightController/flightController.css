@@ -504,6 +504,18 @@
   color: #ff8844;
 }
 
+#map-hud-info .transfer-info {
+  color: #ffcc44;
+  margin-top: 4px;
+  display: none;
+}
+
+#map-hud-info .transfer-progress {
+  color: #ff6644;
+  margin-top: 4px;
+  display: none;
+}
+
 #map-hud-controls {
   position: absolute;
   bottom: 18px;

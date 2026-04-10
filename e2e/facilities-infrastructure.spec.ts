@@ -21,11 +21,7 @@ import {
   VP_W, VP_H,
   buildSaveEnvelope,
   seedAndLoadSave,
-  startTestFlight,
   getGameState,
-  getFlightState,
-  getPhysicsSnapshot,
-  waitForAltitude,
   buildCrewMember,
   buildContract,
   buildObjective,
@@ -40,16 +36,7 @@ import {
   midGameFixture,
   orbitalFixture,
   ALL_PARTS,
-  STARTER_PARTS,
-  MID_PARTS,
 } from './fixtures.js';
-
-// ---------------------------------------------------------------------------
-// Shared constants
-// ---------------------------------------------------------------------------
-
-const BASIC_ROCKET: string[]  = ['probe-core-mk1', 'tank-small', 'engine-spark'];
-const CREWED_ROCKET: string[] = ['cmd-mk1', 'tank-small', 'engine-spark', 'parachute-mk1'];
 
 // ---------------------------------------------------------------------------
 // Local type aliases for game state accessed via page.evaluate()
@@ -89,12 +76,6 @@ interface CrewSnapshot {
   trainingSkill: string | null;
   trainingEnds: number | null;
   [key: string]: unknown;
-}
-
-/** Shape of a facility in game state. */
-interface FacilitySnapshot {
-  built: boolean;
-  tier: number;
 }
 
 /** Return type for mass limit evaluate. */
@@ -192,61 +173,6 @@ interface TutorialMissionNarrative {
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Return to agency from flight.
- */
-async function returnToAgency(page: Page): Promise<void> {
-  const dropdown = page.locator('#topbar-dropdown');
-  if (!(await dropdown.isVisible())) {
-    await page.click('#topbar-menu-btn');
-    await expect(dropdown).toBeVisible({ timeout: 2_000 });
-  }
-  await dropdown.getByText('Return to Space Agency').click();
-
-  const orbitReturn = page.locator('[data-testid="orbit-return-btn"]');
-  const abortReturn = page.locator('[data-testid="abort-confirm-btn"]');
-
-  const orbitVisible = await orbitReturn.isVisible({ timeout: 2_000 }).catch(() => false);
-  if (orbitVisible) {
-    await orbitReturn.click();
-    await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 10_000 });
-    await page.click('#post-flight-return-btn');
-  } else {
-    const abortVisible = await abortReturn.isVisible({ timeout: 2_000 }).catch(() => false);
-    if (abortVisible) {
-      await abortReturn.click();
-    } else {
-      await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 10_000 });
-      await page.click('#post-flight-return-btn');
-    }
-  }
-
-  await page.waitForFunction(
-    () => window.__flightState === null || window.__flightState === undefined,
-    { timeout: 10_000 },
-  );
-}
-
-/**
- * Dismiss the return-results overlay if present.
- */
-async function dismissReturnResults(page: Page): Promise<void> {
-  try {
-    const dismissBtn = page.locator('#return-results-dismiss-btn');
-    await dismissBtn.waitFor({ state: 'visible', timeout: 5_000 });
-    await dismissBtn.click();
-  } catch { /* No overlay */ }
-}
-
-/**
- * Complete a flight cycle: start → return → dismiss.
- */
-async function completeFlightCycle(page: Page, parts: string[] = BASIC_ROCKET): Promise<void> {
-  await startTestFlight(page, parts);
-  await returnToAgency(page);
-  await dismissReturnResults(page);
-}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 1. FACILITY UPGRADE PURCHASE FROM CONSTRUCTION MENU
@@ -616,9 +542,6 @@ test.describe('Crew Admin — hire and fire', () => {
   });
 
   test('(2) can fire a crew member', async () => {
-    const gsBefore = await getGameState(page) as GameState;
-    const activeBefore = (gsBefore.crew as CrewSnapshot[]).filter(c => c.status === 'active').length;
-
     const result = await page.evaluate((): HireFireResult => {
       const w = window as unknown as GameWindow;
       const gs = w.__gameState;
