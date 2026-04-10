@@ -44,7 +44,7 @@ function addCrew(state, overrides = {}) {
     status: overrides.status ?? AstronautStatus.ACTIVE,
     skills: { piloting: 0, engineering: 0, science: 0 },
     salary: overrides.salary ?? CREW_SALARY_PER_PERIOD,
-    hiredDate: new Date().toISOString(),
+    hireDate: new Date().toISOString(),
     injuryEnds: null,
   });
 }

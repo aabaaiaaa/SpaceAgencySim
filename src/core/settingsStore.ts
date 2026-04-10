@@ -29,6 +29,45 @@ const STORAGE_KEY = 'spaceAgency_settings';
 const SCHEMA_VERSION = 1;
 
 // ---------------------------------------------------------------------------
+// Schema migration infrastructure
+// ---------------------------------------------------------------------------
+
+/** A function that transforms settings from one schema version to the next. */
+type MigrationFn = (settings: Record<string, unknown>) => Record<string, unknown>;
+
+/**
+ * Registry of schema migrations.  Each entry is a tuple of
+ * [fromVersion, migrationFunction].  Migrations are applied in order for all
+ * entries where fromVersion >= the envelope's current version.
+ *
+ * Example — when SCHEMA_VERSION is bumped to 2, add:
+ *   MIGRATIONS.push([1, (s) => { s.newField = 'default'; return s; }]);
+ */
+const MIGRATIONS: Array<[number, MigrationFn]> = [];
+
+/**
+ * Apply any pending schema migrations to a settings envelope.
+ *
+ * If the envelope is already at SCHEMA_VERSION, returns it unchanged.
+ * Otherwise walks the MIGRATIONS array and applies each migration whose
+ * fromVersion >= envelope.version, in order.  Returns a new envelope with
+ * version set to SCHEMA_VERSION.
+ */
+function _migrateSettings(envelope: SettingsEnvelope): SettingsEnvelope {
+  if (envelope.version === SCHEMA_VERSION) return envelope;
+
+  let settings: Record<string, unknown> = { ...envelope.settings } as Record<string, unknown>;
+
+  for (const [fromVersion, migrate] of MIGRATIONS) {
+    if (fromVersion >= envelope.version) {
+      settings = migrate(settings);
+    }
+  }
+
+  return { version: SCHEMA_VERSION, settings: settings as unknown as PersistedSettings };
+}
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -92,8 +131,10 @@ export function loadSettings(): PersistedSettings {
     const envelope: unknown = JSON.parse(raw);
     if (!isValidEnvelope(envelope)) return defaultSettings();
 
-    // Merge with defaults so any newly-added fields get a value.
-    return mergeWithDefaults(envelope.settings);
+    // Apply any pending schema migrations, then merge with defaults so any
+    // newly-added fields get a value.
+    const migrated = _migrateSettings(envelope);
+    return mergeWithDefaults(migrated.settings);
   } catch {
     // JSON parse error or any other runtime issue — fall back to defaults.
     return defaultSettings();
@@ -167,12 +208,16 @@ export function migrateSettings(gameState: GameState | Record<string, unknown>):
 function isValidEnvelope(value: unknown): value is SettingsEnvelope {
   if (value === null || typeof value !== 'object') return false;
   const obj = value as Record<string, unknown>;
-  return (
-    typeof obj.version === 'number' &&
-    obj.version === SCHEMA_VERSION &&
-    obj.settings !== null &&
-    typeof obj.settings === 'object'
-  );
+  if (typeof obj.version !== 'number') return false;
+  if (obj.version < 1) return false;
+  if (obj.version > SCHEMA_VERSION) {
+    console.warn(
+      `Settings were saved with a newer schema version (${obj.version}) ` +
+      `than this build supports (${SCHEMA_VERSION}). Using defaults.`,
+    );
+    return false;
+  }
+  return obj.settings !== null && typeof obj.settings === 'object';
 }
 
 /**

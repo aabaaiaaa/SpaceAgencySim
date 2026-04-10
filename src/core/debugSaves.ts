@@ -39,7 +39,7 @@ function completedMission(id: string, title: string, reward: number): Mission {
 }
 
 function makeCrew(id: string, name: string, salary: number, skills: Partial<CrewSkills> = {}): CrewMember {
-  const c = createCrewMember({ id, name, salary, hiredDate: '2026-01-01T00:00:00.000Z' });
+  const c = createCrewMember({ id, name, salary, hireDate: '2026-01-01T00:00:00.000Z' });
   c.skills = { piloting: skills.piloting ?? 0, engineering: skills.engineering ?? 0, science: skills.science ?? 0 };
   return c;
 }

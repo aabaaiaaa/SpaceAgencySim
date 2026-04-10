@@ -15,13 +15,13 @@
 export function buildCrewMember({
   id          = 'crew-test-1',
   name        = 'Test Astronaut',
-  status      = 'IDLE',
+  status      = 'active',
   salary      = 5_000,
-  hiredDate   = new Date().toISOString(),
+  hireDate    = new Date().toISOString(),
   skills      = { piloting: 50, engineering: 50, science: 50 },
   missionsFlown = 0,
 } = {}) {
-  return { id, name, status, salary, hiredDate, skills, missionsFlown };
+  return { id, name, status, salary, hireDate, skills, missionsFlown };
 }
 
 // ---------------------------------------------------------------------------

@@ -109,7 +109,7 @@ describe('Round-trip: save and load a complex state', () => {
         status: CrewStatus.IDLE,
         skills: { piloting: 75, engineering: 40, science: 60 },
         salary: 5000,
-        hiredDate: '2025-01-01T00:00:00.000Z',
+        hireDate: '2025-01-01T00:00:00.000Z',
         injuryEnds: null,
       },
       {
@@ -118,7 +118,7 @@ describe('Round-trip: save and load a complex state', () => {
         status: CrewStatus.ON_MISSION,
         skills: { piloting: 20, engineering: 90, science: 30 },
         salary: 6000,
-        hiredDate: '2025-03-15T00:00:00.000Z',
+        hireDate: '2025-03-15T00:00:00.000Z',
         injuryEnds: 5,
       },
       {
@@ -127,7 +127,7 @@ describe('Round-trip: save and load a complex state', () => {
         status: CrewStatus.DEAD,
         skills: { piloting: 55, engineering: 55, science: 55 },
         salary: 5500,
-        hiredDate: '2024-06-01T00:00:00.000Z',
+        hireDate: '2024-06-01T00:00:00.000Z',
         injuryEnds: null,
       },
     ];
@@ -1071,7 +1071,7 @@ describe('_validateNestedStructures()', () => {
 
   // Helper: a valid crew entry.
   function validCrew(name = 'Alice') {
-    return { id: 'crew-1', name, status: CrewStatus.IDLE, skills: { piloting: 50, engineering: 50, science: 50 }, salary: 5000, hiredDate: '2025-01-01' };
+    return { id: 'crew-1', name, status: CrewStatus.IDLE, skills: { piloting: 50, engineering: 50, science: 50 }, salary: 5000, hireDate: '2025-01-01' };
   }
 
   // Helper: a valid orbital object entry.
@@ -1368,7 +1368,7 @@ describe('Save compression', () => {
         {
           id: 'c1', name: 'Test Pilot', status: 'idle',
           skills: { piloting: 80, engineering: 50, science: 60 },
-          salary: 5000, hiredDate: '2025-01-01', injuryEnds: null,
+          salary: 5000, hireDate: '2025-01-01', injuryEnds: null,
         },
       ];
       state.missions.accepted = [
@@ -1578,7 +1578,7 @@ describe('Save export format', () => {
       {
         id: 'c1', name: 'Pilot', status: CrewStatus.IDLE,
         skills: { piloting: 90, engineering: 40, science: 50 },
-        salary: 5000, hiredDate: '2025-06-01T00:00:00.000Z', injuryEnds: null,
+        salary: 5000, hireDate: '2025-06-01T00:00:00.000Z', injuryEnds: null,
       },
     ];
     await saveGame(state, 0, 'Binary Export Test');

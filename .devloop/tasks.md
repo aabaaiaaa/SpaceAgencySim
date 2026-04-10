@@ -3,7 +3,7 @@
 ## Phase A: Foundations
 
 ### TASK-001: Implement settings schema migration chain
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Add a versioned migration chain to `src/core/settingsStore.ts`. Change `isValidEnvelope()` to accept `version <= SCHEMA_VERSION` (reject higher versions with a warning, reject version < 1). Add a `_migrateSettings(envelope)` function that sequentially applies migration functions from the stored version to `SCHEMA_VERSION`. Define a migration registry (array of `[fromVersion, migrationFn]` pairs). Call `_migrateSettings()` in `loadSettings()` after validation but before `mergeWithDefaults()`. No actual migrations are needed yet — just the infrastructure. See requirements §1.
 - **Verification**: `npx vitest run src/tests/settingsStore.test.ts`
@@ -15,25 +15,25 @@
 - **Verification**: `npx vitest run src/tests/settingsStore.test.ts`
 
 ### TASK-003: Tighten null guards in map.ts _drawBody and _drawShadow
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/render/map.ts`, change the guard in `_drawBody` (line 626) from `if (!_mapRoot) return` to `if (!_mapRoot || !_bodyGraphics) return` and remove the `!` non-null assertion on `_bodyGraphics`. Do the same in `_drawShadow` (line 1339): change to `if (!_mapRoot || !_shadowGraphics) return` and remove the `!` assertion on `_shadowGraphics`. See requirements §2.
 - **Verification**: `npx vitest run src/tests/render-map-state.test.ts`
 
 ### TASK-004: Unify CrewMember and Astronaut types
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Merge all `Astronaut`-specific fields into `CrewMember` in `src/core/gameState.ts`. Handle the status type conflict (CrewStatus vs AstronautStatus) by adding a separate `careerStatus` field or widening appropriately — inspect runtime data to choose. Normalize `hiredDate`/`hireDate` to one name. Delete the `Astronaut` interface from `crew.ts`. Remove the `_crew()` cast helper and replace all usages with direct `state.crew` access. Update all source files and all test files that reference `Astronaut` to use `CrewMember`. Verify `as unknown as` count drops to 2. See requirements §3.
 - **Verification**: `npm run typecheck && npx vitest run src/tests/crew.test.ts && npx vitest run src/tests/lifeSupport.test.ts`
 
 ### TASK-005: Convert vite.config.js to TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Rename `vite.config.js` to `vite.config.ts`. Add type imports for Vite config types. Type the custom `jsToTsResolve` plugin's parameters and return values. Ensure the Vitest test configuration block is properly typed. No functional changes. See requirements §4.1.
 - **Verification**: `npx vitest run src/tests/gameState.test.ts`
 
 ### TASK-006: Convert playwright.config.js to TypeScript and create e2e/tsconfig.json
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Rename `playwright.config.js` to `playwright.config.ts`. Add Playwright config type imports. Create `e2e/tsconfig.json` for E2E type checking (strict, noEmit, include `e2e/**/*.ts`, reference `@playwright/test` types). Update the `typecheck` script in `package.json` to also run `tsc --noEmit -p e2e/tsconfig.json`. Set `testMatch` in Playwright config to accept both `.js` and `.ts` specs during the transition. See requirements §4.2.
 - **Verification**: `npm run typecheck`

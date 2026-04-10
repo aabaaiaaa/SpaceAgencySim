@@ -8,7 +8,7 @@
  */
 
 import {
-  CrewStatus,
+  AstronautStatus,
   FlightOutcome,
   FlightPhase,
   GameMode,
@@ -180,19 +180,33 @@ export interface CrewMember {
   id: string;
   /** Display name. */
   name: string;
-  /** Current activity status. */
-  status: CrewStatus;
+  /** Career / employment status (active, fired, kia). */
+  status: AstronautStatus;
   /** Skill levels. */
   skills: CrewSkills;
   /** Weekly salary cost (dollars). */
   salary: number;
   /** ISO 8601 date string when hired. */
-  hiredDate: string;
+  hireDate: string;
+  /** Total missions flown. */
+  missionsFlown: number;
+  /** Total flights flown. */
+  flightsFlown: number;
+  /** ISO 8601 date of death, or null if alive. */
+  deathDate: string | null;
+  /** Cause of death description, or null if alive. */
+  deathCause: string | null;
+  /** ID of rocket the crew member is assigned to, or null. */
+  assignedRocketId: string | null;
   /**
    * Period number when the injury clears (crew becomes IDLE again),
    * or null if not injured.
    */
   injuryEnds: number | null;
+  /** Skill currently being trained, or null if not training. */
+  trainingSkill: 'piloting' | 'engineering' | 'science' | null;
+  /** Period number when training completes, or null. */
+  trainingEnds: number | null;
 }
 
 /** Requirements that a rocket must satisfy for a mission. */
@@ -910,25 +924,32 @@ export function createCrewMember({
   id,
   name,
   salary,
-  hiredDate = new Date().toISOString(),
+  hireDate = new Date().toISOString(),
 }: {
   id: string;
   name: string;
   salary: number;
-  hiredDate?: string;
+  hireDate?: string;
 }): CrewMember {
   return {
     id,
     name,
-    status: CrewStatus.IDLE,
+    status: AstronautStatus.ACTIVE,
     skills: {
       piloting: 0,
       engineering: 0,
       science: 0,
     },
     salary,
-    hiredDate,
+    hireDate,
+    missionsFlown: 0,
+    flightsFlown: 0,
+    deathDate: null,
+    deathCause: null,
+    assignedRocketId: null,
     injuryEnds: null,
+    trainingSkill: null,
+    trainingEnds: null,
   };
 }
 
@@ -1090,9 +1111,9 @@ export function isFlightActive(state: GameState): boolean {
   return state.currentFlight !== null;
 }
 
-/** Returns all idle crew members available for assignment. */
+/** Returns all active crew members available for assignment. */
 export function getIdleCrew(state: GameState): CrewMember[] {
-  return state.crew.filter((c) => c.status === CrewStatus.IDLE);
+  return state.crew.filter((c) => c.status === AstronautStatus.ACTIVE);
 }
 
 /** Finds a crew member by ID, or null if not found. */

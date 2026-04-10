@@ -14,7 +14,7 @@
     "test:unit": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p e2e/tsconfig.json",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint src/ e2e/",
     "lint:fix": "eslint src/ e2e/ --fix",

@@ -441,9 +441,9 @@ test.describe('Crew Admin — hire and fire', () => {
         const newCrew = {
           id: 'crew-hired-test',
           name: 'New Hire',
-          status: 'ACTIVE',
+          status: 'active',
           salary: 5000,
-          hiredDate: new Date().toISOString(),
+          hireDate: new Date().toISOString(),
           skills: { piloting: 0, engineering: 0, science: 0 },
           missionsFlown: 0,
           flightsFlown: 0,
@@ -469,13 +469,13 @@ test.describe('Crew Admin — hire and fire', () => {
 
   test('(2) can fire a crew member', async () => {
     const gsBefore = await getGameState(page);
-    const activeBefore = gsBefore.crew.filter(c => c.status === 'ACTIVE' || c.status === 'IDLE').length;
+    const activeBefore = gsBefore.crew.filter(c => c.status === 'active').length;
 
     const result = await page.evaluate(() => {
       const gs = window.__gameState;
-      const target = gs.crew.find(c => c.status === 'ACTIVE' || c.status === 'IDLE');
+      const target = gs.crew.find(c => c.status === 'active');
       if (!target) return { success: false };
-      target.status = 'FIRED';
+      target.status = 'fired';
       target.assignedRocketId = null;
       return { success: true, id: target.id };
     });
@@ -484,7 +484,7 @@ test.describe('Crew Admin — hire and fire', () => {
 
     const gsAfter = await getGameState(page);
     const firedCrew = gsAfter.crew.find(c => c.id === result.id);
-    expect(firedCrew.status).toBe('FIRED');
+    expect(firedCrew.status).toBe('fired');
   });
 });
 
@@ -516,7 +516,7 @@ test.describe('Crew Admin — training system', () => {
       // TRAINING_SLOTS_BY_TIER: { 2: 1, 3: 3 }
       const maxSlots = tier === 2 ? 1 : tier === 3 ? 3 : 0;
       const usedSlots = gs.crew.filter(c =>
-        (c.status === 'ACTIVE' || c.status === 'IDLE') && c.trainingSkill
+        c.status === 'active' && c.trainingSkill
       ).length;
       return { maxSlots, usedSlots, availableSlots: maxSlots - usedSlots };
     });
@@ -528,7 +528,7 @@ test.describe('Crew Admin — training system', () => {
   test('(2) assigning crew to training sets trainingSkill and trainingEnds', async () => {
     const result = await page.evaluate(() => {
       const gs = window.__gameState;
-      const crew = gs.crew.find(c => (c.status === 'ACTIVE' || c.status === 'IDLE') && !c.trainingSkill);
+      const crew = gs.crew.find(c => c.status === 'active' && !c.trainingSkill);
       if (!crew) return { success: false, error: 'No available crew' };
 
       const currentPeriod = gs.currentPeriod ?? 0;
@@ -605,7 +605,7 @@ test.describe('Crew Admin — training system', () => {
     await page.evaluate(() => {
       const gs = window.__gameState;
       const available = gs.crew.find(c =>
-        (c.status === 'ACTIVE' || c.status === 'IDLE') && !c.trainingSkill
+        c.status === 'active' && !c.trainingSkill
       );
       if (available) {
         available.trainingSkill = 'engineering';
@@ -618,7 +618,7 @@ test.describe('Crew Admin — training system', () => {
       const gs = window.__gameState;
       const maxSlots = 1; // Tier 2 = 1 slot
       const usedSlots = gs.crew.filter(c =>
-        (c.status === 'ACTIVE' || c.status === 'IDLE') && c.trainingSkill
+        c.status === 'active' && c.trainingSkill
       ).length;
       return { maxSlots, usedSlots, full: usedSlots >= maxSlots };
     });
@@ -680,9 +680,9 @@ test.describe('Crew Admin — tier 3 features', () => {
       const newCrew = {
         id: 'crew-exp-test',
         name: 'Experienced Recruit',
-        status: 'ACTIVE',
+        status: 'active',
         salary: 5000,
-        hiredDate: new Date().toISOString(),
+        hireDate: new Date().toISOString(),
         skills: { piloting: randSkill(), engineering: randSkill(), science: randSkill() },
         missionsFlown: 0,
         flightsFlown: 0,
@@ -765,7 +765,7 @@ test.describe('Crew training opportunity cost — crew unavailable during traini
       const gs = window.__gameState;
       const currentPeriod = gs.currentPeriod ?? 0;
       return gs.crew.filter(c =>
-        (c.status === 'ACTIVE' || c.status === 'IDLE') &&
+        c.status === 'active' &&
         (c.injuryEnds == null || c.injuryEnds <= currentPeriod) &&
         !c.trainingSkill
       ).map(c => c.id);

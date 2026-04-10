@@ -91,7 +91,7 @@ export function processLifeSupport(state: GameState): LifeSupportResult {
       const crew = state.crew;
       for (const crewId of craft.crewIds) {
         const astronaut = crew.find((a) => a.id === crewId);
-        if (astronaut && (astronaut.status as string) !== AstronautStatus.KIA) {
+        if (astronaut && astronaut.status !== AstronautStatus.KIA) {
           const crewName = astronaut.name;
           recordKIA(state, crewId, 'Life support exhausted');
           deaths.push({

@@ -99,7 +99,7 @@ export function advancePeriod(state: GameState): PeriodSummary {
   const { costMult } = getFinancialMultipliers(state);
   const crew = state.crew;
   const activeCrew = crew.filter(
-    (c) => (c.status as string) === AstronautStatus.ACTIVE,
+    (c) => c.status === AstronautStatus.ACTIVE,
   );
   const crewSalaryCost = Math.round(activeCrew.reduce(
     (sum, c) => sum + (c.salary ?? CREW_SALARY_PER_PERIOD),

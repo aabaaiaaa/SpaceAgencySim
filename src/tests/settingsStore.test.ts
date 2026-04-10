@@ -191,7 +191,9 @@ describe('settingsStore', () => {
       expect(loaded).to.deep.equal(expectedDefaults());
     });
 
-    it('should return defaults when envelope has version 99', () => {
+    it('should return defaults when envelope has version 99 (future version) and log a warning', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
       mockStorage.setItem(STORAGE_KEY, JSON.stringify({
         version: 99,
         settings: customSettings(),
@@ -199,6 +201,10 @@ describe('settingsStore', () => {
 
       const loaded = loadSettings();
       expect(loaded).to.deep.equal(expectedDefaults());
+      expect(warnSpy).toHaveBeenCalledOnce();
+      expect(warnSpy.mock.calls[0][0]).toMatch(/newer schema version.*99/);
+
+      warnSpy.mockRestore();
     });
 
     it('should return defaults when version is a string instead of number', () => {
@@ -209,6 +215,75 @@ describe('settingsStore', () => {
 
       const loaded = loadSettings();
       expect(loaded).to.deep.equal(expectedDefaults());
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // 5b. Schema migration infrastructure
+  // -----------------------------------------------------------------------
+
+  describe('schema migration', () => {
+    it('should pass a version-1 envelope through the migration path unchanged', () => {
+      const settings = customSettings();
+      mockStorage.setItem(STORAGE_KEY, JSON.stringify({
+        version: 1,
+        settings,
+      }));
+
+      const loaded = loadSettings();
+      expect(loaded).to.deep.equal(settings);
+    });
+
+    it('should reject version < 1 and return defaults', () => {
+      mockStorage.setItem(STORAGE_KEY, JSON.stringify({
+        version: -1,
+        settings: customSettings(),
+      }));
+
+      const loaded = loadSettings();
+      expect(loaded).to.deep.equal(expectedDefaults());
+    });
+
+    it('should reject version 0 and return defaults', () => {
+      mockStorage.setItem(STORAGE_KEY, JSON.stringify({
+        version: 0,
+        settings: customSettings(),
+      }));
+
+      const loaded = loadSettings();
+      expect(loaded).to.deep.equal(expectedDefaults());
+    });
+
+    it('should reject version > SCHEMA_VERSION with a console warning', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      mockStorage.setItem(STORAGE_KEY, JSON.stringify({
+        version: 50,
+        settings: customSettings(),
+      }));
+
+      const loaded = loadSettings();
+      expect(loaded).to.deep.equal(expectedDefaults());
+      expect(warnSpy).toHaveBeenCalledOnce();
+      expect(warnSpy.mock.calls[0][0]).toMatch(/newer schema version.*50/);
+
+      warnSpy.mockRestore();
+    });
+
+    it('should load valid settings through the full migration code path', () => {
+      // Write a valid version-1 envelope with non-default settings and verify
+      // it loads correctly through isValidEnvelope -> _migrateSettings -> mergeWithDefaults.
+      const settings = customSettings();
+      mockStorage.setItem(STORAGE_KEY, JSON.stringify({
+        version: 1,
+        settings,
+      }));
+
+      const loaded = loadSettings();
+      expect(loaded.autoSaveEnabled).to.equal(false);
+      expect(loaded.debugMode).to.equal(true);
+      expect(loaded.showPerfDashboard).to.equal(true);
+      expect(loaded.malfunctionMode).to.equal(MalfunctionMode.FORCED);
     });
   });
 

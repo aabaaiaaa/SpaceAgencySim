@@ -623,32 +623,32 @@ function _useLabel(text: string, x: number, y: number, color: number | string): 
 // ---------------------------------------------------------------------------
 
 function _drawBody(cx: number, cy: number, scale: number, R: number): void {
-  if (!_mapRoot) return;
-  _bodyGraphics!.clear();
+  if (!_mapRoot || !_bodyGraphics) return;
+  _bodyGraphics.clear();
 
   const bodyPxR = R * scale;
 
   if (bodyPxR < 2) {
     // Too small — draw a dot.
-    _bodyGraphics!.circle(cx, cy, 3);
-    _bodyGraphics!.fill(BODY_COLOR);
+    _bodyGraphics.circle(cx, cy, 3);
+    _bodyGraphics.fill(BODY_COLOR);
     return;
   }
 
   // Atmosphere glow.
   if (bodyPxR > 10) {
     const atmosR = (R + ATMOSPHERE_VISUAL_HEIGHT) * scale;
-    _bodyGraphics!.circle(cx, cy, atmosR);
-    _bodyGraphics!.fill({ color: BODY_ATMOSPHERE, alpha: 0.08 });
+    _bodyGraphics.circle(cx, cy, atmosR);
+    _bodyGraphics.fill({ color: BODY_ATMOSPHERE, alpha: 0.08 });
   }
 
   // Solid body.
-  _bodyGraphics!.circle(cx, cy, bodyPxR);
-  _bodyGraphics!.fill(BODY_COLOR);
+  _bodyGraphics.circle(cx, cy, bodyPxR);
+  _bodyGraphics.fill(BODY_COLOR);
 
   // Edge highlight.
-  _bodyGraphics!.circle(cx, cy, bodyPxR);
-  _bodyGraphics!.stroke({ color: BODY_ATMOSPHERE, width: 1, alpha: 0.4 });
+  _bodyGraphics.circle(cx, cy, bodyPxR);
+  _bodyGraphics.stroke({ color: BODY_ATMOSPHERE, width: 1, alpha: 0.4 });
 }
 
 /** Map colours for each surface item type. */
@@ -1336,8 +1336,8 @@ function _drawTransferProgress(flightState: ReadonlyFlightState, w: number, h: n
 }
 
 function _drawShadow(cx: number, cy: number, scale: number, R: number, timeElapsed: number): void {
-  if (!_mapRoot) return;
-  _shadowGraphics!.clear();
+  if (!_mapRoot || !_shadowGraphics) return;
+  _shadowGraphics.clear();
   if (!_showShadow) return;
 
   const bodyPxR = R * scale;
@@ -1348,10 +1348,10 @@ function _drawShadow(cx: number, cy: number, scale: number, R: number, timeElaps
   const nightAngle = sunAngle + Math.PI;
 
   // Semi-circle shadow on the night side.
-  _shadowGraphics!.moveTo(cx, cy);
-  _shadowGraphics!.arc(cx, cy, bodyPxR, nightAngle - Math.PI / 2, nightAngle + Math.PI / 2);
-  _shadowGraphics!.closePath();
-  _shadowGraphics!.fill({ color: SHADOW_COLOR, alpha: 0.4 });
+  _shadowGraphics.moveTo(cx, cy);
+  _shadowGraphics.arc(cx, cy, bodyPxR, nightAngle - Math.PI / 2, nightAngle + Math.PI / 2);
+  _shadowGraphics.closePath();
+  _shadowGraphics.fill({ color: SHADOW_COLOR, alpha: 0.4 });
 }
 
 // ---------------------------------------------------------------------------

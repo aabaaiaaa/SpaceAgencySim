@@ -37,6 +37,7 @@ import {
   PartType,
   MissionState,
   CrewStatus,
+  AstronautStatus,
   FlightOutcome,
   FuelType,
   STARTING_MONEY,
@@ -125,8 +126,8 @@ describe('createCrewMember()', () => {
     expect(member.salary).toBe(500);
   });
 
-  it('defaults status to IDLE', () => {
-    expect(member.status).toBe(CrewStatus.IDLE);
+  it('defaults status to ACTIVE', () => {
+    expect(member.status).toBe(AstronautStatus.ACTIVE);
   });
 
   it('initialises all skills to 0', () => {
@@ -139,15 +140,15 @@ describe('createCrewMember()', () => {
     expect(member.injuryEnds).toBeNull();
   });
 
-  it('stores a custom hiredDate when provided', () => {
+  it('stores a custom hireDate when provided', () => {
     const date = '2026-01-01T00:00:00.000Z';
-    const m = createCrewMember({ ...opts, hiredDate: date });
-    expect(m.hiredDate).toBe(date);
+    const m = createCrewMember({ ...opts, hireDate: date });
+    expect(m.hireDate).toBe(date);
   });
 
-  it('generates a default hiredDate when not provided', () => {
-    expect(typeof member.hiredDate).toBe('string');
-    expect(member.hiredDate.length).toBeGreaterThan(0);
+  it('generates a default hireDate when not provided', () => {
+    expect(typeof member.hireDate).toBe('string');
+    expect(member.hireDate.length).toBeGreaterThan(0);
   });
 });
 
@@ -331,11 +332,11 @@ describe('getIdleCrew()', () => {
     expect(getIdleCrew(state)).toEqual([]);
   });
 
-  it('returns only IDLE members', () => {
+  it('returns only ACTIVE members', () => {
     const state = createGameState();
     const alice = createCrewMember({ id: 'c1', name: 'Alice', salary: 500 });
     const bob = createCrewMember({ id: 'c2', name: 'Bob', salary: 500 });
-    bob.status = CrewStatus.ON_MISSION;
+    bob.status = AstronautStatus.FIRED;
     state.crew.push(alice, bob);
     const idle = getIdleCrew(state);
     expect(idle).toHaveLength(1);

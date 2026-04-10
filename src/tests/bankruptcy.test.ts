@@ -37,7 +37,7 @@ function addCrew(state, overrides = {}) {
     status: overrides.status ?? AstronautStatus.ACTIVE,
     skills: { piloting: 0, engineering: 0, science: 0 },
     salary: overrides.salary ?? CREW_SALARY_PER_PERIOD,
-    hiredDate: new Date().toISOString(),
+    hireDate: new Date().toISOString(),
     injuryEnds: null,
   });
 }
@@ -174,7 +174,7 @@ describe('advancePeriod() — individual crew salaries', () => {
       status: AstronautStatus.ACTIVE,
       skills: { piloting: 0, engineering: 0, science: 0 },
       // No salary field — simulates legacy save data
-      hiredDate: new Date().toISOString(),
+      hireDate: new Date().toISOString(),
       injuryEnds: null,
     });
     const result = advancePeriod(state);
@@ -188,7 +188,7 @@ describe('advancePeriod() — individual crew salaries', () => {
       name: 'Legacy',
       status: AstronautStatus.ACTIVE,
       skills: { piloting: 0, engineering: 0, science: 0 },
-      hiredDate: new Date().toISOString(),
+      hireDate: new Date().toISOString(),
       injuryEnds: null,
     });
     const result = advancePeriod(state);

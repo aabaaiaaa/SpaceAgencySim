@@ -24,7 +24,7 @@ import { earn, applyInterest, applyDeathFine } from './finance.ts';
 import { advancePeriod } from './period.ts';
 import { initWeather } from './weather.ts';
 import { getPartById } from '../data/parts.ts';
-import { PartType, DEATH_FINE_PER_ASTRONAUT, FlightOutcome } from './constants.ts';
+import { PartType, DEATH_FINE_PER_ASTRONAUT, FlightOutcome, AstronautStatus } from './constants.ts';
 import { processContractCompletions, generateContracts } from './contracts.ts';
 import { deploySatellitesFromFlight } from './satellites.ts';
 import { awardFlightXP, getMaxCrewSkill, processFlightInjuries } from './crew.ts';
@@ -224,7 +224,7 @@ export function processFlightReturn(state: GameState, flightState: FlightState, 
       const survivingIds = crewIds.filter((id: string) => {
         if (isCrashed && !ejectedIds.has(id)) return false;
         const astro = (state.crew ?? []).find((a) => a.id === id);
-        return astro && (astro.status as string) !== 'kia';
+        return astro && astro.status !== AstronautStatus.KIA;
       });
       if (survivingIds.length > 0) {
         if (!Array.isArray(state.fieldCraft)) state.fieldCraft = [];

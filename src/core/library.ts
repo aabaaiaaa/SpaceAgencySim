@@ -8,7 +8,7 @@
  * @module core/library
  */
 
-import { FlightOutcome, CrewStatus } from './constants.ts';
+import { FlightOutcome, AstronautStatus } from './constants.ts';
 import { CELESTIAL_BODIES, ALL_BODY_IDS, getBodyDef } from '../data/bodies.ts';
 import { ACHIEVEMENTS } from './achievements.ts';
 import type { GameState, FlightResult, RocketDesign, CrewMember, SurfaceItem, FieldCraft } from './gameState.ts';
@@ -74,7 +74,7 @@ interface CrewCareer {
   status: string;
   flightsFlown: number;
   skills: { piloting: number; engineering: number; science: number };
-  hiredDate: string;
+  hireDate: string;
 }
 
 interface FinancialSummary {
@@ -158,9 +158,9 @@ export function getAgencyStats(state: GameState): AgencyStats {
     achievementsEarned: (state.achievements ?? []).length,
     totalAchievements: ACHIEVEMENTS.length,
     satellitesDeployed: (state.satelliteNetwork?.satellites ?? []).length,
-    activeCrew: crew.filter((c) => (c.status as string) !== CrewStatus.DEAD && (c.status as string) !== 'kia').length,
+    activeCrew: crew.filter((c) => c.status === AstronautStatus.ACTIVE).length,
     totalCrewHired: crew.length,
-    crewLost: crew.filter((c) => (c.status as string) === CrewStatus.DEAD || (c.status as string) === 'kia').length,
+    crewLost: crew.filter((c) => c.status === AstronautStatus.KIA).length,
   };
 }
 
@@ -254,7 +254,7 @@ export function getCrewCareers(state: GameState): CrewCareer[] {
     status: c.status,
     flightsFlown: flightCounts.get(c.id) ?? 0,
     skills: { ...c.skills },
-    hiredDate: c.hiredDate ?? '',
+    hireDate: c.hireDate ?? '',
   }));
 }
 
