@@ -155,19 +155,19 @@ See `.devloop/requirements.md` for full context on each item.
 - **Verification**: `npx playwright test e2e/asteroid-belt.spec.js`
 
 ### TASK-021: Unit tests for CapturedBody physics integration
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001, TASK-002, TASK-003
 - **Description**: Add or update unit tests to cover: (1) `capturedBody` is set on capture with correct mass, radius, offset, and name. (2) `capturedBody` is cleared on release. (3) CoM shifts proportionally to asteroid mass and offset — test with known values. (4) Moment of inertia includes asteroid contribution (sphere inertia + parallel-axis). (5) Asteroid torque uses `capturedBody` fields correctly. See requirements section 9.4.
 - **Verification**: `npx vitest run src/tests/grabbing.test.ts src/tests/physics.test.ts`
 
 ### TASK-022: Unit tests for per-arm properties, collision cooldown, and autoSave
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-004, TASK-006, TASK-009
 - **Description**: Add or update unit tests: (1) Verify different arm tiers have different effective range and speed limits — Standard 25m/1.0, Heavy 35m/0.8, Industrial 50m/0.5. Boundary tests at exact mass limit thresholds. (2) Verify collision cooldown prevents re-damage during cooldown period; verify cooldown decrements and eventually allows re-collision. (3) Verify `_getAutoSaveKey()` returns fallback when all slots are occupied. See requirements section 9.4.
 - **Verification**: `npx vitest run src/tests/grabbing.test.ts src/tests/collision.test.ts src/tests/autoSave.test.ts`
 
 ### TASK-023: E2E tests for changed behaviour
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-002, TASK-003, TASK-004, TASK-006
 - **Description**: Add E2E specs to `e2e/asteroid-belt.spec.js` covering user-visible behaviour changes: (1) Heavy arm grabs at longer range than Standard arm. (2) A slow-speed overlap doesn't destroy the craft (cooldown prevents per-frame damage). (3) After capture, craft rotates when thrusting unaligned and stabilises after alignment. (4) Heavy arm is not available until its new tier is researched. Each test must set up its own state (no shared page). See requirements section 9.5. **Note:** Use the Playwright MCP tool to interactively debug any failing E2E tests rather than rerunning blindly.
 - **Verification**: `npx playwright test e2e/asteroid-belt.spec.js`

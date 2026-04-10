@@ -24,6 +24,9 @@ import {
   handleKeyDown,
   handleKeyUp,
   fireNextStage,
+  setCapturedBody,
+  clearCapturedBody,
+  setThrustAligned,
 } from '../core/physics.ts';
 import {
   LegState,
@@ -2924,5 +2927,179 @@ describe('Topple recovery with deployed legs', () => {
     expect(ps.angle).toBe(0);
     expect(ps.angularVelocity).toBe(0);
     expect(ps.crashed).toBeFalsy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// CapturedBody — CoM shift, MoI, and asteroid torque via tick() side-effects
+// ---------------------------------------------------------------------------
+
+describe('setCapturedBody / clearCapturedBody', () => {
+  it('setCapturedBody stores the body on the physics state', () => {
+    const { assembly } = makeSimpleRocket();
+    const ps = createPhysicsState(assembly, makeFlightState());
+    const body = { mass: 10_000, radius: 50, offset: { x: 100, y: 0 }, name: 'AST-0001' };
+    setCapturedBody(ps, body);
+    expect(ps.capturedBody).toBe(body);
+    expect(ps.thrustAligned).toBe(false);
+  });
+
+  it('clearCapturedBody removes the body from the physics state', () => {
+    const { assembly } = makeSimpleRocket();
+    const ps = createPhysicsState(assembly, makeFlightState());
+    setCapturedBody(ps, { mass: 10_000, radius: 50, offset: { x: 100, y: 0 }, name: 'AST-0001' });
+    clearCapturedBody(ps);
+    expect(ps.capturedBody).toBeNull();
+    expect(ps.thrustAligned).toBe(false);
+  });
+
+  it('setCapturedBody resets thrustAligned even if it was true', () => {
+    const { assembly } = makeSimpleRocket();
+    const ps = createPhysicsState(assembly, makeFlightState());
+    setCapturedBody(ps, { mass: 1_000, radius: 10, offset: { x: 0, y: 0 }, name: 'A' });
+    setThrustAligned(ps, true);
+    expect(ps.thrustAligned).toBe(true);
+    // Capturing a new body resets alignment.
+    setCapturedBody(ps, { mass: 2_000, radius: 20, offset: { x: 50, y: 0 }, name: 'B' });
+    expect(ps.thrustAligned).toBe(false);
+  });
+});
+
+describe('CapturedBody — total mass includes asteroid', () => {
+  it('captured asteroid reduces acceleration under same thrust', () => {
+    // Build two identical rockets, fire engines, tick, compare acceleration.
+    // The one with a heavy captured body should accelerate more slowly.
+    const { assembly: assemblyA, staging: stagingA, engineId: engineIdA } = makeSimpleRocket();
+    const { assembly: assemblyB, staging: stagingB, engineId: engineIdB } = makeSimpleRocket();
+    const fsA = makeFlightState();
+    const fsB = makeFlightState();
+    const psA = createPhysicsState(assemblyA, fsA);
+    const psB = createPhysicsState(assemblyB, fsB);
+
+    // Attach a heavy asteroid to rocket B.
+    setCapturedBody(psB, { mass: 50_000, radius: 100, offset: { x: 0, y: 0 }, name: 'HEAVY' });
+    setThrustAligned(psB, true); // suppress torque so we compare linear only
+
+    // Fire engines on both.
+    fireNextStage(psA, assemblyA, stagingA, fsA);
+    fireNextStage(psB, assemblyB, stagingB, fsB);
+
+    // Liftoff both rockets (not grounded).
+    psA.grounded = false;
+    psB.grounded = false;
+    psA.posY = 1000;
+    psB.posY = 1000;
+
+    tick(psA, assemblyA, stagingA, fsA, 1 / 60);
+    tick(psB, assemblyB, stagingB, fsB, 1 / 60);
+
+    // Both should have upward velocity, but B should be slower due to extra mass.
+    expect(psA.velY).toBeGreaterThan(0);
+    expect(psB.velY).toBeGreaterThan(0);
+    expect(psA.velY).toBeGreaterThan(psB.velY);
+  });
+});
+
+describe('CapturedBody — asteroid torque via tick()', () => {
+  it('unaligned captured asteroid produces angular velocity change when engines fire', () => {
+    const { assembly, staging, engineId } = makeSimpleRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    // Move to high altitude (vacuum, no atmo damping).
+    ps.grounded = false;
+    ps.posY = 200_000;
+
+    // Fire engine.
+    fireNextStage(ps, assembly, staging, fs);
+
+    // Attach a heavy asteroid offset from centre, unaligned.
+    setCapturedBody(ps, { mass: 100_000, radius: 200, offset: { x: 500, y: 0 }, name: 'TORQUE-AST' });
+    // thrustAligned is false by default after setCapturedBody.
+
+    const angBefore = ps.angularVelocity;
+    tick(ps, assembly, staging, fs, 1 / 60);
+
+    // Angular velocity should have changed due to asteroid torque.
+    expect(ps.angularVelocity).not.toBe(angBefore);
+    expect(Math.abs(ps.angularVelocity)).toBeGreaterThan(0);
+  });
+
+  it('aligned captured asteroid produces no asteroid torque', () => {
+    const { assembly, staging } = makeSimpleRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    ps.grounded = false;
+    ps.posY = 200_000;
+
+    fireNextStage(ps, assembly, staging, fs);
+
+    setCapturedBody(ps, { mass: 100_000, radius: 200, offset: { x: 500, y: 0 }, name: 'ALIGNED-AST' });
+    setThrustAligned(ps, true);
+
+    const angBefore = ps.angularVelocity;
+    tick(ps, assembly, staging, fs, 1 / 60);
+
+    // With thrust aligned, no asteroid torque is applied — angular velocity
+    // stays at zero (no player steering input either).
+    expect(ps.angularVelocity).toBe(angBefore);
+  });
+
+  it('no captured body produces no asteroid torque even with engines firing', () => {
+    const { assembly, staging } = makeSimpleRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    ps.grounded = false;
+    ps.posY = 200_000;
+
+    fireNextStage(ps, assembly, staging, fs);
+
+    // No capturedBody set.
+    expect(ps.capturedBody).toBeNull();
+
+    tick(ps, assembly, staging, fs, 1 / 60);
+
+    // No player steering, no asteroid — angular velocity remains zero.
+    expect(ps.angularVelocity).toBe(0);
+  });
+});
+
+describe('CapturedBody — MoI dampens angular acceleration', () => {
+  it('heavy captured asteroid results in lower angular acceleration from steering', () => {
+    // Two rockets, both given the same steering input ('d' key).
+    // One has a heavy asteroid → higher MoI → smaller angular acceleration.
+    const { assembly: assemblyA, staging: stagingA } = makeSimpleRocket();
+    const { assembly: assemblyB, staging: stagingB } = makeSimpleRocket();
+    const fsA = makeFlightState();
+    const fsB = makeFlightState();
+    const psA = createPhysicsState(assemblyA, fsA);
+    const psB = createPhysicsState(assemblyB, fsB);
+
+    // Both airborne in vacuum (no atmo damping).
+    psA.grounded = false;
+    psA.posY = 200_000;
+    psB.grounded = false;
+    psB.posY = 200_000;
+
+    // Attach a very heavy asteroid to rocket B at a large offset.
+    // This massively increases the MoI about the CoM.
+    setCapturedBody(psB, { mass: 500_000, radius: 500, offset: { x: 1000, y: 0 }, name: 'HEAVY-MOI' });
+    setThrustAligned(psB, true); // suppress asteroid torque
+
+    // Steer right on both.
+    handleKeyDown(psA, assemblyA, 'd');
+    handleKeyDown(psB, assemblyB, 'd');
+
+    tick(psA, assemblyA, stagingA, fsA, 1 / 60);
+    tick(psB, assemblyB, stagingB, fsB, 1 / 60);
+
+    // Both should have rotated clockwise (positive angular velocity).
+    expect(psA.angularVelocity).toBeGreaterThan(0);
+    expect(psB.angularVelocity).toBeGreaterThan(0);
+
+    // Rocket A (no asteroid) should have rotated more than rocket B (heavy asteroid).
+    expect(psA.angularVelocity).toBeGreaterThan(psB.angularVelocity);
   });
 });

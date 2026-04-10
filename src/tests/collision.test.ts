@@ -896,6 +896,7 @@ import {
   AsteroidDamageLevel,
   applyAsteroidDamage,
   checkAsteroidCollisions,
+  resetAsteroidCollisionCooldowns,
 } from '../core/collision.ts';
 
 /**
@@ -1533,5 +1534,88 @@ describe('checkAsteroidCollisions() — extended', () => {
 
     expect(results).toHaveLength(0);
     expect(fs.events.length).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Asteroid collision cooldown
+// ---------------------------------------------------------------------------
+
+describe('Asteroid collision cooldown', () => {
+  beforeEach(() => {
+    resetAsteroidCollisionCooldowns();
+  });
+
+  it('@smoke first collision records damage; second call within cooldown returns empty for that asteroid', () => {
+    const { ps, assembly, fs } = makeAsteroidTestCraft({ posX: 0, posY: 0, velX: 3, velY: 0 });
+    const asteroid = makeAsteroid({ posX: 0, posY: 0, velX: 0, velY: 0, radius: 100, name: 'COOL-1' });
+
+    // First call — collision should be detected and damage applied.
+    const results1 = checkAsteroidCollisions(ps, assembly, [asteroid], fs);
+    expect(results1).toHaveLength(1);
+    expect(results1[0].damage).toBe(AsteroidDamageLevel.MINOR);
+
+    // Second call — asteroid is on cooldown, no collision.
+    const fs2 = makeFlightState();
+    const results2 = checkAsteroidCollisions(ps, assembly, [asteroid], fs2);
+    expect(results2).toHaveLength(0);
+  });
+
+  it('after 10 cooldown decrements, asteroid can collide again', () => {
+    const { ps, assembly, fs } = makeAsteroidTestCraft({ posX: 0, posY: 0, velX: 3, velY: 0 });
+    const asteroid = makeAsteroid({ posX: 0, posY: 0, velX: 0, velY: 0, radius: 100, name: 'COOL-2' });
+
+    // Trigger initial collision.
+    checkAsteroidCollisions(ps, assembly, [asteroid], fs);
+
+    // Tick 10 times with no asteroids to decrement cooldown without new collisions.
+    for (let i = 0; i < 10; i++) {
+      checkAsteroidCollisions(ps, assembly, [], makeFlightState());
+    }
+
+    // Cooldown expired — asteroid should collide again.
+    const fs3 = makeFlightState();
+    const results = checkAsteroidCollisions(ps, assembly, [asteroid], fs3);
+    expect(results).toHaveLength(1);
+    expect(results[0].asteroid.name).toBe('COOL-2');
+  });
+
+  it('multiple asteroids — only the cooled-down one is skipped, others still collide', () => {
+    const { ps, assembly, fs } = makeAsteroidTestCraft({ posX: 0, posY: 0, velX: 3, velY: 0 });
+    const ast1 = makeAsteroid({ posX: 0, posY: 0, velX: 0, velY: 0, radius: 100, name: 'SKIP' });
+    const ast2 = makeAsteroid({ posX: 0, posY: 0, velX: 0, velY: 0, radius: 100, name: 'HIT' });
+
+    // Collide with ast1 only.
+    checkAsteroidCollisions(ps, assembly, [ast1], fs);
+
+    // Now check both — ast1 is on cooldown, ast2 is fresh.
+    const fs2 = makeFlightState();
+    const results = checkAsteroidCollisions(ps, assembly, [ast1, ast2], fs2);
+
+    // Only ast2 should have collided.
+    expect(results).toHaveLength(1);
+    expect(results[0].asteroid.name).toBe('HIT');
+  });
+
+  it('resetAsteroidCollisionCooldowns clears all cooldowns', () => {
+    const { ps, assembly, fs } = makeAsteroidTestCraft({ posX: 0, posY: 0, velX: 3, velY: 0 });
+    const asteroid = makeAsteroid({ posX: 0, posY: 0, velX: 0, velY: 0, radius: 100, name: 'RESET-1' });
+
+    // Trigger collision to put asteroid on cooldown.
+    checkAsteroidCollisions(ps, assembly, [asteroid], fs);
+
+    // Normally the asteroid would be skipped.
+    const fs2 = makeFlightState();
+    const skipped = checkAsteroidCollisions(ps, assembly, [asteroid], fs2);
+    expect(skipped).toHaveLength(0);
+
+    // Reset cooldowns.
+    resetAsteroidCollisionCooldowns();
+
+    // Now the asteroid should collide again.
+    const fs3 = makeFlightState();
+    const results = checkAsteroidCollisions(ps, assembly, [asteroid], fs3);
+    expect(results).toHaveLength(1);
+    expect(results[0].asteroid.name).toBe('RESET-1');
   });
 });

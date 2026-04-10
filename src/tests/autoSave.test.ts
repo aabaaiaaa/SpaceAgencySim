@@ -199,6 +199,29 @@ describe('performAutoSave', () => {
     // Should use slot 5 (first empty beyond the occupied ones).
     expect(mockStorage.getItem('spaceAgencySave_5')).not.toBeNull();
   });
+
+  it('falls back to AUTO_SAVE_KEY when all 100 slots are occupied @smoke', async () => {
+    // Fill all 100 manual save slots (0-99).
+    for (let i = 0; i < 100; i++) {
+      mockStorage.setItem(`spaceAgencySave_${i}`, 'occupied');
+    }
+    _resetAutoSaveSlotForTesting();
+
+    const state = freshState();
+    state.agencyName = 'Fallback Agency';
+
+    const result = await performAutoSave(state);
+
+    expect(result.success).toBe(true);
+    // Should have fallen back to the dedicated auto-save key.
+    const raw = mockStorage.getItem(AUTO_SAVE_KEY);
+    expect(raw).not.toBeNull();
+
+    const json = decompressSaveData(raw);
+    const envelope = JSON.parse(json);
+    expect(envelope.saveName).toBe('Auto-Save');
+    expect(envelope.state.agencyName).toBe('Fallback Agency');
+  });
 });
 
 // ---------------------------------------------------------------------------

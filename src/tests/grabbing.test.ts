@@ -898,6 +898,18 @@ function stubAssemblyWithHeavyArm() {
   };
 }
 
+function stubAssemblyWithIndustrialArm() {
+  const parts = new Map();
+  parts.set('part-1', { instanceId: 'part-1', partId: 'cmd-mk1', x: 0, y: 0 });
+  parts.set('arm-1', { instanceId: 'arm-1', partId: 'grabbing-arm-industrial', x: -20, y: 0 });
+  return {
+    parts,
+    connections: [],
+    symmetryPairs: [],
+    _nextId: 3,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // canGrab — asteroid support
 // ---------------------------------------------------------------------------
@@ -1245,5 +1257,192 @@ describe('breakThrustAlignment', () => {
     // Re-align restores it
     alignThrustWithAsteroid(gs, ps);
     expect(ps.thrustAligned).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// CapturedBody physics integration
+// ---------------------------------------------------------------------------
+
+describe('CapturedBody physics integration', () => {
+  it('captureAsteroid sets ps.capturedBody with correct mass, radius, offset, and name', () => {
+    const gs = createGrabState();
+    const ps = stubPs({ posX: 100, posY: 200, velX: 0, velY: 0 });
+    const assembly = stubAssemblyWithArm();
+    const ast = makeAsteroid({ posX: 110, posY: 208, velX: 0, velY: 0, mass: 5_000, radius: 25, name: 'AST-7777' });
+    const result = captureAsteroid(gs, ast, ps, assembly);
+    expect(result.success).toBe(true);
+    expect(ps.capturedBody).not.toBeNull();
+    expect(ps.capturedBody.mass).toBe(5_000);
+    expect(ps.capturedBody.radius).toBe(25);
+    expect(ps.capturedBody.offset.x).toBe(10);  // 110 - 100
+    expect(ps.capturedBody.offset.y).toBe(8);   // 208 - 200
+    expect(ps.capturedBody.name).toBe('AST-7777');
+  });
+
+  it('captureAsteroid sets thrustAligned to false', () => {
+    const gs = createGrabState();
+    const ps = stubPs({ posX: 0, posY: 0, velX: 0, velY: 0, thrustAligned: true });
+    const assembly = stubAssemblyWithArm();
+    const ast = makeAsteroid({ posX: 5, posY: 0, mass: 1_000 });
+    captureAsteroid(gs, ast, ps, assembly);
+    expect(ps.thrustAligned).toBe(false);
+  });
+
+  it('releaseGrabbedAsteroid clears ps.capturedBody to null', () => {
+    const gs = createGrabState();
+    gs.state = GrabState.GRABBED;
+    gs.grabbedAsteroid = makeAsteroid();
+    const ps = stubPs({
+      capturedBody: { mass: 5_000, radius: 25, offset: { x: 10, y: 8 }, name: 'AST-7777' },
+      thrustAligned: true,
+    });
+    const result = releaseGrabbedAsteroid(gs, ps);
+    expect(result.success).toBe(true);
+    expect(ps.capturedBody).toBeNull();
+    expect(ps.thrustAligned).toBe(false);
+  });
+
+  it('capture then release round-trip sets and clears capturedBody', () => {
+    const gs = createGrabState();
+    const ps = stubPs({ posX: 0, posY: 0, velX: 0, velY: 0 });
+    const assembly = stubAssemblyWithArm();
+    const ast = makeAsteroid({ posX: 10, posY: 0, mass: 1_000 });
+
+    // Capture — capturedBody set
+    captureAsteroid(gs, ast, ps, assembly);
+    expect(ps.capturedBody).not.toBeNull();
+    expect(ps.capturedBody.mass).toBe(1_000);
+
+    // Release — capturedBody cleared
+    releaseGrabbedAsteroid(gs, ps);
+    expect(ps.capturedBody).toBeNull();
+  });
+
+  it('capturedBody offset equals asteroid position minus craft position', () => {
+    const gs = createGrabState();
+    const ps = stubPs({ posX: 500, posY: 300, velX: 0, velY: 0 });
+    const assembly = stubAssemblyWithArm();
+    const ast = makeAsteroid({ posX: 512, posY: 295, velX: 0, velY: 0, mass: 2_000 });
+    captureAsteroid(gs, ast, ps, assembly);
+    expect(ps.capturedBody.offset.x).toBeCloseTo(12, 6);   // 512 - 500
+    expect(ps.capturedBody.offset.y).toBeCloseTo(-5, 6);    // 295 - 300
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Per-arm effective range and speed limits
+// ---------------------------------------------------------------------------
+
+describe('Per-arm effective range and speed limits', () => {
+  // -- Range boundary tests --
+
+  it('@smoke Standard arm range boundary — 25m succeeds, 25.01m fails', () => {
+    const gs1 = createGrabState();
+    const ps1 = stubPs({ posX: 0, posY: 0, velX: 0, velY: 0 });
+    const assembly1 = stubAssemblyWithArm();
+    const astOk = makeAsteroid({ posX: 25, posY: 0, velX: 0, velY: 0, mass: 1_000 });
+    expect(captureAsteroid(gs1, astOk, ps1, assembly1).success).toBe(true);
+
+    const gs2 = createGrabState();
+    const ps2 = stubPs({ posX: 0, posY: 0, velX: 0, velY: 0 });
+    const assembly2 = stubAssemblyWithArm();
+    const astFail = makeAsteroid({ posX: 25.01, posY: 0, velX: 0, velY: 0, mass: 1_000 });
+    expect(captureAsteroid(gs2, astFail, ps2, assembly2).success).toBe(false);
+    expect(captureAsteroid(gs2, astFail, ps2, assembly2).reason).toContain('out of range');
+  });
+
+  it('Heavy arm range boundary — 35m succeeds, 35.01m fails', () => {
+    const gs1 = createGrabState();
+    const ps1 = stubPs({ posX: 0, posY: 0, velX: 0, velY: 0 });
+    const assembly1 = stubAssemblyWithHeavyArm();
+    const astOk = makeAsteroid({ posX: 35, posY: 0, velX: 0, velY: 0, mass: 1_000 });
+    expect(captureAsteroid(gs1, astOk, ps1, assembly1).success).toBe(true);
+
+    const gs2 = createGrabState();
+    const ps2 = stubPs({ posX: 0, posY: 0, velX: 0, velY: 0 });
+    const assembly2 = stubAssemblyWithHeavyArm();
+    const astFail = makeAsteroid({ posX: 35.01, posY: 0, velX: 0, velY: 0, mass: 1_000 });
+    expect(captureAsteroid(gs2, astFail, ps2, assembly2).success).toBe(false);
+    expect(captureAsteroid(gs2, astFail, ps2, assembly2).reason).toContain('out of range');
+  });
+
+  it('Industrial arm range boundary — 50m succeeds, 50.01m fails', () => {
+    const gs1 = createGrabState();
+    const ps1 = stubPs({ posX: 0, posY: 0, velX: 0, velY: 0 });
+    const assembly1 = stubAssemblyWithIndustrialArm();
+    const astOk = makeAsteroid({ posX: 50, posY: 0, velX: 0, velY: 0, mass: 1_000 });
+    expect(captureAsteroid(gs1, astOk, ps1, assembly1).success).toBe(true);
+
+    const gs2 = createGrabState();
+    const ps2 = stubPs({ posX: 0, posY: 0, velX: 0, velY: 0 });
+    const assembly2 = stubAssemblyWithIndustrialArm();
+    const astFail = makeAsteroid({ posX: 50.01, posY: 0, velX: 0, velY: 0, mass: 1_000 });
+    expect(captureAsteroid(gs2, astFail, ps2, assembly2).success).toBe(false);
+    expect(captureAsteroid(gs2, astFail, ps2, assembly2).reason).toContain('out of range');
+  });
+
+  // -- Speed limit tests --
+
+  it('Standard arm speed limit — 1.0 m/s succeeds, 1.01 m/s fails', () => {
+    const gs1 = createGrabState();
+    const ps1 = stubPs({ posX: 0, posY: 0, velX: 0, velY: 0 });
+    const assembly1 = stubAssemblyWithArm();
+    const astOk = makeAsteroid({ posX: 10, posY: 0, velX: 1.0, velY: 0, mass: 1_000 });
+    expect(captureAsteroid(gs1, astOk, ps1, assembly1).success).toBe(true);
+
+    const gs2 = createGrabState();
+    const ps2 = stubPs({ posX: 0, posY: 0, velX: 0, velY: 0 });
+    const assembly2 = stubAssemblyWithArm();
+    const astFail = makeAsteroid({ posX: 10, posY: 0, velX: 1.01, velY: 0, mass: 1_000 });
+    expect(captureAsteroid(gs2, astFail, ps2, assembly2).success).toBe(false);
+    expect(captureAsteroid(gs2, astFail, ps2, assembly2).reason).toContain('Relative speed too high');
+  });
+
+  it('Heavy arm speed limit — 0.8 m/s succeeds, 0.81 m/s fails', () => {
+    const gs1 = createGrabState();
+    const ps1 = stubPs({ posX: 0, posY: 0, velX: 0, velY: 0 });
+    const assembly1 = stubAssemblyWithHeavyArm();
+    const astOk = makeAsteroid({ posX: 10, posY: 0, velX: 0.8, velY: 0, mass: 1_000 });
+    expect(captureAsteroid(gs1, astOk, ps1, assembly1).success).toBe(true);
+
+    const gs2 = createGrabState();
+    const ps2 = stubPs({ posX: 0, posY: 0, velX: 0, velY: 0 });
+    const assembly2 = stubAssemblyWithHeavyArm();
+    const astFail = makeAsteroid({ posX: 10, posY: 0, velX: 0.81, velY: 0, mass: 1_000 });
+    expect(captureAsteroid(gs2, astFail, ps2, assembly2).success).toBe(false);
+    expect(captureAsteroid(gs2, astFail, ps2, assembly2).reason).toContain('Relative speed too high');
+  });
+
+  it('Industrial arm speed limit — 0.5 m/s succeeds, 0.51 m/s fails', () => {
+    const gs1 = createGrabState();
+    const ps1 = stubPs({ posX: 0, posY: 0, velX: 0, velY: 0 });
+    const assembly1 = stubAssemblyWithIndustrialArm();
+    const astOk = makeAsteroid({ posX: 10, posY: 0, velX: 0.5, velY: 0, mass: 1_000 });
+    expect(captureAsteroid(gs1, astOk, ps1, assembly1).success).toBe(true);
+
+    const gs2 = createGrabState();
+    const ps2 = stubPs({ posX: 0, posY: 0, velX: 0, velY: 0 });
+    const assembly2 = stubAssemblyWithIndustrialArm();
+    const astFail = makeAsteroid({ posX: 10, posY: 0, velX: 0.51, velY: 0, mass: 1_000 });
+    expect(captureAsteroid(gs2, astFail, ps2, assembly2).success).toBe(false);
+    expect(captureAsteroid(gs2, astFail, ps2, assembly2).reason).toContain('Relative speed too high');
+  });
+
+  // -- Mass limit boundary tests --
+
+  it('Standard arm mass limit — 100,000 kg succeeds, 100,001 kg fails', () => {
+    const gs1 = createGrabState();
+    const ps1 = stubPs({ posX: 0, posY: 0, velX: 0, velY: 0 });
+    const assembly1 = stubAssemblyWithArm();
+    const astOk = makeAsteroid({ posX: 10, posY: 0, velX: 0, velY: 0, mass: 100_000 });
+    expect(captureAsteroid(gs1, astOk, ps1, assembly1).success).toBe(true);
+
+    const gs2 = createGrabState();
+    const ps2 = stubPs({ posX: 0, posY: 0, velX: 0, velY: 0 });
+    const assembly2 = stubAssemblyWithArm();
+    const astFail = makeAsteroid({ posX: 10, posY: 0, velX: 0, velY: 0, mass: 100_001 });
+    expect(captureAsteroid(gs2, astFail, ps2, assembly2).success).toBe(false);
+    expect(captureAsteroid(gs2, astFail, ps2, assembly2).reason).toContain('too massive');
   });
 });

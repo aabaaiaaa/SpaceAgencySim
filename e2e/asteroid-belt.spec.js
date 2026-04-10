@@ -1951,3 +1951,467 @@ test.describe('Asteroid Belt — grabbing arm tier mass limits', () => {
     expect(limits.industrial).toBeGreaterThan(limits.heavy);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 13. EXTENDED ARM BEHAVIOUR, COOLDOWNS, ALIGNMENT PHYSICS, AND TECH GATING
+// ═══════════════════════════════════════════════════════════════════════════
+
+test.describe('Asteroid Belt — heavy arm range, collision cooldown, alignment physics, and tech gating', () => {
+  /** @type {import('@playwright/test').Page} */
+  let page;
+
+  test.afterEach(async () => { await page.close(); });
+
+  // -----------------------------------------------------------------------
+  // Test 1: Heavy arm grabs at longer range than Standard arm
+  // -----------------------------------------------------------------------
+
+  test('heavy arm grabs at 30m range where standard arm cannot reach @smoke', async ({ browser }) => {
+    test.setTimeout(60_000);
+    page = await browser.newPage();
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    const envelope = orbitalFixture({
+      parts: [
+        'probe-core-mk1', 'tank-small', 'engine-spark',
+        'grabbing-arm', 'grabbing-arm-heavy',
+      ],
+    });
+    await seedAndLoadSave(page, envelope);
+
+    // Start two flights: one with standard arm, one with heavy arm, both
+    // targeting an asteroid at 30m distance (between standard 25m and heavy 35m).
+
+    // --- Standard arm attempt (25m reach) ---
+    const STANDARD_PROBE = ['probe-core-mk1', 'grabbing-arm', 'tank-small', 'engine-spark'];
+    await startTestFlight(page, STANDARD_PROBE, { bodyId: 'SUN' });
+
+    const denseMidpoint = 396_500_000_000;
+    await teleportCraft(page, {
+      posX: denseMidpoint, posY: 0, velX: 0, velY: 18_300,
+      bodyId: 'SUN', phase: 'ORBIT',
+    });
+
+    const standardResult = await page.evaluate(async () => {
+      try {
+        const grabbing = await import('/src/core/grabbing.ts');
+        const beltMod = await import('/src/core/asteroidBelt.ts');
+        const constants = await import('/src/core/constants.ts');
+
+        const ps = window.__flightPs;
+        const assembly = window.__flightAssembly;
+        if (!ps || !assembly) return null;
+
+        const asteroids = beltMod.generateBeltAsteroids(
+          constants.BeltZone.DENSE, ps.posX, ps.posY, 50_000,
+        );
+        const target = asteroids[0];
+        // Place asteroid at 30m — beyond standard arm's 25m reach.
+        target.posX = ps.posX + 30;
+        target.posY = ps.posY;
+        target.velX = ps.velX;
+        target.velY = ps.velY;
+        target.mass = 50_000; // within standard arm's 100,000 mass limit
+
+        const grabState = grabbing.createGrabState();
+        const result = grabbing.captureAsteroid(grabState, target, ps, assembly);
+        return {
+          success: result.success,
+          reason: result.reason || null,
+        };
+      } catch (e) {
+        return { error: String(e) };
+      }
+    });
+
+    expect(standardResult).not.toBeNull();
+    expect(standardResult.error).toBeUndefined();
+    expect(standardResult.success).toBe(false);
+    expect(standardResult.reason).toContain('out of range');
+
+    // --- Heavy arm attempt (35m reach) --- needs a fresh flight.
+    // Navigate back to hub and start a new flight with heavy arm.
+    await page.evaluate(() => {
+      window.location.reload();
+    });
+    await page.waitForLoadState('load');
+    await seedAndLoadSave(page, envelope);
+
+    const HEAVY_PROBE = ['probe-core-mk1', 'grabbing-arm-heavy', 'tank-small', 'engine-spark'];
+    await startTestFlight(page, HEAVY_PROBE, { bodyId: 'SUN' });
+
+    await teleportCraft(page, {
+      posX: denseMidpoint, posY: 0, velX: 0, velY: 18_300,
+      bodyId: 'SUN', phase: 'ORBIT',
+    });
+
+    const heavyResult = await page.evaluate(async () => {
+      try {
+        const grabbing = await import('/src/core/grabbing.ts');
+        const beltMod = await import('/src/core/asteroidBelt.ts');
+        const constants = await import('/src/core/constants.ts');
+
+        const ps = window.__flightPs;
+        const assembly = window.__flightAssembly;
+        if (!ps || !assembly) return null;
+
+        const asteroids = beltMod.generateBeltAsteroids(
+          constants.BeltZone.DENSE, ps.posX, ps.posY, 50_000,
+        );
+        const target = asteroids[0];
+        // Same 30m distance — within heavy arm's 35m reach.
+        target.posX = ps.posX + 30;
+        target.posY = ps.posY;
+        target.velX = ps.velX;
+        target.velY = ps.velY;
+        target.mass = 50_000;
+
+        const grabState = grabbing.createGrabState();
+        const result = grabbing.captureAsteroid(grabState, target, ps, assembly);
+        return {
+          success: result.success,
+          reason: result.reason || null,
+          armReach: 35, // expected for heavy arm
+        };
+      } catch (e) {
+        return { error: String(e) };
+      }
+    });
+
+    expect(heavyResult).not.toBeNull();
+    expect(heavyResult.error).toBeUndefined();
+    expect(heavyResult.success).toBe(true);
+  });
+
+  // -----------------------------------------------------------------------
+  // Test 2: Collision cooldown prevents per-frame damage on slow overlap
+  // -----------------------------------------------------------------------
+
+  test('slow-speed collision cooldown prevents repeated damage on same asteroid', async ({ browser }) => {
+    test.setTimeout(60_000);
+    page = await browser.newPage();
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    const envelope = orbitalFixture();
+    await seedAndLoadSave(page, envelope);
+
+    await startTestFlight(page, PROBE, { bodyId: 'SUN' });
+
+    const denseMidpoint = 396_500_000_000;
+    await teleportCraft(page, {
+      posX: denseMidpoint, posY: 0, velX: 0, velY: 18_300,
+      bodyId: 'SUN', phase: 'ORBIT',
+    });
+
+    const result = await page.evaluate(async () => {
+      try {
+        const collision = await import('/src/core/collision.ts');
+        const ps = window.__flightPs;
+        const fs = window.__flightState;
+        const assembly = window.__flightAssembly;
+        if (!ps || !fs || !assembly) return null;
+
+        // Reset any prior cooldown state.
+        collision.resetAsteroidCollisionCooldowns();
+
+        // Create a fake asteroid overlapping the craft with low relative speed
+        // (2 m/s = MINOR damage — should not destroy craft).
+        const fakeAsteroid = {
+          id: 'AST-COOLDOWN-0',
+          type: 'asteroid',
+          name: 'AST-COOLDOWN',
+          posX: ps.posX,
+          posY: ps.posY,
+          velX: ps.velX + 2,
+          velY: ps.velY,
+          radius: 50,
+          mass: 500_000,
+          shapeSeed: 77,
+        };
+
+        const partCountBefore = ps.activeParts.size;
+
+        // First collision call — should register a MINOR hit.
+        const results1 = collision.checkAsteroidCollisions(
+          ps, assembly, [fakeAsteroid], fs,
+        );
+
+        const partCountAfterFirst = ps.activeParts.size;
+        const crashedAfterFirst = ps.crashed;
+
+        // Second call immediately — same asteroid should be on cooldown.
+        const results2 = collision.checkAsteroidCollisions(
+          ps, assembly, [fakeAsteroid], fs,
+        );
+
+        const partCountAfterSecond = ps.activeParts.size;
+        const crashedAfterSecond = ps.crashed;
+
+        return {
+          firstCallCount: results1.length,
+          firstDamage: results1.length > 0 ? results1[0].damage : null,
+          secondCallCount: results2.length,
+          partCountBefore,
+          partCountAfterFirst,
+          partCountAfterSecond,
+          crashedAfterFirst,
+          crashedAfterSecond,
+          // Verify the second call did not destroy additional parts.
+          noExtraDamage: partCountAfterFirst === partCountAfterSecond,
+        };
+      } catch (e) {
+        return { error: String(e) };
+      }
+    });
+
+    expect(result).not.toBeNull();
+    expect(result.error).toBeUndefined();
+    // First call registers the collision.
+    expect(result.firstCallCount).toBe(1);
+    expect(result.firstDamage).toBe('MINOR');
+    // Second call returns empty — asteroid is on cooldown.
+    expect(result.secondCallCount).toBe(0);
+    // Craft is not destroyed after either call.
+    expect(result.crashedAfterFirst).toBe(false);
+    expect(result.crashedAfterSecond).toBe(false);
+    // No additional part loss on the second call.
+    expect(result.noExtraDamage).toBe(true);
+    // Some parts may have been lost to minor damage, but craft survives.
+    expect(result.partCountAfterSecond).toBeGreaterThan(0);
+  });
+
+  // -----------------------------------------------------------------------
+  // Test 3: Thrust misalignment causes rotation; alignment suppresses it
+  // -----------------------------------------------------------------------
+
+  test('unaligned thrust causes angular velocity change; aligned thrust does not @smoke', async ({ browser }) => {
+    test.setTimeout(60_000);
+    page = await browser.newPage();
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    const envelope = orbitalFixture({
+      parts: [
+        'probe-core-mk1', 'tank-small', 'engine-spark',
+        'grabbing-arm',
+      ],
+    });
+    await seedAndLoadSave(page, envelope);
+
+    const GRAB_PROBE = ['probe-core-mk1', 'grabbing-arm', 'tank-small', 'engine-spark'];
+    await startTestFlight(page, GRAB_PROBE, { bodyId: 'SUN' });
+
+    const denseMidpoint = 396_500_000_000;
+    await teleportCraft(page, {
+      posX: denseMidpoint, posY: 0, velX: 0, velY: 18_300,
+      bodyId: 'SUN', phase: 'ORBIT',
+    });
+
+    const result = await page.evaluate(async () => {
+      try {
+        const grabbing = await import('/src/core/grabbing.ts');
+        const physics = await import('/src/core/physics.ts');
+        const beltMod = await import('/src/core/asteroidBelt.ts');
+        const constants = await import('/src/core/constants.ts');
+
+        const ps = window.__flightPs;
+        const fs = window.__flightState;
+        const assembly = window.__flightAssembly;
+        if (!ps || !fs || !assembly) return null;
+
+        // Capture an asteroid to create a captured body with mass offset.
+        const asteroids = beltMod.generateBeltAsteroids(
+          constants.BeltZone.DENSE, ps.posX, ps.posY, 50_000,
+        );
+        const target = asteroids[0];
+        target.posX = ps.posX + 15;
+        target.posY = ps.posY;
+        target.velX = ps.velX;
+        target.velY = ps.velY;
+        target.mass = 80_000; // heavy enough to cause noticeable torque
+
+        const grabState = grabbing.createGrabState();
+        const capture = grabbing.captureAsteroid(grabState, target, ps, assembly);
+        if (!capture.success) return { error: 'capture failed: ' + capture.reason };
+
+        // Verify unaligned state after capture.
+        const isUnalignedAfterCapture = !ps.thrustAligned;
+
+        // --- Phase 1: Thrust while UNALIGNED ---
+        // Set throttle and fire engines to generate thrust.
+        ps.throttle = 1.0;
+        ps.angularVelocity = 0; // reset to measure change
+        // Fire all engines.
+        for (const instanceId of ps.activeParts) {
+          const placed = assembly.parts.get(instanceId);
+          if (!placed) continue;
+          const partDef = (await import('/src/data/parts.ts')).getPartById(placed.partId);
+          if (partDef && partDef.type === 'ENGINE') {
+            ps.firingEngines.add(instanceId);
+          }
+        }
+
+        // Run several physics ticks while unaligned.
+        const dt = 1 / 60;
+        const stagingConfig = fs.stagingConfig || { stages: [] };
+        for (let i = 0; i < 10; i++) {
+          physics.tick(ps, assembly, stagingConfig, fs, dt, 1);
+        }
+
+        const angularVelUnaligned = ps.angularVelocity;
+
+        // --- Phase 2: Align thrust and fire again ---
+        grabbing.alignThrustWithAsteroid(grabState, ps);
+        const isAlignedNow = ps.thrustAligned;
+
+        // Reset angular velocity and fire again while aligned.
+        ps.angularVelocity = 0;
+        for (let i = 0; i < 10; i++) {
+          physics.tick(ps, assembly, stagingConfig, fs, dt, 1);
+        }
+
+        const angularVelAligned = ps.angularVelocity;
+
+        return {
+          isUnalignedAfterCapture,
+          isAlignedNow,
+          angularVelUnaligned,
+          angularVelAligned,
+          // Unaligned thrust should produce more rotation than aligned thrust.
+          unalignedHasRotation: Math.abs(angularVelUnaligned) > 1e-8,
+          alignedRotationSmaller: Math.abs(angularVelAligned) < Math.abs(angularVelUnaligned),
+        };
+      } catch (e) {
+        return { error: String(e) };
+      }
+    });
+
+    expect(result).not.toBeNull();
+    expect(result.error).toBeUndefined();
+    // After capture, thrust starts unaligned.
+    expect(result.isUnalignedAfterCapture).toBe(true);
+    // After align action, thrust is aligned.
+    expect(result.isAlignedNow).toBe(true);
+    // Unaligned thrust produces noticeable angular velocity.
+    expect(result.unalignedHasRotation).toBe(true);
+    expect(Math.abs(result.angularVelUnaligned)).toBeGreaterThan(0);
+    // Aligned thrust produces less (ideally zero) angular velocity change
+    // from asteroid torque.
+    expect(result.alignedRotationSmaller).toBe(true);
+  });
+
+  // -----------------------------------------------------------------------
+  // Test 4: Heavy arm requires struct-t5 tech tree research
+  // -----------------------------------------------------------------------
+
+  test('heavy grabbing arm is gated behind struct-t5 research', async ({ browser }) => {
+    test.setTimeout(60_000);
+    page = await browser.newPage();
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+
+    // Create a save with struct-t4 researched but NOT struct-t5.
+    // struct-t4 unlocks: docking-port-std, docking-port-small, relay-antenna,
+    //                     antenna-relay, grabbing-arm
+    // struct-t5 unlocks: station-habitat, station-truss, grabbing-arm-heavy
+    const envelopeT4Only = buildSaveEnvelope({
+      saveName: 'Tech T4 Only',
+      agencyName: 'Tech Test Agency',
+      money: 5_000_000,
+      parts: ['probe-core-mk1', 'tank-small', 'engine-spark'],
+      tutorialMode: false,
+      facilities: {
+        VAB: { level: 3, built: true },
+        LAUNCH_PAD: { level: 3, built: true },
+        MISSION_CONTROL: { level: 2, built: true },
+        RND_LAB: { level: 2, built: true },
+        TRACKING_STATION: { level: 2, built: true },
+        ASTRONAUT_COMPLEX: { level: 2, built: true },
+        ADMIN: { level: 1, built: true },
+      },
+      techTree: {
+        researched: ['struct-t1', 'struct-t2', 'struct-t3', 'struct-t4'],
+        unlockedInstruments: [],
+      },
+      sciencePoints: 300,
+    });
+
+    await seedAndLoadSave(page, envelopeT4Only);
+
+    // Check unlocked parts with struct-t4 only.
+    const t4Result = await page.evaluate(async () => {
+      try {
+        const missions = await import('/src/core/missions.ts');
+        const state = window.__gameState;
+        if (!state) return null;
+
+        const unlocked = missions.getUnlockedParts(state);
+        return {
+          hasStandardArm: unlocked.includes('grabbing-arm'),
+          hasHeavyArm: unlocked.includes('grabbing-arm-heavy'),
+          hasIndustrialArm: unlocked.includes('grabbing-arm-industrial'),
+        };
+      } catch (e) {
+        return { error: String(e) };
+      }
+    });
+
+    expect(t4Result).not.toBeNull();
+    expect(t4Result.error).toBeUndefined();
+    // Standard arm is unlocked by struct-t4.
+    expect(t4Result.hasStandardArm).toBe(true);
+    // Heavy arm requires struct-t5 — should NOT be available.
+    expect(t4Result.hasHeavyArm).toBe(false);
+    // Industrial arm requires struct-t6 — should NOT be available.
+    expect(t4Result.hasIndustrialArm).toBe(false);
+
+    // Now reload with struct-t5 also researched.
+    const envelopeT5 = buildSaveEnvelope({
+      saveName: 'Tech T5',
+      agencyName: 'Tech Test Agency',
+      money: 5_000_000,
+      parts: ['probe-core-mk1', 'tank-small', 'engine-spark'],
+      tutorialMode: false,
+      facilities: {
+        VAB: { level: 3, built: true },
+        LAUNCH_PAD: { level: 3, built: true },
+        MISSION_CONTROL: { level: 2, built: true },
+        RND_LAB: { level: 2, built: true },
+        TRACKING_STATION: { level: 2, built: true },
+        ASTRONAUT_COMPLEX: { level: 2, built: true },
+        ADMIN: { level: 1, built: true },
+      },
+      techTree: {
+        researched: ['struct-t1', 'struct-t2', 'struct-t3', 'struct-t4', 'struct-t5'],
+        unlockedInstruments: [],
+      },
+      sciencePoints: 300,
+    });
+
+    // Reload the page with the new save.
+    await page.evaluate(() => { window.location.reload(); });
+    await page.waitForLoadState('load');
+    await seedAndLoadSave(page, envelopeT5);
+
+    const t5Result = await page.evaluate(async () => {
+      try {
+        const missions = await import('/src/core/missions.ts');
+        const state = window.__gameState;
+        if (!state) return null;
+
+        const unlocked = missions.getUnlockedParts(state);
+        return {
+          hasStandardArm: unlocked.includes('grabbing-arm'),
+          hasHeavyArm: unlocked.includes('grabbing-arm-heavy'),
+          hasIndustrialArm: unlocked.includes('grabbing-arm-industrial'),
+        };
+      } catch (e) {
+        return { error: String(e) };
+      }
+    });
+
+    expect(t5Result).not.toBeNull();
+    expect(t5Result.error).toBeUndefined();
+    // Standard arm still unlocked.
+    expect(t5Result.hasStandardArm).toBe(true);
+    // Heavy arm is NOW unlocked via struct-t5.
+    expect(t5Result.hasHeavyArm).toBe(true);
+    // Industrial arm still requires struct-t6 — should NOT be available.
+    expect(t5Result.hasIndustrialArm).toBe(false);
+  });
+});
