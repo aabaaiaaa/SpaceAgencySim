@@ -1,14 +1,3 @@
-// @ts-nocheck
-/**
- * idbStorage.test.js — Unit tests for the IndexedDB backup storage layer.
- *
- * Tests cover:
- *   - idbStorage.js: idbSet, idbGet, idbDelete, isIdbAvailable
- *   - saveload.js integration: writes mirror to IndexedDB, loadGameAsync
- *     checks both layers and uses most recent, IndexedDB unavailability
- *     falls back to localStorage-only
- */
-
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
 import {
@@ -27,55 +16,71 @@ import {
   _resetDbForTesting,
 } from '../core/idbStorage.ts';
 
+import type { GameState } from '../core/gameState.ts';
+
+interface TestSaveEnvelope {
+  saveName: string;
+  timestamp: string;
+  version: number;
+  state: GameState;
+}
+
 // ---------------------------------------------------------------------------
 // IndexedDB mock — in-memory implementation for Node.js
 // ---------------------------------------------------------------------------
 
-function createIdbMock() {
-  const stores = new Map();
+interface MockIdbFactory {
+  open(_name: string, _version?: number): MockIDBRequest;
+  _stores: Map<string, Map<string, unknown>>;
+  _clear(): void;
+}
 
-  class MockIDBRequest {
-    constructor() {
-      this.result = undefined;
-      this.error = null;
-      this.onsuccess = null;
-      this.onerror = null;
-    }
-    _succeed(result) {
-      this.result = result;
-      if (this.onsuccess) this.onsuccess({ target: this });
-    }
-    _fail(error) {
-      this.error = error;
-      if (this.onerror) this.onerror({ target: this });
-    }
+class MockIDBRequest {
+  result: unknown = undefined;
+  error: DOMException | null = null;
+  onsuccess: ((ev: { target: MockIDBRequest }) => void) | null = null;
+  onerror: ((ev: { target: MockIDBRequest }) => void) | null = null;
+  onupgradeneeded: ((ev: { target: MockIDBRequest }) => void) | null = null;
+
+  _succeed(result: unknown): void {
+    this.result = result;
+    if (this.onsuccess) this.onsuccess({ target: this });
   }
+  _fail(error: DOMException): void {
+    this.error = error;
+    if (this.onerror) this.onerror({ target: this });
+  }
+}
+
+function createIdbMock(): MockIdbFactory {
+  const stores = new Map<string, Map<string, unknown>>();
 
   class MockIDBObjectStore {
-    constructor(name) {
+    _name: string;
+    constructor(name: string) {
       this._name = name;
       if (!stores.has(name)) stores.set(name, new Map());
     }
-    get _data() { return stores.get(this._name); }
-    put(value, key) {
+    get _data(): Map<string, unknown> | undefined { return stores.get(this._name); }
+    put(value: unknown, key: string): MockIDBRequest {
       const req = new MockIDBRequest();
       queueMicrotask(() => {
-        this._data.set(key, value);
+        this._data!.set(key, value);
         req._succeed(key);
       });
       return req;
     }
-    get(key) {
+    get(key: string): MockIDBRequest {
       const req = new MockIDBRequest();
       queueMicrotask(() => {
-        req._succeed(this._data.get(key));
+        req._succeed(this._data!.get(key));
       });
       return req;
     }
-    delete(key) {
+    delete(key: string): MockIDBRequest {
       const req = new MockIDBRequest();
       queueMicrotask(() => {
-        this._data.delete(key);
+        this._data!.delete(key);
         req._succeed(undefined);
       });
       return req;
@@ -83,37 +88,36 @@ function createIdbMock() {
   }
 
   class MockIDBTransaction {
-    constructor(db, storeNames) {
+    _db: MockIDBDatabase;
+    _storeNames: string | string[];
+    constructor(db: MockIDBDatabase, storeNames: string | string[]) {
       this._db = db;
       this._storeNames = storeNames;
     }
-    objectStore(name) {
+    objectStore(name: string): MockIDBObjectStore {
       return new MockIDBObjectStore(name);
     }
   }
 
   class MockIDBDatabase {
-    constructor() {
-      this.objectStoreNames = {
-        contains(name) { return stores.has(name); }
-      };
-    }
-    createObjectStore(name) {
+    objectStoreNames = {
+      contains(name: string): boolean { return stores.has(name); }
+    };
+    createObjectStore(name: string): void {
       stores.set(name, new Map());
     }
-    transaction(storeNames, _mode) {
+    transaction(storeNames: string | string[], _mode?: string): MockIDBTransaction {
       return new MockIDBTransaction(this, storeNames);
     }
-    close() {}
+    close(): void {}
   }
 
   const mockDb = new MockIDBDatabase();
 
-  const mockIndexedDB = {
-    open(_name, _version) {
+  const mockIndexedDB: MockIdbFactory = {
+    open(_name: string, _version?: number): MockIDBRequest {
       const req = new MockIDBRequest();
       queueMicrotask(() => {
-        // Trigger upgrade if store doesn't exist
         if (req.onupgradeneeded) {
           req.result = mockDb;
           req.onupgradeneeded({ target: req });
@@ -123,7 +127,7 @@ function createIdbMock() {
       return req;
     },
     _stores: stores,
-    _clear() { stores.clear(); },
+    _clear(): void { stores.clear(); },
   };
 
   return mockIndexedDB;
@@ -133,14 +137,22 @@ function createIdbMock() {
 // localStorage mock
 // ---------------------------------------------------------------------------
 
-function createLocalStorageMock() {
-  const store = new Map();
+interface MockLocalStorage {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+  clear(): void;
+  readonly length: number;
+}
+
+function createLocalStorageMock(): MockLocalStorage {
+  const store = new Map<string, string>();
   return {
-    getItem(key) { return store.has(key) ? store.get(key) : null; },
-    setItem(key, value) { store.set(key, String(value)); },
-    removeItem(key) { store.delete(key); },
-    clear() { store.clear(); },
-    get length() { return store.size; },
+    getItem(key: string): string | null { return store.has(key) ? store.get(key)! : null; },
+    setItem(key: string, value: string): void { store.set(key, String(value)); },
+    removeItem(key: string): void { store.delete(key); },
+    clear(): void { store.clear(); },
+    get length(): number { return store.size; },
   };
 }
 
@@ -148,8 +160,8 @@ function createLocalStorageMock() {
 // Setup / Teardown
 // ---------------------------------------------------------------------------
 
-let mockStorage;
-let mockIdb;
+let mockStorage: MockLocalStorage;
+let mockIdb: MockIdbFactory;
 
 beforeEach(() => {
   mockStorage = createLocalStorageMock();
@@ -168,7 +180,7 @@ afterEach(() => {
   _resetDbForTesting();
 });
 
-function freshState() {
+function freshState(): GameState {
   return createGameState();
 }
 
@@ -262,8 +274,8 @@ describe('saveGame() IndexedDB mirroring', () => {
 
     const idbRaw = await idbGet('spaceAgencySave_0');
     expect(idbRaw).not.toBeNull();
-    const idbJson = decompressSaveData(idbRaw);
-    const idbEnvelope = JSON.parse(idbJson);
+    const idbJson = decompressSaveData(idbRaw!);
+    const idbEnvelope = JSON.parse(idbJson) as TestSaveEnvelope;
     expect(idbEnvelope.state.money).toBe(42_000);
   });
 
@@ -277,8 +289,8 @@ describe('saveGame() IndexedDB mirroring', () => {
 
     const raw = localStorage.getItem('spaceAgencySave_0');
     expect(raw).not.toBeNull();
-    const json = decompressSaveData(raw);
-    const envelope = JSON.parse(json);
+    const json = decompressSaveData(raw!);
+    const envelope = JSON.parse(json) as TestSaveEnvelope;
     expect(envelope.state.money).toBe(99_000);
   });
 });
@@ -324,22 +336,22 @@ describe('loadGameAsync()', () => {
     // Write an older save to localStorage.
     const oldState = freshState();
     oldState.money = 10_000;
-    const oldEnvelope = {
+    const oldEnvelope: TestSaveEnvelope = {
       saveName: 'Old',
       timestamp: '2025-01-01T00:00:00.000Z',
       version: 1,
-      state: JSON.parse(JSON.stringify(oldState)),
+      state: JSON.parse(JSON.stringify(oldState)) as GameState,
     };
     localStorage.setItem('spaceAgencySave_0', JSON.stringify(oldEnvelope));
 
     // Write a newer save directly to IndexedDB.
     const newState = freshState();
     newState.money = 99_000;
-    const newEnvelope = {
+    const newEnvelope: TestSaveEnvelope = {
       saveName: 'New',
       timestamp: '2025-06-01T00:00:00.000Z',
       version: 1,
-      state: JSON.parse(JSON.stringify(newState)),
+      state: JSON.parse(JSON.stringify(newState)) as GameState,
     };
     await idbSet('spaceAgencySave_0', JSON.stringify(newEnvelope));
 
@@ -351,22 +363,22 @@ describe('loadGameAsync()', () => {
     // Write an older save to IndexedDB.
     const oldState = freshState();
     oldState.money = 10_000;
-    const oldEnvelope = {
+    const oldEnvelope: TestSaveEnvelope = {
       saveName: 'Old IDB',
       timestamp: '2025-01-01T00:00:00.000Z',
       version: 1,
-      state: JSON.parse(JSON.stringify(oldState)),
+      state: JSON.parse(JSON.stringify(oldState)) as GameState,
     };
     await idbSet('spaceAgencySave_0', JSON.stringify(oldEnvelope));
 
     // Write a newer save to localStorage.
     const newState = freshState();
     newState.money = 77_000;
-    const newEnvelope = {
+    const newEnvelope: TestSaveEnvelope = {
       saveName: 'New LS',
       timestamp: '2025-06-01T00:00:00.000Z',
       version: 1,
-      state: JSON.parse(JSON.stringify(newState)),
+      state: JSON.parse(JSON.stringify(newState)) as GameState,
     };
     localStorage.setItem('spaceAgencySave_0', JSON.stringify(newEnvelope));
 
@@ -377,11 +389,11 @@ describe('loadGameAsync()', () => {
   it('falls back to IndexedDB when localStorage is empty', async () => {
     const state = freshState();
     state.money = 88_000;
-    const envelope = {
+    const envelope: TestSaveEnvelope = {
       saveName: 'IDB Only',
       timestamp: '2025-03-01T00:00:00.000Z',
       version: 1,
-      state: JSON.parse(JSON.stringify(state)),
+      state: JSON.parse(JSON.stringify(state)) as GameState,
     };
     await idbSet('spaceAgencySave_2', JSON.stringify(envelope));
 
@@ -417,11 +429,11 @@ describe('loadGameAsync()', () => {
     // Put a save only in IndexedDB.
     const state = freshState();
     state.money = 55_000;
-    const envelope = {
+    const envelope: TestSaveEnvelope = {
       saveName: 'Sync Restore',
       timestamp: '2025-04-01T00:00:00.000Z',
       version: 1,
-      state: JSON.parse(JSON.stringify(state)),
+      state: JSON.parse(JSON.stringify(state)) as GameState,
     };
     await idbSet('spaceAgencySave_0', JSON.stringify(envelope));
 

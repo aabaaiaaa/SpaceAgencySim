@@ -1,22 +1,6 @@
-// @ts-nocheck
-/**
- * grabbing.test.js — Unit tests for the grabbing arm system (TASK-029).
- *
- * Tests cover:
- *   - createGrabState()           — default state
- *   - hasGrabbingArm()            — grabbing arm detection
- *   - getGrabbingArms()           — grabbing arm enumeration
- *   - selectGrabTarget()          — target selection
- *   - clearGrabTarget()           — target clearing
- *   - canGrab()                   — grabbability checks
- *   - repairGrabbedSatellite()    — satellite repair
- *   - releaseGrabbedSatellite()   — release after grab
- *   - processGrabRepairsFromFlight() — flight event integration
- *   - Part definition validation  — grabbing-arm part exists with correct properties
- */
-
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createFlightState, createGameState } from '../core/gameState.ts';
+import type { FlightState, FlightEvent, GameState, OrbitalObject } from '../core/gameState.ts';
 import {
   FlightPhase,
   ControlMode,
@@ -50,12 +34,14 @@ import {
   breakThrustAlignment,
 } from '../core/grabbing.ts';
 import { getPartById } from '../data/parts.ts';
+import type { PhysicsState, RocketAssembly, PlacedPart, CapturedBody } from '../core/physics.ts';
+import type { Asteroid } from '../core/asteroidBelt.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function freshFlightState(phase = FlightPhase.ORBIT) {
+function freshFlightState(phase: FlightPhase = FlightPhase.ORBIT): FlightState {
   const fs = createFlightState({
     missionId: 'test-mission',
     rocketId: 'test-rocket',
@@ -77,7 +63,7 @@ function freshFlightState(phase = FlightPhase.ORBIT) {
   return fs;
 }
 
-function stubPs(overrides = {}) {
+function stubPs(overrides: Partial<PhysicsState> = {}): PhysicsState {
   return {
     posX: 0,
     posY: 100_000,
@@ -85,12 +71,12 @@ function stubPs(overrides = {}) {
     velY: 0,
     angle: 0,
     throttle: 0,
-    throttleMode: 'absolute',
+    throttleMode: 'absolute' as const,
     targetTWR: 1.0,
-    firingEngines: new Set(),
-    fuelStore: new Map(),
+    firingEngines: new Set<string>(),
+    fuelStore: new Map<string, number>(),
     activeParts: new Set(['part-1', 'arm-1']),
-    deployedParts: new Set(),
+    deployedParts: new Set<string>(),
     grounded: false,
     landed: false,
     crashed: false,
@@ -99,16 +85,37 @@ function stubPs(overrides = {}) {
     dockingAltitudeBand: null,
     dockingOffsetAlongTrack: 0,
     dockingOffsetRadial: 0,
-    rcsActiveDirections: new Set(),
-    dockingPortStates: new Map(),
+    rcsActiveDirections: new Set<string>(),
+    dockingPortStates: new Map<string, string>(),
     _dockedCombinedMass: 0,
-    _heldKeys: new Set(),
+    _heldKeys: new Set<string>(),
+    capturedBody: null,
+    thrustAligned: false,
+    angularVelocity: 0,
+    isTipping: false,
+    tippingContactX: 0,
+    tippingContactY: 0,
+    _accumulator: 0,
+    parachuteStates: new Map(),
+    legStates: new Map(),
+    ejectorStates: new Map(),
+    ejectedCrewIds: new Set(),
+    ejectedCrew: [],
+    instrumentStates: new Map(),
+    scienceModuleStates: new Map(),
+    heatMap: new Map(),
+    debris: [],
+    weatherIspModifier: 1.0,
+    weatherWindSpeed: 0,
+    weatherWindAngle: 0,
+    hasLaunchClamps: false,
+    powerState: null,
     ...overrides,
-  };
+  } as PhysicsState;
 }
 
-function stubAssemblyWithArm() {
-  const parts = new Map();
+function stubAssemblyWithArm(): RocketAssembly {
+  const parts = new Map<string, PlacedPart>();
   parts.set('part-1', { instanceId: 'part-1', partId: 'cmd-mk1', x: 0, y: 0 });
   parts.set('arm-1', { instanceId: 'arm-1', partId: 'grabbing-arm', x: -20, y: 0 });
   return {
@@ -119,8 +126,8 @@ function stubAssemblyWithArm() {
   };
 }
 
-function stubAssemblyNoArm() {
-  const parts = new Map();
+function stubAssemblyNoArm(): RocketAssembly {
+  const parts = new Map<string, PlacedPart>();
   parts.set('part-1', { instanceId: 'part-1', partId: 'cmd-mk1', x: 0, y: 0 });
   parts.set('tank-1', { instanceId: 'tank-1', partId: 'tank-small', x: 0, y: 30 });
   return {
@@ -131,7 +138,7 @@ function stubAssemblyNoArm() {
   };
 }
 
-function stubGameStateWithSatellite() {
+function stubGameStateWithSatellite(): GameState {
   const state = createGameState();
   state.facilities[FacilityId.SATELLITE_OPS] = { built: true, tier: 1 };
   state.satelliteNetwork = {
@@ -303,7 +310,7 @@ describe('repairGrabbedSatellite', () => {
     expect(result.success).toBe(true);
     expect(result.healthBefore).toBe(50);
 
-    const sat = state.satelliteNetwork.satellites[0];
+    const sat = state.satelliteNetwork!.satellites[0];
     expect(sat.health).toBe(100);
   });
 
@@ -333,7 +340,7 @@ describe('repairGrabbedSatellite', () => {
     gs.state = GrabState.GRABBED;
     gs.grabbedSatelliteId = 'sat-1';
     const state = stubGameStateWithSatellite();
-    state.satelliteNetwork.satellites[0].health = 0;
+    state.satelliteNetwork!.satellites[0].health = 0;
 
     const result = repairGrabbedSatellite(gs, state);
     expect(result.success).toBe(false);
@@ -345,11 +352,11 @@ describe('repairGrabbedSatellite', () => {
     gs.state = GrabState.GRABBED;
     gs.grabbedSatelliteId = 'sat-1';
     const state = stubGameStateWithSatellite();
-    state.satelliteNetwork.satellites[0].health = 95;
+    state.satelliteNetwork!.satellites[0].health = 95;
 
     const result = repairGrabbedSatellite(gs, state);
     expect(result.success).toBe(true);
-    expect(state.satelliteNetwork.satellites[0].health).toBe(100);
+    expect(state.satelliteNetwork!.satellites[0].health).toBe(100);
   });
 });
 
@@ -387,14 +394,14 @@ describe('processGrabRepairsFromFlight', () => {
     const state = stubGameStateWithSatellite();
     const fs = freshFlightState();
     fs.events = [
-      { type: 'SATELLITE_REPAIRED', satelliteId: 'sat-1', timestamp: 1000 },
+      { type: 'SATELLITE_REPAIRED', satelliteId: 'sat-1', timestamp: 1000, time: 1000, description: '' },
     ];
 
     const repaired = processGrabRepairsFromFlight(state, fs);
     expect(repaired).toHaveLength(1);
     expect(repaired[0].satelliteId).toBe('sat-1');
     expect(repaired[0].healthBefore).toBe(50);
-    expect(state.satelliteNetwork.satellites[0].health).toBe(100);
+    expect(state.satelliteNetwork!.satellites[0].health).toBe(100);
   });
 
   it('returns empty array when no repair events', () => {
@@ -408,10 +415,10 @@ describe('processGrabRepairsFromFlight', () => {
 
   it('skips decommissioned satellites', () => {
     const state = stubGameStateWithSatellite();
-    state.satelliteNetwork.satellites[0].health = 0;
+    state.satelliteNetwork!.satellites[0].health = 0;
     const fs = freshFlightState();
     fs.events = [
-      { type: 'SATELLITE_REPAIRED', satelliteId: 'sat-1', timestamp: 1000 },
+      { type: 'SATELLITE_REPAIRED', satelliteId: 'sat-1', timestamp: 1000, time: 1000, description: '' },
     ];
 
     const repaired = processGrabRepairsFromFlight(state, fs);
@@ -436,35 +443,35 @@ describe('grabbing-arm part definition', () => {
   });
 
   it('has correct type', () => {
-    const part = getPartById('grabbing-arm');
+    const part = getPartById('grabbing-arm')!;
     expect(part.type).toBe(PartType.GRABBING_ARM);
   });
 
   it('costs $35,000', () => {
-    const part = getPartById('grabbing-arm');
+    const part = getPartById('grabbing-arm')!;
     expect(part.cost).toBe(35_000);
   });
 
   it('weighs 150 kg', () => {
-    const part = getPartById('grabbing-arm');
+    const part = getPartById('grabbing-arm')!;
     expect(part.mass).toBe(150);
   });
 
   it('is activatable with GRAB behaviour', () => {
-    const part = getPartById('grabbing-arm');
+    const part = getPartById('grabbing-arm')!;
     expect(part.activatable).toBe(true);
     expect(part.activationBehaviour).toBe('GRAB');
   });
 
   it('has radial snap points', () => {
-    const part = getPartById('grabbing-arm');
+    const part = getPartById('grabbing-arm')!;
     const sides = part.snapPoints.map((sp) => sp.side);
     expect(sides).toContain('left');
     expect(sides).toContain('right');
   });
 
   it('has heat tolerance and crash threshold properties', () => {
-    const part = getPartById('grabbing-arm');
+    const part = getPartById('grabbing-arm')!;
     expect(part.properties.heatTolerance).toBeGreaterThan(0);
     expect(part.properties.crashThreshold).toBeGreaterThan(0);
     expect(part.properties.armReach).toBe(25);
@@ -652,7 +659,7 @@ describe('updateGrabState', () => {
     const fs = freshFlightState();
     const state = stubGameStateWithSatellite();
     // Use identical orbital elements so distance ≈ 0, relSpeed ≈ 0.
-    state.orbitalObjects[0].elements = { ...fs.orbitalElements };
+    state.orbitalObjects[0].elements = { ...fs.orbitalElements! };
 
     updateGrabState(gs, ps, fs, state);
 
@@ -716,7 +723,7 @@ describe('getGrabTargetsInRange', () => {
     const fs = freshFlightState();
     const state = stubGameStateWithSatellite();
     // Use the exact same orbital elements for both craft and satellite.
-    state.orbitalObjects[0].elements = { ...fs.orbitalElements };
+    state.orbitalObjects[0].elements = { ...fs.orbitalElements! };
 
     const targets = getGrabTargetsInRange(ps, fs, state);
     // Should find the satellite since angular distance is ~0.
@@ -728,12 +735,12 @@ describe('getGrabTargetsInRange', () => {
     const ps = stubPs();
     const fs = freshFlightState();
     const state = stubGameStateWithSatellite();
-    state.orbitalObjects[0].elements = { ...fs.orbitalElements };
+    state.orbitalObjects[0].elements = { ...fs.orbitalElements! };
 
     const targets = getGrabTargetsInRange(ps, fs, state);
     if (targets.length > 0) {
       expect(targets[0].satelliteRecord).not.toBeNull();
-      expect(targets[0].satelliteRecord.id).toBe('sat-1');
+      expect(targets[0].satelliteRecord!.id).toBe('sat-1');
     }
   });
 
@@ -741,8 +748,8 @@ describe('getGrabTargetsInRange', () => {
     const ps = stubPs();
     const fs = freshFlightState();
     const state = stubGameStateWithSatellite();
-    state.orbitalObjects[0].elements = { ...fs.orbitalElements };
-    state.satelliteNetwork.satellites[0].health = 0;
+    state.orbitalObjects[0].elements = { ...fs.orbitalElements! };
+    state.satelliteNetwork!.satellites[0].health = 0;
 
     const targets = getGrabTargetsInRange(ps, fs, state);
     if (targets.length > 0) {
@@ -760,9 +767,9 @@ describe('getGrabTargetsInRange', () => {
       bodyId: 'EARTH',
       type: OrbitalObjectType.SATELLITE,
       name: 'Comm Sat 2',
-      elements: { ...fs.orbitalElements, meanAnomalyAtEpoch: 0.01 },
+      elements: { ...fs.orbitalElements!, meanAnomalyAtEpoch: 0.01 },
     });
-    state.orbitalObjects[0].elements = { ...fs.orbitalElements };
+    state.orbitalObjects[0].elements = { ...fs.orbitalElements! };
 
     const targets = getGrabTargetsInRange(ps, fs, state);
     for (let i = 1; i < targets.length; i++) {
@@ -829,9 +836,10 @@ describe('repairGrabbedSatellite — edge cases', () => {
 describe('processGrabRepairsFromFlight — edge cases', () => {
   it('handles null satelliteNetwork gracefully', () => {
     const state = stubGameStateWithSatellite();
+    // @ts-expect-error — intentionally setting to null to test runtime guard
     state.satelliteNetwork = null;
     const fs = freshFlightState();
-    fs.events = [{ type: 'SATELLITE_REPAIRED', satelliteId: 'sat-1', timestamp: 1000 }];
+    fs.events = [{ type: 'SATELLITE_REPAIRED', satelliteId: 'sat-1', timestamp: 1000, time: 1000, description: '' }];
 
     const repaired = processGrabRepairsFromFlight(state, fs);
     expect(repaired).toHaveLength(0);
@@ -840,7 +848,7 @@ describe('processGrabRepairsFromFlight — edge cases', () => {
   it('skips events with missing satelliteId', () => {
     const state = stubGameStateWithSatellite();
     const fs = freshFlightState();
-    fs.events = [{ type: 'SATELLITE_REPAIRED', timestamp: 1000 }]; // no satelliteId
+    fs.events = [{ type: 'SATELLITE_REPAIRED', timestamp: 1000, time: 1000, description: '' }]; // no satelliteId
 
     const repaired = processGrabRepairsFromFlight(state, fs);
     expect(repaired).toHaveLength(0);
@@ -849,7 +857,7 @@ describe('processGrabRepairsFromFlight — edge cases', () => {
   it('skips events for unknown satellite IDs', () => {
     const state = stubGameStateWithSatellite();
     const fs = freshFlightState();
-    fs.events = [{ type: 'SATELLITE_REPAIRED', satelliteId: 'unknown-sat', timestamp: 1000 }];
+    fs.events = [{ type: 'SATELLITE_REPAIRED', satelliteId: 'unknown-sat', timestamp: 1000, time: 1000, description: '' }];
 
     const repaired = processGrabRepairsFromFlight(state, fs);
     expect(repaired).toHaveLength(0);
@@ -857,12 +865,12 @@ describe('processGrabRepairsFromFlight — edge cases', () => {
 
   it('caps satellite health at 100', () => {
     const state = stubGameStateWithSatellite();
-    state.satelliteNetwork.satellites[0].health = 99;
+    state.satelliteNetwork!.satellites[0].health = 99;
     const fs = freshFlightState();
-    fs.events = [{ type: 'SATELLITE_REPAIRED', satelliteId: 'sat-1', timestamp: 1000 }];
+    fs.events = [{ type: 'SATELLITE_REPAIRED', satelliteId: 'sat-1', timestamp: 1000, time: 1000, description: '' }];
 
     processGrabRepairsFromFlight(state, fs);
-    expect(state.satelliteNetwork.satellites[0].health).toBe(100);
+    expect(state.satelliteNetwork!.satellites[0].health).toBe(100);
   });
 });
 
@@ -870,7 +878,7 @@ describe('processGrabRepairsFromFlight — edge cases', () => {
 // Asteroid grab target helpers
 // ---------------------------------------------------------------------------
 
-function makeAsteroid(overrides = {}) {
+function makeAsteroid(overrides: Partial<Asteroid> = {}): Asteroid {
   return {
     id: 'AST-0001-0',
     type: 'asteroid' as const,
@@ -886,8 +894,8 @@ function makeAsteroid(overrides = {}) {
   };
 }
 
-function stubAssemblyWithHeavyArm() {
-  const parts = new Map();
+function stubAssemblyWithHeavyArm(): RocketAssembly {
+  const parts = new Map<string, PlacedPart>();
   parts.set('part-1', { instanceId: 'part-1', partId: 'cmd-mk1', x: 0, y: 0 });
   parts.set('arm-1', { instanceId: 'arm-1', partId: 'grabbing-arm-heavy', x: -20, y: 0 });
   return {
@@ -898,8 +906,8 @@ function stubAssemblyWithHeavyArm() {
   };
 }
 
-function stubAssemblyWithIndustrialArm() {
-  const parts = new Map();
+function stubAssemblyWithIndustrialArm(): RocketAssembly {
+  const parts = new Map<string, PlacedPart>();
   parts.set('part-1', { instanceId: 'part-1', partId: 'cmd-mk1', x: 0, y: 0 });
   parts.set('arm-1', { instanceId: 'arm-1', partId: 'grabbing-arm-industrial', x: -20, y: 0 });
   return {
@@ -1147,7 +1155,7 @@ describe('releaseGrabbedAsteroid', () => {
     const result = releaseGrabbedAsteroid(gs, ps);
     expect(result.success).toBe(true);
     expect(result.asteroid).toBe(ast);
-    expect(result.asteroid.id).toBe('AST-RELEASED');
+    expect(result.asteroid!.id).toBe('AST-RELEASED');
     expect(ps.capturedBody).toBeNull();
   });
 });
@@ -1273,11 +1281,11 @@ describe('CapturedBody physics integration', () => {
     const result = captureAsteroid(gs, ast, ps, assembly);
     expect(result.success).toBe(true);
     expect(ps.capturedBody).not.toBeNull();
-    expect(ps.capturedBody.mass).toBe(5_000);
-    expect(ps.capturedBody.radius).toBe(25);
-    expect(ps.capturedBody.offset.x).toBe(10);  // 110 - 100
-    expect(ps.capturedBody.offset.y).toBe(8);   // 208 - 200
-    expect(ps.capturedBody.name).toBe('AST-7777');
+    expect(ps.capturedBody!.mass).toBe(5_000);
+    expect(ps.capturedBody!.radius).toBe(25);
+    expect(ps.capturedBody!.offset.x).toBe(10);  // 110 - 100
+    expect(ps.capturedBody!.offset.y).toBe(8);   // 208 - 200
+    expect(ps.capturedBody!.name).toBe('AST-7777');
   });
 
   it('captureAsteroid sets thrustAligned to false', () => {
@@ -1312,7 +1320,7 @@ describe('CapturedBody physics integration', () => {
     // Capture — capturedBody set
     captureAsteroid(gs, ast, ps, assembly);
     expect(ps.capturedBody).not.toBeNull();
-    expect(ps.capturedBody.mass).toBe(1_000);
+    expect(ps.capturedBody!.mass).toBe(1_000);
 
     // Release — capturedBody cleared
     releaseGrabbedAsteroid(gs, ps);
@@ -1325,8 +1333,8 @@ describe('CapturedBody physics integration', () => {
     const assembly = stubAssemblyWithArm();
     const ast = makeAsteroid({ posX: 512, posY: 295, velX: 0, velY: 0, mass: 2_000 });
     captureAsteroid(gs, ast, ps, assembly);
-    expect(ps.capturedBody.offset.x).toBeCloseTo(12, 6);   // 512 - 500
-    expect(ps.capturedBody.offset.y).toBeCloseTo(-5, 6);    // 295 - 300
+    expect(ps.capturedBody!.offset.x).toBeCloseTo(12, 6);   // 512 - 500
+    expect(ps.capturedBody!.offset.y).toBeCloseTo(-5, 6);    // 295 - 300
   });
 });
 

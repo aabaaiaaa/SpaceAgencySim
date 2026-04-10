@@ -1,21 +1,3 @@
-// @ts-nocheck
-/**
- * fuelsystem.test.js — Unit tests for the segment-aware fuel system (TASK-022).
- *
- * Tests cover:
- *   getConnectedTanks()      — simple rocket, two-stage with decoupler,
- *                              multiple tanks, radial SRB, jettisoned parts
- *   computeEngineFlowRate()  — liquid engine at sea level / vacuum,
- *                              throttle scaling, SRB fixed rate, explicit burnRate
- *   tickFuelSystem()         — liquid drain from connected tanks,
- *                              even drain across multiple tanks,
- *                              engine flames out when tanks empty,
- *                              SRB drains integral fuel,
- *                              SRB removed from firingEngines when empty,
- *                              jettisoned engines cleaned up,
- *                              detached parts retain fuel state
- */
-
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   getConnectedTanks,
@@ -36,6 +18,10 @@ import { createFlightState }  from '../core/gameState.ts';
 import { getPartById }        from '../data/parts.ts';
 import { SEA_LEVEL_DENSITY }  from '../core/atmosphere.ts';
 
+import type { RocketAssembly, PhysicsState } from '../core/physics.ts';
+import type { StagingConfig } from '../core/rocketbuilder.ts';
+import type { PartDef } from '../data/parts.ts';
+
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
@@ -44,7 +30,13 @@ import { SEA_LEVEL_DENSITY }  from '../core/atmosphere.ts';
  * Minimal rocket: Probe Core → Small Tank → Spark Engine.
  * All parts connected in a single segment (no decouplers).
  */
-function makeSimpleRocket() {
+function makeSimpleRocket(): {
+  assembly: RocketAssembly;
+  staging: StagingConfig;
+  probeId: string;
+  tankId: string;
+  engineId: string;
+} {
   const assembly = createRocketAssembly();
   const staging  = createStagingConfig();
 
@@ -65,7 +57,14 @@ function makeSimpleRocket() {
  * Two-stage rocket: Probe Core → Decoupler → Small Tank → Spark Engine.
  * The decoupler separates the probe (upper) from the tank+engine (lower).
  */
-function makeTwoStageRocket() {
+function makeTwoStageRocket(): {
+  assembly: RocketAssembly;
+  staging: StagingConfig;
+  probeId: string;
+  decId: string;
+  tankId: string;
+  engineId: string;
+} {
   const assembly = createRocketAssembly();
   const staging  = createStagingConfig();
 
@@ -90,7 +89,14 @@ function makeTwoStageRocket() {
  * Rocket with two tanks in series above the engine (no decoupler).
  *   Probe → Tank A → Tank B → Engine
  */
-function makeRocketWithTwoTanks() {
+function makeRocketWithTwoTanks(): {
+  assembly: RocketAssembly;
+  staging: StagingConfig;
+  probeId: string;
+  tankAId: string;
+  tankBId: string;
+  engineId: string;
+} {
   const assembly = createRocketAssembly();
   const staging  = createStagingConfig();
 
@@ -109,8 +115,7 @@ function makeRocketWithTwoTanks() {
   return { assembly, staging, probeId, tankAId, tankBId, engineId };
 }
 
-/** Build a minimal PhysicsState for a test. */
-function makePS(assembly) {
+function makePS(assembly: RocketAssembly): PhysicsState {
   return createPhysicsState(assembly, createFlightState({ missionId: 'm', rocketId: 'r' }));
 }
 
@@ -221,7 +226,7 @@ describe('getConnectedTanks() — SRB has no external tanks', () => {
 // ---------------------------------------------------------------------------
 
 describe('computeEngineFlowRate() — liquid engine', () => {
-  const engineDef = getPartById('engine-spark'); // thrust 60 kN SL / 72 kN vac
+  const engineDef = getPartById('engine-spark')!; // thrust 60 kN SL / 72 kN vac
 
   it('returns a positive flow rate at full throttle, sea level', () => {
     const rate = computeEngineFlowRate(engineDef, 1.0, SEA_LEVEL_DENSITY);
@@ -250,8 +255,8 @@ describe('computeEngineFlowRate() — liquid engine', () => {
 
   it('matches Tsiolkovsky formula: F / (Isp * 9.81) at sea level', () => {
     const G0       = 9.81;
-    const thrust   = engineDef.properties.thrust * 1_000; // kN → N
-    const isp      = engineDef.properties.isp;            // sea-level Isp
+    const thrust   = (engineDef.properties.thrust as number) * 1_000; // kN → N
+    const isp      = engineDef.properties.isp as number;              // sea-level Isp
     const expected = thrust / (isp * G0);
 
     const rate = computeEngineFlowRate(engineDef, 1.0, SEA_LEVEL_DENSITY);
@@ -260,7 +265,7 @@ describe('computeEngineFlowRate() — liquid engine', () => {
 });
 
 describe('computeEngineFlowRate() — SRB', () => {
-  const srbDef = getPartById('srb-small');
+  const srbDef = getPartById('srb-small')!;
 
   it('returns a positive flow rate regardless of throttle', () => {
     const rateZeroThrottle = computeEngineFlowRate(srbDef, 0.0, SEA_LEVEL_DENSITY);
@@ -274,7 +279,7 @@ describe('computeEngineFlowRate() — SRB', () => {
     const fakeDef = {
       type: 'SOLID_ROCKET_BOOSTER',
       properties: { burnRate: 42, thrust: 999, isp: 999 },
-    };
+    } as unknown as PartDef;
     const rate = computeEngineFlowRate(fakeDef, 0.5, SEA_LEVEL_DENSITY);
     expect(rate).toBe(42);
   });
@@ -283,7 +288,7 @@ describe('computeEngineFlowRate() — SRB', () => {
     const fakeDef = {
       type: 'SOLID_ROCKET_BOOSTER',
       properties: { burnRate: 0, thrust: 100, isp: 200 },
-    };
+    } as unknown as PartDef;
     const rate = computeEngineFlowRate(fakeDef, 1.0, SEA_LEVEL_DENSITY);
     expect(rate).toBe(0);
   });
@@ -298,7 +303,7 @@ describe('tickFuelSystem() — liquid engine drains connected tank', () => {
     const { assembly, staging, tankId, engineId } = makeSimpleRocket();
     const ps = makePS(assembly);
 
-    const initialFuel = ps.fuelStore.get(tankId);
+    const initialFuel = ps.fuelStore.get(tankId)!;
     ps.firingEngines.add(engineId);
 
     tickFuelSystem(ps, assembly, 1 / 60, SEA_LEVEL_DENSITY);
@@ -326,14 +331,14 @@ describe('tickFuelSystem() — liquid engine drains connected tank', () => {
     const ps = makePS(assembly);
 
     // Record initial fuel ratios.
-    const initA = ps.fuelStore.get(tankAId);
-    const initB = ps.fuelStore.get(tankBId);
+    const initA = ps.fuelStore.get(tankAId)!;
+    const initB = ps.fuelStore.get(tankBId)!;
 
     ps.firingEngines.add(engineId);
     tickFuelSystem(ps, assembly, 1 / 60, SEA_LEVEL_DENSITY);
 
-    const remA = ps.fuelStore.get(tankAId);
-    const remB = ps.fuelStore.get(tankBId);
+    const remA = ps.fuelStore.get(tankAId)!;
+    const remB = ps.fuelStore.get(tankBId)!;
 
     // Both should decrease.
     expect(remA).toBeLessThan(initA);
@@ -397,7 +402,7 @@ describe('tickFuelSystem() — SRB drains integral fuel', () => {
     const srbId    = addPartToAssembly(assembly, 'srb-small',      50,  0);
     const ps       = makePS(assembly);
 
-    const initFuel = ps.fuelStore.get(srbId);
+    const initFuel = ps.fuelStore.get(srbId)!;
     expect(initFuel).toBeGreaterThan(0); // srb-small has 900 kg fuel
 
     ps.firingEngines.add(srbId);
@@ -420,8 +425,8 @@ describe('tickFuelSystem() — SRB drains integral fuel', () => {
     ps1.throttle = 0.0;
     ps2.throttle = 1.0;
 
-    const init1 = ps1.fuelStore.get(srbId1);
-    const init2 = ps2.fuelStore.get(srbId2);
+    const init1 = ps1.fuelStore.get(srbId1)!;
+    const init2 = ps2.fuelStore.get(srbId2)!;
 
     ps1.firingEngines.add(srbId1);
     ps2.firingEngines.add(srbId2);
@@ -503,19 +508,19 @@ describe('tickFuelSystem() — exact depletion rate matches thrust/Isp formula',
     const { assembly, tankId, engineId } = makeSimpleRocket();
     const ps = makePS(assembly);
 
-    const engineDef = getPartById('engine-spark');
+    const engineDef = getPartById('engine-spark')!;
     const dt = 1 / 60;
 
     // Expected drain: flow = F / (Isp × g₀) at sea level, full throttle.
     const expectedRate  = computeEngineFlowRate(engineDef, 1.0, SEA_LEVEL_DENSITY);
     const expectedDrain = expectedRate * dt;
 
-    const fuelBefore = ps.fuelStore.get(tankId);
+    const fuelBefore = ps.fuelStore.get(tankId)!;
     ps.throttle = 1.0;
     ps.firingEngines.add(engineId);
     tickFuelSystem(ps, assembly, dt, SEA_LEVEL_DENSITY);
 
-    const actualDrain = fuelBefore - ps.fuelStore.get(tankId);
+    const actualDrain = fuelBefore - ps.fuelStore.get(tankId)!;
     expect(actualDrain).toBeCloseTo(expectedDrain, 5);
   });
 
@@ -523,18 +528,18 @@ describe('tickFuelSystem() — exact depletion rate matches thrust/Isp formula',
     const { assembly, tankId, engineId } = makeSimpleRocket();
     const ps = makePS(assembly);
 
-    const engineDef = getPartById('engine-spark');
+    const engineDef = getPartById('engine-spark')!;
     const dt = 1 / 60;
 
     const rateHalf  = computeEngineFlowRate(engineDef, 0.5, SEA_LEVEL_DENSITY);
     const rateFull  = computeEngineFlowRate(engineDef, 1.0, SEA_LEVEL_DENSITY);
 
-    const fuelBefore = ps.fuelStore.get(tankId);
+    const fuelBefore = ps.fuelStore.get(tankId)!;
     ps.throttle = 0.5;
     ps.firingEngines.add(engineId);
     tickFuelSystem(ps, assembly, dt, SEA_LEVEL_DENSITY);
 
-    const actualDrain = fuelBefore - ps.fuelStore.get(tankId);
+    const actualDrain = fuelBefore - ps.fuelStore.get(tankId)!;
     expect(actualDrain).toBeCloseTo(rateHalf * dt, 5);
     expect(actualDrain).toBeCloseTo(rateFull * dt * 0.5, 5);
   });
@@ -551,7 +556,15 @@ describe('tickFuelSystem() — exact depletion rate matches thrust/Isp formula',
  * The engine is in the lower segment; it must only draw from the lower tank.
  * The upper tank (across the decoupler boundary) must never be drained.
  */
-function makeRocketWithTanksAboveAndBelowDecoupler() {
+function makeRocketWithTanksAboveAndBelowDecoupler(): {
+  assembly: RocketAssembly;
+  staging: StagingConfig;
+  probeId: string;
+  decId: string;
+  upperTankId: string;
+  lowerTankId: string;
+  engineId: string;
+} {
   const assembly = createRocketAssembly();
   const staging  = createStagingConfig();
 
@@ -577,7 +590,7 @@ describe('tickFuelSystem() — cross-feed isolation across decoupler', () => {
     const { assembly, lowerTankId, engineId } = makeRocketWithTanksAboveAndBelowDecoupler();
     const ps = makePS(assembly);
 
-    const lowerFuelBefore = ps.fuelStore.get(lowerTankId);
+    const lowerFuelBefore = ps.fuelStore.get(lowerTankId)!;
     ps.firingEngines.add(engineId);
     tickFuelSystem(ps, assembly, 1 / 60, SEA_LEVEL_DENSITY);
 
@@ -588,7 +601,7 @@ describe('tickFuelSystem() — cross-feed isolation across decoupler', () => {
     const { assembly, upperTankId, engineId } = makeRocketWithTanksAboveAndBelowDecoupler();
     const ps = makePS(assembly);
 
-    const upperFuelBefore = ps.fuelStore.get(upperTankId);
+    const upperFuelBefore = ps.fuelStore.get(upperTankId)!;
     ps.firingEngines.add(engineId);
     tickFuelSystem(ps, assembly, 1 / 60, SEA_LEVEL_DENSITY);
 
@@ -636,7 +649,7 @@ describe('part mass tracking — fuel drain decreases total rocket mass', () => 
     const { assembly, tankId, engineId } = makeSimpleRocket();
     const ps = makePS(assembly);
 
-    const engineDef = getPartById('engine-spark');
+    const engineDef = getPartById('engine-spark')!;
     const dt        = 1 / 60;
 
     // Force a known fuel level well above what one tick can drain.
@@ -667,7 +680,7 @@ describe('computeEngineFlowRate() — edge cases', () => {
     const fakeDef = {
       type: 'SOLID_ROCKET_BOOSTER',
       properties: { thrust: 100, isp: 0 },
-    };
+    } as unknown as PartDef;
     const rate = computeEngineFlowRate(fakeDef, 1.0, SEA_LEVEL_DENSITY);
     expect(rate).toBe(0);
   });
@@ -676,7 +689,7 @@ describe('computeEngineFlowRate() — edge cases', () => {
     const fakeDef = {
       type: 'ENGINE',
       properties: { thrust: 100, isp: 0 },
-    };
+    } as unknown as PartDef;
     const rate = computeEngineFlowRate(fakeDef, 1.0, SEA_LEVEL_DENSITY);
     expect(rate).toBe(0);
   });
@@ -685,13 +698,13 @@ describe('computeEngineFlowRate() — edge cases', () => {
     const fakeDef = {
       type: 'SOLID_ROCKET_BOOSTER',
       properties: { burnRate: -5 },
-    };
+    } as unknown as PartDef;
     const rate = computeEngineFlowRate(fakeDef, 1.0, SEA_LEVEL_DENSITY);
     expect(rate).toBe(0);
   });
 
   it('handles negative density gracefully (clamped to 0)', () => {
-    const engineDef = getPartById('engine-spark');
+    const engineDef = getPartById('engine-spark')!;
     // Negative density should be clamped to ratio 0, giving vacuum performance.
     const rateNeg = computeEngineFlowRate(engineDef, 1.0, -1);
     const rateVac = computeEngineFlowRate(engineDef, 1.0, 0);
@@ -703,7 +716,7 @@ describe('computeEngineFlowRate() — edge cases', () => {
     const fakeDef = {
       type: 'SOLID_ROCKET_BOOSTER',
       properties: { thrust: 100, thrustVac: 120, isp: 200, ispVac: 250 },
-    };
+    } as unknown as PartDef;
     const rateVac = computeEngineFlowRate(fakeDef, 1.0, 0);
     // In vacuum: thrust = 120 kN = 120_000 N, isp = 250 s
     const expected = 120_000 / (250 * 9.81);
@@ -711,7 +724,7 @@ describe('computeEngineFlowRate() — edge cases', () => {
   });
 
   it('liquid engine clamps throttle to [0,1] range', () => {
-    const engineDef = getPartById('engine-spark');
+    const engineDef = getPartById('engine-spark')!;
     const rateOver = computeEngineFlowRate(engineDef, 2.0, SEA_LEVEL_DENSITY);
     const rateFull = computeEngineFlowRate(engineDef, 1.0, SEA_LEVEL_DENSITY);
     // Throttle > 1 is clamped to 1.
@@ -719,13 +732,13 @@ describe('computeEngineFlowRate() — edge cases', () => {
   });
 
   it('liquid engine returns 0 for negative throttle (clamped to 0)', () => {
-    const engineDef = getPartById('engine-spark');
+    const engineDef = getPartById('engine-spark')!;
     const rate = computeEngineFlowRate(engineDef, -0.5, SEA_LEVEL_DENSITY);
     expect(rate).toBe(0);
   });
 
   it('handles missing properties object gracefully', () => {
-    const fakeDef = { type: 'ENGINE' };
+    const fakeDef = { type: 'ENGINE' } as unknown as PartDef;
     const rate = computeEngineFlowRate(fakeDef, 1.0, SEA_LEVEL_DENSITY);
     // All properties default to 0 thrust / 300 isp → 0 thrust → 0 rate.
     expect(rate).toBe(0);
@@ -760,7 +773,7 @@ describe('tickFuelSystem() — engine with missing assembly data', () => {
     const badId = 'bad-engine-123';
     ps.activeParts.add(badId);
     ps.firingEngines.add(badId);
-    assembly.parts.set(badId, { partId: 'nonexistent-part', x: 0, y: 0 });
+    assembly.parts.set(badId, { instanceId: badId, partId: 'nonexistent-part', x: 0, y: 0 });
 
     tickFuelSystem(ps, assembly, 1 / 60, SEA_LEVEL_DENSITY);
 
@@ -824,7 +837,7 @@ describe('getConnectedTanks() — parts with missing data', () => {
     const ps = makePS(assembly);
 
     // Replace tank's partId with a nonexistent one.
-    assembly.parts.set(tankId, { ...assembly.parts.get(tankId), partId: 'fake-part' });
+    assembly.parts.set(tankId, { ...assembly.parts.get(tankId)!, partId: 'fake-part' });
 
     const tanks = getConnectedTanks(engineId, assembly, ps.activeParts);
     expect(tanks).not.toContain(tankId);

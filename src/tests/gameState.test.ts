@@ -1,37 +1,24 @@
-// @ts-nocheck
-/**
- * gameState.test.js — Unit tests for the central game state module.
- *
- * Tests cover:
- *   - createGameState()       — correct initial shape and defaults
- *   - createCrewMember()      — correct defaults and field presence
- *   - createMission()         — correct defaults and field presence
- *   - createRocketDesign()    — correct defaults and field presence
- *   - createFlightResult()    — correct defaults and field presence
- *   - createFlightState()     — correct defaults and field presence
- *   - isFlightActive()        — correctly detects active / idle state
- *   - getIdleCrew()           — filters correctly by status
- *   - findCrewById()          — finds and returns correct record
- *   - findMissionById()       — searches all three mission buckets
- *   - findRocketById()        — finds and returns correct record
- *   - PartType / MissionState / CrewStatus / FlightOutcome — frozen enums
- */
-
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  // State factories
   createGameState,
   createCrewMember,
   createMission,
   createRocketDesign,
   createFlightResult,
   createFlightState,
-  // Helpers
   isFlightActive,
   getIdleCrew,
   findCrewById,
   findMissionById,
   findRocketById,
+} from '../core/gameState.ts';
+import type {
+  GameState,
+  CrewMember,
+  MissionInstance,
+  RocketDesign,
+  FlightResult,
+  FlightState,
 } from '../core/gameState.ts';
 import {
   PartType,
@@ -50,7 +37,7 @@ import {
 // ---------------------------------------------------------------------------
 
 describe('createGameState()', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = createGameState(); });
 
   it('sets money to STARTING_MONEY', () => {
@@ -117,7 +104,7 @@ describe('createGameState()', () => {
 
 describe('createCrewMember()', () => {
   const opts = { id: 'crew-1', name: 'Alice', salary: 500 };
-  let member;
+  let member: CrewMember;
   beforeEach(() => { member = createCrewMember(opts); });
 
   it('stores provided id, name, and salary', () => {
@@ -164,7 +151,7 @@ describe('createMission()', () => {
     reward: 5000,
     deadline: '2026-12-31T00:00:00.000Z',
   };
-  let mission;
+  let mission: MissionInstance;
   beforeEach(() => { mission = createMission(baseOpts); });
 
   it('stores provided fields', () => {
@@ -205,7 +192,7 @@ describe('createMission()', () => {
 // ---------------------------------------------------------------------------
 
 describe('createRocketDesign()', () => {
-  let design;
+  let design: RocketDesign;
   beforeEach(() => { design = createRocketDesign({ id: 'rocket-1', name: 'Sparrow I' }); });
 
   it('stores id and name', () => {
@@ -241,7 +228,7 @@ describe('createFlightResult()', () => {
     rocketId: 'rocket-1',
     outcome: FlightOutcome.SUCCESS,
   };
-  let result;
+  let result: FlightResult;
   beforeEach(() => { result = createFlightResult(baseOpts); });
 
   it('stores required fields', () => {
@@ -270,7 +257,7 @@ describe('createFlightResult()', () => {
 // ---------------------------------------------------------------------------
 
 describe('createFlightState()', () => {
-  let flight;
+  let flight: FlightState;
   beforeEach(() => {
     flight = createFlightState({
       missionId: 'mission-1',
@@ -360,7 +347,7 @@ describe('findCrewById()', () => {
     state.crew.push(createCrewMember({ id: 'c2', name: 'Bob', salary: 500 }));
     const found = findCrewById(state, 'c2');
     expect(found).not.toBeNull();
-    expect(found.name).toBe('Bob');
+    expect(found!.name).toBe('Bob');
   });
 });
 
@@ -419,7 +406,7 @@ describe('findRocketById()', () => {
     const state = createGameState();
     state.rockets.push(createRocketDesign({ id: 'r1', name: 'Sparrow I' }));
     state.rockets.push(createRocketDesign({ id: 'r2', name: 'Condor II' }));
-    expect(findRocketById(state, 'r2').name).toBe('Condor II');
+    expect(findRocketById(state, 'r2')!.name).toBe('Condor II');
   });
 });
 

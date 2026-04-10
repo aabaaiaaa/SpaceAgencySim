@@ -1,21 +1,3 @@
-// @ts-nocheck
-/**
- * flightReturn.test.js — Unit tests for processFlightReturn().
- *
- * Tests cover:
- *   - Return summary structure and defaults
- *   - Mission completion — all-met, partial, empty objectives
- *   - Part recovery — landed with assembly, crash, engineering bonus
- *   - Loan interest — applied when balance > 0, skipped when 0
- *   - Death fines — crashed crew, ejected crew, already applied
- *   - Reputation — crew death, safe return, rocket destruction, mission failure
- *   - Flight outcome determination — all FlightOutcome branches
- *   - Field craft deployment — orbit, non-Earth landing, crash filtering
- *   - Flight history recording and currentFlight clearing
- *   - Flight time accumulation
- *   - Contract/satellite/achievement/challenge delegation
- */
-
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
 import { processFlightReturn } from '../core/flightReturn.ts';
@@ -30,16 +12,20 @@ import {
   FieldCraftStatus,
 } from '../core/constants.ts';
 import { getPartById } from '../data/parts.ts';
+import type { GameState, FlightState, CrewMember, MissionInstance, Loan, ObjectiveDef } from '../core/gameState.ts';
+import type { FlightReturnSummary } from '../core/flightReturn.ts';
+import type { PhysicsState, RocketAssembly, PlacedPart } from '../core/physics.ts';
+import type { MissionDef } from '../data/missions.ts';
 
 // ---------------------------------------------------------------------------
 // Test fixture helpers
 // ---------------------------------------------------------------------------
 
-function freshState() {
+function freshState(): GameState {
   return createGameState();
 }
 
-function makeMissionDef(overrides = {}) {
+function makeMissionDef(overrides: Partial<MissionDef> = {}): MissionDef {
   return {
     id: 'test-mission-001',
     title: 'Test Mission',
@@ -54,19 +40,19 @@ function makeMissionDef(overrides = {}) {
   };
 }
 
-function seedAcceptedMission(state, def) {
+function seedAcceptedMission(state: GameState, def: MissionDef): MissionInstance {
   const instance = {
     ...def,
-    objectives: def.objectives.map((o) => ({ ...o })),
+    objectives: def.objectives.map((o: ObjectiveDef) => ({ ...o })),
     unlocksAfter: [...def.unlocksAfter],
     unlockedParts: [...def.unlockedParts],
     status: MissionStatus.ACCEPTED,
-  };
+  } as unknown as MissionInstance;
   state.missions.accepted.push(instance);
   return instance;
 }
 
-function makeFlightState(missionId, overrides = {}) {
+function makeFlightState(missionId: string | null, overrides: Partial<FlightState> = {}): FlightState {
   return {
     missionId,
     rocketId: 'rocket-1',
@@ -81,38 +67,49 @@ function makeFlightState(missionId, overrides = {}) {
     events: [],
     aborted: false,
     ...overrides,
-  };
+  } as FlightState;
 }
 
-/**
- * Build a minimal physics state for testing.
- */
-function makePhysicsState(overrides = {}) {
+function makePhysicsState(overrides: Partial<PhysicsState> = {}): PhysicsState {
   return {
     landed: false,
     crashed: false,
-    activeParts: new Set(),
-    ejectedCrewIds: new Set(),
-    _usedInventoryParts: null,
+    activeParts: new Set<string>(),
+    ejectedCrewIds: new Set<string>(),
+    _usedInventoryParts: undefined,
     ...overrides,
-  };
+  } as PhysicsState;
 }
 
-/**
- * Build a minimal rocket assembly with a parts Map.
- * @param {Array<[string, {partId: string}]>} entries - [instanceId, {partId}] pairs
- */
-function makeAssembly(entries) {
+function makeAssembly(entries: Array<[string, { partId: string }]>): RocketAssembly {
   return {
-    parts: new Map(entries.map(([id, data]) => [id, data])),
-  };
+    parts: new Map(entries.map(([id, data]) => [id, data as PlacedPart])),
+  } as RocketAssembly;
+}
+
+function testCrew(overrides: Partial<CrewMember> & { id: string; name: string }): CrewMember {
+  return {
+    status: 'active',
+    skills: { piloting: 0, engineering: 0, science: 0 },
+    salary: 0,
+    hireDate: '2020-01-01',
+    missionsFlown: 0,
+    flightsFlown: 0,
+    deathDate: null,
+    deathCause: null,
+    assignedRocketId: null,
+    injuryEnds: null,
+    trainingSkill: null,
+    trainingEnds: null,
+    ...overrides,
+  } as CrewMember;
 }
 
 // ---------------------------------------------------------------------------
 // Catalog surgery — same pattern as missions.test.js
 // ---------------------------------------------------------------------------
 
-function withMissions(...defs) {
+function withMissions(...defs: MissionDef[]): () => void {
   const saved = MISSIONS.splice(0, MISSIONS.length);
   MISSIONS.push(...defs);
   rebuildMissionsIndex();
@@ -127,9 +124,8 @@ function withMissions(...defs) {
 // Common setup
 // ---------------------------------------------------------------------------
 
-/** @type {import('../core/gameState.js').GameState} */
-let state;
-let cleanup;
+let state: GameState;
+let cleanup: (() => void) | null;
 
 beforeEach(() => {
   state = freshState();
@@ -198,7 +194,7 @@ describe('processFlightReturn() — return summary', () => {
   });
 
   it('clears state.currentFlight to null', () => {
-    state.currentFlight = { missionId: 'x' };
+    state.currentFlight = makeFlightState('x');
     const fs = makeFlightState(null);
     processFlightReturn(state, fs, null, null);
     expect(state.currentFlight).toBeNull();
@@ -221,7 +217,7 @@ describe('processFlightReturn() — mission completion', () => {
     });
     cleanup = withMissions(def);
     seedAcceptedMission(state, def);
-    state.loan = { balance: 0, interestRate: 0 };
+    state.loan = { balance: 0, interestRate: 0, totalInterestAccrued: 0 };
 
     const fs = makeFlightState('fr-m1');
     const result = processFlightReturn(state, fs, null, null);
@@ -283,7 +279,7 @@ describe('processFlightReturn() — mission completion', () => {
     cleanup = withMissions(def1, def2);
     seedAcceptedMission(state, def1);
     seedAcceptedMission(state, def2);
-    state.loan = { balance: 0, interestRate: 0 };
+    state.loan = { balance: 0, interestRate: 0, totalInterestAccrued: 0 };
 
     const moneyBefore = state.money;
     const fs = makeFlightState('fr-multi1');
@@ -303,7 +299,7 @@ describe('processFlightReturn() — mission completion', () => {
     });
     cleanup = withMissions(def);
     seedAcceptedMission(state, def);
-    state.loan = { balance: 0, interestRate: 0 };
+    state.loan = { balance: 0, interestRate: 0, totalInterestAccrued: 0 };
 
     const moneyBefore = state.money;
     const fs = makeFlightState('fr-reward');
@@ -320,7 +316,7 @@ describe('processFlightReturn() — mission completion', () => {
 
 describe('processFlightReturn() — part recovery', () => {
   it('recovers part value when landed safely with an assembly', () => {
-    state.loan = { balance: 0, interestRate: 0 };
+    state.loan = { balance: 0, interestRate: 0, totalInterestAccrued: 0 };
 
     // Use real part IDs from the catalog.
     // probe-core-mk1 cost=5000, tank-small cost=800
@@ -379,7 +375,7 @@ describe('processFlightReturn() — part recovery', () => {
   });
 
   it('skips destroyed parts (not in activeParts)', () => {
-    state.loan = { balance: 0, interestRate: 0 };
+    state.loan = { balance: 0, interestRate: 0, totalInterestAccrued: 0 };
 
     const assembly = makeAssembly([
       ['inst-1', { partId: 'probe-core-mk1' }],   // active
@@ -398,7 +394,7 @@ describe('processFlightReturn() — part recovery', () => {
   });
 
   it('skips parts with unknown partId (not in catalog)', () => {
-    state.loan = { balance: 0, interestRate: 0 };
+    state.loan = { balance: 0, interestRate: 0, totalInterestAccrued: 0 };
 
     const assembly = makeAssembly([
       ['inst-1', { partId: 'nonexistent-part-xyz' }],
@@ -415,18 +411,15 @@ describe('processFlightReturn() — part recovery', () => {
   });
 
   it('applies engineering skill bonus to recovery fraction', () => {
-    state.loan = { balance: 0, interestRate: 0 };
+    state.loan = { balance: 0, interestRate: 0, totalInterestAccrued: 0 };
 
     // Add a crew member with engineering skill.
     const crewId = 'eng-crew-1';
-    state.crew.push({
+    state.crew.push(testCrew({
       id: crewId,
       name: 'Engineer',
-      status: 'active',
       skills: { piloting: 0, engineering: 50, science: 0 },
-      flightCount: 0,
-      hiredPeriod: 0,
-    });
+    }));
 
     const assembly = makeAssembly([
       ['inst-1', { partId: 'engine-spark' }], // cost=6000
@@ -485,8 +478,8 @@ describe('processFlightReturn() — death fines', () => {
   it('applies death fine for crew KIA on crash', () => {
     // Add crew members.
     state.crew.push(
-      { id: 'crew-a', name: 'Alpha', status: 'active', skills: { piloting: 0, engineering: 0, science: 0 }, flightCount: 0, hiredPeriod: 0 },
-      { id: 'crew-b', name: 'Beta', status: 'active', skills: { piloting: 0, engineering: 0, science: 0 }, flightCount: 0, hiredPeriod: 0 },
+      testCrew({ id: 'crew-a', name: 'Alpha' }),
+      testCrew({ id: 'crew-b', name: 'Beta' }),
     );
     state.loan = { balance: 0, interestRate: 0, totalInterestAccrued: 0 };
 
@@ -506,8 +499,8 @@ describe('processFlightReturn() — death fines', () => {
 
   it('does not fine ejected crew on crash', () => {
     state.crew.push(
-      { id: 'crew-a', name: 'Alpha', status: 'active', skills: { piloting: 0, engineering: 0, science: 0 }, flightCount: 0, hiredPeriod: 0 },
-      { id: 'crew-b', name: 'Beta', status: 'active', skills: { piloting: 0, engineering: 0, science: 0 }, flightCount: 0, hiredPeriod: 0 },
+      testCrew({ id: 'crew-a', name: 'Alpha' }),
+      testCrew({ id: 'crew-b', name: 'Beta' }),
     );
     state.loan = { balance: 0, interestRate: 0, totalInterestAccrued: 0 };
 
@@ -528,7 +521,7 @@ describe('processFlightReturn() — death fines', () => {
 
   it('does not apply death fines when deathFinesApplied is true', () => {
     state.crew.push(
-      { id: 'crew-a', name: 'Alpha', status: 'active', skills: { piloting: 0, engineering: 0, science: 0 }, flightCount: 0, hiredPeriod: 0 },
+      testCrew({ id: 'crew-a', name: 'Alpha' }),
     );
 
     const ps = makePhysicsState({ crashed: true });
@@ -544,7 +537,7 @@ describe('processFlightReturn() — death fines', () => {
 
   it('does not apply death fines when craft landed safely', () => {
     state.crew.push(
-      { id: 'crew-a', name: 'Alpha', status: 'active', skills: { piloting: 0, engineering: 0, science: 0 }, flightCount: 0, hiredPeriod: 0 },
+      testCrew({ id: 'crew-a', name: 'Alpha' }),
     );
 
     const ps = makePhysicsState({ landed: true, crashed: false });
@@ -557,7 +550,7 @@ describe('processFlightReturn() — death fines', () => {
 
   it('applies death fine when all command modules destroyed (not crashed)', () => {
     state.crew.push(
-      { id: 'crew-a', name: 'Alpha', status: 'active', skills: { piloting: 0, engineering: 0, science: 0 }, flightCount: 0, hiredPeriod: 0 },
+      testCrew({ id: 'crew-a', name: 'Alpha' }),
     );
     state.loan = { balance: 0, interestRate: 0, totalInterestAccrued: 0 };
 
@@ -580,7 +573,7 @@ describe('processFlightReturn() — death fines', () => {
 
   it('does not apply death fine when command module is still active', () => {
     state.crew.push(
-      { id: 'crew-a', name: 'Alpha', status: 'active', skills: { piloting: 0, engineering: 0, science: 0 }, flightCount: 0, hiredPeriod: 0 },
+      testCrew({ id: 'crew-a', name: 'Alpha' }),
     );
 
     const assembly = makeAssembly([
@@ -609,7 +602,7 @@ describe('processFlightReturn() — death fines', () => {
 
   it('marks deathFinesApplied on flightState after processing', () => {
     state.crew.push(
-      { id: 'crew-a', name: 'Alpha', status: 'active', skills: { piloting: 0, engineering: 0, science: 0 }, flightCount: 0, hiredPeriod: 0 },
+      testCrew({ id: 'crew-a', name: 'Alpha' }),
     );
 
     const ps = makePhysicsState({ crashed: true });
@@ -628,7 +621,7 @@ describe('processFlightReturn() — death fines', () => {
 describe('processFlightReturn() — reputation', () => {
   it('decreases reputation on crew death', () => {
     state.crew.push(
-      { id: 'crew-a', name: 'Alpha', status: 'active', skills: { piloting: 0, engineering: 0, science: 0 }, flightCount: 0, hiredPeriod: 0 },
+      testCrew({ id: 'crew-a', name: 'Alpha' }),
     );
 
     const ps = makePhysicsState({ crashed: true });
@@ -643,7 +636,7 @@ describe('processFlightReturn() — reputation', () => {
 
   it('increases reputation on safe crew return', () => {
     state.crew.push(
-      { id: 'crew-a', name: 'Alpha', status: 'active', skills: { piloting: 0, engineering: 0, science: 0 }, flightCount: 0, hiredPeriod: 0 },
+      testCrew({ id: 'crew-a', name: 'Alpha' }),
     );
 
     // Complete a mission so outcome is SUCCESS (not FAILURE which would penalise).
@@ -813,7 +806,7 @@ describe('processFlightReturn() — flight history', () => {
 
   it('records crewIds from flight state', () => {
     state.crew.push(
-      { id: 'crew-a', name: 'Alpha', status: 'active', skills: { piloting: 0, engineering: 0, science: 0 }, flightCount: 0, hiredPeriod: 0 },
+      testCrew({ id: 'crew-a', name: 'Alpha' }),
     );
     const ps = makePhysicsState({ landed: true, crashed: false });
     const fs = makeFlightState(null, { crewIds: ['crew-a'] });
@@ -875,7 +868,7 @@ describe('processFlightReturn() — flight history', () => {
       transferState: {
         originBodyId: 'EARTH',
         destinationBodyId: 'MOON',
-      },
+      } as FlightState['transferState'],
     });
     processFlightReturn(state, fs, null, null);
 
@@ -885,7 +878,7 @@ describe('processFlightReturn() — flight history', () => {
   });
 
   it('records rocket name from savedDesigns or rockets', () => {
-    state.rockets = [{ id: 'rocket-1', name: 'My Rocket' }];
+    state.rockets = [{ id: 'rocket-1', name: 'My Rocket' } as GameState['rockets'][number]];
     const fs = makeFlightState(null, { rocketId: 'rocket-1' });
     processFlightReturn(state, fs, null, null);
 
@@ -904,6 +897,7 @@ describe('processFlightReturn() — flight history', () => {
   });
 
   it('initialises flightHistory array if missing', () => {
+    // @ts-expect-error testing defensive code with invalid state
     state.flightHistory = undefined;
     const fs = makeFlightState(null);
     processFlightReturn(state, fs, null, null);
@@ -929,6 +923,7 @@ describe('processFlightReturn() — flight time', () => {
   it('defaults timeElapsed to 0 if not present', () => {
     state.flightTimeSeconds = 100;
     const fs = makeFlightState(null);
+    // @ts-expect-error testing defensive code with missing field
     delete fs.timeElapsed;
     processFlightReturn(state, fs, null, null);
 
@@ -936,6 +931,7 @@ describe('processFlightReturn() — flight time', () => {
   });
 
   it('initialises flightTimeSeconds if undefined', () => {
+    // @ts-expect-error testing defensive code with invalid state
     state.flightTimeSeconds = undefined;
     const fs = makeFlightState(null, { timeElapsed: 50 });
     processFlightReturn(state, fs, null, null);
@@ -985,9 +981,9 @@ describe('processFlightReturn() — net cash change', () => {
 describe('processFlightReturn() — field craft', () => {
   it('creates field craft when crew is in orbit', () => {
     state.crew.push(
-      { id: 'crew-orbit', name: 'Orbiter', status: 'active', skills: { piloting: 0, engineering: 0, science: 0 }, flightCount: 0, hiredPeriod: 0 },
+      testCrew({ id: 'crew-orbit', name: 'Orbiter' }),
     );
-    state.rockets = [{ id: 'rocket-1', name: 'Orbital Vessel' }];
+    state.rockets = [{ id: 'rocket-1', name: 'Orbital Vessel' } as GameState['rockets'][number]];
 
     const ps = makePhysicsState({ landed: false, crashed: false });
     const fs = makeFlightState(null, {
@@ -999,16 +995,16 @@ describe('processFlightReturn() — field craft', () => {
     const result = processFlightReturn(state, fs, ps, null);
 
     expect(result.deployedFieldCraft).not.toBeNull();
-    expect(result.deployedFieldCraft.crewIds).toContain('crew-orbit');
-    expect(result.deployedFieldCraft.status).toBe(FieldCraftStatus.IN_ORBIT);
+    expect(result.deployedFieldCraft!.crewIds).toContain('crew-orbit');
+    expect(result.deployedFieldCraft!.status).toBe(FieldCraftStatus.IN_ORBIT);
     expect(state.fieldCraft.length).toBeGreaterThanOrEqual(1);
   });
 
   it('creates field craft when crew lands on non-Earth body', () => {
     state.crew.push(
-      { id: 'crew-moon', name: 'Moonwalker', status: 'active', skills: { piloting: 0, engineering: 0, science: 0 }, flightCount: 0, hiredPeriod: 0 },
+      testCrew({ id: 'crew-moon', name: 'Moonwalker' }),
     );
-    state.rockets = [{ id: 'rocket-1', name: 'Lunar Lander' }];
+    state.rockets = [{ id: 'rocket-1', name: 'Lunar Lander' } as GameState['rockets'][number]];
 
     const ps = makePhysicsState({ landed: true, crashed: false });
     const fs = makeFlightState(null, {
@@ -1019,13 +1015,13 @@ describe('processFlightReturn() — field craft', () => {
     const result = processFlightReturn(state, fs, ps, null);
 
     expect(result.deployedFieldCraft).not.toBeNull();
-    expect(result.deployedFieldCraft.status).toBe(FieldCraftStatus.LANDED);
-    expect(result.deployedFieldCraft.bodyId).toBe('MOON');
+    expect(result.deployedFieldCraft!.status).toBe(FieldCraftStatus.LANDED);
+    expect(result.deployedFieldCraft!.bodyId).toBe('MOON');
   });
 
   it('does not create field craft when crew returns to Earth', () => {
     state.crew.push(
-      { id: 'crew-home', name: 'Homer', status: 'active', skills: { piloting: 0, engineering: 0, science: 0 }, flightCount: 0, hiredPeriod: 0 },
+      testCrew({ id: 'crew-home', name: 'Homer' }),
     );
 
     const ps = makePhysicsState({ landed: true, crashed: false });
@@ -1053,10 +1049,10 @@ describe('processFlightReturn() — field craft', () => {
 
   it('excludes KIA crew from field craft when crashed in orbit', () => {
     state.crew.push(
-      { id: 'crew-alive', name: 'Survivor', status: 'active', skills: { piloting: 0, engineering: 0, science: 0 }, flightCount: 0, hiredPeriod: 0 },
-      { id: 'crew-dead', name: 'Lost', status: 'active', skills: { piloting: 0, engineering: 0, science: 0 }, flightCount: 0, hiredPeriod: 0 },
+      testCrew({ id: 'crew-alive', name: 'Survivor' }),
+      testCrew({ id: 'crew-dead', name: 'Lost' }),
     );
-    state.rockets = [{ id: 'rocket-1', name: 'Vessel' }];
+    state.rockets = [{ id: 'rocket-1', name: 'Vessel' } as GameState['rockets'][number]];
 
     const ps = makePhysicsState({
       landed: false,
@@ -1079,7 +1075,7 @@ describe('processFlightReturn() — field craft', () => {
 
   it('does not create field craft when all crew are KIA', () => {
     state.crew.push(
-      { id: 'crew-dead', name: 'Lost', status: 'active', skills: { piloting: 0, engineering: 0, science: 0 }, flightCount: 0, hiredPeriod: 0 },
+      testCrew({ id: 'crew-dead', name: 'Lost' }),
     );
 
     const ps = makePhysicsState({
@@ -1098,11 +1094,12 @@ describe('processFlightReturn() — field craft', () => {
   });
 
   it('initialises fieldCraft array if missing', () => {
+    // @ts-expect-error testing defensive code with invalid state
     state.fieldCraft = undefined;
     state.crew.push(
-      { id: 'crew-orbit', name: 'Orbiter', status: 'active', skills: { piloting: 0, engineering: 0, science: 0 }, flightCount: 0, hiredPeriod: 0 },
+      testCrew({ id: 'crew-orbit', name: 'Orbiter' }),
     );
-    state.rockets = [{ id: 'rocket-1', name: 'Ship' }];
+    state.rockets = [{ id: 'rocket-1', name: 'Ship' } as GameState['rockets'][number]];
 
     const ps = makePhysicsState({ landed: false, crashed: false });
     const fs = makeFlightState(null, {
@@ -1124,7 +1121,7 @@ describe('processFlightReturn() — field craft', () => {
 describe('processFlightReturn() — crew XP', () => {
   it('awards XP to surviving crew', () => {
     state.crew.push(
-      { id: 'crew-a', name: 'Alpha', status: 'active', skills: { piloting: 0, engineering: 0, science: 0 }, flightCount: 0, hiredPeriod: 0 },
+      testCrew({ id: 'crew-a', name: 'Alpha' }),
     );
 
     const ps = makePhysicsState({ landed: true, crashed: false });
@@ -1137,7 +1134,7 @@ describe('processFlightReturn() — crew XP', () => {
 
   it('does not award XP to KIA crew on crash', () => {
     state.crew.push(
-      { id: 'crew-dead', name: 'Lost', status: 'active', skills: { piloting: 0, engineering: 0, science: 0 }, flightCount: 0, hiredPeriod: 0 },
+      testCrew({ id: 'crew-dead', name: 'Lost' }),
     );
 
     const ps = makePhysicsState({
@@ -1154,7 +1151,7 @@ describe('processFlightReturn() — crew XP', () => {
 
   it('awards XP to ejected crew even on crash', () => {
     state.crew.push(
-      { id: 'crew-ejected', name: 'Ejected', status: 'active', skills: { piloting: 0, engineering: 0, science: 0 }, flightCount: 0, hiredPeriod: 0 },
+      testCrew({ id: 'crew-ejected', name: 'Ejected' }),
     );
 
     const ps = makePhysicsState({
@@ -1220,7 +1217,7 @@ describe('processFlightReturn() — operating costs', () => {
 
   it('reports activeCrewCount', () => {
     state.crew.push(
-      { id: 'crew-a', name: 'Alpha', status: 'active', skills: { piloting: 0, engineering: 0, science: 0 }, flightCount: 0, hiredPeriod: 0 },
+      testCrew({ id: 'crew-a', name: 'Alpha' }),
     );
 
     const ps = makePhysicsState({ landed: true, crashed: false });
@@ -1300,6 +1297,7 @@ describe('processFlightReturn() — edge cases', () => {
   it('handles null flightState.crewIds gracefully in death fine path', () => {
     const ps = makePhysicsState({ crashed: true });
     const fs = makeFlightState(null);
+    // @ts-expect-error testing defensive code with invalid field
     fs.crewIds = undefined;
 
     // Should not throw.
@@ -1309,6 +1307,7 @@ describe('processFlightReturn() — edge cases', () => {
 
   it('handles missing flightState.events gracefully', () => {
     const fs = makeFlightState(null);
+    // @ts-expect-error testing defensive code with missing field
     delete fs.events;
 
     // Should not throw.
@@ -1318,10 +1317,11 @@ describe('processFlightReturn() — edge cases', () => {
 
   it('handles undefined ps.ejectedCrewIds', () => {
     state.crew.push(
-      { id: 'crew-a', name: 'Alpha', status: 'active', skills: { piloting: 0, engineering: 0, science: 0 }, flightCount: 0, hiredPeriod: 0 },
+      testCrew({ id: 'crew-a', name: 'Alpha' }),
     );
 
     const ps = makePhysicsState({ crashed: true });
+    // @ts-expect-error testing defensive code with missing field
     delete ps.ejectedCrewIds;
     const fs = makeFlightState(null, { crewIds: ['crew-a'] });
 
@@ -1349,6 +1349,7 @@ describe('processFlightReturn() — edge cases', () => {
 
   it('handles flightState with no bodyId (defaults to EARTH)', () => {
     const fs = makeFlightState(null);
+    // @ts-expect-error testing defensive code with missing field
     delete fs.bodyId;
     const result = processFlightReturn(state, fs, null, null);
 
@@ -1365,7 +1366,7 @@ describe('processFlightReturn() — edge cases', () => {
 describe('processFlightReturn() — command module destruction logic', () => {
   it('does not trigger when assembly has no command modules', () => {
     state.crew.push(
-      { id: 'crew-a', name: 'Alpha', status: 'active', skills: { piloting: 0, engineering: 0, science: 0 }, flightCount: 0, hiredPeriod: 0 },
+      testCrew({ id: 'crew-a', name: 'Alpha' }),
     );
 
     // Assembly has only a probe core (COMPUTER_MODULE, not COMMAND_MODULE).
@@ -1387,7 +1388,7 @@ describe('processFlightReturn() — command module destruction logic', () => {
 
   it('does not trigger when at least one command module is active', () => {
     state.crew.push(
-      { id: 'crew-a', name: 'Alpha', status: 'active', skills: { piloting: 0, engineering: 0, science: 0 }, flightCount: 0, hiredPeriod: 0 },
+      testCrew({ id: 'crew-a', name: 'Alpha' }),
     );
 
     const assembly = makeAssembly([
@@ -1409,7 +1410,7 @@ describe('processFlightReturn() — command module destruction logic', () => {
 
   it('triggers death fine when all command modules destroyed (two modules)', () => {
     state.crew.push(
-      { id: 'crew-a', name: 'Alpha', status: 'active', skills: { piloting: 0, engineering: 0, science: 0 }, flightCount: 0, hiredPeriod: 0 },
+      testCrew({ id: 'crew-a', name: 'Alpha' }),
     );
     state.loan = { balance: 0, interestRate: 0, totalInterestAccrued: 0 };
 
@@ -1458,7 +1459,7 @@ describe('processFlightReturn() — crew injuries', () => {
 
   it('returns empty injuries for safe landing', () => {
     state.crew.push(
-      { id: 'crew-a', name: 'Alpha', status: 'active', skills: { piloting: 0, engineering: 0, science: 0 }, flightCount: 0, hiredPeriod: 0 },
+      testCrew({ id: 'crew-a', name: 'Alpha' }),
     );
 
     const ps = makePhysicsState({ landed: true, crashed: false });
@@ -1495,6 +1496,7 @@ describe('processFlightReturn() — life support', () => {
 
 describe('processFlightReturn() — defensive null guards', () => {
   it('handles state.crew being null without throwing', () => {
+    // @ts-expect-error testing defensive code with invalid state
     state.crew = null;
     const fs = makeFlightState(null, {
       crewIds: ['astro-1'],
@@ -1506,6 +1508,7 @@ describe('processFlightReturn() — defensive null guards', () => {
   });
 
   it('handles state.crew being undefined without throwing', () => {
+    // @ts-expect-error testing defensive code with invalid state
     state.crew = undefined;
     const fs = makeFlightState(null, {
       crewIds: ['astro-1'],
@@ -1517,6 +1520,7 @@ describe('processFlightReturn() — defensive null guards', () => {
   });
 
   it('handles state.missions being null without throwing', () => {
+    // @ts-expect-error testing defensive code with invalid state
     state.missions = null;
     const fs = makeFlightState(null);
 
@@ -1526,6 +1530,7 @@ describe('processFlightReturn() — defensive null guards', () => {
   });
 
   it('handles state.missions.accepted being undefined without throwing', () => {
+    // @ts-expect-error testing defensive code with invalid state
     state.missions = {};
     const fs = makeFlightState(null);
 
