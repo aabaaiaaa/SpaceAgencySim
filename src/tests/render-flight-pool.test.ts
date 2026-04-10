@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * render-flight-pool.test.ts — Unit tests for the flight renderer pool wrapper.
  *
@@ -7,6 +6,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { Container, Graphics, Text } from 'pixi.js';
 
 // ---------------------------------------------------------------------------
 // Mock pixi.js
@@ -24,9 +24,9 @@ const { MockGraphics, MockText, MockTextStyle, MockContainer } = vi.hoisted(() =
     constructor() {}
   }
   class MockContainer {
-    children = [];
-    removeChildAt(index) { return this.children.splice(index, 1)[0]; }
-    removeChild(child) {
+    children: unknown[] = [];
+    removeChildAt(index: number) { return this.children.splice(index, 1)[0]; }
+    removeChild(child: unknown) {
       const idx = this.children.indexOf(child);
       if (idx >= 0) this.children.splice(idx, 1);
       return child;
@@ -104,7 +104,7 @@ describe('flight _pool.ts wrapper', () => {
       const g = new MockGraphics();
       container.children.push(g);
 
-      releaseContainerChildren(container);
+      releaseContainerChildren(container as unknown as Container);
       expect(container.children.length).toBe(0);
 
       const reused = acquireGraphics();

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * render-ground.test.ts — Unit tests for ground rendering functions.
  *
@@ -6,6 +5,8 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { Graphics } from 'pixi.js';
+import type { ReadonlySurfaceItem } from '../render/types.ts';
 
 // ---------------------------------------------------------------------------
 // Mock pixi.js
@@ -26,10 +27,10 @@ const { MockGraphics, MockText, MockTextStyle, MockContainer } = vi.hoisted(() =
   }
   class MockTextStyle {}
   class MockContainer {
-    children = [];
-    addChild(c) { this.children.push(c); return c; }
-    removeChildAt(i) { return this.children.splice(i,1)[0]; }
-    removeChild(c) { const i = this.children.indexOf(c); if(i>=0) this.children.splice(i,1); return c; }
+    children: unknown[] = [];
+    addChild(c: unknown) { this.children.push(c); return c; }
+    removeChildAt(i: number) { return this.children.splice(i,1)[0]; }
+    removeChild(c: unknown) { const i = this.children.indexOf(c); if(i>=0) this.children.splice(i,1); return c; }
   }
   return { MockGraphics, MockText, MockTextStyle, MockContainer };
 });
@@ -65,7 +66,7 @@ describe('renderGround', () => {
   it('clears and draws ground when visible', () => {
     const s = getFlightRenderState();
     const mockGfx = new MockGraphics();
-    s.groundGraphics = mockGfx;
+    s.groundGraphics = mockGfx as unknown as Graphics;
     s.camWorldY = -10; // camera looking down at ground
 
     renderGround(800, 600);
@@ -78,7 +79,7 @@ describe('renderGround', () => {
   it('skips drawing when ground is entirely above viewport', () => {
     const s = getFlightRenderState();
     const mockGfx = new MockGraphics();
-    s.groundGraphics = mockGfx;
+    s.groundGraphics = mockGfx as unknown as Graphics;
     s.camWorldY = -10000; // camera looking way up
 
     renderGround(800, 600);
@@ -100,20 +101,21 @@ describe('renderSurfaceItems', () => {
 
   it('does nothing for empty items array', () => {
     const s = getFlightRenderState();
-    s.surfaceItemsGraphics = new MockGraphics();
+    const mockGfx = new MockGraphics();
+    s.surfaceItemsGraphics = mockGfx as unknown as Graphics;
     renderSurfaceItems([], 800, 600);
-    expect(s.surfaceItemsGraphics.clear).toHaveBeenCalled();
+    expect(mockGfx.clear).toHaveBeenCalled();
   });
 
   it('renders a FLAG surface item', () => {
     const s = getFlightRenderState();
     const mockGfx = new MockGraphics();
-    s.surfaceItemsGraphics = mockGfx;
+    s.surfaceItemsGraphics = mockGfx as unknown as Graphics;
     s.camWorldX = 0;
     s.camWorldY = 0;
     s.zoomLevel = 1;
 
-    const items = [{ type: SurfaceItemType.FLAG, posX: 10 }];
+    const items: ReadonlySurfaceItem[] = [{ id: '1', type: SurfaceItemType.FLAG, bodyId: 'earth', posX: 10, deployedPeriod: 0 }];
     renderSurfaceItems(items, 800, 600);
 
     expect(mockGfx.rect).toHaveBeenCalled();
@@ -123,10 +125,10 @@ describe('renderSurfaceItems', () => {
   it('renders a SURFACE_SAMPLE item', () => {
     const s = getFlightRenderState();
     const mockGfx = new MockGraphics();
-    s.surfaceItemsGraphics = mockGfx;
+    s.surfaceItemsGraphics = mockGfx as unknown as Graphics;
     s.zoomLevel = 1;
 
-    const items = [{ type: SurfaceItemType.SURFACE_SAMPLE, posX: 5 }];
+    const items: ReadonlySurfaceItem[] = [{ id: '2', type: SurfaceItemType.SURFACE_SAMPLE, bodyId: 'earth', posX: 5, deployedPeriod: 0 }];
     renderSurfaceItems(items, 800, 600);
 
     expect(mockGfx.circle).toHaveBeenCalled();
@@ -136,10 +138,10 @@ describe('renderSurfaceItems', () => {
   it('renders a SURFACE_INSTRUMENT item', () => {
     const s = getFlightRenderState();
     const mockGfx = new MockGraphics();
-    s.surfaceItemsGraphics = mockGfx;
+    s.surfaceItemsGraphics = mockGfx as unknown as Graphics;
     s.zoomLevel = 1;
 
-    const items = [{ type: SurfaceItemType.SURFACE_INSTRUMENT, posX: 0 }];
+    const items: ReadonlySurfaceItem[] = [{ id: '3', type: SurfaceItemType.SURFACE_INSTRUMENT, bodyId: 'earth', posX: 0, deployedPeriod: 0 }];
     renderSurfaceItems(items, 800, 600);
 
     expect(mockGfx.moveTo).toHaveBeenCalled();
@@ -150,10 +152,10 @@ describe('renderSurfaceItems', () => {
   it('renders a BEACON item', () => {
     const s = getFlightRenderState();
     const mockGfx = new MockGraphics();
-    s.surfaceItemsGraphics = mockGfx;
+    s.surfaceItemsGraphics = mockGfx as unknown as Graphics;
     s.zoomLevel = 1;
 
-    const items = [{ type: SurfaceItemType.BEACON, posX: -5 }];
+    const items: ReadonlySurfaceItem[] = [{ id: '4', type: SurfaceItemType.BEACON, bodyId: 'earth', posX: -5, deployedPeriod: 0 }];
     renderSurfaceItems(items, 800, 600);
 
     expect(mockGfx.moveTo).toHaveBeenCalled();
@@ -163,13 +165,13 @@ describe('renderSurfaceItems', () => {
   it('renders multiple items of different types', () => {
     const s = getFlightRenderState();
     const mockGfx = new MockGraphics();
-    s.surfaceItemsGraphics = mockGfx;
+    s.surfaceItemsGraphics = mockGfx as unknown as Graphics;
     s.zoomLevel = 1;
 
-    const items = [
-      { type: SurfaceItemType.FLAG, posX: -10 },
-      { type: SurfaceItemType.SURFACE_SAMPLE, posX: 0 },
-      { type: SurfaceItemType.BEACON, posX: 10 },
+    const items: ReadonlySurfaceItem[] = [
+      { id: '5', type: SurfaceItemType.FLAG, bodyId: 'earth', posX: -10, deployedPeriod: 0 },
+      { id: '6', type: SurfaceItemType.SURFACE_SAMPLE, bodyId: 'earth', posX: 0, deployedPeriod: 0 },
+      { id: '7', type: SurfaceItemType.BEACON, bodyId: 'earth', posX: 10, deployedPeriod: 0 },
     ];
     renderSurfaceItems(items, 800, 600);
 
@@ -180,12 +182,12 @@ describe('renderSurfaceItems', () => {
   it('skips items that are off-screen', () => {
     const s = getFlightRenderState();
     const mockGfx = new MockGraphics();
-    s.surfaceItemsGraphics = mockGfx;
+    s.surfaceItemsGraphics = mockGfx as unknown as Graphics;
     s.camWorldX = 0;
     s.zoomLevel = 1;
 
     // Item very far off-screen
-    const items = [{ type: SurfaceItemType.FLAG, posX: 100000 }];
+    const items: ReadonlySurfaceItem[] = [{ id: '8', type: SurfaceItemType.FLAG, bodyId: 'earth', posX: 100000, deployedPeriod: 0 }];
     renderSurfaceItems(items, 800, 600);
 
     // rect should not be called because item is off-screen
@@ -195,11 +197,11 @@ describe('renderSurfaceItems', () => {
   it('skips rendering when ground is off-screen', () => {
     const s = getFlightRenderState();
     const mockGfx = new MockGraphics();
-    s.surfaceItemsGraphics = mockGfx;
+    s.surfaceItemsGraphics = mockGfx as unknown as Graphics;
     s.camWorldY = -100000; // ground way below viewport
     s.zoomLevel = 1;
 
-    const items = [{ type: SurfaceItemType.FLAG, posX: 0 }];
+    const items: ReadonlySurfaceItem[] = [{ id: '9', type: SurfaceItemType.FLAG, bodyId: 'earth', posX: 0, deployedPeriod: 0 }];
     renderSurfaceItems(items, 800, 600);
 
     // Should have cleared but not drawn any items

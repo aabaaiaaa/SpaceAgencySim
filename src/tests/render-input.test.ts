@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * render-input.test.ts — Unit tests for flight input handlers.
  *
@@ -16,7 +15,7 @@ vi.mock('pixi.js', () => ({
   Graphics: class {},
   Text: class { constructor() {} },
   TextStyle: class {},
-  Container: class { children = []; addChild(c) { this.children.push(c); } removeChildAt(i) { return this.children.splice(i,1)[0]; } removeChild(c) { const i = this.children.indexOf(c); if(i>=0) this.children.splice(i,1); return c; } },
+  Container: class { children: unknown[] = []; addChild(c: unknown) { this.children.push(c); } removeChildAt(i: number) { return this.children.splice(i,1)[0]; } removeChild(c: unknown) { const i = this.children.indexOf(c); if(i>=0) this.children.splice(i,1); return c; } },
 }));
 
 import {

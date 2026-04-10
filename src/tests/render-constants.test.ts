@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * render-constants.test.ts — Unit tests for flight render constants.
  *

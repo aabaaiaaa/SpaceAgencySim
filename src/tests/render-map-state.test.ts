@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * render-map-state.test.ts — Unit tests for map renderer state management.
  *
@@ -8,6 +7,8 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { Asteroid } from '../core/asteroidBelt.ts';
+import type { OrbitalObject } from '../core/gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Mock pixi.js
@@ -35,9 +36,9 @@ const { MockGraphics, MockText, MockTextStyle, MockContainer, MockApplication } 
   }
   class MockContainer {
     visible = true;
-    children = [];
-    addChild(c) { this.children.push(c); return c; }
-    removeChild(c) { const i = this.children.indexOf(c); if (i >= 0) this.children.splice(i, 1); return c; }
+    children: unknown[] = [];
+    addChild(c: unknown) { this.children.push(c); return c; }
+    removeChild(c: unknown) { const i = this.children.indexOf(c); if (i >= 0) this.children.splice(i, 1); return c; }
     destroy() {}
   }
   class MockApplication {
@@ -61,11 +62,11 @@ vi.mock('../render/index.ts', () => ({
 
 // Mock the asteroidBelt core module
 vi.mock('../core/asteroidBelt.ts', () => {
-  let _asteroids = [];
+  let _asteroids: Asteroid[] = [];
   return {
     getActiveAsteroids: () => _asteroids,
     hasAsteroids: () => _asteroids.length > 0,
-    setActiveAsteroids: (a) => { _asteroids = [...a]; },
+    setActiveAsteroids: (a: Asteroid[]) => { _asteroids = [...a]; },
     clearAsteroids: () => { _asteroids = []; },
     generateBeltAsteroids: vi.fn(),
   };
@@ -190,16 +191,16 @@ describe('getSelectedAsteroid', () => {
   });
 
   it('returns the asteroid when target matches an active asteroid', () => {
-    const ast = { id: 'ast-1', name: 'AST-0001', type: 'asteroid', posX: 0, posY: 0, velX: 0, velY: 0, radius: 50, mass: 1000, shapeSeed: 42 };
+    const ast: Asteroid = { id: 'ast-1', name: 'AST-0001', type: 'asteroid', posX: 0, posY: 0, velX: 0, velY: 0, radius: 50, mass: 1000, shapeSeed: 42 };
     setActiveAsteroids([ast]);
     setMapTarget('ast-1');
     const result = getSelectedAsteroid();
     expect(result).not.toBeNull();
-    expect(result.id).toBe('ast-1');
+    expect(result!.id).toBe('ast-1');
   });
 
   it('returns null when target ID does not match any active asteroid', () => {
-    const ast = { id: 'ast-1', name: 'AST-0001', type: 'asteroid', posX: 0, posY: 0, velX: 0, velY: 0, radius: 50, mass: 1000, shapeSeed: 42 };
+    const ast: Asteroid = { id: 'ast-1', name: 'AST-0001', type: 'asteroid', posX: 0, posY: 0, velX: 0, velY: 0, radius: 50, mass: 1000, shapeSeed: 42 };
     setActiveAsteroids([ast]);
     setMapTarget('ast-999');
     expect(getSelectedAsteroid()).toBeNull();
@@ -218,19 +219,19 @@ describe('cycleMapTarget', () => {
 
   it('selects the first matching object from the list', () => {
     const objects = [
-      { id: 'obj-1', name: 'Sat 1', bodyId: 'EARTH', elements: {} },
-      { id: 'obj-2', name: 'Sat 2', bodyId: 'EARTH', elements: {} },
-    ];
+      { id: 'obj-1', name: 'Sat 1', bodyId: 'EARTH', type: 'satellite', elements: {} },
+      { id: 'obj-2', name: 'Sat 2', bodyId: 'EARTH', type: 'satellite', elements: {} },
+    ] as OrbitalObject[];
     const result = cycleMapTarget(objects, 'EARTH');
     expect(result).toBe('obj-1');
   });
 
   it('cycles through objects sequentially', () => {
     const objects = [
-      { id: 'obj-1', name: 'Sat 1', bodyId: 'EARTH', elements: {} },
-      { id: 'obj-2', name: 'Sat 2', bodyId: 'EARTH', elements: {} },
-      { id: 'obj-3', name: 'Sat 3', bodyId: 'EARTH', elements: {} },
-    ];
+      { id: 'obj-1', name: 'Sat 1', bodyId: 'EARTH', type: 'satellite', elements: {} },
+      { id: 'obj-2', name: 'Sat 2', bodyId: 'EARTH', type: 'satellite', elements: {} },
+      { id: 'obj-3', name: 'Sat 3', bodyId: 'EARTH', type: 'satellite', elements: {} },
+    ] as OrbitalObject[];
 
     // First call: selects obj-1
     cycleMapTarget(objects, 'EARTH');
@@ -251,20 +252,20 @@ describe('cycleMapTarget', () => {
 
   it('filters objects by bodyId', () => {
     const objects = [
-      { id: 'obj-1', name: 'Earth Sat', bodyId: 'EARTH', elements: {} },
-      { id: 'obj-2', name: 'Mars Sat', bodyId: 'MARS', elements: {} },
-    ];
+      { id: 'obj-1', name: 'Earth Sat', bodyId: 'EARTH', type: 'satellite', elements: {} },
+      { id: 'obj-2', name: 'Mars Sat', bodyId: 'MARS', type: 'satellite', elements: {} },
+    ] as OrbitalObject[];
     const result = cycleMapTarget(objects, 'MARS');
     expect(result).toBe('obj-2');
   });
 
   it('includes belt asteroids when bodyId is SUN and asteroids are active', () => {
-    const ast = { id: 'ast-1', name: 'AST-0001', type: 'asteroid', posX: 0, posY: 0, velX: 0, velY: 0, radius: 50, mass: 1000, shapeSeed: 42 };
+    const ast: Asteroid = { id: 'ast-1', name: 'AST-0001', type: 'asteroid', posX: 0, posY: 0, velX: 0, velY: 0, radius: 50, mass: 1000, shapeSeed: 42 };
     setActiveAsteroids([ast]);
 
     const objects = [
-      { id: 'obj-1', name: 'Sun Sat', bodyId: 'SUN', elements: {} },
-    ];
+      { id: 'obj-1', name: 'Sun Sat', bodyId: 'SUN', type: 'satellite', elements: {} },
+    ] as OrbitalObject[];
 
     // First: obj-1
     cycleMapTarget(objects, 'SUN');
