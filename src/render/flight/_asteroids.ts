@@ -48,7 +48,7 @@ const LANDABLE_STYLE = {
  * Create a simple seeded PRNG using the LCG algorithm.
  * Returns values in [0, 1).
  */
-function seededRng(seed: number): () => number {
+export function seededRng(seed: number): () => number {
   let s = seed;
   return () => {
     s = (s * 16807 + 0) % 2147483647;
@@ -72,9 +72,9 @@ export function getSizeCategory(radius: number): SizeCategory {
 // LOD determination
 // ---------------------------------------------------------------------------
 
-type LOD = 'full' | 'basic' | 'streak';
+export type LOD = 'full' | 'basic' | 'streak';
 
-function getLOD(relativeSpeed: number): LOD {
+export function getLOD(relativeSpeed: number): LOD {
   if (relativeSpeed < 5) return 'full';
   if (relativeSpeed < 50) return 'basic';
   return 'streak';

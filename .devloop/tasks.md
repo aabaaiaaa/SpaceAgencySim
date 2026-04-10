@@ -183,7 +183,7 @@ See `.devloop/requirements.md` for full context on each item.
 - **Verification**: `npx vitest run --coverage`
 
 ### TASK-025: Add tests to meet coverage floors
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-024
 - **Description**: If TASK-024's coverage run shows render or UI below the new floors, add targeted unit tests for the lowest-coverage files until thresholds pass. Priority files: `src/render/flight/_asteroids.ts` (size categories, LOD selection helpers), `src/render/map.ts` (belt rendering helpers), `src/ui/flightController/_mapView.ts` (asteroid rename, map interaction). Re-run coverage to confirm floors are met. If floors are already met after prior tasks, mark this task as complete with no changes. See requirements section 8.1.
 - **Verification**: `npx vitest run --coverage`

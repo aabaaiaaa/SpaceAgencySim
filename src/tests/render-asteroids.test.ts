@@ -1,0 +1,209 @@
+// @ts-nocheck
+/**
+ * render-asteroids.test.ts — Unit tests for asteroid rendering helpers.
+ *
+ * Tests getSizeCategory, getLOD, seededRng, and renderBeltAsteroids from
+ * src/render/flight/_asteroids.ts.
+ */
+
+import { describe, it, expect, vi } from 'vitest';
+
+// ---------------------------------------------------------------------------
+// Mock pixi.js
+// ---------------------------------------------------------------------------
+
+const { MockGraphics, MockText, MockTextStyle, MockContainer } = vi.hoisted(() => {
+  class MockGraphics {
+    visible = true;
+    alpha = 1;
+    position = { set: vi.fn() };
+    scale = { set: vi.fn() };
+    rotation = 0;
+    label = '';
+    parent = null;
+    clear = vi.fn();
+    rect = vi.fn();
+    fill = vi.fn();
+    stroke = vi.fn();
+    circle = vi.fn();
+    arc = vi.fn();
+    moveTo = vi.fn();
+    lineTo = vi.fn();
+    closePath = vi.fn();
+    ellipse = vi.fn();
+  }
+  class MockText {
+    visible = true;
+    alpha = 1;
+    position = { set: vi.fn() };
+    scale = { set: vi.fn() };
+    rotation = 0;
+    label = '';
+    anchor = { set: vi.fn() };
+    parent = null;
+    text = '';
+    style = null;
+    x = 0;
+    y = 0;
+    constructor() {}
+  }
+  class MockTextStyle {}
+  class MockContainer {
+    children = [];
+    addChild(c) { this.children.push(c); return c; }
+    removeChildAt(i) { return this.children.splice(i, 1)[0]; }
+    removeChild(c) {
+      const i = this.children.indexOf(c);
+      if (i >= 0) this.children.splice(i, 1);
+      return c;
+    }
+  }
+  return { MockGraphics, MockText, MockTextStyle, MockContainer };
+});
+
+vi.mock('pixi.js', () => ({
+  Graphics: MockGraphics,
+  Text: MockText,
+  TextStyle: MockTextStyle,
+  Container: MockContainer,
+}));
+
+import {
+  getSizeCategory,
+  getLOD,
+  seededRng,
+  renderBeltAsteroids,
+} from '../render/flight/_asteroids.ts';
+// Types are tested indirectly via the exported functions.
+
+// ---------------------------------------------------------------------------
+// getSizeCategory
+// ---------------------------------------------------------------------------
+
+describe('getSizeCategory', () => {
+  it('returns "small" for radius < 10', () => {
+    expect(getSizeCategory(0.5)).toBe('small');
+    expect(getSizeCategory(1)).toBe('small');
+    expect(getSizeCategory(5)).toBe('small');
+    expect(getSizeCategory(9.99)).toBe('small');
+  });
+
+  it('returns "medium" for radius 10..99', () => {
+    expect(getSizeCategory(10)).toBe('medium');
+    expect(getSizeCategory(50)).toBe('medium');
+    expect(getSizeCategory(99.99)).toBe('medium');
+  });
+
+  it('returns "large" for radius >= 100', () => {
+    expect(getSizeCategory(100)).toBe('large');
+    expect(getSizeCategory(500)).toBe('large');
+    expect(getSizeCategory(1000)).toBe('large');
+  });
+
+  it('@smoke boundary values are correct', () => {
+    expect(getSizeCategory(9.999)).toBe('small');
+    expect(getSizeCategory(10)).toBe('medium');
+    expect(getSizeCategory(99.999)).toBe('medium');
+    expect(getSizeCategory(100)).toBe('large');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getLOD
+// ---------------------------------------------------------------------------
+
+describe('getLOD', () => {
+  it('returns "full" for relative speed < 5 m/s', () => {
+    expect(getLOD(0)).toBe('full');
+    expect(getLOD(1)).toBe('full');
+    expect(getLOD(4.99)).toBe('full');
+  });
+
+  it('returns "basic" for relative speed 5..49 m/s', () => {
+    expect(getLOD(5)).toBe('basic');
+    expect(getLOD(25)).toBe('basic');
+    expect(getLOD(49.99)).toBe('basic');
+  });
+
+  it('returns "streak" for relative speed >= 50 m/s', () => {
+    expect(getLOD(50)).toBe('streak');
+    expect(getLOD(100)).toBe('streak');
+    expect(getLOD(1000)).toBe('streak');
+  });
+
+  it('@smoke boundary values are correct', () => {
+    expect(getLOD(4.999)).toBe('full');
+    expect(getLOD(5)).toBe('basic');
+    expect(getLOD(49.999)).toBe('basic');
+    expect(getLOD(50)).toBe('streak');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// seededRng
+// ---------------------------------------------------------------------------
+
+describe('seededRng', () => {
+  it('produces values in [0, 1)', () => {
+    const rng = seededRng(42);
+    for (let i = 0; i < 100; i++) {
+      const val = rng();
+      expect(val).toBeGreaterThanOrEqual(0);
+      expect(val).toBeLessThan(1);
+    }
+  });
+
+  it('is deterministic for the same seed', () => {
+    const rng1 = seededRng(12345);
+    const rng2 = seededRng(12345);
+    for (let i = 0; i < 20; i++) {
+      expect(rng1()).toBe(rng2());
+    }
+  });
+
+  it('produces different sequences for different seeds', () => {
+    const rng1 = seededRng(1);
+    const rng2 = seededRng(2);
+    // At least one of the first 10 values should differ.
+    let allSame = true;
+    for (let i = 0; i < 10; i++) {
+      if (rng1() !== rng2()) {
+        allSame = false;
+        break;
+      }
+    }
+    expect(allSame).toBe(false);
+  });
+
+  it('does not return the same value consecutively', () => {
+    const rng = seededRng(7);
+    let prev = rng();
+    let allSame = true;
+    for (let i = 0; i < 50; i++) {
+      const val = rng();
+      if (val !== prev) { allSame = false; break; }
+      prev = val;
+    }
+    expect(allSame).toBe(false);
+  });
+
+  it('seed 0 still produces valid output', () => {
+    const rng = seededRng(0);
+    const val = rng();
+    expect(val).toBeGreaterThanOrEqual(0);
+    expect(val).toBeLessThan(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// renderBeltAsteroids — basic integration (with mocked PixiJS)
+// ---------------------------------------------------------------------------
+
+describe('renderBeltAsteroids', () => {
+  it('returns early when asteroidsContainer is null (no crash)', () => {
+    // With no flight render state set up, the function should return early.
+    expect(() => {
+      renderBeltAsteroids(800, 600, 0, 0, 0, 0, null);
+    }).not.toThrow();
+  });
+});
