@@ -772,12 +772,17 @@ describe('exportSave()', () => {
 
     expect(() => exportSave(1)).not.toThrow();
 
-    // The Blob was built from the raw JSON string.
+    // The Blob content is now a base64-encoded binary envelope (TASK-012).
+    // Verify it round-trips through importSave into a different slot.
     expect(capturedBlobContent).not.toBeNull();
-    let parsed;
-    expect(() => { parsed = JSON.parse(capturedBlobContent); }).not.toThrow();
-    expect(parsed.state.money).toBe(555_000);
-    expect(parsed.state.rockets[0].name).toBe('Mock Rocket');
+    expect(typeof capturedBlobContent).toBe('string');
+    expect(capturedBlobContent.length).toBeGreaterThan(0);
+
+    // Round-trip: import the exported content into slot 2 and verify state.
+    expect(() => importSave(capturedBlobContent, 2)).not.toThrow();
+    const loaded = await loadGame(2);
+    expect(loaded.money).toBe(555_000);
+    expect(loaded.rockets[0].name).toBe('Mock Rocket');
 
     // Clean up extra stubs.
     vi.unstubAllGlobals();
