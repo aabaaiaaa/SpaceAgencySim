@@ -1,6 +1,5 @@
-// @ts-nocheck
 /**
- * reputation.test.js — Unit tests for the agency reputation system.
+ * reputation.test.ts — Unit tests for the agency reputation system.
  *
  * Tests cover:
  *   - Reputation tier lookup (getReputationTier)
@@ -11,8 +10,9 @@
  *   - Crew hiring cost adjusted by reputation
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
+import type { GameState } from '../core/gameState.ts';
 import {
   STARTING_REPUTATION,
   getReputationTier,
@@ -40,7 +40,7 @@ import { getAdjustedHireCost } from '../core/crew.ts';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function freshState() {
+function freshState(): GameState {
   return createGameState();
 }
 

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * render-trails.test.ts — Unit tests for trail segment logic.
  *
@@ -6,7 +5,8 @@
  * from src/render/flight/_trails.ts.
  */
 
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach, type Mock } from 'vitest';
+import type { TrailSegment } from '../render/flight/_state.ts';
 
 // ---------------------------------------------------------------------------
 // Mock pixi.js
@@ -15,22 +15,22 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 vi.mock('pixi.js', () => ({
   Graphics: class {
     visible = true; alpha = 1; position = { set: vi.fn() }; scale = { set: vi.fn() };
-    rotation = 0; label = ''; parent = null; clear = vi.fn(); rect = vi.fn();
-    fill = vi.fn(); stroke = vi.fn(); circle = vi.fn(); moveTo = vi.fn();
-    lineTo = vi.fn(); closePath = vi.fn(); ellipse = vi.fn();
+    rotation = 0; label = ''; parent: unknown = null; clear: Mock = vi.fn(); rect: Mock = vi.fn();
+    fill: Mock = vi.fn(); stroke: Mock = vi.fn(); circle: Mock = vi.fn(); moveTo: Mock = vi.fn();
+    lineTo: Mock = vi.fn(); closePath: Mock = vi.fn(); ellipse: Mock = vi.fn();
   },
   Text: class {
     visible = true; alpha = 1; position = { set: vi.fn() }; scale = { set: vi.fn() };
-    rotation = 0; label = ''; anchor = { set: vi.fn() }; parent = null; text = '';
-    style = null; x = 0; y = 0;
-    constructor() {}
+    rotation = 0; label = ''; anchor = { set: vi.fn() }; parent: unknown = null; text = '';
+    style: Record<string, unknown> | null = null; x = 0; y = 0;
+    constructor() { /* empty */ }
   },
   TextStyle: class {},
   Container: class {
-    children = [];
-    addChild(c) { this.children.push(c); return c; }
-    removeChildAt(i) { return this.children.splice(i,1)[0]; }
-    removeChild(c) { const i = this.children.indexOf(c); if(i>=0) this.children.splice(i,1); return c; }
+    children: unknown[] = [];
+    addChild(c: unknown): unknown { this.children.push(c); return c; }
+    removeChildAt(i: number): unknown { return this.children.splice(i, 1)[0]; }
+    removeChild(c: unknown): unknown { const i = this.children.indexOf(c); if (i >= 0) this.children.splice(i, 1); return c; }
   },
 }));
 
@@ -50,7 +50,7 @@ import { TRAIL_MAX_AGE } from '../render/flight/_constants.ts';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeSegment(overrides = {}) {
+function makeSegment(overrides: Partial<TrailSegment> = {}): TrailSegment {
   return {
     worldX: 0,
     worldY: 0,

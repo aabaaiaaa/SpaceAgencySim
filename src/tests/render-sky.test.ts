@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * render-sky.test.ts — Unit tests for sky rendering utilities.
  *
@@ -7,6 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { Graphics, Container } from 'pixi.js';
 
 // ---------------------------------------------------------------------------
 // Mock pixi.js
@@ -20,7 +20,7 @@ const { MockGraphics, MockTextStyle, MockText, MockContainer } = vi.hoisted(() =
     scale = { set: vi.fn() };
     rotation = 0;
     label = '';
-    parent = null;
+    parent: unknown = null;
     clear = vi.fn();
     rect = vi.fn();
     fill = vi.fn();
@@ -43,19 +43,19 @@ const { MockGraphics, MockTextStyle, MockText, MockContainer } = vi.hoisted(() =
     rotation = 0;
     label = '';
     anchor = { set: vi.fn() };
-    parent = null;
+    parent: unknown = null;
     text = '';
-    style = null;
+    style: unknown = null;
     x = 0;
     y = 0;
-    constructor(_opts?) {}
+    constructor(_opts?: unknown) {} // eslint-disable-line @typescript-eslint/no-unused-vars
   }
 
   class MockContainer {
-    children = [];
-    addChild(child) { this.children.push(child); return child; }
-    removeChildAt(index) { return this.children.splice(index, 1)[0]; }
-    removeChild(child) {
+    children: unknown[] = [];
+    addChild(child: unknown) { this.children.push(child); return child; }
+    removeChildAt(index: number) { return this.children.splice(index, 1)[0]; }
+    removeChild(child: unknown) {
       const idx = this.children.indexOf(child);
       if (idx >= 0) this.children.splice(idx, 1);
       return child;
@@ -269,7 +269,7 @@ describe('renderSky', () => {
   it('renders sky with mock graphics', () => {
     const s = getFlightRenderState();
     const mockGfx = new MockGraphics();
-    s.skyGraphics = mockGfx;
+    s.skyGraphics = mockGfx as unknown as Graphics;
     renderSky(0, 800, 600);
     expect(mockGfx.clear).toHaveBeenCalled();
     expect(mockGfx.rect).toHaveBeenCalledWith(0, 0, 800, 600);
@@ -278,7 +278,7 @@ describe('renderSky', () => {
 
   it('renders sky at different altitudes', () => {
     const s = getFlightRenderState();
-    s.skyGraphics = new MockGraphics();
+    s.skyGraphics = new MockGraphics() as unknown as Graphics;
 
     renderSky(0, 800, 600);
     renderSky(30000, 800, 600);
@@ -299,22 +299,24 @@ describe('renderStars', () => {
 
   it('renders stars at high altitude with mock container', () => {
     const s = getFlightRenderState();
-    s.starsContainer = new MockContainer();
+    const mockContainer = new MockContainer();
+    s.starsContainer = mockContainer as unknown as Container;
     generateStars();
 
     renderStars(80000, 800, 600);
     // Stars container should have had graphics added
-    expect(s.starsContainer.children.length).toBeGreaterThan(0);
+    expect(mockContainer.children.length).toBeGreaterThan(0);
   });
 
   it('renders no stars below star fade start', () => {
     const s = getFlightRenderState();
-    s.starsContainer = new MockContainer();
+    const mockContainer = new MockContainer();
+    s.starsContainer = mockContainer as unknown as Container;
     generateStars();
 
     renderStars(0, 800, 600);
     // At sea level, alpha <= 0, stars are not drawn
-    expect(s.starsContainer.children.length).toBe(0);
+    expect(mockContainer.children.length).toBe(0);
   });
 });
 
@@ -331,7 +333,7 @@ describe('renderHorizon', () => {
   it('does nothing below curvature start altitude', () => {
     const s = getFlightRenderState();
     const mockGfx = new MockGraphics();
-    s.horizonGraphics = mockGfx;
+    s.horizonGraphics = mockGfx as unknown as Graphics;
     renderHorizon(1000, 800, 600);
     expect(mockGfx.clear).toHaveBeenCalled();
     // No arc drawing at low altitude
@@ -341,7 +343,7 @@ describe('renderHorizon', () => {
   it('draws curved horizon at high altitude', () => {
     const s = getFlightRenderState();
     const mockGfx = new MockGraphics();
-    s.horizonGraphics = mockGfx;
+    s.horizonGraphics = mockGfx as unknown as Graphics;
     s.camWorldY = 50000; // high altitude
     renderHorizon(50000, 800, 600);
     expect(mockGfx.arc).toHaveBeenCalled();
@@ -361,25 +363,27 @@ describe('renderWeatherHaze', () => {
 
   it('does nothing when weather visibility is near zero', () => {
     const s = getFlightRenderState();
-    s.hazeGraphics = new MockGraphics();
+    const mockGfx = new MockGraphics();
+    s.hazeGraphics = mockGfx as unknown as Graphics;
     s.weatherVisibility = 0;
     renderWeatherHaze(0, 800, 600);
-    expect(s.hazeGraphics.rect).not.toHaveBeenCalled();
+    expect(mockGfx.rect).not.toHaveBeenCalled();
   });
 
   it('renders haze when visibility is above threshold', () => {
     const s = getFlightRenderState();
-    s.hazeGraphics = new MockGraphics();
+    const mockGfx = new MockGraphics();
+    s.hazeGraphics = mockGfx as unknown as Graphics;
     s.weatherVisibility = 0.5;
     renderWeatherHaze(1000, 800, 600, 'EARTH');
-    expect(s.hazeGraphics.rect).toHaveBeenCalled();
-    expect(s.hazeGraphics.fill).toHaveBeenCalled();
+    expect(mockGfx.rect).toHaveBeenCalled();
+    expect(mockGfx.fill).toHaveBeenCalled();
   });
 
   it('renders no haze above atmosphere top', () => {
     const s = getFlightRenderState();
     const mockGfx = new MockGraphics();
-    s.hazeGraphics = mockGfx;
+    s.hazeGraphics = mockGfx as unknown as Graphics;
     s.weatherVisibility = 1.0;
     renderWeatherHaze(200000, 800, 600, 'EARTH');
     expect(mockGfx.rect).not.toHaveBeenCalled();
@@ -387,7 +391,7 @@ describe('renderWeatherHaze', () => {
 
   it('uses dust colour for Mars', () => {
     const s = getFlightRenderState();
-    s.hazeGraphics = new MockGraphics();
+    s.hazeGraphics = new MockGraphics() as unknown as Graphics;
     s.weatherVisibility = 0.5;
     renderWeatherHaze(1000, 800, 600, 'MARS');
     // Should not throw — tests the Mars branch

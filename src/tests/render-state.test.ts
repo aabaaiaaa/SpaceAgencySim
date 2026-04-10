@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * render-state.test.ts — Unit tests for flight render state management.
  *
@@ -7,6 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { TrailSegment, PlumeState } from '../render/flight/_state.ts';
 
 // ---------------------------------------------------------------------------
 // Mock pixi.js — needed because _state.ts imports PixiJS types
@@ -183,11 +183,12 @@ describe('FlightRenderState', () => {
       s.weatherVisibility = 0.9;
       s.inputEnabled = false;
       s.machPhase = 42;
-      s.trailSegments.push({
+      const seg: TrailSegment = {
         worldX: 1, worldY: 2, vx: 3, vy: 4,
         age: 0, baseW: 5, baseH: 6, isSRB: false,
         maxAge: 1, isSmoke: false,
-      });
+      };
+      s.trailSegments.push(seg);
 
       resetFlightRenderState();
 
@@ -210,7 +211,8 @@ describe('FlightRenderState', () => {
 
     it('resets plumeStates map', () => {
       const s = getFlightRenderState();
-      s.plumeStates.set('engine1', { phase: 1.5 });
+      const plume: PlumeState = { phase: 1.5 };
+      s.plumeStates.set('engine1', plume);
       expect(s.plumeStates.size).toBe(1);
 
       resetFlightRenderState();

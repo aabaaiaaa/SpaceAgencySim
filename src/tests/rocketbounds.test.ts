@@ -1,6 +1,5 @@
-// @ts-nocheck
 /**
- * rocketbounds.test.js — Unit tests for getRocketBounds utility.
+ * rocketbounds.test.ts — Unit tests for getRocketBounds utility.
  *
  * Tests cover:
  *   - Empty assembly returns null
@@ -15,6 +14,7 @@ import {
   createRocketAssembly,
   addPartToAssembly,
 } from '../core/rocketbuilder.ts';
+import type { PlacedPart } from '../core/rocketbuilder.ts';
 import { getPartById } from '../data/parts.ts';
 
 // ---------------------------------------------------------------------------
@@ -32,9 +32,11 @@ describe('getRocketBounds()', () => {
     addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
 
     const def = getPartById('probe-core-mk1');
-    const bounds = getRocketBounds(assembly);
+    if (!def) throw new Error('probe-core-mk1 part definition not found');
 
-    expect(bounds).not.toBeNull();
+    const bounds = getRocketBounds(assembly);
+    if (!bounds) throw new Error('expected non-null bounds');
+
     expect(bounds.minX).toBeCloseTo(-def.width / 2);
     expect(bounds.maxX).toBeCloseTo(def.width / 2);
     expect(bounds.minY).toBeCloseTo(-def.height / 2);
@@ -48,15 +50,16 @@ describe('getRocketBounds()', () => {
     addPartToAssembly(assembly, 'engine-spark', 0, -55);
 
     const bounds = getRocketBounds(assembly);
-    expect(bounds).not.toBeNull();
+    if (!bounds) throw new Error('expected non-null bounds');
 
     // Each part extends ±width/2 and ±height/2 from its placed position.
     // The union should encompass all three parts.
-    for (const [partId, x, y] of [
+    const testParts: [string, number, number][] = [
       ['probe-core-mk1', 0, 60],
       ['fuel-tank-small', 0, 0],
       ['engine-spark', 0, -55],
-    ]) {
+    ];
+    for (const [partId, x, y] of testParts) {
       const def = getPartById(partId);
       if (!def) continue;
       expect(bounds.minX).toBeLessThanOrEqual(x - def.width / 2);
@@ -69,12 +72,13 @@ describe('getRocketBounds()', () => {
   it('ignores unknown part IDs gracefully', () => {
     const assembly = createRocketAssembly();
     // Manually insert a part with a bogus partId.
-    assembly.parts.set('bogus-instance', {
+    const bogusPart: PlacedPart = {
       instanceId: 'bogus-instance',
       partId: 'nonexistent-part-xyz',
       x: 100,
       y: 100,
-    });
+    };
+    assembly.parts.set('bogus-instance', bogusPart);
 
     // Should still return null because the only part has no definition.
     expect(getRocketBounds(assembly)).toBeNull();
