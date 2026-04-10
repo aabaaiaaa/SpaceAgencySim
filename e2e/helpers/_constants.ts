@@ -74,9 +74,10 @@ export const ALL_FACILITIES: Readonly<Record<string, FacilityState>> = Object.fr
 export interface ObjectiveTemplate {
   id: string;
   type: string;
-  target: Record<string, number>;
+  target: Record<string, number | string>;
   completed: boolean;
   description: string;
+  [key: string]: unknown;
 }
 
 export interface MissionTemplate {

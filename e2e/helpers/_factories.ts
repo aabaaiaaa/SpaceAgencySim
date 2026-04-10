@@ -66,6 +66,7 @@ export interface Contract {
   chainPart: number | null;
   chainTotal: number | null;
   conflictTags: string[];
+  [key: string]: unknown;
 }
 
 /**

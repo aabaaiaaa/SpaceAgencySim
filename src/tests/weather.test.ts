@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * weather.test.js — Unit tests for the weather and launch conditions system.
  *
@@ -16,6 +15,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
+import type { GameState, WeatherConditions, OrbitalObject, SatelliteRecord } from '../core/gameState.ts';
 import {
   generateWeather,
   initWeather,
@@ -36,7 +36,7 @@ import {
 // Helpers
 // ---------------------------------------------------------------------------
 
-let state;
+let state: GameState;
 
 beforeEach(() => {
   state = createGameState();
@@ -123,8 +123,8 @@ describe('initWeather() / getCurrentWeather()', () => {
     expect(state.weather).toBeNull();
     initWeather(state, 'EARTH');
     expect(state.weather).not.toBeNull();
-    expect(state.weather.current).toBeDefined();
-    expect(state.weather.skipCount).toBe(0);
+    expect(state.weather!.current).toBeDefined();
+    expect(state.weather!.skipCount).toBe(0);
   });
 
   it('getCurrentWeather returns current conditions after init', () => {
@@ -158,10 +158,10 @@ describe('getWeatherSkipCost()', () => {
     const cost0 = getWeatherSkipCost(state);
 
     // Simulate a skip by incrementing skipCount.
-    state.weather.skipCount = 1;
+    state.weather!.skipCount = 1;
     const cost1 = getWeatherSkipCost(state);
 
-    state.weather.skipCount = 2;
+    state.weather!.skipCount = 2;
     const cost2 = getWeatherSkipCost(state);
 
     expect(cost1).toBeGreaterThan(cost0);
@@ -184,7 +184,7 @@ describe('skipWeather()', () => {
     expect(result.success).toBe(true);
     expect(result.cost).toBe(WEATHER_BASE_SKIP_COST);
     expect(state.money).toBe(moneyBefore - WEATHER_BASE_SKIP_COST);
-    expect(state.weather.skipCount).toBe(1);
+    expect(state.weather!.skipCount).toBe(1);
   });
 
   it('fails if player cannot afford the skip', () => {
@@ -194,7 +194,7 @@ describe('skipWeather()', () => {
     const result = skipWeather(state, 'EARTH');
     expect(result.success).toBe(false);
     expect(result.newWeather).toBeNull();
-    expect(state.weather.skipCount).toBe(0);
+    expect(state.weather!.skipCount).toBe(0);
   });
 
   it('escalates fees on consecutive skips', () => {
@@ -208,17 +208,17 @@ describe('skipWeather()', () => {
     expect(r2.success).toBe(true);
     expect(r2.cost).toBe(Math.round(WEATHER_BASE_SKIP_COST * WEATHER_SKIP_ESCALATION));
 
-    expect(state.weather.skipCount).toBe(2);
+    expect(state.weather!.skipCount).toBe(2);
   });
 
   it('resets skip counter on weather init (new day)', () => {
     initWeather(state, 'EARTH');
     skipWeather(state, 'EARTH');
     skipWeather(state, 'EARTH');
-    expect(state.weather.skipCount).toBe(2);
+    expect(state.weather!.skipCount).toBe(2);
 
     initWeather(state, 'EARTH');
-    expect(state.weather.skipCount).toBe(0);
+    expect(state.weather!.skipCount).toBe(0);
   });
 });
 
@@ -260,7 +260,7 @@ describe('getWindForce()', () => {
   });
 
   it('wind decreases with altitude', () => {
-    const w = { windSpeed: 10, windAngle: 0, temperature: 1.0, visibility: 0, extreme: false, description: 'Test', bodyId: 'EARTH' };
+    const w: WeatherConditions = { windSpeed: 10, windAngle: 0, temperature: 1.0, visibility: 0, extreme: false, description: 'Test', bodyId: 'EARTH' };
     const ground = getWindForce(w, 0, 'EARTH');
     const mid    = getWindForce(w, 35_000, 'EARTH');
     expect(Math.abs(ground.windFX)).toBeGreaterThan(Math.abs(mid.windFX));
@@ -277,7 +277,7 @@ describe('getIspModifier()', () => {
   });
 
   it('returns the temperature field from weather', () => {
-    const w = { temperature: 1.03, windSpeed: 0, windAngle: 0, visibility: 0, extreme: false, description: 'Test', bodyId: 'EARTH' };
+    const w: WeatherConditions = { temperature: 1.03, windSpeed: 0, windAngle: 0, visibility: 0, extreme: false, description: 'Test', bodyId: 'EARTH' };
     expect(getIspModifier(w)).toBe(1.03);
   });
 
@@ -307,7 +307,7 @@ describe('getWeatherForecast()', () => {
 
     // Manually simulate a weather satellite providing forecastAccuracy.
     // Deploy a weather satellite.
-    state.satelliteNetwork.satellites.push({
+    const sat: SatelliteRecord = {
       id: 'sat-1',
       orbitalObjectId: 'orb-1',
       satelliteType: 'WEATHER',
@@ -317,10 +317,11 @@ describe('getWeatherForecast()', () => {
       health: 100,
       autoMaintain: false,
       deployedPeriod: 0,
-    });
+    };
+    state.satelliteNetwork.satellites.push(sat);
     // Add a matching orbital object.
     state.orbitalObjects = state.orbitalObjects ?? [];
-    state.orbitalObjects.push({
+    const orb: OrbitalObject = {
       id: 'orb-1',
       bodyId: 'EARTH',
       type: 'SATELLITE',
@@ -332,7 +333,8 @@ describe('getWeatherForecast()', () => {
         meanAnomalyAtEpoch: 0,
         epoch: 0,
       },
-    });
+    };
+    state.orbitalObjects.push(orb);
 
     const forecast = getWeatherForecast(state, 'EARTH', 3);
     expect(forecast.length).toBe(3);

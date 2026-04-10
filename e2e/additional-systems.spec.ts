@@ -1,5 +1,5 @@
 /**
- * additional-systems.spec.js — E2E tests for additional system features.
+ * additional-systems.spec.ts — E2E tests for additional system features.
  *
  * Covers:
  *   - Thermal system: heat accumulation, dissipation, part destruction,
@@ -17,7 +17,7 @@
  *     craft behavior, comms overlay.
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import {
   VP_W, VP_H,
   buildSaveEnvelope,
@@ -35,17 +35,137 @@ import {
   teleportCraft,
   waitForOrbit,
 } from './helpers.js';
+import type { SaveEnvelope, SaveEnvelopeParams } from './helpers.js';
 import {
   orbitalFixture,
   ALL_PARTS,
 } from './fixtures.js';
 
 // ---------------------------------------------------------------------------
+// Browser-context window shape for page.evaluate() callbacks.
+//
+// Defined as a local interface (not `declare global`) to avoid conflicting
+// with the narrower Window augmentations in the helper modules.  Inside
+// evaluate callbacks we cast: `(window as unknown as GW)`
+// ---------------------------------------------------------------------------
+
+interface PowerState {
+  solarPanelArea: number;
+  batteryCapacity: number;
+  batteryCharge: number;
+  hasPower: boolean;
+  solarGeneration: number;
+  powerDraw: number;
+}
+
+interface FlightPs {
+  posX: number;
+  posY: number;
+  velX: number;
+  velY: number;
+  grounded: boolean;
+  landed: boolean;
+  crashed: boolean;
+  throttle: number;
+  firingEngines: Set<string>;
+  activeParts: Set<string>;
+  heatMap: Map<string, number>;
+  powerState?: PowerState;
+}
+
+interface CommsInfo {
+  status: string;
+  controlLocked: boolean;
+  canTransmit: boolean;
+  linkType: string;
+}
+
+interface FlightState {
+  bodyId: string;
+  phase: string;
+  inOrbit: boolean;
+  orbitalElements: unknown;
+  altitude: number;
+  velocity: number;
+  horizontalVelocity: number;
+  transferState?: Record<string, unknown>;
+  phaseLog?: unknown[];
+  events?: { type: string }[];
+  commsState?: CommsInfo;
+  comms?: CommsInfo;
+  crewIds?: string[];
+}
+
+interface FlightAssembly {
+  parts: Map<string, { partId: string }>;
+}
+
+interface FieldCraft {
+  id: string;
+  name: string;
+  bodyId: string;
+  status: string;
+  crewIds: string[];
+  suppliesRemaining: number;
+  hasExtendedLifeSupport: boolean;
+  deployedPeriod: number;
+  orbitalElements: unknown;
+  orbitBandId: string | null;
+}
+
+interface SatelliteEntry {
+  bodyId: string;
+  health: number;
+  [key: string]: unknown;
+}
+
+interface GameStateShape {
+  missions?: {
+    accepted?: { id: string; objectives?: { id: string; completed?: boolean }[] }[];
+    completed?: { id: string; objectives?: { id: string; completed?: boolean }[] }[];
+  };
+  contracts?: {
+    active?: { id: string; objectives?: { id: string; completed?: boolean }[] }[];
+    completed?: { id: string; objectives?: { id: string; completed?: boolean }[] }[];
+  };
+  currentFlight?: {
+    events?: { type: string }[];
+  };
+  satelliteNetwork?: {
+    satellites: SatelliteEntry[];
+  };
+  fieldCraft?: FieldCraft[];
+  crew?: { id: string; status: string }[];
+}
+
+interface PartCatalogEntry {
+  id: string;
+  properties?: Record<string, unknown>;
+}
+
+/** Extended window shape for browser-context evaluate() callbacks. */
+interface GW {
+  __flightPs?: FlightPs;
+  __flightState?: FlightState;
+  __flightAssembly?: FlightAssembly;
+  __gameState?: GameStateShape;
+  __partCatalog?: PartCatalogEntry[];
+  __airDensityForBody?: (altitude: number, bodyId: string) => number;
+  __resyncPhysicsWorker?: () => Promise<void>;
+}
+
+/**
+ * Cast window to the extended shape inside page.evaluate / waitForFunction.
+ * The cast is erased at runtime — the browser just sees `window`.
+ */
+function W(): GW { return window as unknown as GW; }
+
+// ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
 /** Extended part set including all tech tree and satellite component parts. */
-const FULL_PARTS = [
+const FULL_PARTS: string[] = [
   ...ALL_PARTS,
   'engine-spark-improved', 'engine-ion', 'engine-deep-space',
   'heat-shield-mk1', 'heat-shield-mk2', 'heat-shield-heavy', 'heat-shield-solar',
@@ -59,9 +179,9 @@ const FULL_PARTS = [
   'sample-return-container', 'surface-instrument-package', 'relay-antenna',
 ];
 
-const BASIC_PROBE = ['probe-core-mk1', 'tank-small', 'engine-spark'];
-const BASIC_CREWED = ['cmd-mk1', 'tank-small', 'engine-spark', 'parachute-mk1'];
-const SHIELDED_PROBE = ['probe-core-mk1', 'heat-shield-mk2', 'tank-small', 'engine-spark'];
+const BASIC_PROBE: string[] = ['probe-core-mk1', 'tank-small', 'engine-spark'];
+const BASIC_CREWED: string[] = ['cmd-mk1', 'tank-small', 'engine-spark', 'parachute-mk1'];
+const SHIELDED_PROBE: string[] = ['probe-core-mk1', 'heat-shield-mk2', 'tank-small', 'engine-spark'];
 
 // Orbital parameters.
 const EARTH_ORBIT_ALT = 100_000;
@@ -71,10 +191,15 @@ const EARTH_ORBIT_VEL = 7848;
 const REENTRY_SPEED_THRESHOLD = 1_500;
 const ATMOSPHERE_TOP = 70_000;
 
+/** Shorthand to pass SaveEnvelope to seedAndLoadSave (which accepts Record). */
+function asSave(envelope: SaveEnvelope): Record<string, unknown> {
+  return envelope as unknown as Record<string, unknown>;
+}
+
 /**
  * Build a fully-progressed save envelope for these tests.
  */
-function fullFixture(overrides = {}) {
+function fullFixture(overrides: SaveEnvelopeParams = {}): SaveEnvelope {
   return buildSaveEnvelope({
     saveName: 'Additional Systems Test',
     agencyName: 'Full Test Agency',
@@ -130,7 +255,7 @@ function fullFixture(overrides = {}) {
 
 test.describe('Thermal system', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
@@ -142,7 +267,7 @@ test.describe('Thermal system', () => {
 
   test('(1) heat accumulates during high-speed atmospheric flight', async () => {
     test.setTimeout(60_000);
-    await seedAndLoadSave(page, fullFixture());
+    await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, BASIC_PROBE);
 
     // Place craft at 50km altitude moving at 2000 m/s (above threshold) descending.
@@ -150,14 +275,14 @@ test.describe('Thermal system', () => {
 
     // Wait a bit for heat to accumulate.
     await page.waitForFunction(() => {
-      const ps = window.__flightPs;
+      const ps = (window as unknown as GW).__flightPs;
       if (!ps?.heatMap) return false;
       for (const h of ps.heatMap.values()) { if (h > 0) return true; }
       return false;
     }, { timeout: 10_000 });
 
     const heatData = await page.evaluate(() => {
-      const ps = window.__flightPs;
+      const ps = (window as unknown as GW).__flightPs;
       if (!ps || !ps.heatMap) return { totalHeat: 0, partCount: 0 };
       let total = 0;
       let count = 0;
@@ -173,20 +298,20 @@ test.describe('Thermal system', () => {
 
   test('(2) heat dissipates when slowing below threshold', async () => {
     test.setTimeout(60_000);
-    await seedAndLoadSave(page, fullFixture());
+    await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, BASIC_PROBE);
 
     // First accumulate heat.
     await teleportCraft(page, { posY: 50_000, velY: -2000 });
     await page.waitForFunction(() => {
-      const ps = window.__flightPs;
+      const ps = (window as unknown as GW).__flightPs;
       if (!ps?.heatMap) return false;
       for (const h of ps.heatMap.values()) { if (h > 0) return true; }
       return false;
     }, { timeout: 10_000 });
 
     const beforeHeat = await page.evaluate(() => {
-      const ps = window.__flightPs;
+      const ps = (window as unknown as GW).__flightPs!;
       let total = 0;
       for (const [, h] of ps.heatMap) total += h;
       return total;
@@ -194,14 +319,15 @@ test.describe('Thermal system', () => {
 
     // Now slow down below threshold — move to high altitude (vacuum).
     await page.evaluate(async () => {
-      const ps = window.__flightPs;
+      const w = window as unknown as GW;
+      const ps = w.__flightPs!;
       ps.posY = 80_000; // Above atmosphere
       ps.velY = -100;   // Slow
-      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
+      if (typeof w.__resyncPhysicsWorker === 'function') { await w.__resyncPhysicsWorker(); }
     });
 
-    await page.waitForFunction((bh) => {
-      const ps = window.__flightPs;
+    await page.waitForFunction((bh: number) => {
+      const ps = (window as unknown as GW).__flightPs;
       if (!ps?.heatMap) return false;
       let t = 0;
       for (const h of ps.heatMap.values()) t += h;
@@ -209,7 +335,7 @@ test.describe('Thermal system', () => {
     }, beforeHeat, { timeout: 10_000 });
 
     const afterHeat = await page.evaluate(() => {
-      const ps = window.__flightPs;
+      const ps = (window as unknown as GW).__flightPs!;
       let total = 0;
       for (const [, h] of ps.heatMap) total += h;
       return total;
@@ -220,11 +346,13 @@ test.describe('Thermal system', () => {
 
   test('(3) parts are destroyed when thermal tolerance is exceeded', async () => {
     test.setTimeout(60_000);
-    await seedAndLoadSave(page, fullFixture());
+    await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, BASIC_PROBE);
 
     // Count parts before.
-    const partsBefore = await page.evaluate(() => window.__flightPs?.activeParts?.size ?? 0);
+    const partsBefore = await page.evaluate(() =>
+      (window as unknown as GW).__flightPs?.activeParts?.size ?? 0,
+    );
     expect(partsBefore).toBeGreaterThan(0);
 
     // Put craft in extreme reentry conditions to trigger destruction.
@@ -239,8 +367,9 @@ test.describe('Thermal system', () => {
     }
 
     const result = await page.evaluate(() => {
-      const ps = window.__flightPs;
-      const fs = window.__flightState;
+      const w = window as unknown as GW;
+      const ps = w.__flightPs;
+      const fs = w.__flightState;
       return {
         partsNow: ps?.activeParts?.size ?? 0,
         destroyEvents: (fs?.events ?? []).filter(e => e.type === 'PART_DESTROYED').length,
@@ -253,7 +382,7 @@ test.describe('Thermal system', () => {
 
   test('(4) heat shields protect parts behind them in stack', async () => {
     test.setTimeout(60_000);
-    await seedAndLoadSave(page, fullFixture());
+    await seedAndLoadSave(page, asSave(fullFixture()));
     // Build order is top-to-bottom: probe, tank, engine at the top, shield at bottom.
     // When descending, the lowest-Y part (bottom) is the leading face.
     // Heat shield at bottom = leading face when descending; protects parts above.
@@ -262,7 +391,7 @@ test.describe('Thermal system', () => {
     // Set descending reentry conditions.
     await teleportCraft(page, { posY: 50_000, velY: -2500 });
     await page.waitForFunction(() => {
-      const ps = window.__flightPs;
+      const ps = (window as unknown as GW).__flightPs;
       if (!ps?.heatMap) return false;
       for (const h of ps.heatMap.values()) { if (h > 0) return true; }
       return false;
@@ -271,11 +400,12 @@ test.describe('Thermal system', () => {
     // The heat shield should be leading face (lowest Y); parts above (probe, tank, engine)
     // should be shielded and accumulate less or zero heat.
     const heatInfo = await page.evaluate(() => {
-      const ps = window.__flightPs;
-      const assembly = window.__flightAssembly;
+      const w = window as unknown as GW;
+      const ps = w.__flightPs;
+      const assembly = w.__flightAssembly;
       if (!ps || !assembly) return null;
 
-      const result = {};
+      const result: Record<string, number> = {};
       for (const [id, placed] of assembly.parts) {
         if (!ps.activeParts.has(id)) continue;
         result[placed.partId] = ps.heatMap.get(id) || 0;
@@ -285,13 +415,13 @@ test.describe('Thermal system', () => {
 
     expect(heatInfo).not.toBeNull();
     // The heat shield should be accumulating heat as the leading face.
-    if (heatInfo['heat-shield-mk2'] !== undefined) {
-      expect(heatInfo['heat-shield-mk2']).toBeGreaterThan(0);
+    if (heatInfo!['heat-shield-mk2'] !== undefined) {
+      expect(heatInfo!['heat-shield-mk2']).toBeGreaterThan(0);
     }
     // At least one shielded part should have less heat than an exposed part.
     // The shield protects parts behind it — verify shielding effect exists
     // by checking that not all parts have equal heat distribution.
-    const heatValues = Object.values(heatInfo).filter(v => v > 0);
+    const heatValues = Object.values(heatInfo!).filter(v => v > 0);
     if (heatValues.length >= 2) {
       const maxHeat = Math.max(...heatValues);
       const minHeat = Math.min(...heatValues);
@@ -302,21 +432,21 @@ test.describe('Thermal system', () => {
 
   test('(5) orientation matters — ascending heat distribution differs from descending', async () => {
     test.setTimeout(60_000);
-    await seedAndLoadSave(page, fullFixture());
+    await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'tank-small', 'engine-spark', 'heat-shield-mk2']);
 
     // Set ascending through atmosphere at high speed.
     await teleportCraft(page, { posY: 30_000, velY: 3000 }); // 30 km, ascending at 3000 m/s.
 
     await page.waitForFunction(() => {
-      const ps = window.__flightPs;
+      const ps = (window as unknown as GW).__flightPs;
       if (!ps?.heatMap) return false;
       for (const h of ps.heatMap.values()) { if (h > 0) return true; }
       return false;
     }, { timeout: 10_000 });
 
     const ascendingHeat = await page.evaluate(() => {
-      const ps = window.__flightPs;
+      const ps = (window as unknown as GW).__flightPs!;
       let total = 0;
       let count = 0;
       for (const [, h] of ps.heatMap) {
@@ -334,7 +464,7 @@ test.describe('Thermal system', () => {
 
   test('(6) body-specific heating — Mars low, Earth moderate, Venus extreme', async () => {
     test.setTimeout(60_000);
-    await seedAndLoadSave(page, fullFixture());
+    await seedAndLoadSave(page, asSave(fullFixture()));
 
     // Verify body-specific atmosphere properties by computing density from
     // known constants. The heating system uses these per-body values.
@@ -342,7 +472,7 @@ test.describe('Thermal system', () => {
     // At 30 km altitude, density differences determine heat rate.
     const densities = await page.evaluate(() => {
       // Use the atmosphere lookup functions exposed by the game modules.
-      const atmoFunc = window.__airDensityForBody;
+      const atmoFunc = (window as unknown as GW).__airDensityForBody;
       if (typeof atmoFunc === 'function') {
         return {
           earth: atmoFunc(30_000, 'EARTH'),
@@ -372,7 +502,7 @@ test.describe('Thermal system', () => {
 
   test('(7) airless bodies produce no atmospheric heating', async () => {
     test.setTimeout(60_000);
-    await seedAndLoadSave(page, fullFixture());
+    await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, BASIC_PROBE, { bodyId: 'MOON' });
 
     // Teleport to Moon at high speed.
@@ -384,12 +514,12 @@ test.describe('Thermal system', () => {
 
     // Wait for physics to run several frames (gravity pulls craft down, proving sim is running)
     await page.waitForFunction(
-      () => (window.__flightPs?.posY ?? 20_000) < 19_500,
+      () => ((window as unknown as GW).__flightPs?.posY ?? 20_000) < 19_500,
       { timeout: 10_000 },
     );
 
     const heatOnMoon = await page.evaluate(() => {
-      const ps = window.__flightPs;
+      const ps = (window as unknown as GW).__flightPs!;
       let total = 0;
       for (const [, h] of ps.heatMap) total += h;
       return total;
@@ -401,7 +531,7 @@ test.describe('Thermal system', () => {
 
   test('(8) thermal ratings visible in VAB part tooltips', async () => {
     test.setTimeout(30_000);
-    await seedAndLoadSave(page, fullFixture());
+    await seedAndLoadSave(page, asSave(fullFixture()));
     await navigateToVab(page);
 
     // Check that heat shield part card shows thermal info.
@@ -411,29 +541,30 @@ test.describe('Thermal system', () => {
 
     // The card or tooltip should mention heat tolerance or thermal rating.
     // Check for any thermal-related text.
-    const hasThermalInfo = cardText.toLowerCase().includes('heat') ||
-                           cardText.toLowerCase().includes('thermal') ||
-                           cardText.toLowerCase().includes('tolerance');
+    const hasThermalInfo = cardText!.toLowerCase().includes('heat') ||
+                           cardText!.toLowerCase().includes('thermal') ||
+                           cardText!.toLowerCase().includes('tolerance');
     expect(hasThermalInfo).toBe(true);
   });
 
   test('(9) heat glow visual effect appears on heated parts', async () => {
     test.setTimeout(60_000);
-    await seedAndLoadSave(page, fullFixture());
+    await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, BASIC_PROBE);
 
     // Apply significant heat to parts.
     await page.evaluate(async () => {
-      const ps = window.__flightPs;
+      const w = window as unknown as GW;
+      const ps = w.__flightPs!;
       for (const id of ps.activeParts) {
         ps.heatMap.set(id, 600); // ~50% of default tolerance — should trigger glow.
       }
-      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
+      if (typeof w.__resyncPhysicsWorker === 'function') { await w.__resyncPhysicsWorker(); }
     });
 
     // Wait for render frame to process the heat state
     await page.waitForFunction(() => {
-      const ps = window.__flightPs;
+      const ps = (window as unknown as GW).__flightPs;
       if (!ps?.heatMap) return false;
       for (const h of ps.heatMap.values()) { if (h > 0) return true; }
       return false;
@@ -442,10 +573,11 @@ test.describe('Thermal system', () => {
     // The heat glow is a PixiJS rendering effect. We verify indirectly that
     // the heat ratio is above the 0.1 threshold for rendering.
     const ratios = await page.evaluate(() => {
-      const ps = window.__flightPs;
-      const assembly = window.__flightAssembly;
+      const w = window as unknown as GW;
+      const ps = w.__flightPs;
+      const assembly = w.__flightAssembly;
       if (!ps || !assembly) return [];
-      const results = [];
+      const results: number[] = [];
       for (const id of ps.activeParts) {
         const heat = ps.heatMap.get(id) || 0;
         const placed = assembly.parts.get(id);
@@ -468,13 +600,13 @@ test.describe('Thermal system', () => {
 
 test.describe('Tech tree parts', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    await seedAndLoadSave(page, fullFixture());
+    await seedAndLoadSave(page, asSave(fullFixture()));
   });
 
   test.afterAll(async () => { await page.close(); });
@@ -484,7 +616,7 @@ test.describe('Tech tree parts', () => {
     await startTestFlight(page, ['probe-core-mk1', 'tank-small', 'engine-spark-improved']);
 
     const engineInfo = await page.evaluate(() => {
-      const assembly = window.__flightAssembly;
+      const assembly = (window as unknown as GW).__flightAssembly;
       if (!assembly) return null;
       for (const [, placed] of assembly.parts) {
         if (placed.partId === 'engine-spark-improved') {
@@ -502,16 +634,16 @@ test.describe('Tech tree parts', () => {
     await waitForAltitude(page, 50, 15_000);
 
     const snap = await getPhysicsSnapshot(page);
-    expect(snap.posY).toBeGreaterThan(0);
+    expect(snap!.posY).toBeGreaterThan(0);
   });
 
   test('(2) ion engine has very low thrust but is present', async () => {
     test.setTimeout(60_000);
-    await seedAndLoadSave(page, fullFixture());
+    await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'tank-small', 'engine-ion']);
 
     const ionInfo = await page.evaluate(() => {
-      const assembly = window.__flightAssembly;
+      const assembly = (window as unknown as GW).__flightAssembly!;
       for (const [, placed] of assembly.parts) {
         if (placed.partId === 'engine-ion') return { found: true };
       }
@@ -522,11 +654,11 @@ test.describe('Tech tree parts', () => {
 
   test('(3) deep space engine is placeable and functional', async () => {
     test.setTimeout(60_000);
-    await seedAndLoadSave(page, fullFixture());
+    await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'tank-large', 'engine-deep-space']);
 
     const found = await page.evaluate(() => {
-      const assembly = window.__flightAssembly;
+      const assembly = (window as unknown as GW).__flightAssembly!;
       for (const [, placed] of assembly.parts) {
         if (placed.partId === 'engine-deep-space') return true;
       }
@@ -542,12 +674,12 @@ test.describe('Tech tree parts', () => {
     try {
       await waitForAltitude(page, 5, 20_000);
       const snap = await getPhysicsSnapshot(page);
-      expect(snap.posY).toBeGreaterThan(0);
+      expect(snap!.posY).toBeGreaterThan(0);
     } catch {
       // Even if altitude isn't gained (heavy craft), verify engine is firing.
       const firing = await page.evaluate(() => {
-        const ps = window.__flightPs;
-        return ps?.firingEngines?.size > 0 || ps?.throttle > 0;
+        const ps = (window as unknown as GW).__flightPs;
+        return (ps?.firingEngines?.size ?? 0) > 0 || (ps?.throttle ?? 0) > 0;
       });
       expect(firing).toBe(true);
     }
@@ -555,13 +687,12 @@ test.describe('Tech tree parts', () => {
 
   test('(4) large fuel tank has correct capacity', async () => {
     test.setTimeout(60_000);
-    await seedAndLoadSave(page, fullFixture());
+    await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'tank-large', 'engine-reliant']);
 
     // Verify the tank part is in the assembly.
     const tankInfo = await page.evaluate(() => {
-      const assembly = window.__flightAssembly;
-      const ps = window.__flightPs;
+      const assembly = (window as unknown as GW).__flightAssembly!;
       for (const [, placed] of assembly.parts) {
         if (placed.partId === 'tank-large') return { found: true };
       }
@@ -575,12 +706,12 @@ test.describe('Tech tree parts', () => {
     await waitForAltitude(page, 50, 15_000);
 
     const snap = await getPhysicsSnapshot(page);
-    expect(snap.posY).toBeGreaterThan(0);
+    expect(snap!.posY).toBeGreaterThan(0);
   });
 
   test('(5) parachute deploys and slows descent', async () => {
     test.setTimeout(60_000);
-    await seedAndLoadSave(page, fullFixture());
+    await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'parachute-mk1', 'tank-small', 'engine-spark']);
 
     // Launch up.
@@ -590,28 +721,31 @@ test.describe('Tech tree parts', () => {
 
     // Cut engine and stage parachute.
     await page.keyboard.press('x');
-    await page.waitForFunction(() => (window.__flightPs?.throttle ?? 1) === 0, { timeout: 5_000 });
+    await page.waitForFunction(
+      () => ((window as unknown as GW).__flightPs?.throttle ?? 1) === 0,
+      { timeout: 5_000 },
+    );
     await page.keyboard.press('Space');
 
     // Wait for descent — velocity should slow.
     await page.waitForFunction(
-      () => Math.abs(window.__flightPs?.velY ?? 999) < 200,
+      () => Math.abs((window as unknown as GW).__flightPs?.velY ?? 999) < 200,
       { timeout: 15_000 },
     );
 
     const snap = await getPhysicsSnapshot(page);
     // Parachute should have slowed descent — velY should be manageable.
     // Even partially deployed, descent speed should be well under freefall.
-    expect(Math.abs(snap.velY)).toBeLessThan(200);
+    expect(Math.abs(snap!.velY)).toBeLessThan(200);
   });
 
   test('(6) drogue chute deploys at high altitude', async () => {
     test.setTimeout(60_000);
-    await seedAndLoadSave(page, fullFixture());
+    await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'parachute-drogue', 'parachute-mk1', 'tank-small', 'engine-spark']);
 
     const found = await page.evaluate(() => {
-      const assembly = window.__flightAssembly;
+      const assembly = (window as unknown as GW).__flightAssembly!;
       for (const [, placed] of assembly.parts) {
         if (placed.partId === 'parachute-drogue') return true;
       }
@@ -622,11 +756,11 @@ test.describe('Tech tree parts', () => {
 
   test('(7) heat shields are placeable and have high tolerance', async () => {
     test.setTimeout(60_000);
-    await seedAndLoadSave(page, fullFixture());
+    await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'heat-shield-mk2', 'tank-small', 'engine-spark']);
 
     const shieldInfo = await page.evaluate(() => {
-      const assembly = window.__flightAssembly;
+      const assembly = (window as unknown as GW).__flightAssembly!;
       for (const [, placed] of assembly.parts) {
         if (placed.partId === 'heat-shield-mk2') return { found: true };
       }
@@ -637,11 +771,11 @@ test.describe('Tech tree parts', () => {
 
   test('(8) powered landing guidance auto-lands consuming fuel', async () => {
     test.setTimeout(60_000);
-    await seedAndLoadSave(page, fullFixture());
+    await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'landing-legs-powered', 'tank-small', 'engine-spark']);
 
     const found = await page.evaluate(() => {
-      const assembly = window.__flightAssembly;
+      const assembly = (window as unknown as GW).__flightAssembly!;
       for (const [, placed] of assembly.parts) {
         if (placed.partId === 'landing-legs-powered') return true;
       }
@@ -651,11 +785,12 @@ test.describe('Tech tree parts', () => {
 
     // The auto-land part should exist and its properties should indicate autoLand.
     const hasAutoLand = await page.evaluate(() => {
-      const assembly = window.__flightAssembly;
+      const w = window as unknown as GW;
+      const assembly = w.__flightAssembly!;
       for (const [, placed] of assembly.parts) {
         if (placed.partId === 'landing-legs-powered') {
           // Access the part definition through the game's catalog.
-          const catalog = window.__partCatalog;
+          const catalog = w.__partCatalog;
           if (catalog) {
             const def = catalog.find(p => p.id === 'landing-legs-powered');
             return def?.properties?.autoLand === true;
@@ -670,7 +805,7 @@ test.describe('Tech tree parts', () => {
 
   test('(9) reusable booster module creates inventory parts on stage separation', async () => {
     test.setTimeout(60_000);
-    await seedAndLoadSave(page, fullFixture());
+    await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, [
       'probe-core-mk1', 'tank-small', 'engine-spark',
       'decoupler-stack-tr18',
@@ -678,7 +813,7 @@ test.describe('Tech tree parts', () => {
     ]);
 
     const found = await page.evaluate(() => {
-      const assembly = window.__flightAssembly;
+      const assembly = (window as unknown as GW).__flightAssembly!;
       for (const [, placed] of assembly.parts) {
         if (placed.partId === 'booster-reusable') return true;
       }
@@ -689,11 +824,11 @@ test.describe('Tech tree parts', () => {
 
   test('(10) Science Lab generates additional science from collected data', async () => {
     test.setTimeout(60_000);
-    await seedAndLoadSave(page, fullFixture());
+    await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'science-lab', 'tank-small', 'engine-spark']);
 
     const labInfo = await page.evaluate(() => {
-      const assembly = window.__flightAssembly;
+      const assembly = (window as unknown as GW).__flightAssembly!;
       for (const [, placed] of assembly.parts) {
         if (placed.partId === 'science-lab') {
           return { found: true };
@@ -706,11 +841,11 @@ test.describe('Tech tree parts', () => {
 
   test('(11) deep space instruments work when present in assembly', async () => {
     test.setTimeout(60_000);
-    await seedAndLoadSave(page, fullFixture());
+    await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'instrument-telescope', 'tank-small', 'engine-spark']);
 
     const found = await page.evaluate(() => {
-      const assembly = window.__flightAssembly;
+      const assembly = (window as unknown as GW).__flightAssembly!;
       for (const [, placed] of assembly.parts) {
         if (placed.partId === 'instrument-telescope') return true;
       }
@@ -726,7 +861,7 @@ test.describe('Tech tree parts', () => {
 
 test.describe('Satellite components', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
@@ -738,7 +873,7 @@ test.describe('Satellite components', () => {
 
   test('(1) custom satellite buildable from individual parts', async () => {
     test.setTimeout(60_000);
-    await seedAndLoadSave(page, fullFixture());
+    await seedAndLoadSave(page, asSave(fullFixture()));
     // Build a custom satellite: probe core + solar panel + battery + antenna + sensor.
     await startTestFlight(page, [
       'probe-core-mk1',
@@ -751,8 +886,8 @@ test.describe('Satellite components', () => {
     ]);
 
     const partIds = await page.evaluate(() => {
-      const assembly = window.__flightAssembly;
-      const ids = [];
+      const assembly = (window as unknown as GW).__flightAssembly!;
+      const ids: string[] = [];
       for (const [, placed] of assembly.parts) {
         ids.push(placed.partId);
       }
@@ -771,7 +906,7 @@ test.describe('Satellite components', () => {
 
     // Check that the power state recognizes solar panels.
     const powerInfo = await page.evaluate(() => {
-      const ps = window.__flightPs;
+      const ps = (window as unknown as GW).__flightPs;
       if (!ps?.powerState) return null;
       return {
         solarPanelArea: ps.powerState.solarPanelArea,
@@ -789,7 +924,7 @@ test.describe('Satellite components', () => {
   test('(3) batteries store electrical energy', async () => {
     test.setTimeout(30_000);
     const powerInfo = await page.evaluate(() => {
-      const ps = window.__flightPs;
+      const ps = (window as unknown as GW).__flightPs;
       if (!ps?.powerState) return null;
       return {
         batteryCapacity: ps.powerState.batteryCapacity,
@@ -805,28 +940,28 @@ test.describe('Satellite components', () => {
 
   test('(4) standard antenna has short range property', async () => {
     test.setTimeout(30_000);
-    await seedAndLoadSave(page, fullFixture());
+    await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'antenna-standard', 'tank-small', 'engine-spark']);
 
     const antennaInfo = await page.evaluate(() => {
-      const assembly = window.__flightAssembly;
+      const assembly = (window as unknown as GW).__flightAssembly!;
       for (const [, placed] of assembly.parts) {
         if (placed.partId === 'antenna-standard') {
           return { found: true, partId: placed.partId };
         }
       }
-      return { found: false };
+      return { found: false, partId: '' };
     });
     expect(antennaInfo.found).toBe(true);
   });
 
   test('(5) high-power antenna has medium range property', async () => {
     test.setTimeout(30_000);
-    await seedAndLoadSave(page, fullFixture());
+    await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'antenna-high-power', 'tank-small', 'engine-spark']);
 
     const found = await page.evaluate(() => {
-      const assembly = window.__flightAssembly;
+      const assembly = (window as unknown as GW).__flightAssembly!;
       for (const [, placed] of assembly.parts) {
         if (placed.partId === 'antenna-high-power') return true;
       }
@@ -837,11 +972,11 @@ test.describe('Satellite components', () => {
 
   test('(6) relay dish has interplanetary range and relay capability', async () => {
     test.setTimeout(30_000);
-    await seedAndLoadSave(page, fullFixture());
+    await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'antenna-relay', 'tank-small', 'engine-spark']);
 
     const found = await page.evaluate(() => {
-      const assembly = window.__flightAssembly;
+      const assembly = (window as unknown as GW).__flightAssembly!;
       for (const [, placed] of assembly.parts) {
         if (placed.partId === 'antenna-relay') return true;
       }
@@ -852,11 +987,11 @@ test.describe('Satellite components', () => {
 
   test('(7) weather sensor provides correct sensor type', async () => {
     test.setTimeout(30_000);
-    await seedAndLoadSave(page, fullFixture());
+    await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'sensor-weather', 'tank-small', 'engine-spark']);
 
     const found = await page.evaluate(() => {
-      const assembly = window.__flightAssembly;
+      const assembly = (window as unknown as GW).__flightAssembly!;
       for (const [, placed] of assembly.parts) {
         if (placed.partId === 'sensor-weather') return true;
       }
@@ -867,11 +1002,11 @@ test.describe('Satellite components', () => {
 
   test('(8) science sensor provides correct sensor type', async () => {
     test.setTimeout(30_000);
-    await seedAndLoadSave(page, fullFixture());
+    await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'sensor-science', 'tank-small', 'engine-spark']);
 
     const found = await page.evaluate(() => {
-      const assembly = window.__flightAssembly;
+      const assembly = (window as unknown as GW).__flightAssembly!;
       for (const [, placed] of assembly.parts) {
         if (placed.partId === 'sensor-science') return true;
       }
@@ -882,11 +1017,11 @@ test.describe('Satellite components', () => {
 
   test('(9) GPS transponder provides correct sensor type', async () => {
     test.setTimeout(30_000);
-    await seedAndLoadSave(page, fullFixture());
+    await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'sensor-gps', 'tank-small', 'engine-spark']);
 
     const found = await page.evaluate(() => {
-      const assembly = window.__flightAssembly;
+      const assembly = (window as unknown as GW).__flightAssembly!;
       for (const [, placed] of assembly.parts) {
         if (placed.partId === 'sensor-gps') return true;
       }
@@ -897,7 +1032,7 @@ test.describe('Satellite components', () => {
 
   test('(10) science telescope generates orbital science', async () => {
     test.setTimeout(60_000);
-    await seedAndLoadSave(page, fullFixture());
+    await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, [
       'probe-core-mk1', 'instrument-telescope',
       'solar-panel-large', 'battery-large',
@@ -905,7 +1040,7 @@ test.describe('Satellite components', () => {
     ]);
 
     const telescopeInfo = await page.evaluate(() => {
-      const assembly = window.__flightAssembly;
+      const assembly = (window as unknown as GW).__flightAssembly!;
       for (const [, placed] of assembly.parts) {
         if (placed.partId === 'instrument-telescope') {
           return { found: true };
@@ -918,7 +1053,7 @@ test.describe('Satellite components', () => {
 
   test('(11) power draw from active components is tracked', async () => {
     test.setTimeout(60_000);
-    await seedAndLoadSave(page, fullFixture());
+    await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, [
       'probe-core-mk1',
       'solar-panel-medium', 'battery-medium',
@@ -930,12 +1065,12 @@ test.describe('Satellite components', () => {
     await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
     await waitForOrbit(page);
     await page.waitForFunction(
-      () => window.__flightPs?.powerState?.solarPanelArea > 0,
+      () => ((window as unknown as GW).__flightPs?.powerState?.solarPanelArea ?? 0) > 0,
       { timeout: 10_000 },
     );
 
     const power = await page.evaluate(() => {
-      const ps = window.__flightPs;
+      const ps = (window as unknown as GW).__flightPs;
       if (!ps?.powerState) return null;
       return {
         solarGeneration: ps.powerState.solarGeneration,
@@ -959,7 +1094,7 @@ test.describe('Satellite components', () => {
 
 test.describe('Life support', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
@@ -985,13 +1120,14 @@ test.describe('Life support', () => {
       orbitalElements: null,
       orbitBandId: 'LEO',
     }];
-    await seedAndLoadSave(page, fixture);
+    await seedAndLoadSave(page, asSave(fixture));
 
     // Check the initial state.
     const initialState = await getGameState(page);
-    const fc = initialState?.fieldCraft?.find(c => c.id === 'fc-test-1');
+    const fieldCraft = initialState?.fieldCraft as FieldCraft[] | undefined;
+    const fc = fieldCraft?.find(c => c.id === 'fc-test-1');
     expect(fc).toBeDefined();
-    expect(fc.suppliesRemaining).toBe(5);
+    expect(fc!.suppliesRemaining).toBe(5);
   });
 
   test('(2) warning at 1 period remaining', async () => {
@@ -1010,12 +1146,13 @@ test.describe('Life support', () => {
       orbitalElements: null,
       orbitBandId: 'LLO',
     }];
-    await seedAndLoadSave(page, fixture);
+    await seedAndLoadSave(page, asSave(fixture));
 
     const state = await getGameState(page);
-    const fc = state?.fieldCraft?.find(c => c.id === 'fc-warn-1');
+    const fieldCraft = state?.fieldCraft as FieldCraft[] | undefined;
+    const fc = fieldCraft?.find(c => c.id === 'fc-warn-1');
     expect(fc).toBeDefined();
-    expect(fc.suppliesRemaining).toBeLessThanOrEqual(1);
+    expect(fc!.suppliesRemaining).toBeLessThanOrEqual(1);
   });
 
   test('(3) crew death at 0 supplies — state reflects KIA after period advance', async () => {
@@ -1034,16 +1171,18 @@ test.describe('Life support', () => {
       orbitalElements: null,
       orbitBandId: 'LMO',
     }];
-    await seedAndLoadSave(page, fixture);
+    await seedAndLoadSave(page, asSave(fixture));
 
     const state = await getGameState(page);
-    const fc = state?.fieldCraft?.find(c => c.id === 'fc-death-1');
+    const fieldCraft = state?.fieldCraft as FieldCraft[] | undefined;
+    const fc = fieldCraft?.find(c => c.id === 'fc-death-1');
     // Craft exists with 0 supplies.
     if (fc) {
       expect(fc.suppliesRemaining).toBe(0);
     } else {
       // If game already processed the death on load, crew should be KIA.
-      const crew3 = state?.crew?.find(c => c.id === 'crew-3');
+      const crew = state?.crew as { id: string; status: string }[] | undefined;
+      const crew3 = crew?.find(c => c.id === 'crew-3');
       // Either craft was removed or crew died.
       expect(crew3 === undefined || crew3?.status === 'kia' || crew3?.status === 'KIA' || true).toBe(true);
     }
@@ -1064,26 +1203,27 @@ test.describe('Life support', () => {
       orbitalElements: null,
       orbitBandId: 'LEO',
     }];
-    await seedAndLoadSave(page, fixture);
+    await seedAndLoadSave(page, asSave(fixture));
 
     const state = await getGameState(page);
-    const fc = state?.fieldCraft?.find(c => c.id === 'fc-extended-1');
+    const fieldCraft = state?.fieldCraft as FieldCraft[] | undefined;
+    const fc = fieldCraft?.find(c => c.id === 'fc-extended-1');
     expect(fc).toBeDefined();
-    expect(fc.hasExtendedLifeSupport).toBe(true);
+    expect(fc!.hasExtendedLifeSupport).toBe(true);
     // With extended life support, supplies remain at 5 (not consumed).
-    expect(fc.suppliesRemaining).toBe(5);
+    expect(fc!.suppliesRemaining).toBe(5);
   });
 
   test('(5) countdown does not apply during active flight', async () => {
     test.setTimeout(60_000);
-    await seedAndLoadSave(page, fullFixture());
+    await seedAndLoadSave(page, asSave(fullFixture()));
     // Start a crewed flight — life support should not tick during flight.
     await startTestFlight(page, BASIC_CREWED, { crewIds: ['crew-1'] });
 
     // During active flight, there should be no field craft countdown.
     const state = await getGameState(page);
     // Active flight crew shouldn't appear as field craft.
-    const fieldCraft = state?.fieldCraft ?? [];
+    const fieldCraft = (state?.fieldCraft ?? []) as FieldCraft[];
     const activeCrew = fieldCraft.filter(fc => fc.crewIds?.includes('crew-1'));
     expect(activeCrew.length).toBe(0);
   });
@@ -1117,17 +1257,18 @@ test.describe('Life support', () => {
         orbitBandId: null,
       },
     ];
-    await seedAndLoadSave(page, fixture);
+    await seedAndLoadSave(page, asSave(fixture));
 
     const state = await getGameState(page);
-    expect(state.fieldCraft).toBeDefined();
-    expect(state.fieldCraft.length).toBe(2);
+    const fieldCraft = state!.fieldCraft as FieldCraft[];
+    expect(fieldCraft).toBeDefined();
+    expect(fieldCraft.length).toBe(2);
 
-    const leoStation = state.fieldCraft.find(fc => fc.id === 'fc-visible-1');
+    const leoStation = fieldCraft.find(fc => fc.id === 'fc-visible-1')!;
     expect(leoStation.suppliesRemaining).toBe(3);
     expect(leoStation.bodyId).toBe('EARTH');
 
-    const lunarOutpost = state.fieldCraft.find(fc => fc.id === 'fc-visible-2');
+    const lunarOutpost = fieldCraft.find(fc => fc.id === 'fc-visible-2')!;
     expect(lunarOutpost.suppliesRemaining).toBe(2);
     expect(lunarOutpost.status).toBe('LANDED');
   });
@@ -1139,7 +1280,7 @@ test.describe('Life support', () => {
 
 test.describe('Comms range', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(180_000);
@@ -1151,70 +1292,75 @@ test.describe('Comms range', () => {
 
   test('(1) direct comms work within Earth orbit range', async () => {
     test.setTimeout(60_000);
-    await seedAndLoadSave(page, fullFixture({
+    await seedAndLoadSave(page, asSave(fullFixture({
       satelliteNetwork: { satellites: [] }, // No satellites — test pure direct link.
       facilities: {
         ...ALL_FACILITIES,
         [FacilityId.TRACKING_STATION]: { built: true, tier: 1 }, // No T3 boost.
         [FacilityId.SATELLITE_OPS]: { built: true, tier: 1 },
       },
-    }));
+    })));
     await startTestFlight(page, BASIC_PROBE);
 
     // Teleport to LEO on Earth — should have direct comms.
     await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
     await waitForOrbit(page);
     await page.waitForFunction(
-      () => (window.__flightState?.commsState?.status ?? window.__flightState?.comms?.status) != null,
+      () => {
+        const fs = (window as unknown as GW).__flightState;
+        return (fs?.commsState?.status ?? fs?.comms?.status) != null;
+      },
       { timeout: 10_000 },
     );
 
     const comms = await page.evaluate(() => {
-      const ps = window.__flightPs;
-      const fs = window.__flightState;
+      const w = window as unknown as GW;
+      const ps = w.__flightPs;
+      const fs = w.__flightState;
       if (!ps || !fs) return null;
-      // Check if comms state is exposed.
       return {
         phase: fs.phase,
         bodyId: fs.bodyId,
         altitude: ps.posY,
-        // Check for comms status in flight state.
         commsStatus: fs.commsState?.status ?? fs.comms?.status ?? null,
         controlLocked: fs.commsState?.controlLocked ?? fs.comms?.controlLocked ?? false,
       };
     });
 
     expect(comms).not.toBeNull();
-    expect(comms.bodyId).toBe('EARTH');
+    expect(comms!.bodyId).toBe('EARTH');
     // In Earth LEO, direct comms should work.
-    expect(comms.controlLocked).toBe(false);
+    expect(comms!.controlLocked).toBe(false);
   });
 
   test('(2) comms fail beyond direct range limit without infrastructure', async () => {
     test.setTimeout(60_000);
     // No satellites, no T3 tracking station — only basic direct range.
-    await seedAndLoadSave(page, fullFixture({
+    await seedAndLoadSave(page, asSave(fullFixture({
       satelliteNetwork: { satellites: [] },
       facilities: {
         ...ALL_FACILITIES,
         [FacilityId.TRACKING_STATION]: { built: true, tier: 1 },
         [FacilityId.SATELLITE_OPS]: { built: true, tier: 1 },
       },
-    }));
+    })));
     await startTestFlight(page, BASIC_PROBE);
 
     // Teleport to Moon orbit — beyond direct range (40,000 km).
     await teleportCraft(page, { posY: 20_000, velX: 1671, bodyId: 'MOON' });
     await waitForOrbit(page);
     await page.waitForFunction(
-      () => (window.__flightState?.commsState?.status ?? window.__flightState?.comms?.status) != null,
+      () => {
+        const fs = (window as unknown as GW).__flightState;
+        return (fs?.commsState?.status ?? fs?.comms?.status) != null;
+      },
       { timeout: 10_000 },
     );
 
     const comms = await page.evaluate(() => {
-      const fs = window.__flightState;
+      const fs = (window as unknown as GW).__flightState;
       return {
-        bodyId: fs?.bodyId,
+        bodyId: fs?.bodyId ?? null,
         commsStatus: fs?.commsState?.status ?? fs?.comms?.status ?? null,
         linkType: fs?.commsState?.linkType ?? fs?.comms?.linkType ?? null,
         controlLocked: fs?.commsState?.controlLocked ?? fs?.comms?.controlLocked ?? null,
@@ -1232,28 +1378,30 @@ test.describe('Comms range', () => {
     test.setTimeout(60_000);
     // T3 tracking station extends Earth direct range to 500,000 km.
     // Test at high Earth orbit — beyond basic 40,000 km but within T3 range.
-    await seedAndLoadSave(page, fullFixture({
+    await seedAndLoadSave(page, asSave(fullFixture({
       satelliteNetwork: { satellites: [] },
       facilities: {
         ...ALL_FACILITIES,
         [FacilityId.TRACKING_STATION]: { built: true, tier: 3 },
       },
-    }));
+    })));
     await startTestFlight(page, BASIC_PROBE);
 
     // High Earth orbit at ~100,000 km — beyond basic range but within T3.
-    // BODY_RADIUS[EARTH] = 6,371,000 + 100,000,000 = 106,371,000 < 500,000,000 T3 range.
     await teleportCraft(page, { posY: 100_000_000, velX: 2000, bodyId: 'EARTH' });
     await waitForOrbit(page);
     await page.waitForFunction(
-      () => (window.__flightState?.commsState?.status ?? window.__flightState?.comms?.status) != null,
+      () => {
+        const fs = (window as unknown as GW).__flightState;
+        return (fs?.commsState?.status ?? fs?.comms?.status) != null;
+      },
       { timeout: 10_000 },
     );
 
     const comms = await page.evaluate(() => {
-      const fs = window.__flightState;
+      const fs = (window as unknown as GW).__flightState;
       return {
-        bodyId: fs?.bodyId,
+        bodyId: fs?.bodyId ?? null,
         commsStatus: fs?.commsState?.status ?? fs?.comms?.status ?? null,
         linkType: fs?.commsState?.linkType ?? fs?.comms?.linkType ?? null,
         controlLocked: fs?.commsState?.controlLocked ?? fs?.comms?.controlLocked ?? false,
@@ -1271,7 +1419,7 @@ test.describe('Comms range', () => {
   test('(4) local comms network provides coverage via comm-sats', async () => {
     test.setTimeout(60_000);
     // Deploy 3 comm-sats around the Moon for full coverage.
-    await seedAndLoadSave(page, fullFixture({
+    await seedAndLoadSave(page, asSave(fullFixture({
       facilities: {
         ...ALL_FACILITIES,
         [FacilityId.TRACKING_STATION]: { built: true, tier: 1 }, // No T3 boost.
@@ -1285,20 +1433,23 @@ test.describe('Comms range', () => {
           { id: 'sat-e1', name: 'EarthComm-1', partId: 'satellite-comm', satelliteType: 'COMMUNICATION', bodyId: 'EARTH', bandId: 'LEO', health: 100, autoMaintain: true, deployedPeriod: 5 },
         ],
       },
-    }));
+    })));
     await startTestFlight(page, BASIC_PROBE);
 
     await teleportCraft(page, { posY: 20_000, velX: 1671, bodyId: 'MOON' });
     await waitForOrbit(page);
     await page.waitForFunction(
-      () => (window.__flightState?.commsState?.status ?? window.__flightState?.comms?.status) != null,
+      () => {
+        const fs = (window as unknown as GW).__flightState;
+        return (fs?.commsState?.status ?? fs?.comms?.status) != null;
+      },
       { timeout: 10_000 },
     );
 
     const comms = await page.evaluate(() => {
-      const fs = window.__flightState;
+      const fs = (window as unknown as GW).__flightState;
       return {
-        bodyId: fs?.bodyId,
+        bodyId: fs?.bodyId ?? null,
         commsStatus: fs?.commsState?.status ?? fs?.comms?.status ?? null,
         controlLocked: fs?.commsState?.controlLocked ?? fs?.comms?.controlLocked ?? false,
       };
@@ -1314,7 +1465,7 @@ test.describe('Comms range', () => {
   test('(5) dark spots on far side with partial coverage', async () => {
     test.setTimeout(60_000);
     // Only 1 comm-sat — partial coverage, dark spots possible.
-    await seedAndLoadSave(page, fullFixture({
+    await seedAndLoadSave(page, asSave(fullFixture({
       facilities: {
         ...ALL_FACILITIES,
         [FacilityId.TRACKING_STATION]: { built: true, tier: 1 },
@@ -1325,16 +1476,15 @@ test.describe('Comms range', () => {
           { id: 'sat-e1', name: 'EarthComm-1', partId: 'satellite-comm', satelliteType: 'COMMUNICATION', bodyId: 'EARTH', bandId: 'LEO', health: 100, autoMaintain: true, deployedPeriod: 5 },
         ],
       },
-    }));
+    })));
 
     // The comms system has a shadow half-angle of 80 degrees for partial coverage.
     // We verify the system knows about the partial coverage.
     const coverageInfo = await page.evaluate(() => {
-      // Check the coverage info available from the game.
-      const gs = window.__gameState;
+      const gs = (window as unknown as GW).__gameState;
       if (!gs) return null;
       const sats = gs.satelliteNetwork?.satellites ?? [];
-      const moonCommSats = sats.filter(s => s.bodyId === 'MOON');
+      const moonCommSats = sats.filter((s: SatelliteEntry) => s.bodyId === 'MOON');
       return {
         moonSatCount: moonCommSats.length,
         fullCoverageThreshold: 3,
@@ -1351,7 +1501,7 @@ test.describe('Comms range', () => {
   test('(6) relay antennas bridge interplanetary distances', async () => {
     test.setTimeout(60_000);
     // Deploy relay sats at Earth and Mars to create a relay chain.
-    await seedAndLoadSave(page, fullFixture({
+    await seedAndLoadSave(page, asSave(fullFixture({
       facilities: {
         ...ALL_FACILITIES,
         [FacilityId.TRACKING_STATION]: { built: true, tier: 1 },
@@ -1366,27 +1516,30 @@ test.describe('Comms range', () => {
           { id: 'sat-mc3', name: 'MarsComm-3', partId: 'satellite-comm', satelliteType: 'COMMUNICATION', bodyId: 'MARS', bandId: 'LMO', health: 100, autoMaintain: true, deployedPeriod: 15 },
         ],
       },
-    }));
+    })));
     await startTestFlight(page, BASIC_PROBE, { bodyId: 'MARS' });
 
     await teleportCraft(page, { posY: 100_000, velX: 3503, bodyId: 'MARS' });
     await waitForOrbit(page);
     await page.waitForFunction(
-      () => (window.__flightState?.commsState?.status ?? window.__flightState?.comms?.status) != null,
+      () => {
+        const fs = (window as unknown as GW).__flightState;
+        return (fs?.commsState?.status ?? fs?.comms?.status) != null;
+      },
       { timeout: 10_000 },
     );
 
     const comms = await page.evaluate(() => {
-      const fs = window.__flightState;
+      const fs = (window as unknown as GW).__flightState;
       return {
-        bodyId: fs?.bodyId,
+        bodyId: fs?.bodyId ?? null,
         commsStatus: fs?.commsState?.status ?? fs?.comms?.status ?? null,
         linkType: fs?.commsState?.linkType ?? fs?.comms?.linkType ?? null,
       };
     });
 
     expect(comms.bodyId).toBe('MARS');
-    // Relay chain from Mars → Earth should provide connectivity.
+    // Relay chain from Mars -> Earth should provide connectivity.
     if (comms.commsStatus !== null) {
       expect(comms.commsStatus).toBe('CONNECTED');
     }
@@ -1396,18 +1549,18 @@ test.describe('Comms range', () => {
     test.setTimeout(60_000);
     // Verify the relay antenna part (antenna-relay) is present and has
     // the relayCapable property that the comms system checks.
-    await seedAndLoadSave(page, fullFixture({
+    await seedAndLoadSave(page, asSave(fullFixture({
       satelliteNetwork: { satellites: [] },
-    }));
+    })));
     await startTestFlight(page, ['probe-core-mk1', 'antenna-relay', 'tank-small', 'engine-spark']);
 
     const relayInfo = await page.evaluate(() => {
-      const assembly = window.__flightAssembly;
-      if (!assembly) return { found: false };
+      const w = window as unknown as GW;
+      const assembly = w.__flightAssembly;
+      if (!assembly) return { found: false, relayCapable: null as boolean | null, range: undefined as unknown };
       for (const [, placed] of assembly.parts) {
         if (placed.partId === 'antenna-relay') {
-          // Verify the part definition has relay properties.
-          const catalog = window.__partCatalog;
+          const catalog = w.__partCatalog;
           if (catalog) {
             const def = catalog.find(p => p.id === 'antenna-relay');
             return {
@@ -1416,10 +1569,10 @@ test.describe('Comms range', () => {
               range: def?.properties?.antennaRange,
             };
           }
-          return { found: true, relayCapable: null };
+          return { found: true, relayCapable: null as boolean | null, range: undefined as unknown };
         }
       }
-      return { found: false };
+      return { found: false, relayCapable: null as boolean | null, range: undefined as unknown };
     });
 
     expect(relayInfo.found).toBe(true);
@@ -1432,28 +1585,31 @@ test.describe('Comms range', () => {
   test('(8) probe loses control without comms in orbital phase', async () => {
     test.setTimeout(60_000);
     // No infrastructure, no relay — probe at Mars should lose control.
-    await seedAndLoadSave(page, fullFixture({
+    await seedAndLoadSave(page, asSave(fullFixture({
       satelliteNetwork: { satellites: [] },
       facilities: {
         ...ALL_FACILITIES,
         [FacilityId.TRACKING_STATION]: { built: true, tier: 1 },
       },
-    }));
+    })));
     await startTestFlight(page, BASIC_PROBE);
 
     // Teleport probe to Mars orbit — no relay infrastructure.
     await teleportCraft(page, { posY: 100_000, velX: 3503, bodyId: 'MARS' });
     await waitForOrbit(page);
     await page.waitForFunction(
-      () => (window.__flightState?.commsState?.status ?? window.__flightState?.comms?.status) != null,
+      () => {
+        const fs = (window as unknown as GW).__flightState;
+        return (fs?.commsState?.status ?? fs?.comms?.status) != null;
+      },
       { timeout: 10_000 },
     );
 
     const comms = await page.evaluate(() => {
-      const fs = window.__flightState;
+      const fs = (window as unknown as GW).__flightState;
       return {
-        bodyId: fs?.bodyId,
-        phase: fs?.phase,
+        bodyId: fs?.bodyId ?? null,
+        phase: fs?.phase ?? null,
         commsStatus: fs?.commsState?.status ?? fs?.comms?.status ?? null,
         controlLocked: fs?.commsState?.controlLocked ?? fs?.comms?.controlLocked ?? null,
       };
@@ -1469,29 +1625,32 @@ test.describe('Comms range', () => {
 
   test('(9) probe regains control when comms are restored', async () => {
     test.setTimeout(60_000);
-    // Start with no infrastructure → probe loses control.
-    // Then inject satellite infrastructure → probe should regain control.
-    await seedAndLoadSave(page, fullFixture({
+    // Start with no infrastructure -> probe loses control.
+    // Then inject satellite infrastructure -> probe should regain control.
+    await seedAndLoadSave(page, asSave(fullFixture({
       satelliteNetwork: { satellites: [] },
       facilities: {
         ...ALL_FACILITIES,
         [FacilityId.TRACKING_STATION]: { built: true, tier: 1 },
       },
-    }));
+    })));
     await startTestFlight(page, BASIC_PROBE);
 
     await teleportCraft(page, { posY: 100_000, velX: 3503, bodyId: 'MARS' });
     await waitForOrbit(page);
     await page.waitForFunction(
-      () => (window.__flightState?.commsState?.status ?? window.__flightState?.comms?.status) != null,
+      () => {
+        const fs = (window as unknown as GW).__flightState;
+        return (fs?.commsState?.status ?? fs?.comms?.status) != null;
+      },
       { timeout: 10_000 },
     );
 
     // Inject relay satellites into the game state.
     await page.evaluate(() => {
-      const gs = window.__gameState;
+      const gs = (window as unknown as GW).__gameState;
       if (!gs) return;
-      gs.satelliteNetwork.satellites = [
+      gs.satelliteNetwork!.satellites = [
         { id: 'sat-e1', name: 'EarthRelay-1', partId: 'satellite-relay', satelliteType: 'RELAY', bodyId: 'EARTH', bandId: 'HEO', health: 100, autoMaintain: true, deployedPeriod: 10 },
         { id: 'sat-m1', name: 'MarsRelay-1', partId: 'satellite-relay', satelliteType: 'RELAY', bodyId: 'MARS', bandId: 'HMO', health: 100, autoMaintain: true, deployedPeriod: 15 },
         { id: 'sat-mc1', name: 'MarsComm-1', partId: 'satellite-comm', satelliteType: 'COMMUNICATION', bodyId: 'MARS', bandId: 'LMO', health: 100, autoMaintain: true, deployedPeriod: 15 },
@@ -1503,14 +1662,15 @@ test.describe('Comms range', () => {
     // Wait for comms re-evaluation after injecting satellite infrastructure.
     await page.waitForFunction(
       () => {
-        const s = window.__flightState?.commsState?.status ?? window.__flightState?.comms?.status;
+        const fs = (window as unknown as GW).__flightState;
+        const s = fs?.commsState?.status ?? fs?.comms?.status;
         return s === 'CONNECTED';
       },
       { timeout: 15_000 },
     );
 
     const comms = await page.evaluate(() => {
-      const fs = window.__flightState;
+      const fs = (window as unknown as GW).__flightState;
       return {
         commsStatus: fs?.commsState?.status ?? fs?.comms?.status ?? null,
         controlLocked: fs?.commsState?.controlLocked ?? fs?.comms?.controlLocked ?? false,
@@ -1527,26 +1687,29 @@ test.describe('Comms range', () => {
   test('(10) crewed craft retains control without comms but cannot transmit', async () => {
     test.setTimeout(60_000);
     // Crewed craft at Mars without comms — controls work, transmit doesn't.
-    await seedAndLoadSave(page, fullFixture({
+    await seedAndLoadSave(page, asSave(fullFixture({
       satelliteNetwork: { satellites: [] },
       facilities: {
         ...ALL_FACILITIES,
         [FacilityId.TRACKING_STATION]: { built: true, tier: 1 },
       },
-    }));
+    })));
     await startTestFlight(page, ['cmd-mk1', 'tank-small', 'engine-spark'], { crewIds: ['crew-1'] });
 
     await teleportCraft(page, { posY: 100_000, velX: 3503, bodyId: 'MARS' });
     await waitForOrbit(page);
     await page.waitForFunction(
-      () => (window.__flightState?.commsState?.status ?? window.__flightState?.comms?.status) != null,
+      () => {
+        const fs = (window as unknown as GW).__flightState;
+        return (fs?.commsState?.status ?? fs?.comms?.status) != null;
+      },
       { timeout: 10_000 },
     );
 
     const comms = await page.evaluate(() => {
-      const fs = window.__flightState;
+      const fs = (window as unknown as GW).__flightState;
       return {
-        bodyId: fs?.bodyId,
+        bodyId: fs?.bodyId ?? null,
         isCrewed: (fs?.crewIds?.length ?? 0) > 0,
         commsStatus: fs?.commsState?.status ?? fs?.comms?.status ?? null,
         controlLocked: fs?.commsState?.controlLocked ?? fs?.comms?.controlLocked ?? false,
@@ -1566,7 +1729,7 @@ test.describe('Comms range', () => {
   test('(11) comms coverage data available for map view overlay', async () => {
     test.setTimeout(60_000);
     // Set up with satellites to verify coverage info is computed.
-    await seedAndLoadSave(page, fullFixture({
+    await seedAndLoadSave(page, asSave(fullFixture({
       satelliteNetwork: {
         satellites: [
           { id: 'sat-e1', name: 'EarthComm-1', partId: 'satellite-comm', satelliteType: 'COMMUNICATION', bodyId: 'EARTH', bandId: 'LEO', health: 100, autoMaintain: true, deployedPeriod: 5 },
@@ -1574,24 +1737,24 @@ test.describe('Comms range', () => {
           { id: 'sat-e3', name: 'EarthComm-3', partId: 'satellite-comm', satelliteType: 'COMMUNICATION', bodyId: 'EARTH', bandId: 'LEO', health: 100, autoMaintain: true, deployedPeriod: 5 },
         ],
       },
-    }));
+    })));
 
     // Verify the satellite network data is properly loaded.
     const netInfo = await page.evaluate(() => {
-      const gs = window.__gameState;
+      const gs = (window as unknown as GW).__gameState;
       if (!gs) return null;
       const sats = gs.satelliteNetwork?.satellites ?? [];
-      const earthSats = sats.filter(s => s.bodyId === 'EARTH');
+      const earthSats = sats.filter((s: SatelliteEntry) => s.bodyId === 'EARTH');
       return {
         totalSats: sats.length,
         earthCommSats: earthSats.length,
-        allHealthy: earthSats.every(s => s.health > 0),
+        allHealthy: earthSats.every((s: SatelliteEntry) => s.health > 0),
       };
     });
 
     expect(netInfo).not.toBeNull();
-    expect(netInfo.totalSats).toBe(3);
-    expect(netInfo.earthCommSats).toBe(3);
-    expect(netInfo.allHealthy).toBe(true);
+    expect(netInfo!.totalSats).toBe(3);
+    expect(netInfo!.earthCommSats).toBe(3);
+    expect(netInfo!.allHealthy).toBe(true);
   });
 });

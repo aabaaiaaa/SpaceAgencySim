@@ -637,13 +637,13 @@
 - **Verification**: `npx vitest run src/tests/vabTiers.test.ts`
 
 ### TASK-106: Convert weather.test.ts to strict TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007
 - **Description**: Remove `// @ts-nocheck` from `src/tests/weather.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
 - **Verification**: `npx vitest run src/tests/weather.test.ts`
 
 ### TASK-107: Convert workerBridgeTimeout.test.ts to strict TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007
 - **Description**: Remove `// @ts-nocheck` from `src/tests/workerBridgeTimeout.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
 - **Verification**: `npx vitest run src/tests/workerBridgeTimeout.test.ts`
@@ -651,19 +651,19 @@
 ## Phase D: E2E Spec Conversion
 
 ### TASK-108: Convert additional-systems.spec.js to TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-016, TASK-017
 - **Description**: Rename `e2e/additional-systems.spec.js` to `e2e/additional-systems.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. Use `// @ts-expect-error` for intentional edge cases. See requirements §5.5.
 - **Verification**: `npx playwright test e2e/additional-systems.spec.ts`
 
 ### TASK-109: Convert agency-depth.spec.js to TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-016, TASK-017
 - **Description**: Rename `e2e/agency-depth.spec.js` to `e2e/agency-depth.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
 - **Verification**: `npx playwright test e2e/agency-depth.spec.ts`
 
 ### TASK-110: Convert asteroid-belt.spec.js to TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-016, TASK-017
 - **Description**: Rename `e2e/asteroid-belt.spec.js` to `e2e/asteroid-belt.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
 - **Verification**: `npx playwright test e2e/asteroid-belt.spec.ts`

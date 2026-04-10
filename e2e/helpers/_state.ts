@@ -5,6 +5,7 @@
 import type { Page } from '@playwright/test';
 
 import { SAVE_KEY } from './_constants.js';
+import type { SaveEnvelope } from './_saveFactory.js';
 
 interface PhysicsSnapshot {
   posX: number;
@@ -20,8 +21,8 @@ interface PhysicsSnapshot {
  * Seed localStorage with a save envelope, navigate to '/', load slot 0,
  * and wait for the hub overlay to confirm the game is loaded.
  */
-export async function seedAndLoadSave(page: Page, envelope: Record<string, unknown>): Promise<void> {
-  await page.addInitScript(({ key, envelope }: { key: string; envelope: Record<string, unknown> }) => {
+export async function seedAndLoadSave(page: Page, envelope: SaveEnvelope | Record<string, unknown>): Promise<void> {
+  await page.addInitScript(({ key, envelope }: { key: string; envelope: SaveEnvelope | Record<string, unknown> }) => {
     localStorage.setItem(key, JSON.stringify(envelope));
   }, { key: SAVE_KEY, envelope });
 

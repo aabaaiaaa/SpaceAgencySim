@@ -24,6 +24,7 @@ import {
 import type {
   SaveEnvelope,
   SaveEnvelopeParams,
+  ObjectiveTemplate,
 } from './helpers.js';
 
 // ---------------------------------------------------------------------------
@@ -66,7 +67,7 @@ export const ALL_PARTS: string[] = [
 /** Minimum shape for a mission passed to missionTestFixture. */
 interface MissionFixtureInput {
   id: string;
-  objectives: Record<string, unknown>[];
+  objectives: (ObjectiveTemplate | Record<string, unknown>)[];
   reward: number;
   [key: string]: unknown;
 }
@@ -74,7 +75,7 @@ interface MissionFixtureInput {
 /** Minimum shape for a contract passed to contractTestFixture. */
 interface ContractFixtureInput {
   id: string;
-  objectives: Record<string, unknown>[];
+  objectives: (ObjectiveTemplate | Record<string, unknown>)[];
   reward: number;
   [key: string]: unknown;
 }
