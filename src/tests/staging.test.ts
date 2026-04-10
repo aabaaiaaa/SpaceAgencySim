@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * staging.test.js — Unit tests for the flight staging and debris system (TASK-023).
  *
@@ -34,6 +33,11 @@ import {
 } from '../core/rocketbuilder.ts';
 import { createFlightState } from '../core/gameState.ts';
 
+import type { DebrisState } from '../core/staging.ts';
+import type { PhysicsState } from '../core/physics.ts';
+import type { RocketAssembly, StagingConfig } from '../core/rocketbuilder.ts';
+import type { FlightState, FlightEvent } from '../core/gameState.ts';
+
 // ---------------------------------------------------------------------------
 // Shared fixture helpers
 // ---------------------------------------------------------------------------
@@ -45,7 +49,16 @@ import { createFlightState } from '../core/gameState.ts';
  *     ↕ Small Tank
  *     ↕ Spark Engine      (Stage 1)
  */
-function makeTwoStageRocket() {
+interface TwoStageRocket {
+  assembly: RocketAssembly;
+  staging: StagingConfig;
+  probeId: string;
+  decId: string;
+  tankId: string;
+  engineId: string;
+}
+
+function makeTwoStageRocket(): TwoStageRocket {
   const assembly = createRocketAssembly();
   const staging  = createStagingConfig();
 
@@ -70,7 +83,15 @@ function makeTwoStageRocket() {
  * Minimal uncrewed rocket: Probe Core + Small Tank + Spark Engine.
  * Engine assigned to Stage 1 only.
  */
-function makeSimpleRocket() {
+interface SimpleRocket {
+  assembly: RocketAssembly;
+  staging: StagingConfig;
+  probeId: string;
+  tankId: string;
+  engineId: string;
+}
+
+function makeSimpleRocket(): SimpleRocket {
   const assembly = createRocketAssembly();
   const staging  = createStagingConfig();
 
@@ -88,7 +109,7 @@ function makeSimpleRocket() {
 }
 
 /** Create a minimal FlightState for test use. */
-function makeFlightState() {
+function makeFlightState(): FlightState {
   return createFlightState({ missionId: 'test', rocketId: 'test' });
 }
 
@@ -96,7 +117,7 @@ function makeFlightState() {
  * Build a minimal PhysicsState for test rockets that don't need full physics.
  * Parts are all active; fuel store is populated.
  */
-function makePhysicsState(assembly) {
+function makePhysicsState(assembly: RocketAssembly): PhysicsState {
   return createPhysicsState(assembly, makeFlightState());
 }
 
@@ -123,7 +144,7 @@ describe('activateCurrentStage() — IGNITE (engine)', () => {
     activateCurrentStage(ps, assembly, staging, fs);
 
     const evt = fs.events.find(
-      (e) => e.type === 'PART_ACTIVATED' && e.partType === 'ENGINE',
+      (e: FlightEvent) => e.type === 'PART_ACTIVATED' && e.partType === 'ENGINE',
     );
     expect(evt).toBeDefined();
   });
@@ -272,7 +293,7 @@ describe('activateCurrentStage() — SEPARATE (stack decoupler)', () => {
     activateCurrentStage(ps, assembly, staging, fs); // stage 2
 
     const evt = fs.events.find(
-      (e) => e.type === 'PART_ACTIVATED' && e.description?.includes('separation'),
+      (e: FlightEvent) => e.type === 'PART_ACTIVATED' && e.description?.includes('separation'),
     );
     expect(evt).toBeDefined();
   });
@@ -283,7 +304,7 @@ describe('activateCurrentStage() — SEPARATE (stack decoupler)', () => {
 // ---------------------------------------------------------------------------
 
 describe('activateCurrentStage() — DEPLOY (parachute)', () => {
-  function makeRocketWithChute() {
+  function makeRocketWithChute(): { assembly: RocketAssembly; staging: StagingConfig; cmdId: string; chuteId: string } {
     const assembly = createRocketAssembly();
     const staging  = createStagingConfig();
 
@@ -316,7 +337,7 @@ describe('activateCurrentStage() — DEPLOY (parachute)', () => {
     activateCurrentStage(ps, assembly, staging, fs);
 
     const evt = fs.events.find(
-      (e) => e.type === 'PART_ACTIVATED' && e.partType === 'PARACHUTE',
+      (e: FlightEvent) => e.type === 'PART_ACTIVATED' && e.partType === 'PARACHUTE',
     );
     expect(evt).toBeDefined();
   });
@@ -350,9 +371,9 @@ describe('activateCurrentStage() — EJECT', () => {
 
     activateCurrentStage(ps, assembly, staging, fs);
 
-    const evt = fs.events.find((e) => e.type === 'CREW_EJECTED');
+    const evt = fs.events.find((e: FlightEvent) => e.type === 'CREW_EJECTED');
     expect(evt).toBeDefined();
-    expect(evt.altitude).toBeCloseTo(12_000, 0);
+    expect(evt!.altitude).toBeCloseTo(12_000, 0);
   });
 });
 
@@ -378,9 +399,9 @@ describe('activateCurrentStage() — RELEASE', () => {
 
     activateCurrentStage(ps, assembly, staging, fs);
 
-    const evt = fs.events.find((e) => e.type === 'SATELLITE_RELEASED');
+    const evt = fs.events.find((e: FlightEvent) => e.type === 'SATELLITE_RELEASED');
     expect(evt).toBeDefined();
-    expect(evt.altitude).toBeCloseTo(200_000, 0);
+    expect(evt!.altitude).toBeCloseTo(200_000, 0);
   });
 });
 
@@ -389,7 +410,7 @@ describe('activateCurrentStage() — RELEASE', () => {
 // ---------------------------------------------------------------------------
 
 describe('activateCurrentStage() — RELEASE (satellite debris)', () => {
-  function makeRocketWithSatellite() {
+  function makeRocketWithSatellite(): { assembly: RocketAssembly; staging: StagingConfig; probeId: string; satId: string } {
     const assembly = createRocketAssembly();
     const staging  = createStagingConfig();
 
@@ -421,7 +442,7 @@ describe('activateCurrentStage() — RELEASE (satellite debris)', () => {
     const debris = activateCurrentStage(ps, assembly, staging, fs);
 
     expect(debris.length).toBeGreaterThanOrEqual(1);
-    const satFragment = debris.find((d) => d.activeParts.has(satId));
+    const satFragment = debris.find((d: DebrisState) => d.activeParts.has(satId));
     expect(satFragment).toBeDefined();
   });
 
@@ -435,11 +456,11 @@ describe('activateCurrentStage() — RELEASE (satellite debris)', () => {
 
     activateCurrentStage(ps, assembly, staging, fs);
 
-    const evt = fs.events.find((e) => e.type === 'SATELLITE_RELEASED');
+    const evt = fs.events.find((e: FlightEvent) => e.type === 'SATELLITE_RELEASED');
     expect(evt).toBeDefined();
-    expect(evt.altitude).toBeCloseTo(200_000, 0);
-    expect(typeof evt.velocity).toBe('number');
-    expect(evt.velocity).toBeGreaterThan(0);
+    expect(evt!.altitude).toBeCloseTo(200_000, 0);
+    expect(typeof evt!.velocity).toBe('number');
+    expect(evt!.velocity).toBeGreaterThan(0);
   });
 
   it('satellite debris inherits parent rocket position and velocity', () => {
@@ -452,13 +473,13 @@ describe('activateCurrentStage() — RELEASE (satellite debris)', () => {
     const fs = makeFlightState();
 
     const debris = activateCurrentStage(ps, assembly, staging, fs);
-    const satFragment = debris.find((d) => d.activeParts.has(satId));
+    const satFragment = debris.find((d: DebrisState) => d.activeParts.has(satId));
 
-    expect(satFragment.posX).toBe(100);
+    expect(satFragment!.posX).toBe(100);
     // posY is shifted by renormalization, but satellite and rocket share the same offset
-    expect(Math.abs(satFragment.posY - ps.posY)).toBeLessThan(1);
-    expect(satFragment.velX).toBe(300);
-    expect(satFragment.velY).toBe(150);
+    expect(Math.abs(satFragment!.posY - ps.posY)).toBeLessThan(1);
+    expect(satFragment!.velX).toBe(300);
+    expect(satFragment!.velY).toBe(150);
   });
 });
 
@@ -471,7 +492,7 @@ describe('activateCurrentStage() — SEPARATE with satellite in lower stage', ()
    *   Small Tank
    *   Spark Engine     ← Stage 1
    */
-  function makeRocketWithSatelliteBelow() {
+  function makeRocketWithSatelliteBelow(): { assembly: RocketAssembly; staging: StagingConfig; probeId: string; decId: string; satId: string; tankId: string; engineId: string } {
     const assembly = createRocketAssembly();
     const staging  = createStagingConfig();
 
@@ -504,10 +525,10 @@ describe('activateCurrentStage() — SEPARATE with satellite in lower stage', ()
     activateCurrentStage(ps, assembly, staging, fs); // stage 1: engine ignites
     activateCurrentStage(ps, assembly, staging, fs); // stage 2: decoupler fires
 
-    const evt = fs.events.find((e) => e.type === 'SATELLITE_RELEASED');
+    const evt = fs.events.find((e: FlightEvent) => e.type === 'SATELLITE_RELEASED');
     expect(evt).toBeDefined();
-    expect(evt.altitude).toBeCloseTo(35_000, 0);
-    expect(typeof evt.velocity).toBe('number');
+    expect(evt!.altitude).toBeCloseTo(35_000, 0);
+    expect(typeof evt!.velocity).toBe('number');
   });
 
   it('satellite is in the debris fragment after decoupler fires', () => {
@@ -519,7 +540,7 @@ describe('activateCurrentStage() — SEPARATE with satellite in lower stage', ()
     const debris = activateCurrentStage(ps, assembly, staging, fs); // decoupler
 
     expect(debris.length).toBe(2); // decoupler fragment + disconnected stage
-    const stageFrag = debris.find((d) => d.activeParts.has(satId));
+    const stageFrag = debris.find((d: DebrisState) => d.activeParts.has(satId));
     expect(stageFrag).toBeDefined();
     expect(ps.activeParts.has(satId)).toBe(false);
   });
@@ -557,13 +578,13 @@ describe('activateCurrentStage() — COLLECT_SCIENCE', () => {
 
     activateCurrentStage(ps, assembly, staging, fs);
 
-    expect(fs.events.some((e) => e.type === 'PART_ACTIVATED')).toBe(true);
+    expect(fs.events.some((e: FlightEvent) => e.type === 'PART_ACTIVATED')).toBe(true);
     // SCIENCE_COLLECTED is now deferred until the experiment timer expires
     // in tickScienceModules, so it is NOT emitted on activation.
     const entry = ps.scienceModuleStates?.get(scienceId);
     expect(entry).toBeDefined();
-    expect(entry.state).toBe('running');
-    expect(entry.timer).toBeGreaterThan(0);
+    expect(entry!.state).toBe('running');
+    expect(entry!.timer).toBeGreaterThan(0);
   });
 });
 
@@ -572,7 +593,7 @@ describe('activateCurrentStage() — COLLECT_SCIENCE', () => {
 // ---------------------------------------------------------------------------
 
 describe('activateCurrentStage() — SRB IGNITE', () => {
-  function makeRocketWithSRB() {
+  function makeRocketWithSRB(): { assembly: RocketAssembly; staging: StagingConfig; probeId: string; srbId: string } {
     const assembly = createRocketAssembly();
     const staging  = createStagingConfig();
 
@@ -889,7 +910,7 @@ describe('tickDebris() — SRB thrust on detached stage', () => {
 
     const allDebris = activateCurrentStage(ps, assembly, staging, fs); // Stage 2: separate
     // Find the fragment containing the SRB (not the decoupler fragment).
-    const debris = allDebris.find((d) => d.activeParts.has(srbId));
+    const debris = allDebris.find((d: DebrisState) => d.activeParts.has(srbId))!;
 
     // SRB should now be in debris.firingEngines with fuel remaining.
     expect(debris.firingEngines.has(srbId)).toBe(true);
@@ -922,7 +943,7 @@ describe('liquid engines flame out on debris', () => {
 
     const allDebris = activateCurrentStage(ps, assembly, staging, fs); // stage 2: separate
     // Find the stage fragment (not the decoupler fragment).
-    const stageDebris = allDebris.find((d) => d.activeParts.has(engineId));
+    const stageDebris = allDebris.find((d: DebrisState) => d.activeParts.has(engineId))!;
 
     // Liquid engine should NOT be in debris.firingEngines (no command module).
     expect(stageDebris.firingEngines.has(engineId)).toBe(false);
@@ -940,7 +961,7 @@ describe('liquid engines flame out on debris', () => {
     activateCurrentStage(ps, assembly, staging, fs); // stage 1: engine ignites
     const allDebris = activateCurrentStage(ps, assembly, staging, fs); // stage 2: separate
     // Find the stage fragment containing the engine (not the decoupler).
-    const stageDebris = allDebris.find((d) => d.activeParts.size > 1);
+    const stageDebris = allDebris.find((d: DebrisState) => d.activeParts.size > 1)!;
 
     stageDebris.velY = 0;
     const initialY = stageDebris.posY;
@@ -982,7 +1003,7 @@ describe('fireNextStage() — debris integration via physics.js', () => {
     fireNextStage(ps, assembly, staging, fs); // separate → creates debris
 
     // Pick the stage fragment (not the single-part decoupler).
-    const debris = ps.debris.find((d) => d.activeParts.size > 1) ?? ps.debris[0];
+    const debris = ps.debris.find((d: DebrisState) => d.activeParts.size > 1) ?? ps.debris[0];
     // Clear firing engines so this test isolates gravity-based falling.
     debris.firingEngines.clear();
     debris.posY = 5000;
@@ -1041,7 +1062,7 @@ describe('fireNextStage() — debris integration via physics.js', () => {
 // ---------------------------------------------------------------------------
 
 describe('activateCurrentStage() — DEPLOY (landing legs)', () => {
-  function makeRocketWithLegs() {
+  function makeRocketWithLegs(): { assembly: RocketAssembly; staging: StagingConfig; cmdId: string; legId: string } {
     const assembly = createRocketAssembly();
     const staging  = createStagingConfig();
 
@@ -1074,7 +1095,7 @@ describe('activateCurrentStage() — DEPLOY (landing legs)', () => {
     activateCurrentStage(ps, assembly, staging, fs);
 
     const evt = fs.events.find(
-      (e) => e.type === 'PART_ACTIVATED' && e.partType === 'LANDING_LEGS',
+      (e: FlightEvent) => e.type === 'PART_ACTIVATED' && e.partType === 'LANDING_LEGS',
     );
     expect(evt).toBeDefined();
   });
@@ -1094,7 +1115,7 @@ describe('activateCurrentStage() — DEPLOY (landing legs)', () => {
 // ---------------------------------------------------------------------------
 
 describe('activateCurrentStage() — SEPARATE (launch clamp)', () => {
-  function makeRocketWithClamp() {
+  function makeRocketWithClamp(): { assembly: RocketAssembly; staging: StagingConfig; probeId: string; tankId: string; engId: string; clampId: string } {
     const assembly = createRocketAssembly();
     const staging  = createStagingConfig();
 
@@ -1123,7 +1144,7 @@ describe('activateCurrentStage() — SEPARATE (launch clamp)', () => {
     activateCurrentStage(ps, assembly, staging, fs); // stage 1: engine
     activateCurrentStage(ps, assembly, staging, fs); // stage 2: clamp release
 
-    const evt = fs.events.find((e) => e.type === 'LAUNCH_CLAMP_RELEASED');
+    const evt = fs.events.find((e: FlightEvent) => e.type === 'LAUNCH_CLAMP_RELEASED');
     expect(evt).toBeDefined();
   });
 
@@ -1135,11 +1156,11 @@ describe('activateCurrentStage() — SEPARATE (launch clamp)', () => {
     activateCurrentStage(ps, assembly, staging, fs); // engine
     const debris = activateCurrentStage(ps, assembly, staging, fs); // clamp
 
-    const clampDebris = debris.find((d) => d.activeParts.has(clampId));
+    const clampDebris = debris.find((d: DebrisState) => d.activeParts.has(clampId));
     expect(clampDebris).toBeDefined();
     // Clamp at x=-30 (left side) should swing left (negative velX).
-    expect(clampDebris.velX).not.toBe(0);
-    expect(clampDebris.angularVelocity).not.toBe(0);
+    expect(clampDebris!.velX).not.toBe(0);
+    expect(clampDebris!.angularVelocity).not.toBe(0);
   });
 });
 
@@ -1293,7 +1314,7 @@ describe('activatePartDirect() — IGNITE', () => {
     activatePartDirect(ps, assembly, fs, engineId);
 
     const evt = fs.events.find(
-      (e) => e.type === 'PART_ACTIVATED' && e.description?.includes('ignited'),
+      (e: FlightEvent) => e.type === 'PART_ACTIVATED' && e.description?.includes('ignited'),
     );
     expect(evt).toBeDefined();
   });
@@ -1333,7 +1354,7 @@ describe('activatePartDirect() — SEPARATE', () => {
     // Decoupler should no longer be in activeParts.
     expect(ps.activeParts.has(decId)).toBe(false);
     // Tank and engine should be in a debris fragment.
-    const stageFrag = debris.find((d) => d.activeParts.has(tankId));
+    const stageFrag = debris.find((d: DebrisState) => d.activeParts.has(tankId));
     expect(stageFrag).toBeDefined();
   });
 
@@ -1354,7 +1375,7 @@ describe('activatePartDirect() — SEPARATE', () => {
 
     activatePartDirect(ps, assembly, fs, decId);
 
-    const evt = fs.events.find((e) => e.type === 'SATELLITE_RELEASED');
+    const evt = fs.events.find((e: FlightEvent) => e.type === 'SATELLITE_RELEASED');
     expect(evt).toBeDefined();
   });
 });
@@ -1375,7 +1396,7 @@ describe('activatePartDirect() — DEPLOY (landing legs)', () => {
     expect(debris).toHaveLength(0);
 
     const evt = fs.events.find(
-      (e) => e.type === 'PART_ACTIVATED' && e.partType === 'LANDING_LEGS',
+      (e: FlightEvent) => e.type === 'PART_ACTIVATED' && e.partType === 'LANDING_LEGS',
     );
     expect(evt).toBeDefined();
   });
@@ -1396,12 +1417,12 @@ describe('activatePartDirect() — RELEASE (satellite)', () => {
     const debris = activatePartDirect(ps, assembly, fs, satId);
 
     expect(debris.length).toBeGreaterThanOrEqual(1);
-    const satFrag = debris.find((d) => d.activeParts.has(satId));
+    const satFrag = debris.find((d: DebrisState) => d.activeParts.has(satId));
     expect(satFrag).toBeDefined();
 
-    const evt = fs.events.find((e) => e.type === 'SATELLITE_RELEASED');
+    const evt = fs.events.find((e: FlightEvent) => e.type === 'SATELLITE_RELEASED');
     expect(evt).toBeDefined();
-    expect(evt.velocity).toBeGreaterThan(0);
+    expect(evt!.velocity).toBeGreaterThan(0);
   });
 });
 

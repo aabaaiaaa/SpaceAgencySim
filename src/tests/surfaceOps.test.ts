@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * surfaceOps.test.js — Unit tests for the surface operations system.
  *
@@ -16,6 +15,8 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
+import type { GameState, FlightState, SurfaceItem } from '../core/gameState.ts';
+import type { PhysicsState, RocketAssembly, PlacedPart } from '../core/physics.ts';
 import {
   plantFlag,
   collectSurfaceSample,
@@ -40,12 +41,24 @@ import {
   SatelliteType,
 } from '../core/constants.ts';
 
+interface SurfaceActionResult {
+  success: boolean;
+  reason?: string;
+  item?: SurfaceItem;
+}
+
+interface SurfaceAction {
+  id: string;
+  label: string;
+  enabled: boolean;
+  reason?: string;
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Create a minimal physics state simulating a landed rocket. */
-function makeLandedPS(posX = 100) {
+function makeLandedPS(posX = 100): Partial<PhysicsState> {
   return {
     landed: true,
     crashed: false,
@@ -54,12 +67,11 @@ function makeLandedPS(posX = 100) {
     posY: 0,
     velX: 0,
     velY: 0,
-    activeParts: new Set([0, 1, 2]),
+    activeParts: new Set(['0', '1', '2']),
   };
 }
 
-/** Create a minimal physics state simulating a flying rocket (not landed). */
-function makeFlyingPS() {
+function makeFlyingPS(): Partial<PhysicsState> {
   return {
     landed: false,
     crashed: false,
@@ -68,12 +80,11 @@ function makeFlyingPS() {
     posY: 5000,
     velX: 100,
     velY: 50,
-    activeParts: new Set([0, 1]),
+    activeParts: new Set(['0', '1']),
   };
 }
 
-/** Create a crewed flight state. */
-function makeCrewedFlightState(bodyId = 'MOON') {
+function makeCrewedFlightState(bodyId = 'MOON'): Partial<FlightState> {
   return {
     missionId: 'test-mission',
     rocketId: 'test-rocket',
@@ -82,12 +93,11 @@ function makeCrewedFlightState(bodyId = 'MOON') {
     altitude: 0,
     velocity: 0,
     events: [],
-    bodyId,
+    bodyId: bodyId as FlightState['bodyId'],
   };
 }
 
-/** Create an uncrewed flight state. */
-function makeUncrewedFlightState(bodyId = 'MOON') {
+function makeUncrewedFlightState(bodyId = 'MOON'): Partial<FlightState> {
   return {
     missionId: 'test-mission',
     rocketId: 'test-rocket',
@@ -96,27 +106,25 @@ function makeUncrewedFlightState(bodyId = 'MOON') {
     altitude: 0,
     velocity: 0,
     events: [],
-    bodyId,
+    bodyId: bodyId as FlightState['bodyId'],
   };
 }
 
-/** Create a mock assembly with a science module (SERVICE_MODULE). */
-function makeAssemblyWithScience() {
+function makeAssemblyWithScience(): Partial<RocketAssembly> {
   return {
-    parts: new Map([
-      [0, { partId: 'cmd-mk1', type: PartType.COMMAND_MODULE }],
-      [1, { partId: 'tank-small', type: PartType.FUEL_TANK }],
-      [2, { partId: 'science-module-mk1', type: PartType.SERVICE_MODULE }],
+    parts: new Map<string, PlacedPart>([
+      ['0', { instanceId: '0', partId: 'cmd-mk1', x: 0, y: 0 }],
+      ['1', { instanceId: '1', partId: 'tank-small', x: 0, y: 0 }],
+      ['2', { instanceId: '2', partId: 'science-module-mk1', x: 0, y: 0 }],
     ]),
   };
 }
 
-/** Create a mock assembly without a science module. */
-function makeAssemblyWithoutScience() {
+function makeAssemblyWithoutScience(): Partial<RocketAssembly> {
   return {
-    parts: new Map([
-      [0, { partId: 'cmd-mk1', type: PartType.COMMAND_MODULE }],
-      [1, { partId: 'tank-small', type: PartType.FUEL_TANK }],
+    parts: new Map<string, PlacedPart>([
+      ['0', { instanceId: '0', partId: 'cmd-mk1', x: 0, y: 0 }],
+      ['1', { instanceId: '1', partId: 'tank-small', x: 0, y: 0 }],
     ]),
   };
 }
@@ -126,8 +134,7 @@ function makeAssemblyWithoutScience() {
 // ---------------------------------------------------------------------------
 
 describe('surfaceOps', () => {
-  /** @type {import('../core/gameState.js').GameState} */
-  let state;
+  let state: GameState;
 
   beforeEach(() => {
     state = createGameState();
@@ -140,21 +147,21 @@ describe('surfaceOps', () => {
 
   describe('plantFlag()', () => {
     it('plants a flag on a body when crewed and landed', () => {
-      const ps = makeLandedPS();
-      const fs = makeCrewedFlightState('MOON');
+      const ps = makeLandedPS() as PhysicsState;
+      const fs = makeCrewedFlightState('MOON') as FlightState;
 
-      const result = plantFlag(state, fs, ps);
+      const result: SurfaceActionResult = plantFlag(state, fs, ps);
 
       expect(result.success).toBe(true);
       expect(result.item).toBeDefined();
-      expect(result.item.type).toBe(SurfaceItemType.FLAG);
-      expect(result.item.bodyId).toBe('MOON');
+      expect(result.item!.type).toBe(SurfaceItemType.FLAG);
+      expect(result.item!.bodyId).toBe('MOON');
       expect(state.surfaceItems).toHaveLength(1);
     });
 
     it('awards milestone bonus cash and reputation', () => {
-      const ps = makeLandedPS();
-      const fs = makeCrewedFlightState('MOON');
+      const ps = makeLandedPS() as PhysicsState;
+      const fs = makeCrewedFlightState('MOON') as FlightState;
       const cashBefore = state.money;
       const repBefore = state.reputation;
 
@@ -165,8 +172,8 @@ describe('surfaceOps', () => {
     });
 
     it('adds a flight event', () => {
-      const ps = makeLandedPS();
-      const fs = makeCrewedFlightState('MOON');
+      const ps = makeLandedPS() as PhysicsState;
+      const fs = makeCrewedFlightState('MOON') as FlightState;
 
       plantFlag(state, fs, ps);
 
@@ -175,41 +182,41 @@ describe('surfaceOps', () => {
     });
 
     it('rejects planting a second flag on the same body', () => {
-      const ps = makeLandedPS();
-      const fs = makeCrewedFlightState('MOON');
+      const ps = makeLandedPS() as PhysicsState;
+      const fs = makeCrewedFlightState('MOON') as FlightState;
 
       plantFlag(state, fs, ps);
-      const result = plantFlag(state, fs, ps);
+      const result: SurfaceActionResult = plantFlag(state, fs, ps);
 
       expect(result.success).toBe(false);
       expect(result.reason).toContain('already planted');
     });
 
     it('allows planting flags on different bodies', () => {
-      const ps = makeLandedPS();
+      const ps = makeLandedPS() as PhysicsState;
 
-      plantFlag(state, makeCrewedFlightState('MOON'), ps);
-      const result = plantFlag(state, makeCrewedFlightState('MARS'), ps);
+      plantFlag(state, makeCrewedFlightState('MOON') as FlightState, ps);
+      const result: SurfaceActionResult = plantFlag(state, makeCrewedFlightState('MARS') as FlightState, ps);
 
       expect(result.success).toBe(true);
       expect(state.surfaceItems).toHaveLength(2);
     });
 
     it('rejects uncrewed flights', () => {
-      const ps = makeLandedPS();
-      const fs = makeUncrewedFlightState('MOON');
+      const ps = makeLandedPS() as PhysicsState;
+      const fs = makeUncrewedFlightState('MOON') as FlightState;
 
-      const result = plantFlag(state, fs, ps);
+      const result: SurfaceActionResult = plantFlag(state, fs, ps);
 
       expect(result.success).toBe(false);
       expect(result.reason).toContain('Crew');
     });
 
     it('rejects when not landed', () => {
-      const ps = makeFlyingPS();
-      const fs = makeCrewedFlightState('MOON');
+      const ps = makeFlyingPS() as PhysicsState;
+      const fs = makeCrewedFlightState('MOON') as FlightState;
 
-      const result = plantFlag(state, fs, ps);
+      const result: SurfaceActionResult = plantFlag(state, fs, ps);
 
       expect(result.success).toBe(false);
       expect(result.reason).toContain('landed');
@@ -222,31 +229,31 @@ describe('surfaceOps', () => {
 
   describe('collectSurfaceSample()', () => {
     it('collects a sample when crewed and landed', () => {
-      const ps = makeLandedPS();
-      const fs = makeCrewedFlightState('MARS');
+      const ps = makeLandedPS() as PhysicsState;
+      const fs = makeCrewedFlightState('MARS') as FlightState;
 
-      const result = collectSurfaceSample(state, fs, ps);
+      const result: SurfaceActionResult = collectSurfaceSample(state, fs, ps);
 
       expect(result.success).toBe(true);
-      expect(result.item.type).toBe(SurfaceItemType.SURFACE_SAMPLE);
-      expect(result.item.collected).toBe(false);
+      expect(result.item!.type).toBe(SurfaceItemType.SURFACE_SAMPLE);
+      expect(result.item!.collected).toBe(false);
     });
 
     it('rejects uncrewed flights', () => {
-      const ps = makeLandedPS();
-      const fs = makeUncrewedFlightState('MARS');
+      const ps = makeLandedPS() as PhysicsState;
+      const fs = makeUncrewedFlightState('MARS') as FlightState;
 
-      const result = collectSurfaceSample(state, fs, ps);
+      const result: SurfaceActionResult = collectSurfaceSample(state, fs, ps);
 
       expect(result.success).toBe(false);
     });
 
     it('allows multiple samples on the same body', () => {
-      const ps = makeLandedPS();
-      const fs = makeCrewedFlightState('MARS');
+      const ps = makeLandedPS() as PhysicsState;
+      const fs = makeCrewedFlightState('MARS') as FlightState;
 
       collectSurfaceSample(state, fs, ps);
-      const result = collectSurfaceSample(state, fs, ps);
+      const result: SurfaceActionResult = collectSurfaceSample(state, fs, ps);
 
       expect(result.success).toBe(true);
       expect(state.surfaceItems).toHaveLength(2);
@@ -259,33 +266,33 @@ describe('surfaceOps', () => {
 
   describe('deploySurfaceInstrument()', () => {
     it('deploys an instrument when science module is present', () => {
-      const ps = makeLandedPS();
-      const fs = makeCrewedFlightState('MOON');
-      const assembly = makeAssemblyWithScience();
+      const ps = makeLandedPS() as PhysicsState;
+      const fs = makeCrewedFlightState('MOON') as FlightState;
+      const assembly = makeAssemblyWithScience() as RocketAssembly;
 
-      const result = deploySurfaceInstrument(state, fs, ps, assembly);
+      const result: SurfaceActionResult = deploySurfaceInstrument(state, fs, ps, assembly);
 
       expect(result.success).toBe(true);
-      expect(result.item.type).toBe(SurfaceItemType.SURFACE_INSTRUMENT);
+      expect(result.item!.type).toBe(SurfaceItemType.SURFACE_INSTRUMENT);
     });
 
     it('rejects when no science module is present', () => {
-      const ps = makeLandedPS();
-      const fs = makeCrewedFlightState('MOON');
-      const assembly = makeAssemblyWithoutScience();
+      const ps = makeLandedPS() as PhysicsState;
+      const fs = makeCrewedFlightState('MOON') as FlightState;
+      const assembly = makeAssemblyWithoutScience() as RocketAssembly;
 
-      const result = deploySurfaceInstrument(state, fs, ps, assembly);
+      const result: SurfaceActionResult = deploySurfaceInstrument(state, fs, ps, assembly);
 
       expect(result.success).toBe(false);
       expect(result.reason).toContain('science module');
     });
 
     it('rejects when not landed', () => {
-      const ps = makeFlyingPS();
-      const fs = makeCrewedFlightState('MOON');
-      const assembly = makeAssemblyWithScience();
+      const ps = makeFlyingPS() as PhysicsState;
+      const fs = makeCrewedFlightState('MOON') as FlightState;
+      const assembly = makeAssemblyWithScience() as RocketAssembly;
 
-      const result = deploySurfaceInstrument(state, fs, ps, assembly);
+      const result: SurfaceActionResult = deploySurfaceInstrument(state, fs, ps, assembly);
 
       expect(result.success).toBe(false);
     });
@@ -297,31 +304,32 @@ describe('surfaceOps', () => {
 
   describe('deployBeacon()', () => {
     it('deploys a beacon when landed', () => {
-      const ps = makeLandedPS();
-      const fs = makeCrewedFlightState('MOON');
+      const ps = makeLandedPS() as PhysicsState;
+      const fs = makeCrewedFlightState('MOON') as FlightState;
 
-      const result = deployBeacon(state, fs, ps);
+      const result: SurfaceActionResult = deployBeacon(state, fs, ps);
 
       expect(result.success).toBe(true);
-      expect(result.item.type).toBe(SurfaceItemType.BEACON);
+      expect(result.item!.type).toBe(SurfaceItemType.BEACON);
     });
 
     it('works for uncrewed flights', () => {
-      const ps = makeLandedPS();
-      const fs = makeUncrewedFlightState('MOON');
+      const ps = makeLandedPS() as PhysicsState;
+      const fs = makeUncrewedFlightState('MOON') as FlightState;
 
-      const result = deployBeacon(state, fs, ps);
+      const result: SurfaceActionResult = deployBeacon(state, fs, ps);
 
       expect(result.success).toBe(true);
     });
 
     it('uses custom beacon name', () => {
-      const ps = makeLandedPS();
-      const fs = makeCrewedFlightState('MOON');
+      const ps = makeLandedPS() as PhysicsState;
+      const fs = makeCrewedFlightState('MOON') as FlightState;
 
-      const result = deployBeacon(state, fs, ps, 'Alpha Base');
+      const result: SurfaceActionResult = deployBeacon(state, fs, ps, 'Alpha Base');
 
-      expect(result.item.label).toBe('Alpha Base');
+      expect(result.success).toBe(true);
+      expect(result.item!.label).toBe('Alpha Base');
     });
   });
 
@@ -335,8 +343,8 @@ describe('surfaceOps', () => {
 
       // Deploy 2 instruments.
       state.surfaceItems = [
-        { id: 'si-1', type: SurfaceItemType.SURFACE_INSTRUMENT, bodyId: 'MOON', posX: 0, deployedPeriod: 0 },
-        { id: 'si-2', type: SurfaceItemType.SURFACE_INSTRUMENT, bodyId: 'MARS', posX: 0, deployedPeriod: 0 },
+        { id: 'si-1', type: SurfaceItemType.SURFACE_INSTRUMENT, bodyId: 'MOON', posX: 0, deployedPeriod: 0 } as SurfaceItem,
+        { id: 'si-2', type: SurfaceItemType.SURFACE_INSTRUMENT, bodyId: 'MARS', posX: 0, deployedPeriod: 0 } as SurfaceItem,
       ];
 
       const result = processSurfaceOps(state);
@@ -347,8 +355,8 @@ describe('surfaceOps', () => {
 
     it('does not award science for non-instrument items', () => {
       state.surfaceItems = [
-        { id: 'f-1', type: SurfaceItemType.FLAG, bodyId: 'MOON', posX: 0, deployedPeriod: 0 },
-        { id: 'b-1', type: SurfaceItemType.BEACON, bodyId: 'MOON', posX: 0, deployedPeriod: 0 },
+        { id: 'f-1', type: SurfaceItemType.FLAG, bodyId: 'MOON', posX: 0, deployedPeriod: 0 } as SurfaceItem,
+        { id: 'b-1', type: SurfaceItemType.BEACON, bodyId: 'MOON', posX: 0, deployedPeriod: 0 } as SurfaceItem,
       ];
 
       const result = processSurfaceOps(state);
@@ -364,8 +372,8 @@ describe('surfaceOps', () => {
   describe('processSampleReturns()', () => {
     it('awards science for uncollected samples on safe Earth landing', () => {
       state.surfaceItems = [
-        { id: 's-1', type: SurfaceItemType.SURFACE_SAMPLE, bodyId: 'MOON', posX: 0, deployedPeriod: 0, collected: false },
-        { id: 's-2', type: SurfaceItemType.SURFACE_SAMPLE, bodyId: 'MARS', posX: 0, deployedPeriod: 0, collected: false },
+        { id: 's-1', type: SurfaceItemType.SURFACE_SAMPLE, bodyId: 'MOON', posX: 0, deployedPeriod: 0, collected: false } as SurfaceItem,
+        { id: 's-2', type: SurfaceItemType.SURFACE_SAMPLE, bodyId: 'MARS', posX: 0, deployedPeriod: 0, collected: false } as SurfaceItem,
       ];
 
       const result = processSampleReturns(state, 'EARTH');
@@ -378,7 +386,7 @@ describe('surfaceOps', () => {
 
     it('does not process samples when landing on non-Earth body', () => {
       state.surfaceItems = [
-        { id: 's-1', type: SurfaceItemType.SURFACE_SAMPLE, bodyId: 'MOON', posX: 0, deployedPeriod: 0, collected: false },
+        { id: 's-1', type: SurfaceItemType.SURFACE_SAMPLE, bodyId: 'MOON', posX: 0, deployedPeriod: 0, collected: false } as SurfaceItem,
       ];
 
       const result = processSampleReturns(state, 'MOON');
@@ -389,8 +397,8 @@ describe('surfaceOps', () => {
 
     it('skips already-collected samples', () => {
       state.surfaceItems = [
-        { id: 's-1', type: SurfaceItemType.SURFACE_SAMPLE, bodyId: 'MOON', posX: 0, deployedPeriod: 0, collected: true },
-        { id: 's-2', type: SurfaceItemType.SURFACE_SAMPLE, bodyId: 'MARS', posX: 0, deployedPeriod: 0, collected: false },
+        { id: 's-1', type: SurfaceItemType.SURFACE_SAMPLE, bodyId: 'MOON', posX: 0, deployedPeriod: 0, collected: true } as SurfaceItem,
+        { id: 's-2', type: SurfaceItemType.SURFACE_SAMPLE, bodyId: 'MARS', posX: 0, deployedPeriod: 0, collected: false } as SurfaceItem,
       ];
 
       const result = processSampleReturns(state, 'EARTH');
@@ -405,60 +413,60 @@ describe('surfaceOps', () => {
 
   describe('getAvailableSurfaceActions()', () => {
     it('returns all actions when crewed with science module and landed', () => {
-      const ps = makeLandedPS();
-      const fs = makeCrewedFlightState('MOON');
-      const assembly = makeAssemblyWithScience();
+      const ps = makeLandedPS() as PhysicsState;
+      const fs = makeCrewedFlightState('MOON') as FlightState;
+      const assembly = makeAssemblyWithScience() as RocketAssembly;
 
-      const actions = getAvailableSurfaceActions(state, fs, ps, assembly);
+      const actions: SurfaceAction[] = getAvailableSurfaceActions(state, fs, ps, assembly);
 
       expect(actions).toHaveLength(4);
-      expect(actions.find(a => a.id === 'plant-flag').enabled).toBe(true);
-      expect(actions.find(a => a.id === 'collect-sample').enabled).toBe(true);
-      expect(actions.find(a => a.id === 'deploy-instrument').enabled).toBe(true);
-      expect(actions.find(a => a.id === 'deploy-beacon').enabled).toBe(true);
+      expect(actions.find(a => a.id === 'plant-flag')!.enabled).toBe(true);
+      expect(actions.find(a => a.id === 'collect-sample')!.enabled).toBe(true);
+      expect(actions.find(a => a.id === 'deploy-instrument')!.enabled).toBe(true);
+      expect(actions.find(a => a.id === 'deploy-beacon')!.enabled).toBe(true);
     });
 
     it('disables flag after already planted', () => {
-      const ps = makeLandedPS();
-      const fs = makeCrewedFlightState('MOON');
-      const assembly = makeAssemblyWithScience();
+      const ps = makeLandedPS() as PhysicsState;
+      const fs = makeCrewedFlightState('MOON') as FlightState;
+      const assembly = makeAssemblyWithScience() as RocketAssembly;
 
       plantFlag(state, fs, ps);
-      const actions = getAvailableSurfaceActions(state, fs, ps, assembly);
+      const actions: SurfaceAction[] = getAvailableSurfaceActions(state, fs, ps, assembly);
 
-      expect(actions.find(a => a.id === 'plant-flag').enabled).toBe(false);
+      expect(actions.find(a => a.id === 'plant-flag')!.enabled).toBe(false);
     });
 
     it('disables crew-only actions for uncrewed flights', () => {
-      const ps = makeLandedPS();
-      const fs = makeUncrewedFlightState('MOON');
-      const assembly = makeAssemblyWithScience();
+      const ps = makeLandedPS() as PhysicsState;
+      const fs = makeUncrewedFlightState('MOON') as FlightState;
+      const assembly = makeAssemblyWithScience() as RocketAssembly;
 
-      const actions = getAvailableSurfaceActions(state, fs, ps, assembly);
+      const actions: SurfaceAction[] = getAvailableSurfaceActions(state, fs, ps, assembly);
 
-      expect(actions.find(a => a.id === 'plant-flag').enabled).toBe(false);
-      expect(actions.find(a => a.id === 'collect-sample').enabled).toBe(false);
+      expect(actions.find(a => a.id === 'plant-flag')!.enabled).toBe(false);
+      expect(actions.find(a => a.id === 'collect-sample')!.enabled).toBe(false);
       // Instrument and beacon should still work.
-      expect(actions.find(a => a.id === 'deploy-instrument').enabled).toBe(true);
-      expect(actions.find(a => a.id === 'deploy-beacon').enabled).toBe(true);
+      expect(actions.find(a => a.id === 'deploy-instrument')!.enabled).toBe(true);
+      expect(actions.find(a => a.id === 'deploy-beacon')!.enabled).toBe(true);
     });
 
     it('disables instrument without science module', () => {
-      const ps = makeLandedPS();
-      const fs = makeCrewedFlightState('MOON');
-      const assembly = makeAssemblyWithoutScience();
+      const ps = makeLandedPS() as PhysicsState;
+      const fs = makeCrewedFlightState('MOON') as FlightState;
+      const assembly = makeAssemblyWithoutScience() as RocketAssembly;
 
-      const actions = getAvailableSurfaceActions(state, fs, ps, assembly);
+      const actions: SurfaceAction[] = getAvailableSurfaceActions(state, fs, ps, assembly);
 
-      expect(actions.find(a => a.id === 'deploy-instrument').enabled).toBe(false);
+      expect(actions.find(a => a.id === 'deploy-instrument')!.enabled).toBe(false);
     });
 
     it('returns empty array when not landed', () => {
-      const ps = makeFlyingPS();
-      const fs = makeCrewedFlightState('MOON');
-      const assembly = makeAssemblyWithScience();
+      const ps = makeFlyingPS() as PhysicsState;
+      const fs = makeCrewedFlightState('MOON') as FlightState;
+      const assembly = makeAssemblyWithScience() as RocketAssembly;
 
-      const actions = getAvailableSurfaceActions(state, fs, ps, assembly);
+      const actions: SurfaceAction[] = getAvailableSurfaceActions(state, fs, ps, assembly);
 
       expect(actions).toHaveLength(0);
     });
@@ -533,13 +541,13 @@ describe('surfaceOps', () => {
   describe('getSurfaceItemsAtBody()', () => {
     it('filters items by body', () => {
       state.surfaceItems = [
-        { id: '1', type: SurfaceItemType.FLAG, bodyId: 'MOON', posX: 0, deployedPeriod: 0 },
-        { id: '2', type: SurfaceItemType.FLAG, bodyId: 'MARS', posX: 0, deployedPeriod: 0 },
-        { id: '3', type: SurfaceItemType.BEACON, bodyId: 'MOON', posX: 50, deployedPeriod: 0 },
+        { id: '1', type: SurfaceItemType.FLAG, bodyId: 'MOON', posX: 0, deployedPeriod: 0 } as SurfaceItem,
+        { id: '2', type: SurfaceItemType.FLAG, bodyId: 'MARS', posX: 0, deployedPeriod: 0 } as SurfaceItem,
+        { id: '3', type: SurfaceItemType.BEACON, bodyId: 'MOON', posX: 50, deployedPeriod: 0 } as SurfaceItem,
       ];
 
-      const moonItems = getSurfaceItemsAtBody(state, 'MOON');
-      const marsItems = getSurfaceItemsAtBody(state, 'MARS');
+      const moonItems: SurfaceItem[] = getSurfaceItemsAtBody(state, 'MOON');
+      const marsItems: SurfaceItem[] = getSurfaceItemsAtBody(state, 'MARS');
 
       expect(moonItems).toHaveLength(2);
       expect(marsItems).toHaveLength(1);
@@ -560,8 +568,8 @@ describe('surfaceOps', () => {
     });
 
     it('returns true after planting a flag', () => {
-      const ps = makeLandedPS();
-      const fs = makeCrewedFlightState('MOON');
+      const ps = makeLandedPS() as PhysicsState;
+      const fs = makeCrewedFlightState('MOON') as FlightState;
       plantFlag(state, fs, ps);
 
       expect(hasFlag(state, 'MOON')).toBe(true);

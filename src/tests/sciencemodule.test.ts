@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * sciencemodule.test.js — Unit tests for sciencemodule.js edge cases and
  * behaviours not covered by instruments.test.js.
@@ -50,29 +49,31 @@ import {
   connectParts,
 } from '../core/rocketbuilder.ts';
 import { createPhysicsState } from '../core/physics.ts';
+import type { PhysicsState, RocketAssembly, InstrumentStateEntry, ScienceModuleStateEntry } from '../core/physics.ts';
 import { createFlightState } from '../core/gameState.ts';
+import type { FlightState, GameState, FlightEvent, ScienceLogEntry, CrewMember, FacilityState } from '../core/gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
 
-function makeFlightState(overrides = {}) {
-  return { ...createFlightState({ missionId: 'test', rocketId: 'test' }), ...overrides };
+function makeFlightState(overrides: Partial<FlightState & { _gameState?: Partial<GameState> }> = {}): FlightState {
+  return { ...createFlightState({ missionId: 'test', rocketId: 'test' }), ...overrides } as FlightState;
 }
 
-function makeAssemblyWithInstruments(instrumentIds) {
+function makeAssemblyWithInstruments(instrumentIds: string[]): { assembly: RocketAssembly; probeId: string; scienceId: string } {
   const assembly = createRocketAssembly();
   const probeId = addPartToAssembly(assembly, 'probe-core-mk1', 0, 60);
   const scienceId = addPartToAssembly(assembly, 'science-module-mk1', 0, 100);
   connectParts(assembly, probeId, 1, scienceId, 0);
 
-  const placed = assembly.parts.get(scienceId);
+  const placed = assembly.parts.get(scienceId)!;
   placed.instruments = [...instrumentIds];
 
   return { assembly, probeId, scienceId };
 }
 
-function makeLegacyAssembly() {
+function makeLegacyAssembly(): { assembly: RocketAssembly; probeId: string; scienceId: string } {
   const assembly = createRocketAssembly();
   const probeId = addPartToAssembly(assembly, 'probe-core-mk1', 0, 60);
   const scienceId = addPartToAssembly(assembly, 'science-module-mk1', 0, 100);
@@ -81,23 +82,30 @@ function makeLegacyAssembly() {
   return { assembly, probeId, scienceId };
 }
 
-function makePhysicsState(assembly, altitude = 0) {
+function makePhysicsState(assembly: RocketAssembly, altitude: number = 0): PhysicsState {
   const ps = createPhysicsState(assembly, makeFlightState());
   ps.posY = altitude;
   return ps;
 }
 
-function makeGameState(overrides = {}) {
+interface TestGameStateOverrides {
+  scienceLog?: ScienceLogEntry[];
+  sciencePoints?: number;
+  crew?: Array<{ id: string; skills: Partial<CrewMember['skills']> }>;
+  facilities?: Record<string, FacilityState>;
+}
+
+function makeGameState(overrides: TestGameStateOverrides = {}): GameState {
   return {
     scienceLog: [],
     sciencePoints: 0,
     crew: [],
     facilities: {},
     ...overrides,
-  };
+  } as GameState;
 }
 
-function makeGameStateWithRdLab(tier) {
+function makeGameStateWithRdLab(tier: number): GameState {
   return makeGameState({
     facilities: {
       [FacilityId.RD_LAB]: { built: true, tier },
@@ -105,7 +113,7 @@ function makeGameStateWithRdLab(tier) {
   });
 }
 
-function makeGameStateWithCrew(scienceSkill) {
+function makeGameStateWithCrew(scienceSkill: number): GameState {
   return makeGameState({
     crew: [{ id: 'crew-1', skills: { science: scienceSkill } }],
   });
@@ -132,7 +140,7 @@ describe('Malfunction blocking', () => {
     const result = activateInstrument(ps, assembly, fs, key);
 
     expect(result).toBe(false);
-    expect(ps.instrumentStates.get(key).state).toBe(ScienceModuleState.IDLE);
+    expect(ps.instrumentStates.get(key)!.state).toBe(ScienceModuleState.IDLE);
   });
 
   it('allows activation after malfunction is recovered', () => {
@@ -150,7 +158,7 @@ describe('Malfunction blocking', () => {
     const result = activateInstrument(ps, assembly, fs, key);
 
     expect(result).toBe(true);
-    expect(ps.instrumentStates.get(key).state).toBe(ScienceModuleState.RUNNING);
+    expect(ps.instrumentStates.get(key)!.state).toBe(ScienceModuleState.RUNNING);
   });
 
   it('allows activation when malfunction type is not SCIENCE_INSTRUMENT_FAILURE', () => {
@@ -186,8 +194,8 @@ describe('Crew science skill', () => {
     const key = getInstrumentKey(scienceId, 0);
     activateInstrument(ps, assembly, fs, key);
 
-    const entry = ps.instrumentStates.get(key);
-    const baseDuration = getInstrumentById('thermometer-mk1').experimentDuration; // 10s
+    const entry = ps.instrumentStates.get(key)!;
+    const baseDuration = getInstrumentById('thermometer-mk1')!.experimentDuration; // 10s
     // At 100 skill: durationFactor = 1 - (100/100) * (1/3) ≈ 0.6667
     const expected = baseDuration * (2 / 3);
     expect(entry.timer).toBeCloseTo(expected, 1);
@@ -203,8 +211,8 @@ describe('Crew science skill', () => {
     const key = getInstrumentKey(scienceId, 0);
     activateInstrument(ps, assembly, fs, key);
 
-    const baseDuration = getInstrumentById('thermometer-mk1').experimentDuration;
-    expect(ps.instrumentStates.get(key).timer).toBe(baseDuration);
+    const baseDuration = getInstrumentById('thermometer-mk1')!.experimentDuration;
+    expect(ps.instrumentStates.get(key)!.timer).toBe(baseDuration);
   });
 
   it('reduces duration proportionally at 50 skill', () => {
@@ -217,10 +225,10 @@ describe('Crew science skill', () => {
     const key = getInstrumentKey(scienceId, 0);
     activateInstrument(ps, assembly, fs, key);
 
-    const baseDuration = getInstrumentById('thermometer-mk1').experimentDuration;
+    const baseDuration = getInstrumentById('thermometer-mk1')!.experimentDuration;
     // At 50 skill: factor = 1 - (50/100) * (1/3) = 1 - 1/6 ≈ 0.8333
     const expected = baseDuration * (5 / 6);
-    expect(ps.instrumentStates.get(key).timer).toBeCloseTo(expected, 1);
+    expect(ps.instrumentStates.get(key)!.timer).toBeCloseTo(expected, 1);
   });
 
   it('uses highest crew member science skill', () => {
@@ -239,10 +247,10 @@ describe('Crew science skill', () => {
     const key = getInstrumentKey(scienceId, 0);
     activateInstrument(ps, assembly, fs, key);
 
-    const baseDuration = getInstrumentById('thermometer-mk1').experimentDuration;
+    const baseDuration = getInstrumentById('thermometer-mk1')!.experimentDuration;
     // Best skill = 80: factor = 1 - (80/100) * (1/3) = 1 - 0.2667 ≈ 0.7333
     const expected = baseDuration * (1 - (80 / 100) * (1 / 3));
-    expect(ps.instrumentStates.get(key).timer).toBeCloseTo(expected, 1);
+    expect(ps.instrumentStates.get(key)!.timer).toBeCloseTo(expected, 1);
   });
 });
 
@@ -253,7 +261,7 @@ describe('Crew science skill', () => {
 describe('R&D Lab science bonus', () => {
   it('applies tier 1 bonus (+10%) to yield', () => {
     const gs = makeGameStateWithRdLab(1);
-    const baseYield = getInstrumentById('thermometer-mk1').baseYield;
+    const baseYield = getInstrumentById('thermometer-mk1')!.baseYield;
 
     const yield_ = calculateYield('thermometer-mk1', 'GROUND', 1.0, 0, gs);
     // base * biome * skill(1.0) * diminish(1.0) * (1 + 0.10) = 5 * 1.1 = 5.5
@@ -262,7 +270,7 @@ describe('R&D Lab science bonus', () => {
 
   it('applies tier 2 bonus (+20%) to yield', () => {
     const gs = makeGameStateWithRdLab(2);
-    const baseYield = getInstrumentById('thermometer-mk1').baseYield;
+    const baseYield = getInstrumentById('thermometer-mk1')!.baseYield;
 
     const yield_ = calculateYield('thermometer-mk1', 'GROUND', 1.0, 0, gs);
     expect(yield_).toBeCloseTo(baseYield * 1.20, 2);
@@ -270,7 +278,7 @@ describe('R&D Lab science bonus', () => {
 
   it('applies tier 3 bonus (+30%) to yield', () => {
     const gs = makeGameStateWithRdLab(3);
-    const baseYield = getInstrumentById('thermometer-mk1').baseYield;
+    const baseYield = getInstrumentById('thermometer-mk1')!.baseYield;
 
     const yield_ = calculateYield('thermometer-mk1', 'GROUND', 1.0, 0, gs);
     expect(yield_).toBeCloseTo(baseYield * 1.30, 2);
@@ -278,7 +286,7 @@ describe('R&D Lab science bonus', () => {
 
   it('applies no bonus when R&D Lab is not built', () => {
     const gs = makeGameState();
-    const baseYield = getInstrumentById('thermometer-mk1').baseYield;
+    const baseYield = getInstrumentById('thermometer-mk1')!.baseYield;
 
     const yield_ = calculateYield('thermometer-mk1', 'GROUND', 1.0, 0, gs);
     expect(yield_).toBeCloseTo(baseYield, 2);
@@ -286,7 +294,7 @@ describe('R&D Lab science bonus', () => {
 
   it('combines R&D bonus with skill and biome multiplier', () => {
     const gs = makeGameStateWithRdLab(2);
-    const baseYield = getInstrumentById('thermometer-mk1').baseYield;
+    const baseYield = getInstrumentById('thermometer-mk1')!.baseYield;
 
     // skill 60 → bonus 1.3, biome 2.0, rdlab +20%
     const yield_ = calculateYield('thermometer-mk1', 'GROUND', 2.0, 60, gs);
@@ -319,15 +327,15 @@ describe('Inactive parts', () => {
 
     const key = getInstrumentKey(scienceId, 0);
     activateInstrument(ps, assembly, fs, key);
-    expect(ps.instrumentStates.get(key).state).toBe(ScienceModuleState.RUNNING);
+    expect(ps.instrumentStates.get(key)!.state).toBe(ScienceModuleState.RUNNING);
 
     // Deactivate the part.
     ps.activeParts.delete(scienceId);
 
-    const timerBefore = ps.instrumentStates.get(key).timer;
+    const timerBefore = ps.instrumentStates.get(key)!.timer;
     tickInstruments(ps, assembly, fs, 5);
     // Timer should not change since part is inactive.
-    expect(ps.instrumentStates.get(key).timer).toBe(timerBefore);
+    expect(ps.instrumentStates.get(key)!.timer).toBe(timerBefore);
   });
 
   it('transmit fails when module is inactive', () => {
@@ -353,13 +361,13 @@ describe('Inactive parts', () => {
     const key = getInstrumentKey(scienceId, 0);
     activateInstrument(ps, assembly, fs, key);
     tickInstruments(ps, assembly, fs, 15);
-    expect(ps.instrumentStates.get(key).state).toBe(ScienceModuleState.COMPLETE);
+    expect(ps.instrumentStates.get(key)!.state).toBe(ScienceModuleState.COMPLETE);
 
     ps.activeParts.delete(scienceId);
     onSafeLanding(ps, assembly, fs, gs);
 
     // Should remain COMPLETE, not transition to DATA_RETURNED.
-    expect(ps.instrumentStates.get(key).state).toBe(ScienceModuleState.COMPLETE);
+    expect(ps.instrumentStates.get(key)!.state).toBe(ScienceModuleState.COMPLETE);
   });
 
   it('hasAnyRunningExperiment ignores inactive parts', () => {
@@ -401,7 +409,7 @@ describe('Legacy module (no instruments)', () => {
     const result = activateScienceModule(ps, assembly, fs, scienceId);
     expect(result).toBe(true);
 
-    const entry = ps.scienceModuleStates.get(scienceId);
+    const entry = ps.scienceModuleStates.get(scienceId)!;
     expect(entry.state).toBe(ScienceModuleState.RUNNING);
     expect(entry.timer).toBeGreaterThan(0);
   });
@@ -421,14 +429,14 @@ describe('Legacy module (no instruments)', () => {
 
     tickInstruments(ps, assembly, fs, 6);
 
-    const entry = ps.scienceModuleStates.get(scienceId);
+    const entry = ps.scienceModuleStates.get(scienceId)!;
     expect(entry.state).toBe(ScienceModuleState.COMPLETE);
     expect(entry.timer).toBe(0);
     expect(entry.completeBiome).toBeDefined();
 
-    const event = fs.events.find((e) => e.type === 'SCIENCE_COLLECTED');
+    const event = fs.events.find((e: FlightEvent) => e.type === 'SCIENCE_COLLECTED');
     expect(event).toBeDefined();
-    expect(event.instanceId).toBe(scienceId);
+    expect(event!.instanceId).toBe(scienceId);
   });
 
   it('legacy module sets scienceModuleRunning flag during tick', () => {
@@ -465,11 +473,11 @@ describe('Legacy module (no instruments)', () => {
 
     onSafeLanding(ps, assembly, fs, gs);
 
-    expect(ps.scienceModuleStates.get(scienceId).state).toBe(ScienceModuleState.DATA_RETURNED);
+    expect(ps.scienceModuleStates.get(scienceId)!.state).toBe(ScienceModuleState.DATA_RETURNED);
 
-    const event = fs.events.find((e) => e.type === 'SCIENCE_DATA_RETURNED');
+    const event = fs.events.find((e: FlightEvent) => e.type === 'SCIENCE_DATA_RETURNED');
     expect(event).toBeDefined();
-    expect(event.instanceId).toBe(scienceId);
+    expect(event!.instanceId).toBe(scienceId);
   });
 
   it('hasAnyRunningExperiment detects running legacy modules', () => {
@@ -508,9 +516,9 @@ describe('Multiple instruments timing', () => {
     // Tick 12s — thermometer should complete, sampler still running.
     tickInstruments(ps, assembly, fs, 12);
 
-    expect(ps.instrumentStates.get(key0).state).toBe(ScienceModuleState.COMPLETE);
-    expect(ps.instrumentStates.get(key1).state).toBe(ScienceModuleState.RUNNING);
-    expect(ps.instrumentStates.get(key1).timer).toBeCloseTo(28, 0);
+    expect(ps.instrumentStates.get(key0)!.state).toBe(ScienceModuleState.COMPLETE);
+    expect(ps.instrumentStates.get(key1)!.state).toBe(ScienceModuleState.RUNNING);
+    expect(ps.instrumentStates.get(key1)!.timer).toBeCloseTo(28, 0);
   });
 
   it('module status shows RUNNING when any instrument is running', () => {
@@ -660,7 +668,7 @@ describe('Transmit edge cases', () => {
 
     // Transmit once.
     transmitInstrument(ps, assembly, fs, key, gs);
-    expect(ps.instrumentStates.get(key).state).toBe(ScienceModuleState.TRANSMITTED);
+    expect(ps.instrumentStates.get(key)!.state).toBe(ScienceModuleState.TRANSMITTED);
 
     // Second transmit fails.
     expect(transmitInstrument(ps, assembly, fs, key, gs)).toBe(0);
@@ -720,14 +728,14 @@ describe('Diminishing returns edge cases', () => {
 
   it('handles null gameState gracefully (no diminishing returns applied)', () => {
     const yield_ = calculateYield('thermometer-mk1', 'GROUND', 1.0, 0, null);
-    const baseYield = getInstrumentById('thermometer-mk1').baseYield;
+    const baseYield = getInstrumentById('thermometer-mk1')!.baseYield;
     // No gameState → priorCount = 0 → DIMINISHING_RETURNS[0] = 1.0, no rdlab bonus.
     expect(yield_).toBeCloseTo(baseYield, 2);
   });
 
   it('cumulative collections degrade yield across multiple flights', () => {
     const gs = makeGameState();
-    const baseYield = getInstrumentById('thermometer-mk1').baseYield;
+    const baseYield = getInstrumentById('thermometer-mk1')!.baseYield;
 
     // First collection.
     const y1 = calculateYield('thermometer-mk1', 'GROUND', 1.0, 0, gs);
@@ -757,53 +765,53 @@ describe('Diminishing returns edge cases', () => {
 
 describe('Null-safety edge cases', () => {
   it('getInstrumentStatus returns IDLE when instrumentStates is undefined', () => {
-    const ps = { instrumentStates: undefined };
+    const ps = { instrumentStates: undefined } as unknown as PhysicsState;
     expect(getInstrumentStatus(ps, 'any:instr:0')).toBe(ScienceModuleState.IDLE);
   });
 
   it('getInstrumentTimer returns 0 when instrumentStates is undefined', () => {
-    const ps = { instrumentStates: undefined };
+    const ps = { instrumentStates: undefined } as unknown as PhysicsState;
     expect(getInstrumentTimer(ps, 'any:instr:0')).toBe(0);
   });
 
   it('getModuleInstrumentKeys returns [] when instrumentStates is undefined', () => {
-    const ps = { instrumentStates: undefined };
+    const ps = { instrumentStates: undefined } as unknown as PhysicsState;
     expect(getModuleInstrumentKeys(ps, 'any')).toEqual([]);
   });
 
   it('tickInstruments is a no-op when instrumentStates is undefined', () => {
-    const ps = { instrumentStates: undefined, scienceModuleStates: undefined, activeParts: new Set() };
+    const ps = { instrumentStates: undefined, scienceModuleStates: undefined, activeParts: new Set<string>() } as unknown as PhysicsState;
     const fs = makeFlightState();
     // Should not throw.
-    expect(() => tickInstruments(ps, { parts: new Map() }, fs, 1)).not.toThrow();
+    expect(() => tickInstruments(ps, { parts: new Map() } as RocketAssembly, fs, 1)).not.toThrow();
   });
 
   it('onSafeLanding handles undefined instrumentStates and scienceModuleStates', () => {
-    const ps = { instrumentStates: undefined, scienceModuleStates: undefined, activeParts: new Set() };
+    const ps = { instrumentStates: undefined, scienceModuleStates: undefined, activeParts: new Set<string>() } as unknown as PhysicsState;
     const fs = makeFlightState();
     const gs = makeGameState();
-    expect(() => onSafeLanding(ps, { parts: new Map() }, fs, gs)).not.toThrow();
+    expect(() => onSafeLanding(ps, { parts: new Map() } as RocketAssembly, fs, gs)).not.toThrow();
   });
 
   it('hasAnyRunningExperiment returns false for empty maps', () => {
     const ps = {
-      instrumentStates: new Map(),
-      scienceModuleStates: new Map(),
-      activeParts: new Set(),
-    };
+      instrumentStates: new Map<string, InstrumentStateEntry>(),
+      scienceModuleStates: new Map<string, ScienceModuleStateEntry>(),
+      activeParts: new Set<string>(),
+    } as unknown as PhysicsState;
     expect(hasAnyRunningExperiment(ps)).toBe(false);
   });
 
   it('activateInstrument returns false when instrumentStates is undefined', () => {
-    const ps = { instrumentStates: undefined, activeParts: new Set() };
+    const ps = { instrumentStates: undefined, activeParts: new Set<string>() } as unknown as PhysicsState;
     const fs = makeFlightState();
-    expect(activateInstrument(ps, { parts: new Map() }, fs, 'any:instr:0')).toBe(false);
+    expect(activateInstrument(ps, { parts: new Map() } as RocketAssembly, fs, 'any:instr:0')).toBe(false);
   });
 
   it('activateAllInstruments returns 0 when instrumentStates is undefined', () => {
-    const ps = { instrumentStates: undefined, activeParts: new Set() };
+    const ps = { instrumentStates: undefined, activeParts: new Set<string>() } as unknown as PhysicsState;
     const fs = makeFlightState();
-    expect(activateAllInstruments(ps, { parts: new Map() }, fs, 'mod-1')).toBe(0);
+    expect(activateAllInstruments(ps, { parts: new Map() } as RocketAssembly, fs, 'mod-1')).toBe(0);
   });
 });
 
@@ -823,20 +831,20 @@ describe('Full instrument lifecycle', () => {
 
     // 1. Activate.
     expect(activateInstrument(ps, assembly, fs, key)).toBe(true);
-    expect(ps.instrumentStates.get(key).state).toBe(ScienceModuleState.RUNNING);
+    expect(ps.instrumentStates.get(key)!.state).toBe(ScienceModuleState.RUNNING);
 
     // 2. Tick to completion.
     tickInstruments(ps, assembly, fs, 45);
-    expect(ps.instrumentStates.get(key).state).toBe(ScienceModuleState.COMPLETE);
+    expect(ps.instrumentStates.get(key)!.state).toBe(ScienceModuleState.COMPLETE);
 
     // 3. Safe landing recovers data.
     onSafeLanding(ps, assembly, fs, gs);
-    expect(ps.instrumentStates.get(key).state).toBe(ScienceModuleState.DATA_RETURNED);
+    expect(ps.instrumentStates.get(key)!.state).toBe(ScienceModuleState.DATA_RETURNED);
 
-    const returnEvent = fs.events.find((e) => e.type === 'SCIENCE_DATA_RETURNED' && e.instrumentKey === key);
+    const returnEvent = fs.events.find((e: FlightEvent) => e.type === 'SCIENCE_DATA_RETURNED' && e.instrumentKey === key);
     expect(returnEvent).toBeDefined();
-    expect(returnEvent.scienceYield).toBeGreaterThan(0);
-    expect(returnEvent.dataType).toBe(ScienceDataType.SAMPLE);
+    expect(returnEvent!.scienceYield).toBeGreaterThan(0);
+    expect(returnEvent!.dataType).toBe(ScienceDataType.SAMPLE);
 
     // 4. Diminishing returns recorded.
     expect(gs.scienceLog.length).toBe(1);
@@ -857,8 +865,8 @@ describe('Full instrument lifecycle', () => {
 
     const fullYield = calculateYield(
       'thermometer-mk1',
-      ps.instrumentStates.get(key).completeBiome,
-      ps.instrumentStates.get(key).scienceMultiplier,
+      ps.instrumentStates.get(key)!.completeBiome,
+      ps.instrumentStates.get(key)!.scienceMultiplier,
       0,
       gs,
     );
@@ -867,6 +875,6 @@ describe('Full instrument lifecycle', () => {
 
     expect(transmitYield).toBeGreaterThan(0);
     expect(transmitYield).toBeLessThan(fullYield);
-    expect(ps.instrumentStates.get(key).state).toBe(ScienceModuleState.TRANSMITTED);
+    expect(ps.instrumentStates.get(key)!.state).toBe(ScienceModuleState.TRANSMITTED);
   });
 });

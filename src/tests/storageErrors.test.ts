@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * storageErrors.test.js — Tests for localStorage quota handling and
  * error logging in saveload.js and designLibrary.js.
@@ -23,24 +22,34 @@ import {
   loadSharedLibrary,
 } from '../core/designLibrary.ts';
 
+import type { GameState, RocketDesign } from '../core/gameState.ts';
+
 // ---------------------------------------------------------------------------
 // localStorage mock with configurable setItem behavior
 // ---------------------------------------------------------------------------
 
-function createLocalStorageMock() {
-  const store = new Map();
+interface MockStorage {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+  clear(): void;
+  readonly length: number;
+  _store: Map<string, string>;
+}
+
+function createLocalStorageMock(): MockStorage {
+  const store = new Map<string, string>();
   return {
-    getItem(key) { return store.has(key) ? store.get(key) : null; },
-    setItem(key, value) { store.set(key, String(value)); },
-    removeItem(key) { store.delete(key); },
-    clear() { store.clear(); },
-    get length() { return store.size; },
-    /** Direct access to the store for test setup */
+    getItem(key: string): string | null { return store.has(key) ? store.get(key)! : null; },
+    setItem(key: string, value: string): void { store.set(key, String(value)); },
+    removeItem(key: string): void { store.delete(key); },
+    clear(): void { store.clear(); },
+    get length(): number { return store.size; },
     _store: store,
   };
 }
 
-let mockStorage;
+let mockStorage: MockStorage;
 
 beforeEach(() => {
   mockStorage = createLocalStorageMock();
@@ -60,16 +69,16 @@ afterEach(() => {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function freshState() {
+function freshState(): GameState {
   return createGameState();
 }
 
-function makeQuotaError() {
+function makeQuotaError(): DOMException {
   const err = new DOMException('quota exceeded', 'QuotaExceededError');
   return err;
 }
 
-function minimalEnvelopeJSON() {
+function minimalEnvelopeJSON(): string {
   const state = freshState();
   return JSON.stringify({
     saveName: 'Test Save',
@@ -138,7 +147,7 @@ describe('saveSharedLibrary() quota handling', () => {
       throw makeQuotaError();
     });
 
-    expect(() => saveSharedLibrary([{ id: 'd1', name: 'Test' }])).toThrow(
+    expect(() => saveSharedLibrary([{ id: 'd1', name: 'Test' } as RocketDesign])).toThrow(
       /storage full/i,
     );
   });

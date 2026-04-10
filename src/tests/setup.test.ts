@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Smoke test — verifies that the Vitest test infrastructure is working.
 // All core-logic unit tests live alongside this file in src/tests/.
 
