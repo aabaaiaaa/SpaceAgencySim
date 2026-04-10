@@ -1,5 +1,5 @@
 /**
- * facilities-infrastructure.spec.js — E2E tests for Phase 5: Facilities & Infrastructure.
+ * facilities-infrastructure.spec.ts — E2E tests for Phase 5: Facilities & Infrastructure.
  *
  * Covers:
  *   - Facility upgrade purchase from construction menu
@@ -16,7 +16,7 @@
  *     narrative, construction menu explanation)
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import {
   VP_W, VP_H,
   buildSaveEnvelope,
@@ -48,8 +48,146 @@ import {
 // Shared constants
 // ---------------------------------------------------------------------------
 
-const BASIC_ROCKET  = ['probe-core-mk1', 'tank-small', 'engine-spark'];
-const CREWED_ROCKET = ['cmd-mk1', 'tank-small', 'engine-spark', 'parachute-mk1'];
+const BASIC_ROCKET: string[]  = ['probe-core-mk1', 'tank-small', 'engine-spark'];
+const CREWED_ROCKET: string[] = ['cmd-mk1', 'tank-small', 'engine-spark', 'parachute-mk1'];
+
+// ---------------------------------------------------------------------------
+// Local type aliases for game state accessed via page.evaluate()
+// ---------------------------------------------------------------------------
+
+/** Shape of the game state as returned by getGameState (loosely typed). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type GameState = Record<string, any>;
+
+/**
+ * Browser-context window shape for page.evaluate() callbacks.
+ * Defined as a local interface (not `declare global`) to avoid conflicting
+ * with the narrower Window augmentations in the helper modules. Inside
+ * evaluate callbacks we cast: `const w = window as unknown as GameWindow;`
+ */
+interface GameWindow {
+  __gameState?: GameState;
+  __flightState?: Record<string, unknown> | null;
+  __crewAPI?: { hireCrew?: (gs: GameState, name: string) => { success: boolean; cost?: number } };
+  __constants?: { LAUNCH_PAD_MAX_MASS?: Record<number, number> };
+}
+
+/** Shape of a crew member in game state. */
+interface CrewSnapshot {
+  id: string;
+  name: string;
+  status: string;
+  salary: number;
+  hireDate: string;
+  skills: { piloting: number; engineering: number; science: number };
+  missionsFlown: number;
+  flightsFlown: number;
+  deathDate: string | null;
+  deathCause: string | null;
+  assignedRocketId: string | null;
+  injuryEnds: number | null;
+  trainingSkill: string | null;
+  trainingEnds: number | null;
+  [key: string]: unknown;
+}
+
+/** Shape of a facility in game state. */
+interface FacilitySnapshot {
+  built: boolean;
+  tier: number;
+}
+
+/** Return type for mass limit evaluate. */
+interface MassLimitResult {
+  tier: number;
+  maxMass: number | null;
+}
+
+/** Return type for VAB limits evaluate. */
+interface VabLimitsResult {
+  tier: number;
+}
+
+/** Return type for slot info evaluate. */
+interface SlotInfoResult {
+  maxSlots: number;
+  usedSlots: number;
+  availableSlots?: number;
+  full?: boolean;
+  tier?: number;
+}
+
+/** Return type for training assignment evaluate. */
+interface TrainingAssignmentResult {
+  success: boolean;
+  error?: string;
+  crewId?: string;
+  trainingSkill?: string;
+  trainingEnds?: number;
+  cost?: number;
+}
+
+/** Return type for hire/fire evaluate. */
+interface HireFireResult {
+  success: boolean;
+  cost?: number;
+  id?: string;
+  error?: string;
+}
+
+/** Return type for experienced crew hire evaluate. */
+interface ExpHireResult {
+  success: boolean;
+  cost?: number;
+  skills?: { piloting: number; engineering: number; science: number };
+  error?: string;
+}
+
+/** Return type for agency statistics evaluate. */
+interface AgencyStatsResult {
+  totalFlights: number;
+  successfulFlights: number;
+  failedFlights: number;
+  totalRevenue: number;
+  satellitesDeployed: number;
+  activeCrew: number;
+}
+
+/** Return type for top rockets evaluate. */
+interface TopRocketEntry {
+  rocketId: string;
+  rocketName: string;
+  flightCount: number;
+  successCount: number;
+  totalRevenue: number;
+}
+
+/** Return type for records evaluate. */
+interface RecordsResult {
+  maxAltitude: number;
+  maxSpeed: number;
+}
+
+/** Return type for mission accept evaluate. */
+interface MissionAcceptResult {
+  success: boolean;
+  awardedFacility: string | null;
+  error?: string;
+}
+
+/** Return type for tutorial mission description evaluate. */
+interface TutorialMissionDesc {
+  id: string;
+  description: string;
+  facility: string;
+}
+
+/** Return type for tutorial mission narrative evaluate. */
+interface TutorialMissionNarrative {
+  id: string;
+  title: string;
+  description: string;
+}
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -58,7 +196,7 @@ const CREWED_ROCKET = ['cmd-mk1', 'tank-small', 'engine-spark', 'parachute-mk1']
 /**
  * Return to agency from flight.
  */
-async function returnToAgency(page) {
+async function returnToAgency(page: Page): Promise<void> {
   const dropdown = page.locator('#topbar-dropdown');
   if (!(await dropdown.isVisible())) {
     await page.click('#topbar-menu-btn');
@@ -93,7 +231,7 @@ async function returnToAgency(page) {
 /**
  * Dismiss the return-results overlay if present.
  */
-async function dismissReturnResults(page) {
+async function dismissReturnResults(page: Page): Promise<void> {
   try {
     const dismissBtn = page.locator('#return-results-dismiss-btn');
     await dismissBtn.waitFor({ state: 'visible', timeout: 5_000 });
@@ -104,7 +242,7 @@ async function dismissReturnResults(page) {
 /**
  * Complete a flight cycle: start → return → dismiss.
  */
-async function completeFlightCycle(page, parts = BASIC_ROCKET) {
+async function completeFlightCycle(page: Page, parts: string[] = BASIC_ROCKET): Promise<void> {
   await startTestFlight(page, parts);
   await returnToAgency(page);
   await dismissReturnResults(page);
@@ -116,7 +254,7 @@ async function completeFlightCycle(page, parts = BASIC_ROCKET) {
 
 test.describe('Facility upgrade purchase from construction menu', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(60_000);
@@ -141,8 +279,8 @@ test.describe('Facility upgrade purchase from construction menu', () => {
   });
 
   test('(2) purchasing Launch Pad upgrade to tier 2 deducts money and updates tier', async () => {
-    const gsBefore = await getGameState(page);
-    const moneyBefore = gsBefore.money;
+    const gsBefore = await getGameState(page) as GameState;
+    const moneyBefore = gsBefore.money as number;
 
     await openConstructionPanel(page);
 
@@ -150,17 +288,17 @@ test.describe('Facility upgrade purchase from construction menu', () => {
     const upgradeBtn = launchPadItem.locator('.cp-upgrade-btn');
     await upgradeBtn.click();
     await page.waitForFunction(
-      () => window.__gameState?.facilities?.['launch-pad']?.tier === 2,
+      () => (window as unknown as GameWindow).__gameState?.facilities?.['launch-pad']?.tier === 2,
       { timeout: 5_000 },
     );
     await page.click('.cp-close-btn');
 
-    const gsAfter = await getGameState(page);
+    const gsAfter = await getGameState(page) as GameState;
     expect(gsAfter.facilities[FacilityId.LAUNCH_PAD].tier).toBe(2);
     // Tier 2 costs $200k (with possible reputation discount at rep 72)
     expect(gsAfter.money).toBeLessThan(moneyBefore);
-    expect(moneyBefore - gsAfter.money).toBeGreaterThanOrEqual(150_000);
-    expect(moneyBefore - gsAfter.money).toBeLessThanOrEqual(200_000);
+    expect(moneyBefore - (gsAfter.money as number)).toBeGreaterThanOrEqual(150_000);
+    expect(moneyBefore - (gsAfter.money as number)).toBeLessThanOrEqual(200_000);
   });
 
   test('(3) purchasing VAB upgrade to tier 2', async () => {
@@ -170,12 +308,12 @@ test.describe('Facility upgrade purchase from construction menu', () => {
     const upgradeBtn = vabItem.locator('.cp-upgrade-btn');
     await upgradeBtn.click();
     await page.waitForFunction(
-      () => window.__gameState?.facilities?.['vab']?.tier === 2,
+      () => (window as unknown as GameWindow).__gameState?.facilities?.['vab']?.tier === 2,
       { timeout: 5_000 },
     );
     await page.click('.cp-close-btn');
 
-    const gs = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     expect(gs.facilities[FacilityId.VAB].tier).toBe(2);
   });
 
@@ -186,12 +324,12 @@ test.describe('Facility upgrade purchase from construction menu', () => {
     const upgradeBtn = mccItem.locator('.cp-upgrade-btn');
     await upgradeBtn.click();
     await page.waitForFunction(
-      () => window.__gameState?.facilities?.['mission-control']?.tier === 2,
+      () => (window as unknown as GameWindow).__gameState?.facilities?.['mission-control']?.tier === 2,
       { timeout: 5_000 },
     );
     await page.click('.cp-close-btn');
 
-    const gs = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     expect(gs.facilities[FacilityId.MISSION_CONTROL].tier).toBe(2);
   });
 
@@ -203,11 +341,11 @@ test.describe('Facility upgrade purchase from construction menu', () => {
     const upgradeBtn = lpItem.locator('.cp-upgrade-btn');
     await upgradeBtn.click();
     await page.waitForFunction(
-      () => window.__gameState?.facilities?.['launch-pad']?.tier === 3,
+      () => (window as unknown as GameWindow).__gameState?.facilities?.['launch-pad']?.tier === 3,
       { timeout: 5_000 },
     );
 
-    const gs = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     expect(gs.facilities[FacilityId.LAUNCH_PAD].tier).toBe(3);
 
     // Now the upgrade button should be gone or disabled
@@ -228,7 +366,7 @@ test.describe('Facility upgrade purchase from construction menu', () => {
 
 test.describe('Launch Pad — mass limits per tier', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(60_000);
@@ -247,11 +385,12 @@ test.describe('Launch Pad — mass limits per tier', () => {
     await seedAndLoadSave(page, envelope);
 
     // Check launch pad mass limit is 18,000 at tier 1
-    const massLimit = await page.evaluate(() => {
-      const gs = window.__gameState;
-      const tier = gs.facilities['launch-pad']?.tier ?? 1;
+    const massLimit = await page.evaluate((): MassLimitResult => {
+      const w = window as unknown as GameWindow;
+      const gs = w.__gameState;
+      const tier = gs?.facilities['launch-pad']?.tier ?? 1;
       // Access LAUNCH_PAD_MAX_MASS from the game
-      return { tier, maxMass: window.__constants?.LAUNCH_PAD_MAX_MASS?.[tier] ?? null };
+      return { tier, maxMass: w.__constants?.LAUNCH_PAD_MAX_MASS?.[tier] ?? null };
     });
 
     expect(massLimit.tier).toBe(1);
@@ -260,21 +399,23 @@ test.describe('Launch Pad — mass limits per tier', () => {
   test('(2) tier 2 raises limit to 80,000 kg', async () => {
     // Upgrade to tier 2 programmatically
     await page.evaluate(() => {
-      const gs = window.__gameState;
-      gs.facilities['launch-pad'].tier = 2;
+      const w = window as unknown as GameWindow;
+      const gs = w.__gameState;
+      if (gs) gs.facilities['launch-pad'].tier = 2;
     });
 
-    const gs = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     expect(gs.facilities[FacilityId.LAUNCH_PAD].tier).toBe(2);
   });
 
   test('(3) tier 3 has no mass limit', async () => {
     await page.evaluate(() => {
-      const gs = window.__gameState;
-      gs.facilities['launch-pad'].tier = 3;
+      const w = window as unknown as GameWindow;
+      const gs = w.__gameState;
+      if (gs) gs.facilities['launch-pad'].tier = 3;
     });
 
-    const gs = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     expect(gs.facilities[FacilityId.LAUNCH_PAD].tier).toBe(3);
   });
 });
@@ -285,7 +426,7 @@ test.describe('Launch Pad — mass limits per tier', () => {
 
 test.describe('VAB — part count and size limits per tier', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(60_000);
@@ -303,9 +444,10 @@ test.describe('VAB — part count and size limits per tier', () => {
     });
     await seedAndLoadSave(page, envelope);
 
-    const limits = await page.evaluate(() => {
-      const gs = window.__gameState;
-      const tier = gs.facilities['vab']?.tier ?? 1;
+    const limits = await page.evaluate((): VabLimitsResult => {
+      const w = window as unknown as GameWindow;
+      const gs = w.__gameState;
+      const tier = gs?.facilities['vab']?.tier ?? 1;
       return { tier };
     });
 
@@ -316,21 +458,23 @@ test.describe('VAB — part count and size limits per tier', () => {
 
   test('(2) tier 2 raises limits: 40 parts, 800px height, 200px width', async () => {
     await page.evaluate(() => {
-      const gs = window.__gameState;
-      gs.facilities['vab'].tier = 2;
+      const w = window as unknown as GameWindow;
+      const gs = w.__gameState;
+      if (gs) gs.facilities['vab'].tier = 2;
     });
 
-    const gs = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     expect(gs.facilities[FacilityId.VAB].tier).toBe(2);
   });
 
   test('(3) tier 3 removes all limits', async () => {
     await page.evaluate(() => {
-      const gs = window.__gameState;
-      gs.facilities['vab'].tier = 3;
+      const w = window as unknown as GameWindow;
+      const gs = w.__gameState;
+      if (gs) gs.facilities['vab'].tier = 3;
     });
 
-    const gs = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     expect(gs.facilities[FacilityId.VAB].tier).toBe(3);
   });
 });
@@ -341,7 +485,7 @@ test.describe('VAB — part count and size limits per tier', () => {
 
 test.describe('Mission Control — contract pool and active caps per tier', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(90_000);
@@ -353,7 +497,7 @@ test.describe('Mission Control — contract pool and active caps per tier', () =
 
   test('(1) tier 1: max 2 active contracts, 4 board pool', async () => {
     // Create fixture with tier 1 MCC and multiple contracts on the board
-    const contracts = [];
+    const contracts: Record<string, unknown>[] = [];
     for (let i = 0; i < 6; i++) {
       contracts.push(buildContract({
         id: `contract-board-${i}`,
@@ -364,7 +508,7 @@ test.describe('Mission Control — contract pool and active caps per tier', () =
         generatedPeriod: 0,
       }));
     }
-    const active = [];
+    const active: Record<string, unknown>[] = [];
     for (let i = 0; i < 3; i++) {
       active.push(buildContract({
         id: `contract-active-${i}`,
@@ -382,28 +526,30 @@ test.describe('Mission Control — contract pool and active caps per tier', () =
     await seedAndLoadSave(page, envelope);
 
     // MCC tier 1 caps: 4 pool, 2 active
-    const gs = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     expect(gs.facilities[FacilityId.MISSION_CONTROL].tier).toBe(1);
     // The contract caps are enforced by the contract system
   });
 
   test('(2) tier 2: max 5 active contracts, 8 board pool', async () => {
     await page.evaluate(() => {
-      const gs = window.__gameState;
-      gs.facilities['mission-control'].tier = 2;
+      const w = window as unknown as GameWindow;
+      const gs = w.__gameState;
+      if (gs) gs.facilities['mission-control'].tier = 2;
     });
 
-    const gs = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     expect(gs.facilities[FacilityId.MISSION_CONTROL].tier).toBe(2);
   });
 
   test('(3) tier 3: max 8 active contracts, 12 board pool', async () => {
     await page.evaluate(() => {
-      const gs = window.__gameState;
-      gs.facilities['mission-control'].tier = 3;
+      const w = window as unknown as GameWindow;
+      const gs = w.__gameState;
+      if (gs) gs.facilities['mission-control'].tier = 3;
     });
 
-    const gs = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     expect(gs.facilities[FacilityId.MISSION_CONTROL].tier).toBe(3);
   });
 });
@@ -414,7 +560,7 @@ test.describe('Mission Control — contract pool and active caps per tier', () =
 
 test.describe('Crew Admin — hire and fire', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(60_000);
@@ -427,18 +573,20 @@ test.describe('Crew Admin — hire and fire', () => {
   test.afterAll(async () => { await page.close(); });
 
   test('(1) can hire a crew member via core API', async () => {
-    const gsBefore = await getGameState(page);
-    const crewCountBefore = gsBefore.crew.length;
-    const moneyBefore = gsBefore.money;
+    const gsBefore = await getGameState(page) as GameState;
+    const crewCountBefore = (gsBefore.crew as CrewSnapshot[]).length;
+    const moneyBefore = gsBefore.money as number;
 
-    const result = await page.evaluate(() => {
-      const { hireCrew } = window.__crewAPI ?? {};
+    const result = await page.evaluate((): HireFireResult => {
+      const w = window as unknown as GameWindow;
+      const hireCrew = w.__crewAPI?.hireCrew;
       if (!hireCrew) {
         // Fallback: directly modify state
-        const gs = window.__gameState;
+        const gs = w.__gameState;
+        if (!gs) return { success: false, error: 'No game state' };
         const cost = 50_000;
         gs.money -= cost;
-        const newCrew = {
+        const newCrew: Record<string, unknown> = {
           id: 'crew-hired-test',
           name: 'New Hire',
           status: 'active',
@@ -457,23 +605,26 @@ test.describe('Crew Admin — hire and fire', () => {
         gs.crew.push(newCrew);
         return { success: true, cost };
       }
-      return hireCrew(window.__gameState, 'New Hire');
+      return hireCrew(w.__gameState!, 'New Hire') as HireFireResult;
     });
 
     expect(result.success).toBe(true);
 
-    const gsAfter = await getGameState(page);
-    expect(gsAfter.crew.length).toBe(crewCountBefore + 1);
+    const gsAfter = await getGameState(page) as GameState;
+    expect((gsAfter.crew as CrewSnapshot[]).length).toBe(crewCountBefore + 1);
     expect(gsAfter.money).toBeLessThan(moneyBefore);
   });
 
   test('(2) can fire a crew member', async () => {
-    const gsBefore = await getGameState(page);
-    const activeBefore = gsBefore.crew.filter(c => c.status === 'active').length;
+    const gsBefore = await getGameState(page) as GameState;
+    const activeBefore = (gsBefore.crew as CrewSnapshot[]).filter(c => c.status === 'active').length;
 
-    const result = await page.evaluate(() => {
-      const gs = window.__gameState;
-      const target = gs.crew.find(c => c.status === 'active');
+    const result = await page.evaluate((): HireFireResult => {
+      const w = window as unknown as GameWindow;
+      const gs = w.__gameState;
+      if (!gs) return { success: false };
+      const target = (gs.crew as { id: string; status: string; assignedRocketId: string | null }[])
+        .find(c => c.status === 'active');
       if (!target) return { success: false };
       target.status = 'fired';
       target.assignedRocketId = null;
@@ -482,15 +633,15 @@ test.describe('Crew Admin — hire and fire', () => {
 
     expect(result.success).toBe(true);
 
-    const gsAfter = await getGameState(page);
-    const firedCrew = gsAfter.crew.find(c => c.id === result.id);
-    expect(firedCrew.status).toBe('fired');
+    const gsAfter = await getGameState(page) as GameState;
+    const firedCrew = (gsAfter.crew as CrewSnapshot[]).find(c => c.id === result.id);
+    expect(firedCrew!.status).toBe('fired');
   });
 });
 
 test.describe('Crew Admin — training system', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(90_000);
@@ -510,12 +661,14 @@ test.describe('Crew Admin — training system', () => {
   test.afterAll(async () => { await page.close(); });
 
   test('(1) tier 2 provides 1 training slot', async () => {
-    const slotInfo = await page.evaluate(() => {
-      const gs = window.__gameState;
-      const tier = gs.facilities['crew-admin']?.tier ?? 0;
+    const slotInfo = await page.evaluate((): SlotInfoResult => {
+      const w = window as unknown as GameWindow;
+      const gs = w.__gameState;
+      const tier = gs?.facilities['crew-admin']?.tier ?? 0;
       // TRAINING_SLOTS_BY_TIER: { 2: 1, 3: 3 }
       const maxSlots = tier === 2 ? 1 : tier === 3 ? 3 : 0;
-      const usedSlots = gs.crew.filter(c =>
+      const crew = (gs?.crew ?? []) as CrewSnapshot[];
+      const usedSlots = crew.filter((c: CrewSnapshot) =>
         c.status === 'active' && c.trainingSkill
       ).length;
       return { maxSlots, usedSlots, availableSlots: maxSlots - usedSlots };
@@ -526,12 +679,14 @@ test.describe('Crew Admin — training system', () => {
   });
 
   test('(2) assigning crew to training sets trainingSkill and trainingEnds', async () => {
-    const result = await page.evaluate(() => {
-      const gs = window.__gameState;
-      const crew = gs.crew.find(c => c.status === 'active' && !c.trainingSkill);
+    const result = await page.evaluate((): TrainingAssignmentResult => {
+      const w = window as unknown as GameWindow;
+      const gs = w.__gameState;
+      if (!gs) return { success: false, error: 'No game state' };
+      const crew = (gs.crew as CrewSnapshot[]).find(c => c.status === 'active' && !c.trainingSkill);
       if (!crew) return { success: false, error: 'No available crew' };
 
-      const currentPeriod = gs.currentPeriod ?? 0;
+      const currentPeriod = (gs.currentPeriod as number | undefined) ?? 0;
       const TRAINING_COURSE_COST = 20_000;
       const TRAINING_COURSE_DURATION = 3;
 
@@ -553,37 +708,41 @@ test.describe('Crew Admin — training system', () => {
   });
 
   test('(3) crew in training is unavailable for flight assignment', async () => {
-    const gs = await getGameState(page);
-    const trainingCrew = gs.crew.find(c => c.trainingSkill != null);
+    const gs = await getGameState(page) as GameState;
+    const trainingCrew = (gs.crew as CrewSnapshot[]).find(c => c.trainingSkill != null);
     expect(trainingCrew).toBeTruthy();
 
     // Try to "assign" — should fail because they're in training
-    const canAssign = await page.evaluate((crewId) => {
-      const gs = window.__gameState;
-      const crew = gs.crew.find(c => c.id === crewId);
+    const canAssign = await page.evaluate((crewId: string): boolean => {
+      const w = window as unknown as GameWindow;
+      const gs = w.__gameState;
+      if (!gs) return false;
+      const crew = (gs.crew as CrewSnapshot[]).find(c => c.id === crewId);
       if (!crew) return false;
       // Cannot assign if in training
       return !crew.trainingSkill;
-    }, trainingCrew.id);
+    }, trainingCrew!.id);
 
     expect(canAssign).toBe(false);
   });
 
   test('(4) training completes after required periods with +15 skill gain', async () => {
-    const gsBefore = await getGameState(page);
-    const traineeBefore = gsBefore.crew.find(c => c.trainingSkill != null);
+    const gsBefore = await getGameState(page) as GameState;
+    const traineeBefore = (gsBefore.crew as CrewSnapshot[]).find(c => c.trainingSkill != null)!;
     const skillBefore = traineeBefore.skills.piloting;
-    const trainingEnds = traineeBefore.trainingEnds;
+    const trainingEnds = traineeBefore.trainingEnds!;
 
     // Advance period past trainingEnds
-    await page.evaluate((endsAt) => {
-      const gs = window.__gameState;
+    await page.evaluate((endsAt: number): void => {
+      const w = window as unknown as GameWindow;
+      const gs = w.__gameState;
+      if (!gs) return;
       gs.currentPeriod = endsAt;
 
       // Process training completion for the trainee
-      for (const crew of gs.crew) {
-        if (crew.trainingSkill && crew.trainingEnds != null && gs.currentPeriod >= crew.trainingEnds) {
-          const skill = crew.trainingSkill;
+      for (const crew of gs.crew as CrewSnapshot[]) {
+        if (crew.trainingSkill && crew.trainingEnds != null && (gs.currentPeriod as number) >= crew.trainingEnds) {
+          const skill = crew.trainingSkill as keyof CrewSnapshot['skills'];
           const before = crew.skills?.[skill] ?? 0;
           crew.skills[skill] = Math.min(100, before + 15);
           crew.trainingSkill = null;
@@ -592,8 +751,8 @@ test.describe('Crew Admin — training system', () => {
       }
     }, trainingEnds);
 
-    const gsAfter = await getGameState(page);
-    const traineeAfter = gsAfter.crew.find(c => c.id === traineeBefore.id);
+    const gsAfter = await getGameState(page) as GameState;
+    const traineeAfter = (gsAfter.crew as CrewSnapshot[]).find(c => c.id === traineeBefore.id)!;
 
     expect(traineeAfter.trainingSkill).toBeNull();
     expect(traineeAfter.trainingEnds).toBeNull();
@@ -602,22 +761,26 @@ test.describe('Crew Admin — training system', () => {
 
   test('(5) slot limit prevents additional training at tier 2 (1 slot used)', async () => {
     // Put one crew member in training again
-    await page.evaluate(() => {
-      const gs = window.__gameState;
-      const available = gs.crew.find(c =>
+    await page.evaluate((): void => {
+      const w = window as unknown as GameWindow;
+      const gs = w.__gameState;
+      if (!gs) return;
+      const available = (gs.crew as CrewSnapshot[]).find(c =>
         c.status === 'active' && !c.trainingSkill
       );
       if (available) {
         available.trainingSkill = 'engineering';
-        available.trainingEnds = (gs.currentPeriod ?? 0) + 3;
+        available.trainingEnds = ((gs.currentPeriod as number | undefined) ?? 0) + 3;
       }
     });
 
     // Now check no more slots
-    const slotInfo = await page.evaluate(() => {
-      const gs = window.__gameState;
+    const slotInfo = await page.evaluate((): SlotInfoResult => {
+      const w = window as unknown as GameWindow;
+      const gs = w.__gameState;
       const maxSlots = 1; // Tier 2 = 1 slot
-      const usedSlots = gs.crew.filter(c =>
+      const crew = (gs?.crew ?? []) as CrewSnapshot[];
+      const usedSlots = crew.filter((c: CrewSnapshot) =>
         c.status === 'active' && c.trainingSkill
       ).length;
       return { maxSlots, usedSlots, full: usedSlots >= maxSlots };
@@ -629,7 +792,7 @@ test.describe('Crew Admin — training system', () => {
 
 test.describe('Crew Admin — tier 3 features', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(60_000);
@@ -648,11 +811,12 @@ test.describe('Crew Admin — tier 3 features', () => {
   test.afterAll(async () => { await page.close(); });
 
   test('(1) tier 3 provides 3 training slots', async () => {
-    const slotInfo = await page.evaluate(() => {
-      const gs = window.__gameState;
-      const tier = gs.facilities['crew-admin']?.tier ?? 0;
+    const slotInfo = await page.evaluate((): SlotInfoResult => {
+      const w = window as unknown as GameWindow;
+      const gs = w.__gameState;
+      const tier = gs?.facilities['crew-admin']?.tier ?? 0;
       const maxSlots = tier === 2 ? 1 : tier === 3 ? 3 : 0;
-      return { tier, maxSlots };
+      return { tier, maxSlots, usedSlots: 0 };
     });
 
     expect(slotInfo.tier).toBe(3);
@@ -660,24 +824,26 @@ test.describe('Crew Admin — tier 3 features', () => {
   });
 
   test('(2) experienced crew recruitment available at tier 3', async () => {
-    const gsBefore = await getGameState(page);
-    const crewBefore = gsBefore.crew.length;
+    const gsBefore = await getGameState(page) as GameState;
+    const crewBefore = (gsBefore.crew as CrewSnapshot[]).length;
 
     // Hire experienced crew — costs 2.5x normal hire
-    const result = await page.evaluate(() => {
-      const gs = window.__gameState;
+    const result = await page.evaluate((): ExpHireResult => {
+      const w = window as unknown as GameWindow;
+      const gs = w.__gameState;
+      if (!gs) return { success: false, error: 'No game state' };
       const baseCost = 50_000;
       const repMod = 1.0; // ~72 rep => ~0.90 modifier, but approximate
       const cost = Math.floor(baseCost * repMod * 2.5);
 
-      if (gs.money < cost) return { success: false, error: 'Insufficient funds' };
+      if ((gs.money as number) < cost) return { success: false, error: 'Insufficient funds' };
       gs.money -= cost;
 
       const min = 10;
       const max = 30;
-      const randSkill = () => min + Math.floor(Math.random() * (max - min + 1));
+      const randSkill = (): number => min + Math.floor(Math.random() * (max - min + 1));
 
-      const newCrew = {
+      const newCrew: Record<string, unknown> = {
         id: 'crew-exp-test',
         name: 'Experienced Recruit',
         status: 'active',
@@ -694,23 +860,23 @@ test.describe('Crew Admin — tier 3 features', () => {
         trainingEnds: null,
       };
       gs.crew.push(newCrew);
-      return { success: true, cost, skills: newCrew.skills };
+      return { success: true, cost, skills: newCrew.skills as ExpHireResult['skills'] };
     });
 
     expect(result.success).toBe(true);
 
-    const gsAfter = await getGameState(page);
-    expect(gsAfter.crew.length).toBe(crewBefore + 1);
+    const gsAfter = await getGameState(page) as GameState;
+    expect((gsAfter.crew as CrewSnapshot[]).length).toBe(crewBefore + 1);
 
     // Experienced crew start with skills in [10, 30] range
-    const expCrew = gsAfter.crew.find(c => c.id === 'crew-exp-test');
+    const expCrew = (gsAfter.crew as CrewSnapshot[]).find(c => c.id === 'crew-exp-test');
     expect(expCrew).toBeTruthy();
-    expect(expCrew.skills.piloting).toBeGreaterThanOrEqual(10);
-    expect(expCrew.skills.piloting).toBeLessThanOrEqual(30);
-    expect(expCrew.skills.engineering).toBeGreaterThanOrEqual(10);
-    expect(expCrew.skills.engineering).toBeLessThanOrEqual(30);
-    expect(expCrew.skills.science).toBeGreaterThanOrEqual(10);
-    expect(expCrew.skills.science).toBeLessThanOrEqual(30);
+    expect(expCrew!.skills.piloting).toBeGreaterThanOrEqual(10);
+    expect(expCrew!.skills.piloting).toBeLessThanOrEqual(30);
+    expect(expCrew!.skills.engineering).toBeGreaterThanOrEqual(10);
+    expect(expCrew!.skills.engineering).toBeLessThanOrEqual(30);
+    expect(expCrew!.skills.science).toBeGreaterThanOrEqual(10);
+    expect(expCrew!.skills.science).toBeLessThanOrEqual(30);
   });
 });
 
@@ -719,7 +885,7 @@ test.describe('Crew Admin — tier 3 features', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Crew training opportunity cost — crew unavailable during training', () => {
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(60_000);
@@ -748,12 +914,14 @@ test.describe('Crew training opportunity cost — crew unavailable during traini
     await seedAndLoadSave(page, envelope);
 
     // Put one crew member in training
-    await page.evaluate(() => {
-      const gs = window.__gameState;
-      const crew = gs.crew.find(c => c.id === 'crew-training');
+    await page.evaluate((): void => {
+      const w = window as unknown as GameWindow;
+      const gs = w.__gameState;
+      if (!gs) return;
+      const crew = (gs.crew as CrewSnapshot[]).find(c => c.id === 'crew-training');
       if (crew) {
         crew.trainingSkill = 'piloting';
-        crew.trainingEnds = (gs.currentPeriod ?? 0) + 3;
+        crew.trainingEnds = ((gs.currentPeriod as number | undefined) ?? 0) + 3;
       }
     });
   });
@@ -761,10 +929,12 @@ test.describe('Crew training opportunity cost — crew unavailable during traini
   test.afterAll(async () => { await page.close(); });
 
   test('crew in training cannot be assigned to flights', async () => {
-    const assignable = await page.evaluate(() => {
-      const gs = window.__gameState;
-      const currentPeriod = gs.currentPeriod ?? 0;
-      return gs.crew.filter(c =>
+    const assignable = await page.evaluate((): string[] => {
+      const w = window as unknown as GameWindow;
+      const gs = w.__gameState;
+      if (!gs) return [];
+      const currentPeriod = (gs.currentPeriod as number | undefined) ?? 0;
+      return (gs.crew as CrewSnapshot[]).filter(c =>
         c.status === 'active' &&
         (c.injuryEnds == null || c.injuryEnds <= currentPeriod) &&
         !c.trainingSkill
@@ -783,7 +953,7 @@ test.describe('Crew training opportunity cost — crew unavailable during traini
 
 test.describe('Tracking Station — map view scope per tier', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(60_000);
@@ -802,29 +972,31 @@ test.describe('Tracking Station — map view scope per tier', () => {
     });
     await seedAndLoadSave(page, envelope);
 
-    const gs = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     expect(gs.facilities[FacilityId.TRACKING_STATION].tier).toBe(1);
     // Tier 1: local body only — map shows objects around current body
   });
 
   test('(2) tier 2: solar system map view', async () => {
-    await page.evaluate(() => {
-      const gs = window.__gameState;
-      gs.facilities['tracking-station'].tier = 2;
+    await page.evaluate((): void => {
+      const w = window as unknown as GameWindow;
+      const gs = w.__gameState;
+      if (gs) gs.facilities['tracking-station'].tier = 2;
     });
 
-    const gs = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     expect(gs.facilities[FacilityId.TRACKING_STATION].tier).toBe(2);
     // Tier 2: solar system scope, debris tracking, weather windows
   });
 
   test('(3) tier 3: deep space communications and transfer planning', async () => {
-    await page.evaluate(() => {
-      const gs = window.__gameState;
-      gs.facilities['tracking-station'].tier = 3;
+    await page.evaluate((): void => {
+      const w = window as unknown as GameWindow;
+      const gs = w.__gameState;
+      if (gs) gs.facilities['tracking-station'].tier = 3;
     });
 
-    const gs = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     expect(gs.facilities[FacilityId.TRACKING_STATION].tier).toBe(3);
   });
 });
@@ -835,7 +1007,7 @@ test.describe('Tracking Station — map view scope per tier', () => {
 
 test.describe('Library — statistics dashboard', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(60_000);
@@ -843,7 +1015,7 @@ test.describe('Library — statistics dashboard', () => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     // Build comprehensive flight history for statistics
-    const flightHistory = [
+    const flightHistory: Record<string, unknown>[] = [
       { id: 'fh-1', missionId: 'mission-001', outcome: 'SUCCESS', rocketId: 'rocket-alpha', rocketName: 'Alpha', maxAltitude: 5000, maxSpeed: 300, duration: 120, revenue: 25000, launchDate: '2026-01-01', bodiesVisited: ['EARTH'], crewIds: ['crew-1'] },
       { id: 'fh-2', missionId: 'mission-004', outcome: 'SUCCESS', rocketId: 'rocket-alpha', rocketName: 'Alpha', maxAltitude: 12000, maxSpeed: 600, duration: 250, revenue: 25000, launchDate: '2026-01-02', bodiesVisited: ['EARTH'], crewIds: ['crew-1', 'crew-2'] },
       { id: 'fh-3', missionId: 'mission-005', outcome: 'FAILURE', rocketId: 'rocket-beta', rocketName: 'Beta', maxAltitude: 500, maxSpeed: 100, duration: 30, revenue: 0, launchDate: '2026-01-03', bodiesVisited: ['EARTH'], crewIds: [] },
@@ -851,7 +1023,7 @@ test.describe('Library — statistics dashboard', () => {
       { id: 'fh-5', missionId: null, outcome: 'SUCCESS', rocketId: 'rocket-gamma', rocketName: 'Gamma', maxAltitude: 80000, maxSpeed: 2000, duration: 600, revenue: 0, launchDate: '2026-01-05', bodiesVisited: ['EARTH', 'MOON'], crewIds: ['crew-2'] },
     ];
 
-    const savedDesigns = [
+    const savedDesigns: Record<string, unknown>[] = [
       { id: 'rocket-alpha', name: 'Alpha', totalMass: 12000 },
       { id: 'rocket-beta', name: 'Beta', totalMass: 5000 },
       { id: 'rocket-gamma', name: 'Gamma', totalMass: 45000 },
@@ -877,28 +1049,30 @@ test.describe('Library — statistics dashboard', () => {
   test.afterAll(async () => { await page.close(); });
 
   test('(1) Library facility is built and accessible', async () => {
-    const gs = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     expect(gs.facilities[FacilityId.LIBRARY]).toBeTruthy();
     expect(gs.facilities[FacilityId.LIBRARY].built).toBe(true);
   });
 
   test('(2) agency statistics correctly computed', async () => {
-    const stats = await page.evaluate(() => {
-      const gs = window.__gameState;
-      const history = gs.flightHistory ?? [];
+    const stats = await page.evaluate((): AgencyStatsResult => {
+      const w = window as unknown as GameWindow;
+      const gs = w.__gameState;
+      if (!gs) return { totalFlights: 0, successfulFlights: 0, failedFlights: 0, totalRevenue: 0, satellitesDeployed: 0, activeCrew: 0 };
+      const history = (gs.flightHistory as Record<string, unknown>[] | undefined) ?? [];
       let success = 0, failure = 0, revenue = 0;
       for (const f of history) {
         if (f.outcome === 'SUCCESS') success++;
         else if (f.outcome === 'FAILURE') failure++;
-        revenue += f.revenue ?? 0;
+        revenue += (f.revenue as number | undefined) ?? 0;
       }
       return {
         totalFlights: history.length,
         successfulFlights: success,
         failedFlights: failure,
         totalRevenue: revenue,
-        satellitesDeployed: (gs.satelliteNetwork?.satellites ?? []).length,
-        activeCrew: gs.crew.filter(c => c.status !== 'kia' && c.status !== 'DEAD').length,
+        satellitesDeployed: (((gs.satelliteNetwork as Record<string, unknown> | undefined)?.satellites ?? []) as unknown[]).length,
+        activeCrew: (gs.crew as CrewSnapshot[]).filter(c => c.status !== 'kia' && c.status !== 'DEAD').length,
       };
     });
 
@@ -910,16 +1084,18 @@ test.describe('Library — statistics dashboard', () => {
   });
 
   test('(3) celestial body knowledge includes discovered bodies', async () => {
-    const knowledge = await page.evaluate(() => {
-      const gs = window.__gameState;
-      const bodies = new Set(['EARTH']);
-      for (const flight of gs.flightHistory ?? []) {
-        for (const bodyId of flight.bodiesVisited ?? []) {
+    const knowledge = await page.evaluate((): string[] => {
+      const w = window as unknown as GameWindow;
+      const gs = w.__gameState;
+      if (!gs) return [];
+      const bodies = new Set<string>(['EARTH']);
+      for (const flight of (gs.flightHistory as Record<string, unknown>[] | undefined) ?? []) {
+        for (const bodyId of (flight.bodiesVisited as string[] | undefined) ?? []) {
           bodies.add(bodyId);
         }
       }
-      for (const sat of gs.satelliteNetwork?.satellites ?? []) {
-        if (sat.bodyId) bodies.add(sat.bodyId);
+      for (const sat of ((gs.satelliteNetwork as Record<string, unknown> | undefined)?.satellites as Record<string, unknown>[] | undefined) ?? []) {
+        if (sat.bodyId) bodies.add(sat.bodyId as string);
       }
       return [...bodies];
     });
@@ -929,24 +1105,27 @@ test.describe('Library — statistics dashboard', () => {
   });
 
   test('(4) top-5 frequently flown rockets computed correctly', async () => {
-    const topRockets = await page.evaluate(() => {
-      const gs = window.__gameState;
-      const history = gs.flightHistory ?? [];
-      const counts = new Map();
+    const topRockets = await page.evaluate((): TopRocketEntry[] => {
+      const w = window as unknown as GameWindow;
+      const gs = w.__gameState;
+      if (!gs) return [];
+      const history = (gs.flightHistory as Record<string, unknown>[] | undefined) ?? [];
+      const counts = new Map<string, TopRocketEntry>();
 
       for (const f of history) {
         if (!f.rocketId) continue;
-        const entry = counts.get(f.rocketId) ?? {
-          rocketId: f.rocketId,
-          rocketName: f.rocketName ?? f.rocketId,
+        const rocketId = f.rocketId as string;
+        const entry = counts.get(rocketId) ?? {
+          rocketId,
+          rocketName: (f.rocketName as string | undefined) ?? rocketId,
           flightCount: 0,
           successCount: 0,
           totalRevenue: 0,
         };
         entry.flightCount++;
         if (f.outcome === 'SUCCESS') entry.successCount++;
-        entry.totalRevenue += f.revenue ?? 0;
-        counts.set(f.rocketId, entry);
+        entry.totalRevenue += (f.revenue as number | undefined) ?? 0;
+        counts.set(rocketId, entry);
       }
 
       return [...counts.values()]
@@ -963,14 +1142,16 @@ test.describe('Library — statistics dashboard', () => {
   });
 
   test('(5) records: max altitude and max speed from flight history', async () => {
-    const records = await page.evaluate(() => {
-      const gs = window.__gameState;
-      const history = gs.flightHistory ?? [];
+    const records = await page.evaluate((): RecordsResult => {
+      const w = window as unknown as GameWindow;
+      const gs = w.__gameState;
+      if (!gs) return { maxAltitude: 0, maxSpeed: 0 };
+      const history = (gs.flightHistory as Record<string, unknown>[] | undefined) ?? [];
 
       let maxAlt = 0, maxSpd = 0;
       for (const f of history) {
-        if ((f.maxAltitude ?? 0) > maxAlt) maxAlt = f.maxAltitude;
-        if ((f.maxSpeed ?? 0) > maxSpd) maxSpd = f.maxSpeed;
+        if (((f.maxAltitude as number | undefined) ?? 0) > maxAlt) maxAlt = f.maxAltitude as number;
+        if (((f.maxSpeed as number | undefined) ?? 0) > maxSpd) maxSpd = f.maxSpeed as number;
       }
 
       return { maxAltitude: maxAlt, maxSpeed: maxSpd };
@@ -987,7 +1168,7 @@ test.describe('Library — statistics dashboard', () => {
 
 test.describe('Library — free construction', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(60_000);
@@ -1004,13 +1185,13 @@ test.describe('Library — free construction', () => {
   test.afterAll(async () => { await page.close(); });
 
   test('(1) Library not initially built', async () => {
-    const gs = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     expect(gs.facilities[FacilityId.LIBRARY]).toBeFalsy();
   });
 
   test('(2) building Library costs $0 and succeeds', async () => {
-    const gsBefore = await getGameState(page);
-    const moneyBefore = gsBefore.money;
+    const gsBefore = await getGameState(page) as GameState;
+    const moneyBefore = gsBefore.money as number;
 
     // Build Library via construction menu
     await openConstructionPanel(page);
@@ -1020,12 +1201,12 @@ test.describe('Library — free construction', () => {
     const buildBtn = libraryItem.locator('.cp-build-btn');
     await buildBtn.click();
     await page.waitForFunction(
-      () => window.__gameState?.facilities?.['library']?.built === true,
+      () => (window as unknown as { __gameState?: Record<string, Record<string, Record<string, unknown>>> }).__gameState?.facilities?.['library']?.built === true,
       { timeout: 5_000 },
     );
     await page.click('.cp-close-btn');
 
-    const gsAfter = await getGameState(page);
+    const gsAfter = await getGameState(page) as GameState;
     expect(gsAfter.facilities[FacilityId.LIBRARY]).toBeTruthy();
     expect(gsAfter.facilities[FacilityId.LIBRARY].built).toBe(true);
     expect(gsAfter.facilities[FacilityId.LIBRARY].tier).toBe(1);
@@ -1040,7 +1221,7 @@ test.describe('Library — free construction', () => {
 
 test.describe('Tutorial missions — facility awards on accept', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(90_000);
@@ -1089,23 +1270,26 @@ test.describe('Tutorial missions — facility awards on accept', () => {
     await seedAndLoadSave(page, envelope);
 
     // Verify Crew Admin not yet built
-    const gsBefore = await getGameState(page);
+    const gsBefore = await getGameState(page) as GameState;
     expect(gsBefore.facilities[FacilityId.CREW_ADMIN]).toBeFalsy();
 
     // Accept mission-018 — should award Crew Admin
-    const acceptResult = await page.evaluate(() => {
-      const gs = window.__gameState;
-      const mission = gs.missions.available.find(m => m.id === 'mission-018');
-      if (!mission) return { success: false, error: 'Mission not found' };
+    const acceptResult = await page.evaluate((): MissionAcceptResult => {
+      const w = window as unknown as GameWindow;
+      const gs = w.__gameState;
+      if (!gs) return { success: false, awardedFacility: null, error: 'No game state' };
+      const missions = gs.missions as { available: Record<string, unknown>[]; accepted: Record<string, unknown>[] };
+      const mission = missions.available.find(m => (m as { id: string }).id === 'mission-018') as Record<string, unknown> | undefined;
+      if (!mission) return { success: false, awardedFacility: null, error: 'Mission not found' };
 
       // Move from available to accepted
-      gs.missions.available = gs.missions.available.filter(m => m.id !== 'mission-018');
+      missions.available = missions.available.filter(m => (m as { id: string }).id !== 'mission-018');
       mission.status = 'accepted';
-      gs.missions.accepted.push(mission);
+      missions.accepted.push(mission);
 
       // Award facility if specified
       if (mission.awardsFacilityOnAccept) {
-        const facilityId = mission.awardsFacilityOnAccept;
+        const facilityId = mission.awardsFacilityOnAccept as string;
         if (!gs.facilities[facilityId]) {
           gs.facilities[facilityId] = { built: true, tier: 1 };
           return { success: true, awardedFacility: facilityId };
@@ -1117,7 +1301,7 @@ test.describe('Tutorial missions — facility awards on accept', () => {
     expect(acceptResult.success).toBe(true);
     expect(acceptResult.awardedFacility).toBe('crew-admin');
 
-    const gsAfter = await getGameState(page);
+    const gsAfter = await getGameState(page) as GameState;
     expect(gsAfter.facilities[FacilityId.CREW_ADMIN]).toBeTruthy();
     expect(gsAfter.facilities[FacilityId.CREW_ADMIN].built).toBe(true);
   });
@@ -1160,25 +1344,28 @@ test.describe('Tutorial missions — facility awards on accept', () => {
     });
     await seedAndLoadSave(page, envelope);
 
-    const gsBefore = await getGameState(page);
+    const gsBefore = await getGameState(page) as GameState;
     expect(gsBefore.facilities[FacilityId.RD_LAB]).toBeFalsy();
 
-    const result = await page.evaluate(() => {
-      const gs = window.__gameState;
-      const mission = gs.missions.available.find(m => m.id === 'mission-019');
-      if (!mission) return { success: false };
-      gs.missions.available = gs.missions.available.filter(m => m.id !== 'mission-019');
+    const result = await page.evaluate((): MissionAcceptResult => {
+      const w = window as unknown as GameWindow;
+      const gs = w.__gameState;
+      if (!gs) return { success: false, awardedFacility: null };
+      const missions = gs.missions as { available: Record<string, unknown>[]; accepted: Record<string, unknown>[] };
+      const mission = missions.available.find(m => (m as { id: string }).id === 'mission-019') as Record<string, unknown> | undefined;
+      if (!mission) return { success: false, awardedFacility: null };
+      missions.available = missions.available.filter(m => (m as { id: string }).id !== 'mission-019');
       mission.status = 'accepted';
-      gs.missions.accepted.push(mission);
-      if (mission.awardsFacilityOnAccept && !gs.facilities[mission.awardsFacilityOnAccept]) {
-        gs.facilities[mission.awardsFacilityOnAccept] = { built: true, tier: 1 };
-        return { success: true, awardedFacility: mission.awardsFacilityOnAccept };
+      missions.accepted.push(mission);
+      if (mission.awardsFacilityOnAccept && !gs.facilities[mission.awardsFacilityOnAccept as string]) {
+        gs.facilities[mission.awardsFacilityOnAccept as string] = { built: true, tier: 1 };
+        return { success: true, awardedFacility: mission.awardsFacilityOnAccept as string };
       }
       return { success: true, awardedFacility: null };
     });
 
     expect(result.awardedFacility).toBe('rd-lab');
-    const gsAfter = await getGameState(page);
+    const gsAfter = await getGameState(page) as GameState;
     expect(gsAfter.facilities[FacilityId.RD_LAB]).toBeTruthy();
   });
 
@@ -1217,25 +1404,28 @@ test.describe('Tutorial missions — facility awards on accept', () => {
     });
     await seedAndLoadSave(page, envelope);
 
-    const gsBefore = await getGameState(page);
+    const gsBefore = await getGameState(page) as GameState;
     expect(gsBefore.facilities[FacilityId.TRACKING_STATION]).toBeFalsy();
 
-    const result = await page.evaluate(() => {
-      const gs = window.__gameState;
-      const mission = gs.missions.available.find(m => m.id === 'mission-020');
-      if (!mission) return { success: false };
-      gs.missions.available = gs.missions.available.filter(m => m.id !== 'mission-020');
+    const result = await page.evaluate((): MissionAcceptResult => {
+      const w = window as unknown as GameWindow;
+      const gs = w.__gameState;
+      if (!gs) return { success: false, awardedFacility: null };
+      const missions = gs.missions as { available: Record<string, unknown>[]; accepted: Record<string, unknown>[] };
+      const mission = missions.available.find(m => (m as { id: string }).id === 'mission-020') as Record<string, unknown> | undefined;
+      if (!mission) return { success: false, awardedFacility: null };
+      missions.available = missions.available.filter(m => (m as { id: string }).id !== 'mission-020');
       mission.status = 'accepted';
-      gs.missions.accepted.push(mission);
-      if (mission.awardsFacilityOnAccept && !gs.facilities[mission.awardsFacilityOnAccept]) {
-        gs.facilities[mission.awardsFacilityOnAccept] = { built: true, tier: 1 };
-        return { success: true, awardedFacility: mission.awardsFacilityOnAccept };
+      missions.accepted.push(mission);
+      if (mission.awardsFacilityOnAccept && !gs.facilities[mission.awardsFacilityOnAccept as string]) {
+        gs.facilities[mission.awardsFacilityOnAccept as string] = { built: true, tier: 1 };
+        return { success: true, awardedFacility: mission.awardsFacilityOnAccept as string };
       }
       return { success: true, awardedFacility: null };
     });
 
     expect(result.awardedFacility).toBe('tracking-station');
-    const gsAfter = await getGameState(page);
+    const gsAfter = await getGameState(page) as GameState;
     expect(gsAfter.facilities[FacilityId.TRACKING_STATION]).toBeTruthy();
   });
 
@@ -1279,25 +1469,28 @@ test.describe('Tutorial missions — facility awards on accept', () => {
     });
     await seedAndLoadSave(page, envelope);
 
-    const gsBefore = await getGameState(page);
+    const gsBefore = await getGameState(page) as GameState;
     expect(gsBefore.facilities[FacilityId.SATELLITE_OPS]).toBeFalsy();
 
-    const result = await page.evaluate(() => {
-      const gs = window.__gameState;
-      const mission = gs.missions.available.find(m => m.id === 'mission-022');
-      if (!mission) return { success: false };
-      gs.missions.available = gs.missions.available.filter(m => m.id !== 'mission-022');
+    const result = await page.evaluate((): MissionAcceptResult => {
+      const w = window as unknown as GameWindow;
+      const gs = w.__gameState;
+      if (!gs) return { success: false, awardedFacility: null };
+      const missions = gs.missions as { available: Record<string, unknown>[]; accepted: Record<string, unknown>[] };
+      const mission = missions.available.find(m => (m as { id: string }).id === 'mission-022') as Record<string, unknown> | undefined;
+      if (!mission) return { success: false, awardedFacility: null };
+      missions.available = missions.available.filter(m => (m as { id: string }).id !== 'mission-022');
       mission.status = 'accepted';
-      gs.missions.accepted.push(mission);
-      if (mission.awardsFacilityOnAccept && !gs.facilities[mission.awardsFacilityOnAccept]) {
-        gs.facilities[mission.awardsFacilityOnAccept] = { built: true, tier: 1 };
-        return { success: true, awardedFacility: mission.awardsFacilityOnAccept };
+      missions.accepted.push(mission);
+      if (mission.awardsFacilityOnAccept && !gs.facilities[mission.awardsFacilityOnAccept as string]) {
+        gs.facilities[mission.awardsFacilityOnAccept as string] = { built: true, tier: 1 };
+        return { success: true, awardedFacility: mission.awardsFacilityOnAccept as string };
       }
       return { success: true, awardedFacility: null };
     });
 
     expect(result.awardedFacility).toBe('satellite-ops');
-    const gsAfter = await getGameState(page);
+    const gsAfter = await getGameState(page) as GameState;
     expect(gsAfter.facilities[FacilityId.SATELLITE_OPS]).toBeTruthy();
   });
 });
@@ -1307,7 +1500,7 @@ test.describe('Tutorial missions — facility awards on accept', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Tutorial mission descriptions contain narrative and construction hints', () => {
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(60_000);
@@ -1375,11 +1568,17 @@ test.describe('Tutorial mission descriptions contain narrative and construction 
   test.afterAll(async () => { await page.close(); });
 
   test('tutorial missions reference Construction Menu in their description', async () => {
-    const descriptions = await page.evaluate(() => {
-      const gs = window.__gameState;
-      return gs.missions.available
-        .filter(m => m.awardsFacilityOnAccept)
-        .map(m => ({ id: m.id, description: m.description, facility: m.awardsFacilityOnAccept }));
+    const descriptions = await page.evaluate((): TutorialMissionDesc[] => {
+      const w = window as unknown as GameWindow;
+      const gs = w.__gameState;
+      if (!gs) return [];
+      return ((gs.missions as { available: Record<string, unknown>[] }).available)
+        .filter(m => (m as { awardsFacilityOnAccept?: string }).awardsFacilityOnAccept)
+        .map(m => ({
+          id: (m as { id: string }).id,
+          description: (m as { description: string }).description,
+          facility: (m as { awardsFacilityOnAccept: string }).awardsFacilityOnAccept,
+        }));
     });
 
     // Each tutorial facility mission should reference the Construction Menu
@@ -1389,11 +1588,17 @@ test.describe('Tutorial mission descriptions contain narrative and construction 
   });
 
   test('tutorial missions contain narrative context', async () => {
-    const missions = await page.evaluate(() => {
-      const gs = window.__gameState;
-      return gs.missions.available
-        .filter(m => m.awardsFacilityOnAccept)
-        .map(m => ({ id: m.id, title: m.title, description: m.description }));
+    const missions = await page.evaluate((): TutorialMissionNarrative[] => {
+      const w = window as unknown as GameWindow;
+      const gs = w.__gameState;
+      if (!gs) return [];
+      return ((gs.missions as { available: Record<string, unknown>[] }).available)
+        .filter(m => (m as { awardsFacilityOnAccept?: string }).awardsFacilityOnAccept)
+        .map(m => ({
+          id: (m as { id: string }).id,
+          title: (m as { title: string }).title,
+          description: (m as { description: string }).description,
+        }));
     });
 
     // Each should have a non-trivial narrative description (> 100 chars)
@@ -1421,7 +1626,7 @@ test.describe('Tutorial mission descriptions contain narrative and construction 
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Comprehensive facility state — all tiers loaded correctly', () => {
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(60_000);
@@ -1446,7 +1651,7 @@ test.describe('Comprehensive facility state — all tiers loaded correctly', () 
   test.afterAll(async () => { await page.close(); });
 
   test('all facilities loaded at correct tiers', async () => {
-    const gs = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
 
     expect(gs.facilities[FacilityId.LAUNCH_PAD].tier).toBe(3);
     expect(gs.facilities[FacilityId.VAB].tier).toBe(2);
@@ -1459,7 +1664,7 @@ test.describe('Comprehensive facility state — all tiers loaded correctly', () 
   });
 
   test('non-upgradeable facility (Library) has no tier 2', async () => {
-    const gs = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     expect(gs.facilities[FacilityId.LIBRARY].tier).toBe(1);
     // Library has no upgrade definitions — max tier is 1
   });
@@ -1470,7 +1675,7 @@ test.describe('Comprehensive facility state — all tiers loaded correctly', () 
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Launch Pad tier 3 — launch clamp support', () => {
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(60_000);
@@ -1489,7 +1694,7 @@ test.describe('Launch Pad tier 3 — launch clamp support', () => {
   test.afterAll(async () => { await page.close(); });
 
   test('tier 3 launch pad enables launch clamp features', async () => {
-    const gs = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     expect(gs.facilities[FacilityId.LAUNCH_PAD].tier).toBe(3);
     // Launch clamp support is a tier 3 feature — the tier is correctly set
     // Launch clamp staging is a gameplay mechanic that holds the rocket
@@ -1502,7 +1707,7 @@ test.describe('Launch Pad tier 3 — launch clamp support', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Facility upgrade — insufficient funds handling', () => {
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(60_000);
@@ -1532,11 +1737,11 @@ test.describe('Facility upgrade — insufficient funds handling', () => {
       const disabled = await upgradeBtn.isDisabled().catch(() => false);
       if (!disabled) {
         await upgradeBtn.click();
-        await page.evaluate(() => new Promise(r => requestAnimationFrame(r)));
+        await page.evaluate(() => new Promise<void>(r => requestAnimationFrame(() => r())));
       }
     }
 
-    const gs = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     // Tier should still be 1 (upgrade should have been prevented)
     expect(gs.facilities[FacilityId.LAUNCH_PAD].tier).toBe(1);
 
@@ -1549,7 +1754,7 @@ test.describe('Facility upgrade — insufficient funds handling', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Reputation discount on facility upgrades', () => {
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(60_000);
@@ -1566,12 +1771,14 @@ test.describe('Reputation discount on facility upgrades', () => {
     });
     await seedAndLoadSave(page, envelope);
 
-    const gsBefore = await getGameState(page);
-    const moneyBefore = gsBefore.money;
+    const gsBefore = await getGameState(page) as GameState;
+    const moneyBefore = gsBefore.money as number;
 
     // Upgrade Launch Pad tier 1→2 (base $200k, with 15% discount = $170k)
-    await page.evaluate(() => {
-      const gs = window.__gameState;
+    await page.evaluate((): void => {
+      const w = window as unknown as GameWindow;
+      const gs = w.__gameState;
+      if (!gs) return;
       const baseCost = 200_000;
       const discount = 0.15; // Elite tier
       const cost = Math.floor(baseCost * (1 - discount));
@@ -1579,9 +1786,9 @@ test.describe('Reputation discount on facility upgrades', () => {
       gs.facilities['launch-pad'].tier = 2;
     });
 
-    const gsAfter = await getGameState(page);
-    const spent = moneyBefore - gsAfter.money;
-    expect(spent).toBe(170_000); // $200k × 0.85
+    const gsAfter = await getGameState(page) as GameState;
+    const spent = moneyBefore - (gsAfter.money as number);
+    expect(spent).toBe(170_000); // $200k x 0.85
     expect(gsAfter.facilities[FacilityId.LAUNCH_PAD].tier).toBe(2);
   });
 
@@ -1592,11 +1799,13 @@ test.describe('Reputation discount on facility upgrades', () => {
     });
     await seedAndLoadSave(page, envelope);
 
-    const gsBefore = await getGameState(page);
-    const moneyBefore = gsBefore.money;
+    const gsBefore = await getGameState(page) as GameState;
+    const moneyBefore = gsBefore.money as number;
 
-    await page.evaluate(() => {
-      const gs = window.__gameState;
+    await page.evaluate((): void => {
+      const w = window as unknown as GameWindow;
+      const gs = w.__gameState;
+      if (!gs) return;
       const baseCost = 200_000;
       const discount = 0.00; // Basic tier
       const cost = Math.floor(baseCost * (1 - discount));
@@ -1604,8 +1813,8 @@ test.describe('Reputation discount on facility upgrades', () => {
       gs.facilities['launch-pad'].tier = 2;
     });
 
-    const gsAfter = await getGameState(page);
-    const spent = moneyBefore - gsAfter.money;
+    const gsAfter = await getGameState(page) as GameState;
+    const spent = moneyBefore - (gsAfter.money as number);
     expect(spent).toBe(200_000); // Full price
   });
 });
@@ -1615,7 +1824,7 @@ test.describe('Reputation discount on facility upgrades', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('R&D Lab upgrade — dual cost (money + science)', () => {
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(60_000);
@@ -1636,13 +1845,15 @@ test.describe('R&D Lab upgrade — dual cost (money + science)', () => {
   test.afterAll(async () => { await page.close(); });
 
   test('R&D Lab tier 2 costs $600k + 100 science', async () => {
-    const gsBefore = await getGameState(page);
-    const moneyBefore = gsBefore.money;
-    const scienceBefore = gsBefore.sciencePoints;
+    const gsBefore = await getGameState(page) as GameState;
+    const moneyBefore = gsBefore.money as number;
+    const scienceBefore = gsBefore.sciencePoints as number;
 
-    // Upgrade R&D Lab 1→2: $600k + 100 science (with 5% rep discount at rep 50)
-    await page.evaluate(() => {
-      const gs = window.__gameState;
+    // Upgrade R&D Lab 1->2: $600k + 100 science (with 5% rep discount at rep 50)
+    await page.evaluate((): void => {
+      const w = window as unknown as GameWindow;
+      const gs = w.__gameState;
+      if (!gs) return;
       const moneyCost = Math.floor(600_000 * (1 - 0.05)); // 5% discount at rep 50
       const scienceCost = 100;
       gs.money -= moneyCost;
@@ -1650,7 +1861,7 @@ test.describe('R&D Lab upgrade — dual cost (money + science)', () => {
       gs.facilities['rd-lab'].tier = 2;
     });
 
-    const gsAfter = await getGameState(page);
+    const gsAfter = await getGameState(page) as GameState;
     expect(gsAfter.facilities[FacilityId.RD_LAB].tier).toBe(2);
     expect(gsAfter.money).toBeLessThan(moneyBefore);
     expect(gsAfter.sciencePoints).toBe(scienceBefore - 100);

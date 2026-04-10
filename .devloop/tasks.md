@@ -699,31 +699,31 @@
 - **Verification**: `npx playwright test e2e/core-mechanics.spec.ts`
 
 ### TASK-116: Convert crew.spec.js to TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-016, TASK-017
 - **Description**: Rename `e2e/crew.spec.js` to `e2e/crew.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
 - **Verification**: `npx playwright test e2e/crew.spec.ts`
 
 ### TASK-117: Convert debug-mode.spec.js to TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-016, TASK-017
 - **Description**: Rename `e2e/debug-mode.spec.js` to `e2e/debug-mode.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
 - **Verification**: `npx playwright test e2e/debug-mode.spec.ts`
 
 ### TASK-118: Convert destinations.spec.js to TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-016, TASK-017
 - **Description**: Rename `e2e/destinations.spec.js` to `e2e/destinations.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
 - **Verification**: `npx playwright test e2e/destinations.spec.ts`
 
 ### TASK-119: Convert facilities-infrastructure.spec.js to TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-016, TASK-017
 - **Description**: Rename `e2e/facilities-infrastructure.spec.js` to `e2e/facilities-infrastructure.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
 - **Verification**: `npx playwright test e2e/facilities-infrastructure.spec.ts`
 
 ### TASK-120: Convert failure-paths.spec.js to TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-016, TASK-017
 - **Description**: Rename `e2e/failure-paths.spec.js` to `e2e/failure-paths.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
 - **Verification**: `npx playwright test e2e/failure-paths.spec.ts`

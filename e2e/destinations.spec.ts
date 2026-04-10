@@ -1,5 +1,5 @@
 /**
- * destinations.spec.js — E2E tests for Phase 6: Destinations.
+ * destinations.spec.ts — E2E tests for Phase 6: Destinations.
  *
  * Covers:
  *   - Celestial body data driving physics (gravity, atmosphere) and rendering
@@ -15,7 +15,7 @@
  *   - Phase 6 new parts functioning correctly
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import {
   VP_W, VP_H,
   buildSaveEnvelope,
@@ -31,6 +31,7 @@ import {
   teleportCraft,
   waitForOrbit,
 } from './helpers.js';
+import type { SaveEnvelope, SaveEnvelopeParams } from './helpers.js';
 import {
   orbitalFixture,
   ALL_PARTS,
@@ -41,7 +42,7 @@ import {
 // ---------------------------------------------------------------------------
 
 // Phase 6 parts — not in the base ALL_PARTS set yet.
-const PHASE6_PARTS = [
+const PHASE6_PARTS: string[] = [
   ...ALL_PARTS,
   'engine-deep-space',
   'mission-module-extended',
@@ -55,38 +56,116 @@ const PHASE6_PARTS = [
 ];
 
 // Rocket configurations for different test scenarios.
-const BASIC_PROBE     = ['probe-core-mk1', 'tank-small', 'engine-spark'];
-const LUNAR_LANDER    = ['cmd-mk1', 'tank-large', 'engine-reliant', 'landing-legs-small'];
-const DEEP_SPACE_SHIP = ['cmd-mk1', 'tank-large', 'engine-deep-space'];
-const SOLAR_PROBE     = ['probe-core-mk1', 'heat-shield-solar', 'tank-small', 'engine-spark'];
+const BASIC_PROBE: string[]     = ['probe-core-mk1', 'tank-small', 'engine-spark'];
+const LUNAR_LANDER: string[]    = ['cmd-mk1', 'tank-large', 'engine-reliant', 'landing-legs-small'];
+const DEEP_SPACE_SHIP: string[] = ['cmd-mk1', 'tank-large', 'engine-deep-space'];
+const SOLAR_PROBE: string[]     = ['probe-core-mk1', 'heat-shield-solar', 'tank-small', 'engine-spark'];
 
 // Orbital parameters.
-const EARTH_ORBIT_ALT = 100_000;
-const EARTH_ORBIT_VEL = 7848;
-const MOON_ORBIT_ALT  = 20_000;
-const MOON_ORBIT_VEL  = 1671;  // Circular velocity at 20 km above Moon surface
-const MARS_ORBIT_ALT  = 100_000;
-const MARS_ORBIT_VEL  = 3503;  // Circular velocity at 100 km above Mars surface
+const EARTH_ORBIT_ALT: number = 100_000;
+const EARTH_ORBIT_VEL: number = 7848;
+const MOON_ORBIT_ALT: number  = 20_000;
+const MOON_ORBIT_VEL: number  = 1671;  // Circular velocity at 20 km above Moon surface
+const MARS_ORBIT_ALT: number  = 100_000;
+const MARS_ORBIT_VEL: number  = 3503;  // Circular velocity at 100 km above Mars surface
 
 // Sun constants from src/core/constants.js.
-const SUN_DESTRUCTION_ALTITUDE   = 500_000_000;
-const SUN_HEAT_START_ALTITUDE    = 20_000_000_000;
+const SUN_DESTRUCTION_ALTITUDE: number   = 500_000_000;
+const SUN_HEAT_START_ALTITUDE: number    = 20_000_000_000;
 
 // Surface ops constants.
-const FLAG_MILESTONE_BONUS = 100_000;
-const FLAG_MILESTONE_REP   = 5;
-const SURFACE_SAMPLE_BASE_SCIENCE = 15;
-const SURFACE_INSTRUMENT_SCIENCE_PER_PERIOD = 3;
+const FLAG_MILESTONE_BONUS: number = 100_000;
+const FLAG_MILESTONE_REP: number   = 5;
+const SURFACE_SAMPLE_BASE_SCIENCE: number = 15;
+const SURFACE_INSTRUMENT_SCIENCE_PER_PERIOD: number = 3;
+
+// ---------------------------------------------------------------------------
+// Local interfaces for page.evaluate return types
+// ---------------------------------------------------------------------------
+
+interface HeatEvent {
+  type: string;
+  description?: string;
+}
+
+interface HeatState {
+  hasHeat: boolean;
+  maxHeat: number;
+  eventCount?: number;
+}
+
+interface DestructionState {
+  crashed: boolean;
+  events: HeatEvent[];
+}
+
+interface ShieldState {
+  hasShield: boolean;
+}
+
+interface TransferInfo {
+  departureDV: number;
+  captureDV: number;
+  totalDV: number;
+}
+
+interface DeltaVInfo {
+  departureDV: number;
+  captureDV?: number;
+  totalDV: number;
+}
+
+interface BiomeInfo {
+  id: string;
+  mult: number;
+}
+
+interface SunBiomeInfo {
+  id: string;
+  name: string;
+  mult: number;
+  min: number;
+  max: number;
+}
+
+interface SurfaceActionResult {
+  success: boolean;
+  reason?: string;
+}
+
+interface SampleReturnResult {
+  samplesReturned: number;
+  scienceEarned: number;
+}
+
+interface SurfaceOpsResult {
+  scienceEarned: number;
+}
+
+interface AchievementResult {
+  id: string;
+  cashReward: number;
+  repReward: number;
+}
+
+interface PartInfo {
+  id: string;
+  type: string;
+  mass: number;
+  cost: number;
+  properties: Record<string, unknown>;
+}
+
+interface ShieldTierInfo {
+  id: string;
+  tolerance: number;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Build a Phase-6-ready save envelope with all parts unlocked,
- * all facilities built, crew available, and high progression.
- */
-function phase6Fixture(overrides = {}) {
+function phase6Fixture(overrides: SaveEnvelopeParams = {}): SaveEnvelope {
   return buildSaveEnvelope({
     saveName:     'Phase 6 Test',
     agencyName:   'Deep Space Agency',
@@ -136,10 +215,7 @@ function phase6Fixture(overrides = {}) {
   });
 }
 
-/**
- * Set the craft into transfer phase.
- */
-async function setTransferState(page, origin, destination) {
+async function setTransferState(page: Page, origin: string, destination: string): Promise<void> {
   await page.evaluate(async ({ origin, destination }) => {
     const fs = window.__flightState;
     if (!fs) return;
@@ -165,12 +241,9 @@ async function setTransferState(page, origin, destination) {
   );
 }
 
-/**
- * Return to agency from flight.
- */
-async function returnToAgency(page) {
+async function returnToAgency(page: Page): Promise<void> {
   // Already on the hub? Nothing to do.
-  const hubAlready = await page.locator('#hub-overlay').isVisible().catch(() => false);
+  const hubAlready: boolean = await page.locator('#hub-overlay').isVisible().catch(() => false);
   if (hubAlready) return;
 
   // If the post-flight summary is already visible (e.g. after landing/crash),
@@ -189,7 +262,7 @@ async function returnToAgency(page) {
     const orbitReturn = page.locator('[data-testid="orbit-return-btn"]');
     const abortReturn = page.locator('[data-testid="abort-confirm-btn"]');
 
-    const orbitVisible = await orbitReturn.isVisible({ timeout: 2_000 }).catch(() => false);
+    const orbitVisible: boolean = await orbitReturn.isVisible({ timeout: 2_000 }).catch(() => false);
     if (orbitVisible) {
       await orbitReturn.click();
       const summaryAfter = page.locator('#post-flight-summary');
@@ -197,7 +270,7 @@ async function returnToAgency(page) {
         await page.click('#post-flight-return-btn');
       }
     } else {
-      const abortVisible = await abortReturn.isVisible({ timeout: 2_000 }).catch(() => false);
+      const abortVisible: boolean = await abortReturn.isVisible({ timeout: 2_000 }).catch(() => false);
       if (abortVisible) {
         await abortReturn.click();
       } else {
@@ -226,7 +299,7 @@ async function returnToAgency(page) {
 
 test.describe('Celestial body data drives physics and rendering', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(180_000);
@@ -238,7 +311,7 @@ test.describe('Celestial body data drives physics and rendering', () => {
   test.afterAll(async () => { await page.close(); });
 
   test('(1) body catalog is accessible and contains all expected bodies', async () => {
-    const bodies = await page.evaluate(() => {
+    const bodies = await page.evaluate((): string[] | null => {
       const mod = window.__celestialBodies || window.__gameState?._bodyCache;
       // Fallback: check if CELESTIAL_BODIES is exposed via any global.
       if (mod) return Object.keys(mod);
@@ -325,7 +398,7 @@ test.describe('Celestial body data drives physics and rendering', () => {
     const ps1 = await getPhysicsSnapshot(page);
     // Wait for physics to run a few frames (position changes due to gravity)
     await page.waitForFunction(
-      (y0) => (window.__flightPs?.posY ?? y0) !== y0,
+      (y0: number) => (window.__flightPs?.posY ?? y0) !== y0,
       ps1.posY,
       { timeout: 5_000 },
     );
@@ -333,7 +406,7 @@ test.describe('Celestial body data drives physics and rendering', () => {
 
     // Velocity change should be purely gravitational (small, only vertical).
     // Horizontal velocity should be essentially unchanged (no drag).
-    const hVelChange = Math.abs(ps2.velX - ps1.velX);
+    const hVelChange: number = Math.abs(ps2.velX - ps1.velX);
     expect(hVelChange).toBeLessThan(1);
 
     await returnToAgency(page);
@@ -349,7 +422,7 @@ test.describe('Celestial body data drives physics and rendering', () => {
 
 test.describe('Sun destruction altitude and escalating heat damage', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
@@ -366,17 +439,17 @@ test.describe('Sun destruction altitude and escalating heat damage', () => {
     // Teleport above the heat start altitude.
     await teleportCraft(page, { posY: SUN_HEAT_START_ALTITUDE + 1_000_000_000, bodyId: 'SUN' });
     // Wait for physics sim to run (gravity changes posY)
-    const _sunPosY1 = await page.evaluate(() => window.__flightPs?.posY ?? 0);
+    const _sunPosY1: number = await page.evaluate((): number => window.__flightPs?.posY ?? 0);
     await page.waitForFunction(
-      (y0) => (window.__flightPs?.posY ?? y0) !== y0,
+      (y0: number) => (window.__flightPs?.posY ?? y0) !== y0,
       _sunPosY1,
       { timeout: 10_000 },
     );
 
     // Check that no heat-related events fired.
-    const events = await page.evaluate(() => {
+    const events = await page.evaluate((): HeatEvent[] => {
       const fs = window.__flightState;
-      return (fs?.events ?? []).filter(e =>
+      return (fs?.events ?? []).filter((e: HeatEvent) =>
         e.type === 'HEAT_DAMAGE' || e.type === 'PART_DESTROYED' ||
         (e.description && e.description.toLowerCase().includes('solar'))
       );
@@ -404,14 +477,14 @@ test.describe('Sun destruction altitude and escalating heat damage', () => {
       }
       // Or check for destruction events
       const fs = window.__flightState;
-      return (fs?.events ?? []).some(e =>
+      return (fs?.events ?? []).some((e: { type: string }) =>
         e.type === 'PART_DESTROYED' || e.type === 'HEAT_DAMAGE'
       );
     }, { timeout: 15_000 });
 
     // Check for heat-related effects — parts should accumulate heat.
     // Heat is tracked in ps.heatMap (Map<string, number>).
-    const heatState = await page.evaluate(() => {
+    const heatState = await page.evaluate((): HeatState => {
       const ps = window.__flightPs;
       if (!ps) return { hasHeat: false, maxHeat: 0 };
       let maxHeat = 0;
@@ -422,7 +495,7 @@ test.describe('Sun destruction altitude and escalating heat damage', () => {
       }
       // Also check for any destruction events as evidence of heat.
       const fs = window.__flightState;
-      const heatEvents = (fs?.events ?? []).filter(e =>
+      const heatEvents = (fs?.events ?? []).filter((e: { type: string; description?: string }) =>
         e.type === 'PART_DESTROYED' || e.type === 'HEAT_DAMAGE' ||
         (e.description && (e.description.includes('heat') || e.description.includes('solar') || e.description.includes('destroyed')))
       );
@@ -448,16 +521,16 @@ test.describe('Sun destruction altitude and escalating heat damage', () => {
       const ps = window.__flightPs;
       const fs = window.__flightState;
       return ps?.crashed === true ||
-        (fs?.events ?? []).some(e => e.type === 'PART_DESTROYED');
+        (fs?.events ?? []).some((e: { type: string }) => e.type === 'PART_DESTROYED');
     }, { timeout: 10_000 });
 
     // All parts should be destroyed — check for crash or destruction state.
-    const state = await page.evaluate(() => {
+    const state = await page.evaluate((): DestructionState => {
       const ps = window.__flightPs;
       const fs = window.__flightState;
       return {
         crashed: ps?.crashed ?? false,
-        events: (fs?.events ?? []).filter(e =>
+        events: (fs?.events ?? []).filter((e: { type: string; description?: string }) =>
           e.type === 'PART_DESTROYED' ||
           (e.description && e.description.toLowerCase().includes('destroyed'))
         ),
@@ -465,7 +538,7 @@ test.describe('Sun destruction altitude and escalating heat damage', () => {
     });
 
     // Craft should be destroyed or have destruction events.
-    const isDestroyed = state.crashed || state.events.length > 0;
+    const isDestroyed: boolean = state.crashed || state.events.length > 0;
     expect(isDestroyed).toBe(true);
 
     await returnToAgency(page);
@@ -480,14 +553,14 @@ test.describe('Sun destruction altitude and escalating heat damage', () => {
     // Teleport to inner corona — should survive longer with solar shield.
     await teleportCraft(page, { posY: 3_000_000_000, bodyId: 'SUN' });
     // Wait for physics to process several frames near the Sun
-    const _sunPosY2 = await page.evaluate(() => window.__flightPs?.posY ?? 0);
+    const _sunPosY2: number = await page.evaluate((): number => window.__flightPs?.posY ?? 0);
     await page.waitForFunction(
-      (y0) => Math.abs((window.__flightPs?.posY ?? y0) - y0) > 1000,
+      (y0: number) => Math.abs((window.__flightPs?.posY ?? y0) - y0) > 1000,
       _sunPosY2,
       { timeout: 15_000 },
     );
 
-    const shieldState = await page.evaluate(() => {
+    const shieldState = await page.evaluate((): ShieldState => {
       const ps = window.__flightPs;
       if (!ps) return { hasShield: false };
       const assembly = window.__flightAssembly;
@@ -517,7 +590,7 @@ test.describe('Sun destruction altitude and escalating heat damage', () => {
 
 test.describe('Transfer gameplay mechanics', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(180_000);
@@ -548,17 +621,17 @@ test.describe('Transfer gameplay mechanics', () => {
 
   test('(2) time warp during transfer does NOT advance period counter', async () => {
     const gsBefore = await getGameState(page);
-    const periodBefore = gsBefore.currentPeriod;
+    const periodBefore: number = gsBefore.currentPeriod;
 
     // Try to activate time warp.
     const warpBtn = page.locator('.hud-warp-btn[data-warp="5"]');
-    const warpExists = await warpBtn.isVisible({ timeout: 3_000 }).catch(() => false);
+    const warpExists: boolean = await warpBtn.isVisible({ timeout: 3_000 }).catch(() => false);
     if (warpExists) {
       await warpBtn.click();
       // Wait for simulation to advance at warp speed
-      const _tPosX = await page.evaluate(() => window.__flightPs?.posX ?? 0);
+      const _tPosX: number = await page.evaluate((): number => window.__flightPs?.posX ?? 0);
       await page.waitForFunction(
-        (x0) => Math.abs((window.__flightPs?.posX ?? x0) - x0) > 100,
+        (x0: number) => Math.abs((window.__flightPs?.posX ?? x0) - x0) > 100,
         _tPosX,
         { timeout: 10_000 },
       );
@@ -576,14 +649,14 @@ test.describe('Transfer gameplay mechanics', () => {
     expect(fs.transferState).not.toBeNull();
 
     // The flight state should still be active (not ended).
-    const flightActive = await page.evaluate(() => {
+    const flightActive: boolean = await page.evaluate((): boolean => {
       return window.__flightState !== null && window.__flightState !== undefined;
     });
     expect(flightActive).toBe(true);
   });
 
   test('(4) delta-v display shows values for transfer', async () => {
-    const transferInfo = await page.evaluate(() => {
+    const transferInfo = await page.evaluate((): TransferInfo | null => {
       const fs = window.__flightState;
       if (!fs?.transferState) return null;
       return {
@@ -594,9 +667,9 @@ test.describe('Transfer gameplay mechanics', () => {
     });
 
     expect(transferInfo).not.toBeNull();
-    expect(transferInfo.departureDV).toBeGreaterThan(0);
-    expect(transferInfo.captureDV).toBeGreaterThan(0);
-    expect(transferInfo.totalDV).toBeGreaterThan(0);
+    expect(transferInfo!.departureDV).toBeGreaterThan(0);
+    expect(transferInfo!.captureDV).toBeGreaterThan(0);
+    expect(transferInfo!.totalDV).toBeGreaterThan(0);
 
     // Reset to orbit so we can return cleanly.
     await page.evaluate(async () => {
@@ -616,7 +689,7 @@ test.describe('Transfer gameplay mechanics', () => {
   });
 
   test('(5) transfer delta-v calculation returns values for Earth-Moon', async () => {
-    const dvInfo = await page.evaluate(() => {
+    const dvInfo = await page.evaluate((): DeltaVInfo | null => {
       if (typeof window.__computeTransferDeltaV === 'function') {
         return window.__computeTransferDeltaV('EARTH', 'MOON', 100000);
       }
@@ -633,7 +706,7 @@ test.describe('Transfer gameplay mechanics', () => {
   });
 
   test('(6) transfer delta-v calculation returns values for Earth-Mars', async () => {
-    const dvInfo = await page.evaluate(() => {
+    const dvInfo = await page.evaluate((): DeltaVInfo | null => {
       if (typeof window.__computeTransferDeltaV === 'function') {
         return window.__computeTransferDeltaV('EARTH', 'MARS', 100000);
       }
@@ -654,7 +727,7 @@ test.describe('Transfer gameplay mechanics', () => {
 
 test.describe('Landing on airless and atmospheric bodies', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(180_000);
@@ -718,7 +791,7 @@ test.describe('Landing on airless and atmospheric bodies', () => {
   });
 
   test('(4) Sun is not landable', async () => {
-    const landable = await page.evaluate(() => {
+    const landable: boolean = await page.evaluate((): boolean => {
       // Check via data module if exposed, or via game logic.
       if (typeof window.__isLandable === 'function') {
         return window.__isLandable('SUN');
@@ -736,7 +809,7 @@ test.describe('Landing on airless and atmospheric bodies', () => {
 
 test.describe('Body-specific biomes and science opportunities', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(180_000);
@@ -750,20 +823,20 @@ test.describe('Body-specific biomes and science opportunities', () => {
   test('(1) Moon has distinct biomes with science multipliers', async () => {
     await startTestFlight(page, BASIC_PROBE, { bodyId: 'MOON' });
 
-    const biomes = await page.evaluate(() => {
+    const biomes = await page.evaluate((): BiomeInfo[] | null => {
       // Access body data through any exposed global.
       const bodies = window.__celestialBodies;
       if (bodies && bodies.MOON) {
-        return bodies.MOON.biomes.map(b => ({ id: b.id, mult: b.scienceMultiplier }));
+        return bodies.MOON.biomes.map((b: { id: string; scienceMultiplier: number }) => ({ id: b.id, mult: b.scienceMultiplier }));
       }
       return null;
     });
 
     if (biomes !== null) {
       expect(biomes.length).toBeGreaterThan(0);
-      const surfaceBiome = biomes.find(b => b.id === 'LUNAR_SURFACE');
+      const surfaceBiome: BiomeInfo | undefined = biomes.find((b: BiomeInfo) => b.id === 'LUNAR_SURFACE');
       expect(surfaceBiome).toBeDefined();
-      expect(surfaceBiome.mult).toBe(1.0);
+      expect(surfaceBiome!.mult).toBe(1.0);
     }
 
     // Also verify the biome display works during flight.
@@ -772,7 +845,7 @@ test.describe('Body-specific biomes and science opportunities', () => {
     await waitForAltitude(page, 150, 15_000);
 
     // The biome label should change as we ascend.
-    const biomeText = await page.evaluate(() => {
+    const biomeText = await page.evaluate((): string | null => {
       const el = document.querySelector('#hud-biome');
       return el ? el.textContent : null;
     });
@@ -803,10 +876,10 @@ test.describe('Body-specific biomes and science opportunities', () => {
   });
 
   test('(3) Sun biomes include danger zones', async () => {
-    const sunBiomes = await page.evaluate(() => {
+    const sunBiomes = await page.evaluate((): SunBiomeInfo[] | null => {
       const bodies = window.__celestialBodies;
       if (bodies && bodies.SUN) {
-        return bodies.SUN.biomes.map(b => ({
+        return bodies.SUN.biomes.map((b: { id: string; name: string; scienceMultiplier: number; min: number; max: number }) => ({
           id: b.id,
           name: b.name,
           mult: b.scienceMultiplier,
@@ -818,13 +891,13 @@ test.describe('Body-specific biomes and science opportunities', () => {
     });
 
     if (sunBiomes !== null) {
-      const inferno = sunBiomes.find(b => b.id === 'SUN_INFERNO');
+      const inferno: SunBiomeInfo | undefined = sunBiomes.find((b: SunBiomeInfo) => b.id === 'SUN_INFERNO');
       expect(inferno).toBeDefined();
-      expect(inferno.mult).toBe(0); // No science in destruction zone.
+      expect(inferno!.mult).toBe(0); // No science in destruction zone.
 
-      const innerCorona = sunBiomes.find(b => b.id === 'SUN_INNER_CORONA');
+      const innerCorona: SunBiomeInfo | undefined = sunBiomes.find((b: SunBiomeInfo) => b.id === 'SUN_INNER_CORONA');
       expect(innerCorona).toBeDefined();
-      expect(innerCorona.mult).toBe(12.0); // High science reward.
+      expect(innerCorona!.mult).toBe(12.0); // High science reward.
     }
   });
 });
@@ -835,7 +908,7 @@ test.describe('Body-specific biomes and science opportunities', () => {
 
 test.describe('Surface operations — flag planting', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(180_000);
@@ -851,12 +924,12 @@ test.describe('Surface operations — flag planting', () => {
     await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MOON' });
 
     const gsBefore = await getGameState(page);
-    const moneyBefore = gsBefore.money;
-    const repBefore = gsBefore.reputation;
+    const moneyBefore: number = gsBefore.money;
+    const repBefore: number = gsBefore.reputation;
 
     // Plant flag via game API.
-    const result = await page.evaluate(async () => {
-      let r = null;
+    const result = await page.evaluate(async (): Promise<SurfaceActionResult | null> => {
+      let r: SurfaceActionResult | null = null;
       if (typeof window.__plantFlag === 'function') {
         r = window.__plantFlag();
       } else if (typeof window.__surfaceAction === 'function') {
@@ -877,14 +950,14 @@ test.describe('Surface operations — flag planting', () => {
       // Surface items should contain the flag.
       expect(gsAfter.surfaceItems).toBeDefined();
       const moonFlags = gsAfter.surfaceItems.filter(
-        i => i.type === 'FLAG' && i.bodyId === 'MOON',
+        (i: Record<string, unknown>) => i.type === 'FLAG' && i.bodyId === 'MOON',
       );
       expect(moonFlags.length).toBe(1);
     }
 
     // Check flight event was logged.
-    const events = await page.evaluate(() => {
-      return (window.__flightState?.events ?? []).filter(e => e.type === 'FLAG_PLANTED');
+    const events = await page.evaluate((): { type: string }[] => {
+      return (window.__flightState?.events ?? []).filter((e: { type: string }) => e.type === 'FLAG_PLANTED');
     });
     if (result !== null) {
       expect(events.length).toBeGreaterThan(0);
@@ -892,8 +965,8 @@ test.describe('Surface operations — flag planting', () => {
   });
 
   test('(2) cannot plant second flag on same body', async () => {
-    const result = await page.evaluate(async () => {
-      let r = null;
+    const result = await page.evaluate(async (): Promise<SurfaceActionResult | null> => {
+      let r: SurfaceActionResult | null = null;
       if (typeof window.__plantFlag === 'function') {
         r = window.__plantFlag();
       } else if (typeof window.__surfaceAction === 'function') {
@@ -919,8 +992,8 @@ test.describe('Surface operations — flag planting', () => {
     await startTestFlight(page, BASIC_PROBE, { bodyId: 'MARS' });
     await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MARS' });
 
-    const result = await page.evaluate(async () => {
-      let r = null;
+    const result = await page.evaluate(async (): Promise<SurfaceActionResult | null> => {
+      let r: SurfaceActionResult | null = null;
       if (typeof window.__plantFlag === 'function') {
         r = window.__plantFlag();
       } else if (typeof window.__surfaceAction === 'function') {
@@ -932,7 +1005,7 @@ test.describe('Surface operations — flag planting', () => {
 
     if (result !== null) {
       expect(result.success).toBe(false);
-      expect(result.reason.toLowerCase()).toContain('crew');
+      expect(result.reason!.toLowerCase()).toContain('crew');
     }
 
     await returnToAgency(page);
@@ -948,7 +1021,7 @@ test.describe('Surface operations — flag planting', () => {
 
 test.describe('Surface operations — sample collection and return', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(180_000);
@@ -963,8 +1036,8 @@ test.describe('Surface operations — sample collection and return', () => {
     await startTestFlight(page, LUNAR_LANDER, { bodyId: 'MOON', crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MOON' });
 
-    const result = await page.evaluate(async () => {
-      let r = null;
+    const result = await page.evaluate(async (): Promise<SurfaceActionResult | null> => {
+      let r: SurfaceActionResult | null = null;
       if (typeof window.__collectSample === 'function') {
         r = window.__collectSample();
       } else if (typeof window.__surfaceAction === 'function') {
@@ -979,7 +1052,7 @@ test.describe('Surface operations — sample collection and return', () => {
 
       const gs = await getGameState(page);
       const samples = (gs.surfaceItems ?? []).filter(
-        i => i.type === 'SURFACE_SAMPLE' && i.bodyId === 'MOON',
+        (i: Record<string, unknown>) => i.type === 'SURFACE_SAMPLE' && i.bodyId === 'MOON',
       );
       expect(samples.length).toBeGreaterThan(0);
       // Sample should not be collected (returned) yet.
@@ -987,8 +1060,8 @@ test.describe('Surface operations — sample collection and return', () => {
     }
 
     // Check event logged.
-    const events = await page.evaluate(() => {
-      return (window.__flightState?.events ?? []).filter(e => e.type === 'SAMPLE_COLLECTED');
+    const events = await page.evaluate((): { type: string }[] => {
+      return (window.__flightState?.events ?? []).filter((e: { type: string }) => e.type === 'SAMPLE_COLLECTED');
     });
     if (result !== null) {
       expect(events.length).toBeGreaterThan(0);
@@ -1002,7 +1075,7 @@ test.describe('Surface operations — sample collection and return', () => {
 
   test('(2) sample return on Earth landing awards science', async () => {
     const gsBefore = await getGameState(page);
-    const scienceBefore = gsBefore.sciencePoints;
+    const scienceBefore: number = gsBefore.sciencePoints;
 
     // Inject a Moon sample that hasn't been returned yet.
     await page.evaluate(async () => {
@@ -1010,7 +1083,7 @@ test.describe('Surface operations — sample collection and return', () => {
       if (!gs.surfaceItems) gs.surfaceItems = [];
       // Only add if we don't already have an uncollected Moon sample.
       const existing = gs.surfaceItems.find(
-        i => i.type === 'SURFACE_SAMPLE' && i.bodyId === 'MOON' && !i.collected,
+        (i: Record<string, unknown>) => i.type === 'SURFACE_SAMPLE' && i.bodyId === 'MOON' && !i.collected,
       );
       if (!existing) {
         gs.surfaceItems.push({
@@ -1027,8 +1100,8 @@ test.describe('Surface operations — sample collection and return', () => {
     });
 
     // Process sample returns (simulating safe Earth landing).
-    const returnResult = await page.evaluate(async () => {
-      let r = null;
+    const returnResult = await page.evaluate(async (): Promise<SampleReturnResult | null> => {
+      let r: SampleReturnResult | null = null;
       if (typeof window.__processSampleReturns === 'function') {
         r = window.__processSampleReturns('EARTH');
       }
@@ -1062,8 +1135,8 @@ test.describe('Surface operations — sample collection and return', () => {
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
-    const result = await page.evaluate(async () => {
-      let r = null;
+    const result = await page.evaluate(async (): Promise<SampleReturnResult | null> => {
+      let r: SampleReturnResult | null = null;
       if (typeof window.__processSampleReturns === 'function') {
         r = window.__processSampleReturns('MARS');
       }
@@ -1084,7 +1157,7 @@ test.describe('Surface operations — sample collection and return', () => {
 
 test.describe('Surface operations — instruments and beacons', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(180_000);
@@ -1101,8 +1174,8 @@ test.describe('Surface operations — instruments and beacons', () => {
     ], { bodyId: 'MOON', crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MOON' });
 
-    const result = await page.evaluate(async () => {
-      let r = null;
+    const result = await page.evaluate(async (): Promise<SurfaceActionResult | null> => {
+      let r: SurfaceActionResult | null = null;
       if (typeof window.__deployInstrument === 'function') {
         r = window.__deployInstrument();
       } else if (typeof window.__surfaceAction === 'function') {
@@ -1117,14 +1190,14 @@ test.describe('Surface operations — instruments and beacons', () => {
 
       const gs = await getGameState(page);
       const instruments = (gs.surfaceItems ?? []).filter(
-        i => i.type === 'SURFACE_INSTRUMENT' && i.bodyId === 'MOON',
+        (i: Record<string, unknown>) => i.type === 'SURFACE_INSTRUMENT' && i.bodyId === 'MOON',
       );
       expect(instruments.length).toBeGreaterThan(0);
     }
 
     // Check event.
-    const events = await page.evaluate(() => {
-      return (window.__flightState?.events ?? []).filter(e => e.type === 'INSTRUMENT_DEPLOYED');
+    const events = await page.evaluate((): { type: string }[] => {
+      return (window.__flightState?.events ?? []).filter((e: { type: string }) => e.type === 'INSTRUMENT_DEPLOYED');
     });
     if (result !== null) {
       expect(events.length).toBeGreaterThan(0);
@@ -1142,7 +1215,7 @@ test.describe('Surface operations — instruments and beacons', () => {
       const gs = window.__gameState;
       if (!gs.surfaceItems) gs.surfaceItems = [];
       const existing = gs.surfaceItems.find(
-        i => i.type === 'SURFACE_INSTRUMENT',
+        (i: Record<string, unknown>) => i.type === 'SURFACE_INSTRUMENT',
       );
       if (!existing) {
         gs.surfaceItems.push({
@@ -1158,11 +1231,11 @@ test.describe('Surface operations — instruments and beacons', () => {
     });
 
     const gsBefore = await getGameState(page);
-    const scienceBefore = gsBefore.sciencePoints;
+    const scienceBefore: number = gsBefore.sciencePoints;
 
     // Process surface ops (simulating period advancement).
-    const result = await page.evaluate(async () => {
-      let r = null;
+    const result = await page.evaluate(async (): Promise<SurfaceOpsResult | null> => {
+      let r: SurfaceOpsResult | null = null;
       if (typeof window.__processSurfaceOps === 'function') {
         r = window.__processSurfaceOps();
       }
@@ -1181,8 +1254,8 @@ test.describe('Surface operations — instruments and beacons', () => {
     await startTestFlight(page, BASIC_PROBE, { bodyId: 'MARS' });
     await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MARS' });
 
-    const result = await page.evaluate(async () => {
-      let r = null;
+    const result = await page.evaluate(async (): Promise<SurfaceActionResult | null> => {
+      let r: SurfaceActionResult | null = null;
       if (typeof window.__deployBeacon === 'function') {
         r = window.__deployBeacon('Mars Alpha');
       } else if (typeof window.__surfaceAction === 'function') {
@@ -1197,7 +1270,7 @@ test.describe('Surface operations — instruments and beacons', () => {
 
       const gs = await getGameState(page);
       const beacons = (gs.surfaceItems ?? []).filter(
-        i => i.type === 'BEACON' && i.bodyId === 'MARS',
+        (i: Record<string, unknown>) => i.type === 'BEACON' && i.bodyId === 'MARS',
       );
       expect(beacons.length).toBeGreaterThan(0);
     }
@@ -1214,7 +1287,7 @@ test.describe('Surface operations — instruments and beacons', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Surface item visibility based on GPS coverage', () => {
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
@@ -1225,14 +1298,14 @@ test.describe('Surface item visibility based on GPS coverage', () => {
   test.afterAll(async () => { await page.close(); });
 
   test('(1) Earth surface items are always visible (direct line of sight)', async () => {
-    const envelope = phase6Fixture({
+    const envelope: SaveEnvelope = phase6Fixture({
       surfaceItems: [
         { id: 'test-flag-earth', type: 'FLAG', bodyId: 'EARTH', posX: 0, deployedPeriod: 1, label: 'Earth flag' },
       ],
     });
     await seedAndLoadSave(page, envelope);
 
-    const visible = await page.evaluate(() => {
+    const visible: boolean = await page.evaluate((): boolean => {
       if (typeof window.__areSurfaceItemsVisible === 'function') {
         return window.__areSurfaceItemsVisible('EARTH');
       }
@@ -1243,7 +1316,7 @@ test.describe('Surface item visibility based on GPS coverage', () => {
   });
 
   test('(2) Moon items NOT visible without GPS satellite', async () => {
-    const envelope = phase6Fixture({
+    const envelope: SaveEnvelope = phase6Fixture({
       surfaceItems: [
         { id: 'test-flag-moon', type: 'FLAG', bodyId: 'MOON', posX: 0, deployedPeriod: 1, label: 'Moon flag' },
       ],
@@ -1251,7 +1324,7 @@ test.describe('Surface item visibility based on GPS coverage', () => {
     });
     await seedAndLoadSave(page, envelope);
 
-    const visible = await page.evaluate(() => {
+    const visible = await page.evaluate((): boolean | null => {
       if (typeof window.__areSurfaceItemsVisible === 'function') {
         return window.__areSurfaceItemsVisible('MOON');
       }
@@ -1264,7 +1337,7 @@ test.describe('Surface item visibility based on GPS coverage', () => {
   });
 
   test('(3) Moon items visible WITH GPS satellite in orbit', async () => {
-    const envelope = phase6Fixture({
+    const envelope: SaveEnvelope = phase6Fixture({
       surfaceItems: [
         { id: 'test-flag-moon', type: 'FLAG', bodyId: 'MOON', posX: 0, deployedPeriod: 1, label: 'Moon flag' },
       ],
@@ -1276,7 +1349,7 @@ test.describe('Surface item visibility based on GPS coverage', () => {
     });
     await seedAndLoadSave(page, envelope);
 
-    const visible = await page.evaluate(() => {
+    const visible = await page.evaluate((): boolean | null => {
       if (typeof window.__areSurfaceItemsVisible === 'function') {
         return window.__areSurfaceItemsVisible('MOON');
       }
@@ -1295,7 +1368,7 @@ test.describe('Surface item visibility based on GPS coverage', () => {
 
 test.describe('Prestige milestones trigger at correct events', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(180_000);
@@ -1306,13 +1379,13 @@ test.describe('Prestige milestones trigger at correct events', () => {
   test.afterAll(async () => { await page.close(); });
 
   test('(1) FIRST_ORBIT triggers with orbital evidence', async () => {
-    const envelope = phase6Fixture({
+    const envelope: SaveEnvelope = phase6Fixture({
       achievements: [],
       orbitalObjects: [{ id: 'obj-1', bodyId: 'EARTH', type: 'DEBRIS' }],
     });
     await seedAndLoadSave(page, envelope);
 
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate((): AchievementResult[] | null => {
       if (typeof window.__checkAchievements === 'function') {
         return window.__checkAchievements({
           flightState: null,
@@ -1325,15 +1398,15 @@ test.describe('Prestige milestones trigger at correct events', () => {
     });
 
     if (result !== null) {
-      const firstOrbit = result.find(a => a.id === 'FIRST_ORBIT');
+      const firstOrbit: AchievementResult | undefined = result.find((a: AchievementResult) => a.id === 'FIRST_ORBIT');
       expect(firstOrbit).toBeDefined();
-      expect(firstOrbit.cashReward).toBe(200_000);
-      expect(firstOrbit.repReward).toBe(20);
+      expect(firstOrbit!.cashReward).toBe(200_000);
+      expect(firstOrbit!.repReward).toBe(20);
     }
   });
 
   test('(2) FIRST_SATELLITE triggers with satellite deployed', async () => {
-    const envelope = phase6Fixture({
+    const envelope: SaveEnvelope = phase6Fixture({
       achievements: [],
       satelliteNetwork: {
         satellites: [
@@ -1343,7 +1416,7 @@ test.describe('Prestige milestones trigger at correct events', () => {
     });
     await seedAndLoadSave(page, envelope);
 
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate((): AchievementResult[] | null => {
       if (typeof window.__checkAchievements === 'function') {
         return window.__checkAchievements({
           flightState: null,
@@ -1356,15 +1429,15 @@ test.describe('Prestige milestones trigger at correct events', () => {
     });
 
     if (result !== null) {
-      const firstSat = result.find(a => a.id === 'FIRST_SATELLITE');
+      const firstSat: AchievementResult | undefined = result.find((a: AchievementResult) => a.id === 'FIRST_SATELLITE');
       expect(firstSat).toBeDefined();
-      expect(firstSat.cashReward).toBe(150_000);
-      expect(firstSat.repReward).toBe(15);
+      expect(firstSat!.cashReward).toBe(150_000);
+      expect(firstSat!.repReward).toBe(15);
     }
   });
 
   test('(3) FIRST_CONSTELLATION triggers with 3+ same-type satellites', async () => {
-    const envelope = phase6Fixture({
+    const envelope: SaveEnvelope = phase6Fixture({
       achievements: [],
       satelliteNetwork: {
         satellites: [
@@ -1376,7 +1449,7 @@ test.describe('Prestige milestones trigger at correct events', () => {
     });
     await seedAndLoadSave(page, envelope);
 
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate((): AchievementResult[] | null => {
       if (typeof window.__checkAchievements === 'function') {
         return window.__checkAchievements({
           flightState: null,
@@ -1389,15 +1462,15 @@ test.describe('Prestige milestones trigger at correct events', () => {
     });
 
     if (result !== null) {
-      const constellation = result.find(a => a.id === 'FIRST_CONSTELLATION');
+      const constellation: AchievementResult | undefined = result.find((a: AchievementResult) => a.id === 'FIRST_CONSTELLATION');
       expect(constellation).toBeDefined();
-      expect(constellation.cashReward).toBe(300_000);
-      expect(constellation.repReward).toBe(25);
+      expect(constellation!.cashReward).toBe(300_000);
+      expect(constellation!.repReward).toBe(25);
     }
   });
 
   test('(4) FIRST_LUNAR_LANDING triggers with Moon surface item', async () => {
-    const envelope = phase6Fixture({
+    const envelope: SaveEnvelope = phase6Fixture({
       achievements: [],
       surfaceItems: [
         { id: 'moon-flag', type: 'FLAG', bodyId: 'MOON', posX: 0, deployedPeriod: 10, label: 'Moon flag' },
@@ -1405,7 +1478,7 @@ test.describe('Prestige milestones trigger at correct events', () => {
     });
     await seedAndLoadSave(page, envelope);
 
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate((): AchievementResult[] | null => {
       if (typeof window.__checkAchievements === 'function') {
         return window.__checkAchievements({
           flightState: null,
@@ -1418,15 +1491,15 @@ test.describe('Prestige milestones trigger at correct events', () => {
     });
 
     if (result !== null) {
-      const lunarLanding = result.find(a => a.id === 'FIRST_LUNAR_LANDING');
+      const lunarLanding: AchievementResult | undefined = result.find((a: AchievementResult) => a.id === 'FIRST_LUNAR_LANDING');
       expect(lunarLanding).toBeDefined();
-      expect(lunarLanding.cashReward).toBe(1_000_000);
-      expect(lunarLanding.repReward).toBe(40);
+      expect(lunarLanding!.cashReward).toBe(1_000_000);
+      expect(lunarLanding!.repReward).toBe(40);
     }
   });
 
   test('(5) FIRST_LUNAR_RETURN triggers with Moon sample returned', async () => {
-    const envelope = phase6Fixture({
+    const envelope: SaveEnvelope = phase6Fixture({
       achievements: [],
       surfaceItems: [
         { id: 'moon-flag', type: 'FLAG', bodyId: 'MOON', posX: 0, deployedPeriod: 10, label: 'Moon flag' },
@@ -1435,7 +1508,7 @@ test.describe('Prestige milestones trigger at correct events', () => {
     });
     await seedAndLoadSave(page, envelope);
 
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate((): AchievementResult[] | null => {
       if (typeof window.__checkAchievements === 'function') {
         return window.__checkAchievements({
           flightState: null,
@@ -1448,15 +1521,15 @@ test.describe('Prestige milestones trigger at correct events', () => {
     });
 
     if (result !== null) {
-      const lunarReturn = result.find(a => a.id === 'FIRST_LUNAR_RETURN');
+      const lunarReturn: AchievementResult | undefined = result.find((a: AchievementResult) => a.id === 'FIRST_LUNAR_RETURN');
       expect(lunarReturn).toBeDefined();
-      expect(lunarReturn.cashReward).toBe(2_000_000);
-      expect(lunarReturn.repReward).toBe(50);
+      expect(lunarReturn!.cashReward).toBe(2_000_000);
+      expect(lunarReturn!.repReward).toBe(50);
     }
   });
 
   test('(6) FIRST_MARS_LANDING triggers with Mars surface item', async () => {
-    const envelope = phase6Fixture({
+    const envelope: SaveEnvelope = phase6Fixture({
       achievements: [],
       surfaceItems: [
         { id: 'mars-beacon', type: 'BEACON', bodyId: 'MARS', posX: 0, deployedPeriod: 20, label: 'Mars base' },
@@ -1464,7 +1537,7 @@ test.describe('Prestige milestones trigger at correct events', () => {
     });
     await seedAndLoadSave(page, envelope);
 
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate((): AchievementResult[] | null => {
       if (typeof window.__checkAchievements === 'function') {
         return window.__checkAchievements({
           flightState: null,
@@ -1477,15 +1550,15 @@ test.describe('Prestige milestones trigger at correct events', () => {
     });
 
     if (result !== null) {
-      const marsLanding = result.find(a => a.id === 'FIRST_MARS_LANDING');
+      const marsLanding: AchievementResult | undefined = result.find((a: AchievementResult) => a.id === 'FIRST_MARS_LANDING');
       expect(marsLanding).toBeDefined();
-      expect(marsLanding.cashReward).toBe(5_000_000);
-      expect(marsLanding.repReward).toBe(60);
+      expect(marsLanding!.cashReward).toBe(5_000_000);
+      expect(marsLanding!.repReward).toBe(60);
     }
   });
 
   test('(7) FIRST_SOLAR_SCIENCE triggers with Sun biome science log', async () => {
-    const envelope = phase6Fixture({
+    const envelope: SaveEnvelope = phase6Fixture({
       achievements: [],
       scienceLog: [
         { instrumentId: 'thermometer-mk1', biomeId: 'SUN_OUTER_CORONA', count: 1 },
@@ -1493,7 +1566,7 @@ test.describe('Prestige milestones trigger at correct events', () => {
     });
     await seedAndLoadSave(page, envelope);
 
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate((): AchievementResult[] | null => {
       if (typeof window.__checkAchievements === 'function') {
         return window.__checkAchievements({
           flightState: null,
@@ -1506,15 +1579,15 @@ test.describe('Prestige milestones trigger at correct events', () => {
     });
 
     if (result !== null) {
-      const solarScience = result.find(a => a.id === 'FIRST_SOLAR_SCIENCE');
+      const solarScience: AchievementResult | undefined = result.find((a: AchievementResult) => a.id === 'FIRST_SOLAR_SCIENCE');
       expect(solarScience).toBeDefined();
-      expect(solarScience.cashReward).toBe(4_000_000);
-      expect(solarScience.repReward).toBe(50);
+      expect(solarScience!.cashReward).toBe(4_000_000);
+      expect(solarScience!.repReward).toBe(50);
     }
   });
 
   test('(8) achievements are not re-awarded once earned', async () => {
-    const envelope = phase6Fixture({
+    const envelope: SaveEnvelope = phase6Fixture({
       achievements: [
         { id: 'FIRST_ORBIT', earnedPeriod: 5 },
         { id: 'FIRST_SATELLITE', earnedPeriod: 8 },
@@ -1528,7 +1601,7 @@ test.describe('Prestige milestones trigger at correct events', () => {
     });
     await seedAndLoadSave(page, envelope);
 
-    const result = await page.evaluate(() => {
+    const result = await page.evaluate((): AchievementResult[] | null => {
       if (typeof window.__checkAchievements === 'function') {
         return window.__checkAchievements({
           flightState: null,
@@ -1542,8 +1615,8 @@ test.describe('Prestige milestones trigger at correct events', () => {
 
     if (result !== null) {
       // Neither FIRST_ORBIT nor FIRST_SATELLITE should be in new awards.
-      const reOrbit = result.find(a => a.id === 'FIRST_ORBIT');
-      const reSat = result.find(a => a.id === 'FIRST_SATELLITE');
+      const reOrbit: AchievementResult | undefined = result.find((a: AchievementResult) => a.id === 'FIRST_ORBIT');
+      const reSat: AchievementResult | undefined = result.find((a: AchievementResult) => a.id === 'FIRST_SATELLITE');
       expect(reOrbit).toBeUndefined();
       expect(reSat).toBeUndefined();
     }
@@ -1556,7 +1629,7 @@ test.describe('Prestige milestones trigger at correct events', () => {
 
 test.describe('Phase 6 new parts function correctly', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(180_000);
@@ -1568,7 +1641,7 @@ test.describe('Phase 6 new parts function correctly', () => {
   test.afterAll(async () => { await page.close(); });
 
   test('(1) Deep Space Engine — exists in part catalog with correct stats', async () => {
-    const part = await page.evaluate(() => {
+    const part = await page.evaluate((): PartInfo | null => {
       if (typeof window.__getPartById === 'function') {
         return window.__getPartById('engine-deep-space');
       }
@@ -1611,7 +1684,7 @@ test.describe('Phase 6 new parts function correctly', () => {
   });
 
   test('(3) Extended Mission Module — exists with correct properties', async () => {
-    const part = await page.evaluate(() => {
+    const part = await page.evaluate((): PartInfo | null => {
       if (typeof window.__getPartById === 'function') {
         return window.__getPartById('mission-module-extended');
       }
@@ -1629,7 +1702,7 @@ test.describe('Phase 6 new parts function correctly', () => {
   });
 
   test('(4) Sample Return Container — exists with correct properties', async () => {
-    const part = await page.evaluate(() => {
+    const part = await page.evaluate((): PartInfo | null => {
       if (typeof window.__getPartById === 'function') {
         return window.__getPartById('sample-return-container');
       }
@@ -1647,7 +1720,7 @@ test.describe('Phase 6 new parts function correctly', () => {
   });
 
   test('(5) Surface Instrument Package — exists with correct properties', async () => {
-    const part = await page.evaluate(() => {
+    const part = await page.evaluate((): PartInfo | null => {
       if (typeof window.__getPartById === 'function') {
         return window.__getPartById('surface-instrument-package');
       }
@@ -1666,7 +1739,7 @@ test.describe('Phase 6 new parts function correctly', () => {
   });
 
   test('(6) Relay Antenna — exists with correct properties', async () => {
-    const part = await page.evaluate(() => {
+    const part = await page.evaluate((): PartInfo | null => {
       if (typeof window.__getPartById === 'function') {
         return window.__getPartById('relay-antenna');
       }
@@ -1685,7 +1758,7 @@ test.describe('Phase 6 new parts function correctly', () => {
   });
 
   test('(7) Heat Shield Heavy — exists with interplanetary-rated tolerance', async () => {
-    const part = await page.evaluate(() => {
+    const part = await page.evaluate((): PartInfo | null => {
       if (typeof window.__getPartById === 'function') {
         return window.__getPartById('heat-shield-heavy');
       }
@@ -1702,7 +1775,7 @@ test.describe('Phase 6 new parts function correctly', () => {
   });
 
   test('(8) Solar Heat Shield — exists with solar heat resistance', async () => {
-    const part = await page.evaluate(() => {
+    const part = await page.evaluate((): PartInfo | null => {
       if (typeof window.__getPartById === 'function') {
         return window.__getPartById('heat-shield-solar');
       }
@@ -1720,7 +1793,7 @@ test.describe('Phase 6 new parts function correctly', () => {
   });
 
   test('(9) Heat Shield Mk1 — basic tier with correct tolerance', async () => {
-    const part = await page.evaluate(() => {
+    const part = await page.evaluate((): PartInfo | null => {
       if (typeof window.__getPartById === 'function') {
         return window.__getPartById('heat-shield-mk1');
       }
@@ -1737,7 +1810,7 @@ test.describe('Phase 6 new parts function correctly', () => {
   });
 
   test('(10) Heat Shield Mk2 — standard tier for crewed capsules', async () => {
-    const part = await page.evaluate(() => {
+    const part = await page.evaluate((): PartInfo | null => {
       if (typeof window.__getPartById === 'function') {
         return window.__getPartById('heat-shield-mk2');
       }
@@ -1754,13 +1827,13 @@ test.describe('Phase 6 new parts function correctly', () => {
   });
 
   test('(11) heat shield tiers ordered by increasing tolerance', async () => {
-    const shields = await page.evaluate(() => {
+    const shields = await page.evaluate((): ShieldTierInfo[] | null => {
       if (typeof window.__getPartById !== 'function') return null;
       const ids = ['heat-shield-mk1', 'heat-shield-mk2', 'heat-shield-heavy', 'heat-shield-solar'];
-      return ids.map(id => {
+      return ids.map((id: string) => {
         const p = window.__getPartById(id);
         return p ? { id: p.id, tolerance: p.properties.heatTolerance } : null;
-      }).filter(Boolean);
+      }).filter((x: ShieldTierInfo | null): x is ShieldTierInfo => x !== null);
     });
 
     if (shields !== null && shields.length === 4) {
@@ -1777,7 +1850,7 @@ test.describe('Phase 6 new parts function correctly', () => {
 
 test.describe('Map view controls during transfer', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
@@ -1797,10 +1870,10 @@ test.describe('Map view controls during transfer', () => {
     // Toggle map view (key 'c' or 'm' depending on implementation).
     await page.keyboard.press('c');
     // Wait for map view state to change
-    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+    await page.evaluate(() => new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r()))));
 
     // Check if map view is active.
-    const mapActive = await page.evaluate(() => {
+    const mapActive: boolean = await page.evaluate((): boolean => {
       return window.__mapViewActive === true ||
              document.querySelector('#map-overlay')?.style.display !== 'none' ||
              document.querySelector('[data-testid="map-view"]') !== null;
@@ -1808,7 +1881,7 @@ test.describe('Map view controls during transfer', () => {
 
     // Toggle back.
     await page.keyboard.press('c');
-    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+    await page.evaluate(() => new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r()))));
 
     // Reset transfer state to orbit so we can return cleanly.
     await page.evaluate(async () => {
@@ -1834,7 +1907,7 @@ test.describe('Map view controls during transfer', () => {
 
 test.describe('Integration — full lunar mission flow', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(180_000);
@@ -1865,8 +1938,8 @@ test.describe('Integration — full lunar mission flow', () => {
 
   test('(3) perform all surface operations', async () => {
     // Plant flag.
-    const flagResult = await page.evaluate(async () => {
-      let r = { success: true };
+    const flagResult = await page.evaluate(async (): Promise<SurfaceActionResult> => {
+      let r: SurfaceActionResult = { success: true };
       if (typeof window.__plantFlag === 'function') r = window.__plantFlag();
       else if (typeof window.__surfaceAction === 'function') r = window.__surfaceAction('plant-flag');
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
@@ -1875,8 +1948,8 @@ test.describe('Integration — full lunar mission flow', () => {
     expect(flagResult.success).toBe(true);
 
     // Collect sample.
-    const sampleResult = await page.evaluate(async () => {
-      let r = { success: true };
+    const sampleResult = await page.evaluate(async (): Promise<SurfaceActionResult> => {
+      let r: SurfaceActionResult = { success: true };
       if (typeof window.__collectSample === 'function') r = window.__collectSample();
       else if (typeof window.__surfaceAction === 'function') r = window.__surfaceAction('collect-sample');
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
@@ -1885,8 +1958,8 @@ test.describe('Integration — full lunar mission flow', () => {
     expect(sampleResult.success).toBe(true);
 
     // Deploy beacon.
-    const beaconResult = await page.evaluate(async () => {
-      let r = { success: true };
+    const beaconResult = await page.evaluate(async (): Promise<SurfaceActionResult> => {
+      let r: SurfaceActionResult = { success: true };
       if (typeof window.__deployBeacon === 'function') r = window.__deployBeacon('Tranquility Base');
       else if (typeof window.__surfaceAction === 'function') r = window.__surfaceAction('deploy-beacon');
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
@@ -1897,7 +1970,7 @@ test.describe('Integration — full lunar mission flow', () => {
 
   test('(4) verify surface items created', async () => {
     const gs = await getGameState(page);
-    const moonItems = (gs.surfaceItems ?? []).filter(i => i.bodyId === 'MOON');
+    const moonItems = (gs.surfaceItems ?? []).filter((i: Record<string, unknown>) => i.bodyId === 'MOON');
     expect(moonItems.length).toBeGreaterThanOrEqual(1);
   });
 

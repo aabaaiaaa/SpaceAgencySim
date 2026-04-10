@@ -1,5 +1,5 @@
 /**
- * failure-paths.spec.js — E2E tests for failure scenarios.
+ * failure-paths.spec.ts — E2E tests for failure scenarios.
  *
  * Covers:
  *   1. Malfunction during flight — part fails, UI records it, flight log shows event
@@ -8,16 +8,14 @@
  *   4. Loan default / bankruptcy — bankruptcy banner appears on hub
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import {
   VP_W, VP_H,
   buildSaveEnvelope,
   seedAndLoadSave,
   startTestFlight,
   getGameState,
-  getFlightState,
   getPhysicsSnapshot,
-  setMalfunctionMode,
   waitForAltitude,
   buildCrewMember,
   buildContract,
@@ -34,10 +32,65 @@ import {
 // Shared constants
 // ---------------------------------------------------------------------------
 
-const BASIC_ROCKET  = ['probe-core-mk1', 'tank-small', 'engine-spark'];
-const CREWED_ROCKET = ['cmd-mk1', 'tank-small', 'engine-spark'];
+const BASIC_ROCKET: string[]  = ['probe-core-mk1', 'tank-small', 'engine-spark'];
+const CREWED_ROCKET: string[] = ['cmd-mk1', 'tank-small', 'engine-spark'];
 
-const DEATH_FINE = 500_000;
+const DEATH_FINE: number = 500_000;
+
+// ---------------------------------------------------------------------------
+// Local type aliases for game state accessed via page.evaluate()
+// ---------------------------------------------------------------------------
+
+/** Shape of the game state as returned by getGameState (loosely typed). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type GameState = Record<string, any>;
+
+/**
+ * Browser-context window shape for page.evaluate() callbacks.
+ * Defined as a local interface (not `declare global`) to avoid conflicting
+ * with the narrower Window augmentations in the helper modules.
+ */
+interface GameWindow {
+  __gameState?: GameState;
+  __flightState?: Record<string, unknown> | null;
+  __flightPs?: {
+    malfunctions?: { size: number };
+    crashed?: boolean;
+    [key: string]: unknown;
+  } | null;
+}
+
+/** Shape of a malfunction event from the flight event log. */
+interface MalfunctionEvent {
+  type: string;
+  description: string;
+  malfunctionType: string;
+  partName: string;
+  time: number;
+  [key: string]: unknown;
+}
+
+/** Shape of a contract in game state. */
+interface ContractSnapshot {
+  id: string;
+  title: string;
+  [key: string]: unknown;
+}
+
+/** Shape of the contracts collection in game state. */
+interface ContractsState {
+  active: ContractSnapshot[];
+  failed: ContractSnapshot[];
+  board: ContractSnapshot[];
+  completed: ContractSnapshot[];
+}
+
+/** Shape of a loan in game state. */
+interface LoanSnapshot {
+  balance: number;
+  interestRate: number;
+  totalInterestAccrued: number;
+}
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -46,7 +99,7 @@ const DEATH_FINE = 500_000;
 /**
  * Return to agency from flight — waits for post-flight summary and clicks return.
  */
-async function returnToAgencyViaSummary(page) {
+async function returnToAgencyViaSummary(page: Page): Promise<void> {
   await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 15_000 });
   await page.click('#post-flight-return-btn');
   await page.waitForFunction(
@@ -59,7 +112,7 @@ async function returnToAgencyViaSummary(page) {
  * Open the hamburger menu and click "Return to Space Agency", handling
  * the various confirmation dialogs.
  */
-async function returnToAgency(page) {
+async function returnToAgency(page: Page): Promise<void> {
   const dropdown = page.locator('#topbar-dropdown');
   if (!(await dropdown.isVisible())) {
     await page.click('#topbar-menu-btn');
@@ -87,7 +140,7 @@ async function returnToAgency(page) {
 /**
  * Dismiss the return-results overlay if it appears.
  */
-async function dismissReturnResults(page) {
+async function dismissReturnResults(page: Page): Promise<void> {
   try {
     const dismissBtn = page.locator('#return-results-dismiss-btn');
     await dismissBtn.waitFor({ state: 'visible', timeout: 5_000 });
@@ -101,7 +154,7 @@ async function dismissReturnResults(page) {
 
 test.describe('Malfunction during flight', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
@@ -124,24 +177,25 @@ test.describe('Malfunction during flight', () => {
 
     // Wait for at least one malfunction to appear on the physics state.
     await page.waitForFunction(
-      () => (window.__flightPs?.malfunctions?.size ?? 0) > 0,
+      () => ((window as unknown as GameWindow).__flightPs?.malfunctions?.size ?? 0) > 0,
       { timeout: 10_000 },
     );
 
     // Verify a PART_MALFUNCTION event was logged in the flight state.
-    const malfEvent = await page.evaluate(() => {
-      const events = window.__gameState?.currentFlight?.events ?? [];
-      return events.find(e => e.type === 'PART_MALFUNCTION') ?? null;
+    const malfEvent = await page.evaluate((): MalfunctionEvent | null => {
+      const w = window as unknown as GameWindow;
+      const events = (w.__gameState?.currentFlight?.events ?? []) as MalfunctionEvent[];
+      return events.find((e: MalfunctionEvent) => e.type === 'PART_MALFUNCTION') ?? null;
     });
     expect(malfEvent).not.toBeNull();
-    expect(malfEvent.type).toBe('PART_MALFUNCTION');
-    expect(malfEvent.description).toBeTruthy();
-    expect(malfEvent.malfunctionType).toBeTruthy();
+    expect(malfEvent!.type).toBe('PART_MALFUNCTION');
+    expect(malfEvent!.description).toBeTruthy();
+    expect(malfEvent!.malfunctionType).toBeTruthy();
 
     // The flight is still active — player can still fly (not crashed).
     const ps = await getPhysicsSnapshot(page);
     expect(ps).not.toBeNull();
-    expect(ps.crashed).toBe(false);
+    expect(ps!.crashed).toBe(false);
 
     // Return to agency — flight can complete despite malfunction.
     await returnToAgency(page);
@@ -161,14 +215,15 @@ test.describe('Malfunction during flight', () => {
 
     // Wait for malfunctions.
     await page.waitForFunction(
-      () => (window.__flightPs?.malfunctions?.size ?? 0) > 0,
+      () => ((window as unknown as GameWindow).__flightPs?.malfunctions?.size ?? 0) > 0,
       { timeout: 10_000 },
     );
 
     // Verify the malfunction event structure includes partName and time.
-    const events = await page.evaluate(() => {
-      const evts = window.__gameState?.currentFlight?.events ?? [];
-      return evts.filter(e => e.type === 'PART_MALFUNCTION');
+    const events = await page.evaluate((): MalfunctionEvent[] => {
+      const w = window as unknown as GameWindow;
+      const evts = (w.__gameState?.currentFlight?.events ?? []) as MalfunctionEvent[];
+      return evts.filter((e: MalfunctionEvent) => e.type === 'PART_MALFUNCTION');
     });
     expect(events.length).toBeGreaterThan(0);
 
@@ -191,7 +246,7 @@ test.describe('Malfunction during flight', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Crew KIA on crash', () => {
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
@@ -209,7 +264,7 @@ test.describe('Crew KIA on crash', () => {
       status: 'active',
       skills: { piloting: 50, engineering: 50, science: 50 },
     });
-    const startingMoney = 5_000_000;
+    const startingMoney: number = 5_000_000;
     const envelope = buildSaveEnvelope({
       saveName: 'KIA Test',
       money: startingMoney,
@@ -247,7 +302,7 @@ test.describe('Crew KIA on crash', () => {
 
     // Wait for the craft to crash.
     await page.waitForFunction(
-      () => window.__flightPs?.crashed === true,
+      () => (window as unknown as GameWindow).__flightPs?.crashed === true,
       { timeout: 30_000 },
     );
 
@@ -255,17 +310,20 @@ test.describe('Crew KIA on crash', () => {
     await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 15_000 });
 
     // Verify the heading says "Rocket Destroyed".
-    const heading = await page.locator('#post-flight-summary h1').textContent();
+    const heading: string | null = await page.locator('#post-flight-summary h1').textContent();
     expect(heading).toContain('Rocket Destroyed');
 
     // Verify the "Crew KIA" section appears in the summary with crew name and fine.
-    const summaryText = await page.locator('#post-flight-summary').textContent();
+    const summaryText: string | null = await page.locator('#post-flight-summary').textContent();
     expect(summaryText).toContain('Crew KIA');
     expect(summaryText).toContain('Jeb Testman');
     expect(summaryText).toContain('500,000');
 
     // Record money before clicking return (flight return applies the fine).
-    const moneyBeforeReturn = await page.evaluate(() => window.__gameState?.money);
+    const moneyBeforeReturn: number | null = await page.evaluate((): number | null => {
+      const w = window as unknown as GameWindow;
+      return (w.__gameState?.money as number) ?? null;
+    });
 
     // Click "Return to Space Agency" to process the flight return.
     await page.click('#post-flight-return-btn');
@@ -280,7 +338,7 @@ test.describe('Crew KIA on crash', () => {
 
     // Verify the death fine was deducted — money should be less than starting.
     const gs = await getGameState(page);
-    expect(gs.money).toBeLessThan(startingMoney);
+    expect((gs as GameState).money).toBeLessThan(startingMoney);
   });
 });
 
@@ -289,7 +347,7 @@ test.describe('Crew KIA on crash', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Contract deadline expiry', () => {
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
@@ -317,7 +375,7 @@ test.describe('Contract deadline expiry', () => {
       ],
     });
 
-    const startingReputation = 72;
+    const startingReputation: number = 72;
     const envelope = buildSaveEnvelope({
       saveName: 'Contract Expiry Test',
       money: 5_000_000,
@@ -336,10 +394,10 @@ test.describe('Contract deadline expiry', () => {
     await seedAndLoadSave(page, envelope);
 
     // Verify the contract is in active list before flight.
-    const gsBefore = await getGameState(page);
-    expect(gsBefore.contracts.active.length).toBe(1);
-    expect(gsBefore.contracts.active[0].id).toBe('contract-expire-test');
-    expect(gsBefore.contracts.failed.length).toBe(0);
+    const gsBefore = await getGameState(page) as GameState;
+    expect((gsBefore.contracts as ContractsState).active.length).toBe(1);
+    expect((gsBefore.contracts as ContractsState).active[0].id).toBe('contract-expire-test');
+    expect((gsBefore.contracts as ContractsState).failed.length).toBe(0);
 
     // Do a quick flight to trigger period advancement (which runs expiry checks).
     await startTestFlight(page, BASIC_ROCKET, { malfunctionMode: 'off' });
@@ -352,16 +410,20 @@ test.describe('Contract deadline expiry', () => {
     await expect(page.locator('#hub-overlay')).toBeVisible({ timeout: 10_000 });
 
     // Check state: contract should be in failed, not in active.
-    const gsAfter = await getGameState(page);
-    const stillActive = gsAfter.contracts.active.find(c => c.id === 'contract-expire-test');
+    const gsAfter = await getGameState(page) as GameState;
+    const stillActive: ContractSnapshot | undefined = (gsAfter.contracts as ContractsState).active.find(
+      (c: ContractSnapshot) => c.id === 'contract-expire-test',
+    );
     expect(stillActive).toBeUndefined();
 
-    const failed = gsAfter.contracts.failed.find(c => c.id === 'contract-expire-test');
+    const failed: ContractSnapshot | undefined = (gsAfter.contracts as ContractsState).failed.find(
+      (c: ContractSnapshot) => c.id === 'contract-expire-test',
+    );
     expect(failed).toBeTruthy();
-    expect(failed.id).toBe('contract-expire-test');
+    expect(failed!.id).toBe('contract-expire-test');
 
     // Reputation should have decreased (CONTRACT_REP_LOSS_FAIL = 5).
-    expect(gsAfter.reputation).toBeLessThan(startingReputation);
+    expect(gsAfter.reputation as number).toBeLessThan(startingReputation);
   });
 });
 
@@ -370,7 +432,7 @@ test.describe('Contract deadline expiry', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Loan default / bankruptcy', () => {
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
@@ -407,9 +469,9 @@ test.describe('Loan default / bankruptcy', () => {
     // The return-results overlay should indicate bankruptcy.
     // Check if the return-results overlay has a bankruptcy section.
     const returnOverlay = page.locator('#return-results-overlay');
-    const returnOverlayVisible = await returnOverlay.isVisible({ timeout: 5_000 }).catch(() => false);
+    const returnOverlayVisible: boolean = await returnOverlay.isVisible({ timeout: 5_000 }).catch(() => false);
     if (returnOverlayVisible) {
-      const returnText = await returnOverlay.textContent();
+      const returnText: string | null = await returnOverlay.textContent();
       expect(returnText).toContain('Bankrupt');
       await page.click('#return-results-dismiss-btn');
     }
@@ -422,15 +484,15 @@ test.describe('Loan default / bankruptcy', () => {
     await expect(banner).toBeVisible({ timeout: 5_000 });
 
     // The banner should contain appropriate warning text.
-    const bannerText = await banner.textContent();
+    const bannerText: string | null = await banner.textContent();
     expect(bannerText).toContain('Bankrupt');
     expect(bannerText).toContain('cheapest rocket');
 
     // Verify the game state confirms bankruptcy.
-    const gs = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     // Money should be very low (may have gone negative from interest/costs).
-    expect(gs.money).toBeLessThan(1_000);
+    expect(gs.money as number).toBeLessThan(1_000);
     // Loan balance should be at or near max.
-    expect(gs.loan.balance).toBeGreaterThanOrEqual(9_000_000);
+    expect((gs.loan as LoanSnapshot).balance).toBeGreaterThanOrEqual(9_000_000);
   });
 });

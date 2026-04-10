@@ -4,6 +4,7 @@ import {
   FIRST_FLIGHT_MISSION, buildSaveEnvelope, seedAndLoadSave,
   ALL_FACILITIES,
 } from './helpers.js';
+import type { SaveEnvelope } from './helpers.js';
 
 /**
  * E2E — Crew Administration Flow
@@ -33,20 +34,33 @@ import {
  */
 
 // ---------------------------------------------------------------------------
+// Browser-context window shape for page.evaluate() callbacks.
+// ---------------------------------------------------------------------------
+
+interface GameStateShape {
+  money?: number;
+  crew?: { status: string }[];
+}
+
+interface GW {
+  __gameState?: GameStateShape;
+}
+
+// ---------------------------------------------------------------------------
 // Constants & helpers
 // ---------------------------------------------------------------------------
 
-const HIRE_COST = 50_000;
+const HIRE_COST: number = 50_000;
 
 /** Standard fresh-game envelope: no crew, full starting funds, all facilities built. */
-const FRESH_ENVELOPE = buildSaveEnvelope({
+const FRESH_ENVELOPE: SaveEnvelope = buildSaveEnvelope({
   saveName: 'Crew E2E Test',
   missions: { available: [{ ...FIRST_FLIGHT_MISSION, status: 'available' }], accepted: [], completed: [] },
   facilities: ALL_FACILITIES,
 });
 
 /** Broke envelope: cash below the hire cost so hire is blocked. */
-const BROKE_ENVELOPE = buildSaveEnvelope({
+const BROKE_ENVELOPE: SaveEnvelope = buildSaveEnvelope({
   saveName: 'Crew E2E Test',
   money: 10_000,
   missions: { available: [{ ...FIRST_FLIGHT_MISSION, status: 'available' }], accepted: [], completed: [] },
@@ -104,7 +118,9 @@ test.describe('Crew Administration Flow', () => {
     await page.click('[data-tab-id="hire"]');
 
     // Record cash before hiring.
-    const cashBefore = await page.evaluate(() => window.__gameState?.money);
+    const cashBefore: number | undefined = await page.evaluate(() =>
+      (window as unknown as GW).__gameState?.money,
+    );
     expect(cashBefore).toBe(STARTING_MONEY);
 
     // Enter a name and click the hire button.
@@ -116,7 +132,9 @@ test.describe('Crew Administration Flow', () => {
     await expect(page.locator('.hire-feedback.success')).toContainText('Valentina Tereshkova');
 
     // Cash in game state must have decreased by exactly HIRE_COST.
-    const cashAfter = await page.evaluate(() => window.__gameState?.money);
+    const cashAfter: number | undefined = await page.evaluate(() =>
+      (window as unknown as GW).__gameState?.money,
+    );
     expect(cashAfter).toBe(STARTING_MONEY - HIRE_COST);
 
     // The persistent top bar must reflect the deducted balance.
@@ -145,7 +163,9 @@ test.describe('Crew Administration Flow', () => {
     await expect(missionsCell).toHaveText('0');
 
     // The astronaut's status in game state must be "active".
-    const status = await page.evaluate(() => window.__gameState?.crew?.[0]?.status);
+    const status: string | undefined = await page.evaluate(() =>
+      (window as unknown as GW).__gameState?.crew?.[0]?.status,
+    );
     expect(status).toBe('active');
   });
 

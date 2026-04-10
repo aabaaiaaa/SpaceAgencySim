@@ -1,17 +1,25 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import {
   VP_W, VP_H,
   buildSaveEnvelope, seedAndLoadSave, dismissWelcomeModal,
 } from './helpers.js';
 
-/**
- * E2E — Debug Mode Toggle
- * Each test is fully self-contained — seeds its own state and gets a fresh page.
- */
+// ---------------------------------------------------------------------------
+// Browser-context type aliases
+// ---------------------------------------------------------------------------
+
+interface GameWindow {
+  __gameState: { debugMode: boolean };
+  __enableDebugMode: () => void;
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
 
 test.describe('Debug Mode Toggle', () => {
 
-  test('(1) Ctrl+Shift+D does not open debug saves panel when debug mode is off', async ({ page }) => {
+  test('(1) Ctrl+Shift+D does not open debug saves panel when debug mode is off', async ({ page }: { page: Page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = buildSaveEnvelope({ gameMode: 'sandbox', debugMode: false });
     await seedAndLoadSave(page, envelope);
@@ -22,26 +30,26 @@ test.describe('Debug Mode Toggle', () => {
     await expect(page.locator('#debug-save-panel')).not.toBeVisible();
   });
 
-  test('(2) Ctrl+Shift+D opens debug saves panel when debug mode is on', async ({ page }) => {
+  test('(2) Ctrl+Shift+D opens debug saves panel when debug mode is on', async ({ page }: { page: Page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = buildSaveEnvelope({ gameMode: 'sandbox', debugMode: false });
     await seedAndLoadSave(page, envelope);
     await dismissWelcomeModal(page);
 
-    await page.evaluate(() => window.__enableDebugMode());
+    await page.evaluate(() => (window as unknown as GameWindow).__enableDebugMode());
     await page.keyboard.press('Control+Shift+D');
     await expect(page.locator('#debug-save-panel')).toBeVisible({ timeout: 5_000 });
     await page.click('.debug-save-close-btn');
   });
 
-  test('(3) debug mode setting persists across save/load cycle', async ({ page }) => {
+  test('(3) debug mode setting persists across save/load cycle', async ({ page }: { page: Page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = buildSaveEnvelope({ gameMode: 'sandbox', debugMode: false });
     await seedAndLoadSave(page, envelope);
     await dismissWelcomeModal(page);
 
-    await page.evaluate(() => window.__enableDebugMode());
-    expect(await page.evaluate(() => window.__gameState.debugMode)).toBe(true);
+    await page.evaluate(() => (window as unknown as GameWindow).__enableDebugMode());
+    expect(await page.evaluate(() => (window as unknown as GameWindow).__gameState.debugMode)).toBe(true);
 
     // Save via topbar.
     await page.click('#topbar-menu-btn');
@@ -57,33 +65,33 @@ test.describe('Debug Mode Toggle', () => {
     await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
     await dismissWelcomeModal(page);
 
-    expect(await page.evaluate(() => window.__gameState.debugMode)).toBe(true);
+    expect(await page.evaluate(() => (window as unknown as GameWindow).__gameState.debugMode)).toBe(true);
     await page.keyboard.press('Control+Shift+D');
     await expect(page.locator('#debug-save-panel')).toBeVisible({ timeout: 5_000 });
     await page.click('.debug-save-close-btn');
   });
 
-  test('(4) Ctrl+Shift+D does nothing after debug mode is disabled', async ({ page }) => {
+  test('(4) Ctrl+Shift+D does nothing after debug mode is disabled', async ({ page }: { page: Page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = buildSaveEnvelope({ gameMode: 'sandbox', debugMode: true });
     await seedAndLoadSave(page, envelope);
     await dismissWelcomeModal(page);
 
-    await page.evaluate(() => { window.__gameState.debugMode = false; });
+    await page.evaluate(() => { (window as unknown as GameWindow).__gameState.debugMode = false; });
     await page.keyboard.press('Control+Shift+D');
     await page.waitForTimeout(500);
     await expect(page.locator('#debug-save-panel')).not.toBeVisible();
   });
 
-  test('(5) window.__enableDebugMode() enables debug mode programmatically', async ({ page }) => {
+  test('(5) window.__enableDebugMode() enables debug mode programmatically', async ({ page }: { page: Page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = buildSaveEnvelope({ gameMode: 'sandbox', debugMode: false });
     await seedAndLoadSave(page, envelope);
     await dismissWelcomeModal(page);
 
-    expect(await page.evaluate(() => window.__gameState.debugMode)).toBe(false);
-    await page.evaluate(() => window.__enableDebugMode());
-    expect(await page.evaluate(() => window.__gameState.debugMode)).toBe(true);
+    expect(await page.evaluate(() => (window as unknown as GameWindow).__gameState.debugMode)).toBe(false);
+    await page.evaluate(() => (window as unknown as GameWindow).__enableDebugMode());
+    expect(await page.evaluate(() => (window as unknown as GameWindow).__gameState.debugMode)).toBe(true);
 
     await page.keyboard.press('Control+Shift+D');
     await expect(page.locator('#debug-save-panel')).toBeVisible({ timeout: 5_000 });
