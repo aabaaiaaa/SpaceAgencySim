@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * autoSave.test.js — Unit tests for the auto-save system.
  *
@@ -11,8 +10,10 @@
  *   - IndexedDB fallback
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
+
+import type { GameState } from '../core/gameState.ts';
 
 // Mock idbStorage before importing autoSave.
 vi.mock('../core/idbStorage.js', () => ({
@@ -39,18 +40,26 @@ import { idbSet, idbDelete, isIdbAvailable } from '../core/idbStorage.ts';
 // localStorage mock
 // ---------------------------------------------------------------------------
 
-function createLocalStorageMock() {
-  const store = new Map();
+interface MockStorage {
+  getItem(key: string): string | null;
+  setItem: ((key: string, value: string) => void) | Mock;
+  removeItem(key: string): void;
+  clear(): void;
+  readonly length: number;
+}
+
+function createLocalStorageMock(): MockStorage {
+  const store = new Map<string, string>();
   return {
-    getItem(key) { return store.has(key) ? store.get(key) : null; },
-    setItem(key, value) { store.set(key, String(value)); },
-    removeItem(key) { store.delete(key); },
+    getItem(key: string): string | null { return store.has(key) ? store.get(key)! : null; },
+    setItem(key: string, value: string) { store.set(key, String(value)); },
+    removeItem(key: string) { store.delete(key); },
     clear() { store.clear(); },
     get length() { return store.size; },
   };
 }
 
-let mockStorage;
+let mockStorage: MockStorage;
 
 beforeEach(() => {
   mockStorage = createLocalStorageMock();
@@ -66,7 +75,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function freshState() {
+function freshState(): GameState {
   return createGameState();
 }
 
@@ -83,6 +92,7 @@ describe('isAutoSaveEnabled', () => {
 
   it('returns true when autoSaveEnabled is undefined (default)', () => {
     const state = freshState();
+    // @ts-expect-error — intentionally deleting required property to test undefined fallback
     delete state.autoSaveEnabled;
     expect(isAutoSaveEnabled(state)).toBe(true);
   });
@@ -114,7 +124,7 @@ describe('performAutoSave', () => {
     const raw = mockStorage.getItem('spaceAgencySave_0');
     expect(raw).not.toBeNull();
 
-    const json = decompressSaveData(raw);
+    const json = decompressSaveData(raw!);
     const envelope = JSON.parse(json);
     expect(envelope.saveName).toBe('Auto-Save');
     expect(envelope.state.agencyName).toBe('Test Agency');
@@ -163,7 +173,7 @@ describe('performAutoSave', () => {
     const state = freshState();
     const quotaError = new DOMException('quota exceeded', 'QuotaExceededError');
     mockStorage.setItem = vi.fn(() => { throw quotaError; });
-    isIdbAvailable.mockReturnValue(false);
+    vi.mocked(isIdbAvailable).mockReturnValue(false);
 
     const result = await performAutoSave(state);
 
@@ -181,7 +191,7 @@ describe('performAutoSave', () => {
     state.agencyName = 'After';
 
     // With no manual saves, auto-save goes to slot 0.
-    const json = decompressSaveData(mockStorage.getItem('spaceAgencySave_0'));
+    const json = decompressSaveData(mockStorage.getItem('spaceAgencySave_0')!);
     const envelope = JSON.parse(json);
     expect(envelope.state.agencyName).toBe('Before');
   });
@@ -217,7 +227,7 @@ describe('performAutoSave', () => {
     const raw = mockStorage.getItem(AUTO_SAVE_KEY);
     expect(raw).not.toBeNull();
 
-    const json = decompressSaveData(raw);
+    const json = decompressSaveData(raw!);
     const envelope = JSON.parse(json);
     expect(envelope.saveName).toBe('Auto-Save');
     expect(envelope.state.agencyName).toBe('Fallback Agency');

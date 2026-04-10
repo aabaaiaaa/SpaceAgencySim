@@ -1,5 +1,5 @@
 /**
- * fixtures.js — Pre-built game state factories for E2E testing.
+ * fixtures.ts — Pre-built game state factories for E2E testing.
  *
  * Each fixture represents a specific point in game progression, allowing
  * tests to start from any phase without replaying earlier gameplay.
@@ -21,24 +21,29 @@ import {
   buildObjective,
 } from './helpers.js';
 
+import type {
+  SaveEnvelope,
+  SaveEnvelopeParams,
+} from './helpers.js';
+
 // ---------------------------------------------------------------------------
 // Part sets at various progression stages
 // ---------------------------------------------------------------------------
 
 /** Starter parts available from the very beginning (non-tutorial). */
-export const STARTER_PARTS = [
+export const STARTER_PARTS: string[] = [
   'probe-core-mk1', 'tank-small', 'engine-spark', 'parachute-mk1',
   'science-module-mk1', 'thermometer-mk1', 'cmd-mk1',
 ];
 
 /** Early game — starters + first mission rewards. */
-export const EARLY_PARTS = [
+export const EARLY_PARTS: string[] = [
   ...STARTER_PARTS,
   'tank-medium', 'srb-small', 'decoupler-stack-tr18',
 ];
 
 /** Mid game — includes landing legs, larger tanks, science instruments. */
-export const MID_PARTS = [
+export const MID_PARTS: string[] = [
   ...EARLY_PARTS,
   'engine-reliant', 'tank-large', 'srb-large', 'decoupler-radial',
   'parachute-mk2', 'landing-legs-small', 'landing-legs-large',
@@ -46,7 +51,7 @@ export const MID_PARTS = [
 ];
 
 /** Late game — orbital-capable, all parts unlocked. */
-export const ALL_PARTS = [
+export const ALL_PARTS: string[] = [
   ...MID_PARTS,
   'engine-poodle', 'engine-nerv',
   'satellite-comm', 'satellite-weather', 'satellite-science',
@@ -55,17 +60,34 @@ export const ALL_PARTS = [
 ];
 
 // ---------------------------------------------------------------------------
+// Lightweight interfaces for mission/contract fixture parameters
+// ---------------------------------------------------------------------------
+
+/** Minimum shape for a mission passed to missionTestFixture. */
+interface MissionFixtureInput {
+  id: string;
+  objectives: Record<string, unknown>[];
+  reward: number;
+  [key: string]: unknown;
+}
+
+/** Minimum shape for a contract passed to contractTestFixture. */
+interface ContractFixtureInput {
+  id: string;
+  objectives: Record<string, unknown>[];
+  reward: number;
+  [key: string]: unknown;
+}
+
+// ---------------------------------------------------------------------------
 // Fixture: Fresh start (non-tutorial)
 // ---------------------------------------------------------------------------
 
 /**
  * Brand-new game, non-tutorial mode. Starter parts unlocked, starter facilities
  * built, no missions attempted.
- *
- * @param {object} [overrides]  Fields to override on the save envelope.
- * @returns {object} Save envelope ready for seedAndLoadSave.
  */
-export function freshStartFixture(overrides = {}) {
+export function freshStartFixture(overrides: SaveEnvelopeParams = {}): SaveEnvelope {
   return buildSaveEnvelope({
     saveName:     'Fresh Start',
     agencyName:   'Test Agency',
@@ -82,11 +104,8 @@ export function freshStartFixture(overrides = {}) {
 /**
  * Early game: 3 missions completed, some money earned, basic parts unlocked.
  * Represents Phase 0 completion / early Phase 1.
- *
- * @param {object} [overrides]
- * @returns {object}
  */
-export function earlyGameFixture(overrides = {}) {
+export function earlyGameFixture(overrides: SaveEnvelopeParams = {}): SaveEnvelope {
   return buildSaveEnvelope({
     saveName:       'Early Game',
     agencyName:     'Early Test Agency',
@@ -117,11 +136,8 @@ export function earlyGameFixture(overrides = {}) {
 /**
  * Mid game: multiple facilities built, crew hired, science collected,
  * tech researched. Represents Phase 2–3 gameplay.
- *
- * @param {object} [overrides]
- * @returns {object}
  */
-export function midGameFixture(overrides = {}) {
+export function midGameFixture(overrides: SaveEnvelopeParams = {}): SaveEnvelope {
   return buildSaveEnvelope({
     saveName:       'Mid Game',
     agencyName:     'Mid Test Agency',
@@ -179,11 +195,8 @@ export function midGameFixture(overrides = {}) {
 /**
  * Late game: orbital capability, satellites deployed, full tech tree,
  * advanced contracts. Represents Phase 5–6 gameplay.
- *
- * @param {object} [overrides]
- * @returns {object}
  */
-export function orbitalFixture(overrides = {}) {
+export function orbitalFixture(overrides: SaveEnvelopeParams = {}): SaveEnvelope {
   return buildSaveEnvelope({
     saveName:       'Orbital',
     agencyName:     'Orbital Test Agency',
@@ -244,12 +257,8 @@ export function orbitalFixture(overrides = {}) {
 /**
  * Create a fixture with a specific accepted mission, ready to fly.
  * Useful for testing individual objective types in isolation.
- *
- * @param {object} mission         Mission object (must have id, objectives, reward).
- * @param {object} [stateOverrides] Additional state overrides.
- * @returns {object}
  */
-export function missionTestFixture(mission, stateOverrides = {}) {
+export function missionTestFixture(mission: MissionFixtureInput, stateOverrides: SaveEnvelopeParams = {}): SaveEnvelope {
   return buildSaveEnvelope({
     saveName:     'Mission Test',
     agencyName:   'Mission Test Agency',
@@ -270,12 +279,8 @@ export function missionTestFixture(mission, stateOverrides = {}) {
 
 /**
  * Create a fixture with a specific active contract, ready to fly.
- *
- * @param {object} contract        Contract object (must have id, objectives, reward).
- * @param {object} [stateOverrides]
- * @returns {object}
  */
-export function contractTestFixture(contract, stateOverrides = {}) {
+export function contractTestFixture(contract: ContractFixtureInput, stateOverrides: SaveEnvelopeParams = {}): SaveEnvelope {
   return buildSaveEnvelope({
     saveName:     'Contract Test',
     agencyName:   'Contract Test Agency',

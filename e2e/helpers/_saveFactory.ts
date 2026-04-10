@@ -4,6 +4,7 @@
 
 import { STARTING_MONEY, STARTER_FACILITIES } from './_constants.js';
 import type { FacilityState } from './_constants.js';
+import type { CrewMember } from './_factories.js';
 
 // ---------------------------------------------------------------------------
 // Sub-interfaces for complex nested state shapes
@@ -58,10 +59,10 @@ export interface SaveEnvelopeParams {
   saveName?: string;
   money?: number;
   missions?: MissionsState;
-  crew?: Record<string, unknown>[];
+  crew?: (Record<string, unknown> | CrewMember)[];
   rockets?: Record<string, unknown>[];
   savedDesigns?: Record<string, unknown>[];
-  parts?: Record<string, unknown>[];
+  parts?: string[];
   agencyName?: string;
   loan?: LoanState;
   flightHistory?: Record<string, unknown>[];
@@ -103,10 +104,10 @@ export interface SaveEnvelopeState {
   money: number;
   loan: LoanState;
   missions: MissionsState;
-  crew: Record<string, unknown>[];
+  crew: (Record<string, unknown> | CrewMember)[];
   rockets: Record<string, unknown>[];
   savedDesigns: Record<string, unknown>[];
-  parts: Record<string, unknown>[];
+  parts: string[];
   flightHistory: Record<string, unknown>[];
   currentPeriod: number;
   playTimeSeconds: number;

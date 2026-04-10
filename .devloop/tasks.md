@@ -95,13 +95,13 @@
 - **Verification**: `npx playwright test e2e/smoke.spec.js --grep @smoke`
 
 ### TASK-016: Convert E2E barrel helpers.js to TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-008, TASK-009, TASK-010, TASK-011, TASK-012, TASK-013, TASK-014, TASK-015
 - **Description**: Rename `e2e/helpers.js` to `e2e/helpers.ts`. Update re-export paths if needed for TypeScript module resolution. Add explicit type re-exports. Eliminate all `any`. See requirements §5.4.
 - **Verification**: `npx playwright test e2e/smoke.spec.js --grep @smoke`
 
 ### TASK-017: Convert E2E barrel fixtures.js to TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-008, TASK-009, TASK-010, TASK-011, TASK-012, TASK-013, TASK-014, TASK-015
 - **Description**: Rename `e2e/fixtures.js` to `e2e/fixtures.ts`. Update any imports and re-exports for TypeScript module resolution. Add explicit types. Eliminate all `any`. See requirements §5.4.
 - **Verification**: `npx playwright test e2e/smoke.spec.js --grep @smoke`
@@ -109,19 +109,19 @@
 ## Phase C: Unit Test Conversion
 
 ### TASK-018: Convert achievements.test.ts to strict TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007
 - **Description**: Remove `// @ts-nocheck` from `src/tests/achievements.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
 - **Verification**: `npx vitest run src/tests/achievements.test.ts`
 
 ### TASK-019: Convert atmosphere.test.ts to strict TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007
 - **Description**: Remove `// @ts-nocheck` from `src/tests/atmosphere.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
 - **Verification**: `npx vitest run src/tests/atmosphere.test.ts`
 
 ### TASK-020: Convert autoSave.test.ts to strict TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007
 - **Description**: Remove `// @ts-nocheck` from `src/tests/autoSave.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
 - **Verification**: `npx vitest run src/tests/autoSave.test.ts`

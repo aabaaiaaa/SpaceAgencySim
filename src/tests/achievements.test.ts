@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * achievements.test.js — Unit tests for the prestige milestone system.
  *
@@ -15,12 +14,15 @@ import { createGameState } from '../core/gameState.ts';
 import { checkAchievements, getAchievementStatus, ACHIEVEMENTS } from '../core/achievements.ts';
 import { CelestialBody, SatelliteType } from '../core/constants.ts';
 
+import type { GameState, MissionInstance, OrbitalObject, FlightState } from '../core/gameState.ts';
+import type { AchievementCheckContext } from '../core/achievements.ts';
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 /** Create a minimal achievement check context. */
-function makeCtx(overrides = {}) {
+function makeCtx(overrides: Partial<AchievementCheckContext> = {}): AchievementCheckContext {
   return {
     flightState: null,
     ps: null,
@@ -31,14 +33,14 @@ function makeCtx(overrides = {}) {
 }
 
 /** Create a state with a completed mission that had a REACH_ORBIT objective. */
-function stateWithCompletedOrbitMission() {
+function stateWithCompletedOrbitMission(): GameState {
   const state = createGameState();
   state.missions.completed.push({
     id: 'orbit-mission',
     title: 'Reach Orbit',
-    objectives: [{ type: 'REACH_ORBIT', completed: true }],
+    objectives: [{ type: 'REACH_ORBIT', completed: true }] as MissionInstance['objectives'],
     reward: 50000,
-  });
+  } as MissionInstance);
   return state;
 }
 
@@ -89,11 +91,11 @@ describe('getAchievementStatus()', () => {
     state.achievements = [{ id: 'FIRST_ORBIT', earnedPeriod: 5 }];
 
     const status = getAchievementStatus(state);
-    const orbit = status.find((a) => a.id === 'FIRST_ORBIT');
+    const orbit = status.find((a) => a.id === 'FIRST_ORBIT')!;
     expect(orbit.earned).toBe(true);
     expect(orbit.earnedPeriod).toBe(5);
 
-    const satellite = status.find((a) => a.id === 'FIRST_SATELLITE');
+    const satellite = status.find((a) => a.id === 'FIRST_SATELLITE')!;
     expect(satellite.earned).toBe(false);
   });
 });
@@ -105,6 +107,7 @@ describe('getAchievementStatus()', () => {
 describe('checkAchievements()', () => {
   it('initializes achievements array if missing', () => {
     const state = createGameState();
+    // @ts-expect-error intentionally deleting required property to test defensive init
     delete state.achievements;
     checkAchievements(state, makeCtx());
     expect(Array.isArray(state.achievements)).toBe(true);
@@ -149,7 +152,7 @@ describe('checkAchievements()', () => {
 
     const record = state.achievements.find((a) => a.id === 'FIRST_ORBIT');
     expect(record).toBeTruthy();
-    expect(record.earnedPeriod).toBe(7);
+    expect(record!.earnedPeriod).toBe(7);
   });
 });
 
@@ -167,7 +170,7 @@ describe('FIRST_ORBIT', () => {
   it('triggers when there are Earth satellites', () => {
     const state = createGameState();
     state.satelliteNetwork.satellites.push({
-      id: 's1', bodyId: 'EARTH', satelliteType: 'COMMUNICATION',
+      id: 's1', bodyId: 'EARTH', satelliteType: SatelliteType.COMMUNICATION,
       orbitalObjectId: 'o1', partId: 'sat-comm', bandId: 'LEO',
       health: 100, autoMaintain: false, deployedPeriod: 1,
     });
@@ -180,7 +183,7 @@ describe('FIRST_SATELLITE', () => {
   it('triggers when a satellite exists in the network', () => {
     const state = createGameState();
     state.satelliteNetwork.satellites.push({
-      id: 's1', bodyId: 'EARTH', satelliteType: 'COMMUNICATION',
+      id: 's1', bodyId: 'EARTH', satelliteType: SatelliteType.COMMUNICATION,
       orbitalObjectId: 'o1', partId: 'sat-comm', bandId: 'LEO',
       health: 100, autoMaintain: false, deployedPeriod: 1,
     });
@@ -201,7 +204,7 @@ describe('FIRST_CONSTELLATION', () => {
     // Also need FIRST_ORBIT completed to not interfere.
     for (let i = 0; i < 3; i++) {
       state.satelliteNetwork.satellites.push({
-        id: `s${i}`, bodyId: 'EARTH', satelliteType: 'GPS',
+        id: `s${i}`, bodyId: 'EARTH', satelliteType: SatelliteType.GPS,
         orbitalObjectId: `o${i}`, partId: 'sat-gps', bandId: 'MEO',
         health: 100, autoMaintain: false, deployedPeriod: 1,
       });
@@ -214,7 +217,7 @@ describe('FIRST_CONSTELLATION', () => {
     const state = createGameState();
     for (let i = 0; i < 2; i++) {
       state.satelliteNetwork.satellites.push({
-        id: `s${i}`, bodyId: 'EARTH', satelliteType: 'GPS',
+        id: `s${i}`, bodyId: 'EARTH', satelliteType: SatelliteType.GPS,
         orbitalObjectId: `o${i}`, partId: 'sat-gps', bandId: 'MEO',
         health: 100, autoMaintain: false, deployedPeriod: 1,
       });
@@ -229,8 +232,8 @@ describe('FIRST_LUNAR_FLYBY', () => {
     const state = createGameState();
     state.orbitalObjects.push({
       id: 'obj1', bodyId: 'MOON', type: 'CRAFT', name: 'Lunar Probe',
-      elements: { semiMajorAxis: 2000000, eccentricity: 0 },
-    });
+      elements: { semiMajorAxis: 2000000, eccentricity: 0 } as OrbitalObject['elements'],
+    } as OrbitalObject);
     const result = checkAchievements(state, makeCtx());
     expect(result.some((a) => a.id === 'FIRST_LUNAR_FLYBY')).toBe(true);
   });
@@ -249,7 +252,7 @@ describe('FIRST_LUNAR_ORBIT', () => {
   it('triggers when a satellite orbits the Moon', () => {
     const state = createGameState();
     state.satelliteNetwork.satellites.push({
-      id: 's1', bodyId: 'MOON', satelliteType: 'RELAY',
+      id: 's1', bodyId: 'MOON', satelliteType: SatelliteType.RELAY,
       orbitalObjectId: 'o1', partId: 'sat-relay', bandId: 'LUNAR_LOW',
       health: 100, autoMaintain: false, deployedPeriod: 1,
     });
@@ -309,10 +312,10 @@ describe('FIRST_LUNAR_RETURN', () => {
       landingBodyId: 'EARTH',
       flightState: {
         bodyId: 'EARTH',
-        transferState: { originBodyId: 'MOON', destinationBodyId: 'EARTH' },
+        transferState: { originBodyId: 'MOON', destinationBodyId: 'EARTH' } as FlightState['transferState'],
         phaseLog: [],
         events: [],
-      },
+      } as unknown as FlightState,
     });
     const result = checkAchievements(state, ctx);
     expect(result.some((a) => a.id === 'FIRST_LUNAR_RETURN')).toBe(true);
@@ -323,7 +326,7 @@ describe('FIRST_MARS_ORBIT', () => {
   it('triggers when a satellite orbits Mars', () => {
     const state = createGameState();
     state.satelliteNetwork.satellites.push({
-      id: 's1', bodyId: 'MARS', satelliteType: 'SCIENCE',
+      id: 's1', bodyId: 'MARS', satelliteType: SatelliteType.SCIENCE,
       orbitalObjectId: 'o1', partId: 'sat-sci', bandId: 'MARS_LOW',
       health: 100, autoMaintain: false, deployedPeriod: 1,
     });
@@ -377,18 +380,18 @@ describe('multiple achievements', () => {
     // Set up state to earn FIRST_ORBIT + FIRST_SATELLITE + FIRST_LUNAR_FLYBY
     state.missions.completed.push({
       id: 'orbit-m', title: 'Orbit',
-      objectives: [{ type: 'REACH_ORBIT', completed: true }],
+      objectives: [{ type: 'REACH_ORBIT', completed: true }] as MissionInstance['objectives'],
       reward: 10000,
-    });
+    } as MissionInstance);
     state.satelliteNetwork.satellites.push({
-      id: 's1', bodyId: 'EARTH', satelliteType: 'COMMUNICATION',
+      id: 's1', bodyId: 'EARTH', satelliteType: SatelliteType.COMMUNICATION,
       orbitalObjectId: 'o1', partId: 'sat-comm', bandId: 'LEO',
       health: 100, autoMaintain: false, deployedPeriod: 1,
     });
     state.orbitalObjects.push({
       id: 'obj1', bodyId: 'MOON', type: 'CRAFT', name: 'Probe',
       elements: {},
-    });
+    } as OrbitalObject);
 
     const result = checkAchievements(state, makeCtx());
     const ids = result.map((a) => a.id);

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * atmosphere.test.js — Unit tests for the atmosphere model and reentry heat
  * simulation (TASK-021, TASK-064).
@@ -61,6 +60,9 @@ import { getPartById } from '../data/parts.ts';
 import { createFlightState } from '../core/gameState.ts';
 import { createPhysicsState, tick } from '../core/physics.ts';
 
+import type { PartDef } from '../data/parts.ts';
+import type { RocketAssembly } from '../core/physics.ts';
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -122,7 +124,7 @@ function makeFlightState() {
  * Return the instance ID of the part with the minimum Y (lowest physical
  * position) among all active parts — i.e. the leading face when descending.
  */
-function findLowestActivePartId(ps, assembly) {
+function findLowestActivePartId(ps: { activeParts: Set<string> }, assembly: RocketAssembly): string {
   return Array.from(assembly.parts.entries())
     .filter(([id]) => ps.activeParts.has(id))
     .sort(([, a], [, b]) => a.y - b.y)[0][0];
@@ -132,7 +134,7 @@ function findLowestActivePartId(ps, assembly) {
  * Return the instance ID of the part with the maximum Y (highest physical
  * position) among all active parts — i.e. the leading face when ascending.
  */
-function findHighestActivePartId(ps, assembly) {
+function findHighestActivePartId(ps: { activeParts: Set<string> }, assembly: RocketAssembly): string {
   return Array.from(assembly.parts.entries())
     .filter(([id]) => ps.activeParts.has(id))
     .sort(([, a], [, b]) => b.y - a.y)[0][0];
@@ -352,7 +354,7 @@ describe('getLeadingPartId()', () => {
 
   it('returns null when activeParts is empty', () => {
     const { assembly } = makeSimpleRocket();
-    const ps = { velY: -100, activeParts: new Set() };
+    const ps = { velY: -100, activeParts: new Set<string>() };
     expect(getLeadingPartId(ps, assembly)).toBeNull();
   });
 
@@ -436,19 +438,19 @@ describe('getHeatTolerance()', () => {
   });
 
   it('returns DEFAULT_HEAT_TOLERANCE for a regular part with no explicit property', () => {
-    expect(getHeatTolerance({ type: 'ENGINE', properties: {} })).toBe(DEFAULT_HEAT_TOLERANCE);
+    expect(getHeatTolerance({ type: 'ENGINE', properties: {} } as PartDef)).toBe(DEFAULT_HEAT_TOLERANCE);
   });
 
   it('returns HEAT_SHIELD_TOLERANCE for a HEAT_SHIELD part with no explicit property', () => {
-    expect(getHeatTolerance({ type: 'HEAT_SHIELD', properties: {} })).toBe(HEAT_SHIELD_TOLERANCE);
+    expect(getHeatTolerance({ type: 'HEAT_SHIELD', properties: {} } as PartDef)).toBe(HEAT_SHIELD_TOLERANCE);
   });
 
   it('returns the explicit heatTolerance when set (structural part)', () => {
-    expect(getHeatTolerance({ type: 'ENGINE', properties: { heatTolerance: 500 } })).toBe(500);
+    expect(getHeatTolerance({ type: 'ENGINE', properties: { heatTolerance: 500 } as PartDef['properties'] } as PartDef)).toBe(500);
   });
 
   it('returns the explicit heatTolerance even on a HEAT_SHIELD (overrides default)', () => {
-    expect(getHeatTolerance({ type: 'HEAT_SHIELD', properties: { heatTolerance: 9_999 } })).toBe(9_999);
+    expect(getHeatTolerance({ type: 'HEAT_SHIELD', properties: { heatTolerance: 9_999 } as PartDef['properties'] } as PartDef)).toBe(9_999);
   });
 
   it('HEAT_SHIELD_TOLERANCE is greater than DEFAULT_HEAT_TOLERANCE', () => {
@@ -469,7 +471,7 @@ describe('getHeatRatio()', () => {
 
   it('returns ~0.5 for a part at half its tolerance', () => {
     const { assembly, probeId } = makeSimpleRocket();
-    const placed = assembly.parts.get(probeId);
+    const placed = assembly.parts.get(probeId)!;
     const def = getPartById(placed.partId);
     const tol = getHeatTolerance(def);
     const ps = { heatMap: new Map([[probeId, tol / 2]]), activeParts: new Set(assembly.parts.keys()) };
@@ -478,7 +480,7 @@ describe('getHeatRatio()', () => {
 
   it('clamps to 1 when heat exceeds tolerance', () => {
     const { assembly, probeId } = makeSimpleRocket();
-    const placed = assembly.parts.get(probeId);
+    const placed = assembly.parts.get(probeId)!;
     const def = getPartById(placed.partId);
     const tol = getHeatTolerance(def);
     const ps = { heatMap: new Map([[probeId, tol * 2]]), activeParts: new Set(assembly.parts.keys()) };
@@ -645,7 +647,7 @@ describe('updateHeat() — heat shield protection', () => {
     // The heat shield itself should have accumulated heat (as an exposed part).
     expect(ps.heatMap.get(shieldId)).toBeGreaterThan(0);
     // The engine (leading) should have the most heat.
-    expect(ps.heatMap.get(engineId)).toBeGreaterThan(ps.heatMap.get(shieldId));
+    expect(ps.heatMap.get(engineId)).toBeGreaterThan(ps.heatMap.get(shieldId) ?? 0);
     // Shielded parts should have no heat (they dissipate each tick and never accumulate).
     expect(ps.heatMap.get(probeId) ?? 0).toBe(0);
     expect(ps.heatMap.get(tankId) ?? 0).toBe(0);
@@ -764,8 +766,8 @@ describe('updateHeat() — part destruction', () => {
 
     const evt = fs.events.find((e) => e.type === 'PART_DESTROYED');
     expect(evt).toBeDefined();
-    expect(evt.instanceId).toBe(leadingId);
-    expect(evt.description).toContain('atmospheric heating');
+    expect(evt!.instanceId).toBe(leadingId);
+    expect(evt!.description).toContain('atmospheric heating');
   });
 
   it('does not destroy a part whose heat is well below tolerance', () => {
@@ -798,13 +800,13 @@ describe('heat shield part definitions', () => {
   it('heat-shield-mk1 exists and has HEAT_SHIELD type', () => {
     const def = getPartById('heat-shield-mk1');
     expect(def).toBeDefined();
-    expect(def.type).toBe('HEAT_SHIELD');
+    expect(def!.type).toBe('HEAT_SHIELD');
   });
 
   it('heat-shield-mk2 exists and has HEAT_SHIELD type', () => {
     const def = getPartById('heat-shield-mk2');
     expect(def).toBeDefined();
-    expect(def.type).toBe('HEAT_SHIELD');
+    expect(def!.type).toBe('HEAT_SHIELD');
   });
 
   it('heat shields have higher thermal tolerance than structural parts', () => {
@@ -1028,7 +1030,7 @@ describe('updateSolarHeat()', () => {
 
     const evt = fs.events.find(e => e.type === 'PART_DESTROYED');
     expect(evt).toBeDefined();
-    expect(evt.description).toContain('vaporised');
+    expect(evt!.description).toContain('vaporised');
   });
 
   it('solar heat shield reduces heat on shielded parts', () => {
@@ -1098,7 +1100,7 @@ describe('updateSolarHeat()', () => {
     expect(ps.activeParts.has(engineId)).toBe(false);
     const evt = fs.events.find(e => e.type === 'PART_DESTROYED' && e.instanceId === engineId);
     expect(evt).toBeDefined();
-    expect(evt.description).toContain('solar radiation');
+    expect(evt!.description).toContain('solar radiation');
   });
 
   it('no shield resistance when no heat shields are active', () => {
