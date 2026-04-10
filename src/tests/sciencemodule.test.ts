@@ -19,7 +19,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   ScienceModuleState,
-  initInstrumentStates,
   activateInstrument,
   activateAllInstruments,
   activateScienceModule,
@@ -40,7 +39,6 @@ import {
   ScienceDataType,
   DIMINISHING_RETURNS,
   FacilityId,
-  RD_LAB_SCIENCE_BONUS,
   MalfunctionType,
 } from '../core/constants.ts';
 import {

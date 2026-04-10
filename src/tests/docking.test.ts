@@ -32,7 +32,6 @@ import {
   transferCrew,
   transferFuel,
   getDockingGuidance,
-  getTargetsInVisualRange,
   canDockWith,
 } from '../core/docking.ts';
 

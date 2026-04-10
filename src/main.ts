@@ -8,11 +8,9 @@ import { initVabRenderer } from './render/vab.ts';
 import { initHubRenderer } from './render/hub.ts';
 import { showMainMenu, initUI, returnToHubFromFlight } from './ui/index.ts';
 import { buildTestRocket } from './core/testFlightBuilder.ts';
-import { startFlightScene, stopFlightScene } from './ui/flightController.ts';
+import { startFlightScene } from './ui/flightController.ts';
 import { createFlightState } from './core/gameState.ts';
-import type { GameState, FlightState } from './core/gameState.ts';
-import type { RocketAssembly } from './core/rocketbuilder.ts';
-import type { PhysicsState } from './core/physics.ts';
+import type { GameState } from './core/gameState.ts';
 import type { CelestialBodyDef } from './data/bodies.ts';
 import type { CelestialBody } from './core/constants.ts';
 import { setMalfunctionMode } from './core/malfunction.ts';
@@ -100,7 +98,7 @@ async function main() {
       // opts.instruments is a map of part catalog ID → instrument ID array.
       // e.g. { 'science-module-mk1': ['thermometer-mk1', 'barometer'] }
       if (opts.instruments) {
-        for (const [instanceId, placed] of assembly.parts) {
+        for (const [_instanceId, placed] of assembly.parts) {
           const instrumentList = opts.instruments[placed.partId];
           if (instrumentList) {
             placed.instruments = [...instrumentList];

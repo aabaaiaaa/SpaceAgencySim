@@ -15,10 +15,8 @@ import { advancePeriod } from '../core/period.ts';
 import { getMinimumRocketCost, isBankrupt } from '../core/finance.ts';
 import {
   CREW_SALARY_PER_PERIOD,
-  FACILITY_UPKEEP_PER_PERIOD,
   MAX_LOAN_BALANCE,
   AstronautStatus,
-  STARTING_MONEY,
 } from '../core/constants.ts';
 
 // ---------------------------------------------------------------------------

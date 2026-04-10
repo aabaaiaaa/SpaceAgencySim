@@ -177,7 +177,6 @@ describe('getWeatherSkipCost()', () => {
 describe('skipWeather()', () => {
   it('@smoke rerolls weather and deducts fee', () => {
     initWeather(state, 'EARTH');
-    const oldWeather = { ...getCurrentWeather(state) };
     const moneyBefore = state.money;
 
     const result = skipWeather(state, 'EARTH');

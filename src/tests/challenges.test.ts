@@ -1,10 +1,9 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
 import {
   ensureChallengeState,
   getUnlockedChallenges,
   getChallengeResult,
-  getActiveChallenge,
   acceptChallenge,
   abandonChallenge,
   checkChallengeObjectives,
@@ -449,14 +448,12 @@ describe('Challenge System', () => {
 
     it('upgrades medal on better replay', () => {
       const state = freshState();
-      const moneyBefore = state.money;
 
       // First attempt: bronze (cost = 40000)
       acceptChallenge(state, 'challenge-penny-pincher');
       for (const obj of state.challenges.active!.objectives) obj.completed = true;
       const r1 = processChallengeCompletion(state, makeFlightState({ rocketCost: 40000 }), null);
       expect(r1.medal).toBe(MedalTier.BRONZE);
-      const bronzeReward = r1.reward;
 
       // Second attempt: gold (cost = 10000)
       acceptChallenge(state, 'challenge-penny-pincher');

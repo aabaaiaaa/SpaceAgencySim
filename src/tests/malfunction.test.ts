@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
-  initMalfunctionState,
   checkMalfunctions,
   tickMalfunctions,
   hasMalfunction,
@@ -205,7 +204,7 @@ describe('checkMalfunctions()', () => {
 
   it('does nothing in OFF mode', () => {
     setMalfunctionMode(gs, MalfunctionMode.OFF);
-    const { assembly, engineId } = makeSimpleRocket();
+    const { assembly } = makeSimpleRocket();
     const { ps, fs } = makePhysicsState(assembly);
 
     checkMalfunctions(ps, assembly, fs, gs);
@@ -227,11 +226,10 @@ describe('checkMalfunctions()', () => {
 
   it('marks parts as checked so they are not re-rolled', () => {
     setMalfunctionMode(gs, MalfunctionMode.FORCED);
-    const { assembly, engineId } = makeSimpleRocket();
+    const { assembly } = makeSimpleRocket();
     const { ps, fs } = makePhysicsState(assembly);
 
     checkMalfunctions(ps, assembly, fs, gs);
-    const firstMalf = getMalfunction(ps, engineId);
 
     // Second check should not add new malfunctions (already checked).
     const sizeAfterFirst = ps.malfunctions!.size;
@@ -289,7 +287,7 @@ describe('Malfunction effects', () => {
 
   it('ENGINE_FLAMEOUT removes engine from firingEngines', () => {
     const { assembly, engineId } = makeSimpleRocket();
-    const { ps, fs } = makePhysicsState(assembly);
+    const { ps } = makePhysicsState(assembly);
 
     // Start engine firing.
     ps.firingEngines.add(engineId);

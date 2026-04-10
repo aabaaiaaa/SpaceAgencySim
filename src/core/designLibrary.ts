@@ -21,7 +21,6 @@ import { getPartById } from '../data/parts.ts';
 import { PartType } from './constants.ts';
 import { logger } from './logger.ts';
 import { TECH_NODES } from '../data/techtree.ts';
-import type { PartDef } from '../data/parts.ts';
 import type { TechNodeDef } from '../data/techtree.ts';
 import type { GameState, RocketDesign } from './gameState.ts';
 

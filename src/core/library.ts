@@ -9,9 +9,9 @@
  */
 
 import { FlightOutcome, AstronautStatus } from './constants.ts';
-import { CELESTIAL_BODIES, ALL_BODY_IDS, getBodyDef } from '../data/bodies.ts';
+import { ALL_BODY_IDS, getBodyDef } from '../data/bodies.ts';
 import { ACHIEVEMENTS } from './achievements.ts';
-import type { GameState, FlightResult, RocketDesign, CrewMember, SurfaceItem, FieldCraft } from './gameState.ts';
+import type { GameState } from './gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Local types for return values

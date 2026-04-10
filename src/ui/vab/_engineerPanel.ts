@@ -5,8 +5,6 @@
 import { runValidation } from '../../core/rocketvalidator.ts';
 import { getVabState } from './_state.ts';
 
-import type { ValidationCheck } from '../../core/rocketvalidator.ts';
-
 /**
  * Populate the Rocket Engineer side panel with the latest validation result.
  */

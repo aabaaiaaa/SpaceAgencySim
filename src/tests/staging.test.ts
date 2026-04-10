@@ -10,7 +10,7 @@
  *                             debris ticked on each physics tick
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   activateCurrentStage,
   activatePartDirect,
@@ -250,9 +250,6 @@ describe('activateCurrentStage() — SEPARATE (stack decoupler)', () => {
     activateCurrentStage(ps, assembly, staging, fs); // stage 2: separation
     expect(ps.firingEngines.has(engineId)).toBe(false); // removed from rocket
 
-    // The engine is now on the debris fragment.
-    const debris = ps.debris; // not populated here — need to check via return value
-    // (debris is the return value of activateCurrentStage, tested separately)
   });
 
   it('debris fragment inherits rocket position and velocity (±separation impulse)', () => {
@@ -705,7 +702,7 @@ describe('recomputeActiveGraph()', () => {
   });
 
   it('returns a debris fragment for parts not connected to any command module', () => {
-    const { assembly, staging, decId, tankId, engineId } = makeTwoStageRocket();
+    const { assembly, staging: _staging, decId, tankId, engineId } = makeTwoStageRocket();
     const ps = makePhysicsState(assembly);
 
     // Manually simulate what happens when the decoupler fires:
@@ -749,7 +746,6 @@ describe('recomputeActiveGraph()', () => {
     const ps = makePhysicsState(assembly);
 
     // Even with the decoupler removed, probe stays.
-    const { decId } = makeTwoStageRocket(); // fresh IDs not used here
     // Just verify the probe stays after a noop recompute.
     recomputeActiveGraph(ps, assembly);
 

@@ -14,7 +14,6 @@ import {
   showMapScene,
   hideMapScene,
   getMapZoomLevel,
-  setMapZoomLevel,
   getMapTarget,
   setMapTarget,
   getSelectedTransferTarget,
@@ -27,7 +26,6 @@ import {
   isMapViewAvailable,
   getMapTransferTargets,
   getTransferProgressInfo,
-  getAllowedMapZooms,
 } from '../../core/mapView.ts';
 import { warpToTarget } from '../../core/orbit.ts';
 import { FlightPhase, BODY_RADIUS } from '../../core/constants.ts';

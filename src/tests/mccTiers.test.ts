@@ -185,10 +185,6 @@ describe('generateContracts() — MCC tier filtering', () => {
     // All generated contracts should come from templates with minMccTier 1.
     // We check this indirectly: at MCC tier 1, no medium/premium templates
     // should appear (speed-push, crash-test, science-chain, etc.).
-    const tier1TemplateIds: Set<string> = new Set(
-      CONTRACT_TEMPLATES.filter(t => t.minMccTier <= 1).map(t => t.id),
-    );
-
     // Verify we actually generated some contracts.
     expect(generated.length).toBeGreaterThan(0);
 

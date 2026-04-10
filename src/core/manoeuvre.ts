@@ -26,11 +26,6 @@ import {
 } from './constants.ts';
 import {
   computeOrbitalElements,
-  checkOrbitStatus,
-  getOrbitalPeriod,
-  circularOrbitVelocity,
-  getPeriapsisAltitude,
-  getApoapsisAltitude,
 } from './orbit.ts';
 
 import type { FlightState, OrbitalElements } from './gameState.ts';
@@ -703,7 +698,7 @@ export function computeTransferRoute(
   fromBodyId: string,
   toBodyId: string,
   altitude: number,
-  craftElements: OrbitalElements | null,
+  _craftElements: OrbitalElements | null,
 ): TransferRoute | null {
   const transfer = computeTransferDeltaV(fromBodyId, toBodyId, altitude);
   if (!transfer) return null;
@@ -805,7 +800,7 @@ export function shouldEnterTransfer(ps: PhysicsState, flightState: FlightState):
  * Determine the turn direction for a gravity assist based on approach geometry.
  * Returns +1 or -1.
  */
-function _determineTurnDirection(ps: PhysicsState, bodyId: string, approachAngle: number): number {
+function _determineTurnDirection(ps: PhysicsState, bodyId: string, _approachAngle: number): number {
   const R = (BODY_RADIUS as Record<string, number>)[bodyId];
   // Cross product of position vector and velocity vector determines
   // which side of the body the craft passes.

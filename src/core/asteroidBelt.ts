@@ -166,15 +166,6 @@ export function generateBeltAsteroids(
   const sizeExponent =
     zone === BeltZone.DENSE ? SIZE_EXPONENT_DENSE : SIZE_EXPONENT_SPARSE;
 
-  // Player distance from Sun centre (for orbital velocity direction).
-  const playerDist = Math.hypot(playerX, playerY);
-
-  // Orbital velocity direction at player position (tangent to orbit, prograde).
-  // For a circular orbit the velocity is perpendicular to the radius vector.
-  // Direction: 90 degrees counter-clockwise from the radius vector.
-  const radAngle = Math.atan2(playerY, playerX);
-  const progradeAngle = radAngle + Math.PI / 2;
-
   const asteroids: Asteroid[] = [];
 
   for (let i = 0; i < count; i++) {

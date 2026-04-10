@@ -25,7 +25,6 @@ import {
   REP_LOSS_CREW_DEATH,
   REP_LOSS_MISSION_FAILURE,
   REP_LOSS_ROCKET_DESTRUCTION,
-  getReputationTier,
 } from './constants.ts';
 
 import type { GameState } from './gameState.ts';

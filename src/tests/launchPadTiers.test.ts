@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import {
-  getTotalMass,
   runValidation,
   hasLaunchClamps,
 } from '../core/rocketvalidator.ts';

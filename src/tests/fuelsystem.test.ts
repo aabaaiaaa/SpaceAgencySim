@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   getConnectedTanks,
   computeEngineFlowRate,
@@ -210,7 +210,7 @@ describe('getConnectedTanks() — jettisoned parts are invisible', () => {
 describe('getConnectedTanks() — SRB has no external tanks', () => {
   it('returns an empty array for a radially-attached SRB with no connected tanks', () => {
     const assembly = createRocketAssembly();
-    const probeId  = addPartToAssembly(assembly, 'probe-core-mk1', 0,  60);
+    addPartToAssembly(assembly, 'probe-core-mk1', 0,  60);
     const srbId    = addPartToAssembly(assembly, 'srb-small',      50,  0);
     // SRBs attach to the side — in this test there is no tank in the SRB's segment.
     // (No connection is drawn between probe and SRB for this isolation test.)
@@ -300,7 +300,7 @@ describe('computeEngineFlowRate() — SRB', () => {
 
 describe('tickFuelSystem() — liquid engine drains connected tank', () => {
   it('reduces tank fuel after one tick', () => {
-    const { assembly, staging, tankId, engineId } = makeSimpleRocket();
+    const { assembly, staging: _staging, tankId, engineId } = makeSimpleRocket();
     const ps = makePS(assembly);
 
     const initialFuel = ps.fuelStore.get(tankId)!;
@@ -314,7 +314,7 @@ describe('tickFuelSystem() — liquid engine drains connected tank', () => {
   it('does not drain a tank not connected to the engine (across a decoupler)', () => {
     // In the two-stage rocket, the probe-side has no tank so nothing extra
     // is drained.  Here we explicitly verify the probe part's fuelStore is untouched.
-    const { assembly, staging, tankId, engineId } = makeTwoStageRocket();
+    const { assembly, staging: _staging, tankId, engineId } = makeTwoStageRocket();
     const ps = makePS(assembly);
 
     ps.firingEngines.add(engineId);
@@ -398,7 +398,7 @@ describe('tickFuelSystem() — liquid engine flames out when tanks empty', () =>
 describe('tickFuelSystem() — SRB drains integral fuel', () => {
   it('drains the SRB fuelStore entry (not any external tank)', () => {
     const assembly = createRocketAssembly();
-    const probeId  = addPartToAssembly(assembly, 'probe-core-mk1', 0,  60);
+    addPartToAssembly(assembly, 'probe-core-mk1', 0,  60);
     const srbId    = addPartToAssembly(assembly, 'srb-small',      50,  0);
     const ps       = makePS(assembly);
 

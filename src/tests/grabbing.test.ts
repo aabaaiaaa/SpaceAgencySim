@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createFlightState, createGameState } from '../core/gameState.ts';
-import type { FlightState, FlightEvent, GameState, OrbitalObject } from '../core/gameState.ts';
+import type { FlightState, GameState } from '../core/gameState.ts';
 import {
   FlightPhase,
   ControlMode,
@@ -34,7 +34,7 @@ import {
   breakThrustAlignment,
 } from '../core/grabbing.ts';
 import { getPartById } from '../data/parts.ts';
-import type { PhysicsState, RocketAssembly, PlacedPart, CapturedBody } from '../core/physics.ts';
+import type { PhysicsState, RocketAssembly, PlacedPart } from '../core/physics.ts';
 import type { Asteroid } from '../core/asteroidBelt.ts';
 
 // ---------------------------------------------------------------------------

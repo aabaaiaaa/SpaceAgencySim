@@ -34,13 +34,12 @@ import {
   WEATHER_EXTREME_CHANCE,
   WEATHER_EXTREME_WIND_MIN,
   WEATHER_EXTREME_VISIBILITY_MAX,
-  WeatherSeverity,
 } from './constants.ts';
 import { getBodyDef, hasAtmosphere } from '../data/bodies.ts';
 import { getNetworkBenefits } from './satellites.ts';
 import { spend } from './finance.ts';
 import { getWeatherSeverityMultipliers } from './settings.ts';
-import type { GameState, WeatherConditions, WeatherState } from './gameState.ts';
+import type { GameState, WeatherConditions } from './gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Types

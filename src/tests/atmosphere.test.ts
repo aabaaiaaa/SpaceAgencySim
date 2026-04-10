@@ -130,15 +130,6 @@ function findLowestActivePartId(ps: { activeParts: Set<string> }, assembly: Rock
     .sort(([, a], [, b]) => a.y - b.y)[0][0];
 }
 
-/**
- * Return the instance ID of the part with the maximum Y (highest physical
- * position) among all active parts — i.e. the leading face when ascending.
- */
-function findHighestActivePartId(ps: { activeParts: Set<string> }, assembly: RocketAssembly): string {
-  return Array.from(assembly.parts.entries())
-    .filter(([id]) => ps.activeParts.has(id))
-    .sort(([, a], [, b]) => b.y - a.y)[0][0];
-}
 
 // ---------------------------------------------------------------------------
 // airDensity()
@@ -392,7 +383,7 @@ describe('getShieldedPartIds()', () => {
   });
 
   it('shields parts below the heat shield when ascending', () => {
-    const { assembly, probeId, tankId, shieldId, engineId } = makeShieldedRocket();
+    const { assembly, probeId, tankId, shieldId: _shieldId, engineId } = makeShieldedRocket();
     const ps = { velY: 100, activeParts: new Set(assembly.parts.keys()) };
     const shielded = getShieldedPartIds(ps, assembly);
 
@@ -420,7 +411,7 @@ describe('getShieldedPartIds()', () => {
   });
 
   it('does not shield anything when the heat shield is destroyed (not in activeParts)', () => {
-    const { assembly, probeId, tankId, shieldId, engineId } = makeShieldedRocket();
+    const { assembly, probeId, tankId, shieldId: _shieldId, engineId } = makeShieldedRocket();
     // Remove shield from active parts (destroyed).
     const ps = { velY: -100, activeParts: new Set([probeId, tankId, engineId]) };
     const shielded = getShieldedPartIds(ps, assembly);
@@ -555,7 +546,7 @@ describe('updateHeat() — reentry heating', () => {
   });
 
   it('shielded parts dissipate heat during reentry instead of accumulating', () => {
-    const { assembly, probeId, tankId, shieldId, engineId } = makeShieldedRocket();
+    const { assembly, probeId, tankId, shieldId: _shieldId, engineId } = makeShieldedRocket();
     const fs = makeFlightState();
     const ps = createPhysicsState(assembly, fs);
 
@@ -654,7 +645,7 @@ describe('updateHeat() — heat shield protection', () => {
   });
 
   it('protection reverses with ascent direction', () => {
-    const { assembly, probeId, tankId, shieldId, engineId } = makeShieldedRocket();
+    const { assembly, probeId, tankId: _tankId, shieldId: _shieldId, engineId } = makeShieldedRocket();
     const fs = makeFlightState();
     const ps = createPhysicsState(assembly, fs);
     ps.posY = 50_000;
@@ -1034,7 +1025,7 @@ describe('updateSolarHeat()', () => {
   });
 
   it('solar heat shield reduces heat on shielded parts', () => {
-    const { assembly, probeId, tankId, shieldId, engineId } = makeSolarShieldedRocket();
+    const { assembly, probeId, tankId, shieldId: _shieldId, engineId } = makeSolarShieldedRocket();
     const fs = makeFlightState();
     const ps = createPhysicsState(assembly, fs);
     // Descending (velY < 0): shield at y=-30 protects parts above (probe, tank).

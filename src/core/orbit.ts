@@ -98,7 +98,6 @@ export interface ProximityState {
 // ---------------------------------------------------------------------------
 
 const TWO_PI = 2 * Math.PI;
-const DEG_TO_RAD = Math.PI / 180;
 const RAD_TO_DEG = 180 / Math.PI;
 
 /** Maximum iterations for Newton-Raphson Kepler solver. */
@@ -383,7 +382,7 @@ export function orbitalStateToCartesian(
 ): { posX: number; posY: number; velX: number; velY: number } {
   const mu = BODY_GM[bodyId];
   const R = BODY_RADIUS[bodyId];
-  const { semiMajorAxis: a, eccentricity: e, argPeriapsis: omega, meanAnomalyAtEpoch: M0, epoch } = elements;
+  const { semiMajorAxis: a, eccentricity: e, meanAnomalyAtEpoch: M0, epoch } = elements;
 
   // Mean anomaly at time t.
   const n = getMeanMotion(a, bodyId);

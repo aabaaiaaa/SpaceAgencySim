@@ -292,7 +292,6 @@ describe('recordKIA()', () => {
 
   it('does not apply an extra fine on the second KIA call', () => {
     const a = hireOne(state);
-    const moneyAfterFirst = state.money - DEATH_FINE_PER_ASTRONAUT;
     recordKIA(state, a.id, 'first');
     const cashAfterFirst = state.money;
     recordKIA(state, a.id, 'second');
@@ -444,7 +443,7 @@ describe('getActiveCrew()', () => {
   });
 
   it('result is a subset of state.crew (same references)', () => {
-    const a = hireOne(state, 'A');
+    hireOne(state, 'A');
     const active = getActiveCrew(state);
     expect(active[0]).toBe(state.crew[0]);
   });

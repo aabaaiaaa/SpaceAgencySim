@@ -9,10 +9,10 @@
  *   - Cash and reputation rewards
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
 import { checkAchievements, getAchievementStatus, ACHIEVEMENTS } from '../core/achievements.ts';
-import { CelestialBody, SatelliteType } from '../core/constants.ts';
+import { SatelliteType } from '../core/constants.ts';
 
 import type { GameState, MissionInstance, OrbitalObject, FlightState } from '../core/gameState.ts';
 import type { AchievementCheckContext } from '../core/achievements.ts';

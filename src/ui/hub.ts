@@ -20,7 +20,7 @@
  */
 
 import { showHubScene, hideHubScene, setHubWeather, setBuiltFacilities } from '../render/hub.ts';
-import { FACILITY_DEFINITIONS, FacilityId, FACILITY_UPGRADE_DEFS, getFacilityUpgradeDef, getReputationTier, GameMode } from '../core/constants.ts';
+import { FACILITY_DEFINITIONS, getFacilityUpgradeDef, getReputationTier, GameMode } from '../core/constants.ts';
 import { openSettingsPanel } from './settings.ts';
 import { openDebugSavePanel } from './debugSaves.ts';
 import { setTopBarHubItems, clearTopBarHubItems } from './topbar.ts';
@@ -672,7 +672,7 @@ function _renderBankruptcyBanner(): void {
 /**
  * Create the left-side info panel containing the reputation badge and weather.
  */
-function _renderLeftPanel(container: HTMLElement): void {
+function _renderLeftPanel(_container: HTMLElement): void {
   if (!_overlay || !_state) return;
 
   // Remove stale left panel.

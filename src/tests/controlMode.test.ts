@@ -1,12 +1,11 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createFlightState } from '../core/gameState.ts';
-import { FlightPhase, ControlMode, PartType } from '../core/constants.ts';
+import { FlightPhase, ControlMode } from '../core/constants.ts';
 import {
   canEnterDockingMode,
   enterDockingMode,
   exitDockingMode,
   toggleRcsMode,
-  hasRcsThrusters,
   checkBandLimitWarning,
   clampDockingRadial,
   resetControlModeIfNeeded,

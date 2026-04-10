@@ -3,17 +3,12 @@ import { createGameState } from '../core/gameState.ts';
 import { processFlightReturn } from '../core/flightReturn.ts';
 import { MISSIONS, ObjectiveType, MissionStatus, rebuildMissionsIndex } from '../data/missions.ts';
 import {
-  PartType,
   DEATH_FINE_PER_ASTRONAUT,
   FlightOutcome,
-  STARTING_MONEY,
-  STARTING_LOAN_BALANCE,
   STARTING_REPUTATION,
   FieldCraftStatus,
 } from '../core/constants.ts';
-import { getPartById } from '../data/parts.ts';
-import type { GameState, FlightState, CrewMember, MissionInstance, Loan, ObjectiveDef } from '../core/gameState.ts';
-import type { FlightReturnSummary } from '../core/flightReturn.ts';
+import type { GameState, FlightState, CrewMember, MissionInstance, ObjectiveDef } from '../core/gameState.ts';
 import type { PhysicsState, RocketAssembly, PlacedPart } from '../core/physics.ts';
 import type { MissionDef } from '../data/missions.ts';
 

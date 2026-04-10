@@ -24,8 +24,6 @@ import {
   buildContract,
   buildObjective,
   STARTING_MONEY,
-  STARTER_FACILITIES,
-  ALL_FACILITIES,
 } from '../../e2e/helpers.js';
 
 import type {
@@ -333,7 +331,7 @@ describe('buildTestRocket', () => {
   });
 
   it('connects parts in order (top to bottom)', () => {
-    const { assembly, stagingConfig } = buildTestRocket([
+    const { assembly } = buildTestRocket([
       'cmd-mk1', 'tank-medium', 'engine-spark',
     ]);
 
@@ -358,7 +356,7 @@ describe('buildTestRocket', () => {
   });
 
   it('handles a single part', () => {
-    const { assembly, stagingConfig } = buildTestRocket(['probe-core-mk1']);
+    const { assembly } = buildTestRocket(['probe-core-mk1']);
     expect(assembly.parts.size).toBe(1);
     expect(assembly.connections.length).toBe(0);
   });

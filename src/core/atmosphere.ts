@@ -58,7 +58,7 @@ import {
   STANDARD_SHIELD_SOLAR_RESISTANCE,
   BODY_RADIUS,
 } from './constants.ts';
-import { getAirDensity as _bodyAirDensity, getAtmosphereTop as _bodyAtmoTop, hasAtmosphere } from '../data/bodies.ts';
+import { getAirDensity as _bodyAirDensity, getAtmosphereTop as _bodyAtmoTop } from '../data/bodies.ts';
 
 import type { PartDef } from '../data/parts.ts';
 import type { PhysicsState, RocketAssembly } from './physics.ts';

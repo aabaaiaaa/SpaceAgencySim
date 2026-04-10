@@ -48,7 +48,7 @@ const { MockGraphics, MockTextStyle, MockText, MockContainer } = vi.hoisted(() =
     style: unknown = null;
     x = 0;
     y = 0;
-    constructor(_opts?: unknown) {} // eslint-disable-line @typescript-eslint/no-unused-vars
+    constructor(_opts?: unknown) {}
   }
 
   class MockContainer {

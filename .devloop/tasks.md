@@ -7,7 +7,7 @@ See `.devloop/requirements.md` for full context and rationale behind each task.
 ## Section 1: Bug Fix
 
 ### TASK-001: Fix saveload.ts CrewStatus.DEAD / AstronautStatus.KIA enum mismatch
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/core/saveload.ts`, `countKIA()` (line 256) and `countLivingCrew()` (line 263) compare `c.status === CrewStatus.DEAD` but `CrewMember.status` is now typed as `AstronautStatus` after the iteration 5 type unification. Replace `CrewStatus.DEAD` (value `'DEAD'`) with `AstronautStatus.KIA` (value `'kia'`) in both functions. Also tighten the parameter types from `{ crew?: Array<{ status: string }> }` to use `AstronautStatus` instead of bare `string`. Update `src/tests/saveload.test.ts` mock data at lines 151, 242, 354-368 that use `CrewStatus.DEAD` — these currently validate the wrong behavior.
 - **Verification**: `npx vitest run src/tests/saveload.test.ts` — all tests pass with corrected enum values.
@@ -17,7 +17,7 @@ See `.devloop/requirements.md` for full context and rationale behind each task.
 ## Section 2: Test Map Regeneration
 
 ### TASK-002: Create generate-test-map.mjs script
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Create `scripts/generate-test-map.mjs` that auto-generates `test-map.json` from import analysis. The script should: (1) scan all unit test files (`src/tests/**/*.test.ts`) and E2E spec files (`e2e/**/*.spec.ts`), (2) parse each file's imports to determine which source modules it tests, (3) group results by source area using the existing naming convention (e.g., `core/physics`, `ui/vab`, `render/flight`), (4) output the same JSON structure as the current `test-map.json` with `{ areas: { [name]: { sources, unit, e2e } } }`, (5) handle barrel re-exports (if a test imports from a barrel like `src/ui/vab.ts`, trace through to sub-modules), (6) include an `e2e-infra` area for E2E helpers. The script should accept a `--dry-run` flag that prints the output to stdout without writing the file.
 - **Verification**: `node scripts/generate-test-map.mjs --dry-run` runs without error and outputs valid JSON to stdout.
@@ -33,13 +33,13 @@ See `.devloop/requirements.md` for full context and rationale behind each task.
 ## Section 3: Lint Warning Cleanup
 
 ### TASK-004: Clean up lint warnings in source files
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Remove all unused imports and variables flagged by `@typescript-eslint/no-unused-vars` in production source files. Files with warnings include: `src/core/` (~20 files: achievements.ts, asteroidBelt.ts, atmosphere.ts, construction.ts, controlMode.ts, customChallenges.ts, designLibrary.ts, docking.ts, flightPhase.ts, grabbing.ts, library.ts, malfunction.ts, manoeuvre.ts, mapView.ts, orbit.ts, physics.ts, reputation.ts, sciencemodule.ts, settings.ts, surfaceOps.ts, techtree.ts, weather.ts), `src/data/challenges.ts`, `src/main.ts`, `src/render/` (flight/_debris.ts, flight/_rocket.ts, flight/_trails.ts, map.ts), `src/ui/` (flightController/_keyboard.ts, flightController/_mapView.ts, hub.ts, library.ts, rdLab.ts, vab/_engineerPanel.ts). For each file: identify the unused import/variable in the ESLint warning, delete the import or declaration, verify the file still compiles.
 - **Verification**: `npx eslint src/core/ src/data/ src/render/ src/ui/ src/main.ts --max-warnings 0` — 0 warnings, 0 errors.
 
 ### TASK-005: Clean up lint warnings in unit test files
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Remove all unused imports and variables in unit test files flagged by `@typescript-eslint/no-unused-vars`. There are ~35 test files with warnings in `src/tests/`. For each file: run `npx eslint <file>` to see the specific warning, remove the unused import or variable, verify the test still passes. Files include: achievements.test.ts, atmosphere.test.ts, autoSave.test.ts, bankruptcy.test.ts, branchCoverage.test.ts, challenges.test.ts, collision.test.ts, comms.test.ts, construction.test.ts, contracts.test.ts, controlMode.test.ts, crew.test.ts, docking.test.ts, e2e-infrastructure.test.ts, flightReturn.test.ts, fuelsystem.test.ts, grabbing.test.ts, instruments.test.ts, launchPadTiers.test.ts, malfunction.test.ts, manoeuvre.test.ts, mccTiers.test.ts, multiBodyLanding.test.ts, orbit.test.ts, parachute-deploy.test.ts, parachute-descent.test.ts, partInventory.test.ts, period.test.ts, physics.test.ts, physicsWorker.test.ts, power.test.ts, render-flight-pool.test.ts, render-sky.test.ts, rocketvalidator.test.ts, sandbox.test.ts, satellites.test.ts, sciencemodule.test.ts, staging.test.ts, surfaceOps.test.ts, undoRedo.test.ts, weather.test.ts.
 - **Verification**: `npx eslint src/tests/ --max-warnings 0` — 0 warnings, 0 errors.
@@ -55,7 +55,7 @@ See `.devloop/requirements.md` for full context and rationale behind each task.
 ## Section 4: Typed Test Factory Functions
 
 ### TASK-007: Create unit test factory file
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Create `src/tests/_factories.ts` with typed factory functions for all types that have 10+ `as unknown as` casts in unit tests. Each factory takes an optional `Partial<T>` parameter for overrides and returns a fully typed object with sensible defaults. Required factories: `makePhysicsState(overrides?)` (77 casts), `makeGameState(overrides?)` (22 casts), `makeMissionInstance(overrides?)` (20 casts), `makeFlightState(overrides?)` (20 casts), `makeGraphics(overrides?)` for mock PixiJS Graphics (18 casts), `makeRecord(overrides?)` or appropriate typed alternative (17 casts), `makeRecoveryPS(overrides?)` (16 casts), `makeCrewMember(overrides?)` (16 casts — mirrors E2E's `buildCrewMember` pattern), `makeMockElement(overrides?)` for mock DOM elements (13 casts). Import real interfaces from `src/core/` modules. No `any` allowed — use proper types throughout. Export all factories.
 - **Verification**: `npx vitest run src/tests/_factories.test.ts 2>&1 || echo "No test file yet"` — file compiles without errors: `npx tsc --noEmit src/tests/_factories.ts 2>&1 | head -5` should show no errors. Also `npx eslint src/tests/_factories.ts --max-warnings 0`.

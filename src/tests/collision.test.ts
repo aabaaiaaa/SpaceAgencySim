@@ -269,21 +269,21 @@ describe('Collision response', () => {
    * Helper: create two overlapping debris-like bodies and run tickCollisions.
    */
   function makeTwoBodyCollision({
-    mass1 = 100, mass2 = 100,
+    _mass1 = 100, _mass2 = 100,
     vel1X = 0, vel1Y = -5,
     vel2X = 0, vel2Y = 5,
     pos1Y = 100.5, pos2Y = 100,
-    altitude = 100,
+    _altitude = 100,
   }: {
-    mass1?: number;
-    mass2?: number;
+    _mass1?: number;
+    _mass2?: number;
     vel1X?: number;
     vel1Y?: number;
     vel2X?: number;
     vel2Y?: number;
     pos1Y?: number;
     pos2Y?: number;
-    altitude?: number;
+    _altitude?: number;
   } = {}): {
     ps: TestPhysicsState;
     assembly: RocketAssembly;

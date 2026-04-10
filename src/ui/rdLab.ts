@@ -8,7 +8,7 @@
  * @module ui/rdLab
  */
 
-import { TECH_NODES, TechBranch, BRANCH_NAMES } from '../data/techtree.ts';
+import { TechBranch, BRANCH_NAMES } from '../data/techtree.ts';
 import {
   getTechTreeStatus,
   researchNode,

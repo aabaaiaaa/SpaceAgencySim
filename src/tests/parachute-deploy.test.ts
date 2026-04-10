@@ -29,7 +29,6 @@ import {
   getParachuteContextMenuItems,
 } from '../core/parachute.ts';
 import type { ParachuteEntry, ParachuteContextMenuItem } from '../core/parachute.ts';
-import { PartType } from '../core/constants.ts';
 
 // ---------------------------------------------------------------------------
 // Local mock interfaces matching the unexported parameter types in parachute.ts

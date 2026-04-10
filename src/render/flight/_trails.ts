@@ -16,7 +16,6 @@ import { lerpColor } from './_sky.ts';
 import { acquireGraphics, releaseGraphics, releaseContainerChildren } from './_pool.ts';
 import {
   SCALE_M_PER_PX,
-  FLIGHT_PIXELS_PER_METRE,
   TRAIL_MAX_AGE,
   TRAIL_ATMOSPHERE_AGE_BONUS,
   TRAIL_DENSITY_THRESHOLD,

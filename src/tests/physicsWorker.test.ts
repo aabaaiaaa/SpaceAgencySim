@@ -29,15 +29,10 @@ import type {
   InitCommand,
   TickCommand,
   SetThrottleCommand,
-  StageCommand,
-  AbortCommand,
   KeyDownCommand,
   KeyUpCommand,
-  StopCommand,
   SnapshotMessage,
-  ReadyMessage,
   ErrorMessage,
-  StoppedMessage,
 } from '../core/physicsWorkerProtocol.ts';
 import {
   serialisePhysicsState,

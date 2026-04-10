@@ -18,7 +18,6 @@ import {
   FACILITY_UPKEEP_PER_PERIOD,
   FACILITY_DEFINITIONS,
   AstronautStatus,
-  STARTING_MONEY,
 } from '../core/constants.ts';
 import type { GameState, CrewMember, MissionInstance } from '../core/gameState.ts';
 

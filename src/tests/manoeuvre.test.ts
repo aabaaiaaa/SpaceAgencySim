@@ -7,7 +7,6 @@ import {
   checkSOITransition,
   isEscapeTrajectory,
   computeGravityAssist,
-  applyGravityAssist,
   shouldEnterManoeuvre,
   shouldExitManoeuvre,
   shouldEnterTransfer,
@@ -21,7 +20,6 @@ import {
 } from '../core/manoeuvre.ts';
 import {
   CelestialBody,
-  BODY_GM,
   BODY_RADIUS,
   FlightPhase,
   ControlMode,

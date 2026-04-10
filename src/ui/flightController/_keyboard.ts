@@ -15,7 +15,6 @@ import {
   resyncWorkerState,
 } from './_workerBridge.ts';
 import {
-  cycleMapZoom,
   getMapZoomLevel,
   setMapZoomLevel,
   cycleMapTarget,
@@ -27,7 +26,6 @@ import {
 import {
   isTransferPlanningAvailable,
   getAllowedMapZooms,
-  isDebrisTrackingAvailable,
 } from '../../core/mapView.ts';
 import { FlightPhase, ControlMode, DockingState } from '../../core/constants.ts';
 import { getFCState, getPhysicsState, getFlightState } from './_state.ts';

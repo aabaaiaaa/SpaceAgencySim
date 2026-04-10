@@ -1,14 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import {
   ScienceModuleState,
-  initInstrumentStates,
   activateInstrument,
   activateAllInstruments,
   activateScienceModule,
   tickInstruments,
   transmitInstrument,
   getScienceModuleStatus,
-  getScienceModuleTimer,
   getInstrumentStatus,
   getInstrumentTimer,
   getModuleInstrumentKeys,
@@ -41,7 +39,7 @@ import {
   syncStagingWithAssembly,
   assignPartToStage,
 } from '../core/rocketbuilder.ts';
-import type { RocketAssembly, StagingConfig } from '../core/rocketbuilder.ts';
+import type { RocketAssembly } from '../core/rocketbuilder.ts';
 import { createPhysicsState } from '../core/physics.ts';
 import type { PhysicsState, ScienceModuleStateEntry } from '../core/physics.ts';
 import { createFlightState } from '../core/gameState.ts';

@@ -38,7 +38,7 @@ import { getInstrumentById, isInstrumentValidForBiome } from '../data/instrument
 import { PartType, ScienceDataType, DIMINISHING_RETURNS,
          ANALYSIS_TRANSMIT_YIELD_MIN, ANALYSIS_TRANSMIT_YIELD_MAX,
          FacilityId, RD_LAB_SCIENCE_BONUS } from './constants.ts';
-import { getBiome, getBiomeId, getScienceMultiplier } from './biomes.ts';
+import { getBiome, getScienceMultiplier } from './biomes.ts';
 // hasMalfunction not used directly — inline check avoids PhysicsStateWithMalfunctions type mismatch
 import { MalfunctionType } from './constants.ts';
 

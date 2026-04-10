@@ -34,8 +34,6 @@ import type { GameState } from './gameState.ts';
 // Local types (shapes from data modules)
 // ---------------------------------------------------------------------------
 
-// TechNode is an alias for TechNodeDef from the data module.
-type TechNode = TechNodeDef;
 
 interface ResearchCheck {
   allowed: boolean;

@@ -13,7 +13,6 @@ import {
   CommsLinkType,
   COMMS_DIRECT_RANGE,
   COMMS_TRACKING_T3_RANGE,
-  SatelliteType,
   FacilityId,
   FlightPhase,
   CelestialBody,
@@ -40,14 +39,6 @@ function flightAt(bodyId: CelestialBody, phase: FlightPhase, crewIds: string[] =
 
 const LEO_ELEMENTS: OrbitalElements = {
   semiMajorAxis: BODY_RADIUS.EARTH + 150_000,
-  eccentricity: 0.001,
-  argPeriapsis: 0,
-  meanAnomalyAtEpoch: 0,
-  epoch: 0,
-};
-
-const HEO_ELEMENTS: OrbitalElements = {
-  semiMajorAxis: BODY_RADIUS.EARTH + 5_000_000,
   eccentricity: 0.001,
   argPeriapsis: 0,
   meanAnomalyAtEpoch: 0,

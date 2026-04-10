@@ -34,14 +34,11 @@
 
 import { getPartById } from '../data/parts.ts';
 import {
-  PartType,
   GameMode,
   MalfunctionType,
   MalfunctionMode,
   MALFUNCTION_TYPE_MAP,
   FUEL_LEAK_RATE,
-  REDUCED_THRUST_FACTOR,
-  PARTIAL_CHUTE_FACTOR,
   MAX_ENGINEERING_MALFUNCTION_REDUCTION,
 } from './constants.ts';
 import { getMalfunctionMultiplier } from './settings.ts';

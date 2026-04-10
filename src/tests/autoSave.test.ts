@@ -243,7 +243,7 @@ describe('hasAutoSave', () => {
     expect(hasAutoSave()).toBe(false);
   });
 
-  it('returns true when the dedicated auto-save key has data', async () => {
+  it('returns true when the dedicated auto-save key has data', () => {
     // Directly place data at the dedicated key (legacy or manual).
     mockStorage.setItem(AUTO_SAVE_KEY, 'data');
     expect(hasAutoSave()).toBe(true);
@@ -255,7 +255,7 @@ describe('hasAutoSave', () => {
 // ---------------------------------------------------------------------------
 
 describe('deleteAutoSave', () => {
-  it('removes the auto-save from localStorage', async () => {
+  it('removes the auto-save from localStorage', () => {
     // Place data at the dedicated key.
     mockStorage.setItem(AUTO_SAVE_KEY, 'data');
     expect(hasAutoSave()).toBe(true);

@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { Container, Graphics, Text } from 'pixi.js';
+import type { Container } from 'pixi.js';
 
 // ---------------------------------------------------------------------------
 // Mock pixi.js

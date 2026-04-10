@@ -42,13 +42,12 @@ import {
   warpToTarget,
   orbitOverlapsBand,
 } from '../core/orbit.ts';
-import type { ProximityState, OrbitStatus, WarpResult } from '../core/orbit.ts';
-import type { OrbitalElements, OrbitalObject } from '../core/gameState.ts';
+import type { ProximityState } from '../core/orbit.ts';
+import type { OrbitalElements } from '../core/gameState.ts';
 import {
   CelestialBody,
   BODY_GM,
   BODY_RADIUS,
-  MIN_ORBIT_ALTITUDE,
 } from '../core/constants.ts';
 
 const EARTH = CelestialBody.EARTH;
@@ -60,12 +59,6 @@ const TWO_PI = 2 * Math.PI;
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Tolerance for angular comparisons (radians). */
-const ANGLE_TOL = 1e-6;
-/** Tolerance for distance comparisons (metres). */
-const DIST_TOL = 100; // 100 m
-/** Tolerance for time comparisons (seconds). */
-const TIME_TOL = 1;
 
 /**
  * Create a circular orbit state at a given altitude with exact circular velocity.

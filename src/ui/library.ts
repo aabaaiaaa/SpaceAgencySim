@@ -224,10 +224,6 @@ function _renderStatsTab(content: HTMLDivElement): void {
     const section = _makeSection('Exploration Progress');
 
     // Progress bar.
-    const pctBodies = Math.round((exploration.discoveredBodies.length / exploration.totalBodies) * 100);
-    const pctBiomes = exploration.totalBiomes > 0
-      ? Math.round((exploration.biomesExplored / exploration.totalBiomes) * 100) : 0;
-
     const grid: HTMLDivElement = document.createElement('div');
     grid.className = 'lib-stat-grid';
     grid.appendChild(_makeStatCard('Bodies Discovered',

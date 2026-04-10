@@ -14,7 +14,7 @@
  */
 
 import { compressToUTF16, decompressFromUTF16 } from 'lz-string';
-import { CrewStatus, FACILITY_DEFINITIONS, GameMode, DEFAULT_DIFFICULTY_SETTINGS } from './constants.ts';
+import { AstronautStatus, FACILITY_DEFINITIONS, GameMode, DEFAULT_DIFFICULTY_SETTINGS } from './constants.ts';
 import { crc32 } from './crc32.ts';
 import { loadSharedLibrary, saveSharedLibrary } from './designLibrary.ts';
 import { logger } from './logger.ts';
@@ -250,17 +250,17 @@ function assertValidSlot(slotIndex: number): void {
 }
 
 /**
- * Returns the count of crew members with status DEAD (KIA).
+ * Returns the count of crew members with status KIA.
  */
-function countKIA(state: { crew?: Array<{ status: string }> }): number {
-  return (state.crew ?? []).filter((c) => c.status === CrewStatus.DEAD).length;
+function countKIA(state: { crew?: Array<{ status: AstronautStatus }> }): number {
+  return (state.crew ?? []).filter((c) => c.status === AstronautStatus.KIA).length;
 }
 
 /**
- * Returns the count of living (non-dead) crew members.
+ * Returns the count of living (non-KIA) crew members.
  */
-function countLivingCrew(state: { crew?: Array<{ status: string }> }): number {
-  return (state.crew ?? []).filter((c) => c.status !== CrewStatus.DEAD).length;
+function countLivingCrew(state: { crew?: Array<{ status: AstronautStatus }> }): number {
+  return (state.crew ?? []).filter((c) => c.status !== AstronautStatus.KIA).length;
 }
 
 /**

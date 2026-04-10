@@ -20,7 +20,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { GameState, FlightState, FlightEvent, TransferState, PowerState, CrewMember } from '../core/gameState.ts';
-import type { PhysicsState, RocketAssembly, LegEntry, ParachuteEntry } from '../core/physics.ts';
+import type { PhysicsState, LegEntry, ParachuteEntry } from '../core/physics.ts';
 import type { DebrisState } from '../core/staging.ts';
 import type { FuelSystemState } from '../core/fuelsystem.ts';
 import type { DifficultySettings } from '../core/constants.ts';
@@ -175,8 +175,6 @@ describe('logger.ts branch coverage', () => {
 
 import {
   tickFuelSystem,
-  getConnectedTanks,
-  computeEngineFlowRate,
 } from '../core/fuelsystem.ts';
 import {
   createRocketAssembly,
@@ -185,9 +183,7 @@ import {
   createStagingConfig,
   syncStagingWithAssembly,
   assignPartToStage,
-  addStageToConfig,
 } from '../core/rocketbuilder.ts';
-import { getPartById } from '../data/parts.ts';
 import { PartType, ControlMode, MalfunctionMode, MalfunctionType, GameMode } from '../core/constants.ts';
 
 describe('fuelsystem.ts branch coverage', () => {
@@ -260,7 +256,6 @@ import {
   LEG_DEPLOY_DURATION,
   getDeployedLegFootOffset,
   countDeployedLegs,
-  initLegStates,
 } from '../core/legs.ts';
 
 describe('legs.ts branch coverage', () => {
@@ -415,16 +410,11 @@ describe('legs.ts branch coverage', () => {
 // ---------------------------------------------------------------------------
 
 import {
-  initMalfunctionState,
   checkMalfunctions,
-  tickMalfunctions,
   attemptRecovery,
-  setMalfunctionMode,
-  getMalfunctionMode,
-  getPartReliability,
 } from '../core/malfunction.ts';
-import { createPhysicsState, tick, handleKeyDown, handleKeyUp, fireNextStage } from '../core/physics.ts';
-import { createFlightState, createGameState, createCrewMember } from '../core/gameState.ts';
+import { createPhysicsState, tick, handleKeyDown } from '../core/physics.ts';
+import { createFlightState, createGameState } from '../core/gameState.ts';
 
 type MalfunctionPS = Parameters<typeof checkMalfunctions>[0];
 type RecoveryPS = Parameters<typeof attemptRecovery>[0];
@@ -900,7 +890,7 @@ describe('physics.ts branch coverage', () => {
 // staging.ts — debris angular damping, tipping, launch clamp
 // ---------------------------------------------------------------------------
 
-import { activateCurrentStage, recomputeActiveGraph, tickDebris } from '../core/staging.ts';
+import { activateCurrentStage, tickDebris } from '../core/staging.ts';
 
 function makeDebris(activeParts: Set<string>, overrides: Partial<DebrisState> = {}): DebrisState {
   return {
@@ -1055,7 +1045,6 @@ describe('staging.ts branch coverage', () => {
       if (!ps.malfunctions) ps.malfunctions = new Map();
       ps.malfunctions.set(decId, { type: MalfunctionType.DECOUPLER_STUCK, recovered: false });
 
-      const beforeActiveParts = ps.activeParts.size;
       activateCurrentStage(ps, assembly, staging, flightState);
 
       // Decoupler should NOT have fired
@@ -1099,7 +1088,7 @@ describe('staging.ts branch coverage', () => {
 // power.ts — commsActive draw, insufficient satellite power
 // ---------------------------------------------------------------------------
 
-import { tickPower, hasSufficientSatellitePower, initPowerState, recalcPowerState } from '../core/power.ts';
+import { tickPower, hasSufficientSatellitePower } from '../core/power.ts';
 
 describe('power.ts branch coverage', () => {
   it('tickPower includes POWER_DRAW_COMMS when commsActive is true', () => {
@@ -1300,7 +1289,7 @@ describe('physics.ts additional branch coverage', () => {
   }
 
   it('tick in RCS mode with held keys applies docking movement', () => {
-    const { assembly, staging, engineId } = makeSimpleRocket();
+    const { assembly, staging } = makeSimpleRocket();
     const flightState = makeFlightState();
     const ps = createPhysicsState(assembly, flightState);
 
@@ -1312,7 +1301,6 @@ describe('physics.ts additional branch coverage', () => {
     ps.landed = false;
     ps._heldKeys.add('w');
 
-    const initialVelY = ps.velY;
     tick(ps, assembly, staging, flightState, 1 / 60);
 
     // The RCS mode should have applied movement via _applyDockingMovement
@@ -1387,7 +1375,6 @@ describe('physics.ts additional branch coverage', () => {
     ps.landed = false;
     ps._heldKeys.add('a'); // Would normally steer — RCS blocks it
 
-    const initialAngle = ps.angle;
     tick(ps, assembly, staging, flightState, 1 / 60);
     // In RCS mode, _applySteering returns early — no rotation applied
     // (but docking movement may affect velocity)
@@ -1461,7 +1448,7 @@ describe('settings.ts additional branch coverage', () => {
 // Additional challenges.ts — edge cases
 // ---------------------------------------------------------------------------
 
-import { extractScoreMetric, computeMedal, isBetterMedal } from '../core/challenges.ts';
+import { extractScoreMetric } from '../core/challenges.ts';
 
 describe('challenges.ts branch coverage', () => {
   it('extractScoreMetric returns null for unknown metric', () => {

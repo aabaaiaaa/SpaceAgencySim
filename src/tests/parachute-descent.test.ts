@@ -22,7 +22,6 @@ import {
   createStagingConfig,
   syncStagingWithAssembly,
   assignPartToStage,
-  addStageToConfig,
 } from '../core/rocketbuilder.ts';
 import { createFlightState } from '../core/gameState.ts';
 import { deployParachute, ParachuteState } from '../core/parachute.ts';
@@ -78,7 +77,7 @@ function setupDescentState(): {
   fs: FlightState;
   chuteId: string;
 } {
-  const { assembly, staging, probeId, chuteId } = makeCapsuleWithChute();
+  const { assembly, staging, probeId: _probeId, chuteId } = makeCapsuleWithChute();
   const fs = makeFlightState();
   const ps = createPhysicsState(assembly, fs);
 
@@ -307,7 +306,7 @@ describe('landed command module steering', () => {
     staging: StagingConfig;
     fs: FlightState;
   } {
-    const { assembly, staging, probeId, chuteId } = makeCapsuleWithChute();
+    const { assembly, staging, probeId: _probeId, chuteId: _chuteId } = makeCapsuleWithChute();
     const fs = makeFlightState();
     const ps = createPhysicsState(assembly, fs);
 
@@ -643,7 +642,6 @@ describe('landed capsule ground-contact rendering', () => {
     ps: PhysicsState,
     assembly: RocketAssembly,
   ): { minScreenY: number; maxScreenY: number } {
-    const SCALE = 0.05;  // SCALE_M_PER_PX
     const contactX = ps.tippingContactX ?? 0;
     const contactY = ps.tippingContactY ?? 0;
     const cosA = Math.cos(ps.angle);
@@ -686,7 +684,7 @@ describe('landed capsule ground-contact rendering', () => {
     staging: StagingConfig;
     fs: FlightState;
   } {
-    const { assembly, staging, probeId, chuteId } = makeCapsuleWithChute();
+    const { assembly, staging, probeId: _probeId, chuteId: _chuteId } = makeCapsuleWithChute();
     const fs = makeFlightState();
     const ps = createPhysicsState(assembly, fs);
     ps.posY = 0; ps.velX = 0; ps.velY = 0;
@@ -754,7 +752,7 @@ describe('landed capsule ground-contact rendering', () => {
       tick(ps, assembly, staging, fs, dt);
       if (!ps.isTipping) continue;
 
-      const { minScreenY, maxScreenY } = computeCornerScreenYs(ps, assembly);
+      const { maxScreenY } = computeCornerScreenYs(ps, assembly);
       // No corner should be below ground (allow small floating-point tolerance).
       expect(maxScreenY).toBeLessThanOrEqual(0.01);
       // The rocket should still be touching the ground (not floating).

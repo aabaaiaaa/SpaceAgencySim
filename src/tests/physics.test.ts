@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   createPhysicsState,
   tick,
@@ -30,10 +30,9 @@ import {
 } from '../core/rocketbuilder.ts';
 import { createFlightState } from '../core/gameState.ts';
 
-import type { PhysicsState, CapturedBody, RocketAssembly, ParachuteEntry, LegEntry } from '../core/physics.ts';
-import type { FlightState, FlightEvent } from '../core/gameState.ts';
+import type { PhysicsState, RocketAssembly } from '../core/physics.ts';
+import type { FlightState } from '../core/gameState.ts';
 import type { StagingConfig } from '../core/rocketbuilder.ts';
-import type { PartDef } from '../data/parts.ts';
 
 // ---------------------------------------------------------------------------
 // Shared test fixtures
@@ -711,7 +710,7 @@ describe('fireNextStage() — DEPLOY (parachute)', () => {
   });
 
   it('deployed parachute increases drag (slower fall vs no chute)', () => {
-    const { assembly, staging, chuteId } = makeRocketWithChute();
+    const { assembly, staging } = makeRocketWithChute();
     const fs1 = makeFlightState();
     const fs2 = makeFlightState();
     const ps1 = createPhysicsState(assembly, fs1);
@@ -1496,7 +1495,7 @@ describe('TASK-025: landing detection — controlled landing', () => {
   });
 
   it('emits LANDING even for 1 deployed leg when speed is below thresholds', () => {
-    const { assembly, staging, legId1, legId2 } = makeRocketWithLegs();
+    const { assembly, staging, legId1, legId2: _legId2 } = makeRocketWithLegs();
     const fs = makeFlightState();
     const ps = createPhysicsState(assembly, fs);
 
@@ -2011,7 +2010,7 @@ describe('Debris ground physics — tipping & settling', () => {
 
 describe('Airborne torque-based rotation', () => {
   it('holding D in flight produces positive angular velocity', () => {
-    const { assembly, staging, engineId } = makeSimpleRocket();
+    const { assembly, staging } = makeSimpleRocket();
     const fs = makeFlightState();
     const ps = createPhysicsState(assembly, fs);
 
@@ -2101,7 +2100,7 @@ describe('Airborne torque-based rotation', () => {
 
 describe('Debris angular dynamics', () => {
   it('debris inherits angularVelocity from parent at separation', () => {
-    const { assembly, staging, engineId } = makeTwoStageRocketGlobal();
+    const { assembly, staging } = makeTwoStageRocketGlobal();
     const fs = makeFlightState();
     const ps = createPhysicsState(assembly, fs);
 
@@ -2400,7 +2399,7 @@ describe('cascading crash thresholds', () => {
   }
 
   it('safe landing — impact 5 m/s, all parts survive, landed = true', () => {
-    const { ps, assembly } = dropRocket(5);
+    const { ps } = dropRocket(5);
 
     expect(ps.landed).toBe(true);
     expect(ps.crashed).toBe(false);
@@ -2412,7 +2411,7 @@ describe('cascading crash thresholds', () => {
     // engine-spark crashThreshold=12, tank-small crashThreshold=8, probe crashThreshold=12
     // Impact at 15 m/s: engine destroyed (threshold 12), remaining speed = 15 - 12 = 3.
     // Tank threshold 8 > 3 → tank survives. Probe survives.
-    const { ps, assembly, engineId, tankId, probeId } = dropRocket(15);
+    const { ps, engineId, tankId, probeId } = dropRocket(15);
 
     // Engine is at the bottom (y=-55), should be destroyed.
     expect(ps.activeParts.has(engineId)).toBe(false);
@@ -2695,7 +2694,7 @@ describe('Legs deploy on launch pad (grounded)', () => {
   });
 
   it('leg timers tick while grounded (DEPLOYING after 1.0s)', () => {
-    const { assembly, staging, legId1, legId2 } = makeRocketWithLegs();
+    const { assembly, staging, legId1, legId2: _legId2 } = makeRocketWithLegs();
     const fs = makeFlightState();
     const ps = createPhysicsState(assembly, fs);
 
@@ -2775,7 +2774,7 @@ describe('Deployed legs are lowest point on grounded rocket', () => {
 
 describe('Asymmetric leg deploy causes tipping on pad', () => {
   it('rocket tips and settles on its side when only one leg is deployed on the pad', () => {
-    const { assembly, staging, legId1, legId2 } = makeRocketWithLegs();
+    const { assembly, staging, legId1, legId2: _legId2 } = makeRocketWithLegs();
     const fs = makeFlightState();
     const ps = createPhysicsState(assembly, fs);
 
@@ -2997,8 +2996,8 @@ describe('CapturedBody — total mass includes asteroid', () => {
   it('captured asteroid reduces acceleration under same thrust', () => {
     // Build two identical rockets, fire engines, tick, compare acceleration.
     // The one with a heavy captured body should accelerate more slowly.
-    const { assembly: assemblyA, staging: stagingA, engineId: engineIdA } = makeSimpleRocket();
-    const { assembly: assemblyB, staging: stagingB, engineId: engineIdB } = makeSimpleRocket();
+    const { assembly: assemblyA, staging: stagingA } = makeSimpleRocket();
+    const { assembly: assemblyB, staging: stagingB } = makeSimpleRocket();
     const fsA = makeFlightState();
     const fsB = makeFlightState();
     const psA = createPhysicsState(assemblyA, fsA);
@@ -3031,7 +3030,7 @@ describe('CapturedBody — total mass includes asteroid', () => {
 
 describe('CapturedBody — asteroid torque via tick()', () => {
   it('unaligned captured asteroid produces angular velocity change when engines fire', () => {
-    const { assembly, staging, engineId } = makeSimpleRocket();
+    const { assembly, staging } = makeSimpleRocket();
     const fs = makeFlightState();
     const ps = createPhysicsState(assembly, fs);
 

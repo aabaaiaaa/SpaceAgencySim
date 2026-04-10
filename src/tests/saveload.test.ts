@@ -34,7 +34,7 @@ import {
   decompressSaveData,
 } from '../core/saveload.ts';
 import { crc32 } from '../core/crc32.ts';
-import { CrewStatus } from '../core/constants.ts';
+import { AstronautStatus, CrewStatus } from '../core/constants.ts';
 
 import type { GameState, CrewMember, MissionInstance, RocketDesign, FlightResult } from '../core/gameState.ts';
 import type { SaveSlotSummary } from '../core/saveload.ts';
@@ -148,7 +148,7 @@ describe('Round-trip: save and load a complex state', () => {
       {
         id: 'crew-3',
         name: 'Carol',
-        status: CrewStatus.DEAD,
+        status: AstronautStatus.KIA,
         skills: { piloting: 55, engineering: 55, science: 55 },
         salary: 5500,
         hireDate: '2024-06-01T00:00:00.000Z',
@@ -239,7 +239,7 @@ describe('Round-trip: save and load a complex state', () => {
     expect(restored.crew[0].skills.piloting).toBe(75);
     expect(restored.crew[1].status).toBe(CrewStatus.ON_MISSION);
     expect(restored.crew[1].injuryEnds).toBe(5);
-    expect(restored.crew[2].status).toBe(CrewStatus.DEAD);
+    expect(restored.crew[2].status).toBe(AstronautStatus.KIA);
 
     // Missions — all three buckets.
     expect(restored.missions.available).toHaveLength(2);
@@ -353,17 +353,17 @@ describe('saveGame()', () => {
     state.crew = [
       { id: 'c1', status: CrewStatus.IDLE },
       { id: 'c2', status: CrewStatus.ON_MISSION },
-      { id: 'c3', status: CrewStatus.DEAD },
+      { id: 'c3', status: AstronautStatus.KIA },
     ] as unknown as CrewMember[];
     const summary = await saveGame(state, 0);
     expect(summary.crewCount).toBe(2);
   });
 
-  it('summary.crewKIA counts crew with DEAD status', async () => {
+  it('summary.crewKIA counts crew with KIA status', async () => {
     const state = freshState();
     state.crew = [
-      { id: 'c1', status: CrewStatus.DEAD },
-      { id: 'c2', status: CrewStatus.DEAD },
+      { id: 'c1', status: AstronautStatus.KIA },
+      { id: 'c2', status: AstronautStatus.KIA },
       { id: 'c3', status: CrewStatus.IDLE },
     ] as unknown as CrewMember[];
     const summary = await saveGame(state, 0);

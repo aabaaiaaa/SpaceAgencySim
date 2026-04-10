@@ -11,12 +11,12 @@ import type { PartDef } from '../../data/parts.ts';
 import { PartType } from '../../core/constants.ts';
 import { getHeatRatio } from '../../core/atmosphere.ts';
 import { DEPLOY_DURATION } from '../../core/parachute.ts';
-import { LegState, LEG_DEPLOY_DURATION, getDeployedLegFootOffset } from '../../core/legs.ts';
+import { getDeployedLegFootOffset } from '../../core/legs.ts';
 import type { ReadonlyPhysicsState, ReadonlyAssembly } from '../types.ts';
 import type { PlacedPart } from '../../core/rocketbuilder.ts';
 import { getFlightRenderState } from './_state.ts';
 import { ppm, worldToScreen, computeCoM } from './_camera.ts';
-import { SCALE_M_PER_PX, PART_FILL, PART_STROKE, FLIGHT_PIXELS_PER_METRE } from './_constants.ts';
+import { SCALE_M_PER_PX, PART_FILL, PART_STROKE } from './_constants.ts';
 import { acquireGraphics, acquireText, releaseContainerChildren } from './_pool.ts';
 
 // ---------------------------------------------------------------------------

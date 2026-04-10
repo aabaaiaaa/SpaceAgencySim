@@ -19,9 +19,7 @@ import { getSunAngle, getShadowHalfAngle } from './power.ts';
 import {
   getOrbitalStateAtTime,
   getOrbitalPeriod,
-  getPeriapsisAltitude,
   getApoapsisAltitude,
-  computeOrbitalElements,
 } from './orbit.ts';
 import {
   getTransferTargets,
@@ -33,7 +31,6 @@ import {
   BODY_PARENT,
   BODY_CHILDREN,
   SOI_RADIUS,
-  computeGravityAssist,
 } from './manoeuvre.ts';
 
 import type { OrbitalElements } from './gameState.ts';

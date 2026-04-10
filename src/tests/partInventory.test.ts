@@ -14,7 +14,7 @@
  *   recoverPartsToInventory()  — full recovery flow
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   getFlightWear,
   getEffectiveReliability,
@@ -32,7 +32,6 @@ import {
   WEAR_PER_FLIGHT_PASSIVE,
   WEAR_PER_FLIGHT_ENGINE,
   WEAR_PER_FLIGHT_SRB,
-  WEAR_RELIABILITY_FACTOR,
   WEAR_AFTER_REFURBISH,
   REFURBISH_COST_FRACTION,
   SCRAP_VALUE_FRACTION,
@@ -258,7 +257,7 @@ describe('useInventoryPart', () => {
   it('uses the lowest-wear part', () => {
     const state = makeState();
     addToInventory(state, 'engine-spark', 40);
-    const best = addToInventory(state, 'engine-spark', 10);
+    addToInventory(state, 'engine-spark', 10);
     addToInventory(state, 'engine-spark', 25);
 
     const used = useInventoryPart(state, 'engine-spark')!;
@@ -311,7 +310,7 @@ describe('recoverPartsToInventory', () => {
     const state = makeState();
     const assembly = createRocketAssembly();
     const probeId = addPartToAssembly(assembly, 'probe-core-mk1', 0, 60);
-    const tankId  = addPartToAssembly(assembly, 'tank-small',     0, 0);
+    addPartToAssembly(assembly, 'tank-small',     0, 0);
 
     const ps: Partial<PhysicsState> = {
       activeParts: new Set([probeId]), // tank was jettisoned

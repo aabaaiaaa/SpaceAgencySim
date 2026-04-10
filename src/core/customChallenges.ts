@@ -17,7 +17,7 @@
  */
 
 import { ObjectiveType } from '../data/missions.ts';
-import { MedalTier, ScoreDirection } from '../data/challenges.ts';
+import { ScoreDirection } from '../data/challenges.ts';
 import type { GameState, ChallengeDef, ObjectiveDef } from './gameState.ts';
 
 // ---------------------------------------------------------------------------

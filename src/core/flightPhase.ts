@@ -24,14 +24,14 @@
  * @module core/flightPhase
  */
 
-import { FlightPhase, MIN_ORBIT_ALTITUDE, ControlMode, BeltZone } from './constants.ts';
+import { FlightPhase, MIN_ORBIT_ALTITUDE } from './constants.ts';
 import type { CelestialBody } from './constants.ts';
 import {
-  isOrbitalBurnActive, shouldEnterManoeuvre, shouldExitManoeuvre,
+  shouldEnterManoeuvre, shouldExitManoeuvre,
   shouldEnterTransfer, isEscapeTrajectory, checkSOITransition,
   getTransferTargets, computeTransferDeltaV, BODY_PARENT,
 } from './manoeuvre.ts';
-import { checkOrbitStatus, computeOrbitalElements, getAltitudeBand } from './orbit.ts';
+import { computeOrbitalElements, getAltitudeBand } from './orbit.ts';
 import type { FlightState, PhaseTransition, OrbitalElements } from './gameState.ts';
 import type { PhysicsState } from './physics.ts';
 

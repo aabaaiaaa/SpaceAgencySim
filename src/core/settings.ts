@@ -12,13 +12,11 @@
 import {
   DEFAULT_DIFFICULTY_SETTINGS,
   MALFUNCTION_FREQUENCY_MULTIPLIERS,
-  MalfunctionFrequency,
   WEATHER_SEVERITY_MULTIPLIERS,
   WeatherSeverity,
   FINANCIAL_PRESSURE_MULTIPLIERS,
   FinancialPressure,
   INJURY_DURATION_MULTIPLIERS,
-  InjuryDuration,
   DifficultySettings,
   WeatherSeverityMultiplier,
   FinancialPressureMultiplier,

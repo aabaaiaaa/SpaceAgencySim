@@ -25,7 +25,7 @@ import {
   GrabState, PartType, OrbitalObjectType,
   GRAB_VISUAL_RANGE_DEG, GRAB_GUIDANCE_RANGE, GRAB_ARM_RANGE,
   GRAB_MAX_RELATIVE_SPEED, GRAB_MAX_LATERAL_OFFSET, GRAB_REPAIR_HEALTH,
-  GRAB_RELEASE_SPEED, BODY_RADIUS,
+  BODY_RADIUS,
 } from './constants.ts';
 import { getOrbitalStateAtTime, angularDistance, getAltitudeBand, circularOrbitVelocity, computeOrbitalElements } from './orbit.ts';
 import { getBeltZoneAtAltitude } from './asteroidBelt.ts';

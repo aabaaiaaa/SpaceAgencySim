@@ -27,8 +27,7 @@
  */
 
 import { ObjectiveType } from './missions.ts';
-import { PartType } from '../core/constants.ts';
-import type { ChallengeDef, MedalThresholds, ObjectiveDef } from '../core/gameState.ts';
+import type { ChallengeDef } from '../core/gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Enums

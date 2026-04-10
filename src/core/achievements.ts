@@ -13,7 +13,7 @@
 
 import { earnReward } from './finance.ts';
 import { adjustReputation } from './reputation.ts';
-import { CelestialBody, CONSTELLATION_THRESHOLD, SatelliteType } from './constants.ts';
+import { CelestialBody, CONSTELLATION_THRESHOLD } from './constants.ts';
 
 import type { GameState, FlightState } from './gameState.ts';
 import type { PhysicsState } from './physics.ts';
@@ -47,7 +47,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
     description: 'Achieve a stable orbit around Earth.',
     cashReward: 200_000,
     repReward: 20,
-    check: (state: GameState, ctx: AchievementCheckContext): boolean => {
+    check: (state: GameState, _ctx: AchievementCheckContext): boolean => {
       // The flight reached orbit at any point (flightHistory records it,
       // or the current flight was in orbit). We check flight history for
       // any flight where the craft entered orbit around Earth.

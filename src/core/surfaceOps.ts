@@ -29,7 +29,6 @@ import { getActiveSatellites } from './satellites.ts';
 import { getPartById } from '../data/parts.ts';
 import type { GameState, FlightState, SurfaceItem } from './gameState.ts';
 import type { PhysicsState, RocketAssembly } from './physics.ts';
-import type { PartDef } from '../data/parts.ts';
 
 // ---------------------------------------------------------------------------
 // Local types

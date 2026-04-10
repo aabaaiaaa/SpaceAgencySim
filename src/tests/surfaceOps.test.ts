@@ -35,9 +35,6 @@ import {
   FLAG_MILESTONE_REP,
   SURFACE_INSTRUMENT_SCIENCE_PER_PERIOD,
   SURFACE_SAMPLE_BASE_SCIENCE,
-  FacilityId,
-  PartType,
-  STARTING_MONEY,
   SatelliteType,
 } from '../core/constants.ts';
 

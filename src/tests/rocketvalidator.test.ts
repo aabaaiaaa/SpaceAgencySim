@@ -14,7 +14,7 @@
  *       canLaunch: blocked when any blocking check fails
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   getTotalMass,
   getStage1Thrust,
@@ -31,9 +31,8 @@ import {
 } from '../core/rocketbuilder.ts';
 import { createGameState } from '../core/gameState.ts';
 
-import type { RocketAssembly, StagingConfig, PlacedPart } from '../core/rocketbuilder.ts';
-import type { GameState, MissionInstance } from '../core/gameState.ts';
-import type { ValidationCheck, ValidationResult } from '../core/rocketvalidator.ts';
+import type { RocketAssembly, StagingConfig } from '../core/rocketbuilder.ts';
+import type { GameState } from '../core/gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Test helpers

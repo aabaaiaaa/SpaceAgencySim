@@ -27,7 +27,7 @@ import {
   hasSufficientSatellitePower,
 } from '../core/power.ts';
 import { getPartById } from '../data/parts.ts';
-import { PartType, SUN_ROTATION_RATE, POWER_DRAW_ROTATION, POWER_DRAW_SCIENCE, POWER_CRITICAL_THRESHOLD } from '../core/constants.ts';
+import { PartType, SUN_ROTATION_RATE, POWER_DRAW_ROTATION, POWER_DRAW_SCIENCE } from '../core/constants.ts';
 import { getShadowOverlayGeometry } from '../core/mapView.ts';
 import type { PowerState } from '../core/gameState.ts';
 import type { RocketAssembly } from '../core/physics.ts';

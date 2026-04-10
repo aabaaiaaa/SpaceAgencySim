@@ -44,8 +44,6 @@ import {
   getTransferProgressInfo,
 } from '../core/mapView.ts';
 import {
-  getApoapsisAltitude,
-  getPeriapsisAltitude,
   computeOrbitalElements,
 } from '../core/orbit.ts';
 import { FlightPhase } from '../core/constants.ts';
@@ -82,8 +80,6 @@ const TRANSFER_TRAJECTORY_COLOR = 0xff6644;
 const MOON_BODY_COLOR       = 0xa0a0a0;
 const DEST_BODY_COLOR       = 0xff8844;
 const SOI_BOUNDARY_COLOR    = 0x334455;
-const ASSIST_BODY_COLOR     = 0x88cc44;
-
 const BAND_COLORS: Record<string, number> = {
   LEO: 0x104020,
   MEO: 0x403020,
@@ -1303,7 +1299,7 @@ function _drawCelestialBodies(flightState: ReadonlyFlightState, cx: number, cy: 
 /**
  * Draw transfer progress indicator (ETA, progress bar, destination info).
  */
-function _drawTransferProgress(flightState: ReadonlyFlightState, w: number, h: number): void {
+function _drawTransferProgress(flightState: ReadonlyFlightState, w: number, _h: number): void {
   if (!_mapRoot) return;
   const info = getTransferProgressInfo(flightState.transferState, flightState.timeElapsed);
   if (!info) return;

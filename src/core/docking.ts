@@ -22,9 +22,9 @@ import {
   DockingState, PartType, ControlMode, OrbitalObjectType,
   DOCKING_VISUAL_RANGE_DEG, DOCKING_GUIDANCE_RANGE, DOCKING_AUTO_RANGE,
   DOCKING_MAX_RELATIVE_SPEED, DOCKING_MAX_ORIENTATION_DIFF, DOCKING_MAX_LATERAL_OFFSET,
-  DOCKING_AUTO_APPROACH_SPEED, UNDOCKING_SEPARATION_SPEED, BODY_RADIUS,
+  DOCKING_AUTO_APPROACH_SPEED, BODY_RADIUS,
 } from './constants.ts';
-import { getOrbitalStateAtTime, checkProximity, angularDistance, computeOrbitalElements, getAltitudeBand } from './orbit.ts';
+import { getOrbitalStateAtTime, angularDistance, computeOrbitalElements, getAltitudeBand } from './orbit.ts';
 import { getPartById } from '../data/parts.ts';
 import type { PartDef } from '../data/parts.ts';
 import type { PhysicsState, RocketAssembly } from './physics.ts';

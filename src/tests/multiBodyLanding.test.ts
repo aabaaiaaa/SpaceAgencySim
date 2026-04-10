@@ -10,12 +10,10 @@
  *   - Airless body landings are fully propulsive
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   createPhysicsState,
   tick,
-  tickDebrisGround,
-  fireNextStage,
 } from '../core/physics.ts';
 import {
   createRocketAssembly,
@@ -24,13 +22,12 @@ import {
   createStagingConfig,
   syncStagingWithAssembly,
   assignPartToStage,
-  addStageToConfig,
 } from '../core/rocketbuilder.ts';
 import { createFlightState } from '../core/gameState.ts';
 import { getSurfaceGravity } from '../data/bodies.ts';
 
 import type { PhysicsState, RocketAssembly } from '../core/physics.ts';
-import type { FlightState, FlightEvent } from '../core/gameState.ts';
+import type { FlightState } from '../core/gameState.ts';
 import type { StagingConfig } from '../core/rocketbuilder.ts';
 import type { CelestialBody } from '../core/constants.ts';
 

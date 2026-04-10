@@ -13,7 +13,7 @@
  *   - getDiscountedMoneyCost() — reputation discount on money costs
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
 import type { GameState } from '../core/gameState.ts';
 import {
@@ -573,7 +573,7 @@ describe('FACILITY_UPGRADE_DEFS', () => {
   });
 
   it('all upgrade tiers have moneyCost, scienceCost, and description', () => {
-    for (const [id, def] of Object.entries(FACILITY_UPGRADE_DEFS)) {
+    for (const [_id, def] of Object.entries(FACILITY_UPGRADE_DEFS)) {
       for (let tier = 2; tier <= def.maxTier; tier++) {
         const tierDef = def.tiers[tier];
         expect(tierDef).toBeDefined();

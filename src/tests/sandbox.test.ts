@@ -20,7 +20,6 @@ import {
   FACILITY_DEFINITIONS,
   SANDBOX_STARTING_MONEY,
   STARTING_MONEY,
-  MalfunctionMode,
 } from '../core/constants.ts';
 import {
   hasFacility,
@@ -28,7 +27,6 @@ import {
   buildFacility,
   canUpgradeFacility,
   upgradeFacility,
-  getFacilityTier,
 } from '../core/construction.ts';
 import {
   canResearchNode,

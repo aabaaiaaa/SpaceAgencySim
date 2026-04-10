@@ -21,11 +21,7 @@
 
 import {
   FACILITY_DEFINITIONS,
-  FacilityId,
   GameMode,
-  RD_LAB_TIER_DEFS,
-  RD_LAB_MAX_TIER,
-  FACILITY_UPGRADE_DEFS,
   getFacilityUpgradeDef,
   getReputationDiscount,
 } from './constants.ts';

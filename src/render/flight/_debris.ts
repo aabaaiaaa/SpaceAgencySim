@@ -150,8 +150,6 @@ export function renderEjectedCrew(ps: ReadonlyPhysicsState, w: number, h: number
   const s = getFlightRenderState();
   if (!s.debrisContainer) return;
 
-  const p = ppm();
-
   for (const crew of ps.ejectedCrew) {
     const { sx, sy } = worldToScreen(crew.x, crew.y, w, h);
 

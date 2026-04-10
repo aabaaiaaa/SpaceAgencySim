@@ -34,7 +34,6 @@ import {
   createStagingConfig,
   syncStagingWithAssembly,
   assignPartToStage,
-  movePartBetweenStages,
   returnPartToUnstaged,
 } from '../core/rocketbuilder.ts';
 import type { PlacedPart } from '../core/rocketbuilder.ts';
@@ -62,12 +61,12 @@ describe('Undo/Redo Stack — core operations', () => {
   });
 
   it('push adds to undo stack', () => {
-    let value = 0;
+    let _value = 0;
     pushUndoAction({
       type: 'place',
       label: 'Place Part',
-      undo() { value = -1; },
-      redo() { value = 1; },
+      undo() { _value = -1; },
+      redo() { _value = 1; },
     });
     expect(canUndo()).toBe(true);
     expect(canRedo()).toBe(false);
@@ -118,12 +117,12 @@ describe('Undo/Redo Stack — core operations', () => {
   });
 
   it('new action after undo clears redo stack', () => {
-    let value = 0;
+    let _value = 0;
     pushUndoAction({
       type: 'place',
       label: 'Action 1',
-      undo() { value = 0; },
-      redo() { value = 1; },
+      undo() { _value = 0; },
+      redo() { _value = 1; },
     });
     undo();
     expect(canRedo()).toBe(true);
@@ -132,8 +131,8 @@ describe('Undo/Redo Stack — core operations', () => {
     pushUndoAction({
       type: 'place',
       label: 'Action 2',
-      undo() { value = 0; },
-      redo() { value = 2; },
+      undo() { _value = 0; },
+      redo() { _value = 2; },
     });
     expect(canRedo()).toBe(false);
     expect(redoStackSize()).toBe(0);
@@ -388,7 +387,7 @@ describe('Undo/Redo — staging changes', () => {
     const staging = createStagingConfig();
 
     const id1 = addPartToAssembly(assembly, 'engine-spark', 0, 0);
-    const id2 = addPartToAssembly(assembly, 'decoupler-1', 0, 50);
+    addPartToAssembly(assembly, 'decoupler-1', 0, 50);
     syncStagingWithAssembly(assembly, staging);
     assignPartToStage(staging, id1, 0);
 

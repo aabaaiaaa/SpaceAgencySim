@@ -31,9 +31,7 @@ import { ControlMode, FlightPhase } from './constants.ts';
 import { getAltitudeBand } from './orbit.ts';
 import { computeOrbitalElements } from './orbit.ts';
 import { getPartById } from '../data/parts.ts';
-import { PartType, BODY_RADIUS, ALTITUDE_BANDS } from './constants.ts';
-
-import type { ControlMode as ControlModeType, AltitudeBand } from './constants.ts';
+import { PartType, BODY_RADIUS } from './constants.ts';
 import type { PhysicsState, RocketAssembly } from './physics.ts';
 import type { FlightState } from './gameState.ts';
 
@@ -174,7 +172,7 @@ export function enterDockingMode(ps: PhysicsState, flightState: FlightState, bod
  * Exit docking mode, returning to NORMAL.
  * Applies the accumulated docking offset as a small orbit adjustment.
  */
-export function exitDockingMode(ps: PhysicsState, flightState: FlightState, bodyId: string): ModeTransitionResult {
+export function exitDockingMode(ps: PhysicsState, _flightState: FlightState, _bodyId: string): ModeTransitionResult {
   if (ps.controlMode !== ControlMode.DOCKING && ps.controlMode !== ControlMode.RCS) {
     return { success: false, reason: 'Not in docking mode' };
   }
@@ -224,7 +222,7 @@ export function toggleRcsMode(ps: PhysicsState, assembly: RocketAssembly): ModeT
  * Check whether the craft is near the edge of its altitude band and return
  * a warning if so.
  */
-export function checkBandLimitWarning(ps: PhysicsState, bodyId: string): BandWarningResult {
+export function checkBandLimitWarning(ps: PhysicsState, _bodyId: string): BandWarningResult {
   if (ps.controlMode !== ControlMode.DOCKING && ps.controlMode !== ControlMode.RCS) {
     return { warning: false, message: '' };
   }
@@ -248,7 +246,7 @@ export function checkBandLimitWarning(ps: PhysicsState, bodyId: string): BandWar
  * Clamp a radial velocity delta so the craft doesn't leave its altitude band
  * in docking mode.
  */
-export function clampDockingRadial(ps: PhysicsState, deltaVelY: number, bodyId: string): number {
+export function clampDockingRadial(ps: PhysicsState, deltaVelY: number, _bodyId: string): number {
   const band = ps.dockingAltitudeBand;
   if (!band) return deltaVelY;
 

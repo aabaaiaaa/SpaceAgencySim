@@ -55,9 +55,7 @@ import {
 } from './atmosphere.ts';
 import {
   getSurfaceGravity,
-  hasAtmosphere,
   getAtmosphereTop,
-  getAirDensity as bodyAirDensity,
 } from '../data/bodies.ts';
 import { tickFuelSystem } from './fuelsystem.ts';
 import { activateCurrentStage, tickDebris } from './staging.ts';
@@ -74,7 +72,6 @@ import {
 import {
   initLegStates,
   tickLegs,
-  countDeployedLegs,
   getDeployedLegFootOffset,
   LegState,
 } from './legs.ts';
@@ -89,11 +86,9 @@ import {
   initMalfunctionState,
   checkMalfunctions,
   tickMalfunctions,
-  hasMalfunction,
-  getMalfunction,
 } from './malfunction.ts';
 import { MalfunctionType, REDUCED_THRUST_FACTOR, PARTIAL_CHUTE_FACTOR } from './constants.ts';
-import { getWindForce, getCurrentWeather } from './weather.ts';
+import { getWindForce } from './weather.ts';
 import { initPowerState, tickPower, recalcPowerState } from './power.ts';
 import { getOrbitalStateAtTime, orbitalStateToCartesian, computeOrbitalElements } from './orbit.ts';
 
@@ -503,29 +498,11 @@ const FIXED_DT: number = 1 / 60;
 /** Scale factor: metres per pixel at default 1× zoom. */
 const SCALE_M_PER_PX: number = 0.05;
 
-/**
- * Base rocket turn rate in radians/second.
- * At 30°/s, a 90° turn takes 3 seconds — deliberately sluggish.
- */
-const BASE_TURN_RATE: number = Math.PI / 6;
-
-/** Turn-rate multiplier applied when RCS is available in vacuum. */
-const RCS_TURN_MULTIPLIER: number = 2.5;
-
 /** Throttle change per keypress (5 %). */
 const THROTTLE_STEP: number = 0.05;
 
 /** Target TWR change per keypress in TWR mode. */
 const TWR_STEP: number = 0.1;
-
-/**
- * Drag coefficient multiplier applied to an open parachute.
- * An open chute is modelled as having 80× its stowed Cd — very high drag.
- */
-const CHUTE_DRAG_MULTIPLIER: number = 80;
-
-/** Landing speed below which a contact is considered "safe" (m/s). */
-const DEFAULT_SAFE_LANDING_SPEED: number = 10;
 
 /** Default crash threshold (m/s) for parts without an explicit crashThreshold. */
 const DEFAULT_CRASH_THRESHOLD: number = 10;
@@ -535,8 +512,6 @@ const DEFAULT_CRASH_THRESHOLD: number = 10;
 const PLAYER_TIP_TORQUE: number = 50_000;
 /** Angle (radians) past which a grounded tipping rocket crashes (~80°). */
 const TOPPLE_CRASH_ANGLE: number = Math.PI * 0.44;
-/** Per-tick angular velocity damping while tipping on the ground. */
-const GROUND_ANGULAR_DAMPING: number = 0.98;
 /** Maximum angular acceleration (rad/s²) from player tipping input. */
 const MAX_PLAYER_TIP_ACCEL: number = 10.0;
 /** Angle threshold below which a near-upright rocket snaps to 0. */
@@ -705,7 +680,7 @@ export function createPhysicsState(assembly: RocketAssembly, flightState: Flight
   };
 
   // Detect launch clamps in the assembly.
-  for (const [instanceId, placed] of assembly.parts) {
+  for (const [_instanceId, placed] of assembly.parts) {
     const clampDef: PartDef | undefined = getPartById(placed.partId);
     if (clampDef && clampDef.type === PartType.LAUNCH_CLAMP) {
       ps.hasLaunchClamps = true;
@@ -2005,7 +1980,7 @@ function _hasActiveParachutes(ps: PhysicsState): boolean {
   return false;
 }
 
-function _hasAsymmetricLegs(ps: PhysicsState, assembly: RocketAssembly): boolean {
+function _hasAsymmetricLegs(ps: PhysicsState, _assembly: RocketAssembly): boolean {
   if (!ps.legStates || ps.legStates.size === 0) return false;
   let hasDeployed = false;
   let hasRetracted = false;
@@ -2139,7 +2114,6 @@ function _applyGroundedSteering(
 
   // Heavy damping during active player input limits overshoot; lighter
   // damping during free rocking allows several visible oscillations.
-  const hasLegBase: boolean = countDeployedLegs(ps) >= 2;
   const effectiveDamping: number = (left || right) ? 0.85 : 0.99;
   ps.angularVelocity *= effectiveDamping;
 
