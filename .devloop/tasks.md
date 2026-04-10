@@ -193,7 +193,7 @@ See `.devloop/requirements.md` for full context on each item.
 ## Verification
 
 ### TASK-026: Verification pass — run all checks
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-007, TASK-008, TASK-009, TASK-010, TASK-011, TASK-012, TASK-013, TASK-014, TASK-015, TASK-016, TASK-017, TASK-018, TASK-019, TASK-020, TASK-021, TASK-022, TASK-023, TASK-024, TASK-025
 - **Description**: Run the full verification suite and fix any issues. Check: (1) `npm run typecheck` passes. (2) `npm run lint` passes. (3) `npm run test:unit` all pass. (4) `npm run test:e2e` all pass. (5) `npm run build` succeeds. (6) `as unknown as` cast count is <= 3 in source files. (7) Coverage floors met. See requirements section 10.
 - **Verification**: `npm run typecheck && npm run lint && npm run test:unit && npm run test:e2e && npm run build`

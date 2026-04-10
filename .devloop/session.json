@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 6,
+  "lastIteration": 7,
   "startedAt": "2026-04-10T06:31:29.602Z",
   "iteration": 4,
   "devloopVersion": "4.0.1",
   "activeTask": {
-    "taskId": "TASK-025",
-    "taskTitle": "Add tests to meet coverage floors",
-    "iterationNumber": 7,
-    "startedAt": "2026-04-10T07:20:30.194Z"
+    "taskId": "TASK-026",
+    "taskTitle": "Verification pass — run all checks",
+    "iterationNumber": 8,
+    "startedAt": "2026-04-10T07:30:29.535Z"
   }
 }
