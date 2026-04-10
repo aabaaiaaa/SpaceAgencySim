@@ -371,7 +371,7 @@ function _serialisePhysicsState(ps: PhysicsState): PhysicsSnapshot {
     malfunctions: ps.malfunctions
       ? mapToRecord(ps.malfunctions) as PhysicsSnapshot['malfunctions']
       : null,
-    capturedAsteroidMass: ps.capturedAsteroidMass,
+    capturedBody: ps.capturedBody,
     thrustAligned: ps.thrustAligned,
   };
 }

@@ -312,6 +312,14 @@ interface MalfunctionEntry {
   recovered: boolean;
 }
 
+/** Describes a body (asteroid) captured by a grabbing arm and attached to the craft. */
+export interface CapturedBody {
+  mass: number;           // kg
+  radius: number;         // metres
+  offset: { x: number; y: number };  // craft-local frame
+  name: string;           // for UI display
+}
+
 /**
  * Subset of PhysicsState / DebrisState fields shared by mass/geometry helpers.
  * Both PhysicsState and DebrisState satisfy this constraint so that
@@ -321,8 +329,8 @@ interface MalfunctionEntry {
 interface MassQueryable {
   activeParts: Set<string>;
   fuelStore: Map<string, number>;
-  /** Mass of captured asteroid (kg), 0 when none captured. Optional for DebrisState. */
-  capturedAsteroidMass?: number;
+  /** Captured body attached to the craft, null when none captured. Optional for DebrisState. */
+  capturedBody?: CapturedBody | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -414,8 +422,8 @@ export interface PhysicsState {
   dockingPortStates: Map<string, string>;
   /** Combined mass when docked (0 = not docked). */
   _dockedCombinedMass: number;
-  /** Mass of captured asteroid (kg), 0 when none captured. */
-  capturedAsteroidMass: number;
+  /** Captured body (asteroid) attached to the craft, null when none captured. */
+  capturedBody: CapturedBody | null;
   /** True when thrust is aligned through the combined CoM after asteroid capture. */
   thrustAligned: boolean;
   /** Weather-based ISP modifier (0.95–1.05). */
@@ -687,7 +695,7 @@ export function createPhysicsState(assembly: RocketAssembly, flightState: Flight
     rcsActiveDirections: new Set(),
     dockingPortStates: new Map(),
     _dockedCombinedMass: 0,
-    capturedAsteroidMass: 0,
+    capturedBody: null,
     thrustAligned: false,
     weatherIspModifier: 1.0,
     weatherWindSpeed: 0,
@@ -1010,8 +1018,8 @@ function _updateThrottleFromTWR(ps: PhysicsState, assembly: RocketAssembly, body
     }
   }
 
-  // Include captured asteroid mass in TWR calculation.
-  totalMass += ps.capturedAsteroidMass ?? 0;
+  // Include captured body mass in TWR calculation.
+  totalMass += ps.capturedBody?.mass ?? 0;
 
   if (maxLiquidThrustN <= 0) return; // can't throttle SRBs
   if (totalMass <= 0) return;
@@ -1415,8 +1423,8 @@ function _computeTotalMass(ps: MassQueryable, assembly: RocketAssembly): number 
     }
   }
 
-  // Add captured asteroid mass (if any).
-  mass += ps.capturedAsteroidMass ?? 0;
+  // Add captured body mass (if any).
+  mass += ps.capturedBody?.mass ?? 0;
 
   return Math.max(1, mass);
 }
@@ -1851,7 +1859,7 @@ function _computeAsteroidTorque(
   assembly: RocketAssembly,
   thrustMagnitude: number,
 ): number {
-  if (ps.capturedAsteroidMass <= 0) return 0;
+  if (!ps.capturedBody) return 0;
   if (ps.thrustAligned) return 0;
   if (thrustMagnitude <= 0) return 0;
 
@@ -1861,7 +1869,7 @@ function _computeAsteroidTorque(
   // Mass ratio: how much the asteroid shifts the CoM relative to the total.
   // When the asteroid is much heavier than the craft, the ratio approaches 1
   // and the torque is large.  When it's light, the torque is negligible.
-  const massRatio = ps.capturedAsteroidMass / totalMass;
+  const massRatio = ps.capturedBody.mass / totalMass;
 
   // Torque direction: always clockwise (+) as a simplification — the asteroid
   // hangs off one side.  A full model would use the actual grapple attachment
@@ -2729,26 +2737,26 @@ function _emitEvent(flightState: FlightState, event: { time: number; type: strin
 }
 
 // ---------------------------------------------------------------------------
-// Captured asteroid mass helpers (public API)
+// Captured body helpers (public API)
 // ---------------------------------------------------------------------------
 
 /**
- * Set the captured asteroid mass on the physics state.
+ * Attach a captured body (asteroid) to the physics state.
  * Called by the grabbing system when an asteroid is captured.
- * This adds the asteroid's mass to all physics calculations (thrust, gravity,
+ * This adds the body's mass to all physics calculations (thrust, gravity,
  * drag, TWR) and enables rotational torque from off-CoM thrust.
  */
-export function setCapturedAsteroidMass(ps: PhysicsState, mass: number): void {
-  ps.capturedAsteroidMass = Math.max(0, mass);
+export function setCapturedBody(ps: PhysicsState, body: CapturedBody): void {
+  ps.capturedBody = body;
   ps.thrustAligned = false; // new capture always starts unaligned
 }
 
 /**
- * Clear the captured asteroid mass (release).
+ * Clear the captured body (release).
  * Called by the grabbing system when the asteroid is released.
  */
-export function clearCapturedAsteroidMass(ps: PhysicsState): void {
-  ps.capturedAsteroidMass = 0;
+export function clearCapturedBody(ps: PhysicsState): void {
+  ps.capturedBody = null;
   ps.thrustAligned = false;
 }
 

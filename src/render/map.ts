@@ -917,9 +917,14 @@ function _drawBeltAsteroidObjects(
   const craftY = ps.posY + R;
 
   for (const ast of asteroids) {
-    // Asteroid positions are already in sun-centred (body-centred) coordinates.
-    const sx = cx + ast.posX * scale;
-    const sy = cy - ast.posY * scale;
+    // Asteroid positions are in the same surface-relative frame as ps.posX/posY.
+    // Convert to body-centred coordinates for the map (X is the same in both
+    // frames; Y needs the body radius offset).
+    const astMapX = ast.posX;
+    const astMapY = ast.posY + R;
+
+    const sx = cx + astMapX * scale;
+    const sy = cy - astMapY * scale;
 
     const isTarget = ast.id === _selectedTarget;
     const dotColor = isTarget ? ASTEROID_TARGET_COLOR : ASTEROID_DOT_COLOR;
@@ -935,9 +940,9 @@ function _drawBeltAsteroidObjects(
       _asteroidObjGraphics.circle(sx, sy, dotSize + 6 + pulse * 3);
       _asteroidObjGraphics.stroke({ color: ASTEROID_TARGET_COLOR, width: 1.5, alpha: 0.4 + pulse * 0.3 });
 
-      // Compute distance from craft to asteroid.
-      const dx = ast.posX - craftX;
-      const dy = ast.posY - craftY;
+      // Compute distance from craft to asteroid (both in body-centred frame).
+      const dx = astMapX - craftX;
+      const dy = astMapY - craftY;
       const dist = Math.hypot(dx, dy);
 
       // Size category label.

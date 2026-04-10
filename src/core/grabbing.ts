@@ -208,13 +208,23 @@ export function releaseGrabbedSatellite(grabState: GrabSystemState): { success: 
 export function getAsteroidGrabTargetsInRange(
   asteroids: readonly Asteroid[],
   ps: PhysicsState,
+  assembly?: RocketAssembly,
 ): Array<{ asteroid: Asteroid; distance: number; relativeSpeed: number }> {
+  // Determine the best arm's reach for the broad visual filter.
+  let bestArmReach = 25; // fallback to standard arm reach
+  if (assembly) {
+    const arms = getGrabbingArms(ps, assembly);
+    for (const arm of arms) {
+      const reach = Number(arm.partDef.properties?.armReach ?? 25);
+      if (reach > bestArmReach) bestArmReach = reach;
+    }
+  }
   const results: Array<{ asteroid: Asteroid; distance: number; relativeSpeed: number }> = [];
   for (const ast of asteroids) {
     const dx = ast.posX - ps.posX;
     const dy = ast.posY - ps.posY;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist > GRAB_ARM_RANGE * 20) continue; // broad filter — within visual range
+    if (dist > bestArmReach * 20) continue; // broad filter — within visual range
     const dvx = ast.velX - ps.velX;
     const dvy = ast.velY - ps.velY;
     const relSpeed = Math.sqrt(dvx * dvx + dvy * dvy);
@@ -263,7 +273,8 @@ export function captureAsteroid(
   const dx = asteroid.posX - ps.posX;
   const dy = asteroid.posY - ps.posY;
   const dist = Math.sqrt(dx * dx + dy * dy);
-  if (dist > GRAB_ARM_RANGE) {
+  const armReach = Number(bestArm?.partDef.properties?.armReach ?? 25);
+  if (dist > armReach) {
     return { success: false, reason: 'Asteroid out of range.' };
   }
 
@@ -271,7 +282,8 @@ export function captureAsteroid(
   const dvx = asteroid.velX - ps.velX;
   const dvy = asteroid.velY - ps.velY;
   const relSpeed = Math.sqrt(dvx * dvx + dvy * dvy);
-  if (relSpeed > GRAB_MAX_RELATIVE_SPEED) {
+  const maxGrabSpeed = Number(bestArm?.partDef.properties?.maxGrabSpeed ?? 1.0);
+  if (relSpeed > maxGrabSpeed) {
     return { success: false, reason: 'Relative speed too high.' };
   }
 
@@ -319,8 +331,8 @@ export function alignThrustWithAsteroid(
   if (!grabState.grabbedAsteroid) {
     return { success: false, reason: 'No asteroid captured.' };
   }
-  if (ps.capturedAsteroidMass <= 0) {
-    return { success: false, reason: 'No captured asteroid mass.' };
+  if (!ps.capturedBody) {
+    return { success: false, reason: 'No captured body.' };
   }
   if (ps.thrustAligned) {
     return { success: false, reason: 'Thrust is already aligned.' };
@@ -335,7 +347,7 @@ export function alignThrustWithAsteroid(
  * Called when the player rotates the craft while an asteroid is captured.
  */
 export function breakThrustAlignment(ps: PhysicsState): void {
-  if (ps.capturedAsteroidMass > 0 && ps.thrustAligned) {
+  if (ps.capturedBody !== null && ps.thrustAligned) {
     setThrustAligned(ps, false);
   }
 }

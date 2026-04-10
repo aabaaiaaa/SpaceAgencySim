@@ -1143,7 +1143,7 @@ describe('alignThrustWithAsteroid', () => {
     const gs = createGrabState();
     gs.state = GrabState.GRABBED;
     gs.grabbedAsteroid = makeAsteroid();
-    const ps = stubPs({ capturedAsteroidMass: 50_000, thrustAligned: false });
+    const ps = stubPs({ capturedBody: { mass: 50_000, radius: 100, offset: { x: 0, y: 0 }, name: 'TEST-AST' }, thrustAligned: false });
     const result = alignThrustWithAsteroid(gs, ps);
     expect(result.success).toBe(true);
     expect(ps.thrustAligned).toBe(true);
@@ -1152,7 +1152,7 @@ describe('alignThrustWithAsteroid', () => {
   it('fails when not in GRABBED state', () => {
     const gs = createGrabState();
     gs.state = GrabState.IDLE;
-    const ps = stubPs({ capturedAsteroidMass: 50_000, thrustAligned: false });
+    const ps = stubPs({ capturedBody: { mass: 50_000, radius: 100, offset: { x: 0, y: 0 }, name: 'TEST-AST' }, thrustAligned: false });
     const result = alignThrustWithAsteroid(gs, ps);
     expect(result.success).toBe(false);
     expect(result.reason).toContain('not grabbing');
@@ -1162,27 +1162,27 @@ describe('alignThrustWithAsteroid', () => {
     const gs = createGrabState();
     gs.state = GrabState.GRABBED;
     gs.grabbedAsteroid = null;
-    const ps = stubPs({ capturedAsteroidMass: 0, thrustAligned: false });
+    const ps = stubPs({ capturedBody: null, thrustAligned: false });
     const result = alignThrustWithAsteroid(gs, ps);
     expect(result.success).toBe(false);
     expect(result.reason).toContain('No asteroid captured');
   });
 
-  it('fails when capturedAsteroidMass is zero', () => {
+  it('fails when capturedBody is null', () => {
     const gs = createGrabState();
     gs.state = GrabState.GRABBED;
     gs.grabbedAsteroid = makeAsteroid();
-    const ps = stubPs({ capturedAsteroidMass: 0, thrustAligned: false });
+    const ps = stubPs({ capturedBody: null, thrustAligned: false });
     const result = alignThrustWithAsteroid(gs, ps);
     expect(result.success).toBe(false);
-    expect(result.reason).toContain('No captured asteroid mass');
+    expect(result.reason).toContain('No captured body');
   });
 
   it('fails when thrust is already aligned', () => {
     const gs = createGrabState();
     gs.state = GrabState.GRABBED;
     gs.grabbedAsteroid = makeAsteroid();
-    const ps = stubPs({ capturedAsteroidMass: 50_000, thrustAligned: true });
+    const ps = stubPs({ capturedBody: { mass: 50_000, radius: 100, offset: { x: 0, y: 0 }, name: 'TEST-AST' }, thrustAligned: true });
     const result = alignThrustWithAsteroid(gs, ps);
     expect(result.success).toBe(false);
     expect(result.reason).toContain('already aligned');
@@ -1192,7 +1192,7 @@ describe('alignThrustWithAsteroid', () => {
     const gs = createGrabState();
     gs.state = GrabState.GRABBED;
     gs.grabbedAsteroid = makeAsteroid();
-    const ps = stubPs({ capturedAsteroidMass: 50_000, thrustAligned: false });
+    const ps = stubPs({ capturedBody: { mass: 50_000, radius: 100, offset: { x: 0, y: 0 }, name: 'TEST-AST' }, thrustAligned: false });
     expect(ps.thrustAligned).toBe(false);
     alignThrustWithAsteroid(gs, ps);
     expect(ps.thrustAligned).toBe(true);
@@ -1205,19 +1205,19 @@ describe('alignThrustWithAsteroid', () => {
 
 describe('breakThrustAlignment', () => {
   it('@smoke sets thrustAligned to false when asteroid is captured and aligned', () => {
-    const ps = stubPs({ capturedAsteroidMass: 50_000, thrustAligned: true });
+    const ps = stubPs({ capturedBody: { mass: 50_000, radius: 100, offset: { x: 0, y: 0 }, name: 'TEST-AST' }, thrustAligned: true });
     breakThrustAlignment(ps);
     expect(ps.thrustAligned).toBe(false);
   });
 
   it('does nothing when no asteroid is captured', () => {
-    const ps = stubPs({ capturedAsteroidMass: 0, thrustAligned: false });
+    const ps = stubPs({ capturedBody: null, thrustAligned: false });
     breakThrustAlignment(ps);
     expect(ps.thrustAligned).toBe(false);
   });
 
   it('does nothing when thrust is already unaligned', () => {
-    const ps = stubPs({ capturedAsteroidMass: 50_000, thrustAligned: false });
+    const ps = stubPs({ capturedBody: { mass: 50_000, radius: 100, offset: { x: 0, y: 0 }, name: 'TEST-AST' }, thrustAligned: false });
     breakThrustAlignment(ps);
     expect(ps.thrustAligned).toBe(false);
   });
@@ -1226,7 +1226,7 @@ describe('breakThrustAlignment', () => {
     const gs = createGrabState();
     gs.state = GrabState.GRABBED;
     gs.grabbedAsteroid = makeAsteroid();
-    const ps = stubPs({ capturedAsteroidMass: 50_000, thrustAligned: false });
+    const ps = stubPs({ capturedBody: { mass: 50_000, radius: 100, offset: { x: 0, y: 0 }, name: 'TEST-AST' }, thrustAligned: false });
 
     // Align
     alignThrustWithAsteroid(gs, ps);

@@ -111,7 +111,7 @@ function deserialisePhysicsState(snap: PhysicsSnapshot): PhysicsState {
     rcsActiveDirections: _arrayToSet(snap.rcsActiveDirections),
     dockingPortStates: _recordToMap(snap.dockingPortStates),
     _dockedCombinedMass: 0,
-    capturedAsteroidMass: snap.capturedAsteroidMass ?? 0,
+    capturedBody: snap.capturedBody ?? null,
     thrustAligned: snap.thrustAligned ?? false,
     weatherIspModifier: snap.weatherIspModifier,
     weatherWindSpeed: snap.weatherWindSpeed ?? 0,
@@ -257,7 +257,7 @@ function serialisePhysicsState(ps: PhysicsState): PhysicsSnapshot {
     malfunctions: ps.malfunctions
       ? _mapToRecord(ps.malfunctions) as PhysicsSnapshot['malfunctions']
       : null,
-    capturedAsteroidMass: ps.capturedAsteroidMass,
+    capturedBody: ps.capturedBody,
     thrustAligned: ps.thrustAligned,
   };
 }

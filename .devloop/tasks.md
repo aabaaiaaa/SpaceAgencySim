@@ -7,7 +7,7 @@ See `.devloop/requirements.md` for full context on each item.
 ## Critical Physics Integration
 
 ### TASK-001: Define CapturedBody interface and refactor PhysicsState
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Replace the scalar `capturedAsteroidMass: number` field in PhysicsState (`physics.ts`) with `capturedBody: CapturedBody | null`. Define the `CapturedBody` interface with `mass`, `radius`, `offset: { x, y }` (craft-local frame), and `name`. Rename `setCapturedAsteroidMass()` → `setCapturedBody(ps, body)` and `clearCapturedAsteroidMass()` → `clearCapturedBody(ps)`. Update `_computeTotalMass()` to read `ps.capturedBody?.mass ?? 0`. Update `_computeAsteroidTorque()` to check `capturedBody !== null` instead of `capturedAsteroidMass > 0`. Update `alignThrustWithAsteroid()` in `grabbing.ts` to check `ps.capturedBody !== null`. Fix all compilation errors across the codebase caused by the field rename (including test files). No backward compatibility needed for old saves.
 - **Verification**: `npm run typecheck && npx vitest run src/tests/grabbing.test.ts src/tests/physics.test.ts`
@@ -25,7 +25,7 @@ See `.devloop/requirements.md` for full context on each item.
 - **Verification**: `npm run typecheck && npx vitest run src/tests/physics.test.ts`
 
 ### TASK-004: Use per-arm armReach and maxGrabSpeed from part definitions
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `captureAsteroid()` (`grabbing.ts:266`), look up the equipped arm's part definition and use its `armReach` property instead of the global `GRAB_ARM_RANGE` (25m). Use `maxGrabSpeed` instead of `GRAB_MAX_RELATIVE_SPEED` (1.0). In `getAsteroidGrabTargetsInRange()`, update the broad filter from `GRAB_ARM_RANGE * 20` to `armReach * 20`. Standard arm: 25m/1.0, Heavy: 35m/0.8, Industrial: 50m/0.5. Consider deprecating or removing the global constants if no longer referenced. See requirements section 1.3.
 - **Verification**: `npm run typecheck && npx vitest run src/tests/grabbing.test.ts`
@@ -35,19 +35,19 @@ See `.devloop/requirements.md` for full context on each item.
 ## Bug Fixes
 
 ### TASK-005: Fix double-scale in streak asteroid rendering
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `_asteroids.ts`, the streak LOD `_renderStreakAsteroid` function double-scales the trail. Line 248: `trailLength = Math.min(200, speed * scale * 0.05)` already includes `scale`. Lines 257-258: `tailX = headX - dx * trailLength * scale` applies `scale` again. Remove the second `* scale` from lines 257-258 so tail positions use just `trailLength`. See requirements section 2.1.
 - **Verification**: `npm run typecheck`
 
 ### TASK-006: Add per-asteroid collision cooldown
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: `checkAsteroidCollisions` in `collision.ts` applies damage every tick during multi-frame overlaps. Add collision cooldown tracking for asteroids, mirroring the existing `SEPARATION_COOLDOWN_TICKS` (10 ticks) pattern used for debris. Use a Map or Set tracking recently-collided asteroid IDs with a tick counter. In `checkAsteroidCollisions`, skip asteroids with active cooldown, decrement cooldowns each tick, and set cooldown after applying damage. See requirements section 2.2.
 - **Verification**: `npm run typecheck && npx vitest run src/tests/collision.test.ts`
 
 ### TASK-007: Fix map coordinate frame in _drawBeltAsteroidObjects
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `_drawBeltAsteroidObjects` (`map.ts:916-917`), `craftX` uses body-relative coordinates while `craftY` is adjusted to sun-centred (`ps.posY + R`). Convert `craftX` to the same sun-centred coordinate frame as `craftY` so distance calculations between craft and asteroid positions are correct. See requirements section 2.3.
 - **Verification**: `npm run typecheck`

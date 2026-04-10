@@ -1091,13 +1091,13 @@ test.describe('Asteroid Belt — asteroid capture with grabbing arm', () => {
         target.mass = 50_000;         // 50 tonnes — within standard arm's 100,000 limit
 
         const grabState = grabbing.createGrabState();
-        const massBefore = ps.capturedAsteroidMass;
+        const massBefore = ps.capturedBody ? ps.capturedBody.mass : 0;
 
         const captureResult = grabbing.captureAsteroid(grabState, target, ps, assembly);
 
-        // After capture, set the asteroid mass on physics state (caller responsibility).
+        // After capture, set the captured body on physics state (caller responsibility).
         if (captureResult.success) {
-          physics.setCapturedAsteroidMass(ps, target.mass);
+          physics.setCapturedBody(ps, { mass: target.mass, radius: target.radius || 15, offset: { x: 0, y: 0 }, name: target.name || 'AST-CAPTURED' });
         }
 
         return {
@@ -1106,7 +1106,7 @@ test.describe('Asteroid Belt — asteroid capture with grabbing arm', () => {
           grabStateName: grabState.state,
           grabbedAsteroidName: grabState.grabbedAsteroid?.name || null,
           massBefore,
-          massAfter: ps.capturedAsteroidMass,
+          massAfter: ps.capturedBody ? ps.capturedBody.mass : 0,
           thrustAligned: ps.thrustAligned,
         };
       } catch (e) {
@@ -1265,7 +1265,7 @@ test.describe('Asteroid Belt — thrust alignment after capture', () => {
         const capture = grabbing.captureAsteroid(grabState, target, ps, assembly);
         if (!capture.success) return { error: 'capture failed: ' + capture.reason };
 
-        physics.setCapturedAsteroidMass(ps, target.mass);
+        physics.setCapturedBody(ps, { mass: target.mass, radius: target.radius || 15, offset: { x: 0, y: 0 }, name: target.name || 'AST-CAPTURED' });
 
         const alignedBefore = ps.thrustAligned;
 
@@ -1277,7 +1277,7 @@ test.describe('Asteroid Belt — thrust alignment after capture', () => {
           alignSuccess: alignResult.success,
           alignedBefore,
           alignedAfter: ps.thrustAligned,
-          capturedMass: ps.capturedAsteroidMass,
+          capturedMass: ps.capturedBody ? ps.capturedBody.mass : 0,
         };
       } catch (e) {
         return { error: String(e) };
@@ -1324,7 +1324,7 @@ test.describe('Asteroid Belt — thrust alignment after capture', () => {
 
         const grabState = grabbing.createGrabState();
         grabbing.captureAsteroid(grabState, target, ps, assembly);
-        physics.setCapturedAsteroidMass(ps, target.mass);
+        physics.setCapturedBody(ps, { mass: target.mass, radius: target.radius || 15, offset: { x: 0, y: 0 }, name: target.name || 'AST-CAPTURED' });
 
         // First align succeeds.
         grabbing.alignThrustWithAsteroid(grabState, ps);
@@ -1376,7 +1376,7 @@ test.describe('Asteroid Belt — thrust alignment after capture', () => {
 
         const grabState = grabbing.createGrabState();
         grabbing.captureAsteroid(grabState, target, ps, assembly);
-        physics.setCapturedAsteroidMass(ps, target.mass);
+        physics.setCapturedBody(ps, { mass: target.mass, radius: target.radius || 15, offset: { x: 0, y: 0 }, name: target.name || 'AST-CAPTURED' });
 
         // Align thrust.
         grabbing.alignThrustWithAsteroid(grabState, ps);
@@ -1502,13 +1502,13 @@ test.describe('Asteroid Belt — captured asteroid persistence', () => {
         const capture = grabbing.captureAsteroid(grabState, target, ps, assembly);
         if (!capture.success) return { error: 'capture failed: ' + capture.reason };
 
-        physics.setCapturedAsteroidMass(ps, target.mass);
+        physics.setCapturedBody(ps, { mass: target.mass, radius: target.radius || 15, offset: { x: 0, y: 0 }, name: target.name || 'AST-CAPTURED' });
 
         // Release the asteroid.
         const release = grabbing.releaseGrabbedAsteroid(grabState);
         if (!release.success || !release.asteroid) return { error: 'release failed' };
 
-        physics.clearCapturedAsteroidMass(ps);
+        physics.clearCapturedBody(ps);
 
         // Count orbital objects before persist.
         const countBefore = state.orbitalObjects.length;
@@ -1596,12 +1596,12 @@ test.describe('Asteroid Belt — captured asteroid persistence', () => {
 
         const grabState = grabbing.createGrabState();
         grabbing.captureAsteroid(grabState, target, ps, assembly);
-        physics.setCapturedAsteroidMass(ps, target.mass);
+        physics.setCapturedBody(ps, { mass: target.mass, radius: target.radius || 15, offset: { x: 0, y: 0 }, name: target.name || 'AST-CAPTURED' });
 
         const release = grabbing.releaseGrabbedAsteroid(grabState);
         if (!release.success || !release.asteroid) return { error: 'release failed' };
 
-        physics.clearCapturedAsteroidMass(ps);
+        physics.clearCapturedBody(ps);
 
         const countBefore = state.orbitalObjects.length;
         const persist = grabbing.persistReleasedAsteroid(
@@ -1689,9 +1689,9 @@ test.describe('Asteroid Belt — asteroid rename', () => {
 
         const grabState = grabbing.createGrabState();
         grabbing.captureAsteroid(grabState, target, ps, assembly);
-        physics.setCapturedAsteroidMass(ps, target.mass);
+        physics.setCapturedBody(ps, { mass: target.mass, radius: target.radius || 15, offset: { x: 0, y: 0 }, name: target.name || 'AST-CAPTURED' });
         const release = grabbing.releaseGrabbedAsteroid(grabState);
-        physics.clearCapturedAsteroidMass(ps);
+        physics.clearCapturedBody(ps);
 
         const persist = grabbing.persistReleasedAsteroid(
           release.asteroid, ps, fs, state,

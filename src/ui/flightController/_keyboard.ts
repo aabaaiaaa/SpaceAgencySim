@@ -166,7 +166,7 @@ export function onKeyDown(e: KeyboardEvent): void {
 
   // Y — align thrust through combined CoM (asteroid capture).
   if (e.code === 'KeyY' && !s.mapActive) {
-    if (ps.capturedAsteroidMass > 0) {
+    if (ps.capturedBody !== null) {
       e.preventDefault();
       if (ps.thrustAligned) {
         showPhaseNotification('Thrust already aligned');
@@ -270,7 +270,7 @@ export function onKeyDown(e: KeyboardEvent): void {
   // Manual rotation breaks asteroid thrust alignment (TASK-027).
   if ((e.key === 'a' || e.key === 'd' || e.key === 'A' || e.key === 'D' ||
        e.key === 'ArrowLeft' || e.key === 'ArrowRight') &&
-      ps.capturedAsteroidMass > 0 && ps.thrustAligned) {
+      ps.capturedBody !== null && ps.thrustAligned) {
     breakThrustAlignment(ps);
     resyncWorkerState(ps, s.assembly!, s.stagingConfig!, flightState!).catch(() => {});
     showPhaseNotification('Thrust alignment lost');

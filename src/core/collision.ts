@@ -166,6 +166,9 @@ const ASTEROID_SPEED_SIGNIFICANT: number = 20;
 
 /** At or above ASTEROID_SPEED_SIGNIFICANT: catastrophic — total destruction. */
 
+/** Per-asteroid collision cooldown map: asteroid id → remaining cooldown ticks. */
+const _asteroidCollisionCooldowns: Map<string, number> = new Map();
+
 /** Fraction of outermost parts to damage on a MINOR impact (0–1). */
 const MINOR_DAMAGE_FRACTION: number = 0.25;
 
@@ -776,6 +779,15 @@ export function checkAsteroidCollisions(
   if (ps.landed || ps.crashed || ps.activeParts.size === 0) return [];
   if (asteroids.length === 0) return [];
 
+  // Decrement active asteroid collision cooldowns and remove expired entries.
+  for (const [id, ticks] of _asteroidCollisionCooldowns) {
+    if (ticks <= 1) {
+      _asteroidCollisionCooldowns.delete(id);
+    } else {
+      _asteroidCollisionCooldowns.set(id, ticks - 1);
+    }
+  }
+
   // Compute craft AABB once.
   const craftAABB = computeAABB(
     ps.activeParts,
@@ -788,6 +800,9 @@ export function checkAsteroidCollisions(
   const results: AsteroidCollisionResult[] = [];
 
   for (const asteroid of asteroids) {
+    // Skip asteroids still on cooldown from a recent collision.
+    if (_asteroidCollisionCooldowns.has(asteroid.id)) continue;
+
     // AABB vs circle overlap test.
     if (!testAABBCircleOverlap(craftAABB, asteroid.posX, asteroid.posY, asteroid.radius)) {
       continue;
@@ -805,6 +820,9 @@ export function checkAsteroidCollisions(
     // Apply damage to the craft.
     applyAsteroidDamage(ps, assembly, flightState, damage, relSpeed, asteroid.name);
 
+    // Set cooldown to prevent repeated damage during multi-frame overlap.
+    _asteroidCollisionCooldowns.set(asteroid.id, SEPARATION_COOLDOWN_TICKS);
+
     results.push({ asteroid, relativeSpeed: relSpeed, damage });
 
     // If craft is destroyed, stop checking further asteroids.
@@ -812,4 +830,17 @@ export function checkAsteroidCollisions(
   }
 
   return results;
+}
+
+// ---------------------------------------------------------------------------
+// Public API — Reset asteroid collision cooldowns
+// ---------------------------------------------------------------------------
+
+/**
+ * Clear all asteroid collision cooldowns.
+ *
+ * Call when leaving flight (returning to hub) or in tests to reset state.
+ */
+export function resetAsteroidCollisionCooldowns(): void {
+  _asteroidCollisionCooldowns.clear();
 }

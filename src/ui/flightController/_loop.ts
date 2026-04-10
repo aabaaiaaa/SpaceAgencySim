@@ -128,7 +128,7 @@ function _syncSnapshotToMutableState(
   ps.scienceModuleStates = new Map(Object.entries(snap.physics.scienceModuleStates)) as typeof ps.scienceModuleStates;
   ps.dockingPortStates = new Map(Object.entries(snap.physics.dockingPortStates));
   ps.powerState = snap.physics.powerState;
-  ps.capturedAsteroidMass = snap.physics.capturedAsteroidMass;
+  ps.capturedBody = snap.physics.capturedBody;
   ps.thrustAligned = snap.physics.thrustAligned;
   ps.malfunctions = snap.physics.malfunctions
     ? new Map(Object.entries(snap.physics.malfunctions))

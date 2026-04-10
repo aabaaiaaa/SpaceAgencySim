@@ -254,8 +254,8 @@ function _renderStreakAsteroid(
   // Streak: bright head + fading trail segments.
   const headX = x;
   const headY = y;
-  const tailX = headX - dx * trailLength * scale;
-  const tailY = headY + dy * trailLength * scale; // Y inverted
+  const tailX = headX - dx * trailLength;
+  const tailY = headY + dy * trailLength; // Y inverted
 
   const segments = 5;
   for (let i = 0; i < segments; i++) {
