@@ -1,21 +1,3 @@
-// @ts-nocheck
-/**
- * malfunction.test.js — Unit tests for the part reliability and malfunction system (TASK-019).
- *
- * Tests cover:
- *   initMalfunctionState()    — initialises tracking maps on physics state
- *   checkMalfunctions()       — rolls reliability checks on biome transition
- *   tickMalfunctions()        — fuel leak continuous drain
- *   hasMalfunction()          — query malfunction status
- *   getMalfunction()          — get malfunction entry
- *   attemptRecovery()         — recovery mechanics for each type
- *   setMalfunctionMode()      — off / forced / normal modes
- *   getPartReliability()      — returns reliability from part definition
- *   Malfunction effects       — engine flameout, reduced thrust, SRB burnout, etc.
- *   Crew engineering skill    — reduces malfunction chance
- *   Part definitions          — all parts have reliability property
- */
-
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   initMalfunctionState,
@@ -52,14 +34,29 @@ import { createPhysicsState } from '../core/physics.ts';
 import { createFlightState, createGameState, createCrewMember } from '../core/gameState.ts';
 import { getPartById, PARTS } from '../data/parts.ts';
 
+import type { GameState, FlightState } from '../core/gameState.ts';
+import type { PhysicsState, RocketAssembly } from '../core/physics.ts';
+import type { StagingConfig } from '../core/rocketbuilder.ts';
+
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
 
-/** Shared game state for malfunction mode — reset before each top-level suite. */
-let gs;
+interface PhysicsStateExt extends PhysicsState {
+  malfunctionChecked?: Set<string>;
+}
 
-function makeFlightState() {
+interface SimpleRocket {
+  assembly: RocketAssembly;
+  staging: StagingConfig;
+  probeId: string;
+  tankId: string;
+  engineId: string;
+}
+
+let gs: GameState;
+
+function makeFlightState(): FlightState {
   return createFlightState({
     missionId: 'test-mission',
     rocketId: 'test-rocket',
@@ -67,10 +64,7 @@ function makeFlightState() {
   });
 }
 
-/**
- * Minimal rocket: Probe Core → Small Tank → Spark Engine.
- */
-function makeSimpleRocket() {
+function makeSimpleRocket(): SimpleRocket {
   const assembly = createRocketAssembly();
   const staging = createStagingConfig();
 
@@ -87,10 +81,7 @@ function makeSimpleRocket() {
   return { assembly, staging, probeId, tankId, engineId };
 }
 
-/**
- * Create a PhysicsState for testing.
- */
-function makePhysicsState(assembly) {
+function makePhysicsState(assembly: RocketAssembly): { ps: PhysicsState; fs: FlightState } {
   const fs = makeFlightState();
   return { ps: createPhysicsState(assembly, fs), fs };
 }
@@ -124,11 +115,12 @@ describe('initMalfunctionState()', () => {
   it('creates malfunctions and malfunctionChecked maps on ps', () => {
     const { assembly } = makeSimpleRocket();
     const { ps } = makePhysicsState(assembly);
+    const psExt = ps as PhysicsStateExt;
 
-    expect(ps.malfunctions).toBeInstanceOf(Map);
-    expect(ps.malfunctionChecked).toBeInstanceOf(Set);
-    expect(ps.malfunctions.size).toBe(0);
-    expect(ps.malfunctionChecked.size).toBe(0);
+    expect(psExt.malfunctions).toBeInstanceOf(Map);
+    expect(psExt.malfunctionChecked).toBeInstanceOf(Set);
+    expect(psExt.malfunctions!.size).toBe(0);
+    expect(psExt.malfunctionChecked!.size).toBe(0);
   });
 
   it('initialises pending check state', () => {
@@ -142,19 +134,21 @@ describe('initMalfunctionState()', () => {
 
 describe('getPartReliability()', () => {
   it('returns reliability from part definition', () => {
-    const def = getPartById('engine-spark');
+    const def = getPartById('engine-spark')!;
     expect(getPartReliability(def)).toBe(RELIABILITY_TIERS.STARTER);
   });
 
   it('returns 1.0 for parts without reliability', () => {
+    // @ts-expect-error testing with incomplete PartDef
     expect(getPartReliability({})).toBe(1.0);
+    // @ts-expect-error testing with incomplete PartDef
     expect(getPartReliability({ reliability: undefined })).toBe(1.0);
   });
 
   it('returns correct tier values', () => {
-    expect(getPartReliability(getPartById('engine-spark'))).toBe(0.92);  // STARTER
-    expect(getPartReliability(getPartById('engine-reliant'))).toBe(0.96); // MID
-    expect(getPartReliability(getPartById('engine-nerv'))).toBe(0.98);   // HIGH
+    expect(getPartReliability(getPartById('engine-spark')!)).toBe(0.92);  // STARTER
+    expect(getPartReliability(getPartById('engine-reliant')!)).toBe(0.96); // MID
+    expect(getPartReliability(getPartById('engine-nerv')!)).toBe(0.98);   // HIGH
   });
 });
 
@@ -181,20 +175,20 @@ describe('hasMalfunction() / getMalfunction()', () => {
     const { assembly, engineId } = makeSimpleRocket();
     const { ps } = makePhysicsState(assembly);
 
-    ps.malfunctions.set(engineId, {
+    ps.malfunctions!.set(engineId, {
       type: MalfunctionType.ENGINE_FLAMEOUT,
       recovered: false,
     });
 
     expect(hasMalfunction(ps, engineId)).toBe(true);
-    expect(getMalfunction(ps, engineId).type).toBe(MalfunctionType.ENGINE_FLAMEOUT);
+    expect(getMalfunction(ps, engineId)!.type).toBe(MalfunctionType.ENGINE_FLAMEOUT);
   });
 
   it('returns false when malfunction is recovered', () => {
     const { assembly, engineId } = makeSimpleRocket();
     const { ps } = makePhysicsState(assembly);
 
-    ps.malfunctions.set(engineId, {
+    ps.malfunctions!.set(engineId, {
       type: MalfunctionType.ENGINE_FLAMEOUT,
       recovered: true,
     });
@@ -216,7 +210,7 @@ describe('checkMalfunctions()', () => {
 
     checkMalfunctions(ps, assembly, fs, gs);
 
-    expect(ps.malfunctions.size).toBe(0);
+    expect(ps.malfunctions!.size).toBe(0);
   });
 
   it('@smoke forces malfunctions on all applicable parts in FORCED mode', () => {
@@ -227,8 +221,8 @@ describe('checkMalfunctions()', () => {
     checkMalfunctions(ps, assembly, fs, gs);
 
     // Engine and tank should be malfunctioned (probe core has no applicable types).
-    expect(ps.malfunctions.has(engineId)).toBe(true);
-    expect(ps.malfunctions.has(tankId)).toBe(true);
+    expect(ps.malfunctions!.has(engineId)).toBe(true);
+    expect(ps.malfunctions!.has(tankId)).toBe(true);
   });
 
   it('marks parts as checked so they are not re-rolled', () => {
@@ -240,9 +234,9 @@ describe('checkMalfunctions()', () => {
     const firstMalf = getMalfunction(ps, engineId);
 
     // Second check should not add new malfunctions (already checked).
-    const sizeAfterFirst = ps.malfunctions.size;
+    const sizeAfterFirst = ps.malfunctions!.size;
     checkMalfunctions(ps, assembly, fs, gs);
-    expect(ps.malfunctions.size).toBe(sizeAfterFirst);
+    expect(ps.malfunctions!.size).toBe(sizeAfterFirst);
   });
 
   it('emits PART_MALFUNCTION flight events', () => {
@@ -301,7 +295,7 @@ describe('Malfunction effects', () => {
     ps.firingEngines.add(engineId);
 
     // Manually apply flameout.
-    ps.malfunctions.set(engineId, {
+    ps.malfunctions!.set(engineId, {
       type: MalfunctionType.ENGINE_FLAMEOUT,
       recovered: false,
     });
@@ -323,11 +317,11 @@ describe('Malfunction effects', () => {
 
     // Start SRB firing.
     ps.firingEngines.add(srbId);
-    const fuelBefore = ps.fuelStore.get(srbId);
+    const fuelBefore = ps.fuelStore.get(srbId)!;
     expect(fuelBefore).toBeGreaterThan(0);
 
     // Apply SRB early burnout.
-    ps.malfunctions.set(srbId, {
+    ps.malfunctions!.set(srbId, {
       type: MalfunctionType.SRB_EARLY_BURNOUT,
       recovered: false,
     });
@@ -344,11 +338,11 @@ describe('tickMalfunctions()', () => {
     const { assembly, tankId } = makeSimpleRocket();
     const { ps } = makePhysicsState(assembly);
 
-    const initialFuel = ps.fuelStore.get(tankId);
+    const initialFuel = ps.fuelStore.get(tankId)!;
     expect(initialFuel).toBeGreaterThan(0);
 
     // Apply fuel tank leak.
-    ps.malfunctions.set(tankId, {
+    ps.malfunctions!.set(tankId, {
       type: MalfunctionType.FUEL_TANK_LEAK,
       recovered: false,
     });
@@ -356,7 +350,7 @@ describe('tickMalfunctions()', () => {
     // Tick for 1 second.
     tickMalfunctions(ps, assembly, 1.0);
 
-    const afterFuel = ps.fuelStore.get(tankId);
+    const afterFuel = ps.fuelStore.get(tankId)!;
     // Should have lost ~2% of initial fuel.
     expect(afterFuel).toBeLessThan(initialFuel);
     expect(afterFuel).toBeCloseTo(initialFuel * (1 - FUEL_LEAK_RATE), 2);
@@ -366,12 +360,12 @@ describe('tickMalfunctions()', () => {
     const { assembly, tankId } = makeSimpleRocket();
     const { ps } = makePhysicsState(assembly);
 
-    ps.malfunctions.set(tankId, {
+    ps.malfunctions!.set(tankId, {
       type: MalfunctionType.FUEL_TANK_LEAK,
       recovered: true,
     });
 
-    const initialFuel = ps.fuelStore.get(tankId);
+    const initialFuel = ps.fuelStore.get(tankId)!;
     tickMalfunctions(ps, assembly, 1.0);
 
     expect(ps.fuelStore.get(tankId)).toBe(initialFuel);
@@ -403,21 +397,21 @@ describe('attemptRecovery()', () => {
     const fs = makeFlightState();
     const ps = createPhysicsState(assembly, fs);
 
-    ps.malfunctions.set(decId, {
+    ps.malfunctions!.set(decId, {
       type: MalfunctionType.DECOUPLER_STUCK,
       recovered: false,
     });
 
     const result = attemptRecovery(ps, decId, gs);
     expect(result.success).toBe(true);
-    expect(ps.malfunctions.get(decId).recovered).toBe(true);
+    expect(ps.malfunctions!.get(decId)!.recovered).toBe(true);
   });
 
   it('ENGINE_REDUCED_THRUST cannot be recovered', () => {
     const { assembly, engineId } = makeSimpleRocket();
     const { ps } = makePhysicsState(assembly);
 
-    ps.malfunctions.set(engineId, {
+    ps.malfunctions!.set(engineId, {
       type: MalfunctionType.ENGINE_REDUCED_THRUST,
       recovered: false,
     });
@@ -437,7 +431,7 @@ describe('attemptRecovery()', () => {
     const fs = makeFlightState();
     const ps = createPhysicsState(assembly, fs);
 
-    ps.malfunctions.set(chuteId, {
+    ps.malfunctions!.set(chuteId, {
       type: MalfunctionType.PARACHUTE_PARTIAL,
       recovered: false,
     });
@@ -457,7 +451,7 @@ describe('attemptRecovery()', () => {
     const fs = makeFlightState();
     const ps = createPhysicsState(assembly, fs);
 
-    ps.malfunctions.set(srbId, {
+    ps.malfunctions!.set(srbId, {
       type: MalfunctionType.SRB_EARLY_BURNOUT,
       recovered: false,
     });
@@ -470,7 +464,7 @@ describe('attemptRecovery()', () => {
     const { assembly, engineId } = makeSimpleRocket();
     const { ps } = makePhysicsState(assembly);
 
-    ps.malfunctions.set(engineId, {
+    ps.malfunctions!.set(engineId, {
       type: MalfunctionType.ENGINE_FLAMEOUT,
       recovered: false,
     });
@@ -569,7 +563,7 @@ describe('malfunctionMode save/load round-trip', () => {
     // Change to OFF, serialise, and deserialise.
     setMalfunctionMode(state, MalfunctionMode.OFF);
     const json = JSON.stringify(state);
-    const restored = JSON.parse(json);
+    const restored = JSON.parse(json) as GameState;
 
     expect(restored.malfunctionMode).toBe(MalfunctionMode.OFF);
     expect(getMalfunctionMode(restored)).toBe(MalfunctionMode.OFF);
@@ -578,13 +572,14 @@ describe('malfunctionMode save/load round-trip', () => {
   it('persists FORCED mode through JSON serialisation', () => {
     const state = createGameState();
     setMalfunctionMode(state, MalfunctionMode.FORCED);
-    const restored = JSON.parse(JSON.stringify(state));
+    const restored = JSON.parse(JSON.stringify(state)) as GameState;
 
     expect(getMalfunctionMode(restored)).toBe(MalfunctionMode.FORCED);
   });
 
   it('defaults to NORMAL when malfunctionMode is missing (legacy saves)', () => {
     const state = createGameState();
+    // @ts-expect-error simulating legacy save with missing field
     delete state.malfunctionMode;
 
     expect(getMalfunctionMode(state)).toBe(MalfunctionMode.NORMAL);

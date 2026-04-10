@@ -1,21 +1,6 @@
-// @ts-nocheck
-/**
- * missions.test.js — Unit tests for the mission data model and core missions module.
- *
- * Tests cover:
- *   - ObjectiveType enum        — frozen, correct values
- *   - MissionStatus enum        — frozen, correct values
- *   - initializeMissions()      — seeds available missions from catalog
- *   - getAvailableMissions()    — returns current available bucket
- *   - acceptMission()           — moves mission to accepted, guards against bad IDs
- *   - completeMission()         — moves to completed, awards reward, unlocks parts/missions
- *   - getUnlockedMissions()     — surfaces missions whose prereqs are now met
- *   - getUnlockedParts()        — union of state.parts + mission unlockedParts
- *   - checkObjectiveCompletion()— all 10 objective types, HOLD_ALTITUDE timer
- */
-
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
+import type { GameState, FlightState, MissionInstance } from '../core/gameState.ts';
 import {
   initializeMissions,
   getAvailableMissions,
@@ -27,22 +12,18 @@ import {
 } from '../core/missions.ts';
 import { processFlightReturn } from '../core/flightReturn.ts';
 import { MISSIONS, ObjectiveType, MissionStatus, rebuildMissionsIndex } from '../data/missions.ts';
-import { MissionState } from '../core/constants.ts';
+import type { MissionDef } from '../data/missions.ts';
+import { MissionState, FlightPhase, CelestialBody } from '../core/constants.ts';
 
 // ---------------------------------------------------------------------------
 // Test fixture helpers
 // ---------------------------------------------------------------------------
 
-/** Returns a fresh game state with empty mission buckets. */
-function freshState() {
+function freshState(): GameState {
   return createGameState();
 }
 
-/**
- * Build a minimal mission definition for testing.
- * Callers can override any field via `overrides`.
- */
-function makeMissionDef(overrides = {}) {
+function makeMissionDef(overrides: Partial<MissionDef> = {}): MissionDef {
   return {
     id: 'test-mission-001',
     title: 'Test Mission',
@@ -57,31 +38,33 @@ function makeMissionDef(overrides = {}) {
   };
 }
 
-/**
- * Build a minimal accepted mission instance (already in state.missions.accepted).
- * Adds the mission to the state and returns it.
- */
-function seedAcceptedMission(state, def) {
-  const instance = {
-    ...def,
+function seedAcceptedMission(state: GameState, def: MissionDef): MissionInstance {
+  const instance: MissionInstance = {
+    id: def.id,
+    title: def.title,
+    description: def.description,
+    reward: def.reward,
+    deadline: '',
+    state: MissionState.ACCEPTED,
+    requirements: { requiredParts: [] },
+    acceptedDate: null,
+    completedDate: null,
     objectives: def.objectives.map((o) => ({ ...o })),
-    unlocksAfter: [...def.unlocksAfter],
     unlockedParts: [...def.unlockedParts],
-    status: MissionStatus.ACCEPTED,
+    location: def.location,
+    unlocksAfter: [...def.unlocksAfter],
+    templateStatus: def.status,
   };
   state.missions.accepted.push(instance);
   return instance;
 }
 
-/**
- * Build a minimal FlightState for a given mission ID.
- * Callers can override any field.
- */
-function makeFlightState(missionId, overrides = {}) {
+function makeFlightState(missionId: string, overrides: Partial<FlightState> = {}): FlightState {
   return {
     missionId,
     rocketId: 'rocket-1',
     crewIds: [],
+    crewCount: 0,
     timeElapsed: 0,
     altitude: 0,
     velocity: 0,
@@ -90,6 +73,20 @@ function makeFlightState(missionId, overrides = {}) {
     deltaVRemaining: 5000,
     events: [],
     aborted: false,
+    phase: FlightPhase.FLIGHT,
+    phaseLog: [],
+    inOrbit: false,
+    orbitalElements: null,
+    bodyId: CelestialBody.EARTH,
+    orbitBandId: null,
+    currentBiome: null,
+    biomesVisited: [],
+    maxAltitude: 0,
+    maxVelocity: 0,
+    dockingState: null,
+    transferState: null,
+    powerState: null,
+    commsState: null,
     ...overrides,
   };
 }
@@ -102,15 +99,7 @@ function makeFlightState(missionId, overrides = {}) {
 // mutating the live export between test files.
 // ---------------------------------------------------------------------------
 
-/**
- * Temporarily replace the entire MISSIONS catalog with `defs` and return a
- * cleanup function that restores the original contents.
- *
- * Using a full replacement (rather than an append) ensures that the real
- * catalog missions (e.g. mission-001 with unlocksAfter: []) do not bleed
- * into tests that inject synthetic missions.
- */
-function withMissions(...defs) {
+function withMissions(...defs: MissionDef[]): () => void {
   const saved = MISSIONS.splice(0, MISSIONS.length); // save & clear
   MISSIONS.push(...defs);
   rebuildMissionsIndex();
@@ -118,6 +107,22 @@ function withMissions(...defs) {
     MISSIONS.splice(0, MISSIONS.length); // clear injected
     MISSIONS.push(...saved);             // restore original
     rebuildMissionsIndex();
+  };
+}
+
+function makeCompletedStub(id: string): MissionInstance {
+  return {
+    id,
+    title: '',
+    description: '',
+    reward: 0,
+    deadline: '',
+    state: MissionState.COMPLETED,
+    requirements: { requiredParts: [] },
+    acceptedDate: null,
+    completedDate: null,
+    objectives: [],
+    unlockedParts: [],
   };
 }
 
@@ -131,7 +136,7 @@ describe('ObjectiveType enum', () => {
   });
 
   it('has all 10 required types', () => {
-    const expected = [
+    const expected: (keyof typeof ObjectiveType)[] = [
       'REACH_ALTITUDE',
       'REACH_SPEED',
       'SAFE_LANDING',
@@ -177,8 +182,8 @@ describe('MissionStatus enum', () => {
 // ---------------------------------------------------------------------------
 
 describe('initializeMissions()', () => {
-  let state;
-  let cleanup;
+  let state: GameState;
+  let cleanup: (() => void) | null;
 
   beforeEach(() => {
     state = freshState();
@@ -224,7 +229,7 @@ describe('initializeMissions()', () => {
     initializeMissions(state);
 
     // Mutate the live copy.
-    state.missions.available[0].objectives[0].completed = true;
+    state.missions.available[0].objectives![0].completed = true;
 
     // Template must remain unchanged.
     expect(def.objectives[0].completed).toBe(false);
@@ -250,7 +255,7 @@ describe('getAvailableMissions()', () => {
   it('returns the available bucket', () => {
     const state = freshState();
     const m = makeMissionDef({ id: 'm1' });
-    state.missions.available.push({ ...m });
+    state.missions.available.push(makeCompletedStub(m.id));
     const result = getAvailableMissions(state);
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe('m1');
@@ -267,8 +272,8 @@ describe('getAvailableMissions()', () => {
 // ---------------------------------------------------------------------------
 
 describe('acceptMission()', () => {
-  let state;
-  let cleanup;
+  let state: GameState;
+  let cleanup: (() => void) | null;
 
   beforeEach(() => {
     state = freshState();
@@ -284,7 +289,7 @@ describe('acceptMission()', () => {
     const result = acceptMission(state, 'mission-a');
     expect(result.success).toBe(true);
     expect(result.mission).toBeDefined();
-    expect(result.mission.id).toBe('mission-a');
+    expect(result.mission!.id).toBe('mission-a');
   });
 
   it('moves mission from available to accepted', () => {
@@ -361,7 +366,7 @@ describe('acceptMission()', () => {
     initializeMissions(state);
 
     // Simulate an old save by deleting requiredParts from the instance.
-    const instance = state.missions.available.find(m => m.id === 'mission-req');
+    const instance = state.missions.available.find(m => m.id === 'mission-req')!;
     delete instance.requiredParts;
 
     const result = acceptMission(state, 'mission-req');
@@ -376,8 +381,8 @@ describe('acceptMission()', () => {
 // ---------------------------------------------------------------------------
 
 describe('completeMission()', () => {
-  let state;
-  let cleanup;
+  let state: GameState;
+  let cleanup: (() => void) | null;
 
   beforeEach(() => {
     state = freshState();
@@ -395,7 +400,7 @@ describe('completeMission()', () => {
     const result = completeMission(state, 'm1');
     expect(result.success).toBe(true);
     expect(result.reward).toBe(50_000);
-    expect(result.mission.id).toBe('m1');
+    expect(result.mission!.id).toBe('m1');
   });
 
   it('moves mission from accepted to completed', () => {
@@ -476,8 +481,8 @@ describe('completeMission()', () => {
 // ---------------------------------------------------------------------------
 
 describe('getUnlockedMissions()', () => {
-  let state;
-  let cleanup;
+  let state: GameState;
+  let cleanup: (() => void) | null;
 
   beforeEach(() => {
     state = freshState();
@@ -502,7 +507,7 @@ describe('getUnlockedMissions()', () => {
 
     // Manually mark m1 as completed.
     const m1 = state.missions.available.splice(0, 1)[0];
-    m1.status = MissionStatus.COMPLETED;
+    m1.state = MissionState.COMPLETED;
     state.missions.completed.push(m1);
 
     const unlocked = getUnlockedMissions(state);
@@ -521,9 +526,9 @@ describe('getUnlockedMissions()', () => {
     initializeMissions(state);
 
     // Complete only pre1.
-    const pre1 = state.missions.available.find((m) => m.id === 'pre1');
+    const pre1 = state.missions.available.find((m) => m.id === 'pre1')!;
     state.missions.available.splice(state.missions.available.indexOf(pre1), 1);
-    pre1.status = MissionStatus.COMPLETED;
+    pre1.state = MissionState.COMPLETED;
     state.missions.completed.push(pre1);
 
     const unlocked = getUnlockedMissions(state);
@@ -541,9 +546,9 @@ describe('getUnlockedMissions()', () => {
 
     // Complete both prerequisites.
     for (const id of ['pre1', 'pre2']) {
-      const m = state.missions.available.find((x) => x.id === id);
+      const m = state.missions.available.find((x) => x.id === id)!;
       state.missions.available.splice(state.missions.available.indexOf(m), 1);
-      m.status = MissionStatus.COMPLETED;
+      m.state = MissionState.COMPLETED;
       state.missions.completed.push(m);
     }
 
@@ -570,10 +575,13 @@ describe('getUnlockedMissions()', () => {
 
     // Manually set up: m1 completed, m2 already accepted.
     const m1 = state.missions.available.splice(0, 1)[0];
-    m1.status = MissionStatus.COMPLETED;
+    m1.state = MissionState.COMPLETED;
     state.missions.completed.push(m1);
 
-    const m2Instance = { ...makeMissionDef({ id: 'm2' }), status: MissionStatus.ACCEPTED };
+    const m2Instance: MissionInstance = {
+      ...makeCompletedStub('m2'),
+      state: MissionState.ACCEPTED,
+    };
     state.missions.accepted.push(m2Instance);
 
     const unlocked = getUnlockedMissions(state);
@@ -586,8 +594,8 @@ describe('getUnlockedMissions()', () => {
 // ---------------------------------------------------------------------------
 
 describe('getUnlockedParts()', () => {
-  let state;
-  let cleanup;
+  let state: GameState;
+  let cleanup: (() => void) | null;
 
   beforeEach(() => {
     state = freshState();
@@ -605,7 +613,7 @@ describe('getUnlockedParts()', () => {
   it('includes parts unlocked by completed missions', () => {
     const def = makeMissionDef({ id: 'm1', unlockedParts: ['engine-mk2'] });
     cleanup = withMissions(def);
-    state.missions.completed.push({ ...def, status: MissionStatus.COMPLETED });
+    state.missions.completed.push(makeCompletedStub('m1'));
 
     const parts = getUnlockedParts(state);
     expect(parts).toContain('engine-mk2');
@@ -615,7 +623,7 @@ describe('getUnlockedParts()', () => {
     state.parts = ['shared-part'];
     const def = makeMissionDef({ id: 'm1', unlockedParts: ['shared-part', 'unique-part'] });
     cleanup = withMissions(def);
-    state.missions.completed.push({ ...def, status: MissionStatus.COMPLETED });
+    state.missions.completed.push(makeCompletedStub('m1'));
 
     const parts = getUnlockedParts(state);
     expect(parts.filter((p) => p === 'shared-part')).toHaveLength(1);
@@ -639,7 +647,7 @@ describe('checkObjectiveCompletion() guards', () => {
 
   it('does nothing when no accepted missions exist', () => {
     const state = freshState();
-    expect(() => checkObjectiveCompletion(state, { events: [], altitude: 0, velocity: 0, timeElapsed: 0 })).not.toThrow();
+    expect(() => checkObjectiveCompletion(state, makeFlightState('', { events: [], altitude: 0, velocity: 0, timeElapsed: 0 }))).not.toThrow();
   });
 
   it('skips objectives already marked completed', () => {
@@ -654,7 +662,7 @@ describe('checkObjectiveCompletion() guards', () => {
     const fs = makeFlightState('m1', { altitude: 999 });
     checkObjectiveCompletion(state, fs);
     // Objective was already true — should stay true and not error.
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(true);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(true);
   });
 
   it('checks objectives across multiple accepted missions', () => {
@@ -677,8 +685,8 @@ describe('checkObjectiveCompletion() guards', () => {
     const fs = makeFlightState('mA', { altitude: 600, velocity: 150 });
     checkObjectiveCompletion(state, fs);
 
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(true);
-    expect(state.missions.accepted[1].objectives[0].completed).toBe(true);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(true);
+    expect(state.missions.accepted[1].objectives![0].completed).toBe(true);
   });
 });
 
@@ -687,7 +695,7 @@ describe('checkObjectiveCompletion() guards', () => {
 // ---------------------------------------------------------------------------
 
 describe('checkObjectiveCompletion() — REACH_ALTITUDE', () => {
-  let state;
+  let state: GameState;
 
   beforeEach(() => {
     state = freshState();
@@ -702,17 +710,17 @@ describe('checkObjectiveCompletion() — REACH_ALTITUDE', () => {
 
   it('marks objective completed when altitude threshold is met', () => {
     checkObjectiveCompletion(state, makeFlightState('m1', { altitude: 500 }));
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(true);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(true);
   });
 
   it('marks completed when altitude exceeds threshold', () => {
     checkObjectiveCompletion(state, makeFlightState('m1', { altitude: 1000 }));
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(true);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(true);
   });
 
   it('does not complete when below threshold', () => {
     checkObjectiveCompletion(state, makeFlightState('m1', { altitude: 499 }));
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(false);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(false);
   });
 });
 
@@ -721,7 +729,7 @@ describe('checkObjectiveCompletion() — REACH_ALTITUDE', () => {
 // ---------------------------------------------------------------------------
 
 describe('checkObjectiveCompletion() — REACH_SPEED', () => {
-  let state;
+  let state: GameState;
 
   beforeEach(() => {
     state = freshState();
@@ -736,12 +744,12 @@ describe('checkObjectiveCompletion() — REACH_SPEED', () => {
 
   it('marks completed at exact threshold', () => {
     checkObjectiveCompletion(state, makeFlightState('m1', { velocity: 150 }));
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(true);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(true);
   });
 
   it('does not complete below threshold', () => {
     checkObjectiveCompletion(state, makeFlightState('m1', { velocity: 149 }));
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(false);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(false);
   });
 });
 
@@ -750,7 +758,7 @@ describe('checkObjectiveCompletion() — REACH_SPEED', () => {
 // ---------------------------------------------------------------------------
 
 describe('checkObjectiveCompletion() — SAFE_LANDING', () => {
-  let state;
+  let state: GameState;
 
   beforeEach(() => {
     state = freshState();
@@ -768,7 +776,7 @@ describe('checkObjectiveCompletion() — SAFE_LANDING', () => {
       events: [{ type: 'LANDING', time: 30, speed: 8, description: 'soft landing' }],
     });
     checkObjectiveCompletion(state, fs);
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(true);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(true);
   });
 
   it('marks completed at exact speed limit', () => {
@@ -776,7 +784,7 @@ describe('checkObjectiveCompletion() — SAFE_LANDING', () => {
       events: [{ type: 'LANDING', time: 30, speed: 10, description: 'landing' }],
     });
     checkObjectiveCompletion(state, fs);
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(true);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(true);
   });
 
   it('does not complete when LANDING speed exceeds limit', () => {
@@ -784,12 +792,12 @@ describe('checkObjectiveCompletion() — SAFE_LANDING', () => {
       events: [{ type: 'LANDING', time: 30, speed: 11, description: 'hard landing' }],
     });
     checkObjectiveCompletion(state, fs);
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(false);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(false);
   });
 
   it('does not complete with no events', () => {
     checkObjectiveCompletion(state, makeFlightState('m1'));
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(false);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(false);
   });
 });
 
@@ -798,7 +806,7 @@ describe('checkObjectiveCompletion() — SAFE_LANDING', () => {
 // ---------------------------------------------------------------------------
 
 describe('checkObjectiveCompletion() — ACTIVATE_PART', () => {
-  let state;
+  let state: GameState;
 
   beforeEach(() => {
     state = freshState();
@@ -816,7 +824,7 @@ describe('checkObjectiveCompletion() — ACTIVATE_PART', () => {
       events: [{ type: 'PART_ACTIVATED', time: 20, partType: 'PARACHUTE', description: 'parachute deployed' }],
     });
     checkObjectiveCompletion(state, fs);
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(true);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(true);
   });
 
   it('does not complete when partType does not match', () => {
@@ -824,12 +832,12 @@ describe('checkObjectiveCompletion() — ACTIVATE_PART', () => {
       events: [{ type: 'PART_ACTIVATED', time: 20, partType: 'ENGINE', description: 'engine ignited' }],
     });
     checkObjectiveCompletion(state, fs);
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(false);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(false);
   });
 
   it('does not complete with no events', () => {
     checkObjectiveCompletion(state, makeFlightState('m1'));
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(false);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(false);
   });
 });
 
@@ -838,7 +846,7 @@ describe('checkObjectiveCompletion() — ACTIVATE_PART', () => {
 // ---------------------------------------------------------------------------
 
 describe('checkObjectiveCompletion() — HOLD_ALTITUDE', () => {
-  let state;
+  let state: GameState;
 
   beforeEach(() => {
     state = freshState();
@@ -859,12 +867,12 @@ describe('checkObjectiveCompletion() — HOLD_ALTITUDE', () => {
 
   it('starts timing when rocket enters the altitude band', () => {
     checkObjectiveCompletion(state, makeFlightState('m1', { altitude: 1000, timeElapsed: 10 }));
-    expect(state.missions.accepted[0].objectives[0]._holdEnteredAt).toBe(10);
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(false);
+    expect(state.missions.accepted[0].objectives![0]._holdEnteredAt).toBe(10);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(false);
   });
 
   it('marks completed after holding for the full duration', () => {
-    const obj = state.missions.accepted[0].objectives[0];
+    const obj = state.missions.accepted[0].objectives![0];
     // Simulate entering at t=10.
     checkObjectiveCompletion(state, makeFlightState('m1', { altitude: 1000, timeElapsed: 10 }));
     // Simulate still in range at t=40 (30s elapsed).
@@ -875,11 +883,11 @@ describe('checkObjectiveCompletion() — HOLD_ALTITUDE', () => {
   it('does not complete when holding for less than duration', () => {
     checkObjectiveCompletion(state, makeFlightState('m1', { altitude: 1000, timeElapsed: 10 }));
     checkObjectiveCompletion(state, makeFlightState('m1', { altitude: 1000, timeElapsed: 39 }));
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(false);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(false);
   });
 
   it('resets timer when rocket leaves the band', () => {
-    const obj = state.missions.accepted[0].objectives[0];
+    const obj = state.missions.accepted[0].objectives![0];
     checkObjectiveCompletion(state, makeFlightState('m1', { altitude: 1000, timeElapsed: 10 }));
     // Rocket leaves the band.
     checkObjectiveCompletion(state, makeFlightState('m1', { altitude: 500, timeElapsed: 20 }));
@@ -887,7 +895,7 @@ describe('checkObjectiveCompletion() — HOLD_ALTITUDE', () => {
   });
 
   it('does not complete after timer reset and insufficient re-entry time', () => {
-    const obj = state.missions.accepted[0].objectives[0];
+    const obj = state.missions.accepted[0].objectives![0];
     checkObjectiveCompletion(state, makeFlightState('m1', { altitude: 1000, timeElapsed: 10 }));
     // Leave band.
     checkObjectiveCompletion(state, makeFlightState('m1', { altitude: 500, timeElapsed: 20 }));
@@ -900,13 +908,13 @@ describe('checkObjectiveCompletion() — HOLD_ALTITUDE', () => {
   it('does not complete when below the altitude band', () => {
     checkObjectiveCompletion(state, makeFlightState('m1', { altitude: 799, timeElapsed: 0 }));
     checkObjectiveCompletion(state, makeFlightState('m1', { altitude: 799, timeElapsed: 60 }));
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(false);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(false);
   });
 
   it('does not complete when above the altitude band', () => {
     checkObjectiveCompletion(state, makeFlightState('m1', { altitude: 1201, timeElapsed: 0 }));
     checkObjectiveCompletion(state, makeFlightState('m1', { altitude: 1201, timeElapsed: 60 }));
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(false);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(false);
   });
 });
 
@@ -915,7 +923,7 @@ describe('checkObjectiveCompletion() — HOLD_ALTITUDE', () => {
 // ---------------------------------------------------------------------------
 
 describe('checkObjectiveCompletion() — RETURN_SCIENCE_DATA', () => {
-  let state;
+  let state: GameState;
 
   beforeEach(() => {
     state = freshState();
@@ -936,7 +944,7 @@ describe('checkObjectiveCompletion() — RETURN_SCIENCE_DATA', () => {
       ],
     });
     checkObjectiveCompletion(state, fs);
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(true);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(true);
   });
 
   it('does not complete without safe landing', () => {
@@ -944,7 +952,7 @@ describe('checkObjectiveCompletion() — RETURN_SCIENCE_DATA', () => {
       events: [{ type: 'SCIENCE_COLLECTED', time: 60, description: 'data gathered' }],
     });
     checkObjectiveCompletion(state, fs);
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(false);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(false);
   });
 
   it('does not complete without science collection', () => {
@@ -952,7 +960,7 @@ describe('checkObjectiveCompletion() — RETURN_SCIENCE_DATA', () => {
       events: [{ type: 'LANDING', time: 120, speed: 5, description: 'landing' }],
     });
     checkObjectiveCompletion(state, fs);
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(false);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(false);
   });
 
   it('does not complete when landing is too hard (> 10 m/s)', () => {
@@ -963,7 +971,7 @@ describe('checkObjectiveCompletion() — RETURN_SCIENCE_DATA', () => {
       ],
     });
     checkObjectiveCompletion(state, fs);
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(false);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(false);
   });
 });
 
@@ -972,7 +980,7 @@ describe('checkObjectiveCompletion() — RETURN_SCIENCE_DATA', () => {
 // ---------------------------------------------------------------------------
 
 describe('checkObjectiveCompletion() — CONTROLLED_CRASH', () => {
-  let state;
+  let state: GameState;
 
   beforeEach(() => {
     state = freshState();
@@ -990,7 +998,7 @@ describe('checkObjectiveCompletion() — CONTROLLED_CRASH', () => {
       events: [{ type: 'LANDING', time: 30, speed: 60, description: 'crash' }],
     });
     checkObjectiveCompletion(state, fs);
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(true);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(true);
   });
 
   it('marks completed when CRASH event speed meets threshold', () => {
@@ -998,7 +1006,7 @@ describe('checkObjectiveCompletion() — CONTROLLED_CRASH', () => {
       events: [{ type: 'CRASH', time: 30, speed: 50, description: 'crash' }],
     });
     checkObjectiveCompletion(state, fs);
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(true);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(true);
   });
 
   it('does not complete when impact speed is below threshold', () => {
@@ -1006,7 +1014,7 @@ describe('checkObjectiveCompletion() — CONTROLLED_CRASH', () => {
       events: [{ type: 'LANDING', time: 30, speed: 49, description: 'soft crash' }],
     });
     checkObjectiveCompletion(state, fs);
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(false);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(false);
   });
 });
 
@@ -1015,7 +1023,7 @@ describe('checkObjectiveCompletion() — CONTROLLED_CRASH', () => {
 // ---------------------------------------------------------------------------
 
 describe('checkObjectiveCompletion() — EJECT_CREW', () => {
-  let state;
+  let state: GameState;
 
   beforeEach(() => {
     state = freshState();
@@ -1033,7 +1041,7 @@ describe('checkObjectiveCompletion() — EJECT_CREW', () => {
       events: [{ type: 'CREW_EJECTED', time: 15, altitude: 250, description: 'ejected' }],
     });
     checkObjectiveCompletion(state, fs);
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(true);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(true);
   });
 
   it('does not complete when ejection altitude is below minimum', () => {
@@ -1041,7 +1049,7 @@ describe('checkObjectiveCompletion() — EJECT_CREW', () => {
       events: [{ type: 'CREW_EJECTED', time: 15, altitude: 199, description: 'ejected low' }],
     });
     checkObjectiveCompletion(state, fs);
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(false);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(false);
   });
 });
 
@@ -1050,7 +1058,7 @@ describe('checkObjectiveCompletion() — EJECT_CREW', () => {
 // ---------------------------------------------------------------------------
 
 describe('checkObjectiveCompletion() — RELEASE_SATELLITE', () => {
-  let state;
+  let state: GameState;
 
   beforeEach(() => {
     state = freshState();
@@ -1068,7 +1076,7 @@ describe('checkObjectiveCompletion() — RELEASE_SATELLITE', () => {
       events: [{ type: 'SATELLITE_RELEASED', time: 200, altitude: 35_000, description: 'satellite deployed' }],
     });
     checkObjectiveCompletion(state, fs);
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(true);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(true);
   });
 
   it('does not complete when altitude is below minimum', () => {
@@ -1076,7 +1084,7 @@ describe('checkObjectiveCompletion() — RELEASE_SATELLITE', () => {
       events: [{ type: 'SATELLITE_RELEASED', time: 200, altitude: 29_999, description: 'too low' }],
     });
     checkObjectiveCompletion(state, fs);
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(false);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(false);
   });
 
   it('completes when SATELLITE_RELEASED event has velocity field (backwards compatible)', () => {
@@ -1084,7 +1092,7 @@ describe('checkObjectiveCompletion() — RELEASE_SATELLITE', () => {
       events: [{ type: 'SATELLITE_RELEASED', time: 200, altitude: 35_000, velocity: 1_500, description: 'deployed with velocity' }],
     });
     checkObjectiveCompletion(state, fs);
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(true);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(true);
   });
 });
 
@@ -1093,7 +1101,7 @@ describe('checkObjectiveCompletion() — RELEASE_SATELLITE', () => {
 // ---------------------------------------------------------------------------
 
 describe('checkObjectiveCompletion() — RELEASE_SATELLITE with minVelocity', () => {
-  let state;
+  let state: GameState;
 
   beforeEach(() => {
     state = freshState();
@@ -1117,7 +1125,7 @@ describe('checkObjectiveCompletion() — RELEASE_SATELLITE with minVelocity', ()
       events: [{ type: 'SATELLITE_RELEASED', time: 300, altitude: 85_000, velocity: 7_500, description: 'orbital deployment' }],
     });
     checkObjectiveCompletion(state, fs);
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(true);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(true);
   });
 
   it('does not complete when altitude met but velocity below minimum', () => {
@@ -1125,7 +1133,7 @@ describe('checkObjectiveCompletion() — RELEASE_SATELLITE with minVelocity', ()
       events: [{ type: 'SATELLITE_RELEASED', time: 300, altitude: 85_000, velocity: 6_999, description: 'too slow' }],
     });
     checkObjectiveCompletion(state, fs);
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(false);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(false);
   });
 
   it('does not complete when altitude too low even if velocity is met', () => {
@@ -1133,7 +1141,7 @@ describe('checkObjectiveCompletion() — RELEASE_SATELLITE with minVelocity', ()
       events: [{ type: 'SATELLITE_RELEASED', time: 300, altitude: 79_999, velocity: 8_000, description: 'altitude too low' }],
     });
     checkObjectiveCompletion(state, fs);
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(false);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(false);
   });
 
   it('does not complete when velocity field is missing from event', () => {
@@ -1141,7 +1149,7 @@ describe('checkObjectiveCompletion() — RELEASE_SATELLITE with minVelocity', ()
       events: [{ type: 'SATELLITE_RELEASED', time: 300, altitude: 85_000, description: 'no velocity field' }],
     });
     checkObjectiveCompletion(state, fs);
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(false);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(false);
   });
 });
 
@@ -1150,7 +1158,7 @@ describe('checkObjectiveCompletion() — RELEASE_SATELLITE with minVelocity', ()
 // ---------------------------------------------------------------------------
 
 describe('checkObjectiveCompletion() — REACH_ORBIT', () => {
-  let state;
+  let state: GameState;
 
   beforeEach(() => {
     state = freshState();
@@ -1172,25 +1180,25 @@ describe('checkObjectiveCompletion() — REACH_ORBIT', () => {
   it('marks completed when both altitude and velocity thresholds are met', () => {
     const fs = makeFlightState('m1', { altitude: 80_000, velocity: 7_800 });
     checkObjectiveCompletion(state, fs);
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(true);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(true);
   });
 
   it('does not complete when only altitude is met', () => {
     const fs = makeFlightState('m1', { altitude: 80_000, velocity: 7_000 });
     checkObjectiveCompletion(state, fs);
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(false);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(false);
   });
 
   it('does not complete when only velocity is met', () => {
     const fs = makeFlightState('m1', { altitude: 50_000, velocity: 7_800 });
     checkObjectiveCompletion(state, fs);
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(false);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(false);
   });
 
   it('marks completed when both thresholds are exceeded', () => {
     const fs = makeFlightState('m1', { altitude: 100_000, velocity: 8_000 });
     checkObjectiveCompletion(state, fs);
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(true);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(true);
   });
 });
 
@@ -1251,8 +1259,7 @@ describe('Catalog (2): completing Mission 1 makes Mission 4 available', () => {
 });
 
 describe('Catalog (3): completing Mission 4 unlocks Missions 5 and 6', () => {
-  /** Helper: advance through the tutorial chain up to and including `targetId`. */
-  function completeTutorialChainTo(state, targetId) {
+  function completeTutorialChainTo(state: GameState, targetId: string): void {
     const chain = ['mission-001', 'mission-004'];
     for (const id of chain) {
       acceptMission(state, id);
@@ -1289,22 +1296,22 @@ describe('Catalog (4): two-prerequisite mission only unlocks when both prereqs a
 
   it('mission-011 does not unlock when only mission-008 is completed', () => {
     const state = freshState();
-    state.missions.completed.push({ id: 'mission-008', status: MissionStatus.COMPLETED });
+    state.missions.completed.push(makeCompletedStub('mission-008'));
     const unlocked = getUnlockedMissions(state);
     expect(unlocked.map((m) => m.id)).not.toContain('mission-011');
   });
 
   it('mission-011 does not unlock when only mission-009 is completed', () => {
     const state = freshState();
-    state.missions.completed.push({ id: 'mission-009', status: MissionStatus.COMPLETED });
+    state.missions.completed.push(makeCompletedStub('mission-009'));
     const unlocked = getUnlockedMissions(state);
     expect(unlocked.map((m) => m.id)).not.toContain('mission-011');
   });
 
   it('mission-011 unlocks once both mission-008 and mission-009 are completed', () => {
     const state = freshState();
-    state.missions.completed.push({ id: 'mission-008', status: MissionStatus.COMPLETED });
-    state.missions.completed.push({ id: 'mission-009', status: MissionStatus.COMPLETED });
+    state.missions.completed.push(makeCompletedStub('mission-008'));
+    state.missions.completed.push(makeCompletedStub('mission-009'));
     const unlocked = getUnlockedMissions(state);
     expect(unlocked.map((m) => m.id)).toContain('mission-011');
   });
@@ -1343,8 +1350,7 @@ describe('Catalog (6): early tutorial allows only one accepted mission at a time
 });
 
 describe('Catalog (7): after early tutorial, multiple missions can be accepted simultaneously', () => {
-  /** Complete the linear chain so that missions 5, 6, 7 are all available. */
-  function completeTutorialChain(state) {
+  function completeTutorialChain(state: GameState): void {
     for (const id of ['mission-001', 'mission-004']) {
       acceptMission(state, id);
       completeMission(state, id);
@@ -1369,7 +1375,7 @@ describe('Catalog (7): after early tutorial, multiple missions can be accepted s
 });
 
 describe('Catalog (8): checkObjectiveCompletion marks mission-001 objectives complete', () => {
-  let state;
+  let state: GameState;
 
   beforeEach(() => {
     state = freshState();
@@ -1379,22 +1385,22 @@ describe('Catalog (8): checkObjectiveCompletion marks mission-001 objectives com
 
   it('REACH_SPEED objective is completed when velocity reaches 150 m/s', () => {
     checkObjectiveCompletion(state, makeFlightState('mission-001', { velocity: 150 }));
-    const obj = state.missions.accepted[0].objectives[0];
+    const obj = state.missions.accepted[0].objectives![0];
     expect(obj.type).toBe(ObjectiveType.REACH_SPEED);
     expect(obj.completed).toBe(true);
   });
 
   it('REACH_ALTITUDE objective is completed when altitude reaches 500 m', () => {
     checkObjectiveCompletion(state, makeFlightState('mission-001', { altitude: 500 }));
-    const obj = state.missions.accepted[0].objectives[1];
+    const obj = state.missions.accepted[0].objectives![1];
     expect(obj.type).toBe(ObjectiveType.REACH_ALTITUDE);
     expect(obj.completed).toBe(true);
   });
 
   it('required objectives NOT completed below threshold', () => {
     checkObjectiveCompletion(state, makeFlightState('mission-001', { velocity: 100, altitude: 400 }));
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(false);
-    expect(state.missions.accepted[0].objectives[1].completed).toBe(false);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(false);
+    expect(state.missions.accepted[0].objectives![1].completed).toBe(false);
   });
 });
 
@@ -1406,8 +1412,8 @@ describe('Catalog (9): completing all objectives then calling completeMission ma
 
     // Drive required objectives to completion.
     checkObjectiveCompletion(state, makeFlightState('mission-001', { velocity: 150, altitude: 500 }));
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(true);
-    expect(state.missions.accepted[0].objectives[1].completed).toBe(true);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(true);
+    expect(state.missions.accepted[0].objectives![1].completed).toBe(true);
 
     // Now formally complete the mission.
     const result = completeMission(state, 'mission-001');
@@ -1424,7 +1430,7 @@ describe('Catalog (9): completing all objectives then calling completeMission ma
     acceptMission(state, 'mission-001');
     checkObjectiveCompletion(state, makeFlightState('mission-001', { velocity: 150, altitude: 500 }));
     completeMission(state, 'mission-001');
-    const completedObjs = state.missions.completed[0].objectives;
+    const completedObjs = state.missions.completed[0].objectives!;
     // Required objectives (first two) should be completed.
     expect(completedObjs[0].completed).toBe(true);
     expect(completedObjs[1].completed).toBe(true);
@@ -1434,31 +1440,31 @@ describe('Catalog (9): completing all objectives then calling completeMission ma
 describe('Catalog (10): getUnlockedParts returns correct part IDs after catalog missions complete', () => {
   it('returns parachute-mk2 after mission-005 is completed', () => {
     const state = freshState();
-    state.missions.completed.push({ id: 'mission-005', status: MissionStatus.COMPLETED });
+    state.missions.completed.push(makeCompletedStub('mission-005'));
     expect(getUnlockedParts(state)).toContain('parachute-mk2');
   });
 
   it('returns landing-legs-small after mission-006 is completed', () => {
     const state = freshState();
-    state.missions.completed.push({ id: 'mission-006', status: MissionStatus.COMPLETED });
+    state.missions.completed.push(makeCompletedStub('mission-006'));
     expect(getUnlockedParts(state)).toContain('landing-legs-small');
   });
 
   it('returns landing-legs-large after mission-007 is completed', () => {
     const state = freshState();
-    state.missions.completed.push({ id: 'mission-007', status: MissionStatus.COMPLETED });
+    state.missions.completed.push(makeCompletedStub('mission-007'));
     expect(getUnlockedParts(state)).toContain('landing-legs-large');
   });
 
   it('returns engine-poodle after mission-010 is completed', () => {
     const state = freshState();
-    state.missions.completed.push({ id: 'mission-010', status: MissionStatus.COMPLETED });
+    state.missions.completed.push(makeCompletedStub('mission-010'));
     expect(getUnlockedParts(state)).toContain('engine-poodle');
   });
 
   it('returns engine-reliant and srb-small after mission-012 is completed', () => {
     const state = freshState();
-    state.missions.completed.push({ id: 'mission-012', status: MissionStatus.COMPLETED });
+    state.missions.completed.push(makeCompletedStub('mission-012'));
     const parts = getUnlockedParts(state);
     expect(parts).toContain('engine-reliant');
     expect(parts).toContain('srb-small');
@@ -1466,9 +1472,9 @@ describe('Catalog (10): getUnlockedParts returns correct part IDs after catalog 
 
   it('accumulates parts from multiple completed missions without duplicates', () => {
     const state = freshState();
-    state.missions.completed.push({ id: 'mission-005', status: MissionStatus.COMPLETED });
-    state.missions.completed.push({ id: 'mission-006', status: MissionStatus.COMPLETED });
-    state.missions.completed.push({ id: 'mission-007', status: MissionStatus.COMPLETED });
+    state.missions.completed.push(makeCompletedStub('mission-005'));
+    state.missions.completed.push(makeCompletedStub('mission-006'));
+    state.missions.completed.push(makeCompletedStub('mission-007'));
     const parts = getUnlockedParts(state);
     expect(parts).toContain('parachute-mk2');
     expect(parts).toContain('landing-legs-small');
@@ -1482,7 +1488,7 @@ describe('Catalog (10): getUnlockedParts returns correct part IDs after catalog 
   it('includes starting state.parts alongside mission-unlocked parts', () => {
     const state = freshState();
     state.parts = ['starter-engine'];
-    state.missions.completed.push({ id: 'mission-005', status: MissionStatus.COMPLETED });
+    state.missions.completed.push(makeCompletedStub('mission-005'));
     const parts = getUnlockedParts(state);
     expect(parts).toContain('starter-engine');
     expect(parts).toContain('parachute-mk2');
@@ -1494,8 +1500,8 @@ describe('Catalog (10): getUnlockedParts returns correct part IDs after catalog 
 // ---------------------------------------------------------------------------
 
 describe('Mission lifecycle integration', () => {
-  let state;
-  let cleanup;
+  let state: GameState;
+  let cleanup: (() => void) | null;
 
   beforeEach(() => {
     state = freshState();
@@ -1568,7 +1574,7 @@ describe('processFlightReturn() — multi-mission completion', () => {
   it('@smoke completes two missions when all objectives are met and credits both rewards', () => {
     const state = freshState();
     // Zero out any starting loan so interest doesn't affect the assertion.
-    state.loan = { balance: 0, interestRate: 0 };
+    state.loan = { balance: 0, interestRate: 0, totalInterestAccrued: 0 };
 
     // Seed two accepted missions with completed objectives.
     const def1 = makeMissionDef({
@@ -1604,7 +1610,7 @@ describe('processFlightReturn() — multi-mission completion', () => {
 
   it('completes only missions whose objectives are all met', () => {
     const state = freshState();
-    state.loan = { balance: 0, interestRate: 0 };
+    state.loan = { balance: 0, interestRate: 0, totalInterestAccrued: 0 };
 
     const def1 = makeMissionDef({
       id: 'pr-done',
@@ -1658,11 +1664,11 @@ describe('checkObjectiveCompletion() — only accepted missions', () => {
     });
 
     // Place the mission directly in the completed bucket.
-    state.missions.completed.push({
-      ...def,
+    const completedInstance: MissionInstance = {
+      ...makeCompletedStub(def.id),
       objectives: def.objectives.map((o) => ({ ...o })),
-      status: MissionStatus.COMPLETED,
-    });
+    };
+    state.missions.completed.push(completedInstance);
 
     // FlightState that would normally satisfy the objective.
     const fs = makeFlightState('already-done', { altitude: 500 });
@@ -1670,7 +1676,7 @@ describe('checkObjectiveCompletion() — only accepted missions', () => {
     checkObjectiveCompletion(state, fs);
 
     // The completed mission's objective should remain untouched.
-    expect(state.missions.completed[0].objectives[0].completed).toBe(false);
+    expect(state.missions.completed[0].objectives![0].completed).toBe(false);
   });
 });
 
@@ -1686,7 +1692,7 @@ describe('Bonus objectives: mission completes with only required objectives', ()
 
     // Complete required objectives (speed 150 + altitude 500) but not bonus.
     checkObjectiveCompletion(state, makeFlightState('mission-001', { velocity: 150, altitude: 500 }));
-    const objs = state.missions.accepted[0].objectives;
+    const objs = state.missions.accepted[0].objectives!;
     expect(objs[0].completed).toBe(true); // speed
     expect(objs[1].completed).toBe(true); // altitude 500
     expect(objs[2].completed).toBe(false); // bonus altitude 1000
@@ -1704,7 +1710,7 @@ describe('Bonus objectives: mission completes with only required objectives', ()
 
     // Complete required + 1km bonus.
     checkObjectiveCompletion(state, makeFlightState('mission-001', { velocity: 150, altitude: 1000 }));
-    const objs = state.missions.accepted[0].objectives;
+    const objs = state.missions.accepted[0].objectives!;
     expect(objs[2].completed).toBe(true); // bonus 1km
     expect(objs[3].completed).toBe(false); // bonus landing — not triggered
 
@@ -1723,7 +1729,7 @@ describe('REACH_HORIZONTAL_SPEED objective type', () => {
     acceptMission(state, 'mission-004');
 
     checkObjectiveCompletion(state, makeFlightState('mission-004', { horizontalVelocity: 300 }));
-    const obj = state.missions.accepted[0].objectives[0];
+    const obj = state.missions.accepted[0].objectives![0];
     expect(obj.type).toBe(ObjectiveType.REACH_HORIZONTAL_SPEED);
     expect(obj.completed).toBe(true);
   });
@@ -1736,7 +1742,7 @@ describe('REACH_HORIZONTAL_SPEED objective type', () => {
     acceptMission(state, 'mission-004');
 
     checkObjectiveCompletion(state, makeFlightState('mission-004', { horizontalVelocity: 299 }));
-    expect(state.missions.accepted[0].objectives[0].completed).toBe(false);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(false);
   });
 });
 
@@ -1753,7 +1759,7 @@ describe('SAFE_LANDING with allowCrash', () => {
       events: [{ type: 'CRASH', time: 10, speed: 25, description: 'Crashed' }],
     });
     checkObjectiveCompletion(state, fs);
-    const landingObj = state.missions.accepted[0].objectives[1];
+    const landingObj = state.missions.accepted[0].objectives![1];
     expect(landingObj.completed).toBe(true);
   });
 
@@ -1768,7 +1774,7 @@ describe('SAFE_LANDING with allowCrash', () => {
       events: [{ type: 'CRASH', time: 10, speed: 35, description: 'Crashed hard' }],
     });
     checkObjectiveCompletion(state, fs);
-    expect(state.missions.accepted[0].objectives[1].completed).toBe(false);
+    expect(state.missions.accepted[0].objectives![1].completed).toBe(false);
   });
 
   it('SAFE_LANDING without allowCrash ignores CRASH events', () => {
@@ -1782,7 +1788,7 @@ describe('SAFE_LANDING with allowCrash', () => {
       events: [{ type: 'CRASH', time: 10, speed: 5, description: 'Soft crash' }],
     });
     checkObjectiveCompletion(state, fs);
-    const landingObj = state.missions.accepted[0].objectives[3]; // bonus safe landing
+    const landingObj = state.missions.accepted[0].objectives![3]; // bonus safe landing
     expect(landingObj.completed).toBe(false);
   });
 });
@@ -1792,8 +1798,8 @@ describe('Mission chain: dependency fixes', () => {
     const state = freshState();
     // Complete missions 001, 004 — mission 007 should NOT be available.
     state.missions.completed = [
-      { id: 'mission-001', status: MissionStatus.COMPLETED },
-      { id: 'mission-004', status: MissionStatus.COMPLETED },
+      makeCompletedStub('mission-001'),
+      makeCompletedStub('mission-004'),
     ];
     const unlocked = getUnlockedMissions(state);
     const ids = unlocked.map((m) => m.id);
@@ -1804,9 +1810,9 @@ describe('Mission chain: dependency fixes', () => {
   it('mission-007 unlocks after mission-006 is completed', () => {
     const state = freshState();
     state.missions.completed = [
-      { id: 'mission-001', status: MissionStatus.COMPLETED },
-      { id: 'mission-004', status: MissionStatus.COMPLETED },
-      { id: 'mission-006', status: MissionStatus.COMPLETED },
+      makeCompletedStub('mission-001'),
+      makeCompletedStub('mission-004'),
+      makeCompletedStub('mission-006'),
     ];
     const unlocked = getUnlockedMissions(state);
     expect(unlocked.map((m) => m.id)).toContain('mission-007');
@@ -1815,8 +1821,8 @@ describe('Mission chain: dependency fixes', () => {
   it('mission-018 requires mission-009 (not mission-004)', () => {
     const state = freshState();
     state.missions.completed = [
-      { id: 'mission-001', status: MissionStatus.COMPLETED },
-      { id: 'mission-004', status: MissionStatus.COMPLETED },
+      makeCompletedStub('mission-001'),
+      makeCompletedStub('mission-004'),
     ];
     const unlocked = getUnlockedMissions(state);
     expect(unlocked.map((m) => m.id)).not.toContain('mission-018');
@@ -1825,11 +1831,11 @@ describe('Mission chain: dependency fixes', () => {
   it('mission-018 unlocks after mission-009 is completed', () => {
     const state = freshState();
     state.missions.completed = [
-      { id: 'mission-001', status: MissionStatus.COMPLETED },
-      { id: 'mission-004', status: MissionStatus.COMPLETED },
-      { id: 'mission-006', status: MissionStatus.COMPLETED },
-      { id: 'mission-007', status: MissionStatus.COMPLETED },
-      { id: 'mission-009', status: MissionStatus.COMPLETED },
+      makeCompletedStub('mission-001'),
+      makeCompletedStub('mission-004'),
+      makeCompletedStub('mission-006'),
+      makeCompletedStub('mission-007'),
+      makeCompletedStub('mission-009'),
     ];
     const unlocked = getUnlockedMissions(state);
     expect(unlocked.map((m) => m.id)).toContain('mission-018');

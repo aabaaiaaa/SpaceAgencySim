@@ -1,21 +1,3 @@
-// @ts-nocheck
-/**
- * manoeuvre.test.js — Unit tests for the orbital manoeuvre system (TASK-024).
- *
- * Tests cover:
- *   Orbit recalculation      — elements update after state vector changes
- *   Orbital burn detection    — isOrbitalBurnActive in various control modes
- *   Transfer delta-v          — Earth→Moon and Moon→Earth Hohmann transfers
- *   Transfer targets          — target list generation
- *   SOI transitions           — escape and child-body entry detection
- *   Escape trajectory         — specific energy check
- *   Gravity assist            — turn angle and delta-v computation
- *   Manoeuvre phase logic     — shouldEnterManoeuvre / shouldExitManoeuvre
- *   Transfer phase logic      — shouldEnterTransfer
- *   Route planning            — transfer route computation
- *   Formatting helpers        — time and delta-v display strings
- */
-
 import { describe, it, expect } from 'vitest';
 import {
   recalculateOrbit,
@@ -45,15 +27,25 @@ import {
   ControlMode,
 } from '../core/constants.ts';
 import { circularOrbitVelocity } from '../core/orbit.ts';
+import type { PhysicsState } from '../core/physics.ts';
+import type { FlightState } from '../core/gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Create a minimal PhysicsState-like object for testing.
- */
-function makePs(overrides = {}) {
+interface MinimalPs {
+  posX: number;
+  posY: number;
+  velX: number;
+  velY: number;
+  angle: number;
+  throttle: number;
+  firingEngines: Set<string>;
+  controlMode: string;
+}
+
+function makePs(overrides: Partial<MinimalPs> = {}): PhysicsState {
   return {
     posX: 0,
     posY: 150_000,                   // 150 km altitude (LEO)
@@ -61,16 +53,23 @@ function makePs(overrides = {}) {
     velY: 0,
     angle: 0,
     throttle: 0,
-    firingEngines: new Set(),
+    firingEngines: new Set<string>(),
     controlMode: ControlMode.NORMAL,
     ...overrides,
-  };
+  } as PhysicsState;
 }
 
-/**
- * Create a minimal FlightState-like object for testing.
- */
-function makeFlightState(overrides = {}) {
+interface MinimalFlightState {
+  phase: string;
+  bodyId: string;
+  timeElapsed: number;
+  inOrbit: boolean;
+  orbitalElements: null;
+  phaseLog: unknown[];
+  events: unknown[];
+}
+
+function makeFlightState(overrides: Partial<MinimalFlightState> = {}): FlightState {
   return {
     phase: FlightPhase.ORBIT,
     bodyId: CelestialBody.EARTH,
@@ -80,7 +79,7 @@ function makeFlightState(overrides = {}) {
     phaseLog: [],
     events: [],
     ...overrides,
-  };
+  } as FlightState;
 }
 
 // ---------------------------------------------------------------------------
@@ -119,8 +118,8 @@ describe('Manoeuvre — recalculateOrbit', () => {
     const elements = recalculateOrbit(ps, CelestialBody.EARTH, 0);
 
     expect(elements).not.toBeNull();
-    expect(elements.semiMajorAxis).toBeGreaterThan(BODY_RADIUS.EARTH);
-    expect(elements.eccentricity).toBeLessThan(0.01);
+    expect(elements!.semiMajorAxis).toBeGreaterThan(BODY_RADIUS.EARTH);
+    expect(elements!.eccentricity).toBeLessThan(0.01);
   });
 
   it('returns null for escape trajectory', () => {
@@ -183,27 +182,27 @@ describe('Manoeuvre — computeTransferDeltaV', () => {
   it('@smoke computes Earth → Moon transfer with reasonable delta-v', () => {
     const result = computeTransferDeltaV(CelestialBody.EARTH, CelestialBody.MOON, 150_000);
     expect(result).not.toBeNull();
-    expect(result.departureDV).toBeGreaterThan(2000);   // ~3.1 km/s departure
-    expect(result.departureDV).toBeLessThan(5000);
-    expect(result.captureDV).toBeGreaterThan(100);
-    expect(result.totalDV).toBeGreaterThan(result.departureDV);
-    expect(result.transferTime).toBeGreaterThan(100_000);  // ~5 days
-    expect(result.transferTime).toBeLessThan(1_000_000);
+    expect(result!.departureDV).toBeGreaterThan(2000);   // ~3.1 km/s departure
+    expect(result!.departureDV).toBeLessThan(5000);
+    expect(result!.captureDV).toBeGreaterThan(100);
+    expect(result!.totalDV).toBeGreaterThan(result!.departureDV);
+    expect(result!.transferTime).toBeGreaterThan(100_000);  // ~5 days
+    expect(result!.transferTime).toBeLessThan(1_000_000);
   });
 
   it('computes Moon → Earth transfer with reasonable delta-v', () => {
     const result = computeTransferDeltaV(CelestialBody.MOON, CelestialBody.EARTH, 50_000);
     expect(result).not.toBeNull();
-    expect(result.departureDV).toBeGreaterThan(500);
-    expect(result.totalDV).toBeGreaterThan(result.departureDV);
-    expect(result.transferTime).toBeGreaterThan(100_000);
+    expect(result!.departureDV).toBeGreaterThan(500);
+    expect(result!.totalDV).toBeGreaterThan(result!.departureDV);
+    expect(result!.transferTime).toBeGreaterThan(100_000);
   });
 
   it('departure delta-v decreases with higher orbit altitude', () => {
     const lowOrbit = computeTransferDeltaV(CelestialBody.EARTH, CelestialBody.MOON, 150_000);
     const highOrbit = computeTransferDeltaV(CelestialBody.EARTH, CelestialBody.MOON, 2_000_000);
     // Higher orbit means less energy needed to reach Moon.
-    expect(highOrbit.departureDV).toBeLessThan(lowOrbit.departureDV);
+    expect(highOrbit!.departureDV).toBeLessThan(lowOrbit!.departureDV);
   });
 
   // ── Extended body pair transfers (TASK-041) ────────────────────────
@@ -211,56 +210,56 @@ describe('Manoeuvre — computeTransferDeltaV', () => {
   it('computes Earth → Mars sibling transfer', () => {
     const result = computeTransferDeltaV(CelestialBody.EARTH, CelestialBody.MARS, 150_000);
     expect(result).not.toBeNull();
-    expect(result.departureDV).toBeGreaterThan(3000);   // ~3.6 km/s escape + Hohmann
-    expect(result.departureDV).toBeLessThan(15000);
-    expect(result.captureDV).toBeGreaterThan(500);
-    expect(result.transferTime).toBeGreaterThan(10_000_000); // ~8 months
+    expect(result!.departureDV).toBeGreaterThan(3000);   // ~3.6 km/s escape + Hohmann
+    expect(result!.departureDV).toBeLessThan(15000);
+    expect(result!.captureDV).toBeGreaterThan(500);
+    expect(result!.transferTime).toBeGreaterThan(10_000_000); // ~8 months
   });
 
   it('computes Mars → Earth sibling transfer', () => {
     const result = computeTransferDeltaV(CelestialBody.MARS, CelestialBody.EARTH, 100_000);
     expect(result).not.toBeNull();
-    expect(result.departureDV).toBeGreaterThan(2000);
-    expect(result.totalDV).toBeGreaterThan(result.departureDV);
+    expect(result!.departureDV).toBeGreaterThan(2000);
+    expect(result!.totalDV).toBeGreaterThan(result!.departureDV);
   });
 
   it('computes Mars → Phobos parent-to-child transfer', () => {
     const result = computeTransferDeltaV(CelestialBody.MARS, CelestialBody.PHOBOS, 100_000);
     expect(result).not.toBeNull();
-    expect(result.departureDV).toBeGreaterThan(0);
-    expect(result.transferTime).toBeGreaterThan(0);
+    expect(result!.departureDV).toBeGreaterThan(0);
+    expect(result!.transferTime).toBeGreaterThan(0);
   });
 
   it('computes Phobos → Mars child-to-parent transfer', () => {
     const result = computeTransferDeltaV(CelestialBody.PHOBOS, CelestialBody.MARS, 2_000);
     expect(result).not.toBeNull();
-    expect(result.departureDV).toBeGreaterThan(0);
+    expect(result!.departureDV).toBeGreaterThan(0);
   });
 
   it('computes Moon → Mars deep-to-shallow transfer', () => {
     const result = computeTransferDeltaV(CelestialBody.MOON, CelestialBody.MARS, 50_000);
     expect(result).not.toBeNull();
-    expect(result.departureDV).toBeGreaterThan(3000);  // Escape Moon + Earth + Hohmann
-    expect(result.transferTime).toBeGreaterThan(10_000_000);
+    expect(result!.departureDV).toBeGreaterThan(3000);  // Escape Moon + Earth + Hohmann
+    expect(result!.transferTime).toBeGreaterThan(10_000_000);
   });
 
   it('computes Earth → Phobos shallow-to-deep transfer', () => {
     const result = computeTransferDeltaV(CelestialBody.EARTH, CelestialBody.PHOBOS, 150_000);
     expect(result).not.toBeNull();
-    expect(result.departureDV).toBeGreaterThan(3000);
-    expect(result.totalDV).toBeGreaterThan(result.departureDV);
+    expect(result!.departureDV).toBeGreaterThan(3000);
+    expect(result!.totalDV).toBeGreaterThan(result!.departureDV);
   });
 
   it('computes Earth → Venus sibling transfer', () => {
     const result = computeTransferDeltaV(CelestialBody.EARTH, CelestialBody.VENUS, 150_000);
     expect(result).not.toBeNull();
-    expect(result.departureDV).toBeGreaterThan(3000);
+    expect(result!.departureDV).toBeGreaterThan(3000);
   });
 
   it('computes Earth → Mercury sibling transfer', () => {
     const result = computeTransferDeltaV(CelestialBody.EARTH, CelestialBody.MERCURY, 150_000);
     expect(result).not.toBeNull();
-    expect(result.departureDV).toBeGreaterThan(3000);
+    expect(result!.departureDV).toBeGreaterThan(3000);
   });
 
   it('returns null for Sun as either endpoint', () => {
@@ -277,7 +276,7 @@ describe('Manoeuvre — computeTransferDeltaV', () => {
   it('returns consistent totalDV = departureDV + captureDV', () => {
     const result = computeTransferDeltaV(CelestialBody.EARTH, CelestialBody.MARS, 150_000);
     expect(result).not.toBeNull();
-    expect(result.totalDV).toBe(result.departureDV + result.captureDV);
+    expect(result!.totalDV).toBe(result!.departureDV + result!.captureDV);
   });
 });
 
@@ -535,12 +534,12 @@ describe('Manoeuvre — computeTransferRoute', () => {
       CelestialBody.EARTH, CelestialBody.MOON, 150_000, null,
     );
     expect(route).not.toBeNull();
-    expect(route.fromBodyId).toBe(CelestialBody.EARTH);
-    expect(route.toBodyId).toBe(CelestialBody.MOON);
-    expect(route.departureDV).toBeGreaterThan(0);
-    expect(route.burnDirection).toBe('PROGRADE');
-    expect(route.burnPoint).toBe('periapsis');
-    expect(route.transferPath.length).toBeGreaterThan(0);
+    expect(route!.fromBodyId).toBe(CelestialBody.EARTH);
+    expect(route!.toBodyId).toBe(CelestialBody.MOON);
+    expect(route!.departureDV).toBeGreaterThan(0);
+    expect(route!.burnDirection).toBe('PROGRADE');
+    expect(route!.burnPoint).toBe('periapsis');
+    expect(route!.transferPath.length).toBeGreaterThan(0);
   });
 
   it('returns a route for Moon → Earth', () => {
@@ -548,8 +547,8 @@ describe('Manoeuvre — computeTransferRoute', () => {
       CelestialBody.MOON, CelestialBody.EARTH, 50_000, null,
     );
     expect(route).not.toBeNull();
-    expect(route.burnDirection).toBe('RETROGRADE');
-    expect(route.transferPath.length).toBeGreaterThan(0);
+    expect(route!.burnDirection).toBe('RETROGRADE');
+    expect(route!.transferPath.length).toBeGreaterThan(0);
   });
 
   it('returns null for same body', () => {
@@ -564,9 +563,9 @@ describe('Manoeuvre — computeTransferRoute', () => {
       CelestialBody.EARTH, CelestialBody.MARS, 150_000, null,
     );
     expect(route).not.toBeNull();
-    expect(route.burnDirection).toBe('PROGRADE');
-    expect(route.transferPath.length).toBeGreaterThan(0);
-    expect(route.transferTime).toBeGreaterThan(10_000_000);
+    expect(route!.burnDirection).toBe('PROGRADE');
+    expect(route!.transferPath.length).toBeGreaterThan(0);
+    expect(route!.transferTime).toBeGreaterThan(10_000_000);
   });
 
   it('returns a route with assistInfo for interplanetary transfers', () => {
@@ -575,8 +574,8 @@ describe('Manoeuvre — computeTransferRoute', () => {
     );
     // assistInfo may be null if no intermediate bodies exist between Earth and Mars.
     // This just verifies the field is present.
-    if (route.assistInfo) {
-      expect(route.assistInfo.bodies).toBeInstanceOf(Array);
+    if (route!.assistInfo) {
+      expect(route!.assistInfo.bodies).toBeInstanceOf(Array);
     }
   });
 });

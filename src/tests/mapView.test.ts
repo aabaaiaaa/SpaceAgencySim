@@ -1,16 +1,3 @@
-// @ts-nocheck
-/**
- * mapView.test.js — Unit tests for the map view core logic (TASK-004).
- *
- * Tests cover:
- *   View radius computation   — zoom level presets produce sensible radii
- *   Orbit path generation     — correct number of points, closure
- *   Position helpers          — craft and object map positions
- *   Orbital thrust angles     — prograde/retrograde/radial directions
- *   Orbit predictions         — correct number and monotonic time values
- *   Availability check        — defaults to true when facilities not implemented
- */
-
 import { describe, it, expect } from 'vitest';
 import {
   MapZoom,
@@ -38,25 +25,21 @@ import {
 import { BODY_RADIUS, ALTITUDE_BANDS, FlightPhase } from '../core/constants.ts';
 import { computeOrbitalElements, circularOrbitVelocity } from '../core/orbit.ts';
 import { BODY_ORBIT_RADIUS, SOI_RADIUS } from '../core/manoeuvre.ts';
+import type { OrbitalElements, TransferState, GameState, FacilityState } from '../core/gameState.ts';
+import type { PhysicsState } from '../core/physics.ts';
+
+type MockPs = Pick<PhysicsState, 'posX' | 'posY' | 'velX' | 'velY' | 'angle'>;
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Create orbital elements for a circular orbit at a given altitude.
- */
-function circularOrbit(altitude, bodyId = 'EARTH') {
-  const R = BODY_RADIUS[bodyId];
+function circularOrbit(altitude: number, bodyId: string = 'EARTH'): OrbitalElements {
   const vCirc = circularOrbitVelocity(altitude, bodyId);
-  // Position at (0, altitude) with horizontal velocity → circular orbit.
-  return computeOrbitalElements(0, altitude, vCirc, 0, bodyId, 0);
+  return computeOrbitalElements(0, altitude, vCirc, 0, bodyId, 0)!;
 }
 
-/**
- * Create a minimal physics state mock.
- */
-function makeMockPs(posX, posY, velX, velY) {
+function makeMockPs(posX: number, posY: number, velX: number, velY: number): MockPs {
   return { posX, posY, velX, velY, angle: 0 };
 }
 
@@ -70,17 +53,17 @@ describe('getViewRadius', () => {
 
   it('ORBIT_DETAIL is larger than the body radius', () => {
     const elements = circularOrbit(150_000);
-    const vr = getViewRadius(MapZoom.ORBIT_DETAIL, bodyId, elements, null);
+    const vr = getViewRadius(MapZoom.ORBIT_DETAIL, bodyId, elements, null, null);
     expect(vr).toBeGreaterThan(R);
   });
 
   it('ORBIT_DETAIL without elements falls back to 1.5× body radius', () => {
-    const vr = getViewRadius(MapZoom.ORBIT_DETAIL, bodyId, null, null);
+    const vr = getViewRadius(MapZoom.ORBIT_DETAIL, bodyId, null, null, null);
     expect(vr).toBeCloseTo(R * 1.5, -3);
   });
 
   it('LOCAL_BODY encompasses the highest altitude band', () => {
-    const vr = getViewRadius(MapZoom.LOCAL_BODY, bodyId, null, null);
+    const vr = getViewRadius(MapZoom.LOCAL_BODY, bodyId, null, null, null);
     const maxBand = ALTITUDE_BANDS[bodyId][ALTITUDE_BANDS[bodyId].length - 1];
     expect(vr).toBeGreaterThan(R + maxBand.max);
   });
@@ -88,19 +71,19 @@ describe('getViewRadius', () => {
   it('CRAFT_TO_TARGET is large enough to fit both orbits', () => {
     const craftEl  = circularOrbit(150_000);
     const targetEl = circularOrbit(500_000);
-    const vr = getViewRadius(MapZoom.CRAFT_TO_TARGET, bodyId, craftEl, targetEl);
+    const vr = getViewRadius(MapZoom.CRAFT_TO_TARGET, bodyId, craftEl, targetEl, null);
     expect(vr).toBeGreaterThan(R + 500_000);
   });
 
   it('CRAFT_TO_TARGET falls back to LOCAL_BODY when no target', () => {
     const craftEl = circularOrbit(150_000);
-    const vr = getViewRadius(MapZoom.CRAFT_TO_TARGET, bodyId, craftEl, null);
-    const localVr = getViewRadius(MapZoom.LOCAL_BODY, bodyId, craftEl, null);
+    const vr = getViewRadius(MapZoom.CRAFT_TO_TARGET, bodyId, craftEl, null, null);
+    const localVr = getViewRadius(MapZoom.LOCAL_BODY, bodyId, craftEl, null, null);
     expect(vr).toBe(localVr);
   });
 
   it('SOLAR_SYSTEM is much larger than the body', () => {
-    const vr = getViewRadius(MapZoom.SOLAR_SYSTEM, bodyId, null, null);
+    const vr = getViewRadius(MapZoom.SOLAR_SYSTEM, bodyId, null, null, null);
     expect(vr).toBeGreaterThan(R * 10);
   });
 });
@@ -246,15 +229,15 @@ describe('generateOrbitPredictions', () => {
 
 describe('isMapViewAvailable', () => {
   it('returns false when tracking station is not built', () => {
-    const state = { orbitalObjects: [], facilities: {} };
+    const state = { orbitalObjects: [], facilities: {} } as Partial<GameState> as GameState;
     expect(isMapViewAvailable(state)).toBe(false);
   });
 
   it('returns true when tracking station is built', () => {
     const state = {
       orbitalObjects: [],
-      facilities: { 'tracking-station': { built: true, tier: 1 } },
-    };
+      facilities: { 'tracking-station': { built: true, tier: 1 } as FacilityState },
+    } as Partial<GameState> as GameState;
     expect(isMapViewAvailable(state)).toBe(true);
   });
 });
@@ -266,7 +249,7 @@ describe('isMapViewAvailable', () => {
 describe('getViewRadius — transfer state branches', () => {
   const bodyId = 'EARTH';
 
-  function makeTransferState(origin, destination) {
+  function makeTransferState(origin: string, destination: string): TransferState {
     return {
       originBodyId: origin,
       destinationBodyId: destination,
@@ -334,34 +317,31 @@ describe('getViewRadius — transfer state branches', () => {
 // ---------------------------------------------------------------------------
 
 describe('generateTransferTrajectory', () => {
+  type TransferPs = Pick<PhysicsState, 'posX' | 'posY' | 'velX' | 'velY'>;
+
   it('returns at least the initial point', () => {
-    const ps = { posX: 0, posY: 100_000, velX: 7800, velY: 500 };
+    const ps: TransferPs = { posX: 0, posY: 100_000, velX: 7800, velY: 500 };
     const pts = generateTransferTrajectory(ps, 'EARTH', 60);
     expect(pts.length).toBeGreaterThanOrEqual(1);
   });
 
   it('first point is at the craft body-centred position', () => {
     const R = BODY_RADIUS.EARTH;
-    const ps = { posX: 1000, posY: 200_000, velX: 8000, velY: 100 };
+    const ps: TransferPs = { posX: 1000, posY: 200_000, velX: 8000, velY: 100 };
     const pts = generateTransferTrajectory(ps, 'EARTH', 30);
     expect(pts[0].x).toBe(1000);
     expect(pts[0].y).toBe(200_000 + R);
   });
 
   it('stops early if trajectory leaves SOI', () => {
-    // Start near the SOI boundary with high velocity to guarantee escape
-    // within the integration window (break condition is r > soiR * 1.1).
-    const ps = { posX: 0, posY: 910_000_000, velX: 50_000, velY: 50_000 };
+    const ps: TransferPs = { posX: 0, posY: 910_000_000, velX: 50_000, velY: 50_000 };
     const pts = generateTransferTrajectory(ps, 'EARTH', 200);
-    // Should stop well before 201 points (escaped SOI).
     expect(pts.length).toBeLessThan(201);
   });
 
   it('stops early if trajectory crashes into body', () => {
-    // Heading straight down at high speed.
-    const ps = { posX: 0, posY: 50_000, velX: 0, velY: -10_000 };
+    const ps: TransferPs = { posX: 0, posY: 50_000, velX: 0, velY: -10_000 };
     const pts = generateTransferTrajectory(ps, 'EARTH', 200);
-    // Should stop before completing all 200 points.
     expect(pts.length).toBeLessThan(201);
   });
 });
@@ -371,7 +351,7 @@ describe('generateTransferTrajectory', () => {
 // ---------------------------------------------------------------------------
 
 describe('getTransferProgressInfo', () => {
-  function makeTransferState(depTime, arrTime, origin, dest) {
+  function makeTransferState(depTime: number, arrTime: number, origin: string, dest: string): TransferState {
     return {
       originBodyId: origin,
       destinationBodyId: dest,
@@ -392,50 +372,50 @@ describe('getTransferProgressInfo', () => {
     const ts = makeTransferState(100, 200, 'EARTH', 'MARS');
     const info = getTransferProgressInfo(ts, 100);
     expect(info).not.toBeNull();
-    expect(info.progress).toBe(0);
+    expect(info!.progress).toBe(0);
   });
 
   it('returns progress 1 at arrival time', () => {
     const ts = makeTransferState(100, 200, 'EARTH', 'MARS');
-    const info = getTransferProgressInfo(ts, 200);
+    const info = getTransferProgressInfo(ts, 200)!;
     expect(info.progress).toBe(1);
   });
 
   it('returns progress 0.5 at midpoint', () => {
     const ts = makeTransferState(100, 300, 'EARTH', 'MARS');
-    const info = getTransferProgressInfo(ts, 200);
+    const info = getTransferProgressInfo(ts, 200)!;
     expect(info.progress).toBeCloseTo(0.5, 5);
   });
 
   it('clamps progress to 1 past arrival', () => {
     const ts = makeTransferState(100, 200, 'EARTH', 'MARS');
-    const info = getTransferProgressInfo(ts, 500);
+    const info = getTransferProgressInfo(ts, 500)!;
     expect(info.progress).toBe(1);
   });
 
   it('clamps progress to 0 before departure', () => {
     const ts = makeTransferState(100, 200, 'EARTH', 'MARS');
-    const info = getTransferProgressInfo(ts, 50);
+    const info = getTransferProgressInfo(ts, 50)!;
     expect(info.progress).toBe(0);
   });
 
   it('includes formatted destination and origin names', () => {
     const ts = makeTransferState(100, 200, 'EARTH', 'MARS');
-    const info = getTransferProgressInfo(ts, 150);
+    const info = getTransferProgressInfo(ts, 150)!;
     expect(info.destName).toBe('Mars');
     expect(info.originName).toBe('Earth');
   });
 
   it('includes formatted captureDV and etaStr', () => {
     const ts = makeTransferState(100, 200, 'EARTH', 'MARS');
-    const info = getTransferProgressInfo(ts, 150);
+    const info = getTransferProgressInfo(ts, 150)!;
     expect(typeof info.captureDV).toBe('string');
     expect(typeof info.etaStr).toBe('string');
   });
 
   it('handles zero total time gracefully (progress = 0)', () => {
     const ts = makeTransferState(100, 100, 'EARTH', 'MARS');
-    const info = getTransferProgressInfo(ts, 100);
+    const info = getTransferProgressInfo(ts, 100)!;
     expect(info.progress).toBe(0);
   });
 });
@@ -464,7 +444,7 @@ describe('getMapCelestialBodies', () => {
   });
 
   it('adds destination body during transfer if not already a child', () => {
-    const ts = {
+    const ts: TransferState = {
       originBodyId: 'EARTH',
       destinationBodyId: 'MARS',
       departureTime: 0,
@@ -481,7 +461,7 @@ describe('getMapCelestialBodies', () => {
   });
 
   it('does not duplicate destination if it is already a child', () => {
-    const ts = {
+    const ts: TransferState = {
       originBodyId: 'EARTH',
       destinationBodyId: 'MOON',
       departureTime: 0,
@@ -586,12 +566,12 @@ describe('getMapTransferTargets', () => {
 // ---------------------------------------------------------------------------
 
 describe('Tracking Station tier-based features', () => {
-  function makeState(tier) {
-    if (tier === 0) return { orbitalObjects: [], facilities: {} };
+  function makeState(tier: number): GameState {
+    if (tier === 0) return { orbitalObjects: [], facilities: {} } as Partial<GameState> as GameState;
     return {
       orbitalObjects: [],
-      facilities: { 'tracking-station': { built: true, tier } },
-    };
+      facilities: { 'tracking-station': { built: true, tier } as FacilityState },
+    } as Partial<GameState> as GameState;
   }
 
   it('getTrackingStationTier returns 0 when not built', () => {

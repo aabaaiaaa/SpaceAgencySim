@@ -1,20 +1,6 @@
-// @ts-nocheck
-/**
- * mccTiers.test.js — Unit tests for Mission Control Centre upgrade tiers (TASK-033).
- *
- * Tests cover:
- *   - MCC_TIER_FEATURES constant validation
- *   - CONTRACT_TIER_CAPS per tier (pool + active limits)
- *   - Contract template minMccTier annotations
- *   - Contract generation filtering by MCC tier
- *   - Tier 1 generates only basic contracts (minMccTier 1)
- *   - Tier 2 unlocks medium-difficulty contracts (minMccTier 2)
- *   - Tier 3 unlocks premium contracts and chains (minMccTier 3)
- *   - Upgrade definitions for MISSION_CONTROL in FACILITY_UPGRADE_DEFS
- */
-
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
+import type { GameState, MissionInstance } from '../core/gameState.ts';
 import {
   generateContracts,
   getMissionControlTier,
@@ -27,18 +13,17 @@ import {
   FACILITY_UPGRADE_DEFS,
 } from '../core/constants.ts';
 import { CONTRACT_TEMPLATES } from '../data/contracts.ts';
+import type { ContractTemplate } from '../data/contracts.ts';
 import { ObjectiveType } from '../data/missions.ts';
+
+type GeneratedContract = ReturnType<typeof generateContracts>[number];
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Create a game state with a specific MCC tier and enough completed missions
- * to reach the given progression tier.
- */
-function makeState(mccTier = 1, progressionMissions = 2) {
-  const state = createGameState();
+function makeState(mccTier: number = 1, progressionMissions: number = 2): GameState {
+  const state: GameState = createGameState();
   state.facilities[FacilityId.MISSION_CONTROL] = { built: true, tier: mccTier };
 
   // Populate completed missions for progression tier calculation.
@@ -49,7 +34,7 @@ function makeState(mccTier = 1, progressionMissions = 2) {
       title: `M${i + 1}`,
       objectives: [{ type: ObjectiveType.REACH_ALTITUDE, target: { altitude: 100 + i * 500 }, completed: true }],
       reward: 15000,
-    });
+    } as unknown as MissionInstance);
   }
 
   // Unlock science and satellite parts for templates that check these.
@@ -152,32 +137,32 @@ describe('Contract templates — minMccTier', () => {
   });
 
   it('basic templates (altitude-push, safe-recovery, budget-challenge) require MCC tier 1', () => {
-    const basicIds = ['altitude-push', 'safe-recovery', 'budget-challenge'];
+    const basicIds: string[] = ['altitude-push', 'safe-recovery', 'budget-challenge'];
     for (const id of basicIds) {
-      const t = CONTRACT_TEMPLATES.find(t => t.id === id);
+      const t: ContractTemplate | undefined = CONTRACT_TEMPLATES.find(t => t.id === id);
       expect(t, `Template ${id} not found`).toBeDefined();
-      expect(t.minMccTier).toBe(1);
+      expect(t!.minMccTier).toBe(1);
     }
   });
 
   it('medium templates (speed-push, crash-test, minimalist, etc.) require MCC tier 2', () => {
-    const mediumIds = ['speed-push', 'crash-test', 'minimalist', 'no-chute-recovery', 'science-survey'];
+    const mediumIds: string[] = ['speed-push', 'crash-test', 'minimalist', 'no-chute-recovery', 'science-survey'];
     for (const id of mediumIds) {
-      const t = CONTRACT_TEMPLATES.find(t => t.id === id);
+      const t: ContractTemplate | undefined = CONTRACT_TEMPLATES.find(t => t.id === id);
       expect(t, `Template ${id} not found`).toBeDefined();
-      expect(t.minMccTier).toBe(2);
+      expect(t!.minMccTier).toBe(2);
     }
   });
 
   it('premium/chain templates require MCC tier 3', () => {
-    const premiumIds = [
+    const premiumIds: string[] = [
       'science-chain', 'satellite-deploy', 'multi-satellite',
       'orbital-mission', 'orbital-satellite', 'crewed-orbital', 'budget-orbital',
     ];
     for (const id of premiumIds) {
-      const t = CONTRACT_TEMPLATES.find(t => t.id === id);
+      const t: ContractTemplate | undefined = CONTRACT_TEMPLATES.find(t => t.id === id);
       expect(t, `Template ${id} not found`).toBeDefined();
-      expect(t.minMccTier).toBe(3);
+      expect(t!.minMccTier).toBe(3);
     }
   });
 });
@@ -188,19 +173,19 @@ describe('Contract templates — minMccTier', () => {
 
 describe('generateContracts() — MCC tier filtering', () => {
   it('Tier 1: only generates contracts with minMccTier <= 1', () => {
-    const state = makeState(1, 4); // progression tier 2 (4 missions)
+    const state: GameState = makeState(1, 4); // progression tier 2 (4 missions)
     // Generate contracts many times to cover randomness.
-    const generated = [];
+    const generated: GeneratedContract[] = [];
     for (let i = 0; i < 20; i++) {
       state.contracts.board = [];
-      const result = generateContracts(state);
+      const result: GeneratedContract[] = generateContracts(state);
       generated.push(...result);
     }
 
     // All generated contracts should come from templates with minMccTier 1.
     // We check this indirectly: at MCC tier 1, no medium/premium templates
     // should appear (speed-push, crash-test, science-chain, etc.).
-    const tier1TemplateIds = new Set(
+    const tier1TemplateIds: Set<string> = new Set(
       CONTRACT_TEMPLATES.filter(t => t.minMccTier <= 1).map(t => t.id),
     );
 
@@ -210,7 +195,7 @@ describe('generateContracts() — MCC tier filtering', () => {
     // All generated contracts should have titles matching tier 1 templates.
     // Since we can't directly check template id on generated contracts,
     // verify no medium-difficulty-only contracts appear.
-    const hasMediumOnly = generated.some(c =>
+    const hasMediumOnly: boolean = generated.some(c =>
       c.title.startsWith('Speed Trial') ||
       c.title.startsWith('Impact Test') ||
       c.title.startsWith('Minimalist'),
@@ -219,11 +204,11 @@ describe('generateContracts() — MCC tier filtering', () => {
   });
 
   it('Tier 2: generates medium-difficulty contracts', () => {
-    const state = makeState(2, 4); // MCC tier 2, progression tier 2
-    const generated = [];
+    const state: GameState = makeState(2, 4); // MCC tier 2, progression tier 2
+    const generated: GeneratedContract[] = [];
     for (let i = 0; i < 30; i++) {
       state.contracts.board = [];
-      const result = generateContracts(state);
+      const result: GeneratedContract[] = generateContracts(state);
       generated.push(...result);
     }
 
@@ -231,7 +216,7 @@ describe('generateContracts() — MCC tier filtering', () => {
 
     // At MCC tier 2, medium-difficulty contracts should appear (speed, crash, minimalist).
     // Given enough iterations, at least one should show up.
-    const hasMedium = generated.some(c =>
+    const hasMedium: boolean = generated.some(c =>
       c.title.startsWith('Speed Trial') ||
       c.title.startsWith('Impact Test') ||
       c.title.startsWith('Minimalist') ||
@@ -240,7 +225,7 @@ describe('generateContracts() — MCC tier filtering', () => {
     expect(hasMedium).toBe(true);
 
     // But premium (tier 3) contracts should NOT appear.
-    const hasPremium = generated.some(c =>
+    const hasPremium: boolean = generated.some(c =>
       c.title.startsWith('Atmospheric Survey I') || // science-chain
       c.title.startsWith('Orbital Insertion') ||
       c.title.startsWith('Constellation'),
@@ -250,19 +235,19 @@ describe('generateContracts() — MCC tier filtering', () => {
 
   it('Tier 3: generates premium and chain contracts when progression allows', () => {
     // Need high progression (15+ missions) plus MCC tier 3 for orbital contracts.
-    const state = makeState(3, 16);
+    const state: GameState = makeState(3, 16);
     // Also need orbital capability for orbital templates.
     state.missions.completed.push({
       id: 'mission-orbital',
       title: 'Orbital',
       objectives: [{ type: ObjectiveType.REACH_ORBIT, target: { orbitAltitude: 80000, orbitalVelocity: 7800 }, completed: true }],
       reward: 200000,
-    });
+    } as unknown as MissionInstance);
 
-    const generated = [];
+    const generated: GeneratedContract[] = [];
     for (let i = 0; i < 40; i++) {
       state.contracts.board = [];
-      const result = generateContracts(state);
+      const result: GeneratedContract[] = generateContracts(state);
       generated.push(...result);
     }
 
@@ -270,7 +255,7 @@ describe('generateContracts() — MCC tier filtering', () => {
 
     // At tier 3 with high progression, premium contracts should be available.
     // Check for chain contracts or orbital contracts.
-    const hasPremium = generated.some(c =>
+    const hasPremium: boolean = generated.some(c =>
       c.chainId != null ||
       c.title.startsWith('Orbital Insertion') ||
       c.title.startsWith('Orbital Satellite') ||
@@ -281,22 +266,22 @@ describe('generateContracts() — MCC tier filtering', () => {
   });
 
   it('Tier 2 does not generate chain contracts', () => {
-    const state = makeState(2, 8); // MCC tier 2, high progression
-    const generated = [];
+    const state: GameState = makeState(2, 8); // MCC tier 2, high progression
+    const generated: GeneratedContract[] = [];
     for (let i = 0; i < 30; i++) {
       state.contracts.board = [];
-      const result = generateContracts(state);
+      const result: GeneratedContract[] = generateContracts(state);
       generated.push(...result);
     }
 
-    const hasChain = generated.some(c => c.chainId != null);
+    const hasChain: boolean = generated.some(c => c.chainId != null);
     expect(hasChain).toBe(false);
   });
 
   it('pool cap respects MCC tier', () => {
-    for (const tier of [1, 2, 3]) {
-      const state = makeState(tier, 4);
-      const caps = getContractCaps(state);
+    for (const tier of [1, 2, 3] as const) {
+      const state: GameState = makeState(tier, 4);
+      const caps: { pool: number; active: number } = getContractCaps(state);
       expect(caps.pool).toBe(CONTRACT_TIER_CAPS[tier].pool);
       expect(caps.active).toBe(CONTRACT_TIER_CAPS[tier].active);
     }
@@ -309,20 +294,21 @@ describe('generateContracts() — MCC tier filtering', () => {
 
 describe('getMissionControlTier() — tier values', () => {
   it('returns 1 for fresh state (MCC at default tier)', () => {
-    const state = createGameState();
+    const state: GameState = createGameState();
     expect(getMissionControlTier(state)).toBe(1);
   });
 
   it('returns the correct tier for each upgrade level', () => {
-    for (const tier of [1, 2, 3]) {
-      const state = createGameState();
+    for (const tier of [1, 2, 3] as const) {
+      const state: GameState = createGameState();
       state.facilities[FacilityId.MISSION_CONTROL] = { built: true, tier };
       expect(getMissionControlTier(state)).toBe(tier);
     }
   });
 
   it('returns 1 when facilities object is missing', () => {
-    const state = createGameState();
+    const state: GameState = createGameState();
+    // @ts-expect-error -- testing defensive handling of missing facilities
     delete state.facilities;
     state.facilities = {};
     expect(getMissionControlTier(state)).toBe(1);
