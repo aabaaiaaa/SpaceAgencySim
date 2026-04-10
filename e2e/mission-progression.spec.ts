@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import {
   VP_W, VP_H,
   CENTRE_X, CANVAS_CENTRE_Y,
@@ -22,12 +23,95 @@ import {
  */
 
 // ---------------------------------------------------------------------------
+// Browser-context interfaces (for page.evaluate / page.waitForFunction casts)
+// ---------------------------------------------------------------------------
+
+interface FlightPs {
+  posY: number;
+  velX: number;
+  velY: number;
+  grounded: boolean;
+  landed: boolean;
+  crashed: boolean;
+  firingEngines: Set<string>;
+}
+
+interface MissionObjective {
+  id: string;
+  type: string;
+  completed: boolean;
+  description: string;
+  target: Record<string, unknown>;
+}
+
+interface Mission {
+  id: string;
+  title: string;
+  objectives: MissionObjective[];
+  status: string;
+}
+
+interface GameWindow {
+  __flightPs?: FlightPs;
+  __gameState?: {
+    missions?: {
+      accepted?: Mission[];
+      completed?: Mission[];
+    };
+    parts?: string[];
+    currentFlight?: Record<string, unknown>;
+  };
+  __vabStagingConfig?: {
+    stages: { instanceIds: string[] }[];
+    unstaged: string[];
+  };
+  __vabAssembly?: {
+    parts: Map<string, { partId: string }>;
+  };
+  __testSetTimeWarp?: (speed: number) => void;
+}
+
+// ---------------------------------------------------------------------------
+// Mission template types
+// ---------------------------------------------------------------------------
+
+interface ObjectiveTemplate {
+  id: string;
+  type: string;
+  target: Record<string, unknown>;
+}
+
+interface MissionTemplate {
+  title: string;
+  objectives: ObjectiveTemplate[];
+  reward: number;
+  unlocksAfter: string[];
+  unlockedParts: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Crew member type
+// ---------------------------------------------------------------------------
+
+interface CrewMember {
+  id: string;
+  name: string;
+  hireDate: string;
+  status: string;
+  missionsFlown: number;
+  flightsFlown: number;
+  deathDate: string | null;
+  deathCause: string | null;
+  assignedRocketId: string | null;
+}
+
+// ---------------------------------------------------------------------------
 // Constants (domain-specific to this file)
 // ---------------------------------------------------------------------------
 
 const STARTING_MONEY = 10_000_000;
 
-const STARTER_PARTS = [
+const STARTER_PARTS: string[] = [
   'cmd-mk1', 'probe-core-mk1', 'tank-small', 'engine-spark',
   'parachute-mk1', 'decoupler-stack-tr18',
 ];
@@ -36,7 +120,14 @@ const STARTER_PARTS = [
 // Part snap-point geometry  (offset from centre, screen-space)
 // ---------------------------------------------------------------------------
 
-const GEO = {
+interface PartGeometry {
+  topY?: number;
+  botY?: number;
+  leftX?: number;
+  rightX?: number;
+}
+
+const GEO: Record<string, PartGeometry> = {
   'cmd-mk1':              { topY: -20, botY: 20,  leftX: -20, rightX: 20 },
   'probe-core-mk1':       { topY:  -5, botY:  5 },
   'tank-small':            { topY: -20, botY: 20,  leftX: -10, rightX: 10 },
@@ -62,12 +153,12 @@ const GEO = {
  * Compute screen-Y positions for a vertical stack of parts.
  * Parts are listed top-to-bottom.  The first part is placed at `anchorY`.
  */
-function stackYs(partIds, anchorY = CANVAS_CENTRE_Y) {
-  const ys = [anchorY];
+function stackYs(partIds: string[], anchorY: number = CANVAS_CENTRE_Y): number[] {
+  const ys: number[] = [anchorY];
   for (let i = 1; i < partIds.length; i++) {
     const prev = GEO[partIds[i - 1]];
     const curr = GEO[partIds[i]];
-    ys.push(ys[i - 1] + prev.botY - curr.topY);
+    ys.push(ys[i - 1] + prev.botY! - curr.topY!);
   }
   return ys;
 }
@@ -76,7 +167,7 @@ function stackYs(partIds, anchorY = CANVAS_CENTRE_Y) {
 // Mission objective templates  (compact — only the data needed for seeding)
 // ---------------------------------------------------------------------------
 
-const OBJ = {
+const OBJ: Record<string, MissionTemplate> = {
   'mission-001': {
     title: 'First Flight',
     objectives: [{ id: 'obj-001-1', type: 'REACH_ALTITUDE', target: { altitude: 100 } }],
@@ -187,10 +278,22 @@ const OBJ = {
 // Save-state builder
 // ---------------------------------------------------------------------------
 
+interface AcceptedMission {
+  id: string;
+  title: string;
+  description: string;
+  location: string;
+  objectives: { id: string; type: string; completed: boolean; description: string; target: Record<string, unknown> }[];
+  reward: number;
+  unlocksAfter: string[];
+  unlockedParts: string[];
+  status: string;
+}
+
 /**
  * Build an accepted mission object suitable for `state.missions.accepted`.
  */
-function acceptedMission(id) {
+function acceptedMission(id: string): AcceptedMission {
   const t = OBJ[id];
   return {
     id, title: t.title,
@@ -204,16 +307,48 @@ function acceptedMission(id) {
   };
 }
 
+interface BuildEnvelopeParams {
+  completedIds?: string[];
+  acceptedId: string;
+  parts: string[];
+  crew?: CrewMember[];
+}
+
+interface LocalSaveEnvelope {
+  saveName: string;
+  timestamp: string;
+  state: {
+    agencyName: string;
+    money: number;
+    loan: { balance: number; interestRate: number; totalInterestAccrued: number };
+    missions: {
+      available: unknown[];
+      accepted: AcceptedMission[];
+      completed: {
+        id: string;
+        title: string;
+        description: string;
+        location: string;
+        objectives: { id: string; type: string; completed: boolean; description: string; target: Record<string, unknown> }[];
+        reward: number;
+        unlocksAfter: string[];
+        unlockedParts: string[];
+        status: string;
+      }[];
+    };
+    crew: CrewMember[];
+    rockets: unknown[];
+    parts: string[];
+    flightHistory: unknown[];
+    playTimeSeconds: number;
+    currentFlight: null;
+  };
+}
+
 /**
  * Build a save-slot envelope to inject into localStorage.
- *
- * @param {object} opts
- * @param {string[]} opts.completedIds   - mission IDs already completed
- * @param {string}   opts.acceptedId     - mission to accept for this flight
- * @param {string[]} opts.parts          - unlocked part IDs
- * @param {object[]} [opts.crew]         - crew members
  */
-function buildEnvelope({ completedIds = [], acceptedId, parts, crew = [] }) {
+function buildEnvelope({ completedIds = [], acceptedId, parts, crew = [] }: BuildEnvelopeParams): LocalSaveEnvelope {
   return {
     saveName: 'Mission Progression E2E',
     timestamp: new Date().toISOString(),
@@ -244,7 +379,7 @@ function buildEnvelope({ completedIds = [], acceptedId, parts, crew = [] }) {
 }
 
 /** Minimal crew member for tests requiring crew. */
-function testCrew() {
+function testCrew(): CrewMember {
   return {
     id: 'test-pilot-1',
     name: 'Test Pilot',
@@ -262,7 +397,7 @@ function testCrew() {
 // Page interaction helpers
 // ---------------------------------------------------------------------------
 
-async function openStaging(page) {
+async function openStaging(page: Page): Promise<void> {
   const panel = page.locator('#vab-staging-panel');
   if (!await panel.isVisible()) {
     await page.click('#vab-btn-staging');
@@ -270,11 +405,11 @@ async function openStaging(page) {
   await expect(panel).toBeVisible({ timeout: 3_000 });
 }
 
-async function addStage(page) {
+async function addStage(page: Page): Promise<void> {
   await page.click('#vab-staging-add');
 }
 
-async function dragToStage(page, chipText, stageIdx) {
+async function dragToStage(page: Page, chipText: string, stageIdx: number): Promise<void> {
   await page.dragAndDrop(
     `[data-drop-zone="unstaged"] .vab-stage-chip:has-text("${chipText}")`,
     `[data-drop-zone="stage-${stageIdx}"]`,
@@ -284,14 +419,13 @@ async function dragToStage(page, chipText, stageIdx) {
 /**
  * Programmatically move an unstaged part to a stage (more reliable than drag-and-drop).
  * Creates intermediate stages if needed.
- * @param {string} partId  Part definition ID (e.g. 'parachute-mk1')
- * @param {number} stageIdx  Target stage index (0-based)
  */
-async function stagePartFromUnstaged(page, partId, stageIdx) {
-  await page.evaluate(({ partId, stageIdx }) => {
-    const config = window.__vabStagingConfig;
-    const assembly = window.__vabAssembly;
-    const idx = config.unstaged.findIndex(instanceId => {
+async function stagePartFromUnstaged(page: Page, partId: string, stageIdx: number): Promise<void> {
+  await page.evaluate(({ partId, stageIdx }: { partId: string; stageIdx: number }): void => {
+    const w = window as unknown as GameWindow;
+    const config = w.__vabStagingConfig!;
+    const assembly = w.__vabAssembly!;
+    const idx = config.unstaged.findIndex((instanceId: string) => {
       const placed = assembly.parts.get(instanceId);
       return placed?.partId === partId;
     });
@@ -307,12 +441,13 @@ async function stagePartFromUnstaged(page, partId, stageIdx) {
 /**
  * Move a part from one stage to another.
  */
-async function movePartBetweenStages(page, partId, fromStageIdx, toStageIdx) {
-  await page.evaluate(({ partId, fromStageIdx, toStageIdx }) => {
-    const config = window.__vabStagingConfig;
-    const assembly = window.__vabAssembly;
+async function movePartBetweenStages(page: Page, partId: string, fromStageIdx: number, toStageIdx: number): Promise<void> {
+  await page.evaluate(({ partId, fromStageIdx, toStageIdx }: { partId: string; fromStageIdx: number; toStageIdx: number }): void => {
+    const w = window as unknown as GameWindow;
+    const config = w.__vabStagingConfig!;
+    const assembly = w.__vabAssembly!;
     const stage = config.stages[fromStageIdx];
-    const idx = stage.instanceIds.findIndex(instanceId => {
+    const idx = stage.instanceIds.findIndex((instanceId: string) => {
       const placed = assembly.parts.get(instanceId);
       return placed?.partId === partId;
     });
@@ -325,7 +460,7 @@ async function movePartBetweenStages(page, partId, fromStageIdx, toStageIdx) {
   }, { partId, fromStageIdx, toStageIdx });
 }
 
-async function launch(page, { selectCrew = false } = {}) {
+async function launch(page: Page, { selectCrew = false }: { selectCrew?: boolean } = {}): Promise<void> {
   const btn = page.locator('#vab-btn-launch');
   await expect(btn).not.toBeDisabled({ timeout: 5_000 });
   await btn.click();
@@ -338,13 +473,13 @@ async function launch(page, { selectCrew = false } = {}) {
   // Wait for flight.
   await page.waitForSelector('#flight-hud', { state: 'visible', timeout: 15_000 });
   await page.waitForFunction(
-    () => window.__flightPs != null,
+    (): boolean => (window as unknown as GameWindow).__flightPs != null,
     { timeout: 10_000 },
   );
 }
 
 /** Launch from a rocket with probe core (no crew dialog). */
-async function launchProbe(page) {
+async function launchProbe(page: Page): Promise<void> {
   const btn = page.locator('#vab-btn-launch');
   await expect(btn).not.toBeDisabled({ timeout: 5_000 });
   await btn.click();
@@ -354,43 +489,49 @@ async function launchProbe(page) {
   const crewOverlay = page.locator('#vab-crew-overlay');
   const flightHud   = page.locator('#flight-hud');
   const which = await Promise.race([
-    crewOverlay.waitFor({ state: 'visible', timeout: 10_000 }).then(() => 'crew'),
-    flightHud.waitFor({ state: 'visible', timeout: 10_000 }).then(() => 'flight'),
+    crewOverlay.waitFor({ state: 'visible', timeout: 10_000 }).then(() => 'crew' as const),
+    flightHud.waitFor({ state: 'visible', timeout: 10_000 }).then(() => 'flight' as const),
   ]);
   if (which === 'crew') {
     await page.click('#vab-crew-confirm');
     await page.waitForSelector('#flight-hud', { state: 'visible', timeout: 15_000 });
   }
-  await page.waitForFunction(() => window.__flightPs != null, { timeout: 10_000 });
-}
-
-async function stage(page) {
-  await page.keyboard.press('Space');
-}
-
-async function waitWarpUnlocked(page) {
   await page.waitForFunction(
-    () => !document.querySelector('.hud-warp-btn')?.disabled,
+    (): boolean => (window as unknown as GameWindow).__flightPs != null,
     { timeout: 10_000 },
   );
 }
 
-async function setWarp(page, factor) {
-  await waitWarpUnlocked(page);
-  await page.evaluate((f) => window.__testSetTimeWarp?.(f), factor);
+async function stage(page: Page): Promise<void> {
+  await page.keyboard.press('Space');
 }
 
-async function waitAlt(page, m, timeout = 60_000) {
+async function waitWarpUnlocked(page: Page): Promise<void> {
   await page.waitForFunction(
-    alt => (window.__flightPs?.posY ?? 0) >= alt,
+    (): boolean => !(document.querySelector('.hud-warp-btn') as HTMLButtonElement | null)?.disabled,
+    { timeout: 10_000 },
+  );
+}
+
+async function setWarp(page: Page, factor: number): Promise<void> {
+  await waitWarpUnlocked(page);
+  await page.evaluate(
+    (f: number): void => { (window as unknown as GameWindow).__testSetTimeWarp?.(f); },
+    factor,
+  );
+}
+
+async function waitAlt(page: Page, m: number, timeout: number = 60_000): Promise<void> {
+  await page.waitForFunction(
+    (alt: number): boolean => ((window as unknown as GameWindow).__flightPs?.posY ?? 0) >= alt,
     m, { timeout },
   );
 }
 
-async function waitSpeed(page, s, timeout = 60_000) {
+async function waitSpeed(page: Page, s: number, timeout: number = 60_000): Promise<void> {
   await page.waitForFunction(
-    spd => {
-      const ps = window.__flightPs;
+    (spd: number): boolean => {
+      const ps = (window as unknown as GameWindow).__flightPs;
       if (!ps) return false;
       return Math.hypot(ps.velX, ps.velY) >= spd;
     },
@@ -398,28 +539,31 @@ async function waitSpeed(page, s, timeout = 60_000) {
   );
 }
 
-async function waitLanded(page, timeout = 60_000) {
+async function waitLanded(page: Page, timeout: number = 60_000): Promise<void> {
   await page.waitForFunction(
-    () => window.__flightPs?.landed === true || window.__flightPs?.crashed === true,
+    (): boolean => {
+      const ps = (window as unknown as GameWindow).__flightPs;
+      return ps?.landed === true || ps?.crashed === true;
+    },
     { timeout },
   );
 }
 
-async function waitOrbit(page, alt, vel, timeout = 180_000) {
+async function waitOrbit(page: Page, alt: number, vel: number, timeout: number = 180_000): Promise<void> {
   await page.waitForFunction(
-    ([a, v]) => {
-      const ps = window.__flightPs;
+    ([a, v]: [number, number]): boolean => {
+      const ps = (window as unknown as GameWindow).__flightPs;
       if (!ps) return false;
       return ps.posY >= a && Math.hypot(ps.velX, ps.velY) >= v;
     },
-    [alt, vel], { timeout },
+    [alt, vel] as [number, number], { timeout },
   );
 }
 
-async function waitObjectivesComplete(page, missionId, timeout = 120_000) {
+async function waitObjectivesComplete(page: Page, missionId: string, timeout: number = 120_000): Promise<void> {
   await page.waitForFunction(
-    id => {
-      const state = window.__gameState;
+    (id: string): boolean => {
+      const state = (window as unknown as GameWindow).__gameState;
       const m = state?.missions?.accepted?.find(x => x.id === id);
       return m?.objectives?.every(o => o.completed) ?? false;
     },
@@ -427,7 +571,7 @@ async function waitObjectivesComplete(page, missionId, timeout = 120_000) {
   );
 }
 
-async function returnToHub(page) {
+async function returnToHub(page: Page): Promise<void> {
   // If we're already at the hub (e.g. after triggerReturnViaMenu aborted),
   // just dismiss any overlays and return.
   const alreadyAtHub = await page.locator('#hub-overlay').isVisible().catch(() => false);
@@ -440,10 +584,10 @@ async function returnToHub(page) {
     const hub = page.locator('#hub-overlay');
 
     const which = await Promise.race([
-      orbitReturn.waitFor({ state: 'visible', timeout: 60_000 }).then(() => 'orbit'),
-      abortBtn.waitFor({ state: 'visible', timeout: 60_000 }).then(() => 'abort'),
-      summary.waitFor({ state: 'visible', timeout: 60_000 }).then(() => 'summary'),
-      hub.waitFor({ state: 'visible', timeout: 60_000 }).then(() => 'hub'),
+      orbitReturn.waitFor({ state: 'visible', timeout: 60_000 }).then(() => 'orbit' as const),
+      abortBtn.waitFor({ state: 'visible', timeout: 60_000 }).then(() => 'abort' as const),
+      summary.waitFor({ state: 'visible', timeout: 60_000 }).then(() => 'summary' as const),
+      hub.waitFor({ state: 'visible', timeout: 60_000 }).then(() => 'hub' as const),
     ]);
 
     if (which === 'orbit') {
@@ -486,7 +630,7 @@ async function returnToHub(page) {
  * Needed for probe-core rockets that land safely — the auto-trigger only
  * fires when crashed or all COMMAND_MODULE parts are destroyed.
  */
-async function triggerReturnViaMenu(page) {
+async function triggerReturnViaMenu(page: Page): Promise<void> {
   await page.click('#topbar-menu-btn', { force: true });
   const dropdown = page.locator('#topbar-dropdown');
   await expect(dropdown).toBeVisible({ timeout: 5_000 });
@@ -500,23 +644,23 @@ async function triggerReturnViaMenu(page) {
   }
 }
 
-async function expectCompleted(page, missionId) {
+async function expectCompleted(page: Page, missionId: string): Promise<void> {
   const ok = await page.evaluate(
-    id => window.__gameState?.missions?.completed?.some(m => m.id === id) ?? false,
+    (id: string): boolean => (window as unknown as GameWindow).__gameState?.missions?.completed?.some(m => m.id === id) ?? false,
     missionId,
   );
   expect(ok).toBe(true);
 }
 
-async function expectPartUnlocked(page, partId) {
+async function expectPartUnlocked(page: Page, partId: string): Promise<void> {
   const ok = await page.evaluate(
-    id => window.__gameState?.parts?.includes(id) ?? false,
+    (id: string): boolean => (window as unknown as GameWindow).__gameState?.parts?.includes(id) ?? false,
     partId,
   );
   expect(ok).toBe(true);
 }
 
-async function expectPartInVab(page, partId) {
+async function expectPartInVab(page: Page, partId: string): Promise<void> {
   await navigateToVab(page);
   await expect(
     page.locator(`.vab-part-card[data-part-id="${partId}"]`),
@@ -531,7 +675,7 @@ async function expectPartInVab(page, partId) {
  * Build a vertical stack of parts in the VAB.
  * `parts` are listed top-to-bottom.  The first part is placed at anchorY.
  */
-async function buildStack(page, parts, anchorY = CANVAS_CENTRE_Y) {
+async function buildStack(page: Page, parts: string[], anchorY: number = CANVAS_CENTRE_Y): Promise<void> {
   const ys = stackYs(parts, anchorY);
   for (let i = 0; i < parts.length; i++) {
     await placePart(page, parts[i], CENTRE_X, ys[i], i + 1);
@@ -540,14 +684,11 @@ async function buildStack(page, parts, anchorY = CANVAS_CENTRE_Y) {
 
 /**
  * Place a radial part on the LEFT side of a parent part.
- * @param parentPartId  Part ID of the parent (must already be placed)
- * @param radialPartId  Part ID of the radial part to attach
- * @param parentY       Screen Y of the parent part's centre
  */
-async function placeRadialLeft(page, radialPartId, parentPartId, parentY) {
+async function placeRadialLeft(page: Page, radialPartId: string, parentPartId: string, parentY: number): Promise<void> {
   const parent = GEO[parentPartId];
   const child  = GEO[radialPartId];
-  const x = CENTRE_X + parent.leftX - child.rightX;
+  const x = CENTRE_X + parent.leftX! - child.rightX!;
   await dragPartToCanvas(page, radialPartId, x, parentY);
 }
 
@@ -571,7 +712,7 @@ test.describe('Mission Progression', () => {
       parts: STARTER_PARTS,
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    await seedAndLoadSave(page, env);
+    await seedAndLoadSave(page, env as unknown as Record<string, unknown>);
 
     await startTestFlight(page, ['cmd-mk1', 'tank-small', 'engine-spark']);
     await stage(page);
@@ -593,7 +734,7 @@ test.describe('Mission Progression', () => {
       parts: [...STARTER_PARTS, 'tank-medium'],
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    await seedAndLoadSave(page, env);
+    await seedAndLoadSave(page, env as unknown as Record<string, unknown>);
 
     await startTestFlight(page, ['cmd-mk1', 'tank-medium', 'engine-spark']);
     await stage(page);
@@ -618,7 +759,7 @@ test.describe('Mission Progression', () => {
       parts: STARTER_PARTS,
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    await seedAndLoadSave(page, env);
+    await seedAndLoadSave(page, env as unknown as Record<string, unknown>);
 
     // Use probe-core for a lighter rocket. Without landing legs, the physics
     // engine requires ≤5 m/s for a LANDING event. Terminal velocity with mk1
@@ -639,7 +780,7 @@ test.describe('Mission Progression', () => {
     // Dry mass 250kg → terminal velocity with mk1 chute ≈ 4.12 m/s ≤ 5 m/s.
     await waitAlt(page, 50); // confirm engine is firing
     await page.waitForFunction(
-      () => window.__flightPs?.firingEngines?.size === 0,
+      (): boolean => (window as unknown as GameWindow).__flightPs?.firingEngines?.size === 0,
       { timeout: 30_000 },
     );
 
@@ -671,7 +812,7 @@ test.describe('Mission Progression', () => {
       parts: STARTER_PARTS,
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    await seedAndLoadSave(page, env);
+    await seedAndLoadSave(page, env as unknown as Record<string, unknown>);
 
     // Use probe-core for lighter rocket: wet 720kg, dry 320kg — both under
     // parachute-mk1 maxSafeMass 1200kg. Terminal velocity ≈ 4.7 m/s < 5 m/s.
@@ -689,7 +830,7 @@ test.describe('Mission Progression', () => {
     // Without legs, the physics engine crashes rockets landing > 5 m/s.
     await waitAlt(page, 50); // confirm engine is firing
     await page.waitForFunction(
-      () => window.__flightPs?.firingEngines?.size === 0,
+      (): boolean => (window as unknown as GameWindow).__flightPs?.firingEngines?.size === 0,
       { timeout: 30_000 },
     );
 
@@ -718,7 +859,7 @@ test.describe('Mission Progression', () => {
       parts: [...STARTER_PARTS, 'landing-legs-small'],
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    await seedAndLoadSave(page, env);
+    await seedAndLoadSave(page, env as unknown as Record<string, unknown>);
 
     // Use probe-core for lighter rocket. With 2 deployed legs AND speed < 10
     // the physics uses Case 1 (controlled landing). Terminal velocity at dry
@@ -767,7 +908,7 @@ test.describe('Mission Progression', () => {
       parts: [...STARTER_PARTS, 'science-module-mk1', 'tank-medium'],
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    await seedAndLoadSave(page, env);
+    await seedAndLoadSave(page, env as unknown as Record<string, unknown>);
 
     // Build: cmd-mk1 + science-module-mk1 + tank-medium + engine-spark
     await startTestFlight(page, ['cmd-mk1', 'science-module-mk1', 'tank-medium', 'engine-spark'], {
@@ -798,7 +939,7 @@ test.describe('Mission Progression', () => {
       parts: [...STARTER_PARTS, 'probe-core-mk1', 'cmd-mk1'],
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    await seedAndLoadSave(page, env);
+    await seedAndLoadSave(page, env as unknown as Record<string, unknown>);
 
     // Uncrewed test: probe-core + cmd-mk1 (for ejector seat) + tank + engine
     await startTestFlight(page, ['cmd-mk1', 'probe-core-mk1', 'tank-small', 'engine-spark'], {
@@ -838,7 +979,7 @@ test.describe('Mission Progression', () => {
       parts: [...STARTER_PARTS, 'science-module-mk1', 'tank-medium', 'parachute-mk2'],
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    await seedAndLoadSave(page, env);
+    await seedAndLoadSave(page, env as unknown as Record<string, unknown>);
 
     // probe-core (50) + parachute-mk2 (250) + science-module (200) + tank-small (50+400)
     // + engine-spark (120) = 1070kg wet.  Terminal velocity under mk2 chute
@@ -880,9 +1021,9 @@ test.describe('Mission Progression', () => {
     // Playwright round-trip takes longer than at 100× warp the rocket needs
     // to traverse the 400m band).
     await page.waitForFunction(
-      () => {
-        const ps = window.__flightPs;
-        return ps && ps.posY <= 1400 && ps.velY <= 0;
+      (): boolean => {
+        const ps = (window as unknown as GameWindow).__flightPs;
+        return ps != null && ps.posY <= 1400 && ps.velY <= 0;
       },
       { timeout: 60_000 },
     );
@@ -890,7 +1031,7 @@ test.describe('Mission Progression', () => {
 
     // Wait until we descend into the altitude band (≤ 1200m).
     await page.waitForFunction(
-      () => (window.__flightPs?.posY ?? Infinity) <= 1200,
+      (): boolean => ((window as unknown as GameWindow).__flightPs?.posY ?? Infinity) <= 1200,
       { timeout: 30_000 },
     );
 
@@ -909,10 +1050,10 @@ test.describe('Mission Progression', () => {
 
     // Wait for HOLD_ALTITUDE objective completion.
     await page.waitForFunction(
-      id => {
-        const state = window.__gameState;
+      (id: string): boolean => {
+        const state = (window as unknown as GameWindow).__gameState;
         const m = state?.missions?.accepted?.find(x => x.id === id);
-        return m?.objectives?.find(o => o.type === 'HOLD_ALTITUDE')?.completed;
+        return m?.objectives?.find(o => o.type === 'HOLD_ALTITUDE')?.completed ?? false;
       },
       'mission-010',
       { timeout: 90_000 },
@@ -941,7 +1082,7 @@ test.describe('Mission Progression', () => {
       parts: [...STARTER_PARTS, 'probe-core-mk1', 'cmd-mk1'],
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    await seedAndLoadSave(page, env);
+    await seedAndLoadSave(page, env as unknown as Record<string, unknown>);
 
     // Uncrewed test: probe-core + cmd-mk1 (for ejector seat) + tank + engine
     await startTestFlight(page, ['cmd-mk1', 'probe-core-mk1', 'tank-small', 'engine-spark'], {
@@ -960,9 +1101,9 @@ test.describe('Mission Progression', () => {
 
     // Wait until descending past ~150m, then eject at ≥100m.
     await page.waitForFunction(
-      () => {
-        const ps = window.__flightPs;
-        return ps && ps.velY < 0 && ps.posY < 250 && ps.posY > 100;
+      (): boolean => {
+        const ps = (window as unknown as GameWindow).__flightPs;
+        return ps != null && ps.velY < 0 && ps.posY < 250 && ps.posY > 100;
       },
       { timeout: 20_000 },
     );
@@ -984,7 +1125,7 @@ test.describe('Mission Progression', () => {
       parts: [...STARTER_PARTS, 'tank-medium'],
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    await seedAndLoadSave(page, env);
+    await seedAndLoadSave(page, env as unknown as Record<string, unknown>);
 
     // Two-stage rocket: use a simple probe + tank + engine and teleport
     // to 2km, then stage the decoupler to complete the ACTIVATE_PART objective.
@@ -1034,7 +1175,7 @@ test.describe('Mission Progression', () => {
       parts: [...STARTER_PARTS, 'tank-medium'],
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    await seedAndLoadSave(page, env);
+    await seedAndLoadSave(page, env as unknown as Record<string, unknown>);
 
     await startTestFlight(page, [
       'probe-core-mk1', 'tank-medium', 'engine-spark',
@@ -1067,7 +1208,7 @@ test.describe('Mission Progression', () => {
       parts: [...STARTER_PARTS, 'tank-medium', 'engine-reliant'],
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    await seedAndLoadSave(page, env);
+    await seedAndLoadSave(page, env as unknown as Record<string, unknown>);
 
     await startTestFlight(page, [
       'probe-core-mk1', 'tank-medium', 'engine-reliant',
@@ -1104,7 +1245,7 @@ test.describe('Mission Progression', () => {
       ],
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    await seedAndLoadSave(page, env);
+    await seedAndLoadSave(page, env as unknown as Record<string, unknown>);
 
     // Use startTestFlight to skip the slow VAB build.
     // Staging: stage-0 = reliant, stage-1 = decoupler + nerv, stage-2 = decoupler (satellite release).
@@ -1129,9 +1270,9 @@ test.describe('Mission Progression', () => {
     await teleportCraft(page, { posX: 0, posY: 82_000, velX: 8000, velY: 0, orbit: true });
 
     // Wait for REACH_ORBIT objective.
-    await page.waitForFunction(() => {
-      const m = window.__gameState?.missions?.accepted?.find(x => x.id === 'mission-015');
-      return m?.objectives?.find(o => o.type === 'REACH_ORBIT')?.completed;
+    await page.waitForFunction((): boolean => {
+      const m = (window as unknown as GameWindow).__gameState?.missions?.accepted?.find(x => x.id === 'mission-015');
+      return m?.objectives?.find(o => o.type === 'REACH_ORBIT')?.completed ?? false;
     }, { timeout: 15_000 });
 
     // Re-teleport to maintain altitude for satellite release (>80km required).
@@ -1163,7 +1304,7 @@ test.describe('Mission Progression', () => {
       parts: [...STARTER_PARTS, 'tank-medium', 'engine-reliant', 'engine-nerv'],
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    await seedAndLoadSave(page, env);
+    await seedAndLoadSave(page, env as unknown as Record<string, unknown>);
 
     await startTestFlight(page, [
       'probe-core-mk1', 'tank-medium', 'tank-medium', 'engine-nerv',
@@ -1182,9 +1323,9 @@ test.describe('Mission Progression', () => {
     await teleportCraft(page, { posX: 0, posY: 82_000, velX: 8000, velY: 0, orbit: true });
 
     // Wait for objectives.
-    await page.waitForFunction(() => {
-      const m = window.__gameState?.missions?.accepted?.find(x => x.id === 'mission-016');
-      return m?.objectives?.every(o => o.completed);
+    await page.waitForFunction((): boolean => {
+      const m = (window as unknown as GameWindow).__gameState?.missions?.accepted?.find(x => x.id === 'mission-016');
+      return m?.objectives?.every(o => o.completed) ?? false;
     }, { timeout: 15_000 });
 
     // Return via menu.
@@ -1212,7 +1353,7 @@ test.describe('Mission Progression', () => {
       ],
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    await seedAndLoadSave(page, env);
+    await seedAndLoadSave(page, env as unknown as Record<string, unknown>);
 
     // Use startTestFlight to skip the slow VAB build.
     await startTestFlight(page, [
@@ -1236,9 +1377,9 @@ test.describe('Mission Progression', () => {
     await teleportCraft(page, { posX: 0, posY: 82_000, velX: 8000, velY: 0, orbit: true });
 
     // Wait for REACH_ORBIT objective.
-    await page.waitForFunction(() => {
-      const m = window.__gameState?.missions?.accepted?.find(x => x.id === 'mission-017');
-      return m?.objectives?.find(o => o.type === 'REACH_ORBIT')?.completed;
+    await page.waitForFunction((): boolean => {
+      const m = (window as unknown as GameWindow).__gameState?.missions?.accepted?.find(x => x.id === 'mission-017');
+      return m?.objectives?.find(o => o.type === 'REACH_ORBIT')?.completed ?? false;
     }, { timeout: 15_000 });
 
     // Re-teleport to maintain altitude for satellite release (>80km required).

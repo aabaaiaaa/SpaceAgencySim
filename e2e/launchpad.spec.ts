@@ -24,18 +24,54 @@ import {
  */
 
 // ---------------------------------------------------------------------------
+// Browser-context window shape for page.evaluate() callbacks.
+//
+// Defined as a local interface (not `declare global`) to avoid conflicting
+// with the narrower Window augmentations in the helper modules. Inside
+// evaluate callbacks we cast: `const w = window as unknown as GameWindow;`
+// ---------------------------------------------------------------------------
+
+interface GameWindow {
+  __flightPs?: Record<string, unknown>;
+  __gameState?: {
+    currentFlight?: { rocketId: string };
+    money?: number;
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const AGENCY_NAME = 'LP Test Agency';
+const AGENCY_NAME: string = 'LP Test Agency';
 
 // Unlocked parts needed for the seeded rocket design.
-const UNLOCKED_PARTS = ['cmd-mk1', 'tank-small', 'engine-spark'];
+const UNLOCKED_PARTS: string[] = ['cmd-mk1', 'tank-small', 'engine-spark'];
+
+// ---------------------------------------------------------------------------
+// Seeded design types
+// ---------------------------------------------------------------------------
+
+interface DesignPart {
+  partId: string;
+  position: { x: number; y: number };
+}
+
+interface RocketDesign {
+  id: string;
+  name: string;
+  parts: DesignPart[];
+  staging: { stages: string[][]; unstaged: string[] };
+  totalMass: number;
+  totalThrust: number;
+  createdDate: string;
+  updatedDate: string;
+}
 
 // A rocket design mirroring the format produced by VAB _doLaunch().
 // Three parts: cmd-mk1, tank-small, engine-spark stacked vertically.
 // Parts are ordered so reconstruction produces inst-1, inst-2, inst-3.
-const SEEDED_DESIGN = {
+const SEEDED_DESIGN: RocketDesign = {
   id:          'design-lp-test',
   name:        'Test Rocket Alpha',
   parts: [
@@ -56,13 +92,13 @@ const SEEDED_DESIGN = {
 };
 
 /** Build a save-slot envelope for launchpad tests. */
-function lpSaveEnvelope(rockets = []) {
+function lpSaveEnvelope(rockets: RocketDesign[] = []): ReturnType<typeof buildSaveEnvelope> {
   return buildSaveEnvelope({
     saveName: 'LP E2E Test',
     agencyName: AGENCY_NAME,
     missions: { available: [], accepted: [{ ...FIRST_FLIGHT_MISSION, status: 'accepted' }], completed: [] },
     parts: UNLOCKED_PARTS,
-    rockets,
+    rockets: rockets as unknown as Record<string, unknown>[],
   });
 }
 
@@ -72,12 +108,12 @@ function lpSaveEnvelope(rockets = []) {
 
 test.describe('Launch Pad', () => {
 
-  // ── (1) Launch pad shows saved rocket designs ───────────────────────────
+  // -- (1) Launch pad shows saved rocket designs -----------------------------
 
   test('(1) launch pad displays previously launched rocket designs', async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     // Seed a save with one rocket design.
-    await page.addInitScript(({ key, envelope }) => {
+    await page.addInitScript(({ key, envelope }: { key: string; envelope: ReturnType<typeof buildSaveEnvelope> }) => {
       localStorage.setItem(key, JSON.stringify(envelope));
     }, { key: SAVE_KEY, envelope: lpSaveEnvelope([SEEDED_DESIGN]) });
 
@@ -118,12 +154,12 @@ test.describe('Launch Pad', () => {
     await expect(launchBtn).not.toBeDisabled();
   });
 
-  // ── (2) Launch pad shows empty state when no rockets exist ──────────────
+  // -- (2) Launch pad shows empty state when no rockets exist ----------------
 
   test('(2) launch pad shows empty state when no rockets exist', async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     // Seed a save with NO rocket designs (overwrite the previous seed).
-    await page.addInitScript(({ key, envelope }) => {
+    await page.addInitScript(({ key, envelope }: { key: string; envelope: ReturnType<typeof buildSaveEnvelope> }) => {
       localStorage.setItem(key, JSON.stringify(envelope));
     }, { key: SAVE_KEY, envelope: lpSaveEnvelope([]) });
 
@@ -147,12 +183,12 @@ test.describe('Launch Pad', () => {
     await expect(page.locator('.lp-rocket-card')).toHaveCount(0);
   });
 
-  // ── (3) Clicking Launch starts the flight scene from the launch pad ─────
+  // -- (3) Clicking Launch starts the flight scene from the launch pad -------
 
   test('(3) clicking Launch on a design starts the flight scene', async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     // Seed a save with the test rocket design.
-    await page.addInitScript(({ key, envelope }) => {
+    await page.addInitScript(({ key, envelope }: { key: string; envelope: ReturnType<typeof buildSaveEnvelope> }) => {
       localStorage.setItem(key, JSON.stringify(envelope));
     }, { key: SAVE_KEY, envelope: lpSaveEnvelope([SEEDED_DESIGN]) });
 
@@ -168,7 +204,7 @@ test.describe('Launch Pad', () => {
     await page.waitForSelector('#launch-pad-overlay', { state: 'visible', timeout: 10_000 });
 
     // Click Launch on the rocket card.
-    // cmd-mk1 has 1 seat → a crew dialog will appear.
+    // cmd-mk1 has 1 seat -> a crew dialog will appear.
     await page.click('.lp-launch-btn');
 
     // The crew dialog should appear (cmd-mk1 has a crew seat).
@@ -186,29 +222,36 @@ test.describe('Launch Pad', () => {
 
     // Verify the physics state is exposed (flight is active).
     await page.waitForFunction(
-      () => typeof window.__flightPs !== 'undefined',
+      (): boolean =>
+        typeof (window as unknown as GameWindow).__flightPs !== 'undefined',
       { timeout: 5_000 },
     );
 
     // Verify currentFlight references the design we launched.
-    const rocketId = await page.evaluate(() => window.__gameState?.currentFlight?.rocketId);
+    const rocketId: string | undefined = await page.evaluate(
+      (): string | undefined =>
+        (window as unknown as GameWindow).__gameState?.currentFlight?.rocketId,
+    );
     expect(rocketId).toBe('design-lp-test');
 
     // Verify the launch cost was deducted from the player's money.
     // Cost = $14,800 (cmd-mk1 $8,000 + tank-small $800 + engine-spark $6,000).
-    const money = await page.evaluate(() => window.__gameState?.money);
+    const money: number | undefined = await page.evaluate(
+      (): number | undefined =>
+        (window as unknown as GameWindow).__gameState?.money,
+    );
     expect(money).toBe(STARTING_MONEY - 14_800);
   });
 
-  // ── (4) Launch button disabled when player can't afford the rocket ──────
+  // -- (4) Launch button disabled when player can't afford the rocket --------
 
   test('(4) launch button is disabled when player cannot afford the rocket', async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     // Seed a save with very low money — not enough to cover the $14,800 cost.
-    const poorEnvelope = lpSaveEnvelope([SEEDED_DESIGN]);
+    const poorEnvelope: ReturnType<typeof buildSaveEnvelope> = lpSaveEnvelope([SEEDED_DESIGN]);
     poorEnvelope.state.money = 5_000;
 
-    await page.addInitScript(({ key, envelope }) => {
+    await page.addInitScript(({ key, envelope }: { key: string; envelope: ReturnType<typeof buildSaveEnvelope> }) => {
       localStorage.setItem(key, JSON.stringify(envelope));
     }, { key: SAVE_KEY, envelope: poorEnvelope });
 

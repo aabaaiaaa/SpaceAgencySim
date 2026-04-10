@@ -16,6 +16,7 @@ interface StartFlightOptions {
   bodyId?: string;
   malfunctionMode?: string;
   instruments?: Record<string, string[]>;
+  staging?: Array<{ partIds: string[] }>;
 }
 
 interface TeleportOptions {

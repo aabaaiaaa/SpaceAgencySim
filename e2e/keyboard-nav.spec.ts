@@ -31,7 +31,7 @@ test.describe('Keyboard Navigation', () => {
     await expect(tutorialOption).toBeFocused();
 
     // Verify focus ring is visible via computed outline style.
-    const outlineStyle = await tutorialOption.evaluate((el) => {
+    const outlineStyle: string = await tutorialOption.evaluate((el: Element): string => {
       return window.getComputedStyle(el).outlineStyle;
     });
     expect(outlineStyle).not.toBe('none');
@@ -50,9 +50,9 @@ test.describe('Keyboard Navigation', () => {
     // Tab through to the Start button and activate it.
     // Continue tabbing until we reach the start button.
     // After sandbox option → sandbox checkboxes → Start button.
-    for (let i = 0; i < 10; i++) {
+    for (let i: number = 0; i < 10; i++) {
       await page.keyboard.press('Tab');
-      const focused = await page.evaluate(() => document.activeElement?.id);
+      const focused: string | undefined = await page.evaluate((): string | undefined => document.activeElement?.id);
       if (focused === 'mm-start-btn') break;
     }
 
@@ -83,10 +83,10 @@ test.describe('Keyboard Navigation', () => {
     await dismissWelcomeModal(page);
 
     // Tab repeatedly until we land on a hub building (topbar buttons come first).
-    let foundBuilding = false;
-    for (let i = 0; i < 15; i++) {
+    let foundBuilding: boolean = false;
+    for (let i: number = 0; i < 15; i++) {
       await page.keyboard.press('Tab');
-      const isBuilding = await page.evaluate(() =>
+      const isBuilding: boolean = await page.evaluate((): boolean =>
         document.activeElement?.classList.contains('hub-building') ?? false
       );
       if (isBuilding) {
@@ -97,22 +97,22 @@ test.describe('Keyboard Navigation', () => {
     expect(foundBuilding).toBe(true);
 
     // Verify the focused building matches :focus-visible (keyboard focus ring is active).
-    const matchesFocusVisible = await page.evaluate(() =>
+    const matchesFocusVisible: boolean = await page.evaluate((): boolean =>
       document.activeElement?.matches(':focus-visible') ?? false
     );
     expect(matchesFocusVisible).toBe(true);
 
     // Tab through multiple buildings and collect IDs.
-    const buildingIds = [];
+    const buildingIds: string[] = [];
     // Record the current one first.
-    const firstId = await page.evaluate(() =>
+    const firstId: string | null = await page.evaluate((): string | null =>
       document.activeElement?.getAttribute('data-building-id') || null
     );
     if (firstId) buildingIds.push(firstId);
 
-    for (let i = 0; i < 8; i++) {
+    for (let i: number = 0; i < 8; i++) {
       await page.keyboard.press('Tab');
-      const id = await page.evaluate(() =>
+      const id: string | null = await page.evaluate((): string | null =>
         document.activeElement?.getAttribute('data-building-id') || null
       );
       if (id && !buildingIds.includes(id)) buildingIds.push(id);
@@ -181,10 +181,10 @@ test.describe('Keyboard Navigation', () => {
 
     // Tab through settings options — they should be focusable buttons.
     // Tab repeatedly until we land on a settings option button.
-    let foundSettingsBtn = false;
-    for (let i = 0; i < 20; i++) {
+    let foundSettingsBtn: boolean = false;
+    for (let i: number = 0; i < 20; i++) {
       await page.keyboard.press('Tab');
-      const isSettingsBtn = await page.evaluate(() =>
+      const isSettingsBtn: boolean = await page.evaluate((): boolean =>
         document.activeElement?.classList.contains('settings-option-btn') ?? false
       );
       if (isSettingsBtn) {
@@ -195,8 +195,8 @@ test.describe('Keyboard Navigation', () => {
     expect(foundSettingsBtn).toBe(true);
 
     // Verify focus ring is visible on the focused settings button.
-    const outlineStyle = await page.evaluate(() => {
-      const el = document.activeElement;
+    const outlineStyle: string = await page.evaluate((): string => {
+      const el: Element | null = document.activeElement;
       if (!el) return 'none';
       return window.getComputedStyle(el).outlineStyle;
     });
@@ -223,10 +223,10 @@ test.describe('Keyboard Navigation', () => {
     await navigateToVab(page);
 
     // Tab through toolbar buttons — collect focused element IDs.
-    const focusedIds = [];
-    for (let i = 0; i < 20; i++) {
+    const focusedIds: string[] = [];
+    for (let i: number = 0; i < 20; i++) {
       await page.keyboard.press('Tab');
-      const id = await page.evaluate(() => document.activeElement?.id || null);
+      const id: string | null = await page.evaluate((): string | null => document.activeElement?.id || null);
       if (id && !focusedIds.includes(id)) focusedIds.push(id);
     }
 
@@ -234,16 +234,16 @@ test.describe('Keyboard Navigation', () => {
     expect(focusedIds.length).toBeGreaterThanOrEqual(3);
 
     // At least one toolbar button should be among the focused elements.
-    const hasToolbarBtn = focusedIds.some((id) =>
+    const hasToolbarBtn: boolean = focusedIds.some((id: string): boolean =>
       id.startsWith('vab-btn-') || id.startsWith('vab-back')
     );
     expect(hasToolbarBtn).toBe(true);
 
     // Tab into the parts panel — part cards should be focusable.
-    let foundPartCard = false;
-    for (let i = 0; i < 30; i++) {
+    let foundPartCard: boolean = false;
+    for (let i: number = 0; i < 30; i++) {
       await page.keyboard.press('Tab');
-      const isPartCard = await page.evaluate(() =>
+      const isPartCard: boolean = await page.evaluate((): boolean =>
         document.activeElement?.classList.contains('vab-part-card') ?? false
       );
       if (isPartCard) {
@@ -254,7 +254,7 @@ test.describe('Keyboard Navigation', () => {
     expect(foundPartCard).toBe(true);
 
     // Verify the part card has :focus-visible.
-    const matchesFocusVisible = await page.evaluate(() =>
+    const matchesFocusVisible: boolean = await page.evaluate((): boolean =>
       document.activeElement?.matches(':focus-visible') ?? false
     );
     expect(matchesFocusVisible).toBe(true);
@@ -282,10 +282,10 @@ test.describe('Keyboard Navigation', () => {
     });
 
     // Tab through — should reach a tab button.
-    let foundMcTab = false;
-    for (let i = 0; i < 20; i++) {
+    let foundMcTab: boolean = false;
+    for (let i: number = 0; i < 20; i++) {
       await page.keyboard.press('Tab');
-      const isMcTab = await page.evaluate(() =>
+      const isMcTab: boolean = await page.evaluate((): boolean =>
         document.activeElement?.classList.contains('mc-tab') ?? false
       );
       if (isMcTab) {
@@ -296,23 +296,23 @@ test.describe('Keyboard Navigation', () => {
     expect(foundMcTab).toBe(true);
 
     // Verify focus ring is active on the tab.
-    const matchesFocusVisible = await page.evaluate(() =>
+    const matchesFocusVisible: boolean = await page.evaluate((): boolean =>
       document.activeElement?.matches(':focus-visible') ?? false
     );
     expect(matchesFocusVisible).toBe(true);
 
     // Tab further and collect more focused mc-tab buttons.
-    const tabLabels = [];
-    const firstLabel = await page.evaluate(() => document.activeElement?.textContent || null);
+    const tabLabels: string[] = [];
+    const firstLabel: string | null = await page.evaluate((): string | null => document.activeElement?.textContent || null);
     if (firstLabel) tabLabels.push(firstLabel);
 
-    for (let i = 0; i < 10; i++) {
+    for (let i: number = 0; i < 10; i++) {
       await page.keyboard.press('Tab');
-      const isMcTab = await page.evaluate(() =>
+      const isMcTab: boolean = await page.evaluate((): boolean =>
         document.activeElement?.classList.contains('mc-tab') ?? false
       );
       if (isMcTab) {
-        const label = await page.evaluate(() => document.activeElement?.textContent || null);
+        const label: string | null = await page.evaluate((): string | null => document.activeElement?.textContent || null);
         if (label && !tabLabels.includes(label)) tabLabels.push(label);
       }
     }

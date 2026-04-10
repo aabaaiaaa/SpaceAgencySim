@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import {
   VP_W, VP_H,
   FIRST_FLIGHT_MISSION, buildSaveEnvelope,
@@ -13,10 +14,45 @@ import {
  */
 
 // ---------------------------------------------------------------------------
+// Browser-context type aliases (used with type assertions inside page.evaluate)
+//
+// These describe the runtime shapes of globals injected by the game.
+// Defined as a local interface (not `declare global`) to avoid conflicting
+// with the narrower Window augmentations in the helper modules. Inside
+// evaluate callbacks we cast: `(window as unknown as GameWindow)`
+// ---------------------------------------------------------------------------
+
+interface FlightPs {
+  posY: number;
+  grounded: boolean;
+  landed: boolean;
+  crashed: boolean;
+  debris: unknown[];
+  firingEngines: Set<string>;
+  activeParts: Set<string>;
+  parachuteStates: Map<string, { state: string }>;
+}
+
+interface FlightEvent {
+  type: string;
+  partsDestroyed: boolean;
+  speed: number;
+}
+
+interface GameWindow {
+  __flightPs?: FlightPs;
+  __gameState?: {
+    currentFlight?: {
+      events?: FlightEvent[];
+    };
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeEnvelope() {
+function makeEnvelope(): ReturnType<typeof buildSaveEnvelope> {
   return buildSaveEnvelope({
     saveName: 'Landing E2E Test',
     missions: { available: [], accepted: [{ ...FIRST_FLIGHT_MISSION, status: 'accepted' }], completed: [] },
@@ -24,8 +60,7 @@ function makeEnvelope() {
   });
 }
 
-/** Build the 5-part rocket programmatically and start flight. */
-async function buildAndLaunch(page) {
+async function buildAndLaunch(page: Page): Promise<void> {
   await page.setViewportSize({ width: VP_W, height: VP_H });
   await seedAndLoadSave(page, makeEnvelope());
   await startTestFlight(page,
@@ -37,38 +72,38 @@ async function buildAndLaunch(page) {
   );
 }
 
-async function waitForWarpUnlocked(page) {
+async function waitForWarpUnlocked(page: Page): Promise<void> {
   await page.waitForFunction(
-    () => !document.querySelector('.hud-warp-btn')?.disabled,
+    () => !(document.querySelector('.hud-warp-btn') as HTMLButtonElement | null)?.disabled,
     { timeout: 10_000 },
   );
 }
 
-/** Fire Stage 1 and wait for liftoff. */
-async function fireStage1(page) {
+async function fireStage1(page: Page): Promise<void> {
   await page.keyboard.press('Space');
   await page.waitForFunction(
-    () => (window.__flightPs?.posY ?? 0) > 0,
+    () => ((window as unknown as GameWindow).__flightPs?.posY ?? 0) > 0,
     { timeout: 3_000 },
   );
 }
 
-/** Wait for warp lockout, then fire Stage 2 (decoupler + parachute). */
-async function fireStage2(page) {
+async function fireStage2(page: Page): Promise<void> {
   await waitForWarpUnlocked(page);
   await page.keyboard.press('Space');
   await page.waitForFunction(
-    () => (window.__flightPs?.debris?.length ?? 0) > 0,
+    () => ((window as unknown as GameWindow).__flightPs?.debris?.length ?? 0) > 0,
     { timeout: 5_000 },
   );
 }
 
-/** Time warp and wait for landing. */
-async function waitForLanding(page) {
+async function waitForLanding(page: Page): Promise<void> {
   await waitForWarpUnlocked(page);
   await page.click('[data-warp="50"]');
   await page.waitForFunction(
-    () => window.__flightPs?.landed === true || window.__flightPs?.crashed === true,
+    () => {
+      const ps = (window as unknown as GameWindow).__flightPs;
+      return ps?.landed === true || ps?.crashed === true;
+    },
     { timeout: 30_000 },
   );
 }
@@ -90,9 +125,13 @@ test.describe('Flight — Landing', () => {
     test.setTimeout(120_000);
     await buildAndLaunch(page);
 
-    expect(await page.evaluate(() => window.__flightPs?.grounded ?? true)).toBe(true);
+    expect(await page.evaluate((): boolean =>
+      (window as unknown as GameWindow).__flightPs?.grounded ?? true,
+    )).toBe(true);
     await fireStage1(page);
-    expect(await page.evaluate(() => window.__flightPs?.posY ?? 0)).toBeGreaterThan(0);
+    expect(await page.evaluate((): number =>
+      (window as unknown as GameWindow).__flightPs?.posY ?? 0,
+    )).toBeGreaterThan(0);
   });
 
   test('(3) pressing Space again separates the lower stage and deploys the parachute', async ({ page }) => {
@@ -103,7 +142,7 @@ test.describe('Flight — Landing', () => {
 
     // Parachute should be deploying or deployed.
     await page.waitForFunction(() => {
-      const ps = window.__flightPs;
+      const ps = (window as unknown as GameWindow).__flightPs;
       if (!ps?.parachuteStates) return false;
       for (const [, entry] of ps.parachuteStates) {
         if (entry.state === 'deploying' || entry.state === 'deployed') return true;
@@ -111,16 +150,16 @@ test.describe('Flight — Landing', () => {
       return false;
     }, { timeout: 5_000 });
 
-    const chuteState = await page.evaluate(() => {
-      const ps = window.__flightPs;
+    const chuteState: string = await page.evaluate((): string => {
+      const ps = (window as unknown as GameWindow).__flightPs;
       if (!ps?.parachuteStates) return 'none';
       for (const [, entry] of ps.parachuteStates) return entry.state;
       return 'none';
     });
     expect(['deploying', 'deployed']).toContain(chuteState);
 
-    const activeParts = await page.evaluate(
-      () => window.__flightPs?.activeParts?.size ?? -1,
+    const activeParts: number = await page.evaluate(
+      (): number => (window as unknown as GameWindow).__flightPs?.activeParts?.size ?? -1,
     );
     expect(activeParts).toBeLessThanOrEqual(3);
   });
@@ -132,9 +171,9 @@ test.describe('Flight — Landing', () => {
     await fireStage2(page);
     await waitForLanding(page);
 
-    const { landed, crashed } = await page.evaluate(() => ({
-      landed:  window.__flightPs?.landed  ?? false,
-      crashed: window.__flightPs?.crashed ?? false,
+    const { landed, crashed }: { landed: boolean; crashed: boolean } = await page.evaluate((): { landed: boolean; crashed: boolean } => ({
+      landed:  (window as unknown as GameWindow).__flightPs?.landed  ?? false,
+      crashed: (window as unknown as GameWindow).__flightPs?.crashed ?? false,
     }));
 
     expect(landed).toBe(true);
@@ -148,14 +187,14 @@ test.describe('Flight — Landing', () => {
     await fireStage2(page);
     await waitForLanding(page);
 
-    const events = await page.evaluate(
-      () => window.__gameState?.currentFlight?.events ?? [],
+    const events: FlightEvent[] = await page.evaluate(
+      (): FlightEvent[] => (window as unknown as GameWindow).__gameState?.currentFlight?.events ?? [],
     );
 
-    const landingEvent = events.find((e) => e.type === 'LANDING');
+    const landingEvent: FlightEvent | undefined = events.find((e) => e.type === 'LANDING');
     expect(landingEvent).toBeTruthy();
-    expect(landingEvent.partsDestroyed).toBe(false);
-    expect(landingEvent.speed).toBeLessThan(7);
+    expect(landingEvent!.partsDestroyed).toBe(false);
+    expect(landingEvent!.speed).toBeLessThan(7);
   });
 
   test('(6) clicking "Return to Space Agency" shows the post-flight summary', async ({ page }) => {
@@ -165,7 +204,7 @@ test.describe('Flight — Landing', () => {
     await fireStage2(page);
     await waitForLanding(page);
 
-    const summaryAlreadyVisible = await page.locator('#post-flight-summary').isVisible();
+    const summaryAlreadyVisible: boolean = await page.locator('#post-flight-summary').isVisible();
     if (!summaryAlreadyVisible) {
       await page.click('#topbar-menu-btn', { force: true });
       const dropdown = page.locator('#topbar-dropdown');

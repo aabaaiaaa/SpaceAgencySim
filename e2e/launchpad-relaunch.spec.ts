@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import {
   VP_W, VP_H,
   FIRST_FLIGHT_MISSION, buildSaveEnvelope,
@@ -11,9 +11,47 @@ import {
  * Each test is independent — seeds its own save with a pre-built rocket design.
  */
 
-const UNLOCKED_PARTS = ['cmd-mk1', 'tank-small', 'engine-spark'];
+/* ------------------------------------------------------------------ */
+/*  Window interface for accessing flight physics state               */
+/* ------------------------------------------------------------------ */
 
-const SEEDED_DESIGN = {
+interface FlightPs {
+  grounded: boolean;
+  posY: number;
+  firingEngines: Set<string>;
+}
+
+interface GameWindow {
+  __flightPs?: FlightPs;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Seeded design types                                               */
+/* ------------------------------------------------------------------ */
+
+interface DesignPart {
+  partId: string;
+  position: { x: number; y: number };
+}
+
+interface RocketDesign {
+  id: string;
+  name: string;
+  parts: DesignPart[];
+  staging: { stages: string[][]; unstaged: string[] };
+  totalMass: number;
+  totalThrust: number;
+  createdDate: string;
+  updatedDate: string;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Test fixtures                                                     */
+/* ------------------------------------------------------------------ */
+
+const UNLOCKED_PARTS: string[] = ['cmd-mk1', 'tank-small', 'engine-spark'];
+
+const SEEDED_DESIGN: RocketDesign = {
   id:          'design-relaunch-test',
   name:        'Relaunch Rocket',
   parts: [
@@ -31,21 +69,25 @@ const SEEDED_DESIGN = {
   updatedDate: new Date().toISOString(),
 };
 
-function makeEnvelope() {
+function makeEnvelope(): ReturnType<typeof buildSaveEnvelope> {
   return buildSaveEnvelope({
     missions: { available: [], accepted: [{ ...FIRST_FLIGHT_MISSION, status: 'accepted' }], completed: [] },
     parts: UNLOCKED_PARTS,
-    rockets: [SEEDED_DESIGN],
+    rockets: [SEEDED_DESIGN as unknown as Record<string, unknown>],
   });
 }
 
-async function seedAndGoToHub(page) {
+/* ------------------------------------------------------------------ */
+/*  Helper functions                                                  */
+/* ------------------------------------------------------------------ */
+
+async function seedAndGoToHub(page: Page): Promise<void> {
   await page.setViewportSize({ width: VP_W, height: VP_H });
   await seedAndLoadSave(page, makeEnvelope());
   await dismissWelcomeModal(page);
 }
 
-async function launchFromPad(page) {
+async function launchFromPad(page: Page): Promise<void> {
   await page.click('[data-building-id="launch-pad"]');
   await page.waitForSelector('#launch-pad-overlay', { state: 'visible', timeout: 10_000 });
   await page.click('.lp-launch-btn');
@@ -53,32 +95,38 @@ async function launchFromPad(page) {
   await page.click('.lp-crew-confirm-btn');
   await page.waitForSelector('#flight-hud', { state: 'visible', timeout: 15_000 });
   await page.waitForFunction(
-    () => typeof window.__flightPs !== 'undefined' && window.__flightPs !== null,
+    (): boolean =>
+      typeof (window as unknown as GameWindow).__flightPs !== 'undefined' &&
+      (window as unknown as GameWindow).__flightPs !== null,
     { timeout: 10_000 },
   );
 }
 
-async function fireStageAndVerifyLiftoff(page) {
-  const groundedBefore = await page.evaluate(() => window.__flightPs?.grounded ?? true);
+async function fireStageAndVerifyLiftoff(page: Page): Promise<void> {
+  const groundedBefore: boolean = await page.evaluate(
+    (): boolean => (window as unknown as GameWindow).__flightPs?.grounded ?? true,
+  );
   expect(groundedBefore).toBe(true);
 
   await page.keyboard.press('Space');
 
   await page.waitForFunction(
-    () => (window.__flightPs?.firingEngines?.size ?? 0) > 0,
+    (): boolean => ((window as unknown as GameWindow).__flightPs?.firingEngines?.size ?? 0) > 0,
     { timeout: 5_000 },
   );
 
-  const firingCount = await page.evaluate(() => window.__flightPs?.firingEngines?.size ?? 0);
+  const firingCount: number = await page.evaluate(
+    (): number => (window as unknown as GameWindow).__flightPs?.firingEngines?.size ?? 0,
+  );
   expect(firingCount).toBeGreaterThan(0);
 
   await page.waitForFunction(
-    () => (window.__flightPs?.posY ?? 0) > 5,
+    (): boolean => ((window as unknown as GameWindow).__flightPs?.posY ?? 0) > 5,
     { timeout: 5_000 },
   );
 }
 
-async function returnToHub(page) {
+async function returnToHub(page: Page): Promise<void> {
   const dropdown = page.locator('#topbar-dropdown');
   if (!(await dropdown.isVisible())) {
     await page.click('#topbar-menu-btn');
@@ -87,7 +135,7 @@ async function returnToHub(page) {
   await dropdown.getByText('Return to Space Agency').click();
 
   const abortBtn = page.locator('[data-testid="abort-confirm-btn"]');
-  const didAbort = await abortBtn.isVisible({ timeout: 2_000 }).catch(() => false);
+  const didAbort: boolean = await abortBtn.isVisible({ timeout: 2_000 }).catch((): boolean => false);
   if (didAbort) {
     await abortBtn.click();
   } else {
@@ -103,6 +151,10 @@ async function returnToHub(page) {
 
   await expect(page.locator('#hub-overlay')).toBeVisible({ timeout: 10_000 });
 }
+
+/* ------------------------------------------------------------------ */
+/*  Tests                                                             */
+/* ------------------------------------------------------------------ */
 
 test.describe('Launch Pad — Relaunch Engine Bug', () => {
 
@@ -135,7 +187,9 @@ test.describe('Launch Pad — Relaunch Engine Bug', () => {
     await launchFromPad(page);
     await fireStageAndVerifyLiftoff(page);
 
-    const grounded = await page.evaluate(() => window.__flightPs?.grounded ?? true);
+    const grounded: boolean = await page.evaluate(
+      (): boolean => (window as unknown as GameWindow).__flightPs?.grounded ?? true,
+    );
     expect(grounded).toBe(false);
   });
 });

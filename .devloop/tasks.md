@@ -759,31 +759,31 @@
 - **Verification**: `npx playwright test e2e/hub-navigation.spec.ts`
 
 ### TASK-126: Convert keyboard-nav.spec.js to TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-016, TASK-017
 - **Description**: Rename `e2e/keyboard-nav.spec.js` to `e2e/keyboard-nav.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
 - **Verification**: `npx playwright test e2e/keyboard-nav.spec.ts`
 
 ### TASK-127: Convert landing.spec.js to TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-016, TASK-017
 - **Description**: Rename `e2e/landing.spec.js` to `e2e/landing.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
 - **Verification**: `npx playwright test e2e/landing.spec.ts`
 
 ### TASK-128: Convert launchpad-relaunch.spec.js to TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-016, TASK-017
 - **Description**: Rename `e2e/launchpad-relaunch.spec.js` to `e2e/launchpad-relaunch.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
 - **Verification**: `npx playwright test e2e/launchpad-relaunch.spec.ts`
 
 ### TASK-129: Convert launchpad.spec.js to TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-016, TASK-017
 - **Description**: Rename `e2e/launchpad.spec.js` to `e2e/launchpad.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
 - **Verification**: `npx playwright test e2e/launchpad.spec.ts`
 
 ### TASK-130: Convert mission-progression.spec.js to TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-016, TASK-017
 - **Description**: Rename `e2e/mission-progression.spec.js` to `e2e/mission-progression.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
 - **Verification**: `npx playwright test e2e/mission-progression.spec.ts`

@@ -59,7 +59,7 @@
     "core/missions": {
       "sources": ["src/core/missions.ts"],
       "unit": ["src/tests/missions.test.ts"],
-      "e2e": ["e2e/missions.spec.js", "e2e/flight-mission.spec.js", "e2e/mission-progression.spec.js"]
+      "e2e": ["e2e/missions.spec.js", "e2e/flight-mission.spec.js", "e2e/mission-progression.spec.ts"]
     },
     "core/contracts": {
       "sources": ["src/core/contracts.ts"],
@@ -189,7 +189,7 @@
     "data/missions": {
       "sources": ["src/data/missions.ts"],
       "unit": ["src/tests/missions.test.ts"],
-      "e2e": ["e2e/missions.spec.js", "e2e/mission-progression.spec.js", "e2e/tutorial-revisions.spec.js"]
+      "e2e": ["e2e/missions.spec.js", "e2e/mission-progression.spec.ts", "e2e/tutorial-revisions.spec.js"]
     },
     "data/contracts": {
       "sources": ["src/data/contracts.ts"],
