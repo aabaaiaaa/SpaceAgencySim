@@ -312,7 +312,7 @@ test.describe('Celestial body data drives physics and rendering', () => {
 
   test('(1) body catalog is accessible and contains all expected bodies', async () => {
     const bodies = await page.evaluate((): string[] | null => {
-      const mod = window.__celestialBodies || window.__gameState?._bodyCache;
+      const mod = window.__celestialBodies || (window.__gameState as unknown as Record<string, unknown> | undefined)?._bodyCache;
       // Fallback: check if CELESTIAL_BODIES is exposed via any global.
       if (mod) return Object.keys(mod);
       // Try to read from a known data source.
@@ -323,7 +323,7 @@ test.describe('Celestial body data drives physics and rendering', () => {
     await startTestFlight(page, BASIC_PROBE, { bodyId: 'EARTH' });
     const fs = await getFlightState(page);
     expect(fs).not.toBeNull();
-    expect(fs.bodyId).toBe('EARTH');
+    expect(fs!.bodyId).toBe('EARTH');
     await returnToAgency(page);
     try {
       await page.locator('#return-results-dismiss-btn').click({ timeout: 3_000 });
@@ -332,7 +332,7 @@ test.describe('Celestial body data drives physics and rendering', () => {
 
   test('(2) Earth flight uses Earth gravity (~9.81 m/s²)', async () => {
     await startTestFlight(page, BASIC_PROBE, { bodyId: 'EARTH' });
-    const ps1 = await getPhysicsSnapshot(page);
+    const ps1 = (await getPhysicsSnapshot(page))!;
     expect(ps1.posY).toBeCloseTo(0, 0);
 
     // Stage and launch.
@@ -340,7 +340,7 @@ test.describe('Celestial body data drives physics and rendering', () => {
     await page.keyboard.press('z');
     await waitForAltitude(page, 50, 15_000);
 
-    const ps2 = await getPhysicsSnapshot(page);
+    const ps2 = (await getPhysicsSnapshot(page))!;
     expect(ps2.posY).toBeGreaterThan(0);
     // Velocity should be fighting Earth gravity (~9.81).
     expect(ps2.velY).toBeGreaterThan(0);
@@ -357,7 +357,7 @@ test.describe('Celestial body data drives physics and rendering', () => {
     await page.keyboard.press('z');
     await waitForAltitude(page, 50, 15_000);
 
-    const ps = await getPhysicsSnapshot(page);
+    const ps = (await getPhysicsSnapshot(page))!;
     expect(ps.posY).toBeGreaterThan(0);
     // Under lower gravity, the rocket should climb faster with the same thrust.
     expect(ps.velY).toBeGreaterThan(0);
@@ -370,14 +370,14 @@ test.describe('Celestial body data drives physics and rendering', () => {
 
   test('(4) Mars flight starts with body-appropriate settings', async () => {
     await startTestFlight(page, BASIC_PROBE, { bodyId: 'MARS' });
-    const fs = await getFlightState(page);
+    const fs = (await getFlightState(page))!;
     expect(fs.bodyId).toBe('MARS');
 
     await page.keyboard.press('Space');
     await page.keyboard.press('z');
     await waitForAltitude(page, 50, 15_000);
 
-    const ps = await getPhysicsSnapshot(page);
+    const ps = (await getPhysicsSnapshot(page))!;
     expect(ps.posY).toBeGreaterThan(0);
 
     await returnToAgency(page);
@@ -395,14 +395,14 @@ test.describe('Celestial body data drives physics and rendering', () => {
     // Cut throttle and check velocity — on airless body, velocity shouldn't
     // decrease much except from gravity (no atmospheric drag).
     await page.keyboard.press('x');
-    const ps1 = await getPhysicsSnapshot(page);
+    const ps1 = (await getPhysicsSnapshot(page))!;
     // Wait for physics to run a few frames (position changes due to gravity)
     await page.waitForFunction(
       (y0: number) => (window.__flightPs?.posY ?? y0) !== y0,
       ps1.posY,
       { timeout: 5_000 },
     );
-    const ps2 = await getPhysicsSnapshot(page);
+    const ps2 = (await getPhysicsSnapshot(page))!;
 
     // Velocity change should be purely gravitational (small, only vertical).
     // Horizontal velocity should be essentially unchanged (no drag).
@@ -607,21 +607,22 @@ test.describe('Transfer gameplay mechanics', () => {
     await waitForOrbit(page);
     await setTransferState(page, 'EARTH', 'MOON');
 
-    const fs = await getFlightState(page);
+    const fs = (await getFlightState(page))!;
     expect(fs.phase).toBe('TRANSFER');
     expect(fs.transferState).not.toBeNull();
-    expect(fs.transferState.originBodyId).toBe('EARTH');
-    expect(fs.transferState.destinationBodyId).toBe('MOON');
-    expect(fs.transferState.departureDV).toBeGreaterThan(0);
-    expect(fs.transferState.captureDV).toBeGreaterThan(0);
-    expect(fs.transferState.totalDV).toBe(
-      fs.transferState.departureDV + fs.transferState.captureDV,
+    const ts = fs.transferState as Record<string, unknown>;
+    expect(ts.originBodyId).toBe('EARTH');
+    expect(ts.destinationBodyId).toBe('MOON');
+    expect(ts.departureDV).toBeGreaterThan(0);
+    expect(ts.captureDV).toBeGreaterThan(0);
+    expect(ts.totalDV).toBe(
+      (ts.departureDV as number) + (ts.captureDV as number),
     );
   });
 
   test('(2) time warp during transfer does NOT advance period counter', async () => {
-    const gsBefore = await getGameState(page);
-    const periodBefore: number = gsBefore.currentPeriod;
+    const gsBefore = (await getGameState(page))!;
+    const periodBefore: number = gsBefore.currentPeriod as number;
 
     // Try to activate time warp.
     const warpBtn = page.locator('.hud-warp-btn[data-warp="5"]');
@@ -637,14 +638,14 @@ test.describe('Transfer gameplay mechanics', () => {
       );
     }
 
-    const gsAfter = await getGameState(page);
+    const gsAfter = (await getGameState(page))!;
     expect(gsAfter.currentPeriod).toBe(periodBefore);
   });
 
   test('(3) player is locked to craft during transfer (phase prevents return)', async () => {
     // During TRANSFER phase, the player cannot leave the craft.
     // Verify the flight state confirms we're in transfer.
-    const fs = await getFlightState(page);
+    const fs = (await getFlightState(page))!;
     expect(fs.phase).toBe('TRANSFER');
     expect(fs.transferState).not.toBeNull();
 
@@ -691,7 +692,7 @@ test.describe('Transfer gameplay mechanics', () => {
   test('(5) transfer delta-v calculation returns values for Earth-Moon', async () => {
     const dvInfo = await page.evaluate((): DeltaVInfo | null => {
       if (typeof window.__computeTransferDeltaV === 'function') {
-        return window.__computeTransferDeltaV('EARTH', 'MOON', 100000);
+        return window.__computeTransferDeltaV('EARTH', 'MOON', 100000) as DeltaVInfo | null;
       }
       // Fallback: manually verify transfer state was populated.
       return null;
@@ -708,7 +709,7 @@ test.describe('Transfer gameplay mechanics', () => {
   test('(6) transfer delta-v calculation returns values for Earth-Mars', async () => {
     const dvInfo = await page.evaluate((): DeltaVInfo | null => {
       if (typeof window.__computeTransferDeltaV === 'function') {
-        return window.__computeTransferDeltaV('EARTH', 'MARS', 100000);
+        return window.__computeTransferDeltaV('EARTH', 'MARS', 100000) as DeltaVInfo | null;
       }
       return null;
     });
@@ -742,12 +743,12 @@ test.describe('Landing on airless and atmospheric bodies', () => {
     await startTestFlight(page, LUNAR_LANDER, { bodyId: 'MOON', crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MOON' });
 
-    const ps = await getPhysicsSnapshot(page);
+    const ps = (await getPhysicsSnapshot(page))!;
     expect(ps.landed).toBe(true);
     expect(ps.grounded).toBe(true);
     expect(ps.crashed).toBe(false);
 
-    const fs = await getFlightState(page);
+    const fs = (await getFlightState(page))!;
     expect(fs.bodyId).toBe('MOON');
 
     await returnToAgency(page);
@@ -760,11 +761,11 @@ test.describe('Landing on airless and atmospheric bodies', () => {
     await startTestFlight(page, LUNAR_LANDER, { bodyId: 'MARS', crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MARS' });
 
-    const ps = await getPhysicsSnapshot(page);
+    const ps = (await getPhysicsSnapshot(page))!;
     expect(ps.landed).toBe(true);
     expect(ps.crashed).toBe(false);
 
-    const fs = await getFlightState(page);
+    const fs = (await getFlightState(page))!;
     expect(fs.bodyId).toBe('MARS');
 
     await returnToAgency(page);
@@ -777,11 +778,11 @@ test.describe('Landing on airless and atmospheric bodies', () => {
     await startTestFlight(page, LUNAR_LANDER, { bodyId: 'MERCURY', crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MERCURY' });
 
-    const ps = await getPhysicsSnapshot(page);
+    const ps = (await getPhysicsSnapshot(page))!;
     expect(ps.landed).toBe(true);
     expect(ps.crashed).toBe(false);
 
-    const fs = await getFlightState(page);
+    const fs = (await getFlightState(page))!;
     expect(fs.bodyId).toBe('MERCURY');
 
     await returnToAgency(page);
@@ -866,7 +867,7 @@ test.describe('Body-specific biomes and science opportunities', () => {
     await page.keyboard.press('z');
     await waitForAltitude(page, 200, 15_000);
 
-    const fs = await getFlightState(page);
+    const fs = (await getFlightState(page))!;
     expect(fs.bodyId).toBe('MARS');
 
     await returnToAgency(page);
@@ -923,17 +924,17 @@ test.describe('Surface operations — flag planting', () => {
     await startTestFlight(page, LUNAR_LANDER, { bodyId: 'MOON', crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MOON' });
 
-    const gsBefore = await getGameState(page);
-    const moneyBefore: number = gsBefore.money;
-    const repBefore: number = gsBefore.reputation;
+    const gsBefore = (await getGameState(page))!;
+    const moneyBefore: number = gsBefore.money as number;
+    const repBefore: number = gsBefore.reputation as number;
 
     // Plant flag via game API.
     const result = await page.evaluate(async (): Promise<SurfaceActionResult | null> => {
       let r: SurfaceActionResult | null = null;
       if (typeof window.__plantFlag === 'function') {
-        r = window.__plantFlag();
+        r = window.__plantFlag() as SurfaceActionResult | null;
       } else if (typeof window.__surfaceAction === 'function') {
-        r = window.__surfaceAction('plant-flag');
+        r = window.__surfaceAction('plant-flag') as SurfaceActionResult | null;
       }
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
       return r;
@@ -942,15 +943,15 @@ test.describe('Surface operations — flag planting', () => {
     if (result !== null) {
       expect(result.success).toBe(true);
 
-      const gsAfter = await getGameState(page);
+      const gsAfter = (await getGameState(page))!;
       // Should receive milestone bonus.
       expect(gsAfter.money).toBe(moneyBefore + FLAG_MILESTONE_BONUS);
       expect(gsAfter.reputation).toBeGreaterThanOrEqual(repBefore + FLAG_MILESTONE_REP);
 
       // Surface items should contain the flag.
       expect(gsAfter.surfaceItems).toBeDefined();
-      const moonFlags = gsAfter.surfaceItems.filter(
-        (i: Record<string, unknown>) => i.type === 'FLAG' && i.bodyId === 'MOON',
+      const moonFlags = (gsAfter.surfaceItems as unknown[] ?? []).filter(
+        (i: unknown) => (i as Record<string, unknown>).type === 'FLAG' && (i as Record<string, unknown>).bodyId === 'MOON',
       );
       expect(moonFlags.length).toBe(1);
     }
@@ -968,9 +969,9 @@ test.describe('Surface operations — flag planting', () => {
     const result = await page.evaluate(async (): Promise<SurfaceActionResult | null> => {
       let r: SurfaceActionResult | null = null;
       if (typeof window.__plantFlag === 'function') {
-        r = window.__plantFlag();
+        r = window.__plantFlag() as SurfaceActionResult | null;
       } else if (typeof window.__surfaceAction === 'function') {
-        r = window.__surfaceAction('plant-flag');
+        r = window.__surfaceAction('plant-flag') as SurfaceActionResult | null;
       }
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
       return r;
@@ -995,9 +996,9 @@ test.describe('Surface operations — flag planting', () => {
     const result = await page.evaluate(async (): Promise<SurfaceActionResult | null> => {
       let r: SurfaceActionResult | null = null;
       if (typeof window.__plantFlag === 'function') {
-        r = window.__plantFlag();
+        r = window.__plantFlag() as SurfaceActionResult | null;
       } else if (typeof window.__surfaceAction === 'function') {
-        r = window.__surfaceAction('plant-flag');
+        r = window.__surfaceAction('plant-flag') as SurfaceActionResult | null;
       }
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
       return r;
@@ -1039,9 +1040,9 @@ test.describe('Surface operations — sample collection and return', () => {
     const result = await page.evaluate(async (): Promise<SurfaceActionResult | null> => {
       let r: SurfaceActionResult | null = null;
       if (typeof window.__collectSample === 'function') {
-        r = window.__collectSample();
+        r = window.__collectSample() as SurfaceActionResult | null;
       } else if (typeof window.__surfaceAction === 'function') {
-        r = window.__surfaceAction('collect-sample');
+        r = window.__surfaceAction('collect-sample') as SurfaceActionResult | null;
       }
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
       return r;
@@ -1050,13 +1051,13 @@ test.describe('Surface operations — sample collection and return', () => {
     if (result !== null) {
       expect(result.success).toBe(true);
 
-      const gs = await getGameState(page);
-      const samples = (gs.surfaceItems ?? []).filter(
-        (i: Record<string, unknown>) => i.type === 'SURFACE_SAMPLE' && i.bodyId === 'MOON',
+      const gs = (await getGameState(page))!;
+      const samples = (gs.surfaceItems as unknown[] ?? []).filter(
+        (i: unknown) => (i as Record<string, unknown>).type === 'SURFACE_SAMPLE' && (i as Record<string, unknown>).bodyId === 'MOON',
       );
       expect(samples.length).toBeGreaterThan(0);
       // Sample should not be collected (returned) yet.
-      expect(samples[0].collected).toBe(false);
+      expect((samples[0] as Record<string, unknown>).collected).toBe(false);
     }
 
     // Check event logged.
@@ -1074,16 +1075,16 @@ test.describe('Surface operations — sample collection and return', () => {
   });
 
   test('(2) sample return on Earth landing awards science', async () => {
-    const gsBefore = await getGameState(page);
-    const scienceBefore: number = gsBefore.sciencePoints;
+    const gsBefore = (await getGameState(page))!;
+    const scienceBefore: number = gsBefore.sciencePoints as number;
 
     // Inject a Moon sample that hasn't been returned yet.
     await page.evaluate(async () => {
       const gs = window.__gameState;
       if (!gs.surfaceItems) gs.surfaceItems = [];
       // Only add if we don't already have an uncollected Moon sample.
-      const existing = gs.surfaceItems.find(
-        (i: Record<string, unknown>) => i.type === 'SURFACE_SAMPLE' && i.bodyId === 'MOON' && !i.collected,
+      const existing = (gs.surfaceItems as unknown as Record<string, unknown>[]).find(
+        (i) => i.type === 'SURFACE_SAMPLE' && i.bodyId === 'MOON' && !i.collected,
       );
       if (!existing) {
         gs.surfaceItems.push({
@@ -1103,7 +1104,7 @@ test.describe('Surface operations — sample collection and return', () => {
     const returnResult = await page.evaluate(async (): Promise<SampleReturnResult | null> => {
       let r: SampleReturnResult | null = null;
       if (typeof window.__processSampleReturns === 'function') {
-        r = window.__processSampleReturns('EARTH');
+        r = window.__processSampleReturns('EARTH') as SampleReturnResult | null;
       }
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
       return r;
@@ -1113,7 +1114,7 @@ test.describe('Surface operations — sample collection and return', () => {
       expect(returnResult.samplesReturned).toBeGreaterThan(0);
       expect(returnResult.scienceEarned).toBeGreaterThan(0);
 
-      const gsAfter = await getGameState(page);
+      const gsAfter = (await getGameState(page))!;
       expect(gsAfter.sciencePoints).toBeGreaterThan(scienceBefore);
     }
   });
@@ -1138,7 +1139,7 @@ test.describe('Surface operations — sample collection and return', () => {
     const result = await page.evaluate(async (): Promise<SampleReturnResult | null> => {
       let r: SampleReturnResult | null = null;
       if (typeof window.__processSampleReturns === 'function') {
-        r = window.__processSampleReturns('MARS');
+        r = window.__processSampleReturns('MARS') as SampleReturnResult | null;
       }
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
       return r;
@@ -1177,9 +1178,9 @@ test.describe('Surface operations — instruments and beacons', () => {
     const result = await page.evaluate(async (): Promise<SurfaceActionResult | null> => {
       let r: SurfaceActionResult | null = null;
       if (typeof window.__deployInstrument === 'function') {
-        r = window.__deployInstrument();
+        r = window.__deployInstrument() as SurfaceActionResult | null;
       } else if (typeof window.__surfaceAction === 'function') {
-        r = window.__surfaceAction('deploy-instrument');
+        r = window.__surfaceAction('deploy-instrument') as SurfaceActionResult | null;
       }
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
       return r;
@@ -1188,9 +1189,9 @@ test.describe('Surface operations — instruments and beacons', () => {
     if (result !== null) {
       expect(result.success).toBe(true);
 
-      const gs = await getGameState(page);
-      const instruments = (gs.surfaceItems ?? []).filter(
-        (i: Record<string, unknown>) => i.type === 'SURFACE_INSTRUMENT' && i.bodyId === 'MOON',
+      const gs = (await getGameState(page))!;
+      const instruments = (gs.surfaceItems as unknown[] ?? []).filter(
+        (i: unknown) => (i as Record<string, unknown>).type === 'SURFACE_INSTRUMENT' && (i as Record<string, unknown>).bodyId === 'MOON',
       );
       expect(instruments.length).toBeGreaterThan(0);
     }
@@ -1214,8 +1215,8 @@ test.describe('Surface operations — instruments and beacons', () => {
     await page.evaluate(async () => {
       const gs = window.__gameState;
       if (!gs.surfaceItems) gs.surfaceItems = [];
-      const existing = gs.surfaceItems.find(
-        (i: Record<string, unknown>) => i.type === 'SURFACE_INSTRUMENT',
+      const existing = (gs.surfaceItems as unknown as Record<string, unknown>[]).find(
+        (i) => i.type === 'SURFACE_INSTRUMENT',
       );
       if (!existing) {
         gs.surfaceItems.push({
@@ -1230,14 +1231,14 @@ test.describe('Surface operations — instruments and beacons', () => {
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
-    const gsBefore = await getGameState(page);
-    const scienceBefore: number = gsBefore.sciencePoints;
+    const gsBefore = (await getGameState(page))!;
+    const scienceBefore: number = gsBefore.sciencePoints as number;
 
     // Process surface ops (simulating period advancement).
     const result = await page.evaluate(async (): Promise<SurfaceOpsResult | null> => {
       let r: SurfaceOpsResult | null = null;
       if (typeof window.__processSurfaceOps === 'function') {
-        r = window.__processSurfaceOps();
+        r = window.__processSurfaceOps() as SurfaceOpsResult | null;
       }
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
       return r;
@@ -1245,7 +1246,7 @@ test.describe('Surface operations — instruments and beacons', () => {
 
     if (result !== null) {
       expect(result.scienceEarned).toBe(SURFACE_INSTRUMENT_SCIENCE_PER_PERIOD);
-      const gsAfter = await getGameState(page);
+      const gsAfter = (await getGameState(page))!;
       expect(gsAfter.sciencePoints).toBe(scienceBefore + SURFACE_INSTRUMENT_SCIENCE_PER_PERIOD);
     }
   });
@@ -1257,9 +1258,9 @@ test.describe('Surface operations — instruments and beacons', () => {
     const result = await page.evaluate(async (): Promise<SurfaceActionResult | null> => {
       let r: SurfaceActionResult | null = null;
       if (typeof window.__deployBeacon === 'function') {
-        r = window.__deployBeacon('Mars Alpha');
+        r = window.__deployBeacon('Mars Alpha') as SurfaceActionResult | null;
       } else if (typeof window.__surfaceAction === 'function') {
-        r = window.__surfaceAction('deploy-beacon');
+        r = window.__surfaceAction('deploy-beacon') as SurfaceActionResult | null;
       }
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
       return r;
@@ -1268,9 +1269,9 @@ test.describe('Surface operations — instruments and beacons', () => {
     if (result !== null) {
       expect(result.success).toBe(true);
 
-      const gs = await getGameState(page);
-      const beacons = (gs.surfaceItems ?? []).filter(
-        (i: Record<string, unknown>) => i.type === 'BEACON' && i.bodyId === 'MARS',
+      const gs = (await getGameState(page))!;
+      const beacons = (gs.surfaceItems as unknown[] ?? []).filter(
+        (i: unknown) => (i as Record<string, unknown>).type === 'BEACON' && (i as Record<string, unknown>).bodyId === 'MARS',
       );
       expect(beacons.length).toBeGreaterThan(0);
     }
@@ -1392,7 +1393,7 @@ test.describe('Prestige milestones trigger at correct events', () => {
           ps: null,
           isLanded: false,
           landingBodyId: 'EARTH',
-        });
+        }) as AchievementResult[] | null;
       }
       return null;
     });
@@ -1423,7 +1424,7 @@ test.describe('Prestige milestones trigger at correct events', () => {
           ps: null,
           isLanded: false,
           landingBodyId: 'EARTH',
-        });
+        }) as AchievementResult[] | null;
       }
       return null;
     });
@@ -1456,7 +1457,7 @@ test.describe('Prestige milestones trigger at correct events', () => {
           ps: null,
           isLanded: false,
           landingBodyId: 'EARTH',
-        });
+        }) as AchievementResult[] | null;
       }
       return null;
     });
@@ -1485,7 +1486,7 @@ test.describe('Prestige milestones trigger at correct events', () => {
           ps: null,
           isLanded: true,
           landingBodyId: 'EARTH',
-        });
+        }) as AchievementResult[] | null;
       }
       return null;
     });
@@ -1515,7 +1516,7 @@ test.describe('Prestige milestones trigger at correct events', () => {
           ps: null,
           isLanded: true,
           landingBodyId: 'EARTH',
-        });
+        }) as AchievementResult[] | null;
       }
       return null;
     });
@@ -1544,7 +1545,7 @@ test.describe('Prestige milestones trigger at correct events', () => {
           ps: null,
           isLanded: true,
           landingBodyId: 'EARTH',
-        });
+        }) as AchievementResult[] | null;
       }
       return null;
     });
@@ -1573,7 +1574,7 @@ test.describe('Prestige milestones trigger at correct events', () => {
           ps: null,
           isLanded: false,
           landingBodyId: 'EARTH',
-        });
+        }) as AchievementResult[] | null;
       }
       return null;
     });
@@ -1608,7 +1609,7 @@ test.describe('Prestige milestones trigger at correct events', () => {
           ps: null,
           isLanded: false,
           landingBodyId: 'EARTH',
-        });
+        }) as AchievementResult[] | null;
       }
       return null;
     });
@@ -1643,7 +1644,7 @@ test.describe('Phase 6 new parts function correctly', () => {
   test('(1) Deep Space Engine — exists in part catalog with correct stats', async () => {
     const part = await page.evaluate((): PartInfo | null => {
       if (typeof window.__getPartById === 'function') {
-        return window.__getPartById('engine-deep-space');
+        return window.__getPartById('engine-deep-space') as PartInfo | null;
       }
       return null;
     });
@@ -1667,14 +1668,14 @@ test.describe('Phase 6 new parts function correctly', () => {
 
     const fs = await getFlightState(page);
     expect(fs).not.toBeNull();
-    expect(fs.bodyId).toBe('MOON');
+    expect(fs!.bodyId).toBe('MOON');
 
     // Stage and thrust. On the Moon, 5 kN can lift ~300 kg at 1.62 g.
     await page.keyboard.press('Space');
     await page.keyboard.press('z');
     await waitForAltitude(page, 10, 30_000);
 
-    const ps = await getPhysicsSnapshot(page);
+    const ps = (await getPhysicsSnapshot(page))!;
     expect(ps.posY).toBeGreaterThan(0);
 
     await returnToAgency(page);
@@ -1686,7 +1687,7 @@ test.describe('Phase 6 new parts function correctly', () => {
   test('(3) Extended Mission Module — exists with correct properties', async () => {
     const part = await page.evaluate((): PartInfo | null => {
       if (typeof window.__getPartById === 'function') {
-        return window.__getPartById('mission-module-extended');
+        return window.__getPartById('mission-module-extended') as PartInfo | null;
       }
       return null;
     });
@@ -1704,7 +1705,7 @@ test.describe('Phase 6 new parts function correctly', () => {
   test('(4) Sample Return Container — exists with correct properties', async () => {
     const part = await page.evaluate((): PartInfo | null => {
       if (typeof window.__getPartById === 'function') {
-        return window.__getPartById('sample-return-container');
+        return window.__getPartById('sample-return-container') as PartInfo | null;
       }
       return null;
     });
@@ -1722,7 +1723,7 @@ test.describe('Phase 6 new parts function correctly', () => {
   test('(5) Surface Instrument Package — exists with correct properties', async () => {
     const part = await page.evaluate((): PartInfo | null => {
       if (typeof window.__getPartById === 'function') {
-        return window.__getPartById('surface-instrument-package');
+        return window.__getPartById('surface-instrument-package') as PartInfo | null;
       }
       return null;
     });
@@ -1741,7 +1742,7 @@ test.describe('Phase 6 new parts function correctly', () => {
   test('(6) Relay Antenna — exists with correct properties', async () => {
     const part = await page.evaluate((): PartInfo | null => {
       if (typeof window.__getPartById === 'function') {
-        return window.__getPartById('relay-antenna');
+        return window.__getPartById('relay-antenna') as PartInfo | null;
       }
       return null;
     });
@@ -1760,7 +1761,7 @@ test.describe('Phase 6 new parts function correctly', () => {
   test('(7) Heat Shield Heavy — exists with interplanetary-rated tolerance', async () => {
     const part = await page.evaluate((): PartInfo | null => {
       if (typeof window.__getPartById === 'function') {
-        return window.__getPartById('heat-shield-heavy');
+        return window.__getPartById('heat-shield-heavy') as PartInfo | null;
       }
       return null;
     });
@@ -1777,7 +1778,7 @@ test.describe('Phase 6 new parts function correctly', () => {
   test('(8) Solar Heat Shield — exists with solar heat resistance', async () => {
     const part = await page.evaluate((): PartInfo | null => {
       if (typeof window.__getPartById === 'function') {
-        return window.__getPartById('heat-shield-solar');
+        return window.__getPartById('heat-shield-solar') as PartInfo | null;
       }
       return null;
     });
@@ -1795,7 +1796,7 @@ test.describe('Phase 6 new parts function correctly', () => {
   test('(9) Heat Shield Mk1 — basic tier with correct tolerance', async () => {
     const part = await page.evaluate((): PartInfo | null => {
       if (typeof window.__getPartById === 'function') {
-        return window.__getPartById('heat-shield-mk1');
+        return window.__getPartById('heat-shield-mk1') as PartInfo | null;
       }
       return null;
     });
@@ -1812,7 +1813,7 @@ test.describe('Phase 6 new parts function correctly', () => {
   test('(10) Heat Shield Mk2 — standard tier for crewed capsules', async () => {
     const part = await page.evaluate((): PartInfo | null => {
       if (typeof window.__getPartById === 'function') {
-        return window.__getPartById('heat-shield-mk2');
+        return window.__getPartById('heat-shield-mk2') as PartInfo | null;
       }
       return null;
     });
@@ -1831,9 +1832,9 @@ test.describe('Phase 6 new parts function correctly', () => {
       if (typeof window.__getPartById !== 'function') return null;
       const ids = ['heat-shield-mk1', 'heat-shield-mk2', 'heat-shield-heavy', 'heat-shield-solar'];
       return ids.map((id: string) => {
-        const p = window.__getPartById(id);
-        return p ? { id: p.id, tolerance: p.properties.heatTolerance } : null;
-      }).filter((x: ShieldTierInfo | null): x is ShieldTierInfo => x !== null);
+        const p = window.__getPartById(id) as PartInfo | null;
+        return p ? { id: p.id, tolerance: p.properties.heatTolerance as number } : null;
+      }).filter((x): x is ShieldTierInfo => x !== null);
     });
 
     if (shields !== null && shields.length === 4) {
@@ -1875,7 +1876,7 @@ test.describe('Map view controls during transfer', () => {
     // Check if map view is active.
     const mapActive: boolean = await page.evaluate((): boolean => {
       return window.__mapViewActive === true ||
-             document.querySelector('#map-overlay')?.style.display !== 'none' ||
+             (document.querySelector('#map-overlay') as HTMLElement | null)?.style.display !== 'none' ||
              document.querySelector('[data-testid="map-view"]') !== null;
     });
 
@@ -1923,7 +1924,7 @@ test.describe('Integration — full lunar mission flow', () => {
     await teleportCraft(page, { posY: MOON_ORBIT_ALT, velX: MOON_ORBIT_VEL, bodyId: 'MOON' });
     await waitForOrbit(page);
 
-    const fs = await getFlightState(page);
+    const fs = (await getFlightState(page))!;
     expect(fs.phase).toBe('ORBIT');
     expect(fs.bodyId).toBe('MOON');
   });
@@ -1931,7 +1932,7 @@ test.describe('Integration — full lunar mission flow', () => {
   test('(2) land on Moon surface', async () => {
     await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MOON' });
 
-    const ps = await getPhysicsSnapshot(page);
+    const ps = (await getPhysicsSnapshot(page))!;
     expect(ps.landed).toBe(true);
     expect(ps.crashed).toBe(false);
   });
@@ -1940,8 +1941,8 @@ test.describe('Integration — full lunar mission flow', () => {
     // Plant flag.
     const flagResult = await page.evaluate(async (): Promise<SurfaceActionResult> => {
       let r: SurfaceActionResult = { success: true };
-      if (typeof window.__plantFlag === 'function') r = window.__plantFlag();
-      else if (typeof window.__surfaceAction === 'function') r = window.__surfaceAction('plant-flag');
+      if (typeof window.__plantFlag === 'function') r = window.__plantFlag() as SurfaceActionResult;
+      else if (typeof window.__surfaceAction === 'function') r = window.__surfaceAction('plant-flag') as SurfaceActionResult;
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
       return r;
     });
@@ -1950,8 +1951,8 @@ test.describe('Integration — full lunar mission flow', () => {
     // Collect sample.
     const sampleResult = await page.evaluate(async (): Promise<SurfaceActionResult> => {
       let r: SurfaceActionResult = { success: true };
-      if (typeof window.__collectSample === 'function') r = window.__collectSample();
-      else if (typeof window.__surfaceAction === 'function') r = window.__surfaceAction('collect-sample');
+      if (typeof window.__collectSample === 'function') r = window.__collectSample() as SurfaceActionResult;
+      else if (typeof window.__surfaceAction === 'function') r = window.__surfaceAction('collect-sample') as SurfaceActionResult;
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
       return r;
     });
@@ -1960,8 +1961,8 @@ test.describe('Integration — full lunar mission flow', () => {
     // Deploy beacon.
     const beaconResult = await page.evaluate(async (): Promise<SurfaceActionResult> => {
       let r: SurfaceActionResult = { success: true };
-      if (typeof window.__deployBeacon === 'function') r = window.__deployBeacon('Tranquility Base');
-      else if (typeof window.__surfaceAction === 'function') r = window.__surfaceAction('deploy-beacon');
+      if (typeof window.__deployBeacon === 'function') r = window.__deployBeacon('Tranquility Base') as SurfaceActionResult;
+      else if (typeof window.__surfaceAction === 'function') r = window.__surfaceAction('deploy-beacon') as SurfaceActionResult;
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
       return r;
     });
@@ -1969,8 +1970,8 @@ test.describe('Integration — full lunar mission flow', () => {
   });
 
   test('(4) verify surface items created', async () => {
-    const gs = await getGameState(page);
-    const moonItems = (gs.surfaceItems ?? []).filter((i: Record<string, unknown>) => i.bodyId === 'MOON');
+    const gs = (await getGameState(page))!;
+    const moonItems = (gs.surfaceItems as unknown[] ?? []).filter((i: unknown) => (i as Record<string, unknown>).bodyId === 'MOON');
     expect(moonItems.length).toBeGreaterThanOrEqual(1);
   });
 
@@ -1981,7 +1982,7 @@ test.describe('Integration — full lunar mission flow', () => {
     } catch { /* no overlay */ }
 
     await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
-    const gs = await getGameState(page);
+    const gs = (await getGameState(page))!;
     // Period should have advanced.
     expect(gs.currentPeriod).toBeGreaterThan(30);
   });

@@ -899,7 +899,7 @@
 - **Verification**: `npm run lint`
 
 ### TASK-149: Final verification pass
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-148
 - **Description**: Run the full verification suite from requirements §7. Confirm: `npm run typecheck` passes (including E2E), `npm run lint` passes, `npm run test:unit` passes, `npm run test:e2e` passes, `npm run build` succeeds. Verify zero `// @ts-nocheck` in source or test files, zero `.js` files in `e2e/`, zero `any` in test code, and `as unknown as` count in production source is <= 2.
 - **Verification**: `npm run typecheck && npm run lint && npm run test:unit && npm run test:e2e && npm run build`

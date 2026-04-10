@@ -16,7 +16,7 @@ const UNLOCKED_PARTS: string[] = ['probe-core-mk1', 'tank-small', 'engine-spark'
 
 async function setupGroundedFlight(page: Page): Promise<void> {
   await page.setViewportSize({ width: VP_W, height: VP_H });
-  const envelope: string = buildSaveEnvelope({
+  const envelope = buildSaveEnvelope({
     missions: { available: [], accepted: [{ ...FIRST_FLIGHT_MISSION, status: 'accepted' }], completed: [] },
     parts: UNLOCKED_PARTS,
   });
@@ -29,7 +29,7 @@ test.describe('Tipping physics — ground-contact rotation', () => {
   test('(1) rocket tips clockwise when D is held on the pad', async ({ page }) => {
     await setupGroundedFlight(page);
 
-    const initAngle: number = await page.evaluate(() => window.__flightPs.angle);
+    const initAngle: number = await page.evaluate(() => window.__flightPs!.angle);
     expect(initAngle).toBeCloseTo(0, 1);
 
     await page.keyboard.down('d');
@@ -39,7 +39,7 @@ test.describe('Tipping physics — ground-contact rotation', () => {
     );
     await page.keyboard.up('d');
 
-    const angle: number = await page.evaluate(() => window.__flightPs.angle);
+    const angle: number = await page.evaluate(() => window.__flightPs!.angle);
     expect(angle).toBeGreaterThan(0);
   });
 
@@ -48,14 +48,14 @@ test.describe('Tipping physics — ground-contact rotation', () => {
 
     // Pre-tilt the rocket programmatically.
     await page.evaluate(async () => {
-      window.__flightPs.angle = 0.45;
-      window.__flightPs.angularVelocity = 0.05;
+      window.__flightPs!.angle = 0.45;
+      window.__flightPs!.angularVelocity = 0.05;
       if (typeof window.__resyncPhysicsWorker === 'function') {
         await window.__resyncPhysicsWorker();
       }
     });
 
-    const angleBefore: number = await page.evaluate(() => window.__flightPs.angle);
+    const angleBefore: number = await page.evaluate(() => window.__flightPs!.angle);
 
     await page.waitForFunction(
       (prev: number) => {
@@ -66,8 +66,8 @@ test.describe('Tipping physics — ground-contact rotation', () => {
       { timeout: 10_000 },
     );
 
-    const angleAfter: number = await page.evaluate(() => window.__flightPs.angle);
-    const crashed: boolean = await page.evaluate(() => window.__flightPs.crashed);
+    const angleAfter: number = await page.evaluate(() => window.__flightPs!.angle);
+    const crashed: boolean = await page.evaluate(() => window.__flightPs!.crashed);
     if (!crashed) {
       expect(angleAfter).toBeGreaterThan(angleBefore);
     }
@@ -93,7 +93,7 @@ test.describe('Tipping physics — ground-contact rotation', () => {
       { timeout: 90_000 },
     );
 
-    const crashed: boolean = await page.evaluate(() => window.__flightPs.crashed);
+    const crashed: boolean = await page.evaluate(() => window.__flightPs!.crashed);
     expect(crashed).toBe(true);
   });
 });

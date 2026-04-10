@@ -220,7 +220,7 @@ test.describe('Malfunction toggle and biome-transition triggering', () => {
       { timeout: 10_000 },
     );
 
-    const malfCount = await page.evaluate(() => window.__flightPs.malfunctions.size);
+    const malfCount = await page.evaluate(() => window.__flightPs!.malfunctions!.size);
     expect(malfCount).toBeGreaterThan(0);
 
     // Verify a PART_MALFUNCTION event was logged
@@ -275,15 +275,15 @@ test.describe('Engine flameout malfunction', () => {
       if (!engineId) return { error: 'no engine found' };
 
       // Apply flameout malfunction
-      ps.malfunctions.set(engineId, { type: 'ENGINE_FLAMEOUT', recovered: false });
-      ps.firingEngines.delete(engineId);
+      ps!.malfunctions!.set(engineId, { type: 'ENGINE_FLAMEOUT', recovered: false });
+      ps!.firingEngines.delete(engineId);
 
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
 
       return {
         engineId,
-        hasMalfunction: ps.malfunctions.has(engineId),
-        isFiring: ps.firingEngines.has(engineId),
+        hasMalfunction: ps!.malfunctions!.has(engineId),
+        isFiring: ps!.firingEngines.has(engineId),
       };
     });
 
@@ -319,15 +319,15 @@ test.describe('Engine reduced thrust malfunction', () => {
       const ps = window.__flightPs;
       const assembly = window.__flightAssembly;
       let engineId: string | null = null;
-      for (const [id, placed] of assembly.parts) {
+      for (const [id, placed] of assembly!.parts) {
         if (placed.partId.includes('engine')) { engineId = id; break; }
       }
       if (!engineId) return { error: 'no engine' };
 
-      ps.malfunctions.set(engineId, { type: 'ENGINE_REDUCED_THRUST', recovered: false });
+      ps!.malfunctions!.set(engineId, { type: 'ENGINE_REDUCED_THRUST', recovered: false });
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
-      const entry = ps.malfunctions.get(engineId);
-      return { type: entry.type, recovered: entry.recovered };
+      const entry = ps!.malfunctions!.get(engineId);
+      return { type: entry!.type, recovered: entry!.recovered };
     });
 
     expect(result.type).toBe('ENGINE_REDUCED_THRUST');
@@ -360,14 +360,14 @@ test.describe('Fuel tank leak malfunction', () => {
       const ps = window.__flightPs;
       const assembly = window.__flightAssembly;
       let tankId: string | null = null;
-      for (const [id, placed] of assembly.parts) {
+      for (const [id, placed] of assembly!.parts) {
         if (placed.partId.includes('tank')) { tankId = id; break; }
       }
       if (!tankId) return -1;
 
-      ps.malfunctions.set(tankId, { type: 'FUEL_TANK_LEAK', recovered: false });
+      ps!.malfunctions!.set(tankId, { type: 'FUEL_TANK_LEAK', recovered: false });
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
-      return ps.fuelStore?.get(tankId) ?? 0;
+      return ps!.fuelStore?.get(tankId) ?? 0;
     });
 
     expect(beforeFuel).toBeGreaterThan(0);
@@ -393,10 +393,10 @@ test.describe('Fuel tank leak malfunction', () => {
       const ps = window.__flightPs;
       const assembly = window.__flightAssembly;
       let tankId: string | null = null;
-      for (const [id, placed] of assembly.parts) {
+      for (const [id, placed] of assembly!.parts) {
         if (placed.partId.includes('tank')) { tankId = id; break; }
       }
-      return ps.fuelStore?.get(tankId) ?? 0;
+      return ps!.fuelStore?.get(tankId!) ?? 0;
     });
 
     // Fuel should have decreased due to leak
@@ -428,15 +428,15 @@ test.describe('Stuck decoupler malfunction', () => {
       const ps = window.__flightPs;
       const assembly = window.__flightAssembly;
       let decouplerId: string | null = null;
-      for (const [id, placed] of assembly.parts) {
+      for (const [id, placed] of assembly!.parts) {
         if (placed.partId.includes('decoupler')) { decouplerId = id; break; }
       }
       if (!decouplerId) return { error: 'no decoupler' };
 
-      ps.malfunctions.set(decouplerId, { type: 'DECOUPLER_STUCK', recovered: false });
+      ps!.malfunctions!.set(decouplerId, { type: 'DECOUPLER_STUCK', recovered: false });
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
-      const entry = ps.malfunctions.get(decouplerId);
-      return { type: entry.type, recovered: entry.recovered, id: decouplerId };
+      const entry = ps!.malfunctions!.get(decouplerId);
+      return { type: entry!.type, recovered: entry!.recovered, id: decouplerId };
     });
 
     expect(result.type).toBe('DECOUPLER_STUCK');
@@ -468,14 +468,14 @@ test.describe('Partial parachute malfunction', () => {
       const ps = window.__flightPs;
       const assembly = window.__flightAssembly;
       let chuteId: string | null = null;
-      for (const [id, placed] of assembly.parts) {
+      for (const [id, placed] of assembly!.parts) {
         if (placed.partId.includes('parachute')) { chuteId = id; break; }
       }
       if (!chuteId) return { error: 'no chute' };
 
-      ps.malfunctions.set(chuteId, { type: 'PARACHUTE_PARTIAL', recovered: false });
+      ps!.malfunctions!.set(chuteId, { type: 'PARACHUTE_PARTIAL', recovered: false });
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
-      return { type: ps.malfunctions.get(chuteId).type };
+      return { type: ps!.malfunctions!.get(chuteId)!.type };
     });
 
     expect(result.type).toBe('PARACHUTE_PARTIAL');
@@ -513,22 +513,22 @@ test.describe('SRB early burnout malfunction', () => {
       const ps = window.__flightPs;
       const assembly = window.__flightAssembly;
       let srbId: string | null = null;
-      for (const [id, placed] of assembly.parts) {
+      for (const [id, placed] of assembly!.parts) {
         if (placed.partId.includes('srb')) { srbId = id; break; }
       }
       if (!srbId) return { error: 'no srb' };
 
       // Apply SRB early burnout
-      ps.malfunctions.set(srbId, { type: 'SRB_EARLY_BURNOUT', recovered: false });
-      ps.fuelStore.set(srbId, 0);
-      ps.firingEngines.delete(srbId);
+      ps!.malfunctions!.set(srbId, { type: 'SRB_EARLY_BURNOUT', recovered: false });
+      ps!.fuelStore.set(srbId, 0);
+      ps!.firingEngines.delete(srbId);
 
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
 
       return {
-        fuel: ps.fuelStore.get(srbId),
-        isFiring: ps.firingEngines.has(srbId),
-        type: ps.malfunctions.get(srbId).type,
+        fuel: ps!.fuelStore.get(srbId),
+        isFiring: ps!.firingEngines.has(srbId),
+        type: ps!.malfunctions!.get(srbId)!.type,
       };
     });
 
@@ -565,14 +565,14 @@ test.describe('Science instrument failure malfunction', () => {
       const ps = window.__flightPs;
       const assembly = window.__flightAssembly;
       let sciId: string | null = null;
-      for (const [id, placed] of assembly.parts) {
+      for (const [id, placed] of assembly!.parts) {
         if (placed.partId.includes('science-module')) { sciId = id; break; }
       }
       if (!sciId) return { error: 'no science module' };
 
-      ps.malfunctions.set(sciId, { type: 'SCIENCE_INSTRUMENT_FAILURE', recovered: false });
+      ps!.malfunctions!.set(sciId, { type: 'SCIENCE_INSTRUMENT_FAILURE', recovered: false });
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
-      return { type: ps.malfunctions.get(sciId).type };
+      return { type: ps!.malfunctions!.get(sciId)!.type };
     });
 
     expect(result.type).toBe('SCIENCE_INSTRUMENT_FAILURE');
@@ -603,14 +603,14 @@ test.describe('Stuck landing legs malfunction', () => {
       const ps = window.__flightPs;
       const assembly = window.__flightAssembly;
       let legsId: string | null = null;
-      for (const [id, placed] of assembly.parts) {
+      for (const [id, placed] of assembly!.parts) {
         if (placed.partId.includes('landing-legs')) { legsId = id; break; }
       }
       if (!legsId) return { error: 'no landing legs' };
 
-      ps.malfunctions.set(legsId, { type: 'LANDING_LEGS_STUCK', recovered: false });
+      ps!.malfunctions!.set(legsId, { type: 'LANDING_LEGS_STUCK', recovered: false });
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
-      return { type: ps.malfunctions.get(legsId).type };
+      return { type: ps!.malfunctions!.get(legsId)!.type };
     });
 
     expect(result.type).toBe('LANDING_LEGS_STUCK');
@@ -646,25 +646,25 @@ test.describe('Malfunction recovery via context menu', () => {
       const ps = window.__flightPs;
       const assembly = window.__flightAssembly;
       let decouplerId: string | null = null;
-      for (const [id, placed] of assembly.parts) {
+      for (const [id, placed] of assembly!.parts) {
         if (placed.partId.includes('decoupler')) { decouplerId = id; break; }
       }
       if (!decouplerId) return { error: 'no decoupler' };
 
       // Set malfunction
-      ps.malfunctions.set(decouplerId, { type: 'DECOUPLER_STUCK', recovered: false });
+      ps!.malfunctions!.set(decouplerId, { type: 'DECOUPLER_STUCK', recovered: false });
 
       // Attempt recovery (manual decouple always succeeds)
       // Import is not available in evaluate, so we simulate the recovery logic:
-      const entry = ps.malfunctions.get(decouplerId);
+      const entry = ps!.malfunctions!.get(decouplerId);
       // Decoupler recovery always succeeds
-      entry.recovered = true;
+      entry!.recovered = true;
 
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
 
       return {
-        recovered: entry.recovered,
-        type: entry.type,
+        recovered: entry!.recovered,
+        type: entry!.type,
       };
     });
 
@@ -684,25 +684,25 @@ test.describe('Malfunction recovery via context menu', () => {
       const ps = window.__flightPs;
       const assembly = window.__flightAssembly;
       let engineId: string | null = null;
-      for (const [id, placed] of assembly.parts) {
+      for (const [id, placed] of assembly!.parts) {
         if (placed.partId.includes('engine')) { engineId = id; break; }
       }
       if (!engineId) return { error: 'no engine' };
 
       // Set malfunction
-      ps.malfunctions.set(engineId, { type: 'ENGINE_FLAMEOUT', recovered: false });
-      ps.firingEngines.delete(engineId);
+      ps!.malfunctions!.set(engineId, { type: 'ENGINE_FLAMEOUT', recovered: false });
+      ps!.firingEngines.delete(engineId);
 
       // Simulate successful recovery (reignition)
-      const entry = ps.malfunctions.get(engineId);
-      entry.recovered = true;
-      ps.firingEngines.add(engineId);
+      const entry = ps!.malfunctions!.get(engineId);
+      entry!.recovered = true;
+      ps!.firingEngines.add(engineId);
 
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
 
       return {
-        recovered: entry.recovered,
-        isFiring: ps.firingEngines.has(engineId),
+        recovered: entry!.recovered,
+        isFiring: ps!.firingEngines.has(engineId),
       };
     });
 
@@ -1148,8 +1148,8 @@ test.describe('Day skipping with escalating fees', () => {
       // Base cost is $25,000 for first skip
       const cost = 25_000;
       gs.money -= cost;
-      gs.weather.skipCount = 1;
-      gs.weather.seed = (gs.weather.seed + 13397) & 0x7fffffff;
+      gs.weather!.skipCount = 1;
+      gs.weather!.seed = (gs.weather!.seed + 13397) & 0x7fffffff;
     });
 
     const gsAfter = await getGameState(page) as GameStateSnapshot;
@@ -1222,7 +1222,7 @@ test.describe('Extreme weather warning', () => {
     await page.evaluate(() => {
       // Patch initWeather so it preserves our extreme weather
       const gs = window.__gameState;
-      gs._forceWeather = {
+      (gs as unknown as Record<string, unknown>)._forceWeather = {
         windSpeed: 25,
         windAngle: 0,
         temperature: 0.97,
@@ -1237,7 +1237,7 @@ test.describe('Extreme weather warning', () => {
     await page.click('#vab-back-btn');
     await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
     await page.waitForFunction(
-      () => document.querySelector('#hub-overlay')?.children.length > 0,
+      () => (document.querySelector('#hub-overlay')?.children.length ?? 0) > 0,
       { timeout: 5_000 },
     );
 
@@ -1268,7 +1268,7 @@ test.describe('Extreme weather warning', () => {
     await page.click('#vab-back-btn');
     await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
     await page.waitForFunction(
-      () => document.querySelector('#hub-overlay')?.children.length > 0,
+      () => (document.querySelector('#hub-overlay')?.children.length ?? 0) > 0,
       { timeout: 5_000 },
     );
 

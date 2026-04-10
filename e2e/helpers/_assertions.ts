@@ -5,41 +5,6 @@
 import type { Page } from '@playwright/test';
 
 // ---------------------------------------------------------------------------
-// Browser-context window augmentation (these globals are injected at runtime)
-// ---------------------------------------------------------------------------
-
-/* eslint-disable @typescript-eslint/consistent-type-definitions */
-declare global {
-  interface Window {
-    __gameState?: {
-      missions?: {
-        accepted?: { id: string; objectives?: { id: string; completed?: boolean }[] }[];
-        completed?: { id: string; objectives?: { id: string; completed?: boolean }[] }[];
-      };
-      contracts?: {
-        active?: { id: string; objectives?: { id: string; completed?: boolean }[] }[];
-        completed?: { id: string; objectives?: { id: string; completed?: boolean }[] }[];
-      };
-      currentFlight?: {
-        events?: { type: string }[];
-      };
-    };
-    __flightPs?: {
-      posX: number;
-      posY: number;
-      velX: number;
-      velY: number;
-      grounded: boolean;
-      landed: boolean;
-      crashed: boolean;
-      throttle: number;
-      firingEngines: Set<string>;
-    };
-  }
-}
-/* eslint-enable @typescript-eslint/consistent-type-definitions */
-
-// ---------------------------------------------------------------------------
 // Objective helpers
 // ---------------------------------------------------------------------------
 

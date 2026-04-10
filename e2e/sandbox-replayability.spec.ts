@@ -210,7 +210,7 @@ test.describe('Sandbox mode', () => {
     test.setTimeout(120_000);
     const page: Page = await setupSandboxPage(browser);
 
-    const gs: GameState = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
 
     expect(gs.money).toBe(999_999_999);
     expect(gs.gameMode).toBe('sandbox');
@@ -224,7 +224,7 @@ test.describe('Sandbox mode', () => {
     test.setTimeout(120_000);
     const page: Page = await setupSandboxPage(browser);
 
-    const gs: GameState = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     const facilityIds: string[] = [
       'launch-pad', 'vab', 'mission-control', 'crew-admin',
       'tracking-station', 'rd-lab', 'satellite-ops', 'library',
@@ -240,7 +240,7 @@ test.describe('Sandbox mode', () => {
     test.setTimeout(120_000);
     const page: Page = await setupSandboxPage(browser);
 
-    const gs: GameState = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     expect(gs.sandboxSettings).toBeTruthy();
     expect(gs.sandboxSettings.malfunctionsEnabled).toBe(false);
     expect(gs.sandboxSettings.weatherEnabled).toBe(false);
@@ -262,7 +262,7 @@ test.describe('Sandbox mode', () => {
     await waitForAltitude(page, 200, 30_000);
 
     const ps = await getPhysicsSnapshot(page);
-    expect(ps.posY).toBeGreaterThan(200);
+    expect(ps!.posY).toBeGreaterThan(200);
 
     // Return to hub
     const dropdown = page.locator('#topbar-dropdown');
@@ -294,7 +294,7 @@ test.describe('Sandbox mode', () => {
     test.setTimeout(120_000);
     const page: Page = await setupSandboxPage(browser);
 
-    const gs: GameState = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     // Design library is stored globally (savedDesigns field).
     // Both sandbox and career games read/write to the same underlying storage.
     expect(Array.isArray(gs.savedDesigns)).toBe(true);
@@ -366,7 +366,7 @@ test.describe('Challenge missions', () => {
     await acceptBtn.click();
 
     // Verify state
-    const gs: GameState = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     expect(gs.challenges).toBeTruthy();
     expect(gs.challenges.active).toBeTruthy();
     expect(gs.challenges.active.id).toBeTruthy();
@@ -414,7 +414,7 @@ test.describe('Challenge missions', () => {
     const activeCard = page.locator('.mc-challenge-card.active-challenge');
     await activeCard.locator('.mc-challenge-abandon-btn').click();
 
-    const gs: GameState = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     expect(gs.challenges.active).toBeNull();
 
     await page.close();
@@ -508,7 +508,7 @@ test.describe('Challenge missions', () => {
     await page.waitForSelector('.mc-challenge-grid', { state: 'visible', timeout: 5_000 });
 
     // The challenge with a result should show "Replay" instead of "Accept"
-    const gs: GameState = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     const hasResult: boolean = Object.keys(gs.challenges.results).length > 0;
     expect(hasResult).toBe(true);
 
@@ -532,7 +532,7 @@ test.describe('Challenge missions', () => {
       };
     }, challengeId);
 
-    const gs2: GameState = await getGameState(page);
+    const gs2 = await getGameState(page) as GameState;
     expect(gs2.challenges.results[challengeId].attempts).toBe(2);
     expect(gs2.challenges.results[challengeId].medal).toBe('gold');
 
@@ -805,7 +805,7 @@ test.describe('Custom mission creator', () => {
     );
 
     // Verify custom challenge was added to state
-    const gs: GameState = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     const formChallenge = gs.customChallenges.find(
       (c: Record<string, unknown>) => c.title === 'E2E Form Challenge',
     );
@@ -966,7 +966,7 @@ test.describe('Custom mission creator', () => {
     expect(result.success).toBe(true);
     expect(result.title).toBe('Imported Test Challenge');
 
-    const gs: GameState = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     const imported = gs.customChallenges.find(
       (c: Record<string, unknown>) => c.title === 'Imported Test Challenge',
     );
@@ -1016,7 +1016,7 @@ test.describe('Custom mission creator', () => {
       );
     });
 
-    const before: GameState = await getGameState(page);
+    const before = await getGameState(page) as GameState;
     const countBefore: number = before.customChallenges.length;
     expect(countBefore).toBeGreaterThan(0);
 
@@ -1033,7 +1033,7 @@ test.describe('Custom mission creator', () => {
       }
     });
 
-    const after: GameState = await getGameState(page);
+    const after = await getGameState(page) as GameState;
     expect(after.customChallenges.length).toBe(countBefore - 1);
 
     await page.close();
@@ -1140,7 +1140,7 @@ test.describe('Game settings — difficulty options', () => {
 
     await page.click('.settings-option-btn[data-setting="malfunctionFrequency"][data-value="off"]');
 
-    const gs: GameState = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     expect(gs.difficultySettings.malfunctionFrequency).toBe('off');
 
     // Verify the Off button is now active
@@ -1159,7 +1159,7 @@ test.describe('Game settings — difficulty options', () => {
 
     await page.click('.settings-option-btn[data-setting="malfunctionFrequency"][data-value="high"]');
 
-    const gs: GameState = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     expect(gs.difficultySettings.malfunctionFrequency).toBe('high');
 
     await page.close();
@@ -1174,7 +1174,7 @@ test.describe('Game settings — difficulty options', () => {
 
     await page.click('.settings-option-btn[data-setting="weatherSeverity"][data-value="off"]');
 
-    const gs: GameState = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     expect(gs.difficultySettings.weatherSeverity).toBe('off');
 
     await page.close();
@@ -1189,7 +1189,7 @@ test.describe('Game settings — difficulty options', () => {
 
     await page.click('.settings-option-btn[data-setting="weatherSeverity"][data-value="extreme"]');
 
-    const gs: GameState = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     expect(gs.difficultySettings.weatherSeverity).toBe('extreme');
 
     await page.close();
@@ -1204,7 +1204,7 @@ test.describe('Game settings — difficulty options', () => {
 
     await page.click('.settings-option-btn[data-setting="financialPressure"][data-value="easy"]');
 
-    const gs: GameState = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     expect(gs.difficultySettings.financialPressure).toBe('easy');
 
     await page.close();
@@ -1219,7 +1219,7 @@ test.describe('Game settings — difficulty options', () => {
 
     await page.click('.settings-option-btn[data-setting="financialPressure"][data-value="hard"]');
 
-    const gs: GameState = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     expect(gs.difficultySettings.financialPressure).toBe('hard');
 
     await page.close();
@@ -1234,7 +1234,7 @@ test.describe('Game settings — difficulty options', () => {
 
     await page.click('.settings-option-btn[data-setting="injuryDuration"][data-value="short"]');
 
-    const gs: GameState = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     expect(gs.difficultySettings.injuryDuration).toBe('short');
 
     await page.close();
@@ -1249,7 +1249,7 @@ test.describe('Game settings — difficulty options', () => {
 
     await page.click('.settings-option-btn[data-setting="injuryDuration"][data-value="long"]');
 
-    const gs: GameState = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     expect(gs.difficultySettings.injuryDuration).toBe('long');
 
     await page.close();
@@ -1268,7 +1268,7 @@ test.describe('Game settings — difficulty options', () => {
     await page.click('.settings-option-btn[data-setting="financialPressure"][data-value="easy"]');
     await page.click('.settings-option-btn[data-setting="injuryDuration"][data-value="short"]');
 
-    const gs: GameState = await getGameState(page);
+    const gs = await getGameState(page) as GameState;
     expect(gs.difficultySettings.malfunctionFrequency).toBe('low');
     expect(gs.difficultySettings.weatherSeverity).toBe('mild');
     expect(gs.difficultySettings.financialPressure).toBe('easy');

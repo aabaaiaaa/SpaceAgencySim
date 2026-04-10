@@ -1,5 +1,13 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
+
+/* Node.js Buffer — declared locally since @types/node is not in e2e tsconfig */
+type BufferLike = { toString(enc: string): string };
+declare const Buffer: {
+  isBuffer(obj: unknown): obj is BufferLike;
+  from(data: Uint8Array): BufferLike;
+  concat(list: BufferLike[]): BufferLike;
+};
 import {
   VP_W, VP_H,
   SAVE_KEY, STARTING_MONEY,
@@ -172,7 +180,7 @@ test.describe('Save & Load Flow', () => {
     ]);
 
     const stream = await download.createReadStream();
-    const chunks: Buffer[] = [];
+    const chunks: BufferLike[] = [];
     for await (const chunk of stream!) {
       chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Uint8Array));
     }

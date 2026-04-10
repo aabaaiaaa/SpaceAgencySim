@@ -53,39 +53,7 @@ interface VisibleTransferObject {
   type: string;
 }
 
-// ---------------------------------------------------------------------------
-// Browser-context window augmentation (these globals are injected at runtime)
-// ---------------------------------------------------------------------------
-
-/* eslint-disable @typescript-eslint/consistent-type-definitions */
-declare global {
-  interface Window {
-    __e2eStartFlight?: (parts: string[], options: StartFlightOptions) => void;
-    __setMalfunctionMode?: (mode: MalfunctionMode) => void;
-    __getMalfunctionMode?: () => MalfunctionMode;
-    __flightState?: {
-      bodyId: string;
-      phase: string;
-      inOrbit: boolean;
-      orbitalElements: unknown;
-      altitude: number;
-      velocity: number;
-      horizontalVelocity: number;
-      transferState?: Record<string, unknown>;
-      phaseLog?: unknown[];
-      events?: unknown[];
-    };
-    __resyncPhysicsWorker?: () => Promise<void>;
-    __addTransferObject?: (obj: TransferObject) => void;
-    __getProximityObjects?: (
-      posX: number,
-      posY: number,
-      velX: number,
-      velY: number,
-    ) => { id: string; distance: number; lod: string; type: string }[];
-  }
-}
-/* eslint-enable @typescript-eslint/consistent-type-definitions */
+// Window augmentations are in e2e/window.d.ts (shared across all E2E files).
 
 // ---------------------------------------------------------------------------
 // Programmatic test flight (bypasses VAB UI)
@@ -185,8 +153,8 @@ export async function teleportCraft(
     ps.throttle = o.throttle ?? 0;
     ps.firingEngines.clear();
 
-    // Body.
-    if (o.bodyId) fs.bodyId = o.bodyId;
+    // Body (cast: E2E passes a string that is a valid CelestialBody value).
+    if (o.bodyId) (fs as { bodyId: string }).bodyId = o.bodyId;
 
     // Compute common derived values.
     const vel = Math.sqrt((o.velX ?? 0) ** 2 + (o.velY ?? 0) ** 2);
@@ -226,7 +194,7 @@ export async function teleportCraft(
         fs.inOrbit = false;
         fs.orbitalElements = null;
         if (o.transferState) {
-          fs.transferState = o.transferState;
+          (fs as { transferState: unknown }).transferState = o.transferState;
         }
         fs.altitude = o.posY;
         fs.velocity = vel;
@@ -275,10 +243,10 @@ export async function spawnTransferObject(
   obj: TransferObject,
 ): Promise<void> {
   await page.evaluate((o) => {
-    // Import addTransferObject from the module via the global test API.
     // The function is exposed on window for E2E testing.
     if (typeof window.__addTransferObject === 'function') {
-      window.__addTransferObject(o);
+      // Cast: local TransferObject uses string type, source uses a union.
+      window.__addTransferObject(o as Parameters<NonNullable<typeof window.__addTransferObject>>[0]);
     }
   }, obj);
 }
@@ -294,6 +262,9 @@ export async function getVisibleTransferObjects(
     const ps = window.__flightPs;
     if (!ps) return [];
     return window.__getProximityObjects(ps.posX, ps.posY, ps.velX, ps.velY)
-      .map(o => ({ id: o.id, distance: o.distance, lod: o.lod, type: o.type }));
+      .map((o) => {
+        const obj = o as { id: string; distance: number; lod: string; type: string };
+        return { id: obj.id, distance: obj.distance, lod: obj.lod, type: obj.type };
+      });
   });
 }

@@ -37,7 +37,7 @@ export async function seedAndLoadSave(page: Page, envelope: SaveEnvelope | Recor
  */
 export async function getGameState(page: Page): Promise<Record<string, unknown> | null> {
   return page.evaluate(() => {
-    const gs = (window as Record<string, unknown>).__gameState;
+    const gs = window.__gameState;
     if (!gs) return null;
     return JSON.parse(JSON.stringify(gs)) as Record<string, unknown>;
   });
@@ -49,7 +49,7 @@ export async function getGameState(page: Page): Promise<Record<string, unknown> 
  */
 export async function getFlightState(page: Page): Promise<Record<string, unknown> | null> {
   return page.evaluate(() => {
-    const gs = (window as Record<string, unknown>).__gameState as Record<string, unknown> | undefined;
+    const gs = window.__gameState;
     if (!gs?.currentFlight) return null;
     return JSON.parse(JSON.stringify(gs.currentFlight)) as Record<string, unknown>;
   });
@@ -61,16 +61,16 @@ export async function getFlightState(page: Page): Promise<Record<string, unknown
  */
 export async function getPhysicsSnapshot(page: Page): Promise<PhysicsSnapshot | null> {
   return page.evaluate(() => {
-    const ps = (window as Record<string, unknown>).__flightPs as Record<string, unknown> | undefined;
+    const ps = window.__flightPs;
     if (!ps) return null;
     return {
-      posX: ps.posX as number,
-      posY: ps.posY as number,
-      velX: ps.velX as number,
-      velY: ps.velY as number,
-      grounded: ps.grounded as boolean,
-      landed: ps.landed as boolean,
-      crashed: ps.crashed as boolean,
+      posX: ps.posX,
+      posY: ps.posY,
+      velX: ps.velX,
+      velY: ps.velY,
+      grounded: ps.grounded,
+      landed: ps.landed,
+      crashed: ps.crashed,
     };
   });
 }

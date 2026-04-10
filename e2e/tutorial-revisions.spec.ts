@@ -270,9 +270,9 @@ function tutorialSave({
     crew,
     facilities,
     missions: {
-      available: availableIds.map(mkAvailable),
-      accepted: acceptedId ? [mkAccepted(acceptedId)] : [],
-      completed: completedIds.map(mkCompleted),
+      available: availableIds.map(mkAvailable) as unknown as Record<string, unknown>[],
+      accepted: acceptedId ? [mkAccepted(acceptedId)] as unknown as Record<string, unknown>[] : [],
+      completed: completedIds.map(mkCompleted) as unknown as Record<string, unknown>[],
     },
     ...extra,
   });
@@ -302,7 +302,7 @@ async function waitLanded(page: Page, timeout: number = 60_000): Promise<void> {
 
 async function setWarp(page: Page, factor: number): Promise<void> {
   await page.waitForFunction(
-    () => !document.querySelector('.hud-warp-btn')?.disabled,
+    () => !(document.querySelector('.hud-warp-btn') as HTMLButtonElement | null)?.disabled,
     { timeout: 10_000 },
   );
   await page.evaluate((f: number) => window.__testSetTimeWarp?.(f), factor);

@@ -32,8 +32,11 @@ const SCHEMA_VERSION = 1;
 // Schema migration infrastructure
 // ---------------------------------------------------------------------------
 
-/** A function that transforms settings from one schema version to the next. */
-type MigrationFn = (settings: Record<string, unknown>) => Record<string, unknown>;
+/**
+ * A function that transforms settings from one schema version to the next.
+ * Input may be missing new fields (from older versions); output must include them.
+ */
+type MigrationFn = (settings: Partial<PersistedSettings>) => Partial<PersistedSettings>;
 
 /**
  * Registry of schema migrations.  Each entry is a tuple of
@@ -52,11 +55,14 @@ const MIGRATIONS: Array<[number, MigrationFn]> = [];
  * Otherwise walks the MIGRATIONS array and applies each migration whose
  * fromVersion >= envelope.version, in order.  Returns a new envelope with
  * version set to SCHEMA_VERSION.
+ *
+ * The caller (loadSettings) runs mergeWithDefaults() after this, which fills
+ * any fields the migrations didn't set.
  */
 function _migrateSettings(envelope: SettingsEnvelope): SettingsEnvelope {
   if (envelope.version === SCHEMA_VERSION) return envelope;
 
-  let settings: Record<string, unknown> = { ...envelope.settings } as Record<string, unknown>;
+  let settings: Partial<PersistedSettings> = { ...envelope.settings };
 
   for (const [fromVersion, migrate] of MIGRATIONS) {
     if (fromVersion >= envelope.version) {
@@ -64,7 +70,9 @@ function _migrateSettings(envelope: SettingsEnvelope): SettingsEnvelope {
     }
   }
 
-  return { version: SCHEMA_VERSION, settings: settings as unknown as PersistedSettings };
+  // After migrations + the subsequent mergeWithDefaults(), all fields are present.
+  // The Partial is safe because mergeWithDefaults fills any gaps.
+  return { version: SCHEMA_VERSION, settings: settings as PersistedSettings };
 }
 
 // ---------------------------------------------------------------------------

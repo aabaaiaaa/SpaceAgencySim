@@ -4,19 +4,7 @@
 
 import type { Page } from '@playwright/test';
 
-// ---------------------------------------------------------------------------
-// Browser-context window augmentation (these globals are injected at runtime)
-// ---------------------------------------------------------------------------
-
-/* eslint-disable @typescript-eslint/consistent-type-definitions */
-declare global {
-  interface Window {
-    __vabAssembly?: {
-      parts?: { size: number };
-    };
-  }
-}
-/* eslint-enable @typescript-eslint/consistent-type-definitions */
+// Window augmentations are in e2e/window.d.ts (shared across all E2E files).
 
 // ---------------------------------------------------------------------------
 // Navigation helpers

@@ -243,7 +243,7 @@ async function injectOrbitalObject(page: Page, obj: Record<string, unknown>): Pr
     const gs = window.__gameState;
     if (!gs) return;
     if (!gs.orbitalObjects) gs.orbitalObjects = [];
-    (gs.orbitalObjects as Record<string, unknown>[]).push(orbObj);
+    (gs.orbitalObjects as unknown as Record<string, unknown>[]).push(orbObj);
   }, obj);
 }
 
@@ -596,7 +596,7 @@ test.describe('Docking mode local positioning', () => {
 
     // Verify no console errors were thrown by the PixiJS draw calls.
     const errors = await page.evaluate(() => {
-      return ((window as Record<string, unknown>).__consoleErrors as string[] || []).filter(
+      return ((window as unknown as Record<string, unknown>).__consoleErrors as string[] || []).filter(
         (e: string) => e.includes('beginFill') || e.includes('drawCircle') ||
              e.includes('lineStyle') || e.includes('endFill') ||
              e.includes('is not a function'),
@@ -899,7 +899,7 @@ test.describe('Satellite degradation and maintenance', () => {
     // Manually set health to 100 to simulate maintenance.
     await page.evaluate(() => {
       const gs = window.__gameState;
-      const sats = (gs as Record<string, unknown>)?.satelliteNetwork as { satellites: { id: string; health: number }[] } | undefined;
+      const sats = (gs as unknown as Record<string, unknown>)?.satelliteNetwork as { satellites: { id: string; health: number }[] } | undefined;
       const sat = sats?.satellites?.find((s: { id: string }) => s.id === 'sat-manual-1');
       if (sat) sat.health = 100;
     });
@@ -1082,8 +1082,8 @@ test.describe('Docking approach and guidance', () => {
     // Verify station is in the objects list.
     const hasStation = await page.evaluate(() => {
       const gs = window.__gameState;
-      return (gs as Record<string, unknown>)?.orbitalObjects
-        ? ((gs as Record<string, unknown>).orbitalObjects as { id: string }[])?.some((o: { id: string }) => o.id === 'station-1') ?? false
+      return (gs as unknown as Record<string, unknown>)?.orbitalObjects
+        ? ((gs as unknown as Record<string, unknown>).orbitalObjects as { id: string }[])?.some((o: { id: string }) => o.id === 'station-1') ?? false
         : false;
     });
     expect(hasStation).toBe(true);
@@ -1326,8 +1326,8 @@ test.describe('Crew transfer and fuel transfer', () => {
     expect(fs).not.toBeNull();
     const crewEvents = fs!.events.filter((e: { type: string }) => e.type === 'CREW_TRANSFER');
     expect(crewEvents.length).toBeGreaterThanOrEqual(1);
-    expect((crewEvents[0] as { crewIds: string[] }).crewIds).toContain('crew-2');
-    expect((crewEvents[0] as { direction: string }).direction).toBe('TO_STATION');
+    expect((crewEvents[0] as unknown as { crewIds: string[] }).crewIds).toContain('crew-2');
+    expect((crewEvents[0] as unknown as { direction: string }).direction).toBe('TO_STATION');
   });
 
   test('(2) fuel transfer event is logged during docked state', async () => {
@@ -1348,7 +1348,7 @@ test.describe('Crew transfer and fuel transfer', () => {
     expect(fs).not.toBeNull();
     const fuelEvents = fs!.events.filter((e: { type: string }) => e.type === 'FUEL_TRANSFER');
     expect(fuelEvents.length).toBeGreaterThanOrEqual(1);
-    expect((fuelEvents[0] as { amount: number }).amount).toBe(500);
+    expect((fuelEvents[0] as unknown as { amount: number }).amount).toBe(500);
   });
 });
 
@@ -1377,7 +1377,7 @@ test.describe('Power system', () => {
 
     // Wait for power state to be populated.
     await page.waitForFunction(
-      () => window.__flightPs?.powerState?.solarPanelArea > 0,
+      () => window.__flightPs?.powerState?.solarPanelArea! > 0,
       { timeout: 10_000 },
     );
 
@@ -1523,7 +1523,7 @@ test.describe('Grabbing arm and satellite repair', () => {
 
     const hasArm = await page.evaluate(() => {
       const ps = window.__flightPs;
-      const assembly = (window as Record<string, unknown>).__flightAssembly as
+      const assembly = (window as unknown as Record<string, unknown>).__flightAssembly as
         { parts: Map<string, { partId: string }> } | undefined;
       if (!ps || !assembly) return false;
       for (const instanceId of ps.activeParts) {
@@ -1551,7 +1551,7 @@ test.describe('Grabbing arm and satellite repair', () => {
       });
 
       // Apply the repair to satellite health.
-      const network = (gs as Record<string, unknown>).satelliteNetwork as
+      const network = (gs as unknown as Record<string, unknown>).satelliteNetwork as
         { satellites: { id: string; health: number }[] } | undefined;
       const sat = network?.satellites?.find((s: { id: string }) => s.id === 'sat-repair-1');
       if (sat) sat.health = 100;

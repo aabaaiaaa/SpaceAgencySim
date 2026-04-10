@@ -4,14 +4,7 @@
 
 import type { Page } from '@playwright/test';
 
-/* eslint-disable @typescript-eslint/consistent-type-definitions */
-declare global {
-  interface Window {
-    __testSetTimeWarp?: (speed: number) => void;
-    __testGetTimeWarp?: () => number;
-  }
-}
-/* eslint-enable @typescript-eslint/consistent-type-definitions */
+// Window augmentations are in e2e/window.d.ts (shared across all E2E files).
 
 /**
  * Set the simulation time warp multiplier to an arbitrary value.

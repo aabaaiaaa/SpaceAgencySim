@@ -34,7 +34,7 @@ const ALL_VAB_PARTS: string[] = [
 
 async function seedAndOpenVab(page: Page): Promise<void> {
   await page.setViewportSize({ width: VP_W, height: VP_H });
-  const envelope: string = buildSaveEnvelope({ gameMode: 'freeplay', parts: ALL_VAB_PARTS });
+  const envelope = buildSaveEnvelope({ gameMode: 'freeplay', parts: ALL_VAB_PARTS });
   await seedAndLoadSave(page, envelope);
   await dismissWelcomeModal(page);
   await navigateToVab(page);
@@ -122,7 +122,7 @@ test.describe('VAB — Part Disconnection & Reconnection', () => {
     await page.locator('#vab-staging-close').click();
 
     await page.waitForFunction(
-      () => !document.querySelector('#vab-btn-launch')?.disabled,
+      () => !(document.querySelector('#vab-btn-launch') as HTMLButtonElement | null)?.disabled,
       { timeout: 5_000 },
     );
   });
@@ -169,7 +169,7 @@ test.describe('VAB — Part Disconnection & Reconnection', () => {
     expect(checkTexts.some((t: string) => /floating/i.test(t))).toBe(false);
 
     await page.waitForFunction(
-      () => !document.querySelector('#vab-btn-launch')?.disabled,
+      () => !(document.querySelector('#vab-btn-launch') as HTMLButtonElement | null)?.disabled,
       { timeout: 5_000 },
     );
     await page.locator('#vab-engineer-close').click();

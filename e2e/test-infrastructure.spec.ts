@@ -311,7 +311,7 @@ test.describe('E2E Infrastructure — Objective Verification', () => {
   async function setupMissionFlight(browser: Browser): Promise<Page> {
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    const envelope = missionTestFixture(TEST_MISSION);
+    const envelope = missionTestFixture(TEST_MISSION as unknown as Parameters<typeof missionTestFixture>[0]);
     await seedAndLoadSave(page, envelope);
 
     // Verify mission was injected

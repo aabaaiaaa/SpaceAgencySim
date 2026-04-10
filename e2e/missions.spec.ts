@@ -207,7 +207,7 @@ test.describe('Mission Control Flow', () => {
 
     const completedEnvelope: SaveEnvelope = buildSaveEnvelope({
       saveName: 'Mission E2E Test',
-      missions: { available: [], accepted: [], completed: [completedFlight] },
+      missions: { available: [], accepted: [], completed: [completedFlight as unknown as Record<string, unknown>] },
     });
 
     // Re-seed with the completed envelope (overrides beforeEach's fresh seed).
@@ -265,7 +265,7 @@ test.describe('Mission Control Flow', () => {
     // ── Available tab: rewards shown before accepting ──
     const availEnv: SaveEnvelope = buildSaveEnvelope({
       saveName: 'Rewards Available Test',
-      missions: { available: [safeReturnAvailable], accepted: [], completed: [] },
+      missions: { available: [safeReturnAvailable as unknown as Record<string, unknown>], accepted: [], completed: [] },
     });
     // Re-seed with the rewards envelope (overrides beforeEach's fresh seed).
     await seedAndLoadSave(page, availEnv);

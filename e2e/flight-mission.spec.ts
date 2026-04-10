@@ -80,7 +80,7 @@ test.describe('Flight — First Flight Mission Completion', () => {
         (m: { id: string }) => m.id === 'mission-001',
       );
       if (!mission) return false;
-      return mission.objectives.every((o: { completed: boolean }) => o.completed);
+      return mission.objectives!.every((o: { completed: boolean }) => o.completed);
     });
     expect(objectiveCompleted).toBe(true);
 
