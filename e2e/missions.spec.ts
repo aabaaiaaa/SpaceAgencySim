@@ -3,6 +3,7 @@ import {
   STARTING_MONEY,
   FIRST_FLIGHT_MISSION, buildSaveEnvelope, seedAndLoadSave,
 } from './helpers.js';
+import type { SaveEnvelope, MissionsState } from './helpers.js';
 
 /**
  * E2E — Mission Control Flow
@@ -31,6 +32,45 @@ import {
  */
 
 // ---------------------------------------------------------------------------
+// Browser-context window shape for page.evaluate() callbacks.
+//
+// Defined as a local interface (not `declare global`) to avoid conflicting
+// with the narrower Window augmentations in the helper modules.  Inside
+// evaluate callbacks we cast: `(window as unknown as GW)`
+// ---------------------------------------------------------------------------
+
+interface GW {
+  __gameState?: {
+    money?: number;
+    missions?: MissionsState;
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Local mission data interface (mission template spread with status + optional completedDate)
+// ---------------------------------------------------------------------------
+
+interface MissionData {
+  id: string;
+  title: string;
+  description: string;
+  location: string;
+  objectives: {
+    id: string;
+    type: string;
+    target: Record<string, number | string>;
+    completed: boolean;
+    description: string;
+  }[];
+  reward: number;
+  unlocksAfter: string[];
+  unlockedParts: string[];
+  requiredParts?: string[];
+  status: string;
+  completedDate?: string;
+}
+
+// ---------------------------------------------------------------------------
 // Constants & helpers
 // ---------------------------------------------------------------------------
 
@@ -38,7 +78,7 @@ import {
  * The standard fresh-game envelope:
  * only First Flight in the available bucket, nothing accepted or completed.
  */
-const FRESH_ENVELOPE = buildSaveEnvelope({
+const FRESH_ENVELOPE: SaveEnvelope = buildSaveEnvelope({
   saveName: 'Mission E2E Test',
   missions: { available: [{ ...FIRST_FLIGHT_MISSION, status: 'available' }], accepted: [], completed: [] },
 });
@@ -113,14 +153,18 @@ test.describe('Mission Control Flow', () => {
 
   test('(4) accepting a mission deducts nothing from cash (missions are free to accept)', async ({ page }) => {
     // Read cash before accepting.
-    const cashBefore = await page.evaluate(() => window.__gameState?.money);
+    const cashBefore: number | undefined = await page.evaluate(() =>
+      (window as unknown as GW).__gameState?.money
+    );
     expect(cashBefore).toBe(STARTING_MONEY);
 
     // Accept First Flight.
     await page.click('.mc-accept-btn');
 
     // Cash must be exactly the same after accepting.
-    const cashAfter = await page.evaluate(() => window.__gameState?.money);
+    const cashAfter: number | undefined = await page.evaluate(() =>
+      (window as unknown as GW).__gameState?.money
+    );
     expect(cashAfter).toBe(STARTING_MONEY);
   });
 
@@ -155,13 +199,13 @@ test.describe('Mission Control Flow', () => {
   test('(7) simulating mission completion via seeded state shows the mission in the Completed tab with its reward amount', async ({ page }) => {
     test.setTimeout(60_000);
     // Build an envelope where "First Flight" has already been completed.
-    const completedFlight = {
+    const completedFlight: MissionData = {
       ...FIRST_FLIGHT_MISSION,
       status:        'completed',
       completedDate: '2026-02-27T00:00:00.000Z',
     };
 
-    const completedEnvelope = buildSaveEnvelope({
+    const completedEnvelope: SaveEnvelope = buildSaveEnvelope({
       saveName: 'Mission E2E Test',
       missions: { available: [], accepted: [], completed: [completedFlight] },
     });
@@ -192,7 +236,7 @@ test.describe('Mission Control Flow', () => {
     test.setTimeout(60_000);
 
     // Use mission-005 (Safe Return I) which rewards parachute-mk2.
-    const safeReturnAvailable = {
+    const safeReturnAvailable: MissionData = {
       id:           'mission-005',
       title:        'Safe Return I',
       description:  'Land at less than 10 m/s.',
@@ -211,15 +255,15 @@ test.describe('Mission Control Flow', () => {
       status:        'available',
     };
 
-    const safeReturnAccepted = { ...safeReturnAvailable, status: 'accepted' };
-    const safeReturnCompleted = {
+    const safeReturnAccepted: MissionData = { ...safeReturnAvailable, status: 'accepted' };
+    const safeReturnCompleted: MissionData = {
       ...safeReturnAvailable,
       status: 'completed',
       completedDate: '2026-02-27T00:00:00.000Z',
     };
 
     // ── Available tab: rewards shown before accepting ──
-    const availEnv = buildSaveEnvelope({
+    const availEnv: SaveEnvelope = buildSaveEnvelope({
       saveName: 'Rewards Available Test',
       missions: { available: [safeReturnAvailable], accepted: [], completed: [] },
     });
@@ -231,8 +275,9 @@ test.describe('Mission Control Flow', () => {
     await expect(page.locator('.mc-mission-rewards')).toContainText('Mk2 Parachute');
 
     // ── Accepted tab: rewards shown ──
-    await page.evaluate((state) => {
-      Object.assign(window.__gameState.missions, {
+    await page.evaluate((state: MissionData) => {
+      const gw = window as unknown as GW;
+      Object.assign(gw.__gameState!.missions!, {
         available: [],
         accepted: [state],
         completed: [],
@@ -247,8 +292,9 @@ test.describe('Mission Control Flow', () => {
     await expect(page.locator('.mc-mission-rewards')).toContainText('Mk2 Parachute');
 
     // ── Completed tab: parts unlocked column shown ──
-    await page.evaluate((state) => {
-      Object.assign(window.__gameState.missions, {
+    await page.evaluate((state: MissionData) => {
+      const gw = window as unknown as GW;
+      Object.assign(gw.__gameState!.missions!, {
         available: [],
         accepted: [],
         completed: [state],

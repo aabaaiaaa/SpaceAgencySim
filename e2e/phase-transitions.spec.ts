@@ -1,5 +1,5 @@
 /**
- * phase-transitions.spec.js — E2E tests for flight phase transitions.
+ * phase-transitions.spec.ts — E2E tests for flight phase transitions.
  *
  * Each test covers one unique phase transition, using teleport+velocity to
  * get near the transition point and then letting the real physics pipeline
@@ -16,7 +16,7 @@
  *   8. Crash                (impact detection + part destruction)
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page, type Browser } from '@playwright/test';
 import {
   VP_W, VP_H,
   buildSaveEnvelope,
@@ -29,31 +29,71 @@ import {
 } from './helpers.js';
 import { ALL_PARTS } from './fixtures.js';
 
+import type { SaveEnvelope, SaveEnvelopeParams } from './helpers.js';
+
+// ---------------------------------------------------------------------------
+// Browser-context type aliases (used with type assertions inside page.evaluate)
+//
+// These describe the runtime shapes of globals injected by the game.
+// Inside page.evaluate / waitForFunction callbacks we cast `window` to access
+// custom flight globals.  The cast is erased at compile time.
+// ---------------------------------------------------------------------------
+
+interface PhaseLogEntry {
+  from: string;
+  to: string;
+  reason?: string;
+}
+
+interface FlightAssemblyPart {
+  partId: string;
+}
+
+interface GW {
+  __flightPs?: {
+    posX: number; posY: number; velX: number; velY: number;
+    grounded: boolean; landed: boolean; crashed: boolean;
+    throttle: number; controlMode: string;
+    firingEngines: Set<string>; activeParts: Set<string>;
+    parachuteStates?: Map<string, { state: string }>;
+  };
+  __flightState?: {
+    phase: string; inOrbit: boolean; orbitalElements: unknown;
+    altitude: number; velocity: number; horizontalVelocity: number;
+    bodyId: string; phaseLog?: PhaseLogEntry[];
+    events?: { type: string; [key: string]: unknown }[];
+    transferState?: Record<string, unknown>;
+  };
+  __flightAssembly?: { parts: Map<string, FlightAssemblyPart> };
+  __gameState?: { currentFlight?: { events?: { type: string }[] } };
+  __resyncPhysicsWorker?: () => Promise<void>;
+}
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
 // Earth orbital parameters.
-const EARTH_RADIUS = 6_371_000;       // metres
-const EARTH_GM     = 3.986004418e14;  // m³/s²
+const EARTH_RADIUS: number = 6_371_000;       // metres
+const EARTH_GM: number     = 3.986004418e14;  // m³/s²
 
 // Circular orbital velocity at 100 km altitude.
-const ORBIT_ALT = 100_000;
-const ORBIT_VEL = Math.round(Math.sqrt(EARTH_GM / (EARTH_RADIUS + ORBIT_ALT))); // ~7848 m/s
+const ORBIT_ALT: number = 100_000;
+const ORBIT_VEL: number = Math.round(Math.sqrt(EARTH_GM / (EARTH_RADIUS + ORBIT_ALT))); // ~7848 m/s
 
 // Escape velocity at 100 km altitude.
-const ESCAPE_VEL = Math.round(Math.sqrt(2 * EARTH_GM / (EARTH_RADIUS + ORBIT_ALT))); // ~11097 m/s
+const ESCAPE_VEL: number = Math.round(Math.sqrt(2 * EARTH_GM / (EARTH_RADIUS + ORBIT_ALT))); // ~11097 m/s
 
 // Rocket configs.
-const BASIC_ROCKET    = ['probe-core-mk1', 'tank-small', 'engine-spark'];
-const CHUTE_ROCKET    = ['probe-core-mk1', 'parachute-mk1', 'tank-small', 'engine-spark'];
-const ORBITAL_ROCKET  = ['probe-core-mk1', 'tank-large', 'engine-reliant'];
+const BASIC_ROCKET: string[]    = ['probe-core-mk1', 'tank-small', 'engine-spark'];
+const CHUTE_ROCKET: string[]    = ['probe-core-mk1', 'parachute-mk1', 'tank-small', 'engine-spark'];
+const ORBITAL_ROCKET: string[]  = ['probe-core-mk1', 'tank-large', 'engine-reliant'];
 
 // ---------------------------------------------------------------------------
 // Shared fixture
 // ---------------------------------------------------------------------------
 
-function phaseTestFixture(overrides = {}) {
+function phaseTestFixture(overrides: SaveEnvelopeParams = {}): SaveEnvelope {
   return buildSaveEnvelope({
     saveName:     'Phase Transition Test',
     agencyName:   'Phase Test Agency',
@@ -70,11 +110,11 @@ function phaseTestFixture(overrides = {}) {
  * Helper: wait for a specific phase to appear in the phaseLog via real
  * physics transitions (not direct state mutation).
  */
-async function waitForPhaseInLog(page, targetPhase, timeout = 30_000) {
+async function waitForPhaseInLog(page: Page, targetPhase: string, timeout: number = 30_000): Promise<void> {
   await page.waitForFunction(
-    (phase) => {
-      const fs = window.__flightState;
-      return fs?.phaseLog?.some((entry) => entry.to === phase) ?? false;
+    (phase: string) => {
+      const fs = (window as unknown as GW).__flightState;
+      return fs?.phaseLog?.some((entry: PhaseLogEntry) => entry.to === phase) ?? false;
     },
     targetPhase,
     { timeout },
@@ -84,9 +124,9 @@ async function waitForPhaseInLog(page, targetPhase, timeout = 30_000) {
 /**
  * Helper: wait for the current phase to be a specific value.
  */
-async function waitForPhase(page, targetPhase, timeout = 30_000) {
+async function waitForPhase(page: Page, targetPhase: string, timeout: number = 30_000): Promise<void> {
   await page.waitForFunction(
-    (phase) => window.__flightState?.phase === phase,
+    (phase: string) => (window as unknown as GW).__flightState?.phase === phase,
     targetPhase,
     { timeout },
   );
@@ -95,8 +135,8 @@ async function waitForPhase(page, targetPhase, timeout = 30_000) {
 /**
  * Helper: read the full phaseLog from the flight state.
  */
-async function getPhaseLog(page) {
-  return page.evaluate(() => window.__flightState?.phaseLog ?? []);
+async function getPhaseLog(page: Page): Promise<PhaseLogEntry[]> {
+  return page.evaluate(() => (window as unknown as GW).__flightState?.phaseLog ?? []);
 }
 
 // ===========================================================================
@@ -104,17 +144,19 @@ async function getPhaseLog(page) {
 // ===========================================================================
 
 test.describe('Phase Transition: PRELAUNCH → LAUNCH', () => {
-  test('engine ignition transitions from PRELAUNCH to LAUNCH', async ({ browser }) => {
+  test('engine ignition transitions from PRELAUNCH to LAUNCH', async ({ browser }: { browser: Browser }) => {
     test.setTimeout(60_000);
-    const page = await browser.newPage();
+    const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
-    const envelope = phaseTestFixture();
+    const envelope: SaveEnvelope = phaseTestFixture();
     await seedAndLoadSave(page, envelope);
     await startTestFlight(page, BASIC_ROCKET);
 
     // Verify we start in PRELAUNCH.
-    const initialPhase = await page.evaluate(() => window.__flightState?.phase);
+    const initialPhase: string | undefined = await page.evaluate(
+      () => (window as unknown as GW).__flightState?.phase,
+    );
     expect(initialPhase).toBe('PRELAUNCH');
 
     // Press Space to stage (ignite the engine).
@@ -124,11 +166,11 @@ test.describe('Phase Transition: PRELAUNCH → LAUNCH', () => {
     // transition happened through evaluateAutoTransitions, not direct mutation.
     await waitForPhaseInLog(page, 'LAUNCH', 5_000);
 
-    const log = await getPhaseLog(page);
-    const launchEntry = log.find((e) => e.to === 'LAUNCH');
+    const log: PhaseLogEntry[] = await getPhaseLog(page);
+    const launchEntry: PhaseLogEntry | undefined = log.find((e: PhaseLogEntry) => e.to === 'LAUNCH');
     expect(launchEntry).toBeTruthy();
-    expect(launchEntry.from).toBe('PRELAUNCH');
-    expect(launchEntry.reason).toContain('ignition');
+    expect(launchEntry!.from).toBe('PRELAUNCH');
+    expect(launchEntry!.reason).toContain('ignition');
 
     await page.close();
   });
@@ -139,12 +181,12 @@ test.describe('Phase Transition: PRELAUNCH → LAUNCH', () => {
 // ===========================================================================
 
 test.describe('Phase Transition: LAUNCH → FLIGHT', () => {
-  test('liftoff transitions from LAUNCH to FLIGHT', async ({ browser }) => {
+  test('liftoff transitions from LAUNCH to FLIGHT', async ({ browser }: { browser: Browser }) => {
     test.setTimeout(60_000);
-    const page = await browser.newPage();
+    const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
-    const envelope = phaseTestFixture();
+    const envelope: SaveEnvelope = phaseTestFixture();
     await seedAndLoadSave(page, envelope);
     await startTestFlight(page, BASIC_ROCKET);
 
@@ -154,15 +196,17 @@ test.describe('Phase Transition: LAUNCH → FLIGHT', () => {
     // Wait for FLIGHT phase — the rocket lifts off the pad.
     await waitForPhaseInLog(page, 'FLIGHT', 10_000);
 
-    const log = await getPhaseLog(page);
-    const flightEntry = log.find((e) => e.to === 'FLIGHT' && e.from === 'LAUNCH');
+    const log: PhaseLogEntry[] = await getPhaseLog(page);
+    const flightEntry: PhaseLogEntry | undefined = log.find(
+      (e: PhaseLogEntry) => e.to === 'FLIGHT' && e.from === 'LAUNCH',
+    );
     expect(flightEntry).toBeTruthy();
-    expect(flightEntry.reason).toContain('Liftoff');
+    expect(flightEntry!.reason).toContain('Liftoff');
 
     // Verify physics state: not grounded, posY > 0.
-    const ps = await page.evaluate(() => ({
-      grounded: window.__flightPs?.grounded,
-      posY: window.__flightPs?.posY,
+    const ps: { grounded: boolean | undefined; posY: number | undefined } = await page.evaluate(() => ({
+      grounded: (window as unknown as GW).__flightPs?.grounded,
+      posY: (window as unknown as GW).__flightPs?.posY,
     }));
     expect(ps.grounded).toBe(false);
     expect(ps.posY).toBeGreaterThan(0);
@@ -176,12 +220,12 @@ test.describe('Phase Transition: LAUNCH → FLIGHT', () => {
 // ===========================================================================
 
 test.describe('Phase Transition: FLIGHT → ORBIT', () => {
-  test('reaching orbital velocity transitions from FLIGHT to ORBIT', async ({ browser }) => {
+  test('reaching orbital velocity transitions from FLIGHT to ORBIT', async ({ browser }: { browser: Browser }) => {
     test.setTimeout(60_000);
-    const page = await browser.newPage();
+    const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
-    const envelope = phaseTestFixture();
+    const envelope: SaveEnvelope = phaseTestFixture();
     await seedAndLoadSave(page, envelope);
     await startTestFlight(page, ORBITAL_ROCKET);
 
@@ -200,18 +244,22 @@ test.describe('Phase Transition: FLIGHT → ORBIT', () => {
     // checkOrbitStatus() and triggers FLIGHT → ORBIT.
     await waitForOrbit(page);
 
-    const log = await getPhaseLog(page);
-    const orbitEntry = log.find((e) => e.to === 'ORBIT' && e.from === 'FLIGHT');
+    const log: PhaseLogEntry[] = await getPhaseLog(page);
+    const orbitEntry: PhaseLogEntry | undefined = log.find(
+      (e: PhaseLogEntry) => e.to === 'ORBIT' && e.from === 'FLIGHT',
+    );
     expect(orbitEntry).toBeTruthy();
 
     // Verify orbital elements were computed (not null).
-    const orbitalElements = await page.evaluate(
-      () => window.__flightState?.orbitalElements,
+    const orbitalElements: unknown = await page.evaluate(
+      () => (window as unknown as GW).__flightState?.orbitalElements,
     );
     expect(orbitalElements).toBeTruthy();
 
     // Verify inOrbit flag.
-    const inOrbit = await page.evaluate(() => window.__flightState?.inOrbit);
+    const inOrbit: boolean | undefined = await page.evaluate(
+      () => (window as unknown as GW).__flightState?.inOrbit,
+    );
     expect(inOrbit).toBe(true);
 
     await page.close();
@@ -223,12 +271,12 @@ test.describe('Phase Transition: FLIGHT → ORBIT', () => {
 // ===========================================================================
 
 test.describe('Phase Transition: ORBIT → MANOEUVRE', () => {
-  test('starting a burn in orbit transitions to MANOEUVRE', async ({ browser }) => {
+  test('starting a burn in orbit transitions to MANOEUVRE', async ({ browser }: { browser: Browser }) => {
     test.setTimeout(60_000);
-    const page = await browser.newPage();
+    const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
-    const envelope = phaseTestFixture();
+    const envelope: SaveEnvelope = phaseTestFixture();
     await seedAndLoadSave(page, envelope);
     await startTestFlight(page, ORBITAL_ROCKET);
 
@@ -246,20 +294,21 @@ test.describe('Phase Transition: ORBIT → MANOEUVRE', () => {
     // activeParts. The actual thrust, orbit modification, and phase
     // transition all run through the real physics pipeline.
     await page.evaluate(async () => {
-      const ps = window.__flightPs;
-      const assembly = window.__flightAssembly;
+      const w: GW = window as unknown as GW;
+      const ps = w.__flightPs;
+      const assembly = w.__flightAssembly;
       if (!ps || !assembly) return;
       ps.controlMode = 'NORMAL';
       ps.throttle = 1.0;
       for (const [id, placed] of assembly.parts) {
-        const def = placed.partId;
+        const def: string = placed.partId;
         if (ps.activeParts.has(id) &&
             (def.includes('engine') || def.includes('srb'))) {
           ps.firingEngines.add(id);
         }
       }
-      if (typeof window.__resyncPhysicsWorker === 'function') {
-        await window.__resyncPhysicsWorker();
+      if (typeof w.__resyncPhysicsWorker === 'function') {
+        await w.__resyncPhysicsWorker();
       }
     });
 
@@ -267,10 +316,12 @@ test.describe('Phase Transition: ORBIT → MANOEUVRE', () => {
     // isOrbitalBurnActive (throttle > 0 + firingEngines non-empty + NORMAL mode).
     await waitForPhaseInLog(page, 'MANOEUVRE', 10_000);
 
-    const log = await getPhaseLog(page);
-    const manEntry = log.find((e) => e.to === 'MANOEUVRE' && e.from === 'ORBIT');
+    const log: PhaseLogEntry[] = await getPhaseLog(page);
+    const manEntry: PhaseLogEntry | undefined = log.find(
+      (e: PhaseLogEntry) => e.to === 'MANOEUVRE' && e.from === 'ORBIT',
+    );
     expect(manEntry).toBeTruthy();
-    expect(manEntry.reason).toContain('burn');
+    expect(manEntry!.reason).toContain('burn');
 
     await page.close();
   });
@@ -281,12 +332,12 @@ test.describe('Phase Transition: ORBIT → MANOEUVRE', () => {
 // ===========================================================================
 
 test.describe('Phase Transition: MANOEUVRE → TRANSFER', () => {
-  test('reaching escape velocity during manoeuvre transitions to TRANSFER', async ({ browser }) => {
+  test('reaching escape velocity during manoeuvre transitions to TRANSFER', async ({ browser }: { browser: Browser }) => {
     test.setTimeout(60_000);
-    const page = await browser.newPage();
+    const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
-    const envelope = phaseTestFixture();
+    const envelope: SaveEnvelope = phaseTestFixture();
     await seedAndLoadSave(page, envelope);
     await startTestFlight(page, ORBITAL_ROCKET);
 
@@ -303,15 +354,16 @@ test.describe('Phase Transition: MANOEUVRE → TRANSFER', () => {
     // The burn runs through real physics — the engine thrust pushes
     // velocity past the escape threshold naturally.
     await page.evaluate(async () => {
-      const ps = window.__flightPs;
-      const assembly = window.__flightAssembly;
+      const w: GW = window as unknown as GW;
+      const ps = w.__flightPs;
+      const assembly = w.__flightAssembly;
       if (!ps || !assembly) return;
 
       // Set velocity above escape (~11097 m/s at 100km).
       // Clear orbital elements so Keplerian propagation doesn't override velocity.
       ps.velX = 11_200;
       ps.velY = 0;
-      const fs = window.__flightState;
+      const fs = w.__flightState;
       if (fs) fs.orbitalElements = null;
 
       // Fire engines in NORMAL mode to get into MANOEUVRE.
@@ -323,8 +375,8 @@ test.describe('Phase Transition: MANOEUVRE → TRANSFER', () => {
           ps.firingEngines.add(id);
         }
       }
-      if (typeof window.__resyncPhysicsWorker === 'function') {
-        await window.__resyncPhysicsWorker();
+      if (typeof w.__resyncPhysicsWorker === 'function') {
+        await w.__resyncPhysicsWorker();
       }
     });
 
@@ -338,12 +390,14 @@ test.describe('Phase Transition: MANOEUVRE → TRANSFER', () => {
     // Wait for TRANSFER phase (escape trajectory detection).
     await waitForPhaseInLog(page, 'TRANSFER', 20_000);
 
-    const log = await getPhaseLog(page);
-    const transferEntry = log.find((e) => e.to === 'TRANSFER');
+    const log: PhaseLogEntry[] = await getPhaseLog(page);
+    const transferEntry: PhaseLogEntry | undefined = log.find((e: PhaseLogEntry) => e.to === 'TRANSFER');
     expect(transferEntry).toBeTruthy();
 
     // Verify inOrbit is false (we've left orbit).
-    const inOrbit = await page.evaluate(() => window.__flightState?.inOrbit);
+    const inOrbit: boolean | undefined = await page.evaluate(
+      () => (window as unknown as GW).__flightState?.inOrbit,
+    );
     expect(inOrbit).toBe(false);
 
     await page.close();
@@ -355,12 +409,12 @@ test.describe('Phase Transition: MANOEUVRE → TRANSFER', () => {
 // ===========================================================================
 
 test.describe('Phase Transition: Reentry', () => {
-  test('lowering periapsis triggers ORBIT → REENTRY → FLIGHT', async ({ browser }) => {
+  test('lowering periapsis triggers ORBIT → REENTRY → FLIGHT', async ({ browser }: { browser: Browser }) => {
     test.setTimeout(90_000);
-    const page = await browser.newPage();
+    const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
-    const envelope = phaseTestFixture();
+    const envelope: SaveEnvelope = phaseTestFixture();
     await seedAndLoadSave(page, envelope);
     await startTestFlight(page, ORBITAL_ROCKET);
 
@@ -378,23 +432,24 @@ test.describe('Phase Transition: Reentry', () => {
     // the physics recomputes the orbit from the new velocity and detects
     // it's no longer valid (triggers deorbit).
     await page.evaluate(async () => {
-      const ps = window.__flightPs;
-      const fs = window.__flightState;
+      const w: GW = window as unknown as GW;
+      const ps = w.__flightPs;
+      const fs = w.__flightState;
       if (!ps || !fs) return;
       ps.velX = ps.velX - 300;
       fs.orbitalElements = null;
-      if (typeof window.__resyncPhysicsWorker === 'function') {
-        await window.__resyncPhysicsWorker();
+      if (typeof w.__resyncPhysicsWorker === 'function') {
+        await w.__resyncPhysicsWorker();
       }
     });
 
     // The deorbit warning fires after a 2-second delay, then transitions to REENTRY.
     await waitForPhaseInLog(page, 'REENTRY', 15_000);
 
-    const log = await getPhaseLog(page);
-    const reentryEntry = log.find((e) => e.to === 'REENTRY');
+    const log: PhaseLogEntry[] = await getPhaseLog(page);
+    const reentryEntry: PhaseLogEntry | undefined = log.find((e: PhaseLogEntry) => e.to === 'REENTRY');
     expect(reentryEntry).toBeTruthy();
-    expect(reentryEntry.from).toBe('ORBIT');
+    expect(reentryEntry!.from).toBe('ORBIT');
 
     // Now let the craft descend. Once below 70 km, REENTRY → FLIGHT should fire.
     // High warp speed to cover the 30km descent quickly.
@@ -402,12 +457,12 @@ test.describe('Phase Transition: Reentry', () => {
 
     await waitForPhase(page, 'FLIGHT', 60_000);
 
-    const log2 = await getPhaseLog(page);
-    const flightEntry = log2.find(
-      (e) => e.to === 'FLIGHT' && e.from === 'REENTRY',
+    const log2: PhaseLogEntry[] = await getPhaseLog(page);
+    const flightEntry: PhaseLogEntry | undefined = log2.find(
+      (e: PhaseLogEntry) => e.to === 'FLIGHT' && e.from === 'REENTRY',
     );
     expect(flightEntry).toBeTruthy();
-    expect(flightEntry.reason).toContain('Atmospheric');
+    expect(flightEntry!.reason).toContain('Atmospheric');
 
     await page.close();
   });
@@ -418,12 +473,12 @@ test.describe('Phase Transition: Reentry', () => {
 // ===========================================================================
 
 test.describe('Phase Transition: Landing', () => {
-  test('parachute descent leads to safe landing via real physics', async ({ browser }) => {
+  test('parachute descent leads to safe landing via real physics', async ({ browser }: { browser: Browser }) => {
     test.setTimeout(60_000);
-    const page = await browser.newPage();
+    const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
-    const envelope = phaseTestFixture();
+    const envelope: SaveEnvelope = phaseTestFixture();
     await seedAndLoadSave(page, envelope);
 
     // Use a rocket with a parachute. Custom staging ensures:
@@ -453,7 +508,8 @@ test.describe('Phase Transition: Landing', () => {
 
     // Wait for parachute to be deploying or deployed.
     await page.waitForFunction(() => {
-      const ps = window.__flightPs;
+      const w: GW = window as unknown as GW;
+      const ps = w.__flightPs;
       if (!ps?.parachuteStates) return false;
       for (const [, entry] of ps.parachuteStates) {
         if (entry.state === 'deploying' || entry.state === 'deployed') return true;
@@ -466,25 +522,26 @@ test.describe('Phase Transition: Landing', () => {
 
     // Wait for landing.
     await page.waitForFunction(
-      () => window.__flightPs?.landed === true,
+      () => (window as unknown as GW).__flightPs?.landed === true,
       { timeout: 30_000 },
     );
 
     // Verify it was a safe landing, not a crash.
-    const result = await page.evaluate(() => ({
-      landed: window.__flightPs?.landed,
-      crashed: window.__flightPs?.crashed,
-      posY: window.__flightPs?.posY,
-    }));
+    const result: { landed: boolean | undefined; crashed: boolean | undefined; posY: number | undefined } =
+      await page.evaluate(() => ({
+        landed: (window as unknown as GW).__flightPs?.landed,
+        crashed: (window as unknown as GW).__flightPs?.crashed,
+        posY: (window as unknown as GW).__flightPs?.posY,
+      }));
     expect(result.landed).toBe(true);
     expect(result.crashed).toBe(false);
     expect(result.posY).toBeLessThanOrEqual(1);
 
     // Verify a LANDING event was recorded through the physics pipeline.
-    const events = await page.evaluate(
-      () => window.__gameState?.currentFlight?.events ?? [],
+    const events: { type: string }[] = await page.evaluate(
+      () => (window as unknown as GW).__gameState?.currentFlight?.events ?? [],
     );
-    const landingEvent = events.find((e) => e.type === 'LANDING');
+    const landingEvent: { type: string } | undefined = events.find((e: { type: string }) => e.type === 'LANDING');
     expect(landingEvent).toBeTruthy();
 
     await page.close();
@@ -496,12 +553,12 @@ test.describe('Phase Transition: Landing', () => {
 // ===========================================================================
 
 test.describe('Phase Transition: Crash', () => {
-  test('high-speed ground impact triggers crash detection', async ({ browser }) => {
+  test('high-speed ground impact triggers crash detection', async ({ browser }: { browser: Browser }) => {
     test.setTimeout(60_000);
-    const page = await browser.newPage();
+    const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
-    const envelope = phaseTestFixture();
+    const envelope: SaveEnvelope = phaseTestFixture();
     await seedAndLoadSave(page, envelope);
     await startTestFlight(page, BASIC_ROCKET);
 
@@ -517,23 +574,23 @@ test.describe('Phase Transition: Crash', () => {
 
     // Let physics detect the impact.
     await page.waitForFunction(
-      () => window.__flightPs?.crashed === true,
+      () => (window as unknown as GW).__flightPs?.crashed === true,
       { timeout: 15_000 },
     );
 
     // Verify crash state.
-    const result = await page.evaluate(() => ({
-      crashed: window.__flightPs?.crashed,
-      landed: window.__flightPs?.landed,
+    const result: { crashed: boolean | undefined; landed: boolean | undefined } = await page.evaluate(() => ({
+      crashed: (window as unknown as GW).__flightPs?.crashed,
+      landed: (window as unknown as GW).__flightPs?.landed,
     }));
     expect(result.crashed).toBe(true);
     expect(result.landed).toBe(false);
 
     // Verify a CRASH event was recorded through the physics pipeline.
-    const events = await page.evaluate(
-      () => window.__gameState?.currentFlight?.events ?? [],
+    const events: { type: string }[] = await page.evaluate(
+      () => (window as unknown as GW).__gameState?.currentFlight?.events ?? [],
     );
-    const crashEvent = events.find((e) => e.type === 'CRASH');
+    const crashEvent: { type: string } | undefined = events.find((e: { type: string }) => e.type === 'CRASH');
     expect(crashEvent).toBeTruthy();
 
     await page.close();
@@ -545,26 +602,26 @@ test.describe('Phase Transition: Crash', () => {
 // ===========================================================================
 
 // Moon's orbital distance from Earth centre and SOI radius.
-const MOON_ORBIT_R  = 384_400_000;  // metres from Earth centre
-const MOON_SOI      = 66_100_000;   // metres
-const MOON_RADIUS   = 1_737_400;    // metres
-const MOON_GM       = 4.9048695e12; // m³/s²
-const MOON_MIN_ORBIT = 15_000;      // metres
+const MOON_ORBIT_R: number  = 384_400_000;  // metres from Earth centre
+const MOON_SOI: number      = 66_100_000;   // metres
+const MOON_RADIUS: number   = 1_737_400;    // metres
+const MOON_GM: number       = 4.9048695e12; // m³/s²
+const MOON_MIN_ORBIT: number = 15_000;      // metres
 
 test.describe('Phase Transition: TRANSFER → CAPTURE → ORBIT', () => {
-  test('entering Moon SOI transitions TRANSFER → CAPTURE → ORBIT', async ({ browser }) => {
+  test('entering Moon SOI transitions TRANSFER → CAPTURE → ORBIT', async ({ browser }: { browser: Browser }) => {
     test.setTimeout(60_000);
-    const page = await browser.newPage();
+    const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
-    const envelope = phaseTestFixture();
+    const envelope: SaveEnvelope = phaseTestFixture();
     await seedAndLoadSave(page, envelope);
     await startTestFlight(page, ORBITAL_ROCKET);
 
     // Step 1: Teleport to TRANSFER phase, just INSIDE the Moon's SOI.
     // The SOI check uses |craftR - childOrbitR| < childSOI, so placing
     // 100km inside the boundary triggers CAPTURE immediately.
-    const insideMoonSOI = MOON_ORBIT_R - EARTH_RADIUS - MOON_SOI + 100_000;
+    const insideMoonSOI: number = MOON_ORBIT_R - EARTH_RADIUS - MOON_SOI + 100_000;
     await teleportCraft(page, {
       posY: insideMoonSOI,
       velX: 0,
@@ -586,21 +643,24 @@ test.describe('Phase Transition: TRANSFER → CAPTURE → ORBIT', () => {
     // CAPTURE should trigger within a few physics ticks.
     await waitForPhaseInLog(page, 'CAPTURE', 10_000);
 
-    const log1 = await getPhaseLog(page);
-    const captureEntry = log1.find((e) => e.to === 'CAPTURE');
+    const log1: PhaseLogEntry[] = await getPhaseLog(page);
+    const captureEntry: PhaseLogEntry | undefined = log1.find((e: PhaseLogEntry) => e.to === 'CAPTURE');
     expect(captureEntry).toBeTruthy();
 
     // After CAPTURE, bodyId should change to MOON.
-    const bodyAfterCapture = await page.evaluate(() => window.__flightState?.bodyId);
+    const bodyAfterCapture: string | undefined = await page.evaluate(
+      () => (window as unknown as GW).__flightState?.bodyId,
+    );
     expect(bodyAfterCapture).toBe('MOON');
 
     // Step 2: Set Moon-relative position + orbital velocity for ORBIT detection.
     // Moon min orbit altitude = 15,000m.
-    const moonOrbitAlt = 50_000;
-    const moonOrbitVel = Math.round(Math.sqrt(MOON_GM / (MOON_RADIUS + moonOrbitAlt)));
-    await page.evaluate(async (v) => {
-      const ps = window.__flightPs;
-      const fs = window.__flightState;
+    const moonOrbitAlt: number = 50_000;
+    const moonOrbitVel: number = Math.round(Math.sqrt(MOON_GM / (MOON_RADIUS + moonOrbitAlt)));
+    await page.evaluate(async (v: { alt: number; vel: number }) => {
+      const w: GW = window as unknown as GW;
+      const ps = w.__flightPs;
+      const fs = w.__flightState;
       if (!ps || !fs) return;
       ps.posX = 0;
       ps.posY = v.alt;
@@ -609,16 +669,18 @@ test.describe('Phase Transition: TRANSFER → CAPTURE → ORBIT', () => {
       fs.altitude = v.alt;
       fs.velocity = v.vel;
       fs.horizontalVelocity = v.vel;
-      if (typeof window.__resyncPhysicsWorker === 'function') {
-        await window.__resyncPhysicsWorker();
+      if (typeof w.__resyncPhysicsWorker === 'function') {
+        await w.__resyncPhysicsWorker();
       }
     }, { alt: moonOrbitAlt, vel: moonOrbitVel });
 
     // ORBIT should be detected within a few physics ticks.
     await waitForPhaseInLog(page, 'ORBIT', 15_000);
 
-    const log2 = await getPhaseLog(page);
-    const orbitEntry = log2.find((e) => e.to === 'ORBIT' && log2.indexOf(e) > log2.indexOf(captureEntry));
+    const log2: PhaseLogEntry[] = await getPhaseLog(page);
+    const orbitEntry: PhaseLogEntry | undefined = log2.find(
+      (e: PhaseLogEntry) => e.to === 'ORBIT' && log2.indexOf(e) > log2.indexOf(captureEntry!),
+    );
     expect(orbitEntry).toBeTruthy();
 
     await page.close();

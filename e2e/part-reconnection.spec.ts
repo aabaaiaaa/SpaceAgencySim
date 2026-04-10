@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import {
   VP_W, VP_H,
   CENTRE_X, CANVAS_CENTRE_Y,
@@ -12,41 +12,54 @@ import {
  * Each test is independent — seeds its own state and builds its own rocket.
  */
 
-const CMD_DROP_Y    = CANVAS_CENTRE_Y;
-const TANK_DROP_Y   = CMD_DROP_Y + 40;
-const ENGINE_DROP_Y = TANK_DROP_Y + 35;
+interface VabAssembly {
+  parts: Map<string, { partId: string; x: number; y: number }>;
+  connections: unknown[];
+}
 
-const ALL_VAB_PARTS = [
+interface GW {
+  __vabAssembly?: VabAssembly;
+  __vabWorldToScreen?: (x: number, y: number) => { screenX: number; screenY: number };
+  __flightPs?: { posY: number };
+}
+
+const CMD_DROP_Y: number    = CANVAS_CENTRE_Y;
+const TANK_DROP_Y: number   = CMD_DROP_Y + 40;
+const ENGINE_DROP_Y: number = TANK_DROP_Y + 35;
+
+const ALL_VAB_PARTS: string[] = [
   'cmd-mk1', 'probe-core-mk1', 'tank-small', 'tank-medium', 'engine-spark',
   'engine-reliant', 'parachute-mk1', 'decoupler-stack-tr18',
 ];
 
-async function seedAndOpenVab(page) {
+async function seedAndOpenVab(page: Page): Promise<void> {
   await page.setViewportSize({ width: VP_W, height: VP_H });
-  const envelope = buildSaveEnvelope({ gameMode: 'freeplay', parts: ALL_VAB_PARTS });
+  const envelope: string = buildSaveEnvelope({ gameMode: 'freeplay', parts: ALL_VAB_PARTS });
   await seedAndLoadSave(page, envelope);
   await dismissWelcomeModal(page);
   await navigateToVab(page);
 }
 
-async function buildThreePartRocket(page) {
+async function buildThreePartRocket(page: Page): Promise<void> {
   await placePart(page, 'cmd-mk1', CENTRE_X, CMD_DROP_Y, 1);
   await placePart(page, 'tank-small', CENTRE_X, TANK_DROP_Y, 2);
   await placePart(page, 'engine-spark', CENTRE_X, ENGINE_DROP_Y, 3);
 }
 
-async function getPartScreenPos(page, instanceId) {
-  return page.evaluate((id) => {
-    const a = window.__vabAssembly;
+async function getPartScreenPos(page: Page, instanceId: string): Promise<{ x: number; y: number } | null> {
+  return page.evaluate((id: string) => {
+    const a = (window as unknown as GW).__vabAssembly;
     const placed = a?.parts?.get(id);
     if (!placed) return null;
-    const { screenX, screenY } = window.__vabWorldToScreen(placed.x, placed.y);
+    const toScreen = (window as unknown as GW).__vabWorldToScreen;
+    if (!toScreen) return null;
+    const { screenX, screenY } = toScreen(placed.x, placed.y);
     return { x: screenX, y: screenY };
   }, instanceId);
 }
 
-async function dragPlacedPart(page, instanceId, targetX, targetY) {
-  const pos = await getPartScreenPos(page, instanceId);
+async function dragPlacedPart(page: Page, instanceId: string, targetX: number, targetY: number): Promise<void> {
+  const pos: { x: number; y: number } | null = await getPartScreenPos(page, instanceId);
   if (!pos) throw new Error(`Part ${instanceId} not found in assembly`);
   await page.mouse.move(pos.x, pos.y);
   await page.mouse.down();
@@ -55,30 +68,32 @@ async function dragPlacedPart(page, instanceId, targetX, targetY) {
   await page.mouse.up();
 }
 
-async function findTankInstanceId(page) {
+async function findTankInstanceId(page: Page): Promise<string | null> {
   return page.evaluate(() => {
-    for (const [id, p] of window.__vabAssembly.parts) {
+    const a = (window as unknown as GW).__vabAssembly;
+    if (!a) return null;
+    for (const [id, p] of a.parts) {
       if (p.partId === 'tank-small') return id;
     }
     return null;
   });
 }
 
-async function disconnectTank(page) {
-  const tankId = await findTankInstanceId(page);
+async function disconnectTank(page: Page): Promise<string> {
+  const tankId: string | null = await findTankInstanceId(page);
   expect(tankId).not.toBeNull();
-  await dragPlacedPart(page, tankId, CENTRE_X + 200, CANVAS_CENTRE_Y + 100);
+  await dragPlacedPart(page, tankId!, CENTRE_X + 200, CANVAS_CENTRE_Y + 100);
   await page.waitForFunction(
-    () => (window.__vabAssembly?.connections?.length ?? 99) === 0,
+    () => ((window as unknown as GW).__vabAssembly?.connections?.length ?? 99) === 0,
     { timeout: 5_000 },
   );
-  return tankId;
+  return tankId!;
 }
 
-async function reconnectTank(page, tankId) {
+async function reconnectTank(page: Page, tankId: string): Promise<void> {
   await dragPlacedPart(page, tankId, CENTRE_X, TANK_DROP_Y);
   await page.waitForFunction(
-    () => (window.__vabAssembly?.connections?.length ?? 0) >= 2,
+    () => ((window as unknown as GW).__vabAssembly?.connections?.length ?? 0) >= 2,
     { timeout: 5_000 },
   );
 }
@@ -90,7 +105,9 @@ test.describe('VAB — Part Disconnection & Reconnection', () => {
     await seedAndOpenVab(page);
     await buildThreePartRocket(page);
 
-    const connCount = await page.evaluate(() => window.__vabAssembly?.connections?.length ?? 0);
+    const connCount: number = await page.evaluate(
+      () => (window as unknown as GW).__vabAssembly?.connections?.length ?? 0,
+    );
     expect(connCount).toBe(2);
   });
 
@@ -119,8 +136,8 @@ test.describe('VAB — Part Disconnection & Reconnection', () => {
     await page.click('#vab-btn-engineer');
     await expect(page.locator('#vab-engineer-panel')).toBeVisible();
 
-    const checkTexts = await page.locator('#vab-engineer-panel .vab-val-msg').allTextContents();
-    expect(checkTexts.some(t => /floating/i.test(t))).toBe(true);
+    const checkTexts: string[] = await page.locator('#vab-engineer-panel .vab-val-msg').allTextContents();
+    expect(checkTexts.some((t: string) => /floating/i.test(t))).toBe(true);
     await expect(page.locator('#vab-btn-launch')).toBeDisabled();
     await page.locator('#vab-engineer-close').click();
   });
@@ -129,10 +146,12 @@ test.describe('VAB — Part Disconnection & Reconnection', () => {
     test.setTimeout(120_000);
     await seedAndOpenVab(page);
     await buildThreePartRocket(page);
-    const tankId = await disconnectTank(page);
+    const tankId: string = await disconnectTank(page);
     await reconnectTank(page, tankId);
 
-    const connCount = await page.evaluate(() => window.__vabAssembly?.connections?.length ?? 0);
+    const connCount: number = await page.evaluate(
+      () => (window as unknown as GW).__vabAssembly?.connections?.length ?? 0,
+    );
     expect(connCount).toBe(2);
   });
 
@@ -140,14 +159,14 @@ test.describe('VAB — Part Disconnection & Reconnection', () => {
     test.setTimeout(120_000);
     await seedAndOpenVab(page);
     await buildThreePartRocket(page);
-    const tankId = await disconnectTank(page);
+    const tankId: string = await disconnectTank(page);
     await reconnectTank(page, tankId);
 
     await page.click('#vab-btn-engineer');
     await expect(page.locator('#vab-engineer-panel')).toBeVisible();
 
-    const checkTexts = await page.locator('#vab-engineer-panel .vab-val-msg').allTextContents();
-    expect(checkTexts.some(t => /floating/i.test(t))).toBe(false);
+    const checkTexts: string[] = await page.locator('#vab-engineer-panel .vab-val-msg').allTextContents();
+    expect(checkTexts.some((t: string) => /floating/i.test(t))).toBe(false);
 
     await page.waitForFunction(
       () => !document.querySelector('#vab-btn-launch')?.disabled,
@@ -160,12 +179,14 @@ test.describe('VAB — Part Disconnection & Reconnection', () => {
     test.setTimeout(120_000);
     await seedAndOpenVab(page);
     await buildThreePartRocket(page);
-    const tankId = await disconnectTank(page);
+    const tankId: string = await disconnectTank(page);
     await reconnectTank(page, tankId);
 
     await launchFromVab(page);
 
-    const altitude = await page.evaluate(() => window.__flightPs?.posY ?? 0);
+    const altitude: number = await page.evaluate(
+      () => (window as unknown as GW).__flightPs?.posY ?? 0,
+    );
     expect(altitude).toBeGreaterThanOrEqual(0);
   });
 });

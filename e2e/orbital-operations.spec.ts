@@ -1,5 +1,5 @@
 /**
- * orbital-operations.spec.js — E2E tests for Phase 4: Orbital Operations.
+ * orbital-operations.spec.ts — E2E tests for Phase 4: Orbital Operations.
  *
  * Covers:
  *   - Orbit entry detection (periapsis above minimum altitude) with notification
@@ -19,7 +19,7 @@
  *   - Grabbing arm attachment and satellite repair
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page, type Browser } from '@playwright/test';
 import {
   VP_W, VP_H,
   buildSaveEnvelope,
@@ -36,17 +36,84 @@ import {
   teleportCraft,
   waitForOrbit,
 } from './helpers.js';
+import type { SaveEnvelope, SaveEnvelopeParams } from './helpers.js';
 import {
   orbitalFixture,
   ALL_PARTS,
 } from './fixtures.js';
 
 // ---------------------------------------------------------------------------
+// Local interfaces for page.evaluate() return shapes
+// ---------------------------------------------------------------------------
+
+interface SatelliteRecord {
+  id: string;
+  name: string;
+  satelliteType: string;
+  partId: string;
+  bodyId: string;
+  bandId: string;
+  health: number;
+  autoMaintain: boolean;
+  deployedPeriod: number;
+  leased: boolean;
+  orbitalObjectId?: string;
+  [key: string]: unknown;
+}
+
+interface GameStateSnapshot {
+  currentPeriod: number;
+  facilities: Record<string, { built: boolean; tier: number }>;
+  satelliteNetwork: {
+    satellites: SatelliteRecord[];
+  };
+  orbitalObjects?: Record<string, unknown>[];
+  [key: string]: unknown;
+}
+
+interface FlightStateSnapshot {
+  phase: string;
+  inOrbit: boolean;
+  orbitalElements: { semiMajorAxis: number; eccentricity: number } | null;
+  orbitBandId?: string;
+  phaseLog: { from: string; to: string }[];
+  events: { type: string; [key: string]: unknown }[];
+  dockingState?: DockingStateSnapshot;
+  timeElapsed: number;
+  [key: string]: unknown;
+}
+
+interface DockingStateSnapshot {
+  state: string;
+  targetId: string | null;
+  targetDistance: number;
+  targetRelSpeed: number;
+  targetOriDiff: number;
+  targetLateral: number;
+  speedOk: boolean;
+  orientationOk: boolean;
+  lateralOk: boolean;
+  dockedObjectIds: string[];
+  combinedMass: number;
+  [key: string]: unknown;
+}
+
+interface PowerStateSnapshot {
+  solarPanelArea: number;
+  batteryCapacity: number;
+  batteryCharge: number;
+  solarGeneration: number;
+  powerDraw: number;
+  sunlit: boolean;
+  hasPower: boolean;
+}
+
+// ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
 /** Extended part set including orbital, satellite, and servicing parts. */
-const ORBITAL_PARTS = [
+const ORBITAL_PARTS: string[] = [
   ...ALL_PARTS,
   'solar-panel-small', 'solar-panel-medium', 'solar-panel-large',
   'battery-small', 'battery-medium', 'battery-large',
@@ -58,17 +125,17 @@ const ORBITAL_PARTS = [
 ];
 
 // Orbital parameters for Earth.
-const EARTH_ORBIT_ALT = 100_000;   // 100 km — LEO
-const EARTH_ORBIT_VEL = 7848;      // Circular velocity at 100 km
-const MEO_ORBIT_ALT = 500_000;     // 500 km — MEO
-const MEO_ORBIT_VEL = 7613;        // Circular velocity at 500 km
+const EARTH_ORBIT_ALT: number = 100_000;   // 100 km — LEO
+const EARTH_ORBIT_VEL: number = 7848;      // Circular velocity at 100 km
+const MEO_ORBIT_ALT: number = 500_000;     // 500 km — MEO
+const MEO_ORBIT_VEL: number = 7613;        // Circular velocity at 500 km
 
 // Rocket configurations.
-const BASIC_PROBE    = ['probe-core-mk1', 'tank-small', 'engine-spark'];
-const ORBITAL_ROCKET = ['cmd-mk1', 'tank-large', 'engine-reliant'];
-const DOCKING_ROCKET = ['cmd-mk1', 'docking-port-std', 'tank-large', 'engine-reliant'];
-const GRAB_ROCKET    = ['cmd-mk1', 'grabbing-arm', 'tank-large', 'engine-reliant'];
-const SOLAR_PROBE    = ['probe-core-mk1', 'solar-panel-medium', 'battery-medium', 'tank-small', 'engine-spark'];
+const BASIC_PROBE: string[]    = ['probe-core-mk1', 'tank-small', 'engine-spark'];
+const ORBITAL_ROCKET: string[] = ['cmd-mk1', 'tank-large', 'engine-reliant'];
+const DOCKING_ROCKET: string[] = ['cmd-mk1', 'docking-port-std', 'tank-large', 'engine-reliant'];
+const GRAB_ROCKET: string[]    = ['cmd-mk1', 'grabbing-arm', 'tank-large', 'engine-reliant'];
+const SOLAR_PROBE: string[]    = ['probe-core-mk1', 'solar-panel-medium', 'battery-medium', 'tank-small', 'engine-spark'];
 
 // ---------------------------------------------------------------------------
 // Shared fixture builder
@@ -77,7 +144,7 @@ const SOLAR_PROBE    = ['probe-core-mk1', 'solar-panel-medium', 'battery-medium'
 /**
  * Build a fully-progressed save envelope for orbital operations tests.
  */
-function orbitalOpsFixture(overrides = {}) {
+function orbitalOpsFixture(overrides: SaveEnvelopeParams = {}): SaveEnvelope {
   return buildSaveEnvelope({
     saveName: 'Orbital Ops Test',
     agencyName: 'Orbital Ops Agency',
@@ -128,7 +195,7 @@ function orbitalOpsFixture(overrides = {}) {
 /**
  * Return to agency from flight.
  */
-async function returnToAgency(page) {
+async function returnToAgency(page: Page): Promise<void> {
   const dropdown = page.locator('#topbar-dropdown');
   if (!(await dropdown.isVisible())) {
     await page.click('#topbar-menu-btn');
@@ -171,12 +238,12 @@ async function returnToAgency(page) {
  * Inject an orbital object (station/satellite/craft) into the game state
  * so it appears in the orbital object list for docking/grabbing tests.
  */
-async function injectOrbitalObject(page, obj) {
-  await page.evaluate((orbObj) => {
+async function injectOrbitalObject(page: Page, obj: Record<string, unknown>): Promise<void> {
+  await page.evaluate((orbObj: Record<string, unknown>) => {
     const gs = window.__gameState;
     if (!gs) return;
     if (!gs.orbitalObjects) gs.orbitalObjects = [];
-    gs.orbitalObjects.push(orbObj);
+    (gs.orbitalObjects as Record<string, unknown>[]).push(orbObj);
   }, obj);
 }
 
@@ -186,9 +253,9 @@ async function injectOrbitalObject(page, obj) {
 
 test.describe('Orbit entry detection', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeAll(async ({ browser }: { browser: Browser }) => {
     test.setTimeout(120_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
@@ -221,7 +288,7 @@ test.describe('Orbit entry detection', () => {
     });
 
     // Set orbital position and velocity — circular orbit at 100 km.
-    await page.evaluate(async ({ alt, v }) => {
+    await page.evaluate(async ({ alt, v }: { alt: number; v: number }) => {
       const ps = window.__flightPs;
       if (!ps) return;
       ps.posX = 0;
@@ -240,22 +307,25 @@ test.describe('Orbit entry detection', () => {
       { timeout: 15_000 },
     );
 
-    const fs = await getFlightState(page);
-    expect(fs.phase).toBe('ORBIT');
-    expect(fs.inOrbit).toBe(true);
-    expect(fs.orbitalElements).not.toBeNull();
-    expect(fs.orbitalElements.semiMajorAxis).toBeGreaterThan(0);
+    const fs = await getFlightState(page) as FlightStateSnapshot | null;
+    expect(fs).not.toBeNull();
+    expect(fs!.phase).toBe('ORBIT');
+    expect(fs!.inOrbit).toBe(true);
+    expect(fs!.orbitalElements).not.toBeNull();
+    expect(fs!.orbitalElements!.semiMajorAxis).toBeGreaterThan(0);
   });
 
   test('(2) orbit entry populates the orbitBandId field', async () => {
-    const fs = await getFlightState(page);
+    const fs = await getFlightState(page) as FlightStateSnapshot | null;
+    expect(fs).not.toBeNull();
     // 100 km orbit should be LEO.
-    expect(fs.orbitBandId).toBeTruthy();
+    expect(fs!.orbitBandId).toBeTruthy();
   });
 
   test('(3) phase log records the orbit entry transition', async () => {
-    const fs = await getFlightState(page);
-    const orbitEntry = fs.phaseLog.find(t => t.to === 'ORBIT');
+    const fs = await getFlightState(page) as FlightStateSnapshot | null;
+    expect(fs).not.toBeNull();
+    const orbitEntry = fs!.phaseLog.find((t: { from: string; to: string }) => t.to === 'ORBIT');
     expect(orbitEntry).toBeTruthy();
   });
 });
@@ -266,9 +336,9 @@ test.describe('Orbit entry detection', () => {
 
 test.describe('Orbit exit warning and transition', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeAll(async ({ browser }: { browser: Browser }) => {
     test.setTimeout(120_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
@@ -302,10 +372,11 @@ test.describe('Orbit exit warning and transition', () => {
       { timeout: 15_000 },
     );
 
-    const fs = await getFlightState(page);
+    const fs = await getFlightState(page) as FlightStateSnapshot | null;
+    expect(fs).not.toBeNull();
     // Phase should be REENTRY or FLIGHT after de-orbit.
-    expect(['REENTRY', 'FLIGHT']).toContain(fs.phase);
-    expect(fs.inOrbit).toBe(false);
+    expect(['REENTRY', 'FLIGHT']).toContain(fs!.phase);
+    expect(fs!.inOrbit).toBe(false);
   });
 });
 
@@ -315,9 +386,9 @@ test.describe('Orbit exit warning and transition', () => {
 
 test.describe('Orbital manoeuvres', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeAll(async ({ browser }: { browser: Browser }) => {
     test.setTimeout(120_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
@@ -358,9 +429,9 @@ test.describe('Orbital manoeuvres', () => {
     );
 
     // Let burn run for several physics frames.
-    await page.evaluate(() => new Promise(resolve => {
+    await page.evaluate(() => new Promise<void>(resolve => {
       let frames = 0;
-      (function tick() { if (++frames >= 60) resolve(); else requestAnimationFrame(tick); })();
+      (function tick(): void { if (++frames >= 60) resolve(); else requestAnimationFrame(tick); })();
     }));
 
     // Record velocity after burn.
@@ -387,7 +458,7 @@ test.describe('Orbital manoeuvres', () => {
       const ps = window.__flightPs;
       return ps ? Math.sqrt(ps.velX * ps.velX + ps.velY * ps.velY) : 0;
     });
-    const velMagBefore = Math.abs(velBefore);
+    const velMagBefore: number = Math.abs(velBefore);
     // At minimum, the MANOEUVRE phase was entered and exited, confirming the burn.
     expect(velDuringBurn).not.toBe(0);
   });
@@ -406,7 +477,7 @@ test.describe('Orbital manoeuvres', () => {
 
     // Wait for physics to process the velocity change
     await page.waitForFunction(
-      (v0) => (window.__flightPs?.velX ?? v0) < v0,
+      (v0: number) => (window.__flightPs?.velX ?? v0) < v0,
       velBefore,
       { timeout: 5_000 },
     );
@@ -423,9 +494,9 @@ test.describe('Orbital manoeuvres', () => {
 
 test.describe('Docking mode local positioning', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeAll(async ({ browser }: { browser: Browser }) => {
     test.setTimeout(120_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
@@ -525,8 +596,8 @@ test.describe('Docking mode local positioning', () => {
 
     // Verify no console errors were thrown by the PixiJS draw calls.
     const errors = await page.evaluate(() => {
-      return (window.__consoleErrors || []).filter(
-        e => e.includes('beginFill') || e.includes('drawCircle') ||
+      return ((window as Record<string, unknown>).__consoleErrors as string[] || []).filter(
+        (e: string) => e.includes('beginFill') || e.includes('drawCircle') ||
              e.includes('lineStyle') || e.includes('endFill') ||
              e.includes('is not a function'),
       );
@@ -559,9 +630,9 @@ test.describe('Docking mode local positioning', () => {
 
 test.describe('Satellite deployment and benefits', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeAll(async ({ browser }: { browser: Browser }) => {
     test.setTimeout(120_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
@@ -580,9 +651,10 @@ test.describe('Satellite deployment and benefits', () => {
     });
     await seedAndLoadSave(page, fixture);
 
-    const gs = await getGameState(page);
-    const sats = gs.satelliteNetwork?.satellites ?? [];
-    const commSats = sats.filter(s => s.satelliteType === 'COMMUNICATION');
+    const gs = await getGameState(page) as GameStateSnapshot | null;
+    expect(gs).not.toBeNull();
+    const sats = gs!.satelliteNetwork?.satellites ?? [];
+    const commSats = sats.filter((s: SatelliteRecord) => s.satelliteType === 'COMMUNICATION');
     expect(commSats.length).toBeGreaterThanOrEqual(1);
     expect(commSats[0].health).toBe(100);
   });
@@ -598,9 +670,10 @@ test.describe('Satellite deployment and benefits', () => {
     });
     await seedAndLoadSave(page, fixture);
 
-    const gs = await getGameState(page);
-    const sats = gs.satelliteNetwork?.satellites ?? [];
-    const weatherSats = sats.filter(s => s.satelliteType === 'WEATHER');
+    const gs = await getGameState(page) as GameStateSnapshot | null;
+    expect(gs).not.toBeNull();
+    const sats = gs!.satelliteNetwork?.satellites ?? [];
+    const weatherSats = sats.filter((s: SatelliteRecord) => s.satelliteType === 'WEATHER');
     expect(weatherSats.length).toBeGreaterThanOrEqual(1);
   });
 
@@ -615,9 +688,10 @@ test.describe('Satellite deployment and benefits', () => {
     });
     await seedAndLoadSave(page, fixture);
 
-    const gs = await getGameState(page);
-    const sats = gs.satelliteNetwork?.satellites ?? [];
-    const sciSats = sats.filter(s => s.satelliteType === 'SCIENCE');
+    const gs = await getGameState(page) as GameStateSnapshot | null;
+    expect(gs).not.toBeNull();
+    const sats = gs!.satelliteNetwork?.satellites ?? [];
+    const sciSats = sats.filter((s: SatelliteRecord) => s.satelliteType === 'SCIENCE');
     expect(sciSats.length).toBeGreaterThanOrEqual(1);
   });
 
@@ -632,9 +706,10 @@ test.describe('Satellite deployment and benefits', () => {
     });
     await seedAndLoadSave(page, fixture);
 
-    const gs = await getGameState(page);
-    const sats = gs.satelliteNetwork?.satellites ?? [];
-    const gpsSats = sats.filter(s => s.satelliteType === 'GPS');
+    const gs = await getGameState(page) as GameStateSnapshot | null;
+    expect(gs).not.toBeNull();
+    const sats = gs!.satelliteNetwork?.satellites ?? [];
+    const gpsSats = sats.filter((s: SatelliteRecord) => s.satelliteType === 'GPS');
     expect(gpsSats.length).toBeGreaterThanOrEqual(1);
   });
 
@@ -666,8 +741,9 @@ test.describe('Satellite deployment and benefits', () => {
     expect(deployed).toBe(true);
 
     // Verify the event is logged.
-    const fs = await getFlightState(page);
-    const deployEvents = fs.events.filter(e => e.type === 'SATELLITE_DEPLOYED');
+    const fs = await getFlightState(page) as FlightStateSnapshot | null;
+    expect(fs).not.toBeNull();
+    const deployEvents = fs!.events.filter((e: { type: string }) => e.type === 'SATELLITE_DEPLOYED');
     expect(deployEvents.length).toBeGreaterThanOrEqual(1);
   });
 });
@@ -678,9 +754,9 @@ test.describe('Satellite deployment and benefits', () => {
 
 test.describe('Constellation bonus', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeAll(async ({ browser }: { browser: Browser }) => {
     test.setTimeout(120_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
@@ -700,8 +776,9 @@ test.describe('Constellation bonus', () => {
     });
     await seedAndLoadSave(page, fixture);
 
-    const gs = await getGameState(page);
-    const commSats = gs.satelliteNetwork.satellites.filter(s => s.satelliteType === 'COMMUNICATION' && s.health > 0);
+    const gs = await getGameState(page) as GameStateSnapshot | null;
+    expect(gs).not.toBeNull();
+    const commSats = gs!.satelliteNetwork.satellites.filter((s: SatelliteRecord) => s.satelliteType === 'COMMUNICATION' && s.health > 0);
     // 2 sats — below threshold of 3.
     expect(commSats.length).toBe(2);
   });
@@ -719,8 +796,9 @@ test.describe('Constellation bonus', () => {
     });
     await seedAndLoadSave(page, fixture);
 
-    const gs = await getGameState(page);
-    const commSats = gs.satelliteNetwork.satellites.filter(s => s.satelliteType === 'COMMUNICATION' && s.health > 0);
+    const gs = await getGameState(page) as GameStateSnapshot | null;
+    expect(gs).not.toBeNull();
+    const commSats = gs!.satelliteNetwork.satellites.filter((s: SatelliteRecord) => s.satelliteType === 'COMMUNICATION' && s.health > 0);
     // 3 sats — meets threshold.
     expect(commSats.length).toBe(3);
   });
@@ -740,11 +818,12 @@ test.describe('Constellation bonus', () => {
     });
     await seedAndLoadSave(page, fixture);
 
-    const gs = await getGameState(page);
-    const sats = gs.satelliteNetwork.satellites;
-    const commCount = sats.filter(s => s.satelliteType === 'COMMUNICATION').length;
-    const weatherCount = sats.filter(s => s.satelliteType === 'WEATHER').length;
-    const sciCount = sats.filter(s => s.satelliteType === 'SCIENCE').length;
+    const gs = await getGameState(page) as GameStateSnapshot | null;
+    expect(gs).not.toBeNull();
+    const sats = gs!.satelliteNetwork.satellites;
+    const commCount = sats.filter((s: SatelliteRecord) => s.satelliteType === 'COMMUNICATION').length;
+    const weatherCount = sats.filter((s: SatelliteRecord) => s.satelliteType === 'WEATHER').length;
+    const sciCount = sats.filter((s: SatelliteRecord) => s.satelliteType === 'SCIENCE').length;
     expect(commCount).toBe(3);   // Constellation bonus
     expect(weatherCount).toBe(1); // No bonus
     expect(sciCount).toBe(1);     // No bonus
@@ -757,9 +836,9 @@ test.describe('Constellation bonus', () => {
 
 test.describe('Satellite degradation and maintenance', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeAll(async ({ browser }: { browser: Browser }) => {
     test.setTimeout(120_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
@@ -778,12 +857,13 @@ test.describe('Satellite degradation and maintenance', () => {
     });
     await seedAndLoadSave(page, fixture);
 
-    const gs = await getGameState(page);
-    const sat = gs.satelliteNetwork.satellites.find(s => s.id === 'sat-deg-1');
+    const gs = await getGameState(page) as GameStateSnapshot | null;
+    expect(gs).not.toBeNull();
+    const sat = gs!.satelliteNetwork.satellites.find((s: SatelliteRecord) => s.id === 'sat-deg-1');
     expect(sat).toBeTruthy();
-    expect(sat.health).toBe(80);
+    expect(sat!.health).toBe(80);
     // Degradation is 3 per period — satellite at 80 health is not yet dead.
-    expect(sat.health).toBeGreaterThan(0);
+    expect(sat!.health).toBeGreaterThan(0);
   });
 
   test('(2) auto-maintenance flag can be set on satellites', async () => {
@@ -797,10 +877,11 @@ test.describe('Satellite degradation and maintenance', () => {
     });
     await seedAndLoadSave(page, fixture);
 
-    const gs = await getGameState(page);
-    const sat = gs.satelliteNetwork.satellites.find(s => s.id === 'sat-auto-1');
+    const gs = await getGameState(page) as GameStateSnapshot | null;
+    expect(gs).not.toBeNull();
+    const sat = gs!.satelliteNetwork.satellites.find((s: SatelliteRecord) => s.id === 'sat-auto-1');
     expect(sat).toBeTruthy();
-    expect(sat.autoMaintain).toBe(true);
+    expect(sat!.autoMaintain).toBe(true);
   });
 
   test('(3) manual maintenance can restore satellite health via game state', async () => {
@@ -818,13 +899,16 @@ test.describe('Satellite degradation and maintenance', () => {
     // Manually set health to 100 to simulate maintenance.
     await page.evaluate(() => {
       const gs = window.__gameState;
-      const sat = gs?.satelliteNetwork?.satellites?.find(s => s.id === 'sat-manual-1');
+      const sats = (gs as Record<string, unknown>)?.satelliteNetwork as { satellites: { id: string; health: number }[] } | undefined;
+      const sat = sats?.satellites?.find((s: { id: string }) => s.id === 'sat-manual-1');
       if (sat) sat.health = 100;
     });
 
-    const gs = await getGameState(page);
-    const sat = gs.satelliteNetwork.satellites.find(s => s.id === 'sat-manual-1');
-    expect(sat.health).toBe(100);
+    const gs = await getGameState(page) as GameStateSnapshot | null;
+    expect(gs).not.toBeNull();
+    const sat = gs!.satelliteNetwork.satellites.find((s: SatelliteRecord) => s.id === 'sat-manual-1');
+    expect(sat).toBeTruthy();
+    expect(sat!.health).toBe(100);
   });
 
   test('(4) degraded satellite below threshold has reduced effectiveness', async () => {
@@ -839,10 +923,12 @@ test.describe('Satellite degradation and maintenance', () => {
     });
     await seedAndLoadSave(page, fixture);
 
-    const gs = await getGameState(page);
-    const sat = gs.satelliteNetwork.satellites.find(s => s.id === 'sat-low-1');
-    expect(sat.health).toBe(20);
-    expect(sat.health).toBeLessThan(30); // Below degraded threshold.
+    const gs = await getGameState(page) as GameStateSnapshot | null;
+    expect(gs).not.toBeNull();
+    const sat = gs!.satelliteNetwork.satellites.find((s: SatelliteRecord) => s.id === 'sat-low-1');
+    expect(sat).toBeTruthy();
+    expect(sat!.health).toBe(20);
+    expect(sat!.health).toBeLessThan(30); // Below degraded threshold.
   });
 });
 
@@ -852,9 +938,9 @@ test.describe('Satellite degradation and maintenance', () => {
 
 test.describe('Satellite Network Ops Centre tiers', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeAll(async ({ browser }: { browser: Browser }) => {
     test.setTimeout(120_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
@@ -879,11 +965,12 @@ test.describe('Satellite Network Ops Centre tiers', () => {
     });
     await seedAndLoadSave(page, fixture);
 
-    const gs = await getGameState(page);
-    expect(gs.facilities[FacilityId.SATELLITE_OPS].tier).toBe(1);
-    expect(gs.satelliteNetwork.satellites.length).toBe(5);
+    const gs = await getGameState(page) as GameStateSnapshot | null;
+    expect(gs).not.toBeNull();
+    expect(gs!.facilities[FacilityId.SATELLITE_OPS].tier).toBe(1);
+    expect(gs!.satelliteNetwork.satellites.length).toBe(5);
     // Tier 1 cap is 6 — we have 5, one more should fit.
-    expect(gs.satelliteNetwork.satellites.length).toBeLessThanOrEqual(6);
+    expect(gs!.satelliteNetwork.satellites.length).toBeLessThanOrEqual(6);
   });
 
   test('(2) tier 2 allows up to 12 satellites', async () => {
@@ -903,10 +990,11 @@ test.describe('Satellite Network Ops Centre tiers', () => {
     });
     await seedAndLoadSave(page, fixture);
 
-    const gs = await getGameState(page);
-    expect(gs.facilities[FacilityId.SATELLITE_OPS].tier).toBe(2);
-    expect(gs.satelliteNetwork.satellites.length).toBe(10);
-    expect(gs.satelliteNetwork.satellites.length).toBeLessThanOrEqual(12);
+    const gs = await getGameState(page) as GameStateSnapshot | null;
+    expect(gs).not.toBeNull();
+    expect(gs!.facilities[FacilityId.SATELLITE_OPS].tier).toBe(2);
+    expect(gs!.satelliteNetwork.satellites.length).toBe(10);
+    expect(gs!.satelliteNetwork.satellites.length).toBeLessThanOrEqual(12);
   });
 
   test('(3) tier 3 allows up to 24 satellites', async () => {
@@ -926,10 +1014,11 @@ test.describe('Satellite Network Ops Centre tiers', () => {
     });
     await seedAndLoadSave(page, fixture);
 
-    const gs = await getGameState(page);
-    expect(gs.facilities[FacilityId.SATELLITE_OPS].tier).toBe(3);
-    expect(gs.satelliteNetwork.satellites.length).toBe(20);
-    expect(gs.satelliteNetwork.satellites.length).toBeLessThanOrEqual(24);
+    const gs = await getGameState(page) as GameStateSnapshot | null;
+    expect(gs).not.toBeNull();
+    expect(gs!.facilities[FacilityId.SATELLITE_OPS].tier).toBe(3);
+    expect(gs!.satelliteNetwork.satellites.length).toBe(20);
+    expect(gs!.satelliteNetwork.satellites.length).toBeLessThanOrEqual(24);
   });
 });
 
@@ -939,9 +1028,9 @@ test.describe('Satellite Network Ops Centre tiers', () => {
 
 test.describe('Docking approach and guidance', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeAll(async ({ browser }: { browser: Browser }) => {
     test.setTimeout(120_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
@@ -965,11 +1054,11 @@ test.describe('Docking approach and guidance', () => {
     const dockingState = await page.evaluate(() => {
       const ds = window.__flightState?.dockingState;
       if (!ds) return null;
-      return { state: ds.state, targetId: ds.targetId };
+      return { state: ds.state as string, targetId: ds.targetId as string | null };
     });
     expect(dockingState).not.toBeNull();
-    expect(dockingState.state).toBe('IDLE');
-    expect(dockingState.targetId).toBeNull();
+    expect(dockingState!.state).toBe('IDLE');
+    expect(dockingState!.targetId).toBeNull();
   });
 
   test('(2) docking target can be selected when station is in visual range', async () => {
@@ -993,7 +1082,9 @@ test.describe('Docking approach and guidance', () => {
     // Verify station is in the objects list.
     const hasStation = await page.evaluate(() => {
       const gs = window.__gameState;
-      return gs?.orbitalObjects?.some(o => o.id === 'station-1') ?? false;
+      return (gs as Record<string, unknown>)?.orbitalObjects
+        ? ((gs as Record<string, unknown>).orbitalObjects as { id: string }[])?.some((o: { id: string }) => o.id === 'station-1') ?? false
+        : false;
     });
     expect(hasStation).toBe(true);
   });
@@ -1019,41 +1110,41 @@ test.describe('Docking approach and guidance', () => {
     });
 
     expect(guidance).not.toBeNull();
-    expect(guidance.hasState).toBe(true);
-    expect(guidance.hasTargetId).toBe(true);
-    expect(guidance.hasTargetDistance).toBe(true);
-    expect(guidance.hasTargetRelSpeed).toBe(true);
-    expect(guidance.hasTargetOriDiff).toBe(true);
-    expect(guidance.hasTargetLateral).toBe(true);
-    expect(guidance.hasSpeedOk).toBe(true);
-    expect(guidance.hasOrientationOk).toBe(true);
-    expect(guidance.hasLateralOk).toBe(true);
-    expect(guidance.hasDockedObjectIds).toBe(true);
-    expect(guidance.hasCombinedMass).toBe(true);
+    expect(guidance!.hasState).toBe(true);
+    expect(guidance!.hasTargetId).toBe(true);
+    expect(guidance!.hasTargetDistance).toBe(true);
+    expect(guidance!.hasTargetRelSpeed).toBe(true);
+    expect(guidance!.hasTargetOriDiff).toBe(true);
+    expect(guidance!.hasTargetLateral).toBe(true);
+    expect(guidance!.hasSpeedOk).toBe(true);
+    expect(guidance!.hasOrientationOk).toBe(true);
+    expect(guidance!.hasLateralOk).toBe(true);
+    expect(guidance!.hasDockedObjectIds).toBe(true);
+    expect(guidance!.hasCombinedMass).toBe(true);
   });
 
   test('(4) auto-dock conditions are met when distance <= 15m and all indicators OK', async () => {
     // Verify the auto-dock logic: within 15m with all indicators green → auto-dock eligible.
     const autoDockCheck = await page.evaluate(() => {
-      const DOCKING_AUTO_RANGE = 15;
-      const DOCKING_MAX_REL_SPEED = 2.0;
-      const DOCKING_MAX_ORI_DIFF = 0.15;
-      const DOCKING_MAX_LATERAL = 3.0;
+      const DOCKING_AUTO_RANGE: number = 15;
+      const DOCKING_MAX_REL_SPEED: number = 2.0;
+      const DOCKING_MAX_ORI_DIFF: number = 0.15;
+      const DOCKING_MAX_LATERAL: number = 3.0;
 
       // Scenario 1: within range, all OK.
-      const dist1 = 10, speed1 = 0.3, ori1 = 0.05, lat1 = 1.0;
-      const eligible1 = dist1 <= DOCKING_AUTO_RANGE &&
-                         speed1 <= DOCKING_MAX_REL_SPEED &&
-                         ori1 <= DOCKING_MAX_ORI_DIFF &&
-                         lat1 <= DOCKING_MAX_LATERAL;
+      const dist1: number = 10, speed1: number = 0.3, ori1: number = 0.05, lat1: number = 1.0;
+      const eligible1: boolean = dist1 <= DOCKING_AUTO_RANGE &&
+                       speed1 <= DOCKING_MAX_REL_SPEED &&
+                       ori1 <= DOCKING_MAX_ORI_DIFF &&
+                       lat1 <= DOCKING_MAX_LATERAL;
 
       // Scenario 2: outside range.
-      const dist2 = 20;
-      const eligible2 = dist2 <= DOCKING_AUTO_RANGE;
+      const dist2: number = 20;
+      const eligible2: boolean = dist2 <= DOCKING_AUTO_RANGE;
 
       // Scenario 3: within range but speed too high.
-      const dist3 = 10, speed3 = 3.0;
-      const eligible3 = dist3 <= DOCKING_AUTO_RANGE && speed3 <= DOCKING_MAX_REL_SPEED;
+      const dist3: number = 10, speed3: number = 3.0;
+      const eligible3: boolean = dist3 <= DOCKING_AUTO_RANGE && speed3 <= DOCKING_MAX_REL_SPEED;
 
       return { eligible1, eligible2, eligible3 };
     });
@@ -1078,9 +1169,9 @@ test.describe('Docking approach and guidance', () => {
       ds.combinedMass = 15_000;
 
       // Log docking event.
-      window.__flightState.events.push({
+      window.__flightState!.events.push({
         type: 'DOCKING_COMPLETE',
-        time: window.__flightState.timeElapsed,
+        time: window.__flightState!.timeElapsed,
         targetId: 'station-1',
         description: 'Docked with Test Station',
       });
@@ -1090,19 +1181,21 @@ test.describe('Docking approach and guidance', () => {
     const docked = await page.evaluate(() => {
       const ds = window.__flightState?.dockingState;
       return ds ? {
-        state: ds.state,
-        dockedCount: ds.dockedObjectIds?.length ?? 0,
-        combinedMass: ds.combinedMass,
+        state: ds.state as string,
+        dockedCount: (ds.dockedObjectIds as string[])?.length ?? 0,
+        combinedMass: ds.combinedMass as number,
       } : null;
     });
 
-    expect(docked.state).toBe('DOCKED');
-    expect(docked.dockedCount).toBe(1);
-    expect(docked.combinedMass).toBeGreaterThan(0);
+    expect(docked).not.toBeNull();
+    expect(docked!.state).toBe('DOCKED');
+    expect(docked!.dockedCount).toBe(1);
+    expect(docked!.combinedMass).toBeGreaterThan(0);
 
     // Verify event logged.
-    const fs = await getFlightState(page);
-    const dockEvents = fs.events.filter(e => e.type === 'DOCKING_COMPLETE');
+    const fs = await getFlightState(page) as FlightStateSnapshot | null;
+    expect(fs).not.toBeNull();
+    const dockEvents = fs!.events.filter((e: { type: string }) => e.type === 'DOCKING_COMPLETE');
     expect(dockEvents.length).toBeGreaterThanOrEqual(1);
   });
 });
@@ -1113,9 +1206,9 @@ test.describe('Docking approach and guidance', () => {
 
 test.describe('Undocking and control assignment', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeAll(async ({ browser }: { browser: Browser }) => {
     test.setTimeout(120_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
@@ -1156,9 +1249,9 @@ test.describe('Undocking and control assignment', () => {
       ds.targetId = null;
       ds.targetDistance = Infinity;
 
-      window.__flightState.events.push({
+      window.__flightState!.events.push({
         type: 'UNDOCKING_COMPLETE',
-        time: window.__flightState.timeElapsed,
+        time: window.__flightState!.timeElapsed,
         description: 'Undocked from station',
       });
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
@@ -1166,15 +1259,17 @@ test.describe('Undocking and control assignment', () => {
 
     const afterUndock = await page.evaluate(() => {
       const ds = window.__flightState?.dockingState;
-      return ds ? { state: ds.state, dockedCount: ds.dockedObjectIds?.length ?? 0 } : null;
+      return ds ? { state: ds.state as string, dockedCount: (ds.dockedObjectIds as string[])?.length ?? 0 } : null;
     });
 
-    expect(afterUndock.state).toBe('IDLE');
-    expect(afterUndock.dockedCount).toBe(0);
+    expect(afterUndock).not.toBeNull();
+    expect(afterUndock!.state).toBe('IDLE');
+    expect(afterUndock!.dockedCount).toBe(0);
 
     // Verify undocking event.
-    const fs = await getFlightState(page);
-    const undockEvents = fs.events.filter(e => e.type === 'UNDOCKING_COMPLETE');
+    const fs = await getFlightState(page) as FlightStateSnapshot | null;
+    expect(fs).not.toBeNull();
+    const undockEvents = fs!.events.filter((e: { type: string }) => e.type === 'UNDOCKING_COMPLETE');
     expect(undockEvents.length).toBeGreaterThanOrEqual(1);
   });
 });
@@ -1185,9 +1280,9 @@ test.describe('Undocking and control assignment', () => {
 
 test.describe('Crew transfer and fuel transfer', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeAll(async ({ browser }: { browser: Browser }) => {
     test.setTimeout(120_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
@@ -1227,11 +1322,12 @@ test.describe('Crew transfer and fuel transfer', () => {
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
-    const fs = await getFlightState(page);
-    const crewEvents = fs.events.filter(e => e.type === 'CREW_TRANSFER');
+    const fs = await getFlightState(page) as FlightStateSnapshot | null;
+    expect(fs).not.toBeNull();
+    const crewEvents = fs!.events.filter((e: { type: string }) => e.type === 'CREW_TRANSFER');
     expect(crewEvents.length).toBeGreaterThanOrEqual(1);
-    expect(crewEvents[0].crewIds).toContain('crew-2');
-    expect(crewEvents[0].direction).toBe('TO_STATION');
+    expect((crewEvents[0] as { crewIds: string[] }).crewIds).toContain('crew-2');
+    expect((crewEvents[0] as { direction: string }).direction).toBe('TO_STATION');
   });
 
   test('(2) fuel transfer event is logged during docked state', async () => {
@@ -1248,10 +1344,11 @@ test.describe('Crew transfer and fuel transfer', () => {
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
-    const fs = await getFlightState(page);
-    const fuelEvents = fs.events.filter(e => e.type === 'FUEL_TRANSFER');
+    const fs = await getFlightState(page) as FlightStateSnapshot | null;
+    expect(fs).not.toBeNull();
+    const fuelEvents = fs!.events.filter((e: { type: string }) => e.type === 'FUEL_TRANSFER');
     expect(fuelEvents.length).toBeGreaterThanOrEqual(1);
-    expect(fuelEvents[0].amount).toBe(500);
+    expect((fuelEvents[0] as { amount: number }).amount).toBe(500);
   });
 });
 
@@ -1261,9 +1358,9 @@ test.describe('Crew transfer and fuel transfer', () => {
 
 test.describe('Power system', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeAll(async ({ browser }: { browser: Browser }) => {
     test.setTimeout(120_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
@@ -1288,16 +1385,16 @@ test.describe('Power system', () => {
       const ps = window.__flightPs;
       if (!ps?.powerState) return null;
       return {
-        solarPanelArea: ps.powerState.solarPanelArea,
-        batteryCapacity: ps.powerState.batteryCapacity,
-        hasPower: ps.powerState.hasPower,
+        solarPanelArea: ps.powerState.solarPanelArea as number,
+        batteryCapacity: ps.powerState.batteryCapacity as number,
+        hasPower: ps.powerState.hasPower as boolean,
       };
     });
 
     expect(powerInfo).not.toBeNull();
-    expect(powerInfo.solarPanelArea).toBeGreaterThan(0);
-    expect(powerInfo.batteryCapacity).toBeGreaterThan(0);
-    expect(powerInfo.hasPower).toBe(true);
+    expect(powerInfo!.solarPanelArea).toBeGreaterThan(0);
+    expect(powerInfo!.batteryCapacity).toBeGreaterThan(0);
+    expect(powerInfo!.hasPower).toBe(true);
   });
 
   test('(2) solar generation is positive when craft is sunlit', async () => {
@@ -1310,14 +1407,14 @@ test.describe('Power system', () => {
       const ps = window.__flightPs;
       if (!ps?.powerState) return null;
       return {
-        solarGeneration: ps.powerState.solarGeneration,
-        sunlit: ps.powerState.sunlit,
+        solarGeneration: ps.powerState.solarGeneration as number,
+        sunlit: ps.powerState.sunlit as boolean,
       };
     });
 
     expect(generation).not.toBeNull();
     // Solar generation should be non-negative (could be 0 if in shadow).
-    expect(generation.solarGeneration).toBeGreaterThanOrEqual(0);
+    expect(generation!.solarGeneration).toBeGreaterThanOrEqual(0);
   });
 
   test('(3) battery charge is tracked and bounded by capacity', async () => {
@@ -1325,14 +1422,14 @@ test.describe('Power system', () => {
       const ps = window.__flightPs;
       if (!ps?.powerState) return null;
       return {
-        charge: ps.powerState.batteryCharge,
-        capacity: ps.powerState.batteryCapacity,
+        charge: ps.powerState.batteryCharge as number,
+        capacity: ps.powerState.batteryCapacity as number,
       };
     });
 
     expect(batteryInfo).not.toBeNull();
-    expect(batteryInfo.charge).toBeGreaterThanOrEqual(0);
-    expect(batteryInfo.charge).toBeLessThanOrEqual(batteryInfo.capacity);
+    expect(batteryInfo!.charge).toBeGreaterThanOrEqual(0);
+    expect(batteryInfo!.charge).toBeLessThanOrEqual(batteryInfo!.capacity);
   });
 
   test('(4) power draw is present when systems are active', async () => {
@@ -1340,13 +1437,13 @@ test.describe('Power system', () => {
       const ps = window.__flightPs;
       if (!ps?.powerState) return null;
       return {
-        powerDraw: ps.powerState.powerDraw,
+        powerDraw: ps.powerState.powerDraw as number,
       };
     });
 
     expect(drawInfo).not.toBeNull();
     // There should be some baseline power draw (attitude control at minimum).
-    expect(drawInfo.powerDraw).toBeGreaterThanOrEqual(0);
+    expect(drawInfo!.powerDraw).toBeGreaterThanOrEqual(0);
   });
 
   test('(5) craft without solar panels has limited power from built-in battery', async () => {
@@ -1367,16 +1464,16 @@ test.describe('Power system', () => {
       const ps = window.__flightPs;
       if (!ps?.powerState) return null;
       return {
-        solarPanelArea: ps.powerState.solarPanelArea,
-        batteryCapacity: ps.powerState.batteryCapacity,
-        hasPower: ps.powerState.hasPower,
+        solarPanelArea: ps.powerState.solarPanelArea as number,
+        batteryCapacity: ps.powerState.batteryCapacity as number,
+        hasPower: ps.powerState.hasPower as boolean,
       };
     });
 
     expect(powerInfo).not.toBeNull();
     // No solar panels — area should be 0 or minimal (built-in only).
     // Battery should still have some capacity from probe core.
-    expect(powerInfo.batteryCapacity).toBeGreaterThanOrEqual(0);
+    expect(powerInfo!.batteryCapacity).toBeGreaterThanOrEqual(0);
   });
 });
 
@@ -1386,9 +1483,9 @@ test.describe('Power system', () => {
 
 test.describe('Grabbing arm and satellite repair', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeAll(async ({ browser }: { browser: Browser }) => {
     test.setTimeout(120_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
@@ -1426,7 +1523,8 @@ test.describe('Grabbing arm and satellite repair', () => {
 
     const hasArm = await page.evaluate(() => {
       const ps = window.__flightPs;
-      const assembly = window.__flightAssembly;
+      const assembly = (window as Record<string, unknown>).__flightAssembly as
+        { parts: Map<string, { partId: string }> } | undefined;
       if (!ps || !assembly) return false;
       for (const instanceId of ps.activeParts) {
         const placed = assembly.parts.get(instanceId);
@@ -1453,20 +1551,24 @@ test.describe('Grabbing arm and satellite repair', () => {
       });
 
       // Apply the repair to satellite health.
-      const sat = gs.satelliteNetwork?.satellites?.find(s => s.id === 'sat-repair-1');
+      const network = (gs as Record<string, unknown>).satelliteNetwork as
+        { satellites: { id: string; health: number }[] } | undefined;
+      const sat = network?.satellites?.find((s: { id: string }) => s.id === 'sat-repair-1');
       if (sat) sat.health = 100;
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
     // Verify satellite health is restored.
-    const gs = await getGameState(page);
-    const repairedSat = gs.satelliteNetwork.satellites.find(s => s.id === 'sat-repair-1');
+    const gs = await getGameState(page) as GameStateSnapshot | null;
+    expect(gs).not.toBeNull();
+    const repairedSat = gs!.satelliteNetwork.satellites.find((s: SatelliteRecord) => s.id === 'sat-repair-1');
     expect(repairedSat).toBeTruthy();
-    expect(repairedSat.health).toBe(100);
+    expect(repairedSat!.health).toBe(100);
 
     // Verify repair event is logged.
-    const fs = await getFlightState(page);
-    const repairEvents = fs.events.filter(e => e.type === 'SATELLITE_REPAIRED');
+    const fs = await getFlightState(page) as FlightStateSnapshot | null;
+    expect(fs).not.toBeNull();
+    const repairEvents = fs!.events.filter((e: { type: string }) => e.type === 'SATELLITE_REPAIRED');
     expect(repairEvents.length).toBeGreaterThanOrEqual(1);
   });
 
@@ -1474,7 +1576,7 @@ test.describe('Grabbing arm and satellite repair', () => {
     // Verify the grab states exist and can be set.
     const stateCheck = await page.evaluate(() => {
       // Manually create a grab state object to verify the state machine.
-      const states = ['IDLE', 'APPROACHING', 'EXTENDING', 'GRABBED', 'RELEASING'];
+      const states: string[] = ['IDLE', 'APPROACHING', 'EXTENDING', 'GRABBED', 'RELEASING'];
       return { validStates: states, count: states.length };
     });
 
@@ -1491,9 +1593,9 @@ test.describe('Grabbing arm and satellite repair', () => {
 
 test.describe('Integrated orbital operations', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeAll(async ({ browser }: { browser: Browser }) => {
     test.setTimeout(180_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
@@ -1514,11 +1616,12 @@ test.describe('Integrated orbital operations', () => {
   test.afterAll(async () => { await page.close(); });
 
   test('(1) full satellite network is loaded with all types', async () => {
-    const gs = await getGameState(page);
-    const sats = gs.satelliteNetwork.satellites;
+    const gs = await getGameState(page) as GameStateSnapshot | null;
+    expect(gs).not.toBeNull();
+    const sats = gs!.satelliteNetwork.satellites;
     expect(sats.length).toBe(6);
 
-    const types = [...new Set(sats.map(s => s.satelliteType))];
+    const types = [...new Set(sats.map((s: SatelliteRecord) => s.satelliteType))];
     expect(types).toContain('COMMUNICATION');
     expect(types).toContain('WEATHER');
     expect(types).toContain('SCIENCE');
@@ -1526,8 +1629,9 @@ test.describe('Integrated orbital operations', () => {
   });
 
   test('(2) communication constellation has 3 satellites (bonus active)', async () => {
-    const gs = await getGameState(page);
-    const commSats = gs.satelliteNetwork.satellites.filter(s => s.satelliteType === 'COMMUNICATION' && s.health > 0);
+    const gs = await getGameState(page) as GameStateSnapshot | null;
+    expect(gs).not.toBeNull();
+    const commSats = gs!.satelliteNetwork.satellites.filter((s: SatelliteRecord) => s.satelliteType === 'COMMUNICATION' && s.health > 0);
     expect(commSats.length).toBe(3);
   });
 
@@ -1572,20 +1676,23 @@ test.describe('Integrated orbital operations', () => {
     await returnToAgency(page);
 
     // Verify period advanced.
-    const gs = await getGameState(page);
-    expect(gs.currentPeriod).toBeGreaterThanOrEqual(31);
+    const gs = await getGameState(page) as GameStateSnapshot | null;
+    expect(gs).not.toBeNull();
+    expect(gs!.currentPeriod).toBeGreaterThanOrEqual(31);
   });
 
   test('(4) satellite network persists after flight return', async () => {
-    const gs = await getGameState(page);
-    expect(gs.satelliteNetwork.satellites.length).toBe(6);
+    const gs = await getGameState(page) as GameStateSnapshot | null;
+    expect(gs).not.toBeNull();
+    expect(gs!.satelliteNetwork.satellites.length).toBe(6);
   });
 
   test('(5) auto-maintenance flag is preserved across flights', async () => {
-    const gs = await getGameState(page);
-    const weatherSat = gs.satelliteNetwork.satellites.find(s => s.id === 'int-sat-w1');
+    const gs = await getGameState(page) as GameStateSnapshot | null;
+    expect(gs).not.toBeNull();
+    const weatherSat = gs!.satelliteNetwork.satellites.find((s: SatelliteRecord) => s.id === 'int-sat-w1');
     expect(weatherSat).toBeTruthy();
-    expect(weatherSat.autoMaintain).toBe(true);
+    expect(weatherSat!.autoMaintain).toBe(true);
   });
 });
 
@@ -1595,9 +1702,9 @@ test.describe('Integrated orbital operations', () => {
 
 test.describe('Docking thresholds', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeAll(async ({ browser }: { browser: Browser }) => {
     test.setTimeout(120_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
@@ -1624,10 +1731,11 @@ test.describe('Docking thresholds', () => {
       ds.targetRelSpeed = 1.5;
       ds.speedOk = ds.targetRelSpeed <= 2.0;
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
-      return { speedOk: ds.speedOk, speed: ds.targetRelSpeed };
+      return { speedOk: ds.speedOk as boolean, speed: ds.targetRelSpeed as number };
     });
 
-    expect(result.speedOk).toBe(true);
+    expect(result).not.toBeNull();
+    expect(result!.speedOk).toBe(true);
   });
 
   test('(2) speed NOT OK when relative speed > 2.0 m/s', async () => {
@@ -1637,10 +1745,11 @@ test.describe('Docking thresholds', () => {
       ds.targetRelSpeed = 3.0;
       ds.speedOk = ds.targetRelSpeed <= 2.0;
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
-      return { speedOk: ds.speedOk, speed: ds.targetRelSpeed };
+      return { speedOk: ds.speedOk as boolean, speed: ds.targetRelSpeed as number };
     });
 
-    expect(result.speedOk).toBe(false);
+    expect(result).not.toBeNull();
+    expect(result!.speedOk).toBe(false);
   });
 
   test('(3) orientation OK when diff <= 0.15 rad', async () => {
@@ -1650,10 +1759,11 @@ test.describe('Docking thresholds', () => {
       ds.targetOriDiff = 0.10;
       ds.orientationOk = ds.targetOriDiff <= 0.15;
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
-      return { orientationOk: ds.orientationOk };
+      return { orientationOk: ds.orientationOk as boolean };
     });
 
-    expect(result.orientationOk).toBe(true);
+    expect(result).not.toBeNull();
+    expect(result!.orientationOk).toBe(true);
   });
 
   test('(4) lateral OK when offset <= 3.0 m', async () => {
@@ -1663,10 +1773,11 @@ test.describe('Docking thresholds', () => {
       ds.targetLateral = 2.0;
       ds.lateralOk = ds.targetLateral <= 3.0;
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
-      return { lateralOk: ds.lateralOk };
+      return { lateralOk: ds.lateralOk as boolean };
     });
 
-    expect(result.lateralOk).toBe(true);
+    expect(result).not.toBeNull();
+    expect(result!.lateralOk).toBe(true);
   });
 
   test('(5) auto-dock range is 15 m', async () => {
@@ -1678,13 +1789,14 @@ test.describe('Docking thresholds', () => {
       ds.speedOk = true;
       ds.orientationOk = true;
       ds.lateralOk = true;
-      const wouldAutoDock = ds.targetDistance <= 15 && ds.speedOk && ds.orientationOk && ds.lateralOk;
+      const wouldAutoDock: boolean = ds.targetDistance <= 15 && ds.speedOk && ds.orientationOk && ds.lateralOk;
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
-      return { wouldAutoDock, distance: ds.targetDistance };
+      return { wouldAutoDock, distance: ds.targetDistance as number };
     });
 
-    expect(result.wouldAutoDock).toBe(true);
-    expect(result.distance).toBeLessThanOrEqual(15);
+    expect(result).not.toBeNull();
+    expect(result!.wouldAutoDock).toBe(true);
+    expect(result!.distance).toBeLessThanOrEqual(15);
   });
 });
 
@@ -1694,9 +1806,9 @@ test.describe('Docking thresholds', () => {
 
 test.describe('Grab arm thresholds', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeAll(async ({ browser }: { browser: Browser }) => {
     test.setTimeout(120_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
@@ -1726,7 +1838,7 @@ test.describe('Grab arm thresholds', () => {
     await waitForOrbit(page);
 
     const withinRange = await page.evaluate(() => {
-      const GRAB_ARM_RANGE = 25;
+      const GRAB_ARM_RANGE: number = 25;
       // Test: 20m is within range, 30m is not.
       return {
         at20m: 20 <= GRAB_ARM_RANGE,
@@ -1740,7 +1852,7 @@ test.describe('Grab arm thresholds', () => {
 
   test('(2) max relative speed for grab is 1.0 m/s', async () => {
     const speedCheck = await page.evaluate(() => {
-      const GRAB_MAX_SPEED = 1.0;
+      const GRAB_MAX_SPEED: number = 1.0;
       return {
         at0_8: 0.8 <= GRAB_MAX_SPEED,
         at1_5: 1.5 <= GRAB_MAX_SPEED,
@@ -1753,7 +1865,7 @@ test.describe('Grab arm thresholds', () => {
 
   test('(3) max lateral offset for grab is 5.0 m', async () => {
     const lateralCheck = await page.evaluate(() => {
-      const GRAB_MAX_LATERAL = 5.0;
+      const GRAB_MAX_LATERAL: number = 5.0;
       return {
         at3m: 3.0 <= GRAB_MAX_LATERAL,
         at7m: 7.0 <= GRAB_MAX_LATERAL,
@@ -1771,9 +1883,9 @@ test.describe('Grab arm thresholds', () => {
 
 test.describe('Power system eclipse behaviour', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeAll(async ({ browser }: { browser: Browser }) => {
     test.setTimeout(120_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
@@ -1796,15 +1908,15 @@ test.describe('Power system eclipse behaviour', () => {
       const ps = window.__flightPs;
       if (!ps?.powerState) return null;
       return {
-        sunlit: ps.powerState.sunlit,
-        hasPower: ps.powerState.hasPower,
+        sunlit: ps.powerState.sunlit as boolean,
+        hasPower: ps.powerState.hasPower as boolean,
       };
     });
 
     expect(sunlitInfo).not.toBeNull();
     // sunlit is a boolean — either true or false, both valid.
-    expect(typeof sunlitInfo.sunlit).toBe('boolean');
-    expect(typeof sunlitInfo.hasPower).toBe('boolean');
+    expect(typeof sunlitInfo!.sunlit).toBe('boolean');
+    expect(typeof sunlitInfo!.hasPower).toBe('boolean');
   });
 
   test('(2) battery provides power when solar generation is zero', async () => {
@@ -1815,11 +1927,11 @@ test.describe('Power system eclipse behaviour', () => {
       ps.powerState.sunlit = false;
       ps.powerState.solarGeneration = 0;
       // Ensure battery has charge.
-      ps.powerState.batteryCharge = ps.powerState.batteryCapacity * 0.5;
+      ps.powerState.batteryCharge = (ps.powerState.batteryCapacity as number) * 0.5;
     });
 
     await page.waitForFunction(
-      () => window.__flightPs?.powerState?.batteryCharge > 0,
+      () => (window.__flightPs?.powerState?.batteryCharge as number) > 0,
       { timeout: 5_000 },
     );
 
@@ -1827,15 +1939,15 @@ test.describe('Power system eclipse behaviour', () => {
       const ps = window.__flightPs;
       if (!ps?.powerState) return null;
       return {
-        solarGeneration: ps.powerState.solarGeneration,
-        batteryCharge: ps.powerState.batteryCharge,
-        hasPower: ps.powerState.hasPower,
+        solarGeneration: ps.powerState.solarGeneration as number,
+        batteryCharge: ps.powerState.batteryCharge as number,
+        hasPower: ps.powerState.hasPower as boolean,
       };
     });
 
     expect(eclipseInfo).not.toBeNull();
     // With battery charge available, craft should still have power.
-    expect(eclipseInfo.batteryCharge).toBeGreaterThan(0);
+    expect(eclipseInfo!.batteryCharge).toBeGreaterThan(0);
   });
 });
 
@@ -1845,9 +1957,9 @@ test.describe('Power system eclipse behaviour', () => {
 
 test.describe('Satellite leasing', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeAll(async ({ browser }: { browser: Browser }) => {
     test.setTimeout(120_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
@@ -1870,10 +1982,11 @@ test.describe('Satellite leasing', () => {
     });
     await seedAndLoadSave(page, fixture);
 
-    const gs = await getGameState(page);
-    const sat = gs.satelliteNetwork.satellites.find(s => s.id === 'sat-lease-1');
+    const gs = await getGameState(page) as GameStateSnapshot | null;
+    expect(gs).not.toBeNull();
+    const sat = gs!.satelliteNetwork.satellites.find((s: SatelliteRecord) => s.id === 'sat-lease-1');
     expect(sat).toBeTruthy();
-    expect(sat.leased).toBe(true);
+    expect(sat!.leased).toBe(true);
   });
 
   test('(2) non-leased satellite has leased flag false', async () => {
@@ -1886,10 +1999,11 @@ test.describe('Satellite leasing', () => {
     });
     await seedAndLoadSave(page, fixture);
 
-    const gs = await getGameState(page);
-    const sat = gs.satelliteNetwork.satellites.find(s => s.id === 'sat-nolease');
+    const gs = await getGameState(page) as GameStateSnapshot | null;
+    expect(gs).not.toBeNull();
+    const sat = gs!.satelliteNetwork.satellites.find((s: SatelliteRecord) => s.id === 'sat-nolease');
     expect(sat).toBeTruthy();
-    expect(sat.leased).toBe(false);
+    expect(sat!.leased).toBe(false);
   });
 });
 
@@ -1899,9 +2013,9 @@ test.describe('Satellite leasing', () => {
 
 test.describe('Orbital elements tracking', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeAll(async ({ browser }: { browser: Browser }) => {
     test.setTimeout(120_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
@@ -1918,12 +2032,12 @@ test.describe('Orbital elements tracking', () => {
 
     const elements = await page.evaluate(() => {
       const fs = window.__flightState;
-      return fs?.orbitalElements ?? null;
+      return fs?.orbitalElements as { semiMajorAxis: number; eccentricity: number } | null ?? null;
     });
 
     expect(elements).not.toBeNull();
-    expect(elements.eccentricity).toBeLessThan(0.05); // Near-circular.
-    expect(elements.semiMajorAxis).toBeGreaterThan(6_000_000); // Above Earth surface.
+    expect(elements!.eccentricity).toBeLessThan(0.05); // Near-circular.
+    expect(elements!.semiMajorAxis).toBeGreaterThan(6_000_000); // Above Earth surface.
   });
 
   test('(2) elliptical orbit has non-zero eccentricity', async () => {
@@ -1934,11 +2048,11 @@ test.describe('Orbital elements tracking', () => {
     await waitForOrbit(page);
 
     const elements = await page.evaluate(() => {
-      return window.__flightState?.orbitalElements ?? null;
+      return window.__flightState?.orbitalElements as { semiMajorAxis: number; eccentricity: number } | null ?? null;
     });
 
     expect(elements).not.toBeNull();
-    expect(elements.eccentricity).toBeGreaterThan(0.01); // Clearly non-circular.
+    expect(elements!.eccentricity).toBeGreaterThan(0.01); // Clearly non-circular.
   });
 });
 
@@ -1948,9 +2062,9 @@ test.describe('Orbital elements tracking', () => {
 
 test.describe('Complete orbital lifecycle', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeAll(async ({ browser }: { browser: Browser }) => {
     test.setTimeout(180_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
@@ -1959,22 +2073,24 @@ test.describe('Complete orbital lifecycle', () => {
 
   test.afterAll(async () => { await page.close(); });
 
-  test('(1) launch → orbit → manoeuvre → orbit → return lifecycle', async () => {
+  test('(1) launch -> orbit -> manoeuvre -> orbit -> return lifecycle', async () => {
     test.setTimeout(60_000);
     await startTestFlight(page, ORBITAL_ROCKET, { crewIds: ['crew-1'] });
 
     // Phase starts at PRELAUNCH.
-    const fsPre = await getFlightState(page);
-    expect(fsPre.phase).toBe('PRELAUNCH');
+    const fsPre = await getFlightState(page) as FlightStateSnapshot | null;
+    expect(fsPre).not.toBeNull();
+    expect(fsPre!.phase).toBe('PRELAUNCH');
 
     // Teleport to orbit.
     await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
     await waitForOrbit(page);
 
     // Verify ORBIT phase.
-    const fsOrbit = await getFlightState(page);
-    expect(fsOrbit.phase).toBe('ORBIT');
-    expect(fsOrbit.inOrbit).toBe(true);
+    const fsOrbit = await getFlightState(page) as FlightStateSnapshot | null;
+    expect(fsOrbit).not.toBeNull();
+    expect(fsOrbit!.phase).toBe('ORBIT');
+    expect(fsOrbit!.inOrbit).toBe(true);
 
     // Start a manoeuvre.
     await page.evaluate(async () => {
@@ -2017,8 +2133,9 @@ test.describe('Complete orbital lifecycle', () => {
   });
 
   test('(2) period advances after orbital flight return', async () => {
-    const gs = await getGameState(page);
+    const gs = await getGameState(page) as GameStateSnapshot | null;
+    expect(gs).not.toBeNull();
     // Started at period 30 — should now be 31.
-    expect(gs.currentPeriod).toBeGreaterThanOrEqual(31);
+    expect(gs!.currentPeriod).toBeGreaterThanOrEqual(31);
   });
 });
