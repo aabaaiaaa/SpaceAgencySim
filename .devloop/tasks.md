@@ -221,7 +221,7 @@ All tasks reference `.devloop/requirements.md` for full context.
 - **Verification**: `npx playwright test e2e/asteroid-belt.spec.js` passes.
 
 ### TASK-034: Verification pass — run all checks
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001, TASK-002, TASK-003, TASK-004c, TASK-005b, TASK-006, TASK-007, TASK-008, TASK-009, TASK-010, TASK-011, TASK-012, TASK-013, TASK-014, TASK-015, TASK-016, TASK-017, TASK-018, TASK-019, TASK-020, TASK-021, TASK-022, TASK-023, TASK-024, TASK-025, TASK-026, TASK-027, TASK-028, TASK-029, TASK-030, TASK-031, TASK-032, TASK-033
 - **Description**: Run the full verification suite: `npm run typecheck`, `npm run lint`, `npm run test:unit`, `npm run test:e2e`, `npm run build`. Verify `as unknown as` cast count is <10 in source files. Confirm all new E2E belt specs pass. See requirements §7.
 - **Verification**: All 5 commands pass with zero errors. `grep -rc "as unknown as" src/ --include="*.ts" | grep -v test | awk -F: '{s+=$2}END{print s}'` returns <10.
