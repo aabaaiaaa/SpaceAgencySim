@@ -229,7 +229,7 @@ describe('buildCrewMember', () => {
     const crew = buildCrewMember();
     expect(crew.id).toBe('crew-test-1');
     expect(crew.name).toBe('Test Astronaut');
-    expect(crew.status).toBe('IDLE');
+    expect(crew.status).toBe('active');
     expect(crew.salary).toBe(5_000);
     expect(crew.skills).toEqual({ piloting: 50, engineering: 50, science: 50 });
   });

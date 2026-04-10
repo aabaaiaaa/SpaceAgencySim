@@ -154,11 +154,8 @@ interface GW {
   __resyncPhysicsWorker?: () => Promise<void>;
 }
 
-/**
- * Cast window to the extended shape inside page.evaluate / waitForFunction.
- * The cast is erased at runtime — the browser just sees `window`.
- */
-function W(): GW { return window as unknown as GW; }
+/** Type alias for the extended window shape in evaluate callbacks. */
+type _W = GW;
 
 // ---------------------------------------------------------------------------
 // Constants
