@@ -16,7 +16,7 @@ import {
  * Each test is fully independent — seeds its own state, navigates, acts, asserts.
  */
 
-const UNLOCKED_PARTS = ['probe-core-mk1', 'tank-small', 'engine-spark'];
+const UNLOCKED_PARTS: string[] = ['probe-core-mk1', 'tank-small', 'engine-spark'];
 
 test.describe('Auto-Save System', () => {
 
@@ -37,9 +37,9 @@ test.describe('Auto-Save System', () => {
     await expect(page.locator('#auto-save-toast')).toBeVisible({ timeout: 5_000 });
 
     await page.waitForFunction(
-      () => {
+      (): boolean => {
         const toast = document.getElementById('auto-save-toast');
-        return toast && toast.textContent.includes('Saved');
+        return toast?.textContent?.includes('Saved') ?? false;
       },
       { timeout: 10_000 },
     );
@@ -47,7 +47,7 @@ test.describe('Auto-Save System', () => {
     // Verify the auto-save was written to localStorage.
     // Auto-save picks the first empty slot (spaceAgencySave_0, _1, etc.)
     // Saves are LZ-compressed (prefixed with "LZC:"), so we just check existence and non-empty.
-    const autoSaveInfo = await page.evaluate(() => {
+    const autoSaveInfo = await page.evaluate((): { exists: boolean; length: number } => {
       // Check all possible slots for an auto-save.
       for (let i = 0; i < 10; i++) {
         const raw = localStorage.getItem(`spaceAgencySave_${i}`);
@@ -75,9 +75,9 @@ test.describe('Auto-Save System', () => {
     await expect(page.locator('#auto-save-toast')).toBeVisible({ timeout: 5_000 });
     await page.click('#auto-save-cancel-btn');
 
-    await page.waitForFunction(() => !document.getElementById('auto-save-toast'), { timeout: 5_000 });
+    await page.waitForFunction((): boolean => !document.getElementById('auto-save-toast'), { timeout: 5_000 });
 
-    const hasAutoSave = await page.evaluate(() => localStorage.getItem('spaceAgencySave_auto') !== null);
+    const hasAutoSave: boolean = await page.evaluate((): boolean => localStorage.getItem('spaceAgencySave_auto') !== null);
     expect(hasAutoSave).toBe(false);
   });
 
@@ -98,7 +98,7 @@ test.describe('Auto-Save System', () => {
 
     await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 15_000 });
     await page.waitForTimeout(2_000);
-    const toastVisible = await page.locator('#auto-save-toast').isVisible().catch(() => false);
+    const toastVisible: boolean = await page.locator('#auto-save-toast').isVisible().catch((): boolean => false);
     expect(toastVisible).toBe(false);
   });
 });

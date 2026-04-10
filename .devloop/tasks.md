@@ -669,31 +669,31 @@
 - **Verification**: `npx playwright test e2e/asteroid-belt.spec.ts`
 
 ### TASK-111: Convert auto-save.spec.js to TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-016, TASK-017
 - **Description**: Rename `e2e/auto-save.spec.js` to `e2e/auto-save.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
 - **Verification**: `npx playwright test e2e/auto-save.spec.ts`
 
 ### TASK-112: Convert biomes-science.spec.js to TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-016, TASK-017
 - **Description**: Rename `e2e/biomes-science.spec.js` to `e2e/biomes-science.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
 - **Verification**: `npx playwright test e2e/biomes-science.spec.ts`
 
 ### TASK-113: Convert collision.spec.js to TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-016, TASK-017
 - **Description**: Rename `e2e/collision.spec.js` to `e2e/collision.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
 - **Verification**: `npx playwright test e2e/collision.spec.ts`
 
 ### TASK-114: Convert context-menu.spec.js to TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-016, TASK-017
 - **Description**: Rename `e2e/context-menu.spec.js` to `e2e/context-menu.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
 - **Verification**: `npx playwright test e2e/context-menu.spec.ts`
 
 ### TASK-115: Convert core-mechanics.spec.js to TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-016, TASK-017
 - **Description**: Rename `e2e/core-mechanics.spec.js` to `e2e/core-mechanics.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
 - **Verification**: `npx playwright test e2e/core-mechanics.spec.ts`

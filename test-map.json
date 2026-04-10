@@ -4,7 +4,7 @@
     "core/physics": {
       "sources": ["src/core/physics.ts"],
       "unit": ["src/tests/physics.test.ts", "src/tests/physicsWorker.test.ts", "src/tests/physicsWorkerCommand.test.ts"],
-      "e2e": ["e2e/flight.spec.js", "e2e/landing.spec.js", "e2e/core-mechanics.spec.js", "e2e/phase-transitions.spec.js", "e2e/collision.spec.js"]
+      "e2e": ["e2e/flight.spec.js", "e2e/landing.spec.js", "e2e/core-mechanics.spec.js", "e2e/phase-transitions.spec.js", "e2e/collision.spec.ts"]
     },
     "core/physicsWorker": {
       "sources": ["src/core/physicsWorker.ts", "src/core/physicsWorkerProtocol.ts"],
@@ -29,7 +29,7 @@
     "core/staging": {
       "sources": ["src/core/staging.ts"],
       "unit": ["src/tests/staging.test.ts"],
-      "e2e": ["e2e/rocketbuilder.spec.js", "e2e/flight.spec.js", "e2e/landing.spec.js", "e2e/collision.spec.js"]
+      "e2e": ["e2e/rocketbuilder.spec.js", "e2e/flight.spec.js", "e2e/landing.spec.js", "e2e/collision.spec.ts"]
     },
     "core/atmosphere": {
       "sources": ["src/core/atmosphere.ts"],
@@ -39,12 +39,12 @@
     "core/parachute": {
       "sources": ["src/core/parachute.ts", "src/core/legs.ts"],
       "unit": ["src/tests/parachute-deploy.test.ts", "src/tests/parachute-descent.test.ts", "src/tests/parachute-landing.test.ts", "src/tests/legs.test.ts"],
-      "e2e": ["e2e/landing.spec.js", "e2e/context-menu.spec.js"]
+      "e2e": ["e2e/landing.spec.js", "e2e/context-menu.spec.ts"]
     },
     "core/collision": {
       "sources": ["src/core/collision.ts"],
       "unit": ["src/tests/collision.test.ts"],
-      "e2e": ["e2e/collision.spec.js", "e2e/asteroid-belt.spec.js"]
+      "e2e": ["e2e/collision.spec.ts", "e2e/asteroid-belt.spec.js"]
     },
     "core/fuelsystem": {
       "sources": ["src/core/fuelsystem.ts"],
@@ -234,7 +234,7 @@
     "ui/flightHud": {
       "sources": ["src/ui/flightHud.ts", "src/ui/flightContextMenu.ts"],
       "unit": [],
-      "e2e": ["e2e/flight.spec.js", "e2e/context-menu.spec.js"]
+      "e2e": ["e2e/flight.spec.js", "e2e/context-menu.spec.ts"]
     },
     "ui/vab": {
       "sources": ["src/ui/vab.ts", "src/ui/vab/_init.ts", "src/ui/vab/_canvasInteraction.ts", "src/ui/vab/_panels.ts", "src/ui/vab/_partsPanel.ts", "src/ui/vab/_staging.ts", "src/ui/vab/_inventory.ts", "src/ui/vab/_state.ts", "src/ui/vab/_designLibrary.ts", "src/ui/vab/_engineerPanel.ts", "src/ui/vab/_launchFlow.ts", "src/ui/vab/_scalebar.ts", "src/ui/vab/_undoActions.ts"],

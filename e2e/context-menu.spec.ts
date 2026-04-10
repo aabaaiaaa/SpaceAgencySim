@@ -1,39 +1,43 @@
-import { test, expect } from '@playwright/test';
+/**
+ * context-menu.spec.ts — E2E tests for flight part context menu.
+ *
+ * Each test is independent — starts its own flight with an unstaged parachute.
+ */
+
+import { test, expect, type Page } from '@playwright/test';
 import {
   VP_W, VP_H,
   buildSaveEnvelope,
   seedAndLoadSave, startTestFlight,
 } from './helpers.js';
+import type { SaveEnvelope } from './helpers.js';
 
-/**
- * E2E — Flight Part Context Menu
- *
- * Each test is independent — starts its own flight with an unstaged parachute.
- */
+const UNLOCKED_PARTS: string[] = ['cmd-mk1', 'parachute-mk2', 'tank-medium', 'engine-spark'];
+const FLIGHT_PARTS: string[] = ['parachute-mk2', 'cmd-mk1', 'tank-medium', 'engine-spark'];
 
-const UNLOCKED_PARTS = ['cmd-mk1', 'parachute-mk2', 'tank-medium', 'engine-spark'];
-const FLIGHT_PARTS = ['parachute-mk2', 'cmd-mk1', 'tank-medium', 'engine-spark'];
-
-async function setupFlightWithParachute(page) {
+async function setupFlightWithParachute(page: Page): Promise<void> {
   await page.setViewportSize({ width: VP_W, height: VP_H });
-  const envelope = buildSaveEnvelope({ parts: UNLOCKED_PARTS });
+  const envelope: SaveEnvelope = buildSaveEnvelope({ parts: UNLOCKED_PARTS });
   await seedAndLoadSave(page, envelope);
   await startTestFlight(page, FLIGHT_PARTS);
   // Stage engine and lift off.
   await page.keyboard.press('Space');
-  await page.waitForFunction(() => (window.__flightPs?.posY ?? 0) > 5, { timeout: 5_000 });
+  await page.waitForFunction(() => {
+    const ps = (window as unknown as Record<string, unknown>).__flightPs as Record<string, unknown> | undefined;
+    return ((ps?.posY as number) ?? 0) > 5;
+  }, { timeout: 5_000 });
 }
 
 /** Sweep right-clicks to find the parachute and open context menu. */
-async function openParachuteContextMenu(page) {
+async function openParachuteContextMenu(page: Page): Promise<boolean> {
   const menu = page.locator('#flight-part-ctx-menu');
-  const centreX = VP_W / 2;
-  const centreY = VP_H / 2;
-  let menuOpened = false;
-  for (let dy = -60; dy <= 60 && !menuOpened; dy += 5) {
+  const centreX: number = VP_W / 2;
+  const centreY: number = VP_H / 2;
+  let menuOpened: boolean = false;
+  for (let dy: number = -60; dy <= 60 && !menuOpened; dy += 5) {
     await page.mouse.click(centreX, centreY + dy, { button: 'right' });
-    const visible = await menu.evaluate(
-      (el) => !el.hasAttribute('hidden') && el.textContent.includes('Mk2 Parachute'),
+    const visible: boolean = await menu.evaluate(
+      (el: HTMLElement) => !el.hasAttribute('hidden') && (el.textContent?.includes('Mk2 Parachute') ?? false),
     ).catch(() => false);
     if (visible) menuOpened = true;
   }
@@ -48,7 +52,7 @@ test.describe('Flight — Part Context Menu', () => {
     const menu = page.locator('#flight-part-ctx-menu');
     await expect(menu).toBeHidden();
 
-    const menuOpened = await openParachuteContextMenu(page);
+    const menuOpened: boolean = await openParachuteContextMenu(page);
     expect(menuOpened).toBe(true);
     await expect(menu).toBeVisible();
     await expect(menu).toContainText('Mk2 Parachute');
@@ -59,19 +63,20 @@ test.describe('Flight — Part Context Menu', () => {
     await setupFlightWithParachute(page);
 
     const menu = page.locator('#flight-part-ctx-menu');
-    const menuOpened = await openParachuteContextMenu(page);
+    const menuOpened: boolean = await openParachuteContextMenu(page);
     expect(menuOpened).toBe(true);
 
     await menu.locator('.fctx-item', { hasText: 'Deploy Parachute' }).click();
     await expect(menu).toBeHidden({ timeout: 2_000 });
 
-    const chuteState = await page.evaluate(() => {
-      const ps       = window.__flightPs;
-      const assembly = window.__flightAssembly;
+    const chuteState: string | null = await page.evaluate(() => {
+      const w = window as unknown as Record<string, unknown>;
+      const ps = w.__flightPs as Record<string, unknown> | undefined;
+      const assembly = w.__flightAssembly as Record<string, unknown> | undefined;
       if (!ps || !assembly) return null;
-      for (const [id, placed] of assembly.parts) {
+      for (const [id, placed] of assembly.parts as Map<string, { partId: string }>) {
         if (placed.partId === 'parachute-mk2') {
-          const entry = ps.parachuteStates?.get(id);
+          const entry = (ps.parachuteStates as Map<string, { state: string }> | undefined)?.get(id);
           return entry?.state ?? null;
         }
       }
@@ -85,17 +90,17 @@ test.describe('Flight — Part Context Menu', () => {
 
     // Open menu and deploy.
     const menu = page.locator('#flight-part-ctx-menu');
-    const opened = await openParachuteContextMenu(page);
+    const opened: boolean = await openParachuteContextMenu(page);
     expect(opened).toBe(true);
     await menu.locator('.fctx-item', { hasText: 'Deploy Parachute' }).click();
     await expect(menu).toBeHidden({ timeout: 2_000 });
 
     // Re-open menu.
-    const reopened = await openParachuteContextMenu(page);
+    const reopened: boolean = await openParachuteContextMenu(page);
     expect(reopened).toBe(true);
 
     await expect(menu).toContainText(/Parachute: (Deploying|Deployed)/);
-    const deployBtnCount = await menu.locator('.fctx-item', { hasText: 'Deploy Parachute' }).count();
+    const deployBtnCount: number = await menu.locator('.fctx-item', { hasText: 'Deploy Parachute' }).count();
     expect(deployBtnCount).toBe(0);
   });
 });

@@ -15,6 +15,7 @@ interface StartFlightOptions {
   crewIds?: string[];
   bodyId?: string;
   malfunctionMode?: string;
+  instruments?: Record<string, string[]>;
 }
 
 interface TeleportOptions {
