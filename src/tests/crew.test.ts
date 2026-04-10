@@ -1,21 +1,7 @@
-// @ts-nocheck
-/**
- * crew.test.js — Unit tests for the crew management system.
- *
- * Tests cover:
- *   - hireCrew()        — deducts $50k, adds astronaut, fails without funds
- *   - fireCrew()        — sets status to 'fired', idempotency guards
- *   - recordKIA()       — sets status to 'kia', records date/cause, applies fine
- *   - assignToCrew()    — stores rocketId on astronaut, active-only guard
- *   - unassignCrew()    — clears rocketId, works regardless of status
- *   - getActiveCrew()   — filters to 'active' status only
- *   - getFullHistory()  — returns all records including fired and KIA
- *   - AstronautStatus   — frozen enum with correct values
- *   - HIRE_COST         — matches $50,000 spec
- */
-
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
+import type { GameState, CrewMember, FlightState } from '../core/gameState.ts';
+import type { PhysicsState } from '../core/physics.ts';
 import {
   hireCrew,
   fireCrew,
@@ -46,14 +32,13 @@ import {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function freshState() {
+function freshState(): GameState {
   return createGameState();
 }
 
-/** Hire one astronaut by name, returning the astronaut record. */
-function hireOne(state, name = 'Alice') {
+function hireOne(state: GameState, name = 'Alice'): CrewMember {
   const result = hireCrew(state, name);
-  if (!result.success) throw new Error('hireCrew failed unexpectedly');
+  if (!result.success || !result.astronaut) throw new Error('hireCrew failed unexpectedly');
   return result.astronaut;
 }
 
@@ -88,7 +73,7 @@ describe('HIRE_COST constant', () => {
 // ---------------------------------------------------------------------------
 
 describe('hireCrew()', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('deducts $50,000 from cash', () => {
@@ -100,7 +85,7 @@ describe('hireCrew()', () => {
     const result = hireCrew(state, 'Bob');
     expect(result.success).toBe(true);
     expect(result.astronaut).toBeDefined();
-    expect(result.astronaut.name).toBe('Bob');
+    expect(result.astronaut!.name).toBe('Bob');
   });
 
   it('adds the astronaut to state.crew', () => {
@@ -111,41 +96,41 @@ describe('hireCrew()', () => {
 
   it('new astronaut has status "active"', () => {
     const { astronaut } = hireCrew(state, 'Dana');
-    expect(astronaut.status).toBe(AstronautStatus.ACTIVE);
+    expect(astronaut!.status).toBe(AstronautStatus.ACTIVE);
   });
 
   it('new astronaut starts with 0 missions and 0 flights', () => {
     const { astronaut } = hireCrew(state, 'Eve');
-    expect(astronaut.missionsFlown).toBe(0);
-    expect(astronaut.flightsFlown).toBe(0);
+    expect(astronaut!.missionsFlown).toBe(0);
+    expect(astronaut!.flightsFlown).toBe(0);
   });
 
   it('new astronaut has null deathDate and deathCause', () => {
     const { astronaut } = hireCrew(state, 'Frank');
-    expect(astronaut.deathDate).toBeNull();
-    expect(astronaut.deathCause).toBeNull();
+    expect(astronaut!.deathDate).toBeNull();
+    expect(astronaut!.deathCause).toBeNull();
   });
 
   it('new astronaut has null assignedRocketId', () => {
     const { astronaut } = hireCrew(state, 'Grace');
-    expect(astronaut.assignedRocketId).toBeNull();
+    expect(astronaut!.assignedRocketId).toBeNull();
   });
 
   it('new astronaut has a UUID id', () => {
     const { astronaut } = hireCrew(state, 'Hank');
-    expect(typeof astronaut.id).toBe('string');
-    expect(astronaut.id.length).toBeGreaterThan(0);
+    expect(typeof astronaut!.id).toBe('string');
+    expect(astronaut!.id.length).toBeGreaterThan(0);
   });
 
   it('new astronaut has an ISO hireDate', () => {
     const { astronaut } = hireCrew(state, 'Iris');
-    expect(typeof astronaut.hireDate).toBe('string');
-    expect(astronaut.hireDate).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(typeof astronaut!.hireDate).toBe('string');
+    expect(astronaut!.hireDate).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 
   it('each hired astronaut gets a unique id', () => {
-    const a = hireCrew(state, 'A').astronaut;
-    const b = hireCrew(state, 'B').astronaut;
+    const a = hireCrew(state, 'A').astronaut!;
+    const b = hireCrew(state, 'B').astronaut!;
     expect(a.id).not.toBe(b.id);
   });
 
@@ -181,7 +166,7 @@ describe('hireCrew()', () => {
 // ---------------------------------------------------------------------------
 
 describe('fireCrew()', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('sets status to "fired"', () => {
@@ -237,7 +222,7 @@ describe('fireCrew()', () => {
 // ---------------------------------------------------------------------------
 
 describe('recordKIA()', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('sets status to "kia"', () => {
@@ -333,7 +318,7 @@ describe('recordKIA()', () => {
 // ---------------------------------------------------------------------------
 
 describe('assignToCrew()', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('sets assignedRocketId on the astronaut', () => {
@@ -376,7 +361,7 @@ describe('assignToCrew()', () => {
 // ---------------------------------------------------------------------------
 
 describe('unassignCrew()', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('clears assignedRocketId', () => {
@@ -424,7 +409,7 @@ describe('unassignCrew()', () => {
 // ---------------------------------------------------------------------------
 
 describe('getActiveCrew()', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('returns empty array when crew is empty', () => {
@@ -470,7 +455,7 @@ describe('getActiveCrew()', () => {
 // ---------------------------------------------------------------------------
 
 describe('getFullHistory()', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('returns empty array when no crew has ever been hired', () => {
@@ -508,7 +493,7 @@ describe('getFullHistory()', () => {
   it('returns a shallow copy — pushing to result does not affect state.crew', () => {
     hireOne(state, 'A');
     const history = getFullHistory(state);
-    history.push({ id: 'fake', name: 'Fake' });
+    history.push({ id: 'fake', name: 'Fake' } as unknown as CrewMember);
     expect(state.crew).toHaveLength(1);
   });
 
@@ -524,7 +509,7 @@ describe('getFullHistory()', () => {
 // ---------------------------------------------------------------------------
 
 describe('injureCrew()', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('sets injuryEnds to currentPeriod + duration', () => {
@@ -557,6 +542,7 @@ describe('injureCrew()', () => {
 
   it('defaults currentPeriod to 0 when undefined', () => {
     const a = hireOne(state);
+    // @ts-expect-error intentionally testing undefined currentPeriod
     state.currentPeriod = undefined;
     injureCrew(state, a.id, 3);
     expect(a.injuryEnds).toBe(3);
@@ -568,7 +554,7 @@ describe('injureCrew()', () => {
 // ---------------------------------------------------------------------------
 
 describe('isCrewInjured()', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('returns true when injuryEnds is in the future', () => {
@@ -600,7 +586,7 @@ describe('isCrewInjured()', () => {
 // ---------------------------------------------------------------------------
 
 describe('assignToCrew() — injury blocking', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('returns false for injured crew', () => {
@@ -623,7 +609,7 @@ describe('assignToCrew() — injury blocking', () => {
 // ---------------------------------------------------------------------------
 
 describe('payMedicalCare()', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('halves remaining recovery time (round up)', () => {
@@ -681,7 +667,7 @@ describe('payMedicalCare()', () => {
 // ---------------------------------------------------------------------------
 
 describe('checkInjuryRecovery()', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('clears injuryEnds when period has reached it', () => {
@@ -730,7 +716,7 @@ describe('checkInjuryRecovery()', () => {
 // ---------------------------------------------------------------------------
 
 describe('getAssignableCrew()', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('excludes injured crew', () => {
@@ -768,17 +754,17 @@ describe('getAssignableCrew()', () => {
 // ---------------------------------------------------------------------------
 
 describe('processFlightInjuries()', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); state.currentPeriod = 5; });
 
   it('@smoke injures crew on hard landing (5–10 m/s)', () => {
     const a = hireOne(state, 'Pilot');
     const flightState = {
       crewIds: [a.id],
-      events: [{ type: 'LANDING', speed: 7.5, time: 100 }],
+      events: [{ type: 'LANDING', speed: 7.5, time: 100, description: '' }],
       timeElapsed: 100,
-    };
-    const ps = { crashed: false, ejectedCrewIds: new Set() };
+    } as unknown as FlightState;
+    const ps = { crashed: false, ejectedCrewIds: new Set<string>() } as unknown as PhysicsState;
 
     const injuries = processFlightInjuries(state, flightState, ps);
     expect(injuries).toHaveLength(1);
@@ -793,10 +779,10 @@ describe('processFlightInjuries()', () => {
     const a = hireOne(state, 'Pilot');
     const flightState = {
       crewIds: [a.id],
-      events: [{ type: 'LANDING', speed: 3.0, time: 50 }],
+      events: [{ type: 'LANDING', speed: 3.0, time: 50, description: '' }],
       timeElapsed: 50,
-    };
-    const ps = { crashed: false, ejectedCrewIds: new Set() };
+    } as unknown as FlightState;
+    const ps = { crashed: false, ejectedCrewIds: new Set<string>() } as unknown as PhysicsState;
 
     const injuries = processFlightInjuries(state, flightState, ps);
     expect(injuries).toHaveLength(0);
@@ -807,11 +793,11 @@ describe('processFlightInjuries()', () => {
     const a = hireOne(state, 'Pilot');
     const flightState = {
       crewIds: [a.id],
-      events: [{ type: 'CREW_EJECTED', altitude: 5000, time: 30 }],
+      events: [{ type: 'CREW_EJECTED', altitude: 5000, time: 30, description: '' }],
       timeElapsed: 30,
-    };
+    } as unknown as FlightState;
     const ejected = new Set([a.id]);
-    const ps = { crashed: true, ejectedCrewIds: ejected };
+    const ps = { crashed: true, ejectedCrewIds: ejected } as unknown as PhysicsState;
 
     const injuries = processFlightInjuries(state, flightState, ps);
     expect(injuries).toHaveLength(1);
@@ -824,10 +810,10 @@ describe('processFlightInjuries()', () => {
     const a = hireOne(state, 'Pilot');
     const flightState = {
       crewIds: [a.id],
-      events: [{ type: 'CRASH', speed: 50, time: 80 }],
+      events: [{ type: 'CRASH', speed: 50, time: 80, description: '' }],
       timeElapsed: 80,
-    };
-    const ps = { crashed: true, ejectedCrewIds: new Set() };
+    } as unknown as FlightState;
+    const ps = { crashed: true, ejectedCrewIds: new Set<string>() } as unknown as PhysicsState;
 
     const injuries = processFlightInjuries(state, flightState, ps);
     expect(injuries).toHaveLength(0);
@@ -837,10 +823,10 @@ describe('processFlightInjuries()', () => {
     const a = hireOne(state, 'Pilot');
     const flightState = {
       crewIds: [a.id],
-      events: [{ type: 'LANDING', speed: 8.0, time: 100 }],
+      events: [{ type: 'LANDING', speed: 8.0, time: 100, description: '' }],
       timeElapsed: 100,
-    };
-    const ps = { crashed: false, ejectedCrewIds: new Set() };
+    } as unknown as FlightState;
+    const ps = { crashed: false, ejectedCrewIds: new Set<string>() } as unknown as PhysicsState;
 
     processFlightInjuries(state, flightState, ps);
     const injuryEvents = flightState.events.filter((e) => e.type === 'CREW_INJURED');
@@ -850,6 +836,7 @@ describe('processFlightInjuries()', () => {
   });
 
   it('returns empty when no flight state', () => {
+    // @ts-expect-error intentionally passing null for non-nullable FlightState
     expect(processFlightInjuries(state, null, null)).toEqual([]);
   });
 
@@ -858,10 +845,10 @@ describe('processFlightInjuries()', () => {
     const a = hireOne(state, 'SlowLanding');
     const flightState1 = {
       crewIds: [a.id],
-      events: [{ type: 'LANDING', speed: HARD_LANDING_SPEED_MIN, time: 10 }],
+      events: [{ type: 'LANDING', speed: HARD_LANDING_SPEED_MIN, time: 10, description: '' }],
       timeElapsed: 10,
-    };
-    const ps = { crashed: false, ejectedCrewIds: new Set() };
+    } as unknown as FlightState;
+    const ps = { crashed: false, ejectedCrewIds: new Set<string>() } as unknown as PhysicsState;
     const injuries1 = processFlightInjuries(state, flightState1, ps);
     expect(injuries1[0].periods).toBe(2);
 
@@ -869,9 +856,9 @@ describe('processFlightInjuries()', () => {
     const b = hireOne(state, 'FastLanding');
     const flightState2 = {
       crewIds: [b.id],
-      events: [{ type: 'LANDING', speed: HARD_LANDING_SPEED_MAX - 0.1, time: 10 }],
+      events: [{ type: 'LANDING', speed: HARD_LANDING_SPEED_MAX - 0.1, time: 10, description: '' }],
       timeElapsed: 10,
-    };
+    } as unknown as FlightState;
     const injuries2 = processFlightInjuries(state, flightState2, ps);
     expect(injuries2[0].periods).toBe(3);
   });

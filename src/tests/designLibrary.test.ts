@@ -1,19 +1,3 @@
-// @ts-nocheck
-/**
- * designLibrary.test.js — Unit tests for rocket design library system.
- *
- * Tests cover:
- *   - Shared library persistence (localStorage read/write)
- *   - Error handling: quota errors, corrupt JSON with console.warn
- *   - Unified library access (shared + private merging)
- *   - Save/delete routing (shared vs. private)
- *   - Design duplication
- *   - Cost breakdown calculation
- *   - Tech tree compatibility checking
- *   - Design grouping and filtering
- *   - JSON import/export (cross-save sharing)
- */
-
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
 import {
@@ -31,24 +15,34 @@ import {
   getDesignGroupDefs,
   filterDesignsByGroup,
 } from '../core/designLibrary.ts';
+import type { GameState, RocketDesign } from '../core/gameState.ts';
 
 // ---------------------------------------------------------------------------
 // localStorage mock
 // ---------------------------------------------------------------------------
 
-function createLocalStorageMock() {
-  const store = new Map();
+interface MockStorage {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+  clear(): void;
+  readonly length: number;
+  _store: Map<string, string>;
+}
+
+function createLocalStorageMock(): MockStorage {
+  const store = new Map<string, string>();
   return {
-    getItem(key) { return store.has(key) ? store.get(key) : null; },
-    setItem(key, value) { store.set(key, String(value)); },
-    removeItem(key) { store.delete(key); },
-    clear() { store.clear(); },
-    get length() { return store.size; },
+    getItem(key: string): string | null { return store.has(key) ? store.get(key)! : null; },
+    setItem(key: string, value: string): void { store.set(key, String(value)); },
+    removeItem(key: string): void { store.delete(key); },
+    clear(): void { store.clear(); },
+    get length(): number { return store.size; },
     _store: store,
   };
 }
 
-let mockStorage;
+let mockStorage: MockStorage;
 
 beforeEach(() => {
   mockStorage = createLocalStorageMock();
@@ -64,12 +58,11 @@ afterEach(() => {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function freshState() {
+function freshState(): GameState {
   return createGameState();
 }
 
-/** Create a minimal design with sensible defaults. */
-function makeDesign(overrides = {}) {
+function makeDesign(overrides: Partial<RocketDesign> = {}): RocketDesign {
   return {
     id: 'design-test-1',
     name: 'Test Rocket',
@@ -87,8 +80,7 @@ function makeDesign(overrides = {}) {
   };
 }
 
-/** Create a crewed design (has cmd-mk1). */
-function makeCrewedDesign(overrides = {}) {
+function makeCrewedDesign(overrides: Partial<RocketDesign> = {}): RocketDesign {
   return makeDesign({
     id: 'design-crewed-1',
     name: 'Crewed Rocket',
@@ -102,8 +94,7 @@ function makeCrewedDesign(overrides = {}) {
   });
 }
 
-/** Create a satellite design. */
-function makeSatelliteDesign(overrides = {}) {
+function makeSatelliteDesign(overrides: Partial<RocketDesign> = {}): RocketDesign {
   return makeDesign({
     id: 'design-sat-1',
     name: 'Sat Launcher',
@@ -117,8 +108,7 @@ function makeSatelliteDesign(overrides = {}) {
   });
 }
 
-/** Seed localStorage with designs. */
-function seedSharedLibrary(designs) {
+function seedSharedLibrary(designs: RocketDesign[]): void {
   mockStorage.setItem('spaceAgencyDesignLibrary', JSON.stringify(designs));
 }
 
@@ -149,6 +139,7 @@ describe('Design Library', () => {
       const result = loadSharedLibrary();
       expect(result).toEqual([]);
       expect(warnSpy).toHaveBeenCalledOnce();
+      // @ts-expect-error .calls fallback for alternate spy API shape
       expect(warnSpy.calls?.[0]?.[0] ?? warnSpy.mock.calls[0][0]).toContain('designLibrary');
     });
 
@@ -169,7 +160,7 @@ describe('Design Library', () => {
       saveSharedLibrary(designs);
       const raw = mockStorage.getItem('spaceAgencyDesignLibrary');
       expect(raw).toBeTruthy();
-      const parsed = JSON.parse(raw);
+      const parsed = JSON.parse(raw!);
       expect(parsed).toHaveLength(1);
       expect(parsed[0].id).toBe('design-test-1');
     });
@@ -177,7 +168,7 @@ describe('Design Library', () => {
     it('overwrites existing data', () => {
       seedSharedLibrary([makeDesign()]);
       saveSharedLibrary([makeDesign({ id: 'design-new' })]);
-      const parsed = JSON.parse(mockStorage.getItem('spaceAgencyDesignLibrary'));
+      const parsed = JSON.parse(mockStorage.getItem('spaceAgencyDesignLibrary')!);
       expect(parsed).toHaveLength(1);
       expect(parsed[0].id).toBe('design-new');
     });
@@ -284,6 +275,7 @@ describe('Design Library', () => {
 
     it('handles undefined savedDesigns gracefully', () => {
       const state = freshState();
+      // @ts-expect-error testing defensive handling of undefined
       state.savedDesigns = undefined;
       expect(() => getAllDesigns(state)).not.toThrow();
       expect(getAllDesigns(state)).toEqual([]);
@@ -333,6 +325,7 @@ describe('Design Library', () => {
 
     it('handles undefined savedDesigns when saving private design', () => {
       const state = freshState();
+      // @ts-expect-error testing defensive handling of undefined
       state.savedDesigns = undefined;
       const design = makeDesign({ savePrivate: true });
       expect(() => saveDesignToLibrary(state, design)).not.toThrow();
@@ -342,6 +335,7 @@ describe('Design Library', () => {
 
     it('handles null savedDesigns when saving private design', () => {
       const state = freshState();
+      // @ts-expect-error testing defensive handling of null
       state.savedDesigns = null;
       const design = makeDesign({ savePrivate: true });
       expect(() => saveDesignToLibrary(state, design)).not.toThrow();
@@ -350,6 +344,7 @@ describe('Design Library', () => {
 
     it('handles undefined savedDesigns when saving shared design', () => {
       const state = freshState();
+      // @ts-expect-error testing defensive handling of undefined
       state.savedDesigns = undefined;
       const design = makeDesign({ savePrivate: false });
       expect(() => saveDesignToLibrary(state, design)).not.toThrow();
@@ -392,6 +387,7 @@ describe('Design Library', () => {
 
     it('handles undefined savedDesigns', () => {
       const state = freshState();
+      // @ts-expect-error testing defensive handling of undefined
       state.savedDesigns = undefined;
       expect(() => deleteDesignFromLibrary(state, 'design-test-1')).not.toThrow();
       expect(state.savedDesigns).toEqual([]);
@@ -399,6 +395,7 @@ describe('Design Library', () => {
 
     it('handles null savedDesigns', () => {
       const state = freshState();
+      // @ts-expect-error testing defensive handling of null
       state.savedDesigns = null;
       expect(() => deleteDesignFromLibrary(state, 'design-test-1')).not.toThrow();
       expect(state.savedDesigns).toEqual([]);
@@ -489,8 +486,8 @@ describe('Design Library', () => {
       });
       const cost = calculateCostBreakdown(design);
       const tankEntry = cost.partDetails.find((d) => d.partId === 'tank-small');
-      expect(tankEntry.count).toBe(2);
-      expect(tankEntry.cost).toBe(800 * 2);
+      expect(tankEntry!.count).toBe(2);
+      expect(tankEntry!.cost).toBe(800 * 2);
     });
 
     it('handles design with no parts', () => {
@@ -607,6 +604,7 @@ describe('Design Library', () => {
 
     it('handles undefined state.parts', () => {
       const state = freshState();
+      // @ts-expect-error testing defensive handling of undefined
       state.parts = undefined;
       const design = makeDesign({
         parts: [{ partId: 'engine-spark-improved', position: { x: 0, y: 0 } }],
@@ -625,7 +623,7 @@ describe('Design Library', () => {
       const singleStage = groups.find((g) => g.groupId === 'single-stage');
       const probe = groups.find((g) => g.groupId === 'probe');
       expect(singleStage).toBeDefined();
-      expect(singleStage.designs).toHaveLength(1);
+      expect(singleStage!.designs).toHaveLength(1);
       expect(probe).toBeDefined();
     });
 
@@ -634,7 +632,7 @@ describe('Design Library', () => {
       const groups = groupDesigns(designs);
       const crewed = groups.find((g) => g.groupId === 'crewed');
       expect(crewed).toBeDefined();
-      expect(crewed.designs).toHaveLength(1);
+      expect(crewed!.designs).toHaveLength(1);
     });
 
     it('classifies satellite designs', () => {
@@ -650,8 +648,8 @@ describe('Design Library', () => {
       const groups = groupDesigns([heavy, light]);
       const heavyGroup = groups.find((g) => g.groupId === 'heavy');
       expect(heavyGroup).toBeDefined();
-      expect(heavyGroup.designs).toHaveLength(1);
-      expect(heavyGroup.designs[0].totalMass).toBe(50_000);
+      expect(heavyGroup!.designs).toHaveLength(1);
+      expect(heavyGroup!.designs[0].totalMass).toBe(50_000);
     });
 
     it('classifies 2-stage designs', () => {
@@ -726,7 +724,7 @@ describe('Design Library', () => {
 
     it('does not expose test functions', () => {
       for (const def of getDesignGroupDefs()) {
-        expect(def.test).toBeUndefined();
+        expect((def as Record<string, unknown>).test).toBeUndefined();
       }
     });
   });

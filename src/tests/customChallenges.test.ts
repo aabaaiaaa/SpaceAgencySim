@@ -1,19 +1,6 @@
-// @ts-nocheck
-/**
- * customChallenges.test.js — Unit tests for player-created custom challenges.
- *
- * Tests cover:
- *   - State initialisation (ensureCustomChallengeState)
- *   - Challenge creation with validation
- *   - Challenge deletion and state cleanup
- *   - Export to shareable JSON
- *   - Import from JSON with validation
- *   - Edge cases and error handling
- *   - OBJECTIVE_TYPE_META and SCORE_METRIC_OPTIONS constants
- */
-
 import { describe, it, expect } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
+import type { GameState, ChallengeDef } from '../core/gameState.ts';
 import {
   OBJECTIVE_TYPE_META,
   SCORE_METRIC_OPTIONS,
@@ -26,18 +13,19 @@ import {
 import { ObjectiveType } from '../data/missions.ts';
 import { ScoreDirection } from '../data/challenges.ts';
 
+type CustomChallengeDef = Parameters<typeof createCustomChallenge>[1];
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function freshState() {
+function freshState(): GameState {
   const state = createGameState();
   ensureCustomChallengeState(state);
   return state;
 }
 
-/** Minimal valid challenge definition. */
-function validDef(overrides = {}) {
+function validDef(overrides: Partial<CustomChallengeDef> = {}): CustomChallengeDef {
   return {
     title: 'Test Challenge',
     description: 'A test challenge',
@@ -121,13 +109,13 @@ describe('Custom Challenges', () => {
     it('contains rocketCost as a lower-is-better metric', () => {
       const cost = SCORE_METRIC_OPTIONS.find((m) => m.value === 'rocketCost');
       expect(cost).toBeDefined();
-      expect(cost.direction).toBe(ScoreDirection.LOWER_IS_BETTER);
+      expect(cost!.direction).toBe(ScoreDirection.LOWER_IS_BETTER);
     });
 
     it('contains maxAltitude as a higher-is-better metric', () => {
       const alt = SCORE_METRIC_OPTIONS.find((m) => m.value === 'maxAltitude');
       expect(alt).toBeDefined();
-      expect(alt.direction).toBe(ScoreDirection.HIGHER_IS_BETTER);
+      expect(alt!.direction).toBe(ScoreDirection.HIGHER_IS_BETTER);
     });
   });
 
@@ -136,6 +124,7 @@ describe('Custom Challenges', () => {
   describe('ensureCustomChallengeState', () => {
     it('creates customChallenges array if missing', () => {
       const state = createGameState();
+      // @ts-expect-error testing missing property
       delete state.customChallenges;
       ensureCustomChallengeState(state);
       expect(Array.isArray(state.customChallenges)).toBe(true);
@@ -144,7 +133,7 @@ describe('Custom Challenges', () => {
 
     it('preserves existing custom challenges', () => {
       const state = createGameState();
-      state.customChallenges = [{ id: 'custom-abc', title: 'Existing' }];
+      state.customChallenges = [{ id: 'custom-abc', title: 'Existing' } as ChallengeDef];
       ensureCustomChallengeState(state);
       expect(state.customChallenges.length).toBe(1);
       expect(state.customChallenges[0].id).toBe('custom-abc');
@@ -152,6 +141,7 @@ describe('Custom Challenges', () => {
 
     it('replaces non-array value with empty array', () => {
       const state = createGameState();
+      // @ts-expect-error testing invalid type
       state.customChallenges = 'not an array';
       ensureCustomChallengeState(state);
       expect(Array.isArray(state.customChallenges)).toBe(true);
@@ -167,8 +157,8 @@ describe('Custom Challenges', () => {
       const result = createCustomChallenge(state, validDef());
       expect(result.success).toBe(true);
       expect(result.challenge).toBeDefined();
-      expect(result.challenge.custom).toBe(true);
-      expect(result.challenge.title).toBe('Test Challenge');
+      expect(result.challenge!.custom).toBe(true);
+      expect(result.challenge!.title).toBe('Test Challenge');
       expect(state.customChallenges.length).toBe(1);
     });
 
@@ -176,21 +166,21 @@ describe('Custom Challenges', () => {
       const state = freshState();
       const r1 = createCustomChallenge(state, validDef());
       const r2 = createCustomChallenge(state, validDef({ title: 'Another' }));
-      expect(r1.challenge.id).toMatch(/^custom-/);
-      expect(r2.challenge.id).toMatch(/^custom-/);
-      expect(r1.challenge.id).not.toBe(r2.challenge.id);
+      expect(r1.challenge!.id).toMatch(/^custom-/);
+      expect(r2.challenge!.id).toMatch(/^custom-/);
+      expect(r1.challenge!.id).not.toBe(r2.challenge!.id);
     });
 
     it('trims whitespace from title', () => {
       const state = freshState();
       const result = createCustomChallenge(state, validDef({ title: '  Spaces  ' }));
-      expect(result.challenge.title).toBe('Spaces');
+      expect(result.challenge!.title).toBe('Spaces');
     });
 
     it('uses default description when none provided', () => {
       const state = freshState();
       const result = createCustomChallenge(state, validDef({ description: '' }));
-      expect(result.challenge.description).toBe('A custom challenge.');
+      expect(result.challenge!.description).toBe('A custom challenge.');
     });
 
     it('maps objectives with auto-generated descriptions', () => {
@@ -201,11 +191,11 @@ describe('Custom Challenges', () => {
           { type: ObjectiveType.SAFE_LANDING, target: { maxLandingSpeed: 10 } },
         ],
       }));
-      expect(result.challenge.objectives.length).toBe(2);
-      expect(result.challenge.objectives[0].id).toBe('custom-obj-0');
-      expect(result.challenge.objectives[1].id).toBe('custom-obj-1');
-      expect(result.challenge.objectives[0].completed).toBe(false);
-      expect(result.challenge.objectives[1].completed).toBe(false);
+      expect(result.challenge!.objectives.length).toBe(2);
+      expect(result.challenge!.objectives[0].id).toBe('custom-obj-0');
+      expect(result.challenge!.objectives[1].id).toBe('custom-obj-1');
+      expect(result.challenge!.objectives[0].completed).toBe(false);
+      expect(result.challenge!.objectives[1].completed).toBe(false);
     });
 
     it('uses provided objective description over auto-generated', () => {
@@ -215,7 +205,7 @@ describe('Custom Challenges', () => {
           { type: ObjectiveType.REACH_ALTITUDE, target: { altitude: 5000 }, description: 'Go high!' },
         ],
       }));
-      expect(result.challenge.objectives[0].description).toBe('Go high!');
+      expect(result.challenge!.objectives[0].description).toBe('Go high!');
     });
 
     it('copies target values without sharing references', () => {
@@ -225,27 +215,27 @@ describe('Custom Challenges', () => {
         objectives: [{ type: ObjectiveType.REACH_ALTITUDE, target }],
       }));
       target.altitude = 99999;
-      expect(result.challenge.objectives[0].target.altitude).toBe(5000);
+      expect(result.challenge!.objectives[0].target.altitude).toBe(5000);
     });
 
     it('resolves score label and unit from SCORE_METRIC_OPTIONS', () => {
       const state = freshState();
       const result = createCustomChallenge(state, validDef({ scoreMetric: 'rocketCost' }));
-      expect(result.challenge.scoreLabel).toBe('Rocket Cost');
-      expect(result.challenge.scoreUnit).toBe('$');
+      expect(result.challenge!.scoreLabel).toBe('Rocket Cost');
+      expect(result.challenge!.scoreUnit).toBe('$');
     });
 
     it('falls back to metric name when metric not in SCORE_METRIC_OPTIONS', () => {
       const state = freshState();
       const result = createCustomChallenge(state, validDef({ scoreMetric: 'unknownMetric' }));
-      expect(result.challenge.scoreLabel).toBe('unknownMetric');
-      expect(result.challenge.scoreUnit).toBe('');
+      expect(result.challenge!.scoreLabel).toBe('unknownMetric');
+      expect(result.challenge!.scoreUnit).toBe('');
     });
 
     it('resolves scoreDirection from SCORE_METRIC_OPTIONS when not specified', () => {
       const state = freshState();
       const result = createCustomChallenge(state, validDef({ scoreMetric: 'maxAltitude' }));
-      expect(result.challenge.scoreDirection).toBe(ScoreDirection.HIGHER_IS_BETTER);
+      expect(result.challenge!.scoreDirection).toBe(ScoreDirection.HIGHER_IS_BETTER);
     });
 
     it('uses explicit scoreDirection over auto-resolved', () => {
@@ -254,31 +244,32 @@ describe('Custom Challenges', () => {
         scoreMetric: 'rocketCost',
         scoreDirection: ScoreDirection.HIGHER_IS_BETTER,
       }));
-      expect(result.challenge.scoreDirection).toBe(ScoreDirection.HIGHER_IS_BETTER);
+      expect(result.challenge!.scoreDirection).toBe(ScoreDirection.HIGHER_IS_BETTER);
     });
 
     it('converts medal thresholds to numbers', () => {
       const state = freshState();
       const result = createCustomChallenge(state, validDef({
+        // @ts-expect-error testing string-to-number coercion
         medals: { bronze: '50000', silver: '30000', gold: '15000' },
       }));
-      expect(result.challenge.medals.bronze).toBe(50000);
-      expect(result.challenge.medals.silver).toBe(30000);
-      expect(result.challenge.medals.gold).toBe(15000);
+      expect(result.challenge!.medals.bronze).toBe(50000);
+      expect(result.challenge!.medals.silver).toBe(30000);
+      expect(result.challenge!.medals.gold).toBe(15000);
     });
 
     it('defaults medal values to 0 for missing fields', () => {
       const state = freshState();
-      const result = createCustomChallenge(state, validDef({ medals: {} }));
-      expect(result.challenge.medals.bronze).toBe(0);
-      expect(result.challenge.medals.silver).toBe(0);
-      expect(result.challenge.medals.gold).toBe(0);
+      const result = createCustomChallenge(state, validDef({ medals: {} as CustomChallengeDef['medals'] }));
+      expect(result.challenge!.medals.bronze).toBe(0);
+      expect(result.challenge!.medals.silver).toBe(0);
+      expect(result.challenge!.medals.gold).toBe(0);
     });
 
     it('sets requiredMissions to empty array', () => {
       const state = freshState();
       const result = createCustomChallenge(state, validDef());
-      expect(result.challenge.requiredMissions).toEqual([]);
+      expect(result.challenge!.requiredMissions).toEqual([]);
     });
 
     // ── Validation errors ───────────────────────────────────────────────
@@ -300,6 +291,7 @@ describe('Custom Challenges', () => {
     it('fails with missing title', () => {
       const state = freshState();
       const def = validDef();
+      // @ts-expect-error testing missing required property
       delete def.title;
       const result = createCustomChallenge(state, def);
       expect(result.success).toBe(false);
@@ -315,6 +307,7 @@ describe('Custom Challenges', () => {
     it('fails with missing objectives', () => {
       const state = freshState();
       const def = validDef();
+      // @ts-expect-error testing missing required property
       delete def.objectives;
       const result = createCustomChallenge(state, def);
       expect(result.success).toBe(false);
@@ -335,6 +328,7 @@ describe('Custom Challenges', () => {
 
     it('initialises state.customChallenges if missing before creation', () => {
       const state = createGameState();
+      // @ts-expect-error testing missing property
       delete state.customChallenges;
       const result = createCustomChallenge(state, validDef());
       expect(result.success).toBe(true);
@@ -347,7 +341,7 @@ describe('Custom Challenges', () => {
   describe('deleteCustomChallenge', () => {
     it('removes a custom challenge by ID', () => {
       const state = freshState();
-      const { challenge } = createCustomChallenge(state, validDef());
+      const { challenge } = createCustomChallenge(state, validDef()) as { challenge: ChallengeDef };
       expect(state.customChallenges.length).toBe(1);
 
       const result = deleteCustomChallenge(state, challenge.id);
@@ -364,9 +358,8 @@ describe('Custom Challenges', () => {
 
     it('clears active challenge slot if deleted challenge was active', () => {
       const state = freshState();
-      const { challenge } = createCustomChallenge(state, validDef());
+      const { challenge } = createCustomChallenge(state, validDef()) as { challenge: ChallengeDef };
 
-      // Simulate accepting the custom challenge.
       state.challenges = { active: { ...challenge }, results: {} };
 
       deleteCustomChallenge(state, challenge.id);
@@ -375,9 +368,8 @@ describe('Custom Challenges', () => {
 
     it('clears results for deleted challenge', () => {
       const state = freshState();
-      const { challenge } = createCustomChallenge(state, validDef());
+      const { challenge } = createCustomChallenge(state, validDef()) as { challenge: ChallengeDef };
 
-      // Simulate stored results.
       state.challenges = {
         active: null,
         results: { [challenge.id]: { medal: 'gold', score: 100, attempts: 1 } },
@@ -389,7 +381,7 @@ describe('Custom Challenges', () => {
 
     it('does not affect other challenges when deleting one', () => {
       const state = freshState();
-      const { challenge: c1 } = createCustomChallenge(state, validDef({ title: 'First' }));
+      const { challenge: c1 } = createCustomChallenge(state, validDef({ title: 'First' })) as { challenge: ChallengeDef };
       createCustomChallenge(state, validDef({ title: 'Second' }));
       expect(state.customChallenges.length).toBe(2);
 
@@ -400,13 +392,13 @@ describe('Custom Challenges', () => {
 
     it('preserves active challenge when deleting a different one', () => {
       const state = freshState();
-      const { challenge: c1 } = createCustomChallenge(state, validDef({ title: 'First' }));
-      const { challenge: c2 } = createCustomChallenge(state, validDef({ title: 'Second' }));
+      const { challenge: c1 } = createCustomChallenge(state, validDef({ title: 'First' })) as { challenge: ChallengeDef };
+      const { challenge: c2 } = createCustomChallenge(state, validDef({ title: 'Second' })) as { challenge: ChallengeDef };
 
       state.challenges = { active: { ...c2 }, results: {} };
 
       deleteCustomChallenge(state, c1.id);
-      expect(state.challenges.active.id).toBe(c2.id);
+      expect(state.challenges.active!.id).toBe(c2.id);
     });
   });
 
@@ -415,15 +407,15 @@ describe('Custom Challenges', () => {
   describe('exportChallengeJSON', () => {
     it('produces valid JSON', () => {
       const state = freshState();
-      const { challenge } = createCustomChallenge(state, validDef());
+      const { challenge } = createCustomChallenge(state, validDef()) as { challenge: ChallengeDef };
       const json = exportChallengeJSON(challenge);
       expect(() => JSON.parse(json)).not.toThrow();
     });
 
     it('includes format marker and version', () => {
       const state = freshState();
-      const { challenge } = createCustomChallenge(state, validDef());
-      const data = JSON.parse(exportChallengeJSON(challenge));
+      const { challenge } = createCustomChallenge(state, validDef()) as { challenge: ChallengeDef };
+      const data = JSON.parse(exportChallengeJSON(challenge)) as Record<string, unknown>;
       expect(data._format).toBe('SpaceAgencySim-CustomChallenge');
       expect(data._version).toBe(1);
     });
@@ -433,36 +425,36 @@ describe('Custom Challenges', () => {
       const { challenge } = createCustomChallenge(state, validDef({
         title: 'Export Test',
         description: 'Testing export',
-      }));
-      const data = JSON.parse(exportChallengeJSON(challenge));
+      })) as { challenge: ChallengeDef };
+      const data = JSON.parse(exportChallengeJSON(challenge)) as Record<string, unknown>;
       expect(data.title).toBe('Export Test');
       expect(data.description).toBe('Testing export');
       expect(data.scoreMetric).toBe('rocketCost');
-      expect(data.objectives.length).toBe(1);
-      expect(data.objectives[0].type).toBe(ObjectiveType.REACH_ALTITUDE);
+      expect((data.objectives as Array<Record<string, unknown>>).length).toBe(1);
+      expect((data.objectives as Array<Record<string, unknown>>)[0].type).toBe(ObjectiveType.REACH_ALTITUDE);
     });
 
     it('strips runtime ID field', () => {
       const state = freshState();
-      const { challenge } = createCustomChallenge(state, validDef());
-      const data = JSON.parse(exportChallengeJSON(challenge));
+      const { challenge } = createCustomChallenge(state, validDef()) as { challenge: ChallengeDef };
+      const data = JSON.parse(exportChallengeJSON(challenge)) as Record<string, unknown>;
       expect(data.id).toBeUndefined();
     });
 
     it('does not share object references with original', () => {
       const state = freshState();
-      const { challenge } = createCustomChallenge(state, validDef());
-      const data = JSON.parse(exportChallengeJSON(challenge));
-      data.medals.bronze = 999999;
+      const { challenge } = createCustomChallenge(state, validDef()) as { challenge: ChallengeDef };
+      const data = JSON.parse(exportChallengeJSON(challenge)) as Record<string, unknown>;
+      (data.medals as Record<string, number>).bronze = 999999;
       expect(challenge.medals.bronze).toBe(50000);
     });
 
     it('strips completed flag from objectives', () => {
       const state = freshState();
-      const { challenge } = createCustomChallenge(state, validDef());
+      const { challenge } = createCustomChallenge(state, validDef()) as { challenge: ChallengeDef };
       challenge.objectives[0].completed = true;
-      const data = JSON.parse(exportChallengeJSON(challenge));
-      expect(data.objectives[0].completed).toBeUndefined();
+      const data = JSON.parse(exportChallengeJSON(challenge)) as Record<string, unknown>;
+      expect((data.objectives as Array<Record<string, unknown>>)[0].completed).toBeUndefined();
     });
   });
 
@@ -471,26 +463,26 @@ describe('Custom Challenges', () => {
   describe('importChallengeJSON', () => {
     it('imports a valid exported challenge', () => {
       const state = freshState();
-      const { challenge } = createCustomChallenge(state, validDef({ title: 'Original' }));
+      const { challenge } = createCustomChallenge(state, validDef({ title: 'Original' })) as { challenge: ChallengeDef };
       const json = exportChallengeJSON(challenge);
 
       const state2 = freshState();
       const result = importChallengeJSON(state2, json);
       expect(result.success).toBe(true);
-      expect(result.challenge.title).toBe('Original');
-      expect(result.challenge.custom).toBe(true);
+      expect(result.challenge!.title).toBe('Original');
+      expect(result.challenge!.custom).toBe(true);
       expect(state2.customChallenges.length).toBe(1);
     });
 
     it('generates a new ID on import', () => {
       const state = freshState();
-      const { challenge } = createCustomChallenge(state, validDef());
+      const { challenge } = createCustomChallenge(state, validDef()) as { challenge: ChallengeDef };
       const json = exportChallengeJSON(challenge);
 
       const state2 = freshState();
       const result = importChallengeJSON(state2, json);
-      expect(result.challenge.id).toMatch(/^custom-/);
-      expect(result.challenge.id).not.toBe(challenge.id);
+      expect(result.challenge!.id).toMatch(/^custom-/);
+      expect(result.challenge!.id).not.toBe(challenge.id);
     });
 
     it('round-trips objectives correctly', () => {
@@ -500,15 +492,15 @@ describe('Custom Challenges', () => {
           { type: ObjectiveType.REACH_ALTITUDE, target: { altitude: 10000 } },
           { type: ObjectiveType.SAFE_LANDING, target: { maxLandingSpeed: 8 } },
         ],
-      }));
+      })) as { challenge: ChallengeDef };
       const json = exportChallengeJSON(challenge);
 
       const state2 = freshState();
       const result = importChallengeJSON(state2, json);
-      expect(result.challenge.objectives.length).toBe(2);
-      expect(result.challenge.objectives[0].type).toBe(ObjectiveType.REACH_ALTITUDE);
-      expect(result.challenge.objectives[0].target.altitude).toBe(10000);
-      expect(result.challenge.objectives[1].type).toBe(ObjectiveType.SAFE_LANDING);
+      expect(result.challenge!.objectives.length).toBe(2);
+      expect(result.challenge!.objectives[0].type).toBe(ObjectiveType.REACH_ALTITUDE);
+      expect(result.challenge!.objectives[0].target.altitude).toBe(10000);
+      expect(result.challenge!.objectives[1].type).toBe(ObjectiveType.SAFE_LANDING);
     });
 
     it('round-trips medal and reward values', () => {
@@ -516,13 +508,13 @@ describe('Custom Challenges', () => {
       const { challenge } = createCustomChallenge(state, validDef({
         medals: { bronze: 50000, silver: 30000, gold: 15000 },
         rewards: { bronze: 5000, silver: 10000, gold: 20000 },
-      }));
+      })) as { challenge: ChallengeDef };
       const json = exportChallengeJSON(challenge);
 
       const state2 = freshState();
       const result = importChallengeJSON(state2, json);
-      expect(result.challenge.medals).toEqual({ bronze: 50000, silver: 30000, gold: 15000 });
-      expect(result.challenge.rewards).toEqual({ bronze: 5000, silver: 10000, gold: 20000 });
+      expect(result.challenge!.medals).toEqual({ bronze: 50000, silver: 30000, gold: 15000 });
+      expect(result.challenge!.rewards).toEqual({ bronze: 5000, silver: 10000, gold: 20000 });
     });
 
     // ── Import validation errors ────────────────────────────────────────
@@ -608,7 +600,7 @@ describe('Custom Challenges', () => {
         scoreMetric: 'rocketCost',
       }));
       expect(result.success).toBe(true);
-      expect(result.challenge.objectives[0].type).toBe('REACH_ALTITUDE');
+      expect(result.challenge!.objectives[0].type).toBe('REACH_ALTITUDE');
     });
 
     it('defaults missing medals and rewards to zero', () => {
@@ -619,8 +611,8 @@ describe('Custom Challenges', () => {
         scoreMetric: 'rocketCost',
       }));
       expect(result.success).toBe(true);
-      expect(result.challenge.medals).toEqual({ bronze: 0, silver: 0, gold: 0 });
-      expect(result.challenge.rewards).toEqual({ bronze: 0, silver: 0, gold: 0 });
+      expect(result.challenge!.medals).toEqual({ bronze: 0, silver: 0, gold: 0 });
+      expect(result.challenge!.rewards).toEqual({ bronze: 0, silver: 0, gold: 0 });
     });
 
     it('does not add challenge to state on import failure', () => {

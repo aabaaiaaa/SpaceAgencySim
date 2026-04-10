@@ -1,24 +1,13 @@
-// @ts-nocheck
-/**
- * docking.test.js — Unit tests for the docking system (TASK-027).
- *
- * Tests cover:
- *   - createDockingState() — default state
- *   - hasDockingPort() — docking port detection
- *   - getDockingPorts() — docking port enumeration
- *   - selectDockingTarget() — target selection
- *   - clearDockingTarget() — target clearing
- *   - tickDocking() — guidance updates and state transitions
- *   - undock() — undocking procedure
- *   - transferCrew() — crew transfer between docked vessels
- *   - transferFuel() — fuel transfer between docked vessels
- *   - getDockingGuidance() — guidance data for HUD
- *   - getTargetsInVisualRange() — target discovery
- *   - canDockWith() — dockability checks
- */
-
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createFlightState, createGameState } from '../core/gameState.ts';
+import type {
+  FlightState,
+  GameState,
+  OrbitalObject,
+  DockingSystemState,
+} from '../core/gameState.ts';
+import type { PhysicsState, RocketAssembly, PlacedPart, PartConnection } from '../core/physics.ts';
+import type { FlightPhase as FlightPhaseType } from '../core/constants.ts';
 import {
   FlightPhase,
   ControlMode,
@@ -51,7 +40,7 @@ import {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function freshFlightState(phase = FlightPhase.ORBIT) {
+function freshFlightState(phase: FlightPhaseType = FlightPhase.ORBIT): FlightState {
   const fs = createFlightState({
     missionId: 'test-mission',
     rocketId: 'test-rocket',
@@ -74,7 +63,7 @@ function freshFlightState(phase = FlightPhase.ORBIT) {
   return fs;
 }
 
-function stubPs(overrides = {}) {
+function stubPs(overrides: Partial<PhysicsState> = {}): PhysicsState {
   return {
     posX: 0,
     posY: 100_000,
@@ -82,12 +71,12 @@ function stubPs(overrides = {}) {
     velY: 0,
     angle: 0,
     throttle: 0,
-    throttleMode: 'absolute',
+    throttleMode: 'absolute' as const,
     targetTWR: 1.0,
-    firingEngines: new Set(),
-    fuelStore: new Map(),
+    firingEngines: new Set<string>(),
+    fuelStore: new Map<string, number>(),
     activeParts: new Set(['part-1', 'dock-1']),
-    deployedParts: new Set(),
+    deployedParts: new Set<string>(),
     grounded: false,
     landed: false,
     crashed: false,
@@ -96,40 +85,40 @@ function stubPs(overrides = {}) {
     dockingAltitudeBand: null,
     dockingOffsetAlongTrack: 0,
     dockingOffsetRadial: 0,
-    rcsActiveDirections: new Set(),
-    dockingPortStates: new Map(),
+    rcsActiveDirections: new Set<string>(),
+    dockingPortStates: new Map<string, string>(),
     _dockedCombinedMass: 0,
-    _heldKeys: new Set(),
+    _heldKeys: new Set<string>(),
     ...overrides,
-  };
+  } as PhysicsState;
 }
 
-function stubAssemblyWithDockingPort() {
-  const parts = new Map();
+function stubAssemblyWithDockingPort(): RocketAssembly {
+  const parts = new Map<string, PlacedPart>();
   parts.set('part-1', { instanceId: 'part-1', partId: 'cmd-mk1', x: 0, y: 0 });
   parts.set('dock-1', { instanceId: 'dock-1', partId: 'docking-port-std', x: 0, y: -30 });
   parts.set('tank-1', { instanceId: 'tank-1', partId: 'tank-small', x: 0, y: 30 });
   return {
     parts,
-    connections: [],
-    symmetryPairs: [],
+    connections: [] as PartConnection[],
+    symmetryPairs: [] as Array<[string, string]>,
     _nextId: 4,
   };
 }
 
-function stubAssemblyNoDockingPort() {
-  const parts = new Map();
+function stubAssemblyNoDockingPort(): RocketAssembly {
+  const parts = new Map<string, PlacedPart>();
   parts.set('part-1', { instanceId: 'part-1', partId: 'cmd-mk1', x: 0, y: 0 });
   parts.set('tank-1', { instanceId: 'tank-1', partId: 'tank-small', x: 0, y: 30 });
   return {
     parts,
-    connections: [],
-    symmetryPairs: [],
+    connections: [] as PartConnection[],
+    symmetryPairs: [] as Array<[string, string]>,
     _nextId: 3,
   };
 }
 
-function stubGameState() {
+function stubGameState(): GameState {
   const state = createGameState();
   state.orbitalObjects = [
     {
@@ -274,19 +263,19 @@ describe('clearDockingTarget', () => {
 
 describe('canDockWith', () => {
   it('allows docking with CRAFT', () => {
-    expect(canDockWith({ type: OrbitalObjectType.CRAFT })).toBe(true);
+    expect(canDockWith({ type: OrbitalObjectType.CRAFT } as OrbitalObject)).toBe(true);
   });
 
   it('allows docking with STATION', () => {
-    expect(canDockWith({ type: OrbitalObjectType.STATION })).toBe(true);
+    expect(canDockWith({ type: OrbitalObjectType.STATION } as OrbitalObject)).toBe(true);
   });
 
   it('disallows docking with DEBRIS', () => {
-    expect(canDockWith({ type: OrbitalObjectType.DEBRIS })).toBe(false);
+    expect(canDockWith({ type: OrbitalObjectType.DEBRIS } as OrbitalObject)).toBe(false);
   });
 
   it('disallows docking with SATELLITE', () => {
-    expect(canDockWith({ type: OrbitalObjectType.SATELLITE })).toBe(false);
+    expect(canDockWith({ type: OrbitalObjectType.SATELLITE } as OrbitalObject)).toBe(false);
   });
 });
 
@@ -328,7 +317,11 @@ describe('getDockingGuidance', () => {
 });
 
 describe('undock', () => {
-  let ds, ps, assembly, flightState, state;
+  let ds: DockingSystemState;
+  let ps: PhysicsState;
+  let assembly: RocketAssembly;
+  let flightState: FlightState;
+  let state: GameState;
 
   beforeEach(() => {
     ds = createDockingState();

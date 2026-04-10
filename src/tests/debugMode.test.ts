@@ -1,16 +1,6 @@
-// @ts-nocheck
-/**
- * debugMode.test.js — Unit tests for the debug mode toggle feature.
- *
- * Tests cover:
- *   - debugMode defaults to false in createGameState()
- *   - debugMode persists through save/load round-trip
- *   - Save migration defaults debugMode to false for legacy saves
- *   - debugMode toggle mutates state correctly
- */
-
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
+import type { GameState } from '../core/gameState.ts';
 import {
   saveGame,
   loadGame,
@@ -21,18 +11,26 @@ import {
 // localStorage mock (same pattern as saveload.test.js)
 // ---------------------------------------------------------------------------
 
-function createLocalStorageMock() {
-  const store = new Map();
+interface LocalStorageMock {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+  clear(): void;
+  readonly length: number;
+}
+
+function createLocalStorageMock(): LocalStorageMock {
+  const store = new Map<string, string>();
   return {
-    getItem(key) { return store.has(key) ? store.get(key) : null; },
-    setItem(key, value) { store.set(key, String(value)); },
-    removeItem(key) { store.delete(key); },
-    clear() { store.clear(); },
-    get length() { return store.size; },
+    getItem(key: string): string | null { return store.has(key) ? store.get(key)! : null; },
+    setItem(key: string, value: string): void { store.set(key, String(value)); },
+    removeItem(key: string): void { store.delete(key); },
+    clear(): void { store.clear(); },
+    get length(): number { return store.size; },
   };
 }
 
-let mockStorage;
+let mockStorage: LocalStorageMock;
 
 beforeEach(() => {
   mockStorage = createLocalStorageMock();
@@ -51,7 +49,7 @@ afterEach(() => {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function freshState() {
+function freshState(): GameState {
   return createGameState();
 }
 
@@ -121,6 +119,7 @@ describe('debugMode persistence', () => {
 describe('debugMode save migration', () => {
   it('defaults debugMode to false for legacy saves missing the field', async () => {
     const state = freshState();
+    // @ts-expect-error Simulating a legacy save missing the debugMode field
     delete state.debugMode;
     state.agencyName = 'Legacy Agency';
 
