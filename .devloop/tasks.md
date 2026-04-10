@@ -397,31 +397,31 @@
 - **Verification**: `npx vitest run src/tests/physicsWorker.test.ts`
 
 ### TASK-066: Convert physicsWorkerCommand.test.ts to strict TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007
 - **Description**: Remove `// @ts-nocheck` from `src/tests/physicsWorkerCommand.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
 - **Verification**: `npx vitest run src/tests/physicsWorkerCommand.test.ts`
 
 ### TASK-067: Convert pool.test.ts to strict TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007
 - **Description**: Remove `// @ts-nocheck` from `src/tests/pool.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
 - **Verification**: `npx vitest run src/tests/pool.test.ts`
 
 ### TASK-068: Convert power.test.ts to strict TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007
 - **Description**: Remove `// @ts-nocheck` from `src/tests/power.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
 - **Verification**: `npx vitest run src/tests/power.test.ts`
 
 ### TASK-069: Convert render-asteroids.test.ts to strict TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007
 - **Description**: Remove `// @ts-nocheck` from `src/tests/render-asteroids.test.ts`. Add proper type imports for render and asteroid types. Type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
 - **Verification**: `npx vitest run src/tests/render-asteroids.test.ts`
 
 ### TASK-070: Convert render-camera.test.ts to strict TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007
 - **Description**: Remove `// @ts-nocheck` from `src/tests/render-camera.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
 - **Verification**: `npx vitest run src/tests/render-camera.test.ts`

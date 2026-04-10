@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * render-asteroids.test.ts — Unit tests for asteroid rendering helpers.
  *
@@ -12,15 +11,21 @@ import { describe, it, expect, vi } from 'vitest';
 // Mock pixi.js
 // ---------------------------------------------------------------------------
 
+interface MockSetFn {
+  set: ReturnType<typeof vi.fn>;
+}
+
 const { MockGraphics, MockText, MockTextStyle, MockContainer } = vi.hoisted(() => {
+  type MockChild = MockGraphics | MockText | MockContainer;
+
   class MockGraphics {
-    visible = true;
-    alpha = 1;
-    position = { set: vi.fn() };
-    scale = { set: vi.fn() };
-    rotation = 0;
-    label = '';
-    parent = null;
+    visible: boolean = true;
+    alpha: number = 1;
+    position: MockSetFn = { set: vi.fn() };
+    scale: MockSetFn = { set: vi.fn() };
+    rotation: number = 0;
+    label: string = '';
+    parent: MockContainer | null = null;
     clear = vi.fn();
     rect = vi.fn();
     fill = vi.fn();
@@ -33,26 +38,26 @@ const { MockGraphics, MockText, MockTextStyle, MockContainer } = vi.hoisted(() =
     ellipse = vi.fn();
   }
   class MockText {
-    visible = true;
-    alpha = 1;
-    position = { set: vi.fn() };
-    scale = { set: vi.fn() };
-    rotation = 0;
-    label = '';
-    anchor = { set: vi.fn() };
-    parent = null;
-    text = '';
-    style = null;
-    x = 0;
-    y = 0;
+    visible: boolean = true;
+    alpha: number = 1;
+    position: MockSetFn = { set: vi.fn() };
+    scale: MockSetFn = { set: vi.fn() };
+    rotation: number = 0;
+    label: string = '';
+    anchor: MockSetFn = { set: vi.fn() };
+    parent: MockContainer | null = null;
+    text: string = '';
+    style: MockTextStyle | null = null;
+    x: number = 0;
+    y: number = 0;
     constructor() {}
   }
   class MockTextStyle {}
   class MockContainer {
-    children = [];
-    addChild(c) { this.children.push(c); return c; }
-    removeChildAt(i) { return this.children.splice(i, 1)[0]; }
-    removeChild(c) {
+    children: MockChild[] = [];
+    addChild(c: MockChild): MockChild { this.children.push(c); return c; }
+    removeChildAt(i: number): MockChild { return this.children.splice(i, 1)[0]; }
+    removeChild(c: MockChild): MockChild {
       const i = this.children.indexOf(c);
       if (i >= 0) this.children.splice(i, 1);
       return c;

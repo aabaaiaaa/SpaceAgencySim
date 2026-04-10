@@ -1,6 +1,5 @@
-// @ts-nocheck
 /**
- * power.test.js — Unit tests for the power generation and storage system.
+ * power.test.ts — Unit tests for the power generation and storage system.
  *
  * Tests cover:
  *   - getSunAngle()           — sun direction angle computation
@@ -30,22 +29,19 @@ import {
 import { getPartById } from '../data/parts.ts';
 import { PartType, SUN_ROTATION_RATE, POWER_DRAW_ROTATION, POWER_DRAW_SCIENCE, POWER_CRITICAL_THRESHOLD } from '../core/constants.ts';
 import { getShadowOverlayGeometry } from '../core/mapView.ts';
+import type { PowerState } from '../core/gameState.ts';
+import type { RocketAssembly } from '../core/physics.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Create a minimal assembly mock with the given parts.
- * @param {Array<{instanceId: string, partId: string}>} partList
- * @returns {{ parts: Map<string, {partId: string}> }}
- */
-function mockAssembly(partList) {
-  const parts = new Map();
+function mockAssembly(partList: Array<{ instanceId: string; partId: string }>): RocketAssembly {
+  const parts = new Map<string, { instanceId: string; partId: string; x: number; y: number }>();
   for (const { instanceId, partId } of partList) {
-    parts.set(instanceId, { partId });
+    parts.set(instanceId, { instanceId, partId, x: 0, y: 0 });
   }
-  return { parts };
+  return { parts, connections: [], _nextId: 0, symmetryPairs: [] };
 }
 
 // ---------------------------------------------------------------------------
@@ -224,7 +220,7 @@ describe('initPowerState', () => {
 
 describe('tickPower', () => {
   it('@smoke charges battery when sunlit with solar panels', () => {
-    const ps = {
+    const ps: PowerState = {
       batteryCapacity: 100,
       batteryCharge: 50,
       solarGeneration: 0,
@@ -249,7 +245,7 @@ describe('tickPower', () => {
   });
 
   it('discharges battery in eclipse', () => {
-    const ps = {
+    const ps: PowerState = {
       batteryCapacity: 100,
       batteryCharge: 50,
       solarGeneration: 0,
@@ -275,7 +271,7 @@ describe('tickPower', () => {
   });
 
   it('draws more power with active science instruments', () => {
-    const ps = {
+    const ps: PowerState = {
       batteryCapacity: 100,
       batteryCharge: 100,
       solarGeneration: 0,
@@ -300,7 +296,7 @@ describe('tickPower', () => {
   });
 
   it('sets hasPower to false when battery depleted', () => {
-    const ps = {
+    const ps: PowerState = {
       batteryCapacity: 1,
       batteryCharge: 0.1, // very low
       solarGeneration: 0,
@@ -323,7 +319,7 @@ describe('tickPower', () => {
   });
 
   it('does not exceed battery capacity when charging', () => {
-    const ps = {
+    const ps: PowerState = {
       batteryCapacity: 10,
       batteryCharge: 9.5,
       solarGeneration: 0,
@@ -387,54 +383,57 @@ describe('power-related part definitions', () => {
   it('solar-panel-small has solarPanelArea', () => {
     const def = getPartById('solar-panel-small');
     expect(def).toBeDefined();
-    expect(def.type).toBe(PartType.SOLAR_PANEL);
-    expect(def.properties.solarPanelArea).toBe(1.0);
+    expect(def!.type).toBe(PartType.SOLAR_PANEL);
+    expect(def!.properties.solarPanelArea).toBe(1.0);
   });
 
   it('solar-panel-large has larger solarPanelArea', () => {
     const def = getPartById('solar-panel-large');
     expect(def).toBeDefined();
-    expect(def.properties.solarPanelArea).toBe(4.0);
+    expect(def!.properties.solarPanelArea).toBe(4.0);
   });
 
   it('battery-small has batteryCapacity', () => {
     const def = getPartById('battery-small');
     expect(def).toBeDefined();
-    expect(def.type).toBe(PartType.BATTERY);
-    expect(def.properties.batteryCapacity).toBe(100);
+    expect(def!.type).toBe(PartType.BATTERY);
+    expect(def!.properties.batteryCapacity).toBe(100);
   });
 
   it('battery-large has higher batteryCapacity', () => {
     const def = getPartById('battery-large');
     expect(def).toBeDefined();
-    expect(def.properties.batteryCapacity).toBe(400);
+    expect(def!.properties.batteryCapacity).toBe(400);
   });
 
   it('cmd-mk1 has built-in battery', () => {
     const def = getPartById('cmd-mk1');
-    expect(def.properties.batteryCapacity).toBe(50);
+    expect(def).toBeDefined();
+    expect(def!.properties.batteryCapacity).toBe(50);
   });
 
   it('probe-core-mk1 has built-in battery', () => {
     const def = getPartById('probe-core-mk1');
-    expect(def.properties.batteryCapacity).toBe(20);
+    expect(def).toBeDefined();
+    expect(def!.properties.batteryCapacity).toBe(20);
   });
 
   it('all satellite parts have builtInPower, batteryCapacity, and solarPanelArea', () => {
-    const satIds = ['satellite-mk1', 'satellite-comm', 'satellite-weather',
+    const satIds: string[] = ['satellite-mk1', 'satellite-comm', 'satellite-weather',
       'satellite-science', 'satellite-gps', 'satellite-relay'];
     for (const id of satIds) {
       const def = getPartById(id);
       expect(def, `${id} should exist`).toBeDefined();
-      expect(def.properties.builtInPower, `${id} should have builtInPower`).toBe(true);
-      expect(def.properties.batteryCapacity, `${id} should have batteryCapacity`).toBeGreaterThan(0);
-      expect(def.properties.solarPanelArea, `${id} should have solarPanelArea`).toBeGreaterThan(0);
+      expect(def!.properties.builtInPower, `${id} should have builtInPower`).toBe(true);
+      expect(def!.properties.batteryCapacity, `${id} should have batteryCapacity`).toBeGreaterThan(0);
+      expect(def!.properties.solarPanelArea, `${id} should have solarPanelArea`).toBeGreaterThan(0);
     }
   });
 
   it('science-module-mk1 has powerDraw', () => {
     const def = getPartById('science-module-mk1');
-    expect(def.properties.powerDraw).toBe(25);
+    expect(def).toBeDefined();
+    expect(def!.properties.powerDraw).toBe(25);
   });
 });
 

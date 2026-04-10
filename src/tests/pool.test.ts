@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * pool.test.ts — Unit tests for the RendererPool class (src/render/pool.ts).
  *
@@ -12,47 +11,54 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type * as PIXI from 'pixi.js';
 
 // ---------------------------------------------------------------------------
 // Mock pixi.js — minimal classes for pool testing
 // vi.hoisted() ensures these are available when vi.mock factory runs (hoisted)
 // ---------------------------------------------------------------------------
 
+interface MockPointLike {
+  set: ReturnType<typeof vi.fn>;
+}
+
+type MockChild = InstanceType<typeof MockGraphics> | InstanceType<typeof MockText> | InstanceType<typeof MockContainer>;
+
 const { MockGraphics, MockTextStyle, MockText, MockContainer } = vi.hoisted(() => {
   class MockGraphics {
-    visible = true;
-    alpha = 1;
-    position = { set: vi.fn() };
-    scale = { set: vi.fn() };
-    rotation = 0;
-    label = '';
-    parent = null;
+    visible: boolean = true;
+    alpha: number = 1;
+    position: MockPointLike = { set: vi.fn() };
+    scale: MockPointLike = { set: vi.fn() };
+    rotation: number = 0;
+    label: string = '';
+    parent: MockContainer | null = null;
     clear = vi.fn();
   }
 
   class MockTextStyle {}
 
   class MockText {
-    visible = true;
-    alpha = 1;
-    position = { set: vi.fn() };
-    scale = { set: vi.fn() };
-    rotation = 0;
-    label = '';
-    anchor = { set: vi.fn() };
-    parent = null;
+    visible: boolean = true;
+    alpha: number = 1;
+    position: MockPointLike = { set: vi.fn() };
+    scale: MockPointLike = { set: vi.fn() };
+    rotation: number = 0;
+    label: string = '';
+    anchor: MockPointLike = { set: vi.fn() };
+    parent: MockContainer | null = null;
 
-    constructor(_opts) {
+    constructor(_opts?: Record<string, unknown>) {
       // Mimic PIXI.Text constructor
     }
   }
 
   class MockContainer {
-    children = [];
-    removeChildAt(index) {
+    children: Array<MockGraphics | MockText | MockContainer> = [];
+    removeChildAt(index: number): MockGraphics | MockText | MockContainer {
       return this.children.splice(index, 1)[0];
     }
-    removeChild(child) {
+    removeChild(child: MockGraphics | MockText | MockContainer): MockGraphics | MockText | MockContainer {
       const idx = this.children.indexOf(child);
       if (idx >= 0) this.children.splice(idx, 1);
       return child;
@@ -76,7 +82,7 @@ import { RendererPool } from '../render/pool.ts';
 // ---------------------------------------------------------------------------
 
 describe('RendererPool', () => {
-  let pool;
+  let pool: RendererPool;
 
   beforeEach(() => {
     pool = new RendererPool();
@@ -128,21 +134,23 @@ describe('RendererPool', () => {
     it('detaches from parent container', () => {
       const g = pool.acquireGraphics();
       const parent = new MockContainer();
-      parent.children.push(g);
-      g.parent = parent;
-      g.parent.removeChild = vi.fn((child) => {
+      parent.children.push(g as unknown as MockChild);
+      (g as unknown as InstanceType<typeof MockGraphics>).parent = parent;
+      const mockRemoveChild = vi.fn((child: MockChild): MockChild => {
         const idx = parent.children.indexOf(child);
         if (idx >= 0) parent.children.splice(idx, 1);
+        return child;
       });
+      parent.removeChild = mockRemoveChild;
 
       pool.releaseGraphics(g);
 
-      expect(g.parent.removeChild).toHaveBeenCalledWith(g);
+      expect(mockRemoveChild).toHaveBeenCalledWith(g);
     });
 
     it('calls clear() on the released Graphics', () => {
       const g = pool.acquireGraphics();
-      g.clear.mockClear();
+      vi.mocked(g.clear).mockClear();
       pool.releaseGraphics(g);
       expect(g.clear).toHaveBeenCalledOnce();
     });
@@ -194,13 +202,14 @@ describe('RendererPool', () => {
     it('detaches from parent container', () => {
       const t = pool.acquireText();
       const parent = new MockContainer();
-      parent.children.push(t);
-      t.parent = parent;
-      t.parent.removeChild = vi.fn();
+      parent.children.push(t as unknown as MockChild);
+      (t as unknown as InstanceType<typeof MockText>).parent = parent;
+      const mockRemoveChild = vi.fn();
+      parent.removeChild = mockRemoveChild;
 
       pool.releaseText(t);
 
-      expect(t.parent.removeChild).toHaveBeenCalledWith(t);
+      expect(mockRemoveChild).toHaveBeenCalledWith(t);
     });
   });
 
@@ -216,7 +225,7 @@ describe('RendererPool', () => {
       const g = new MockGraphics();
       container.children.push(g);
 
-      pool.releaseContainerChildren(container);
+      pool.releaseContainerChildren(container as unknown as PIXI.Container);
 
       expect(container.children).toHaveLength(0);
       // The Graphics should be in the pool now — acquiring should return it.
@@ -229,7 +238,7 @@ describe('RendererPool', () => {
       const t = new MockText({});
       container.children.push(t);
 
-      pool.releaseContainerChildren(container);
+      pool.releaseContainerChildren(container as unknown as PIXI.Container);
 
       expect(container.children).toHaveLength(0);
       const reused = pool.acquireText();
@@ -242,7 +251,7 @@ describe('RendererPool', () => {
       const t = new MockText({});
       container.children.push(g, t);
 
-      pool.releaseContainerChildren(container);
+      pool.releaseContainerChildren(container as unknown as PIXI.Container);
 
       expect(container.children).toHaveLength(0);
       expect(pool.acquireGraphics()).toBe(g);
@@ -256,7 +265,7 @@ describe('RendererPool', () => {
       inner.children.push(g);
       outer.children.push(inner);
 
-      pool.releaseContainerChildren(outer);
+      pool.releaseContainerChildren(outer as unknown as PIXI.Container);
 
       expect(outer.children).toHaveLength(0);
       expect(inner.children).toHaveLength(0);

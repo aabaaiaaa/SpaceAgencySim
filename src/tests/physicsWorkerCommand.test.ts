@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * physicsWorkerCommand.test.ts — Unit tests for the handleCommand() function
  * in physicsWorker.ts.
@@ -45,13 +44,15 @@ import type {
   SerialisedStagingConfig,
   WorkerMessage,
   InitCommand,
+  SnapshotMessage,
+  ErrorMessage,
 } from '../core/physicsWorkerProtocol.ts';
 
 // ---------------------------------------------------------------------------
 // Test helpers — minimal valid state objects
 // ---------------------------------------------------------------------------
 
-function makePhysicsSnapshot(overrides = {}): PhysicsSnapshot {
+function makePhysicsSnapshot(overrides: Partial<PhysicsSnapshot> = {}): PhysicsSnapshot {
   return {
     posX: 0, posY: 1000, velX: 0, velY: 100,
     angle: 0, throttle: 1.0,
@@ -69,17 +70,20 @@ function makePhysicsSnapshot(overrides = {}): PhysicsSnapshot {
     baseOrbit: null, dockingAltitudeBand: null,
     dockingOffsetAlongTrack: 0, dockingOffsetRadial: 0,
     rcsActiveDirections: [], dockingPortStates: {},
-    weatherIspModifier: 1.0, hasLaunchClamps: false,
+    weatherIspModifier: 1.0, weatherWindSpeed: 0, weatherWindAngle: 0,
+    hasLaunchClamps: false,
     powerState: null, malfunctions: null,
+    capturedBody: null, thrustAligned: false,
     ...overrides,
   };
 }
 
-function makeFlightSnapshot(overrides = {}): FlightSnapshot {
+function makeFlightSnapshot(overrides: Partial<FlightSnapshot> = {}): FlightSnapshot {
   return {
     missionId: 'm1', rocketId: 'r1',
     crewIds: [], crewCount: 0,
     timeElapsed: 0, altitude: 1000, velocity: 100,
+    horizontalVelocity: 0,
     fuelRemaining: 500, deltaVRemaining: 3000,
     events: [], aborted: false,
     phase: 'FLIGHT', phaseLog: [],
@@ -178,7 +182,7 @@ describe('handleCommand — tick', () => {
     handleCommand({ type: 'tick', realDeltaTime: 0.016, timeWarp: 4 }, post);
 
     expect(tick).toHaveBeenCalledOnce();
-    const args = tick.mock.calls[0];
+    const args = vi.mocked(tick).mock.calls[0];
     expect(args[4]).toBe(0.016); // realDeltaTime
     expect(args[5]).toBe(4);     // timeWarp
   });
@@ -205,15 +209,15 @@ describe('handleCommand — tick', () => {
 
     expect(messages).toHaveLength(2);
     expect(messages[0].type).toBe('snapshot');
-    expect(messages[0].frame).toBe(1);
-    expect(messages[1].frame).toBe(2);
+    expect((messages[0] as SnapshotMessage).frame).toBe(1);
+    expect((messages[1] as SnapshotMessage).frame).toBe(2);
   });
 
   it('snapshot contains physics and flight data', () => {
     const { messages, post } = collectMessages();
     handleCommand({ type: 'tick', realDeltaTime: 0.016, timeWarp: 1 }, post);
 
-    const snap = messages[0];
+    const snap = messages[0] as SnapshotMessage;
     expect(snap.type).toBe('snapshot');
     expect(snap.physics).toBeDefined();
     expect(snap.flight).toBeDefined();
@@ -234,21 +238,21 @@ describe('handleCommand — setThrottle', () => {
     handleCommand({ type: 'setThrottle', throttle: 0.5 }, post);
     // Verify by ticking and checking the snapshot.
     handleCommand({ type: 'tick', realDeltaTime: 0.016, timeWarp: 1 }, post);
-    expect(messages[0].physics.throttle).toBe(0.5);
+    expect((messages[0] as SnapshotMessage).physics.throttle).toBe(0.5);
   });
 
   it('clamps throttle below 0 to 0', () => {
     const { messages, post } = collectMessages();
     handleCommand({ type: 'setThrottle', throttle: -0.5 }, post);
     handleCommand({ type: 'tick', realDeltaTime: 0.016, timeWarp: 1 }, post);
-    expect(messages[0].physics.throttle).toBe(0);
+    expect((messages[0] as SnapshotMessage).physics.throttle).toBe(0);
   });
 
   it('clamps throttle above 1 to 1', () => {
     const { messages, post } = collectMessages();
     handleCommand({ type: 'setThrottle', throttle: 1.5 }, post);
     handleCommand({ type: 'tick', realDeltaTime: 0.016, timeWarp: 1 }, post);
-    expect(messages[0].physics.throttle).toBe(1);
+    expect((messages[0] as SnapshotMessage).physics.throttle).toBe(1);
   });
 });
 
@@ -263,7 +267,7 @@ describe('handleCommand — setAngle', () => {
     const { messages, post } = collectMessages();
     handleCommand({ type: 'setAngle', angle: 1.57 }, post);
     handleCommand({ type: 'tick', realDeltaTime: 0.016, timeWarp: 1 }, post);
-    expect(messages[0].physics.angle).toBe(1.57);
+    expect((messages[0] as SnapshotMessage).physics.angle).toBe(1.57);
   });
 });
 
@@ -292,7 +296,7 @@ describe('handleCommand — abort', () => {
     handleCommand({ type: 'abort' }, post);
     // Verify through a tick snapshot.
     handleCommand({ type: 'tick', realDeltaTime: 0.016, timeWarp: 1 }, post);
-    expect(messages[0].flight.aborted).toBe(true);
+    expect((messages[0] as SnapshotMessage).flight.aborted).toBe(true);
   });
 });
 
@@ -306,13 +310,13 @@ describe('handleCommand — keyDown / keyUp', () => {
   it('keyDown forwards to handleKeyDown', () => {
     handleCommand({ type: 'keyDown', key: 'w' }, () => {});
     expect(handleKeyDown).toHaveBeenCalledOnce();
-    expect(handleKeyDown.mock.calls[0][2]).toBe('w');
+    expect(vi.mocked(handleKeyDown).mock.calls[0][2]).toBe('w');
   });
 
   it('keyUp forwards to handleKeyUp', () => {
     handleCommand({ type: 'keyUp', key: 'w' }, () => {});
     expect(handleKeyUp).toHaveBeenCalledOnce();
-    expect(handleKeyUp.mock.calls[0][1]).toBe('w');
+    expect(vi.mocked(handleKeyUp).mock.calls[0][1]).toBe('w');
   });
 });
 
@@ -348,7 +352,7 @@ describe('handleCommand — stop', () => {
 
     const { messages, post } = collectMessages();
     handleCommand({ type: 'tick', realDeltaTime: 0.016, timeWarp: 1 }, post);
-    expect(messages[0].frame).toBe(1);
+    expect((messages[0] as SnapshotMessage).frame).toBe(1);
   });
 });
 
@@ -360,37 +364,37 @@ describe('handleCommand — error handling', () => {
   });
 
   it('posts an error message when tick throws', () => {
-    tick.mockImplementationOnce(() => { throw new Error('physics exploded'); });
+    vi.mocked(tick).mockImplementationOnce(() => { throw new Error('physics exploded'); });
 
     const { messages, post } = collectMessages();
     handleCommand({ type: 'tick', realDeltaTime: 0.016, timeWarp: 1 }, post);
 
     expect(messages).toHaveLength(1);
     expect(messages[0].type).toBe('error');
-    expect(messages[0].message).toBe('physics exploded');
-    expect(messages[0].stack).toBeDefined();
+    expect((messages[0] as ErrorMessage).message).toBe('physics exploded');
+    expect((messages[0] as ErrorMessage).stack).toBeDefined();
   });
 
   it('posts an error message when fireNextStage throws', () => {
-    fireNextStage.mockImplementationOnce(() => { throw new Error('staging failed'); });
+    vi.mocked(fireNextStage).mockImplementationOnce(() => { throw new Error('staging failed'); });
 
     const { messages, post } = collectMessages();
     handleCommand({ type: 'stage' }, post);
 
     expect(messages).toHaveLength(1);
     expect(messages[0].type).toBe('error');
-    expect(messages[0].message).toBe('staging failed');
+    expect((messages[0] as ErrorMessage).message).toBe('staging failed');
   });
 
   it('handles non-Error thrown values', () => {
-    tick.mockImplementationOnce(() => { throw Object.assign(Object.create(null), { toString: () => 'custom thrown' }); });
+    vi.mocked(tick).mockImplementationOnce(() => { throw Object.assign(Object.create(null), { toString: () => 'custom thrown' }); });
 
     const { messages, post } = collectMessages();
     handleCommand({ type: 'tick', realDeltaTime: 0.016, timeWarp: 1 }, post);
 
     expect(messages[0].type).toBe('error');
     // Non-Error value is stringified; stack is undefined.
-    expect(messages[0].stack).toBeUndefined();
+    expect((messages[0] as ErrorMessage).stack).toBeUndefined();
   });
 });
 
