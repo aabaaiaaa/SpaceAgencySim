@@ -10,7 +10,27 @@ import {
  * Each test is fully self-contained — seeds its own state and gets a fresh page.
  */
 
-const FLIGHT_PARTS = ['cmd-mk1', 'tank-small', 'engine-spark'];
+// ---------------------------------------------------------------------------
+// Browser-context type aliases
+// ---------------------------------------------------------------------------
+
+interface PerfStats {
+  fps: number;
+  frameTime: number;
+  minFrameTime: number;
+  maxFrameTime: number;
+}
+
+interface GameWindow {
+  __enableDebugMode: () => void;
+  __perfStats: PerfStats | null;
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+const FLIGHT_PARTS: string[] = ['cmd-mk1', 'tank-small', 'engine-spark'];
 
 test.describe('FPS Monitor', () => {
 
@@ -31,14 +51,14 @@ test.describe('FPS Monitor', () => {
     await seedAndLoadSave(page, envelope);
     await dismissWelcomeModal(page);
 
-    await page.evaluate(() => window.__enableDebugMode());
+    await page.evaluate(() => (window as unknown as GameWindow).__enableDebugMode());
     await startTestFlight(page, FLIGHT_PARTS);
     await page.waitForTimeout(600);
 
     await expect(page.locator('#fps-monitor')).toBeVisible({ timeout: 5_000 });
-    const fpsText = await page.locator('#fps-monitor-fps').textContent();
+    const fpsText: string | null = await page.locator('#fps-monitor-fps').textContent();
     expect(fpsText).toMatch(/FPS:\s*\d+/);
-    const ftText = await page.locator('#fps-monitor-ft').textContent();
+    const ftText: string | null = await page.locator('#fps-monitor-ft').textContent();
     expect(ftText).toMatch(/Frame:\s*[\d.]+\s*ms/);
   });
 
@@ -48,15 +68,17 @@ test.describe('FPS Monitor', () => {
     await seedAndLoadSave(page, envelope);
     await dismissWelcomeModal(page);
 
-    await page.evaluate(() => window.__enableDebugMode());
+    await page.evaluate(() => (window as unknown as GameWindow).__enableDebugMode());
     await startTestFlight(page, FLIGHT_PARTS);
     await page.waitForTimeout(600);
 
-    const stats = await page.evaluate(() => window.__perfStats);
+    const stats = await page.evaluate((): PerfStats | null =>
+      (window as unknown as GameWindow).__perfStats
+    );
     expect(stats).toBeTruthy();
-    expect(typeof stats.fps).toBe('number');
-    expect(stats.fps).toBeGreaterThan(0);
-    expect(typeof stats.frameTime).toBe('number');
-    expect(stats.frameTime).toBeGreaterThan(0);
+    expect(typeof stats!.fps).toBe('number');
+    expect(stats!.fps).toBeGreaterThan(0);
+    expect(typeof stats!.frameTime).toBe('number');
+    expect(stats!.frameTime).toBeGreaterThan(0);
   });
 });

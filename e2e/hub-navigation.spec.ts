@@ -1,28 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { dismissWelcomeModal } from './helpers.js';
 
-/**
- * E2E — Hub Navigation
- *
- * Verifies that each building button on the hub navigates to the correct
- * screen, that every building screen has a back/return button which returns
- * the player to the hub, and that the persistent top bar (cash display) is
- * visible on every building screen.
- *
- * Each test receives its own Playwright page fixture. `beforeEach` starts a
- * new Sandbox game so the hub is showing before each test runs.
- *
- * Tests:
- *   (1) Clicking "Vehicle Assembly Building" loads the VAB screen
- *       (parts panel is visible).
- *   (2) Clicking "Mission Control Centre" loads the mission control screen
- *       (at least one mission is listed as available).
- *   (3) Clicking "Crew Administration" loads the crew admin screen
- *       (tabs for Active Crew, Hire, History are present).
- *   (4) Clicking "Launch Pad" loads the launch pad screen.
- *   (5) Each building screen has a back/return button that returns to the hub.
- *   (6) The top bar showing cash is visible on each building screen.
- */
+interface BuildingEntry {
+  id: string;
+  overlay: string;
+  backBtn: string;
+}
 
 test.describe('Hub Navigation', () => {
 
@@ -101,7 +84,7 @@ test.describe('Hub Navigation', () => {
   // ── (5) Each building has a back/return button that returns to the hub ─────
 
   test('(5) each building screen has a back/return button that navigates back to the hub', async ({ page }) => {
-    const buildings = [
+    const buildings: BuildingEntry[] = [
       { id: 'vab',             overlay: '#vab-root',               backBtn: '#vab-back-btn'             },
       { id: 'mission-control', overlay: '#mission-control-overlay', backBtn: '#mission-control-back-btn' },
       { id: 'crew-admin',      overlay: '#crew-admin-overlay',      backBtn: '#crew-admin-back-btn'      },
@@ -128,7 +111,7 @@ test.describe('Hub Navigation', () => {
   // ── (6) Top bar with cash is visible on every building screen ─────────────
 
   test('(6) the top bar showing cash is visible on every building screen', async ({ page }) => {
-    const buildings = [
+    const buildings: BuildingEntry[] = [
       { id: 'vab',             overlay: '#vab-root',               backBtn: '#vab-back-btn'             },
       { id: 'mission-control', overlay: '#mission-control-overlay', backBtn: '#mission-control-back-btn' },
       { id: 'crew-admin',      overlay: '#crew-admin-overlay',      backBtn: '#crew-admin-back-btn'      },

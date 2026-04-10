@@ -15,14 +15,14 @@ import {
  * bypass the VAB and test mission completion during flight directly.
  */
 
-const CMD_DROP_Y    = CANVAS_CENTRE_Y;
-const TANK_M_DROP_Y = CMD_DROP_Y   + 20 + 30;
-const ENGINE_DROP_Y = TANK_M_DROP_Y + 30 + 15;
+const CMD_DROP_Y: number    = CANVAS_CENTRE_Y;
+const TANK_M_DROP_Y: number = CMD_DROP_Y   + 20 + 30;
+const ENGINE_DROP_Y: number = TANK_M_DROP_Y + 30 + 15;
 
-const UNLOCKED_PARTS = ['cmd-mk1', 'tank-medium', 'engine-spark'];
-const FLIGHT_PARTS   = ['cmd-mk1', 'tank-medium', 'engine-spark'];
+const UNLOCKED_PARTS: string[] = ['cmd-mk1', 'tank-medium', 'engine-spark'];
+const FLIGHT_PARTS: string[]   = ['cmd-mk1', 'tank-medium', 'engine-spark'];
 
-function makeMissionEnvelope(overrides = {}) {
+function makeMissionEnvelope(overrides: Record<string, unknown> = {}): ReturnType<typeof buildSaveEnvelope> {
   return buildSaveEnvelope({
     missions: { available: [], accepted: [{ ...FIRST_FLIGHT_MISSION, status: 'accepted' }], completed: [] },
     parts: UNLOCKED_PARTS,
@@ -61,24 +61,26 @@ test.describe('Flight — First Flight Mission Completion', () => {
       staging: [{ partIds: ['engine-spark'] }],
     });
 
-    const moneyBefore = await page.evaluate(() => window.__gameState?.money ?? 0);
+    const moneyBefore: number = await page.evaluate((): number => window.__gameState?.money ?? 0);
 
     await page.keyboard.press('Space');
     await page.keyboard.press('z');
 
     await page.waitForFunction(
-      () => (window.__flightPs?.posY ?? 0) >= 100,
+      (): boolean => (window.__flightPs?.posY ?? 0) >= 100,
       { timeout: 30_000 },
     );
 
     await page.keyboard.press('x');
 
-    const objectiveCompleted = await page.evaluate(() => {
+    const objectiveCompleted: boolean = await page.evaluate((): boolean => {
       const state = window.__gameState;
       if (!state) return false;
-      const mission = state.missions.accepted.find(m => m.id === 'mission-001');
+      const mission = state.missions.accepted.find(
+        (m: { id: string }) => m.id === 'mission-001',
+      );
       if (!mission) return false;
-      return mission.objectives.every(o => o.completed);
+      return mission.objectives.every((o: { completed: boolean }) => o.completed);
     });
     expect(objectiveCompleted).toBe(true);
 
@@ -88,19 +90,23 @@ test.describe('Flight — First Flight Mission Completion', () => {
 
     await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
 
-    const missionCompleted = await page.evaluate(() => {
+    const missionCompleted: boolean = await page.evaluate((): boolean => {
       const state = window.__gameState;
       if (!state) return false;
-      return state.missions.completed.some(m => m.id === 'mission-001');
+      return state.missions.completed.some(
+        (m: { id: string }) => m.id === 'mission-001',
+      );
     });
     expect(missionCompleted).toBe(true);
 
-    const moneyAfter = await page.evaluate(() => window.__gameState?.money ?? 0);
-    const missionReward = 15_000;
-    const facilityCount = await page.evaluate(
-      () => Object.values(window.__gameState?.facilities ?? {}).filter(f => f.built).length,
+    const moneyAfter: number = await page.evaluate((): number => window.__gameState?.money ?? 0);
+    const missionReward: number = 15_000;
+    const facilityCount: number = await page.evaluate(
+      (): number => Object.values(window.__gameState?.facilities ?? {}).filter(
+        (f: { built: boolean }) => f.built,
+      ).length,
     );
-    const expectedUpkeep = 10_000 * facilityCount;
+    const expectedUpkeep: number = 10_000 * facilityCount;
     expect(moneyAfter).toBeGreaterThanOrEqual(moneyBefore + missionReward - expectedUpkeep - 1_000);
   });
 });

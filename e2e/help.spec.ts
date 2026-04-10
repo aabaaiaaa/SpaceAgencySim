@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import {
   VP_W, VP_H,
   CENTRE_X, CANVAS_CENTRE_Y,
@@ -6,6 +7,7 @@ import {
   seedAndLoadSave, navigateToVab, placePart, launchFromVab,
   ALL_FACILITIES,
 } from './helpers.js';
+import type { SaveEnvelope } from './helpers.js';
 
 /**
  * E2E — Help Panel Accessibility
@@ -22,24 +24,23 @@ import {
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function openHelp(page) {
+async function openHelp(page: Page): Promise<void> {
   await page.click('#topbar-menu-btn');
   const helpBtn = page.locator('.topbar-dropdown-item', { hasText: 'Help' });
   await helpBtn.click();
   await expect(page.locator('#help-panel')).toBeVisible({ timeout: 3_000 });
 }
 
-async function closeHelp(page) {
+async function closeHelp(page: Page): Promise<void> {
   await page.click('.help-close-x');
   await expect(page.locator('#help-panel')).toHaveCount(0, { timeout: 3_000 });
 }
 
-function activeSection(page) {
+function activeSection(page: Page): Promise<string | null> {
   return page.locator('.help-sidebar-item.active').getAttribute('data-section');
 }
 
-/** Build the standard save envelope for help tests. */
-function helpEnvelope() {
+function helpEnvelope(): SaveEnvelope {
   return buildSaveEnvelope({
     saveName: 'Help E2E Test',
     missions: {
@@ -159,7 +160,7 @@ test.describe('Help Panel Accessibility', () => {
     await openHelp(page);
 
     // Click a few sections and verify the active state changes.
-    const sections = ['flight', 'finance', 'advanced', 'overview'];
+    const sections: string[] = ['flight', 'finance', 'advanced', 'overview'];
     for (const sectionId of sections) {
       await page.click(`.help-sidebar-item[data-section="${sectionId}"]`);
       expect(await activeSection(page)).toBe(sectionId);
