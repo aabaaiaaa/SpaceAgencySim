@@ -1,905 +1,157 @@
-# Iteration 5 — Tasks
+# Iteration 6 — Task List
 
-## Phase A: Foundations
+See `.devloop/requirements.md` for full context and rationale behind each task.
 
-### TASK-001: Implement settings schema migration chain
-- **Status**: done
+---
+
+## Section 1: Bug Fix
+
+### TASK-001: Fix saveload.ts CrewStatus.DEAD / AstronautStatus.KIA enum mismatch
+- **Status**: pending
 - **Dependencies**: none
-- **Description**: Add a versioned migration chain to `src/core/settingsStore.ts`. Change `isValidEnvelope()` to accept `version <= SCHEMA_VERSION` (reject higher versions with a warning, reject version < 1). Add a `_migrateSettings(envelope)` function that sequentially applies migration functions from the stored version to `SCHEMA_VERSION`. Define a migration registry (array of `[fromVersion, migrationFn]` pairs). Call `_migrateSettings()` in `loadSettings()` after validation but before `mergeWithDefaults()`. No actual migrations are needed yet — just the infrastructure. See requirements §1.
-- **Verification**: `npx vitest run src/tests/settingsStore.test.ts`
+- **Description**: In `src/core/saveload.ts`, `countKIA()` (line 256) and `countLivingCrew()` (line 263) compare `c.status === CrewStatus.DEAD` but `CrewMember.status` is now typed as `AstronautStatus` after the iteration 5 type unification. Replace `CrewStatus.DEAD` (value `'DEAD'`) with `AstronautStatus.KIA` (value `'kia'`) in both functions. Also tighten the parameter types from `{ crew?: Array<{ status: string }> }` to use `AstronautStatus` instead of bare `string`. Update `src/tests/saveload.test.ts` mock data at lines 151, 242, 354-368 that use `CrewStatus.DEAD` — these currently validate the wrong behavior.
+- **Verification**: `npx vitest run src/tests/saveload.test.ts` — all tests pass with corrected enum values.
 
-### TASK-002: Add unit tests for settings migration chain
-- **Status**: done
-- **Dependencies**: TASK-001
-- **Description**: Add tests to `src/tests/settingsStore.test.ts` covering: envelope with version 0 is rejected, version 1 passes unchanged, version > SCHEMA_VERSION is rejected with warning, migration chain executes in order (test with mock migrations that increment a counter or transform a field), and `mergeWithDefaults()` still fills missing fields after migration. See requirements §1.
-- **Verification**: `npx vitest run src/tests/settingsStore.test.ts`
+---
 
-### TASK-003: Tighten null guards in map.ts _drawBody and _drawShadow
-- **Status**: done
+## Section 2: Test Map Regeneration
+
+### TASK-002: Create generate-test-map.mjs script
+- **Status**: pending
 - **Dependencies**: none
-- **Description**: In `src/render/map.ts`, change the guard in `_drawBody` (line 626) from `if (!_mapRoot) return` to `if (!_mapRoot || !_bodyGraphics) return` and remove the `!` non-null assertion on `_bodyGraphics`. Do the same in `_drawShadow` (line 1339): change to `if (!_mapRoot || !_shadowGraphics) return` and remove the `!` assertion on `_shadowGraphics`. See requirements §2.
-- **Verification**: `npx vitest run src/tests/render-map-state.test.ts`
+- **Description**: Create `scripts/generate-test-map.mjs` that auto-generates `test-map.json` from import analysis. The script should: (1) scan all unit test files (`src/tests/**/*.test.ts`) and E2E spec files (`e2e/**/*.spec.ts`), (2) parse each file's imports to determine which source modules it tests, (3) group results by source area using the existing naming convention (e.g., `core/physics`, `ui/vab`, `render/flight`), (4) output the same JSON structure as the current `test-map.json` with `{ areas: { [name]: { sources, unit, e2e } } }`, (5) handle barrel re-exports (if a test imports from a barrel like `src/ui/vab.ts`, trace through to sub-modules), (6) include an `e2e-infra` area for E2E helpers. The script should accept a `--dry-run` flag that prints the output to stdout without writing the file.
+- **Verification**: `node scripts/generate-test-map.mjs --dry-run` runs without error and outputs valid JSON to stdout.
 
-### TASK-004: Unify CrewMember and Astronaut types
-- **Status**: done
+### TASK-003: Generate test-map.json and add npm script
+- **Status**: pending
+- **Dependencies**: TASK-002
+- **Description**: Run the generator to produce a fresh `test-map.json`. Review the output for completeness — check that: (1) all source areas from the old map are present, (2) no stale `.spec.js` or `.js` references remain, (3) the `e2e-infra` area references `.ts` files. Add `"test-map:generate": "node scripts/generate-test-map.mjs"` to `package.json` scripts. If the generator missed any E2E-to-source mappings that are exercised indirectly (not via direct imports), manually add them.
+- **Verification**: `node scripts/run-affected.mjs --dry-run --base HEAD~1` runs without error and resolves test file paths that exist on disk (no missing file warnings).
+
+---
+
+## Section 3: Lint Warning Cleanup
+
+### TASK-004: Clean up lint warnings in source files
+- **Status**: pending
 - **Dependencies**: none
-- **Description**: Merge all `Astronaut`-specific fields into `CrewMember` in `src/core/gameState.ts`. Handle the status type conflict (CrewStatus vs AstronautStatus) by adding a separate `careerStatus` field or widening appropriately — inspect runtime data to choose. Normalize `hiredDate`/`hireDate` to one name. Delete the `Astronaut` interface from `crew.ts`. Remove the `_crew()` cast helper and replace all usages with direct `state.crew` access. Update all source files and all test files that reference `Astronaut` to use `CrewMember`. Verify `as unknown as` count drops to 2. See requirements §3.
-- **Verification**: `npm run typecheck && npx vitest run src/tests/crew.test.ts && npx vitest run src/tests/lifeSupport.test.ts`
+- **Description**: Remove all unused imports and variables flagged by `@typescript-eslint/no-unused-vars` in production source files. Files with warnings include: `src/core/` (~20 files: achievements.ts, asteroidBelt.ts, atmosphere.ts, construction.ts, controlMode.ts, customChallenges.ts, designLibrary.ts, docking.ts, flightPhase.ts, grabbing.ts, library.ts, malfunction.ts, manoeuvre.ts, mapView.ts, orbit.ts, physics.ts, reputation.ts, sciencemodule.ts, settings.ts, surfaceOps.ts, techtree.ts, weather.ts), `src/data/challenges.ts`, `src/main.ts`, `src/render/` (flight/_debris.ts, flight/_rocket.ts, flight/_trails.ts, map.ts), `src/ui/` (flightController/_keyboard.ts, flightController/_mapView.ts, hub.ts, library.ts, rdLab.ts, vab/_engineerPanel.ts). For each file: identify the unused import/variable in the ESLint warning, delete the import or declaration, verify the file still compiles.
+- **Verification**: `npx eslint src/core/ src/data/ src/render/ src/ui/ src/main.ts --max-warnings 0` — 0 warnings, 0 errors.
 
-### TASK-005: Convert vite.config.js to TypeScript
-- **Status**: done
+### TASK-005: Clean up lint warnings in unit test files
+- **Status**: pending
 - **Dependencies**: none
-- **Description**: Rename `vite.config.js` to `vite.config.ts`. Add type imports for Vite config types. Type the custom `jsToTsResolve` plugin's parameters and return values. Ensure the Vitest test configuration block is properly typed. No functional changes. See requirements §4.1.
-- **Verification**: `npx vitest run src/tests/gameState.test.ts`
+- **Description**: Remove all unused imports and variables in unit test files flagged by `@typescript-eslint/no-unused-vars`. There are ~35 test files with warnings in `src/tests/`. For each file: run `npx eslint <file>` to see the specific warning, remove the unused import or variable, verify the test still passes. Files include: achievements.test.ts, atmosphere.test.ts, autoSave.test.ts, bankruptcy.test.ts, branchCoverage.test.ts, challenges.test.ts, collision.test.ts, comms.test.ts, construction.test.ts, contracts.test.ts, controlMode.test.ts, crew.test.ts, docking.test.ts, e2e-infrastructure.test.ts, flightReturn.test.ts, fuelsystem.test.ts, grabbing.test.ts, instruments.test.ts, launchPadTiers.test.ts, malfunction.test.ts, manoeuvre.test.ts, mccTiers.test.ts, multiBodyLanding.test.ts, orbit.test.ts, parachute-deploy.test.ts, parachute-descent.test.ts, partInventory.test.ts, period.test.ts, physics.test.ts, physicsWorker.test.ts, power.test.ts, render-flight-pool.test.ts, render-sky.test.ts, rocketvalidator.test.ts, sandbox.test.ts, satellites.test.ts, sciencemodule.test.ts, staging.test.ts, surfaceOps.test.ts, undoRedo.test.ts, weather.test.ts.
+- **Verification**: `npx eslint src/tests/ --max-warnings 0` — 0 warnings, 0 errors.
 
-### TASK-006: Convert playwright.config.js to TypeScript and create e2e/tsconfig.json
-- **Status**: done
+### TASK-006: Clean up lint warnings in E2E files and fix remaining warning types
+- **Status**: pending
+- **Dependencies**: TASK-004, TASK-005
+- **Description**: (1) Remove unused imports/variables in E2E files with warnings: additional-systems.spec.ts, agency-depth.spec.ts, biomes-science.spec.ts, collision.spec.ts, destinations.spec.ts, facilities-infrastructure.spec.ts, failure-paths.spec.ts, fixtures.ts, flight.spec.ts, mission-progression.spec.ts, orbital-operations.spec.ts, phase-transitions.spec.ts, reliability-risk.spec.ts, sandbox-replayability.spec.ts, saveload.spec.ts, tutorial-revisions.spec.ts. (2) Fix the 2 `require-await` warnings — remove the `async` keyword if the function doesn't need to be async, or add the missing `await`. (3) Fix the 1 `no-useless-assignment` — remove the dead assignment.
+- **Verification**: `npm run lint 2>&1 | tail -5` — reports "0 problems" (0 errors, 0 warnings).
+
+---
+
+## Section 4: Typed Test Factory Functions
+
+### TASK-007: Create unit test factory file
+- **Status**: pending
 - **Dependencies**: none
-- **Description**: Rename `playwright.config.js` to `playwright.config.ts`. Add Playwright config type imports. Create `e2e/tsconfig.json` for E2E type checking (strict, noEmit, include `e2e/**/*.ts`, reference `@playwright/test` types). Update the `typecheck` script in `package.json` to also run `tsc --noEmit -p e2e/tsconfig.json`. Set `testMatch` in Playwright config to accept both `.js` and `.ts` specs during the transition. See requirements §4.2.
-- **Verification**: `npm run typecheck`
-
-## Phase B: Test Infrastructure
-
-### TASK-007: Convert unit test setup helper (setup.ts) to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-004
-- **Description**: Remove `// @ts-nocheck` from `src/tests/setup.ts`. Add proper type imports, type all exported functions with explicit return types and typed parameters, eliminate all `any` usage. This file is the shared test setup referenced by Vitest's `setupFiles` — all unit tests depend on it. See requirements §5.2.
-- **Verification**: `npx vitest run src/tests/gameState.test.ts`
-
-### TASK-008: Convert E2E helper _constants.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-006
-- **Description**: Rename `e2e/helpers/_constants.js` to `e2e/helpers/_constants.ts`. Add type annotations to all exported constants and enums. Add explicit types to any exported objects or arrays. Eliminate all `any`. See requirements §5.4.
-- **Verification**: `npx playwright test e2e/smoke.spec.js --grep @smoke`
-
-### TASK-009: Convert E2E helper _assertions.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-006
-- **Description**: Rename `e2e/helpers/_assertions.js` to `e2e/helpers/_assertions.ts`. Add Playwright type imports (`Page`, `Locator`, `expect`). Type all exported assertion functions with explicit parameter types and return types. Eliminate all `any`. See requirements §5.4.
-- **Verification**: `npx playwright test e2e/smoke.spec.js --grep @smoke`
-
-### TASK-010: Convert E2E helper _state.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-006
-- **Description**: Rename `e2e/helpers/_state.js` to `e2e/helpers/_state.ts`. Add Playwright type imports. Type all exported state management functions with explicit parameter types and return types. Eliminate all `any`. See requirements §5.4.
-- **Verification**: `npx playwright test e2e/smoke.spec.js --grep @smoke`
-
-### TASK-011: Convert E2E helper _factories.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-006
-- **Description**: Rename `e2e/helpers/_factories.js` to `e2e/helpers/_factories.ts`. Add Playwright type imports. Type all exported factory functions with explicit parameter types and return types. Use proper interfaces for factory output shapes. Eliminate all `any`. See requirements §5.4.
-- **Verification**: `npx playwright test e2e/smoke.spec.js --grep @smoke`
-
-### TASK-012: Convert E2E helper _saveFactory.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-006
-- **Description**: Rename `e2e/helpers/_saveFactory.js` to `e2e/helpers/_saveFactory.ts`. Add type imports for save-related types. Type all exported functions with explicit parameter types and return types. Eliminate all `any`. See requirements §5.4.
-- **Verification**: `npx playwright test e2e/smoke.spec.js --grep @smoke`
-
-### TASK-013: Convert E2E helper _navigation.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-006
-- **Description**: Rename `e2e/helpers/_navigation.js` to `e2e/helpers/_navigation.ts`. Add Playwright type imports (`Page`). Type all exported navigation functions with explicit parameter types and return types. Eliminate all `any`. See requirements §5.4.
-- **Verification**: `npx playwright test e2e/smoke.spec.js --grep @smoke`
-
-### TASK-014: Convert E2E helper _flight.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-006
-- **Description**: Rename `e2e/helpers/_flight.js` to `e2e/helpers/_flight.ts`. Add Playwright type imports. Type all exported flight helper functions with explicit parameter types and return types. Eliminate all `any`. See requirements §5.4.
-- **Verification**: `npx playwright test e2e/smoke.spec.js --grep @smoke`
-
-### TASK-015: Convert E2E helper _timewarp.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-006
-- **Description**: Rename `e2e/helpers/_timewarp.js` to `e2e/helpers/_timewarp.ts`. Add Playwright type imports. Type all exported timewarp functions with explicit parameter types and return types. Eliminate all `any`. See requirements §5.4.
-- **Verification**: `npx playwright test e2e/smoke.spec.js --grep @smoke`
-
-### TASK-016: Convert E2E barrel helpers.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-008, TASK-009, TASK-010, TASK-011, TASK-012, TASK-013, TASK-014, TASK-015
-- **Description**: Rename `e2e/helpers.js` to `e2e/helpers.ts`. Update re-export paths if needed for TypeScript module resolution. Add explicit type re-exports. Eliminate all `any`. See requirements §5.4.
-- **Verification**: `npx playwright test e2e/smoke.spec.js --grep @smoke`
-
-### TASK-017: Convert E2E barrel fixtures.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-008, TASK-009, TASK-010, TASK-011, TASK-012, TASK-013, TASK-014, TASK-015
-- **Description**: Rename `e2e/fixtures.js` to `e2e/fixtures.ts`. Update any imports and re-exports for TypeScript module resolution. Add explicit types. Eliminate all `any`. See requirements §5.4.
-- **Verification**: `npx playwright test e2e/smoke.spec.js --grep @smoke`
-
-## Phase C: Unit Test Conversion
-
-### TASK-018: Convert achievements.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/achievements.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/achievements.test.ts`
-
-### TASK-019: Convert atmosphere.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/atmosphere.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/atmosphere.test.ts`
-
-### TASK-020: Convert autoSave.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/autoSave.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/autoSave.test.ts`
-
-### TASK-021: Convert bankruptcy.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/bankruptcy.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/bankruptcy.test.ts`
-
-### TASK-022: Convert biomes.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/biomes.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/biomes.test.ts`
-
-### TASK-023: Convert bodies.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/bodies.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/bodies.test.ts`
-
-### TASK-024: Convert branchCoverage.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/branchCoverage.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/branchCoverage.test.ts`
-
-### TASK-025: Convert challenges.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/challenges.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/challenges.test.ts`
-
-### TASK-026: Convert collision.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/collision.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/collision.test.ts`
-
-### TASK-027: Convert comms.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/comms.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/comms.test.ts`
-
-### TASK-028: Convert construction.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/construction.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/construction.test.ts`
-
-### TASK-029: Convert contracts.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/contracts.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/contracts.test.ts`
-
-### TASK-030: Convert controlMode.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/controlMode.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/controlMode.test.ts`
-
-### TASK-031: Convert crew.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/crew.test.ts`. Add proper type imports using the unified `CrewMember` type (after TASK-004 unification). Type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/crew.test.ts`
-
-### TASK-032: Convert customChallenges.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/customChallenges.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/customChallenges.test.ts`
-
-### TASK-033: Convert debugMode.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/debugMode.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/debugMode.test.ts`
-
-### TASK-034: Convert designLibrary.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/designLibrary.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/designLibrary.test.ts`
-
-### TASK-035: Convert docking.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/docking.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/docking.test.ts`
-
-### TASK-036: Convert e2e-infrastructure.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/e2e-infrastructure.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/e2e-infrastructure.test.ts`
-
-### TASK-037: Convert ejector.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/ejector.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/ejector.test.ts`
-
-### TASK-038: Convert escapeHtml.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/escapeHtml.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/escapeHtml.test.ts`
-
-### TASK-039: Convert finance.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/finance.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/finance.test.ts`
-
-### TASK-040: Convert flightPhase.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/flightPhase.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/flightPhase.test.ts`
-
-### TASK-041: Convert flightReturn.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/flightReturn.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/flightReturn.test.ts`
-
-### TASK-042: Convert fuelsystem.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/fuelsystem.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/fuelsystem.test.ts`
-
-### TASK-043: Convert gameState.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/gameState.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/gameState.test.ts`
-
-### TASK-044: Convert grabbing.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/grabbing.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/grabbing.test.ts`
-
-### TASK-045: Convert idbStorage.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/idbStorage.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/idbStorage.test.ts`
-
-### TASK-046: Convert instruments.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/instruments.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/instruments.test.ts`
-
-### TASK-047: Convert launchPadTiers.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/launchPadTiers.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/launchPadTiers.test.ts`
-
-### TASK-048: Convert legs.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/legs.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/legs.test.ts`
-
-### TASK-049: Convert lifeSupport.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/lifeSupport.test.ts`. Add proper type imports using the unified `CrewMember` type (after TASK-004 unification). Type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/lifeSupport.test.ts`
-
-### TASK-050: Convert loopErrorHandling.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/loopErrorHandling.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/loopErrorHandling.test.ts`
-
-### TASK-051: Convert malfunction.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/malfunction.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/malfunction.test.ts`
-
-### TASK-052: Convert manoeuvre.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/manoeuvre.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/manoeuvre.test.ts`
-
-### TASK-053: Convert mapView.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/mapView.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/mapView.test.ts`
-
-### TASK-054: Convert mccTiers.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/mccTiers.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/mccTiers.test.ts`
-
-### TASK-055: Convert missions.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/missions.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/missions.test.ts`
-
-### TASK-056: Convert multiBodyLanding.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/multiBodyLanding.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/multiBodyLanding.test.ts`
-
-### TASK-057: Convert orbit.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/orbit.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/orbit.test.ts`
-
-### TASK-058: Convert parachute-deploy.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/parachute-deploy.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/parachute-deploy.test.ts`
-
-### TASK-059: Convert parachute-descent.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/parachute-descent.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/parachute-descent.test.ts`
-
-### TASK-060: Convert parachute-landing.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/parachute-landing.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/parachute-landing.test.ts`
-
-### TASK-061: Convert partInventory.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/partInventory.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/partInventory.test.ts`
-
-### TASK-062: Convert parts.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/parts.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/parts.test.ts`
-
-### TASK-063: Convert period.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/period.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/period.test.ts`
-
-### TASK-064: Convert physics.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/physics.test.ts`. Add proper type imports for `PhysicsState`, `CapturedBody`, and other physics types. Type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/physics.test.ts`
-
-### TASK-065: Convert physicsWorker.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/physicsWorker.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/physicsWorker.test.ts`
-
-### TASK-066: Convert physicsWorkerCommand.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/physicsWorkerCommand.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/physicsWorkerCommand.test.ts`
-
-### TASK-067: Convert pool.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/pool.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/pool.test.ts`
-
-### TASK-068: Convert power.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/power.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/power.test.ts`
-
-### TASK-069: Convert render-asteroids.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/render-asteroids.test.ts`. Add proper type imports for render and asteroid types. Type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/render-asteroids.test.ts`
-
-### TASK-070: Convert render-camera.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/render-camera.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/render-camera.test.ts`
-
-### TASK-071: Convert render-constants.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/render-constants.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/render-constants.test.ts`
-
-### TASK-072: Convert render-flight-pool.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/render-flight-pool.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/render-flight-pool.test.ts`
-
-### TASK-073: Convert render-ground.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/render-ground.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/render-ground.test.ts`
-
-### TASK-074: Convert render-input.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/render-input.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/render-input.test.ts`
-
-### TASK-075: Convert render-map-state.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/render-map-state.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/render-map-state.test.ts`
-
-### TASK-076: Convert render-sky.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/render-sky.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/render-sky.test.ts`
-
-### TASK-077: Convert render-state.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/render-state.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/render-state.test.ts`
-
-### TASK-078: Convert render-trails.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/render-trails.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/render-trails.test.ts`
-
-### TASK-079: Convert reputation.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/reputation.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/reputation.test.ts`
-
-### TASK-080: Convert rocketbounds.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/rocketbounds.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/rocketbounds.test.ts`
-
-### TASK-081: Convert rocketbuilder.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/rocketbuilder.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/rocketbuilder.test.ts`
-
-### TASK-082: Convert rocketvalidator.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/rocketvalidator.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/rocketvalidator.test.ts`
-
-### TASK-083: Convert sandbox.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/sandbox.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/sandbox.test.ts`
-
-### TASK-084: Convert satellites.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/satellites.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/satellites.test.ts`
-
-### TASK-085: Convert saveload.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/saveload.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/saveload.test.ts`
-
-### TASK-086: Convert sciencemodule.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/sciencemodule.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/sciencemodule.test.ts`
-
-### TASK-087: Convert setup.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/setup.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/setup.test.ts`
-
-### TASK-088: Convert staging.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/staging.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/staging.test.ts`
-
-### TASK-089: Convert storageErrors.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/storageErrors.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/storageErrors.test.ts`
-
-### TASK-090: Convert surfaceOps.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/surfaceOps.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/surfaceOps.test.ts`
-
-### TASK-091: Convert techtree.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/techtree.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/techtree.test.ts`
-
-### TASK-092: Convert trackingStationTiers.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/trackingStationTiers.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/trackingStationTiers.test.ts`
-
-### TASK-093: Convert ui-escapeHtml.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/ui-escapeHtml.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/ui-escapeHtml.test.ts`
-
-### TASK-094: Convert ui-fcState.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/ui-fcState.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/ui-fcState.test.ts`
-
-### TASK-095: Convert ui-fpsMonitor.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/ui-fpsMonitor.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/ui-fpsMonitor.test.ts`
-
-### TASK-096: Convert ui-listenerTracker.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/ui-listenerTracker.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/ui-listenerTracker.test.ts`
-
-### TASK-097: Convert ui-mapView.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/ui-mapView.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/ui-mapView.test.ts`
-
-### TASK-098: Convert ui-mcState.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/ui-mcState.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/ui-mcState.test.ts`
-
-### TASK-099: Convert ui-rocketCardUtil.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/ui-rocketCardUtil.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/ui-rocketCardUtil.test.ts`
-
-### TASK-100: Convert ui-timeWarp.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/ui-timeWarp.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/ui-timeWarp.test.ts`
-
-### TASK-101: Convert ui-vabStaging.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/ui-vabStaging.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/ui-vabStaging.test.ts`
-
-### TASK-102: Convert ui-vabState.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/ui-vabState.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/ui-vabState.test.ts`
-
-### TASK-103: Convert ui-vabUndoActions.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/ui-vabUndoActions.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/ui-vabUndoActions.test.ts`
-
-### TASK-104: Convert undoRedo.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/undoRedo.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/undoRedo.test.ts`
-
-### TASK-105: Convert vabTiers.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/vabTiers.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/vabTiers.test.ts`
-
-### TASK-106: Convert weather.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/weather.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/weather.test.ts`
-
-### TASK-107: Convert workerBridgeTimeout.test.ts to strict TypeScript
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Remove `// @ts-nocheck` from `src/tests/workerBridgeTimeout.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
-- **Verification**: `npx vitest run src/tests/workerBridgeTimeout.test.ts`
-
-## Phase D: E2E Spec Conversion
-
-### TASK-108: Convert additional-systems.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/additional-systems.spec.js` to `e2e/additional-systems.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. Use `// @ts-expect-error` for intentional edge cases. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/additional-systems.spec.ts`
-
-### TASK-109: Convert agency-depth.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/agency-depth.spec.js` to `e2e/agency-depth.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/agency-depth.spec.ts`
-
-### TASK-110: Convert asteroid-belt.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/asteroid-belt.spec.js` to `e2e/asteroid-belt.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/asteroid-belt.spec.ts`
-
-### TASK-111: Convert auto-save.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/auto-save.spec.js` to `e2e/auto-save.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/auto-save.spec.ts`
-
-### TASK-112: Convert biomes-science.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/biomes-science.spec.js` to `e2e/biomes-science.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/biomes-science.spec.ts`
-
-### TASK-113: Convert collision.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/collision.spec.js` to `e2e/collision.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/collision.spec.ts`
-
-### TASK-114: Convert context-menu.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/context-menu.spec.js` to `e2e/context-menu.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/context-menu.spec.ts`
-
-### TASK-115: Convert core-mechanics.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/core-mechanics.spec.js` to `e2e/core-mechanics.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/core-mechanics.spec.ts`
-
-### TASK-116: Convert crew.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/crew.spec.js` to `e2e/crew.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/crew.spec.ts`
-
-### TASK-117: Convert debug-mode.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/debug-mode.spec.js` to `e2e/debug-mode.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/debug-mode.spec.ts`
-
-### TASK-118: Convert destinations.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/destinations.spec.js` to `e2e/destinations.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/destinations.spec.ts`
-
-### TASK-119: Convert facilities-infrastructure.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/facilities-infrastructure.spec.js` to `e2e/facilities-infrastructure.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/facilities-infrastructure.spec.ts`
-
-### TASK-120: Convert failure-paths.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/failure-paths.spec.js` to `e2e/failure-paths.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/failure-paths.spec.ts`
-
-### TASK-121: Convert flight-mission.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/flight-mission.spec.js` to `e2e/flight-mission.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/flight-mission.spec.ts`
-
-### TASK-122: Convert flight.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/flight.spec.js` to `e2e/flight.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/flight.spec.ts`
-
-### TASK-123: Convert fps-monitor.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/fps-monitor.spec.js` to `e2e/fps-monitor.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/fps-monitor.spec.ts`
-
-### TASK-124: Convert help.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/help.spec.js` to `e2e/help.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/help.spec.ts`
-
-### TASK-125: Convert hub-navigation.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/hub-navigation.spec.js` to `e2e/hub-navigation.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/hub-navigation.spec.ts`
-
-### TASK-126: Convert keyboard-nav.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/keyboard-nav.spec.js` to `e2e/keyboard-nav.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/keyboard-nav.spec.ts`
-
-### TASK-127: Convert landing.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/landing.spec.js` to `e2e/landing.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/landing.spec.ts`
-
-### TASK-128: Convert launchpad-relaunch.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/launchpad-relaunch.spec.js` to `e2e/launchpad-relaunch.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/launchpad-relaunch.spec.ts`
-
-### TASK-129: Convert launchpad.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/launchpad.spec.js` to `e2e/launchpad.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/launchpad.spec.ts`
-
-### TASK-130: Convert mission-progression.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/mission-progression.spec.js` to `e2e/mission-progression.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/mission-progression.spec.ts`
-
-### TASK-131: Convert missions.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/missions.spec.js` to `e2e/missions.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/missions.spec.ts`
-
-### TASK-132: Convert newgame.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/newgame.spec.js` to `e2e/newgame.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/newgame.spec.ts`
-
-### TASK-133: Convert orbital-operations.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/orbital-operations.spec.js` to `e2e/orbital-operations.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/orbital-operations.spec.ts`
-
-### TASK-134: Convert part-reconnection.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/part-reconnection.spec.js` to `e2e/part-reconnection.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/part-reconnection.spec.ts`
-
-### TASK-135: Convert phase-transitions.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/phase-transitions.spec.js` to `e2e/phase-transitions.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/phase-transitions.spec.ts`
-
-### TASK-136: Convert relaunch.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/relaunch.spec.js` to `e2e/relaunch.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/relaunch.spec.ts`
-
-### TASK-137: Convert reliability-risk.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/reliability-risk.spec.js` to `e2e/reliability-risk.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/reliability-risk.spec.ts`
-
-### TASK-138: Convert rocketbuilder.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/rocketbuilder.spec.js` to `e2e/rocketbuilder.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/rocketbuilder.spec.ts`
-
-### TASK-139: Convert sandbox-replayability.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/sandbox-replayability.spec.js` to `e2e/sandbox-replayability.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/sandbox-replayability.spec.ts`
-
-### TASK-140: Convert save-version.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/save-version.spec.js` to `e2e/save-version.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/save-version.spec.ts`
-
-### TASK-141: Convert saveload.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/saveload.spec.js` to `e2e/saveload.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/saveload.spec.ts`
-
-### TASK-142: Convert scene-cleanup.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/scene-cleanup.spec.js` to `e2e/scene-cleanup.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/scene-cleanup.spec.ts`
-
-### TASK-143: Convert smoke.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/smoke.spec.js` to `e2e/smoke.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/smoke.spec.ts`
-
-### TASK-144: Convert test-infrastructure.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/test-infrastructure.spec.js` to `e2e/test-infrastructure.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/test-infrastructure.spec.ts`
-
-### TASK-145: Convert tipping.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/tipping.spec.js` to `e2e/tipping.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/tipping.spec.ts`
-
-### TASK-146: Convert tutorial-revisions.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/tutorial-revisions.spec.js` to `e2e/tutorial-revisions.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/tutorial-revisions.spec.ts`
-
-### TASK-147: Convert vab-undo.spec.js to TypeScript
-- **Status**: done
-- **Dependencies**: TASK-016, TASK-017
-- **Description**: Rename `e2e/vab-undo.spec.js` to `e2e/vab-undo.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
-- **Verification**: `npx playwright test e2e/vab-undo.spec.ts`
-
-## Phase E: Enforcement & Verification
-
-### TASK-148: Escalate ESLint no-explicit-any to error for test files
-- **Status**: done
-- **Dependencies**: TASK-107, TASK-147
-- **Description**: In `eslint.config.js`, change the `@typescript-eslint/no-explicit-any` rule from `warn` to `error` in the test file override (lines 152-160). This prevents regression — no `any` can be reintroduced in test code. Also add E2E test files (`e2e/**/*.ts`) to the TypeScript lint rules if not already covered. See requirements §6.
-- **Verification**: `npm run lint`
-
-### TASK-149: Final verification pass
-- **Status**: done
-- **Dependencies**: TASK-148
-- **Description**: Run the full verification suite from requirements §7. Confirm: `npm run typecheck` passes (including E2E), `npm run lint` passes, `npm run test:unit` passes, `npm run test:e2e` passes, `npm run build` succeeds. Verify zero `// @ts-nocheck` in source or test files, zero `.js` files in `e2e/`, zero `any` in test code, and `as unknown as` count in production source is <= 2.
-- **Verification**: `npm run typecheck && npm run lint && npm run test:unit && npm run test:e2e && npm run build`
+- **Description**: Create `src/tests/_factories.ts` with typed factory functions for all types that have 10+ `as unknown as` casts in unit tests. Each factory takes an optional `Partial<T>` parameter for overrides and returns a fully typed object with sensible defaults. Required factories: `makePhysicsState(overrides?)` (77 casts), `makeGameState(overrides?)` (22 casts), `makeMissionInstance(overrides?)` (20 casts), `makeFlightState(overrides?)` (20 casts), `makeGraphics(overrides?)` for mock PixiJS Graphics (18 casts), `makeRecord(overrides?)` or appropriate typed alternative (17 casts), `makeRecoveryPS(overrides?)` (16 casts), `makeCrewMember(overrides?)` (16 casts — mirrors E2E's `buildCrewMember` pattern), `makeMockElement(overrides?)` for mock DOM elements (13 casts). Import real interfaces from `src/core/` modules. No `any` allowed — use proper types throughout. Export all factories.
+- **Verification**: `npx vitest run src/tests/_factories.test.ts 2>&1 || echo "No test file yet"` — file compiles without errors: `npx tsc --noEmit src/tests/_factories.ts 2>&1 | head -5` should show no errors. Also `npx eslint src/tests/_factories.ts --max-warnings 0`.
+
+### TASK-008: Create E2E typed GameWindow helper
+- **Status**: pending
+- **Dependencies**: none
+- **Description**: Create a typed helper in `e2e/helpers/` that provides type-safe access to game globals on `window`, reducing the 382 `as unknown as GameWindow` and `as unknown as GW` casts across E2E specs. The current pattern is `(window as unknown as GameWindow).someProperty` inside `page.evaluate()` callbacks. Design a helper (e.g., a typed `evaluateGame()` wrapper or a `GameWindow` type declaration that augments the `Window` interface for E2E context) that eliminates the need for per-line casts. Update the barrel export in `e2e/helpers.ts` to include the new helper.
+- **Verification**: `npx tsc --noEmit -p e2e/tsconfig.json` — no type errors. The helper compiles and is exported from the barrel.
+
+### TASK-009: Migrate unit tests to factories — physics and flight tests
+- **Status**: pending
+- **Dependencies**: TASK-006, TASK-007
+- **Description**: Update unit test files that primarily use `PhysicsState` and flight-related `as unknown as` casts to use the new factory functions from `src/tests/_factories.ts`. Target files include those with PhysicsState casts: physics.test.ts, physicsWorker.test.ts, physicsWorkerCommand.test.ts, flightPhase.test.ts, parachute-deploy.test.ts, parachute-descent.test.ts, parachute-landing.test.ts, atmosphere.test.ts, collision.test.ts, fuelsystem.test.ts, orbit.test.ts, manoeuvre.test.ts, legs.test.ts, controlMode.test.ts, staging.test.ts, ejector.test.ts. Replace `{...} as unknown as PhysicsState` with `makePhysicsState({...})`. Also replace any other factory-eligible casts in these files (FlightState, GameState, etc.).
+- **Verification**: `npx vitest run src/tests/physics.test.ts src/tests/physicsWorker.test.ts src/tests/flightPhase.test.ts src/tests/collision.test.ts src/tests/orbit.test.ts` — all pass. Count PhysicsState casts remaining: `grep -c "as unknown as PhysicsState" src/tests/*.test.ts 2>/dev/null | grep -v ":0$" | wc -l` should be 0 or near-0.
+
+### TASK-010: Migrate unit tests to factories — state, mission, and crew tests
+- **Status**: pending
+- **Dependencies**: TASK-006, TASK-007
+- **Description**: Update unit test files that primarily use `GameState`, `MissionInstance`, `CrewMember`, and `RecoveryPS` casts to use factory functions. Target files include: gameState.test.ts, crew.test.ts, missions.test.ts, contracts.test.ts, challenges.test.ts, customChallenges.test.ts, saveload.test.ts, finance.test.ts, bankruptcy.test.ts, designLibrary.test.ts, achievements.test.ts, flightReturn.test.ts, multiBodyLanding.test.ts, reputation.test.ts, malfunction.test.ts, partInventory.test.ts, construction.test.ts, launchPadTiers.test.ts, mccTiers.test.ts, techtree.test.ts, satellites.test.ts, comms.test.ts, power.test.ts, lifeSupport.test.ts, biomes.test.ts, sciencemodule.test.ts, surfaceOps.test.ts, instruments.test.ts. Replace `{...} as unknown as GameState` with `makeGameState({...})`, and similarly for other types.
+- **Verification**: `npx vitest run src/tests/gameState.test.ts src/tests/crew.test.ts src/tests/missions.test.ts src/tests/saveload.test.ts src/tests/flightReturn.test.ts` — all pass. Total unit test `as unknown as` count: `grep -r "as unknown as" src/tests/ | wc -l` should be under 120 (down from 279).
+
+### TASK-011: Migrate unit tests to factories — render and UI tests
+- **Status**: pending
+- **Dependencies**: TASK-006, TASK-007
+- **Description**: Update remaining unit test files (primarily render and UI tests) that use `Graphics`, `MockElement`, and other `as unknown as` casts to use factory functions. Target files include: render-camera.test.ts, render-sky.test.ts, render-ground.test.ts, render-constants.test.ts, render-trails.test.ts, render-input.test.ts, render-flight-pool.test.ts, render-state.test.ts, render-map-state.test.ts, render-asteroids.test.ts, ui-fcState.test.ts, ui-timeWarp.test.ts, ui-vabStaging.test.ts, ui-vabState.test.ts, ui-vabUndoActions.test.ts, ui-mcState.test.ts, ui-mapView.test.ts, ui-fpsMonitor.test.ts, ui-escapeHtml.test.ts, ui-listenerTracker.test.ts, ui-rocketCardUtil.test.ts, docking.test.ts, grabbing.test.ts, undoRedo.test.ts, sandbox.test.ts, weather.test.ts, e2e-infrastructure.test.ts, branchCoverage.test.ts, autoSave.test.ts, idbStorage.test.ts, storageErrors.test.ts. Replace casts with factory calls.
+- **Verification**: `npx vitest run src/tests/render-camera.test.ts src/tests/ui-vabStaging.test.ts src/tests/docking.test.ts src/tests/weather.test.ts` — all pass. Total unit test `as unknown as` count: `grep -r "as unknown as" src/tests/ | wc -l` should be under 50.
+
+### TASK-012: Migrate E2E specs to typed window helper — batch 1
+- **Status**: pending
+- **Dependencies**: TASK-006, TASK-008
+- **Description**: Update the first batch of E2E specs to use the typed GameWindow helper instead of `as unknown as GameWindow` / `as unknown as GW` casts. Files: additional-systems.spec.ts, agency-depth.spec.ts, biomes-science.spec.ts, core-mechanics.spec.ts, crew.spec.ts, debug-mode.spec.ts, facilities-infrastructure.spec.ts, failure-paths.spec.ts, fps-monitor.spec.ts, landing.spec.ts. For each file: import the typed helper, replace all GameWindow/GW cast patterns with the helper usage.
+- **Verification**: `npx playwright test e2e/additional-systems.spec.ts e2e/crew.spec.ts e2e/landing.spec.ts --reporter=list` — all pass. Cast count in batch: `grep -c "as unknown as G" e2e/additional-systems.spec.ts e2e/agency-depth.spec.ts e2e/biomes-science.spec.ts e2e/core-mechanics.spec.ts e2e/crew.spec.ts e2e/debug-mode.spec.ts e2e/facilities-infrastructure.spec.ts e2e/failure-paths.spec.ts e2e/fps-monitor.spec.ts e2e/landing.spec.ts | grep -v ":0$"` should show 0 remaining casts.
+
+### TASK-013: Migrate E2E specs to typed window helper — batch 2
+- **Status**: pending
+- **Dependencies**: TASK-006, TASK-008
+- **Description**: Update the second batch of E2E specs to use the typed GameWindow helper. Files: launchpad-relaunch.spec.ts, launchpad.spec.ts, mission-progression.spec.ts, missions.spec.ts, part-reconnection.spec.ts, phase-transitions.spec.ts, relaunch.spec.ts, sandbox-replayability.spec.ts, saveload.spec.ts. For each file: import the typed helper, replace all GameWindow/GW cast patterns.
+- **Verification**: `npx playwright test e2e/missions.spec.ts e2e/saveload.spec.ts e2e/sandbox-replayability.spec.ts --reporter=list` — all pass. Total E2E `as unknown as G` count: `grep -r "as unknown as G" e2e/ | wc -l` should be 0 or near-0.
+
+---
+
+## Section 5+6: Small Fixes
+
+### TASK-014: Move _mapView.ts inline styles to CSS and tighten Playwright testMatch
+- **Status**: pending
+- **Dependencies**: none
+- **Description**: Two small fixes: (1) In `src/ui/flightController/_mapView.ts` lines 290-291, replace the inline `style=""` attributes on the `transfer-info` and `transfer-progress` divs with CSS classes. The transfer-info div uses `color:#ffcc44;margin-top:4px;display:none` and transfer-progress uses `color:#ff6644;margin-top:4px;display:none`. Add CSS classes (e.g., `.transfer-info`, `.transfer-progress`) to the project stylesheet and apply them. (2) In `playwright.config.ts` line 8, change `testMatch: '**/*.spec.{js,ts}'` to `testMatch: '**/*.spec.ts'` since all specs are now TypeScript.
+- **Verification**: `npx tsc --noEmit` — no type errors. `npx playwright test --list 2>&1 | head -5` — lists specs successfully (no "no tests found" error). `grep "style=" src/ui/flightController/_mapView.ts` should return no results for those lines.
+
+---
+
+## Section 7: Coverage Overhaul
+
+### TASK-015: Update vite.config.ts coverage exclusions
+- **Status**: pending
+- **Dependencies**: none
+- **Description**: Add untestable PixiJS-heavy and DOM-heavy files to the coverage `exclude` array in `vite.config.ts`. These are files at 0% unit test line coverage where the logic is inherently tied to canvas rendering or DOM manipulation. See the full exclusion list in requirements.md section 7.3 — it includes render barrels/init/rocket/debris/hub/vab, UI barrels/screens (crewAdmin, mainmenu, help, launchPad, topbar, settings, perfDashboard, satelliteOps, trackingStation, rdLab, library, etc.), flightController sub-modules (init, keyboard, menuActions, docking, orbitRcs, postFlight, surfaceActions, flightPhase), missionControl sub-modules (init, shell, tabs), and vab sub-modules (init, canvasInteraction, panels, partsPanel, designLibrary, engineerPanel, launchFlow, scalebar, inventory). Keep all files that currently have non-zero line coverage.
+- **Verification**: `npx vitest run --coverage 2>&1 | grep "ERROR"` — no coverage threshold errors (exclusions should bring actual coverage above the current aspirational thresholds for the remaining files).
+
+### TASK-016: Add unit tests for render/flight/_camera.ts, _ground.ts, and _sky.ts
+- **Status**: pending
+- **Dependencies**: TASK-006, TASK-015
+- **Description**: Add new unit tests targeting uncovered code paths in three render/flight modules: (1) `_camera.ts` (48% lines) — test uncovered `worldToScreen` edge cases, `computeCoM` with varied inputs, lines 114-190. (2) `_ground.ts` (52% lines) — test terrain data generation logic, uncovered branches, lines 111-186. (3) `_sky.ts` (82% lines) — test uncovered sky rendering logic, lines 129-205. Add tests to the existing test files (`render-camera.test.ts`, `render-ground.test.ts`, `render-sky.test.ts`). Focus on testable pure-logic paths — don't try to test PixiJS rendering calls.
+- **Verification**: `npx vitest run src/tests/render-camera.test.ts src/tests/render-ground.test.ts src/tests/render-sky.test.ts --coverage 2>&1 | grep -E "(_camera|_ground|_sky)"` — line coverage improved for all three files.
+
+### TASK-017: Add unit tests for render/flight/_trails.ts, _asteroids.ts, and render/map.ts
+- **Status**: pending
+- **Dependencies**: TASK-006, TASK-015
+- **Description**: Add new unit tests targeting uncovered code paths: (1) `_trails.ts` (9% lines) — test trail point management, trail calculation logic. Much of this module is PixiJS-heavy, so focus on any extractable pure-logic functions. (2) `_asteroids.ts` (16% lines) — test asteroid rendering calculation logic. (3) `render/map.ts` (21% lines) — test orbit math helper functions that are pure calculations. Add tests to existing files (`render-trails.test.ts`, `render-asteroids.test.ts`, `render-map-state.test.ts`) or create new test files if appropriate.
+- **Verification**: `npx vitest run src/tests/render-trails.test.ts src/tests/render-asteroids.test.ts src/tests/render-map-state.test.ts --coverage 2>&1 | grep -E "(_trails|_asteroids|map)"` — line coverage improved for all three files.
+
+### TASK-018: Add unit tests for UI modules: fpsMonitor.ts, vab/_staging.ts, vab/_undoActions.ts
+- **Status**: pending
+- **Dependencies**: TASK-006, TASK-015
+- **Description**: Add new unit tests targeting uncovered code paths: (1) `fpsMonitor.ts` (70% lines) — test uncovered recording/display logic, lines 161-169 and 201-248. (2) `vab/_staging.ts` (19% lines) — test `computeVabStageDeltaV()` pure physics math and other testable stage logic. This is the biggest coverage gap in testable UI code. (3) `vab/_undoActions.ts` (81% lines) — test uncovered snapshot edge cases, lines 149-253 and 262-266. Add to existing test files (`ui-fpsMonitor.test.ts`, `ui-vabStaging.test.ts`, `ui-vabUndoActions.test.ts`).
+- **Verification**: `npx vitest run src/tests/ui-fpsMonitor.test.ts src/tests/ui-vabStaging.test.ts src/tests/ui-vabUndoActions.test.ts --coverage 2>&1 | grep -E "(fpsMonitor|_staging|_undoActions)"` — line coverage improved for all three files.
+
+### TASK-019: Add unit tests for flightController modules
+- **Status**: pending
+- **Dependencies**: TASK-006, TASK-015
+- **Description**: Add new unit tests targeting uncovered code paths in flightController sub-modules: (1) `_loop.ts` (41% lines) — test loop tick logic, error recovery paths. (2) `_mapView.ts` (64% lines) — test transfer calculation display logic. (3) `_timeWarp.ts` (90% lines) — test uncovered threshold edge case at lines 73-77 (small addition). (4) `_workerBridge.ts` (73% lines) — test uncovered message handling paths. Add to existing test files (`ui-timeWarp.test.ts`, etc.) or create new test files for modules that don't have them.
+- **Verification**: `npx vitest run src/tests/ui-timeWarp.test.ts src/tests/loopErrorHandling.test.ts src/tests/workerBridgeTimeout.test.ts --coverage 2>&1 | grep -E "(_loop|_mapView|_timeWarp|_workerBridge)"` — line coverage improved.
+
+### TASK-020: Set final coverage thresholds and enforce --coverage in test:unit
+- **Status**: pending
+- **Dependencies**: TASK-016, TASK-017, TASK-018, TASK-019
+- **Description**: After all coverage exclusions and new tests are in place: (1) Run `npx vitest run --coverage` and record actual coverage percentages for `src/core/**`, `src/render/**`, and `src/ui/**`. (2) Set thresholds in `vite.config.ts` at or slightly below the measured values — round down to the nearest integer. For core, the threshold should be at least 91% lines, 81% branches, 92% functions (matching or exceeding current actuals). For render and UI, set based on the post-exclusion measurements. (3) Change `package.json` script `"test:unit"` from `"vitest run"` to `"vitest run --coverage"` so thresholds are enforced on every test run.
+- **Verification**: `npm run test:unit` — all tests pass AND no coverage threshold errors (exit code 0).
+
+---
+
+## Final
+
+### TASK-021: Final verification pass
+- **Status**: pending
+- **Dependencies**: TASK-001, TASK-003, TASK-006, TASK-011, TASK-013, TASK-014, TASK-020
+- **Description**: Run the full verification suite to confirm all iteration 6 goals are met: (1) `npm run typecheck` — no errors. (2) `npm run lint` — 0 warnings, 0 errors. (3) `npm run test:unit` — all unit tests pass with coverage thresholds enforced. (4) Run a targeted selection of E2E specs to verify no regressions: `npx playwright test e2e/smoke.spec.ts e2e/saveload.spec.ts e2e/crew.spec.ts`. (5) `npm run build` — production build succeeds. (6) Verify cast counts: `grep -r "as unknown as" src/tests/ | wc -l` < 50 and `grep -r "as unknown as" e2e/ | wc -l` < 100. (7) `node scripts/run-affected.mjs --dry-run --base HEAD~5` resolves test paths without errors.
+- **Verification**: All 7 checks above pass. Report final numbers for: lint warnings, unit test `as unknown as` count, E2E `as unknown as` count, coverage percentages per directory.
