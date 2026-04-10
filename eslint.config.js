@@ -55,7 +55,7 @@ export default [
   // TypeScript files in src/
   // -----------------------------------------------------------------------
   {
-    files: ['src/**/*.ts'],
+    files: ['src/**/*.ts', 'e2e/**/*.ts'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
@@ -97,6 +97,7 @@ export default [
       'no-template-curly-in-string': 'warn',
       'eqeqeq': ['error', 'always', { null: 'ignore' }],
       'no-throw-literal': 'error',
+      'no-useless-assignment': 'warn',
 
       // -- Console / async rules --
       'no-console': ['error', { allow: ['warn', 'error'] }],
@@ -115,7 +116,7 @@ export default [
   // E2E test files: add Playwright globals
   // -----------------------------------------------------------------------
   {
-    files: ['e2e/**/*.js'],
+    files: ['e2e/**/*.{js,ts}'],
     languageOptions: {
       globals: {
         ...globals.node,
@@ -147,15 +148,15 @@ export default [
   },
 
   // -----------------------------------------------------------------------
-  // Test files: keep no-explicit-any as warning (not error)
+  // Test files: enforce no-explicit-any as error (prevent regression)
   // -----------------------------------------------------------------------
   {
-    files: ['src/tests/**'],
+    files: ['src/tests/**', 'e2e/**'],
     plugins: {
       '@typescript-eslint': tsPlugin,
     },
     rules: {
-      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-explicit-any': 'error',
     },
   },
 ];

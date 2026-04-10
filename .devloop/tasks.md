@@ -893,7 +893,7 @@
 ## Phase E: Enforcement & Verification
 
 ### TASK-148: Escalate ESLint no-explicit-any to error for test files
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-107, TASK-147
 - **Description**: In `eslint.config.js`, change the `@typescript-eslint/no-explicit-any` rule from `warn` to `error` in the test file override (lines 152-160). This prevents regression — no `any` can be reintroduced in test code. Also add E2E test files (`e2e/**/*.ts`) to the TypeScript lint rules if not already covered. See requirements §6.
 - **Verification**: `npm run lint`
