@@ -157,31 +157,31 @@
 - **Verification**: `npx vitest run src/tests/challenges.test.ts`
 
 ### TASK-026: Convert collision.test.ts to strict TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007
 - **Description**: Remove `// @ts-nocheck` from `src/tests/collision.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
 - **Verification**: `npx vitest run src/tests/collision.test.ts`
 
 ### TASK-027: Convert comms.test.ts to strict TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007
 - **Description**: Remove `// @ts-nocheck` from `src/tests/comms.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
 - **Verification**: `npx vitest run src/tests/comms.test.ts`
 
 ### TASK-028: Convert construction.test.ts to strict TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007
 - **Description**: Remove `// @ts-nocheck` from `src/tests/construction.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
 - **Verification**: `npx vitest run src/tests/construction.test.ts`
 
 ### TASK-029: Convert contracts.test.ts to strict TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007
 - **Description**: Remove `// @ts-nocheck` from `src/tests/contracts.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
 - **Verification**: `npx vitest run src/tests/contracts.test.ts`
 
 ### TASK-030: Convert controlMode.test.ts to strict TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007
 - **Description**: Remove `// @ts-nocheck` from `src/tests/controlMode.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
 - **Verification**: `npx vitest run src/tests/controlMode.test.ts`

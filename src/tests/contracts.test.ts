@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * contracts.test.js — Unit tests for the contract system.
  *
@@ -19,6 +18,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
+import type { GameState, FlightState, Contract, ObjectiveDef, FlightEvent, MissionInstance } from '../core/gameState.ts';
 import {
   generateContracts,
   acceptContract,
@@ -49,24 +49,72 @@ import {
   CONTRACT_CONFLICT_TAGS,
   PartType,
 } from '../core/constants.ts';
+import type { ContractCategory as ContractCategoryType } from '../core/constants.ts';
 import { ObjectiveType } from '../data/missions.ts';
+
+interface TestContract extends Contract {
+  bonusObjectives: (ObjectiveDef & { bonus?: boolean })[];
+  bonusReward: number;
+  conflictTags: string[];
+}
+
+interface TestContractOverrides {
+  id?: string;
+  title?: string;
+  description?: string;
+  category?: ContractCategoryType;
+  objectives?: ObjectiveDef[];
+  bonusObjectives?: (ObjectiveDef & { bonus?: boolean })[];
+  bonusReward?: number;
+  reward?: number;
+  penaltyFee?: number;
+  reputationReward?: number;
+  reputationPenalty?: number;
+  deadlinePeriod?: number | null;
+  boardExpiryPeriod?: number;
+  generatedPeriod?: number;
+  acceptedPeriod?: number | null;
+  chainId?: string | null;
+  chainPart?: number | null;
+  chainTotal?: number | null;
+  conflictTags?: string[];
+}
+
+interface TestFlightEvent {
+  type: string;
+  time?: number;
+  description?: string;
+  [key: string]: unknown;
+}
+
+interface TestFlightOverrides {
+  altitude?: number;
+  velocity?: number;
+  timeElapsed?: number;
+  events?: TestFlightEvent[];
+  hasScienceModules?: boolean;
+  scienceModuleRunning?: boolean;
+  rocketCost?: number;
+  partCount?: number;
+  partTypes?: string[];
+  crewCount?: number;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function freshState() {
+function freshState(): GameState {
   const state = createGameState();
   // Give the player some completed missions so contracts can generate.
   state.missions.completed = [
     { id: 'mission-001', title: 'M1', objectives: [{ type: ObjectiveType.REACH_SPEED, target: { speed: 150 }, completed: true }], reward: 25000 },
     { id: 'mission-004', title: 'M4', objectives: [{ type: ObjectiveType.REACH_HORIZONTAL_SPEED, target: { speed: 300 }, completed: true }], reward: 30000 },
-  ];
+  ] as unknown as MissionInstance[];
   return state;
 }
 
-/** Create a minimal contract for direct state manipulation in tests. */
-function makeContract(overrides = {}) {
+function makeContract(overrides: TestContractOverrides = {}): TestContract {
   return {
     id: overrides.id ?? `contract-test-${Math.random().toString(36).slice(2)}`,
     title: overrides.title ?? 'Test Contract',
@@ -92,21 +140,19 @@ function makeContract(overrides = {}) {
   };
 }
 
-/** Create a minimal flight state for objective checking. */
-function makeFlightState(overrides = {}) {
+function makeFlightState(overrides: TestFlightOverrides = {}): FlightState {
   return {
     altitude: overrides.altitude ?? 0,
     velocity: overrides.velocity ?? 0,
     timeElapsed: overrides.timeElapsed ?? 0,
-    events: overrides.events ?? [],
+    events: (overrides.events ?? []) as FlightEvent[],
     hasScienceModules: overrides.hasScienceModules ?? false,
     scienceModuleRunning: overrides.scienceModuleRunning ?? false,
-    // New fields for constraint-based objectives (TASK-009)
     rocketCost: overrides.rocketCost,
     partCount: overrides.partCount,
     partTypes: overrides.partTypes,
     crewCount: overrides.crewCount,
-  };
+  } as FlightState;
 }
 
 // ---------------------------------------------------------------------------
@@ -166,7 +212,7 @@ describe('getContractCaps()', () => {
 // ---------------------------------------------------------------------------
 
 describe('generateContracts()', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('generates 2-3 contracts on a fresh board', () => {
@@ -214,6 +260,7 @@ describe('generateContracts()', () => {
   });
 
   it('handles state without contracts field (legacy save)', () => {
+    // @ts-expect-error intentionally deleting required field to test legacy save handling
     delete state.contracts;
     const result = generateContracts(state);
     expect(result.length).toBeGreaterThanOrEqual(CONTRACTS_PER_FLIGHT_MIN);
@@ -226,7 +273,7 @@ describe('generateContracts()', () => {
 // ---------------------------------------------------------------------------
 
 describe('acceptContract()', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => {
     state = freshState();
     state.contracts.board.push(makeContract({ id: 'c-1' }));
@@ -236,7 +283,7 @@ describe('acceptContract()', () => {
   it('moves contract from board to active', () => {
     const result = acceptContract(state, 'c-1');
     expect(result.success).toBe(true);
-    expect(result.contract.id).toBe('c-1');
+    expect(result.contract!.id).toBe('c-1');
     expect(state.contracts.board.length).toBe(1);
     expect(state.contracts.active.length).toBe(1);
     expect(state.contracts.active[0].id).toBe('c-1');
@@ -269,7 +316,7 @@ describe('acceptContract()', () => {
 // ---------------------------------------------------------------------------
 
 describe('completeContract()', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => {
     state = freshState();
     state.contracts.active.push(makeContract({ id: 'c-1', reward: 100_000 }));
@@ -315,9 +362,9 @@ describe('completeContract() — chain contracts', () => {
     const result = completeContract(state, 'chain-1');
     expect(result.success).toBe(true);
     expect(result.nextChainContract).toBeDefined();
-    expect(result.nextChainContract.chainPart).toBe(2);
-    expect(result.nextChainContract.chainTotal).toBe(3);
-    expect(result.nextChainContract.chainId).toBe('chain-test');
+    expect(result.nextChainContract!.chainPart).toBe(2);
+    expect(result.nextChainContract!.chainTotal).toBe(3);
+    expect(result.nextChainContract!.chainId).toBe('chain-test');
     // Next part should be on the board
     expect(state.contracts.board.some(c => c.chainId === 'chain-test' && c.chainPart === 2)).toBe(true);
   });
@@ -343,7 +390,7 @@ describe('completeContract() — chain contracts', () => {
 // ---------------------------------------------------------------------------
 
 describe('cancelContract()', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => {
     state = freshState();
     state.contracts.active.push(makeContract({
@@ -391,7 +438,7 @@ describe('cancelContract()', () => {
 // ---------------------------------------------------------------------------
 
 describe('expireBoardContracts()', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('removes contracts past their board expiry period', () => {
@@ -419,7 +466,7 @@ describe('expireBoardContracts()', () => {
 // ---------------------------------------------------------------------------
 
 describe('expireActiveContracts()', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); state.reputation = 50; });
 
   it('expires active contracts past their deadline', () => {
@@ -454,7 +501,7 @@ describe('expireActiveContracts()', () => {
 // ---------------------------------------------------------------------------
 
 describe('checkContractObjectives()', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('completes REACH_ALTITUDE objective when altitude met', () => {
@@ -528,6 +575,7 @@ describe('checkContractObjectives()', () => {
 
   it('no-ops when flightState is null', () => {
     state.contracts.active.push(makeContract({ id: 'c-1' }));
+    // @ts-expect-error intentionally passing null to test defensive guard
     expect(() => checkContractObjectives(state, null)).not.toThrow();
     expect(state.contracts.active[0].objectives[0].completed).toBe(false);
   });
@@ -649,7 +697,7 @@ describe('GameState — contract fields', () => {
 // ---------------------------------------------------------------------------
 
 describe('checkContractObjectives() — BUDGET_LIMIT', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('completes when rocket cost is within budget', () => {
@@ -706,7 +754,7 @@ describe('checkContractObjectives() — BUDGET_LIMIT', () => {
 });
 
 describe('checkContractObjectives() — MAX_PARTS', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('completes when part count is within limit', () => {
@@ -750,7 +798,7 @@ describe('checkContractObjectives() — MAX_PARTS', () => {
 });
 
 describe('checkContractObjectives() — RESTRICT_PART', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('completes when forbidden part type is absent', () => {
@@ -798,7 +846,7 @@ describe('checkContractObjectives() — RESTRICT_PART', () => {
 });
 
 describe('checkContractObjectives() — MULTI_SATELLITE', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('completes when enough satellites are released at altitude', () => {
@@ -857,7 +905,7 @@ describe('checkContractObjectives() — MULTI_SATELLITE', () => {
 });
 
 describe('checkContractObjectives() — MINIMUM_CREW', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('completes when crew count meets minimum', () => {
@@ -936,7 +984,7 @@ describe('Bonus objectives', () => {
 
     checkContractObjectives(state, makeFlightState({ altitude: 1200 }));
     expect(state.contracts.active[0].objectives[0].completed).toBe(true);
-    expect(state.contracts.active[0].bonusObjectives[0].completed).toBe(true);
+    expect((state.contracts.active[0] as TestContract).bonusObjectives[0].completed).toBe(true);
   });
 
   it('bonus objectives can remain incomplete while main objectives complete', () => {
@@ -957,7 +1005,7 @@ describe('Bonus objectives', () => {
 
     checkContractObjectives(state, makeFlightState({ altitude: 700 }));
     expect(state.contracts.active[0].objectives[0].completed).toBe(true);
-    expect(state.contracts.active[0].bonusObjectives[0].completed).toBe(false);
+    expect((state.contracts.active[0] as TestContract).bonusObjectives[0].completed).toBe(false);
   });
 
   it('completeContract() awards bonus reward when all bonus objectives met', () => {

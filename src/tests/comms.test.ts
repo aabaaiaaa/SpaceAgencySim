@@ -1,22 +1,6 @@
-// @ts-nocheck
-/**
- * comms.test.js — Unit tests for the communication range system.
- *
- * Tests cover:
- *   - evaluateComms()       — link type resolution in various scenarios
- *   - Direct comms           — Earth orbit, range limits
- *   - Tracking Station T3    — extended direct range
- *   - Local network          — comm-sat coverage with partial/full constellations
- *   - Relay chain            — interplanetary relay links
- *   - Onboard relay          — self-sustaining craft connection
- *   - Control lockout        — probe-only with no signal
- *   - Crewed craft           — no lockout, just science data blocked
- *   - getCommsCoverageInfo() — map overlay data
- *   - getCommsLinkLabel()    — label formatting
- */
-
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createGameState, createFlightState } from '../core/gameState.ts';
+import type { GameState, FlightState, OrbitalElements, RocketDesign, TransferState } from '../core/gameState.ts';
 import {
   evaluateComms,
   createCommsState,
@@ -41,20 +25,20 @@ import { deploySatellite } from '../core/satellites.ts';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function freshState() {
+function freshState(): GameState {
   const state = createGameState();
   state.facilities[FacilityId.SATELLITE_OPS] = { built: true, tier: 1 };
   return state;
 }
 
-function flightAt(bodyId, phase, crewIds = [], rocketId = 'r1') {
+function flightAt(bodyId: CelestialBody, phase: FlightPhase, crewIds: string[] = [], rocketId: string = 'r1'): FlightState {
   const fs = createFlightState({ missionId: 'm1', rocketId, crewIds });
   fs.bodyId = bodyId;
   fs.phase = phase;
   return fs;
 }
 
-const LEO_ELEMENTS = {
+const LEO_ELEMENTS: OrbitalElements = {
   semiMajorAxis: BODY_RADIUS.EARTH + 150_000,
   eccentricity: 0.001,
   argPeriapsis: 0,
@@ -62,7 +46,7 @@ const LEO_ELEMENTS = {
   epoch: 0,
 };
 
-const HEO_ELEMENTS = {
+const HEO_ELEMENTS: OrbitalElements = {
   semiMajorAxis: BODY_RADIUS.EARTH + 5_000_000,
   eccentricity: 0.001,
   argPeriapsis: 0,
@@ -70,7 +54,7 @@ const HEO_ELEMENTS = {
   epoch: 0,
 };
 
-const MOON_ELEMENTS = {
+const MOON_ELEMENTS: OrbitalElements = {
   semiMajorAxis: BODY_RADIUS.MOON + 50_000,
   eccentricity: 0.001,
   argPeriapsis: 0,
@@ -78,7 +62,7 @@ const MOON_ELEMENTS = {
   epoch: 0,
 };
 
-const MARS_ELEMENTS = {
+const MARS_ELEMENTS: OrbitalElements = {
   semiMajorAxis: BODY_RADIUS.MARS + 150_000,
   eccentricity: 0.001,
   argPeriapsis: 0,
@@ -86,7 +70,7 @@ const MARS_ELEMENTS = {
   epoch: 0,
 };
 
-function deployCommSats(state, bodyId, count, elements) {
+function deployCommSats(state: GameState, bodyId: string, count: number, elements: OrbitalElements): void {
   for (let i = 0; i < count; i++) {
     const alt = elements.semiMajorAxis - BODY_RADIUS[bodyId];
     deploySatellite(state, {
@@ -98,12 +82,11 @@ function deployCommSats(state, bodyId, count, elements) {
   }
 }
 
-function deployRelaySats(state, bodyId, count) {
+function deployRelaySats(state: GameState, bodyId: string, count: number): void {
   const R = BODY_RADIUS[bodyId];
-  // Use altitudes safely within the high-orbit band for each body.
-  const altMap = { EARTH: 5_000_000, MARS: 5_000_000, MOON: 2_000_000, MERCURY: 2_000_000, VENUS: 5_000_000 };
+  const altMap: Record<string, number> = { EARTH: 5_000_000, MARS: 5_000_000, MOON: 2_000_000, MERCURY: 2_000_000, VENUS: 5_000_000 };
   const alt = altMap[bodyId] || 5_000_000;
-  const elements = {
+  const elements: OrbitalElements = {
     semiMajorAxis: R + alt,
     eccentricity: 0.001,
     argPeriapsis: 0,
@@ -208,7 +191,7 @@ describe('comms — Tracking Station T3 extends range', () => {
 });
 
 describe('comms — local comm-sat network', () => {
-  let state;
+  let state: GameState;
 
   beforeEach(() => {
     state = freshState();
@@ -233,7 +216,7 @@ describe('comms — local comm-sat network', () => {
 });
 
 describe('comms — relay chain', () => {
-  let state;
+  let state: GameState;
 
   beforeEach(() => {
     state = freshState();
@@ -265,7 +248,7 @@ describe('comms — onboard relay antenna', () => {
   it('provides connection anywhere with relay antenna on craft', () => {
     const state = freshState();
     // Add a rocket design with a relay antenna.
-    state.rockets = [{
+    const relayRocket: RocketDesign = {
       id: 'r1',
       name: 'Relay Probe',
       parts: [
@@ -277,7 +260,8 @@ describe('comms — onboard relay antenna', () => {
       totalThrust: 0,
       createdDate: '2026-01-01',
       updatedDate: '2026-01-01',
-    }];
+    };
+    state.rockets = [relayRocket];
     const fs = flightAt('MARS', FlightPhase.ORBIT, [], 'r1');
     const result = evaluateComms(state, fs, { altitude: 150_000, posX: 0, posY: 0 });
     expect(result.status).toBe(CommsStatus.CONNECTED);
@@ -305,7 +289,7 @@ describe('comms — control lockout for probe-only craft', () => {
   it('locks controls during TRANSFER phase for probe beyond comms range', () => {
     const state = freshState();
     const fs = flightAt('EARTH', FlightPhase.TRANSFER, []);
-    fs.transferState = { originBodyId: 'EARTH', destinationBodyId: 'MARS' };
+    fs.transferState = { originBodyId: 'EARTH', destinationBodyId: 'MARS' } as Partial<TransferState> as TransferState;
     // Place the craft far beyond direct and T3 range — deep space.
     const deepSpaceAlt = 1_000_000_000; // 1 billion m — well beyond any direct range
     const result = evaluateComms(state, fs, { altitude: deepSpaceAlt, posX: 0, posY: 0 });

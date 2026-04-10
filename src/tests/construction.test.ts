@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * construction.test.js — Unit tests for the facility construction system.
  *
@@ -16,6 +15,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
+import type { GameState } from '../core/gameState.ts';
 import {
   hasFacility,
   getFacilityDef,
@@ -42,11 +42,11 @@ import {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function freshState() {
+function freshState(): GameState {
   return createGameState();
 }
 
-function nonTutorialState() {
+function nonTutorialState(): GameState {
   const state = createGameState();
   state.tutorialMode = false;
   return state;
@@ -83,7 +83,7 @@ describe('hasFacility', () => {
 
 describe('getFacilityDef', () => {
   it('returns the definition for a valid facility ID', () => {
-    const def = getFacilityDef(FacilityId.CREW_ADMIN);
+    const def = getFacilityDef(FacilityId.CREW_ADMIN)!;
     expect(def).toBeDefined();
     expect(def.name).toBe('Crew Administration');
     expect(def.cost).toBe(100_000);
@@ -638,7 +638,7 @@ describe('generalized facility upgrades', () => {
     const state = nonTutorialState();
     state.money = 1_000_000;
     const moneyBefore = state.money;
-    const upgDef = getFacilityUpgradeDef(FacilityId.MISSION_CONTROL);
+    const upgDef = getFacilityUpgradeDef(FacilityId.MISSION_CONTROL)!;
     const expectedCost = getDiscountedMoneyCost(upgDef.tiers[2].moneyCost, state.reputation ?? 50);
     upgradeFacility(state, FacilityId.MISSION_CONTROL);
     expect(state.money).toBe(moneyBefore - expectedCost);
@@ -658,7 +658,7 @@ describe('generalized facility upgrades', () => {
     state.reputation = 100;
     state.money = 5_000_000;
     const moneyBefore = state.money;
-    const upgDef = getFacilityUpgradeDef(FacilityId.LAUNCH_PAD);
+    const upgDef = getFacilityUpgradeDef(FacilityId.LAUNCH_PAD)!;
     const discount = getReputationDiscount(100);
     const expectedCost = Math.floor(upgDef.tiers[2].moneyCost * (1 - discount));
     upgradeFacility(state, FacilityId.LAUNCH_PAD);

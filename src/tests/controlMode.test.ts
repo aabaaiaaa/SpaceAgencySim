@@ -1,20 +1,3 @@
-// @ts-nocheck
-/**
- * controlMode.test.js — Unit tests for the control mode system (TASK-005).
- *
- * Tests cover:
- *   - ControlMode enum values
- *   - canEnterDockingMode() — phase gating
- *   - enterDockingMode() / exitDockingMode() — state transitions
- *   - toggleRcsMode() — RCS toggling within docking mode
- *   - hasRcsThrusters() — RCS part detection
- *   - checkBandLimitWarning() — altitude band warnings
- *   - clampDockingRadial() — band limit clamping
- *   - resetControlModeIfNeeded() — auto-reset on phase change
- *   - getControlModeLabel() — human-readable labels
- *   - Physics integration: handleKeyDown in docking/RCS modes
- */
-
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createFlightState } from '../core/gameState.ts';
 import { FlightPhase, ControlMode, PartType } from '../core/constants.ts';
@@ -33,11 +16,15 @@ import {
 } from '../core/controlMode.ts';
 import { handleKeyDown } from '../core/physics.ts';
 
+import type { FlightPhase as FlightPhaseType, AltitudeBand } from '../core/constants.ts';
+import type { FlightState, OrbitalElements } from '../core/gameState.ts';
+import type { PhysicsState, RocketAssembly, PlacedPart } from '../core/physics.ts';
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function freshFlightState(phase = FlightPhase.ORBIT) {
+function freshFlightState(phase: FlightPhaseType = FlightPhase.ORBIT): FlightState {
   const fs = createFlightState({
     missionId: 'test-mission',
     rocketId: 'test-rocket',
@@ -50,7 +37,7 @@ function freshFlightState(phase = FlightPhase.ORBIT) {
   return fs;
 }
 
-function stubPs(overrides = {}) {
+function stubPs(overrides: Partial<PhysicsState> = {}): PhysicsState {
   return {
     posX: 0,
     posY: 100_000, // 100 km altitude (LEO)
@@ -60,10 +47,10 @@ function stubPs(overrides = {}) {
     throttle: 0.5,
     throttleMode: 'absolute',
     targetTWR: 1.0,
-    firingEngines: new Set(),
-    fuelStore: new Map(),
-    activeParts: new Set(),
-    deployedParts: new Set(),
+    firingEngines: new Set<string>(),
+    fuelStore: new Map<string, number>(),
+    activeParts: new Set<string>(),
+    deployedParts: new Set<string>(),
     grounded: false,
     landed: false,
     crashed: false,
@@ -72,16 +59,15 @@ function stubPs(overrides = {}) {
     dockingAltitudeBand: null,
     dockingOffsetAlongTrack: 0,
     dockingOffsetRadial: 0,
-    rcsActiveDirections: new Set(),
-    _heldKeys: new Set(),
+    rcsActiveDirections: new Set<string>(),
+    _heldKeys: new Set<string>(),
     ...overrides,
-  };
+  } as PhysicsState;
 }
 
-/** Create a minimal assembly with one RCS-capable part. */
-function assemblyWithRcs() {
-  const parts = new Map();
-  parts.set('cmd-1', { partId: 'cmd-mk1', x: 0, y: 0 });
+function assemblyWithRcs(): RocketAssembly {
+  const parts = new Map<string, PlacedPart>();
+  parts.set('cmd-1', { partId: 'cmd-mk1', x: 0, y: 0 } as PlacedPart);
   return {
     parts,
     connections: [],
@@ -90,10 +76,9 @@ function assemblyWithRcs() {
   };
 }
 
-/** Create an assembly without RCS. */
-function assemblyWithoutRcs() {
-  const parts = new Map();
-  parts.set('tank-1', { partId: 'tank-small', x: 0, y: 0 });
+function assemblyWithoutRcs(): RocketAssembly {
+  const parts = new Map<string, PlacedPart>();
+  parts.set('tank-1', { partId: 'tank-small', x: 0, y: 0 } as PlacedPart);
   return {
     parts,
     connections: [],
@@ -173,7 +158,7 @@ describe('enterDockingMode', () => {
     const fs = freshFlightState();
     enterDockingMode(ps, fs, 'EARTH');
     expect(ps.dockingAltitudeBand).not.toBeNull();
-    expect(ps.dockingAltitudeBand.id).toBe('LEO');
+    expect(ps.dockingAltitudeBand!.id).toBe('LEO');
   });
 
   it('fails if not in ORBIT phase', () => {
@@ -199,8 +184,8 @@ describe('enterDockingMode', () => {
 describe('exitDockingMode', () => {
   it('returns to NORMAL mode', () => {
     const ps = stubPs({ controlMode: ControlMode.DOCKING });
-    ps.baseOrbit = { semiMajorAxis: 6471000 };
-    ps.dockingAltitudeBand = { id: 'LEO', min: 80000, max: 200000 };
+    ps.baseOrbit = { semiMajorAxis: 6471000 } as Partial<OrbitalElements> as OrbitalElements;
+    ps.dockingAltitudeBand = { id: 'LEO', min: 80000, max: 200000 } as Partial<AltitudeBand> as AltitudeBand;
     const fs = freshFlightState();
     const result = exitDockingMode(ps, fs, 'EARTH');
     expect(result.success).toBe(true);
@@ -216,8 +201,8 @@ describe('exitDockingMode', () => {
 
   it('clears docking state', () => {
     const ps = stubPs({ controlMode: ControlMode.DOCKING });
-    ps.baseOrbit = { semiMajorAxis: 6471000 };
-    ps.dockingAltitudeBand = { id: 'LEO' };
+    ps.baseOrbit = { semiMajorAxis: 6471000 } as Partial<OrbitalElements> as OrbitalElements;
+    ps.dockingAltitudeBand = { id: 'LEO' } as Partial<AltitudeBand> as AltitudeBand;
     ps.dockingOffsetAlongTrack = 50;
     ps.dockingOffsetRadial = 10;
     const fs = freshFlightState();
@@ -441,25 +426,25 @@ describe('CONTROL_MODE_TIPS', () => {
 describe('handleKeyDown in docking/RCS modes', () => {
   it('does not change throttle on W press in DOCKING mode', () => {
     const ps = stubPs({ controlMode: ControlMode.DOCKING, throttle: 0 });
-    handleKeyDown(ps, null, 'w');
+    handleKeyDown(ps, null as unknown as RocketAssembly, 'w');
     expect(ps.throttle).toBe(0);
   });
 
   it('does not change throttle on S press in DOCKING mode', () => {
     const ps = stubPs({ controlMode: ControlMode.DOCKING, throttle: 0.5 });
-    handleKeyDown(ps, null, 's');
+    handleKeyDown(ps, null as unknown as RocketAssembly, 's');
     expect(ps.throttle).toBe(0.5);
   });
 
   it('X cuts throttle in DOCKING mode', () => {
     const ps = stubPs({ controlMode: ControlMode.DOCKING, throttle: 0.5 });
-    handleKeyDown(ps, null, 'x');
+    handleKeyDown(ps, null as unknown as RocketAssembly, 'x');
     expect(ps.throttle).toBe(0);
   });
 
   it('does not change throttle on W in RCS mode', () => {
     const ps = stubPs({ controlMode: ControlMode.RCS, throttle: 0 });
-    handleKeyDown(ps, null, 'w');
+    handleKeyDown(ps, null as unknown as RocketAssembly, 'w');
     expect(ps.throttle).toBe(0);
   });
 });
