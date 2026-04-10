@@ -1,19 +1,3 @@
-// @ts-nocheck
-/**
- * instruments.test.js — Unit tests for the instrument-based science system.
- *
- * Tests cover:
- *   Instrument catalog         — definitions, lookup helpers, new fields
- *   Biome validation           — validBiomes enforcement on activation
- *   Science module containers  — instrument slot initialisation, per-instrument states
- *   Instrument activation      — individual and batch (via staging)
- *   Experiment lifecycle       — idle → running → complete → data_returned / transmitted
- *   Yield formula              — baseYield × biomeMultiplier × skillBonus × diminishingReturn
- *   Diminishing returns        — persistent tracking across collections
- *   Data types                 — SAMPLE (return only) vs ANALYSIS (transmit or return)
- *   Context menu integration   — getModuleInstrumentKeys, status queries
- */
-
 import { describe, it, expect } from 'vitest';
 import {
   ScienceModuleState,
@@ -34,6 +18,7 @@ import {
   getInstrumentKey,
   parseInstrumentKey,
 } from '../core/sciencemodule.ts';
+import type { InstrumentStateEntry } from '../core/sciencemodule.ts';
 import {
   getInstrumentById,
   getAllInstruments,
@@ -56,42 +41,41 @@ import {
   syncStagingWithAssembly,
   assignPartToStage,
 } from '../core/rocketbuilder.ts';
+import type { RocketAssembly, StagingConfig } from '../core/rocketbuilder.ts';
 import { createPhysicsState } from '../core/physics.ts';
+import type { PhysicsState, ScienceModuleStateEntry } from '../core/physics.ts';
 import { createFlightState } from '../core/gameState.ts';
+import type { FlightState, GameState, ScienceLogEntry, FacilityState, FlightEvent } from '../core/gameState.ts';
 import { activateCurrentStage } from '../core/staging.ts';
 
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
 
-function makeFlightState() {
+function makeFlightState(): FlightState {
   return createFlightState({ missionId: 'test', rocketId: 'test' });
 }
 
-/**
- * Build an assembly with a probe core and a science module that has
- * the given instruments loaded.
- */
-function makeAssemblyWithInstruments(instrumentIds) {
+function makeAssemblyWithInstruments(instrumentIds: string[]): { assembly: RocketAssembly; probeId: string; scienceId: string } {
   const assembly = createRocketAssembly();
   const probeId = addPartToAssembly(assembly, 'probe-core-mk1', 0, 60);
   const scienceId = addPartToAssembly(assembly, 'science-module-mk1', 0, 100);
   connectParts(assembly, probeId, 1, scienceId, 0);
 
   // Load instruments into the science module.
-  const placed = assembly.parts.get(scienceId);
+  const placed = assembly.parts.get(scienceId)!;
   placed.instruments = [...instrumentIds];
 
   return { assembly, probeId, scienceId };
 }
 
-function makePhysicsState(assembly, altitude = 0) {
+function makePhysicsState(assembly: RocketAssembly, altitude = 0): PhysicsState {
   const ps = createPhysicsState(assembly, makeFlightState());
   ps.posY = altitude;
   return ps;
 }
 
-function makeGameState() {
+function makeGameState(): Pick<GameState, 'scienceLog' | 'sciencePoints' | 'crew' | 'facilities'> {
   return {
     scienceLog: [],
     sciencePoints: 0,
@@ -315,7 +299,7 @@ describe('initInstrumentStates', () => {
     const key0 = getInstrumentKey(scienceId, 0);
     const key1 = getInstrumentKey(scienceId, 1);
 
-    const entry0 = ps.instrumentStates.get(key0);
+    const entry0 = ps.instrumentStates.get(key0)!;
     expect(entry0).toBeDefined();
     expect(entry0.instrumentId).toBe('thermometer-mk1');
     expect(entry0.moduleInstanceId).toBe(scienceId);
@@ -323,7 +307,7 @@ describe('initInstrumentStates', () => {
     expect(entry0.state).toBe(ScienceModuleState.IDLE);
     expect(entry0.dataType).toBe('ANALYSIS');
 
-    const entry1 = ps.instrumentStates.get(key1);
+    const entry1 = ps.instrumentStates.get(key1)!;
     expect(entry1).toBeDefined();
     expect(entry1.instrumentId).toBe('barometer');
   });
@@ -333,7 +317,7 @@ describe('initInstrumentStates', () => {
     const ps = makePhysicsState(assembly);
 
     expect(ps.scienceModuleStates.has(scienceId)).toBe(true);
-    expect(ps.scienceModuleStates.get(scienceId).state).toBe(ScienceModuleState.IDLE);
+    expect(ps.scienceModuleStates.get(scienceId)!.state).toBe(ScienceModuleState.IDLE);
   });
 
   it('creates no entries when no instruments are loaded', () => {
@@ -363,9 +347,9 @@ describe('activateInstrument', () => {
     const result = activateInstrument(ps, assembly, fs, key);
 
     expect(result).toBe(true);
-    expect(ps.instrumentStates.get(key).state).toBe(ScienceModuleState.RUNNING);
-    expect(ps.instrumentStates.get(key).timer).toBe(10); // thermometer-mk1 duration
-    expect(ps.instrumentStates.get(key).startBiome).toBeDefined();
+    expect(ps.instrumentStates.get(key)!.state).toBe(ScienceModuleState.RUNNING);
+    expect(ps.instrumentStates.get(key)!.timer).toBe(10); // thermometer-mk1 duration
+    expect(ps.instrumentStates.get(key)!.startBiome).toBeDefined();
   });
 
   it('emits PART_ACTIVATED event with instrumentId', () => {
@@ -376,7 +360,7 @@ describe('activateInstrument', () => {
     const key = getInstrumentKey(scienceId, 0);
     activateInstrument(ps, assembly, fs, key);
 
-    const event = fs.events.find((e) => e.type === 'PART_ACTIVATED');
+    const event = fs.events.find((e) => e.type === 'PART_ACTIVATED')!;
     expect(event).toBeDefined();
     expect(event.instrumentId).toBe('thermometer-mk1');
     expect(event.instrumentKey).toBe(key);
@@ -411,9 +395,9 @@ describe('activateInstrument', () => {
     const result = activateInstrument(ps, assembly, fs, key);
 
     expect(result).toBe(false);
-    expect(ps.instrumentStates.get(key).state).toBe(ScienceModuleState.IDLE);
+    expect(ps.instrumentStates.get(key)!.state).toBe(ScienceModuleState.IDLE);
 
-    const event = fs.events.find((e) => e.type === 'INSTRUMENT_INVALID_BIOME');
+    const event = fs.events.find((e) => e.type === 'INSTRUMENT_INVALID_BIOME')!;
     expect(event).toBeDefined();
     expect(event.instrumentId).toBe('thermometer-mk1');
   });
@@ -428,7 +412,7 @@ describe('activateInstrument', () => {
     const result = activateInstrument(ps, assembly, fs, key);
 
     expect(result).toBe(true);
-    expect(ps.instrumentStates.get(key).state).toBe(ScienceModuleState.RUNNING);
+    expect(ps.instrumentStates.get(key)!.state).toBe(ScienceModuleState.RUNNING);
   });
 });
 
@@ -449,8 +433,8 @@ describe('activateAllInstruments', () => {
 
     const key0 = getInstrumentKey(scienceId, 0);
     const key1 = getInstrumentKey(scienceId, 1);
-    expect(ps.instrumentStates.get(key0).state).toBe(ScienceModuleState.RUNNING);
-    expect(ps.instrumentStates.get(key1).state).toBe(ScienceModuleState.IDLE);
+    expect(ps.instrumentStates.get(key0)!.state).toBe(ScienceModuleState.RUNNING);
+    expect(ps.instrumentStates.get(key1)!.state).toBe(ScienceModuleState.IDLE);
   });
 });
 
@@ -464,7 +448,7 @@ describe('activateScienceModule (backward compat)', () => {
     expect(result).toBe(true);
 
     const key = getInstrumentKey(scienceId, 0);
-    expect(ps.instrumentStates.get(key).state).toBe(ScienceModuleState.RUNNING);
+    expect(ps.instrumentStates.get(key)!.state).toBe(ScienceModuleState.RUNNING);
   });
 
   it('falls back to legacy behaviour for modules without instruments', () => {
@@ -486,11 +470,11 @@ describe('activateScienceModule (backward compat)', () => {
       startBiome: null,
       completeBiome: null,
       scienceMultiplier: 1.0,
-    });
+    } as ScienceModuleStateEntry);
 
     const result = activateScienceModule(ps, assembly, fs, scienceId);
     expect(result).toBe(true);
-    expect(ps.scienceModuleStates.get(scienceId).state).toBe(ScienceModuleState.RUNNING);
+    expect(ps.scienceModuleStates.get(scienceId)!.state).toBe(ScienceModuleState.RUNNING);
   });
 });
 
@@ -507,9 +491,9 @@ describe('tickInstruments', () => {
     const key = getInstrumentKey(scienceId, 0);
     activateInstrument(ps, assembly, fs, key);
 
-    const initialTimer = ps.instrumentStates.get(key).timer;
+    const initialTimer = ps.instrumentStates.get(key)!.timer;
     tickInstruments(ps, assembly, fs, 1);
-    expect(ps.instrumentStates.get(key).timer).toBeCloseTo(initialTimer - 1, 1);
+    expect(ps.instrumentStates.get(key)!.timer).toBeCloseTo(initialTimer - 1, 1);
   });
 
   it('transitions to complete when timer expires and emits SCIENCE_COLLECTED', () => {
@@ -523,11 +507,11 @@ describe('tickInstruments', () => {
     // Fast-forward past the experiment duration.
     tickInstruments(ps, assembly, fs, 15);
 
-    expect(ps.instrumentStates.get(key).state).toBe(ScienceModuleState.COMPLETE);
-    expect(ps.instrumentStates.get(key).completeBiome).toBeDefined();
-    expect(ps.instrumentStates.get(key).scienceMultiplier).toBeGreaterThan(0);
+    expect(ps.instrumentStates.get(key)!.state).toBe(ScienceModuleState.COMPLETE);
+    expect(ps.instrumentStates.get(key)!.completeBiome).toBeDefined();
+    expect(ps.instrumentStates.get(key)!.scienceMultiplier).toBeGreaterThan(0);
 
-    const sciEvent = fs.events.find((e) => e.type === 'SCIENCE_COLLECTED');
+    const sciEvent = fs.events.find((e) => e.type === 'SCIENCE_COLLECTED')!;
     expect(sciEvent).toBeDefined();
     expect(sciEvent.instrumentId).toBe('thermometer-mk1');
     expect(sciEvent.dataType).toBe('ANALYSIS');

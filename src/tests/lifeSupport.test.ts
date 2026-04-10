@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * lifeSupport.test.js — Unit tests for the crew life support system.
  *
@@ -23,16 +22,19 @@ import {
   FieldCraftStatus,
   CREW_SALARY_PER_PERIOD,
 } from '../core/constants.ts';
+import type { GameState, CrewMember, FieldCraft } from '../core/gameState.ts';
+import type { RocketAssembly, PlacedPart, PhysicsState } from '../core/physics.ts';
+import type { PeriodSummary } from '../core/period.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function freshState() {
+function freshState(): GameState {
   return createGameState();
 }
 
-function addCrew(state, overrides = {}) {
+function addCrew(state: GameState, overrides: Partial<CrewMember> = {}): string {
   const id = overrides.id ?? `crew-${state.crew.length + 1}`;
   state.crew.push({
     id,
@@ -42,13 +44,20 @@ function addCrew(state, overrides = {}) {
     salary: overrides.salary ?? CREW_SALARY_PER_PERIOD,
     hireDate: new Date().toISOString(),
     injuryEnds: null,
+    missionsFlown: 0,
+    flightsFlown: 0,
+    deathDate: null,
+    deathCause: null,
+    assignedRocketId: null,
+    trainingSkill: null,
+    trainingEnds: null,
   });
   return id;
 }
 
-function addFieldCraft(state, overrides = {}) {
+function addFieldCraft(state: GameState, overrides: Partial<FieldCraft> = {}): FieldCraft {
   if (!Array.isArray(state.fieldCraft)) state.fieldCraft = [];
-  const craft = {
+  const craft: FieldCraft = {
     id: overrides.id ?? `fc-${state.fieldCraft.length + 1}`,
     name: overrides.name ?? `Vessel ${state.fieldCraft.length + 1}`,
     bodyId: overrides.bodyId ?? 'EARTH',
@@ -69,7 +78,7 @@ function addFieldCraft(state, overrides = {}) {
 // ---------------------------------------------------------------------------
 
 describe('processLifeSupport()', () => {
-  let state;
+  let state: GameState;
 
   beforeEach(() => {
     state = freshState();
@@ -128,8 +137,8 @@ describe('processLifeSupport()', () => {
 
     // Crew should be KIA.
     const astronaut = state.crew.find((a) => a.id === crewId);
-    expect(astronaut.status).toBe(AstronautStatus.KIA);
-    expect(astronaut.deathCause).toBe('Life support exhausted');
+    expect(astronaut!.status).toBe(AstronautStatus.KIA);
+    expect(astronaut!.deathCause).toBe('Life support exhausted');
 
     // Death reported in result.
     expect(result.deaths).toHaveLength(1);
@@ -148,8 +157,8 @@ describe('processLifeSupport()', () => {
     const result = processLifeSupport(state);
 
     expect(result.deaths).toHaveLength(2);
-    expect(state.crew.find((a) => a.id === id1).status).toBe(AstronautStatus.KIA);
-    expect(state.crew.find((a) => a.id === id2).status).toBe(AstronautStatus.KIA);
+    expect(state.crew.find((a) => a.id === id1)!.status).toBe(AstronautStatus.KIA);
+    expect(state.crew.find((a) => a.id === id2)!.status).toBe(AstronautStatus.KIA);
   });
 
   it('removes field craft with no surviving crew', () => {
@@ -174,6 +183,7 @@ describe('processLifeSupport()', () => {
   });
 
   it('handles missing fieldCraft property gracefully', () => {
+    // @ts-expect-error Intentionally deleting required property to test defensive code
     delete state.fieldCraft;
     const result = processLifeSupport(state);
     expect(result.deaths).toHaveLength(0);
@@ -283,51 +293,51 @@ describe('hasExtendedLifeSupport()', () => {
 
   it('returns true when Extended Mission Module is present', () => {
     // Mock assembly with Map-like interface.
-    const assembly = {
-      parts: new Map([
+    const assembly: Pick<RocketAssembly, 'parts'> = {
+      parts: new Map<string, Pick<PlacedPart, 'partId'>>([
         ['inst-1', { partId: 'mission-module-extended' }],
         ['inst-2', { partId: 'engine-spark' }],
-      ]),
+      ]) as Map<string, PlacedPart>,
     };
 
-    expect(hasExtendedLifeSupport(assembly, null)).toBe(true);
+    expect(hasExtendedLifeSupport(assembly as RocketAssembly, null)).toBe(true);
   });
 
   it('returns false when no Extended Mission Module is present', () => {
-    const assembly = {
-      parts: new Map([
+    const assembly: Pick<RocketAssembly, 'parts'> = {
+      parts: new Map<string, Pick<PlacedPart, 'partId'>>([
         ['inst-1', { partId: 'engine-spark' }],
         ['inst-2', { partId: 'cmd-mk1' }],
-      ]),
+      ]) as Map<string, PlacedPart>,
     };
 
-    expect(hasExtendedLifeSupport(assembly, null)).toBe(false);
+    expect(hasExtendedLifeSupport(assembly as RocketAssembly, null)).toBe(false);
   });
 
   it('ignores destroyed parts when physics state is available', () => {
-    const assembly = {
-      parts: new Map([
+    const assembly: Pick<RocketAssembly, 'parts'> = {
+      parts: new Map<string, Pick<PlacedPart, 'partId'>>([
         ['inst-1', { partId: 'mission-module-extended' }],
-      ]),
+      ]) as Map<string, PlacedPart>,
     };
-    const ps = {
-      activeParts: new Set(), // inst-1 is NOT active (destroyed).
+    const ps: Pick<PhysicsState, 'activeParts'> = {
+      activeParts: new Set<string>(), // inst-1 is NOT active (destroyed).
     };
 
-    expect(hasExtendedLifeSupport(assembly, ps)).toBe(false);
+    expect(hasExtendedLifeSupport(assembly as RocketAssembly, ps as PhysicsState)).toBe(false);
   });
 
   it('detects active Extended Mission Module in physics state', () => {
-    const assembly = {
-      parts: new Map([
+    const assembly: Pick<RocketAssembly, 'parts'> = {
+      parts: new Map<string, Pick<PlacedPart, 'partId'>>([
         ['inst-1', { partId: 'mission-module-extended' }],
-      ]),
+      ]) as Map<string, PlacedPart>,
     };
-    const ps = {
-      activeParts: new Set(['inst-1']),
+    const ps: Pick<PhysicsState, 'activeParts'> = {
+      activeParts: new Set<string>(['inst-1']),
     };
 
-    expect(hasExtendedLifeSupport(assembly, ps)).toBe(true);
+    expect(hasExtendedLifeSupport(assembly as RocketAssembly, ps as PhysicsState)).toBe(true);
   });
 });
 
@@ -336,7 +346,7 @@ describe('hasExtendedLifeSupport()', () => {
 // ---------------------------------------------------------------------------
 
 describe('advancePeriod() life support integration', () => {
-  let state;
+  let state: GameState;
 
   beforeEach(() => {
     state = freshState();
@@ -349,7 +359,7 @@ describe('advancePeriod() life support integration', () => {
       suppliesRemaining: LIFE_SUPPORT_WARNING_THRESHOLD + 1,
     });
 
-    const summary = advancePeriod(state);
+    const summary: PeriodSummary = advancePeriod(state);
 
     expect(summary.lifeSupportWarnings).toHaveLength(1);
   });
@@ -361,7 +371,7 @@ describe('advancePeriod() life support integration', () => {
       suppliesRemaining: 1,
     });
 
-    const summary = advancePeriod(state);
+    const summary: PeriodSummary = advancePeriod(state);
 
     expect(summary.lifeSupportDeaths).toHaveLength(1);
     expect(summary.lifeSupportDeaths[0].crewName).toBe('Doomed');
@@ -380,7 +390,7 @@ describe('advancePeriod() life support integration', () => {
     advancePeriod(state); // 2 → 1 (warning)
     expect(state.fieldCraft[0].suppliesRemaining).toBe(1);
 
-    const summary = advancePeriod(state); // 1 → 0 (death)
+    const summary: PeriodSummary = advancePeriod(state); // 1 → 0 (death)
     expect(state.fieldCraft).toHaveLength(0); // Removed — crew dead.
     expect(summary.lifeSupportDeaths).toHaveLength(1);
   });

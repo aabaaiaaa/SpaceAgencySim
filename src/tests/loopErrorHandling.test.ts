@@ -1,19 +1,16 @@
-// @ts-nocheck
-/**
- * loopErrorHandling.test.ts — Unit tests for the flight controller loop's
- * error handling: try-catch around the simulation body, consecutive error
- * counter, and abort banner trigger.
- */
-
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import type { CommsState } from '../core/gameState.ts';
+import type { PhysicsState } from '../core/physics.ts';
+import type { FlightState } from '../core/gameState.ts';
+import type { FCState } from '../ui/flightController/_state.ts';
 
 // ---------------------------------------------------------------------------
 // Hoisted mock functions — available inside vi.mock() factories.
 // ---------------------------------------------------------------------------
 
 const { mockEvaluateComms, mockAbort } = vi.hoisted(() => ({
-  mockEvaluateComms: vi.fn(() => ({ controlLocked: false })),
-  mockAbort: vi.fn(),
+  mockEvaluateComms: vi.fn<(...args: unknown[]) => CommsState>(() => ({ status: 'CONNECTED', linkType: 'DIRECT', canTransmit: true, controlLocked: false })),
+  mockAbort: vi.fn<() => void>(),
 }));
 
 // ---------------------------------------------------------------------------
@@ -67,7 +64,9 @@ vi.mock('../ui/flightController/_menuActions.js', () => ({
 }));
 
 // Mock the logger so we can verify error logging without console.error.
-const { mockLoggerError } = vi.hoisted(() => ({ mockLoggerError: vi.fn() }));
+const { mockLoggerError } = vi.hoisted(() => ({
+  mockLoggerError: vi.fn<(category: string, message: string, data?: unknown) => void>(),
+}));
 vi.mock('../core/logger.ts', () => ({
   logger: { error: mockLoggerError, warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
@@ -107,13 +106,25 @@ import { getFCState, setFCState, resetFCState, setPhysicsState, setFlightState }
 // Minimal DOM stubs (the test environment is Node, not jsdom).
 // ---------------------------------------------------------------------------
 
-function createMockElement() {
-  const el = {
+interface MockElement {
+  style: { cssText: string };
+  textContent: string;
+  dataset: Record<string, string>;
+  children: MockElement[];
+  className: string;
+  appendChild(child: MockElement): MockElement;
+  remove: ReturnType<typeof vi.fn>;
+  addEventListener: ReturnType<typeof vi.fn>;
+}
+
+function createMockElement(): MockElement {
+  const el: MockElement = {
     style: { cssText: '' },
     textContent: '',
     dataset: {},
     children: [],
-    appendChild(child) { el.children.push(child); return child; },
+    className: '',
+    appendChild(child: MockElement): MockElement { el.children.push(child); return child; },
     remove: vi.fn(),
     addEventListener: vi.fn(),
   };
@@ -124,20 +135,18 @@ function createMockElement() {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Build a minimal flight-controller state that satisfies the loop guard. */
-function seedFCState(overrides = {}) {
+function seedFCState(overrides: Partial<FCState> = {}): void {
   setPhysicsState({
     posX: 0, posY: 0, velX: 0, velY: 0,
     throttle: 0, grounded: true, landed: false, crashed: false,
     firingEngines: new Set(), activeParts: new Set(),
-    surfaceAltitude: 0,
-  });
-  setFlightState({ phase: 'FLIGHT', bodyId: 'EARTH', scienceModuleRunning: false });
-  const defaults = {
-    assembly: { parts: new Map() },
-    stagingConfig: { stages: [] },
-    state: { missions: [], contracts: [], challenges: [] },
-    container: createMockElement(),
+  } as PhysicsState);
+  setFlightState({ phase: 'FLIGHT', bodyId: 'EARTH', scienceModuleRunning: false } as FlightState);
+  const defaults: Partial<FCState> = {
+    assembly: { parts: new Map() } as FCState['assembly'],
+    stagingConfig: { stages: [] } as unknown as FCState['stagingConfig'],
+    state: { missions: [], contracts: [], challenges: [] } as unknown as FCState['state'],
+    container: createMockElement() as unknown as HTMLElement,
     rafId: 1,
     lastTs: 0,
     mapActive: false,
@@ -158,7 +167,7 @@ beforeEach(() => {
   setPhysicsState(null);
   setFlightState(null);
   mockEvaluateComms.mockReset();
-  mockEvaluateComms.mockReturnValue({ controlLocked: false });
+  mockEvaluateComms.mockReturnValue({ status: 'CONNECTED', linkType: 'DIRECT', canTransmit: true, controlLocked: false });
   mockAbort.mockReset();
   mockLoggerError.mockReset();
 
@@ -242,9 +251,9 @@ describe('Flight controller loop error handling', () => {
     const s = getFCState();
     // The container's appendChild should have been called only once for
     // the banner (once at error #5), not again at #6 or #7.
-    const container = s.container;
+    const container = s.container as unknown as MockElement;
     const bannerAppends = container.children.filter(
-      (c) => c.dataset && c.dataset.testid === 'loop-error-banner',
+      (c: MockElement) => c.dataset && c.dataset.testid === 'loop-error-banner',
     );
     expect(bannerAppends.length).toBe(1);
   });
@@ -256,7 +265,7 @@ describe('Flight controller loop error handling', () => {
       callCount++;
       // Fail on odd calls, succeed on even calls.
       if (callCount % 2 === 1) throw new Error('intermittent');
-      return { controlLocked: false };
+      return { status: 'CONNECTED', linkType: 'DIRECT', canTransmit: true, controlLocked: false };
     });
 
     // Run 10 frames: error, success, error, success, ...

@@ -277,31 +277,31 @@
 - **Verification**: `npx vitest run src/tests/idbStorage.test.ts`
 
 ### TASK-046: Convert instruments.test.ts to strict TypeScript
-- **Status**: pending
+- **Status**: in-progress
 - **Dependencies**: TASK-007
 - **Description**: Remove `// @ts-nocheck` from `src/tests/instruments.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
 - **Verification**: `npx vitest run src/tests/instruments.test.ts`
 
 ### TASK-047: Convert launchPadTiers.test.ts to strict TypeScript
-- **Status**: pending
+- **Status**: in-progress
 - **Dependencies**: TASK-007
 - **Description**: Remove `// @ts-nocheck` from `src/tests/launchPadTiers.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
 - **Verification**: `npx vitest run src/tests/launchPadTiers.test.ts`
 
 ### TASK-048: Convert legs.test.ts to strict TypeScript
-- **Status**: pending
+- **Status**: in-progress
 - **Dependencies**: TASK-007
 - **Description**: Remove `// @ts-nocheck` from `src/tests/legs.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
 - **Verification**: `npx vitest run src/tests/legs.test.ts`
 
 ### TASK-049: Convert lifeSupport.test.ts to strict TypeScript
-- **Status**: pending
+- **Status**: in-progress
 - **Dependencies**: TASK-007
 - **Description**: Remove `// @ts-nocheck` from `src/tests/lifeSupport.test.ts`. Add proper type imports using the unified `CrewMember` type (after TASK-004 unification). Type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
 - **Verification**: `npx vitest run src/tests/lifeSupport.test.ts`
 
 ### TASK-050: Convert loopErrorHandling.test.ts to strict TypeScript
-- **Status**: pending
+- **Status**: in-progress
 - **Dependencies**: TASK-007
 - **Description**: Remove `// @ts-nocheck` from `src/tests/loopErrorHandling.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
 - **Verification**: `npx vitest run src/tests/loopErrorHandling.test.ts`

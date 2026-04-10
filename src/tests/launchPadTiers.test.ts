@@ -1,18 +1,4 @@
-// @ts-nocheck
-/**
- * launchPadTiers.test.js — Unit tests for Launch Pad upgrade tiers (TASK-031).
- *
- * Tests cover:
- *   - LAUNCH_PAD_MAX_MASS constants per tier
- *   - Validation: mass limit check per Launch Pad tier
- *   - Validation: launch clamps require Tier 3
- *   - Validation: launch clamps must be staged
- *   - Physics: launch clamps hold rocket on pad
- *   - Physics: releasing clamps allows liftoff
- *   - hasLaunchClamps() helper
- */
-
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   getTotalMass,
   runValidation,
@@ -35,11 +21,15 @@ import {
 } from '../core/constants.ts';
 import { getPartById } from '../data/parts.ts';
 
+import type { GameState } from '../core/gameState.ts';
+import type { RocketAssembly, StagingConfig } from '../core/rocketbuilder.ts';
+import type { FlightState } from '../core/gameState.ts';
+
 // ---------------------------------------------------------------------------
 // Test helpers
 // ---------------------------------------------------------------------------
 
-function makeState(padTier = 1) {
+function makeState(padTier: number = 1): GameState {
   const state = createGameState();
   state.facilities[FacilityId.LAUNCH_PAD] = { built: true, tier: padTier };
   return state;
@@ -49,7 +39,7 @@ function makeState(padTier = 1) {
  * Build a small passing rocket (probe + small tank + spark engine).
  * Total wet mass ≈ 50 + 50 + 400 + 120 = 620 kg — well within Tier 1 limit.
  */
-function makeSmallRocket() {
+function makeSmallRocket(): { assembly: RocketAssembly; staging: StagingConfig } {
   const assembly = createRocketAssembly();
   const staging = createStagingConfig();
 
@@ -70,7 +60,7 @@ function makeSmallRocket() {
  * Build a rocket with a launch clamp attached.
  * Probe + small tank + spark engine + launch clamp on the side.
  */
-function makeRocketWithClamp() {
+function makeRocketWithClamp(): { assembly: RocketAssembly; staging: StagingConfig; clampId: string; engineId: string } {
   const assembly = createRocketAssembly();
   const staging = createStagingConfig();
 
@@ -115,9 +105,9 @@ describe('LAUNCH_CLAMP part type', () => {
   it('has a part definition in the catalog', () => {
     const def = getPartById('launch-clamp-1');
     expect(def).toBeDefined();
-    expect(def.type).toBe(PartType.LAUNCH_CLAMP);
-    expect(def.mass).toBe(0);
-    expect(def.activationBehaviour).toBe('SEPARATE');
+    expect(def!.type).toBe(PartType.LAUNCH_CLAMP);
+    expect(def!.mass).toBe(0);
+    expect(def!.activationBehaviour).toBe('SEPARATE');
   });
 });
 
@@ -165,7 +155,7 @@ describe('runValidation — pad mass limit', () => {
     if (result.totalMassKg > LAUNCH_PAD_MAX_MASS[1]) {
       const massCheck = result.checks.find(c => c.id === 'pad-mass-limit');
       expect(massCheck).toBeDefined();
-      expect(massCheck.pass).toBe(false);
+      expect(massCheck!.pass).toBe(false);
       expect(result.canLaunch).toBe(false);
     }
   });
@@ -210,7 +200,7 @@ describe('runValidation — launch clamp tier requirement', () => {
     const result = runValidation(assembly, staging, state);
     const clampCheck = result.checks.find(c => c.id === 'clamp-tier-required');
     expect(clampCheck).toBeDefined();
-    expect(clampCheck.pass).toBe(false);
+    expect(clampCheck!.pass).toBe(false);
   });
 
   it('fails when clamps are used at Tier 2', () => {
@@ -221,7 +211,7 @@ describe('runValidation — launch clamp tier requirement', () => {
     const result = runValidation(assembly, staging, state);
     const clampCheck = result.checks.find(c => c.id === 'clamp-tier-required');
     expect(clampCheck).toBeDefined();
-    expect(clampCheck.pass).toBe(false);
+    expect(clampCheck!.pass).toBe(false);
   });
 
   it('passes when clamps are used at Tier 3', () => {
@@ -248,7 +238,7 @@ describe('runValidation — launch clamp staging', () => {
     const result = runValidation(assembly, staging, state);
     const clampStagingCheck = result.checks.find(c => c.id === 'clamp-not-staged');
     expect(clampStagingCheck).toBeDefined();
-    expect(clampStagingCheck.pass).toBe(false);
+    expect(clampStagingCheck!.pass).toBe(false);
   });
 
   it('passes when clamps are staged', () => {
@@ -285,14 +275,14 @@ describe('hasLaunchClamps', () => {
 describe('createPhysicsState — launch clamp detection', () => {
   it('sets hasLaunchClamps = true when assembly contains clamps', () => {
     const { assembly } = makeRocketWithClamp();
-    const flightState = { fuelRemaining: 0, hasScienceModules: false, scienceModuleRunning: false };
+    const flightState = { fuelRemaining: 0, hasScienceModules: false, scienceModuleRunning: false } as Partial<FlightState> as FlightState;
     const ps = createPhysicsState(assembly, flightState);
     expect(ps.hasLaunchClamps).toBe(true);
   });
 
   it('sets hasLaunchClamps = false when assembly has no clamps', () => {
     const { assembly } = makeSmallRocket();
-    const flightState = { fuelRemaining: 0, hasScienceModules: false, scienceModuleRunning: false };
+    const flightState = { fuelRemaining: 0, hasScienceModules: false, scienceModuleRunning: false } as Partial<FlightState> as FlightState;
     const ps = createPhysicsState(assembly, flightState);
     expect(ps.hasLaunchClamps).toBe(false);
   });

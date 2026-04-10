@@ -1,24 +1,9 @@
-// @ts-nocheck
-/**
- * legs.test.js — Unit tests for landing leg deployment events and mirror pair behavior.
- *
- * Tests cover:
- *   - deployLandingLeg transitions RETRACTED → DEPLOYING
- *   - tickLegs completes deploy and emits LEG_DEPLOYED event
- *   - PART_ACTIVATED objective completion for manual leg deploy
- *   - getMirrorPartId returns partner for symmetry pairs
- *   - deploying both legs in a mirror pair
- *   - getMirrorPartId returns null when no pair exists
- */
-
 import { describe, it, expect } from 'vitest';
 import {
   deployLandingLeg,
-  getLegStatus,
   LegState,
   LEG_DEPLOY_DURATION,
   tickLegs,
-  retractLandingLeg,
 } from '../core/legs.ts';
 import {
   createRocketAssembly,
@@ -28,35 +13,43 @@ import {
 } from '../core/rocketbuilder.ts';
 import { checkObjectiveCompletion } from '../core/missions.ts';
 import { createGameState } from '../core/gameState.ts';
-import { ObjectiveType, MissionStatus } from '../data/missions.ts';
+import { ObjectiveType } from '../data/missions.ts';
 import { PartType } from '../core/constants.ts';
+
+import type { LegEntry } from '../core/physics.ts';
+import type { RocketAssembly } from '../core/rocketbuilder.ts';
+import type { FlightEvent, FlightState, MissionInstance } from '../core/gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Build a minimal PhysicsState with legStates for the given instance IDs.
- */
-function makePS(...legInstanceIds) {
-  const legStates = new Map();
-  const activeParts = new Set(legInstanceIds);
+interface MinimalPS {
+  legStates: Map<string, LegEntry>;
+  activeParts: Set<string>;
+  posY: number;
+}
+
+function makePS(...legInstanceIds: string[]): MinimalPS {
+  const legStates = new Map<string, LegEntry>();
+  const activeParts = new Set<string>(legInstanceIds);
   for (const id of legInstanceIds) {
     legStates.set(id, { state: LegState.RETRACTED, deployTimer: 0 });
   }
   return { legStates, activeParts, posY: 0 };
 }
 
-/**
- * Build a minimal assembly with landing leg parts at the given instance IDs.
- */
-function makeAssembly(...legInstanceIds) {
+interface MinimalFlightState {
+  events: FlightEvent[];
+  timeElapsed: number;
+}
+
+function makeAssembly(...legInstanceIds: string[]): RocketAssembly {
   const assembly = createRocketAssembly();
   for (const id of legInstanceIds) {
     addPartToAssembly(assembly, 'landing-legs-mk1', 0, 0);
-    // Overwrite the auto-generated ID so we can control it.
-    const lastKey = [...assembly.parts.keys()].pop();
-    const placed = assembly.parts.get(lastKey);
+    const lastKey = [...assembly.parts.keys()].pop()!;
+    const placed = assembly.parts.get(lastKey)!;
     assembly.parts.delete(lastKey);
     assembly.parts.set(id, { ...placed, instanceId: id });
   }
@@ -71,7 +64,7 @@ describe('landing leg manual deployment events', () => {
   it('deployLandingLeg transitions RETRACTED → DEPLOYING', () => {
     const ps = makePS('leg-1');
     deployLandingLeg(ps, 'leg-1');
-    const entry = ps.legStates.get('leg-1');
+    const entry = ps.legStates.get('leg-1')!;
     expect(entry.state).toBe(LegState.DEPLOYING);
     expect(entry.deployTimer).toBe(LEG_DEPLOY_DURATION);
   });
@@ -79,14 +72,14 @@ describe('landing leg manual deployment events', () => {
   it('tickLegs completes deploy and emits LEG_DEPLOYED event', () => {
     const ps = makePS('leg-1');
     const assembly = makeAssembly('leg-1');
-    const flightState = { events: [], timeElapsed: 0 };
+    const flightState: MinimalFlightState = { events: [], timeElapsed: 0 };
 
     deployLandingLeg(ps, 'leg-1');
 
     // Tick past the full deploy duration.
     tickLegs(ps, assembly, flightState, LEG_DEPLOY_DURATION + 0.1);
 
-    expect(ps.legStates.get('leg-1').state).toBe(LegState.DEPLOYED);
+    expect(ps.legStates.get('leg-1')!.state).toBe(LegState.DEPLOYED);
     const deployedEvent = flightState.events.find((e) => e.type === 'LEG_DEPLOYED');
     expect(deployedEvent).toBeDefined();
   });
@@ -99,7 +92,7 @@ describe('landing leg manual deployment events', () => {
 describe('ACTIVATE_PART objective — manual leg deploy', () => {
   it('manual deploy PART_ACTIVATED event satisfies ACTIVATE_PART objective', () => {
     const state = createGameState();
-    const mission = {
+    const mission: Partial<MissionInstance> = {
       id: 'test-leg-mission',
       title: 'Deploy Landing Legs',
       description: 'Test',
@@ -107,7 +100,6 @@ describe('ACTIVATE_PART objective — manual leg deploy', () => {
       reward: 1000,
       unlocksAfter: [],
       unlockedParts: [],
-      status: MissionStatus.ACCEPTED,
       objectives: [
         {
           id: 'obj-deploy-legs',
@@ -118,9 +110,9 @@ describe('ACTIVATE_PART objective — manual leg deploy', () => {
         },
       ],
     };
-    state.missions.accepted.push(mission);
+    state.missions.accepted.push(mission as MissionInstance);
 
-    const flightState = {
+    const flightState: Partial<FlightState> = {
       missionId: 'test-leg-mission',
       events: [
         {
@@ -138,9 +130,9 @@ describe('ACTIVATE_PART objective — manual leg deploy', () => {
       deltaVRemaining: 0,
     };
 
-    checkObjectiveCompletion(state, flightState);
+    checkObjectiveCompletion(state, flightState as FlightState);
 
-    const obj = state.missions.accepted[0].objectives[0];
+    const obj = state.missions.accepted[0].objectives![0];
     expect(obj.completed).toBe(true);
   });
 });
@@ -166,8 +158,8 @@ describe('mirror pair leg deployment', () => {
     deployLandingLeg(ps, 'leg-L');
     deployLandingLeg(ps, 'leg-R');
 
-    expect(ps.legStates.get('leg-L').state).toBe(LegState.DEPLOYING);
-    expect(ps.legStates.get('leg-R').state).toBe(LegState.DEPLOYING);
+    expect(ps.legStates.get('leg-L')!.state).toBe(LegState.DEPLOYING);
+    expect(ps.legStates.get('leg-R')!.state).toBe(LegState.DEPLOYING);
   });
 
   it('getMirrorPartId returns null when no pair exists', () => {
