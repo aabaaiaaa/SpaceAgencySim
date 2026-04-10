@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * ui-timeWarp.test.ts — Unit tests for time warp auto-reset logic.
  *
@@ -6,6 +5,8 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { PhysicsState } from '../core/physics.ts';
+import type { FlightState } from '../core/gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Mocks — must be set up before importing the module under test
@@ -20,18 +21,32 @@ vi.mock('../ui/flightHud.ts', () => ({
 // Mock atmosphere
 vi.mock('../core/atmosphere.ts', () => ({
   ATMOSPHERE_TOP: 100000, // 100 km
-  airDensity: vi.fn(() => 0),
+  airDensity: vi.fn((): number => 0),
   SEA_LEVEL_DENSITY: 1.225,
 }));
 
 // Mock bodies data
 vi.mock('../data/bodies.ts', () => ({
-  getAtmosphereTop: vi.fn(() => 100000),
+  getAtmosphereTop: vi.fn((): number => 100000),
 }));
 
 import { setHudTimeWarp, lockTimeWarp } from '../ui/flightHud.ts';
 import { getFCState, setFCState, resetFCState, setPhysicsState, setFlightState } from '../ui/flightController/_state.ts';
 import { checkTimeWarpResets, applyTimeWarp } from '../ui/flightController/_timeWarp.ts';
+
+// ---------------------------------------------------------------------------
+// Helpers — build partial PhysicsState / FlightState for test fixtures
+// ---------------------------------------------------------------------------
+
+/** Build a PhysicsState from only the fields the tests care about. */
+function makePS(overrides: Partial<PhysicsState>): PhysicsState {
+  return overrides as unknown as PhysicsState;
+}
+
+/** Build a FlightState from only the fields the tests care about. */
+function makeFS(overrides: Record<string, unknown>): FlightState {
+  return overrides as unknown as FlightState;
+}
 
 describe('timeWarp', () => {
   beforeEach(() => {
@@ -59,14 +74,14 @@ describe('timeWarp', () => {
     });
 
     it('returns early when flightState is null', () => {
-      setPhysicsState({ posY: 50000, velX: 0, velY: 0 });
+      setPhysicsState(makePS({ posY: 50000, velX: 0, velY: 0 }));
       expect(() => checkTimeWarpResets(1000)).not.toThrow();
     });
 
     describe('staging lockout expiry', () => {
       it('clears staging lockout when timestamp exceeds lockout time', () => {
-        setPhysicsState({ posY: 50000, velX: 0, velY: 0, landed: false, crashed: false });
-        setFlightState({ bodyId: 'EARTH', phase: 'ASCENT' });
+        setPhysicsState(makePS({ posY: 50000, velX: 0, velY: 0, landed: false, crashed: false }));
+        setFlightState(makeFS({ bodyId: 'EARTH', phase: 'ASCENT' }));
         setFCState({
           stagingLockoutUntil: 5000,
           timeWarp: 1,
@@ -79,8 +94,8 @@ describe('timeWarp', () => {
       });
 
       it('does not clear lockout before expiry', () => {
-        setPhysicsState({ posY: 50000, velX: 0, velY: 0, landed: false, crashed: false });
-        setFlightState({ bodyId: 'EARTH', phase: 'ASCENT' });
+        setPhysicsState(makePS({ posY: 50000, velX: 0, velY: 0, landed: false, crashed: false }));
+        setFlightState(makeFS({ bodyId: 'EARTH', phase: 'ASCENT' }));
         setFCState({
           stagingLockoutUntil: 5000,
           timeWarp: 1,
@@ -93,8 +108,8 @@ describe('timeWarp', () => {
 
     describe('when timeWarp is 1', () => {
       it('updates prevAltitude and prevInSpace and returns early', () => {
-        setPhysicsState({ posY: 50000, velX: 0, velY: 0, landed: false, crashed: false });
-        setFlightState({ bodyId: 'EARTH', phase: 'ASCENT' });
+        setPhysicsState(makePS({ posY: 50000, velX: 0, velY: 0, landed: false, crashed: false }));
+        setFlightState(makeFS({ bodyId: 'EARTH', phase: 'ASCENT' }));
         setFCState({
           timeWarp: 1,
         });
@@ -106,8 +121,8 @@ describe('timeWarp', () => {
       });
 
       it('sets prevInSpace to true when above atmosphere', () => {
-        setPhysicsState({ posY: 150000, velX: 0, velY: 0, landed: false, crashed: false });
-        setFlightState({ bodyId: 'EARTH', phase: 'ORBIT' });
+        setPhysicsState(makePS({ posY: 150000, velX: 0, velY: 0, landed: false, crashed: false }));
+        setFlightState(makeFS({ bodyId: 'EARTH', phase: 'ORBIT' }));
         setFCState({
           timeWarp: 1,
         });
@@ -117,8 +132,8 @@ describe('timeWarp', () => {
       });
 
       it('clamps negative altitude to 0', () => {
-        setPhysicsState({ posY: -50, velX: 0, velY: 0, landed: false, crashed: false });
-        setFlightState({ bodyId: 'EARTH', phase: 'LANDED' });
+        setPhysicsState(makePS({ posY: -50, velX: 0, velY: 0, landed: false, crashed: false }));
+        setFlightState(makeFS({ bodyId: 'EARTH', phase: 'LANDED' }));
         setFCState({
           timeWarp: 1,
         });
@@ -130,8 +145,8 @@ describe('timeWarp', () => {
 
     describe('landing/crash reset', () => {
       it('resets warp to 1x on landing', () => {
-        setPhysicsState({ posY: 0, velX: 0, velY: 0, landed: true, crashed: false });
-        setFlightState({ bodyId: 'EARTH', phase: 'LANDED' });
+        setPhysicsState(makePS({ posY: 0, velX: 0, velY: 0, landed: true, crashed: false }));
+        setFlightState(makeFS({ bodyId: 'EARTH', phase: 'LANDED' }));
         setFCState({
           timeWarp: 4,
           prevAltitude: 100,
@@ -144,8 +159,8 @@ describe('timeWarp', () => {
       });
 
       it('resets warp to 1x on crash', () => {
-        setPhysicsState({ posY: 0, velX: 0, velY: 0, landed: false, crashed: true });
-        setFlightState({ bodyId: 'EARTH', phase: 'CRASHED' });
+        setPhysicsState(makePS({ posY: 0, velX: 0, velY: 0, landed: false, crashed: true }));
+        setFlightState(makeFS({ bodyId: 'EARTH', phase: 'CRASHED' }));
         setFCState({
           timeWarp: 10,
           prevAltitude: 5000,
@@ -159,8 +174,8 @@ describe('timeWarp', () => {
 
     describe('reentry reset', () => {
       it('resets warp on reentry (was in space, now below atmosphere, fast speed)', () => {
-        setPhysicsState({ posY: 90000, velX: 600, velY: -400, landed: false, crashed: false });
-        setFlightState({ bodyId: 'EARTH', phase: 'REENTRY' });
+        setPhysicsState(makePS({ posY: 90000, velX: 600, velY: -400, landed: false, crashed: false }));
+        setFlightState(makeFS({ bodyId: 'EARTH', phase: 'REENTRY' }));
         setFCState({
           timeWarp: 4,
           prevAltitude: 110000,
@@ -173,8 +188,8 @@ describe('timeWarp', () => {
       });
 
       it('does NOT reset warp when speed is low (ascending slowly)', () => {
-        setPhysicsState({ posY: 90000, velX: 10, velY: 5, landed: false, crashed: false });
-        setFlightState({ bodyId: 'EARTH', phase: 'ASCENT' });
+        setPhysicsState(makePS({ posY: 90000, velX: 10, velY: 5, landed: false, crashed: false }));
+        setFlightState(makeFS({ bodyId: 'EARTH', phase: 'ASCENT' }));
         setFCState({
           timeWarp: 4,
           prevAltitude: 110000,
@@ -187,8 +202,8 @@ describe('timeWarp', () => {
       });
 
       it('does NOT reset warp when still in space', () => {
-        setPhysicsState({ posY: 120000, velX: 7000, velY: 0, landed: false, crashed: false });
-        setFlightState({ bodyId: 'EARTH', phase: 'ORBIT' });
+        setPhysicsState(makePS({ posY: 120000, velX: 7000, velY: 0, landed: false, crashed: false }));
+        setFlightState(makeFS({ bodyId: 'EARTH', phase: 'ORBIT' }));
         setFCState({
           timeWarp: 10,
           prevAltitude: 130000,
@@ -201,8 +216,8 @@ describe('timeWarp', () => {
       });
 
       it('does NOT reset warp when was NOT in space last frame', () => {
-        setPhysicsState({ posY: 40000, velX: 600, velY: -300, landed: false, crashed: false });
-        setFlightState({ bodyId: 'EARTH', phase: 'DESCENT' });
+        setPhysicsState(makePS({ posY: 40000, velX: 600, velY: -300, landed: false, crashed: false }));
+        setFlightState(makeFS({ bodyId: 'EARTH', phase: 'DESCENT' }));
         setFCState({
           timeWarp: 4,
           prevAltitude: 50000,
@@ -217,8 +232,8 @@ describe('timeWarp', () => {
 
     describe('altitude tracking', () => {
       it('updates prevAltitude and prevInSpace each frame', () => {
-        setPhysicsState({ posY: 200000, velX: 7800, velY: 0, landed: false, crashed: false });
-        setFlightState({ bodyId: 'EARTH', phase: 'ORBIT' });
+        setPhysicsState(makePS({ posY: 200000, velX: 7800, velY: 0, landed: false, crashed: false }));
+        setFlightState(makeFS({ bodyId: 'EARTH', phase: 'ORBIT' }));
         setFCState({
           timeWarp: 4,
           prevAltitude: 190000,

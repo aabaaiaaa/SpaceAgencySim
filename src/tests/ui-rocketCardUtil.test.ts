@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * ui-rocketCardUtil.test.ts — Unit tests for rocket card utility functions.
  *
@@ -6,7 +5,42 @@
  * and renderRocketPreview scaling logic.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest';
+import type { RocketDesign } from '../core/gameState.ts';
+import type { PartDef } from '../data/parts.ts';
+import type { RocketCardAction } from '../ui/rocketCardUtil.ts';
+
+// ---------------------------------------------------------------------------
+// Mock DOM interfaces
+// ---------------------------------------------------------------------------
+
+/** Minimal canvas 2D context mock. */
+interface MockCtx {
+  clearRect: Mock;
+  fillRect: Mock;
+  strokeRect: Mock;
+  fillStyle: string;
+  strokeStyle: string;
+  lineWidth: number;
+}
+
+/** Minimal DOM element mock used throughout the test suite. */
+interface MockElement {
+  tag: string;
+  id: string;
+  type: string;
+  style: Record<string, string>;
+  textContent: string;
+  className: string;
+  innerHTML: string;
+  dataset: Record<string, string>;
+  width: number;
+  height: number;
+  children: MockElement[];
+  appendChild: Mock;
+  addEventListener: Mock;
+  getContext: Mock;
+}
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -14,24 +48,26 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 vi.mock('../ui/rocketCardUtil.css', () => ({}));
 
+/** Partial part catalog used by the getPartById mock. */
+const mockPartCatalog: Record<string, Pick<PartDef, 'name' | 'width' | 'height' | 'type'>> = {
+  'engine-1': { name: 'Merlin', width: 40, height: 30, type: 'ENGINE' },
+  'tank-1': { name: 'Fuel Tank', width: 40, height: 60, type: 'FUEL_TANK' },
+  'cmd-1': { name: 'Command Pod', width: 30, height: 20, type: 'COMMAND_MODULE' },
+};
+
 vi.mock('../data/parts.ts', () => ({
-  getPartById: vi.fn((id) => {
-    const catalog = {
-      'engine-1': { name: 'Merlin', width: 40, height: 30, type: 'ENGINE' },
-      'tank-1': { name: 'Fuel Tank', width: 40, height: 60, type: 'FUEL_TANK' },
-      'cmd-1': { name: 'Command Pod', width: 30, height: 20, type: 'COMMAND_MODULE' },
-    };
-    return catalog[id] || null;
+  getPartById: vi.fn((id: string) => {
+    return mockPartCatalog[id] ?? null;
   }),
 }));
 
 // Mock document for buildRocketCard
-const _mockElements = [];
+const _mockElements: MockElement[] = [];
 vi.stubGlobal('document', {
-  createElement: vi.fn((tag) => {
+  createElement: vi.fn((tag: string): MockElement => {
     // Create a single context per element so getContext('2d') returns
     // the same instance every time (matching real canvas behavior).
-    const ctx = {
+    const ctx: MockCtx = {
       clearRect: vi.fn(),
       fillRect: vi.fn(),
       strokeRect: vi.fn(),
@@ -39,7 +75,7 @@ vi.stubGlobal('document', {
       strokeStyle: '',
       lineWidth: 0,
     };
-    const el = {
+    const el: MockElement = {
       tag,
       id: '',
       type: '',
@@ -51,9 +87,12 @@ vi.stubGlobal('document', {
       width: 0,
       height: 0,
       children: [],
-      appendChild: vi.fn(function(child) { this.children.push(child); return child; }),
+      appendChild: vi.fn(function (this: MockElement, child: MockElement): MockElement {
+        this.children.push(child);
+        return child;
+      }),
       addEventListener: vi.fn(),
-      getContext: vi.fn(() => ctx),
+      getContext: vi.fn((): MockCtx => ctx),
     };
     _mockElements.push(el);
     return el;
@@ -65,176 +104,198 @@ import {
   buildRocketCard,
 } from '../ui/rocketCardUtil.ts';
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Create a minimal RocketDesign with required fields filled in. */
+function makeDesign(overrides: Partial<RocketDesign>): RocketDesign {
+  return {
+    id: 'r0',
+    name: 'Test',
+    parts: [],
+    staging: { stages: [], unstaged: [] },
+    totalMass: 0,
+    totalThrust: 0,
+    createdDate: '',
+    updatedDate: '',
+    ...overrides,
+  } as RocketDesign;
+}
+
 describe('rocketCardUtil', () => {
-  beforeEach(() => {
+  beforeEach((): void => {
     _mockElements.length = 0;
     vi.clearAllMocks();
   });
 
   describe('renderRocketPreview()', () => {
-    it('sets canvas dimensions to 80x120', () => {
-      const canvas = document.createElement('canvas');
-      const design = {
+    it('sets canvas dimensions to 80x120', (): void => {
+      const canvas = document.createElement('canvas') as unknown as MockElement;
+      const design = makeDesign({
         parts: [
           { partId: 'engine-1', position: { x: 0, y: 0 } },
         ],
-      };
+      });
 
-      renderRocketPreview(canvas, design);
+      renderRocketPreview(canvas as unknown as HTMLCanvasElement, design);
 
       expect(canvas.width).toBe(80);
       expect(canvas.height).toBe(120);
     });
 
-    it('sets the preview CSS class on the canvas', () => {
-      const canvas = document.createElement('canvas');
-      const design = {
+    it('sets the preview CSS class on the canvas', (): void => {
+      const canvas = document.createElement('canvas') as unknown as MockElement;
+      const design = makeDesign({
         parts: [{ partId: 'cmd-1', position: { x: 0, y: 0 } }],
-      };
+      });
 
-      renderRocketPreview(canvas, design);
+      renderRocketPreview(canvas as unknown as HTMLCanvasElement, design);
       expect(canvas.className).toBe('rocket-card-preview');
     });
 
-    it('calls fillRect and strokeRect for each resolved part', () => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      const design = {
+    it('calls fillRect and strokeRect for each resolved part', (): void => {
+      const canvas = document.createElement('canvas') as unknown as MockElement;
+      const ctx = canvas.getContext('2d') as MockCtx;
+      const design = makeDesign({
         parts: [
           { partId: 'engine-1', position: { x: 0, y: 0 } },
           { partId: 'tank-1', position: { x: 0, y: 50 } },
         ],
-      };
+      });
 
-      renderRocketPreview(canvas, design);
+      renderRocketPreview(canvas as unknown as HTMLCanvasElement, design);
 
       expect(ctx.fillRect).toHaveBeenCalledTimes(2);
       expect(ctx.strokeRect).toHaveBeenCalledTimes(2);
     });
 
-    it('handles empty parts array gracefully', () => {
-      const canvas = document.createElement('canvas');
-      const design = { parts: [] };
+    it('handles empty parts array gracefully', (): void => {
+      const canvas = document.createElement('canvas') as unknown as MockElement;
+      const design = makeDesign({ parts: [] });
 
-      expect(() => renderRocketPreview(canvas, design)).not.toThrow();
+      expect(() => renderRocketPreview(canvas as unknown as HTMLCanvasElement, design)).not.toThrow();
     });
 
-    it('handles null parts gracefully', () => {
-      const canvas = document.createElement('canvas');
-      const design = { parts: null };
+    it('handles null parts gracefully', (): void => {
+      const canvas = document.createElement('canvas') as unknown as MockElement;
+      // @ts-expect-error — intentionally passing null to test defensive handling
+      const design = makeDesign({ parts: null });
 
-      expect(() => renderRocketPreview(canvas, design)).not.toThrow();
+      expect(() => renderRocketPreview(canvas as unknown as HTMLCanvasElement, design)).not.toThrow();
     });
 
-    it('skips parts not found in catalog', () => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      const design = {
+    it('skips parts not found in catalog', (): void => {
+      const canvas = document.createElement('canvas') as unknown as MockElement;
+      const ctx = canvas.getContext('2d') as MockCtx;
+      const design = makeDesign({
         parts: [
           { partId: 'nonexistent', position: { x: 0, y: 0 } },
           { partId: 'engine-1', position: { x: 0, y: 0 } },
         ],
-      };
+      });
 
-      renderRocketPreview(canvas, design);
+      renderRocketPreview(canvas as unknown as HTMLCanvasElement, design);
       // Only one part resolved
       expect(ctx.fillRect).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('buildRocketCard()', () => {
-    it('creates a card element with correct class', () => {
-      const design = {
+    it('creates a card element with correct class', (): void => {
+      const design = makeDesign({
         id: 'r1',
         name: 'Test Rocket',
         parts: [],
         totalMass: 5000,
         totalThrust: 200,
-      };
+      });
 
-      const card = buildRocketCard(design, []);
+      const card = buildRocketCard(design, []) as unknown as MockElement;
       expect(card.className).toBe('rocket-card');
       expect(card.dataset.rocketId).toBe('r1');
     });
 
-    it('includes the rocket name', () => {
-      const design = {
+    it('includes the rocket name', (): void => {
+      const design = makeDesign({
         id: 'r1',
         name: 'Super Heavy',
         parts: [],
         totalMass: 100000,
         totalThrust: 5000,
-      };
+      });
 
-      const card = buildRocketCard(design, []);
+      const card = buildRocketCard(design, []) as unknown as MockElement;
       // Find the name element in the card's children
-      const infoCol = card.children.find(c => c.className === 'rocket-card-info');
+      const infoCol = card.children.find((c: MockElement) => c.className === 'rocket-card-info');
       expect(infoCol).toBeDefined();
-      const nameEl = infoCol.children.find(c => c.className === 'rocket-card-name');
-      expect(nameEl.textContent).toBe('Super Heavy');
+      const nameEl = infoCol!.children.find((c: MockElement) => c.className === 'rocket-card-name');
+      expect(nameEl!.textContent).toBe('Super Heavy');
     });
 
-    it('uses "Unnamed Rocket" when name is empty', () => {
-      const design = {
+    it('uses "Unnamed Rocket" when name is empty', (): void => {
+      const design = makeDesign({
         id: 'r1',
         name: '',
         parts: [],
         totalMass: 0,
         totalThrust: 0,
-      };
+      });
 
-      const card = buildRocketCard(design, []);
-      const infoCol = card.children.find(c => c.className === 'rocket-card-info');
-      const nameEl = infoCol.children.find(c => c.className === 'rocket-card-name');
-      expect(nameEl.textContent).toBe('Unnamed Rocket');
+      const card = buildRocketCard(design, []) as unknown as MockElement;
+      const infoCol = card.children.find((c: MockElement) => c.className === 'rocket-card-info');
+      const nameEl = infoCol!.children.find((c: MockElement) => c.className === 'rocket-card-name');
+      expect(nameEl!.textContent).toBe('Unnamed Rocket');
     });
 
-    it('renders action buttons', () => {
+    it('renders action buttons', (): void => {
       const onClick = vi.fn();
-      const design = {
+      const design = makeDesign({
         id: 'r1',
         name: 'Test',
         parts: [],
         totalMass: 0,
         totalThrust: 0,
-      };
+      });
 
-      const card = buildRocketCard(design, [
+      const actions: RocketCardAction[] = [
         { label: 'Launch', className: 'btn-launch', onClick },
         { label: 'Delete', onClick: vi.fn() },
-      ]);
+      ];
 
-      const actionsEl = card.children.find(c => c.className === 'rocket-card-actions');
+      const card = buildRocketCard(design, actions) as unknown as MockElement;
+
+      const actionsEl = card.children.find((c: MockElement) => c.className === 'rocket-card-actions');
       expect(actionsEl).toBeDefined();
-      expect(actionsEl.children.length).toBe(2);
-      expect(actionsEl.children[0].textContent).toBe('Launch');
-      expect(actionsEl.children[0].className).toBe('btn-launch');
-      expect(actionsEl.children[1].textContent).toBe('Delete');
+      expect(actionsEl!.children.length).toBe(2);
+      expect(actionsEl!.children[0].textContent).toBe('Launch');
+      expect(actionsEl!.children[0].className).toBe('btn-launch');
+      expect(actionsEl!.children[1].textContent).toBe('Delete');
     });
 
-    it('does not render actions section when no actions provided', () => {
-      const design = { id: 'r1', name: 'Test', parts: [], totalMass: 0, totalThrust: 0 };
-      const card = buildRocketCard(design, []);
-      const actionsEl = card.children.find(c => c.className === 'rocket-card-actions');
+    it('does not render actions section when no actions provided', (): void => {
+      const design = makeDesign({ id: 'r1', name: 'Test', parts: [], totalMass: 0, totalThrust: 0 });
+      const card = buildRocketCard(design, []) as unknown as MockElement;
+      const actionsEl = card.children.find((c: MockElement) => c.className === 'rocket-card-actions');
       expect(actionsEl).toBeUndefined();
     });
 
-    it('includes stats with formatted numbers', () => {
-      const design = {
+    it('includes stats with formatted numbers', (): void => {
+      const design = makeDesign({
         id: 'r1',
         name: 'Big Rocket',
         parts: [{ partId: 'engine-1', position: { x: 0, y: 0 } }],
         totalMass: 12500,
         totalThrust: 3400,
-      };
+      });
 
-      const card = buildRocketCard(design, []);
-      const infoCol = card.children.find(c => c.className === 'rocket-card-info');
-      const statsEl = infoCol.children.find(c => c.className === 'rocket-card-stats');
+      const card = buildRocketCard(design, []) as unknown as MockElement;
+      const infoCol = card.children.find((c: MockElement) => c.className === 'rocket-card-info');
+      const statsEl = infoCol!.children.find((c: MockElement) => c.className === 'rocket-card-stats');
       // Stats innerHTML contains formatted mass and thrust
-      expect(statsEl.innerHTML).toContain('Parts: 1');
-      expect(statsEl.innerHTML).toContain('12,500');
-      expect(statsEl.innerHTML).toContain('3,400');
+      expect(statsEl!.innerHTML).toContain('Parts: 1');
+      expect(statsEl!.innerHTML).toContain('12,500');
+      expect(statsEl!.innerHTML).toContain('3,400');
     });
   });
 });

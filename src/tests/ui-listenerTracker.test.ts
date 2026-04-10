@@ -1,40 +1,54 @@
-// @ts-nocheck
 /**
  * ui-listenerTracker.test.ts — Unit tests for the event listener tracker utility.
  */
 
-import { describe, it, expect, vi } from 'vitest';
-import { createListenerTracker } from '../ui/listenerTracker.ts';
+import { describe, it, expect, vi, type Mock } from 'vitest';
+import { createListenerTracker, type ListenerTracker } from '../ui/listenerTracker.ts';
+
+/** Shape of a tracked listener entry inside the mock. */
+interface MockListenerEntry {
+  event: string;
+  handler: EventListenerOrEventListenerObject;
+  options?: boolean | AddEventListenerOptions;
+}
+
+/** Mock EventTarget that records added/removed listeners for assertions. */
+interface MockEventTarget extends EventTarget {
+  listeners: MockListenerEntry[];
+  addEventListener: Mock<(event: string, handler: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions) => void>;
+  removeEventListener: Mock<(event: string, handler: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions) => void>;
+}
 
 describe('createListenerTracker', () => {
   /** Minimal EventTarget mock. */
-  function createMockTarget() {
-    const listeners: Array<{ event: string; handler: unknown; options?: unknown }> = [];
+  function createMockTarget(): MockEventTarget {
+    const listeners: MockListenerEntry[] = [];
     return {
       listeners,
-      addEventListener: vi.fn((event, handler, options) => {
+      addEventListener: vi.fn((event: string, handler: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void => {
         listeners.push({ event, handler, options });
       }),
-      removeEventListener: vi.fn((event, handler, _options) => {
+      removeEventListener: vi.fn((event: string, handler: EventListenerOrEventListenerObject, _options?: boolean | AddEventListenerOptions): void => {
         const idx = listeners.findIndex(
           l => l.event === event && l.handler === handler,
         );
         if (idx >= 0) listeners.splice(idx, 1);
       }),
-    };
+      dispatchEvent: vi.fn((_event: Event): boolean => true),
+    } as MockEventTarget;
   }
 
   it('returns an object with add and removeAll methods', () => {
-    const tracker = createListenerTracker();
+    const tracker: ListenerTracker = createListenerTracker();
     expect(typeof tracker.add).toBe('function');
     expect(typeof tracker.removeAll).toBe('function');
   });
 
   describe('add()', () => {
     it('calls addEventListener on the target', () => {
-      const tracker = createListenerTracker();
-      const target = createMockTarget();
-      const handler = vi.fn();
+      const tracker: ListenerTracker = createListenerTracker();
+      const target: MockEventTarget = createMockTarget();
+      const handler: EventListener = vi.fn();
 
       tracker.add(target, 'click', handler);
 
@@ -43,9 +57,9 @@ describe('createListenerTracker', () => {
     });
 
     it('forwards options to addEventListener', () => {
-      const tracker = createListenerTracker();
-      const target = createMockTarget();
-      const handler = vi.fn();
+      const tracker: ListenerTracker = createListenerTracker();
+      const target: MockEventTarget = createMockTarget();
+      const handler: EventListener = vi.fn();
 
       tracker.add(target, 'scroll', handler, { passive: true });
 
@@ -53,9 +67,9 @@ describe('createListenerTracker', () => {
     });
 
     it('forwards boolean capture option', () => {
-      const tracker = createListenerTracker();
-      const target = createMockTarget();
-      const handler = vi.fn();
+      const tracker: ListenerTracker = createListenerTracker();
+      const target: MockEventTarget = createMockTarget();
+      const handler: EventListener = vi.fn();
 
       tracker.add(target, 'click', handler, true);
 
@@ -63,11 +77,11 @@ describe('createListenerTracker', () => {
     });
 
     it('tracks multiple listeners on different targets', () => {
-      const tracker = createListenerTracker();
-      const t1 = createMockTarget();
-      const t2 = createMockTarget();
-      const h1 = vi.fn();
-      const h2 = vi.fn();
+      const tracker: ListenerTracker = createListenerTracker();
+      const t1: MockEventTarget = createMockTarget();
+      const t2: MockEventTarget = createMockTarget();
+      const h1: EventListener = vi.fn();
+      const h2: EventListener = vi.fn();
 
       tracker.add(t1, 'click', h1);
       tracker.add(t2, 'keydown', h2);
@@ -77,11 +91,11 @@ describe('createListenerTracker', () => {
     });
 
     it('tracks multiple listeners on the same target', () => {
-      const tracker = createListenerTracker();
-      const target = createMockTarget();
+      const tracker: ListenerTracker = createListenerTracker();
+      const target: MockEventTarget = createMockTarget();
 
-      tracker.add(target, 'click', vi.fn());
-      tracker.add(target, 'mouseover', vi.fn());
+      tracker.add(target, 'click', vi.fn() as EventListener);
+      tracker.add(target, 'mouseover', vi.fn() as EventListener);
 
       expect(target.addEventListener).toHaveBeenCalledTimes(2);
     });
@@ -89,10 +103,10 @@ describe('createListenerTracker', () => {
 
   describe('removeAll()', () => {
     it('calls removeEventListener for each tracked listener', () => {
-      const tracker = createListenerTracker();
-      const target = createMockTarget();
-      const h1 = vi.fn();
-      const h2 = vi.fn();
+      const tracker: ListenerTracker = createListenerTracker();
+      const target: MockEventTarget = createMockTarget();
+      const h1: EventListener = vi.fn();
+      const h2: EventListener = vi.fn();
 
       tracker.add(target, 'click', h1);
       tracker.add(target, 'keydown', h2);
@@ -104,9 +118,9 @@ describe('createListenerTracker', () => {
     });
 
     it('passes options to removeEventListener', () => {
-      const tracker = createListenerTracker();
-      const target = createMockTarget();
-      const handler = vi.fn();
+      const tracker: ListenerTracker = createListenerTracker();
+      const target: MockEventTarget = createMockTarget();
+      const handler: EventListener = vi.fn();
 
       tracker.add(target, 'scroll', handler, { capture: true });
       tracker.removeAll();
@@ -115,10 +129,10 @@ describe('createListenerTracker', () => {
     });
 
     it('clears the internal list after removeAll', () => {
-      const tracker = createListenerTracker();
-      const target = createMockTarget();
+      const tracker: ListenerTracker = createListenerTracker();
+      const target: MockEventTarget = createMockTarget();
 
-      tracker.add(target, 'click', vi.fn());
+      tracker.add(target, 'click', vi.fn() as EventListener);
       tracker.removeAll();
 
       // Second removeAll should be a no-op
@@ -128,18 +142,18 @@ describe('createListenerTracker', () => {
     });
 
     it('handles empty tracker (no listeners added)', () => {
-      const tracker = createListenerTracker();
+      const tracker: ListenerTracker = createListenerTracker();
       // Should not throw
       expect(() => tracker.removeAll()).not.toThrow();
     });
 
     it('removes listeners from multiple targets', () => {
-      const tracker = createListenerTracker();
-      const t1 = createMockTarget();
-      const t2 = createMockTarget();
+      const tracker: ListenerTracker = createListenerTracker();
+      const t1: MockEventTarget = createMockTarget();
+      const t2: MockEventTarget = createMockTarget();
 
-      tracker.add(t1, 'click', vi.fn());
-      tracker.add(t2, 'keydown', vi.fn());
+      tracker.add(t1, 'click', vi.fn() as EventListener);
+      tracker.add(t2, 'keydown', vi.fn() as EventListener);
       tracker.removeAll();
 
       expect(t1.removeEventListener).toHaveBeenCalledTimes(1);
@@ -149,11 +163,11 @@ describe('createListenerTracker', () => {
 
   describe('independence of tracker instances', () => {
     it('two trackers do not share state', () => {
-      const t1 = createListenerTracker();
-      const t2 = createListenerTracker();
-      const target = createMockTarget();
-      const h1 = vi.fn();
-      const h2 = vi.fn();
+      const t1: ListenerTracker = createListenerTracker();
+      const t2: ListenerTracker = createListenerTracker();
+      const target: MockEventTarget = createMockTarget();
+      const h1: EventListener = vi.fn();
+      const h2: EventListener = vi.fn();
 
       t1.add(target, 'click', h1);
       t2.add(target, 'keydown', h2);

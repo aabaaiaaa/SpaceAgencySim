@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * ui-mapView.test.ts — Unit tests for the map view UI controller.
  *
@@ -10,6 +9,9 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { PhysicsState } from '../core/physics.ts';
+import type { FlightState, GameState, OrbitalElements } from '../core/gameState.ts';
+import type { FCState } from '../ui/flightController/_state.ts';
 
 // ---------------------------------------------------------------------------
 // Mock pixi.js (needed transitively by render modules)
@@ -21,10 +23,10 @@ vi.mock('pixi.js', () => ({
   TextStyle: class {},
   Container: class {
     visible = true;
-    children = [];
-    addChild(c) { this.children.push(c); return c; }
-    removeChild(c) { const i = this.children.indexOf(c); if (i >= 0) this.children.splice(i, 1); return c; }
-    destroy() {}
+    children: unknown[] = [];
+    addChild(c: unknown): unknown { this.children.push(c); return c; }
+    removeChild(c: unknown): unknown { const i = this.children.indexOf(c); if (i >= 0) this.children.splice(i, 1); return c; }
+    destroy(): void {}
   },
   Application: class { stage = { addChild: vi.fn(), removeChild: vi.fn() }; },
 }));
@@ -36,17 +38,54 @@ vi.mock('../render/flight.ts', () => ({
   setFlightInputEnabled: vi.fn(),
 }));
 
+// ---------------------------------------------------------------------------
+// Stub DOM element interface — minimal shape for tests that run without a DOM.
+// ---------------------------------------------------------------------------
+
+interface StubElement {
+  id: string;
+  className: string;
+  textContent: string;
+  innerHTML: string;
+  style: { display: string; cssText: string; setProperty(): void };
+  children: StubElement[];
+  appendChild(c: StubElement): StubElement;
+  removeChild(c: StubElement): StubElement;
+  remove(): void;
+  querySelector(sel: string): StubElement | null;
+  querySelectorAll(sel: string): StubElement[];
+  addEventListener(type: string, handler: EventListener): void;
+  removeEventListener(type: string, handler: EventListener): void;
+  setAttribute(name: string, value: string): void;
+}
+
+// ---------------------------------------------------------------------------
+// Map mock with internal _setTarget helper for test manipulation.
+// ---------------------------------------------------------------------------
+
+interface MapMock {
+  _setTarget: (t: string | null) => void;
+  showMapScene: ReturnType<typeof vi.fn>;
+  hideMapScene: ReturnType<typeof vi.fn>;
+  getMapZoomLevel: ReturnType<typeof vi.fn>;
+  setMapZoomLevel: ReturnType<typeof vi.fn>;
+  getMapTarget: ReturnType<typeof vi.fn>;
+  setMapTarget: ReturnType<typeof vi.fn>;
+  getSelectedTransferTarget: ReturnType<typeof vi.fn>;
+  getSelectedAsteroid: ReturnType<typeof vi.fn>;
+}
+
 // Mock render/map.ts
-const _mapMock = vi.hoisted(() => {
-  let _target = null;
+const _mapMock: MapMock = vi.hoisted(() => {
+  let _target: string | null = null;
   return {
-    _setTarget: (t) => { _target = t; },
+    _setTarget: (t: string | null): void => { _target = t; },
     showMapScene: vi.fn(),
     hideMapScene: vi.fn(),
     getMapZoomLevel: vi.fn(() => 'ORBIT_DETAIL'),
     setMapZoomLevel: vi.fn(),
     getMapTarget: vi.fn(() => _target),
-    setMapTarget: vi.fn((t) => { _target = t; }),
+    setMapTarget: vi.fn((t: string | null) => { _target = t; }),
     getSelectedTransferTarget: vi.fn(() => null),
     getSelectedAsteroid: vi.fn(() => null),
   };
@@ -88,7 +127,7 @@ vi.mock('../core/orbit.ts', () => ({
 
 vi.mock('../core/flightPhase.ts', () => ({
   isPlayerLocked: vi.fn(() => false),
-  getPhaseLabel: vi.fn((p) => p),
+  getPhaseLabel: vi.fn((p: string) => p),
 }));
 
 vi.mock('../core/satellites.ts', () => ({
@@ -96,7 +135,7 @@ vi.mock('../core/satellites.ts', () => ({
 }));
 
 vi.mock('../ui/escapeHtml.ts', () => ({
-  escapeHtml: (s) => s,
+  escapeHtml: (s: string): string => s,
 }));
 
 // ---------------------------------------------------------------------------
@@ -104,19 +143,19 @@ vi.mock('../ui/escapeHtml.ts', () => ({
 // Node.js test environment has no DOM.
 // ---------------------------------------------------------------------------
 
-function _stubElement() {
-  const el = {
+function _stubElement(): StubElement {
+  const el: StubElement = {
     id: '',
     className: '',
     textContent: '',
     innerHTML: '',
     style: { display: '', cssText: '', setProperty() {} },
     children: [],
-    appendChild(c) { el.children.push(c); return c; },
-    removeChild(c) { const i = el.children.indexOf(c); if (i >= 0) el.children.splice(i, 1); return c; },
+    appendChild(c: StubElement): StubElement { el.children.push(c); return c; },
+    removeChild(c: StubElement): StubElement { const i = el.children.indexOf(c); if (i >= 0) el.children.splice(i, 1); return c; },
     remove() {},
-    querySelector() { return null; },
-    querySelectorAll() { return []; },
+    querySelector(): StubElement | null { return null; },
+    querySelectorAll(): StubElement[] { return []; },
     addEventListener() {},
     removeEventListener() {},
     setAttribute() {},
@@ -125,12 +164,16 @@ function _stubElement() {
 }
 
 globalThis.document = globalThis.document || {
-  createElement: () => _stubElement(),
-  getElementById: () => null,
+  createElement: (): StubElement => _stubElement(),
+  getElementById: (): null => null,
   body: _stubElement(),
 };
 
-const _notifyMock = vi.hoisted(() => ({
+interface NotifyMock {
+  showPhaseNotification: ReturnType<typeof vi.fn>;
+}
+
+const _notifyMock: NotifyMock = vi.hoisted(() => ({
   showPhaseNotification: vi.fn(),
 }));
 
@@ -162,14 +205,14 @@ import { computeOrbitalThrustAngle } from '../core/mapView.ts';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function setUpFCState(overrides = {}) {
+function setUpFCState(overrides: Partial<FCState> = {}): void {
   resetFCState();
   const s = getFCState();
-  s.state = { orbitalObjects: [], facilities: {} };
+  s.state = { orbitalObjects: [], facilities: {} } as unknown as GameState;
   setPhysicsState({
     posX: 0, posY: 200_000, velX: 7800, velY: 0,
     angle: 0, throttle: 0,
-  });
+  } as unknown as PhysicsState);
   setFlightState({
     phase: 'ORBIT',
     bodyId: 'EARTH',
@@ -177,7 +220,7 @@ function setUpFCState(overrides = {}) {
     orbitalElements: null,
     events: [],
     transferState: null,
-  });
+  } as unknown as FlightState);
   Object.assign(s, overrides);
 }
 
@@ -240,7 +283,7 @@ describe('toggleMapView', () => {
 
   it('cuts map thrust on deactivation', () => {
     const s = getFCState();
-    const ps = { posX: 0, posY: 200_000, velX: 7800, velY: 0, angle: 0, throttle: 1 };
+    const ps = { posX: 0, posY: 200_000, velX: 7800, velY: 0, angle: 0, throttle: 1 } as unknown as PhysicsState;
     setPhysicsState(ps);
 
     s.mapActive = true;
@@ -305,7 +348,7 @@ describe('applyMapThrust', () => {
 
   it('cuts thrust when no keys are held after thrusting', () => {
     const s = getFCState();
-    const ps = { posX: 0, posY: 200_000, velX: 7800, velY: 0, angle: 0, throttle: 1 };
+    const ps = { posX: 0, posY: 200_000, velX: 7800, velY: 0, angle: 0, throttle: 1 } as unknown as PhysicsState;
     setPhysicsState(ps);
     s.mapThrusting = true;
     applyMapThrust();
@@ -318,7 +361,7 @@ describe('applyMapThrust', () => {
     setFlightState({
       phase: 'LAUNCH', bodyId: 'EARTH', timeElapsed: 0,
       orbitalElements: null, events: [], transferState: null,
-    });
+    } as unknown as FlightState);
     s.mapHeldKeys.add('w');
     applyMapThrust();
     expect(s.mapThrusting).toBe(false);
@@ -326,13 +369,13 @@ describe('applyMapThrust', () => {
 
   it('cuts thrust in non-orbital phase if was thrusting', () => {
     const s = getFCState();
-    const ps = { posX: 0, posY: 200_000, velX: 7800, velY: 0, angle: 0, throttle: 1 };
+    const ps = { posX: 0, posY: 200_000, velX: 7800, velY: 0, angle: 0, throttle: 1 } as unknown as PhysicsState;
     setPhysicsState(ps);
     s.mapThrusting = true;
     setFlightState({
       phase: 'LAUNCH', bodyId: 'EARTH', timeElapsed: 0,
       orbitalElements: null, events: [], transferState: null,
-    });
+    } as unknown as FlightState);
     applyMapThrust();
     expect(ps.throttle).toBe(0);
     expect(s.mapThrusting).toBe(false);
@@ -343,7 +386,7 @@ describe('applyMapThrust', () => {
     setFlightState({
       phase: 'MANOEUVRE', bodyId: 'EARTH', timeElapsed: 0,
       orbitalElements: null, events: [], transferState: null,
-    });
+    } as unknown as FlightState);
     s.mapHeldKeys.add('w');
     applyMapThrust();
     expect(s.mapThrusting).toBe(true);
@@ -354,7 +397,7 @@ describe('applyMapThrust', () => {
     setFlightState({
       phase: 'TRANSFER', bodyId: 'EARTH', timeElapsed: 0,
       orbitalElements: null, events: [], transferState: null,
-    });
+    } as unknown as FlightState);
     s.mapHeldKeys.add('w');
     applyMapThrust();
     expect(s.mapThrusting).toBe(true);
@@ -365,7 +408,7 @@ describe('applyMapThrust', () => {
     setFlightState({
       phase: 'CAPTURE', bodyId: 'EARTH', timeElapsed: 0,
       orbitalElements: null, events: [], transferState: null,
-    });
+    } as unknown as FlightState);
     s.mapHeldKeys.add('w');
     applyMapThrust();
     expect(s.mapThrusting).toBe(true);
@@ -404,8 +447,8 @@ describe('handleWarpToTarget', () => {
 
   it('shows notification when no target is selected', () => {
     // Provide orbitalElements so handleWarpToTarget doesn't early-return.
-    const fs = getFlightState();
-    fs.orbitalElements = { sma: 6771000, ecc: 0, inc: 0, argPe: 0, lan: 0, trueAnomaly: 0 };
+    const fs = getFlightState()!;
+    fs.orbitalElements = { sma: 6771000, ecc: 0, inc: 0, argPe: 0, lan: 0, trueAnomaly: 0 } as unknown as OrbitalElements;
     _mapMock._setTarget(null);
     handleWarpToTarget();
     expect(showPhaseNotification).toHaveBeenCalledWith(
@@ -414,8 +457,8 @@ describe('handleWarpToTarget', () => {
   });
 
   it('shows notification when target not found in orbital objects', () => {
-    const fs = getFlightState();
-    fs.orbitalElements = { sma: 6771000, ecc: 0, inc: 0, argPe: 0, lan: 0, trueAnomaly: 0 };
+    const fs = getFlightState()!;
+    fs.orbitalElements = { sma: 6771000, ecc: 0, inc: 0, argPe: 0, lan: 0, trueAnomaly: 0 } as unknown as OrbitalElements;
     _mapMock._setTarget('nonexistent');
     handleWarpToTarget();
     expect(showPhaseNotification).toHaveBeenCalledWith('Target not found');

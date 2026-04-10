@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * ui-mcState.test.ts — Unit tests for Mission Control state management.
  *
@@ -6,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { getMCState, setMCState } from '../ui/missionControl/_state.ts';
+import { getMCState, setMCState, type MCState } from '../ui/missionControl/_state.ts';
 
 describe('MCState', () => {
   // Reset to known defaults before each test by patching back.
@@ -23,7 +22,7 @@ describe('MCState', () => {
 
   describe('getMCState()', () => {
     it('returns a state object', () => {
-      const s = getMCState();
+      const s: MCState = getMCState();
       expect(s).toBeDefined();
       expect(typeof s).toBe('object');
     });
@@ -35,7 +34,7 @@ describe('MCState', () => {
 
   describe('default state values', () => {
     it('nullable references are null', () => {
-      const s = getMCState();
+      const s: MCState = getMCState();
       expect(s.overlay).toBeNull();
       expect(s.state).toBeNull();
       expect(s.onBack).toBeNull();
@@ -59,7 +58,7 @@ describe('MCState', () => {
 
     it('patches multiple properties at once', () => {
       setMCState({ activeTab: 'challenges', creatorFormOpen: true });
-      const s = getMCState();
+      const s: MCState = getMCState();
       expect(s.activeTab).toBe('challenges');
       expect(s.creatorFormOpen).toBe(true);
     });
@@ -71,13 +70,13 @@ describe('MCState', () => {
     });
 
     it('preserves object identity', () => {
-      const before = getMCState();
+      const before: MCState = getMCState();
       setMCState({ activeTab: 'challenges' });
       expect(getMCState()).toBe(before);
     });
 
     it('can set the onBack callback', () => {
-      const cb = () => {};
+      const cb: () => void = () => {};
       setMCState({ onBack: cb });
       expect(getMCState().onBack).toBe(cb);
     });
