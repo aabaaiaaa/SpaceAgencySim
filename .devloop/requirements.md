@@ -1,414 +1,305 @@
-# Iteration 6 — Type Safety Hardening, Settings/Save Improvements, and Asteroid Belt
+# Iteration 4 — Stabilization: Physics Integration, Bug Fixes, and Quality Improvements
 
-This iteration addresses all actionable findings from the iteration 5 code review, adds independent settings persistence and save export integrity, converts dynamic inline styles to CSS custom properties, and introduces the asteroid belt as a major new gameplay feature.
+This iteration addresses all actionable findings from the iteration 6 code review. No new features — the focus is fixing critical bugs in the asteroid capture physics pipeline, correcting rendering and collision issues, improving test infrastructure, and cleaning up polish items.
 
-The codebase is ~60,400 lines of TypeScript across 154 source modules, with ~2,815 unit tests and 39 E2E specs. All work builds on the existing codebase.
+The codebase is ~60,400 lines of TypeScript across 154 source modules. All work builds on the existing codebase.
 
 ---
 
-## 1. Review Fix-ups
+## 1. Critical Physics Integration
 
-### 1.1 Log IDB Mirror Failures in autoSave.ts
+### 1.1 Wire Asteroid Mass into Physics on Capture/Release
 
-**Files:** `src/core/autoSave.ts:139,158`
+**Files:** `src/core/grabbing.ts`, callers in UI layer
 
-Two silent `.catch(() => {})` handlers on IDB operations swallow failures. `saveload.ts` already logs these via `logger.debug()`.
+`captureAsteroid()` (`grabbing.ts:278-280`) sets `GrabState.GRABBED` and stores the asteroid reference, but never calls `setCapturedAsteroidMass(ps, asteroid.mass)` from `physics.ts`. The function already receives `ps: PhysicsState` but doesn't use it for mass. Similarly, `releaseGrabbedAsteroid()` (`grabbing.ts:288-298`) doesn't call `clearCapturedAsteroidMass(ps)` — its signature doesn't even accept `PhysicsState`.
 
-**Fix:**
-- Replace `idbSet(saveKey, compressed).catch(() => {})` at line 139 with `.catch(err => logger.debug('autoSave', 'IDB mirror write failed', err))`
-- Replace `idbDelete(AUTO_SAVE_KEY).catch(() => {})` at line 158 with `.catch(err => logger.debug('autoSave', 'IDB mirror delete failed', err))`
-
-### 1.2 Remove Unnecessary Type Casts in flightHud.ts
-
-**File:** `src/ui/flightHud.ts`
-
-Nine `as unknown as Record<string, unknown>` casts access `throttleMode`, `targetTWR`, and `controlMode` on `_ps` — but `PhysicsState` already declares all three properties (`physics.ts:352,354,400`). The casts bypass type checking unnecessarily.
+**Impact:** After capture, `ps.capturedAsteroidMass` stays at 0. `_computeTotalMass` excludes asteroid mass, `_computeAsteroidTorque` returns 0 (mass <= 0 early return), and `alignThrustWithAsteroid` returns early with "No captured asteroid mass." The entire asteroid mass/thrust/torque system is silently inert.
 
 **Fix:**
-- Remove all 9 casts (lines 195, 198, 204, 433, 531, 547, 565, 827, 1148) and access properties directly on `_ps`
-- Replace `(psAny.targetTWR as number)` downcasts with direct access since the property is already typed as `number`
-- Use optional chaining for the `_ps` null check where needed (e.g., `_ps?.throttleMode`)
+- In `captureAsteroid()`, after successful capture (line 278), call `setCapturedAsteroidMass(ps, asteroid.mass)`
+- In `releaseGrabbedAsteroid()`, add `ps: PhysicsState` parameter and call `clearCapturedAsteroidMass(ps)`
+- Update all callers of `releaseGrabbedAsteroid()` to pass `ps`
 
-### 1.3 Remove Unused Listener Tracker in perfDashboard.ts
+### 1.2 Replace Scalar Asteroid Mass with CapturedBody Struct
 
-**File:** `src/ui/perfDashboard.ts`
+**Files:** `src/core/physics.ts` (PhysicsState interface, `_computeCoMLocal`, `_computeMomentOfInertia`, `_computeTotalMass`, `_computeAsteroidTorque`, `setCapturedAsteroidMass`, `clearCapturedAsteroidMass`, `alignThrustWithAsteroid`)
 
-`createListenerTracker()` is imported (line 17), instantiated (line 50), and cleaned up (line 242), but `_tracker.add()` is never called. No listeners are routed through it.
+The current `capturedAsteroidMass` field in PhysicsState is a scalar — it doesn't encode position, orientation, or attachment geometry. `_computeCoMLocal()` (`physics.ts:1431-1452`) iterates over craft parts only and has no knowledge of the asteroid's spatial position. The CoM doesn't shift, moment of inertia is underestimated, and thrust alignment works via a boolean flag rather than actual physics.
 
-**Fix:**
-- Remove the `createListenerTracker` import
-- Remove the `_tracker` variable declaration, instantiation in `_createDOM()`, and cleanup in `destroyPerfDashboard()`
-
-### 1.4 Unify Mission / MissionDef Types
-
-**Files:** `src/core/gameState.ts`, `src/data/missions.ts`, `src/core/missions.ts`, `src/ui/missionControl/_missionsTab.ts`
-
-`Mission` (gameState.ts:209-232) and `MissionDef` (data/missions.ts:207-234) are incompatible types. `missions.ts` has 11 `as unknown as` casts bridging between them. The code treats stored missions as a hybrid containing both runtime state (`deadline`, `acceptedDate`) and template properties (`objectives`, `unlockedParts`).
+As asteroid mechanics deepen (mining, multi-asteroid capture, surface operations), this needs to become a proper struct.
 
 **Fix:**
-- Create a `MissionInstance` type that combines template fields from `MissionDef` with runtime fields from `Mission` using a discriminated union or intersection type
-- Replace `Mission` in `GameState` with `MissionInstance`
-- Update `missions.ts` to work with the unified type, eliminating all 11 casts
-- Update `_missionsTab.ts` to use the unified type, eliminating its 3 casts
-- Ensure save/load serialization handles the new type (backward compatible with existing saves)
+- Define a `CapturedBody` interface in `physics.ts`:
+  ```typescript
+  interface CapturedBody {
+    mass: number;           // kg
+    radius: number;         // metres — used for inertia approximation
+    offset: { x: number; y: number };  // attachment position in craft-local coordinates (rotates with the ship)
+    name: string;           // for UI display
+  }
+  ```
+- The `offset` is in **craft-local frame** — it rotates with the ship automatically. CoM and MoI calculations use it directly without frame conversion.
+- Replace `capturedAsteroidMass: number` with `capturedBody: CapturedBody | null` in PhysicsState
+- Update `setCapturedAsteroidMass()` → `setCapturedBody(ps, body: CapturedBody)` — sets the full struct and resets `thrustAligned`
+- Update `clearCapturedAsteroidMass()` → `clearCapturedBody(ps)` — sets to null
+- Update `_computeTotalMass()` to read `ps.capturedBody?.mass ?? 0`
+- Update `_computeCoMLocal()` to include the captured body's mass at its `offset` position in the weighted average
+- Update `_computeMomentOfInertia()` to include the captured body's rotational contribution (approximate as solid sphere: `(2/5) * mass * radius^2` plus parallel-axis term `mass * dist_from_CoM^2`)
+- Update `_computeAsteroidTorque()` to read from `capturedBody`
+- Update `alignThrustWithAsteroid()` to check `capturedBody !== null` instead of `capturedAsteroidMass > 0`
+- Update all callers (grabbing.ts, flightController, etc.) to use the new API
+- No backward compatibility required for the old `capturedAsteroidMass` field — just remove it. The feature was broken anyway (mass was never wired in), so no valid old saves exist with a captured asteroid.
 
-### 1.5 Reduce Remaining `as unknown as` Casts
+### 1.3 Use Per-Arm Properties Instead of Global Constants
 
-**Current state:** 51 casts across 18 source files. After fixing flightHud (9) and missions (11+3), ~28 remain across 15 files.
+**Files:** `src/core/grabbing.ts`, `src/core/constants.ts`
 
-**Target:** Reduce remaining casts to <10 by addressing the concentrated files:
-- `period.ts` (3 casts) — crew/mission type narrowing
-- `_designLibrary.ts` (3 casts) — staging data serialization
-- `_postFlight.ts` (2 casts) — mission result types
-- `_init.ts` in vab (2 casts) — part type narrowing
-- `index.ts` in ui (2 casts) — module type coercion
-- `debugSaves.ts` (2 casts) — debug utility types
-- `contracts.ts` (2 casts) — contract type narrowing
-- Remaining single-cast files where the fix is straightforward
+`captureAsteroid()` at `grabbing.ts:266` checks `dist > GRAB_ARM_RANGE` (global constant = 25m) and `relSpeed > GRAB_MAX_RELATIVE_SPEED` (global = 1.0 m/s). It ignores the per-arm `armReach` and `maxGrabSpeed` properties defined in `parts.ts`. This means all three arm tiers (standard, heavy, industrial) have identical 25m range and 1.0 m/s speed limit.
 
-For each cast, either: add the missing property to the type interface, use a proper type guard, or use a discriminated union. Keep `as unknown as` only where the cast is genuinely necessary (e.g., justified Chrome-only API access in `perfMonitor.ts`).
+Per-arm values defined but unused:
+| Arm | armReach | maxGrabSpeed | maxCaptureMass |
+|-----|----------|-------------|----------------|
+| Standard | 25 | 1.0 | 100,000 kg |
+| Heavy | 35 | 0.8 | 100,000,000 kg |
+| Industrial | 50 | 0.5 | 2,000,000,000,000 kg |
 
-### 1.6 Promote ESLint no-explicit-any to Error
-
-**File:** `eslint.config.js:87`
-
-Currently `'@typescript-eslint/no-explicit-any': 'warn'`. Zero `as any` exists in source files; 8 remain in test files (`workerBridgeTimeout.test.ts`).
+Only `maxCaptureMass` is currently read (lines 249-260).
 
 **Fix:**
-- Set `'@typescript-eslint/no-explicit-any': 'error'` for source files
-- Keep `'warn'` for test files via an override block matching `src/tests/**`
-- Fix the 8 `as any` usages in `workerBridgeTimeout.test.ts` by using `Partial<T>` or test factory types
+- In `captureAsteroid()`, look up the equipped arm's part definition and use its `armReach` instead of `GRAB_ARM_RANGE`
+- Use the arm's `maxGrabSpeed` instead of `GRAB_MAX_RELATIVE_SPEED`
+- Update `getAsteroidGrabTargetsInRange()` — its broad filter (`GRAB_ARM_RANGE * 20` = 500m) should use the equipped arm's `armReach * 20`
+- Consider deprecating or removing the global constants if they're no longer referenced
 
-### 1.7 Defensive Guards in map.ts
+---
+
+## 2. Bug Fixes
+
+### 2.1 Fix Double-Scale in Streak Asteroid Rendering
+
+**File:** `src/render/flight/_asteroids.ts`
+
+In the streak LOD rendering:
+- Line 248: `trailLength = Math.min(200, speed * scale * 0.05)` — already includes `scale`
+- Lines 257-258: `tailX = headX - dx * trailLength * scale` — `scale` applied a second time
+
+Result: trails are `scale^2` too long.
+
+**Fix:** Remove the second `* scale` from lines 257-258, so tail position is computed as `headX - dx * trailLength`.
+
+### 2.2 Add Per-Asteroid Collision Cooldown
+
+**File:** `src/core/collision.ts`
+
+`checkAsteroidCollisions` (`collision.ts:769-815`) applies full damage every tick when an asteroid overlaps the craft across multiple frames. No per-asteroid cooldown exists. The debris collision system already uses `SEPARATION_COOLDOWN_TICKS` (10 ticks) to prevent this — asteroid collisions need the same pattern.
+
+**Fix:**
+- Add a `collisionCooldown` field to the `Asteroid` type (or use a Map/Set tracking recently-collided asteroid IDs)
+- In `checkAsteroidCollisions`, skip asteroids with active cooldown (decrement each tick)
+- After applying damage, set cooldown to `SEPARATION_COOLDOWN_TICKS`
+
+### 2.3 Fix Map Coordinate Frame in Belt Asteroid Rendering
 
 **File:** `src/render/map.ts`
 
-Non-null assertions (`!`) are used on `_bgGraphics`, `_orbitsGraphics`, `_transferGraphics`, `_bandsGraphics` throughout drawing functions. While `renderMapFrame()` has a top-level `if (!_mapRoot) return` guard, the individual drawing functions called from it don't guard independently.
+`_drawBeltAsteroidObjects` (line 916-917): `craftX` uses body-relative coordinates while `craftY` is adjusted to sun-centred (`ps.posY + R`). The distance calculation between craft and asteroid positions is incorrect for non-zero craft angular positions.
+
+**Fix:** Convert `craftX` to the same sun-centred coordinate frame as `craftY`.
+
+### 2.4 Unify Asteroid Size Category Thresholds
+
+**Files:** `src/render/map.ts` (line 944), `src/render/flight/_asteroids.ts` (lines 58-62)
+
+Size thresholds are inconsistent:
+- Flight view (`_asteroids.ts`): small < 10m, medium < 100m, large >= 100m
+- Map view (`map.ts`): small < 50m, medium < 500m, large >= 500m
+
+A 30m asteroid is "medium" on the map but "large" in flight. A 200m asteroid is "large" in flight but "medium" on the map.
+
+**Fix:** Export `getSizeCategory()` from `_asteroids.ts` and import/reuse it in `map.ts` to derive the label text, eliminating the duplicate thresholds.
+
+### 2.5 Cap _getAutoSaveKey Loop and Deduplicate SAVE_VERSION
+
+**File:** `src/core/autoSave.ts`
+
+Two issues:
+1. `_getAutoSaveKey()` (lines 79-88) has an unbounded `for (let i = 0; ; i++)` loop that iterates indefinitely if all slots are occupied. JSDoc claims it falls back to `AUTO_SAVE_KEY` but the fallback code doesn't exist.
+2. `SAVE_VERSION = 2` is defined at line 31, duplicating the same constant exported from `saveload.ts:41`. If one is bumped without the other, version skew occurs.
 
 **Fix:**
-- Add `if (!_mapRoot) return` guards at the entry point of each drawing function that uses graphics objects: `_drawBands()`, `_drawCraft()`, `_drawTransferTargets()`, and any other functions with `!` assertions
-- This protects against edge cases during destroy/init transitions where a function might be called after the root is destroyed but before the calling code checks
+- Cap the loop at a reasonable upper bound (e.g., 100) and return `AUTO_SAVE_KEY` as fallback when no empty slot is found
+- Remove the local `SAVE_VERSION` and import it from `saveload.ts`
 
 ---
 
-## 2. Independent Settings Persistence
+## 3. Map & Render Quality
 
-### 2.1 Settings Store
+### 3.1 Defensive Null Guards in map.ts
 
-**Current state:** All settings (`difficultySettings`, `autoSaveEnabled`, `debugMode`, `showPerfDashboard`, `malfunctionMode`) live inside `GameState` and are saved/loaded per save slot. Deleting a save loses settings. Starting a new game resets settings.
+**File:** `src/render/map.ts`
 
-**Target:** Settings persist independently of save files, surviving save deletion and new game creation.
+`_drawBody` (line 623) and `_drawShadow` (line 1325) use `!` non-null assertions on graphics objects without preceding null guards. All other drawing functions already have `if (!_mapRoot) return` guards. Additionally, `_commsGraphics` is not nulled in `destroyMapRenderer()` (lines 335-367), leaving a stale reference to a destroyed PixiJS object.
+
+**Fix:**
+- Add `if (!_mapRoot) return` guards at the top of `_drawBody` and `_drawShadow`
+- Add `_commsGraphics = null` in `destroyMapRenderer()` alongside the other graphics nulling
+
+### 3.2 Off-Screen Culling for Belt Asteroid Objects
+
+**File:** `src/render/map.ts`
+
+`_drawBeltAsteroidObjects` draws all active asteroids with no viewport bounds check, unlike `_drawAsteroidBelt` (dot rendering) which already culls off-screen positions.
+
+**Fix:** Add a viewport bounds check before drawing each asteroid object, matching the culling pattern used in `_drawAsteroidBelt`.
+
+### 3.3 Extract LANDABLE TextStyle Constant
+
+**File:** `src/render/flight/_asteroids.ts`
+
+Line 210: `label.style = { ... }` replaces the entire `TextStyle` object every frame for LANDABLE labels. This triggers GPU texture re-uploads each frame — a performance concern.
+
+**Fix:** Create a shared `const LANDABLE_STYLE` at module level and assign it once. In the per-frame render code, only assign the style if the label doesn't already have it (or assign unconditionally since PIXI may short-circuit identical styles).
+
+---
+
+## 4. Save System
+
+### 4.1 Validate Binary Envelope Format Version
+
+**File:** `src/core/saveload.ts`
+
+Line 833: The binary envelope format version is read (`const _version = view.getUint16(4, false)`) but never validated. If a future version changes the envelope structure, old code will silently misparse the payload.
+
+**Fix:** After reading the version, compare against the current supported version (1). If higher, return a clear error ("Save was created with a newer version of the game"). Version 1 and below proceed normally.
+
+---
+
+## 5. Architecture
+
+### 5.1 Add renameOrbitalObject Core Function
+
+**Files:** `src/ui/flightController/_mapView.ts`, new function in `src/core/` (e.g., `orbitalObjects.ts` or added to an existing module)
+
+`_mapView.ts:248` directly mutates `obj!.name = newName`, violating the convention that state mutations happen only in `src/core/` modules.
+
+**Fix:** Create a `renameOrbitalObject(state: GameState, objectId: string, newName: string)` function in the core layer. Call it from `_mapView.ts` instead of directly mutating the name.
+
+---
+
+## 6. Type Safety & Polish
+
+### 6.1 Remove Spurious Cast in lifeSupport.ts
+
+**File:** `src/core/lifeSupport.ts` (line 91)
+
+An unnecessary `as unknown as` cast accesses properties that `CrewMember` already declares. Removing it reduces the project-wide cast count from 4 to 3.
+
+### 6.2 Update Tech Tree Descriptions and Adjust Arm Tier Placement
+
+**Files:** `src/data/techtree.js` (or `.ts`)
+
+Two issues:
+1. `struct-t4` and `struct-t5` node descriptions don't mention that they unlock grabbing arms
+2. Both the standard Grabbing Arm and Heavy Grabbing Arm unlock at T4, making the standard arm immediately obsolete — there's no progression
+
+**Fix:**
+- Update tech tree node descriptions to mention grabbing arm unlocks
+- Move the Heavy Grabbing Arm to T5 and the Industrial Grabbing Arm to T6. Create new tech tree tiers if T5/T6 don't exist — proper progression spacing is more important than fitting into existing tiers
+
+---
+
+## 7. Technical Debt Cleanup
+
+### 7.1 Inline Styles in Rename Dialog
+
+**File:** `src/ui/flightController/_mapView.ts` (lines 220-232)
+
+The asteroid rename dialog uses `style.cssText` and inline `style=""` attributes, contradicting the iteration 6 CSS custom property migration goal. This is new tech debt introduced in the same iteration that migrated other inline styles.
+
+**Fix:** Move the rename dialog styles to a CSS class in the appropriate stylesheet. Replace inline `style.cssText` and `style=""` attributes with class-based styling.
+
+### 7.2 Document Caller Contracts in grabbing.ts
+
+**File:** `src/core/grabbing.ts`
+
+Multiple functions have implicit caller contracts (e.g., the caller must manage `setCapturedBody` / `clearCapturedBody` separately). After fixing the mass wiring (section 1.1), verify that the contracts are now internal to the module — callers should not need to separately manage physics state. If any implicit contracts remain, document them with JSDoc `@remarks` annotations.
+
+---
+
+## 8. Coverage Escalation
+
+### 8.1 Increase Render and UI Coverage Floors
+
+The 50%/40% coverage floor for render and UI layers was set in iteration 5. With the asteroid belt adding significant render/UI logic (belt rendering, asteroid flight view, map visualization, capture UI), these floors should increase to maintain quality.
+
+**New targets:**
+- Render layer (`src/render/`): 50% → 55%
+- UI layer (`src/ui/`): 40% → 45%
+
+**Enforcement:** Configure Vitest's `coverage.thresholds` in `vitest.config` to fail tests if render/UI layers drop below the new floors. This enforces the floors locally and in CI.
 
 **Approach:**
-- Create a `SettingsStore` module at `src/core/settingsStore.ts`
-- Store settings in localStorage under a dedicated key (e.g., `spaceAgency_settings`), separate from save slot keys
-- On game load: read settings from the dedicated key, apply to `GameState`
-- On settings change: write to both `GameState` (for current session) and the dedicated settings key (for persistence)
-- On new game: read persisted settings and apply them as defaults
-- Backward compatibility: if no dedicated settings key exists (first run after update), extract settings from the loaded save and write them to the new key
-
-**Settings to decouple:**
-- `difficultySettings` (the full `DifficultySettings` object)
-- `autoSaveEnabled`
-- `debugMode`
-- `showPerfDashboard`
-- `malfunctionMode`
-- `useWorkerPhysics` (if it exists as a setting)
-
-**Settings that stay in GameState:** Any setting that is inherently per-save (e.g., tutorial completion flags, per-save progression markers).
-
-### 2.2 Migration
-
-On first load after this change:
-1. Check if `spaceAgency_settings` exists in localStorage
-2. If not, check if any save slot exists
-3. If a save exists, extract settings from it and write to `spaceAgency_settings`
-4. Future loads always read from `spaceAgency_settings`
+1. Set the new thresholds in vitest config
+2. Run `npx vitest run --coverage` to check current state
+3. If below the floors, add targeted unit tests for the lowest-coverage files in the asteroid belt feature area until the thresholds pass. Priority files:
+   - `src/render/flight/_asteroids.ts` — asteroid rendering logic has testable helper functions (size categories, LOD selection)
+   - `src/render/map.ts` — belt rendering helpers
+   - `src/ui/flightController/_mapView.ts` — asteroid rename, map interaction
+4. Re-run coverage to confirm floors are met
 
 ---
 
-## 3. Save Export Format
+## 9. Testing Improvements
 
-### 3.1 Binary Envelope
+### 9.1 Add Missing test-map.json Entries
 
-**Current state:** Save data is JSON stringified, compressed with lz-string (`LZC:` prefix), and stored in localStorage as a string. Export copies this string. No integrity checking — a corrupted export silently loads garbage or fails with an opaque JSON parse error.
+**File:** `test-map.json`
 
-**Target:** Exported saves have a structured envelope with magic bytes, version header, and CRC checksum for integrity verification.
+`asteroidBelt`, `settingsStore`, and `crc32` source modules have no entries. `e2e/asteroid-belt.spec.js` is not linked from the collision or grabbing entries. Running `npm run test:affected` after changes to these modules won't trigger relevant tests.
 
-**Envelope structure:**
-```
-Bytes 0-3:   Magic bytes "SASV" (Space Agency Save, ASCII)
-Bytes 4-5:   Format version (uint16, big-endian) — starts at 1
-Bytes 6-9:   CRC-32 checksum of the payload (uint32, big-endian)
-Bytes 10-13: Payload length in bytes (uint32, big-endian)
-Bytes 14+:   Payload (the existing LZC-compressed JSON string, UTF-8 encoded)
-```
+### 9.2 Add @smoke Tags
 
-**On export:**
-1. Serialize save data as usual (JSON → LZC compress)
-2. Compute CRC-32 of the compressed payload
-3. Write the envelope header + payload
-4. Encode as base64 for clipboard/file download
+**Files:** `src/tests/autoSave.test.ts`, `src/tests/crc32.test.ts`, `src/tests/settingsStore.test.ts`, `src/tests/asteroidBelt.test.ts`
 
-**On import:**
-1. Decode base64
-2. Verify magic bytes ("SASV")
-3. Read version, checksum, payload length
-4. Verify CRC-32 matches payload
-5. If valid: decompress and load as usual
-6. If invalid: show clear error ("Save file is corrupted" / "Unrecognized save format")
+None of these files have `@smoke`-tagged tests. Pick 1-2 representative tests per file that exercise the broadest code paths and add `@smoke` to their descriptions.
 
-**Backward compatibility:** If import data doesn't start with "SASV" magic bytes, fall back to the current import path (raw LZC string). This allows importing old-format saves.
+### 9.3 Fix E2E Test Independence
 
-### 3.2 CRC-32 Implementation
+**File:** `e2e/asteroid-belt.spec.js`
 
-Use a lookup-table-based CRC-32 implementation (standard polynomial 0xEDB88320). Small, fast, no dependencies. Implement in `src/core/crc32.ts` as a pure function.
+Tests within `describe` blocks share page instances via `beforeAll`/`afterAll` (lines 45-56, 163-175). If an earlier test fails, later tests are unreliable. Each test should set up its own page state.
 
----
+**Fix:** Convert `beforeAll`/`afterAll` page setup to `beforeEach`/`afterEach` so each test gets a fresh page instance.
 
-## 4. CSS Custom Properties for Dynamic Styles
+### 9.4 Unit Tests for Fixed Code
 
-### 4.1 Flight HUD Dynamic Styles
+New or updated tests to cover the fixes in this iteration:
 
-**File:** `src/ui/flightHud.ts`
+- **Physics integration:** Verify `capturedBody` is set on capture and cleared on release. Verify CoM shifts proportionally to asteroid mass and offset. Verify moment of inertia includes asteroid contribution.
+- **Per-arm properties:** Verify different arm tiers have different effective range and speed limits. Verify industrial arm's 50m reach and 0.5 m/s speed. Boundary tests at exact mass limit thresholds.
+- **Collision cooldown:** Verify no re-damage during cooldown period. Verify cooldown decrements and eventually allows re-collision.
+- **autoSave:** Verify `_getAutoSaveKey()` returns fallback when all slots are occupied.
 
-14+ inline style assignments set dynamic values (heights, colors, display). Convert to CSS custom properties where the value changes at runtime but the CSS rule is static.
+### 9.5 E2E Tests for Changed Behaviour
 
-**Pattern:**
-```javascript
-// Before:
-_elThrottleFill.style.height = `${pct}%`;
+Any fix that changes user-visible behaviour needs E2E coverage. Update or add specs in `e2e/asteroid-belt.spec.js`:
 
-// After:
-_elThrottleFill.style.setProperty('--throttle-pct', `${pct}%`);
-// CSS: .throttle-fill { height: var(--throttle-pct, 0%); }
-```
-
-**Candidates for conversion:**
-- Throttle bar height (`style.height` — percentage)
-- TWR bar height (`style.height` — percentage)
-- Velocity color (`style.color` — dynamic color selection)
-- Comms color (`style.color`)
-- TWR color (`style.color`)
-
-**Not converted (leave as inline):**
-- `style.display` toggles (show/hide) — these are binary state changes, CSS custom properties add no value
-
-### 4.2 Contracts Tab Dynamic Styles
-
-**File:** `src/ui/missionControl/_contractsTab.ts`
-
-Reputation bar uses `repBar.style.setProperty('--rep-color', ...)` for color (already a CSS custom property) but width and background-color are set directly.
-
-**Fix:**
-- Convert `repFill.style.width` to `--rep-width` custom property
-- Convert remaining direct style assignments to CSS custom properties
-- Define corresponding CSS rules in the module's CSS file
+- **Arm tier differences:** Verify that the Heavy arm can grab at longer range than the Standard arm. Verify the Industrial arm's slower grab speed limit.
+- **Collision cooldown:** Verify a slow-speed overlap doesn't destroy the craft (damage applied once, not per-frame).
+- **Thrust alignment with real physics:** After capture, verify the craft actually rotates when thrusting unaligned, and stabilises after aligning.
+- **Arm tech tree progression:** Verify Heavy arm is not available until its new tier is researched (not same tier as Standard).
 
 ---
 
-## 5. Asteroid Belt
-
-### 5.1 Belt Zone Definitions
-
-Three concentric orbital zones around the Sun, beyond Mars (~1.52 AU):
-
-| Zone | Inner Edge | Outer Edge | AU Range | Type | Flight View Asteroids |
-|------|-----------|-----------|----------|------|----------------------|
-| Outer Belt A | 329,000,000 km | 374,000,000 km | 2.2–2.5 AU | Safe orbit | ~10 |
-| Dense Belt | 374,000,000 km | 419,000,000 km | 2.5–2.8 AU | Unsafe orbit | ~30 |
-| Outer Belt B | 419,000,000 km | 479,000,000 km | 2.8–3.2 AU | Safe orbit | ~10 |
-
-**Data definition:** Add belt zones to the Sun's altitude bands in `src/data/bodies.ts`. Each zone is a new `AltitudeBand` entry with a `beltZone` property identifying it as `'outer_a'`, `'dense'`, or `'outer_b'`.
-
-**Unsafe orbit mechanic:** The dense belt zone is flagged as unsafe. The existing "return to hub" check (which already prevents returning during transfer) is extended to also prevent returning when the player's orbit falls within the dense belt altitude band. The player must manoeuvre to any safe orbit (outer belt, or outside the belt entirely) before returning to hub.
-
-### 5.2 Map Visualization
-
-**Rendering approach:** Add a belt rendering pass to `src/render/map.ts` that draws:
-
-1. **Scattered dots** — Procedurally placed dots across all three zones representing the visual density of the belt. Dots are static (not orbiting) and generated from a fixed seed so they don't change between frames. Density is higher in the inner zone. Dots are small (1-2px), brownish/amber colored (#998877 for outer, #cc9966 for inner), with varying opacity.
-
-2. **Danger zone shading** — A semi-transparent amber fill (#884422 at ~12% opacity) covering only the dense inner belt zone. Bounded by faint dashed lines at the inner and outer edges with AU distance labels visible when zoomed in.
-
-3. **Zone label** — "⚠ Dense Belt" text centered on the inner zone, visible at appropriate zoom levels.
-
-**No shading on outer zones** — safe zones are the default state and don't need visual highlighting.
-
-**Zoom behavior:** At solar system zoom, the belt appears as a ring of dots with the amber danger zone visible. When zoomed into the belt region, individual zone boundaries become clearer and the dots are larger/more distinct. When zoomed to orbit-level within the belt, the map shows the player's orbit and any nearby trackable asteroids as selectable objects.
-
-**Selectable asteroids on map:** When the player is in ORBIT phase within a belt zone, the procedurally generated asteroids (from the flight view) are also shown on the map as selectable orbital objects. They appear near the player's position and can be targeted with the existing T-key cycling and targeting system.
-
-### 5.3 Flight View Asteroid Rendering
-
-**When asteroids appear:** Only when the player is in ORBIT phase and their orbit falls within a belt zone altitude band. Transfer phase passes through safely with no asteroids rendered. The player must circularise their orbit within a belt zone for asteroids to spawn.
-
-**Procedural generation:** On entering orbit within a belt zone:
-- Generate N asteroids (10 for outer zones, 30 for dense zone) within the flight view render distance
-- Each asteroid gets:
-  - Random position within render distance of the player
-  - Random velocity — co-orbital with small relative speed (these are objects in similar solar orbits)
-  - Random size: 1m–1km, weighted toward smaller sizes. Dense zone has a higher weight toward larger asteroids.
-  - Random shape seed for rendering (irregular polygons)
-  - Auto-generated name: `AST-XXXX` (4-digit random ID)
-- Asteroids persist for the duration of that orbit session
-- Regenerated fresh on next visit (procedural each visit)
-
-**Rendering LOD:** Reuse the existing transfer object LOD system from `src/render/flight/_transferObjects.ts`:
-- **Full LOD** (low relative speed): Irregular polygon shape with crater details, brownish/amber color palette
-- **Basic LOD** (medium relative speed): Simple filled ellipse
-- **Streak LOD** (high relative speed): Shooting star effect — should be rare since co-orbital objects have low relative speeds
-
-**All asteroids are trackable/selectable** regardless of size. The player can cycle through them (T key) and see name, size, and distance info. Selected asteroids get a dashed targeting circle.
-
-**Size-based visual detail:**
-- Small (1–10m): Rendered as small rough circles/dots
-- Medium (10–100m): Irregular polygon, a few surface details
-- Large (100m–1km): Larger irregular polygon with multiple crater marks, labeled as "LANDABLE" if above the landing threshold
-
-### 5.4 Asteroid Collision
-
-**Damage model:** Velocity-based only. Damage scales with relative velocity at impact, regardless of asteroid size.
-
-- Very low relative speed (< 1 m/s): No damage — this is the docking/capture speed range
-- Low relative speed (1–5 m/s): Minor bump, possible part damage to outermost parts
-- Medium relative speed (5–20 m/s): Significant damage, outer parts destroyed
-- High relative speed (> 20 m/s): Catastrophic — likely total craft destruction
-
-**Collision detection:** Extend the existing collision system (`src/core/collision.ts`) to check player craft AABB against asteroid circular boundaries. Asteroids use their `radius` field for collision bounds.
-
-**Asteroid-asteroid collision:** Not simulated — asteroids only collide with the player craft.
-
-### 5.5 Grabbing Arm Extension for Asteroid Capture
-
-**Existing system:** `src/core/grabbing.ts` has a full grab state machine (IDLE → APPROACHING → EXTENDING → GRABBED → RELEASING) that targets SATELLITE-type orbital objects. The Grabbing Arm part (`src/data/parts.ts:2375`) has 25m range and 1.0 m/s max grab speed.
-
-**Extension for asteroids:**
-1. **Target expansion:** `getGrabTargetsInRange()` accepts asteroid objects in addition to SATELLITE-type objects
-2. **Capture action:** When grabbed object is an asteroid, offer "Capture" action (instead of "Repair" for satellites). Capture attaches the asteroid to the craft.
-3. **Combined mass physics:** Once captured, the asteroid's mass is added to the craft's total mass. This dramatically changes thrust-to-weight ratio and delta-v budget.
-4. **Centre of mass shift:** The combined CoM shifts toward the asteroid based on relative masses and grapple attachment point.
-
-### 5.6 Grabbing Arm Tiers
-
-Three tiers of grabbing arm, each with different mass limits for asteroid capture:
-
-| Tier | Part Name | Max Capture Mass | Tech Tree Level | Cost |
-|------|-----------|-----------------|-----------------|------|
-| Light | Grabbing Arm (existing) | Small asteroids (TBD kg threshold) | Current level | 35,000 (existing) |
-| Medium | Heavy Grabbing Arm | Medium asteroids | Mid-tier unlock | TBD |
-| Heavy | Industrial Grabbing Arm | Large asteroids (up to 1km) | High-tier unlock | TBD |
-
-The existing Grabbing Arm becomes the light tier with no changes to its current satellite-grabbing functionality. Medium and heavy tiers are new parts with higher mass, cost, and power draw.
-
-Attempting to capture an asteroid that exceeds the arm's mass limit fails with a message (e.g., "Asteroid too massive for this grabbing arm").
-
-### 5.7 Thrust Alignment After Capture
-
-**Problem:** After capturing an asteroid, the combined centre of mass shifts. If engines thrust through the old CoM (craft-only), the craft spins.
-
-**Mechanic:**
-- After capture, the craft is controllable but misaligned — thrust doesn't pass through the combined CoM, causing rotation
-- The player can **manually rotate** the craft+asteroid assembly to orient it as desired (e.g., spin the asteroid around to a preferred orientation before pushing)
-- When ready, the player activates **"Align Thrust"** action — the grabbing arm articulates to position the asteroid so that the craft's engine thrust vector passes through the combined CoM
-- After alignment, thrust is stable and the player can manoeuvre normally (accounting for the increased mass)
-- If the player wants to reorient, they can manually rotate and re-align
-
-**Physics impact of captured asteroid:**
-- Total mass increases (craft mass + asteroid mass)
-- Delta-v budget recalculated based on new total mass
-- TWR drops proportionally
-- Very large asteroids may make the craft nearly immovable with small engines
-
-### 5.8 Persistent Captured Asteroids
-
-**Capture → persistence flow:**
-1. Player grabs asteroid with grabbing arm → asteroid attached to craft
-2. Player manoeuvres craft (with attached asteroid) to an orbit outside the belt zones
-3. Player releases the asteroid → it becomes a persistent `OrbitalObject` in `gameState.orbitalObjects`
-4. The asteroid's orbital elements are computed from the craft's current orbit at release time
-5. The asteroid appears on the solar system map as a permanent tracked object orbiting the Sun
-
-**Persistent asteroid data:**
-- Added to `gameState.orbitalObjects` with `type: 'asteroid'`
-- `bodyId: 'SUN'`
-- `name`: Initially the auto-generated `AST-XXXX` name
-- Player can rename captured asteroids (new UI action on the map view when targeting a captured asteroid)
-- `radius` and `mass` preserved from the original procedural asteroid
-- Standard `OrbitalElements` for its Sun orbit
-
-**Revisiting:** The player can target and travel to captured asteroids like any other orbital object — transfer, capture orbit, dock/land.
-
-### 5.9 Landing on Large Asteroids
-
-Asteroids above a size threshold (TBD, likely ~100m+ radius) are landable with very low surface gravity.
-
-**Gravity model:** Derive surface gravity from asteroid mass and radius. For a 1km asteroid with rock density (~2,500 kg/m³), surface gravity is ~0.001 m/s² — essentially microgravity. Landing is more like a very slow docking with the surface.
-
-**Landing behavior:**
-- Reuse existing landing system with asteroid-specific parameters
-- Very low touchdown speed tolerance (surface gravity is negligible)
-- No atmosphere, no drag
-- Player can deploy instruments, collect science data (future mission hook)
-
-### 5.10 Belt-Specific Flight Phase Considerations
-
-**Transfer phase through belt region:** When the player is on a transfer trajectory that passes through the belt region (e.g., Mars → outer solar system), no asteroids spawn. The player is safe during transfer. Asteroids only appear when the player circularises into orbit within a belt zone.
-
-**Orbit detection in belt zones:** The existing orbit detection system (`evaluateAutoTransitions` in `flightPhase.ts`) determines when the player achieves a stable orbit. When this orbit falls within a belt zone altitude band (checked against the Sun's altitude bands), asteroid generation is triggered.
-
-**Returning to hub from belt:** The "return to hub" action checks whether the player's current orbit is in a safe zone. If the orbit is within the dense belt zone, the action is blocked with a message (e.g., "Cannot return to hub — orbit is within the dense asteroid belt. Manoeuvre to a safe orbit first."). This reuses the existing pattern where return-to-hub is blocked during certain flight phases.
-
----
-
-## 6. Testing
-
-### 6.1 Unit Tests for New Code
-
-- **autoSave IDB logging** — verify `.catch()` handlers call `logger.debug()` (mock IDB failure)
-- **MissionInstance type** — verify type unification handles existing save data, backward compatibility
-- **settingsStore** — read/write settings independently of saves, migration from old format
-- **crc32** — known test vectors (empty string, "123456789", etc.)
-- **Save export envelope** — round-trip: export → import produces identical save data; corrupted checksum detected; old-format import still works
-- **Asteroid generation** — correct count per zone (10/30), size distribution, position within render distance
-- **Asteroid collision** — velocity-based damage thresholds, no damage at <1 m/s
-- **Grabbing arm asteroid capture** — mass limit enforcement per tier, target type expansion
-- **Thrust alignment** — CoM calculation with attached asteroid, alignment action effect
-- **Belt zone safety** — orbit in dense belt flagged as unsafe, outer belt flagged as safe
-
-### 6.2 E2E Tests for Asteroid Belt
-
-New E2E specs in `e2e/asteroid-belt.spec.js`:
-
-- **Belt visible on map** — open solar system map, verify belt dots and danger zone shading are rendered at the correct orbital distances
-- **Belt zone orbit detection** — teleport craft to belt region, circularise orbit, verify asteroids spawn in flight view with correct count (10 for outer, 30 for dense)
-- **Asteroid selection** — in orbit within belt, verify all asteroids are targetable via T-key cycling, verify name/size/distance displayed
-- **Asteroid collision** — fly craft into asteroid at speed, verify damage/destruction occurs
-- **Asteroid capture** — equip grabbing arm, approach asteroid, match velocity, capture, verify asteroid attached and mass changes
-- **Thrust alignment** — after capture, verify misalignment effect, activate align thrust, verify stable thrust
-- **Captured asteroid persistence** — capture asteroid, manoeuvre outside belt, release, verify asteroid appears as persistent orbital object on map
-- **Unsafe orbit hub block** — orbit in dense belt, attempt return to hub, verify blocked with appropriate message
-- **Transfer safety** — transfer trajectory through belt region, verify no asteroids spawn during transfer phase
-- **Grabbing arm tier limits** — attempt to capture asteroid exceeding arm mass limit, verify failure message
-
-### 6.3 Existing Test Impact
-
-The following changes may affect existing tests:
-- `Mission`/`MissionDef` type unification — any tests that construct `Mission` objects will need type updates
-- ESLint `error` promotion — test files need their `as any` usages fixed
-- Settings decoupling — save/load tests that check for settings in save data
-- Map renderer changes — existing map E2E tests should still pass (belt is additive)
-
----
-
-## 7. Verification
+## 10. Verification
 
 After all changes are complete, run:
 
 1. `npm run typecheck` — no errors
-2. `npm run lint` — no errors (with `no-explicit-any: error` for source files)
+2. `npm run lint` — no errors
 3. `npm run test:unit` — all tests pass
-4. `npm run test:e2e` — all E2E specs pass (including new belt specs)
+4. `npm run test:e2e` — all E2E specs pass
 5. `npm run build` — production build succeeds
-6. `as unknown as` cast count is <10 in source files
-7. Manual verification: open solar system map — belt visible with danger zone shading. Transfer to belt region. Circularise in outer belt — 10 asteroids appear. Circularise in dense belt — 30 asteroids, hub return blocked. Capture asteroid with grabbing arm, align thrust, manoeuvre outside belt, release — asteroid persists on map.
+6. `as unknown as` cast count is <= 3 in source files (was 4, minus lifeSupport fix)
+7. `npx vitest run --coverage` — render layer >= 55%, UI layer >= 45%
