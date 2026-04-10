@@ -594,6 +594,21 @@ export function getRepositionTargets(state: GameState, satelliteId: string): Arr
 }
 
 // ---------------------------------------------------------------------------
+// Rename
+// ---------------------------------------------------------------------------
+
+/**
+ * Rename an orbital object by its ID.
+ * Returns true if the object was found and renamed, false otherwise.
+ */
+export function renameOrbitalObject(state: GameState, objectId: string, newName: string): boolean {
+  const obj = state.orbitalObjects?.find(o => o.id === objectId);
+  if (!obj) return false;
+  obj.name = newName;
+  return true;
+}
+
+// ---------------------------------------------------------------------------
 // Decommission
 // ---------------------------------------------------------------------------
 

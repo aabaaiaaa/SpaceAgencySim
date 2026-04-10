@@ -32,6 +32,7 @@ import {
 import { warpToTarget } from '../../core/orbit.ts';
 import { FlightPhase, BODY_RADIUS } from '../../core/constants.ts';
 import { isPlayerLocked, getPhaseLabel } from '../../core/flightPhase.ts';
+import { renameOrbitalObject } from '../../core/satellites.ts';
 import { getFCState, getPhysicsState, getFlightState } from './_state.ts';
 import { showPhaseNotification } from './_flightPhase.ts';
 import { resyncWorkerState } from './_workerBridge.ts';
@@ -245,7 +246,7 @@ export function handleRenameAsteroid(): void {
   function confirm(): void {
     const newName = input.value.trim();
     if (newName && newName !== obj!.name) {
-      obj!.name = newName;
+      renameOrbitalObject(s.state!, targetId!, newName);
       showPhaseNotification(`Renamed to "${escapeHtml(newName)}"`);
       updateMapHud();
     }

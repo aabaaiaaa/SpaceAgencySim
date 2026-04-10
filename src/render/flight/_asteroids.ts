@@ -33,6 +33,13 @@ const COLOR_LARGE  = 0xAA8866;
 const STREAK_HEAD  = 0xffcc44;
 const STREAK_TRAIL = 0xff8800;
 
+const LANDABLE_STYLE = {
+  fontFamily: 'monospace',
+  fontSize: 9,
+  fill: 0xffffff,
+  align: 'center',
+} as const;
+
 // ---------------------------------------------------------------------------
 // Seeded PRNG (simple LCG for shape generation)
 // ---------------------------------------------------------------------------
@@ -207,12 +214,7 @@ function _renderLargeAsteroid(
   const label = acquireText();
   container.addChild(label);
   label.text = 'LANDABLE';
-  label.style = {
-    fontFamily: 'monospace',
-    fontSize: 9,
-    fill: 0xffffff,
-    align: 'center',
-  };
+  label.style = LANDABLE_STYLE;
   label.anchor.set(0.5, 1);
   label.position.set(x, y - r - 10);
   label.alpha = 0.7;

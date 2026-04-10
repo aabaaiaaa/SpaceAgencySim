@@ -75,13 +75,13 @@ See `.devloop/requirements.md` for full context on each item.
 - **Verification**: `npm run typecheck`
 
 ### TASK-011: Add off-screen culling to _drawBeltAsteroidObjects
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: `_drawBeltAsteroidObjects` in `map.ts` draws all active asteroids with no viewport bounds check, unlike `_drawAsteroidBelt` (dot rendering) which already culls off-screen positions. Add a viewport bounds check before drawing each asteroid object, matching the culling pattern used in `_drawAsteroidBelt`. See requirements section 3.2.
 - **Verification**: `npm run typecheck`
 
 ### TASK-012: Extract LANDABLE TextStyle to module-level constant
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `_asteroids.ts` (line 210), `label.style = { ... }` replaces the entire TextStyle object every frame for LANDABLE labels, triggering GPU texture re-uploads. Create a shared `const LANDABLE_STYLE` at module level and assign it once. In the per-frame render, only set the style if it hasn't been assigned yet. See requirements section 3.3.
 - **Verification**: `npm run typecheck`
@@ -91,7 +91,7 @@ See `.devloop/requirements.md` for full context on each item.
 ## Save System
 
 ### TASK-013: Validate binary envelope format version during import
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `saveload.ts` (line 833), the binary envelope format version is read (`const _version = view.getUint16(4, false)`) but never validated. After reading the version, compare it against the current supported version (1). If higher, return a clear error message ("Save was created with a newer version of the game"). Version 1 and below proceed normally. See requirements section 4.1.
 - **Verification**: `npx vitest run src/tests/saveload.test.ts`
@@ -101,7 +101,7 @@ See `.devloop/requirements.md` for full context on each item.
 ## Architecture
 
 ### TASK-014: Add renameOrbitalObject core function
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: `_mapView.ts:248` directly mutates `obj!.name = newName`, violating the convention that state mutations happen only in `src/core/`. Create a `renameOrbitalObject(state: GameState, objectId: string, newName: string)` function in an appropriate core module. Call it from `_mapView.ts` instead of the direct mutation. See requirements section 5.1.
 - **Verification**: `npm run typecheck`
@@ -111,7 +111,7 @@ See `.devloop/requirements.md` for full context on each item.
 ## Type Safety & Polish
 
 ### TASK-015: Remove spurious cast in lifeSupport.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: `lifeSupport.ts:91` has an unnecessary `as unknown as` cast — `CrewMember` already declares all needed fields. Remove the cast and access properties directly. This reduces the project-wide cast count from 4 to 3. See requirements section 6.1.
 - **Verification**: `npm run typecheck`

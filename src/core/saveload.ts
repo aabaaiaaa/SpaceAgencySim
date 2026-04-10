@@ -830,7 +830,13 @@ function _importBinaryEnvelope(bytes: Uint8Array, slotIndex: number): SaveSlotSu
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 
   // Read header fields.
-  const _version = view.getUint16(4, false);
+  const version = view.getUint16(4, false);
+  if (version > ENVELOPE_FORMAT_VERSION) {
+    throw new Error(
+      'Save was created with a newer version of the game. ' +
+      `Please update to load this save (save version: ${version}, supported: ${ENVELOPE_FORMAT_VERSION}).`
+    );
+  }
   const expectedCrc = view.getUint32(6, false);
   const payloadLength = view.getUint32(10, false);
 

@@ -576,7 +576,7 @@ export function renderMapFrame(
   _drawOrbitalObjects(state, flightState, cx, cy, scale, bodyId, options);
 
   // 3a. Belt asteroid objects (selectable, drawn above orbital objects).
-  _drawBeltAsteroidObjects(ps, cx, cy, scale, bodyId);
+  _drawBeltAsteroidObjects(ps, cx, cy, scale, bodyId, w, h);
 
   // 4. Craft orbit, position, and predictions.
   _drawCraft(ps, flightState, cx, cy, scale, bodyId);
@@ -905,6 +905,8 @@ function _drawBeltAsteroidObjects(
   cy: number,
   scale: number,
   bodyId: string,
+  w: number,
+  h: number,
 ): void {
   if (!_mapRoot || !_asteroidObjGraphics) return;
   _asteroidObjGraphics.clear();
@@ -928,6 +930,8 @@ function _drawBeltAsteroidObjects(
 
     const sx = cx + astMapX * scale;
     const sy = cy - astMapY * scale;
+
+    if (sx < -10 || sx > w + 10 || sy < -10 || sy > h + 10) continue;
 
     const isTarget = ast.id === _selectedTarget;
     const dotColor = isTarget ? ASTEROID_TARGET_COLOR : ASTEROID_DOT_COLOR;
