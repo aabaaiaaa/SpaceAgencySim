@@ -1,14 +1,9 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 7,
+  "lastIteration": 8,
   "startedAt": "2026-04-10T06:31:29.602Z",
   "iteration": 4,
   "devloopVersion": "4.0.1",
-  "activeTask": {
-    "taskId": "TASK-026",
-    "taskTitle": "Verification pass — run all checks",
-    "iterationNumber": 8,
-    "startedAt": "2026-04-10T07:30:29.535Z"
-  }
+  "activeTask": null
 }

@@ -2209,6 +2209,7 @@ test.describe('Asteroid Belt — heavy arm range, collision cooldown, alignment 
         const physics = await import('/src/core/physics.ts');
         const beltMod = await import('/src/core/asteroidBelt.ts');
         const constants = await import('/src/core/constants.ts');
+        const partsData = await import('/src/data/parts.ts');
 
         const ps = window.__flightPs;
         const fs = window.__flightState;
@@ -2237,11 +2238,11 @@ test.describe('Asteroid Belt — heavy arm range, collision cooldown, alignment 
         // Set throttle and fire engines to generate thrust.
         ps.throttle = 1.0;
         ps.angularVelocity = 0; // reset to measure change
-        // Fire all engines.
+        // Fire all engines (no await in loop — must stay synchronous after capture).
         for (const instanceId of ps.activeParts) {
           const placed = assembly.parts.get(instanceId);
           if (!placed) continue;
-          const partDef = (await import('/src/data/parts.ts')).getPartById(placed.partId);
+          const partDef = partsData.getPartById(placed.partId);
           if (partDef && partDef.type === 'ENGINE') {
             ps.firingEngines.add(instanceId);
           }

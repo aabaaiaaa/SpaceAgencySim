@@ -99,6 +99,37 @@ vi.mock('../ui/escapeHtml.ts', () => ({
   escapeHtml: (s) => s,
 }));
 
+// ---------------------------------------------------------------------------
+// Minimal DOM stub — buildMapHud/destroyMapHud use document.createElement etc.
+// Node.js test environment has no DOM.
+// ---------------------------------------------------------------------------
+
+function _stubElement() {
+  const el = {
+    id: '',
+    className: '',
+    textContent: '',
+    innerHTML: '',
+    style: { display: '', cssText: '', setProperty() {} },
+    children: [],
+    appendChild(c) { el.children.push(c); return c; },
+    removeChild(c) { const i = el.children.indexOf(c); if (i >= 0) el.children.splice(i, 1); return c; },
+    remove() {},
+    querySelector() { return null; },
+    querySelectorAll() { return []; },
+    addEventListener() {},
+    removeEventListener() {},
+    setAttribute() {},
+  };
+  return el;
+}
+
+globalThis.document = globalThis.document || {
+  createElement: () => _stubElement(),
+  getElementById: () => null,
+  body: _stubElement(),
+};
+
 const _notifyMock = vi.hoisted(() => ({
   showPhaseNotification: vi.fn(),
 }));
@@ -114,6 +145,7 @@ import {
   resetFCState,
   setPhysicsState,
   setFlightState,
+  getFlightState,
 } from '../ui/flightController/_state.ts';
 import {
   toggleMapView,
@@ -371,6 +403,9 @@ describe('handleWarpToTarget', () => {
   });
 
   it('shows notification when no target is selected', () => {
+    // Provide orbitalElements so handleWarpToTarget doesn't early-return.
+    const fs = getFlightState();
+    fs.orbitalElements = { sma: 6771000, ecc: 0, inc: 0, argPe: 0, lan: 0, trueAnomaly: 0 };
     _mapMock._setTarget(null);
     handleWarpToTarget();
     expect(showPhaseNotification).toHaveBeenCalledWith(
@@ -379,6 +414,8 @@ describe('handleWarpToTarget', () => {
   });
 
   it('shows notification when target not found in orbital objects', () => {
+    const fs = getFlightState();
+    fs.orbitalElements = { sma: 6771000, ecc: 0, inc: 0, argPe: 0, lan: 0, trueAnomaly: 0 };
     _mapMock._setTarget('nonexistent');
     handleWarpToTarget();
     expect(showPhaseNotification).toHaveBeenCalledWith('Target not found');

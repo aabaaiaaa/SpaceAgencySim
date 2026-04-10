@@ -2976,8 +2976,9 @@ describe('CapturedBody — total mass includes asteroid', () => {
     const psA = createPhysicsState(assemblyA, fsA);
     const psB = createPhysicsState(assemblyB, fsB);
 
-    // Attach a heavy asteroid to rocket B.
-    setCapturedBody(psB, { mass: 50_000, radius: 100, offset: { x: 0, y: 0 }, name: 'HEAVY' });
+    // Attach a moderately heavy asteroid to rocket B.
+    // Must be light enough that TWR > 1 at low altitude so velY stays positive.
+    setCapturedBody(psB, { mass: 500, radius: 10, offset: { x: 0, y: 0 }, name: 'HEAVY' });
     setThrustAligned(psB, true); // suppress torque so we compare linear only
 
     // Fire engines on both.

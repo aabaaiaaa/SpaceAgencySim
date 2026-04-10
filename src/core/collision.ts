@@ -775,11 +775,8 @@ export function checkAsteroidCollisions(
   asteroids: readonly Asteroid[],
   flightState: FlightState,
 ): AsteroidCollisionResult[] {
-  // Skip if craft is not flying.
-  if (ps.landed || ps.crashed || ps.activeParts.size === 0) return [];
-  if (asteroids.length === 0) return [];
-
-  // Decrement active asteroid collision cooldowns and remove expired entries.
+  // Decrement active asteroid collision cooldowns and remove expired entries
+  // every tick, even if there are no asteroids or the craft is inactive.
   for (const [id, ticks] of _asteroidCollisionCooldowns) {
     if (ticks <= 1) {
       _asteroidCollisionCooldowns.delete(id);
@@ -787,6 +784,10 @@ export function checkAsteroidCollisions(
       _asteroidCollisionCooldowns.set(id, ticks - 1);
     }
   }
+
+  // Skip if craft is not flying.
+  if (ps.landed || ps.crashed || ps.activeParts.size === 0) return [];
+  if (asteroids.length === 0) return [];
 
   // Compute craft AABB once.
   const craftAABB = computeAABB(

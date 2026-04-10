@@ -10,7 +10,7 @@
  *   tickCollisions          — integration with physics loop, cooldowns
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
   computeAABB,
   testAABBOverlap,
@@ -1146,6 +1146,10 @@ describe('applyAsteroidDamage()', () => {
 });
 
 describe('checkAsteroidCollisions()', () => {
+  beforeEach(() => {
+    resetAsteroidCollisionCooldowns();
+  });
+
   it('returns empty when no asteroids overlap the craft', () => {
     const { ps, assembly, fs } = makeAsteroidTestCraft({ posX: 0, posY: 0 });
 
