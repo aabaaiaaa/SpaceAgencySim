@@ -44,7 +44,7 @@
     "core/collision": {
       "sources": ["src/core/collision.ts"],
       "unit": ["src/tests/collision.test.ts"],
-      "e2e": ["e2e/collision.spec.js"]
+      "e2e": ["e2e/collision.spec.js", "e2e/asteroid-belt.spec.js"]
     },
     "core/fuelsystem": {
       "sources": ["src/core/fuelsystem.ts"],
@@ -114,7 +114,7 @@
     "core/docking": {
       "sources": ["src/core/docking.ts", "src/core/grabbing.ts"],
       "unit": ["src/tests/docking.test.ts", "src/tests/grabbing.test.ts"],
-      "e2e": ["e2e/orbital-operations.spec.js"]
+      "e2e": ["e2e/orbital-operations.spec.js", "e2e/asteroid-belt.spec.js"]
     },
     "core/power": {
       "sources": ["src/core/power.ts", "src/core/lifeSupport.ts"],
@@ -324,6 +324,21 @@
     "render/pool": {
       "sources": ["src/render/pool.ts"],
       "unit": ["src/tests/pool.test.ts", "src/tests/render-flight-pool.test.ts"],
+      "e2e": []
+    },
+    "core/asteroidBelt": {
+      "sources": ["src/core/asteroidBelt.ts"],
+      "unit": ["src/tests/asteroidBelt.test.ts"],
+      "e2e": ["e2e/asteroid-belt.spec.js"]
+    },
+    "core/settingsStore": {
+      "sources": ["src/core/settingsStore.ts"],
+      "unit": ["src/tests/settingsStore.test.ts"],
+      "e2e": []
+    },
+    "core/crc32": {
+      "sources": ["src/core/crc32.ts"],
+      "unit": ["src/tests/crc32.test.ts"],
       "e2e": []
     },
     "e2e-infra": {

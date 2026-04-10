@@ -119,7 +119,7 @@ export function isNodeUnlocked(state: GameState, nodeId: string): boolean {
 export function getMaxResearchableTier(state: GameState): number {
   if (!hasFacility(state, FacilityId.RD_LAB)) return 0;
   const rdTier = state.facilities[FacilityId.RD_LAB]?.tier ?? 1;
-  return (RD_TIER_MAX_TECH as Record<number, number>)[rdTier] ?? 5;
+  return (RD_TIER_MAX_TECH as Record<number, number>)[rdTier] ?? 6;
 }
 
 /**

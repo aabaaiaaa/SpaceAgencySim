@@ -40,7 +40,7 @@ describe('asteroidBelt', () => {
       expect(asteroids).toHaveLength(10);
     });
 
-    it('generates 30 asteroids for DENSE', () => {
+    it('generates 30 asteroids for DENSE @smoke', () => {
       const asteroids = generateBeltAsteroids(
         BeltZone.DENSE,
         400_000_000_000,
@@ -290,7 +290,7 @@ describe('asteroidBelt', () => {
   // -------------------------------------------------------------------------
 
   describe('getBeltZoneAtAltitude', () => {
-    it('returns OUTER_A for altitude within 329-374 billion m', () => {
+    it('returns OUTER_A for altitude within 329-374 billion m @smoke', () => {
       expect(getBeltZoneAtAltitude(329_000_000_000)).toBe(BeltZone.OUTER_A);
       expect(getBeltZoneAtAltitude(350_000_000_000)).toBe(BeltZone.OUTER_A);
       expect(getBeltZoneAtAltitude(373_999_999_999)).toBe(BeltZone.OUTER_A);

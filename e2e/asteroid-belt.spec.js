@@ -46,14 +46,14 @@ test.describe('Asteroid Belt — zone definitions', () => {
   /** @type {import('@playwright/test').Page} */
   let page;
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeEach(async ({ browser }) => {
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = buildSaveEnvelope({ tutorialMode: false });
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
+  test.afterEach(async () => { await page.close(); });
 
   test('@smoke belt zones are defined on the Sun body with correct boundaries', async () => {
     const beltInfo = await page.evaluate(() => {
@@ -164,7 +164,7 @@ test.describe('Asteroid Belt — solar system map visibility', () => {
   /** @type {import('@playwright/test').Page} */
   let page;
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeEach(async ({ browser }) => {
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     // Use an orbital-capable save so the map view is fully available.
@@ -172,7 +172,7 @@ test.describe('Asteroid Belt — solar system map visibility', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
+  test.afterEach(async () => { await page.close(); });
 
   test('Sun body definition includes belt data accessible from map', async () => {
     // The map renderer reads from CELESTIAL_BODIES.SUN.altitudeBands.
@@ -220,7 +220,7 @@ test.describe('Asteroid Belt — orbit detection and asteroid counts', () => {
   /** @type {import('@playwright/test').Page} */
   let page;
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeEach(async ({ browser }) => {
     test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
@@ -228,7 +228,7 @@ test.describe('Asteroid Belt — orbit detection and asteroid counts', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
+  test.afterEach(async () => { await page.close(); });
 
   test('asteroid count constants: dense zone spawns more than outer zones', async () => {
     // Start a flight so that modules are loaded and accessible.
@@ -275,7 +275,7 @@ test.describe('Asteroid Belt — unsafe orbit hub-return rules', () => {
   /** @type {import('@playwright/test').Page} */
   let page;
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeEach(async ({ browser }) => {
     test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
@@ -283,7 +283,7 @@ test.describe('Asteroid Belt — unsafe orbit hub-return rules', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
+  test.afterEach(async () => { await page.close(); });
 
   test('dense belt zone unsafe flag blocks hub return logic', async () => {
     // Verify at the data level that the dense belt zone carries the unsafe
@@ -452,7 +452,7 @@ test.describe('Asteroid Belt — asteroid selection and targeting', () => {
   /** @type {import('@playwright/test').Page} */
   let page;
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeEach(async ({ browser }) => {
     test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
@@ -460,7 +460,7 @@ test.describe('Asteroid Belt — asteroid selection and targeting', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
+  test.afterEach(async () => { await page.close(); });
 
   test('belt zone configuration supports asteroid generation with correct zone counts', async () => {
     // Verify the belt zone definitions provide the data needed for
@@ -645,7 +645,7 @@ test.describe('Asteroid Belt — collision damage at speed', () => {
   /** @type {import('@playwright/test').Page} */
   let page;
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeEach(async ({ browser }) => {
     test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
@@ -653,7 +653,7 @@ test.describe('Asteroid Belt — collision damage at speed', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
+  test.afterEach(async () => { await page.close(); });
 
   test('relative velocity determines damage classification', async () => {
     // Verify the damage classification thresholds from the collision module.
@@ -881,7 +881,7 @@ test.describe('Asteroid Belt — transfer trajectory safety', () => {
   /** @type {import('@playwright/test').Page} */
   let page;
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeEach(async ({ browser }) => {
     test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
@@ -889,7 +889,7 @@ test.describe('Asteroid Belt — transfer trajectory safety', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
+  test.afterEach(async () => { await page.close(); });
 
   test('no active asteroids during TRANSFER phase at belt altitude @smoke', async () => {
     // Start a flight and teleport to TRANSFER phase at belt altitude.
@@ -941,6 +941,19 @@ test.describe('Asteroid Belt — transfer trajectory safety', () => {
   });
 
   test('flight render only shows belt asteroids during ORBIT phase (not TRANSFER)', async () => {
+    // Each test must set up its own state — start a flight and teleport to TRANSFER.
+    await startTestFlight(page, PROBE, { bodyId: 'SUN' });
+
+    const denseMidpoint = 396_500_000_000;
+    await teleportCraft(page, {
+      posX: denseMidpoint,
+      posY: 0,
+      velX: 0,
+      velY: 25_000, // transfer trajectory velocity
+      bodyId: 'SUN',
+      phase: 'TRANSFER',
+    });
+
     // Verify that the render layer's condition for showing asteroids
     // requires ORBIT phase. The render layer checks:
     //   flightState.phase === 'ORBIT' && hasAsteroids()
@@ -1036,7 +1049,7 @@ test.describe('Asteroid Belt — asteroid capture with grabbing arm', () => {
   // Parts list includes the standard grabbing arm.
   const GRAB_PROBE = ['probe-core-mk1', 'grabbing-arm', 'tank-small', 'engine-spark'];
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeEach(async ({ browser }) => {
     test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
@@ -1051,7 +1064,7 @@ test.describe('Asteroid Belt — asteroid capture with grabbing arm', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
+  test.afterEach(async () => { await page.close(); });
 
   test('captureAsteroid succeeds when in range, velocity matched, and within mass limit @smoke', async () => {
     await startTestFlight(page, GRAB_PROBE, { bodyId: 'SUN' });
@@ -1216,7 +1229,7 @@ test.describe('Asteroid Belt — thrust alignment after capture', () => {
 
   const GRAB_PROBE = ['probe-core-mk1', 'grabbing-arm', 'tank-small', 'engine-spark'];
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeEach(async ({ browser }) => {
     test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
@@ -1229,7 +1242,7 @@ test.describe('Asteroid Belt — thrust alignment after capture', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
+  test.afterEach(async () => { await page.close(); });
 
   test('alignThrustWithAsteroid succeeds after capture and sets thrustAligned @smoke', async () => {
     await startTestFlight(page, GRAB_PROBE, { bodyId: 'SUN' });
@@ -1441,7 +1454,7 @@ test.describe('Asteroid Belt — captured asteroid persistence', () => {
 
   const GRAB_PROBE = ['probe-core-mk1', 'grabbing-arm', 'tank-small', 'engine-spark'];
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeEach(async ({ browser }) => {
     test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
@@ -1454,7 +1467,7 @@ test.describe('Asteroid Belt — captured asteroid persistence', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
+  test.afterEach(async () => { await page.close(); });
 
   test('released asteroid persists as OrbitalObject when outside belt zones @smoke', async () => {
     await startTestFlight(page, GRAB_PROBE, { bodyId: 'SUN' });
@@ -1629,7 +1642,7 @@ test.describe('Asteroid Belt — asteroid rename', () => {
 
   const GRAB_PROBE = ['probe-core-mk1', 'grabbing-arm', 'tank-small', 'engine-spark'];
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeEach(async ({ browser }) => {
     test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
@@ -1641,7 +1654,7 @@ test.describe('Asteroid Belt — asteroid rename', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
+  test.afterEach(async () => { await page.close(); });
 
   test('persistent asteroid can be renamed via orbitalObjects mutation', async () => {
     await startTestFlight(page, GRAB_PROBE, { bodyId: 'SUN' });
@@ -1727,7 +1740,7 @@ test.describe('Asteroid Belt — grabbing arm tier mass limits', () => {
   /** @type {import('@playwright/test').Page} */
   let page;
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeEach(async ({ browser }) => {
     test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
@@ -1740,7 +1753,7 @@ test.describe('Asteroid Belt — grabbing arm tier mass limits', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
+  test.afterEach(async () => { await page.close(); });
 
   test('standard arm rejects asteroid exceeding 100,000 kg mass limit @smoke', async () => {
     // Use only the standard grabbing arm (100,000 kg limit).

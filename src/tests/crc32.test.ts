@@ -7,7 +7,7 @@ describe('crc32', () => {
     expect(result).toBe(0x00000000);
   });
 
-  it('returns 0xCBF43926 for ASCII "123456789"', () => {
+  it('returns 0xCBF43926 for ASCII "123456789" @smoke', () => {
     const data = new TextEncoder().encode('123456789');
     const result = crc32(data);
     expect(result).toBe(0xCBF43926);
@@ -30,7 +30,7 @@ describe('crc32', () => {
     expect(result).toBe(0xA505DF1B);
   });
 
-  it('produces different results for different inputs', () => {
+  it('produces different results for different inputs @smoke', () => {
     const a = crc32(new Uint8Array([0x00]));
     const b = crc32(new Uint8Array([0x01]));
     expect(a).not.toBe(b);

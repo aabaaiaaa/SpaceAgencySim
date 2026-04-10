@@ -218,18 +218,17 @@ export function handleRenameAsteroid(): void {
   // Create a simple prompt overlay.
   const overlay = document.createElement('div');
   overlay.id = 'rename-asteroid-overlay';
-  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:10000;';
+  overlay.classList.add('rename-asteroid-overlay');
 
   const dialog = document.createElement('div');
-  dialog.style.cssText = 'background:#1a1a2e;border:1px solid #444;border-radius:8px;padding:20px;min-width:300px;color:#fff;';
+  dialog.classList.add('rename-asteroid-dialog');
   dialog.innerHTML = `
-    <div style="font-size:16px;margin-bottom:12px;">Rename Asteroid</div>
-    <input type="text" id="rename-asteroid-input" value="${escapeHtml(obj.name)}"
-           style="width:100%;padding:8px;background:#0d0d1a;border:1px solid #555;color:#fff;border-radius:4px;box-sizing:border-box;font-size:14px;"
+    <div class="rename-asteroid-title">Rename Asteroid</div>
+    <input type="text" id="rename-asteroid-input" class="rename-asteroid-input" value="${escapeHtml(obj.name)}"
            maxlength="32" />
-    <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end;">
-      <button id="rename-asteroid-cancel" style="padding:6px 16px;background:#333;border:1px solid #555;color:#ccc;border-radius:4px;cursor:pointer;">Cancel</button>
-      <button id="rename-asteroid-confirm" style="padding:6px 16px;background:#2a5298;border:1px solid #4a82d8;color:#fff;border-radius:4px;cursor:pointer;">Rename</button>
+    <div class="rename-asteroid-actions">
+      <button id="rename-asteroid-cancel" class="rename-asteroid-btn rename-asteroid-btn-cancel">Cancel</button>
+      <button id="rename-asteroid-confirm" class="rename-asteroid-btn rename-asteroid-btn-confirm">Rename</button>
     </div>
   `;
   overlay.appendChild(dialog);

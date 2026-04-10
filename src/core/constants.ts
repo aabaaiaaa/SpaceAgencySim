@@ -1051,12 +1051,12 @@ export const ANALYSIS_TRANSMIT_YIELD_MAX: number = 0.60;
  *
  *   R&D Lab Tier 1 -> tech tiers 1-2
  *   R&D Lab Tier 2 -> tech tiers 3-4
- *   R&D Lab Tier 3 -> tech tier 5
+ *   R&D Lab Tier 3 -> tech tiers 5-6
  */
 export const RD_TIER_MAX_TECH: Readonly<Record<number, number>> = Object.freeze({
   1: 2,
   2: 4,
-  3: 5,
+  3: 6,
 });
 
 // ---------------------------------------------------------------------------

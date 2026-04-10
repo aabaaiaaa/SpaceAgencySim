@@ -75,8 +75,8 @@ function noLabState() {
 describe('Tech Tree Data', () => {
 
   describe('TECH_NODES', () => {
-    it('contains exactly 20 nodes (4 branches × 5 tiers)', () => {
-      expect(TECH_NODES).toHaveLength(20);
+    it('contains exactly 21 nodes (4 branches × 5 tiers + 1 tier-6 structural)', () => {
+      expect(TECH_NODES).toHaveLength(21);
     });
 
     it('each node has required fields', () => {
@@ -85,7 +85,7 @@ describe('Tech Tree Data', () => {
         expect(node.name).toBeTruthy();
         expect(Object.values(TechBranch)).toContain(node.branch);
         expect(node.tier).toBeGreaterThanOrEqual(1);
-        expect(node.tier).toBeLessThanOrEqual(5);
+        expect(node.tier).toBeLessThanOrEqual(6);
         expect(typeof node.scienceCost).toBe('number');
         expect(typeof node.fundsCost).toBe('number');
         expect(Array.isArray(node.unlocksParts)).toBe(true);
@@ -99,12 +99,17 @@ describe('Tech Tree Data', () => {
       expect(new Set(ids).size).toBe(ids.length);
     });
 
-    it('each branch has exactly 5 tiers (1 through 5)', () => {
+    it('each branch has at least 5 tiers (1 through 5), structural has 6', () => {
       for (const branch of Object.values(TechBranch)) {
         const nodes = TECH_NODES.filter((n) => n.branch === branch);
-        expect(nodes).toHaveLength(5);
         const tiers = nodes.map((n) => n.tier).sort();
-        expect(tiers).toEqual([1, 2, 3, 4, 5]);
+        if (branch === TechBranch.STRUCTURAL) {
+          expect(nodes).toHaveLength(6);
+          expect(tiers).toEqual([1, 2, 3, 4, 5, 6]);
+        } else {
+          expect(nodes).toHaveLength(5);
+          expect(tiers).toEqual([1, 2, 3, 4, 5]);
+        }
       }
     });
 
@@ -184,8 +189,8 @@ describe('Tech Tree Data', () => {
       expect(node.name).toBe('Field Instruments');
     });
 
-    it('getAllTechNodes returns all 20 nodes', () => {
-      expect(getAllTechNodes()).toHaveLength(20);
+    it('getAllTechNodes returns all 21 nodes', () => {
+      expect(getAllTechNodes()).toHaveLength(21);
     });
   });
 
@@ -197,11 +202,11 @@ describe('Tech Tree Data', () => {
       ]);
     });
 
-    it('Structural: Medium Tank → Radial Attachments → Heavy Structures → Docking Ports → Station Segments', () => {
+    it('Structural: Medium Tank → Radial Attachments → Heavy Structures → Docking Ports → Station Segments → Industrial Grapple', () => {
       const names = getNodesByBranch(TechBranch.STRUCTURAL).map((n) => n.name);
       expect(names).toEqual([
         'Medium Tank', 'Radial Attachments', 'Heavy Structures',
-        'Docking Ports', 'Station Segments',
+        'Docking Ports', 'Station Segments', 'Industrial Grapple',
       ]);
     });
 
@@ -316,10 +321,10 @@ describe('Tech Tree Core Logic', () => {
       expect(getMaxResearchableTier(state)).toBe(4);
     });
 
-    it('returns max tier 5 for R&D Lab tier 3', () => {
+    it('returns max tier 6 for R&D Lab tier 3', () => {
       const state = readyState();
       state.facilities[FacilityId.RD_LAB].tier = 3;
-      expect(getMaxResearchableTier(state)).toBe(5);
+      expect(getMaxResearchableTier(state)).toBe(6);
     });
   });
 
@@ -547,7 +552,7 @@ describe('Tech Tree Aggregation', () => {
     it('returns an entry for every node', () => {
       const state = readyState();
       const status = getTechTreeStatus(state);
-      expect(status).toHaveLength(20);
+      expect(status).toHaveLength(21);
     });
 
     it('marks researched nodes correctly', () => {

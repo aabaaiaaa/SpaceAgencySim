@@ -103,7 +103,7 @@ describe('isAutoSaveEnabled', () => {
 // ---------------------------------------------------------------------------
 
 describe('performAutoSave', () => {
-  it('saves to first empty manual slot when no manual saves exist', async () => {
+  it('saves to first empty manual slot when no manual saves exist @smoke', async () => {
     const state = freshState();
     state.agencyName = 'Test Agency';
 
@@ -148,7 +148,7 @@ describe('performAutoSave', () => {
     expect(result.error).toBe('No state provided');
   });
 
-  it('falls back to IndexedDB on QuotaExceededError', async () => {
+  it('falls back to IndexedDB on QuotaExceededError @smoke', async () => {
     const state = freshState();
     const quotaError = new DOMException('quota exceeded', 'QuotaExceededError');
     mockStorage.setItem = vi.fn(() => { throw quotaError; });

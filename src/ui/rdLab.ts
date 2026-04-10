@@ -2,7 +2,7 @@
  * rdLab.ts — R&D Lab / Tech Tree HTML overlay UI.
  *
  * Displays the technology tree organised by branch (Propulsion, Structural,
- * Recovery, Science) with 5 tiers each.  Nodes can be researched by spending
+ * Recovery, Science) with up to 6 tiers each.  Nodes can be researched by spending
  * science points and funds.
  *
  * @module ui/rdLab

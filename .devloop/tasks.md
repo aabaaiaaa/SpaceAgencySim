@@ -117,7 +117,7 @@ See `.devloop/requirements.md` for full context on each item.
 - **Verification**: `npm run typecheck`
 
 ### TASK-016: Update tech tree descriptions and adjust arm tier placement
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Two changes in `src/data/techtree.js` (or `.ts`) and `src/data/parts.ts`: (1) Update `struct-t4` and `struct-t5` node descriptions to mention grabbing arm unlocks. (2) Currently both Standard and Heavy arms unlock at T4, making Standard immediately obsolete. Move Heavy Grabbing Arm to T5 and Industrial Grabbing Arm to T6. Create new tech tree tiers if T5/T6 don't exist. Update the `techLevel` property on the arm part definitions in `parts.ts` accordingly. See requirements section 6.2.
 - **Verification**: `npm run typecheck && npx vitest run src/tests/techtree.test.ts`
@@ -127,13 +127,13 @@ See `.devloop/requirements.md` for full context on each item.
 ## Technical Debt
 
 ### TASK-017: Move rename dialog inline styles to CSS
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: The asteroid rename dialog in `_mapView.ts:220-232` uses `style.cssText` and inline `style=""` attributes, contradicting the CSS custom property migration from iteration 3. Move these styles to a CSS class in the appropriate stylesheet and replace the inline styles with class-based styling. See requirements section 7.1.
 - **Verification**: `npm run typecheck`
 
 ### TASK-018: Document caller contracts in grabbing.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-002
 - **Description**: After TASK-002 wires `setCapturedBody`/`clearCapturedBody` into `captureAsteroid()`/`releaseGrabbedAsteroid()`, verify that caller contracts are now internal to the module — callers should not need to separately manage physics state. If any implicit contracts remain, document them with JSDoc `@remarks` annotations. See requirements section 7.2.
 - **Verification**: `npm run typecheck`
@@ -143,13 +143,13 @@ See `.devloop/requirements.md` for full context on each item.
 ## Testing Improvements
 
 ### TASK-019: Add missing test-map.json entries and @smoke tags
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Two changes: (1) Add `test-map.json` entries for `asteroidBelt`, `settingsStore`, and `crc32` source modules mapping to their unit test and E2E files. Link `e2e/asteroid-belt.spec.js` from the collision and grabbing entries. (2) Add `@smoke` tags to 1-2 representative tests in each of: `autoSave.test.ts`, `crc32.test.ts`, `settingsStore.test.ts`, `asteroidBelt.test.ts`. Pick tests that exercise the broadest code paths. See requirements sections 9.1 and 9.2.
 - **Verification**: `node scripts/run-affected.mjs --base HEAD~1 --dry-run`
 
 ### TASK-020: Fix E2E test independence in asteroid-belt.spec.js
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Tests within `describe` blocks in `e2e/asteroid-belt.spec.js` share page instances via `beforeAll`/`afterAll` (lines 45-56, 163-175). Convert to `beforeEach`/`afterEach` so each test gets a fresh page instance and can't be affected by prior test failures. See requirements section 9.3. **Note:** Use the Playwright MCP tool to interactively debug any failing E2E tests rather than rerunning blindly.
 - **Verification**: `npx playwright test e2e/asteroid-belt.spec.js`

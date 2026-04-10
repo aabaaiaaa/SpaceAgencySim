@@ -1,7 +1,7 @@
 /**
  * techtree.ts — Technology tree node definitions.
  *
- * The tech tree has 4 branches, each with 5 tiers.  Nodes are unlocked
+ * The tech tree has 4 branches, each with up to 6 tiers.  Nodes are unlocked
  * by spending science points AND funds at the R&D Lab facility.
  *
  * BRANCHES
@@ -18,6 +18,7 @@
  *   T3 =  60 sci / $200,000
  *   T4 = 120 sci / $400,000
  *   T5 = 200 sci / $750,000
+ *   T6 = 300 sci / $1,200,000
  *
  * RULES
  * =====
@@ -67,6 +68,7 @@ export const TIER_COSTS: Readonly<Record<number, Readonly<{ science: number; fun
   3: Object.freeze({ science: 60,  funds: 200_000 }),
   4: Object.freeze({ science: 120, funds: 400_000 }),
   5: Object.freeze({ science: 200, funds: 750_000 }),
+  6: Object.freeze({ science: 300, funds: 1_200_000 }),
 });
 
 // ---------------------------------------------------------------------------
@@ -81,7 +83,7 @@ export interface TechNodeDef {
   name: string;
   /** TechBranch value. */
   branch: TechBranch;
-  /** Tech tier (1–5). */
+  /** Tech tier (1–6). */
   tier: number;
   /** Science points required to research. */
   scienceCost: number;
@@ -99,7 +101,7 @@ export interface TechNodeDef {
 // Node Definitions
 // ---------------------------------------------------------------------------
 
-/** Complete tech tree: 4 branches × 5 tiers = 20 nodes. */
+/** Complete tech tree: 4 branches × up to 6 tiers = 21 nodes. */
 export const TECH_NODES: ReadonlyArray<Readonly<TechNodeDef>> = Object.freeze([
 
   // ── Propulsion Branch ────────────────────────────────────────────────────
@@ -209,9 +211,9 @@ export const TECH_NODES: ReadonlyArray<Readonly<TechNodeDef>> = Object.freeze([
     tier:               4,
     scienceCost:        TIER_COSTS[4].science,
     fundsCost:          TIER_COSTS[4].funds,
-    unlocksParts:       ['docking-port-std', 'docking-port-small', 'relay-antenna', 'antenna-relay', 'grabbing-arm', 'grabbing-arm-heavy'],
+    unlocksParts:       ['docking-port-std', 'docking-port-small', 'relay-antenna', 'antenna-relay', 'grabbing-arm'],
     unlocksInstruments: [],
-    description:        'Docking mechanisms, grabbing arms, orbital assembly, and interplanetary relay dishes.',
+    description:        'Docking mechanisms, a standard grabbing arm for satellite servicing, orbital assembly, and interplanetary relay dishes.',
   }),
 
   Object.freeze({
@@ -221,9 +223,21 @@ export const TECH_NODES: ReadonlyArray<Readonly<TechNodeDef>> = Object.freeze([
     tier:               5,
     scienceCost:        TIER_COSTS[5].science,
     fundsCost:          TIER_COSTS[5].funds,
-    unlocksParts:       ['station-habitat', 'station-truss', 'grabbing-arm-industrial'],
+    unlocksParts:       ['station-habitat', 'station-truss', 'grabbing-arm-heavy'],
     unlocksInstruments: [],
-    description:        'Pressurised habitation modules and structural trusses for orbital stations.',
+    description:        'Pressurised habitation modules, structural trusses for orbital stations, and a heavy grabbing arm for medium asteroid capture.',
+  }),
+
+  Object.freeze({
+    id:                 'struct-t6',
+    name:               'Industrial Grapple',
+    branch:             TechBranch.STRUCTURAL,
+    tier:               6,
+    scienceCost:        TIER_COSTS[6].science,
+    fundsCost:          TIER_COSTS[6].funds,
+    unlocksParts:       ['grabbing-arm-industrial'],
+    unlocksInstruments: [],
+    description:        'An industrial-grade grapple system capable of capturing large asteroids approaching 1 km in diameter.',
   }),
 
   // ── Recovery Branch ──────────────────────────────────────────────────────

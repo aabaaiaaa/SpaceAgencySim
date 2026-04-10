@@ -95,7 +95,7 @@ describe('settingsStore', () => {
   // -----------------------------------------------------------------------
 
   describe('round-trip', () => {
-    it('should save settings and load them back identically', () => {
+    it('should save settings and load them back identically @smoke', () => {
       const settings = customSettings();
       saveSettings(settings);
 
@@ -217,7 +217,7 @@ describe('settingsStore', () => {
   // -----------------------------------------------------------------------
 
   describe('migrateSettings', () => {
-    it('should extract legacy settings from gameState and persist them', () => {
+    it('should extract legacy settings from gameState and persist them @smoke', () => {
       const legacyState: Record<string, unknown> = {
         autoSaveEnabled: false,
         debugMode: true,

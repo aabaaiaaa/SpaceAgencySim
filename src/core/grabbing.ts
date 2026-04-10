@@ -242,6 +242,13 @@ export function getAsteroidGrabTargetsInRange(
  * Attempt to capture an asteroid with the grabbing arm.
  * Enforces mass limits per arm tier — uses the best (highest maxCaptureMass)
  * arm on the craft.
+ *
+ * @remarks
+ * Physics state is managed internally — on success this calls
+ * {@link setCapturedBody} so callers must NOT separately update
+ * `ps.capturedBody`.  After a successful capture the caller may optionally
+ * call {@link alignThrustWithAsteroid} to align the thrust vector, and
+ * should eventually call {@link releaseGrabbedAsteroid} to detach.
  */
 export function captureAsteroid(
   grabState: GrabSystemState,
@@ -309,6 +316,16 @@ export function captureAsteroid(
  * Release a captured asteroid.
  * Returns the asteroid object so the caller can restore it to the
  * active asteroid list if needed.
+ *
+ * @remarks
+ * Physics state is managed internally — this calls
+ * {@link clearCapturedBody} and resets thrust alignment, so callers
+ * must NOT separately update `ps.capturedBody` or `ps.thrustAligned`.
+ *
+ * After release, callers should pass the returned asteroid to
+ * {@link persistReleasedAsteroid} to decide whether it becomes a
+ * persistent orbital object (outside belt zones) or returns to the
+ * procedural field (inside belt zones).
  */
 export function releaseGrabbedAsteroid(
   grabState: GrabSystemState,
@@ -333,6 +350,13 @@ export function releaseGrabbedAsteroid(
  * The grabbing arm articulates to position the asteroid so that the engine
  * thrust vector passes through the combined centre of mass, eliminating
  * rotational torque from off-axis thrust.
+ *
+ * @remarks
+ * Physics state is managed internally — this calls
+ * {@link setThrustAligned} so callers must NOT separately set
+ * `ps.thrustAligned`.  Prefer this function over calling
+ * `setThrustAligned` directly, as it validates that a capture is
+ * active and not already aligned.
  *
  * @returns `{ success: true }` when alignment is set, or `{ success: false, reason }` on failure.
  */
@@ -360,6 +384,12 @@ export function alignThrustWithAsteroid(
 /**
  * Break thrust alignment after manual rotation.
  * Called when the player rotates the craft while an asteroid is captured.
+ *
+ * @remarks
+ * Physics state is managed internally — this calls
+ * {@link setThrustAligned}(false) when appropriate.  Safe to call
+ * unconditionally; it no-ops if no asteroid is captured or thrust is
+ * already unaligned.
  */
 export function breakThrustAlignment(ps: PhysicsState): void {
   if (ps.capturedBody !== null && ps.thrustAligned) {
@@ -376,7 +406,15 @@ export function breakThrustAlignment(ps: PhysicsState): void {
  * OrbitalObject (when outside all belt zones) or simply let it return to the
  * procedural field (when inside a belt zone).
  *
- * Call this *after* `releaseGrabbedAsteroid()` returns the asteroid.
+ * @remarks
+ * This is the second step of a two-step release flow:
+ * 1. Call {@link releaseGrabbedAsteroid} — detaches asteroid, clears physics
+ *    state, and returns the asteroid object.
+ * 2. Call this function with the returned asteroid — handles persistence.
+ *
+ * Physics state is already cleared by step 1; this function only reads
+ * `ps` for position/velocity and mutates `state.orbitalObjects` when
+ * persisting.
  *
  * @param asteroid  The asteroid returned by `releaseGrabbedAsteroid()`.
  * @param ps        Current physics state (provides craft position & velocity).
