@@ -2,9 +2,27 @@
  * Data factories for E2E tests — crew members, contracts, and objectives.
  */
 
+import type { ObjectiveTemplate } from './_constants.js';
+
 // ---------------------------------------------------------------------------
 // Crew factory
 // ---------------------------------------------------------------------------
+
+export interface CrewSkills {
+  piloting: number;
+  engineering: number;
+  science: number;
+}
+
+export interface CrewMember {
+  id: string;
+  name: string;
+  status: string;
+  salary: number;
+  hireDate: string;
+  skills: CrewSkills;
+  missionsFlown: number;
+}
 
 /**
  * Create a crew member object for use in save envelopes.
@@ -20,13 +38,35 @@ export function buildCrewMember({
   hireDate    = new Date().toISOString(),
   skills      = { piloting: 50, engineering: 50, science: 50 },
   missionsFlown = 0,
-} = {}) {
+}: Partial<CrewMember> = {}): CrewMember {
   return { id, name, status, salary, hireDate, skills, missionsFlown };
 }
 
 // ---------------------------------------------------------------------------
 // Contract factory
 // ---------------------------------------------------------------------------
+
+export interface Contract {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  objectives: ObjectiveTemplate[];
+  bonusObjectives: ObjectiveTemplate[];
+  bonusReward: number;
+  reward: number;
+  penaltyFee: number;
+  reputationReward: number;
+  reputationPenalty: number;
+  deadlinePeriod: number | null;
+  boardExpiryPeriod: number;
+  generatedPeriod: number;
+  acceptedPeriod: number | null;
+  chainId: string | null;
+  chainPart: number | null;
+  chainTotal: number | null;
+  conflictTags: string[];
+}
 
 /**
  * Create a contract object for use in save envelopes.
@@ -54,7 +94,7 @@ export function buildContract({
   chainPart        = null,
   chainTotal       = null,
   conflictTags     = [],
-} = {}) {
+}: Partial<Contract> = {}): Contract {
   return {
     id, title, description, category, objectives, bonusObjectives,
     bonusReward, reward, penaltyFee, reputationReward, reputationPenalty,
@@ -79,6 +119,6 @@ export function buildObjective({
   target      = { altitude: 100 },
   completed   = false,
   description = '',
-} = {}) {
+}: Partial<ObjectiveTemplate> = {}): ObjectiveTemplate {
   return { id, type, target, completed, description };
 }

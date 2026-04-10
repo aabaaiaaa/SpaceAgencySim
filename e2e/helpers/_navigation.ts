@@ -2,12 +2,30 @@
  * Screen navigation and UI interaction helpers for E2E tests.
  */
 
+import type { Page } from '@playwright/test';
+
+// ---------------------------------------------------------------------------
+// Browser-context window augmentation (these globals are injected at runtime)
+// ---------------------------------------------------------------------------
+
+/* eslint-disable @typescript-eslint/consistent-type-definitions */
+declare global {
+  interface Window {
+    __vabAssembly?: {
+      parts?: { size: number };
+    };
+  }
+}
+/* eslint-enable @typescript-eslint/consistent-type-definitions */
+
+// ---------------------------------------------------------------------------
+// Navigation helpers
+// ---------------------------------------------------------------------------
+
 /**
  * Dismiss the welcome modal if it is showing. No-ops if it is not present.
- *
- * @param {import('@playwright/test').Page} page
  */
-export async function dismissWelcomeModal(page) {
+export async function dismissWelcomeModal(page: Page): Promise<void> {
   const btn = page.locator('#welcome-dismiss-btn');
   try {
     await btn.waitFor({ state: 'visible', timeout: 2_000 });
@@ -20,13 +38,13 @@ export async function dismissWelcomeModal(page) {
 /**
  * Drag a part card from the VAB parts panel and drop it at (targetX, targetY)
  * in viewport coordinates.
- *
- * @param {import('@playwright/test').Page} page
- * @param {string} partId    data-part-id of the card to drag
- * @param {number} targetX   Drop viewport X
- * @param {number} targetY   Drop viewport Y
  */
-export async function dragPartToCanvas(page, partId, targetX, targetY) {
+export async function dragPartToCanvas(
+  page: Page,
+  partId: string,
+  targetX: number,
+  targetY: number,
+): Promise<void> {
   const card    = page.locator(`.vab-part-card[data-part-id="${partId}"]`);
   await card.scrollIntoViewIfNeeded();
   const cardBox = await card.boundingBox();
@@ -43,10 +61,8 @@ export async function dragPartToCanvas(page, partId, targetX, targetY) {
 
 /**
  * From the hub, navigate to the VAB and wait for it to fully initialise.
- *
- * @param {import('@playwright/test').Page} page
  */
-export async function navigateToVab(page) {
+export async function navigateToVab(page: Page): Promise<void> {
   await page.click('[data-building-id="vab"]');
   await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 15_000 });
   await page.waitForFunction(
@@ -54,17 +70,17 @@ export async function navigateToVab(page) {
     { timeout: 15_000 },
   );
 
-  // Disable auto-zoom and reset zoom to 1× so that viewport-pixel offsets
+  // Disable auto-zoom and reset zoom to 1x so that viewport-pixel offsets
   // used by placePart / dragPartToCanvas map 1:1 to world units.
   await page.evaluate(() => {
     const chk = document.getElementById('vab-chk-autozoom');
-    if (chk && chk.checked) {
-      chk.checked = false;
+    if (chk && (chk as HTMLInputElement).checked) {
+      (chk as HTMLInputElement).checked = false;
       chk.dispatchEvent(new Event('change'));
     }
     const slider = document.getElementById('vab-zoom-slider');
     if (slider) {
-      slider.value = '1';
+      (slider as HTMLInputElement).value = '1';
       slider.dispatchEvent(new Event('input'));
     }
   });
@@ -73,14 +89,14 @@ export async function navigateToVab(page) {
 /**
  * Drag a part onto the canvas and wait for the assembly part count to reach
  * at least {@link expectedCount}.
- *
- * @param {import('@playwright/test').Page} page
- * @param {string} partId         data-part-id of the card to drag
- * @param {number} targetX        Drop viewport X
- * @param {number} targetY        Drop viewport Y
- * @param {number} expectedCount  Minimum assembly.parts.size after placement
  */
-export async function placePart(page, partId, targetX, targetY, expectedCount) {
+export async function placePart(
+  page: Page,
+  partId: string,
+  targetX: number,
+  targetY: number,
+  expectedCount: number,
+): Promise<void> {
   await dragPartToCanvas(page, partId, targetX, targetY);
   await page.waitForFunction(
     (n) => (window.__vabAssembly?.parts?.size ?? 0) >= n,
@@ -92,13 +108,11 @@ export async function placePart(page, partId, targetX, targetY, expectedCount) {
 /**
  * Click the Launch button, handle the crew-assignment dialog (if it appears),
  * and wait for the flight scene to be ready (HUD visible + physics state exposed).
- *
- * @param {import('@playwright/test').Page} page
  */
-export async function launchFromVab(page) {
+export async function launchFromVab(page: Page): Promise<void> {
   await page.waitForFunction(
     () => {
-      const btn = document.querySelector('#vab-btn-launch');
+      const btn = document.querySelector('#vab-btn-launch') as HTMLButtonElement | null;
       return btn && !btn.disabled;
     },
     { timeout: 5_000 },
@@ -123,10 +137,8 @@ export async function launchFromVab(page) {
 
 /**
  * Open the construction panel via the hamburger menu.
- *
- * @param {import('@playwright/test').Page} page
  */
-export async function openConstructionPanel(page) {
+export async function openConstructionPanel(page: Page): Promise<void> {
   await page.click('#topbar-menu-btn');
   await page.click('#hub-construction-btn');
   await page.waitForSelector('#construction-panel', { state: 'visible', timeout: 5_000 });
@@ -134,10 +146,8 @@ export async function openConstructionPanel(page) {
 
 /**
  * Open the settings panel via the hamburger menu.
- *
- * @param {import('@playwright/test').Page} page
  */
-export async function openSettingsPanel(page) {
+export async function openSettingsPanel(page: Page): Promise<void> {
   await page.click('#topbar-menu-btn');
   await page.click('#hub-settings-btn');
 }

@@ -25,7 +25,15 @@ declare global {
       };
     };
     __flightPs?: {
-      posY?: number;
+      posX: number;
+      posY: number;
+      velX: number;
+      velY: number;
+      grounded: boolean;
+      landed: boolean;
+      crashed: boolean;
+      throttle: number;
+      firingEngines: Set<string>;
     };
   }
 }

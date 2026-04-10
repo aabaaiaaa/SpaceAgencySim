@@ -65,31 +65,31 @@
 - **Verification**: `npx playwright test e2e/smoke.spec.js --grep @smoke`
 
 ### TASK-011: Convert E2E helper _factories.js to TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-006
 - **Description**: Rename `e2e/helpers/_factories.js` to `e2e/helpers/_factories.ts`. Add Playwright type imports. Type all exported factory functions with explicit parameter types and return types. Use proper interfaces for factory output shapes. Eliminate all `any`. See requirements §5.4.
 - **Verification**: `npx playwright test e2e/smoke.spec.js --grep @smoke`
 
 ### TASK-012: Convert E2E helper _saveFactory.js to TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-006
 - **Description**: Rename `e2e/helpers/_saveFactory.js` to `e2e/helpers/_saveFactory.ts`. Add type imports for save-related types. Type all exported functions with explicit parameter types and return types. Eliminate all `any`. See requirements §5.4.
 - **Verification**: `npx playwright test e2e/smoke.spec.js --grep @smoke`
 
 ### TASK-013: Convert E2E helper _navigation.js to TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-006
 - **Description**: Rename `e2e/helpers/_navigation.js` to `e2e/helpers/_navigation.ts`. Add Playwright type imports (`Page`). Type all exported navigation functions with explicit parameter types and return types. Eliminate all `any`. See requirements §5.4.
 - **Verification**: `npx playwright test e2e/smoke.spec.js --grep @smoke`
 
 ### TASK-014: Convert E2E helper _flight.js to TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-006
 - **Description**: Rename `e2e/helpers/_flight.js` to `e2e/helpers/_flight.ts`. Add Playwright type imports. Type all exported flight helper functions with explicit parameter types and return types. Eliminate all `any`. See requirements §5.4.
 - **Verification**: `npx playwright test e2e/smoke.spec.js --grep @smoke`
 
 ### TASK-015: Convert E2E helper _timewarp.js to TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-006
 - **Description**: Rename `e2e/helpers/_timewarp.js` to `e2e/helpers/_timewarp.ts`. Add Playwright type imports. Type all exported timewarp functions with explicit parameter types and return types. Eliminate all `any`. See requirements §5.4.
 - **Verification**: `npx playwright test e2e/smoke.spec.js --grep @smoke`

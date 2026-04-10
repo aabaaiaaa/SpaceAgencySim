@@ -1,6 +1,89 @@
 /**
- * Flight control helpers for E2E tests — teleport, launch, malfunctions.
+ * Flight control helpers for E2E tests -- teleport, launch, malfunctions.
  */
+
+import type { Page } from '@playwright/test';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+type MalfunctionMode = 'off' | 'forced' | 'normal';
+
+interface StartFlightOptions {
+  missionId?: string;
+  crewIds?: string[];
+  bodyId?: string;
+  malfunctionMode?: string;
+}
+
+interface TeleportOptions {
+  posX?: number;
+  posY: number;
+  velX?: number;
+  velY?: number;
+  grounded?: boolean;
+  landed?: boolean;
+  crashed?: boolean;
+  throttle?: number;
+  bodyId?: string;
+  orbit?: boolean;
+  phase?: 'FLIGHT' | 'ORBIT' | 'MANOEUVRE' | 'REENTRY' | 'TRANSFER';
+  transferState?: Record<string, unknown>;
+}
+
+interface TransferObject {
+  id: string;
+  type: string;
+  name: string;
+  posX: number;
+  posY: number;
+  velX: number;
+  velY: number;
+  radius: number;
+  mass: number;
+}
+
+interface VisibleTransferObject {
+  id: string;
+  distance: number;
+  lod: string;
+  type: string;
+}
+
+// ---------------------------------------------------------------------------
+// Browser-context window augmentation (these globals are injected at runtime)
+// ---------------------------------------------------------------------------
+
+/* eslint-disable @typescript-eslint/consistent-type-definitions */
+declare global {
+  interface Window {
+    __e2eStartFlight?: (parts: string[], options: StartFlightOptions) => void;
+    __setMalfunctionMode?: (mode: MalfunctionMode) => void;
+    __getMalfunctionMode?: () => MalfunctionMode;
+    __flightState?: {
+      bodyId: string;
+      phase: string;
+      inOrbit: boolean;
+      orbitalElements: unknown;
+      altitude: number;
+      velocity: number;
+      horizontalVelocity: number;
+      transferState?: Record<string, unknown>;
+      phaseLog?: unknown[];
+      events?: unknown[];
+    };
+    __resyncPhysicsWorker?: () => Promise<void>;
+    __addTransferObject?: (obj: TransferObject) => void;
+    __getProximityObjects?: (
+      posX: number,
+      posY: number,
+      velX: number,
+      velY: number,
+    ) => { id: string; distance: number; lod: string; type: string }[];
+  }
+}
+/* eslint-enable @typescript-eslint/consistent-type-definitions */
 
 // ---------------------------------------------------------------------------
 // Programmatic test flight (bypasses VAB UI)
@@ -9,19 +92,19 @@
 /**
  * Start a flight programmatically by building a rocket from part IDs.
  * Bypasses the VAB UI entirely. Malfunctions disabled by default.
- *
- * @param {import('@playwright/test').Page} page
- * @param {string[]} partIds  Part catalog IDs (top → bottom).
- * @param {object} [opts]  Options: missionId, crewIds, bodyId, malfunctionMode.
  */
-export async function startTestFlight(page, partIds, opts = {}) {
+export async function startTestFlight(
+  page: Page,
+  partIds: string[],
+  opts: StartFlightOptions = {},
+): Promise<void> {
   await page.waitForFunction(
     () => typeof window.__e2eStartFlight === 'function',
     { timeout: 15_000 },
   );
 
   await page.evaluate(
-    ({ parts, options }) => window.__e2eStartFlight(parts, options),
+    ({ parts, options }) => window.__e2eStartFlight!(parts, options),
     { parts: partIds, options: opts },
   );
 
@@ -42,11 +125,11 @@ export async function startTestFlight(page, partIds, opts = {}) {
  *
  * Must be called AFTER the flight scene is loaded (window.__setMalfunctionMode
  * is only available during flight).
- *
- * @param {import('@playwright/test').Page} page
- * @param {'off'|'forced'|'normal'} mode
  */
-export async function setMalfunctionMode(page, mode) {
+export async function setMalfunctionMode(
+  page: Page,
+  mode: MalfunctionMode,
+): Promise<void> {
   await page.evaluate((m) => {
     if (typeof window.__setMalfunctionMode === 'function') {
       window.__setMalfunctionMode(m);
@@ -56,11 +139,8 @@ export async function setMalfunctionMode(page, mode) {
 
 /**
  * Get the current malfunction mode from the running game.
- *
- * @param {import('@playwright/test').Page} page
- * @returns {Promise<string>}
  */
-export async function getMalfunctionMode(page) {
+export async function getMalfunctionMode(page: Page): Promise<string> {
   return page.evaluate(() => {
     if (typeof window.__getMalfunctionMode === 'function') {
       return window.__getMalfunctionMode();
@@ -77,31 +157,14 @@ export async function getMalfunctionMode(page) {
  * Teleport the craft to a specific position with velocity.
  *
  * Sets position, velocity, and basic flags.  The physics simulation
- * computes phase transitions (FLIGHT → ORBIT, etc.) and orbital elements
- * automatically on the next frame — callers should follow with
+ * computes phase transitions (FLIGHT -> ORBIT, etc.) and orbital elements
+ * automatically on the next frame -- callers should follow with
  * {@link waitForOrbit} or similar condition checks as needed.
- *
- * @param {import('@playwright/test').Page} page
- * @param {object} opts
- * @param {number} [opts.posX=0]         Position X (metres).
- * @param {number} opts.posY             Position Y / altitude (metres).
- * @param {number} [opts.velX=0]         Velocity X (m/s).
- * @param {number} [opts.velY=0]         Velocity Y (m/s).
- * @param {boolean} [opts.grounded=false]
- * @param {boolean} [opts.landed=false]
- * @param {boolean} [opts.crashed=false]
- * @param {number}  [opts.throttle=0]
- * @param {string}  [opts.bodyId]        Celestial body ID (e.g. 'EARTH', 'MOON').
- * @param {boolean} [opts.orbit]         Shorthand for phase='ORBIT'.
- * @param {string}  [opts.phase]         Flight phase to set directly:
- *   'FLIGHT' (default) — resets to FLIGHT, lets physics auto-detect.
- *   'ORBIT' — sets ORBIT phase, inOrbit=true, computes velocity/altitude.
- *   'MANOEUVRE' — sets MANOEUVRE phase, keeps orbit state.
- *   'REENTRY' — sets REENTRY phase, clears orbit state.
- *   'TRANSFER' — sets TRANSFER phase with transferState from opts.
- * @param {object}  [opts.transferState] Transfer state for TRANSFER phase.
  */
-export async function teleportCraft(page, opts) {
+export async function teleportCraft(
+  page: Page,
+  opts: TeleportOptions,
+): Promise<void> {
   await page.evaluate(async (o) => {
     const ps = window.__flightPs;
     const fs = window.__flightState;
@@ -141,7 +204,7 @@ export async function teleportCraft(page, opts) {
 
       case 'MANOEUVRE':
         fs.phase = 'MANOEUVRE';
-        // Keep orbit state — manoeuvre is a burn within orbit.
+        // Keep orbit state -- manoeuvre is a burn within orbit.
         fs.altitude = o.posY;
         fs.velocity = vel;
         fs.horizontalVelocity = hVel;
@@ -190,11 +253,11 @@ export async function teleportCraft(page, opts) {
 /**
  * Wait for the physics simulation to detect a valid orbit and transition
  * the flight phase to ORBIT.
- *
- * @param {import('@playwright/test').Page} page
- * @param {number} [timeout=10_000]
  */
-export async function waitForOrbit(page, timeout = 10_000) {
+export async function waitForOrbit(
+  page: Page,
+  timeout: number = 10_000,
+): Promise<void> {
   await page.waitForFunction(
     () => window.__flightState?.phase === 'ORBIT' && window.__flightState?.inOrbit === true,
     { timeout },
@@ -204,11 +267,11 @@ export async function waitForOrbit(page, timeout = 10_000) {
 /**
  * Spawn a transfer object near the player craft for testing proximity
  * rendering and collision during TRANSFER phase.
- *
- * @param {import('@playwright/test').Page} page
- * @param {object} obj  Object definition: { id, type, name, posX, posY, velX, velY, radius, mass }
  */
-export async function spawnTransferObject(page, obj) {
+export async function spawnTransferObject(
+  page: Page,
+  obj: TransferObject,
+): Promise<void> {
   await page.evaluate((o) => {
     // Import addTransferObject from the module via the global test API.
     // The function is exposed on window for E2E testing.
@@ -220,11 +283,10 @@ export async function spawnTransferObject(page, obj) {
 
 /**
  * Query which transfer objects are currently within render distance.
- *
- * @param {import('@playwright/test').Page} page
- * @returns {Promise<Array<{ id: string, distance: number, lod: string }>>}
  */
-export async function getVisibleTransferObjects(page) {
+export async function getVisibleTransferObjects(
+  page: Page,
+): Promise<VisibleTransferObject[]> {
   return page.evaluate(() => {
     if (typeof window.__getProximityObjects !== 'function') return [];
     const ps = window.__flightPs;
