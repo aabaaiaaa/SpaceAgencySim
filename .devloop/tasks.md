@@ -879,13 +879,13 @@
 - **Verification**: `npx playwright test e2e/tipping.spec.ts`
 
 ### TASK-146: Convert tutorial-revisions.spec.js to TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-016, TASK-017
 - **Description**: Rename `e2e/tutorial-revisions.spec.js` to `e2e/tutorial-revisions.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
 - **Verification**: `npx playwright test e2e/tutorial-revisions.spec.ts`
 
 ### TASK-147: Convert vab-undo.spec.js to TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-016, TASK-017
 - **Description**: Rename `e2e/vab-undo.spec.js` to `e2e/vab-undo.spec.ts`. Delete the original `.js` file. Add Playwright type imports, import typed helpers from the converted barrel exports, type all local helper functions and variables, eliminate all `any` usage. See requirements §5.5.
 - **Verification**: `npx playwright test e2e/vab-undo.spec.ts`

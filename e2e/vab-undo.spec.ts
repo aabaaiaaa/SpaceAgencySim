@@ -34,14 +34,18 @@ test.describe('VAB — Undo/Redo', () => {
     await navigateToVab(page);
 
     // Verify assembly is initially empty.
-    const partsBefore = await page.evaluate(() => window.__vabAssembly.parts.size);
+    const partsBefore: number = await page.evaluate(
+      () => window.__vabAssembly?.parts?.size ?? 0,
+    );
     expect(partsBefore).toBe(0);
 
     // Place a command module on the canvas.
     await dragPartToCanvas(page, 'cmd-mk1', CENTRE_X, CANVAS_CENTRE_Y);
 
     // Verify part was placed.
-    const partsAfterPlace = await page.evaluate(() => window.__vabAssembly.parts.size);
+    const partsAfterPlace: number = await page.evaluate(
+      () => window.__vabAssembly?.parts?.size ?? 0,
+    );
     expect(partsAfterPlace).toBe(1);
 
     // Press Ctrl+Z to undo.
@@ -49,16 +53,18 @@ test.describe('VAB — Undo/Redo', () => {
 
     // Wait for the undo to take effect.
     await page.waitForFunction(
-      () => window.__vabAssembly.parts.size === 0,
+      () => (window.__vabAssembly?.parts?.size ?? 0) === 0,
       { timeout: 5_000 },
     );
 
-    const partsAfterUndo = await page.evaluate(() => window.__vabAssembly.parts.size);
+    const partsAfterUndo: number = await page.evaluate(
+      () => window.__vabAssembly?.parts?.size ?? 0,
+    );
     expect(partsAfterUndo).toBe(0);
 
     // Verify the undo button is now disabled (stack empty).
-    const undoBtnDisabled = await page.evaluate(
-      () => document.getElementById('vab-btn-undo')?.disabled ?? true,
+    const undoBtnDisabled: boolean = await page.evaluate(
+      () => (document.getElementById('vab-btn-undo') as HTMLButtonElement | null)?.disabled ?? true,
     );
     expect(undoBtnDisabled).toBe(true);
   });

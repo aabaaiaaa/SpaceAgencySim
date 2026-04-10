@@ -13,6 +13,7 @@
  */
 
 import { test, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import {
   VP_W, VP_H,
   FacilityId,
@@ -29,18 +30,33 @@ import {
   waitForFlightEvent,
   teleportCraft,
 } from './helpers.js';
+import type { FacilityState, CrewMember, SaveEnvelope } from './helpers.js';
 
 // ---------------------------------------------------------------------------
 // Tutorial-mode starter parts (minimum available at game start)
 // ---------------------------------------------------------------------------
 
-const TUTORIAL_STARTERS = ['probe-core-mk1', 'tank-small', 'engine-spark'];
+const TUTORIAL_STARTERS: string[] = ['probe-core-mk1', 'tank-small', 'engine-spark'];
 
 // ---------------------------------------------------------------------------
 // Compact mission data (objectives, rewards, dependencies)
 // ---------------------------------------------------------------------------
 
-const MD = {
+interface MissionObjectiveData {
+  id: string;
+  type: string;
+  target: Record<string, number | string>;
+}
+
+interface MissionData {
+  title: string;
+  objectives: MissionObjectiveData[];
+  reward: number;
+  unlocksAfter: string[];
+  unlockedParts: string[];
+}
+
+const MD: Record<string, MissionData> = {
   'mission-001': {
     title: 'First Flight',
     objectives: [{ id: 'obj-001-1', type: 'REACH_ALTITUDE', target: { altitude: 100 } }],
@@ -99,7 +115,7 @@ const MD = {
     unlockedParts: ['engine-reliant', 'srb-small'],
   },
   'mission-014': {
-    title: 'Kármán Line Approach',
+    title: 'Karman Line Approach',
     objectives: [{ id: 'obj-014-1', type: 'REACH_ALTITUDE', target: { altitude: 60_000 } }],
     reward: 200_000, unlocksAfter: ['mission-012'],
     unlockedParts: ['engine-nerv', 'srb-large'],
@@ -167,11 +183,35 @@ const MD = {
 };
 
 // ---------------------------------------------------------------------------
+// Mission state shape returned by mk* helpers
+// ---------------------------------------------------------------------------
+
+interface MissionObjectiveState {
+  id: string;
+  type: string;
+  target: Record<string, number | string>;
+  completed: boolean;
+  description: string;
+}
+
+interface MissionState {
+  id: string;
+  title: string;
+  description: string;
+  location: string;
+  objectives: MissionObjectiveState[];
+  reward: number;
+  unlocksAfter: string[];
+  unlockedParts: string[];
+  status: string;
+}
+
+// ---------------------------------------------------------------------------
 // Save state helpers
 // ---------------------------------------------------------------------------
 
-function mkCompleted(id) {
-  const d = MD[id];
+function mkCompleted(id: string): MissionState {
+  const d: MissionData | undefined = MD[id];
   if (!d) return { id, title: id, description: '', location: 'desert', objectives: [], reward: 0, unlocksAfter: [], unlockedParts: [], status: 'completed' };
   return {
     id, title: d.title, description: '', location: 'desert',
@@ -181,8 +221,8 @@ function mkCompleted(id) {
   };
 }
 
-function mkAccepted(id) {
-  const d = MD[id];
+function mkAccepted(id: string): MissionState {
+  const d: MissionData = MD[id];
   return {
     id, title: d.title, description: '', location: 'desert',
     objectives: d.objectives.map(o => ({ ...o, completed: false, description: '' })),
@@ -191,8 +231,8 @@ function mkAccepted(id) {
   };
 }
 
-function mkAvailable(id) {
-  const d = MD[id];
+function mkAvailable(id: string): MissionState {
+  const d: MissionData = MD[id];
   return {
     id, title: d.title, description: '', location: 'desert',
     objectives: d.objectives.map(o => ({ ...o, completed: false, description: '' })),
@@ -201,8 +241,27 @@ function mkAvailable(id) {
   };
 }
 
+/** Parameter interface for tutorialSave helper. */
+interface TutorialSaveOptions {
+  completedIds?: string[];
+  acceptedId?: string | null;
+  availableIds?: string[];
+  parts?: string[];
+  crew?: CrewMember[];
+  facilities?: Readonly<Record<string, FacilityState>>;
+  [key: string]: unknown;
+}
+
 /** Build a tutorial-mode save envelope. */
-function tutorialSave({ completedIds = [], acceptedId = null, availableIds = [], parts = TUTORIAL_STARTERS, crew = [], facilities = { ...STARTER_FACILITIES }, ...extra } = {}) {
+function tutorialSave({
+  completedIds = [],
+  acceptedId = null,
+  availableIds = [],
+  parts = TUTORIAL_STARTERS,
+  crew = [],
+  facilities = { ...STARTER_FACILITIES },
+  ...extra
+}: TutorialSaveOptions = {}): SaveEnvelope {
   return buildSaveEnvelope({
     saveName: 'Tutorial Revisions E2E',
     tutorialMode: true,
@@ -223,9 +282,9 @@ function tutorialSave({ completedIds = [], acceptedId = null, availableIds = [],
 // Flight helpers
 // ---------------------------------------------------------------------------
 
-async function waitSpeed(page, speed, timeout = 60_000) {
+async function waitSpeed(page: Page, speed: number, timeout: number = 60_000): Promise<void> {
   await page.waitForFunction(
-    spd => {
+    (spd: number) => {
       const ps = window.__flightPs;
       if (!ps) return false;
       return Math.hypot(ps.velX, ps.velY) >= spd;
@@ -234,22 +293,22 @@ async function waitSpeed(page, speed, timeout = 60_000) {
   );
 }
 
-async function waitLanded(page, timeout = 60_000) {
+async function waitLanded(page: Page, timeout: number = 60_000): Promise<void> {
   await page.waitForFunction(
     () => window.__flightPs?.landed === true || window.__flightPs?.crashed === true,
     { timeout },
   );
 }
 
-async function setWarp(page, factor) {
+async function setWarp(page: Page, factor: number): Promise<void> {
   await page.waitForFunction(
     () => !document.querySelector('.hud-warp-btn')?.disabled,
     { timeout: 10_000 },
   );
-  await page.evaluate((f) => window.__testSetTimeWarp?.(f), factor);
+  await page.evaluate((f: number) => window.__testSetTimeWarp?.(f), factor);
 }
 
-async function triggerReturnViaMenu(page) {
+async function triggerReturnViaMenu(page: Page): Promise<void> {
   await page.click('#topbar-menu-btn', { force: true });
   const dropdown = page.locator('#topbar-dropdown');
   await expect(dropdown).toBeVisible({ timeout: 5_000 });
@@ -258,22 +317,22 @@ async function triggerReturnViaMenu(page) {
   // Handle different return flows — orbit return (ORBIT phase) or abort (FLIGHT).
   const orbitBtn = page.locator('[data-testid="orbit-return-btn"]');
   const abortBtn = page.locator('[data-testid="abort-confirm-btn"]');
-  const orbitVisible = await orbitBtn.isVisible({ timeout: 2_000 }).catch(() => false);
+  const orbitVisible: boolean = await orbitBtn.isVisible({ timeout: 2_000 }).catch(() => false);
   if (orbitVisible) {
     await orbitBtn.click();
   } else {
-    const abortVisible = await abortBtn.isVisible({ timeout: 2_000 }).catch(() => false);
+    const abortVisible: boolean = await abortBtn.isVisible({ timeout: 2_000 }).catch(() => false);
     if (abortVisible) {
       await abortBtn.click();
     }
   }
 }
 
-async function returnToHub(page) {
+async function returnToHub(page: Page): Promise<void> {
   // With startTestFlight, the hub-overlay may be visible BEHIND the flight
   // scene.  Always check for the post-flight summary first — clicking its
   // return button triggers processFlightReturn (mission completion).
-  const hasSummary = await page.waitForSelector(
+  const hasSummary: boolean = await page.waitForSelector(
     '#post-flight-summary', { state: 'visible', timeout: 5_000 },
   ).then(() => true).catch(() => false);
 
@@ -282,7 +341,7 @@ async function returnToHub(page) {
   } else {
     // No summary — might be at hub (via abort) or still need to dismiss abort dialog.
     const abortBtn = page.locator('[data-testid="abort-confirm-btn"]');
-    const didAbort = await abortBtn.isVisible({ timeout: 1_000 }).catch(() => false);
+    const didAbort: boolean = await abortBtn.isVisible({ timeout: 1_000 }).catch(() => false);
     if (didAbort) {
       await abortBtn.click();
     }
@@ -306,51 +365,51 @@ async function returnToHub(page) {
   await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
 }
 
-async function stage(page) {
+async function stage(page: Page): Promise<void> {
   await page.keyboard.press('Space');
 }
 
-async function expectCompleted(page, missionId) {
-  const ok = await page.evaluate(
-    id => window.__gameState?.missions?.completed?.some(m => m.id === id) ?? false,
+async function expectCompleted(page: Page, missionId: string): Promise<void> {
+  const ok: boolean = await page.evaluate(
+    (id: string) => window.__gameState?.missions?.completed?.some(m => m.id === id) ?? false,
     missionId,
   );
   expect(ok).toBe(true);
 }
 
-async function expectPartUnlocked(page, partId) {
-  const ok = await page.evaluate(
-    id => window.__gameState?.parts?.includes(id) ?? false,
+async function expectPartUnlocked(page: Page, partId: string): Promise<void> {
+  const ok: boolean = await page.evaluate(
+    (id: string) => (window as unknown as { __gameState?: { parts?: string[] } }).__gameState?.parts?.includes(id) ?? false,
     partId,
   );
   expect(ok).toBe(true);
 }
 
-async function expectFacilityBuilt(page, facilityId) {
-  const ok = await page.evaluate(
-    id => window.__gameState?.facilities?.[id]?.built === true,
+async function expectFacilityBuilt(page: Page, facilityId: string): Promise<void> {
+  const ok: boolean = await page.evaluate(
+    (id: string) => (window as unknown as { __gameState?: { facilities?: Record<string, { built?: boolean }> } }).__gameState?.facilities?.[id]?.built === true,
     facilityId,
   );
   expect(ok).toBe(true);
 }
 
-async function expectMissionAvailable(page, missionId) {
-  const ok = await page.evaluate(
-    id => window.__gameState?.missions?.available?.some(m => m.id === id) ?? false,
+async function expectMissionAvailable(page: Page, missionId: string): Promise<void> {
+  const ok: boolean = await page.evaluate(
+    (id: string) => (window as unknown as { __gameState?: { missions?: { available?: { id: string }[] } } }).__gameState?.missions?.available?.some(m => m.id === id) ?? false,
     missionId,
   );
   expect(ok).toBe(true);
 }
 
 /** Teleport the rocket to orbital conditions. */
-async function teleportToOrbitConditions(page) {
+async function teleportToOrbitConditions(page: Page): Promise<void> {
   await teleportCraft(page, { posY: 85_000, velX: 8_000 });
 }
 
 /** Completed mission IDs for a given range. */
-function missionRange(start, end) {
-  const ids = [];
-  for (let i = start; i <= end; i++) {
+function missionRange(start: number, end: number): string[] {
+  const ids: string[] = [];
+  for (let i: number = start; i <= end; i++) {
     ids.push(`mission-${String(i).padStart(3, '0')}`);
   }
   return ids;
@@ -369,9 +428,9 @@ test.describe('Tutorial Revisions', () => {
 
   test.describe('Starter Parts — M001-M004', () => {
 
-    test('M001 — First Flight (reach 100m) with tutorial starters', async ({ page }) => {
+    test('M001 — First Flight (reach 100m) with tutorial starters', async ({ page }: { page: Page }) => {
       test.setTimeout(90_000);
-      const env = tutorialSave({ acceptedId: 'mission-001' });
+      const env: SaveEnvelope = tutorialSave({ acceptedId: 'mission-001' });
       await page.setViewportSize({ width: VP_W, height: VP_H });
       await seedAndLoadSave(page, env);
       await startTestFlight(page, TUTORIAL_STARTERS);
@@ -383,9 +442,9 @@ test.describe('Tutorial Revisions', () => {
       await expectCompleted(page, 'mission-001');
     });
 
-    test('M004 — Speed Demon (reach 150 m/s) with tutorial starters', async ({ page }) => {
+    test('M004 — Speed Demon (reach 150 m/s) with tutorial starters', async ({ page }: { page: Page }) => {
       test.setTimeout(90_000);
-      const env = tutorialSave({
+      const env: SaveEnvelope = tutorialSave({
         completedIds: ['mission-001'],
         acceptedId: 'mission-004',
       });
@@ -407,9 +466,9 @@ test.describe('Tutorial Revisions', () => {
 
   test.describe('Unlock Chain Progression', () => {
 
-    test('completing M004 unlocks M005 and M006', async ({ page }) => {
+    test('completing M004 unlocks M005 and M006', async ({ page }: { page: Page }) => {
       test.setTimeout(90_000);
-      const env = tutorialSave({
+      const env: SaveEnvelope = tutorialSave({
         completedIds: ['mission-001'],
         acceptedId: 'mission-004',
       });
@@ -430,9 +489,9 @@ test.describe('Tutorial Revisions', () => {
       await expectMissionAvailable(page, 'mission-006');
     });
 
-    test('completing M005 awards parachute-mk2, science-module-mk1, thermometer-mk1', async ({ page }) => {
+    test('completing M005 awards parachute-mk2, science-module-mk1, thermometer-mk1', async ({ page }: { page: Page }) => {
       test.setTimeout(120_000);
-      const env = tutorialSave({
+      const env: SaveEnvelope = tutorialSave({
         completedIds: ['mission-001', 'mission-004'],
         acceptedId: 'mission-005',
         parts: [...TUTORIAL_STARTERS, 'parachute-mk1'],
@@ -440,7 +499,7 @@ test.describe('Tutorial Revisions', () => {
       await page.setViewportSize({ width: VP_W, height: VP_H });
       await seedAndLoadSave(page, env);
 
-      // M005: safe landing at ≤10 m/s. Use parachute + burn all fuel for light mass.
+      // M005: safe landing at <=10 m/s. Use parachute + burn all fuel for light mass.
       await startTestFlight(page,
         ['parachute-mk1', 'probe-core-mk1', 'tank-small', 'engine-spark'],
         { staging: [{ partIds: ['engine-spark'] }, { partIds: ['parachute-mk1'] }] },
@@ -464,10 +523,10 @@ test.describe('Tutorial Revisions', () => {
       await expectPartUnlocked(page, 'thermometer-mk1');
     });
 
-    test('completing M010 unlocks M019 (R&D Lab tutorial)', async ({ page }) => {
+    test('completing M010 unlocks M019 (R&D Lab tutorial)', async ({ page }: { page: Page }) => {
       test.setTimeout(180_000);
       // Seed state: M001-M005, M008 completed (M010 prerequisites).
-      const env = tutorialSave({
+      const env: SaveEnvelope = tutorialSave({
         completedIds: ['mission-001', 'mission-004', 'mission-005', 'mission-008'],
         acceptedId: 'mission-010',
         parts: [...TUTORIAL_STARTERS, 'parachute-mk1', 'parachute-mk2',
@@ -510,7 +569,7 @@ test.describe('Tutorial Revisions', () => {
       );
       await setWarp(page, 5);
 
-      // Wait until inside the altitude band (≤ 1200m).
+      // Wait until inside the altitude band (<= 1200m).
       await page.waitForFunction(
         () => (window.__flightPs?.posY ?? Infinity) <= 1_200,
         { timeout: 30_000 },
@@ -523,7 +582,7 @@ test.describe('Tutorial Revisions', () => {
       // Warp through the 30s hold.
       await setWarp(page, 100);
       await page.waitForFunction(
-        id => {
+        (id: string) => {
           const state = window.__gameState;
           const m = state?.missions?.accepted?.find(x => x.id === id);
           return m?.objectives?.find(o => o.type === 'HOLD_ALTITUDE')?.completed;
@@ -542,9 +601,9 @@ test.describe('Tutorial Revisions', () => {
       await expectMissionAvailable(page, 'mission-019');
     });
 
-    test('completing M016 unlocks M015 and M020 (Tracking Station tutorial)', async ({ page }) => {
+    test('completing M016 unlocks M015 and M020 (Tracking Station tutorial)', async ({ page }: { page: Page }) => {
       test.setTimeout(120_000);
-      const env = tutorialSave({
+      const env: SaveEnvelope = tutorialSave({
         completedIds: ['mission-001', 'mission-004', 'mission-005', 'mission-008', 'mission-010', 'mission-012', 'mission-014'],
         acceptedId: 'mission-016',
         parts: [...TUTORIAL_STARTERS, 'parachute-mk1', 'tank-medium',
@@ -553,7 +612,7 @@ test.describe('Tutorial Revisions', () => {
       await page.setViewportSize({ width: VP_W, height: VP_H });
       await seedAndLoadSave(page, env);
 
-      // M016: reach orbit (≥80km, ≥7800 m/s).
+      // M016: reach orbit (>=80km, >=7800 m/s).
       await startTestFlight(page,
         ['probe-core-mk1', 'tank-small', 'engine-spark'],
       );
@@ -564,7 +623,7 @@ test.describe('Tutorial Revisions', () => {
       // Teleport to orbital conditions.
       await teleportToOrbitConditions(page);
       await page.waitForFunction(
-        id => {
+        (id: string) => {
           const m = window.__gameState?.missions?.accepted?.find(x => x.id === id);
           return m?.objectives?.every(o => o.completed);
         },
@@ -581,10 +640,10 @@ test.describe('Tutorial Revisions', () => {
       await expectMissionAvailable(page, 'mission-020');
     });
 
-    test('completing M017 unlocks M022 (Satellite Network Ops tutorial)', async ({ page }) => {
+    test('completing M017 unlocks M022 (Satellite Network Ops tutorial)', async ({ page }: { page: Page }) => {
       test.setTimeout(120_000);
-      const allPrev = ['mission-001', ...missionRange(4, 16), 'mission-020'];
-      const env = tutorialSave({
+      const allPrev: string[] = ['mission-001', ...missionRange(4, 16), 'mission-020'];
+      const env: SaveEnvelope = tutorialSave({
         completedIds: allPrev,
         acceptedId: 'mission-017',
         parts: [...TUTORIAL_STARTERS, 'parachute-mk1', 'satellite-mk1',
@@ -638,9 +697,9 @@ test.describe('Tutorial Revisions', () => {
 
   test.describe('Facility Tutorial Awards', () => {
 
-    test('accepting M018 awards CREW_ADMIN facility and cmd-mk1 part', async ({ page }) => {
+    test('accepting M018 awards CREW_ADMIN facility and cmd-mk1 part', async ({ page }: { page: Page }) => {
       test.setTimeout(60_000);
-      const env = tutorialSave({
+      const env: SaveEnvelope = tutorialSave({
         completedIds: ['mission-001', 'mission-004', 'mission-006', 'mission-007', 'mission-009'],
         availableIds: ['mission-018'],
         parts: TUTORIAL_STARTERS,
@@ -659,9 +718,9 @@ test.describe('Tutorial Revisions', () => {
       await expectPartUnlocked(page, 'cmd-mk1');
     });
 
-    test('accepting M019 awards RD_LAB facility', async ({ page }) => {
+    test('accepting M019 awards RD_LAB facility', async ({ page }: { page: Page }) => {
       test.setTimeout(60_000);
-      const env = tutorialSave({
+      const env: SaveEnvelope = tutorialSave({
         completedIds: ['mission-001', 'mission-004', 'mission-005', 'mission-008', 'mission-010'],
         availableIds: ['mission-019'],
         parts: [...TUTORIAL_STARTERS, 'parachute-mk1', 'science-module-mk1', 'thermometer-mk1'],
@@ -676,9 +735,9 @@ test.describe('Tutorial Revisions', () => {
       await expectFacilityBuilt(page, FacilityId.RD_LAB);
     });
 
-    test('accepting M020 awards TRACKING_STATION facility', async ({ page }) => {
+    test('accepting M020 awards TRACKING_STATION facility', async ({ page }: { page: Page }) => {
       test.setTimeout(60_000);
-      const env = tutorialSave({
+      const env: SaveEnvelope = tutorialSave({
         completedIds: ['mission-001', 'mission-004', 'mission-005', 'mission-008', 'mission-010',
           'mission-012', 'mission-014', 'mission-016'],
         availableIds: ['mission-020'],
@@ -696,9 +755,9 @@ test.describe('Tutorial Revisions', () => {
       await expectFacilityBuilt(page, FacilityId.TRACKING_STATION);
     });
 
-    test('accepting M022 awards SATELLITE_OPS facility', async ({ page }) => {
+    test('accepting M022 awards SATELLITE_OPS facility', async ({ page }: { page: Page }) => {
       test.setTimeout(60_000);
-      const env = tutorialSave({
+      const env: SaveEnvelope = tutorialSave({
         completedIds: ['mission-001', ...missionRange(4, 17), 'mission-020'],
         availableIds: ['mission-022'],
         parts: [...TUTORIAL_STARTERS, 'parachute-mk1', 'satellite-mk1',
@@ -716,9 +775,9 @@ test.describe('Tutorial Revisions', () => {
       await expectFacilityBuilt(page, FacilityId.SATELLITE_OPS);
     });
 
-    test('completing M020 awards docking-port-std', async ({ page }) => {
+    test('completing M020 awards docking-port-std', async ({ page }: { page: Page }) => {
       test.setTimeout(120_000);
-      const env = tutorialSave({
+      const env: SaveEnvelope = tutorialSave({
         completedIds: ['mission-001', 'mission-004', 'mission-005', 'mission-008', 'mission-010',
           'mission-012', 'mission-014', 'mission-016'],
         acceptedId: 'mission-020',
@@ -760,13 +819,13 @@ test.describe('Tutorial Revisions', () => {
 
   test.describe('Facility Tutorial Flights', () => {
 
-    test('M018 — First Crew Flight (crew + safe landing)', async ({ page }) => {
+    test('M018 — First Crew Flight (crew + safe landing)', async ({ page }: { page: Page }) => {
       test.setTimeout(120_000);
-      const crew = [buildCrewMember({ id: 'crew-1', name: 'Test Pilot' })];
+      const crew: CrewMember[] = [buildCrewMember({ id: 'crew-1', name: 'Test Pilot' })];
       // Realistic state: player completed through M009 (awards cmd-mk1 via M018 prereq).
       // cmd-mk1 dry mass + crew is too heavy for parachute-mk1 (legless landing
-      // requires ≤5 m/s).  parachute-mk2 provides enough drag.
-      const env = tutorialSave({
+      // requires <=5 m/s).  parachute-mk2 provides enough drag.
+      const env: SaveEnvelope = tutorialSave({
         completedIds: ['mission-001', 'mission-004', 'mission-005', 'mission-006', 'mission-007', 'mission-009'],
         acceptedId: 'mission-018',
         parts: [...TUTORIAL_STARTERS, 'parachute-mk1', 'parachute-mk2', 'cmd-mk1'],
@@ -811,9 +870,9 @@ test.describe('Tutorial Revisions', () => {
       await expectCompleted(page, 'mission-018');
     });
 
-    test('M019 — Research Division (5000m + return science)', async ({ page }) => {
+    test('M019 — Research Division (5000m + return science)', async ({ page }: { page: Page }) => {
       test.setTimeout(180_000);
-      const env = tutorialSave({
+      const env: SaveEnvelope = tutorialSave({
         completedIds: ['mission-001', 'mission-004', 'mission-005', 'mission-008', 'mission-010'],
         acceptedId: 'mission-019',
         parts: [...TUTORIAL_STARTERS, 'parachute-mk1', 'parachute-mk2',
@@ -869,9 +928,9 @@ test.describe('Tutorial Revisions', () => {
       await expectCompleted(page, 'mission-019');
     });
 
-    test('M021 — Orbital Survey (orbit + return science)', async ({ page }) => {
+    test('M021 — Orbital Survey (orbit + return science)', async ({ page }: { page: Page }) => {
       test.setTimeout(180_000);
-      const env = tutorialSave({
+      const env: SaveEnvelope = tutorialSave({
         completedIds: ['mission-001', 'mission-004', 'mission-005', 'mission-008', 'mission-010',
           'mission-012', 'mission-014', 'mission-016', 'mission-020'],
         acceptedId: 'mission-021',
@@ -942,9 +1001,9 @@ test.describe('Tutorial Revisions', () => {
       await expectCompleted(page, 'mission-021');
     });
 
-    test('M022 — Network Control (orbit + deploy 2 satellites)', async ({ page }) => {
+    test('M022 — Network Control (orbit + deploy 2 satellites)', async ({ page }: { page: Page }) => {
       test.setTimeout(120_000);
-      const env = tutorialSave({
+      const env: SaveEnvelope = tutorialSave({
         completedIds: ['mission-001', ...missionRange(4, 17), 'mission-020'],
         acceptedId: 'mission-022',
         parts: [...TUTORIAL_STARTERS, 'parachute-mk1', 'satellite-mk1',
@@ -956,7 +1015,7 @@ test.describe('Tutorial Revisions', () => {
       await seedAndLoadSave(page, env);
 
       // M022: orbit + deploy 2 satellites.
-      // Auto-staging: engine → stage 0, decouplers → stages 1 & 2.
+      // Auto-staging: engine -> stage 0, decouplers -> stages 1 & 2.
       await startTestFlight(page, [
         'satellite-mk1', 'decoupler-stack-tr18',
         'satellite-mk1', 'decoupler-stack-tr18',
@@ -980,7 +1039,7 @@ test.describe('Tutorial Revisions', () => {
       // Release first satellite (decoupler stage).
       await stage(page);
       // Wait for decoupler separation
-      await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+      await page.evaluate(() => new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r()))));
 
       // Release second satellite (decoupler stage).
       await stage(page);
@@ -1006,9 +1065,9 @@ test.describe('Tutorial Revisions', () => {
 
   test.describe('Instrument-in-Module System', () => {
 
-    test('M008 — Black Box Test with loaded thermometer instrument', async ({ page }) => {
+    test('M008 — Black Box Test with loaded thermometer instrument', async ({ page }: { page: Page }) => {
       test.setTimeout(120_000);
-      const env = tutorialSave({
+      const env: SaveEnvelope = tutorialSave({
         completedIds: ['mission-001', 'mission-004', 'mission-005'],
         acceptedId: 'mission-008',
         parts: [...TUTORIAL_STARTERS, 'parachute-mk1', 'parachute-mk2',
@@ -1017,7 +1076,7 @@ test.describe('Tutorial Revisions', () => {
       await page.setViewportSize({ width: VP_W, height: VP_H });
       await seedAndLoadSave(page, env);
 
-      // M008: activate science module (with instrument) + crash ≥50 m/s.
+      // M008: activate science module (with instrument) + crash >=50 m/s.
       // Staging: 0=engine + science-module (both fire together).
       await startTestFlight(page,
         ['probe-core-mk1', 'science-module-mk1', 'tank-small', 'engine-spark'],
@@ -1032,13 +1091,13 @@ test.describe('Tutorial Revisions', () => {
 
       // Verify the science module activated (PART_ACTIVATED event for SERVICE_MODULE).
       await page.waitForFunction(
-        () => window.__gameState?.currentFlight?.events?.some(
+        () => (window.__gameState?.currentFlight?.events as { type: string; partType?: string }[] | undefined)?.some(
           e => e.type === 'PART_ACTIVATED' && e.partType === 'SERVICE_MODULE',
         ),
         { timeout: 10_000 },
       );
 
-      // Climb to ~500m so free-fall gives ≥50 m/s impact.
+      // Climb to ~500m so free-fall gives >=50 m/s impact.
       await waitForAltitude(page, 500);
       await page.keyboard.press('x'); // cut throttle
 
@@ -1048,9 +1107,9 @@ test.describe('Tutorial Revisions', () => {
       await expectCompleted(page, 'mission-008');
     });
 
-    test('M010 — Science Experiment Alpha with loaded instrument + altitude hold', async ({ page }) => {
+    test('M010 — Science Experiment Alpha with loaded instrument + altitude hold', async ({ page }: { page: Page }) => {
       test.setTimeout(180_000);
-      const env = tutorialSave({
+      const env: SaveEnvelope = tutorialSave({
         completedIds: ['mission-001', 'mission-004', 'mission-005', 'mission-008'],
         acceptedId: 'mission-010',
         parts: [...TUTORIAL_STARTERS, 'parachute-mk1', 'parachute-mk2',
@@ -1105,7 +1164,7 @@ test.describe('Tutorial Revisions', () => {
       // Warp through the 30s hold.
       await setWarp(page, 100);
       await page.waitForFunction(
-        id => {
+        (id: string) => {
           const state = window.__gameState;
           const m = state?.missions?.accepted?.find(x => x.id === id);
           return m?.objectives?.find(o => o.type === 'HOLD_ALTITUDE')?.completed;
@@ -1129,9 +1188,9 @@ test.describe('Tutorial Revisions', () => {
 
   test.describe('Orbital Gameplay — M014-M017', () => {
 
-    test('M014 — Kármán Line Approach (reach 60,000m) in tutorial mode', async ({ page }) => {
+    test('M014 — Karman Line Approach (reach 60,000m) in tutorial mode', async ({ page }: { page: Page }) => {
       test.setTimeout(120_000);
-      const env = tutorialSave({
+      const env: SaveEnvelope = tutorialSave({
         completedIds: ['mission-001', 'mission-004', 'mission-005', 'mission-008', 'mission-010', 'mission-012'],
         acceptedId: 'mission-014',
         parts: [...TUTORIAL_STARTERS, 'parachute-mk1', 'tank-medium',
@@ -1168,9 +1227,9 @@ test.describe('Tutorial Revisions', () => {
       await expectPartUnlocked(page, 'srb-large');
     });
 
-    test('M015 — Orbital Satellite Deployment I (orbit + release satellite)', async ({ page }) => {
+    test('M015 — Orbital Satellite Deployment I (orbit + release satellite)', async ({ page }: { page: Page }) => {
       test.setTimeout(120_000);
-      const env = tutorialSave({
+      const env: SaveEnvelope = tutorialSave({
         completedIds: ['mission-001', 'mission-004', 'mission-005', 'mission-008', 'mission-010',
           'mission-012', 'mission-014', 'mission-016'],
         acceptedId: 'mission-015',
@@ -1182,7 +1241,7 @@ test.describe('Tutorial Revisions', () => {
       await seedAndLoadSave(page, env);
 
       // Satellite + decoupler + probe + tank + engine.
-      // Auto-staging: engine → stage 0, decoupler → stage 1.
+      // Auto-staging: engine -> stage 0, decoupler -> stage 1.
       await startTestFlight(page, [
         'satellite-mk1', 'decoupler-stack-tr18',
         'probe-core-mk1', 'tank-small', 'engine-spark',
@@ -1217,9 +1276,9 @@ test.describe('Tutorial Revisions', () => {
       await expectCompleted(page, 'mission-015');
     });
 
-    test('M016 — Low Earth Orbit (≥80km AND ≥7,800 m/s) in tutorial mode', async ({ page }) => {
+    test('M016 — Low Earth Orbit (>=80km AND >=7,800 m/s) in tutorial mode', async ({ page }: { page: Page }) => {
       test.setTimeout(120_000);
-      const env = tutorialSave({
+      const env: SaveEnvelope = tutorialSave({
         completedIds: ['mission-001', 'mission-004', 'mission-005', 'mission-008', 'mission-010',
           'mission-012', 'mission-014'],
         acceptedId: 'mission-016',
@@ -1249,10 +1308,10 @@ test.describe('Tutorial Revisions', () => {
       await expectPartUnlocked(page, 'tank-large');
     });
 
-    test('M017 — Tracked Satellite Deployment (orbit + satellite via Tracking Station)', async ({ page }) => {
+    test('M017 — Tracked Satellite Deployment (orbit + satellite via Tracking Station)', async ({ page }: { page: Page }) => {
       test.setTimeout(120_000);
-      const allPrev = ['mission-001', ...missionRange(4, 16), 'mission-020'];
-      const env = tutorialSave({
+      const allPrev: string[] = ['mission-001', ...missionRange(4, 16), 'mission-020'];
+      const env: SaveEnvelope = tutorialSave({
         completedIds: allPrev,
         acceptedId: 'mission-017',
         parts: [...TUTORIAL_STARTERS, 'parachute-mk1', 'satellite-mk1',
