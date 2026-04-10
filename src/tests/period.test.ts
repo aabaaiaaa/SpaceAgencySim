@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * period.test.js — Unit tests for the period (flight) system.
  *
@@ -21,6 +20,7 @@ import {
   AstronautStatus,
   STARTING_MONEY,
 } from '../core/constants.ts';
+import type { GameState, CrewMember, MissionInstance } from '../core/gameState.ts';
 
 /** Number of starter facilities pre-built in a fresh game. */
 const STARTER_COUNT = FACILITY_DEFINITIONS.filter((f) => f.starter).length;
@@ -32,12 +32,11 @@ const BASE_UPKEEP = FACILITY_UPKEEP_PER_PERIOD * STARTER_COUNT;
 // Helpers
 // ---------------------------------------------------------------------------
 
-function freshState() {
+function freshState(): GameState {
   return createGameState();
 }
 
-/** Add an active crew member to the state. */
-function addCrew(state, overrides = {}) {
+function addCrew(state: GameState, overrides: Partial<CrewMember> = {}): void {
   state.crew.push({
     id: overrides.id ?? `crew-${state.crew.length + 1}`,
     name: overrides.name ?? `Astronaut ${state.crew.length + 1}`,
@@ -45,12 +44,23 @@ function addCrew(state, overrides = {}) {
     skills: { piloting: 0, engineering: 0, science: 0 },
     salary: overrides.salary ?? CREW_SALARY_PER_PERIOD,
     hireDate: new Date().toISOString(),
+    missionsFlown: 0,
+    flightsFlown: 0,
+    deathDate: null,
+    deathCause: null,
+    assignedRocketId: null,
     injuryEnds: null,
+    trainingSkill: null,
+    trainingEnds: null,
   });
 }
 
-/** Add an accepted mission with an optional deadline period. */
-function addAcceptedMission(state, { id, deadlinePeriod } = {}) {
+interface AddMissionOptions {
+  id?: string;
+  deadlinePeriod?: number;
+}
+
+function addAcceptedMission(state: GameState, { id, deadlinePeriod }: AddMissionOptions = {}): void {
   const missionId = id ?? `mission-${state.missions.accepted.length + 1}`;
   state.missions.accepted.push({
     id: missionId,
@@ -64,7 +74,7 @@ function addAcceptedMission(state, { id, deadlinePeriod } = {}) {
     objectives: [],
     acceptedDate: new Date().toISOString(),
     completedDate: null,
-  });
+  } as MissionInstance & { deadlinePeriod?: number });
 }
 
 // ---------------------------------------------------------------------------
@@ -86,7 +96,7 @@ describe('Period constants', () => {
 // ---------------------------------------------------------------------------
 
 describe('advancePeriod() — counter', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('starts at period 0', () => {
@@ -107,6 +117,7 @@ describe('advancePeriod() — counter', () => {
   });
 
   it('handles missing currentPeriod field (legacy save)', () => {
+    // @ts-expect-error intentionally deleting required property to simulate legacy save
     delete state.currentPeriod;
     const result = advancePeriod(state);
     expect(state.currentPeriod).toBe(1);
@@ -119,7 +130,7 @@ describe('advancePeriod() — counter', () => {
 // ---------------------------------------------------------------------------
 
 describe('advancePeriod() — crew salaries', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('charges nothing when there are no crew', () => {
@@ -158,7 +169,7 @@ describe('advancePeriod() — crew salaries', () => {
 // ---------------------------------------------------------------------------
 
 describe('advancePeriod() — facility upkeep', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('charges base facility upkeep per built facility', () => {
@@ -172,7 +183,7 @@ describe('advancePeriod() — facility upkeep', () => {
 // ---------------------------------------------------------------------------
 
 describe('advancePeriod() — operating costs deduction', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('deducts total operating costs from cash', () => {
@@ -214,7 +225,7 @@ describe('advancePeriod() — operating costs deduction', () => {
 // ---------------------------------------------------------------------------
 
 describe('advancePeriod() — mission expiry', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('expires missions past their deadline period', () => {

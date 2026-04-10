@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * partInventory.test.js — Unit tests for the part wear and reusability system (TASK-020).
  *
@@ -39,19 +38,21 @@ import {
   SCRAP_VALUE_FRACTION,
 } from '../core/constants.ts';
 import { createGameState } from '../core/gameState.ts';
+import type { GameState, InventoryPart } from '../core/gameState.ts';
 import { getPartById } from '../data/parts.ts';
 import {
   createRocketAssembly,
   addPartToAssembly,
   connectParts,
 } from '../core/rocketbuilder.ts';
+import type { PhysicsState } from '../core/physics.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeState(money = 2_000_000) {
-  const state = createGameState();
+function makeState(money: number = 2_000_000): GameState {
+  const state: GameState = createGameState();
   state.money = money;
   return state;
 }
@@ -128,6 +129,7 @@ describe('addToInventory', () => {
 
   it('initialises partInventory if missing', () => {
     const state = makeState();
+    // @ts-expect-error testing defensive guard when partInventory is missing
     delete state.partInventory;
     addToInventory(state, 'engine-spark', 10);
     expect(state.partInventory).toHaveLength(1);
@@ -195,7 +197,7 @@ describe('refurbishPart', () => {
   it('pays cost and resets wear to 10%', () => {
     const state = makeState(100_000);
     const entry = addToInventory(state, 'engine-spark', 50);
-    const def = getPartById('engine-spark');
+    const def = getPartById('engine-spark')!;
     const expectedCost = Math.round(def.cost * REFURBISH_COST_FRACTION);
 
     const result = refurbishPart(state, entry.id);
@@ -230,7 +232,7 @@ describe('scrapPart', () => {
   it('removes part and earns scrap value', () => {
     const state = makeState(100_000);
     const entry = addToInventory(state, 'engine-spark', 60);
-    const def = getPartById('engine-spark');
+    const def = getPartById('engine-spark')!;
     const expectedValue = Math.round(def.cost * SCRAP_VALUE_FRACTION);
 
     const result = scrapPart(state, entry.id);
@@ -259,7 +261,7 @@ describe('useInventoryPart', () => {
     const best = addToInventory(state, 'engine-spark', 10);
     addToInventory(state, 'engine-spark', 25);
 
-    const used = useInventoryPart(state, 'engine-spark');
+    const used = useInventoryPart(state, 'engine-spark')!;
     expect(used.wear).toBe(10);
     expect(state.partInventory).toHaveLength(2);
   });
@@ -284,19 +286,19 @@ describe('recoverPartsToInventory', () => {
     connectParts(assembly, probeId, 1, tankId, 0);
     connectParts(assembly, tankId, 1, engineId, 0);
 
-    const ps = {
+    const ps: Partial<PhysicsState> = {
       activeParts: new Set([probeId, tankId, engineId]),
       landed: true,
       crashed: false,
     };
 
-    const result = recoverPartsToInventory(state, assembly, ps, null);
+    const result = recoverPartsToInventory(state, assembly, ps as PhysicsState, null);
 
     expect(result.partsRecovered).toBe(3);
     expect(state.partInventory).toHaveLength(3);
 
     // Check wear values by part type.
-    const invByPartId = {};
+    const invByPartId: Record<string, InventoryPart> = {};
     for (const e of state.partInventory) {
       invByPartId[e.partId] = e;
     }
@@ -311,13 +313,13 @@ describe('recoverPartsToInventory', () => {
     const probeId = addPartToAssembly(assembly, 'probe-core-mk1', 0, 60);
     const tankId  = addPartToAssembly(assembly, 'tank-small',     0, 0);
 
-    const ps = {
+    const ps: Partial<PhysicsState> = {
       activeParts: new Set([probeId]), // tank was jettisoned
       landed: true,
       crashed: false,
     };
 
-    const result = recoverPartsToInventory(state, assembly, ps, null);
+    const result = recoverPartsToInventory(state, assembly, ps as PhysicsState, null);
 
     expect(result.partsRecovered).toBe(1);
     expect(state.partInventory).toHaveLength(1);
@@ -329,17 +331,17 @@ describe('recoverPartsToInventory', () => {
     const assembly = createRocketAssembly();
     const engineId = addPartToAssembly(assembly, 'engine-spark', 0, 0);
 
-    const ps = {
+    const ps: Partial<PhysicsState> = {
       activeParts: new Set([engineId]),
       landed: true,
       crashed: false,
     };
 
     // Simulate a part from inventory with existing wear.
-    const usedInvParts = new Map();
+    const usedInvParts = new Map<string, InventoryPart>();
     usedInvParts.set(engineId, { id: 'inv-old', partId: 'engine-spark', wear: 30, flights: 2 });
 
-    const result = recoverPartsToInventory(state, assembly, ps, usedInvParts);
+    const result = recoverPartsToInventory(state, assembly, ps as PhysicsState, usedInvParts);
 
     expect(result.partsRecovered).toBe(1);
     const recovered = state.partInventory[0];
@@ -352,17 +354,17 @@ describe('recoverPartsToInventory', () => {
     const assembly = createRocketAssembly();
     const engineId = addPartToAssembly(assembly, 'engine-spark', 0, 0);
 
-    const ps = {
+    const ps: Partial<PhysicsState> = {
       activeParts: new Set([engineId]),
       landed: true,
       crashed: false,
     };
 
     // Part already at 90% wear — adding 15% engine wear would exceed 100%.
-    const usedInvParts = new Map();
+    const usedInvParts = new Map<string, InventoryPart>();
     usedInvParts.set(engineId, { id: 'inv-old', partId: 'engine-spark', wear: 90, flights: 5 });
 
-    const result = recoverPartsToInventory(state, assembly, ps, usedInvParts);
+    const result = recoverPartsToInventory(state, assembly, ps as PhysicsState, usedInvParts);
 
     // 90 + 15 = 105 → capped at 100 → skipped (wear >= 100)
     expect(result.partsRecovered).toBe(0);

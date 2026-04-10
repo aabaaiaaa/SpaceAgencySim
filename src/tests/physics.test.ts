@@ -1,21 +1,3 @@
-// @ts-nocheck
-/**
- * physics.test.js — Unit tests for the flight physics engine (TASK-020).
- *
- * Tests cover:
- *   createPhysicsState()  — initial state setup, fuel store population
- *   tick()                — launch-pad hold, liftoff, gravity-only flight,
- *                           landing/crash event emission, timeElapsed advance
- *   handleKeyDown/Up()    — throttle changes, held-key steering tracking
- *   fireNextStage()       — IGNITE (engine start), SEPARATE (stage jettison),
- *                           DEPLOY (parachute), EJECT, RELEASE, COLLECT_SCIENCE
- *   Internal helpers (via observable side-effects):
- *     airDensity model    — positive at sea level, zero above 70 km
- *     drag                — speed-squared dependence, zero in vacuum
- *     fuel consumption    — SRB burns independently; liquid drains tanks
- *     deltaV estimate     — positive while fuel remains
- */
-
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   createPhysicsState,
@@ -48,6 +30,11 @@ import {
 } from '../core/rocketbuilder.ts';
 import { createFlightState } from '../core/gameState.ts';
 
+import type { PhysicsState, CapturedBody, RocketAssembly, ParachuteEntry, LegEntry } from '../core/physics.ts';
+import type { FlightState, FlightEvent } from '../core/gameState.ts';
+import type { StagingConfig } from '../core/rocketbuilder.ts';
+import type { PartDef } from '../data/parts.ts';
+
 // ---------------------------------------------------------------------------
 // Shared test fixtures
 // ---------------------------------------------------------------------------
@@ -61,7 +48,13 @@ import { createFlightState } from '../core/gameState.ts';
  * Wet mass       : 620 kg
  * Spark thrust   : 60 kN sea-level → TWR ≈ 9.9 — very flyable.
  */
-function makeSimpleRocket() {
+function makeSimpleRocket(): {
+  assembly: RocketAssembly;
+  staging: StagingConfig;
+  probeId: string;
+  tankId: string;
+  engineId: string;
+} {
   const assembly = createRocketAssembly();
   const staging  = createStagingConfig();
 
@@ -82,7 +75,14 @@ function makeSimpleRocket() {
  * Two-stage rocket: Probe Core + Decoupler + Small Tank + Spark Engine.
  * Stage 1: engine ignition.  Stage 2: decoupler separation.
  */
-function makeTwoStageRocketGlobal() {
+function makeTwoStageRocketGlobal(): {
+  assembly: RocketAssembly;
+  staging: StagingConfig;
+  probeId: string;
+  decId: string;
+  tankId: string;
+  engineId: string;
+} {
   const assembly = createRocketAssembly();
   const staging  = createStagingConfig();
 
@@ -106,7 +106,7 @@ function makeTwoStageRocketGlobal() {
 /**
  * Build a FlightState stub for a test flight.
  */
-function makeFlightState() {
+function makeFlightState(): FlightState {
   return createFlightState({
     missionId: 'test-mission',
     rocketId:  'test-rocket',
@@ -255,7 +255,7 @@ describe('tick() — engine firing and liftoff', () => {
     const fs = makeFlightState();
     const ps = createPhysicsState(assembly, fs);
 
-    const initialFuel = ps.fuelStore.get(tankId);
+    const initialFuel = ps.fuelStore.get(tankId)!;
     fireNextStage(ps, assembly, staging, fs);
     tick(ps, assembly, staging, fs, 1.0);
 
@@ -343,7 +343,7 @@ describe('tick() — landing and crash events', () => {
 
     const evt = fs.events.find((e) => e.type === 'LANDING');
     expect(evt).toBeDefined();
-    expect(evt.speed).toBeGreaterThan(0);
+    expect(evt!.speed).toBeGreaterThan(0);
     expect(ps.landed).toBe(true);
     expect(ps.crashed).toBe(false);
   });
@@ -592,7 +592,14 @@ describe('fireNextStage() — SEPARATE (decoupler)', () => {
    *     ↕ Small Tank
    *     ↕ Spark Engine     (Stage 1)
    */
-  function makeTwoStageRocket() {
+  function makeTwoStageRocket(): {
+    assembly: RocketAssembly;
+    staging: StagingConfig;
+    probeId: string;
+    decId: string;
+    tankId: string;
+    engineId: string;
+  } {
     const assembly = createRocketAssembly();
     const staging  = createStagingConfig();
 
@@ -660,14 +667,19 @@ describe('fireNextStage() — SEPARATE (decoupler)', () => {
 });
 
 describe('fireNextStage() — DEPLOY (parachute)', () => {
-  function makeRocketWithChute() {
+  function makeRocketWithChute(): {
+    assembly: RocketAssembly;
+    staging: StagingConfig;
+    cmdId: string;
+    chuteId: string;
+  } {
     const assembly = createRocketAssembly();
     const staging  = createStagingConfig();
 
     const cmdId    = addPartToAssembly(assembly, 'cmd-mk1',        0,  60);
     const chuteId  = addPartToAssembly(assembly, 'parachute-mk1',  0,  90);
 
-    connectParts(assembly, cmdId, 0, chuteId, 1); // chute on top
+    connectParts(assembly, cmdId, 0, chuteId, 1);
 
     syncStagingWithAssembly(assembly, staging);
     assignPartToStage(staging, chuteId, 0);
@@ -739,7 +751,7 @@ describe('fireNextStage() — EJECT (ejector seat)', () => {
 
     const evt = fs.events.find((e) => e.type === 'CREW_EJECTED');
     expect(evt).toBeDefined();
-    expect(evt.altitude).toBeCloseTo(5000, 0);
+    expect(evt!.altitude).toBeCloseTo(5000, 0);
   });
 });
 
@@ -764,7 +776,7 @@ describe('fireNextStage() — RELEASE (satellite)', () => {
 
     const evt = fs.events.find((e) => e.type === 'SATELLITE_RELEASED');
     expect(evt).toBeDefined();
-    expect(evt.altitude).toBeCloseTo(200_000, 0);
+    expect(evt!.altitude).toBeCloseTo(200_000, 0);
   });
 });
 
@@ -794,8 +806,8 @@ describe('fireNextStage() — COLLECT_SCIENCE (service module)', () => {
     // Science module enters RUNNING state with a countdown timer.
     const entry = ps.scienceModuleStates?.get(scienceId);
     expect(entry).toBeDefined();
-    expect(entry.state).toBe('running');
-    expect(entry.timer).toBeGreaterThan(0);
+    expect(entry!.state).toBe('running');
+    expect(entry!.timer).toBeGreaterThan(0);
 
     // SCIENCE_COLLECTED is NOT emitted on activation — it fires when the
     // timer expires in tickScienceModules.
@@ -809,15 +821,18 @@ describe('fireNextStage() — COLLECT_SCIENCE (service module)', () => {
 // ---------------------------------------------------------------------------
 
 describe('SRB — burns and exhausts independently', () => {
-  function makeRocketWithSRB() {
+  function makeRocketWithSRB(): {
+    assembly: RocketAssembly;
+    staging: StagingConfig;
+    probeId: string;
+    srbId: string;
+  } {
     const assembly = createRocketAssembly();
     const staging  = createStagingConfig();
 
     const probeId = addPartToAssembly(assembly, 'probe-core-mk1', 0,  60);
     const srbId   = addPartToAssembly(assembly, 'srb-small',      50, 0);
 
-    // SRBs attach radially — just add the part; connectivity not needed for
-    // physics tests.
     syncStagingWithAssembly(assembly, staging);
     assignPartToStage(staging, srbId, 0);
 
@@ -829,7 +844,7 @@ describe('SRB — burns and exhausts independently', () => {
     const fs = makeFlightState();
     const ps = createPhysicsState(assembly, fs);
 
-    const initFuel = ps.fuelStore.get(srbId);
+    const initFuel = ps.fuelStore.get(srbId)!;
     expect(initFuel).toBeGreaterThan(0);
 
     fireNextStage(ps, assembly, staging, fs);
@@ -1261,7 +1276,13 @@ describe('TASK-037: time warp scaling — 10×5× warp equals 50×1× warp', () 
  * Build a rocket with two small landing legs attached.
  * Probe Core at y=60, two legs at y=0 on either side.
  */
-function makeRocketWithLegs() {
+function makeRocketWithLegs(): {
+  assembly: RocketAssembly;
+  staging: StagingConfig;
+  probeId: string;
+  legId1: string;
+  legId2: string;
+} {
   const assembly = createRocketAssembly();
   const staging  = createStagingConfig();
 
@@ -1269,7 +1290,6 @@ function makeRocketWithLegs() {
   const legId1  = addPartToAssembly(assembly, 'landing-legs-small', 20,  0);
   const legId2  = addPartToAssembly(assembly, 'landing-legs-small', -20, 0);
 
-  // Assign both legs to Stage 1 (DEPLOY activation).
   syncStagingWithAssembly(assembly, staging);
   assignPartToStage(staging, legId1, 0);
   assignPartToStage(staging, legId2, 0);
@@ -1323,7 +1343,7 @@ describe('TASK-025: deployLandingLeg() — state transitions', () => {
 
     deployLandingLeg(ps, legId1);
 
-    const entry = ps.legStates.get(legId1);
+    const entry = ps.legStates.get(legId1)!;
     expect(entry.deployTimer).toBe(1.5);
   });
 
@@ -1332,11 +1352,10 @@ describe('TASK-025: deployLandingLeg() — state transitions', () => {
     const ps = createPhysicsState(assembly, makeFlightState());
 
     deployLandingLeg(ps, legId1);
-    const entry = ps.legStates.get(legId1);
-    entry.deployTimer = 0.5; // reduce to 0.5 s remaining
+    const entry = ps.legStates.get(legId1)!;
+    entry.deployTimer = 0.5;
 
-    deployLandingLeg(ps, legId1); // call again
-    // Timer should still be 0.5 (not reset to 1.5).
+    deployLandingLeg(ps, legId1);
     expect(entry.deployTimer).toBe(0.5);
   });
 
@@ -1344,8 +1363,7 @@ describe('TASK-025: deployLandingLeg() — state transitions', () => {
     const { assembly, legId1 } = makeRocketWithLegs();
     const ps = createPhysicsState(assembly, makeFlightState());
 
-    // Manually set to deployed.
-    ps.legStates.get(legId1).state = LegState.DEPLOYED;
+    ps.legStates.get(legId1)!.state = LegState.DEPLOYED;
     deployLandingLeg(ps, legId1);
 
     // State should remain deployed.
@@ -1430,7 +1448,7 @@ describe('TASK-025: tickLegs() — deploying → deployed timer', () => {
       (e) => e.type === 'LEG_DEPLOYED' && e.instanceId === legId1,
     );
     expect(deployedEvt).toBeDefined();
-    expect(deployedEvt.altitude).toBeGreaterThan(0);
+    expect(deployedEvt!.altitude).toBeGreaterThan(0);
   });
 
   it('leg stays DEPLOYING before 1.5 s has elapsed', () => {
@@ -1460,8 +1478,8 @@ describe('TASK-025: landing detection — controlled landing', () => {
     const ps = createPhysicsState(assembly, fs);
 
     // Manually set both legs to DEPLOYED state.
-    ps.legStates.get(legId1).state = LegState.DEPLOYED;
-    ps.legStates.get(legId2).state = LegState.DEPLOYED;
+    ps.legStates.get(legId1)!.state = LegState.DEPLOYED;
+    ps.legStates.get(legId2)!.state = LegState.DEPLOYED;
 
     // Set rocket just above ground, falling within safe speed.
     ps.posY     = 0.01;
@@ -1472,7 +1490,7 @@ describe('TASK-025: landing detection — controlled landing', () => {
 
     const evt = fs.events.find((e) => e.type === 'LANDING');
     expect(evt).toBeDefined();
-    expect(evt.speed).toBeCloseTo(7, 0);
+    expect(evt!.speed).toBeCloseTo(7, 0);
     expect(ps.landed).toBe(true);
     expect(ps.crashed).toBe(false);
   });
@@ -1483,7 +1501,7 @@ describe('TASK-025: landing detection — controlled landing', () => {
     const ps = createPhysicsState(assembly, fs);
 
     // Only 1 leg deployed.
-    ps.legStates.get(legId1).state = LegState.DEPLOYED;
+    ps.legStates.get(legId1)!.state = LegState.DEPLOYED;
     // legId2 stays RETRACTED.
 
     ps.posY     = 0.01;
@@ -1511,8 +1529,8 @@ describe('TASK-025: landing detection — hard landing (cascading damage)', () =
     const ps = createPhysicsState(assembly, fs);
 
     // Both legs deployed.
-    ps.legStates.get(legId1).state = LegState.DEPLOYED;
-    ps.legStates.get(legId2).state = LegState.DEPLOYED;
+    ps.legStates.get(legId1)!.state = LegState.DEPLOYED;
+    ps.legStates.get(legId2)!.state = LegState.DEPLOYED;
 
     // Falling at 20 m/s — legs have crashThreshold 25, so they survive.
     ps.posY     = 0.01;
@@ -1536,8 +1554,8 @@ describe('TASK-025: landing detection — hard landing (cascading damage)', () =
     const fs = makeFlightState();
     const ps = createPhysicsState(assembly, fs);
 
-    ps.legStates.get(legId1).state = LegState.DEPLOYED;
-    ps.legStates.get(legId2).state = LegState.DEPLOYED;
+    ps.legStates.get(legId1)!.state = LegState.DEPLOYED;
+    ps.legStates.get(legId2)!.state = LegState.DEPLOYED;
 
     ps.posY     = 0.01;
     ps.velY     = -20;
@@ -1689,10 +1707,10 @@ describe('TASK-025: getLegContextMenuItems()', () => {
     const { assembly, legId1 } = makeRocketWithLegs();
     const ps = createPhysicsState(assembly, makeFlightState());
 
-    ps.legStates.get(legId1).state = LegState.DEPLOYED;
+    ps.legStates.get(legId1)!.state = LegState.DEPLOYED;
 
     const items = getLegContextMenuItems(ps, assembly);
-    const item1 = items.find((i) => i.instanceId === legId1);
+    const item1 = items.find((i) => i.instanceId === legId1)!;
     expect(item1.canDeploy).toBe(false);
     expect(item1.statusLabel).toBe('Deployed');
   });
@@ -1701,12 +1719,12 @@ describe('TASK-025: getLegContextMenuItems()', () => {
     const { assembly, legId1 } = makeRocketWithLegs();
     const ps = createPhysicsState(assembly, makeFlightState());
 
-    const entry = ps.legStates.get(legId1);
+    const entry = ps.legStates.get(legId1)!;
     entry.state       = LegState.DEPLOYING;
     entry.deployTimer = 0.8;
 
     const items = getLegContextMenuItems(ps, assembly);
-    const item1 = items.find((i) => i.instanceId === legId1);
+    const item1 = items.find((i) => i.instanceId === legId1)!;
     expect(item1.deployTimer).toBeCloseTo(0.8, 1);
     expect(item1.statusLabel).toContain('Deploying');
   });
@@ -1794,7 +1812,7 @@ describe('Ground rotation — tipping physics', () => {
     expect(ps.crashed).toBe(true);
     const crashEvt = fs.events.find((e) => e.type === 'CRASH' && e.toppled === true);
     expect(crashEvt).toBeDefined();
-    expect(crashEvt.speed).toBeGreaterThan(0);
+    expect(crashEvt!.speed).toBeGreaterThan(0);
   });
 
   it('slowly toppling rocket does not crash', () => {
@@ -1825,7 +1843,7 @@ describe('Ground rotation — tipping physics', () => {
     expect(ps.crashed).toBe(true);
     const evt = fs.events.find(e => e.type === 'CRASH' && e.toppled);
     expect(evt).toBeDefined();
-    expect(evt.speed).toBeGreaterThan(0);
+    expect(evt!.speed).toBeGreaterThan(0);
   });
 
   it('slowly toppled rocket settles on its side without crashing', () => {
@@ -1892,13 +1910,14 @@ describe('Ground rotation — tipping physics', () => {
 // ---------------------------------------------------------------------------
 
 describe('Debris ground physics — tipping & settling', () => {
-  // Helper: create landed debris from a two-stage rocket separation.
-  function makeLandedDebris() {
+  function makeLandedDebris(): {
+    debris: PhysicsState['debris'][number];
+    assembly: RocketAssembly;
+  } {
     const { assembly, staging } = makeTwoStageRocketGlobal();
     const fs = makeFlightState();
     const ps = createPhysicsState(assembly, fs);
 
-    // Fire stage 1 (engine ignition), then stage 2 (decoupler separation).
     fireNextStage(ps, assembly, staging, fs);
     fireNextStage(ps, assembly, staging, fs);
 
@@ -2135,7 +2154,14 @@ describe('Debris angular dynamics', () => {
  * The parachute is above the CoM, so when deployed its drag creates a
  * pendulum restoring torque that swings the rocket upright.
  */
-function makeRocketWithChute(chuteId = 'parachute-mk1') {
+function makeRocketWithChute(chuteId: string = 'parachute-mk1'): {
+  assembly: RocketAssembly;
+  staging: StagingConfig;
+  chuteInstanceId: string;
+  probeId: string;
+  tankId: string;
+  engineId: string;
+} {
   const assembly = createRocketAssembly();
   const staging  = createStagingConfig();
 
@@ -2144,13 +2170,12 @@ function makeRocketWithChute(chuteId = 'parachute-mk1') {
   const tankId          = addPartToAssembly(assembly, 'tank-small',      0,    0);
   const engineId        = addPartToAssembly(assembly, 'engine-spark',    0,  -55);
 
-  connectParts(assembly, chuteInstanceId, 1, probeId, 0); // chute bottom → probe top
+  connectParts(assembly, chuteInstanceId, 1, probeId, 0);
   connectParts(assembly, probeId, 1, tankId,   0);
   connectParts(assembly, tankId,  1, engineId, 0);
 
   syncStagingWithAssembly(assembly, staging);
   assignPartToStage(staging, engineId, 0);
-  // Chute deploy on stage 2.
   addStageToConfig(staging);
   assignPartToStage(staging, chuteInstanceId, 1);
 
@@ -2171,7 +2196,7 @@ describe('Parachute stabilization torque', () => {
     ps.angularVelocity = 0;
 
     // Deploy the chute manually.
-    ps.parachuteStates.set(chuteInstanceId, { state: 'deployed', deployTimer: 0 });
+    ps.parachuteStates.set(chuteInstanceId, { state: 'deployed', deployTimer: 0, canopyAngle: 0, canopyAngularVel: 0 });
 
     // Run 5 seconds of simulation.
     const steps = 5 * 60;
@@ -2228,8 +2253,8 @@ describe('Parachute stabilization torque', () => {
     }
 
     // Deploy both chutes.
-    psMk1.parachuteStates.set(mk1.chuteInstanceId, { state: 'deployed', deployTimer: 0 });
-    psMk2.parachuteStates.set(mk2.chuteInstanceId, { state: 'deployed', deployTimer: 0 });
+    psMk1.parachuteStates.set(mk1.chuteInstanceId, { state: 'deployed', deployTimer: 0, canopyAngle: 0, canopyAngularVel: 0 });
+    psMk2.parachuteStates.set(mk2.chuteInstanceId, { state: 'deployed', deployTimer: 0, canopyAngle: 0, canopyAngularVel: 0 });
 
     // Run 0.25 seconds.
     const steps = Math.round(0.25 * 60);
@@ -2254,7 +2279,11 @@ describe('Single command module turn sensitivity', () => {
    * Before the self-inertia fix the MoI was clamped to 1 kg·m²,
    * giving absurd angular acceleration.
    */
-  function makeSoloCmdModule() {
+  function makeSoloCmdModule(): {
+    assembly: RocketAssembly;
+    staging: StagingConfig;
+    cmdId: string;
+  } {
     const assembly = createRocketAssembly();
     const staging  = createStagingConfig();
     const cmdId = addPartToAssembly(assembly, 'cmd-mk1', 0, 0);
@@ -2272,7 +2301,7 @@ describe('Single command module turn sensitivity', () => {
     ps.velY     = 0;
     ps.grounded = false;
 
-    // Hold right-turn key for 1 second.
+    // @ts-expect-error -- testing with missing assembly parameter
     handleKeyDown(ps, 'd');
     const steps = Math.round(1 / FIXED_DT);
     for (let i = 0; i < steps; i++) {
@@ -2280,7 +2309,6 @@ describe('Single command module turn sensitivity', () => {
     }
     handleKeyUp(ps, 'd');
 
-    // With self-inertia the angular velocity should be moderate, not thousands.
     expect(Math.abs(ps.angularVelocity)).toBeLessThan(5);
   });
 });
@@ -2297,7 +2325,7 @@ describe('Parachute angular damping', () => {
     ps.angle    = 0;
     ps.angularVelocity = 2.0;  // spinning at 2 rad/s
 
-    ps.parachuteStates.set(chuteInstanceId, { state: 'deployed', deployTimer: 0 });
+    ps.parachuteStates.set(chuteInstanceId, { state: 'deployed', deployTimer: 0, canopyAngle: 0, canopyAngularVel: 0 });
 
     const steps = 5 * 60;
     for (let i = 0; i < steps; i++) {
@@ -2319,9 +2347,9 @@ describe('Parachute angular damping', () => {
     ps.angle    = 0;
     ps.angularVelocity = 0;
 
-    ps.parachuteStates.set(chuteInstanceId, { state: 'deployed', deployTimer: 0 });
+    ps.parachuteStates.set(chuteInstanceId, { state: 'deployed', deployTimer: 0, canopyAngle: 0, canopyAngularVel: 0 });
 
-    // Hold right-turn key throughout.
+    // @ts-expect-error -- testing with missing assembly parameter
     handleKeyDown(ps, 'd');
 
     const steps = 3 * 60;
@@ -2350,19 +2378,22 @@ describe('cascading crash thresholds', () => {
    *   tank-small      at y=0    (crashThreshold: 8,  mass: 50 dry + 400 fuel)
    *   probe-core-mk1  at y=60   (crashThreshold: 12, mass: 50)
    */
-  function dropRocket(speed) {
+  function dropRocket(speed: number): {
+    ps: PhysicsState;
+    assembly: RocketAssembly;
+    fs: FlightState;
+    probeId: string;
+    tankId: string;
+    engineId: string;
+  } {
     const { assembly, staging, probeId, tankId, engineId } = makeSimpleRocket();
     const fs = makeFlightState();
     const ps = createPhysicsState(assembly, fs);
 
-    // Place rocket barely above ground. At 1/60s step, position delta is
-    // roughly speed/60 m, so for speed=5 that's ~0.08m. Use a tiny posY
-    // so ground contact is triggered in the first integration step.
     ps.posY     = speed * (1 / 60) * 0.5;
     ps.velY     = -speed;
     ps.grounded = false;
 
-    // Tick enough frames that the rocket definitely hits ground.
     tick(ps, assembly, staging, fs, 0.5);
 
     return { ps, assembly, fs, probeId, tankId, engineId };
@@ -2500,7 +2531,7 @@ describe('cascading crash thresholds', () => {
     // Check that the engine appears in destroyed events.
     const engineDestroyed = destroyedEvents.find((e) => e.instanceId === engineId);
     expect(engineDestroyed).toBeDefined();
-    expect(engineDestroyed.partId).toBe('engine-spark');
+    expect(engineDestroyed!.partId).toBe('engine-spark');
   });
 
   it('higher threshold absorbs more — engine (12) vs decoupler (6) at bottom', () => {
@@ -2618,24 +2649,21 @@ describe('Deployed leg foot extends past engine', () => {
     const ps = createPhysicsState(assembly, fs);
 
     // Deploy legs manually.
-    ps.legStates.get(legId1).state = LegState.DEPLOYED;
-    ps.legStates.get(legId1).deployTimer = 0;
-    ps.legStates.get(legId2).state = LegState.DEPLOYED;
-    ps.legStates.get(legId2).deployTimer = 0;
+    ps.legStates.get(legId1)!.state = LegState.DEPLOYED;
+    ps.legStates.get(legId1)!.deployTimer = 0;
+    ps.legStates.get(legId2)!.state = LegState.DEPLOYED;
+    ps.legStates.get(legId2)!.deployTimer = 0;
 
-    const legDef = getPartById('landing-legs-small');
-    const engineDef = getPartById('engine-spark');
+    const legDef = getPartById('landing-legs-small')!;
+    const engineDef = getPartById('engine-spark')!;
 
-    // Leg foot Y (in VAB coords, more negative = lower).
-    const legPlaced = assembly.parts.get(legId1);
+    const legPlaced = assembly.parts.get(legId1)!;
     const { dy } = getDeployedLegFootOffset(legId1, legDef, ps.legStates);
     const footVabY = legPlaced.y - dy;
 
-    // Engine bottom Y.
-    const enginePlaced = assembly.parts.get(engineId);
+    const enginePlaced = assembly.parts.get(engineId)!;
     const engineBottomY = enginePlaced.y - (engineDef.height ?? 40) / 2;
 
-    // Foot should be lower (more negative) than engine bottom.
     expect(footVabY).toBeLessThan(engineBottomY);
   });
 });
@@ -2685,7 +2713,7 @@ describe('Legs deploy on launch pad (grounded)', () => {
 
     // Should still be deploying (timer decremented but not expired).
     expect(getLegStatus(ps, legId1)).toBe(LegState.DEPLOYING);
-    const entry = ps.legStates.get(legId1);
+    const entry = ps.legStates.get(legId1)!;
     expect(entry.deployTimer).toBeLessThan(LEG_DEPLOY_DURATION);
     expect(entry.deployTimer).toBeGreaterThan(0);
   });
@@ -2711,16 +2739,17 @@ describe('Deployed legs are lowest point on grounded rocket', () => {
     const ps = createPhysicsState(assembly, fs);
 
     // Deploy legs.
-    ps.legStates.get(legId1).state = LegState.DEPLOYED;
-    ps.legStates.get(legId1).deployTimer = 0;
-    ps.legStates.get(legId2).state = LegState.DEPLOYED;
-    ps.legStates.get(legId2).deployTimer = 0;
+    ps.legStates.get(legId1)!.state = LegState.DEPLOYED;
+    ps.legStates.get(legId1)!.deployTimer = 0;
+    ps.legStates.get(legId2)!.state = LegState.DEPLOYED;
+    ps.legStates.get(legId2)!.deployTimer = 0;
 
     // Find the lowest point across all parts, accounting for foot offset.
     let lowestY = Infinity;
     for (const instanceId of ps.activeParts) {
       const placed = assembly.parts.get(instanceId);
-      const def = placed ? getPartById(placed.partId) : null;
+      if (!placed) continue;
+      const def = getPartById(placed.partId);
       if (!def) continue;
       let bottomY = placed.y - (def.height ?? 40) / 2;
       if (def.type === 'LANDING_LEGS' || def.type === 'LANDING_LEG') {
@@ -2731,9 +2760,8 @@ describe('Deployed legs are lowest point on grounded rocket', () => {
       if (bottomY < lowestY) lowestY = bottomY;
     }
 
-    // The lowest point should be the deployed leg foot, not the engine.
-    const legDef = getPartById('landing-legs-small');
-    const legPlaced = assembly.parts.get(legId1);
+    const legDef = getPartById('landing-legs-small')!;
+    const legPlaced = assembly.parts.get(legId1)!;
     const { dy } = getDeployedLegFootOffset(legId1, legDef, ps.legStates);
     const expectedFootY = legPlaced.y - dy;
 
@@ -2752,8 +2780,8 @@ describe('Asymmetric leg deploy causes tipping on pad', () => {
     const ps = createPhysicsState(assembly, fs);
 
     // Deploy only leg1, leave leg2 retracted.
-    ps.legStates.get(legId1).state = LegState.DEPLOYED;
-    ps.legStates.get(legId1).deployTimer = 0;
+    ps.legStates.get(legId1)!.state = LegState.DEPLOYED;
+    ps.legStates.get(legId1)!.deployTimer = 0;
 
     ps.grounded = true;
     ps.posY = 0;
@@ -2780,10 +2808,10 @@ describe('Asymmetric leg deploy causes tipping on pad', () => {
     const ps = createPhysicsState(assembly, fs);
 
     // Deploy both legs.
-    ps.legStates.get(legId1).state = LegState.DEPLOYED;
-    ps.legStates.get(legId1).deployTimer = 0;
-    ps.legStates.get(legId2).state = LegState.DEPLOYED;
-    ps.legStates.get(legId2).deployTimer = 0;
+    ps.legStates.get(legId1)!.state = LegState.DEPLOYED;
+    ps.legStates.get(legId1)!.deployTimer = 0;
+    ps.legStates.get(legId2)!.state = LegState.DEPLOYED;
+    ps.legStates.get(legId2)!.deployTimer = 0;
 
     ps.grounded = true;
     ps.posY = 0;
@@ -2813,10 +2841,10 @@ describe('Topple recovery with deployed legs', () => {
     const ps = createPhysicsState(assembly, fs);
 
     // Deploy both legs.
-    ps.legStates.get(legId1).state = LegState.DEPLOYED;
-    ps.legStates.get(legId1).deployTimer = 0;
-    ps.legStates.get(legId2).state = LegState.DEPLOYED;
-    ps.legStates.get(legId2).deployTimer = 0;
+    ps.legStates.get(legId1)!.state = LegState.DEPLOYED;
+    ps.legStates.get(legId1)!.deployTimer = 0;
+    ps.legStates.get(legId2)!.state = LegState.DEPLOYED;
+    ps.legStates.get(legId2)!.deployTimer = 0;
 
     ps.landed = true;
     ps.grounded = true;
@@ -2867,10 +2895,10 @@ describe('Topple recovery with deployed legs', () => {
     const fs = makeFlightState();
     const ps = createPhysicsState(assembly, fs);
 
-    ps.legStates.get(legId1).state = LegState.DEPLOYED;
-    ps.legStates.get(legId1).deployTimer = 0;
-    ps.legStates.get(legId2).state = LegState.DEPLOYED;
-    ps.legStates.get(legId2).deployTimer = 0;
+    ps.legStates.get(legId1)!.state = LegState.DEPLOYED;
+    ps.legStates.get(legId1)!.deployTimer = 0;
+    ps.legStates.get(legId2)!.state = LegState.DEPLOYED;
+    ps.legStates.get(legId2)!.deployTimer = 0;
 
     ps.landed = true;
     ps.grounded = true;
@@ -2906,10 +2934,10 @@ describe('Topple recovery with deployed legs', () => {
     const fs = makeFlightState();
     const ps = createPhysicsState(assembly, fs);
 
-    ps.legStates.get(legId1).state = LegState.DEPLOYED;
-    ps.legStates.get(legId1).deployTimer = 0;
-    ps.legStates.get(legId2).state = LegState.DEPLOYED;
-    ps.legStates.get(legId2).deployTimer = 0;
+    ps.legStates.get(legId1)!.state = LegState.DEPLOYED;
+    ps.legStates.get(legId1)!.deployTimer = 0;
+    ps.legStates.get(legId2)!.state = LegState.DEPLOYED;
+    ps.legStates.get(legId2)!.deployTimer = 0;
 
     ps.landed = true;
     ps.grounded = true;

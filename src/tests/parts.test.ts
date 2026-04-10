@@ -1,21 +1,3 @@
-// @ts-nocheck
-/**
- * parts.test.js — Unit tests for the part definitions system (TASK-003).
- *
- * Tests cover:
- *   - ActivationBehaviour enum         — frozen, expected values present
- *   - STACK_TYPES / RADIAL_TYPES       — frozen arrays, correct membership
- *   - makeSnapPoint()                  — returns correct shape, copies accepts
- *   - PARTS array                      — exported, is an array
- *   - getPartById()                    — returns undefined for unknown IDs;
- *                                        correct object when parts exist
- *   - getPartsByType()                 — returns filtered subset
- *   - getAllParts()                     — returns a copy, mutations isolated
- *   - getPartIdsByType()               — returns string IDs only
- *   - PartType additions               — new values added for TASK-003
- *   - PartDef schema validation        — helper validates expected fields
- */
-
 import { describe, it, expect, beforeAll } from 'vitest';
 import {
   ActivationBehaviour,
@@ -28,6 +10,7 @@ import {
   getAllParts,
   getPartIdsByType,
 } from '../data/parts.ts';
+import type { PartDef } from '../data/parts.ts';
 import { PartType } from '../core/constants.ts';
 
 // ---------------------------------------------------------------------------
@@ -213,7 +196,7 @@ describe('makeSnapPoint()', () => {
   });
 
   it('copies the accepts array (mutation of original does not affect result)', () => {
-    const accepts = [PartType.FUEL_TANK];
+    const accepts: string[] = [PartType.FUEL_TANK];
     const sp = makeSnapPoint('bottom', 0, 25, accepts);
     accepts.push(PartType.ENGINE);
     expect(sp.accepts).toHaveLength(1);
@@ -232,7 +215,7 @@ describe('makeSnapPoint()', () => {
   });
 
   it('works with all four side values', () => {
-    for (const side of ['top', 'bottom', 'left', 'right']) {
+    for (const side of ['top', 'bottom', 'left', 'right'] as const) {
       const sp = makeSnapPoint(side, 0, 0, []);
       expect(sp.side).toBe(side);
     }
@@ -253,12 +236,7 @@ describe('PARTS', () => {
 // Schema validation helper (used within the test suite only)
 // ---------------------------------------------------------------------------
 
-/**
- * Asserts that a value looks like a valid PartDef.
- * Throws (via expect) if any required field is missing or has the wrong type.
- * @param {*} part
- */
-function assertValidPartDef(part) {
+function assertValidPartDef(part: PartDef): void {
   expect(typeof part.id).toBe('string');
   expect(part.id.length).toBeGreaterThan(0);
 
@@ -306,11 +284,7 @@ function assertValidPartDef(part) {
 // ---------------------------------------------------------------------------
 
 describe('lookup functions with a fixture part', () => {
-  /**
-   * A minimal but schema-valid PartDef used for testing lookups.
-   * @type {import('../data/parts.js').PartDef}
-   */
-  const FIXTURE_PART = {
+  const FIXTURE_PART: PartDef = {
     id: 'test-engine-fixture',
     name: 'Test Engine',
     type: PartType.ENGINE,
@@ -393,6 +367,7 @@ describe('lookup functions with a fixture part', () => {
     it('returns a copy — mutating the result does not affect PARTS', () => {
       const all = getAllParts();
       const originalLength = PARTS.length;
+      // @ts-expect-error intentionally pushing incomplete object to test isolation
       all.push({ id: 'phantom' });
       expect(PARTS).toHaveLength(originalLength);
     });

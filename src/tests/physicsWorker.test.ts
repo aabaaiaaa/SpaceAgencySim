@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * physicsWorker.test.ts — Unit tests for the physics Web Worker message protocol.
  *
@@ -96,9 +95,13 @@ function makePhysicsSnapshot(overrides: Partial<PhysicsSnapshot> = {}): PhysicsS
     rcsActiveDirections: ['up'],
     dockingPortStates: {},
     weatherIspModifier: 1.0,
+    weatherWindSpeed: 0,
+    weatherWindAngle: 0,
     hasLaunchClamps: false,
     powerState: null,
     malfunctions: null,
+    capturedBody: null,
+    thrustAligned: false,
     ...overrides,
   };
 }
@@ -112,6 +115,7 @@ function makeFlightSnapshot(overrides: Partial<FlightSnapshot> = {}): FlightSnap
     timeElapsed: 120,
     altitude: 85000,
     velocity: 2200,
+    horizontalVelocity: 0,
     fuelRemaining: 800,
     deltaVRemaining: 3500,
     events: [
@@ -242,7 +246,7 @@ describe('physicsWorkerProtocol — PhysicsSnapshot round trip', () => {
       debris: [makeDebrisSnapshot()],
       ejectedCrewIds: ['crew-a'],
       ejectedCrew: [{ x: 10, y: 20, velX: 1, velY: -5, chuteOpen: true, chuteTimer: 3 }],
-      malfunctions: { 'engine-1': { type: 'THRUST_LOSS', recovered: false } },
+      malfunctions: { 'engine-1': { type: 'ENGINE_REDUCED_THRUST', recovered: false } },
     });
 
     // Deserialise to mutable state, then serialise back.
@@ -304,7 +308,7 @@ describe('physicsWorkerProtocol — PhysicsSnapshot round trip', () => {
   it('handles orbital state', () => {
     const snapshot = makePhysicsSnapshot({
       baseOrbit: { semiMajorAxis: 6471000, eccentricity: 0.01, argPeriapsis: 0.5, meanAnomalyAtEpoch: 1.0, epoch: 100 },
-      dockingAltitudeBand: { id: 'LEO', name: 'Low Earth Orbit' },
+      dockingAltitudeBand: { id: 'LEO', name: 'Low Earth Orbit', min: 200000, max: 2000000 },
     });
     const mutable = deserialisePhysicsState(snapshot);
     const roundTripped = serialisePhysicsState(mutable);
@@ -336,6 +340,7 @@ describe('physicsWorkerProtocol — FlightSnapshot round trip', () => {
         orientationOk: false,
         lateralOk: true,
         dockedObjectIds: [],
+        combinedMass: 0,
       },
       transferState: {
         originBodyId: 'EARTH',
@@ -506,6 +511,7 @@ describe('physicsWorkerProtocol — message type discriminators', () => {
         physics: makePhysicsSnapshot(),
         flight: makeFlightSnapshot(),
         frame: 1,
+        currentStageIdx: 0,
       },
       { type: 'ready' },
       { type: 'error', message: 'test error', stack: 'stack trace' },
@@ -522,6 +528,7 @@ describe('physicsWorkerProtocol — message type discriminators', () => {
       physics: makePhysicsSnapshot(),
       flight: makeFlightSnapshot(),
       frame: 42,
+      currentStageIdx: 0,
     };
     expect(msg.frame).toBe(42);
     expect(msg.type).toBe('snapshot');
@@ -578,7 +585,7 @@ describe('physicsWorkerProtocol — full snapshot round trip', () => {
       debris: [makeDebrisSnapshot()],
       ejectedCrewIds: ['crew-x'],
       ejectedCrew: [{ x: 5, y: 10, velX: 0, velY: -3, chuteOpen: false, chuteTimer: 0 }],
-      malfunctions: { 'part-a': { type: 'LEAK', recovered: true } },
+      malfunctions: { 'part-a': { type: 'FUEL_TANK_LEAK', recovered: true } },
       powerState: { batteryCapacity: 200, batteryCharge: 150, solarGeneration: 20, powerDraw: 10, sunlit: true, hasPower: true, solarPanelArea: 8 },
     });
 
