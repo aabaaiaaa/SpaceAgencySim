@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * satellites.test.js — Unit tests for the satellite network system.
  *
@@ -55,11 +54,13 @@ import {
   SATELLITE_REPOSITION_HEALTH_COST,
 } from '../core/constants.ts';
 
+import type { GameState, OrbitalElements, FlightState } from '../core/gameState.ts';
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function freshState() {
+function freshState(): GameState {
   const state = createGameState();
   // Build the Satellite Ops facility so deployment works.
   state.facilities[FacilityId.SATELLITE_OPS] = { built: true, tier: 1 };
@@ -67,7 +68,7 @@ function freshState() {
 }
 
 /** Default orbital elements for a LEO satellite. */
-const LEO_ELEMENTS = {
+const LEO_ELEMENTS: OrbitalElements = {
   semiMajorAxis: 6_371_000 + 150_000, // ~150 km altitude
   eccentricity: 0.001,
   argPeriapsis: 0,
@@ -76,7 +77,7 @@ const LEO_ELEMENTS = {
 };
 
 /** Default orbital elements for a MEO satellite. */
-const MEO_ELEMENTS = {
+const MEO_ELEMENTS: OrbitalElements = {
   semiMajorAxis: 6_371_000 + 500_000, // ~500 km altitude
   eccentricity: 0.001,
   argPeriapsis: 0,
@@ -85,7 +86,7 @@ const MEO_ELEMENTS = {
 };
 
 /** Default orbital elements for a HEO satellite. */
-const HEO_ELEMENTS = {
+const HEO_ELEMENTS: OrbitalElements = {
   semiMajorAxis: 6_371_000 + 5_000_000, // ~5000 km altitude
   eccentricity: 0.001,
   argPeriapsis: 0,
@@ -93,7 +94,12 @@ const HEO_ELEMENTS = {
   epoch: 0,
 };
 
-function deploySatHelper(state, partId, elements, altitude) {
+function deploySatHelper(
+  state: GameState,
+  partId: string,
+  elements: OrbitalElements,
+  altitude?: number,
+): ReturnType<typeof deploySatellite> {
   return deploySatellite(state, {
     partId,
     bodyId: 'EARTH',
@@ -107,7 +113,7 @@ function deploySatHelper(state, partId, elements, altitude) {
 // ---------------------------------------------------------------------------
 
 describe('Satellite Network — deploySatellite()', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('should deploy a generic satellite successfully', () => {
@@ -176,7 +182,7 @@ describe('Satellite Network — deploySatellite()', () => {
 });
 
 describe('Satellite Network — queries', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => {
     state = freshState();
     deploySatHelper(state, 'satellite-comm', LEO_ELEMENTS);
@@ -211,7 +217,7 @@ describe('Satellite Network — queries', () => {
 });
 
 describe('Satellite Network — benefits', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('returns 0 multiplier with no satellites', () => {
@@ -257,7 +263,7 @@ describe('Satellite Network — benefits', () => {
 });
 
 describe('Satellite Network — processSatelliteNetwork()', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => {
     state = freshState();
     deploySatHelper(state, 'satellite-comm', LEO_ELEMENTS);
@@ -314,12 +320,12 @@ describe('Satellite Network — processSatelliteNetwork()', () => {
 });
 
 describe('Satellite Network — maintenance & decommission', () => {
-  let state;
-  let satId;
+  let state: GameState;
+  let satId: string;
   beforeEach(() => {
     state = freshState();
     const result = deploySatHelper(state, 'satellite-comm', LEO_ELEMENTS);
-    satId = result.satelliteId;
+    satId = result.satelliteId!;
   });
 
   it('maintainSatellite restores health to 100', () => {
@@ -357,7 +363,7 @@ describe('Satellite Network — maintenance & decommission', () => {
 });
 
 describe('Satellite Network — getNetworkSummary()', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => {
     state = freshState();
     deploySatHelper(state, 'satellite-comm', LEO_ELEMENTS);
@@ -377,7 +383,7 @@ describe('Satellite Network — getNetworkSummary()', () => {
 });
 
 describe('Satellite Network — deploySatellitesFromFlight()', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('deploys satellite from flight event when in orbit', () => {
@@ -394,7 +400,7 @@ describe('Satellite Network — deploySatellitesFromFlight()', () => {
           partId: 'satellite-comm',
         },
       ],
-    };
+    } as unknown as FlightState;
     const deployed = deploySatellitesFromFlight(state, flightState);
     expect(deployed).toHaveLength(1);
     expect(deployed[0].satelliteType).toBe(SatelliteType.COMMUNICATION);
@@ -415,7 +421,7 @@ describe('Satellite Network — deploySatellitesFromFlight()', () => {
           partId: 'satellite-comm',
         },
       ],
-    };
+    } as unknown as FlightState;
     const deployed = deploySatellitesFromFlight(state, flightState);
     expect(deployed).toHaveLength(0);
   });
@@ -429,7 +435,7 @@ describe('Satellite Network — deploySatellitesFromFlight()', () => {
         { type: 'SATELLITE_RELEASED', time: 100, altitude: 150_000, velocity: 7800, partId: 'satellite-comm' },
         { type: 'SATELLITE_RELEASED', time: 150, altitude: 150_000, velocity: 7800, partId: 'satellite-science' },
       ],
-    };
+    } as unknown as FlightState;
     const deployed = deploySatellitesFromFlight(state, flightState);
     expect(deployed).toHaveLength(2);
     expect(state.satelliteNetwork.satellites).toHaveLength(2);
@@ -443,7 +449,7 @@ describe('Satellite Network — deploySatellitesFromFlight()', () => {
       events: [
         { type: 'SATELLITE_RELEASED', time: 90, altitude: 150_000, velocity: 7800 },
       ],
-    };
+    } as unknown as FlightState;
     const deployed = deploySatellitesFromFlight(state, flightState);
     expect(deployed).toHaveLength(1);
     expect(deployed[0].satelliteType).toBe('GENERIC');
@@ -451,7 +457,7 @@ describe('Satellite Network — deploySatellitesFromFlight()', () => {
 });
 
 describe('Satellite Network — advancePeriod integration', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => {
     state = freshState();
     deploySatHelper(state, 'satellite-comm', LEO_ELEMENTS);
@@ -488,13 +494,13 @@ describe('Satellite Network — advancePeriod integration', () => {
 // ---------------------------------------------------------------------------
 
 describe('Satellite Network — leasing', () => {
-  let state;
-  let satId;
+  let state: GameState;
+  let satId: string;
   beforeEach(() => {
     state = freshState();
     state.facilities[FacilityId.SATELLITE_OPS].tier = 2;
     const result = deploySatHelper(state, 'satellite-comm', LEO_ELEMENTS);
-    satId = result.satelliteId;
+    satId = result.satelliteId!;
   });
 
   it('setSatelliteLease enables leasing on Tier 2', () => {
@@ -597,14 +603,14 @@ describe('Satellite Network — leasing', () => {
 // ---------------------------------------------------------------------------
 
 describe('Satellite Network — repositioning', () => {
-  let state;
-  let satId;
+  let state: GameState;
+  let satId: string;
   beforeEach(() => {
     state = freshState();
     state.facilities[FacilityId.SATELLITE_OPS].tier = 3;
     state.money = 1_000_000;
     const result = deploySatHelper(state, 'satellite-comm', LEO_ELEMENTS);
-    satId = result.satelliteId;
+    satId = result.satelliteId!;
   });
 
   it('repositionSatellite moves satellite to new band', () => {
@@ -659,7 +665,7 @@ describe('Satellite Network — repositioning', () => {
 
   it('repositionSatellite rejects GPS to invalid band (LEO)', () => {
     const gpsResult = deploySatHelper(state, 'satellite-gps', MEO_ELEMENTS, 500_000);
-    const gpsId = gpsResult.satelliteId;
+    const gpsId = gpsResult.satelliteId!;
     // GPS only valid in MEO, MLO — try to move to LEO (invalid).
     const result = repositionSatellite(state, gpsId, 'LEO');
     expect(result.success).toBe(false);
@@ -673,7 +679,7 @@ describe('Satellite Network — repositioning', () => {
     );
     // MEO for Earth: min 200000, max 2000000, mid = 1100000
     // semiMajorAxis = 6371000 + 1100000 = 7471000
-    expect(orbObj.elements.semiMajorAxis).toBe(6_371_000 + 1_100_000);
+    expect(orbObj!.elements.semiMajorAxis).toBe(6_371_000 + 1_100_000);
   });
 
   it('getRepositionTargets returns valid bands excluding current', () => {
@@ -697,7 +703,7 @@ describe('Satellite Network — repositioning', () => {
 // ---------------------------------------------------------------------------
 
 describe('Satellite Network — getNetworkSummary with tiers', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => {
     state = freshState();
     state.facilities[FacilityId.SATELLITE_OPS].tier = 2;

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * rocketbuilder.test.js — Unit tests for rocket builder and validator logic (TASK-041).
  *
@@ -18,6 +17,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import type { RocketAssembly, SnapCandidate } from '../core/rocketbuilder.ts';
 import {
   createRocketAssembly,
   addPartToAssembly,
@@ -151,9 +151,9 @@ describe('Validation — TWR < 1', () => {
     const twrCheck = result.checks.find((c) => c.id === 'twr');
 
     expect(twrCheck).toBeDefined();
-    expect(twrCheck.pass).toBe(false);
+    expect(twrCheck!.pass).toBe(false);
     expect(result.twr).toBeLessThan(1);
-    expect(twrCheck.message).toMatch(/too low/i);
+    expect(twrCheck!.message).toMatch(/too low/i);
     expect(result.canLaunch).toBe(false);
   });
 });
@@ -181,8 +181,8 @@ describe('Validation — no command module', () => {
     const cmdCheck = result.checks.find((c) => c.id === 'command-module');
 
     expect(cmdCheck).toBeDefined();
-    expect(cmdCheck.pass).toBe(false);
-    expect(cmdCheck.message).toMatch(/no command/i);
+    expect(cmdCheck!.pass).toBe(false);
+    expect(cmdCheck!.message).toMatch(/no command/i);
     expect(result.canLaunch).toBe(false);
   });
 });
@@ -368,8 +368,8 @@ describe('Connectivity — part isolation after decoupler separation', () => {
     const check  = result.checks.find((c) => c.id === 'connectivity');
 
     expect(check).toBeDefined();
-    expect(check.pass).toBe(false);
-    expect(check.message).toMatch(/floating/i);
+    expect(check!.pass).toBe(false);
+    expect(check!.message).toMatch(/floating/i);
     expect(result.canLaunch).toBe(false);
   });
 });
@@ -465,14 +465,14 @@ describe('Mirror candidate — picks corresponding vertical position', () => {
   // (e.g. bottom), the mirror candidate picks the matching right-side point
   // at the same offsetY (e.g. right-bottom), not just the first right snap.
 
-  function buildTankAssemblyWithLegCandidate(targetSnapIndex) {
+  function buildTankAssemblyWithLegCandidate(targetSnapIndex: number): { assembly: RocketAssembly; candidate: SnapCandidate } {
     const assembly = createRocketAssembly();
     const tankId = addPartToAssembly(assembly, 'tank-small', 0, 0);
 
-    const tankDef = getPartById('tank-small');
+    const tankDef = getPartById('tank-small')!;
     const tSnap = tankDef.snapPoints[targetSnapIndex];
 
-    const candidate = {
+    const candidate: SnapCandidate = {
       targetInstanceId: tankId,
       targetSnapIndex,
       dragSnapIndex: 0,
@@ -489,42 +489,42 @@ describe('Mirror candidate — picks corresponding vertical position', () => {
     const { assembly, candidate } = buildTankAssemblyWithLegCandidate(2);
     const mirror = findMirrorCandidate(assembly, candidate, 'landing-legs-small');
     expect(mirror).not.toBeNull();
-    expect(mirror.mirrorTargetSnapIndex).toBe(5);
+    expect(mirror!.mirrorTargetSnapIndex).toBe(5);
   });
 
   it('left-mid (index 3) mirrors to right-mid (index 6)', () => {
     const { assembly, candidate } = buildTankAssemblyWithLegCandidate(3);
     const mirror = findMirrorCandidate(assembly, candidate, 'landing-legs-small');
     expect(mirror).not.toBeNull();
-    expect(mirror.mirrorTargetSnapIndex).toBe(6);
+    expect(mirror!.mirrorTargetSnapIndex).toBe(6);
   });
 
   it('left-bottom (index 4) mirrors to right-bottom (index 7)', () => {
     const { assembly, candidate } = buildTankAssemblyWithLegCandidate(4);
     const mirror = findMirrorCandidate(assembly, candidate, 'landing-legs-small');
     expect(mirror).not.toBeNull();
-    expect(mirror.mirrorTargetSnapIndex).toBe(7);
+    expect(mirror!.mirrorTargetSnapIndex).toBe(7);
   });
 
   it('right-top (index 5) mirrors to left-top (index 2)', () => {
     const { assembly, candidate } = buildTankAssemblyWithLegCandidate(5);
     const mirror = findMirrorCandidate(assembly, candidate, 'landing-legs-small');
     expect(mirror).not.toBeNull();
-    expect(mirror.mirrorTargetSnapIndex).toBe(2);
+    expect(mirror!.mirrorTargetSnapIndex).toBe(2);
   });
 
   it('right-mid (index 6) mirrors to left-mid (index 3)', () => {
     const { assembly, candidate } = buildTankAssemblyWithLegCandidate(6);
     const mirror = findMirrorCandidate(assembly, candidate, 'landing-legs-small');
     expect(mirror).not.toBeNull();
-    expect(mirror.mirrorTargetSnapIndex).toBe(3);
+    expect(mirror!.mirrorTargetSnapIndex).toBe(3);
   });
 
   it('right-bottom (index 7) mirrors to left-bottom (index 4)', () => {
     const { assembly, candidate } = buildTankAssemblyWithLegCandidate(7);
     const mirror = findMirrorCandidate(assembly, candidate, 'landing-legs-small');
     expect(mirror).not.toBeNull();
-    expect(mirror.mirrorTargetSnapIndex).toBe(4);
+    expect(mirror!.mirrorTargetSnapIndex).toBe(4);
   });
 
   it('mirror returns null when the opposite snap is already occupied', () => {
@@ -537,7 +537,7 @@ describe('Mirror candidate — picks corresponding vertical position', () => {
 
     // Now try to mirror from left-mid (index 3) → should fail because
     // right-mid (index 6) is occupied.
-    const candidate = {
+    const candidate: SnapCandidate = {
       targetInstanceId: tankId,
       targetSnapIndex:  3,
       dragSnapIndex:    0,
@@ -557,11 +557,11 @@ describe('Mirror candidate — picks corresponding vertical position', () => {
       const assembly = createRocketAssembly();
       const tid = addPartToAssembly(assembly, partId, 0, 0);
 
-      const tankDef = getPartById(partId);
+      const tankDef = getPartById(partId)!;
 
       // Find all left snaps and their matching right snaps.
-      const leftSnaps  = [];
-      const rightSnaps = [];
+      const leftSnaps: Array<{ index: number; offsetY: number }>  = [];
+      const rightSnaps: Array<{ index: number; offsetY: number }> = [];
       tankDef.snapPoints.forEach((sp, i) => {
         if (sp.side === 'left')  leftSnaps.push({ index: i, offsetY: sp.offsetY });
         if (sp.side === 'right') rightSnaps.push({ index: i, offsetY: sp.offsetY });
@@ -573,7 +573,7 @@ describe('Mirror candidate — picks corresponding vertical position', () => {
 
       // For each left snap, the mirror should find the right snap with matching offsetY.
       for (const ls of leftSnaps) {
-        const candidate = {
+        const candidate: SnapCandidate = {
           targetInstanceId: tid,
           targetSnapIndex:  ls.index,
           dragSnapIndex:    0,
@@ -587,7 +587,7 @@ describe('Mirror candidate — picks corresponding vertical position', () => {
         expect(mirror).not.toBeNull();
         const expectedRight = rightSnaps.find(rs => rs.offsetY === ls.offsetY);
         expect(expectedRight).toBeDefined();
-        expect(mirror.mirrorTargetSnapIndex).toBe(expectedRight.index);
+        expect(mirror!.mirrorTargetSnapIndex).toBe(expectedRight!.index);
       }
     }
   });

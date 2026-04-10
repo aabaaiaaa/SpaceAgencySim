@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * sandbox.test.js — Unit tests for sandbox game mode.
  *
@@ -14,6 +13,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
+import type { GameState } from '../core/gameState.ts';
 import {
   GameMode,
   FacilityId,
@@ -44,8 +44,8 @@ import { getAllParts } from '../data/parts.ts';
 // ---------------------------------------------------------------------------
 
 /** Create a sandbox-mode state with all facilities, parts, and tech unlocked. */
-function sandboxState() {
-  const state = createGameState();
+function sandboxState(): GameState {
+  const state: GameState = createGameState();
   state.gameMode = GameMode.SANDBOX;
   state.tutorialMode = false;
   state.money = SANDBOX_STARTING_MONEY;
@@ -61,8 +61,8 @@ function sandboxState() {
   state.parts = getAllParts().map((p) => p.id);
 
   // All tech nodes researched.
-  const researched = [];
-  const instruments = [];
+  const researched: string[] = [];
+  const instruments: string[] = [];
   for (const node of TECH_NODES) {
     researched.push(node.id);
     for (const iid of node.unlocksInstruments) {
@@ -111,7 +111,7 @@ describe('createGameState sandbox fields', () => {
 // ---------------------------------------------------------------------------
 
 describe('sandbox construction', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => {
     state = sandboxState();
   });
@@ -208,8 +208,8 @@ describe('sandbox tech tree', () => {
 
 describe('sandbox weather', () => {
   it('generates perfect weather when weather disabled', () => {
-    const state = sandboxState();
-    state.sandboxSettings.weatherEnabled = false;
+    const state: GameState = sandboxState();
+    state.sandboxSettings!.weatherEnabled = false;
     initWeather(state, 'EARTH');
     const weather = getCurrentWeather(state);
     expect(weather.windSpeed).toBe(0);
@@ -220,8 +220,8 @@ describe('sandbox weather', () => {
   });
 
   it('generates normal weather when weather enabled', () => {
-    const state = sandboxState();
-    state.sandboxSettings.weatherEnabled = true;
+    const state: GameState = sandboxState();
+    state.sandboxSettings!.weatherEnabled = true;
     initWeather(state, 'EARTH');
     const weather = getCurrentWeather(state);
     // Weather should be generated normally — wind may be non-zero.

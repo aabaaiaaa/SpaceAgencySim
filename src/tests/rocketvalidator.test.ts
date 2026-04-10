@@ -1,6 +1,5 @@
-// @ts-nocheck
 /**
- * rocketvalidator.test.js — Unit tests for the Rocket Engineer validation module (TASK-019).
+ * rocketvalidator.test.ts — Unit tests for the Rocket Engineer validation module (TASK-019).
  *
  * Tests cover:
  *   - getTotalMass()        — empty assembly, dry-only parts, parts with fuel
@@ -32,15 +31,16 @@ import {
 } from '../core/rocketbuilder.ts';
 import { createGameState } from '../core/gameState.ts';
 
+import type { RocketAssembly, StagingConfig, PlacedPart } from '../core/rocketbuilder.ts';
+import type { GameState, MissionInstance } from '../core/gameState.ts';
+import type { ValidationCheck, ValidationResult } from '../core/rocketvalidator.ts';
+
 // ---------------------------------------------------------------------------
 // Test helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Build a minimal GameState with no accepted missions.
- * @returns {import('../core/gameState.js').GameState}
- */
-function makeState() {
+/** Build a minimal GameState with no accepted missions. */
+function makeState(): GameState {
   return createGameState();
 }
 
@@ -51,11 +51,8 @@ function makeState() {
  *   - Spark Engine below tank, assigned to Stage 1
  *
  * The parts are connected top-to-bottom, giving a fully connected assembly.
- *
- * @returns {{ assembly: import('../core/rocketbuilder.js').RocketAssembly,
- *             staging:  import('../core/rocketbuilder.js').StagingConfig }}
  */
-function makePassingRocket() {
+function makePassingRocket(): { assembly: RocketAssembly; staging: StagingConfig } {
   const assembly = createRocketAssembly();
   const staging  = createStagingConfig();
 
@@ -229,7 +226,7 @@ describe('runValidation() — Check 1: command module', () => {
 
     const check = result.checks.find((c) => c.id === 'command-module');
     expect(check).toBeDefined();
-    expect(check.pass).toBe(false);
+    expect(check!.pass).toBe(false);
     expect(result.canLaunch).toBe(false);
   });
 
@@ -240,8 +237,8 @@ describe('runValidation() — Check 1: command module', () => {
     addPartToAssembly(assembly, 'cmd-mk1', 0, 0);
     const result = runValidation(assembly, staging, state);
     const check  = result.checks.find((c) => c.id === 'command-module');
-    expect(check.pass).toBe(true);
-    expect(check.message).toMatch(/crewed command module/i);
+    expect(check!.pass).toBe(true);
+    expect(check!.message).toMatch(/crewed command module/i);
   });
 
   it('passes with a computer (probe) module', () => {
@@ -251,8 +248,8 @@ describe('runValidation() — Check 1: command module', () => {
     addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
     const result = runValidation(assembly, staging, state);
     const check  = result.checks.find((c) => c.id === 'command-module');
-    expect(check.pass).toBe(true);
-    expect(check.message).toMatch(/computer/i);
+    expect(check!.pass).toBe(true);
+    expect(check!.message).toMatch(/computer/i);
   });
 });
 
@@ -268,14 +265,14 @@ describe('runValidation() — Check 2: part connectivity', () => {
     addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
     const result = runValidation(assembly, staging, state);
     const check  = result.checks.find((c) => c.id === 'connectivity');
-    expect(check.pass).toBe(true);
+    expect(check!.pass).toBe(true);
   });
 
   it('passes when all parts are connected', () => {
     const { assembly, staging } = makePassingRocket();
     const result = runValidation(assembly, staging, makeState());
     const check  = result.checks.find((c) => c.id === 'connectivity');
-    expect(check.pass).toBe(true);
+    expect(check!.pass).toBe(true);
   });
 
   it('fails when a part is floating (not connected to root)', () => {
@@ -287,8 +284,8 @@ describe('runValidation() — Check 2: part connectivity', () => {
     addPartToAssembly(assembly, 'tank-small', 200, 200); // far away, no connection
     const result = runValidation(assembly, staging, state);
     const check  = result.checks.find((c) => c.id === 'connectivity');
-    expect(check.pass).toBe(false);
-    expect(check.message).toMatch(/floating/i);
+    expect(check!.pass).toBe(false);
+    expect(check!.message).toMatch(/floating/i);
   });
 
   it('is a blocking check (canLaunch false when it fails)', () => {
@@ -312,7 +309,7 @@ describe('runValidation() — Check 3: Stage 1 engine', () => {
     addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
     const result = runValidation(assembly, staging, makeState());
     const check  = result.checks.find((c) => c.id === 'stage1-engine');
-    expect(check.pass).toBe(false);
+    expect(check!.pass).toBe(false);
     expect(result.canLaunch).toBe(false);
   });
 
@@ -320,7 +317,7 @@ describe('runValidation() — Check 3: Stage 1 engine', () => {
     const { assembly, staging } = makePassingRocket();
     const result = runValidation(assembly, staging, makeState());
     const check  = result.checks.find((c) => c.id === 'stage1-engine');
-    expect(check.pass).toBe(true);
+    expect(check!.pass).toBe(true);
   });
 
   it('passes when an SRB is in Stage 1', () => {
@@ -332,7 +329,7 @@ describe('runValidation() — Check 3: Stage 1 engine', () => {
     assignPartToStage(staging, srbId, 0);
     const result = runValidation(assembly, staging, makeState());
     const check  = result.checks.find((c) => c.id === 'stage1-engine');
-    expect(check.pass).toBe(true);
+    expect(check!.pass).toBe(true);
   });
 });
 
@@ -347,15 +344,15 @@ describe('runValidation() — Check 4: Stage 1 TWR', () => {
     addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
     const result = runValidation(assembly, staging, makeState());
     const check  = result.checks.find((c) => c.id === 'twr');
-    expect(check.pass).toBe(false);
+    expect(check!.pass).toBe(false);
   });
 
   it('passes for the passing rocket fixture', () => {
     const { assembly, staging } = makePassingRocket();
     const result = runValidation(assembly, staging, makeState());
     const check  = result.checks.find((c) => c.id === 'twr');
-    expect(check.pass).toBe(true);
-    expect(check.message).toMatch(/TWR:/);
+    expect(check!.pass).toBe(true);
+    expect(check!.message).toMatch(/TWR:/);
   });
 
   it('reports TWR value numerically in message', () => {
@@ -363,7 +360,7 @@ describe('runValidation() — Check 4: Stage 1 TWR', () => {
     const result = runValidation(assembly, staging, makeState());
     const check  = result.checks.find((c) => c.id === 'twr');
     // Message should contain a decimal number.
-    expect(check.message).toMatch(/\d+\.\d+/);
+    expect(check!.message).toMatch(/\d+\.\d+/);
   });
 
   it('fails for a rocket too heavy to lift off', () => {
@@ -383,7 +380,7 @@ describe('runValidation() — Check 4: Stage 1 TWR', () => {
 
     const result = runValidation(assembly, staging, makeState());
     const check  = result.checks.find((c) => c.id === 'twr');
-    expect(check.pass).toBe(false);
+    expect(check!.pass).toBe(false);
     expect(result.canLaunch).toBe(false);
   });
 });
@@ -421,8 +418,8 @@ describe('runValidation() — Warning 5: crew warning', () => {
     const result = runValidation(assembly, staging, state);
     const warn   = result.checks.find((c) => c.id === 'crew-module-warn');
     expect(warn).toBeDefined();
-    expect(warn.pass).toBe(false);
-    expect(warn.warn).toBe(true); // non-blocking
+    expect(warn!.pass).toBe(false);
+    expect(warn!.warn).toBe(true); // non-blocking
   });
 
   it('does NOT block launch when only a warning fails', () => {

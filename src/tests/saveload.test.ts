@@ -1,6 +1,5 @@
-// @ts-nocheck
 /**
- * saveload.test.js — Unit tests for the save/load system.
+ * saveload.test.ts — Unit tests for the save/load system.
  *
  * Because Vitest runs in a Node.js environment (no browser globals),
  * localStorage is mocked in-memory before each test and wiped after.
@@ -37,6 +36,31 @@ import {
 import { crc32 } from '../core/crc32.ts';
 import { CrewStatus } from '../core/constants.ts';
 
+import type { GameState, CrewMember, MissionInstance, RocketDesign, FlightResult } from '../core/gameState.ts';
+import type { SaveSlotSummary } from '../core/saveload.ts';
+
+// Node.js Buffer is available in Vitest's Node environment but @types/node is not installed.
+declare const Buffer: {
+  from(str: string, encoding: string): { toString(encoding: string): string };
+};
+
+/** Minimal localStorage-compatible interface used by the mock. */
+interface MockStorage {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+  clear(): void;
+  readonly length: number;
+}
+
+/** Shape of the parsed save envelope in localStorage. */
+interface SaveEnvelope {
+  saveName: string;
+  timestamp: string;
+  version?: number;
+  state: Record<string, unknown>;
+}
+
 // ---------------------------------------------------------------------------
 // localStorage mock
 // ---------------------------------------------------------------------------
@@ -45,18 +69,18 @@ import { CrewStatus } from '../core/constants.ts';
  * A simple in-memory localStorage replacement that fulfils the subset of the
  * Web Storage API used by saveload.js (getItem / setItem / removeItem).
  */
-function createLocalStorageMock() {
-  const store = new Map();
+function createLocalStorageMock(): MockStorage {
+  const store = new Map<string, string>();
   return {
-    getItem(key) { return store.has(key) ? store.get(key) : null; },
-    setItem(key, value) { store.set(key, String(value)); },
-    removeItem(key) { store.delete(key); },
-    clear() { store.clear(); },
-    get length() { return store.size; },
+    getItem(key: string): string | null { return store.has(key) ? store.get(key)! : null; },
+    setItem(key: string, value: string): void { store.set(key, String(value)); },
+    removeItem(key: string): void { store.delete(key); },
+    clear(): void { store.clear(); },
+    get length(): number { return store.size; },
   };
 }
 
-let mockStorage;
+let mockStorage: MockStorage;
 
 beforeEach(() => {
   mockStorage = createLocalStorageMock();
@@ -77,12 +101,12 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 /** Returns a fresh game state with defaults. */
-function freshState() {
+function freshState(): GameState {
   return createGameState();
 }
 
 /** Returns a minimal valid envelope JSON string. */
-function minimalEnvelopeJSON(overrides = {}) {
+function minimalEnvelopeJSON(overrides: Record<string, unknown> = {}): string {
   const state = freshState();
   const envelope = {
     saveName: 'Test Save',
@@ -130,20 +154,20 @@ describe('Round-trip: save and load a complex state', () => {
         hireDate: '2024-06-01T00:00:00.000Z',
         injuryEnds: null,
       },
-    ];
+    ] as unknown as CrewMember[];
 
     // Several missions distributed across the three buckets.
     state.missions.available = [
       { id: 'mission-avail-1', title: 'Sub-orbital test', reward: 10000 },
       { id: 'mission-avail-2', title: 'Weather sat', reward: 25000 },
-    ];
+    ] as unknown as MissionInstance[];
     state.missions.accepted = [
       { id: 'mission-acc-1', title: 'Orbital insertion', reward: 50000 },
-    ];
+    ] as unknown as MissionInstance[];
     state.missions.completed = [
       { id: 'mission-comp-1', title: 'First flight', reward: 5000 },
       { id: 'mission-comp-2', title: 'Science drop', reward: 8000 },
-    ];
+    ] as unknown as MissionInstance[];
 
     // Multiple rocket designs with nested staging.
     state.rockets = [
@@ -177,7 +201,7 @@ describe('Round-trip: save and load a complex state', () => {
         createdDate: '2025-02-01T00:00:00.000Z',
         updatedDate: '2025-02-14T00:00:00.000Z',
       },
-    ];
+    ] as RocketDesign[];
 
     // Flight history.
     state.flightHistory = [
@@ -192,7 +216,7 @@ describe('Round-trip: save and load a complex state', () => {
         revenue: 5000,
         notes: 'Perfect flight.',
       },
-    ];
+    ] as unknown as FlightResult[];
 
     state.money = 123_456;
     state.loan.balance = 80_000;
@@ -263,6 +287,7 @@ describe('Slot index validation', () => {
   });
 
   it('throws RangeError for a string index', async () => {
+    // @ts-expect-error — intentionally passing wrong type to test runtime validation
     await expect(saveGame(freshState(), '0')).rejects.toThrow(RangeError);
   });
 });
@@ -277,8 +302,8 @@ describe('saveGame()', () => {
     await saveGame(state, 2, 'My Agency');
     const raw = localStorage.getItem('spaceAgencySave_2');
     expect(raw).not.toBeNull();
-    const json = decompressSaveData(raw);
-    const envelope = JSON.parse(json);
+    const json = decompressSaveData(raw!);
+    const envelope = JSON.parse(json) as SaveEnvelope;
     expect(envelope.saveName).toBe('My Agency');
   });
 
@@ -304,21 +329,21 @@ describe('saveGame()', () => {
 
   it('summary.missionsCompleted counts completed missions', async () => {
     const state = freshState();
-    state.missions.completed = [{ id: 'm1' }, { id: 'm2' }];
+    state.missions.completed = [{ id: 'm1' }, { id: 'm2' }] as unknown as MissionInstance[];
     const summary = await saveGame(state, 0);
     expect(summary.missionsCompleted).toBe(2);
   });
 
   it('summary.acceptedMissionCount counts accepted missions', async () => {
     const state = freshState();
-    state.missions.accepted = [{ id: 'm1' }];
+    state.missions.accepted = [{ id: 'm1' }] as unknown as MissionInstance[];
     const summary = await saveGame(state, 0);
     expect(summary.acceptedMissionCount).toBe(1);
   });
 
   it('summary.totalFlights counts flightHistory entries', async () => {
     const state = freshState();
-    state.flightHistory = [{ id: 'f1' }, { id: 'f2' }, { id: 'f3' }];
+    state.flightHistory = [{ id: 'f1' }, { id: 'f2' }, { id: 'f3' }] as unknown as FlightResult[];
     const summary = await saveGame(state, 0);
     expect(summary.totalFlights).toBe(3);
   });
@@ -329,7 +354,7 @@ describe('saveGame()', () => {
       { id: 'c1', status: CrewStatus.IDLE },
       { id: 'c2', status: CrewStatus.ON_MISSION },
       { id: 'c3', status: CrewStatus.DEAD },
-    ];
+    ] as unknown as CrewMember[];
     const summary = await saveGame(state, 0);
     expect(summary.crewCount).toBe(2);
   });
@@ -340,7 +365,7 @@ describe('saveGame()', () => {
       { id: 'c1', status: CrewStatus.DEAD },
       { id: 'c2', status: CrewStatus.DEAD },
       { id: 'c3', status: CrewStatus.IDLE },
-    ];
+    ] as unknown as CrewMember[];
     const summary = await saveGame(state, 0);
     expect(summary.crewKIA).toBe(2);
   });
@@ -387,6 +412,7 @@ describe('saveGame()', () => {
   });
 
   it('coerces non-string saveName to string', async () => {
+    // @ts-expect-error — intentionally passing wrong type to test runtime coercion
     const summary = await saveGame(freshState(), 0, 42);
     expect(summary.saveName).toBe('42');
   });
@@ -447,7 +473,7 @@ describe('loadGame()', () => {
   it('restores nested objects correctly', async () => {
     const state = freshState();
     state.loan.balance = 500_000;
-    state.crew = [{ id: 'c1', status: CrewStatus.IDLE, name: 'Alice', skills: { piloting: 50, engineering: 50, science: 50 } }];
+    state.crew = [{ id: 'c1', status: CrewStatus.IDLE, name: 'Alice', skills: { piloting: 50, engineering: 50, science: 50 } }] as unknown as CrewMember[];
     await saveGame(state, 0);
 
     const restored = await loadGame(0);
@@ -511,11 +537,11 @@ describe('listSaves()', () => {
 
     const saves = listSaves();
     expect(saves[0]).not.toBeNull();
-    expect(saves[0].saveName).toBe('slot 0');
+    expect(saves[0]!.saveName).toBe('slot 0');
     expect(saves[1]).toBeNull();
     expect(saves[2]).toBeNull();
     expect(saves[3]).not.toBeNull();
-    expect(saves[3].saveName).toBe('slot 3');
+    expect(saves[3]!.saveName).toBe('slot 3');
     expect(saves[4]).toBeNull();
   });
 
@@ -527,8 +553,8 @@ describe('listSaves()', () => {
 
   it('returned summaries include all required fields', async () => {
     await saveGame(freshState(), 0, 'full test');
-    const summary = listSaves()[0];
-    const expectedFields = [
+    const summary = listSaves()[0]!;
+    const expectedFields: (keyof SaveSlotSummary)[] = [
       'slotIndex', 'saveName', 'timestamp', 'missionsCompleted',
       'money', 'acceptedMissionCount', 'totalFlights',
       'crewCount', 'crewKIA', 'playTimeSeconds',
@@ -614,7 +640,7 @@ describe('importSave()', () => {
     await saveGame(freshState(), 0, 'original');
     const imported = { saveName: 'replacement', timestamp: 'T', state: freshState() };
     importSave(JSON.stringify(imported), 0);
-    expect(listSaves()[0].saveName).toBe('replacement');
+    expect(listSaves()[0]!.saveName).toBe('replacement');
   });
 });
 
@@ -628,67 +654,70 @@ describe('_validateState()', () => {
   });
 
   it('throws when money is not a number', () => {
-    const s = freshState();
+    const s = freshState() as unknown as Record<string, unknown>;
     s.money = '1000';
     expect(() => _validateState(s)).toThrow(/money/i);
   });
 
   it('throws when playTimeSeconds is not a number', () => {
-    const s = freshState();
+    const s = freshState() as unknown as Record<string, unknown>;
     s.playTimeSeconds = null;
     expect(() => _validateState(s)).toThrow(/playTimeSeconds/i);
   });
 
   it('throws when loan is missing', () => {
-    const s = freshState();
+    const s = freshState() as unknown as Record<string, unknown>;
     delete s.loan;
     expect(() => _validateState(s)).toThrow(/loan/i);
   });
 
   it('throws when loan.balance is not a number', () => {
     const s = freshState();
+    // @ts-expect-error — intentionally assigning wrong type to test validation
     s.loan.balance = 'a lot';
     expect(() => _validateState(s)).toThrow(/loan\.balance/i);
   });
 
   it('throws when loan.interestRate is not a number', () => {
     const s = freshState();
+    // @ts-expect-error — intentionally assigning wrong type to test validation
     s.loan.interestRate = true;
     expect(() => _validateState(s)).toThrow(/loan\.interestRate/i);
   });
 
   it('throws when crew is not an array', () => {
-    const s = freshState();
+    const s = freshState() as unknown as Record<string, unknown>;
     s.crew = {};
     expect(() => _validateState(s)).toThrow(/crew/i);
   });
 
   it('throws when missions is missing', () => {
-    const s = freshState();
+    const s = freshState() as unknown as Record<string, unknown>;
     delete s.missions;
     expect(() => _validateState(s)).toThrow(/missions/i);
   });
 
   it('throws when missions.available is not an array', () => {
     const s = freshState();
+    // @ts-expect-error — intentionally assigning wrong type to test validation
     s.missions.available = null;
     expect(() => _validateState(s)).toThrow(/missions\.available/i);
   });
 
   it('throws when rockets is not an array', () => {
-    const s = freshState();
+    const s = freshState() as unknown as Record<string, unknown>;
     s.rockets = 'none';
     expect(() => _validateState(s)).toThrow(/rockets/i);
   });
 
   it('throws when parts is not an array', () => {
-    const s = freshState();
+    const s = freshState() as unknown as Record<string, unknown>;
     s.parts = undefined;
     expect(() => _validateState(s)).toThrow(/parts/i);
   });
 
   it('throws when flightHistory is not an array', () => {
-    const s = freshState();
+    const s = freshState() as unknown as Record<string, unknown>;
     s.flightHistory = 0;
     expect(() => _validateState(s)).toThrow(/flightHistory/i);
   });
@@ -720,45 +749,46 @@ describe('exportSave()', () => {
     // envelope.state matches the state that was saved.
     const state = freshState();
     state.money = 987_654;
-    state.crew = [{ id: 'c1', status: CrewStatus.IDLE, name: 'Dana' }];
-    state.missions.completed = [{ id: 'm1', title: 'First orbit' }];
+    state.crew = [{ id: 'c1', status: CrewStatus.IDLE, name: 'Dana' }] as unknown as CrewMember[];
+    state.missions.completed = [{ id: 'm1', title: 'First orbit' }] as unknown as MissionInstance[];
     await saveGame(state, 0, 'Export Test');
 
     // Read what's in storage and decompress it.
     const raw = localStorage.getItem('spaceAgencySave_0');
     expect(typeof raw).toBe('string');
-    const json = decompressSaveData(raw);
+    const json = decompressSaveData(raw!);
 
     // Must be parseable JSON.
-    let envelope;
-    expect(() => { envelope = JSON.parse(json); }).not.toThrow();
+    let envelope: SaveEnvelope | undefined;
+    expect(() => { envelope = JSON.parse(json) as SaveEnvelope; }).not.toThrow();
 
     // Must contain all top-level envelope fields.
-    expect(envelope).toHaveProperty('saveName', 'Export Test');
-    expect(envelope).toHaveProperty('timestamp');
-    expect(envelope).toHaveProperty('state');
+    expect(envelope!).toHaveProperty('saveName', 'Export Test');
+    expect(envelope!).toHaveProperty('timestamp');
+    expect(envelope!).toHaveProperty('state');
 
     // The embedded state must include the full game data.
-    expect(envelope.state.money).toBe(987_654);
-    expect(envelope.state.crew[0].name).toBe('Dana');
-    expect(envelope.state.missions.completed[0].title).toBe('First orbit');
+    const envelopeState = envelope!.state as unknown as GameState;
+    expect(envelopeState.money).toBe(987_654);
+    expect(envelopeState.crew[0].name).toBe('Dana');
+    expect(envelopeState.missions.completed[0].title).toBe('First orbit');
   });
 
   it('the exported JSON from a browser-mocked environment is parseable and contains full state', async () => {
     // Mock the minimum browser APIs needed to exercise the DOM code path.
     const state = freshState();
     state.money = 555_000;
-    state.rockets = [{ id: 'r1', name: 'Mock Rocket', parts: [], staging: { stages: [[]], unstaged: [] }, totalMass: 100, totalThrust: 50 }];
+    state.rockets = [{ id: 'r1', name: 'Mock Rocket', parts: [], staging: { stages: [[]], unstaged: [] }, totalMass: 100, totalThrust: 50 }] as unknown as RocketDesign[];
     await saveGame(state, 1, 'Browser Export');
 
     // Capture what Blob is constructed with.
-    let capturedBlobContent = null;
+    let capturedBlobContent: string | null = null;
     const MockBlob = class {
-      constructor(parts) { capturedBlobContent = parts.join(''); }
+      constructor(parts: string[]) { capturedBlobContent = parts.join(''); }
     };
     const mockCreateObjectURL = vi.fn().mockReturnValue('blob:mock-url');
     const mockRevokeObjectURL = vi.fn();
-    const mockAnchor = {
+    const mockAnchor: Record<string, unknown> = {
       href: null, download: null,
       click: vi.fn(),
     };
@@ -776,10 +806,10 @@ describe('exportSave()', () => {
     // Verify it round-trips through importSave into a different slot.
     expect(capturedBlobContent).not.toBeNull();
     expect(typeof capturedBlobContent).toBe('string');
-    expect(capturedBlobContent.length).toBeGreaterThan(0);
+    expect(capturedBlobContent!.length).toBeGreaterThan(0);
 
     // Round-trip: import the exported content into slot 2 and verify state.
-    expect(() => importSave(capturedBlobContent, 2)).not.toThrow();
+    expect(() => importSave(capturedBlobContent!, 2)).not.toThrow();
     const loaded = await loadGame(2);
     expect(loaded.money).toBe(555_000);
     expect(loaded.rockets[0].name).toBe('Mock Rocket');
@@ -804,15 +834,15 @@ describe('Save format version field', () => {
   it('saveGame() includes the version field in the stored envelope', async () => {
     await saveGame(freshState(), 0, 'versioned');
     const raw = localStorage.getItem('spaceAgencySave_0');
-    const json = decompressSaveData(raw);
-    const envelope = JSON.parse(json);
+    const json = decompressSaveData(raw!);
+    const envelope = JSON.parse(json) as SaveEnvelope;
     expect(envelope.version).toBe(SAVE_VERSION);
   });
 
   it('loadGame() loads a version-0 (no version field) save with all migrations applied', async () => {
     // Simulate a pre-versioning save: no version field, missing fields that
     // the migration logic defaults via ??=.
-    const state = freshState();
+    const state = freshState() as unknown as Record<string, unknown>;
     delete state.malfunctionMode;
     delete state.savedDesigns;
     delete state.welcomeShown;
@@ -883,8 +913,8 @@ describe('Save format version field', () => {
     const state = freshState();
     await saveGame(state, 2, 'round-trip');
     const raw = localStorage.getItem('spaceAgencySave_2');
-    const json = decompressSaveData(raw);
-    const envelope = JSON.parse(json);
+    const json = decompressSaveData(raw!);
+    const envelope = JSON.parse(json) as SaveEnvelope;
     expect(envelope.version).toBe(SAVE_VERSION);
 
     // Load succeeds and the envelope in storage still has the version.
@@ -902,22 +932,28 @@ describe('Save migration edge cases', () => {
    * Helper: writes a raw envelope to localStorage slot 0, bypassing saveGame()
    * so we can craft envelopes with missing/invalid fields.
    */
-  function injectEnvelope(envelopeOverrides = {}, stateOverrides = {}) {
+  interface EnvelopeOverrides extends Record<string, unknown> {
+    _rawStatePatches?: Record<string, unknown>;
+  }
+
+  function injectEnvelope(envelopeOverrides: EnvelopeOverrides = {}, stateOverrides: Record<string, unknown> = {}): void {
     const state = { ...freshState(), ...stateOverrides };
-    const envelope = {
+    const envelope: Record<string, unknown> = {
       saveName: 'Edge Case',
       timestamp: new Date(0).toISOString(),
       version: SAVE_VERSION,
-      state: JSON.parse(JSON.stringify(state)),
+      state: JSON.parse(JSON.stringify(state)) as Record<string, unknown>,
       ...envelopeOverrides,
     };
     // Apply state overrides AFTER JSON clone so we can set null/undefined explicitly.
     if ('_rawStatePatches' in envelopeOverrides) {
-      for (const [key, value] of Object.entries(envelopeOverrides._rawStatePatches)) {
+      const patches = envelopeOverrides._rawStatePatches!;
+      const envelopeState = envelope.state as Record<string, unknown>;
+      for (const [key, value] of Object.entries(patches)) {
         if (value === undefined) {
-          delete envelope.state[key];
+          delete envelopeState[key];
         } else {
-          envelope.state[key] = value;
+          envelopeState[key] = value;
         }
       }
       delete envelope._rawStatePatches;
@@ -959,7 +995,7 @@ describe('Save migration edge cases', () => {
 
     // Make saveSharedLibrary's internal localStorage.setItem throw for the
     // shared library key only.
-    mockStorage.setItem = (key, value) => {
+    mockStorage.setItem = (key: string, value: string): void => {
       if (key === sharedLibKey) {
         throw new Error('Storage full — unable to save design library. Delete old saves or designs to free space.');
       }
@@ -970,7 +1006,7 @@ describe('Save migration edge cases', () => {
     const state = freshState();
     state.savedDesigns = [
       { id: 'design-1', name: 'Legacy Rocket', savePrivate: undefined },
-    ];
+    ] as unknown as RocketDesign[];
     const envelope = {
       saveName: 'Migration Fail',
       timestamp: new Date(0).toISOString(),
@@ -1006,7 +1042,7 @@ describe('Save migration edge cases', () => {
   it('loads a pre-version save (no version field) with all migrations applied', async () => {
     // Simulate a very old save: no version field, missing several fields
     // that were added in later iterations.
-    const state = freshState();
+    const state = freshState() as unknown as Record<string, unknown>;
     delete state.malfunctionMode;
     delete state.savedDesigns;
     delete state.welcomeShown;
@@ -1065,27 +1101,27 @@ describe('Save migration edge cases', () => {
 
 describe('_validateNestedStructures()', () => {
   // Helper: a valid mission entry.
-  function validMission(id = 'mission-1') {
+  function validMission(id = 'mission-1'): Partial<MissionInstance> {
     return { id, title: 'Test Mission', reward: 5000, description: 'desc', deadline: '2025-12-31' };
   }
 
   // Helper: a valid crew entry.
-  function validCrew(name = 'Alice') {
-    return { id: 'crew-1', name, status: CrewStatus.IDLE, skills: { piloting: 50, engineering: 50, science: 50 }, salary: 5000, hireDate: '2025-01-01' };
+  function validCrew(name = 'Alice'): Partial<CrewMember> {
+    return { id: 'crew-1', name, status: CrewStatus.IDLE as unknown as CrewMember['status'], skills: { piloting: 50, engineering: 50, science: 50 }, salary: 5000, hireDate: '2025-01-01' };
   }
 
   // Helper: a valid orbital object entry.
-  function validOrbitalObject(id = 'obj-1') {
+  function validOrbitalObject(id = 'obj-1'): Record<string, unknown> {
     return { id, bodyId: 'EARTH', type: 'SATELLITE', name: 'Sat-1', elements: { a: 7000, e: 0.01, i: 0 } };
   }
 
   // Helper: a valid saved design entry.
-  function validDesign(name = 'Rocket-1') {
+  function validDesign(name = 'Rocket-1'): Partial<RocketDesign> {
     return { id: 'design-1', name, parts: [{ partId: 'pod', position: { x: 0, y: 0 } }], staging: { stages: [], unstaged: [] }, totalMass: 100, totalThrust: 50 };
   }
 
   // Helper: a valid contract entry.
-  function validContract(id = 'contract-1') {
+  function validContract(id = 'contract-1'): Record<string, unknown> {
     return { id, title: 'Test Contract', reward: 10000, category: 'LAUNCH', objectives: [] };
   }
 
@@ -1098,7 +1134,7 @@ describe('_validateNestedStructures()', () => {
       validMission('m1'),
       { title: 'No ID', reward: 100 }, // missing id
       validMission('m3'),
-    ];
+    ] as unknown as MissionInstance[];
 
     _validateNestedStructures(state);
 
@@ -1115,7 +1151,7 @@ describe('_validateNestedStructures()', () => {
     state.missions.completed = [
       validMission('m1'),
       { id: 'm2', title: 'No Reward' }, // missing reward
-    ];
+    ] as unknown as MissionInstance[];
 
     _validateNestedStructures(state);
 
@@ -1127,7 +1163,7 @@ describe('_validateNestedStructures()', () => {
   it('filters out null and non-object mission entries', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const state = freshState();
-    state.missions.accepted = [null, 42, 'garbage', validMission('m1')];
+    state.missions.accepted = [null, 42, 'garbage', validMission('m1')] as unknown as MissionInstance[];
 
     _validateNestedStructures(state);
 
@@ -1145,7 +1181,7 @@ describe('_validateNestedStructures()', () => {
       validCrew('Alice'),
       { id: 'c2', status: CrewStatus.IDLE, skills: { piloting: 10, engineering: 10, science: 10 } }, // missing name
       validCrew('Bob'),
-    ];
+    ] as unknown as CrewMember[];
 
     _validateNestedStructures(state);
 
@@ -1162,7 +1198,7 @@ describe('_validateNestedStructures()', () => {
     state.crew = [
       validCrew('Alice'),
       { id: 'c2', name: 'Bad Status', status: null, skills: { piloting: 0, engineering: 0, science: 0 } },
-    ];
+    ] as unknown as CrewMember[];
 
     _validateNestedStructures(state);
 
@@ -1177,7 +1213,7 @@ describe('_validateNestedStructures()', () => {
     state.crew = [
       { id: 'c1', name: 'NoSkills', status: CrewStatus.IDLE, skills: null },
       validCrew('Bob'),
-    ];
+    ] as unknown as CrewMember[];
 
     _validateNestedStructures(state);
 
@@ -1195,7 +1231,7 @@ describe('_validateNestedStructures()', () => {
       validOrbitalObject('o1'),
       { id: 'o2', bodyId: 'EARTH' }, // missing elements
       validOrbitalObject('o3'),
-    ];
+    ] as unknown as GameState['orbitalObjects'];
 
     _validateNestedStructures(state);
 
@@ -1213,7 +1249,7 @@ describe('_validateNestedStructures()', () => {
     state.savedDesigns = [
       validDesign('Rocket-1'),
       { id: 'd2', name: 'No Parts' }, // missing parts
-    ];
+    ] as unknown as RocketDesign[];
 
     _validateNestedStructures(state);
 
@@ -1231,7 +1267,7 @@ describe('_validateNestedStructures()', () => {
       validContract('c1'),
       { id: 'c2' }, // missing reward
       validContract('c3'),
-    ], completed: [], failed: [] };
+    ], completed: [], failed: [] } as unknown as GameState['contracts'];
 
     _validateNestedStructures(state);
 
@@ -1246,12 +1282,12 @@ describe('_validateNestedStructures()', () => {
   it('preserves all valid entries when nothing is corrupted', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const state = freshState();
-    state.missions.accepted = [validMission('m1'), validMission('m2')];
-    state.missions.completed = [validMission('m3')];
-    state.crew = [validCrew('Alice'), validCrew('Bob')];
-    state.orbitalObjects = [validOrbitalObject('o1')];
-    state.savedDesigns = [validDesign('R1')];
-    state.contracts = { board: [], active: [validContract('c1')], completed: [], failed: [] };
+    state.missions.accepted = [validMission('m1'), validMission('m2')] as unknown as MissionInstance[];
+    state.missions.completed = [validMission('m3')] as unknown as MissionInstance[];
+    state.crew = [validCrew('Alice'), validCrew('Bob')] as unknown as CrewMember[];
+    state.orbitalObjects = [validOrbitalObject('o1')] as unknown as GameState['orbitalObjects'];
+    state.savedDesigns = [validDesign('R1')] as unknown as RocketDesign[];
+    state.contracts = { board: [], active: [validContract('c1')], completed: [], failed: [] } as unknown as GameState['contracts'];
 
     _validateNestedStructures(state);
 
@@ -1269,7 +1305,7 @@ describe('_validateNestedStructures()', () => {
   // --- Skips missing optional arrays ---
 
   it('does not crash when optional arrays are absent', () => {
-    const state = freshState();
+    const state = freshState() as unknown as Record<string, unknown>;
     delete state.orbitalObjects;
     delete state.savedDesigns;
     delete state.contracts;
@@ -1285,7 +1321,7 @@ describe('_validateNestedStructures()', () => {
     state.crew = [
       validCrew('Alice'),
       { id: 'bad', name: 123, status: CrewStatus.IDLE, skills: {} }, // name is not a string
-    ];
+    ] as unknown as CrewMember[];
 
     _validateState(state);
 
@@ -1302,11 +1338,11 @@ describe('_validateNestedStructures()', () => {
     state.missions.accepted = [
       validMission('m1'),
       { title: 'Corrupt', reward: 'not a number' }, // invalid
-    ];
+    ] as unknown as MissionInstance[];
     state.crew = [
       validCrew('Good'),
       null, // invalid
-    ];
+    ] as unknown as CrewMember[];
 
     const envelope = {
       saveName: 'Nested Validation',
@@ -1370,20 +1406,20 @@ describe('Save compression', () => {
           skills: { piloting: 80, engineering: 50, science: 60 },
           salary: 5000, hireDate: '2025-01-01', injuryEnds: null,
         },
-      ];
+      ] as unknown as CrewMember[];
       state.missions.accepted = [
         { id: 'm1', title: 'Orbital Test', reward: 50000 },
-      ];
+      ] as unknown as MissionInstance[];
       state.missions.completed = [
         { id: 'm2', title: 'First Flight', reward: 10000 },
-      ];
+      ] as unknown as MissionInstance[];
 
       await saveGame(state, 0, 'Compression Test');
 
       // Verify localStorage contains compressed data (LZC: prefix).
       const raw = localStorage.getItem('spaceAgencySave_0');
       expect(raw).not.toBeNull();
-      expect(raw.startsWith('LZC:')).toBe(true);
+      expect(raw!.startsWith('LZC:')).toBe(true);
 
       const restored = await loadGame(0);
 
@@ -1404,8 +1440,8 @@ describe('Save compression', () => {
 
       const saves = listSaves();
       expect(saves[2]).not.toBeNull();
-      expect(saves[2].saveName).toBe('Slot 2 Save');
-      expect(saves[2].agencyName).toBe('Listed Agency');
+      expect(saves[2]!.saveName).toBe('Slot 2 Save');
+      expect(saves[2]!.agencyName).toBe('Listed Agency');
     });
   });
 
@@ -1466,9 +1502,9 @@ describe('Save compression', () => {
 
       const saves = listSaves();
       expect(saves[0]).not.toBeNull();
-      expect(saves[0].saveName).toBe('Legacy');
+      expect(saves[0]!.saveName).toBe('Legacy');
       expect(saves[1]).not.toBeNull();
-      expect(saves[1].saveName).toBe('Modern');
+      expect(saves[1]!.saveName).toBe('Modern');
     });
 
     it('importSave compresses the imported data', () => {
@@ -1485,7 +1521,7 @@ describe('Save compression', () => {
 
       const raw = localStorage.getItem('spaceAgencySave_3');
       expect(raw).not.toBeNull();
-      expect(raw.startsWith('LZC:')).toBe(true);
+      expect(raw!.startsWith('LZC:')).toBe(true);
     });
   });
 
@@ -1499,8 +1535,8 @@ describe('Save compression', () => {
       await saveGame(state, 0, 'Version Test');
 
       const raw = localStorage.getItem('spaceAgencySave_0');
-      const json = decompressSaveData(raw);
-      const envelope = JSON.parse(json);
+      const json = decompressSaveData(raw!);
+      const envelope = JSON.parse(json) as SaveEnvelope;
       expect(envelope.version).toBe(2);
     });
   });
@@ -1513,15 +1549,21 @@ describe('Save compression', () => {
 describe('Save export format', () => {
   // Polyfill btoa/atob for Node.js test environment.
   beforeEach(() => {
-    vi.stubGlobal('btoa', (str) => Buffer.from(str, 'binary').toString('base64'));
-    vi.stubGlobal('atob', (str) => Buffer.from(str, 'base64').toString('binary'));
+    vi.stubGlobal('btoa', (str: string) => Buffer.from(str, 'binary').toString('base64'));
+    vi.stubGlobal('atob', (str: string) => Buffer.from(str, 'base64').toString('binary'));
   });
 
   /**
    * Helper: builds a binary envelope from a raw LZC string, returning a
    * base64-encoded string suitable for `importSave()`.
    */
-  function buildTestEnvelope(rawLZC, { corruptCrc = false, badMagic = false, truncatePayload = false } = {}) {
+  interface BuildEnvelopeOptions {
+    corruptCrc?: boolean;
+    badMagic?: boolean;
+    truncatePayload?: boolean;
+  }
+
+  function buildTestEnvelope(rawLZC: string, { corruptCrc = false, badMagic = false, truncatePayload = false }: BuildEnvelopeOptions = {}): string {
     const encoder = new TextEncoder();
     const payloadBytes = encoder.encode(rawLZC);
     const checksum = crc32(payloadBytes);
@@ -1580,7 +1622,7 @@ describe('Save export format', () => {
         skills: { piloting: 90, engineering: 40, science: 50 },
         salary: 5000, hireDate: '2025-06-01T00:00:00.000Z', injuryEnds: null,
       },
-    ];
+    ] as unknown as CrewMember[];
     await saveGame(state, 0, 'Binary Export Test');
 
     // Read the raw LZC string from localStorage.
@@ -1588,7 +1630,7 @@ describe('Save export format', () => {
     expect(rawLZC).not.toBeNull();
 
     // Build a valid binary envelope manually and base64-encode it.
-    const base64 = buildTestEnvelope(rawLZC);
+    const base64 = buildTestEnvelope(rawLZC!);
 
     // Import the binary envelope into slot 1.
     const summary = importSave(base64, 1);
@@ -1611,7 +1653,7 @@ describe('Save export format', () => {
     await saveGame(state, 0, 'CRC Test');
 
     const rawLZC = localStorage.getItem('spaceAgencySave_0');
-    const base64 = buildTestEnvelope(rawLZC, { corruptCrc: true });
+    const base64 = buildTestEnvelope(rawLZC!, { corruptCrc: true });
 
     // importSave should throw with a message about checksum or CRC.
     expect(() => importSave(base64, 1)).toThrow(/checksum|CRC/i);
@@ -1623,7 +1665,7 @@ describe('Save export format', () => {
     await saveGame(state, 0, 'Magic Test');
 
     const rawLZC = localStorage.getItem('spaceAgencySave_0');
-    const base64 = buildTestEnvelope(rawLZC, { badMagic: true });
+    const base64 = buildTestEnvelope(rawLZC!, { badMagic: true });
 
     // Without SASV magic bytes, importSave falls back to legacy JSON import.
     // The base64 string is not valid JSON, so it should throw about invalid JSON.
@@ -1637,7 +1679,7 @@ describe('Save export format', () => {
     await saveGame(state, 0, 'Truncate Test');
 
     const rawLZC = localStorage.getItem('spaceAgencySave_0');
-    const base64 = buildTestEnvelope(rawLZC, { truncatePayload: true });
+    const base64 = buildTestEnvelope(rawLZC!, { truncatePayload: true });
 
     // importSave should throw with a message about corrupted or payload length.
     expect(() => importSave(base64, 1)).toThrow(/corrupted|payload length/i);
@@ -1664,6 +1706,6 @@ describe('Save export format', () => {
     // Verify the data is persisted and can be loaded back.
     const saves = listSaves();
     expect(saves[2]).not.toBeNull();
-    expect(saves[2].saveName).toBe('Legacy Save File');
+    expect(saves[2]!.saveName).toBe('Legacy Save File');
   });
 });
