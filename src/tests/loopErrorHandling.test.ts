@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import type { CommsState } from '../core/gameState.ts';
+import type { CommsState, GameState, FlightState } from '../core/gameState.ts';
 import type { PhysicsState } from '../core/physics.ts';
-import type { FlightState } from '../core/gameState.ts';
 import type { FCState } from '../ui/flightController/_state.ts';
+import type { StagingConfig } from '../core/rocketbuilder.ts';
 
 // ---------------------------------------------------------------------------
 // Hoisted mock functions — available inside vi.mock() factories.
@@ -144,8 +144,8 @@ function seedFCState(overrides: Partial<FCState> = {}): void {
   setFlightState({ phase: 'FLIGHT', bodyId: 'EARTH', scienceModuleRunning: false } as FlightState);
   const defaults: Partial<FCState> = {
     assembly: { parts: new Map() } as FCState['assembly'],
-    stagingConfig: { stages: [] } as unknown as FCState['stagingConfig'],
-    state: { missions: [], contracts: [], challenges: [] } as unknown as FCState['state'],
+    stagingConfig: { stages: [] } as Partial<StagingConfig> as StagingConfig,
+    state: { missions: [], contracts: [], challenges: [] } as unknown as GameState,
     container: createMockElement() as unknown as HTMLElement,
     rafId: 1,
     lastTs: 0,

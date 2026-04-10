@@ -5,5 +5,10 @@
   "startedAt": "2026-04-10T09:17:35.231Z",
   "iteration": 5,
   "devloopVersion": "4.0.1",
-  "activeTask": null
+  "activeTask": {
+    "taskId": "TASK-046",
+    "taskTitle": "Batch: TASK-046, TASK-047, TASK-048, TASK-049, TASK-050",
+    "iterationNumber": 10,
+    "startedAt": "2026-04-10T11:59:28.868Z"
+  }
 }

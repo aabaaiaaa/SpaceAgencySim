@@ -18,7 +18,7 @@ import {
   getInstrumentKey,
   parseInstrumentKey,
 } from '../core/sciencemodule.ts';
-import type { InstrumentStateEntry } from '../core/sciencemodule.ts';
+
 import {
   getInstrumentById,
   getAllInstruments,
@@ -45,7 +45,7 @@ import type { RocketAssembly, StagingConfig } from '../core/rocketbuilder.ts';
 import { createPhysicsState } from '../core/physics.ts';
 import type { PhysicsState, ScienceModuleStateEntry } from '../core/physics.ts';
 import { createFlightState } from '../core/gameState.ts';
-import type { FlightState, GameState, ScienceLogEntry, FacilityState, FlightEvent } from '../core/gameState.ts';
+import type { FlightState, GameState } from '../core/gameState.ts';
 import { activateCurrentStage } from '../core/staging.ts';
 
 // ---------------------------------------------------------------------------
@@ -75,13 +75,13 @@ function makePhysicsState(assembly: RocketAssembly, altitude = 0): PhysicsState 
   return ps;
 }
 
-function makeGameState(): Pick<GameState, 'scienceLog' | 'sciencePoints' | 'crew' | 'facilities'> {
+function makeGameState(): GameState {
   return {
     scienceLog: [],
     sciencePoints: 0,
     crew: [],
     facilities: {},
-  };
+  } as unknown as GameState;
 }
 
 // ---------------------------------------------------------------------------
@@ -118,7 +118,7 @@ describe('Instrument catalog', () => {
   });
 
   it('thermometer-mk1 matches spec: $2k, 50kg, 10s, 5pts, starter', () => {
-    const t = getInstrumentById('thermometer-mk1');
+    const t = getInstrumentById('thermometer-mk1')!;
     expect(t.cost).toBe(2_000);
     expect(t.mass).toBe(50);
     expect(t.experimentDuration).toBe(10);
@@ -128,7 +128,7 @@ describe('Instrument catalog', () => {
   });
 
   it('barometer matches spec: $4k, 80kg, 15s, 10pts, T1', () => {
-    const b = getInstrumentById('barometer');
+    const b = getInstrumentById('barometer')!;
     expect(b.cost).toBe(4_000);
     expect(b.mass).toBe(80);
     expect(b.experimentDuration).toBe(15);
@@ -138,7 +138,7 @@ describe('Instrument catalog', () => {
   });
 
   it('radiation detector matches spec: $8k, 120kg, 20s, 20pts, T2', () => {
-    const r = getInstrumentById('radiation-detector');
+    const r = getInstrumentById('radiation-detector')!;
     expect(r.cost).toBe(8_000);
     expect(r.mass).toBe(120);
     expect(r.experimentDuration).toBe(20);
@@ -148,7 +148,7 @@ describe('Instrument catalog', () => {
   });
 
   it('gravity gradiometer matches spec: $15k, 200kg, 30s, 40pts, T3', () => {
-    const g = getInstrumentById('gravity-gradiometer');
+    const g = getInstrumentById('gravity-gradiometer')!;
     expect(g.cost).toBe(15_000);
     expect(g.mass).toBe(200);
     expect(g.experimentDuration).toBe(30);
@@ -158,7 +158,7 @@ describe('Instrument catalog', () => {
   });
 
   it('magnetometer matches spec: $12k, 150kg, 25s, 15pts, T3', () => {
-    const m = getInstrumentById('magnetometer');
+    const m = getInstrumentById('magnetometer')!;
     expect(m.cost).toBe(12_000);
     expect(m.mass).toBe(150);
     expect(m.experimentDuration).toBe(25);
@@ -168,7 +168,7 @@ describe('Instrument catalog', () => {
   });
 
   it('getInstrumentById returns correct instrument', () => {
-    const therm = getInstrumentById('thermometer-mk1');
+    const therm = getInstrumentById('thermometer-mk1')!;
     expect(therm).toBeDefined();
     expect(therm.name).toBe('Thermometer Mk1');
     expect(therm.dataType).toBe('ANALYSIS');
@@ -279,7 +279,7 @@ describe('Instrument key helpers', () => {
 
 describe('Science module part definition', () => {
   it('science-module-mk1 has instrumentSlots property', () => {
-    const def = getPartById('science-module-mk1');
+    const def = getPartById('science-module-mk1')!;
     expect(def).toBeDefined();
     expect(def.properties.instrumentSlots).toBe(2);
   });
@@ -548,9 +548,9 @@ describe('onSafeLanding', () => {
 
     onSafeLanding(ps, assembly, fs, gs);
 
-    expect(ps.instrumentStates.get(key).state).toBe(ScienceModuleState.DATA_RETURNED);
+    expect(ps.instrumentStates.get(key)!.state).toBe(ScienceModuleState.DATA_RETURNED);
 
-    const returnEvent = fs.events.find((e) => e.type === 'SCIENCE_DATA_RETURNED');
+    const returnEvent = fs.events.find((e) => e.type === 'SCIENCE_DATA_RETURNED')!;
     expect(returnEvent).toBeDefined();
     expect(returnEvent.instrumentId).toBe('thermometer-mk1');
     expect(returnEvent.scienceYield).toBeGreaterThan(0);
@@ -583,7 +583,7 @@ describe('onSafeLanding', () => {
     // Do NOT tick to completion.
 
     onSafeLanding(ps, assembly, fs, gs);
-    expect(ps.instrumentStates.get(key).state).toBe(ScienceModuleState.RUNNING);
+    expect(ps.instrumentStates.get(key)!.state).toBe(ScienceModuleState.RUNNING);
   });
 });
 
@@ -604,9 +604,9 @@ describe('transmitInstrument', () => {
 
     const yield_ = transmitInstrument(ps, assembly, fs, key, gs);
     expect(yield_).toBeGreaterThan(0);
-    expect(ps.instrumentStates.get(key).state).toBe(ScienceModuleState.TRANSMITTED);
+    expect(ps.instrumentStates.get(key)!.state).toBe(ScienceModuleState.TRANSMITTED);
 
-    const event = fs.events.find((e) => e.type === 'SCIENCE_TRANSMITTED');
+    const event = fs.events.find((e) => e.type === 'SCIENCE_TRANSMITTED')!;
     expect(event).toBeDefined();
     expect(event.transmitFraction).toBeGreaterThanOrEqual(ANALYSIS_TRANSMIT_YIELD_MIN);
     expect(event.transmitFraction).toBeLessThanOrEqual(ANALYSIS_TRANSMIT_YIELD_MAX);
@@ -625,7 +625,7 @@ describe('transmitInstrument', () => {
 
     const yield_ = transmitInstrument(ps, assembly, fs, key, gs);
     expect(yield_).toBe(0);
-    expect(ps.instrumentStates.get(key).state).toBe(ScienceModuleState.COMPLETE);
+    expect(ps.instrumentStates.get(key)!.state).toBe(ScienceModuleState.COMPLETE);
   });
 
   it('refuses to transmit already-returned data', () => {
@@ -666,7 +666,7 @@ describe('transmitInstrument', () => {
 describe('calculateYield', () => {
   it('applies base yield and biome multiplier', () => {
     const gs = makeGameState();
-    const therm = getInstrumentById('thermometer-mk1');
+    const therm = getInstrumentById('thermometer-mk1')!;
 
     // First collection, biome multiplier 2.0, no skill bonus.
     const yield_ = calculateYield('thermometer-mk1', 'MESOSPHERE', 2.0, 0, gs);
@@ -675,7 +675,7 @@ describe('calculateYield', () => {
 
   it('applies science skill bonus', () => {
     const gs = makeGameState();
-    const therm = getInstrumentById('thermometer-mk1');
+    const therm = getInstrumentById('thermometer-mk1')!;
 
     // 100 skill = 1.5× bonus.
     const yield_ = calculateYield('thermometer-mk1', 'GROUND', 0.5, 100, gs);
@@ -684,7 +684,7 @@ describe('calculateYield', () => {
 
   it('applies diminishing returns: 1st=100%, 2nd=25%, 3rd=10%, 4th=0%', () => {
     const gs = makeGameState();
-    const therm = getInstrumentById('thermometer-mk1');
+    const therm = getInstrumentById('thermometer-mk1')!;
     const biome = 'LOW_ATMOSPHERE';
     const mult = 1.0;
 
@@ -830,7 +830,7 @@ describe('Staging integration', () => {
 
     activateCurrentStage(ps, assembly, staging, fs);
 
-    expect(ps.instrumentStates.get(key).state).toBe(ScienceModuleState.RUNNING);
+    expect(ps.instrumentStates.get(key)!.state).toBe(ScienceModuleState.RUNNING);
     expect(fs.events.some((e) => e.type === 'PART_ACTIVATED' && e.instrumentId === 'thermometer-mk1')).toBe(true);
   });
 });
