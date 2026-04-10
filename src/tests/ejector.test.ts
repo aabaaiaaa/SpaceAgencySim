@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * ejector.test.js — Unit tests for the ejector seat system (TASK-026).
  *
@@ -26,6 +25,7 @@ import {
 import {
   createPhysicsState,
 } from '../core/physics.ts';
+import type { PhysicsState } from '../core/physics.ts';
 import {
   createRocketAssembly,
   addPartToAssembly,
@@ -34,8 +34,10 @@ import {
   syncStagingWithAssembly,
   assignPartToStage,
 } from '../core/rocketbuilder.ts';
+import type { RocketAssembly, StagingConfig } from '../core/rocketbuilder.ts';
 import { activateCurrentStage } from '../core/staging.ts';
 import { createFlightState, createGameState } from '../core/gameState.ts';
+import type { FlightState, FlightEvent, CrewMember } from '../core/gameState.ts';
 import { hireCrew } from '../core/crew.ts';
 import { AstronautStatus } from '../core/constants.ts';
 
@@ -46,7 +48,7 @@ import { AstronautStatus } from '../core/constants.ts';
 /**
  * Build a minimal crewed rocket: Mk1 Command Module + Small Tank + Spark Engine.
  */
-function makeCrewedRocket() {
+function makeCrewedRocket(): { assembly: RocketAssembly; staging: StagingConfig; cmdId: string; tankId: string; engineId: string } {
   const assembly = createRocketAssembly();
   const staging  = createStagingConfig();
 
@@ -66,7 +68,7 @@ function makeCrewedRocket() {
 /**
  * Minimal uncrewed rocket: Probe Core only (no ejector seat).
  */
-function makeUncrewedRocket() {
+function makeUncrewedRocket(): { assembly: RocketAssembly; staging: StagingConfig; probeId: string } {
   const assembly = createRocketAssembly();
   const staging  = createStagingConfig();
   const probeId  = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
@@ -75,7 +77,7 @@ function makeUncrewedRocket() {
 }
 
 /** Create a FlightState for test use. */
-function makeFlightState(crewIds = []) {
+function makeFlightState(crewIds: string[] = []): FlightState {
   return createFlightState({ missionId: 'test', rocketId: 'test', crewIds });
 }
 
@@ -83,7 +85,7 @@ function makeFlightState(crewIds = []) {
  * Build a PhysicsState for a given assembly (wraps createPhysicsState which
  * now calls initEjectorStates internally).
  */
-function makePhysicsState(assembly) {
+function makePhysicsState(assembly: RocketAssembly): PhysicsState {
   return createPhysicsState(assembly, makeFlightState());
 }
 
@@ -163,9 +165,9 @@ describe('activateEjectorSeat()', () => {
 
     activateEjectorSeat(ps, assembly, fs, cmdId);
 
-    const evt = fs.events.find((e) => e.type === 'CREW_EJECTED');
+    const evt = fs.events.find((e: FlightEvent) => e.type === 'CREW_EJECTED');
     expect(evt).toBeDefined();
-    expect(typeof evt.altitude).toBe('number');
+    expect(typeof evt!.altitude).toBe('number');
   });
 
   it('includes the correct altitude in the CREW_EJECTED event', () => {
@@ -176,8 +178,8 @@ describe('activateEjectorSeat()', () => {
 
     activateEjectorSeat(ps, assembly, fs, cmdId);
 
-    const evt = fs.events.find((e) => e.type === 'CREW_EJECTED');
-    expect(evt.altitude).toBeCloseTo(3_500, 0);
+    const evt = fs.events.find((e: FlightEvent) => e.type === 'CREW_EJECTED');
+    expect(evt!.altitude).toBeCloseTo(3_500, 0);
   });
 
   it('adds crew IDs to ps.ejectedCrewIds', () => {
@@ -217,7 +219,8 @@ describe('activateEjectorSeat()', () => {
   it('does not modify ejectorStates when ps.ejectorStates is absent', () => {
     const { assembly, cmdId } = makeCrewedRocket();
     const ps = makePhysicsState(assembly);
-    delete ps.ejectorStates; // simulate missing map
+    // @ts-expect-error — intentionally deleting required field to simulate missing map
+    delete ps.ejectorStates;
     const fs = makeFlightState(['crew-1']);
 
     // Should not throw.
@@ -232,7 +235,7 @@ describe('activateEjectorSeat()', () => {
 
 describe('getEjectorSeatStatus()', () => {
   it('returns ARMED for an uninitialised instance (no ejectorStates map)', () => {
-    const ps = { activeParts: new Set() }; // no ejectorStates
+    const ps = { activeParts: new Set<string>() } as Partial<PhysicsState> as PhysicsState; // no ejectorStates
     expect(getEjectorSeatStatus(ps, 'any-id')).toBe(EjectorState.ARMED);
   });
 
@@ -345,15 +348,15 @@ describe('resolveCrewCasualties() — crash without ejection', () => {
     const state = createGameState();
     // Hire an astronaut and add to crew
     const result = hireCrew(state, 'Valentina Test');
-    const astronaut = result.astronaut;
+    const astronaut = result.astronaut!;
 
     const fs = makeFlightState([astronaut.id]);
 
     const newKia = resolveCrewCasualties(state, ps, assembly, fs);
 
     expect(newKia).toContain(astronaut.id);
-    const updated = state.crew.find((c) => c.id === astronaut.id);
-    expect(updated.status).toBe(AstronautStatus.KIA);
+    const updated = state.crew.find((c: CrewMember) => c.id === astronaut.id);
+    expect(updated!.status).toBe(AstronautStatus.KIA);
   });
 
   it('applies the $500,000 fine per KIA astronaut', () => {
@@ -365,7 +368,7 @@ describe('resolveCrewCasualties() — crash without ejection', () => {
     const { astronaut } = hireCrew(state, 'Yuri Test');
     const moneyBefore = state.money;
 
-    const fs = makeFlightState([astronaut.id]);
+    const fs = makeFlightState([astronaut!.id]);
     resolveCrewCasualties(state, ps, assembly, fs);
 
     expect(state.money).toBe(moneyBefore - 500_000);
@@ -378,7 +381,7 @@ describe('resolveCrewCasualties() — crash without ejection', () => {
     const state = createGameState();
     const { astronaut } = hireCrew(state, 'Buzz Test');
 
-    const fs = makeFlightState([astronaut.id]);
+    const fs = makeFlightState([astronaut!.id]);
 
     // Eject crew first.
     activateEjectorSeat(ps, assembly, fs, cmdId);
@@ -389,8 +392,8 @@ describe('resolveCrewCasualties() — crash without ejection', () => {
     const newKia = resolveCrewCasualties(state, ps, assembly, fs);
 
     expect(newKia).toHaveLength(0);
-    const updated = state.crew.find((c) => c.id === astronaut.id);
-    expect(updated.status).toBe(AstronautStatus.ACTIVE);
+    const updated = state.crew.find((c: CrewMember) => c.id === astronaut!.id);
+    expect(updated!.status).toBe(AstronautStatus.ACTIVE);
   });
 
   it('returns empty array for an uncrewed flight', () => {
@@ -413,13 +416,13 @@ describe('resolveCrewCasualties() — crash without ejection', () => {
 
     const state = createGameState();
     const { astronaut } = hireCrew(state, 'Neil Test');
-    const fs = makeFlightState([astronaut.id]);
+    const fs = makeFlightState([astronaut!.id]);
 
     const newKia = resolveCrewCasualties(state, ps, assembly, fs);
 
     expect(newKia).toHaveLength(0);
-    const updated = state.crew.find((c) => c.id === astronaut.id);
-    expect(updated.status).toBe(AstronautStatus.ACTIVE);
+    const updated = state.crew.find((c: CrewMember) => c.id === astronaut!.id);
+    expect(updated!.status).toBe(AstronautStatus.ACTIVE);
   });
 });
 
@@ -431,7 +434,7 @@ describe('resolveCrewCasualties() — heat destruction of command module', () =>
 
     const state = createGameState();
     const { astronaut } = hireCrew(state, 'Gus Test');
-    const fs = makeFlightState([astronaut.id]);
+    const fs = makeFlightState([astronaut!.id]);
 
     // Simulate PART_DESTROYED event for the command module.
     fs.events.push({
@@ -445,9 +448,9 @@ describe('resolveCrewCasualties() — heat destruction of command module', () =>
 
     const newKia = resolveCrewCasualties(state, ps, assembly, fs);
 
-    expect(newKia).toContain(astronaut.id);
-    const updated = state.crew.find((c) => c.id === astronaut.id);
-    expect(updated.status).toBe(AstronautStatus.KIA);
+    expect(newKia).toContain(astronaut!.id);
+    const updated = state.crew.find((c: CrewMember) => c.id === astronaut!.id);
+    expect(updated!.status).toBe(AstronautStatus.KIA);
   });
 
   it('does NOT mark crew KIA when ejector was activated before heat destruction', () => {
@@ -456,7 +459,7 @@ describe('resolveCrewCasualties() — heat destruction of command module', () =>
 
     const state = createGameState();
     const { astronaut } = hireCrew(state, 'Mae Test');
-    const fs = makeFlightState([astronaut.id]);
+    const fs = makeFlightState([astronaut!.id]);
 
     // Eject crew before the module is destroyed.
     activateEjectorSeat(ps, assembly, fs, cmdId);
@@ -474,8 +477,8 @@ describe('resolveCrewCasualties() — heat destruction of command module', () =>
     const newKia = resolveCrewCasualties(state, ps, assembly, fs);
 
     expect(newKia).toHaveLength(0);
-    const updated = state.crew.find((c) => c.id === astronaut.id);
-    expect(updated.status).toBe(AstronautStatus.ACTIVE);
+    const updated = state.crew.find((c: CrewMember) => c.id === astronaut!.id);
+    expect(updated!.status).toBe(AstronautStatus.ACTIVE);
   });
 
   it('ignores PART_DESTROYED events for non-command-module parts', () => {
@@ -484,7 +487,7 @@ describe('resolveCrewCasualties() — heat destruction of command module', () =>
 
     const state = createGameState();
     const { astronaut } = hireCrew(state, 'Sally Test');
-    const fs = makeFlightState([astronaut.id]);
+    const fs = makeFlightState([astronaut!.id]);
 
     // Simulate heat destruction of the fuel tank (not a command module).
     fs.events.push({
@@ -499,8 +502,8 @@ describe('resolveCrewCasualties() — heat destruction of command module', () =>
     const newKia = resolveCrewCasualties(state, ps, assembly, fs);
 
     expect(newKia).toHaveLength(0);
-    const updated = state.crew.find((c) => c.id === astronaut.id);
-    expect(updated.status).toBe(AstronautStatus.ACTIVE);
+    const updated = state.crew.find((c: CrewMember) => c.id === astronaut!.id);
+    expect(updated!.status).toBe(AstronautStatus.ACTIVE);
   });
 });
 
@@ -540,8 +543,8 @@ describe('staging EJECT → ejector state via activateEjectorSeat', () => {
 
     activateCurrentStage(ps, assembly, staging, fs);
 
-    const evt = fs.events.find((e) => e.type === 'CREW_EJECTED');
+    const evt = fs.events.find((e: FlightEvent) => e.type === 'CREW_EJECTED');
     expect(evt).toBeDefined();
-    expect(evt.altitude).toBeCloseTo(500, 0);
+    expect(evt!.altitude).toBeCloseTo(500, 0);
   });
 });

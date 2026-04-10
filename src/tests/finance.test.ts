@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * finance.test.js — Unit tests for the financial system.
  *
@@ -13,6 +12,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
+import type { GameState } from '../core/gameState.ts';
 import {
   applyInterest,
   payDownLoan,
@@ -34,7 +34,7 @@ import {
 // ---------------------------------------------------------------------------
 
 /** Returns a fresh state with the default starting values. */
-function freshState() {
+function freshState(): GameState {
   return createGameState();
 }
 
@@ -75,7 +75,7 @@ describe('Financial starting constants', () => {
 // ---------------------------------------------------------------------------
 
 describe('applyInterest()', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('deducts interest from cash when cash covers it fully', () => {
@@ -150,7 +150,7 @@ describe('applyInterest()', () => {
 // ---------------------------------------------------------------------------
 
 describe('payDownLoan()', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('reduces both loan balance and cash by the paid amount', () => {
@@ -203,7 +203,7 @@ describe('payDownLoan()', () => {
 // ---------------------------------------------------------------------------
 
 describe('borrowMore()', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('increases loan balance and cash by the borrowed amount', () => {
@@ -249,7 +249,7 @@ describe('borrowMore()', () => {
 // ---------------------------------------------------------------------------
 
 describe('spend()', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('deducts the amount from cash and returns true on success', () => {
@@ -294,7 +294,7 @@ describe('spend()', () => {
 // ---------------------------------------------------------------------------
 
 describe('earn()', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('adds amount to cash', () => {
@@ -326,7 +326,7 @@ describe('earn()', () => {
 // ---------------------------------------------------------------------------
 
 describe('applyDeathFine()', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('deducts $500,000 per astronaut killed', () => {

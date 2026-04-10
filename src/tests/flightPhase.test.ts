@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * flightPhase.test.js — Unit tests for the flight phase state machine.
  *
@@ -14,7 +13,9 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createFlightState } from '../core/gameState.ts';
+import type { FlightState, OrbitalElements } from '../core/gameState.ts';
 import { FlightPhase } from '../core/constants.ts';
+import type { PhysicsState } from '../core/physics.ts';
 import {
   isValidTransition,
   transitionPhase,
@@ -29,7 +30,7 @@ import {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function freshFlightState() {
+function freshFlightState(): FlightState {
   return createFlightState({
     missionId: 'test-mission',
     rocketId: 'test-rocket',
@@ -40,17 +41,28 @@ function freshFlightState() {
 }
 
 /** Minimal PhysicsState stub for auto-transition tests. */
-function stubPs(overrides = {}) {
+function stubPs(overrides: Partial<PhysicsState> = {}): PhysicsState {
   return {
     posX: 0,
     posY: 0,
     velX: 0,
     velY: 0,
     throttle: 0,
-    firingEngines: new Set(),
+    firingEngines: new Set<string>(),
     grounded: true,
     landed: false,
     crashed: false,
+    ...overrides,
+  } as PhysicsState;
+}
+
+function stubElements(overrides: Partial<OrbitalElements> = {}): OrbitalElements {
+  return {
+    semiMajorAxis: 6_500_000,
+    eccentricity: 0.01,
+    argPeriapsis: 0,
+    meanAnomalyAtEpoch: 0,
+    epoch: 0,
     ...overrides,
   };
 }
@@ -149,7 +161,7 @@ describe('isValidTransition', () => {
 // ---------------------------------------------------------------------------
 
 describe('transitionPhase', () => {
-  let fs;
+  let fs: FlightState;
 
   beforeEach(() => {
     fs = freshFlightState();
@@ -176,7 +188,7 @@ describe('transitionPhase', () => {
     transitionPhase(fs, FlightPhase.LAUNCH, 'Engine ignition');
     const evt = fs.events.find(e => e.type === 'PHASE_CHANGE');
     expect(evt).toBeDefined();
-    expect(evt.description).toBe('Engine ignition');
+    expect(evt!.description).toBe('Engine ignition');
   });
 
   it('rejects invalid transitions', () => {
@@ -215,7 +227,7 @@ describe('transitionPhase', () => {
 // ---------------------------------------------------------------------------
 
 describe('evaluateAutoTransitions', () => {
-  let fs;
+  let fs: FlightState;
 
   beforeEach(() => {
     fs = freshFlightState();
@@ -226,7 +238,7 @@ describe('evaluateAutoTransitions', () => {
     const transition = evaluateAutoTransitions(fs, ps, null);
 
     expect(transition).not.toBeNull();
-    expect(transition.to).toBe(FlightPhase.LAUNCH);
+    expect(transition!.to).toBe(FlightPhase.LAUNCH);
     expect(fs.phase).toBe(FlightPhase.LAUNCH);
   });
 
@@ -245,7 +257,7 @@ describe('evaluateAutoTransitions', () => {
     const transition = evaluateAutoTransitions(fs, ps, null);
 
     expect(transition).not.toBeNull();
-    expect(transition.to).toBe(FlightPhase.FLIGHT);
+    expect(transition!.to).toBe(FlightPhase.FLIGHT);
     expect(fs.phase).toBe(FlightPhase.FLIGHT);
   });
 
@@ -263,14 +275,14 @@ describe('evaluateAutoTransitions', () => {
     const ps = stubPs({ posY: 100_000 });
     const orbitStatus = {
       valid: true,
-      elements: { semiMajorAxis: 6_500_000, eccentricity: 0.01 },
+      elements: stubElements({ semiMajorAxis: 6_500_000, eccentricity: 0.01 }),
       periapsisAlt: 90_000,
       apoapsisAlt: 110_000,
     };
 
     const transition = evaluateAutoTransitions(fs, ps, orbitStatus);
     expect(transition).not.toBeNull();
-    expect(transition.to).toBe(FlightPhase.ORBIT);
+    expect(transition!.to).toBe(FlightPhase.ORBIT);
     expect(fs.phase).toBe(FlightPhase.ORBIT);
     expect(fs.inOrbit).toBe(true);
     expect(fs.orbitalElements).toEqual(orbitStatus.elements);
@@ -291,7 +303,7 @@ describe('evaluateAutoTransitions', () => {
     const transition = evaluateAutoTransitions(fs, ps, null);
 
     expect(transition).not.toBeNull();
-    expect(transition.to).toBe(FlightPhase.FLIGHT);
+    expect(transition!.to).toBe(FlightPhase.FLIGHT);
     expect(fs.phase).toBe(FlightPhase.FLIGHT);
     expect(fs.inOrbit).toBe(false);
     expect(fs.orbitalElements).toBeNull();
@@ -311,14 +323,14 @@ describe('evaluateAutoTransitions', () => {
     const ps = stubPs({ posY: 100_000 });
     const orbitStatus = {
       valid: true,
-      elements: { semiMajorAxis: 6_500_000, eccentricity: 0.05 },
+      elements: stubElements({ semiMajorAxis: 6_500_000, eccentricity: 0.05 }),
       periapsisAlt: 85_000,
       apoapsisAlt: 120_000,
     };
 
     const transition = evaluateAutoTransitions(fs, ps, orbitStatus);
     expect(transition).not.toBeNull();
-    expect(transition.to).toBe(FlightPhase.ORBIT);
+    expect(transition!.to).toBe(FlightPhase.ORBIT);
     expect(fs.phase).toBe(FlightPhase.ORBIT);
     expect(fs.inOrbit).toBe(true);
   });
@@ -326,7 +338,7 @@ describe('evaluateAutoTransitions', () => {
   it('does not auto-transition from ORBIT (manual only)', () => {
     fs.phase = FlightPhase.ORBIT;
     const ps = stubPs({ posY: 100_000 });
-    const orbitStatus = { valid: true, elements: {}, periapsisAlt: 90_000, apoapsisAlt: 110_000 };
+    const orbitStatus = { valid: true, elements: stubElements(), periapsisAlt: 90_000, apoapsisAlt: 110_000 };
     const transition = evaluateAutoTransitions(fs, ps, orbitStatus);
     expect(transition).toBeNull();
     expect(fs.phase).toBe(FlightPhase.ORBIT);
@@ -450,7 +462,7 @@ describe('full flight lifecycle', () => {
     const ps3 = stubPs({ posY: 100_000 });
     const orbitStatus = {
       valid: true,
-      elements: { semiMajorAxis: 6_500_000, eccentricity: 0.01 },
+      elements: stubElements({ semiMajorAxis: 6_500_000, eccentricity: 0.01 }),
       periapsisAlt: 95_000,
       apoapsisAlt: 105_000,
     };
@@ -515,7 +527,7 @@ describe('full flight lifecycle', () => {
     const ps = stubPs({ posY: 100_000 });
     const orbitStatus = {
       valid: true,
-      elements: { semiMajorAxis: 2_000_000, eccentricity: 0.1 },
+      elements: stubElements({ semiMajorAxis: 2_000_000, eccentricity: 0.1 }),
       periapsisAlt: 80_000,
       apoapsisAlt: 200_000,
     };
@@ -536,7 +548,7 @@ describe('orbit entry altitude band metadata', () => {
     const ps = stubPs({ posY: 100_000 });
     const orbitStatus = {
       valid: true,
-      elements: { semiMajorAxis: 6_500_000, eccentricity: 0.01 },
+      elements: stubElements({ semiMajorAxis: 6_500_000, eccentricity: 0.01 }),
       periapsisAlt: 95_000,
       apoapsisAlt: 105_000,
       altitudeBand: { id: 'LEO', name: 'Low Earth Orbit', min: 80_000, max: 200_000 },
@@ -544,8 +556,8 @@ describe('orbit entry altitude band metadata', () => {
 
     const transition = evaluateAutoTransitions(fs, ps, orbitStatus);
     expect(transition).not.toBeNull();
-    expect(transition.to).toBe(FlightPhase.ORBIT);
-    expect(transition.reason).toContain('Low Earth Orbit');
+    expect(transition!.to).toBe(FlightPhase.ORBIT);
+    expect(transition!.reason).toContain('Low Earth Orbit');
   });
 
   it('FLIGHT → ORBIT transition includes band meta object', () => {
@@ -554,7 +566,7 @@ describe('orbit entry altitude band metadata', () => {
 
     const orbitStatus = {
       valid: true,
-      elements: { semiMajorAxis: 6_500_000, eccentricity: 0.01 },
+      elements: stubElements({ semiMajorAxis: 6_500_000, eccentricity: 0.01 }),
       periapsisAlt: 95_000,
       apoapsisAlt: 105_000,
       altitudeBand: { id: 'LEO', name: 'Low Earth Orbit', min: 80_000, max: 200_000 },
@@ -564,7 +576,7 @@ describe('orbit entry altitude band metadata', () => {
     evaluateAutoTransitions(fs, ps, orbitStatus);
     const lastEntry = fs.phaseLog[fs.phaseLog.length - 1];
     expect(lastEntry.meta).toBeDefined();
-    expect(lastEntry.meta.altitudeBand.id).toBe('LEO');
+    expect((lastEntry.meta as Record<string, Record<string, unknown>>).altitudeBand.id).toBe('LEO');
   });
 
   it('FLIGHT → ORBIT without altitude band uses generic reason', () => {
@@ -573,7 +585,7 @@ describe('orbit entry altitude band metadata', () => {
 
     const orbitStatus = {
       valid: true,
-      elements: { semiMajorAxis: 6_500_000, eccentricity: 0.01 },
+      elements: stubElements({ semiMajorAxis: 6_500_000, eccentricity: 0.01 }),
       periapsisAlt: 95_000,
       apoapsisAlt: 105_000,
       altitudeBand: null,
@@ -581,7 +593,7 @@ describe('orbit entry altitude band metadata', () => {
     const ps = stubPs({ posY: 100_000 });
 
     const transition = evaluateAutoTransitions(fs, ps, orbitStatus);
-    expect(transition.reason).toContain('Orbit');
+    expect(transition!.reason).toContain('Orbit');
   });
 
   it('CAPTURE → ORBIT transition includes altitude band', () => {
@@ -590,7 +602,7 @@ describe('orbit entry altitude band metadata', () => {
 
     const orbitStatus = {
       valid: true,
-      elements: { semiMajorAxis: 2_000_000, eccentricity: 0.1 },
+      elements: stubElements({ semiMajorAxis: 2_000_000, eccentricity: 0.1 }),
       periapsisAlt: 25_000,
       apoapsisAlt: 80_000,
       altitudeBand: { id: 'LLO', name: 'Low Lunar Orbit', min: 15_000, max: 100_000 },
@@ -599,7 +611,7 @@ describe('orbit entry altitude band metadata', () => {
 
     const transition = evaluateAutoTransitions(fs, ps, orbitStatus);
     expect(transition).not.toBeNull();
-    expect(transition.reason).toContain('Low Lunar Orbit');
+    expect(transition!.reason).toContain('Low Lunar Orbit');
   });
 });
 

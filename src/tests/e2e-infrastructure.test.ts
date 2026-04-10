@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * e2e-infrastructure.test.js — Unit tests for the E2E test infrastructure.
  *
@@ -27,6 +26,11 @@ import {
   STARTING_MONEY,
   STARTER_FACILITIES,
   ALL_FACILITIES,
+} from '../../e2e/helpers.js';
+
+import type {
+  SaveEnvelope,
+  SaveEnvelopeParams,
 } from '../../e2e/helpers.js';
 
 import {
@@ -105,7 +109,7 @@ describe('buildSaveEnvelope', () => {
 // ---------------------------------------------------------------------------
 
 describe('Fixture factories', () => {
-  const fixtureTests = [
+  const fixtureTests: [string, (overrides?: SaveEnvelopeParams) => SaveEnvelope][] = [
     ['freshStartFixture', freshStartFixture],
     ['earlyGameFixture',  earlyGameFixture],
     ['midGameFixture',    midGameFixture],
@@ -163,7 +167,7 @@ describe('Fixture factories', () => {
 // ---------------------------------------------------------------------------
 
 describe('missionTestFixture', () => {
-  const mission = {
+  const mission: { id: string; title: string; description: string; objectives: Record<string, unknown>[]; reward: number; unlocksAfter: string[]; unlockedParts: string[] } = {
     id: 'test-m',
     title: 'Test',
     description: 'Test mission.',
@@ -194,14 +198,14 @@ describe('missionTestFixture', () => {
 });
 
 describe('contractTestFixture', () => {
-  const contract = buildContract({
+  const contract: Parameters<typeof contractTestFixture>[0] = {
     id: 'test-c',
     title: 'Test Contract',
     objectives: [
-      buildObjective({ id: 'co1', type: 'REACH_ALTITUDE', target: { altitude: 200 } }),
+      { ...buildObjective({ id: 'co1', type: 'REACH_ALTITUDE', target: { altitude: 200 } }) },
     ],
     reward: 50_000,
-  });
+  };
 
   it('injects the contract as active', () => {
     const envelope = contractTestFixture(contract);
