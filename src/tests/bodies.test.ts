@@ -1,21 +1,3 @@
-// @ts-nocheck
-/**
- * bodies.test.js — Unit tests for the celestial body data system (TASK-039).
- *
- * Tests cover:
- *   CELESTIAL_BODIES catalog  — all 8 bodies defined with correct properties
- *   getBodyDef()              — lookup by ID
- *   getAirDensity()           — body-aware atmosphere model
- *   getSurfaceGravity()       — per-body gravity values
- *   getAtmosphereTop()        — atmosphere ceiling per body
- *   hasAtmosphere()           — correctly identifies atmospheric/airless bodies
- *   isLandable()              — landability flag
- *   getDestructionZone()      — Sun's extreme heat zone
- *   findBodyPath()            — hierarchical path between bodies
- *   SOI consistency           — SOI values match between bodies.js and manoeuvre.js
- *   Biome/band consistency    — biomes and altitude bands match constants.js
- */
-
 import { describe, it, expect } from 'vitest';
 import {
   CELESTIAL_BODIES,
@@ -120,23 +102,23 @@ describe('Atmosphere profiles', () => {
     expect(hasAtmosphere('EARTH')).toBe(true);
     const atmo = getBodyAtmosphere('EARTH');
     expect(atmo).not.toBeNull();
-    expect(atmo.seaLevelDensity).toBe(1.225);
-    expect(atmo.scaleHeight).toBe(8_500);
-    expect(atmo.topAltitude).toBe(70_000);
+    expect(atmo!.seaLevelDensity).toBe(1.225);
+    expect(atmo!.scaleHeight).toBe(8_500);
+    expect(atmo!.topAltitude).toBe(70_000);
   });
 
   it('Venus has a very dense atmosphere', () => {
     expect(hasAtmosphere('VENUS')).toBe(true);
     const atmo = getBodyAtmosphere('VENUS');
-    expect(atmo.seaLevelDensity).toBe(65.0);
-    expect(atmo.topAltitude).toBe(250_000);
+    expect(atmo!.seaLevelDensity).toBe(65.0);
+    expect(atmo!.topAltitude).toBe(250_000);
   });
 
   it('Mars has a thin atmosphere', () => {
     expect(hasAtmosphere('MARS')).toBe(true);
     const atmo = getBodyAtmosphere('MARS');
-    expect(atmo.seaLevelDensity).toBe(0.020);
-    expect(atmo.topAltitude).toBe(80_000);
+    expect(atmo!.seaLevelDensity).toBe(0.020);
+    expect(atmo!.topAltitude).toBe(80_000);
   });
 
   it('Moon is airless', () => {
@@ -302,18 +284,18 @@ describe('Visual properties', () => {
     const airlessBodies = ['MOON', 'MERCURY', 'PHOBOS', 'DEIMOS'];
     for (const id of airlessBodies) {
       const sky = getSkyVisual(id);
-      expect(sky.seaLevelColor).toBe(0x000005);
+      expect(sky!.seaLevelColor).toBe(0x000005);
     }
   });
 
   it('Earth has blue sky at surface', () => {
     const sky = getSkyVisual('EARTH');
-    expect(sky.seaLevelColor).toBe(0x87ceeb);
+    expect(sky!.seaLevelColor).toBe(0x87ceeb);
   });
 
   it('Mars has a butterscotch sky', () => {
     const sky = getSkyVisual('MARS');
-    expect(sky.seaLevelColor).toBe(0xd4a574);
+    expect(sky!.seaLevelColor).toBe(0xd4a574);
   });
 });
 
@@ -435,7 +417,7 @@ describe('SOI radius', () => {
 describe('Consistency with constants.js', () => {
   it('CelestialBody enum has all body IDs', () => {
     for (const id of ALL_BODY_IDS) {
-      expect(CelestialBody[id]).toBe(id);
+      expect((CelestialBody as Record<string, string>)[id]).toBe(id);
     }
   });
 
@@ -567,7 +549,7 @@ describe('getBodyDef()', () => {
   it('returns the body definition for valid IDs', () => {
     const earth = getBodyDef('EARTH');
     expect(earth).toBeDefined();
-    expect(earth.name).toBe('Earth');
+    expect(earth!.name).toBe('Earth');
   });
 
   it('returns undefined for unknown IDs', () => {

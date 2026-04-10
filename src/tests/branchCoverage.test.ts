@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * branchCoverage.test.ts — Targeted tests to raise branch coverage above 80%.
  *
@@ -20,6 +19,12 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import type { GameState, FlightState, FlightEvent, TransferState, PowerState, CrewMember } from '../core/gameState.ts';
+import type { PhysicsState, RocketAssembly, LegEntry, ParachuteEntry } from '../core/physics.ts';
+import type { DebrisState } from '../core/staging.ts';
+import type { FuelSystemState } from '../core/fuelsystem.ts';
+import type { DifficultySettings } from '../core/constants.ts';
+import type { LogLevel } from '../core/logger.ts';
 
 // ---------------------------------------------------------------------------
 // settings.ts — updateDifficultySettings with null/undefined difficultySettings
@@ -37,28 +42,28 @@ import { DEFAULT_DIFFICULTY_SETTINGS } from '../core/constants.ts';
 
 describe('settings.ts branch coverage', () => {
   it('updateDifficultySettings initialises from defaults when difficultySettings is null', () => {
-    const state = { difficultySettings: null };
-    updateDifficultySettings(state, { malfunctionFrequency: 'OFF' });
+    const state = { difficultySettings: null } as unknown as GameState;
+    updateDifficultySettings(state, { malfunctionFrequency: 'OFF' } as unknown as Partial<DifficultySettings>);
     expect(state.difficultySettings).toBeDefined();
-    expect(state.difficultySettings.malfunctionFrequency).toBe('OFF');
+    expect(state.difficultySettings!.malfunctionFrequency).toBe('OFF');
     // Other fields should have been initialised from defaults
-    expect(state.difficultySettings.weatherSeverity).toBe(DEFAULT_DIFFICULTY_SETTINGS.weatherSeverity);
+    expect(state.difficultySettings!.weatherSeverity).toBe(DEFAULT_DIFFICULTY_SETTINGS.weatherSeverity);
   });
 
   it('updateDifficultySettings initialises from defaults when difficultySettings is undefined', () => {
-    const state = {};
-    updateDifficultySettings(state, { weatherSeverity: 'CALM' });
+    const state = {} as unknown as GameState;
+    updateDifficultySettings(state, { weatherSeverity: 'CALM' } as unknown as Partial<DifficultySettings>);
     expect(state.difficultySettings).toBeDefined();
-    expect(state.difficultySettings.weatherSeverity).toBe('CALM');
+    expect(state.difficultySettings!.weatherSeverity).toBe('CALM');
   });
 
   it('getDifficultySettings returns defaults when state is null', () => {
-    const result = getDifficultySettings(null);
+    const result = getDifficultySettings(null as unknown as GameState);
     expect(result).toEqual({ ...DEFAULT_DIFFICULTY_SETTINGS });
   });
 
   it('getDifficultySettings fills missing fields with defaults', () => {
-    const state = { difficultySettings: { malfunctionFrequency: 'HIGH' } };
+    const state = { difficultySettings: { malfunctionFrequency: 'HIGH' } } as unknown as GameState;
     const result = getDifficultySettings(state);
     expect(result.malfunctionFrequency).toBe('HIGH');
     expect(result.weatherSeverity).toBe(DEFAULT_DIFFICULTY_SETTINGS.weatherSeverity);
@@ -74,7 +79,7 @@ describe('settings.ts branch coverage', () => {
 import { logger } from '../core/logger.ts';
 
 describe('logger.ts branch coverage', () => {
-  let originalLevel;
+  let originalLevel: LogLevel;
 
   beforeEach(() => {
     originalLevel = logger.getLevel();
@@ -193,7 +198,7 @@ describe('fuelsystem.ts branch coverage', () => {
     const srbId = addPartToAssembly(assembly, 'srb-small', 0, -40);
     connectParts(assembly, probeId, 1, srbId, 0);
 
-    const ps = {
+    const ps: FuelSystemState = {
       activeParts: new Set([probeId, srbId]),
       firingEngines: new Set([srbId]),
       fuelStore: new Map([[srbId, 0]]),  // zero fuel
@@ -212,7 +217,7 @@ describe('fuelsystem.ts branch coverage', () => {
     connectParts(assembly, probeId, 1, tankId, 0);
     connectParts(assembly, tankId, 1, engineId, 0);
 
-    const ps = {
+    const ps: FuelSystemState = {
       activeParts: new Set([probeId, tankId, engineId]),
       firingEngines: new Set([engineId]),
       fuelStore: new Map([[tankId, 0]]), // zero fuel
@@ -229,7 +234,7 @@ describe('fuelsystem.ts branch coverage', () => {
     const engineId = addPartToAssembly(assembly, 'engine-spark', 0, -55);
     connectParts(assembly, probeId, 1, engineId, 0);
 
-    const ps = {
+    const ps: FuelSystemState = {
       activeParts: new Set([probeId]), // engine NOT in activeParts (jettisoned)
       firingEngines: new Set([engineId]),
       fuelStore: new Map(),
@@ -260,54 +265,54 @@ import {
 
 describe('legs.ts branch coverage', () => {
   it('deployLandingLeg late-initialises a missing leg entry', () => {
-    const ps = { legStates: new Map() };
+    const ps = { legStates: new Map<string, LegEntry>() };
     deployLandingLeg(ps, 'new-leg');
     const entry = ps.legStates.get('new-leg');
     expect(entry).toBeDefined();
-    expect(entry.state).toBe(LegState.DEPLOYING);
+    expect(entry!.state).toBe(LegState.DEPLOYING);
   });
 
   it('deployLandingLeg is no-op when legStates is falsy', () => {
-    const ps = { legStates: null };
+    const ps = { legStates: null } as unknown as { legStates: Map<string, LegEntry> };
     deployLandingLeg(ps, 'leg-1');
     // Should not throw
     expect(ps.legStates).toBeNull();
   });
 
   it('deployLandingLeg is no-op when already deploying', () => {
-    const ps = { legStates: new Map([['leg-1', { state: LegState.DEPLOYING, deployTimer: 1.0 }]]) };
+    const ps = { legStates: new Map<string, LegEntry>([['leg-1', { state: LegState.DEPLOYING, deployTimer: 1.0 }]]) };
     deployLandingLeg(ps, 'leg-1');
-    expect(ps.legStates.get('leg-1').deployTimer).toBe(1.0);
+    expect(ps.legStates.get('leg-1')!.deployTimer).toBe(1.0);
   });
 
   it('deployLandingLeg is no-op when already deployed', () => {
-    const ps = { legStates: new Map([['leg-1', { state: LegState.DEPLOYED, deployTimer: 0 }]]) };
+    const ps = { legStates: new Map<string, LegEntry>([['leg-1', { state: LegState.DEPLOYED, deployTimer: 0 }]]) };
     deployLandingLeg(ps, 'leg-1');
-    expect(ps.legStates.get('leg-1').state).toBe(LegState.DEPLOYED);
+    expect(ps.legStates.get('leg-1')!.state).toBe(LegState.DEPLOYED);
   });
 
   it('retractLandingLeg is no-op when legStates is falsy', () => {
-    const ps = { legStates: null };
+    const ps = { legStates: null } as unknown as { legStates: Map<string, LegEntry> };
     retractLandingLeg(ps, 'leg-1');
     expect(ps.legStates).toBeNull();
   });
 
   it('retractLandingLeg is no-op when entry does not exist', () => {
-    const ps = { legStates: new Map() };
+    const ps = { legStates: new Map<string, LegEntry>() };
     retractLandingLeg(ps, 'missing');
     expect(ps.legStates.size).toBe(0);
   });
 
   it('retractLandingLeg is no-op for RETRACTED leg', () => {
-    const ps = { legStates: new Map([['leg-1', { state: LegState.RETRACTED, deployTimer: 0 }]]) };
+    const ps = { legStates: new Map<string, LegEntry>([['leg-1', { state: LegState.RETRACTED, deployTimer: 0 }]]) };
     retractLandingLeg(ps, 'leg-1');
-    expect(ps.legStates.get('leg-1').state).toBe(LegState.RETRACTED);
+    expect(ps.legStates.get('leg-1')!.state).toBe(LegState.RETRACTED);
   });
 
   it('retractLandingLeg is no-op for DEPLOYING leg', () => {
-    const ps = { legStates: new Map([['leg-1', { state: LegState.DEPLOYING, deployTimer: 1.0 }]]) };
+    const ps = { legStates: new Map<string, LegEntry>([['leg-1', { state: LegState.DEPLOYING, deployTimer: 1.0 }]]) };
     retractLandingLeg(ps, 'leg-1');
-    expect(ps.legStates.get('leg-1').state).toBe(LegState.DEPLOYING);
+    expect(ps.legStates.get('leg-1')!.state).toBe(LegState.DEPLOYING);
   });
 
   it('getLegContextMenuItems shows DEPLOYING state with timer', () => {
@@ -318,7 +323,7 @@ describe('legs.ts branch coverage', () => {
 
     const ps = {
       activeParts: new Set([legId]),
-      legStates: new Map([[legId, { state: LegState.DEPLOYING, deployTimer: 0.8 }]]),
+      legStates: new Map<string, LegEntry>([[legId, { state: LegState.DEPLOYING, deployTimer: 0.8 }]]),
     };
 
     const items = getLegContextMenuItems(ps, assembly);
@@ -336,7 +341,7 @@ describe('legs.ts branch coverage', () => {
 
     const ps = {
       activeParts: new Set([legId]),
-      legStates: new Map([[legId, { state: LegState.DEPLOYED, deployTimer: 0 }]]),
+      legStates: new Map<string, LegEntry>([[legId, { state: LegState.DEPLOYED, deployTimer: 0 }]]),
     };
 
     const items = getLegContextMenuItems(ps, assembly);
@@ -351,7 +356,7 @@ describe('legs.ts branch coverage', () => {
 
     const ps = {
       activeParts: new Set([legId]),
-      legStates: new Map([[legId, { state: 'unknown_state', deployTimer: 0 }]]),
+      legStates: new Map<string, LegEntry>([[legId, { state: 'unknown_state', deployTimer: 0 }]]),
     };
 
     const items = getLegContextMenuItems(ps, assembly);
@@ -373,21 +378,21 @@ describe('legs.ts branch coverage', () => {
   });
 
   it('tickLegs is no-op when legStates is falsy', () => {
-    const ps = { legStates: null, posY: 0 };
-    const flightState = { events: [], timeElapsed: 0 };
+    const ps = { legStates: null, posY: 0 } as unknown as { legStates: Map<string, LegEntry>; posY: number };
+    const flightState: { events: FlightEvent[]; timeElapsed: number } = { events: [], timeElapsed: 0 };
     tickLegs(ps, { parts: new Map() }, flightState, 0.5);
     expect(flightState.events.length).toBe(0);
   });
 
   it('getDeployedLegFootOffset returns t=0 when entry missing', () => {
-    const result = getDeployedLegFootOffset('missing', { width: 10, height: 20 }, new Map());
+    const result = getDeployedLegFootOffset('missing', { width: 10, height: 20 }, new Map<string, LegEntry>());
     expect(result.t).toBe(0);
     expect(result.dx).toBe(0);
     expect(result.dy).toBe(0);
   });
 
   it('getDeployedLegFootOffset interpolates during DEPLOYING', () => {
-    const legStates = new Map([
+    const legStates = new Map<string, LegEntry>([
       ['leg-1', { state: LegState.DEPLOYING, deployTimer: LEG_DEPLOY_DURATION / 2 }],
     ]);
     const result = getDeployedLegFootOffset('leg-1', { width: 10, height: 20 }, legStates);
@@ -397,7 +402,7 @@ describe('legs.ts branch coverage', () => {
   });
 
   it('getDeployedLegFootOffset returns t=1 when DEPLOYED', () => {
-    const legStates = new Map([
+    const legStates = new Map<string, LegEntry>([
       ['leg-1', { state: LegState.DEPLOYED, deployTimer: 0 }],
     ]);
     const result = getDeployedLegFootOffset('leg-1', { width: 10, height: 20 }, legStates);
@@ -421,8 +426,10 @@ import {
 import { createPhysicsState, tick, handleKeyDown, handleKeyUp, fireNextStage } from '../core/physics.ts';
 import { createFlightState, createGameState, createCrewMember } from '../core/gameState.ts';
 
-/** Helper to create a minimal FlightState for tests. */
-function makeFlightState(overrides = {}) {
+type MalfunctionPS = Parameters<typeof checkMalfunctions>[0];
+type RecoveryPS = Parameters<typeof attemptRecovery>[0];
+
+function makeFlightState(overrides: Partial<Parameters<typeof createFlightState>[0]> = {}): FlightState {
   return createFlightState({ missionId: 'test', rocketId: 'test', ...overrides });
 }
 
@@ -436,20 +443,20 @@ describe('malfunction.ts branch coverage', () => {
     const ps = {
       activeParts: new Set([probeId, engineId]),
       firingEngines: new Set([engineId]),
-      fuelStore: new Map(),
-      malfunctions: new Map(),
-      malfunctionChecked: new Set(),
-    };
+      fuelStore: new Map<string, number>(),
+      malfunctions: new Map<string, { type: string; recovered: boolean }>(),
+      malfunctionChecked: new Set<string>(),
+    } as unknown as MalfunctionPS;
 
     const flightState = makeFlightState();
     const gameState = createGameState();
     gameState.malfunctionMode = MalfunctionMode.NORMAL;
     gameState.gameMode = GameMode.SANDBOX;
-    gameState.sandboxSettings = { malfunctionsEnabled: false };
+    gameState.sandboxSettings = { malfunctionsEnabled: false, weatherEnabled: true };
 
     checkMalfunctions(ps, assembly, flightState, gameState);
     // No malfunctions should have been applied
-    expect(ps.malfunctions.size).toBe(0);
+    expect((ps as unknown as { malfunctions: Map<string, unknown> }).malfunctions.size).toBe(0);
   });
 
   it('checkMalfunctions skips when malfunctionMult is 0 (OFF frequency)', () => {
@@ -458,27 +465,27 @@ describe('malfunction.ts branch coverage', () => {
 
     const ps = {
       activeParts: new Set([probeId]),
-      firingEngines: new Set(),
-      fuelStore: new Map(),
-      malfunctions: new Map(),
-      malfunctionChecked: new Set(),
-    };
+      firingEngines: new Set<string>(),
+      fuelStore: new Map<string, number>(),
+      malfunctions: new Map<string, { type: string; recovered: boolean }>(),
+      malfunctionChecked: new Set<string>(),
+    } as unknown as MalfunctionPS;
 
     const flightState = makeFlightState();
     const gameState = createGameState();
-    gameState.difficultySettings = { malfunctionFrequency: 'OFF', weatherSeverity: 'NORMAL', financialPressure: 'NORMAL', injuryDuration: 'NORMAL' };
+    gameState.difficultySettings = { malfunctionFrequency: 'OFF', weatherSeverity: 'NORMAL', financialPressure: 'NORMAL', injuryDuration: 'NORMAL' } as unknown as DifficultySettings;
     gameState.malfunctionMode = MalfunctionMode.NORMAL;
 
     checkMalfunctions(ps, assembly, flightState, gameState);
-    expect(ps.malfunctions.size).toBe(0);
+    expect((ps as unknown as { malfunctions: Map<string, unknown> }).malfunctions.size).toBe(0);
   });
 
   it('attemptRecovery ENGINE_FLAMEOUT can fail (roll >= 0.5)', () => {
     const ps = {
       malfunctions: new Map([['eng-1', { type: MalfunctionType.ENGINE_FLAMEOUT, recovered: false }]]),
-      firingEngines: new Set(),
+      firingEngines: new Set<string>(),
       _gameState: { malfunctionMode: MalfunctionMode.NORMAL },
-    };
+    } as unknown as RecoveryPS;
 
     // Force a high random roll to ensure failure
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
@@ -491,9 +498,9 @@ describe('malfunction.ts branch coverage', () => {
   it('attemptRecovery FUEL_TANK_LEAK can fail (roll >= 0.6)', () => {
     const ps = {
       malfunctions: new Map([['tank-1', { type: MalfunctionType.FUEL_TANK_LEAK, recovered: false }]]),
-      firingEngines: new Set(),
+      firingEngines: new Set<string>(),
       _gameState: { malfunctionMode: MalfunctionMode.NORMAL },
-    };
+    } as unknown as RecoveryPS;
 
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
     const result = attemptRecovery(ps, 'tank-1');
@@ -504,9 +511,9 @@ describe('malfunction.ts branch coverage', () => {
   it('attemptRecovery SCIENCE_INSTRUMENT_FAILURE can fail (roll >= 0.4)', () => {
     const ps = {
       malfunctions: new Map([['sci-1', { type: MalfunctionType.SCIENCE_INSTRUMENT_FAILURE, recovered: false }]]),
-      firingEngines: new Set(),
+      firingEngines: new Set<string>(),
       _gameState: { malfunctionMode: MalfunctionMode.NORMAL },
-    };
+    } as unknown as RecoveryPS;
 
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
     const result = attemptRecovery(ps, 'sci-1');
@@ -517,9 +524,9 @@ describe('malfunction.ts branch coverage', () => {
   it('attemptRecovery LANDING_LEGS_STUCK can fail (roll >= 0.7)', () => {
     const ps = {
       malfunctions: new Map([['leg-1', { type: MalfunctionType.LANDING_LEGS_STUCK, recovered: false }]]),
-      firingEngines: new Set(),
+      firingEngines: new Set<string>(),
       _gameState: { malfunctionMode: MalfunctionMode.NORMAL },
-    };
+    } as unknown as RecoveryPS;
 
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
     const result = attemptRecovery(ps, 'leg-1');
@@ -528,26 +535,27 @@ describe('malfunction.ts branch coverage', () => {
   });
 
   it('attemptRecovery DECOUPLER_STUCK succeeds (always)', () => {
+    const malfunctions = new Map([['dec-2', { type: MalfunctionType.DECOUPLER_STUCK, recovered: false }]]);
     const ps = {
-      malfunctions: new Map([['dec-2', { type: MalfunctionType.DECOUPLER_STUCK, recovered: false }]]),
-      firingEngines: new Set(),
+      malfunctions,
+      firingEngines: new Set<string>(),
       _gameState: null,
-    };
+    } as unknown as RecoveryPS;
     const gs = createGameState();
     gs.malfunctionMode = MalfunctionMode.FORCED;
 
     // DECOUPLER_STUCK always succeeds regardless of mode
     const result = attemptRecovery(ps, 'dec-2', gs);
     expect(result.success).toBe(true);
-    expect(ps.malfunctions.get('dec-2').recovered).toBe(true);
+    expect(malfunctions.get('dec-2')!.recovered).toBe(true);
   });
 
   it('attemptRecovery FUEL_TANK_LEAK succeeds with low roll', () => {
     const ps = {
       malfunctions: new Map([['tank-2', { type: MalfunctionType.FUEL_TANK_LEAK, recovered: false }]]),
-      firingEngines: new Set(),
+      firingEngines: new Set<string>(),
       _gameState: null,
-    };
+    } as unknown as RecoveryPS;
 
     vi.spyOn(Math, 'random').mockReturnValue(0.1); // < 0.6 threshold
     const result = attemptRecovery(ps, 'tank-2');
@@ -558,9 +566,9 @@ describe('malfunction.ts branch coverage', () => {
   it('attemptRecovery LANDING_LEGS_STUCK succeeds with low roll', () => {
     const ps = {
       malfunctions: new Map([['leg-2', { type: MalfunctionType.LANDING_LEGS_STUCK, recovered: false }]]),
-      firingEngines: new Set(),
+      firingEngines: new Set<string>(),
       _gameState: null,
-    };
+    } as unknown as RecoveryPS;
 
     vi.spyOn(Math, 'random').mockReturnValue(0.1); // < 0.7 threshold
     const result = attemptRecovery(ps, 'leg-2');
@@ -571,9 +579,9 @@ describe('malfunction.ts branch coverage', () => {
   it('attemptRecovery SCIENCE_INSTRUMENT_FAILURE succeeds with low roll', () => {
     const ps = {
       malfunctions: new Map([['sci-2', { type: MalfunctionType.SCIENCE_INSTRUMENT_FAILURE, recovered: false }]]),
-      firingEngines: new Set(),
+      firingEngines: new Set<string>(),
       _gameState: null,
-    };
+    } as unknown as RecoveryPS;
 
     vi.spyOn(Math, 'random').mockReturnValue(0.1); // < 0.4 threshold
     const result = attemptRecovery(ps, 'sci-2');
@@ -582,24 +590,25 @@ describe('malfunction.ts branch coverage', () => {
   });
 
   it('attemptRecovery ENGINE_FLAMEOUT succeeds with low roll', () => {
+    const firingEngines = new Set<string>();
     const ps = {
       malfunctions: new Map([['eng-2', { type: MalfunctionType.ENGINE_FLAMEOUT, recovered: false }]]),
-      firingEngines: new Set(),
+      firingEngines,
       _gameState: null,
-    };
+    } as unknown as RecoveryPS;
 
     vi.spyOn(Math, 'random').mockReturnValue(0.1); // < 0.5 threshold
     const result = attemptRecovery(ps, 'eng-2');
     expect(result.success).toBe(true);
-    expect(ps.firingEngines.has('eng-2')).toBe(true);
+    expect(firingEngines.has('eng-2')).toBe(true);
     vi.restoreAllMocks();
   });
 
   it('attemptRecovery ENGINE_REDUCED_THRUST always fails', () => {
     const ps = {
       malfunctions: new Map([['eng-1', { type: MalfunctionType.ENGINE_REDUCED_THRUST, recovered: false }]]),
-      firingEngines: new Set(),
-    };
+      firingEngines: new Set<string>(),
+    } as unknown as RecoveryPS;
 
     const result = attemptRecovery(ps, 'eng-1');
     expect(result.success).toBe(false);
@@ -608,8 +617,8 @@ describe('malfunction.ts branch coverage', () => {
   it('attemptRecovery PARACHUTE_PARTIAL always fails', () => {
     const ps = {
       malfunctions: new Map([['ch-1', { type: MalfunctionType.PARACHUTE_PARTIAL, recovered: false }]]),
-      firingEngines: new Set(),
-    };
+      firingEngines: new Set<string>(),
+    } as unknown as RecoveryPS;
 
     const result = attemptRecovery(ps, 'ch-1');
     expect(result.success).toBe(false);
@@ -618,8 +627,8 @@ describe('malfunction.ts branch coverage', () => {
   it('attemptRecovery SRB_EARLY_BURNOUT always fails', () => {
     const ps = {
       malfunctions: new Map([['srb-1', { type: MalfunctionType.SRB_EARLY_BURNOUT, recovered: false }]]),
-      firingEngines: new Set(),
-    };
+      firingEngines: new Set<string>(),
+    } as unknown as RecoveryPS;
 
     const result = attemptRecovery(ps, 'srb-1');
     expect(result.success).toBe(false);
@@ -628,8 +637,8 @@ describe('malfunction.ts branch coverage', () => {
   it('attemptRecovery DECOUPLER_STUCK always succeeds', () => {
     const ps = {
       malfunctions: new Map([['dec-1', { type: MalfunctionType.DECOUPLER_STUCK, recovered: false }]]),
-      firingEngines: new Set(),
-    };
+      firingEngines: new Set<string>(),
+    } as unknown as RecoveryPS;
 
     const result = attemptRecovery(ps, 'dec-1');
     expect(result.success).toBe(true);
@@ -638,8 +647,8 @@ describe('malfunction.ts branch coverage', () => {
   it('attemptRecovery returns no-op for already recovered malfunction', () => {
     const ps = {
       malfunctions: new Map([['eng-1', { type: MalfunctionType.ENGINE_FLAMEOUT, recovered: true }]]),
-      firingEngines: new Set(),
-    };
+      firingEngines: new Set<string>(),
+    } as unknown as RecoveryPS;
 
     const result = attemptRecovery(ps, 'eng-1');
     expect(result.success).toBe(false);
@@ -648,9 +657,9 @@ describe('malfunction.ts branch coverage', () => {
 
   it('attemptRecovery returns no-op for non-existent malfunction', () => {
     const ps = {
-      malfunctions: new Map(),
-      firingEngines: new Set(),
-    };
+      malfunctions: new Map<string, { type: string; recovered: boolean }>(),
+      firingEngines: new Set<string>(),
+    } as unknown as RecoveryPS;
 
     const result = attemptRecovery(ps, 'missing');
     expect(result.success).toBe(false);
@@ -659,8 +668,8 @@ describe('malfunction.ts branch coverage', () => {
   it('attemptRecovery unknown type returns failure', () => {
     const ps = {
       malfunctions: new Map([['x', { type: 'UNKNOWN_TYPE', recovered: false }]]),
-      firingEngines: new Set(),
-    };
+      firingEngines: new Set<string>(),
+    } as unknown as RecoveryPS;
 
     const result = attemptRecovery(ps, 'x');
     expect(result.success).toBe(false);
@@ -676,23 +685,23 @@ describe('malfunction.ts branch coverage', () => {
     const ps = {
       activeParts: new Set([probeId, engineId]),
       firingEngines: new Set([engineId]),
-      fuelStore: new Map(),
-      malfunctions: new Map(),
-      malfunctionChecked: new Set(),
-    };
+      fuelStore: new Map<string, number>(),
+      malfunctions: new Map<string, { type: string; recovered: boolean }>(),
+      malfunctionChecked: new Set<string>(),
+    } as unknown as MalfunctionPS;
 
     const flightState = makeFlightState();
     flightState.crewIds = ['crew-1'];
     const gameState = createGameState();
     gameState.malfunctionMode = MalfunctionMode.NORMAL;
     gameState.crew = [
-      { id: 'crew-1', name: 'Test', skills: { engineering: 100 } },
+      { id: 'crew-1', name: 'Test', skills: { engineering: 100 } } as unknown as CrewMember,
     ];
 
     // With high engineering skill, malfunction chance is reduced
     vi.spyOn(Math, 'random').mockReturnValue(0.99); // Always pass reliability check
     checkMalfunctions(ps, assembly, flightState, gameState);
-    expect(ps.malfunctions.size).toBe(0);
+    expect((ps as unknown as { malfunctions: Map<string, unknown> }).malfunctions.size).toBe(0);
     vi.restoreAllMocks();
   });
 });
@@ -893,34 +902,45 @@ describe('physics.ts branch coverage', () => {
 
 import { activateCurrentStage, recomputeActiveGraph, tickDebris } from '../core/staging.ts';
 
+function makeDebris(activeParts: Set<string>, overrides: Partial<DebrisState> = {}): DebrisState {
+  return {
+    id: 'debris-0',
+    activeParts,
+    firingEngines: new Set<string>(),
+    fuelStore: new Map<string, number>(),
+    deployedParts: new Set<string>(),
+    parachuteStates: new Map<string, ParachuteEntry>(),
+    legStates: new Map<string, LegEntry>(),
+    heatMap: new Map<string, number>(),
+    posX: 0,
+    posY: 0,
+    velX: 0,
+    velY: 0,
+    angle: 0,
+    throttle: 1,
+    angularVelocity: 0,
+    isTipping: false,
+    tippingContactX: 0,
+    tippingContactY: 0,
+    landed: false,
+    crashed: false,
+    ...overrides,
+  };
+}
+
 describe('staging.ts branch coverage', () => {
   describe('tickDebris angular damping', () => {
     it('applies aerodynamic angular damping at non-zero density', () => {
       const assembly = createRocketAssembly();
       const probeId = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
 
-      const debris = {
+      const debris = makeDebris(new Set([probeId]), {
         id: 'debris-1',
-        activeParts: new Set([probeId]),
-        firingEngines: new Set(),
-        fuelStore: new Map(),
-        deployedParts: new Set(),
-        parachuteStates: new Map(),
-        legStates: new Map(),
-        heatMap: new Map(),
-        posX: 0,
         posY: 5000, // in atmosphere
-        velX: 0,
         velY: -50,
         angle: 0.5,
-        throttle: 1,
         angularVelocity: 2.0,
-        isTipping: false,
-        tippingContactX: 0,
-        tippingContactY: 0,
-        landed: false,
-        crashed: false,
-      };
+      });
 
       const initialAV = debris.angularVelocity;
       tickDebris(debris, assembly, 1 / 60);
@@ -935,28 +955,12 @@ describe('staging.ts branch coverage', () => {
       const assembly = createRocketAssembly();
       const probeId = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
 
-      const debris = {
+      const debris = makeDebris(new Set([probeId]), {
         id: 'debris-2',
-        activeParts: new Set([probeId]),
-        firingEngines: new Set(),
-        fuelStore: new Map(),
-        deployedParts: new Set(),
-        parachuteStates: new Map(),
-        legStates: new Map(),
-        heatMap: new Map(),
-        posX: 0,
         posY: 0.01, // Almost touching ground
-        velX: 0,
         velY: -5, // Under 10 m/s = safe landing
         angle: 0.5, // Significant tilt
-        throttle: 1,
-        angularVelocity: 0,
-        isTipping: false,
-        tippingContactX: 0,
-        tippingContactY: 0,
-        landed: false,
-        crashed: false,
-      };
+      });
 
       // Tick with a larger dt to ensure ground contact
       tickDebris(debris, assembly, 0.5);
@@ -969,28 +973,12 @@ describe('staging.ts branch coverage', () => {
       const assembly = createRocketAssembly();
       const probeId = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
 
-      const debris = {
+      const debris = makeDebris(new Set([probeId]), {
         id: 'debris-3',
-        activeParts: new Set([probeId]),
-        firingEngines: new Set(),
-        fuelStore: new Map(),
-        deployedParts: new Set(),
-        parachuteStates: new Map(),
-        legStates: new Map(),
-        heatMap: new Map(),
-        posX: 0,
         posY: 0.01,
-        velX: 0,
         velY: -5,
         angle: 0.001, // Nearly upright
-        throttle: 1,
-        angularVelocity: 0,
-        isTipping: false,
-        tippingContactX: 0,
-        tippingContactY: 0,
-        landed: false,
-        crashed: false,
-      };
+      });
 
       tickDebris(debris, assembly, 0.5);
 
@@ -1004,28 +992,10 @@ describe('staging.ts branch coverage', () => {
       const assembly = createRocketAssembly();
       const probeId = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
 
-      const debris = {
+      const debris = makeDebris(new Set([probeId]), {
         id: 'debris-4',
-        activeParts: new Set([probeId]),
-        firingEngines: new Set(),
-        fuelStore: new Map(),
-        deployedParts: new Set(),
-        parachuteStates: new Map(),
-        legStates: new Map(),
-        heatMap: new Map(),
-        posX: 0,
-        posY: 0,
-        velX: 0,
-        velY: 0,
-        angle: 0,
-        throttle: 1,
-        angularVelocity: 0,
-        isTipping: false,
-        tippingContactX: 0,
-        tippingContactY: 0,
         landed: true,
-        crashed: false,
-      };
+      });
 
       tickDebris(debris, assembly, 1 / 60);
       expect(debris.posY).toBe(0); // Unchanged
@@ -1133,7 +1103,7 @@ import { tickPower, hasSufficientSatellitePower, initPowerState, recalcPowerStat
 
 describe('power.ts branch coverage', () => {
   it('tickPower includes POWER_DRAW_COMMS when commsActive is true', () => {
-    const powerState = {
+    const powerState: PowerState = {
       solarPanelArea: 5,
       solarGeneration: 0,
       batteryCapacity: 100,
@@ -1160,7 +1130,7 @@ describe('power.ts branch coverage', () => {
   });
 
   it('tickPower without commsActive has lower draw', () => {
-    const powerState = {
+    const powerState: PowerState = {
       solarPanelArea: 5,
       solarGeneration: 0,
       batteryCapacity: 100,
@@ -1218,33 +1188,27 @@ describe('collision.ts branch coverage', () => {
     const p2 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
 
     // Two debris at nearly same position — side by side horizontally
-    const debris1 = {
+    const debris1 = makeDebris(new Set([p1]), {
       id: 'frag-1',
-      activeParts: new Set([p1]),
-      fuelStore: new Map(),
       posX: 0, posY: 100,
       velX: 5, velY: 0,
-      angle: 0, landed: false, crashed: false,
       collisionCooldown: 0,
-    };
-    const debris2 = {
+    });
+    const debris2 = makeDebris(new Set([p2]), {
       id: 'frag-2',
-      activeParts: new Set([p2]),
-      fuelStore: new Map(),
       posX: 0.3, posY: 100,
       velX: -5, velY: 0,
-      angle: 0, landed: false, crashed: false,
       collisionCooldown: 0,
-    };
+    });
 
     const ps = {
       posX: 10000, posY: 10000,
-      activeParts: new Set(),
-      fuelStore: new Map(),
+      activeParts: new Set<string>(),
+      fuelStore: new Map<string, number>(),
       landed: true, crashed: false,
       debris: [debris1, debris2],
       angle: 0,
-    };
+    } as unknown as PhysicsState;
 
     // Just exercise the code path — no assertion needed beyond no-throw
     tickCollisions(ps, assembly, 1/60);
@@ -1259,7 +1223,7 @@ import { getMapCelestialBodies, getShadowOverlayGeometry } from '../core/mapView
 
 describe('mapView.ts branch coverage', () => {
   it('getMapCelestialBodies includes transfer destination when transferState exists', () => {
-    const result = getMapCelestialBodies('EARTH', {
+    const transferState: TransferState = {
       originBodyId: 'EARTH',
       destinationBodyId: 'MARS',
       departureTime: 0,
@@ -1268,7 +1232,8 @@ describe('mapView.ts branch coverage', () => {
       captureDV: 1500,
       totalDV: 5000,
       trajectoryPath: [],
-    });
+    };
+    const result = getMapCelestialBodies('EARTH', transferState);
 
     expect(result).toBeDefined();
     expect(Array.isArray(result)).toBe(true);
@@ -1295,7 +1260,7 @@ describe('mapView.ts branch coverage', () => {
 
   it('getMapCelestialBodies with transfer dest already a child body', () => {
     // MOON is already a child of EARTH — should not duplicate
-    const result = getMapCelestialBodies('EARTH', {
+    const transferState: TransferState = {
       originBodyId: 'EARTH',
       destinationBodyId: 'MOON',
       departureTime: 0,
@@ -1304,7 +1269,8 @@ describe('mapView.ts branch coverage', () => {
       captureDV: 500,
       totalDV: 1500,
       trajectoryPath: [],
-    });
+    };
+    const result = getMapCelestialBodies('EARTH', transferState);
 
     const moonEntries = result.filter(b => b.bodyId === 'MOON');
     expect(moonEntries.length).toBe(1); // Not duplicated
@@ -1401,7 +1367,7 @@ describe('physics.ts additional branch coverage', () => {
     ps.velY = 0;
     ps.grounded = false;
     ps.landed = false;
-    ps.dockingAltitudeBand = { min: 180000, max: 202000 };
+    ps.dockingAltitudeBand = { id: 'LEO', name: 'Low Earth Orbit', min: 180000, max: 202000 };
     ps._heldKeys.add('w'); // radial out — should be clamped near max
 
     tick(ps, assembly, staging, flightState, 1 / 60);
@@ -1453,25 +1419,25 @@ describe('physics.ts additional branch coverage', () => {
 
 describe('settings.ts additional branch coverage', () => {
   it('getMalfunctionMultiplier with unknown frequency returns 1.0', () => {
-    const state = { difficultySettings: { malfunctionFrequency: 'NONEXISTENT' } };
+    const state = { difficultySettings: { malfunctionFrequency: 'NONEXISTENT' } } as unknown as GameState;
     const result = getMalfunctionMultiplier(state);
     expect(result).toBe(1.0);
   });
 
   it('getWeatherSeverityMultipliers with unknown severity returns NORMAL', () => {
-    const state = { difficultySettings: { weatherSeverity: 'NONEXISTENT' } };
+    const state = { difficultySettings: { weatherSeverity: 'NONEXISTENT' } } as unknown as GameState;
     const result = getWeatherSeverityMultipliers(state);
     expect(result).toBeDefined();
   });
 
   it('getFinancialMultipliers with unknown pressure returns NORMAL', () => {
-    const state = { difficultySettings: { financialPressure: 'NONEXISTENT' } };
+    const state = { difficultySettings: { financialPressure: 'NONEXISTENT' } } as unknown as GameState;
     const result = getFinancialMultipliers(state);
     expect(result).toBeDefined();
   });
 
   it('getInjuryDurationMultiplier with unknown duration returns 1.0', () => {
-    const state = { difficultySettings: { injuryDuration: 'NONEXISTENT' } };
+    const state = { difficultySettings: { injuryDuration: 'NONEXISTENT' } } as unknown as GameState;
     const result = getInjuryDurationMultiplier(state);
     expect(result).toBe(1.0);
   });
@@ -1482,7 +1448,7 @@ describe('settings.ts additional branch coverage', () => {
       weatherSeverity: null,
       financialPressure: null,
       injuryDuration: null,
-    }};
+    }} as unknown as GameState;
     const result = getDifficultySettings(state);
     expect(result.malfunctionFrequency).toBe(DEFAULT_DIFFICULTY_SETTINGS.malfunctionFrequency);
     expect(result.weatherSeverity).toBe(DEFAULT_DIFFICULTY_SETTINGS.weatherSeverity);
@@ -1513,7 +1479,7 @@ describe('challenges.ts branch coverage', () => {
 
   it('extractScoreMetric falls back to altitude when maxAltitude is undefined', () => {
     const fs = makeFlightState();
-    delete fs.maxAltitude;
+    (fs as unknown as Record<string, unknown>).maxAltitude = undefined;
     fs.altitude = 30000;
     const result = extractScoreMetric('maxAltitude', fs, null);
     expect(result).toBe(30000);
@@ -1521,8 +1487,8 @@ describe('challenges.ts branch coverage', () => {
 
   it('extractScoreMetric returns null for maxAltitude when both undefined', () => {
     const fs = makeFlightState();
-    delete fs.maxAltitude;
-    delete fs.altitude;
+    (fs as unknown as Record<string, unknown>).maxAltitude = undefined;
+    (fs as unknown as Record<string, unknown>).altitude = undefined;
     const result = extractScoreMetric('maxAltitude', fs, null);
     expect(result).toBeNull();
   });
@@ -1536,7 +1502,7 @@ describe('challenges.ts branch coverage', () => {
 
   it('extractScoreMetric falls back to velocity when maxVelocity undefined', () => {
     const fs = makeFlightState();
-    delete fs.maxVelocity;
+    (fs as unknown as Record<string, unknown>).maxVelocity = undefined;
     fs.velocity = 1500;
     const result = extractScoreMetric('maxVelocity', fs, null);
     expect(result).toBe(1500);
@@ -1544,8 +1510,8 @@ describe('challenges.ts branch coverage', () => {
 
   it('extractScoreMetric returns null for maxVelocity when both undefined', () => {
     const fs = makeFlightState();
-    delete fs.maxVelocity;
-    delete fs.velocity;
+    (fs as unknown as Record<string, unknown>).maxVelocity = undefined;
+    (fs as unknown as Record<string, unknown>).velocity = undefined;
     const result = extractScoreMetric('maxVelocity', fs, null);
     expect(result).toBeNull();
   });
@@ -1566,7 +1532,7 @@ describe('challenges.ts branch coverage', () => {
 
   it('extractScoreMetric returns fuelRemaining from ps', () => {
     const fs = makeFlightState();
-    const ps = { totalFuel: 200, maxFuel: 400 };
+    const ps = { totalFuel: 200, maxFuel: 400 } as unknown as PhysicsState;
     const result = extractScoreMetric('fuelRemaining', fs, ps);
     expect(result).toBe(50); // 200/400 * 100
   });
@@ -1587,9 +1553,9 @@ describe('challenges.ts branch coverage', () => {
   it('extractScoreMetric counts satellitesDeployed', () => {
     const fs = makeFlightState();
     fs.events = [
-      { type: 'SATELLITE_RELEASED' },
-      { type: 'SATELLITE_RELEASED' },
-      { type: 'PART_ACTIVATED' },
+      { type: 'SATELLITE_RELEASED', time: 0, description: '' },
+      { type: 'SATELLITE_RELEASED', time: 1, description: '' },
+      { type: 'PART_ACTIVATED', time: 2, description: '' },
     ];
     const result = extractScoreMetric('satellitesDeployed', fs, null);
     expect(result).toBe(2);

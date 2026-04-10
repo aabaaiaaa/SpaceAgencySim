@@ -127,31 +127,31 @@
 - **Verification**: `npx vitest run src/tests/autoSave.test.ts`
 
 ### TASK-021: Convert bankruptcy.test.ts to strict TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007
 - **Description**: Remove `// @ts-nocheck` from `src/tests/bankruptcy.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
 - **Verification**: `npx vitest run src/tests/bankruptcy.test.ts`
 
 ### TASK-022: Convert biomes.test.ts to strict TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007
 - **Description**: Remove `// @ts-nocheck` from `src/tests/biomes.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
 - **Verification**: `npx vitest run src/tests/biomes.test.ts`
 
 ### TASK-023: Convert bodies.test.ts to strict TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007
 - **Description**: Remove `// @ts-nocheck` from `src/tests/bodies.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
 - **Verification**: `npx vitest run src/tests/bodies.test.ts`
 
 ### TASK-024: Convert branchCoverage.test.ts to strict TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007
 - **Description**: Remove `// @ts-nocheck` from `src/tests/branchCoverage.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
 - **Verification**: `npx vitest run src/tests/branchCoverage.test.ts`
 
 ### TASK-025: Convert challenges.test.ts to strict TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007
 - **Description**: Remove `// @ts-nocheck` from `src/tests/challenges.test.ts`. Add proper type imports, type all local helper functions with explicit return types, type mock objects and fixtures using real interfaces, eliminate all `any` usage. Use `// @ts-expect-error` for intentional invalid-input tests. See requirements §5.3.
 - **Verification**: `npx vitest run src/tests/challenges.test.ts`

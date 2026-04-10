@@ -1,17 +1,3 @@
-// @ts-nocheck
-/**
- * biomes.test.js — Unit tests for the altitude biome system (TASK-014).
- *
- * Tests cover:
- *   getBiome()             — returns correct biome for various altitudes
- *   getBiomeId()           — returns biome ID string
- *   getScienceMultiplier() — returns correct multiplier per biome
- *   getBiomeTransition()   — detects boundary cross-fade zones
- *   getOrbitalBiomes()     — returns biomes an elliptical orbit passes through
- *   hasBiomeChanged()      — detects biome transitions
- *   BIOME_DEFINITIONS      — validates all defined biomes
- */
-
 import { describe, it, expect } from 'vitest';
 import {
   getBiome,
@@ -23,6 +9,8 @@ import {
   BIOME_FADE_RANGE,
 } from '../core/biomes.ts';
 import { BIOME_DEFINITIONS } from '../core/constants.ts';
+
+import type { OrbitalElements } from '../core/gameState.ts';
 
 // ---------------------------------------------------------------------------
 // BIOME_DEFINITIONS validation
@@ -76,57 +64,57 @@ describe('BIOME_DEFINITIONS', () => {
 describe('getBiome()', () => {
   it('returns Ground at altitude 0', () => {
     const biome = getBiome(0, 'EARTH');
-    expect(biome.id).toBe('GROUND');
+    expect(biome!.id).toBe('GROUND');
   });
 
   it('returns Ground at altitude 50', () => {
     const biome = getBiome(50, 'EARTH');
-    expect(biome.id).toBe('GROUND');
+    expect(biome!.id).toBe('GROUND');
   });
 
   it('returns Low Atmosphere at altitude 100', () => {
     const biome = getBiome(100, 'EARTH');
-    expect(biome.id).toBe('LOW_ATMOSPHERE');
+    expect(biome!.id).toBe('LOW_ATMOSPHERE');
   });
 
   it('returns Mid Atmosphere at 5000 m', () => {
     const biome = getBiome(5000, 'EARTH');
-    expect(biome.id).toBe('MID_ATMOSPHERE');
+    expect(biome!.id).toBe('MID_ATMOSPHERE');
   });
 
   it('returns Upper Atmosphere at 20000 m', () => {
     const biome = getBiome(20000, 'EARTH');
-    expect(biome.id).toBe('UPPER_ATMOSPHERE');
+    expect(biome!.id).toBe('UPPER_ATMOSPHERE');
   });
 
   it('returns Mesosphere at 50000 m', () => {
     const biome = getBiome(50000, 'EARTH');
-    expect(biome.id).toBe('MESOSPHERE');
+    expect(biome!.id).toBe('MESOSPHERE');
   });
 
   it('returns Near Space at 80000 m', () => {
     const biome = getBiome(80000, 'EARTH');
-    expect(biome.id).toBe('NEAR_SPACE');
+    expect(biome!.id).toBe('NEAR_SPACE');
   });
 
   it('returns Low Orbit at 150000 m', () => {
     const biome = getBiome(150000, 'EARTH');
-    expect(biome.id).toBe('LOW_ORBIT');
+    expect(biome!.id).toBe('LOW_ORBIT');
   });
 
   it('returns High Orbit at 300000 m', () => {
     const biome = getBiome(300000, 'EARTH');
-    expect(biome.id).toBe('HIGH_ORBIT');
+    expect(biome!.id).toBe('HIGH_ORBIT');
   });
 
   it('returns High Orbit at very high altitude (1000 km)', () => {
     const biome = getBiome(1_000_000, 'EARTH');
-    expect(biome.id).toBe('HIGH_ORBIT');
+    expect(biome!.id).toBe('HIGH_ORBIT');
   });
 
   it('clamps negative altitudes to 0 (Ground)', () => {
     const biome = getBiome(-100, 'EARTH');
-    expect(biome.id).toBe('GROUND');
+    expect(biome!.id).toBe('GROUND');
   });
 
   it('returns null for unknown body', () => {
@@ -203,21 +191,21 @@ describe('getBiomeTransition()', () => {
   it('detects transition near the 100 m boundary (Ground → Low Atmosphere)', () => {
     const t = getBiomeTransition(100, 'EARTH');
     expect(t).not.toBeNull();
-    expect(t.from.id).toBe('GROUND');
-    expect(t.to.id).toBe('LOW_ATMOSPHERE');
-    expect(t.ratio).toBeCloseTo(0.5, 1);
+    expect(t!.from.id).toBe('GROUND');
+    expect(t!.to.id).toBe('LOW_ATMOSPHERE');
+    expect(t!.ratio).toBeCloseTo(0.5, 1);
   });
 
   it('ratio approaches 0 well inside lower biome', () => {
     const t = getBiomeTransition(100 - BIOME_FADE_RANGE, 'EARTH');
     expect(t).not.toBeNull();
-    expect(t.ratio).toBeCloseTo(0, 1);
+    expect(t!.ratio).toBeCloseTo(0, 1);
   });
 
   it('ratio approaches 1 well inside upper biome', () => {
     const t = getBiomeTransition(100 + BIOME_FADE_RANGE, 'EARTH');
     expect(t).not.toBeNull();
-    expect(t.ratio).toBeCloseTo(1, 1);
+    expect(t!.ratio).toBeCloseTo(1, 1);
   });
 
   it('returns null for unknown body', () => {
@@ -232,7 +220,7 @@ describe('getBiomeTransition()', () => {
 describe('getOrbitalBiomes()', () => {
   it('returns a single biome for a circular orbit within one biome', () => {
     // Circular orbit at 150 km (Low Orbit: 100–200 km)
-    const elements = {
+    const elements: OrbitalElements = {
       semiMajorAxis: 6_371_000 + 150_000, // R + altitude
       eccentricity: 0,
       argPeriapsis: 0,
@@ -252,7 +240,7 @@ describe('getOrbitalBiomes()', () => {
     const rApo = R + 300_000;
     const a = (rPeri + rApo) / 2;
     const e = (rApo - rPeri) / (rApo + rPeri);
-    const elements = {
+    const elements: OrbitalElements = {
       semiMajorAxis: a,
       eccentricity: e,
       argPeriapsis: 0,
@@ -269,7 +257,7 @@ describe('getOrbitalBiomes()', () => {
   });
 
   it('returns empty array for unknown body', () => {
-    const elements = {
+    const elements: OrbitalElements = {
       semiMajorAxis: 6_371_000 + 150_000,
       eccentricity: 0,
       argPeriapsis: 0,

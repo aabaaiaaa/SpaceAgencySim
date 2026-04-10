@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * bankruptcy.test.js — Unit tests for operating costs and bankruptcy detection.
  *
@@ -11,6 +10,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
+import type { GameState, CrewMember } from '../core/gameState.ts';
 import { advancePeriod } from '../core/period.ts';
 import { getMinimumRocketCost, isBankrupt } from '../core/finance.ts';
 import {
@@ -25,12 +25,18 @@ import {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function freshState() {
+function freshState(): GameState {
   return createGameState();
 }
 
-/** Add an active crew member with a given salary. */
-function addCrew(state, overrides = {}) {
+interface CrewOverrides {
+  id?: string;
+  name?: string;
+  status?: AstronautStatus;
+  salary?: number;
+}
+
+function addCrew(state: GameState, overrides: CrewOverrides = {}): void {
   state.crew.push({
     id: overrides.id ?? `crew-${state.crew.length + 1}`,
     name: overrides.name ?? `Astronaut ${state.crew.length + 1}`,
@@ -38,7 +44,14 @@ function addCrew(state, overrides = {}) {
     skills: { piloting: 0, engineering: 0, science: 0 },
     salary: overrides.salary ?? CREW_SALARY_PER_PERIOD,
     hireDate: new Date().toISOString(),
+    missionsFlown: 0,
+    flightsFlown: 0,
+    deathDate: null,
+    deathCause: null,
+    assignedRocketId: null,
     injuryEnds: null,
+    trainingSkill: null,
+    trainingEnds: null,
   });
 }
 
@@ -47,7 +60,7 @@ function addCrew(state, overrides = {}) {
 // ---------------------------------------------------------------------------
 
 describe('getMinimumRocketCost()', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('returns Infinity when no parts are unlocked', () => {
@@ -102,7 +115,7 @@ describe('getMinimumRocketCost()', () => {
 // ---------------------------------------------------------------------------
 
 describe('isBankrupt()', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('returns false when no parts are unlocked (early game)', () => {
@@ -157,7 +170,7 @@ describe('isBankrupt()', () => {
 // ---------------------------------------------------------------------------
 
 describe('advancePeriod() — individual crew salaries', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('uses per-astronaut salary field when set', () => {
@@ -176,7 +189,14 @@ describe('advancePeriod() — individual crew salaries', () => {
       // No salary field — simulates legacy save data
       hireDate: new Date().toISOString(),
       injuryEnds: null,
-    });
+      missionsFlown: 0,
+      flightsFlown: 0,
+      deathDate: null,
+      deathCause: null,
+      assignedRocketId: null,
+      trainingSkill: null,
+      trainingEnds: null,
+    } as CrewMember);
     const result = advancePeriod(state);
     expect(result.crewSalaryCost).toBe(CREW_SALARY_PER_PERIOD);
   });
@@ -190,7 +210,14 @@ describe('advancePeriod() — individual crew salaries', () => {
       skills: { piloting: 0, engineering: 0, science: 0 },
       hireDate: new Date().toISOString(),
       injuryEnds: null,
-    });
+      missionsFlown: 0,
+      flightsFlown: 0,
+      deathDate: null,
+      deathCause: null,
+      assignedRocketId: null,
+      trainingSkill: null,
+      trainingEnds: null,
+    } as CrewMember);
     const result = advancePeriod(state);
     expect(result.crewSalaryCost).toBe(8_000 + CREW_SALARY_PER_PERIOD);
   });
@@ -201,7 +228,7 @@ describe('advancePeriod() — individual crew salaries', () => {
 // ---------------------------------------------------------------------------
 
 describe('advancePeriod() — bankruptcy flag', () => {
-  let state;
+  let state: GameState;
   beforeEach(() => { state = freshState(); });
 
   it('returns bankrupt: false when player is solvent', () => {

@@ -1,17 +1,3 @@
-// @ts-nocheck
-/**
- * challenges.test.js — Unit tests for the challenge mission system.
- *
- * Tests cover:
- *   - Challenge unlocking based on mission prerequisites
- *   - Challenge acceptance and abandonment
- *   - Objective checking during flight
- *   - Score extraction and medal computation
- *   - Challenge completion and reward calculation
- *   - Replay with medal improvement
- *   - Save/load migration for challenge state
- */
-
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
 import {
@@ -29,32 +15,52 @@ import {
 } from '../core/challenges.ts';
 import { CHALLENGES, MedalTier, ScoreDirection } from '../data/challenges.ts';
 import { ObjectiveType } from '../data/missions.ts';
+import type { GameState, FlightState, FlightEvent, MissionInstance, ChallengeDef, MedalThresholds } from '../core/gameState.ts';
+import type { PhysicsState } from '../core/physics.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function freshState() {
+interface FlightStateOverrides {
+  altitude?: number;
+  velocity?: number;
+  timeElapsed?: number;
+  events?: FlightEvent[];
+  rocketCost?: number;
+  partCount?: number;
+  partTypes?: string[];
+  crewCount?: number;
+  maxAltitude?: number;
+  maxVelocity?: number;
+  fuelFraction?: number;
+  hasScienceModules?: boolean;
+  scienceModuleRunning?: boolean;
+}
+
+function freshState(): GameState {
   const state = createGameState();
   // Provide completed missions to unlock challenges.
   state.missions.completed = [
     { id: 'mission-001', title: 'M1', objectives: [], reward: 25000 },
     { id: 'mission-004', title: 'M4', objectives: [], reward: 30000 },
-  ];
+  ] as unknown as MissionInstance[];
   return state;
 }
 
-function stateWithOrbitalMissions() {
+function stateWithOrbitalMissions(): GameState {
   const state = freshState();
   // Add orbital missions needed for advanced challenges.
   state.missions.completed.push(
-    { id: 'mission-016', title: 'M16', objectives: [], reward: 50000 },
-    { id: 'mission-017', title: 'M17', objectives: [], reward: 60000 },
+    ...([
+      { id: 'mission-016', title: 'M16', objectives: [], reward: 50000 },
+      { id: 'mission-017', title: 'M17', objectives: [], reward: 60000 },
+    ] as unknown as MissionInstance[]),
   );
   return state;
 }
 
-function makeFlightState(overrides = {}) {
+function makeFlightState(overrides: FlightStateOverrides = {}): FlightState {
   return {
     altitude: overrides.altitude ?? 0,
     velocity: overrides.velocity ?? 0,
@@ -69,7 +75,7 @@ function makeFlightState(overrides = {}) {
     fuelFraction: overrides.fuelFraction ?? 1,
     hasScienceModules: overrides.hasScienceModules ?? false,
     scienceModuleRunning: overrides.scienceModuleRunning ?? false,
-  };
+  } as FlightState;
 }
 
 // ---------------------------------------------------------------------------
@@ -83,6 +89,7 @@ describe('Challenge System', () => {
   describe('ensureChallengeState', () => {
     it('creates challenges property if missing', () => {
       const state = createGameState();
+      // @ts-expect-error — testing defensive init when field is missing (e.g. old saves)
       delete state.challenges;
       ensureChallengeState(state);
       expect(state.challenges).toEqual({ active: null, results: {} });
@@ -130,13 +137,13 @@ describe('Challenge System', () => {
       const result = acceptChallenge(state, 'challenge-penny-pincher');
       expect(result.success).toBe(true);
       expect(state.challenges.active).not.toBeNull();
-      expect(state.challenges.active.id).toBe('challenge-penny-pincher');
+      expect(state.challenges.active!.id).toBe('challenge-penny-pincher');
     });
 
     it('resets objective completion on accept', () => {
       const state = freshState();
       acceptChallenge(state, 'challenge-penny-pincher');
-      for (const obj of state.challenges.active.objectives) {
+      for (const obj of state.challenges.active!.objectives) {
         expect(obj.completed).toBe(false);
       }
     });
@@ -157,7 +164,7 @@ describe('Challenge System', () => {
       const state = freshState();
       acceptChallenge(state, 'challenge-penny-pincher');
       acceptChallenge(state, 'challenge-bullseye');
-      expect(state.challenges.active.id).toBe('challenge-bullseye');
+      expect(state.challenges.active!.id).toBe('challenge-bullseye');
     });
   });
 
@@ -181,9 +188,9 @@ describe('Challenge System', () => {
       const fs = makeFlightState({ altitude: 15000 });
       checkChallengeObjectives(state, fs);
 
-      const altObj = state.challenges.active.objectives.find(
+      const altObj = state.challenges.active!.objectives.find(
         (o) => o.type === ObjectiveType.REACH_ALTITUDE
-      );
+      )!;
       expect(altObj.completed).toBe(true);
     });
 
@@ -191,13 +198,13 @@ describe('Challenge System', () => {
       const state = freshState();
       acceptChallenge(state, 'challenge-penny-pincher');
       const fs = makeFlightState({
-        events: [{ type: 'LANDING', speed: 5, time: 100 }],
+        events: [{ type: 'LANDING', speed: 5, time: 100, description: '' } as FlightEvent],
       });
       checkChallengeObjectives(state, fs);
 
-      const landObj = state.challenges.active.objectives.find(
+      const landObj = state.challenges.active!.objectives.find(
         (o) => o.type === ObjectiveType.SAFE_LANDING
-      );
+      )!;
       expect(landObj.completed).toBe(true);
     });
 
@@ -207,9 +214,9 @@ describe('Challenge System', () => {
       const fs = makeFlightState({ altitude: 500 });
       checkChallengeObjectives(state, fs);
 
-      const altObj = state.challenges.active.objectives.find(
+      const altObj = state.challenges.active!.objectives.find(
         (o) => o.type === ObjectiveType.REACH_ALTITUDE
-      );
+      )!;
       expect(altObj.completed).toBe(false);
     });
 
@@ -231,7 +238,7 @@ describe('Challenge System', () => {
 
     it('extracts landingSpeed from LANDING event', () => {
       const fs = makeFlightState({
-        events: [{ type: 'LANDING', speed: 3.5, time: 100 }],
+        events: [{ type: 'LANDING', speed: 3.5, time: 100, description: '' } as FlightEvent],
       });
       expect(extractScoreMetric('landingSpeed', fs, null)).toBe(3.5);
     });
@@ -258,7 +265,7 @@ describe('Challenge System', () => {
 
     it('extracts fuelRemaining from ps when available', () => {
       const fs = makeFlightState();
-      const ps = { totalFuel: 30, maxFuel: 100 };
+      const ps = { totalFuel: 30, maxFuel: 100 } as unknown as PhysicsState;
       expect(extractScoreMetric('fuelRemaining', fs, ps)).toBe(30);
     });
 
@@ -273,13 +280,13 @@ describe('Challenge System', () => {
   describe('computeMedal', () => {
     const lowerIsBetter = {
       scoreDirection: ScoreDirection.LOWER_IS_BETTER,
-      medals: { bronze: 50000, silver: 30000, gold: 15000 },
-    };
+      medals: { bronze: 50000, silver: 30000, gold: 15000 } as MedalThresholds,
+    } as Pick<ChallengeDef, 'scoreDirection' | 'medals'> as ChallengeDef;
 
     const higherIsBetter = {
       scoreDirection: ScoreDirection.HIGHER_IS_BETTER,
-      medals: { bronze: 100000, silver: 250000, gold: 500000 },
-    };
+      medals: { bronze: 100000, silver: 250000, gold: 500000 } as MedalThresholds,
+    } as Pick<ChallengeDef, 'scoreDirection' | 'medals'> as ChallengeDef;
 
     it('awards gold for lower-is-better when score <= gold', () => {
       expect(computeMedal(lowerIsBetter, 10000)).toBe(MedalTier.GOLD);
@@ -351,13 +358,13 @@ describe('Challenge System', () => {
       acceptChallenge(state, 'challenge-penny-pincher');
 
       // Mark all objectives as completed.
-      for (const obj of state.challenges.active.objectives) {
+      for (const obj of state.challenges.active!.objectives) {
         obj.completed = true;
       }
 
       const fs = makeFlightState({
         rocketCost: 20000,
-        events: [{ type: 'LANDING', speed: 5, time: 100 }],
+        events: [{ type: 'LANDING', speed: 5, time: 100, description: '' } as FlightEvent],
       });
 
       const result = processChallengeCompletion(state, fs, null);
@@ -371,7 +378,7 @@ describe('Challenge System', () => {
     it('clears active challenge after completion', () => {
       const state = freshState();
       acceptChallenge(state, 'challenge-penny-pincher');
-      for (const obj of state.challenges.active.objectives) {
+      for (const obj of state.challenges.active!.objectives) {
         obj.completed = true;
       }
       const fs = makeFlightState({ rocketCost: 20000 });
@@ -382,13 +389,13 @@ describe('Challenge System', () => {
     it('stores best result', () => {
       const state = freshState();
       acceptChallenge(state, 'challenge-penny-pincher');
-      for (const obj of state.challenges.active.objectives) {
+      for (const obj of state.challenges.active!.objectives) {
         obj.completed = true;
       }
       const fs = makeFlightState({ rocketCost: 40000 });
       processChallengeCompletion(state, fs, null);
 
-      const stored = getChallengeResult(state, 'challenge-penny-pincher');
+      const stored = getChallengeResult(state, 'challenge-penny-pincher')!;
       expect(stored).not.toBeNull();
       expect(stored.medal).toBe(MedalTier.BRONZE);
       expect(stored.score).toBe(40000);
@@ -399,7 +406,7 @@ describe('Challenge System', () => {
       const state = freshState();
       acceptChallenge(state, 'challenge-penny-pincher');
       // Only complete the first objective.
-      state.challenges.active.objectives[0].completed = true;
+      state.challenges.active!.objectives[0].completed = true;
 
       const fs = makeFlightState({ rocketCost: 10000 });
       const result = processChallengeCompletion(state, fs, null);
@@ -426,15 +433,15 @@ describe('Challenge System', () => {
 
       // First attempt: bronze
       acceptChallenge(state, 'challenge-penny-pincher');
-      for (const obj of state.challenges.active.objectives) obj.completed = true;
+      for (const obj of state.challenges.active!.objectives) obj.completed = true;
       processChallengeCompletion(state, makeFlightState({ rocketCost: 40000 }), null);
 
       // Second attempt: still bronze
       acceptChallenge(state, 'challenge-penny-pincher');
-      for (const obj of state.challenges.active.objectives) obj.completed = true;
+      for (const obj of state.challenges.active!.objectives) obj.completed = true;
       processChallengeCompletion(state, makeFlightState({ rocketCost: 45000 }), null);
 
-      const stored = getChallengeResult(state, 'challenge-penny-pincher');
+      const stored = getChallengeResult(state, 'challenge-penny-pincher')!;
       expect(stored.attempts).toBe(2);
       // Original better score should be preserved.
       expect(stored.score).toBe(40000);
@@ -446,22 +453,22 @@ describe('Challenge System', () => {
 
       // First attempt: bronze (cost = 40000)
       acceptChallenge(state, 'challenge-penny-pincher');
-      for (const obj of state.challenges.active.objectives) obj.completed = true;
+      for (const obj of state.challenges.active!.objectives) obj.completed = true;
       const r1 = processChallengeCompletion(state, makeFlightState({ rocketCost: 40000 }), null);
       expect(r1.medal).toBe(MedalTier.BRONZE);
       const bronzeReward = r1.reward;
 
       // Second attempt: gold (cost = 10000)
       acceptChallenge(state, 'challenge-penny-pincher');
-      for (const obj of state.challenges.active.objectives) obj.completed = true;
+      for (const obj of state.challenges.active!.objectives) obj.completed = true;
       const r2 = processChallengeCompletion(state, makeFlightState({ rocketCost: 10000 }), null);
       expect(r2.medal).toBe(MedalTier.GOLD);
       expect(r2.isNewBest).toBe(true);
       // Reward should be the delta (gold - bronze reward).
       expect(r2.reward).toBeGreaterThan(0);
-      expect(r2.reward).toBeLessThan(CHALLENGES.find((c) => c.id === 'challenge-penny-pincher').rewards.gold);
+      expect(r2.reward).toBeLessThan(CHALLENGES.find((c) => c.id === 'challenge-penny-pincher')!.rewards.gold);
 
-      const stored = getChallengeResult(state, 'challenge-penny-pincher');
+      const stored = getChallengeResult(state, 'challenge-penny-pincher')!;
       expect(stored.medal).toBe(MedalTier.GOLD);
       expect(stored.score).toBe(10000);
     });
@@ -471,17 +478,17 @@ describe('Challenge System', () => {
 
       // First attempt: gold
       acceptChallenge(state, 'challenge-penny-pincher');
-      for (const obj of state.challenges.active.objectives) obj.completed = true;
+      for (const obj of state.challenges.active!.objectives) obj.completed = true;
       processChallengeCompletion(state, makeFlightState({ rocketCost: 10000 }), null);
 
       // Second attempt: bronze
       acceptChallenge(state, 'challenge-penny-pincher');
-      for (const obj of state.challenges.active.objectives) obj.completed = true;
+      for (const obj of state.challenges.active!.objectives) obj.completed = true;
       const r2 = processChallengeCompletion(state, makeFlightState({ rocketCost: 45000 }), null);
       expect(r2.isNewBest).toBe(false);
       expect(r2.reward).toBe(0);
 
-      const stored = getChallengeResult(state, 'challenge-penny-pincher');
+      const stored = getChallengeResult(state, 'challenge-penny-pincher')!;
       expect(stored.medal).toBe(MedalTier.GOLD);
       expect(stored.score).toBe(10000);
     });
