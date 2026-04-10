@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * vabTiers.test.js — Unit tests for VAB upgrade tiers (TASK-032).
  *
@@ -31,11 +30,14 @@ import {
   VAB_MAX_WIDTH,
 } from '../core/constants.ts';
 
+import type { GameState } from '../core/gameState.ts';
+import type { RocketAssembly, StagingConfig } from '../core/rocketbuilder.ts';
+
 // ---------------------------------------------------------------------------
 // Test helpers
 // ---------------------------------------------------------------------------
 
-function makeState(vabTier = 1) {
+function makeState(vabTier: number = 1): GameState {
   const state = createGameState();
   state.facilities[FacilityId.VAB] = { built: true, tier: vabTier };
   // Give launch pad tier 3 so mass limits don't interfere.
@@ -46,7 +48,7 @@ function makeState(vabTier = 1) {
 /**
  * Build a small passing rocket (probe + small tank + spark engine).
  */
-function makeSmallRocket() {
+function makeSmallRocket(): { assembly: RocketAssembly; staging: StagingConfig } {
   const assembly = createRocketAssembly();
   const staging = createStagingConfig();
 
@@ -67,7 +69,7 @@ function makeSmallRocket() {
  * Build a rocket with many parts to exceed part count limits.
  * Adds probe + engine + many fuel tanks connected in a chain.
  */
-function makeHighPartCountRocket(partCount) {
+function makeHighPartCountRocket(partCount: number): { assembly: RocketAssembly; staging: StagingConfig } {
   const assembly = createRocketAssembly();
   const staging = createStagingConfig();
 
@@ -139,7 +141,7 @@ describe('runValidation — VAB part count limit', () => {
     expect(assembly.parts.size).toBeGreaterThan(VAB_MAX_PARTS[1]);
     const partCheck = result.checks.find(c => c.id === 'vab-part-limit');
     expect(partCheck).toBeDefined();
-    expect(partCheck.pass).toBe(false);
+    expect(partCheck!.pass).toBe(false);
     expect(result.canLaunch).toBe(false);
   });
 
@@ -161,7 +163,7 @@ describe('runValidation — VAB part count limit', () => {
 
     const partCheck = result.checks.find(c => c.id === 'vab-part-limit');
     expect(partCheck).toBeDefined();
-    expect(partCheck.pass).toBe(false);
+    expect(partCheck!.pass).toBe(false);
   });
 
   it('passes any part count at Tier 3 (unlimited)', () => {
@@ -204,7 +206,7 @@ describe('runValidation — VAB height limit', () => {
     // If the rocket is tall enough, height check should fail.
     if (height > VAB_MAX_HEIGHT[1]) {
       expect(heightCheck).toBeDefined();
-      expect(heightCheck.pass).toBe(false);
+      expect(heightCheck!.pass).toBe(false);
     }
   });
 
@@ -263,7 +265,7 @@ describe('runValidation — VAB width limit', () => {
 
     if (width > VAB_MAX_WIDTH[1]) {
       expect(widthCheck).toBeDefined();
-      expect(widthCheck.pass).toBe(false);
+      expect(widthCheck!.pass).toBe(false);
     }
   });
 

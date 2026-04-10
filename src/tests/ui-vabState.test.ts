@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * ui-vabState.test.ts — Unit tests for VAB state management.
  *

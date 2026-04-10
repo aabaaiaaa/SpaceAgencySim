@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * undoRedo.test.js — Unit tests for VAB undo/redo stack.
  *
@@ -38,6 +37,7 @@ import {
   movePartBetweenStages,
   returnPartToUnstaged,
 } from '../core/rocketbuilder.ts';
+import type { PlacedPart } from '../core/rocketbuilder.ts';
 
 // ---------------------------------------------------------------------------
 // Setup
@@ -194,7 +194,7 @@ describe('Undo/Redo Stack — depth limit', () => {
     }
     // The oldest remaining action should be Action 5 (0-4 were dropped).
     // Undo all to check the last label.
-    let lastLabel = null;
+    let lastLabel: string | undefined | null = null;
     while (canUndo()) {
       lastLabel = undo()?.label;
     }
@@ -261,8 +261,8 @@ describe('Undo/Redo — part placement', () => {
     redo();
     expect(assembly.parts.size).toBe(1);
     expect(assembly.parts.has(id)).toBe(true);
-    expect(assembly.parts.get(id).x).toBe(0);
-    expect(assembly.parts.get(id).y).toBe(100);
+    expect(assembly.parts.get(id)!.x).toBe(0);
+    expect(assembly.parts.get(id)!.y).toBe(100);
   });
 });
 
@@ -281,7 +281,7 @@ describe('Undo/Redo — part deletion', () => {
     syncStagingWithAssembly(assembly, staging);
 
     // Capture state before deletion for undo.
-    const deletedPart = { ...assembly.parts.get(id2) };
+    const deletedPart: PlacedPart = { ...assembly.parts.get(id2)! };
     const deletedConns = assembly.connections
       .filter(c => c.fromInstanceId === id2 || c.toInstanceId === id2)
       .map(c => ({ ...c }));
@@ -324,7 +324,7 @@ describe('Undo/Redo — part deletion', () => {
     undo();
     expect(assembly.parts.size).toBe(2);
     expect(assembly.parts.has(id2)).toBe(true);
-    expect(assembly.parts.get(id2).partId).toBe('tank-small');
+    expect(assembly.parts.get(id2)!.partId).toBe('tank-small');
     expect(assembly.connections.length).toBe(1);
 
     // Redo the deletion.
@@ -365,16 +365,16 @@ describe('Undo/Redo — part movement', () => {
       },
     });
 
-    expect(assembly.parts.get(id).x).toBe(newX);
-    expect(assembly.parts.get(id).y).toBe(newY);
+    expect(assembly.parts.get(id)!.x).toBe(newX);
+    expect(assembly.parts.get(id)!.y).toBe(newY);
 
     undo();
-    expect(assembly.parts.get(id).x).toBe(oldX);
-    expect(assembly.parts.get(id).y).toBe(oldY);
+    expect(assembly.parts.get(id)!.x).toBe(oldX);
+    expect(assembly.parts.get(id)!.y).toBe(oldY);
 
     redo();
-    expect(assembly.parts.get(id).x).toBe(newX);
-    expect(assembly.parts.get(id).y).toBe(newY);
+    expect(assembly.parts.get(id)!.x).toBe(newX);
+    expect(assembly.parts.get(id)!.y).toBe(newY);
   });
 });
 
@@ -445,7 +445,7 @@ describe('Undo/Redo — staging changes', () => {
 describe('Undo/Redo — multiple operations', () => {
   it('undoes and redoes multiple actions in correct order', () => {
     const assembly = createRocketAssembly();
-    const ids = [];
+    const ids: string[] = [];
 
     // Place 3 parts.
     for (let i = 0; i < 3; i++) {
@@ -483,7 +483,7 @@ describe('Undo/Redo — multiple operations', () => {
   });
 
   it('new action in the middle clears redo stack', () => {
-    const log = [];
+    const log: string[] = [];
 
     pushUndoAction({ type: 'place', label: 'A', undo() { log.push('undo-A'); }, redo() { log.push('redo-A'); } });
     pushUndoAction({ type: 'place', label: 'B', undo() { log.push('undo-B'); }, redo() { log.push('redo-B'); } });

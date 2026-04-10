@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * ui-vabStaging.test.ts — Unit tests for VAB staging panel logic.
  *
@@ -9,14 +8,16 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { PartDef } from '../data/parts.ts';
+import type { RocketAssembly, StagingConfig } from '../core/rocketbuilder.ts';
 
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
 
 vi.mock('../data/parts.ts', () => ({
-  getPartById: vi.fn((id) => {
-    const catalog = {
+  getPartById: vi.fn((id: string) => {
+    const catalog: Record<string, Partial<PartDef>> = {
       'engine-1': {
         name: 'Merlin',
         mass: 500,
@@ -54,7 +55,7 @@ vi.mock('../data/parts.ts', () => ({
         properties: { thrust: 200, isp: 250, ispVac: 250, fuelMass: 500 },
       },
     };
-    return catalog[id] || null;
+    return catalog[id] ?? null;
   }),
 }));
 
@@ -70,7 +71,7 @@ vi.mock('../core/rocketbuilder.ts', () => ({
 }));
 
 vi.mock('../core/atmosphere.ts', () => ({
-  airDensity: vi.fn((alt) => {
+  airDensity: vi.fn((alt: number) => {
     // Simple exponential model for testing
     if (alt <= 0) return 1.225;
     if (alt >= 100000) return 0;
@@ -80,7 +81,7 @@ vi.mock('../core/atmosphere.ts', () => ({
 }));
 
 vi.mock('../ui/vab/_undoActions.ts', () => ({
-  snapshotStaging: vi.fn(() => ({
+  snapshotStaging: vi.fn((): StagingConfig => ({
     stages: [{ instanceIds: [] }],
     unstaged: [],
     currentStageIdx: 0,
@@ -88,15 +89,30 @@ vi.mock('../ui/vab/_undoActions.ts', () => ({
   recordStagingChange: vi.fn(),
 }));
 
+interface MockElement {
+  style: Record<string, string>;
+  className: string;
+  textContent: string;
+  innerHTML: string;
+  appendChild: ReturnType<typeof vi.fn>;
+  addEventListener: ReturnType<typeof vi.fn>;
+}
+
+interface MockDocument {
+  getElementById: ReturnType<typeof vi.fn>;
+  createElement: ReturnType<typeof vi.fn>;
+}
+
 // Stub document so renderStagingPanel() (which accesses document.getElementById)
 // doesn't crash in Node.js.
-vi.stubGlobal('document', {
+const mockDocument: MockDocument = {
   getElementById: vi.fn(() => null),
-  createElement: vi.fn(() => ({
+  createElement: vi.fn((): MockElement => ({
     style: {}, className: '', textContent: '', innerHTML: '',
     appendChild: vi.fn(), addEventListener: vi.fn(),
   })),
-});
+};
+vi.stubGlobal('document', mockDocument);
 
 import { setVabState, resetVabState } from '../ui/vab/_state.ts';
 import { syncStagingWithAssembly } from '../core/rocketbuilder.ts';
@@ -131,27 +147,25 @@ describe('VAB Staging', () => {
     });
 
     it('does nothing when stagingConfig is null', () => {
-      setVabState({
-        assembly: {
-          parts: new Map(),
-          connections: [],
-          symmetryPairs: [],
-          _nextId: 0,
-        },
-        stagingConfig: null,
-      });
-      syncAndRenderStaging();
-      expect(syncStagingWithAssembly).not.toHaveBeenCalled();
-    });
-
-    it('calls syncStagingWithAssembly when both assembly and staging exist', () => {
-      const assembly = {
+      const assembly: RocketAssembly = {
         parts: new Map(),
         connections: [],
         symmetryPairs: [],
         _nextId: 0,
       };
-      const staging = {
+      setVabState({ assembly, stagingConfig: null });
+      syncAndRenderStaging();
+      expect(syncStagingWithAssembly).not.toHaveBeenCalled();
+    });
+
+    it('calls syncStagingWithAssembly when both assembly and staging exist', () => {
+      const assembly: RocketAssembly = {
+        parts: new Map(),
+        connections: [],
+        symmetryPairs: [],
+        _nextId: 0,
+      };
+      const staging: StagingConfig = {
         stages: [{ instanceIds: [] }],
         unstaged: [],
         currentStageIdx: 0,
@@ -183,8 +197,8 @@ describe('VAB Staging', () => {
     });
 
     it('calls doZoomToFit when autoZoomEnabled is true', () => {
-      const assembly = { parts: new Map(), connections: [], symmetryPairs: [], _nextId: 0 };
-      const staging = { stages: [{ instanceIds: [] }], unstaged: [], currentStageIdx: 0 };
+      const assembly: RocketAssembly = { parts: new Map(), connections: [], symmetryPairs: [], _nextId: 0 };
+      const staging: StagingConfig = { stages: [{ instanceIds: [] }], unstaged: [], currentStageIdx: 0 };
 
       setVabState({ assembly, stagingConfig: staging, autoZoomEnabled: true });
 
@@ -202,8 +216,8 @@ describe('VAB Staging', () => {
     });
 
     it('does NOT call doZoomToFit when autoZoomEnabled is false', () => {
-      const assembly = { parts: new Map(), connections: [], symmetryPairs: [], _nextId: 0 };
-      const staging = { stages: [{ instanceIds: [] }], unstaged: [], currentStageIdx: 0 };
+      const assembly: RocketAssembly = { parts: new Map(), connections: [], symmetryPairs: [], _nextId: 0 };
+      const staging: StagingConfig = { stages: [{ instanceIds: [] }], unstaged: [], currentStageIdx: 0 };
 
       setVabState({ assembly, stagingConfig: staging, autoZoomEnabled: false });
 

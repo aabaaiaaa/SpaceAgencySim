@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * ui-vabUndoActions.test.ts — Unit tests for VAB undo action snapshot logic.
  *
@@ -7,14 +6,17 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { PartDef } from '../data/parts.ts';
+import type { PlacedPart, RocketAssembly, StagingConfig, PartConnection } from '../core/rocketbuilder.ts';
+import type { GameState } from '../core/gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
 
 vi.mock('../data/parts.ts', () => ({
-  getPartById: vi.fn((id) => {
-    const catalog = {
+  getPartById: vi.fn((id: string) => {
+    const catalog: Record<string, Partial<PartDef>> = {
       'engine-1': { name: 'Merlin', mass: 500, cost: 1000, type: 'ENGINE', properties: { thrust: 100 } },
       'tank-1': { name: 'Fuel Tank', mass: 200, cost: 500, type: 'FUEL_TANK', properties: { fuelMass: 800 } },
       'cmd-1': { name: 'Command Pod', mass: 100, cost: 2000, type: 'COMMAND_MODULE' },
@@ -35,8 +37,7 @@ import {
 } from '../ui/vab/_undoActions.ts';
 import { undo, redo, canUndo } from '../core/undoRedo.ts';
 
-/** Create a minimal RocketAssembly for testing. */
-function createTestAssembly(partsMap) {
+function createTestAssembly(partsMap: Map<string, PlacedPart> | Record<string, PlacedPart>): RocketAssembly {
   return {
     parts: partsMap instanceof Map ? partsMap : new Map(Object.entries(partsMap)),
     connections: [],
@@ -45,8 +46,7 @@ function createTestAssembly(partsMap) {
   };
 }
 
-/** Create a minimal StagingConfig for testing. */
-function createTestStaging(stages = [[]], unstaged = [], currentIdx = 0) {
+function createTestStaging(stages: string[][] = [[]], unstaged: string[] = [], currentIdx: number = 0): StagingConfig {
   return {
     stages: stages.map(ids => ({ instanceIds: [...ids] })),
     unstaged: [...unstaged],
@@ -166,7 +166,7 @@ describe('VAB Undo Actions', () => {
       const assembly = createTestAssembly(parts);
       assembly._nextId = 2;
       const staging = createTestStaging([['p1']], []);
-      const gameState = { money: 5000 };
+      const gameState = { money: 5000 } as unknown as GameState;
 
       setVabState({ assembly, stagingConfig: staging, gameState });
 
@@ -188,7 +188,7 @@ describe('VAB Undo Actions', () => {
       const assembly = createTestAssembly(parts);
       assembly._nextId = 2;
       const staging = createTestStaging([['p1']], []);
-      const gameState = { money: 5000 };
+      const gameState = { money: 5000 } as unknown as GameState;
 
       setVabState({ assembly, stagingConfig: staging, gameState });
 
@@ -211,7 +211,7 @@ describe('VAB Undo Actions', () => {
       ]);
       const assembly = createTestAssembly(parts);
       const staging = createTestStaging([['p1']], []);
-      const gameState = { money: 5000 };
+      const gameState = { money: 5000 } as unknown as GameState;
 
       setVabState({ assembly, stagingConfig: staging, gameState });
 
@@ -239,14 +239,14 @@ describe('VAB Undo Actions', () => {
 
       setVabState({ assembly, stagingConfig: createTestStaging() });
 
-      const oldConns = [];
-      const newConns = [];
+      const oldConns: PartConnection[] = [];
+      const newConns: PartConnection[] = [];
       recordMove('p1', 0, 0, 100, 200, oldConns, newConns);
 
       expect(canUndo()).toBe(true);
 
       undo();
-      const p = assembly.parts.get('p1');
+      const p = assembly.parts.get('p1')!;
       expect(p.x).toBe(0);
       expect(p.y).toBe(0);
     });
@@ -264,7 +264,7 @@ describe('VAB Undo Actions', () => {
       undo();
       redo();
 
-      const p = assembly.parts.get('p1');
+      const p = assembly.parts.get('p1')!;
       expect(p.x).toBe(100);
       expect(p.y).toBe(200);
     });
@@ -277,9 +277,9 @@ describe('VAB Undo Actions', () => {
         ['p2', { instanceId: 'p2', partId: 'tank-1', x: 0, y: 50 }],
       ]);
       const assembly = createTestAssembly(parts);
-      assembly.connections = [{ fromInstanceId: 'p1', toInstanceId: 'p2', fromNode: 'top', toNode: 'bottom' }];
+      assembly.connections = [{ fromInstanceId: 'p1', toInstanceId: 'p2', fromSnapIndex: 0, toSnapIndex: 0 }];
       const staging = createTestStaging([['p1', 'p2']], []);
-      const gameState = { money: 3000 };
+      const gameState = { money: 3000 } as unknown as GameState;
 
       setVabState({ assembly, stagingConfig: staging, gameState });
 
@@ -307,7 +307,7 @@ describe('VAB Undo Actions', () => {
       ]);
       const assembly = createTestAssembly(parts);
       const staging = createTestStaging([['p1']], []);
-      const gameState = { money: 3000 };
+      const gameState = { money: 3000 } as unknown as GameState;
 
       setVabState({ assembly, stagingConfig: staging, gameState });
 
