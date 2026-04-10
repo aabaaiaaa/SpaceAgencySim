@@ -52,12 +52,12 @@ export default defineConfig({
           functions: 91,
         },
         'src/render/**': {
-          lines: 50,
-          branches: 40,
+          lines: 55,
+          branches: 45,
         },
         'src/ui/**': {
           lines: 50,
-          branches: 40,
+          branches: 45,
         },
       },
     },

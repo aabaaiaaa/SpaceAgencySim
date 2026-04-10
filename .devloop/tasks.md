@@ -177,7 +177,7 @@ See `.devloop/requirements.md` for full context on each item.
 ## Coverage Escalation
 
 ### TASK-024: Configure Vitest coverage thresholds for render and UI layers
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-021, TASK-022
 - **Description**: Configure Vitest's `coverage.thresholds` in `vitest.config` to enforce new coverage floors: render layer (`src/render/`) >= 55%, UI layer (`src/ui/`) >= 45%. Run `npx vitest run --coverage` to check current state against the new thresholds. See requirements section 8.1.
 - **Verification**: `npx vitest run --coverage`
