@@ -1024,3 +1024,926 @@ test.describe('Asteroid Belt — transfer trajectory safety', () => {
     expect(afterClear.hasAsteroids).toBe(false);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 8. ASTEROID CAPTURE WITH GRABBING ARM
+// ═══════════════════════════════════════════════════════════════════════════
+
+test.describe('Asteroid Belt — asteroid capture with grabbing arm', () => {
+  /** @type {import('@playwright/test').Page} */
+  let page;
+
+  // Parts list includes the standard grabbing arm.
+  const GRAB_PROBE = ['probe-core-mk1', 'grabbing-arm', 'tank-small', 'engine-spark'];
+
+  test.beforeAll(async ({ browser }) => {
+    test.setTimeout(60_000);
+    page = await browser.newPage();
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    const envelope = orbitalFixture({
+      parts: [
+        ...['probe-core-mk1', 'tank-small', 'engine-spark', 'parachute-mk1',
+          'tank-medium', 'tank-large', 'engine-reliant', 'engine-poodle',
+          'engine-nerv', 'cmd-mk1', 'decoupler-stack-tr18',
+          'grabbing-arm', 'grabbing-arm-heavy', 'grabbing-arm-industrial'],
+      ],
+    });
+    await seedAndLoadSave(page, envelope);
+  });
+
+  test.afterAll(async () => { await page.close(); });
+
+  test('captureAsteroid succeeds when in range, velocity matched, and within mass limit @smoke', async () => {
+    await startTestFlight(page, GRAB_PROBE, { bodyId: 'SUN' });
+
+    // Teleport to orbit within the dense belt zone.
+    const denseMidpoint = 396_500_000_000;
+    await teleportCraft(page, {
+      posX: denseMidpoint,
+      posY: 0,
+      velX: 0,
+      velY: 18_300,
+      bodyId: 'SUN',
+      phase: 'ORBIT',
+    });
+
+    const result = await page.evaluate(async () => {
+      try {
+        const grabbing = await import('/src/core/grabbing.ts');
+        const physics = await import('/src/core/physics.ts');
+        const beltMod = await import('/src/core/asteroidBelt.ts');
+        const constants = await import('/src/core/constants.ts');
+
+        const ps = window.__flightPs;
+        const assembly = window.__flightAssembly;
+        if (!ps || !assembly) return null;
+
+        // Generate a small asteroid positioned right next to the craft.
+        const asteroids = beltMod.generateBeltAsteroids(
+          constants.BeltZone.DENSE, ps.posX, ps.posY, 50_000,
+        );
+        // Pick a small asteroid and position it within arm range with matched velocity.
+        const target = asteroids[0];
+        target.posX = ps.posX + 10;   // 10m away (within GRAB_ARM_RANGE of 25m)
+        target.posY = ps.posY;
+        target.velX = ps.velX + 0.3;  // 0.3 m/s relative (within GRAB_MAX_RELATIVE_SPEED of 1.0)
+        target.velY = ps.velY;
+        target.mass = 50_000;         // 50 tonnes — within standard arm's 100,000 limit
+
+        const grabState = grabbing.createGrabState();
+        const massBefore = ps.capturedAsteroidMass;
+
+        const captureResult = grabbing.captureAsteroid(grabState, target, ps, assembly);
+
+        // After capture, set the asteroid mass on physics state (caller responsibility).
+        if (captureResult.success) {
+          physics.setCapturedAsteroidMass(ps, target.mass);
+        }
+
+        return {
+          success: captureResult.success,
+          reason: captureResult.reason || null,
+          grabStateName: grabState.state,
+          grabbedAsteroidName: grabState.grabbedAsteroid?.name || null,
+          massBefore,
+          massAfter: ps.capturedAsteroidMass,
+          thrustAligned: ps.thrustAligned,
+        };
+      } catch (e) {
+        return { error: String(e) };
+      }
+    });
+
+    expect(result).not.toBeNull();
+    expect(result.error).toBeUndefined();
+    expect(result.success).toBe(true);
+    expect(result.grabStateName).toBe('GRABBED');
+    expect(result.grabbedAsteroidName).toBeTruthy();
+    expect(result.massBefore).toBe(0);
+    expect(result.massAfter).toBe(50_000);
+    // New capture always starts unaligned.
+    expect(result.thrustAligned).toBe(false);
+  });
+
+  test('captureAsteroid fails when relative speed is too high', async () => {
+    await startTestFlight(page, GRAB_PROBE, { bodyId: 'SUN' });
+    const denseMidpoint = 396_500_000_000;
+    await teleportCraft(page, {
+      posX: denseMidpoint, posY: 0, velX: 0, velY: 18_300,
+      bodyId: 'SUN', phase: 'ORBIT',
+    });
+
+    const result = await page.evaluate(async () => {
+      try {
+        const grabbing = await import('/src/core/grabbing.ts');
+        const beltMod = await import('/src/core/asteroidBelt.ts');
+        const constants = await import('/src/core/constants.ts');
+
+        const ps = window.__flightPs;
+        const assembly = window.__flightAssembly;
+        if (!ps || !assembly) return null;
+
+        const asteroids = beltMod.generateBeltAsteroids(
+          constants.BeltZone.DENSE, ps.posX, ps.posY, 50_000,
+        );
+        const target = asteroids[0];
+        target.posX = ps.posX + 10;
+        target.posY = ps.posY;
+        target.velX = ps.velX + 5;  // 5 m/s relative — exceeds 1.0 limit
+        target.velY = ps.velY;
+        target.mass = 50_000;
+
+        const grabState = grabbing.createGrabState();
+        return grabbing.captureAsteroid(grabState, target, ps, assembly);
+      } catch (e) {
+        return { error: String(e) };
+      }
+    });
+
+    expect(result).not.toBeNull();
+    expect(result.success).toBe(false);
+    expect(result.reason).toContain('Relative speed too high');
+  });
+
+  test('captureAsteroid fails when asteroid is out of range', async () => {
+    await startTestFlight(page, GRAB_PROBE, { bodyId: 'SUN' });
+    const denseMidpoint = 396_500_000_000;
+    await teleportCraft(page, {
+      posX: denseMidpoint, posY: 0, velX: 0, velY: 18_300,
+      bodyId: 'SUN', phase: 'ORBIT',
+    });
+
+    const result = await page.evaluate(async () => {
+      try {
+        const grabbing = await import('/src/core/grabbing.ts');
+        const beltMod = await import('/src/core/asteroidBelt.ts');
+        const constants = await import('/src/core/constants.ts');
+
+        const ps = window.__flightPs;
+        const assembly = window.__flightAssembly;
+        if (!ps || !assembly) return null;
+
+        const asteroids = beltMod.generateBeltAsteroids(
+          constants.BeltZone.DENSE, ps.posX, ps.posY, 50_000,
+        );
+        const target = asteroids[0];
+        target.posX = ps.posX + 100;  // 100m away — exceeds GRAB_ARM_RANGE 25m
+        target.posY = ps.posY;
+        target.velX = ps.velX;
+        target.velY = ps.velY;
+        target.mass = 50_000;
+
+        const grabState = grabbing.createGrabState();
+        return grabbing.captureAsteroid(grabState, target, ps, assembly);
+      } catch (e) {
+        return { error: String(e) };
+      }
+    });
+
+    expect(result).not.toBeNull();
+    expect(result.success).toBe(false);
+    expect(result.reason).toContain('out of range');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 9. THRUST ALIGNMENT AFTER CAPTURE
+// ═══════════════════════════════════════════════════════════════════════════
+
+test.describe('Asteroid Belt — thrust alignment after capture', () => {
+  /** @type {import('@playwright/test').Page} */
+  let page;
+
+  const GRAB_PROBE = ['probe-core-mk1', 'grabbing-arm', 'tank-small', 'engine-spark'];
+
+  test.beforeAll(async ({ browser }) => {
+    test.setTimeout(60_000);
+    page = await browser.newPage();
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    const envelope = orbitalFixture({
+      parts: [
+        'probe-core-mk1', 'tank-small', 'engine-spark',
+        'grabbing-arm', 'grabbing-arm-heavy', 'grabbing-arm-industrial',
+      ],
+    });
+    await seedAndLoadSave(page, envelope);
+  });
+
+  test.afterAll(async () => { await page.close(); });
+
+  test('alignThrustWithAsteroid succeeds after capture and sets thrustAligned @smoke', async () => {
+    await startTestFlight(page, GRAB_PROBE, { bodyId: 'SUN' });
+    const denseMidpoint = 396_500_000_000;
+    await teleportCraft(page, {
+      posX: denseMidpoint, posY: 0, velX: 0, velY: 18_300,
+      bodyId: 'SUN', phase: 'ORBIT',
+    });
+
+    const result = await page.evaluate(async () => {
+      try {
+        const grabbing = await import('/src/core/grabbing.ts');
+        const physics = await import('/src/core/physics.ts');
+        const beltMod = await import('/src/core/asteroidBelt.ts');
+        const constants = await import('/src/core/constants.ts');
+
+        const ps = window.__flightPs;
+        const assembly = window.__flightAssembly;
+        if (!ps || !assembly) return null;
+
+        // Set up: generate and capture an asteroid.
+        const asteroids = beltMod.generateBeltAsteroids(
+          constants.BeltZone.DENSE, ps.posX, ps.posY, 50_000,
+        );
+        const target = asteroids[0];
+        target.posX = ps.posX + 10;
+        target.posY = ps.posY;
+        target.velX = ps.velX;
+        target.velY = ps.velY;
+        target.mass = 80_000;
+
+        const grabState = grabbing.createGrabState();
+        const capture = grabbing.captureAsteroid(grabState, target, ps, assembly);
+        if (!capture.success) return { error: 'capture failed: ' + capture.reason };
+
+        physics.setCapturedAsteroidMass(ps, target.mass);
+
+        const alignedBefore = ps.thrustAligned;
+
+        // Align thrust.
+        const alignResult = grabbing.alignThrustWithAsteroid(grabState, ps);
+
+        return {
+          captureSuccess: capture.success,
+          alignSuccess: alignResult.success,
+          alignedBefore,
+          alignedAfter: ps.thrustAligned,
+          capturedMass: ps.capturedAsteroidMass,
+        };
+      } catch (e) {
+        return { error: String(e) };
+      }
+    });
+
+    expect(result).not.toBeNull();
+    expect(result.error).toBeUndefined();
+    expect(result.captureSuccess).toBe(true);
+    expect(result.alignedBefore).toBe(false);
+    expect(result.alignSuccess).toBe(true);
+    expect(result.alignedAfter).toBe(true);
+    expect(result.capturedMass).toBe(80_000);
+  });
+
+  test('alignThrustWithAsteroid fails when already aligned', async () => {
+    await startTestFlight(page, GRAB_PROBE, { bodyId: 'SUN' });
+    const denseMidpoint = 396_500_000_000;
+    await teleportCraft(page, {
+      posX: denseMidpoint, posY: 0, velX: 0, velY: 18_300,
+      bodyId: 'SUN', phase: 'ORBIT',
+    });
+
+    const result = await page.evaluate(async () => {
+      try {
+        const grabbing = await import('/src/core/grabbing.ts');
+        const physics = await import('/src/core/physics.ts');
+        const beltMod = await import('/src/core/asteroidBelt.ts');
+        const constants = await import('/src/core/constants.ts');
+
+        const ps = window.__flightPs;
+        const assembly = window.__flightAssembly;
+        if (!ps || !assembly) return null;
+
+        const asteroids = beltMod.generateBeltAsteroids(
+          constants.BeltZone.DENSE, ps.posX, ps.posY, 50_000,
+        );
+        const target = asteroids[0];
+        target.posX = ps.posX + 10;
+        target.posY = ps.posY;
+        target.velX = ps.velX;
+        target.velY = ps.velY;
+        target.mass = 40_000;
+
+        const grabState = grabbing.createGrabState();
+        grabbing.captureAsteroid(grabState, target, ps, assembly);
+        physics.setCapturedAsteroidMass(ps, target.mass);
+
+        // First align succeeds.
+        grabbing.alignThrustWithAsteroid(grabState, ps);
+
+        // Second align should fail (already aligned).
+        const secondAlign = grabbing.alignThrustWithAsteroid(grabState, ps);
+        return {
+          success: secondAlign.success,
+          reason: secondAlign.reason,
+        };
+      } catch (e) {
+        return { error: String(e) };
+      }
+    });
+
+    expect(result).not.toBeNull();
+    expect(result.success).toBe(false);
+    expect(result.reason).toContain('already aligned');
+  });
+
+  test('manual rotation breaks thrust alignment, re-align restores it', async () => {
+    await startTestFlight(page, GRAB_PROBE, { bodyId: 'SUN' });
+    const denseMidpoint = 396_500_000_000;
+    await teleportCraft(page, {
+      posX: denseMidpoint, posY: 0, velX: 0, velY: 18_300,
+      bodyId: 'SUN', phase: 'ORBIT',
+    });
+
+    const result = await page.evaluate(async () => {
+      try {
+        const grabbing = await import('/src/core/grabbing.ts');
+        const physics = await import('/src/core/physics.ts');
+        const beltMod = await import('/src/core/asteroidBelt.ts');
+        const constants = await import('/src/core/constants.ts');
+
+        const ps = window.__flightPs;
+        const assembly = window.__flightAssembly;
+        if (!ps || !assembly) return null;
+
+        const asteroids = beltMod.generateBeltAsteroids(
+          constants.BeltZone.DENSE, ps.posX, ps.posY, 50_000,
+        );
+        const target = asteroids[0];
+        target.posX = ps.posX + 10;
+        target.posY = ps.posY;
+        target.velX = ps.velX;
+        target.velY = ps.velY;
+        target.mass = 60_000;
+
+        const grabState = grabbing.createGrabState();
+        grabbing.captureAsteroid(grabState, target, ps, assembly);
+        physics.setCapturedAsteroidMass(ps, target.mass);
+
+        // Align thrust.
+        grabbing.alignThrustWithAsteroid(grabState, ps);
+        const alignedAfterFirst = ps.thrustAligned;
+
+        // Simulate manual rotation — breaks alignment.
+        grabbing.breakThrustAlignment(ps);
+        const alignedAfterRotation = ps.thrustAligned;
+
+        // Re-align.
+        const reAlignResult = grabbing.alignThrustWithAsteroid(grabState, ps);
+        const alignedAfterReAlign = ps.thrustAligned;
+
+        return {
+          alignedAfterFirst,
+          alignedAfterRotation,
+          reAlignSuccess: reAlignResult.success,
+          alignedAfterReAlign,
+        };
+      } catch (e) {
+        return { error: String(e) };
+      }
+    });
+
+    expect(result).not.toBeNull();
+    expect(result.error).toBeUndefined();
+    expect(result.alignedAfterFirst).toBe(true);
+    expect(result.alignedAfterRotation).toBe(false);
+    expect(result.reAlignSuccess).toBe(true);
+    expect(result.alignedAfterReAlign).toBe(true);
+  });
+
+  test('alignThrustWithAsteroid fails when no asteroid is grabbed', async () => {
+    await startTestFlight(page, GRAB_PROBE, { bodyId: 'SUN' });
+
+    const result = await page.evaluate(async () => {
+      try {
+        const grabbing = await import('/src/core/grabbing.ts');
+        const ps = window.__flightPs;
+        if (!ps) return null;
+
+        const grabState = grabbing.createGrabState();
+        return grabbing.alignThrustWithAsteroid(grabState, ps);
+      } catch (e) {
+        return { error: String(e) };
+      }
+    });
+
+    expect(result).not.toBeNull();
+    expect(result.success).toBe(false);
+    expect(result.reason).toContain('not grabbing');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 10. CAPTURED ASTEROID PERSISTENCE — RELEASE OUTSIDE BELT
+// ═══════════════════════════════════════════════════════════════════════════
+
+test.describe('Asteroid Belt — captured asteroid persistence', () => {
+  /** @type {import('@playwright/test').Page} */
+  let page;
+
+  const GRAB_PROBE = ['probe-core-mk1', 'grabbing-arm', 'tank-small', 'engine-spark'];
+
+  test.beforeAll(async ({ browser }) => {
+    test.setTimeout(60_000);
+    page = await browser.newPage();
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    const envelope = orbitalFixture({
+      parts: [
+        'probe-core-mk1', 'tank-small', 'engine-spark',
+        'grabbing-arm', 'grabbing-arm-heavy',
+      ],
+    });
+    await seedAndLoadSave(page, envelope);
+  });
+
+  test.afterAll(async () => { await page.close(); });
+
+  test('released asteroid persists as OrbitalObject when outside belt zones @smoke', async () => {
+    await startTestFlight(page, GRAB_PROBE, { bodyId: 'SUN' });
+
+    // Teleport to an orbit OUTSIDE all belt zones (200 billion m from Sun).
+    await teleportCraft(page, {
+      posX: 200_000_000_000,
+      posY: 0,
+      velX: 0,
+      velY: 25_800, // circular velocity outside belt
+      bodyId: 'SUN',
+      phase: 'ORBIT',
+    });
+
+    const result = await page.evaluate(async () => {
+      try {
+        const grabbing = await import('/src/core/grabbing.ts');
+        const physics = await import('/src/core/physics.ts');
+        const beltMod = await import('/src/core/asteroidBelt.ts');
+        const constants = await import('/src/core/constants.ts');
+
+        const ps = window.__flightPs;
+        const fs = window.__flightState;
+        const assembly = window.__flightAssembly;
+        const state = window.__gameState;
+        if (!ps || !fs || !assembly || !state) return null;
+
+        // Update flightState altitude to match position.
+        fs.altitude = Math.hypot(ps.posX, ps.posY);
+        fs.timeElapsed = 1000;
+
+        // Create an asteroid close by and capture it.
+        const asteroids = beltMod.generateBeltAsteroids(
+          constants.BeltZone.OUTER_A, ps.posX, ps.posY, 50_000,
+        );
+        const target = asteroids[0];
+        target.posX = ps.posX + 10;
+        target.posY = ps.posY;
+        target.velX = ps.velX;
+        target.velY = ps.velY;
+        target.mass = 30_000;
+        target.radius = 15;
+
+        const grabState = grabbing.createGrabState();
+        const capture = grabbing.captureAsteroid(grabState, target, ps, assembly);
+        if (!capture.success) return { error: 'capture failed: ' + capture.reason };
+
+        physics.setCapturedAsteroidMass(ps, target.mass);
+
+        // Release the asteroid.
+        const release = grabbing.releaseGrabbedAsteroid(grabState);
+        if (!release.success || !release.asteroid) return { error: 'release failed' };
+
+        physics.clearCapturedAsteroidMass(ps);
+
+        // Count orbital objects before persist.
+        const countBefore = state.orbitalObjects.length;
+
+        // Persist — outside belt zone, should create an OrbitalObject.
+        const persist = grabbing.persistReleasedAsteroid(
+          release.asteroid, ps, fs, state,
+        );
+
+        const countAfter = state.orbitalObjects.length;
+
+        // Find the newly persisted object.
+        const persisted = persist.orbitalObject;
+
+        return {
+          releaseSuccess: release.success,
+          persisted: persist.persisted,
+          countBefore,
+          countAfter,
+          newObject: persisted ? {
+            id: persisted.id,
+            type: persisted.type,
+            bodyId: persisted.bodyId,
+            name: persisted.name,
+            hasElements: !!persisted.elements,
+            radius: persisted.radius,
+            mass: persisted.mass,
+          } : null,
+        };
+      } catch (e) {
+        return { error: String(e) };
+      }
+    });
+
+    expect(result).not.toBeNull();
+    expect(result.error).toBeUndefined();
+    expect(result.releaseSuccess).toBe(true);
+    expect(result.persisted).toBe(true);
+    expect(result.countAfter).toBe(result.countBefore + 1);
+    expect(result.newObject).not.toBeNull();
+    expect(result.newObject.type).toBe('asteroid');
+    expect(result.newObject.bodyId).toBe('SUN');
+    expect(result.newObject.hasElements).toBe(true);
+    expect(result.newObject.radius).toBe(15);
+    expect(result.newObject.mass).toBe(30_000);
+    expect(result.newObject.name).toBeTruthy();
+  });
+
+  test('released asteroid does NOT persist when inside a belt zone', async () => {
+    await startTestFlight(page, GRAB_PROBE, { bodyId: 'SUN' });
+
+    // Teleport INSIDE the dense belt zone.
+    const denseMidpoint = 396_500_000_000;
+    await teleportCraft(page, {
+      posX: denseMidpoint, posY: 0, velX: 0, velY: 18_300,
+      bodyId: 'SUN', phase: 'ORBIT',
+    });
+
+    const result = await page.evaluate(async () => {
+      try {
+        const grabbing = await import('/src/core/grabbing.ts');
+        const physics = await import('/src/core/physics.ts');
+        const beltMod = await import('/src/core/asteroidBelt.ts');
+        const constants = await import('/src/core/constants.ts');
+
+        const ps = window.__flightPs;
+        const fs = window.__flightState;
+        const assembly = window.__flightAssembly;
+        const state = window.__gameState;
+        if (!ps || !fs || !assembly || !state) return null;
+
+        // Set altitude to dense belt midpoint.
+        fs.altitude = Math.hypot(ps.posX, ps.posY);
+        fs.timeElapsed = 2000;
+
+        const asteroids = beltMod.generateBeltAsteroids(
+          constants.BeltZone.DENSE, ps.posX, ps.posY, 50_000,
+        );
+        const target = asteroids[0];
+        target.posX = ps.posX + 10;
+        target.posY = ps.posY;
+        target.velX = ps.velX;
+        target.velY = ps.velY;
+        target.mass = 20_000;
+
+        const grabState = grabbing.createGrabState();
+        grabbing.captureAsteroid(grabState, target, ps, assembly);
+        physics.setCapturedAsteroidMass(ps, target.mass);
+
+        const release = grabbing.releaseGrabbedAsteroid(grabState);
+        if (!release.success || !release.asteroid) return { error: 'release failed' };
+
+        physics.clearCapturedAsteroidMass(ps);
+
+        const countBefore = state.orbitalObjects.length;
+        const persist = grabbing.persistReleasedAsteroid(
+          release.asteroid, ps, fs, state,
+        );
+        const countAfter = state.orbitalObjects.length;
+
+        return {
+          persisted: persist.persisted,
+          countBefore,
+          countAfter,
+        };
+      } catch (e) {
+        return { error: String(e) };
+      }
+    });
+
+    expect(result).not.toBeNull();
+    expect(result.error).toBeUndefined();
+    expect(result.persisted).toBe(false);
+    expect(result.countAfter).toBe(result.countBefore);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 11. ASTEROID RENAME
+// ═══════════════════════════════════════════════════════════════════════════
+
+test.describe('Asteroid Belt — asteroid rename', () => {
+  /** @type {import('@playwright/test').Page} */
+  let page;
+
+  const GRAB_PROBE = ['probe-core-mk1', 'grabbing-arm', 'tank-small', 'engine-spark'];
+
+  test.beforeAll(async ({ browser }) => {
+    test.setTimeout(60_000);
+    page = await browser.newPage();
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    const envelope = orbitalFixture({
+      parts: [
+        'probe-core-mk1', 'tank-small', 'engine-spark', 'grabbing-arm',
+      ],
+    });
+    await seedAndLoadSave(page, envelope);
+  });
+
+  test.afterAll(async () => { await page.close(); });
+
+  test('persistent asteroid can be renamed via orbitalObjects mutation', async () => {
+    await startTestFlight(page, GRAB_PROBE, { bodyId: 'SUN' });
+
+    // Teleport outside belt zones.
+    await teleportCraft(page, {
+      posX: 200_000_000_000, posY: 0, velX: 0, velY: 25_800,
+      bodyId: 'SUN', phase: 'ORBIT',
+    });
+
+    const result = await page.evaluate(async () => {
+      try {
+        const grabbing = await import('/src/core/grabbing.ts');
+        const physics = await import('/src/core/physics.ts');
+        const beltMod = await import('/src/core/asteroidBelt.ts');
+        const constants = await import('/src/core/constants.ts');
+
+        const ps = window.__flightPs;
+        const fs = window.__flightState;
+        const assembly = window.__flightAssembly;
+        const state = window.__gameState;
+        if (!ps || !fs || !assembly || !state) return null;
+
+        fs.altitude = Math.hypot(ps.posX, ps.posY);
+        fs.timeElapsed = 3000;
+
+        // Generate, capture, release, and persist an asteroid.
+        const asteroids = beltMod.generateBeltAsteroids(
+          constants.BeltZone.OUTER_A, ps.posX, ps.posY, 50_000,
+        );
+        const target = asteroids[0];
+        target.posX = ps.posX + 10;
+        target.posY = ps.posY;
+        target.velX = ps.velX;
+        target.velY = ps.velY;
+        target.mass = 5_000;
+        target.radius = 8;
+
+        const grabState = grabbing.createGrabState();
+        grabbing.captureAsteroid(grabState, target, ps, assembly);
+        physics.setCapturedAsteroidMass(ps, target.mass);
+        const release = grabbing.releaseGrabbedAsteroid(grabState);
+        physics.clearCapturedAsteroidMass(ps);
+
+        const persist = grabbing.persistReleasedAsteroid(
+          release.asteroid, ps, fs, state,
+        );
+        if (!persist.persisted || !persist.orbitalObject) return { error: 'persist failed' };
+
+        const originalName = persist.orbitalObject.name;
+
+        // Rename the asteroid in orbitalObjects.
+        const obj = state.orbitalObjects.find(o => o.id === persist.orbitalObject.id);
+        if (!obj) return { error: 'object not found in state' };
+
+        obj.name = 'My Custom Asteroid';
+
+        // Re-read to verify the rename took effect.
+        const renamedObj = state.orbitalObjects.find(o => o.id === persist.orbitalObject.id);
+
+        return {
+          originalName,
+          renamedName: renamedObj?.name,
+          matchesAST: /^AST-\d{4}$/.test(originalName),
+        };
+      } catch (e) {
+        return { error: String(e) };
+      }
+    });
+
+    expect(result).not.toBeNull();
+    expect(result.error).toBeUndefined();
+    // Original name should be auto-generated AST-XXXX format.
+    expect(result.matchesAST).toBe(true);
+    // Renamed name should be the custom one.
+    expect(result.renamedName).toBe('My Custom Asteroid');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 12. GRABBING ARM TIER MASS LIMIT ENFORCEMENT
+// ═══════════════════════════════════════════════════════════════════════════
+
+test.describe('Asteroid Belt — grabbing arm tier mass limits', () => {
+  /** @type {import('@playwright/test').Page} */
+  let page;
+
+  test.beforeAll(async ({ browser }) => {
+    test.setTimeout(60_000);
+    page = await browser.newPage();
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    const envelope = orbitalFixture({
+      parts: [
+        'probe-core-mk1', 'tank-small', 'engine-spark',
+        'grabbing-arm', 'grabbing-arm-heavy', 'grabbing-arm-industrial',
+      ],
+    });
+    await seedAndLoadSave(page, envelope);
+  });
+
+  test.afterAll(async () => { await page.close(); });
+
+  test('standard arm rejects asteroid exceeding 100,000 kg mass limit @smoke', async () => {
+    // Use only the standard grabbing arm (100,000 kg limit).
+    const LIGHT_PROBE = ['probe-core-mk1', 'grabbing-arm', 'tank-small', 'engine-spark'];
+    await startTestFlight(page, LIGHT_PROBE, { bodyId: 'SUN' });
+
+    const denseMidpoint = 396_500_000_000;
+    await teleportCraft(page, {
+      posX: denseMidpoint, posY: 0, velX: 0, velY: 18_300,
+      bodyId: 'SUN', phase: 'ORBIT',
+    });
+
+    const result = await page.evaluate(async () => {
+      try {
+        const grabbing = await import('/src/core/grabbing.ts');
+        const beltMod = await import('/src/core/asteroidBelt.ts');
+        const constants = await import('/src/core/constants.ts');
+
+        const ps = window.__flightPs;
+        const assembly = window.__flightAssembly;
+        if (!ps || !assembly) return null;
+
+        const asteroids = beltMod.generateBeltAsteroids(
+          constants.BeltZone.DENSE, ps.posX, ps.posY, 50_000,
+        );
+        const target = asteroids[0];
+        target.posX = ps.posX + 10;
+        target.posY = ps.posY;
+        target.velX = ps.velX;
+        target.velY = ps.velY;
+        target.mass = 200_000; // 200 tonnes — exceeds standard arm's 100,000 limit
+
+        const grabState = grabbing.createGrabState();
+        return grabbing.captureAsteroid(grabState, target, ps, assembly);
+      } catch (e) {
+        return { error: String(e) };
+      }
+    });
+
+    expect(result).not.toBeNull();
+    expect(result.success).toBe(false);
+    expect(result.reason).toContain('too massive');
+  });
+
+  test('heavy arm accepts asteroid within its 100M kg limit', async () => {
+    const HEAVY_PROBE = ['probe-core-mk1', 'grabbing-arm-heavy', 'tank-small', 'engine-spark'];
+    await startTestFlight(page, HEAVY_PROBE, { bodyId: 'SUN' });
+
+    const denseMidpoint = 396_500_000_000;
+    await teleportCraft(page, {
+      posX: denseMidpoint, posY: 0, velX: 0, velY: 18_300,
+      bodyId: 'SUN', phase: 'ORBIT',
+    });
+
+    const result = await page.evaluate(async () => {
+      try {
+        const grabbing = await import('/src/core/grabbing.ts');
+        const beltMod = await import('/src/core/asteroidBelt.ts');
+        const constants = await import('/src/core/constants.ts');
+
+        const ps = window.__flightPs;
+        const assembly = window.__flightAssembly;
+        if (!ps || !assembly) return null;
+
+        const asteroids = beltMod.generateBeltAsteroids(
+          constants.BeltZone.DENSE, ps.posX, ps.posY, 50_000,
+        );
+        const target = asteroids[0];
+        target.posX = ps.posX + 10;
+        target.posY = ps.posY;
+        target.velX = ps.velX;
+        target.velY = ps.velY;
+        target.mass = 50_000_000; // 50M kg — within heavy arm's 100M limit
+
+        const grabState = grabbing.createGrabState();
+        return grabbing.captureAsteroid(grabState, target, ps, assembly);
+      } catch (e) {
+        return { error: String(e) };
+      }
+    });
+
+    expect(result).not.toBeNull();
+    expect(result.success).toBe(true);
+  });
+
+  test('heavy arm rejects asteroid exceeding 100M kg limit', async () => {
+    const HEAVY_PROBE = ['probe-core-mk1', 'grabbing-arm-heavy', 'tank-small', 'engine-spark'];
+    await startTestFlight(page, HEAVY_PROBE, { bodyId: 'SUN' });
+
+    const denseMidpoint = 396_500_000_000;
+    await teleportCraft(page, {
+      posX: denseMidpoint, posY: 0, velX: 0, velY: 18_300,
+      bodyId: 'SUN', phase: 'ORBIT',
+    });
+
+    const result = await page.evaluate(async () => {
+      try {
+        const grabbing = await import('/src/core/grabbing.ts');
+        const beltMod = await import('/src/core/asteroidBelt.ts');
+        const constants = await import('/src/core/constants.ts');
+
+        const ps = window.__flightPs;
+        const assembly = window.__flightAssembly;
+        if (!ps || !assembly) return null;
+
+        const asteroids = beltMod.generateBeltAsteroids(
+          constants.BeltZone.DENSE, ps.posX, ps.posY, 50_000,
+        );
+        const target = asteroids[0];
+        target.posX = ps.posX + 10;
+        target.posY = ps.posY;
+        target.velX = ps.velX;
+        target.velY = ps.velY;
+        target.mass = 500_000_000; // 500M kg — exceeds heavy arm's 100M limit
+
+        const grabState = grabbing.createGrabState();
+        return grabbing.captureAsteroid(grabState, target, ps, assembly);
+      } catch (e) {
+        return { error: String(e) };
+      }
+    });
+
+    expect(result).not.toBeNull();
+    expect(result.success).toBe(false);
+    expect(result.reason).toContain('too massive');
+  });
+
+  test('industrial arm accepts very large asteroids within its 2T kg limit', async () => {
+    const INDUSTRIAL_PROBE = ['probe-core-mk1', 'grabbing-arm-industrial', 'tank-small', 'engine-spark'];
+    await startTestFlight(page, INDUSTRIAL_PROBE, { bodyId: 'SUN' });
+
+    const denseMidpoint = 396_500_000_000;
+    await teleportCraft(page, {
+      posX: denseMidpoint, posY: 0, velX: 0, velY: 18_300,
+      bodyId: 'SUN', phase: 'ORBIT',
+    });
+
+    const result = await page.evaluate(async () => {
+      try {
+        const grabbing = await import('/src/core/grabbing.ts');
+        const beltMod = await import('/src/core/asteroidBelt.ts');
+        const constants = await import('/src/core/constants.ts');
+
+        const ps = window.__flightPs;
+        const assembly = window.__flightAssembly;
+        if (!ps || !assembly) return null;
+
+        const asteroids = beltMod.generateBeltAsteroids(
+          constants.BeltZone.DENSE, ps.posX, ps.posY, 50_000,
+        );
+        const target = asteroids[0];
+        target.posX = ps.posX + 10;
+        target.posY = ps.posY;
+        target.velX = ps.velX;
+        target.velY = ps.velY;
+        target.mass = 1_000_000_000_000; // 1T kg — within industrial arm's 2T limit
+
+        const grabState = grabbing.createGrabState();
+        return grabbing.captureAsteroid(grabState, target, ps, assembly);
+      } catch (e) {
+        return { error: String(e) };
+      }
+    });
+
+    expect(result).not.toBeNull();
+    expect(result.success).toBe(true);
+  });
+
+  test('arm tier mass limits match part definitions', async () => {
+    // Verify the mass limits from parts catalog match expectations.
+    const limits = await page.evaluate(async () => {
+      try {
+        const parts = await import('/src/data/parts.ts');
+        const light = parts.getPartById('grabbing-arm');
+        const heavy = parts.getPartById('grabbing-arm-heavy');
+        const industrial = parts.getPartById('grabbing-arm-industrial');
+
+        return {
+          light: light?.properties?.maxCaptureMass ?? null,
+          heavy: heavy?.properties?.maxCaptureMass ?? null,
+          industrial: industrial?.properties?.maxCaptureMass ?? null,
+        };
+      } catch (e) {
+        return { error: String(e) };
+      }
+    });
+
+    expect(limits).not.toBeNull();
+    expect(limits.error).toBeUndefined();
+    expect(limits.light).toBe(100_000);
+    expect(limits.heavy).toBe(100_000_000);
+    expect(limits.industrial).toBe(2_000_000_000_000);
+    // Each tier should have a strictly higher limit than the previous.
+    expect(limits.heavy).toBeGreaterThan(limits.light);
+    expect(limits.industrial).toBeGreaterThan(limits.heavy);
+  });
+});

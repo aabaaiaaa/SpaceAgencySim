@@ -215,7 +215,7 @@ All tasks reference `.devloop/requirements.md` for full context.
 - **Verification**: `npx playwright test e2e/asteroid-belt.spec.js` passes.
 
 ### TASK-033: E2E — Asteroid capture, alignment, persistence, and arm tiers
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-027, TASK-028, TASK-029
 - **Description**: Add E2E tests to `e2e/asteroid-belt.spec.js` covering: capture with grabbing arm (approach, match velocity, capture, mass change), thrust alignment action, captured asteroid persistence when released outside belt, asteroid rename, and arm tier mass limit enforcement (attempt capture with too-small arm). See requirements §6.2.
 - **Verification**: `npx playwright test e2e/asteroid-belt.spec.js` passes.
