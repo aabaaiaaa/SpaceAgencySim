@@ -1,10 +1,11 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import {
   VP_W, VP_H, STARTING_MONEY,
   CENTRE_X, CANVAS_CENTRE_Y,
   buildSaveEnvelope, seedAndLoadSave, navigateToVab,
   dragPartToCanvas, placePart, dismissWelcomeModal,
 } from './helpers.js';
+import type { SaveEnvelopeParams } from './helpers.js';
 
 /**
  * E2E — Rocket Builder Flow
@@ -19,7 +20,7 @@ const CMD_COST    = 8_000;
 const TANK_COST   = 800;
 const ENGINE_COST = 6_000;
 
-const ALL_VAB_PARTS = [
+const ALL_VAB_PARTS: string[] = [
   'cmd-mk1', 'probe-core-mk1', 'tank-small', 'tank-medium', 'tank-large',
   'engine-spark', 'engine-reliant', 'engine-poodle', 'engine-nerv',
   'srb-small', 'srb-large', 'parachute-mk1', 'parachute-mk2',
@@ -29,7 +30,7 @@ const ALL_VAB_PARTS = [
   'satellite-gps', 'satellite-relay', 'docking-port-std', 'docking-port-small',
 ];
 
-async function seedAndOpenVab(page, opts = {}) {
+async function seedAndOpenVab(page: Page, opts: SaveEnvelopeParams = {}): Promise<void> {
   await page.setViewportSize({ width: VP_W, height: VP_H });
   const envelope = buildSaveEnvelope({ gameMode: 'freeplay', parts: ALL_VAB_PARTS, ...opts });
   await seedAndLoadSave(page, envelope);
@@ -37,7 +38,7 @@ async function seedAndOpenVab(page, opts = {}) {
   await navigateToVab(page);
 }
 
-async function buildThreePartRocket(page) {
+async function buildThreePartRocket(page: Page): Promise<void> {
   await placePart(page, 'cmd-mk1', CENTRE_X, CMD_DROP_Y, 1);
   await placePart(page, 'tank-small', CENTRE_X, TANK_DROP_Y, 2);
   await placePart(page, 'engine-spark', CENTRE_X, ENGINE_DROP_Y, 3);
@@ -53,9 +54,9 @@ test.describe('VAB — Rocket Builder Flow', () => {
 
     const headers = list.locator('.vab-parts-group-hdr');
     const headerTexts = await headers.allTextContents();
-    expect(headerTexts.some(h => /command modules/i.test(h))).toBe(true);
-    expect(headerTexts.some(h => /engines/i.test(h))).toBe(true);
-    expect(headerTexts.some(h => /fuel tanks/i.test(h))).toBe(true);
+    expect(headerTexts.some((h: string) => /command modules/i.test(h))).toBe(true);
+    expect(headerTexts.some((h: string) => /engines/i.test(h))).toBe(true);
+    expect(headerTexts.some((h: string) => /fuel tanks/i.test(h))).toBe(true);
 
     await expect(page.locator('.vab-part-card[data-part-id="cmd-mk1"]')).toBeVisible();
     await expect(page.locator('.vab-part-card[data-part-id="engine-spark"]')).toBeVisible();

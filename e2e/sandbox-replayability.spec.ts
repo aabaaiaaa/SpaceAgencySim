@@ -10,7 +10,7 @@
  *    financial pressure, crew injury duration — changeable from hub, not on save slots)
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page, type Browser } from '@playwright/test';
 import {
   VP_W, VP_H,
   buildSaveEnvelope,
@@ -29,13 +29,85 @@ import {
   freshStartFixture,
 } from './fixtures.js';
 
+// ---------------------------------------------------------------------------
+// Local type aliases for game state accessed via page.evaluate()
+// ---------------------------------------------------------------------------
+
+/** Loosely-typed game state shape for page.evaluate() return values. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type GameState = Record<string, any>;
+
+/** Shape of a challenge objective. */
+interface ChallengeObjective {
+  id: string;
+  type: string;
+  target: Record<string, unknown>;
+  completed: boolean;
+  description?: string;
+}
+
+/** Shape of medal tiers. */
+interface MedalTiers {
+  bronze: number;
+  silver: number;
+  gold: number;
+}
+
+/** Shape of a challenge in game state. */
+interface ChallengeSnapshot {
+  id: string;
+  custom?: boolean;
+  title: string;
+  description?: string;
+  briefing?: string;
+  objectives: ChallengeObjective[];
+  scoreMetric: string;
+  scoreLabel: string;
+  scoreUnit: string;
+  scoreDirection: string;
+  medals: MedalTiers;
+  rewards: MedalTiers;
+  requiredMissions: string[];
+}
+
+/** Shape of a challenge result. */
+interface ChallengeResult {
+  medal: string;
+  score: number;
+  attempts: number;
+}
+
+/** Shape of difficulty settings in game state. */
+interface DifficultySettings {
+  malfunctionFrequency: string;
+  weatherSeverity: string;
+  financialPressure: string;
+  injuryDuration: string;
+}
+
+/** Shape of sandbox settings in game state. */
+interface SandboxSettings {
+  malfunctionsEnabled: boolean;
+  weatherEnabled: boolean;
+}
+
+/**
+ * Browser-context window shape for page.evaluate() callbacks.
+ * Defined as a local interface (not `declare global`) to avoid conflicting
+ * with the narrower Window augmentations in the helper modules. Inside
+ * evaluate callbacks we cast: `const w = window as unknown as GameWindow;`
+ */
+interface GameWindow {
+  __gameState?: GameState;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // Shared helpers
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /** Build and load a sandbox save envelope on a fresh page. */
-async function setupSandboxPage(browser) {
-  const page = await browser.newPage();
+async function setupSandboxPage(browser: Browser): Promise<Page> {
+  const page: Page = await browser.newPage();
   await page.setViewportSize({ width: VP_W, height: VP_H });
 
   const envelope = buildSaveEnvelope({
@@ -61,8 +133,8 @@ async function setupSandboxPage(browser) {
 }
 
 /** Build and load a challenge-ready orbital fixture on a fresh page. */
-async function setupChallengePage(browser) {
-  const page = await browser.newPage();
+async function setupChallengePage(browser: Browser): Promise<Page> {
+  const page: Page = await browser.newPage();
   await page.setViewportSize({ width: VP_W, height: VP_H });
 
   const envelope = orbitalFixture({
@@ -83,8 +155,8 @@ async function setupChallengePage(browser) {
 }
 
 /** Build and load a custom mission creator fixture on a fresh page. */
-async function setupCustomMissionPage(browser) {
-  const page = await browser.newPage();
+async function setupCustomMissionPage(browser: Browser): Promise<Page> {
+  const page: Page = await browser.newPage();
   await page.setViewportSize({ width: VP_W, height: VP_H });
 
   const envelope = orbitalFixture({
@@ -102,8 +174,8 @@ async function setupCustomMissionPage(browser) {
 }
 
 /** Build and load a settings test fixture on a fresh page. */
-async function setupSettingsPage(browser) {
-  const page = await browser.newPage();
+async function setupSettingsPage(browser: Browser): Promise<Page> {
+  const page: Page = await browser.newPage();
   await page.setViewportSize({ width: VP_W, height: VP_H });
 
   const envelope = buildSaveEnvelope({
@@ -136,9 +208,9 @@ test.describe('Sandbox mode', () => {
 
   test('sandbox save has unlimited money and all parts unlocked', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupSandboxPage(browser);
+    const page: Page = await setupSandboxPage(browser);
 
-    const gs = await getGameState(page);
+    const gs: GameState = await getGameState(page);
 
     expect(gs.money).toBe(999_999_999);
     expect(gs.gameMode).toBe('sandbox');
@@ -150,10 +222,10 @@ test.describe('Sandbox mode', () => {
 
   test('sandbox save has all facilities built', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupSandboxPage(browser);
+    const page: Page = await setupSandboxPage(browser);
 
-    const gs = await getGameState(page);
-    const facilityIds = [
+    const gs: GameState = await getGameState(page);
+    const facilityIds: string[] = [
       'launch-pad', 'vab', 'mission-control', 'crew-admin',
       'tracking-station', 'rd-lab', 'satellite-ops', 'library',
     ];
@@ -166,9 +238,9 @@ test.describe('Sandbox mode', () => {
 
   test('sandbox malfunction toggle stored in state', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupSandboxPage(browser);
+    const page: Page = await setupSandboxPage(browser);
 
-    const gs = await getGameState(page);
+    const gs: GameState = await getGameState(page);
     expect(gs.sandboxSettings).toBeTruthy();
     expect(gs.sandboxSettings.malfunctionsEnabled).toBe(false);
     expect(gs.sandboxSettings.weatherEnabled).toBe(false);
@@ -178,7 +250,7 @@ test.describe('Sandbox mode', () => {
 
   test('sandbox flight works with malfunctions disabled', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupSandboxPage(browser);
+    const page: Page = await setupSandboxPage(browser);
 
     await startTestFlight(page,
       ['probe-core-mk1', 'tank-small', 'engine-spark'],
@@ -220,9 +292,9 @@ test.describe('Sandbox mode', () => {
 
   test('sandbox and career can share design library via state', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupSandboxPage(browser);
+    const page: Page = await setupSandboxPage(browser);
 
-    const gs = await getGameState(page);
+    const gs: GameState = await getGameState(page);
     // Design library is stored globally (savedDesigns field).
     // Both sandbox and career games read/write to the same underlying storage.
     expect(Array.isArray(gs.savedDesigns)).toBe(true);
@@ -239,7 +311,7 @@ test.describe('Challenge missions', () => {
 
   test('challenges tab displays unlocked challenges in Mission Control', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupChallengePage(browser);
+    const page: Page = await setupChallengePage(browser);
 
     // Open mission control
     await page.click('[data-building-id="mission-control"]');
@@ -250,7 +322,7 @@ test.describe('Challenge missions', () => {
     await page.waitForSelector('.mc-challenge-grid', { state: 'visible', timeout: 5_000 });
 
     // Should show challenge cards
-    const cards = await page.locator('.mc-challenge-card').count();
+    const cards: number = await page.locator('.mc-challenge-card').count();
     expect(cards).toBeGreaterThan(0);
 
     await page.close();
@@ -258,7 +330,7 @@ test.describe('Challenge missions', () => {
 
   test('challenge card shows objectives, medal thresholds, and scoring info', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupChallengePage(browser);
+    const page: Page = await setupChallengePage(browser);
 
     await page.click('[data-building-id="mission-control"]');
     await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
@@ -269,11 +341,11 @@ test.describe('Challenge missions', () => {
     await expect(firstCard).toBeVisible();
 
     // Objectives list
-    const objectives = await firstCard.locator('.mc-challenge-obj-item').count();
+    const objectives: number = await firstCard.locator('.mc-challenge-obj-item').count();
     expect(objectives).toBeGreaterThan(0);
 
     // Medal thresholds row
-    const medalTiers = await firstCard.locator('.mc-medal-tier').count();
+    const medalTiers: number = await firstCard.locator('.mc-medal-tier').count();
     expect(medalTiers).toBe(3); // Bronze, Silver, Gold
 
     await page.close();
@@ -281,7 +353,7 @@ test.describe('Challenge missions', () => {
 
   test('accept challenge stores it in state.challenges.active', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupChallengePage(browser);
+    const page: Page = await setupChallengePage(browser);
 
     await page.click('[data-building-id="mission-control"]');
     await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
@@ -294,7 +366,7 @@ test.describe('Challenge missions', () => {
     await acceptBtn.click();
 
     // Verify state
-    const gs = await getGameState(page);
+    const gs: GameState = await getGameState(page);
     expect(gs.challenges).toBeTruthy();
     expect(gs.challenges.active).toBeTruthy();
     expect(gs.challenges.active.id).toBeTruthy();
@@ -305,7 +377,7 @@ test.describe('Challenge missions', () => {
 
   test('active challenge shows Active badge and Abandon button', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupChallengePage(browser);
+    const page: Page = await setupChallengePage(browser);
 
     await page.click('[data-building-id="mission-control"]');
     await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
@@ -327,7 +399,7 @@ test.describe('Challenge missions', () => {
 
   test('abandon challenge clears active slot', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupChallengePage(browser);
+    const page: Page = await setupChallengePage(browser);
 
     await page.click('[data-building-id="mission-control"]');
     await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
@@ -342,7 +414,7 @@ test.describe('Challenge missions', () => {
     const activeCard = page.locator('.mc-challenge-card.active-challenge');
     await activeCard.locator('.mc-challenge-abandon-btn').click();
 
-    const gs = await getGameState(page);
+    const gs: GameState = await getGameState(page);
     expect(gs.challenges.active).toBeNull();
 
     await page.close();
@@ -350,12 +422,13 @@ test.describe('Challenge missions', () => {
 
   test('challenge scoring and medal award via core API', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupChallengePage(browser);
+    const page: Page = await setupChallengePage(browser);
 
     // Test challenge completion via direct state manipulation.
     // Accept the Sky High challenge (challenge-sky-high) which scores on maxAltitude.
     const result = await page.evaluate(() => {
-      const state = window.__gameState;
+      const w = window as unknown as GameWindow;
+      const state = w.__gameState!;
 
       // Import won't work in page context — use the challenge functions directly.
       // Accept Sky High challenge.
@@ -379,7 +452,9 @@ test.describe('Challenge missions', () => {
       };
 
       // Simulate a score of 300,000 m (should earn silver)
-      const allObjsMet = state.challenges.active.objectives.every(o => o.completed);
+      const allObjsMet: boolean = state.challenges.active.objectives.every(
+        (o: Record<string, unknown>) => o.completed,
+      );
       const score = 300_000;
 
       // Determine medal
@@ -396,7 +471,11 @@ test.describe('Challenge missions', () => {
         allObjsMet,
         medal,
         score,
-        result: state.challenges.results['challenge-sky-high'],
+        result: state.challenges.results['challenge-sky-high'] as {
+          medal: string;
+          score: number;
+          attempts: number;
+        },
       };
     });
 
@@ -410,11 +489,12 @@ test.describe('Challenge missions', () => {
 
   test('replaying challenge shows Replay button and increments attempts', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupChallengePage(browser);
+    const page: Page = await setupChallengePage(browser);
 
     // Inject a challenge result so the card shows "Replay" and best-score info
     await page.evaluate(() => {
-      const state = window.__gameState;
+      const w = window as unknown as GameWindow;
+      const state = w.__gameState!;
       if (!state.challenges) state.challenges = { active: null, results: {} };
       state.challenges.results['challenge-sky-high'] = { medal: 'silver', score: 300_000, attempts: 1 };
     });
@@ -428,29 +508,31 @@ test.describe('Challenge missions', () => {
     await page.waitForSelector('.mc-challenge-grid', { state: 'visible', timeout: 5_000 });
 
     // The challenge with a result should show "Replay" instead of "Accept"
-    const gs = await getGameState(page);
-    const hasResult = Object.keys(gs.challenges.results).length > 0;
+    const gs: GameState = await getGameState(page);
+    const hasResult: boolean = Object.keys(gs.challenges.results).length > 0;
     expect(hasResult).toBe(true);
 
     // Find a card with best score info
     const bestInfo = page.locator('.mc-challenge-best');
-    const count = await bestInfo.count();
+    const count: number = await bestInfo.count();
     expect(count).toBeGreaterThan(0);
 
     // Click replay
-    const challengeId = Object.keys(gs.challenges.results)[0];
-    await page.evaluate((cid) => {
-      const state = window.__gameState;
+    const challengeId: string = Object.keys(gs.challenges.results)[0];
+    await page.evaluate((cid: string) => {
+      const w = window as unknown as GameWindow;
+      const state = w.__gameState!;
       // Simulate replaying and getting a better score (gold)
-      const prev = state.challenges.results[cid];
+      const prev = state.challenges.results[cid] as
+        { medal: string; score: number; attempts?: number } | undefined;
       state.challenges.results[cid] = {
         medal: 'gold',
         score: 600_000,
-        attempts: (prev?.attempts ?? 0) + 1,
+        attempts: ((prev?.attempts as number) ?? 0) + 1,
       };
     }, challengeId);
 
-    const gs2 = await getGameState(page);
+    const gs2: GameState = await getGameState(page);
     expect(gs2.challenges.results[challengeId].attempts).toBe(2);
     expect(gs2.challenges.results[challengeId].medal).toBe('gold');
 
@@ -459,7 +541,7 @@ test.describe('Challenge missions', () => {
 
   test('close Mission Control and return to hub', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupChallengePage(browser);
+    const page: Page = await setupChallengePage(browser);
 
     await page.click('[data-building-id="mission-control"]');
     await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
@@ -479,10 +561,11 @@ test.describe('Custom mission creator', () => {
 
   test('custom challenge creation via core API', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupCustomMissionPage(browser);
+    const page: Page = await setupCustomMissionPage(browser);
 
     const result = await page.evaluate(() => {
-      const state = window.__gameState;
+      const w = window as unknown as GameWindow;
+      const state = w.__gameState!;
       if (!Array.isArray(state.customChallenges)) {
         state.customChallenges = [];
       }
@@ -503,11 +586,11 @@ test.describe('Custom mission creator', () => {
         scoreDirection: 'lower',
         medals: { bronze: 50000, silver: 30000, gold: 15000 },
         rewards: { bronze: 10000, silver: 25000, gold: 50000 },
-        requiredMissions: [],
+        requiredMissions: [] as string[],
       };
 
       state.customChallenges.push(challenge);
-      return { id: challenge.id, count: state.customChallenges.length };
+      return { id: challenge.id, count: state.customChallenges.length as number };
     });
 
     expect(result.count).toBe(1);
@@ -518,11 +601,12 @@ test.describe('Custom mission creator', () => {
 
   test('custom challenge appears in Challenges tab with custom badge', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupCustomMissionPage(browser);
+    const page: Page = await setupCustomMissionPage(browser);
 
     // Inject a custom challenge so it appears in the UI
     await page.evaluate(() => {
-      const state = window.__gameState;
+      const w = window as unknown as GameWindow;
+      const state = w.__gameState!;
       if (!Array.isArray(state.customChallenges)) {
         state.customChallenges = [];
       }
@@ -541,7 +625,7 @@ test.describe('Custom mission creator', () => {
         scoreDirection: 'higher',
         medals: { bronze: 2000, silver: 5000, gold: 10000 },
         rewards: { bronze: 5000, silver: 10000, gold: 20000 },
-        requiredMissions: [],
+        requiredMissions: [] as string[],
       });
     });
 
@@ -561,11 +645,12 @@ test.describe('Custom mission creator', () => {
 
   test('custom challenge has Export and Delete buttons', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupCustomMissionPage(browser);
+    const page: Page = await setupCustomMissionPage(browser);
 
     // Inject a custom challenge
     await page.evaluate(() => {
-      const state = window.__gameState;
+      const w = window as unknown as GameWindow;
+      const state = w.__gameState!;
       if (!Array.isArray(state.customChallenges)) {
         state.customChallenges = [];
       }
@@ -584,7 +669,7 @@ test.describe('Custom mission creator', () => {
         scoreDirection: 'higher',
         medals: { bronze: 1000, silver: 3000, gold: 5000 },
         rewards: { bronze: 5000, silver: 10000, gold: 20000 },
-        requiredMissions: [],
+        requiredMissions: [] as string[],
       });
     });
 
@@ -602,7 +687,7 @@ test.describe('Custom mission creator', () => {
 
   test('objective type selection available in creator form', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupCustomMissionPage(browser);
+    const page: Page = await setupCustomMissionPage(browser);
 
     await page.click('[data-building-id="mission-control"]');
     await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
@@ -619,7 +704,7 @@ test.describe('Custom mission creator', () => {
     await expect(typeSelect).toBeVisible();
 
     // Verify objective type options are present
-    const options = await typeSelect.locator('option').allInnerTexts();
+    const options: string[] = await typeSelect.locator('option').allInnerTexts();
     expect(options.length).toBeGreaterThan(5);
     expect(options).toContain('Reach Altitude');
     expect(options).toContain('Safe Landing');
@@ -630,7 +715,7 @@ test.describe('Custom mission creator', () => {
 
   test('creator form has medal threshold and reward inputs', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupCustomMissionPage(browser);
+    const page: Page = await setupCustomMissionPage(browser);
 
     await page.click('[data-building-id="mission-control"]');
     await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
@@ -657,7 +742,7 @@ test.describe('Custom mission creator', () => {
 
   test('creator form has score metric selector', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupCustomMissionPage(browser);
+    const page: Page = await setupCustomMissionPage(browser);
 
     await page.click('[data-building-id="mission-control"]');
     await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
@@ -672,7 +757,7 @@ test.describe('Custom mission creator', () => {
     const metricSelect = page.locator('#cc-metric');
     await expect(metricSelect).toBeVisible();
 
-    const options = await metricSelect.locator('option').allInnerTexts();
+    const options: string[] = await metricSelect.locator('option').allInnerTexts();
     expect(options.length).toBe(8); // 8 score metric options
 
     await page.close();
@@ -680,7 +765,7 @@ test.describe('Custom mission creator', () => {
 
   test('creating a custom challenge via the form adds it to state', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupCustomMissionPage(browser);
+    const page: Page = await setupCustomMissionPage(browser);
 
     await page.click('[data-building-id="mission-control"]');
     await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
@@ -720,8 +805,10 @@ test.describe('Custom mission creator', () => {
     );
 
     // Verify custom challenge was added to state
-    const gs = await getGameState(page);
-    const formChallenge = gs.customChallenges.find(c => c.title === 'E2E Form Challenge');
+    const gs: GameState = await getGameState(page);
+    const formChallenge = gs.customChallenges.find(
+      (c: Record<string, unknown>) => c.title === 'E2E Form Challenge',
+    );
     expect(formChallenge).toBeTruthy();
     expect(formChallenge.custom).toBe(true);
     expect(formChallenge.objectives.length).toBe(1);
@@ -734,11 +821,12 @@ test.describe('Custom mission creator', () => {
 
   test('export custom challenge produces valid JSON', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupCustomMissionPage(browser);
+    const page: Page = await setupCustomMissionPage(browser);
 
     // Inject a custom challenge to export
     await page.evaluate(() => {
-      const state = window.__gameState;
+      const w = window as unknown as GameWindow;
+      const state = w.__gameState!;
       if (!Array.isArray(state.customChallenges)) {
         state.customChallenges = [];
       }
@@ -757,23 +845,29 @@ test.describe('Custom mission creator', () => {
         scoreDirection: 'higher',
         medals: { bronze: 5000, silver: 10000, gold: 20000 },
         rewards: { bronze: 5000, silver: 10000, gold: 20000 },
-        requiredMissions: [],
+        requiredMissions: [] as string[],
       });
     });
 
     const json = await page.evaluate(() => {
-      const state = window.__gameState;
-      const ch = state.customChallenges[0];
+      const w = window as unknown as GameWindow;
+      const state = w.__gameState!;
+      const ch = state.customChallenges[0] as Record<string, unknown> | undefined;
       if (!ch) return null;
 
       // Replicate the export logic
+      const objectives = ch.objectives as {
+        type: string;
+        target: Record<string, unknown>;
+        description: string;
+      }[];
       const exportData = {
         _format: 'SpaceAgencySim-CustomChallenge',
         _version: 1,
         title: ch.title,
         description: ch.description,
         briefing: ch.briefing,
-        objectives: ch.objectives.map(obj => ({
+        objectives: objectives.map((obj) => ({
           type: obj.type,
           target: { ...obj.target },
           description: obj.description,
@@ -782,28 +876,28 @@ test.describe('Custom mission creator', () => {
         scoreLabel: ch.scoreLabel,
         scoreUnit: ch.scoreUnit,
         scoreDirection: ch.scoreDirection,
-        medals: { ...ch.medals },
-        rewards: { ...ch.rewards },
+        medals: { ...(ch.medals as Record<string, number>) },
+        rewards: { ...(ch.rewards as Record<string, number>) },
       };
       return JSON.stringify(exportData, null, 2);
     });
 
     expect(json).toBeTruthy();
-    const parsed = JSON.parse(json);
+    const parsed: Record<string, unknown> = JSON.parse(json!);
     expect(parsed._format).toBe('SpaceAgencySim-CustomChallenge');
     expect(parsed._version).toBe(1);
     expect(parsed.title).toBeTruthy();
     expect(Array.isArray(parsed.objectives)).toBe(true);
-    expect(parsed.objectives.length).toBeGreaterThan(0);
+    expect((parsed.objectives as unknown[]).length).toBeGreaterThan(0);
 
     await page.close();
   });
 
   test('import custom challenge from JSON adds it to state', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupCustomMissionPage(browser);
+    const page: Page = await setupCustomMissionPage(browser);
 
-    const importJson = JSON.stringify({
+    const importJson: string = JSON.stringify({
       _format: 'SpaceAgencySim-CustomChallenge',
       _version: 1,
       title: 'Imported Test Challenge',
@@ -820,43 +914,49 @@ test.describe('Custom mission creator', () => {
       rewards: { bronze: 5000, silver: 10000, gold: 20000 },
     });
 
-    const result = await page.evaluate((jsonStr) => {
-      const state = window.__gameState;
+    const result = await page.evaluate((jsonStr: string) => {
+      const w = window as unknown as GameWindow;
+      const state = w.__gameState!;
       if (!Array.isArray(state.customChallenges)) {
         state.customChallenges = [];
       }
 
-      let data;
+      let data: Record<string, unknown>;
       try {
-        data = JSON.parse(jsonStr);
-      } catch (e) {
-        return { success: false, error: e.message };
+        data = JSON.parse(jsonStr) as Record<string, unknown>;
+      } catch (e: unknown) {
+        return { success: false, error: (e as Error).message };
       }
 
       if (data._format !== 'SpaceAgencySim-CustomChallenge') {
         return { success: false, error: 'Wrong format' };
       }
 
+      const objectives = data.objectives as {
+        type: string;
+        target: Record<string, unknown>;
+        description?: string;
+      }[];
       const challenge = {
         id: 'custom-import-' + Date.now(),
         custom: true,
-        title: data.title,
-        description: data.description || '',
-        briefing: data.briefing || '',
-        objectives: data.objectives.map((obj, i) => ({
+        title: data.title as string,
+        description: (data.description as string) || '',
+        briefing: (data.briefing as string) || '',
+        objectives: objectives.map((obj, i: number) => ({
           id: `custom-obj-${i}`,
           type: obj.type,
           target: { ...obj.target },
           completed: false,
           description: obj.description || obj.type,
         })),
-        scoreMetric: data.scoreMetric,
-        scoreLabel: data.scoreLabel || data.scoreMetric,
-        scoreUnit: data.scoreUnit || '',
-        scoreDirection: data.scoreDirection || 'lower',
-        medals: data.medals || { bronze: 0, silver: 0, gold: 0 },
-        rewards: data.rewards || { bronze: 0, silver: 0, gold: 0 },
-        requiredMissions: [],
+        scoreMetric: data.scoreMetric as string,
+        scoreLabel: (data.scoreLabel as string) || (data.scoreMetric as string),
+        scoreUnit: (data.scoreUnit as string) || '',
+        scoreDirection: (data.scoreDirection as string) || 'lower',
+        medals: (data.medals as Record<string, number>) || { bronze: 0, silver: 0, gold: 0 },
+        rewards: (data.rewards as Record<string, number>) || { bronze: 0, silver: 0, gold: 0 },
+        requiredMissions: [] as string[],
       };
 
       state.customChallenges.push(challenge);
@@ -866,8 +966,10 @@ test.describe('Custom mission creator', () => {
     expect(result.success).toBe(true);
     expect(result.title).toBe('Imported Test Challenge');
 
-    const gs = await getGameState(page);
-    const imported = gs.customChallenges.find(c => c.title === 'Imported Test Challenge');
+    const gs: GameState = await getGameState(page);
+    const imported = gs.customChallenges.find(
+      (c: Record<string, unknown>) => c.title === 'Imported Test Challenge',
+    );
     expect(imported).toBeTruthy();
     expect(imported.scoreMetric).toBe('maxAltitude');
     expect(imported.scoreDirection).toBe('higher');
@@ -877,11 +979,12 @@ test.describe('Custom mission creator', () => {
 
   test('delete custom challenge removes it from state', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupCustomMissionPage(browser);
+    const page: Page = await setupCustomMissionPage(browser);
 
     // Inject two custom challenges
     await page.evaluate(() => {
-      const state = window.__gameState;
+      const w = window as unknown as GameWindow;
+      const state = w.__gameState!;
       if (!Array.isArray(state.customChallenges)) {
         state.customChallenges = [];
       }
@@ -896,7 +999,7 @@ test.describe('Custom mission creator', () => {
           scoreMetric: 'maxAltitude', scoreLabel: 'Alt', scoreUnit: 'm', scoreDirection: 'higher',
           medals: { bronze: 200, silver: 500, gold: 1000 },
           rewards: { bronze: 1000, silver: 2000, gold: 5000 },
-          requiredMissions: [],
+          requiredMissions: [] as string[],
         },
         {
           id: 'custom-delete-2',
@@ -908,28 +1011,29 @@ test.describe('Custom mission creator', () => {
           scoreMetric: 'maxAltitude', scoreLabel: 'Alt', scoreUnit: 'm', scoreDirection: 'higher',
           medals: { bronze: 400, silver: 800, gold: 1500 },
           rewards: { bronze: 1000, silver: 2000, gold: 5000 },
-          requiredMissions: [],
+          requiredMissions: [] as string[],
         },
       );
     });
 
-    const before = await getGameState(page);
-    const countBefore = before.customChallenges.length;
+    const before: GameState = await getGameState(page);
+    const countBefore: number = before.customChallenges.length;
     expect(countBefore).toBeGreaterThan(0);
 
     // Delete the first custom challenge via state
     await page.evaluate(() => {
-      const state = window.__gameState;
+      const w = window as unknown as GameWindow;
+      const state = w.__gameState!;
       if (state.customChallenges.length > 0) {
-        const removed = state.customChallenges.shift();
+        const removed = state.customChallenges.shift() as Record<string, unknown>;
         // Also clear from results if present
-        if (state.challenges?.results?.[removed.id]) {
-          delete state.challenges.results[removed.id];
+        if (state.challenges?.results?.[removed.id as string]) {
+          delete state.challenges.results[removed.id as string];
         }
       }
     });
 
-    const after = await getGameState(page);
+    const after: GameState = await getGameState(page);
     expect(after.customChallenges.length).toBe(countBefore - 1);
 
     await page.close();
@@ -937,7 +1041,7 @@ test.describe('Custom mission creator', () => {
 
   test('close Mission Control', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupCustomMissionPage(browser);
+    const page: Page = await setupCustomMissionPage(browser);
 
     await page.click('[data-building-id="mission-control"]');
     await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
@@ -957,7 +1061,7 @@ test.describe('Game settings — difficulty options', () => {
 
   test('settings button is visible in hamburger menu', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupSettingsPage(browser);
+    const page: Page = await setupSettingsPage(browser);
 
     await page.click('#topbar-menu-btn');
     const settingsBtn = page.locator('#hub-settings-btn');
@@ -970,7 +1074,7 @@ test.describe('Game settings — difficulty options', () => {
 
   test('clicking settings opens settings panel', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupSettingsPage(browser);
+    const page: Page = await setupSettingsPage(browser);
 
     await openSettingsPanel(page);
     await page.waitForSelector('#settings-panel', { state: 'visible', timeout: 5_000 });
@@ -984,17 +1088,17 @@ test.describe('Game settings — difficulty options', () => {
 
   test('settings panel shows all four difficulty categories', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupSettingsPage(browser);
+    const page: Page = await setupSettingsPage(browser);
 
     await openSettingsPanel(page);
     await page.waitForSelector('#settings-panel', { state: 'visible', timeout: 5_000 });
 
     const groups = page.locator('.settings-group');
-    const count = await groups.count();
+    const count: number = await groups.count();
     expect(count).toBe(7);
 
     // Verify labels
-    const labels = await page.locator('.settings-group-label').allInnerTexts();
+    const labels: string[] = await page.locator('.settings-group-label').allInnerTexts();
     expect(labels).toContain('Malfunction Frequency');
     expect(labels).toContain('Weather Severity');
     expect(labels).toContain('Financial Pressure');
@@ -1007,7 +1111,7 @@ test.describe('Game settings — difficulty options', () => {
 
   test('Normal is selected by default for all settings', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupSettingsPage(browser);
+    const page: Page = await setupSettingsPage(browser);
 
     await openSettingsPanel(page);
     await page.waitForSelector('#settings-panel', { state: 'visible', timeout: 5_000 });
@@ -1016,11 +1120,11 @@ test.describe('Game settings — difficulty options', () => {
     // The Auto-Save group defaults to "On" (not "Normal").
     // The Debug Mode group defaults to "Off".
     const groups = page.locator('.settings-group');
-    const count = await groups.count();
+    const count: number = await groups.count();
     for (let i = 0; i < count; i++) {
       const group = groups.nth(i);
       const activeBtn = group.locator('.settings-option-btn.active');
-      const text = await activeBtn.innerText();
+      const text: string = await activeBtn.innerText();
       expect(['Normal', 'On', 'Off']).toContain(text);
     }
 
@@ -1029,14 +1133,14 @@ test.describe('Game settings — difficulty options', () => {
 
   test('changing malfunction frequency to Off updates state', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupSettingsPage(browser);
+    const page: Page = await setupSettingsPage(browser);
 
     await openSettingsPanel(page);
     await page.waitForSelector('#settings-panel', { state: 'visible', timeout: 5_000 });
 
     await page.click('.settings-option-btn[data-setting="malfunctionFrequency"][data-value="off"]');
 
-    const gs = await getGameState(page);
+    const gs: GameState = await getGameState(page);
     expect(gs.difficultySettings.malfunctionFrequency).toBe('off');
 
     // Verify the Off button is now active
@@ -1048,14 +1152,14 @@ test.describe('Game settings — difficulty options', () => {
 
   test('changing malfunction frequency to High updates state', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupSettingsPage(browser);
+    const page: Page = await setupSettingsPage(browser);
 
     await openSettingsPanel(page);
     await page.waitForSelector('#settings-panel', { state: 'visible', timeout: 5_000 });
 
     await page.click('.settings-option-btn[data-setting="malfunctionFrequency"][data-value="high"]');
 
-    const gs = await getGameState(page);
+    const gs: GameState = await getGameState(page);
     expect(gs.difficultySettings.malfunctionFrequency).toBe('high');
 
     await page.close();
@@ -1063,14 +1167,14 @@ test.describe('Game settings — difficulty options', () => {
 
   test('changing weather severity to Off updates state', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupSettingsPage(browser);
+    const page: Page = await setupSettingsPage(browser);
 
     await openSettingsPanel(page);
     await page.waitForSelector('#settings-panel', { state: 'visible', timeout: 5_000 });
 
     await page.click('.settings-option-btn[data-setting="weatherSeverity"][data-value="off"]');
 
-    const gs = await getGameState(page);
+    const gs: GameState = await getGameState(page);
     expect(gs.difficultySettings.weatherSeverity).toBe('off');
 
     await page.close();
@@ -1078,14 +1182,14 @@ test.describe('Game settings — difficulty options', () => {
 
   test('changing weather severity to Extreme updates state', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupSettingsPage(browser);
+    const page: Page = await setupSettingsPage(browser);
 
     await openSettingsPanel(page);
     await page.waitForSelector('#settings-panel', { state: 'visible', timeout: 5_000 });
 
     await page.click('.settings-option-btn[data-setting="weatherSeverity"][data-value="extreme"]');
 
-    const gs = await getGameState(page);
+    const gs: GameState = await getGameState(page);
     expect(gs.difficultySettings.weatherSeverity).toBe('extreme');
 
     await page.close();
@@ -1093,14 +1197,14 @@ test.describe('Game settings — difficulty options', () => {
 
   test('changing financial pressure to Easy updates state', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupSettingsPage(browser);
+    const page: Page = await setupSettingsPage(browser);
 
     await openSettingsPanel(page);
     await page.waitForSelector('#settings-panel', { state: 'visible', timeout: 5_000 });
 
     await page.click('.settings-option-btn[data-setting="financialPressure"][data-value="easy"]');
 
-    const gs = await getGameState(page);
+    const gs: GameState = await getGameState(page);
     expect(gs.difficultySettings.financialPressure).toBe('easy');
 
     await page.close();
@@ -1108,14 +1212,14 @@ test.describe('Game settings — difficulty options', () => {
 
   test('changing financial pressure to Hard updates state', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupSettingsPage(browser);
+    const page: Page = await setupSettingsPage(browser);
 
     await openSettingsPanel(page);
     await page.waitForSelector('#settings-panel', { state: 'visible', timeout: 5_000 });
 
     await page.click('.settings-option-btn[data-setting="financialPressure"][data-value="hard"]');
 
-    const gs = await getGameState(page);
+    const gs: GameState = await getGameState(page);
     expect(gs.difficultySettings.financialPressure).toBe('hard');
 
     await page.close();
@@ -1123,14 +1227,14 @@ test.describe('Game settings — difficulty options', () => {
 
   test('changing crew injury duration to Short updates state', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupSettingsPage(browser);
+    const page: Page = await setupSettingsPage(browser);
 
     await openSettingsPanel(page);
     await page.waitForSelector('#settings-panel', { state: 'visible', timeout: 5_000 });
 
     await page.click('.settings-option-btn[data-setting="injuryDuration"][data-value="short"]');
 
-    const gs = await getGameState(page);
+    const gs: GameState = await getGameState(page);
     expect(gs.difficultySettings.injuryDuration).toBe('short');
 
     await page.close();
@@ -1138,14 +1242,14 @@ test.describe('Game settings — difficulty options', () => {
 
   test('changing crew injury duration to Long updates state', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupSettingsPage(browser);
+    const page: Page = await setupSettingsPage(browser);
 
     await openSettingsPanel(page);
     await page.waitForSelector('#settings-panel', { state: 'visible', timeout: 5_000 });
 
     await page.click('.settings-option-btn[data-setting="injuryDuration"][data-value="long"]');
 
-    const gs = await getGameState(page);
+    const gs: GameState = await getGameState(page);
     expect(gs.difficultySettings.injuryDuration).toBe('long');
 
     await page.close();
@@ -1153,7 +1257,7 @@ test.describe('Game settings — difficulty options', () => {
 
   test('settings changes take effect immediately (no restart needed)', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupSettingsPage(browser);
+    const page: Page = await setupSettingsPage(browser);
 
     await openSettingsPanel(page);
     await page.waitForSelector('#settings-panel', { state: 'visible', timeout: 5_000 });
@@ -1164,7 +1268,7 @@ test.describe('Game settings — difficulty options', () => {
     await page.click('.settings-option-btn[data-setting="financialPressure"][data-value="easy"]');
     await page.click('.settings-option-btn[data-setting="injuryDuration"][data-value="short"]');
 
-    const gs = await getGameState(page);
+    const gs: GameState = await getGameState(page);
     expect(gs.difficultySettings.malfunctionFrequency).toBe('low');
     expect(gs.difficultySettings.weatherSeverity).toBe('mild');
     expect(gs.difficultySettings.financialPressure).toBe('easy');
@@ -1175,7 +1279,7 @@ test.describe('Game settings — difficulty options', () => {
 
   test('back to hub button closes settings panel', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupSettingsPage(browser);
+    const page: Page = await setupSettingsPage(browser);
 
     await openSettingsPanel(page);
     await page.waitForSelector('#settings-panel', { state: 'visible', timeout: 5_000 });
@@ -1189,7 +1293,7 @@ test.describe('Game settings — difficulty options', () => {
 
   test('settings panel can be reopened with values persisted', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupSettingsPage(browser);
+    const page: Page = await setupSettingsPage(browser);
 
     // Open settings, change values, close, reopen
     await openSettingsPanel(page);
@@ -1225,7 +1329,7 @@ test.describe('Game settings — difficulty options', () => {
 
   test('save slot summary does NOT contain difficulty settings', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await setupSettingsPage(browser);
+    const page: Page = await setupSettingsPage(browser);
 
     // Save the game and check that the slot summary has no difficulty settings.
     // The summary object from saveload.js only includes: saveName, agencyName,
@@ -1233,21 +1337,26 @@ test.describe('Game settings — difficulty options', () => {
     // crewCount, crewKIA, playTimeSeconds, flightTimeSeconds, gameMode.
     // NOT difficultySettings.
     const summaryKeys = await page.evaluate(() => {
-      const gs = window.__gameState;
+      const w = window as unknown as GameWindow;
+      const gs = w.__gameState!;
       // Build what the summary would look like
-      const summary = {
+      const summary: Record<string, unknown> = {
         saveName: 'test',
-        agencyName: gs.agencyName,
+        agencyName: gs.agencyName as string,
         timestamp: new Date().toISOString(),
-        missionsCompleted: gs.missions?.completed?.length ?? 0,
-        money: gs.money,
-        acceptedMissionCount: gs.missions?.accepted?.length ?? 0,
-        totalFlights: gs.flightHistory?.length ?? 0,
-        crewCount: (gs.crew ?? []).filter(c => c.status !== 'DEAD').length,
-        crewKIA: (gs.crew ?? []).filter(c => c.status === 'DEAD').length,
-        playTimeSeconds: gs.playTimeSeconds ?? 0,
-        flightTimeSeconds: gs.flightTimeSeconds ?? 0,
-        gameMode: gs.gameMode ?? 'freeplay',
+        missionsCompleted: (gs.missions?.completed?.length as number) ?? 0,
+        money: gs.money as number,
+        acceptedMissionCount: (gs.missions?.accepted?.length as number) ?? 0,
+        totalFlights: (gs.flightHistory?.length as number) ?? 0,
+        crewCount: ((gs.crew ?? []) as Record<string, unknown>[]).filter(
+          (c) => c.status !== 'DEAD',
+        ).length,
+        crewKIA: ((gs.crew ?? []) as Record<string, unknown>[]).filter(
+          (c) => c.status === 'DEAD',
+        ).length,
+        playTimeSeconds: (gs.playTimeSeconds as number) ?? 0,
+        flightTimeSeconds: (gs.flightTimeSeconds as number) ?? 0,
+        gameMode: (gs.gameMode as string) ?? 'freeplay',
       };
       return Object.keys(summary);
     });
@@ -1268,7 +1377,7 @@ test.describe('Difficulty settings modify gameplay values', () => {
 
   test('malfunction frequency multiplier: off = 0, low = 0.4, normal = 1, high = 2', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await browser.newPage();
+    const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     const envelope = buildSaveEnvelope({
@@ -1283,13 +1392,14 @@ test.describe('Difficulty settings modify gameplay values', () => {
 
     // Test multiplier mapping via state values
     const results = await page.evaluate(() => {
-      const state = window.__gameState;
-      const multipliers = { off: 0, low: 0.4, normal: 1.0, high: 2.0 };
-      const checks = {};
+      const w = window as unknown as GameWindow;
+      const state = w.__gameState!;
+      const multipliers: Record<string, number> = { off: 0, low: 0.4, normal: 1.0, high: 2.0 };
+      const checks: Record<string, { expected: number; actual: number; match: boolean }> = {};
 
       for (const [setting, expected] of Object.entries(multipliers)) {
         state.difficultySettings.malfunctionFrequency = setting;
-        const actual = multipliers[state.difficultySettings.malfunctionFrequency];
+        const actual: number = multipliers[state.difficultySettings.malfunctionFrequency as string];
         checks[setting] = { expected, actual, match: actual === expected };
       }
       return checks;
@@ -1305,7 +1415,7 @@ test.describe('Difficulty settings modify gameplay values', () => {
 
   test('weather severity multiplier mapping is correct', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await browser.newPage();
+    const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     const envelope = buildSaveEnvelope({
@@ -1319,19 +1429,25 @@ test.describe('Difficulty settings modify gameplay values', () => {
     await seedAndLoadSave(page, envelope);
 
     const results = await page.evaluate(() => {
-      const expected = {
+      const expected: Record<string, { windMult: number; extremeChanceMult: number }> = {
         off:     { windMult: 0, extremeChanceMult: 0 },
         mild:    { windMult: 0.5, extremeChanceMult: 0.25 },
         normal:  { windMult: 1.0, extremeChanceMult: 1.0 },
         extreme: { windMult: 1.5, extremeChanceMult: 3.0 },
       };
 
-      const state = window.__gameState;
-      const checks = {};
+      const w = window as unknown as GameWindow;
+      const state = w.__gameState!;
+      const checks: Record<string, {
+        setting: string;
+        expectedWind: number;
+        expectedExtreme: number;
+        match: boolean;
+      }> = {};
       for (const [setting, mult] of Object.entries(expected)) {
         state.difficultySettings.weatherSeverity = setting;
         checks[setting] = {
-          setting: state.difficultySettings.weatherSeverity,
+          setting: state.difficultySettings.weatherSeverity as string,
           expectedWind: mult.windMult,
           expectedExtreme: mult.extremeChanceMult,
           match: true,
@@ -1349,7 +1465,7 @@ test.describe('Difficulty settings modify gameplay values', () => {
 
   test('financial pressure multiplier mapping is correct', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await browser.newPage();
+    const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     const envelope = buildSaveEnvelope({
@@ -1363,18 +1479,23 @@ test.describe('Difficulty settings modify gameplay values', () => {
     await seedAndLoadSave(page, envelope);
 
     const results = await page.evaluate(() => {
-      const expected = {
+      const expected: Record<string, { rewardMult: number; costMult: number }> = {
         easy:   { rewardMult: 2.0, costMult: 1.0 },
         normal: { rewardMult: 1.0, costMult: 1.0 },
         hard:   { rewardMult: 0.5, costMult: 2.0 },
       };
 
-      const state = window.__gameState;
-      const checks = {};
+      const w = window as unknown as GameWindow;
+      const state = w.__gameState!;
+      const checks: Record<string, {
+        setting: string;
+        expectedReward: number;
+        expectedCost: number;
+      }> = {};
       for (const [setting, mult] of Object.entries(expected)) {
         state.difficultySettings.financialPressure = setting;
         checks[setting] = {
-          setting: state.difficultySettings.financialPressure,
+          setting: state.difficultySettings.financialPressure as string,
           expectedReward: mult.rewardMult,
           expectedCost: mult.costMult,
         };
@@ -1391,7 +1512,7 @@ test.describe('Difficulty settings modify gameplay values', () => {
 
   test('injury duration multiplier mapping is correct', async ({ browser }) => {
     test.setTimeout(120_000);
-    const page = await browser.newPage();
+    const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     const envelope = buildSaveEnvelope({
@@ -1405,14 +1526,15 @@ test.describe('Difficulty settings modify gameplay values', () => {
     await seedAndLoadSave(page, envelope);
 
     const results = await page.evaluate(() => {
-      const expected = { short: 0.5, normal: 1.0, long: 2.0 };
+      const expected: Record<string, number> = { short: 0.5, normal: 1.0, long: 2.0 };
 
-      const state = window.__gameState;
-      const checks = {};
+      const w = window as unknown as GameWindow;
+      const state = w.__gameState!;
+      const checks: Record<string, { setting: string; expectedMult: number; match: boolean }> = {};
       for (const [setting, mult] of Object.entries(expected)) {
         state.difficultySettings.injuryDuration = setting;
         checks[setting] = {
-          setting: state.difficultySettings.injuryDuration,
+          setting: state.difficultySettings.injuryDuration as string,
           expectedMult: mult,
           match: true,
         };

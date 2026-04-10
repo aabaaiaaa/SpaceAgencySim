@@ -1,5 +1,5 @@
 /**
- * reliability-risk.spec.js — E2E tests for Phase 3: Reliability & Risk.
+ * reliability-risk.spec.ts — E2E tests for Phase 3: Reliability & Risk.
  *
  * Covers:
  *   - Malfunction triggering on biome transition (forced-100% mode)
@@ -21,7 +21,7 @@
  *   - Reputation tier effects on contract quality, crew hiring cost, facility discounts
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import {
   VP_W, VP_H,
   buildSaveEnvelope,
@@ -50,26 +50,70 @@ import {
 } from './fixtures.js';
 
 // ---------------------------------------------------------------------------
+// Local type aliases for game state accessed via page.evaluate()
+// ---------------------------------------------------------------------------
+
+interface PartInventoryItem {
+  id: string;
+  partId: string;
+  wear: number;
+  flights: number;
+}
+
+interface WeatherCurrent {
+  windSpeed: number;
+  windAngle: number;
+  temperature: number;
+  visibility: number;
+  extreme: boolean;
+  description: string;
+  bodyId: string;
+}
+
+interface WeatherState {
+  current: WeatherCurrent;
+  skipCount: number;
+  seed: number;
+}
+
+interface ReputationTier {
+  min: number;
+  max: number;
+  label: string;
+  crewCostModifier: number;
+  facilityDiscount: number;
+}
+
+interface GameStateSnapshot {
+  money: number;
+  reputation: number;
+  partInventory: PartInventoryItem[];
+  weather: WeatherState;
+  currentFlight?: {
+    events?: { type: string }[];
+  };
+  crew?: { id: string; name: string; skills?: { piloting: number; engineering: number; science: number } }[];
+  [key: string]: unknown;
+}
+
+// ---------------------------------------------------------------------------
 // Shared constants
 // ---------------------------------------------------------------------------
 
-const BASIC_ROCKET    = ['probe-core-mk1', 'tank-small', 'engine-spark'];
-const CREWED_ROCKET   = ['cmd-mk1', 'tank-small', 'engine-spark', 'parachute-mk1'];
-const ENGINE_ROCKET   = ['probe-core-mk1', 'tank-small', 'engine-spark'];
-const SRB_ROCKET      = ['probe-core-mk1', 'srb-small'];
-const CHUTE_ROCKET    = ['probe-core-mk1', 'tank-small', 'engine-spark', 'parachute-mk1'];
-const LEGS_ROCKET     = ['probe-core-mk1', 'tank-small', 'engine-spark', 'landing-legs-small'];
-const SCIENCE_ROCKET  = ['probe-core-mk1', 'tank-small', 'engine-spark', 'science-module-mk1'];
-const DECOUPLER_ROCKET = ['probe-core-mk1', 'tank-small', 'decoupler-stack-tr18', 'tank-small', 'engine-spark'];
+const BASIC_ROCKET: string[]      = ['probe-core-mk1', 'tank-small', 'engine-spark'];
+const CREWED_ROCKET: string[]     = ['cmd-mk1', 'tank-small', 'engine-spark', 'parachute-mk1'];
+const ENGINE_ROCKET: string[]     = ['probe-core-mk1', 'tank-small', 'engine-spark'];
+const SRB_ROCKET: string[]        = ['probe-core-mk1', 'srb-small'];
+const CHUTE_ROCKET: string[]      = ['probe-core-mk1', 'tank-small', 'engine-spark', 'parachute-mk1'];
+const LEGS_ROCKET: string[]       = ['probe-core-mk1', 'tank-small', 'engine-spark', 'landing-legs-small'];
+const SCIENCE_ROCKET: string[]    = ['probe-core-mk1', 'tank-small', 'engine-spark', 'science-module-mk1'];
+const DECOUPLER_ROCKET: string[]  = ['probe-core-mk1', 'tank-small', 'decoupler-stack-tr18', 'tank-small', 'engine-spark'];
 
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Return to agency from flight — handles the different return flows.
- */
-async function returnToAgency(page) {
+async function returnToAgency(page: Page): Promise<void> {
   const dropdown = page.locator('#topbar-dropdown');
   if (!(await dropdown.isVisible())) {
     await page.click('#topbar-menu-btn');
@@ -101,10 +145,7 @@ async function returnToAgency(page) {
   );
 }
 
-/**
- * Dismiss the return-results overlay if it appears.
- */
-async function dismissReturnResults(page) {
+async function dismissReturnResults(page: Page): Promise<void> {
   try {
     const dismissBtn = page.locator('#return-results-dismiss-btn');
     await dismissBtn.waitFor({ state: 'visible', timeout: 5_000 });
@@ -112,10 +153,7 @@ async function dismissReturnResults(page) {
   } catch { /* No overlay */ }
 }
 
-/**
- * Complete a flight cycle: start flight → return to agency → dismiss results.
- */
-async function completeFlightCycle(page, parts = BASIC_ROCKET) {
+async function completeFlightCycle(page: Page, parts: string[] = BASIC_ROCKET): Promise<void> {
   await startTestFlight(page, parts);
   await returnToAgency(page);
   await dismissReturnResults(page);
@@ -127,7 +165,7 @@ async function completeFlightCycle(page, parts = BASIC_ROCKET) {
 
 test.describe('Malfunction toggle and biome-transition triggering', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
@@ -202,7 +240,7 @@ test.describe('Malfunction toggle and biome-transition triggering', () => {
 
 test.describe('Engine flameout malfunction', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
@@ -227,7 +265,7 @@ test.describe('Engine flameout malfunction', () => {
       if (!ps || !assembly) return { error: 'no flight state' };
 
       // Find an engine part
-      let engineId = null;
+      let engineId: string | null = null;
       for (const [id, placed] of assembly.parts) {
         if (placed.partId.includes('engine')) {
           engineId = id;
@@ -259,7 +297,7 @@ test.describe('Engine flameout malfunction', () => {
 
 test.describe('Engine reduced thrust malfunction', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
@@ -280,7 +318,7 @@ test.describe('Engine reduced thrust malfunction', () => {
     const result = await page.evaluate(async () => {
       const ps = window.__flightPs;
       const assembly = window.__flightAssembly;
-      let engineId = null;
+      let engineId: string | null = null;
       for (const [id, placed] of assembly.parts) {
         if (placed.partId.includes('engine')) { engineId = id; break; }
       }
@@ -302,7 +340,7 @@ test.describe('Engine reduced thrust malfunction', () => {
 
 test.describe('Fuel tank leak malfunction', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
@@ -321,7 +359,7 @@ test.describe('Fuel tank leak malfunction', () => {
     const beforeFuel = await page.evaluate(async () => {
       const ps = window.__flightPs;
       const assembly = window.__flightAssembly;
-      let tankId = null;
+      let tankId: string | null = null;
       for (const [id, placed] of assembly.parts) {
         if (placed.partId.includes('tank')) { tankId = id; break; }
       }
@@ -336,11 +374,11 @@ test.describe('Fuel tank leak malfunction', () => {
 
     // Wait for the leak to drain some fuel (tick runs every frame)
     await page.waitForFunction(
-      (initFuel) => {
+      (initFuel: number) => {
         const ps = window.__flightPs;
         const assembly = window.__flightAssembly;
         if (!ps || !assembly) return false;
-        let tankId = null;
+        let tankId: string | null = null;
         for (const [id, placed] of assembly.parts) {
           if (placed.partId.includes('tank')) { tankId = id; break; }
         }
@@ -354,7 +392,7 @@ test.describe('Fuel tank leak malfunction', () => {
     const afterFuel = await page.evaluate(() => {
       const ps = window.__flightPs;
       const assembly = window.__flightAssembly;
-      let tankId = null;
+      let tankId: string | null = null;
       for (const [id, placed] of assembly.parts) {
         if (placed.partId.includes('tank')) { tankId = id; break; }
       }
@@ -371,7 +409,7 @@ test.describe('Fuel tank leak malfunction', () => {
 
 test.describe('Stuck decoupler malfunction', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
@@ -389,7 +427,7 @@ test.describe('Stuck decoupler malfunction', () => {
     const result = await page.evaluate(async () => {
       const ps = window.__flightPs;
       const assembly = window.__flightAssembly;
-      let decouplerId = null;
+      let decouplerId: string | null = null;
       for (const [id, placed] of assembly.parts) {
         if (placed.partId.includes('decoupler')) { decouplerId = id; break; }
       }
@@ -411,7 +449,7 @@ test.describe('Stuck decoupler malfunction', () => {
 
 test.describe('Partial parachute malfunction', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
@@ -429,7 +467,7 @@ test.describe('Partial parachute malfunction', () => {
     const result = await page.evaluate(async () => {
       const ps = window.__flightPs;
       const assembly = window.__flightAssembly;
-      let chuteId = null;
+      let chuteId: string | null = null;
       for (const [id, placed] of assembly.parts) {
         if (placed.partId.includes('parachute')) { chuteId = id; break; }
       }
@@ -449,7 +487,7 @@ test.describe('Partial parachute malfunction', () => {
 
 test.describe('SRB early burnout malfunction', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
@@ -474,7 +512,7 @@ test.describe('SRB early burnout malfunction', () => {
     const result = await page.evaluate(async () => {
       const ps = window.__flightPs;
       const assembly = window.__flightAssembly;
-      let srbId = null;
+      let srbId: string | null = null;
       for (const [id, placed] of assembly.parts) {
         if (placed.partId.includes('srb')) { srbId = id; break; }
       }
@@ -505,7 +543,7 @@ test.describe('SRB early burnout malfunction', () => {
 
 test.describe('Science instrument failure malfunction', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
@@ -526,7 +564,7 @@ test.describe('Science instrument failure malfunction', () => {
     const result = await page.evaluate(async () => {
       const ps = window.__flightPs;
       const assembly = window.__flightAssembly;
-      let sciId = null;
+      let sciId: string | null = null;
       for (const [id, placed] of assembly.parts) {
         if (placed.partId.includes('science-module')) { sciId = id; break; }
       }
@@ -546,7 +584,7 @@ test.describe('Science instrument failure malfunction', () => {
 
 test.describe('Stuck landing legs malfunction', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
@@ -564,7 +602,7 @@ test.describe('Stuck landing legs malfunction', () => {
     const result = await page.evaluate(async () => {
       const ps = window.__flightPs;
       const assembly = window.__flightAssembly;
-      let legsId = null;
+      let legsId: string | null = null;
       for (const [id, placed] of assembly.parts) {
         if (placed.partId.includes('landing-legs')) { legsId = id; break; }
       }
@@ -588,7 +626,7 @@ test.describe('Stuck landing legs malfunction', () => {
 
 test.describe('Malfunction recovery via context menu', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
@@ -607,7 +645,7 @@ test.describe('Malfunction recovery via context menu', () => {
     const result = await page.evaluate(async () => {
       const ps = window.__flightPs;
       const assembly = window.__flightAssembly;
-      let decouplerId = null;
+      let decouplerId: string | null = null;
       for (const [id, placed] of assembly.parts) {
         if (placed.partId.includes('decoupler')) { decouplerId = id; break; }
       }
@@ -645,7 +683,7 @@ test.describe('Malfunction recovery via context menu', () => {
     const result = await page.evaluate(async () => {
       const ps = window.__flightPs;
       const assembly = window.__flightAssembly;
-      let engineId = null;
+      let engineId: string | null = null;
       for (const [id, placed] of assembly.parts) {
         if (placed.partId.includes('engine')) { engineId = id; break; }
       }
@@ -682,7 +720,7 @@ test.describe('Malfunction recovery via context menu', () => {
 
 test.describe('Reliability display in VAB', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(60_000);
@@ -723,7 +761,7 @@ test.describe('Reliability display in VAB', () => {
 
 test.describe('Crew engineering skill reduces malfunction chance', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
@@ -785,7 +823,7 @@ test.describe('Crew engineering skill reduces malfunction chance', () => {
 
 test.describe('Part inventory and wear tracking', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
@@ -809,24 +847,24 @@ test.describe('Part inventory and wear tracking', () => {
   test.afterAll(async () => { await page.close(); });
 
   test('(1) part inventory is loaded with wear values', async () => {
-    const gs = await getGameState(page);
+    const gs = await getGameState(page) as GameStateSnapshot;
     expect(gs.partInventory).toBeDefined();
     expect(gs.partInventory.length).toBe(3);
 
     const engine1 = gs.partInventory.find(p => p.id === 'inv-engine-1');
     expect(engine1).toBeDefined();
-    expect(engine1.wear).toBe(15);
-    expect(engine1.flights).toBe(1);
+    expect(engine1!.wear).toBe(15);
+    expect(engine1!.flights).toBe(1);
   });
 
   test('(2) wear affects effective reliability', async () => {
     // Effective reliability = base × (1 - wear/100 × 0.5)
     // For engine-spark with reliability ~0.92 and wear 45:
     // effectiveRel = 0.92 × (1 - 0.45 × 0.5) = 0.92 × 0.775 = 0.713
-    const gs = await getGameState(page);
+    const gs = await getGameState(page) as GameStateSnapshot;
     const wornEngine = gs.partInventory.find(p => p.id === 'inv-engine-2');
     expect(wornEngine).toBeDefined();
-    expect(wornEngine.wear).toBe(45);
+    expect(wornEngine!.wear).toBe(45);
 
     // The effective reliability will be lower than base (verified via VAB display below)
   });
@@ -837,7 +875,7 @@ test.describe('Part inventory and wear tracking', () => {
     await returnToAgency(page);
     await dismissReturnResults(page);
 
-    const gs = await getGameState(page);
+    const gs = await getGameState(page) as GameStateSnapshot;
     // After a flight, new parts should be in inventory with some wear
     // (only if the rocket lands safely — the basic rocket probe will crash,
     //  so we check the existing inventory is still intact)
@@ -852,7 +890,7 @@ test.describe('Part inventory and wear tracking', () => {
 
 test.describe('VAB inventory tab — refurbish and scrap', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
@@ -899,7 +937,7 @@ test.describe('VAB inventory tab — refurbish and scrap', () => {
   });
 
   test('(3) refurbish button resets wear to 10% and deducts cost', async () => {
-    const gsBefore = await getGameState(page);
+    const gsBefore = await getGameState(page) as GameStateSnapshot;
     const moneyBefore = gsBefore.money;
 
     // Click refurbish on the first inventory item
@@ -909,12 +947,12 @@ test.describe('VAB inventory tab — refurbish and scrap', () => {
 
     // Wait for state to update (money changes after refurbish)
     await page.waitForFunction(
-      (m0) => (window.__gameState?.money ?? m0) !== m0,
+      (m0: number) => (window.__gameState?.money ?? m0) !== m0,
       moneyBefore,
       { timeout: 5_000 },
     );
 
-    const gsAfter = await getGameState(page);
+    const gsAfter = await getGameState(page) as GameStateSnapshot;
     // Money should decrease (refurbish costs 30% of base part cost)
     expect(gsAfter.money).toBeLessThan(moneyBefore);
 
@@ -926,7 +964,7 @@ test.describe('VAB inventory tab — refurbish and scrap', () => {
   });
 
   test('(4) scrap button removes part and adds money', async () => {
-    const gsBefore = await getGameState(page);
+    const gsBefore = await getGameState(page) as GameStateSnapshot;
     const moneyBefore = gsBefore.money;
     const invCountBefore = gsBefore.partInventory.length;
 
@@ -936,12 +974,12 @@ test.describe('VAB inventory tab — refurbish and scrap', () => {
     await scrapBtn.click();
 
     await page.waitForFunction(
-      (m0) => (window.__gameState?.money ?? m0) !== m0,
+      (m0: number) => (window.__gameState?.money ?? m0) !== m0,
       moneyBefore,
       { timeout: 5_000 },
     );
 
-    const gsAfter = await getGameState(page);
+    const gsAfter = await getGameState(page) as GameStateSnapshot;
     // Money should increase (scrap gives 15% of base cost)
     expect(gsAfter.money).toBeGreaterThan(moneyBefore);
     // Inventory should have one fewer item
@@ -955,7 +993,7 @@ test.describe('VAB inventory tab — refurbish and scrap', () => {
 
 test.describe('Weather display on hub', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(60_000);
@@ -977,7 +1015,7 @@ test.describe('Weather display on hub', () => {
     await expect(desc).toBeVisible();
     const text = await desc.textContent();
     // Should be one of the weather tier labels
-    expect(text.length).toBeGreaterThan(0);
+    expect(text!.length).toBeGreaterThan(0);
   });
 
   test('(3) weather stats show wind, ISP effect, visibility', async () => {
@@ -995,7 +1033,7 @@ test.describe('Weather display on hub', () => {
   });
 
   test('(4) weather state exists in game state', async () => {
-    const gs = await getGameState(page);
+    const gs = await getGameState(page) as GameStateSnapshot;
     expect(gs.weather).toBeDefined();
     expect(gs.weather.current).toBeDefined();
     expect(typeof gs.weather.current.windSpeed).toBe('number');
@@ -1011,7 +1049,7 @@ test.describe('Weather display on hub', () => {
 
 test.describe('Wind force during flight and ISP modifier', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
@@ -1070,7 +1108,7 @@ test.describe('Wind force during flight and ISP modifier', () => {
 
   test('(2) ISP temperature modifier is within valid range', async () => {
     // Weather temperature (ISP modifier) should be in range 0.95-1.05
-    const gs = await getGameState(page);
+    const gs = await getGameState(page) as GameStateSnapshot;
     const temp = gs.weather.current.temperature;
     expect(temp).toBeGreaterThanOrEqual(0.95);
     expect(temp).toBeLessThanOrEqual(1.05);
@@ -1083,7 +1121,7 @@ test.describe('Wind force during flight and ISP modifier', () => {
 
 test.describe('Day skipping with escalating fees', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(60_000);
@@ -1096,12 +1134,12 @@ test.describe('Day skipping with escalating fees', () => {
   test.afterAll(async () => { await page.close(); });
 
   test('(1) skip count starts at 0', async () => {
-    const gs = await getGameState(page);
+    const gs = await getGameState(page) as GameStateSnapshot;
     expect(gs.weather.skipCount).toBe(0);
   });
 
   test('(2) skipping weather costs base fee and increments skip count', async () => {
-    const gsBefore = await getGameState(page);
+    const gsBefore = await getGameState(page) as GameStateSnapshot;
     const moneyBefore = gsBefore.money;
 
     // Skip weather via game API
@@ -1114,7 +1152,7 @@ test.describe('Day skipping with escalating fees', () => {
       gs.weather.seed = (gs.weather.seed + 13397) & 0x7fffffff;
     });
 
-    const gsAfter = await getGameState(page);
+    const gsAfter = await getGameState(page) as GameStateSnapshot;
     expect(gsAfter.weather.skipCount).toBe(1);
     expect(gsAfter.money).toBe(moneyBefore - 25_000);
   });
@@ -1143,7 +1181,7 @@ test.describe('Day skipping with escalating fees', () => {
 
 test.describe('Extreme weather warning', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(60_000);
@@ -1263,7 +1301,7 @@ test.describe('Extreme weather warning', () => {
     await expect(weatherPanel).toBeVisible({ timeout: 5_000 });
 
     // The panel may show re-initialized weather; verify the state is extreme
-    const gs = await getGameState(page);
+    const gs = await getGameState(page) as GameStateSnapshot;
     expect(gs.weather.current.extreme).toBe(true);
     expect(gs.weather.current.description).toBe('Severe storm');
   });
@@ -1275,7 +1313,7 @@ test.describe('Extreme weather warning', () => {
 
 test.describe('Reputation score changes from events', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120_000);
@@ -1292,9 +1330,9 @@ test.describe('Reputation score changes from events', () => {
   });
 
   test('(2) reputation value matches game state', async () => {
-    const gs = await getGameState(page);
+    const gs = await getGameState(page) as GameStateSnapshot;
     const repValue = await page.locator('.hub-rep-value').textContent();
-    expect(repValue.trim()).toBe(`${Math.round(gs.reputation)}`);
+    expect(repValue!.trim()).toBe(`${Math.round(gs.reputation)}`);
   });
 
   test('(3) reputation tier label is shown (Good at rep 50)', async () => {
@@ -1311,7 +1349,7 @@ test.describe('Reputation score changes from events', () => {
       gs.reputation = Math.min(100, gs.reputation + 3); // 3 crew returned safely
     });
 
-    const gs = await getGameState(page);
+    const gs = await getGameState(page) as GameStateSnapshot;
     expect(gs.reputation).toBe(53);
   });
 
@@ -1322,7 +1360,7 @@ test.describe('Reputation score changes from events', () => {
       gs.reputation = Math.max(0, gs.reputation - 10); // 1 crew death
     });
 
-    const gs = await getGameState(page);
+    const gs = await getGameState(page) as GameStateSnapshot;
     expect(gs.reputation).toBe(43);
   });
 
@@ -1333,7 +1371,7 @@ test.describe('Reputation score changes from events', () => {
       gs.reputation = Math.max(0, gs.reputation - 3);
     });
 
-    const gs = await getGameState(page);
+    const gs = await getGameState(page) as GameStateSnapshot;
     expect(gs.reputation).toBe(40);
   });
 
@@ -1344,7 +1382,7 @@ test.describe('Reputation score changes from events', () => {
       gs.reputation = Math.max(0, gs.reputation - 2);
     });
 
-    const gs = await getGameState(page);
+    const gs = await getGameState(page) as GameStateSnapshot;
     expect(gs.reputation).toBe(38);
   });
 
@@ -1355,7 +1393,7 @@ test.describe('Reputation score changes from events', () => {
       gs.reputation = Math.min(100, gs.reputation + 10);
     });
 
-    const gs = await getGameState(page);
+    const gs = await getGameState(page) as GameStateSnapshot;
     expect(gs.reputation).toBe(48);
   });
 
@@ -1364,14 +1402,14 @@ test.describe('Reputation score changes from events', () => {
       const gs = window.__gameState;
       gs.reputation = 150; // Over max
     });
-    let gs = await getGameState(page);
+    let gs = await getGameState(page) as GameStateSnapshot;
     // The raw value may be 150 in state, but getReputationTier clamps it
     // Let's reset and verify clamp behavior
     await page.evaluate(() => {
       const gs = window.__gameState;
       gs.reputation = Math.max(0, Math.min(100, gs.reputation));
     });
-    gs = await getGameState(page);
+    gs = await getGameState(page) as GameStateSnapshot;
     expect(gs.reputation).toBe(100);
 
     // Reset to a reasonable value for subsequent tests
@@ -1387,7 +1425,7 @@ test.describe('Reputation score changes from events', () => {
 
 test.describe('Reputation tier effects', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(60_000);
@@ -1402,7 +1440,7 @@ test.describe('Reputation tier effects', () => {
     await seedAndLoadSave(page, envelope);
 
     const tier = await page.evaluate(() => {
-      const TIERS = [
+      const TIERS: { min: number; max: number; label: string; crewCostModifier: number; facilityDiscount: number }[] = [
         { min: 0,  max: 20,  label: 'Basic',    crewCostModifier: 1.50, facilityDiscount: 0.00 },
         { min: 21, max: 40,  label: 'Standard',  crewCostModifier: 1.25, facilityDiscount: 0.00 },
         { min: 41, max: 60,  label: 'Good',      crewCostModifier: 1.00, facilityDiscount: 0.05 },
@@ -1413,15 +1451,15 @@ test.describe('Reputation tier effects', () => {
       return TIERS.find(t => rep >= t.min && rep <= t.max);
     });
 
-    expect(tier.label).toBe('Basic');
-    expect(tier.crewCostModifier).toBe(1.50);
-    expect(tier.facilityDiscount).toBe(0.00);
+    expect(tier!.label).toBe('Basic');
+    expect(tier!.crewCostModifier).toBe(1.50);
+    expect(tier!.facilityDiscount).toBe(0.00);
   });
 
   test('(2) Standard tier (21-40): +25% crew cost, 0% facility discount', async () => {
     await page.evaluate(() => { window.__gameState.reputation = 30; });
     const tier = await page.evaluate(() => {
-      const TIERS = [
+      const TIERS: { min: number; max: number; label: string; crewCostModifier: number; facilityDiscount: number }[] = [
         { min: 0,  max: 20,  label: 'Basic',    crewCostModifier: 1.50, facilityDiscount: 0.00 },
         { min: 21, max: 40,  label: 'Standard',  crewCostModifier: 1.25, facilityDiscount: 0.00 },
         { min: 41, max: 60,  label: 'Good',      crewCostModifier: 1.00, facilityDiscount: 0.05 },
@@ -1432,15 +1470,15 @@ test.describe('Reputation tier effects', () => {
       return TIERS.find(t => rep >= t.min && rep <= t.max);
     });
 
-    expect(tier.label).toBe('Standard');
-    expect(tier.crewCostModifier).toBe(1.25);
-    expect(tier.facilityDiscount).toBe(0.00);
+    expect(tier!.label).toBe('Standard');
+    expect(tier!.crewCostModifier).toBe(1.25);
+    expect(tier!.facilityDiscount).toBe(0.00);
   });
 
   test('(3) Good tier (41-60): normal crew cost, 5% facility discount', async () => {
     await page.evaluate(() => { window.__gameState.reputation = 50; });
     const tier = await page.evaluate(() => {
-      const TIERS = [
+      const TIERS: { min: number; max: number; label: string; crewCostModifier: number; facilityDiscount: number }[] = [
         { min: 0,  max: 20,  label: 'Basic',    crewCostModifier: 1.50, facilityDiscount: 0.00 },
         { min: 21, max: 40,  label: 'Standard',  crewCostModifier: 1.25, facilityDiscount: 0.00 },
         { min: 41, max: 60,  label: 'Good',      crewCostModifier: 1.00, facilityDiscount: 0.05 },
@@ -1451,15 +1489,15 @@ test.describe('Reputation tier effects', () => {
       return TIERS.find(t => rep >= t.min && rep <= t.max);
     });
 
-    expect(tier.label).toBe('Good');
-    expect(tier.crewCostModifier).toBe(1.00);
-    expect(tier.facilityDiscount).toBe(0.05);
+    expect(tier!.label).toBe('Good');
+    expect(tier!.crewCostModifier).toBe(1.00);
+    expect(tier!.facilityDiscount).toBe(0.05);
   });
 
   test('(4) Premium tier (61-80): -10% crew cost, 10% facility discount', async () => {
     await page.evaluate(() => { window.__gameState.reputation = 70; });
     const tier = await page.evaluate(() => {
-      const TIERS = [
+      const TIERS: { min: number; max: number; label: string; crewCostModifier: number; facilityDiscount: number }[] = [
         { min: 0,  max: 20,  label: 'Basic',    crewCostModifier: 1.50, facilityDiscount: 0.00 },
         { min: 21, max: 40,  label: 'Standard',  crewCostModifier: 1.25, facilityDiscount: 0.00 },
         { min: 41, max: 60,  label: 'Good',      crewCostModifier: 1.00, facilityDiscount: 0.05 },
@@ -1470,15 +1508,15 @@ test.describe('Reputation tier effects', () => {
       return TIERS.find(t => rep >= t.min && rep <= t.max);
     });
 
-    expect(tier.label).toBe('Premium');
-    expect(tier.crewCostModifier).toBe(0.90);
-    expect(tier.facilityDiscount).toBe(0.10);
+    expect(tier!.label).toBe('Premium');
+    expect(tier!.crewCostModifier).toBe(0.90);
+    expect(tier!.facilityDiscount).toBe(0.10);
   });
 
   test('(5) Elite tier (81-100): -25% crew cost, 15% facility discount', async () => {
     await page.evaluate(() => { window.__gameState.reputation = 90; });
     const tier = await page.evaluate(() => {
-      const TIERS = [
+      const TIERS: { min: number; max: number; label: string; crewCostModifier: number; facilityDiscount: number }[] = [
         { min: 0,  max: 20,  label: 'Basic',    crewCostModifier: 1.50, facilityDiscount: 0.00 },
         { min: 21, max: 40,  label: 'Standard',  crewCostModifier: 1.25, facilityDiscount: 0.00 },
         { min: 41, max: 60,  label: 'Good',      crewCostModifier: 1.00, facilityDiscount: 0.05 },
@@ -1489,9 +1527,9 @@ test.describe('Reputation tier effects', () => {
       return TIERS.find(t => rep >= t.min && rep <= t.max);
     });
 
-    expect(tier.label).toBe('Elite');
-    expect(tier.crewCostModifier).toBe(0.75);
-    expect(tier.facilityDiscount).toBe(0.15);
+    expect(tier!.label).toBe('Elite');
+    expect(tier!.crewCostModifier).toBe(0.75);
+    expect(tier!.facilityDiscount).toBe(0.15);
   });
 
   test('(6) hub badge updates to reflect current tier', async () => {
@@ -1510,7 +1548,7 @@ test.describe('Reputation tier effects', () => {
     expect(tierText).toBe('Elite');
 
     const repValue = await page.locator('.hub-rep-value').textContent();
-    expect(repValue.trim()).toBe('90');
+    expect(repValue!.trim()).toBe('90');
   });
 });
 
@@ -1520,7 +1558,7 @@ test.describe('Reputation tier effects', () => {
 
 test.describe('Building with recovered vs new parts', () => {
   test.describe.configure({ mode: 'serial' });
-  let page;
+  let page: Page;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(60_000);
@@ -1544,14 +1582,14 @@ test.describe('Building with recovered vs new parts', () => {
 
   test('(1) inventory parts are available alongside new parts in VAB', async () => {
     // Verify inventory was injected
-    const gsBefore = await getGameState(page);
+    const gsBefore = await getGameState(page) as GameStateSnapshot;
     expect(gsBefore.partInventory).toBeDefined();
     expect(gsBefore.partInventory.length).toBeGreaterThanOrEqual(2);
 
     await navigateToVab(page);
 
     // Both new parts (from catalog) and inventory parts should be available
-    const gs = await getGameState(page);
+    const gs = await getGameState(page) as GameStateSnapshot;
     expect(gs.partInventory.length).toBeGreaterThanOrEqual(2);
 
     // The VAB parts panel should show catalog parts

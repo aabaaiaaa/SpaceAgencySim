@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { buildSaveEnvelope, SAVE_KEY } from './helpers.js';
+import type { SaveEnvelope } from './helpers.js';
 
 /**
  * E2E — Save Version Indicator
@@ -13,8 +14,8 @@ test.describe('Save Version Indicator', () => {
 
   test('main menu: current-version save shows no version warning', async ({ page }) => {
     // Seed a save with version 1 (the current SAVE_VERSION).
-    const envelope = buildSaveEnvelope({ saveName: 'Current Version' });
-    await page.addInitScript(({ key, env }) => {
+    const envelope: SaveEnvelope = buildSaveEnvelope({ saveName: 'Current Version' });
+    await page.addInitScript(({ key, env }: { key: string; env: SaveEnvelope }) => {
       localStorage.setItem(key, JSON.stringify(env));
     }, { key: SAVE_KEY, env: envelope });
 
@@ -31,8 +32,8 @@ test.describe('Save Version Indicator', () => {
 
   test('main menu: mismatched-version save shows version warning badge', async ({ page }) => {
     // Seed a save with version 0 (simulating a pre-versioning save).
-    const envelope = buildSaveEnvelope({ version: 0, saveName: 'Old Version' });
-    await page.addInitScript(({ key, env }) => {
+    const envelope: SaveEnvelope = buildSaveEnvelope({ version: 0, saveName: 'Old Version' });
+    await page.addInitScript(({ key, env }: { key: string; env: SaveEnvelope }) => {
       localStorage.setItem(key, JSON.stringify(env));
     }, { key: SAVE_KEY, env: envelope });
 
@@ -51,8 +52,8 @@ test.describe('Save Version Indicator', () => {
 
   test('topbar load modal: mismatched-version save shows version warning', async ({ page }) => {
     // Seed a save with a mismatched version and load the game.
-    const envelope = buildSaveEnvelope({ version: 0, saveName: 'Old Save' });
-    await page.addInitScript(({ key, env }) => {
+    const envelope: SaveEnvelope = buildSaveEnvelope({ version: 0, saveName: 'Old Save' });
+    await page.addInitScript(({ key, env }: { key: string; env: SaveEnvelope }) => {
       localStorage.setItem(key, JSON.stringify(env));
     }, { key: SAVE_KEY, env: envelope });
 
@@ -79,8 +80,8 @@ test.describe('Save Version Indicator', () => {
 
   test('topbar load modal: current-version save shows no version warning', async ({ page }) => {
     // Seed a save with the current version.
-    const envelope = buildSaveEnvelope({ version: 2, saveName: 'Current Save' });
-    await page.addInitScript(({ key, env }) => {
+    const envelope: SaveEnvelope = buildSaveEnvelope({ version: 2, saveName: 'Current Save' });
+    await page.addInitScript(({ key, env }: { key: string; env: SaveEnvelope }) => {
       localStorage.setItem(key, JSON.stringify(env));
     }, { key: SAVE_KEY, env: envelope });
 

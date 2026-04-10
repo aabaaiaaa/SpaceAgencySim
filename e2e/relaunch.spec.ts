@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import {
   VP_W, VP_H,
   FIRST_FLIGHT_MISSION, buildSaveEnvelope,
@@ -11,9 +11,37 @@ import {
  * Each test is independent — starts its own flight via startTestFlight.
  */
 
-const UNLOCKED_PARTS = ['cmd-mk1', 'tank-small', 'engine-spark'];
+// ---------------------------------------------------------------------------
+// Window interface for browser-context evaluate() callbacks
+// ---------------------------------------------------------------------------
 
-async function setupFlight(page) {
+interface FlightAssemblyPart {
+  partId: string;
+}
+
+interface GW {
+  __flightPs?: {
+    posY: number;
+    velY: number;
+    grounded: boolean;
+    landed: boolean;
+    firingEngines: Set<string>;
+  };
+  __flightAssembly?: { parts: Map<string, FlightAssemblyPart> };
+  __resyncPhysicsWorker?: () => Promise<void>;
+}
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const UNLOCKED_PARTS: string[] = ['cmd-mk1', 'tank-small', 'engine-spark'];
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+async function setupFlight(page: Page): Promise<void> {
   await page.setViewportSize({ width: VP_W, height: VP_H });
   const envelope = buildSaveEnvelope({
     missions: { available: [], accepted: [{ ...FIRST_FLIGHT_MISSION, status: 'accepted' }], completed: [] },
@@ -23,7 +51,7 @@ async function setupFlight(page) {
   await startTestFlight(page, UNLOCKED_PARTS);
 }
 
-async function stageAndThrottle(page) {
+async function stageAndThrottle(page: Page): Promise<void> {
   await page.keyboard.press('Space');
   await page.keyboard.press('z');
 }
@@ -104,14 +132,15 @@ test.describe('Relaunch — Takeoff, Land, Takeoff Again', () => {
     // Re-enable engine firing (teleportCraft clears firingEngines, but the
     // re-liftoff mechanic needs engines active).
     await page.evaluate(async () => {
-      const ps = window.__flightPs;
-      const assembly = window.__flightAssembly;
+      const w: GW = window as unknown as GW;
+      const ps = w.__flightPs;
+      const assembly = w.__flightAssembly;
       if (ps && assembly) {
         for (const [id, p] of assembly.parts) {
           if (p.partId === 'engine-spark') ps.firingEngines.add(id);
         }
-        if (typeof window.__resyncPhysicsWorker === 'function') {
-          await window.__resyncPhysicsWorker();
+        if (typeof w.__resyncPhysicsWorker === 'function') {
+          await w.__resyncPhysicsWorker();
         }
       }
     });
