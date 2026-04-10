@@ -1,6 +1,5 @@
-// @ts-nocheck
 /**
- * orbit.test.js — Unit tests for the orbit slot system (TASK-002).
+ * orbit.test.ts — Unit tests for the orbit slot system (TASK-002).
  *
  * Tests cover:
  *   Kepler's equation solver   — convergence for circular and eccentric orbits
@@ -43,6 +42,8 @@ import {
   warpToTarget,
   orbitOverlapsBand,
 } from '../core/orbit.ts';
+import type { ProximityState, OrbitStatus, WarpResult } from '../core/orbit.ts';
+import type { OrbitalElements, OrbitalObject } from '../core/gameState.ts';
 import {
   CelestialBody,
   BODY_GM,
@@ -70,7 +71,7 @@ const TIME_TOL = 1;
  * Create a circular orbit state at a given altitude with exact circular velocity.
  * Craft is directly above the body centre (posX = 0) moving horizontally.
  */
-function circularOrbitState(altitude) {
+function circularOrbitState(altitude: number): { posX: number; posY: number; velX: number; velY: number } {
   const r = R_EARTH + altitude;
   const v = Math.sqrt(MU_EARTH / r);
   return { posX: 0, posY: altitude, velX: v, velY: 0 };
@@ -210,9 +211,9 @@ describe('computeOrbitalElements', () => {
 
     expect(el).not.toBeNull();
     // Semi-major axis ≈ R_earth + altitude.
-    expect(el.semiMajorAxis).toBeCloseTo(R_EARTH + alt, -2); // within 100 m
+    expect(el!.semiMajorAxis).toBeCloseTo(R_EARTH + alt, -2); // within 100 m
     // Eccentricity ≈ 0.
-    expect(el.eccentricity).toBeLessThan(1e-6);
+    expect(el!.eccentricity).toBeLessThan(1e-6);
   });
 
   it('computes an elliptical orbit with correct periapsis/apoapsis', () => {
@@ -224,10 +225,10 @@ describe('computeOrbitalElements', () => {
 
     const el = computeOrbitalElements(0, alt, vFast, 0, EARTH, 0);
     expect(el).not.toBeNull();
-    expect(el.eccentricity).toBeGreaterThan(0.01);
+    expect(el!.eccentricity).toBeGreaterThan(0.01);
 
-    const periAlt = getPeriapsisAltitude(el, EARTH);
-    const apoAlt = getApoapsisAltitude(el, EARTH);
+    const periAlt = getPeriapsisAltitude(el!, EARTH);
+    const apoAlt = getApoapsisAltitude(el!, EARTH);
 
     // Periapsis should be near the starting altitude (we're at periapsis
     // since moving purely horizontally = fastest point).
@@ -287,7 +288,7 @@ describe('getOrbitalStateAtTime', () => {
   it('circular orbit returns constant altitude', () => {
     const alt = 150_000; // 150 km
     const { posX, posY, velX, velY } = circularOrbitState(alt);
-    const el = computeOrbitalElements(posX, posY, velX, velY, EARTH, 0);
+    const el = computeOrbitalElements(posX, posY, velX, velY, EARTH, 0)!;
 
     // Check at multiple times.
     const T = getOrbitalPeriod(el.semiMajorAxis, EARTH);
@@ -301,7 +302,7 @@ describe('getOrbitalStateAtTime', () => {
     const alt = 100_000;
     const r = R_EARTH + alt;
     const vCirc = Math.sqrt(MU_EARTH / r);
-    const el = computeOrbitalElements(0, alt, vCirc * 1.15, 0, EARTH, 0);
+    const el = computeOrbitalElements(0, alt, vCirc * 1.15, 0, EARTH, 0)!;
 
     const periAlt = getPeriapsisAltitude(el, EARTH);
     const apoAlt = getApoapsisAltitude(el, EARTH);
@@ -319,7 +320,7 @@ describe('getOrbitalStateAtTime', () => {
   it('angular position advances 360° in one period', () => {
     const alt = 150_000;
     const { posX, posY, velX, velY } = circularOrbitState(alt);
-    const el = computeOrbitalElements(posX, posY, velX, velY, EARTH, 0);
+    const el = computeOrbitalElements(posX, posY, velX, velY, EARTH, 0)!;
     const T = getOrbitalPeriod(el.semiMajorAxis, EARTH);
 
     const state0 = getOrbitalStateAtTime(el, 0, EARTH);
@@ -351,7 +352,7 @@ describe('altitude bands', () => {
   it('classifies 100 km as LEO', () => {
     const band = getAltitudeBand(100_000, EARTH);
     expect(band).not.toBeNull();
-    expect(band.id).toBe('LEO');
+    expect(band!.id).toBe('LEO');
   });
 
   it('classifies 80 km as LEO (lower bound, inclusive)', () => {
@@ -390,13 +391,13 @@ describe('altitude bands', () => {
 describe('orbitOverlapsBand', () => {
   it('circular LEO orbit overlaps LEO', () => {
     const { posX, posY, velX, velY } = circularOrbitState(100_000);
-    const el = computeOrbitalElements(posX, posY, velX, velY, EARTH, 0);
+    const el = computeOrbitalElements(posX, posY, velX, velY, EARTH, 0)!;
     expect(orbitOverlapsBand(el, 'LEO', EARTH)).toBe(true);
   });
 
   it('circular LEO orbit does NOT overlap MEO', () => {
     const { posX, posY, velX, velY } = circularOrbitState(100_000);
-    const el = computeOrbitalElements(posX, posY, velX, velY, EARTH, 0);
+    const el = computeOrbitalElements(posX, posY, velX, velY, EARTH, 0)!;
     expect(orbitOverlapsBand(el, 'MEO', EARTH)).toBe(false);
   });
 
@@ -405,7 +406,7 @@ describe('orbitOverlapsBand', () => {
     const alt = 100_000;
     const r = R_EARTH + alt;
     const vCirc = Math.sqrt(MU_EARTH / r);
-    const el = computeOrbitalElements(0, alt, vCirc * 1.15, 0, EARTH, 0);
+    const el = computeOrbitalElements(0, alt, vCirc * 1.15, 0, EARTH, 0)!;
     // Verify this orbit actually spans LEO→MEO.
     const apoAlt = getApoapsisAltitude(el, EARTH);
     expect(apoAlt).toBeGreaterThan(200_000);
@@ -477,39 +478,39 @@ describe('angularDistance', () => {
 
 describe('checkProximity', () => {
   it('returns true when same band and angle < 5°', () => {
-    const s1 = { altitude: 100_000, angularPositionDeg: 42 };
-    const s2 = { altitude: 120_000, angularPositionDeg: 44 };
+    const s1: ProximityState = { altitude: 100_000, angularPositionDeg: 42 };
+    const s2: ProximityState = { altitude: 120_000, angularPositionDeg: 44 };
     expect(checkProximity(s1, s2, EARTH)).toBe(true);
   });
 
   it('returns false when angle >= 5°', () => {
-    const s1 = { altitude: 100_000, angularPositionDeg: 42 };
-    const s2 = { altitude: 120_000, angularPositionDeg: 48 };
+    const s1: ProximityState = { altitude: 100_000, angularPositionDeg: 42 };
+    const s2: ProximityState = { altitude: 120_000, angularPositionDeg: 48 };
     expect(checkProximity(s1, s2, EARTH)).toBe(false);
   });
 
   it('returns false when different altitude bands', () => {
-    const s1 = { altitude: 100_000, angularPositionDeg: 42 }; // LEO
-    const s2 = { altitude: 500_000, angularPositionDeg: 43 }; // MEO
+    const s1: ProximityState = { altitude: 100_000, angularPositionDeg: 42 }; // LEO
+    const s2: ProximityState = { altitude: 500_000, angularPositionDeg: 43 }; // MEO
     expect(checkProximity(s1, s2, EARTH)).toBe(false);
   });
 
   it('returns false when either is outside all bands', () => {
-    const s1 = { altitude: 50_000, angularPositionDeg: 10 };  // below LEO
-    const s2 = { altitude: 100_000, angularPositionDeg: 10 }; // LEO
+    const s1: ProximityState = { altitude: 50_000, angularPositionDeg: 10 };  // below LEO
+    const s2: ProximityState = { altitude: 100_000, angularPositionDeg: 10 }; // LEO
     expect(checkProximity(s1, s2, EARTH)).toBe(false);
   });
 
   it('handles wrap-around angles (359° and 1°)', () => {
-    const s1 = { altitude: 100_000, angularPositionDeg: 359 };
-    const s2 = { altitude: 100_000, angularPositionDeg: 1 };
+    const s1: ProximityState = { altitude: 100_000, angularPositionDeg: 359 };
+    const s2: ProximityState = { altitude: 100_000, angularPositionDeg: 1 };
     // Angular distance = 2°, same band → proximate.
     expect(checkProximity(s1, s2, EARTH)).toBe(true);
   });
 
   it('returns false at exactly 5° distance', () => {
-    const s1 = { altitude: 100_000, angularPositionDeg: 0 };
-    const s2 = { altitude: 100_000, angularPositionDeg: 5 };
+    const s1: ProximityState = { altitude: 100_000, angularPositionDeg: 0 };
+    const s2: ProximityState = { altitude: 100_000, angularPositionDeg: 5 };
     // Requirement: "angular distance < 5 degrees" (strict).
     expect(checkProximity(s1, s2, EARTH)).toBe(false);
   });
@@ -551,7 +552,7 @@ describe('checkOrbitStatus', () => {
 
 describe('orbital object management', () => {
   it('createOrbitalObject creates a complete object', () => {
-    const elements = {
+    const elements: OrbitalElements = {
       semiMajorAxis: R_EARTH + 150_000,
       eccentricity: 0.001,
       argPeriapsis: 0,
@@ -576,7 +577,7 @@ describe('orbital object management', () => {
   });
 
   it('tickOrbitalObjects rebases epochs', () => {
-    const elements = {
+    const elements: OrbitalElements = {
       semiMajorAxis: R_EARTH + 150_000,
       eccentricity: 0.01,
       argPeriapsis: 0,
@@ -596,7 +597,7 @@ describe('orbital object management', () => {
   it('rebaseEpoch preserves orbital position', () => {
     const alt = 150_000;
     const { posX, posY, velX, velY } = circularOrbitState(alt);
-    const el = computeOrbitalElements(posX, posY, velX, velY, EARTH, 0);
+    const el = computeOrbitalElements(posX, posY, velX, velY, EARTH, 0)!;
 
     const t = 500; // Check at 500 seconds.
     const stateBefore = getOrbitalStateAtTime(el, t, EARTH);
@@ -620,7 +621,7 @@ describe('elliptical orbit altitude band crossing', () => {
     const alt = 100_000;
     const r = R_EARTH + alt;
     const vCirc = Math.sqrt(MU_EARTH / r);
-    const el = computeOrbitalElements(0, alt, vCirc * 1.2, 0, EARTH, 0);
+    const el = computeOrbitalElements(0, alt, vCirc * 1.2, 0, EARTH, 0)!;
 
     const periAlt = getPeriapsisAltitude(el, EARTH);
     const apoAlt = getApoapsisAltitude(el, EARTH);
@@ -658,9 +659,9 @@ describe('warpToTarget', () => {
     const { posX: px1, posY: py1, velX: vx1, velY: vy1 } = circularOrbitState(alt1);
     const { posX: px2, posY: py2, velX: vx2, velY: vy2 } = circularOrbitState(alt2);
 
-    const craftEl = computeOrbitalElements(px1, py1, vx1, vy1, EARTH, 0);
+    const craftEl = computeOrbitalElements(px1, py1, vx1, vy1, EARTH, 0)!;
     // Offset target by 20° in mean anomaly.
-    const targetEl = computeOrbitalElements(px2, py2, vx2, vy2, EARTH, 0);
+    const targetEl = computeOrbitalElements(px2, py2, vx2, vy2, EARTH, 0)!;
     targetEl.meanAnomalyAtEpoch = 20 * (Math.PI / 180); // 20° ahead
 
     const result = warpToTarget(craftEl, targetEl, EARTH, 0);
@@ -669,8 +670,8 @@ describe('warpToTarget', () => {
     expect(result.elapsed).toBeGreaterThan(0);
 
     // Verify proximity at the found time.
-    const craftState = getOrbitalStateAtTime(craftEl, result.time, EARTH);
-    const targetState = getOrbitalStateAtTime(targetEl, result.time, EARTH);
+    const craftState = getOrbitalStateAtTime(craftEl, result.time!, EARTH);
+    const targetState = getOrbitalStateAtTime(targetEl, result.time!, EARTH);
     const dist = angularDistance(craftState.angularPositionDeg, targetState.angularPositionDeg);
     expect(dist).toBeLessThan(5);
   });
@@ -680,8 +681,8 @@ describe('warpToTarget', () => {
     const { posX: px1, posY: py1, velX: vx1, velY: vy1 } = circularOrbitState(100_000);
     const { posX: px2, posY: py2, velX: vx2, velY: vy2 } = circularOrbitState(5_000_000);
 
-    const craftEl = computeOrbitalElements(px1, py1, vx1, vy1, EARTH, 0);
-    const targetEl = computeOrbitalElements(px2, py2, vx2, vy2, EARTH, 0);
+    const craftEl = computeOrbitalElements(px1, py1, vx1, vy1, EARTH, 0)!;
+    const targetEl = computeOrbitalElements(px2, py2, vx2, vy2, EARTH, 0)!;
 
     const result = warpToTarget(craftEl, targetEl, EARTH, 0);
     expect(result.possible).toBe(false);
@@ -691,8 +692,8 @@ describe('warpToTarget', () => {
     // Two objects at the same position, same orbit.
     const alt = 100_000;
     const { posX, posY, velX, velY } = circularOrbitState(alt);
-    const craftEl = computeOrbitalElements(posX, posY, velX, velY, EARTH, 0);
-    const targetEl = computeOrbitalElements(posX, posY, velX, velY, EARTH, 0);
+    const craftEl = computeOrbitalElements(posX, posY, velX, velY, EARTH, 0)!;
+    const targetEl = computeOrbitalElements(posX, posY, velX, velY, EARTH, 0)!;
 
     const result = warpToTarget(craftEl, targetEl, EARTH, 0);
     expect(result.possible).toBe(true);
@@ -707,8 +708,8 @@ describe('warpToTarget', () => {
     const { posX: px1, posY: py1, velX: vx1, velY: vy1 } = circularOrbitState(alt1);
     const { posX: px2, posY: py2, velX: vx2, velY: vy2 } = circularOrbitState(alt2);
 
-    const craftEl = computeOrbitalElements(px1, py1, vx1, vy1, EARTH, 0);
-    const targetEl = computeOrbitalElements(px2, py2, vx2, vy2, EARTH, 0);
+    const craftEl = computeOrbitalElements(px1, py1, vx1, vy1, EARTH, 0)!;
+    const targetEl = computeOrbitalElements(px2, py2, vx2, vy2, EARTH, 0)!;
     // Offset target so they aren't immediately proximate.
     targetEl.meanAnomalyAtEpoch = Math.PI; // 180° ahead
 
@@ -741,7 +742,7 @@ describe('periapsis and apoapsis', () => {
   it('circular orbit has equal periapsis and apoapsis', () => {
     const alt = 200_000;
     const { posX, posY, velX, velY } = circularOrbitState(alt);
-    const el = computeOrbitalElements(posX, posY, velX, velY, EARTH, 0);
+    const el = computeOrbitalElements(posX, posY, velX, velY, EARTH, 0)!;
 
     const peri = getPeriapsisAltitude(el, EARTH);
     const apo = getApoapsisAltitude(el, EARTH);
@@ -752,7 +753,7 @@ describe('periapsis and apoapsis', () => {
     const alt = 100_000;
     const r = R_EARTH + alt;
     const vCirc = Math.sqrt(MU_EARTH / r);
-    const el = computeOrbitalElements(0, alt, vCirc * 1.1, 0, EARTH, 0);
+    const el = computeOrbitalElements(0, alt, vCirc * 1.1, 0, EARTH, 0)!;
 
     const peri = getPeriapsisAltitude(el, EARTH);
     const apo = getApoapsisAltitude(el, EARTH);
@@ -788,8 +789,8 @@ describe('checkOrbitStatus altitude band', () => {
     const result = checkOrbitStatus(posX, posY, velX, velY, EARTH);
     expect(result.valid).toBe(true);
     expect(result.altitudeBand).not.toBeNull();
-    expect(result.altitudeBand.id).toBe('LEO');
-    expect(result.altitudeBand.name).toBe('Low Earth Orbit');
+    expect(result.altitudeBand!.id).toBe('LEO');
+    expect(result.altitudeBand!.name).toBe('Low Earth Orbit');
   });
 
   it('MEO orbit reports MEO altitude band', () => {
@@ -797,7 +798,7 @@ describe('checkOrbitStatus altitude band', () => {
     const result = checkOrbitStatus(posX, posY, velX, velY, EARTH);
     expect(result.valid).toBe(true);
     expect(result.altitudeBand).not.toBeNull();
-    expect(result.altitudeBand.id).toBe('MEO');
+    expect(result.altitudeBand!.id).toBe('MEO');
   });
 
   it('invalid orbit has null altitude band', () => {
@@ -817,7 +818,7 @@ describe('checkOrbitStatus altitude band', () => {
     const result = checkOrbitStatus(0, alt, v, 0, MOON);
     expect(result.valid).toBe(true);
     expect(result.altitudeBand).not.toBeNull();
-    expect(result.altitudeBand.id).toBe('LLO');
+    expect(result.altitudeBand!.id).toBe('LLO');
   });
 
   it('orbit below Moon min altitude is invalid', () => {

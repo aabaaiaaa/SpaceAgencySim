@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * parachute-landing.test.js — Unit tests for post-landing parachute swing
  * and auto-stow behaviour.
@@ -11,10 +10,14 @@ import {
   deployParachute,
   POST_LANDING_STOW_DELAY,
 } from '../core/parachute.ts';
+import type { ParachuteEntry } from '../core/parachute.ts';
 
 /** Create a minimal physics state with one parachute entry. */
-function makePsWithChute(overrides = {}) {
-  const entry = {
+function makePsWithChute(overrides: Partial<ParachuteEntry> = {}): {
+  ps: { parachuteStates: Map<string, ParachuteEntry>; activeParts: Set<string> };
+  entry: ParachuteEntry;
+} {
+  const entry: ParachuteEntry = {
     state:            ParachuteState.DEPLOYED,
     deployTimer:      0,
     canopyAngle:      0,
@@ -23,7 +26,8 @@ function makePsWithChute(overrides = {}) {
     ...overrides,
   };
   const ps = {
-    parachuteStates: new Map([['chute1', entry]]),
+    parachuteStates: new Map<string, ParachuteEntry>([['chute1', entry]]),
+    activeParts: new Set<string>(),
   };
   return { ps, entry };
 }
@@ -74,16 +78,17 @@ describe('tickLandedParachutes', () => {
   });
 
   it('ignores packed and failed parachutes', () => {
-    const packed = {
+    const packed: ParachuteEntry = {
       state: ParachuteState.PACKED, deployTimer: 0,
       canopyAngle: 0, canopyAngularVel: 0, stowTimer: 0,
     };
-    const failed = {
+    const failed: ParachuteEntry = {
       state: ParachuteState.FAILED, deployTimer: 0,
       canopyAngle: 0.5, canopyAngularVel: 0, stowTimer: 0,
     };
     const ps = {
-      parachuteStates: new Map([['p', packed], ['f', failed]]),
+      parachuteStates: new Map<string, ParachuteEntry>([['p', packed], ['f', failed]]),
+      activeParts: new Set<string>(),
     };
 
     tickLandedParachutes(ps, 1 / 60);

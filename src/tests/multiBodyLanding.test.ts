@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * multiBodyLanding.test.js — Unit tests for multi-body landing physics (TASK-042).
  *
@@ -30,6 +29,11 @@ import {
 import { createFlightState } from '../core/gameState.ts';
 import { getSurfaceGravity } from '../data/bodies.ts';
 
+import type { PhysicsState, RocketAssembly } from '../core/physics.ts';
+import type { FlightState, FlightEvent } from '../core/gameState.ts';
+import type { StagingConfig } from '../core/rocketbuilder.ts';
+import type { CelestialBody } from '../core/constants.ts';
+
 // ---------------------------------------------------------------------------
 // Shared test fixtures
 // ---------------------------------------------------------------------------
@@ -38,7 +42,13 @@ import { getSurfaceGravity } from '../data/bodies.ts';
  * Minimal uncrewed rocket: Probe Core + Small Tank + Spark Engine.
  * Engine is assigned to Stage 1.
  */
-function makeSimpleRocket() {
+function makeSimpleRocket(): {
+  assembly: RocketAssembly;
+  staging: StagingConfig;
+  probeId: string;
+  tankId: string;
+  engineId: string;
+} {
   const assembly = createRocketAssembly();
   const staging  = createStagingConfig();
 
@@ -55,7 +65,7 @@ function makeSimpleRocket() {
   return { assembly, staging, probeId, tankId, engineId };
 }
 
-function makeFlightState(bodyId = 'EARTH') {
+function makeFlightState(bodyId: CelestialBody = 'EARTH'): FlightState {
   return createFlightState({
     missionId: 'test-mission',
     rocketId:  'test-rocket',
@@ -66,7 +76,7 @@ function makeFlightState(bodyId = 'EARTH') {
 /**
  * Helper: tick the physics N times at 1× warp, 60 Hz.
  */
-function tickN(ps, assembly, staging, fs, n) {
+function tickN(ps: PhysicsState, assembly: RocketAssembly, staging: StagingConfig, fs: FlightState, n: number): void {
   const dt = 1 / 60;
   for (let i = 0; i < n; i++) {
     tick(ps, assembly, staging, fs, dt, 1);
@@ -77,7 +87,12 @@ function tickN(ps, assembly, staging, fs, n) {
  * Helper: drop a rocket from a given altitude and let it fall.
  * Returns the physics state after it lands or crashes.
  */
-function dropFromAltitude(bodyId, altitude, maxTicks = 60000) {
+function dropFromAltitude(bodyId: CelestialBody, altitude: number, maxTicks: number = 60000): {
+  ps: PhysicsState;
+  fs: FlightState;
+  ticks: number;
+  assembly: RocketAssembly;
+} {
   const { assembly, staging } = makeSimpleRocket();
   const fs = makeFlightState(bodyId);
   const ps = createPhysicsState(assembly, fs);
@@ -232,8 +247,8 @@ describe('Multi-body landing events', () => {
 
     expect(result.ps.landed).toBe(true);
     expect(landingEvent).toBeTruthy();
-    expect(landingEvent.bodyId).toBe('MOON');
-    expect(landingEvent.description).toContain('Moon');
+    expect(landingEvent!.bodyId).toBe('MOON');
+    expect(landingEvent!.description).toContain('Moon');
   });
 
   it('includes bodyId in LANDING event on Mars', () => {
@@ -242,8 +257,8 @@ describe('Multi-body landing events', () => {
 
     expect(result.ps.landed).toBe(true);
     expect(landingEvent).toBeTruthy();
-    expect(landingEvent.bodyId).toBe('MARS');
-    expect(landingEvent.description).toContain('Mars');
+    expect(landingEvent!.bodyId).toBe('MARS');
+    expect(landingEvent!.description).toContain('Mars');
   });
 
   it('includes bodyId in CRASH event on Moon', () => {
@@ -258,7 +273,7 @@ describe('Multi-body landing events', () => {
     // Either landed hard or crashed — both should have body info
     const anyEvent = result.fs.events.find(e => e.type === 'LANDING' || e.type === 'CRASH');
     expect(anyEvent).toBeTruthy();
-    expect(anyEvent.bodyId).toBe('MOON');
+    expect(anyEvent!.bodyId).toBe('MOON');
   });
 
   it('gentle drop on Phobos results in landing (very low gravity)', () => {
@@ -267,7 +282,7 @@ describe('Multi-body landing events', () => {
 
     const landingEvent = result.fs.events.find(e => e.type === 'LANDING');
     expect(landingEvent).toBeTruthy();
-    expect(landingEvent.bodyId).toBe('PHOBOS');
+    expect(landingEvent!.bodyId).toBe('PHOBOS');
   });
 });
 
@@ -368,7 +383,7 @@ describe('Mars thin atmosphere', () => {
 // ---------------------------------------------------------------------------
 
 describe('Gravity values match body definitions', () => {
-  const bodies = ['EARTH', 'MOON', 'MARS', 'VENUS', 'MERCURY', 'PHOBOS', 'DEIMOS'];
+  const bodies: CelestialBody[] = ['EARTH', 'MOON', 'MARS', 'VENUS', 'MERCURY', 'PHOBOS', 'DEIMOS'];
 
   for (const bodyId of bodies) {
     it(`applies correct surface gravity for ${bodyId}`, () => {

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * parachute-deploy.test.js — Unit tests for parachute deployment triggers,
  * state machine transitions, drag multiplier, and context menu helpers.
@@ -29,7 +28,48 @@ import {
   getParachuteStatus,
   getParachuteContextMenuItems,
 } from '../core/parachute.ts';
+import type { ParachuteEntry, ParachuteContextMenuItem } from '../core/parachute.ts';
 import { PartType } from '../core/constants.ts';
+
+// ---------------------------------------------------------------------------
+// Local mock interfaces matching the unexported parameter types in parachute.ts
+// ---------------------------------------------------------------------------
+
+/**
+ * Mirrors the unexported `PartialParachuteState` from parachute.ts.
+ * Used by deployParachute, tickCanopyAngles, getChuteMultiplier,
+ * getParachuteStatus, getParachuteContextMenuItems.
+ */
+interface MockPartialPs {
+  parachuteStates?: Map<string, ParachuteEntry>;
+  activeParts: Set<string>;
+  deployedParts?: Set<string>;
+  posY?: number;
+  angle?: number;
+}
+
+/**
+ * Mirrors the unexported `ParachutePhysicsState & { deployedParts: Set<string> }`
+ * used by tickParachutes.
+ */
+interface MockFullPs {
+  parachuteStates: Map<string, ParachuteEntry>;
+  activeParts: Set<string>;
+  deployedParts: Set<string>;
+  posY?: number;
+  angle?: number;
+}
+
+/** Mirrors the unexported `ParachuteAssembly` from parachute.ts. */
+interface MockAssembly {
+  parts: Map<string, { partId: string }>;
+}
+
+/** Mirrors the unexported `ParachuteFlightState` from parachute.ts. */
+interface MockFlightState {
+  events: Array<Record<string, unknown>>;
+  timeElapsed: number;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -39,8 +79,8 @@ import { PartType } from '../core/constants.ts';
  * Create a minimal physics state with a single parachute entry.
  * Defaults to PACKED state with sensible physics values.
  */
-function makePs(overrides = {}) {
-  const entry = {
+function makePs(overrides: Partial<ParachuteEntry> = {}): MockFullPs {
+  const entry: ParachuteEntry = {
     state:            ParachuteState.PACKED,
     deployTimer:      0,
     canopyAngle:      0,
@@ -60,7 +100,7 @@ function makePs(overrides = {}) {
 /**
  * Build a minimal assembly with one parachute part and one probe.
  */
-function makeAssembly() {
+function makeAssembly(): MockAssembly {
   return {
     parts: new Map([
       ['chute-1', { partId: 'parachute-mk1' }],
@@ -70,7 +110,7 @@ function makeAssembly() {
 }
 
 /** Minimal flight state for tickParachutes. */
-function makeFlightState() {
+function makeFlightState(): MockFlightState {
   return { events: [], timeElapsed: 42.0 };
 }
 
@@ -83,7 +123,7 @@ describe('deployParachute', () => {
     const ps = makePs();
     deployParachute(ps, 'chute-1');
 
-    const entry = ps.parachuteStates.get('chute-1');
+    const entry = ps.parachuteStates.get('chute-1')!;
     expect(entry.state).toBe(ParachuteState.DEPLOYING);
   });
 
@@ -91,7 +131,7 @@ describe('deployParachute', () => {
     const ps = makePs();
     deployParachute(ps, 'chute-1');
 
-    const entry = ps.parachuteStates.get('chute-1');
+    const entry = ps.parachuteStates.get('chute-1')!;
     expect(entry.deployTimer).toBe(DEPLOY_DURATION);
   });
 
@@ -100,7 +140,7 @@ describe('deployParachute', () => {
     ps.angle = 1.2;
     deployParachute(ps, 'chute-1');
 
-    const entry = ps.parachuteStates.get('chute-1');
+    const entry = ps.parachuteStates.get('chute-1')!;
     expect(entry.canopyAngle).toBe(1.2);
   });
 
@@ -108,7 +148,7 @@ describe('deployParachute', () => {
     const ps = makePs({ canopyAngularVel: 5.0 });
     deployParachute(ps, 'chute-1');
 
-    const entry = ps.parachuteStates.get('chute-1');
+    const entry = ps.parachuteStates.get('chute-1')!;
     expect(entry.canopyAngularVel).toBe(0);
   });
 
@@ -116,7 +156,7 @@ describe('deployParachute', () => {
     const ps = makePs({ state: ParachuteState.DEPLOYING, deployTimer: 0.5 });
     deployParachute(ps, 'chute-1');
 
-    const entry = ps.parachuteStates.get('chute-1');
+    const entry = ps.parachuteStates.get('chute-1')!;
     expect(entry.state).toBe(ParachuteState.DEPLOYING);
     expect(entry.deployTimer).toBe(0.5); // unchanged
   });
@@ -125,7 +165,7 @@ describe('deployParachute', () => {
     const ps = makePs({ state: ParachuteState.DEPLOYED });
     deployParachute(ps, 'chute-1');
 
-    const entry = ps.parachuteStates.get('chute-1');
+    const entry = ps.parachuteStates.get('chute-1')!;
     expect(entry.state).toBe(ParachuteState.DEPLOYED);
   });
 
@@ -133,7 +173,7 @@ describe('deployParachute', () => {
     const ps = makePs({ state: ParachuteState.FAILED });
     deployParachute(ps, 'chute-1');
 
-    const entry = ps.parachuteStates.get('chute-1');
+    const entry = ps.parachuteStates.get('chute-1')!;
     expect(entry.state).toBe(ParachuteState.FAILED);
   });
 
@@ -143,12 +183,12 @@ describe('deployParachute', () => {
 
     const entry = ps.parachuteStates.get('new-chute');
     expect(entry).toBeDefined();
-    expect(entry.state).toBe(ParachuteState.DEPLOYING);
-    expect(entry.deployTimer).toBe(DEPLOY_DURATION);
+    expect(entry!.state).toBe(ParachuteState.DEPLOYING);
+    expect(entry!.deployTimer).toBe(DEPLOY_DURATION);
   });
 
   it('does nothing when parachuteStates is absent', () => {
-    const ps = { parachuteStates: undefined };
+    const ps: MockPartialPs = { parachuteStates: undefined, activeParts: new Set() };
     // Should not throw.
     expect(() => deployParachute(ps, 'chute-1')).not.toThrow();
   });
@@ -158,7 +198,7 @@ describe('deployParachute', () => {
     delete ps.angle;
     deployParachute(ps, 'chute-1');
 
-    const entry = ps.parachuteStates.get('chute-1');
+    const entry = ps.parachuteStates.get('chute-1')!;
     expect(entry.canopyAngle).toBe(0);
   });
 });
@@ -170,22 +210,24 @@ describe('deployParachute', () => {
 describe('initParachuteStates', () => {
   it('creates a packed entry for each active parachute part', () => {
     const assembly = makeAssembly();
-    const ps = {
+    const ps: MockFullPs = {
       parachuteStates: new Map(),
       activeParts: new Set(['chute-1', 'probe-1']),
+      deployedParts: new Set(),
     };
 
     initParachuteStates(ps, assembly);
 
     expect(ps.parachuteStates.has('chute-1')).toBe(true);
-    expect(ps.parachuteStates.get('chute-1').state).toBe(ParachuteState.PACKED);
+    expect(ps.parachuteStates.get('chute-1')!.state).toBe(ParachuteState.PACKED);
   });
 
   it('does not create entries for non-parachute parts', () => {
     const assembly = makeAssembly();
-    const ps = {
+    const ps: MockFullPs = {
       parachuteStates: new Map(),
       activeParts: new Set(['chute-1', 'probe-1']),
+      deployedParts: new Set(),
     };
 
     initParachuteStates(ps, assembly);
@@ -195,29 +237,31 @@ describe('initParachuteStates', () => {
 
   it('does not overwrite existing entries', () => {
     const assembly = makeAssembly();
-    const existingEntry = {
+    const existingEntry: ParachuteEntry = {
       state: ParachuteState.DEPLOYED,
       deployTimer: 0,
       canopyAngle: 1.5,
       canopyAngularVel: 0.2,
       stowTimer: 0,
     };
-    const ps = {
+    const ps: MockFullPs = {
       parachuteStates: new Map([['chute-1', existingEntry]]),
       activeParts: new Set(['chute-1']),
+      deployedParts: new Set(),
     };
 
     initParachuteStates(ps, assembly);
 
-    expect(ps.parachuteStates.get('chute-1').state).toBe(ParachuteState.DEPLOYED);
-    expect(ps.parachuteStates.get('chute-1').canopyAngle).toBe(1.5);
+    expect(ps.parachuteStates.get('chute-1')!.state).toBe(ParachuteState.DEPLOYED);
+    expect(ps.parachuteStates.get('chute-1')!.canopyAngle).toBe(1.5);
   });
 
   it('skips parts not in activeParts', () => {
     const assembly = makeAssembly();
-    const ps = {
+    const ps: MockFullPs = {
       parachuteStates: new Map(),
       activeParts: new Set(['probe-1']), // chute-1 not active
+      deployedParts: new Set(),
     };
 
     initParachuteStates(ps, assembly);
@@ -227,14 +271,15 @@ describe('initParachuteStates', () => {
 
   it('sets default values for a new entry', () => {
     const assembly = makeAssembly();
-    const ps = {
+    const ps: MockFullPs = {
       parachuteStates: new Map(),
       activeParts: new Set(['chute-1']),
+      deployedParts: new Set(),
     };
 
     initParachuteStates(ps, assembly);
 
-    const entry = ps.parachuteStates.get('chute-1');
+    const entry = ps.parachuteStates.get('chute-1')!;
     expect(entry.deployTimer).toBe(0);
     expect(entry.canopyAngle).toBe(0);
     expect(entry.canopyAngularVel).toBe(0);
@@ -255,7 +300,7 @@ describe('tickParachutes', () => {
 
     tickParachutes(ps, assembly, fs, dt, 500);
 
-    const entry = ps.parachuteStates.get('chute-1');
+    const entry = ps.parachuteStates.get('chute-1')!;
     expect(entry.deployTimer).toBeCloseTo(DEPLOY_DURATION - dt, 5);
     expect(entry.state).toBe(ParachuteState.DEPLOYING); // not yet expired
   });
@@ -268,7 +313,7 @@ describe('tickParachutes', () => {
     // parachute-mk1 maxSafeMass is 1200 kg; pass 500 kg
     tickParachutes(ps, assembly, fs, 0.02, 500);
 
-    const entry = ps.parachuteStates.get('chute-1');
+    const entry = ps.parachuteStates.get('chute-1')!;
     expect(entry.state).toBe(ParachuteState.DEPLOYED);
   });
 
@@ -294,7 +339,7 @@ describe('tickParachutes', () => {
     // parachute-mk1 maxSafeMass is 1200 kg; pass 2000 kg
     tickParachutes(ps, assembly, fs, 0.02, 2000);
 
-    const entry = ps.parachuteStates.get('chute-1');
+    const entry = ps.parachuteStates.get('chute-1')!;
     expect(entry.state).toBe(ParachuteState.FAILED);
   });
 
@@ -307,7 +352,7 @@ describe('tickParachutes', () => {
 
     expect(fs.events).toHaveLength(1);
     expect(fs.events[0].type).toBe('PARACHUTE_FAILED');
-    expect(fs.events[0].description).toContain('exceeds safe limit');
+    expect((fs.events[0].description as string)).toContain('exceeds safe limit');
   });
 
   it('removes the part from activeParts and deployedParts on failure', () => {
@@ -329,7 +374,7 @@ describe('tickParachutes', () => {
 
     tickParachutes(ps, assembly, fs, 1.0, 500);
 
-    expect(ps.parachuteStates.get('chute-1').state).toBe(ParachuteState.PACKED);
+    expect(ps.parachuteStates.get('chute-1')!.state).toBe(ParachuteState.PACKED);
     expect(fs.events).toHaveLength(0);
   });
 
@@ -340,7 +385,7 @@ describe('tickParachutes', () => {
 
     tickParachutes(ps, assembly, fs, 1.0, 500);
 
-    expect(ps.parachuteStates.get('chute-1').state).toBe(ParachuteState.DEPLOYED);
+    expect(ps.parachuteStates.get('chute-1')!.state).toBe(ParachuteState.DEPLOYED);
     expect(fs.events).toHaveLength(0);
   });
 
@@ -351,12 +396,13 @@ describe('tickParachutes', () => {
 
     tickParachutes(ps, assembly, fs, 1.0, 500);
 
-    expect(ps.parachuteStates.get('chute-1').state).toBe(ParachuteState.FAILED);
+    expect(ps.parachuteStates.get('chute-1')!.state).toBe(ParachuteState.FAILED);
     expect(fs.events).toHaveLength(0);
   });
 
   it('handles missing parachuteStates gracefully', () => {
-    const ps = { parachuteStates: undefined };
+    // @ts-expect-error -- testing defensive code path with missing parachuteStates
+    const ps: MockFullPs = { parachuteStates: undefined };
     expect(() => tickParachutes(ps, makeAssembly(), makeFlightState(), 1 / 60, 500)).not.toThrow();
   });
 
@@ -368,7 +414,7 @@ describe('tickParachutes', () => {
     // parachute-mk1 maxSafeMass is 1200 — pass exactly 1200
     tickParachutes(ps, assembly, fs, 0.02, 1200);
 
-    const entry = ps.parachuteStates.get('chute-1');
+    const entry = ps.parachuteStates.get('chute-1')!;
     expect(entry.state).toBe(ParachuteState.DEPLOYED); // not failed — equal is safe
   });
 
@@ -379,7 +425,7 @@ describe('tickParachutes', () => {
 
     tickParachutes(ps, assembly, fs, 0.02, 1201);
 
-    const entry = ps.parachuteStates.get('chute-1');
+    const entry = ps.parachuteStates.get('chute-1')!;
     expect(entry.state).toBe(ParachuteState.FAILED);
   });
 
@@ -406,15 +452,15 @@ describe('tickParachutes', () => {
   });
 
   it('handles multiple parachutes transitioning in the same tick', () => {
-    const entry1 = { state: ParachuteState.DEPLOYING, deployTimer: 0.01, canopyAngle: 0, canopyAngularVel: 0, stowTimer: 0 };
-    const entry2 = { state: ParachuteState.DEPLOYING, deployTimer: 0.01, canopyAngle: 0, canopyAngularVel: 0, stowTimer: 0 };
-    const ps = {
+    const entry1: ParachuteEntry = { state: ParachuteState.DEPLOYING, deployTimer: 0.01, canopyAngle: 0, canopyAngularVel: 0, stowTimer: 0 };
+    const entry2: ParachuteEntry = { state: ParachuteState.DEPLOYING, deployTimer: 0.01, canopyAngle: 0, canopyAngularVel: 0, stowTimer: 0 };
+    const ps: MockFullPs = {
       parachuteStates: new Map([['c1', entry1], ['c2', entry2]]),
       activeParts: new Set(['c1', 'c2']),
       deployedParts: new Set(),
       posY: 3000,
     };
-    const assembly = {
+    const assembly: MockAssembly = {
       parts: new Map([
         ['c1', { partId: 'parachute-mk1' }],
         ['c2', { partId: 'parachute-mk2' }],
@@ -443,7 +489,7 @@ describe('tickCanopyAngles', () => {
       tickCanopyAngles(ps, dt);
     }
 
-    const entry = ps.parachuteStates.get('chute-1');
+    const entry = ps.parachuteStates.get('chute-1')!;
     expect(Math.abs(entry.canopyAngle)).toBeLessThan(0.1);
   });
 
@@ -455,7 +501,7 @@ describe('tickCanopyAngles', () => {
       tickCanopyAngles(ps, dt);
     }
 
-    const entry = ps.parachuteStates.get('chute-1');
+    const entry = ps.parachuteStates.get('chute-1')!;
     expect(Math.abs(entry.canopyAngularVel)).toBeLessThan(0.5);
   });
 
@@ -466,7 +512,7 @@ describe('tickCanopyAngles', () => {
 
     tickCanopyAngles(ps, dt);
 
-    const entry = ps.parachuteStates.get('chute-1');
+    const entry = ps.parachuteStates.get('chute-1')!;
     // Angle should have moved toward zero.
     expect(Math.abs(entry.canopyAngle)).toBeLessThan(initialAngle);
   });
@@ -475,18 +521,19 @@ describe('tickCanopyAngles', () => {
     const ps = makePs({ state: ParachuteState.PACKED, canopyAngle: 1.0 });
     tickCanopyAngles(ps, 1 / 60);
 
-    expect(ps.parachuteStates.get('chute-1').canopyAngle).toBe(1.0); // unchanged
+    expect(ps.parachuteStates.get('chute-1')!.canopyAngle).toBe(1.0); // unchanged
   });
 
   it('ignores FAILED parachutes', () => {
     const ps = makePs({ state: ParachuteState.FAILED, canopyAngle: 0.5 });
     tickCanopyAngles(ps, 1 / 60);
 
-    expect(ps.parachuteStates.get('chute-1').canopyAngle).toBe(0.5); // unchanged
+    expect(ps.parachuteStates.get('chute-1')!.canopyAngle).toBe(0.5); // unchanged
   });
 
   it('handles missing parachuteStates gracefully', () => {
-    expect(() => tickCanopyAngles({ parachuteStates: undefined }, 1 / 60)).not.toThrow();
+    const ps: MockPartialPs = { parachuteStates: undefined, activeParts: new Set() };
+    expect(() => tickCanopyAngles(ps, 1 / 60)).not.toThrow();
   });
 });
 
@@ -559,12 +606,12 @@ describe('getChuteMultiplier', () => {
   });
 
   it('falls back to legacy deployedParts check when parachuteStates is absent', () => {
-    const ps = { deployedParts: new Set(['chute-1']) };
+    const ps: MockPartialPs = { deployedParts: new Set(['chute-1']), activeParts: new Set() };
     expect(getChuteMultiplier(ps, 'chute-1', 1.225)).toBe(80);
   });
 
   it('returns 1 from legacy fallback when not in deployedParts', () => {
-    const ps = { deployedParts: new Set() };
+    const ps: MockPartialPs = { deployedParts: new Set(), activeParts: new Set() };
     expect(getChuteMultiplier(ps, 'chute-1', 1.225)).toBe(1);
   });
 
@@ -592,7 +639,8 @@ describe('getParachuteStatus', () => {
   });
 
   it('returns PACKED when parachuteStates is absent', () => {
-    expect(getParachuteStatus({}, 'chute-1')).toBe(ParachuteState.PACKED);
+    const ps: MockPartialPs = { activeParts: new Set() };
+    expect(getParachuteStatus(ps, 'chute-1')).toBe(ParachuteState.PACKED);
   });
 
   it('returns each possible state correctly', () => {
@@ -612,7 +660,7 @@ describe('getParachuteContextMenuItems', () => {
     const ps = makePs();
     const assembly = makeAssembly();
 
-    const items = getParachuteContextMenuItems(ps, assembly);
+    const items: ParachuteContextMenuItem[] = getParachuteContextMenuItems(ps, assembly);
 
     expect(items).toHaveLength(1);
     expect(items[0].instanceId).toBe('chute-1');
@@ -623,7 +671,7 @@ describe('getParachuteContextMenuItems', () => {
     const ps = makePs({ state: ParachuteState.PACKED });
     const assembly = makeAssembly();
 
-    const items = getParachuteContextMenuItems(ps, assembly);
+    const items: ParachuteContextMenuItem[] = getParachuteContextMenuItems(ps, assembly);
 
     expect(items[0].canDeploy).toBe(true);
     expect(items[0].statusLabel).toBe('Packed (ready)');
@@ -633,7 +681,7 @@ describe('getParachuteContextMenuItems', () => {
     const ps = makePs({ state: ParachuteState.DEPLOYING, deployTimer: 1.3 });
     const assembly = makeAssembly();
 
-    const items = getParachuteContextMenuItems(ps, assembly);
+    const items: ParachuteContextMenuItem[] = getParachuteContextMenuItems(ps, assembly);
 
     expect(items[0].canDeploy).toBe(false);
     expect(items[0].deployTimer).toBeCloseTo(1.3, 1);
@@ -644,7 +692,7 @@ describe('getParachuteContextMenuItems', () => {
     const ps = makePs({ state: ParachuteState.DEPLOYED });
     const assembly = makeAssembly();
 
-    const items = getParachuteContextMenuItems(ps, assembly);
+    const items: ParachuteContextMenuItem[] = getParachuteContextMenuItems(ps, assembly);
 
     expect(items[0].canDeploy).toBe(false);
     expect(items[0].statusLabel).toBe('Deployed');
@@ -657,7 +705,7 @@ describe('getParachuteContextMenuItems', () => {
     ps.activeParts.add('chute-1');
     const assembly = makeAssembly();
 
-    const items = getParachuteContextMenuItems(ps, assembly);
+    const items: ParachuteContextMenuItem[] = getParachuteContextMenuItems(ps, assembly);
 
     expect(items[0].canDeploy).toBe(false);
     expect(items[0].statusLabel).toBe('Failed (destroyed)');
@@ -668,33 +716,33 @@ describe('getParachuteContextMenuItems', () => {
     ps.activeParts.delete('chute-1');
     const assembly = makeAssembly();
 
-    const items = getParachuteContextMenuItems(ps, assembly);
+    const items: ParachuteContextMenuItem[] = getParachuteContextMenuItems(ps, assembly);
 
     expect(items).toHaveLength(0);
   });
 
   it('handles multiple parachutes', () => {
-    const entry1 = { state: ParachuteState.PACKED, deployTimer: 0, canopyAngle: 0, canopyAngularVel: 0, stowTimer: 0 };
-    const entry2 = { state: ParachuteState.DEPLOYED, deployTimer: 0, canopyAngle: 0, canopyAngularVel: 0, stowTimer: 0 };
-    const ps = {
+    const entry1: ParachuteEntry = { state: ParachuteState.PACKED, deployTimer: 0, canopyAngle: 0, canopyAngularVel: 0, stowTimer: 0 };
+    const entry2: ParachuteEntry = { state: ParachuteState.DEPLOYED, deployTimer: 0, canopyAngle: 0, canopyAngularVel: 0, stowTimer: 0 };
+    const ps: MockFullPs = {
       parachuteStates: new Map([['c1', entry1], ['c2', entry2]]),
       activeParts: new Set(['c1', 'c2']),
       deployedParts: new Set(),
       posY: 1000,
     };
-    const assembly = {
+    const assembly: MockAssembly = {
       parts: new Map([
         ['c1', { partId: 'parachute-mk1' }],
         ['c2', { partId: 'parachute-mk2' }],
       ]),
     };
 
-    const items = getParachuteContextMenuItems(ps, assembly);
+    const items: ParachuteContextMenuItem[] = getParachuteContextMenuItems(ps, assembly);
 
     expect(items).toHaveLength(2);
-    const packed = items.find(i => i.instanceId === 'c1');
-    const deployed = items.find(i => i.instanceId === 'c2');
-    expect(packed.canDeploy).toBe(true);
-    expect(deployed.canDeploy).toBe(false);
+    const packed = items.find((i: ParachuteContextMenuItem) => i.instanceId === 'c1');
+    const deployed = items.find((i: ParachuteContextMenuItem) => i.instanceId === 'c2');
+    expect(packed!.canDeploy).toBe(true);
+    expect(deployed!.canDeploy).toBe(false);
   });
 });

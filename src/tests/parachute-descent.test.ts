@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * parachute-descent.test.js — Tests for a command module descending under
  * parachute with player steering input.
@@ -26,8 +25,13 @@ import {
   addStageToConfig,
 } from '../core/rocketbuilder.ts';
 import { createFlightState } from '../core/gameState.ts';
-import { deployParachute } from '../core/parachute.ts';
+import { deployParachute, ParachuteState } from '../core/parachute.ts';
 import { getPartById } from '../data/parts.ts';
+
+import type { PhysicsState, RocketAssembly } from '../core/physics.ts';
+import type { FlightState } from '../core/gameState.ts';
+import type { StagingConfig } from '../core/rocketbuilder.ts';
+import type { PartDef } from '../data/parts.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -37,7 +41,12 @@ import { getPartById } from '../data/parts.ts';
  * Build a minimal capsule: Probe Core Mk1 + Mk1 Parachute.
  * Parachute is assigned to Stage 1 for deployment.
  */
-function makeCapsuleWithChute() {
+function makeCapsuleWithChute(): {
+  assembly: RocketAssembly;
+  staging: StagingConfig;
+  probeId: string;
+  chuteId: string;
+} {
   const assembly = createRocketAssembly();
   const staging  = createStagingConfig();
 
@@ -52,7 +61,7 @@ function makeCapsuleWithChute() {
   return { assembly, staging, probeId, chuteId };
 }
 
-function makeFlightState() {
+function makeFlightState(): FlightState {
   return createFlightState({
     missionId: 'test-mission',
     rocketId:  'test-rocket',
@@ -62,7 +71,13 @@ function makeFlightState() {
 /**
  * Place the physics state mid-air, descending, with parachute deployed.
  */
-function setupDescentState() {
+function setupDescentState(): {
+  ps: PhysicsState;
+  assembly: RocketAssembly;
+  staging: StagingConfig;
+  fs: FlightState;
+  chuteId: string;
+} {
   const { assembly, staging, probeId, chuteId } = makeCapsuleWithChute();
   const fs = makeFlightState();
   const ps = createPhysicsState(assembly, fs);
@@ -78,16 +93,16 @@ function setupDescentState() {
   // Advance the deploy timer so chute is fully deployed.
   // tickParachutes is called inside tick/_integrate, but we can manually
   // set the state to deployed for simplicity.
-  const entry = ps.parachuteStates.get(chuteId);
-  entry.state       = 'deployed';
+  const entry = ps.parachuteStates.get(chuteId)!;
+  entry.state       = ParachuteState.DEPLOYED;
   entry.deployTimer = 0;
 
   return { ps, assembly, staging, fs, chuteId };
 }
 
 /** Check that all critical physics values are finite numbers. */
-function assertNoNaN(ps, label) {
-  const fields = ['posX', 'posY', 'velX', 'velY', 'angle', 'angularVelocity'];
+function assertNoNaN(ps: PhysicsState, label: string): void {
+  const fields = ['posX', 'posY', 'velX', 'velY', 'angle', 'angularVelocity'] as const;
   for (const f of fields) {
     expect(ps[f], `${label}: ps.${f} should be finite`).toSatisfy(Number.isFinite);
   }
@@ -286,7 +301,12 @@ describe('landed command module steering', () => {
   /**
    * Set up a capsule that has already landed softly.
    */
-  function setupLandedState() {
+  function setupLandedState(): {
+    ps: PhysicsState;
+    assembly: RocketAssembly;
+    staging: StagingConfig;
+    fs: FlightState;
+  } {
     const { assembly, staging, probeId, chuteId } = makeCapsuleWithChute();
     const fs = makeFlightState();
     const ps = createPhysicsState(assembly, fs);
@@ -619,7 +639,10 @@ describe('landed capsule ground-contact rendering', () => {
    * Returns { minScreenY, maxScreenY } where 0 = ground level and
    * negative = above ground.
    */
-  function computeCornerScreenYs(ps, assembly) {
+  function computeCornerScreenYs(
+    ps: PhysicsState,
+    assembly: RocketAssembly,
+  ): { minScreenY: number; maxScreenY: number } {
     const SCALE = 0.05;  // SCALE_M_PER_PX
     const contactX = ps.tippingContactX ?? 0;
     const contactY = ps.tippingContactY ?? 0;
@@ -627,15 +650,15 @@ describe('landed capsule ground-contact rendering', () => {
     const sinA = Math.sin(ps.angle);
 
     // Collect all corners in VAB coords.
-    const drops = [];
+    const drops: number[] = [];
     for (const instanceId of ps.activeParts) {
       const placed = assembly.parts.get(instanceId);
       if (!placed) continue;
-      const def = getPartById(placed.partId);
+      const def: PartDef | undefined = getPartById(placed.partId);
       if (!def) continue;
       const hw = (def.width  ?? 40) / 2;
       const hh = (def.height ?? 40) / 2;
-      const corners = [
+      const corners: [number, number][] = [
         [placed.x - hw, placed.y - hh],
         [placed.x + hw, placed.y - hh],
         [placed.x - hw, placed.y + hh],
@@ -657,7 +680,12 @@ describe('landed capsule ground-contact rendering', () => {
     };
   }
 
-  function setupLandedState() {
+  function setupLandedState(): {
+    ps: PhysicsState;
+    assembly: RocketAssembly;
+    staging: StagingConfig;
+    fs: FlightState;
+  } {
     const { assembly, staging, probeId, chuteId } = makeCapsuleWithChute();
     const fs = makeFlightState();
     const ps = createPhysicsState(assembly, fs);
