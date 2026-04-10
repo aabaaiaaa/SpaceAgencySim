@@ -31,8 +31,8 @@ import { getOrbitalStateAtTime, angularDistance, getAltitudeBand, circularOrbitV
 import { getBeltZoneAtAltitude } from './asteroidBelt.ts';
 import { getPartById } from '../data/parts.ts';
 import type { PartDef } from '../data/parts.ts';
-import { setThrustAligned } from './physics.ts';
-import type { PhysicsState, RocketAssembly } from './physics.ts';
+import { setThrustAligned, setCapturedBody, clearCapturedBody } from './physics.ts';
+import type { PhysicsState, RocketAssembly, CapturedBody } from './physics.ts';
 import type { FlightState, FlightEvent, GameState, OrbitalObject, SatelliteRecord } from './gameState.ts';
 import type { Asteroid } from './asteroidBelt.ts';
 
@@ -289,6 +289,19 @@ export function captureAsteroid(
 
   grabState.state = GrabState.GRABBED;
   grabState.grabbedAsteroid = asteroid;
+
+  // Wire captured body into physics state.
+  const body: CapturedBody = {
+    mass: asteroid.mass,
+    radius: asteroid.radius,
+    offset: {
+      x: (asteroid.posX - ps.posX),
+      y: (asteroid.posY - ps.posY),
+    },
+    name: asteroid.name,
+  };
+  setCapturedBody(ps, body);
+
   return { success: true };
 }
 
@@ -299,6 +312,7 @@ export function captureAsteroid(
  */
 export function releaseGrabbedAsteroid(
   grabState: GrabSystemState,
+  ps: PhysicsState,
 ): { success: boolean; reason?: string; asteroid?: Asteroid } {
   if (grabState.state !== GrabState.GRABBED || !grabState.grabbedAsteroid) {
     return { success: false, reason: 'No asteroid grabbed.' };
@@ -306,6 +320,7 @@ export function releaseGrabbedAsteroid(
   const asteroid = grabState.grabbedAsteroid;
   grabState.grabbedAsteroid = null;
   grabState.state = GrabState.RELEASING;
+  clearCapturedBody(ps);
   return { success: true, asteroid };
 }
 

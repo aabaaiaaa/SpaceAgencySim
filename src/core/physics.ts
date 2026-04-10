@@ -1453,6 +1453,14 @@ function _computeCoMLocal(ps: MassQueryable, assembly: RocketAssembly): Point2D 
     totalMass += mass;
   }
 
+  // Include captured body (asteroid) in CoM calculation.
+  const cb = ps.capturedBody;
+  if (cb) {
+    comX += cb.offset.x * cb.mass;
+    comY += cb.offset.y * cb.mass;
+    totalMass += cb.mass;
+  }
+
   if (totalMass > 0) {
     return { x: comX / totalMass, y: comY / totalMass };
   }
@@ -1528,6 +1536,17 @@ function _computeMomentOfInertia(ps: MassQueryable, assembly: RocketAssembly, pi
     const hM: number = (def.height ?? 40) * SCALE_M_PER_PX;
     const Iself: number = mass * (wM * wM + hM * hM) / 12;
     I += Iself + mass * (dx * dx + dy * dy);
+  }
+
+  // Include captured body (asteroid) in MoI calculation.
+  const cb = ps.capturedBody;
+  if (cb) {
+    // Solid sphere self-inertia: (2/5) * m * r^2
+    const Isphere = (2 / 5) * cb.mass * cb.radius * cb.radius;
+    // Parallel-axis: m * d^2, where d is distance from pivot to body centre (in metres)
+    const cdx = (cb.offset.x - pivot.x) * SCALE_M_PER_PX;
+    const cdy = (cb.offset.y - pivot.y) * SCALE_M_PER_PX;
+    I += Isphere + cb.mass * (cdx * cdx + cdy * cdy);
   }
 
   return Math.max(1, I);

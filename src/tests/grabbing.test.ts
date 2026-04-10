@@ -1098,17 +1098,20 @@ describe('releaseGrabbedAsteroid', () => {
     const gs = createGrabState();
     gs.state = GrabState.GRABBED;
     gs.grabbedAsteroid = makeAsteroid();
-    const result = releaseGrabbedAsteroid(gs);
+    const ps = stubPs({ capturedBody: { mass: 1000, radius: 10, offset: { x: 0, y: 0 }, name: 'AST-TEST' }, thrustAligned: false });
+    const result = releaseGrabbedAsteroid(gs, ps);
     expect(result.success).toBe(true);
     expect(gs.state).toBe(GrabState.RELEASING);
     expect(gs.grabbedAsteroid).toBeNull();
+    expect(ps.capturedBody).toBeNull();
   });
 
   it('fails when no asteroid grabbed', () => {
     const gs = createGrabState();
     gs.state = GrabState.GRABBED;
     gs.grabbedAsteroid = null;
-    const result = releaseGrabbedAsteroid(gs);
+    const ps = stubPs({ capturedBody: null, thrustAligned: false });
+    const result = releaseGrabbedAsteroid(gs, ps);
     expect(result.success).toBe(false);
     expect(result.reason).toContain('No asteroid grabbed');
   });
@@ -1117,7 +1120,8 @@ describe('releaseGrabbedAsteroid', () => {
     const gs = createGrabState();
     gs.state = GrabState.IDLE;
     gs.grabbedAsteroid = makeAsteroid();
-    const result = releaseGrabbedAsteroid(gs);
+    const ps = stubPs({ capturedBody: null, thrustAligned: false });
+    const result = releaseGrabbedAsteroid(gs, ps);
     expect(result.success).toBe(false);
     expect(result.reason).toContain('No asteroid grabbed');
   });
@@ -1127,10 +1131,12 @@ describe('releaseGrabbedAsteroid', () => {
     gs.state = GrabState.GRABBED;
     const ast = makeAsteroid({ id: 'AST-RELEASED' });
     gs.grabbedAsteroid = ast;
-    const result = releaseGrabbedAsteroid(gs);
+    const ps = stubPs({ capturedBody: { mass: 1000, radius: 10, offset: { x: 0, y: 0 }, name: 'AST-RELEASED' }, thrustAligned: false });
+    const result = releaseGrabbedAsteroid(gs, ps);
     expect(result.success).toBe(true);
     expect(result.asteroid).toBe(ast);
     expect(result.asteroid.id).toBe('AST-RELEASED');
+    expect(ps.capturedBody).toBeNull();
   });
 });
 

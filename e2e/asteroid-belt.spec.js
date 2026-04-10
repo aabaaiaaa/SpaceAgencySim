@@ -1502,13 +1502,9 @@ test.describe('Asteroid Belt — captured asteroid persistence', () => {
         const capture = grabbing.captureAsteroid(grabState, target, ps, assembly);
         if (!capture.success) return { error: 'capture failed: ' + capture.reason };
 
-        physics.setCapturedBody(ps, { mass: target.mass, radius: target.radius || 15, offset: { x: 0, y: 0 }, name: target.name || 'AST-CAPTURED' });
-
         // Release the asteroid.
-        const release = grabbing.releaseGrabbedAsteroid(grabState);
+        const release = grabbing.releaseGrabbedAsteroid(grabState, ps);
         if (!release.success || !release.asteroid) return { error: 'release failed' };
-
-        physics.clearCapturedBody(ps);
 
         // Count orbital objects before persist.
         const countBefore = state.orbitalObjects.length;
@@ -1596,12 +1592,9 @@ test.describe('Asteroid Belt — captured asteroid persistence', () => {
 
         const grabState = grabbing.createGrabState();
         grabbing.captureAsteroid(grabState, target, ps, assembly);
-        physics.setCapturedBody(ps, { mass: target.mass, radius: target.radius || 15, offset: { x: 0, y: 0 }, name: target.name || 'AST-CAPTURED' });
 
-        const release = grabbing.releaseGrabbedAsteroid(grabState);
+        const release = grabbing.releaseGrabbedAsteroid(grabState, ps);
         if (!release.success || !release.asteroid) return { error: 'release failed' };
-
-        physics.clearCapturedBody(ps);
 
         const countBefore = state.orbitalObjects.length;
         const persist = grabbing.persistReleasedAsteroid(
@@ -1689,9 +1682,7 @@ test.describe('Asteroid Belt — asteroid rename', () => {
 
         const grabState = grabbing.createGrabState();
         grabbing.captureAsteroid(grabState, target, ps, assembly);
-        physics.setCapturedBody(ps, { mass: target.mass, radius: target.radius || 15, offset: { x: 0, y: 0 }, name: target.name || 'AST-CAPTURED' });
-        const release = grabbing.releaseGrabbedAsteroid(grabState);
-        physics.clearCapturedBody(ps);
+        const release = grabbing.releaseGrabbedAsteroid(grabState, ps);
 
         const persist = grabbing.persistReleasedAsteroid(
           release.asteroid, ps, fs, state,

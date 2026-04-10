@@ -53,9 +53,9 @@ function seededRng(seed: number): () => number {
 // Size category
 // ---------------------------------------------------------------------------
 
-type SizeCategory = 'small' | 'medium' | 'large';
+export type SizeCategory = 'small' | 'medium' | 'large';
 
-function getSizeCategory(radius: number): SizeCategory {
+export function getSizeCategory(radius: number): SizeCategory {
   if (radius < 10) return 'small';
   if (radius < 100) return 'medium';
   return 'large';

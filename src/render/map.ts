@@ -53,6 +53,7 @@ import { SOI_RADIUS } from '../core/manoeuvre.ts';
 import { getCommsCoverageInfo } from '../core/comms.ts';
 import { getActiveAsteroids, hasAsteroids } from '../core/asteroidBelt.ts';
 import type { Asteroid } from '../core/asteroidBelt.ts';
+import { getSizeCategory } from './flight/_asteroids.ts';
 
 import type { ReadonlyPhysicsState, ReadonlyFlightState, ReadonlyGameState } from './types.ts';
 import type { OrbitalElements, OrbitalObject } from '../core/gameState.ts';
@@ -356,6 +357,7 @@ export function destroyMapRenderer(): void {
   _craftGraphics       = null;
   _transferGraphics    = null;
   _surfaceGraphics     = null;
+  _commsGraphics       = null;
   _labelContainer      = null;
   _labelPool           = [];
   _beltDots            = null;
@@ -621,6 +623,7 @@ function _useLabel(text: string, x: number, y: number, color: number | string): 
 // ---------------------------------------------------------------------------
 
 function _drawBody(cx: number, cy: number, scale: number, R: number): void {
+  if (!_mapRoot) return;
   _bodyGraphics!.clear();
 
   const bodyPxR = R * scale;
@@ -946,7 +949,8 @@ function _drawBeltAsteroidObjects(
       const dist = Math.hypot(dx, dy);
 
       // Size category label.
-      const sizeLabel = ast.radius >= 500 ? 'Large' : ast.radius >= 50 ? 'Medium' : 'Small';
+      const cat = getSizeCategory(ast.radius);
+      const sizeLabel = cat.charAt(0).toUpperCase() + cat.slice(1);
 
       // Label: name, size, distance.
       _useLabel(
@@ -1328,6 +1332,7 @@ function _drawTransferProgress(flightState: ReadonlyFlightState, w: number, h: n
 }
 
 function _drawShadow(cx: number, cy: number, scale: number, R: number, timeElapsed: number): void {
+  if (!_mapRoot) return;
   _shadowGraphics!.clear();
   if (!_showShadow) return;
 

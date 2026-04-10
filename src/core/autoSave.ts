@@ -9,7 +9,7 @@
  */
 
 import { idbSet, idbDelete, isIdbAvailable } from './idbStorage.ts';
-import { compressSaveData } from './saveload.ts';
+import { compressSaveData, SAVE_VERSION } from './saveload.ts';
 import { logger } from './logger.ts';
 
 import type { GameState } from './gameState.ts';
@@ -26,9 +26,6 @@ export const AUTO_SAVE_KEY = 'spaceAgencySave_auto';
 
 /** Remembered slot for this session (picked once, reused). */
 let _autoSaveSlotKey: string | null = null;
-
-/** Current save format version (mirrors saveload.ts SAVE_VERSION). */
-const SAVE_VERSION = 2;
 
 // ---------------------------------------------------------------------------
 // Session time (mirrors saveload.js pattern)
@@ -72,20 +69,24 @@ export function isAutoSaveEnabled(state: GameState | null | undefined): boolean 
 
 /**
  * Determine which localStorage key to use for auto-saves.
- * Picks the first empty slot starting from 0, with no upper limit —
- * there's always a spare slot available beyond the occupied ones.
+ * Picks the first empty slot starting from 0, capped at 100.
+ * Falls back to the dedicated auto-save key if all slots are occupied.
  * The choice is remembered for the session so we don't switch slots.
  */
 function _getAutoSaveKey(): string {
   if (_autoSaveSlotKey !== null) return _autoSaveSlotKey;
 
-  for (let i = 0; ; i++) {
+  for (let i = 0; i < 100; i++) {
     const key = `${MANUAL_SAVE_PREFIX}${i}`;
     if (localStorage.getItem(key) === null) {
       _autoSaveSlotKey = key;
       return key;
     }
   }
+
+  // All slots occupied — fall back to the dedicated auto-save key.
+  _autoSaveSlotKey = AUTO_SAVE_KEY;
+  return AUTO_SAVE_KEY;
 }
 
 /**

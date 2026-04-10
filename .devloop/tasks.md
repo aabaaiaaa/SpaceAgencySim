@@ -13,13 +13,13 @@ See `.devloop/requirements.md` for full context on each item.
 - **Verification**: `npm run typecheck && npx vitest run src/tests/grabbing.test.ts src/tests/physics.test.ts`
 
 ### TASK-002: Wire setCapturedBody into captureAsteroid and clearCapturedBody into release
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001
 - **Description**: In `captureAsteroid()` (`grabbing.ts:278-280`), after successful capture, construct a `CapturedBody` from the asteroid's mass, radius, and name, compute the craft-local attachment offset from the relative position at capture time, and call `setCapturedBody(ps, body)`. In `releaseGrabbedAsteroid()` (`grabbing.ts:288-298`), add a `ps: PhysicsState` parameter and call `clearCapturedBody(ps)` on release. Update all callers of `releaseGrabbedAsteroid()` to pass `ps`. See requirements section 1.1.
 - **Verification**: `npm run typecheck && npx vitest run src/tests/grabbing.test.ts`
 
 ### TASK-003: Update CoM and MoI calculations to use CapturedBody offset
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001
 - **Description**: Update `_computeCoMLocal()` (`physics.ts:1431-1452`) to include `capturedBody.mass` at `capturedBody.offset` position in the weighted CoM average. Update `_computeMomentOfInertia()` to include the asteroid's rotational contribution: approximate as solid sphere `(2/5) * mass * radius^2` plus parallel-axis term `mass * dist_from_CoM^2`. The offset is in craft-local coordinates and rotates with the ship. See requirements section 1.2.
 - **Verification**: `npm run typecheck && npx vitest run src/tests/physics.test.ts`
@@ -53,13 +53,13 @@ See `.devloop/requirements.md` for full context on each item.
 - **Verification**: `npm run typecheck`
 
 ### TASK-008: Unify asteroid size category thresholds between map and flight view
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Map view (`map.ts:944`) uses size thresholds 500/50m while flight view (`_asteroids.ts:58-62`) uses 100/10m. Export `getSizeCategory()` from `_asteroids.ts` and import it in `map.ts` to derive the size label, eliminating the duplicate thresholds. See requirements section 2.4.
 - **Verification**: `npm run typecheck`
 
 ### TASK-009: Cap _getAutoSaveKey loop and deduplicate SAVE_VERSION
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Two fixes in `autoSave.ts`: (1) `_getAutoSaveKey()` (lines 79-88) has an unbounded `for (let i = 0; ; i++)` loop. Cap it at a reasonable upper bound (e.g., 100) and return `AUTO_SAVE_KEY` as fallback. (2) `SAVE_VERSION = 2` at line 31 duplicates the constant from `saveload.ts:41`. Remove the local definition and import from `saveload.ts`. See requirements section 2.5.
 - **Verification**: `npm run typecheck && npx vitest run src/tests/autoSave.test.ts`
@@ -69,7 +69,7 @@ See `.devloop/requirements.md` for full context on each item.
 ## Map & Render Quality
 
 ### TASK-010: Add defensive null guards in map.ts and null _commsGraphics
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Add `if (!_mapRoot) return` guards at the top of `_drawBody` (line 623) and `_drawShadow` (line 1325) in `map.ts`, matching the pattern used by all other drawing functions. Add `_commsGraphics = null` in `destroyMapRenderer()` (lines 335-367) alongside the other graphics nulling — it's currently missing, leaving a stale reference to a destroyed PixiJS object. See requirements section 3.1.
 - **Verification**: `npm run typecheck`
