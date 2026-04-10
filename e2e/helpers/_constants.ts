@@ -35,17 +35,28 @@ export const FacilityId = Object.freeze({
   RD_LAB:          'rd-lab',
   SATELLITE_OPS:   'satellite-ops',
   LIBRARY:         'library',
-});
+} as const);
+
+export type FacilityIdValue = typeof FacilityId[keyof typeof FacilityId];
+
+// ---------------------------------------------------------------------------
+// Facility state
+// ---------------------------------------------------------------------------
+
+export interface FacilityState {
+  built: boolean;
+  tier: number;
+}
 
 /** Default starter facilities (pre-built at tier 1 in every new game). */
-export const STARTER_FACILITIES = Object.freeze({
+export const STARTER_FACILITIES: Readonly<Record<string, FacilityState>> = Object.freeze({
   [FacilityId.LAUNCH_PAD]:      { built: true, tier: 1 },
   [FacilityId.VAB]:             { built: true, tier: 1 },
   [FacilityId.MISSION_CONTROL]: { built: true, tier: 1 },
 });
 
 /** All facilities built at tier 1 (for advanced test scenarios). */
-export const ALL_FACILITIES = Object.freeze({
+export const ALL_FACILITIES: Readonly<Record<string, FacilityState>> = Object.freeze({
   [FacilityId.LAUNCH_PAD]:      { built: true, tier: 1 },
   [FacilityId.VAB]:             { built: true, tier: 1 },
   [FacilityId.MISSION_CONTROL]: { built: true, tier: 1 },
@@ -60,7 +71,26 @@ export const ALL_FACILITIES = Object.freeze({
 // Mission template (no status field — callers spread and add their own)
 // ---------------------------------------------------------------------------
 
-export const FIRST_FLIGHT_MISSION = {
+export interface ObjectiveTemplate {
+  id: string;
+  type: string;
+  target: Record<string, number>;
+  completed: boolean;
+  description: string;
+}
+
+export interface MissionTemplate {
+  id: string;
+  title: string;
+  description: string;
+  location: string;
+  objectives: ObjectiveTemplate[];
+  reward: number;
+  unlocksAfter: string[];
+  unlockedParts: string[];
+}
+
+export const FIRST_FLIGHT_MISSION: MissionTemplate = {
   id:           'mission-001',
   title:        'First Flight',
   description:  'Reach 100 m altitude.',

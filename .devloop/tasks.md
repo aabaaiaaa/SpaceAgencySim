@@ -9,7 +9,7 @@
 - **Verification**: `npx vitest run src/tests/settingsStore.test.ts`
 
 ### TASK-002: Add unit tests for settings migration chain
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001
 - **Description**: Add tests to `src/tests/settingsStore.test.ts` covering: envelope with version 0 is rejected, version 1 passes unchanged, version > SCHEMA_VERSION is rejected with warning, migration chain executes in order (test with mock migrations that increment a counter or transform a field), and `mergeWithDefaults()` still fills missing fields after migration. See requirements §1.
 - **Verification**: `npx vitest run src/tests/settingsStore.test.ts`
@@ -41,25 +41,25 @@
 ## Phase B: Test Infrastructure
 
 ### TASK-007: Convert unit test setup helper (setup.ts) to strict TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-004
 - **Description**: Remove `// @ts-nocheck` from `src/tests/setup.ts`. Add proper type imports, type all exported functions with explicit return types and typed parameters, eliminate all `any` usage. This file is the shared test setup referenced by Vitest's `setupFiles` — all unit tests depend on it. See requirements §5.2.
 - **Verification**: `npx vitest run src/tests/gameState.test.ts`
 
 ### TASK-008: Convert E2E helper _constants.js to TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-006
 - **Description**: Rename `e2e/helpers/_constants.js` to `e2e/helpers/_constants.ts`. Add type annotations to all exported constants and enums. Add explicit types to any exported objects or arrays. Eliminate all `any`. See requirements §5.4.
 - **Verification**: `npx playwright test e2e/smoke.spec.js --grep @smoke`
 
 ### TASK-009: Convert E2E helper _assertions.js to TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-006
 - **Description**: Rename `e2e/helpers/_assertions.js` to `e2e/helpers/_assertions.ts`. Add Playwright type imports (`Page`, `Locator`, `expect`). Type all exported assertion functions with explicit parameter types and return types. Eliminate all `any`. See requirements §5.4.
 - **Verification**: `npx playwright test e2e/smoke.spec.js --grep @smoke`
 
 ### TASK-010: Convert E2E helper _state.js to TypeScript
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-006
 - **Description**: Rename `e2e/helpers/_state.js` to `e2e/helpers/_state.ts`. Add Playwright type imports. Type all exported state management functions with explicit parameter types and return types. Eliminate all `any`. See requirements §5.4.
 - **Verification**: `npx playwright test e2e/smoke.spec.js --grep @smoke`

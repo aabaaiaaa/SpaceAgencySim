@@ -2,19 +2,48 @@
  * Wait/assertion helpers for E2E tests — objective completion, altitude, flight events.
  */
 
+import type { Page } from '@playwright/test';
+
+// ---------------------------------------------------------------------------
+// Browser-context window augmentation (these globals are injected at runtime)
+// ---------------------------------------------------------------------------
+
+/* eslint-disable @typescript-eslint/consistent-type-definitions */
+declare global {
+  interface Window {
+    __gameState?: {
+      missions?: {
+        accepted?: { id: string; objectives?: { id: string; completed?: boolean }[] }[];
+        completed?: { id: string; objectives?: { id: string; completed?: boolean }[] }[];
+      };
+      contracts?: {
+        active?: { id: string; objectives?: { id: string; completed?: boolean }[] }[];
+        completed?: { id: string; objectives?: { id: string; completed?: boolean }[] }[];
+      };
+      currentFlight?: {
+        events?: { type: string }[];
+      };
+    };
+    __flightPs?: {
+      posY?: number;
+    };
+  }
+}
+/* eslint-enable @typescript-eslint/consistent-type-definitions */
+
 // ---------------------------------------------------------------------------
 // Objective helpers
 // ---------------------------------------------------------------------------
 
 /**
  * Wait for a specific mission objective to be marked complete.
- *
- * @param {import('@playwright/test').Page} page
- * @param {string} missionId   ID of the mission (e.g. 'mission-001')
- * @param {string} objectiveId ID of the objective (e.g. 'obj-001-1')
- * @param {number} [timeout=30000] Max time to wait in ms
  */
-export async function waitForObjectiveComplete(page, missionId, objectiveId, timeout = 30_000) {
+export async function waitForObjectiveComplete(
+  page: Page,
+  missionId: string,
+  objectiveId: string,
+  timeout: number = 30_000,
+): Promise<void> {
   await page.waitForFunction(
     ({ mid, oid }) => {
       const gs = window.__gameState;
@@ -35,13 +64,13 @@ export async function waitForObjectiveComplete(page, missionId, objectiveId, tim
 
 /**
  * Wait for a specific contract objective to be marked complete.
- *
- * @param {import('@playwright/test').Page} page
- * @param {string} contractId  ID of the contract
- * @param {string} objectiveId ID of the objective
- * @param {number} [timeout=30000]
  */
-export async function waitForContractObjectiveComplete(page, contractId, objectiveId, timeout = 30_000) {
+export async function waitForContractObjectiveComplete(
+  page: Page,
+  contractId: string,
+  objectiveId: string,
+  timeout: number = 30_000,
+): Promise<void> {
   await page.waitForFunction(
     ({ cid, oid }) => {
       const gs = window.__gameState;
@@ -62,12 +91,11 @@ export async function waitForContractObjectiveComplete(page, contractId, objecti
 
 /**
  * Check whether ALL objectives on a mission are complete (snapshot, no wait).
- *
- * @param {import('@playwright/test').Page} page
- * @param {string} missionId
- * @returns {Promise<boolean>}
  */
-export async function areAllObjectivesComplete(page, missionId) {
+export async function areAllObjectivesComplete(
+  page: Page,
+  missionId: string,
+): Promise<boolean> {
   return page.evaluate((mid) => {
     const gs = window.__gameState;
     if (!gs) return false;
@@ -83,12 +111,12 @@ export async function areAllObjectivesComplete(page, missionId) {
 
 /**
  * Wait for the rocket to reach a minimum altitude during flight.
- *
- * @param {import('@playwright/test').Page} page
- * @param {number} altitude   Minimum altitude in metres
- * @param {number} [timeout=30000]
  */
-export async function waitForAltitude(page, altitude, timeout = 30_000) {
+export async function waitForAltitude(
+  page: Page,
+  altitude: number,
+  timeout: number = 30_000,
+): Promise<void> {
   await page.waitForFunction(
     (alt) => (window.__flightPs?.posY ?? 0) >= alt,
     altitude,
@@ -98,12 +126,12 @@ export async function waitForAltitude(page, altitude, timeout = 30_000) {
 
 /**
  * Wait for a specific flight event type to appear in the event log.
- *
- * @param {import('@playwright/test').Page} page
- * @param {string} eventType  Event type string (e.g. 'LANDING', 'SCIENCE_COLLECTED')
- * @param {number} [timeout=30000]
  */
-export async function waitForFlightEvent(page, eventType, timeout = 30_000) {
+export async function waitForFlightEvent(
+  page: Page,
+  eventType: string,
+  timeout: number = 30_000,
+): Promise<void> {
   await page.waitForFunction(
     (evtType) => {
       const gs = window.__gameState;

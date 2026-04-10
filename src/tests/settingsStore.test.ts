@@ -285,6 +285,64 @@ describe('settingsStore', () => {
       expect(loaded.showPerfDashboard).to.equal(true);
       expect(loaded.malfunctionMode).to.equal(MalfunctionMode.FORCED);
     });
+
+    it('should fill missing fields from defaults after migration (partial envelope)', () => {
+      // Save an envelope at version 1 with only autoSaveEnabled and debugMode.
+      // The migration pipeline (isValidEnvelope -> _migrateSettings -> mergeWithDefaults)
+      // should preserve the specified fields and fill the rest from defaults.
+      const partialEnvelope = {
+        version: 1,
+        settings: {
+          autoSaveEnabled: false,
+          debugMode: true,
+        },
+      };
+      mockStorage.setItem(STORAGE_KEY, JSON.stringify(partialEnvelope));
+
+      const loaded = loadSettings();
+
+      // Specified fields retain their saved values
+      expect(loaded.autoSaveEnabled).to.equal(false);
+      expect(loaded.debugMode).to.equal(true);
+
+      // Missing fields filled from defaults
+      expect(loaded.showPerfDashboard).to.equal(false);
+      expect(loaded.malfunctionMode).to.equal(MalfunctionMode.NORMAL);
+      expect(loaded.difficultySettings).to.deep.equal({ ...DEFAULT_DIFFICULTY_SETTINGS });
+    });
+
+    it('should preserve all fields exactly when a version-1 envelope has every field populated', () => {
+      // A fully-populated version-1 envelope should pass through the migration
+      // pipeline completely unchanged — no field should be overwritten by defaults.
+      const settings = customSettings();
+      mockStorage.setItem(STORAGE_KEY, JSON.stringify({
+        version: 1,
+        settings,
+      }));
+
+      const loaded = loadSettings();
+      expect(loaded).to.deep.equal(settings);
+      // Verify individual fields to confirm nothing was silently replaced
+      expect(loaded.autoSaveEnabled).to.equal(false);
+      expect(loaded.debugMode).to.equal(true);
+      expect(loaded.showPerfDashboard).to.equal(true);
+      expect(loaded.malfunctionMode).to.equal(MalfunctionMode.FORCED);
+      expect(loaded.difficultySettings.malfunctionFrequency).to.equal('high');
+    });
+
+    it('should fill all fields from defaults when version-1 envelope has an empty settings object', () => {
+      // An empty settings object is still a valid object — the envelope passes
+      // isValidEnvelope, _migrateSettings is a no-op (version already 1), and
+      // mergeWithDefaults fills every field from defaults.
+      const emptyEnvelope = {
+        version: 1,
+        settings: {},
+      };
+      mockStorage.setItem(STORAGE_KEY, JSON.stringify(emptyEnvelope));
+
+      const loaded = loadSettings();
+      expect(loaded).to.deep.equal(expectedDefaults());
+    });
   });
 
   // -----------------------------------------------------------------------
