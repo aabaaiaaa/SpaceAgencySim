@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import {
   VP_W, VP_H,
   SAVE_KEY, STARTING_MONEY,
@@ -12,13 +13,29 @@ import {
  * Each test is independent — seeds its own state.
  */
 
+/**
+ * Browser-context window shape for page.evaluate() callbacks.
+ * Defined as a local interface (not `declare global`) to avoid conflicting
+ * with the narrower Window augmentations in the helper modules. Inside
+ * evaluate callbacks we cast: `(window as unknown as GameWindow)`.
+ */
+interface GameWindow {
+  __gameState?: {
+    agencyName?: string;
+    money?: number;
+  };
+  __vabAssembly?: {
+    parts: Map<string, { partId: string }>;
+  };
+}
+
 const AGENCY_NAME = 'Test Agency';
 
-function makeEnvelope(overrides = {}) {
+function makeEnvelope(overrides: Record<string, unknown> = {}): ReturnType<typeof buildSaveEnvelope> {
   return buildSaveEnvelope({ agencyName: AGENCY_NAME, ...overrides });
 }
 
-async function openTopbarSaveDialog(page) {
+async function openTopbarSaveDialog(page: Page): Promise<void> {
   await page.click('#topbar-menu-btn');
   await expect(page.locator('#topbar-dropdown')).toBeVisible();
   await page.locator('#topbar-dropdown').getByText('Save Game').click();
@@ -26,7 +43,7 @@ async function openTopbarSaveDialog(page) {
 }
 
 /** Start a new game and navigate to VAB. */
-async function startNewGameAndGoToVab(page) {
+async function startNewGameAndGoToVab(page: Page): Promise<void> {
   await page.setViewportSize({ width: VP_W, height: VP_H });
   await page.goto('/');
   await page.waitForSelector('#mm-agency-name-input', { state: 'visible', timeout: 15_000 });
@@ -39,7 +56,7 @@ async function startNewGameAndGoToVab(page) {
 }
 
 /** Seed a save in slot 0 and navigate to the load screen. */
-async function seedSaveAndGoToLoadScreen(page, envelope) {
+async function seedSaveAndGoToLoadScreen(page: Page, envelope: ReturnType<typeof buildSaveEnvelope>): Promise<void> {
   await page.setViewportSize({ width: VP_W, height: VP_H });
   await page.addInitScript(({ key, envelope }) => {
     localStorage.setItem(key, JSON.stringify(envelope));
@@ -87,10 +104,14 @@ test.describe('Save & Load Flow', () => {
     await page.click('[data-action="load"][data-slot="0"]');
     await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
 
-    const agencyName = await page.evaluate(() => window.__gameState?.agencyName);
+    const agencyName: string | undefined = await page.evaluate(
+      () => (window as unknown as GameWindow).__gameState?.agencyName,
+    );
     expect(agencyName).toBe(AGENCY_NAME);
 
-    const money = await page.evaluate(() => window.__gameState?.money);
+    const money: number | undefined = await page.evaluate(
+      () => (window as unknown as GameWindow).__gameState?.money,
+    );
     expect(money).toBe(STARTING_MONEY);
   });
 
@@ -150,18 +171,18 @@ test.describe('Save & Load Flow', () => {
       page.click('[data-action="export"][data-slot="0"]'),
     ]);
 
-    const stream  = await download.createReadStream();
-    const chunks  = [];
-    for await (const chunk of stream) {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    const stream = await download.createReadStream();
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream!) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Uint8Array));
     }
-    const rawJson = Buffer.concat(chunks).toString('utf-8');
+    const rawJson: string = Buffer.concat(chunks).toString('utf-8');
 
-    let parsed;
+    let parsed: { state: { money: number } } | undefined;
     expect(() => { parsed = JSON.parse(rawJson); }).not.toThrow();
     expect(parsed).toHaveProperty('state');
-    expect(parsed.state).toHaveProperty('money');
-    expect(typeof parsed.state.money).toBe('number');
+    expect(parsed!.state).toHaveProperty('money');
+    expect(typeof parsed!.state.money).toBe('number');
   });
 
   test('(8) VAB rocket assembly persists across save/load cycle', async ({ page }) => {
@@ -169,17 +190,22 @@ test.describe('Save & Load Flow', () => {
 
     // Disable auto-zoom.
     await page.evaluate(() => {
-      const chk = document.getElementById('vab-chk-autozoom');
+      const chk = document.getElementById('vab-chk-autozoom') as HTMLInputElement | null;
       if (chk && chk.checked) { chk.checked = false; chk.dispatchEvent(new Event('change')); }
-      const slider = document.getElementById('vab-zoom-slider');
+      const slider = document.getElementById('vab-zoom-slider') as HTMLInputElement | null;
       if (slider) { slider.value = '1'; slider.dispatchEvent(new Event('input')); }
     });
 
     await page.waitForSelector('.vab-part-card[data-part-id="probe-core-mk1"]', { state: 'visible', timeout: 10_000 });
     await dragPartToCanvas(page, 'probe-core-mk1', 525, 400);
-    await page.waitForFunction(() => (window.__vabAssembly?.parts?.size ?? 0) >= 1, { timeout: 5_000 });
+    await page.waitForFunction(
+      () => ((window as unknown as GameWindow).__vabAssembly?.parts?.size ?? 0) >= 1,
+      { timeout: 5_000 },
+    );
 
-    const sizeBefore = await page.evaluate(() => window.__vabAssembly.parts.size);
+    const sizeBefore: number = await page.evaluate(
+      () => (window as unknown as GameWindow).__vabAssembly?.parts?.size ?? 0,
+    );
     expect(sizeBefore).toBeGreaterThanOrEqual(1);
 
     await openTopbarSaveDialog(page);
@@ -193,13 +219,19 @@ test.describe('Save & Load Flow', () => {
 
     await page.click('[data-building-id="vab"]');
     await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 15_000 });
-    await page.waitForFunction(() => (window.__vabAssembly?.parts?.size ?? 0) >= 1, { timeout: 5_000 });
+    await page.waitForFunction(
+      () => ((window as unknown as GameWindow).__vabAssembly?.parts?.size ?? 0) >= 1,
+      { timeout: 5_000 },
+    );
 
-    const sizeAfter = await page.evaluate(() => window.__vabAssembly.parts.size);
+    const sizeAfter: number = await page.evaluate(
+      () => (window as unknown as GameWindow).__vabAssembly?.parts?.size ?? 0,
+    );
     expect(sizeAfter).toBeGreaterThanOrEqual(1);
 
-    const hasProbe = await page.evaluate(() => {
-      for (const p of window.__vabAssembly.parts.values()) {
+    const hasProbe: boolean = await page.evaluate(() => {
+      const w = window as unknown as GameWindow;
+      for (const p of w.__vabAssembly?.parts?.values() ?? []) {
         if (p.partId === 'probe-core-mk1') return true;
       }
       return false;

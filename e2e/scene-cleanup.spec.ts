@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import {
   VP_W, VP_H,
   buildSaveEnvelope,
@@ -14,12 +15,12 @@ import {
  * loading a game results in a clean hub with no PixiJS scene remnants.
  */
 
-const UNLOCKED_PARTS = ['cmd-mk1', 'tank-small', 'engine-spark'];
-const envelope = buildSaveEnvelope({ parts: UNLOCKED_PARTS });
+const UNLOCKED_PARTS: string[] = ['cmd-mk1', 'tank-small', 'engine-spark'];
+const envelope: ReturnType<typeof buildSaveEnvelope> = buildSaveEnvelope({ parts: UNLOCKED_PARTS });
 
-// ── Helper: open hamburger and click "Exit to Menu", then confirm ─────────
+// -- Helper: open hamburger and click "Exit to Menu", then confirm -----------
 
-async function exitToMenu(page) {
+async function exitToMenu(page: Page): Promise<void> {
   await page.click('#topbar-menu-btn');
   await page.waitForSelector('#topbar-dropdown', { state: 'visible', timeout: 5_000 });
   await page.click('.topbar-dropdown-item.danger');
@@ -28,24 +29,25 @@ async function exitToMenu(page) {
   await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
 }
 
-// ── Helper: load slot 0 and wait for hub ──────────────────────────────────
+// -- Helper: load slot 0 and wait for hub ------------------------------------
 
-async function loadSaveSlot0(page) {
+async function loadSaveSlot0(page: Page): Promise<void> {
   await page.click('[data-action="load"][data-slot="0"]');
   await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
 }
 
-// ── Helper: assert hub is clean ───────────────────────────────────────────
+// -- Helper: assert hub is clean ---------------------------------------------
 
-async function assertCleanHub(page) {
+async function assertCleanHub(page: Page): Promise<void> {
   await expect(page.locator('#hub-overlay')).toBeVisible();
   await expect(page.locator('#vab-root')).toHaveCount(0);
   await expect(page.locator('#flight-hud')).toHaveCount(0);
   await expect(page.locator('#flight-overlay')).toHaveCount(0);
 
   // PixiJS: VAB container should not be visible.
-  const vabContainerVisible = await page.evaluate(() => {
-    const app = window.__pixiApp;
+  const vabContainerVisible: boolean = await page.evaluate(() => {
+    const app = (window as Record<string, unknown>).__pixiApp as
+      { stage: { children: { label: string; visible: boolean }[] } } | undefined;
     if (!app) return false;
     for (const child of app.stage.children) {
       if (child.label === 'vabRoot' && child.visible) return true;
@@ -55,7 +57,7 @@ async function assertCleanHub(page) {
   expect(vabContainerVisible).toBe(false);
 }
 
-// ── (1) From VAB → exit to menu → load game ──────────────────────────────
+// -- (1) From VAB -> exit to menu -> load game -------------------------------
 
 test('VAB scene is hidden after exit-to-menu and reload', async ({ page }) => {
   await page.setViewportSize({ width: VP_W, height: VP_H });
@@ -70,7 +72,7 @@ test('VAB scene is hidden after exit-to-menu and reload', async ({ page }) => {
   await assertCleanHub(page);
 });
 
-// ── (2) From flight → exit to menu → load game ───────────────────────────
+// -- (2) From flight -> exit to menu -> load game ----------------------------
 
 test('flight scene is cleaned up after exit-to-menu and reload', async ({ page }) => {
   await page.setViewportSize({ width: VP_W, height: VP_H });
@@ -85,6 +87,8 @@ test('flight scene is cleaned up after exit-to-menu and reload', async ({ page }
 
   await assertCleanHub(page);
 
-  const flightPs = await page.evaluate(() => window.__flightPs);
+  const flightPs: unknown = await page.evaluate(
+    () => (window as Record<string, unknown>).__flightPs
+  );
   expect(flightPs).toBeNull();
 });
