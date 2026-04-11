@@ -55,13 +55,13 @@
 - **Verification**: `npx vitest run src/tests/mining.test.ts`
 
 ### TASK-010: Implement refinery recipe processing
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-009
 - **Description**: Create `src/core/refinery.ts` with: `RecipeEntry` and `RefineryRecipe` interfaces, `REFINERY_RECIPES` frozen array (4 recipes: water-electrolysis, sabatier-process, regolith-electrolysis, hydrazine-synthesis — see requirements.md §2 for mass ratios), `RECIPES_BY_ID` record, `setRefineryRecipe(site, moduleId, recipeId)`, `getRefineryRecipe(site, moduleId)`, `processRefineries(state)` (per-period — check inputs available scaled by power efficiency, consume inputs, produce outputs). Create `src/tests/refinery.test.ts` with tests covering: recipe catalog contents, water electrolysis conversion, no processing when inputs insufficient, no processing when no recipe set.
 - **Verification**: `npx vitest run src/tests/refinery.test.ts`
 
 ### TASK-011: Implement surface launch pad orbital buffer transfer
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-009
 - **Description**: Add `processSurfaceLaunchPads(state)` to `src/core/mining.ts`. For each site, for each SURFACE_LAUNCH_PAD module: get launch capacity from part properties (scaled by power efficiency), transfer resources from `site.storage` to `site.orbitalBuffer` up to the capacity limit. Append tests to `src/tests/mining.test.ts` covering: resources transfer from storage to orbital buffer, launch capacity limit respected, no transfer without power.
 - **Verification**: `npx vitest run src/tests/mining.test.ts`

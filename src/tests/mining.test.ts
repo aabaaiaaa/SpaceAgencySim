@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
-import { createMiningSite, findNearestSite, addModuleToSite, toggleConnection, SITE_PROXIMITY_RADIUS, getPowerEfficiency, getConnectedStorage, processMiningSites } from '../core/mining.ts';
+import { createMiningSite, findNearestSite, addModuleToSite, toggleConnection, SITE_PROXIMITY_RADIUS, getPowerEfficiency, getConnectedStorage, processMiningSites, processSurfaceLaunchPads } from '../core/mining.ts';
 import { MiningModuleType, ResourceType, ResourceState } from '../core/constants.ts';
 
 describe('GameState mining/route fields', () => {
@@ -417,5 +417,76 @@ describe('processMiningSites', () => {
     expect(waterIce).toBeCloseTo(50 * efficiency, 5);
     // REGOLITH: 200 * (10/27) * 1.0
     expect(regolith).toBeCloseTo(200 * efficiency, 5);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Surface launch pad tests
+// ---------------------------------------------------------------------------
+
+describe('processSurfaceLaunchPads', () => {
+  function buildSiteWithLaunchPad(state: ReturnType<typeof createGameState>, opts?: { noPower?: boolean }) {
+    const site = createMiningSite(state, {
+      name: 'Launch Test Site',
+      bodyId: 'MOON',
+      coordinates: { x: 0, y: 0 },
+      controlUnitPartId: 'base-control-unit-mk1',
+    });
+
+    if (!opts?.noPower) {
+      addModuleToSite(site, {
+        partId: 'power-generator-solar-mk1',
+        type: MiningModuleType.POWER_GENERATOR,
+        powerDraw: 0,
+        powerOutput: 100,
+      });
+    }
+
+    addModuleToSite(site, {
+      partId: 'surface-launch-pad-mk1',
+      type: MiningModuleType.SURFACE_LAUNCH_PAD,
+      powerDraw: 50,
+    });
+
+    return site;
+  }
+
+  it('transfers resources from storage to orbital buffer', () => {
+    const state = createGameState();
+    const site = buildSiteWithLaunchPad(state);
+
+    site.storage[ResourceType.WATER_ICE] = 100;
+
+    processSurfaceLaunchPads(state);
+
+    expect(site.orbitalBuffer[ResourceType.WATER_ICE]).toBe(100);
+    expect(site.storage[ResourceType.WATER_ICE]).toBe(0);
+  });
+
+  it('respects launch capacity limit', () => {
+    const state = createGameState();
+    const site = buildSiteWithLaunchPad(state);
+
+    // Put more resources than the 200 kg capacity
+    site.storage[ResourceType.WATER_ICE] = 500;
+
+    processSurfaceLaunchPads(state);
+
+    // At full power (100 gen / 50 draw → efficiency clamped to 1.0), capacity = 200
+    expect(site.orbitalBuffer[ResourceType.WATER_ICE]).toBe(200);
+    expect(site.storage[ResourceType.WATER_ICE]).toBe(300);
+  });
+
+  it('does not transfer without power', () => {
+    const state = createGameState();
+    const site = buildSiteWithLaunchPad(state, { noPower: true });
+
+    site.storage[ResourceType.WATER_ICE] = 100;
+
+    processSurfaceLaunchPads(state);
+
+    // No power generator → powerGenerated=0, powerRequired=50 → efficiency=0
+    expect(site.orbitalBuffer[ResourceType.WATER_ICE] ?? 0).toBe(0);
+    expect(site.storage[ResourceType.WATER_ICE]).toBe(100);
   });
 });

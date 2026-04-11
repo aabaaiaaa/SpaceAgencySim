@@ -305,3 +305,43 @@ export function processMiningSites(state: GameState): void {
     }
   }
 }
+
+/**
+ * Process surface launch pads across all mining sites.
+ *
+ * For each SURFACE_LAUNCH_PAD module, transfers resources from the site's
+ * `storage` to its `orbitalBuffer` up to the pad's launch capacity (scaled
+ * by the site's power efficiency).  Unlike extractors, launch pads read
+ * directly from site-wide storage and do not require pipe connections.
+ */
+export function processSurfaceLaunchPads(state: GameState): void {
+  for (const site of state.miningSites) {
+    const efficiency = getPowerEfficiency(site);
+    if (efficiency <= 0) continue;
+
+    for (const mod of site.modules) {
+      if (mod.type !== MiningModuleType.SURFACE_LAUNCH_PAD) continue;
+
+      const partDef = getPartById(mod.partId);
+      const launchCapacityKgPerPeriod = partDef
+        ? ((partDef.properties.launchCapacityKgPerPeriod as number) ?? 0)
+        : 0;
+
+      const effectiveCapacity = launchCapacityKgPerPeriod * efficiency;
+      let remainingCapacity = effectiveCapacity;
+
+      for (const resourceType of Object.keys(site.storage) as ResourceType[]) {
+        if (remainingCapacity <= 0) break;
+
+        const available = site.storage[resourceType] ?? 0;
+        const toTransfer = Math.min(available, remainingCapacity);
+
+        if (toTransfer > 0) {
+          site.storage[resourceType] = (site.storage[resourceType] ?? 0) - toTransfer;
+          site.orbitalBuffer[resourceType] = (site.orbitalBuffer[resourceType] ?? 0) + toTransfer;
+          remainingCapacity -= toTransfer;
+        }
+      }
+    }
+  }
+}
