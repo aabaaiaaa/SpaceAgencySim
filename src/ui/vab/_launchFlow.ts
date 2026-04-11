@@ -5,6 +5,7 @@
 
 import { getPartById } from '../../data/parts.ts';
 import { PartType, DEATH_FINE_PER_ASTRONAUT } from '../../core/constants.ts';
+import type { CelestialBody } from '../../core/constants.ts';
 import { getCurrentWeather } from '../../core/weather.ts';
 import { getActiveCrew } from '../../core/crew.ts';
 import { createRocketDesign, createFlightState } from '../../core/gameState.ts';
@@ -246,7 +247,7 @@ function doLaunch(crewIds: string[]): void {
     ...(isOrbitalLaunch ? {
       launchType: 'orbital' as const,
       launchHubId: activeHub.id,
-      bodyId: activeHub.bodyId as any,
+      bodyId: activeHub.bodyId as CelestialBody,
     } : {}),
   });
 

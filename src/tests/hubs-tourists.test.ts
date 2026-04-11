@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
 import type { GameState } from '../core/gameState.ts';
-import { FacilityId, EARTH_HUB_ID, AstronautStatus } from '../core/constants.ts';
+import { FacilityId, AstronautStatus } from '../core/constants.ts';
 import type { Tourist } from '../core/hubTypes.ts';
 import {
   getHubCapacity,

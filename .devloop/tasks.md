@@ -229,7 +229,7 @@
 - **Verification**: `npx playwright test e2e/hubs-vab-offworld.spec.ts` passes.
 
 ### TASK-034: Final hub verification pass
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-031, TASK-032, TASK-033
 - **Description**: Run the complete unit test suite, TypeScript type checking, and ESLint. Grep for any TODO/FIXME/HACK comments in new hub files. Verify no regressions in existing tests. This is a verification-only task — fix any issues found.
 - **Verification**: `npm run test:unit` passes. `npx tsc --noEmit` passes. `npm run lint` passes.

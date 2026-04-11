@@ -9,6 +9,7 @@ import {
   FlightPhase,
   BODY_RADIUS,
 } from '../core/constants.ts';
+import type { CelestialBody } from '../core/constants.ts';
 import { getSurfaceGravity } from '../data/bodies.ts';
 import type { RocketAssembly } from '../core/physics.ts';
 import {
@@ -26,8 +27,6 @@ import {
 import {
   hasFacility,
   getFacilityTier,
-  buildFacility,
-  upgradeFacility,
 } from '../core/construction.ts';
 import {
   EnvironmentCategory,
@@ -308,7 +307,7 @@ describe('Orbital hub undocking launch', () => {
       missionId: 'test-orbital',
       rocketId: 'rocket-orbital',
       launchType: 'orbital',
-      bodyId: bodyId as any,
+      bodyId: bodyId as CelestialBody,
     });
     // Set altitude as the launch flow would.
     flightState.altitude = altitude;

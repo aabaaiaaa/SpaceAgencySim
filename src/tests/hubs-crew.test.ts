@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createGameState, createCrewMember } from '../core/gameState.ts';
 import type { GameState, CrewMember } from '../core/gameState.ts';
-import { EARTH_HUB_ID, HIRE_COST, AstronautStatus } from '../core/constants.ts';
+import { EARTH_HUB_ID, HIRE_COST, AstronautStatus, ResourceType } from '../core/constants.ts';
 import { createHub } from '../core/hubs.ts';
 import {
   getCrewAtHub,
@@ -177,7 +177,7 @@ describe('getTransferCost', () => {
       id: 'route-test',
       name: 'Earth-Moon Route',
       status: 'active',
-      resourceType: 'WATER_ICE' as any,
+      resourceType: ResourceType.WATER_ICE,
       legs: [{
         id: 'leg-1',
         origin: { bodyId: 'EARTH', locationType: 'orbit' },
@@ -208,7 +208,7 @@ describe('getTransferCost', () => {
       id: 'route-paused',
       name: 'Paused Route',
       status: 'paused',
-      resourceType: 'WATER_ICE' as any,
+      resourceType: ResourceType.WATER_ICE,
       legs: [{
         id: 'leg-p',
         origin: { bodyId: 'EARTH', locationType: 'orbit' },
@@ -308,7 +308,7 @@ describe('requestCrewTransfer', () => {
       id: 'route-em',
       name: 'Earth-Moon',
       status: 'active',
-      resourceType: 'WATER_ICE' as any,
+      resourceType: ResourceType.WATER_ICE,
       legs: [{
         id: 'leg-em',
         origin: { bodyId: 'EARTH', locationType: 'orbit' },
