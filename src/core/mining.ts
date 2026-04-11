@@ -132,6 +132,15 @@ export function addModuleToSite(site: MiningSite, params: AddModuleParams): Mini
     connections: [],
   };
 
+  // Populate storage fields for storage-type modules
+  const STORAGE_TYPES: MiningModuleType[] = [MiningModuleType.STORAGE_SILO, MiningModuleType.PRESSURE_VESSEL, MiningModuleType.FLUID_TANK];
+  if (STORAGE_TYPES.includes(params.type)) {
+    const partDef = getPartById(params.partId);
+    mod.stored = {};
+    mod.storageCapacityKg = partDef ? (partDef.properties.storageCapacityKg as number) ?? 0 : 0;
+    mod.storageState = partDef ? (partDef.properties.storageState as ResourceState) ?? undefined : undefined;
+  }
+
   site.modules.push(mod);
   site.powerRequired += params.powerDraw;
 
@@ -231,6 +240,22 @@ export function getConnectedStorage(
   }
 
   return result;
+}
+
+/**
+ * Recompute site.storage as the aggregate of all module-level stored values.
+ */
+export function recomputeSiteStorage(site: MiningSite): void {
+  const aggregated: Partial<Record<ResourceType, number>> = {};
+  for (const mod of site.modules) {
+    if (!mod.stored) continue;
+    for (const [rt, amount] of Object.entries(mod.stored) as Array<[ResourceType, number]>) {
+      if (amount > 0) {
+        aggregated[rt as ResourceType] = (aggregated[rt as ResourceType] ?? 0) + amount;
+      }
+    }
+  }
+  site.storage = aggregated;
 }
 
 /**

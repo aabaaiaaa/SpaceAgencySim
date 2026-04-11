@@ -23,7 +23,7 @@ See `.devloop/requirements.md` for full context on all items below.
 ## Per-Module Storage Refactor
 
 ### TASK-003: Add per-module storage fields to MiningSiteModule
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-002
 - **Description**: In `src/core/gameState.ts`, add optional fields to `MiningSiteModule`: `stored?: Partial<Record<ResourceType, number>>`, `storageCapacityKg?: number`, `storageState?: ResourceState`. In `src/core/mining.ts`, update `addModuleToSite()` to populate these fields from the part definition's properties when the module type is a storage type (STORAGE_SILO, PRESSURE_VESSEL, FLUID_TANK). Initialize `stored` to `{}` for storage modules. Add a `recomputeSiteStorage(site)` helper that aggregates all module `stored` values into `site.storage`. See requirements.md section 3.
 - **Verification**: `npx vitest run src/tests/mining.test.ts && npx tsc --noEmit src/core/gameState.ts src/core/mining.ts`
@@ -57,7 +57,7 @@ See `.devloop/requirements.md` for full context on all items below.
 ## Route Processing Scalability
 
 ### TASK-008: Add miningSitesByBodyId index to processRoutes()
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001
 - **Description**: In `src/core/routes.ts`, add a helper function `buildSiteIndex(sites: MiningSite[]): Map<string, MiningSite[]>` that groups mining sites by `bodyId`. At the start of `processRoutes()`, build this index once and use `index.get(bodyId)` instead of `state.miningSites.find(...)` for all site lookups within the function. This is an internal optimization — no API or behavior changes. See requirements.md section 4.
 - **Verification**: `npx vitest run src/tests/routes.test.ts`
@@ -99,7 +99,7 @@ See `.devloop/requirements.md` for full context on all items below.
 - **Verification**: `npx tsc --noEmit src/ui/logistics.ts` and manually verify the map renders in the Logistics Center routes tab via dev server.
 
 ### TASK-013: Add proven leg dashed lines and route solid lines to map
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-012
 - **Description**: On the SVG schematic map, render proven legs as dashed lines (`stroke-dasharray`) between origin and destination bodies. Render active routes as solid colored lines (paused routes dimmer, broken routes red). Add hover tooltips on proven leg lines showing craft design name, cargo capacity, and cost per run. Add click handling on route lines that highlights the corresponding row in the route table. See requirements.md section 7 "Proven Leg Visualization" and "Active Route Visualization".
 - **Verification**: `npx tsc --noEmit src/ui/logistics.ts` and manually verify legs and routes render on the map via dev server.
@@ -117,7 +117,7 @@ See `.devloop/requirements.md` for full context on all items below.
 - **Verification**: `npx tsc --noEmit src/ui/logistics.ts` and manually test the full route creation flow via dev server.
 
 ### TASK-015: Add inline +/- craft count controls on route legs
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-012
 - **Description**: In the route table in `src/ui/logistics.ts`, make each route row expandable to show its legs. Each leg row displays the current craft count with +/− buttons. The + button calls `addCraftToLeg()` (which triggers build cost via `spend()`). The − button decrements craft count (minimum 1) and recalculates throughput/cost. Both buttons re-render the route table to show updated throughput, cost, and revenue. See requirements.md section 7 "Craft Assignment".
 - **Verification**: `npx tsc --noEmit src/ui/logistics.ts` and manually test expanding a route and clicking +/− via dev server.
@@ -139,7 +139,7 @@ See `.devloop/requirements.md` for full context on all items below.
 - **Verification**: `npx vitest run src/tests/refinery.test.ts --testNamePattern "regolith|hydrazine"`
 
 ### TASK-018: Unit test for route to non-Earth body without destination site
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001
 - **Description**: In `src/tests/routes.test.ts`, add a test that creates a route targeting a non-Earth body that has no mining site. Run `processRoutes()` and verify: (1) no money is deducted (`state.funds` unchanged), (2) no resources are removed from the source orbital buffer, (3) the route status is set to `'broken'`. Tag with `@smoke`. See requirements.md section 8.
 - **Verification**: `npx vitest run src/tests/routes.test.ts --testNamePattern "without destination"`

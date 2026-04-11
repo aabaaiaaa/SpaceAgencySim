@@ -28,6 +28,7 @@ import type {
   DifficultySettings,
   FieldCraftStatus,
   MiningModuleType,
+  ResourceState,
   ResourceType,
   SatelliteType,
   SurfaceItemType,
@@ -678,6 +679,9 @@ export interface MiningSiteModule {
   powerDraw: number;
   connections: string[];    // bidirectional adjacency list
   recipeId?: string;        // REFINERY modules only
+  stored?: Partial<Record<ResourceType, number>>;  // storage modules only
+  storageCapacityKg?: number;                        // storage modules only
+  storageState?: ResourceState;                      // storage modules only
 }
 
 export interface MiningSite {

@@ -8,7 +8,7 @@
  */
 
 import type { GameState, MiningSite, Route, ProvenLeg, RouteLocation } from '../core/gameState.ts';
-import { setRouteStatus } from '../core/routes.ts';
+import { setRouteStatus, addCraftToLeg, calculateRouteThroughput } from '../core/routes.ts';
 import { MiningModuleType } from '../core/constants.ts';
 import type { ResourceType } from '../core/constants.ts';
 import { REFINERY_RECIPES, setRefineryRecipe } from '../core/refinery.ts';
@@ -23,6 +23,7 @@ let _overlay: HTMLDivElement | null = null;
 let _state: GameState | null = null;
 let _selectedBodyId: string | null = null;
 let _activeTab: 'mining' | 'routes' = 'mining';
+let _expandedRouteIds = new Set<string>();
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -81,6 +82,7 @@ export function closeLogisticsPanel(): void {
   }
   _state = null;
   _selectedBodyId = null;
+  _expandedRouteIds = new Set<string>();
 }
 
 // ---------------------------------------------------------------------------
@@ -475,6 +477,74 @@ function _renderRouteMap(): SVGSVGElement {
     svg.appendChild(label);
   }
 
+  // --- Proven leg dashed lines ---
+  if (_state) {
+    for (const leg of _state.provenLegs) {
+      const originPos = bodyPositions[leg.origin.bodyId];
+      const destPos = bodyPositions[leg.destination.bodyId];
+      if (!originPos || !destPos) continue;
+
+      const line = document.createElementNS(svgNS, 'line');
+      line.setAttribute('x1', String(originPos.x));
+      line.setAttribute('y1', String(originPos.y));
+      line.setAttribute('x2', String(destPos.x));
+      line.setAttribute('y2', String(destPos.y));
+      line.setAttribute('stroke', '#888');
+      line.setAttribute('stroke-width', '1.5');
+      line.setAttribute('stroke-dasharray', '6 4');
+      line.setAttribute('class', 'proven-leg-line');
+      line.style.cursor = 'pointer';
+
+      // Tooltip on hover
+      const titleEl = document.createElementNS(svgNS, 'title');
+      titleEl.textContent = `Craft: ${leg.craftDesignId}\nCapacity: ${leg.cargoCapacityKg} kg\nCost/Run: $${leg.costPerRun.toLocaleString()}`;
+      line.appendChild(titleEl);
+
+      svg.appendChild(line);
+    }
+
+    // --- Active route solid lines ---
+    for (const route of _state.routes) {
+      for (const leg of route.legs) {
+        const originPos = bodyPositions[leg.origin.bodyId];
+        const destPos = bodyPositions[leg.destination.bodyId];
+        if (!originPos || !destPos) continue;
+
+        const line = document.createElementNS(svgNS, 'line');
+        line.setAttribute('x1', String(originPos.x));
+        line.setAttribute('y1', String(originPos.y));
+        line.setAttribute('x2', String(destPos.x));
+        line.setAttribute('y2', String(destPos.y));
+        line.setAttribute('stroke-width', '2.5');
+        line.setAttribute('class', `route-line route-${route.status}`);
+        line.style.cursor = 'pointer';
+
+        // Color by status
+        if (route.status === 'broken') {
+          line.setAttribute('stroke', '#CC3333');
+        } else if (route.status === 'paused') {
+          line.setAttribute('stroke', 'rgba(100, 180, 255, 0.4)');
+        } else {
+          line.setAttribute('stroke', '#64B4FF');
+        }
+
+        // Click to highlight route in table
+        const routeId = route.id;
+        line.addEventListener('click', () => {
+          const tableRow = _overlay?.querySelector(`tr[data-route-id="${routeId}"]`);
+          if (tableRow) {
+            // Remove existing highlights
+            _overlay?.querySelectorAll('tr.route-highlighted').forEach((el) => el.classList.remove('route-highlighted'));
+            tableRow.classList.add('route-highlighted');
+            tableRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }
+        });
+
+        svg.appendChild(line);
+      }
+    }
+  }
+
   return svg;
 }
 
@@ -541,6 +611,7 @@ function _renderRoutesTable(routes: Route[]): HTMLTableElement {
   const tbody = document.createElement('tbody');
   for (const route of routes) {
     const tr = document.createElement('tr');
+    tr.setAttribute('data-route-id', route.id);
 
     // Name
     const tdName = document.createElement('td');
@@ -552,9 +623,21 @@ function _renderRoutesTable(routes: Route[]): HTMLTableElement {
     tdResource.textContent = _formatResourceType(route.resourceType);
     tr.appendChild(tdResource);
 
-    // Legs summary
+    // Legs (expandable)
     const tdLegs = document.createElement('td');
-    tdLegs.textContent = `${route.legs.length} leg${route.legs.length !== 1 ? 's' : ''}`;
+    const expandBtn = document.createElement('button');
+    expandBtn.className = 'btn-ghost logistics-expand-btn';
+    const isExpanded = _expandedRouteIds.has(route.id);
+    expandBtn.textContent = `${isExpanded ? '\u25BC' : '\u25B6'} ${route.legs.length} leg${route.legs.length !== 1 ? 's' : ''}`;
+    expandBtn.addEventListener('click', () => {
+      if (_expandedRouteIds.has(route.id)) {
+        _expandedRouteIds.delete(route.id);
+      } else {
+        _expandedRouteIds.add(route.id);
+      }
+      _render();
+    });
+    tdLegs.appendChild(expandBtn);
     tr.appendChild(tdLegs);
 
     // Throughput
@@ -604,6 +687,69 @@ function _renderRoutesTable(routes: Route[]): HTMLTableElement {
     tr.appendChild(tdStatus);
 
     tbody.appendChild(tr);
+
+    // Expanded leg rows
+    if (_expandedRouteIds.has(route.id)) {
+      for (const leg of route.legs) {
+        const legTr = document.createElement('tr');
+        legTr.className = 'logistics-leg-row';
+
+        // Empty cell (for Name column alignment)
+        legTr.appendChild(document.createElement('td'));
+
+        // Origin -> Destination
+        const tdRoute = document.createElement('td');
+        tdRoute.colSpan = 2;
+        tdRoute.textContent = `${_formatLocation(leg.origin)} \u2192 ${_formatLocation(leg.destination)}`;
+        tdRoute.className = 'logistics-leg-route';
+        legTr.appendChild(tdRoute);
+
+        // Craft design
+        const tdCraft = document.createElement('td');
+        tdCraft.textContent = leg.craftDesignId;
+        legTr.appendChild(tdCraft);
+
+        // Craft count with +/- buttons
+        const tdCount = document.createElement('td');
+        tdCount.className = 'logistics-craft-controls';
+
+        const minusBtn = document.createElement('button');
+        minusBtn.className = 'btn-ghost logistics-craft-btn';
+        minusBtn.textContent = '\u2212';
+        minusBtn.disabled = leg.craftCount <= 1;
+        minusBtn.addEventListener('click', () => {
+          if (leg.craftCount > 1) {
+            leg.craftCount--;
+            route.throughputPerPeriod = calculateRouteThroughput(route.legs);
+            route.totalCostPerPeriod = route.legs.reduce((sum, l) => sum + l.costPerRun * l.craftCount, 0);
+            _render();
+          }
+        });
+        tdCount.appendChild(minusBtn);
+
+        const countSpan = document.createElement('span');
+        countSpan.className = 'logistics-craft-count';
+        countSpan.textContent = String(leg.craftCount);
+        tdCount.appendChild(countSpan);
+
+        const plusBtn = document.createElement('button');
+        plusBtn.className = 'btn-ghost logistics-craft-btn';
+        plusBtn.textContent = '+';
+        plusBtn.addEventListener('click', () => {
+          addCraftToLeg(route, leg.id);
+          _render();
+        });
+        tdCount.appendChild(plusBtn);
+
+        legTr.appendChild(tdCount);
+
+        // Empty cells for remaining columns (Revenue, Status)
+        legTr.appendChild(document.createElement('td'));
+        legTr.appendChild(document.createElement('td'));
+
+        tbody.appendChild(legTr);
+      }
+    }
   }
   table.appendChild(tbody);
 

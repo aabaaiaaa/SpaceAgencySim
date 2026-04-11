@@ -595,6 +595,28 @@ describe('processRoutes', () => {
     const expectedRevenue = 500 * resourceDef.baseValuePerKg;
     expect(state.money).toBe(initialMoney - 50_000 + expectedRevenue);
   });
+
+  it('sets route to broken when non-Earth destination has no mining site without destination @smoke', () => {
+    // Use the existing setupRouteState helper with destBodyId = 'MARS'
+    // but do NOT create a mining site on Mars
+    const { state, site, route } = setupRouteState({
+      destBodyId: 'MARS',
+      bufferAmount: 5000,
+      money: 10_000_000,
+    });
+
+    const initialMoney = state.money;
+    const initialBuffer = site.orbitalBuffer[ResourceType.WATER_ICE];
+
+    processRoutes(state);
+
+    // Route should be marked as broken
+    expect(route.status).toBe('broken');
+    // No money deducted
+    expect(state.money).toBe(initialMoney);
+    // No resources removed from buffer
+    expect(site.orbitalBuffer[ResourceType.WATER_ICE]).toBe(initialBuffer);
+  });
 });
 
 // ---------------------------------------------------------------------------

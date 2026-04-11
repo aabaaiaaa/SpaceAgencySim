@@ -289,6 +289,26 @@ function collectOrbitAltitude(
 }
 
 // ---------------------------------------------------------------------------
+// Mining site index helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Build an index mapping bodyId to mining sites for fast lookup.
+ */
+export function buildSiteIndex(sites: MiningSite[]): Map<string, MiningSite[]> {
+  const index = new Map<string, MiningSite[]>();
+  for (const site of sites) {
+    const list = index.get(site.bodyId);
+    if (list) {
+      list.push(site);
+    } else {
+      index.set(site.bodyId, [site]);
+    }
+  }
+  return index;
+}
+
+// ---------------------------------------------------------------------------
 // Per-period route processing (automation)
 // ---------------------------------------------------------------------------
 
@@ -296,6 +316,7 @@ export function processRoutes(state: GameState): { revenue: number; operatingCos
   let totalRevenue = 0;
   let totalOperatingCost = 0;
   const delivered: Partial<Record<ResourceType, number>> = {};
+  const siteIndex = buildSiteIndex(state.miningSites);
   for (const route of state.routes) {
     if (route.status !== 'active') continue;
     if (route.legs.length === 0) continue;
@@ -304,8 +325,8 @@ export function processRoutes(state: GameState): { revenue: number; operatingCos
     const sourceBodyId = route.legs[0].origin.bodyId;
 
     // Find any mining site on the source body that has this resource in its orbital buffer
-    const sourceSite = state.miningSites.find(
-      (s) => s.bodyId === sourceBodyId && (s.orbitalBuffer[route.resourceType] ?? 0) > 0,
+    const sourceSite = (siteIndex.get(sourceBodyId) ?? []).find(
+      (s) => (s.orbitalBuffer[route.resourceType] ?? 0) > 0,
     );
     if (!sourceSite) continue;
 
@@ -318,7 +339,7 @@ export function processRoutes(state: GameState): { revenue: number; operatingCos
     const destBodyId = lastLeg.destination.bodyId;
     let destSite: MiningSite | undefined;
     if (destBodyId !== 'EARTH') {
-      destSite = state.miningSites.find((s) => s.bodyId === destBodyId);
+      destSite = (siteIndex.get(destBodyId) ?? [])[0];
       if (!destSite) {
         route.status = 'broken';
         continue;
