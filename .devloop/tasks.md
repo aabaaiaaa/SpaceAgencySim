@@ -43,7 +43,7 @@
 - **Verification**: `npx vitest run src/tests/mining.test.ts`
 
 ### TASK-008: Implement module placement and pipe connections
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007
 - **Description**: Add to `src/core/mining.ts`: `AddModuleParams` interface (partId, type, powerDraw, powerOutput?), `addModuleToSite(site, params)` function that creates a `MiningSiteModule`, pushes to `site.modules`, updates `site.powerRequired`/`site.powerGenerated`. Add `toggleConnection(site, moduleAId, moduleBId)` that toggles bidirectional connections (add on first call, remove on second). Append tests to `src/tests/mining.test.ts` covering: adding drill updates powerRequired, adding generator updates powerGenerated, connecting two modules, disconnecting on second toggle.
 - **Verification**: `npx vitest run src/tests/mining.test.ts`
@@ -73,7 +73,7 @@
 - **Verification**: `npx vitest run src/tests/routes.test.ts`
 
 ### TASK-013: Implement route assembly and automation
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-012
 - **Description**: Add to `src/core/routes.ts`: `CreateRouteParams` interface, `calculateRouteThroughput(legs)` (min of capacity×craftCount across legs), `createRoute(state, params)` (builds Route from proven leg IDs, starts paused, calculates throughput/cost), `addCraftToLeg(route, legId)` (increments craftCount, recalculates), `setRouteStatus(route, status)`. Add `processRoutes(state)` for per-period automation: skip non-active routes, find source orbital buffer, transport min(throughput, available), deduct cost via `spend(state, cost)` (check boolean return — if spend fails, skip the run), deliver to Earth for revenue via `earn(state, revenue)` or to destination body's orbital buffer. Import `spend`/`earn` from `src/core/finance.ts`, `RESOURCES_BY_ID` from `src/data/resources.ts`. Append tests to `src/tests/routes.test.ts` covering: route creation, throughput calculation, craft addition, route processing with revenue, paused routes not processed, operating cost deduction.
 - **Verification**: `npx vitest run src/tests/routes.test.ts`

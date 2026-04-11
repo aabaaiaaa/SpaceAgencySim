@@ -5,7 +5,8 @@
  * to find the nearest site within a given radius.
  */
 
-import type { GameState, MiningSite } from './gameState.ts';
+import type { GameState, MiningSite, MiningSiteModule } from './gameState.ts';
+import type { MiningModuleType } from './constants.ts';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -93,4 +94,81 @@ export function findNearestSite(
   }
 
   return nearest;
+}
+
+// ---------------------------------------------------------------------------
+// Module placement
+// ---------------------------------------------------------------------------
+
+export interface AddModuleParams {
+  partId: string;
+  type: MiningModuleType;
+  powerDraw: number;
+  powerOutput?: number; // only power generators have this
+}
+
+function generateModuleId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `module-${crypto.randomUUID()}`;
+  }
+  return `module-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/**
+ * Add a module to an existing mining site.
+ *
+ * Creates the module, pushes it to the site's module list, and updates
+ * the site's power bookkeeping.
+ */
+export function addModuleToSite(site: MiningSite, params: AddModuleParams): MiningSiteModule {
+  const mod: MiningSiteModule = {
+    id: generateModuleId(),
+    partId: params.partId,
+    type: params.type,
+    powerDraw: params.powerDraw,
+    connections: [],
+  };
+
+  site.modules.push(mod);
+  site.powerRequired += params.powerDraw;
+
+  if (params.powerOutput != null && params.powerOutput > 0) {
+    site.powerGenerated += params.powerOutput;
+  }
+
+  return mod;
+}
+
+// ---------------------------------------------------------------------------
+// Pipe connections
+// ---------------------------------------------------------------------------
+
+/**
+ * Toggle a bidirectional connection between two modules on a site.
+ *
+ * If the modules are already connected, disconnect them.
+ * If they are not connected, connect them.
+ *
+ * Returns `true` on success, `false` if either module ID is not found.
+ */
+export function toggleConnection(site: MiningSite, moduleAId: string, moduleBId: string): boolean {
+  const modA = site.modules.find((m) => m.id === moduleAId);
+  const modB = site.modules.find((m) => m.id === moduleBId);
+
+  if (!modA || !modB) return false;
+
+  const idxInA = modA.connections.indexOf(moduleBId);
+
+  if (idxInA !== -1) {
+    // Already connected — disconnect
+    modA.connections.splice(idxInA, 1);
+    const idxInB = modB.connections.indexOf(moduleAId);
+    if (idxInB !== -1) modB.connections.splice(idxInB, 1);
+  } else {
+    // Not connected — connect
+    modA.connections.push(moduleBId);
+    modB.connections.push(moduleAId);
+  }
+
+  return true;
 }

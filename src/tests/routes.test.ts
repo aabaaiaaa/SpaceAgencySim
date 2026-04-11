@@ -4,9 +4,17 @@ import {
   proveRouteLeg,
   locationsMatch,
   getProvenLegsForOriginDestination,
+  calculateRouteThroughput,
+  createRoute,
+  addCraftToLeg,
+  setRouteStatus,
+  processRoutes,
 } from '../core/routes.ts';
+import { createMiningSite } from '../core/mining.ts';
+import { ResourceType } from '../core/constants.ts';
+import { RESOURCES_BY_ID } from '../data/resources.ts';
 
-import type { RouteLocation } from '../core/gameState.ts';
+import type { RouteLocation, RouteLeg } from '../core/gameState.ts';
 import type { ProveRouteLegParams } from '../core/routes.ts';
 
 // ---------------------------------------------------------------------------
@@ -201,5 +209,387 @@ describe('getProvenLegsForOriginDestination', () => {
     );
 
     expect(results).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// calculateRouteThroughput
+// ---------------------------------------------------------------------------
+
+describe('calculateRouteThroughput', () => {
+  it('returns 0 for empty legs array', () => {
+    expect(calculateRouteThroughput([])).toBe(0);
+  });
+
+  it('returns cargoCapacityKg * craftCount for a single leg', () => {
+    const legs: RouteLeg[] = [
+      {
+        id: 'leg-1',
+        origin: surface('earth'),
+        destination: orbit('earth', 200),
+        craftDesignId: 'design-1',
+        craftCount: 3,
+        cargoCapacityKg: 1000,
+        costPerRun: 50_000,
+        provenFlightId: 'f1',
+      },
+    ];
+    expect(calculateRouteThroughput(legs)).toBe(3000);
+  });
+
+  it('returns the minimum of capacity*craftCount across all legs', () => {
+    const legs: RouteLeg[] = [
+      {
+        id: 'leg-1',
+        origin: surface('earth'),
+        destination: orbit('earth', 200),
+        craftDesignId: 'design-1',
+        craftCount: 2,
+        cargoCapacityKg: 5000,
+        costPerRun: 100_000,
+        provenFlightId: 'f1',
+      },
+      {
+        id: 'leg-2',
+        origin: orbit('earth', 200),
+        destination: orbit('MOON', 50),
+        craftDesignId: 'design-2',
+        craftCount: 1,
+        cargoCapacityKg: 2000,
+        costPerRun: 200_000,
+        provenFlightId: 'f2',
+      },
+    ];
+    // leg-1: 2*5000 = 10000, leg-2: 1*2000 = 2000 → min = 2000
+    expect(calculateRouteThroughput(legs)).toBe(2000);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// createRoute
+// ---------------------------------------------------------------------------
+
+describe('createRoute', () => {
+  it('creates a route from proven leg IDs and pushes it to state.routes', () => {
+    const state = createGameState();
+    const pl1 = proveRouteLeg(state, makeParams({ flightId: 'f1', cargoCapacityKg: 5000, costPerRun: 100_000 }));
+    const pl2 = proveRouteLeg(state, makeParams({
+      origin: orbit('earth', 200),
+      destination: orbit('MOON', 50),
+      flightId: 'f2',
+      cargoCapacityKg: 2000,
+      costPerRun: 200_000,
+    }));
+
+    const route = createRoute(state, {
+      name: 'Earth to Moon',
+      resourceType: ResourceType.WATER_ICE,
+      provenLegIds: [pl1.id, pl2.id],
+    });
+
+    expect(state.routes).toHaveLength(1);
+    expect(state.routes[0]).toBe(route);
+  });
+
+  it('starts with status paused', () => {
+    const state = createGameState();
+    const pl = proveRouteLeg(state, makeParams());
+    const route = createRoute(state, {
+      name: 'Test Route',
+      resourceType: ResourceType.REGOLITH,
+      provenLegIds: [pl.id],
+    });
+
+    expect(route.status).toBe('paused');
+  });
+
+  it('assigns craftCount 1 to each leg', () => {
+    const state = createGameState();
+    const pl = proveRouteLeg(state, makeParams());
+    const route = createRoute(state, {
+      name: 'Test Route',
+      resourceType: ResourceType.REGOLITH,
+      provenLegIds: [pl.id],
+    });
+
+    expect(route.legs[0].craftCount).toBe(1);
+  });
+
+  it('calculates correct throughput and totalCostPerPeriod', () => {
+    const state = createGameState();
+    const pl1 = proveRouteLeg(state, makeParams({ cargoCapacityKg: 5000, costPerRun: 100_000, flightId: 'f1' }));
+    const pl2 = proveRouteLeg(state, makeParams({
+      origin: orbit('earth', 200),
+      destination: orbit('MOON', 50),
+      cargoCapacityKg: 3000,
+      costPerRun: 150_000,
+      flightId: 'f2',
+    }));
+
+    const route = createRoute(state, {
+      name: 'Multi-leg',
+      resourceType: ResourceType.IRON_ORE,
+      provenLegIds: [pl1.id, pl2.id],
+    });
+
+    // craftCount = 1 for all legs, so throughput = min(5000*1, 3000*1) = 3000
+    expect(route.throughputPerPeriod).toBe(3000);
+    // totalCost = 100_000*1 + 150_000*1 = 250_000
+    expect(route.totalCostPerPeriod).toBe(250_000);
+  });
+
+  it('copies fields from proven legs to route legs', () => {
+    const state = createGameState();
+    const pl = proveRouteLeg(state, makeParams({
+      origin: surface('MOON'),
+      destination: orbit('MOON', 50),
+      craftDesignId: 'lunar-shuttle',
+      cargoCapacityKg: 800,
+      costPerRun: 25_000,
+      flightId: 'flight-lunar',
+    }));
+
+    const route = createRoute(state, {
+      name: 'Lunar Route',
+      resourceType: ResourceType.WATER_ICE,
+      provenLegIds: [pl.id],
+    });
+
+    const leg = route.legs[0];
+    expect(leg.origin).toEqual(surface('MOON'));
+    expect(leg.destination).toEqual(orbit('MOON', 50));
+    expect(leg.craftDesignId).toBe('lunar-shuttle');
+    expect(leg.cargoCapacityKg).toBe(800);
+    expect(leg.costPerRun).toBe(25_000);
+    expect(leg.provenFlightId).toBe('flight-lunar');
+  });
+
+  it('generates unique route and leg IDs', () => {
+    const state = createGameState();
+    const pl = proveRouteLeg(state, makeParams());
+    const r1 = createRoute(state, { name: 'Route 1', resourceType: ResourceType.REGOLITH, provenLegIds: [pl.id] });
+    const r2 = createRoute(state, { name: 'Route 2', resourceType: ResourceType.REGOLITH, provenLegIds: [pl.id] });
+
+    expect(r1.id).not.toBe(r2.id);
+    expect(r1.legs[0].id).not.toBe(r2.legs[0].id);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// addCraftToLeg
+// ---------------------------------------------------------------------------
+
+describe('addCraftToLeg', () => {
+  it('increments craft count and recalculates throughput and cost', () => {
+    const state = createGameState();
+    const pl1 = proveRouteLeg(state, makeParams({ cargoCapacityKg: 5000, costPerRun: 100_000, flightId: 'f1' }));
+    const pl2 = proveRouteLeg(state, makeParams({
+      origin: orbit('earth', 200),
+      destination: orbit('MOON', 50),
+      cargoCapacityKg: 2000,
+      costPerRun: 200_000,
+      flightId: 'f2',
+    }));
+
+    const route = createRoute(state, {
+      name: 'Test',
+      resourceType: ResourceType.WATER_ICE,
+      provenLegIds: [pl1.id, pl2.id],
+    });
+
+    // Initially: throughput = min(5000*1, 2000*1) = 2000, cost = 300_000
+    expect(route.throughputPerPeriod).toBe(2000);
+    expect(route.totalCostPerPeriod).toBe(300_000);
+
+    // Add craft to second leg (the bottleneck)
+    const result = addCraftToLeg(route, route.legs[1].id);
+    expect(result).toBe(true);
+    expect(route.legs[1].craftCount).toBe(2);
+
+    // Now: throughput = min(5000*1, 2000*2) = min(5000, 4000) = 4000
+    expect(route.throughputPerPeriod).toBe(4000);
+    // cost = 100_000*1 + 200_000*2 = 500_000
+    expect(route.totalCostPerPeriod).toBe(500_000);
+  });
+
+  it('returns false for an unknown leg ID', () => {
+    const state = createGameState();
+    const pl = proveRouteLeg(state, makeParams());
+    const route = createRoute(state, {
+      name: 'Test',
+      resourceType: ResourceType.REGOLITH,
+      provenLegIds: [pl.id],
+    });
+
+    expect(addCraftToLeg(route, 'nonexistent-leg-id')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// setRouteStatus
+// ---------------------------------------------------------------------------
+
+describe('setRouteStatus', () => {
+  it('changes route status', () => {
+    const state = createGameState();
+    const pl = proveRouteLeg(state, makeParams());
+    const route = createRoute(state, {
+      name: 'Test',
+      resourceType: ResourceType.REGOLITH,
+      provenLegIds: [pl.id],
+    });
+
+    expect(route.status).toBe('paused');
+
+    setRouteStatus(route, 'active');
+    expect(route.status).toBe('active');
+
+    setRouteStatus(route, 'broken');
+    expect(route.status).toBe('broken');
+
+    setRouteStatus(route, 'paused');
+    expect(route.status).toBe('paused');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// processRoutes
+// ---------------------------------------------------------------------------
+
+describe('processRoutes', () => {
+  /**
+   * Helper to set up a state with a mining site, proven leg, and route
+   * for processRoutes tests.
+   */
+  function setupRouteState(opts?: {
+    money?: number;
+    bufferAmount?: number;
+    resourceType?: ResourceType;
+    destBodyId?: string;
+  }) {
+    const resourceType = opts?.resourceType ?? ResourceType.WATER_ICE;
+    const destBodyId = opts?.destBodyId ?? 'EARTH';
+    const state = createGameState();
+    state.money = opts?.money ?? 10_000_000;
+
+    // Create a mining site on the source body (MOON) with orbital buffer
+    const site = createMiningSite(state, {
+      name: 'Lunar Mine',
+      bodyId: 'MOON',
+      coordinates: { x: 0, y: 0 },
+      controlUnitPartId: 'ctrl-1',
+    });
+    site.orbitalBuffer[resourceType] = opts?.bufferAmount ?? 5000;
+
+    // Prove a leg from MOON orbit to the destination
+    const pl = proveRouteLeg(state, {
+      origin: orbit('MOON', 50),
+      destination: destBodyId === 'EARTH' ? orbit('EARTH', 200) : orbit(destBodyId, 100),
+      craftDesignId: 'cargo-shuttle',
+      cargoCapacityKg: 2000,
+      costPerRun: 50_000,
+      flightId: 'flight-cargo-1',
+    });
+
+    // Create and activate the route
+    const route = createRoute(state, {
+      name: 'Lunar Export',
+      resourceType,
+      provenLegIds: [pl.id],
+    });
+    setRouteStatus(route, 'active');
+
+    return { state, site, route };
+  }
+
+  it('transports resources and generates revenue when destination is Earth', () => {
+    const { state, site, route } = setupRouteState({
+      bufferAmount: 5000,
+    });
+    const initialMoney = state.money;
+    const resourceDef = RESOURCES_BY_ID[ResourceType.WATER_ICE];
+
+    processRoutes(state);
+
+    // Transport amount = min(throughput=2000, buffer=5000) = 2000
+    expect(site.orbitalBuffer[ResourceType.WATER_ICE]).toBe(3000); // 5000 - 2000
+    // Revenue = 2000 * baseValuePerKg - operating cost
+    const expectedRevenue = 2000 * resourceDef.baseValuePerKg;
+    const expectedMoney = initialMoney - route.totalCostPerPeriod + expectedRevenue;
+    expect(state.money).toBe(expectedMoney);
+  });
+
+  it('skips paused routes', () => {
+    const { state, site, route } = setupRouteState();
+    setRouteStatus(route, 'paused');
+    const initialMoney = state.money;
+    const initialBuffer = site.orbitalBuffer[ResourceType.WATER_ICE];
+
+    processRoutes(state);
+
+    expect(state.money).toBe(initialMoney);
+    expect(site.orbitalBuffer[ResourceType.WATER_ICE]).toBe(initialBuffer);
+  });
+
+  it('deducts operating cost via spend', () => {
+    const { state, route } = setupRouteState({ money: 10_000_000 });
+
+    const moneyBefore = state.money;
+    processRoutes(state);
+
+    // Operating cost was deducted (and revenue added for Earth destination)
+    const resourceDef = RESOURCES_BY_ID[ResourceType.WATER_ICE];
+    const transportAmount = 2000; // min(2000 throughput, 5000 buffer)
+    const expectedRevenue = transportAmount * resourceDef.baseValuePerKg;
+    expect(state.money).toBe(moneyBefore - route.totalCostPerPeriod + expectedRevenue);
+  });
+
+  it('skips the route when spend returns false (insufficient funds)', () => {
+    const { state, site } = setupRouteState({ money: 0 });
+
+    processRoutes(state);
+
+    // Nothing should change — spend failed, so buffer untouched
+    expect(site.orbitalBuffer[ResourceType.WATER_ICE]).toBe(5000);
+    expect(state.money).toBe(0);
+  });
+
+  it('transports to non-Earth destination orbital buffer', () => {
+    const { state, site } = setupRouteState({
+      destBodyId: 'MARS',
+      bufferAmount: 5000,
+    });
+
+    // Create a destination mining site on Mars
+    const marsSite = createMiningSite(state, {
+      name: 'Mars Base',
+      bodyId: 'MARS',
+      coordinates: { x: 100, y: 100 },
+      controlUnitPartId: 'ctrl-2',
+    });
+
+    const initialMoney = state.money;
+    processRoutes(state);
+
+    // Transport amount = min(2000, 5000) = 2000
+    expect(site.orbitalBuffer[ResourceType.WATER_ICE]).toBe(3000);
+    expect(marsSite.orbitalBuffer[ResourceType.WATER_ICE]).toBe(2000);
+    // No revenue earned for non-Earth destination, only cost deducted
+    expect(state.money).toBe(initialMoney - 50_000);
+  });
+
+  it('limits transport to available buffer when buffer is less than throughput', () => {
+    const { state, site } = setupRouteState({
+      bufferAmount: 500, // less than throughput of 2000
+    });
+    const initialMoney = state.money;
+    const resourceDef = RESOURCES_BY_ID[ResourceType.WATER_ICE];
+
+    processRoutes(state);
+
+    // Transport amount = min(2000, 500) = 500
+    expect(site.orbitalBuffer[ResourceType.WATER_ICE]).toBe(0);
+    const expectedRevenue = 500 * resourceDef.baseValuePerKg;
+    expect(state.money).toBe(initialMoney - 50_000 + expectedRevenue);
   });
 });
