@@ -1,11 +1,16 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createGameState } from '../core/gameState.ts';
+import { createGameState, createFlightState } from '../core/gameState.ts';
 import type { GameState } from '../core/gameState.ts';
+import { createPhysicsState } from '../core/physics.ts';
 import {
   EARTH_HUB_ID,
   FACILITY_DEFINITIONS,
   FacilityId,
+  FlightPhase,
+  BODY_RADIUS,
 } from '../core/constants.ts';
+import { getSurfaceGravity } from '../data/bodies.ts';
+import type { RocketAssembly } from '../core/physics.ts';
 import {
   getActiveHub,
   getHub,
@@ -15,6 +20,7 @@ import {
   getEnvironmentCategory,
   getEnvironmentCostMultiplier,
   getImportTaxMultiplier,
+  getSurfaceHubsForRecovery,
 } from '../core/hubs.ts';
 import {
   hasFacility,
@@ -285,5 +291,118 @@ describe('Hub-aware construction', () => {
     expect(hasFacility(state, FacilityId.LAUNCH_PAD, moonHub.id)).toBe(false);
     // Explicitly query Earth hub
     expect(hasFacility(state, FacilityId.LAUNCH_PAD, EARTH_HUB_ID)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Orbital hub launch
+// ---------------------------------------------------------------------------
+
+describe('Orbital hub undocking launch', () => {
+  it('craft spawns at correct altitude with orbital velocity', () => {
+    const altitude = 200_000;
+    const bodyId = 'EARTH';
+
+    const flightState = createFlightState({
+      missionId: 'test-orbital',
+      rocketId: 'rocket-orbital',
+      launchType: 'orbital',
+      bodyId: bodyId as any,
+    });
+    // Set altitude as the launch flow would.
+    flightState.altitude = altitude;
+
+    // Minimal assembly with no parts — sufficient for createPhysicsState.
+    const assembly: RocketAssembly = {
+      parts: new Map(),
+      connections: [],
+      _nextId: 0,
+      symmetryPairs: [],
+    };
+
+    const ps = createPhysicsState(assembly, flightState);
+
+    // Should be at the orbital altitude.
+    expect(ps.posY).toBe(altitude);
+
+    // Should have orbital velocity (non-zero horizontal).
+    expect(ps.velX).toBeGreaterThan(0);
+    expect(ps.velY).toBe(0);
+
+    // Should not be grounded or landed.
+    expect(ps.landed).toBe(false);
+    expect(ps.grounded).toBe(false);
+
+    // Should be in ORBIT phase.
+    expect(flightState.phase).toBe(FlightPhase.ORBIT);
+    expect(flightState.inOrbit).toBe(true);
+
+    // Verify orbital velocity is approximately correct.
+    // v = sqrt(GM / r), where GM = g_surface * R^2.
+    const R = BODY_RADIUS[bodyId];
+    const gSurface = getSurfaceGravity(bodyId);
+    const GM = gSurface * R * R;
+    const r = R + altitude;
+    const expectedVelocity = Math.sqrt(GM / r);
+
+    expect(ps.velX).toBeCloseTo(expectedVelocity, 0);
+    // Sanity check: Earth LEO velocity should be ~7700-7800 m/s.
+    expect(ps.velX).toBeGreaterThan(7000);
+    expect(ps.velX).toBeLessThan(8500);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Surface hub recovery
+// ---------------------------------------------------------------------------
+
+describe('Surface hub recovery — getSurfaceHubsForRecovery', () => {
+  let state: GameState;
+  beforeEach(() => { state = createGameState(); });
+
+  it('returns online surface hubs on the specified body', () => {
+    const moonHub = createHub(state, { name: 'Moon Base', type: 'surface', bodyId: 'MOON' });
+    moonHub.online = true;
+
+    const result = getSurfaceHubsForRecovery(state, 'MOON');
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe(moonHub.id);
+  });
+
+  it('returns Earth hub for Earth body', () => {
+    const result = getSurfaceHubsForRecovery(state, 'EARTH');
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe(EARTH_HUB_ID);
+  });
+
+  it('excludes offline hubs', () => {
+    const moonHub = createHub(state, { name: 'Moon Base', type: 'surface', bodyId: 'MOON' });
+    moonHub.online = false;
+
+    const result = getSurfaceHubsForRecovery(state, 'MOON');
+    expect(result).toHaveLength(0);
+  });
+
+  it('excludes orbital hubs', () => {
+    const orbitalHub = createHub(state, { name: 'Moon Station', type: 'orbital', bodyId: 'MOON', altitude: 100_000 });
+    orbitalHub.online = true;
+
+    const result = getSurfaceHubsForRecovery(state, 'MOON');
+    expect(result).toHaveLength(0);
+  });
+
+  it('returns multiple surface hubs on the same body', () => {
+    const hub1 = createHub(state, { name: 'Moon Alpha', type: 'surface', bodyId: 'MOON' });
+    hub1.online = true;
+    const hub2 = createHub(state, { name: 'Moon Beta', type: 'surface', bodyId: 'MOON' });
+    hub2.online = true;
+
+    const result = getSurfaceHubsForRecovery(state, 'MOON');
+    expect(result).toHaveLength(2);
+  });
+
+  it('returns empty array for body with no hubs', () => {
+    const result = getSurfaceHubsForRecovery(state, 'MARS');
+    expect(result).toHaveLength(0);
   });
 });

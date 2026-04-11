@@ -537,6 +537,12 @@ export interface FlightState {
   scienceModuleRunning?: boolean;
   /** Whether death fines have already been applied mid-flight. */
   deathFinesApplied?: boolean;
+  /** Whether this is a surface or orbital launch. */
+  launchType?: 'surface' | 'orbital';
+  /** Hub ID from which the craft launched. */
+  launchHubId?: string;
+  /** Hub ID selected for craft recovery after landing. */
+  recoveryHubId?: string;
 }
 
 /** A record of an earned achievement. */
@@ -1181,6 +1187,8 @@ export function createFlightState({
   fuelRemaining = 0,
   deltaVRemaining = 0,
   bodyId = 'EARTH' as CelestialBody,
+  launchType,
+  launchHubId,
 }: {
   missionId: string;
   rocketId: string;
@@ -1188,6 +1196,8 @@ export function createFlightState({
   fuelRemaining?: number;
   deltaVRemaining?: number;
   bodyId?: CelestialBody;
+  launchType?: 'surface' | 'orbital';
+  launchHubId?: string;
 }): FlightState {
   return {
     missionId,
@@ -1216,6 +1226,8 @@ export function createFlightState({
     transferState: null,
     powerState: null,
     commsState: null,
+    launchType,
+    launchHubId,
   };
 }
 

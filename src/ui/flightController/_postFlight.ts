@@ -9,6 +9,7 @@ import { getPartById } from '../../data/parts.ts';
 import { PartType, DEATH_FINE_PER_ASTRONAUT } from '../../core/constants.ts';
 import { processFlightReturn } from '../../core/flightReturn.ts';
 import { createFlightState } from '../../core/gameState.ts';
+import { getSurfaceHubsForRecovery } from '../../core/hubs.ts';
 import { refreshTopBar } from '../topbar.ts';
 import { getFCState } from './_state.ts';
 import { stopFlightScene, startFlightScene } from './_init.ts';
@@ -18,6 +19,7 @@ import { showUnlockNotification } from '../missionControl/_missionsTab.ts';
 import type { PhysicsState } from '../../core/physics.ts';
 import type { RocketAssembly } from '../../core/rocketbuilder.ts';
 import type { FlightState, GameState, FlightEvent } from '../../core/gameState.ts';
+import type { Hub } from '../../core/hubTypes.ts';
 
 // ---------------------------------------------------------------------------
 // Flight event formatting helpers
@@ -104,6 +106,45 @@ export function buildFlightEventList(events: FlightEvent[]): HTMLElement {
   }
 
   return list;
+}
+
+// ---------------------------------------------------------------------------
+// Hub recovery dialog
+// ---------------------------------------------------------------------------
+
+/**
+ * Shows a modal dialog allowing the player to select which surface hub to
+ * recover the craft at when multiple online surface hubs exist on the
+ * landing body.
+ */
+function _showHubRecoveryDialog(
+  hubs: Hub[],
+  onSelect: (hubId: string) => void,
+): void {
+  const overlay = document.createElement('div');
+  overlay.id = 'hub-recovery-dialog';
+  overlay.className = 'hub-recovery-overlay';
+  overlay.innerHTML = `
+    <div class="hub-recovery-panel">
+      <h3>Select Recovery Location</h3>
+      <div class="hub-recovery-list"></div>
+    </div>
+  `;
+
+  const list = overlay.querySelector('.hub-recovery-list')!;
+  for (const hub of hubs) {
+    const btn = document.createElement('button');
+    btn.className = 'hub-recovery-btn';
+    btn.textContent = `${hub.name} (${hub.bodyId})`;
+    btn.dataset.hubId = hub.id;
+    btn.addEventListener('click', () => {
+      overlay.remove();
+      onSelect(hub.id);
+    });
+    list.appendChild(btn);
+  }
+
+  document.body.appendChild(overlay);
 }
 
 // ---------------------------------------------------------------------------
@@ -537,9 +578,14 @@ export function showPostFlightSummary(
   const returnBtn: HTMLButtonElement = _pfBtn('Return to Space Agency', recoveryCostStr, 'pf-btn-primary');
   returnBtn.id    = 'post-flight-return-btn';
   returnBtn.title = 'End this flight, process mission results and part recovery, and return to your Space Agency hub.';
-  returnBtn.addEventListener('click', () => {
+
+  /** Shared recovery logic: process return, show unlocks, and end flight. */
+  const _performRecovery = (recoveryHubId?: string): void => {
     let returnResults: ReturnType<typeof processFlightReturn> | null = null;
     if (state && flightState) {
+      if (recoveryHubId) {
+        flightState.recoveryHubId = recoveryHubId;
+      }
       returnResults = processFlightReturn(state, flightState, ps, assembly);
     }
 
@@ -555,6 +601,29 @@ export function showPostFlightSummary(
     overlay.remove();
     stopFlightScene();
     if (onFlightEnd) onFlightEnd(state, returnResults);
+  };
+
+  returnBtn.addEventListener('click', () => {
+    // Hub-aware recovery: check for surface hubs on the landing body.
+    const landingBodyId = flightState?.bodyId ?? 'EARTH';
+    if (isLanded && state) {
+      const hubs = getSurfaceHubsForRecovery(state, landingBodyId);
+      if (hubs.length === 0) {
+        // No hubs on this body — standard recovery
+        _performRecovery();
+      } else if (hubs.length === 1) {
+        // Single hub — auto-recover there
+        _performRecovery(hubs[0].id);
+      } else {
+        // Multiple hubs — let player choose
+        _showHubRecoveryDialog(hubs, (hubId) => {
+          _performRecovery(hubId);
+        });
+      }
+    } else {
+      // Not landed or no state — standard recovery
+      _performRecovery();
+    }
   });
   buttonsEl.appendChild(returnBtn);
 

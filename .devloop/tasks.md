@@ -121,7 +121,7 @@
 - **Verification**: `npx vitest run src/tests/hubs.test.ts` passes. `npm run test:unit` passes.
 
 ### TASK-016: Hub switcher UI component
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-015
 - **Description**: Create `src/ui/hubSwitcher.ts` with `initHubSwitcher()`, `renderHubSwitcher()`, `destroyHubSwitcher()`. Renders a `<select id="hub-switcher">` dropdown listing all hubs with name, body, and status indicators ([Building]/[Offline]). On change, calls `setActiveHub()` and triggers a re-render callback. Mount it in `src/ui/hub.ts` inside `initHubUI()` and clean up in `destroyHubUI()`. Write E2E test in `e2e/hubs-switcher.spec.ts`: switcher visible, lists all hubs, Earth first. See implementation plan for exact HTML/CSS structure.
 - **Verification**: `npx playwright test e2e/hubs-switcher.spec.ts` passes.
@@ -151,7 +151,7 @@
 - **Verification**: `npx vitest run src/tests/hubs-construction.test.ts` passes.
 
 ### TASK-021: Hub maintenance and offline logic
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-020
 - **Description**: Add `calculateHubMaintenance()`, `processHubMaintenance()`, and `reactivateHub()` to `src/core/hubs.ts`. Maintenance sums per-facility upkeep scaled by tier (Earth returns 0, offline returns 0). Processing deducts costs; insufficient money triggers offline state with crew evacuation and tourist eviction. Reactivation costs one period's maintenance. Write tests in `src/tests/hubs-economy.test.ts`. See plan for exact test cases.
 - **Verification**: `npx vitest run src/tests/hubs-economy.test.ts` passes.
@@ -175,13 +175,13 @@
 - **Verification**: `npx vitest run src/tests/hubs-tourists.test.ts` passes.
 
 ### TASK-025: Facility tier upgrades at outposts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-020
 - **Description**: Add `startFacilityUpgrade()` to `src/core/hubs.ts`. Queues a construction project with tier-scaled resource costs (tier N+1 costs (N+1)x base) and environment-multiplied resources. Fails if facility not built, already at max tier (3), or upgrade already in progress. Update `processConstructionProjects()` to increment tier on completion of an upgrade (vs creating at tier 1 for new builds). Write tests in `src/tests/hubs-construction.test.ts`. See plan for exact test cases.
 - **Verification**: `npx vitest run src/tests/hubs-construction.test.ts` passes.
 
 ### TASK-026: Orbital hub undocking launch
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-013
 - **Description**: Add `launchType?: 'surface' | 'orbital'` and `launchHubId?: string` to `FlightState` in `src/core/gameState.ts`. In `src/core/physics.ts`, update `createPhysicsState()` to handle orbital launches: spawn at station altitude with orbital velocity, skip PRELAUNCH phase. In `src/ui/vab/_launchFlow.ts`, detect orbital hub and set launch type accordingly (skip weather check and launch pad requirement). Write unit test verifying craft spawns at correct altitude with orbital velocity.
 - **Verification**: `npx vitest run src/tests/hubs.test.ts --testNamePattern "orbital"` passes. `npx tsc --noEmit` passes.
@@ -193,7 +193,7 @@
 - **Verification**: `npx vitest run src/tests/hubs.test.ts --testNamePattern "proximity"` passes.
 
 ### TASK-028: Surface hub recovery with hub selection
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-013
 - **Description**: Add `getSurfaceHubsForRecovery()` to `src/core/hubs.ts`: returns online surface hubs on the specified body. In `src/ui/flightController.ts`, on landing: if no hubs, standard recovery; if one hub, auto-recover there; if multiple, show selection dialog. Write unit tests: returns correct hubs, excludes offline, excludes orbital. See plan for test cases.
 - **Verification**: `npx vitest run src/tests/hubs.test.ts --testNamePattern "recovery"` passes.

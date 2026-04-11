@@ -5,7 +5,7 @@
 
 import type { GameState } from './gameState.ts';
 import type { Hub, ConstructionProject, ResourceRequirement } from './hubTypes.ts';
-import { FacilityId } from './constants.ts';
+import { FacilityId, EARTH_HUB_ID } from './constants.ts';
 import { spend } from './finance.ts';
 import {
   BODY_ENVIRONMENT,
@@ -13,6 +13,7 @@ import {
   IMPORT_TAX_MULTIPLIER,
   DEFAULT_IMPORT_TAX,
   OFFWORLD_FACILITY_COSTS,
+  OFFWORLD_FACILITY_UPKEEP,
   SURFACE_HUB_FACILITIES,
   ORBITAL_HUB_FACILITIES,
   EARTH_ONLY_FACILITIES,
@@ -258,7 +259,14 @@ export function processConstructionProjects(state: GameState): void {
 
       if (isConstructionComplete(project)) {
         project.completedPeriod = state.currentPeriod;
-        hub.facilities[project.facilityId] = { built: true, tier: 1 };
+        const existing = hub.facilities[project.facilityId];
+        if (existing && existing.built) {
+          // Upgrade: increment tier
+          existing.tier += 1;
+        } else {
+          // New build: set to tier 1
+          hub.facilities[project.facilityId] = { built: true, tier: 1 };
+        }
 
         // Bring hub online when Crew Hab completes
         if (project.facilityId === FacilityId.CREW_HAB && !hub.online) {
@@ -304,4 +312,150 @@ export function getAvailableFacilitiesToBuild(hub: Hub): string[] {
     if (id === FacilityId.CREW_HAB) return false;
     return true;
   });
+}
+
+// ---------------------------------------------------------------------------
+// Facility Tier Upgrades
+// ---------------------------------------------------------------------------
+
+/** Maximum facility tier. */
+const MAX_FACILITY_TIER = 3;
+
+/**
+ * Queues a facility upgrade construction project at the given hub.
+ * Tier N+1 costs (N+1)× the base resource amounts, environment-multiplied.
+ * Money cost is also scaled by (N+1).
+ *
+ * Returns the queued project, or null if:
+ *  - Facility is not built
+ *  - Already at max tier (3)
+ *  - An upgrade for this facility is already in progress
+ *  - No cost definition found
+ */
+export function startFacilityUpgrade(
+  state: GameState,
+  hub: Hub,
+  facilityId: string,
+): ConstructionProject | null {
+  const fState = hub.facilities[facilityId];
+  if (!fState || !fState.built) return null;
+  if (fState.tier >= MAX_FACILITY_TIER) return null;
+
+  // Check for in-progress upgrade
+  const alreadyInProgress = hub.constructionQueue.some(
+    p => p.facilityId === facilityId && p.completedPeriod === undefined,
+  );
+  if (alreadyInProgress) return null;
+
+  const costDef = OFFWORLD_FACILITY_COSTS.find(c => c.facilityId === facilityId);
+  if (!costDef) return null;
+
+  const nextTier = fState.tier + 1;
+  const envMultiplier = getEnvironmentCostMultiplier(hub.bodyId);
+
+  const resourcesRequired: ResourceRequirement[] = costDef.resources.map(r => ({
+    resourceId: r.resourceId,
+    amount: r.amount * nextTier * envMultiplier,
+  }));
+  const resourcesDelivered: ResourceRequirement[] = costDef.resources.map(r => ({
+    resourceId: r.resourceId,
+    amount: 0,
+  }));
+
+  const project: ConstructionProject = {
+    facilityId,
+    resourcesRequired,
+    resourcesDelivered,
+    moneyCost: costDef.moneyCost * nextTier,
+    startedPeriod: state.currentPeriod,
+  };
+
+  hub.constructionQueue.push(project);
+  return project;
+}
+
+// ---------------------------------------------------------------------------
+// Maintenance & Offline
+// ---------------------------------------------------------------------------
+
+/**
+ * Calculates the per-period maintenance cost for a hub.
+ * Earth hub returns 0 (uses existing system). Offline hubs return 0.
+ * Each built facility's upkeep is scaled by its tier.
+ */
+export function calculateHubMaintenance(hub: Hub): number {
+  if (hub.id === EARTH_HUB_ID) return 0;
+  if (!hub.online) return 0;
+
+  let total = 0;
+  for (const [facilityId, fState] of Object.entries(hub.facilities)) {
+    if (!fState.built) continue;
+    const baseUpkeep = OFFWORLD_FACILITY_UPKEEP[facilityId] ?? 0;
+    total += baseUpkeep * fState.tier;
+  }
+  return total;
+}
+
+/**
+ * Processes maintenance costs for all hubs.
+ * Deducts costs via spend(). If insufficient money, hub goes offline,
+ * crew are evacuated to Earth, and tourists are evicted.
+ */
+export function processHubMaintenance(state: GameState): void {
+  for (const hub of state.hubs) {
+    const cost = calculateHubMaintenance(hub);
+    if (cost <= 0) continue;
+
+    hub.maintenanceCost = cost;
+
+    if (!spend(state, cost)) {
+      // Insufficient funds — take hub offline
+      hub.online = false;
+
+      // Evacuate crew to Earth
+      for (const crew of state.crew) {
+        if (crew.stationedHubId === hub.id) {
+          crew.stationedHubId = EARTH_HUB_ID;
+        }
+      }
+
+      // Evict tourists
+      hub.tourists = [];
+    }
+  }
+}
+
+/**
+ * Reactivates an offline hub by paying one period's maintenance.
+ * Returns true on success, false if hub not found, already online,
+ * or insufficient funds.
+ */
+export function reactivateHub(state: GameState, hubId: string): boolean {
+  const hub = state.hubs.find(h => h.id === hubId);
+  if (!hub) return false;
+  if (hub.online) return false;
+
+  // Temporarily bring online to calculate maintenance
+  hub.online = true;
+  const cost = calculateHubMaintenance(hub);
+  hub.online = false;
+
+  if (!spend(state, cost)) return false;
+
+  hub.online = true;
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// Surface Hub Recovery
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns online surface hubs on the specified body, suitable for craft recovery.
+ * Excludes offline hubs and orbital hubs.
+ */
+export function getSurfaceHubsForRecovery(state: GameState, bodyId: string): Hub[] {
+  return state.hubs.filter(
+    h => h.bodyId === bodyId && h.type === 'surface' && h.online,
+  );
 }

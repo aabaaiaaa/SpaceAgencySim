@@ -8,7 +8,10 @@ import {
   isConstructionComplete,
   processConstructionProjects,
   getAvailableFacilitiesToBuild,
+  startFacilityUpgrade,
+  getEnvironmentCostMultiplier,
 } from '../core/hubs.ts';
+import { OFFWORLD_FACILITY_COSTS } from '../data/hubFacilities.ts';
 import { makeConstructionProject } from './_factories.ts';
 import type { ResourceType } from '../core/constants.ts';
 
@@ -191,5 +194,79 @@ describe('getAvailableFacilitiesToBuild', () => {
     expect(available).not.toContain(FacilityId.LAUNCH_PAD);
     expect(available).toContain(FacilityId.VAB);
     expect(available).toContain(FacilityId.LOGISTICS_CENTER);
+  });
+});
+
+describe('startFacilityUpgrade', () => {
+  let state: GameState;
+  beforeEach(() => { state = createGameState(); });
+
+  it('queues upgrade project with tier-scaled costs', () => {
+    const hub = createHub(state, { name: 'Moon Base', type: 'surface', bodyId: 'MOON' });
+    hub.facilities[FacilityId.VAB] = { built: true, tier: 1 };
+
+    const project = startFacilityUpgrade(state, hub, FacilityId.VAB);
+    expect(project).not.toBeNull();
+    expect(project!.facilityId).toBe(FacilityId.VAB);
+
+    // Tier 2 costs = 2× base, environment-multiplied
+    const baseCost = OFFWORLD_FACILITY_COSTS.find(c => c.facilityId === FacilityId.VAB)!;
+    const envMult = getEnvironmentCostMultiplier('MOON');
+    for (const req of project!.resourcesRequired) {
+      const baseRes = baseCost.resources.find(r => r.resourceId === req.resourceId)!;
+      expect(req.amount).toBe(baseRes.amount * 2 * envMult);
+    }
+    expect(project!.moneyCost).toBe(baseCost.moneyCost * 2);
+  });
+
+  it('returns null if facility not built', () => {
+    const hub = createHub(state, { name: 'Moon Base', type: 'surface', bodyId: 'MOON' });
+    expect(startFacilityUpgrade(state, hub, FacilityId.VAB)).toBeNull();
+  });
+
+  it('returns null if already at max tier', () => {
+    const hub = createHub(state, { name: 'Moon Base', type: 'surface', bodyId: 'MOON' });
+    hub.facilities[FacilityId.VAB] = { built: true, tier: 3 };
+    expect(startFacilityUpgrade(state, hub, FacilityId.VAB)).toBeNull();
+  });
+
+  it('returns null if upgrade already in progress', () => {
+    const hub = createHub(state, { name: 'Moon Base', type: 'surface', bodyId: 'MOON' });
+    hub.facilities[FacilityId.VAB] = { built: true, tier: 1 };
+    startFacilityUpgrade(state, hub, FacilityId.VAB);
+    // Second call should fail
+    expect(startFacilityUpgrade(state, hub, FacilityId.VAB)).toBeNull();
+  });
+});
+
+describe('processConstructionProjects — upgrades', () => {
+  let state: GameState;
+  beforeEach(() => { state = createGameState(); });
+
+  it('increments tier on upgrade completion', () => {
+    const hub = createHub(state, { name: 'Moon Base', type: 'surface', bodyId: 'MOON' });
+    hub.facilities[FacilityId.VAB] = { built: true, tier: 1 };
+
+    const project = startFacilityUpgrade(state, hub, FacilityId.VAB)!;
+    // Fully deliver all resources
+    for (const req of project.resourcesRequired) {
+      const del = project.resourcesDelivered.find(d => d.resourceId === req.resourceId);
+      if (del) del.amount = req.amount;
+    }
+
+    processConstructionProjects(state);
+    expect(hub.facilities[FacilityId.VAB].tier).toBe(2);
+  });
+
+  it('does not overwrite tier for new builds', () => {
+    const hub = createHub(state, { name: 'Moon Base', type: 'surface', bodyId: 'MOON' });
+    // Complete the Crew Hab construction
+    for (const req of hub.constructionQueue[0].resourcesRequired) {
+      const del = hub.constructionQueue[0].resourcesDelivered.find(d => d.resourceId === req.resourceId);
+      if (del) del.amount = req.amount;
+    }
+
+    processConstructionProjects(state);
+    expect(hub.facilities[FacilityId.CREW_HAB].tier).toBe(1);
   });
 });

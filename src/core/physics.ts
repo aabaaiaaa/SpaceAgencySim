@@ -725,6 +725,28 @@ export function createPhysicsState(assembly: RocketAssembly, flightState: Flight
     flightState.powerState = ps.powerState;
   }
 
+  // Handle orbital launches: spawn at station altitude with orbital velocity.
+  if (flightState && flightState.launchType === 'orbital' && flightState.altitude > 0) {
+    const bodyId = flightState.bodyId;
+    const R: number = BODY_RADIUS[bodyId] ?? BODY_RADIUS.EARTH;
+    const alt: number = flightState.altitude;
+    const r: number = R + alt;
+    // GM = g_surface * R^2, then v_orbit = sqrt(GM / r)
+    const gSurface: number = getSurfaceGravity(bodyId);
+    const GM: number = gSurface * R * R;
+    const orbitalVelocity: number = Math.sqrt(GM / r);
+
+    ps.posY = alt;
+    ps.velX = orbitalVelocity;
+    ps.velY = 0;
+    ps.landed = false;
+    ps.grounded = false;
+
+    // Skip PRELAUNCH — go directly to ORBIT phase.
+    flightState.phase = FlightPhase.ORBIT;
+    flightState.inOrbit = true;
+  }
+
   return ps;
 }
 

@@ -13,6 +13,7 @@ import type { FlightReturnSummary } from '../../core/flightReturn.ts';
 import { startFlightScene } from '../flightController.ts';
 import { showReturnResultsOverlay } from '../hub.ts';
 import { getVabState } from './_state.ts';
+import { getActiveHub } from '../../core/hubs.ts';
 
 // ---------------------------------------------------------------------------
 // Forward references — set by _init.js to break circular deps
@@ -37,6 +38,13 @@ export function setLaunchFlowCallbacks({
 export function handleLaunchClicked(): void {
   const S = getVabState();
   if (!S.assembly || !S.gameState || !S.lastValidation?.canLaunch) return;
+
+  // Skip weather check for orbital hubs (no atmosphere).
+  const activeHub = getActiveHub(S.gameState);
+  if (activeHub.type === 'orbital') {
+    proceedVabLaunch();
+    return;
+  }
 
   const weather = getCurrentWeather(S.gameState);
   if (weather.extreme) {
@@ -225,13 +233,28 @@ function doLaunch(crewIds: string[]): void {
   });
   S.gameState.rockets.push(launchDesign);
 
+  // Detect orbital hub for launch type.
+  const activeHub = getActiveHub(S.gameState);
+  const isOrbitalLaunch = activeHub.type === 'orbital';
+
   S.gameState.currentFlight = createFlightState({
     missionId,
     rocketId:        launchDesign.id,
     crewIds,
     fuelRemaining:   totalFuel,
     deltaVRemaining: 0,
+    ...(isOrbitalLaunch ? {
+      launchType: 'orbital' as const,
+      launchHubId: activeHub.id,
+      bodyId: activeHub.bodyId as any,
+    } : {}),
   });
+
+  // For orbital launches, set the altitude from the hub so physics can
+  // compute the correct spawn position and orbital velocity.
+  if (isOrbitalLaunch) {
+    S.gameState.currentFlight.altitude = activeHub.altitude ?? 200_000;
+  }
 
   const vabRoot = document.getElementById('vab-root');
   if (vabRoot) vabRoot.style.display = 'none';

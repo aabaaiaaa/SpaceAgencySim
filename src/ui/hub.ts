@@ -36,6 +36,7 @@ import { isWeatherPredictionAvailable } from '../core/mapView.ts';
 import './hub.css';
 import type { GameState } from '../core/gameState.ts';
 import type { FlightReturnSummary } from '../core/flightReturn.ts';
+import { initHubSwitcher, destroyHubSwitcher } from './hubSwitcher.ts';
 
 // ---------------------------------------------------------------------------
 // Layout constants — must match src/render/hub.js
@@ -231,6 +232,13 @@ export function initHubUI(container: HTMLElement, state: GameState, onNavigate: 
   _registerHubMenuItems(container);
   _bindDebugSavesShortcut(container);
 
+  // Mount the hub switcher dropdown (hidden when only one hub exists).
+  initHubSwitcher(_overlay, state, () => {
+    // Re-render buildings and panels when hub changes
+    destroyHubUI();
+    initHubUI(container, state, onNavigate);
+  });
+
   // Show the PixiJS background.
   showHubScene();
 }
@@ -251,6 +259,9 @@ export function destroyHubUI(): void {
   // Clean up hub-specific topbar items and keyboard shortcuts.
   clearTopBarHubItems();
   _unbindDebugSavesShortcut();
+
+  // Tear down the hub switcher dropdown.
+  destroyHubSwitcher();
 
   // Clear any focused building to prevent selection highlight leaking into
   // other screens (e.g. flight view).
