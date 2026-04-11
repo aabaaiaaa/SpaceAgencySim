@@ -1,157 +1,189 @@
-# Iteration 9 — Tasks
+# Iteration 10 — Tasks
 
-### TASK-001: Add ResourceType, ResourceState, MiningModuleType enums to constants.ts
-- **Status**: done
+See `.devloop/requirements.md` for full context on all items below.
+
+---
+
+## Bug Fixes & Cleanup
+
+### TASK-001: Fix route cost/destination validation order in processRoutes()
+- **Status**: pending
 - **Dependencies**: none
-- **Description**: Add three new frozen-object enums to `src/core/constants.ts` following the existing pattern (`Object.freeze({} as const)` + companion type): `ResourceType` (10 values: WATER_ICE, REGOLITH, IRON_ORE, RARE_METALS, CO2, HYDROGEN, OXYGEN, HELIUM_3, LIQUID_METHANE, HYDRAZINE), `ResourceState` (SOLID, LIQUID, GAS), `MiningModuleType` (BASE_CONTROL_UNIT, MINING_DRILL, GAS_COLLECTOR, FLUID_EXTRACTOR, REFINERY, STORAGE_SILO, PRESSURE_VESSEL, FLUID_TANK, SURFACE_LAUNCH_PAD, POWER_GENERATOR). Create `src/tests/resources.test.ts` with tests verifying all values exist, all enums are frozen, and value counts are correct. See requirements.md §1 for details.
-- **Verification**: `npx vitest run src/tests/resources.test.ts && npx tsc --noEmit src/core/constants.ts`
+- **Description**: In `src/core/routes.ts` (around lines 310–340), move the destination mining site lookup to *before* the `spend()` call. If the route's final destination is a non-Earth body and no mining site is found for that body, skip processing that route for this period and set its status to `'broken'`. Do not deduct money or resources. See requirements.md section 1.
+- **Verification**: `npx vitest run src/tests/routes.test.ts`
 
-### TASK-002: Create resource data catalog
-- **Status**: done
-- **Dependencies**: TASK-001
-- **Description**: Create `src/data/resources.ts` exporting `ResourceDef` interface, `RESOURCES` (frozen array of 10 entries), and `RESOURCES_BY_ID` (frozen record). Each entry has: `id` (ResourceType), `name`, `description`, `state` (ResourceState), `massDensity` (kg/m³), `baseValuePerKg` ($/kg), `sources` (body IDs — UPPERCASE like `'MOON'`, `'MARS'`, `'CERES'`, `'TITAN'`, `'JUPITER'`, `'SATURN'`), `extractionModule` (MiningModuleType). Append tests to `src/tests/resources.test.ts` verifying: 10 resources, required fields, state-to-extraction-module mappings (solids→MINING_DRILL, gases→GAS_COLLECTOR, liquids→FLUID_EXTRACTOR). See requirements.md §1 resource catalog table for values.
-- **Verification**: `npx vitest run src/tests/resources.test.ts`
+### TASK-002: Remove dead MiningSite.production field
+- **Status**: pending
+- **Dependencies**: none
+- **Description**: Remove the `production` field from the `MiningSite` interface in `src/core/gameState.ts`, remove its initialization (`production: {}`) in `createMiningSite()` in `src/core/mining.ts`, and remove any test assertions that reference it (e.g., in `src/tests/mining.test.ts`). See requirements.md section 2.
+- **Verification**: `npx vitest run src/tests/mining.test.ts && npx tsc --noEmit src/core/gameState.ts src/core/mining.ts`
 
-### TASK-003: Add resource profiles to celestial body definitions
-- **Status**: done
-- **Dependencies**: TASK-001
-- **Description**: Extend the `CelestialBodyDef` interface in `src/data/bodies.ts` with optional `resourceProfile?: readonly BodyResourceEntry[]` field. Define a `BodyResourceEntry` interface with `{ resourceType: ResourceType, extractionRateKgPerPeriod: number, abundance: number }`. Add frozen resource profiles to body definitions: MOON (water ice, regolith, iron ore, helium-3), MARS (water ice, regolith, CO₂, oxygen), CERES (iron ore, rare metals, water ice), TITAN (liquid methane), JUPITER (hydrogen), SATURN (hydrogen). Earth and Sun get no profile. Access bodies via `CELESTIAL_BODIES['MOON']` not via array `.find()`. Append tests to `src/tests/resources.test.ts` verifying Moon has water ice and helium-3, Mars has CO₂ and water ice, all profile entries have positive extraction rates, Earth has no profile.
-- **Verification**: `npx vitest run src/tests/resources.test.ts && npx tsc --noEmit src/data/bodies.ts`
+---
 
-### TASK-004: Add cargo module parts (Cargo Bay, Pressurized Tank, Cryo Tank)
-- **Status**: done
-- **Dependencies**: TASK-001
-- **Description**: Add `CARGO_BAY`, `PRESSURIZED_TANK`, `CRYO_TANK` to the `PartType` enum in `src/core/constants.ts`. Add these three types to `STACK_TYPES` in `src/data/parts.ts`. Add three part definitions to the `PARTS` array: cargo-bay-mk1 (500kg, SOLID), pressurized-tank-mk1 (300kg, GAS), cryo-tank-mk1 (400kg, LIQUID). Each has `properties.cargoCapacityKg` and `properties.cargoState`. Follow existing part definition patterns (makeSnapPoint, RELIABILITY_TIERS.MID, ActivationBehaviour.NONE, etc.). Append tests to `src/tests/resources.test.ts` verifying part types exist and catalog contains parts with correct cargo state/capacity.
-- **Verification**: `npx vitest run src/tests/resources.test.ts`
+## Per-Module Storage Refactor
 
-### TASK-005: Add mining module parts (9 modules)
-- **Status**: done
-- **Dependencies**: TASK-001
-- **Description**: Add `MINING_MODULE` to `PartType` in `src/core/constants.ts` and to `STACK_TYPES` in `src/data/parts.ts`. Add `MINE` and `LAUNCH_RESOURCES` to `ActivationBehaviour` in `src/data/parts.ts` (insert before the Object.freeze). Add 9 mining module part definitions to the `PARTS` array: base-control-unit-mk1, mining-drill-mk1, gas-collector-mk1, fluid-extractor-mk1, refinery-mk1, storage-silo-mk1, pressure-vessel-mk1, fluid-tank-mk1, surface-launch-pad-mk1, power-generator-solar-mk1. All use `type: PartType.MINING_MODULE` with `properties.miningModuleType` set to the matching `MiningModuleType` value. See requirements.md §1 mining module table for property values. Append tests to `src/tests/resources.test.ts` verifying all 9 modules exist with correct types.
-- **Verification**: `npx vitest run src/tests/resources.test.ts`
+### TASK-003: Add per-module storage fields to MiningSiteModule
+- **Status**: pending
+- **Dependencies**: TASK-002
+- **Description**: In `src/core/gameState.ts`, add optional fields to `MiningSiteModule`: `stored?: Partial<Record<ResourceType, number>>`, `storageCapacityKg?: number`, `storageState?: ResourceState`. In `src/core/mining.ts`, update `addModuleToSite()` to populate these fields from the part definition's properties when the module type is a storage type (STORAGE_SILO, PRESSURE_VESSEL, FLUID_TANK). Initialize `stored` to `{}` for storage modules. Add a `recomputeSiteStorage(site)` helper that aggregates all module `stored` values into `site.storage`. See requirements.md section 3.
+- **Verification**: `npx vitest run src/tests/mining.test.ts && npx tsc --noEmit src/core/gameState.ts src/core/mining.ts`
 
-### TASK-006: Add MiningSite, Route, ProvenLeg types and fields to GameState
-- **Status**: done
-- **Dependencies**: TASK-001
-- **Description**: Add `MiningSiteModule`, `MiningSite`, `RouteLocation`, `RouteLeg`, `RouteStatus`, `Route`, and `ProvenLeg` interfaces to `src/core/gameState.ts` as specified in requirements.md §2 and §3. Import `ResourceType` and `MiningModuleType` from constants.ts. Add three new fields to the `GameState` interface: `miningSites: MiningSite[]`, `provenLegs: ProvenLeg[]`, `routes: Route[]`. Initialize all three to `[]` in the `createGameState()` function. Create `src/tests/mining.test.ts` with tests verifying the three new arrays exist and are empty on a fresh game state.
-- **Verification**: `npx vitest run src/tests/mining.test.ts && npx tsc --noEmit src/core/gameState.ts`
-
-### TASK-007: Implement mining site creation and proximity lookup
-- **Status**: done
-- **Dependencies**: TASK-006
-- **Description**: Create `src/core/mining.ts` with: `SITE_PROXIMITY_RADIUS` constant (500), `CreateSiteParams` interface, `createMiningSite(state, params)` function that creates a `MiningSite` and pushes it to `state.miningSites`, and `findNearestSite(state, bodyId, coordinates)` that returns the nearest site within proximity radius on the specified body (or null). Append tests to `src/tests/mining.test.ts` covering: site creation with control unit, empty storage/production/orbitalBuffer, zero power fields, proximity lookup finding/missing sites, ignoring sites on other bodies.
+### TASK-004: Refactor extraction to use per-module storage
+- **Status**: pending
+- **Dependencies**: TASK-003
+- **Description**: In `src/core/mining.ts`, update `processMiningSites()` to distribute extracted resources proportionally across connected storage modules based on each module's remaining capacity (see requirements.md section 3 "Extraction Changes"). After distributing, call `recomputeSiteStorage(site)`. Update existing extraction tests in `mining.test.ts` to verify resources appear in individual module `stored` records as well as `site.storage`.
 - **Verification**: `npx vitest run src/tests/mining.test.ts`
 
-### TASK-008: Implement module placement and pipe connections
-- **Status**: done
-- **Dependencies**: TASK-007
-- **Description**: Add to `src/core/mining.ts`: `AddModuleParams` interface (partId, type, powerDraw, powerOutput?), `addModuleToSite(site, params)` function that creates a `MiningSiteModule`, pushes to `site.modules`, updates `site.powerRequired`/`site.powerGenerated`. Add `toggleConnection(site, moduleAId, moduleBId)` that toggles bidirectional connections (add on first call, remove on second). Append tests to `src/tests/mining.test.ts` covering: adding drill updates powerRequired, adding generator updates powerGenerated, connecting two modules, disconnecting on second toggle.
-- **Verification**: `npx vitest run src/tests/mining.test.ts`
-
-### TASK-009: Implement resource extraction with power budget
-- **Status**: done
-- **Dependencies**: TASK-008, TASK-002, TASK-003
-- **Description**: Add to `src/core/mining.ts`: `getPowerEfficiency(site)` (returns ratio clamped to 0-1, 1.0 when no power required), `getConnectedStorage(site, moduleId, storageState)` (BFS through connections finding storage modules of matching state), `processMiningSites(state)` (per-period extraction — for each extractor module, find matching resources from the body's resource profile, check connected storage capacity, extract at rate × efficiency × multiplier). Must import from `src/data/bodies.ts` (`CELESTIAL_BODIES` or `getBodyDef`), `src/data/resources.ts` (`RESOURCES_BY_ID`), and `src/data/parts.ts` (`getPartById`). Append tests to `src/tests/mining.test.ts` covering: power efficiency calculations, extraction with full power, no extraction with zero power, reduced extraction with partial power.
-- **Verification**: `npx vitest run src/tests/mining.test.ts`
-
-### TASK-010: Implement refinery recipe processing
-- **Status**: done
-- **Dependencies**: TASK-009
-- **Description**: Create `src/core/refinery.ts` with: `RecipeEntry` and `RefineryRecipe` interfaces, `REFINERY_RECIPES` frozen array (4 recipes: water-electrolysis, sabatier-process, regolith-electrolysis, hydrazine-synthesis — see requirements.md §2 for mass ratios), `RECIPES_BY_ID` record, `setRefineryRecipe(site, moduleId, recipeId)`, `getRefineryRecipe(site, moduleId)`, `processRefineries(state)` (per-period — check inputs available scaled by power efficiency, consume inputs, produce outputs). Create `src/tests/refinery.test.ts` with tests covering: recipe catalog contents, water electrolysis conversion, no processing when inputs insufficient, no processing when no recipe set.
+### TASK-005: Refactor refinery processing to use per-module storage
+- **Status**: pending
+- **Dependencies**: TASK-003
+- **Description**: In `src/core/refinery.ts`, update `processRefineries()` to read input resources from individual connected storage modules' `stored` fields and write output resources to individual connected storage modules proportionally. Consume inputs proportionally from source modules. After processing, call `recomputeSiteStorage(site)`. Update existing refinery tests in `refinery.test.ts` to verify module-level storage changes. See requirements.md section 3 "Refinery Changes".
 - **Verification**: `npx vitest run src/tests/refinery.test.ts`
 
-### TASK-011: Implement surface launch pad orbital buffer transfer
-- **Status**: done
-- **Dependencies**: TASK-009
-- **Description**: Add `processSurfaceLaunchPads(state)` to `src/core/mining.ts`. For each site, for each SURFACE_LAUNCH_PAD module: get launch capacity from part properties (scaled by power efficiency), transfer resources from `site.storage` to `site.orbitalBuffer` up to the capacity limit. Append tests to `src/tests/mining.test.ts` covering: resources transfer from storage to orbital buffer, launch capacity limit respected, no transfer without power.
+### TASK-006: Refactor launch pad to use per-module storage
+- **Status**: pending
+- **Dependencies**: TASK-004, TASK-005
+- **Description**: In `src/core/mining.ts`, update `processSurfaceLaunchPads()` to read from connected storage modules' individual `stored` fields instead of `site.storage`. Deduct from individual modules proportionally. After transferring to orbital buffer, call `recomputeSiteStorage(site)`. See requirements.md section 3 "Launch Pad Changes".
 - **Verification**: `npx vitest run src/tests/mining.test.ts`
 
-### TASK-012: Implement route leg proving
-- **Status**: done
+### TASK-007: Update save/load for per-module storage
+- **Status**: pending
 - **Dependencies**: TASK-006
-- **Description**: Create `src/core/routes.ts` with: `ProveRouteLegParams` interface (origin, destination, craftDesignId, cargoCapacityKg, costPerRun, flightId), `proveRouteLeg(state, params)` that creates a `ProvenLeg` with unique ID and `dateProven: state.currentPeriod` and pushes to `state.provenLegs`, `locationsMatch(a, b)` helper comparing RouteLocations (bodyId + locationType + altitude), `getProvenLegsForOriginDestination(state, origin, destination)` that filters matching legs. Create `src/tests/routes.test.ts` with tests covering: recording proven legs, unique IDs, date assignment, multiple legs for same route with different craft, filtering by origin/destination.
+- **Description**: In `src/core/saveload.ts`, ensure the new `stored`, `storageCapacityKg`, and `storageState` fields on `MiningSiteModule` are serialized. For backwards compatibility, add deserialization logic that defaults `stored` to `{}` for any module with a storage-type `MiningModuleType` if the field is missing. After loading, call `recomputeSiteStorage()` on each site to rebuild `site.storage` from module-level data. Update or add a round-trip save/load test.
+- **Verification**: `npx vitest run src/tests/mining.test.ts && npx vitest run src/tests/saveload.test.ts`
+
+---
+
+## Route Processing Scalability
+
+### TASK-008: Add miningSitesByBodyId index to processRoutes()
+- **Status**: pending
+- **Dependencies**: TASK-001
+- **Description**: In `src/core/routes.ts`, add a helper function `buildSiteIndex(sites: MiningSite[]): Map<string, MiningSite[]>` that groups mining sites by `bodyId`. At the start of `processRoutes()`, build this index once and use `index.get(bodyId)` instead of `state.miningSites.find(...)` for all site lookups within the function. This is an internal optimization — no API or behavior changes. See requirements.md section 4.
 - **Verification**: `npx vitest run src/tests/routes.test.ts`
 
-### TASK-013: Implement route assembly and automation
-- **Status**: done
+---
+
+## Period Summary Reporting
+
+### TASK-009: Extend PeriodSummary with resource system fields
+- **Status**: pending
+- **Dependencies**: none
+- **Description**: In `src/core/period.ts`, add the following fields to the `PeriodSummary` interface: `miningExtracted`, `refineryProduced`, `refineryConsumed`, `launchPadTransferred` (all `Partial<Record<ResourceType, number>>`), plus `routeRevenue: number`, `routeOperatingCost: number`, `routeDeliveries: Partial<Record<ResourceType, number>>`. Define return types for each process function as described in requirements.md section 5.
+- **Verification**: `npx tsc --noEmit src/core/period.ts`
+
+### TASK-010: Wire process function return values into advancePeriod()
+- **Status**: pending
+- **Dependencies**: TASK-009, TASK-008
+- **Description**: Update `processMiningSites()`, `processRefineries()`, `processSurfaceLaunchPads()`, and `processRoutes()` to return summary objects (extracted amounts, produced/consumed, transferred, revenue/cost/delivered). In `advancePeriod()` (period.ts lines 177–180), capture these return values and include them in the `PeriodSummary` return object. See requirements.md section 5.
+- **Verification**: `npx vitest run src/tests/mining.test.ts && npx vitest run src/tests/refinery.test.ts && npx vitest run src/tests/routes.test.ts`
+
+---
+
+## Revenue Display
+
+### TASK-011: Wire up Revenue/Period column in route management table
+- **Status**: pending
+- **Dependencies**: none
+- **Description**: In `src/ui/logistics.ts` (around line 483), replace the hardcoded `'-'` in the Revenue/Period column with a calculated value. For active routes where the final leg destination body is Earth: `route.throughputPerPeriod × RESOURCES_BY_ID[route.resourceType].baseValuePerKg`, formatted with `formatMoney()`. For inter-site routes: display `$0`. For paused/broken routes: display `'-'`. See requirements.md section 6.
+- **Verification**: `npx vitest run src/tests/routes.test.ts && npx tsc --noEmit src/ui/logistics.ts`
+
+---
+
+## Route Creation UI — Map Builder
+
+### TASK-012: Build SVG schematic body map component
+- **Status**: pending
+- **Dependencies**: none
+- **Description**: In `src/ui/logistics.ts` (or a new sub-module `src/ui/logistics/routeMap.ts` with barrel re-export), replace the placeholder div in the routes tab (around line 412–415) with an SVG-based schematic map. Render celestial bodies as labeled circles positioned schematically (Sun left, Earth/Moon center, Mars right-center, Ceres further right, Jupiter/Saturn/Titan right). Only show bodies that have mining sites or are route endpoints, plus Earth always. Style with existing CSS design tokens. The map should be a reusable render function that takes game state and returns/populates an SVG element. See requirements.md section 7 "Schematic Body Map".
+- **Verification**: `npx tsc --noEmit src/ui/logistics.ts` and manually verify the map renders in the Logistics Center routes tab via dev server.
+
+### TASK-013: Add proven leg dashed lines and route solid lines to map
+- **Status**: pending
 - **Dependencies**: TASK-012
-- **Description**: Add to `src/core/routes.ts`: `CreateRouteParams` interface, `calculateRouteThroughput(legs)` (min of capacity×craftCount across legs), `createRoute(state, params)` (builds Route from proven leg IDs, starts paused, calculates throughput/cost), `addCraftToLeg(route, legId)` (increments craftCount, recalculates), `setRouteStatus(route, status)`. Add `processRoutes(state)` for per-period automation: skip non-active routes, find source orbital buffer, transport min(throughput, available), deduct cost via `spend(state, cost)` (check boolean return — if spend fails, skip the run), deliver to Earth for revenue via `earn(state, revenue)` or to destination body's orbital buffer. Import `spend`/`earn` from `src/core/finance.ts`, `RESOURCES_BY_ID` from `src/data/resources.ts`. Append tests to `src/tests/routes.test.ts` covering: route creation, throughput calculation, craft addition, route processing with revenue, paused routes not processed, operating cost deduction.
-- **Verification**: `npx vitest run src/tests/routes.test.ts`
+- **Description**: On the SVG schematic map, render proven legs as dashed lines (`stroke-dasharray`) between origin and destination bodies. Render active routes as solid colored lines (paused routes dimmer, broken routes red). Add hover tooltips on proven leg lines showing craft design name, cargo capacity, and cost per run. Add click handling on route lines that highlights the corresponding row in the route table. See requirements.md section 7 "Proven Leg Visualization" and "Active Route Visualization".
+- **Verification**: `npx tsc --noEmit src/ui/logistics.ts` and manually verify legs and routes render on the map via dev server.
 
-### TASK-014: Add Logistics Center facility definition
-- **Status**: done
-- **Dependencies**: none
-- **Description**: Add `LOGISTICS_CENTER: 'logistics-center'` to the `FacilityId` enum in `src/core/constants.ts`. Add a matching entry to the `FACILITY_DEFINITIONS` array with name 'Logistics Center', cost 350_000, scienceCost 15, starter false. Follow the existing pattern for facility definitions. Append test to `src/tests/resources.test.ts` verifying FacilityId.LOGISTICS_CENTER exists and FACILITY_DEFINITIONS includes it.
-- **Verification**: `npx vitest run src/tests/resources.test.ts`
+### TASK-014a: Implement route builder mode — UI scaffold and resource picker
+- **Status**: pending
+- **Dependencies**: TASK-013
+- **Description**: Add a "Create Route" button below the map. When clicked, enter route builder mode: show a builder panel with a resource type dropdown (filtered to resources that have at least one proven leg touching a body that produces them), a route name text input, a "legs chain" display area (initially empty), and Cancel/Confirm buttons. Cancel exits builder mode. The builder state (selected resource, chain of legs, current body position) should be managed as local UI state. See requirements.md section 7 "Route Creation Workflow" steps 1–2.
+- **Verification**: `npx tsc --noEmit src/ui/logistics.ts` and manually verify the builder panel appears/disappears via dev server.
 
-### TASK-015: Integrate resource processing into period tick
-- **Status**: done
-- **Dependencies**: TASK-009, TASK-010, TASK-011, TASK-013
-- **Description**: In `src/core/period.ts`, import `processMiningSites` and `processSurfaceLaunchPads` from `./mining.ts`, `processRefineries` from `./refinery.ts`, `processRoutes` from `./routes.ts`. Add calls in `advancePeriod()` after step 11 (life support) and before step 12 (bankruptcy check): processMiningSites → processRefineries → processSurfaceLaunchPads → processRoutes. Append an integration test to `src/tests/mining.test.ts` verifying that a full extraction→launch chain produces resources in the orbital buffer after calling each function in sequence.
-- **Verification**: `npx vitest run src/tests/mining.test.ts && npx tsc --noEmit src/core/period.ts`
+### TASK-014b: Implement route builder mode — click-to-chain interaction
+- **Status**: pending
+- **Dependencies**: TASK-014a
+- **Description**: In route builder mode, clicking a body on the map sets it as the route origin and highlights all outbound proven legs from that body (change dashed to solid, fade non-outbound legs). Clicking a highlighted leg adds it to the chain display, updates the "current position" to that leg's destination body, and highlights the new body's outbound legs. The chain display shows each added leg with origin → destination labels. Confirm button calls `createRoute()` from `src/core/routes.ts` with the selected name, resource type, and proven leg IDs. Show error text if creation fails (e.g., empty chain). On success, exit builder mode and re-render the routes tab. See requirements.md section 7 "Route Creation Workflow" steps 3–7.
+- **Verification**: `npx tsc --noEmit src/ui/logistics.ts` and manually test the full route creation flow via dev server.
 
-### TASK-016: Add save/load support for new state fields
-- **Status**: done
+### TASK-015: Add inline +/- craft count controls on route legs
+- **Status**: pending
+- **Dependencies**: TASK-012
+- **Description**: In the route table in `src/ui/logistics.ts`, make each route row expandable to show its legs. Each leg row displays the current craft count with +/− buttons. The + button calls `addCraftToLeg()` (which triggers build cost via `spend()`). The − button decrements craft count (minimum 1) and recalculates throughput/cost. Both buttons re-render the route table to show updated throughput, cost, and revenue. See requirements.md section 7 "Craft Assignment".
+- **Verification**: `npx tsc --noEmit src/ui/logistics.ts` and manually test expanding a route and clicking +/− via dev server.
+
+---
+
+## Unit Test Gaps
+
+### TASK-016: Unit tests for storage overflow and multi-resource extraction
+- **Status**: pending
 - **Dependencies**: TASK-006
-- **Description**: In `src/core/saveload.ts`, ensure the serialization path includes `miningSites`, `provenLegs`, and `routes` from `GameState`. In the deserialization/migration path, default missing fields to `[]` for backwards compatibility with old saves (e.g., `state.miningSites = data.miningSites ?? []`). The save/load is async and slot-based — `saveGame(state, slotIndex, name)` returns `Promise<SaveSlotSummary>`, `loadGame(slotIndex)` returns `Promise<GameState>`. Append round-trip tests to `src/tests/mining.test.ts` (or `src/tests/saveload.test.ts` if more appropriate) using `await saveGame(state, 0, 'test')` and `await loadGame(0)`, verifying that miningSites (with modules and storage), provenLegs, and routes survive the round-trip.
-- **Verification**: `npx vitest run src/tests/saveload.test.ts`
+- **Description**: In `src/tests/mining.test.ts`, add two tests: (1) **Storage capacity overflow** — create a site with a storage silo at near-capacity, run extraction, verify stored amount is clamped to the module's `storageCapacityKg` and no resources are created or lost. (2) **Multi-resource extraction competition** — create a site on a body with multiple extractable resources (e.g., Mars: water ice + CO₂), with appropriate extractors and storage for each, run extraction, verify both resources are extracted independently. Tag one with `@smoke`. See requirements.md section 8.
+- **Verification**: `npx vitest run src/tests/mining.test.ts --testNamePattern "overflow|multi-resource"`
 
-### TASK-017: Add resource contract chain (12 contracts)
-- **Status**: done
-- **Dependencies**: TASK-001, TASK-014
-- **Description**: Add 12 resource contract templates to `src/data/contracts.ts`, integrating with the existing `CONTRACT_TEMPLATES` generator pattern. Each contract has a `canGenerate()` function that checks prerequisites (all tutorials complete, previous resource contract completed) and a `generate()` function returning the contract instance. Contracts follow the sequential chain in requirements.md §5 — contract 8 unlocks the Logistics Center facility. Export a `RESOURCE_CONTRACTS` array for direct access/testing. Append tests to `src/tests/resources.test.ts` verifying: 12 contracts exist, first contract requires tutorials, contracts are sequential (each requires previous), contract 8 unlocks 'logistics-center'.
-- **Verification**: `npx vitest run src/tests/resources.test.ts`
-
-### TASK-018: Add Logistics tech tree branch
-- **Status**: done
+### TASK-017: Unit tests for regolith electrolysis and hydrazine synthesis
+- **Status**: pending
 - **Dependencies**: TASK-005
-- **Description**: Add `LOGISTICS: 'LOGISTICS'` to the `TechBranch` enum and `'Logistics'` to `BRANCH_NAMES` in `src/data/techtree.ts`. Add 5 new `TechNodeDef` entries to the `TECH_NODES` array, each with `branch: TechBranch.LOGISTICS` and tiers 1-5: (1) Surface Mining — unlocks drill, BCU, silo, power generator; (2) Gas & Fluid Extraction — unlocks gas collector, fluid extractor, pressure vessel, fluid tank; (3) Refining & Processing — unlocks refinery, cargo bay, pressurized tank, cryo tank; (4) Surface Launch Systems — unlocks surface launch pad; (5) Automated Logistics — empty unlocksParts. Append tests to `src/tests/resources.test.ts` verifying: Logistics branch exists in TECH_NODES, 5 nodes with correct tiers, tier 1 unlocks basic mining parts.
-- **Verification**: `npx vitest run src/tests/resources.test.ts`
+- **Description**: In `src/tests/refinery.test.ts`, add two tests that run the untested recipes through `processRefineries()`: (1) **Regolith electrolysis** — provide 100 kg regolith in connected storage, process, verify 15 kg oxygen produced and 100 kg regolith consumed. (2) **Hydrazine synthesis** — provide 50 kg hydrogen, process, verify 40 kg hydrazine produced and 50 kg hydrogen consumed. Tag one with `@smoke`. See requirements.md section 8.
+- **Verification**: `npx vitest run src/tests/refinery.test.ts --testNamePattern "regolith|hydrazine"`
 
-### TASK-019: Build Logistics Center UI — mining sites panel
-- **Status**: done
-- **Dependencies**: TASK-009, TASK-010, TASK-014
-- **Description**: Create `src/ui/logistics.ts` and `src/ui/logistics.css`. The module exports `openLogisticsPanel(state, parentEl)` and `closeLogisticsPanel()`. The panel has two tabs: "Mining Sites" (default) and "Route Management" (placeholder for TASK-020). The mining sites panel has a left sidebar listing celestial bodies with sites, and a right area showing site diagrams with module boxes, power budget, storage fill levels, refinery recipe selectors, and orbital buffer status. Follow existing UI patterns (DOM-based panels, CSS classes using design tokens where applicable, monospace font). See requirements.md §4 Panel 1 for full specification.
-- **Verification**: `npx tsc --noEmit src/ui/logistics.ts && npx vitest run`
+### TASK-018: Unit test for route to non-Earth body without destination site
+- **Status**: pending
+- **Dependencies**: TASK-001
+- **Description**: In `src/tests/routes.test.ts`, add a test that creates a route targeting a non-Earth body that has no mining site. Run `processRoutes()` and verify: (1) no money is deducted (`state.funds` unchanged), (2) no resources are removed from the source orbital buffer, (3) the route status is set to `'broken'`. Tag with `@smoke`. See requirements.md section 8.
+- **Verification**: `npx vitest run src/tests/routes.test.ts --testNamePattern "without destination"`
 
-### TASK-020: Build Logistics Center UI — route management panel
-- **Status**: done
-- **Dependencies**: TASK-019, TASK-013
-- **Description**: Replace the route management placeholder in `src/ui/logistics.ts`. The routes panel shows: (top) a map placeholder div for future route visualization, (bottom) a table of all routes with name, resource type, legs summary, throughput, cost/period, revenue/period, and status toggle button. Below the table, show proven legs as cards with origin→destination, craft design, capacity, and cost. Add route status toggle (active↔paused) click handlers using `setRouteStatus()`. Add route panel CSS to `src/ui/logistics.css`.
-- **Verification**: `npx tsc --noEmit src/ui/logistics.ts && npx vitest run`
+### TASK-019: Unit test for multi-period accumulation
+- **Status**: pending
+- **Dependencies**: TASK-010
+- **Description**: In `src/tests/mining.test.ts` (or create `src/tests/resource-integration.test.ts` if mining.test.ts is already large), add a test that sets up a complete pipeline: extractor → storage → refinery → storage → launch pad → orbital buffer. Run `advancePeriod()` 3–5 times. Verify: (1) resources accumulate at each stage, (2) no negative values, (3) no double-counting, (4) orbital buffer grows as expected, (5) PeriodSummary fields report non-zero extraction/refining/transfer amounts. Tag with `@smoke`. See requirements.md section 8.
+- **Verification**: `npx vitest run src/tests/mining.test.ts --testNamePattern "multi-period"` (or the integration test file)
 
-### TASK-021: Add Logistics Center to hub screen
-- **Status**: done
-- **Dependencies**: TASK-019
-- **Description**: In `src/ui/hub.ts`, import `openLogisticsPanel` and `closeLogisticsPanel` from `./logistics.ts`. Add a Logistics Center building entry to the hub layout following the existing building pattern (position it in a free spot). Add a click handler case for `FacilityId.LOGISTICS_CENTER` that calls `openLogisticsPanel(state, overlayContainer)`. Import `FacilityId` from constants if not already imported.
-- **Verification**: `npx tsc --noEmit src/ui/hub.ts && npx vitest run`
+---
 
-### TASK-022: Add in-flight map route overlay (placeholder)
-- **Status**: done
-- **Dependencies**: TASK-013
-- **Description**: In `src/render/map.ts`, add a `routeOverlayVisible` flag, a `toggleRouteOverlay()` export, and a `renderRouteOverlay(state)` function that iterates active routes and draws placeholder directional lines between origin/destination bodies (using PixiJS Graphics, following the existing map rendering patterns). Add a toggle button or keybind for the overlay. The rendering can be basic (solid lines with colour coding for active vs paused) — visual polish is deferred. This is read-only; editing happens in the Logistics Center.
-- **Verification**: `npx tsc --noEmit src/render/map.ts && npx vitest run`
+## E2E Tests
 
-### TASK-023: Implement route safety warnings
-- **Status**: done
-- **Dependencies**: TASK-013
-- **Description**: Add to `src/core/routes.ts`: `getRouteDependencies(state, bodyId, orbitAltitude)` returns active routes with legs referencing that body and orbit altitude, `SafeOrbitRange` interface with `minAltitude`/`maxAltitude`, `getSafeOrbitRange(state, bodyId, currentAltitude)` returns the altitude range that keeps all dependent routes valid (or null if no dependencies). Append tests to `src/tests/routes.test.ts` covering: dependencies found for craft at route orbit, empty when no routes at location, safe range calculation.
-- **Verification**: `npx vitest run src/tests/routes.test.ts`
+### TASK-020: E2E test for mining panel interactions
+- **Status**: pending
+- **Dependencies**: TASK-006
+- **Description**: Create `e2e/mining-interactions.spec.ts`. Inject game state with a mining site that has a refinery module with available recipes and multiple modules with pipe connections. Test: (1) Navigate to Logistics Center, verify mining tab renders the site. (2) Change the refinery recipe via dropdown, verify UI updates. (3) Verify module connection display is accurate. Each test is independent — sets up its own state. Use Playwright MCP for interactive debugging if tests fail. Tag one test with `@smoke`. See requirements.md section 8.
+- **Verification**: `npx playwright test e2e/mining-interactions.spec.ts`
 
-### TASK-024: Extend body tests for new celestial bodies
-- **Status**: done
-- **Dependencies**: none
-- **Description**: In `src/tests/bodies.test.ts`, extend the specific property-value tests (surface gravity, atmosphere profiles, landable/non-landable, destruction zones) to cover the 4 new bodies (CERES, JUPITER, SATURN, TITAN). Add: CERES gravity 0.28, JUPITER gravity 24.79, SATURN gravity 10.44, TITAN gravity 1.352 to the gravity test map. Add TITAN to the atmosphere tests (dense N₂/CH₄, sea level density 5.3 kg/m³). Verify JUPITER and SATURN are non-landable with 'extreme_pressure' destruction zones. Verify CERES is landable with no atmosphere. Verify TITAN weather is 'methane_rain'. Verify Saturn has TITAN as child. Verify manoeuvre constants (SOI_RADIUS, BODY_PARENT, BODY_CHILDREN, BODY_ORBIT_RADIUS) include all 12 bodies.
-- **Verification**: `npx vitest run src/tests/bodies.test.ts`
+### TASK-021: E2E test for route management interactions
+- **Status**: pending
+- **Dependencies**: TASK-015
+- **Description**: Create `e2e/route-interactions.spec.ts`. Inject game state with an active route (with proven legs and at least one route). Test: (1) Navigate to Logistics Center routes tab, verify route appears in table. (2) Toggle route status (active → paused), verify UI updates. (3) Expand a route, verify leg details appear with +/− craft buttons. Each test is independent. Use Playwright MCP for interactive debugging if tests fail. Tag one test with `@smoke`. See requirements.md section 8.
+- **Verification**: `npx playwright test e2e/route-interactions.spec.ts`
 
-### TASK-025: E2E test for mining deployment flow
-- **Status**: done
-- **Dependencies**: TASK-021
-- **Description**: Create `e2e/mining.spec.ts` with a Playwright test that verifies the basic mining system is accessible: start a new game, verify the Logistics Center is visible in the hub (may need to be unlocked via game state injection with `page.evaluate()`), open the Logistics Center, verify the mining sites panel shows the empty state message, verify the route management tab is accessible. Use `page.evaluate()` to inject a mining site into gameState and verify it renders in the panel. Follow existing E2E patterns in `e2e/` — use helpers from `e2e/helpers.js`, dispatch keyboard events via `window.dispatchEvent` not `page.keyboard.press`.
-- **Verification**: `npx playwright test e2e/mining.spec.ts`
+### TASK-022: E2E test for resource contract milestones — early chain
+- **Status**: pending
+- **Dependencies**: TASK-006
+- **Description**: Create `e2e/resource-contracts.spec.ts`. Test contracts 1 (Lunar Survey) and 2 (First Harvest) as key milestones. For each: inject game state that simulates the contract's completion conditions (e.g., a BCU + Drill landed on Moon for contract 1; 100 kg water ice delivered to Earth for contract 2), trigger the contract check, and verify the contract completes and the next contract becomes available. Each test is independent. Use Playwright MCP for interactive debugging if tests fail. Tag one test with `@smoke`. See requirements.md section 8.
+- **Verification**: `npx playwright test e2e/resource-contracts.spec.ts --grep "early"`
 
-### TASK-026: Final verification pass
-- **Status**: done
-- **Dependencies**: TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-007, TASK-008, TASK-009, TASK-010, TASK-011, TASK-012, TASK-013, TASK-014, TASK-015, TASK-016, TASK-017, TASK-018, TASK-019, TASK-020, TASK-021, TASK-022, TASK-023, TASK-024, TASK-025
-- **Description**: Run the full verification suite to confirm no regressions. Check: `npm run typecheck` (0 errors), `npm run lint` (0 warnings, 0 errors), `npm run test:unit` (all tests pass, coverage thresholds met), `npm run build` (production build succeeds). If any failures, fix them. Verify the new test files have at least 1-2 `@smoke`-tagged tests each and update `test-map.json` to map new source files to their test files.
-- **Verification**: `npm run typecheck && npm run lint && npm run test:unit && npm run build`
+### TASK-023: E2E test for resource contract milestones — automation chain
+- **Status**: pending
+- **Dependencies**: TASK-006
+- **Description**: In `e2e/resource-contracts.spec.ts`, add tests for contracts 8 (Automate It — first automated route set up) and 12 (Supply Network — 3+ active routes simultaneously). Inject state with the prerequisites for each contract, trigger the contract check, verify completion. Each test is independent. Use Playwright MCP for interactive debugging if tests fail. Tag one test with `@smoke`. See requirements.md section 8.
+- **Verification**: `npx playwright test e2e/resource-contracts.spec.ts --grep "automation"`
+
+---
+
+## Final Verification
+
+### TASK-024: Final verification pass
+- **Status**: pending
+- **Dependencies**: TASK-007, TASK-010, TASK-011, TASK-014b, TASK-015, TASK-016, TASK-017, TASK-018, TASK-019, TASK-020, TASK-021, TASK-022, TASK-023
+- **Description**: Run the full unit test suite and typecheck to verify nothing is broken. Check that all new smoke tests pass. Verify no TypeScript errors in changed files. Run ESLint on changed files. This is a validation-only task — do not write new code.
+- **Verification**: `npm run test:unit && npm run typecheck && npm run lint`

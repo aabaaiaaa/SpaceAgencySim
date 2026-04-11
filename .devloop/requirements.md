@@ -1,331 +1,222 @@
-# Iteration 9 — Resource Generation & Transportation System
+# Iteration 10 — Resource System Gaps, Route Builder UI & Hardening
 
-This iteration adds a complete resource extraction, processing, and automated transportation layer to SpaceAgencySim. Players mine resources from celestial bodies, refine them through processing chains, and automate transport via manually-proven routes. A new Logistics Center facility provides monitoring and route management.
-
-This is the largest feature addition to date — it introduces new data types, core game logic, game loop integration, save/load support, and a full UI facility. Off-world bases, crew transport, life support supply chains, and NPC interactions are explicitly out of scope — they are future features that consume from this infrastructure.
+This iteration addresses all issues, gaps, and architectural improvements identified in the iteration 9 review for the resource generation and transportation system. No new gameplay features are added — the focus is on fixing bugs, filling UI gaps, improving the architecture for future scalability, and closing test coverage holes.
 
 ---
 
-## 1. Resource Data Model
+## 1. Bug Fix: Route Cost/Destination Validation Order
 
-### Resource Catalog (10 resources, 3 physical states)
+**Problem:** In `src/core/routes.ts` (lines 310–340), `processRoutes()` calls `spend(state, route.totalCostPerPeriod)` and deducts resources from the source orbital buffer *before* checking whether the destination mining site exists. If the destination site is missing (e.g., misconfigured route), both money and resources are silently lost with no player feedback.
 
-| Resource | State | Sources | Primary Use |
-|----------|-------|---------|-------------|
-| Water Ice | Solid | MOON, MARS, CERES | Refine into H₂ + O₂; life support feedstock |
-| Regolith | Solid | MOON, MARS | Refine into oxygen (low yield); future: construction |
-| Iron Ore | Solid | CERES, MOON | Earth export (medium value) |
-| Rare Metals | Solid | CERES | High-value Earth export |
-| CO₂ | Gas | MARS atmosphere | Refine into methane + O₂ |
-| Hydrogen | Gas | Refined from water; JUPITER, SATURN | Rocket fuel |
-| Oxygen | Gas | Refined from water/CO₂/regolith; MARS | Oxidizer, life support |
-| Helium-3 | Gas | MOON surface | Very high-value Earth export (fusion fuel) |
-| Liquid Methane | Liquid | Refined from CO₂ + H₂; TITAN | Fuel alternative |
-| Hydrazine | Liquid | Manufactured from H₂ (simplified) | Monopropellant / RCS fuel |
+**Fix:** Move the destination site lookup (currently at line 331) to *before* the `spend()` call. If the destination is a non-Earth body and no mining site is found, skip the route for this period and set its status to `'broken'`. This gives the player a visible signal that something is wrong.
 
-New enums in `src/core/constants.ts`: `ResourceType` (10 values), `ResourceState` (`SOLID`, `LIQUID`, `GAS`), `MiningModuleType` (10 values). All follow the existing `Object.freeze({} as const)` pattern.
-
-New file `src/data/resources.ts`: immutable `ResourceDef` catalog with state, mass density, base value per kg, source body IDs, and extraction module type. Exports `RESOURCES` (array) and `RESOURCES_BY_ID` (record).
-
-**Important codebase convention:** Body IDs are UPPERCASE strings matching the `CelestialBody` enum in constants.ts (e.g., `'MOON'`, `'MARS'`, `'CERES'`, `'TITAN'`). The resource catalog's `sources` arrays must use these uppercase IDs. Ceres (asteroid belt dwarf planet) is the primary asteroid mining body, but the system should be designed so that any landable body with a resource profile can be mined — including small asteroids if more asteroid bodies are added later.
-
-### Body Resource Profiles
-
-Each body in `src/data/bodies.ts` gains an optional `resourceProfile` field — an array of `{ resourceType, extractionRateKgPerPeriod, abundance }` entries. The `CelestialBodyDef` interface is extended with this optional field.
-
-Bodies with resource profiles: MOON (water ice, regolith, iron ore, helium-3), MARS (water ice, regolith, CO₂, oxygen), CERES (iron ore, rare metals, water ice), TITAN (liquid methane), JUPITER (hydrogen), SATURN (hydrogen). Earth and Sun get no profiles.
-
-**Codebase note:** The body catalog exports `CELESTIAL_BODIES` as a `Readonly<Record<string, CelestialBodyDef>>` — NOT an array. Access bodies via `CELESTIAL_BODIES['MOON']` or `getBodyDef('MOON')`, not via `.find()`.
-
-### Cargo Module Parts (3 new parts)
-
-| Part | Type | Carries | Capacity |
-|------|------|---------|----------|
-| Cargo Bay Mk1 | `CARGO_BAY` | Solids | 500 kg |
-| Pressurized Tank Mk1 | `PRESSURIZED_TANK` | Gases | 300 kg |
-| Cryo Tank Mk1 | `CRYO_TANK` | Liquids | 400 kg |
-
-Three new `PartType` values added to constants.ts. Parts added to `PARTS` array and `STACK_TYPES` in `src/data/parts.ts`. Each has `properties.cargoCapacityKg` and `properties.cargoState` matching the `ResourceState` value.
-
-### Mining Module Parts (9 new parts)
-
-One new `PartType`: `MINING_MODULE`. All 9 mining parts use this type, differentiated by `properties.miningModuleType` matching the `MiningModuleType` enum.
-
-| Module | MiningModuleType | Key Properties |
-|--------|-----------------|----------------|
-| Base Control Unit | BASE_CONTROL_UNIT | powerDraw: 10 |
-| Mining Drill | MINING_DRILL | powerDraw: 25, extractionMultiplier: 1.0 |
-| Gas Collector | GAS_COLLECTOR | powerDraw: 20, extractionMultiplier: 1.0 |
-| Fluid Extractor | FLUID_EXTRACTOR | powerDraw: 30, extractionMultiplier: 1.0 |
-| Refinery | REFINERY | powerDraw: 40, processingMultiplier: 1.0 |
-| Storage Silo | STORAGE_SILO | powerDraw: 2, storageCapacityKg: 2000, storageState: SOLID |
-| Pressure Vessel | PRESSURE_VESSEL | powerDraw: 5, storageCapacityKg: 1000, storageState: GAS |
-| Fluid Tank | FLUID_TANK | powerDraw: 8, storageCapacityKg: 1500, storageState: LIQUID |
-| Surface Launch Pad | SURFACE_LAUNCH_PAD | powerDraw: 50, launchCapacityKgPerPeriod: 200 |
-| Power Generator (Solar) | POWER_GENERATOR | powerDraw: 0, powerOutput: 100 |
-
-New `ActivationBehaviour` values: `MINE`, `LAUNCH_RESOURCES`. Added to the existing frozen object in `src/data/parts.ts` before the freeze.
+**Validation:** The existing route automation tests should continue to pass. A new test (see Testing section) covers the missing-destination scenario.
 
 ---
 
-## 2. Mining Sites
+## 2. Dead Field Removal: MiningSite.production
 
-### Core Logic (`src/core/mining.ts`)
+**Problem:** `MiningSite.production` (defined in `gameState.ts` line ~695) is initialized to `{}` in `createMiningSite()` (`mining.ts` line 63) but is never read or written by any production code or UI. It was likely intended for production rate tracking but was never implemented.
 
-A mining site is created implicitly when a Base Control Unit lands on a body. The site is tied to that body and landing coordinates.
+**Fix:** Remove the `production` field from the `MiningSite` interface in `gameState.ts`, remove the initialization in `createMiningSite()`, and remove any test assertions that reference it (e.g., `mining.test.ts` line 56). Production rate tracking is not needed — the UI already computes display rates from module properties and power efficiency.
 
-- **Proximity grouping:** Subsequent landings within `SITE_PROXIMITY_RADIUS` (constant, ~500 game units) of an existing site's Base Control Unit join that site. Landings outside this radius with a BCU create a new site.
-- **Module placement:** Modules are added to a site when they land within its radius. Each module tracks its part ID, type, power draw, and pipe connections.
-- **Pipe connections:** Built-in pipework — players toggle connections between modules at a site. All modules at a site are within connection range (the site boundary IS the connection boundary). Connections form a bidirectional adjacency graph.
-- **Power budget:** `powerGenerated` vs `powerRequired` per site. Efficiency ratio = min(1.0, generated/required). Zero power = zero production.
-- **Extraction:** Per period, each extractor module queries the body's resource profile for resources matching its extraction type. Output flows to connected storage modules of the matching state. Extraction rate scales with power efficiency and the part's extraction multiplier.
-- **No maintenance:** Modules operate indefinitely once placed.
+**Save/load compatibility:** Old saves that include the `production` field in serialized mining sites will harmlessly ignore it during deserialization (the field simply won't be mapped to anything). No migration needed.
 
-### Refinery Processing (`src/core/refinery.ts`)
+---
 
-Refineries transform resources using configured recipes. Each refinery module has one active recipe (or none).
+## 3. Per-Module Storage Accounting
 
-| Recipe | Inputs | Outputs |
-|--------|--------|---------|
-| Water Electrolysis | 100 kg Water Ice | 11 kg Hydrogen + 89 kg Oxygen |
-| Sabatier Process | 100 kg CO₂ + 8 kg Hydrogen | 33 kg Liquid Methane + 75 kg Oxygen |
-| Regolith Electrolysis | 100 kg Regolith | 15 kg Oxygen |
-| Hydrazine Synthesis | 50 kg Hydrogen | 40 kg Hydrazine |
+**Problem:** Currently `site.storage` is a flat `Partial<Record<ResourceType, number>>` — a single pool per resource type per site. Storage capacity is calculated by summing all connected storage module capacities and subtracting total stored, which overstates available capacity when multiple storage modules of the same type exist with different fill levels. This also prevents future Mk2 modules with different capacities from working correctly.
 
-Recipes are defined as immutable data (`REFINERY_RECIPES` array, `RECIPES_BY_ID` record). Processing checks input availability, consumes inputs, produces outputs — all scaled by power efficiency.
+**Approach:** Move storage tracking from site-level to module-level. Each storage-type module (`STORAGE_SILO`, `PRESSURE_VESSEL`, `FLUID_TANK`) gets its own `stored` record tracking what it holds and how much.
 
-### Surface Launch Pad
+### Data Model Changes
 
-Pulls resources from connected storage and transfers them to the site's `orbitalBuffer` — a per-resource-type accumulator that represents resources staged in orbit for automated route pickup. Transfer rate capped by `launchCapacityKgPerPeriod`, scaled by power efficiency.
-
-### Mining Site State (GameState additions)
-
+Add to `MiningSiteModule` in `gameState.ts`:
 ```typescript
-interface MiningSiteModule {
-  id: string;
-  partId: string;
-  type: MiningModuleType;
-  powerDraw: number;
-  connections: string[];    // bidirectional adjacency list
-  recipeId?: string;        // REFINERY modules only
-}
-
-interface MiningSite {
-  id: string;
-  name: string;
-  bodyId: string;
-  coordinates: { x: number; y: number };
-  controlUnit: { partId: string };
-  modules: MiningSiteModule[];
-  storage: Partial<Record<ResourceType, number>>;
-  production: Partial<Record<ResourceType, number>>;
-  powerGenerated: number;
-  powerRequired: number;
-  orbitalBuffer: Partial<Record<ResourceType, number>>;
-}
+stored?: Partial<Record<ResourceType, number>>;  // storage modules only
+storageCapacityKg?: number;                        // storage modules only
+storageState?: ResourceState;                      // storage modules only
 ```
 
-Added to `GameState`: `miningSites: MiningSite[]` (default `[]`).
+These optional fields are populated only for storage-type modules (determined by `MiningModuleType`). The values are copied from the part definition's properties when the module is added via `addModuleToSite()`.
+
+### Derived Site Storage
+
+`site.storage` becomes a **computed aggregate** — the sum of all module-level `stored` records. Rather than removing it from the interface (which would break the UI and many tests), keep it and recompute it at the end of each processing step. Add a helper function `recomputeSiteStorage(site)` that sums all module stored values.
+
+### Extraction Changes (`processMiningSites`)
+
+When an extractor produces resources, distribute the output **proportionally** across all connected storage modules of the matching state, based on each module's remaining capacity. Specifically:
+
+1. Find all connected storage modules of the correct `ResourceState` (existing BFS logic).
+2. For each module, compute `remainingCapacity = storageCapacityKg - sum(stored values)`.
+3. Sum all remaining capacities to get `totalRemaining`.
+4. If `totalRemaining <= 0`, skip (all storage full).
+5. Extracted amount = `min(extractionRate * efficiency * multiplier, totalRemaining)`.
+6. Distribute: each module receives `extracted * (moduleRemaining / totalRemaining)`.
+7. Call `recomputeSiteStorage(site)`.
+
+### Refinery Changes (`processRefineries`)
+
+Refineries consume inputs from connected storage and produce outputs to connected storage. Update to:
+
+1. **Input check:** For each input resource, sum the `stored` amounts across all connected storage modules that hold that resource. If any input is insufficient, skip.
+2. **Output check:** For each output resource, sum the remaining capacity across connected storage modules of the matching state. If insufficient space, skip.
+3. **Consume:** Deduct inputs from individual modules (drain from each proportionally or sequentially — proportional for consistency with extraction).
+4. **Produce:** Distribute outputs proportionally to connected storage modules.
+5. Call `recomputeSiteStorage(site)`.
+
+### Launch Pad Changes (`processSurfaceLaunchPads`)
+
+Surface launch pads pull from storage and transfer to orbital buffer. Update to read from connected storage modules rather than `site.storage`, deducting from individual modules proportionally.
+
+### Save/Load
+
+The new `stored`, `storageCapacityKg`, and `storageState` fields on `MiningSiteModule` will be serialized automatically. For backwards compatibility with old saves, `addModuleToSite()` should initialize `stored` to `{}` for storage modules, and deserialization should default missing `stored` to `{}` for any module that has a storage-type `MiningModuleType`.
 
 ---
 
-## 3. Routes & Automation
+## 4. Route Processing Scalability
 
-### Proving a Route Leg
+**Problem:** `processRoutes()` calls `state.miningSites.find(s => s.bodyId === ...)` for every active route every period tick. This is O(routes × sites).
 
-When a player manually flies a craft from one location to another, the game records a **proven leg**: origin (body + surface/orbit + altitude), destination (body + surface/orbit + altitude), craft design ID, cargo capacity, and cost per run (derived from fuel usage).
+**Fix:** Add a helper function `getMiningSitesByBodyId(state)` that builds a `Map<string, MiningSite[]>` index from `state.miningSites`. Call it once at the start of `processRoutes()` and use it for all lookups within that period. The index is rebuilt each period (not cached on state) since sites can be added/removed between periods.
 
-- Cargo tanks don't need to be filled during proving — completing the trip is enough.
-- Different craft designs require separate proving flights.
-- Proven legs are stored in `gameState.provenLegs`.
+This is a contained optimization — it changes the internal implementation of `processRoutes()` without affecting its API or behavior.
 
-### Route Assembly
+---
 
-Routes are assembled in the Logistics Center by chaining proven legs end-to-end.
+## 5. Period Summary Reporting
 
-- Each route carries a single resource type.
-- Throughput bottleneck = minimum (leg capacity × craft count) across all legs.
-- Routes start in `'paused'` status; player activates them.
+**Problem:** `advancePeriod()` in `period.ts` (lines 177–180) calls `processMiningSites()`, `processRefineries()`, `processSurfaceLaunchPads()`, and `processRoutes()` but discards their return values. The `PeriodSummary` interface (lines 59–79) has no fields for resource system activity, so the end-of-period report can't show resource income/expenses separately.
 
-### Automation Economics
+### PeriodSummary Additions
 
-- Each leg requires building at least one craft (full construction cost).
-- Fixed cost per trip per craft per period (set at proving time).
-- Additional craft can be assigned to a leg to multiply throughput (and cost).
-- No risk — automated runs never fail.
-- Revenue generated when resources are delivered to Earth (sold at base value per kg).
-
-**Codebase note:** `spend(state, amount)` in `src/core/finance.ts` returns `boolean` (false if insufficient funds). Route processing must check this return value and handle insufficient funds (e.g., pause the route or skip the run).
-
-### Route State (GameState additions)
+Add these fields to the `PeriodSummary` interface:
 
 ```typescript
-interface RouteLocation {
-  bodyId: string;
-  locationType: 'surface' | 'orbit';
-  altitude?: number;
-}
-
-interface RouteLeg {
-  id: string;
-  origin: RouteLocation;
-  destination: RouteLocation;
-  craftDesignId: string;
-  craftCount: number;
-  cargoCapacityKg: number;
-  costPerRun: number;
-  provenFlightId: string;
-}
-
-interface Route {
-  id: string;
-  name: string;
-  status: 'active' | 'paused' | 'broken';
-  resourceType: ResourceType;
-  legs: RouteLeg[];
-  throughputPerPeriod: number;
-  totalCostPerPeriod: number;
-}
-
-interface ProvenLeg {
-  id: string;
-  origin: RouteLocation;
-  destination: RouteLocation;
-  craftDesignId: string;
-  cargoCapacityKg: number;
-  costPerRun: number;
-  provenFlightId: string;
-  dateProven: number;
-}
+// Resource system
+miningExtracted: Partial<Record<ResourceType, number>>;  // kg extracted per resource
+refineryProduced: Partial<Record<ResourceType, number>>; // kg produced per resource
+refineryConsumed: Partial<Record<ResourceType, number>>; // kg consumed per resource
+launchPadTransferred: Partial<Record<ResourceType, number>>; // kg transferred to orbit
+routeRevenue: number;          // total credits earned from Earth deliveries
+routeOperatingCost: number;    // total route operating costs
+routeDeliveries: Partial<Record<ResourceType, number>>; // kg delivered per resource
 ```
 
-Added to `GameState`: `provenLegs: ProvenLeg[]`, `routes: Route[]` (both default `[]`).
+### Process Function Return Values
 
-### Route Safety
+Each process function should return a summary object:
 
-When a player controls a craft involved in an active route:
-- Warning displayed listing dependent routes.
-- Safe orbit altitude range highlighted.
-- Moving craft outside safe range breaks the route (status → `'broken'`).
+- `processMiningSites()` → `{ extracted: Partial<Record<ResourceType, number>> }`
+- `processRefineries()` → `{ produced: ..., consumed: ... }`
+- `processSurfaceLaunchPads()` → `{ transferred: ... }`
+- `processRoutes()` → `{ revenue: number, operatingCost: number, delivered: ... }`
 
-Core logic: `getRouteDependencies(state, bodyId, altitude)` returns routes referencing that orbit. `getSafeOrbitRange(state, bodyId, altitude)` returns the min/max altitude range.
-
----
-
-## 4. Logistics Center Facility
-
-### Facility Definition
-
-New `FacilityId.LOGISTICS_CENTER` in constants.ts. Added to `FACILITY_DEFINITIONS` with cost, science cost, and `starter: false`. Higher tiers unlock more simultaneous active routes.
-
-### Panel 1 — Mining Sites (Systems Diagram)
-
-Left sidebar: grouped list of celestial bodies with mining sites. Selecting a body shows all sites on that body.
-
-Per-site diagram:
-- Module boxes with type icon, status, and key metric (production rate for extractors, fill level for storage, recipe for refineries, orbital buffer for launch pads).
-- Connection lines between piped modules.
-- Site-level power budget display with visual warning on deficit.
-- Refinery recipe selection (configurable from this view).
-
-### Panel 2 — Route Management (Map + Table)
-
-Top: Map showing bodies and active routes as directional lines.
-Bottom: Table listing each route with name, resource type, legs summary, throughput, cost/period, revenue/period, status toggle.
-
-- Create new routes by chaining proven legs.
-- Assign additional craft to legs (triggers build cost).
-- Pause/resume routes.
-
-### Hub Integration
-
-Add Logistics Center building to the hub layout in `src/ui/hub.ts`. Click handler opens the logistics panel.
-
-### In-Flight Map Overlay
-
-Toggleable overlay on the existing map view showing active routes as directional lines. Read-only — editing happens in the Logistics Center.
+`advancePeriod()` captures these return values and includes them in the `PeriodSummary`.
 
 ---
 
-## 5. Contract Progression
+## 6. Revenue/Period Column in Route Table
 
-12 new contracts using the existing contract system. Contracts unlock sequentially after all tutorial missions are complete.
+**Problem:** The route management table in `src/ui/logistics.ts` (line 483) has a Revenue/Period column hardcoded to `'-'`.
 
-| # | Contract | Objective | Unlocks |
-|---|----------|-----------|---------|
-| 1 | Lunar Survey | Land BCU + Drill on Moon | Mining site creation |
-| 2 | First Harvest | Return 100kg water ice to Earth | Cargo modules |
-| 3 | Expand Operations | Add silo + 2nd drill to lunar site | Pipe connections |
-| 4 | Power Up | Deploy power generator | Power budget mechanic |
-| 5 | Refining Basics | Deploy refinery, produce hydrogen | Refinery module |
-| 6 | Launch Capability | Build surface launch pad | Orbital buffer |
-| 7 | Orbital Storage | Place fuel depot in lunar orbit | Fuel depots |
-| 8 | Automate It | Set up first automated route | Logistics Center facility |
-| 9 | Gas Mining | Deploy gas collector on Mars | Gas collector, pressurized tank |
-| 10 | Methane Production | Produce methane from CO₂ + H₂ | Multi-input recipes, cryo tank |
-| 11 | Asteroid Prospecting | Extract rare metals from Ceres | Asteroid mining |
-| 12 | Supply Network | 3+ active routes simultaneously | Multi-route management |
+**Fix:** Calculate and display the expected revenue per period:
+- For routes where the final leg destination is Earth: `route.throughputPerPeriod × RESOURCES_BY_ID[route.resourceType].baseValuePerKg`
+- For inter-site routes: display `$0` (resources are transferred, not sold)
+- For paused/broken routes: display `'-'`
 
-**Codebase note:** The existing contract system uses `CONTRACT_TEMPLATES` in `src/data/contracts.ts` with a `canGenerate()` / `generate()` pattern, not a static array. The resource contracts need to integrate with this generator pattern. After contract 8 is completed, the procedural generator should also produce resource delivery contracts.
+Format as currency using the existing `formatMoney()` helper.
 
 ---
 
-## 6. Tech Tree
+## 7. Route Creation Map-Based Builder
 
-New "Logistics" branch added to the tech tree. The existing tech tree uses flat `TechNodeDef` entries in the `TECH_NODES` array (in `src/data/techtree.ts`), each with a `branch`, `tier`, `name`, `scienceCost`, `fundsCost`, and `unlocksParts` array. A new `TechBranch.LOGISTICS` value is needed in the `TechBranch` enum, plus a `BRANCH_NAMES` entry.
+This is the most significant UI addition. The route management tab in the Logistics Center currently has no way for players to create routes from proven legs — the core functions `createRoute()` and `addCraftToLeg()` exist and are tested, but no UI invokes them.
 
-5 nodes across tiers 1-5:
-1. Surface Mining (drill, BCU, silo, power generator)
-2. Gas & Fluid Extraction (gas collector, fluid extractor, pressure vessel, fluid tank)
-3. Refining & Processing (refinery, cargo bay, pressurized tank, cryo tank)
-4. Surface Launch Systems (surface launch pad)
-5. Automated Logistics (unlocks route automation feature)
+### Schematic Body Map
+
+Replace the placeholder `div` in the routes tab (logistics.ts line 412–415) with an **SVG-based schematic map** showing celestial bodies as labeled icons/circles, positioned in a simplified layout (not to orbital scale — schematic positioning for readability).
+
+Body positions should be roughly: Sun center-left, inner planets (Earth, Moon) center, Mars right of center, asteroid belt (Ceres) further right, outer planets (Jupiter, Saturn, Titan) right edge. Only bodies that have mining sites OR are route endpoints should be shown — plus Earth (always shown as the universal destination).
+
+### Proven Leg Visualization
+
+Proven legs appear as **dashed lines** between their origin and destination bodies on the map. Each line is an SVG `<line>` or `<path>` with `stroke-dasharray`. Lines are colored by the resource state they can carry (solid=brown, gas=blue, liquid=green) or a neutral color if multiple states are possible.
+
+When the player hovers over a proven leg line, show a tooltip with: craft design name, cargo capacity, cost per run.
+
+### Route Creation Workflow
+
+1. Player clicks a **"Create Route"** button below the map.
+2. The UI enters **route builder mode**: a panel appears below the map with:
+   - Resource type dropdown (filtered to resources that have at least one proven leg touching a body that produces them).
+   - A "legs chain" area showing the sequence of legs added so far.
+   - Route name text input.
+3. Clicking a body on the map highlights all **outbound proven legs** from that body as solid lines (non-outbound legs stay dashed/faded). The first click sets the route origin.
+4. Clicking a highlighted outbound leg adds it to the chain. The destination body of that leg becomes the new "current position," and its outbound legs are highlighted.
+5. The player continues clicking legs until the chain reaches the desired destination.
+6. "Confirm" button calls `createRoute()` with the selected resource type, leg IDs, and name. "Cancel" exits builder mode.
+7. Validation: the chain must have at least one leg. Display an error if `createRoute()` fails.
+
+### Active Route Visualization
+
+Active routes appear as **solid colored lines** on the map (distinct from dashed proven legs). Paused routes are dimmer. Broken routes are red. Clicking a route line or its table row highlights it on both the map and table.
+
+### Craft Assignment
+
+In the route table, each route row expands to show its legs. Each leg row shows the current craft count with **inline +/−** buttons. The + button calls `addCraftToLeg()`, which triggers a build cost. The − button reduces craft count (minimum 1). Both recalculate route throughput and cost displays.
 
 ---
 
-## 7. Game Loop Integration
+## 8. Testing Gaps
 
-### Period Tick (`src/core/period.ts`)
+### Unit Tests
 
-Add resource processing to `advancePeriod()`, after existing steps (crew salaries, facility upkeep, contracts, satellites, training, surface ops, life support) but before the bankruptcy check:
+All new unit tests go in existing test files where the tested module already has coverage.
 
-1. `processMiningSites(state)` — extraction
-2. `processRefineries(state)` — refinery processing
-3. `processSurfaceLaunchPads(state)` — orbital buffer transfers
-4. `processRoutes(state)` — automated transport and revenue
+**Storage capacity overflow** (`mining.test.ts`): Create a site with a single storage silo (2000 kg capacity), run extraction for enough periods that output would exceed 2000 kg, verify that stored amount is clamped to capacity and no resources are lost or created.
 
-The `PeriodSummary` return type should be extended with resource system fields (mining revenue, route costs, etc.).
+**Multi-resource extraction competition** (`mining.test.ts`): Create a site with two different extractors (e.g., drill + gas collector on Mars) both connected to appropriate storage. Run extraction and verify both resources are extracted independently and stored correctly without interference.
 
-### Save/Load (`src/core/saveload.ts`)
+**Regolith electrolysis recipe** (`refinery.test.ts`): Set up a refinery with the regolith electrolysis recipe, provide 100 kg regolith in connected storage, run `processRefineries()`, verify 15 kg oxygen produced and 100 kg regolith consumed.
 
-The save/load system is async and slot-based: `saveGame(state, slotIndex, saveName)` → `Promise<SaveSlotSummary>`, `loadGame(slotIndex)` → `Promise<GameState>`. State is serialized to JSON, compressed, and stored in localStorage + IndexedDB.
+**Hydrazine synthesis recipe** (`refinery.test.ts`): Set up a refinery with the hydrazine synthesis recipe, provide 50 kg hydrogen, run `processRefineries()`, verify 40 kg hydrazine produced and 50 kg hydrogen consumed.
 
-The new `miningSites`, `provenLegs`, and `routes` arrays need to be included in serialization. Deserialization must default missing fields to `[]` for backwards compatibility with old saves. The `_validateState()` function does NOT need changes since it doesn't reject unknown fields, but `_validateNestedStructures()` could optionally validate mining site entries.
+**Route to non-Earth body without destination site** (`routes.test.ts`): Create a route targeting a non-Earth body that has no mining site. Run `processRoutes()` and verify: no money is deducted, no resources are lost from the source orbital buffer, and the route status is set to `'broken'`.
+
+**Multi-period accumulation** (`mining.test.ts` or a new `integration.test.ts`): Set up a complete pipeline (extractor → storage → refinery → storage → launch pad → orbital buffer), run `advancePeriod()` 3–5 times, verify resources accumulate correctly at each stage with no state corruption, double-counting, or negative values.
+
+### E2E Tests
+
+All E2E tests use Playwright targeting Chromium. **Use Playwright MCP for interactive debugging** when tests fail — don't rerun blindly. Each E2E test must be independent (sets up its own state, no serial dependencies between tests).
+
+**Mining panel interactions** (`e2e/mining-interactions.spec.ts`): Inject game state with a mining site that has a refinery module. Verify the recipe selection dropdown appears, change the recipe, verify the UI updates. Also verify module connection toggle works.
+
+**Route management interactions** (`e2e/route-interactions.spec.ts`): Inject game state with an active route. Verify the route appears in the table. Toggle route status (active → paused), verify UI updates. Test the +/− craft buttons on a route leg.
+
+**Resource contract milestones — early chain** (`e2e/resource-contracts.spec.ts`): Test contracts 1 (Lunar Survey — land BCU + Drill on Moon) and 2 (First Harvest — return 100 kg water ice to Earth). Inject state to simulate completion conditions, verify contracts complete and unlock the next stage.
+
+**Resource contract milestones — automation chain** (`e2e/resource-contracts.spec.ts`): Test contracts 8 (Automate It — first automated route) and 12 (Supply Network — 3+ active routes). Inject state with the prerequisites, verify contract completion detection works correctly.
 
 ---
 
-## 8. New Body Test Coverage
+## 9. Technical Decisions
 
-Four celestial bodies were added in a pre-iteration change (Ceres, Jupiter, Saturn, Titan). The general iteration tests in `bodies.test.ts` (field presence, hierarchy, weather) already cover them via `ALL_BODY_IDS` iteration. However, the specific property-value tests (surface gravity, atmosphere profiles, radius, GM) only cover the original 8 bodies. These should be extended to cover all 12 bodies for completeness.
-
----
-
-## 9. Testing Strategy
-
-- **TDD approach:** Write failing tests first, then implement, then verify.
-- **Unit tests** for all core modules: `resources.test.ts`, `mining.test.ts`, `refinery.test.ts`, `routes.test.ts`.
-- **Existing test extension:** `bodies.test.ts` extended for new body property coverage.
-- **Save/load round-trip tests** added to verify persistence of new state fields. Must use the async `saveGame(state, slot)` / `loadGame(slot)` pattern with `await`.
-- **E2E test** for basic mining deployment flow.
-- **Verification per task:** Targeted test commands (single file), not full suite. Type-check changed files only where possible.
+- **SVG for the route builder map** — DOM-based, fits the UI layer pattern, supports click events and hover natively, no PixiJS dependency in the UI layer.
+- **Proportional storage fill** — distributes resources across connected storage modules proportionally to remaining capacity. Simple, balanced, and deterministic.
+- **Body index rebuilt per period** — the `miningSitesByBodyId` map is cheap to build and avoids stale cache issues. No need to maintain it on game state.
+- **Per-module storage as optional fields** — only storage-type modules populate `stored`/`storageCapacityKg`/`storageState`. Other module types ignore these fields. This avoids a parallel module hierarchy.
+- **Backwards-compatible save/load** — old saves without per-module `stored` fields will have them defaulted to `{}` during deserialization. Site-level `storage` is recomputed on load.
 
 ---
 
 ## 10. What This Iteration Does NOT Include
 
-- **No off-world bases or habitats** — future feature consuming from this infrastructure
-- **No crew transport or taxi service** — future feature
-- **No life support supply chains** — future feature
-- **No NPC craft interactions** — future feature
-- **No bundle splitting** — the main chunk size warning is acknowledged but deferred
-- **No route map rendering** in the in-flight overlay — placeholder only; full PixiJS route rendering is a visual polish task
+- **No new resource types or recipes** — the 10-resource, 4-recipe system is unchanged.
+- **No new parts or modules** — Mk2 storage modules are a future addition that this iteration *enables* but does not implement.
+- **No off-world bases, crew transport, or life support** — still future features.
+- **No full PixiJS route rendering on the in-flight map** — the placeholder overlay remains; the new SVG map is in the Logistics Center only.
+- **No bundle code-splitting** — deferred as before.
