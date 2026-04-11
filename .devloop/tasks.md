@@ -5,7 +5,7 @@ See [requirements.md](requirements.md) for full context on each section.
 ---
 
 ### TASK-001: Fix UI coverage threshold
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Lower the `src/ui/**` lines coverage threshold from 77 to 76 in `vite.config.ts` (line 119, inside `test.coverage.thresholds['src/ui/**']`). This fixes the 0.01% shortfall caused by the iteration 7 staging extraction. See requirements section 1.
 - **Verification**: `npm run test:unit` exits with code 0 (all tests pass, all coverage thresholds met).
@@ -29,7 +29,7 @@ See [requirements.md](requirements.md) for full context on each section.
 - **Verification**: `npm run typecheck` passes. `npx vitest run src/tests/gameState.test.ts` passes. `grep -r "CrewStatus" src/ --include="*.ts" | grep -v node_modules` returns zero results.
 
 ### TASK-004: Add makeContract factory and fix saveload.test.ts casts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Eliminate the 3 remaining `as unknown as` casts in `saveload.test.ts`:
   1. Add a `makeContract()` factory to `src/tests/_factories.ts` that returns a typed `Contract` (import from `gameState.ts`). Include sensible defaults for all required fields: `id`, `title`, `description`, `category`, `objectives`, `reward`, `penaltyFee`, etc. Accept `Partial<Contract>` overrides.
@@ -41,7 +41,7 @@ See [requirements.md](requirements.md) for full context on each section.
 - **Verification**: `npx vitest run src/tests/saveload.test.ts` — all tests pass. `grep -c "as unknown as" src/tests/saveload.test.ts` returns 0.
 
 ### TASK-005: Eliminate pool.test.ts and workerBridgeTimeout.test.ts casts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Eliminate the 4 remaining `as unknown as` casts across these two files:
   1. **`pool.test.ts`** (lines 87, 96): The `asPIXIContainer()` and `attachToParent()` helpers bridge `MockContainer` ↔ `PIXI.Container`. Attempt to extend `makeMockContainer()` in `_factories.ts` to satisfy enough of the `PIXI.Container` interface (specifically `children` array and `destroy()` method). If the interface surface is too large, replace the casts with `@ts-expect-error` comments explaining the WebGL limitation.
@@ -50,7 +50,7 @@ See [requirements.md](requirements.md) for full context on each section.
 - **Verification**: `npx vitest run src/tests/pool.test.ts` and `npx vitest run src/tests/workerBridgeTimeout.test.ts` — all tests pass. `grep -c "as unknown as" src/tests/pool.test.ts src/tests/workerBridgeTimeout.test.ts` returns 0 for both files.
 
 ### TASK-006: Eliminate ui-rocketCardUtil.test.ts casts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Eliminate the 4 remaining `as unknown as` casts in `ui-rocketCardUtil.test.ts` (lines 128, 133, 138):
   The three helper functions (`createCanvas`, `renderPreview`, `buildCard`) bridge between JSDOM elements and the test's `MockElement` type. Strategy options (pick the one that works cleanly):
@@ -62,7 +62,7 @@ See [requirements.md](requirements.md) for full context on each section.
 - **Verification**: `npx vitest run src/tests/ui-rocketCardUtil.test.ts` — all tests pass. `grep -c "as unknown as" src/tests/ui-rocketCardUtil.test.ts` returns 0.
 
 ### TASK-007: Migrate static inline styles — _launchFlow.ts and launchPad.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Migrate all 23 static inline styles from `src/ui/vab/_launchFlow.ts` (12) and `src/ui/launchPad.ts` (11) to CSS classes. These two files share near-identical launch confirmation dialog styles — create shared CSS classes (e.g., `.launch-dialog-title`, `.launch-dialog-subtitle`, `.launch-dialog-warn-highlight`, `.launch-dialog-actions`, `.launch-btn-abort`, `.launch-btn-confirm`, `.launch-caution-box`, `.launch-caution-title`, `.launch-caution-highlight`) in `src/ui/launchPad.css` (the common launch context). Use design tokens from `design-tokens.css` where hex values match existing tokens. Replace each `style="..."` with the appropriate `class="..."`. See requirements section 5 for the full style inventory.
 - **Verification**: `npm run build` succeeds. `grep -c 'style="' src/ui/vab/_launchFlow.ts src/ui/launchPad.ts` returns 0 for both files. Visual check: start dev server, open VAB, attempt a launch with validation errors — confirm the dialog looks identical to before.

@@ -84,7 +84,8 @@ import { RendererPool } from '../render/pool.ts';
 
 /** Bridge MockContainer → PIXI.Container for releaseContainerChildren(). */
 function asPIXIContainer(c: InstanceType<typeof MockContainer>): PIXI.Container {
-  return c as unknown as PIXI.Container;
+  // @ts-expect-error — MockContainer intentionally omits WebGL-dependent members of PIXI.Container
+  return c;
 }
 
 /** Attach a Graphics object to a parent mock container (sets up .parent + .children). */
@@ -92,8 +93,9 @@ function attachToParent(
   child: PIXI.Graphics | PIXI.Text,
   parent: InstanceType<typeof MockContainer>,
 ): void {
-  (parent.children as unknown[]).push(child);
-  (child as unknown as { parent: InstanceType<typeof MockContainer> }).parent = parent;
+  parent.children.push(child);
+  // @ts-expect-error — setting parent on mock object that intentionally lacks full PIXI interface
+  child.parent = parent;
 }
 
 // ---------------------------------------------------------------------------

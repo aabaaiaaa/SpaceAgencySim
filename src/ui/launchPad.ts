@@ -614,19 +614,15 @@ function _showExtremeWeatherWarning(design: RocketDesign, assembly: RocketAssemb
   dialog.className = 'weather-warning-dialog';
 
   dialog.innerHTML =
-    `<div style="font-size:1.2rem;font-weight:700;color:#ff5050;margin-bottom:8px;">` +
+    `<div class="launch-dialog-title">` +
       `Extreme Weather Warning</div>` +
-    `<div style="font-size:0.88rem;color:#c0a0a0;margin-bottom:16px;line-height:1.5;">` +
-      `Current conditions: <strong style="color:#ff8060;">${weather.description}</strong><br>` +
+    `<div class="launch-dialog-subtitle">` +
+      `Current conditions: <strong class="launch-dialog-warn-highlight">${weather.description}</strong><br>` +
       `Wind: ${weather.windSpeed.toFixed(1)} m/s<br>` +
       `Launching in these conditions is highly inadvisable.</div>` +
-    `<div style="display:flex;gap:12px;justify-content:center;">` +
-      `<button id="lp-weather-cancel" style="padding:10px 24px;background:#302020;` +
-        `border:1px solid #804040;border-radius:6px;color:#e0c0c0;cursor:pointer;` +
-        `font-size:0.9rem;">Cancel</button>` +
-      `<button id="lp-weather-proceed" style="padding:10px 24px;background:#601010;` +
-        `border:1px solid #ff4040;border-radius:6px;color:#ffa0a0;cursor:pointer;` +
-        `font-size:0.9rem;font-weight:600;">Launch Anyway</button>` +
+    `<div class="launch-dialog-actions">` +
+      `<button id="lp-weather-cancel" class="launch-btn-abort">Cancel</button>` +
+      `<button id="lp-weather-proceed" class="launch-btn-confirm">Launch Anyway</button>` +
     `</div>`;
 
   overlay.appendChild(dialog);
@@ -677,9 +673,9 @@ function _showCrewDialog(
   }
 
   const infoMsg = activeCrew.length === 0
-    ? `<p style="font-size:10px;color:#c07030;margin-bottom:10px;line-height:1.6;">` +
+    ? `<p class="launch-crew-msg-warn">` +
       `No active crew to assign.<br>Seats will launch empty.</p>`
-    : `<p style="font-size:10px;color:#3a6080;margin-bottom:12px;line-height:1.6;">` +
+    : `<p class="launch-crew-msg-info">` +
       `Assign crew to seats before launch.<br>Seats may be left empty.</p>`;
 
   // Show a crew death risk warning if the player hasn't done a crewed flight yet.
@@ -688,12 +684,10 @@ function _showCrewDialog(
   );
   const fineStr = `$${DEATH_FINE_PER_ASTRONAUT.toLocaleString('en-US')}`;
   const crewWarning = !hadCrewedFlight
-    ? `<div style="background:rgba(120,80,20,0.4);border:1px solid #c09030;` +
-      `border-radius:6px;padding:8px 10px;margin-bottom:10px;font-size:10px;` +
-      `color:#e0c080;line-height:1.5;">` +
-      `<strong style="color:#ffcc40;">Crew Risk Warning:</strong> ` +
+    ? `<div class="launch-caution-box">` +
+      `<strong class="launch-caution-title">Crew Risk Warning:</strong> ` +
       `If a crewed rocket is destroyed, each astronaut killed incurs a ` +
-      `<strong style="color:#ff8060;">${fineStr}</strong> fine. ` +
+      `<strong class="launch-caution-highlight">${fineStr}</strong> fine. ` +
       `Consider launching uncrewed first to test your design.</div>`
     : '';
 

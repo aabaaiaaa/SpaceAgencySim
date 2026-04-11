@@ -70,11 +70,15 @@ const _OriginalWorker = globalThis.Worker;
 
 function installWorkerStub(): void {
   latestMockWorker = null;
-  (globalThis as unknown as { Worker: unknown }).Worker = function MockWorkerConstructor() {
-    const w = new MockWorker();
-    latestMockWorker = w;
-    return w;
-  } as unknown as typeof Worker;
+  Object.defineProperty(globalThis, 'Worker', {
+    value: function MockWorkerConstructor() {
+      const w = new MockWorker();
+      latestMockWorker = w;
+      return w;
+    },
+    writable: true,
+    configurable: true,
+  });
 }
 
 function restoreWorkerStub(): void {

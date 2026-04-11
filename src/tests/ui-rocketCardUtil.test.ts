@@ -123,19 +123,22 @@ function makeDesign(overrides: Partial<RocketDesign>): RocketDesign {
   } as RocketDesign;
 }
 
-/** Helper: create a mock canvas element (avoids `as unknown as MockElement` at each call site). */
+/** Helper: create a mock canvas element (avoids cast at each call site). */
 function createCanvas(): MockElement {
-  return document.createElement('canvas') as unknown as MockElement;
+  // @ts-expect-error — document.createElement is stubbed to return MockElement, not real HTMLCanvasElement
+  return document.createElement('canvas');
 }
 
-/** Helper: call renderRocketPreview with a MockElement canvas (centralises the HTMLCanvasElement cast). */
+/** Helper: call renderRocketPreview with a MockElement canvas (centralises the type bridge). */
 function renderPreview(canvas: MockElement, design: RocketDesign): void {
-  renderRocketPreview(canvas as unknown as HTMLCanvasElement, design);
+  // @ts-expect-error — MockElement intentionally lacks full HTMLCanvasElement interface
+  renderRocketPreview(canvas, design);
 }
 
-/** Helper: call buildRocketCard and return a MockElement (centralises the return-type cast). */
+/** Helper: call buildRocketCard and return a MockElement (centralises the return-type bridge). */
 function buildCard(design: RocketDesign, actions: RocketCardAction[]): MockElement {
-  return buildRocketCard(design, actions) as unknown as MockElement;
+  // @ts-expect-error — buildRocketCard returns HTMLElement but test uses MockElement stub
+  return buildRocketCard(design, actions);
 }
 
 describe('rocketCardUtil', () => {

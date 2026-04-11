@@ -31,6 +31,7 @@
  *   makeSepDebris()         → SepDebrisShape          (DebrisLike param for applySeparationImpulse)
  *   makeFlightResult()      → FlightResult            (from gameState.ts)
  *   makeStagingConfig()     → StagingConfig           (from rocketbuilder.ts)
+ *   makeContract()          → Contract                (from gameState.ts)
  * ---------------------------------------------------------------------------
  */
 
@@ -44,6 +45,7 @@ import type {
   ObjectiveDef,
   RocketDesign,
   FlightResult,
+  Contract,
 } from '../core/gameState.ts';
 
 import type { PhysicsState, RocketAssembly } from '../core/physics.ts';
@@ -56,6 +58,7 @@ import type { StagingConfig } from '../core/rocketbuilder.ts';
 
 import {
   AstronautStatus,
+  ContractCategory,
   ControlMode,
   FlightOutcome,
   FlightPhase,
@@ -785,6 +788,35 @@ export function makeStagingConfig(overrides: Partial<StagingConfig> = {}): Stagi
     stages: [],
     unstaged: [],
     currentStageIdx: 0,
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Contract factory (3 casts in tests — saveload.test.ts)
+// ---------------------------------------------------------------------------
+
+/**
+ * Create a Contract with sensible defaults for testing.
+ */
+export function makeContract(overrides: Partial<Contract> = {}): Contract {
+  return {
+    id: 'contract-test-1',
+    title: 'Test Contract',
+    description: 'A test contract.',
+    category: ContractCategory.ALTITUDE_RECORD,
+    objectives: [],
+    reward: 10_000,
+    penaltyFee: 5_000,
+    reputationReward: 10,
+    reputationPenalty: 5,
+    deadlinePeriod: null,
+    boardExpiryPeriod: 10,
+    generatedPeriod: 0,
+    acceptedPeriod: null,
+    chainId: null,
+    chainPart: null,
+    chainTotal: null,
     ...overrides,
   };
 }

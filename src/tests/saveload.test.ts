@@ -36,9 +36,9 @@ import {
 import { crc32 } from '../core/crc32.ts';
 import { AstronautStatus } from '../core/constants.ts';
 
-import type { GameState, CrewMember, MissionInstance, OrbitalObject, RocketDesign } from '../core/gameState.ts';
+import type { GameState, Contract, CrewMember, MissionInstance, OrbitalObject, RocketDesign } from '../core/gameState.ts';
 import type { SaveSlotSummary } from '../core/saveload.ts';
-import { makeCrewMember, makeFlightResult, makeMissionInstance, makeOrbitalObject, makeRocketDesign } from './_factories.js';
+import { makeContract, makeCrewMember, makeFlightResult, makeMissionInstance, makeOrbitalObject, makeRocketDesign } from './_factories.js';
 
 // Node.js Buffer is available in Vitest's Node environment but @types/node is not installed.
 declare const Buffer: {
@@ -59,7 +59,7 @@ interface SaveEnvelope {
   saveName: string;
   timestamp: string;
   version?: number;
-  state: Record<string, unknown>;
+  state: GameState;
 }
 
 // ---------------------------------------------------------------------------
@@ -775,7 +775,7 @@ describe('exportSave()', () => {
     expect(envelope!).toHaveProperty('state');
 
     // The embedded state must include the full game data.
-    const envelopeState = envelope!.state as unknown as GameState;
+    const envelopeState = envelope!.state;
     expect(envelopeState.money).toBe(987_654);
     expect(envelopeState.crew[0].name).toBe('Dana');
     expect(envelopeState.missions.completed[0].title).toBe('First orbit');
@@ -1131,8 +1131,8 @@ describe('_validateNestedStructures()', () => {
   }
 
   // Helper: a valid contract entry.
-  function validContract(id = 'contract-1'): Record<string, unknown> {
-    return { id, title: 'Test Contract', reward: 10000, category: 'LAUNCH', objectives: [] };
+  function validContract(id = 'contract-1'): Contract {
+    return makeContract({ id, title: 'Test Contract', reward: 10000 });
   }
 
   // --- Missions ---
@@ -1283,9 +1283,10 @@ describe('_validateNestedStructures()', () => {
     const state = freshState();
     state.contracts = { board: [], active: [
       validContract('c1'),
+      // @ts-expect-error — deliberately including invalid entry (missing reward) for validation test
       { id: 'c2' }, // missing reward
       validContract('c3'),
-    ], completed: [], failed: [] } as unknown as GameState['contracts'];
+    ], completed: [], failed: [] };
 
     _validateNestedStructures(state);
 
@@ -1305,7 +1306,7 @@ describe('_validateNestedStructures()', () => {
     state.crew = [makeCrewMember({ name: 'Alice' }), makeCrewMember({ name: 'Bob' })];
     state.orbitalObjects = [makeOrbitalObject({ id: 'o1' })];
     state.savedDesigns = [makeRocketDesign({ name: 'R1' })];
-    state.contracts = { board: [], active: [validContract('c1')], completed: [], failed: [] } as unknown as GameState['contracts'];
+    state.contracts = { board: [], active: [validContract('c1')], completed: [], failed: [] };
 
     _validateNestedStructures(state);
 

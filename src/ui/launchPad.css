@@ -285,3 +285,86 @@
 .lp-rocket-mass.over-limit {
   color: #c06040;
 }
+
+/* ── Shared launch dialog styles ───────────────────────────────────── */
+.launch-dialog-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #ff5050;
+  margin-bottom: 8px;
+}
+
+.launch-dialog-subtitle {
+  font-size: 0.88rem;
+  color: #c0a0a0;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.launch-dialog-warn-highlight {
+  color: #ff8060;
+}
+
+.launch-dialog-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.launch-btn-abort {
+  padding: 10px 24px;
+  background: #302020;
+  border: 1px solid #804040;
+  border-radius: 6px;
+  color: #e0c0c0;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.launch-btn-confirm {
+  padding: 10px 24px;
+  background: #601010;
+  border: 1px solid #ff4040;
+  border-radius: 6px;
+  color: #ffa0a0;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.launch-crew-msg-warn {
+  font-size: 10px;
+  color: #c07030;
+  margin-bottom: 10px;
+  line-height: 1.6;
+}
+
+.launch-crew-msg-info {
+  font-size: 10px;
+  color: #3a6080;
+  margin-bottom: 12px;
+  line-height: 1.6;
+}
+
+.launch-caution-box {
+  background: rgba(120, 80, 20, 0.4);
+  border: 1px solid #c09030;
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  font-size: 10px;
+  color: #e0c080;
+  line-height: 1.5;
+}
+
+.launch-caution-title {
+  color: #ffcc40;
+}
+
+.launch-caution-highlight {
+  color: #ff8060;
+}
+
+.launch-dismiss-mt {
+  margin-top: 14px;
+}
