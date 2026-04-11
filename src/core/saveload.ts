@@ -14,7 +14,7 @@
  */
 
 import { compressToUTF16, decompressFromUTF16 } from 'lz-string';
-import { AstronautStatus, FACILITY_DEFINITIONS, GameMode, DEFAULT_DIFFICULTY_SETTINGS, MiningModuleType } from './constants.ts';
+import { AstronautStatus, EARTH_HUB_ID, FACILITY_DEFINITIONS, GameMode, DEFAULT_DIFFICULTY_SETTINGS, MiningModuleType } from './constants.ts';
 import { crc32 } from './crc32.ts';
 import { loadSharedLibrary, saveSharedLibrary } from './designLibrary.ts';
 import { logger } from './logger.ts';
@@ -39,7 +39,7 @@ const SAVE_KEY_PREFIX = 'spaceAgencySave_';
  * Current save format version. Bump this whenever the save envelope or
  * state schema changes in a way that requires new migration logic.
  */
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 // ---------------------------------------------------------------------------
 // Session Time Tracking
@@ -646,6 +646,9 @@ export async function loadGame(slotIndex: number): Promise<GameState> {
     recomputeSiteStorage(site);
   }
 
+  // Migrate legacy saves to the hub system (Earth HQ from facilities/inventory).
+  migrateToHubs(envelope.state);
+
   // Validate and filter corrupted nested entries (missions, crew, etc.).
   _validateNestedStructures(envelope.state);
 
@@ -656,6 +659,45 @@ export async function loadGame(slotIndex: number): Promise<GameState> {
   applyPersistedSettings(envelope.state as GameState);
 
   return envelope.state as GameState;
+}
+
+/**
+ * Migrates a raw save state to include the hubs system.
+ *
+ * For legacy saves (pre-hub), creates an Earth HQ hub from the save's existing
+ * `facilities` and `partInventory` fields. Also defaults `stationedHubId` and
+ * `transitUntil` on all crew members.
+ *
+ * Idempotent: if `state.hubs` already exists and is an array, this is a no-op.
+ *
+ * @param state - The raw (any-typed) state object from the save envelope.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function migrateToHubs(state: any): void {
+  if (Array.isArray(state.hubs)) return;
+
+  state.hubs = [{
+    id: EARTH_HUB_ID,
+    name: 'Earth HQ',
+    type: 'surface',
+    bodyId: 'EARTH',
+    coordinates: { x: 0, y: 0 },
+    facilities: state.facilities ? { ...state.facilities } : {},
+    tourists: [],
+    partInventory: state.partInventory ? [...state.partInventory] : [],
+    constructionQueue: [],
+    maintenanceCost: 0,
+    established: 0,
+    online: true,
+  }];
+  state.activeHubId = EARTH_HUB_ID;
+
+  if (Array.isArray(state.crew)) {
+    for (const c of state.crew) {
+      c.stationedHubId ??= EARTH_HUB_ID;
+      c.transitUntil ??= null;
+    }
+  }
 }
 
 /**

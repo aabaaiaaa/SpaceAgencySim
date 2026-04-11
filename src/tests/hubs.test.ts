@@ -17,6 +17,12 @@ import {
   getImportTaxMultiplier,
 } from '../core/hubs.ts';
 import {
+  hasFacility,
+  getFacilityTier,
+  buildFacility,
+  upgradeFacility,
+} from '../core/construction.ts';
+import {
   EnvironmentCategory,
   ENVIRONMENT_COST_MULTIPLIER,
   DEFAULT_IMPORT_TAX,
@@ -246,5 +252,38 @@ describe('Environment & tax helpers', () => {
 
   it('getImportTaxMultiplier returns DEFAULT_IMPORT_TAX (2.0) for unknown body', () => {
     expect(getImportTaxMultiplier('PLUTO')).toBe(DEFAULT_IMPORT_TAX);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Hub-aware construction
+// ---------------------------------------------------------------------------
+
+describe('Hub-aware construction', () => {
+  let state: GameState;
+  beforeEach(() => { state = createGameState(); });
+
+  it('hasFacility checks active hub', () => {
+    // Earth hub has starter facilities
+    expect(hasFacility(state, FacilityId.LAUNCH_PAD)).toBe(true);
+    // Create a Moon hub with no facilities, switch to it
+    const moonHub = createHub(state, { name: 'Moon Base', type: 'surface', bodyId: 'MOON' });
+    setActiveHub(state, moonHub.id);
+    expect(hasFacility(state, FacilityId.LAUNCH_PAD)).toBe(false);
+  });
+
+  it('getFacilityTier returns active hub tier', () => {
+    expect(getFacilityTier(state, FacilityId.LAUNCH_PAD)).toBe(1);
+    const moonHub = createHub(state, { name: 'Moon Base', type: 'surface', bodyId: 'MOON' });
+    setActiveHub(state, moonHub.id);
+    expect(getFacilityTier(state, FacilityId.LAUNCH_PAD)).toBe(0);
+  });
+
+  it('explicit hubId overrides active hub', () => {
+    const moonHub = createHub(state, { name: 'Moon Base', type: 'surface', bodyId: 'MOON' });
+    // Active is Earth, but explicitly query Moon hub
+    expect(hasFacility(state, FacilityId.LAUNCH_PAD, moonHub.id)).toBe(false);
+    // Explicitly query Earth hub
+    expect(hasFacility(state, FacilityId.LAUNCH_PAD, EARTH_HUB_ID)).toBe(true);
   });
 });

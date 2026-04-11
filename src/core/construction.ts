@@ -26,9 +26,10 @@ import {
   getReputationDiscount,
 } from './constants.ts';
 import { spend } from './finance.ts';
+import { getActiveHub, getHub } from './hubs.ts';
 
 import type { FacilityDefinition } from './constants.ts';
-import type { GameState } from './gameState.ts';
+import type { GameState, FacilityState } from './gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -57,22 +58,44 @@ export interface CommandResult {
 }
 
 // ---------------------------------------------------------------------------
+// Hub resolution helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolves the facilities record for the target hub.
+ * If `hubId` is provided, looks up that specific hub;
+ * otherwise uses the active hub.
+ */
+function resolveHubFacilities(state: GameState, hubId?: string): Record<string, FacilityState> {
+  if (hubId) {
+    const hub = getHub(state, hubId);
+    if (!hub) throw new Error(`Hub not found: ${hubId}`);
+    return hub.facilities;
+  }
+  return getActiveHub(state).facilities;
+}
+
+// ---------------------------------------------------------------------------
 // Queries
 // ---------------------------------------------------------------------------
 
 /**
  * Returns true if the facility with `facilityId` has been built.
+ * If `hubId` is provided, checks that specific hub; otherwise checks the active hub.
  */
-export function hasFacility(state: GameState, facilityId: string): boolean {
-  return !!state.facilities[facilityId]?.built;
+export function hasFacility(state: GameState, facilityId: string, hubId?: string): boolean {
+  const facilities = resolveHubFacilities(state, hubId);
+  return !!facilities[facilityId]?.built;
 }
 
 /**
  * Returns the current tier of a built facility, or 0 if not built.
+ * If `hubId` is provided, checks that specific hub; otherwise checks the active hub.
  */
-export function getFacilityTier(state: GameState, facilityId: string): number {
-  if (!hasFacility(state, facilityId)) return 0;
-  return state.facilities[facilityId]?.tier ?? 1;
+export function getFacilityTier(state: GameState, facilityId: string, hubId?: string): number {
+  if (!hasFacility(state, facilityId, hubId)) return 0;
+  const facilities = resolveHubFacilities(state, hubId);
+  return facilities[facilityId]?.tier ?? 1;
 }
 
 /**
@@ -97,12 +120,12 @@ export function getDiscountedMoneyCost(baseMoneyCost: number, reputation: number
  * Returns an object with `allowed` (boolean) and `reason` (string) when
  * construction is blocked.
  */
-export function canBuildFacility(state: GameState, facilityId: string): BuildCheckResult {
+export function canBuildFacility(state: GameState, facilityId: string, hubId?: string): BuildCheckResult {
   const def = getFacilityDef(facilityId);
   if (!def) {
     return { allowed: false, reason: 'Unknown facility.' };
   }
-  if (hasFacility(state, facilityId)) {
+  if (hasFacility(state, facilityId, hubId)) {
     return { allowed: false, reason: 'Already built.' };
   }
   // Sandbox mode: always allowed, no cost.
@@ -137,10 +160,10 @@ export function canBuildFacility(state: GameState, facilityId: string): BuildChe
  * Any facility listed in FACILITY_UPGRADE_DEFS can be upgraded.
  * All facilities cost money only, except R&D Lab (money + science).
  */
-export function canUpgradeFacility(state: GameState, facilityId: string): UpgradeCheckResult {
+export function canUpgradeFacility(state: GameState, facilityId: string, hubId?: string): UpgradeCheckResult {
   const noUpgrade: UpgradeCheckResult = { allowed: false, reason: '', nextTier: 0, moneyCost: 0, scienceCost: 0, description: '' };
 
-  if (!hasFacility(state, facilityId)) {
+  if (!hasFacility(state, facilityId, hubId)) {
     return { ...noUpgrade, reason: 'Facility not built.' };
   }
 
@@ -149,7 +172,7 @@ export function canUpgradeFacility(state: GameState, facilityId: string): Upgrad
     return { ...noUpgrade, reason: 'This facility cannot be upgraded.' };
   }
 
-  const currentTier = getFacilityTier(state, facilityId);
+  const currentTier = getFacilityTier(state, facilityId, hubId);
   const nextTier = currentTier + 1;
 
   if (nextTier > upgradeDef.maxTier) {
@@ -210,8 +233,8 @@ export function canUpgradeFacility(state: GameState, facilityId: string): Upgrad
  * Returns `{ success, reason }`.  On success the facility is added to
  * `state.facilities` at tier 1.
  */
-export function buildFacility(state: GameState, facilityId: string): CommandResult {
-  const check = canBuildFacility(state, facilityId);
+export function buildFacility(state: GameState, facilityId: string, hubId?: string): CommandResult {
+  const check = canBuildFacility(state, facilityId, hubId);
   if (!check.allowed) {
     return { success: false, reason: check.reason };
   }
@@ -240,7 +263,8 @@ export function buildFacility(state: GameState, facilityId: string): CommandResu
     }
   }
 
-  state.facilities[facilityId] = { built: true, tier: 1 };
+  const facilities = resolveHubFacilities(state, hubId);
+  facilities[facilityId] = { built: true, tier: 1 };
   return { success: true, reason: '' };
 }
 
@@ -249,8 +273,8 @@ export function buildFacility(state: GameState, facilityId: string): CommandResu
  *
  * Any facility listed in FACILITY_UPGRADE_DEFS can be upgraded.
  */
-export function upgradeFacility(state: GameState, facilityId: string): CommandResult {
-  const check = canUpgradeFacility(state, facilityId);
+export function upgradeFacility(state: GameState, facilityId: string, hubId?: string): CommandResult {
+  const check = canUpgradeFacility(state, facilityId, hubId);
   if (!check.allowed) {
     return { success: false, reason: check.reason };
   }
@@ -275,7 +299,8 @@ export function upgradeFacility(state: GameState, facilityId: string): CommandRe
     }
   }
 
-  state.facilities[facilityId].tier = check.nextTier;
+  const facilities = resolveHubFacilities(state, hubId);
+  facilities[facilityId].tier = check.nextTier;
   return { success: true, reason: '' };
 }
 
@@ -283,14 +308,15 @@ export function upgradeFacility(state: GameState, facilityId: string): CommandRe
  * Award a facility for free (used by tutorial missions).
  * Bypasses the tutorial-mode lock and cost check.
  */
-export function awardFacility(state: GameState, facilityId: string): CommandResult {
+export function awardFacility(state: GameState, facilityId: string, hubId?: string): CommandResult {
   const def = getFacilityDef(facilityId);
   if (!def) {
     return { success: false, reason: 'Unknown facility.' };
   }
-  if (hasFacility(state, facilityId)) {
+  if (hasFacility(state, facilityId, hubId)) {
     return { success: false, reason: 'Already built.' };
   }
-  state.facilities[facilityId] = { built: true, tier: 1 };
+  const facilities = resolveHubFacilities(state, hubId);
+  facilities[facilityId] = { built: true, tier: 1 };
   return { success: true, reason: '' };
 }

@@ -109,13 +109,13 @@
 - **Verification**: `npx vitest run src/tests/hubs.test.ts` passes.
 
 ### TASK-014: Save/load migration for hubs
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-013
 - **Description**: Add `migrateToHubs()` to `src/core/saveload.ts`. It creates an Earth hub from legacy saves' top-level `facilities` and `partInventory`, sets `activeHubId`, and defaults `stationedHubId`/`transitUntil` on crew. Idempotent — skips if `hubs` already exists. Call it inside `loadGame()` after existing migrations. Bump `SAVE_VERSION`. Write tests in `src/tests/hubs-save-migration.test.ts`: legacy save creates Earth hub, crew get stationedHubId, no double-migration, round-trip serialisation preserves hubs.
 - **Verification**: `npx vitest run src/tests/hubs-save-migration.test.ts` passes. `npm run test:unit` passes.
 
 ### TASK-015: Make construction module hub-aware
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-013
 - **Description**: Update `hasFacility()`, `getFacilityTier()`, `buildFacility()`, `upgradeFacility()` in `src/core/construction.ts` to read/write from the active hub's facilities (or a specified hub via optional `hubId` parameter) instead of `state.facilities` directly. Import `getActiveHub`/`getHub` from hubs.ts. Write tests in `src/tests/hubs.test.ts` verifying: hasFacility checks active hub, getFacilityTier returns active hub's tier, explicit hubId overrides active hub. Fix any existing construction tests that break.
 - **Verification**: `npx vitest run src/tests/hubs.test.ts` passes. `npm run test:unit` passes.
@@ -139,13 +139,13 @@
 - **Verification**: `npx vitest run src/tests/hubs-outpost-core.test.ts` passes. `npx tsc --noEmit` passes.
 
 ### TASK-019: Outpost Core deployment logic
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-018, TASK-013
 - **Description**: Add `deployOutpostCore(state, flight, name)` to `src/core/hubs.ts`. Creates a surface hub if landed, orbital hub if in orbit. Deducts Crew Hab monetary cost via `spend()`. Fails if insufficient money. Write tests in `src/tests/hubs-outpost-core.test.ts`: surface deployment creates surface hub, orbital deployment creates orbital hub with altitude, cost deducted, insufficient money fails.
 - **Verification**: `npx vitest run src/tests/hubs-outpost-core.test.ts` passes.
 
 ### TASK-020: Construction project resource delivery and completion
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-013
 - **Description**: Add `deliverResources()`, `isConstructionComplete()`, `processConstructionProjects()`, and `getAvailableFacilitiesToBuild()` to `src/core/hubs.ts`. `deliverResources` records partial deliveries capped at required. `processConstructionProjects` marks completed projects, adds facilities at tier 1, brings hub online when Crew Hab completes. `getAvailableFacilitiesToBuild` returns buildable facilities (excludes built, in-progress, Earth-only, and Crew Hab). Write tests in `src/tests/hubs-construction.test.ts`. See plan for exact test cases.
 - **Verification**: `npx vitest run src/tests/hubs-construction.test.ts` passes.
@@ -163,7 +163,7 @@
 - **Verification**: `npx vitest run src/tests/hubs-crew.test.ts` passes.
 
 ### TASK-023: Off-world VAB import tax tests
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-013
 - **Description**: Write unit tests in `src/tests/hubs-vab.test.ts` verifying import tax multipliers: Earth 1.0x, Moon 1.2x, Mars 1.5x, Saturn 3.0x, unknown body gets default 2.0x. Also verify that a part's cost at an off-world hub is base cost times the multiplier (use an actual part from the catalog).
 - **Verification**: `npx vitest run src/tests/hubs-vab.test.ts` passes.
