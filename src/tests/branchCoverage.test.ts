@@ -25,6 +25,7 @@ import type { DebrisState } from '../core/staging.ts';
 import type { FuelSystemState } from '../core/fuelsystem.ts';
 import type { DifficultySettings } from '../core/constants.ts';
 import type { LogLevel } from '../core/logger.ts';
+import { makeGameState, makePhysicsState, makeCrewMember, makeRecoveryPS } from './_factories.js';
 
 // ---------------------------------------------------------------------------
 // settings.ts — updateDifficultySettings with null/undefined difficultySettings
@@ -471,11 +472,10 @@ describe('malfunction.ts branch coverage', () => {
   });
 
   it('attemptRecovery ENGINE_FLAMEOUT can fail (roll >= 0.5)', () => {
-    const ps = {
+    const ps = makeRecoveryPS({
       malfunctions: new Map([['eng-1', { type: MalfunctionType.ENGINE_FLAMEOUT, recovered: false }]]),
-      firingEngines: new Set<string>(),
       _gameState: { malfunctionMode: MalfunctionMode.NORMAL },
-    } as unknown as RecoveryPS;
+    }) as unknown as RecoveryPS;
 
     // Force a high random roll to ensure failure
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
@@ -486,11 +486,10 @@ describe('malfunction.ts branch coverage', () => {
   });
 
   it('attemptRecovery FUEL_TANK_LEAK can fail (roll >= 0.6)', () => {
-    const ps = {
+    const ps = makeRecoveryPS({
       malfunctions: new Map([['tank-1', { type: MalfunctionType.FUEL_TANK_LEAK, recovered: false }]]),
-      firingEngines: new Set<string>(),
       _gameState: { malfunctionMode: MalfunctionMode.NORMAL },
-    } as unknown as RecoveryPS;
+    }) as unknown as RecoveryPS;
 
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
     const result = attemptRecovery(ps, 'tank-1');
@@ -499,11 +498,10 @@ describe('malfunction.ts branch coverage', () => {
   });
 
   it('attemptRecovery SCIENCE_INSTRUMENT_FAILURE can fail (roll >= 0.4)', () => {
-    const ps = {
+    const ps = makeRecoveryPS({
       malfunctions: new Map([['sci-1', { type: MalfunctionType.SCIENCE_INSTRUMENT_FAILURE, recovered: false }]]),
-      firingEngines: new Set<string>(),
       _gameState: { malfunctionMode: MalfunctionMode.NORMAL },
-    } as unknown as RecoveryPS;
+    }) as unknown as RecoveryPS;
 
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
     const result = attemptRecovery(ps, 'sci-1');
@@ -512,11 +510,10 @@ describe('malfunction.ts branch coverage', () => {
   });
 
   it('attemptRecovery LANDING_LEGS_STUCK can fail (roll >= 0.7)', () => {
-    const ps = {
+    const ps = makeRecoveryPS({
       malfunctions: new Map([['leg-1', { type: MalfunctionType.LANDING_LEGS_STUCK, recovered: false }]]),
-      firingEngines: new Set<string>(),
       _gameState: { malfunctionMode: MalfunctionMode.NORMAL },
-    } as unknown as RecoveryPS;
+    }) as unknown as RecoveryPS;
 
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
     const result = attemptRecovery(ps, 'leg-1');
@@ -526,11 +523,9 @@ describe('malfunction.ts branch coverage', () => {
 
   it('attemptRecovery DECOUPLER_STUCK succeeds (always)', () => {
     const malfunctions = new Map([['dec-2', { type: MalfunctionType.DECOUPLER_STUCK, recovered: false }]]);
-    const ps = {
+    const ps = makeRecoveryPS({
       malfunctions,
-      firingEngines: new Set<string>(),
-      _gameState: null,
-    } as unknown as RecoveryPS;
+    }) as unknown as RecoveryPS;
     const gs = createGameState();
     gs.malfunctionMode = MalfunctionMode.FORCED;
 
@@ -541,11 +536,9 @@ describe('malfunction.ts branch coverage', () => {
   });
 
   it('attemptRecovery FUEL_TANK_LEAK succeeds with low roll', () => {
-    const ps = {
+    const ps = makeRecoveryPS({
       malfunctions: new Map([['tank-2', { type: MalfunctionType.FUEL_TANK_LEAK, recovered: false }]]),
-      firingEngines: new Set<string>(),
-      _gameState: null,
-    } as unknown as RecoveryPS;
+    }) as unknown as RecoveryPS;
 
     vi.spyOn(Math, 'random').mockReturnValue(0.1); // < 0.6 threshold
     const result = attemptRecovery(ps, 'tank-2');
@@ -554,11 +547,9 @@ describe('malfunction.ts branch coverage', () => {
   });
 
   it('attemptRecovery LANDING_LEGS_STUCK succeeds with low roll', () => {
-    const ps = {
+    const ps = makeRecoveryPS({
       malfunctions: new Map([['leg-2', { type: MalfunctionType.LANDING_LEGS_STUCK, recovered: false }]]),
-      firingEngines: new Set<string>(),
-      _gameState: null,
-    } as unknown as RecoveryPS;
+    }) as unknown as RecoveryPS;
 
     vi.spyOn(Math, 'random').mockReturnValue(0.1); // < 0.7 threshold
     const result = attemptRecovery(ps, 'leg-2');
@@ -567,11 +558,9 @@ describe('malfunction.ts branch coverage', () => {
   });
 
   it('attemptRecovery SCIENCE_INSTRUMENT_FAILURE succeeds with low roll', () => {
-    const ps = {
+    const ps = makeRecoveryPS({
       malfunctions: new Map([['sci-2', { type: MalfunctionType.SCIENCE_INSTRUMENT_FAILURE, recovered: false }]]),
-      firingEngines: new Set<string>(),
-      _gameState: null,
-    } as unknown as RecoveryPS;
+    }) as unknown as RecoveryPS;
 
     vi.spyOn(Math, 'random').mockReturnValue(0.1); // < 0.4 threshold
     const result = attemptRecovery(ps, 'sci-2');
@@ -581,11 +570,10 @@ describe('malfunction.ts branch coverage', () => {
 
   it('attemptRecovery ENGINE_FLAMEOUT succeeds with low roll', () => {
     const firingEngines = new Set<string>();
-    const ps = {
+    const ps = makeRecoveryPS({
       malfunctions: new Map([['eng-2', { type: MalfunctionType.ENGINE_FLAMEOUT, recovered: false }]]),
       firingEngines,
-      _gameState: null,
-    } as unknown as RecoveryPS;
+    }) as unknown as RecoveryPS;
 
     vi.spyOn(Math, 'random').mockReturnValue(0.1); // < 0.5 threshold
     const result = attemptRecovery(ps, 'eng-2');
@@ -595,50 +583,45 @@ describe('malfunction.ts branch coverage', () => {
   });
 
   it('attemptRecovery ENGINE_REDUCED_THRUST always fails', () => {
-    const ps = {
+    const ps = makeRecoveryPS({
       malfunctions: new Map([['eng-1', { type: MalfunctionType.ENGINE_REDUCED_THRUST, recovered: false }]]),
-      firingEngines: new Set<string>(),
-    } as unknown as RecoveryPS;
+    }) as unknown as RecoveryPS;
 
     const result = attemptRecovery(ps, 'eng-1');
     expect(result.success).toBe(false);
   });
 
   it('attemptRecovery PARACHUTE_PARTIAL always fails', () => {
-    const ps = {
+    const ps = makeRecoveryPS({
       malfunctions: new Map([['ch-1', { type: MalfunctionType.PARACHUTE_PARTIAL, recovered: false }]]),
-      firingEngines: new Set<string>(),
-    } as unknown as RecoveryPS;
+    }) as unknown as RecoveryPS;
 
     const result = attemptRecovery(ps, 'ch-1');
     expect(result.success).toBe(false);
   });
 
   it('attemptRecovery SRB_EARLY_BURNOUT always fails', () => {
-    const ps = {
+    const ps = makeRecoveryPS({
       malfunctions: new Map([['srb-1', { type: MalfunctionType.SRB_EARLY_BURNOUT, recovered: false }]]),
-      firingEngines: new Set<string>(),
-    } as unknown as RecoveryPS;
+    }) as unknown as RecoveryPS;
 
     const result = attemptRecovery(ps, 'srb-1');
     expect(result.success).toBe(false);
   });
 
   it('attemptRecovery DECOUPLER_STUCK always succeeds', () => {
-    const ps = {
+    const ps = makeRecoveryPS({
       malfunctions: new Map([['dec-1', { type: MalfunctionType.DECOUPLER_STUCK, recovered: false }]]),
-      firingEngines: new Set<string>(),
-    } as unknown as RecoveryPS;
+    }) as unknown as RecoveryPS;
 
     const result = attemptRecovery(ps, 'dec-1');
     expect(result.success).toBe(true);
   });
 
   it('attemptRecovery returns no-op for already recovered malfunction', () => {
-    const ps = {
+    const ps = makeRecoveryPS({
       malfunctions: new Map([['eng-1', { type: MalfunctionType.ENGINE_FLAMEOUT, recovered: true }]]),
-      firingEngines: new Set<string>(),
-    } as unknown as RecoveryPS;
+    }) as unknown as RecoveryPS;
 
     const result = attemptRecovery(ps, 'eng-1');
     expect(result.success).toBe(false);
@@ -646,20 +629,16 @@ describe('malfunction.ts branch coverage', () => {
   });
 
   it('attemptRecovery returns no-op for non-existent malfunction', () => {
-    const ps = {
-      malfunctions: new Map<string, { type: string; recovered: boolean }>(),
-      firingEngines: new Set<string>(),
-    } as unknown as RecoveryPS;
+    const ps = makeRecoveryPS() as unknown as RecoveryPS;
 
     const result = attemptRecovery(ps, 'missing');
     expect(result.success).toBe(false);
   });
 
   it('attemptRecovery unknown type returns failure', () => {
-    const ps = {
+    const ps = makeRecoveryPS({
       malfunctions: new Map([['x', { type: 'UNKNOWN_TYPE', recovered: false }]]),
-      firingEngines: new Set<string>(),
-    } as unknown as RecoveryPS;
+    }) as unknown as RecoveryPS;
 
     const result = attemptRecovery(ps, 'x');
     expect(result.success).toBe(false);
@@ -685,7 +664,7 @@ describe('malfunction.ts branch coverage', () => {
     const gameState = createGameState();
     gameState.malfunctionMode = MalfunctionMode.NORMAL;
     gameState.crew = [
-      { id: 'crew-1', name: 'Test', skills: { engineering: 100 } } as unknown as CrewMember,
+      makeCrewMember({ id: 'crew-1', name: 'Test', skills: { piloting: 50, engineering: 100, science: 50 } }),
     ];
 
     // With high engineering skill, malfunction chance is reduced
@@ -1190,14 +1169,12 @@ describe('collision.ts branch coverage', () => {
       collisionCooldown: 0,
     });
 
-    const ps = {
+    const ps = makePhysicsState({
       posX: 10000, posY: 10000,
-      activeParts: new Set<string>(),
-      fuelStore: new Map<string, number>(),
       landed: true, crashed: false,
       debris: [debris1, debris2],
       angle: 0,
-    } as unknown as PhysicsState;
+    });
 
     // Just exercise the code path — no assertion needed beyond no-throw
     tickCollisions(ps, assembly, 1/60);

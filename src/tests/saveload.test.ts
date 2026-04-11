@@ -38,6 +38,7 @@ import { AstronautStatus, CrewStatus } from '../core/constants.ts';
 
 import type { GameState, CrewMember, MissionInstance, RocketDesign, FlightResult } from '../core/gameState.ts';
 import type { SaveSlotSummary } from '../core/saveload.ts';
+import { makeCrewMember, makeMissionInstance } from './_factories.js';
 
 // Node.js Buffer is available in Vitest's Node environment but @types/node is not installed.
 declare const Buffer: {
@@ -158,16 +159,16 @@ describe('Round-trip: save and load a complex state', () => {
 
     // Several missions distributed across the three buckets.
     state.missions.available = [
-      { id: 'mission-avail-1', title: 'Sub-orbital test', reward: 10000 },
-      { id: 'mission-avail-2', title: 'Weather sat', reward: 25000 },
-    ] as unknown as MissionInstance[];
+      makeMissionInstance({ id: 'mission-avail-1', title: 'Sub-orbital test', reward: 10000 }),
+      makeMissionInstance({ id: 'mission-avail-2', title: 'Weather sat', reward: 25000 }),
+    ];
     state.missions.accepted = [
-      { id: 'mission-acc-1', title: 'Orbital insertion', reward: 50000 },
-    ] as unknown as MissionInstance[];
+      makeMissionInstance({ id: 'mission-acc-1', title: 'Orbital insertion', reward: 50000 }),
+    ];
     state.missions.completed = [
-      { id: 'mission-comp-1', title: 'First flight', reward: 5000 },
-      { id: 'mission-comp-2', title: 'Science drop', reward: 8000 },
-    ] as unknown as MissionInstance[];
+      makeMissionInstance({ id: 'mission-comp-1', title: 'First flight', reward: 5000 }),
+      makeMissionInstance({ id: 'mission-comp-2', title: 'Science drop', reward: 8000 }),
+    ];
 
     // Multiple rocket designs with nested staging.
     state.rockets = [
@@ -329,14 +330,14 @@ describe('saveGame()', () => {
 
   it('summary.missionsCompleted counts completed missions', async () => {
     const state = freshState();
-    state.missions.completed = [{ id: 'm1' }, { id: 'm2' }] as unknown as MissionInstance[];
+    state.missions.completed = [makeMissionInstance({ id: 'm1' }), makeMissionInstance({ id: 'm2' })];
     const summary = await saveGame(state, 0);
     expect(summary.missionsCompleted).toBe(2);
   });
 
   it('summary.acceptedMissionCount counts accepted missions', async () => {
     const state = freshState();
-    state.missions.accepted = [{ id: 'm1' }] as unknown as MissionInstance[];
+    state.missions.accepted = [makeMissionInstance({ id: 'm1' })];
     const summary = await saveGame(state, 0);
     expect(summary.acceptedMissionCount).toBe(1);
   });
@@ -351,10 +352,10 @@ describe('saveGame()', () => {
   it('summary.crewCount counts living crew members', async () => {
     const state = freshState();
     state.crew = [
-      { id: 'c1', status: CrewStatus.IDLE },
-      { id: 'c2', status: CrewStatus.ON_MISSION },
-      { id: 'c3', status: AstronautStatus.KIA },
-    ] as unknown as CrewMember[];
+      makeCrewMember({ id: 'c1', status: AstronautStatus.ACTIVE }),
+      makeCrewMember({ id: 'c2', status: AstronautStatus.ACTIVE }),
+      makeCrewMember({ id: 'c3', status: AstronautStatus.KIA }),
+    ];
     const summary = await saveGame(state, 0);
     expect(summary.crewCount).toBe(2);
   });
@@ -362,10 +363,10 @@ describe('saveGame()', () => {
   it('summary.crewKIA counts crew with KIA status', async () => {
     const state = freshState();
     state.crew = [
-      { id: 'c1', status: AstronautStatus.KIA },
-      { id: 'c2', status: AstronautStatus.KIA },
-      { id: 'c3', status: CrewStatus.IDLE },
-    ] as unknown as CrewMember[];
+      makeCrewMember({ id: 'c1', status: AstronautStatus.KIA }),
+      makeCrewMember({ id: 'c2', status: AstronautStatus.KIA }),
+      makeCrewMember({ id: 'c3', status: AstronautStatus.ACTIVE }),
+    ];
     const summary = await saveGame(state, 0);
     expect(summary.crewKIA).toBe(2);
   });
@@ -473,7 +474,7 @@ describe('loadGame()', () => {
   it('restores nested objects correctly', async () => {
     const state = freshState();
     state.loan.balance = 500_000;
-    state.crew = [{ id: 'c1', status: CrewStatus.IDLE, name: 'Alice', skills: { piloting: 50, engineering: 50, science: 50 } }] as unknown as CrewMember[];
+    state.crew = [makeCrewMember({ id: 'c1', name: 'Alice', skills: { piloting: 50, engineering: 50, science: 50 } })];
     await saveGame(state, 0);
 
     const restored = await loadGame(0);
@@ -749,8 +750,8 @@ describe('exportSave()', () => {
     // envelope.state matches the state that was saved.
     const state = freshState();
     state.money = 987_654;
-    state.crew = [{ id: 'c1', status: CrewStatus.IDLE, name: 'Dana' }] as unknown as CrewMember[];
-    state.missions.completed = [{ id: 'm1', title: 'First orbit' }] as unknown as MissionInstance[];
+    state.crew = [makeCrewMember({ id: 'c1', name: 'Dana' })];
+    state.missions.completed = [makeMissionInstance({ id: 'm1', title: 'First orbit' })];
     await saveGame(state, 0, 'Export Test');
 
     // Read what's in storage and decompress it.
@@ -1401,18 +1402,18 @@ describe('Save compression', () => {
       state.agencyName = 'Compressed Agency';
       state.money = 999999;
       state.crew = [
-        {
-          id: 'c1', name: 'Test Pilot', status: 'idle',
+        makeCrewMember({
+          id: 'c1', name: 'Test Pilot',
           skills: { piloting: 80, engineering: 50, science: 60 },
           salary: 5000, hireDate: '2025-01-01', injuryEnds: null,
-        },
-      ] as unknown as CrewMember[];
+        }),
+      ];
       state.missions.accepted = [
-        { id: 'm1', title: 'Orbital Test', reward: 50000 },
-      ] as unknown as MissionInstance[];
+        makeMissionInstance({ id: 'm1', title: 'Orbital Test', reward: 50000 }),
+      ];
       state.missions.completed = [
-        { id: 'm2', title: 'First Flight', reward: 10000 },
-      ] as unknown as MissionInstance[];
+        makeMissionInstance({ id: 'm2', title: 'First Flight', reward: 10000 }),
+      ];
 
       await saveGame(state, 0, 'Compression Test');
 
@@ -1617,12 +1618,12 @@ describe('Save export format', () => {
     state.money = 314_159;
     state.agencyName = 'Binary Test Agency';
     state.crew = [
-      {
-        id: 'c1', name: 'Pilot', status: CrewStatus.IDLE,
+      makeCrewMember({
+        id: 'c1', name: 'Pilot',
         skills: { piloting: 90, engineering: 40, science: 50 },
         salary: 5000, hireDate: '2025-06-01T00:00:00.000Z', injuryEnds: null,
-      },
-    ] as unknown as CrewMember[];
+      }),
+    ];
     await saveGame(state, 0, 'Binary Export Test');
 
     // Read the raw LZC string from localStorage.

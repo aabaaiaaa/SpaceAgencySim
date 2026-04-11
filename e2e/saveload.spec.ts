@@ -21,22 +21,6 @@ import {
  * Each test is independent — seeds its own state.
  */
 
-/**
- * Browser-context window shape for page.evaluate() callbacks.
- * Defined as a local interface (not `declare global`) to avoid conflicting
- * with the narrower Window augmentations in the helper modules. Inside
- * evaluate callbacks we cast: `(window as unknown as GameWindow)`.
- */
-interface GameWindow {
-  __gameState?: {
-    agencyName?: string;
-    money?: number;
-  };
-  __vabAssembly?: {
-    parts: Map<string, { partId: string }>;
-  };
-}
-
 const AGENCY_NAME = 'Test Agency';
 
 function makeEnvelope(overrides: Record<string, unknown> = {}): ReturnType<typeof buildSaveEnvelope> {
@@ -113,12 +97,12 @@ test.describe('Save & Load Flow', () => {
     await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
 
     const agencyName: string | undefined = await page.evaluate(
-      () => (window as unknown as GameWindow).__gameState?.agencyName,
+      () => window.__gameState?.agencyName,
     );
     expect(agencyName).toBe(AGENCY_NAME);
 
     const money: number | undefined = await page.evaluate(
-      () => (window as unknown as GameWindow).__gameState?.money,
+      () => window.__gameState?.money,
     );
     expect(money).toBe(STARTING_MONEY);
   });
@@ -207,12 +191,12 @@ test.describe('Save & Load Flow', () => {
     await page.waitForSelector('.vab-part-card[data-part-id="probe-core-mk1"]', { state: 'visible', timeout: 10_000 });
     await dragPartToCanvas(page, 'probe-core-mk1', 525, 400);
     await page.waitForFunction(
-      () => ((window as unknown as GameWindow).__vabAssembly?.parts?.size ?? 0) >= 1,
+      () => (window.__vabAssembly?.parts?.size ?? 0) >= 1,
       { timeout: 5_000 },
     );
 
     const sizeBefore: number = await page.evaluate(
-      () => (window as unknown as GameWindow).__vabAssembly?.parts?.size ?? 0,
+      () => window.__vabAssembly?.parts?.size ?? 0,
     );
     expect(sizeBefore).toBeGreaterThanOrEqual(1);
 
@@ -228,18 +212,17 @@ test.describe('Save & Load Flow', () => {
     await page.click('[data-building-id="vab"]');
     await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 15_000 });
     await page.waitForFunction(
-      () => ((window as unknown as GameWindow).__vabAssembly?.parts?.size ?? 0) >= 1,
+      () => (window.__vabAssembly?.parts?.size ?? 0) >= 1,
       { timeout: 5_000 },
     );
 
     const sizeAfter: number = await page.evaluate(
-      () => (window as unknown as GameWindow).__vabAssembly?.parts?.size ?? 0,
+      () => window.__vabAssembly?.parts?.size ?? 0,
     );
     expect(sizeAfter).toBeGreaterThanOrEqual(1);
 
     const hasProbe: boolean = await page.evaluate(() => {
-      const w = window as unknown as GameWindow;
-      for (const p of w.__vabAssembly?.parts?.values() ?? []) {
+      for (const p of window.__vabAssembly?.parts?.values() ?? []) {
         if (p.partId === 'probe-core-mk1') return true;
       }
       return false;

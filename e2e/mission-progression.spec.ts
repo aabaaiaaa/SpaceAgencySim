@@ -21,55 +21,6 @@ import {
  */
 
 // ---------------------------------------------------------------------------
-// Browser-context interfaces (for page.evaluate / page.waitForFunction casts)
-// ---------------------------------------------------------------------------
-
-interface FlightPs {
-  posY: number;
-  velX: number;
-  velY: number;
-  grounded: boolean;
-  landed: boolean;
-  crashed: boolean;
-  firingEngines: Set<string>;
-}
-
-interface MissionObjective {
-  id: string;
-  type: string;
-  completed: boolean;
-  description: string;
-  target: Record<string, unknown>;
-}
-
-interface Mission {
-  id: string;
-  title: string;
-  objectives: MissionObjective[];
-  status: string;
-}
-
-interface GameWindow {
-  __flightPs?: FlightPs;
-  __gameState?: {
-    missions?: {
-      accepted?: Mission[];
-      completed?: Mission[];
-    };
-    parts?: string[];
-    currentFlight?: Record<string, unknown>;
-  };
-  __vabStagingConfig?: {
-    stages: { instanceIds: string[] }[];
-    unstaged: string[];
-  };
-  __vabAssembly?: {
-    parts: Map<string, { partId: string }>;
-  };
-  __testSetTimeWarp?: (speed: number) => void;
-}
-
-// ---------------------------------------------------------------------------
 // Mission template types
 // ---------------------------------------------------------------------------
 
@@ -347,14 +298,14 @@ async function waitWarpUnlocked(page: Page): Promise<void> {
 async function setWarp(page: Page, factor: number): Promise<void> {
   await waitWarpUnlocked(page);
   await page.evaluate(
-    (f: number): void => { (window as unknown as GameWindow).__testSetTimeWarp?.(f); },
+    (f: number): void => { window.__testSetTimeWarp?.(f); },
     factor,
   );
 }
 
 async function waitAlt(page: Page, m: number, timeout: number = 60_000): Promise<void> {
   await page.waitForFunction(
-    (alt: number): boolean => ((window as unknown as GameWindow).__flightPs?.posY ?? 0) >= alt,
+    (alt: number): boolean => (window.__flightPs?.posY ?? 0) >= alt,
     m, { timeout },
   );
 }
@@ -362,7 +313,7 @@ async function waitAlt(page: Page, m: number, timeout: number = 60_000): Promise
 async function waitSpeed(page: Page, s: number, timeout: number = 60_000): Promise<void> {
   await page.waitForFunction(
     (spd: number): boolean => {
-      const ps = (window as unknown as GameWindow).__flightPs;
+      const ps = window.__flightPs;
       if (!ps) return false;
       return Math.hypot(ps.velX, ps.velY) >= spd;
     },
@@ -373,7 +324,7 @@ async function waitSpeed(page: Page, s: number, timeout: number = 60_000): Promi
 async function waitLanded(page: Page, timeout: number = 60_000): Promise<void> {
   await page.waitForFunction(
     (): boolean => {
-      const ps = (window as unknown as GameWindow).__flightPs;
+      const ps = window.__flightPs;
       return ps?.landed === true || ps?.crashed === true;
     },
     { timeout },
@@ -383,7 +334,7 @@ async function waitLanded(page: Page, timeout: number = 60_000): Promise<void> {
 async function waitObjectivesComplete(page: Page, missionId: string, timeout: number = 120_000): Promise<void> {
   await page.waitForFunction(
     (id: string): boolean => {
-      const state = (window as unknown as GameWindow).__gameState;
+      const state = window.__gameState;
       const m = state?.missions?.accepted?.find(x => x.id === id);
       return m?.objectives?.every(o => o.completed) ?? false;
     },
@@ -466,7 +417,7 @@ async function triggerReturnViaMenu(page: Page): Promise<void> {
 
 async function expectCompleted(page: Page, missionId: string): Promise<void> {
   const ok = await page.evaluate(
-    (id: string): boolean => (window as unknown as GameWindow).__gameState?.missions?.completed?.some(m => m.id === id) ?? false,
+    (id: string): boolean => window.__gameState?.missions?.completed?.some(m => m.id === id) ?? false,
     missionId,
   );
   expect(ok).toBe(true);
@@ -474,7 +425,7 @@ async function expectCompleted(page: Page, missionId: string): Promise<void> {
 
 async function expectPartUnlocked(page: Page, partId: string): Promise<void> {
   const ok = await page.evaluate(
-    (id: string): boolean => (window as unknown as GameWindow).__gameState?.parts?.includes(id) ?? false,
+    (id: string): boolean => window.__gameState?.parts?.includes(id) ?? false,
     partId,
   );
   expect(ok).toBe(true);
@@ -575,7 +526,7 @@ test.describe('Mission Progression', () => {
     // Dry mass 250kg → terminal velocity with mk1 chute ≈ 4.12 m/s ≤ 5 m/s.
     await waitAlt(page, 50); // confirm engine is firing
     await page.waitForFunction(
-      (): boolean => (window as unknown as GameWindow).__flightPs?.firingEngines?.size === 0,
+      (): boolean => window.__flightPs?.firingEngines?.size === 0,
       { timeout: 30_000 },
     );
 
@@ -625,7 +576,7 @@ test.describe('Mission Progression', () => {
     // Without legs, the physics engine crashes rockets landing > 5 m/s.
     await waitAlt(page, 50); // confirm engine is firing
     await page.waitForFunction(
-      (): boolean => (window as unknown as GameWindow).__flightPs?.firingEngines?.size === 0,
+      (): boolean => window.__flightPs?.firingEngines?.size === 0,
       { timeout: 30_000 },
     );
 
@@ -817,7 +768,7 @@ test.describe('Mission Progression', () => {
     // to traverse the 400m band).
     await page.waitForFunction(
       (): boolean => {
-        const ps = (window as unknown as GameWindow).__flightPs;
+        const ps = window.__flightPs;
         return ps != null && ps.posY <= 1400 && ps.velY <= 0;
       },
       { timeout: 60_000 },
@@ -826,7 +777,7 @@ test.describe('Mission Progression', () => {
 
     // Wait until we descend into the altitude band (≤ 1200m).
     await page.waitForFunction(
-      (): boolean => ((window as unknown as GameWindow).__flightPs?.posY ?? Infinity) <= 1200,
+      (): boolean => (window.__flightPs?.posY ?? Infinity) <= 1200,
       { timeout: 30_000 },
     );
 
@@ -846,7 +797,7 @@ test.describe('Mission Progression', () => {
     // Wait for HOLD_ALTITUDE objective completion.
     await page.waitForFunction(
       (id: string): boolean => {
-        const state = (window as unknown as GameWindow).__gameState;
+        const state = window.__gameState;
         const m = state?.missions?.accepted?.find(x => x.id === id);
         return m?.objectives?.find(o => o.type === 'HOLD_ALTITUDE')?.completed ?? false;
       },
@@ -897,7 +848,7 @@ test.describe('Mission Progression', () => {
     // Wait until descending past ~150m, then eject at ≥100m.
     await page.waitForFunction(
       (): boolean => {
-        const ps = (window as unknown as GameWindow).__flightPs;
+        const ps = window.__flightPs;
         return ps != null && ps.velY < 0 && ps.posY < 250 && ps.posY > 100;
       },
       { timeout: 20_000 },
@@ -1066,7 +1017,7 @@ test.describe('Mission Progression', () => {
 
     // Wait for REACH_ORBIT objective.
     await page.waitForFunction((): boolean => {
-      const m = (window as unknown as GameWindow).__gameState?.missions?.accepted?.find(x => x.id === 'mission-015');
+      const m = window.__gameState?.missions?.accepted?.find(x => x.id === 'mission-015');
       return m?.objectives?.find(o => o.type === 'REACH_ORBIT')?.completed ?? false;
     }, { timeout: 15_000 });
 
@@ -1119,7 +1070,7 @@ test.describe('Mission Progression', () => {
 
     // Wait for objectives.
     await page.waitForFunction((): boolean => {
-      const m = (window as unknown as GameWindow).__gameState?.missions?.accepted?.find(x => x.id === 'mission-016');
+      const m = window.__gameState?.missions?.accepted?.find(x => x.id === 'mission-016');
       return m?.objectives?.every(o => o.completed) ?? false;
     }, { timeout: 15_000 });
 
@@ -1173,7 +1124,7 @@ test.describe('Mission Progression', () => {
 
     // Wait for REACH_ORBIT objective.
     await page.waitForFunction((): boolean => {
-      const m = (window as unknown as GameWindow).__gameState?.missions?.accepted?.find(x => x.id === 'mission-017');
+      const m = window.__gameState?.missions?.accepted?.find(x => x.id === 'mission-017');
       return m?.objectives?.find(o => o.type === 'REACH_ORBIT')?.completed ?? false;
     }, { timeout: 15_000 });
 

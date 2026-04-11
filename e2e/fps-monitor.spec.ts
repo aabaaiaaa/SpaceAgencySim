@@ -11,19 +11,15 @@ import {
  */
 
 // ---------------------------------------------------------------------------
-// Browser-context type aliases
+// (window.d.ts augments the global Window interface with game properties)
 // ---------------------------------------------------------------------------
 
+/** Shape of the perf stats object (matches window.__perfStats). */
 interface PerfStats {
   fps: number;
   frameTime: number;
   minFrameTime: number;
   maxFrameTime: number;
-}
-
-interface GameWindow {
-  __enableDebugMode: () => void;
-  __perfStats: PerfStats | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -51,7 +47,7 @@ test.describe('FPS Monitor', () => {
     await seedAndLoadSave(page, envelope);
     await dismissWelcomeModal(page);
 
-    await page.evaluate(() => (window as unknown as GameWindow).__enableDebugMode());
+    await page.evaluate(() => window.__enableDebugMode());
     await startTestFlight(page, FLIGHT_PARTS);
     await page.waitForTimeout(600);
 
@@ -68,12 +64,12 @@ test.describe('FPS Monitor', () => {
     await seedAndLoadSave(page, envelope);
     await dismissWelcomeModal(page);
 
-    await page.evaluate(() => (window as unknown as GameWindow).__enableDebugMode());
+    await page.evaluate(() => window.__enableDebugMode());
     await startTestFlight(page, FLIGHT_PARTS);
     await page.waitForTimeout(600);
 
     const stats = await page.evaluate((): PerfStats | null =>
-      (window as unknown as GameWindow).__perfStats
+      window.__perfStats
     );
     expect(stats).toBeTruthy();
     expect(typeof stats!.fps).toBe('number');

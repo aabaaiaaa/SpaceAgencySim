@@ -32,21 +32,6 @@ import type { SaveEnvelope, MissionsState } from './helpers.js';
  */
 
 // ---------------------------------------------------------------------------
-// Browser-context window shape for page.evaluate() callbacks.
-//
-// Defined as a local interface (not `declare global`) to avoid conflicting
-// with the narrower Window augmentations in the helper modules.  Inside
-// evaluate callbacks we cast: `(window as unknown as GW)`
-// ---------------------------------------------------------------------------
-
-interface GW {
-  __gameState?: {
-    money?: number;
-    missions?: MissionsState;
-  };
-}
-
-// ---------------------------------------------------------------------------
 // Local mission data interface (mission template spread with status + optional completedDate)
 // ---------------------------------------------------------------------------
 
@@ -154,7 +139,7 @@ test.describe('Mission Control Flow', () => {
   test('(4) accepting a mission deducts nothing from cash (missions are free to accept)', async ({ page }) => {
     // Read cash before accepting.
     const cashBefore: number | undefined = await page.evaluate(() =>
-      (window as unknown as GW).__gameState?.money
+      window.__gameState?.money
     );
     expect(cashBefore).toBe(STARTING_MONEY);
 
@@ -163,7 +148,7 @@ test.describe('Mission Control Flow', () => {
 
     // Cash must be exactly the same after accepting.
     const cashAfter: number | undefined = await page.evaluate(() =>
-      (window as unknown as GW).__gameState?.money
+      window.__gameState?.money
     );
     expect(cashAfter).toBe(STARTING_MONEY);
   });
@@ -276,8 +261,7 @@ test.describe('Mission Control Flow', () => {
 
     // ── Accepted tab: rewards shown ──
     await page.evaluate((state: MissionData) => {
-      const gw = window as unknown as GW;
-      Object.assign(gw.__gameState!.missions!, {
+      Object.assign(window.__gameState!.missions!, {
         available: [],
         accepted: [state],
         completed: [],
@@ -293,8 +277,7 @@ test.describe('Mission Control Flow', () => {
 
     // ── Completed tab: parts unlocked column shown ──
     await page.evaluate((state: MissionData) => {
-      const gw = window as unknown as GW;
-      Object.assign(gw.__gameState!.missions!, {
+      Object.assign(window.__gameState!.missions!, {
         available: [],
         accepted: [],
         completed: [state],

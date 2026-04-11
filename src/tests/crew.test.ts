@@ -27,6 +27,7 @@ import {
   HARD_LANDING_SPEED_MAX,
   EJECTION_INJURY_PERIODS,
 } from '../core/constants.ts';
+import { makeCrewMember, makeFlightState as makeFlightStateFactory, makePhysicsState as makePhysicsStateFactory } from './_factories.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -492,7 +493,7 @@ describe('getFullHistory()', () => {
   it('returns a shallow copy — pushing to result does not affect state.crew', () => {
     hireOne(state, 'A');
     const history = getFullHistory(state);
-    history.push({ id: 'fake', name: 'Fake' } as unknown as CrewMember);
+    history.push(makeCrewMember({ id: 'fake', name: 'Fake' }));
     expect(state.crew).toHaveLength(1);
   });
 
@@ -758,12 +759,12 @@ describe('processFlightInjuries()', () => {
 
   it('@smoke injures crew on hard landing (5–10 m/s)', () => {
     const a = hireOne(state, 'Pilot');
-    const flightState = {
+    const flightState = makeFlightStateFactory({
       crewIds: [a.id],
       events: [{ type: 'LANDING', speed: 7.5, time: 100, description: '' }],
       timeElapsed: 100,
-    } as unknown as FlightState;
-    const ps = { crashed: false, ejectedCrewIds: new Set<string>() } as unknown as PhysicsState;
+    });
+    const ps = makePhysicsStateFactory({ crashed: false });
 
     const injuries = processFlightInjuries(state, flightState, ps);
     expect(injuries).toHaveLength(1);
@@ -776,12 +777,12 @@ describe('processFlightInjuries()', () => {
 
   it('does not injure on gentle landing (< 5 m/s)', () => {
     const a = hireOne(state, 'Pilot');
-    const flightState = {
+    const flightState = makeFlightStateFactory({
       crewIds: [a.id],
       events: [{ type: 'LANDING', speed: 3.0, time: 50, description: '' }],
       timeElapsed: 50,
-    } as unknown as FlightState;
-    const ps = { crashed: false, ejectedCrewIds: new Set<string>() } as unknown as PhysicsState;
+    });
+    const ps = makePhysicsStateFactory({ crashed: false });
 
     const injuries = processFlightInjuries(state, flightState, ps);
     expect(injuries).toHaveLength(0);
@@ -790,13 +791,13 @@ describe('processFlightInjuries()', () => {
 
   it('injures ejected crew for 1 period', () => {
     const a = hireOne(state, 'Pilot');
-    const flightState = {
+    const flightState = makeFlightStateFactory({
       crewIds: [a.id],
       events: [{ type: 'CREW_EJECTED', altitude: 5000, time: 30, description: '' }],
       timeElapsed: 30,
-    } as unknown as FlightState;
+    });
     const ejected = new Set([a.id]);
-    const ps = { crashed: true, ejectedCrewIds: ejected } as unknown as PhysicsState;
+    const ps = makePhysicsStateFactory({ crashed: true, ejectedCrewIds: ejected });
 
     const injuries = processFlightInjuries(state, flightState, ps);
     expect(injuries).toHaveLength(1);
@@ -807,12 +808,12 @@ describe('processFlightInjuries()', () => {
 
   it('does not injure KIA crew (crash without ejection)', () => {
     const a = hireOne(state, 'Pilot');
-    const flightState = {
+    const flightState = makeFlightStateFactory({
       crewIds: [a.id],
       events: [{ type: 'CRASH', speed: 50, time: 80, description: '' }],
       timeElapsed: 80,
-    } as unknown as FlightState;
-    const ps = { crashed: true, ejectedCrewIds: new Set<string>() } as unknown as PhysicsState;
+    });
+    const ps = makePhysicsStateFactory({ crashed: true });
 
     const injuries = processFlightInjuries(state, flightState, ps);
     expect(injuries).toHaveLength(0);
@@ -820,12 +821,12 @@ describe('processFlightInjuries()', () => {
 
   it('logs CREW_INJURED events to flightState.events', () => {
     const a = hireOne(state, 'Pilot');
-    const flightState = {
+    const flightState = makeFlightStateFactory({
       crewIds: [a.id],
       events: [{ type: 'LANDING', speed: 8.0, time: 100, description: '' }],
       timeElapsed: 100,
-    } as unknown as FlightState;
-    const ps = { crashed: false, ejectedCrewIds: new Set<string>() } as unknown as PhysicsState;
+    });
+    const ps = makePhysicsStateFactory({ crashed: false });
 
     processFlightInjuries(state, flightState, ps);
     const injuryEvents = flightState.events.filter((e) => e.type === 'CREW_INJURED');
@@ -842,22 +843,22 @@ describe('processFlightInjuries()', () => {
   it('scales injury duration by impact speed', () => {
     // At exactly 5 m/s → 2 periods (minimum)
     const a = hireOne(state, 'SlowLanding');
-    const flightState1 = {
+    const flightState1 = makeFlightStateFactory({
       crewIds: [a.id],
       events: [{ type: 'LANDING', speed: HARD_LANDING_SPEED_MIN, time: 10, description: '' }],
       timeElapsed: 10,
-    } as unknown as FlightState;
-    const ps = { crashed: false, ejectedCrewIds: new Set<string>() } as unknown as PhysicsState;
+    });
+    const ps = makePhysicsStateFactory({ crashed: false });
     const injuries1 = processFlightInjuries(state, flightState1, ps);
     expect(injuries1[0].periods).toBe(2);
 
     // At ~10 m/s → 3 periods (maximum, but 10 is the crash threshold so use 9.9)
     const b = hireOne(state, 'FastLanding');
-    const flightState2 = {
+    const flightState2 = makeFlightStateFactory({
       crewIds: [b.id],
       events: [{ type: 'LANDING', speed: HARD_LANDING_SPEED_MAX - 0.1, time: 10, description: '' }],
       timeElapsed: 10,
-    } as unknown as FlightState;
+    });
     const injuries2 = processFlightInjuries(state, flightState2, ps);
     expect(injuries2[0].periods).toBe(3);
   });

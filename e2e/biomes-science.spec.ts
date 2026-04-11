@@ -71,17 +71,6 @@ interface FlightEvent {
   [key: string]: unknown;
 }
 
-/** Shape of the flight physics state as accessed from browser context. */
-interface FlightPs {
-  posY: number;
-  instrumentStates?: Map<string, InstrumentStateEntry>;
-}
-
-/** Shape of the flight assembly as accessed from browser context. */
-interface FlightAssembly {
-  parts?: Map<string, { partId: string }>;
-}
-
 /** Shape of the current flight state within game state. */
 interface CurrentFlight {
   events: FlightEvent[];
@@ -99,26 +88,7 @@ interface TechTree {
   unlockedInstruments: string[];
 }
 
-/**
- * Browser-context window shape for page.evaluate() callbacks.
- * Defined as a local interface (not `declare global`) to avoid conflicting
- * with the narrower Window augmentations in the helper modules. Inside
- * evaluate callbacks we cast: `const w = window as unknown as GameWindow;`
- */
-interface GameWindow {
-  __flightPs?: FlightPs;
-  __flightAssembly?: FlightAssembly;
-  __gameState?: {
-    currentFlight?: CurrentFlight;
-    scienceLog?: ScienceLogEntry[];
-    sciencePoints?: number;
-    money?: number;
-    facilities?: Record<string, FacilityEntry>;
-    techTree?: TechTree;
-    parts?: string[];
-  };
-  __resyncPhysicsWorker?: () => Promise<void>;
-}
+// (window.d.ts augments the global Window interface with game properties)
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 1. BIOME LABEL TRANSITIONS
@@ -232,8 +202,8 @@ test.describe('Science multiplier per biome', () => {
     // Activate thermometer directly (science modules don't auto-stage) and
     // fast-forward the timer so it completes in the GROUND biome.
     await page.evaluate(async (): Promise<void> => {
-      const w = window as unknown as GameWindow;
-      const ps: FlightPs | undefined = w.__flightPs;
+      const w = window;
+      const ps = w.__flightPs;
       if (!ps?.instrumentStates) return;
       for (const [_key, entry] of ps.instrumentStates) {
         if (entry.instrumentId === 'thermometer-mk1' && entry.state === 'idle') {
@@ -248,7 +218,7 @@ test.describe('Science multiplier per biome', () => {
     // Wait for SCIENCE_COLLECTED event (generated when timer expires).
     await page.waitForFunction(
       (): boolean => {
-        const w = window as unknown as GameWindow;
+        const w = window;
         const events: FlightEvent[] = w.__gameState?.currentFlight?.events ?? [];
         return events.some((e: FlightEvent) => e.type === 'SCIENCE_COLLECTED');
       },
@@ -256,7 +226,7 @@ test.describe('Science multiplier per biome', () => {
     );
 
     const event: FlightEvent | null = await page.evaluate((): FlightEvent | null => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       const events: FlightEvent[] = w.__gameState?.currentFlight?.events ?? [];
       return events.find((e: FlightEvent) => e.type === 'SCIENCE_COLLECTED') ?? null;
     });
@@ -300,7 +270,7 @@ test.describe('Horizon curvature rendering', () => {
 
     // Confirm we're below the curvature threshold.
     const alt: number = await page.evaluate((): number => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       return w.__flightPs?.posY ?? 0;
     });
     expect(alt).toBeLessThan(5000);
@@ -317,7 +287,7 @@ test.describe('Horizon curvature rendering', () => {
     await teleportCraft(page, { posY: 5500 });
 
     const altitude: number = await page.evaluate((): number => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       return w.__flightPs?.posY ?? 0;
     });
     expect(altitude).toBeGreaterThanOrEqual(5000);
@@ -334,7 +304,7 @@ test.describe('Horizon curvature rendering', () => {
     await teleportCraft(page, { posY: 20_000 });
 
     const altitude: number = await page.evaluate((): number => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       return w.__flightPs?.posY ?? 0;
     });
     expect(altitude).toBeGreaterThanOrEqual(20_000);
@@ -375,8 +345,8 @@ test.describe('Science module instruments', () => {
 
     // Verify instruments are loaded in the physics state.
     const instrumentCount: number = await page.evaluate((): number => {
-      const w = window as unknown as GameWindow;
-      const ps: FlightPs | undefined = w.__flightPs;
+      const w = window;
+      const ps = w.__flightPs;
       if (!ps?.instrumentStates) return 0;
       return ps.instrumentStates.size;
     });
@@ -397,8 +367,8 @@ test.describe('Science module instruments', () => {
     }
 
     const states: InstrumentSnapshot[] = await page.evaluate((): InstrumentSnapshot[] => {
-      const w = window as unknown as GameWindow;
-      const ps: FlightPs | undefined = w.__flightPs;
+      const w = window;
+      const ps = w.__flightPs;
       if (!ps?.instrumentStates) return [];
       const result: InstrumentSnapshot[] = [];
       for (const [key, entry] of ps.instrumentStates) {
@@ -437,8 +407,8 @@ test.describe('Science module instruments', () => {
     }
 
     const instrumentInfo: InstrumentInfo[] = await page.evaluate((): InstrumentInfo[] => {
-      const w = window as unknown as GameWindow;
-      const ps: FlightPs | undefined = w.__flightPs;
+      const w = window;
+      const ps = w.__flightPs;
       if (!ps?.instrumentStates) return [];
       const result: InstrumentInfo[] = [];
       for (const [key, entry] of ps.instrumentStates) {
@@ -473,8 +443,8 @@ test.describe('Science module instruments', () => {
 
     // Also verify the science module part exists in the assembly.
     const hasSciModule: boolean = await page.evaluate((): boolean => {
-      const w = window as unknown as GameWindow;
-      const assembly: FlightAssembly | undefined = w.__flightAssembly;
+      const w = window;
+      const assembly = w.__flightAssembly;
       if (!assembly?.parts) return false;
       for (const [, p] of assembly.parts) {
         if (p.partId === 'science-module-mk1') return true;
@@ -500,8 +470,8 @@ test.describe('Science module instruments', () => {
     // Activate the thermometer directly (simulating what the context menu
     // button would do when clicked).
     const result: ActivationResult = await page.evaluate(async (): Promise<ActivationResult> => {
-      const w = window as unknown as GameWindow;
-      const ps: FlightPs | undefined = w.__flightPs;
+      const w = window;
+      const ps = w.__flightPs;
       if (!ps?.instrumentStates) return { success: false, reason: 'no states' };
       for (const [key, entry] of ps.instrumentStates) {
         if (entry.instrumentId === 'thermometer-mk1' && entry.state === 'idle') {
@@ -520,8 +490,8 @@ test.describe('Science module instruments', () => {
 
     // Verify the state persisted.
     const afterState: string | null = await page.evaluate((): string | null => {
-      const w = window as unknown as GameWindow;
-      const ps: FlightPs | undefined = w.__flightPs;
+      const w = window;
+      const ps = w.__flightPs;
       if (!ps?.instrumentStates) return null;
       for (const [, entry] of ps.instrumentStates) {
         if (entry.instrumentId === 'thermometer-mk1') return entry.state;
@@ -559,8 +529,8 @@ test.describe('Instrument activation via staging', () => {
 
     // Verify instrument starts as idle.
     const stateBefore: string | null = await page.evaluate((): string | null => {
-      const w = window as unknown as GameWindow;
-      const ps: FlightPs | undefined = w.__flightPs;
+      const w = window;
+      const ps = w.__flightPs;
       if (!ps?.instrumentStates) return null;
       for (const [, entry] of ps.instrumentStates) {
         if (entry.instrumentId === 'thermometer-mk1') return entry.state;
@@ -571,8 +541,8 @@ test.describe('Instrument activation via staging', () => {
 
     // Activate the instrument (simulate what context menu does).
     await page.evaluate(async (): Promise<void> => {
-      const w = window as unknown as GameWindow;
-      const ps: FlightPs | undefined = w.__flightPs;
+      const w = window;
+      const ps = w.__flightPs;
       if (!ps?.instrumentStates) return;
       for (const [_key, entry] of ps.instrumentStates) {
         if (entry.instrumentId === 'thermometer-mk1' && entry.state === 'idle') {
@@ -586,8 +556,8 @@ test.describe('Instrument activation via staging', () => {
 
     // Verify the instrument is now running.
     const stateAfter: string | null = await page.evaluate((): string | null => {
-      const w = window as unknown as GameWindow;
-      const ps: FlightPs | undefined = w.__flightPs;
+      const w = window;
+      const ps = w.__flightPs;
       if (!ps?.instrumentStates) return null;
       for (const [, entry] of ps.instrumentStates) {
         if (entry.instrumentId === 'thermometer-mk1') return entry.state;
@@ -599,8 +569,8 @@ test.describe('Instrument activation via staging', () => {
     // Wait for the experiment to complete (timer counts down via physics tick).
     await page.waitForFunction(
       (): boolean => {
-        const w = window as unknown as GameWindow;
-        const ps: FlightPs | undefined = w.__flightPs;
+        const w = window;
+        const ps = w.__flightPs;
         if (!ps?.instrumentStates) return false;
         for (const [, entry] of ps.instrumentStates) {
           if (entry.instrumentId === 'thermometer-mk1') {
@@ -614,7 +584,7 @@ test.describe('Instrument activation via staging', () => {
 
     // Verify completion and SCIENCE_COLLECTED event.
     const event: FlightEvent | null = await page.evaluate((): FlightEvent | null => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       const events: FlightEvent[] = w.__gameState?.currentFlight?.events ?? [];
       return events.find((e: FlightEvent) => e.type === 'SCIENCE_COLLECTED') ?? null;
     });
@@ -650,8 +620,8 @@ test.describe('Science data types', () => {
 
     // Activate the thermometer (ANALYSIS type) — ground biome is valid.
     await page.evaluate(async (): Promise<void> => {
-      const w = window as unknown as GameWindow;
-      const ps: FlightPs | undefined = w.__flightPs;
+      const w = window;
+      const ps = w.__flightPs;
       if (!ps?.instrumentStates) return;
       for (const [_key, entry] of ps.instrumentStates) {
         if (entry.instrumentId === 'thermometer-mk1' && entry.state === 'idle') {
@@ -666,8 +636,8 @@ test.describe('Science data types', () => {
     // Wait for completion.
     await page.waitForFunction(
       (): boolean => {
-        const w = window as unknown as GameWindow;
-        const ps: FlightPs | undefined = w.__flightPs;
+        const w = window;
+        const ps = w.__flightPs;
         if (!ps?.instrumentStates) return false;
         for (const [, entry] of ps.instrumentStates) {
           if (entry.instrumentId === 'thermometer-mk1') {
@@ -681,8 +651,8 @@ test.describe('Science data types', () => {
 
     // Verify data type is ANALYSIS.
     const dataType: string | null = await page.evaluate((): string | null => {
-      const w = window as unknown as GameWindow;
-      const ps: FlightPs | undefined = w.__flightPs;
+      const w = window;
+      const ps = w.__flightPs;
       if (!ps?.instrumentStates) return null;
       for (const [, entry] of ps.instrumentStates) {
         if (entry.instrumentId === 'thermometer-mk1') return entry.dataType;
@@ -715,8 +685,8 @@ test.describe('Science data types', () => {
 
     // Set surface sampler to complete state directly.
     await page.evaluate(async (): Promise<void> => {
-      const w = window as unknown as GameWindow;
-      const ps: FlightPs | undefined = w.__flightPs;
+      const w = window;
+      const ps = w.__flightPs;
       if (!ps?.instrumentStates) return;
       for (const [_key, entry] of ps.instrumentStates) {
         if (entry.instrumentId === 'surface-sampler') {
@@ -736,8 +706,8 @@ test.describe('Science data types', () => {
     }
 
     const info: SamplerInfo | null = await page.evaluate((): SamplerInfo | null => {
-      const w = window as unknown as GameWindow;
-      const ps: FlightPs | undefined = w.__flightPs;
+      const w = window;
+      const ps = w.__flightPs;
       if (!ps?.instrumentStates) return null;
       for (const [, entry] of ps.instrumentStates) {
         if (entry.instrumentId === 'surface-sampler') {
@@ -777,7 +747,7 @@ test.describe('Diminishing returns', () => {
 
     // Verify science log was loaded correctly.
     const scienceLog: ScienceLogEntry[] = await page.evaluate((): ScienceLogEntry[] => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       return w.__gameState?.scienceLog ?? [];
     });
 
@@ -815,7 +785,7 @@ test.describe('Diminishing returns', () => {
     // DIMINISHING_RETURNS = [1.0, 0.25, 0.10] — index by count, 3+ = 0
     const scienceLog: ScienceLogEntry[] = await page.evaluate(
       (): ScienceLogEntry[] => {
-        const w = window as unknown as GameWindow;
+        const w = window;
         return w.__gameState?.scienceLog ?? [];
       },
     );
@@ -870,7 +840,7 @@ test.describe('Yield formula', () => {
 
     // Verify the yield formula components via game state.
     const yieldData: YieldData = await page.evaluate((): YieldData => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       const state = w.__gameState;
 
       // Thermometer Mk1: baseYield = 5
@@ -938,7 +908,7 @@ test.describe('Yield formula', () => {
 
     // Verify the R&D Lab bonus via game state.
     const rdLabTier: number = await page.evaluate((): number => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       const fac: FacilityEntry | undefined = w.__gameState?.facilities?.['rd-lab'];
       return fac?.tier ?? 0;
     });
@@ -962,7 +932,7 @@ test.describe('Yield formula', () => {
     await seedAndLoadSave(page, envelope);
 
     const rdLabTier: number = await page.evaluate((): number => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       const fac: FacilityEntry | undefined = w.__gameState?.facilities?.['rd-lab'];
       return fac?.tier ?? 0;
     });
@@ -1000,8 +970,8 @@ test.describe('Instrument biome validity', () => {
 
     // Activate thermometer on the ground.
     const result: ActivationResult = await page.evaluate(async (): Promise<ActivationResult> => {
-      const w = window as unknown as GameWindow;
-      const ps: FlightPs | undefined = w.__flightPs;
+      const w = window;
+      const ps = w.__flightPs;
       if (!ps?.instrumentStates) return { activated: false, reason: 'no states' };
       for (const [_key, entry] of ps.instrumentStates) {
         if (entry.instrumentId === 'thermometer-mk1' && entry.state === 'idle') {
@@ -1047,8 +1017,8 @@ test.describe('Instrument biome validity', () => {
 
     // Wait for instrument state to be set (activation attempt should fail at ground level)
     await page.waitForFunction((): boolean => {
-      const w = window as unknown as GameWindow;
-      const ps: FlightPs | undefined = w.__flightPs;
+      const w = window;
+      const ps = w.__flightPs;
       if (!ps?.instrumentStates) return false;
       for (const [, entry] of ps.instrumentStates) {
         if (entry.instrumentId === 'barometer') return true;
@@ -1058,7 +1028,7 @@ test.describe('Instrument biome validity', () => {
 
     // Check for INSTRUMENT_INVALID_BIOME event.
     const invalidBiomeEvent: FlightEvent | null = await page.evaluate((): FlightEvent | null => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       const events: FlightEvent[] = w.__gameState?.currentFlight?.events ?? [];
       return events.find((e: FlightEvent) => e.type === 'INSTRUMENT_INVALID_BIOME') ?? null;
     });
@@ -1071,8 +1041,8 @@ test.describe('Instrument biome validity', () => {
 
     // Verify the barometer is still idle (activation failed).
     const barometerState: string | null = await page.evaluate((): string | null => {
-      const w = window as unknown as GameWindow;
-      const ps: FlightPs | undefined = w.__flightPs;
+      const w = window;
+      const ps = w.__flightPs;
       if (!ps?.instrumentStates) return null;
       for (const [, entry] of ps.instrumentStates) {
         if (entry.instrumentId === 'barometer') return entry.state;
@@ -1108,8 +1078,8 @@ test.describe('Instrument biome validity', () => {
     await page.keyboard.press('Space'); // science module
 
     await page.waitForFunction((): boolean => {
-      const w = window as unknown as GameWindow;
-      const ps: FlightPs | undefined = w.__flightPs;
+      const w = window;
+      const ps = w.__flightPs;
       if (!ps?.instrumentStates) return false;
       for (const [, entry] of ps.instrumentStates) {
         if (entry.instrumentId === 'radiation-detector') return true;
@@ -1118,8 +1088,8 @@ test.describe('Instrument biome validity', () => {
     }, { timeout: 10_000 });
 
     const radState: string | null = await page.evaluate((): string | null => {
-      const w = window as unknown as GameWindow;
-      const ps: FlightPs | undefined = w.__flightPs;
+      const w = window;
+      const ps = w.__flightPs;
       if (!ps?.instrumentStates) return null;
       for (const [, entry] of ps.instrumentStates) {
         if (entry.instrumentId === 'radiation-detector') return entry.state;
@@ -1250,7 +1220,7 @@ test.describe('Tech tree system', () => {
 
     // Research sci-t1 (Barometer): costs 15 science, $50,000.
     const result: ResearchResult = await page.evaluate((): ResearchResult => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       const state = w.__gameState;
       if (!state) return { success: false, reason: 'no state' };
       const nodeId: string = 'sci-t1';
@@ -1343,7 +1313,7 @@ test.describe('Tech tree system', () => {
 
     // Research sci-t2 (Radiation Detector): costs 30 science, $100,000.
     const result: Tier2ResearchResult = await page.evaluate((): Tier2ResearchResult => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       const state = w.__gameState;
       if (!state) return { success: false, reason: 'no state' };
       const scienceCost: number = 30;
@@ -1430,7 +1400,7 @@ test.describe('R&D Lab tier gating', () => {
 
     // Try to research tier 3 — should be blocked by R&D Lab tier 1 (max tech = 2).
     const result: TierGateResult = await page.evaluate((): TierGateResult => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       const state = w.__gameState;
       const rdLabTier: number = state?.facilities?.['rd-lab']?.tier ?? 0;
       const maxTech: Record<number, number> = { 1: 2, 2: 4, 3: 5 };
@@ -1476,7 +1446,7 @@ test.describe('R&D Lab tier gating', () => {
 
     // Tier 2 lab: max tech = 4. Tier 3 should be allowed.
     const tier3Result: TierCheckResult = await page.evaluate((): TierCheckResult => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       const state = w.__gameState;
       const rdLabTier: number = state?.facilities?.['rd-lab']?.tier ?? 0;
       const maxTech: Record<number, number> = { 1: 2, 2: 4, 3: 5 };
@@ -1512,7 +1482,7 @@ test.describe('R&D Lab tier gating', () => {
     }
 
     const result: TierMaxResult = await page.evaluate((): TierMaxResult => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       const state = w.__gameState;
       const rdLabTier: number = state?.facilities?.['rd-lab']?.tier ?? 0;
       const maxTech: Record<number, number> = { 1: 2, 2: 4, 3: 5 };
@@ -1546,7 +1516,7 @@ test.describe('R&D Lab tier gating', () => {
     }
 
     const result: RdLabStatus = await page.evaluate((): RdLabStatus => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       const state = w.__gameState;
       const rdLab: FacilityEntry | undefined = state?.facilities?.['rd-lab'];
       const hasRdLab: boolean = rdLab?.built === true;
@@ -1595,7 +1565,7 @@ test.describe('Tutorial pre-unlocked nodes', () => {
     // sci-t1 unlocksParts: [], unlocksInstruments: ['barometer', 'surface-sampler']
     // Player already owns both instruments → tutorial-unlocked.
     const tutorialStatus: TutorialStatus = await page.evaluate((): TutorialStatus => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       const state = w.__gameState;
       const researched: string[] = state?.techTree?.researched ?? [];
       const isResearched: boolean = researched.includes('sci-t1');
@@ -1646,7 +1616,7 @@ test.describe('Tutorial pre-unlocked nodes', () => {
 
     // Try to research sci-t1 when it's already tutorial-unlocked.
     const result: ReResearchResult = await page.evaluate((): ReResearchResult => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       const state = w.__gameState;
       const researched: string[] = state?.techTree?.researched ?? [];
 
@@ -1695,7 +1665,7 @@ test.describe('Tutorial pre-unlocked nodes', () => {
 
     // sci-t1 should be researchable since the player doesn't own the rewards yet.
     const result: ResearchAllowedResult = await page.evaluate((): ResearchAllowedResult => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       const state = w.__gameState;
       const researched: string[] = state?.techTree?.researched ?? [];
       const unlockedInstruments: Set<string> = new Set(state?.techTree?.unlockedInstruments ?? []);
@@ -1754,7 +1724,7 @@ test.describe('Tech tree part unlocking', () => {
 
     // Research prop-t1 which unlocks engine-spark-improved.
     const result: PartUnlockResult = await page.evaluate((): PartUnlockResult => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       const state = w.__gameState;
       if (!state) {
         return { partsBefore: [], partsAfter: [], newPart: 'engine-spark-improved', hadPartBefore: false, hasPartAfter: false };
@@ -1809,7 +1779,7 @@ test.describe('Tech tree part unlocking', () => {
 
     // Try to research prop-t2 without prop-t1 being researched.
     const result: TierPrereqResult = await page.evaluate((): TierPrereqResult => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       const state = w.__gameState;
       const researched: string[] = state?.techTree?.researched ?? [];
 
@@ -1849,8 +1819,8 @@ test.describe('Science collection integration', () => {
 
     // Force thermometer to run with very short timer.
     await page.evaluate(async (): Promise<void> => {
-      const w = window as unknown as GameWindow;
-      const ps: FlightPs | undefined = w.__flightPs;
+      const w = window;
+      const ps = w.__flightPs;
       if (!ps?.instrumentStates) return;
       for (const [_key, entry] of ps.instrumentStates) {
         if (entry.instrumentId === 'thermometer-mk1') {
@@ -1865,7 +1835,7 @@ test.describe('Science collection integration', () => {
     // Wait for SCIENCE_COLLECTED event.
     await page.waitForFunction(
       (): boolean => {
-        const w = window as unknown as GameWindow;
+        const w = window;
         const events: FlightEvent[] = w.__gameState?.currentFlight?.events ?? [];
         return events.some((e: FlightEvent) => e.type === 'SCIENCE_COLLECTED');
       },
@@ -1873,7 +1843,7 @@ test.describe('Science collection integration', () => {
     );
 
     const event: FlightEvent | null = await page.evaluate((): FlightEvent | null => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       const events: FlightEvent[] = w.__gameState?.currentFlight?.events ?? [];
       return events.find((e: FlightEvent) => e.type === 'SCIENCE_COLLECTED') ?? null;
     });

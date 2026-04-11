@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
-import type { GameState, MissionInstance } from '../core/gameState.ts';
+import type { GameState, MissionInstance, ObjectiveDef } from '../core/gameState.ts';
 import {
   generateContracts,
   getMissionControlTier,
@@ -15,6 +15,7 @@ import {
 import { CONTRACT_TEMPLATES } from '../data/contracts.ts';
 import type { ContractTemplate } from '../data/contracts.ts';
 import { ObjectiveType } from '../data/missions.ts';
+import { makeMissionInstance } from './_factories.js';
 
 type GeneratedContract = ReturnType<typeof generateContracts>[number];
 
@@ -29,12 +30,12 @@ function makeState(mccTier: number = 1, progressionMissions: number = 2): GameSt
   // Populate completed missions for progression tier calculation.
   state.missions.completed = [];
   for (let i = 0; i < progressionMissions; i++) {
-    state.missions.completed.push({
+    state.missions.completed.push(makeMissionInstance({
       id: `mission-${i + 1}`,
       title: `M${i + 1}`,
-      objectives: [{ type: ObjectiveType.REACH_ALTITUDE, target: { altitude: 100 + i * 500 }, completed: true }],
+      objectives: [{ type: ObjectiveType.REACH_ALTITUDE, target: { altitude: 100 + i * 500 }, completed: true }] as unknown as ObjectiveDef[],
       reward: 15000,
-    } as unknown as MissionInstance);
+    }));
   }
 
   // Unlock science and satellite parts for templates that check these.
@@ -233,12 +234,12 @@ describe('generateContracts() — MCC tier filtering', () => {
     // Need high progression (15+ missions) plus MCC tier 3 for orbital contracts.
     const state: GameState = makeState(3, 16);
     // Also need orbital capability for orbital templates.
-    state.missions.completed.push({
+    state.missions.completed.push(makeMissionInstance({
       id: 'mission-orbital',
       title: 'Orbital',
-      objectives: [{ type: ObjectiveType.REACH_ORBIT, target: { orbitAltitude: 80000, orbitalVelocity: 7800 }, completed: true }],
+      objectives: [{ type: ObjectiveType.REACH_ORBIT, target: { orbitAltitude: 80000, orbitalVelocity: 7800 }, completed: true }] as unknown as ObjectiveDef[],
       reward: 200000,
-    } as unknown as MissionInstance);
+    }));
 
     const generated: GeneratedContract[] = [];
     for (let i = 0; i < 40; i++) {

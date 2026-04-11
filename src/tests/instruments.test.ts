@@ -45,6 +45,7 @@ import type { PhysicsState, ScienceModuleStateEntry } from '../core/physics.ts';
 import { createFlightState } from '../core/gameState.ts';
 import type { FlightState, GameState } from '../core/gameState.ts';
 import { activateCurrentStage } from '../core/staging.ts';
+import { makeGameState as makeGameStateFactory } from './_factories.js';
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -74,12 +75,12 @@ function makePhysicsState(assembly: RocketAssembly, altitude = 0): PhysicsState 
 }
 
 function makeGameState(): GameState {
-  return {
+  return makeGameStateFactory({
     scienceLog: [],
     sciencePoints: 0,
     crew: [],
     facilities: {},
-  } as unknown as GameState;
+  });
 }
 
 // ---------------------------------------------------------------------------

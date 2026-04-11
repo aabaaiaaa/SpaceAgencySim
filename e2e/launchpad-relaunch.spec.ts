@@ -12,20 +12,6 @@ import {
  */
 
 /* ------------------------------------------------------------------ */
-/*  Window interface for accessing flight physics state               */
-/* ------------------------------------------------------------------ */
-
-interface FlightPs {
-  grounded: boolean;
-  posY: number;
-  firingEngines: Set<string>;
-}
-
-interface GameWindow {
-  __flightPs?: FlightPs;
-}
-
-/* ------------------------------------------------------------------ */
 /*  Seeded design types                                               */
 /* ------------------------------------------------------------------ */
 
@@ -96,32 +82,32 @@ async function launchFromPad(page: Page): Promise<void> {
   await page.waitForSelector('#flight-hud', { state: 'visible', timeout: 15_000 });
   await page.waitForFunction(
     (): boolean =>
-      typeof (window as unknown as GameWindow).__flightPs !== 'undefined' &&
-      (window as unknown as GameWindow).__flightPs !== null,
+      typeof window.__flightPs !== 'undefined' &&
+      window.__flightPs !== null,
     { timeout: 10_000 },
   );
 }
 
 async function fireStageAndVerifyLiftoff(page: Page): Promise<void> {
   const groundedBefore: boolean = await page.evaluate(
-    (): boolean => (window as unknown as GameWindow).__flightPs?.grounded ?? true,
+    (): boolean => window.__flightPs?.grounded ?? true,
   );
   expect(groundedBefore).toBe(true);
 
   await page.keyboard.press('Space');
 
   await page.waitForFunction(
-    (): boolean => ((window as unknown as GameWindow).__flightPs?.firingEngines?.size ?? 0) > 0,
+    (): boolean => (window.__flightPs?.firingEngines?.size ?? 0) > 0,
     { timeout: 5_000 },
   );
 
   const firingCount: number = await page.evaluate(
-    (): number => (window as unknown as GameWindow).__flightPs?.firingEngines?.size ?? 0,
+    (): number => window.__flightPs?.firingEngines?.size ?? 0,
   );
   expect(firingCount).toBeGreaterThan(0);
 
   await page.waitForFunction(
-    (): boolean => ((window as unknown as GameWindow).__flightPs?.posY ?? 0) > 5,
+    (): boolean => (window.__flightPs?.posY ?? 0) > 5,
     { timeout: 5_000 },
   );
 }
@@ -188,7 +174,7 @@ test.describe('Launch Pad — Relaunch Engine Bug', () => {
     await fireStageAndVerifyLiftoff(page);
 
     const grounded: boolean = await page.evaluate(
-      (): boolean => (window as unknown as GameWindow).__flightPs?.grounded ?? true,
+      (): boolean => window.__flightPs?.grounded ?? true,
     );
     expect(grounded).toBe(false);
   });

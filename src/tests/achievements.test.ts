@@ -16,6 +16,7 @@ import { SatelliteType } from '../core/constants.ts';
 
 import type { GameState, MissionInstance, OrbitalObject, FlightState } from '../core/gameState.ts';
 import type { AchievementCheckContext } from '../core/achievements.ts';
+import { makeFlightState } from './_factories.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -310,12 +311,11 @@ describe('FIRST_LUNAR_RETURN', () => {
     const ctx = makeCtx({
       isLanded: true,
       landingBodyId: 'EARTH',
-      flightState: {
-        bodyId: 'EARTH',
+      flightState: makeFlightState({
         transferState: { originBodyId: 'MOON', destinationBodyId: 'EARTH' } as FlightState['transferState'],
         phaseLog: [],
         events: [],
-      } as unknown as FlightState,
+      }),
     });
     const result = checkAchievements(state, ctx);
     expect(result.some((a) => a.id === 'FIRST_LUNAR_RETURN')).toBe(true);

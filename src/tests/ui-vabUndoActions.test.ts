@@ -9,6 +9,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { PartDef } from '../data/parts.ts';
 import type { PlacedPart, RocketAssembly, StagingConfig, PartConnection } from '../core/rocketbuilder.ts';
 import type { GameState } from '../core/gameState.ts';
+import { makeGameState } from './_factories.js';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -166,7 +167,7 @@ describe('VAB Undo Actions', () => {
       const assembly = createTestAssembly(parts);
       assembly._nextId = 2;
       const staging = createTestStaging([['p1']], []);
-      const gameState = { money: 5000 } as unknown as GameState;
+      const gameState = makeGameState({ money: 5000 });
 
       setVabState({ assembly, stagingConfig: staging, gameState });
 
@@ -188,7 +189,7 @@ describe('VAB Undo Actions', () => {
       const assembly = createTestAssembly(parts);
       assembly._nextId = 2;
       const staging = createTestStaging([['p1']], []);
-      const gameState = { money: 5000 } as unknown as GameState;
+      const gameState = makeGameState({ money: 5000 });
 
       setVabState({ assembly, stagingConfig: staging, gameState });
 
@@ -211,7 +212,7 @@ describe('VAB Undo Actions', () => {
       ]);
       const assembly = createTestAssembly(parts);
       const staging = createTestStaging([['p1']], []);
-      const gameState = { money: 5000 } as unknown as GameState;
+      const gameState = makeGameState({ money: 5000 });
 
       setVabState({ assembly, stagingConfig: staging, gameState });
 
@@ -279,7 +280,7 @@ describe('VAB Undo Actions', () => {
       const assembly = createTestAssembly(parts);
       assembly.connections = [{ fromInstanceId: 'p1', toInstanceId: 'p2', fromSnapIndex: 0, toSnapIndex: 0 }];
       const staging = createTestStaging([['p1', 'p2']], []);
-      const gameState = { money: 3000 } as unknown as GameState;
+      const gameState = makeGameState({ money: 3000 });
 
       setVabState({ assembly, stagingConfig: staging, gameState });
 
@@ -307,7 +308,7 @@ describe('VAB Undo Actions', () => {
       ]);
       const assembly = createTestAssembly(parts);
       const staging = createTestStaging([['p1']], []);
-      const gameState = { money: 3000 } as unknown as GameState;
+      const gameState = makeGameState({ money: 3000 });
 
       setVabState({ assembly, stagingConfig: staging, gameState });
 

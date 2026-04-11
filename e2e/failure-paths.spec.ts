@@ -43,20 +43,7 @@ const CREWED_ROCKET: string[] = ['cmd-mk1', 'tank-small', 'engine-spark'];
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type GameState = Record<string, any>;
 
-/**
- * Browser-context window shape for page.evaluate() callbacks.
- * Defined as a local interface (not `declare global`) to avoid conflicting
- * with the narrower Window augmentations in the helper modules.
- */
-interface GameWindow {
-  __gameState?: GameState;
-  __flightState?: Record<string, unknown> | null;
-  __flightPs?: {
-    malfunctions?: { size: number };
-    crashed?: boolean;
-    [key: string]: unknown;
-  } | null;
-}
+// (window.d.ts augments the global Window interface with game properties)
 
 /** Shape of a malfunction event from the flight event log. */
 interface MalfunctionEvent {
@@ -175,13 +162,13 @@ test.describe('Malfunction during flight', () => {
 
     // Wait for at least one malfunction to appear on the physics state.
     await page.waitForFunction(
-      () => ((window as unknown as GameWindow).__flightPs?.malfunctions?.size ?? 0) > 0,
+      () => (window.__flightPs?.malfunctions?.size ?? 0) > 0,
       { timeout: 10_000 },
     );
 
     // Verify a PART_MALFUNCTION event was logged in the flight state.
     const malfEvent = await page.evaluate((): MalfunctionEvent | null => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       const events = (w.__gameState?.currentFlight?.events ?? []) as MalfunctionEvent[];
       return events.find((e: MalfunctionEvent) => e.type === 'PART_MALFUNCTION') ?? null;
     });
@@ -213,13 +200,13 @@ test.describe('Malfunction during flight', () => {
 
     // Wait for malfunctions.
     await page.waitForFunction(
-      () => ((window as unknown as GameWindow).__flightPs?.malfunctions?.size ?? 0) > 0,
+      () => (window.__flightPs?.malfunctions?.size ?? 0) > 0,
       { timeout: 10_000 },
     );
 
     // Verify the malfunction event structure includes partName and time.
     const events = await page.evaluate((): MalfunctionEvent[] => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       const evts = (w.__gameState?.currentFlight?.events ?? []) as MalfunctionEvent[];
       return evts.filter((e: MalfunctionEvent) => e.type === 'PART_MALFUNCTION');
     });
@@ -300,7 +287,7 @@ test.describe('Crew KIA on crash', () => {
 
     // Wait for the craft to crash.
     await page.waitForFunction(
-      () => (window as unknown as GameWindow).__flightPs?.crashed === true,
+      () => window.__flightPs?.crashed === true,
       { timeout: 30_000 },
     );
 
@@ -319,7 +306,7 @@ test.describe('Crew KIA on crash', () => {
 
     // Record money before clicking return (flight return applies the fine).
     const _moneyBeforeReturn: number | null = await page.evaluate((): number | null => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       return (w.__gameState?.money as number) ?? null;
     });
 

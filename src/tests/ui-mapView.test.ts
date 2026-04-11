@@ -12,6 +12,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { PhysicsState } from '../core/physics.ts';
 import type { FlightState, GameState, OrbitalElements } from '../core/gameState.ts';
 import type { FCState } from '../ui/flightController/_state.ts';
+import { makeGameState, makePhysicsState, makeFlightState as makeFlightStateFactory } from './_factories.js';
 
 // ---------------------------------------------------------------------------
 // Mock pixi.js (needed transitively by render modules)
@@ -208,19 +209,19 @@ import { computeOrbitalThrustAngle } from '../core/mapView.ts';
 function setUpFCState(overrides: Partial<FCState> = {}): void {
   resetFCState();
   const s = getFCState();
-  s.state = { orbitalObjects: [], facilities: {} } as unknown as GameState;
-  setPhysicsState({
+  s.state = makeGameState({ orbitalObjects: [], facilities: {} });
+  setPhysicsState(makePhysicsState({
     posX: 0, posY: 200_000, velX: 7800, velY: 0,
     angle: 0, throttle: 0,
-  } as unknown as PhysicsState);
-  setFlightState({
+  }));
+  setFlightState(makeFlightStateFactory({
     phase: 'ORBIT',
     bodyId: 'EARTH',
     timeElapsed: 0,
     orbitalElements: null,
     events: [],
     transferState: null,
-  } as unknown as FlightState);
+  }));
   Object.assign(s, overrides);
 }
 
@@ -283,7 +284,7 @@ describe('toggleMapView', () => {
 
   it('cuts map thrust on deactivation', () => {
     const s = getFCState();
-    const ps = { posX: 0, posY: 200_000, velX: 7800, velY: 0, angle: 0, throttle: 1 } as unknown as PhysicsState;
+    const ps = makePhysicsState({ posX: 0, posY: 200_000, velX: 7800, velY: 0, angle: 0, throttle: 1 });
     setPhysicsState(ps);
 
     s.mapActive = true;
@@ -348,7 +349,7 @@ describe('applyMapThrust', () => {
 
   it('cuts thrust when no keys are held after thrusting', () => {
     const s = getFCState();
-    const ps = { posX: 0, posY: 200_000, velX: 7800, velY: 0, angle: 0, throttle: 1 } as unknown as PhysicsState;
+    const ps = makePhysicsState({ posX: 0, posY: 200_000, velX: 7800, velY: 0, angle: 0, throttle: 1 });
     setPhysicsState(ps);
     s.mapThrusting = true;
     applyMapThrust();
@@ -358,10 +359,10 @@ describe('applyMapThrust', () => {
 
   it('does nothing in LAUNCH phase', () => {
     const s = getFCState();
-    setFlightState({
+    setFlightState(makeFlightStateFactory({
       phase: 'LAUNCH', bodyId: 'EARTH', timeElapsed: 0,
       orbitalElements: null, events: [], transferState: null,
-    } as unknown as FlightState);
+    }));
     s.mapHeldKeys.add('w');
     applyMapThrust();
     expect(s.mapThrusting).toBe(false);
@@ -369,13 +370,13 @@ describe('applyMapThrust', () => {
 
   it('cuts thrust in non-orbital phase if was thrusting', () => {
     const s = getFCState();
-    const ps = { posX: 0, posY: 200_000, velX: 7800, velY: 0, angle: 0, throttle: 1 } as unknown as PhysicsState;
+    const ps = makePhysicsState({ posX: 0, posY: 200_000, velX: 7800, velY: 0, angle: 0, throttle: 1 });
     setPhysicsState(ps);
     s.mapThrusting = true;
-    setFlightState({
+    setFlightState(makeFlightStateFactory({
       phase: 'LAUNCH', bodyId: 'EARTH', timeElapsed: 0,
       orbitalElements: null, events: [], transferState: null,
-    } as unknown as FlightState);
+    }));
     applyMapThrust();
     expect(ps.throttle).toBe(0);
     expect(s.mapThrusting).toBe(false);
@@ -383,10 +384,10 @@ describe('applyMapThrust', () => {
 
   it('allows thrust in MANOEUVRE phase', () => {
     const s = getFCState();
-    setFlightState({
+    setFlightState(makeFlightStateFactory({
       phase: 'MANOEUVRE', bodyId: 'EARTH', timeElapsed: 0,
       orbitalElements: null, events: [], transferState: null,
-    } as unknown as FlightState);
+    }));
     s.mapHeldKeys.add('w');
     applyMapThrust();
     expect(s.mapThrusting).toBe(true);
@@ -394,10 +395,10 @@ describe('applyMapThrust', () => {
 
   it('allows thrust in TRANSFER phase', () => {
     const s = getFCState();
-    setFlightState({
+    setFlightState(makeFlightStateFactory({
       phase: 'TRANSFER', bodyId: 'EARTH', timeElapsed: 0,
       orbitalElements: null, events: [], transferState: null,
-    } as unknown as FlightState);
+    }));
     s.mapHeldKeys.add('w');
     applyMapThrust();
     expect(s.mapThrusting).toBe(true);
@@ -405,10 +406,10 @@ describe('applyMapThrust', () => {
 
   it('allows thrust in CAPTURE phase', () => {
     const s = getFCState();
-    setFlightState({
+    setFlightState(makeFlightStateFactory({
       phase: 'CAPTURE', bodyId: 'EARTH', timeElapsed: 0,
       orbitalElements: null, events: [], transferState: null,
-    } as unknown as FlightState);
+    }));
     s.mapHeldKeys.add('w');
     applyMapThrust();
     expect(s.mapThrusting).toBe(true);

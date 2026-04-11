@@ -7,6 +7,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { PhysicsState } from '../core/physics.ts';
 import type { FlightState } from '../core/gameState.ts';
+import { makePhysicsState, makeFlightState as makeFlightStateFactory } from './_factories.js';
 
 // ---------------------------------------------------------------------------
 // Mocks — must be set up before importing the module under test
@@ -40,12 +41,12 @@ import { checkTimeWarpResets, applyTimeWarp } from '../ui/flightController/_time
 
 /** Build a PhysicsState from only the fields the tests care about. */
 function makePS(overrides: Partial<PhysicsState>): PhysicsState {
-  return overrides as unknown as PhysicsState;
+  return makePhysicsState(overrides);
 }
 
 /** Build a FlightState from only the fields the tests care about. */
 function makeFS(overrides: Record<string, unknown>): FlightState {
-  return overrides as unknown as FlightState;
+  return makeFlightStateFactory(overrides as Partial<FlightState>);
 }
 
 describe('timeWarp', () => {

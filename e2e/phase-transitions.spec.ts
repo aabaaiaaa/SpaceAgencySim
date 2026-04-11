@@ -33,40 +33,12 @@ import type { SaveEnvelope, SaveEnvelopeParams } from './helpers.js';
 
 // ---------------------------------------------------------------------------
 // Browser-context type aliases (used with type assertions inside page.evaluate)
-//
-// These describe the runtime shapes of globals injected by the game.
-// Inside page.evaluate / waitForFunction callbacks we cast `window` to access
-// custom flight globals.  The cast is erased at compile time.
 // ---------------------------------------------------------------------------
 
 interface PhaseLogEntry {
   from: string;
   to: string;
   reason?: string;
-}
-
-interface FlightAssemblyPart {
-  partId: string;
-}
-
-interface GW {
-  __flightPs?: {
-    posX: number; posY: number; velX: number; velY: number;
-    grounded: boolean; landed: boolean; crashed: boolean;
-    throttle: number; controlMode: string;
-    firingEngines: Set<string>; activeParts: Set<string>;
-    parachuteStates?: Map<string, { state: string }>;
-  };
-  __flightState?: {
-    phase: string; inOrbit: boolean; orbitalElements: unknown;
-    altitude: number; velocity: number; horizontalVelocity: number;
-    bodyId: string; phaseLog?: PhaseLogEntry[];
-    events?: { type: string; [key: string]: unknown }[];
-    transferState?: Record<string, unknown>;
-  };
-  __flightAssembly?: { parts: Map<string, FlightAssemblyPart> };
-  __gameState?: { currentFlight?: { events?: { type: string }[] } };
-  __resyncPhysicsWorker?: () => Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -110,7 +82,7 @@ function phaseTestFixture(overrides: SaveEnvelopeParams = {}): SaveEnvelope {
 async function waitForPhaseInLog(page: Page, targetPhase: string, timeout: number = 30_000): Promise<void> {
   await page.waitForFunction(
     (phase: string) => {
-      const fs = (window as unknown as GW).__flightState;
+      const fs = window.__flightState;
       return fs?.phaseLog?.some((entry: PhaseLogEntry) => entry.to === phase) ?? false;
     },
     targetPhase,
@@ -123,7 +95,7 @@ async function waitForPhaseInLog(page: Page, targetPhase: string, timeout: numbe
  */
 async function waitForPhase(page: Page, targetPhase: string, timeout: number = 30_000): Promise<void> {
   await page.waitForFunction(
-    (phase: string) => (window as unknown as GW).__flightState?.phase === phase,
+    (phase: string) => window.__flightState?.phase === phase,
     targetPhase,
     { timeout },
   );
@@ -133,7 +105,7 @@ async function waitForPhase(page: Page, targetPhase: string, timeout: number = 3
  * Helper: read the full phaseLog from the flight state.
  */
 async function getPhaseLog(page: Page): Promise<PhaseLogEntry[]> {
-  return page.evaluate(() => (window as unknown as GW).__flightState?.phaseLog ?? []);
+  return page.evaluate(() => window.__flightState?.phaseLog ?? []);
 }
 
 // ===========================================================================
@@ -152,7 +124,7 @@ test.describe('Phase Transition: PRELAUNCH → LAUNCH', () => {
 
     // Verify we start in PRELAUNCH.
     const initialPhase: string | undefined = await page.evaluate(
-      () => (window as unknown as GW).__flightState?.phase,
+      () => window.__flightState?.phase,
     );
     expect(initialPhase).toBe('PRELAUNCH');
 
@@ -202,8 +174,8 @@ test.describe('Phase Transition: LAUNCH → FLIGHT', () => {
 
     // Verify physics state: not grounded, posY > 0.
     const ps: { grounded: boolean | undefined; posY: number | undefined } = await page.evaluate(() => ({
-      grounded: (window as unknown as GW).__flightPs?.grounded,
-      posY: (window as unknown as GW).__flightPs?.posY,
+      grounded: window.__flightPs?.grounded,
+      posY: window.__flightPs?.posY,
     }));
     expect(ps.grounded).toBe(false);
     expect(ps.posY).toBeGreaterThan(0);
@@ -249,13 +221,13 @@ test.describe('Phase Transition: FLIGHT → ORBIT', () => {
 
     // Verify orbital elements were computed (not null).
     const orbitalElements: unknown = await page.evaluate(
-      () => (window as unknown as GW).__flightState?.orbitalElements,
+      () => window.__flightState?.orbitalElements,
     );
     expect(orbitalElements).toBeTruthy();
 
     // Verify inOrbit flag.
     const inOrbit: boolean | undefined = await page.evaluate(
-      () => (window as unknown as GW).__flightState?.inOrbit,
+      () => window.__flightState?.inOrbit,
     );
     expect(inOrbit).toBe(true);
 
@@ -291,7 +263,7 @@ test.describe('Phase Transition: ORBIT → MANOEUVRE', () => {
     // activeParts. The actual thrust, orbit modification, and phase
     // transition all run through the real physics pipeline.
     await page.evaluate(async () => {
-      const w: GW = window as unknown as GW;
+      const w = window;
       const ps = w.__flightPs;
       const assembly = w.__flightAssembly;
       if (!ps || !assembly) return;
@@ -351,7 +323,7 @@ test.describe('Phase Transition: MANOEUVRE → TRANSFER', () => {
     // The burn runs through real physics — the engine thrust pushes
     // velocity past the escape threshold naturally.
     await page.evaluate(async () => {
-      const w: GW = window as unknown as GW;
+      const w = window;
       const ps = w.__flightPs;
       const assembly = w.__flightAssembly;
       if (!ps || !assembly) return;
@@ -393,7 +365,7 @@ test.describe('Phase Transition: MANOEUVRE → TRANSFER', () => {
 
     // Verify inOrbit is false (we've left orbit).
     const inOrbit: boolean | undefined = await page.evaluate(
-      () => (window as unknown as GW).__flightState?.inOrbit,
+      () => window.__flightState?.inOrbit,
     );
     expect(inOrbit).toBe(false);
 
@@ -429,7 +401,7 @@ test.describe('Phase Transition: Reentry', () => {
     // the physics recomputes the orbit from the new velocity and detects
     // it's no longer valid (triggers deorbit).
     await page.evaluate(async () => {
-      const w: GW = window as unknown as GW;
+      const w = window;
       const ps = w.__flightPs;
       const fs = w.__flightState;
       if (!ps || !fs) return;
@@ -505,7 +477,7 @@ test.describe('Phase Transition: Landing', () => {
 
     // Wait for parachute to be deploying or deployed.
     await page.waitForFunction(() => {
-      const w: GW = window as unknown as GW;
+      const w = window;
       const ps = w.__flightPs;
       if (!ps?.parachuteStates) return false;
       for (const [, entry] of ps.parachuteStates) {
@@ -519,16 +491,16 @@ test.describe('Phase Transition: Landing', () => {
 
     // Wait for landing.
     await page.waitForFunction(
-      () => (window as unknown as GW).__flightPs?.landed === true,
+      () => window.__flightPs?.landed === true,
       { timeout: 30_000 },
     );
 
     // Verify it was a safe landing, not a crash.
     const result: { landed: boolean | undefined; crashed: boolean | undefined; posY: number | undefined } =
       await page.evaluate(() => ({
-        landed: (window as unknown as GW).__flightPs?.landed,
-        crashed: (window as unknown as GW).__flightPs?.crashed,
-        posY: (window as unknown as GW).__flightPs?.posY,
+        landed: window.__flightPs?.landed,
+        crashed: window.__flightPs?.crashed,
+        posY: window.__flightPs?.posY,
       }));
     expect(result.landed).toBe(true);
     expect(result.crashed).toBe(false);
@@ -536,7 +508,7 @@ test.describe('Phase Transition: Landing', () => {
 
     // Verify a LANDING event was recorded through the physics pipeline.
     const events: { type: string }[] = await page.evaluate(
-      () => (window as unknown as GW).__gameState?.currentFlight?.events ?? [],
+      () => window.__gameState?.currentFlight?.events ?? [],
     );
     const landingEvent: { type: string } | undefined = events.find((e: { type: string }) => e.type === 'LANDING');
     expect(landingEvent).toBeTruthy();
@@ -571,21 +543,21 @@ test.describe('Phase Transition: Crash', () => {
 
     // Let physics detect the impact.
     await page.waitForFunction(
-      () => (window as unknown as GW).__flightPs?.crashed === true,
+      () => window.__flightPs?.crashed === true,
       { timeout: 15_000 },
     );
 
     // Verify crash state.
     const result: { crashed: boolean | undefined; landed: boolean | undefined } = await page.evaluate(() => ({
-      crashed: (window as unknown as GW).__flightPs?.crashed,
-      landed: (window as unknown as GW).__flightPs?.landed,
+      crashed: window.__flightPs?.crashed,
+      landed: window.__flightPs?.landed,
     }));
     expect(result.crashed).toBe(true);
     expect(result.landed).toBe(false);
 
     // Verify a CRASH event was recorded through the physics pipeline.
     const events: { type: string }[] = await page.evaluate(
-      () => (window as unknown as GW).__gameState?.currentFlight?.events ?? [],
+      () => window.__gameState?.currentFlight?.events ?? [],
     );
     const crashEvent: { type: string } | undefined = events.find((e: { type: string }) => e.type === 'CRASH');
     expect(crashEvent).toBeTruthy();
@@ -644,7 +616,7 @@ test.describe('Phase Transition: TRANSFER → CAPTURE → ORBIT', () => {
 
     // After CAPTURE, bodyId should change to MOON.
     const bodyAfterCapture: string | undefined = await page.evaluate(
-      () => (window as unknown as GW).__flightState?.bodyId,
+      () => window.__flightState?.bodyId,
     );
     expect(bodyAfterCapture).toBe('MOON');
 
@@ -653,7 +625,7 @@ test.describe('Phase Transition: TRANSFER → CAPTURE → ORBIT', () => {
     const moonOrbitAlt: number = 50_000;
     const moonOrbitVel: number = Math.round(Math.sqrt(MOON_GM / (MOON_RADIUS + moonOrbitAlt)));
     await page.evaluate(async (v: { alt: number; vel: number }) => {
-      const w: GW = window as unknown as GW;
+      const w = window;
       const ps = w.__flightPs;
       const fs = w.__flightState;
       if (!ps || !fs) return;

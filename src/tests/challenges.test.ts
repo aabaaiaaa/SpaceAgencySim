@@ -16,6 +16,7 @@ import { CHALLENGES, MedalTier, ScoreDirection } from '../data/challenges.ts';
 import { ObjectiveType } from '../data/missions.ts';
 import type { GameState, FlightState, FlightEvent, MissionInstance, ChallengeDef, MedalThresholds } from '../core/gameState.ts';
 import type { PhysicsState } from '../core/physics.ts';
+import { makeMissionInstance } from './_factories.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -41,9 +42,9 @@ function freshState(): GameState {
   const state = createGameState();
   // Provide completed missions to unlock challenges.
   state.missions.completed = [
-    { id: 'mission-001', title: 'M1', objectives: [], reward: 25000 },
-    { id: 'mission-004', title: 'M4', objectives: [], reward: 30000 },
-  ] as unknown as MissionInstance[];
+    makeMissionInstance({ id: 'mission-001', title: 'M1', objectives: [], reward: 25000 }),
+    makeMissionInstance({ id: 'mission-004', title: 'M4', objectives: [], reward: 30000 }),
+  ];
   return state;
 }
 
@@ -51,10 +52,8 @@ function stateWithOrbitalMissions(): GameState {
   const state = freshState();
   // Add orbital missions needed for advanced challenges.
   state.missions.completed.push(
-    ...([
-      { id: 'mission-016', title: 'M16', objectives: [], reward: 50000 },
-      { id: 'mission-017', title: 'M17', objectives: [], reward: 60000 },
-    ] as unknown as MissionInstance[]),
+    makeMissionInstance({ id: 'mission-016', title: 'M16', objectives: [], reward: 50000 }),
+    makeMissionInstance({ id: 'mission-017', title: 'M17', objectives: [], reward: 60000 }),
   );
   return state;
 }

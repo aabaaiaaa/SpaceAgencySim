@@ -58,17 +58,7 @@ const CREWED_ROCKET: string[]  = ['cmd-mk1', 'tank-small', 'engine-spark', 'para
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type GameState = Record<string, any>;
 
-/**
- * Browser-context window shape for page.evaluate() callbacks.
- * Defined as a local interface (not `declare global`) to avoid conflicting
- * with the narrower Window augmentations in the helper modules. Inside
- * evaluate callbacks we cast: `const w = window as unknown as GameWindow;`
- */
-interface GameWindow {
-  __gameState?: GameState;
-  __flightState?: Record<string, unknown> | null;
-  __flightPs?: Record<string, unknown> | null;
-}
+// (window.d.ts augments the global Window interface with game properties)
 
 /** Shape of a crew member in game state. */
 interface CrewSnapshot {
@@ -207,7 +197,7 @@ test.describe('Construction menu — building a facility', () => {
 
     // Wait for facility to be built in game state
     await page.waitForFunction(
-      () => (window as unknown as GameWindow).__gameState?.facilities?.['crew-admin']?.built === true,
+      () => window.__gameState?.facilities?.['crew-admin']?.built === true,
       { timeout: 5_000 },
     );
 
@@ -359,7 +349,7 @@ test.describe('Contract acceptance and cancellation', () => {
   test('(2) accepting a contract moves it from board to active', async () => {
     // Accept via state manipulation (simulates the UI accept action)
     await page.evaluate(() => {
-      const gs = (window as unknown as GameWindow).__gameState as GameState | undefined;
+      const gs = window.__gameState as unknown as GameState | undefined;
       if (!gs) return;
       const contract = (gs.contracts.board as ContractSnapshot[]).find(
         (c: ContractSnapshot) => c.id === 'contract-accept-test',
@@ -390,7 +380,7 @@ test.describe('Contract acceptance and cancellation', () => {
 
     // Cancel via state manipulation
     await page.evaluate(() => {
-      const gs = (window as unknown as GameWindow).__gameState as
+      const gs = window.__gameState as
         { contracts: { active: { id: string; penaltyFee: number; reputationPenalty: number }[]; failed: unknown[] }; money: number; reputation: number } | undefined;
       if (!gs) return;
       const contract = gs.contracts.active.find(c => c.id === 'contract-accept-test');
@@ -686,7 +676,7 @@ test.describe('Contract BUDGET_LIMIT and MAX_PARTS constraints', () => {
     // Inject constraint properties on flightState (populated by the flight scene
     // from the assembly — E2E test flight bypasses VAB so they may not be set).
     await page.evaluate(() => {
-      const gs = (window as unknown as GameWindow).__gameState as
+      const gs = window.__gameState as
         { currentFlight?: { rocketCost?: number; partCount?: number } } | undefined;
       const fs = gs?.currentFlight;
       if (!fs) return;
@@ -696,7 +686,7 @@ test.describe('Contract BUDGET_LIMIT and MAX_PARTS constraints', () => {
 
     // Wait for the constraint objectives to be checked
     await page.waitForFunction(() => {
-      const gs = (window as unknown as GameWindow).__gameState as
+      const gs = window.__gameState as
         { contracts?: { active?: { id: string; objectives?: { completed?: boolean }[] }[] } } | undefined;
       const contract = gs?.contracts?.active?.find(c => c.id === 'contract-constraints');
       return contract?.objectives?.some(o => o.completed === true);
@@ -763,7 +753,7 @@ test.describe('Contract over-performance bonus', () => {
 
     // Wait for contract objective to be evaluated
     await page.waitForFunction(() => {
-      const gs = (window as unknown as GameWindow).__gameState as
+      const gs = window.__gameState as
         { contracts?: { active?: { id: string; objectives?: { completed?: boolean }[] }[] } } | undefined;
       const contract = gs?.contracts?.active?.find(c => c.id === 'contract-bonus');
       return contract?.objectives?.[0]?.completed === true;
@@ -908,7 +898,7 @@ test.describe('Operating costs charged per period', () => {
   test('(2) operating costs scale with more facilities', async () => {
     // Build crew admin (adds another $10k upkeep)
     await page.evaluate(() => {
-      const gs = (window as unknown as GameWindow).__gameState as
+      const gs = window.__gameState as
         { facilities: Record<string, { built: boolean; tier: number }> } | undefined;
       if (!gs) return;
       gs.facilities['crew-admin'] = { built: true, tier: 1 };
@@ -955,7 +945,7 @@ test.describe('Bankruptcy trigger', () => {
     // money=0, loan maxed at 10M -> no borrowing capacity
     // Cannot afford minimum rocket
     const isBankrupt = await page.evaluate(() => {
-      const gs = (window as unknown as GameWindow).__gameState as
+      const gs = window.__gameState as
         { money: number; loan: { balance: number } } | undefined;
       if (!gs) return false;
       // Purchasing power = money + (MAX_LOAN - loan.balance) = 0 + 0 = 0
@@ -1157,7 +1147,7 @@ test.describe('Crew injury from hard landing', () => {
     // Simulate the hard landing injury via state manipulation
     // (direct physics manipulation of a landing at 7 m/s is fragile in E2E)
     await page.evaluate(() => {
-      const gs = (window as unknown as GameWindow).__gameState as
+      const gs = window.__gameState as
         { crew: { id: string; injuryEnds?: number | null }[]; currentPeriod: number } | undefined;
       if (!gs) return;
       const crew = gs.crew.find(c => c.id === 'crew-injury-1');
@@ -1217,7 +1207,7 @@ test.describe('Crew ejection injury', () => {
     // Simulate what processFlightInjuries does for an ejection:
     // injureCrew(state, id, EJECTION_INJURY_PERIODS) sets injuryEnds = currentPeriod + 1
     await page.evaluate((period: number) => {
-      const gs = (window as unknown as GameWindow).__gameState as
+      const gs = window.__gameState as
         { crew: { id: string; injuryEnds?: number | null }[] } | undefined;
       if (!gs) return;
       const crew = gs.crew.find(c => c.id === 'crew-eject-1');
@@ -1272,7 +1262,7 @@ test.describe('Injury blocks flight assignment', () => {
   test('(1) injured crew cannot be assigned to flights', async () => {
     // Set injury via state manipulation
     await page.evaluate(() => {
-      const gs = (window as unknown as GameWindow).__gameState as
+      const gs = window.__gameState as
         { crew: { id: string; injuryEnds?: number | null }[]; currentPeriod: number } | undefined;
       if (!gs) return;
       const crew = gs.crew.find(c => c.id === 'crew-injured-1');
@@ -1289,7 +1279,7 @@ test.describe('Injury blocks flight assignment', () => {
 
     // The crew module's assignToCrew checks: injuryEnds > currentPeriod -> blocked
     const canAssign = await page.evaluate(() => {
-      const gs = (window as unknown as GameWindow).__gameState as
+      const gs = window.__gameState as
         { crew: { id: string; injuryEnds?: number | null }[]; currentPeriod: number } | undefined;
       if (!gs) return true;
       const crew = gs.crew.find(c => c.id === 'crew-injured-1');
@@ -1335,7 +1325,7 @@ test.describe('Medical care halves recovery time', () => {
   test('(1) medical care halves remaining recovery periods', async () => {
     // Set injury: 4 periods remaining (injuryEnds = 14)
     await page.evaluate(() => {
-      const gs = (window as unknown as GameWindow).__gameState as
+      const gs = window.__gameState as
         { crew: { id: string; injuryEnds?: number | null }[] } | undefined;
       if (!gs) return;
       const crew = gs.crew.find(c => c.id === 'crew-medical-1');
@@ -1353,7 +1343,7 @@ test.describe('Medical care halves recovery time', () => {
 
     // Apply medical care via state manipulation (mirrors payMedicalCare)
     await page.evaluate(() => {
-      const gs = (window as unknown as GameWindow).__gameState as
+      const gs = window.__gameState as
         { crew: { id: string; injuryEnds?: number | null }[]; money: number; currentPeriod: number } | undefined;
       if (!gs) return;
       const crew = gs.crew.find(c => c.id === 'crew-medical-1');
@@ -1425,7 +1415,7 @@ test.describe('Design library save/load/duplicate', () => {
 
   test('(2) duplicate design creates copy with new ID and name suffix', async () => {
     await page.evaluate(() => {
-      const gs = (window as unknown as GameWindow).__gameState as
+      const gs = window.__gameState as unknown as
         { savedDesigns: { id: string; name: string; [key: string]: unknown }[] } | undefined;
       if (!gs) return;
       const original = gs.savedDesigns[0];
@@ -1455,7 +1445,7 @@ test.describe('Design library save/load/duplicate', () => {
 
   test('(3) delete design removes it from library', async () => {
     await page.evaluate(() => {
-      const gs = (window as unknown as GameWindow).__gameState as
+      const gs = window.__gameState as
         { savedDesigns: { id: string }[] } | undefined;
       if (!gs) return;
       gs.savedDesigns = gs.savedDesigns.filter(d => d.id === 'design-test-1');
@@ -1517,7 +1507,7 @@ test.describe('Design library cross-save sharing', () => {
   test('(2) shared designs merge with save-private designs', async () => {
     // Add a private design to the game state
     await page.evaluate(() => {
-      const gs = (window as unknown as GameWindow).__gameState as
+      const gs = window.__gameState as unknown as
         { savedDesigns: Record<string, unknown>[] } | undefined;
       if (!gs) return;
       gs.savedDesigns.push({
@@ -1535,7 +1525,7 @@ test.describe('Design library cross-save sharing', () => {
 
     // Verify both pools exist
     const result = await page.evaluate(() => {
-      const gs = (window as unknown as GameWindow).__gameState as
+      const gs = window.__gameState as
         { savedDesigns: { id: string; savePrivate?: boolean }[] } | undefined;
       if (!gs) return { sharedCount: 0, privateCount: 0, totalUnique: 0 };
       const shared = JSON.parse(localStorage.getItem('spaceAgencyDesignLibrary') || '[]') as { id: string }[];
@@ -1710,7 +1700,7 @@ test.describe('Design library compatibility — locked parts', () => {
   test('(2) validation fails for design with locked parts', async () => {
     // Check via the checkDesignCompatibility logic
     const result = await page.evaluate(() => {
-      const gs = (window as unknown as GameWindow).__gameState as
+      const gs = window.__gameState as
         { savedDesigns: { name: string; parts: { partId: string }[] }[]; parts: string[] } | undefined;
       if (!gs) return null;
       const design = gs.savedDesigns[0];
@@ -1864,7 +1854,7 @@ test.describe('Contract RESTRICT_PART constraint objective', () => {
 
     // Inject partTypes on flightState (populated by flight scene from assembly)
     await page.evaluate(() => {
-      const gs = (window as unknown as GameWindow).__gameState as
+      const gs = window.__gameState as
         { currentFlight?: { partTypes?: string[] } } | undefined;
       const fs = gs?.currentFlight;
       if (!fs) return;
@@ -1873,7 +1863,7 @@ test.describe('Contract RESTRICT_PART constraint objective', () => {
     });
 
     await page.waitForFunction(() => {
-      const gs = (window as unknown as GameWindow).__gameState as
+      const gs = window.__gameState as
         { contracts?: { active?: { id: string; objectives?: { completed?: boolean }[] }[] } } | undefined;
       const contract = gs?.contracts?.active?.find(c => c.id === 'contract-restrict');
       return contract?.objectives?.[0]?.completed === true;
@@ -1933,7 +1923,7 @@ test.describe('Contract MINIMUM_CREW constraint objective', () => {
 
     // Inject crewCount on flightState (populated by flight scene from crew assignment)
     await page.evaluate(() => {
-      const gs = (window as unknown as GameWindow).__gameState as
+      const gs = window.__gameState as
         { currentFlight?: { crewCount?: number; crewIds?: string[] } } | undefined;
       const fs = gs?.currentFlight;
       if (!fs) return;
@@ -1941,7 +1931,7 @@ test.describe('Contract MINIMUM_CREW constraint objective', () => {
     });
 
     await page.waitForFunction(() => {
-      const gs = (window as unknown as GameWindow).__gameState as
+      const gs = window.__gameState as
         { contracts?: { active?: { id: string; objectives?: { completed?: boolean }[] }[] } } | undefined;
       const contract = gs?.contracts?.active?.find(c => c.id === 'contract-mincrew');
       return contract?.objectives?.[0]?.completed === true;

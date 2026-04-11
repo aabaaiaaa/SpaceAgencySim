@@ -67,31 +67,31 @@ See `.devloop/requirements.md` for full context and rationale behind each task.
 - **Verification**: `npx tsc --noEmit -p e2e/tsconfig.json` — no type errors. The helper compiles and is exported from the barrel.
 
 ### TASK-009: Migrate unit tests to factories — physics and flight tests
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-006, TASK-007
 - **Description**: Update unit test files that primarily use `PhysicsState` and flight-related `as unknown as` casts to use the new factory functions from `src/tests/_factories.ts`. Target files include those with PhysicsState casts: physics.test.ts, physicsWorker.test.ts, physicsWorkerCommand.test.ts, flightPhase.test.ts, parachute-deploy.test.ts, parachute-descent.test.ts, parachute-landing.test.ts, atmosphere.test.ts, collision.test.ts, fuelsystem.test.ts, orbit.test.ts, manoeuvre.test.ts, legs.test.ts, controlMode.test.ts, staging.test.ts, ejector.test.ts. Replace `{...} as unknown as PhysicsState` with `makePhysicsState({...})`. Also replace any other factory-eligible casts in these files (FlightState, GameState, etc.).
 - **Verification**: `npx vitest run src/tests/physics.test.ts src/tests/physicsWorker.test.ts src/tests/flightPhase.test.ts src/tests/collision.test.ts src/tests/orbit.test.ts` — all pass. Count PhysicsState casts remaining: `grep -c "as unknown as PhysicsState" src/tests/*.test.ts 2>/dev/null | grep -v ":0$" | wc -l` should be 0 or near-0.
 
 ### TASK-010: Migrate unit tests to factories — state, mission, and crew tests
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-006, TASK-007
 - **Description**: Update unit test files that primarily use `GameState`, `MissionInstance`, `CrewMember`, and `RecoveryPS` casts to use factory functions. Target files include: gameState.test.ts, crew.test.ts, missions.test.ts, contracts.test.ts, challenges.test.ts, customChallenges.test.ts, saveload.test.ts, finance.test.ts, bankruptcy.test.ts, designLibrary.test.ts, achievements.test.ts, flightReturn.test.ts, multiBodyLanding.test.ts, reputation.test.ts, malfunction.test.ts, partInventory.test.ts, construction.test.ts, launchPadTiers.test.ts, mccTiers.test.ts, techtree.test.ts, satellites.test.ts, comms.test.ts, power.test.ts, lifeSupport.test.ts, biomes.test.ts, sciencemodule.test.ts, surfaceOps.test.ts, instruments.test.ts. Replace `{...} as unknown as GameState` with `makeGameState({...})`, and similarly for other types.
 - **Verification**: `npx vitest run src/tests/gameState.test.ts src/tests/crew.test.ts src/tests/missions.test.ts src/tests/saveload.test.ts src/tests/flightReturn.test.ts` — all pass. Total unit test `as unknown as` count: `grep -r "as unknown as" src/tests/ | wc -l` should be under 120 (down from 279).
 
 ### TASK-011: Migrate unit tests to factories — render and UI tests
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-006, TASK-007
 - **Description**: Update remaining unit test files (primarily render and UI tests) that use `Graphics`, `MockElement`, and other `as unknown as` casts to use factory functions. Target files include: render-camera.test.ts, render-sky.test.ts, render-ground.test.ts, render-constants.test.ts, render-trails.test.ts, render-input.test.ts, render-flight-pool.test.ts, render-state.test.ts, render-map-state.test.ts, render-asteroids.test.ts, ui-fcState.test.ts, ui-timeWarp.test.ts, ui-vabStaging.test.ts, ui-vabState.test.ts, ui-vabUndoActions.test.ts, ui-mcState.test.ts, ui-mapView.test.ts, ui-fpsMonitor.test.ts, ui-escapeHtml.test.ts, ui-listenerTracker.test.ts, ui-rocketCardUtil.test.ts, docking.test.ts, grabbing.test.ts, undoRedo.test.ts, sandbox.test.ts, weather.test.ts, e2e-infrastructure.test.ts, branchCoverage.test.ts, autoSave.test.ts, idbStorage.test.ts, storageErrors.test.ts. Replace casts with factory calls.
 - **Verification**: `npx vitest run src/tests/render-camera.test.ts src/tests/ui-vabStaging.test.ts src/tests/docking.test.ts src/tests/weather.test.ts` — all pass. Total unit test `as unknown as` count: `grep -r "as unknown as" src/tests/ | wc -l` should be under 50.
 
 ### TASK-012: Migrate E2E specs to typed window helper — batch 1
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-006, TASK-008
 - **Description**: Update the first batch of E2E specs to use the typed GameWindow helper instead of `as unknown as GameWindow` / `as unknown as GW` casts. Files: additional-systems.spec.ts, agency-depth.spec.ts, biomes-science.spec.ts, core-mechanics.spec.ts, crew.spec.ts, debug-mode.spec.ts, facilities-infrastructure.spec.ts, failure-paths.spec.ts, fps-monitor.spec.ts, landing.spec.ts. For each file: import the typed helper, replace all GameWindow/GW cast patterns with the helper usage.
 - **Verification**: `npx playwright test e2e/additional-systems.spec.ts e2e/crew.spec.ts e2e/landing.spec.ts --reporter=list` — all pass. Cast count in batch: `grep -c "as unknown as G" e2e/additional-systems.spec.ts e2e/agency-depth.spec.ts e2e/biomes-science.spec.ts e2e/core-mechanics.spec.ts e2e/crew.spec.ts e2e/debug-mode.spec.ts e2e/facilities-infrastructure.spec.ts e2e/failure-paths.spec.ts e2e/fps-monitor.spec.ts e2e/landing.spec.ts | grep -v ":0$"` should show 0 remaining casts.
 
 ### TASK-013: Migrate E2E specs to typed window helper — batch 2
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-006, TASK-008
 - **Description**: Update the second batch of E2E specs to use the typed GameWindow helper. Files: launchpad-relaunch.spec.ts, launchpad.spec.ts, mission-progression.spec.ts, missions.spec.ts, part-reconnection.spec.ts, phase-transitions.spec.ts, relaunch.spec.ts, sandbox-replayability.spec.ts, saveload.spec.ts. For each file: import the typed helper, replace all GameWindow/GW cast patterns.
 - **Verification**: `npx playwright test e2e/missions.spec.ts e2e/saveload.spec.ts e2e/sandbox-replayability.spec.ts --reporter=list` — all pass. Total E2E `as unknown as G` count: `grep -r "as unknown as G" e2e/ | wc -l` should be 0 or near-0.

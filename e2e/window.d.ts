@@ -15,6 +15,13 @@
 
 type _GameState = import('../src/core/gameState').GameState;
 type _FlightState = import('../src/core/gameState').FlightState;
+type _CommsState = import('../src/core/gameState').CommsState;
+
+/**
+ * At runtime, FlightState may expose a `comms` alias for `commsState`.
+ * E2E specs access both paths as a fallback chain, so include it here.
+ */
+type _FlightStateExt = _FlightState & { comms?: _CommsState | null };
 type _PhysicsState = import('../src/core/physics').PhysicsState;
 type _RocketAssembly = import('../src/core/rocketbuilder').RocketAssembly;
 type _StagingConfig = import('../src/core/rocketbuilder').StagingConfig;
@@ -55,7 +62,7 @@ declare global {
     // -- From src/ui/flightController/_init.ts --
     __flightPs: _PhysicsState | null;
     __flightAssembly: _RocketAssembly | null;
-    __flightState: _FlightState | null;
+    __flightState: _FlightStateExt | null;
     __setMalfunctionMode: ((mode: string) => void) | undefined;
     __getMalfunctionMode: (() => string) | undefined;
     __testSetTimeWarp: ((speedMultiplier: number) => void) | undefined;
@@ -81,9 +88,10 @@ declare global {
     // -- Additional E2E test hooks (used by spec files) --
     __surfaceAction?: (action: string) => unknown;
     __mapViewActive?: boolean;
+    __airDensityForBody?: (altitude: number, bodyId: string) => number;
 
     // -- Spec-only properties (referenced in evaluate callbacks but not in source) --
-    __partCatalog?: Array<{ id: string; [key: string]: unknown }>;
+    __partCatalog?: Array<{ id: string; properties?: Record<string, unknown>; [key: string]: unknown }>;
     __constants?: Record<string, unknown>;
     __crewAPI?: Record<string, unknown>;
     __consoleErrors?: string[];

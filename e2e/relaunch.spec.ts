@@ -12,26 +12,6 @@ import {
  */
 
 // ---------------------------------------------------------------------------
-// Window interface for browser-context evaluate() callbacks
-// ---------------------------------------------------------------------------
-
-interface FlightAssemblyPart {
-  partId: string;
-}
-
-interface GW {
-  __flightPs?: {
-    posY: number;
-    velY: number;
-    grounded: boolean;
-    landed: boolean;
-    firingEngines: Set<string>;
-  };
-  __flightAssembly?: { parts: Map<string, FlightAssemblyPart> };
-  __resyncPhysicsWorker?: () => Promise<void>;
-}
-
-// ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
@@ -132,15 +112,14 @@ test.describe('Relaunch — Takeoff, Land, Takeoff Again', () => {
     // Re-enable engine firing (teleportCraft clears firingEngines, but the
     // re-liftoff mechanic needs engines active).
     await page.evaluate(async () => {
-      const w: GW = window as unknown as GW;
-      const ps = w.__flightPs;
-      const assembly = w.__flightAssembly;
+      const ps = window.__flightPs;
+      const assembly = window.__flightAssembly;
       if (ps && assembly) {
         for (const [id, p] of assembly.parts) {
           if (p.partId === 'engine-spark') ps.firingEngines.add(id);
         }
-        if (typeof w.__resyncPhysicsWorker === 'function') {
-          await w.__resyncPhysicsWorker();
+        if (typeof window.__resyncPhysicsWorker === 'function') {
+          await window.__resyncPhysicsWorker();
         }
       }
     });

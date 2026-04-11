@@ -53,6 +53,7 @@ import {
 } from '../core/constants.ts';
 
 import type { GameState, OrbitalElements, FlightState } from '../core/gameState.ts';
+import { makeFlightState as makeFlightStateFactory } from './_factories.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -385,20 +386,20 @@ describe('Satellite Network — deploySatellitesFromFlight()', () => {
   beforeEach(() => { state = freshState(); });
 
   it('deploys satellite from flight event when in orbit', () => {
-    const flightState = {
-      bodyId: 'EARTH',
+    const flightState = makeFlightStateFactory({
       orbitalElements: { ...LEO_ELEMENTS },
       timeElapsed: 100,
       events: [
         {
           type: 'SATELLITE_RELEASED',
           time: 90,
+          description: '',
           altitude: 150_000,
           velocity: 7800,
           partId: 'satellite-comm',
         },
       ],
-    } as unknown as FlightState;
+    });
     const deployed = deploySatellitesFromFlight(state, flightState);
     expect(deployed).toHaveLength(1);
     expect(deployed[0].satelliteType).toBe(SatelliteType.COMMUNICATION);
@@ -406,48 +407,46 @@ describe('Satellite Network — deploySatellitesFromFlight()', () => {
   });
 
   it('does not deploy satellite released below orbit altitude', () => {
-    const flightState = {
-      bodyId: 'EARTH',
+    const flightState = makeFlightStateFactory({
       orbitalElements: null,
       timeElapsed: 50,
       events: [
         {
           type: 'SATELLITE_RELEASED',
           time: 40,
+          description: '',
           altitude: 50_000, // below 70km minimum
           velocity: 3000,
           partId: 'satellite-comm',
         },
       ],
-    } as unknown as FlightState;
+    });
     const deployed = deploySatellitesFromFlight(state, flightState);
     expect(deployed).toHaveLength(0);
   });
 
   it('deploys multiple satellites from a single flight', () => {
-    const flightState = {
-      bodyId: 'EARTH',
+    const flightState = makeFlightStateFactory({
       orbitalElements: { ...LEO_ELEMENTS },
       timeElapsed: 200,
       events: [
-        { type: 'SATELLITE_RELEASED', time: 100, altitude: 150_000, velocity: 7800, partId: 'satellite-comm' },
-        { type: 'SATELLITE_RELEASED', time: 150, altitude: 150_000, velocity: 7800, partId: 'satellite-science' },
+        { type: 'SATELLITE_RELEASED', time: 100, description: '', altitude: 150_000, velocity: 7800, partId: 'satellite-comm' },
+        { type: 'SATELLITE_RELEASED', time: 150, description: '', altitude: 150_000, velocity: 7800, partId: 'satellite-science' },
       ],
-    } as unknown as FlightState;
+    });
     const deployed = deploySatellitesFromFlight(state, flightState);
     expect(deployed).toHaveLength(2);
     expect(state.satelliteNetwork.satellites).toHaveLength(2);
   });
 
   it('defaults to satellite-mk1 when partId is missing', () => {
-    const flightState = {
-      bodyId: 'EARTH',
+    const flightState = makeFlightStateFactory({
       orbitalElements: { ...LEO_ELEMENTS },
       timeElapsed: 100,
       events: [
-        { type: 'SATELLITE_RELEASED', time: 90, altitude: 150_000, velocity: 7800 },
+        { type: 'SATELLITE_RELEASED', time: 90, description: '', altitude: 150_000, velocity: 7800 },
       ],
-    } as unknown as FlightState;
+    });
     const deployed = deploySatellitesFromFlight(state, flightState);
     expect(deployed).toHaveLength(1);
     expect(deployed[0].satelliteType).toBe('GENERIC');

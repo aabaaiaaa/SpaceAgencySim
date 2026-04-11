@@ -14,6 +14,7 @@ import {
   BAND_WARNING_MARGIN,
 } from '../core/controlMode.ts';
 import { handleKeyDown } from '../core/physics.ts';
+import { makePhysicsState } from './_factories.js';
 
 import type { FlightPhase as FlightPhaseType, AltitudeBand } from '../core/constants.ts';
 import type { FlightState, OrbitalElements } from '../core/gameState.ts';
@@ -37,31 +38,16 @@ function freshFlightState(phase: FlightPhaseType = FlightPhase.ORBIT): FlightSta
 }
 
 function stubPs(overrides: Partial<PhysicsState> = {}): PhysicsState {
-  return {
-    posX: 0,
+  return makePhysicsState({
     posY: 100_000, // 100 km altitude (LEO)
     velX: 7800,    // ~orbital velocity
-    velY: 0,
-    angle: 0,
     throttle: 0.5,
     throttleMode: 'absolute',
     targetTWR: 1.0,
-    firingEngines: new Set<string>(),
-    fuelStore: new Map<string, number>(),
-    activeParts: new Set<string>(),
-    deployedParts: new Set<string>(),
     grounded: false,
     landed: false,
-    crashed: false,
-    controlMode: ControlMode.NORMAL,
-    baseOrbit: null,
-    dockingAltitudeBand: null,
-    dockingOffsetAlongTrack: 0,
-    dockingOffsetRadial: 0,
-    rcsActiveDirections: new Set<string>(),
-    _heldKeys: new Set<string>(),
     ...overrides,
-  } as PhysicsState;
+  });
 }
 
 function assemblyWithRcs(): RocketAssembly {

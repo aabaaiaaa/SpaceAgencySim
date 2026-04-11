@@ -24,22 +24,6 @@ import {
  */
 
 // ---------------------------------------------------------------------------
-// Browser-context window shape for page.evaluate() callbacks.
-//
-// Defined as a local interface (not `declare global`) to avoid conflicting
-// with the narrower Window augmentations in the helper modules. Inside
-// evaluate callbacks we cast: `const w = window as unknown as GameWindow;`
-// ---------------------------------------------------------------------------
-
-interface GameWindow {
-  __flightPs?: Record<string, unknown>;
-  __gameState?: {
-    currentFlight?: { rocketId: string };
-    money?: number;
-  };
-}
-
-// ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
@@ -223,14 +207,14 @@ test.describe('Launch Pad', () => {
     // Verify the physics state is exposed (flight is active).
     await page.waitForFunction(
       (): boolean =>
-        typeof (window as unknown as GameWindow).__flightPs !== 'undefined',
+        typeof window.__flightPs !== 'undefined',
       { timeout: 5_000 },
     );
 
     // Verify currentFlight references the design we launched.
     const rocketId: string | undefined = await page.evaluate(
       (): string | undefined =>
-        (window as unknown as GameWindow).__gameState?.currentFlight?.rocketId,
+        window.__gameState?.currentFlight?.rocketId,
     );
     expect(rocketId).toBe('design-lp-test');
 
@@ -238,7 +222,7 @@ test.describe('Launch Pad', () => {
     // Cost = $14,800 (cmd-mk1 $8,000 + tank-small $800 + engine-spark $6,000).
     const money: number | undefined = await page.evaluate(
       (): number | undefined =>
-        (window as unknown as GameWindow).__gameState?.money,
+        window.__gameState?.money,
     );
     expect(money).toBe(STARTING_MONEY - 14_800);
   });

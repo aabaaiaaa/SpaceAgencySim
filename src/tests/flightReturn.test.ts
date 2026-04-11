@@ -5,12 +5,14 @@ import { MISSIONS, ObjectiveType, MissionStatus, rebuildMissionsIndex } from '..
 import {
   DEATH_FINE_PER_ASTRONAUT,
   FlightOutcome,
+  MissionState,
   STARTING_REPUTATION,
   FieldCraftStatus,
 } from '../core/constants.ts';
 import type { GameState, FlightState, CrewMember, MissionInstance, ObjectiveDef } from '../core/gameState.ts';
 import type { PhysicsState, RocketAssembly, PlacedPart } from '../core/physics.ts';
 import type { MissionDef } from '../data/missions.ts';
+import { makeMissionInstance } from './_factories.js';
 
 // ---------------------------------------------------------------------------
 // Test fixture helpers
@@ -36,13 +38,13 @@ function makeMissionDef(overrides: Partial<MissionDef> = {}): MissionDef {
 }
 
 function seedAcceptedMission(state: GameState, def: MissionDef): MissionInstance {
-  const instance = {
+  const instance = makeMissionInstance({
     ...def,
     objectives: def.objectives.map((o: ObjectiveDef) => ({ ...o })),
     unlocksAfter: [...def.unlocksAfter],
     unlockedParts: [...def.unlockedParts],
-    status: MissionStatus.ACCEPTED,
-  } as unknown as MissionInstance;
+    state: MissionState.ACCEPTED,
+  });
   state.missions.accepted.push(instance);
   return instance;
 }

@@ -34,17 +34,8 @@ import type { SaveEnvelope } from './helpers.js';
  */
 
 // ---------------------------------------------------------------------------
-// Browser-context window shape for page.evaluate() callbacks.
+// (window.d.ts augments the global Window interface with game properties)
 // ---------------------------------------------------------------------------
-
-interface GameStateShape {
-  money?: number;
-  crew?: { status: string }[];
-}
-
-interface GW {
-  __gameState?: GameStateShape;
-}
 
 // ---------------------------------------------------------------------------
 // Constants & helpers
@@ -119,7 +110,7 @@ test.describe('Crew Administration Flow', () => {
 
     // Record cash before hiring.
     const cashBefore: number | undefined = await page.evaluate(() =>
-      (window as unknown as GW).__gameState?.money,
+      window.__gameState?.money,
     );
     expect(cashBefore).toBe(STARTING_MONEY);
 
@@ -133,7 +124,7 @@ test.describe('Crew Administration Flow', () => {
 
     // Cash in game state must have decreased by exactly HIRE_COST.
     const cashAfter: number | undefined = await page.evaluate(() =>
-      (window as unknown as GW).__gameState?.money,
+      window.__gameState?.money,
     );
     expect(cashAfter).toBe(STARTING_MONEY - HIRE_COST);
 
@@ -164,7 +155,7 @@ test.describe('Crew Administration Flow', () => {
 
     // The astronaut's status in game state must be "active".
     const status: string | undefined = await page.evaluate(() =>
-      (window as unknown as GW).__gameState?.crew?.[0]?.status,
+      window.__gameState?.crew?.[0]?.status,
     );
     expect(status).toBe('active');
   });

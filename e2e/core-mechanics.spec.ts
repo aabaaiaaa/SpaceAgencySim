@@ -35,11 +35,8 @@ import {
 } from './fixtures.js';
 
 // ---------------------------------------------------------------------------
-// Browser-context window shape for page.evaluate() callbacks.
-//
-// Defined as a local interface (not `declare global`) to avoid conflicting
-// with the narrower Window augmentations in the helper modules.  Inside
-// evaluate callbacks we cast: `(window as unknown as GW)`
+// Local type aliases for evaluate() return value shapes.
+// (window.d.ts augments the global Window interface with game properties)
 // ---------------------------------------------------------------------------
 
 interface FlightPs {
@@ -69,14 +66,7 @@ interface GameStateShape {
   orbitalObjects: { id: string; name: string; bodyId: string; type: string; elements: unknown }[];
 }
 
-/** Extended window shape for browser-context evaluate() callbacks. */
-interface GW {
-  __flightPs?: FlightPs;
-  __flightState?: FlightState;
-  __gameState?: GameStateShape;
-  __resyncPhysicsWorker?: () => Promise<void>;
-  dispatchEvent(event: Event): boolean;
-}
+// (window.d.ts augments the global Window interface with game properties)
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -129,7 +119,7 @@ async function returnToAgency(page: Page): Promise<void> {
 
   await page.waitForFunction(
     () => {
-      const w = window as unknown as GW;
+      const w = window;
       return w.__flightState === null || w.__flightState === undefined;
     },
     { timeout: 10_000 },
@@ -223,9 +213,9 @@ test.describe('Period does NOT advance during time warp', () => {
     );
     await page.click('.hud-warp-btn[data-warp="5"]');
     // Wait for warp to be active and altitude to change (proves sim advanced)
-    const alt1: number = await page.evaluate(() => (window as unknown as GW).__flightPs?.posY ?? 0);
+    const alt1: number = await page.evaluate(() => window.__flightPs?.posY ?? 0);
     await page.waitForFunction(
-      (y0: number) => Math.abs(((window as unknown as GW).__flightPs?.posY ?? y0) - y0) > 50,
+      (y0: number) => Math.abs((window.__flightPs?.posY ?? y0) - y0) > 50,
       alt1,
       { timeout: 10_000 },
     );
@@ -258,9 +248,9 @@ test.describe('Period does NOT advance during time warp', () => {
     await page.click('.hud-warp-btn[data-warp="10"]');
     // Wait for simulation time to advance (proves warp is active).
     // posX stays 0 during Keplerian propagation, so check timeElapsed instead.
-    const t0: number = await page.evaluate(() => (window as unknown as GW).__flightState?.timeElapsed ?? 0);
+    const t0: number = await page.evaluate(() => window.__flightState?.timeElapsed ?? 0);
     await page.waitForFunction(
-      (t0val: number) => ((window as unknown as GW).__flightState?.timeElapsed ?? t0val) > t0val + 5,
+      (t0val: number) => (window.__flightState?.timeElapsed ?? t0val) > t0val + 5,
       t0,
       { timeout: 10_000 },
     );
@@ -295,7 +285,7 @@ test.describe('Flight phase transitions', () => {
     // Wait for FLIGHT phase (LAUNCH may be transient).
     await page.waitForFunction(
       () => {
-        const phase = (window as unknown as GW).__flightState?.phase;
+        const phase = window.__flightState?.phase;
         return phase === 'LAUNCH' || phase === 'FLIGHT';
       },
       { timeout: 10_000 },
@@ -303,7 +293,7 @@ test.describe('Flight phase transitions', () => {
 
     // Wait until liftoff completes (FLIGHT phase).
     await page.waitForFunction(
-      () => (window as unknown as GW).__flightState?.phase === 'FLIGHT',
+      () => window.__flightState?.phase === 'FLIGHT',
       { timeout: 10_000 },
     );
 
@@ -333,7 +323,7 @@ test.describe('Flight phase transitions', () => {
     await teleportCraft(page, { posY: ORBIT_ALT, velX: ORBIT_VEL, velY: 0 });
 
     await page.waitForFunction(
-      () => (window as unknown as GW).__flightState?.phase === 'ORBIT',
+      () => window.__flightState?.phase === 'ORBIT',
       { timeout: 30_000 },
     );
 
@@ -350,7 +340,7 @@ test.describe('Flight phase transitions', () => {
 
     // Activate engine thrust in NORMAL mode.
     await page.evaluate(async () => {
-      const w = window as unknown as GW;
+      const w = window;
       const ps = w.__flightPs;
       if (!ps) return;
       ps.controlMode = 'NORMAL';
@@ -366,7 +356,7 @@ test.describe('Flight phase transitions', () => {
     });
 
     await page.waitForFunction(
-      () => (window as unknown as GW).__flightState?.phase === 'MANOEUVRE',
+      () => window.__flightState?.phase === 'MANOEUVRE',
       { timeout: 10_000 },
     );
     expect((await getFlightState(page))!.phase).toBe('MANOEUVRE');
@@ -379,7 +369,7 @@ test.describe('Flight phase transitions', () => {
 
     // First enter MANOEUVRE by thrusting.
     await page.evaluate(async () => {
-      const w = window as unknown as GW;
+      const w = window;
       const ps = w.__flightPs;
       if (!ps) return;
       ps.controlMode = 'NORMAL';
@@ -394,13 +384,13 @@ test.describe('Flight phase transitions', () => {
     });
 
     await page.waitForFunction(
-      () => (window as unknown as GW).__flightState?.phase === 'MANOEUVRE',
+      () => window.__flightState?.phase === 'MANOEUVRE',
       { timeout: 10_000 },
     );
 
     // Now stop thrusting — should return to ORBIT.
     await page.evaluate(async () => {
-      const w = window as unknown as GW;
+      const w = window;
       const ps = w.__flightPs;
       if (!ps) return;
       ps.throttle = 0;
@@ -409,7 +399,7 @@ test.describe('Flight phase transitions', () => {
     });
 
     await page.waitForFunction(
-      () => (window as unknown as GW).__flightState?.phase === 'ORBIT',
+      () => window.__flightState?.phase === 'ORBIT',
       { timeout: 10_000 },
     );
     expect((await getFlightState(page))!.phase).toBe('ORBIT');
@@ -424,7 +414,7 @@ test.describe('Flight phase transitions', () => {
     // Clear orbital elements so the physics recomputes from the new velocity
     // and detects the orbit is no longer valid (triggers reentry).
     await page.evaluate(async () => {
-      const w = window as unknown as GW;
+      const w = window;
       const ps = w.__flightPs;
       const fs = w.__flightState;
       if (!ps || !fs) return;
@@ -438,7 +428,7 @@ test.describe('Flight phase transitions', () => {
 
     // Deorbit warning fires after 2s, then transitions to REENTRY.
     await page.waitForFunction(
-      () => (window as unknown as GW).__flightState?.phase === 'REENTRY',
+      () => window.__flightState?.phase === 'REENTRY',
       { timeout: 15_000 },
     );
     expect((await getFlightState(page))!.phase).toBe('REENTRY');
@@ -451,7 +441,7 @@ test.describe('Flight phase transitions', () => {
 
     // Set escape velocity and activate engine.
     await page.evaluate(async ({ escVel }: { escVel: number }) => {
-      const w = window as unknown as GW;
+      const w = window;
       const ps = w.__flightPs;
       if (!ps) return;
       ps.velX = escVel;
@@ -469,17 +459,17 @@ test.describe('Flight phase transitions', () => {
     // Should go through MANOEUVRE → TRANSFER.
     await page.waitForFunction(
       () => {
-        const phase = (window as unknown as GW).__flightState?.phase;
+        const phase = window.__flightState?.phase;
         return phase === 'TRANSFER' || phase === 'MANOEUVRE';
       },
       { timeout: 15_000 },
     );
 
     // If in MANOEUVRE, wait for TRANSFER.
-    const phase: string | undefined = await page.evaluate(() => (window as unknown as GW).__flightState?.phase);
+    const phase: string | undefined = await page.evaluate(() => window.__flightState?.phase);
     if (phase === 'MANOEUVRE') {
       await page.waitForFunction(
-        () => (window as unknown as GW).__flightState?.phase === 'TRANSFER',
+        () => window.__flightState?.phase === 'TRANSFER',
         { timeout: 15_000 },
       );
     }
@@ -498,7 +488,7 @@ test.describe('Control mode switching in ORBIT', () => {
     test.setTimeout(120_000);
     const page: Page = await setupOrbitalFlight(browser);
 
-    const mode: string | undefined = await page.evaluate(() => (window as unknown as GW).__flightPs?.controlMode);
+    const mode: string | undefined = await page.evaluate(() => window.__flightPs?.controlMode);
     expect(mode).toBe('NORMAL');
     await page.close();
   });
@@ -509,10 +499,10 @@ test.describe('Control mode switching in ORBIT', () => {
 
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
     await page.waitForFunction(
-      () => (window as unknown as GW).__flightPs?.controlMode === 'DOCKING',
+      () => window.__flightPs?.controlMode === 'DOCKING',
       { timeout: 5_000 },
     );
-    expect(await page.evaluate(() => (window as unknown as GW).__flightPs?.controlMode)).toBe('DOCKING');
+    expect(await page.evaluate(() => window.__flightPs?.controlMode)).toBe('DOCKING');
     await page.close();
   });
 
@@ -522,17 +512,17 @@ test.describe('Control mode switching in ORBIT', () => {
 
     // Set some throttle first, then switch to docking.
     await page.evaluate(async () => {
-      const w = window as unknown as GW;
+      const w = window;
       if (w.__flightPs) w.__flightPs.throttle = 0.5;
       if (typeof w.__resyncPhysicsWorker === 'function') { await w.__resyncPhysicsWorker(); }
     });
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
     await page.waitForFunction(
-      () => (window as unknown as GW).__flightPs?.controlMode === 'DOCKING',
+      () => window.__flightPs?.controlMode === 'DOCKING',
       { timeout: 5_000 },
     );
 
-    const throttle: number = await page.evaluate(() => (window as unknown as GW).__flightPs?.throttle ?? -1);
+    const throttle: number = await page.evaluate(() => window.__flightPs?.throttle ?? -1);
     expect(throttle).toBe(0);
     await page.close();
   });
@@ -544,11 +534,11 @@ test.describe('Control mode switching in ORBIT', () => {
     // Enter docking mode, then toggle to RCS.
     // Use dispatchEvent to avoid browser tab-throttling issues under parallel workers.
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
-    await page.waitForFunction(() => (window as unknown as GW).__flightPs?.controlMode === 'DOCKING', { timeout: 5_000 });
+    await page.waitForFunction(() => window.__flightPs?.controlMode === 'DOCKING', { timeout: 5_000 });
 
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyR', key: 'r', bubbles: true })));
-    await page.waitForFunction(() => (window as unknown as GW).__flightPs?.controlMode === 'RCS', { timeout: 5_000 });
-    expect(await page.evaluate(() => (window as unknown as GW).__flightPs?.controlMode)).toBe('RCS');
+    await page.waitForFunction(() => window.__flightPs?.controlMode === 'RCS', { timeout: 5_000 });
+    expect(await page.evaluate(() => window.__flightPs?.controlMode)).toBe('RCS');
     await page.close();
   });
 
@@ -558,14 +548,14 @@ test.describe('Control mode switching in ORBIT', () => {
 
     // Enter DOCKING → RCS via dispatched key events.
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
-    await page.waitForFunction(() => (window as unknown as GW).__flightPs?.controlMode === 'DOCKING', { timeout: 5_000 });
+    await page.waitForFunction(() => window.__flightPs?.controlMode === 'DOCKING', { timeout: 5_000 });
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyR', key: 'r', bubbles: true })));
-    await page.waitForFunction(() => (window as unknown as GW).__flightPs?.controlMode === 'RCS', { timeout: 5_000 });
+    await page.waitForFunction(() => window.__flightPs?.controlMode === 'RCS', { timeout: 5_000 });
 
     // Now toggle back to DOCKING.
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyR', key: 'r', bubbles: true })));
-    await page.waitForFunction(() => (window as unknown as GW).__flightPs?.controlMode === 'DOCKING', { timeout: 5_000 });
-    expect(await page.evaluate(() => (window as unknown as GW).__flightPs?.controlMode)).toBe('DOCKING');
+    await page.waitForFunction(() => window.__flightPs?.controlMode === 'DOCKING', { timeout: 5_000 });
+    expect(await page.evaluate(() => window.__flightPs?.controlMode)).toBe('DOCKING');
     await page.close();
   });
 
@@ -575,12 +565,12 @@ test.describe('Control mode switching in ORBIT', () => {
 
     // Enter docking mode.
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
-    await page.waitForFunction(() => (window as unknown as GW).__flightPs?.controlMode === 'DOCKING', { timeout: 5_000 });
+    await page.waitForFunction(() => window.__flightPs?.controlMode === 'DOCKING', { timeout: 5_000 });
 
     // Exit back to NORMAL.
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
-    await page.waitForFunction(() => (window as unknown as GW).__flightPs?.controlMode === 'NORMAL', { timeout: 5_000 });
-    expect(await page.evaluate(() => (window as unknown as GW).__flightPs?.controlMode)).toBe('NORMAL');
+    await page.waitForFunction(() => window.__flightPs?.controlMode === 'NORMAL', { timeout: 5_000 });
+    expect(await page.evaluate(() => window.__flightPs?.controlMode)).toBe('NORMAL');
     await page.close();
   });
 
@@ -590,29 +580,29 @@ test.describe('Control mode switching in ORBIT', () => {
 
     // Set throttle, enter docking mode — should cut.
     await page.evaluate(async () => {
-      const w = window as unknown as GW;
+      const w = window;
       if (w.__flightPs) w.__flightPs.throttle = 0.5;
       if (typeof w.__resyncPhysicsWorker === 'function') { await w.__resyncPhysicsWorker(); }
     });
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
     await page.waitForFunction(
-      () => (window as unknown as GW).__flightPs?.controlMode === 'DOCKING',
+      () => window.__flightPs?.controlMode === 'DOCKING',
       { timeout: 5_000 },
     );
-    expect(await page.evaluate(() => (window as unknown as GW).__flightPs?.throttle ?? -1)).toBe(0);
+    expect(await page.evaluate(() => window.__flightPs?.throttle ?? -1)).toBe(0);
 
     // Set throttle in docking mode, exit — should cut again.
     await page.evaluate(async () => {
-      const w = window as unknown as GW;
+      const w = window;
       if (w.__flightPs) w.__flightPs.throttle = 0.3;
       if (typeof w.__resyncPhysicsWorker === 'function') { await w.__resyncPhysicsWorker(); }
     });
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
     await page.waitForFunction(
-      () => (window as unknown as GW).__flightPs?.controlMode === 'NORMAL',
+      () => window.__flightPs?.controlMode === 'NORMAL',
       { timeout: 5_000 },
     );
-    expect(await page.evaluate(() => (window as unknown as GW).__flightPs?.throttle ?? -1)).toBe(0);
+    expect(await page.evaluate(() => window.__flightPs?.throttle ?? -1)).toBe(0);
     await page.close();
   });
 });
@@ -629,24 +619,24 @@ test.describe('RCS mode directional translation', () => {
     // Enter docking mode then RCS mode.
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
     await page.waitForFunction(
-      () => (window as unknown as GW).__flightPs?.controlMode === 'DOCKING',
+      () => window.__flightPs?.controlMode === 'DOCKING',
       { timeout: 5_000 },
     );
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyR', key: 'r', bubbles: true })));
     await page.waitForFunction(
-      () => (window as unknown as GW).__flightPs?.controlMode === 'RCS',
+      () => window.__flightPs?.controlMode === 'RCS',
       { timeout: 5_000 },
     );
 
     const before: { velX: number; velY: number } = await page.evaluate(() => ({
-      velX: (window as unknown as GW).__flightPs?.velX ?? 0,
-      velY: (window as unknown as GW).__flightPs?.velY ?? 0,
+      velX: window.__flightPs?.velX ?? 0,
+      velY: window.__flightPs?.velY ?? 0,
     }));
 
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW', key: 'w', bubbles: true })));
     await page.waitForFunction(
       (v0: { x: number; y: number }) => {
-        const ps = (window as unknown as GW).__flightPs;
+        const ps = window.__flightPs;
         if (!ps) return false;
         return Math.abs(ps.velX - v0.x) + Math.abs(ps.velY - v0.y) > 0.001;
       },
@@ -656,8 +646,8 @@ test.describe('RCS mode directional translation', () => {
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW', key: 'w', bubbles: true })));
 
     const after: { velX: number; velY: number } = await page.evaluate(() => ({
-      velX: (window as unknown as GW).__flightPs?.velX ?? 0,
-      velY: (window as unknown as GW).__flightPs?.velY ?? 0,
+      velX: window.__flightPs?.velX ?? 0,
+      velY: window.__flightPs?.velY ?? 0,
     }));
 
     const dVelX: number = Math.abs(after.velX - before.velX);
@@ -673,30 +663,30 @@ test.describe('RCS mode directional translation', () => {
     // Enter docking mode then RCS mode.
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
     await page.waitForFunction(
-      () => (window as unknown as GW).__flightPs?.controlMode === 'DOCKING',
+      () => window.__flightPs?.controlMode === 'DOCKING',
       { timeout: 5_000 },
     );
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyR', key: 'r', bubbles: true })));
     await page.waitForFunction(
-      () => (window as unknown as GW).__flightPs?.controlMode === 'RCS',
+      () => window.__flightPs?.controlMode === 'RCS',
       { timeout: 5_000 },
     );
 
-    const angleBefore: number = await page.evaluate(() => (window as unknown as GW).__flightPs?.angle ?? 0);
+    const angleBefore: number = await page.evaluate(() => window.__flightPs?.angle ?? 0);
 
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyA', key: 'a', bubbles: true })));
     // Wait for physics to process input (position changes in orbit even without rotation)
-    const posY0: number = await page.evaluate(() => (window as unknown as GW).__flightPs?.posY ?? 0);
+    const posY0: number = await page.evaluate(() => window.__flightPs?.posY ?? 0);
     await page.waitForFunction(
-      (y0: number) => ((window as unknown as GW).__flightPs?.posY ?? y0) !== y0,
+      (y0: number) => (window.__flightPs?.posY ?? y0) !== y0,
       posY0,
       { timeout: 5_000 },
     );
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyA', key: 'a', bubbles: true })));
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyD', key: 'd', bubbles: true })));
-    const posY1: number = await page.evaluate(() => (window as unknown as GW).__flightPs?.posY ?? 0);
+    const posY1: number = await page.evaluate(() => window.__flightPs?.posY ?? 0);
     await page.waitForFunction(
-      (y0: number) => ((window as unknown as GW).__flightPs?.posY ?? y0) !== y0,
+      (y0: number) => (window.__flightPs?.posY ?? y0) !== y0,
       posY1,
       { timeout: 5_000 },
     );
@@ -704,7 +694,7 @@ test.describe('RCS mode directional translation', () => {
     // Wait one frame for physics to settle
     await page.evaluate(() => new Promise<void>(r => requestAnimationFrame(() => r())));
 
-    const angleAfter: number = await page.evaluate(() => (window as unknown as GW).__flightPs?.angle ?? 0);
+    const angleAfter: number = await page.evaluate(() => window.__flightPs?.angle ?? 0);
     expect(Math.abs(angleAfter - angleBefore)).toBeLessThan(0.01);
     await page.close();
   });
@@ -761,23 +751,23 @@ test.describe('Map view toggle and controls', () => {
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyM', key: 'm', bubbles: true })));
     await expect(page.locator('#map-hud')).toBeVisible({ timeout: 5_000 });
 
-    const throttleBefore: number = await page.evaluate(() => (window as unknown as GW).__flightPs?.throttle ?? -1);
+    const throttleBefore: number = await page.evaluate(() => window.__flightPs?.throttle ?? -1);
     expect(throttleBefore).toBe(0);
 
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW', key: 'w', bubbles: true })));
     await page.waitForFunction(
-      () => ((window as unknown as GW).__flightPs?.throttle ?? 0) > 0,
+      () => (window.__flightPs?.throttle ?? 0) > 0,
       { timeout: 5_000 },
     );
-    const throttleDuring: number = await page.evaluate(() => (window as unknown as GW).__flightPs?.throttle ?? -1);
+    const throttleDuring: number = await page.evaluate(() => window.__flightPs?.throttle ?? -1);
     expect(throttleDuring).toBeGreaterThan(0);
 
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW', key: 'w', bubbles: true })));
     await page.waitForFunction(
-      () => ((window as unknown as GW).__flightPs?.throttle ?? -1) === 0,
+      () => (window.__flightPs?.throttle ?? -1) === 0,
       { timeout: 5_000 },
     );
-    const throttleAfter: number = await page.evaluate(() => (window as unknown as GW).__flightPs?.throttle ?? -1);
+    const throttleAfter: number = await page.evaluate(() => window.__flightPs?.throttle ?? -1);
     expect(throttleAfter).toBe(0);
     await page.close();
   });
@@ -791,14 +781,14 @@ test.describe('Map view toggle and controls', () => {
 
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyS', key: 's', bubbles: true })));
     await page.waitForFunction(
-      () => ((window as unknown as GW).__flightPs?.throttle ?? 0) > 0,
+      () => (window.__flightPs?.throttle ?? 0) > 0,
       { timeout: 5_000 },
     );
 
     // Retrograde: angle = atan2(-velX, -velY). With velX≈7848, velY≈0 → angle ≈ -π/2.
     const state: { throttle: number; angle: number } = await page.evaluate(() => ({
-      throttle: (window as unknown as GW).__flightPs?.throttle ?? 0,
-      angle: (window as unknown as GW).__flightPs?.angle ?? 0,
+      throttle: window.__flightPs?.throttle ?? 0,
+      angle: window.__flightPs?.angle ?? 0,
     }));
     expect(state.throttle).toBeGreaterThan(0);
     // Retrograde angle should be approximately -π/2 (pointing opposite velocity).
@@ -806,10 +796,10 @@ test.describe('Map view toggle and controls', () => {
 
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyS', key: 's', bubbles: true })));
     await page.waitForFunction(
-      () => ((window as unknown as GW).__flightPs?.throttle ?? -1) === 0,
+      () => (window.__flightPs?.throttle ?? -1) === 0,
       { timeout: 5_000 },
     );
-    const throttleAfter: number = await page.evaluate(() => (window as unknown as GW).__flightPs?.throttle ?? -1);
+    const throttleAfter: number = await page.evaluate(() => window.__flightPs?.throttle ?? -1);
     expect(throttleAfter).toBe(0);
     await page.close();
   });
@@ -823,7 +813,7 @@ test.describe('Map view toggle and controls', () => {
 
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyA', key: 'a', bubbles: true })));
     await page.waitForFunction(
-      () => ((window as unknown as GW).__flightPs?.throttle ?? 0) > 0,
+      () => (window.__flightPs?.throttle ?? 0) > 0,
       { timeout: 5_000 },
     );
 
@@ -831,8 +821,8 @@ test.describe('Map view toggle and controls', () => {
     // At position (0, 100_000) body-centred (0, 6_471_000), radial-in points down.
     // angle = atan2(-px/r, -py/r) = atan2(0, -1) = π.
     const state: { throttle: number; angle: number } = await page.evaluate(() => ({
-      throttle: (window as unknown as GW).__flightPs?.throttle ?? 0,
-      angle: (window as unknown as GW).__flightPs?.angle ?? 0,
+      throttle: window.__flightPs?.throttle ?? 0,
+      angle: window.__flightPs?.angle ?? 0,
     }));
     expect(state.throttle).toBeGreaterThan(0);
     // Radial-in angle should be approximately π (pointing toward body centre).
@@ -840,10 +830,10 @@ test.describe('Map view toggle and controls', () => {
 
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyA', key: 'a', bubbles: true })));
     await page.waitForFunction(
-      () => ((window as unknown as GW).__flightPs?.throttle ?? -1) === 0,
+      () => (window.__flightPs?.throttle ?? -1) === 0,
       { timeout: 5_000 },
     );
-    const throttleAfter: number = await page.evaluate(() => (window as unknown as GW).__flightPs?.throttle ?? -1);
+    const throttleAfter: number = await page.evaluate(() => window.__flightPs?.throttle ?? -1);
     expect(throttleAfter).toBe(0);
     await page.close();
   });
@@ -922,19 +912,19 @@ test.describe('Orbit slot proximity detection and warp-to-target', () => {
     await expect(targetField).not.toContainText('None', { timeout: 5_000 });
 
     const timeBefore: number = await page.evaluate(
-      () => (window as unknown as GW).__flightState?.timeElapsed ?? 0,
+      () => window.__flightState?.timeElapsed ?? 0,
     );
 
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyG', key: 'g', bubbles: true })));
 
     await page.waitForFunction(
-      (before: number) => ((window as unknown as GW).__flightState?.timeElapsed ?? 0) > before,
+      (before: number) => (window.__flightState?.timeElapsed ?? 0) > before,
       timeBefore,
       { timeout: 15_000 },
     );
 
     const timeAfter: number = await page.evaluate(
-      () => (window as unknown as GW).__flightState?.timeElapsed ?? 0,
+      () => window.__flightState?.timeElapsed ?? 0,
     );
     expect(timeAfter).toBeGreaterThan(timeBefore);
 

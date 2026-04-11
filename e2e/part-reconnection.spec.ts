@@ -12,17 +12,6 @@ import {
  * Each test is independent — seeds its own state and builds its own rocket.
  */
 
-interface VabAssembly {
-  parts: Map<string, { partId: string; x: number; y: number }>;
-  connections: unknown[];
-}
-
-interface GW {
-  __vabAssembly?: VabAssembly;
-  __vabWorldToScreen?: (x: number, y: number) => { screenX: number; screenY: number };
-  __flightPs?: { posY: number };
-}
-
 const CMD_DROP_Y: number    = CANVAS_CENTRE_Y;
 const TANK_DROP_Y: number   = CMD_DROP_Y + 40;
 const ENGINE_DROP_Y: number = TANK_DROP_Y + 35;
@@ -48,10 +37,10 @@ async function buildThreePartRocket(page: Page): Promise<void> {
 
 async function getPartScreenPos(page: Page, instanceId: string): Promise<{ x: number; y: number } | null> {
   return page.evaluate((id: string) => {
-    const a = (window as unknown as GW).__vabAssembly;
+    const a = window.__vabAssembly;
     const placed = a?.parts?.get(id);
     if (!placed) return null;
-    const toScreen = (window as unknown as GW).__vabWorldToScreen;
+    const toScreen = window.__vabWorldToScreen;
     if (!toScreen) return null;
     const { screenX, screenY } = toScreen(placed.x, placed.y);
     return { x: screenX, y: screenY };
@@ -70,7 +59,7 @@ async function dragPlacedPart(page: Page, instanceId: string, targetX: number, t
 
 async function findTankInstanceId(page: Page): Promise<string | null> {
   return page.evaluate(() => {
-    const a = (window as unknown as GW).__vabAssembly;
+    const a = window.__vabAssembly;
     if (!a) return null;
     for (const [id, p] of a.parts) {
       if (p.partId === 'tank-small') return id;
@@ -84,7 +73,7 @@ async function disconnectTank(page: Page): Promise<string> {
   expect(tankId).not.toBeNull();
   await dragPlacedPart(page, tankId!, CENTRE_X + 200, CANVAS_CENTRE_Y + 100);
   await page.waitForFunction(
-    () => ((window as unknown as GW).__vabAssembly?.connections?.length ?? 99) === 0,
+    () => (window.__vabAssembly?.connections?.length ?? 99) === 0,
     { timeout: 5_000 },
   );
   return tankId!;
@@ -93,7 +82,7 @@ async function disconnectTank(page: Page): Promise<string> {
 async function reconnectTank(page: Page, tankId: string): Promise<void> {
   await dragPlacedPart(page, tankId, CENTRE_X, TANK_DROP_Y);
   await page.waitForFunction(
-    () => ((window as unknown as GW).__vabAssembly?.connections?.length ?? 0) >= 2,
+    () => (window.__vabAssembly?.connections?.length ?? 0) >= 2,
     { timeout: 5_000 },
   );
 }
@@ -106,7 +95,7 @@ test.describe('VAB — Part Disconnection & Reconnection', () => {
     await buildThreePartRocket(page);
 
     const connCount: number = await page.evaluate(
-      () => (window as unknown as GW).__vabAssembly?.connections?.length ?? 0,
+      () => window.__vabAssembly?.connections?.length ?? 0,
     );
     expect(connCount).toBe(2);
   });
@@ -150,7 +139,7 @@ test.describe('VAB — Part Disconnection & Reconnection', () => {
     await reconnectTank(page, tankId);
 
     const connCount: number = await page.evaluate(
-      () => (window as unknown as GW).__vabAssembly?.connections?.length ?? 0,
+      () => window.__vabAssembly?.connections?.length ?? 0,
     );
     expect(connCount).toBe(2);
   });
@@ -185,7 +174,7 @@ test.describe('VAB — Part Disconnection & Reconnection', () => {
     await launchFromVab(page);
 
     const altitude: number = await page.evaluate(
-      () => (window as unknown as GW).__flightPs?.posY ?? 0,
+      () => window.__flightPs?.posY ?? 0,
     );
     expect(altitude).toBeGreaterThanOrEqual(0);
   });

@@ -31,83 +31,15 @@ import {
   addStageToConfig,
 } from '../core/rocketbuilder.ts';
 import { createFlightState } from '../core/gameState.ts';
+import { makePhysicsState } from './_factories.js';
 
 import type { PhysicsState, RocketAssembly } from '../core/physics.ts';
 import type { FlightState, FlightEvent } from '../core/gameState.ts';
 import type { Asteroid } from '../core/asteroidBelt.ts';
 import type { StagingConfig } from '../core/rocketbuilder.ts';
-
-interface TestDebris {
-  id: string;
-  posX: number;
-  posY: number;
-  velX: number;
-  velY: number;
-  angle: number;
-  angularVelocity: number;
-  landed: boolean;
-  crashed: boolean;
-  activeParts: Set<string>;
-  fuelStore: Map<string, number>;
-  firingEngines: Set<string>;
-  collisionCooldown: number;
-}
-
-interface TestPhysicsState {
-  posX: number;
-  posY: number;
-  velX: number;
-  velY: number;
-  angle: number;
-  angularVelocity: number;
-  landed: boolean;
-  crashed: boolean;
-  activeParts: Set<string>;
-  fuelStore: Map<string, number>;
-  firingEngines: Set<string>;
-  debris: TestDebris[];
-}
-
-interface SepPhysicsState {
-  posX: number;
-  posY: number;
-  velX: number;
-  velY: number;
-  angle: number;
-  activeParts: Set<string>;
-  fuelStore: Map<string, number>;
-}
-
-interface SepDebris {
-  id: string;
-  posX: number;
-  posY: number;
-  velX: number;
-  velY: number;
-  angle: number;
-  activeParts: Set<string>;
-  fuelStore: Map<string, number>;
-}
+import type { DebrisState } from '../core/staging.ts';
 
 type SepDebrisParam = Parameters<typeof applySeparationImpulse>[1];
-
-interface DamagePhysicsState {
-  posX: number;
-  posY: number;
-  velX: number;
-  velY: number;
-  angle: number;
-  angularVelocity: number;
-  landed: boolean;
-  crashed: boolean;
-  activeParts: Set<string>;
-  fuelStore: Map<string, number>;
-  firingEngines: Set<string>;
-  deployedParts: Set<string>;
-  heatMap: Map<string, number>;
-  debris: TestDebris[];
-  grounded?: boolean;
-}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -285,7 +217,7 @@ describe('Collision response', () => {
     pos2Y?: number;
     _altitude?: number;
   } = {}): {
-    ps: TestPhysicsState;
+    ps: PhysicsState;
     assembly: RocketAssembly;
     pBefore: number;
     pAfter: number;
@@ -299,13 +231,9 @@ describe('Collision response', () => {
 
     // Create a fake physics state with one body being the main rocket,
     // one being debris.
-    const ps: TestPhysicsState = {
-      posX: 0, posY: pos1Y, velX: vel1X, velY: vel1Y, angle: 0,
-      angularVelocity: 0,
-      landed: false, crashed: false,
+    const ps = makePhysicsState({
+      posX: 0, posY: pos1Y, velX: vel1X, velY: vel1Y,
       activeParts: new Set([id1]),
-      fuelStore: new Map<string, number>(),
-      firingEngines: new Set<string>(),
       debris: [{
         id: 'debris-test',
         posX: 0, posY: pos2Y, velX: vel2X, velY: vel2Y, angle: 0,
@@ -315,8 +243,8 @@ describe('Collision response', () => {
         fuelStore: new Map<string, number>(),
         firingEngines: new Set<string>(),
         collisionCooldown: 0,
-      }],
-    };
+      } as unknown as DebrisState],
+    });
 
     // Momentum before.
     // probe-core-mk1 has mass 50 kg
@@ -324,7 +252,7 @@ describe('Collision response', () => {
     const m2 = 50;
     const pBefore = m1 * ps.velY + m2 * ps.debris[0].velY;
 
-    tickCollisions(ps as unknown as PhysicsState, assembly, 1 / 60);
+    tickCollisions(ps, assembly, 1 / 60);
 
     const pAfter = m1 * ps.velY + m2 * ps.debris[0].velY;
 
@@ -343,13 +271,9 @@ describe('Collision response', () => {
     const lightId = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
     const heavyId = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
 
-    const ps: TestPhysicsState = {
-      posX: 0, posY: 100.5, velX: 0, velY: -5, angle: 0,
-      angularVelocity: 0,
-      landed: false, crashed: false,
+    const ps = makePhysicsState({
+      posX: 0, posY: 100.5, velX: 0, velY: -5,
       activeParts: new Set([lightId]),
-      fuelStore: new Map<string, number>(),
-      firingEngines: new Set<string>(),
       debris: [{
         id: 'debris-heavy',
         posX: 0, posY: 100, velX: 0, velY: 5, angle: 0,
@@ -359,13 +283,13 @@ describe('Collision response', () => {
         fuelStore: new Map<string, number>([[heavyId, 500]]),  // Heavy: 50 + 500 = 550 kg
         firingEngines: new Set<string>(),
         collisionCooldown: 0,
-      }],
-    };
+      } as unknown as DebrisState],
+    });
 
     const lightVelBefore = ps.velY;
     const heavyVelBefore = ps.debris[0].velY;
 
-    tickCollisions(ps as unknown as PhysicsState, assembly, 1 / 60);
+    tickCollisions(ps, assembly, 1 / 60);
 
     const lightDv = Math.abs(ps.velY - lightVelBefore);
     const heavyDv = Math.abs(ps.debris[0].velY - heavyVelBefore);
@@ -379,13 +303,9 @@ describe('Collision response', () => {
     const id1 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
     const id2 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
 
-    const ps: TestPhysicsState = {
-      posX: 0, posY: 100.5, velX: 0, velY: -5, angle: 0,
-      angularVelocity: 0,
-      landed: false, crashed: false,
+    const ps = makePhysicsState({
+      posX: 0, posY: 100.5, velX: 0, velY: -5,
       activeParts: new Set([id1]),
-      fuelStore: new Map<string, number>(),
-      firingEngines: new Set<string>(),
       debris: [{
         id: 'debris-test',
         posX: 0, posY: 100, velX: 0, velY: 5, angle: 0,
@@ -395,12 +315,12 @@ describe('Collision response', () => {
         fuelStore: new Map<string, number>(),
         firingEngines: new Set<string>(),
         collisionCooldown: 0,
-      }],
-    };
+      } as unknown as DebrisState],
+    });
 
     // Both have equal mass (50 kg probe-core-mk1)
     const m = 50;
-    tickCollisions(ps as unknown as PhysicsState, assembly, 1 / 60);
+    tickCollisions(ps, assembly, 1 / 60);
 
     // Equal mass → velocity changes should be equal and opposite.
     // After collision with equal mass head-on, they should swap velocities
@@ -422,13 +342,9 @@ describe('Collision response', () => {
     const id2a = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
 
     // Sea level collision
-    const psSL: TestPhysicsState = {
-      posX: 0, posY: 1.5, velX: 0, velY: -10, angle: 0,
-      angularVelocity: 0,
-      landed: false, crashed: false,
+    const psSL = makePhysicsState({
+      posX: 0, posY: 1.5, velX: 0, velY: -10,
       activeParts: new Set([id1a]),
-      fuelStore: new Map<string, number>(),
-      firingEngines: new Set<string>(),
       debris: [{
         id: 'debris-sl',
         posX: 0, posY: 1, velX: 0, velY: 10, angle: 0,
@@ -438,10 +354,10 @@ describe('Collision response', () => {
         fuelStore: new Map<string, number>(),
         firingEngines: new Set<string>(),
         collisionCooldown: 0,
-      }],
-    };
+      } as unknown as DebrisState],
+    });
 
-    tickCollisions(psSL as unknown as PhysicsState, assembly, 1 / 60);
+    tickCollisions(psSL, assembly, 1 / 60);
     const bounceSpeedSL = Math.abs(psSL.velY - psSL.debris[0].velY);
 
     // Vacuum collision — need new assembly and parts
@@ -449,13 +365,9 @@ describe('Collision response', () => {
     const id1b = addPartToAssembly(assembly2, 'probe-core-mk1', 0, 0);
     const id2b = addPartToAssembly(assembly2, 'probe-core-mk1', 0, 0);
 
-    const psVac: TestPhysicsState = {
-      posX: 0, posY: 80000.5, velX: 0, velY: -10, angle: 0,
-      angularVelocity: 0,
-      landed: false, crashed: false,
+    const psVac = makePhysicsState({
+      posX: 0, posY: 80000.5, velX: 0, velY: -10,
       activeParts: new Set([id1b]),
-      fuelStore: new Map<string, number>(),
-      firingEngines: new Set<string>(),
       debris: [{
         id: 'debris-vac',
         posX: 0, posY: 80000, velX: 0, velY: 10, angle: 0,
@@ -465,10 +377,10 @@ describe('Collision response', () => {
         fuelStore: new Map<string, number>(),
         firingEngines: new Set<string>(),
         collisionCooldown: 0,
-      }],
-    };
+      } as unknown as DebrisState],
+    });
 
-    tickCollisions(psVac as unknown as PhysicsState, assembly2, 1 / 60);
+    tickCollisions(psVac, assembly2, 1 / 60);
     const bounceSpeedVac = Math.abs(psVac.velY - psVac.debris[0].velY);
 
     // Vacuum should have bouncier (higher relative speed) collision.
@@ -481,13 +393,9 @@ describe('Collision response', () => {
     const id2 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
 
     // Bodies overlapping but already moving apart.
-    const ps: TestPhysicsState = {
-      posX: 0, posY: 100.5, velX: 0, velY: 5, angle: 0,  // moving up
-      angularVelocity: 0,
-      landed: false, crashed: false,
+    const ps = makePhysicsState({
+      posX: 0, posY: 100.5, velX: 0, velY: 5,  // moving up
       activeParts: new Set([id1]),
-      fuelStore: new Map<string, number>(),
-      firingEngines: new Set<string>(),
       debris: [{
         id: 'debris-sep',
         posX: 0, posY: 100, velX: 0, velY: -5, angle: 0,  // moving down
@@ -497,11 +405,11 @@ describe('Collision response', () => {
         fuelStore: new Map<string, number>(),
         firingEngines: new Set<string>(),
         collisionCooldown: 0,
-      }],
-    };
+      } as unknown as DebrisState],
+    });
 
     const velBefore = ps.velY;
-    tickCollisions(ps as unknown as PhysicsState, assembly, 1 / 60);
+    tickCollisions(ps, assembly, 1 / 60);
 
     // Velocities should remain unchanged — they were already separating.
     expect(ps.velY).toBe(velBefore);
@@ -513,13 +421,9 @@ describe('Collision response', () => {
     const id2 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
 
     // Bodies almost exactly on top of each other, approaching.
-    const ps: TestPhysicsState = {
-      posX: 0, posY: 100.3, velX: 0, velY: -3, angle: 0,
-      angularVelocity: 0,
-      landed: false, crashed: false,
+    const ps = makePhysicsState({
+      posX: 0, posY: 100.3, velX: 0, velY: -3,
       activeParts: new Set([id1]),
-      fuelStore: new Map<string, number>(),
-      firingEngines: new Set<string>(),
       debris: [{
         id: 'debris-overlap',
         posX: 0, posY: 100, velX: 0, velY: 3, angle: 0,
@@ -529,11 +433,11 @@ describe('Collision response', () => {
         fuelStore: new Map<string, number>(),
         firingEngines: new Set<string>(),
         collisionCooldown: 0,
-      }],
-    };
+      } as unknown as DebrisState],
+    });
 
     const gapBefore = ps.posY - ps.debris[0].posY;
-    tickCollisions(ps as unknown as PhysicsState, assembly, 1 / 60);
+    tickCollisions(ps, assembly, 1 / 60);
     const gapAfter = ps.posY - ps.debris[0].posY;
 
     // Bodies should be pushed further apart.
@@ -546,13 +450,9 @@ describe('Collision response', () => {
     const id2 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
 
     // Body A offset horizontally, approaching B from the side.
-    const ps: TestPhysicsState = {
-      posX: 1.5, posY: 100, velX: -5, velY: 0, angle: 0,
-      angularVelocity: 0,
-      landed: false, crashed: false,
+    const ps = makePhysicsState({
+      posX: 1.5, posY: 100, velX: -5, velY: 0,
       activeParts: new Set([id1]),
-      fuelStore: new Map<string, number>(),
-      firingEngines: new Set<string>(),
       debris: [{
         id: 'debris-angular',
         posX: 0, posY: 100, velX: 5, velY: 0, angle: 0,
@@ -562,10 +462,10 @@ describe('Collision response', () => {
         fuelStore: new Map<string, number>(),
         firingEngines: new Set<string>(),
         collisionCooldown: 0,
-      }],
-    };
+      } as unknown as DebrisState],
+    });
 
-    tickCollisions(ps as unknown as PhysicsState, assembly, 1 / 60);
+    tickCollisions(ps, assembly, 1 / 60);
 
     // At minimum, the collision should produce some angular change on one or
     // both bodies (depending on contact offset from centre).
@@ -588,20 +488,19 @@ describe('applySeparationImpulse()', () => {
     const lightId = addPartToAssembly(assembly, 'probe-core-mk1', 0, 100);  // 50 kg, higher Y
     const heavyId = addPartToAssembly(assembly, 'tank-small',     0,   0);   // 50 kg dry + fuel
 
-    const ps: SepPhysicsState = {
-      posX: 0, posY: 1000, velX: 0, velY: 100, angle: 0,
+    const ps = makePhysicsState({
+      posX: 0, posY: 1000, velX: 0, velY: 100,
       activeParts: new Set([lightId]),
-      fuelStore: new Map<string, number>(),
-    };
+    });
 
-    const debris: SepDebris = {
+    const debris = {
       id: 'debris-sep',
       posX: 0, posY: 1000, velX: 0, velY: 100, angle: 0,
       activeParts: new Set([heavyId]),
       fuelStore: new Map<string, number>([[heavyId, 400]]),  // 50 + 400 = 450 kg
-    };
+    } as unknown as SepDebrisParam;
 
-    applySeparationImpulse(ps as unknown as PhysicsState, debris as unknown as SepDebrisParam, assembly);
+    applySeparationImpulse(ps, debris, assembly);
 
     const rocketDv = Math.abs(ps.velY - 100);
     const debrisDv = Math.abs(debris.velY - 100);
@@ -615,21 +514,20 @@ describe('applySeparationImpulse()', () => {
     const id1 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 50);
     const id2 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
 
-    const ps: SepPhysicsState = {
+    const ps = makePhysicsState({
       posX: 0, posY: 1000, velX: 0, velY: 0,
       angle: Math.PI / 4,  // 45° tilt
       activeParts: new Set([id1]),
-      fuelStore: new Map<string, number>(),
-    };
+    });
 
-    const debris: SepDebris = {
+    const debris = {
       id: 'debris-angle',
       posX: 0, posY: 1000, velX: 0, velY: 0, angle: Math.PI / 4,
       activeParts: new Set([id2]),
       fuelStore: new Map<string, number>(),
-    };
+    } as unknown as SepDebrisParam;
 
-    applySeparationImpulse(ps as unknown as PhysicsState, debris as unknown as SepDebrisParam, assembly);
+    applySeparationImpulse(ps, debris, assembly);
 
     // At 45°, sin(π/4) ≈ 0.707, cos(π/4) ≈ 0.707
     // Both X and Y should have non-zero impulse components.
@@ -644,20 +542,19 @@ describe('applySeparationImpulse()', () => {
     const topId = addPartToAssembly(assembly, 'probe-core-mk1', 0, 100); // higher = top
     const botId = addPartToAssembly(assembly, 'probe-core-mk1', 0,   0); // lower = bottom
 
-    const ps: SepPhysicsState = {
-      posX: 0, posY: 1000, velX: 0, velY: 50, angle: 0,
+    const ps = makePhysicsState({
+      posX: 0, posY: 1000, velX: 0, velY: 50,
       activeParts: new Set([topId]),
-      fuelStore: new Map<string, number>(),
-    };
+    });
 
-    const debris: SepDebris = {
+    const debris = {
       id: 'debris-apart',
       posX: 0, posY: 1000, velX: 0, velY: 50, angle: 0,
       activeParts: new Set([botId]),
       fuelStore: new Map<string, number>(),
-    };
+    } as unknown as SepDebrisParam;
 
-    applySeparationImpulse(ps as unknown as PhysicsState, debris as unknown as SepDebrisParam, assembly);
+    applySeparationImpulse(ps, debris, assembly);
 
     // Top part (rocket) should be pushed forward (higher velY).
     // Bottom part (debris) should be pushed backward (lower velY).
@@ -670,20 +567,19 @@ describe('applySeparationImpulse()', () => {
     const upperId = addPartToAssembly(assembly, 'probe-core-mk1', 0, 100);
     const lowerId = addPartToAssembly(assembly, 'probe-core-mk1', 0,   0);
 
-    const ps: SepPhysicsState = {
-      posX: 0, posY: 500, velX: 0, velY: 0, angle: 0,
+    const ps = makePhysicsState({
+      posX: 0, posY: 500, velX: 0, velY: 0,
       activeParts: new Set([upperId]),
-      fuelStore: new Map<string, number>(),
-    };
+    });
 
-    const debris: SepDebris = {
+    const debris = {
       id: 'debris-lower',
       posX: 0, posY: 500, velX: 0, velY: 0, angle: 0,
       activeParts: new Set([lowerId]),
       fuelStore: new Map<string, number>(),
-    };
+    } as unknown as SepDebrisParam;
 
-    applySeparationImpulse(ps as unknown as PhysicsState, debris as unknown as SepDebrisParam, assembly);
+    applySeparationImpulse(ps, debris, assembly);
 
     // Upper stage (rocket) pushed forward (positive Y with angle=0).
     expect(ps.velY).toBeGreaterThan(0);
@@ -703,20 +599,19 @@ describe('applySeparationImpulse() — reduced impulse magnitude', () => {
     const id1 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 100);
     const id2 = addPartToAssembly(assembly, 'probe-core-mk1', 0,   0);
 
-    const ps: SepPhysicsState = {
-      posX: 0, posY: 1000, velX: 0, velY: 0, angle: 0,
+    const ps = makePhysicsState({
+      posX: 0, posY: 1000, velX: 0, velY: 0,
       activeParts: new Set([id1]),
-      fuelStore: new Map<string, number>(),
-    };
+    });
 
-    const debris: SepDebris = {
+    const debris = {
       id: 'debris-dv',
       posX: 0, posY: 1000, velX: 0, velY: 0, angle: 0,
       activeParts: new Set([id2]),
       fuelStore: new Map<string, number>(),
-    };
+    } as unknown as SepDebrisParam;
 
-    applySeparationImpulse(ps as unknown as PhysicsState, debris as unknown as SepDebrisParam, assembly);
+    applySeparationImpulse(ps, debris, assembly);
 
     // Both 50 kg → Δv = 2000 N·s / 50 kg = 40 m/s each
     expect(Math.abs(ps.velY)).toBeCloseTo(40.0, 0);
@@ -728,20 +623,19 @@ describe('applySeparationImpulse() — reduced impulse magnitude', () => {
     const lightId = addPartToAssembly(assembly, 'probe-core-mk1', 0, 100); // 50 kg
     const heavyId = addPartToAssembly(assembly, 'tank-small',     0,   0); // 50 kg dry
 
-    const ps: SepPhysicsState = {
-      posX: 0, posY: 1000, velX: 0, velY: 0, angle: 0,
+    const ps = makePhysicsState({
+      posX: 0, posY: 1000, velX: 0, velY: 0,
       activeParts: new Set([lightId]),
-      fuelStore: new Map<string, number>(),
-    };
+    });
 
-    const debris: SepDebris = {
+    const debris = {
       id: 'debris-heavy-dv',
       posX: 0, posY: 1000, velX: 0, velY: 0, angle: 0,
       activeParts: new Set([heavyId]),
       fuelStore: new Map<string, number>([[heavyId, 400]]), // 50 + 400 = 450 kg
-    };
+    } as unknown as SepDebrisParam;
 
-    applySeparationImpulse(ps as unknown as PhysicsState, debris as unknown as SepDebrisParam, assembly);
+    applySeparationImpulse(ps, debris, assembly);
 
     // Light (50 kg): Δv = 2000/50 = 40.0 m/s
     // Heavy (450 kg): Δv = 2000/450 ≈ 4.44 m/s
@@ -760,13 +654,10 @@ describe('collision cooldown at reduced value', () => {
     const id1 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
     const id2 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
 
-    const ps: TestPhysicsState = {
-      posX: 0, posY: 9999, velX: 0, velY: 0, angle: 0,
-      angularVelocity: 0,
-      landed: true, crashed: false,
+    const ps = makePhysicsState({
+      posX: 0, posY: 9999,
+      landed: true,
       activeParts: new Set<string>(),
-      fuelStore: new Map<string, number>(),
-      firingEngines: new Set<string>(),
       debris: [{
         id: 'debris-cd10',
         posX: 0, posY: 200, velX: 0, velY: 3, angle: 0,
@@ -776,7 +667,7 @@ describe('collision cooldown at reduced value', () => {
         fuelStore: new Map<string, number>(),
         firingEngines: new Set<string>(),
         collisionCooldown: 10,
-      }, {
+      } as unknown as DebrisState, {
         id: 'debris-cd10b',
         posX: 0, posY: 200.3, velX: 0, velY: -3, angle: 0,
         angularVelocity: 0,
@@ -785,18 +676,18 @@ describe('collision cooldown at reduced value', () => {
         fuelStore: new Map<string, number>(),
         firingEngines: new Set<string>(),
         collisionCooldown: 10,
-      }],
-    };
+      } as unknown as DebrisState],
+    });
 
     // After 9 ticks, cooldown should be 1 and no collision yet.
     for (let i = 0; i < 9; i++) {
-      tickCollisions(ps as unknown as PhysicsState, assembly, 1 / 60);
+      tickCollisions(ps, assembly, 1 / 60);
     }
     expect(ps.debris[0].collisionCooldown).toBe(1);
     expect(ps.debris[1].velY).toBe(-3); // unchanged — still in cooldown
 
     // Tick 10: cooldown decrements to 0, collision fires immediately.
-    tickCollisions(ps as unknown as PhysicsState, assembly, 1 / 60);
+    tickCollisions(ps, assembly, 1 / 60);
     expect(ps.debris[0].collisionCooldown).toBe(0);
     expect(ps.debris[1].velY).not.toBe(-3); // velocity changed by collision
   });
@@ -812,13 +703,9 @@ describe('tickCollisions integration', () => {
     const id1 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
     const id2 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
 
-    const ps: TestPhysicsState = {
-      posX: 0, posY: 100.5, velX: 0, velY: -5, angle: 0,
-      angularVelocity: 0,
-      landed: false, crashed: false,
+    const ps = makePhysicsState({
+      posX: 0, posY: 100.5, velX: 0, velY: -5,
       activeParts: new Set([id1]),
-      fuelStore: new Map<string, number>(),
-      firingEngines: new Set<string>(),
       debris: [{
         id: 'debris-cd',
         posX: 0, posY: 100, velX: 0, velY: 5, angle: 0,
@@ -828,11 +715,11 @@ describe('tickCollisions integration', () => {
         fuelStore: new Map<string, number>(),
         firingEngines: new Set<string>(),
         collisionCooldown: 5,
-      }],
-    };
+      } as unknown as DebrisState],
+    });
 
     const velBefore = ps.velY;
-    tickCollisions(ps as unknown as PhysicsState, assembly, 1 / 60);
+    tickCollisions(ps, assembly, 1 / 60);
 
     // Velocity should not change — cooldown active.
     expect(ps.velY).toBe(velBefore);
@@ -845,13 +732,9 @@ describe('tickCollisions integration', () => {
     const id1 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
     const id2 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
 
-    const ps: TestPhysicsState = {
-      posX: 0, posY: 100.5, velX: 0, velY: -5, angle: 0,
-      angularVelocity: 0,
-      landed: false, crashed: false,
+    const ps = makePhysicsState({
+      posX: 0, posY: 100.5, velX: 0, velY: -5,
       activeParts: new Set([id1]),
-      fuelStore: new Map<string, number>(),
-      firingEngines: new Set<string>(),
       debris: [{
         id: 'debris-cd-expired',
         posX: 0, posY: 100, velX: 0, velY: 5, angle: 0,
@@ -861,11 +744,11 @@ describe('tickCollisions integration', () => {
         fuelStore: new Map<string, number>(),
         firingEngines: new Set<string>(),
         collisionCooldown: 0,
-      }],
-    };
+      } as unknown as DebrisState],
+    });
 
     const velBefore = ps.velY;
-    tickCollisions(ps as unknown as PhysicsState, assembly, 1 / 60);
+    tickCollisions(ps, assembly, 1 / 60);
 
     // Velocity should have changed — collision resolved.
     expect(ps.velY).not.toBe(velBefore);
@@ -911,13 +794,9 @@ describe('tickCollisions integration', () => {
     const id1 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
     const id2 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
 
-    const ps: TestPhysicsState = {
-      posX: 0, posY: 0.5, velX: 0, velY: -5, angle: 0,
-      angularVelocity: 0,
-      landed: false, crashed: false,
+    const ps = makePhysicsState({
+      posX: 0, posY: 0.5, velX: 0, velY: -5,
       activeParts: new Set([id1]),
-      fuelStore: new Map<string, number>(),
-      firingEngines: new Set<string>(),
       debris: [{
         id: 'debris-landed',
         posX: 0, posY: 0, velX: 0, velY: 0, angle: 0,
@@ -928,11 +807,11 @@ describe('tickCollisions integration', () => {
         fuelStore: new Map<string, number>(),
         firingEngines: new Set<string>(),
         collisionCooldown: 0,
-      }],
-    };
+      } as unknown as DebrisState],
+    });
 
     const velBefore = ps.velY;
-    tickCollisions(ps as unknown as PhysicsState, assembly, 1 / 60);
+    tickCollisions(ps, assembly, 1 / 60);
 
     // Velocity unchanged — landed debris is excluded from collision.
     expect(ps.velY).toBe(velBefore);
@@ -943,14 +822,10 @@ describe('tickCollisions integration', () => {
     const id1 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
     const id2 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
 
-    const ps: TestPhysicsState = {
-      posX: 0, posY: 9999, velX: 0, velY: 0, angle: 0,
-      angularVelocity: 0,
+    const ps = makePhysicsState({
+      posX: 0, posY: 9999,
       landed: true,  // Main rocket landed (excluded)
-      crashed: false,
       activeParts: new Set<string>(),
-      fuelStore: new Map<string, number>(),
-      firingEngines: new Set<string>(),
       debris: [
         {
           id: 'debris-a',
@@ -961,7 +836,7 @@ describe('tickCollisions integration', () => {
           fuelStore: new Map<string, number>(),
           firingEngines: new Set<string>(),
           collisionCooldown: 0,
-        },
+        } as unknown as DebrisState,
         {
           id: 'debris-b',
           posX: 0, posY: 200, velX: 0, velY: 5, angle: 0,
@@ -971,13 +846,13 @@ describe('tickCollisions integration', () => {
           fuelStore: new Map<string, number>(),
           firingEngines: new Set<string>(),
           collisionCooldown: 0,
-        },
+        } as unknown as DebrisState,
       ],
-    };
+    });
 
     const vel1Before = ps.debris[0].velY;
     const vel2Before = ps.debris[1].velY;
-    tickCollisions(ps as unknown as PhysicsState, assembly, 1 / 60);
+    tickCollisions(ps, assembly, 1 / 60);
 
     // Both debris should have changed velocity.
     expect(ps.debris[0].velY).not.toBe(vel1Before);
@@ -1039,7 +914,7 @@ function makeAsteroidTestCraft({
   velY?: number;
 } = {}): {
   assembly: RocketAssembly;
-  ps: DamagePhysicsState;
+  ps: PhysicsState;
   fs: FlightState;
   probeId: string;
   tankId: string;
@@ -1050,17 +925,10 @@ function makeAsteroidTestCraft({
   const tankId = addPartToAssembly(assembly, 'tank-small', 0, -40);
   connectParts(assembly, probeId, 1, tankId, 0);
 
-  const ps: DamagePhysicsState = {
-    posX, posY, velX, velY, angle: 0,
-    angularVelocity: 0,
-    landed: false, crashed: false,
+  const ps = makePhysicsState({
+    posX, posY, velX, velY,
     activeParts: new Set([probeId, tankId]),
-    fuelStore: new Map<string, number>(),
-    firingEngines: new Set<string>(),
-    deployedParts: new Set<string>(),
-    heatMap: new Map<string, number>(),
-    debris: [],
-  };
+  });
 
   const fs = makeFlightState();
 
@@ -1157,7 +1025,7 @@ describe('applyAsteroidDamage()', () => {
     const { ps, assembly, fs } = makeAsteroidTestCraft();
     const partsBefore = ps.activeParts.size;
 
-    applyAsteroidDamage(ps as unknown as PhysicsState, assembly, fs, AsteroidDamageLevel.NONE, 0.5);
+    applyAsteroidDamage(ps, assembly, fs, AsteroidDamageLevel.NONE, 0.5);
 
     expect(ps.activeParts.size).toBe(partsBefore);
     expect(ps.crashed).toBe(false);
@@ -1168,7 +1036,7 @@ describe('applyAsteroidDamage()', () => {
     const { ps, assembly, fs } = makeAsteroidTestCraft();
     const partsBefore = ps.activeParts.size;
 
-    applyAsteroidDamage(ps as unknown as PhysicsState, assembly, fs, AsteroidDamageLevel.MINOR, 3);
+    applyAsteroidDamage(ps, assembly, fs, AsteroidDamageLevel.MINOR, 3);
 
     // Should destroy at least 1 part but not all.
     expect(ps.activeParts.size).toBeLessThan(partsBefore);
@@ -1186,13 +1054,9 @@ describe('applyAsteroidDamage()', () => {
     for (let i = 0; i < 10; i++) {
       ids1.push(addPartToAssembly(assembly1, 'probe-core-mk1', i * 30, 0));
     }
-    const ps1: DamagePhysicsState = {
-      posX: 0, posY: 0, velX: 0, velY: 0, angle: 0,
-      angularVelocity: 0, landed: false, crashed: false,
+    const ps1 = makePhysicsState({
       activeParts: new Set(ids1),
-      fuelStore: new Map<string, number>(), firingEngines: new Set<string>(),
-      deployedParts: new Set<string>(), heatMap: new Map<string, number>(), debris: [],
-    };
+    });
     const fs1 = makeFlightState();
 
     const assembly2 = createRocketAssembly();
@@ -1200,17 +1064,13 @@ describe('applyAsteroidDamage()', () => {
     for (let i = 0; i < 10; i++) {
       ids2.push(addPartToAssembly(assembly2, 'probe-core-mk1', i * 30, 0));
     }
-    const ps2: DamagePhysicsState = {
-      posX: 0, posY: 0, velX: 0, velY: 0, angle: 0,
-      angularVelocity: 0, landed: false, crashed: false,
+    const ps2 = makePhysicsState({
       activeParts: new Set(ids2),
-      fuelStore: new Map<string, number>(), firingEngines: new Set<string>(),
-      deployedParts: new Set<string>(), heatMap: new Map<string, number>(), debris: [],
-    };
+    });
     const fs2 = makeFlightState();
 
-    applyAsteroidDamage(ps1 as unknown as PhysicsState, assembly1, fs1, AsteroidDamageLevel.MINOR, 3);
-    applyAsteroidDamage(ps2 as unknown as PhysicsState, assembly2, fs2, AsteroidDamageLevel.SIGNIFICANT, 12);
+    applyAsteroidDamage(ps1, assembly1, fs1, AsteroidDamageLevel.MINOR, 3);
+    applyAsteroidDamage(ps2, assembly2, fs2, AsteroidDamageLevel.SIGNIFICANT, 12);
 
     // SIGNIFICANT should destroy more parts than MINOR.
     const minorDestroyed = 10 - ps1.activeParts.size;
@@ -1221,7 +1081,7 @@ describe('applyAsteroidDamage()', () => {
   it('CATASTROPHIC damage destroys all parts and crashes craft', () => {
     const { ps, assembly, fs } = makeAsteroidTestCraft();
 
-    applyAsteroidDamage(ps as unknown as PhysicsState, assembly, fs, AsteroidDamageLevel.CATASTROPHIC, 25);
+    applyAsteroidDamage(ps, assembly, fs, AsteroidDamageLevel.CATASTROPHIC, 25);
 
     expect(ps.activeParts.size).toBe(0);
     expect(ps.crashed).toBe(true);
@@ -1231,7 +1091,7 @@ describe('applyAsteroidDamage()', () => {
   it('logs flight events with correct asteroid name and speed', () => {
     const { ps, assembly, fs } = makeAsteroidTestCraft();
 
-    applyAsteroidDamage(ps as unknown as PhysicsState, assembly, fs, AsteroidDamageLevel.MINOR, 2.5, 'AST-1234');
+    applyAsteroidDamage(ps, assembly, fs, AsteroidDamageLevel.MINOR, 2.5, 'AST-1234');
 
     const impactEvent = fs.events.find((e: FlightEvent) => e.type === 'ASTEROID_IMPACT');
     expect(impactEvent).toBeDefined();
@@ -1245,16 +1105,12 @@ describe('applyAsteroidDamage()', () => {
     const assembly = createRocketAssembly();
     const probeId = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
 
-    const ps: DamagePhysicsState = {
-      posX: 0, posY: 0, velX: 0, velY: 0, angle: 0,
-      angularVelocity: 0, landed: false, crashed: false,
+    const ps = makePhysicsState({
       activeParts: new Set([probeId]),
-      fuelStore: new Map<string, number>(), firingEngines: new Set<string>(),
-      deployedParts: new Set<string>(), heatMap: new Map<string, number>(), debris: [],
-    };
+    });
     const fs = makeFlightState();
 
-    applyAsteroidDamage(ps as unknown as PhysicsState, assembly, fs, AsteroidDamageLevel.MINOR, 3);
+    applyAsteroidDamage(ps, assembly, fs, AsteroidDamageLevel.MINOR, 3);
 
     expect(ps.activeParts.size).toBe(0);
     expect(ps.crashed).toBe(true);
@@ -1270,7 +1126,7 @@ describe('checkAsteroidCollisions()', () => {
     const { ps, assembly, fs } = makeAsteroidTestCraft({ posX: 0, posY: 0 });
 
     const asteroid = makeAsteroid({ posX: 10000, posY: 10000, radius: 5 });
-    const results = checkAsteroidCollisions(ps as unknown as PhysicsState, assembly, [asteroid], fs);
+    const results = checkAsteroidCollisions(ps, assembly, [asteroid], fs);
 
     expect(results).toHaveLength(0);
   });
@@ -1280,7 +1136,7 @@ describe('checkAsteroidCollisions()', () => {
     ps.landed = true;
 
     const asteroid = makeAsteroid({ posX: 0, posY: 0, radius: 100 });
-    const results = checkAsteroidCollisions(ps as unknown as PhysicsState, assembly, [asteroid], fs);
+    const results = checkAsteroidCollisions(ps, assembly, [asteroid], fs);
 
     expect(results).toHaveLength(0);
   });
@@ -1290,7 +1146,7 @@ describe('checkAsteroidCollisions()', () => {
     ps.crashed = true;
 
     const asteroid = makeAsteroid({ posX: 0, posY: 0, radius: 100 });
-    const results = checkAsteroidCollisions(ps as unknown as PhysicsState, assembly, [asteroid], fs);
+    const results = checkAsteroidCollisions(ps, assembly, [asteroid], fs);
 
     expect(results).toHaveLength(0);
   });
@@ -1309,7 +1165,7 @@ describe('checkAsteroidCollisions()', () => {
       radius: 100,
     });
 
-    const results = checkAsteroidCollisions(ps as unknown as PhysicsState, assembly, [asteroid], fs);
+    const results = checkAsteroidCollisions(ps, assembly, [asteroid], fs);
 
     expect(results).toHaveLength(1);
     expect(results[0].damage).toBe(AsteroidDamageLevel.MINOR);
@@ -1325,7 +1181,7 @@ describe('checkAsteroidCollisions()', () => {
     const ast1 = makeAsteroid({ posX: 0, posY: 0, velX: 0, velY: 0, radius: 100, name: 'A' });
     const ast2 = makeAsteroid({ posX: 0, posY: 0, velX: 0, velY: 0, radius: 100, name: 'B' });
 
-    const results = checkAsteroidCollisions(ps as unknown as PhysicsState, assembly, [ast1, ast2], fs);
+    const results = checkAsteroidCollisions(ps, assembly, [ast1, ast2], fs);
 
     // First asteroid destroys the craft (30 m/s → CATASTROPHIC).
     // Second should not be processed.
@@ -1347,7 +1203,7 @@ describe('checkAsteroidCollisions()', () => {
     });
 
     const partsBefore = ps.activeParts.size;
-    const results = checkAsteroidCollisions(ps as unknown as PhysicsState, assembly, [asteroid], fs);
+    const results = checkAsteroidCollisions(ps, assembly, [asteroid], fs);
 
     expect(results).toHaveLength(1);
     expect(results[0].damage).toBe(AsteroidDamageLevel.NONE);
@@ -1366,7 +1222,7 @@ describe('checkAsteroidCollisions()', () => {
  */
 function makeDamageTestSetup(): {
   assembly: RocketAssembly;
-  ps: DamagePhysicsState;
+  ps: PhysicsState;
   fs: FlightState;
   partIds: string[];
 } {
@@ -1377,14 +1233,10 @@ function makeDamageTestSetup(): {
   const tank2Id  = addPartToAssembly(assembly, 'tank-small', 0, 20);
   const engineId = addPartToAssembly(assembly, 'engine-spark', 0, -20);
 
-  const ps: DamagePhysicsState = {
-    posX: 0, posY: 0, velX: 0, velY: 0,
-    angle: 0, activeParts: new Set([probeId, tank1Id, tank2Id, engineId]),
-    firingEngines: new Set<string>(), deployedParts: new Set<string>(),
-    fuelStore: new Map<string, number>(), heatMap: new Map<string, number>(),
-    landed: false, crashed: false, grounded: false,
-    angularVelocity: 0, debris: [],
-  };
+  const ps = makePhysicsState({
+    activeParts: new Set([probeId, tank1Id, tank2Id, engineId]),
+    grounded: false,
+  });
 
   const fs = createFlightState({ missionId: 'test', rocketId: 'test' });
   return { assembly, ps, fs, partIds: [probeId, tank1Id, tank2Id, engineId] };
@@ -1519,7 +1371,7 @@ describe('applyAsteroidDamage() — quantitative 4-part rocket', () => {
     const { ps, assembly, fs } = makeDamageTestSetup();
     expect(ps.activeParts.size).toBe(4);
 
-    applyAsteroidDamage(ps as unknown as PhysicsState, assembly, fs, AsteroidDamageLevel.NONE, 0.5, 'AST-0001');
+    applyAsteroidDamage(ps, assembly, fs, AsteroidDamageLevel.NONE, 0.5, 'AST-0001');
 
     expect(ps.activeParts.size).toBe(4);
     expect(ps.crashed).toBe(false);
@@ -1530,7 +1382,7 @@ describe('applyAsteroidDamage() — quantitative 4-part rocket', () => {
     const { ps, assembly, fs } = makeDamageTestSetup();
     expect(ps.activeParts.size).toBe(4);
 
-    applyAsteroidDamage(ps as unknown as PhysicsState, assembly, fs, AsteroidDamageLevel.MINOR, 3, 'AST-0001');
+    applyAsteroidDamage(ps, assembly, fs, AsteroidDamageLevel.MINOR, 3, 'AST-0001');
 
     // 25% of 4 = 1 part (ceil(4 * 0.25) = 1)
     expect(ps.activeParts.size).toBe(3);
@@ -1542,7 +1394,7 @@ describe('applyAsteroidDamage() — quantitative 4-part rocket', () => {
     const { ps, assembly, fs } = makeDamageTestSetup();
     expect(ps.activeParts.size).toBe(4);
 
-    applyAsteroidDamage(ps as unknown as PhysicsState, assembly, fs, AsteroidDamageLevel.SIGNIFICANT, 12, 'AST-0001');
+    applyAsteroidDamage(ps, assembly, fs, AsteroidDamageLevel.SIGNIFICANT, 12, 'AST-0001');
 
     // 60% of 4 = 2.4 → ceil = 3 parts destroyed, 1 remaining
     // But if the code uses Math.max(1, ceil(N * fraction)), with N=4 and fraction=0.6:
@@ -1558,7 +1410,7 @@ describe('applyAsteroidDamage() — quantitative 4-part rocket', () => {
     const { ps, assembly, fs } = makeDamageTestSetup();
     expect(ps.activeParts.size).toBe(4);
 
-    applyAsteroidDamage(ps as unknown as PhysicsState, assembly, fs, AsteroidDamageLevel.CATASTROPHIC, 25, 'AST-0001');
+    applyAsteroidDamage(ps, assembly, fs, AsteroidDamageLevel.CATASTROPHIC, 25, 'AST-0001');
 
     expect(ps.activeParts.size).toBe(0);
     expect(ps.crashed).toBe(true);
@@ -1572,7 +1424,7 @@ describe('applyAsteroidDamage() — quantitative 4-part rocket', () => {
     ps.firingEngines.add(partIds[3]);  // engine
     ps.deployedParts.add(partIds[0]);  // probe
 
-    applyAsteroidDamage(ps as unknown as PhysicsState, assembly, fs, AsteroidDamageLevel.CATASTROPHIC, 30, 'AST-0001');
+    applyAsteroidDamage(ps, assembly, fs, AsteroidDamageLevel.CATASTROPHIC, 30, 'AST-0001');
 
     expect(ps.firingEngines.size).toBe(0);
     expect(ps.deployedParts.size).toBe(0);
@@ -1582,7 +1434,7 @@ describe('applyAsteroidDamage() — quantitative 4-part rocket', () => {
 describe('checkAsteroidCollisions() — extended', () => {
   it('returns empty array when no asteroids are provided', () => {
     const { ps, assembly, fs } = makeAsteroidTestCraft();
-    const results = checkAsteroidCollisions(ps as unknown as PhysicsState, assembly, [], fs);
+    const results = checkAsteroidCollisions(ps, assembly, [], fs);
     expect(results).toHaveLength(0);
   });
 
@@ -1595,7 +1447,7 @@ describe('checkAsteroidCollisions() — extended', () => {
       makeAsteroid({ posX: 100, posY: 100, radius: 5, name: 'FAR-3' }),
     ];
 
-    const results = checkAsteroidCollisions(ps as unknown as PhysicsState, assembly, farAsteroids, fs);
+    const results = checkAsteroidCollisions(ps, assembly, farAsteroids, fs);
     expect(results).toHaveLength(0);
     expect(ps.crashed).toBe(false);
   });
@@ -1610,7 +1462,7 @@ describe('checkAsteroidCollisions() — extended', () => {
       name: 'HIT-1',
     });
 
-    const results = checkAsteroidCollisions(ps as unknown as PhysicsState, assembly, [asteroid], fs);
+    const results = checkAsteroidCollisions(ps, assembly, [asteroid], fs);
     expect(results).toHaveLength(1);
     expect(results[0].asteroid.name).toBe('HIT-1');
     expect(results[0].relativeSpeed).toBeCloseTo(10, 1);
@@ -1633,7 +1485,7 @@ describe('checkAsteroidCollisions() — extended', () => {
       makeAsteroid({ posX: 0, posY: 0, velX: 0, velY: 0, radius: 100, name: 'M-3' }),
     ];
 
-    const results = checkAsteroidCollisions(ps as unknown as PhysicsState, assembly, asteroids, fs);
+    const results = checkAsteroidCollisions(ps, assembly, asteroids, fs);
 
     // Should have at least 1 collision result, parts should decrease.
     expect(results.length).toBeGreaterThanOrEqual(1);
@@ -1645,7 +1497,7 @@ describe('checkAsteroidCollisions() — extended', () => {
     ps.crashed = true;
 
     const asteroid = makeAsteroid({ posX: 0, posY: 0, radius: 100 });
-    const results = checkAsteroidCollisions(ps as unknown as PhysicsState, assembly, [asteroid], fs);
+    const results = checkAsteroidCollisions(ps, assembly, [asteroid], fs);
 
     expect(results).toHaveLength(0);
     expect(fs.events.length).toBe(0);
@@ -1656,7 +1508,7 @@ describe('checkAsteroidCollisions() — extended', () => {
     ps.landed = true;
 
     const asteroid = makeAsteroid({ posX: 0, posY: 0, radius: 100 });
-    const results = checkAsteroidCollisions(ps as unknown as PhysicsState, assembly, [asteroid], fs);
+    const results = checkAsteroidCollisions(ps, assembly, [asteroid], fs);
 
     expect(results).toHaveLength(0);
     expect(fs.events.length).toBe(0);
@@ -1677,13 +1529,13 @@ describe('Asteroid collision cooldown', () => {
     const asteroid = makeAsteroid({ posX: 0, posY: 0, velX: 0, velY: 0, radius: 100, name: 'COOL-1' });
 
     // First call — collision should be detected and damage applied.
-    const results1 = checkAsteroidCollisions(ps as unknown as PhysicsState, assembly, [asteroid], fs);
+    const results1 = checkAsteroidCollisions(ps, assembly, [asteroid], fs);
     expect(results1).toHaveLength(1);
     expect(results1[0].damage).toBe(AsteroidDamageLevel.MINOR);
 
     // Second call — asteroid is on cooldown, no collision.
     const fs2 = makeFlightState();
-    const results2 = checkAsteroidCollisions(ps as unknown as PhysicsState, assembly, [asteroid], fs2);
+    const results2 = checkAsteroidCollisions(ps, assembly, [asteroid], fs2);
     expect(results2).toHaveLength(0);
   });
 
@@ -1692,16 +1544,16 @@ describe('Asteroid collision cooldown', () => {
     const asteroid = makeAsteroid({ posX: 0, posY: 0, velX: 0, velY: 0, radius: 100, name: 'COOL-2' });
 
     // Trigger initial collision.
-    checkAsteroidCollisions(ps as unknown as PhysicsState, assembly, [asteroid], fs);
+    checkAsteroidCollisions(ps, assembly, [asteroid], fs);
 
     // Tick 10 times with no asteroids to decrement cooldown without new collisions.
     for (let i = 0; i < 10; i++) {
-      checkAsteroidCollisions(ps as unknown as PhysicsState, assembly, [], makeFlightState());
+      checkAsteroidCollisions(ps, assembly, [], makeFlightState());
     }
 
     // Cooldown expired — asteroid should collide again.
     const fs3 = makeFlightState();
-    const results = checkAsteroidCollisions(ps as unknown as PhysicsState, assembly, [asteroid], fs3);
+    const results = checkAsteroidCollisions(ps, assembly, [asteroid], fs3);
     expect(results).toHaveLength(1);
     expect(results[0].asteroid.name).toBe('COOL-2');
   });
@@ -1712,11 +1564,11 @@ describe('Asteroid collision cooldown', () => {
     const ast2 = makeAsteroid({ posX: 0, posY: 0, velX: 0, velY: 0, radius: 100, name: 'HIT' });
 
     // Collide with ast1 only.
-    checkAsteroidCollisions(ps as unknown as PhysicsState, assembly, [ast1], fs);
+    checkAsteroidCollisions(ps, assembly, [ast1], fs);
 
     // Now check both — ast1 is on cooldown, ast2 is fresh.
     const fs2 = makeFlightState();
-    const results = checkAsteroidCollisions(ps as unknown as PhysicsState, assembly, [ast1, ast2], fs2);
+    const results = checkAsteroidCollisions(ps, assembly, [ast1, ast2], fs2);
 
     // Only ast2 should have collided.
     expect(results).toHaveLength(1);
@@ -1728,11 +1580,11 @@ describe('Asteroid collision cooldown', () => {
     const asteroid = makeAsteroid({ posX: 0, posY: 0, velX: 0, velY: 0, radius: 100, name: 'RESET-1' });
 
     // Trigger collision to put asteroid on cooldown.
-    checkAsteroidCollisions(ps as unknown as PhysicsState, assembly, [asteroid], fs);
+    checkAsteroidCollisions(ps, assembly, [asteroid], fs);
 
     // Normally the asteroid would be skipped.
     const fs2 = makeFlightState();
-    const skipped = checkAsteroidCollisions(ps as unknown as PhysicsState, assembly, [asteroid], fs2);
+    const skipped = checkAsteroidCollisions(ps, assembly, [asteroid], fs2);
     expect(skipped).toHaveLength(0);
 
     // Reset cooldowns.
@@ -1740,7 +1592,7 @@ describe('Asteroid collision cooldown', () => {
 
     // Now the asteroid should collide again.
     const fs3 = makeFlightState();
-    const results = checkAsteroidCollisions(ps as unknown as PhysicsState, assembly, [asteroid], fs3);
+    const results = checkAsteroidCollisions(ps, assembly, [asteroid], fs3);
     expect(results).toHaveLength(1);
     expect(results[0].asteroid.name).toBe('RESET-1');
   });

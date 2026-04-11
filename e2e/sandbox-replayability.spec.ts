@@ -36,16 +36,6 @@ import {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type GameState = Record<string, any>;
 
-/**
- * Browser-context window shape for page.evaluate() callbacks.
- * Defined as a local interface (not `declare global`) to avoid conflicting
- * with the narrower Window augmentations in the helper modules. Inside
- * evaluate callbacks we cast: `const w = window as unknown as GameWindow;`
- */
-interface GameWindow {
-  __gameState?: GameState;
-}
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // Shared helpers
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -372,7 +362,7 @@ test.describe('Challenge missions', () => {
     // Test challenge completion via direct state manipulation.
     // Accept the Sky High challenge (challenge-sky-high) which scores on maxAltitude.
     const result = await page.evaluate(() => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       const state = w.__gameState!;
 
       // Import won't work in page context — use the challenge functions directly.
@@ -384,8 +374,10 @@ test.describe('Challenge missions', () => {
       state.challenges.active = {
         id: 'challenge-sky-high',
         title: 'Sky High',
+        description: 'Reach the highest altitude possible',
+        briefing: 'Launch a rocket as high as you can',
         objectives: [
-          { id: 'ch-sh-1', type: 'REACH_ALTITUDE', target: { altitude: 50_000 }, completed: true },
+          { id: 'ch-sh-1', type: 'REACH_ALTITUDE', target: { altitude: 50_000 }, completed: true, description: 'Reach 50km altitude' },
         ],
         scoreMetric: 'maxAltitude',
         scoreLabel: 'Peak Altitude',
@@ -397,8 +389,8 @@ test.describe('Challenge missions', () => {
       };
 
       // Simulate a score of 300,000 m (should earn silver)
-      const allObjsMet: boolean = state.challenges.active.objectives.every(
-        (o: Record<string, unknown>) => o.completed,
+      const allObjsMet: boolean = state.challenges.active!.objectives.every(
+        (o: { completed: boolean }) => o.completed,
       );
       const score = 300_000;
 
@@ -438,7 +430,7 @@ test.describe('Challenge missions', () => {
 
     // Inject a challenge result so the card shows "Replay" and best-score info
     await page.evaluate(() => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       const state = w.__gameState!;
       if (!state.challenges) state.challenges = { active: null, results: {} };
       state.challenges.results['challenge-sky-high'] = { medal: 'silver', score: 300_000, attempts: 1 };
@@ -465,7 +457,7 @@ test.describe('Challenge missions', () => {
     // Click replay
     const challengeId: string = Object.keys(gs.challenges.results)[0];
     await page.evaluate((cid: string) => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       const state = w.__gameState!;
       // Simulate replaying and getting a better score (gold)
       const prev = state.challenges.results[cid] as
@@ -509,7 +501,7 @@ test.describe('Custom mission creator', () => {
     const page: Page = await setupCustomMissionPage(browser);
 
     const result = await page.evaluate(() => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       const state = w.__gameState!;
       if (!Array.isArray(state.customChallenges)) {
         state.customChallenges = [];
@@ -550,7 +542,7 @@ test.describe('Custom mission creator', () => {
 
     // Inject a custom challenge so it appears in the UI
     await page.evaluate(() => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       const state = w.__gameState!;
       if (!Array.isArray(state.customChallenges)) {
         state.customChallenges = [];
@@ -594,7 +586,7 @@ test.describe('Custom mission creator', () => {
 
     // Inject a custom challenge
     await page.evaluate(() => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       const state = w.__gameState!;
       if (!Array.isArray(state.customChallenges)) {
         state.customChallenges = [];
@@ -770,7 +762,7 @@ test.describe('Custom mission creator', () => {
 
     // Inject a custom challenge to export
     await page.evaluate(() => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       const state = w.__gameState!;
       if (!Array.isArray(state.customChallenges)) {
         state.customChallenges = [];
@@ -795,9 +787,9 @@ test.describe('Custom mission creator', () => {
     });
 
     const json = await page.evaluate(() => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       const state = w.__gameState!;
-      const ch = state.customChallenges[0] as Record<string, unknown> | undefined;
+      const ch = state.customChallenges[0] as unknown as Record<string, unknown> | undefined;
       if (!ch) return null;
 
       // Replicate the export logic
@@ -860,7 +852,7 @@ test.describe('Custom mission creator', () => {
     });
 
     const result = await page.evaluate((jsonStr: string) => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       const state = w.__gameState!;
       if (!Array.isArray(state.customChallenges)) {
         state.customChallenges = [];
@@ -899,8 +891,8 @@ test.describe('Custom mission creator', () => {
         scoreLabel: (data.scoreLabel as string) || (data.scoreMetric as string),
         scoreUnit: (data.scoreUnit as string) || '',
         scoreDirection: (data.scoreDirection as string) || 'lower',
-        medals: (data.medals as Record<string, number>) || { bronze: 0, silver: 0, gold: 0 },
-        rewards: (data.rewards as Record<string, number>) || { bronze: 0, silver: 0, gold: 0 },
+        medals: (data.medals as { bronze: number; silver: number; gold: number }) || { bronze: 0, silver: 0, gold: 0 },
+        rewards: (data.rewards as { bronze: number; silver: number; gold: number }) || { bronze: 0, silver: 0, gold: 0 },
         requiredMissions: [] as string[],
       };
 
@@ -928,7 +920,7 @@ test.describe('Custom mission creator', () => {
 
     // Inject two custom challenges
     await page.evaluate(() => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       const state = w.__gameState!;
       if (!Array.isArray(state.customChallenges)) {
         state.customChallenges = [];
@@ -967,10 +959,10 @@ test.describe('Custom mission creator', () => {
 
     // Delete the first custom challenge via state
     await page.evaluate(() => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       const state = w.__gameState!;
       if (state.customChallenges.length > 0) {
-        const removed = state.customChallenges.shift() as Record<string, unknown>;
+        const removed = state.customChallenges.shift() as unknown as Record<string, unknown>;
         // Also clear from results if present
         if (state.challenges?.results?.[removed.id as string]) {
           delete state.challenges.results[removed.id as string];
@@ -1282,7 +1274,7 @@ test.describe('Game settings — difficulty options', () => {
     // crewCount, crewKIA, playTimeSeconds, flightTimeSeconds, gameMode.
     // NOT difficultySettings.
     const summaryKeys = await page.evaluate(() => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       const gs = w.__gameState!;
       // Build what the summary would look like
       const summary: Record<string, unknown> = {
@@ -1293,10 +1285,10 @@ test.describe('Game settings — difficulty options', () => {
         money: gs.money as number,
         acceptedMissionCount: (gs.missions?.accepted?.length as number) ?? 0,
         totalFlights: (gs.flightHistory?.length as number) ?? 0,
-        crewCount: ((gs.crew ?? []) as Record<string, unknown>[]).filter(
+        crewCount: ((gs.crew ?? []) as unknown as Record<string, unknown>[]).filter(
           (c) => c.status !== 'DEAD',
         ).length,
-        crewKIA: ((gs.crew ?? []) as Record<string, unknown>[]).filter(
+        crewKIA: ((gs.crew ?? []) as unknown as Record<string, unknown>[]).filter(
           (c) => c.status === 'DEAD',
         ).length,
         playTimeSeconds: (gs.playTimeSeconds as number) ?? 0,
@@ -1337,13 +1329,13 @@ test.describe('Difficulty settings modify gameplay values', () => {
 
     // Test multiplier mapping via state values
     const results = await page.evaluate(() => {
-      const w = window as unknown as GameWindow;
+      const w = window;
       const state = w.__gameState!;
       const multipliers: Record<string, number> = { off: 0, low: 0.4, normal: 1.0, high: 2.0 };
       const checks: Record<string, { expected: number; actual: number; match: boolean }> = {};
 
       for (const [setting, expected] of Object.entries(multipliers)) {
-        state.difficultySettings.malfunctionFrequency = setting;
+        (state.difficultySettings as { malfunctionFrequency: string }).malfunctionFrequency = setting;
         const actual: number = multipliers[state.difficultySettings.malfunctionFrequency as string];
         checks[setting] = { expected, actual, match: actual === expected };
       }
@@ -1381,7 +1373,7 @@ test.describe('Difficulty settings modify gameplay values', () => {
         extreme: { windMult: 1.5, extremeChanceMult: 3.0 },
       };
 
-      const w = window as unknown as GameWindow;
+      const w = window;
       const state = w.__gameState!;
       const checks: Record<string, {
         setting: string;
@@ -1390,7 +1382,7 @@ test.describe('Difficulty settings modify gameplay values', () => {
         match: boolean;
       }> = {};
       for (const [setting, mult] of Object.entries(expected)) {
-        state.difficultySettings.weatherSeverity = setting;
+        (state.difficultySettings as { weatherSeverity: string }).weatherSeverity = setting;
         checks[setting] = {
           setting: state.difficultySettings.weatherSeverity as string,
           expectedWind: mult.windMult,
@@ -1430,7 +1422,7 @@ test.describe('Difficulty settings modify gameplay values', () => {
         hard:   { rewardMult: 0.5, costMult: 2.0 },
       };
 
-      const w = window as unknown as GameWindow;
+      const w = window;
       const state = w.__gameState!;
       const checks: Record<string, {
         setting: string;
@@ -1438,7 +1430,7 @@ test.describe('Difficulty settings modify gameplay values', () => {
         expectedCost: number;
       }> = {};
       for (const [setting, mult] of Object.entries(expected)) {
-        state.difficultySettings.financialPressure = setting;
+        (state.difficultySettings as { financialPressure: string }).financialPressure = setting;
         checks[setting] = {
           setting: state.difficultySettings.financialPressure as string,
           expectedReward: mult.rewardMult,
@@ -1473,11 +1465,11 @@ test.describe('Difficulty settings modify gameplay values', () => {
     const results = await page.evaluate(() => {
       const expected: Record<string, number> = { short: 0.5, normal: 1.0, long: 2.0 };
 
-      const w = window as unknown as GameWindow;
+      const w = window;
       const state = w.__gameState!;
       const checks: Record<string, { setting: string; expectedMult: number; match: boolean }> = {};
       for (const [setting, mult] of Object.entries(expected)) {
-        state.difficultySettings.injuryDuration = setting;
+        (state.difficultySettings as { injuryDuration: string }).injuryDuration = setting;
         checks[setting] = {
           setting: state.difficultySettings.injuryDuration as string,
           expectedMult: mult,

@@ -5,13 +5,8 @@ import {
 } from './helpers.js';
 
 // ---------------------------------------------------------------------------
-// Browser-context type aliases
+// (window.d.ts augments the global Window interface with game properties)
 // ---------------------------------------------------------------------------
-
-interface GameWindow {
-  __gameState: { debugMode: boolean };
-  __enableDebugMode: () => void;
-}
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -36,7 +31,7 @@ test.describe('Debug Mode Toggle', () => {
     await seedAndLoadSave(page, envelope);
     await dismissWelcomeModal(page);
 
-    await page.evaluate(() => (window as unknown as GameWindow).__enableDebugMode());
+    await page.evaluate(() => window.__enableDebugMode());
     await page.keyboard.press('Control+Shift+D');
     await expect(page.locator('#debug-save-panel')).toBeVisible({ timeout: 5_000 });
     await page.click('.debug-save-close-btn');
@@ -48,8 +43,8 @@ test.describe('Debug Mode Toggle', () => {
     await seedAndLoadSave(page, envelope);
     await dismissWelcomeModal(page);
 
-    await page.evaluate(() => (window as unknown as GameWindow).__enableDebugMode());
-    expect(await page.evaluate(() => (window as unknown as GameWindow).__gameState.debugMode)).toBe(true);
+    await page.evaluate(() => window.__enableDebugMode());
+    expect(await page.evaluate(() => window.__gameState.debugMode)).toBe(true);
 
     // Save via topbar.
     await page.click('#topbar-menu-btn');
@@ -65,7 +60,7 @@ test.describe('Debug Mode Toggle', () => {
     await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
     await dismissWelcomeModal(page);
 
-    expect(await page.evaluate(() => (window as unknown as GameWindow).__gameState.debugMode)).toBe(true);
+    expect(await page.evaluate(() => window.__gameState.debugMode)).toBe(true);
     await page.keyboard.press('Control+Shift+D');
     await expect(page.locator('#debug-save-panel')).toBeVisible({ timeout: 5_000 });
     await page.click('.debug-save-close-btn');
@@ -77,7 +72,7 @@ test.describe('Debug Mode Toggle', () => {
     await seedAndLoadSave(page, envelope);
     await dismissWelcomeModal(page);
 
-    await page.evaluate(() => { (window as unknown as GameWindow).__gameState.debugMode = false; });
+    await page.evaluate(() => { window.__gameState.debugMode = false; });
     await page.keyboard.press('Control+Shift+D');
     await page.waitForTimeout(500);
     await expect(page.locator('#debug-save-panel')).not.toBeVisible();
@@ -89,9 +84,9 @@ test.describe('Debug Mode Toggle', () => {
     await seedAndLoadSave(page, envelope);
     await dismissWelcomeModal(page);
 
-    expect(await page.evaluate(() => (window as unknown as GameWindow).__gameState.debugMode)).toBe(false);
-    await page.evaluate(() => (window as unknown as GameWindow).__enableDebugMode());
-    expect(await page.evaluate(() => (window as unknown as GameWindow).__gameState.debugMode)).toBe(true);
+    expect(await page.evaluate(() => window.__gameState.debugMode)).toBe(false);
+    await page.evaluate(() => window.__enableDebugMode());
+    expect(await page.evaluate(() => window.__gameState.debugMode)).toBe(true);
 
     await page.keyboard.press('Control+Shift+D');
     await expect(page.locator('#debug-save-panel')).toBeVisible({ timeout: 5_000 });
