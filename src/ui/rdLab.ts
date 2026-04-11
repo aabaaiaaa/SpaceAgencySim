@@ -98,7 +98,7 @@ function _render(): void {
   resources.id = 'rd-resources';
   resources.innerHTML =
     `Science: <span class="rd-res-val">${Math.floor(_state.sciencePoints ?? 0)}</span>` +
-    `<span style="margin: 0 4px;">|</span>` +
+    `<span class="rd-res-sep">|</span>` +
     `Funds: <span class="rd-res-val">$${(_state.money ?? 0).toLocaleString('en-US')}</span>`;
   header.appendChild(resources);
 

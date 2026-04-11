@@ -11,7 +11,7 @@ See [requirements.md](requirements.md) for full context on each section.
 - **Verification**: `npm run test:unit` exits with code 0 (all tests pass, all coverage thresholds met).
 
 ### TASK-002: Fix crew career table status rendering
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001
 - **Description**: Fix the crew career table in the Library facility. Two files need changes:
   1. **`src/core/library.ts`**: In the `CrewCareer` interface (line 71-78), change `status: string` to `status: AstronautStatus` (import from constants.ts — already imported on line 11). Add `injuryEnds: number | null` field. In `getCrewCareers()` (line 251-258), add `injuryEnds: c.injuryEnds ?? null` to the mapped object.
@@ -68,13 +68,13 @@ See [requirements.md](requirements.md) for full context on each section.
 - **Verification**: `npm run build` succeeds. `grep -c 'style="' src/ui/vab/_launchFlow.ts src/ui/launchPad.ts` returns 0 for both files. Visual check: start dev server, open VAB, attempt a launch with validation errors — confirm the dialog looks identical to before.
 
 ### TASK-008: Migrate static inline styles — _docking.ts and _scalebar.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Migrate static inline styles from `src/ui/flightController/_docking.ts` (3 static out of 9 total) and `src/ui/vab/_scalebar.ts` (5 static out of 7 total) to CSS classes. For `_docking.ts`, add classes to `src/ui/flightController/flightController.css`. For `_scalebar.ts`, add classes to `src/ui/vab/vab.css`. Leave dynamic styles (template literal interpolations like `${whiteStyle}`, `${speedColor}`, `${barY.toFixed(1)}px`) as inline. Use design tokens where applicable. See requirements section 5 for style details.
 - **Verification**: `npm run build` succeeds. Verify remaining `style=` attributes in both files are only dynamic (contain `${`). Visual check via dev server: open a docking scenario and the VAB to confirm panels render correctly.
 
 ### TASK-009: Migrate static inline styles — remaining UI files
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Migrate the remaining 5 static inline styles from smaller files:
   - `src/ui/crewAdmin.ts` — 1 static style (`margin-top:4px` on line 639) → `src/ui/crewAdmin.css`

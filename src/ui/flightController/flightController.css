@@ -582,6 +582,19 @@
   pointer-events: none;
 }
 
+/* Docking HUD hint text (keybind reminders) */
+.dock-hud-hint {
+  color: #888;
+  margin-top: var(--space-sm);
+  font-size: 11px;
+}
+
+/* Docking HUD auto-dock proximity prompt */
+.dock-hud-proximity {
+  color: #ff0;
+  margin-top: var(--space-sm);
+}
+
 /* ── Post-flight mission reward box ──────────────────────────────────── */
 .pf-reward-box {
   margin-top: var(--space-sm);

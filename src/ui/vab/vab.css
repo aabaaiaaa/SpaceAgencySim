@@ -1166,3 +1166,22 @@
 .vab-load-card-delete-btn:hover {
   background: rgba(100,30,30,0.9) !important;
 }
+
+/* ── Scale bar extent markers ───────────────────────────────────────── */
+.vab-tick-extent-label {
+  color: #4ab870;
+}
+
+.vab-tick-extent-line {
+  position: absolute;
+  right: 0;
+  width: 16px;
+  height: 1px;
+  background: #4ab870;
+  top: 0;
+}
+
+.vab-tick-height-label {
+  color: #c0a040;
+  font-size: 7px;
+}

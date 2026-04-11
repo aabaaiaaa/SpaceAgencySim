@@ -479,6 +479,10 @@
   margin-top: 6px;
 }
 
+.training-cost-note-spaced {
+  margin-top: var(--space-xs);
+}
+
 .training-crew-item {
   display: flex;
   align-items: center;

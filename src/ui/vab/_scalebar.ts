@@ -122,8 +122,8 @@ export function updateScaleBarExtents(): void {
     const el = document.createElement('div');
     el.className = 'vab-tick vab-tick-extent';
     el.style.top = `${topBarY.toFixed(1)}px`;
-    el.innerHTML = `<span class="vab-tick-label" style="color:#4ab870">Top</span>` +
-      `<span style="position:absolute;right:0;width:16px;height:1px;background:#4ab870;top:0"></span>`;
+    el.innerHTML = `<span class="vab-tick-label vab-tick-extent-label">Top</span>` +
+      `<span class="vab-tick-extent-line"></span>`;
     S.scaleTicks.appendChild(el);
   }
 
@@ -132,8 +132,8 @@ export function updateScaleBarExtents(): void {
     const el = document.createElement('div');
     el.className = 'vab-tick vab-tick-extent';
     el.style.top = `${bottomBarY.toFixed(1)}px`;
-    el.innerHTML = `<span class="vab-tick-label" style="color:#4ab870">Bot</span>` +
-      `<span style="position:absolute;right:0;width:16px;height:1px;background:#4ab870;top:0"></span>`;
+    el.innerHTML = `<span class="vab-tick-label vab-tick-extent-label">Bot</span>` +
+      `<span class="vab-tick-extent-line"></span>`;
     S.scaleTicks.appendChild(el);
   }
 
@@ -142,7 +142,7 @@ export function updateScaleBarExtents(): void {
     const el = document.createElement('div');
     el.className = 'vab-tick vab-tick-extent';
     el.style.top = `${midBarY.toFixed(1)}px`;
-    el.innerHTML = `<span class="vab-tick-label" style="color:#c0a040;font-size:7px">&#x21D5;${heightM.toFixed(1)}m</span>`;
+    el.innerHTML = `<span class="vab-tick-label vab-tick-height-label">&#x21D5;${heightM.toFixed(1)}m</span>`;
     S.scaleTicks.appendChild(el);
   }
 }

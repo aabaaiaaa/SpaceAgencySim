@@ -231,7 +231,7 @@ export function updateDockingHud(): void {
 
   if (guidance.isDocked) {
     html += `<div style="${greenStyle}">DOCKED (${guidance.dockedCount} vessel${guidance.dockedCount !== 1 ? 's' : ''})</div>`;
-    html += `<div style="color: #888; margin-top: 6px; font-size: 11px;">U = Undock &nbsp; F = Transfer fuel</div>`;
+    html += `<div class="dock-hud-hint">U = Undock &nbsp; F = Transfer fuel</div>`;
   } else {
     html += `<div>Distance: ${distStr}</div>`;
     html += `<div style="${speedColor}">Rel. Speed: ${guidance.relativeSpeed.toFixed(2)} m/s ${guidance.speedOk ? '\u2713' : '\u2717'}</div>`;
@@ -241,10 +241,10 @@ export function updateDockingHud(): void {
     if (guidance.state === DockingState.FINAL_APPROACH) {
       html += `<div style="${greenStyle}; margin-top: 6px;">Auto-dock engaged...</div>`;
     } else if (guidance.allGreen && guidance.distance <= 500) {
-      html += `<div style="color: #ff0; margin-top: 6px;">Close to ${Math.round(15)} m for auto-dock</div>`;
+      html += `<div class="dock-hud-proximity">Close to ${Math.round(15)} m for auto-dock</div>`;
     }
 
-    html += `<div style="color: #888; margin-top: 6px; font-size: 11px;">T = Cycle target</div>`;
+    html += `<div class="dock-hud-hint">T = Cycle target</div>`;
   }
 
   s.dockingHud.innerHTML = html;

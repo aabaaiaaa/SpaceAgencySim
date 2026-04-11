@@ -54,6 +54,9 @@
   font-weight: 700;
   color: #e0f0ff;
 }
+#rd-resources .rd-res-sep {
+  margin: 0 var(--space-xs);
+}
 
 /* -- Branch tabs ---------------------------------------------------------- */
 #rd-tabs {

@@ -434,6 +434,9 @@
 .mm-sandbox-options {
   margin-top: 12px;
 }
+.mm-sandbox-options-hidden {
+  display: none;
+}
 .mm-sandbox-options > label {
   display: block;
   font-size: 0.85rem;

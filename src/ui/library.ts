@@ -23,6 +23,7 @@ import {
   getCelestialBodyKnowledge,
   getFrequentRockets,
 } from '../core/library.ts';
+import { AstronautStatus } from '../core/constants.ts';
 import { escapeHtml } from './escapeHtml.ts';
 import './library.css';
 import type { GameState } from '../core/gameState.ts';
@@ -247,7 +248,7 @@ function _renderStatsTab(content: HTMLDivElement): void {
       if (!rec.visited) continue;
       const tr: HTMLTableRowElement = document.createElement('tr');
       tr.innerHTML = `
-        <td style="font-weight:600">${bodyId}</td>
+        <td class="cell-bold">${bodyId}</td>
         <td>${rec.visited ? _badge('visited', 'Visited') : '\u2014'}</td>
         <td>${rec.orbited ? _badge('orbited', 'Orbited') : '\u2014'}</td>
         <td>${rec.landed ? _badge('landed', 'Landed') : '\u2014'}</td>
@@ -298,19 +299,31 @@ function _renderStatsTab(content: HTMLDivElement): void {
 
       // Sort: active crew first, then by flights.
       const sorted = [...crewCareers].sort((a, b) => {
-        const aActive = a.status !== 'DEAD' && a.status !== 'kia' ? 1 : 0;
-        const bActive = b.status !== 'DEAD' && b.status !== 'kia' ? 1 : 0;
+        const aActive = a.status === AstronautStatus.ACTIVE ? 1 : 0;
+        const bActive = b.status === AstronautStatus.ACTIVE ? 1 : 0;
         if (aActive !== bActive) return bActive - aActive;
         return b.flightsFlown - a.flightsFlown;
       });
 
       for (const c of sorted) {
         const tr: HTMLTableRowElement = document.createElement('tr');
-        const statusColor = c.status === 'DEAD' || c.status === 'kia'
-          ? '#ff6060' : c.status === 'INJURED' ? '#ffaa30' : '#60dd80';
+        const statusColor = c.status === AstronautStatus.KIA
+          ? '#ff6060'
+          : c.status === AstronautStatus.FIRED
+            ? '#a0a0a0'
+            : c.injuryEnds !== null
+              ? '#ffaa30'
+              : '#60dd80';
+        const statusText = c.status === AstronautStatus.KIA
+          ? 'KIA'
+          : c.status === AstronautStatus.FIRED
+            ? 'Fired'
+            : c.injuryEnds !== null
+              ? 'Injured'
+              : 'Active';
         tr.innerHTML = `
-          <td style="font-weight:600">${escapeHtml(c.name)}</td>
-          <td style="color:${statusColor}">${c.status}</td>
+          <td class="cell-bold">${escapeHtml(c.name)}</td>
+          <td style="color:${statusColor}">${statusText}</td>
           <td class="num">${c.flightsFlown}</td>
           <td class="num">${c.skills.piloting}</td>
           <td class="num">${c.skills.engineering}</td>

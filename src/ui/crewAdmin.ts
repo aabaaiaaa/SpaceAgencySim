@@ -636,7 +636,7 @@ function _renderTrainingTab(): void {
     <div class="training-cost-note">
       Course cost: ${fmtCash(TRAINING_COURSE_COST)} &bull; Duration: ${TRAINING_COURSE_DURATION} flights &bull; Gain: +${TRAINING_SKILL_GAIN} skill
     </div>
-    <div class="training-cost-note" style="margin-top:4px;">
+    <div class="training-cost-note training-cost-note-spaced">
       Training slots: ${slotInfo.usedSlots} / ${slotInfo.maxSlots} in use
     </div>
   `;

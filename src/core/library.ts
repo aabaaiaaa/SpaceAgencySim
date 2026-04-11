@@ -71,7 +71,8 @@ interface Records {
 interface CrewCareer {
   id: string;
   name: string;
-  status: string;
+  status: AstronautStatus;
+  injuryEnds: number | null;
   flightsFlown: number;
   skills: { piloting: number; engineering: number; science: number };
   hireDate: string;
@@ -252,6 +253,7 @@ export function getCrewCareers(state: GameState): CrewCareer[] {
     id: c.id,
     name: c.name,
     status: c.status,
+    injuryEnds: c.injuryEnds ?? null,
     flightsFlown: flightCounts.get(c.id) ?? 0,
     skills: { ...c.skills },
     hireDate: c.hireDate ?? '',

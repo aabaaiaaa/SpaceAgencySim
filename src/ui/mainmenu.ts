@@ -448,7 +448,7 @@ function _renderNewGameScreen(overlay: HTMLElement, canGoBack: boolean): void {
           </div>
         </div>
       </div>
-      <div class="mm-sandbox-options" id="mm-sandbox-options" style="display:none">
+      <div class="mm-sandbox-options mm-sandbox-options-hidden" id="mm-sandbox-options">
         <label>Sandbox Options</label>
         <div class="mm-sandbox-toggles">
           <label class="mm-toggle-label">
@@ -495,7 +495,7 @@ function _renderNewGameScreen(overlay: HTMLElement, canGoBack: boolean): void {
       (opt.querySelector('input[type="radio"]') as HTMLInputElement).checked = true;
       // Show/hide sandbox-specific options.
       if (sandboxOpts) {
-        sandboxOpts.style.display = (opt as HTMLElement).dataset.mode === 'sandbox' ? '' : 'none';
+        sandboxOpts.classList.toggle('mm-sandbox-options-hidden', (opt as HTMLElement).dataset.mode !== 'sandbox');
       }
     };
 
