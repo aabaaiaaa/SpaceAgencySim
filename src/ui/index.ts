@@ -16,7 +16,7 @@ import { initSatelliteOpsUI, destroySatelliteOpsUI } from './satelliteOps.ts';
 import { initTrackingStationUI, destroyTrackingStationUI } from './trackingStation.ts';
 import { initLibraryUI, destroyLibraryUI } from './library.ts';
 import { initRdLabUI, destroyRdLabUI } from './rdLab.ts';
-import { openLogisticsPanel, closeLogisticsPanel } from './logistics.ts';
+import { openLogisticsPanel, closeLogisticsPanel } from './logistics/index.ts';
 import { stopFlightScene } from './flightController.ts';
 import { initTopBar, destroyTopBar, refreshTopBar, setCurrentScreen } from './topbar.ts';
 import { showVabScene, hideVabScene } from '../render/vab.ts';

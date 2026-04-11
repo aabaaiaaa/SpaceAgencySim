@@ -71,6 +71,8 @@ export const PartType = Object.freeze({
   CRYO_TANK: 'CRYO_TANK',
   /** Mining module deployed on a celestial body surface. */
   MINING_MODULE: 'MINING_MODULE',
+  /** Deployable outpost core for establishing off-world hubs. */
+  OUTPOST_CORE: 'OUTPOST_CORE',
 } as const);
 
 export type PartType = (typeof PartType)[keyof typeof PartType];
@@ -280,6 +282,7 @@ export const FacilityId = Object.freeze({
   SATELLITE_OPS:    'satellite-ops',
   LIBRARY:          'library',
   LOGISTICS_CENTER: 'logistics-center',
+  CREW_HAB:         'crew-hab',
 } as const);
 
 export type FacilityId = (typeof FacilityId)[keyof typeof FacilityId];
@@ -2205,3 +2208,13 @@ export const MiningModuleType = Object.freeze({
 } as const);
 
 export type MiningModuleType = (typeof MiningModuleType)[keyof typeof MiningModuleType];
+
+// ---------------------------------------------------------------------------
+// Hub Constants
+// ---------------------------------------------------------------------------
+
+/** Proximity radius (metres) for detecting orbital hub docking range. */
+export const HUB_PROXIMITY_DOCK_RADIUS = 1000;
+
+/** The ID of the default Earth hub. */
+export const EARTH_HUB_ID = 'earth';

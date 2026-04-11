@@ -15,7 +15,7 @@
 - **Verification**: `npx tsc --noEmit` passes. The original `src/ui/logistics.ts` should now only contain the barrel re-export setup or shared initialisation code.
 
 ### TASK-001c: Split logistics.ts — barrel re-export and verify
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001b
 - **Description**: Convert the remaining `src/ui/logistics.ts` into `src/ui/logistics/index.ts` (barrel re-export). It should re-export all public functions from the four sub-modules. Delete the old `src/ui/logistics.ts` file. Verify that all external imports (other UI modules, E2E tests) continue to resolve correctly. Run the full unit test suite and targeted E2E tests.
 - **Verification**: `npx tsc --noEmit` passes. `npm run test:unit` passes. `npx playwright test e2e/route-interactions.spec.ts e2e/mining-interactions.spec.ts` passes.
@@ -39,7 +39,7 @@
 - **Verification**: `npx vitest run src/tests/mining.test.ts --testNamePattern "orbital buffer"` passes.
 
 ### TASK-005: Extract SVG body colors to CSS custom properties
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001b
 - **Description**: Define CSS custom properties for celestial body colours in the existing game stylesheet (e.g. `--body-color-earth: #4488CC;`). Update the `_getBodyColor()` function (now in `src/ui/logistics/routeMap.ts` after the split) to read from a shared constant map that mirrors the CSS values. Ensure the SVG map still renders body circles with the correct colours.
 - **Verification**: `npx tsc --noEmit` passes. `npx playwright test e2e/route-interactions.spec.ts` passes (routes tab still renders correctly).
@@ -69,7 +69,7 @@
 - **Verification**: `npx tsc --noEmit` passes. Visual inspection via dev server shows hub markers on the map.
 
 ### TASK-008c: In-flight map — route tooltips and interactivity
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-008b
 - **Description**: In `src/render/map.ts` and `src/ui/map.ts`, add hover tooltips for route arcs (route name, resource type, throughput, status, revenue for Earth-bound) and hub markers (hub name, body, online status, facility list). Use PixiJS `hitArea` or proximity-based mouse distance detection for route curves. In tracking station mode, clicking a hub marker opens the hub info panel. Write a targeted E2E test that verifies the route overlay toggle works and at least one route arc is drawn when routes exist.
 - **Verification**: `npx tsc --noEmit` passes. `npx playwright test e2e/route-interactions.spec.ts` passes.
@@ -85,7 +85,7 @@
 - **Verification**: `npx tsc --noEmit src/core/hubTypes.ts` passes with no errors.
 
 ### TASK-010: Hub constants and facility definitions
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-009
 - **Description**: Add `OUTPOST_CORE` to PartType and `CREW_HAB` to FacilityId in `src/core/constants.ts`. Add `HUB_PROXIMITY_DOCK_RADIUS` (1000m) and `EARTH_HUB_ID` ('earth') constants. Create `src/data/hubFacilities.ts` with: `EnvironmentCategory` enum, `ENVIRONMENT_COST_MULTIPLIER`, `BODY_ENVIRONMENT` map, `IMPORT_TAX_MULTIPLIER`, `DEFAULT_IMPORT_TAX`, `CREW_HAB_CAPACITY` per tier, `SURFACE_HUB_FACILITIES`, `ORBITAL_HUB_FACILITIES`, `EARTH_ONLY_FACILITIES`, `FacilityResourceCost` interface, `OFFWORLD_FACILITY_COSTS`, and `OFFWORLD_FACILITY_UPKEEP`. All data frozen with `Object.freeze()`. See implementation plan for exact values.
 - **Verification**: `npx tsc --noEmit` passes.

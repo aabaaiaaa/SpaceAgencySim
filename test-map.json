@@ -1129,7 +1129,7 @@
     },
     "ui/logistics": {
       "sources": [
-        "src/ui/logistics.ts"
+        "src/ui/logistics/index.ts"
       ],
       "unit": [],
       "e2e": [

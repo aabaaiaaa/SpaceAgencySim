@@ -11,16 +11,16 @@
  * @module ui/logistics
  */
 
-import type { GameState } from '../core/gameState.ts';
+import type { GameState } from '../../core/gameState.ts';
 import {
   getLogisticsState,
   setLogisticsState,
   resetBuilderState,
   setRenderFn,
-} from './logistics/_state.ts';
-import { renderMiningTab } from './logistics/_miningSites.ts';
-import { renderRoutesTab } from './logistics/_routeTable.ts';
-import './logistics.css';
+} from './_state.ts';
+import { renderMiningTab } from './_miningSites.ts';
+import { renderRoutesTab } from './_routeTable.ts';
+import '../logistics.css';
 
 // ---------------------------------------------------------------------------
 // Public API

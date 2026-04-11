@@ -19,19 +19,23 @@ import {
 // Shared helpers
 // ---------------------------------------------------------------------------
 
+/** Body fill colours — must stay in sync with CSS custom properties in logistics.css. */
+const BODY_COLORS: Record<string, string> = {
+  SUN: '#FFD700',
+  EARTH: '#4488CC',
+  MOON: '#999999',
+  MARS: '#CC5533',
+  CERES: '#887766',
+  JUPITER: '#CC9955',
+  SATURN: '#CCBB77',
+  TITAN: '#AA8844',
+} as const;
+
+const BODY_COLOR_DEFAULT = '#666666';
+
 /** Return a fill colour for a celestial-body circle on the route map. */
 export function getBodyColor(bodyId: string): string {
-  const colors: Record<string, string> = {
-    SUN: '#FFD700',
-    EARTH: '#4488CC',
-    MOON: '#999',
-    MARS: '#CC5533',
-    CERES: '#887766',
-    JUPITER: '#CC9955',
-    SATURN: '#CCBB77',
-    TITAN: '#AA8844',
-  };
-  return colors[bodyId] ?? '#666';
+  return BODY_COLORS[bodyId] ?? BODY_COLOR_DEFAULT;
 }
 
 /**

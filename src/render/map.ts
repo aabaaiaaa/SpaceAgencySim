@@ -56,6 +56,8 @@ import { getSizeCategory } from './flight/_asteroids.ts';
 import type { ReadonlyPhysicsState, ReadonlyFlightState, ReadonlyGameState } from './types.ts';
 import type { OrbitalElements, OrbitalObject } from '../core/gameState.ts';
 import type { Hub } from '../core/hubTypes.ts';
+import { RESOURCES_BY_ID } from '../data/resources.ts';
+import type { ResourceType } from '../core/constants.ts';
 
 // ---------------------------------------------------------------------------
 // Colour palette
@@ -160,6 +162,39 @@ let _selectedTransferTarget: string | null = null;
 
 // Input handlers
 let _wheelHandler: ((e: WheelEvent) => void) | null = null;
+let _mouseMoveHandler: ((e: MouseEvent) => void) | null = null;
+let _clickHandler: ((e: MouseEvent) => void) | null = null;
+
+// Tooltip DOM element and mouse position tracking.
+let _tooltipEl: HTMLDivElement | null = null;
+let _mouseX = 0;
+let _mouseY = 0;
+
+// Cached render-frame data for tooltip hit-testing.
+
+interface _RouteArcInfo {
+  routeId: string;
+  routeName: string;
+  resourceType: string;
+  status: string;
+  throughput: number;
+  isEarthBound: boolean;
+  ox: number; oy: number;
+  cpx: number; cpy: number;
+  dx: number; dy: number;
+}
+let _renderedRouteArcs: _RouteArcInfo[] = [];
+
+interface _HubMarkerInfo {
+  hubId: string;
+  name: string;
+  bodyId: string;
+  online: boolean;
+  facilities: string[];
+  x: number;
+  y: number;
+}
+let _renderedHubMarkers: _HubMarkerInfo[] = [];
 
 // ---------------------------------------------------------------------------
 // Pre-generated asteroid belt dots
@@ -325,6 +360,27 @@ export function initMapRenderer(): void {
   _customViewRadius = null;
   _selectedTarget   = null;
   _showShadow       = false;
+
+  // Create tooltip overlay.
+  if (_tooltipEl) _tooltipEl.remove();
+  _tooltipEl = document.createElement('div');
+  _tooltipEl.className = 'map-tooltip';
+  _tooltipEl.style.cssText =
+    'position:absolute;display:none;pointer-events:none;' +
+    'background:rgba(10,10,30,0.9);color:#ccc;padding:6px 10px;' +
+    'border-radius:4px;font-size:12px;z-index:100;white-space:pre-line;' +
+    'border:1px solid #444;max-width:260px;';
+  document.body.appendChild(_tooltipEl);
+
+  // Mouse tracking for tooltip proximity checks.
+  if (_mouseMoveHandler) window.removeEventListener('mousemove', _mouseMoveHandler);
+  _mouseMoveHandler = (e: MouseEvent) => { _mouseX = e.clientX; _mouseY = e.clientY; };
+  window.addEventListener('mousemove', _mouseMoveHandler);
+
+  // Click handler for hub marker interaction.
+  if (_clickHandler) window.removeEventListener('click', _clickHandler);
+  _clickHandler = _onMapClick;
+  window.addEventListener('click', _clickHandler);
 }
 
 /**
@@ -366,6 +422,18 @@ export function destroyMapRenderer(): void {
     window.removeEventListener('wheel', _wheelHandler);
     _wheelHandler = null;
   }
+  if (_mouseMoveHandler) {
+    window.removeEventListener('mousemove', _mouseMoveHandler);
+    _mouseMoveHandler = null;
+  }
+  if (_clickHandler) {
+    window.removeEventListener('click', _clickHandler);
+    _clickHandler = null;
+  }
+  if (_tooltipEl) {
+    _tooltipEl.remove();
+    _tooltipEl = null;
+  }
 
   if (_mapRoot) {
     const app = getApp();
@@ -394,6 +462,9 @@ export function destroyMapRenderer(): void {
   _labelContainer      = null;
   _labelPool           = [];
   _beltDots            = null;
+
+  _renderedRouteArcs   = [];
+  _renderedHubMarkers  = [];
 
   _customViewRadius        = null;
   _selectedTarget          = null;
@@ -642,6 +713,9 @@ export function renderMapFrame(
 
   // 8. Route overlay.
   _drawRouteOverlay(state, cx, cy, scale, bodyId);
+
+  // 9. Tooltip proximity check (uses cached arc/marker positions from above).
+  _updateMapTooltip();
 }
 
 // ---------------------------------------------------------------------------
@@ -768,6 +842,7 @@ function _drawHubMarkers(
   scale: number,
   R: number,
 ): void {
+  _renderedHubMarkers = [];
   if (!_hubGraphics) return;
   _hubGraphics.clear();
 
@@ -786,6 +861,14 @@ function _drawHubMarkers(
 
   for (const hub of bodyHubs) {
     const alpha = hub.online ? 1.0 : 0.5;
+
+    // Collect facility list for tooltip (facilities with tier > 0).
+    const activeFacilities: string[] = [];
+    if (hub.facilities) {
+      for (const [fid, fstate] of Object.entries(hub.facilities)) {
+        if (fstate && fstate.tier > 0) activeFacilities.push(fid);
+      }
+    }
 
     if (hub.type === 'surface') {
       // Surface hubs: position around the top of the body circle.
@@ -810,6 +893,17 @@ function _drawHubMarkers(
       _hubGraphics.fill({ color: HUB_SURFACE_COLOR, alpha });
 
       _useLabel(hub.name, hx + hw / 2 + 3, hy - hh / 2 - 4, HUB_SURFACE_COLOR);
+
+      _renderedHubMarkers.push({
+        hubId: hub.id,
+        name: hub.name,
+        bodyId: hub.bodyId,
+        online: hub.online,
+        facilities: activeFacilities,
+        x: hx,
+        y: hy - hh / 2,  // centre of marker
+      });
+
       surfaceIndex++;
     } else {
       // Orbital hubs: position at altitude above the body surface.
@@ -834,6 +928,17 @@ function _drawHubMarkers(
       _hubGraphics.fill({ color: HUB_ORBITAL_COLOR, alpha });
 
       _useLabel(hub.name, ox + d + 3, oy - 5, HUB_ORBITAL_COLOR);
+
+      _renderedHubMarkers.push({
+        hubId: hub.id,
+        name: hub.name,
+        bodyId: hub.bodyId,
+        online: hub.online,
+        facilities: activeFacilities,
+        x: ox,
+        y: oy,
+      });
+
       orbitalIndex++;
     }
   }
@@ -1720,6 +1825,7 @@ function _drawRouteOverlay(
   scale: number,
   bodyId: string,
 ): void {
+  _renderedRouteArcs = [];
   if (!_routeGraphics || !_routeOverlayVisible) return;
   _routeGraphics.clear();
 
@@ -1738,6 +1844,11 @@ function _drawRouteOverlay(
   // --- Draw route legs as solid Bezier curves ---
   if (state.routes && state.routes.length > 0) {
     for (const route of state.routes) {
+      // Determine if any leg in this route goes to EARTH.
+      const isEarthBound = route.legs.some(
+        (l) => l.destination.bodyId === 'EARTH',
+      );
+
       for (let legIdx = 0; legIdx < route.legs.length; legIdx++) {
         const leg = route.legs[legIdx];
 
@@ -1764,6 +1875,19 @@ function _drawRouteOverlay(
         _routeGraphics.moveTo(oPos.x, oPos.y);
         _routeGraphics.quadraticCurveTo(cp.cpx, cp.cpy, dPos.x, dPos.y);
         _routeGraphics.stroke({ color, width: 2, alpha });
+
+        // Cache arc info for tooltip hit-testing.
+        _renderedRouteArcs.push({
+          routeId: route.id,
+          routeName: route.name,
+          resourceType: route.resourceType,
+          status: route.status,
+          throughput: route.throughputPerPeriod,
+          isEarthBound,
+          ox: oPos.x, oy: oPos.y,
+          cpx: cp.cpx, cpy: cp.cpy,
+          dx: dPos.x, dy: dPos.y,
+        });
 
         // Animated flow dots for active routes.
         if (route.status === 'active') {
@@ -1814,6 +1938,152 @@ function _drawRouteOverlay(
         8,   // dash length (px)
         6,   // gap length (px)
       );
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Private — tooltip & interaction
+// ---------------------------------------------------------------------------
+
+/** Threshold in pixels for detecting mouse proximity to a route arc. */
+const ROUTE_HIT_DIST = 15;
+/** Threshold in pixels for detecting mouse proximity to a hub marker. */
+const HUB_HIT_DIST = 12;
+/** Number of sample points along a Bezier for hit-testing. */
+const BEZIER_HIT_SAMPLES = 16;
+
+/**
+ * Format a money value for tooltip display.
+ * Simple inline formatter (not exported; mirrors mainmenu.ts formatMoney).
+ */
+function _fmtMoney(amount: number): string {
+  return '$' + Math.round(amount).toLocaleString('en-US');
+}
+
+/**
+ * Compute the minimum distance from a point (px, py) to a quadratic Bezier
+ * curve defined by (ox,oy)→(cpx,cpy)→(dx,dy), sampled at N points.
+ */
+function _distToBezier(
+  px: number, py: number,
+  ox: number, oy: number,
+  cpx: number, cpy: number,
+  dx: number, dy: number,
+): number {
+  let minDist = Infinity;
+  for (let i = 0; i <= BEZIER_HIT_SAMPLES; i++) {
+    const t = i / BEZIER_HIT_SAMPLES;
+    const pt = _evalQuadBezier(ox, oy, cpx, cpy, dx, dy, t);
+    const d = Math.hypot(pt.x - px, pt.y - py);
+    if (d < minDist) minDist = d;
+  }
+  return minDist;
+}
+
+/**
+ * Update the map tooltip based on mouse proximity to rendered route arcs
+ * and hub markers.  Called once per frame from renderMapFrame().
+ */
+function _updateMapTooltip(): void {
+  if (!_tooltipEl || !_mapRoot || !_mapRoot.visible) {
+    if (_tooltipEl) _tooltipEl.style.display = 'none';
+    return;
+  }
+
+  const mx = _mouseX;
+  const my = _mouseY;
+
+  // --- Check hub markers (higher priority — smaller targets) ---
+  for (const hub of _renderedHubMarkers) {
+    const d = Math.hypot(hub.x - mx, hub.y - my);
+    if (d < HUB_HIT_DIST) {
+      const bodyDef = CELESTIAL_BODIES[hub.bodyId];
+      const bodyName = bodyDef ? bodyDef.name : hub.bodyId;
+
+      const statusStr = hub.online ? 'Online' : 'Offline';
+      const facilitiesStr = hub.facilities.length > 0
+        ? hub.facilities.join(', ')
+        : 'None';
+
+      _showTooltip(mx, my,
+        `${hub.name}\n` +
+        `Body: ${bodyName}\n` +
+        `Status: ${statusStr}\n` +
+        `Facilities: ${facilitiesStr}`);
+      return;
+    }
+  }
+
+  // --- Check route arcs (only when overlay is visible) ---
+  if (_routeOverlayVisible) {
+    for (const arc of _renderedRouteArcs) {
+      const d = _distToBezier(mx, my, arc.ox, arc.oy, arc.cpx, arc.cpy, arc.dx, arc.dy);
+      if (d < ROUTE_HIT_DIST) {
+        const resDef = RESOURCES_BY_ID[arc.resourceType as ResourceType];
+        const resName = resDef ? resDef.name : arc.resourceType;
+
+        let text =
+          `${arc.routeName}\n` +
+          `Resource: ${resName}\n` +
+          `Status: ${arc.status}\n` +
+          `Throughput: ${arc.throughput} kg/period`;
+
+        if (arc.isEarthBound && resDef) {
+          const revenue = arc.throughput * resDef.baseValuePerKg;
+          text += `\nRevenue: ${_fmtMoney(revenue)}/period`;
+        }
+
+        _showTooltip(mx, my, text);
+        return;
+      }
+    }
+  }
+
+  // Nothing close — hide tooltip.
+  _tooltipEl.style.display = 'none';
+}
+
+/**
+ * Position and show the tooltip near the mouse cursor.
+ */
+function _showTooltip(mx: number, my: number, text: string): void {
+  if (!_tooltipEl) return;
+  _tooltipEl.textContent = text;
+  _tooltipEl.style.display = 'block';
+
+  // Offset tooltip to the right and slightly below the cursor.
+  let tx = mx + 14;
+  let ty = my + 14;
+
+  // Clamp to viewport to avoid overflow.
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  const elW = _tooltipEl.offsetWidth || 200;
+  const elH = _tooltipEl.offsetHeight || 80;
+  if (tx + elW > w - 8) tx = mx - elW - 8;
+  if (ty + elH > h - 8) ty = my - elH - 8;
+  if (tx < 4) tx = 4;
+  if (ty < 4) ty = 4;
+
+  _tooltipEl.style.left = tx + 'px';
+  _tooltipEl.style.top = ty + 'px';
+}
+
+/**
+ * Handle click events on the map — dispatch hub-click events for the UI layer.
+ */
+function _onMapClick(e: MouseEvent): void {
+  if (!_mapRoot || !_mapRoot.visible) return;
+
+  const mx = e.clientX;
+  const my = e.clientY;
+
+  for (const hub of _renderedHubMarkers) {
+    const d = Math.hypot(hub.x - mx, hub.y - my);
+    if (d < HUB_HIT_DIST) {
+      window.dispatchEvent(new CustomEvent('map-hub-click', { detail: { hubId: hub.hubId } }));
+      return;
     }
   }
 }
