@@ -46,7 +46,7 @@ describe('settings.ts branch coverage', () => {
     const state = makeGameState({ difficultySettings: null });
     updateDifficultySettings(state, { malfunctionFrequency: MalfunctionFrequency.OFF });
     expect(state.difficultySettings).toBeDefined();
-    expect(state.difficultySettings!.malfunctionFrequency).toBe('OFF');
+    expect(state.difficultySettings!.malfunctionFrequency).toBe(MalfunctionFrequency.OFF);
     // Other fields should have been initialised from defaults
     expect(state.difficultySettings!.weatherSeverity).toBe(DEFAULT_DIFFICULTY_SETTINGS.weatherSeverity);
   });

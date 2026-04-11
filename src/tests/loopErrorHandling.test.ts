@@ -29,14 +29,18 @@ vi.mock('../core/surfaceOps.js', () => ({ getSurfaceItemsAtBody: vi.fn(() => [])
 vi.mock('../core/comms.js', () => ({
   evaluateComms: mockEvaluateComms,
 }));
-vi.mock('../core/constants.js', () => ({
-  FlightPhase: {
-    PRELAUNCH: 'PRELAUNCH', LAUNCH: 'LAUNCH', FLIGHT: 'FLIGHT',
-    ORBIT: 'ORBIT', MANOEUVRE: 'MANOEUVRE', TRANSFER: 'TRANSFER',
-    CAPTURE: 'CAPTURE', LANDED: 'LANDED',
-  },
-  PartType: { COMMAND_MODULE: 'COMMAND_MODULE' },
-}));
+vi.mock('../core/constants.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    FlightPhase: {
+      PRELAUNCH: 'PRELAUNCH', LAUNCH: 'LAUNCH', FLIGHT: 'FLIGHT',
+      ORBIT: 'ORBIT', MANOEUVRE: 'MANOEUVRE', TRANSFER: 'TRANSFER',
+      CAPTURE: 'CAPTURE', LANDED: 'LANDED',
+    },
+    PartType: { COMMAND_MODULE: 'COMMAND_MODULE' },
+  };
+});
 vi.mock('../data/parts.js', () => ({ getPartById: vi.fn() }));
 
 vi.mock('../ui/flightController/_timeWarp.js', () => ({
