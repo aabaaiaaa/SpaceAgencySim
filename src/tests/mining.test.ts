@@ -933,14 +933,14 @@ describe('Multi-resource extraction competition', () => {
 
     processMiningSites(state);
 
-    // MARS has WATER_ICE at 30 kg/period (SOLID via MINING_DRILL)
-    expect(silo.stored![ResourceType.WATER_ICE]).toBe(30);
+    // MARS has WATER_ICE at 80 kg/period (SOLID via MINING_DRILL)
+    expect(silo.stored![ResourceType.WATER_ICE]).toBe(80);
 
     // MARS has CO2 at 150 kg/period (GAS via GAS_COLLECTOR)
     expect(pressureVessel.stored![ResourceType.CO2]).toBe(150);
 
     // Verify they are extracted independently (both non-zero)
-    expect(site.storage[ResourceType.WATER_ICE]).toBe(30);
+    expect(site.storage[ResourceType.WATER_ICE]).toBe(80);
     expect(site.storage[ResourceType.CO2]).toBe(150);
   });
 });

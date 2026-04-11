@@ -1755,10 +1755,19 @@ describe('Save/load round-trip for mining/route fields', () => {
         type: MiningModuleType.MINING_DRILL,
         powerDraw: 25,
         connections: [],
+      }, {
+        id: 'mod-2',
+        partId: 'storage-silo-mk1',
+        type: MiningModuleType.STORAGE_SILO,
+        powerDraw: 2,
+        connections: [],
+        stored: { [ResourceType.WATER_ICE]: 500 },
+        storageCapacityKg: 2000,
+        storageState: ResourceState.SOLID,
       }],
       storage: { [ResourceType.WATER_ICE]: 500 },
       powerGenerated: 100,
-      powerRequired: 35,
+      powerRequired: 37,
       orbitalBuffer: {},
     });
 
@@ -1767,7 +1776,7 @@ describe('Save/load round-trip for mining/route fields', () => {
 
     expect(loaded.miningSites).toHaveLength(1);
     expect(loaded.miningSites[0].name).toBe('Lunar Base Alpha');
-    expect(loaded.miningSites[0].modules).toHaveLength(1);
+    expect(loaded.miningSites[0].modules).toHaveLength(2);
     expect(loaded.miningSites[0].storage).toEqual({ WATER_ICE: 500 });
   });
 
