@@ -200,6 +200,7 @@ interface MissionState {
   unlocksAfter: string[];
   unlockedParts: string[];
   status: string;
+  [key: string]: unknown;
 }
 
 // ---------------------------------------------------------------------------

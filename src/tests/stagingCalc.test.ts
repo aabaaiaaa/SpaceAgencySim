@@ -34,7 +34,6 @@ const SPARK_MASS      = 120;
 
 // engine-reliant properties
 const RELIANT_THRUST_KN = 240;
-const RELIANT_ISP_SL    = 310;
 const RELIANT_ISP_VAC   = 345;
 const RELIANT_MASS      = 500;
 
@@ -53,7 +52,6 @@ const SRB_DRY_MASS  = 180;
 const SRB_FUEL_MASS = 900;
 const SRB_THRUST_KN = 180;
 const SRB_ISP_SL    = 175;
-const SRB_ISP_VAC   = 190;
 
 // ---------------------------------------------------------------------------
 // Helper: build a simple single-stage rocket (probe + tank + engine-spark)

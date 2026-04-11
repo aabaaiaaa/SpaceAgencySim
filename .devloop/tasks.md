@@ -107,7 +107,7 @@ See `.devloop/requirements.md` for full context and rationale behind each task.
 - **Verification**: `node scripts/generate-test-map.mjs` runs without error. `node scripts/run-affected.mjs --dry-run` resolves all paths. The `core/stagingCalc` or equivalent area appears in `test-map.json`.
 
 ### TASK-018: Final verification pass
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-007, TASK-008, TASK-009, TASK-010, TASK-011, TASK-012, TASK-013, TASK-014, TASK-015, TASK-016, TASK-017
 - **Description**: Run all global verification commands and confirm cast count targets are met. See requirements section 6.
 - **Verification**: All of the following pass:

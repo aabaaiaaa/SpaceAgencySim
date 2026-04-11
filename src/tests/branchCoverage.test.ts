@@ -19,8 +19,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import type { GameState, FlightState, FlightEvent, TransferState, PowerState } from '../core/gameState.ts';
-import type { PhysicsState, LegEntry, ParachuteEntry } from '../core/physics.ts';
+import type { FlightState, FlightEvent, TransferState, PowerState } from '../core/gameState.ts';
+import type { LegEntry, ParachuteEntry } from '../core/physics.ts';
 import type { DebrisState } from '../core/staging.ts';
 import type { FuelSystemState } from '../core/fuelsystem.ts';
 import type { LogLevel } from '../core/logger.ts';
