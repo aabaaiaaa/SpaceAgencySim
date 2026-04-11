@@ -42,18 +42,6 @@ import {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type GameState = Record<string, any>;
 
-/** Shape of an instrument state entry in the flight physics state. */
-interface InstrumentStateEntry {
-  instrumentId: string;
-  state: string;
-  timer: number;
-  startBiome: string;
-  completeBiome?: string;
-  scienceMultiplier?: number;
-  dataType: string;
-  moduleInstanceId: string;
-}
-
 /** Shape of a science log entry. */
 interface ScienceLogEntry {
   instrumentId: string;
@@ -71,21 +59,10 @@ interface FlightEvent {
   [key: string]: unknown;
 }
 
-/** Shape of the current flight state within game state. */
-interface CurrentFlight {
-  events: FlightEvent[];
-}
-
 /** Shape of a facility entry. */
 interface FacilityEntry {
   built?: boolean;
   tier?: number;
-}
-
-/** Shape of the tech tree in game state. */
-interface TechTree {
-  researched: string[];
-  unlockedInstruments: string[];
 }
 
 // (window.d.ts augments the global Window interface with game properties)

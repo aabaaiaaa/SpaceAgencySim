@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
-import type { GameState, CrewMember, FlightState } from '../core/gameState.ts';
-import type { PhysicsState } from '../core/physics.ts';
+import type { GameState, CrewMember } from '../core/gameState.ts';
 import {
   hireCrew,
   fireCrew,

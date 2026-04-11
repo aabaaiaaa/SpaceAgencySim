@@ -18,7 +18,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
-import type { GameState, FlightState, Contract, ObjectiveDef, FlightEvent, MissionInstance } from '../core/gameState.ts';
+import type { GameState, FlightState, Contract, ObjectiveDef, FlightEvent } from '../core/gameState.ts';
 import {
   generateContracts,
   acceptContract,

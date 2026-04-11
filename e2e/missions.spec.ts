@@ -3,7 +3,7 @@ import {
   STARTING_MONEY,
   FIRST_FLIGHT_MISSION, buildSaveEnvelope, seedAndLoadSave,
 } from './helpers.js';
-import type { SaveEnvelope, MissionsState } from './helpers.js';
+import type { SaveEnvelope } from './helpers.js';
 
 /**
  * E2E — Mission Control Flow

@@ -52,7 +52,7 @@ import {
   SATELLITE_REPOSITION_HEALTH_COST,
 } from '../core/constants.ts';
 
-import type { GameState, OrbitalElements, FlightState } from '../core/gameState.ts';
+import type { GameState, OrbitalElements } from '../core/gameState.ts';
 import { makeFlightState as makeFlightStateFactory } from './_factories.js';
 
 // ---------------------------------------------------------------------------

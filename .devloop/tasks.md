@@ -151,7 +151,7 @@ See `.devloop/requirements.md` for full context and rationale behind each task.
 ## Final
 
 ### TASK-021: Final verification pass
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001, TASK-003, TASK-006, TASK-011, TASK-013, TASK-014, TASK-020
 - **Description**: Run the full verification suite to confirm all iteration 6 goals are met: (1) `npm run typecheck` — no errors. (2) `npm run lint` — 0 warnings, 0 errors. (3) `npm run test:unit` — all unit tests pass with coverage thresholds enforced. (4) Run a targeted selection of E2E specs to verify no regressions: `npx playwright test e2e/smoke.spec.ts e2e/saveload.spec.ts e2e/crew.spec.ts`. (5) `npm run build` — production build succeeds. (6) Verify cast counts: `grep -r "as unknown as" src/tests/ | wc -l` < 50 and `grep -r "as unknown as" e2e/ | wc -l` < 100. (7) `node scripts/run-affected.mjs --dry-run --base HEAD~5` resolves test paths without errors.
 - **Verification**: All 7 checks above pass. Report final numbers for: lint warnings, unit test `as unknown as` count, E2E `as unknown as` count, coverage percentages per directory.

@@ -9,8 +9,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import type { PhysicsState } from '../core/physics.ts';
-import type { FlightState, GameState, OrbitalElements } from '../core/gameState.ts';
+import type { GameState, OrbitalElements } from '../core/gameState.ts';
 import type { FCState } from '../ui/flightController/_state.ts';
 import { makeGameState, makePhysicsState, makeFlightState as makeFlightStateFactory } from './_factories.js';
 
@@ -190,7 +189,6 @@ import {
   setPhysicsState,
   setFlightState,
   getFlightState,
-  getPhysicsState,
 } from '../ui/flightController/_state.ts';
 import {
   toggleMapView,
@@ -470,12 +468,12 @@ describe('handleWarpToTarget', () => {
   it('shows notification when warp is not possible', () => {
     const s = getFCState();
     s.state = makeGameState({
-      orbitalObjects: [{ id: 'sat-1', name: 'Satellite 1', elements: { sma: 7000000, ecc: 0 } }],
-    } as Partial<GameState>);
+      orbitalObjects: [{ id: 'sat-1', name: 'Satellite 1', bodyId: 'EARTH', type: 'SATELLITE', elements: { sma: 7000000, ecc: 0 } }] as unknown as GameState['orbitalObjects'],
+    });
     const fs = getFlightState()!;
     fs.orbitalElements = { sma: 6771000, ecc: 0, inc: 0, argPe: 0, lan: 0, trueAnomaly: 0 } as unknown as OrbitalElements;
     _mapMock._setTarget('sat-1');
-    vi.mocked(warpToTarget).mockReturnValueOnce({ possible: false });
+    vi.mocked(warpToTarget).mockReturnValueOnce({ possible: false, time: null, elapsed: null });
 
     handleWarpToTarget();
 
@@ -487,8 +485,8 @@ describe('handleWarpToTarget', () => {
   it('advances time and shows success notification when warp is possible', () => {
     const s = getFCState();
     s.state = makeGameState({
-      orbitalObjects: [{ id: 'sat-1', name: 'Satellite 1', elements: { sma: 7000000, ecc: 0 } }],
-    } as Partial<GameState>);
+      orbitalObjects: [{ id: 'sat-1', name: 'Satellite 1', bodyId: 'EARTH', type: 'SATELLITE', elements: { sma: 7000000, ecc: 0 } }] as unknown as GameState['orbitalObjects'],
+    });
     const fs = getFlightState()!;
     fs.orbitalElements = { sma: 6771000, ecc: 0, inc: 0, argPe: 0, lan: 0, trueAnomaly: 0 } as unknown as OrbitalElements;
     fs.timeElapsed = 100;
@@ -583,6 +581,7 @@ describe('applyMapThrust — edge cases', () => {
 
   it('uses EARTH as default bodyId when flightState.bodyId is empty', () => {
     setFlightState(makeFlightStateFactory({
+      // @ts-expect-error — intentionally passing empty string to test default-to-EARTH fallback
       phase: 'ORBIT', bodyId: '', timeElapsed: 0,
       orbitalElements: null, events: [], transferState: null,
     }));

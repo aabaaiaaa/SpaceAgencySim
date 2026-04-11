@@ -14,7 +14,7 @@ import {
 } from '../core/challenges.ts';
 import { CHALLENGES, MedalTier, ScoreDirection } from '../data/challenges.ts';
 import { ObjectiveType } from '../data/missions.ts';
-import type { GameState, FlightState, FlightEvent, MissionInstance, ChallengeDef, MedalThresholds } from '../core/gameState.ts';
+import type { GameState, FlightState, FlightEvent, ChallengeDef, MedalThresholds } from '../core/gameState.ts';
 import type { PhysicsState } from '../core/physics.ts';
 import { makeMissionInstance } from './_factories.js';
 

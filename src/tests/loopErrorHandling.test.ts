@@ -102,10 +102,8 @@ vi.mock('../core/orbit.ts', () => ({
 import { loop, MAX_CONSECUTIVE_LOOP_ERRORS } from '../ui/flightController/_loop.ts';
 import { getFCState, setFCState, resetFCState, setPhysicsState, setFlightState } from '../ui/flightController/_state.ts';
 import {
-  isWorkerReady,
   hasWorkerError,
   getWorkerErrorMessage,
-  consumeMainThreadSnapshot,
 } from '../ui/flightController/_workerBridge.ts';
 import { showPostFlightSummary } from '../ui/flightController/_postFlight.ts';
 import { applyTimeWarp } from '../ui/flightController/_timeWarp.ts';

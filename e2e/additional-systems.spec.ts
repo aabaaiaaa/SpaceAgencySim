@@ -44,57 +44,6 @@ import {
 // (window.d.ts augments the global Window interface with game properties)
 // ---------------------------------------------------------------------------
 
-interface PowerState {
-  solarPanelArea: number;
-  batteryCapacity: number;
-  batteryCharge: number;
-  hasPower: boolean;
-  solarGeneration: number;
-  powerDraw: number;
-}
-
-interface FlightPs {
-  posX: number;
-  posY: number;
-  velX: number;
-  velY: number;
-  grounded: boolean;
-  landed: boolean;
-  crashed: boolean;
-  throttle: number;
-  firingEngines: Set<string>;
-  activeParts: Set<string>;
-  heatMap: Map<string, number>;
-  powerState?: PowerState;
-}
-
-interface CommsInfo {
-  status: string;
-  controlLocked: boolean;
-  canTransmit: boolean;
-  linkType: string;
-}
-
-interface FlightState {
-  bodyId: string;
-  phase: string;
-  inOrbit: boolean;
-  orbitalElements: unknown;
-  altitude: number;
-  velocity: number;
-  horizontalVelocity: number;
-  transferState?: Record<string, unknown>;
-  phaseLog?: unknown[];
-  events?: { type: string }[];
-  commsState?: CommsInfo;
-  comms?: CommsInfo;
-  crewIds?: string[];
-}
-
-interface FlightAssembly {
-  parts: Map<string, { partId: string }>;
-}
-
 interface FieldCraft {
   id: string;
   name: string;
@@ -106,36 +55,6 @@ interface FieldCraft {
   deployedPeriod: number;
   orbitalElements: unknown;
   orbitBandId: string | null;
-}
-
-interface SatelliteEntry {
-  bodyId: string;
-  health: number;
-  [key: string]: unknown;
-}
-
-interface GameStateShape {
-  missions?: {
-    accepted?: { id: string; objectives?: { id: string; completed?: boolean }[] }[];
-    completed?: { id: string; objectives?: { id: string; completed?: boolean }[] }[];
-  };
-  contracts?: {
-    active?: { id: string; objectives?: { id: string; completed?: boolean }[] }[];
-    completed?: { id: string; objectives?: { id: string; completed?: boolean }[] }[];
-  };
-  currentFlight?: {
-    events?: { type: string }[];
-  };
-  satelliteNetwork?: {
-    satellites: SatelliteEntry[];
-  };
-  fieldCraft?: FieldCraft[];
-  crew?: { id: string; status: string }[];
-}
-
-interface PartCatalogEntry {
-  id: string;
-  properties?: Record<string, unknown>;
 }
 
 // (window.d.ts augments the global Window interface with game properties)

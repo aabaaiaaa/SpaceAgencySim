@@ -300,6 +300,7 @@ describe('renderBiomeLabel', () => {
       min: 0,
       max: 12000,
       scienceMultiplier: 1.0,
+      color: 0x88ccff,
     });
     vi.mocked(getBiomeTransition).mockReturnValue(null);
 
@@ -322,6 +323,7 @@ describe('renderBiomeLabel', () => {
       min: 12000,
       max: 50000,
       scienceMultiplier: 1.5,
+      color: 0x88ccff,
     });
     vi.mocked(getBiomeTransition).mockReturnValue(null);
 
@@ -346,11 +348,12 @@ describe('renderBiomeLabel', () => {
       min: 0,
       max: 12000,
       scienceMultiplier: 1.0,
+      color: 0x88ccff,
     });
     vi.mocked(getBiomeTransition).mockReturnValue({
       ratio: 0.3,
-      from: { id: 'lower-atmo', name: 'Lower Atmosphere', min: 0, max: 12000, scienceMultiplier: 1.0 },
-      to: { id: 'upper-atmo', name: 'Upper Atmosphere', min: 12000, max: 50000, scienceMultiplier: 1.5 },
+      from: { id: 'lower-atmo', name: 'Lower Atmosphere', min: 0, max: 12000, scienceMultiplier: 1.0, color: 0x88ccff },
+      to: { id: 'upper-atmo', name: 'Upper Atmosphere', min: 12000, max: 50000, scienceMultiplier: 1.5, color: 0x4488ff },
     });
 
     renderBiomeLabel(11950, 800, 600, 0.016, 'EARTH');
@@ -372,11 +375,12 @@ describe('renderBiomeLabel', () => {
       min: 0,
       max: 12000,
       scienceMultiplier: 1.0,
+      color: 0x88ccff,
     });
     vi.mocked(getBiomeTransition).mockReturnValue({
       ratio: 0.7,
-      from: { id: 'lower-atmo', name: 'Lower Atmosphere', min: 0, max: 12000, scienceMultiplier: 1.0 },
-      to: { id: 'upper-atmo', name: 'Upper Atmosphere', min: 12000, max: 50000, scienceMultiplier: 1.5 },
+      from: { id: 'lower-atmo', name: 'Lower Atmosphere', min: 0, max: 12000, scienceMultiplier: 1.0, color: 0x88ccff },
+      to: { id: 'upper-atmo', name: 'Upper Atmosphere', min: 12000, max: 50000, scienceMultiplier: 1.5, color: 0x4488ff },
     });
 
     renderBiomeLabel(12050, 800, 600, 0.016, 'EARTH');
@@ -398,6 +402,7 @@ describe('renderBiomeLabel', () => {
       min: 0,
       max: 12000,
       scienceMultiplier: 1.0,
+      color: 0x88ccff,
     });
     vi.mocked(getBiomeTransition).mockReturnValue(null);
 
@@ -420,12 +425,13 @@ describe('renderBiomeLabel', () => {
       min: 0,
       max: 12000,
       scienceMultiplier: 1.0,
+      color: 0x88ccff,
     });
     // Transition with low ratio means targetAlpha < 1.0
     vi.mocked(getBiomeTransition).mockReturnValue({
       ratio: 0.4,
-      from: { id: 'lower-atmo', name: 'Lower Atmosphere', min: 0, max: 12000, scienceMultiplier: 1.0 },
-      to: { id: 'upper-atmo', name: 'Upper Atmosphere', min: 12000, max: 50000, scienceMultiplier: 1.5 },
+      from: { id: 'lower-atmo', name: 'Lower Atmosphere', min: 0, max: 12000, scienceMultiplier: 1.0, color: 0x88ccff },
+      to: { id: 'upper-atmo', name: 'Upper Atmosphere', min: 12000, max: 50000, scienceMultiplier: 1.5, color: 0x4488ff },
     });
 
     renderBiomeLabel(11980, 800, 600, 0.1, 'EARTH');
@@ -446,6 +452,7 @@ describe('renderBiomeLabel', () => {
       min: 0,
       max: 12000,
       scienceMultiplier: 1.0,
+      color: 0x88ccff,
     });
     vi.mocked(getBiomeTransition).mockReturnValue(null);
 

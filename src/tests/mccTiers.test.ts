@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
-import type { GameState, MissionInstance, ObjectiveDef } from '../core/gameState.ts';
+import type { GameState, ObjectiveDef } from '../core/gameState.ts';
 import {
   generateContracts,
   getMissionControlTier,

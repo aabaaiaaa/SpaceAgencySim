@@ -39,33 +39,6 @@ import {
 // (window.d.ts augments the global Window interface with game properties)
 // ---------------------------------------------------------------------------
 
-interface FlightPs {
-  posX: number;
-  posY: number;
-  velX: number;
-  velY: number;
-  angle: number;
-  throttle: number;
-  controlMode: string;
-  grounded: boolean;
-  firingEngines: Set<string>;
-  activeParts: Set<string>;
-}
-
-interface FlightState {
-  phase: string;
-  inOrbit: boolean;
-  orbitalElements: unknown;
-  timeElapsed: number;
-  phaseLog: { from: string; to: string }[];
-}
-
-interface GameStateShape {
-  currentPeriod: number;
-  parts: string[];
-  orbitalObjects: { id: string; name: string; bodyId: string; type: string; elements: unknown }[];
-}
-
 // (window.d.ts augments the global Window interface with game properties)
 
 // ---------------------------------------------------------------------------

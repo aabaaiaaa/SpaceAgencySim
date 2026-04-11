@@ -8,7 +8,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { PartDef } from '../data/parts.ts';
 import type { PlacedPart, RocketAssembly, StagingConfig, PartConnection } from '../core/rocketbuilder.ts';
-import type { GameState } from '../core/gameState.ts';
 import { makeGameState } from './_factories.js';
 
 // ---------------------------------------------------------------------------

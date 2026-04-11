@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 4,
+  "lastIteration": 5,
   "startedAt": "2026-04-10T23:10:47.879Z",
   "iteration": 6,
   "devloopVersion": "4.0.1",
   "activeTask": {
-    "taskId": "TASK-020",
-    "taskTitle": "Set final coverage thresholds and enforce --coverage in test:unit",
-    "iterationNumber": 5,
-    "startedAt": "2026-04-11T00:42:51.311Z"
+    "taskId": "TASK-021",
+    "taskTitle": "Final verification pass",
+    "iterationNumber": 6,
+    "startedAt": "2026-04-11T00:55:43.903Z"
   }
 }

@@ -19,13 +19,13 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import type { GameState, FlightState, FlightEvent, TransferState, PowerState, CrewMember } from '../core/gameState.ts';
+import type { GameState, FlightState, FlightEvent, TransferState, PowerState } from '../core/gameState.ts';
 import type { PhysicsState, LegEntry, ParachuteEntry } from '../core/physics.ts';
 import type { DebrisState } from '../core/staging.ts';
 import type { FuelSystemState } from '../core/fuelsystem.ts';
 import type { DifficultySettings } from '../core/constants.ts';
 import type { LogLevel } from '../core/logger.ts';
-import { makeGameState, makePhysicsState, makeCrewMember, makeRecoveryPS } from './_factories.js';
+import { makePhysicsState, makeCrewMember, makeRecoveryPS } from './_factories.js';
 
 // ---------------------------------------------------------------------------
 // settings.ts — updateDifficultySettings with null/undefined difficultySettings
