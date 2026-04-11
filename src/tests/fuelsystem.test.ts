@@ -21,6 +21,7 @@ import { SEA_LEVEL_DENSITY }  from '../core/atmosphere.ts';
 import type { RocketAssembly, PhysicsState } from '../core/physics.ts';
 import type { StagingConfig } from '../core/rocketbuilder.ts';
 import type { PartDef } from '../data/parts.ts';
+import { makePartDef } from './_factories.ts';
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -276,19 +277,19 @@ describe('computeEngineFlowRate() — SRB', () => {
   });
 
   it('uses explicit burnRate property when present', () => {
-    const fakeDef = {
+    const fakeDef = makePartDef({
       type: 'SOLID_ROCKET_BOOSTER',
       properties: { burnRate: 42, thrust: 999, isp: 999 },
-    } as unknown as PartDef;
+    });
     const rate = computeEngineFlowRate(fakeDef, 0.5, SEA_LEVEL_DENSITY);
     expect(rate).toBe(42);
   });
 
   it('ignores explicit burnRate of 0 — returns 0', () => {
-    const fakeDef = {
+    const fakeDef = makePartDef({
       type: 'SOLID_ROCKET_BOOSTER',
       properties: { burnRate: 0, thrust: 100, isp: 200 },
-    } as unknown as PartDef;
+    });
     const rate = computeEngineFlowRate(fakeDef, 1.0, SEA_LEVEL_DENSITY);
     expect(rate).toBe(0);
   });
@@ -677,28 +678,28 @@ describe('part mass tracking — fuel drain decreases total rocket mass', () => 
 
 describe('computeEngineFlowRate() — edge cases', () => {
   it('returns 0 for SRB when isp is 0 (zero denominator branch)', () => {
-    const fakeDef = {
+    const fakeDef = makePartDef({
       type: 'SOLID_ROCKET_BOOSTER',
       properties: { thrust: 100, isp: 0 },
-    } as unknown as PartDef;
+    });
     const rate = computeEngineFlowRate(fakeDef, 1.0, SEA_LEVEL_DENSITY);
     expect(rate).toBe(0);
   });
 
   it('returns 0 for liquid engine when isp is 0 (zero denominator branch)', () => {
-    const fakeDef = {
+    const fakeDef = makePartDef({
       type: 'ENGINE',
       properties: { thrust: 100, isp: 0 },
-    } as unknown as PartDef;
+    });
     const rate = computeEngineFlowRate(fakeDef, 1.0, SEA_LEVEL_DENSITY);
     expect(rate).toBe(0);
   });
 
   it('returns 0 for SRB with negative burnRate (clamped to 0)', () => {
-    const fakeDef = {
+    const fakeDef = makePartDef({
       type: 'SOLID_ROCKET_BOOSTER',
       properties: { burnRate: -5 },
-    } as unknown as PartDef;
+    });
     const rate = computeEngineFlowRate(fakeDef, 1.0, SEA_LEVEL_DENSITY);
     expect(rate).toBe(0);
   });
@@ -713,10 +714,10 @@ describe('computeEngineFlowRate() — edge cases', () => {
   });
 
   it('SRB uses vacuum thrust/isp when thrustVac is specified', () => {
-    const fakeDef = {
+    const fakeDef = makePartDef({
       type: 'SOLID_ROCKET_BOOSTER',
       properties: { thrust: 100, thrustVac: 120, isp: 200, ispVac: 250 },
-    } as unknown as PartDef;
+    });
     const rateVac = computeEngineFlowRate(fakeDef, 1.0, 0);
     // In vacuum: thrust = 120 kN = 120_000 N, isp = 250 s
     const expected = 120_000 / (250 * 9.81);
@@ -738,7 +739,8 @@ describe('computeEngineFlowRate() — edge cases', () => {
   });
 
   it('handles missing properties object gracefully', () => {
-    const fakeDef = { type: 'ENGINE' } as unknown as PartDef;
+    // @ts-expect-error — deliberately omitting required fields to test missing-properties fallback
+    const fakeDef: PartDef = { type: 'ENGINE' };
     const rate = computeEngineFlowRate(fakeDef, 1.0, SEA_LEVEL_DENSITY);
     // All properties default to 0 thrust / 300 isp → 0 thrust → 0 rate.
     expect(rate).toBe(0);

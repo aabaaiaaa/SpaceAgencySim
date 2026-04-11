@@ -303,7 +303,7 @@ describe('computeCoM()', () => {
 
   it('defaults mass to 1 when part def has no mass property', () => {
     const placed = makePlaced({ instanceId: 'p1', partId: 'light', x: 0, y: 0 });
-    const def = makeDef({ id: 'light', mass: undefined as unknown as number });
+    const def = makeDef({ id: 'light', mass: undefined });
     vi.mocked(getPartById).mockReturnValue(def);
 
     const parts = new Map<string, PlacedPart>([['p1', placed]]);

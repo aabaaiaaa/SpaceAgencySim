@@ -48,7 +48,7 @@ import {
 } from '../core/constants.ts';
 import type { ContractCategory as ContractCategoryType } from '../core/constants.ts';
 import { ObjectiveType } from '../data/missions.ts';
-import { makeMissionInstance } from './_factories.js';
+import { makeMissionInstance, makeObjectiveDef } from './_factories.js';
 
 interface TestContract extends Contract {
   bonusObjectives: (ObjectiveDef & { bonus?: boolean })[];
@@ -106,8 +106,8 @@ function freshState(): GameState {
   const state = createGameState();
   // Give the player some completed missions so contracts can generate.
   state.missions.completed = [
-    makeMissionInstance({ id: 'mission-001', title: 'M1', objectives: [{ type: ObjectiveType.REACH_SPEED, target: { speed: 150 }, completed: true }] as unknown as ObjectiveDef[], reward: 25000 }),
-    makeMissionInstance({ id: 'mission-004', title: 'M4', objectives: [{ type: ObjectiveType.REACH_HORIZONTAL_SPEED, target: { speed: 300 }, completed: true }] as unknown as ObjectiveDef[], reward: 30000 }),
+    makeMissionInstance({ id: 'mission-001', title: 'M1', objectives: [makeObjectiveDef({ type: ObjectiveType.REACH_SPEED, target: { speed: 150 }, completed: true })], reward: 25000 }),
+    makeMissionInstance({ id: 'mission-004', title: 'M4', objectives: [makeObjectiveDef({ type: ObjectiveType.REACH_HORIZONTAL_SPEED, target: { speed: 300 }, completed: true })], reward: 30000 }),
   ];
   return state;
 }

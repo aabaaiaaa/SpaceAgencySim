@@ -266,9 +266,9 @@ function tutorialSave({
     crew,
     facilities,
     missions: {
-      available: availableIds.map(mkAvailable) as unknown as Record<string, unknown>[],
-      accepted: acceptedId ? [mkAccepted(acceptedId)] as unknown as Record<string, unknown>[] : [],
-      completed: completedIds.map(mkCompleted) as unknown as Record<string, unknown>[],
+      available: availableIds.map(mkAvailable),
+      accepted: acceptedId ? [mkAccepted(acceptedId)] : [],
+      completed: completedIds.map(mkCompleted),
     },
     ...extra,
   });
@@ -375,7 +375,7 @@ async function expectCompleted(page: Page, missionId: string): Promise<void> {
 
 async function expectPartUnlocked(page: Page, partId: string): Promise<void> {
   const ok: boolean = await page.evaluate(
-    (id: string) => (window as unknown as { __gameState?: { parts?: string[] } }).__gameState?.parts?.includes(id) ?? false,
+    (id: string) => window.__gameState?.parts?.includes(id) ?? false,
     partId,
   );
   expect(ok).toBe(true);
@@ -383,7 +383,7 @@ async function expectPartUnlocked(page: Page, partId: string): Promise<void> {
 
 async function expectFacilityBuilt(page: Page, facilityId: string): Promise<void> {
   const ok: boolean = await page.evaluate(
-    (id: string) => (window as unknown as { __gameState?: { facilities?: Record<string, { built?: boolean }> } }).__gameState?.facilities?.[id]?.built === true,
+    (id: string) => window.__gameState?.facilities?.[id]?.built === true,
     facilityId,
   );
   expect(ok).toBe(true);
@@ -391,7 +391,7 @@ async function expectFacilityBuilt(page: Page, facilityId: string): Promise<void
 
 async function expectMissionAvailable(page: Page, missionId: string): Promise<void> {
   const ok: boolean = await page.evaluate(
-    (id: string) => (window as unknown as { __gameState?: { missions?: { available?: { id: string }[] } } }).__gameState?.missions?.available?.some(m => m.id === id) ?? false,
+    (id: string) => window.__gameState?.missions?.available?.some(m => m.id === id) ?? false,
     missionId,
   );
   expect(ok).toBe(true);

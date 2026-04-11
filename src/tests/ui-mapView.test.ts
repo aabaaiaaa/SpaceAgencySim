@@ -9,9 +9,8 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import type { GameState, OrbitalElements } from '../core/gameState.ts';
 import type { FCState } from '../ui/flightController/_state.ts';
-import { makeGameState, makePhysicsState, makeFlightState as makeFlightStateFactory } from './_factories.js';
+import { makeGameState, makePhysicsState, makeFlightState as makeFlightStateFactory, makeOrbitalElements, makeOrbitalObject } from './_factories.js';
 
 // ---------------------------------------------------------------------------
 // Mock pixi.js (needed transitively by render modules)
@@ -449,7 +448,7 @@ describe('handleWarpToTarget', () => {
   it('shows notification when no target is selected', () => {
     // Provide orbitalElements so handleWarpToTarget doesn't early-return.
     const fs = getFlightState()!;
-    fs.orbitalElements = { sma: 6771000, ecc: 0, inc: 0, argPe: 0, lan: 0, trueAnomaly: 0 } as unknown as OrbitalElements;
+    fs.orbitalElements = makeOrbitalElements({ semiMajorAxis: 6771000, eccentricity: 0 });
     _mapMock._setTarget(null);
     handleWarpToTarget();
     expect(showPhaseNotification).toHaveBeenCalledWith(
@@ -459,7 +458,7 @@ describe('handleWarpToTarget', () => {
 
   it('shows notification when target not found in orbital objects', () => {
     const fs = getFlightState()!;
-    fs.orbitalElements = { sma: 6771000, ecc: 0, inc: 0, argPe: 0, lan: 0, trueAnomaly: 0 } as unknown as OrbitalElements;
+    fs.orbitalElements = makeOrbitalElements({ semiMajorAxis: 6771000, eccentricity: 0 });
     _mapMock._setTarget('nonexistent');
     handleWarpToTarget();
     expect(showPhaseNotification).toHaveBeenCalledWith('Target not found');
@@ -468,10 +467,10 @@ describe('handleWarpToTarget', () => {
   it('shows notification when warp is not possible', () => {
     const s = getFCState();
     s.state = makeGameState({
-      orbitalObjects: [{ id: 'sat-1', name: 'Satellite 1', bodyId: 'EARTH', type: 'SATELLITE', elements: { sma: 7000000, ecc: 0 } }] as unknown as GameState['orbitalObjects'],
+      orbitalObjects: [makeOrbitalObject({ id: 'sat-1', name: 'Satellite 1', bodyId: 'EARTH', type: 'SATELLITE', elements: makeOrbitalElements({ semiMajorAxis: 7000000, eccentricity: 0 }) })],
     });
     const fs = getFlightState()!;
-    fs.orbitalElements = { sma: 6771000, ecc: 0, inc: 0, argPe: 0, lan: 0, trueAnomaly: 0 } as unknown as OrbitalElements;
+    fs.orbitalElements = makeOrbitalElements({ semiMajorAxis: 6771000, eccentricity: 0 });
     _mapMock._setTarget('sat-1');
     vi.mocked(warpToTarget).mockReturnValueOnce({ possible: false, time: null, elapsed: null });
 
@@ -485,10 +484,10 @@ describe('handleWarpToTarget', () => {
   it('advances time and shows success notification when warp is possible', () => {
     const s = getFCState();
     s.state = makeGameState({
-      orbitalObjects: [{ id: 'sat-1', name: 'Satellite 1', bodyId: 'EARTH', type: 'SATELLITE', elements: { sma: 7000000, ecc: 0 } }] as unknown as GameState['orbitalObjects'],
+      orbitalObjects: [makeOrbitalObject({ id: 'sat-1', name: 'Satellite 1', bodyId: 'EARTH', type: 'SATELLITE', elements: makeOrbitalElements({ semiMajorAxis: 7000000, eccentricity: 0 }) })],
     });
     const fs = getFlightState()!;
-    fs.orbitalElements = { sma: 6771000, ecc: 0, inc: 0, argPe: 0, lan: 0, trueAnomaly: 0 } as unknown as OrbitalElements;
+    fs.orbitalElements = makeOrbitalElements({ semiMajorAxis: 6771000, eccentricity: 0 });
     fs.timeElapsed = 100;
     fs.events = [];
     _mapMock._setTarget('sat-1');

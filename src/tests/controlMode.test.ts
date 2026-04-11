@@ -411,25 +411,29 @@ describe('CONTROL_MODE_TIPS', () => {
 describe('handleKeyDown in docking/RCS modes', () => {
   it('does not change throttle on W press in DOCKING mode', () => {
     const ps = stubPs({ controlMode: ControlMode.DOCKING, throttle: 0 });
-    handleKeyDown(ps, null as unknown as RocketAssembly, 'w');
+    // @ts-expect-error — testing docking mode with null assembly
+    handleKeyDown(ps, null, 'w');
     expect(ps.throttle).toBe(0);
   });
 
   it('does not change throttle on S press in DOCKING mode', () => {
     const ps = stubPs({ controlMode: ControlMode.DOCKING, throttle: 0.5 });
-    handleKeyDown(ps, null as unknown as RocketAssembly, 's');
+    // @ts-expect-error — testing docking mode with null assembly
+    handleKeyDown(ps, null, 's');
     expect(ps.throttle).toBe(0.5);
   });
 
   it('X cuts throttle in DOCKING mode', () => {
     const ps = stubPs({ controlMode: ControlMode.DOCKING, throttle: 0.5 });
-    handleKeyDown(ps, null as unknown as RocketAssembly, 'x');
+    // @ts-expect-error — testing docking mode with null assembly
+    handleKeyDown(ps, null, 'x');
     expect(ps.throttle).toBe(0);
   });
 
   it('does not change throttle on W in RCS mode', () => {
     const ps = stubPs({ controlMode: ControlMode.RCS, throttle: 0 });
-    handleKeyDown(ps, null as unknown as RocketAssembly, 'w');
+    // @ts-expect-error — testing docking mode with null assembly
+    handleKeyDown(ps, null, 'w');
     expect(ps.throttle).toBe(0);
   });
 });

@@ -763,51 +763,59 @@ describe('Diminishing returns edge cases', () => {
 
 describe('Null-safety edge cases', () => {
   it('getInstrumentStatus returns IDLE when instrumentStates is undefined', () => {
-    const ps = { instrumentStates: undefined } as unknown as PhysicsState;
+    // @ts-expect-error — deliberately undefined to test null-safety path
+    const ps: PhysicsState = { instrumentStates: undefined };
     expect(getInstrumentStatus(ps, 'any:instr:0')).toBe(ScienceModuleState.IDLE);
   });
 
   it('getInstrumentTimer returns 0 when instrumentStates is undefined', () => {
-    const ps = { instrumentStates: undefined } as unknown as PhysicsState;
+    // @ts-expect-error — deliberately undefined to test null-safety path
+    const ps: PhysicsState = { instrumentStates: undefined };
     expect(getInstrumentTimer(ps, 'any:instr:0')).toBe(0);
   });
 
   it('getModuleInstrumentKeys returns [] when instrumentStates is undefined', () => {
-    const ps = { instrumentStates: undefined } as unknown as PhysicsState;
+    // @ts-expect-error — deliberately undefined to test null-safety path
+    const ps: PhysicsState = { instrumentStates: undefined };
     expect(getModuleInstrumentKeys(ps, 'any')).toEqual([]);
   });
 
   it('tickInstruments is a no-op when instrumentStates is undefined', () => {
-    const ps = { instrumentStates: undefined, scienceModuleStates: undefined, activeParts: new Set<string>() } as unknown as PhysicsState;
+    // @ts-expect-error — deliberately incomplete to test null-safety path
+    const ps: PhysicsState = { instrumentStates: undefined, scienceModuleStates: undefined, activeParts: new Set<string>() };
     const fs = makeFlightState();
     // Should not throw.
     expect(() => tickInstruments(ps, { parts: new Map() } as RocketAssembly, fs, 1)).not.toThrow();
   });
 
   it('onSafeLanding handles undefined instrumentStates and scienceModuleStates', () => {
-    const ps = { instrumentStates: undefined, scienceModuleStates: undefined, activeParts: new Set<string>() } as unknown as PhysicsState;
+    // @ts-expect-error — deliberately incomplete to test null-safety path
+    const ps: PhysicsState = { instrumentStates: undefined, scienceModuleStates: undefined, activeParts: new Set<string>() };
     const fs = makeFlightState();
     const gs = makeGameState();
     expect(() => onSafeLanding(ps, { parts: new Map() } as RocketAssembly, fs, gs)).not.toThrow();
   });
 
   it('hasAnyRunningExperiment returns false for empty maps', () => {
-    const ps = {
+    // @ts-expect-error — deliberately incomplete to test empty-map edge case
+    const ps: PhysicsState = {
       instrumentStates: new Map<string, InstrumentStateEntry>(),
       scienceModuleStates: new Map<string, ScienceModuleStateEntry>(),
       activeParts: new Set<string>(),
-    } as unknown as PhysicsState;
+    };
     expect(hasAnyRunningExperiment(ps)).toBe(false);
   });
 
   it('activateInstrument returns false when instrumentStates is undefined', () => {
-    const ps = { instrumentStates: undefined, activeParts: new Set<string>() } as unknown as PhysicsState;
+    // @ts-expect-error — deliberately incomplete to test null-safety path
+    const ps: PhysicsState = { instrumentStates: undefined, activeParts: new Set<string>() };
     const fs = makeFlightState();
     expect(activateInstrument(ps, { parts: new Map() } as RocketAssembly, fs, 'any:instr:0')).toBe(false);
   });
 
   it('activateAllInstruments returns 0 when instrumentStates is undefined', () => {
-    const ps = { instrumentStates: undefined, activeParts: new Set<string>() } as unknown as PhysicsState;
+    // @ts-expect-error — deliberately incomplete to test null-safety path
+    const ps: PhysicsState = { instrumentStates: undefined, activeParts: new Set<string>() };
     const fs = makeFlightState();
     expect(activateAllInstruments(ps, { parts: new Map() } as RocketAssembly, fs, 'mod-1')).toBe(0);
   });

@@ -75,22 +75,19 @@ async function buildAndLaunch(page: Page): Promise<void> {
 async function gainAltitudeAndSeparate(page: Page): Promise<void> {
   await page.keyboard.press('Space'); // Stage 1: engine
   await page.waitForFunction(() => {
-    const ps = (window as unknown as Record<string, unknown>).__flightPs as
-      { posY: number } | undefined;
+    const ps = window.__flightPs;
     return (ps?.posY ?? 0) > 300;
   }, { timeout: 30_000 });
 
   await page.keyboard.press('Space'); // Stage 2: decoupler
   await page.waitForFunction(() => {
-    const ps = (window as unknown as Record<string, unknown>).__flightPs as
-      { debris: unknown[] } | undefined;
+    const ps = window.__flightPs;
     return (ps?.debris?.length ?? 0) > 0;
   }, { timeout: 10_000 });
 
   // Wait for visible separation.
   await page.waitForFunction(() => {
-    const ps = (window as unknown as Record<string, unknown>).__flightPs as
-      { posY: number; debris: { posY: number }[] } | undefined;
+    const ps = window.__flightPs;
     if (!ps?.debris?.length) return false;
     return Math.abs(ps.posY - ps.debris[0].posY) > 0.1;
   }, { timeout: 5_000 });
@@ -108,8 +105,7 @@ test.describe('Collision — Stage Separation', () => {
     await gainAltitudeAndSeparate(page);
 
     const positions: PositionResult = await page.evaluate((): PositionResult => {
-      const ps = (window as unknown as Record<string, unknown>).__flightPs as
-        { posY: number; debris: { posY: number }[] };
+      const ps = window.__flightPs!;
       return { rocketY: ps.posY, debrisY: ps.debris[0].posY };
     });
     expect(positions.rocketY).not.toBe(positions.debrisY);
@@ -122,8 +118,7 @@ test.describe('Collision — Stage Separation', () => {
     await gainAltitudeAndSeparate(page);
 
     const velocities: VelocityResult = await page.evaluate((): VelocityResult => {
-      const ps = (window as unknown as Record<string, unknown>).__flightPs as
-        { velY: number; debris: { velY: number }[] };
+      const ps = window.__flightPs!;
       return { rocketVelY: ps.velY, debrisVelY: ps.debris[0].velY };
     });
     expect(velocities.rocketVelY).not.toBe(velocities.debrisVelY);
@@ -136,15 +131,13 @@ test.describe('Collision — Stage Separation', () => {
     await gainAltitudeAndSeparate(page);
 
     await page.waitForFunction(() => {
-      const ps = (window as unknown as Record<string, unknown>).__flightPs as
-        { posY: number; debris: { posY: number }[] } | undefined;
+      const ps = window.__flightPs;
       if (!ps?.debris?.length) return false;
       return Math.abs(ps.posY - ps.debris[0].posY) > 1;
     }, { timeout: 10_000 });
 
     const result: DistanceResult = await page.evaluate((): DistanceResult => {
-      const ps = (window as unknown as Record<string, unknown>).__flightPs as
-        { posY: number; debris: { posY: number }[] } | undefined;
+      const ps = window.__flightPs;
       if (!ps || !ps.debris || ps.debris.length === 0) return { distance: 0 };
       return { distance: Math.abs(ps.posY - ps.debris[0].posY) };
     });

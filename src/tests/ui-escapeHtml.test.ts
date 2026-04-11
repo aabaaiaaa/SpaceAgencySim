@@ -45,9 +45,12 @@ describe('escapeHtml', () => {
 
   it('coerces non-string input via String()', () => {
     // The function calls String(str) first
-    expect(escapeHtml(42 as unknown as string)).toBe('42');
-    expect(escapeHtml(null as unknown as string)).toBe('null');
-    expect(escapeHtml(undefined as unknown as string)).toBe('undefined');
+    // @ts-expect-error — testing non-string coercion
+    expect(escapeHtml(42)).toBe('42');
+    // @ts-expect-error — testing non-string coercion
+    expect(escapeHtml(null)).toBe('null');
+    // @ts-expect-error — testing non-string coercion
+    expect(escapeHtml(undefined)).toBe('undefined');
   });
 
   it('escapes single quotes are NOT escaped (by design)', () => {

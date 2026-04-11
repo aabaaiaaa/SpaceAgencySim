@@ -63,19 +63,23 @@ describe('escapeHtml', () => {
   // ---- Non-string coercion ----
 
   it('coerces number input via String()', () => {
-    expect(escapeHtml(42 as unknown as string)).toBe('42');
+    // @ts-expect-error — testing non-string coercion
+    expect(escapeHtml(42)).toBe('42');
   });
 
   it('coerces null input via String()', () => {
-    expect(escapeHtml(null as unknown as string)).toBe('null');
+    // @ts-expect-error — testing non-string coercion
+    expect(escapeHtml(null)).toBe('null');
   });
 
   it('coerces undefined input via String()', () => {
-    expect(escapeHtml(undefined as unknown as string)).toBe('undefined');
+    // @ts-expect-error — testing non-string coercion
+    expect(escapeHtml(undefined)).toBe('undefined');
   });
 
   it('coerces boolean input via String()', () => {
-    expect(escapeHtml(true as unknown as string)).toBe('true');
+    // @ts-expect-error — testing non-string coercion
+    expect(escapeHtml(true)).toBe('true');
   });
 
   // ---- Already-escaped input (no double-escaping) ----

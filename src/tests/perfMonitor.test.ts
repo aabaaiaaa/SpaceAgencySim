@@ -239,19 +239,21 @@ describe('perfMonitor', () => {
 
   describe('memory tracking', () => {
     it('reads performance.memory when available', () => {
-      const perfAny = performance as unknown as { memory?: unknown };
-      perfAny.memory = {
-        usedJSHeapSize: 50_000_000,
-        jsHeapSizeLimit: 200_000_000,
-        totalJSHeapSize: 100_000_000,
-      };
+      Object.defineProperty(performance, 'memory', {
+        value: {
+          usedJSHeapSize: 50_000_000,
+          jsHeapSizeLimit: 200_000_000,
+          totalJSHeapSize: 100_000_000,
+        },
+        configurable: true,
+      });
 
       const m = getMetrics();
       expect(m.memoryUsedBytes).toBe(50_000_000);
       expect(m.memoryLimitBytes).toBe(200_000_000);
 
       // Clean up
-      delete perfAny.memory;
+      Object.defineProperty(performance, 'memory', { value: undefined, configurable: true });
     });
 
     it('returns 0 when performance.memory is unavailable', () => {

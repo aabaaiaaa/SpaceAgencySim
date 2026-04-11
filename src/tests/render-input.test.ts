@@ -35,10 +35,8 @@ function makeMouseEvent(clientX: number, clientY: number): MouseEvent {
 }
 
 function makeWheelEvent(deltaY: number): WheelEvent {
-  return {
-    deltaY,
-    preventDefault: vi.fn(),
-  } as unknown as WheelEvent;
+  // @ts-expect-error — minimal WheelEvent mock with only the fields our tests need
+  return { deltaY, preventDefault: vi.fn() };
 }
 
 // ---------------------------------------------------------------------------

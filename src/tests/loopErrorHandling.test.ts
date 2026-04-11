@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import type { CommsState, GameState, FlightState } from '../core/gameState.ts';
+import type { CommsState, FlightState } from '../core/gameState.ts';
 import type { PhysicsState } from '../core/physics.ts';
 import type { FCState } from '../ui/flightController/_state.ts';
 import type { StagingConfig } from '../core/rocketbuilder.ts';
+import { makeGameState } from './_factories.js';
 
 // ---------------------------------------------------------------------------
 // Hoisted mock functions — available inside vi.mock() factories.
@@ -151,8 +152,9 @@ function seedFCState(overrides: Partial<FCState> = {}): void {
   const defaults: Partial<FCState> = {
     assembly: { parts: new Map() } as FCState['assembly'],
     stagingConfig: { stages: [] } as Partial<StagingConfig> as StagingConfig,
-    state: { missions: [], contracts: [], challenges: [] } as unknown as GameState,
-    container: createMockElement() as unknown as HTMLElement,
+    state: makeGameState(),
+    // @ts-expect-error — MockElement substituted for HTMLElement in test
+    container: createMockElement(),
     rafId: 1,
     lastTs: 0,
     mapActive: false,
@@ -257,7 +259,8 @@ describe('Flight controller loop error handling', () => {
     const s = getFCState();
     // The container's appendChild should have been called only once for
     // the banner (once at error #5), not again at #6 or #7.
-    const container = s.container as unknown as MockElement;
+    // @ts-expect-error — s.container is a MockElement at runtime in tests
+    const container: MockElement = s.container;
     const bannerAppends = container.children.filter(
       (c: MockElement) => c.dataset && c.dataset.testid === 'loop-error-banner',
     );

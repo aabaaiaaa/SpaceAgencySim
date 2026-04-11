@@ -263,7 +263,8 @@ describe('Challenge System', () => {
 
     it('extracts fuelRemaining from ps when available', () => {
       const fs = makeFlightState();
-      const ps = { totalFuel: 30, maxFuel: 100 } as unknown as PhysicsState;
+      // @ts-expect-error — minimal partial with only score-extraction fields
+      const ps: PhysicsState = { totalFuel: 30, maxFuel: 100 };
       expect(extractScoreMetric('fuelRemaining', fs, ps)).toBe(30);
     });
 

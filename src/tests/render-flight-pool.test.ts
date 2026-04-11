@@ -6,7 +6,6 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { Container } from 'pixi.js';
 
 // ---------------------------------------------------------------------------
 // Mock pixi.js
@@ -104,7 +103,8 @@ describe('flight _pool.ts wrapper', () => {
       const g = new MockGraphics();
       container.children.push(g);
 
-      releaseContainerChildren(container as unknown as Container);
+      // @ts-expect-error — MockContainer used as Container in test
+      releaseContainerChildren(container);
       expect(container.children.length).toBe(0);
 
       const reused = acquireGraphics();

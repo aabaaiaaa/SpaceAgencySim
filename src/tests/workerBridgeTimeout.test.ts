@@ -7,9 +7,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import type { PhysicsState } from '../core/physics.ts';
-import type { FlightState } from '../core/gameState.ts';
-import type { RocketAssembly, StagingConfig } from '../core/rocketbuilder.ts';
+import { makePhysicsState, makeFlightState, makeRocketAssembly, makeStagingConfig } from './_factories.js';
 
 // ---------------------------------------------------------------------------
 // Mock the logger so warn/error calls don't throw
@@ -88,78 +86,6 @@ function restoreWorkerStub(): void {
 }
 
 // ---------------------------------------------------------------------------
-// Minimal state factories (just enough to pass serialisation)
-// ---------------------------------------------------------------------------
-
-function makeMinimalPhysicsState(): PhysicsState {
-  return {
-    posX: 0, posY: 0, velX: 0, velY: 0,
-    angle: 0, throttle: 1, throttleMode: 'absolute', targetTWR: 1.5,
-    firingEngines: new Set<string>(),
-    fuelStore: new Map<string, number>(),
-    activeParts: new Set<string>(),
-    deployedParts: new Set<string>(),
-    parachuteStates: new Map(),
-    legStates: new Map(),
-    ejectorStates: new Map(),
-    ejectedCrewIds: new Set<string>(),
-    ejectedCrew: [],
-    instrumentStates: new Map(),
-    scienceModuleStates: new Map(),
-    heatMap: new Map(),
-    debris: [],
-    landed: false, crashed: false, grounded: true,
-    angularVelocity: 0, isTipping: false,
-    tippingContactX: 0, tippingContactY: 0,
-    _heldKeys: new Set<string>(), _accumulator: 0,
-    controlMode: 'NORMAL',
-    baseOrbit: null, dockingAltitudeBand: null,
-    dockingOffsetAlongTrack: 0, dockingOffsetRadial: 0,
-    rcsActiveDirections: new Set<string>(),
-    dockingPortStates: new Map(),
-    _dockedCombinedMass: 0,
-    weatherIspModifier: 1.0,
-    hasLaunchClamps: false,
-    powerState: null,
-    malfunctions: null,
-  } as unknown as PhysicsState;
-}
-
-function makeMinimalFlightState(): FlightState {
-  return {
-    missionId: 'm1', rocketId: 'r1',
-    crewIds: [], crewCount: 0,
-    timeElapsed: 0, altitude: 0, velocity: 0,
-    fuelRemaining: 100, deltaVRemaining: 500,
-    events: [], aborted: false,
-    phase: 'PRELAUNCH', phaseLog: [],
-    inOrbit: false, orbitalElements: null,
-    bodyId: 'EARTH', orbitBandId: null,
-    currentBiome: null, biomesVisited: [],
-    maxAltitude: 0, maxVelocity: 0,
-    dockingState: null, transferState: null,
-    powerState: null, commsState: null,
-  } as unknown as FlightState;
-}
-
-function makeMinimalAssembly(): RocketAssembly {
-  return {
-    parts: new Map(),
-    connections: [],
-    _nextId: 1,
-    symmetryPairs: [],
-  } as unknown as RocketAssembly;
-}
-
-function makeMinimalStagingConfig(): StagingConfig {
-  return {
-    stages: [],
-    unstaged: [],
-    currentStageIdx: 0,
-  } as unknown as StagingConfig;
-}
-
-// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -188,10 +114,10 @@ describe('workerBridge — public API', () => {
     bridge.terminatePhysicsWorker();
 
     const promise = bridge.initPhysicsWorker(
-      makeMinimalPhysicsState(),
-      makeMinimalAssembly(),
-      makeMinimalStagingConfig(),
-      makeMinimalFlightState(),
+      makePhysicsState(),
+      makeRocketAssembly(),
+      makeStagingConfig(),
+      makeFlightState(),
     );
 
     vi.advanceTimersByTime(100);
@@ -221,10 +147,10 @@ describe('workerBridge — public API', () => {
     bridge.terminatePhysicsWorker();
 
     const promise = bridge.initPhysicsWorker(
-      makeMinimalPhysicsState(),
-      makeMinimalAssembly(),
-      makeMinimalStagingConfig(),
-      makeMinimalFlightState(),
+      makePhysicsState(),
+      makeRocketAssembly(),
+      makeStagingConfig(),
+      makeFlightState(),
     );
 
     vi.advanceTimersByTime(100);
@@ -248,10 +174,10 @@ describe('workerBridge — public API', () => {
     bridge.terminatePhysicsWorker();
 
     const promise = bridge.initPhysicsWorker(
-      makeMinimalPhysicsState(),
-      makeMinimalAssembly(),
-      makeMinimalStagingConfig(),
-      makeMinimalFlightState(),
+      makePhysicsState(),
+      makeRocketAssembly(),
+      makeStagingConfig(),
+      makeFlightState(),
     );
 
     vi.advanceTimersByTime(100);
@@ -271,10 +197,10 @@ describe('workerBridge — public API', () => {
 
     await expect(
       bridge.resyncWorkerState(
-        makeMinimalPhysicsState(),
-        makeMinimalAssembly(),
-        makeMinimalStagingConfig(),
-        makeMinimalFlightState(),
+        makePhysicsState(),
+        makeRocketAssembly(),
+        makeStagingConfig(),
+        makeFlightState(),
       ),
     ).rejects.toThrow('Worker not available');
   });
@@ -284,10 +210,10 @@ describe('workerBridge — public API', () => {
     bridge.terminatePhysicsWorker();
 
     const initPromise = bridge.initPhysicsWorker(
-      makeMinimalPhysicsState(),
-      makeMinimalAssembly(),
-      makeMinimalStagingConfig(),
-      makeMinimalFlightState(),
+      makePhysicsState(),
+      makeRocketAssembly(),
+      makeStagingConfig(),
+      makeFlightState(),
     );
 
     vi.advanceTimersByTime(100);
@@ -295,10 +221,10 @@ describe('workerBridge — public API', () => {
     await initPromise;
 
     const resyncPromise = bridge.resyncWorkerState(
-      makeMinimalPhysicsState(),
-      makeMinimalAssembly(),
-      makeMinimalStagingConfig(),
-      makeMinimalFlightState(),
+      makePhysicsState(),
+      makeRocketAssembly(),
+      makeStagingConfig(),
+      makeFlightState(),
     );
 
     // Worker re-inits and sends ready again
@@ -312,10 +238,10 @@ describe('workerBridge — public API', () => {
     bridge.terminatePhysicsWorker();
 
     const promise = bridge.initPhysicsWorker(
-      makeMinimalPhysicsState(),
-      makeMinimalAssembly(),
-      makeMinimalStagingConfig(),
-      makeMinimalFlightState(),
+      makePhysicsState(),
+      makeRocketAssembly(),
+      makeStagingConfig(),
+      makeFlightState(),
     );
 
     vi.advanceTimersByTime(100);
@@ -334,10 +260,10 @@ describe('workerBridge — public API', () => {
     bridge.terminatePhysicsWorker();
 
     const promise = bridge.initPhysicsWorker(
-      makeMinimalPhysicsState(),
-      makeMinimalAssembly(),
-      makeMinimalStagingConfig(),
-      makeMinimalFlightState(),
+      makePhysicsState(),
+      makeRocketAssembly(),
+      makeStagingConfig(),
+      makeFlightState(),
     );
 
     vi.advanceTimersByTime(100);
@@ -355,10 +281,10 @@ describe('workerBridge — public API', () => {
     bridge.terminatePhysicsWorker();
 
     const promise = bridge.initPhysicsWorker(
-      makeMinimalPhysicsState(),
-      makeMinimalAssembly(),
-      makeMinimalStagingConfig(),
-      makeMinimalFlightState(),
+      makePhysicsState(),
+      makeRocketAssembly(),
+      makeStagingConfig(),
+      makeFlightState(),
     );
 
     vi.advanceTimersByTime(100);
@@ -376,10 +302,10 @@ describe('workerBridge — public API', () => {
     bridge.terminatePhysicsWorker();
 
     const promise = bridge.initPhysicsWorker(
-      makeMinimalPhysicsState(),
-      makeMinimalAssembly(),
-      makeMinimalStagingConfig(),
-      makeMinimalFlightState(),
+      makePhysicsState(),
+      makeRocketAssembly(),
+      makeStagingConfig(),
+      makeFlightState(),
     );
 
     vi.advanceTimersByTime(100);
@@ -396,10 +322,10 @@ describe('workerBridge — public API', () => {
     bridge.terminatePhysicsWorker();
 
     const promise = bridge.initPhysicsWorker(
-      makeMinimalPhysicsState(),
-      makeMinimalAssembly(),
-      makeMinimalStagingConfig(),
-      makeMinimalFlightState(),
+      makePhysicsState(),
+      makeRocketAssembly(),
+      makeStagingConfig(),
+      makeFlightState(),
     );
 
     vi.advanceTimersByTime(100);
@@ -416,10 +342,10 @@ describe('workerBridge — public API', () => {
     bridge.terminatePhysicsWorker();
 
     const promise = bridge.initPhysicsWorker(
-      makeMinimalPhysicsState(),
-      makeMinimalAssembly(),
-      makeMinimalStagingConfig(),
-      makeMinimalFlightState(),
+      makePhysicsState(),
+      makeRocketAssembly(),
+      makeStagingConfig(),
+      makeFlightState(),
     );
 
     vi.advanceTimersByTime(100);
@@ -442,10 +368,10 @@ describe('workerBridge — public API', () => {
     bridge.terminatePhysicsWorker();
 
     const promise = bridge.initPhysicsWorker(
-      makeMinimalPhysicsState(),
-      makeMinimalAssembly(),
-      makeMinimalStagingConfig(),
-      makeMinimalFlightState(),
+      makePhysicsState(),
+      makeRocketAssembly(),
+      makeStagingConfig(),
+      makeFlightState(),
     );
 
     vi.advanceTimersByTime(100);
@@ -467,10 +393,10 @@ describe('workerBridge — public API', () => {
     bridge.terminatePhysicsWorker();
 
     const promise = bridge.initPhysicsWorker(
-      makeMinimalPhysicsState(),
-      makeMinimalAssembly(),
-      makeMinimalStagingConfig(),
-      makeMinimalFlightState(),
+      makePhysicsState(),
+      makeRocketAssembly(),
+      makeStagingConfig(),
+      makeFlightState(),
     );
 
     vi.advanceTimersByTime(100);
@@ -508,10 +434,10 @@ describe('workerBridge — ready timeout', () => {
     bridge.terminatePhysicsWorker(); // reset state
 
     const promise = bridge.initPhysicsWorker(
-      makeMinimalPhysicsState(),
-      makeMinimalAssembly(),
-      makeMinimalStagingConfig(),
-      makeMinimalFlightState(),
+      makePhysicsState(),
+      makeRocketAssembly(),
+      makeStagingConfig(),
+      makeFlightState(),
     );
 
     // Worker never sends 'ready'. Advance past the 10s timeout.
@@ -525,10 +451,10 @@ describe('workerBridge — ready timeout', () => {
     bridge.terminatePhysicsWorker(); // reset state
 
     const promise = bridge.initPhysicsWorker(
-      makeMinimalPhysicsState(),
-      makeMinimalAssembly(),
-      makeMinimalStagingConfig(),
-      makeMinimalFlightState(),
+      makePhysicsState(),
+      makeRocketAssembly(),
+      makeStagingConfig(),
+      makeFlightState(),
     );
 
     // Worker sends 'ready' after 500ms
@@ -544,10 +470,10 @@ describe('workerBridge — ready timeout', () => {
     bridge.terminatePhysicsWorker(); // reset state
 
     const promise = bridge.initPhysicsWorker(
-      makeMinimalPhysicsState(),
-      makeMinimalAssembly(),
-      makeMinimalStagingConfig(),
-      makeMinimalFlightState(),
+      makePhysicsState(),
+      makeRocketAssembly(),
+      makeStagingConfig(),
+      makeFlightState(),
     );
 
     // Worker sends 'ready' quickly
@@ -569,10 +495,10 @@ describe('workerBridge — ready timeout', () => {
     bridge.terminatePhysicsWorker(); // reset state
 
     const promise = bridge.initPhysicsWorker(
-      makeMinimalPhysicsState(),
-      makeMinimalAssembly(),
-      makeMinimalStagingConfig(),
-      makeMinimalFlightState(),
+      makePhysicsState(),
+      makeRocketAssembly(),
+      makeStagingConfig(),
+      makeFlightState(),
     );
 
     // Worker fires an error

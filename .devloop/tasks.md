@@ -53,25 +53,25 @@ See `.devloop/requirements.md` for full context and rationale behind each task.
 - **Verification**: `npx vitest run src/tests/collision.test.ts` — all tests pass. Cast count should drop to under 3.
 
 ### TASK-009: Migrate ui-rocketCardUtil.test.ts to factories
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-004
 - **Description**: Migrate the 18 `as unknown as` casts in `src/tests/ui-rocketCardUtil.test.ts`. These are primarily DOM element mocks — use `makeMockElement()` from `_factories.ts`. See requirements section 4.
 - **Verification**: `npx vitest run src/tests/ui-rocketCardUtil.test.ts` — all tests pass. Cast count should drop to under 3.
 
 ### TASK-010: Migrate medium-cast unit tests batch 1 (sciencemodule, pool, fuelsystem)
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-004
 - **Description**: Migrate casts in `sciencemodule.test.ts` (8 casts), `pool.test.ts` (8 casts), and `fuelsystem.test.ts` (7 casts). Use existing factories (`makePhysicsState`, `makeGameState`, etc.) or new factories from TASK-004 as appropriate. See requirements section 4, medium-cast table.
 - **Verification**: `npx vitest run src/tests/sciencemodule.test.ts src/tests/pool.test.ts src/tests/fuelsystem.test.ts` — all tests pass. Combined cast count across 3 files should drop to under 5.
 
 ### TASK-011: Migrate medium-cast unit tests batch 2 (workerBridge, mapView, escapeHtml, controlMode)
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-004
 - **Description**: Migrate casts in `workerBridgeTimeout.test.ts` (6 casts), `ui-mapView.test.ts` (6 casts), `escapeHtml.test.ts` (4 casts), and `controlMode.test.ts` (4 casts). Use existing or new factories as appropriate. See requirements section 4, medium-cast table.
 - **Verification**: `npx vitest run src/tests/workerBridgeTimeout.test.ts src/tests/ui-mapView.test.ts src/tests/escapeHtml.test.ts src/tests/controlMode.test.ts` — all tests pass. Combined cast count across 4 files should drop to under 4.
 
 ### TASK-012: Migrate low-cast unit test files (9 files, 13 casts total)
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-004
 - **Description**: Migrate remaining casts in: `ui-escapeHtml.test.ts` (3), `loopErrorHandling.test.ts` (3), `mccTiers.test.ts` (2), `contracts.test.ts` (2), `render-input.test.ts` (1), `render-flight-pool.test.ts` (1), `render-camera.test.ts` (1), `perfMonitor.test.ts` (1), `challenges.test.ts` (1). Use existing factories. See requirements section 4, low-cast table.
 - **Verification**: `npx vitest run src/tests/ui-escapeHtml.test.ts src/tests/loopErrorHandling.test.ts src/tests/mccTiers.test.ts src/tests/contracts.test.ts src/tests/render-input.test.ts src/tests/render-flight-pool.test.ts src/tests/render-camera.test.ts src/tests/perfMonitor.test.ts src/tests/challenges.test.ts` — all tests pass. Combined cast count across 9 files should be 0.
@@ -89,7 +89,7 @@ See `.devloop/requirements.md` for full context and rationale behind each task.
 - **Verification**: `npx playwright test e2e/mission-progression.spec.ts e2e/facilities-infrastructure.spec.ts` — all tests pass. Combined cast count across both files is 0.
 
 ### TASK-015: E2E migration — orbital-operations, collision, tutorial-revisions specs
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Migrate casts in `e2e/orbital-operations.spec.ts` (10 casts), `e2e/collision.spec.ts` (7 casts), and `e2e/tutorial-revisions.spec.ts` (6 casts) to use `gw()`. Same pattern as TASK-013. See requirements section 5.
 - **Verification**: `npx playwright test e2e/orbital-operations.spec.ts e2e/collision.spec.ts e2e/tutorial-revisions.spec.ts` — all tests pass. Combined cast count across 3 files is 0.

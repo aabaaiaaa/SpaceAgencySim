@@ -78,6 +78,25 @@ vi.mock('pixi.js', () => ({
 import { RendererPool } from '../render/pool.ts';
 
 // ---------------------------------------------------------------------------
+// Cast helpers — centralise the mock↔PIXI type bridging so individual tests
+// stay cast-free.
+// ---------------------------------------------------------------------------
+
+/** Bridge MockContainer → PIXI.Container for releaseContainerChildren(). */
+function asPIXIContainer(c: InstanceType<typeof MockContainer>): PIXI.Container {
+  return c as unknown as PIXI.Container;
+}
+
+/** Attach a Graphics object to a parent mock container (sets up .parent + .children). */
+function attachToParent(
+  child: PIXI.Graphics | PIXI.Text,
+  parent: InstanceType<typeof MockContainer>,
+): void {
+  (parent.children as unknown[]).push(child);
+  (child as unknown as { parent: InstanceType<typeof MockContainer> }).parent = parent;
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -134,8 +153,7 @@ describe('RendererPool', () => {
     it('detaches from parent container', () => {
       const g = pool.acquireGraphics();
       const parent = new MockContainer();
-      parent.children.push(g as unknown as MockChild);
-      (g as unknown as InstanceType<typeof MockGraphics>).parent = parent;
+      attachToParent(g, parent);
       const mockRemoveChild = vi.fn((child: MockChild): MockChild => {
         const idx = parent.children.indexOf(child);
         if (idx >= 0) parent.children.splice(idx, 1);
@@ -202,8 +220,7 @@ describe('RendererPool', () => {
     it('detaches from parent container', () => {
       const t = pool.acquireText();
       const parent = new MockContainer();
-      parent.children.push(t as unknown as MockChild);
-      (t as unknown as InstanceType<typeof MockText>).parent = parent;
+      attachToParent(t, parent);
       const mockRemoveChild = vi.fn();
       parent.removeChild = mockRemoveChild;
 
@@ -225,7 +242,7 @@ describe('RendererPool', () => {
       const g = new MockGraphics();
       container.children.push(g);
 
-      pool.releaseContainerChildren(container as unknown as PIXI.Container);
+      pool.releaseContainerChildren(asPIXIContainer(container));
 
       expect(container.children).toHaveLength(0);
       // The Graphics should be in the pool now — acquiring should return it.
@@ -238,7 +255,7 @@ describe('RendererPool', () => {
       const t = new MockText({});
       container.children.push(t);
 
-      pool.releaseContainerChildren(container as unknown as PIXI.Container);
+      pool.releaseContainerChildren(asPIXIContainer(container));
 
       expect(container.children).toHaveLength(0);
       const reused = pool.acquireText();
@@ -251,7 +268,7 @@ describe('RendererPool', () => {
       const t = new MockText({});
       container.children.push(g, t);
 
-      pool.releaseContainerChildren(container as unknown as PIXI.Container);
+      pool.releaseContainerChildren(asPIXIContainer(container));
 
       expect(container.children).toHaveLength(0);
       expect(pool.acquireGraphics()).toBe(g);
@@ -265,7 +282,7 @@ describe('RendererPool', () => {
       inner.children.push(g);
       outer.children.push(inner);
 
-      pool.releaseContainerChildren(outer as unknown as PIXI.Container);
+      pool.releaseContainerChildren(asPIXIContainer(outer));
 
       expect(outer.children).toHaveLength(0);
       expect(inner.children).toHaveLength(0);
