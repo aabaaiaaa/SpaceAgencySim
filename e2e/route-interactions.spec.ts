@@ -32,7 +32,7 @@ function buildLogisticsSave() {
 /** Inject a mining site, proven leg, and route into the live game state. */
 async function injectRouteState(page: import('@playwright/test').Page) {
   await page.evaluate(() => {
-    const gs = (window as any).__gameState;
+    const gs = window.__gameState;
 
     gs.miningSites.push({
       id: 'site-e2e-route-1',
@@ -42,7 +42,6 @@ async function injectRouteState(page: import('@playwright/test').Page) {
       controlUnit: { partId: 'base-control-unit-mk1' },
       modules: [],
       storage: {},
-      production: {},
       powerGenerated: 100,
       powerRequired: 10,
       orbitalBuffer: { WATER_ICE: 5000 },

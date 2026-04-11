@@ -680,7 +680,7 @@ describe('Multi-period accumulation', () => {
     });
 
     // 1. Power generator: 100W output, 0W draw
-    const generator = addModuleToSite(site, {
+    addModuleToSite(site, {
       partId: 'power-generator-solar-mk1',
       type: MiningModuleType.POWER_GENERATOR,
       powerDraw: 0,

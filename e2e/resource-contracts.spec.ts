@@ -103,7 +103,7 @@ test.describe('Resource contracts — early chain', () => {
 
     // Complete the contract by moving it from active to completed via state injection
     await page.evaluate(() => {
-      const gs = (window as any).__gameState;
+      const gs = window.__gameState;
       const contract = gs.contracts.active[0];
       gs.contracts.completed.push(contract);
       gs.contracts.active = [];
@@ -123,11 +123,11 @@ test.describe('Resource contracts — early chain', () => {
     // Verify the state reflects contract 1 completed — this is the prerequisite
     // for contract 2 generation
     const gameState = await page.evaluate(() => {
-      const gs = (window as any).__gameState;
+      const gs = window.__gameState;
       return {
         completedCount: gs.contracts.completed.length,
         activeCount: gs.contracts.active.length,
-        completedChainParts: gs.contracts.completed.map((c: any) => c.chainPart),
+        completedChainParts: gs.contracts.completed.map((c) => c.chainPart),
       };
     });
 
@@ -185,9 +185,9 @@ test.describe('Resource contracts — early chain', () => {
     // Verify that the canGenerate prerequisite for Contract 2 is satisfied:
     // chainPart 1 exists in completed contracts with chainId 'resource-chain'
     const canGenerate = await page.evaluate(() => {
-      const gs = (window as any).__gameState;
+      const gs = window.__gameState;
       return gs.contracts.completed.some(
-        (c: any) => c.chainId === 'resource-chain' && c.chainPart === 1,
+        (c) => c.chainId === 'resource-chain' && c.chainPart === 1,
       );
     });
 
@@ -230,16 +230,16 @@ test.describe('Resource contracts — automation chain', () => {
 
     // Verify Contract 8 can generate (chainPart 7 must exist in completed)
     const canGenerate = await page.evaluate(() => {
-      const gs = (window as any).__gameState;
+      const gs = window.__gameState;
       return gs.contracts.completed.some(
-        (c: any) => c.chainId === 'resource-chain' && c.chainPart === 7,
+        (c) => c.chainId === 'resource-chain' && c.chainPart === 7,
       );
     });
     expect(canGenerate).toBe(true);
 
     // Also inject an active route to simulate the automation feature being used
     await page.evaluate(() => {
-      const gs = (window as any).__gameState;
+      const gs = window.__gameState;
       gs.routes = gs.routes || [];
       gs.routes.push({
         id: 'route-e2e-automate',
@@ -263,7 +263,7 @@ test.describe('Resource contracts — automation chain', () => {
 
     // Verify the route exists and is active
     const routeExists = await page.evaluate(() => {
-      const gs = (window as any).__gameState;
+      const gs = window.__gameState;
       return gs.routes.length > 0 && gs.routes[0].status === 'active';
     });
     expect(routeExists).toBe(true);
@@ -297,7 +297,7 @@ test.describe('Resource contracts — automation chain', () => {
 
     // Inject 3 active routes to simulate the Supply Network objective
     await page.evaluate(() => {
-      const gs = (window as any).__gameState;
+      const gs = window.__gameState;
       gs.routes = gs.routes || [];
       for (let i = 1; i <= 3; i++) {
         gs.routes.push({
@@ -323,12 +323,12 @@ test.describe('Resource contracts — automation chain', () => {
 
     // Verify 3+ active routes exist
     const routeState = await page.evaluate(() => {
-      const gs = (window as any).__gameState;
+      const gs = window.__gameState;
       return {
         totalRoutes: gs.routes.length,
-        activeRoutes: gs.routes.filter((r: any) => r.status === 'active').length,
+        activeRoutes: gs.routes.filter((r) => r.status === 'active').length,
         canGenerateContract12: gs.contracts.completed.some(
-          (c: any) => c.chainId === 'resource-chain' && c.chainPart === 11,
+          (c) => c.chainId === 'resource-chain' && c.chainPart === 11,
         ),
       };
     });

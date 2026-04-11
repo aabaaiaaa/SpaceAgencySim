@@ -183,7 +183,7 @@ See `.devloop/requirements.md` for full context on all items below.
 ## Final Verification
 
 ### TASK-024: Final verification pass
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007, TASK-010, TASK-011, TASK-014b, TASK-015, TASK-016, TASK-017, TASK-018, TASK-019, TASK-020, TASK-021, TASK-022, TASK-023
 - **Description**: Run the full unit test suite and typecheck to verify nothing is broken. Check that all new smoke tests pass. Verify no TypeScript errors in changed files. Run ESLint on changed files. This is a validation-only task — do not write new code.
 - **Verification**: `npm run test:unit && npm run typecheck && npm run lint`

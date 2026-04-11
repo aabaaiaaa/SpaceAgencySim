@@ -31,7 +31,7 @@ function buildLogisticsSave() {
 /** Inject a mining site with a refinery, storage, and multiple connected modules. */
 async function injectRefinerySite(page: import('@playwright/test').Page) {
   await page.evaluate(() => {
-    const gs = (window as any).__gameState;
+    const gs = window.__gameState;
     gs.miningSites.push({
       id: 'site-e2e-interactions-1',
       name: 'Refinery Test Base',

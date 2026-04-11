@@ -118,7 +118,6 @@ test.describe('Mining — Logistics Center', () => {
           },
         ],
         storage: { WATER_ICE: 150.5 },
-        production: { WATER_ICE: 10 },
         powerGenerated: 100,
         powerRequired: 35,
         orbitalBuffer: {},
