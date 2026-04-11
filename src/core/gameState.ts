@@ -9,6 +9,7 @@
 
 import {
   AstronautStatus,
+  EARTH_HUB_ID,
   FlightOutcome,
   FlightPhase,
   GameMode,
@@ -33,6 +34,8 @@ import type {
   SatelliteType,
   SurfaceItemType,
 } from './constants.ts';
+
+import type { Hub } from './hubTypes.ts';
 
 // ---------------------------------------------------------------------------
 // Cross-module types (standalone definitions for JS module shapes)
@@ -210,6 +213,10 @@ export interface CrewMember {
   trainingSkill: 'piloting' | 'engineering' | 'science' | null;
   /** Period number when training completes, or null. */
   trainingEnds: number | null;
+  /** Hub ID where the crew member is stationed. */
+  stationedHubId: string;
+  /** Period number when transit completes, or null if not in transit. */
+  transitUntil: number | null;
 }
 
 /** Requirements that a rocket must satisfy for a mission. */
@@ -854,6 +861,10 @@ export interface GameState {
   provenLegs: ProvenLeg[];
   /** Automated resource transport routes. */
   routes: Route[];
+  /** All player hubs (Earth HQ + off-world bases and stations). */
+  hubs: Hub[];
+  /** ID of the currently active hub for UI context. */
+  activeHubId: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -995,6 +1006,27 @@ export function createGameState(): GameState {
     miningSites: [],
     provenLegs: [],
     routes: [],
+
+    // Hub system — Earth HQ is always the first hub.
+    hubs: [{
+      id: EARTH_HUB_ID,
+      name: 'Earth HQ',
+      type: 'surface',
+      bodyId: 'EARTH',
+      coordinates: { x: 0, y: 0 },
+      facilities: Object.fromEntries(
+        FACILITY_DEFINITIONS
+          .filter((f) => f.starter)
+          .map((f) => [f.id, { built: true, tier: 1 }]),
+      ),
+      tourists: [],
+      partInventory: [],
+      constructionQueue: [],
+      maintenanceCost: 0,
+      established: 0,
+      online: true,
+    }],
+    activeHubId: EARTH_HUB_ID,
   };
 }
 
@@ -1033,6 +1065,8 @@ export function createCrewMember({
     injuryEnds: null,
     trainingSkill: null,
     trainingEnds: null,
+    stationedHubId: EARTH_HUB_ID,
+    transitUntil: null,
   };
 }
 

@@ -222,6 +222,23 @@ export function makeGameState(overrides: Partial<GameState> = {}): GameState {
     miningSites: [],
     provenLegs: [],
     routes: [],
+    hubs: [{
+      id: EARTH_HUB_ID,
+      name: 'Earth HQ',
+      type: 'surface',
+      bodyId: 'EARTH',
+      coordinates: { x: 0, y: 0 },
+      facilities: Object.fromEntries(
+        FACILITY_DEFINITIONS.filter((f) => f.starter).map((f) => [f.id, { built: true, tier: 1 }]),
+      ),
+      tourists: [],
+      partInventory: [],
+      constructionQueue: [],
+      maintenanceCost: 0,
+      established: 0,
+      online: true,
+    }],
+    activeHubId: EARTH_HUB_ID,
     ...overrides,
   };
 }
@@ -390,6 +407,8 @@ export function makeCrewMember(overrides: Partial<CrewMember> = {}): CrewMember 
     injuryEnds: null,
     trainingSkill: null,
     trainingEnds: null,
+    stationedHubId: EARTH_HUB_ID,
+    transitUntil: null,
     ...overrides,
   };
 }

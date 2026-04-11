@@ -50,6 +50,8 @@ function addCrew(state: GameState, overrides: CrewOverrides = {}): void {
     injuryEnds: null,
     trainingSkill: null,
     trainingEnds: null,
+    stationedHubId: 'earth',
+    transitUntil: null,
   });
 }
 
@@ -194,6 +196,8 @@ describe('advancePeriod() — individual crew salaries', () => {
       assignedRocketId: null,
       trainingSkill: null,
       trainingEnds: null,
+      stationedHubId: 'earth',
+      transitUntil: null,
     } as CrewMember);
     const result = advancePeriod(state);
     expect(result.crewSalaryCost).toBe(CREW_SALARY_PER_PERIOD);
@@ -215,6 +219,8 @@ describe('advancePeriod() — individual crew salaries', () => {
       assignedRocketId: null,
       trainingSkill: null,
       trainingEnds: null,
+      stationedHubId: 'earth',
+      transitUntil: null,
     } as CrewMember);
     const result = advancePeriod(state);
     expect(result.crewSalaryCost).toBe(8_000 + CREW_SALARY_PER_PERIOD);

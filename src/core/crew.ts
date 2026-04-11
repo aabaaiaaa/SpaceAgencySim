@@ -11,7 +11,7 @@
 
 import { spend, applyDeathFine } from './finance.ts';
 import {
-  AstronautStatus, HIRE_COST, CREW_SALARY_PER_PERIOD, HARD_LANDING_SPEED_MIN,
+  AstronautStatus, EARTH_HUB_ID, HIRE_COST, CREW_SALARY_PER_PERIOD, HARD_LANDING_SPEED_MIN,
   HARD_LANDING_SPEED_MAX, HARD_LANDING_INJURY_MIN, HARD_LANDING_INJURY_MAX,
   EJECTION_INJURY_PERIODS, MEDICAL_CARE_COST, TRAINING_COURSE_COST, TRAINING_COURSE_DURATION,
   TRAINING_SKILL_GAIN, TRAINING_SLOTS_BY_TIER, EXPERIENCED_CREW_SKILL_RANGE,
@@ -43,7 +43,7 @@ function generateUUID(): string {
 }
 
 function createAstronaut({ name, salary = CREW_SALARY_PER_PERIOD, hireDate = new Date().toISOString(), skills = null }: CreateAstronautOpts): CrewMember {
-  return { id: generateUUID(), name, hireDate, status: AstronautStatus.ACTIVE, salary, missionsFlown: 0, flightsFlown: 0, deathDate: null, deathCause: null, assignedRocketId: null, skills: skills ?? { piloting: 0, engineering: 0, science: 0 }, injuryEnds: null, trainingSkill: null, trainingEnds: null };
+  return { id: generateUUID(), name, hireDate, status: AstronautStatus.ACTIVE, salary, missionsFlown: 0, flightsFlown: 0, deathDate: null, deathCause: null, assignedRocketId: null, skills: skills ?? { piloting: 0, engineering: 0, science: 0 }, injuryEnds: null, trainingSkill: null, trainingEnds: null, stationedHubId: EARTH_HUB_ID, transitUntil: null };
 }
 
 export function getAdjustedHireCost(reputation: number): number { return Math.floor(HIRE_COST * getCrewCostModifier(reputation)); }

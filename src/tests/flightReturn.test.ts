@@ -98,6 +98,8 @@ function testCrew(overrides: Partial<CrewMember> & { id: string; name: string })
     injuryEnds: null,
     trainingSkill: null,
     trainingEnds: null,
+    stationedHubId: 'earth',
+    transitUntil: null,
     ...overrides,
   } as CrewMember;
 }

@@ -22,6 +22,8 @@ export interface CrewMember {
   hireDate: string;
   skills: CrewSkills;
   missionsFlown: number;
+  stationedHubId: string;
+  transitUntil: number | null;
 }
 
 /**
@@ -38,8 +40,10 @@ export function buildCrewMember({
   hireDate    = new Date().toISOString(),
   skills      = { piloting: 50, engineering: 50, science: 50 },
   missionsFlown = 0,
+  stationedHubId = 'earth',
+  transitUntil = null,
 }: Partial<CrewMember> = {}): CrewMember {
-  return { id, name, status, salary, hireDate, skills, missionsFlown };
+  return { id, name, status, salary, hireDate, skills, missionsFlown, stationedHubId, transitUntil };
 }
 
 // ---------------------------------------------------------------------------

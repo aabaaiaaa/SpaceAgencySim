@@ -516,6 +516,8 @@ test.describe('Crew Admin — hire and fire', () => {
           injuryEnds: null,
           trainingSkill: null,
           trainingEnds: null,
+          stationedHubId: 'earth',
+          transitUntil: null,
         };
         gs.crew.push(newCrew);
         return { success: true, cost };
@@ -771,6 +773,8 @@ test.describe('Crew Admin — tier 3 features', () => {
         injuryEnds: null,
         trainingSkill: null,
         trainingEnds: null,
+        stationedHubId: 'earth',
+        transitUntil: null,
       };
       gs.crew.push(newCrew);
       return { success: true, cost, skills };

@@ -97,7 +97,7 @@
 - **Verification**: `npx tsc --noEmit` passes.
 
 ### TASK-012: GameState hub fields and Earth hub initialization
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-011
 - **Description**: Add `hubs: Hub[]` and `activeHubId: string` to the `GameState` interface in `src/core/gameState.ts`. Add `stationedHubId: string` and `transitUntil: number | null` to the `CrewMember` interface. Update `createGameState()` to create an Earth hub from the existing facilities and add it to `hubs[]`, set `activeHubId` to `EARTH_HUB_ID`. Write unit tests in `src/tests/hubs.test.ts` verifying: hubs array exists with Earth hub, activeHubId is 'earth', Earth hub facilities match starter facilities. Fix any existing test failures caused by the new required fields on CrewMember.
 - **Verification**: `npx vitest run src/tests/hubs.test.ts` passes. `npm run test:unit` passes (no regressions).

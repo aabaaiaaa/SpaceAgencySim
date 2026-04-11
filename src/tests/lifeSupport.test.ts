@@ -51,6 +51,8 @@ function addCrew(state: GameState, overrides: Partial<CrewMember> = {}): string 
     assignedRocketId: null,
     trainingSkill: null,
     trainingEnds: null,
+    stationedHubId: 'earth',
+    transitUntil: null,
   });
   return id;
 }
