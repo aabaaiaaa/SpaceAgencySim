@@ -1734,3 +1734,105 @@ describe('Save export format', () => {
     expect(saves[2]!.saveName).toBe('Legacy Save File');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Mining / Route fields round-trip
+// ---------------------------------------------------------------------------
+
+describe('Save/load round-trip for mining/route fields', () => {
+  it('miningSites survive save/load round-trip', async () => {
+    const state = createGameState();
+    // Push a mining site with modules and storage
+    state.miningSites.push({
+      id: 'test-site-1',
+      name: 'Lunar Base Alpha',
+      bodyId: 'MOON',
+      coordinates: { x: 100, y: 200 },
+      controlUnit: { partId: 'base-control-unit-mk1' },
+      modules: [{
+        id: 'mod-1',
+        partId: 'mining-drill-mk1',
+        type: 'MINING_DRILL' as any,
+        powerDraw: 25,
+        connections: [],
+      }],
+      storage: { WATER_ICE: 500 } as any,
+      production: {},
+      powerGenerated: 100,
+      powerRequired: 35,
+      orbitalBuffer: {},
+    });
+
+    await saveGame(state, 0, 'test');
+    const loaded = await loadGame(0);
+
+    expect(loaded.miningSites).toHaveLength(1);
+    expect(loaded.miningSites[0].name).toBe('Lunar Base Alpha');
+    expect(loaded.miningSites[0].modules).toHaveLength(1);
+    expect(loaded.miningSites[0].storage).toEqual({ WATER_ICE: 500 });
+  });
+
+  it('provenLegs survive save/load round-trip', async () => {
+    const state = createGameState();
+    state.provenLegs.push({
+      id: 'leg-1',
+      origin: { bodyId: 'MOON', locationType: 'surface' },
+      destination: { bodyId: 'MOON', locationType: 'orbit', altitude: 50000 },
+      craftDesignId: 'design-1',
+      cargoCapacityKg: 500,
+      costPerRun: 10000,
+      provenFlightId: 'flight-1',
+      dateProven: 5,
+    });
+
+    await saveGame(state, 0, 'test');
+    const loaded = await loadGame(0);
+
+    expect(loaded.provenLegs).toHaveLength(1);
+    expect(loaded.provenLegs[0].origin.bodyId).toBe('MOON');
+  });
+
+  it('routes survive save/load round-trip', async () => {
+    const state = createGameState();
+    state.routes.push({
+      id: 'route-1',
+      name: 'Lunar Ice Express',
+      status: 'active',
+      resourceType: 'WATER_ICE' as any,
+      legs: [{
+        id: 'rleg-1',
+        origin: { bodyId: 'MOON', locationType: 'surface' },
+        destination: { bodyId: 'EARTH', locationType: 'orbit', altitude: 200000 },
+        craftDesignId: 'design-1',
+        craftCount: 2,
+        cargoCapacityKg: 500,
+        costPerRun: 10000,
+        provenFlightId: 'flight-1',
+      }],
+      throughputPerPeriod: 1000,
+      totalCostPerPeriod: 20000,
+    });
+
+    await saveGame(state, 0, 'test');
+    const loaded = await loadGame(0);
+
+    expect(loaded.routes).toHaveLength(1);
+    expect(loaded.routes[0].name).toBe('Lunar Ice Express');
+    expect(loaded.routes[0].legs).toHaveLength(1);
+  });
+
+  it('old saves without mining fields default to empty arrays', async () => {
+    const state = createGameState();
+    // Manually delete the fields to simulate an old save
+    delete (state as any).miningSites;
+    delete (state as any).provenLegs;
+    delete (state as any).routes;
+
+    await saveGame(state, 0, 'test');
+    const loaded = await loadGame(0);
+
+    expect(loaded.miningSites).toEqual([]);
+    expect(loaded.provenLegs).toEqual([]);
+    expect(loaded.routes).toEqual([]);
+  });
+});

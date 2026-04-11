@@ -390,6 +390,7 @@ export const ContractCategory = Object.freeze({
   SAFE_RECOVERY: 'SAFE_RECOVERY',
   ORBITAL: 'ORBITAL',
   CRASH_TEST: 'CRASH_TEST',
+  RESOURCE: 'RESOURCE',
 } as const);
 
 export type ContractCategory = (typeof ContractCategory)[keyof typeof ContractCategory];

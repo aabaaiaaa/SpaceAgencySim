@@ -45,6 +45,7 @@ export const TechBranch = Object.freeze({
   STRUCTURAL: 'structural',
   RECOVERY:   'recovery',
   SCIENCE:    'science',
+  LOGISTICS:  'logistics',
 } as const);
 
 export type TechBranch = (typeof TechBranch)[keyof typeof TechBranch];
@@ -55,6 +56,7 @@ export const BRANCH_NAMES: Readonly<Record<string, string>> = Object.freeze({
   [TechBranch.STRUCTURAL]: 'Structural',
   [TechBranch.RECOVERY]:   'Recovery',
   [TechBranch.SCIENCE]:    'Science',
+  [TechBranch.LOGISTICS]:  'Logistics',
 });
 
 // ---------------------------------------------------------------------------
@@ -101,7 +103,7 @@ export interface TechNodeDef {
 // Node Definitions
 // ---------------------------------------------------------------------------
 
-/** Complete tech tree: 4 branches × up to 6 tiers = 21 nodes. */
+/** Complete tech tree: 5 branches × up to 6 tiers = 26 nodes. */
 export const TECH_NODES: ReadonlyArray<Readonly<TechNodeDef>> = Object.freeze([
 
   // ── Propulsion Branch ────────────────────────────────────────────────────
@@ -362,6 +364,68 @@ export const TECH_NODES: ReadonlyArray<Readonly<TechNodeDef>> = Object.freeze([
     unlocksParts:       [],
     unlocksInstruments: ['deep-space-scanner', 'cosmic-ray-telescope'],
     description:        'Advanced deep-space observatory instruments for interplanetary science.',
+  }),
+
+  // ── Logistics Branch ────────────────────────────────────────────────────
+
+  Object.freeze({
+    id:                 'log-t1',
+    name:               'Surface Mining',
+    branch:             TechBranch.LOGISTICS,
+    tier:               1,
+    scienceCost:        TIER_COSTS[1].science,
+    fundsCost:          TIER_COSTS[1].funds,
+    unlocksParts:       ['mining-drill-mk1', 'base-control-unit-mk1', 'storage-silo-mk1', 'power-generator-solar-mk1'],
+    unlocksInstruments: [],
+    description:        'Basic surface mining equipment: drills, control units, storage silos, and solar power.',
+  }),
+
+  Object.freeze({
+    id:                 'log-t2',
+    name:               'Gas & Fluid Extraction',
+    branch:             TechBranch.LOGISTICS,
+    tier:               2,
+    scienceCost:        TIER_COSTS[2].science,
+    fundsCost:          TIER_COSTS[2].funds,
+    unlocksParts:       ['gas-collector-mk1', 'fluid-extractor-mk1', 'pressure-vessel-mk1', 'fluid-tank-mk1'],
+    unlocksInstruments: [],
+    description:        'Atmospheric gas collection and subsurface fluid extraction systems.',
+  }),
+
+  Object.freeze({
+    id:                 'log-t3',
+    name:               'Refining & Processing',
+    branch:             TechBranch.LOGISTICS,
+    tier:               3,
+    scienceCost:        TIER_COSTS[3].science,
+    fundsCost:          TIER_COSTS[3].funds,
+    unlocksParts:       ['refinery-mk1', 'cargo-bay-mk1', 'pressurized-tank-mk1', 'cryo-tank-mk1'],
+    unlocksInstruments: [],
+    description:        'On-site refining capability and specialised cargo transport modules.',
+  }),
+
+  Object.freeze({
+    id:                 'log-t4',
+    name:               'Surface Launch Systems',
+    branch:             TechBranch.LOGISTICS,
+    tier:               4,
+    scienceCost:        TIER_COSTS[4].science,
+    fundsCost:          TIER_COSTS[4].funds,
+    unlocksParts:       ['surface-launch-pad-mk1'],
+    unlocksInstruments: [],
+    description:        'Electromagnetic catapult systems for launching resources from low-gravity surfaces to orbit.',
+  }),
+
+  Object.freeze({
+    id:                 'log-t5',
+    name:               'Automated Logistics',
+    branch:             TechBranch.LOGISTICS,
+    tier:               5,
+    scienceCost:        TIER_COSTS[5].science,
+    fundsCost:          TIER_COSTS[5].funds,
+    unlocksParts:       [],
+    unlocksInstruments: [],
+    description:        'Autonomous route management and fleet coordination for automated resource transport.',
   }),
 
 ]);

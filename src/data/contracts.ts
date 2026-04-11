@@ -126,6 +126,462 @@ export function hasScienceCapability(state: GameState): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Resource Contract Chain (12-part)
+// ---------------------------------------------------------------------------
+
+const RESOURCE_CHAIN_ID = 'resource-chain';
+
+/**
+ * Check whether the previous resource contract in the chain has been completed.
+ * For contract 1 (index 0), checks that tutorial missions are done (>= 15).
+ * For contracts 2-12, checks that a contract with the matching chainId and
+ * chainPart exists in state.contracts.completed.
+ */
+function _canGenerateResourceContract(index: number, state: GameState): boolean {
+  if (index === 0) {
+    return state.missions.completed.length >= 15;
+  }
+  return state.contracts.completed.some(
+    (c) => c.chainId === RESOURCE_CHAIN_ID && c.chainPart === index,
+  );
+}
+
+/**
+ * 12-part resource contract chain, exported separately for direct testing.
+ */
+export const RESOURCE_CONTRACTS: ContractTemplate[] = [
+  // 1. Lunar Survey
+  {
+    id: 'resource-lunar-survey',
+    category: ContractCategory.RESOURCE,
+    minTier: 5,
+    minMccTier: 3,
+    canGenerate: (state: GameState) => _canGenerateResourceContract(0, state),
+    generate(_state: GameState, _rand: number): GeneratedContract {
+      return {
+        title: 'Lunar Survey',
+        description: 'Land a Base Control Unit and Mining Drill on the Moon to survey for harvestable resources. This is the first step toward off-world resource extraction.',
+        category: ContractCategory.RESOURCE,
+        objectives: [
+          {
+            id: 'obj-res-1-1',
+            type: ObjectiveType.REACH_ORBIT,
+            target: { orbitAltitude: 80_000, orbitalVelocity: 7_800 },
+            completed: false,
+            description: 'Reach Earth orbit',
+          },
+          {
+            id: 'obj-res-1-2',
+            type: ObjectiveType.RELEASE_SATELLITE,
+            target: { minAltitude: 80_000, description: 'Deploy BCU + Drill package on the Moon' },
+            completed: false,
+            description: 'Deploy BCU and Mining Drill on the lunar surface',
+          },
+        ],
+        reward: 50_000,
+        deadlineFlights: null,
+        chainId: RESOURCE_CHAIN_ID,
+        chainPart: 1,
+        chainTotal: 12,
+      };
+    },
+  },
+
+  // 2. First Harvest
+  {
+    id: 'resource-first-harvest',
+    category: ContractCategory.RESOURCE,
+    minTier: 5,
+    minMccTier: 3,
+    canGenerate: (state: GameState) => _canGenerateResourceContract(1, state),
+    generate(_state: GameState, _rand: number): GeneratedContract {
+      return {
+        title: 'First Harvest',
+        description: 'Return 100 kg of water ice from the Moon to Earth. Prove that off-world resource extraction is viable.',
+        category: ContractCategory.RESOURCE,
+        objectives: [
+          {
+            id: 'obj-res-2-1',
+            type: ObjectiveType.REACH_ORBIT,
+            target: { orbitAltitude: 80_000, orbitalVelocity: 7_800 },
+            completed: false,
+            description: 'Reach Earth orbit with cargo',
+          },
+          {
+            id: 'obj-res-2-2',
+            type: ObjectiveType.SAFE_LANDING,
+            target: { maxLandingSpeed: 10, description: 'Return 100 kg water ice to Earth' },
+            completed: false,
+            description: 'Land safely with 100 kg water ice payload',
+          },
+        ],
+        reward: 75_000,
+        deadlineFlights: null,
+        chainId: RESOURCE_CHAIN_ID,
+        chainPart: 2,
+        chainTotal: 12,
+      };
+    },
+  },
+
+  // 3. Expand Operations
+  {
+    id: 'resource-expand-ops',
+    category: ContractCategory.RESOURCE,
+    minTier: 5,
+    minMccTier: 3,
+    canGenerate: (state: GameState) => _canGenerateResourceContract(2, state),
+    generate(_state: GameState, _rand: number): GeneratedContract {
+      return {
+        title: 'Expand Operations',
+        description: 'Add a storage silo and a second mining drill to your lunar mining site. Increase extraction throughput.',
+        category: ContractCategory.RESOURCE,
+        objectives: [
+          {
+            id: 'obj-res-3-1',
+            type: ObjectiveType.RELEASE_SATELLITE,
+            target: { minAltitude: 80_000, description: 'Deploy Storage Silo to lunar site' },
+            completed: false,
+            description: 'Deploy Storage Silo to the lunar mining site',
+          },
+          {
+            id: 'obj-res-3-2',
+            type: ObjectiveType.RELEASE_SATELLITE,
+            target: { minAltitude: 80_000, description: 'Deploy second Mining Drill to lunar site' },
+            completed: false,
+            description: 'Deploy a second Mining Drill to the lunar mining site',
+          },
+        ],
+        reward: 100_000,
+        deadlineFlights: null,
+        chainId: RESOURCE_CHAIN_ID,
+        chainPart: 3,
+        chainTotal: 12,
+      };
+    },
+  },
+
+  // 4. Power Up
+  {
+    id: 'resource-power-up',
+    category: ContractCategory.RESOURCE,
+    minTier: 5,
+    minMccTier: 3,
+    canGenerate: (state: GameState) => _canGenerateResourceContract(3, state),
+    generate(_state: GameState, _rand: number): GeneratedContract {
+      return {
+        title: 'Power Up',
+        description: 'Deploy a solar power generator to your lunar mining site. Reliable power is essential for continuous operations.',
+        category: ContractCategory.RESOURCE,
+        objectives: [
+          {
+            id: 'obj-res-4-1',
+            type: ObjectiveType.RELEASE_SATELLITE,
+            target: { minAltitude: 80_000, description: 'Deploy Power Generator to lunar site' },
+            completed: false,
+            description: 'Deploy Power Generator to the lunar mining site',
+          },
+        ],
+        reward: 120_000,
+        deadlineFlights: null,
+        chainId: RESOURCE_CHAIN_ID,
+        chainPart: 4,
+        chainTotal: 12,
+      };
+    },
+  },
+
+  // 5. Refining Basics
+  {
+    id: 'resource-refining',
+    category: ContractCategory.RESOURCE,
+    minTier: 5,
+    minMccTier: 3,
+    canGenerate: (state: GameState) => _canGenerateResourceContract(4, state),
+    generate(_state: GameState, _rand: number): GeneratedContract {
+      return {
+        title: 'Refining Basics',
+        description: 'Deploy a refinery module and produce hydrogen from water ice. In-situ resource utilisation turns raw materials into rocket fuel.',
+        category: ContractCategory.RESOURCE,
+        objectives: [
+          {
+            id: 'obj-res-5-1',
+            type: ObjectiveType.RELEASE_SATELLITE,
+            target: { minAltitude: 80_000, description: 'Deploy Refinery to lunar site' },
+            completed: false,
+            description: 'Deploy Refinery to the lunar mining site',
+          },
+          {
+            id: 'obj-res-5-2',
+            type: ObjectiveType.SAFE_LANDING,
+            target: { maxLandingSpeed: 10, description: 'Return hydrogen sample to Earth' },
+            completed: false,
+            description: 'Return a hydrogen sample to Earth',
+          },
+        ],
+        reward: 150_000,
+        deadlineFlights: null,
+        chainId: RESOURCE_CHAIN_ID,
+        chainPart: 5,
+        chainTotal: 12,
+      };
+    },
+  },
+
+  // 6. Launch Capability
+  {
+    id: 'resource-launch-cap',
+    category: ContractCategory.RESOURCE,
+    minTier: 5,
+    minMccTier: 3,
+    canGenerate: (state: GameState) => _canGenerateResourceContract(5, state),
+    generate(_state: GameState, _rand: number): GeneratedContract {
+      return {
+        title: 'Launch Capability',
+        description: 'Build a surface launch pad at your lunar mining site. Enable direct launches from the Moon to orbit.',
+        category: ContractCategory.RESOURCE,
+        objectives: [
+          {
+            id: 'obj-res-6-1',
+            type: ObjectiveType.RELEASE_SATELLITE,
+            target: { minAltitude: 80_000, description: 'Deploy Surface Launch Pad to lunar site' },
+            completed: false,
+            description: 'Deploy Surface Launch Pad to the lunar mining site',
+          },
+        ],
+        reward: 180_000,
+        deadlineFlights: null,
+        chainId: RESOURCE_CHAIN_ID,
+        chainPart: 6,
+        chainTotal: 12,
+      };
+    },
+  },
+
+  // 7. Orbital Storage
+  {
+    id: 'resource-orbital-storage',
+    category: ContractCategory.RESOURCE,
+    minTier: 5,
+    minMccTier: 3,
+    canGenerate: (state: GameState) => _canGenerateResourceContract(6, state),
+    generate(_state: GameState, _rand: number): GeneratedContract {
+      return {
+        title: 'Orbital Storage',
+        description: 'Place a fuel depot in lunar orbit. Orbital fuel storage enables efficient transfer operations without returning to the surface.',
+        category: ContractCategory.RESOURCE,
+        objectives: [
+          {
+            id: 'obj-res-7-1',
+            type: ObjectiveType.REACH_ORBIT,
+            target: { orbitAltitude: 80_000, orbitalVelocity: 7_800 },
+            completed: false,
+            description: 'Reach lunar orbit',
+          },
+          {
+            id: 'obj-res-7-2',
+            type: ObjectiveType.RELEASE_SATELLITE,
+            target: { minAltitude: 80_000, description: 'Deploy fuel depot in lunar orbit' },
+            completed: false,
+            description: 'Deploy fuel depot in lunar orbit',
+          },
+        ],
+        reward: 220_000,
+        deadlineFlights: null,
+        chainId: RESOURCE_CHAIN_ID,
+        chainPart: 7,
+        chainTotal: 12,
+      };
+    },
+  },
+
+  // 8. Automate It — unlocks 'logistics-center'
+  {
+    id: 'resource-automate',
+    category: ContractCategory.RESOURCE,
+    minTier: 5,
+    minMccTier: 3,
+    canGenerate: (state: GameState) => _canGenerateResourceContract(7, state),
+    generate(_state: GameState, _rand: number): GeneratedContract {
+      return {
+        title: 'Automate It',
+        description: 'Set up the first automated transport route between your lunar site and orbital depot. Completing this contract unlocks the Logistics Center facility.',
+        category: ContractCategory.RESOURCE,
+        objectives: [
+          {
+            id: 'obj-res-8-1',
+            type: ObjectiveType.REACH_ORBIT,
+            target: { orbitAltitude: 80_000, orbitalVelocity: 7_800 },
+            completed: false,
+            description: 'Demonstrate automated launch-to-orbit route',
+          },
+          {
+            id: 'obj-res-8-2',
+            type: ObjectiveType.RELEASE_SATELLITE,
+            target: { minAltitude: 80_000, description: 'Deliver cargo to orbital depot via automated route' },
+            completed: false,
+            description: 'Deliver cargo to orbital depot via automated route',
+          },
+        ],
+        reward: 280_000,
+        deadlineFlights: null,
+        chainId: RESOURCE_CHAIN_ID,
+        chainPart: 8,
+        chainTotal: 12,
+      };
+    },
+  },
+
+  // 9. Gas Mining
+  {
+    id: 'resource-gas-mining',
+    category: ContractCategory.RESOURCE,
+    minTier: 5,
+    minMccTier: 3,
+    canGenerate: (state: GameState) => _canGenerateResourceContract(8, state),
+    generate(_state: GameState, _rand: number): GeneratedContract {
+      return {
+        title: 'Gas Mining',
+        description: 'Deploy a gas collector on Mars. The Martian atmosphere is rich in CO\u2082 — a key feedstock for methane fuel production.',
+        category: ContractCategory.RESOURCE,
+        objectives: [
+          {
+            id: 'obj-res-9-1',
+            type: ObjectiveType.REACH_ORBIT,
+            target: { orbitAltitude: 80_000, orbitalVelocity: 7_800 },
+            completed: false,
+            description: 'Reach orbit for Mars transfer',
+          },
+          {
+            id: 'obj-res-9-2',
+            type: ObjectiveType.RELEASE_SATELLITE,
+            target: { minAltitude: 80_000, description: 'Deploy Gas Collector on Mars' },
+            completed: false,
+            description: 'Deploy Gas Collector on the Martian surface',
+          },
+        ],
+        reward: 350_000,
+        deadlineFlights: null,
+        chainId: RESOURCE_CHAIN_ID,
+        chainPart: 9,
+        chainTotal: 12,
+      };
+    },
+  },
+
+  // 10. Methane Production
+  {
+    id: 'resource-methane',
+    category: ContractCategory.RESOURCE,
+    minTier: 5,
+    minMccTier: 3,
+    canGenerate: (state: GameState) => _canGenerateResourceContract(9, state),
+    generate(_state: GameState, _rand: number): GeneratedContract {
+      return {
+        title: 'Methane Production',
+        description: 'Produce methane from CO\u2082 and hydrogen via the Sabatier reaction. Deploy a refinery on Mars and return a methane sample.',
+        category: ContractCategory.RESOURCE,
+        objectives: [
+          {
+            id: 'obj-res-10-1',
+            type: ObjectiveType.RELEASE_SATELLITE,
+            target: { minAltitude: 80_000, description: 'Deploy Mars Refinery' },
+            completed: false,
+            description: 'Deploy Refinery to the Martian site',
+          },
+          {
+            id: 'obj-res-10-2',
+            type: ObjectiveType.SAFE_LANDING,
+            target: { maxLandingSpeed: 10, description: 'Return methane sample to Earth' },
+            completed: false,
+            description: 'Return a methane sample to Earth',
+          },
+        ],
+        reward: 400_000,
+        deadlineFlights: null,
+        chainId: RESOURCE_CHAIN_ID,
+        chainPart: 10,
+        chainTotal: 12,
+      };
+    },
+  },
+
+  // 11. Asteroid Prospecting
+  {
+    id: 'resource-asteroid',
+    category: ContractCategory.RESOURCE,
+    minTier: 5,
+    minMccTier: 3,
+    canGenerate: (state: GameState) => _canGenerateResourceContract(10, state),
+    generate(_state: GameState, _rand: number): GeneratedContract {
+      return {
+        title: 'Asteroid Prospecting',
+        description: 'Extract rare metals from Ceres. Asteroid mining opens access to materials unavailable on planetary surfaces.',
+        category: ContractCategory.RESOURCE,
+        objectives: [
+          {
+            id: 'obj-res-11-1',
+            type: ObjectiveType.REACH_ORBIT,
+            target: { orbitAltitude: 80_000, orbitalVelocity: 7_800 },
+            completed: false,
+            description: 'Reach orbit for Ceres transfer',
+          },
+          {
+            id: 'obj-res-11-2',
+            type: ObjectiveType.RELEASE_SATELLITE,
+            target: { minAltitude: 80_000, description: 'Deploy mining rig on Ceres' },
+            completed: false,
+            description: 'Deploy mining rig on Ceres and extract rare metals',
+          },
+        ],
+        reward: 480_000,
+        deadlineFlights: null,
+        chainId: RESOURCE_CHAIN_ID,
+        chainPart: 11,
+        chainTotal: 12,
+      };
+    },
+  },
+
+  // 12. Supply Network
+  {
+    id: 'resource-supply-network',
+    category: ContractCategory.RESOURCE,
+    minTier: 5,
+    minMccTier: 3,
+    canGenerate: (state: GameState) => _canGenerateResourceContract(11, state),
+    generate(_state: GameState, _rand: number): GeneratedContract {
+      return {
+        title: 'Supply Network',
+        description: 'Establish a supply network with 3 or more active automated transport routes running simultaneously. Full logistics mastery.',
+        category: ContractCategory.RESOURCE,
+        objectives: [
+          {
+            id: 'obj-res-12-1',
+            type: ObjectiveType.REACH_ORBIT,
+            target: { orbitAltitude: 80_000, orbitalVelocity: 7_800 },
+            completed: false,
+            description: 'Demonstrate network with 3+ active routes',
+          },
+          {
+            id: 'obj-res-12-2',
+            type: ObjectiveType.RELEASE_SATELLITE,
+            target: { minAltitude: 80_000, description: 'Verify 3+ simultaneous automated routes' },
+            completed: false,
+            description: 'Verify 3 or more simultaneous automated transport routes',
+          },
+        ],
+        reward: 550_000,
+        deadlineFlights: null,
+        chainId: RESOURCE_CHAIN_ID,
+        chainPart: 12,
+        chainTotal: 12,
+      };
+    },
+  },
+];
+
+// ---------------------------------------------------------------------------
 // Contract Templates
 // ---------------------------------------------------------------------------
 
@@ -742,6 +1198,9 @@ export const CONTRACT_TEMPLATES: ContractTemplate[] = [
     },
   },
 ];
+
+// Add resource contracts to the main templates array.
+CONTRACT_TEMPLATES.push(...RESOURCE_CONTRACTS);
 
 /**
  * Contract templates indexed by ID for O(1) lookups.

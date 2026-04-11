@@ -1,9 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { ResourceType, ResourceState, MiningModuleType, FacilityId, FACILITY_DEFINITIONS, PartType } from '../core/constants.ts';
+import { ResourceType, ResourceState, MiningModuleType, FacilityId, FACILITY_DEFINITIONS, PartType, MissionState, ContractCategory } from '../core/constants.ts';
 import { PARTS } from '../data/parts.ts';
 import { RESOURCES, RESOURCES_BY_ID } from '../data/resources.ts';
 import type { ResourceDef } from '../data/resources.ts';
 import { CELESTIAL_BODIES } from '../data/bodies.ts';
+import { RESOURCE_CONTRACTS } from '../data/contracts.ts';
+import { TechBranch, BRANCH_NAMES, TECH_NODES } from '../data/techtree.ts';
+import { createGameState } from '../core/gameState.ts';
+import type { Contract, Mission } from '../core/gameState.ts';
 
 describe('ResourceType enum', () => {
   it('has all 10 resource values', () => {
@@ -238,5 +242,151 @@ describe('Mining module parts', () => {
     expect(gen).toBeDefined();
     expect(gen!.properties.powerDraw).toBe(0);
     expect(gen!.properties.powerOutput).toBe(100);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Resource Contract Chain Tests
+// ---------------------------------------------------------------------------
+
+describe('Resource contract chain', () => {
+  /** Create a stub completed mission for padding the completed list. */
+  function stubMission(index: number): Mission {
+    return {
+      id: `mission-${index}`, title: `M${index}`, description: '', reward: 0,
+      deadline: '', state: MissionState.COMPLETED, requirements: {},
+      acceptedDate: null, completedDate: null,
+    };
+  }
+
+  /** Create a stub completed contract with the resource chain fields. */
+  function stubChainContract(part: number): Contract {
+    return {
+      id: `resource-contract-${part}`, title: '', description: '',
+      category: ContractCategory.RESOURCE, objectives: [], reward: 0,
+      penaltyFee: 0, reputationReward: 0, reputationPenalty: 0,
+      deadlinePeriod: null, boardExpiryPeriod: 0, generatedPeriod: 0,
+      acceptedPeriod: null, chainId: 'resource-chain', chainPart: part,
+      chainTotal: 12,
+    };
+  }
+
+  /** Create a game state with tutorials completed. */
+  function stateWithTutorials() {
+    const state = createGameState();
+    state.missions.completed = Array.from({ length: 15 }, (_, i) => stubMission(i));
+    state.contracts = { board: [], active: [], completed: [], failed: [] };
+    return state;
+  }
+
+  it('RESOURCE_CONTRACTS has 12 templates', () => {
+    expect(RESOURCE_CONTRACTS).toHaveLength(12);
+  });
+
+  it('first contract requires tutorials complete', () => {
+    const state = createGameState();
+    expect(RESOURCE_CONTRACTS[0].canGenerate(state)).toBe(false);
+  });
+
+  it('first contract is available when tutorials are done', () => {
+    const state = stateWithTutorials();
+    expect(RESOURCE_CONTRACTS[0].canGenerate(state)).toBe(true);
+  });
+
+  it('contracts are sequential — each requires previous completion', () => {
+    const state = stateWithTutorials();
+
+    // Contract 1 should be available (tutorials done, no previous required)
+    expect(RESOURCE_CONTRACTS[0].canGenerate(state)).toBe(true);
+    // Contract 2 should not (contract 1 not completed yet)
+    expect(RESOURCE_CONTRACTS[1].canGenerate(state)).toBe(false);
+  });
+
+  it('contract 2 becomes available after contract 1 is completed', () => {
+    const state = stateWithTutorials();
+    state.contracts.completed.push(stubChainContract(1));
+    expect(RESOURCE_CONTRACTS[1].canGenerate(state)).toBe(true);
+  });
+
+  it('contract 8 unlocks logistics-center', () => {
+    const state = stateWithTutorials();
+    // Simulate previous 7 contracts completed
+    for (let i = 1; i <= 7; i++) {
+      state.contracts.completed.push(stubChainContract(i));
+    }
+
+    const generated = RESOURCE_CONTRACTS[7].generate(state, 0.5);
+    expect(generated.title).toContain('Automate');
+    expect(generated.description).toContain('Logistics Center');
+  });
+
+  it('all 12 contracts have unique IDs', () => {
+    const ids = RESOURCE_CONTRACTS.map(c => c.id);
+    expect(new Set(ids).size).toBe(12);
+  });
+
+  it('all contracts use RESOURCE category', () => {
+    for (const template of RESOURCE_CONTRACTS) {
+      expect(template.category).toBe('RESOURCE');
+    }
+  });
+
+  it('rewards increase through the chain', () => {
+    const state = stateWithTutorials();
+
+    let prevReward = 0;
+    for (let i = 0; i < 12; i++) {
+      // Add previous chain completion for contracts after the first
+      if (i > 0) {
+        state.contracts.completed.push(stubChainContract(i));
+      }
+      const generated = RESOURCE_CONTRACTS[i].generate(state, 0.5);
+      expect(generated.reward).toBeGreaterThan(prevReward);
+      prevReward = generated.reward;
+    }
+  });
+
+  it('each generated contract has correct chainId and chainPart', () => {
+    const state = stateWithTutorials();
+
+    for (let i = 0; i < 12; i++) {
+      if (i > 0) {
+        state.contracts.completed.push(stubChainContract(i));
+      }
+      const generated = RESOURCE_CONTRACTS[i].generate(state, 0.5);
+      expect(generated.chainId).toBe('resource-chain');
+      expect(generated.chainPart).toBe(i + 1);
+      expect(generated.chainTotal).toBe(12);
+    }
+  });
+});
+
+describe('Logistics tech tree branch', () => {
+  it('TechBranch has LOGISTICS value', () => {
+    expect(TechBranch.LOGISTICS).toBe('logistics');
+  });
+
+  it('BRANCH_NAMES includes Logistics', () => {
+    expect(BRANCH_NAMES[TechBranch.LOGISTICS]).toBe('Logistics');
+  });
+
+  it('TECH_NODES has 5 Logistics-branch nodes', () => {
+    const logNodes = TECH_NODES.filter(n => n.branch === TechBranch.LOGISTICS);
+    expect(logNodes).toHaveLength(5);
+  });
+
+  it('Logistics nodes have tiers 1-5', () => {
+    const logNodes = TECH_NODES.filter(n => n.branch === TechBranch.LOGISTICS);
+    const tiers = logNodes.map(n => n.tier).sort();
+    expect(tiers).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('tier 1 unlocks basic mining parts', () => {
+    const t1 = TECH_NODES.find(n => n.branch === TechBranch.LOGISTICS && n.tier === 1);
+    expect(t1).toBeDefined();
+    expect(t1!.unlocksParts).toContain('mining-drill-mk1');
+    expect(t1!.unlocksParts).toContain('base-control-unit-mk1');
+    expect(t1!.unlocksParts).toContain('storage-silo-mk1');
+    expect(t1!.unlocksParts).toContain('power-generator-solar-mk1');
   });
 });

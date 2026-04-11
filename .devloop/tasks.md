@@ -37,7 +37,7 @@
 - **Verification**: `npx vitest run src/tests/mining.test.ts && npx tsc --noEmit src/core/gameState.ts`
 
 ### TASK-007: Implement mining site creation and proximity lookup
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-006
 - **Description**: Create `src/core/mining.ts` with: `SITE_PROXIMITY_RADIUS` constant (500), `CreateSiteParams` interface, `createMiningSite(state, params)` function that creates a `MiningSite` and pushes it to `state.miningSites`, and `findNearestSite(state, bodyId, coordinates)` that returns the nearest site within proximity radius on the specified body (or null). Append tests to `src/tests/mining.test.ts` covering: site creation with control unit, empty storage/production/orbitalBuffer, zero power fields, proximity lookup finding/missing sites, ignoring sites on other bodies.
 - **Verification**: `npx vitest run src/tests/mining.test.ts`
@@ -67,7 +67,7 @@
 - **Verification**: `npx vitest run src/tests/mining.test.ts`
 
 ### TASK-012: Implement route leg proving
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-006
 - **Description**: Create `src/core/routes.ts` with: `ProveRouteLegParams` interface (origin, destination, craftDesignId, cargoCapacityKg, costPerRun, flightId), `proveRouteLeg(state, params)` that creates a `ProvenLeg` with unique ID and `dateProven: state.currentPeriod` and pushes to `state.provenLegs`, `locationsMatch(a, b)` helper comparing RouteLocations (bodyId + locationType + altitude), `getProvenLegsForOriginDestination(state, origin, destination)` that filters matching legs. Create `src/tests/routes.test.ts` with tests covering: recording proven legs, unique IDs, date assignment, multiple legs for same route with different craft, filtering by origin/destination.
 - **Verification**: `npx vitest run src/tests/routes.test.ts`
@@ -91,19 +91,19 @@
 - **Verification**: `npx vitest run src/tests/mining.test.ts && npx tsc --noEmit src/core/period.ts`
 
 ### TASK-016: Add save/load support for new state fields
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-006
 - **Description**: In `src/core/saveload.ts`, ensure the serialization path includes `miningSites`, `provenLegs`, and `routes` from `GameState`. In the deserialization/migration path, default missing fields to `[]` for backwards compatibility with old saves (e.g., `state.miningSites = data.miningSites ?? []`). The save/load is async and slot-based — `saveGame(state, slotIndex, name)` returns `Promise<SaveSlotSummary>`, `loadGame(slotIndex)` returns `Promise<GameState>`. Append round-trip tests to `src/tests/mining.test.ts` (or `src/tests/saveload.test.ts` if more appropriate) using `await saveGame(state, 0, 'test')` and `await loadGame(0)`, verifying that miningSites (with modules and storage), provenLegs, and routes survive the round-trip.
 - **Verification**: `npx vitest run src/tests/saveload.test.ts`
 
 ### TASK-017: Add resource contract chain (12 contracts)
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001, TASK-014
 - **Description**: Add 12 resource contract templates to `src/data/contracts.ts`, integrating with the existing `CONTRACT_TEMPLATES` generator pattern. Each contract has a `canGenerate()` function that checks prerequisites (all tutorials complete, previous resource contract completed) and a `generate()` function returning the contract instance. Contracts follow the sequential chain in requirements.md §5 — contract 8 unlocks the Logistics Center facility. Export a `RESOURCE_CONTRACTS` array for direct access/testing. Append tests to `src/tests/resources.test.ts` verifying: 12 contracts exist, first contract requires tutorials, contracts are sequential (each requires previous), contract 8 unlocks 'logistics-center'.
 - **Verification**: `npx vitest run src/tests/resources.test.ts`
 
 ### TASK-018: Add Logistics tech tree branch
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-005
 - **Description**: Add `LOGISTICS: 'LOGISTICS'` to the `TechBranch` enum and `'Logistics'` to `BRANCH_NAMES` in `src/data/techtree.ts`. Add 5 new `TechNodeDef` entries to the `TECH_NODES` array, each with `branch: TechBranch.LOGISTICS` and tiers 1-5: (1) Surface Mining — unlocks drill, BCU, silo, power generator; (2) Gas & Fluid Extraction — unlocks gas collector, fluid extractor, pressure vessel, fluid tank; (3) Refining & Processing — unlocks refinery, cargo bay, pressurized tank, cryo tank; (4) Surface Launch Systems — unlocks surface launch pad; (5) Automated Logistics — empty unlocksParts. Append tests to `src/tests/resources.test.ts` verifying: Logistics branch exists in TECH_NODES, 5 nodes with correct tiers, tier 1 unlocks basic mining parts.
 - **Verification**: `npx vitest run src/tests/resources.test.ts`

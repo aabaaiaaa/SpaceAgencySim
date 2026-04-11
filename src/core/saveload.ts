@@ -625,6 +625,11 @@ export async function loadGame(slotIndex: number): Promise<GameState> {
     envelope.state.flightState.horizontalVelocity = 0;
   }
 
+  // Default mining/route fields for saves created before the resource system.
+  envelope.state.miningSites ??= [];
+  envelope.state.provenLegs ??= [];
+  envelope.state.routes ??= [];
+
   // Validate and filter corrupted nested entries (missions, crew, etc.).
   _validateNestedStructures(envelope.state);
 
