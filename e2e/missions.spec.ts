@@ -90,10 +90,10 @@ test.describe('Mission Control Flow', () => {
 
     // Exactly one mission card must be visible.
     const cards = page.locator('.mc-mission-card');
-    await expect(cards).toHaveCount(1);
+    await expect(cards).toHaveCount(1, { timeout: 5_000 });
 
     // That single card must be titled "First Flight".
-    await expect(cards.first()).toContainText('First Flight');
+    await expect(cards.first()).toContainText('First Flight', { timeout: 5_000 });
   });
 
   // ── (2) Clicking "Accept" moves First Flight to the Accepted tab ───────────
@@ -103,15 +103,15 @@ test.describe('Mission Control Flow', () => {
     await page.click('.mc-accept-btn');
 
     // After accepting, the Available tab re-renders as empty — no mission cards.
-    await expect(page.locator('.mc-mission-card')).toHaveCount(0);
+    await expect(page.locator('.mc-mission-card')).toHaveCount(0, { timeout: 5_000 });
 
     // Switch to the Accepted tab.
     await page.click('[data-tab-id="accepted"]');
 
     // First Flight must appear as an accepted mission card.
     const acceptedCards = page.locator('.mc-mission-card');
-    await expect(acceptedCards).toBeVisible();
-    await expect(acceptedCards.first()).toContainText('First Flight');
+    await expect(acceptedCards).toBeVisible({ timeout: 5_000 });
+    await expect(acceptedCards.first()).toContainText('First Flight', { timeout: 5_000 });
   });
 
   // ── (3) Accepted tab shows the mission's objectives ────────────────────────
@@ -124,14 +124,14 @@ test.describe('Mission Control Flow', () => {
     await page.click('[data-tab-id="accepted"]');
 
     // The "Objectives" section label must be present.
-    await expect(page.locator('.mc-objectives-label')).toBeVisible();
+    await expect(page.locator('.mc-objectives-label')).toBeVisible({ timeout: 5_000 });
 
     // At least one objective item must be rendered.
     const items = page.locator('.mc-objective-item');
-    await expect(items.first()).toBeVisible();
+    await expect(items.first()).toBeVisible({ timeout: 5_000 });
 
     // The first objective text matches the First Flight definition.
-    await expect(page.locator('.mc-objective-text').first()).toContainText('Reach 100 m altitude');
+    await expect(page.locator('.mc-objective-text').first()).toContainText('Reach 100 m altitude', { timeout: 5_000 });
   });
 
   // ── (4) Accepting a mission does not deduct cash ───────────────────────────
@@ -160,10 +160,10 @@ test.describe('Mission Control Flow', () => {
     await page.click('.mc-accept-btn');
 
     // The Available tab should now be completely empty — no mission cards.
-    await expect(page.locator('.mc-mission-card')).toHaveCount(0);
+    await expect(page.locator('.mc-mission-card')).toHaveCount(0, { timeout: 5_000 });
 
     // The empty-state message must be visible.
-    await expect(page.locator('.mc-empty-msg')).toBeVisible();
+    await expect(page.locator('.mc-empty-msg')).toBeVisible({ timeout: 5_000 });
   });
 
   // ── (6) Completed tab is empty at game start ───────────────────────────────
@@ -173,10 +173,10 @@ test.describe('Mission Control Flow', () => {
     await page.click('[data-tab-id="completed"]');
 
     // No completed-missions table should exist (only the empty-state message).
-    await expect(page.locator('.mc-completed-table')).toHaveCount(0);
+    await expect(page.locator('.mc-completed-table')).toHaveCount(0, { timeout: 5_000 });
 
     // The empty-state message must be visible.
-    await expect(page.locator('.mc-empty-msg')).toBeVisible();
+    await expect(page.locator('.mc-empty-msg')).toBeVisible({ timeout: 5_000 });
   });
 
   // ── (7) Seeded completed state shows mission in Completed tab with reward ──
@@ -207,13 +207,13 @@ test.describe('Mission Control Flow', () => {
 
     // Exactly one completed mission card must exist.
     const completedCards = page.locator('.mc-mission-card-completed');
-    await expect(completedCards).toHaveCount(1);
+    await expect(completedCards).toHaveCount(1, { timeout: 5_000 });
 
     // The card must contain the mission title.
-    await expect(completedCards.first()).toContainText('First Flight');
+    await expect(completedCards.first()).toContainText('First Flight', { timeout: 5_000 });
 
     // The card must display the reward amount ($25,000).
-    await expect(page.locator('.mc-mission-reward')).toContainText('25,000');
+    await expect(page.locator('.mc-mission-reward')).toContainText('25,000', { timeout: 5_000 });
   });
 
   // ── (8) Mission reward parts are shown on available, accepted, and completed tabs
@@ -259,7 +259,7 @@ test.describe('Mission Control Flow', () => {
     await page.click('[data-building-id="mission-control"]');
     await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
 
-    await expect(page.locator('.mc-mission-rewards')).toContainText('Mk2 Parachute');
+    await expect(page.locator('.mc-mission-rewards')).toContainText('Mk2 Parachute', { timeout: 5_000 });
 
     // ── Accepted tab: rewards shown ──
     await page.evaluate((state: MissionData) => {
@@ -275,7 +275,7 @@ test.describe('Mission Control Flow', () => {
     await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
     await page.click('[data-tab-id="accepted"]');
 
-    await expect(page.locator('.mc-mission-rewards')).toContainText('Mk2 Parachute');
+    await expect(page.locator('.mc-mission-rewards')).toContainText('Mk2 Parachute', { timeout: 5_000 });
 
     // ── Completed tab: parts unlocked column shown ──
     await page.evaluate((state: MissionData) => {
@@ -291,6 +291,6 @@ test.describe('Mission Control Flow', () => {
     await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
     await page.click('[data-tab-id="completed"]');
 
-    await expect(page.locator('.mc-mission-rewards')).toContainText('Mk2 Parachute');
+    await expect(page.locator('.mc-mission-rewards')).toContainText('Mk2 Parachute', { timeout: 5_000 });
   });
 });

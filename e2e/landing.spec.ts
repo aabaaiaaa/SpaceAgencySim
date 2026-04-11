@@ -96,21 +96,23 @@ test.describe('Flight — Landing', () => {
   test('(1) launching from the VAB loads the flight scene', async ({ page }) => {
     test.setTimeout(120_000);
     await buildAndLaunch(page);
-    await expect(page.locator('#flight-hud')).toBeVisible();
-    await expect(page.locator('#vab-btn-launch')).not.toBeVisible();
+    await expect(page.locator('#flight-hud')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('#vab-btn-launch')).not.toBeVisible({ timeout: 5_000 });
   });
 
   test('(2) pressing Space fires Stage 1 and the rocket lifts off', async ({ page }) => {
     test.setTimeout(120_000);
     await buildAndLaunch(page);
 
-    expect(await page.evaluate((): boolean =>
-      window.__flightPs?.grounded ?? true,
-    )).toBe(true);
+    await page.waitForFunction(
+      () => window.__flightPs?.grounded === true,
+      { timeout: 5_000 },
+    );
     await fireStage1(page);
-    expect(await page.evaluate((): number =>
-      window.__flightPs?.posY ?? 0,
-    )).toBeGreaterThan(0);
+    await page.waitForFunction(
+      () => (window.__flightPs?.posY ?? 0) > 0,
+      { timeout: 5_000 },
+    );
   });
 
   test('(3) pressing Space again separates the lower stage and deploys the parachute', async ({ page }) => {
@@ -166,6 +168,11 @@ test.describe('Flight — Landing', () => {
     await fireStage2(page);
     await waitForLanding(page);
 
+    await page.waitForFunction(
+      () => (window.__gameState?.currentFlight?.events ?? []).some((e: { type: string }) => e.type === 'LANDING'),
+      { timeout: 5_000 },
+    );
+
     const events: FlightEvent[] = await page.evaluate(
       (): FlightEvent[] => window.__gameState?.currentFlight?.events ?? [],
     );
@@ -190,12 +197,12 @@ test.describe('Flight — Landing', () => {
     if (!summaryAlreadyVisible) {
       await page.click('#topbar-menu-btn', { force: true });
       const dropdown = page.locator('#topbar-dropdown');
-      await expect(dropdown).toBeVisible();
+      await expect(dropdown).toBeVisible({ timeout: 5_000 });
       await dropdown.getByText('Return to Space Agency').click();
     }
 
     await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 5_000 });
-    await expect(page.locator('#post-flight-return-btn')).toBeVisible();
-    await expect(page.locator('#flight-hud')).not.toBeVisible();
+    await expect(page.locator('#post-flight-return-btn')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('#flight-hud')).not.toBeVisible({ timeout: 5_000 });
   });
 });

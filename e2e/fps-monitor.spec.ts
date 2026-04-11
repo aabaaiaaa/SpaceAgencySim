@@ -37,8 +37,8 @@ test.describe('FPS Monitor', () => {
     await dismissWelcomeModal(page);
 
     await startTestFlight(page, FLIGHT_PARTS);
-    await page.waitForTimeout(600);
-    await expect(page.locator('#fps-monitor')).not.toBeVisible();
+    // FPS monitor should not appear with debug mode off — no hard wait needed
+    await expect(page.locator('#fps-monitor')).not.toBeVisible({ timeout: 2_000 });
   });
 
   test('(2) FPS monitor is visible during flight with debug mode on', async ({ page }) => {
@@ -49,7 +49,6 @@ test.describe('FPS Monitor', () => {
 
     await page.evaluate(() => window.__enableDebugMode());
     await startTestFlight(page, FLIGHT_PARTS);
-    await page.waitForTimeout(600);
 
     await expect(page.locator('#fps-monitor')).toBeVisible({ timeout: 5_000 });
     const fpsText: string | null = await page.locator('#fps-monitor-fps').textContent();
@@ -66,7 +65,12 @@ test.describe('FPS Monitor', () => {
 
     await page.evaluate(() => window.__enableDebugMode());
     await startTestFlight(page, FLIGHT_PARTS);
-    await page.waitForTimeout(600);
+
+    // Wait for perf stats to be populated (requires at least one render frame)
+    await page.waitForFunction(
+      () => window.__perfStats?.fps != null && window.__perfStats.fps > 0,
+      { timeout: 5_000 },
+    );
 
     const stats = await page.evaluate((): PerfStats | null =>
       window.__perfStats

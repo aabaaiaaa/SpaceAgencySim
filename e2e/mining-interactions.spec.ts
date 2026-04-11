@@ -78,7 +78,7 @@ test.describe('Mining Panel Interactions', () => {
 
     // The body should appear in the sidebar
     const sidebarItem = page.locator('.logistics-sidebar-item', { hasText: 'MOON' });
-    await expect(sidebarItem).toBeVisible();
+    await expect(sidebarItem).toBeVisible({ timeout: 5_000 });
 
     // Power budget should be displayed
     await expect(siteCard).toContainText('Power: 100 / 72');
@@ -111,10 +111,10 @@ test.describe('Mining Panel Interactions', () => {
 
     // Find the recipe dropdown for the refinery module
     const recipeSelect = siteCard.locator('.logistics-recipe-select');
-    await expect(recipeSelect).toBeVisible();
+    await expect(recipeSelect).toBeVisible({ timeout: 5_000 });
 
     // Verify the current recipe is "Water Electrolysis" (matching recipeId: 'water-electrolysis')
-    await expect(recipeSelect).toHaveValue('water-electrolysis');
+    await expect(recipeSelect).toHaveValue('water-electrolysis', { timeout: 5_000 });
 
     // Change the recipe to a different option — "Regolith Electrolysis"
     await recipeSelect.selectOption('regolith-electrolysis');
@@ -122,13 +122,13 @@ test.describe('Mining Panel Interactions', () => {
     // After the UI re-renders, the dropdown should reflect the new value
     // The panel re-renders on change, so re-locate the select
     const updatedSelect = page.locator('.logistics-site-card .logistics-recipe-select');
-    await expect(updatedSelect).toHaveValue('regolith-electrolysis');
+    await expect(updatedSelect).toHaveValue('regolith-electrolysis', { timeout: 5_000 });
 
     // Change to "None" to verify clearing the recipe works
     await updatedSelect.selectOption('');
 
     const clearedSelect = page.locator('.logistics-site-card .logistics-recipe-select');
-    await expect(clearedSelect).toHaveValue('');
+    await expect(clearedSelect).toHaveValue('', { timeout: 5_000 });
   });
 
   test('module list displays module types and part IDs', async ({ page }) => {
@@ -145,7 +145,7 @@ test.describe('Mining Panel Interactions', () => {
     // The UI renders: "Type Name (partId)" for non-refinery modules,
     // and "Type Name (partId) — Recipe: [dropdown]" for refinery modules.
     const moduleItems = siteCard.locator('.logistics-module-item');
-    await expect(moduleItems).toHaveCount(5);
+    await expect(moduleItems).toHaveCount(5, { timeout: 5_000 });
 
     // Verify partIds appear in the module list
     await expect(siteCard.locator('.logistics-module-list')).toContainText('power-generator-solar-mk1');

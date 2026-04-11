@@ -24,10 +24,10 @@ test.describe('Save Version Indicator', () => {
 
     // The save card for slot 0 should be visible.
     const slot0Card = page.locator('.mm-save-card[data-slot="0"]:not(.mm-empty-slot)');
-    await expect(slot0Card).toBeVisible();
+    await expect(slot0Card).toBeVisible({ timeout: 5_000 });
 
     // No version warning should be displayed.
-    await expect(slot0Card.locator('[data-testid="version-warning"]')).toHaveCount(0);
+    await expect(slot0Card.locator('[data-testid="version-warning"]')).toHaveCount(0, { timeout: 5_000 });
   });
 
   test('main menu: mismatched-version save shows version warning badge', async ({ page }) => {
@@ -41,13 +41,13 @@ test.describe('Save Version Indicator', () => {
     await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
 
     const slot0Card = page.locator('.mm-save-card[data-slot="0"]:not(.mm-empty-slot)');
-    await expect(slot0Card).toBeVisible();
+    await expect(slot0Card).toBeVisible({ timeout: 5_000 });
 
     // The version warning badge should be visible and contain the version info.
     const badge = slot0Card.locator('[data-testid="version-warning"]');
-    await expect(badge).toBeVisible();
-    await expect(badge).toContainText('v0');
-    await expect(badge).toContainText('current: v2');
+    await expect(badge).toBeVisible({ timeout: 5_000 });
+    await expect(badge).toContainText('v0', { timeout: 5_000 });
+    await expect(badge).toContainText('current: v2', { timeout: 5_000 });
   });
 
   test('topbar load modal: mismatched-version save shows version warning', async ({ page }) => {
@@ -66,16 +66,16 @@ test.describe('Save Version Indicator', () => {
 
     // Open the topbar menu and click "Load Game".
     await page.click('[data-testid="topbar-menu-btn"]');
-    await expect(page.locator('#topbar-dropdown')).toBeVisible();
+    await expect(page.locator('#topbar-dropdown')).toBeVisible({ timeout: 5_000 });
     await page.locator('#topbar-dropdown button').filter({ hasText: 'Load Game' }).click();
-    await expect(page.locator('#load-modal-backdrop')).toBeVisible();
+    await expect(page.locator('#load-modal-backdrop')).toBeVisible({ timeout: 5_000 });
 
     // The load slot should show the version warning.
     const slot = page.locator('[data-testid="load-slot-0"]');
-    await expect(slot).toBeVisible();
+    await expect(slot).toBeVisible({ timeout: 5_000 });
     const badge = slot.locator('[data-testid="version-warning"]');
-    await expect(badge).toBeVisible();
-    await expect(badge).toContainText('v0');
+    await expect(badge).toBeVisible({ timeout: 5_000 });
+    await expect(badge).toContainText('v0', { timeout: 5_000 });
   });
 
   test('topbar load modal: current-version save shows no version warning', async ({ page }) => {
@@ -94,13 +94,13 @@ test.describe('Save Version Indicator', () => {
 
     // Open the topbar menu and click "Load Game".
     await page.click('[data-testid="topbar-menu-btn"]');
-    await expect(page.locator('#topbar-dropdown')).toBeVisible();
+    await expect(page.locator('#topbar-dropdown')).toBeVisible({ timeout: 5_000 });
     await page.locator('#topbar-dropdown button').filter({ hasText: 'Load Game' }).click();
-    await expect(page.locator('#load-modal-backdrop')).toBeVisible();
+    await expect(page.locator('#load-modal-backdrop')).toBeVisible({ timeout: 5_000 });
 
     // No version warning should be present on slot 0.
     const slot = page.locator('[data-testid="load-slot-0"]');
-    await expect(slot).toBeVisible();
-    await expect(slot.locator('[data-testid="version-warning"]')).toHaveCount(0);
+    await expect(slot).toBeVisible({ timeout: 5_000 });
+    await expect(slot.locator('[data-testid="version-warning"]')).toHaveCount(0, { timeout: 5_000 });
   });
 });

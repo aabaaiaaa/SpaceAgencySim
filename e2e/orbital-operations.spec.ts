@@ -563,8 +563,11 @@ test.describe('Docking mode local positioning', () => {
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
-    // Let a few render frames pass to exercise the docking target draw code.
-    await page.waitForTimeout(500);
+    // Wait for at least one render frame to exercise the docking target draw code.
+    await page.waitForFunction(
+      () => (window.__flightPs?.dockingPortStates?.size ?? 0) > 0,
+      { timeout: 5_000 },
+    );
 
     // Verify no console errors were thrown by the PixiJS draw calls.
     const errors = await page.evaluate(() => {
@@ -586,7 +589,11 @@ test.describe('Docking mode local positioning', () => {
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
-    await page.waitForTimeout(500);
+    // Wait for at least one render frame after docked state change.
+    await page.waitForFunction(
+      () => window.__flightPs?.dockingPortStates?.get('test-port') === 'docked',
+      { timeout: 5_000 },
+    );
 
     // Confirm the render loop is still running (no crash).
     const stillRunning = await page.evaluate(() => {

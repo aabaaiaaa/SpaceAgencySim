@@ -684,7 +684,7 @@ test.describe('Map view toggle and controls', () => {
 
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyM', key: 'm', bubbles: true })));
     await expect(page.locator('#map-hud')).toBeVisible({ timeout: 5_000 });
-    await expect(page.locator('#map-hud-info')).toContainText('MAP VIEW');
+    await expect(page.locator('#map-hud-info')).toContainText('MAP VIEW', { timeout: 5_000 });
     await page.close();
   });
 
@@ -711,9 +711,9 @@ test.describe('Map view toggle and controls', () => {
     await expect(page.locator('#map-hud')).toBeVisible({ timeout: 5_000 });
 
     const controls = page.locator('#map-hud-controls');
-    await expect(controls).toBeVisible();
-    await expect(controls).toContainText('WASD');
-    await expect(controls).toContainText('Warp to target');
+    await expect(controls).toBeVisible({ timeout: 5_000 });
+    await expect(controls).toContainText('WASD', { timeout: 5_000 });
+    await expect(controls).toContainText('Warp to target', { timeout: 5_000 });
     await page.close();
   });
 
@@ -822,7 +822,7 @@ test.describe('Map view toggle and controls', () => {
     // Close map.
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyM', key: 'm', bubbles: true })));
     await expect(page.locator('#map-hud')).not.toBeVisible({ timeout: 5_000 });
-    await expect(page.locator('#flight-hud')).toBeVisible();
+    await expect(page.locator('#flight-hud')).toBeVisible({ timeout: 5_000 });
     await page.close();
   });
 });

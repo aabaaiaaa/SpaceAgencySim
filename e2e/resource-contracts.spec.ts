@@ -117,8 +117,15 @@ test.describe('Resource contracts — early chain', () => {
     // Look for the contracts tab and click it if present
     const contractsTab = page.locator('.facility-tab', { hasText: /[Cc]ontract/ });
     if (await contractsTab.count() > 0) {
+      await expect(contractsTab.first()).toBeVisible({ timeout: 5_000 });
       await contractsTab.first().click();
     }
+
+    // Wait for state to stabilize after UI interaction
+    await page.waitForFunction(
+      () => window.__gameState?.contracts?.completed?.length >= 1,
+      { timeout: 5_000 },
+    );
 
     // Verify the state reflects contract 1 completed — this is the prerequisite
     // for contract 2 generation

@@ -114,28 +114,28 @@ test.describe('Launch Pad', () => {
     await page.waitForSelector('#launch-pad-overlay', { state: 'visible', timeout: 10_000 });
 
     // The rocket list should be visible (not the empty state).
-    await expect(page.locator('#launch-pad-rocket-list')).toBeVisible();
-    await expect(page.locator('#launch-pad-status')).toHaveCount(0);
+    await expect(page.locator('#launch-pad-rocket-list')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('#launch-pad-status')).toHaveCount(0, { timeout: 5_000 });
 
     // Exactly one rocket card should appear.
     const cards = page.locator('.lp-rocket-card');
-    await expect(cards).toHaveCount(1);
+    await expect(cards).toHaveCount(1, { timeout: 5_000 });
 
     // The card shows the rocket name.
-    await expect(cards.first()).toContainText('Test Rocket Alpha');
+    await expect(cards.first()).toContainText('Test Rocket Alpha', { timeout: 5_000 });
 
     // The card shows part count, mass, and thrust.
-    await expect(cards.first()).toContainText('Parts: 3');
-    await expect(cards.first()).toContainText('1,010 kg');
-    await expect(cards.first()).toContainText('60 kN');
+    await expect(cards.first()).toContainText('Parts: 3', { timeout: 5_000 });
+    await expect(cards.first()).toContainText('1,010 kg', { timeout: 5_000 });
+    await expect(cards.first()).toContainText('60 kN', { timeout: 5_000 });
 
     // The card shows the launch cost (cmd-mk1=$8,000 + tank-small=$800 + engine-spark=$6,000 = $14,800).
-    await expect(page.locator('.lp-rocket-cost')).toContainText('$14,800');
+    await expect(page.locator('.lp-rocket-cost')).toContainText('$14,800', { timeout: 5_000 });
 
     // The Launch button shows the cost and is enabled (player has $2,000,000).
     const launchBtn = page.locator('.lp-launch-btn');
-    await expect(launchBtn).toBeVisible();
-    await expect(launchBtn).toContainText('$14,800');
+    await expect(launchBtn).toBeVisible({ timeout: 5_000 });
+    await expect(launchBtn).toContainText('$14,800', { timeout: 5_000 });
     await expect(launchBtn).not.toBeDisabled();
   });
 
@@ -160,12 +160,12 @@ test.describe('Launch Pad', () => {
     await page.waitForSelector('#launch-pad-overlay', { state: 'visible', timeout: 10_000 });
 
     // The empty-state placeholder should be visible.
-    await expect(page.locator('#launch-pad-status')).toBeVisible();
-    await expect(page.locator('#launch-pad-status')).toContainText('No rockets are ready for launch');
+    await expect(page.locator('#launch-pad-status')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('#launch-pad-status')).toContainText('No rockets are ready for launch', { timeout: 5_000 });
 
     // No rocket cards or list.
-    await expect(page.locator('#launch-pad-rocket-list')).toHaveCount(0);
-    await expect(page.locator('.lp-rocket-card')).toHaveCount(0);
+    await expect(page.locator('#launch-pad-rocket-list')).toHaveCount(0, { timeout: 5_000 });
+    await expect(page.locator('.lp-rocket-card')).toHaveCount(0, { timeout: 5_000 });
   });
 
   // -- (3) Clicking Launch starts the flight scene from the launch pad -------
@@ -194,13 +194,13 @@ test.describe('Launch Pad', () => {
 
     // The crew dialog should appear (cmd-mk1 has a crew seat).
     await page.waitForSelector('#lp-crew-overlay', { state: 'visible', timeout: 5_000 });
-    await expect(page.locator('#lp-crew-dialog')).toBeVisible();
+    await expect(page.locator('#lp-crew-dialog')).toBeVisible({ timeout: 5_000 });
 
     // Confirm launch with empty seats (no crew to assign).
     await page.click('.lp-crew-confirm-btn');
 
     // The launch pad overlay should be gone.
-    await expect(page.locator('#launch-pad-overlay')).toHaveCount(0);
+    await expect(page.locator('#launch-pad-overlay')).toHaveCount(0, { timeout: 5_000 });
 
     // The flight scene should be running — check for the flight HUD.
     await page.waitForSelector('#flight-hud', { state: 'visible', timeout: 10_000 });
@@ -252,10 +252,10 @@ test.describe('Launch Pad', () => {
     await page.waitForSelector('#launch-pad-overlay', { state: 'visible', timeout: 10_000 });
 
     // The rocket card should still be visible.
-    await expect(page.locator('.lp-rocket-card')).toHaveCount(1);
+    await expect(page.locator('.lp-rocket-card')).toHaveCount(1, { timeout: 5_000 });
 
     // The cost should be shown and marked as insufficient.
-    await expect(page.locator('.lp-rocket-cost-insufficient')).toBeVisible();
+    await expect(page.locator('.lp-rocket-cost-insufficient')).toBeVisible({ timeout: 5_000 });
 
     // The Launch button should be disabled.
     await expect(page.locator('.lp-launch-btn')).toBeDisabled();

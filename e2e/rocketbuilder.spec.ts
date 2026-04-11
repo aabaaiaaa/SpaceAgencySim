@@ -50,7 +50,7 @@ test.describe('VAB — Rocket Builder Flow', () => {
     await seedAndOpenVab(page);
 
     const list = page.locator('#vab-parts-list');
-    await expect(list).toBeVisible();
+    await expect(list).toBeVisible({ timeout: 5_000 });
 
     const headers = list.locator('.vab-parts-group-hdr');
     const headerTexts = await headers.allTextContents();
@@ -58,16 +58,16 @@ test.describe('VAB — Rocket Builder Flow', () => {
     expect(headerTexts.some((h: string) => /engines/i.test(h))).toBe(true);
     expect(headerTexts.some((h: string) => /fuel tanks/i.test(h))).toBe(true);
 
-    await expect(page.locator('.vab-part-card[data-part-id="cmd-mk1"]')).toBeVisible();
-    await expect(page.locator('.vab-part-card[data-part-id="engine-spark"]')).toBeVisible();
-    await expect(page.locator('.vab-part-card[data-part-id="tank-small"]')).toBeVisible();
+    await expect(page.locator('.vab-part-card[data-part-id="cmd-mk1"]')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('.vab-part-card[data-part-id="engine-spark"]')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('.vab-part-card[data-part-id="tank-small"]')).toBeVisible({ timeout: 5_000 });
   });
 
   test('(2) scale bar is visible on build canvas', async ({ page }) => {
     await seedAndOpenVab(page);
 
     const scaleBar = page.locator('#vab-scale-bar');
-    await expect(scaleBar).toBeVisible();
+    await expect(scaleBar).toBeVisible({ timeout: 5_000 });
 
     const tickCount = await page.evaluate(
       () => document.querySelectorAll('#vab-scale-ticks .vab-tick').length,
@@ -112,13 +112,13 @@ test.describe('VAB — Rocket Builder Flow', () => {
     await buildThreePartRocket(page);
 
     await page.click('#vab-btn-staging');
-    await expect(page.locator('#vab-staging-panel')).toBeVisible();
+    await expect(page.locator('#vab-staging-panel')).toBeVisible({ timeout: 5_000 });
 
     const stage1Zone = page.locator('[data-drop-zone="stage-0"]');
     await expect(stage1Zone.getByText('Spark Engine')).toBeVisible({ timeout: 5_000 });
 
     const unstagedZone = page.locator('[data-drop-zone="unstaged"]');
-    await expect(unstagedZone.getByText('Spark Engine')).not.toBeVisible();
+    await expect(unstagedZone.getByText('Spark Engine')).not.toBeVisible({ timeout: 5_000 });
   });
 
   test('(6) engine appears in Stage 1 slot via auto-staging', async ({ page }) => {
@@ -127,10 +127,10 @@ test.describe('VAB — Rocket Builder Flow', () => {
     await buildThreePartRocket(page);
 
     await page.click('#vab-btn-staging');
-    await expect(page.locator('#vab-staging-panel')).toBeVisible();
+    await expect(page.locator('#vab-staging-panel')).toBeVisible({ timeout: 5_000 });
 
-    await expect(page.locator('[data-drop-zone="stage-0"]').getByText('Spark Engine')).toBeVisible();
-    await expect(page.locator('[data-drop-zone="unstaged"]').getByText('Spark Engine')).not.toBeVisible();
+    await expect(page.locator('[data-drop-zone="stage-0"]').getByText('Spark Engine')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-drop-zone="unstaged"]').getByText('Spark Engine')).not.toBeVisible({ timeout: 5_000 });
   });
 
   test('(7) Rocket Engineer shows passing validation when engine is auto-staged', async ({ page }) => {
@@ -139,7 +139,7 @@ test.describe('VAB — Rocket Builder Flow', () => {
     await buildThreePartRocket(page);
 
     await page.click('#vab-btn-engineer');
-    await expect(page.locator('#vab-engineer-panel')).toBeVisible();
+    await expect(page.locator('#vab-engineer-panel')).toBeVisible({ timeout: 5_000 });
     await expect(page.locator('#vab-btn-launch')).not.toBeDisabled({ timeout: 5_000 });
   });
 
@@ -161,8 +161,8 @@ test.describe('VAB — Rocket Builder Flow', () => {
     expect(actualCash).toBe(expectedCash);
 
     const cashEl = page.locator('#topbar-cash');
-    await expect(cashEl).toBeVisible();
-    await expect(cashEl).toContainText('1,985,200');
+    await expect(cashEl).toBeVisible({ timeout: 5_000 });
+    await expect(cashEl).toContainText('1,985,200', { timeout: 5_000 });
   });
 
   test('(10) off-screen indicator appears when parts are panned out of view, disappears when visible', async ({ page }) => {

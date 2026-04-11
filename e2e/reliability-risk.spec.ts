@@ -989,7 +989,7 @@ test.describe('Weather display on hub', () => {
 
   test('(2) weather description is displayed', async () => {
     const desc = page.locator('#weather-panel .weather-description');
-    await expect(desc).toBeVisible();
+    await expect(desc).toBeVisible({ timeout: 5_000 });
     const text = await desc.textContent();
     // Should be one of the weather tier labels
     expect(text!.length).toBeGreaterThan(0);

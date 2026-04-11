@@ -60,7 +60,7 @@ async function seedBuildAndLaunch(page: Page): Promise<void> {
   await placePart(page, 'engine-spark', CENTRE_X, ENGINE_DROP_Y, 3);
 
   await page.click('#vab-btn-staging');
-  await expect(page.locator('#vab-staging-panel')).toBeVisible();
+  await expect(page.locator('#vab-staging-panel')).toBeVisible({ timeout: 5_000 });
   await expect(
     page.locator('[data-drop-zone="stage-0"]').getByText('Spark Engine'),
   ).toBeVisible({ timeout: 5_000 });
@@ -87,8 +87,8 @@ test.describe('Flight — Launch & Basic Flight', () => {
   test('@smoke (1) clicking Launch from the VAB loads the flight scene', async ({ page }) => {
     await seedBuildAndLaunch(page);
 
-    await expect(page.locator('#flight-hud')).toBeVisible();
-    await expect(page.locator('#vab-btn-launch')).not.toBeVisible();
+    await expect(page.locator('#flight-hud')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('#vab-btn-launch')).not.toBeVisible({ timeout: 5_000 });
   });
 
   // -- (2) HUD visible with altitude, vertical speed, and throttle ------------
@@ -96,11 +96,11 @@ test.describe('Flight — Launch & Basic Flight', () => {
   test('(2) the flight HUD is visible with altitude, vertical speed, and throttle elements', async ({ page }) => {
     await seedAndFly(page);
 
-    await expect(page.locator('#flight-hud')).toBeVisible();
-    await expect(page.locator('#flight-left-panel')).toBeVisible();
-    await expect(page.locator('#flight-hud-throttle-pct')).toBeVisible();
-    await expect(page.locator('#hud-alt')).toBeVisible();
-    await expect(page.locator('#hud-vely')).toBeVisible();
+    await expect(page.locator('#flight-hud')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('#flight-left-panel')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('#flight-hud-throttle-pct')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('#hud-alt')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('#hud-vely')).toBeVisible({ timeout: 5_000 });
   });
 
   // -- (3) Before any input, rocket sits on the pad with altitude near 0 m ----
@@ -173,7 +173,7 @@ test.describe('Flight — Launch & Basic Flight', () => {
     await seedAndFly(page);
 
     const objPanel = page.locator('#flight-hud-objectives');
-    await expect(objPanel).toBeVisible();
+    await expect(objPanel).toBeVisible({ timeout: 5_000 });
     await expect(objPanel).toContainText('Reach 100 m altitude', { timeout: 2_000 });
   });
 
@@ -185,10 +185,10 @@ test.describe('Flight — Launch & Basic Flight', () => {
     await page.click('#topbar-menu-btn');
 
     const dropdown = page.locator('#topbar-dropdown');
-    await expect(dropdown).toBeVisible();
-    await expect(dropdown).toContainText('Save Game');
-    await expect(dropdown).toContainText('Load Game');
-    await expect(dropdown).toContainText('Return to Space Agency');
+    await expect(dropdown).toBeVisible({ timeout: 5_000 });
+    await expect(dropdown).toContainText('Save Game', { timeout: 5_000 });
+    await expect(dropdown).toContainText('Load Game', { timeout: 5_000 });
+    await expect(dropdown).toContainText('Return to Space Agency', { timeout: 5_000 });
 
     await page.click('#topbar-menu-btn');
   });
@@ -291,7 +291,7 @@ test.describe('Flight — Launch & Basic Flight', () => {
   test('(10) clicking "Adjust Build" returns to the VAB with parts loaded', async ({ page }) => {
     await seedBuildAndLaunch(page);
 
-    await expect(page.locator('#flight-hud')).toBeVisible();
+    await expect(page.locator('#flight-hud')).toBeVisible({ timeout: 5_000 });
 
     const dropdown = page.locator('#topbar-dropdown');
     if (!(await dropdown.isVisible())) {

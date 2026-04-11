@@ -109,13 +109,13 @@ test.describe('Route Interactions', () => {
 
     // Find the row for our route
     const routeRow = page.locator('tr[data-route-id="route-e2e-1"]');
-    await expect(routeRow).toBeVisible();
+    await expect(routeRow).toBeVisible({ timeout: 5_000 });
 
     // Verify route name appears in the row
-    await expect(routeRow).toContainText('Lunar Water Export');
+    await expect(routeRow).toContainText('Lunar Water Export', { timeout: 5_000 });
 
     // Verify resource type appears (formatted as "Water Ice")
-    await expect(routeRow).toContainText('Water Ice');
+    await expect(routeRow).toContainText('Water Ice', { timeout: 5_000 });
   });
 
   test('@smoke toggle route status from active to paused', async ({ page }) => {
@@ -129,10 +129,10 @@ test.describe('Route Interactions', () => {
     await expect(routeRow).toBeVisible({ timeout: 10_000 });
 
     const statusBtn = routeRow.locator('.logistics-route-status-btn');
-    await expect(statusBtn).toBeVisible();
+    await expect(statusBtn).toBeVisible({ timeout: 5_000 });
 
     // Verify initial state is "Active"
-    await expect(statusBtn).toHaveText('Active');
+    await expect(statusBtn).toHaveText('Active', { timeout: 5_000 });
     await expect(statusBtn).toHaveClass(/status-active/);
 
     // Click to toggle to paused
@@ -141,7 +141,7 @@ test.describe('Route Interactions', () => {
     // After re-render, the button should show "Paused"
     const updatedRow = page.locator('tr[data-route-id="route-e2e-1"]');
     const updatedBtn = updatedRow.locator('.logistics-route-status-btn');
-    await expect(updatedBtn).toHaveText('Paused');
+    await expect(updatedBtn).toHaveText('Paused', { timeout: 5_000 });
     await expect(updatedBtn).toHaveClass(/status-paused/);
   });
 
@@ -156,37 +156,37 @@ test.describe('Route Interactions', () => {
     await expect(routeRow).toBeVisible({ timeout: 10_000 });
 
     const expandBtn = routeRow.locator('.logistics-expand-btn');
-    await expect(expandBtn).toBeVisible();
+    await expect(expandBtn).toBeVisible({ timeout: 5_000 });
 
     // Initially no leg rows should be visible
-    await expect(page.locator('.logistics-leg-row')).toHaveCount(0);
+    await expect(page.locator('.logistics-leg-row')).toHaveCount(0, { timeout: 5_000 });
 
     // Click to expand
     await expandBtn.click();
 
     // A leg row should now be visible
     const legRow = page.locator('.logistics-leg-row');
-    await expect(legRow).toHaveCount(1);
+    await expect(legRow).toHaveCount(1, { timeout: 5_000 });
 
     // Verify origin -> destination text is present
     // Format: "MOON (orbit, 50km) -> EARTH (orbit, 200km)" with a real arrow
-    await expect(legRow).toContainText('MOON (orbit, 50km)');
-    await expect(legRow).toContainText('EARTH (orbit, 200km)');
+    await expect(legRow).toContainText('MOON (orbit, 50km)', { timeout: 5_000 });
+    await expect(legRow).toContainText('EARTH (orbit, 200km)', { timeout: 5_000 });
 
     // Verify craft design ID is shown
-    await expect(legRow).toContainText('cargo-shuttle');
+    await expect(legRow).toContainText('cargo-shuttle', { timeout: 5_000 });
 
     // Verify craft count controls are present
     const craftControls = legRow.locator('.logistics-craft-controls');
-    await expect(craftControls).toBeVisible();
+    await expect(craftControls).toBeVisible({ timeout: 5_000 });
 
     // Verify craft count shows "1"
     const craftCount = craftControls.locator('.logistics-craft-count');
-    await expect(craftCount).toHaveText('1');
+    await expect(craftCount).toHaveText('1', { timeout: 5_000 });
 
     // Verify + and - buttons exist
     const craftButtons = craftControls.locator('.logistics-craft-btn');
-    await expect(craftButtons).toHaveCount(2);
+    await expect(craftButtons).toHaveCount(2, { timeout: 5_000 });
   });
 
   test('craft +/- buttons change count and update throughput', async ({ page }) => {
@@ -202,15 +202,12 @@ test.describe('Route Interactions', () => {
     await expandBtn.click();
 
     const legRow = page.locator('.logistics-leg-row');
-    await expect(legRow).toHaveCount(1);
+    await expect(legRow).toHaveCount(1, { timeout: 5_000 });
 
     // Record initial values
     const craftControls = legRow.locator('.logistics-craft-controls');
     const craftCount = craftControls.locator('.logistics-craft-count');
-    await expect(craftCount).toHaveText('1');
-
-    // Record initial throughput from the route row
-    const initialThroughput = await routeRow.locator('td:nth-child(4)').textContent();
+    await expect(craftCount).toHaveText('1', { timeout: 5_000 });
 
     // Click the + button (second .logistics-craft-btn in craft controls)
     const plusBtn = craftControls.locator('.logistics-craft-btn:last-child');
@@ -220,9 +217,8 @@ test.describe('Route Interactions', () => {
     await expect(craftCount).toHaveText('2', { timeout: 5_000 });
 
     // Throughput display should have updated (doubled for 2 craft)
-    const updatedThroughput = await routeRow.locator('td:nth-child(4)').textContent();
     // With 2 craft, throughput = 2 * 2000 = 4000.0 kg
-    expect(updatedThroughput).toContain('4000');
+    await expect(routeRow.locator('td:nth-child(4)')).toContainText('4000', { timeout: 5_000 });
 
     // Click the - button (first .logistics-craft-btn)
     const minusBtn = craftControls.locator('.logistics-craft-btn:first-child');
@@ -234,7 +230,7 @@ test.describe('Route Interactions', () => {
     // Verify minimum: - button should be disabled at count 1
     // Click - again — nothing should happen
     await minusBtn.click();
-    await expect(craftCount).toHaveText('1');
+    await expect(craftCount).toHaveText('1', { timeout: 5_000 });
   });
 
   test('route builder creates a new route from proven leg', async ({ page }) => {
@@ -302,7 +298,7 @@ test.describe('Route Interactions', () => {
 
     // Click "Create Route" confirm button
     const confirmBtn = builderPanel.locator('.logistics-builder-confirm-btn');
-    await expect(confirmBtn).toBeVisible();
+    await expect(confirmBtn).toBeVisible({ timeout: 5_000 });
     await confirmBtn.click();
 
     // Builder should close and a new route should appear in the table
@@ -313,7 +309,7 @@ test.describe('Route Interactions', () => {
     await expect(routeTable).toBeVisible({ timeout: 5_000 });
 
     // The route should contain the name we entered
-    await expect(routeTable).toContainText('Test Builder Route');
+    await expect(routeTable).toContainText('Test Builder Route', { timeout: 5_000 });
   });
 
 });

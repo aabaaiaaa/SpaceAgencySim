@@ -1036,7 +1036,7 @@ test.describe('Mission Progression', () => {
     // Return via menu.
     await page.click('#topbar-menu-btn', { force: true });
     const dropdown015 = page.locator('#topbar-dropdown');
-    await expect(dropdown015).toBeVisible();
+    await expect(dropdown015).toBeVisible({ timeout: 5_000 });
     await dropdown015.getByText('Return to Space Agency').click();
 
     await returnToHub(page);
@@ -1079,7 +1079,7 @@ test.describe('Mission Progression', () => {
     // Return via menu.
     await page.click('#topbar-menu-btn', { force: true });
     const dropdown = page.locator('#topbar-dropdown');
-    await expect(dropdown).toBeVisible();
+    await expect(dropdown).toBeVisible({ timeout: 5_000 });
     await dropdown.getByText('Return to Space Agency').click();
 
     await returnToHub(page);
@@ -1143,7 +1143,7 @@ test.describe('Mission Progression', () => {
     // Return via menu.
     await page.click('#topbar-menu-btn', { force: true });
     const dropdown017 = page.locator('#topbar-dropdown');
-    await expect(dropdown017).toBeVisible();
+    await expect(dropdown017).toBeVisible({ timeout: 5_000 });
     await dropdown017.getByText('Return to Space Agency').click();
 
     await returnToHub(page);

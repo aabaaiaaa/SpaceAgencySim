@@ -245,7 +245,7 @@
 - **Verification**: Both E2E suite runs complete (even if some tests fail). A clear list of failures, flaky tests, and slow tests is documented.
 
 ### TASK-036: Debug and fix E2E failures — pass 1
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-035
 - **Description**: Using the catalog from TASK-035, investigate and fix the highest-priority E2E failures and flaky tests. Use **Playwright MCP for interactive debugging** — launch the browser, reproduce the failure, inspect DOM state. Common fixes: add missing `waitForSelector`/`waitForFunction` before assertions, replace `waitForTimeout` with event-based waits, fix selector fragility, resolve race conditions between UI render and state mutation. Focus on true failures first, then the most frequently flaky tests.
 - **Verification**: `npx playwright test <files-that-were-failing>` passes. At least 80% of cataloged failures are resolved.

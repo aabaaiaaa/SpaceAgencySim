@@ -30,9 +30,9 @@ function makeEnvelope(overrides: Record<string, unknown> = {}): ReturnType<typeo
 
 async function openTopbarSaveDialog(page: Page): Promise<void> {
   await page.click('#topbar-menu-btn');
-  await expect(page.locator('#topbar-dropdown')).toBeVisible();
+  await expect(page.locator('#topbar-dropdown')).toBeVisible({ timeout: 5_000 });
   await page.locator('#topbar-dropdown').getByText('Save Game').click();
-  await expect(page.locator('#save-modal-backdrop')).toBeVisible();
+  await expect(page.locator('#save-modal-backdrop')).toBeVisible({ timeout: 5_000 });
 }
 
 /** Start a new game and navigate to VAB. */
@@ -65,9 +65,9 @@ test.describe('Save & Load Flow', () => {
     await openTopbarSaveDialog(page);
 
     const slots = page.locator('.save-slot-card');
-    await expect(slots).toHaveCount(5);
+    await expect(slots).toHaveCount(5, { timeout: 5_000 });
     for (let i = 0; i < 5; i++) {
-      await expect(page.locator(`[data-testid="save-slot-${i}"]`)).toBeVisible();
+      await expect(page.locator(`[data-testid="save-slot-${i}"]`)).toBeVisible({ timeout: 5_000 });
     }
   });
 
@@ -81,14 +81,14 @@ test.describe('Save & Load Flow', () => {
   test('(3) navigating to the app root shows load screen with save, agency name, and stats', async ({ page }) => {
     await seedSaveAndGoToLoadScreen(page, makeEnvelope());
 
-    await expect(page.locator('[data-screen="load"]')).toBeVisible();
+    await expect(page.locator('[data-screen="load"]')).toBeVisible({ timeout: 5_000 });
     const slot0Card = page.locator('.mm-save-card[data-slot="0"]:not(.mm-empty-slot)');
-    await expect(slot0Card).toBeVisible();
-    await expect(slot0Card).toContainText(AGENCY_NAME);
-    await expect(slot0Card).toContainText('2,000,000');
+    await expect(slot0Card).toBeVisible({ timeout: 5_000 });
+    await expect(slot0Card).toContainText(AGENCY_NAME, { timeout: 5_000 });
+    await expect(slot0Card).toContainText('2,000,000', { timeout: 5_000 });
 
     const missionsStat = slot0Card.locator('.mm-stat').filter({ hasText: /missions done/i });
-    await expect(missionsStat).toContainText('0');
+    await expect(missionsStat).toContainText('0', { timeout: 5_000 });
   });
 
   test('(4) clicking Load on the saved slot returns to the hub with the correct game state', async ({ page }) => {
@@ -121,15 +121,15 @@ test.describe('Save & Load Flow', () => {
     await page.goto('/');
     await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
 
-    await expect(page.locator('.mm-save-card:not(.mm-empty-slot)[data-slot="0"]')).toBeVisible();
-    await expect(page.locator('.mm-save-card:not(.mm-empty-slot)[data-slot="1"]')).toBeVisible();
+    await expect(page.locator('.mm-save-card:not(.mm-empty-slot)[data-slot="0"]')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('.mm-save-card:not(.mm-empty-slot)[data-slot="1"]')).toBeVisible({ timeout: 5_000 });
 
     await page.click('[data-action="delete"][data-slot="0"]');
     await page.waitForSelector('#mm-modal-confirm', { state: 'visible', timeout: 5_000 });
     await page.click('#mm-modal-confirm');
 
     await expect(page.locator('.mm-save-card.mm-empty-slot[data-slot="0"]')).toBeVisible({ timeout: 5_000 });
-    await expect(page.locator('.mm-save-card:not(.mm-empty-slot)[data-slot="1"]')).toBeVisible();
+    await expect(page.locator('.mm-save-card:not(.mm-empty-slot)[data-slot="1"]')).toBeVisible({ timeout: 5_000 });
   });
 
   test('(6) after deleting the only save, navigating to the app root shows the New Game screen', async ({ page }) => {
@@ -152,8 +152,8 @@ test.describe('Save & Load Flow', () => {
     // Navigate again — no saves remain, so New Game screen must appear.
     await page.goto('/');
     await page.waitForSelector('#mm-newgame-screen', { state: 'visible', timeout: 15_000 });
-    await expect(page.locator('[data-screen="newgame"]')).toBeVisible();
-    await expect(page.locator('#mm-load-screen')).toHaveCount(0);
+    await expect(page.locator('[data-screen="newgame"]')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('#mm-load-screen')).toHaveCount(0, { timeout: 5_000 });
   });
 
   test('(7) exporting a save produces a binary envelope download with SASV magic bytes', async ({ page }) => {

@@ -51,12 +51,12 @@ test.describe('Mining — Logistics Center', () => {
     await page.waitForSelector('#logistics-overlay', { state: 'visible', timeout: 10_000 });
 
     // The overlay should be visible
-    await expect(page.locator('#logistics-overlay')).toBeVisible();
+    await expect(page.locator('#logistics-overlay')).toBeVisible({ timeout: 5_000 });
 
     // The Mining Sites tab should be active by default — verify empty state message
     const emptyMsg = page.locator('#logistics-overlay .empty-msg');
-    await expect(emptyMsg).toBeVisible();
-    await expect(emptyMsg).toContainText('No mining sites established');
+    await expect(emptyMsg).toBeVisible({ timeout: 5_000 });
+    await expect(emptyMsg).toContainText('No mining sites established', { timeout: 5_000 });
   });
 
   test('Route Management tab is accessible and shows empty state', async ({ page }) => {
@@ -65,12 +65,12 @@ test.describe('Mining — Logistics Center', () => {
 
     // Click the Route Management tab
     const routesTab = page.locator('#logistics-overlay .facility-tab', { hasText: 'Route Management' });
-    await expect(routesTab).toBeVisible();
+    await expect(routesTab).toBeVisible({ timeout: 5_000 });
     await routesTab.click();
 
     // Should show the routes empty state message
     const emptyMsg = page.locator('#logistics-overlay .empty-msg', { hasText: 'No routes created' });
-    await expect(emptyMsg).toBeVisible();
+    await expect(emptyMsg).toBeVisible({ timeout: 5_000 });
   });
 
   test('@smoke injecting a mining site into gameState renders it in the panel', async ({ page }) => {
@@ -79,7 +79,7 @@ test.describe('Mining — Logistics Center', () => {
     await page.waitForSelector('#logistics-overlay', { state: 'visible', timeout: 10_000 });
 
     // Verify empty state first
-    await expect(page.locator('#logistics-overlay .empty-msg')).toBeVisible();
+    await expect(page.locator('#logistics-overlay .empty-msg')).toBeVisible({ timeout: 5_000 });
 
     // Navigate back to hub to re-enter with injected state
     await page.click('#logistics-back-btn');
@@ -129,26 +129,26 @@ test.describe('Mining — Logistics Center', () => {
     await page.waitForSelector('#logistics-overlay', { state: 'visible', timeout: 10_000 });
 
     // The empty message should be gone
-    await expect(page.locator('#logistics-overlay .empty-msg')).not.toBeVisible();
+    await expect(page.locator('#logistics-overlay .empty-msg')).not.toBeVisible({ timeout: 5_000 });
 
     // The site card should render with the site name
     const siteCard = page.locator('.logistics-site-card');
-    await expect(siteCard).toBeVisible();
-    await expect(siteCard).toContainText('Tranquility Base Alpha');
+    await expect(siteCard).toBeVisible({ timeout: 5_000 });
+    await expect(siteCard).toContainText('Tranquility Base Alpha', { timeout: 5_000 });
 
     // The body ID should appear in the sidebar
     const sidebarItem = page.locator('.logistics-sidebar-item', { hasText: 'MOON' });
-    await expect(sidebarItem).toBeVisible();
+    await expect(sidebarItem).toBeVisible({ timeout: 5_000 });
 
     // Power budget should be displayed
-    await expect(siteCard).toContainText('Power: 100 / 35');
+    await expect(siteCard).toContainText('Power: 100 / 35', { timeout: 5_000 });
 
     // Storage should show water ice
-    await expect(siteCard).toContainText('Water Ice');
-    await expect(siteCard).toContainText('150.5 kg');
+    await expect(siteCard).toContainText('Water Ice', { timeout: 5_000 });
+    await expect(siteCard).toContainText('150.5 kg', { timeout: 5_000 });
 
     // Module list should show the three modules
     const moduleItems = page.locator('.logistics-module-item');
-    await expect(moduleItems).toHaveCount(3);
+    await expect(moduleItems).toHaveCount(3, { timeout: 5_000 });
   });
 });

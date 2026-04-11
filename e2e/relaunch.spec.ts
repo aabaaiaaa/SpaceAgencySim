@@ -72,8 +72,20 @@ test.describe('Relaunch — Takeoff, Land, Takeoff Again', () => {
     await page.keyboard.press('x');
     await teleportCraft(page, { posY: 0.1, velX: 0, velY: -0.5, grounded: false, landed: false });
 
+    // Wait for the teleported position to take effect before checking landing.
+    await page.waitForFunction(
+      () => (window.__flightPs?.posY ?? 999) < 5,
+      { timeout: 5_000 },
+    );
+
     await page.waitForFunction(
       () => window.__flightPs?.landed === true,
+      { timeout: 5_000 },
+    );
+
+    // Wait for physics to settle position and velocity after landing.
+    await page.waitForFunction(
+      () => window.__flightPs?.landed === true && window.__flightPs?.posY === 0 && window.__flightPs?.velY === 0,
       { timeout: 5_000 },
     );
 
@@ -100,6 +112,12 @@ test.describe('Relaunch — Takeoff, Land, Takeoff Again', () => {
     // Cut throttle and land gently.
     await page.keyboard.press('x');
     await teleportCraft(page, { posY: 0.1, velX: 0, velY: -0.5, grounded: false, landed: false });
+
+    // Wait for the teleported position to take effect before checking landing.
+    await page.waitForFunction(
+      () => (window.__flightPs?.posY ?? 999) < 5,
+      { timeout: 5_000 },
+    );
 
     await page.waitForFunction(
       () => window.__flightPs?.landed === true,

@@ -36,7 +36,13 @@ test.describe('Hub Save Migration', () => {
 
     // The game should have loaded successfully — hub overlay visible
     const hubOverlay = page.locator('#hub-overlay');
-    await expect(hubOverlay).toBeVisible();
+    await expect(hubOverlay).toBeVisible({ timeout: 10_000 });
+
+    // Wait for the migration to complete and hubs to be populated
+    await page.waitForFunction(
+      () => (window.__gameState?.hubs?.length ?? 0) >= 1,
+      { timeout: 5_000 },
+    );
 
     // Read the live game state to verify the migration occurred
     const gameState = await getGameState(page);
@@ -65,6 +71,6 @@ test.describe('Hub Save Migration', () => {
     // With only one hub, the switcher wrapper should be hidden
     // (migration creates exactly one hub)
     const wrapper = page.locator('#hub-switcher-wrapper');
-    await expect(wrapper).toBeHidden();
+    await expect(wrapper).toBeHidden({ timeout: 5_000 });
   });
 });

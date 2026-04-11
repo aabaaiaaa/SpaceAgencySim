@@ -273,7 +273,7 @@ test.describe('Challenge missions', () => {
     await page.waitForSelector('.mc-challenge-grid', { state: 'visible', timeout: 5_000 });
 
     const firstCard = page.locator('.mc-challenge-card').first();
-    await expect(firstCard).toBeVisible();
+    await expect(firstCard).toBeVisible({ timeout: 5_000 });
 
     // Objectives list
     const objectives: number = await firstCard.locator('.mc-challenge-obj-item').count();
@@ -324,10 +324,10 @@ test.describe('Challenge missions', () => {
     await firstCard.locator('.mc-challenge-accept-btn').click();
 
     const activeCard = page.locator('.mc-challenge-card.active-challenge');
-    await expect(activeCard).toBeVisible();
+    await expect(activeCard).toBeVisible({ timeout: 5_000 });
 
-    await expect(activeCard.locator('.mc-challenge-active-badge')).toBeVisible();
-    await expect(activeCard.locator('.mc-challenge-abandon-btn')).toBeVisible();
+    await expect(activeCard.locator('.mc-challenge-active-badge')).toBeVisible({ timeout: 5_000 });
+    await expect(activeCard.locator('.mc-challenge-abandon-btn')).toBeVisible({ timeout: 5_000 });
 
     await page.close();
   });
@@ -574,8 +574,8 @@ test.describe('Custom mission creator', () => {
 
     // Custom challenge should have a custom badge
     const customCard = page.locator('.mc-challenge-card.custom-challenge');
-    await expect(customCard).toBeVisible();
-    await expect(customCard.locator('.mc-custom-badge')).toBeVisible();
+    await expect(customCard).toBeVisible({ timeout: 5_000 });
+    await expect(customCard.locator('.mc-custom-badge')).toBeVisible({ timeout: 5_000 });
 
     await page.close();
   });
@@ -616,8 +616,8 @@ test.describe('Custom mission creator', () => {
     await page.waitForSelector('.mc-challenge-grid', { state: 'visible', timeout: 5_000 });
 
     const customCard = page.locator('.mc-challenge-card.custom-challenge').first();
-    await expect(customCard.locator('.mc-challenge-export-btn')).toBeVisible();
-    await expect(customCard.locator('.mc-challenge-delete-btn')).toBeVisible();
+    await expect(customCard.locator('.mc-challenge-export-btn')).toBeVisible({ timeout: 5_000 });
+    await expect(customCard.locator('.mc-challenge-delete-btn')).toBeVisible({ timeout: 5_000 });
 
     await page.close();
   });
@@ -638,7 +638,7 @@ test.describe('Custom mission creator', () => {
 
     // The form has an objective type selector
     const typeSelect = page.locator('.cc-obj-type').first();
-    await expect(typeSelect).toBeVisible();
+    await expect(typeSelect).toBeVisible({ timeout: 5_000 });
 
     // Verify objective type options are present
     const options: string[] = await typeSelect.locator('option').allInnerTexts();
@@ -665,14 +665,14 @@ test.describe('Custom mission creator', () => {
     await page.waitForSelector('.mc-creator-form', { state: 'visible', timeout: 5_000 });
 
     // Medal threshold inputs
-    await expect(page.locator('#cc-medal-bronze')).toBeVisible();
-    await expect(page.locator('#cc-medal-silver')).toBeVisible();
-    await expect(page.locator('#cc-medal-gold')).toBeVisible();
+    await expect(page.locator('#cc-medal-bronze')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('#cc-medal-silver')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('#cc-medal-gold')).toBeVisible({ timeout: 5_000 });
 
     // Reward inputs
-    await expect(page.locator('#cc-reward-bronze')).toBeVisible();
-    await expect(page.locator('#cc-reward-silver')).toBeVisible();
-    await expect(page.locator('#cc-reward-gold')).toBeVisible();
+    await expect(page.locator('#cc-reward-bronze')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('#cc-reward-silver')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('#cc-reward-gold')).toBeVisible({ timeout: 5_000 });
 
     await page.close();
   });
@@ -692,7 +692,7 @@ test.describe('Custom mission creator', () => {
     await page.waitForSelector('.mc-creator-form', { state: 'visible', timeout: 5_000 });
 
     const metricSelect = page.locator('#cc-metric');
-    await expect(metricSelect).toBeVisible();
+    await expect(metricSelect).toBeVisible({ timeout: 5_000 });
 
     const options: string[] = await metricSelect.locator('option').allInnerTexts();
     expect(options.length).toBe(8); // 8 score metric options
@@ -1004,7 +1004,7 @@ test.describe('Game settings — difficulty options', () => {
 
     await page.click('#topbar-menu-btn');
     const settingsBtn = page.locator('#hub-settings-btn');
-    await expect(settingsBtn).toBeVisible();
+    await expect(settingsBtn).toBeVisible({ timeout: 5_000 });
     // Close menu
     await page.click('#topbar-menu-btn');
 
@@ -1020,7 +1020,7 @@ test.describe('Game settings — difficulty options', () => {
 
     // Panel has heading
     const heading = page.locator('#settings-panel h1');
-    await expect(heading).toHaveText('Game Settings');
+    await expect(heading).toHaveText('Game Settings', { timeout: 5_000 });
 
     await page.close();
   });
@@ -1225,7 +1225,7 @@ test.describe('Game settings — difficulty options', () => {
 
     await page.click('.settings-close-btn');
     await page.waitForSelector('#settings-panel', { state: 'hidden', timeout: 5_000 });
-    await expect(page.locator('#hub-overlay')).toBeVisible();
+    await expect(page.locator('#hub-overlay')).toBeVisible({ timeout: 5_000 });
 
     await page.close();
   });

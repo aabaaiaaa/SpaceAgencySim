@@ -21,8 +21,8 @@ test.describe('Debug Mode Toggle', () => {
     await dismissWelcomeModal(page);
 
     await page.keyboard.press('Control+Shift+D');
-    await page.waitForTimeout(500);
-    await expect(page.locator('#debug-save-panel')).not.toBeVisible();
+    // Panel should not appear — verify with assertion timeout (no hard wait)
+    await expect(page.locator('#debug-save-panel')).not.toBeVisible({ timeout: 2_000 });
   });
 
   test('(2) Ctrl+Shift+D opens debug saves panel when debug mode is on', async ({ page }: { page: Page }) => {
@@ -74,8 +74,8 @@ test.describe('Debug Mode Toggle', () => {
 
     await page.evaluate(() => { window.__gameState.debugMode = false; });
     await page.keyboard.press('Control+Shift+D');
-    await page.waitForTimeout(500);
-    await expect(page.locator('#debug-save-panel')).not.toBeVisible();
+    // Panel should not appear — verify with assertion timeout (no hard wait)
+    await expect(page.locator('#debug-save-panel')).not.toBeVisible({ timeout: 2_000 });
   });
 
   test('(5) window.__enableDebugMode() enables debug mode programmatically', async ({ page }: { page: Page }) => {

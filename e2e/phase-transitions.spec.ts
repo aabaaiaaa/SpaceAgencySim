@@ -173,6 +173,10 @@ test.describe('Phase Transition: LAUNCH → FLIGHT', () => {
     expect(flightEntry!.reason).toContain('Liftoff');
 
     // Verify physics state: not grounded, posY > 0.
+    await page.waitForFunction(
+      () => window.__flightPs?.grounded === false && (window.__flightPs?.posY ?? 0) > 0,
+      { timeout: 5_000 },
+    );
     const ps: { grounded: boolean | undefined; posY: number | undefined } = await page.evaluate(() => ({
       grounded: window.__flightPs?.grounded,
       posY: window.__flightPs?.posY,
@@ -496,6 +500,10 @@ test.describe('Phase Transition: Landing', () => {
     );
 
     // Verify it was a safe landing, not a crash.
+    await page.waitForFunction(
+      () => window.__flightPs?.landed === true && (window.__flightPs?.posY ?? 999) <= 1,
+      { timeout: 5_000 },
+    );
     const result: { landed: boolean | undefined; crashed: boolean | undefined; posY: number | undefined } =
       await page.evaluate(() => ({
         landed: window.__flightPs?.landed,
@@ -507,6 +515,10 @@ test.describe('Phase Transition: Landing', () => {
     expect(result.posY).toBeLessThanOrEqual(1);
 
     // Verify a LANDING event was recorded through the physics pipeline.
+    await page.waitForFunction(
+      () => (window.__gameState?.currentFlight?.events ?? []).some((e: { type: string }) => e.type === 'LANDING'),
+      { timeout: 5_000 },
+    );
     const events: { type: string }[] = await page.evaluate(
       () => window.__gameState?.currentFlight?.events ?? [],
     );
@@ -556,6 +568,10 @@ test.describe('Phase Transition: Crash', () => {
     expect(result.landed).toBe(false);
 
     // Verify a CRASH event was recorded through the physics pipeline.
+    await page.waitForFunction(
+      () => (window.__gameState?.currentFlight?.events ?? []).some((e: { type: string }) => e.type === 'CRASH'),
+      { timeout: 5_000 },
+    );
     const events: { type: string }[] = await page.evaluate(
       () => window.__gameState?.currentFlight?.events ?? [],
     );
@@ -640,6 +656,13 @@ test.describe('Phase Transition: TRANSFER → CAPTURE → ORBIT', () => {
         await w.__resyncPhysicsWorker();
       }
     }, { alt: moonOrbitAlt, vel: moonOrbitVel });
+
+    // Wait for the position/velocity to take effect before expecting orbit detection.
+    await page.waitForFunction(
+      (v: { alt: number }) => Math.abs((window.__flightPs?.posY ?? 0) - v.alt) < 1000,
+      { alt: moonOrbitAlt },
+      { timeout: 5_000 },
+    );
 
     // ORBIT should be detected within a few physics ticks.
     await waitForPhaseInLog(page, 'ORBIT', 15_000);

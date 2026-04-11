@@ -51,13 +51,13 @@ test.describe('Flight — Part Context Menu', () => {
     await setupFlightWithParachute(page);
 
     const menu = page.locator('#flight-part-ctx-menu');
-    await expect(menu).toBeHidden();
+    await expect(menu).toBeHidden({ timeout: 5_000 });
 
     const menuOpened: boolean = await openParachuteContextMenu(page);
     expect(menuOpened).toBe(true);
-    await expect(menu).toBeVisible();
-    await expect(menu).toContainText('Mk2 Parachute');
-    await expect(menu).toContainText('Deploy Parachute');
+    await expect(menu).toBeVisible({ timeout: 5_000 });
+    await expect(menu).toContainText('Mk2 Parachute', { timeout: 5_000 });
+    await expect(menu).toContainText('Deploy Parachute', { timeout: 5_000 });
   });
 
   test('(2) clicking "Deploy Parachute" deploys the chute and closes the menu', async ({ page }) => {
@@ -99,7 +99,7 @@ test.describe('Flight — Part Context Menu', () => {
     const reopened: boolean = await openParachuteContextMenu(page);
     expect(reopened).toBe(true);
 
-    await expect(menu).toContainText(/Parachute: (Deploying|Deployed)/);
+    await expect(menu).toContainText(/Parachute: (Deploying|Deployed)/, { timeout: 5_000 });
     const deployBtnCount: number = await menu.locator('.fctx-item', { hasText: 'Deploy Parachute' }).count();
     expect(deployBtnCount).toBe(0);
   });

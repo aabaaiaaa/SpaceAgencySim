@@ -54,6 +54,12 @@ test.describe('Hub markers on map @smoke', () => {
 
     await seedAndLoadSave(page, save);
 
+    // Wait for hubs to be loaded in game state before reading.
+    await page.waitForFunction(
+      () => (window.__gameState?.hubs?.length ?? 0) >= 2,
+      { timeout: 5_000 },
+    );
+
     // Verify hubs are loaded in game state.
     const hubCount = await page.evaluate(() => {
       const gs = window.__gameState;
@@ -80,7 +86,7 @@ test.describe('Hub markers on map @smoke', () => {
 
     // Verify the PixiJS canvas is present and visible (hub markers are drawn here).
     const canvas = page.locator('canvas');
-    await expect(canvas).toBeVisible();
+    await expect(canvas).toBeVisible({ timeout: 5_000 });
   });
 
   test('tracking station accessible with multiple hubs', async ({ page }) => {
@@ -127,12 +133,12 @@ test.describe('Hub markers on map @smoke', () => {
 
     // Verify tracking station header shows tier information.
     const tsTitle = page.locator('#ts-title');
-    await expect(tsTitle).toBeVisible();
-    await expect(tsTitle).toContainText('Tracking Station');
+    await expect(tsTitle).toBeVisible({ timeout: 5_000 });
+    await expect(tsTitle).toContainText('Tracking Station', { timeout: 5_000 });
 
     // Verify the back button works (returns to hub).
     const backBtn = page.locator('#ts-back-btn');
-    await expect(backBtn).toBeVisible();
+    await expect(backBtn).toBeVisible({ timeout: 5_000 });
     await backBtn.click();
 
     // Should be back at the hub overlay.

@@ -54,20 +54,20 @@ test.describe('Hub Establishment', () => {
 
     // Switcher should be visible (more than one hub)
     const switcher = page.locator('#hub-switcher');
-    await expect(switcher).toBeVisible();
+    await expect(switcher).toBeVisible({ timeout: 5_000 });
 
     // Should have 2 options — Earth and Moon
     const options = switcher.locator('option');
-    await expect(options).toHaveCount(2);
+    await expect(options).toHaveCount(2, { timeout: 5_000 });
 
     // First option should be Earth
     const earthOption = options.nth(0);
-    await expect(earthOption).toHaveText(/Earth HQ/);
+    await expect(earthOption).toHaveText(/Earth HQ/, { timeout: 5_000 });
     await expect(earthOption).toHaveAttribute('value', 'earth');
 
     // Second option should be the Moon outpost
     const moonOption = options.nth(1);
-    await expect(moonOption).toHaveText(/Moon Surface Outpost/);
+    await expect(moonOption).toHaveText(/Moon Surface Outpost/, { timeout: 5_000 });
     await expect(moonOption).toHaveText(/MOON/);
     await expect(moonOption).toHaveAttribute('value', 'moon-outpost');
   });
@@ -112,11 +112,11 @@ test.describe('Hub Establishment', () => {
 
     // Switcher should be visible
     const switcher = page.locator('#hub-switcher');
-    await expect(switcher).toBeVisible();
+    await expect(switcher).toBeVisible({ timeout: 5_000 });
 
     // The under-construction hub option should show [Building] text
     const marsOption = switcher.locator('option').nth(1);
-    await expect(marsOption).toHaveText(/\[Building\]/);
+    await expect(marsOption).toHaveText(/\[Building\]/, { timeout: 5_000 });
     await expect(marsOption).toHaveText(/Mars Colony/);
   });
 });

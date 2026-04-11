@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 12,
+  "lastIteration": 13,
   "startedAt": "2026-04-11T21:55:45.707Z",
   "iteration": 11,
   "devloopVersion": "4.0.2",
   "activeTask": {
-    "taskId": "TASK-035",
-    "taskTitle": "Full E2E baseline — catalog failures, flaky tests, and slow tests",
-    "iterationNumber": 13,
-    "startedAt": "2026-04-11T23:32:54.585Z"
+    "taskId": "TASK-036",
+    "taskTitle": "Debug and fix E2E failures — pass 1",
+    "iterationNumber": 14,
+    "startedAt": "2026-04-11T23:33:23.393Z"
   }
 }

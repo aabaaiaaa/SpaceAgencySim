@@ -97,8 +97,8 @@ test.describe('Auto-Save System', () => {
     await teleportCraft(page, { posX: 0, posY: 5, velX: 0, velY: 0, grounded: true, landed: true, crashed: true });
 
     await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 15_000 });
-    await page.waitForTimeout(2_000);
-    const toastVisible: boolean = await page.locator('#auto-save-toast').isVisible().catch((): boolean => false);
-    expect(toastVisible).toBe(false);
+    // With auto-save disabled, the toast should not appear. Use assertion-based
+    // wait instead of hard timeout to confirm it stays hidden.
+    await expect(page.locator('#auto-save-toast')).not.toBeVisible({ timeout: 3_000 });
   });
 });

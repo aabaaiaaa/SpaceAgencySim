@@ -105,6 +105,12 @@ test.describe('Collision — Stage Separation', () => {
     await buildAndLaunch(page);
     await gainAltitudeAndSeparate(page);
 
+    // Guard: ensure debris array is populated before accessing [0].
+    await page.waitForFunction(
+      () => (window.__flightPs?.debris?.length ?? 0) > 0,
+      { timeout: 5_000 },
+    );
+
     const positions: PositionResult = await page.evaluate((): PositionResult => {
       const ps = window.__flightPs!;
       return { rocketY: ps.posY, debrisY: ps.debris[0].posY };
@@ -117,6 +123,12 @@ test.describe('Collision — Stage Separation', () => {
     test.setTimeout(120_000);
     await buildAndLaunch(page);
     await gainAltitudeAndSeparate(page);
+
+    // Guard: ensure debris array is populated before accessing [0].
+    await page.waitForFunction(
+      () => (window.__flightPs?.debris?.length ?? 0) > 0,
+      { timeout: 5_000 },
+    );
 
     const velocities: VelocityResult = await page.evaluate((): VelocityResult => {
       const ps = window.__flightPs!;
