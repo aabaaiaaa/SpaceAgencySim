@@ -271,6 +271,7 @@ export const FacilityId = Object.freeze({
   RD_LAB:           'rd-lab',
   SATELLITE_OPS:    'satellite-ops',
   LIBRARY:          'library',
+  LOGISTICS_CENTER: 'logistics-center',
 } as const);
 
 export type FacilityId = (typeof FacilityId)[keyof typeof FacilityId];
@@ -354,6 +355,14 @@ export const FACILITY_DEFINITIONS: readonly FacilityDefinition[] = Object.freeze
     description: 'View agency statistics, records, and knowledge.',
     cost:        0,
     scienceCost: 0,
+    starter:     false,
+  }),
+  Object.freeze({
+    id:          FacilityId.LOGISTICS_CENTER,
+    name:        'Logistics Center',
+    description: 'Manage mining sites and automated transport routes.',
+    cost:        350_000,
+    scienceCost: 15,
     starter:     false,
   }),
 ]);
@@ -2145,3 +2154,45 @@ export const COMMS_RELAY_RANGE: number = 300_000_000_000;
  * Using a generous 80 degree half-angle -- effectively the far hemisphere.
  */
 export const COMMS_SHADOW_HALF_ANGLE_DEG: number = 80;
+
+// ---------------------------------------------------------------------------
+// Resource System
+// ---------------------------------------------------------------------------
+
+export const ResourceType = Object.freeze({
+  WATER_ICE: 'WATER_ICE',
+  REGOLITH: 'REGOLITH',
+  IRON_ORE: 'IRON_ORE',
+  RARE_METALS: 'RARE_METALS',
+  CO2: 'CO2',
+  HYDROGEN: 'HYDROGEN',
+  OXYGEN: 'OXYGEN',
+  HELIUM_3: 'HELIUM_3',
+  LIQUID_METHANE: 'LIQUID_METHANE',
+  HYDRAZINE: 'HYDRAZINE',
+} as const);
+
+export type ResourceType = (typeof ResourceType)[keyof typeof ResourceType];
+
+export const ResourceState = Object.freeze({
+  SOLID: 'SOLID',
+  LIQUID: 'LIQUID',
+  GAS: 'GAS',
+} as const);
+
+export type ResourceState = (typeof ResourceState)[keyof typeof ResourceState];
+
+export const MiningModuleType = Object.freeze({
+  BASE_CONTROL_UNIT: 'BASE_CONTROL_UNIT',
+  MINING_DRILL: 'MINING_DRILL',
+  GAS_COLLECTOR: 'GAS_COLLECTOR',
+  FLUID_EXTRACTOR: 'FLUID_EXTRACTOR',
+  REFINERY: 'REFINERY',
+  STORAGE_SILO: 'STORAGE_SILO',
+  PRESSURE_VESSEL: 'PRESSURE_VESSEL',
+  FLUID_TANK: 'FLUID_TANK',
+  SURFACE_LAUNCH_PAD: 'SURFACE_LAUNCH_PAD',
+  POWER_GENERATOR: 'POWER_GENERATOR',
+} as const);
+
+export type MiningModuleType = (typeof MiningModuleType)[keyof typeof MiningModuleType];

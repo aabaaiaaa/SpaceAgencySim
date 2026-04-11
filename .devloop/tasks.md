@@ -1,7 +1,7 @@
 # Iteration 9 — Tasks
 
 ### TASK-001: Add ResourceType, ResourceState, MiningModuleType enums to constants.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Add three new frozen-object enums to `src/core/constants.ts` following the existing pattern (`Object.freeze({} as const)` + companion type): `ResourceType` (10 values: WATER_ICE, REGOLITH, IRON_ORE, RARE_METALS, CO2, HYDROGEN, OXYGEN, HELIUM_3, LIQUID_METHANE, HYDRAZINE), `ResourceState` (SOLID, LIQUID, GAS), `MiningModuleType` (BASE_CONTROL_UNIT, MINING_DRILL, GAS_COLLECTOR, FLUID_EXTRACTOR, REFINERY, STORAGE_SILO, PRESSURE_VESSEL, FLUID_TANK, SURFACE_LAUNCH_PAD, POWER_GENERATOR). Create `src/tests/resources.test.ts` with tests verifying all values exist, all enums are frozen, and value counts are correct. See requirements.md §1 for details.
 - **Verification**: `npx vitest run src/tests/resources.test.ts && npx tsc --noEmit src/core/constants.ts`
@@ -79,7 +79,7 @@
 - **Verification**: `npx vitest run src/tests/routes.test.ts`
 
 ### TASK-014: Add Logistics Center facility definition
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Add `LOGISTICS_CENTER: 'logistics-center'` to the `FacilityId` enum in `src/core/constants.ts`. Add a matching entry to the `FACILITY_DEFINITIONS` array with name 'Logistics Center', cost 350_000, scienceCost 15, starter false. Follow the existing pattern for facility definitions. Append test to `src/tests/resources.test.ts` verifying FacilityId.LOGISTICS_CENTER exists and FACILITY_DEFINITIONS includes it.
 - **Verification**: `npx vitest run src/tests/resources.test.ts`
@@ -139,7 +139,7 @@
 - **Verification**: `npx vitest run src/tests/routes.test.ts`
 
 ### TASK-024: Extend body tests for new celestial bodies
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/tests/bodies.test.ts`, extend the specific property-value tests (surface gravity, atmosphere profiles, landable/non-landable, destruction zones) to cover the 4 new bodies (CERES, JUPITER, SATURN, TITAN). Add: CERES gravity 0.28, JUPITER gravity 24.79, SATURN gravity 10.44, TITAN gravity 1.352 to the gravity test map. Add TITAN to the atmosphere tests (dense N₂/CH₄, sea level density 5.3 kg/m³). Verify JUPITER and SATURN are non-landable with 'extreme_pressure' destruction zones. Verify CERES is landable with no atmosphere. Verify TITAN weather is 'methane_rain'. Verify Saturn has TITAN as child. Verify manoeuvre constants (SOI_RADIUS, BODY_PARENT, BODY_CHILDREN, BODY_ORBIT_RADIUS) include all 12 bodies.
 - **Verification**: `npx vitest run src/tests/bodies.test.ts`

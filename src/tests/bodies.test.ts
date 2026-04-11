@@ -79,6 +79,10 @@ describe('Surface gravity', () => {
     MARS: 3.72,
     PHOBOS: 0.0057,
     DEIMOS: 0.003,
+    CERES: 0.28,
+    JUPITER: 24.79,
+    SATURN: 10.44,
+    TITAN: 1.352,
   };
 
   for (const [bodyId, expected] of Object.entries(expectedGravities)) {
@@ -138,6 +142,30 @@ describe('Atmosphere profiles', () => {
   it('Phobos and Deimos are airless', () => {
     expect(hasAtmosphere('PHOBOS')).toBe(false);
     expect(hasAtmosphere('DEIMOS')).toBe(false);
+  });
+
+  it('Titan has a dense N₂/CH₄ atmosphere', () => {
+    expect(hasAtmosphere('TITAN')).toBe(true);
+    const atmo = getBodyAtmosphere('TITAN');
+    expect(atmo!.seaLevelDensity).toBe(5.3);
+    expect(atmo!.topAltitude).toBe(600_000);
+  });
+
+  it('Ceres is airless', () => {
+    expect(hasAtmosphere('CERES')).toBe(false);
+    expect(getBodyAtmosphere('CERES')).toBeNull();
+  });
+
+  it('Jupiter has an atmosphere', () => {
+    expect(hasAtmosphere('JUPITER')).toBe(true);
+    const atmo = getBodyAtmosphere('JUPITER');
+    expect(atmo!.seaLevelDensity).toBe(1.326);
+  });
+
+  it('Saturn has an atmosphere', () => {
+    expect(hasAtmosphere('SATURN')).toBe(true);
+    const atmo = getBodyAtmosphere('SATURN');
+    expect(atmo!.seaLevelDensity).toBe(0.687);
   });
 });
 
@@ -249,19 +277,29 @@ describe('Landability', () => {
     expect(isLandable('SUN')).toBe(false);
   });
 
-  it('all other bodies are landable', () => {
-    const landableBodies = ['MERCURY', 'VENUS', 'EARTH', 'MOON', 'MARS', 'PHOBOS', 'DEIMOS'];
+  it('solid-surface bodies are landable', () => {
+    const landableBodies = ['MERCURY', 'VENUS', 'EARTH', 'MOON', 'MARS', 'PHOBOS', 'DEIMOS', 'CERES', 'TITAN'];
     for (const id of landableBodies) {
       expect(isLandable(id)).toBe(true);
     }
+  });
+
+  it('Jupiter and Saturn are not landable', () => {
+    expect(isLandable('JUPITER')).toBe(false);
+    expect(isLandable('SATURN')).toBe(false);
   });
 
   it('Sun has a destruction zone', () => {
     expect(getDestructionZone('SUN')).toBe('extreme_heat');
   });
 
+  it('Jupiter and Saturn have extreme_pressure destruction zones', () => {
+    expect(getDestructionZone('JUPITER')).toBe('extreme_pressure');
+    expect(getDestructionZone('SATURN')).toBe('extreme_pressure');
+  });
+
   it('other bodies have no destruction zone', () => {
-    const others = ['MERCURY', 'VENUS', 'EARTH', 'MOON', 'MARS', 'PHOBOS', 'DEIMOS'];
+    const others = ['MERCURY', 'VENUS', 'EARTH', 'MOON', 'MARS', 'PHOBOS', 'DEIMOS', 'CERES', 'TITAN'];
     for (const id of others) {
       expect(getDestructionZone(id)).toBeNull();
     }
@@ -338,6 +376,26 @@ describe('Body hierarchy', () => {
 
   it('leaf bodies have no children', () => {
     for (const id of ['MERCURY', 'VENUS', 'MOON', 'PHOBOS', 'DEIMOS']) {
+      expect(CELESTIAL_BODIES[id].childIds).toEqual([]);
+    }
+  });
+
+  it('Ceres, Jupiter, and Saturn orbit the Sun', () => {
+    expect(CELESTIAL_BODIES.CERES.parentId).toBe('SUN');
+    expect(CELESTIAL_BODIES.JUPITER.parentId).toBe('SUN');
+    expect(CELESTIAL_BODIES.SATURN.parentId).toBe('SUN');
+  });
+
+  it('Titan orbits Saturn', () => {
+    expect(CELESTIAL_BODIES.TITAN.parentId).toBe('SATURN');
+  });
+
+  it('Saturn has Titan as child', () => {
+    expect(CELESTIAL_BODIES.SATURN.childIds).toEqual(['TITAN']);
+  });
+
+  it('Ceres, Jupiter, and Titan have no children', () => {
+    for (const id of ['CERES', 'JUPITER', 'TITAN']) {
       expect(CELESTIAL_BODIES[id].childIds).toEqual([]);
     }
   });
@@ -532,6 +590,10 @@ describe('Biome integrity', () => {
 describe('Weather', () => {
   it('Mars has dust storms', () => {
     expect(CELESTIAL_BODIES.MARS.weather).toBe('dust_storms');
+  });
+
+  it('Titan has methane rain', () => {
+    expect(CELESTIAL_BODIES.TITAN.weather).toBe('methane_rain');
   });
 
   it('other bodies have no weather', () => {
