@@ -217,7 +217,7 @@
 - **Verification**: `npx playwright test e2e/hubs-establishment.spec.ts e2e/hubs-save-migration.spec.ts e2e/hubs-vab-offworld.spec.ts` passes.
 
 ### TASK-032: Integrate hub processing into period loop
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-021, TASK-022, TASK-024, TASK-025
 - **Description**: In the period processing function (likely `src/core/finance.ts` or `src/core/period.ts`), add calls to `processHubMaintenance()`, `processConstructionProjects()`, `processCrewTransits()`, and `processTouristRevenue()` after existing crew salary and facility upkeep processing. Import from `hubs.ts`, `hubCrew.ts`, and `hubTourists.ts`. Run full test suite to verify no regressions.
 - **Verification**: `npm run test:unit` passes. `npx playwright test e2e/smoke.spec.ts` passes.

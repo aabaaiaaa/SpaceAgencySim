@@ -27,6 +27,9 @@ import { getFinancialMultipliers } from './settings.ts';
 import { processMiningSites, processSurfaceLaunchPads } from './mining.ts';
 import { processRefineries } from './refinery.ts';
 import { processRoutes } from './routes.ts';
+import { processHubMaintenance, processConstructionProjects } from './hubs.ts';
+import { processCrewTransits } from './hubCrew.ts';
+import { processTouristRevenue } from './hubTourists.ts';
 
 import type { GameState, MissionInstance } from './gameState.ts';
 import type { ResourceType } from './constants.ts';
@@ -182,7 +185,13 @@ export function advancePeriod(state: GameState): PeriodSummary {
     deaths: LifeSupportDeath[];
   };
 
-  // ── 11b. Resource processing — extraction, refining, launch, transport ──
+  // ── 11c. Hub processing — maintenance, construction, crew transits, tourism ──
+  processHubMaintenance(state);
+  processConstructionProjects(state);
+  processCrewTransits(state);
+  processTouristRevenue(state);
+
+  // ── 11d. Resource processing — extraction, refining, launch, transport ──
   const miningResult = processMiningSites(state);
   const refineryResult = processRefineries(state);
   const launchPadResult = processSurfaceLaunchPads(state);
