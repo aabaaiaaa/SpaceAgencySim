@@ -342,10 +342,11 @@ export function processMiningSites(state: GameState): { extracted: Partial<Recor
 /**
  * Process surface launch pads across all mining sites.
  *
- * For each SURFACE_LAUNCH_PAD module, transfers resources from the site's
- * `storage` to its `orbitalBuffer` up to the pad's launch capacity (scaled
- * by the site's power efficiency).  Unlike extractors, launch pads read
- * directly from site-wide storage and do not require pipe connections.
+ * For each SURFACE_LAUNCH_PAD module, transfers resources from connected
+ * storage modules to the site's `orbitalBuffer` up to the pad's launch
+ * capacity (scaled by the site's power efficiency). After processing all
+ * launch pads on a site, recomputes site.storage from module-level stored
+ * values.
  */
 export function processSurfaceLaunchPads(state: GameState): { transferred: Partial<Record<ResourceType, number>> } {
   const transferred: Partial<Record<ResourceType, number>> = {};
@@ -364,20 +365,43 @@ export function processSurfaceLaunchPads(state: GameState): { transferred: Parti
       const effectiveCapacity = launchCapacityKgPerPeriod * efficiency;
       let remainingCapacity = effectiveCapacity;
 
-      for (const resourceType of Object.keys(site.storage) as ResourceType[]) {
+      // Gather connected storage modules across all resource states
+      const connectedStorage: MiningSiteModule[] = [];
+      for (const [, storageState] of STORAGE_TYPE_TO_STATE) {
+        for (const storageMod of getConnectedStorage(site, mod.id, storageState)) {
+          if (!connectedStorage.includes(storageMod)) {
+            connectedStorage.push(storageMod);
+          }
+        }
+      }
+
+      // Collect all resource entries across connected storage modules
+      // Each entry tracks: resource type, module, and available amount
+      const entries: Array<{ resourceType: ResourceType; module: MiningSiteModule; available: number }> = [];
+      for (const storageMod of connectedStorage) {
+        if (!storageMod.stored) continue;
+        for (const [rt, amount] of Object.entries(storageMod.stored) as Array<[ResourceType, number]>) {
+          if (amount > 0) {
+            entries.push({ resourceType: rt, module: storageMod, available: amount });
+          }
+        }
+      }
+
+      // Transfer resources from modules to orbital buffer
+      for (const entry of entries) {
         if (remainingCapacity <= 0) break;
-
-        const available = site.storage[resourceType] ?? 0;
-        const toTransfer = Math.min(available, remainingCapacity);
-
+        const toTransfer = Math.min(entry.available, remainingCapacity);
         if (toTransfer > 0) {
-          site.storage[resourceType] = (site.storage[resourceType] ?? 0) - toTransfer;
-          site.orbitalBuffer[resourceType] = (site.orbitalBuffer[resourceType] ?? 0) + toTransfer;
-          transferred[resourceType] = (transferred[resourceType] ?? 0) + toTransfer;
+          entry.module.stored![entry.resourceType] = (entry.module.stored![entry.resourceType] ?? 0) - toTransfer;
+          site.orbitalBuffer[entry.resourceType] = (site.orbitalBuffer[entry.resourceType] ?? 0) + toTransfer;
+          transferred[entry.resourceType] = (transferred[entry.resourceType] ?? 0) + toTransfer;
           remainingCapacity -= toTransfer;
         }
       }
     }
+
+    // Rebuild site.storage from module-level stored values
+    recomputeSiteStorage(site);
   }
   return { transferred };
 }

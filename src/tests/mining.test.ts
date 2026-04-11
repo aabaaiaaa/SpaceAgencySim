@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
-import { createMiningSite, findNearestSite, addModuleToSite, toggleConnection, getPowerEfficiency, processMiningSites, processSurfaceLaunchPads } from '../core/mining.ts';
+import { createMiningSite, findNearestSite, addModuleToSite, toggleConnection, getPowerEfficiency, processMiningSites, processSurfaceLaunchPads, recomputeSiteStorage } from '../core/mining.ts';
 import { MiningModuleType, ResourceType } from '../core/constants.ts';
 import { processRefineries, setRefineryRecipe } from '../core/refinery.ts';
+import { advancePeriod } from '../core/period.ts';
 
 describe('GameState mining/route fields', () => {
   it('createGameState() initializes miningSites as empty array', () => {
@@ -452,52 +453,69 @@ describe('processSurfaceLaunchPads', () => {
       });
     }
 
-    addModuleToSite(site, {
+    const launchPad = addModuleToSite(site, {
       partId: 'surface-launch-pad-mk1',
       type: MiningModuleType.SURFACE_LAUNCH_PAD,
       powerDraw: 50,
     });
 
-    return site;
+    const silo = addModuleToSite(site, {
+      partId: 'storage-silo-mk1',
+      type: MiningModuleType.STORAGE_SILO,
+      powerDraw: 2,
+    });
+
+    // Connect launch pad to storage silo
+    toggleConnection(site, launchPad.id, silo.id);
+
+    return { site, launchPad, silo };
   }
 
   it('transfers resources from storage to orbital buffer', () => {
     const state = createGameState();
-    const site = buildSiteWithLaunchPad(state);
+    const { site, silo } = buildSiteWithLaunchPad(state);
 
-    site.storage[ResourceType.WATER_ICE] = 100;
+    // Set resources on the storage module's stored field
+    silo.stored = { [ResourceType.WATER_ICE]: 100 };
+    recomputeSiteStorage(site);
 
     processSurfaceLaunchPads(state);
 
     expect(site.orbitalBuffer[ResourceType.WATER_ICE]).toBe(100);
-    expect(site.storage[ResourceType.WATER_ICE]).toBe(0);
+    expect(site.storage[ResourceType.WATER_ICE] ?? 0).toBe(0);
+    expect(silo.stored![ResourceType.WATER_ICE] ?? 0).toBe(0);
   });
 
   it('respects launch capacity limit', () => {
     const state = createGameState();
-    const site = buildSiteWithLaunchPad(state);
+    const { site, silo } = buildSiteWithLaunchPad(state);
 
     // Put more resources than the 200 kg capacity
-    site.storage[ResourceType.WATER_ICE] = 500;
+    silo.stored = { [ResourceType.WATER_ICE]: 500 };
+    recomputeSiteStorage(site);
 
     processSurfaceLaunchPads(state);
 
-    // At full power (100 gen / 50 draw → efficiency clamped to 1.0), capacity = 200
+    // At full power (100 gen / 52 draw → efficiency clamped to 1.0), capacity = 200
     expect(site.orbitalBuffer[ResourceType.WATER_ICE]).toBe(200);
     expect(site.storage[ResourceType.WATER_ICE]).toBe(300);
+    expect(silo.stored![ResourceType.WATER_ICE]).toBe(300);
   });
 
   it('does not transfer without power', () => {
     const state = createGameState();
-    const site = buildSiteWithLaunchPad(state, { noPower: true });
+    const { site, silo } = buildSiteWithLaunchPad(state, { noPower: true });
 
-    site.storage[ResourceType.WATER_ICE] = 100;
+    // Set resources on the storage module's stored field
+    silo.stored = { [ResourceType.WATER_ICE]: 100 };
+    recomputeSiteStorage(site);
 
     processSurfaceLaunchPads(state);
 
-    // No power generator → powerGenerated=0, powerRequired=50 → efficiency=0
+    // No power generator → powerGenerated=0, powerRequired=52 → efficiency=0
     expect(site.orbitalBuffer[ResourceType.WATER_ICE] ?? 0).toBe(0);
     expect(site.storage[ResourceType.WATER_ICE]).toBe(100);
+    expect(silo.stored![ResourceType.WATER_ICE]).toBe(100);
   });
 });
 
@@ -554,7 +572,7 @@ describe('Integration: extraction → refining → launch chain', () => {
     });
 
     // Surface launch pad: 50W draw
-    addModuleToSite(site, {
+    const launchPad = addModuleToSite(site, {
       partId: 'surface-launch-pad-mk1',
       type: MiningModuleType.SURFACE_LAUNCH_PAD,
       powerDraw: 50,
@@ -577,6 +595,10 @@ describe('Integration: extraction → refining → launch chain', () => {
 
     // Connect refinery → pressure vessel (output: gas hydrogen + oxygen)
     toggleConnection(site, refinery.id, pressureVessel.id);
+
+    // Connect launch pad → silo (for solid resources) and pressure vessel (for gas)
+    toggleConnection(site, launchPad.id, silo.id);
+    toggleConnection(site, launchPad.id, pressureVessel.id);
 
     // ── Step 1: Extract resources ──
     processMiningSites(state);
@@ -603,7 +625,7 @@ describe('Integration: extraction → refining → launch chain', () => {
     // (processRefineries reads from module.stored, not site.storage).
     if (!silo.stored) silo.stored = {};
     silo.stored[ResourceType.WATER_ICE] = 200;
-    site.storage[ResourceType.WATER_ICE] = 200;
+    recomputeSiteStorage(site);
 
     processRefineries(state);
 
@@ -618,13 +640,18 @@ describe('Integration: extraction → refining → launch chain', () => {
     expect(waterIceAfterRefining).toBeLessThan(200);
 
     // ── Step 3: Launch resources to orbit ──
-    // Clear storage from earlier steps so the launch pad's limited capacity
+    // Clear module-level storage from earlier steps so the launch pad's limited capacity
     // (~164 kg at ~0.82 efficiency) isn't consumed by water ice / regolith.
-    for (const key of Object.keys(site.storage)) {
-      delete site.storage[key as ResourceType];
+    // Set hydrogen and oxygen on the pressure vessel's stored field.
+    for (const m of site.modules) {
+      if (m.stored) {
+        for (const key of Object.keys(m.stored)) {
+          delete m.stored[key as ResourceType];
+        }
+      }
     }
-    site.storage[ResourceType.HYDROGEN] = 50;
-    site.storage[ResourceType.OXYGEN] = 80;
+    pressureVessel.stored = { [ResourceType.HYDROGEN]: 50, [ResourceType.OXYGEN]: 80 };
+    recomputeSiteStorage(site);
 
     processSurfaceLaunchPads(state);
 
@@ -632,5 +659,149 @@ describe('Integration: extraction → refining → launch chain', () => {
     const hydrogenInOrbit = site.orbitalBuffer[ResourceType.HYDROGEN] ?? 0;
     const oxygenInOrbit = site.orbitalBuffer[ResourceType.OXYGEN] ?? 0;
     expect(hydrogenInOrbit + oxygenInOrbit).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Multi-period accumulation test
+// ---------------------------------------------------------------------------
+
+describe('Multi-period accumulation', () => {
+  it('accumulates resources correctly over 3 periods with no corruption @smoke', () => {
+    const state = createGameState();
+    state.money = 1000000; // Enough to cover operating costs across periods
+
+    // Build a Moon mining site with a full pipeline
+    const site = createMiningSite(state, {
+      name: 'Moon Accumulation Base',
+      bodyId: 'MOON',
+      coordinates: { x: 0, y: 0 },
+      controlUnitPartId: 'base-control-unit-mk1',
+    });
+
+    // 1. Power generator: 100W output, 0W draw
+    const generator = addModuleToSite(site, {
+      partId: 'power-generator-solar-mk1',
+      type: MiningModuleType.POWER_GENERATOR,
+      powerDraw: 0,
+      powerOutput: 100,
+    });
+
+    // 2. Mining drill: 25W draw
+    const drill = addModuleToSite(site, {
+      partId: 'mining-drill-mk1',
+      type: MiningModuleType.MINING_DRILL,
+      powerDraw: 25,
+    });
+
+    // 3. Storage silo (solid): 2W draw, capacity 2000 kg
+    const silo = addModuleToSite(site, {
+      partId: 'storage-silo-mk1',
+      type: MiningModuleType.STORAGE_SILO,
+      powerDraw: 2,
+    });
+
+    // 4. Refinery: 40W draw, recipe = water-electrolysis
+    const refinery = addModuleToSite(site, {
+      partId: 'refinery-mk1',
+      type: MiningModuleType.REFINERY,
+      powerDraw: 40,
+    });
+
+    // 5. Pressure vessel (gas): 5W draw, capacity 1000 kg
+    const pressureVessel = addModuleToSite(site, {
+      partId: 'pressure-vessel-mk1',
+      type: MiningModuleType.PRESSURE_VESSEL,
+      powerDraw: 5,
+    });
+
+    // 6. Surface launch pad: 50W draw
+    const launchPad = addModuleToSite(site, {
+      partId: 'surface-launch-pad-mk1',
+      type: MiningModuleType.SURFACE_LAUNCH_PAD,
+      powerDraw: 50,
+    });
+
+    // Total power draw: 25+2+40+5+50 = 122W, generation = 100W
+    // Efficiency = 100/122 ≈ 0.8197
+    expect(site.powerRequired).toBe(122);
+    expect(site.powerGenerated).toBe(100);
+
+    // Set up connections
+    // drill ↔ silo (extraction flows to solid storage)
+    toggleConnection(site, drill.id, silo.id);
+    // refinery ↔ silo (refinery reads solid input from silo)
+    toggleConnection(site, refinery.id, silo.id);
+    // refinery ↔ pressure vessel (refinery outputs gas to pressure vessel)
+    toggleConnection(site, refinery.id, pressureVessel.id);
+    // launch pad ↔ silo (launch pad reads from solid storage)
+    toggleConnection(site, launchPad.id, silo.id);
+    // launch pad ↔ pressure vessel (launch pad reads from gas storage)
+    toggleConnection(site, launchPad.id, pressureVessel.id);
+
+    // Set refinery recipe to water-electrolysis
+    const recipeSet = setRefineryRecipe(site, refinery.id, 'water-electrolysis');
+    expect(recipeSet).toBe(true);
+
+    // Run advancePeriod 3 times and collect summaries
+    const summaries = [];
+    for (let i = 0; i < 3; i++) {
+      summaries.push(advancePeriod(state));
+    }
+
+    // ── Verify 1: Resources accumulate at each stage ──
+    // Storage should have non-zero resource amounts after 3 extraction periods
+    const storageHasResources = Object.values(site.storage).some(v => v > 0);
+    const orbitalBufferHasResources = Object.values(site.orbitalBuffer).some(v => v > 0);
+    expect(storageHasResources || orbitalBufferHasResources).toBe(true);
+
+    // ── Verify 2: No negative values anywhere ──
+    // Check site.storage
+    for (const [resource, amount] of Object.entries(site.storage)) {
+      expect(amount, `site.storage[${resource}] should be >= 0`).toBeGreaterThanOrEqual(0);
+    }
+
+    // Check all module stored values
+    for (const mod of site.modules) {
+      if (mod.stored) {
+        for (const [resource, amount] of Object.entries(mod.stored)) {
+          expect(amount, `module ${mod.id} stored[${resource}] should be >= 0`).toBeGreaterThanOrEqual(0);
+        }
+      }
+    }
+
+    // Check orbital buffer
+    for (const [resource, amount] of Object.entries(site.orbitalBuffer)) {
+      expect(amount, `orbitalBuffer[${resource}] should be >= 0`).toBeGreaterThanOrEqual(0);
+    }
+
+    // ── Verify 3: No double-counting ──
+    // For each resource type, sum of all module stored values should match site.storage
+    // (recomputeSiteStorage is called during processing, so they should be in sync)
+    const moduleStorageTotals: Partial<Record<string, number>> = {};
+    for (const mod of site.modules) {
+      if (mod.stored) {
+        for (const [resource, amount] of Object.entries(mod.stored)) {
+          moduleStorageTotals[resource] = (moduleStorageTotals[resource] ?? 0) + amount;
+        }
+      }
+    }
+    for (const [resource, siteAmount] of Object.entries(site.storage)) {
+      const moduleTotal = moduleStorageTotals[resource] ?? 0;
+      expect(moduleTotal).toBeCloseTo(siteAmount as number, 5);
+    }
+
+    // ── Verify 4: Orbital buffer grows ──
+    // After 3 periods of extraction + launch, orbital buffer should have entries > 0
+    const orbitalBufferTotal = Object.values(site.orbitalBuffer).reduce((sum, v) => sum + v, 0);
+    expect(orbitalBufferTotal).toBeGreaterThan(0);
+
+    // ── Verify 5: PeriodSummary fields report non-zero amounts ──
+    // At least one of the 3 period summaries should have non-zero miningExtracted
+    const anyMiningExtracted = summaries.some(s => {
+      const total = Object.values(s.miningExtracted).reduce((sum, v) => sum + (v ?? 0), 0);
+      return total > 0;
+    });
+    expect(anyMiningExtracted).toBe(true);
   });
 });

@@ -41,7 +41,7 @@ See `.devloop/requirements.md` for full context on all items below.
 - **Verification**: `npx vitest run src/tests/refinery.test.ts`
 
 ### TASK-006: Refactor launch pad to use per-module storage
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-004, TASK-005
 - **Description**: In `src/core/mining.ts`, update `processSurfaceLaunchPads()` to read from connected storage modules' individual `stored` fields instead of `site.storage`. Deduct from individual modules proportionally. After transferring to orbital buffer, call `recomputeSiteStorage(site)`. See requirements.md section 3 "Launch Pad Changes".
 - **Verification**: `npx vitest run src/tests/mining.test.ts`
@@ -111,7 +111,7 @@ See `.devloop/requirements.md` for full context on all items below.
 - **Verification**: `npx tsc --noEmit src/ui/logistics.ts` and manually verify the builder panel appears/disappears via dev server.
 
 ### TASK-014b: Implement route builder mode — click-to-chain interaction
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-014a
 - **Description**: In route builder mode, clicking a body on the map sets it as the route origin and highlights all outbound proven legs from that body (change dashed to solid, fade non-outbound legs). Clicking a highlighted leg adds it to the chain display, updates the "current position" to that leg's destination body, and highlights the new body's outbound legs. The chain display shows each added leg with origin → destination labels. Confirm button calls `createRoute()` from `src/core/routes.ts` with the selected name, resource type, and proven leg IDs. Show error text if creation fails (e.g., empty chain). On success, exit builder mode and re-render the routes tab. See requirements.md section 7 "Route Creation Workflow" steps 3–7.
 - **Verification**: `npx tsc --noEmit src/ui/logistics.ts` and manually test the full route creation flow via dev server.
@@ -133,7 +133,7 @@ See `.devloop/requirements.md` for full context on all items below.
 - **Verification**: `npx vitest run src/tests/mining.test.ts --testNamePattern "overflow|multi-resource"`
 
 ### TASK-017: Unit tests for regolith electrolysis and hydrazine synthesis
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-005
 - **Description**: In `src/tests/refinery.test.ts`, add two tests that run the untested recipes through `processRefineries()`: (1) **Regolith electrolysis** — provide 100 kg regolith in connected storage, process, verify 15 kg oxygen produced and 100 kg regolith consumed. (2) **Hydrazine synthesis** — provide 50 kg hydrogen, process, verify 40 kg hydrazine produced and 50 kg hydrogen consumed. Tag one with `@smoke`. See requirements.md section 8.
 - **Verification**: `npx vitest run src/tests/refinery.test.ts --testNamePattern "regolith|hydrazine"`
@@ -145,7 +145,7 @@ See `.devloop/requirements.md` for full context on all items below.
 - **Verification**: `npx vitest run src/tests/routes.test.ts --testNamePattern "without destination"`
 
 ### TASK-019: Unit test for multi-period accumulation
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-010
 - **Description**: In `src/tests/mining.test.ts` (or create `src/tests/resource-integration.test.ts` if mining.test.ts is already large), add a test that sets up a complete pipeline: extractor → storage → refinery → storage → launch pad → orbital buffer. Run `advancePeriod()` 3–5 times. Verify: (1) resources accumulate at each stage, (2) no negative values, (3) no double-counting, (4) orbital buffer grows as expected, (5) PeriodSummary fields report non-zero extraction/refining/transfer amounts. Tag with `@smoke`. See requirements.md section 8.
 - **Verification**: `npx vitest run src/tests/mining.test.ts --testNamePattern "multi-period"` (or the integration test file)

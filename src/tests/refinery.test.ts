@@ -412,4 +412,48 @@ describe('processRefineries', () => {
     expect(site.storage[ResourceType.WATER_ICE]).toBe(100);
     expect(site.storage[ResourceType.HYDROGEN] ?? 0).toBe(0);
   });
+
+  it('regolith electrolysis converts regolith to oxygen', () => {
+    const state = createGameState();
+    const { site, refinery, silo, pressureVessel } = buildRefinerySite(state);
+
+    setRefineryRecipe(site, refinery.id, 'regolith-electrolysis');
+
+    // Stock 100 kg of regolith in the silo (SOLID storage)
+    silo.stored = { [ResourceType.REGOLITH]: 100 };
+    recomputeSiteStorage(site);
+
+    expect(getPowerEfficiency(site)).toBe(1.0);
+
+    processRefineries(state);
+
+    // Regolith should be fully consumed
+    expect(silo.stored![ResourceType.REGOLITH]).toBe(0);
+    expect(site.storage[ResourceType.REGOLITH] ?? 0).toBe(0);
+    // Oxygen produced: 15 kg — stored in pressure vessel (GAS storage)
+    expect(pressureVessel.stored![ResourceType.OXYGEN]).toBe(15);
+    expect(site.storage[ResourceType.OXYGEN]).toBe(15);
+  });
+
+  it('hydrazine synthesis converts hydrogen to hydrazine @smoke', () => {
+    const state = createGameState();
+    const { site, refinery, pressureVessel, fluidTank } = buildRefinerySite(state);
+
+    setRefineryRecipe(site, refinery.id, 'hydrazine-synthesis');
+
+    // Stock 50 kg of hydrogen in the pressure vessel (GAS storage)
+    pressureVessel.stored = { [ResourceType.HYDROGEN]: 50 };
+    recomputeSiteStorage(site);
+
+    expect(getPowerEfficiency(site)).toBe(1.0);
+
+    processRefineries(state);
+
+    // Hydrogen should be fully consumed
+    expect(pressureVessel.stored![ResourceType.HYDROGEN]).toBe(0);
+    expect(site.storage[ResourceType.HYDROGEN] ?? 0).toBe(0);
+    // Hydrazine produced: 40 kg — stored in fluid tank (LIQUID storage)
+    expect(fluidTank.stored![ResourceType.HYDRAZINE]).toBe(40);
+    expect(site.storage[ResourceType.HYDRAZINE]).toBe(40);
+  });
 });

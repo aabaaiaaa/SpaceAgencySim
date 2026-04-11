@@ -8,7 +8,7 @@
  */
 
 import type { GameState, MiningSite, Route, ProvenLeg, RouteLocation } from '../core/gameState.ts';
-import { setRouteStatus, addCraftToLeg, calculateRouteThroughput } from '../core/routes.ts';
+import { setRouteStatus, addCraftToLeg, calculateRouteThroughput, createRoute } from '../core/routes.ts';
 import { MiningModuleType } from '../core/constants.ts';
 import type { ResourceType } from '../core/constants.ts';
 import { REFINERY_RECIPES, setRefineryRecipe } from '../core/refinery.ts';
@@ -481,6 +481,24 @@ function _renderRouteMap(): SVGSVGElement {
     circle.setAttribute('fill', _getBodyColor(bodyId));
     circle.setAttribute('stroke', '#666');
     circle.setAttribute('stroke-width', '1.5');
+
+    // In builder mode, highlight current body and make circles clickable
+    if (_builderMode) {
+      circle.style.cursor = 'pointer';
+      if (_builderCurrentBodyId === bodyId) {
+        circle.setAttribute('stroke', '#FFD700');
+        circle.setAttribute('stroke-width', '3');
+      }
+      const clickBodyId = bodyId;
+      circle.addEventListener('click', () => {
+        // Only allow setting origin if no legs have been added yet
+        if (_builderLegs.length === 0) {
+          _builderCurrentBodyId = clickBodyId;
+          _render();
+        }
+      });
+    }
+
     svg.appendChild(circle);
 
     // Label below
@@ -507,11 +525,41 @@ function _renderRouteMap(): SVGSVGElement {
       line.setAttribute('y1', String(originPos.y));
       line.setAttribute('x2', String(destPos.x));
       line.setAttribute('y2', String(destPos.y));
-      line.setAttribute('stroke', '#888');
-      line.setAttribute('stroke-width', '1.5');
-      line.setAttribute('stroke-dasharray', '6 4');
       line.setAttribute('class', 'proven-leg-line');
-      line.style.cursor = 'pointer';
+
+      const isOutbound = _builderMode && _builderCurrentBodyId != null
+        && leg.origin.bodyId === _builderCurrentBodyId;
+
+      if (_builderMode && _builderCurrentBodyId != null) {
+        if (isOutbound) {
+          // Highlight outbound legs: solid line, bright color, clickable
+          line.setAttribute('stroke', '#64B4FF');
+          line.setAttribute('stroke-width', '2.5');
+          // No dash — solid line to distinguish from non-outbound
+          line.style.cursor = 'pointer';
+
+          const legId = leg.id;
+          const destBodyId = leg.destination.bodyId;
+          line.addEventListener('click', () => {
+            _builderLegs.push(legId);
+            _builderCurrentBodyId = destBodyId;
+            _render();
+          });
+        } else {
+          // Fade non-outbound legs
+          line.setAttribute('stroke', '#888');
+          line.setAttribute('stroke-width', '1.5');
+          line.setAttribute('stroke-dasharray', '6 4');
+          line.setAttribute('opacity', '0.2');
+          line.style.cursor = 'default';
+        }
+      } else {
+        // Normal (non-builder) mode
+        line.setAttribute('stroke', '#888');
+        line.setAttribute('stroke-width', '1.5');
+        line.setAttribute('stroke-dasharray', '6 4');
+        line.style.cursor = 'pointer';
+      }
 
       // Tooltip on hover
       const titleEl = document.createElementNS(svgNS, 'title');
@@ -749,10 +797,51 @@ function _renderBuilderPanel(): HTMLDivElement {
   const confirmBtn = document.createElement('button');
   confirmBtn.className = 'logistics-builder-confirm-btn';
   confirmBtn.textContent = 'Create Route';
-  confirmBtn.disabled = true; // Will be wired up in TASK-014b
+  confirmBtn.addEventListener('click', () => {
+    // Validate inputs
+    const errors: string[] = [];
+    if (_builderLegs.length === 0) {
+      errors.push('Add at least one leg by clicking a body then an outbound route on the map.');
+    }
+    if (!_builderResourceType) {
+      errors.push('Select a resource type.');
+    }
+    if (!_builderRouteName.trim()) {
+      errors.push('Enter a route name.');
+    }
+
+    // Show errors if validation fails
+    const errorEl = panel.querySelector('.logistics-builder-error') as HTMLDivElement | null;
+    if (errors.length > 0) {
+      if (errorEl) {
+        errorEl.textContent = errors.join(' ');
+      }
+      return;
+    }
+
+    // Attempt to create the route
+    try {
+      createRoute(_state!, {
+        name: _builderRouteName.trim(),
+        resourceType: _builderResourceType as ResourceType,
+        provenLegIds: _builderLegs,
+      });
+      _resetBuilderState();
+      _render();
+    } catch (err: unknown) {
+      if (errorEl) {
+        errorEl.textContent = err instanceof Error ? err.message : String(err);
+      }
+    }
+  });
   actions.appendChild(confirmBtn);
 
   panel.appendChild(actions);
+
+  // --- Error display area ---
+  const errorDiv = document.createElement('div');
+  errorDiv.className = 'logistics-builder-error';
+  panel.appendChild(errorDiv);
 
   return panel;
 }
