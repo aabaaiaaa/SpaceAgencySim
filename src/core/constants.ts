@@ -95,8 +95,9 @@ export type MissionState = (typeof MissionState)[keyof typeof MissionState];
 
 /**
  * Career / employment status of an astronaut.
- * Distinct from the operational CrewStatus below; tracks the astronaut's
- * permanent career arc rather than their current activity within a mission.
+ * Tracks the astronaut's permanent career arc (active → fired / kia).
+ * Operational state (on mission, training, injured) is tracked by dedicated
+ * fields on CrewMember rather than an enum.
  */
 export const AstronautStatus = Object.freeze({
   /** Currently employed and available (alive, not fired). */
@@ -108,24 +109,6 @@ export const AstronautStatus = Object.freeze({
 } as const);
 
 export type AstronautStatus = (typeof AstronautStatus)[keyof typeof AstronautStatus];
-
-/**
- * What a crew member is currently doing.
- */
-export const CrewStatus = Object.freeze({
-  /** Available to be assigned to a mission. */
-  IDLE: 'IDLE',
-  /** Currently aboard a rocket on an active mission. */
-  ON_MISSION: 'ON_MISSION',
-  /** In a training program; unavailable for missions until training ends. */
-  TRAINING: 'TRAINING',
-  /** Recovering from an injury; temporarily unavailable. */
-  INJURED: 'INJURED',
-  /** Killed in action; permanently removed from the crew roster. */
-  DEAD: 'DEAD',
-} as const);
-
-export type CrewStatus = (typeof CrewStatus)[keyof typeof CrewStatus];
 
 // ---------------------------------------------------------------------------
 // Flight Phases

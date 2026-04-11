@@ -23,7 +23,6 @@ import type {
 import {
   PartType,
   MissionState,
-  CrewStatus,
   AstronautStatus,
   FlightOutcome,
   FuelType,
@@ -440,20 +439,6 @@ describe('MissionState enum', () => {
     expect(MissionState.COMPLETED).toBe('COMPLETED');
     expect(MissionState.FAILED).toBe('FAILED');
     expect(MissionState.EXPIRED).toBe('EXPIRED');
-  });
-});
-
-describe('CrewStatus enum', () => {
-  it('is frozen', () => {
-    expect(Object.isFrozen(CrewStatus)).toBe(true);
-  });
-
-  it('contains all status values', () => {
-    expect(CrewStatus.IDLE).toBe('IDLE');
-    expect(CrewStatus.ON_MISSION).toBe('ON_MISSION');
-    expect(CrewStatus.TRAINING).toBe('TRAINING');
-    expect(CrewStatus.INJURED).toBe('INJURED');
-    expect(CrewStatus.DEAD).toBe('DEAD');
   });
 });
 

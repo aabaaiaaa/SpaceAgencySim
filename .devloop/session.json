@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 1,
+  "lastIteration": 2,
   "startedAt": "2026-04-11T09:30:14.222Z",
   "iteration": 8,
   "devloopVersion": "4.0.1",
   "activeTask": {
-    "taskId": "TASK-002",
-    "taskTitle": "Batch: TASK-002, TASK-008, TASK-009",
-    "iterationNumber": 2,
-    "startedAt": "2026-04-11T09:35:41.178Z"
+    "taskId": "TASK-003",
+    "taskTitle": "Remove vestigial CrewStatus enum",
+    "iterationNumber": 3,
+    "startedAt": "2026-04-11T09:41:55.524Z"
   }
 }

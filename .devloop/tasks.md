@@ -20,7 +20,7 @@ See [requirements.md](requirements.md) for full context on each section.
 - **Verification**: `npm run typecheck` passes. `npm run lint` passes. Visual check: start dev server (`npm run dev`), open Library, verify crew table shows correct colors and status text.
 
 ### TASK-003: Remove vestigial CrewStatus enum
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-002
 - **Description**: Remove the unused `CrewStatus` enum from the codebase:
   1. In `src/core/constants.ts`: Delete the `CrewStatus` const object (lines 115-126) and its companion type export (line 128). Update the JSDoc comment on `AstronautStatus` (line 98) to remove the sentence referencing "operational CrewStatus below".
