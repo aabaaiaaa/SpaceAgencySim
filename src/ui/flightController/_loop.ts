@@ -30,6 +30,7 @@ import { applyMapThrust, updateMapHud } from './_mapView.ts';
 import { applyNormalOrbitRcs } from './_orbitRcs.ts';
 import { evaluateFlightPhase, showPhaseNotification } from './_flightPhase.ts';
 import { tickDockingSystem, updateDockingHud } from './_docking.ts';
+import { checkHubDocking } from './_hubDocking.ts';
 import { showPostFlightSummary } from './_postFlight.ts';
 import { handleAbortReturnToAgency } from './_menuActions.ts';
 import {
@@ -385,6 +386,11 @@ export function loop(timestamp: number): void {
 
     // --- Docking system tick ---
     tickDockingSystem(realDt);
+
+    // --- Hub docking proximity check ---
+    if (state && flightState) {
+      checkHubDocking(state, ps, flightState);
+    }
 
     // Check mission, contract, and challenge objective completion.
     checkObjectiveCompletion(state!, flightState);

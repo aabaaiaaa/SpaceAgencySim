@@ -126,4 +126,78 @@ test.describe('Hub Switcher', () => {
     const marsOption = switcher.locator('option').nth(1);
     await expect(marsOption).toHaveText(/\[Building\]/);
   });
+
+  test('switching to non-Earth hub changes displayed facilities', async ({ page }) => {
+    // Moon hub has crew-hab built (a surface hub facility), but should NOT
+    // show Earth-only facilities like mission-control.
+    const moonHub = buildHub({
+      id: 'moon-base',
+      name: 'Lunar Outpost',
+      bodyId: 'MOON',
+      type: 'surface',
+      online: true,
+      facilities: {
+        'crew-hab': { built: true, tier: 1 },
+        'launch-pad': { built: true, tier: 1 },
+        'vab': { built: true, tier: 1 },
+      },
+    });
+
+    const save = buildSaveEnvelope({
+      hubs: [
+        {
+          id: 'earth',
+          name: 'Earth HQ',
+          type: 'surface' as const,
+          bodyId: 'EARTH',
+          coordinates: { x: 0, y: 0 },
+          facilities: { ...STARTER_FACILITIES },
+          tourists: [],
+          partInventory: [],
+          constructionQueue: [],
+          maintenanceCost: 0,
+          established: 0,
+          online: true,
+        },
+        moonHub,
+      ],
+      activeHubId: 'earth',
+    });
+
+    await seedAndLoadSave(page, save);
+
+    // Verify Earth facilities are shown (mission-control is an Earth-only facility).
+    await expect(page.locator('[data-building-id="mission-control"]')).toBeVisible();
+    await expect(page.locator('[data-building-id="launch-pad"]')).toBeVisible();
+    await expect(page.locator('[data-building-id="vab"]')).toBeVisible();
+
+    // Switch to the Moon hub.
+    const switcher = page.locator('#hub-switcher');
+    await switcher.selectOption('moon-base');
+
+    // Wait for the hub UI to re-render.
+    await page.waitForTimeout(500);
+
+    // Moon hub should show surface-hub facilities that are built.
+    await expect(page.locator('[data-building-id="launch-pad"]')).toBeVisible();
+    await expect(page.locator('[data-building-id="vab"]')).toBeVisible();
+
+    // Earth-only facilities must NOT be visible on the Moon hub.
+    await expect(page.locator('[data-building-id="mission-control"]')).toHaveCount(0);
+    await expect(page.locator('[data-building-id="crew-admin"]')).toHaveCount(0);
+    await expect(page.locator('[data-building-id="tracking-station"]')).toHaveCount(0);
+    await expect(page.locator('[data-building-id="rd-lab"]')).toHaveCount(0);
+    await expect(page.locator('[data-building-id="satellite-ops"]')).toHaveCount(0);
+    await expect(page.locator('[data-building-id="library"]')).toHaveCount(0);
+
+    // Collect all visible building IDs to confirm only appropriate ones are shown.
+    const buildingIds = await page.locator('[data-building-id]').evaluateAll(
+      (els: Element[]) => els.map(el => (el as HTMLElement).dataset.buildingId)
+    );
+    // Should only contain surface hub facilities that the Moon hub has built.
+    expect(buildingIds).not.toContain('mission-control');
+    expect(buildingIds).not.toContain('crew-admin');
+    expect(buildingIds).toContain('launch-pad');
+    expect(buildingIds).toContain('vab');
+  });
 });

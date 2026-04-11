@@ -622,6 +622,50 @@ export function isMapShadowEnabled(): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Public API — hub marker queries
+// ---------------------------------------------------------------------------
+
+/** Public type describing a rendered hub marker's position and metadata. */
+export interface HubMarkerInfo {
+  hubId: string;
+  name: string;
+  bodyId: string;
+  online: boolean;
+  facilities: string[];
+  x: number;
+  y: number;
+}
+
+/**
+ * Returns the array of hub markers rendered in the current frame.
+ * Each entry contains the hub's screen-space position and metadata.
+ */
+export function getRenderedHubMarkers(): readonly HubMarkerInfo[] {
+  return _renderedHubMarkers;
+}
+
+/**
+ * Find the nearest rendered hub marker within `radius` pixels of the given
+ * screen coordinates.  Returns `null` if no marker is close enough.
+ */
+export function getHubMarkerAtPoint(
+  screenX: number,
+  screenY: number,
+  radius: number = 20,
+): HubMarkerInfo | null {
+  let best: HubMarkerInfo | null = null;
+  let bestDist = radius;
+  for (const hub of _renderedHubMarkers) {
+    const d = Math.hypot(hub.x - screenX, hub.y - screenY);
+    if (d < bestDist) {
+      bestDist = d;
+      best = hub;
+    }
+  }
+  return best;
+}
+
+// ---------------------------------------------------------------------------
 // Public API — rendering
 // ---------------------------------------------------------------------------
 

@@ -127,7 +127,7 @@
 - **Verification**: `npx playwright test e2e/hubs-switcher.spec.ts` passes.
 
 ### TASK-017: Hub-aware hub rendering
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-016
 - **Description**: Update `src/render/hub.ts` to read the active hub's body and set sky/ground colours accordingly (surface hubs use body visuals, orbital hubs get starfield). Update `src/ui/hub.ts` to show only the active hub's available and built facilities — under-construction facilities at 50% opacity, Earth-only facilities hidden for non-Earth hubs. Add E2E test: switching to a non-Earth hub via the switcher changes the displayed facilities.
 - **Verification**: `npx playwright test e2e/hubs-switcher.spec.ts` passes.
@@ -157,7 +157,7 @@
 - **Verification**: `npx vitest run src/tests/hubs-economy.test.ts` passes.
 
 ### TASK-022: Hub-scoped crew
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-021
 - **Description**: Create `src/core/hubCrew.ts` with: `getCrewAtHub()`, `hireCrewAtHub()`, `requestCrewTransfer()`, `getTransferCost()`, `processCrewTransits()`. Hiring at off-world hubs applies import tax and transit delay. Transfers are free when a route connects the bodies, otherwise distance-based cost. Write tests in `src/tests/hubs-crew.test.ts` covering: crew filtering by hub, Earth hiring (no tax/delay), off-world hiring (tax + delay), transfer with/without route, transit processing. See plan for exact test cases and transit delay values.
 - **Verification**: `npx vitest run src/tests/hubs-crew.test.ts` passes.
@@ -187,7 +187,7 @@
 - **Verification**: `npx vitest run src/tests/hubs.test.ts --testNamePattern "orbital"` passes. `npx tsc --noEmit` passes.
 
 ### TASK-027: Orbital hub docking (1km proximity)
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-026
 - **Description**: Add `findNearbyOrbitalHub()` to `src/core/hubs.ts`: finds orbital hubs within `HUB_PROXIMITY_DOCK_RADIUS` (1km) on the same body. In `src/ui/flightController.ts`, show a dock prompt when in range of an orbital hub. Accepting ends the flight and recovers craft to that hub. Dismissing hides the prompt until the player leaves the zone. Write unit tests for proximity detection (within range, beyond range, different bodies). See plan for test cases.
 - **Verification**: `npx vitest run src/tests/hubs.test.ts --testNamePattern "proximity"` passes.
@@ -199,7 +199,7 @@
 - **Verification**: `npx vitest run src/tests/hubs.test.ts --testNamePattern "recovery"` passes.
 
 ### TASK-029: Hub markers on the in-flight map
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-008b, TASK-013
 - **Description**: In `src/render/map.ts`, add `renderHubMarkers()` that draws hub markers: surface hubs as base icons on bodies, orbital hubs as station icons at altitude. Online hubs fully opaque, offline at 50% alpha. In `src/ui/map.ts`, add click interaction: in-flight shows tooltip only; tracking station allows first-click select, second-click switch prompt. Write E2E test in `e2e/hubs-map.spec.ts` verifying hub markers appear on the tracking station map.
 - **Verification**: `npx playwright test e2e/hubs-map.spec.ts` passes.
@@ -223,7 +223,7 @@
 - **Verification**: `npm run test:unit` passes. `npx playwright test e2e/smoke.spec.ts` passes.
 
 ### TASK-033: VAB UI — import tax display and local body conditions
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-013, TASK-015
 - **Description**: In `src/ui/vab/_partsPanel.ts`, when rendering part costs, read the active hub's body import tax multiplier and display adjusted cost with "(Nx import)" label for off-world hubs. In `src/ui/vab/_engineerPanel.ts`, use the active hub's body surface gravity for TWR and delta-v calculations instead of hardcoded Earth values. Write E2E test verifying import tax text appears when active hub is off-world.
 - **Verification**: `npx playwright test e2e/hubs-vab-offworld.spec.ts` passes.

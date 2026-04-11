@@ -21,6 +21,7 @@ import {
   getEnvironmentCostMultiplier,
   getImportTaxMultiplier,
   getSurfaceHubsForRecovery,
+  findNearbyOrbitalHub,
 } from '../core/hubs.ts';
 import {
   hasFacility,
@@ -404,5 +405,58 @@ describe('Surface hub recovery — getSurfaceHubsForRecovery', () => {
   it('returns empty array for body with no hubs', () => {
     const result = getSurfaceHubsForRecovery(state, 'MARS');
     expect(result).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Orbital hub proximity detection
+// ---------------------------------------------------------------------------
+
+describe('Orbital hub proximity detection', () => {
+  let state: GameState;
+  beforeEach(() => { state = createGameState(); });
+
+  it('finds orbital hub within range on same body', () => {
+    const hub = createHub(state, { name: 'LEO Station', type: 'orbital', bodyId: 'EARTH', altitude: 200_000 });
+    hub.online = true;
+    const found = findNearbyOrbitalHub(state, 'EARTH', 200_500);
+    expect(found).toHaveLength(1);
+    expect(found[0].id).toBe(hub.id);
+  });
+
+  it('does not find orbital hub beyond range', () => {
+    const hub = createHub(state, { name: 'LEO Station', type: 'orbital', bodyId: 'EARTH', altitude: 200_000 });
+    hub.online = true;
+    const found = findNearbyOrbitalHub(state, 'EARTH', 202_000);
+    expect(found).toHaveLength(0);
+  });
+
+  it('does not find orbital hub on different body', () => {
+    const hub = createHub(state, { name: 'Moon Station', type: 'orbital', bodyId: 'MOON', altitude: 100_000 });
+    hub.online = true;
+    const found = findNearbyOrbitalHub(state, 'EARTH', 100_000);
+    expect(found).toHaveLength(0);
+  });
+
+  it('does not find offline orbital hub', () => {
+    const hub = createHub(state, { name: 'Station', type: 'orbital', bodyId: 'EARTH', altitude: 200_000 });
+    hub.online = false;
+    const found = findNearbyOrbitalHub(state, 'EARTH', 200_500);
+    expect(found).toHaveLength(0);
+  });
+
+  it('does not find surface hubs', () => {
+    const hub = createHub(state, { name: 'Base', type: 'surface', bodyId: 'EARTH' });
+    hub.online = true;
+    const found = findNearbyOrbitalHub(state, 'EARTH', 0);
+    expect(found).toHaveLength(0);
+  });
+
+  it('finds hub exactly at range boundary', () => {
+    const hub = createHub(state, { name: 'Station', type: 'orbital', bodyId: 'EARTH', altitude: 200_000 });
+    hub.online = true;
+    // Exactly 1000m away = exactly at boundary
+    const found = findNearbyOrbitalHub(state, 'EARTH', 201_000);
+    expect(found).toHaveLength(1);
   });
 });

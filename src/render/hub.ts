@@ -17,14 +17,22 @@
 import * as PIXI from 'pixi.js';
 import { getApp } from './index.ts';
 import { RendererPool } from './pool.ts';
+import { getSkyVisual, getGroundVisual } from '../data/bodies.ts';
 
 // ---------------------------------------------------------------------------
-// Colours
+// Colours — defaults (Earth)
 // ---------------------------------------------------------------------------
 
-const SKY_COLOR    = 0x87CEEB;
-const GROUND_COLOR = 0xC2A165;
-const GROUND_LINE_COLOR = 0x8B6914;
+const DEFAULT_SKY_COLOR    = 0x87CEEB;
+const DEFAULT_GROUND_COLOR = 0xC2A165;
+const DEFAULT_GROUND_LINE_COLOR = 0x8B6914;
+const STARFIELD_COLOR = 0x050510;
+
+// Active hub visuals (set via setHubBodyVisuals)
+let _skyColor: number    = DEFAULT_SKY_COLOR;
+let _groundColor: number = DEFAULT_GROUND_COLOR;
+let _groundLineColor: number = DEFAULT_GROUND_LINE_COLOR;
+let _isOrbitalHub = false;
 
 // ---------------------------------------------------------------------------
 // Layout
@@ -161,6 +169,40 @@ export function setBuiltFacilities(builtIds: Set<string> | null): void {
   }
 }
 
+/**
+ * Set the hub background visuals based on the active hub's body and type.
+ *
+ * Surface hubs use the body's ground and sky colours.
+ * Orbital hubs use a dark starfield background with no ground.
+ */
+export function setHubBodyVisuals(bodyId: string, hubType: 'surface' | 'orbital'): void {
+  _isOrbitalHub = hubType === 'orbital';
+
+  if (_isOrbitalHub) {
+    _skyColor = STARFIELD_COLOR;
+    _groundColor = STARFIELD_COLOR;
+    _groundLineColor = STARFIELD_COLOR;
+    return;
+  }
+
+  // Surface hub — look up body visuals, fall back to Earth defaults.
+  const sky = getSkyVisual(bodyId);
+  const ground = getGroundVisual(bodyId);
+
+  _skyColor = sky?.seaLevelColor ?? DEFAULT_SKY_COLOR;
+  _groundColor = ground?.color ?? DEFAULT_GROUND_COLOR;
+  // Derive ground line colour: darken the ground colour by shifting channels.
+  // If we have a custom ground colour, use a slightly darker variant.
+  if (ground) {
+    const r = Math.max(0, ((ground.color >> 16) & 0xFF) - 0x30);
+    const g = Math.max(0, ((ground.color >> 8)  & 0xFF) - 0x30);
+    const b = Math.max(0, ( ground.color         & 0xFF) - 0x30);
+    _groundLineColor = (r << 16) | (g << 8) | b;
+  } else {
+    _groundLineColor = DEFAULT_GROUND_LINE_COLOR;
+  }
+}
+
 export function showHubScene(): void {
   if (!_hubRoot) return;
   const app = getApp();
@@ -190,21 +232,30 @@ function _drawScene(): void {
   const H       = app.screen.height;
   const groundY = Math.round(H * GROUND_Y_PCT);
 
-  const sky = _pool.acquireGraphics();
-  sky.rect(0, 0, W, groundY);
-  sky.fill(SKY_COLOR);
-  _hubRoot.addChild(sky);
+  if (_isOrbitalHub) {
+    // Orbital hub: starfield fills the entire screen, no ground.
+    const bg = _pool.acquireGraphics();
+    bg.rect(0, 0, W, H);
+    bg.fill(STARFIELD_COLOR);
+    _hubRoot.addChild(bg);
+  } else {
+    // Surface hub: sky + ground + ground line.
+    const skyGfx = _pool.acquireGraphics();
+    skyGfx.rect(0, 0, W, groundY);
+    skyGfx.fill(_skyColor);
+    _hubRoot.addChild(skyGfx);
 
-  const ground = _pool.acquireGraphics();
-  ground.rect(0, groundY, W, H - groundY);
-  ground.fill(GROUND_COLOR);
-  _hubRoot.addChild(ground);
+    const ground = _pool.acquireGraphics();
+    ground.rect(0, groundY, W, H - groundY);
+    ground.fill(_groundColor);
+    _hubRoot.addChild(ground);
 
-  const groundLine = _pool.acquireGraphics();
-  groundLine.moveTo(0, groundY);
-  groundLine.lineTo(W, groundY);
-  groundLine.stroke({ color: GROUND_LINE_COLOR, width: 2 });
-  _hubRoot.addChild(groundLine);
+    const groundLine = _pool.acquireGraphics();
+    groundLine.moveTo(0, groundY);
+    groundLine.lineTo(W, groundY);
+    groundLine.stroke({ color: _groundLineColor, width: 2 });
+    _hubRoot.addChild(groundLine);
+  }
 
   for (const bld of BUILDINGS) {
     if (_builtFacilities && !_builtFacilities.has(bld.id)) continue;

@@ -5,7 +5,7 @@
 
 import type { GameState } from './gameState.ts';
 import type { Hub, ConstructionProject, ResourceRequirement } from './hubTypes.ts';
-import { FacilityId, EARTH_HUB_ID } from './constants.ts';
+import { FacilityId, EARTH_HUB_ID, HUB_PROXIMITY_DOCK_RADIUS } from './constants.ts';
 import { spend } from './finance.ts';
 import {
   BODY_ENVIRONMENT,
@@ -458,4 +458,31 @@ export function getSurfaceHubsForRecovery(state: GameState, bodyId: string): Hub
   return state.hubs.filter(
     h => h.bodyId === bodyId && h.type === 'surface' && h.online,
   );
+}
+
+// ---------------------------------------------------------------------------
+// Orbital Hub Proximity Detection
+// ---------------------------------------------------------------------------
+
+/**
+ * Finds online orbital hubs within HUB_PROXIMITY_DOCK_RADIUS on the same body.
+ * Used by the flight controller to detect docking opportunities.
+ *
+ * @param state   Game state
+ * @param bodyId  The body the craft is orbiting
+ * @param altitude  The craft's altitude above the body surface (metres)
+ * @returns Array of orbital hubs within docking range, may be empty
+ */
+export function findNearbyOrbitalHub(
+  state: GameState,
+  bodyId: string,
+  altitude: number,
+): Hub[] {
+  return state.hubs.filter(h => {
+    if (h.type !== 'orbital') return false;
+    if (h.bodyId !== bodyId) return false;
+    if (!h.online) return false;
+    const hubAltitude = h.altitude ?? 200_000;
+    return Math.abs(hubAltitude - altitude) <= HUB_PROXIMITY_DOCK_RADIUS;
+  });
 }

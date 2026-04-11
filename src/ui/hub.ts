@@ -19,8 +19,8 @@
  * @module hub
  */
 
-import { showHubScene, hideHubScene, setHubWeather, setBuiltFacilities } from '../render/hub.ts';
-import { FACILITY_DEFINITIONS, getFacilityUpgradeDef, getReputationTier, GameMode } from '../core/constants.ts';
+import { showHubScene, hideHubScene, setHubWeather, setBuiltFacilities, setHubBodyVisuals } from '../render/hub.ts';
+import { FACILITY_DEFINITIONS, getFacilityUpgradeDef, getReputationTier, GameMode, EARTH_HUB_ID } from '../core/constants.ts';
 import { openSettingsPanel } from './settings.ts';
 import { openDebugSavePanel } from './debugSaves.ts';
 import { setTopBarHubItems, clearTopBarHubItems } from './topbar.ts';
@@ -37,6 +37,12 @@ import './hub.css';
 import type { GameState } from '../core/gameState.ts';
 import type { FlightReturnSummary } from '../core/flightReturn.ts';
 import { initHubSwitcher, destroyHubSwitcher } from './hubSwitcher.ts';
+import { getActiveHub } from '../core/hubs.ts';
+import {
+  EARTH_ONLY_FACILITIES,
+  SURFACE_HUB_FACILITIES,
+  ORBITAL_HUB_FACILITIES,
+} from '../data/hubFacilities.ts';
 
 // ---------------------------------------------------------------------------
 // Layout constants — must match src/render/hub.js
@@ -216,12 +222,18 @@ export function initHubUI(container: HTMLElement, state: GameState, onNavigate: 
   _overlay.id = 'hub-overlay';
   container.appendChild(_overlay);
 
+  // Set PixiJS background visuals based on the active hub's body.
+  const activeHub = getActiveHub(state);
+  setHubBodyVisuals(activeHub.bodyId, activeHub.type);
+
   // Tell the PixiJS renderer which facilities are built so it only draws those.
+  // Use the active hub's facilities (not the legacy state.facilities).
   if (state.gameMode === GameMode.SANDBOX) {
     setBuiltFacilities(null); // show all in sandbox
   } else {
+    const hubFacilities = activeHub.facilities;
     const builtIds = new Set(
-      Object.keys(state.facilities).filter((id) => state.facilities[id]?.built)
+      Object.keys(hubFacilities).filter((id) => hubFacilities[id]?.built)
     );
     setBuiltFacilities(builtIds);
   }
@@ -873,20 +885,54 @@ function _addWeatherRow(parent: HTMLElement, label: string, value: string): void
  * Create and append one `<div>` per building inside the overlay.
  */
 function _renderBuildings(onNavigate: (destination: string) => void): void {
-  if (!_overlay) return;
+  if (!_overlay || !_state) return;
+
+  const hub = getActiveHub(_state);
+  const isEarth = hub.id === EARTH_HUB_ID;
+  const allowedFacilities: readonly string[] = isEarth
+    ? [] // Earth shows all buildings (no filter)
+    : hub.type === 'orbital'
+      ? ORBITAL_HUB_FACILITIES
+      : SURFACE_HUB_FACILITIES;
+
+  // Build a set of facility IDs currently under construction (not yet completed).
+  const underConstruction = new Set<string>();
+  for (const project of hub.constructionQueue) {
+    if (project.completedPeriod == null) {
+      underConstruction.add(project.facilityId);
+    }
+  }
 
   for (const bld of BUILDINGS) {
+    // For non-Earth hubs, skip Earth-only facilities and facilities not in the
+    // allowed list for this hub type.
+    if (!isEarth) {
+      if ((EARTH_ONLY_FACILITIES as readonly string[]).includes(bld.id)) continue;
+      if (!allowedFacilities.includes(bld.id)) continue;
+    }
+
     // In sandbox mode all facilities are always built, so show all.
-    // In tutorial/freeplay mode, only show facilities that have been built.
-    if (_state && _state.gameMode !== GameMode.SANDBOX && !hasFacility(_state, bld.id)) {
+    // In tutorial/freeplay mode, only show facilities that have been built
+    // OR are currently under construction.
+    const isBuilt = hasFacility(_state, bld.id);
+    const isUnderConstruction = underConstruction.has(bld.id);
+
+    if (_state.gameMode !== GameMode.SANDBOX && !isBuilt && !isUnderConstruction) {
       continue;
     }
+
     const el: HTMLDivElement = document.createElement('div');
     el.className    = 'hub-building';
     el.dataset.buildingId = bld.id;
     el.setAttribute('role',       'button');
     el.setAttribute('tabindex',   '0');
     el.setAttribute('aria-label', bld.label);
+
+    // Under-construction facilities render at 50% opacity.
+    if (isUnderConstruction && !isBuilt) {
+      el.style.opacity = '0.5';
+      el.dataset.buildingStatus = 'under-construction';
+    }
 
     // Position: left edge and width as % of viewport width.
     const leftPct: number  = (bld.xCenterPct - bld.widthPct / 2) * 100;

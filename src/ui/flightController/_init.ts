@@ -25,6 +25,7 @@ import { onTimeWarpButtonClick } from './_timeWarp.ts';
 import { onSurfaceAction } from './_surfaceActions.ts';
 import { destroyMapHud } from './_mapView.ts';
 import { destroyDockingHud } from './_docking.ts';
+import { destroyHubDocking } from './_hubDocking.ts';
 import { loop } from './_loop.ts';
 import { initFpsMonitor, showFpsMonitor, hideFpsMonitor, destroyFpsMonitor } from '../fpsMonitor.ts';
 import { showPerfDashboard, hidePerfDashboard, destroyPerfDashboard } from '../perfDashboard.ts';
@@ -368,6 +369,7 @@ export function stopFlightScene(): void {
   destroyFlightHud();
   destroyFlightContextMenu();
   destroyDockingHud();
+  destroyHubDocking();
   destroyMapHud();
   destroyMapRenderer();
   destroyFlightRenderer();

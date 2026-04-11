@@ -4,12 +4,13 @@
 
 import { PARTS, getPartById } from '../../data/parts.ts';
 import type { PartDef } from '../../data/parts.ts';
-import { PartType } from '../../core/constants.ts';
+import { PartType, EARTH_HUB_ID } from '../../core/constants.ts';
 import {
   getInventoryCount,
   getInventoryForPart,
   getEffectiveReliability,
 } from '../../core/partInventory.ts';
+import { getActiveHub, getImportTaxMultiplier } from '../../core/hubs.ts';
 import { getVabState } from './_state.ts';
 
 import type { GameState } from '../../core/gameState.ts';
@@ -118,6 +119,19 @@ export function buildPartsHTML(state: GameState): string {
   const unlocked = new Set(state.parts);
   const available = PARTS.filter((p: PartDef) => unlocked.has(p.id));
 
+  // Determine import tax for the active hub (1.0 for Earth — no label shown).
+  let importMultiplier = 1.0;
+  let isOffworld = false;
+  try {
+    const hub = getActiveHub(state);
+    if (hub.id !== EARTH_HUB_ID) {
+      importMultiplier = getImportTaxMultiplier(hub.bodyId);
+      isOffworld = importMultiplier !== 1.0;
+    }
+  } catch {
+    // No active hub — fall back to no tax.
+  }
+
   // Group parts by display label, preserving TYPE_ORDER.
   const groups: Map<string, PartDef[]> = new Map();
   for (const type of TYPE_ORDER) {
@@ -145,12 +159,21 @@ export function buildPartsHTML(state: GameState): string {
       const invBadge = invCount > 0
         ? `<span class="vab-inv-badge" title="${invCount} in inventory (free)">${invCount}</span>`
         : '';
+
+      // Calculate import-adjusted cost for off-world hubs.
+      const adjustedCost = Math.round(p.cost * importMultiplier);
+      const importTag = isOffworld
+        ? ` <span class="vab-part-import-tax" data-import-tax="${importMultiplier}">(${importMultiplier}x import)</span>`
+        : '';
+
       const costLabel = invCount > 0
-        ? `<span class="vab-part-cost-free">Free</span><span class="vab-part-cost-orig">${fmt$(p.cost)}</span>`
-        : `<span>${fmt$(p.cost)}</span>`;
+        ? `<span class="vab-part-cost-free">Free</span><span class="vab-part-cost-orig">${fmt$(adjustedCost)}</span>${importTag}`
+        : `<span>${fmt$(adjustedCost)}</span>${importTag}`;
+
+      const titleCost = invCount > 0 ? 'Free (inventory)' : fmt$(adjustedCost);
       rows.push(
         `<div class="vab-part-card" data-part-id="${p.id}" tabindex="0" ` +
-            `title="${p.name} — ${p.mass} kg · ${invCount > 0 ? 'Free (inventory)' : fmt$(p.cost)}">` +
+            `title="${p.name} — ${p.mass} kg · ${titleCost}">` +
           `<div class="vab-part-rect" style="width:${rw}px;height:${rh}px;` +
               `background:${_CARD_FILL[p.type] ?? _CARD_FILL_DEFAULT};` +
               `border:1px solid ${_CARD_STROKE[p.type] ?? _CARD_STROKE_DEFAULT}"></div>` +
@@ -197,9 +220,29 @@ export function showPartDetail(partId: string): void {
 
   const typeLbl = TYPE_LABEL[def.type.toLowerCase()]
     ?? def.type.toLowerCase().replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+
+  // Determine import tax for the active hub.
+  let detailImportMultiplier = 1.0;
+  let detailIsOffworld = false;
+  if (S.gameState) {
+    try {
+      const hub = getActiveHub(S.gameState);
+      if (hub.id !== EARTH_HUB_ID) {
+        detailImportMultiplier = getImportTaxMultiplier(hub.bodyId);
+        detailIsOffworld = detailImportMultiplier !== 1.0;
+      }
+    } catch {
+      // No active hub — fall back to no tax.
+    }
+  }
+  const detailAdjustedCost = Math.round(def.cost * detailImportMultiplier);
+  const costDisplay = detailIsOffworld
+    ? `${fmt$(detailAdjustedCost)} <span class="vab-part-import-tax" data-import-tax="${detailImportMultiplier}">(${detailImportMultiplier}x import)</span>`
+    : fmt$(detailAdjustedCost);
+
   const stats: [string, string][] = [
     ['Mass',  `${def.mass.toLocaleString('en-US')} kg`],
-    ['Cost',  fmt$(def.cost)],
+    ['Cost',  costDisplay],
   ];
 
   // Type-specific stats.

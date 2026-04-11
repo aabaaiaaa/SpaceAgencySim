@@ -4,6 +4,8 @@
 
 import { runValidation } from '../../core/rocketvalidator.ts';
 import { getVabState } from './_state.ts';
+import { getActiveHub } from '../../core/hubs.ts';
+import { getSurfaceGravity, getBodyDef } from '../../data/bodies.ts';
 
 /**
  * Populate the Rocket Engineer side panel with the latest validation result.
@@ -21,6 +23,25 @@ export function renderEngineerPanel(): void {
   const result = S.lastValidation ?? runValidation(S.assembly, S.stagingConfig, S.gameState);
   const html: string[] = [];
 
+  // Determine the active hub's body gravity for TWR recalculation.
+  let bodyGravity = 9.81; // Earth default
+  let bodyLabel = 'Earth';
+  if (S.gameState) {
+    try {
+      const hub = getActiveHub(S.gameState);
+      bodyGravity = getSurfaceGravity(hub.bodyId);
+      const bodyDef = getBodyDef(hub.bodyId);
+      bodyLabel = bodyDef?.name ?? hub.bodyId;
+    } catch {
+      // No active hub — use Earth defaults.
+    }
+  }
+
+  // Recalculate TWR using the hub body's surface gravity.
+  const adjustedTwr = result.totalMassKg > 0
+    ? (result.stage1Thrust * 1000) / (result.totalMassKg * bodyGravity)
+    : 0;
+
   // ── Stats ─────────────────────────────────────────────────────────────────
   html.push('<div class="vab-val-stats">');
   html.push(
@@ -35,11 +56,11 @@ export function renderEngineerPanel(): void {
       `<span class="vab-val-stat-value">${result.stage1Thrust.toFixed(0)} kN</span>` +
     `</div>`,
   );
-  const twrGoodClass = result.twr > 1.0 ? 'vab-val-stat-good' : 'vab-val-stat-bad';
+  const twrGoodClass = adjustedTwr > 1.0 ? 'vab-val-stat-good' : 'vab-val-stat-bad';
   html.push(
     `<div class="vab-val-stat-row">` +
-      `<span class="vab-val-stat-label">TWR (Stage 1)</span>` +
-      `<span class="vab-val-stat-value ${twrGoodClass}">${result.twr.toFixed(2)}</span>` +
+      `<span class="vab-val-stat-label">TWR (Stage 1) [${bodyLabel}]</span>` +
+      `<span class="vab-val-stat-value ${twrGoodClass}">${adjustedTwr.toFixed(2)}</span>` +
     `</div>`,
   );
   html.push('</div>');

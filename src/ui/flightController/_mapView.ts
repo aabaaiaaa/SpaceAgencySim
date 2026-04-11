@@ -35,6 +35,8 @@ import { getFCState, getPhysicsState, getFlightState } from './_state.ts';
 import { showPhaseNotification } from './_flightPhase.ts';
 import { resyncWorkerState } from './_workerBridge.ts';
 import { escapeHtml } from '../escapeHtml.ts';
+import { setActiveHub, getHub } from '../../core/hubs.ts';
+import { CELESTIAL_BODIES } from '../../data/bodies.ts';
 
 // Re-export setMapTarget for use by _docking.js.
 export { setMapTarget };
@@ -46,6 +48,84 @@ const ZOOM_LABELS: Record<string, string> = {
   [MapZoom.CRAFT_TO_TARGET]: 'Craft \u2192 Target',
   [MapZoom.SOLAR_SYSTEM]:    'Solar System',
 };
+
+// ---------------------------------------------------------------------------
+// Hub marker click state
+// ---------------------------------------------------------------------------
+
+/** Currently selected hub ID on the map (first click selects, second switches). */
+let _selectedHubId: string | null = null;
+
+/** Listener reference so we can remove it when the map HUD is destroyed. */
+let _hubClickListener: ((e: Event) => void) | null = null;
+
+/**
+ * Handle a `map-hub-click` custom event dispatched by the render layer.
+ *
+ * Behaviour depends on whether a flight is active:
+ *   - **In-flight** (active physics): Show a status notification with the
+ *     hub name, body, and online status.
+ *   - **Tracking station / no active flight**: First click selects the hub;
+ *     second click on the same hub prompts the player to switch active hub.
+ */
+function _onHubClick(e: Event): void {
+  const s = getFCState();
+  if (!s.mapActive || !s.state) return;
+
+  const detail = (e as CustomEvent).detail as { hubId: string } | undefined;
+  if (!detail || !detail.hubId) return;
+
+  const hubId = detail.hubId;
+  const hub = getHub(s.state, hubId);
+  if (!hub) return;
+
+  const bodyDef = CELESTIAL_BODIES[hub.bodyId];
+  const bodyName = bodyDef ? bodyDef.name : hub.bodyId;
+  const statusStr = hub.online ? 'Online' : 'Offline';
+
+  // Check whether a flight is in progress (physics state exists).
+  const ps = getPhysicsState();
+  const isInFlight = ps !== null;
+
+  if (isInFlight) {
+    // In-flight: show informational notification only.
+    showPhaseNotification(
+      `${hub.name} (${bodyName}) \u2014 ${statusStr}`,
+      'status',
+    );
+    return;
+  }
+
+  // Tracking station / non-flight context: select + switch workflow.
+  if (_selectedHubId === hubId) {
+    // Second click on the same hub — prompt to switch.
+    if (hubId === s.state.activeHubId) {
+      showPhaseNotification(`${hub.name} is already the active hub`, 'status');
+    } else {
+      const confirmSwitch = window.confirm(
+        `Switch active hub to "${hub.name}" on ${bodyName}?`,
+      );
+      if (confirmSwitch) {
+        setActiveHub(s.state, hubId);
+        showPhaseNotification(`Switched to ${hub.name}`, 'status');
+      }
+    }
+    _selectedHubId = null;
+  } else {
+    // First click — select the hub.
+    _selectedHubId = hubId;
+    const facilitiesStr = hub.facilities
+      ? Object.entries(hub.facilities)
+          .filter(([, fs]) => fs && fs.tier > 0)
+          .map(([fid]) => fid)
+          .join(', ') || 'None'
+      : 'None';
+    showPhaseNotification(
+      `Selected: ${hub.name} (${bodyName}) \u2014 ${statusStr}\nFacilities: ${facilitiesStr}`,
+      'status',
+    );
+  }
+}
 
 /**
  * Toggle between the flight view and the top-down orbital map view.
@@ -326,6 +406,12 @@ export function buildMapHud(): void {
   const host: HTMLElement = s.container || document.getElementById('ui-overlay') || document.body;
   host.appendChild(hud);
 
+  // Register hub-click listener for the map.
+  if (_hubClickListener) window.removeEventListener('map-hub-click', _hubClickListener);
+  _hubClickListener = _onHubClick;
+  window.addEventListener('map-hub-click', _hubClickListener);
+  _selectedHubId = null;
+
   updateMapHud();
 }
 
@@ -435,4 +521,9 @@ export function destroyMapHud(): void {
     s.mapHud.remove();
     s.mapHud = null;
   }
+  if (_hubClickListener) {
+    window.removeEventListener('map-hub-click', _hubClickListener);
+    _hubClickListener = null;
+  }
+  _selectedHubId = null;
 }
