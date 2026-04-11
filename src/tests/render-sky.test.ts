@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import type { Graphics, Container } from 'pixi.js';
+import { Graphics, Container } from 'pixi.js';
 
 // ---------------------------------------------------------------------------
 // Mock pixi.js
@@ -268,8 +268,8 @@ describe('renderSky', () => {
 
   it('renders sky with mock graphics', () => {
     const s = getFlightRenderState();
-    const mockGfx = new MockGraphics();
-    s.skyGraphics = mockGfx as unknown as Graphics;
+    const mockGfx = new Graphics();
+    s.skyGraphics = mockGfx;
     renderSky(0, 800, 600);
     expect(mockGfx.clear).toHaveBeenCalled();
     expect(mockGfx.rect).toHaveBeenCalledWith(0, 0, 800, 600);
@@ -278,7 +278,7 @@ describe('renderSky', () => {
 
   it('renders sky at different altitudes', () => {
     const s = getFlightRenderState();
-    s.skyGraphics = new MockGraphics() as unknown as Graphics;
+    s.skyGraphics = new Graphics();
 
     renderSky(0, 800, 600);
     renderSky(30000, 800, 600);
@@ -299,8 +299,8 @@ describe('renderStars', () => {
 
   it('renders stars at high altitude with mock container', () => {
     const s = getFlightRenderState();
-    const mockContainer = new MockContainer();
-    s.starsContainer = mockContainer as unknown as Container;
+    const mockContainer = new Container();
+    s.starsContainer = mockContainer;
     generateStars();
 
     renderStars(80000, 800, 600);
@@ -310,8 +310,8 @@ describe('renderStars', () => {
 
   it('renders no stars below star fade start', () => {
     const s = getFlightRenderState();
-    const mockContainer = new MockContainer();
-    s.starsContainer = mockContainer as unknown as Container;
+    const mockContainer = new Container();
+    s.starsContainer = mockContainer;
     generateStars();
 
     renderStars(0, 800, 600);
@@ -332,8 +332,8 @@ describe('renderHorizon', () => {
 
   it('does nothing below curvature start altitude', () => {
     const s = getFlightRenderState();
-    const mockGfx = new MockGraphics();
-    s.horizonGraphics = mockGfx as unknown as Graphics;
+    const mockGfx = new Graphics();
+    s.horizonGraphics = mockGfx;
     renderHorizon(1000, 800, 600);
     expect(mockGfx.clear).toHaveBeenCalled();
     // No arc drawing at low altitude
@@ -342,8 +342,8 @@ describe('renderHorizon', () => {
 
   it('draws curved horizon at high altitude', () => {
     const s = getFlightRenderState();
-    const mockGfx = new MockGraphics();
-    s.horizonGraphics = mockGfx as unknown as Graphics;
+    const mockGfx = new Graphics();
+    s.horizonGraphics = mockGfx;
     s.camWorldY = 50000; // high altitude
     renderHorizon(50000, 800, 600);
     expect(mockGfx.arc).toHaveBeenCalled();
@@ -363,8 +363,8 @@ describe('renderWeatherHaze', () => {
 
   it('does nothing when weather visibility is near zero', () => {
     const s = getFlightRenderState();
-    const mockGfx = new MockGraphics();
-    s.hazeGraphics = mockGfx as unknown as Graphics;
+    const mockGfx = new Graphics();
+    s.hazeGraphics = mockGfx;
     s.weatherVisibility = 0;
     renderWeatherHaze(0, 800, 600);
     expect(mockGfx.rect).not.toHaveBeenCalled();
@@ -372,8 +372,8 @@ describe('renderWeatherHaze', () => {
 
   it('renders haze when visibility is above threshold', () => {
     const s = getFlightRenderState();
-    const mockGfx = new MockGraphics();
-    s.hazeGraphics = mockGfx as unknown as Graphics;
+    const mockGfx = new Graphics();
+    s.hazeGraphics = mockGfx;
     s.weatherVisibility = 0.5;
     renderWeatherHaze(1000, 800, 600, 'EARTH');
     expect(mockGfx.rect).toHaveBeenCalled();
@@ -382,8 +382,8 @@ describe('renderWeatherHaze', () => {
 
   it('renders no haze above atmosphere top', () => {
     const s = getFlightRenderState();
-    const mockGfx = new MockGraphics();
-    s.hazeGraphics = mockGfx as unknown as Graphics;
+    const mockGfx = new Graphics();
+    s.hazeGraphics = mockGfx;
     s.weatherVisibility = 1.0;
     renderWeatherHaze(200000, 800, 600, 'EARTH');
     expect(mockGfx.rect).not.toHaveBeenCalled();
@@ -391,7 +391,7 @@ describe('renderWeatherHaze', () => {
 
   it('uses dust colour for Mars', () => {
     const s = getFlightRenderState();
-    s.hazeGraphics = new MockGraphics() as unknown as Graphics;
+    s.hazeGraphics = new Graphics();
     s.weatherVisibility = 0.5;
     renderWeatherHaze(1000, 800, 600, 'MARS');
     // Should not throw — tests the Mars branch
@@ -399,8 +399,8 @@ describe('renderWeatherHaze', () => {
 
   it('skips rendering when hazeAlpha drops below 0.01', () => {
     const s = getFlightRenderState();
-    const mockGfx = new MockGraphics();
-    s.hazeGraphics = mockGfx as unknown as Graphics;
+    const mockGfx = new Graphics();
+    s.hazeGraphics = mockGfx;
     // Very low visibility → hazeAlpha = visibility * altFraction * 0.45 < 0.01
     s.weatherVisibility = 0.02;
     // Altitude near atmosphere top → altFraction near 0
@@ -410,8 +410,8 @@ describe('renderWeatherHaze', () => {
 
   it('renders haze with default bodyId when not provided', () => {
     const s = getFlightRenderState();
-    const mockGfx = new MockGraphics();
-    s.hazeGraphics = mockGfx as unknown as Graphics;
+    const mockGfx = new Graphics();
+    s.hazeGraphics = mockGfx;
     s.weatherVisibility = 0.8;
     renderWeatherHaze(5000, 800, 600);
     expect(mockGfx.rect).toHaveBeenCalled();
@@ -488,8 +488,8 @@ describe('renderStars edge cases', () => {
 
   it('renders stars at full alpha on airless body (starEnd <= 0)', () => {
     const s = getFlightRenderState();
-    const mockContainer = new MockContainer();
-    s.starsContainer = mockContainer as unknown as Container;
+    const mockContainer = new Container();
+    s.starsContainer = mockContainer;
     s.bodyVisuals.starEnd = 0;
     s.bodyVisuals.starStart = 0;
     generateStars();
@@ -501,8 +501,8 @@ describe('renderStars edge cases', () => {
 
   it('renders stars when range is 0 and altitude >= starStart', () => {
     const s = getFlightRenderState();
-    const mockContainer = new MockContainer();
-    s.starsContainer = mockContainer as unknown as Container;
+    const mockContainer = new Container();
+    s.starsContainer = mockContainer;
     s.bodyVisuals.starEnd = 50000;
     s.bodyVisuals.starStart = 50000; // range = 0
     generateStars();
@@ -514,8 +514,8 @@ describe('renderStars edge cases', () => {
 
   it('does not render stars when range is 0 and altitude < starStart', () => {
     const s = getFlightRenderState();
-    const mockContainer = new MockContainer();
-    s.starsContainer = mockContainer as unknown as Container;
+    const mockContainer = new Container();
+    s.starsContainer = mockContainer;
     s.bodyVisuals.starEnd = 50000;
     s.bodyVisuals.starStart = 50000; // range = 0
     generateStars();
@@ -527,8 +527,8 @@ describe('renderStars edge cases', () => {
 
   it('renders stars at partial alpha between starStart and starEnd', () => {
     const s = getFlightRenderState();
-    const mockContainer = new MockContainer();
-    s.starsContainer = mockContainer as unknown as Container;
+    const mockContainer = new Container();
+    s.starsContainer = mockContainer;
     generateStars();
 
     const midAlt = (s.bodyVisuals.starStart + s.bodyVisuals.starEnd) / 2;
@@ -549,8 +549,8 @@ describe('renderHorizon edge cases', () => {
 
   it('renders orbital horizon in ORBIT phase', () => {
     const s = getFlightRenderState();
-    const mockGfx = new MockGraphics();
-    s.horizonGraphics = mockGfx as unknown as Graphics;
+    const mockGfx = new Graphics();
+    s.horizonGraphics = mockGfx;
 
     renderHorizon(100000, 800, 600, 'ORBIT');
 
@@ -560,8 +560,8 @@ describe('renderHorizon edge cases', () => {
 
   it('renders orbital horizon in MANOEUVRE phase', () => {
     const s = getFlightRenderState();
-    const mockGfx = new MockGraphics();
-    s.horizonGraphics = mockGfx as unknown as Graphics;
+    const mockGfx = new Graphics();
+    s.horizonGraphics = mockGfx;
 
     renderHorizon(100000, 800, 600, 'MANOEUVRE');
 
@@ -570,8 +570,8 @@ describe('renderHorizon edge cases', () => {
 
   it('renders orbital horizon in CAPTURE phase', () => {
     const s = getFlightRenderState();
-    const mockGfx = new MockGraphics();
-    s.horizonGraphics = mockGfx as unknown as Graphics;
+    const mockGfx = new Graphics();
+    s.horizonGraphics = mockGfx;
 
     renderHorizon(100000, 800, 600, 'CAPTURE');
 
@@ -580,8 +580,8 @@ describe('renderHorizon edge cases', () => {
 
   it('returns early in TRANSFER phase', () => {
     const s = getFlightRenderState();
-    const mockGfx = new MockGraphics();
-    s.horizonGraphics = mockGfx as unknown as Graphics;
+    const mockGfx = new Graphics();
+    s.horizonGraphics = mockGfx;
 
     renderHorizon(100000, 800, 600, 'TRANSFER');
 
@@ -591,8 +591,8 @@ describe('renderHorizon edge cases', () => {
 
   it('skips flight horizon when ground is way above viewport', () => {
     const s = getFlightRenderState();
-    const mockGfx = new MockGraphics();
-    s.horizonGraphics = mockGfx as unknown as Graphics;
+    const mockGfx = new Graphics();
+    s.horizonGraphics = mockGfx;
     s.camWorldY = -1000000; // ground far below → groundScreenY = h/2 + (-1000000) * ppm → very negative
 
     renderHorizon(50000, 800, 600);
@@ -604,8 +604,8 @@ describe('renderHorizon edge cases', () => {
 
   it('renders atmosphere glow when altitude > 30000 in flight', () => {
     const s = getFlightRenderState();
-    const mockGfx = new MockGraphics();
-    s.horizonGraphics = mockGfx as unknown as Graphics;
+    const mockGfx = new Graphics();
+    s.horizonGraphics = mockGfx;
     s.camWorldY = 50000;
 
     renderHorizon(50000, 800, 600);
@@ -615,8 +615,8 @@ describe('renderHorizon edge cases', () => {
 
   it('does not render glow below 30000 altitude in flight', () => {
     const s = getFlightRenderState();
-    const mockGfx = new MockGraphics();
-    s.horizonGraphics = mockGfx as unknown as Graphics;
+    const mockGfx = new Graphics();
+    s.horizonGraphics = mockGfx;
     s.camWorldY = 10000;
 
     renderHorizon(10000, 800, 600);
@@ -626,8 +626,8 @@ describe('renderHorizon edge cases', () => {
 
   it('renders orbital glow at low orbit (high glowAlpha)', () => {
     const s = getFlightRenderState();
-    const mockGfx = new MockGraphics();
-    s.horizonGraphics = mockGfx as unknown as Graphics;
+    const mockGfx = new Graphics();
+    s.horizonGraphics = mockGfx;
 
     // Low orbit altitude: orbitalT ≈ 0, glowAlpha = 0.4 > 0.05
     renderHorizon(80000, 800, 600, 'ORBIT');
@@ -637,8 +637,8 @@ describe('renderHorizon edge cases', () => {
 
   it('skips orbital glow at very high orbit (low glowAlpha)', () => {
     const s = getFlightRenderState();
-    const mockGfx = new MockGraphics();
-    s.horizonGraphics = mockGfx as unknown as Graphics;
+    const mockGfx = new Graphics();
+    s.horizonGraphics = mockGfx;
 
     // Very high orbit: orbitalT ≈ 1, glowAlpha = 0.4 - 1*0.3 = 0.1 > 0.05 — still renders
     // Need extremely high altitude to suppress glow

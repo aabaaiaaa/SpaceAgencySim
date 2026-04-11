@@ -17,7 +17,7 @@ See `.devloop/requirements.md` for full context and rationale behind each task.
 - **Verification**: `npm run typecheck` — no errors. `npx vitest run src/tests/ui-vabStaging.test.ts` — existing integration tests still pass.
 
 ### TASK-003: Add unit tests for stagingCalc.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-002
 - **Description**: Create `src/tests/stagingCalc.test.ts` with direct unit tests for `computeStageDeltaV()`. Test cases: single engine with fuel (known delta-v), TWR at sea level and altitude, multi-engine thrust-weighted Isp averaging, jettison behavior (previous stage parts excluded), no-engine stage (returns `{ dv: 0, engines: false }`), zero fuel (dv = 0), high altitude (near-vacuum Isp). Use real types — no `as unknown as` casts. Tag 1-2 representative tests with `@smoke`. See requirements section 2.
 - **Verification**: `npx vitest run src/tests/stagingCalc.test.ts` — all tests pass with zero `as unknown as` casts in the file.
@@ -29,25 +29,25 @@ See `.devloop/requirements.md` for full context and rationale behind each task.
 - **Verification**: `npm run typecheck` — no errors. New factories compile cleanly and return properly typed objects.
 
 ### TASK-005: Migrate branchCoverage.test.ts to factories and @ts-expect-error
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-004
 - **Description**: Migrate the 44 `as unknown as` casts in `src/tests/branchCoverage.test.ts`. For casts that construct valid partial objects, use the appropriate factory. For casts that deliberately pass invalid/malformed data to test error paths, replace `as unknown as T` with `// @ts-expect-error` on the preceding line. See requirements section 4, "branchCoverage" row.
 - **Verification**: `npx vitest run src/tests/branchCoverage.test.ts` — all tests pass. Cast count in this file should drop to under 5.
 
 ### TASK-006: Migrate saveload.test.ts remaining casts to factories
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001, TASK-004
 - **Description**: Migrate the remaining `as unknown as` casts in `src/tests/saveload.test.ts` (after TASK-001 fixes the CrewStatus values). Use `makeGameState()`, `makeCrewMember()`, `makeMissionInstance()` and other factories for complex nested state objects. For any casts testing intentionally invalid data, use `@ts-expect-error`. See requirements section 4, "saveload" row.
 - **Verification**: `npx vitest run src/tests/saveload.test.ts` — all tests pass. Cast count in this file should drop to under 5.
 
 ### TASK-007: Migrate render-sky.test.ts and render-ground.test.ts to factories
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-004
 - **Description**: Migrate the 25 casts in `render-sky.test.ts` and 21 casts in `render-ground.test.ts`. Both files cast to PixiJS Graphics-like shapes — use `makeGraphics()` from `_factories.ts`. Replace each `as unknown as Graphics` (or similar) with the factory call, passing any needed overrides. See requirements section 4.
 - **Verification**: `npx vitest run src/tests/render-sky.test.ts src/tests/render-ground.test.ts` — all tests pass. Combined cast count across both files should drop to under 5.
 
 ### TASK-008: Migrate collision.test.ts to factories
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-004
 - **Description**: Migrate the 21 `as unknown as` casts in `src/tests/collision.test.ts`. These are primarily PhysicsState shapes — use `makePhysicsState()` with appropriate overrides for each test case. See requirements section 4.
 - **Verification**: `npx vitest run src/tests/collision.test.ts` — all tests pass. Cast count should drop to under 3.

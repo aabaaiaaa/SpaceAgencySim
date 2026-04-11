@@ -36,9 +36,9 @@ import {
 import { crc32 } from '../core/crc32.ts';
 import { AstronautStatus } from '../core/constants.ts';
 
-import type { GameState, CrewMember, MissionInstance, RocketDesign, FlightResult } from '../core/gameState.ts';
+import type { GameState, CrewMember, MissionInstance, OrbitalObject, RocketDesign } from '../core/gameState.ts';
 import type { SaveSlotSummary } from '../core/saveload.ts';
-import { makeCrewMember, makeMissionInstance } from './_factories.js';
+import { makeCrewMember, makeFlightResult, makeMissionInstance, makeOrbitalObject, makeRocketDesign } from './_factories.js';
 
 // Node.js Buffer is available in Vitest's Node environment but @types/node is not installed.
 declare const Buffer: {
@@ -204,7 +204,7 @@ describe('Round-trip: save and load a complex state', () => {
 
     // Flight history.
     state.flightHistory = [
-      {
+      makeFlightResult({
         id: 'flight-1',
         missionId: 'mission-comp-1',
         rocketId: 'rocket-1',
@@ -214,8 +214,8 @@ describe('Round-trip: save and load a complex state', () => {
         deltaVUsed: 1800,
         revenue: 5000,
         notes: 'Perfect flight.',
-      },
-    ] as unknown as FlightResult[];
+      }),
+    ];
 
     state.money = 123_456;
     state.loan.balance = 80_000;
@@ -342,7 +342,7 @@ describe('saveGame()', () => {
 
   it('summary.totalFlights counts flightHistory entries', async () => {
     const state = freshState();
-    state.flightHistory = [{ id: 'f1' }, { id: 'f2' }, { id: 'f3' }] as unknown as FlightResult[];
+    state.flightHistory = [makeFlightResult({ id: 'f1' }), makeFlightResult({ id: 'f2' }), makeFlightResult({ id: 'f3' })];
     const summary = await saveGame(state, 0);
     expect(summary.totalFlights).toBe(3);
   });
@@ -653,19 +653,22 @@ describe('_validateState()', () => {
   });
 
   it('throws when money is not a number', () => {
-    const s = freshState() as unknown as Record<string, unknown>;
+    const s = freshState();
+    // @ts-expect-error — deliberately passing invalid type for validation test
     s.money = '1000';
     expect(() => _validateState(s)).toThrow(/money/i);
   });
 
   it('throws when playTimeSeconds is not a number', () => {
-    const s = freshState() as unknown as Record<string, unknown>;
+    const s = freshState();
+    // @ts-expect-error — deliberately passing invalid type for validation test
     s.playTimeSeconds = null;
     expect(() => _validateState(s)).toThrow(/playTimeSeconds/i);
   });
 
   it('throws when loan is missing', () => {
-    const s = freshState() as unknown as Record<string, unknown>;
+    const s = freshState();
+    // @ts-expect-error — deliberately deleting required field for validation test
     delete s.loan;
     expect(() => _validateState(s)).toThrow(/loan/i);
   });
@@ -685,13 +688,15 @@ describe('_validateState()', () => {
   });
 
   it('throws when crew is not an array', () => {
-    const s = freshState() as unknown as Record<string, unknown>;
+    const s = freshState();
+    // @ts-expect-error — deliberately passing invalid type for validation test
     s.crew = {};
     expect(() => _validateState(s)).toThrow(/crew/i);
   });
 
   it('throws when missions is missing', () => {
-    const s = freshState() as unknown as Record<string, unknown>;
+    const s = freshState();
+    // @ts-expect-error — deliberately deleting required field for validation test
     delete s.missions;
     expect(() => _validateState(s)).toThrow(/missions/i);
   });
@@ -704,19 +709,22 @@ describe('_validateState()', () => {
   });
 
   it('throws when rockets is not an array', () => {
-    const s = freshState() as unknown as Record<string, unknown>;
+    const s = freshState();
+    // @ts-expect-error — deliberately passing invalid type for validation test
     s.rockets = 'none';
     expect(() => _validateState(s)).toThrow(/rockets/i);
   });
 
   it('throws when parts is not an array', () => {
-    const s = freshState() as unknown as Record<string, unknown>;
+    const s = freshState();
+    // @ts-expect-error — deliberately passing invalid type for validation test
     s.parts = undefined;
     expect(() => _validateState(s)).toThrow(/parts/i);
   });
 
   it('throws when flightHistory is not an array', () => {
-    const s = freshState() as unknown as Record<string, unknown>;
+    const s = freshState();
+    // @ts-expect-error — deliberately passing invalid type for validation test
     s.flightHistory = 0;
     expect(() => _validateState(s)).toThrow(/flightHistory/i);
   });
@@ -777,7 +785,7 @@ describe('exportSave()', () => {
     // Mock the minimum browser APIs needed to exercise the DOM code path.
     const state = freshState();
     state.money = 555_000;
-    state.rockets = [{ id: 'r1', name: 'Mock Rocket', parts: [], staging: { stages: [[]], unstaged: [] }, totalMass: 100, totalThrust: 50 }] as unknown as RocketDesign[];
+    state.rockets = [makeRocketDesign({ id: 'r1', name: 'Mock Rocket', parts: [], staging: { stages: [[]], unstaged: [] }, totalMass: 100, totalThrust: 50 })];
     await saveGame(state, 1, 'Browser Export');
 
     // Capture what Blob is constructed with.
@@ -841,9 +849,12 @@ describe('Save format version field', () => {
   it('loadGame() loads a version-0 (no version field) save with all migrations applied', async () => {
     // Simulate a pre-versioning save: no version field, missing fields that
     // the migration logic defaults via ??=.
-    const state = freshState() as unknown as Record<string, unknown>;
+    const state = freshState();
+    // @ts-expect-error — deliberately deleting required fields to simulate pre-versioning save
     delete state.malfunctionMode;
+    // @ts-expect-error — deliberately deleting required field
     delete state.savedDesigns;
+    // @ts-expect-error — deliberately deleting required field
     delete state.welcomeShown;
     const legacyEnvelope = {
       saveName: 'Legacy',
@@ -1004,8 +1015,8 @@ describe('Save migration edge cases', () => {
     // Inject a save with a legacy design that lacks savePrivate (triggers migration).
     const state = freshState();
     state.savedDesigns = [
-      { id: 'design-1', name: 'Legacy Rocket', savePrivate: undefined },
-    ] as unknown as RocketDesign[];
+      makeRocketDesign({ id: 'design-1', name: 'Legacy Rocket', savePrivate: undefined }),
+    ];
     const envelope = {
       saveName: 'Migration Fail',
       timestamp: new Date(0).toISOString(),
@@ -1041,22 +1052,22 @@ describe('Save migration edge cases', () => {
   it('loads a pre-version save (no version field) with all migrations applied', async () => {
     // Simulate a very old save: no version field, missing several fields
     // that were added in later iterations.
-    const state = freshState() as unknown as Record<string, unknown>;
-    delete state.malfunctionMode;
-    delete state.savedDesigns;
-    delete state.welcomeShown;
-    delete state.autoSaveEnabled;
-    delete state.debugMode;
-    delete state.sciencePoints;
-    delete state.scienceLog;
-    delete state.achievements;
-    delete state.partInventory;
+    const rawState = JSON.parse(JSON.stringify(freshState())) as Record<string, unknown>;
+    delete rawState.malfunctionMode;
+    delete rawState.savedDesigns;
+    delete rawState.welcomeShown;
+    delete rawState.autoSaveEnabled;
+    delete rawState.debugMode;
+    delete rawState.sciencePoints;
+    delete rawState.scienceLog;
+    delete rawState.achievements;
+    delete rawState.partInventory;
 
     const legacyEnvelope = {
       saveName: 'Ancient Save',
       timestamp: new Date(0).toISOString(),
       // No "version" field at all — pre-versioning save
-      state: JSON.parse(JSON.stringify(state)),
+      state: rawState,
     };
     localStorage.setItem('spaceAgencySave_0', JSON.stringify(legacyEnvelope));
 
@@ -1100,23 +1111,23 @@ describe('Save migration edge cases', () => {
 
 describe('_validateNestedStructures()', () => {
   // Helper: a valid mission entry.
-  function validMission(id = 'mission-1'): Partial<MissionInstance> {
-    return { id, title: 'Test Mission', reward: 5000, description: 'desc', deadline: '2025-12-31' };
+  function validMission(id = 'mission-1'): MissionInstance {
+    return makeMissionInstance({ id, title: 'Test Mission', reward: 5000, description: 'desc', deadline: '2025-12-31' });
   }
 
   // Helper: a valid crew entry.
-  function validCrew(name = 'Alice'): Partial<CrewMember> {
-    return { id: 'crew-1', name, status: AstronautStatus.ACTIVE, skills: { piloting: 50, engineering: 50, science: 50 }, salary: 5000, hireDate: '2025-01-01' };
+  function validCrew(name = 'Alice'): CrewMember {
+    return makeCrewMember({ id: 'crew-1', name, status: AstronautStatus.ACTIVE, skills: { piloting: 50, engineering: 50, science: 50 }, salary: 5000, hireDate: '2025-01-01' });
   }
 
   // Helper: a valid orbital object entry.
-  function validOrbitalObject(id = 'obj-1'): Record<string, unknown> {
-    return { id, bodyId: 'EARTH', type: 'SATELLITE', name: 'Sat-1', elements: { a: 7000, e: 0.01, i: 0 } };
+  function validOrbitalObject(id = 'obj-1'): OrbitalObject {
+    return makeOrbitalObject({ id, bodyId: 'EARTH', type: 'SATELLITE', name: 'Sat-1' });
   }
 
   // Helper: a valid saved design entry.
-  function validDesign(name = 'Rocket-1'): Partial<RocketDesign> {
-    return { id: 'design-1', name, parts: [{ partId: 'pod', position: { x: 0, y: 0 } }], staging: { stages: [], unstaged: [] }, totalMass: 100, totalThrust: 50 };
+  function validDesign(name = 'Rocket-1'): RocketDesign {
+    return makeRocketDesign({ id: 'design-1', name, parts: [{ partId: 'pod', position: { x: 0, y: 0 } }], staging: { stages: [], unstaged: [] }, totalMass: 100, totalThrust: 50 });
   }
 
   // Helper: a valid contract entry.
@@ -1131,9 +1142,10 @@ describe('_validateNestedStructures()', () => {
     const state = freshState();
     state.missions.accepted = [
       validMission('m1'),
+      // @ts-expect-error — deliberately including invalid entry (missing id) for validation test
       { title: 'No ID', reward: 100 }, // missing id
       validMission('m3'),
-    ] as unknown as MissionInstance[];
+    ];
 
     _validateNestedStructures(state);
 
@@ -1149,8 +1161,9 @@ describe('_validateNestedStructures()', () => {
     const state = freshState();
     state.missions.completed = [
       validMission('m1'),
+      // @ts-expect-error — deliberately including invalid entry (missing reward) for validation test
       { id: 'm2', title: 'No Reward' }, // missing reward
-    ] as unknown as MissionInstance[];
+    ];
 
     _validateNestedStructures(state);
 
@@ -1162,7 +1175,8 @@ describe('_validateNestedStructures()', () => {
   it('filters out null and non-object mission entries', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const state = freshState();
-    state.missions.accepted = [null, 42, 'garbage', validMission('m1')] as unknown as MissionInstance[];
+    // @ts-expect-error — deliberately including null, number, and string entries for validation test
+    state.missions.accepted = [null, 42, 'garbage', validMission('m1')];
 
     _validateNestedStructures(state);
 
@@ -1178,9 +1192,10 @@ describe('_validateNestedStructures()', () => {
     const state = freshState();
     state.crew = [
       validCrew('Alice'),
+      // @ts-expect-error — deliberately including invalid entry (missing name) for validation test
       { id: 'c2', status: AstronautStatus.ACTIVE, skills: { piloting: 10, engineering: 10, science: 10 } }, // missing name
       validCrew('Bob'),
-    ] as unknown as CrewMember[];
+    ];
 
     _validateNestedStructures(state);
 
@@ -1196,8 +1211,9 @@ describe('_validateNestedStructures()', () => {
     const state = freshState();
     state.crew = [
       validCrew('Alice'),
+      // @ts-expect-error — deliberately including invalid entry (null status) for validation test
       { id: 'c2', name: 'Bad Status', status: null, skills: { piloting: 0, engineering: 0, science: 0 } },
-    ] as unknown as CrewMember[];
+    ];
 
     _validateNestedStructures(state);
 
@@ -1210,9 +1226,10 @@ describe('_validateNestedStructures()', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const state = freshState();
     state.crew = [
+      // @ts-expect-error — deliberately including invalid entry (null skills) for validation test
       { id: 'c1', name: 'NoSkills', status: AstronautStatus.ACTIVE, skills: null },
       validCrew('Bob'),
-    ] as unknown as CrewMember[];
+    ];
 
     _validateNestedStructures(state);
 
@@ -1228,9 +1245,10 @@ describe('_validateNestedStructures()', () => {
     const state = freshState();
     state.orbitalObjects = [
       validOrbitalObject('o1'),
+      // @ts-expect-error — deliberately including invalid entry (missing elements) for validation test
       { id: 'o2', bodyId: 'EARTH' }, // missing elements
       validOrbitalObject('o3'),
-    ] as unknown as GameState['orbitalObjects'];
+    ];
 
     _validateNestedStructures(state);
 
@@ -1247,8 +1265,9 @@ describe('_validateNestedStructures()', () => {
     const state = freshState();
     state.savedDesigns = [
       validDesign('Rocket-1'),
+      // @ts-expect-error — deliberately including invalid entry (missing parts) for validation test
       { id: 'd2', name: 'No Parts' }, // missing parts
-    ] as unknown as RocketDesign[];
+    ];
 
     _validateNestedStructures(state);
 
@@ -1281,11 +1300,11 @@ describe('_validateNestedStructures()', () => {
   it('preserves all valid entries when nothing is corrupted', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const state = freshState();
-    state.missions.accepted = [validMission('m1'), validMission('m2')] as unknown as MissionInstance[];
-    state.missions.completed = [validMission('m3')] as unknown as MissionInstance[];
-    state.crew = [validCrew('Alice'), validCrew('Bob')] as unknown as CrewMember[];
-    state.orbitalObjects = [validOrbitalObject('o1')] as unknown as GameState['orbitalObjects'];
-    state.savedDesigns = [validDesign('R1')] as unknown as RocketDesign[];
+    state.missions.accepted = [makeMissionInstance({ id: 'm1' }), makeMissionInstance({ id: 'm2' })];
+    state.missions.completed = [makeMissionInstance({ id: 'm3' })];
+    state.crew = [makeCrewMember({ name: 'Alice' }), makeCrewMember({ name: 'Bob' })];
+    state.orbitalObjects = [makeOrbitalObject({ id: 'o1' })];
+    state.savedDesigns = [makeRocketDesign({ name: 'R1' })];
     state.contracts = { board: [], active: [validContract('c1')], completed: [], failed: [] } as unknown as GameState['contracts'];
 
     _validateNestedStructures(state);
@@ -1304,9 +1323,12 @@ describe('_validateNestedStructures()', () => {
   // --- Skips missing optional arrays ---
 
   it('does not crash when optional arrays are absent', () => {
-    const state = freshState() as unknown as Record<string, unknown>;
+    const state = freshState();
+    // @ts-expect-error — deliberately deleting required field to simulate legacy save
     delete state.orbitalObjects;
+    // @ts-expect-error — deliberately deleting required field to simulate legacy save
     delete state.savedDesigns;
+    // @ts-expect-error — deliberately deleting required field to simulate legacy save
     delete state.contracts;
 
     expect(() => _validateNestedStructures(state)).not.toThrow();
@@ -1319,8 +1341,9 @@ describe('_validateNestedStructures()', () => {
     const state = freshState();
     state.crew = [
       validCrew('Alice'),
+      // @ts-expect-error — deliberately including invalid entry (name is number, skills is empty) for validation test
       { id: 'bad', name: 123, status: AstronautStatus.ACTIVE, skills: {} }, // name is not a string
-    ] as unknown as CrewMember[];
+    ];
 
     _validateState(state);
 
@@ -1336,12 +1359,14 @@ describe('_validateNestedStructures()', () => {
     const state = freshState();
     state.missions.accepted = [
       validMission('m1'),
+      // @ts-expect-error — deliberately including invalid entry (reward is string) for validation test
       { title: 'Corrupt', reward: 'not a number' }, // invalid
-    ] as unknown as MissionInstance[];
+    ];
     state.crew = [
       validCrew('Good'),
+      // @ts-expect-error — deliberately including null entry for validation test
       null, // invalid
-    ] as unknown as CrewMember[];
+    ];
 
     const envelope = {
       saveName: 'Nested Validation',

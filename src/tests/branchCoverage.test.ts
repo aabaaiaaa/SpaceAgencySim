@@ -23,9 +23,8 @@ import type { GameState, FlightState, FlightEvent, TransferState, PowerState } f
 import type { PhysicsState, LegEntry, ParachuteEntry } from '../core/physics.ts';
 import type { DebrisState } from '../core/staging.ts';
 import type { FuelSystemState } from '../core/fuelsystem.ts';
-import type { DifficultySettings } from '../core/constants.ts';
 import type { LogLevel } from '../core/logger.ts';
-import { makePhysicsState, makeCrewMember, makeRecoveryPS } from './_factories.js';
+import { makePhysicsState, makeCrewMember, makeMalfunctionPS, makeGameState } from './_factories.js';
 
 // ---------------------------------------------------------------------------
 // settings.ts — updateDifficultySettings with null/undefined difficultySettings
@@ -43,8 +42,9 @@ import { DEFAULT_DIFFICULTY_SETTINGS } from '../core/constants.ts';
 
 describe('settings.ts branch coverage', () => {
   it('updateDifficultySettings initialises from defaults when difficultySettings is null', () => {
-    const state = { difficultySettings: null } as unknown as GameState;
-    updateDifficultySettings(state, { malfunctionFrequency: 'OFF' } as unknown as Partial<DifficultySettings>);
+    // @ts-expect-error — deliberately passing null difficultySettings to test null-guard
+    const state = makeGameState({ difficultySettings: null });
+    updateDifficultySettings(state, { malfunctionFrequency: MalfunctionFrequency.OFF });
     expect(state.difficultySettings).toBeDefined();
     expect(state.difficultySettings!.malfunctionFrequency).toBe('OFF');
     // Other fields should have been initialised from defaults
@@ -52,19 +52,21 @@ describe('settings.ts branch coverage', () => {
   });
 
   it('updateDifficultySettings initialises from defaults when difficultySettings is undefined', () => {
-    const state = {} as unknown as GameState;
-    updateDifficultySettings(state, { weatherSeverity: 'CALM' } as unknown as Partial<DifficultySettings>);
+    const state = makeGameState({ difficultySettings: undefined });
+    updateDifficultySettings(state, { weatherSeverity: WeatherSeverity.MILD });
     expect(state.difficultySettings).toBeDefined();
-    expect(state.difficultySettings!.weatherSeverity).toBe('CALM');
+    expect(state.difficultySettings!.weatherSeverity).toBe(WeatherSeverity.MILD);
   });
 
   it('getDifficultySettings returns defaults when state is null', () => {
-    const result = getDifficultySettings(null as unknown as GameState);
+    // @ts-expect-error — deliberately passing null to test null-guard
+    const result = getDifficultySettings(null);
     expect(result).toEqual({ ...DEFAULT_DIFFICULTY_SETTINGS });
   });
 
   it('getDifficultySettings fills missing fields with defaults', () => {
-    const state = { difficultySettings: { malfunctionFrequency: 'HIGH' } } as unknown as GameState;
+    // @ts-expect-error — deliberately passing partial difficultySettings to test field-fill
+    const state = makeGameState({ difficultySettings: { malfunctionFrequency: 'HIGH' } });
     const result = getDifficultySettings(state);
     expect(result.malfunctionFrequency).toBe('HIGH');
     expect(result.weatherSeverity).toBe(DEFAULT_DIFFICULTY_SETTINGS.weatherSeverity);
@@ -185,7 +187,7 @@ import {
   syncStagingWithAssembly,
   assignPartToStage,
 } from '../core/rocketbuilder.ts';
-import { PartType, ControlMode, MalfunctionMode, MalfunctionType, GameMode } from '../core/constants.ts';
+import { PartType, ControlMode, MalfunctionMode, MalfunctionType, GameMode, MalfunctionFrequency, WeatherSeverity, FinancialPressure, InjuryDuration } from '../core/constants.ts';
 
 describe('fuelsystem.ts branch coverage', () => {
   it('SRB with zero fuel is removed immediately from firingEngines', () => {
@@ -269,7 +271,8 @@ describe('legs.ts branch coverage', () => {
   });
 
   it('deployLandingLeg is no-op when legStates is falsy', () => {
-    const ps = { legStates: null } as unknown as { legStates: Map<string, LegEntry> };
+    const ps: { legStates: Map<string, LegEntry> | null } = { legStates: null };
+    // @ts-expect-error — deliberately passing null legStates to test null-guard
     deployLandingLeg(ps, 'leg-1');
     // Should not throw
     expect(ps.legStates).toBeNull();
@@ -288,7 +291,8 @@ describe('legs.ts branch coverage', () => {
   });
 
   it('retractLandingLeg is no-op when legStates is falsy', () => {
-    const ps = { legStates: null } as unknown as { legStates: Map<string, LegEntry> };
+    const ps: { legStates: Map<string, LegEntry> | null } = { legStates: null };
+    // @ts-expect-error — deliberately passing null legStates to test null-guard
     retractLandingLeg(ps, 'leg-1');
     expect(ps.legStates).toBeNull();
   });
@@ -374,8 +378,9 @@ describe('legs.ts branch coverage', () => {
   });
 
   it('tickLegs is no-op when legStates is falsy', () => {
-    const ps = { legStates: null, posY: 0 } as unknown as { legStates: Map<string, LegEntry>; posY: number };
+    const ps: { legStates: Map<string, LegEntry> | null; posY: number } = { legStates: null, posY: 0 };
     const flightState: { events: FlightEvent[]; timeElapsed: number } = { events: [], timeElapsed: 0 };
+    // @ts-expect-error — deliberately passing null legStates to test null-guard
     tickLegs(ps, { parts: new Map() }, flightState, 0.5);
     expect(flightState.events.length).toBe(0);
   });
@@ -431,13 +436,10 @@ describe('malfunction.ts branch coverage', () => {
     const engineId = addPartToAssembly(assembly, 'engine-spark', 0, -55);
     connectParts(assembly, probeId, 1, engineId, 0);
 
-    const ps = {
+    const ps = makeMalfunctionPS({
       activeParts: new Set([probeId, engineId]),
       firingEngines: new Set([engineId]),
-      fuelStore: new Map<string, number>(),
-      malfunctions: new Map<string, { type: string; recovered: boolean }>(),
-      malfunctionChecked: new Set<string>(),
-    } as unknown as MalfunctionPS;
+    }) as MalfunctionPS;
 
     const flightState = makeFlightState();
     const gameState = createGameState();
@@ -447,35 +449,30 @@ describe('malfunction.ts branch coverage', () => {
 
     checkMalfunctions(ps, assembly, flightState, gameState);
     // No malfunctions should have been applied
-    expect((ps as unknown as { malfunctions: Map<string, unknown> }).malfunctions.size).toBe(0);
+    expect(ps.malfunctions!.size).toBe(0);
   });
 
   it('checkMalfunctions skips when malfunctionMult is 0 (OFF frequency)', () => {
     const assembly = createRocketAssembly();
     const probeId = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
 
-    const ps = {
+    const ps = makeMalfunctionPS({
       activeParts: new Set([probeId]),
-      firingEngines: new Set<string>(),
-      fuelStore: new Map<string, number>(),
-      malfunctions: new Map<string, { type: string; recovered: boolean }>(),
-      malfunctionChecked: new Set<string>(),
-    } as unknown as MalfunctionPS;
+    }) as MalfunctionPS;
 
     const flightState = makeFlightState();
     const gameState = createGameState();
-    gameState.difficultySettings = { malfunctionFrequency: 'OFF', weatherSeverity: 'NORMAL', financialPressure: 'NORMAL', injuryDuration: 'NORMAL' } as unknown as DifficultySettings;
+    gameState.difficultySettings = { malfunctionFrequency: MalfunctionFrequency.OFF, weatherSeverity: WeatherSeverity.NORMAL, financialPressure: FinancialPressure.NORMAL, injuryDuration: InjuryDuration.NORMAL };
     gameState.malfunctionMode = MalfunctionMode.NORMAL;
 
     checkMalfunctions(ps, assembly, flightState, gameState);
-    expect((ps as unknown as { malfunctions: Map<string, unknown> }).malfunctions.size).toBe(0);
+    expect(ps.malfunctions!.size).toBe(0);
   });
 
   it('attemptRecovery ENGINE_FLAMEOUT can fail (roll >= 0.5)', () => {
-    const ps = makeRecoveryPS({
+    const ps = makeMalfunctionPS({
       malfunctions: new Map([['eng-1', { type: MalfunctionType.ENGINE_FLAMEOUT, recovered: false }]]),
-      _gameState: { malfunctionMode: MalfunctionMode.NORMAL },
-    }) as unknown as RecoveryPS;
+    }) as RecoveryPS;
 
     // Force a high random roll to ensure failure
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
@@ -486,10 +483,9 @@ describe('malfunction.ts branch coverage', () => {
   });
 
   it('attemptRecovery FUEL_TANK_LEAK can fail (roll >= 0.6)', () => {
-    const ps = makeRecoveryPS({
+    const ps = makeMalfunctionPS({
       malfunctions: new Map([['tank-1', { type: MalfunctionType.FUEL_TANK_LEAK, recovered: false }]]),
-      _gameState: { malfunctionMode: MalfunctionMode.NORMAL },
-    }) as unknown as RecoveryPS;
+    }) as RecoveryPS;
 
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
     const result = attemptRecovery(ps, 'tank-1');
@@ -498,10 +494,9 @@ describe('malfunction.ts branch coverage', () => {
   });
 
   it('attemptRecovery SCIENCE_INSTRUMENT_FAILURE can fail (roll >= 0.4)', () => {
-    const ps = makeRecoveryPS({
+    const ps = makeMalfunctionPS({
       malfunctions: new Map([['sci-1', { type: MalfunctionType.SCIENCE_INSTRUMENT_FAILURE, recovered: false }]]),
-      _gameState: { malfunctionMode: MalfunctionMode.NORMAL },
-    }) as unknown as RecoveryPS;
+    }) as RecoveryPS;
 
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
     const result = attemptRecovery(ps, 'sci-1');
@@ -510,10 +505,9 @@ describe('malfunction.ts branch coverage', () => {
   });
 
   it('attemptRecovery LANDING_LEGS_STUCK can fail (roll >= 0.7)', () => {
-    const ps = makeRecoveryPS({
+    const ps = makeMalfunctionPS({
       malfunctions: new Map([['leg-1', { type: MalfunctionType.LANDING_LEGS_STUCK, recovered: false }]]),
-      _gameState: { malfunctionMode: MalfunctionMode.NORMAL },
-    }) as unknown as RecoveryPS;
+    }) as RecoveryPS;
 
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
     const result = attemptRecovery(ps, 'leg-1');
@@ -523,9 +517,9 @@ describe('malfunction.ts branch coverage', () => {
 
   it('attemptRecovery DECOUPLER_STUCK succeeds (always)', () => {
     const malfunctions = new Map([['dec-2', { type: MalfunctionType.DECOUPLER_STUCK, recovered: false }]]);
-    const ps = makeRecoveryPS({
+    const ps = makeMalfunctionPS({
       malfunctions,
-    }) as unknown as RecoveryPS;
+    }) as RecoveryPS;
     const gs = createGameState();
     gs.malfunctionMode = MalfunctionMode.FORCED;
 
@@ -536,9 +530,9 @@ describe('malfunction.ts branch coverage', () => {
   });
 
   it('attemptRecovery FUEL_TANK_LEAK succeeds with low roll', () => {
-    const ps = makeRecoveryPS({
+    const ps = makeMalfunctionPS({
       malfunctions: new Map([['tank-2', { type: MalfunctionType.FUEL_TANK_LEAK, recovered: false }]]),
-    }) as unknown as RecoveryPS;
+    }) as RecoveryPS;
 
     vi.spyOn(Math, 'random').mockReturnValue(0.1); // < 0.6 threshold
     const result = attemptRecovery(ps, 'tank-2');
@@ -547,9 +541,9 @@ describe('malfunction.ts branch coverage', () => {
   });
 
   it('attemptRecovery LANDING_LEGS_STUCK succeeds with low roll', () => {
-    const ps = makeRecoveryPS({
+    const ps = makeMalfunctionPS({
       malfunctions: new Map([['leg-2', { type: MalfunctionType.LANDING_LEGS_STUCK, recovered: false }]]),
-    }) as unknown as RecoveryPS;
+    }) as RecoveryPS;
 
     vi.spyOn(Math, 'random').mockReturnValue(0.1); // < 0.7 threshold
     const result = attemptRecovery(ps, 'leg-2');
@@ -558,9 +552,9 @@ describe('malfunction.ts branch coverage', () => {
   });
 
   it('attemptRecovery SCIENCE_INSTRUMENT_FAILURE succeeds with low roll', () => {
-    const ps = makeRecoveryPS({
+    const ps = makeMalfunctionPS({
       malfunctions: new Map([['sci-2', { type: MalfunctionType.SCIENCE_INSTRUMENT_FAILURE, recovered: false }]]),
-    }) as unknown as RecoveryPS;
+    }) as RecoveryPS;
 
     vi.spyOn(Math, 'random').mockReturnValue(0.1); // < 0.4 threshold
     const result = attemptRecovery(ps, 'sci-2');
@@ -570,10 +564,10 @@ describe('malfunction.ts branch coverage', () => {
 
   it('attemptRecovery ENGINE_FLAMEOUT succeeds with low roll', () => {
     const firingEngines = new Set<string>();
-    const ps = makeRecoveryPS({
+    const ps = makeMalfunctionPS({
       malfunctions: new Map([['eng-2', { type: MalfunctionType.ENGINE_FLAMEOUT, recovered: false }]]),
       firingEngines,
-    }) as unknown as RecoveryPS;
+    }) as RecoveryPS;
 
     vi.spyOn(Math, 'random').mockReturnValue(0.1); // < 0.5 threshold
     const result = attemptRecovery(ps, 'eng-2');
@@ -583,45 +577,45 @@ describe('malfunction.ts branch coverage', () => {
   });
 
   it('attemptRecovery ENGINE_REDUCED_THRUST always fails', () => {
-    const ps = makeRecoveryPS({
+    const ps = makeMalfunctionPS({
       malfunctions: new Map([['eng-1', { type: MalfunctionType.ENGINE_REDUCED_THRUST, recovered: false }]]),
-    }) as unknown as RecoveryPS;
+    }) as RecoveryPS;
 
     const result = attemptRecovery(ps, 'eng-1');
     expect(result.success).toBe(false);
   });
 
   it('attemptRecovery PARACHUTE_PARTIAL always fails', () => {
-    const ps = makeRecoveryPS({
+    const ps = makeMalfunctionPS({
       malfunctions: new Map([['ch-1', { type: MalfunctionType.PARACHUTE_PARTIAL, recovered: false }]]),
-    }) as unknown as RecoveryPS;
+    }) as RecoveryPS;
 
     const result = attemptRecovery(ps, 'ch-1');
     expect(result.success).toBe(false);
   });
 
   it('attemptRecovery SRB_EARLY_BURNOUT always fails', () => {
-    const ps = makeRecoveryPS({
+    const ps = makeMalfunctionPS({
       malfunctions: new Map([['srb-1', { type: MalfunctionType.SRB_EARLY_BURNOUT, recovered: false }]]),
-    }) as unknown as RecoveryPS;
+    }) as RecoveryPS;
 
     const result = attemptRecovery(ps, 'srb-1');
     expect(result.success).toBe(false);
   });
 
   it('attemptRecovery DECOUPLER_STUCK always succeeds', () => {
-    const ps = makeRecoveryPS({
+    const ps = makeMalfunctionPS({
       malfunctions: new Map([['dec-1', { type: MalfunctionType.DECOUPLER_STUCK, recovered: false }]]),
-    }) as unknown as RecoveryPS;
+    }) as RecoveryPS;
 
     const result = attemptRecovery(ps, 'dec-1');
     expect(result.success).toBe(true);
   });
 
   it('attemptRecovery returns no-op for already recovered malfunction', () => {
-    const ps = makeRecoveryPS({
+    const ps = makeMalfunctionPS({
       malfunctions: new Map([['eng-1', { type: MalfunctionType.ENGINE_FLAMEOUT, recovered: true }]]),
-    }) as unknown as RecoveryPS;
+    }) as RecoveryPS;
 
     const result = attemptRecovery(ps, 'eng-1');
     expect(result.success).toBe(false);
@@ -629,16 +623,17 @@ describe('malfunction.ts branch coverage', () => {
   });
 
   it('attemptRecovery returns no-op for non-existent malfunction', () => {
-    const ps = makeRecoveryPS() as unknown as RecoveryPS;
+    const ps = makeMalfunctionPS() as RecoveryPS;
 
     const result = attemptRecovery(ps, 'missing');
     expect(result.success).toBe(false);
   });
 
   it('attemptRecovery unknown type returns failure', () => {
-    const ps = makeRecoveryPS({
+    const ps = makeMalfunctionPS({
+      // @ts-expect-error — deliberately passing invalid malfunction type to test default case
       malfunctions: new Map([['x', { type: 'UNKNOWN_TYPE', recovered: false }]]),
-    }) as unknown as RecoveryPS;
+    }) as RecoveryPS;
 
     const result = attemptRecovery(ps, 'x');
     expect(result.success).toBe(false);
@@ -651,13 +646,10 @@ describe('malfunction.ts branch coverage', () => {
     const engineId = addPartToAssembly(assembly, 'engine-spark', 0, -55);
     connectParts(assembly, probeId, 1, engineId, 0);
 
-    const ps = {
+    const ps = makeMalfunctionPS({
       activeParts: new Set([probeId, engineId]),
       firingEngines: new Set([engineId]),
-      fuelStore: new Map<string, number>(),
-      malfunctions: new Map<string, { type: string; recovered: boolean }>(),
-      malfunctionChecked: new Set<string>(),
-    } as unknown as MalfunctionPS;
+    }) as MalfunctionPS;
 
     const flightState = makeFlightState();
     flightState.crewIds = ['crew-1'];
@@ -670,7 +662,7 @@ describe('malfunction.ts branch coverage', () => {
     // With high engineering skill, malfunction chance is reduced
     vi.spyOn(Math, 'random').mockReturnValue(0.99); // Always pass reliability check
     checkMalfunctions(ps, assembly, flightState, gameState);
-    expect((ps as unknown as { malfunctions: Map<string, unknown> }).malfunctions.size).toBe(0);
+    expect(ps.malfunctions!.size).toBe(0);
     vi.restoreAllMocks();
   });
 });
@@ -1383,36 +1375,36 @@ describe('physics.ts additional branch coverage', () => {
 
 describe('settings.ts additional branch coverage', () => {
   it('getMalfunctionMultiplier with unknown frequency returns 1.0', () => {
-    const state = { difficultySettings: { malfunctionFrequency: 'NONEXISTENT' } } as unknown as GameState;
+    // @ts-expect-error — deliberately passing invalid enum value to test fallback
+    const state = makeGameState({ difficultySettings: { malfunctionFrequency: 'NONEXISTENT', weatherSeverity: 'normal', financialPressure: 'normal', injuryDuration: 'normal' } });
     const result = getMalfunctionMultiplier(state);
     expect(result).toBe(1.0);
   });
 
   it('getWeatherSeverityMultipliers with unknown severity returns NORMAL', () => {
-    const state = { difficultySettings: { weatherSeverity: 'NONEXISTENT' } } as unknown as GameState;
+    // @ts-expect-error — deliberately passing invalid enum value to test fallback
+    const state = makeGameState({ difficultySettings: { malfunctionFrequency: 'normal', weatherSeverity: 'NONEXISTENT', financialPressure: 'normal', injuryDuration: 'normal' } });
     const result = getWeatherSeverityMultipliers(state);
     expect(result).toBeDefined();
   });
 
   it('getFinancialMultipliers with unknown pressure returns NORMAL', () => {
-    const state = { difficultySettings: { financialPressure: 'NONEXISTENT' } } as unknown as GameState;
+    // @ts-expect-error — deliberately passing invalid enum value to test fallback
+    const state = makeGameState({ difficultySettings: { malfunctionFrequency: 'normal', weatherSeverity: 'normal', financialPressure: 'NONEXISTENT', injuryDuration: 'normal' } });
     const result = getFinancialMultipliers(state);
     expect(result).toBeDefined();
   });
 
   it('getInjuryDurationMultiplier with unknown duration returns 1.0', () => {
-    const state = { difficultySettings: { injuryDuration: 'NONEXISTENT' } } as unknown as GameState;
+    // @ts-expect-error — deliberately passing invalid enum value to test fallback
+    const state = makeGameState({ difficultySettings: { malfunctionFrequency: 'normal', weatherSeverity: 'normal', financialPressure: 'normal', injuryDuration: 'NONEXISTENT' } });
     const result = getInjuryDurationMultiplier(state);
     expect(result).toBe(1.0);
   });
 
   it('getDifficultySettings with partial null fields returns defaults', () => {
-    const state = { difficultySettings: {
-      malfunctionFrequency: null,
-      weatherSeverity: null,
-      financialPressure: null,
-      injuryDuration: null,
-    }} as unknown as GameState;
+    // @ts-expect-error — deliberately passing null fields to test null-guard fallback
+    const state = makeGameState({ difficultySettings: { malfunctionFrequency: null, weatherSeverity: null, financialPressure: null, injuryDuration: null } });
     const result = getDifficultySettings(state);
     expect(result.malfunctionFrequency).toBe(DEFAULT_DIFFICULTY_SETTINGS.malfunctionFrequency);
     expect(result.weatherSeverity).toBe(DEFAULT_DIFFICULTY_SETTINGS.weatherSeverity);
@@ -1443,7 +1435,8 @@ describe('challenges.ts branch coverage', () => {
 
   it('extractScoreMetric falls back to altitude when maxAltitude is undefined', () => {
     const fs = makeFlightState();
-    (fs as unknown as Record<string, unknown>).maxAltitude = undefined;
+    // @ts-expect-error — deliberately setting required field to undefined to test fallback
+    fs.maxAltitude = undefined;
     fs.altitude = 30000;
     const result = extractScoreMetric('maxAltitude', fs, null);
     expect(result).toBe(30000);
@@ -1451,8 +1444,10 @@ describe('challenges.ts branch coverage', () => {
 
   it('extractScoreMetric returns null for maxAltitude when both undefined', () => {
     const fs = makeFlightState();
-    (fs as unknown as Record<string, unknown>).maxAltitude = undefined;
-    (fs as unknown as Record<string, unknown>).altitude = undefined;
+    // @ts-expect-error — deliberately setting required field to undefined to test fallback
+    fs.maxAltitude = undefined;
+    // @ts-expect-error — deliberately setting required field to undefined to test fallback
+    fs.altitude = undefined;
     const result = extractScoreMetric('maxAltitude', fs, null);
     expect(result).toBeNull();
   });
@@ -1466,7 +1461,8 @@ describe('challenges.ts branch coverage', () => {
 
   it('extractScoreMetric falls back to velocity when maxVelocity undefined', () => {
     const fs = makeFlightState();
-    (fs as unknown as Record<string, unknown>).maxVelocity = undefined;
+    // @ts-expect-error — deliberately setting required field to undefined to test fallback
+    fs.maxVelocity = undefined;
     fs.velocity = 1500;
     const result = extractScoreMetric('maxVelocity', fs, null);
     expect(result).toBe(1500);
@@ -1474,8 +1470,10 @@ describe('challenges.ts branch coverage', () => {
 
   it('extractScoreMetric returns null for maxVelocity when both undefined', () => {
     const fs = makeFlightState();
-    (fs as unknown as Record<string, unknown>).maxVelocity = undefined;
-    (fs as unknown as Record<string, unknown>).velocity = undefined;
+    // @ts-expect-error — deliberately setting required field to undefined to test fallback
+    fs.maxVelocity = undefined;
+    // @ts-expect-error — deliberately setting required field to undefined to test fallback
+    fs.velocity = undefined;
     const result = extractScoreMetric('maxVelocity', fs, null);
     expect(result).toBeNull();
   });
@@ -1496,7 +1494,7 @@ describe('challenges.ts branch coverage', () => {
 
   it('extractScoreMetric returns fuelRemaining from ps', () => {
     const fs = makeFlightState();
-    const ps = { totalFuel: 200, maxFuel: 400 } as unknown as PhysicsState;
+    const ps = { ...makePhysicsState(), totalFuel: 200, maxFuel: 400 };
     const result = extractScoreMetric('fuelRemaining', fs, ps);
     expect(result).toBe(50); // 200/400 * 100
   });

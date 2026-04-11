@@ -31,14 +31,12 @@ import {
   addStageToConfig,
 } from '../core/rocketbuilder.ts';
 import { createFlightState } from '../core/gameState.ts';
-import { makePhysicsState } from './_factories.js';
+import { makePhysicsState, makeDebrisState, makeSepDebris } from './_factories.js';
 
 import type { PhysicsState, RocketAssembly } from '../core/physics.ts';
 import type { FlightState, FlightEvent } from '../core/gameState.ts';
 import type { Asteroid } from '../core/asteroidBelt.ts';
 import type { StagingConfig } from '../core/rocketbuilder.ts';
-import type { DebrisState } from '../core/staging.ts';
-
 type SepDebrisParam = Parameters<typeof applySeparationImpulse>[1];
 
 // ---------------------------------------------------------------------------
@@ -234,16 +232,11 @@ describe('Collision response', () => {
     const ps = makePhysicsState({
       posX: 0, posY: pos1Y, velX: vel1X, velY: vel1Y,
       activeParts: new Set([id1]),
-      debris: [{
+      debris: [makeDebrisState({
         id: 'debris-test',
-        posX: 0, posY: pos2Y, velX: vel2X, velY: vel2Y, angle: 0,
-        angularVelocity: 0,
-        landed: false, crashed: false,
+        posX: 0, posY: pos2Y, velX: vel2X, velY: vel2Y,
         activeParts: new Set([id2]),
-        fuelStore: new Map<string, number>(),
-        firingEngines: new Set<string>(),
-        collisionCooldown: 0,
-      } as unknown as DebrisState],
+      })],
     });
 
     // Momentum before.
@@ -274,16 +267,12 @@ describe('Collision response', () => {
     const ps = makePhysicsState({
       posX: 0, posY: 100.5, velX: 0, velY: -5,
       activeParts: new Set([lightId]),
-      debris: [{
+      debris: [makeDebrisState({
         id: 'debris-heavy',
-        posX: 0, posY: 100, velX: 0, velY: 5, angle: 0,
-        angularVelocity: 0,
-        landed: false, crashed: false,
+        posY: 100, velY: 5,
         activeParts: new Set([heavyId]),
         fuelStore: new Map<string, number>([[heavyId, 500]]),  // Heavy: 50 + 500 = 550 kg
-        firingEngines: new Set<string>(),
-        collisionCooldown: 0,
-      } as unknown as DebrisState],
+      })],
     });
 
     const lightVelBefore = ps.velY;
@@ -306,16 +295,11 @@ describe('Collision response', () => {
     const ps = makePhysicsState({
       posX: 0, posY: 100.5, velX: 0, velY: -5,
       activeParts: new Set([id1]),
-      debris: [{
+      debris: [makeDebrisState({
         id: 'debris-test',
-        posX: 0, posY: 100, velX: 0, velY: 5, angle: 0,
-        angularVelocity: 0,
-        landed: false, crashed: false,
+        posY: 100, velY: 5,
         activeParts: new Set([id2]),
-        fuelStore: new Map<string, number>(),
-        firingEngines: new Set<string>(),
-        collisionCooldown: 0,
-      } as unknown as DebrisState],
+      })],
     });
 
     // Both have equal mass (50 kg probe-core-mk1)
@@ -345,16 +329,11 @@ describe('Collision response', () => {
     const psSL = makePhysicsState({
       posX: 0, posY: 1.5, velX: 0, velY: -10,
       activeParts: new Set([id1a]),
-      debris: [{
+      debris: [makeDebrisState({
         id: 'debris-sl',
-        posX: 0, posY: 1, velX: 0, velY: 10, angle: 0,
-        angularVelocity: 0,
-        landed: false, crashed: false,
+        posY: 1, velY: 10,
         activeParts: new Set([id2a]),
-        fuelStore: new Map<string, number>(),
-        firingEngines: new Set<string>(),
-        collisionCooldown: 0,
-      } as unknown as DebrisState],
+      })],
     });
 
     tickCollisions(psSL, assembly, 1 / 60);
@@ -368,16 +347,11 @@ describe('Collision response', () => {
     const psVac = makePhysicsState({
       posX: 0, posY: 80000.5, velX: 0, velY: -10,
       activeParts: new Set([id1b]),
-      debris: [{
+      debris: [makeDebrisState({
         id: 'debris-vac',
-        posX: 0, posY: 80000, velX: 0, velY: 10, angle: 0,
-        angularVelocity: 0,
-        landed: false, crashed: false,
+        posY: 80000, velY: 10,
         activeParts: new Set([id2b]),
-        fuelStore: new Map<string, number>(),
-        firingEngines: new Set<string>(),
-        collisionCooldown: 0,
-      } as unknown as DebrisState],
+      })],
     });
 
     tickCollisions(psVac, assembly2, 1 / 60);
@@ -396,16 +370,11 @@ describe('Collision response', () => {
     const ps = makePhysicsState({
       posX: 0, posY: 100.5, velX: 0, velY: 5,  // moving up
       activeParts: new Set([id1]),
-      debris: [{
+      debris: [makeDebrisState({
         id: 'debris-sep',
-        posX: 0, posY: 100, velX: 0, velY: -5, angle: 0,  // moving down
-        angularVelocity: 0,
-        landed: false, crashed: false,
+        posY: 100, velY: -5,  // moving down
         activeParts: new Set([id2]),
-        fuelStore: new Map<string, number>(),
-        firingEngines: new Set<string>(),
-        collisionCooldown: 0,
-      } as unknown as DebrisState],
+      })],
     });
 
     const velBefore = ps.velY;
@@ -424,16 +393,11 @@ describe('Collision response', () => {
     const ps = makePhysicsState({
       posX: 0, posY: 100.3, velX: 0, velY: -3,
       activeParts: new Set([id1]),
-      debris: [{
+      debris: [makeDebrisState({
         id: 'debris-overlap',
-        posX: 0, posY: 100, velX: 0, velY: 3, angle: 0,
-        angularVelocity: 0,
-        landed: false, crashed: false,
+        posY: 100, velY: 3,
         activeParts: new Set([id2]),
-        fuelStore: new Map<string, number>(),
-        firingEngines: new Set<string>(),
-        collisionCooldown: 0,
-      } as unknown as DebrisState],
+      })],
     });
 
     const gapBefore = ps.posY - ps.debris[0].posY;
@@ -453,16 +417,11 @@ describe('Collision response', () => {
     const ps = makePhysicsState({
       posX: 1.5, posY: 100, velX: -5, velY: 0,
       activeParts: new Set([id1]),
-      debris: [{
+      debris: [makeDebrisState({
         id: 'debris-angular',
-        posX: 0, posY: 100, velX: 5, velY: 0, angle: 0,
-        angularVelocity: 0,
-        landed: false, crashed: false,
+        posY: 100, velX: 5,
         activeParts: new Set([id2]),
-        fuelStore: new Map<string, number>(),
-        firingEngines: new Set<string>(),
-        collisionCooldown: 0,
-      } as unknown as DebrisState],
+      })],
     });
 
     tickCollisions(ps, assembly, 1 / 60);
@@ -493,12 +452,12 @@ describe('applySeparationImpulse()', () => {
       activeParts: new Set([lightId]),
     });
 
-    const debris = {
+    const debris = makeSepDebris({
       id: 'debris-sep',
-      posX: 0, posY: 1000, velX: 0, velY: 100, angle: 0,
+      posY: 1000, velY: 100,
       activeParts: new Set([heavyId]),
       fuelStore: new Map<string, number>([[heavyId, 400]]),  // 50 + 400 = 450 kg
-    } as unknown as SepDebrisParam;
+    }) as SepDebrisParam;
 
     applySeparationImpulse(ps, debris, assembly);
 
@@ -520,12 +479,12 @@ describe('applySeparationImpulse()', () => {
       activeParts: new Set([id1]),
     });
 
-    const debris = {
+    const debris = makeSepDebris({
       id: 'debris-angle',
-      posX: 0, posY: 1000, velX: 0, velY: 0, angle: Math.PI / 4,
+      posY: 1000,
+      angle: Math.PI / 4,
       activeParts: new Set([id2]),
-      fuelStore: new Map<string, number>(),
-    } as unknown as SepDebrisParam;
+    }) as SepDebrisParam;
 
     applySeparationImpulse(ps, debris, assembly);
 
@@ -547,12 +506,11 @@ describe('applySeparationImpulse()', () => {
       activeParts: new Set([topId]),
     });
 
-    const debris = {
+    const debris = makeSepDebris({
       id: 'debris-apart',
-      posX: 0, posY: 1000, velX: 0, velY: 50, angle: 0,
+      posY: 1000, velY: 50,
       activeParts: new Set([botId]),
-      fuelStore: new Map<string, number>(),
-    } as unknown as SepDebrisParam;
+    }) as SepDebrisParam;
 
     applySeparationImpulse(ps, debris, assembly);
 
@@ -572,12 +530,11 @@ describe('applySeparationImpulse()', () => {
       activeParts: new Set([upperId]),
     });
 
-    const debris = {
+    const debris = makeSepDebris({
       id: 'debris-lower',
-      posX: 0, posY: 500, velX: 0, velY: 0, angle: 0,
+      posY: 500,
       activeParts: new Set([lowerId]),
-      fuelStore: new Map<string, number>(),
-    } as unknown as SepDebrisParam;
+    }) as SepDebrisParam;
 
     applySeparationImpulse(ps, debris, assembly);
 
@@ -604,12 +561,11 @@ describe('applySeparationImpulse() — reduced impulse magnitude', () => {
       activeParts: new Set([id1]),
     });
 
-    const debris = {
+    const debris = makeSepDebris({
       id: 'debris-dv',
-      posX: 0, posY: 1000, velX: 0, velY: 0, angle: 0,
+      posY: 1000,
       activeParts: new Set([id2]),
-      fuelStore: new Map<string, number>(),
-    } as unknown as SepDebrisParam;
+    }) as SepDebrisParam;
 
     applySeparationImpulse(ps, debris, assembly);
 
@@ -628,12 +584,12 @@ describe('applySeparationImpulse() — reduced impulse magnitude', () => {
       activeParts: new Set([lightId]),
     });
 
-    const debris = {
+    const debris = makeSepDebris({
       id: 'debris-heavy-dv',
-      posX: 0, posY: 1000, velX: 0, velY: 0, angle: 0,
+      posY: 1000,
       activeParts: new Set([heavyId]),
       fuelStore: new Map<string, number>([[heavyId, 400]]), // 50 + 400 = 450 kg
-    } as unknown as SepDebrisParam;
+    }) as SepDebrisParam;
 
     applySeparationImpulse(ps, debris, assembly);
 
@@ -658,25 +614,17 @@ describe('collision cooldown at reduced value', () => {
       posX: 0, posY: 9999,
       landed: true,
       activeParts: new Set<string>(),
-      debris: [{
+      debris: [makeDebrisState({
         id: 'debris-cd10',
-        posX: 0, posY: 200, velX: 0, velY: 3, angle: 0,
-        angularVelocity: 0,
-        landed: false, crashed: false,
+        posY: 200, velY: 3,
         activeParts: new Set([id1]),
-        fuelStore: new Map<string, number>(),
-        firingEngines: new Set<string>(),
         collisionCooldown: 10,
-      } as unknown as DebrisState, {
+      }), makeDebrisState({
         id: 'debris-cd10b',
-        posX: 0, posY: 200.3, velX: 0, velY: -3, angle: 0,
-        angularVelocity: 0,
-        landed: false, crashed: false,
+        posY: 200.3, velY: -3,
         activeParts: new Set([id2]),
-        fuelStore: new Map<string, number>(),
-        firingEngines: new Set<string>(),
         collisionCooldown: 10,
-      } as unknown as DebrisState],
+      })],
     });
 
     // After 9 ticks, cooldown should be 1 and no collision yet.
@@ -706,16 +654,12 @@ describe('tickCollisions integration', () => {
     const ps = makePhysicsState({
       posX: 0, posY: 100.5, velX: 0, velY: -5,
       activeParts: new Set([id1]),
-      debris: [{
+      debris: [makeDebrisState({
         id: 'debris-cd',
-        posX: 0, posY: 100, velX: 0, velY: 5, angle: 0,
-        angularVelocity: 0,
-        landed: false, crashed: false,
+        posY: 100, velY: 5,
         activeParts: new Set([id2]),
-        fuelStore: new Map<string, number>(),
-        firingEngines: new Set<string>(),
         collisionCooldown: 5,
-      } as unknown as DebrisState],
+      })],
     });
 
     const velBefore = ps.velY;
@@ -735,16 +679,11 @@ describe('tickCollisions integration', () => {
     const ps = makePhysicsState({
       posX: 0, posY: 100.5, velX: 0, velY: -5,
       activeParts: new Set([id1]),
-      debris: [{
+      debris: [makeDebrisState({
         id: 'debris-cd-expired',
-        posX: 0, posY: 100, velX: 0, velY: 5, angle: 0,
-        angularVelocity: 0,
-        landed: false, crashed: false,
+        posY: 100, velY: 5,
         activeParts: new Set([id2]),
-        fuelStore: new Map<string, number>(),
-        firingEngines: new Set<string>(),
-        collisionCooldown: 0,
-      } as unknown as DebrisState],
+      })],
     });
 
     const velBefore = ps.velY;
@@ -797,17 +736,11 @@ describe('tickCollisions integration', () => {
     const ps = makePhysicsState({
       posX: 0, posY: 0.5, velX: 0, velY: -5,
       activeParts: new Set([id1]),
-      debris: [{
+      debris: [makeDebrisState({
         id: 'debris-landed',
-        posX: 0, posY: 0, velX: 0, velY: 0, angle: 0,
-        angularVelocity: 0,
         landed: true,  // Already landed
-        crashed: false,
         activeParts: new Set([id2]),
-        fuelStore: new Map<string, number>(),
-        firingEngines: new Set<string>(),
-        collisionCooldown: 0,
-      } as unknown as DebrisState],
+      })],
     });
 
     const velBefore = ps.velY;
@@ -827,26 +760,16 @@ describe('tickCollisions integration', () => {
       landed: true,  // Main rocket landed (excluded)
       activeParts: new Set<string>(),
       debris: [
-        {
+        makeDebrisState({
           id: 'debris-a',
-          posX: 0, posY: 200.5, velX: 0, velY: -5, angle: 0,
-          angularVelocity: 0,
-          landed: false, crashed: false,
+          posY: 200.5, velY: -5,
           activeParts: new Set([id1]),
-          fuelStore: new Map<string, number>(),
-          firingEngines: new Set<string>(),
-          collisionCooldown: 0,
-        } as unknown as DebrisState,
-        {
+        }),
+        makeDebrisState({
           id: 'debris-b',
-          posX: 0, posY: 200, velX: 0, velY: 5, angle: 0,
-          angularVelocity: 0,
-          landed: false, crashed: false,
+          posY: 200, velY: 5,
           activeParts: new Set([id2]),
-          fuelStore: new Map<string, number>(),
-          firingEngines: new Set<string>(),
-          collisionCooldown: 0,
-        } as unknown as DebrisState,
+        }),
       ],
     });
 

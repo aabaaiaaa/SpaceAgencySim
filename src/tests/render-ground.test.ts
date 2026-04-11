@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import type { Graphics } from 'pixi.js';
+import { Graphics, Container } from 'pixi.js';
 import type { ReadonlySurfaceItem } from '../render/types.ts';
 
 // ---------------------------------------------------------------------------
@@ -73,8 +73,8 @@ describe('renderGround', () => {
 
   it('clears and draws ground when visible', () => {
     const s = getFlightRenderState();
-    const mockGfx = new MockGraphics();
-    s.groundGraphics = mockGfx as unknown as Graphics;
+    const mockGfx = new Graphics();
+    s.groundGraphics = mockGfx;
     s.camWorldY = -10; // camera looking down at ground
 
     renderGround(800, 600);
@@ -86,8 +86,8 @@ describe('renderGround', () => {
 
   it('skips drawing when ground is entirely above viewport', () => {
     const s = getFlightRenderState();
-    const mockGfx = new MockGraphics();
-    s.groundGraphics = mockGfx as unknown as Graphics;
+    const mockGfx = new Graphics();
+    s.groundGraphics = mockGfx;
     s.camWorldY = -10000; // camera looking way up
 
     renderGround(800, 600);
@@ -109,16 +109,16 @@ describe('renderSurfaceItems', () => {
 
   it('does nothing for empty items array', () => {
     const s = getFlightRenderState();
-    const mockGfx = new MockGraphics();
-    s.surfaceItemsGraphics = mockGfx as unknown as Graphics;
+    const mockGfx = new Graphics();
+    s.surfaceItemsGraphics = mockGfx;
     renderSurfaceItems([], 800, 600);
     expect(mockGfx.clear).toHaveBeenCalled();
   });
 
   it('renders a FLAG surface item', () => {
     const s = getFlightRenderState();
-    const mockGfx = new MockGraphics();
-    s.surfaceItemsGraphics = mockGfx as unknown as Graphics;
+    const mockGfx = new Graphics();
+    s.surfaceItemsGraphics = mockGfx;
     s.camWorldX = 0;
     s.camWorldY = 0;
     s.zoomLevel = 1;
@@ -132,8 +132,8 @@ describe('renderSurfaceItems', () => {
 
   it('renders a SURFACE_SAMPLE item', () => {
     const s = getFlightRenderState();
-    const mockGfx = new MockGraphics();
-    s.surfaceItemsGraphics = mockGfx as unknown as Graphics;
+    const mockGfx = new Graphics();
+    s.surfaceItemsGraphics = mockGfx;
     s.zoomLevel = 1;
 
     const items: ReadonlySurfaceItem[] = [{ id: '2', type: SurfaceItemType.SURFACE_SAMPLE, bodyId: 'earth', posX: 5, deployedPeriod: 0 }];
@@ -145,8 +145,8 @@ describe('renderSurfaceItems', () => {
 
   it('renders a SURFACE_INSTRUMENT item', () => {
     const s = getFlightRenderState();
-    const mockGfx = new MockGraphics();
-    s.surfaceItemsGraphics = mockGfx as unknown as Graphics;
+    const mockGfx = new Graphics();
+    s.surfaceItemsGraphics = mockGfx;
     s.zoomLevel = 1;
 
     const items: ReadonlySurfaceItem[] = [{ id: '3', type: SurfaceItemType.SURFACE_INSTRUMENT, bodyId: 'earth', posX: 0, deployedPeriod: 0 }];
@@ -159,8 +159,8 @@ describe('renderSurfaceItems', () => {
 
   it('renders a BEACON item', () => {
     const s = getFlightRenderState();
-    const mockGfx = new MockGraphics();
-    s.surfaceItemsGraphics = mockGfx as unknown as Graphics;
+    const mockGfx = new Graphics();
+    s.surfaceItemsGraphics = mockGfx;
     s.zoomLevel = 1;
 
     const items: ReadonlySurfaceItem[] = [{ id: '4', type: SurfaceItemType.BEACON, bodyId: 'earth', posX: -5, deployedPeriod: 0 }];
@@ -172,8 +172,8 @@ describe('renderSurfaceItems', () => {
 
   it('renders multiple items of different types', () => {
     const s = getFlightRenderState();
-    const mockGfx = new MockGraphics();
-    s.surfaceItemsGraphics = mockGfx as unknown as Graphics;
+    const mockGfx = new Graphics();
+    s.surfaceItemsGraphics = mockGfx;
     s.zoomLevel = 1;
 
     const items: ReadonlySurfaceItem[] = [
@@ -184,13 +184,13 @@ describe('renderSurfaceItems', () => {
     renderSurfaceItems(items, 800, 600);
 
     // Multiple draw calls
-    expect(mockGfx.fill.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect(vi.mocked(mockGfx.fill).mock.calls.length).toBeGreaterThanOrEqual(3);
   });
 
   it('skips items that are off-screen', () => {
     const s = getFlightRenderState();
-    const mockGfx = new MockGraphics();
-    s.surfaceItemsGraphics = mockGfx as unknown as Graphics;
+    const mockGfx = new Graphics();
+    s.surfaceItemsGraphics = mockGfx;
     s.camWorldX = 0;
     s.zoomLevel = 1;
 
@@ -204,8 +204,8 @@ describe('renderSurfaceItems', () => {
 
   it('skips rendering when ground is off-screen', () => {
     const s = getFlightRenderState();
-    const mockGfx = new MockGraphics();
-    s.surfaceItemsGraphics = mockGfx as unknown as Graphics;
+    const mockGfx = new Graphics();
+    s.surfaceItemsGraphics = mockGfx;
     s.camWorldY = -100000; // ground way below viewport
     s.zoomLevel = 1;
 
@@ -218,8 +218,8 @@ describe('renderSurfaceItems', () => {
 
   it('skips rendering when ground is above the viewport (positive camWorldY)', () => {
     const s = getFlightRenderState();
-    const mockGfx = new MockGraphics();
-    s.surfaceItemsGraphics = mockGfx as unknown as Graphics;
+    const mockGfx = new Graphics();
+    s.surfaceItemsGraphics = mockGfx;
     s.camWorldY = 100000; // camera way above → groundScreenY = h/2 + camWorldY * p which is huge
     s.zoomLevel = 1;
 
@@ -238,8 +238,8 @@ describe('renderGround edge cases', () => {
 
   it('draws ground starting at 0 when groundScreenY is negative', () => {
     const s = getFlightRenderState();
-    const mockGfx = new MockGraphics();
-    s.groundGraphics = mockGfx as unknown as Graphics;
+    const mockGfx = new Graphics();
+    s.groundGraphics = mockGfx;
     s.camWorldY = 5; // camera slightly above ground -> groundScreenY slightly positive
 
     renderGround(800, 600);
@@ -249,8 +249,8 @@ describe('renderGround edge cases', () => {
 
   it('draws ground when groundScreenY equals viewport height exactly', () => {
     const s = getFlightRenderState();
-    const mockGfx = new MockGraphics();
-    s.groundGraphics = mockGfx as unknown as Graphics;
+    const mockGfx = new Graphics();
+    s.groundGraphics = mockGfx;
     // groundScreenY = h/2 + camWorldY * ppm() => need it exactly at h
     // h/2 + camWorldY * 20 = 600 => camWorldY = (600 - 300) / 20 = 15
     s.camWorldY = 15;
@@ -278,8 +278,8 @@ describe('renderBiomeLabel', () => {
 
   it('returns early when getBiome returns null', () => {
     const s = getFlightRenderState();
-    const mockContainer = new MockContainer();
-    s.biomeLabelContainer = mockContainer as unknown as import('pixi.js').Container;
+    const mockContainer = new Container();
+    s.biomeLabelContainer = mockContainer;
     vi.mocked(getBiome).mockReturnValue(null);
     vi.mocked(getBiomeTransition).mockReturnValue(null);
 
@@ -290,8 +290,8 @@ describe('renderBiomeLabel', () => {
 
   it('renders biome label when biome is found', () => {
     const s = getFlightRenderState();
-    const mockContainer = new MockContainer();
-    s.biomeLabelContainer = mockContainer as unknown as import('pixi.js').Container;
+    const mockContainer = new Container();
+    s.biomeLabelContainer = mockContainer;
     s.biomeLabelAlpha = 1.0;
 
     vi.mocked(getBiome).mockReturnValue({
@@ -312,8 +312,8 @@ describe('renderBiomeLabel', () => {
 
   it('resets alpha to 0 when biome name changes', () => {
     const s = getFlightRenderState();
-    const mockContainer = new MockContainer();
-    s.biomeLabelContainer = mockContainer as unknown as import('pixi.js').Container;
+    const mockContainer = new Container();
+    s.biomeLabelContainer = mockContainer;
     s.currentBiomeName = 'Old Biome';
     s.biomeLabelAlpha = 1.0;
 
@@ -337,8 +337,8 @@ describe('renderBiomeLabel', () => {
 
   it('uses transition.from name when ratio < 0.5', () => {
     const s = getFlightRenderState();
-    const mockContainer = new MockContainer();
-    s.biomeLabelContainer = mockContainer as unknown as import('pixi.js').Container;
+    const mockContainer = new Container();
+    s.biomeLabelContainer = mockContainer;
     s.biomeLabelAlpha = 1.0;
     s.currentBiomeName = 'Lower Atmosphere';
 
@@ -364,8 +364,8 @@ describe('renderBiomeLabel', () => {
 
   it('uses transition.to name when ratio >= 0.5', () => {
     const s = getFlightRenderState();
-    const mockContainer = new MockContainer();
-    s.biomeLabelContainer = mockContainer as unknown as import('pixi.js').Container;
+    const mockContainer = new Container();
+    s.biomeLabelContainer = mockContainer;
     s.biomeLabelAlpha = 0.5;
     s.currentBiomeName = 'Lower Atmosphere';
 
@@ -391,8 +391,8 @@ describe('renderBiomeLabel', () => {
 
   it('returns early when biomeLabelAlpha drops below 0.01', () => {
     const s = getFlightRenderState();
-    const mockContainer = new MockContainer();
-    s.biomeLabelContainer = mockContainer as unknown as import('pixi.js').Container;
+    const mockContainer = new Container();
+    s.biomeLabelContainer = mockContainer;
     s.biomeLabelAlpha = 0;
     s.currentBiomeName = null;
 
@@ -414,8 +414,8 @@ describe('renderBiomeLabel', () => {
 
   it('fades alpha down when biomeLabelAlpha exceeds targetAlpha', () => {
     const s = getFlightRenderState();
-    const mockContainer = new MockContainer();
-    s.biomeLabelContainer = mockContainer as unknown as import('pixi.js').Container;
+    const mockContainer = new Container();
+    s.biomeLabelContainer = mockContainer;
     s.biomeLabelAlpha = 1.0;
     s.currentBiomeName = 'Lower Atmosphere';
 
@@ -442,8 +442,8 @@ describe('renderBiomeLabel', () => {
 
   it('defaults bodyId to EARTH when not provided', () => {
     const s = getFlightRenderState();
-    const mockContainer = new MockContainer();
-    s.biomeLabelContainer = mockContainer as unknown as import('pixi.js').Container;
+    const mockContainer = new Container();
+    s.biomeLabelContainer = mockContainer;
     s.biomeLabelAlpha = 1.0;
 
     vi.mocked(getBiome).mockReturnValue({
