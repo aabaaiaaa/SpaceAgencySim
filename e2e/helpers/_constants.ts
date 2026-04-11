@@ -27,14 +27,15 @@ export const CANVAS_CENTRE_Y = TOOLBAR_H + BUILD_H / 2;      // 386
 // ---------------------------------------------------------------------------
 
 export const FacilityId = Object.freeze({
-  LAUNCH_PAD:      'launch-pad',
-  VAB:             'vab',
-  MISSION_CONTROL: 'mission-control',
-  CREW_ADMIN:      'crew-admin',
-  TRACKING_STATION:'tracking-station',
-  RD_LAB:          'rd-lab',
-  SATELLITE_OPS:   'satellite-ops',
-  LIBRARY:         'library',
+  LAUNCH_PAD:       'launch-pad',
+  VAB:              'vab',
+  MISSION_CONTROL:  'mission-control',
+  CREW_ADMIN:       'crew-admin',
+  TRACKING_STATION: 'tracking-station',
+  RD_LAB:           'rd-lab',
+  SATELLITE_OPS:    'satellite-ops',
+  LIBRARY:          'library',
+  LOGISTICS_CENTER: 'logistics-center',
 } as const);
 
 export type FacilityIdValue = typeof FacilityId[keyof typeof FacilityId];
@@ -57,14 +58,15 @@ export const STARTER_FACILITIES: Readonly<Record<string, FacilityState>> = Objec
 
 /** All facilities built at tier 1 (for advanced test scenarios). */
 export const ALL_FACILITIES: Readonly<Record<string, FacilityState>> = Object.freeze({
-  [FacilityId.LAUNCH_PAD]:      { built: true, tier: 1 },
-  [FacilityId.VAB]:             { built: true, tier: 1 },
-  [FacilityId.MISSION_CONTROL]: { built: true, tier: 1 },
-  [FacilityId.CREW_ADMIN]:      { built: true, tier: 1 },
-  [FacilityId.TRACKING_STATION]:{ built: true, tier: 1 },
-  [FacilityId.RD_LAB]:          { built: true, tier: 1 },
-  [FacilityId.SATELLITE_OPS]:   { built: true, tier: 1 },
-  [FacilityId.LIBRARY]:         { built: true, tier: 1 },
+  [FacilityId.LAUNCH_PAD]:       { built: true, tier: 1 },
+  [FacilityId.VAB]:              { built: true, tier: 1 },
+  [FacilityId.MISSION_CONTROL]:  { built: true, tier: 1 },
+  [FacilityId.CREW_ADMIN]:       { built: true, tier: 1 },
+  [FacilityId.TRACKING_STATION]: { built: true, tier: 1 },
+  [FacilityId.RD_LAB]:           { built: true, tier: 1 },
+  [FacilityId.SATELLITE_OPS]:    { built: true, tier: 1 },
+  [FacilityId.LIBRARY]:          { built: true, tier: 1 },
+  [FacilityId.LOGISTICS_CENTER]: { built: true, tier: 1 },
 });
 
 // ---------------------------------------------------------------------------

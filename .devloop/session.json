@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 7,
+  "lastIteration": 8,
   "startedAt": "2026-04-11T12:26:02.716Z",
   "iteration": 9,
   "devloopVersion": "4.0.2",
   "activeTask": {
-    "taskId": "TASK-020",
-    "taskTitle": "Batch: TASK-020, TASK-021",
-    "iterationNumber": 8,
-    "startedAt": "2026-04-11T13:19:54.291Z"
+    "taskId": "TASK-025",
+    "taskTitle": "E2E test for mining deployment flow",
+    "iterationNumber": 9,
+    "startedAt": "2026-04-11T13:26:22.823Z"
   }
 }

@@ -145,7 +145,7 @@
 - **Verification**: `npx vitest run src/tests/bodies.test.ts`
 
 ### TASK-025: E2E test for mining deployment flow
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-021
 - **Description**: Create `e2e/mining.spec.ts` with a Playwright test that verifies the basic mining system is accessible: start a new game, verify the Logistics Center is visible in the hub (may need to be unlocked via game state injection with `page.evaluate()`), open the Logistics Center, verify the mining sites panel shows the empty state message, verify the route management tab is accessible. Use `page.evaluate()` to inject a mining site into gameState and verify it renders in the panel. Follow existing E2E patterns in `e2e/` — use helpers from `e2e/helpers.js`, dispatch keyboard events via `window.dispatchEvent` not `page.keyboard.press`.
 - **Verification**: `npx playwright test e2e/mining.spec.ts`
