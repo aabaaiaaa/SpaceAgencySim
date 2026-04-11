@@ -9,7 +9,7 @@
 - **Verification**: `npx tsc --noEmit` passes. `npx vitest run src/tests/logistics.test.ts` passes (if exists). The original `src/ui/logistics.ts` still exists with reduced content.
 
 ### TASK-001b: Split logistics.ts — extract routeMap.ts and routeBuilder.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001a
 - **Description**: Extract the SVG schematic map component (`_renderRouteMap`, `_getBodyColor`, body positioning, proven leg / active route line drawing) into `logistics/routeMap.ts`. Extract the route builder mode interaction (route creation workflow, click-to-chain, confirm/cancel) into `logistics/routeBuilder.ts`. `_getBodyColor` should be exported from `routeMap.ts` for use by `routeBuilder.ts`. Update internal imports.
 - **Verification**: `npx tsc --noEmit` passes. The original `src/ui/logistics.ts` should now only contain the barrel re-export setup or shared initialisation code.
@@ -63,7 +63,7 @@
 - **Verification**: `npx tsc --noEmit` passes. `npx vitest run src/tests/map.test.ts` passes (if exists). Visual inspection via dev server shows curved route arcs with animated flow dots.
 
 ### TASK-008b: In-flight map — hub markers
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-008a
 - **Description**: In `src/render/map.ts`, add hub marker rendering. Surface hubs: small labelled base icon drawn at the body's surface position (visible when zoomed in). Orbital hubs: small station icon at the orbital altitude ring. Online hubs fully opaque, offline/under-construction hubs at 50% alpha. Use existing PixiJS sprite/graphics patterns from the map renderer. Add markers to the render loop so they update position with camera pan/zoom.
 - **Verification**: `npx tsc --noEmit` passes. Visual inspection via dev server shows hub markers on the map.
@@ -79,7 +79,7 @@
 ## Phase B: Off-World Hubs
 
 ### TASK-009: Hub type definitions
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Create `src/core/hubTypes.ts` with TypeScript interfaces: `Hub` (id, name, type, bodyId, altitude?, coordinates?, biomeId?, facilities, tourists, partInventory, constructionQueue, maintenanceCost, established, online), `ConstructionProject` (facilityId, resourcesRequired, resourcesDelivered, moneyCost, startedPeriod, completedPeriod?), `ResourceRequirement` (resourceId, amount), `Tourist` (id, name, arrivalPeriod, departurePeriod, revenue), and `HubType` union type. See the implementation plan for exact field types.
 - **Verification**: `npx tsc --noEmit src/core/hubTypes.ts` passes with no errors.

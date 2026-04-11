@@ -55,6 +55,7 @@ import { getSizeCategory } from './flight/_asteroids.ts';
 
 import type { ReadonlyPhysicsState, ReadonlyFlightState, ReadonlyGameState } from './types.ts';
 import type { OrbitalElements, OrbitalObject } from '../core/gameState.ts';
+import type { Hub } from '../core/hubTypes.ts';
 
 // ---------------------------------------------------------------------------
 // Colour palette
@@ -97,6 +98,10 @@ const BELT_LABEL_COLOR = 0xddaa44;  // label text
 const ASTEROID_DOT_COLOR     = 0xccaa77;  // brownish for asteroid dots
 const ASTEROID_TARGET_COLOR  = 0xffcc44;  // bright amber for selected asteroid
 
+// Hub marker colours.
+const HUB_SURFACE_COLOR = 0x44aa88;  // green-teal for surface hubs
+const HUB_ORBITAL_COLOR = 0x8888cc;  // blue-grey for orbital hubs
+
 /** Visual atmosphere height (m above surface). */
 const ATMOSPHERE_VISUAL_HEIGHT = 70_000;
 
@@ -124,6 +129,7 @@ let _craftGraphics: PIXI.Graphics | null     = null;
 let _transferGraphics: PIXI.Graphics | null  = null;
 let _surfaceGraphics: PIXI.Graphics | null   = null;
 let _commsGraphics: PIXI.Graphics | null     = null;
+let _hubGraphics: PIXI.Graphics | null       = null;
 
 let _beltGraphics: PIXI.Graphics | null   = null;
 let _asteroidObjGraphics: PIXI.Graphics | null = null;
@@ -261,6 +267,7 @@ export function initMapRenderer(): void {
   _shadowGraphics   = new PIXI.Graphics();
   _surfaceGraphics  = new PIXI.Graphics();
   _commsGraphics    = new PIXI.Graphics();
+  _hubGraphics      = new PIXI.Graphics();
   _routeGraphics    = new PIXI.Graphics();
   _flowDotContainer = new PIXI.Container();
   _objectsGraphics  = new PIXI.Graphics();
@@ -276,6 +283,7 @@ export function initMapRenderer(): void {
   _mapRoot.addChild(_bodyGraphics);
   _mapRoot.addChild(_surfaceGraphics);
   _mapRoot.addChild(_commsGraphics);
+  _mapRoot.addChild(_hubGraphics);
   _mapRoot.addChild(_routeGraphics);
   _mapRoot.addChild(_flowDotContainer);
   _mapRoot.addChild(_shadowGraphics);
@@ -378,6 +386,7 @@ export function destroyMapRenderer(): void {
   _transferGraphics    = null;
   _surfaceGraphics     = null;
   _commsGraphics       = null;
+  _hubGraphics         = null;
   _routeGraphics       = null;
   _flowDotContainer    = null;
   _flowDotPool         = [];
@@ -622,6 +631,9 @@ export function renderMapFrame(
   // 5b. Surface items (flags, instruments, beacons) on the body surface.
   _drawSurfaceItems(state, bodyId, cx, cy, scale, R);
 
+  // 5c. Hub markers (surface bases and orbital stations).
+  _drawHubMarkers(state, bodyId, cx, cy, scale, R);
+
   // 6. Day/night shadow.
   _drawShadow(cx, cy, scale, R, flightState.timeElapsed);
 
@@ -741,6 +753,89 @@ function _drawSurfaceItems(state: ReadonlyGameState, bodyId: string, cx: number,
     const glyph = MAP_SURFACE_GLYPHS[item.type] || '?';
     const labelText = `${glyph} ${item.label || item.type}`;
     _useLabel(labelText, ix + dotR + 3, iy - 5, color);
+  }
+}
+
+/**
+ * Draw hub markers (surface bases and orbital stations) for the current body.
+ * Surface hubs appear on the body circle; orbital hubs float at their altitude.
+ */
+function _drawHubMarkers(
+  state: ReadonlyGameState,
+  bodyId: string,
+  cx: number,
+  cy: number,
+  scale: number,
+  R: number,
+): void {
+  if (!_hubGraphics) return;
+  _hubGraphics.clear();
+
+  // Access hubs defensively — the GameState.hubs field is added by a later task.
+  const hubs = (state as unknown as { hubs?: Hub[] }).hubs;
+  if (!hubs || hubs.length === 0) return;
+
+  const bodyPxR = R * scale;
+  if (bodyPxR < 3) return; // Body too small to show hubs.
+
+  const bodyHubs = hubs.filter((h) => h.bodyId === bodyId);
+  if (bodyHubs.length === 0) return;
+
+  let surfaceIndex = 0;
+  let orbitalIndex = 0;
+
+  for (const hub of bodyHubs) {
+    const alpha = hub.online ? 1.0 : 0.5;
+
+    if (hub.type === 'surface') {
+      // Surface hubs: position around the top of the body circle.
+      // Offset each hub by a small angle so multiples don't overlap.
+      const baseAngle = Math.PI / 2; // top of circle
+      const offsetAngle = (surfaceIndex - (bodyHubs.filter((h) => h.type === 'surface').length - 1) / 2) * 0.35;
+      const angle = baseAngle + offsetAngle;
+
+      const hx = cx + Math.cos(angle) * bodyPxR;
+      const hy = cy - Math.sin(angle) * bodyPxR;
+
+      // Draw a small rectangle (base/house shape): 8px wide, 6px tall.
+      const hw = 8;
+      const hh = 6;
+      _hubGraphics.rect(hx - hw / 2, hy - hh, hw, hh);
+      _hubGraphics.fill({ color: HUB_SURFACE_COLOR, alpha });
+      // Small triangle roof on top.
+      _hubGraphics.moveTo(hx - hw / 2 - 1, hy - hh);
+      _hubGraphics.lineTo(hx, hy - hh - 4);
+      _hubGraphics.lineTo(hx + hw / 2 + 1, hy - hh);
+      _hubGraphics.closePath();
+      _hubGraphics.fill({ color: HUB_SURFACE_COLOR, alpha });
+
+      _useLabel(hub.name, hx + hw / 2 + 3, hy - hh / 2 - 4, HUB_SURFACE_COLOR);
+      surfaceIndex++;
+    } else {
+      // Orbital hubs: position at altitude above the body surface.
+      const altitude = hub.altitude ?? 200_000;
+      const orbitalDist = (R + altitude) * scale;
+
+      // Offset each orbital hub by angle so multiples don't overlap.
+      const baseAngle = 0; // right side
+      const offsetAngle = (orbitalIndex - (bodyHubs.filter((h) => h.type === 'orbital').length - 1) / 2) * 0.4;
+      const angle = baseAngle + offsetAngle;
+
+      const ox = cx + Math.cos(angle) * orbitalDist;
+      const oy = cy - Math.sin(angle) * orbitalDist;
+
+      // Draw a diamond shape (6px half-diagonal).
+      const d = 6;
+      _hubGraphics.moveTo(ox, oy - d);
+      _hubGraphics.lineTo(ox + d, oy);
+      _hubGraphics.lineTo(ox, oy + d);
+      _hubGraphics.lineTo(ox - d, oy);
+      _hubGraphics.closePath();
+      _hubGraphics.fill({ color: HUB_ORBITAL_COLOR, alpha });
+
+      _useLabel(hub.name, ox + d + 3, oy - 5, HUB_ORBITAL_COLOR);
+      orbitalIndex++;
+    }
   }
 }
 
