@@ -6,6 +6,7 @@ type BufferLike = { toString(enc: string): string };
 declare const Buffer: {
   isBuffer(obj: unknown): obj is BufferLike;
   from(data: Uint8Array): BufferLike;
+  from(str: string, encoding: string): BufferLike;
   concat(list: BufferLike[]): BufferLike;
 };
 import {
@@ -155,7 +156,7 @@ test.describe('Save & Load Flow', () => {
     await expect(page.locator('#mm-load-screen')).toHaveCount(0);
   });
 
-  test('(7) exporting a save produces a file download that is valid JSON containing a money field', async ({ page }) => {
+  test('(7) exporting a save produces a binary envelope download with SASV magic bytes', async ({ page }) => {
     await seedSaveAndGoToLoadScreen(page, makeEnvelope());
 
     const [download] = await Promise.all([
@@ -168,13 +169,13 @@ test.describe('Save & Load Flow', () => {
     for await (const chunk of stream!) {
       chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Uint8Array));
     }
-    const rawJson: string = Buffer.concat(chunks).toString('utf-8');
+    const rawContent: string = Buffer.concat(chunks).toString('utf-8');
+    expect(rawContent.length).toBeGreaterThan(0);
 
-    let parsed: { state: { money: number } } | undefined;
-    expect(() => { parsed = JSON.parse(rawJson); }).not.toThrow();
-    expect(parsed).toHaveProperty('state');
-    expect(parsed!.state).toHaveProperty('money');
-    expect(typeof parsed!.state.money).toBe('number');
+    // Export uses binary envelope format: base64-encoded with SASV magic bytes.
+    const decoded: BufferLike = Buffer.from(rawContent, 'base64');
+    const header: string = decoded.toString('binary').slice(0, 4);
+    expect(header).toBe('SASV');
   });
 
   test('(8) VAB rocket assembly persists across save/load cycle', async ({ page }) => {
