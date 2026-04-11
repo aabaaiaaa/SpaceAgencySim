@@ -106,6 +106,14 @@ const BUILDINGS: BuildingDef[] = [
     heightPct:    0.16,
     xCenterPct:   0.88,
   },
+  {
+    id:           'logistics-center',
+    colorFill:    0x5a6a7a,
+    colorStroke:  0x8098b0,
+    widthPct:     0.06,
+    heightPct:    0.18,
+    xCenterPct:   0.95,
+  },
 ];
 
 // ---------------------------------------------------------------------------

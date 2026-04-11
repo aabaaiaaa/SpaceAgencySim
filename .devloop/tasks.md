@@ -115,13 +115,13 @@
 - **Verification**: `npx tsc --noEmit src/ui/logistics.ts && npx vitest run`
 
 ### TASK-020: Build Logistics Center UI — route management panel
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-019, TASK-013
 - **Description**: Replace the route management placeholder in `src/ui/logistics.ts`. The routes panel shows: (top) a map placeholder div for future route visualization, (bottom) a table of all routes with name, resource type, legs summary, throughput, cost/period, revenue/period, and status toggle button. Below the table, show proven legs as cards with origin→destination, craft design, capacity, and cost. Add route status toggle (active↔paused) click handlers using `setRouteStatus()`. Add route panel CSS to `src/ui/logistics.css`.
 - **Verification**: `npx tsc --noEmit src/ui/logistics.ts && npx vitest run`
 
 ### TASK-021: Add Logistics Center to hub screen
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-019
 - **Description**: In `src/ui/hub.ts`, import `openLogisticsPanel` and `closeLogisticsPanel` from `./logistics.ts`. Add a Logistics Center building entry to the hub layout following the existing building pattern (position it in a free spot). Add a click handler case for `FacilityId.LOGISTICS_CENTER` that calls `openLogisticsPanel(state, overlayContainer)`. Import `FacilityId` from constants if not already imported.
 - **Verification**: `npx tsc --noEmit src/ui/hub.ts && npx vitest run`

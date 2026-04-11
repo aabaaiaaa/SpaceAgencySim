@@ -106,6 +106,13 @@ const BUILDINGS: readonly BuildingDef[] = [
     widthPct:   0.08,
     heightPct:  0.16,
   },
+  {
+    id:         'logistics-center',
+    label:      'Logistics Center',
+    xCenterPct: 0.95,
+    widthPct:   0.06,
+    heightPct:  0.18,
+  },
 ];
 
 // ---------------------------------------------------------------------------

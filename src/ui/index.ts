@@ -16,6 +16,7 @@ import { initSatelliteOpsUI, destroySatelliteOpsUI } from './satelliteOps.ts';
 import { initTrackingStationUI, destroyTrackingStationUI } from './trackingStation.ts';
 import { initLibraryUI, destroyLibraryUI } from './library.ts';
 import { initRdLabUI, destroyRdLabUI } from './rdLab.ts';
+import { openLogisticsPanel, closeLogisticsPanel } from './logistics.ts';
 import { stopFlightScene } from './flightController.ts';
 import { initTopBar, destroyTopBar, refreshTopBar, setCurrentScreen } from './topbar.ts';
 import { showVabScene, hideVabScene } from '../render/vab.ts';
@@ -82,6 +83,12 @@ let _libraryOpen: boolean = false;
 let _rdLabOpen: boolean = false;
 
 /**
+ * True while the Logistics Center screen is open.
+ * Used to guard against double-mounting.
+ */
+let _logisticsOpen: boolean = false;
+
+/**
  * The #ui-overlay container, stored so _handleExitToMenu can re-mount the
  * main menu without needing it passed through every callback.
  */
@@ -121,6 +128,7 @@ export function initUI(container: HTMLElement, state: GameState): void {
   _missionControlOpen = false;
   _launchPadOpen      = false;
   _libraryOpen        = false;
+  _logisticsOpen      = false;
   // Ensure a fresh VAB assembly for each new game session.
   resetVabUI();
   hideVabScene(); // ensure VAB PixiJS is hidden when starting a new session
@@ -210,6 +218,10 @@ function _handleExitToMenu(): void {
     destroyRdLabUI();
     _rdLabOpen = false;
   }
+  if (_logisticsOpen) {
+    closeLogisticsPanel();
+    _logisticsOpen = false;
+  }
 
   // Wipe any remaining screen overlays from the container.
   if (_container) {
@@ -245,6 +257,7 @@ function _handleLoadGame(loadedState: GameState): void {
   if (_trackingStationOpen){ destroyTrackingStationUI(); _trackingStationOpen = false; }
   if (_libraryOpen)        { destroyLibraryUI();         _libraryOpen = false; }
   if (_rdLabOpen)          { destroyRdLabUI();           _rdLabOpen = false; }
+  if (_logisticsOpen)      { closeLogisticsPanel();      _logisticsOpen = false; }
 
   if (_container) {
     _container.innerHTML = '';
@@ -464,6 +477,35 @@ function _handleNavigation(container: HTMLElement, state: GameState, destination
         },
       });
       _rdLabOpen = true;
+    }
+
+    return;
+  }
+
+  if (destination === 'logistics-center') {
+    destroyHubUI();
+    setCurrentScreen('logistics-center');
+
+    if (!_logisticsOpen) {
+      openLogisticsPanel(state, container);
+      _logisticsOpen = true;
+
+      // Override back button to return to hub
+      const backBtn = document.getElementById('logistics-back-btn');
+      if (backBtn) {
+        // Clone to remove existing listeners
+        const newBtn = backBtn.cloneNode(true) as HTMLElement;
+        backBtn.replaceWith(newBtn);
+        newBtn.addEventListener('click', () => {
+          closeLogisticsPanel();
+          _logisticsOpen = false;
+          setCurrentScreen('hub');
+          showHubScene();
+          initHubUI(container, state, (dest: string) => {
+            _handleNavigation(container, state, dest);
+          });
+        });
+      }
     }
 
     return;

@@ -124,3 +124,119 @@
   color: var(--color-text-accent);
   font-weight: 600;
 }
+
+/* ===========================================================================
+   Routes Tab
+   =========================================================================== */
+
+.logistics-routes-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--panel-padding);
+}
+
+.logistics-route-map-placeholder {
+  border: 1px dashed var(--color-border-default);
+  border-radius: var(--radius-lg);
+  height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-body);
+  margin-bottom: var(--space-lg);
+}
+
+.logistics-routes-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: var(--space-lg);
+}
+
+.logistics-routes-table th {
+  text-align: left;
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-size-body-sm);
+  color: var(--color-text-secondary);
+  border-bottom: 1px solid var(--color-border-default);
+  font-weight: 600;
+}
+
+.logistics-routes-table td {
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-size-body);
+  color: var(--color-text-body);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.logistics-routes-table tbody tr:hover {
+  background: var(--color-surface-hover);
+}
+
+.logistics-route-status-btn {
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-default), color var(--transition-default);
+}
+
+.logistics-route-status-btn.status-active {
+  background: var(--color-success);
+  color: #fff;
+}
+
+.logistics-route-status-btn.status-paused {
+  background: var(--color-warning);
+  color: #000;
+}
+
+.logistics-route-status-btn.status-broken {
+  background: var(--color-danger);
+  color: #fff;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.logistics-proven-legs-section {
+  margin-top: var(--space-lg);
+}
+
+.logistics-proven-legs-section h3 {
+  font-size: var(--font-size-h3);
+  font-weight: 700;
+  color: var(--color-text-heading);
+  margin: 0 0 var(--space-md);
+}
+
+.logistics-proven-leg-card {
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-lg);
+  padding: var(--card-padding);
+  margin-bottom: var(--space-md);
+}
+
+.logistics-proven-leg-route {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-size-body);
+  color: var(--color-text-primary);
+  font-weight: 600;
+  margin-bottom: var(--space-sm);
+}
+
+.logistics-proven-leg-arrow {
+  color: var(--color-text-accent);
+  font-size: var(--font-size-h3);
+}
+
+.logistics-proven-leg-details {
+  display: flex;
+  gap: var(--space-lg);
+  font-size: var(--font-size-body-sm);
+  color: var(--color-text-secondary);
+}
