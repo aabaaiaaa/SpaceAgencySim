@@ -2077,8 +2077,12 @@ test.describe('Asteroid Belt — heavy arm range, collision cooldown, alignment 
         const isUnalignedAfterCapture = !ps.thrustAligned;
         ps.throttle = 1.0;
         ps.angularVelocity = 0;
+        // Ensure grounded=false — physics worker may have re-set it
+        // since posY=0 at this orbital position.
+        ps.grounded = false;
+        ps.landed = false;
 
-        for (const [instanceId] of ps.activeParts) {
+        for (const instanceId of ps.activeParts) {
           const placed = assembly.parts.get(instanceId);
           if (!placed) continue;
           const partDef = partsData.getPartById(placed.partId);

@@ -433,6 +433,8 @@ export interface PhysicsState {
   powerState: PowerState | null;
   /** Per-part malfunction entries. */
   malfunctions?: Map<string, MalfunctionEntry>;
+  /** Malfunction mode (serialized to worker; mirrors gameState.malfunctionMode). */
+  malfunctionMode?: string;
   /** Reference to game state (set by flightController). */
   _gameState?: GameState;
   /** Cached contact corner X for tipping. */

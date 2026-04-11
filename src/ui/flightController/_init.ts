@@ -164,6 +164,7 @@ export function startFlightScene(
   // Store a reference to the top-level game state so the malfunction system
   // can look up crew engineering skills during reliability checks.
   ps._gameState = s.state;
+  ps.malfunctionMode = s.state?.malfunctionMode;
 
   // Apply weather effects (temperature -> ISP, wind, visibility -> fog/haze).
   if (s.state.weather?.current) {
@@ -182,7 +183,10 @@ export function startFlightScene(
     window.__flightPs       = ps;
     window.__flightAssembly = s.assembly;
     window.__flightState    = flightState;
-    window.__setMalfunctionMode = (mode: string) => setMalfunctionMode(s.state!, mode);
+    window.__setMalfunctionMode = (mode: string) => {
+      setMalfunctionMode(s.state!, mode);
+      ps.malfunctionMode = mode; // Also set on ps so the worker can read it.
+    };
     window.__getMalfunctionMode = () => getMalfunctionMode(s.state!);
 
     // Programmatic time warp API for E2E tests -- allows arbitrary multipliers

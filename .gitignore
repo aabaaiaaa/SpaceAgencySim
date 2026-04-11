@@ -54,3 +54,5 @@ current-issues.txt
 .worktrees/
 
 .playwright-mcp/
+
+.superpowers/

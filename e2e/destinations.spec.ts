@@ -29,6 +29,8 @@ import {
   ALL_FACILITIES,
   teleportCraft,
   waitForOrbit,
+  pressStage,
+  pressThrottleUp,
 } from './helpers.js';
 import type { SaveEnvelope, SaveEnvelopeParams } from './helpers.js';
 import {
@@ -332,8 +334,8 @@ test.describe('Celestial body data drives physics and rendering', () => {
     expect(ps1.posY).toBeCloseTo(0, 0);
 
     // Stage and launch.
-    await page.keyboard.press('Space');
-    await page.keyboard.press('z');
+    await pressStage(page);
+    await pressThrottleUp(page);
     await waitForAltitude(page, 50, 15_000);
 
     const ps2 = (await getPhysicsSnapshot(page))!;
@@ -349,8 +351,8 @@ test.describe('Celestial body data drives physics and rendering', () => {
 
   test('(3) Moon flight uses lower gravity (~1.62 m/s²)', async () => {
     await startTestFlight(page, BASIC_PROBE, { bodyId: 'MOON' });
-    await page.keyboard.press('Space');
-    await page.keyboard.press('z');
+    await pressStage(page);
+    await pressThrottleUp(page);
     await waitForAltitude(page, 50, 15_000);
 
     const ps = (await getPhysicsSnapshot(page))!;
@@ -369,8 +371,8 @@ test.describe('Celestial body data drives physics and rendering', () => {
     const fs = (await getFlightState(page))!;
     expect(fs.bodyId).toBe('MARS');
 
-    await page.keyboard.press('Space');
-    await page.keyboard.press('z');
+    await pressStage(page);
+    await pressThrottleUp(page);
     await waitForAltitude(page, 50, 15_000);
 
     const ps = (await getPhysicsSnapshot(page))!;
@@ -384,8 +386,8 @@ test.describe('Celestial body data drives physics and rendering', () => {
 
   test('(5) airless body (Moon) has no atmospheric drag', async () => {
     await startTestFlight(page, BASIC_PROBE, { bodyId: 'MOON' });
-    await page.keyboard.press('Space');
-    await page.keyboard.press('z');
+    await pressStage(page);
+    await pressThrottleUp(page);
     await waitForAltitude(page, 200, 15_000);
 
     // Cut throttle and check velocity — on airless body, velocity shouldn't
@@ -837,8 +839,8 @@ test.describe('Body-specific biomes and science opportunities', () => {
     }
 
     // Also verify the biome display works during flight.
-    await page.keyboard.press('Space');
-    await page.keyboard.press('z');
+    await pressStage(page);
+    await pressThrottleUp(page);
     await waitForAltitude(page, 150, 15_000);
 
     // The biome label should change as we ascend.
@@ -859,8 +861,8 @@ test.describe('Body-specific biomes and science opportunities', () => {
 
   test('(2) Mars has atmospheric biomes', async () => {
     await startTestFlight(page, BASIC_PROBE, { bodyId: 'MARS' });
-    await page.keyboard.press('Space');
-    await page.keyboard.press('z');
+    await pressStage(page);
+    await pressThrottleUp(page);
     await waitForAltitude(page, 200, 15_000);
 
     const fs = (await getFlightState(page))!;
@@ -1669,8 +1671,8 @@ test.describe('Phase 6 new parts function correctly', () => {
     expect(fs!.bodyId).toBe('MOON');
 
     // Stage and thrust. On the Moon, 5 kN can lift ~300 kg at 1.62 g.
-    await page.keyboard.press('Space');
-    await page.keyboard.press('z');
+    await pressStage(page);
+    await pressThrottleUp(page);
     await waitForAltitude(page, 10, 30_000);
 
     const ps = (await getPhysicsSnapshot(page))!;

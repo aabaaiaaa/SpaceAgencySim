@@ -27,6 +27,8 @@ import {
   FacilityId,
   ALL_FACILITIES,
   STARTER_FACILITIES,
+  pressStage,
+  pressThrottleUp,
 } from './helpers.js';
 import {
   freshStartFixture,
@@ -97,8 +99,8 @@ test.describe('Biome label transitions', () => {
     const page: Page = await setupBiomeFlight(browser);
 
     // Fire engine (space to stage) then set full throttle.
-    await page.keyboard.press('Space');
-    await page.keyboard.press('z');
+    await pressStage(page);
+    await pressThrottleUp(page);
     await waitForAltitude(page, 150, 20_000);
 
     // Wait for HUD biome label to update
@@ -239,8 +241,8 @@ test.describe('Horizon curvature rendering', () => {
     const page: Page = await setupCurvatureFlight(browser);
 
     // Set full throttle then stage.
-    await page.keyboard.press('z');
-    await page.keyboard.press('Space');
+    await pressThrottleUp(page);
+    await pressStage(page);
 
     // Wait briefly for liftoff.
     await waitForAltitude(page, 500, 30_000);
@@ -989,8 +991,8 @@ test.describe('Instrument biome validity', () => {
     });
 
     // Try to stage the science module (fires activation).
-    await page.keyboard.press('Space'); // Stage 1: engine
-    await page.keyboard.press('Space'); // Stage 2: science module
+    await pressStage(page); // Stage 1: engine
+    await pressStage(page); // Stage 2: science module
 
     // Wait for instrument state to be set (activation attempt should fail at ground level)
     await page.waitForFunction((): boolean => {
@@ -1051,8 +1053,8 @@ test.describe('Instrument biome validity', () => {
     });
 
     // At ground level, radiation detector should not activate.
-    await page.keyboard.press('Space'); // engine
-    await page.keyboard.press('Space'); // science module
+    await pressStage(page); // engine
+    await pressStage(page); // science module
 
     await page.waitForFunction((): boolean => {
       const w = window;

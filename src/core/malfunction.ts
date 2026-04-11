@@ -201,7 +201,7 @@ export function checkMalfunctions(
   flightState: FlightState,
   gameState?: GameState,
 ): void {
-  const mode = gameState?.malfunctionMode ?? MalfunctionMode.NORMAL;
+  const mode = gameState?.malfunctionMode ?? ps.malfunctionMode ?? MalfunctionMode.NORMAL;
   if (mode === MalfunctionMode.OFF) return;
   // Sandbox mode with malfunctions disabled: skip all checks.
   if (gameState?.gameMode === GameMode.SANDBOX &&
@@ -310,7 +310,7 @@ export function attemptRecovery(
     return { success: false, message: 'No active malfunction.' };
   }
 
-  const mode = gameState?.malfunctionMode ?? ps._gameState?.malfunctionMode ?? MalfunctionMode.NORMAL;
+  const mode = gameState?.malfunctionMode ?? ps.malfunctionMode ?? ps._gameState?.malfunctionMode ?? MalfunctionMode.NORMAL;
   const roll = (mode === MalfunctionMode.FORCED) ? 1.0 : Math.random();
 
   switch (entry.type) {

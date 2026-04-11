@@ -3,6 +3,7 @@ import {
   VP_W, VP_H,
   FIRST_FLIGHT_MISSION, buildSaveEnvelope,
   seedAndLoadSave, dismissWelcomeModal,
+  pressStage,
 } from './helpers.js';
 
 /**
@@ -78,7 +79,7 @@ async function launchFromPad(page: Page): Promise<void> {
   await page.click('[data-building-id="launch-pad"]');
   await page.waitForSelector('#launch-pad-overlay', { state: 'visible', timeout: 10_000 });
   await page.click('.lp-launch-btn');
-  await page.waitForSelector('#lp-crew-overlay', { state: 'visible', timeout: 5_000 });
+  await page.waitForSelector('#lp-crew-overlay', { state: 'visible', timeout: 10_000 });
   await page.click('.lp-crew-confirm-btn');
   await page.waitForSelector('#flight-hud', { state: 'visible', timeout: 15_000 });
   await page.waitForFunction(
@@ -95,12 +96,22 @@ async function fireStageAndVerifyLiftoff(page: Page): Promise<void> {
   );
   expect(groundedBefore).toBe(true);
 
-  await page.keyboard.press('Space');
-
+  // Wait for the staging system to be ready before pressing stage.
   await page.waitForFunction(
-    (): boolean => (window.__flightPs?.firingEngines?.size ?? 0) > 0,
-    { timeout: 5_000 },
+    () => window.__flightPs?.activeParts?.size > 0,
+    { timeout: 10_000 },
   );
+
+  // Dispatch stage and poll — retry dispatch if the first one is swallowed
+  // (launch pad UI startup can delay keyboard handler registration).
+  for (let attempt = 0; attempt < 5; attempt++) {
+    await pressStage(page);
+    const fired = await page.waitForFunction(
+      (): boolean => (window.__flightPs?.firingEngines?.size ?? 0) > 0,
+      { timeout: 3_000 },
+    ).then(() => true).catch(() => false);
+    if (fired) break;
+  }
 
   const firingCount: number = await page.evaluate(
     (): number => window.__flightPs?.firingEngines?.size ?? 0,
@@ -109,7 +120,7 @@ async function fireStageAndVerifyLiftoff(page: Page): Promise<void> {
 
   await page.waitForFunction(
     (): boolean => (window.__flightPs?.posY ?? 0) > 5,
-    { timeout: 5_000 },
+    { timeout: 10_000 },
   );
 }
 

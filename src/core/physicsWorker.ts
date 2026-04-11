@@ -121,6 +121,7 @@ function deserialisePhysicsState(snap: PhysicsSnapshot): PhysicsState {
     malfunctions: snap.malfunctions
       ? _recordToMap(snap.malfunctions)
       : undefined,
+    malfunctionMode: snap.malfunctionMode,
   };
 }
 
@@ -259,6 +260,7 @@ function serialisePhysicsState(ps: PhysicsState): PhysicsSnapshot {
       : null,
     capturedBody: ps.capturedBody,
     thrustAligned: ps.thrustAligned,
+    malfunctionMode: ps.malfunctionMode,
   };
 }
 

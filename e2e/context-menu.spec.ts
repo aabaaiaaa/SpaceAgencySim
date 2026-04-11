@@ -9,6 +9,7 @@ import {
   VP_W, VP_H,
   buildSaveEnvelope,
   seedAndLoadSave, startTestFlight,
+  pressStage,
 } from './helpers.js';
 import type { SaveEnvelope } from './helpers.js';
 
@@ -21,7 +22,7 @@ async function setupFlightWithParachute(page: Page): Promise<void> {
   await seedAndLoadSave(page, envelope);
   await startTestFlight(page, FLIGHT_PARTS);
   // Stage engine and lift off.
-  await page.keyboard.press('Space');
+  await pressStage(page);
   await page.waitForFunction(() => {
     const ps = window.__flightPs;
     return ((ps?.posY as number) ?? 0) > 5;

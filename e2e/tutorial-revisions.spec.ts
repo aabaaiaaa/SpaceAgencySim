@@ -25,6 +25,8 @@ import {
   startTestFlight,
   waitForAltitude,
   teleportCraft,
+  pressStage,
+  pressThrottleUp,
 } from './helpers.js';
 import type { FacilityState, CrewMember, SaveEnvelope } from './helpers.js';
 
@@ -50,6 +52,8 @@ interface MissionData {
   reward: number;
   unlocksAfter: string[];
   unlockedParts: string[];
+  requiredParts?: string[];
+  awardsFacilityOnAccept?: string;
 }
 
 const MD: Record<string, MissionData> = {
@@ -145,6 +149,7 @@ const MD: Record<string, MissionData> = {
       { id: 'obj-018-2', type: 'SAFE_LANDING', target: { maxLandingSpeed: 10 } },
     ],
     reward: 60_000, unlocksAfter: ['mission-009'], unlockedParts: [],
+    requiredParts: ['cmd-mk1'], awardsFacilityOnAccept: 'crew-admin',
   },
   'mission-019': {
     title: 'Research Division',
@@ -153,12 +158,14 @@ const MD: Record<string, MissionData> = {
       { id: 'obj-019-2', type: 'RETURN_SCIENCE_DATA', target: {} },
     ],
     reward: 120_000, unlocksAfter: ['mission-010'], unlockedParts: [],
+    requiredParts: ['science-module-mk1'], awardsFacilityOnAccept: 'rd-lab',
   },
   'mission-020': {
     title: 'Eyes on the Sky',
     objectives: [{ id: 'obj-020-1', type: 'REACH_ORBIT', target: { orbitAltitude: 80_000, orbitalVelocity: 7_800 } }],
     reward: 250_000, unlocksAfter: ['mission-016'],
     unlockedParts: ['docking-port-std'],
+    awardsFacilityOnAccept: 'tracking-station',
   },
   'mission-021': {
     title: 'Orbital Survey',
@@ -220,22 +227,28 @@ function mkCompleted(id: string): MissionState {
 
 function mkAccepted(id: string): MissionState {
   const d: MissionData = MD[id];
-  return {
+  const m: MissionState = {
     id, title: d.title, description: '', location: 'desert',
     objectives: d.objectives.map(o => ({ ...o, completed: false, description: '' })),
     reward: d.reward, unlocksAfter: d.unlocksAfter, unlockedParts: d.unlockedParts,
     status: 'accepted',
   };
+  if (d.requiredParts) m.requiredParts = d.requiredParts;
+  if (d.awardsFacilityOnAccept) m.awardsFacilityOnAccept = d.awardsFacilityOnAccept;
+  return m;
 }
 
 function mkAvailable(id: string): MissionState {
   const d: MissionData = MD[id];
-  return {
+  const m: MissionState = {
     id, title: d.title, description: '', location: 'desert',
     objectives: d.objectives.map(o => ({ ...o, completed: false, description: '' })),
     reward: d.reward, unlocksAfter: d.unlocksAfter, unlockedParts: d.unlockedParts,
     status: 'available',
   };
+  if (d.requiredParts) m.requiredParts = d.requiredParts;
+  if (d.awardsFacilityOnAccept) m.awardsFacilityOnAccept = d.awardsFacilityOnAccept;
+  return m;
 }
 
 /** Parameter interface for tutorialSave helper. */
@@ -363,7 +376,7 @@ async function returnToHub(page: Page): Promise<void> {
 }
 
 async function stage(page: Page): Promise<void> {
-  await page.keyboard.press('Space');
+  await pressStage(page);
 }
 
 async function expectCompleted(page: Page, missionId: string): Promise<void> {
@@ -432,7 +445,7 @@ test.describe('Tutorial Revisions', () => {
       await seedAndLoadSave(page, env);
       await startTestFlight(page, TUTORIAL_STARTERS);
       await stage(page);
-      await page.keyboard.press('z');
+      await pressThrottleUp(page);
       await waitForAltitude(page, 100);
       await triggerReturnViaMenu(page);
       await returnToHub(page);
@@ -449,7 +462,7 @@ test.describe('Tutorial Revisions', () => {
       await seedAndLoadSave(page, env);
       await startTestFlight(page, TUTORIAL_STARTERS);
       await stage(page);
-      await page.keyboard.press('z');
+      await pressThrottleUp(page);
       await waitSpeed(page, 150);
       await triggerReturnViaMenu(page);
       await returnToHub(page);
@@ -475,7 +488,7 @@ test.describe('Tutorial Revisions', () => {
       // Complete M004 via flight.
       await startTestFlight(page, TUTORIAL_STARTERS);
       await stage(page);
-      await page.keyboard.press('z');
+      await pressThrottleUp(page);
       await waitSpeed(page, 150);
       await triggerReturnViaMenu(page);
       await returnToHub(page);
@@ -502,7 +515,7 @@ test.describe('Tutorial Revisions', () => {
         { staging: [{ partIds: ['engine-spark'] }, { partIds: ['parachute-mk1'] }] },
       );
       await stage(page); // fire engine
-      await page.keyboard.press('z');
+      await pressThrottleUp(page);
       await waitForAltitude(page, 50);
       // Wait for fuel depletion.
       await page.waitForFunction(
@@ -548,7 +561,7 @@ test.describe('Tutorial Revisions', () => {
       );
 
       await stage(page); // Stage 0: fire engine
-      await page.keyboard.press('z');
+      await pressThrottleUp(page);
       await waitForAltitude(page, 1_400);
       await page.keyboard.press('x'); // cut throttle
 
@@ -614,7 +627,7 @@ test.describe('Tutorial Revisions', () => {
         ['probe-core-mk1', 'tank-small', 'engine-spark'],
       );
       await stage(page);
-      await page.keyboard.press('z');
+      await pressThrottleUp(page);
       await waitForAltitude(page, 100);
 
       // Teleport to orbital conditions.
@@ -656,7 +669,7 @@ test.describe('Tutorial Revisions', () => {
         ['satellite-mk1', 'decoupler-stack-tr18', 'probe-core-mk1', 'tank-small', 'engine-spark'],
       );
       await stage(page);
-      await page.keyboard.press('z');
+      await pressThrottleUp(page);
       await waitForAltitude(page, 100);
       await teleportToOrbitConditions(page);
 
@@ -791,7 +804,7 @@ test.describe('Tutorial Revisions', () => {
       // M020: reach orbit.
       await startTestFlight(page, ['probe-core-mk1', 'tank-small', 'engine-spark']);
       await stage(page);
-      await page.keyboard.press('z');
+      await pressThrottleUp(page);
       await waitForAltitude(page, 100);
       await teleportToOrbitConditions(page);
 
@@ -846,7 +859,7 @@ test.describe('Tutorial Revisions', () => {
       );
 
       await stage(page); // fire engine
-      await page.keyboard.press('z');
+      await pressThrottleUp(page);
       await waitForAltitude(page, 50);
 
       // Wait for fuel depletion.
@@ -897,7 +910,7 @@ test.describe('Tutorial Revisions', () => {
       );
 
       await stage(page); // fire engine
-      await page.keyboard.press('z');
+      await pressThrottleUp(page);
 
       // Activate science module at ~1000m.
       await waitForAltitude(page, 1_000);
@@ -955,7 +968,7 @@ test.describe('Tutorial Revisions', () => {
       );
 
       await stage(page); // fire engine
-      await page.keyboard.press('z');
+      await pressThrottleUp(page);
 
       // Activate science module at ~500m.
       await waitForAltitude(page, 500);
@@ -978,15 +991,8 @@ test.describe('Tutorial Revisions', () => {
       );
 
       // Teleport back to low altitude for safe landing.
-      await page.evaluate(async () => {
-        const ps = window.__flightPs;
-        if (ps) {
-          ps.posY = 1_500;
-          ps.velX = 0;
-          ps.velY = -2;
-        }
-        if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
-      });
+      // Must set phase to FLIGHT so the physics uses vertical gravity, not orbital.
+      await teleportCraft(page, { posY: 1_500, velX: 0, velY: -2, phase: 'FLIGHT' });
 
       // Deploy parachute.
       await stage(page);
@@ -1020,7 +1026,7 @@ test.describe('Tutorial Revisions', () => {
       ]);
 
       await stage(page); // fire engine
-      await page.keyboard.press('z');
+      await pressThrottleUp(page);
       await waitForAltitude(page, 100);
 
       // Teleport to orbit.
@@ -1084,7 +1090,7 @@ test.describe('Tutorial Revisions', () => {
       );
 
       await stage(page); // fire engine AND activate science module
-      await page.keyboard.press('z');
+      await pressThrottleUp(page);
 
       // Verify the science module activated (PART_ACTIVATED event for SERVICE_MODULE).
       await page.waitForFunction(
@@ -1130,7 +1136,7 @@ test.describe('Tutorial Revisions', () => {
 
       // Stage 0: fire engine.
       await stage(page);
-      await page.keyboard.press('z');
+      await pressThrottleUp(page);
       await waitForAltitude(page, 1_400);
       await page.keyboard.press('x'); // cut throttle
 
@@ -1199,7 +1205,7 @@ test.describe('Tutorial Revisions', () => {
 
       await startTestFlight(page, ['probe-core-mk1', 'tank-small', 'engine-spark']);
       await stage(page);
-      await page.keyboard.press('z');
+      await pressThrottleUp(page);
       await waitForAltitude(page, 100);
 
       // Teleport to 65km.
@@ -1245,7 +1251,7 @@ test.describe('Tutorial Revisions', () => {
       ]);
 
       await stage(page);
-      await page.keyboard.press('z');
+      await pressThrottleUp(page);
       await waitForAltitude(page, 100);
       await teleportToOrbitConditions(page);
 
@@ -1287,7 +1293,7 @@ test.describe('Tutorial Revisions', () => {
 
       await startTestFlight(page, ['probe-core-mk1', 'tank-small', 'engine-spark']);
       await stage(page);
-      await page.keyboard.press('z');
+      await pressThrottleUp(page);
       await waitForAltitude(page, 100);
       await teleportToOrbitConditions(page);
 
@@ -1325,7 +1331,7 @@ test.describe('Tutorial Revisions', () => {
       ]);
 
       await stage(page);
-      await page.keyboard.press('z');
+      await pressThrottleUp(page);
       await waitForAltitude(page, 100);
       await teleportToOrbitConditions(page);
 

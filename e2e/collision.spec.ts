@@ -9,6 +9,7 @@ import {
   VP_W, VP_H,
   FIRST_FLIGHT_MISSION, buildSaveEnvelope,
   seedAndLoadSave, startTestFlight,
+  pressStage,
 } from './helpers.js';
 
 // ---------------------------------------------------------------------------
@@ -73,13 +74,13 @@ async function buildAndLaunch(page: Page): Promise<void> {
 
 /** Fire engine, gain altitude, fire decoupler, wait for debris. */
 async function gainAltitudeAndSeparate(page: Page): Promise<void> {
-  await page.keyboard.press('Space'); // Stage 1: engine
+  await pressStage(page); // Stage 1: engine
   await page.waitForFunction(() => {
     const ps = window.__flightPs;
     return (ps?.posY ?? 0) > 300;
   }, { timeout: 30_000 });
 
-  await page.keyboard.press('Space'); // Stage 2: decoupler
+  await pressStage(page); // Stage 2: decoupler
   await page.waitForFunction(() => {
     const ps = window.__flightPs;
     return (ps?.debris?.length ?? 0) > 0;

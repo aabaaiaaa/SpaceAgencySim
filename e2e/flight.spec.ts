@@ -6,6 +6,8 @@ import {
   FIRST_FLIGHT_MISSION, buildSaveEnvelope,
   placePart, seedAndLoadSave, navigateToVab, launchFromVab,
   startTestFlight,
+  pressStage,
+  pressThrottleUp,
 } from './helpers.js';
 
 /**
@@ -67,7 +69,7 @@ async function seedBuildAndLaunch(page: Page): Promise<void> {
 }
 
 async function stageAndLiftoff(page: Page): Promise<void> {
-  await page.keyboard.press('Space');
+  await pressStage(page);
   await page.waitForFunction(
     (): boolean => (window.__flightPs?.posY ?? 0) > 0,
     { timeout: 3_000 },

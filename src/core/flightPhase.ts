@@ -118,6 +118,7 @@ export function evaluateAutoTransitions(flightState: FlightState, ps: PhysicsSta
       const result = transitionPhase(flightState, FlightPhase.ORBIT, `${bandName} achieved`, meta);
       if (result.success) {
         flightState.inOrbit = true; flightState.orbitalElements = orbitStatus.elements ?? null;
+        flightState.orbitBandId = orbitStatus.altitudeBand ? orbitStatus.altitudeBand.id : null;
         return flightState.phaseLog[flightState.phaseLog.length - 1];
       }
     }

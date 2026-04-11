@@ -404,7 +404,10 @@ export function orbitalStateToCartesian(
   const posY = altitude;
 
   // Velocity via vis-viva equation: v² = μ(2/r - 1/a)
-  const speed = Math.sqrt(mu * (2 / r - 1 / a));
+  // Guard against stale orbital elements producing a negative argument (e.g. after
+  // a de-orbit burn changes velocity without recalculating elements).
+  const visViva = mu * (2 / r - 1 / a);
+  const speed = visViva > 0 ? Math.sqrt(visViva) : 0;
 
   // Flight path angle: γ = atan2(e·sin θ, 1 + e·cos θ)
   const gamma = Math.atan2(e * Math.sin(theta), 1 + e * Math.cos(theta));
@@ -415,6 +418,12 @@ export function orbitalStateToCartesian(
   // velY = speed × sin(γ)  (radial / vertical component, positive = away from body)
   const velX = speed * Math.cos(gamma);
   const velY = speed * Math.sin(gamma);
+
+  // Guard: if any value is NaN/Infinity (bad elements or numerical edge case),
+  // return zeroes rather than propagating corruption into the physics loop.
+  if (!Number.isFinite(posY) || !Number.isFinite(velX) || !Number.isFinite(velY)) {
+    return { posX: 0, posY: 0, velX: 0, velY: 0 };
+  }
 
   return { posX, posY, velX, velY };
 }

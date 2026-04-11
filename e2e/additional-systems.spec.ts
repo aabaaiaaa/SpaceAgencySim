@@ -33,6 +33,8 @@ import {
   navigateToVab,
   teleportCraft,
   waitForOrbit,
+  pressStage,
+  pressThrottleUp,
 } from './helpers.js';
 import type { SaveEnvelope, SaveEnvelopeParams } from './helpers.js';
 import {
@@ -523,8 +525,8 @@ test.describe('Tech tree parts', () => {
     expect(engineInfo?.found).toBe(true);
 
     // Stage to fire the engine and verify flight works.
-    await page.keyboard.press('Space');
-    await page.keyboard.press('z');
+    await pressStage(page);
+    await pressThrottleUp(page);
     await waitForAltitude(page, 50, 15_000);
 
     const snap = await getPhysicsSnapshot(page);
@@ -561,8 +563,8 @@ test.describe('Tech tree parts', () => {
     expect(found).toBe(true);
 
     // Stage and fire the engine. This engine is heavy so may take time.
-    await page.keyboard.press('Space');
-    await page.keyboard.press('z');
+    await pressStage(page);
+    await pressThrottleUp(page);
 
     // Wait for some altitude gain (even 5 m is enough to prove it works).
     try {
@@ -595,8 +597,8 @@ test.describe('Tech tree parts', () => {
     expect(tankInfo.found).toBe(true);
 
     // Stage and fire — verify the engine consumes fuel (rocket accelerates).
-    await page.keyboard.press('Space');
-    await page.keyboard.press('z');
+    await pressStage(page);
+    await pressThrottleUp(page);
     await waitForAltitude(page, 50, 15_000);
 
     const snap = await getPhysicsSnapshot(page);
@@ -609,8 +611,8 @@ test.describe('Tech tree parts', () => {
     await startTestFlight(page, ['probe-core-mk1', 'parachute-mk1', 'tank-small', 'engine-spark']);
 
     // Launch up.
-    await page.keyboard.press('Space');
-    await page.keyboard.press('z');
+    await pressStage(page);
+    await pressThrottleUp(page);
     await waitForAltitude(page, 200, 15_000);
 
     // Cut engine and stage parachute.
@@ -619,7 +621,7 @@ test.describe('Tech tree parts', () => {
       () => (window.__flightPs?.throttle ?? 1) === 0,
       { timeout: 5_000 },
     );
-    await page.keyboard.press('Space');
+    await pressStage(page);
 
     // Wait for descent — velocity should slow.
     await page.waitForFunction(

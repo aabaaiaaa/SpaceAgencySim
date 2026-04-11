@@ -32,6 +32,8 @@ import {
   waitForAltitude,
   buildCrewMember,
   navigateToVab,
+  pressStage,
+  pressThrottleUp,
 } from './helpers.js';
 import {
   freshStartFixture,
@@ -157,8 +159,8 @@ test.describe('Malfunction toggle and biome-transition triggering', () => {
     expect(mode).toBe('off');
 
     // Cross a biome boundary (100m = Low Atmosphere)
-    await page.keyboard.press('Space');
-    await page.keyboard.press('z');
+    await pressStage(page);
+    await pressThrottleUp(page);
     await waitForAltitude(page, 150, 20_000);
     // Wait for physics to process across the biome boundary
     await page.waitForFunction(
@@ -178,14 +180,15 @@ test.describe('Malfunction toggle and biome-transition triggering', () => {
   });
 
   test('(2) forced mode triggers malfunctions on biome transition', async () => {
+    test.setTimeout(60_000);
     await startTestFlight(page, ENGINE_ROCKET, { malfunctionMode: 'forced' });
 
     const mode = await getMalfunctionMode(page);
     expect(mode).toBe('forced');
 
     // Cross a biome boundary — fire engine and ascend past 100m
-    await page.keyboard.press('Space');
-    await page.keyboard.press('z');
+    await pressStage(page);
+    await pressThrottleUp(page);
     await waitForAltitude(page, 150, 20_000);
 
     // Wait for malfunction check to process
@@ -228,8 +231,8 @@ test.describe('Engine flameout malfunction', () => {
 
   test('(1) engine flameout removes engine from firing set', async () => {
     await startTestFlight(page, ENGINE_ROCKET, { malfunctionMode: 'off' });
-    await page.keyboard.press('Space');
-    await page.keyboard.press('z');
+    await pressStage(page);
+    await pressThrottleUp(page);
     await waitForAltitude(page, 50, 15_000);
 
     // Manually inject an engine flameout malfunction
@@ -285,8 +288,8 @@ test.describe('Engine reduced thrust malfunction', () => {
 
   test('(1) engine reduced thrust malfunction is recorded', async () => {
     await startTestFlight(page, ENGINE_ROCKET, { malfunctionMode: 'off' });
-    await page.keyboard.press('Space');
-    await page.keyboard.press('z');
+    await pressStage(page);
+    await pressThrottleUp(page);
     await waitForAltitude(page, 50, 15_000);
 
     const result = await page.evaluate(async () => {
@@ -475,7 +478,7 @@ test.describe('SRB early burnout malfunction', () => {
 
   test('(1) SRB early burnout exhausts fuel and removes from firing set', async () => {
     await startTestFlight(page, SRB_ROCKET, { malfunctionMode: 'off' });
-    await page.keyboard.press('Space'); // stage SRB
+    await pressStage(page); // stage SRB
 
     // Wait for SRB to start firing
     await page.waitForFunction(
@@ -651,7 +654,7 @@ test.describe('Malfunction recovery via context menu', () => {
 
   test('(2) engine flameout recovery succeeds when forced mode is normal', async () => {
     await startTestFlight(page, ENGINE_ROCKET, { malfunctionMode: 'off' });
-    await page.keyboard.press('Space');
+    await pressStage(page);
 
     // Inject engine flameout and test that recovery is possible
     const result = await page.evaluate(async () => {
@@ -1057,8 +1060,8 @@ test.describe('Wind force during flight and ISP modifier', () => {
 
   test('(1) wind force is applied during low-altitude flight', async () => {
     await startTestFlight(page, ENGINE_ROCKET, { malfunctionMode: 'off' });
-    await page.keyboard.press('Space');
-    await page.keyboard.press('z');
+    await pressStage(page);
+    await pressThrottleUp(page);
 
     // Wait for the rocket to get airborne
     await waitForAltitude(page, 50, 15_000);

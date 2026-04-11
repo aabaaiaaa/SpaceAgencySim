@@ -22,6 +22,8 @@ import {
   buildObjective,
   ALL_FACILITIES,
   teleportCraft,
+  pressStage,
+  pressThrottleUp,
 } from './helpers.js';
 import {
   midGameFixture,
@@ -156,8 +158,8 @@ test.describe('Malfunction during flight', () => {
     await startTestFlight(page, BASIC_ROCKET, { malfunctionMode: 'forced' });
 
     // Fire engine and ascend past 100m (biome boundary: Lower Atmosphere).
-    await page.keyboard.press('Space');
-    await page.keyboard.press('z');
+    await pressStage(page);
+    await pressThrottleUp(page);
     await waitForAltitude(page, 150, 20_000);
 
     // Wait for at least one malfunction to appear on the physics state.
@@ -194,8 +196,8 @@ test.describe('Malfunction during flight', () => {
     // Start another flight with forced malfunctions.
     await startTestFlight(page, BASIC_ROCKET, { malfunctionMode: 'forced' });
 
-    await page.keyboard.press('Space');
-    await page.keyboard.press('z');
+    await pressStage(page);
+    await pressThrottleUp(page);
     await waitForAltitude(page, 150, 20_000);
 
     // Wait for malfunctions.
@@ -267,13 +269,13 @@ test.describe('Crew KIA on crash', () => {
     });
 
     // Fire engine briefly to get airborne.
-    await page.keyboard.press('Space');
-    await page.keyboard.press('z');
+    await pressStage(page);
+    await pressThrottleUp(page);
     await waitForAltitude(page, 200, 20_000);
 
     // Cut engine and teleport to moderate altitude with fast downward velocity
     // to guarantee a crash on impact.
-    await page.keyboard.press('Space'); // cut throttle
+    await pressStage(page); // cut throttle
     await teleportCraft(page, {
       posX: 0,
       posY: 500,

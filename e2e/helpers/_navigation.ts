@@ -139,3 +139,47 @@ export async function openSettingsPanel(page: Page): Promise<void> {
   await page.click('#topbar-menu-btn');
   await page.click('#hub-settings-btn');
 }
+
+// ---------------------------------------------------------------------------
+// Reliable keyboard dispatch helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Dispatch a keyboard event directly on the window via page.evaluate().
+ *
+ * page.keyboard.press() is unreliable under parallel Playwright workers
+ * because Chromium throttles inactive tabs, swallowing key events.
+ * Dispatching via window.dispatchEvent bypasses this throttling entirely.
+ */
+async function dispatchKey(page: Page, code: string, key: string): Promise<void> {
+  await page.evaluate(
+    ({ c, k }) => window.dispatchEvent(
+      new KeyboardEvent('keydown', { code: c, key: k, bubbles: true }),
+    ),
+    { c: code, k: key },
+  );
+}
+
+/**
+ * Fire the next stage (equivalent to pressing Space).
+ * Uses window.dispatchEvent for reliability under parallel workers.
+ */
+export async function pressStage(page: Page): Promise<void> {
+  await dispatchKey(page, 'Space', ' ');
+}
+
+/**
+ * Set throttle to maximum (equivalent to pressing 'z').
+ * Uses window.dispatchEvent for reliability under parallel workers.
+ */
+export async function pressThrottleUp(page: Page): Promise<void> {
+  await dispatchKey(page, 'KeyZ', 'z');
+}
+
+/**
+ * Cut throttle (equivalent to pressing 'x').
+ * Uses window.dispatchEvent for reliability under parallel workers.
+ */
+export async function pressThrottleCut(page: Page): Promise<void> {
+  await dispatchKey(page, 'KeyX', 'x');
+}

@@ -124,6 +124,8 @@ export interface PhysicsSnapshot {
   capturedBody: CapturedBody | null;
   /** True when thrust is aligned through the combined CoM after asteroid capture. */
   thrustAligned: boolean;
+  /** Malfunction mode for the physics worker (mirrors gameState.malfunctionMode). */
+  malfunctionMode?: string;
 }
 
 /**
