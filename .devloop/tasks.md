@@ -21,13 +21,13 @@
 - **Verification**: `npx tsc --noEmit` passes. `npm run test:unit` passes. `npx playwright test e2e/route-interactions.spec.ts e2e/mining-interactions.spec.ts` passes.
 
 ### TASK-002: E2E test for craft +/- button functionality
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001c
 - **Description**: In `e2e/route-interactions.spec.ts`, add a test that seeds a save with an active route containing at least one leg. Locate the + button for that leg. Record current craft count and player money. Click +, verify craft count incremented, money decreased, and throughput display updated. Click -, verify craft count decrements (minimum 1). Use stable `data-testid` or `data-route-id` selectors.
 - **Verification**: `npx playwright test e2e/route-interactions.spec.ts` passes.
 
 ### TASK-003: E2E test for route builder confirm flow
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001c
 - **Description**: In `e2e/route-interactions.spec.ts` (or a new spec), add a test that seeds a save with at least one proven leg between two bodies. Open the Logistics Center routes tab, click "Create Route", select a resource type, click the origin body on the SVG map, click a highlighted proven leg, click "Confirm". Verify a new route appears in the route table with the correct resource type. Use Playwright MCP if debugging is needed.
 - **Verification**: `npx playwright test e2e/route-interactions.spec.ts` passes.
@@ -91,7 +91,7 @@
 - **Verification**: `npx tsc --noEmit` passes.
 
 ### TASK-011: Hub test factories
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-010
 - **Description**: Add hub factory functions to `src/tests/_factories.ts`: `makeHub(overrides)`, `makeEarthHub(overrides)`, `makeOrbitalHub(overrides)`, `makeConstructionProject(overrides)`. Import `Hub`, `ConstructionProject` types from hubTypes and `EARTH_HUB_ID` from constants. Factories use sensible defaults (makeHub defaults to MOON surface hub, makeEarthHub creates Earth HQ with starter facilities, makeOrbitalHub defaults to Earth orbit at 200km). See implementation plan for exact signatures.
 - **Verification**: `npx tsc --noEmit` passes.
@@ -133,7 +133,7 @@
 - **Verification**: `npx playwright test e2e/hubs-switcher.spec.ts` passes.
 
 ### TASK-018: Outpost Core part definition
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-010
 - **Description**: Add the Outpost Core part to `src/data/parts.ts`: id `outpost_core`, type `OUTPOST_CORE`, 2000 kg, $500k, 40x60 size, top and bottom snap points, activatable with DEPLOY behaviour. Write unit tests in `src/tests/hubs-outpost-core.test.ts` verifying: part exists in catalog, has correct type/mass/cost, has top and bottom snap points.
 - **Verification**: `npx vitest run src/tests/hubs-outpost-core.test.ts` passes. `npx tsc --noEmit` passes.

@@ -32,6 +32,10 @@
  *   makeFlightResult()      → FlightResult            (from gameState.ts)
  *   makeStagingConfig()     → StagingConfig           (from rocketbuilder.ts)
  *   makeContract()          → Contract                (from gameState.ts)
+ *   makeHub()               → Hub                    (from hubTypes.ts)
+ *   makeEarthHub()          → Hub                    (from hubTypes.ts)
+ *   makeOrbitalHub()        → Hub                    (from hubTypes.ts)
+ *   makeConstructionProject() → ConstructionProject  (from hubTypes.ts)
  * ---------------------------------------------------------------------------
  */
 
@@ -56,10 +60,13 @@ import type { PartDef } from '../data/parts.ts';
 
 import type { StagingConfig } from '../core/rocketbuilder.ts';
 
+import type { Hub, ConstructionProject } from '../core/hubTypes.ts';
+
 import {
   AstronautStatus,
   ContractCategory,
   ControlMode,
+  EARTH_HUB_ID,
   FlightOutcome,
   FlightPhase,
   GameMode,
@@ -820,6 +827,101 @@ export function makeContract(overrides: Partial<Contract> = {}): Contract {
     chainId: null,
     chainPart: null,
     chainTotal: null,
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Hub factory (off-world base / station)
+// ---------------------------------------------------------------------------
+
+/**
+ * Create a Hub with Moon surface outpost defaults.
+ */
+export function makeHub(overrides: Partial<Hub> = {}): Hub {
+  return {
+    id: 'hub-test-1',
+    name: 'Test Outpost',
+    type: 'surface',
+    bodyId: 'MOON',
+    coordinates: { x: 0, y: 0 },
+    facilities: {},
+    tourists: [],
+    partInventory: [],
+    constructionQueue: [],
+    maintenanceCost: 0,
+    established: 0,
+    online: true,
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Earth Hub factory (Earth HQ with starter facilities)
+// ---------------------------------------------------------------------------
+
+/**
+ * Create the Earth HQ hub with all starter facilities pre-built.
+ */
+export function makeEarthHub(overrides: Partial<Hub> = {}): Hub {
+  return {
+    id: EARTH_HUB_ID,
+    name: 'Earth HQ',
+    type: 'surface',
+    bodyId: 'EARTH',
+    coordinates: { x: 0, y: 0 },
+    facilities: Object.fromEntries(
+      FACILITY_DEFINITIONS.filter((f) => f.starter).map((f) => [f.id, { built: true, tier: 1 }]),
+    ),
+    tourists: [],
+    partInventory: [],
+    constructionQueue: [],
+    maintenanceCost: 0,
+    established: 0,
+    online: true,
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Orbital Hub factory (space station in orbit)
+// ---------------------------------------------------------------------------
+
+/**
+ * Create an orbital Hub with Earth orbit defaults (200 km altitude).
+ */
+export function makeOrbitalHub(overrides: Partial<Hub> = {}): Hub {
+  return {
+    id: 'hub-orbital-test-1',
+    name: 'Test Station',
+    type: 'orbital',
+    bodyId: 'EARTH',
+    altitude: 200_000,
+    facilities: {},
+    tourists: [],
+    partInventory: [],
+    constructionQueue: [],
+    maintenanceCost: 0,
+    established: 0,
+    online: true,
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// ConstructionProject factory (facility build/upgrade project)
+// ---------------------------------------------------------------------------
+
+/**
+ * Create a ConstructionProject with sensible defaults for a crew habitat build.
+ */
+export function makeConstructionProject(overrides: Partial<ConstructionProject> = {}): ConstructionProject {
+  return {
+    facilityId: 'crew-hab',
+    resourcesRequired: [],
+    resourcesDelivered: [],
+    moneyCost: 200_000,
+    startedPeriod: 0,
     ...overrides,
   };
 }

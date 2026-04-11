@@ -175,6 +175,7 @@ export const STACK_TYPES: readonly string[] = Object.freeze([
   PartType.PRESSURIZED_TANK,
   PartType.CRYO_TANK,
   PartType.MINING_MODULE,
+  PartType.OUTPOST_CORE,
 ]);
 
 /**
@@ -2838,6 +2839,34 @@ export const PARTS: PartDef[] = [
       dragCoefficient: 0.15,
       heatTolerance: 1500,
       crashThreshold: 5,
+    },
+  },
+
+  // -------------------------------------------------------------------------
+  // Outpost Modules
+  // -------------------------------------------------------------------------
+
+  {
+    id: 'outpost_core',
+    name: 'Outpost Core',
+    description: 'Deployable outpost module for establishing off-world hubs. Contains basic life support and command systems.',
+    type: PartType.OUTPOST_CORE,
+    reliability: RELIABILITY_TIERS.MID,
+    mass: 2000,
+    cost: 500_000,
+    width: 40,
+    height: 60,
+    snapPoints: [
+      makeSnapPoint('top', 0, -30, STACK_TYPES),
+      makeSnapPoint('bottom', 0, 30, STACK_TYPES),
+    ],
+    animationStates: ['idle', 'deployed'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.DEPLOY,
+    properties: {
+      dragCoefficient: 0.25,
+      heatTolerance: 1800,
+      crashThreshold: 3,
     },
   },
 
