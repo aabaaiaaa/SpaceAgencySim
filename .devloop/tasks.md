@@ -3,7 +3,7 @@
 ## Phase A: Hardening & Tech Debt
 
 ### TASK-001a: Split logistics.ts — extract miningSites.ts and routeTable.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Create `src/ui/logistics/` directory. Extract the mining sites tab rendering code into `logistics/miningSites.ts` and the route table (route list, status toggle, leg expansion, +/- craft buttons, revenue column) into `logistics/routeTable.ts`. Move the relevant private functions and local state. Update internal imports between the new modules. Do NOT create the barrel re-export yet — that comes in TASK-001c.
 - **Verification**: `npx tsc --noEmit` passes. `npx vitest run src/tests/logistics.test.ts` passes (if exists). The original `src/ui/logistics.ts` still exists with reduced content.
@@ -33,7 +33,7 @@
 - **Verification**: `npx playwright test e2e/route-interactions.spec.ts` passes.
 
 ### TASK-004: Unit test for orbital buffer overflow behaviour
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/tests/mining.test.ts`, add a test that creates a site with a launch pad and storage modules filled with a large amount of resources. Run `processSurfaceLaunchPads()` multiple times. Verify that `site.orbitalBuffer` grows without bound — documenting the current intentional behaviour. Add a brief code comment in `src/core/mining.ts` at the launch pad processing section confirming orbital buffers are intentionally unbounded.
 - **Verification**: `npx vitest run src/tests/mining.test.ts --testNamePattern "orbital buffer"` passes.
@@ -45,19 +45,19 @@
 - **Verification**: `npx tsc --noEmit` passes. `npx playwright test e2e/route-interactions.spec.ts` passes (routes tab still renders correctly).
 
 ### TASK-006: Route revenue integration test
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/tests/routes.test.ts`, add a test that sets up a complete pipeline: mining site with orbital buffer stocked with a resource, an active route from that body to Earth with known `throughputPerPeriod`. Run `advancePeriod()`. Verify `PeriodSummary.routeRevenue` equals `throughputPerPeriod * RESOURCES_BY_ID[resourceType].baseValuePerKg`. Also verify `routeDeliveries` has the correct amounts.
 - **Verification**: `npx vitest run src/tests/routes.test.ts --testNamePattern "revenue"` passes.
 
 ### TASK-007: Non-null assertion cleanup in routes.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/core/routes.ts` at lines 366-367, replace the `destSite!.orbitalBuffer` non-null assertions with a local variable assigned after the guard clause. The guard at line 343 ensures `destSite` is non-null in the else branch, but a local variable makes this explicit. No behavioural change.
 - **Verification**: `npx tsc --noEmit` passes. `npx vitest run src/tests/routes.test.ts` passes.
 
 ### TASK-008a: In-flight map — PixiJS route arc rendering
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/render/map.ts`, replace the `_drawRouteOverlay()` function's straight-line rendering with quadratic Bezier curves between body positions. Compute curve control points using the midpoint between bodies, offset perpendicular to the line by 15-20% of inter-body distance. Draw each route leg as a separate arc. Keep colour coding (green active, grey paused, red broken). Use dashed line style for proven legs (when overlay visible) and solid for active routes. Add animated flow dots (small circles) that travel along the Bezier path to indicate cargo direction — use a small pool of `PIXI.Graphics` circles repositioned each frame using parametric `t` interpolation.
 - **Verification**: `npx tsc --noEmit` passes. `npx vitest run src/tests/map.test.ts` passes (if exists). Visual inspection via dev server shows curved route arcs with animated flow dots.

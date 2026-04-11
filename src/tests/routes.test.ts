@@ -14,6 +14,7 @@ import {
 } from '../core/routes.ts';
 import type { SafeOrbitRange } from '../core/routes.ts';
 import { createMiningSite } from '../core/mining.ts';
+import { advancePeriod } from '../core/period.ts';
 import { ResourceType } from '../core/constants.ts';
 import { RESOURCES_BY_ID } from '../data/resources.ts';
 
@@ -791,5 +792,72 @@ describe('getSafeOrbitRange', () => {
     // Only leg at MOON has undefined altitude — no defined altitudes to collect
     const range = getSafeOrbitRange(state, 'MOON', 75);
     expect(range).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Route revenue integration (via advancePeriod)
+// ---------------------------------------------------------------------------
+
+describe('route revenue integration', () => {
+  it('advancePeriod reports correct revenue and deliveries for an Earth-bound route', () => {
+    const state = createGameState();
+    // Give enough money to cover all period costs (crew salaries, facility
+    // upkeep, route operating costs, etc.)
+    state.money = 50_000_000;
+
+    // Create a mining site on the Moon with a stocked orbital buffer
+    const resourceType = ResourceType.WATER_ICE;
+    const site = createMiningSite(state, {
+      name: 'Lunar Mine',
+      bodyId: 'MOON',
+      coordinates: { x: 0, y: 0 },
+      controlUnitPartId: 'ctrl-1',
+    });
+    const bufferAmount = 10_000;
+    site.orbitalBuffer[resourceType] = bufferAmount;
+
+    // Prove a leg from MOON orbit to EARTH orbit
+    const cargoCapacity = 3000;
+    const costPerRun = 75_000;
+    const pl = proveRouteLeg(state, {
+      origin: orbit('MOON', 50),
+      destination: orbit('EARTH', 200),
+      craftDesignId: 'cargo-shuttle',
+      cargoCapacityKg: cargoCapacity,
+      costPerRun,
+      flightId: 'flight-revenue-test',
+    });
+
+    // Create and activate the route
+    const route = createRoute(state, {
+      name: 'Lunar Water Export',
+      resourceType,
+      provenLegIds: [pl.id],
+    });
+    setRouteStatus(route, 'active');
+
+    // Route has 1 craft → throughputPerPeriod = cargoCapacity * 1 = 3000
+    expect(route.throughputPerPeriod).toBe(cargoCapacity);
+
+    // Run advancePeriod and capture the summary
+    const summary = advancePeriod(state);
+
+    // Expected transport: min(throughput=3000, buffer=10000) = 3000
+    const expectedTransport = Math.min(route.throughputPerPeriod, bufferAmount);
+    const resourceDef = RESOURCES_BY_ID[resourceType];
+    const expectedRevenue = expectedTransport * resourceDef.baseValuePerKg;
+
+    // Verify PeriodSummary.routeRevenue
+    expect(summary.routeRevenue).toBe(expectedRevenue);
+
+    // Verify PeriodSummary.routeOperatingCost
+    expect(summary.routeOperatingCost).toBe(route.totalCostPerPeriod);
+
+    // Verify PeriodSummary.routeDeliveries
+    expect(summary.routeDeliveries[resourceType]).toBe(expectedTransport);
+
+    // Verify buffer was actually deducted
+    expect(site.orbitalBuffer[resourceType]).toBe(bufferAmount - expectedTransport);
   });
 });

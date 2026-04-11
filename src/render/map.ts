@@ -143,6 +143,12 @@ let _showCommsOverlay: boolean = false;
 let _routeOverlayVisible: boolean = false;
 let _routeGraphics: PIXI.Graphics | null = null;
 
+// Flow dot pool for animated cargo direction indicators on route Bezier curves.
+const FLOW_DOT_POOL_SIZE = 32;
+let _flowDotContainer: PIXI.Container | null = null;
+let _flowDotPool: PIXI.Graphics[] = [];
+let _flowDotTime: number = 0;
+
 /** Currently selected transfer route target body ID. */
 let _selectedTransferTarget: string | null = null;
 
@@ -256,6 +262,7 @@ export function initMapRenderer(): void {
   _surfaceGraphics  = new PIXI.Graphics();
   _commsGraphics    = new PIXI.Graphics();
   _routeGraphics    = new PIXI.Graphics();
+  _flowDotContainer = new PIXI.Container();
   _objectsGraphics  = new PIXI.Graphics();
   _asteroidObjGraphics = new PIXI.Graphics();
   _craftGraphics    = new PIXI.Graphics();
@@ -270,6 +277,7 @@ export function initMapRenderer(): void {
   _mapRoot.addChild(_surfaceGraphics);
   _mapRoot.addChild(_commsGraphics);
   _mapRoot.addChild(_routeGraphics);
+  _mapRoot.addChild(_flowDotContainer);
   _mapRoot.addChild(_shadowGraphics);
   _mapRoot.addChild(_objectsGraphics);
   _mapRoot.addChild(_asteroidObjGraphics);
@@ -277,6 +285,18 @@ export function initMapRenderer(): void {
   _mapRoot.addChild(_labelContainer);
 
   app.stage.addChild(_mapRoot);
+
+  // Create the flow dot pool for animated route cargo indicators.
+  _flowDotPool = [];
+  for (let i = 0; i < FLOW_DOT_POOL_SIZE; i++) {
+    const dot = new PIXI.Graphics();
+    dot.circle(0, 0, 2.5);
+    dot.fill({ color: 0xffffff });
+    dot.visible = false;
+    _flowDotContainer.addChild(dot);
+    _flowDotPool.push(dot);
+  }
+  _flowDotTime = 0;
 
   // Create the reusable text label pool.
   _labelPool = [];
@@ -359,6 +379,9 @@ export function destroyMapRenderer(): void {
   _surfaceGraphics     = null;
   _commsGraphics       = null;
   _routeGraphics       = null;
+  _flowDotContainer    = null;
+  _flowDotPool         = [];
+  _flowDotTime         = 0;
   _labelContainer      = null;
   _labelPool           = [];
   _beltDots            = null;
@@ -1448,11 +1471,152 @@ function _drawCommsOverlay(state: ReadonlyGameState, bodyId: string, cx: number,
 const ROUTE_ACTIVE_COLOR = 0x44ff88;
 const ROUTE_PAUSED_COLOR = 0x666666;
 const ROUTE_BROKEN_COLOR = 0xff4444;
+const PROVEN_LEG_COLOR   = 0x6688aa;
+
+/** Perpendicular offset factor for Bezier control points (fraction of inter-body distance). */
+const BEZIER_OFFSET_FACTOR = 0.18;
+
+/** Number of flow dots rendered per active route leg. */
+const DOTS_PER_LEG = 3;
+
+/** Speed of flow dot animation (cycles per second along the curve). */
+const FLOW_DOT_SPEED = 0.35;
 
 /**
- * Draw active transport routes as directional lines between bodies.
- * Uses simple lines with colour coding: green for active, grey for paused,
- * red for broken.
+ * Compute the screen position of a body given its ID relative to the current
+ * map centre body.
+ */
+function _bodyScreenPos(
+  bid: string,
+  centreBodyId: string,
+  cx: number,
+  cy: number,
+  scale: number,
+): { x: number; y: number } | null {
+  if (bid === centreBodyId) return { x: cx, y: cy };
+  const body = CELESTIAL_BODIES[bid];
+  if (!body) return null;
+  const orbitDist = body.orbitalDistance || 0;
+  return { x: cx + orbitDist * scale, y: cy };
+}
+
+/**
+ * Compute the control point for a quadratic Bezier curve between two points.
+ * The control point is offset perpendicular to the line joining origin and
+ * destination by a fraction of the inter-body distance, creating an arc.
+ *
+ * @param legIndex  Leg index within a route (used to alternate arc direction for
+ *                  multi-leg routes so arcs don't overlap).
+ */
+function _bezierControlPoint(
+  ox: number, oy: number,
+  dx: number, dy: number,
+  legIndex: number,
+): { cpx: number; cpy: number } {
+  const mx = (ox + dx) / 2;
+  const my = (oy + dy) / 2;
+
+  const lineLen = Math.hypot(dx - ox, dy - oy);
+  const offset = lineLen * BEZIER_OFFSET_FACTOR;
+
+  // Perpendicular direction (normalised).
+  const perpX = -(dy - oy) / (lineLen || 1);
+  const perpY =  (dx - ox) / (lineLen || 1);
+
+  // Alternate direction for even/odd legs so multi-leg arcs fan out.
+  const sign = legIndex % 2 === 0 ? 1 : -1;
+
+  return {
+    cpx: mx + perpX * offset * sign,
+    cpy: my + perpY * offset * sign,
+  };
+}
+
+/**
+ * Evaluate a point on a quadratic Bezier curve at parameter t in [0, 1].
+ */
+function _evalQuadBezier(
+  ox: number, oy: number,
+  cpx: number, cpy: number,
+  dx: number, dy: number,
+  t: number,
+): { x: number; y: number } {
+  const u = 1 - t;
+  return {
+    x: u * u * ox + 2 * u * t * cpx + t * t * dx,
+    y: u * u * oy + 2 * u * t * cpy + t * t * dy,
+  };
+}
+
+/**
+ * Draw a dashed quadratic Bezier curve by approximating it with short line
+ * segments and applying a dash pattern.
+ */
+function _drawDashedBezier(
+  g: PIXI.Graphics,
+  ox: number, oy: number,
+  cpx: number, cpy: number,
+  dx: number, dy: number,
+  color: number,
+  alpha: number,
+  dashLen: number,
+  gapLen: number,
+): void {
+  // Sample the curve into a polyline (32 segments).
+  const SAMPLES = 32;
+  const pts: { x: number; y: number }[] = [{ x: ox, y: oy }];
+  for (let i = 1; i <= SAMPLES; i++) {
+    const t = i / SAMPLES;
+    pts.push(_evalQuadBezier(ox, oy, cpx, cpy, dx, dy, t));
+  }
+
+  // Walk along the polyline, emitting dash / gap segments.
+  const patternLen = dashLen + gapLen;
+  let walked = 0;
+  let drawing = true; // start with a dash
+
+  for (let i = 1; i < pts.length; i++) {
+    const segLen = Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+    let remaining = segLen;
+    let fx = pts[i - 1].x;
+    let fy = pts[i - 1].y;
+    const dirX = (pts[i].x - pts[i - 1].x) / (segLen || 1);
+    const dirY = (pts[i].y - pts[i - 1].y) / (segLen || 1);
+
+    while (remaining > 0) {
+      const posInPattern = walked % patternLen;
+      const dashRemaining = drawing
+        ? dashLen - posInPattern
+        : patternLen - posInPattern;
+      const step = Math.min(remaining, dashRemaining > 0 ? dashRemaining : patternLen);
+
+      const nx = fx + dirX * step;
+      const ny = fy + dirY * step;
+
+      if (drawing) {
+        g.moveTo(fx, fy);
+        g.lineTo(nx, ny);
+        g.stroke({ color, width: 1.5, alpha });
+      }
+
+      walked += step;
+      remaining -= step;
+      fx = nx;
+      fy = ny;
+
+      // Check if we crossed a pattern boundary.
+      const newPosInPattern = walked % patternLen;
+      drawing = newPosInPattern < dashLen;
+    }
+  }
+}
+
+/**
+ * Draw transport routes and proven legs as quadratic Bezier curves between
+ * body positions. Active routes use solid curves with animated flow dots;
+ * proven legs (when overlay visible) use dashed curves. Colour coding:
+ * green for active routes, grey for paused, red for broken, blue-grey for
+ * proven legs.
  */
 function _drawRouteOverlay(
   state: ReadonlyGameState,
@@ -1464,67 +1628,97 @@ function _drawRouteOverlay(
   if (!_routeGraphics || !_routeOverlayVisible) return;
   _routeGraphics.clear();
 
-  if (!state.routes || state.routes.length === 0) return;
+  // Hide all flow dots; visible ones will be re-shown below.
+  for (const dot of _flowDotPool) dot.visible = false;
 
-  for (const route of state.routes) {
-    for (const leg of route.legs) {
-      // Get body positions for origin and destination.
-      const originBody = CELESTIAL_BODIES[leg.origin.bodyId];
-      const destBody = CELESTIAL_BODIES[leg.destination.bodyId];
-      if (!originBody || !destBody) continue;
+  // Advance flow dot animation time.
+  _flowDotTime += 1 / 60; // assume ~60 fps tick
 
-      // For same-body legs (e.g. surface to orbit), skip drawing.
-      if (leg.origin.bodyId === leg.destination.bodyId) continue;
+  let dotIndex = 0;
 
-      // Compute screen positions.
-      // For inter-body legs, draw a line between body centres.
-      let ox: number, oy: number, dx: number, dy: number;
+  // Collect body pairs that have active route legs so we can skip proven-leg
+  // duplicates for clarity.
+  const activeRoutePairs = new Set<string>();
 
-      if (leg.origin.bodyId === bodyId) {
-        ox = cx;
-        oy = cy;
-      } else {
-        const oOrbitDist = originBody.orbitalDistance || 0;
-        ox = cx + oOrbitDist * scale;
-        oy = cy;
+  // --- Draw route legs as solid Bezier curves ---
+  if (state.routes && state.routes.length > 0) {
+    for (const route of state.routes) {
+      for (let legIdx = 0; legIdx < route.legs.length; legIdx++) {
+        const leg = route.legs[legIdx];
+
+        // Skip same-body legs (e.g. surface to orbit).
+        if (leg.origin.bodyId === leg.destination.bodyId) continue;
+
+        const oPos = _bodyScreenPos(leg.origin.bodyId, bodyId, cx, cy, scale);
+        const dPos = _bodyScreenPos(leg.destination.bodyId, bodyId, cx, cy, scale);
+        if (!oPos || !dPos) continue;
+        if (Math.abs(oPos.x - dPos.x) < 1 && Math.abs(oPos.y - dPos.y) < 1) continue;
+
+        const pairKey = [leg.origin.bodyId, leg.destination.bodyId].sort().join(':');
+        activeRoutePairs.add(pairKey);
+
+        const color = route.status === 'active' ? ROUTE_ACTIVE_COLOR
+                    : route.status === 'broken' ? ROUTE_BROKEN_COLOR
+                    : ROUTE_PAUSED_COLOR;
+
+        const alpha = route.status === 'paused' ? 0.4 : 0.7;
+
+        const cp = _bezierControlPoint(oPos.x, oPos.y, dPos.x, dPos.y, legIdx);
+
+        // Draw solid Bezier curve.
+        _routeGraphics.moveTo(oPos.x, oPos.y);
+        _routeGraphics.quadraticCurveTo(cp.cpx, cp.cpy, dPos.x, dPos.y);
+        _routeGraphics.stroke({ color, width: 2, alpha });
+
+        // Animated flow dots for active routes.
+        if (route.status === 'active') {
+          for (let d = 0; d < DOTS_PER_LEG; d++) {
+            if (dotIndex >= FLOW_DOT_POOL_SIZE) break;
+            const dot = _flowDotPool[dotIndex++];
+
+            // Distribute dots evenly along the curve with a time-based offset.
+            const t = ((_flowDotTime * FLOW_DOT_SPEED + d / DOTS_PER_LEG) % 1 + 1) % 1;
+            const pos = _evalQuadBezier(oPos.x, oPos.y, cp.cpx, cp.cpy, dPos.x, dPos.y, t);
+
+            dot.x = pos.x;
+            dot.y = pos.y;
+            dot.tint = color;
+            dot.alpha = 0.9;
+            dot.visible = true;
+          }
+        }
       }
+    }
+  }
 
-      if (leg.destination.bodyId === bodyId) {
-        dx = cx;
-        dy = cy;
-      } else {
-        const dOrbitDist = destBody.orbitalDistance || 0;
-        dx = cx + dOrbitDist * scale;
-        dy = cy;
-      }
+  // --- Draw proven legs as dashed Bezier curves ---
+  if (state.provenLegs && state.provenLegs.length > 0) {
+    for (let i = 0; i < state.provenLegs.length; i++) {
+      const pleg = state.provenLegs[i];
 
-      // Skip if both points are the same on screen.
-      if (Math.abs(ox - dx) < 1 && Math.abs(oy - dy) < 1) continue;
+      if (pleg.origin.bodyId === pleg.destination.bodyId) continue;
 
-      const color = route.status === 'active' ? ROUTE_ACTIVE_COLOR
-                  : route.status === 'broken' ? ROUTE_BROKEN_COLOR
-                  : ROUTE_PAUSED_COLOR;
+      // Skip if an active route already covers this body pair.
+      const pairKey = [pleg.origin.bodyId, pleg.destination.bodyId].sort().join(':');
+      if (activeRoutePairs.has(pairKey)) continue;
 
-      _routeGraphics.moveTo(ox, oy);
-      _routeGraphics.lineTo(dx, dy);
-      _routeGraphics.stroke({ color, width: 2, alpha: 0.7 });
+      const oPos = _bodyScreenPos(pleg.origin.bodyId, bodyId, cx, cy, scale);
+      const dPos = _bodyScreenPos(pleg.destination.bodyId, bodyId, cx, cy, scale);
+      if (!oPos || !dPos) continue;
+      if (Math.abs(oPos.x - dPos.x) < 1 && Math.abs(oPos.y - dPos.y) < 1) continue;
 
-      // Draw a small arrowhead at the destination end.
-      const angle = Math.atan2(dy - oy, dx - ox);
-      const arrowLen = 8;
-      const arrowAngle = Math.PI / 6;
-      _routeGraphics.moveTo(dx, dy);
-      _routeGraphics.lineTo(
-        dx - arrowLen * Math.cos(angle - arrowAngle),
-        dy - arrowLen * Math.sin(angle - arrowAngle),
+      const cp = _bezierControlPoint(oPos.x, oPos.y, dPos.x, dPos.y, i);
+
+      _drawDashedBezier(
+        _routeGraphics,
+        oPos.x, oPos.y,
+        cp.cpx, cp.cpy,
+        dPos.x, dPos.y,
+        PROVEN_LEG_COLOR,
+        0.5,
+        8,   // dash length (px)
+        6,   // gap length (px)
       );
-      _routeGraphics.stroke({ color, width: 2, alpha: 0.7 });
-      _routeGraphics.moveTo(dx, dy);
-      _routeGraphics.lineTo(
-        dx - arrowLen * Math.cos(angle + arrowAngle),
-        dy - arrowLen * Math.sin(angle + arrowAngle),
-      );
-      _routeGraphics.stroke({ color, width: 2, alpha: 0.7 });
     }
   }
 }

@@ -363,8 +363,10 @@ export function processRoutes(state: GameState): { revenue: number; operatingCos
       totalRevenue += revenue;
     } else {
       // Deposit into destination mining site's orbital buffer
-      destSite!.orbitalBuffer[route.resourceType] =
-        (destSite!.orbitalBuffer[route.resourceType] ?? 0) + transportAmount;
+      // destSite is guaranteed non-null here: the guard at line 343 continues on undefined
+      const dest = destSite as MiningSite;
+      dest.orbitalBuffer[route.resourceType] =
+        (dest.orbitalBuffer[route.resourceType] ?? 0) + transportAmount;
     }
     delivered[route.resourceType] = (delivered[route.resourceType] ?? 0) + transportAmount;
   }

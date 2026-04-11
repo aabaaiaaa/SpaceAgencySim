@@ -944,3 +944,73 @@ describe('Multi-resource extraction competition', () => {
     expect(site.storage[ResourceType.CO2]).toBe(150);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Orbital buffer unbounded accumulation
+// ---------------------------------------------------------------------------
+
+describe('orbital buffer accumulation', () => {
+  it('orbital buffer grows without bound across multiple launch pad cycles', () => {
+    const state = createGameState();
+
+    // Build a Moon site with power, launch pad, and storage
+    const site = createMiningSite(state, {
+      name: 'Orbital Buffer Test Site',
+      bodyId: 'MOON',
+      coordinates: { x: 0, y: 0 },
+      controlUnitPartId: 'base-control-unit-mk1',
+    });
+
+    // Power generator: 100W output, 0W draw
+    addModuleToSite(site, {
+      partId: 'power-generator-solar-mk1',
+      type: MiningModuleType.POWER_GENERATOR,
+      powerDraw: 0,
+      powerOutput: 100,
+    });
+
+    // Surface launch pad: 50W draw, 200 kg capacity per period
+    const launchPad = addModuleToSite(site, {
+      partId: 'surface-launch-pad-mk1',
+      type: MiningModuleType.SURFACE_LAUNCH_PAD,
+      powerDraw: 50,
+    });
+
+    // Storage silo (solid): 2W draw, 2000 kg capacity
+    const silo = addModuleToSite(site, {
+      partId: 'storage-silo-mk1',
+      type: MiningModuleType.STORAGE_SILO,
+      powerDraw: 2,
+    });
+
+    // Connect launch pad to storage silo
+    toggleConnection(site, launchPad.id, silo.id);
+
+    // powerGenerated=100, powerRequired=52 (50+2), efficiency clamped to 1.0
+    // Launch capacity per period = 200 kg at full power
+
+    // Run 5 cycles, refilling storage each time to ensure the launch pad
+    // always has resources to transfer.
+    const iterations = 5;
+    const refillAmount = 500; // more than the 200 kg/period capacity
+
+    for (let i = 0; i < iterations; i++) {
+      // Refill storage module before each launch pad cycle
+      silo.stored = { [ResourceType.WATER_ICE]: refillAmount };
+      recomputeSiteStorage(site);
+
+      processSurfaceLaunchPads(state);
+    }
+
+    // Each cycle transfers 200 kg (capped by launch capacity), so after 5 cycles
+    // the orbital buffer should hold 1000 kg — well beyond any single-period limit.
+    const orbitalWaterIce = site.orbitalBuffer[ResourceType.WATER_ICE] ?? 0;
+    expect(orbitalWaterIce).toBe(200 * iterations);
+
+    // The key assertion: orbital buffer is unbounded — no cap was applied.
+    // 1000 kg exceeds the storage silo capacity (2000 kg) is not a limit here;
+    // the orbital buffer has no maximum.
+    expect(orbitalWaterIce).toBe(1000);
+    expect(orbitalWaterIce).toBeGreaterThan(0);
+  });
+});

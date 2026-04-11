@@ -387,7 +387,10 @@ export function processSurfaceLaunchPads(state: GameState): { transferred: Parti
         }
       }
 
-      // Transfer resources from modules to orbital buffer
+      // Transfer resources from modules to orbital buffer.
+      // Note: orbital buffers are intentionally unbounded — there is no cap on
+      // how much resource can accumulate in orbitalBuffer. This lets the player
+      // stockpile resources in orbit without artificial limits.
       for (const entry of entries) {
         if (remainingCapacity <= 0) break;
         const toTransfer = Math.min(entry.available, remainingCapacity);
