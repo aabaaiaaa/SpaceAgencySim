@@ -601,7 +601,11 @@ describe('Integration: extraction → refining → launch chain', () => {
     expect(waterIceAfterRefining).toBeLessThan(200);
 
     // ── Step 3: Launch resources to orbit ──
-    // Put some gas resources (hydrogen) into storage for the launch pad to transfer
+    // Clear storage from earlier steps so the launch pad's limited capacity
+    // (~164 kg at ~0.82 efficiency) isn't consumed by water ice / regolith.
+    for (const key of Object.keys(site.storage)) {
+      delete site.storage[key as ResourceType];
+    }
     site.storage[ResourceType.HYDROGEN] = 50;
     site.storage[ResourceType.OXYGEN] = 80;
 

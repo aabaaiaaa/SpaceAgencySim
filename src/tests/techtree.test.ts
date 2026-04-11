@@ -74,8 +74,8 @@ function noLabState(): GameState {
 describe('Tech Tree Data', () => {
 
   describe('TECH_NODES', () => {
-    it('contains exactly 21 nodes (4 branches × 5 tiers + 1 tier-6 structural)', () => {
-      expect(TECH_NODES).toHaveLength(21);
+    it('contains exactly 26 nodes (5 branches × 5 tiers + 1 tier-6 structural)', () => {
+      expect(TECH_NODES).toHaveLength(26);
     });
 
     it('each node has required fields', () => {
@@ -152,8 +152,8 @@ describe('Tech Tree Data', () => {
   });
 
   describe('TechBranch', () => {
-    it('defines 4 branches', () => {
-      expect(Object.keys(TechBranch)).toHaveLength(4);
+    it('defines 5 branches', () => {
+      expect(Object.keys(TechBranch)).toHaveLength(5);
     });
     it('each branch has a display name', () => {
       for (const branch of Object.values(TechBranch)) {
@@ -188,8 +188,8 @@ describe('Tech Tree Data', () => {
       expect(node.name).toBe('Field Instruments');
     });
 
-    it('getAllTechNodes returns all 21 nodes', () => {
-      expect(getAllTechNodes()).toHaveLength(21);
+    it('getAllTechNodes returns all 26 nodes', () => {
+      expect(getAllTechNodes()).toHaveLength(26);
     });
   });
 
@@ -553,7 +553,7 @@ describe('Tech Tree Aggregation', () => {
     it('returns an entry for every node', () => {
       const state = readyState();
       const status = getTechTreeStatus(state);
-      expect(status).toHaveLength(21);
+      expect(status).toHaveLength(26);
     });
 
     it('marks researched nodes correctly', () => {

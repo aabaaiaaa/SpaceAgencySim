@@ -105,10 +105,12 @@ describe('getFacilityDef', () => {
     }
   });
 
-  it('only R&D Lab has a non-zero scienceCost', () => {
+  it('only R&D Lab and Logistics Center have a non-zero scienceCost', () => {
     for (const def of FACILITY_DEFINITIONS) {
       if (def.id === FacilityId.RD_LAB) {
         expect(def.scienceCost).toBe(20);
+      } else if (def.id === FacilityId.LOGISTICS_CENTER) {
+        expect(def.scienceCost).toBe(15);
       } else {
         expect(def.scienceCost).toBe(0);
       }

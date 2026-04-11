@@ -59,11 +59,11 @@ describe('ActivationBehaviour', () => {
     expect(keys).toEqual(
       expect.arrayContaining([
         'NONE', 'IGNITE', 'SEPARATE', 'DEPLOY', 'EJECT', 'RELEASE', 'COLLECT_SCIENCE', 'DOCK',
-        'AUTO_LAND', 'PROCESS_SCIENCE', 'GRAB',
+        'AUTO_LAND', 'PROCESS_SCIENCE', 'GRAB', 'MINE', 'LAUNCH_RESOURCES',
       ]),
     );
     // No undocumented extras
-    expect(keys).toHaveLength(11);
+    expect(keys).toHaveLength(13);
   });
 });
 
