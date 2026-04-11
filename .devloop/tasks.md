@@ -87,7 +87,7 @@ See [requirements.md](requirements.md) for full context on each section.
 - **Verification**: `npm run build` succeeds. `npm run typecheck` passes. Verify that each modified file's remaining `style=` attributes (if any) are only dynamic.
 
 ### TASK-010: Final verification pass
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-007, TASK-008, TASK-009
 - **Description**: Run the full verification suite and confirm all iteration 8 targets are met:
   1. `npm run typecheck` — no errors
