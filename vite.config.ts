@@ -107,17 +107,19 @@ export default defineConfig({
       //
       thresholds: {
         'src/core/**': {
-          lines: 89,
-          branches: 80,
-          functions: 91,
+          lines: 91,
+          branches: 81,
+          functions: 92,
         },
         'src/render/**': {
-          lines: 55,
-          branches: 45,
+          lines: 40,
+          branches: 91,
+          functions: 58,
         },
         'src/ui/**': {
-          lines: 50,
-          branches: 45,
+          lines: 77,
+          branches: 79,
+          functions: 87,
         },
       },
     },

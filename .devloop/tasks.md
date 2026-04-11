@@ -141,7 +141,7 @@ See `.devloop/requirements.md` for full context and rationale behind each task.
 - **Verification**: `npx vitest run src/tests/ui-timeWarp.test.ts src/tests/loopErrorHandling.test.ts src/tests/workerBridgeTimeout.test.ts --coverage 2>&1 | grep -E "(_loop|_mapView|_timeWarp|_workerBridge)"` — line coverage improved.
 
 ### TASK-020: Set final coverage thresholds and enforce --coverage in test:unit
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-016, TASK-017, TASK-018, TASK-019
 - **Description**: After all coverage exclusions and new tests are in place: (1) Run `npx vitest run --coverage` and record actual coverage percentages for `src/core/**`, `src/render/**`, and `src/ui/**`. (2) Set thresholds in `vite.config.ts` at or slightly below the measured values — round down to the nearest integer. For core, the threshold should be at least 91% lines, 81% branches, 92% functions (matching or exceeding current actuals). For render and UI, set based on the post-exclusion measurements. (3) Change `package.json` script `"test:unit"` from `"vitest run"` to `"vitest run --coverage"` so thresholds are enforced on every test run.
 - **Verification**: `npm run test:unit` — all tests pass AND no coverage threshold errors (exit code 0).
