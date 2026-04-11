@@ -1,0 +1,126 @@
+/* ===========================================================================
+   Logistics Center — CSS
+   =========================================================================== */
+
+/* Logistics panel layout */
+#logistics-overlay {
+  /* uses facility-overlay class, no extra styles needed */
+}
+
+.logistics-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.logistics-sidebar {
+  width: 250px;
+  border-right: 1px solid var(--color-border-default);
+  overflow-y: auto;
+  padding: var(--space-md);
+  flex-shrink: 0;
+}
+
+.logistics-sidebar-item {
+  padding: var(--space-sm) var(--space-md);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-body);
+  transition: background var(--transition-default), color var(--transition-default);
+}
+
+.logistics-sidebar-item:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.logistics-sidebar-item.active {
+  background: var(--color-surface-raised);
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.logistics-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--panel-padding);
+}
+
+.logistics-site-card {
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-card-border);
+  border-radius: var(--radius-lg);
+  padding: var(--card-padding);
+  margin-bottom: var(--space-lg);
+}
+
+.logistics-site-name {
+  font-size: var(--font-size-h3);
+  font-weight: 700;
+  color: var(--color-text-heading);
+  margin: 0 0 var(--space-sm);
+}
+
+.logistics-power-bar {
+  height: 6px;
+  background: var(--color-border-subtle);
+  border-radius: 3px;
+  overflow: hidden;
+  margin: var(--space-xs) 0 var(--space-md);
+}
+
+.logistics-power-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.2s;
+}
+
+.logistics-power-ok { background: var(--color-success); }
+.logistics-power-warn { background: var(--color-warning); }
+.logistics-power-crit { background: var(--color-danger); }
+
+.logistics-module-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--space-md);
+}
+
+.logistics-module-item {
+  padding: var(--space-xs) 0;
+  font-size: var(--font-size-body-sm);
+  color: var(--color-text-body);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.logistics-module-item:last-child {
+  border-bottom: none;
+}
+
+.logistics-recipe-select {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-default);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-caption);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  margin-left: var(--space-sm);
+}
+
+.logistics-storage-section,
+.logistics-buffer-section {
+  margin-top: var(--space-md);
+}
+
+.logistics-resource-row {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-xs) 0;
+  font-size: var(--font-size-body-sm);
+  color: var(--color-text-body);
+}
+
+.logistics-resource-amount {
+  color: var(--color-text-accent);
+  font-weight: 600;
+}

@@ -24,6 +24,9 @@ import { getFacilityTier } from './construction.ts';
 import { processSurfaceOps } from './surfaceOps.ts';
 import { processLifeSupport } from './lifeSupport.ts';
 import { getFinancialMultipliers } from './settings.ts';
+import { processMiningSites, processSurfaceLaunchPads } from './mining.ts';
+import { processRefineries } from './refinery.ts';
+import { processRoutes } from './routes.ts';
 
 import type { GameState, MissionInstance } from './gameState.ts';
 
@@ -169,6 +172,12 @@ export function advancePeriod(state: GameState): PeriodSummary {
     warnings: LifeSupportWarning[];
     deaths: LifeSupportDeath[];
   };
+
+  // ── 11b. Resource processing — extraction, refining, launch, transport ──
+  processMiningSites(state);
+  processRefineries(state);
+  processSurfaceLaunchPads(state);
+  processRoutes(state);
 
   // ── 12. Bankruptcy check ──────────────────────────────────────────────
   const bankrupt = isBankrupt(state);

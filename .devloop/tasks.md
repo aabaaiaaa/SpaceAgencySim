@@ -85,7 +85,7 @@
 - **Verification**: `npx vitest run src/tests/resources.test.ts`
 
 ### TASK-015: Integrate resource processing into period tick
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-009, TASK-010, TASK-011, TASK-013
 - **Description**: In `src/core/period.ts`, import `processMiningSites` and `processSurfaceLaunchPads` from `./mining.ts`, `processRefineries` from `./refinery.ts`, `processRoutes` from `./routes.ts`. Add calls in `advancePeriod()` after step 11 (life support) and before step 12 (bankruptcy check): processMiningSites → processRefineries → processSurfaceLaunchPads → processRoutes. Append an integration test to `src/tests/mining.test.ts` verifying that a full extraction→launch chain produces resources in the orbital buffer after calling each function in sequence.
 - **Verification**: `npx vitest run src/tests/mining.test.ts && npx tsc --noEmit src/core/period.ts`
@@ -109,7 +109,7 @@
 - **Verification**: `npx vitest run src/tests/resources.test.ts`
 
 ### TASK-019: Build Logistics Center UI — mining sites panel
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-009, TASK-010, TASK-014
 - **Description**: Create `src/ui/logistics.ts` and `src/ui/logistics.css`. The module exports `openLogisticsPanel(state, parentEl)` and `closeLogisticsPanel()`. The panel has two tabs: "Mining Sites" (default) and "Route Management" (placeholder for TASK-020). The mining sites panel has a left sidebar listing celestial bodies with sites, and a right area showing site diagrams with module boxes, power budget, storage fill levels, refinery recipe selectors, and orbital buffer status. Follow existing UI patterns (DOM-based panels, CSS classes using design tokens where applicable, monospace font). See requirements.md §4 Panel 1 for full specification.
 - **Verification**: `npx tsc --noEmit src/ui/logistics.ts && npx vitest run`
