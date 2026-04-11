@@ -7,31 +7,31 @@
 - **Verification**: `npx vitest run src/tests/resources.test.ts && npx tsc --noEmit src/core/constants.ts`
 
 ### TASK-002: Create resource data catalog
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001
 - **Description**: Create `src/data/resources.ts` exporting `ResourceDef` interface, `RESOURCES` (frozen array of 10 entries), and `RESOURCES_BY_ID` (frozen record). Each entry has: `id` (ResourceType), `name`, `description`, `state` (ResourceState), `massDensity` (kg/m³), `baseValuePerKg` ($/kg), `sources` (body IDs — UPPERCASE like `'MOON'`, `'MARS'`, `'CERES'`, `'TITAN'`, `'JUPITER'`, `'SATURN'`), `extractionModule` (MiningModuleType). Append tests to `src/tests/resources.test.ts` verifying: 10 resources, required fields, state-to-extraction-module mappings (solids→MINING_DRILL, gases→GAS_COLLECTOR, liquids→FLUID_EXTRACTOR). See requirements.md §1 resource catalog table for values.
 - **Verification**: `npx vitest run src/tests/resources.test.ts`
 
 ### TASK-003: Add resource profiles to celestial body definitions
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001
 - **Description**: Extend the `CelestialBodyDef` interface in `src/data/bodies.ts` with optional `resourceProfile?: readonly BodyResourceEntry[]` field. Define a `BodyResourceEntry` interface with `{ resourceType: ResourceType, extractionRateKgPerPeriod: number, abundance: number }`. Add frozen resource profiles to body definitions: MOON (water ice, regolith, iron ore, helium-3), MARS (water ice, regolith, CO₂, oxygen), CERES (iron ore, rare metals, water ice), TITAN (liquid methane), JUPITER (hydrogen), SATURN (hydrogen). Earth and Sun get no profile. Access bodies via `CELESTIAL_BODIES['MOON']` not via array `.find()`. Append tests to `src/tests/resources.test.ts` verifying Moon has water ice and helium-3, Mars has CO₂ and water ice, all profile entries have positive extraction rates, Earth has no profile.
 - **Verification**: `npx vitest run src/tests/resources.test.ts && npx tsc --noEmit src/data/bodies.ts`
 
 ### TASK-004: Add cargo module parts (Cargo Bay, Pressurized Tank, Cryo Tank)
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001
 - **Description**: Add `CARGO_BAY`, `PRESSURIZED_TANK`, `CRYO_TANK` to the `PartType` enum in `src/core/constants.ts`. Add these three types to `STACK_TYPES` in `src/data/parts.ts`. Add three part definitions to the `PARTS` array: cargo-bay-mk1 (500kg, SOLID), pressurized-tank-mk1 (300kg, GAS), cryo-tank-mk1 (400kg, LIQUID). Each has `properties.cargoCapacityKg` and `properties.cargoState`. Follow existing part definition patterns (makeSnapPoint, RELIABILITY_TIERS.MID, ActivationBehaviour.NONE, etc.). Append tests to `src/tests/resources.test.ts` verifying part types exist and catalog contains parts with correct cargo state/capacity.
 - **Verification**: `npx vitest run src/tests/resources.test.ts`
 
 ### TASK-005: Add mining module parts (9 modules)
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001
 - **Description**: Add `MINING_MODULE` to `PartType` in `src/core/constants.ts` and to `STACK_TYPES` in `src/data/parts.ts`. Add `MINE` and `LAUNCH_RESOURCES` to `ActivationBehaviour` in `src/data/parts.ts` (insert before the Object.freeze). Add 9 mining module part definitions to the `PARTS` array: base-control-unit-mk1, mining-drill-mk1, gas-collector-mk1, fluid-extractor-mk1, refinery-mk1, storage-silo-mk1, pressure-vessel-mk1, fluid-tank-mk1, surface-launch-pad-mk1, power-generator-solar-mk1. All use `type: PartType.MINING_MODULE` with `properties.miningModuleType` set to the matching `MiningModuleType` value. See requirements.md §1 mining module table for property values. Append tests to `src/tests/resources.test.ts` verifying all 9 modules exist with correct types.
 - **Verification**: `npx vitest run src/tests/resources.test.ts`
 
 ### TASK-006: Add MiningSite, Route, ProvenLeg types and fields to GameState
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001
 - **Description**: Add `MiningSiteModule`, `MiningSite`, `RouteLocation`, `RouteLeg`, `RouteStatus`, `Route`, and `ProvenLeg` interfaces to `src/core/gameState.ts` as specified in requirements.md §2 and §3. Import `ResourceType` and `MiningModuleType` from constants.ts. Add three new fields to the `GameState` interface: `miningSites: MiningSite[]`, `provenLegs: ProvenLeg[]`, `routes: Route[]`. Initialize all three to `[]` in the `createGameState()` function. Create `src/tests/mining.test.ts` with tests verifying the three new arrays exist and are empty on a fresh game state.
 - **Verification**: `npx vitest run src/tests/mining.test.ts && npx tsc --noEmit src/core/gameState.ts`

@@ -212,6 +212,9 @@ export function makeGameState(overrides: Partial<GameState> = {}): GameState {
     autoSaveEnabled: true,
     debugMode: false,
     showPerfDashboard: false,
+    miningSites: [],
+    provenLegs: [],
+    routes: [],
     ...overrides,
   };
 }

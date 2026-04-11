@@ -33,7 +33,7 @@
  * 40 px wide.  Use this as a guide when sizing new parts.
  */
 
-import { PartType, FuelType, RELIABILITY_TIERS, SatelliteType } from '../core/constants.ts';
+import { PartType, FuelType, RELIABILITY_TIERS, SatelliteType, MiningModuleType } from '../core/constants.ts';
 
 // ---------------------------------------------------------------------------
 // Activation Behaviour Enum
@@ -81,6 +81,12 @@ export const ActivationBehaviour = Object.freeze({
 
   /** Grabbing arm: extend, grab a satellite, or release a grabbed satellite. */
   GRAB: 'GRAB',
+
+  /** Mining module: begin resource extraction operation. */
+  MINE: 'MINE',
+
+  /** Surface launch pad: launch accumulated resources to orbital buffer. */
+  LAUNCH_RESOURCES: 'LAUNCH_RESOURCES',
 } as const);
 
 export type ActivationBehaviour = (typeof ActivationBehaviour)[keyof typeof ActivationBehaviour];
@@ -165,6 +171,10 @@ export const STACK_TYPES: readonly string[] = Object.freeze([
   PartType.ANTENNA,
   PartType.SENSOR,
   PartType.INSTRUMENT,
+  PartType.CARGO_BAY,
+  PartType.PRESSURIZED_TANK,
+  PartType.CRYO_TANK,
+  PartType.MINING_MODULE,
 ]);
 
 /**
@@ -2470,6 +2480,364 @@ export const PARTS: PartDef[] = [
       dragCoefficient: 0.10,
       heatTolerance: 2000,
       crashThreshold: 18,
+    },
+  },
+
+  // -------------------------------------------------------------------------
+  // Cargo Modules
+  // -------------------------------------------------------------------------
+
+  {
+    id: 'cargo-bay-mk1',
+    name: 'Cargo Bay Mk1',
+    description: 'A sturdy cargo bay for transporting solid materials like ore and regolith. Unpressurized open-frame design.',
+    type: PartType.CARGO_BAY,
+    reliability: RELIABILITY_TIERS.MID,
+    mass: 500,
+    cost: 15_000,
+    width: 40,
+    height: 30,
+    snapPoints: [
+      makeSnapPoint('top', 0, -15, STACK_TYPES),
+      makeSnapPoint('bottom', 0, 15, STACK_TYPES),
+    ],
+    animationStates: ['idle'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      cargoCapacityKg: 500,
+      cargoState: 'SOLID',
+      dragCoefficient: 0.25,
+      heatTolerance: 1800,
+      crashThreshold: 12,
+    },
+  },
+
+  {
+    id: 'pressurized-tank-mk1',
+    name: 'Pressurized Tank Mk1',
+    description: 'A high-pressure vessel for transporting gaseous resources. Reinforced walls maintain containment during flight.',
+    type: PartType.PRESSURIZED_TANK,
+    reliability: RELIABILITY_TIERS.MID,
+    mass: 300,
+    cost: 20_000,
+    width: 30,
+    height: 40,
+    snapPoints: [
+      makeSnapPoint('top', 0, -20, STACK_TYPES),
+      makeSnapPoint('bottom', 0, 20, STACK_TYPES),
+    ],
+    animationStates: ['idle'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      cargoCapacityKg: 300,
+      cargoState: 'GAS',
+      dragCoefficient: 0.18,
+      heatTolerance: 1500,
+      crashThreshold: 8,
+    },
+  },
+
+  {
+    id: 'cryo-tank-mk1',
+    name: 'Cryo Tank Mk1',
+    description: 'A cryogenically cooled tank for transporting liquid resources. Active cooling prevents boil-off during long missions.',
+    type: PartType.CRYO_TANK,
+    reliability: RELIABILITY_TIERS.MID,
+    mass: 400,
+    cost: 25_000,
+    width: 30,
+    height: 50,
+    snapPoints: [
+      makeSnapPoint('top', 0, -25, STACK_TYPES),
+      makeSnapPoint('bottom', 0, 25, STACK_TYPES),
+    ],
+    animationStates: ['idle'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      cargoCapacityKg: 400,
+      cargoState: 'LIQUID',
+      dragCoefficient: 0.18,
+      heatTolerance: 1200,
+      crashThreshold: 6,
+    },
+  },
+
+  // =========================================================================
+  // MINING MODULES (surface-deployed)
+  // =========================================================================
+
+  {
+    id: 'base-control-unit-mk1',
+    name: 'Base Control Unit Mk1',
+    description: 'Central command module for a mining site. Required to establish a new mining outpost on any celestial body.',
+    type: PartType.MINING_MODULE,
+    reliability: RELIABILITY_TIERS.MID,
+    mass: 800,
+    cost: 50_000,
+    width: 40,
+    height: 30,
+    snapPoints: [
+      makeSnapPoint('top', 0, -15, STACK_TYPES),
+      makeSnapPoint('bottom', 0, 15, STACK_TYPES),
+    ],
+    animationStates: ['idle', 'active'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      miningModuleType: MiningModuleType.BASE_CONTROL_UNIT,
+      powerDraw: 10,
+      dragCoefficient: 0.30,
+      heatTolerance: 1800,
+      crashThreshold: 10,
+    },
+  },
+
+  {
+    id: 'mining-drill-mk1',
+    name: 'Mining Drill Mk1',
+    description: 'Extracts solid resources from the surface. Requires connection to a Base Control Unit and power supply.',
+    type: PartType.MINING_MODULE,
+    reliability: RELIABILITY_TIERS.MID,
+    mass: 600,
+    cost: 30_000,
+    width: 30,
+    height: 40,
+    snapPoints: [
+      makeSnapPoint('top', 0, -20, STACK_TYPES),
+      makeSnapPoint('bottom', 0, 20, STACK_TYPES),
+    ],
+    animationStates: ['idle', 'drilling'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.MINE,
+    properties: {
+      miningModuleType: MiningModuleType.MINING_DRILL,
+      powerDraw: 25,
+      extractionMultiplier: 1.0,
+      dragCoefficient: 0.28,
+      heatTolerance: 1800,
+      crashThreshold: 8,
+    },
+  },
+
+  {
+    id: 'gas-collector-mk1',
+    name: 'Gas Collector Mk1',
+    description: 'Collects gaseous resources from the atmosphere or surface vents. Requires power and storage.',
+    type: PartType.MINING_MODULE,
+    reliability: RELIABILITY_TIERS.MID,
+    mass: 450,
+    cost: 35_000,
+    width: 30,
+    height: 35,
+    snapPoints: [
+      makeSnapPoint('top', 0, -17, STACK_TYPES),
+      makeSnapPoint('bottom', 0, 18, STACK_TYPES),
+    ],
+    animationStates: ['idle', 'collecting'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.MINE,
+    properties: {
+      miningModuleType: MiningModuleType.GAS_COLLECTOR,
+      powerDraw: 20,
+      extractionMultiplier: 1.0,
+      dragCoefficient: 0.22,
+      heatTolerance: 1500,
+      crashThreshold: 8,
+    },
+  },
+
+  {
+    id: 'fluid-extractor-mk1',
+    name: 'Fluid Extractor Mk1',
+    description: 'Pumps and processes liquid resources from surface deposits. Handles cryogenic fluids safely.',
+    type: PartType.MINING_MODULE,
+    reliability: RELIABILITY_TIERS.MID,
+    mass: 550,
+    cost: 40_000,
+    width: 30,
+    height: 40,
+    snapPoints: [
+      makeSnapPoint('top', 0, -20, STACK_TYPES),
+      makeSnapPoint('bottom', 0, 20, STACK_TYPES),
+    ],
+    animationStates: ['idle', 'extracting'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.MINE,
+    properties: {
+      miningModuleType: MiningModuleType.FLUID_EXTRACTOR,
+      powerDraw: 30,
+      extractionMultiplier: 1.0,
+      dragCoefficient: 0.24,
+      heatTolerance: 1500,
+      crashThreshold: 8,
+    },
+  },
+
+  {
+    id: 'refinery-mk1',
+    name: 'Refinery Mk1',
+    description: 'Processes raw resources into refined products using configurable recipes. High power consumption.',
+    type: PartType.MINING_MODULE,
+    reliability: RELIABILITY_TIERS.MID,
+    mass: 1000,
+    cost: 60_000,
+    width: 40,
+    height: 40,
+    snapPoints: [
+      makeSnapPoint('top', 0, -20, STACK_TYPES),
+      makeSnapPoint('bottom', 0, 20, STACK_TYPES),
+    ],
+    animationStates: ['idle', 'processing'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.MINE,
+    properties: {
+      miningModuleType: MiningModuleType.REFINERY,
+      powerDraw: 40,
+      processingMultiplier: 1.0,
+      dragCoefficient: 0.30,
+      heatTolerance: 2000,
+      crashThreshold: 10,
+    },
+  },
+
+  {
+    id: 'storage-silo-mk1',
+    name: 'Storage Silo Mk1',
+    description: 'Bulk storage for solid resources. Large capacity open-frame silo.',
+    type: PartType.MINING_MODULE,
+    reliability: RELIABILITY_TIERS.MID,
+    mass: 400,
+    cost: 12_000,
+    width: 40,
+    height: 50,
+    snapPoints: [
+      makeSnapPoint('top', 0, -25, STACK_TYPES),
+      makeSnapPoint('bottom', 0, 25, STACK_TYPES),
+    ],
+    animationStates: ['idle'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      miningModuleType: MiningModuleType.STORAGE_SILO,
+      powerDraw: 2,
+      storageCapacityKg: 2000,
+      storageState: 'SOLID',
+      dragCoefficient: 0.28,
+      heatTolerance: 1800,
+      crashThreshold: 10,
+    },
+  },
+
+  {
+    id: 'pressure-vessel-mk1',
+    name: 'Pressure Vessel Mk1',
+    description: 'High-pressure storage for gaseous resources. Reinforced containment vessel.',
+    type: PartType.MINING_MODULE,
+    reliability: RELIABILITY_TIERS.MID,
+    mass: 350,
+    cost: 18_000,
+    width: 30,
+    height: 40,
+    snapPoints: [
+      makeSnapPoint('top', 0, -20, STACK_TYPES),
+      makeSnapPoint('bottom', 0, 20, STACK_TYPES),
+    ],
+    animationStates: ['idle'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      miningModuleType: MiningModuleType.PRESSURE_VESSEL,
+      powerDraw: 5,
+      storageCapacityKg: 1000,
+      storageState: 'GAS',
+      dragCoefficient: 0.20,
+      heatTolerance: 1500,
+      crashThreshold: 8,
+    },
+  },
+
+  {
+    id: 'fluid-tank-mk1',
+    name: 'Fluid Tank Mk1',
+    description: 'Insulated tank for storing liquid resources. Temperature-controlled to prevent boil-off.',
+    type: PartType.MINING_MODULE,
+    reliability: RELIABILITY_TIERS.MID,
+    mass: 380,
+    cost: 22_000,
+    width: 30,
+    height: 45,
+    snapPoints: [
+      makeSnapPoint('top', 0, -22, STACK_TYPES),
+      makeSnapPoint('bottom', 0, 23, STACK_TYPES),
+    ],
+    animationStates: ['idle'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      miningModuleType: MiningModuleType.FLUID_TANK,
+      powerDraw: 8,
+      storageCapacityKg: 1500,
+      storageState: 'LIQUID',
+      dragCoefficient: 0.20,
+      heatTolerance: 1200,
+      crashThreshold: 6,
+    },
+  },
+
+  {
+    id: 'surface-launch-pad-mk1',
+    name: 'Surface Launch Pad Mk1',
+    description: 'Launches resources from the surface into orbital buffer for automated route pickup. High power requirement.',
+    type: PartType.MINING_MODULE,
+    reliability: RELIABILITY_TIERS.MID,
+    mass: 1200,
+    cost: 80_000,
+    width: 50,
+    height: 30,
+    snapPoints: [
+      makeSnapPoint('top', 0, -15, STACK_TYPES),
+      makeSnapPoint('bottom', 0, 15, STACK_TYPES),
+    ],
+    animationStates: ['idle', 'launching'],
+    activatable: true,
+    activationBehaviour: ActivationBehaviour.LAUNCH_RESOURCES,
+    properties: {
+      miningModuleType: MiningModuleType.SURFACE_LAUNCH_PAD,
+      powerDraw: 50,
+      launchCapacityKgPerPeriod: 200,
+      dragCoefficient: 0.35,
+      heatTolerance: 2500,
+      crashThreshold: 12,
+    },
+  },
+
+  {
+    id: 'power-generator-solar-mk1',
+    name: 'Power Generator (Solar) Mk1',
+    description: 'Solar-powered generator for mining sites. Provides baseline power for extraction and processing operations.',
+    type: PartType.MINING_MODULE,
+    reliability: RELIABILITY_TIERS.MID,
+    mass: 200,
+    cost: 25_000,
+    width: 50,
+    height: 10,
+    snapPoints: [
+      makeSnapPoint('top', 0, -5, STACK_TYPES),
+      makeSnapPoint('bottom', 0, 5, STACK_TYPES),
+    ],
+    animationStates: ['idle', 'deployed'],
+    activatable: false,
+    activationBehaviour: ActivationBehaviour.NONE,
+    properties: {
+      miningModuleType: MiningModuleType.POWER_GENERATOR,
+      powerDraw: 0,
+      powerOutput: 100,
+      dragCoefficient: 0.15,
+      heatTolerance: 1500,
+      crashThreshold: 5,
     },
   },
 

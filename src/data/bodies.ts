@@ -18,7 +18,7 @@
  * @module data/bodies
  */
 
-import { BeltZone } from '../core/constants.js';
+import { BeltZone, ResourceType } from '../core/constants.js';
 
 // ---------------------------------------------------------------------------
 // Type Definitions
@@ -85,6 +85,12 @@ export interface AltitudeBand {
   unsafe?: boolean;
 }
 
+export interface BodyResourceEntry {
+  resourceType: ResourceType;
+  extractionRateKgPerPeriod: number;
+  abundance: number;
+}
+
 export interface CelestialBodyDef {
   /** Unique body identifier (matches CelestialBody enum). */
   id: string;
@@ -124,6 +130,8 @@ export interface CelestialBodyDef {
   minOrbitAltitude: number;
   /** Description of destruction hazard or null. */
   destructionZone: string | null;
+  /** Available resources for mining operations. */
+  resourceProfile?: readonly BodyResourceEntry[];
 }
 
 // ---------------------------------------------------------------------------
@@ -337,6 +345,12 @@ const MOON: CelestialBodyDef = {
   childIds: [],
   minOrbitAltitude: 15_000,
   destructionZone: null,
+  resourceProfile: Object.freeze([
+    { resourceType: ResourceType.WATER_ICE, extractionRateKgPerPeriod: 50, abundance: 0.3 },
+    { resourceType: ResourceType.REGOLITH, extractionRateKgPerPeriod: 200, abundance: 0.9 },
+    { resourceType: ResourceType.IRON_ORE, extractionRateKgPerPeriod: 30, abundance: 0.2 },
+    { resourceType: ResourceType.HELIUM_3, extractionRateKgPerPeriod: 5, abundance: 0.05 },
+  ]),
 };
 
 const MARS: CelestialBodyDef = {
@@ -382,6 +396,12 @@ const MARS: CelestialBodyDef = {
   childIds: ['PHOBOS', 'DEIMOS'],
   minOrbitAltitude: 80_000,
   destructionZone: null,
+  resourceProfile: Object.freeze([
+    { resourceType: ResourceType.WATER_ICE, extractionRateKgPerPeriod: 80, abundance: 0.4 },
+    { resourceType: ResourceType.REGOLITH, extractionRateKgPerPeriod: 250, abundance: 0.95 },
+    { resourceType: ResourceType.CO2, extractionRateKgPerPeriod: 150, abundance: 0.8 },
+    { resourceType: ResourceType.OXYGEN, extractionRateKgPerPeriod: 20, abundance: 0.1 },
+  ]),
 };
 
 const PHOBOS: CelestialBodyDef = {
@@ -489,6 +509,11 @@ const CERES: CelestialBodyDef = {
   childIds: [],
   minOrbitAltitude: 5_000,
   destructionZone: null,
+  resourceProfile: Object.freeze([
+    { resourceType: ResourceType.IRON_ORE, extractionRateKgPerPeriod: 100, abundance: 0.6 },
+    { resourceType: ResourceType.RARE_METALS, extractionRateKgPerPeriod: 10, abundance: 0.08 },
+    { resourceType: ResourceType.WATER_ICE, extractionRateKgPerPeriod: 40, abundance: 0.25 },
+  ]),
 };
 
 const JUPITER: CelestialBodyDef = {
@@ -532,6 +557,9 @@ const JUPITER: CelestialBodyDef = {
   childIds: [],
   minOrbitAltitude: 200_000_000,
   destructionZone: 'extreme_pressure',
+  resourceProfile: Object.freeze([
+    { resourceType: ResourceType.HYDROGEN, extractionRateKgPerPeriod: 500, abundance: 0.9 },
+  ]),
 };
 
 const SATURN: CelestialBodyDef = {
@@ -575,6 +603,9 @@ const SATURN: CelestialBodyDef = {
   childIds: ['TITAN'],
   minOrbitAltitude: 150_000_000,
   destructionZone: 'extreme_pressure',
+  resourceProfile: Object.freeze([
+    { resourceType: ResourceType.HYDROGEN, extractionRateKgPerPeriod: 400, abundance: 0.85 },
+  ]),
 };
 
 const TITAN: CelestialBodyDef = {
@@ -620,6 +651,9 @@ const TITAN: CelestialBodyDef = {
   childIds: [],
   minOrbitAltitude: 200_000,
   destructionZone: null,
+  resourceProfile: Object.freeze([
+    { resourceType: ResourceType.LIQUID_METHANE, extractionRateKgPerPeriod: 200, abundance: 0.7 },
+  ]),
 };
 
 // ---------------------------------------------------------------------------

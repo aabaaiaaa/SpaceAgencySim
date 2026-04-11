@@ -63,6 +63,14 @@ export const PartType = Object.freeze({
   INSTRUMENT: 'INSTRUMENT',
   /** Grabbing arm for attaching to satellites for repair and servicing. */
   GRABBING_ARM: 'GRABBING_ARM',
+  /** Cargo bay for transporting solid resources. */
+  CARGO_BAY: 'CARGO_BAY',
+  /** Pressurized tank for transporting gaseous resources. */
+  PRESSURIZED_TANK: 'PRESSURIZED_TANK',
+  /** Cryo-cooled tank for transporting liquid resources. */
+  CRYO_TANK: 'CRYO_TANK',
+  /** Mining module deployed on a celestial body surface. */
+  MINING_MODULE: 'MINING_MODULE',
 } as const);
 
 export type PartType = (typeof PartType)[keyof typeof PartType];

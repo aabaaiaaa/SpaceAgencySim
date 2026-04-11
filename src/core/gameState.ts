@@ -27,6 +27,8 @@ import type {
   ContractCategory,
   DifficultySettings,
   FieldCraftStatus,
+  MiningModuleType,
+  ResourceType,
   SatelliteType,
   SurfaceItemType,
 } from './constants.ts';
@@ -665,6 +667,73 @@ export interface ChallengesState {
   results: Record<string, ChallengeResultEntry>;
 }
 
+// ---------------------------------------------------------------------------
+// Mining & Route Types
+// ---------------------------------------------------------------------------
+
+export interface MiningSiteModule {
+  id: string;
+  partId: string;
+  type: MiningModuleType;
+  powerDraw: number;
+  connections: string[];    // bidirectional adjacency list
+  recipeId?: string;        // REFINERY modules only
+}
+
+export interface MiningSite {
+  id: string;
+  name: string;
+  bodyId: string;
+  coordinates: { x: number; y: number };
+  controlUnit: { partId: string };
+  modules: MiningSiteModule[];
+  storage: Partial<Record<ResourceType, number>>;
+  production: Partial<Record<ResourceType, number>>;
+  powerGenerated: number;
+  powerRequired: number;
+  orbitalBuffer: Partial<Record<ResourceType, number>>;
+}
+
+export interface RouteLocation {
+  bodyId: string;
+  locationType: 'surface' | 'orbit';
+  altitude?: number;
+}
+
+export interface RouteLeg {
+  id: string;
+  origin: RouteLocation;
+  destination: RouteLocation;
+  craftDesignId: string;
+  craftCount: number;
+  cargoCapacityKg: number;
+  costPerRun: number;
+  provenFlightId: string;
+}
+
+export type RouteStatus = 'active' | 'paused' | 'broken';
+
+export interface Route {
+  id: string;
+  name: string;
+  status: RouteStatus;
+  resourceType: ResourceType;
+  legs: RouteLeg[];
+  throughputPerPeriod: number;
+  totalCostPerPeriod: number;
+}
+
+export interface ProvenLeg {
+  id: string;
+  origin: RouteLocation;
+  destination: RouteLocation;
+  craftDesignId: string;
+  cargoCapacityKg: number;
+  costPerRun: number;
+  provenFlightId: string;
+  dateProven: number;
+}
+
 /** The complete game state.  All subsystems read from and write to this shape. */
 export interface GameState {
   /** Player-assigned agency name (set on new game). */
@@ -776,6 +845,12 @@ export interface GameState {
   debugMode: boolean;
   /** Whether the performance dashboard overlay is visible. Default: off. */
   showPerfDashboard: boolean;
+  /** Active mining sites deployed on celestial bodies. */
+  miningSites: MiningSite[];
+  /** Legs proven by manual flights, available for route assembly. */
+  provenLegs: ProvenLeg[];
+  /** Automated resource transport routes. */
+  routes: Route[];
 }
 
 // ---------------------------------------------------------------------------
@@ -912,6 +987,11 @@ export function createGameState(): GameState {
 
     // Performance dashboard — disabled by default.
     showPerfDashboard: false,
+
+    // Resource transportation system.
+    miningSites: [],
+    provenLegs: [],
+    routes: [],
   };
 }
 
