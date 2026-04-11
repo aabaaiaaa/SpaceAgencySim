@@ -103,7 +103,7 @@
 - **Verification**: `npx vitest run src/tests/hubs.test.ts` passes. `npm run test:unit` passes (no regressions).
 
 ### TASK-013: Core hub module — CRUD and helpers
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-012
 - **Description**: Create `src/core/hubs.ts` with: `getActiveHub()`, `getHub()`, `setActiveHub()`, `getHubsOnBody()`, `createHub()`, `getEnvironmentCategory()`, `getEnvironmentCostMultiplier()`, `getImportTaxMultiplier()`. `createHub()` generates a unique hub ID, computes environment-scaled Crew Hab construction project, and pushes the new hub (offline) onto `state.hubs`. Write unit tests in `src/tests/hubs.test.ts` for all CRUD operations and environment/tax helpers. See implementation plan for exact function signatures and test cases.
 - **Verification**: `npx vitest run src/tests/hubs.test.ts` passes.
@@ -205,7 +205,7 @@
 - **Verification**: `npx playwright test e2e/hubs-map.spec.ts` passes.
 
 ### TASK-030: E2E save factory updates for hubs
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-012
 - **Description**: Update `buildSaveEnvelope()` in `e2e/helpers/_saveFactory.ts` to accept `hubs` and `activeHubId` options. Default behaviour (no hubs passed): create an Earth hub from the existing `facilities` field for backward compatibility. Add `buildHub()` and `buildOrbitalHub()` E2E factories in `e2e/helpers/_factories.ts`. Update barrel re-export in `e2e/helpers.js`. Verify all existing E2E tests still pass with the updated factory.
 - **Verification**: `npx playwright test e2e/smoke.spec.ts e2e/saveload.spec.ts` passes. `npx tsc --noEmit` passes.

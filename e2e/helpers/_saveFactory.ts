@@ -4,7 +4,7 @@
 
 import { STARTING_MONEY, STARTER_FACILITIES } from './_constants.js';
 import type { FacilityState } from './_constants.js';
-import type { CrewMember } from './_factories.js';
+import type { CrewMember, HubSave } from './_factories.js';
 
 // ---------------------------------------------------------------------------
 // Sub-interfaces for complex nested state shapes
@@ -91,6 +91,8 @@ export interface SaveEnvelopeParams {
   challenges?: ChallengesState;
   customChallenges?: Record<string, unknown>[];
   fieldCraft?: Record<string, unknown>[];
+  hubs?: HubSave[];
+  activeHubId?: string;
   autoSaveEnabled?: boolean;
   debugMode?: boolean;
 }
@@ -134,6 +136,8 @@ export interface SaveEnvelopeState {
   challenges: ChallengesState;
   customChallenges: Record<string, unknown>[];
   fieldCraft: Record<string, unknown>[];
+  hubs: HubSave[];
+  activeHubId: string;
   autoSaveEnabled: boolean;
   debugMode: boolean;
 }
@@ -156,46 +160,66 @@ export interface SaveEnvelope {
  * Supports the FULL game state shape — any progression point can be expressed
  * by overriding the relevant fields.
  */
-export function buildSaveEnvelope({
-  version         = 2,
-  saveName        = 'E2E Test',
-  money           = STARTING_MONEY,
-  missions        = { available: [], accepted: [], completed: [] },
-  crew            = [],
-  rockets         = [],
-  savedDesigns    = [],
-  parts           = [],
-  agencyName      = 'Test Agency',
-  loan            = { balance: STARTING_MONEY, interestRate: 0.03, totalInterestAccrued: 0 },
-  flightHistory   = [],
-  currentPeriod   = 0,
-  playTimeSeconds = 0,
-  flightTimeSeconds = 0,
-  currentFlight   = null,
-  orbitalObjects  = [],
-  vabAssembly     = null,
-  vabStagingConfig= null,
-  tutorialMode    = true,
-  gameMode        = null,
-  sandboxSettings = null,
-  difficultySettings = { malfunctionFrequency: 'normal', weatherSeverity: 'normal', financialPressure: 'normal', injuryDuration: 'normal' },
-  facilities      = STARTER_FACILITIES,
-  contracts       = { board: [], active: [], completed: [], failed: [] },
-  reputation      = 50,
-  sciencePoints   = 0,
-  scienceLog      = [],
-  techTree        = { researched: [], unlockedInstruments: [] },
-  satelliteNetwork= { satellites: [] },
-  partInventory   = [],
-  weather         = null,
-  surfaceItems    = [],
-  achievements    = [],
-  challenges      = { active: null, results: {} },
-  customChallenges= [],
-  fieldCraft      = [],
-  autoSaveEnabled    = true,
-  debugMode          = false,
-}: SaveEnvelopeParams = {}): SaveEnvelope {
+export function buildSaveEnvelope(params: SaveEnvelopeParams = {}): SaveEnvelope {
+  const {
+    version         = 2,
+    saveName        = 'E2E Test',
+    money           = STARTING_MONEY,
+    missions        = { available: [], accepted: [], completed: [] },
+    crew            = [],
+    rockets         = [],
+    savedDesigns    = [],
+    parts           = [],
+    agencyName      = 'Test Agency',
+    loan            = { balance: STARTING_MONEY, interestRate: 0.03, totalInterestAccrued: 0 },
+    flightHistory   = [],
+    currentPeriod   = 0,
+    playTimeSeconds = 0,
+    flightTimeSeconds = 0,
+    currentFlight   = null,
+    orbitalObjects  = [],
+    vabAssembly     = null,
+    vabStagingConfig= null,
+    tutorialMode    = true,
+    gameMode        = null,
+    sandboxSettings = null,
+    difficultySettings = { malfunctionFrequency: 'normal', weatherSeverity: 'normal', financialPressure: 'normal', injuryDuration: 'normal' },
+    facilities      = STARTER_FACILITIES,
+    contracts       = { board: [], active: [], completed: [], failed: [] },
+    reputation      = 50,
+    sciencePoints   = 0,
+    scienceLog      = [],
+    techTree        = { researched: [], unlockedInstruments: [] },
+    satelliteNetwork= { satellites: [] },
+    partInventory   = [],
+    weather         = null,
+    surfaceItems    = [],
+    achievements    = [],
+    challenges      = { active: null, results: {} },
+    customChallenges= [],
+    fieldCraft      = [],
+    autoSaveEnabled    = true,
+    debugMode          = false,
+  } = params;
+
+  // Default hubs uses the resolved `facilities` value so existing callers
+  // that only override `facilities` automatically get a matching Earth hub.
+  const hubs = params.hubs ?? [{
+    id: 'earth',
+    name: 'Earth HQ',
+    type: 'surface' as const,
+    bodyId: 'EARTH',
+    coordinates: { x: 0, y: 0 },
+    facilities: { ...facilities },
+    tourists: [],
+    partInventory: [],
+    constructionQueue: [],
+    maintenanceCost: 0,
+    established: 0,
+    online: true,
+  }];
+  const activeHubId = params.activeHubId ?? 'earth';
+
   return {
     saveName,
     timestamp: new Date().toISOString(),
@@ -235,6 +259,8 @@ export function buildSaveEnvelope({
       challenges,
       customChallenges,
       fieldCraft,
+      hubs,
+      activeHubId,
       autoSaveEnabled,
       debugMode,
     },

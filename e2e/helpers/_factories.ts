@@ -1,5 +1,5 @@
 /**
- * Data factories for E2E tests — crew members, contracts, and objectives.
+ * Data factories for E2E tests — crew members, contracts, objectives, and hubs.
  */
 
 import type { ObjectiveTemplate } from './_constants.js';
@@ -126,4 +126,65 @@ export function buildObjective({
   description = '',
 }: Partial<ObjectiveTemplate> = {}): ObjectiveTemplate {
   return { id, type, target, completed, description };
+}
+
+// ---------------------------------------------------------------------------
+// Hub factories
+// ---------------------------------------------------------------------------
+
+export interface HubSave {
+  id: string;
+  name: string;
+  type: 'surface' | 'orbital';
+  bodyId: string;
+  altitude?: number;
+  coordinates?: { x: number; y: number };
+  biomeId?: string;
+  facilities: Record<string, { built: boolean; tier: number }>;
+  tourists: Record<string, unknown>[];
+  partInventory: Record<string, unknown>[];
+  constructionQueue: Record<string, unknown>[];
+  maintenanceCost: number;
+  established: number;
+  online: boolean;
+}
+
+/**
+ * Create a surface hub save object (defaults to Moon outpost).
+ */
+export function buildHub({
+  id = 'hub-test-1',
+  name = 'Test Outpost',
+  type = 'surface' as const,
+  bodyId = 'MOON',
+  coordinates = { x: 0, y: 0 },
+  facilities = {},
+  tourists = [],
+  partInventory = [],
+  constructionQueue = [],
+  maintenanceCost = 0,
+  established = 0,
+  online = true,
+}: Partial<HubSave> = {}): HubSave {
+  return { id, name, type, bodyId, coordinates, facilities, tourists, partInventory, constructionQueue, maintenanceCost, established, online };
+}
+
+/**
+ * Create an orbital hub save object (defaults to Earth orbit at 200km).
+ */
+export function buildOrbitalHub({
+  id = 'hub-orbital-test-1',
+  name = 'Test Station',
+  type = 'orbital' as const,
+  bodyId = 'EARTH',
+  altitude = 200_000,
+  facilities = {},
+  tourists = [],
+  partInventory = [],
+  constructionQueue = [],
+  maintenanceCost = 0,
+  established = 0,
+  online = true,
+}: Partial<HubSave> = {}): HubSave {
+  return { id, name, type, bodyId, altitude, facilities, tourists, partInventory, constructionQueue, maintenanceCost, established, online };
 }
