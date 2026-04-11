@@ -29,13 +29,13 @@ See `.devloop/requirements.md` for full context on all items below.
 - **Verification**: `npx vitest run src/tests/mining.test.ts && npx tsc --noEmit src/core/gameState.ts src/core/mining.ts`
 
 ### TASK-004: Refactor extraction to use per-module storage
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-003
 - **Description**: In `src/core/mining.ts`, update `processMiningSites()` to distribute extracted resources proportionally across connected storage modules based on each module's remaining capacity (see requirements.md section 3 "Extraction Changes"). After distributing, call `recomputeSiteStorage(site)`. Update existing extraction tests in `mining.test.ts` to verify resources appear in individual module `stored` records as well as `site.storage`.
 - **Verification**: `npx vitest run src/tests/mining.test.ts`
 
 ### TASK-005: Refactor refinery processing to use per-module storage
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-003
 - **Description**: In `src/core/refinery.ts`, update `processRefineries()` to read input resources from individual connected storage modules' `stored` fields and write output resources to individual connected storage modules proportionally. Consume inputs proportionally from source modules. After processing, call `recomputeSiteStorage(site)`. Update existing refinery tests in `refinery.test.ts` to verify module-level storage changes. See requirements.md section 3 "Refinery Changes".
 - **Verification**: `npx vitest run src/tests/refinery.test.ts`
@@ -73,7 +73,7 @@ See `.devloop/requirements.md` for full context on all items below.
 - **Verification**: `npx tsc --noEmit src/core/period.ts`
 
 ### TASK-010: Wire process function return values into advancePeriod()
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-009, TASK-008
 - **Description**: Update `processMiningSites()`, `processRefineries()`, `processSurfaceLaunchPads()`, and `processRoutes()` to return summary objects (extracted amounts, produced/consumed, transferred, revenue/cost/delivered). In `advancePeriod()` (period.ts lines 177–180), capture these return values and include them in the `PeriodSummary` return object. See requirements.md section 5.
 - **Verification**: `npx vitest run src/tests/mining.test.ts && npx vitest run src/tests/refinery.test.ts && npx vitest run src/tests/routes.test.ts`
@@ -105,7 +105,7 @@ See `.devloop/requirements.md` for full context on all items below.
 - **Verification**: `npx tsc --noEmit src/ui/logistics.ts` and manually verify legs and routes render on the map via dev server.
 
 ### TASK-014a: Implement route builder mode — UI scaffold and resource picker
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-013
 - **Description**: Add a "Create Route" button below the map. When clicked, enter route builder mode: show a builder panel with a resource type dropdown (filtered to resources that have at least one proven leg touching a body that produces them), a route name text input, a "legs chain" display area (initially empty), and Cancel/Confirm buttons. Cancel exits builder mode. The builder state (selected resource, chain of legs, current body position) should be managed as local UI state. See requirements.md section 7 "Route Creation Workflow" steps 1–2.
 - **Verification**: `npx tsc --noEmit src/ui/logistics.ts` and manually verify the builder panel appears/disappears via dev server.
@@ -161,7 +161,7 @@ See `.devloop/requirements.md` for full context on all items below.
 - **Verification**: `npx playwright test e2e/mining-interactions.spec.ts`
 
 ### TASK-021: E2E test for route management interactions
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-015
 - **Description**: Create `e2e/route-interactions.spec.ts`. Inject game state with an active route (with proven legs and at least one route). Test: (1) Navigate to Logistics Center routes tab, verify route appears in table. (2) Toggle route status (active → paused), verify UI updates. (3) Expand a route, verify leg details appear with +/− craft buttons. Each test is independent. Use Playwright MCP for interactive debugging if tests fail. Tag one test with `@smoke`. See requirements.md section 8.
 - **Verification**: `npx playwright test e2e/route-interactions.spec.ts`

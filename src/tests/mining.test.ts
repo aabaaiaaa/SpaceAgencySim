@@ -327,7 +327,7 @@ describe('processMiningSites', () => {
 
   it('extracts resources with full power @smoke', () => {
     const state = createGameState();
-    const { site } = buildMoonSiteWithDrillAndStorage(state);
+    const { site, silo } = buildMoonSiteWithDrillAndStorage(state);
 
     // Site has powerGenerated=100, powerRequired=27 (25+2), so efficiency is clamped to 1.0
     processMiningSites(state);
@@ -339,6 +339,11 @@ describe('processMiningSites', () => {
 
     expect(waterIce).toBe(50);  // 50 kg/period * 1.0 efficiency * 1.0 multiplier
     expect(regolith).toBe(200); // 200 kg/period * 1.0 efficiency * 1.0 multiplier
+
+    // Verify module-level stored values match site.storage (proportional distribution)
+    expect(silo.stored).toBeDefined();
+    expect(silo.stored![ResourceType.WATER_ICE]).toBe(50);
+    expect(silo.stored![ResourceType.REGOLITH]).toBe(200);
   });
 
   it('no extraction with zero power', () => {
@@ -417,6 +422,11 @@ describe('processMiningSites', () => {
     expect(waterIce).toBeCloseTo(50 * efficiency, 5);
     // REGOLITH: 200 * (10/27) * 1.0
     expect(regolith).toBeCloseTo(200 * efficiency, 5);
+
+    // Verify module-level stored values match site.storage
+    expect(silo.stored).toBeDefined();
+    expect(silo.stored![ResourceType.WATER_ICE]).toBeCloseTo(50 * efficiency, 5);
+    expect(silo.stored![ResourceType.REGOLITH]).toBeCloseTo(200 * efficiency, 5);
   });
 });
 
@@ -579,12 +589,20 @@ describe('Integration: extraction → refining → launch chain', () => {
     const regolithAfterExtraction = site.storage[ResourceType.REGOLITH] ?? 0;
     expect(regolithAfterExtraction).toBeGreaterThan(0);
 
+    // Verify resources flow through module-level storage
+    expect(silo.stored).toBeDefined();
+    expect(silo.stored![ResourceType.WATER_ICE]).toBeGreaterThan(0);
+    expect(silo.stored![ResourceType.REGOLITH]).toBeGreaterThan(0);
+
     // ── Step 2: Refine water ice into hydrogen + oxygen ──
     // Water-electrolysis: 100 kg water ice → 11 kg hydrogen + 89 kg oxygen
     // Scaled by efficiency: needs ~82 kg water ice, produces ~9 kg H2 + ~73 kg O2
     // We have ~41 kg water ice (50 * 0.82), which is less than 82 kg needed,
     // so the refinery may not run if insufficient input.
-    // To ensure the refinery runs, top up water ice in storage.
+    // To ensure the refinery runs, top up water ice in module-level storage
+    // (processRefineries reads from module.stored, not site.storage).
+    if (!silo.stored) silo.stored = {};
+    silo.stored[ResourceType.WATER_ICE] = 200;
     site.storage[ResourceType.WATER_ICE] = 200;
 
     processRefineries(state);

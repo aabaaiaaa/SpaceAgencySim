@@ -235,3 +235,140 @@
   font-size: var(--font-size-body-sm);
   color: var(--color-text-secondary);
 }
+
+/* ===========================================================================
+   Route Builder Panel
+   =========================================================================== */
+
+.logistics-builder-create-btn {
+  display: inline-block;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-default);
+  color: var(--color-text-accent);
+  font-size: var(--font-size-body);
+  font-weight: 600;
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  margin-bottom: var(--space-lg);
+  transition: background var(--transition-default), border-color var(--transition-default);
+}
+
+.logistics-builder-create-btn:hover {
+  background: var(--color-surface-hover);
+  border-color: var(--color-text-accent);
+}
+
+.logistics-builder-panel {
+  background: var(--color-card-bg);
+  border: 2px solid var(--color-text-accent);
+  border-radius: var(--radius-lg);
+  padding: var(--card-padding);
+  margin-bottom: var(--space-lg);
+}
+
+.logistics-builder-heading {
+  font-size: var(--font-size-h3);
+  font-weight: 700;
+  color: var(--color-text-heading);
+  margin: 0 0 var(--space-md);
+}
+
+.logistics-builder-field {
+  margin-bottom: var(--space-md);
+}
+
+.logistics-builder-label {
+  display: block;
+  font-size: var(--font-size-body-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-xs);
+}
+
+.logistics-builder-select,
+.logistics-builder-input {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-default);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  width: 100%;
+  max-width: 400px;
+  box-sizing: border-box;
+}
+
+.logistics-builder-select:focus,
+.logistics-builder-input:focus {
+  outline: none;
+  border-color: var(--color-text-accent);
+}
+
+.logistics-builder-legs {
+  background: var(--color-surface-default);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  padding: var(--space-md);
+  min-height: 60px;
+}
+
+.logistics-builder-legs-empty {
+  color: var(--color-text-secondary);
+  font-style: italic;
+  font-size: var(--font-size-body-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logistics-builder-leg-item {
+  padding: var(--space-xs) 0;
+  font-size: var(--font-size-body-sm);
+  color: var(--color-text-body);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.logistics-builder-leg-item:last-child {
+  border-bottom: none;
+}
+
+.logistics-builder-actions {
+  display: flex;
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+}
+
+.logistics-builder-cancel-btn {
+  background: transparent;
+  border: 1px solid var(--color-border-default);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-body);
+  font-weight: 600;
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-default), color var(--transition-default);
+}
+
+.logistics-builder-cancel-btn:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.logistics-builder-confirm-btn {
+  background: var(--color-text-accent);
+  border: none;
+  color: #fff;
+  font-size: var(--font-size-body);
+  font-weight: 600;
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: opacity var(--transition-default);
+}
+
+.logistics-builder-confirm-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

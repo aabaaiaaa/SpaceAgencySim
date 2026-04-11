@@ -292,22 +292,18 @@ export function processMiningSites(state: GameState): { extracted: Partial<Recor
         const connectedStorage = getConnectedStorage(site, mod.id, resourceDef.state);
         if (connectedStorage.length === 0) continue;
 
-        // Calculate total available storage capacity across connected storage
-        let availableCapacity = 0;
+        // Calculate per-module remaining capacity and total across all connected storage
+        const moduleRemaining: number[] = [];
+        let totalRemaining = 0;
         for (const storageMod of connectedStorage) {
-          const partDef = getPartById(storageMod.partId);
-          if (!partDef) continue;
-          const capacity = (partDef.properties.storageCapacityKg as number) ?? 0;
-          // Each storage module contributes its capacity minus what's currently stored
-          // (stored is site-wide, distributed proportionally, but we simplify to total)
-          availableCapacity += capacity;
+          const capacity = storageMod.storageCapacityKg ?? 0;
+          const usedInModule = Object.values(storageMod.stored ?? {}).reduce((sum, v) => sum + (v ?? 0), 0);
+          const remaining = Math.max(0, capacity - usedInModule);
+          moduleRemaining.push(remaining);
+          totalRemaining += remaining;
         }
 
-        // Subtract total stored from total capacity
-        const totalStored = site.storage[resource.resourceType as ResourceType] ?? 0;
-        availableCapacity = Math.max(0, availableCapacity - totalStored);
-
-        if (availableCapacity <= 0) continue;
+        if (totalRemaining <= 0) continue;
 
         // Get extraction multiplier from the extractor part
         const extractorPartDef = getPartById(mod.partId);
@@ -315,20 +311,30 @@ export function processMiningSites(state: GameState): { extracted: Partial<Recor
           ? ((extractorPartDef.properties.extractionMultiplier as number) ?? 1.0)
           : 1.0;
 
-        // Calculate extraction amount
+        // Calculate extraction amount, capped by total remaining capacity
         const extractedAmount = Math.min(
           resource.extractionRateKgPerPeriod * efficiency * extractionMultiplier,
-          availableCapacity,
+          totalRemaining,
         );
 
         if (extractedAmount > 0) {
-          site.storage[resource.resourceType as ResourceType] =
-            (site.storage[resource.resourceType as ResourceType] ?? 0) + extractedAmount;
-          extracted[resource.resourceType as ResourceType] =
-            (extracted[resource.resourceType as ResourceType] ?? 0) + extractedAmount;
+          // Distribute proportionally across connected storage modules
+          const rt = resource.resourceType as ResourceType;
+          for (let i = 0; i < connectedStorage.length; i++) {
+            const storageMod = connectedStorage[i];
+            const share = extractedAmount * (moduleRemaining[i] / totalRemaining);
+            if (share > 0) {
+              if (!storageMod.stored) storageMod.stored = {};
+              storageMod.stored[rt] = (storageMod.stored[rt] ?? 0) + share;
+            }
+          }
+          extracted[rt] = (extracted[rt] ?? 0) + extractedAmount;
         }
       }
     }
+
+    // Rebuild site.storage from module-level stored values
+    recomputeSiteStorage(site);
   }
   return { extracted };
 }

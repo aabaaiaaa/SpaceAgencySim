@@ -13,6 +13,7 @@ import { MiningModuleType } from '../core/constants.ts';
 import type { ResourceType } from '../core/constants.ts';
 import { REFINERY_RECIPES, setRefineryRecipe } from '../core/refinery.ts';
 import { RESOURCES_BY_ID } from '../data/resources.ts';
+import { getBodyDef } from '../data/bodies.ts';
 import './logistics.css';
 
 // ---------------------------------------------------------------------------
@@ -25,9 +26,25 @@ let _selectedBodyId: string | null = null;
 let _activeTab: 'mining' | 'routes' = 'mining';
 let _expandedRouteIds = new Set<string>();
 
+// Builder mode state (route creation wizard)
+let _builderMode = false;
+let _builderResourceType: string | null = null;
+let _builderRouteName = '';
+let _builderLegs: string[] = []; // proven leg IDs
+let _builderCurrentBodyId: string | null = null;
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/** Reset all builder-mode state back to defaults. */
+function _resetBuilderState(): void {
+  _builderMode = false;
+  _builderResourceType = null;
+  _builderRouteName = '';
+  _builderLegs = [];
+  _builderCurrentBodyId = null;
+}
 
 /**
  * Format a module type name for display.
@@ -83,6 +100,7 @@ export function closeLogisticsPanel(): void {
   _state = null;
   _selectedBodyId = null;
   _expandedRouteIds = new Set<string>();
+  _resetBuilderState();
 }
 
 // ---------------------------------------------------------------------------
@@ -572,16 +590,33 @@ function _renderRoutesTab(): void {
   // --- Route map ---
   wrapper.appendChild(_renderRouteMap());
 
-  // --- Routes table ---
-  const routes = _state.routes;
+  // --- Create Route button (always visible below the map) ---
+  if (!_builderMode) {
+    const createBtn = document.createElement('button');
+    createBtn.className = 'logistics-builder-create-btn';
+    createBtn.textContent = '+ Create Route';
+    createBtn.addEventListener('click', () => {
+      _builderMode = true;
+      _render();
+    });
+    wrapper.appendChild(createBtn);
+  }
 
-  if (routes.length === 0) {
-    const msg = document.createElement('div');
-    msg.className = 'empty-msg';
-    msg.textContent = 'No routes created. Prove route legs by flying them manually, then assemble them into automated routes.';
-    wrapper.appendChild(msg);
+  // --- Builder panel OR routes table ---
+  if (_builderMode) {
+    wrapper.appendChild(_renderBuilderPanel());
   } else {
-    wrapper.appendChild(_renderRoutesTable(routes));
+    // --- Routes table ---
+    const routes = _state.routes;
+
+    if (routes.length === 0) {
+      const msg = document.createElement('div');
+      msg.className = 'empty-msg';
+      msg.textContent = 'No routes created. Prove route legs by flying them manually, then assemble them into automated routes.';
+      wrapper.appendChild(msg);
+    } else {
+      wrapper.appendChild(_renderRoutesTable(routes));
+    }
   }
 
   // --- Proven legs section ---
@@ -590,6 +625,170 @@ function _renderRoutesTab(): void {
 
   _overlay.appendChild(wrapper);
 }
+
+// ---------------------------------------------------------------------------
+// Route Builder Panel
+// ---------------------------------------------------------------------------
+
+function _renderBuilderPanel(): HTMLDivElement {
+  const panel = document.createElement('div');
+  panel.className = 'logistics-builder-panel';
+
+  const heading = document.createElement('h3');
+  heading.className = 'logistics-builder-heading';
+  heading.textContent = 'Create New Route';
+  panel.appendChild(heading);
+
+  // --- Resource type dropdown ---
+  const resourceGroup = document.createElement('div');
+  resourceGroup.className = 'logistics-builder-field';
+
+  const resourceLabel = document.createElement('label');
+  resourceLabel.className = 'logistics-builder-label';
+  resourceLabel.textContent = 'Resource Type';
+  resourceGroup.appendChild(resourceLabel);
+
+  const resourceSelect = document.createElement('select');
+  resourceSelect.className = 'logistics-builder-select';
+
+  // Determine available resource types: resources that exist on bodies
+  // touched by at least one proven leg
+  const availableResourceTypes = _getAvailableResourceTypes();
+
+  const defaultOpt = document.createElement('option');
+  defaultOpt.value = '';
+  defaultOpt.textContent = '-- Select Resource --';
+  resourceSelect.appendChild(defaultOpt);
+
+  for (const rt of availableResourceTypes) {
+    const opt = document.createElement('option');
+    opt.value = rt;
+    opt.textContent = _formatResourceType(rt);
+    if (_builderResourceType === rt) {
+      opt.selected = true;
+    }
+    resourceSelect.appendChild(opt);
+  }
+
+  if (!_builderResourceType) {
+    defaultOpt.selected = true;
+  }
+
+  resourceSelect.addEventListener('change', () => {
+    _builderResourceType = resourceSelect.value || null;
+  });
+
+  resourceGroup.appendChild(resourceSelect);
+  panel.appendChild(resourceGroup);
+
+  // --- Route name input ---
+  const nameGroup = document.createElement('div');
+  nameGroup.className = 'logistics-builder-field';
+
+  const nameLabel = document.createElement('label');
+  nameLabel.className = 'logistics-builder-label';
+  nameLabel.textContent = 'Route Name';
+  nameGroup.appendChild(nameLabel);
+
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.className = 'logistics-builder-input';
+  nameInput.placeholder = 'e.g. Lunar Water Run';
+  nameInput.value = _builderRouteName;
+  nameInput.addEventListener('input', () => {
+    _builderRouteName = nameInput.value;
+  });
+
+  nameGroup.appendChild(nameInput);
+  panel.appendChild(nameGroup);
+
+  // --- Legs chain display ---
+  const legsGroup = document.createElement('div');
+  legsGroup.className = 'logistics-builder-field';
+
+  const legsLabel = document.createElement('label');
+  legsLabel.className = 'logistics-builder-label';
+  legsLabel.textContent = 'Route Legs';
+  legsGroup.appendChild(legsLabel);
+
+  const legsDisplay = document.createElement('div');
+  legsDisplay.className = 'logistics-builder-legs';
+
+  if (_builderLegs.length === 0) {
+    legsDisplay.textContent = 'No legs added yet';
+    legsDisplay.classList.add('logistics-builder-legs-empty');
+  } else {
+    // Show summary of chained legs
+    for (const legId of _builderLegs) {
+      const leg = _state?.provenLegs.find((pl) => pl.id === legId);
+      if (leg) {
+        const legEl = document.createElement('div');
+        legEl.className = 'logistics-builder-leg-item';
+        legEl.textContent = `${_formatLocation(leg.origin)} \u2192 ${_formatLocation(leg.destination)}`;
+        legsDisplay.appendChild(legEl);
+      }
+    }
+  }
+
+  legsGroup.appendChild(legsDisplay);
+  panel.appendChild(legsGroup);
+
+  // --- Action buttons ---
+  const actions = document.createElement('div');
+  actions.className = 'logistics-builder-actions';
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'logistics-builder-cancel-btn';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.addEventListener('click', () => {
+    _resetBuilderState();
+    _render();
+  });
+  actions.appendChild(cancelBtn);
+
+  const confirmBtn = document.createElement('button');
+  confirmBtn.className = 'logistics-builder-confirm-btn';
+  confirmBtn.textContent = 'Create Route';
+  confirmBtn.disabled = true; // Will be wired up in TASK-014b
+  actions.appendChild(confirmBtn);
+
+  panel.appendChild(actions);
+
+  return panel;
+}
+
+/**
+ * Collect resource types available for route building.
+ * A resource is available if at least one proven leg touches a body
+ * that produces it (via its resource profile).
+ */
+function _getAvailableResourceTypes(): string[] {
+  if (!_state) return [];
+
+  // Gather all body IDs from proven leg origins and destinations
+  const bodyIds = new Set<string>();
+  for (const leg of _state.provenLegs) {
+    bodyIds.add(leg.origin.bodyId);
+    bodyIds.add(leg.destination.bodyId);
+  }
+
+  // Collect resource types from those bodies' resource profiles
+  const resourceTypes = new Set<string>();
+  for (const bodyId of bodyIds) {
+    const bodyDef = getBodyDef(bodyId);
+    if (bodyDef?.resourceProfile) {
+      for (const entry of bodyDef.resourceProfile) {
+        resourceTypes.add(entry.resourceType);
+      }
+    }
+  }
+
+  return [...resourceTypes].sort();
+}
+
+// ---------------------------------------------------------------------------
+// Routes Table
+// ---------------------------------------------------------------------------
 
 function _renderRoutesTable(routes: Route[]): HTMLTableElement {
   const table = document.createElement('table');

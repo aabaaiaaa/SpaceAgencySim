@@ -12,7 +12,7 @@ import type { GameState, MiningSite } from './gameState.ts';
 import type { ResourceType } from './constants.ts';
 import { MiningModuleType } from './constants.ts';
 import { ResourceType as RT } from './constants.ts';
-import { getPowerEfficiency, getConnectedStorage } from './mining.ts';
+import { getPowerEfficiency, getConnectedStorage, recomputeSiteStorage } from './mining.ts';
 import { RESOURCES_BY_ID } from '../data/resources.ts';
 
 // ---------------------------------------------------------------------------
@@ -131,11 +131,15 @@ export function getRefineryRecipe(site: MiningSite, moduleId: string): RefineryR
  * For each REFINERY module with a recipe set:
  * 1. Get the site's power efficiency (0–1).
  * 2. Scale all recipe input/output amounts by efficiency.
- * 3. Verify that connected storage of the correct type exists for every
- *    input and output resource.
- * 4. Check that all scaled inputs are available in `site.storage`.
- * 5. If all checks pass: consume inputs, produce outputs.
- * 6. If any check fails: skip this module.
+ * 3. For each input, find connected storage modules and sum the available
+ *    amount of that resource across their `stored` fields. Skip if insufficient.
+ * 4. For each output, find connected storage modules and sum remaining
+ *    capacity. Skip if insufficient space.
+ * 5. Consume inputs proportionally from source modules based on each
+ *    module's share of the resource.
+ * 6. Produce outputs proportionally to connected storage based on each
+ *    module's remaining capacity share.
+ * 7. After all refineries on a site are processed, recompute `site.storage`.
  */
 export function processRefineries(state: GameState): { produced: Partial<Record<ResourceType, number>>; consumed: Partial<Record<ResourceType, number>> } {
   const produced: Partial<Record<ResourceType, number>> = {};
@@ -152,50 +156,121 @@ export function processRefineries(state: GameState): { produced: Partial<Record<
       if (!recipe) continue;
 
       // Check connected storage exists for each input resource's state
+      // and that sufficient resources are available across connected modules
       let storageOk = true;
+      let inputsAvailable = true;
       for (const input of recipe.inputs) {
         const resDef = RESOURCES_BY_ID[input.resourceType];
         if (!resDef) { storageOk = false; break; }
         const connected = getConnectedStorage(site, mod.id, resDef.state);
         if (connected.length === 0) { storageOk = false; break; }
+
+        // Sum available amount from connected modules' stored fields
+        let totalAvailable = 0;
+        for (const sm of connected) {
+          totalAvailable += (sm.stored?.[input.resourceType] ?? 0);
+        }
+        const needed = input.amountKg * efficiency;
+        if (totalAvailable < needed) {
+          inputsAvailable = false;
+          break;
+        }
       }
-      if (!storageOk) continue;
+      if (!storageOk || !inputsAvailable) continue;
 
       // Check connected storage exists for each output resource's state
+      // and that sufficient capacity exists
       for (const output of recipe.outputs) {
         const resDef = RESOURCES_BY_ID[output.resourceType];
         if (!resDef) { storageOk = false; break; }
         const connected = getConnectedStorage(site, mod.id, resDef.state);
         if (connected.length === 0) { storageOk = false; break; }
-      }
-      if (!storageOk) continue;
 
-      // Check all scaled inputs are available
-      let inputsAvailable = true;
-      for (const input of recipe.inputs) {
-        const needed = input.amountKg * efficiency;
-        const available = site.storage[input.resourceType] ?? 0;
-        if (available < needed) {
-          inputsAvailable = false;
+        // Sum remaining capacity across connected storage modules
+        let totalRemaining = 0;
+        for (const sm of connected) {
+          const cap = sm.storageCapacityKg ?? 0;
+          let usedKg = 0;
+          if (sm.stored) {
+            for (const amt of Object.values(sm.stored)) {
+              usedKg += (amt as number) ?? 0;
+            }
+          }
+          totalRemaining += Math.max(0, cap - usedKg);
+        }
+        const produceAmt = output.amountKg * efficiency;
+        if (totalRemaining < produceAmt) {
+          storageOk = false;
           break;
         }
       }
-      if (!inputsAvailable) continue;
+      if (!storageOk) continue;
 
-      // Consume inputs
+      // Consume inputs proportionally from source modules
       for (const input of recipe.inputs) {
         const consumeAmt = input.amountKg * efficiency;
-        site.storage[input.resourceType] = (site.storage[input.resourceType] ?? 0) - consumeAmt;
+        const resDef = RESOURCES_BY_ID[input.resourceType]!;
+        const connected = getConnectedStorage(site, mod.id, resDef.state);
+
+        // Calculate total available across connected modules
+        let totalAvailable = 0;
+        for (const sm of connected) {
+          totalAvailable += (sm.stored?.[input.resourceType] ?? 0);
+        }
+
+        // Deduct proportionally from each module
+        for (const sm of connected) {
+          const moduleAmount = sm.stored?.[input.resourceType] ?? 0;
+          if (moduleAmount <= 0 || totalAvailable <= 0) continue;
+          const deduction = consumeAmt * (moduleAmount / totalAvailable);
+          if (!sm.stored) sm.stored = {};
+          sm.stored[input.resourceType] = (sm.stored[input.resourceType] ?? 0) - deduction;
+        }
+
         consumed[input.resourceType] = (consumed[input.resourceType] ?? 0) + consumeAmt;
       }
 
-      // Produce outputs
+      // Produce outputs proportionally to connected storage by remaining capacity
       for (const output of recipe.outputs) {
         const produceAmt = output.amountKg * efficiency;
-        site.storage[output.resourceType] = (site.storage[output.resourceType] ?? 0) + produceAmt;
+        const resDef = RESOURCES_BY_ID[output.resourceType]!;
+        const connected = getConnectedStorage(site, mod.id, resDef.state);
+
+        // Calculate total remaining capacity across connected modules
+        let totalRemaining = 0;
+        for (const sm of connected) {
+          const cap = sm.storageCapacityKg ?? 0;
+          let usedKg = 0;
+          if (sm.stored) {
+            for (const amt of Object.values(sm.stored)) {
+              usedKg += (amt as number) ?? 0;
+            }
+          }
+          totalRemaining += Math.max(0, cap - usedKg);
+        }
+
+        // Distribute proportionally by remaining capacity
+        for (const sm of connected) {
+          const cap = sm.storageCapacityKg ?? 0;
+          let usedKg = 0;
+          if (sm.stored) {
+            for (const amt of Object.values(sm.stored)) {
+              usedKg += (amt as number) ?? 0;
+            }
+          }
+          const moduleRemaining = Math.max(0, cap - usedKg);
+          if (moduleRemaining <= 0 || totalRemaining <= 0) continue;
+          const addition = produceAmt * (moduleRemaining / totalRemaining);
+          if (!sm.stored) sm.stored = {};
+          sm.stored[output.resourceType] = (sm.stored[output.resourceType] ?? 0) + addition;
+        }
+
         produced[output.resourceType] = (produced[output.resourceType] ?? 0) + produceAmt;
       }
     }
+
+    // Recompute site.storage from module-level stored values
+    recomputeSiteStorage(site);
   }
   return { produced, consumed };
 }

@@ -5,6 +5,7 @@ import {
   addModuleToSite,
   toggleConnection,
   getPowerEfficiency,
+  recomputeSiteStorage,
 } from '../core/mining.ts';
 import { MiningModuleType, ResourceType } from '../core/constants.ts';
 import {
@@ -202,40 +203,46 @@ describe('getRefineryRecipe', () => {
 describe('processRefineries', () => {
   it('water electrolysis converts water ice to hydrogen and oxygen @smoke', () => {
     const state = createGameState();
-    const { site, refinery } = buildRefinerySite(state);
+    const { site, refinery, silo, pressureVessel } = buildRefinerySite(state);
 
     setRefineryRecipe(site, refinery.id, 'water-electrolysis');
 
-    // Stock 100 kg of water ice
-    site.storage[ResourceType.WATER_ICE] = 100;
+    // Stock 100 kg of water ice in the silo's stored field
+    silo.stored = { [ResourceType.WATER_ICE]: 100 };
+    recomputeSiteStorage(site);
 
     // Power efficiency: gen=100, required=40+2+5+8=55 → efficiency=1.0 (clamped)
     expect(getPowerEfficiency(site)).toBe(1.0);
 
     processRefineries(state);
 
-    // Water ice should be fully consumed
-    expect(site.storage[ResourceType.WATER_ICE]).toBe(0);
-    // Hydrogen produced: 11 kg * 1.0 efficiency
+    // Water ice should be fully consumed at module level and site level
+    expect(silo.stored![ResourceType.WATER_ICE]).toBe(0);
+    expect(site.storage[ResourceType.WATER_ICE] ?? 0).toBe(0);
+    // Hydrogen produced: 11 kg * 1.0 efficiency — stored in pressure vessel
+    expect(pressureVessel.stored![ResourceType.HYDROGEN]).toBe(11);
     expect(site.storage[ResourceType.HYDROGEN]).toBe(11);
-    // Oxygen produced: 89 kg * 1.0 efficiency
+    // Oxygen produced: 89 kg * 1.0 efficiency — stored in pressure vessel
+    expect(pressureVessel.stored![ResourceType.OXYGEN]).toBe(89);
     expect(site.storage[ResourceType.OXYGEN]).toBe(89);
   });
 
   it('does not process when inputs are insufficient', () => {
     const state = createGameState();
-    const { site, refinery } = buildRefinerySite(state);
+    const { site, refinery, silo } = buildRefinerySite(state);
 
     setRefineryRecipe(site, refinery.id, 'water-electrolysis');
 
     // Only 50 kg water ice — recipe needs 100 kg at full efficiency
-    site.storage[ResourceType.WATER_ICE] = 50;
+    silo.stored = { [ResourceType.WATER_ICE]: 50 };
+    recomputeSiteStorage(site);
 
     expect(getPowerEfficiency(site)).toBe(1.0);
 
     processRefineries(state);
 
     // Nothing should be consumed or produced
+    expect(silo.stored![ResourceType.WATER_ICE]).toBe(50);
     expect(site.storage[ResourceType.WATER_ICE]).toBe(50);
     expect(site.storage[ResourceType.HYDROGEN] ?? 0).toBe(0);
     expect(site.storage[ResourceType.OXYGEN] ?? 0).toBe(0);
@@ -243,14 +250,16 @@ describe('processRefineries', () => {
 
   it('does not process when no recipe is set', () => {
     const state = createGameState();
-    const { site } = buildRefinerySite(state);
+    const { site, silo } = buildRefinerySite(state);
 
     // Stock resources but do NOT set a recipe
-    site.storage[ResourceType.WATER_ICE] = 100;
+    silo.stored = { [ResourceType.WATER_ICE]: 100 };
+    recomputeSiteStorage(site);
 
     processRefineries(state);
 
     // Water ice should remain untouched
+    expect(silo.stored![ResourceType.WATER_ICE]).toBe(100);
     expect(site.storage[ResourceType.WATER_ICE]).toBe(100);
     expect(site.storage[ResourceType.HYDROGEN] ?? 0).toBe(0);
     expect(site.storage[ResourceType.OXYGEN] ?? 0).toBe(0);
@@ -300,15 +309,19 @@ describe('processRefineries', () => {
     const efficiency = getPowerEfficiency(site);
     expect(efficiency).toBeCloseTo(30 / 47, 5);
 
-    // Stock enough water ice for the scaled recipe
-    site.storage[ResourceType.WATER_ICE] = 200;
+    // Stock enough water ice for the scaled recipe in silo's stored field
+    silo.stored = { [ResourceType.WATER_ICE]: 200 };
+    recomputeSiteStorage(site);
 
     processRefineries(state);
 
     // Scaled consumption: 100 * efficiency
     const expectedConsumed = 100 * efficiency;
+    expect(silo.stored![ResourceType.WATER_ICE]).toBeCloseTo(200 - expectedConsumed, 5);
     expect(site.storage[ResourceType.WATER_ICE]).toBeCloseTo(200 - expectedConsumed, 5);
-    // Scaled production
+    // Scaled production — stored in pressure vessel
+    expect(pressureVessel.stored![ResourceType.HYDROGEN]).toBeCloseTo(11 * efficiency, 5);
+    expect(pressureVessel.stored![ResourceType.OXYGEN]).toBeCloseTo(89 * efficiency, 5);
     expect(site.storage[ResourceType.HYDROGEN]).toBeCloseTo(11 * efficiency, 5);
     expect(site.storage[ResourceType.OXYGEN]).toBeCloseTo(89 * efficiency, 5);
   });
@@ -345,11 +358,13 @@ describe('processRefineries', () => {
     toggleConnection(site, refinery.id, silo.id);
 
     setRefineryRecipe(site, refinery.id, 'water-electrolysis');
-    site.storage[ResourceType.WATER_ICE] = 100;
+    silo.stored = { [ResourceType.WATER_ICE]: 100 };
+    recomputeSiteStorage(site);
 
     processRefineries(state);
 
     // Nothing should be consumed — no GAS storage connected for H2/O2 outputs
+    expect(silo.stored![ResourceType.WATER_ICE]).toBe(100);
     expect(site.storage[ResourceType.WATER_ICE]).toBe(100);
     expect(site.storage[ResourceType.HYDROGEN] ?? 0).toBe(0);
     expect(site.storage[ResourceType.OXYGEN] ?? 0).toBe(0);
@@ -387,11 +402,13 @@ describe('processRefineries', () => {
     toggleConnection(site, refinery.id, pressureVessel.id);
 
     setRefineryRecipe(site, refinery.id, 'water-electrolysis');
-    site.storage[ResourceType.WATER_ICE] = 100;
+    silo.stored = { [ResourceType.WATER_ICE]: 100 };
+    recomputeSiteStorage(site);
 
     processRefineries(state);
 
     // Zero efficiency → nothing processed
+    expect(silo.stored![ResourceType.WATER_ICE]).toBe(100);
     expect(site.storage[ResourceType.WATER_ICE]).toBe(100);
     expect(site.storage[ResourceType.HYDROGEN] ?? 0).toBe(0);
   });
