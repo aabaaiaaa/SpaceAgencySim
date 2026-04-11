@@ -6,7 +6,11 @@
  */
 
 import type { GameState, MiningSite, MiningSiteModule } from './gameState.ts';
-import type { MiningModuleType } from './constants.ts';
+import type { ResourceType } from './constants.ts';
+import { MiningModuleType, ResourceState } from './constants.ts';
+import { getBodyDef } from '../data/bodies.ts';
+import { RESOURCES_BY_ID } from '../data/resources.ts';
+import { getPartById } from '../data/parts.ts';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -171,4 +175,133 @@ export function toggleConnection(site: MiningSite, moduleAId: string, moduleBId:
   }
 
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// Resource extraction
+// ---------------------------------------------------------------------------
+
+/** Storage module type to resource state mapping. */
+const STORAGE_TYPE_TO_STATE: ReadonlyMap<MiningModuleType, ResourceState> = new Map([
+  [MiningModuleType.STORAGE_SILO, ResourceState.SOLID],
+  [MiningModuleType.PRESSURE_VESSEL, ResourceState.GAS],
+  [MiningModuleType.FLUID_TANK, ResourceState.LIQUID],
+]);
+
+/**
+ * Returns the power efficiency of a mining site, clamped to 0–1.
+ * If no modules require power (powerRequired === 0), returns 1.0.
+ */
+export function getPowerEfficiency(site: MiningSite): number {
+  if (site.powerRequired === 0) return 1.0;
+  return Math.min(Math.max(site.powerGenerated / site.powerRequired, 0), 1);
+}
+
+/**
+ * BFS from `moduleId` finding connected storage modules that match the
+ * given `storageState` (SOLID, LIQUID, GAS).
+ */
+export function getConnectedStorage(
+  site: MiningSite,
+  moduleId: string,
+  storageState: string,
+): MiningSiteModule[] {
+  const result: MiningSiteModule[] = [];
+  const visited = new Set<string>();
+  const queue: string[] = [moduleId];
+  visited.add(moduleId);
+
+  while (queue.length > 0) {
+    const currentId = queue.shift()!;
+    const current = site.modules.find((m) => m.id === currentId);
+    if (!current) continue;
+
+    // Check if this module is a storage module matching the requested state
+    const moduleState = STORAGE_TYPE_TO_STATE.get(current.type as MiningModuleType);
+    if (moduleState === storageState && currentId !== moduleId) {
+      result.push(current);
+    }
+
+    // Traverse connections
+    for (const neighborId of current.connections) {
+      if (!visited.has(neighborId)) {
+        visited.add(neighborId);
+        queue.push(neighborId);
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Process all mining sites: extract resources based on power efficiency
+ * and connected storage capacity.
+ */
+export function processMiningSites(state: GameState): void {
+  for (const site of state.miningSites) {
+    const efficiency = getPowerEfficiency(site);
+    if (efficiency <= 0) continue;
+
+    const bodyDef = getBodyDef(site.bodyId);
+    if (!bodyDef || !bodyDef.resourceProfile) continue;
+
+    for (const mod of site.modules) {
+      // Only process extractor modules
+      if (
+        mod.type !== MiningModuleType.MINING_DRILL &&
+        mod.type !== MiningModuleType.GAS_COLLECTOR &&
+        mod.type !== MiningModuleType.FLUID_EXTRACTOR
+      ) {
+        continue;
+      }
+
+      for (const resource of bodyDef.resourceProfile) {
+        const resourceDef = RESOURCES_BY_ID[resource.resourceType];
+        if (!resourceDef) continue;
+
+        // Check that this extractor module type matches the resource's extraction module
+        if (resourceDef.extractionModule !== mod.type) continue;
+
+        // Find connected storage modules of the matching state
+        const connectedStorage = getConnectedStorage(site, mod.id, resourceDef.state);
+        if (connectedStorage.length === 0) continue;
+
+        // Calculate total available storage capacity across connected storage
+        let availableCapacity = 0;
+        for (const storageMod of connectedStorage) {
+          const partDef = getPartById(storageMod.partId);
+          if (!partDef) continue;
+          const capacity = (partDef.properties.storageCapacityKg as number) ?? 0;
+          const stored = site.storage[resource.resourceType as ResourceType] ?? 0;
+          // Each storage module contributes its capacity minus what's currently stored
+          // (stored is site-wide, distributed proportionally, but we simplify to total)
+          availableCapacity += capacity;
+        }
+
+        // Subtract total stored from total capacity
+        const totalStored = site.storage[resource.resourceType as ResourceType] ?? 0;
+        availableCapacity = Math.max(0, availableCapacity - totalStored);
+
+        if (availableCapacity <= 0) continue;
+
+        // Get extraction multiplier from the extractor part
+        const extractorPartDef = getPartById(mod.partId);
+        const extractionMultiplier = extractorPartDef
+          ? ((extractorPartDef.properties.extractionMultiplier as number) ?? 1.0)
+          : 1.0;
+
+        // Calculate extraction amount
+        const extracted = Math.min(
+          resource.extractionRateKgPerPeriod * efficiency * extractionMultiplier,
+          availableCapacity,
+        );
+
+        if (extracted > 0) {
+          site.storage[resource.resourceType as ResourceType] =
+            (site.storage[resource.resourceType as ResourceType] ?? 0) + extracted;
+        }
+      }
+    }
+  }
 }

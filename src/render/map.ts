@@ -140,6 +140,8 @@ let _customViewRadius: number | null = null;
 let _selectedTarget: string | null  = null;
 let _showShadow: boolean      = false;
 let _showCommsOverlay: boolean = false;
+let _routeOverlayVisible: boolean = false;
+let _routeGraphics: PIXI.Graphics | null = null;
 
 /** Currently selected transfer route target body ID. */
 let _selectedTransferTarget: string | null = null;
@@ -253,6 +255,7 @@ export function initMapRenderer(): void {
   _shadowGraphics   = new PIXI.Graphics();
   _surfaceGraphics  = new PIXI.Graphics();
   _commsGraphics    = new PIXI.Graphics();
+  _routeGraphics    = new PIXI.Graphics();
   _objectsGraphics  = new PIXI.Graphics();
   _asteroidObjGraphics = new PIXI.Graphics();
   _craftGraphics    = new PIXI.Graphics();
@@ -266,6 +269,7 @@ export function initMapRenderer(): void {
   _mapRoot.addChild(_bodyGraphics);
   _mapRoot.addChild(_surfaceGraphics);
   _mapRoot.addChild(_commsGraphics);
+  _mapRoot.addChild(_routeGraphics);
   _mapRoot.addChild(_shadowGraphics);
   _mapRoot.addChild(_objectsGraphics);
   _mapRoot.addChild(_asteroidObjGraphics);
@@ -354,6 +358,7 @@ export function destroyMapRenderer(): void {
   _transferGraphics    = null;
   _surfaceGraphics     = null;
   _commsGraphics       = null;
+  _routeGraphics       = null;
   _labelContainer      = null;
   _labelPool           = [];
   _beltDots            = null;
@@ -362,6 +367,7 @@ export function destroyMapRenderer(): void {
   _selectedTarget          = null;
   _selectedTransferTarget  = null;
   _showShadow              = false;
+  _routeOverlayVisible     = false;
 }
 
 // ---------------------------------------------------------------------------
@@ -458,6 +464,16 @@ export function toggleMapCommsOverlay(): void {
  */
 export function isCommsOverlayVisible(): boolean {
   return _showCommsOverlay;
+}
+
+/** Toggle the route overlay on the map. */
+export function toggleRouteOverlay(): void {
+  _routeOverlayVisible = !_routeOverlayVisible;
+}
+
+/** Check whether the route overlay is currently shown. */
+export function isRouteOverlayVisible(): boolean {
+  return _routeOverlayVisible;
 }
 
 /**
@@ -588,6 +604,9 @@ export function renderMapFrame(
 
   // 7. Comms coverage overlay.
   _drawCommsOverlay(state, bodyId, cx, cy, scale, R);
+
+  // 8. Route overlay.
+  _drawRouteOverlay(state, cx, cy, scale, bodyId);
 }
 
 // ---------------------------------------------------------------------------
@@ -1419,6 +1438,94 @@ function _drawCommsOverlay(state: ReadonlyGameState, bodyId: string, cx: number,
   // Status label.
   if (!coverage.connectedToEarth && coverage.hasLocalNetwork) {
     _useLabel('NOT LINKED TO EARTH', cx - 70, cy - R * scale - 30, COMMS_DEAD_ZONE_COLOR);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Private — route overlay
+// ---------------------------------------------------------------------------
+
+const ROUTE_ACTIVE_COLOR = 0x44ff88;
+const ROUTE_PAUSED_COLOR = 0x666666;
+const ROUTE_BROKEN_COLOR = 0xff4444;
+
+/**
+ * Draw active transport routes as directional lines between bodies.
+ * Uses simple lines with colour coding: green for active, grey for paused,
+ * red for broken.
+ */
+function _drawRouteOverlay(
+  state: ReadonlyGameState,
+  cx: number,
+  cy: number,
+  scale: number,
+  bodyId: string,
+): void {
+  if (!_routeGraphics || !_routeOverlayVisible) return;
+  _routeGraphics.clear();
+
+  if (!state.routes || state.routes.length === 0) return;
+
+  for (const route of state.routes) {
+    for (const leg of route.legs) {
+      // Get body positions for origin and destination.
+      const originBody = CELESTIAL_BODIES[leg.origin.bodyId];
+      const destBody = CELESTIAL_BODIES[leg.destination.bodyId];
+      if (!originBody || !destBody) continue;
+
+      // For same-body legs (e.g. surface to orbit), skip drawing.
+      if (leg.origin.bodyId === leg.destination.bodyId) continue;
+
+      // Compute screen positions.
+      // For inter-body legs, draw a line between body centres.
+      let ox: number, oy: number, dx: number, dy: number;
+
+      if (leg.origin.bodyId === bodyId) {
+        ox = cx;
+        oy = cy;
+      } else {
+        const oOrbitDist = originBody.orbitalDistance || 0;
+        ox = cx + oOrbitDist * scale;
+        oy = cy;
+      }
+
+      if (leg.destination.bodyId === bodyId) {
+        dx = cx;
+        dy = cy;
+      } else {
+        const dOrbitDist = destBody.orbitalDistance || 0;
+        dx = cx + dOrbitDist * scale;
+        dy = cy;
+      }
+
+      // Skip if both points are the same on screen.
+      if (Math.abs(ox - dx) < 1 && Math.abs(oy - dy) < 1) continue;
+
+      const color = route.status === 'active' ? ROUTE_ACTIVE_COLOR
+                  : route.status === 'broken' ? ROUTE_BROKEN_COLOR
+                  : ROUTE_PAUSED_COLOR;
+
+      _routeGraphics.moveTo(ox, oy);
+      _routeGraphics.lineTo(dx, dy);
+      _routeGraphics.stroke({ color, width: 2, alpha: 0.7 });
+
+      // Draw a small arrowhead at the destination end.
+      const angle = Math.atan2(dy - oy, dx - ox);
+      const arrowLen = 8;
+      const arrowAngle = Math.PI / 6;
+      _routeGraphics.moveTo(dx, dy);
+      _routeGraphics.lineTo(
+        dx - arrowLen * Math.cos(angle - arrowAngle),
+        dy - arrowLen * Math.sin(angle - arrowAngle),
+      );
+      _routeGraphics.stroke({ color, width: 2, alpha: 0.7 });
+      _routeGraphics.moveTo(dx, dy);
+      _routeGraphics.lineTo(
+        dx - arrowLen * Math.cos(angle + arrowAngle),
+        dy - arrowLen * Math.sin(angle + arrowAngle),
+      );
+      _routeGraphics.stroke({ color, width: 2, alpha: 0.7 });
+    }
   }
 }
 

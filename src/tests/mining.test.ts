@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
-import { createMiningSite, findNearestSite, addModuleToSite, toggleConnection, SITE_PROXIMITY_RADIUS } from '../core/mining.ts';
-import { MiningModuleType } from '../core/constants.ts';
+import { createMiningSite, findNearestSite, addModuleToSite, toggleConnection, SITE_PROXIMITY_RADIUS, getPowerEfficiency, getConnectedStorage, processMiningSites } from '../core/mining.ts';
+import { MiningModuleType, ResourceType, ResourceState } from '../core/constants.ts';
 
 describe('GameState mining/route fields', () => {
   it('createGameState() initializes miningSites as empty array', () => {
@@ -249,5 +249,173 @@ describe('toggleConnection', () => {
     const result = toggleConnection(site, modA.id, 'nonexistent-id');
 
     expect(result).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Resource extraction tests
+// ---------------------------------------------------------------------------
+
+describe('getPowerEfficiency', () => {
+  function makeSite(powerGenerated: number, powerRequired: number) {
+    const state = createGameState();
+    const site = createMiningSite(state, {
+      name: 'Power Test Site',
+      bodyId: 'MOON',
+      coordinates: { x: 0, y: 0 },
+      controlUnitPartId: 'ctrl-1',
+    });
+    site.powerGenerated = powerGenerated;
+    site.powerRequired = powerRequired;
+    return site;
+  }
+
+  it('returns 1.0 when powerRequired is 0', () => {
+    const site = makeSite(0, 0);
+    expect(getPowerEfficiency(site)).toBe(1.0);
+  });
+
+  it('returns 1.0 when powerGenerated >= powerRequired', () => {
+    const site = makeSite(200, 100);
+    expect(getPowerEfficiency(site)).toBe(1.0);
+  });
+
+  it('returns ratio when powerGenerated < powerRequired', () => {
+    const site = makeSite(50, 100);
+    expect(getPowerEfficiency(site)).toBe(0.5);
+  });
+
+  it('returns 0 when powerGenerated is 0 and powerRequired > 0', () => {
+    const site = makeSite(0, 100);
+    expect(getPowerEfficiency(site)).toBe(0);
+  });
+});
+
+describe('processMiningSites', () => {
+  function buildMoonSiteWithDrillAndStorage(state: ReturnType<typeof createGameState>) {
+    const site = createMiningSite(state, {
+      name: 'Moon Mine',
+      bodyId: 'MOON',
+      coordinates: { x: 0, y: 0 },
+      controlUnitPartId: 'base-control-unit-mk1',
+    });
+
+    const generator = addModuleToSite(site, {
+      partId: 'power-generator-solar-mk1',
+      type: MiningModuleType.POWER_GENERATOR,
+      powerDraw: 0,
+      powerOutput: 100,
+    });
+
+    const drill = addModuleToSite(site, {
+      partId: 'mining-drill-mk1',
+      type: MiningModuleType.MINING_DRILL,
+      powerDraw: 25,
+    });
+
+    const silo = addModuleToSite(site, {
+      partId: 'storage-silo-mk1',
+      type: MiningModuleType.STORAGE_SILO,
+      powerDraw: 2,
+    });
+
+    // Connect drill to silo so resources can flow
+    toggleConnection(site, drill.id, silo.id);
+
+    return { site, generator, drill, silo };
+  }
+
+  it('extracts resources with full power', () => {
+    const state = createGameState();
+    const { site } = buildMoonSiteWithDrillAndStorage(state);
+
+    // Site has powerGenerated=100, powerRequired=27 (25+2), so efficiency is clamped to 1.0
+    processMiningSites(state);
+
+    // MOON has WATER_ICE at 50 kg/period and REGOLITH at 200 kg/period (both MINING_DRILL, SOLID)
+    // With efficiency 1.0 and extractionMultiplier 1.0, we expect full extraction rates
+    const waterIce = site.storage[ResourceType.WATER_ICE] ?? 0;
+    const regolith = site.storage[ResourceType.REGOLITH] ?? 0;
+
+    expect(waterIce).toBe(50);  // 50 kg/period * 1.0 efficiency * 1.0 multiplier
+    expect(regolith).toBe(200); // 200 kg/period * 1.0 efficiency * 1.0 multiplier
+  });
+
+  it('no extraction with zero power', () => {
+    const state = createGameState();
+    const site = createMiningSite(state, {
+      name: 'No Power Mine',
+      bodyId: 'MOON',
+      coordinates: { x: 0, y: 0 },
+      controlUnitPartId: 'base-control-unit-mk1',
+    });
+
+    // Add drill and silo but NO power generator
+    const drill = addModuleToSite(site, {
+      partId: 'mining-drill-mk1',
+      type: MiningModuleType.MINING_DRILL,
+      powerDraw: 25,
+    });
+
+    const silo = addModuleToSite(site, {
+      partId: 'storage-silo-mk1',
+      type: MiningModuleType.STORAGE_SILO,
+      powerDraw: 2,
+    });
+
+    toggleConnection(site, drill.id, silo.id);
+
+    // powerGenerated=0, powerRequired=27 → efficiency=0
+    processMiningSites(state);
+
+    const waterIce = site.storage[ResourceType.WATER_ICE] ?? 0;
+    const regolith = site.storage[ResourceType.REGOLITH] ?? 0;
+
+    expect(waterIce).toBe(0);
+    expect(regolith).toBe(0);
+  });
+
+  it('reduced extraction with partial power', () => {
+    const state = createGameState();
+    const site = createMiningSite(state, {
+      name: 'Low Power Mine',
+      bodyId: 'MOON',
+      coordinates: { x: 0, y: 0 },
+      controlUnitPartId: 'base-control-unit-mk1',
+    });
+
+    // Power generator with output 10, but total draw will be 27 → efficiency ~ 10/27
+    const generator = addModuleToSite(site, {
+      partId: 'power-generator-solar-mk1',
+      type: MiningModuleType.POWER_GENERATOR,
+      powerDraw: 0,
+      powerOutput: 10,
+    });
+
+    const drill = addModuleToSite(site, {
+      partId: 'mining-drill-mk1',
+      type: MiningModuleType.MINING_DRILL,
+      powerDraw: 25,
+    });
+
+    const silo = addModuleToSite(site, {
+      partId: 'storage-silo-mk1',
+      type: MiningModuleType.STORAGE_SILO,
+      powerDraw: 2,
+    });
+
+    toggleConnection(site, drill.id, silo.id);
+
+    // powerGenerated=10, powerRequired=27 → efficiency=10/27
+    processMiningSites(state);
+
+    const efficiency = 10 / 27;
+    const waterIce = site.storage[ResourceType.WATER_ICE] ?? 0;
+    const regolith = site.storage[ResourceType.REGOLITH] ?? 0;
+
+    // WATER_ICE: 50 * (10/27) * 1.0
+    expect(waterIce).toBeCloseTo(50 * efficiency, 5);
+    // REGOLITH: 200 * (10/27) * 1.0
+    expect(regolith).toBeCloseTo(200 * efficiency, 5);
   });
 });

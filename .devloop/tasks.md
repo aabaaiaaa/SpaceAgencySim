@@ -49,7 +49,7 @@
 - **Verification**: `npx vitest run src/tests/mining.test.ts`
 
 ### TASK-009: Implement resource extraction with power budget
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-008, TASK-002, TASK-003
 - **Description**: Add to `src/core/mining.ts`: `getPowerEfficiency(site)` (returns ratio clamped to 0-1, 1.0 when no power required), `getConnectedStorage(site, moduleId, storageState)` (BFS through connections finding storage modules of matching state), `processMiningSites(state)` (per-period extraction — for each extractor module, find matching resources from the body's resource profile, check connected storage capacity, extract at rate × efficiency × multiplier). Must import from `src/data/bodies.ts` (`CELESTIAL_BODIES` or `getBodyDef`), `src/data/resources.ts` (`RESOURCES_BY_ID`), and `src/data/parts.ts` (`getPartById`). Append tests to `src/tests/mining.test.ts` covering: power efficiency calculations, extraction with full power, no extraction with zero power, reduced extraction with partial power.
 - **Verification**: `npx vitest run src/tests/mining.test.ts`
@@ -127,13 +127,13 @@
 - **Verification**: `npx tsc --noEmit src/ui/hub.ts && npx vitest run`
 
 ### TASK-022: Add in-flight map route overlay (placeholder)
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-013
 - **Description**: In `src/render/map.ts`, add a `routeOverlayVisible` flag, a `toggleRouteOverlay()` export, and a `renderRouteOverlay(state)` function that iterates active routes and draws placeholder directional lines between origin/destination bodies (using PixiJS Graphics, following the existing map rendering patterns). Add a toggle button or keybind for the overlay. The rendering can be basic (solid lines with colour coding for active vs paused) — visual polish is deferred. This is read-only; editing happens in the Logistics Center.
 - **Verification**: `npx tsc --noEmit src/render/map.ts && npx vitest run`
 
 ### TASK-023: Implement route safety warnings
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-013
 - **Description**: Add to `src/core/routes.ts`: `getRouteDependencies(state, bodyId, orbitAltitude)` returns active routes with legs referencing that body and orbit altitude, `SafeOrbitRange` interface with `minAltitude`/`maxAltitude`, `getSafeOrbitRange(state, bodyId, currentAltitude)` returns the altitude range that keeps all dependent routes valid (or null if no dependencies). Append tests to `src/tests/routes.test.ts` covering: dependencies found for craft at route orbit, empty when no routes at location, safe range calculation.
 - **Verification**: `npx vitest run src/tests/routes.test.ts`

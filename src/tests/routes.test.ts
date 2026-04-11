@@ -9,7 +9,10 @@ import {
   addCraftToLeg,
   setRouteStatus,
   processRoutes,
+  getRouteDependencies,
+  getSafeOrbitRange,
 } from '../core/routes.ts';
+import type { SafeOrbitRange } from '../core/routes.ts';
 import { createMiningSite } from '../core/mining.ts';
 import { ResourceType } from '../core/constants.ts';
 import { RESOURCES_BY_ID } from '../data/resources.ts';
@@ -591,5 +594,180 @@ describe('processRoutes', () => {
     expect(site.orbitalBuffer[ResourceType.WATER_ICE]).toBe(0);
     const expectedRevenue = 500 * resourceDef.baseValuePerKg;
     expect(state.money).toBe(initialMoney - 50_000 + expectedRevenue);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getRouteDependencies
+// ---------------------------------------------------------------------------
+
+describe('getRouteDependencies', () => {
+  it('returns active routes with legs at the given body and orbit altitude', () => {
+    const state = createGameState();
+    const pl = proveRouteLeg(state, makeParams({
+      origin: orbit('MOON', 50),
+      destination: orbit('EARTH', 200),
+      flightId: 'f1',
+    }));
+    const route = createRoute(state, {
+      name: 'Moon to Earth',
+      resourceType: ResourceType.WATER_ICE,
+      provenLegIds: [pl.id],
+    });
+    setRouteStatus(route, 'active');
+
+    const deps = getRouteDependencies(state, 'MOON', 50);
+    expect(deps).toHaveLength(1);
+    expect(deps[0].id).toBe(route.id);
+  });
+
+  it('returns empty array when no routes at location', () => {
+    const state = createGameState();
+    const pl = proveRouteLeg(state, makeParams({
+      origin: orbit('MOON', 50),
+      destination: orbit('EARTH', 200),
+      flightId: 'f1',
+    }));
+    const route = createRoute(state, {
+      name: 'Moon to Earth',
+      resourceType: ResourceType.WATER_ICE,
+      provenLegIds: [pl.id],
+    });
+    setRouteStatus(route, 'active');
+
+    const deps = getRouteDependencies(state, 'MARS', 300);
+    expect(deps).toEqual([]);
+  });
+
+  it('excludes paused and broken routes', () => {
+    const state = createGameState();
+    const pl1 = proveRouteLeg(state, makeParams({
+      origin: orbit('MOON', 50),
+      destination: orbit('EARTH', 200),
+      flightId: 'f1',
+    }));
+    const pl2 = proveRouteLeg(state, makeParams({
+      origin: orbit('MOON', 50),
+      destination: orbit('EARTH', 200),
+      flightId: 'f2',
+    }));
+    const pl3 = proveRouteLeg(state, makeParams({
+      origin: orbit('MOON', 50),
+      destination: orbit('EARTH', 200),
+      flightId: 'f3',
+    }));
+
+    const routePaused = createRoute(state, {
+      name: 'Paused Route',
+      resourceType: ResourceType.WATER_ICE,
+      provenLegIds: [pl1.id],
+    });
+    setRouteStatus(routePaused, 'paused');
+
+    const routeBroken = createRoute(state, {
+      name: 'Broken Route',
+      resourceType: ResourceType.WATER_ICE,
+      provenLegIds: [pl2.id],
+    });
+    setRouteStatus(routeBroken, 'broken');
+
+    const routeActive = createRoute(state, {
+      name: 'Active Route',
+      resourceType: ResourceType.WATER_ICE,
+      provenLegIds: [pl3.id],
+    });
+    setRouteStatus(routeActive, 'active');
+
+    const deps = getRouteDependencies(state, 'MOON', 50);
+    expect(deps).toHaveLength(1);
+    expect(deps[0].id).toBe(routeActive.id);
+  });
+
+  it('matches routes where leg altitude is undefined', () => {
+    const state = createGameState();
+    const pl = proveRouteLeg(state, makeParams({
+      origin: orbit('MOON'),           // no altitude
+      destination: orbit('EARTH', 200),
+      flightId: 'f1',
+    }));
+    const route = createRoute(state, {
+      name: 'Undefined Altitude Route',
+      resourceType: ResourceType.WATER_ICE,
+      provenLegIds: [pl.id],
+    });
+    setRouteStatus(route, 'active');
+
+    const deps = getRouteDependencies(state, 'MOON', 50);
+    expect(deps).toHaveLength(1);
+    expect(deps[0].id).toBe(route.id);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getSafeOrbitRange
+// ---------------------------------------------------------------------------
+
+describe('getSafeOrbitRange', () => {
+  it('returns altitude range covering all route orbit altitudes at the body', () => {
+    const state = createGameState();
+
+    // Route 1: MOON orbit at altitude 50
+    const pl1 = proveRouteLeg(state, makeParams({
+      origin: orbit('MOON', 50),
+      destination: orbit('EARTH', 200),
+      flightId: 'f1',
+    }));
+    const route1 = createRoute(state, {
+      name: 'Route at 50',
+      resourceType: ResourceType.WATER_ICE,
+      provenLegIds: [pl1.id],
+    });
+    setRouteStatus(route1, 'active');
+
+    // Route 2: MOON orbit at altitude 100
+    const pl2 = proveRouteLeg(state, makeParams({
+      origin: orbit('MOON', 100),
+      destination: orbit('EARTH', 200),
+      flightId: 'f2',
+    }));
+    const route2 = createRoute(state, {
+      name: 'Route at 100',
+      resourceType: ResourceType.WATER_ICE,
+      provenLegIds: [pl2.id],
+    });
+    setRouteStatus(route2, 'active');
+
+    const range: SafeOrbitRange | null = getSafeOrbitRange(state, 'MOON', 75);
+    expect(range).not.toBeNull();
+    expect(range!.minAltitude).toBe(50);
+    expect(range!.maxAltitude).toBe(100);
+  });
+
+  it('returns null when no dependencies exist', () => {
+    const state = createGameState();
+
+    const range = getSafeOrbitRange(state, 'MARS', 300);
+    expect(range).toBeNull();
+  });
+
+  it('ignores undefined altitudes', () => {
+    const state = createGameState();
+
+    // Route with undefined altitude at MOON orbit
+    const pl = proveRouteLeg(state, makeParams({
+      origin: orbit('MOON'),           // no altitude
+      destination: orbit('EARTH', 200),
+      flightId: 'f1',
+    }));
+    const route = createRoute(state, {
+      name: 'Undefined Altitude Route',
+      resourceType: ResourceType.WATER_ICE,
+      provenLegIds: [pl.id],
+    });
+    setRouteStatus(route, 'active');
+
+    // Only leg at MOON has undefined altitude — no defined altitudes to collect
+    const range = getSafeOrbitRange(state, 'MOON', 75);
+    expect(range).toBeNull();
   });
 });

@@ -197,6 +197,101 @@ export function setRouteStatus(route: Route, status: RouteStatus): void {
  * 4. If the destination is Earth, sell the cargo at market value.
  * 5. Otherwise, deposit into the destination mining site's orbital buffer.
  */
+// ---------------------------------------------------------------------------
+// Route safety warnings
+// ---------------------------------------------------------------------------
+
+export interface SafeOrbitRange {
+  minAltitude: number;
+  maxAltitude: number;
+}
+
+/**
+ * Returns all active routes that have any leg with an origin or destination
+ * referencing the given body at the given orbit altitude.
+ *
+ * A route depends on that orbit if any leg's origin or destination has:
+ * - `bodyId` matching the given bodyId
+ * - `locationType === 'orbit'`
+ * - `altitude` matching the given orbitAltitude (or altitude undefined, which
+ *   is treated as matching any altitude)
+ *
+ * Only returns routes with status `'active'`.
+ */
+export function getRouteDependencies(
+  state: GameState,
+  bodyId: string,
+  orbitAltitude: number,
+): Route[] {
+  return state.routes.filter((route) => {
+    if (route.status !== 'active') return false;
+    return route.legs.some((leg) => {
+      return matchesOrbitLocation(leg.origin, bodyId, orbitAltitude)
+        || matchesOrbitLocation(leg.destination, bodyId, orbitAltitude);
+    });
+  });
+}
+
+function matchesOrbitLocation(
+  loc: RouteLocation,
+  bodyId: string,
+  altitude: number,
+): boolean {
+  if (loc.bodyId !== bodyId) return false;
+  if (loc.locationType !== 'orbit') return false;
+  // undefined altitude matches any query altitude
+  if (loc.altitude === undefined) return true;
+  return loc.altitude === altitude;
+}
+
+/**
+ * Returns the altitude range that keeps all dependent routes valid, or null if
+ * no active routes depend on any orbit around this body.
+ *
+ * Logic:
+ * 1. Find all active routes with any leg referencing this body at orbit locations
+ * 2. Collect all defined orbit altitudes used by those routes at this body
+ * 3. If no defined orbit altitudes found, return null
+ * 4. Return `{ minAltitude: min(altitudes), maxAltitude: max(altitudes) }`
+ */
+export function getSafeOrbitRange(
+  state: GameState,
+  bodyId: string,
+  _currentAltitude: number,
+): SafeOrbitRange | null {
+  const altitudes: number[] = [];
+
+  for (const route of state.routes) {
+    if (route.status !== 'active') continue;
+    for (const leg of route.legs) {
+      collectOrbitAltitude(leg.origin, bodyId, altitudes);
+      collectOrbitAltitude(leg.destination, bodyId, altitudes);
+    }
+  }
+
+  if (altitudes.length === 0) return null;
+  return {
+    minAltitude: Math.min(...altitudes),
+    maxAltitude: Math.max(...altitudes),
+  };
+}
+
+function collectOrbitAltitude(
+  loc: RouteLocation,
+  bodyId: string,
+  out: number[],
+): void {
+  if (loc.bodyId !== bodyId) return;
+  if (loc.locationType !== 'orbit') return;
+  if (loc.altitude !== undefined) {
+    out.push(loc.altitude);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Per-period route processing (automation)
+// ---------------------------------------------------------------------------
+
 export function processRoutes(state: GameState): void {
   for (const route of state.routes) {
     if (route.status !== 'active') continue;
