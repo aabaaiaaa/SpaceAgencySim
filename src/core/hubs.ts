@@ -7,6 +7,7 @@ import type { GameState } from './gameState.ts';
 import type { Hub, ConstructionProject, ResourceRequirement } from './hubTypes.ts';
 import { FacilityId, EARTH_HUB_ID, HUB_PROXIMITY_DOCK_RADIUS } from './constants.ts';
 import { spend } from './finance.ts';
+import { evictTourists } from './hubTourists.ts';
 import {
   BODY_ENVIRONMENT,
   ENVIRONMENT_COST_MULTIPLIER,
@@ -420,7 +421,7 @@ export function processHubMaintenance(state: GameState): void {
       }
 
       // Evict tourists
-      hub.tourists = [];
+      evictTourists(hub);
     }
   }
 }

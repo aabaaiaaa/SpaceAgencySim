@@ -169,7 +169,7 @@
 - **Verification**: `npx vitest run src/tests/hubs-vab.test.ts` passes.
 
 ### TASK-024: Tourist system
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-022
 - **Description**: Create `src/core/hubTourists.ts` with: `getHubCapacity()`, `getHubCapacityRemaining()`, `addTourist()`, `processTouristRevenue()`, `evictTourists()`. Capacity from Crew Hab tier (4/8/16). Remaining capacity = tier capacity - crew - tourists. Revenue credited per period per tourist. Departed tourists removed. Wire `evictTourists` into hub offline flow in `processHubMaintenance()`. Write tests in `src/tests/hubs-tourists.test.ts`. See plan for exact test cases.
 - **Verification**: `npx vitest run src/tests/hubs-tourists.test.ts` passes.
@@ -211,7 +211,7 @@
 - **Verification**: `npx playwright test e2e/smoke.spec.ts e2e/saveload.spec.ts` passes. `npx tsc --noEmit` passes.
 
 ### TASK-031: Comprehensive hub E2E tests
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-030, TASK-016, TASK-017
 - **Description**: Write E2E tests across multiple spec files: `e2e/hubs-establishment.spec.ts` (new hub appears in switcher, under-construction status shown), `e2e/hubs-save-migration.spec.ts` (legacy save creates Earth hub, switcher visible), `e2e/hubs-vab-offworld.spec.ts` (parts show import tax at off-world hub). Each test seeds its own state. See implementation plan for exact test scenarios and save setups.
 - **Verification**: `npx playwright test e2e/hubs-establishment.spec.ts e2e/hubs-save-migration.spec.ts e2e/hubs-vab-offworld.spec.ts` passes.
