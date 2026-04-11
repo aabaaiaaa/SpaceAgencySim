@@ -34,7 +34,7 @@ import {
   decompressSaveData,
 } from '../core/saveload.ts';
 import { crc32 } from '../core/crc32.ts';
-import { AstronautStatus, MiningModuleType, ResourceType } from '../core/constants.ts';
+import { AstronautStatus, MiningModuleType, ResourceState, ResourceType } from '../core/constants.ts';
 
 import type { GameState, Contract, CrewMember, MissionInstance, OrbitalObject, RocketDesign } from '../core/gameState.ts';
 import type { SaveSlotSummary } from '../core/saveload.ts';
@@ -1836,5 +1836,104 @@ describe('Save/load round-trip for mining/route fields', () => {
     expect(loaded.miningSites).toEqual([]);
     expect(loaded.provenLegs).toEqual([]);
     expect(loaded.routes).toEqual([]);
+  });
+
+  it('per-module stored/storageCapacityKg/storageState survive save/load round-trip', async () => {
+    const state = createGameState();
+    state.miningSites.push({
+      id: 'site-storage-rt',
+      name: 'Storage Round-Trip Site',
+      bodyId: 'MOON',
+      coordinates: { x: 50, y: 50 },
+      controlUnit: { partId: 'base-control-unit-mk1' },
+      modules: [{
+        id: 'silo-1',
+        partId: 'storage-silo-mk1',
+        type: MiningModuleType.STORAGE_SILO,
+        powerDraw: 2,
+        connections: [],
+        stored: { [ResourceType.IRON_ORE]: 250, [ResourceType.WATER_ICE]: 100 },
+        storageCapacityKg: 2000,
+        storageState: ResourceState.SOLID,
+      }, {
+        id: 'pv-1',
+        partId: 'pressure-vessel-mk1',
+        type: MiningModuleType.PRESSURE_VESSEL,
+        powerDraw: 5,
+        connections: [],
+        stored: { [ResourceType.OXYGEN]: 400 },
+        storageCapacityKg: 1000,
+        storageState: ResourceState.GAS,
+      }],
+      storage: { [ResourceType.IRON_ORE]: 250, [ResourceType.WATER_ICE]: 100, [ResourceType.OXYGEN]: 400 },
+      powerGenerated: 100,
+      powerRequired: 17,
+      orbitalBuffer: {},
+    });
+
+    await saveGame(state, 0, 'storage-test');
+    const loaded = await loadGame(0);
+
+    expect(loaded.miningSites).toHaveLength(1);
+    const site = loaded.miningSites[0];
+    expect(site.modules).toHaveLength(2);
+
+    const silo = site.modules.find(m => m.id === 'silo-1')!;
+    expect(silo.stored).toEqual({ IRON_ORE: 250, WATER_ICE: 100 });
+    expect(silo.storageCapacityKg).toBe(2000);
+    expect(silo.storageState).toBe(ResourceState.SOLID);
+
+    const pv = site.modules.find(m => m.id === 'pv-1')!;
+    expect(pv.stored).toEqual({ OXYGEN: 400 });
+    expect(pv.storageCapacityKg).toBe(1000);
+    expect(pv.storageState).toBe(ResourceState.GAS);
+
+    // site.storage should be recomputed from module stored values
+    expect(site.storage).toEqual({ IRON_ORE: 250, WATER_ICE: 100, OXYGEN: 400 });
+  });
+
+  it('old saves with storage modules missing stored field default to empty object', async () => {
+    const state = createGameState();
+    state.miningSites.push({
+      id: 'site-compat',
+      name: 'Backwards Compat Site',
+      bodyId: 'MOON',
+      coordinates: { x: 300, y: 300 },
+      controlUnit: { partId: 'base-control-unit-mk1' },
+      modules: [{
+        id: 'old-silo',
+        partId: 'storage-silo-mk1',
+        type: MiningModuleType.STORAGE_SILO,
+        powerDraw: 2,
+        connections: [],
+        // No stored, storageCapacityKg, or storageState fields — simulating old save
+      }, {
+        id: 'old-drill',
+        partId: 'mining-drill-mk1',
+        type: MiningModuleType.MINING_DRILL,
+        powerDraw: 25,
+        connections: [],
+        // Non-storage module — should NOT get stored field
+      }],
+      storage: {},
+      powerGenerated: 100,
+      powerRequired: 27,
+      orbitalBuffer: {},
+    });
+
+    // Manually strip the stored field to simulate an old save format
+    delete state.miningSites[0].modules[0].stored;
+
+    await saveGame(state, 0, 'compat-test');
+    const loaded = await loadGame(0);
+
+    const site = loaded.miningSites[0];
+    const silo = site.modules.find(m => m.id === 'old-silo')!;
+    // Should have been defaulted to empty object by loadGame()
+    expect(silo.stored).toEqual({});
+
+    const drill = site.modules.find(m => m.id === 'old-drill')!;
+    // Non-storage modules should NOT get a stored field
+    expect(drill.stored).toBeUndefined();
   });
 });

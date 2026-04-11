@@ -14,11 +14,12 @@
  */
 
 import { compressToUTF16, decompressFromUTF16 } from 'lz-string';
-import { AstronautStatus, FACILITY_DEFINITIONS, GameMode, DEFAULT_DIFFICULTY_SETTINGS } from './constants.ts';
+import { AstronautStatus, FACILITY_DEFINITIONS, GameMode, DEFAULT_DIFFICULTY_SETTINGS, MiningModuleType } from './constants.ts';
 import { crc32 } from './crc32.ts';
 import { loadSharedLibrary, saveSharedLibrary } from './designLibrary.ts';
 import { logger } from './logger.ts';
 import { idbSet, idbGet, idbDelete, isIdbAvailable } from './idbStorage.ts';
+import { recomputeSiteStorage } from './mining.ts';
 import { loadSettings, migrateSettings, saveSettings } from './settingsStore.ts';
 
 import type { GameState, RocketDesign } from './gameState.ts';
@@ -629,6 +630,21 @@ export async function loadGame(slotIndex: number): Promise<GameState> {
   envelope.state.miningSites ??= [];
   envelope.state.provenLegs ??= [];
   envelope.state.routes ??= [];
+
+  // Backfill per-module storage fields for saves created before per-module storage.
+  const STORAGE_MODULE_TYPES = new Set([
+    MiningModuleType.STORAGE_SILO,
+    MiningModuleType.PRESSURE_VESSEL,
+    MiningModuleType.FLUID_TANK,
+  ]);
+  for (const site of envelope.state.miningSites) {
+    for (const mod of site.modules ?? []) {
+      if (STORAGE_MODULE_TYPES.has(mod.type) && mod.stored == null) {
+        mod.stored = {};
+      }
+    }
+    recomputeSiteStorage(site);
+  }
 
   // Validate and filter corrupted nested entries (missions, crew, etc.).
   _validateNestedStructures(envelope.state);

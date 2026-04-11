@@ -805,3 +805,142 @@ describe('Multi-period accumulation', () => {
     expect(anyMiningExtracted).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Storage capacity overflow
+// ---------------------------------------------------------------------------
+
+describe('Storage capacity overflow', () => {
+  it('clamps extracted resources to storage capacity @smoke', () => {
+    const state = createGameState();
+
+    // Build a Moon mining site with drill + silo + power
+    const site = createMiningSite(state, {
+      name: 'Overflow Test Site',
+      bodyId: 'MOON',
+      coordinates: { x: 0, y: 0 },
+      controlUnitPartId: 'base-control-unit-mk1',
+    });
+
+    // Power generator: 100W output, 0W draw
+    addModuleToSite(site, {
+      partId: 'power-generator-solar-mk1',
+      type: MiningModuleType.POWER_GENERATOR,
+      powerDraw: 0,
+      powerOutput: 100,
+    });
+
+    // Mining drill: 25W draw
+    const drill = addModuleToSite(site, {
+      partId: 'mining-drill-mk1',
+      type: MiningModuleType.MINING_DRILL,
+      powerDraw: 25,
+    });
+
+    // Storage silo (solid): 2W draw, capacity 2000 kg
+    const silo = addModuleToSite(site, {
+      partId: 'storage-silo-mk1',
+      type: MiningModuleType.STORAGE_SILO,
+      powerDraw: 2,
+    });
+
+    // Connect drill to silo so resources can flow
+    toggleConnection(site, drill.id, silo.id);
+
+    // Pre-fill the silo to near-capacity (1980 kg out of 2000 kg)
+    silo.stored = { [ResourceType.WATER_ICE]: 1980 };
+    recomputeSiteStorage(site);
+
+    // powerGenerated=100, powerRequired=27 (25+2), efficiency clamped to 1.0
+    // MOON extracts 50 kg WATER_ICE + 200 kg REGOLITH per period = 250 kg total
+    // Only 20 kg remaining capacity, so extraction should be capped
+    processMiningSites(state);
+
+    // Verify: sum of stored values in silo should not exceed storageCapacityKg (2000)
+    const totalStored = Object.values(silo.stored!).reduce((sum, v) => sum + v, 0);
+    expect(totalStored).toBeLessThanOrEqual(silo.storageCapacityKg!);
+
+    // Verify: site.storage values should match module stored values
+    for (const [resource, amount] of Object.entries(site.storage)) {
+      const moduleTotal = silo.stored![resource as ResourceType] ?? 0;
+      expect(moduleTotal).toBeCloseTo(amount as number, 5);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Multi-resource extraction competition
+// ---------------------------------------------------------------------------
+
+describe('Multi-resource extraction competition', () => {
+  it('extracts multiple resource types independently on Mars', () => {
+    const state = createGameState();
+
+    // Build a Mars site with a mining drill (for WATER_ICE solid) AND a gas collector (for CO2 gas)
+    const site = createMiningSite(state, {
+      name: 'Mars Multi-Resource Site',
+      bodyId: 'MARS',
+      coordinates: { x: 0, y: 0 },
+      controlUnitPartId: 'base-control-unit-mk1',
+    });
+
+    // Power generator: 100W output, 0W draw
+    addModuleToSite(site, {
+      partId: 'power-generator-solar-mk1',
+      type: MiningModuleType.POWER_GENERATOR,
+      powerDraw: 0,
+      powerOutput: 100,
+    });
+
+    // Mining drill: 25W draw (extracts SOLID resources: WATER_ICE on Mars)
+    const drill = addModuleToSite(site, {
+      partId: 'mining-drill-mk1',
+      type: MiningModuleType.MINING_DRILL,
+      powerDraw: 25,
+    });
+
+    // Storage silo (solid): 2W draw
+    const silo = addModuleToSite(site, {
+      partId: 'storage-silo-mk1',
+      type: MiningModuleType.STORAGE_SILO,
+      powerDraw: 2,
+    });
+
+    // Connect drill to silo
+    toggleConnection(site, drill.id, silo.id);
+
+    // Gas collector: 20W draw (extracts GAS resources: CO2 on Mars)
+    const gasCollector = addModuleToSite(site, {
+      partId: 'gas-collector-mk1',
+      type: MiningModuleType.GAS_COLLECTOR,
+      powerDraw: 20,
+    });
+
+    // Pressure vessel (gas): 5W draw
+    const pressureVessel = addModuleToSite(site, {
+      partId: 'pressure-vessel-mk1',
+      type: MiningModuleType.PRESSURE_VESSEL,
+      powerDraw: 5,
+    });
+
+    // Connect gas collector to pressure vessel
+    toggleConnection(site, gasCollector.id, pressureVessel.id);
+
+    // Total power draw: 25+2+20+5 = 52W, generation = 100W
+    // Efficiency = 100/52 → clamped to 1.0
+    expect(site.powerRequired).toBe(52);
+    expect(site.powerGenerated).toBe(100);
+
+    processMiningSites(state);
+
+    // MARS has WATER_ICE at 30 kg/period (SOLID via MINING_DRILL)
+    expect(silo.stored![ResourceType.WATER_ICE]).toBe(30);
+
+    // MARS has CO2 at 150 kg/period (GAS via GAS_COLLECTOR)
+    expect(pressureVessel.stored![ResourceType.CO2]).toBe(150);
+
+    // Verify they are extracted independently (both non-zero)
+    expect(site.storage[ResourceType.WATER_ICE]).toBe(30);
+    expect(site.storage[ResourceType.CO2]).toBe(150);
+  });
+});

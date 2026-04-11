@@ -47,7 +47,7 @@ See `.devloop/requirements.md` for full context on all items below.
 - **Verification**: `npx vitest run src/tests/mining.test.ts`
 
 ### TASK-007: Update save/load for per-module storage
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-006
 - **Description**: In `src/core/saveload.ts`, ensure the new `stored`, `storageCapacityKg`, and `storageState` fields on `MiningSiteModule` are serialized. For backwards compatibility, add deserialization logic that defaults `stored` to `{}` for any module with a storage-type `MiningModuleType` if the field is missing. After loading, call `recomputeSiteStorage()` on each site to rebuild `site.storage` from module-level data. Update or add a round-trip save/load test.
 - **Verification**: `npx vitest run src/tests/mining.test.ts && npx vitest run src/tests/saveload.test.ts`
@@ -127,7 +127,7 @@ See `.devloop/requirements.md` for full context on all items below.
 ## Unit Test Gaps
 
 ### TASK-016: Unit tests for storage overflow and multi-resource extraction
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-006
 - **Description**: In `src/tests/mining.test.ts`, add two tests: (1) **Storage capacity overflow** — create a site with a storage silo at near-capacity, run extraction, verify stored amount is clamped to the module's `storageCapacityKg` and no resources are created or lost. (2) **Multi-resource extraction competition** — create a site on a body with multiple extractable resources (e.g., Mars: water ice + CO₂), with appropriate extractors and storage for each, run extraction, verify both resources are extracted independently. Tag one with `@smoke`. See requirements.md section 8.
 - **Verification**: `npx vitest run src/tests/mining.test.ts --testNamePattern "overflow|multi-resource"`
@@ -155,7 +155,7 @@ See `.devloop/requirements.md` for full context on all items below.
 ## E2E Tests
 
 ### TASK-020: E2E test for mining panel interactions
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-006
 - **Description**: Create `e2e/mining-interactions.spec.ts`. Inject game state with a mining site that has a refinery module with available recipes and multiple modules with pipe connections. Test: (1) Navigate to Logistics Center, verify mining tab renders the site. (2) Change the refinery recipe via dropdown, verify UI updates. (3) Verify module connection display is accurate. Each test is independent — sets up its own state. Use Playwright MCP for interactive debugging if tests fail. Tag one test with `@smoke`. See requirements.md section 8.
 - **Verification**: `npx playwright test e2e/mining-interactions.spec.ts`
@@ -167,13 +167,13 @@ See `.devloop/requirements.md` for full context on all items below.
 - **Verification**: `npx playwright test e2e/route-interactions.spec.ts`
 
 ### TASK-022: E2E test for resource contract milestones — early chain
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-006
 - **Description**: Create `e2e/resource-contracts.spec.ts`. Test contracts 1 (Lunar Survey) and 2 (First Harvest) as key milestones. For each: inject game state that simulates the contract's completion conditions (e.g., a BCU + Drill landed on Moon for contract 1; 100 kg water ice delivered to Earth for contract 2), trigger the contract check, and verify the contract completes and the next contract becomes available. Each test is independent. Use Playwright MCP for interactive debugging if tests fail. Tag one test with `@smoke`. See requirements.md section 8.
 - **Verification**: `npx playwright test e2e/resource-contracts.spec.ts --grep "early"`
 
 ### TASK-023: E2E test for resource contract milestones — automation chain
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-006
 - **Description**: In `e2e/resource-contracts.spec.ts`, add tests for contracts 8 (Automate It — first automated route set up) and 12 (Supply Network — 3+ active routes simultaneously). Inject state with the prerequisites for each contract, trigger the contract check, verify completion. Each test is independent. Use Playwright MCP for interactive debugging if tests fail. Tag one test with `@smoke`. See requirements.md section 8.
 - **Verification**: `npx playwright test e2e/resource-contracts.spec.ts --grep "automation"`
