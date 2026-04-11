@@ -679,7 +679,8 @@
         "src/data/contracts.ts"
       ],
       "unit": [
-        "src/tests/mccTiers.test.ts"
+        "src/tests/mccTiers.test.ts",
+        "src/tests/resources.test.ts"
       ],
       "e2e": [
         "e2e/agency-depth.spec.ts"
@@ -749,6 +750,7 @@
         "src/data/techtree.ts"
       ],
       "unit": [
+        "src/tests/resources.test.ts",
         "src/tests/sandbox.test.ts",
         "src/tests/techtree.test.ts"
       ],
@@ -1079,6 +1081,59 @@
       ],
       "e2e": [
         "e2e/**/*.spec.ts"
+      ]
+    },
+    "core/mining": {
+      "sources": [
+        "src/core/mining.ts"
+      ],
+      "unit": [
+        "src/tests/mining.test.ts"
+      ],
+      "e2e": [
+        "e2e/mining.spec.ts"
+      ]
+    },
+    "core/refinery": {
+      "sources": [
+        "src/core/refinery.ts"
+      ],
+      "unit": [
+        "src/tests/refinery.test.ts"
+      ],
+      "e2e": [
+        "e2e/mining.spec.ts"
+      ]
+    },
+    "core/routes": {
+      "sources": [
+        "src/core/routes.ts"
+      ],
+      "unit": [
+        "src/tests/routes.test.ts"
+      ],
+      "e2e": [
+        "e2e/mining.spec.ts"
+      ]
+    },
+    "data/resources": {
+      "sources": [
+        "src/data/resources.ts"
+      ],
+      "unit": [
+        "src/tests/resources.test.ts"
+      ],
+      "e2e": [
+        "e2e/mining.spec.ts"
+      ]
+    },
+    "ui/logistics": {
+      "sources": [
+        "src/ui/logistics.ts"
+      ],
+      "unit": [],
+      "e2e": [
+        "e2e/mining.spec.ts"
       ]
     },
     "tests/_factories": {

@@ -273,7 +273,7 @@ describe('calculateRouteThroughput', () => {
 // ---------------------------------------------------------------------------
 
 describe('createRoute', () => {
-  it('creates a route from proven leg IDs and pushes it to state.routes', () => {
+  it('creates a route from proven leg IDs and pushes it to state.routes @smoke', () => {
     const state = createGameState();
     const pl1 = proveRouteLeg(state, makeParams({ flightId: 'f1', cargoCapacityKg: 5000, costPerRun: 100_000 }));
     const pl2 = proveRouteLeg(state, makeParams({
@@ -505,7 +505,7 @@ describe('processRoutes', () => {
     return { state, site, route };
   }
 
-  it('transports resources and generates revenue when destination is Earth', () => {
+  it('transports resources and generates revenue when destination is Earth @smoke', () => {
     const { state, site, route } = setupRouteState({
       bufferAmount: 5000,
     });

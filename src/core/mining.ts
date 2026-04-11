@@ -273,7 +273,6 @@ export function processMiningSites(state: GameState): void {
           const partDef = getPartById(storageMod.partId);
           if (!partDef) continue;
           const capacity = (partDef.properties.storageCapacityKg as number) ?? 0;
-          const stored = site.storage[resource.resourceType as ResourceType] ?? 0;
           // Each storage module contributes its capacity minus what's currently stored
           // (stored is site-wide, distributed proportionally, but we simplify to total)
           availableCapacity += capacity;

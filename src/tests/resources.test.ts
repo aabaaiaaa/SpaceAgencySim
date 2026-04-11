@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { ResourceType, ResourceState, MiningModuleType, FacilityId, FACILITY_DEFINITIONS, PartType, MissionState, ContractCategory } from '../core/constants.ts';
 import { PARTS } from '../data/parts.ts';
 import { RESOURCES, RESOURCES_BY_ID } from '../data/resources.ts';
-import type { ResourceDef } from '../data/resources.ts';
 import { CELESTIAL_BODIES } from '../data/bodies.ts';
 import { RESOURCE_CONTRACTS } from '../data/contracts.ts';
 import { TechBranch, BRANCH_NAMES, TECH_NODES } from '../data/techtree.ts';
@@ -92,7 +91,7 @@ describe('Resource catalog', () => {
     expect(RESOURCES).toHaveLength(10);
   });
 
-  it('every resource has required fields', () => {
+  it('every resource has required fields @smoke', () => {
     for (const r of RESOURCES) {
       expect(r.id).toBeTypeOf('string');
       expect(r.name).toBeTypeOf('string');
@@ -148,7 +147,7 @@ describe('Resource catalog', () => {
 });
 
 describe('Body resource profiles', () => {
-  it('Moon has water ice and helium-3 in its profile', () => {
+  it('Moon has water ice and helium-3 in its profile @smoke', () => {
     const moon = CELESTIAL_BODIES['MOON'];
     expect(moon.resourceProfile).toBeDefined();
     const types = moon.resourceProfile!.map(r => r.resourceType);
@@ -165,7 +164,7 @@ describe('Body resource profiles', () => {
   });
 
   it('all profile entries have positive extraction rates', () => {
-    for (const [id, body] of Object.entries(CELESTIAL_BODIES)) {
+    for (const [, body] of Object.entries(CELESTIAL_BODIES)) {
       if (body.resourceProfile) {
         for (const entry of body.resourceProfile) {
           expect(entry.extractionRateKgPerPeriod).toBeGreaterThan(0);

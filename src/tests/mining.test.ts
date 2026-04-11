@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
-import { createMiningSite, findNearestSite, addModuleToSite, toggleConnection, SITE_PROXIMITY_RADIUS, getPowerEfficiency, getConnectedStorage, processMiningSites, processSurfaceLaunchPads } from '../core/mining.ts';
-import { MiningModuleType, ResourceType, ResourceState } from '../core/constants.ts';
+import { createMiningSite, findNearestSite, addModuleToSite, toggleConnection, getPowerEfficiency, processMiningSites, processSurfaceLaunchPads } from '../core/mining.ts';
+import { MiningModuleType, ResourceType } from '../core/constants.ts';
 import { processRefineries, setRefineryRecipe } from '../core/refinery.ts';
 
 describe('GameState mining/route fields', () => {
@@ -326,7 +326,7 @@ describe('processMiningSites', () => {
     return { site, generator, drill, silo };
   }
 
-  it('extracts resources with full power', () => {
+  it('extracts resources with full power @smoke', () => {
     const state = createGameState();
     const { site } = buildMoonSiteWithDrillAndStorage(state);
 
@@ -386,7 +386,7 @@ describe('processMiningSites', () => {
     });
 
     // Power generator with output 10, but total draw will be 27 → efficiency ~ 10/27
-    const generator = addModuleToSite(site, {
+    addModuleToSite(site, {
       partId: 'power-generator-solar-mk1',
       type: MiningModuleType.POWER_GENERATOR,
       powerDraw: 0,
@@ -497,7 +497,7 @@ describe('processSurfaceLaunchPads', () => {
 // ---------------------------------------------------------------------------
 
 describe('Integration: extraction → refining → launch chain', () => {
-  it('processes the full extraction, refining, and launch pipeline', () => {
+  it('processes the full extraction, refining, and launch pipeline @smoke', () => {
     const state = createGameState();
 
     // Build a Moon mining site with all modules
@@ -509,7 +509,7 @@ describe('Integration: extraction → refining → launch chain', () => {
     });
 
     // Power generator: 100W output, 0W draw
-    const generator = addModuleToSite(site, {
+    addModuleToSite(site, {
       partId: 'power-generator-solar-mk1',
       type: MiningModuleType.POWER_GENERATOR,
       powerDraw: 0,
@@ -545,7 +545,7 @@ describe('Integration: extraction → refining → launch chain', () => {
     });
 
     // Surface launch pad: 50W draw
-    const launchPad = addModuleToSite(site, {
+    addModuleToSite(site, {
       partId: 'surface-launch-pad-mk1',
       type: MiningModuleType.SURFACE_LAUNCH_PAD,
       powerDraw: 50,

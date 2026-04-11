@@ -34,7 +34,7 @@ import {
   decompressSaveData,
 } from '../core/saveload.ts';
 import { crc32 } from '../core/crc32.ts';
-import { AstronautStatus } from '../core/constants.ts';
+import { AstronautStatus, MiningModuleType, ResourceType } from '../core/constants.ts';
 
 import type { GameState, Contract, CrewMember, MissionInstance, OrbitalObject, RocketDesign } from '../core/gameState.ts';
 import type { SaveSlotSummary } from '../core/saveload.ts';
@@ -1752,11 +1752,11 @@ describe('Save/load round-trip for mining/route fields', () => {
       modules: [{
         id: 'mod-1',
         partId: 'mining-drill-mk1',
-        type: 'MINING_DRILL' as any,
+        type: MiningModuleType.MINING_DRILL,
         powerDraw: 25,
         connections: [],
       }],
-      storage: { WATER_ICE: 500 } as any,
+      storage: { [ResourceType.WATER_ICE]: 500 },
       production: {},
       powerGenerated: 100,
       powerRequired: 35,
@@ -1798,7 +1798,7 @@ describe('Save/load round-trip for mining/route fields', () => {
       id: 'route-1',
       name: 'Lunar Ice Express',
       status: 'active',
-      resourceType: 'WATER_ICE' as any,
+      resourceType: ResourceType.WATER_ICE,
       legs: [{
         id: 'rleg-1',
         origin: { bodyId: 'MOON', locationType: 'surface' },
@@ -1824,9 +1824,12 @@ describe('Save/load round-trip for mining/route fields', () => {
   it('old saves without mining fields default to empty arrays', async () => {
     const state = createGameState();
     // Manually delete the fields to simulate an old save
-    delete (state as any).miningSites;
-    delete (state as any).provenLegs;
-    delete (state as any).routes;
+    // @ts-expect-error - intentionally deleting required fields to simulate old save format
+    delete state.miningSites;
+    // @ts-expect-error - intentionally deleting required fields to simulate old save format
+    delete state.provenLegs;
+    // @ts-expect-error - intentionally deleting required fields to simulate old save format
+    delete state.routes;
 
     await saveGame(state, 0, 'test');
     const loaded = await loadGame(0);

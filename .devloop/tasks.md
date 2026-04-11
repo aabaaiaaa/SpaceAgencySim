@@ -151,7 +151,7 @@
 - **Verification**: `npx playwright test e2e/mining.spec.ts`
 
 ### TASK-026: Final verification pass
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-007, TASK-008, TASK-009, TASK-010, TASK-011, TASK-012, TASK-013, TASK-014, TASK-015, TASK-016, TASK-017, TASK-018, TASK-019, TASK-020, TASK-021, TASK-022, TASK-023, TASK-024, TASK-025
 - **Description**: Run the full verification suite to confirm no regressions. Check: `npm run typecheck` (0 errors), `npm run lint` (0 warnings, 0 errors), `npm run test:unit` (all tests pass, coverage thresholds met), `npm run build` (production build succeeds). If any failures, fix them. Verify the new test files have at least 1-2 `@smoke`-tagged tests each and update `test-map.json` to map new source files to their test files.
 - **Verification**: `npm run typecheck && npm run lint && npm run test:unit && npm run build`
