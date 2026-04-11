@@ -1,186 +1,331 @@
-# Iteration 8 — Crew Status Cleanup, Final Cast Elimination & Inline Style Migration
+# Iteration 9 — Resource Generation & Transportation System
 
-This iteration resolves the long-running `CrewStatus` vs `AstronautStatus` confusion that has persisted across multiple iterations, eliminates the last 11 `as unknown as` casts in unit tests, fixes the coverage threshold regression from iteration 7, and migrates static inline styles to CSS classes.
+This iteration adds a complete resource extraction, processing, and automated transportation layer to SpaceAgencySim. Players mine resources from celestial bodies, refine them through processing chains, and automate transport via manually-proven routes. A new Logistics Center facility provides monitoring and route management.
 
-No new game features. No bundle-size changes. This is purely a quality, correctness, and maintainability iteration.
-
----
-
-## 1. Fix UI Coverage Threshold (Blocking)
-
-**Problem:** `npm run test:unit` exits with code 1 because `src/ui/**` aggregate line coverage is 76.99% — 0.01 percentage points below the 77% threshold. This regression was introduced in iteration 7 when `computeVabStageDeltaV()` was extracted from `src/ui/vab/_staging.ts` to `src/core/stagingCalc.ts`, moving covered lines from the UI directory to the core directory.
-
-**Fix:** Lower the `src/ui/**` lines threshold from 77 to 76 in `vite.config.ts` line 119. This is not a real coverage regression — the same code is still tested, it just lives in a different directory now.
+This is the largest feature addition to date — it introduces new data types, core game logic, game loop integration, save/load support, and a full UI facility. Off-world bases, crew transport, life support supply chains, and NPC interactions are explicitly out of scope — they are future features that consume from this infrastructure.
 
 ---
 
-## 2. Fix Crew Career Table Status Rendering
+## 1. Resource Data Model
 
-**Problem:** The crew career table in the Library facility (`src/ui/library.ts` lines 299-313) has three bugs caused by comparing against wrong enum values:
+### Resource Catalog (10 resources, 3 physical states)
 
-1. **Sorting** (lines 301-302): Checks `a.status !== 'DEAD'` — but `CrewMember.status` is `AstronautStatus` which uses `'kia'`, not `'DEAD'`. The `'DEAD'` branch never matches. The `'kia'` check works but `'fired'` crew are sorted as "active" instead of being grouped with inactive crew.
+| Resource | State | Sources | Primary Use |
+|----------|-------|---------|-------------|
+| Water Ice | Solid | MOON, MARS, CERES | Refine into H₂ + O₂; life support feedstock |
+| Regolith | Solid | MOON, MARS | Refine into oxygen (low yield); future: construction |
+| Iron Ore | Solid | CERES, MOON | Earth export (medium value) |
+| Rare Metals | Solid | CERES | High-value Earth export |
+| CO₂ | Gas | MARS atmosphere | Refine into methane + O₂ |
+| Hydrogen | Gas | Refined from water; JUPITER, SATURN | Rocket fuel |
+| Oxygen | Gas | Refined from water/CO₂/regolith; MARS | Oxidizer, life support |
+| Helium-3 | Gas | MOON surface | Very high-value Earth export (fusion fuel) |
+| Liquid Methane | Liquid | Refined from CO₂ + H₂; TITAN | Fuel alternative |
+| Hydrazine | Liquid | Manufactured from H₂ (simplified) | Monopropellant / RCS fuel |
 
-2. **Color — KIA** (lines 309-310): Checks `c.status === 'DEAD' || c.status === 'kia'` — the `'DEAD'` half is dead code. Only `'kia'` triggers the red color. This works but is misleading.
+New enums in `src/core/constants.ts`: `ResourceType` (10 values), `ResourceState` (`SOLID`, `LIQUID`, `GAS`), `MiningModuleType` (10 values). All follow the existing `Object.freeze({} as const)` pattern.
 
-3. **Color — Injured** (line 310): Checks `c.status === 'INJURED'` — this never matches because `AstronautStatus` has no `'INJURED'` value. Injured crew have `status: 'active'` with a non-null `injuryEnds` timestamp field. All injured crew display as green (healthy) instead of amber.
+New file `src/data/resources.ts`: immutable `ResourceDef` catalog with state, mass density, base value per kg, source body IDs, and extraction module type. Exports `RESOURCES` (array) and `RESOURCES_BY_ID` (record).
 
-4. **Color — Fired** (implicit): No distinct color for fired crew — they show green like active crew.
+**Important codebase convention:** Body IDs are UPPERCASE strings matching the `CelestialBody` enum in constants.ts (e.g., `'MOON'`, `'MARS'`, `'CERES'`, `'TITAN'`). The resource catalog's `sources` arrays must use these uppercase IDs. Ceres (asteroid belt dwarf planet) is the primary asteroid mining body, but the system should be designed so that any landable body with a resource profile can be mined — including small asteroids if more asteroid bodies are added later.
 
-5. **Status text** (line 313): Displays the raw enum value (`'active'`, `'fired'`, `'kia'`) without capitalization.
+### Body Resource Profiles
 
-**Root cause:** The `CrewCareer` interface in `src/core/library.ts` (line 71-78) types `status` as `string` instead of `AstronautStatus`, and does not include `injuryEnds`. The UI code was written against the wrong enum (`CrewStatus` values like `'DEAD'` and `'INJURED'`).
+Each body in `src/data/bodies.ts` gains an optional `resourceProfile` field — an array of `{ resourceType, extractionRateKgPerPeriod, abundance }` entries. The `CelestialBodyDef` interface is extended with this optional field.
 
-### Implementation
+Bodies with resource profiles: MOON (water ice, regolith, iron ore, helium-3), MARS (water ice, regolith, CO₂, oxygen), CERES (iron ore, rare metals, water ice), TITAN (liquid methane), JUPITER (hydrogen), SATURN (hydrogen). Earth and Sun get no profiles.
 
-**`src/core/library.ts` changes:**
+**Codebase note:** The body catalog exports `CELESTIAL_BODIES` as a `Readonly<Record<string, CelestialBodyDef>>` — NOT an array. Access bodies via `CELESTIAL_BODIES['MOON']` or `getBodyDef('MOON')`, not via `.find()`.
 
-1. Import `AstronautStatus` from `constants.ts` (line 11 — already imported).
-2. Update the `CrewCareer` interface (line 74): change `status: string` to `status: AstronautStatus`.
-3. Add `injuryEnds: number | null` to `CrewCareer`.
-4. Update `getCrewCareers()` (line 251-258): include `injuryEnds: c.injuryEnds ?? null` in the mapped object.
+### Cargo Module Parts (3 new parts)
 
-**`src/ui/library.ts` changes:**
+| Part | Type | Carries | Capacity |
+|------|------|---------|----------|
+| Cargo Bay Mk1 | `CARGO_BAY` | Solids | 500 kg |
+| Pressurized Tank Mk1 | `PRESSURIZED_TANK` | Gases | 300 kg |
+| Cryo Tank Mk1 | `CRYO_TANK` | Liquids | 400 kg |
 
-1. Import `AstronautStatus` from `../core/constants.ts`.
-2. Fix sorting (lines 300-304): Sort inactive crew (KIA, fired) after active crew. Use `AstronautStatus.KIA` and `AstronautStatus.FIRED` instead of string literals.
-3. Fix color logic (lines 309-310): Four-way coloring:
-   - `AstronautStatus.KIA` → red (`#ff6060`)
-   - `AstronautStatus.FIRED` → muted gray (`#a0a0a0`)
-   - Active with `injuryEnds !== null` → amber (`#ffaa30`)
-   - Active (healthy) → green (`#60dd80`)
-4. Display status text with proper capitalization (e.g., `'Active'`, `'Fired'`, `'KIA'`, `'Injured'`). For injured crew, override the display text since their `status` is still `'active'`.
+Three new `PartType` values added to constants.ts. Parts added to `PARTS` array and `STACK_TYPES` in `src/data/parts.ts`. Each has `properties.cargoCapacityKg` and `properties.cargoState` matching the `ResourceState` value.
 
----
+### Mining Module Parts (9 new parts)
 
-## 3. Remove Vestigial CrewStatus Enum
+One new `PartType`: `MINING_MODULE`. All 9 mining parts use this type, differentiated by `properties.miningModuleType` matching the `MiningModuleType` enum.
 
-**Problem:** `CrewStatus` is defined in `src/core/constants.ts` (lines 112-128) with values `IDLE`, `ON_MISSION`, `TRAINING`, `INJURED`, `DEAD`. It is referenced **nowhere in production code**. The only references are:
+| Module | MiningModuleType | Key Properties |
+|--------|-----------------|----------------|
+| Base Control Unit | BASE_CONTROL_UNIT | powerDraw: 10 |
+| Mining Drill | MINING_DRILL | powerDraw: 25, extractionMultiplier: 1.0 |
+| Gas Collector | GAS_COLLECTOR | powerDraw: 20, extractionMultiplier: 1.0 |
+| Fluid Extractor | FLUID_EXTRACTOR | powerDraw: 30, extractionMultiplier: 1.0 |
+| Refinery | REFINERY | powerDraw: 40, processingMultiplier: 1.0 |
+| Storage Silo | STORAGE_SILO | powerDraw: 2, storageCapacityKg: 2000, storageState: SOLID |
+| Pressure Vessel | PRESSURE_VESSEL | powerDraw: 5, storageCapacityKg: 1000, storageState: GAS |
+| Fluid Tank | FLUID_TANK | powerDraw: 8, storageCapacityKg: 1500, storageState: LIQUID |
+| Surface Launch Pad | SURFACE_LAUNCH_PAD | powerDraw: 50, launchCapacityKgPerPeriod: 200 |
+| Power Generator (Solar) | POWER_GENERATOR | powerDraw: 0, powerOutput: 100 |
 
-- Its own definition and type export in `constants.ts`
-- A constant-validation test block in `src/tests/gameState.test.ts` (lines 446-457)
-- The JSDoc comment on `AstronautStatus` (line 98) that says "Distinct from the operational CrewStatus below"
-
-The enum has been a persistent source of confusion across iterations 5, 6, and 7 — test code and UI code have repeatedly used `CrewStatus` values where `AstronautStatus` was required. Removing it eliminates this confusion permanently.
-
-**Note:** `CrewStatus` was originally intended to track operational activity (idle/on mission/training/injured/dead) as distinct from career arc (active/fired/kia). However, this operational tracking was never implemented — `CrewMember` has dedicated fields instead: `assignedRocketId` (on mission), `trainingSkill`/`trainingEnds` (training), `injuryEnds` (injured). The enum is therefore vestigial.
-
-### Implementation
-
-1. Delete the `CrewStatus` const object (lines 115-126) and its companion type (line 128) from `src/core/constants.ts`.
-2. Update the JSDoc on `AstronautStatus` (line 98): remove the reference to "operational CrewStatus below".
-3. In `src/tests/gameState.test.ts`:
-   - Remove `CrewStatus` from the import (line 26).
-   - Delete the `describe('CrewStatus enum', ...)` test block (lines 446-457).
-
----
-
-## 4. Eliminate Remaining 11 Unit Test Casts
-
-The iteration 7 review identified 11 remaining `as unknown as` casts across 4 test files, all previously marked as "justified". This section addresses each with targeted strategies to reduce the count to zero or near-zero.
-
-### 4a. `src/tests/saveload.test.ts` — 3 casts
-
-**Line 778:** `envelope!.state as unknown as GameState`
-
-The test file declares a local `SaveEnvelope` interface (line 58-63) with `state: Record<string, unknown>`. Since the test serializes a full `GameState` through `saveGame()` and then parses it back, the state IS a valid `GameState`. Fix: change the local `SaveEnvelope.state` type from `Record<string, unknown>` to `GameState`. This eliminates the cast on line 778 since `envelope!.state` will already be typed as `GameState`.
-
-**Lines 1288, 1308:** `{ board: [], active: [...], completed: [], failed: [] } as unknown as GameState['contracts']`
-
-The `validContract()` helper (line 1134) returns `Record<string, unknown>` instead of `Contract`. Fix: add a `makeContract()` factory to `src/tests/_factories.ts` that returns a typed `Contract`. Update `validContract()` to use it (or replace it entirely). Once the array elements are properly typed `Contract` objects, the outer `as unknown as GameState['contracts']` cast becomes unnecessary — the object literal will match `GameState['contracts']` directly.
-
-For the `{ id: 'c2' }` deliberately invalid entry on line 1286, use `@ts-expect-error` since it's intentionally malformed.
-
-### 4b. `src/tests/pool.test.ts` — 2 casts
-
-**Line 87:** `c as unknown as PIXI.Container` in `asPIXIContainer()` helper.
-**Line 96:** `(parent.children as unknown[]).push(child)` in `attachToParent()` helper.
-
-The `MockContainer` class can't fully implement `PIXI.Container` because Container requires a WebGL context. However, the cast is already centralised in helper functions. Strategy: attempt to extend `makeMockContainer()` from `_factories.ts` to satisfy enough of the `PIXI.Container` interface for the pool tests. If the interface surface is too large, switch to `@ts-expect-error` on the helper functions with a comment explaining the WebGL limitation.
-
-### 4c. `src/tests/ui-rocketCardUtil.test.ts` — 4 casts
-
-**Line 128:** `document.createElement('canvas') as unknown as MockElement` in `createCanvas()`.
-**Line 133:** `canvas as unknown as HTMLCanvasElement` in `renderPreview()`.
-**Line 138:** Return type cast in `buildCard()`.
-
-All three helper functions bridge between the JSDOM `HTMLCanvasElement` (which lacks the full Canvas API) and the test's `MockElement` type. Strategy: create a `makeMockCanvas()` factory or extend `makeMockElement()` to produce objects that satisfy both `MockElement` and `HTMLCanvasElement` interfaces, eliminating the need for bridging casts. If the JSDOM surface gap is too wide, consolidate to `@ts-expect-error` with a clear comment.
-
-### 4d. `src/tests/workerBridgeTimeout.test.ts` — 2 casts
-
-**Line 73:** `(globalThis as unknown as { Worker: unknown }).Worker = ...`
-**Line 77:** `... as unknown as typeof Worker`
-
-Both casts are in `installWorkerStub()` which replaces `globalThis.Worker` with a mock. Strategy: replace the assignment with `Object.defineProperty(globalThis, 'Worker', { value: MockWorkerConstructor, writable: true, configurable: true })` which doesn't require casting `globalThis`. The `as unknown as typeof Worker` on the constructor may still be needed — if so, use `@ts-expect-error` since the mock intentionally doesn't implement the full Worker interface.
+New `ActivationBehaviour` values: `MINE`, `LAUNCH_RESOURCES`. Added to the existing frozen object in `src/data/parts.ts` before the freeze.
 
 ---
 
-## 5. Migrate Static Inline Styles to CSS Classes
+## 2. Mining Sites
 
-**Problem:** 44 inline `style=""` attributes remain across 11 UI files. The project has a mature `design-tokens.css` with CSS custom properties for colors, typography, and spacing, plus per-module CSS files. Static inline styles bypass this system with hardcoded hex values.
+### Core Logic (`src/core/mining.ts`)
 
-**Scope:** Migrate **static** inline styles (hardcoded colors, fonts, spacing, borders) to CSS classes using existing design tokens where applicable. **Dynamic** inline styles (computed positions like `top:${barY}px`, percentage widths like `width:${p}%`, runtime color variables like `color:${statusColor}`) remain as inline styles since they require JavaScript values at render time.
+A mining site is created implicitly when a Base Control Unit lands on a body. The site is tied to that body and landing coordinates.
 
-### Files and static style counts
+- **Proximity grouping:** Subsequent landings within `SITE_PROXIMITY_RADIUS` (constant, ~500 game units) of an existing site's Base Control Unit join that site. Landings outside this radius with a BCU create a new site.
+- **Module placement:** Modules are added to a site when they land within its radius. Each module tracks its part ID, type, power draw, and pipe connections.
+- **Pipe connections:** Built-in pipework — players toggle connections between modules at a site. All modules at a site are within connection range (the site boundary IS the connection boundary). Connections form a bidirectional adjacency graph.
+- **Power budget:** `powerGenerated` vs `powerRequired` per site. Efficiency ratio = min(1.0, generated/required). Zero power = zero production.
+- **Extraction:** Per period, each extractor module queries the body's resource profile for resources matching its extraction type. Output flows to connected storage modules of the matching state. Extraction rate scales with power efficiency and the part's extraction multiplier.
+- **No maintenance:** Modules operate indefinitely once placed.
 
-| File | Total | Static | Dynamic | CSS file |
-|------|------:|-------:|--------:|----------|
-| `src/ui/vab/_launchFlow.ts` | 12 | 12 | 0 | `src/ui/vab/vab.css` |
-| `src/ui/launchPad.ts` | 11 | 11 | 0 | `src/ui/launchPad.css` |
-| `src/ui/flightController/_docking.ts` | 9 | 3 | 6 | `src/ui/flightController/flightController.css` |
-| `src/ui/vab/_scalebar.ts` | 7 | 5 | 2 | `src/ui/vab/vab.css` |
-| `src/ui/crewAdmin.ts` | 4 | 1 | 3 | `src/ui/crewAdmin.css` |
-| `src/ui/flightHud.ts` | 4 | 0 | 4 | `src/ui/flightHud.css` |
-| `src/ui/library.ts` | 3 | 2 | 1 | `src/ui/library.css` |
-| `src/ui/vab/_partsPanel.ts` | 1 | 0 | 1 | `src/ui/vab/vab.css` |
-| `src/ui/vab/_inventory.ts` | 1 | 0 | 1 | `src/ui/vab/vab.css` |
-| `src/ui/mainmenu.ts` | 1 | 1 | 0 | `src/ui/mainmenu.css` |
-| `src/ui/rdLab.ts` | 1 | 1 | 0 | `src/ui/rdLab.css` |
-| **Totals** | **54** | **36** | **18** | |
+### Refinery Processing (`src/core/refinery.ts`)
 
-### Shared styles between _launchFlow.ts and launchPad.ts
+Refineries transform resources using configured recipes. Each refinery module has one active recipe (or none).
 
-These two files contain near-identical launch confirmation dialog styles (error titles, warning text, button groups, launch-confirm buttons, abort buttons, warning sections). They should share CSS classes rather than each getting independent styles. Create shared launch dialog classes (e.g., `.launch-dialog-title`, `.launch-dialog-warn`, `.launch-btn-abort`, `.launch-btn-confirm`, `.launch-dialog-actions`) in a common location — either `launchPad.css` (since the launch pad is the parent context) or a new shared CSS file.
+| Recipe | Inputs | Outputs |
+|--------|--------|---------|
+| Water Electrolysis | 100 kg Water Ice | 11 kg Hydrogen + 89 kg Oxygen |
+| Sabatier Process | 100 kg CO₂ + 8 kg Hydrogen | 33 kg Liquid Methane + 75 kg Oxygen |
+| Regolith Electrolysis | 100 kg Regolith | 15 kg Oxygen |
+| Hydrazine Synthesis | 50 kg Hydrogen | 40 kg Hydrazine |
 
-### Migration rules
+Recipes are defined as immutable data (`REFINERY_RECIPES` array, `RECIPES_BY_ID` record). Processing checks input availability, consumes inputs, produces outputs — all scaled by power efficiency.
 
-- Add CSS classes to the appropriate per-module CSS file (see table above).
-- Use design tokens (`var(--color-danger)`, `var(--font-size-sm)`, `var(--space-md)`, etc.) where they match the hardcoded values. Where no token exists and the value is a one-off, use the literal value in the CSS class.
-- Replace `style="..."` with `class="..."` in the template literal.
-- Where an element already has a `class=` attribute, append the new class.
-- Do NOT change dynamic styles — leave them as inline `style=` attributes.
-- Do NOT change test assertions that check for inline styles (if any exist in E2E tests).
+### Surface Launch Pad
 
----
+Pulls resources from connected storage and transfers them to the site's `orbitalBuffer` — a per-resource-type accumulator that represents resources staged in orbit for automated route pickup. Transfer rate capped by `launchCapacityKgPerPeriod`, scaled by power efficiency.
 
-## 6. Verification Strategy
+### Mining Site State (GameState additions)
 
-All changes must pass the existing test suite. New tests are added only for the crew career table fix (section 2).
+```typescript
+interface MiningSiteModule {
+  id: string;
+  partId: string;
+  type: MiningModuleType;
+  powerDraw: number;
+  connections: string[];    // bidirectional adjacency list
+  recipeId?: string;        // REFINERY modules only
+}
 
-**Global verification commands:**
-- `npm run typecheck` — no errors
-- `npm run lint` — 0 warnings, 0 errors
-- `npm run test:unit` — all tests pass, coverage thresholds met (including the lowered UI threshold)
-- `npm run build` — production build succeeds
+interface MiningSite {
+  id: string;
+  name: string;
+  bodyId: string;
+  coordinates: { x: number; y: number };
+  controlUnit: { partId: string };
+  modules: MiningSiteModule[];
+  storage: Partial<Record<ResourceType, number>>;
+  production: Partial<Record<ResourceType, number>>;
+  powerGenerated: number;
+  powerRequired: number;
+  orbitalBuffer: Partial<Record<ResourceType, number>>;
+}
+```
 
-**Per-section verification:**
-1. **Coverage threshold:** `npm run test:unit` completes with exit code 0
-2. **Crew career fix:** `npx vitest run src/tests/library.test.ts` (if it exists) or visual verification via dev server. Core changes verified by `npm run typecheck`.
-3. **CrewStatus removal:** `npm run typecheck` passes. `npx vitest run src/tests/gameState.test.ts` passes (with the test block removed).
-4. **Cast elimination:** Per-file verification:
-   - `npx vitest run src/tests/saveload.test.ts`
-   - `npx vitest run src/tests/pool.test.ts`
-   - `npx vitest run src/tests/ui-rocketCardUtil.test.ts`
-   - `npx vitest run src/tests/workerBridgeTimeout.test.ts`
-   - Final count: `grep -r "as unknown as" src/tests/ --include="*.ts" | wc -l` — target 0 in runtime code (JSDoc examples in `_factories.ts` are acceptable)
-5. **Inline styles:** `npm run build` succeeds. Visual verification via dev server for launch pad, VAB, docking, and library screens. `grep -r 'style="' src/ui/ --include="*.ts" | wc -l` — target ~18 (dynamic only).
-6. **Final:** Full `npm run test:unit`, `npm run typecheck`, `npm run lint`, `npm run build` all pass.
+Added to `GameState`: `miningSites: MiningSite[]` (default `[]`).
 
 ---
 
-## 7. What This Iteration Does NOT Include
+## 3. Routes & Automation
 
-- **No bundle splitting** — the 960 KB main chunk warning is acknowledged but deferred
-- **No new game features** — strictly correctness, cleanup, and style migration
-- **No production logic changes** beyond the crew career table fix and CrewStatus removal
-- **No E2E test changes** — E2E cast elimination was completed in iteration 7 (0 remaining)
-- **No coverage threshold increases** — the UI threshold is lowered, not raised
+### Proving a Route Leg
+
+When a player manually flies a craft from one location to another, the game records a **proven leg**: origin (body + surface/orbit + altitude), destination (body + surface/orbit + altitude), craft design ID, cargo capacity, and cost per run (derived from fuel usage).
+
+- Cargo tanks don't need to be filled during proving — completing the trip is enough.
+- Different craft designs require separate proving flights.
+- Proven legs are stored in `gameState.provenLegs`.
+
+### Route Assembly
+
+Routes are assembled in the Logistics Center by chaining proven legs end-to-end.
+
+- Each route carries a single resource type.
+- Throughput bottleneck = minimum (leg capacity × craft count) across all legs.
+- Routes start in `'paused'` status; player activates them.
+
+### Automation Economics
+
+- Each leg requires building at least one craft (full construction cost).
+- Fixed cost per trip per craft per period (set at proving time).
+- Additional craft can be assigned to a leg to multiply throughput (and cost).
+- No risk — automated runs never fail.
+- Revenue generated when resources are delivered to Earth (sold at base value per kg).
+
+**Codebase note:** `spend(state, amount)` in `src/core/finance.ts` returns `boolean` (false if insufficient funds). Route processing must check this return value and handle insufficient funds (e.g., pause the route or skip the run).
+
+### Route State (GameState additions)
+
+```typescript
+interface RouteLocation {
+  bodyId: string;
+  locationType: 'surface' | 'orbit';
+  altitude?: number;
+}
+
+interface RouteLeg {
+  id: string;
+  origin: RouteLocation;
+  destination: RouteLocation;
+  craftDesignId: string;
+  craftCount: number;
+  cargoCapacityKg: number;
+  costPerRun: number;
+  provenFlightId: string;
+}
+
+interface Route {
+  id: string;
+  name: string;
+  status: 'active' | 'paused' | 'broken';
+  resourceType: ResourceType;
+  legs: RouteLeg[];
+  throughputPerPeriod: number;
+  totalCostPerPeriod: number;
+}
+
+interface ProvenLeg {
+  id: string;
+  origin: RouteLocation;
+  destination: RouteLocation;
+  craftDesignId: string;
+  cargoCapacityKg: number;
+  costPerRun: number;
+  provenFlightId: string;
+  dateProven: number;
+}
+```
+
+Added to `GameState`: `provenLegs: ProvenLeg[]`, `routes: Route[]` (both default `[]`).
+
+### Route Safety
+
+When a player controls a craft involved in an active route:
+- Warning displayed listing dependent routes.
+- Safe orbit altitude range highlighted.
+- Moving craft outside safe range breaks the route (status → `'broken'`).
+
+Core logic: `getRouteDependencies(state, bodyId, altitude)` returns routes referencing that orbit. `getSafeOrbitRange(state, bodyId, altitude)` returns the min/max altitude range.
+
+---
+
+## 4. Logistics Center Facility
+
+### Facility Definition
+
+New `FacilityId.LOGISTICS_CENTER` in constants.ts. Added to `FACILITY_DEFINITIONS` with cost, science cost, and `starter: false`. Higher tiers unlock more simultaneous active routes.
+
+### Panel 1 — Mining Sites (Systems Diagram)
+
+Left sidebar: grouped list of celestial bodies with mining sites. Selecting a body shows all sites on that body.
+
+Per-site diagram:
+- Module boxes with type icon, status, and key metric (production rate for extractors, fill level for storage, recipe for refineries, orbital buffer for launch pads).
+- Connection lines between piped modules.
+- Site-level power budget display with visual warning on deficit.
+- Refinery recipe selection (configurable from this view).
+
+### Panel 2 — Route Management (Map + Table)
+
+Top: Map showing bodies and active routes as directional lines.
+Bottom: Table listing each route with name, resource type, legs summary, throughput, cost/period, revenue/period, status toggle.
+
+- Create new routes by chaining proven legs.
+- Assign additional craft to legs (triggers build cost).
+- Pause/resume routes.
+
+### Hub Integration
+
+Add Logistics Center building to the hub layout in `src/ui/hub.ts`. Click handler opens the logistics panel.
+
+### In-Flight Map Overlay
+
+Toggleable overlay on the existing map view showing active routes as directional lines. Read-only — editing happens in the Logistics Center.
+
+---
+
+## 5. Contract Progression
+
+12 new contracts using the existing contract system. Contracts unlock sequentially after all tutorial missions are complete.
+
+| # | Contract | Objective | Unlocks |
+|---|----------|-----------|---------|
+| 1 | Lunar Survey | Land BCU + Drill on Moon | Mining site creation |
+| 2 | First Harvest | Return 100kg water ice to Earth | Cargo modules |
+| 3 | Expand Operations | Add silo + 2nd drill to lunar site | Pipe connections |
+| 4 | Power Up | Deploy power generator | Power budget mechanic |
+| 5 | Refining Basics | Deploy refinery, produce hydrogen | Refinery module |
+| 6 | Launch Capability | Build surface launch pad | Orbital buffer |
+| 7 | Orbital Storage | Place fuel depot in lunar orbit | Fuel depots |
+| 8 | Automate It | Set up first automated route | Logistics Center facility |
+| 9 | Gas Mining | Deploy gas collector on Mars | Gas collector, pressurized tank |
+| 10 | Methane Production | Produce methane from CO₂ + H₂ | Multi-input recipes, cryo tank |
+| 11 | Asteroid Prospecting | Extract rare metals from Ceres | Asteroid mining |
+| 12 | Supply Network | 3+ active routes simultaneously | Multi-route management |
+
+**Codebase note:** The existing contract system uses `CONTRACT_TEMPLATES` in `src/data/contracts.ts` with a `canGenerate()` / `generate()` pattern, not a static array. The resource contracts need to integrate with this generator pattern. After contract 8 is completed, the procedural generator should also produce resource delivery contracts.
+
+---
+
+## 6. Tech Tree
+
+New "Logistics" branch added to the tech tree. The existing tech tree uses flat `TechNodeDef` entries in the `TECH_NODES` array (in `src/data/techtree.ts`), each with a `branch`, `tier`, `name`, `scienceCost`, `fundsCost`, and `unlocksParts` array. A new `TechBranch.LOGISTICS` value is needed in the `TechBranch` enum, plus a `BRANCH_NAMES` entry.
+
+5 nodes across tiers 1-5:
+1. Surface Mining (drill, BCU, silo, power generator)
+2. Gas & Fluid Extraction (gas collector, fluid extractor, pressure vessel, fluid tank)
+3. Refining & Processing (refinery, cargo bay, pressurized tank, cryo tank)
+4. Surface Launch Systems (surface launch pad)
+5. Automated Logistics (unlocks route automation feature)
+
+---
+
+## 7. Game Loop Integration
+
+### Period Tick (`src/core/period.ts`)
+
+Add resource processing to `advancePeriod()`, after existing steps (crew salaries, facility upkeep, contracts, satellites, training, surface ops, life support) but before the bankruptcy check:
+
+1. `processMiningSites(state)` — extraction
+2. `processRefineries(state)` — refinery processing
+3. `processSurfaceLaunchPads(state)` — orbital buffer transfers
+4. `processRoutes(state)` — automated transport and revenue
+
+The `PeriodSummary` return type should be extended with resource system fields (mining revenue, route costs, etc.).
+
+### Save/Load (`src/core/saveload.ts`)
+
+The save/load system is async and slot-based: `saveGame(state, slotIndex, saveName)` → `Promise<SaveSlotSummary>`, `loadGame(slotIndex)` → `Promise<GameState>`. State is serialized to JSON, compressed, and stored in localStorage + IndexedDB.
+
+The new `miningSites`, `provenLegs`, and `routes` arrays need to be included in serialization. Deserialization must default missing fields to `[]` for backwards compatibility with old saves. The `_validateState()` function does NOT need changes since it doesn't reject unknown fields, but `_validateNestedStructures()` could optionally validate mining site entries.
+
+---
+
+## 8. New Body Test Coverage
+
+Four celestial bodies were added in a pre-iteration change (Ceres, Jupiter, Saturn, Titan). The general iteration tests in `bodies.test.ts` (field presence, hierarchy, weather) already cover them via `ALL_BODY_IDS` iteration. However, the specific property-value tests (surface gravity, atmosphere profiles, radius, GM) only cover the original 8 bodies. These should be extended to cover all 12 bodies for completeness.
+
+---
+
+## 9. Testing Strategy
+
+- **TDD approach:** Write failing tests first, then implement, then verify.
+- **Unit tests** for all core modules: `resources.test.ts`, `mining.test.ts`, `refinery.test.ts`, `routes.test.ts`.
+- **Existing test extension:** `bodies.test.ts` extended for new body property coverage.
+- **Save/load round-trip tests** added to verify persistence of new state fields. Must use the async `saveGame(state, slot)` / `loadGame(slot)` pattern with `await`.
+- **E2E test** for basic mining deployment flow.
+- **Verification per task:** Targeted test commands (single file), not full suite. Type-check changed files only where possible.
+
+---
+
+## 10. What This Iteration Does NOT Include
+
+- **No off-world bases or habitats** — future feature consuming from this infrastructure
+- **No crew transport or taxi service** — future feature
+- **No life support supply chains** — future feature
+- **No NPC craft interactions** — future feature
+- **No bundle splitting** — the main chunk size warning is acknowledged but deferred
+- **No route map rendering** in the in-flight overlay — placeholder only; full PixiJS route rendering is a visual polish task

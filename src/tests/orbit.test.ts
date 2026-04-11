@@ -377,7 +377,7 @@ describe('altitude bands', () => {
   });
 
   it('returns null for unknown body', () => {
-    expect(getAltitudeBandId(100_000, 'JUPITER')).toBeNull();
+    expect(getAltitudeBandId(100_000, 'PLUTO')).toBeNull();
   });
 });
 
@@ -768,7 +768,7 @@ describe('getMinOrbitAltitude', () => {
   });
 
   it('returns default 70 km for unknown body', () => {
-    expect(getMinOrbitAltitude('JUPITER')).toBe(70_000);
+    expect(getMinOrbitAltitude('PLUTO')).toBe(70_000);
   });
 });
 

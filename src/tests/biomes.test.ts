@@ -118,7 +118,7 @@ describe('getBiome()', () => {
   });
 
   it('returns null for unknown body', () => {
-    expect(getBiome(1000, 'JUPITER')).toBeNull();
+    expect(getBiome(1000, 'PLUTO')).toBeNull();
   });
 });
 
@@ -132,7 +132,7 @@ describe('getBiomeId()', () => {
   });
 
   it('returns null for unknown body', () => {
-    expect(getBiomeId(500, 'JUPITER')).toBeNull();
+    expect(getBiomeId(500, 'PLUTO')).toBeNull();
   });
 });
 
@@ -174,7 +174,7 @@ describe('getScienceMultiplier()', () => {
   });
 
   it('falls back to 1.0 for unknown body', () => {
-    expect(getScienceMultiplier(500, 'JUPITER')).toBe(1.0);
+    expect(getScienceMultiplier(500, 'PLUTO')).toBe(1.0);
   });
 });
 
@@ -209,7 +209,7 @@ describe('getBiomeTransition()', () => {
   });
 
   it('returns null for unknown body', () => {
-    expect(getBiomeTransition(100, 'JUPITER')).toBeNull();
+    expect(getBiomeTransition(100, 'PLUTO')).toBeNull();
   });
 });
 
@@ -264,7 +264,7 @@ describe('getOrbitalBiomes()', () => {
       meanAnomalyAtEpoch: 0,
       epoch: 0,
     };
-    expect(getOrbitalBiomes(elements, 'JUPITER')).toEqual([]);
+    expect(getOrbitalBiomes(elements, 'PLUTO')).toEqual([]);
   });
 });
 

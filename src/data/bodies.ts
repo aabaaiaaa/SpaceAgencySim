@@ -167,7 +167,7 @@ const SUN: CelestialBodyDef = {
   landable: false,
   soiRadius: Infinity,
   parentId: null,
-  childIds: ['MERCURY', 'VENUS', 'EARTH', 'MARS'],
+  childIds: ['MERCURY', 'VENUS', 'EARTH', 'MARS', 'CERES', 'JUPITER', 'SATURN'],
   minOrbitAltitude: 2_000_000_000,
   destructionZone: 'extreme_heat',
 };
@@ -454,6 +454,174 @@ const DEIMOS: CelestialBodyDef = {
   destructionZone: null,
 };
 
+const CERES: CelestialBodyDef = {
+  id: 'CERES',
+  name: 'Ceres',
+  surfaceGravity: 0.28,
+  radius: 473_000,
+  gm: 6.263e10,
+  atmosphere: null,
+  orbitalDistance: 413_700_000_000,
+  orbitalPeriod: 145_310_000,
+  biomes: [
+    { id: 'CERES_SURFACE',     name: 'Ceres Surface',      min: 0,       max: 100,       scienceMultiplier: 4.0, color: 0x9a9a90 },
+    { id: 'CERES_NEAR',        name: 'Near Surface',        min: 100,     max: 2_000,     scienceMultiplier: 4.5, color: 0x808078 },
+    { id: 'CERES_LOW_ALT',     name: 'Low Altitude',        min: 2_000,   max: 10_000,    scienceMultiplier: 5.0, color: 0x606058 },
+    { id: 'CERES_LOW_ORBIT',   name: 'Low Ceres Orbit',     min: 10_000,  max: 100_000,   scienceMultiplier: 5.5, color: 0x404038 },
+    { id: 'CERES_HIGH_ORBIT',  name: 'High Ceres Orbit',    min: 100_000, max: Infinity,  scienceMultiplier: 6.0, color: 0x202018 },
+  ],
+  altitudeBands: [
+    { id: 'LCO', name: 'Low Ceres Orbit',  min: 5_000,   max: 50_000 },
+    { id: 'HCO', name: 'High Ceres Orbit', min: 50_000,  max: 200_000 },
+  ],
+  groundVisual: { color: 0x9a9a90, description: 'Dark rocky surface with bright salt deposits' },
+  skyVisual: {
+    seaLevelColor: 0x000005,
+    highAltColor: 0x000005,
+    spaceColor: 0x000005,
+    starFadeStart: 0,
+    starFadeEnd: 0,
+  },
+  weather: null,
+  landable: true,
+  soiRadius: 1_800_000,
+  parentId: 'SUN',
+  childIds: [],
+  minOrbitAltitude: 5_000,
+  destructionZone: null,
+};
+
+const JUPITER: CelestialBodyDef = {
+  id: 'JUPITER',
+  name: 'Jupiter',
+  surfaceGravity: 24.79,
+  radius: 69_911_000,
+  gm: 1.26686534e17,
+  atmosphere: {
+    seaLevelDensity: 1.326,
+    scaleHeight: 27_000,
+    topAltitude: 200_000_000,
+    composition: 'H₂ (89%), He (10%)',
+  },
+  orbitalDistance: 778_570_000_000,
+  orbitalPeriod: 374_335_776,
+  biomes: [
+    { id: 'JUPITER_UPPER_CLOUD', name: 'Upper Cloud Layer',   min: 0,                max: 50_000_000,     scienceMultiplier: 0,    color: 0xe8d8a8 },
+    { id: 'JUPITER_MID_ATMO',    name: 'Mid Atmosphere',      min: 50_000_000,       max: 100_000_000,    scienceMultiplier: 8.0,  color: 0xc4a868 },
+    { id: 'JUPITER_UPPER_ATMO',  name: 'Upper Atmosphere',    min: 100_000_000,      max: 200_000_000,    scienceMultiplier: 7.0,  color: 0x8a7848 },
+    { id: 'JUPITER_LOW_ORBIT',   name: 'Low Jupiter Orbit',   min: 200_000_000,      max: 500_000_000,    scienceMultiplier: 6.0,  color: 0x504828 },
+    { id: 'JUPITER_HIGH_ORBIT',  name: 'High Jupiter Orbit',  min: 500_000_000,      max: Infinity,       scienceMultiplier: 5.0,  color: 0x282418 },
+  ],
+  altitudeBands: [
+    { id: 'LJO', name: 'Low Jupiter Orbit',    min: 200_000_000,     max: 500_000_000 },
+    { id: 'MJO', name: 'Medium Jupiter Orbit',  min: 500_000_000,     max: 2_000_000_000 },
+    { id: 'HJO', name: 'High Jupiter Orbit',   min: 2_000_000_000,   max: 10_000_000_000 },
+  ],
+  groundVisual: { color: 0xe8d8a8, description: 'Swirling ammonia clouds and gas bands' },
+  skyVisual: {
+    seaLevelColor: 0xe8d8a8,
+    highAltColor: 0x8a7848,
+    spaceColor: 0x000005,
+    starFadeStart: 100_000_000,
+    starFadeEnd: 200_000_000,
+  },
+  weather: null,
+  landable: false,
+  soiRadius: 48_200_000_000,
+  parentId: 'SUN',
+  childIds: [],
+  minOrbitAltitude: 200_000_000,
+  destructionZone: 'extreme_pressure',
+};
+
+const SATURN: CelestialBodyDef = {
+  id: 'SATURN',
+  name: 'Saturn',
+  surfaceGravity: 10.44,
+  radius: 58_232_000,
+  gm: 3.7931187e16,
+  atmosphere: {
+    seaLevelDensity: 0.687,
+    scaleHeight: 59_500,
+    topAltitude: 150_000_000,
+    composition: 'H₂ (96%), He (3%)',
+  },
+  orbitalDistance: 1_433_500_000_000,
+  orbitalPeriod: 929_596_608,
+  biomes: [
+    { id: 'SATURN_UPPER_CLOUD',  name: 'Upper Cloud Layer',   min: 0,                max: 40_000_000,     scienceMultiplier: 0,    color: 0xf0e0b0 },
+    { id: 'SATURN_MID_ATMO',     name: 'Mid Atmosphere',      min: 40_000_000,       max: 80_000_000,     scienceMultiplier: 9.0,  color: 0xd4c490 },
+    { id: 'SATURN_UPPER_ATMO',   name: 'Upper Atmosphere',    min: 80_000_000,       max: 150_000_000,    scienceMultiplier: 8.0,  color: 0xa89060 },
+    { id: 'SATURN_LOW_ORBIT',    name: 'Low Saturn Orbit',    min: 150_000_000,      max: 400_000_000,    scienceMultiplier: 7.0,  color: 0x605030 },
+    { id: 'SATURN_HIGH_ORBIT',   name: 'High Saturn Orbit',   min: 400_000_000,      max: Infinity,       scienceMultiplier: 6.0,  color: 0x302818 },
+  ],
+  altitudeBands: [
+    { id: 'LSO', name: 'Low Saturn Orbit',    min: 150_000_000,     max: 400_000_000 },
+    { id: 'MSO', name: 'Medium Saturn Orbit',  min: 400_000_000,     max: 1_500_000_000 },
+    { id: 'HSO', name: 'High Saturn Orbit',   min: 1_500_000_000,   max: 8_000_000_000 },
+  ],
+  groundVisual: { color: 0xf0e0b0, description: 'Pale gold ammonia clouds with prominent ring system' },
+  skyVisual: {
+    seaLevelColor: 0xf0e0b0,
+    highAltColor: 0xa89060,
+    spaceColor: 0x000005,
+    starFadeStart: 80_000_000,
+    starFadeEnd: 150_000_000,
+  },
+  weather: null,
+  landable: false,
+  soiRadius: 54_800_000_000,
+  parentId: 'SUN',
+  childIds: ['TITAN'],
+  minOrbitAltitude: 150_000_000,
+  destructionZone: 'extreme_pressure',
+};
+
+const TITAN: CelestialBodyDef = {
+  id: 'TITAN',
+  name: 'Titan',
+  surfaceGravity: 1.352,
+  radius: 2_574_700,
+  gm: 8.9781e12,
+  atmosphere: {
+    seaLevelDensity: 5.3,
+    scaleHeight: 21_000,
+    topAltitude: 600_000,
+    composition: 'N₂ (94.2%), CH₄ (5.7%)',
+  },
+  orbitalDistance: 1_221_870_000,
+  orbitalPeriod: 1_377_648,
+  biomes: [
+    { id: 'TITAN_SURFACE',      name: 'Titan Surface',       min: 0,         max: 100,       scienceMultiplier: 6.0, color: 0xcc9944 },
+    { id: 'TITAN_LOW_ATMO',     name: 'Low Atmosphere',      min: 100,       max: 20_000,    scienceMultiplier: 5.5, color: 0xbb8833 },
+    { id: 'TITAN_MID_ATMO',     name: 'Mid Atmosphere',      min: 20_000,    max: 100_000,   scienceMultiplier: 5.0, color: 0x997722 },
+    { id: 'TITAN_UPPER_ATMO',   name: 'Upper Atmosphere',    min: 100_000,   max: 300_000,   scienceMultiplier: 5.5, color: 0x776611 },
+    { id: 'TITAN_EXOSPHERE',    name: 'Exosphere',           min: 300_000,   max: 600_000,   scienceMultiplier: 6.0, color: 0x554400 },
+    { id: 'TITAN_LOW_ORBIT',    name: 'Low Titan Orbit',     min: 600_000,   max: 2_000_000, scienceMultiplier: 7.0, color: 0x332200 },
+    { id: 'TITAN_HIGH_ORBIT',   name: 'High Titan Orbit',    min: 2_000_000, max: Infinity,  scienceMultiplier: 8.0, color: 0x221100 },
+  ],
+  altitudeBands: [
+    { id: 'LTO', name: 'Low Titan Orbit',    min: 200_000,    max: 500_000 },
+    { id: 'MTO', name: 'Medium Titan Orbit',  min: 500_000,    max: 2_000_000 },
+    { id: 'HTO', name: 'High Titan Orbit',   min: 2_000_000,  max: 10_000_000 },
+  ],
+  groundVisual: { color: 0xcc9944, description: 'Orange hydrocarbon dunes and methane lakes' },
+  skyVisual: {
+    seaLevelColor: 0xcc9944,
+    highAltColor: 0x776611,
+    spaceColor: 0x000005,
+    starFadeStart: 300_000,
+    starFadeEnd: 600_000,
+  },
+  weather: 'methane_rain',
+  landable: true,
+  soiRadius: 44_000_000,
+  parentId: 'SATURN',
+  childIds: [],
+  minOrbitAltitude: 200_000,
+  destructionZone: null,
+};
+
 // ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
@@ -468,6 +636,10 @@ export const CELESTIAL_BODIES: Readonly<Record<string, Readonly<CelestialBodyDef
   MARS: Object.freeze(MARS),
   PHOBOS: Object.freeze(PHOBOS),
   DEIMOS: Object.freeze(DEIMOS),
+  CERES: Object.freeze(CERES),
+  JUPITER: Object.freeze(JUPITER),
+  SATURN: Object.freeze(SATURN),
+  TITAN: Object.freeze(TITAN),
 });
 
 /** Ordered list of all body IDs for iteration. */

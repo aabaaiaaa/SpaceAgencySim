@@ -28,10 +28,10 @@ import {
 // ---------------------------------------------------------------------------
 
 describe('CELESTIAL_BODIES catalog', () => {
-  const expectedBodies = ['SUN', 'MERCURY', 'VENUS', 'EARTH', 'MOON', 'MARS', 'PHOBOS', 'DEIMOS'];
+  const expectedBodies = ['SUN', 'MERCURY', 'VENUS', 'EARTH', 'MOON', 'MARS', 'PHOBOS', 'DEIMOS', 'CERES', 'JUPITER', 'SATURN', 'TITAN'];
 
-  it('contains all 8 required bodies', () => {
-    expect(ALL_BODY_IDS).toHaveLength(8);
+  it('contains all 12 required bodies', () => {
+    expect(ALL_BODY_IDS).toHaveLength(12);
     for (const id of expectedBodies) {
       expect(CELESTIAL_BODIES[id]).toBeDefined();
     }
@@ -324,8 +324,8 @@ describe('Body hierarchy', () => {
     expect(CELESTIAL_BODIES.DEIMOS.parentId).toBe('MARS');
   });
 
-  it('Sun has Mercury, Venus, Earth, Mars as children', () => {
-    expect(CELESTIAL_BODIES.SUN.childIds).toEqual(['MERCURY', 'VENUS', 'EARTH', 'MARS']);
+  it('Sun has Mercury, Venus, Earth, Mars, Ceres, Jupiter, Saturn as children', () => {
+    expect(CELESTIAL_BODIES.SUN.childIds).toEqual(['MERCURY', 'VENUS', 'EARTH', 'MARS', 'CERES', 'JUPITER', 'SATURN']);
   });
 
   it('Earth has Moon as child', () => {
@@ -344,9 +344,10 @@ describe('Body hierarchy', () => {
 
   it('getBodyHierarchy returns all parent→children mappings', () => {
     const hierarchy = getBodyHierarchy();
-    expect(hierarchy.SUN).toEqual(['MERCURY', 'VENUS', 'EARTH', 'MARS']);
+    expect(hierarchy.SUN).toEqual(['MERCURY', 'VENUS', 'EARTH', 'MARS', 'CERES', 'JUPITER', 'SATURN']);
     expect(hierarchy.EARTH).toEqual(['MOON']);
     expect(hierarchy.MARS).toEqual(['PHOBOS', 'DEIMOS']);
+    expect(hierarchy.SATURN).toEqual(['TITAN']);
     expect(hierarchy.MOON).toEqual([]);
   });
 });
@@ -535,7 +536,7 @@ describe('Weather', () => {
 
   it('other bodies have no weather', () => {
     for (const id of ALL_BODY_IDS) {
-      if (id === 'MARS') continue;
+      if (id === 'MARS' || id === 'TITAN') continue;
       expect(CELESTIAL_BODIES[id].weather).toBeNull();
     }
   });

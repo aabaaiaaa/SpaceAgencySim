@@ -763,6 +763,10 @@ export const CelestialBody = Object.freeze({
   MARS: 'MARS',
   PHOBOS: 'PHOBOS',
   DEIMOS: 'DEIMOS',
+  CERES: 'CERES',
+  JUPITER: 'JUPITER',
+  SATURN: 'SATURN',
+  TITAN: 'TITAN',
 } as const);
 
 export type CelestialBody = (typeof CelestialBody)[keyof typeof CelestialBody];
@@ -799,6 +803,10 @@ export const BODY_GM: Readonly<Record<string, number>> = Object.freeze({
   MARS: 4.282837e13,
   PHOBOS: 7.112e5,
   DEIMOS: 9.8e4,
+  CERES: 6.263e10,
+  JUPITER: 1.26686534e17,
+  SATURN: 3.7931187e16,
+  TITAN: 8.9781e12,
 });
 
 /**
@@ -813,6 +821,10 @@ export const BODY_RADIUS: Readonly<Record<string, number>> = Object.freeze({
   MARS: 3_389_500,
   PHOBOS: 11_267,
   DEIMOS: 6_200,
+  CERES: 473_000,
+  JUPITER: 69_911_000,
+  SATURN: 58_232_000,
+  TITAN: 2_574_700,
 });
 
 /**
@@ -829,6 +841,10 @@ export const MIN_ORBIT_ALTITUDE: Readonly<Record<string, number>> = Object.freez
   MARS: 80_000,
   PHOBOS: 1_000,
   DEIMOS: 500,
+  CERES: 5_000,
+  JUPITER: 200_000_000,
+  SATURN: 150_000_000,
+  TITAN: 200_000,
 });
 
 /**
@@ -892,6 +908,25 @@ export const ALTITUDE_BANDS: Readonly<Record<string, readonly AltitudeBand[]>> =
   DEIMOS: Object.freeze([
     Object.freeze({ id: 'LDO', name: 'Low Deimos Orbit', min: 500, max: 3_000 }),
     Object.freeze({ id: 'HDO', name: 'High Deimos Orbit', min: 3_000, max: 10_000 }),
+  ]),
+  CERES: Object.freeze([
+    Object.freeze({ id: 'LCO', name: 'Low Ceres Orbit', min: 5_000, max: 50_000 }),
+    Object.freeze({ id: 'HCO', name: 'High Ceres Orbit', min: 50_000, max: 200_000 }),
+  ]),
+  JUPITER: Object.freeze([
+    Object.freeze({ id: 'LJO', name: 'Low Jupiter Orbit', min: 200_000_000, max: 500_000_000 }),
+    Object.freeze({ id: 'MJO', name: 'Medium Jupiter Orbit', min: 500_000_000, max: 2_000_000_000 }),
+    Object.freeze({ id: 'HJO', name: 'High Jupiter Orbit', min: 2_000_000_000, max: 10_000_000_000 }),
+  ]),
+  SATURN: Object.freeze([
+    Object.freeze({ id: 'LSO', name: 'Low Saturn Orbit', min: 150_000_000, max: 400_000_000 }),
+    Object.freeze({ id: 'MSO', name: 'Medium Saturn Orbit', min: 400_000_000, max: 1_500_000_000 }),
+    Object.freeze({ id: 'HSO', name: 'High Saturn Orbit', min: 1_500_000_000, max: 8_000_000_000 }),
+  ]),
+  TITAN: Object.freeze([
+    Object.freeze({ id: 'LTO', name: 'Low Titan Orbit', min: 200_000, max: 500_000 }),
+    Object.freeze({ id: 'MTO', name: 'Medium Titan Orbit', min: 500_000, max: 2_000_000 }),
+    Object.freeze({ id: 'HTO', name: 'High Titan Orbit', min: 2_000_000, max: 10_000_000 }),
   ]),
 });
 
@@ -982,6 +1017,36 @@ export const BIOME_DEFINITIONS: Readonly<Record<string, readonly BiomeDefinition
     Object.freeze({ id: 'DEIMOS_SURFACE',     name: 'Deimos Surface',      min: 0,      max: 50,        scienceMultiplier: 3.0, color: 0x7a7a70 }),
     Object.freeze({ id: 'DEIMOS_NEAR',        name: 'Near Deimos',         min: 50,     max: 1_000,     scienceMultiplier: 3.5, color: 0x606060 }),
     Object.freeze({ id: 'DEIMOS_ORBIT',       name: 'Deimos Orbit',        min: 1_000,  max: Infinity,  scienceMultiplier: 4.0, color: 0x404040 }),
+  ]),
+  CERES: Object.freeze([
+    Object.freeze({ id: 'CERES_SURFACE',     name: 'Ceres Surface',      min: 0,       max: 100,       scienceMultiplier: 4.0, color: 0x9a9a90 }),
+    Object.freeze({ id: 'CERES_NEAR',        name: 'Near Surface',        min: 100,     max: 2_000,     scienceMultiplier: 4.5, color: 0x808078 }),
+    Object.freeze({ id: 'CERES_LOW_ALT',     name: 'Low Altitude',        min: 2_000,   max: 10_000,    scienceMultiplier: 5.0, color: 0x606058 }),
+    Object.freeze({ id: 'CERES_LOW_ORBIT',   name: 'Low Ceres Orbit',     min: 10_000,  max: 100_000,   scienceMultiplier: 5.5, color: 0x404038 }),
+    Object.freeze({ id: 'CERES_HIGH_ORBIT',  name: 'High Ceres Orbit',    min: 100_000, max: Infinity,  scienceMultiplier: 6.0, color: 0x202018 }),
+  ]),
+  JUPITER: Object.freeze([
+    Object.freeze({ id: 'JUPITER_UPPER_CLOUD', name: 'Upper Cloud Layer',   min: 0,                max: 50_000_000,     scienceMultiplier: 0,    color: 0xe8d8a8 }),
+    Object.freeze({ id: 'JUPITER_MID_ATMO',    name: 'Mid Atmosphere',      min: 50_000_000,       max: 100_000_000,    scienceMultiplier: 8.0,  color: 0xc4a868 }),
+    Object.freeze({ id: 'JUPITER_UPPER_ATMO',  name: 'Upper Atmosphere',    min: 100_000_000,      max: 200_000_000,    scienceMultiplier: 7.0,  color: 0x8a7848 }),
+    Object.freeze({ id: 'JUPITER_LOW_ORBIT',   name: 'Low Jupiter Orbit',   min: 200_000_000,      max: 500_000_000,    scienceMultiplier: 6.0,  color: 0x504828 }),
+    Object.freeze({ id: 'JUPITER_HIGH_ORBIT',  name: 'High Jupiter Orbit',  min: 500_000_000,      max: Infinity,       scienceMultiplier: 5.0,  color: 0x282418 }),
+  ]),
+  SATURN: Object.freeze([
+    Object.freeze({ id: 'SATURN_UPPER_CLOUD',  name: 'Upper Cloud Layer',   min: 0,                max: 40_000_000,     scienceMultiplier: 0,    color: 0xf0e0b0 }),
+    Object.freeze({ id: 'SATURN_MID_ATMO',     name: 'Mid Atmosphere',      min: 40_000_000,       max: 80_000_000,     scienceMultiplier: 9.0,  color: 0xd4c490 }),
+    Object.freeze({ id: 'SATURN_UPPER_ATMO',   name: 'Upper Atmosphere',    min: 80_000_000,       max: 150_000_000,    scienceMultiplier: 8.0,  color: 0xa89060 }),
+    Object.freeze({ id: 'SATURN_LOW_ORBIT',    name: 'Low Saturn Orbit',    min: 150_000_000,      max: 400_000_000,    scienceMultiplier: 7.0,  color: 0x605030 }),
+    Object.freeze({ id: 'SATURN_HIGH_ORBIT',   name: 'High Saturn Orbit',   min: 400_000_000,      max: Infinity,       scienceMultiplier: 6.0,  color: 0x302818 }),
+  ]),
+  TITAN: Object.freeze([
+    Object.freeze({ id: 'TITAN_SURFACE',      name: 'Titan Surface',       min: 0,         max: 100,       scienceMultiplier: 6.0, color: 0xcc9944 }),
+    Object.freeze({ id: 'TITAN_LOW_ATMO',     name: 'Low Atmosphere',      min: 100,       max: 20_000,    scienceMultiplier: 5.5, color: 0xbb8833 }),
+    Object.freeze({ id: 'TITAN_MID_ATMO',     name: 'Mid Atmosphere',      min: 20_000,    max: 100_000,   scienceMultiplier: 5.0, color: 0x997722 }),
+    Object.freeze({ id: 'TITAN_UPPER_ATMO',   name: 'Upper Atmosphere',    min: 100_000,   max: 300_000,   scienceMultiplier: 5.5, color: 0x776611 }),
+    Object.freeze({ id: 'TITAN_EXOSPHERE',    name: 'Exosphere',           min: 300_000,   max: 600_000,   scienceMultiplier: 6.0, color: 0x554400 }),
+    Object.freeze({ id: 'TITAN_LOW_ORBIT',    name: 'Low Titan Orbit',     min: 600_000,   max: 2_000_000, scienceMultiplier: 7.0, color: 0x332200 }),
+    Object.freeze({ id: 'TITAN_HIGH_ORBIT',   name: 'High Titan Orbit',    min: 2_000_000, max: Infinity,  scienceMultiplier: 8.0, color: 0x221100 }),
   ]),
 });
 

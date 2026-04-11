@@ -51,6 +51,10 @@ export const SOI_RADIUS: Readonly<Record<string, number>> = Object.freeze({
   MARS: 577_000_000,
   PHOBOS: 170_000,
   DEIMOS: 500_000,
+  CERES: 1_800_000,
+  JUPITER: 48_200_000_000,
+  SATURN: 54_800_000_000,
+  TITAN: 44_000_000,
 });
 
 /**
@@ -72,6 +76,14 @@ export const BODY_ORBIT_RADIUS: Readonly<Record<string, number>> = Object.freeze
   PHOBOS: 9_376_000,
   /** Deimos's mean distance from Mars centre. */
   DEIMOS: 23_463_000,
+  /** Ceres's mean distance from the Sun (asteroid belt). */
+  CERES: 413_700_000_000,
+  /** Jupiter's mean distance from the Sun. */
+  JUPITER: 778_570_000_000,
+  /** Saturn's mean distance from the Sun. */
+  SATURN: 1_433_500_000_000,
+  /** Titan's mean distance from Saturn centre. */
+  TITAN: 1_221_870_000,
 });
 
 /**
@@ -87,13 +99,17 @@ export const BODY_PARENT: Readonly<Record<string, string | null>> = Object.freez
   MARS: 'SUN',
   PHOBOS: 'MARS',
   DEIMOS: 'MARS',
+  CERES: 'SUN',
+  JUPITER: 'SUN',
+  SATURN: 'SUN',
+  TITAN: 'SATURN',
 });
 
 /**
  * Child bodies that orbit each parent.
  */
 export const BODY_CHILDREN: Readonly<Record<string, readonly string[]>> = Object.freeze({
-  SUN: Object.freeze(['MERCURY', 'VENUS', 'EARTH', 'MARS']),
+  SUN: Object.freeze(['MERCURY', 'VENUS', 'EARTH', 'MARS', 'CERES', 'JUPITER', 'SATURN']),
   MERCURY: Object.freeze([]),
   VENUS: Object.freeze([]),
   EARTH: Object.freeze(['MOON']),
@@ -101,6 +117,10 @@ export const BODY_CHILDREN: Readonly<Record<string, readonly string[]>> = Object
   MARS: Object.freeze(['PHOBOS', 'DEIMOS']),
   PHOBOS: Object.freeze([]),
   DEIMOS: Object.freeze([]),
+  CERES: Object.freeze([]),
+  JUPITER: Object.freeze([]),
+  SATURN: Object.freeze(['TITAN']),
+  TITAN: Object.freeze([]),
 });
 
 // ---------------------------------------------------------------------------
