@@ -43,7 +43,7 @@ describe('createMiningSite', () => {
     expect(state.miningSites[0]).toBe(site);
   });
 
-  it('has empty storage, production, and orbitalBuffer', () => {
+  it('has empty storage and orbitalBuffer', () => {
     const state = createGameState();
     const site = createMiningSite(state, {
       name: 'Beta Outpost',
@@ -53,7 +53,6 @@ describe('createMiningSite', () => {
     });
 
     expect(site.storage).toEqual({});
-    expect(site.production).toEqual({});
     expect(site.orbitalBuffer).toEqual({});
   });
 

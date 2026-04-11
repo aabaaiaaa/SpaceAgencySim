@@ -688,7 +688,6 @@ export interface MiningSite {
   controlUnit: { partId: string };
   modules: MiningSiteModule[];
   storage: Partial<Record<ResourceType, number>>;
-  production: Partial<Record<ResourceType, number>>;
   powerGenerated: number;
   powerRequired: number;
   orbitalBuffer: Partial<Record<ResourceType, number>>;

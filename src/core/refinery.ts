@@ -137,7 +137,9 @@ export function getRefineryRecipe(site: MiningSite, moduleId: string): RefineryR
  * 5. If all checks pass: consume inputs, produce outputs.
  * 6. If any check fails: skip this module.
  */
-export function processRefineries(state: GameState): void {
+export function processRefineries(state: GameState): { produced: Partial<Record<ResourceType, number>>; consumed: Partial<Record<ResourceType, number>> } {
+  const produced: Partial<Record<ResourceType, number>> = {};
+  const consumed: Partial<Record<ResourceType, number>> = {};
   for (const site of state.miningSites) {
     const efficiency = getPowerEfficiency(site);
     if (efficiency <= 0) continue;
@@ -182,15 +184,18 @@ export function processRefineries(state: GameState): void {
 
       // Consume inputs
       for (const input of recipe.inputs) {
-        const consume = input.amountKg * efficiency;
-        site.storage[input.resourceType] = (site.storage[input.resourceType] ?? 0) - consume;
+        const consumeAmt = input.amountKg * efficiency;
+        site.storage[input.resourceType] = (site.storage[input.resourceType] ?? 0) - consumeAmt;
+        consumed[input.resourceType] = (consumed[input.resourceType] ?? 0) + consumeAmt;
       }
 
       // Produce outputs
       for (const output of recipe.outputs) {
-        const produce = output.amountKg * efficiency;
-        site.storage[output.resourceType] = (site.storage[output.resourceType] ?? 0) + produce;
+        const produceAmt = output.amountKg * efficiency;
+        site.storage[output.resourceType] = (site.storage[output.resourceType] ?? 0) + produceAmt;
+        produced[output.resourceType] = (produced[output.resourceType] ?? 0) + produceAmt;
       }
     }
   }
+  return { produced, consumed };
 }

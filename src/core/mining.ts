@@ -60,7 +60,6 @@ export function createMiningSite(state: GameState, params: CreateSiteParams): Mi
     controlUnit: { partId: params.controlUnitPartId },
     modules: [],
     storage: {},
-    production: {},
     powerGenerated: 0,
     powerRequired: 0,
     orbitalBuffer: {},
@@ -238,7 +237,8 @@ export function getConnectedStorage(
  * Process all mining sites: extract resources based on power efficiency
  * and connected storage capacity.
  */
-export function processMiningSites(state: GameState): void {
+export function processMiningSites(state: GameState): { extracted: Partial<Record<ResourceType, number>> } {
+  const extracted: Partial<Record<ResourceType, number>> = {};
   for (const site of state.miningSites) {
     const efficiency = getPowerEfficiency(site);
     if (efficiency <= 0) continue;
@@ -291,18 +291,21 @@ export function processMiningSites(state: GameState): void {
           : 1.0;
 
         // Calculate extraction amount
-        const extracted = Math.min(
+        const extractedAmount = Math.min(
           resource.extractionRateKgPerPeriod * efficiency * extractionMultiplier,
           availableCapacity,
         );
 
-        if (extracted > 0) {
+        if (extractedAmount > 0) {
           site.storage[resource.resourceType as ResourceType] =
-            (site.storage[resource.resourceType as ResourceType] ?? 0) + extracted;
+            (site.storage[resource.resourceType as ResourceType] ?? 0) + extractedAmount;
+          extracted[resource.resourceType as ResourceType] =
+            (extracted[resource.resourceType as ResourceType] ?? 0) + extractedAmount;
         }
       }
     }
   }
+  return { extracted };
 }
 
 /**
@@ -313,7 +316,8 @@ export function processMiningSites(state: GameState): void {
  * by the site's power efficiency).  Unlike extractors, launch pads read
  * directly from site-wide storage and do not require pipe connections.
  */
-export function processSurfaceLaunchPads(state: GameState): void {
+export function processSurfaceLaunchPads(state: GameState): { transferred: Partial<Record<ResourceType, number>> } {
+  const transferred: Partial<Record<ResourceType, number>> = {};
   for (const site of state.miningSites) {
     const efficiency = getPowerEfficiency(site);
     if (efficiency <= 0) continue;
@@ -338,9 +342,11 @@ export function processSurfaceLaunchPads(state: GameState): void {
         if (toTransfer > 0) {
           site.storage[resourceType] = (site.storage[resourceType] ?? 0) - toTransfer;
           site.orbitalBuffer[resourceType] = (site.orbitalBuffer[resourceType] ?? 0) + toTransfer;
+          transferred[resourceType] = (transferred[resourceType] ?? 0) + toTransfer;
           remainingCapacity -= toTransfer;
         }
       }
     }
   }
+  return { transferred };
 }

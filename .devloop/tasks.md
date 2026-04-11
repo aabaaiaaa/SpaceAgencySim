@@ -7,13 +7,13 @@ See `.devloop/requirements.md` for full context on all items below.
 ## Bug Fixes & Cleanup
 
 ### TASK-001: Fix route cost/destination validation order in processRoutes()
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/core/routes.ts` (around lines 310–340), move the destination mining site lookup to *before* the `spend()` call. If the route's final destination is a non-Earth body and no mining site is found for that body, skip processing that route for this period and set its status to `'broken'`. Do not deduct money or resources. See requirements.md section 1.
 - **Verification**: `npx vitest run src/tests/routes.test.ts`
 
 ### TASK-002: Remove dead MiningSite.production field
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Remove the `production` field from the `MiningSite` interface in `src/core/gameState.ts`, remove its initialization (`production: {}`) in `createMiningSite()` in `src/core/mining.ts`, and remove any test assertions that reference it (e.g., in `src/tests/mining.test.ts`). See requirements.md section 2.
 - **Verification**: `npx vitest run src/tests/mining.test.ts && npx tsc --noEmit src/core/gameState.ts src/core/mining.ts`
@@ -67,7 +67,7 @@ See `.devloop/requirements.md` for full context on all items below.
 ## Period Summary Reporting
 
 ### TASK-009: Extend PeriodSummary with resource system fields
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/core/period.ts`, add the following fields to the `PeriodSummary` interface: `miningExtracted`, `refineryProduced`, `refineryConsumed`, `launchPadTransferred` (all `Partial<Record<ResourceType, number>>`), plus `routeRevenue: number`, `routeOperatingCost: number`, `routeDeliveries: Partial<Record<ResourceType, number>>`. Define return types for each process function as described in requirements.md section 5.
 - **Verification**: `npx tsc --noEmit src/core/period.ts`
@@ -83,7 +83,7 @@ See `.devloop/requirements.md` for full context on all items below.
 ## Revenue Display
 
 ### TASK-011: Wire up Revenue/Period column in route management table
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/ui/logistics.ts` (around line 483), replace the hardcoded `'-'` in the Revenue/Period column with a calculated value. For active routes where the final leg destination body is Earth: `route.throughputPerPeriod × RESOURCES_BY_ID[route.resourceType].baseValuePerKg`, formatted with `formatMoney()`. For inter-site routes: display `$0`. For paused/broken routes: display `'-'`. See requirements.md section 6.
 - **Verification**: `npx vitest run src/tests/routes.test.ts && npx tsc --noEmit src/ui/logistics.ts`
@@ -93,7 +93,7 @@ See `.devloop/requirements.md` for full context on all items below.
 ## Route Creation UI — Map Builder
 
 ### TASK-012: Build SVG schematic body map component
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/ui/logistics.ts` (or a new sub-module `src/ui/logistics/routeMap.ts` with barrel re-export), replace the placeholder div in the routes tab (around line 412–415) with an SVG-based schematic map. Render celestial bodies as labeled circles positioned schematically (Sun left, Earth/Moon center, Mars right-center, Ceres further right, Jupiter/Saturn/Titan right). Only show bodies that have mining sites or are route endpoints, plus Earth always. Style with existing CSS design tokens. The map should be a reusable render function that takes game state and returns/populates an SVG element. See requirements.md section 7 "Schematic Body Map".
 - **Verification**: `npx tsc --noEmit src/ui/logistics.ts` and manually verify the map renders in the Logistics Center routes tab via dev server.

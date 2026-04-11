@@ -6,7 +6,7 @@
  * into automated resource transport routes.
  */
 
-import type { GameState, ProvenLeg, Route, RouteLeg, RouteLocation, RouteStatus } from './gameState.ts';
+import type { GameState, MiningSite, ProvenLeg, Route, RouteLeg, RouteLocation, RouteStatus } from './gameState.ts';
 import type { ResourceType } from './constants.ts';
 import { spend, earn } from './finance.ts';
 import { RESOURCES_BY_ID } from '../data/resources.ts';
@@ -292,7 +292,10 @@ function collectOrbitAltitude(
 // Per-period route processing (automation)
 // ---------------------------------------------------------------------------
 
-export function processRoutes(state: GameState): void {
+export function processRoutes(state: GameState): { revenue: number; operatingCost: number; delivered: Partial<Record<ResourceType, number>> } {
+  let totalRevenue = 0;
+  let totalOperatingCost = 0;
+  const delivered: Partial<Record<ResourceType, number>> = {};
   for (const route of state.routes) {
     if (route.status !== 'active') continue;
     if (route.legs.length === 0) continue;
@@ -310,29 +313,39 @@ export function processRoutes(state: GameState): void {
     const transportAmount = Math.min(route.throughputPerPeriod, availableInBuffer);
     if (transportAmount <= 0) continue;
 
+    // Resolve destination before committing funds or resources
+    const lastLeg = route.legs[route.legs.length - 1];
+    const destBodyId = lastLeg.destination.bodyId;
+    let destSite: MiningSite | undefined;
+    if (destBodyId !== 'EARTH') {
+      destSite = state.miningSites.find((s) => s.bodyId === destBodyId);
+      if (!destSite) {
+        route.status = 'broken';
+        continue;
+      }
+    }
+
     // Deduct operating cost — skip if insufficient funds
     if (!spend(state, route.totalCostPerPeriod)) continue;
+    totalOperatingCost += route.totalCostPerPeriod;
 
     // Deduct from source orbital buffer
     sourceSite.orbitalBuffer[route.resourceType] =
       (sourceSite.orbitalBuffer[route.resourceType] ?? 0) - transportAmount;
 
-    // Check destination
-    const lastLeg = route.legs[route.legs.length - 1];
-    const destBodyId = lastLeg.destination.bodyId;
-
+    // Deliver to destination
     if (destBodyId === 'EARTH') {
       // Sell cargo at market value
       const resourceDef = RESOURCES_BY_ID[route.resourceType];
       const revenue = transportAmount * resourceDef.baseValuePerKg;
       earn(state, revenue);
+      totalRevenue += revenue;
     } else {
       // Deposit into destination mining site's orbital buffer
-      const destSite = state.miningSites.find((s) => s.bodyId === destBodyId);
-      if (destSite) {
-        destSite.orbitalBuffer[route.resourceType] =
-          (destSite.orbitalBuffer[route.resourceType] ?? 0) + transportAmount;
-      }
+      destSite!.orbitalBuffer[route.resourceType] =
+        (destSite!.orbitalBuffer[route.resourceType] ?? 0) + transportAmount;
     }
+    delivered[route.resourceType] = (delivered[route.resourceType] ?? 0) + transportAmount;
   }
+  return { revenue: totalRevenue, operatingCost: totalOperatingCost, delivered };
 }

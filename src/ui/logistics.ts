@@ -12,6 +12,7 @@ import { setRouteStatus } from '../core/routes.ts';
 import { MiningModuleType } from '../core/constants.ts';
 import type { ResourceType } from '../core/constants.ts';
 import { REFINERY_RECIPES, setRefineryRecipe } from '../core/refinery.ts';
+import { RESOURCES_BY_ID } from '../data/resources.ts';
 import './logistics.css';
 
 // ---------------------------------------------------------------------------
@@ -388,6 +389,96 @@ function _renderResourceSection(
 }
 
 // ---------------------------------------------------------------------------
+// Routes Tab — Route Map
+// ---------------------------------------------------------------------------
+
+/** Return a fill colour for a celestial-body circle on the route map. */
+function _getBodyColor(bodyId: string): string {
+  const colors: Record<string, string> = {
+    SUN: '#FFD700',
+    EARTH: '#4488CC',
+    MOON: '#999',
+    MARS: '#CC5533',
+    CERES: '#887766',
+    JUPITER: '#CC9955',
+    SATURN: '#CCBB77',
+    TITAN: '#AA8844',
+  };
+  return colors[bodyId] ?? '#666';
+}
+
+/**
+ * Build an SVG schematic of the solar system showing bodies that are
+ * relevant to the player's logistics network (mining sites, route
+ * endpoints) plus Earth which is always visible.
+ */
+function _renderRouteMap(): SVGSVGElement {
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('class', 'logistics-route-map');
+  svg.setAttribute('viewBox', '0 0 800 200');
+  svg.setAttribute('width', '100%');
+  svg.setAttribute('height', '200');
+
+  // Determine which bodies to show
+  const visibleBodies = new Set<string>();
+  visibleBodies.add('EARTH'); // always shown
+
+  if (_state) {
+    for (const site of _state.miningSites) {
+      visibleBodies.add(site.bodyId);
+    }
+    for (const route of _state.routes) {
+      for (const leg of route.legs) {
+        visibleBodies.add(leg.origin.bodyId);
+        visibleBodies.add(leg.destination.bodyId);
+      }
+    }
+  }
+
+  // Schematic body positions (x, y) within the 800×200 viewBox
+  const bodyPositions: Record<string, { x: number; y: number; label: string; radius: number }> = {
+    SUN:     { x: 60,  y: 100, label: 'Sun',     radius: 20 },
+    EARTH:   { x: 220, y: 100, label: 'Earth',   radius: 14 },
+    MOON:    { x: 280, y: 60,  label: 'Moon',    radius: 8 },
+    MARS:    { x: 400, y: 100, label: 'Mars',    radius: 12 },
+    CERES:   { x: 510, y: 100, label: 'Ceres',   radius: 7 },
+    JUPITER: { x: 620, y: 80,  label: 'Jupiter', radius: 18 },
+    SATURN:  { x: 700, y: 120, label: 'Saturn',  radius: 16 },
+    TITAN:   { x: 740, y: 60,  label: 'Titan',   radius: 7 },
+  };
+
+  // Render visible bodies
+  for (const [bodyId, pos] of Object.entries(bodyPositions)) {
+    if (!visibleBodies.has(bodyId)) continue;
+
+    // Circle
+    const circle = document.createElementNS(svgNS, 'circle');
+    circle.setAttribute('cx', String(pos.x));
+    circle.setAttribute('cy', String(pos.y));
+    circle.setAttribute('r', String(pos.radius));
+    circle.setAttribute('class', `body-node body-${bodyId.toLowerCase()}`);
+    circle.setAttribute('fill', _getBodyColor(bodyId));
+    circle.setAttribute('stroke', '#666');
+    circle.setAttribute('stroke-width', '1.5');
+    svg.appendChild(circle);
+
+    // Label below
+    const label = document.createElementNS(svgNS, 'text');
+    label.setAttribute('x', String(pos.x));
+    label.setAttribute('y', String(pos.y + pos.radius + 16));
+    label.setAttribute('text-anchor', 'middle');
+    label.setAttribute('class', 'body-label');
+    label.setAttribute('fill', '#ccc');
+    label.setAttribute('font-size', '11');
+    label.textContent = pos.label;
+    svg.appendChild(label);
+  }
+
+  return svg;
+}
+
+// ---------------------------------------------------------------------------
 // Routes Tab
 // ---------------------------------------------------------------------------
 
@@ -408,11 +499,8 @@ function _renderRoutesTab(): void {
   const wrapper = document.createElement('div');
   wrapper.className = 'logistics-routes-content';
 
-  // --- Map placeholder ---
-  const mapPlaceholder = document.createElement('div');
-  mapPlaceholder.className = 'logistics-route-map-placeholder';
-  mapPlaceholder.textContent = 'Route map visualization (coming soon)';
-  wrapper.appendChild(mapPlaceholder);
+  // --- Route map ---
+  wrapper.appendChild(_renderRouteMap());
 
   // --- Routes table ---
   const routes = _state.routes;
@@ -481,7 +569,18 @@ function _renderRoutesTable(routes: Route[]): HTMLTableElement {
 
     // Revenue/Period
     const tdRevenue = document.createElement('td');
-    tdRevenue.textContent = '-';
+    if (route.status === 'active' && route.legs.length > 0) {
+      const lastLeg = route.legs[route.legs.length - 1];
+      if (lastLeg.destination.bodyId === 'EARTH') {
+        const resourceDef = RESOURCES_BY_ID[route.resourceType];
+        const revenue = route.throughputPerPeriod * resourceDef.baseValuePerKg;
+        tdRevenue.textContent = `$${Math.round(revenue).toLocaleString()}`;
+      } else {
+        tdRevenue.textContent = '$0';
+      }
+    } else {
+      tdRevenue.textContent = '-';
+    }
     tr.appendChild(tdRevenue);
 
     // Status toggle button

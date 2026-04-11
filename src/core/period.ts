@@ -29,6 +29,7 @@ import { processRefineries } from './refinery.ts';
 import { processRoutes } from './routes.ts';
 
 import type { GameState, MissionInstance } from './gameState.ts';
+import type { ResourceType } from './constants.ts';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -75,6 +76,14 @@ export interface PeriodSummary {
   surfaceScienceEarned: number;
   lifeSupportWarnings: LifeSupportWarning[];
   lifeSupportDeaths: LifeSupportDeath[];
+  // Resource system
+  miningExtracted: Partial<Record<ResourceType, number>>;
+  refineryProduced: Partial<Record<ResourceType, number>>;
+  refineryConsumed: Partial<Record<ResourceType, number>>;
+  launchPadTransferred: Partial<Record<ResourceType, number>>;
+  routeRevenue: number;
+  routeOperatingCost: number;
+  routeDeliveries: Partial<Record<ResourceType, number>>;
   bankrupt: boolean;
 }
 
@@ -174,10 +183,10 @@ export function advancePeriod(state: GameState): PeriodSummary {
   };
 
   // ── 11b. Resource processing — extraction, refining, launch, transport ──
-  processMiningSites(state);
-  processRefineries(state);
-  processSurfaceLaunchPads(state);
-  processRoutes(state);
+  const miningResult = processMiningSites(state);
+  const refineryResult = processRefineries(state);
+  const launchPadResult = processSurfaceLaunchPads(state);
+  const routeResult = processRoutes(state);
 
   // ── 12. Bankruptcy check ──────────────────────────────────────────────
   const bankrupt = isBankrupt(state);
@@ -201,6 +210,13 @@ export function advancePeriod(state: GameState): PeriodSummary {
     surfaceScienceEarned: surfaceResult.scienceEarned,
     lifeSupportWarnings: lifeSupportResult.warnings,
     lifeSupportDeaths: lifeSupportResult.deaths,
+    miningExtracted: miningResult.extracted,
+    refineryProduced: refineryResult.produced,
+    refineryConsumed: refineryResult.consumed,
+    launchPadTransferred: launchPadResult.transferred,
+    routeRevenue: routeResult.revenue,
+    routeOperatingCost: routeResult.operatingCost,
+    routeDeliveries: routeResult.delivered,
     bankrupt,
   };
 }

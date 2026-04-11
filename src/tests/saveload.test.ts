@@ -1757,7 +1757,6 @@ describe('Save/load round-trip for mining/route fields', () => {
         connections: [],
       }],
       storage: { [ResourceType.WATER_ICE]: 500 },
-      production: {},
       powerGenerated: 100,
       powerRequired: 35,
       orbitalBuffer: {},

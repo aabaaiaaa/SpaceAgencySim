@@ -135,15 +135,10 @@
   padding: var(--panel-padding);
 }
 
-.logistics-route-map-placeholder {
-  border: 1px dashed var(--color-border-default);
-  border-radius: var(--radius-lg);
-  height: 160px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-body);
+.logistics-route-map {
+  background: #1a1a2e;
+  border: 1px solid #333;
+  border-radius: 4px;
   margin-bottom: var(--space-lg);
 }
 
