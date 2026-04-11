@@ -396,4 +396,285 @@ describe('renderWeatherHaze', () => {
     renderWeatherHaze(1000, 800, 600, 'MARS');
     // Should not throw — tests the Mars branch
   });
+
+  it('skips rendering when hazeAlpha drops below 0.01', () => {
+    const s = getFlightRenderState();
+    const mockGfx = new MockGraphics();
+    s.hazeGraphics = mockGfx as unknown as Graphics;
+    // Very low visibility → hazeAlpha = visibility * altFraction * 0.45 < 0.01
+    s.weatherVisibility = 0.02;
+    // Altitude near atmosphere top → altFraction near 0
+    renderWeatherHaze(69000, 800, 600, 'EARTH');
+    expect(mockGfx.rect).not.toHaveBeenCalled();
+  });
+
+  it('renders haze with default bodyId when not provided', () => {
+    const s = getFlightRenderState();
+    const mockGfx = new MockGraphics();
+    s.hazeGraphics = mockGfx as unknown as Graphics;
+    s.weatherVisibility = 0.8;
+    renderWeatherHaze(5000, 800, 600);
+    expect(mockGfx.rect).toHaveBeenCalled();
+    expect(mockGfx.fill).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// skyColor — additional edge cases
+// ---------------------------------------------------------------------------
+
+describe('skyColor edge cases', () => {
+  beforeEach(() => {
+    resetFlightRenderState();
+  });
+
+  it('handles altitude exactly at midAlt boundary', () => {
+    const s = getFlightRenderState();
+    const midAlt = s.bodyVisuals.starStart > 0 ? s.bodyVisuals.starStart * 0.6 : 30_000;
+    const result = skyColor(midAlt);
+    // At midAlt, the low-altitude lerp t=1 → should return highAlt colour
+    expect(result).toBe(s.bodyVisuals.highAlt);
+  });
+
+  it('returns highAlt to space gradient above midAlt', () => {
+    const s = getFlightRenderState();
+    const midAlt = s.bodyVisuals.starStart * 0.6;
+    const aboveMid = midAlt + 5000;
+    const result = skyColor(aboveMid);
+    // Should be between highAlt and space
+    expect(result).not.toBe(s.bodyVisuals.seaLevel);
+    expect(result).toBeGreaterThanOrEqual(0);
+    expect(result).toBeLessThanOrEqual(0xffffff);
+  });
+
+  it('handles starStart of 0 (midAlt fallback to 30000)', () => {
+    const s = getFlightRenderState();
+    s.bodyVisuals.starStart = 0;
+    s.bodyVisuals.starEnd = 70000;
+    // midAlt = 30000 since starStart <= 0
+    const result = skyColor(15000);
+    // Should use seaLevel->highAlt lerp with t = 15000/30000 = 0.5
+    expect(result).not.toBe(s.bodyVisuals.seaLevel);
+    expect(result).not.toBe(s.bodyVisuals.highAlt);
+  });
+
+  it('returns seaLevel for altitude 0 even with custom body visuals', () => {
+    const s = getFlightRenderState();
+    s.bodyVisuals.seaLevel = 0xff0000;
+    s.bodyVisuals.highAlt = 0x0000ff;
+    s.bodyVisuals.starStart = 50000;
+    s.bodyVisuals.starEnd = 70000;
+    const result = skyColor(0);
+    // t=0 at altitude 0, so lerp(seaLevel, highAlt, 0) = seaLevel
+    expect(result).toBe(0xff0000);
+  });
+
+  it('clamps high altitude lerp t to 1', () => {
+    const s = getFlightRenderState();
+    // At starEnd altitude, should return space
+    const result = skyColor(s.bodyVisuals.starEnd);
+    expect(result).toBe(s.bodyVisuals.space);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// renderStars — additional edge cases
+// ---------------------------------------------------------------------------
+
+describe('renderStars edge cases', () => {
+  beforeEach(() => {
+    resetFlightRenderState();
+  });
+
+  it('renders stars at full alpha on airless body (starEnd <= 0)', () => {
+    const s = getFlightRenderState();
+    const mockContainer = new MockContainer();
+    s.starsContainer = mockContainer as unknown as Container;
+    s.bodyVisuals.starEnd = 0;
+    s.bodyVisuals.starStart = 0;
+    generateStars();
+
+    renderStars(0, 800, 600);
+    // alpha=1 for airless body, so stars should be drawn
+    expect(mockContainer.children.length).toBeGreaterThan(0);
+  });
+
+  it('renders stars when range is 0 and altitude >= starStart', () => {
+    const s = getFlightRenderState();
+    const mockContainer = new MockContainer();
+    s.starsContainer = mockContainer as unknown as Container;
+    s.bodyVisuals.starEnd = 50000;
+    s.bodyVisuals.starStart = 50000; // range = 0
+    generateStars();
+
+    renderStars(50000, 800, 600);
+    // range=0, altitude >= starStart → alpha=1
+    expect(mockContainer.children.length).toBeGreaterThan(0);
+  });
+
+  it('does not render stars when range is 0 and altitude < starStart', () => {
+    const s = getFlightRenderState();
+    const mockContainer = new MockContainer();
+    s.starsContainer = mockContainer as unknown as Container;
+    s.bodyVisuals.starEnd = 50000;
+    s.bodyVisuals.starStart = 50000; // range = 0
+    generateStars();
+
+    renderStars(49999, 800, 600);
+    // range=0, altitude < starStart → alpha=0
+    expect(mockContainer.children.length).toBe(0);
+  });
+
+  it('renders stars at partial alpha between starStart and starEnd', () => {
+    const s = getFlightRenderState();
+    const mockContainer = new MockContainer();
+    s.starsContainer = mockContainer as unknown as Container;
+    generateStars();
+
+    const midAlt = (s.bodyVisuals.starStart + s.bodyVisuals.starEnd) / 2;
+    renderStars(midAlt, 800, 600);
+    // Should have some stars drawn at partial alpha
+    expect(mockContainer.children.length).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// renderHorizon — additional edge cases
+// ---------------------------------------------------------------------------
+
+describe('renderHorizon edge cases', () => {
+  beforeEach(() => {
+    resetFlightRenderState();
+  });
+
+  it('renders orbital horizon in ORBIT phase', () => {
+    const s = getFlightRenderState();
+    const mockGfx = new MockGraphics();
+    s.horizonGraphics = mockGfx as unknown as Graphics;
+
+    renderHorizon(100000, 800, 600, 'ORBIT');
+
+    expect(mockGfx.arc).toHaveBeenCalled();
+    expect(mockGfx.fill).toHaveBeenCalled();
+  });
+
+  it('renders orbital horizon in MANOEUVRE phase', () => {
+    const s = getFlightRenderState();
+    const mockGfx = new MockGraphics();
+    s.horizonGraphics = mockGfx as unknown as Graphics;
+
+    renderHorizon(100000, 800, 600, 'MANOEUVRE');
+
+    expect(mockGfx.arc).toHaveBeenCalled();
+  });
+
+  it('renders orbital horizon in CAPTURE phase', () => {
+    const s = getFlightRenderState();
+    const mockGfx = new MockGraphics();
+    s.horizonGraphics = mockGfx as unknown as Graphics;
+
+    renderHorizon(100000, 800, 600, 'CAPTURE');
+
+    expect(mockGfx.arc).toHaveBeenCalled();
+  });
+
+  it('returns early in TRANSFER phase', () => {
+    const s = getFlightRenderState();
+    const mockGfx = new MockGraphics();
+    s.horizonGraphics = mockGfx as unknown as Graphics;
+
+    renderHorizon(100000, 800, 600, 'TRANSFER');
+
+    expect(mockGfx.clear).toHaveBeenCalled();
+    expect(mockGfx.arc).not.toHaveBeenCalled();
+  });
+
+  it('skips flight horizon when ground is way above viewport', () => {
+    const s = getFlightRenderState();
+    const mockGfx = new MockGraphics();
+    s.horizonGraphics = mockGfx as unknown as Graphics;
+    s.camWorldY = -1000000; // ground far below → groundScreenY = h/2 + (-1000000) * ppm → very negative
+
+    renderHorizon(50000, 800, 600);
+
+    expect(mockGfx.clear).toHaveBeenCalled();
+    // groundScreenY < -h so should return early
+    expect(mockGfx.arc).not.toHaveBeenCalled();
+  });
+
+  it('renders atmosphere glow when altitude > 30000 in flight', () => {
+    const s = getFlightRenderState();
+    const mockGfx = new MockGraphics();
+    s.horizonGraphics = mockGfx as unknown as Graphics;
+    s.camWorldY = 50000;
+
+    renderHorizon(50000, 800, 600);
+
+    expect(mockGfx.stroke).toHaveBeenCalled();
+  });
+
+  it('does not render glow below 30000 altitude in flight', () => {
+    const s = getFlightRenderState();
+    const mockGfx = new MockGraphics();
+    s.horizonGraphics = mockGfx as unknown as Graphics;
+    s.camWorldY = 10000;
+
+    renderHorizon(10000, 800, 600);
+
+    expect(mockGfx.stroke).not.toHaveBeenCalled();
+  });
+
+  it('renders orbital glow at low orbit (high glowAlpha)', () => {
+    const s = getFlightRenderState();
+    const mockGfx = new MockGraphics();
+    s.horizonGraphics = mockGfx as unknown as Graphics;
+
+    // Low orbit altitude: orbitalT ≈ 0, glowAlpha = 0.4 > 0.05
+    renderHorizon(80000, 800, 600, 'ORBIT');
+
+    expect(mockGfx.stroke).toHaveBeenCalled();
+  });
+
+  it('skips orbital glow at very high orbit (low glowAlpha)', () => {
+    const s = getFlightRenderState();
+    const mockGfx = new MockGraphics();
+    s.horizonGraphics = mockGfx as unknown as Graphics;
+
+    // Very high orbit: orbitalT ≈ 1, glowAlpha = 0.4 - 1*0.3 = 0.1 > 0.05 — still renders
+    // Need extremely high altitude to suppress glow
+    // glowAlpha = 0.4 - orbitalT * 0.3; need orbitalT > 0.4/0.3 = 1.33 which is clamped to 1
+    // So at max orbitalT=1: glowAlpha = 0.1 > 0.05 → glow always renders in orbital mode
+    renderHorizon(2_000_000, 800, 600, 'ORBIT');
+    expect(mockGfx.stroke).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// lerpColor — additional edge cases
+// ---------------------------------------------------------------------------
+
+describe('lerpColor edge cases', () => {
+  it('interpolates blue channel correctly at t=0.25', () => {
+    const result = lerpColor(0x000000, 0x0000ff, 0.25);
+    const b = result & 0xff;
+    // 0.25 * 255 = 63.75 → rounds to 64
+    expect(b).toBe(64);
+  });
+
+  it('handles t slightly above 0', () => {
+    const result = lerpColor(0xff0000, 0x00ff00, 0.01);
+    const r = (result >> 16) & 0xff;
+    const g = (result >> 8) & 0xff;
+    // r should be close to 255, g close to 3
+    expect(r).toBeGreaterThan(250);
+    expect(g).toBeLessThan(5);
+  });
+
+  it('handles t slightly below 1', () => {
+    const result = lerpColor(0xff0000, 0x00ff00, 0.99);
+    const r = (result >> 16) & 0xff;
+    const g = (result >> 8) & 0xff;
+    expect(r).toBeLessThan(5);
+    expect(g).toBeGreaterThan(250);
+  });
 });

@@ -351,3 +351,210 @@ describe('isMapVisible', () => {
     expect(isMapVisible()).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// cycleMapZoom — additional coverage
+// ---------------------------------------------------------------------------
+
+describe('cycleMapZoom edge cases', () => {
+  it('handles unknown zoom level by wrapping to first', () => {
+    setMapZoomLevel('UNKNOWN_ZOOM');
+    cycleMapZoom();
+    // When current zoom is not in the list, indexOf returns -1,
+    // so (-1 + 1) % 4 = 0 => first level = ORBIT_DETAIL
+    expect(getMapZoomLevel()).toBe(MapZoom.ORBIT_DETAIL);
+  });
+
+  it('cycling preserves no custom view radius', () => {
+    setMapZoomLevel(MapZoom.ORBIT_DETAIL);
+    cycleMapZoom();
+    expect(getMapZoomLevel()).toBe(MapZoom.LOCAL_BODY);
+    cycleMapZoom();
+    expect(getMapZoomLevel()).toBe(MapZoom.CRAFT_TO_TARGET);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// cycleMapTarget — additional coverage
+// ---------------------------------------------------------------------------
+
+describe('cycleMapTarget edge cases', () => {
+  it('wraps from last object back to first', () => {
+    const objects = [
+      { id: 'obj-1', name: 'Sat 1', bodyId: 'EARTH', type: 'satellite', elements: {} },
+      { id: 'obj-2', name: 'Sat 2', bodyId: 'EARTH', type: 'satellite', elements: {} },
+    ] as OrbitalObject[];
+
+    cycleMapTarget(objects, 'EARTH'); // -> obj-1
+    cycleMapTarget(objects, 'EARTH'); // -> obj-2
+    cycleMapTarget(objects, 'EARTH'); // -> wraps to obj-1
+    expect(getMapTarget()).toBe('obj-1');
+  });
+
+  it('selects first when current target is not in the candidate list', () => {
+    setMapTarget('nonexistent-id');
+    const objects = [
+      { id: 'obj-A', name: 'Sat A', bodyId: 'MOON', type: 'satellite', elements: {} },
+    ] as OrbitalObject[];
+    cycleMapTarget(objects, 'MOON');
+    expect(getMapTarget()).toBe('obj-A');
+  });
+
+  it('returns null when no objects match the bodyId', () => {
+    const objects = [
+      { id: 'obj-1', name: 'Sat 1', bodyId: 'MARS', type: 'satellite', elements: {} },
+    ] as OrbitalObject[];
+    const result = cycleMapTarget(objects, 'EARTH');
+    expect(result).toBeNull();
+  });
+
+  it('cycles through mixed orbital objects and asteroids for SUN', () => {
+    const ast1: Asteroid = { id: 'ast-1', name: 'AST-0001', type: 'asteroid', posX: 0, posY: 0, velX: 0, velY: 0, radius: 50, mass: 1000, shapeSeed: 42 };
+    const ast2: Asteroid = { id: 'ast-2', name: 'AST-0002', type: 'asteroid', posX: 10, posY: 10, velX: 0, velY: 0, radius: 100, mass: 5000, shapeSeed: 7 };
+    setActiveAsteroids([ast1, ast2]);
+
+    const objects = [
+      { id: 'sun-sat', name: 'Sun Sat', bodyId: 'SUN', type: 'satellite', elements: {} },
+    ] as OrbitalObject[];
+
+    // First: sun-sat
+    cycleMapTarget(objects, 'SUN');
+    expect(getMapTarget()).toBe('sun-sat');
+
+    // Second: ast-1
+    cycleMapTarget(objects, 'SUN');
+    expect(getMapTarget()).toBe('ast-1');
+
+    // Third: ast-2
+    cycleMapTarget(objects, 'SUN');
+    expect(getMapTarget()).toBe('ast-2');
+
+    // Fourth: wraps back to sun-sat
+    cycleMapTarget(objects, 'SUN');
+    expect(getMapTarget()).toBe('sun-sat');
+  });
+
+  it('handles empty array input gracefully', () => {
+    const result = cycleMapTarget([], 'EARTH');
+    expect(result).toBeNull();
+    expect(getMapTarget()).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getSelectedAsteroid — additional coverage
+// ---------------------------------------------------------------------------
+
+describe('getSelectedAsteroid edge cases', () => {
+  it('returns null after asteroids are cleared', () => {
+    const ast: Asteroid = { id: 'ast-1', name: 'AST-0001', type: 'asteroid', posX: 0, posY: 0, velX: 0, velY: 0, radius: 50, mass: 1000, shapeSeed: 42 };
+    setActiveAsteroids([ast]);
+    setMapTarget('ast-1');
+    expect(getSelectedAsteroid()).not.toBeNull();
+
+    clearAsteroids();
+    expect(getSelectedAsteroid()).toBeNull();
+  });
+
+  it('returns correct asteroid when multiple are active', () => {
+    const asteroids: Asteroid[] = [
+      { id: 'ast-1', name: 'AST-0001', type: 'asteroid', posX: 0, posY: 0, velX: 0, velY: 0, radius: 10, mass: 100, shapeSeed: 1 },
+      { id: 'ast-2', name: 'AST-0002', type: 'asteroid', posX: 5, posY: 5, velX: 0, velY: 0, radius: 50, mass: 1000, shapeSeed: 2 },
+      { id: 'ast-3', name: 'AST-0003', type: 'asteroid', posX: 10, posY: 10, velX: 0, velY: 0, radius: 200, mass: 5000, shapeSeed: 3 },
+    ];
+    setActiveAsteroids(asteroids);
+    setMapTarget('ast-2');
+    const result = getSelectedAsteroid();
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe('ast-2');
+    expect(result!.radius).toBe(50);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Transfer target cycling — additional coverage
+// ---------------------------------------------------------------------------
+
+describe('cycleTransferTarget additional', () => {
+  it('returns null for FLIGHT phase', () => {
+    expect(cycleTransferTarget('EARTH', 200_000, FlightPhase.FLIGHT)).toBeNull();
+  });
+
+  it('returns null for PRELAUNCH phase', () => {
+    expect(cycleTransferTarget('EARTH', 200_000, FlightPhase.PRELAUNCH)).toBeNull();
+  });
+
+  it('returns null for REENTRY phase', () => {
+    expect(cycleTransferTarget('EARTH', 200_000, FlightPhase.REENTRY)).toBeNull();
+  });
+
+  it('setSelectedTransferTarget can be overridden multiple times', () => {
+    setSelectedTransferTarget('MARS');
+    expect(getSelectedTransferTarget()).toBe('MARS');
+    setSelectedTransferTarget('MOON');
+    expect(getSelectedTransferTarget()).toBe('MOON');
+    setSelectedTransferTarget(null);
+    expect(getSelectedTransferTarget()).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Shadow and comms toggles — additional coverage
+// ---------------------------------------------------------------------------
+
+describe('map shadow toggle additional', () => {
+  it('multiple toggles cycle correctly', () => {
+    expect(isMapShadowEnabled()).toBe(false);
+    toggleMapShadow();
+    toggleMapShadow();
+    toggleMapShadow();
+    expect(isMapShadowEnabled()).toBe(true);
+    toggleMapShadow();
+    expect(isMapShadowEnabled()).toBe(false);
+  });
+});
+
+describe('map comms overlay toggle additional', () => {
+  it('multiple toggles cycle correctly', () => {
+    expect(isCommsOverlayVisible()).toBe(false);
+    toggleMapCommsOverlay();
+    toggleMapCommsOverlay();
+    toggleMapCommsOverlay();
+    expect(isCommsOverlayVisible()).toBe(true);
+    toggleMapCommsOverlay();
+    expect(isCommsOverlayVisible()).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// destroyMapRenderer resets state
+// ---------------------------------------------------------------------------
+
+describe('destroyMapRenderer resets state', () => {
+  it('clears target selection', () => {
+    setMapTarget('sat-1');
+    expect(getMapTarget()).toBe('sat-1');
+    destroyMapRenderer();
+    expect(getMapTarget()).toBeNull();
+  });
+
+  it('clears transfer target selection', () => {
+    setSelectedTransferTarget('MARS');
+    expect(getSelectedTransferTarget()).toBe('MARS');
+    destroyMapRenderer();
+    expect(getSelectedTransferTarget()).toBeNull();
+  });
+
+  it('resets shadow to disabled', () => {
+    toggleMapShadow();
+    expect(isMapShadowEnabled()).toBe(true);
+    destroyMapRenderer();
+    expect(isMapShadowEnabled()).toBe(false);
+  });
+
+  it('resets map visibility to false', () => {
+    // After destroy, isMapVisible should be false since _mapRoot is null
+    destroyMapRenderer();
+    expect(isMapVisible()).toBe(false);
+  });
+});

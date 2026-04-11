@@ -184,6 +184,118 @@ describe('fpsMonitor', () => {
     });
   });
 
+  describe('recordFrame() — display update and graph', () => {
+    it('updates DOM text when active and display interval elapsed', () => {
+      showFpsMonitor();
+
+      // Record a frame, but not enough time has passed (timestamp 0 → 100)
+      recordFrame(16.67, 100);
+
+      // Now pass enough time (> 500ms) to trigger display update
+      recordFrame(16.67, 700);
+
+      // Verify that createElement was called (for _fpsText, _ftText, _canvas)
+      // The fpsText element should have been updated with the FPS value
+      const createdElements = mockDocument.createElement.mock.results;
+      // First 3 createElement calls are: container div, fpsText div, ftText div, canvas
+      // We check the divs have textContent set
+      const fpsDiv = createdElements[1].value as MockElement;
+      const ftDiv = createdElements[2].value as MockElement;
+
+      expect(fpsDiv.textContent).toContain('FPS:');
+      expect(ftDiv.textContent).toContain('Frame:');
+    });
+
+    it('does not update DOM when not active', () => {
+      // Monitor is hidden by default after init
+      hideFpsMonitor();
+
+      const createdElements = mockDocument.createElement.mock.results;
+      const fpsDiv = createdElements[1].value as MockElement;
+      // Set initial text to track changes
+      fpsDiv.textContent = 'FPS: --';
+
+      recordFrame(16.67, 0);
+      recordFrame(16.67, 600); // enough time passed but not active
+
+      // Text should remain as set during init, not updated
+      expect(fpsDiv.textContent).toBe('FPS: --');
+    });
+
+    it('invokes canvas draw methods when display interval elapses', () => {
+      showFpsMonitor();
+
+      // Need at least 2 frames in the buffer for _drawGraph to draw lines
+      recordFrame(10, 0);
+      recordFrame(20, 600); // triggers display update
+
+      // The canvas context should have had drawing methods called
+      const canvasEl = mockDocument.createElement.mock.results[3].value as MockElement;
+      const ctx = canvasEl.getContext.mock.results[0].value as MockCanvasContext;
+
+      expect(ctx.clearRect).toHaveBeenCalled();
+      expect(ctx.beginPath).toHaveBeenCalled();
+      expect(ctx.stroke).toHaveBeenCalled();
+    });
+
+    it('draws 60fps target line when in range', () => {
+      showFpsMonitor();
+
+      // Record frames around 16.67ms so the target line is in range
+      recordFrame(14, 0);
+      recordFrame(18, 600);
+
+      const canvasEl = mockDocument.createElement.mock.results[3].value as MockElement;
+      const ctx = canvasEl.getContext.mock.results[0].value as MockCanvasContext;
+
+      // The target line at 16.67ms should be drawn (moveTo + lineTo at that y)
+      // clearRect for background, then a strokeStyle for the target line
+      expect(ctx.moveTo).toHaveBeenCalled();
+      expect(ctx.lineTo).toHaveBeenCalled();
+    });
+
+    it('skips graph body when frameCount < 2', () => {
+      showFpsMonitor();
+
+      // Record only one frame with enough time elapsed
+      recordFrame(16, 600);
+
+      const canvasEl = mockDocument.createElement.mock.results[3].value as MockElement;
+      const ctx = canvasEl.getContext.mock.results[0].value as MockCanvasContext;
+
+      // clearRect is called (background is drawn), but beginPath for the line
+      // should not be called since count < 2
+      expect(ctx.clearRect).toHaveBeenCalled();
+      expect(ctx.fillRect).toHaveBeenCalled(); // background rect
+      // beginPath is called zero times for the frame time line
+      // (it may be called for the target line check, but with only 1 frame the
+      //  function returns early before drawing any lines)
+      expect(ctx.lineTo).not.toHaveBeenCalled();
+    });
+
+    it('throttles display updates within DISPLAY_INTERVAL_MS', () => {
+      showFpsMonitor();
+
+      recordFrame(16, 0);
+      recordFrame(16, 600); // triggers update
+
+      const createdElements = mockDocument.createElement.mock.results;
+      const fpsDiv = createdElements[1].value as MockElement;
+
+      // Record the text after the first display update
+      const textAfterFirst = fpsDiv.textContent;
+
+      // Record another frame only 100ms later — should NOT trigger display update
+      recordFrame(50, 700); // 700 - 600 = 100ms < 500ms
+
+      // Text shouldn't change because display interval hasn't elapsed
+      expect(fpsDiv.textContent).toBe(textAfterFirst);
+
+      // But __perfStats should still be updated
+      expect(window.__perfStats!.maxFrameTime).toBeCloseTo(50, 0);
+    });
+  });
+
   describe('destroyFpsMonitor()', () => {
     it('clears window.__perfStats', () => {
       recordFrame(16, 1000);

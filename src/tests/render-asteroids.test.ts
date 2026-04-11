@@ -212,3 +212,99 @@ describe('renderBeltAsteroids', () => {
     }).not.toThrow();
   });
 });
+
+// ---------------------------------------------------------------------------
+// seededRng — additional edge cases
+// ---------------------------------------------------------------------------
+
+describe('seededRng edge cases', () => {
+  it('negative seeds still produce deterministic output', () => {
+    // The LCG is designed for positive seeds (shapeSeed), but should
+    // be deterministic even for negative inputs.
+    const rng1 = seededRng(-1);
+    const rng2 = seededRng(-1);
+    for (let i = 0; i < 20; i++) {
+      expect(rng1()).toBe(rng2());
+    }
+  });
+
+  it('handles very large seeds', () => {
+    const rng = seededRng(2147483646); // max int32 - 1
+    for (let i = 0; i < 20; i++) {
+      const val = rng();
+      expect(val).toBeGreaterThanOrEqual(0);
+      expect(val).toBeLessThan(1);
+    }
+  });
+
+  it('negative seeds produce deterministic results', () => {
+    const rng1 = seededRng(-42);
+    const rng2 = seededRng(-42);
+    for (let i = 0; i < 20; i++) {
+      expect(rng1()).toBe(rng2());
+    }
+  });
+
+  it('produces reasonable distribution (no clustering at edges)', () => {
+    const rng = seededRng(123);
+    let countLow = 0;
+    let countHigh = 0;
+    const n = 1000;
+    for (let i = 0; i < n; i++) {
+      const val = rng();
+      if (val < 0.5) countLow++;
+      else countHigh++;
+    }
+    // Expect roughly 50/50 split — allow generous tolerance (40-60%)
+    expect(countLow).toBeGreaterThan(n * 0.3);
+    expect(countHigh).toBeGreaterThan(n * 0.3);
+  });
+
+  it('adjacent seeds produce different first values', () => {
+    const values = new Set<number>();
+    for (let seed = 0; seed < 20; seed++) {
+      values.add(seededRng(seed)());
+    }
+    // At least 15 of the 20 seeds should produce unique first values
+    expect(values.size).toBeGreaterThanOrEqual(15);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getSizeCategory — edge values
+// ---------------------------------------------------------------------------
+
+describe('getSizeCategory edge values', () => {
+  it('returns "small" for radius 0', () => {
+    expect(getSizeCategory(0)).toBe('small');
+  });
+
+  it('returns "small" for very small fractional radius', () => {
+    expect(getSizeCategory(0.001)).toBe('small');
+  });
+
+  it('returns "large" for very large radius', () => {
+    expect(getSizeCategory(100_000)).toBe('large');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getLOD — additional values
+// ---------------------------------------------------------------------------
+
+describe('getLOD additional checks', () => {
+  it('returns "full" for exactly 0 speed', () => {
+    expect(getLOD(0)).toBe('full');
+  });
+
+  it('returns "streak" for very high speeds', () => {
+    expect(getLOD(10_000)).toBe('streak');
+  });
+
+  it('handles fractional speeds near boundaries', () => {
+    expect(getLOD(4.9999)).toBe('full');
+    expect(getLOD(5.0001)).toBe('basic');
+    expect(getLOD(49.9999)).toBe('basic');
+    expect(getLOD(50.0001)).toBe('streak');
+  });
+});

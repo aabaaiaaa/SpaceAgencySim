@@ -117,25 +117,25 @@ See `.devloop/requirements.md` for full context and rationale behind each task.
 - **Verification**: `npx vitest run --coverage 2>&1 | grep "ERROR"` — no coverage threshold errors (exclusions should bring actual coverage above the current aspirational thresholds for the remaining files).
 
 ### TASK-016: Add unit tests for render/flight/_camera.ts, _ground.ts, and _sky.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-006, TASK-015
 - **Description**: Add new unit tests targeting uncovered code paths in three render/flight modules: (1) `_camera.ts` (48% lines) — test uncovered `worldToScreen` edge cases, `computeCoM` with varied inputs, lines 114-190. (2) `_ground.ts` (52% lines) — test terrain data generation logic, uncovered branches, lines 111-186. (3) `_sky.ts` (82% lines) — test uncovered sky rendering logic, lines 129-205. Add tests to the existing test files (`render-camera.test.ts`, `render-ground.test.ts`, `render-sky.test.ts`). Focus on testable pure-logic paths — don't try to test PixiJS rendering calls.
 - **Verification**: `npx vitest run src/tests/render-camera.test.ts src/tests/render-ground.test.ts src/tests/render-sky.test.ts --coverage 2>&1 | grep -E "(_camera|_ground|_sky)"` — line coverage improved for all three files.
 
 ### TASK-017: Add unit tests for render/flight/_trails.ts, _asteroids.ts, and render/map.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-006, TASK-015
 - **Description**: Add new unit tests targeting uncovered code paths: (1) `_trails.ts` (9% lines) — test trail point management, trail calculation logic. Much of this module is PixiJS-heavy, so focus on any extractable pure-logic functions. (2) `_asteroids.ts` (16% lines) — test asteroid rendering calculation logic. (3) `render/map.ts` (21% lines) — test orbit math helper functions that are pure calculations. Add tests to existing files (`render-trails.test.ts`, `render-asteroids.test.ts`, `render-map-state.test.ts`) or create new test files if appropriate.
 - **Verification**: `npx vitest run src/tests/render-trails.test.ts src/tests/render-asteroids.test.ts src/tests/render-map-state.test.ts --coverage 2>&1 | grep -E "(_trails|_asteroids|map)"` — line coverage improved for all three files.
 
 ### TASK-018: Add unit tests for UI modules: fpsMonitor.ts, vab/_staging.ts, vab/_undoActions.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-006, TASK-015
 - **Description**: Add new unit tests targeting uncovered code paths: (1) `fpsMonitor.ts` (70% lines) — test uncovered recording/display logic, lines 161-169 and 201-248. (2) `vab/_staging.ts` (19% lines) — test `computeVabStageDeltaV()` pure physics math and other testable stage logic. This is the biggest coverage gap in testable UI code. (3) `vab/_undoActions.ts` (81% lines) — test uncovered snapshot edge cases, lines 149-253 and 262-266. Add to existing test files (`ui-fpsMonitor.test.ts`, `ui-vabStaging.test.ts`, `ui-vabUndoActions.test.ts`).
 - **Verification**: `npx vitest run src/tests/ui-fpsMonitor.test.ts src/tests/ui-vabStaging.test.ts src/tests/ui-vabUndoActions.test.ts --coverage 2>&1 | grep -E "(fpsMonitor|_staging|_undoActions)"` — line coverage improved for all three files.
 
 ### TASK-019: Add unit tests for flightController modules
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-006, TASK-015
 - **Description**: Add new unit tests targeting uncovered code paths in flightController sub-modules: (1) `_loop.ts` (41% lines) — test loop tick logic, error recovery paths. (2) `_mapView.ts` (64% lines) — test transfer calculation display logic. (3) `_timeWarp.ts` (90% lines) — test uncovered threshold edge case at lines 73-77 (small addition). (4) `_workerBridge.ts` (73% lines) — test uncovered message handling paths. Add to existing test files (`ui-timeWarp.test.ts`, etc.) or create new test files for modules that don't have them.
 - **Verification**: `npx vitest run src/tests/ui-timeWarp.test.ts src/tests/loopErrorHandling.test.ts src/tests/workerBridgeTimeout.test.ts --coverage 2>&1 | grep -E "(_loop|_mapView|_timeWarp|_workerBridge)"` — line coverage improved.

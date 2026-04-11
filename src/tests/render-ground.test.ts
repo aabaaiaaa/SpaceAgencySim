@@ -42,12 +42,20 @@ vi.mock('pixi.js', () => ({
   Container: MockContainer,
 }));
 
+// Mock biome functions for renderBiomeLabel tests
+vi.mock('../core/biomes.ts', () => ({
+  getBiome: vi.fn(),
+  getBiomeTransition: vi.fn(),
+}));
+
+import { getBiome, getBiomeTransition } from '../core/biomes.ts';
 import { SurfaceItemType } from '../core/constants.ts';
 import {
   getFlightRenderState,
   resetFlightRenderState,
 } from '../render/flight/_state.ts';
-import { renderGround, renderSurfaceItems } from '../render/flight/_ground.ts';
+import { BIOME_LABEL_FADE_SPEED } from '../render/flight/_constants.ts';
+import { renderGround, renderSurfaceItems, renderBiomeLabel } from '../render/flight/_ground.ts';
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -206,5 +214,245 @@ describe('renderSurfaceItems', () => {
 
     // Should have cleared but not drawn any items
     expect(mockGfx.clear).toHaveBeenCalled();
+  });
+
+  it('skips rendering when ground is above the viewport (positive camWorldY)', () => {
+    const s = getFlightRenderState();
+    const mockGfx = new MockGraphics();
+    s.surfaceItemsGraphics = mockGfx as unknown as Graphics;
+    s.camWorldY = 100000; // camera way above → groundScreenY = h/2 + camWorldY * p which is huge
+    s.zoomLevel = 1;
+
+    const items: ReadonlySurfaceItem[] = [{ id: '10', type: SurfaceItemType.FLAG, bodyId: 'earth', posX: 0, deployedPeriod: 0 }];
+    renderSurfaceItems(items, 800, 600);
+
+    // groundScreenY is way above h+50, so no items drawn
+    expect(mockGfx.clear).toHaveBeenCalled();
+  });
+});
+
+describe('renderGround edge cases', () => {
+  beforeEach(() => {
+    resetFlightRenderState();
+  });
+
+  it('draws ground starting at 0 when groundScreenY is negative', () => {
+    const s = getFlightRenderState();
+    const mockGfx = new MockGraphics();
+    s.groundGraphics = mockGfx as unknown as Graphics;
+    s.camWorldY = 5; // camera slightly above ground -> groundScreenY slightly positive
+
+    renderGround(800, 600);
+
+    expect(mockGfx.rect).toHaveBeenCalled();
+  });
+
+  it('draws ground when groundScreenY equals viewport height exactly', () => {
+    const s = getFlightRenderState();
+    const mockGfx = new MockGraphics();
+    s.groundGraphics = mockGfx as unknown as Graphics;
+    // groundScreenY = h/2 + camWorldY * ppm() => need it exactly at h
+    // h/2 + camWorldY * 20 = 600 => camWorldY = (600 - 300) / 20 = 15
+    s.camWorldY = 15;
+
+    renderGround(800, 600);
+
+    // groundScreenY = 600 which is >= h (600) so it should skip drawing
+    expect(mockGfx.clear).toHaveBeenCalled();
+    expect(mockGfx.rect).not.toHaveBeenCalled();
+  });
+});
+
+describe('renderBiomeLabel', () => {
+  beforeEach(() => {
+    resetFlightRenderState();
+    vi.mocked(getBiome).mockReset();
+    vi.mocked(getBiomeTransition).mockReset();
+  });
+
+  it('does nothing when biomeLabelContainer is null', () => {
+    vi.mocked(getBiome).mockReturnValue(null);
+    renderBiomeLabel(1000, 800, 600, 0.016);
+    // Should not throw
+  });
+
+  it('returns early when getBiome returns null', () => {
+    const s = getFlightRenderState();
+    const mockContainer = new MockContainer();
+    s.biomeLabelContainer = mockContainer as unknown as import('pixi.js').Container;
+    vi.mocked(getBiome).mockReturnValue(null);
+    vi.mocked(getBiomeTransition).mockReturnValue(null);
+
+    renderBiomeLabel(1000, 800, 600, 0.016, 'EARTH');
+
+    expect(mockContainer.children.length).toBe(0);
+  });
+
+  it('renders biome label when biome is found', () => {
+    const s = getFlightRenderState();
+    const mockContainer = new MockContainer();
+    s.biomeLabelContainer = mockContainer as unknown as import('pixi.js').Container;
+    s.biomeLabelAlpha = 1.0;
+
+    vi.mocked(getBiome).mockReturnValue({
+      id: 'troposphere',
+      name: 'Troposphere',
+      min: 0,
+      max: 12000,
+      scienceMultiplier: 1.0,
+    });
+    vi.mocked(getBiomeTransition).mockReturnValue(null);
+
+    renderBiomeLabel(5000, 800, 600, 0.016, 'EARTH');
+
+    // Should add two children (label + sublabel)
+    expect(mockContainer.children.length).toBe(2);
+  });
+
+  it('resets alpha to 0 when biome name changes', () => {
+    const s = getFlightRenderState();
+    const mockContainer = new MockContainer();
+    s.biomeLabelContainer = mockContainer as unknown as import('pixi.js').Container;
+    s.currentBiomeName = 'Old Biome';
+    s.biomeLabelAlpha = 1.0;
+
+    vi.mocked(getBiome).mockReturnValue({
+      id: 'stratosphere',
+      name: 'Stratosphere',
+      min: 12000,
+      max: 50000,
+      scienceMultiplier: 1.5,
+    });
+    vi.mocked(getBiomeTransition).mockReturnValue(null);
+
+    renderBiomeLabel(20000, 800, 600, 0.016, 'EARTH');
+
+    // Alpha was reset to 0 because name changed, then incremented slightly
+    expect(s.currentBiomeName).toBe('Stratosphere');
+    // With dt=0.016 and BIOME_LABEL_FADE_SPEED=3, alpha increases by 0.048
+    expect(s.biomeLabelAlpha).toBeCloseTo(BIOME_LABEL_FADE_SPEED * 0.016, 3);
+  });
+
+  it('uses transition.from name when ratio < 0.5', () => {
+    const s = getFlightRenderState();
+    const mockContainer = new MockContainer();
+    s.biomeLabelContainer = mockContainer as unknown as import('pixi.js').Container;
+    s.biomeLabelAlpha = 1.0;
+    s.currentBiomeName = 'Lower Atmosphere';
+
+    vi.mocked(getBiome).mockReturnValue({
+      id: 'lower-atmo',
+      name: 'Lower Atmosphere',
+      min: 0,
+      max: 12000,
+      scienceMultiplier: 1.0,
+    });
+    vi.mocked(getBiomeTransition).mockReturnValue({
+      ratio: 0.3,
+      from: { id: 'lower-atmo', name: 'Lower Atmosphere', min: 0, max: 12000, scienceMultiplier: 1.0 },
+      to: { id: 'upper-atmo', name: 'Upper Atmosphere', min: 12000, max: 50000, scienceMultiplier: 1.5 },
+    });
+
+    renderBiomeLabel(11950, 800, 600, 0.016, 'EARTH');
+
+    // Should use the 'from' biome name
+    expect(s.currentBiomeName).toBe('Lower Atmosphere');
+  });
+
+  it('uses transition.to name when ratio >= 0.5', () => {
+    const s = getFlightRenderState();
+    const mockContainer = new MockContainer();
+    s.biomeLabelContainer = mockContainer as unknown as import('pixi.js').Container;
+    s.biomeLabelAlpha = 0.5;
+    s.currentBiomeName = 'Lower Atmosphere';
+
+    vi.mocked(getBiome).mockReturnValue({
+      id: 'lower-atmo',
+      name: 'Lower Atmosphere',
+      min: 0,
+      max: 12000,
+      scienceMultiplier: 1.0,
+    });
+    vi.mocked(getBiomeTransition).mockReturnValue({
+      ratio: 0.7,
+      from: { id: 'lower-atmo', name: 'Lower Atmosphere', min: 0, max: 12000, scienceMultiplier: 1.0 },
+      to: { id: 'upper-atmo', name: 'Upper Atmosphere', min: 12000, max: 50000, scienceMultiplier: 1.5 },
+    });
+
+    renderBiomeLabel(12050, 800, 600, 0.016, 'EARTH');
+
+    // Name changes to 'to' biome, alpha resets to 0
+    expect(s.currentBiomeName).toBe('Upper Atmosphere');
+  });
+
+  it('returns early when biomeLabelAlpha drops below 0.01', () => {
+    const s = getFlightRenderState();
+    const mockContainer = new MockContainer();
+    s.biomeLabelContainer = mockContainer as unknown as import('pixi.js').Container;
+    s.biomeLabelAlpha = 0;
+    s.currentBiomeName = null;
+
+    vi.mocked(getBiome).mockReturnValue({
+      id: 'troposphere',
+      name: 'Troposphere',
+      min: 0,
+      max: 12000,
+      scienceMultiplier: 1.0,
+    });
+    vi.mocked(getBiomeTransition).mockReturnValue(null);
+
+    // With dt=0 the alpha stays at 0 and the function returns early
+    renderBiomeLabel(5000, 800, 600, 0, 'EARTH');
+
+    expect(mockContainer.children.length).toBe(0);
+  });
+
+  it('fades alpha down when biomeLabelAlpha exceeds targetAlpha', () => {
+    const s = getFlightRenderState();
+    const mockContainer = new MockContainer();
+    s.biomeLabelContainer = mockContainer as unknown as import('pixi.js').Container;
+    s.biomeLabelAlpha = 1.0;
+    s.currentBiomeName = 'Lower Atmosphere';
+
+    vi.mocked(getBiome).mockReturnValue({
+      id: 'lower-atmo',
+      name: 'Lower Atmosphere',
+      min: 0,
+      max: 12000,
+      scienceMultiplier: 1.0,
+    });
+    // Transition with low ratio means targetAlpha < 1.0
+    vi.mocked(getBiomeTransition).mockReturnValue({
+      ratio: 0.4,
+      from: { id: 'lower-atmo', name: 'Lower Atmosphere', min: 0, max: 12000, scienceMultiplier: 1.0 },
+      to: { id: 'upper-atmo', name: 'Upper Atmosphere', min: 12000, max: 50000, scienceMultiplier: 1.5 },
+    });
+
+    renderBiomeLabel(11980, 800, 600, 0.1, 'EARTH');
+
+    // targetAlpha = 1.0 - (0.4 / 0.5) = 0.2, current was 1.0, so it should have decreased
+    expect(s.biomeLabelAlpha).toBeLessThan(1.0);
+  });
+
+  it('defaults bodyId to EARTH when not provided', () => {
+    const s = getFlightRenderState();
+    const mockContainer = new MockContainer();
+    s.biomeLabelContainer = mockContainer as unknown as import('pixi.js').Container;
+    s.biomeLabelAlpha = 1.0;
+
+    vi.mocked(getBiome).mockReturnValue({
+      id: 'troposphere',
+      name: 'Troposphere',
+      min: 0,
+      max: 12000,
+      scienceMultiplier: 1.0,
+    });
+    vi.mocked(getBiomeTransition).mockReturnValue(null);
+
+    // Call without bodyId
+    renderBiomeLabel(5000, 800, 600, 0.016);
+
+    // getBiome should have been called with 'EARTH'
+    expect(vi.mocked(getBiome)).toHaveBeenCalledWith(5000, 'EARTH');
   });
 });

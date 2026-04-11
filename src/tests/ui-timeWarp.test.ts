@@ -33,7 +33,7 @@ vi.mock('../data/bodies.ts', () => ({
 
 import { setHudTimeWarp, lockTimeWarp } from '../ui/flightHud.ts';
 import { getFCState, setFCState, resetFCState, setPhysicsState, setFlightState } from '../ui/flightController/_state.ts';
-import { checkTimeWarpResets, applyTimeWarp } from '../ui/flightController/_timeWarp.ts';
+import { checkTimeWarpResets, applyTimeWarp, onTimeWarpButtonClick } from '../ui/flightController/_timeWarp.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers — build partial PhysicsState / FlightState for test fixtures
@@ -245,6 +245,50 @@ describe('timeWarp', () => {
         expect(getFCState().prevAltitude).toBe(200000);
         expect(getFCState().prevInSpace).toBe(true);
       });
+    });
+  });
+
+  describe('onTimeWarpButtonClick()', () => {
+    it('applies the requested warp level when no staging lockout', () => {
+      setPhysicsState(makePS({ posY: 200000, velX: 7800, velY: 0 }));
+      setFlightState(makeFS({ bodyId: 'EARTH', phase: 'ORBIT' }));
+      setFCState({ stagingLockoutUntil: 0 });
+
+      onTimeWarpButtonClick(4);
+      expect(getFCState().timeWarp).toBe(4);
+      expect(setHudTimeWarp).toHaveBeenCalledWith(4);
+    });
+
+    it('blocks warp change during active staging lockout', () => {
+      setPhysicsState(makePS({ posY: 200000, velX: 7800, velY: 0 }));
+      setFlightState(makeFS({ bodyId: 'EARTH', phase: 'ORBIT' }));
+      // Set lockout to a future time relative to performance.now()
+      const futureTime = performance.now() + 5000;
+      setFCState({ stagingLockoutUntil: futureTime, timeWarp: 1 });
+
+      onTimeWarpButtonClick(10);
+      // Warp should NOT have changed because lockout is active
+      expect(getFCState().timeWarp).toBe(1);
+      expect(setHudTimeWarp).not.toHaveBeenCalled();
+    });
+
+    it('allows warp change after staging lockout has expired', () => {
+      setPhysicsState(makePS({ posY: 200000, velX: 7800, velY: 0 }));
+      setFlightState(makeFS({ bodyId: 'EARTH', phase: 'ORBIT' }));
+      // Set lockout to a past time
+      const pastTime = performance.now() - 1000;
+      setFCState({ stagingLockoutUntil: pastTime, timeWarp: 1 });
+
+      onTimeWarpButtonClick(4);
+      expect(getFCState().timeWarp).toBe(4);
+      expect(setHudTimeWarp).toHaveBeenCalledWith(4);
+    });
+
+    it('allows warp change when stagingLockoutUntil is zero', () => {
+      setFCState({ stagingLockoutUntil: 0, timeWarp: 1 });
+
+      onTimeWarpButtonClick(10);
+      expect(getFCState().timeWarp).toBe(10);
     });
   });
 });

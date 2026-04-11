@@ -190,6 +190,7 @@ import {
   setPhysicsState,
   setFlightState,
   getFlightState,
+  getPhysicsState,
 } from '../ui/flightController/_state.ts';
 import {
   toggleMapView,
@@ -201,6 +202,7 @@ import { showPhaseNotification } from '../ui/flightController/_flightPhase.ts';
 import { isPlayerLocked } from '../core/flightPhase.ts';
 import { isMapViewAvailable } from '../core/mapView.ts';
 import { computeOrbitalThrustAngle } from '../core/mapView.ts';
+import { warpToTarget } from '../core/orbit.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -463,5 +465,134 @@ describe('handleWarpToTarget', () => {
     _mapMock._setTarget('nonexistent');
     handleWarpToTarget();
     expect(showPhaseNotification).toHaveBeenCalledWith('Target not found');
+  });
+
+  it('shows notification when warp is not possible', () => {
+    const s = getFCState();
+    s.state = makeGameState({
+      orbitalObjects: [{ id: 'sat-1', name: 'Satellite 1', elements: { sma: 7000000, ecc: 0 } }],
+    } as Partial<GameState>);
+    const fs = getFlightState()!;
+    fs.orbitalElements = { sma: 6771000, ecc: 0, inc: 0, argPe: 0, lan: 0, trueAnomaly: 0 } as unknown as OrbitalElements;
+    _mapMock._setTarget('sat-1');
+    vi.mocked(warpToTarget).mockReturnValueOnce({ possible: false });
+
+    handleWarpToTarget();
+
+    expect(showPhaseNotification).toHaveBeenCalledWith(
+      expect.stringContaining('Warp impossible'),
+    );
+  });
+
+  it('advances time and shows success notification when warp is possible', () => {
+    const s = getFCState();
+    s.state = makeGameState({
+      orbitalObjects: [{ id: 'sat-1', name: 'Satellite 1', elements: { sma: 7000000, ecc: 0 } }],
+    } as Partial<GameState>);
+    const fs = getFlightState()!;
+    fs.orbitalElements = { sma: 6771000, ecc: 0, inc: 0, argPe: 0, lan: 0, trueAnomaly: 0 } as unknown as OrbitalElements;
+    fs.timeElapsed = 100;
+    fs.events = [];
+    _mapMock._setTarget('sat-1');
+    vi.mocked(warpToTarget).mockReturnValueOnce({
+      possible: true,
+      time: 700,
+      elapsed: 600,
+    });
+
+    handleWarpToTarget();
+
+    expect(fs.timeElapsed).toBe(700);
+    expect(fs.events.length).toBe(1);
+    expect(fs.events[0].type).toBe('TIME_WARP');
+    expect(showPhaseNotification).toHaveBeenCalledWith('Warped to Satellite 1');
+  });
+
+  it('returns early when flightState has no orbitalElements', () => {
+    const fs = getFlightState()!;
+    fs.orbitalElements = null;
+    _mapMock._setTarget('sat-1');
+    handleWarpToTarget();
+    expect(showPhaseNotification).not.toHaveBeenCalled();
+  });
+
+  it('returns early when state is null', () => {
+    const s = getFCState();
+    s.state = null;
+    handleWarpToTarget();
+    expect(showPhaseNotification).not.toHaveBeenCalled();
+  });
+});
+
+describe('applyMapThrust — edge cases', () => {
+  beforeEach(() => {
+    setUpFCState({ mapActive: true });
+    vi.clearAllMocks();
+  });
+
+  it('returns early when physics state is null', () => {
+    setPhysicsState(null);
+    const s = getFCState();
+    s.mapActive = true;
+    s.mapHeldKeys.add('w');
+    applyMapThrust();
+    expect(s.mapThrusting).toBe(false);
+  });
+
+  it('returns early when flight state is null', () => {
+    setFlightState(null);
+    const s = getFCState();
+    s.mapActive = true;
+    s.mapHeldKeys.add('w');
+    applyMapThrust();
+    expect(s.mapThrusting).toBe(false);
+  });
+
+  it('sets throttle to 1 when a direction key is pressed and throttle was 0', () => {
+    const ps = makePhysicsState({ posX: 0, posY: 200_000, velX: 7800, velY: 0, angle: 0, throttle: 0 });
+    setPhysicsState(ps);
+    const s = getFCState();
+    s.mapHeldKeys.add('w');
+    applyMapThrust();
+    expect(ps.throttle).toBe(1);
+    expect(s.mapThrusting).toBe(true);
+  });
+
+  it('does not reset throttle when already thrusting and direction key held', () => {
+    const ps = makePhysicsState({ posX: 0, posY: 200_000, velX: 7800, velY: 0, angle: 0, throttle: 0.5 });
+    setPhysicsState(ps);
+    const s = getFCState();
+    s.mapHeldKeys.add('w');
+    s.mapThrusting = false;
+    applyMapThrust();
+    // throttle was non-zero, so it should remain unchanged
+    expect(ps.throttle).toBe(0.5);
+    expect(s.mapThrusting).toBe(true);
+  });
+
+  it('does not cut thrust when no keys held and was not thrusting', () => {
+    const ps = makePhysicsState({ posX: 0, posY: 200_000, velX: 7800, velY: 0, angle: 0, throttle: 0 });
+    setPhysicsState(ps);
+    const s = getFCState();
+    s.mapThrusting = false;
+    applyMapThrust();
+    // Nothing should change
+    expect(ps.throttle).toBe(0);
+    expect(s.mapThrusting).toBe(false);
+  });
+
+  it('uses EARTH as default bodyId when flightState.bodyId is empty', () => {
+    setFlightState(makeFlightStateFactory({
+      phase: 'ORBIT', bodyId: '', timeElapsed: 0,
+      orbitalElements: null, events: [], transferState: null,
+    }));
+    const s = getFCState();
+    s.mapHeldKeys.add('w');
+    applyMapThrust();
+    expect(computeOrbitalThrustAngle).toHaveBeenCalledWith(
+      expect.anything(),
+      'EARTH',
+      expect.anything(),
+    );
   });
 });

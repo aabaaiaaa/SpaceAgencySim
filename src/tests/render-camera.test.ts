@@ -32,6 +32,7 @@ import { getPartById } from '../data/parts.ts';
 import type { PartDef } from '../data/parts.ts';
 import { PartType } from '../core/constants.ts';
 import {
+  getFlightRenderState,
   resetFlightRenderState,
   setFlightRenderState,
 } from '../render/flight/_state.ts';
@@ -40,9 +41,10 @@ import {
   hasCommandModule,
   ppm,
   worldToScreen,
+  updateCamera,
 } from '../render/flight/_camera.ts';
-import { FLIGHT_PIXELS_PER_METRE } from '../render/flight/_constants.ts';
-import type { ReadonlyAssembly } from '../render/types.ts';
+import { FLIGHT_PIXELS_PER_METRE, SCALE_M_PER_PX } from '../render/flight/_constants.ts';
+import type { ReadonlyAssembly, ReadonlyPhysicsState, ReadonlyDebrisState } from '../render/types.ts';
 import type { PlacedPart } from '../core/physics.ts';
 
 // ---------------------------------------------------------------------------
@@ -297,5 +299,361 @@ describe('computeCoM()', () => {
     // No valid parts → returns origin
     expect(result.x).toBe(5);
     expect(result.y).toBe(10);
+  });
+
+  it('defaults mass to 1 when part def has no mass property', () => {
+    const placed = makePlaced({ instanceId: 'p1', partId: 'light', x: 0, y: 0 });
+    const def = makeDef({ id: 'light', mass: undefined as unknown as number });
+    vi.mocked(getPartById).mockReturnValue(def);
+
+    const parts = new Map<string, PlacedPart>([['p1', placed]]);
+    const assembly: ReadonlyAssembly = { parts, connections: [] };
+    const fuelStore = new Map<string, number>();
+
+    const result = computeCoM(fuelStore, assembly, new Set(['p1']), 0, 0);
+    // mass defaults to 1 via `def.mass ?? 1`
+    expect(result.x).toBeCloseTo(0);
+    expect(result.y).toBeCloseTo(0);
+  });
+
+  it('skips instanceIds not found in assembly parts map', () => {
+    // partSet contains an ID that the assembly doesn't have
+    vi.mocked(getPartById).mockReturnValue(undefined);
+    const assembly: ReadonlyAssembly = { parts: new Map<string, PlacedPart>(), connections: [] };
+    const partSet = new Set(['nonexistent-id']);
+
+    const result = computeCoM(new Map<string, number>(), assembly, partSet, 7, 3);
+    expect(result.x).toBe(7);
+    expect(result.y).toBe(3);
+  });
+
+  it('offsets world position by SCALE_M_PER_PX for non-zero local coords', () => {
+    const placed = makePlaced({ instanceId: 'p1', partId: 'part1', x: 100, y: -50 });
+    const def = makeDef({ id: 'part1', mass: 10 });
+    vi.mocked(getPartById).mockReturnValue(def);
+
+    const parts = new Map<string, PlacedPart>([['p1', placed]]);
+    const assembly: ReadonlyAssembly = { parts, connections: [] };
+    const fuelStore = new Map<string, number>();
+
+    const result = computeCoM(fuelStore, assembly, new Set(['p1']), 0, 0);
+    expect(result.x).toBeCloseTo(100 * SCALE_M_PER_PX);
+    expect(result.y).toBeCloseTo(-50 * SCALE_M_PER_PX);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// worldToScreen — additional edge cases
+// ---------------------------------------------------------------------------
+
+describe('worldToScreen() edge cases', () => {
+  beforeEach(() => {
+    resetFlightRenderState();
+    vi.mocked(getPartById).mockReset();
+  });
+
+  it('handles negative world coordinates', () => {
+    const { sx, sy } = worldToScreen(-10, -10, 800, 600);
+    expect(sx).toBeLessThan(400);
+    expect(sy).toBeGreaterThan(300);
+  });
+
+  it('handles zero-dimension screen', () => {
+    const { sx, sy } = worldToScreen(0, 0, 0, 0);
+    expect(sx).toBe(0);
+    expect(sy).toBe(0);
+  });
+
+  it('returns exact pixel values for known inputs', () => {
+    setFlightRenderState({ camWorldX: 0, camWorldY: 0, zoomLevel: 1 });
+    const p = FLIGHT_PIXELS_PER_METRE;
+    const { sx, sy } = worldToScreen(5, 3, 1000, 800);
+    expect(sx).toBe(500 + 5 * p);
+    expect(sy).toBe(400 - 3 * p);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// hasCommandModule — additional edge cases
+// ---------------------------------------------------------------------------
+
+describe('hasCommandModule() edge cases', () => {
+  beforeEach(() => {
+    resetFlightRenderState();
+    vi.mocked(getPartById).mockReset();
+  });
+
+  it('returns false when instanceId is in partSet but not in assembly parts', () => {
+    vi.mocked(getPartById).mockReturnValue(undefined);
+    const assembly: ReadonlyAssembly = { parts: new Map<string, PlacedPart>(), connections: [] };
+    expect(hasCommandModule(new Set(['ghost-id']), assembly)).toBe(false);
+  });
+
+  it('finds command module among multiple parts', () => {
+    const tank = makePlaced({ instanceId: 'tank-1', partId: 'tank' });
+    const cmd = makePlaced({ instanceId: 'cmd-1', partId: 'pod' });
+    const tankDef = makeDef({ id: 'tank', type: PartType.FUEL_TANK });
+    const cmdDef = makeDef({ id: 'pod', type: PartType.COMMAND_MODULE });
+    vi.mocked(getPartById).mockImplementation((id: string) => {
+      if (id === 'tank') return tankDef;
+      if (id === 'pod') return cmdDef;
+      return undefined;
+    });
+
+    const parts = new Map<string, PlacedPart>([['tank-1', tank], ['cmd-1', cmd]]);
+    const assembly: ReadonlyAssembly = { parts, connections: [] };
+    expect(hasCommandModule(new Set(['tank-1', 'cmd-1']), assembly)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// updateCamera
+// ---------------------------------------------------------------------------
+
+describe('updateCamera()', () => {
+  beforeEach(() => {
+    resetFlightRenderState();
+    vi.mocked(getPartById).mockReset();
+  });
+
+  function makeMinimalPS(overrides: Partial<ReadonlyPhysicsState> = {}): ReadonlyPhysicsState {
+    return {
+      posX: 0,
+      posY: 0,
+      velX: 0,
+      velY: 0,
+      angle: 0,
+      throttle: 0,
+      activeParts: new Set<string>(),
+      fuelStore: new Map<string, number>(),
+      firingEngines: new Set<string>(),
+      deployedParts: new Set<string>(),
+      parachuteStates: new Map(),
+      legStates: new Map(),
+      heatMap: new Map(),
+      debris: [],
+      ejectedCrew: [],
+      grounded: true,
+      landed: false,
+      crashed: false,
+      angularVelocity: 0,
+      isTipping: false,
+      tippingContactX: 0,
+      tippingContactY: 0,
+      controlMode: 'NORMAL' as ReadonlyPhysicsState['controlMode'],
+      baseOrbit: null,
+      dockingOffsetAlongTrack: 0,
+      dockingOffsetRadial: 0,
+      rcsActiveDirections: new Set<string>(),
+      dockingPortStates: new Map(),
+      weatherIspModifier: 1,
+      hasLaunchClamps: false,
+      powerState: null,
+      ...overrides,
+    };
+  }
+
+  it('snaps camera to target on first call (camSnap = true)', () => {
+    const placed = makePlaced({ instanceId: 'cmd-1', partId: 'pod', x: 0, y: 0 });
+    const def = makeDef({ id: 'pod', type: PartType.COMMAND_MODULE, mass: 100 });
+    vi.mocked(getPartById).mockReturnValue(def);
+
+    const parts = new Map<string, PlacedPart>([['cmd-1', placed]]);
+    const assembly: ReadonlyAssembly = { parts, connections: [] };
+    const ps = makeMinimalPS({
+      posX: 50,
+      posY: 100,
+      activeParts: new Set(['cmd-1']),
+    });
+
+    const s = getFlightRenderState();
+    s.camSnap = true;
+
+    updateCamera(ps, assembly);
+
+    expect(s.camWorldX).toBeCloseTo(50);
+    expect(s.camWorldY).toBeCloseTo(100);
+    expect(s.camSnap).toBe(false);
+    expect(s.camOffsetX).toBe(0);
+    expect(s.camOffsetY).toBe(0);
+  });
+
+  it('falls back to rocket position when no command module anywhere', () => {
+    const placed = makePlaced({ instanceId: 'tank-1', partId: 'tank', x: 0, y: 0 });
+    const def = makeDef({ id: 'tank', type: PartType.FUEL_TANK, mass: 100 });
+    vi.mocked(getPartById).mockReturnValue(def);
+
+    const parts = new Map<string, PlacedPart>([['tank-1', placed]]);
+    const assembly: ReadonlyAssembly = { parts, connections: [] };
+    const ps = makeMinimalPS({
+      posX: 200,
+      posY: 300,
+      activeParts: new Set(['tank-1']),
+      debris: [],
+    });
+
+    const s = getFlightRenderState();
+    s.camSnap = true;
+
+    updateCamera(ps, assembly);
+
+    expect(s.camWorldX).toBeCloseTo(200);
+    expect(s.camWorldY).toBeCloseTo(300);
+  });
+
+  it('follows debris command module when main rocket lacks one', () => {
+    const tankPlaced = makePlaced({ instanceId: 'tank-1', partId: 'tank', x: 0, y: 0 });
+    const cmdPlaced = makePlaced({ instanceId: 'cmd-1', partId: 'pod', x: 0, y: 0 });
+    const tankDef = makeDef({ id: 'tank', type: PartType.FUEL_TANK, mass: 50 });
+    const cmdDef = makeDef({ id: 'pod', type: PartType.COMMAND_MODULE, mass: 100 });
+    vi.mocked(getPartById).mockImplementation((id: string) => {
+      if (id === 'tank') return tankDef;
+      if (id === 'pod') return cmdDef;
+      return undefined;
+    });
+
+    const parts = new Map<string, PlacedPart>([['tank-1', tankPlaced], ['cmd-1', cmdPlaced]]);
+    const assembly: ReadonlyAssembly = { parts, connections: [] };
+
+    const debrisItem: ReadonlyDebrisState = {
+      id: 'debris-1',
+      activeParts: new Set(['cmd-1']),
+      firingEngines: new Set<string>(),
+      fuelStore: new Map<string, number>(),
+      deployedParts: new Set<string>(),
+      parachuteStates: new Map(),
+      legStates: new Map(),
+      heatMap: new Map(),
+      posX: 777,
+      posY: 888,
+      velX: 0,
+      velY: 0,
+      angle: 0,
+      throttle: 0,
+      angularVelocity: 0,
+      isTipping: false,
+      tippingContactX: 0,
+      tippingContactY: 0,
+      landed: false,
+      crashed: false,
+    };
+
+    const ps = makeMinimalPS({
+      posX: 0,
+      posY: 0,
+      activeParts: new Set(['tank-1']), // no command module
+      debris: [debrisItem],
+    });
+
+    const s = getFlightRenderState();
+    s.camSnap = true;
+
+    updateCamera(ps, assembly);
+
+    expect(s.camWorldX).toBeCloseTo(777);
+    expect(s.camWorldY).toBeCloseTo(888);
+  });
+
+  it('detects CoM jump and accumulates camera offset', () => {
+    const placed = makePlaced({ instanceId: 'cmd-1', partId: 'pod', x: 0, y: 0 });
+    const def = makeDef({ id: 'pod', type: PartType.COMMAND_MODULE, mass: 100 });
+    vi.mocked(getPartById).mockReturnValue(def);
+
+    const parts = new Map<string, PlacedPart>([['cmd-1', placed]]);
+    const assembly: ReadonlyAssembly = { parts, connections: [] };
+    const ps = makeMinimalPS({
+      posX: 10,
+      posY: 20,
+      activeParts: new Set(['cmd-1']),
+    });
+
+    const s = getFlightRenderState();
+    s.camSnap = true;
+
+    // First call establishes prevTargetX/Y
+    updateCamera(ps, assembly);
+    expect(s.prevTargetX).toBeCloseTo(0); // relX = target - ref = 10 - 10 = 0
+    expect(s.prevTargetY).toBeCloseTo(0);
+
+    // Now add a second part offset to shift CoM
+    const placed2 = makePlaced({ instanceId: 'eng-1', partId: 'engine', x: 0, y: -100 });
+    const engDef = makeDef({ id: 'engine', type: PartType.ENGINE, mass: 50 });
+    vi.mocked(getPartById).mockImplementation((id: string) => {
+      if (id === 'pod') return def;
+      if (id === 'engine') return engDef;
+      return undefined;
+    });
+    parts.set('eng-1', placed2);
+
+    const ps2 = makeMinimalPS({
+      posX: 10,
+      posY: 20,
+      activeParts: new Set(['cmd-1', 'eng-1']),
+    });
+
+    // Second call should detect a CoM jump
+    s.camSnap = false;
+    s.lastCamTime = performance.now() - 16; // simulate ~16ms elapsed
+    updateCamera(ps2, assembly);
+
+    // prevTargetX/Y should be updated; offset may be non-zero if jump > 0.05
+    expect(s.prevTargetX).not.toBeNull();
+    expect(s.prevTargetY).not.toBeNull();
+  });
+
+  it('decays camera offset over time', () => {
+    const placed = makePlaced({ instanceId: 'cmd-1', partId: 'pod', x: 0, y: 0 });
+    const def = makeDef({ id: 'pod', type: PartType.COMMAND_MODULE, mass: 100 });
+    vi.mocked(getPartById).mockReturnValue(def);
+
+    const parts = new Map<string, PlacedPart>([['cmd-1', placed]]);
+    const assembly: ReadonlyAssembly = { parts, connections: [] };
+    const ps = makeMinimalPS({
+      posX: 0,
+      posY: 0,
+      activeParts: new Set(['cmd-1']),
+    });
+
+    const s = getFlightRenderState();
+    // Set up state as if we already had a previous frame
+    s.camSnap = false;
+    s.prevTargetX = 0;
+    s.prevTargetY = 0;
+    s.camOffsetX = 10;
+    s.camOffsetY = 0;
+    s.lastCamTime = performance.now() - 100; // 100ms ago
+
+    updateCamera(ps, assembly);
+
+    // Offset should have decayed toward zero
+    expect(Math.abs(s.camOffsetX)).toBeLessThan(10);
+  });
+
+  it('zeroes offset when decay exceeds distance', () => {
+    const placed = makePlaced({ instanceId: 'cmd-1', partId: 'pod', x: 0, y: 0 });
+    const def = makeDef({ id: 'pod', type: PartType.COMMAND_MODULE, mass: 100 });
+    vi.mocked(getPartById).mockReturnValue(def);
+
+    const parts = new Map<string, PlacedPart>([['cmd-1', placed]]);
+    const assembly: ReadonlyAssembly = { parts, connections: [] };
+    const ps = makeMinimalPS({
+      posX: 0,
+      posY: 0,
+      activeParts: new Set(['cmd-1']),
+    });
+
+    const s = getFlightRenderState();
+    s.camSnap = false;
+    s.prevTargetX = 0;
+    s.prevTargetY = 0;
+    s.camOffsetX = 0.001; // very small offset
+    s.camOffsetY = 0.001;
+    s.lastCamTime = performance.now() - 5000; // 5 seconds ago — large dt
+
+    updateCamera(ps, assembly);
+
+    // dist is tiny, decay is large → offsets snapped to zero
+    expect(s.camOffsetX).toBe(0);
+    expect(s.camOffsetY).toBe(0);
   });
 });

@@ -203,4 +203,131 @@ describe('trailDt', () => {
     const dt2 = trailDt();
     expect(dt2).toBeCloseTo(0.017);
   });
+
+  it('returns positive dt for small intervals', () => {
+    vi.mocked(performance.now).mockReturnValue(5000);
+    trailDt();
+
+    vi.mocked(performance.now).mockReturnValue(5001); // 1ms later
+    const dt = trailDt();
+    expect(dt).toBeCloseTo(0.001);
+    expect(dt).toBeGreaterThan(0);
+  });
+
+  it('returns 0 when no time has elapsed between calls', () => {
+    vi.mocked(performance.now).mockReturnValue(1000);
+    trailDt();
+
+    vi.mocked(performance.now).mockReturnValue(1000); // same time
+    const dt = trailDt();
+    expect(dt).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// updateTrails — additional coverage
+// ---------------------------------------------------------------------------
+
+describe('updateTrails edge cases', () => {
+  beforeEach(() => {
+    resetFlightRenderState();
+  });
+
+  it('handles many segments with mixed expiration', () => {
+    const s = getFlightRenderState();
+    // Push 50 segments: even indices expire fast, odd indices survive
+    for (let i = 0; i < 50; i++) {
+      s.trailSegments.push(
+        makeSegment({
+          worldX: i,
+          maxAge: i % 2 === 0 ? 0.01 : 10.0,
+        }),
+      );
+    }
+
+    updateTrails(0.05);
+
+    // Only odd-indexed segments survive (25 of them)
+    expect(s.trailSegments.length).toBe(25);
+    for (const seg of s.trailSegments) {
+      expect(seg.maxAge).toBe(10.0);
+    }
+  });
+
+  it('correctly applies velocity drift independently per segment', () => {
+    const s = getFlightRenderState();
+    s.trailSegments.push(makeSegment({ worldX: 0, worldY: 0, vx: 100, vy: 0 }));
+    s.trailSegments.push(makeSegment({ worldX: 0, worldY: 0, vx: 0, vy: -200 }));
+    s.trailSegments.push(makeSegment({ worldX: 0, worldY: 0, vx: -50, vy: 50 }));
+
+    updateTrails(0.02);
+
+    expect(s.trailSegments[0].worldX).toBeCloseTo(2.0);   // 100 * 0.02
+    expect(s.trailSegments[0].worldY).toBeCloseTo(0);
+    expect(s.trailSegments[1].worldX).toBeCloseTo(0);
+    expect(s.trailSegments[1].worldY).toBeCloseTo(-4.0);  // -200 * 0.02
+    expect(s.trailSegments[2].worldX).toBeCloseTo(-1.0);  // -50 * 0.02
+    expect(s.trailSegments[2].worldY).toBeCloseTo(1.0);   // 50 * 0.02
+  });
+
+  it('segment clearly past maxAge is expired', () => {
+    const s = getFlightRenderState();
+    // age starts at 0.08, dt=0.05, maxAge=0.10: final age=0.13 > 0.10
+    s.trailSegments.push(makeSegment({ age: 0.08, maxAge: 0.10 }));
+
+    updateTrails(0.05);
+
+    expect(s.trailSegments.length).toBe(0);
+  });
+
+  it('segment just under maxAge survives', () => {
+    const s = getFlightRenderState();
+    // age starts at 0.089, dt=0.01, maxAge=0.10: final age=0.099 which IS < 0.10
+    s.trailSegments.push(makeSegment({ age: 0.089, maxAge: 0.10 }));
+
+    updateTrails(0.01);
+
+    expect(s.trailSegments.length).toBe(1);
+  });
+
+  it('dt=0 does not age or move segments', () => {
+    const s = getFlightRenderState();
+    s.trailSegments.push(makeSegment({ age: 0.5, worldX: 100, worldY: 200, maxAge: 1.0 }));
+
+    updateTrails(0);
+
+    expect(s.trailSegments[0].age).toBeCloseTo(0.5);
+    expect(s.trailSegments[0].worldX).toBeCloseTo(100);
+    expect(s.trailSegments[0].worldY).toBeCloseTo(200);
+    expect(s.trailSegments.length).toBe(1);
+  });
+
+  it('compacts array in-place without leaving stale references', () => {
+    const s = getFlightRenderState();
+    s.trailSegments.push(makeSegment({ maxAge: 0.01 })); // will expire
+    s.trailSegments.push(makeSegment({ maxAge: 5.0 }));  // survives
+    s.trailSegments.push(makeSegment({ maxAge: 0.01 })); // will expire
+    s.trailSegments.push(makeSegment({ maxAge: 5.0 }));  // survives
+
+    updateTrails(0.05);
+
+    expect(s.trailSegments.length).toBe(2);
+    // Both survivors should have maxAge=5.0
+    expect(s.trailSegments[0].maxAge).toBe(5.0);
+    expect(s.trailSegments[1].maxAge).toBe(5.0);
+  });
+
+  it('smoke and non-smoke segments can coexist', () => {
+    const s = getFlightRenderState();
+    s.trailSegments.push(makeSegment({ isSmoke: true, maxAge: 2.0 }));
+    s.trailSegments.push(makeSegment({ isSmoke: false, maxAge: 2.0 }));
+    s.trailSegments.push(makeSegment({ isSmoke: true, isSRB: true, maxAge: 2.0 }));
+
+    updateTrails(0.03);
+
+    expect(s.trailSegments.length).toBe(3);
+    expect(s.trailSegments[0].isSmoke).toBe(true);
+    expect(s.trailSegments[1].isSmoke).toBe(false);
+    expect(s.trailSegments[2].isSRB).toBe(true);
+  });
 });

@@ -101,6 +101,14 @@ vi.mock('../core/orbit.ts', () => ({
 
 import { loop, MAX_CONSECUTIVE_LOOP_ERRORS } from '../ui/flightController/_loop.ts';
 import { getFCState, setFCState, resetFCState, setPhysicsState, setFlightState } from '../ui/flightController/_state.ts';
+import {
+  isWorkerReady,
+  hasWorkerError,
+  getWorkerErrorMessage,
+  consumeMainThreadSnapshot,
+} from '../ui/flightController/_workerBridge.ts';
+import { showPostFlightSummary } from '../ui/flightController/_postFlight.ts';
+import { applyTimeWarp } from '../ui/flightController/_timeWarp.ts';
 
 // ---------------------------------------------------------------------------
 // Minimal DOM stubs (the test environment is Node, not jsdom).
@@ -297,5 +305,275 @@ describe('Flight controller loop error handling', () => {
     loop(16.67);
 
     expect(requestAnimationFrame).not.toHaveBeenCalled();
+  });
+});
+
+describe('Flight controller loop — worker error detection', () => {
+  beforeEach(() => {
+    resetFCState();
+    setPhysicsState(null);
+    setFlightState(null);
+    mockEvaluateComms.mockReset();
+    mockEvaluateComms.mockReturnValue({ status: 'CONNECTED', linkType: 'DIRECT', canTransmit: true, controlLocked: false });
+    mockLoggerError.mockReset();
+    vi.stubGlobal('document', {
+      createElement: () => createMockElement(),
+      body: createMockElement(),
+    });
+    vi.stubGlobal('requestAnimationFrame', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('shows error banner when worker has error and no banner exists', () => {
+    seedFCState();
+    vi.mocked(hasWorkerError).mockReturnValue(true);
+    vi.mocked(getWorkerErrorMessage).mockReturnValue('Worker crashed');
+
+    loop(16.67);
+
+    const s = getFCState();
+    expect(s.loopErrorBanner).not.toBeNull();
+    expect(mockLoggerError).toHaveBeenCalled();
+  });
+
+  it('does not create duplicate banner when worker error persists', () => {
+    seedFCState();
+    vi.mocked(hasWorkerError).mockReturnValue(true);
+    vi.mocked(getWorkerErrorMessage).mockReturnValue('Worker crashed');
+
+    loop(16.67);
+    const firstBanner = getFCState().loopErrorBanner;
+
+    loop(33.34);
+    expect(getFCState().loopErrorBanner).toBe(firstBanner);
+  });
+});
+
+describe('Flight controller loop — guard early returns', () => {
+  beforeEach(() => {
+    resetFCState();
+    setPhysicsState(null);
+    setFlightState(null);
+    mockEvaluateComms.mockReset();
+    vi.stubGlobal('document', {
+      createElement: () => createMockElement(),
+      body: createMockElement(),
+    });
+    vi.stubGlobal('requestAnimationFrame', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('returns early when physics state is null', () => {
+    seedFCState();
+    setPhysicsState(null);
+
+    loop(16.67);
+
+    // evaluateComms should NOT have been called since the early return
+    // occurs before that code path
+    expect(mockEvaluateComms).not.toHaveBeenCalled();
+  });
+
+  it('returns early when assembly is null', () => {
+    seedFCState({ assembly: null });
+
+    loop(16.67);
+
+    expect(mockEvaluateComms).not.toHaveBeenCalled();
+  });
+
+  it('returns early when stagingConfig is null', () => {
+    seedFCState({ stagingConfig: null });
+
+    loop(16.67);
+
+    expect(mockEvaluateComms).not.toHaveBeenCalled();
+  });
+
+  it('returns early when flightState is null', () => {
+    seedFCState();
+    setFlightState(null);
+
+    loop(16.67);
+
+    expect(mockEvaluateComms).not.toHaveBeenCalled();
+  });
+});
+
+describe('Flight controller loop — comms control lockout', () => {
+  beforeEach(() => {
+    resetFCState();
+    setPhysicsState(null);
+    setFlightState(null);
+    mockEvaluateComms.mockReset();
+    mockLoggerError.mockReset();
+    vi.stubGlobal('document', {
+      createElement: () => createMockElement(),
+      body: createMockElement(),
+    });
+    vi.stubGlobal('requestAnimationFrame', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('sets throttle to 0 when comms reports controlLocked', () => {
+    seedFCState();
+    const ps = {
+      posX: 0, posY: 500000, velX: 7000, velY: 0,
+      throttle: 0.8, grounded: false, landed: false, crashed: false,
+      firingEngines: new Set<string>(), activeParts: new Set<string>(),
+    } as PhysicsState;
+    setPhysicsState(ps);
+
+    mockEvaluateComms.mockReturnValue({
+      status: 'NO_SIGNAL', linkType: 'NONE', canTransmit: false, controlLocked: true,
+    });
+
+    loop(16.67);
+
+    expect(ps.throttle).toBe(0);
+  });
+});
+
+describe('Flight controller loop — post-flight auto-trigger', () => {
+  beforeEach(() => {
+    resetFCState();
+    setPhysicsState(null);
+    setFlightState(null);
+    mockEvaluateComms.mockReset();
+    mockEvaluateComms.mockReturnValue({ status: 'CONNECTED', linkType: 'DIRECT', canTransmit: true, controlLocked: false });
+    mockLoggerError.mockReset();
+    vi.stubGlobal('document', {
+      createElement: () => createMockElement(),
+      body: createMockElement(),
+    });
+    vi.stubGlobal('requestAnimationFrame', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('triggers post-flight summary on crash', () => {
+    seedFCState({ summaryShown: false });
+    const ps = {
+      posX: 0, posY: 0, velX: 0, velY: 0,
+      throttle: 0, grounded: false, landed: false, crashed: true,
+      firingEngines: new Set<string>(), activeParts: new Set<string>(),
+    } as PhysicsState;
+    setPhysicsState(ps);
+
+    loop(16.67);
+
+    expect(getFCState().summaryShown).toBe(true);
+    expect(showPostFlightSummary).toHaveBeenCalled();
+  });
+
+  it('triggers post-flight summary on safe landing', () => {
+    seedFCState({ summaryShown: false });
+    const ps = {
+      posX: 0, posY: 0, velX: 0, velY: 0,
+      throttle: 0, grounded: true, landed: true, crashed: false,
+      firingEngines: new Set<string>(), activeParts: new Set<string>(),
+    } as PhysicsState;
+    setPhysicsState(ps);
+
+    loop(16.67);
+
+    expect(getFCState().summaryShown).toBe(true);
+    expect(showPostFlightSummary).toHaveBeenCalled();
+  });
+
+  it('does not re-trigger summary when already shown', () => {
+    seedFCState({ summaryShown: true });
+    const ps = {
+      posX: 0, posY: 0, velX: 0, velY: 0,
+      throttle: 0, grounded: true, landed: true, crashed: false,
+      firingEngines: new Set<string>(), activeParts: new Set<string>(),
+    } as PhysicsState;
+    setPhysicsState(ps);
+
+    loop(16.67);
+
+    expect(showPostFlightSummary).not.toHaveBeenCalled();
+  });
+});
+
+describe('Flight controller loop — map active warp override', () => {
+  beforeEach(() => {
+    resetFCState();
+    setPhysicsState(null);
+    setFlightState(null);
+    mockEvaluateComms.mockReset();
+    mockEvaluateComms.mockReturnValue({ status: 'CONNECTED', linkType: 'DIRECT', canTransmit: true, controlLocked: false });
+    mockLoggerError.mockReset();
+    vi.stubGlobal('document', {
+      createElement: () => createMockElement(),
+      body: createMockElement(),
+    });
+    vi.stubGlobal('requestAnimationFrame', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('forces warp to 1x when map is active in non-ORBIT non-TRANSFER non-CAPTURE phase', () => {
+    seedFCState({ mapActive: true, timeWarp: 4 });
+    setFlightState({ phase: 'FLIGHT', bodyId: 'EARTH', scienceModuleRunning: false } as FlightState);
+
+    loop(16.67);
+
+    expect(applyTimeWarp).toHaveBeenCalledWith(1);
+  });
+
+  it('does NOT force warp to 1x when map is active in ORBIT phase', () => {
+    seedFCState({ mapActive: true, timeWarp: 4 });
+    setFlightState({ phase: 'ORBIT', bodyId: 'EARTH', scienceModuleRunning: false } as FlightState);
+
+    loop(16.67);
+
+    expect(applyTimeWarp).not.toHaveBeenCalledWith(1);
+  });
+
+  it('does NOT force warp to 1x when map is active in TRANSFER phase', () => {
+    seedFCState({ mapActive: true, timeWarp: 4 });
+    setFlightState({ phase: 'TRANSFER', bodyId: 'EARTH', scienceModuleRunning: false } as FlightState);
+
+    loop(16.67);
+
+    expect(applyTimeWarp).not.toHaveBeenCalledWith(1);
+  });
+
+  it('does NOT force warp to 1x when map is active in CAPTURE phase', () => {
+    seedFCState({ mapActive: true, timeWarp: 4 });
+    setFlightState({ phase: 'CAPTURE', bodyId: 'EARTH', scienceModuleRunning: false } as FlightState);
+
+    loop(16.67);
+
+    expect(applyTimeWarp).not.toHaveBeenCalledWith(1);
+  });
+
+  it('does not force warp when already at 1x', () => {
+    seedFCState({ mapActive: true, timeWarp: 1 });
+    setFlightState({ phase: 'FLIGHT', bodyId: 'EARTH', scienceModuleRunning: false } as FlightState);
+
+    loop(16.67);
+
+    // applyTimeWarp should NOT be called since we're already at 1x
+    expect(applyTimeWarp).not.toHaveBeenCalled();
   });
 });
