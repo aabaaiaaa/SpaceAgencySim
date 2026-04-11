@@ -34,7 +34,7 @@ import {
   decompressSaveData,
 } from '../core/saveload.ts';
 import { crc32 } from '../core/crc32.ts';
-import { AstronautStatus, CrewStatus } from '../core/constants.ts';
+import { AstronautStatus } from '../core/constants.ts';
 
 import type { GameState, CrewMember, MissionInstance, RocketDesign, FlightResult } from '../core/gameState.ts';
 import type { SaveSlotSummary } from '../core/saveload.ts';
@@ -128,34 +128,32 @@ describe('Round-trip: save and load a complex state', () => {
 
     // Multiple crew members with varying statuses.
     state.crew = [
-      {
+      makeCrewMember({
         id: 'crew-1',
         name: 'Alice',
-        status: CrewStatus.IDLE,
+        status: AstronautStatus.ACTIVE,
         skills: { piloting: 75, engineering: 40, science: 60 },
         salary: 5000,
         hireDate: '2025-01-01T00:00:00.000Z',
-        injuryEnds: null,
-      },
-      {
+      }),
+      makeCrewMember({
         id: 'crew-2',
         name: 'Bob',
-        status: CrewStatus.ON_MISSION,
+        status: AstronautStatus.ACTIVE,
         skills: { piloting: 20, engineering: 90, science: 30 },
         salary: 6000,
         hireDate: '2025-03-15T00:00:00.000Z',
         injuryEnds: 5,
-      },
-      {
+      }),
+      makeCrewMember({
         id: 'crew-3',
         name: 'Carol',
         status: AstronautStatus.KIA,
         skills: { piloting: 55, engineering: 55, science: 55 },
         salary: 5500,
         hireDate: '2024-06-01T00:00:00.000Z',
-        injuryEnds: null,
-      },
-    ] as unknown as CrewMember[];
+      }),
+    ];
 
     // Several missions distributed across the three buckets.
     state.missions.available = [
@@ -238,7 +236,7 @@ describe('Round-trip: save and load a complex state', () => {
     expect(restored.crew).toHaveLength(3);
     expect(restored.crew[0].name).toBe('Alice');
     expect(restored.crew[0].skills.piloting).toBe(75);
-    expect(restored.crew[1].status).toBe(CrewStatus.ON_MISSION);
+    expect(restored.crew[1].status).toBe(AstronautStatus.ACTIVE);
     expect(restored.crew[1].injuryEnds).toBe(5);
     expect(restored.crew[2].status).toBe(AstronautStatus.KIA);
 
@@ -1108,7 +1106,7 @@ describe('_validateNestedStructures()', () => {
 
   // Helper: a valid crew entry.
   function validCrew(name = 'Alice'): Partial<CrewMember> {
-    return { id: 'crew-1', name, status: CrewStatus.IDLE as unknown as CrewMember['status'], skills: { piloting: 50, engineering: 50, science: 50 }, salary: 5000, hireDate: '2025-01-01' };
+    return { id: 'crew-1', name, status: AstronautStatus.ACTIVE, skills: { piloting: 50, engineering: 50, science: 50 }, salary: 5000, hireDate: '2025-01-01' };
   }
 
   // Helper: a valid orbital object entry.
@@ -1180,7 +1178,7 @@ describe('_validateNestedStructures()', () => {
     const state = freshState();
     state.crew = [
       validCrew('Alice'),
-      { id: 'c2', status: CrewStatus.IDLE, skills: { piloting: 10, engineering: 10, science: 10 } }, // missing name
+      { id: 'c2', status: AstronautStatus.ACTIVE, skills: { piloting: 10, engineering: 10, science: 10 } }, // missing name
       validCrew('Bob'),
     ] as unknown as CrewMember[];
 
@@ -1212,7 +1210,7 @@ describe('_validateNestedStructures()', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const state = freshState();
     state.crew = [
-      { id: 'c1', name: 'NoSkills', status: CrewStatus.IDLE, skills: null },
+      { id: 'c1', name: 'NoSkills', status: AstronautStatus.ACTIVE, skills: null },
       validCrew('Bob'),
     ] as unknown as CrewMember[];
 
@@ -1321,7 +1319,7 @@ describe('_validateNestedStructures()', () => {
     const state = freshState();
     state.crew = [
       validCrew('Alice'),
-      { id: 'bad', name: 123, status: CrewStatus.IDLE, skills: {} }, // name is not a string
+      { id: 'bad', name: 123, status: AstronautStatus.ACTIVE, skills: {} }, // name is not a string
     ] as unknown as CrewMember[];
 
     _validateState(state);

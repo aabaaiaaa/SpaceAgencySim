@@ -244,7 +244,9 @@ interface LocalSaveEnvelope {
     flightHistory: unknown[];
     playTimeSeconds: number;
     currentFlight: null;
+    [key: string]: unknown;
   };
+  [key: string]: unknown;
 }
 
 /**
@@ -458,7 +460,7 @@ test.describe('Mission Progression', () => {
       parts: STARTER_PARTS,
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    await seedAndLoadSave(page, env as unknown as Record<string, unknown>);
+    await seedAndLoadSave(page, env);
 
     await startTestFlight(page, ['cmd-mk1', 'tank-small', 'engine-spark']);
     await stage(page);
@@ -480,7 +482,7 @@ test.describe('Mission Progression', () => {
       parts: [...STARTER_PARTS, 'tank-medium'],
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    await seedAndLoadSave(page, env as unknown as Record<string, unknown>);
+    await seedAndLoadSave(page, env);
 
     await startTestFlight(page, ['cmd-mk1', 'tank-medium', 'engine-spark']);
     await stage(page);
@@ -505,7 +507,7 @@ test.describe('Mission Progression', () => {
       parts: STARTER_PARTS,
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    await seedAndLoadSave(page, env as unknown as Record<string, unknown>);
+    await seedAndLoadSave(page, env);
 
     // Use probe-core for a lighter rocket. Without landing legs, the physics
     // engine requires ≤5 m/s for a LANDING event. Terminal velocity with mk1
@@ -558,7 +560,7 @@ test.describe('Mission Progression', () => {
       parts: STARTER_PARTS,
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    await seedAndLoadSave(page, env as unknown as Record<string, unknown>);
+    await seedAndLoadSave(page, env);
 
     // Use probe-core for lighter rocket: wet 720kg, dry 320kg — both under
     // parachute-mk1 maxSafeMass 1200kg. Terminal velocity ≈ 4.7 m/s < 5 m/s.
@@ -605,7 +607,7 @@ test.describe('Mission Progression', () => {
       parts: [...STARTER_PARTS, 'landing-legs-small'],
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    await seedAndLoadSave(page, env as unknown as Record<string, unknown>);
+    await seedAndLoadSave(page, env);
 
     // Use probe-core for lighter rocket. With 2 deployed legs AND speed < 10
     // the physics uses Case 1 (controlled landing). Terminal velocity at dry
@@ -654,7 +656,7 @@ test.describe('Mission Progression', () => {
       parts: [...STARTER_PARTS, 'science-module-mk1', 'tank-medium'],
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    await seedAndLoadSave(page, env as unknown as Record<string, unknown>);
+    await seedAndLoadSave(page, env);
 
     // Build: cmd-mk1 + science-module-mk1 + tank-medium + engine-spark
     await startTestFlight(page, ['cmd-mk1', 'science-module-mk1', 'tank-medium', 'engine-spark'], {
@@ -685,7 +687,7 @@ test.describe('Mission Progression', () => {
       parts: [...STARTER_PARTS, 'probe-core-mk1', 'cmd-mk1'],
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    await seedAndLoadSave(page, env as unknown as Record<string, unknown>);
+    await seedAndLoadSave(page, env);
 
     // Uncrewed test: probe-core + cmd-mk1 (for ejector seat) + tank + engine
     await startTestFlight(page, ['cmd-mk1', 'probe-core-mk1', 'tank-small', 'engine-spark'], {
@@ -725,7 +727,7 @@ test.describe('Mission Progression', () => {
       parts: [...STARTER_PARTS, 'science-module-mk1', 'tank-medium', 'parachute-mk2'],
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    await seedAndLoadSave(page, env as unknown as Record<string, unknown>);
+    await seedAndLoadSave(page, env);
 
     // probe-core (50) + parachute-mk2 (250) + science-module (200) + tank-small (50+400)
     // + engine-spark (120) = 1070kg wet.  Terminal velocity under mk2 chute
@@ -828,7 +830,7 @@ test.describe('Mission Progression', () => {
       parts: [...STARTER_PARTS, 'probe-core-mk1', 'cmd-mk1'],
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    await seedAndLoadSave(page, env as unknown as Record<string, unknown>);
+    await seedAndLoadSave(page, env);
 
     // Uncrewed test: probe-core + cmd-mk1 (for ejector seat) + tank + engine
     await startTestFlight(page, ['cmd-mk1', 'probe-core-mk1', 'tank-small', 'engine-spark'], {
@@ -871,7 +873,7 @@ test.describe('Mission Progression', () => {
       parts: [...STARTER_PARTS, 'tank-medium'],
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    await seedAndLoadSave(page, env as unknown as Record<string, unknown>);
+    await seedAndLoadSave(page, env);
 
     // Two-stage rocket: use a simple probe + tank + engine and teleport
     // to 2km, then stage the decoupler to complete the ACTIVATE_PART objective.
@@ -921,7 +923,7 @@ test.describe('Mission Progression', () => {
       parts: [...STARTER_PARTS, 'tank-medium'],
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    await seedAndLoadSave(page, env as unknown as Record<string, unknown>);
+    await seedAndLoadSave(page, env);
 
     await startTestFlight(page, [
       'probe-core-mk1', 'tank-medium', 'engine-spark',
@@ -954,7 +956,7 @@ test.describe('Mission Progression', () => {
       parts: [...STARTER_PARTS, 'tank-medium', 'engine-reliant'],
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    await seedAndLoadSave(page, env as unknown as Record<string, unknown>);
+    await seedAndLoadSave(page, env);
 
     await startTestFlight(page, [
       'probe-core-mk1', 'tank-medium', 'engine-reliant',
@@ -991,7 +993,7 @@ test.describe('Mission Progression', () => {
       ],
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    await seedAndLoadSave(page, env as unknown as Record<string, unknown>);
+    await seedAndLoadSave(page, env);
 
     // Use startTestFlight to skip the slow VAB build.
     // Staging: stage-0 = reliant, stage-1 = decoupler + nerv, stage-2 = decoupler (satellite release).
@@ -1050,7 +1052,7 @@ test.describe('Mission Progression', () => {
       parts: [...STARTER_PARTS, 'tank-medium', 'engine-reliant', 'engine-nerv'],
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    await seedAndLoadSave(page, env as unknown as Record<string, unknown>);
+    await seedAndLoadSave(page, env);
 
     await startTestFlight(page, [
       'probe-core-mk1', 'tank-medium', 'tank-medium', 'engine-nerv',
@@ -1099,7 +1101,7 @@ test.describe('Mission Progression', () => {
       ],
     });
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    await seedAndLoadSave(page, env as unknown as Record<string, unknown>);
+    await seedAndLoadSave(page, env);
 
     // Use startTestFlight to skip the slow VAB build.
     await startTestFlight(page, [

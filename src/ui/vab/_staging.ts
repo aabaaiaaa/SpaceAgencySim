@@ -13,7 +13,8 @@ import {
   validateStagingConfig,
   moveStage,
 } from '../../core/rocketbuilder.ts';
-import { airDensity, SEA_LEVEL_DENSITY } from '../../core/atmosphere.ts';
+import { airDensity } from '../../core/atmosphere.ts';
+import { computeStageDeltaV } from '../../core/stagingCalc.ts';
 import { getVabState } from './_state.ts';
 import { snapshotStaging, recordStagingChange } from './_undoActions.ts';
 
@@ -64,73 +65,6 @@ export function syncAndRenderStaging(): void {
 }
 
 /**
- * Compute the delta-v for a given stage index in the VAB.
- */
-function computeVabStageDeltaV(stageIdx: number): { dv: number; twr?: number; engines: boolean } {
-  const S = getVabState();
-  if (!S.assembly || !S.stagingConfig) return { dv: 0, engines: false };
-  const stage = S.stagingConfig.stages[stageIdx];
-  if (!stage) return { dv: 0, engines: false };
-
-  const G0 = 9.81;
-
-  const density = airDensity(S.dvAltitude);
-  const atmFrac = Math.min(1, density / SEA_LEVEL_DENSITY);
-
-  const jettisoned = new Set<string>();
-  for (let s = 0; s < stageIdx; s++) {
-    for (const id of S.stagingConfig.stages[s].instanceIds) {
-      jettisoned.add(id);
-    }
-  }
-
-  let totalMass = 0;
-  let totalFuel = 0;
-  for (const [instanceId, placed] of S.assembly.parts) {
-    if (jettisoned.has(instanceId)) continue;
-    const def = getPartById(placed.partId);
-    if (!def) continue;
-    const fuelMass = (def.properties?.fuelMass as number) ?? 0;
-    totalMass += (def.mass ?? 0) + fuelMass;
-    if (fuelMass > 0) totalFuel += fuelMass;
-  }
-
-  let thrustTotal    = 0;
-  let ispTimesThrust = 0;
-  let hasEngines     = false;
-  for (const instanceId of stage.instanceIds) {
-    if (jettisoned.has(instanceId)) continue;
-    const placed = S.assembly.parts.get(instanceId);
-    const def    = placed ? getPartById(placed.partId) : null;
-    if (!def) continue;
-    const thrustKN = (def.properties?.thrust as number) ?? 0;
-    if (thrustKN > 0) {
-      hasEngines = true;
-      const thrustN = thrustKN * 1000;
-      const ispSL  = (def.properties?.isp as number)    ?? 300;
-      const ispVac = (def.properties?.ispVac as number) ?? ispSL;
-      const isp = ispSL * atmFrac + ispVac * (1 - atmFrac);
-      thrustTotal    += thrustN;
-      ispTimesThrust += isp * thrustN;
-    }
-  }
-
-  const twr = totalMass > 0 && thrustTotal > 0
-    ? thrustTotal / (totalMass * G0)
-    : 0;
-
-  if (totalFuel <= 0 || thrustTotal <= 0 || totalMass <= 0) {
-    return { dv: 0, twr, engines: hasEngines };
-  }
-
-  const avgIsp = ispTimesThrust / thrustTotal;
-  const dryMass = totalMass - totalFuel;
-  if (dryMass <= 0) return { dv: 0, twr, engines: hasEngines };
-
-  return { dv: avgIsp * G0 * Math.log(totalMass / dryMass), twr, engines: true };
-}
-
-/**
  * Update only the delta-v values and altitude label in the staging panel.
  */
 function updateStagingDvValues(body: HTMLElement): void {
@@ -141,7 +75,7 @@ function updateStagingDvValues(body: HTMLElement): void {
   let totalDv = 0;
   const stageDvs: Array<{ dv: number; twr?: number; engines: boolean }> = [];
   for (let i = 0; i < numStages; i++) {
-    const result = computeVabStageDeltaV(i);
+    const result = computeStageDeltaV(i, S.assembly!, S.stagingConfig!, S.dvAltitude);
     stageDvs.push(result);
     totalDv += result.dv;
   }
@@ -200,7 +134,7 @@ export function renderStagingPanel(): void {
   let totalDv = 0;
   const stageDvs: Array<{ dv: number; twr?: number; engines: boolean }> = [];
   for (let i = 0; i < numStages; i++) {
-    const result = computeVabStageDeltaV(i);
+    const result = computeStageDeltaV(i, S.assembly!, S.stagingConfig!, S.dvAltitude);
     stageDvs.push(result);
     totalDv += result.dv;
   }

@@ -501,10 +501,10 @@ test.describe('Crew Admin — hire and fire', () => {
         if (!gs) return { success: false, error: 'No game state' };
         const cost = 50_000;
         gs.money -= cost;
-        const newCrew: Record<string, unknown> = {
+        const newCrew: typeof gs.crew[number] = {
           id: 'crew-hired-test',
           name: 'New Hire',
-          status: 'active',
+          status: 'active' as const,
           salary: 5000,
           hireDate: new Date().toISOString(),
           skills: { piloting: 0, engineering: 0, science: 0 },
@@ -517,10 +517,10 @@ test.describe('Crew Admin — hire and fire', () => {
           trainingSkill: null,
           trainingEnds: null,
         };
-        gs.crew.push(newCrew as unknown as typeof gs.crew[number]);
+        gs.crew.push(newCrew);
         return { success: true, cost };
       }
-      return (hireCrew as unknown as (gs: typeof w.__gameState, name: string) => HireFireResult)(w.__gameState!, 'New Hire');
+      return hireCrew(w.__gameState!, 'New Hire');
     });
 
     expect(result.success).toBe(true);
@@ -755,13 +755,14 @@ test.describe('Crew Admin — tier 3 features', () => {
       const max = 30;
       const randSkill = (): number => min + Math.floor(Math.random() * (max - min + 1));
 
-      const newCrew: Record<string, unknown> = {
+      const skills = { piloting: randSkill(), engineering: randSkill(), science: randSkill() };
+      const newCrew: typeof gs.crew[number] = {
         id: 'crew-exp-test',
         name: 'Experienced Recruit',
-        status: 'active',
+        status: 'active' as const,
         salary: 5000,
         hireDate: new Date().toISOString(),
-        skills: { piloting: randSkill(), engineering: randSkill(), science: randSkill() },
+        skills,
         missionsFlown: 0,
         flightsFlown: 0,
         deathDate: null,
@@ -771,8 +772,8 @@ test.describe('Crew Admin — tier 3 features', () => {
         trainingSkill: null,
         trainingEnds: null,
       };
-      gs.crew.push(newCrew as unknown as typeof gs.crew[number]);
-      return { success: true, cost, skills: newCrew.skills as ExpHireResult['skills'] };
+      gs.crew.push(newCrew);
+      return { success: true, cost, skills };
     });
 
     expect(result.success).toBe(true);
@@ -971,19 +972,19 @@ test.describe('Library — statistics dashboard', () => {
       const w = window;
       const gs = w.__gameState;
       if (!gs) return { totalFlights: 0, successfulFlights: 0, failedFlights: 0, totalRevenue: 0, satellitesDeployed: 0, activeCrew: 0 };
-      const history = (gs.flightHistory as unknown as Record<string, unknown>[] | undefined) ?? [];
+      const history = gs.flightHistory ?? [];
       let success = 0, failure = 0, revenue = 0;
       for (const f of history) {
         if (f.outcome === 'SUCCESS') success++;
         else if (f.outcome === 'FAILURE') failure++;
-        revenue += (f.revenue as number | undefined) ?? 0;
+        revenue += f.revenue ?? 0;
       }
       return {
         totalFlights: history.length,
         successfulFlights: success,
         failedFlights: failure,
         totalRevenue: revenue,
-        satellitesDeployed: (((gs.satelliteNetwork as unknown as Record<string, unknown> | undefined)?.satellites ?? []) as unknown[]).length,
+        satellitesDeployed: (gs.satelliteNetwork?.satellites ?? []).length,
         activeCrew: (gs.crew as CrewSnapshot[]).filter(c => c.status !== 'kia' && c.status !== 'DEAD').length,
       };
     });
@@ -1001,13 +1002,13 @@ test.describe('Library — statistics dashboard', () => {
       const gs = w.__gameState;
       if (!gs) return [];
       const bodies = new Set<string>(['EARTH']);
-      for (const flight of (gs.flightHistory as unknown as Record<string, unknown>[] | undefined) ?? []) {
-        for (const bodyId of (flight.bodiesVisited as string[] | undefined) ?? []) {
+      for (const flight of gs.flightHistory ?? []) {
+        for (const bodyId of flight.bodiesVisited ?? []) {
           bodies.add(bodyId);
         }
       }
-      for (const sat of ((gs.satelliteNetwork as unknown as Record<string, unknown> | undefined)?.satellites as Record<string, unknown>[] | undefined) ?? []) {
-        if (sat.bodyId) bodies.add(sat.bodyId as string);
+      for (const sat of gs.satelliteNetwork?.satellites ?? []) {
+        if (sat.bodyId) bodies.add(sat.bodyId);
       }
       return [...bodies];
     });
@@ -1021,22 +1022,22 @@ test.describe('Library — statistics dashboard', () => {
       const w = window;
       const gs = w.__gameState;
       if (!gs) return [];
-      const history = (gs.flightHistory as unknown as Record<string, unknown>[] | undefined) ?? [];
+      const history = gs.flightHistory ?? [];
       const counts = new Map<string, TopRocketEntry>();
 
       for (const f of history) {
         if (!f.rocketId) continue;
-        const rocketId = f.rocketId as string;
+        const rocketId = f.rocketId;
         const entry = counts.get(rocketId) ?? {
           rocketId,
-          rocketName: (f.rocketName as string | undefined) ?? rocketId,
+          rocketName: f.rocketName ?? rocketId,
           flightCount: 0,
           successCount: 0,
           totalRevenue: 0,
         };
         entry.flightCount++;
         if (f.outcome === 'SUCCESS') entry.successCount++;
-        entry.totalRevenue += (f.revenue as number | undefined) ?? 0;
+        entry.totalRevenue += f.revenue ?? 0;
         counts.set(rocketId, entry);
       }
 
@@ -1058,12 +1059,12 @@ test.describe('Library — statistics dashboard', () => {
       const w = window;
       const gs = w.__gameState;
       if (!gs) return { maxAltitude: 0, maxSpeed: 0 };
-      const history = (gs.flightHistory as unknown as Record<string, unknown>[] | undefined) ?? [];
+      const history = gs.flightHistory ?? [];
 
       let maxAlt = 0, maxSpd = 0;
       for (const f of history) {
-        if (((f.maxAltitude as number | undefined) ?? 0) > maxAlt) maxAlt = f.maxAltitude as number;
-        if (((f.maxSpeed as number | undefined) ?? 0) > maxSpd) maxSpd = f.maxSpeed as number;
+        if ((f.maxAltitude ?? 0) > maxAlt) maxAlt = f.maxAltitude ?? 0;
+        if ((f.maxSpeed ?? 0) > maxSpd) maxSpd = f.maxSpeed ?? 0;
       }
 
       return { maxAltitude: maxAlt, maxSpeed: maxSpd };
@@ -1190,18 +1191,17 @@ test.describe('Tutorial missions — facility awards on accept', () => {
       const w = window;
       const gs = w.__gameState;
       if (!gs) return { success: false, awardedFacility: null, error: 'No game state' };
-      const missions = gs.missions as unknown as { available: Record<string, unknown>[]; accepted: Record<string, unknown>[] };
-      const mission = missions.available.find(m => (m as { id: string }).id === 'mission-018') as Record<string, unknown> | undefined;
+      const mission = gs.missions.available.find(m => m.id === 'mission-018');
       if (!mission) return { success: false, awardedFacility: null, error: 'Mission not found' };
 
       // Move from available to accepted
-      missions.available = missions.available.filter(m => (m as { id: string }).id !== 'mission-018');
-      mission.status = 'accepted';
-      missions.accepted.push(mission);
+      gs.missions.available = gs.missions.available.filter(m => m.id !== 'mission-018');
+      Object.assign(mission, { status: 'accepted' });
+      gs.missions.accepted.push(mission);
 
       // Award facility if specified
       if (mission.awardsFacilityOnAccept) {
-        const facilityId = mission.awardsFacilityOnAccept as string;
+        const facilityId = mission.awardsFacilityOnAccept;
         if (!gs.facilities[facilityId]) {
           gs.facilities[facilityId] = { built: true, tier: 1 };
           return { success: true, awardedFacility: facilityId };
@@ -1263,15 +1263,14 @@ test.describe('Tutorial missions — facility awards on accept', () => {
       const w = window;
       const gs = w.__gameState;
       if (!gs) return { success: false, awardedFacility: null };
-      const missions = gs.missions as unknown as { available: Record<string, unknown>[]; accepted: Record<string, unknown>[] };
-      const mission = missions.available.find(m => (m as { id: string }).id === 'mission-019') as Record<string, unknown> | undefined;
+      const mission = gs.missions.available.find(m => m.id === 'mission-019');
       if (!mission) return { success: false, awardedFacility: null };
-      missions.available = missions.available.filter(m => (m as { id: string }).id !== 'mission-019');
-      mission.status = 'accepted';
-      missions.accepted.push(mission);
-      if (mission.awardsFacilityOnAccept && !gs.facilities[mission.awardsFacilityOnAccept as string]) {
-        gs.facilities[mission.awardsFacilityOnAccept as string] = { built: true, tier: 1 };
-        return { success: true, awardedFacility: mission.awardsFacilityOnAccept as string };
+      gs.missions.available = gs.missions.available.filter(m => m.id !== 'mission-019');
+      Object.assign(mission, { status: 'accepted' });
+      gs.missions.accepted.push(mission);
+      if (mission.awardsFacilityOnAccept && !gs.facilities[mission.awardsFacilityOnAccept]) {
+        gs.facilities[mission.awardsFacilityOnAccept] = { built: true, tier: 1 };
+        return { success: true, awardedFacility: mission.awardsFacilityOnAccept };
       }
       return { success: true, awardedFacility: null };
     });
@@ -1323,15 +1322,14 @@ test.describe('Tutorial missions — facility awards on accept', () => {
       const w = window;
       const gs = w.__gameState;
       if (!gs) return { success: false, awardedFacility: null };
-      const missions = gs.missions as unknown as { available: Record<string, unknown>[]; accepted: Record<string, unknown>[] };
-      const mission = missions.available.find(m => (m as { id: string }).id === 'mission-020') as Record<string, unknown> | undefined;
+      const mission = gs.missions.available.find(m => m.id === 'mission-020');
       if (!mission) return { success: false, awardedFacility: null };
-      missions.available = missions.available.filter(m => (m as { id: string }).id !== 'mission-020');
-      mission.status = 'accepted';
-      missions.accepted.push(mission);
-      if (mission.awardsFacilityOnAccept && !gs.facilities[mission.awardsFacilityOnAccept as string]) {
-        gs.facilities[mission.awardsFacilityOnAccept as string] = { built: true, tier: 1 };
-        return { success: true, awardedFacility: mission.awardsFacilityOnAccept as string };
+      gs.missions.available = gs.missions.available.filter(m => m.id !== 'mission-020');
+      Object.assign(mission, { status: 'accepted' });
+      gs.missions.accepted.push(mission);
+      if (mission.awardsFacilityOnAccept && !gs.facilities[mission.awardsFacilityOnAccept]) {
+        gs.facilities[mission.awardsFacilityOnAccept] = { built: true, tier: 1 };
+        return { success: true, awardedFacility: mission.awardsFacilityOnAccept };
       }
       return { success: true, awardedFacility: null };
     });
@@ -1388,15 +1386,14 @@ test.describe('Tutorial missions — facility awards on accept', () => {
       const w = window;
       const gs = w.__gameState;
       if (!gs) return { success: false, awardedFacility: null };
-      const missions = gs.missions as unknown as { available: Record<string, unknown>[]; accepted: Record<string, unknown>[] };
-      const mission = missions.available.find(m => (m as { id: string }).id === 'mission-022') as Record<string, unknown> | undefined;
+      const mission = gs.missions.available.find(m => m.id === 'mission-022');
       if (!mission) return { success: false, awardedFacility: null };
-      missions.available = missions.available.filter(m => (m as { id: string }).id !== 'mission-022');
-      mission.status = 'accepted';
-      missions.accepted.push(mission);
-      if (mission.awardsFacilityOnAccept && !gs.facilities[mission.awardsFacilityOnAccept as string]) {
-        gs.facilities[mission.awardsFacilityOnAccept as string] = { built: true, tier: 1 };
-        return { success: true, awardedFacility: mission.awardsFacilityOnAccept as string };
+      gs.missions.available = gs.missions.available.filter(m => m.id !== 'mission-022');
+      Object.assign(mission, { status: 'accepted' });
+      gs.missions.accepted.push(mission);
+      if (mission.awardsFacilityOnAccept && !gs.facilities[mission.awardsFacilityOnAccept]) {
+        gs.facilities[mission.awardsFacilityOnAccept] = { built: true, tier: 1 };
+        return { success: true, awardedFacility: mission.awardsFacilityOnAccept };
       }
       return { success: true, awardedFacility: null };
     });
@@ -1484,12 +1481,12 @@ test.describe('Tutorial mission descriptions contain narrative and construction 
       const w = window;
       const gs = w.__gameState;
       if (!gs) return [];
-      return ((gs.missions as unknown as { available: Record<string, unknown>[] }).available)
-        .filter(m => (m as { awardsFacilityOnAccept?: string }).awardsFacilityOnAccept)
+      return gs.missions.available
+        .filter(m => m.awardsFacilityOnAccept)
         .map(m => ({
-          id: (m as { id: string }).id,
-          description: (m as { description: string }).description,
-          facility: (m as { awardsFacilityOnAccept: string }).awardsFacilityOnAccept,
+          id: m.id,
+          description: m.description,
+          facility: m.awardsFacilityOnAccept!,
         }));
     });
 
@@ -1504,12 +1501,12 @@ test.describe('Tutorial mission descriptions contain narrative and construction 
       const w = window;
       const gs = w.__gameState;
       if (!gs) return [];
-      return ((gs.missions as unknown as { available: Record<string, unknown>[] }).available)
-        .filter(m => (m as { awardsFacilityOnAccept?: string }).awardsFacilityOnAccept)
+      return gs.missions.available
+        .filter(m => m.awardsFacilityOnAccept)
         .map(m => ({
-          id: (m as { id: string }).id,
-          title: (m as { title: string }).title,
-          description: (m as { description: string }).description,
+          id: m.id,
+          title: m.title,
+          description: m.description,
         }));
     });
 

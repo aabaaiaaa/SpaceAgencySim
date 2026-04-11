@@ -47,11 +47,9 @@ const EXPECTED_BELT_ZONES: ExpectedBeltZone[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Browser-context type aliases (used with type assertions inside page.evaluate)
-//
-// These describe the runtime shapes of globals injected by the game.
-// We use local aliases + casts rather than `declare global` to avoid
-// conflicts with the narrower Window augmentations in the helper modules.
+// Browser-context type aliases (used as callback parameter annotations
+// inside page.evaluate).  The window.d.ts augmentation makes game globals
+// available on `window` directly — no cast needed.
 // ---------------------------------------------------------------------------
 
 interface AltitudeBand {
@@ -63,46 +61,6 @@ interface AltitudeBand {
   unsafe?: boolean;
 }
 
-interface CelestialBody {
-  orbitalDistance?: number;
-  altitudeBands: AltitudeBand[];
-}
-
-interface E2eFlightPs {
-  posX: number;
-  posY: number;
-  velX: number;
-  velY: number;
-  grounded: boolean;
-  landed: boolean;
-  crashed: boolean;
-  throttle: number;
-  firingEngines: Set<string>;
-  activeParts: Map<string, unknown>;
-  capturedBody: { mass: number; radius: number; offset: { x: number; y: number }; name: string } | null;
-  thrustAligned: boolean;
-  angularVelocity: number;
-}
-
-interface E2eFlightState {
-  bodyId: string;
-  phase: string;
-  inOrbit: boolean;
-  orbitalElements: unknown;
-  altitude: number;
-  velocity: number;
-  horizontalVelocity: number;
-  transferState?: Record<string, unknown>;
-  phaseLog?: unknown[];
-  events: { type: string }[];
-  timeElapsed?: number;
-  stagingConfig?: { stages: unknown[] };
-}
-
-interface E2eFlightAssembly {
-  parts: Map<string, { partId: string }>;
-}
-
 interface OrbitalObject {
   id: string;
   type: string;
@@ -112,28 +70,6 @@ interface OrbitalObject {
   radius?: number;
   mass?: number;
 }
-
-interface E2eGameState {
-  orbitalObjects: OrbitalObject[];
-  [key: string]: unknown;
-}
-
-/** Window shape used in page.evaluate callbacks. */
-interface E2eWindow {
-  __celestialBodies?: Record<string, CelestialBody>;
-  __flightPs?: E2eFlightPs;
-  __flightState?: E2eFlightState;
-  __flightAssembly?: E2eFlightAssembly;
-  __gameState?: E2eGameState;
-  location: Location;
-}
-
-/**
- * Shorthand for casting window to our extended shape inside page.evaluate.
- * Unlike a module-level function, this is inlined at each call site so it
- * survives Playwright's serialisation into the browser context.
- */
-type _W = E2eWindow;
 
 // ---------------------------------------------------------------------------
 // Shared result interfaces for page.evaluate() return types
@@ -449,7 +385,7 @@ test.describe('Asteroid Belt — zone definitions', () => {
 
   test('@smoke belt zones are defined on the Sun body with correct boundaries', async () => {
     const beltInfo = await page.evaluate<BeltBandInfo[] | null>(() => {
-      const sun = (window as unknown as _W).__celestialBodies?.SUN;
+      const sun = window.__celestialBodies?.SUN;
       if (!sun) return null;
       const beltBands = sun.altitudeBands.filter((b: AltitudeBand) => b.beltZone);
       return beltBands.map((b: AltitudeBand) => ({
@@ -478,7 +414,7 @@ test.describe('Asteroid Belt — zone definitions', () => {
 
   test('belt zones are contiguous (Outer A max === Dense min, Dense max === Outer B min)', async () => {
     const beltInfo = await page.evaluate<BeltBandMinimal[] | null>(() => {
-      const sun = (window as unknown as _W).__celestialBodies?.SUN;
+      const sun = window.__celestialBodies?.SUN;
       if (!sun) return null;
       const beltBands = sun.altitudeBands
         .filter((b: AltitudeBand) => b.beltZone)
@@ -501,7 +437,7 @@ test.describe('Asteroid Belt — zone definitions', () => {
 
   test('dense belt zone is marked unsafe, outer zones are not', async () => {
     const unsafeStatus = await page.evaluate<UnsafeStatus[] | null>(() => {
-      const sun = (window as unknown as _W).__celestialBodies?.SUN;
+      const sun = window.__celestialBodies?.SUN;
       if (!sun) return null;
       const beltBands = sun.altitudeBands.filter((b: AltitudeBand) => b.beltZone);
       return beltBands.map((b: AltitudeBand) => ({ zone: b.beltZone!, unsafe: b.unsafe || false }));
@@ -520,7 +456,7 @@ test.describe('Asteroid Belt — zone definitions', () => {
 
   test('Sun has exactly 7 altitude bands (4 solar + 3 belt)', async () => {
     const bandCount = await page.evaluate<number>(() => {
-      const sun = (window as unknown as _W).__celestialBodies?.SUN;
+      const sun = window.__celestialBodies?.SUN;
       return sun ? sun.altitudeBands.length : -1;
     });
 
@@ -529,7 +465,7 @@ test.describe('Asteroid Belt — zone definitions', () => {
 
   test('belt zones sit beyond Mars orbital distance', async () => {
     const result = await page.evaluate<MarsAndBeltResult | null>(() => {
-      const bodies = (window as unknown as _W).__celestialBodies;
+      const bodies = window.__celestialBodies;
       if (!bodies) return null;
       const mars = bodies.MARS;
       const sun = bodies.SUN;
@@ -566,7 +502,7 @@ test.describe('Asteroid Belt — solar system map visibility', () => {
 
   test('Sun body definition includes belt data accessible from map', async () => {
     const hasBeltData = await page.evaluate<boolean>(() => {
-      const sun = (window as unknown as _W).__celestialBodies?.SUN;
+      const sun = window.__celestialBodies?.SUN;
       if (!sun) return false;
       const beltBands = sun.altitudeBands.filter((b: AltitudeBand) => b.beltZone);
       return beltBands.length === 3;
@@ -577,7 +513,7 @@ test.describe('Asteroid Belt — solar system map visibility', () => {
 
   test('belt zone distance ranges are physically sensible (in metres, AU scale)', async () => {
     const ranges = await page.evaluate<BeltRangeInfo[] | null>(() => {
-      const sun = (window as unknown as _W).__celestialBodies?.SUN;
+      const sun = window.__celestialBodies?.SUN;
       if (!sun) return null;
       const AU = 149_597_870_700;
       const beltBands = sun.altitudeBands.filter((b: AltitudeBand) => b.beltZone);
@@ -618,7 +554,7 @@ test.describe('Asteroid Belt — orbit detection and asteroid counts', () => {
     await startTestFlight(page, PROBE, { bodyId: 'EARTH' });
 
     const counts = await page.evaluate<ZoneCountInfo[] | null>(() => {
-      const sun = (window as unknown as _W).__celestialBodies?.SUN;
+      const sun = window.__celestialBodies?.SUN;
       if (!sun) return null;
       const beltBands = sun.altitudeBands.filter((b: AltitudeBand) => b.beltZone);
       return beltBands.map((b: AltitudeBand) => ({
@@ -661,7 +597,7 @@ test.describe('Asteroid Belt — unsafe orbit hub-return rules', () => {
 
   test('dense belt zone unsafe flag blocks hub return logic', async () => {
     const result = await page.evaluate<DenseBandResult | null>(() => {
-      const sun = (window as unknown as _W).__celestialBodies?.SUN;
+      const sun = window.__celestialBodies?.SUN;
       if (!sun) return null;
       const denseBand = sun.altitudeBands.find((b: AltitudeBand) => b.beltZone === 'DENSE');
       if (!denseBand) return null;
@@ -682,7 +618,7 @@ test.describe('Asteroid Belt — unsafe orbit hub-return rules', () => {
 
   test('outer belt zones allow hub return (no unsafe flag)', async () => {
     const outerBands = await page.evaluate<OuterBandInfo[] | null>(() => {
-      const sun = (window as unknown as _W).__celestialBodies?.SUN;
+      const sun = window.__celestialBodies?.SUN;
       if (!sun) return null;
       return sun.altitudeBands
         .filter((b: AltitudeBand) => b.beltZone && b.beltZone !== 'DENSE')
@@ -698,7 +634,7 @@ test.describe('Asteroid Belt — unsafe orbit hub-return rules', () => {
 
   test('non-belt altitude bands on Sun have no unsafe flag', async () => {
     const nonBeltBands = await page.evaluate<NonBeltBandInfo[] | null>(() => {
-      const sun = (window as unknown as _W).__celestialBodies?.SUN;
+      const sun = window.__celestialBodies?.SUN;
       if (!sun) return null;
       return sun.altitudeBands
         .filter((b: AltitudeBand) => !b.beltZone)
@@ -721,7 +657,7 @@ test.describe('Asteroid Belt — unsafe orbit hub-return rules', () => {
     });
 
     const orbitCheck = await page.evaluate<OrbitCheckResult | null>(() => {
-      const w = (window as unknown as _W);
+      const w = window;
       const fs = w.__flightState;
       const ps = w.__flightPs;
       const sun = w.__celestialBodies?.SUN;
@@ -755,7 +691,7 @@ test.describe('Asteroid Belt — unsafe orbit hub-return rules', () => {
     });
 
     const orbitCheck = await page.evaluate<OuterOrbitCheckResult | null>(() => {
-      const w = (window as unknown as _W);
+      const w = window;
       const fs = w.__flightState;
       const ps = w.__flightPs;
       const sun = w.__celestialBodies?.SUN;
@@ -801,7 +737,7 @@ test.describe('Asteroid Belt — asteroid selection and targeting', () => {
 
   test('belt zone configuration supports asteroid generation with correct zone counts', async () => {
     const zoneInfo = await page.evaluate<ZoneInfo[] | null>(() => {
-      const sun = (window as unknown as _W).__celestialBodies?.SUN;
+      const sun = window.__celestialBodies?.SUN;
       if (!sun) return null;
       const beltBands = sun.altitudeBands.filter((b: AltitudeBand) => b.beltZone);
       return beltBands.map((b: AltitudeBand) => ({
@@ -1030,7 +966,7 @@ test.describe('Asteroid Belt — collision damage at speed', () => {
       try {
         // @ts-expect-error Vite dynamic import — browser only
         const collision: ViteModule = await import('/src/core/collision.ts');
-        const w = (window as unknown as _W);
+        const w = window;
         const ps = w.__flightPs;
         const fs = w.__flightState;
         const assembly = w.__flightAssembly;
@@ -1084,7 +1020,7 @@ test.describe('Asteroid Belt — collision damage at speed', () => {
       try {
         // @ts-expect-error Vite dynamic import — browser only
         const collision: ViteModule = await import('/src/core/collision.ts');
-        const w = (window as unknown as _W);
+        const w = window;
         const ps = w.__flightPs;
         const fs = w.__flightState;
         const assembly = w.__flightAssembly;
@@ -1149,7 +1085,7 @@ test.describe('Asteroid Belt — transfer trajectory safety', () => {
     });
 
     const state = await page.evaluate<TransferPhaseState | null>(async () => {
-      const w = (window as unknown as _W);
+      const w = window;
       const fs = w.__flightState;
       const ps = w.__flightPs;
       if (!fs || !ps) return null;
@@ -1188,7 +1124,7 @@ test.describe('Asteroid Belt — transfer trajectory safety', () => {
     });
 
     const renderCondition = await page.evaluate<RenderCondition | null>(() => {
-      const fs = (window as unknown as _W).__flightState;
+      const fs = window.__flightState;
       if (!fs) return null;
       return {
         phase: fs.phase,
@@ -1298,7 +1234,7 @@ test.describe('Asteroid Belt — asteroid capture with grabbing arm', () => {
         // @ts-expect-error Vite dynamic import — browser only
         const constants: ViteModule = await import('/src/core/constants.ts');
 
-        const w = (window as unknown as _W);
+        const w = window;
         const ps = w.__flightPs;
         const assembly = w.__flightAssembly;
         if (!ps || !assembly) return null;
@@ -1362,7 +1298,7 @@ test.describe('Asteroid Belt — asteroid capture with grabbing arm', () => {
         // @ts-expect-error Vite dynamic import — browser only
         const constants: ViteModule = await import('/src/core/constants.ts');
 
-        const w = (window as unknown as _W);
+        const w = window;
         const ps = w.__flightPs;
         const assembly = w.__flightAssembly;
         if (!ps || !assembly) return null;
@@ -1404,7 +1340,7 @@ test.describe('Asteroid Belt — asteroid capture with grabbing arm', () => {
         // @ts-expect-error Vite dynamic import — browser only
         const constants: ViteModule = await import('/src/core/constants.ts');
 
-        const w = (window as unknown as _W);
+        const w = window;
         const ps = w.__flightPs;
         const assembly = w.__flightAssembly;
         if (!ps || !assembly) return null;
@@ -1466,7 +1402,7 @@ test.describe('Asteroid Belt — thrust alignment after capture', () => {
         // @ts-expect-error Vite dynamic import — browser only
         const constants: ViteModule = await import('/src/core/constants.ts');
 
-        const w = (window as unknown as _W);
+        const w = window;
         const ps = w.__flightPs;
         const assembly = w.__flightAssembly;
         if (!ps || !assembly) return null;
@@ -1513,7 +1449,7 @@ test.describe('Asteroid Belt — thrust alignment after capture', () => {
         // @ts-expect-error Vite dynamic import — browser only
         const constants: ViteModule = await import('/src/core/constants.ts');
 
-        const w = (window as unknown as _W); const ps = w.__flightPs; const assembly = w.__flightAssembly;
+        const w = window; const ps = w.__flightPs; const assembly = w.__flightAssembly;
         if (!ps || !assembly) return null;
 
         const asteroids = beltMod.generateBeltAsteroids(constants.BeltZone.DENSE, ps.posX, ps.posY, 50_000);
@@ -1551,7 +1487,7 @@ test.describe('Asteroid Belt — thrust alignment after capture', () => {
         // @ts-expect-error Vite dynamic import — browser only
         const constants: ViteModule = await import('/src/core/constants.ts');
 
-        const w = (window as unknown as _W); const ps = w.__flightPs; const assembly = w.__flightAssembly;
+        const w = window; const ps = w.__flightPs; const assembly = w.__flightAssembly;
         if (!ps || !assembly) return null;
 
         const asteroids = beltMod.generateBeltAsteroids(constants.BeltZone.DENSE, ps.posX, ps.posY, 50_000);
@@ -1590,7 +1526,7 @@ test.describe('Asteroid Belt — thrust alignment after capture', () => {
       try {
         // @ts-expect-error Vite dynamic import — browser only
         const grabbing: ViteModule = await import('/src/core/grabbing.ts');
-        const ps = (window as unknown as _W).__flightPs;
+        const ps = window.__flightPs;
         if (!ps) return null;
         const grabState = grabbing.createGrabState();
         return grabbing.alignThrustWithAsteroid(grabState, ps);
@@ -1636,7 +1572,7 @@ test.describe('Asteroid Belt — captured asteroid persistence', () => {
         // @ts-expect-error Vite dynamic import — browser only
         const constants: ViteModule = await import('/src/core/constants.ts');
 
-        const w = (window as unknown as _W);
+        const w = window;
         const ps = w.__flightPs; const fs = w.__flightState; const assembly = w.__flightAssembly; const state = w.__gameState;
         if (!ps || !fs || !assembly || !state) return null;
 
@@ -1698,7 +1634,7 @@ test.describe('Asteroid Belt — captured asteroid persistence', () => {
         // @ts-expect-error Vite dynamic import — browser only
         const constants: ViteModule = await import('/src/core/constants.ts');
 
-        const w = (window as unknown as _W);
+        const w = window;
         const ps = w.__flightPs; const fs = w.__flightState; const assembly = w.__flightAssembly; const state = w.__gameState;
         if (!ps || !fs || !assembly || !state) return null;
 
@@ -1761,7 +1697,7 @@ test.describe('Asteroid Belt — asteroid rename', () => {
         // @ts-expect-error Vite dynamic import — browser only
         const constants: ViteModule = await import('/src/core/constants.ts');
 
-        const w = (window as unknown as _W);
+        const w = window;
         const ps = w.__flightPs; const fs = w.__flightState; const assembly = w.__flightAssembly; const state = w.__gameState;
         if (!ps || !fs || !assembly || !state) return null;
 
@@ -1829,7 +1765,7 @@ test.describe('Asteroid Belt — grabbing arm tier mass limits', () => {
         // @ts-expect-error Vite dynamic import — browser only
         const constants: ViteModule = await import('/src/core/constants.ts');
 
-        const w = (window as unknown as _W); const ps = w.__flightPs; const assembly = w.__flightAssembly;
+        const w = window; const ps = w.__flightPs; const assembly = w.__flightAssembly;
         if (!ps || !assembly) return null;
 
         const asteroids = beltMod.generateBeltAsteroids(constants.BeltZone.DENSE, ps.posX, ps.posY, 50_000);
@@ -1860,7 +1796,7 @@ test.describe('Asteroid Belt — grabbing arm tier mass limits', () => {
         // @ts-expect-error Vite dynamic import — browser only
         const constants: ViteModule = await import('/src/core/constants.ts');
 
-        const w = (window as unknown as _W); const ps = w.__flightPs; const assembly = w.__flightAssembly;
+        const w = window; const ps = w.__flightPs; const assembly = w.__flightAssembly;
         if (!ps || !assembly) return null;
 
         const asteroids = beltMod.generateBeltAsteroids(constants.BeltZone.DENSE, ps.posX, ps.posY, 50_000);
@@ -1890,7 +1826,7 @@ test.describe('Asteroid Belt — grabbing arm tier mass limits', () => {
         // @ts-expect-error Vite dynamic import — browser only
         const constants: ViteModule = await import('/src/core/constants.ts');
 
-        const w = (window as unknown as _W); const ps = w.__flightPs; const assembly = w.__flightAssembly;
+        const w = window; const ps = w.__flightPs; const assembly = w.__flightAssembly;
         if (!ps || !assembly) return null;
 
         const asteroids = beltMod.generateBeltAsteroids(constants.BeltZone.DENSE, ps.posX, ps.posY, 50_000);
@@ -1921,7 +1857,7 @@ test.describe('Asteroid Belt — grabbing arm tier mass limits', () => {
         // @ts-expect-error Vite dynamic import — browser only
         const constants: ViteModule = await import('/src/core/constants.ts');
 
-        const w = (window as unknown as _W); const ps = w.__flightPs; const assembly = w.__flightAssembly;
+        const w = window; const ps = w.__flightPs; const assembly = w.__flightAssembly;
         if (!ps || !assembly) return null;
 
         const asteroids = beltMod.generateBeltAsteroids(constants.BeltZone.DENSE, ps.posX, ps.posY, 50_000);
@@ -1993,7 +1929,7 @@ test.describe('Asteroid Belt — heavy arm range, collision cooldown, alignment 
         // @ts-expect-error Vite dynamic import — browser only
         const constants: ViteModule = await import('/src/core/constants.ts');
 
-        const w = (window as unknown as _W); const ps = w.__flightPs; const assembly = w.__flightAssembly;
+        const w = window; const ps = w.__flightPs; const assembly = w.__flightAssembly;
         if (!ps || !assembly) return null;
 
         const asteroids = beltMod.generateBeltAsteroids(constants.BeltZone.DENSE, ps.posX, ps.posY, 50_000);
@@ -2027,7 +1963,7 @@ test.describe('Asteroid Belt — heavy arm range, collision cooldown, alignment 
         // @ts-expect-error Vite dynamic import — browser only
         const constants: ViteModule = await import('/src/core/constants.ts');
 
-        const w = (window as unknown as _W); const ps = w.__flightPs; const assembly = w.__flightAssembly;
+        const w = window; const ps = w.__flightPs; const assembly = w.__flightAssembly;
         if (!ps || !assembly) return null;
 
         const asteroids = beltMod.generateBeltAsteroids(constants.BeltZone.DENSE, ps.posX, ps.posY, 50_000);
@@ -2058,7 +1994,7 @@ test.describe('Asteroid Belt — heavy arm range, collision cooldown, alignment 
       try {
         // @ts-expect-error Vite dynamic import — browser only
         const collision: ViteModule = await import('/src/core/collision.ts');
-        const w = (window as unknown as _W);
+        const w = window;
         const ps = w.__flightPs; const fs = w.__flightState; const assembly = w.__flightAssembly;
         if (!ps || !fs || !assembly) return null;
 
@@ -2126,7 +2062,7 @@ test.describe('Asteroid Belt — heavy arm range, collision cooldown, alignment 
         // @ts-expect-error Vite dynamic import — browser only
         const partsData: ViteModule = await import('/src/data/parts.ts');
 
-        const w = (window as unknown as _W);
+        const w = window;
         const ps = w.__flightPs; const fs = w.__flightState; const assembly = w.__flightAssembly;
         if (!ps || !fs || !assembly) return null;
 
@@ -2152,7 +2088,7 @@ test.describe('Asteroid Belt — heavy arm range, collision cooldown, alignment 
         }
 
         const dt = 1 / 60;
-        const stagingConfig = fs.stagingConfig || { stages: [] };
+        const stagingConfig = { stages: [] as unknown[] };
         for (let i = 0; i < 10; i++) {
           physics.tick(ps, assembly, stagingConfig, fs, dt, 1);
         }
@@ -2217,7 +2153,7 @@ test.describe('Asteroid Belt — heavy arm range, collision cooldown, alignment 
       try {
         // @ts-expect-error Vite dynamic import — browser only
         const missions: ViteModule = await import('/src/core/missions.ts');
-        const state = (window as unknown as _W).__gameState;
+        const state = window.__gameState;
         if (!state) return null;
         const unlocked: string[] = missions.getUnlockedParts(state);
         return {
@@ -2264,7 +2200,7 @@ test.describe('Asteroid Belt — heavy arm range, collision cooldown, alignment 
       try {
         // @ts-expect-error Vite dynamic import — browser only
         const missions: ViteModule = await import('/src/core/missions.ts');
-        const state = (window as unknown as _W).__gameState;
+        const state = window.__gameState;
         if (!state) return null;
         const unlocked: string[] = missions.getUnlockedParts(state);
         return {

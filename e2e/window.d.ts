@@ -93,7 +93,10 @@ declare global {
     // -- Spec-only properties (referenced in evaluate callbacks but not in source) --
     __partCatalog?: Array<{ id: string; properties?: Record<string, unknown>; [key: string]: unknown }>;
     __constants?: Record<string, unknown>;
-    __crewAPI?: Record<string, unknown>;
+    __crewAPI?: {
+      hireCrew?: (gs: _GameState, name: string) => { success: boolean; cost?: number; id?: string; error?: string };
+      [key: string]: unknown;
+    };
     __consoleErrors?: string[];
   }
 }

@@ -5,13 +5,13 @@ See `.devloop/requirements.md` for full context and rationale behind each task.
 ---
 
 ### TASK-001: Fix saveload.test.ts CrewStatus mock data
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Replace incorrect `CrewStatus.IDLE` and `CrewStatus.ON_MISSION` values with correct `AstronautStatus.ACTIVE` (or appropriate `AstronautStatus` values) in crew mock data at lines 134, 143, 241, 1111, 1183, 1215, 1324 of `src/tests/saveload.test.ts`. Import `AstronautStatus` from `gameState.ts` if not already imported. Where possible, use the `makeCrewMember()` factory. See requirements section 1.
 - **Verification**: `npx vitest run src/tests/saveload.test.ts` — all tests pass. Grep for `CrewStatus.IDLE` and `CrewStatus.ON_MISSION` in `src/tests/saveload.test.ts` — zero matches in crew `status` fields.
 
 ### TASK-002: Extract computeVabStageDeltaV to core/stagingCalc.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Create `src/core/stagingCalc.ts` with the `computeStageDeltaV()` function extracted from `src/ui/vab/_staging.ts` (lines 69-131). The function should accept explicit parameters (`stageIndex`, `assembly`, `stagingConfig`, `dvAltitude`) instead of reading global VAB state. Export the result type as `StageDeltaVResult`. Update `_staging.ts` to import and call the new function, passing state from `getVabState()`. Remove the old private function. See requirements section 2.
 - **Verification**: `npm run typecheck` — no errors. `npx vitest run src/tests/ui-vabStaging.test.ts` — existing integration tests still pass.
@@ -23,7 +23,7 @@ See `.devloop/requirements.md` for full context and rationale behind each task.
 - **Verification**: `npx vitest run src/tests/stagingCalc.test.ts` — all tests pass with zero `as unknown as` casts in the file.
 
 ### TASK-004: Audit cast types and extend _factories.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Scan all 23 unit test files with `as unknown as` casts. For each cast, identify the target type. For any type with 3+ occurrences across files that doesn't already have a factory in `src/tests/_factories.ts`, add a new factory function following the existing pattern (real types, `Partial<T>` overrides, sensible defaults, no `any`). Likely candidates: Worker/MessagePort mocks, pool object shapes. Document in a code comment at the top of the file which types each factory covers. See requirements section 3.
 - **Verification**: `npm run typecheck` — no errors. New factories compile cleanly and return properly typed objects.
@@ -77,13 +77,13 @@ See `.devloop/requirements.md` for full context and rationale behind each task.
 - **Verification**: `npx vitest run src/tests/ui-escapeHtml.test.ts src/tests/loopErrorHandling.test.ts src/tests/mccTiers.test.ts src/tests/contracts.test.ts src/tests/render-input.test.ts src/tests/render-flight-pool.test.ts src/tests/render-camera.test.ts src/tests/perfMonitor.test.ts src/tests/challenges.test.ts` — all tests pass. Combined cast count across 9 files should be 0.
 
 ### TASK-013: E2E migration — asteroid-belt.spec.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Migrate the 38 `as unknown as` casts in `e2e/asteroid-belt.spec.ts` to use the `gw()` helper from `e2e/helpers/_gameWindow.ts`. Replace all `(window as unknown as GW).prop` or `(window as unknown as { ... }).prop` patterns with `gw().prop` inside `page.evaluate()` callbacks. Remove the local `GW` interface if it becomes unused. If any globals are missing from `e2e/window.d.ts`, add them. See requirements section 5.
 - **Verification**: `npx playwright test e2e/asteroid-belt.spec.ts` — all tests pass. `grep -c "as unknown as" e2e/asteroid-belt.spec.ts` returns 0.
 
 ### TASK-014: E2E migration — mission-progression and facilities-infrastructure specs
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Migrate casts in `e2e/mission-progression.spec.ts` (15 casts) and `e2e/facilities-infrastructure.spec.ts` (15 casts) to use `gw()`. Same pattern as TASK-013. See requirements section 5.
 - **Verification**: `npx playwright test e2e/mission-progression.spec.ts e2e/facilities-infrastructure.spec.ts` — all tests pass. Combined cast count across both files is 0.

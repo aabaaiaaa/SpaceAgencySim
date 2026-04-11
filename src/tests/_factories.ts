@@ -7,6 +7,31 @@
  * Usage:
  *   import { makePhysicsState, makeGameState } from './_factories.ts';
  *   const ps = makePhysicsState({ posX: 100, velY: -50 });
+ *
+ * ---------------------------------------------------------------------------
+ * Factory index — which types each factory covers:
+ * ---------------------------------------------------------------------------
+ *   makePhysicsState()      → PhysicsState          (from physics.ts)
+ *   makeGameState()         → GameState             (from gameState.ts)
+ *   makeMissionInstance()   → MissionInstance        (from gameState.ts)
+ *   makeFlightState()       → FlightState           (from gameState.ts)
+ *   makeGraphics()          → MockGraphicsShape      (PixiJS Graphics mock)
+ *   makeRecoveryPS()        → RecoveryPSShape        (malfunction recovery subset)
+ *   makeCrewMember()        → CrewMember             (from gameState.ts)
+ *   makeMockElement()       → MockElementShape       (HTMLElement mock)
+ *   makeDebrisState()       → DebrisState            (from staging.ts)
+ *   makePartDef()           → PartDef                (from data/parts.ts)
+ *   makeOrbitalElements()   → OrbitalElements        (from gameState.ts)
+ *   makeObjectiveDef()      → ObjectiveDef           (from gameState.ts)
+ *   makeRocketDesign()      → RocketDesign           (from gameState.ts)
+ *   makeRocketAssembly()    → RocketAssembly         (from physics.ts)
+ *   makeMockContainer()     → MockContainerShape     (PixiJS Container mock)
+ *   makeMalfunctionPS()     → MalfunctionPSShape     (PhysicsState + malfunction fields)
+ *   makeOrbitalObject()     → OrbitalObject           (from gameState.ts)
+ *   makeSepDebris()         → SepDebrisShape          (DebrisLike param for applySeparationImpulse)
+ *   makeFlightResult()      → FlightResult            (from gameState.ts)
+ *   makeStagingConfig()     → StagingConfig           (from rocketbuilder.ts)
+ * ---------------------------------------------------------------------------
  */
 
 import type {
@@ -14,13 +39,25 @@ import type {
   GameState,
   CrewMember,
   MissionInstance,
+  OrbitalElements,
+  OrbitalObject,
+  ObjectiveDef,
+  RocketDesign,
+  FlightResult,
 } from '../core/gameState.ts';
 
-import type { PhysicsState } from '../core/physics.ts';
+import type { PhysicsState, RocketAssembly } from '../core/physics.ts';
+
+import type { DebrisState } from '../core/staging.ts';
+
+import type { PartDef } from '../data/parts.ts';
+
+import type { StagingConfig } from '../core/rocketbuilder.ts';
 
 import {
   AstronautStatus,
   ControlMode,
+  FlightOutcome,
   FlightPhase,
   GameMode,
   MalfunctionMode,
@@ -415,4 +452,339 @@ export function makeMockElement(overrides: Partial<MockElementShape> = {}): Mock
     ...overrides,
   };
   return el;
+}
+
+// ---------------------------------------------------------------------------
+// DebrisState factory (15 casts in tests — collision.test.ts)
+// Also usable for SepDebrisParam / DebrisLike (6 casts)
+// ---------------------------------------------------------------------------
+
+/**
+ * Create a DebrisState (stage-separated fragment) with sensible defaults.
+ * DebrisState is a superset of the DebrisLike shape used by
+ * `applySeparationImpulse`, so this factory satisfies both types.
+ */
+export function makeDebrisState(overrides: Partial<DebrisState> = {}): DebrisState {
+  return {
+    id: 'debris-test-1',
+    activeParts: new Set<string>(),
+    firingEngines: new Set<string>(),
+    fuelStore: new Map<string, number>(),
+    deployedParts: new Set<string>(),
+    parachuteStates: new Map(),
+    legStates: new Map(),
+    heatMap: new Map<string, number>(),
+    posX: 0,
+    posY: 0,
+    velX: 0,
+    velY: 0,
+    angle: 0,
+    throttle: 1.0,
+    angularVelocity: 0,
+    isTipping: false,
+    tippingContactX: 0,
+    tippingContactY: 0,
+    landed: false,
+    crashed: false,
+    collisionCooldown: 0,
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// PartDef factory (7 casts in tests — fuelsystem.test.ts)
+// ---------------------------------------------------------------------------
+
+/**
+ * Create a PartDef (part catalog entry) with sensible defaults.
+ * Defaults to a generic command-module-style part.
+ */
+export function makePartDef(overrides: Partial<PartDef> = {}): PartDef {
+  return {
+    id: 'test-part-1',
+    name: 'Test Part',
+    description: 'A test part.',
+    type: 'COMMAND_MODULE',
+    mass: 50,
+    cost: 1000,
+    width: 40,
+    height: 40,
+    snapPoints: [],
+    animationStates: [],
+    activatable: false,
+    activationBehaviour: 'NONE',
+    properties: {},
+    reliability: 1.0,
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// OrbitalElements factory (4 casts in tests — ui-mapView.test.ts)
+// ---------------------------------------------------------------------------
+
+/**
+ * Create OrbitalElements for a near-circular LEO orbit by default.
+ */
+export function makeOrbitalElements(overrides: Partial<OrbitalElements> = {}): OrbitalElements {
+  return {
+    semiMajorAxis: 6_771_000,
+    eccentricity: 0,
+    argPeriapsis: 0,
+    meanAnomalyAtEpoch: 0,
+    epoch: 0,
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// ObjectiveDef factory (4 casts in tests — contracts.test.ts, mccTiers.test.ts)
+// ---------------------------------------------------------------------------
+
+/**
+ * Create an ObjectiveDef (mission objective) with sensible defaults.
+ */
+export function makeObjectiveDef(overrides: Partial<ObjectiveDef> = {}): ObjectiveDef {
+  return {
+    id: 'obj-test-1',
+    type: 'REACH_ALTITUDE',
+    target: { altitude: 100_000 },
+    completed: false,
+    description: 'Reach the target altitude.',
+    optional: false,
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// RocketDesign factory (4 casts in tests — saveload.test.ts)
+// ---------------------------------------------------------------------------
+
+/**
+ * Create a RocketDesign (saved rocket blueprint) with sensible defaults.
+ */
+export function makeRocketDesign(overrides: Partial<RocketDesign> = {}): RocketDesign {
+  return {
+    id: 'design-test-1',
+    name: 'Test Rocket',
+    parts: [],
+    staging: { stages: [[]], unstaged: [] },
+    totalMass: 100,
+    totalThrust: 50,
+    createdDate: new Date().toISOString(),
+    updatedDate: new Date().toISOString(),
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// RocketAssembly factory (5 casts in tests — controlMode.test.ts,
+// workerBridgeTimeout.test.ts)
+// ---------------------------------------------------------------------------
+
+/**
+ * Create a RocketAssembly with empty part maps and connections.
+ * For tests that need actual parts, use `createRocketAssembly()` +
+ * `addPartToAssembly()` from rocketbuilder.ts instead.
+ */
+export function makeRocketAssembly(overrides: Partial<RocketAssembly> = {}): RocketAssembly {
+  return {
+    parts: new Map(),
+    connections: [],
+    _nextId: 1,
+    symmetryPairs: [],
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Mock PixiJS Container (11 casts across render-ground, render-sky, pool,
+// render-flight-pool tests)
+// ---------------------------------------------------------------------------
+
+/** Minimal shape matching the PixiJS Container API surface used in tests. */
+export interface MockContainerShape {
+  children: Array<MockGraphicsShape | MockContainerShape>;
+  addChild: (...items: Array<MockGraphicsShape | MockContainerShape>) => void;
+  removeChild: (child: MockGraphicsShape | MockContainerShape) => MockGraphicsShape | MockContainerShape;
+  removeChildAt: (index: number) => MockGraphicsShape | MockContainerShape;
+  removeChildren: () => void;
+  visible: boolean;
+  alpha: number;
+  position: { set: (...args: number[]) => void };
+  scale: { set: (...args: number[]) => void };
+  label: string;
+}
+
+/**
+ * Create a mock PixiJS Container object.
+ * Pass as `makeMockContainer() as unknown as Container` where the PixiJS type is needed.
+ */
+export function makeMockContainer(overrides: Partial<MockContainerShape> = {}): MockContainerShape {
+  const container: MockContainerShape = {
+    children: [],
+    addChild: (...items) => {
+      for (const item of items) container.children.push(item);
+    },
+    removeChild: (child) => {
+      const idx = container.children.indexOf(child);
+      if (idx >= 0) container.children.splice(idx, 1);
+      return child;
+    },
+    removeChildAt: (index) => {
+      return container.children.splice(index, 1)[0];
+    },
+    removeChildren: () => {
+      container.children.length = 0;
+    },
+    visible: true,
+    alpha: 1,
+    position: { set: () => {} },
+    scale: { set: () => {} },
+    label: '',
+    ...overrides,
+  };
+  return container;
+}
+
+// ---------------------------------------------------------------------------
+// MalfunctionPS factory (3 casts in tests — branchCoverage.test.ts)
+// PhysicsState extended with malfunction-specific optional fields.
+// ---------------------------------------------------------------------------
+
+/**
+ * Shape for a physics state augmented with malfunction tracking fields.
+ * Extends the core PhysicsState fields that `checkMalfunctions()` and
+ * `attemptRecovery()` read/write. The extra `malfunctionChecked` field
+ * is part of the internal `PhysicsStateWithMalfunctions` type in
+ * malfunction.ts (not exported, so we mirror it here).
+ */
+export interface MalfunctionPSShape extends PhysicsState {
+  malfunctionChecked?: Set<string>;
+  _lastBiomeForMalfunction?: string | null;
+}
+
+/**
+ * Create a PhysicsState augmented with malfunction-tracking fields.
+ * Use this when testing `checkMalfunctions()`, `attemptRecovery()`, etc.
+ */
+export function makeMalfunctionPS(overrides: Partial<MalfunctionPSShape> = {}): MalfunctionPSShape {
+  return {
+    ...makePhysicsState(),
+    malfunctions: new Map(),
+    malfunctionChecked: new Set<string>(),
+    _lastBiomeForMalfunction: null,
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// OrbitalObject factory (4 casts in tests — saveload.test.ts, ui-mapView.test.ts)
+// Used when constructing GameState['orbitalObjects'] arrays.
+// ---------------------------------------------------------------------------
+
+/**
+ * Create an OrbitalObject (satellite, debris, asteroid in orbit) with sensible
+ * defaults for a circular LEO satellite.
+ */
+export function makeOrbitalObject(overrides: Partial<OrbitalObject> = {}): OrbitalObject {
+  return {
+    id: 'orbital-test-1',
+    bodyId: 'EARTH',
+    type: 'SATELLITE',
+    name: 'Test Satellite',
+    elements: makeOrbitalElements(),
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// SepDebris / DebrisLike factory (6 casts in tests — collision.test.ts)
+// DebrisLike is the second parameter type of `applySeparationImpulse()`.
+// The interface is not exported from collision.ts, so we mirror it here.
+// ---------------------------------------------------------------------------
+
+/**
+ * Minimal shape matching the `DebrisLike` interface used by
+ * `applySeparationImpulse()` in collision.ts. Since `DebrisLike` is not
+ * exported, we define this mirror interface to keep the factory fully typed.
+ */
+export interface SepDebrisShape {
+  activeParts: Set<string>;
+  fuelStore: Map<string, number>;
+  posX: number;
+  posY: number;
+  velX: number;
+  velY: number;
+  angle: number;
+  angularVelocity: number;
+  landed: boolean;
+  crashed: boolean;
+  collisionCooldown?: number;
+}
+
+/**
+ * Create a DebrisLike object suitable for passing to `applySeparationImpulse()`.
+ * Also includes an optional `id` field used by most test debris objects.
+ *
+ * Usage:
+ *   const debris = makeSepDebris({ posY: 1000, activeParts: new Set(['p1']) });
+ *   applySeparationImpulse(ps, debris as SepDebrisParam, assembly);
+ */
+export function makeSepDebris(overrides: Partial<SepDebrisShape & { id: string }> = {}): SepDebrisShape & { id: string } {
+  return {
+    id: 'sep-debris-test-1',
+    activeParts: new Set<string>(),
+    fuelStore: new Map<string, number>(),
+    posX: 0,
+    posY: 0,
+    velX: 0,
+    velY: 0,
+    angle: 0,
+    angularVelocity: 0,
+    landed: false,
+    crashed: false,
+    collisionCooldown: 0,
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// FlightResult factory (2 casts in tests — saveload.test.ts)
+// Well-defined exported type worth factoring despite low cast count.
+// ---------------------------------------------------------------------------
+
+/**
+ * Create a FlightResult with sensible defaults for a successful mission.
+ */
+export function makeFlightResult(overrides: Partial<FlightResult> = {}): FlightResult {
+  return {
+    id: 'flight-test-1',
+    missionId: 'mission-test-1',
+    rocketId: 'rocket-test-1',
+    crewIds: [],
+    launchDate: new Date().toISOString(),
+    outcome: FlightOutcome.SUCCESS,
+    deltaVUsed: 1500,
+    revenue: 10_000,
+    notes: 'Test flight completed.',
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// StagingConfig factory (1 cast + local helper in workerBridgeTimeout.test.ts)
+// Well-defined exported type worth factoring for consistency.
+// ---------------------------------------------------------------------------
+
+/**
+ * Create a StagingConfig with empty stages at index 0.
+ */
+export function makeStagingConfig(overrides: Partial<StagingConfig> = {}): StagingConfig {
+  return {
+    stages: [],
+    unstaged: [],
+    currentStageIdx: 0,
+    ...overrides,
+  };
 }
