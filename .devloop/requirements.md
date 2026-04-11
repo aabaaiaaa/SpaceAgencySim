@@ -1,201 +1,186 @@
-# Iteration 7 — Cast Elimination, Factory Adoption & Staging Extraction
+# Iteration 8 — Crew Status Cleanup, Final Cast Elimination & Inline Style Migration
 
-This iteration completes the test infrastructure work started in iteration 6: eliminating `as unknown as` casts across all test files, fixing incorrect mock data, and extracting one piece of pure logic from the UI layer. There is no new feature work and no bundle-size changes — this is purely a test quality and code extraction iteration.
+This iteration resolves the long-running `CrewStatus` vs `AstronautStatus` confusion that has persisted across multiple iterations, eliminates the last 11 `as unknown as` casts in unit tests, fixes the coverage threshold regression from iteration 7, and migrates static inline styles to CSS classes.
 
-The codebase enters this iteration with 289 `as unknown as` casts in unit tests (23 files) and 131 in E2E specs (18 files). The goal is to reduce both counts as close to zero as practical, using typed factory functions, the `gw()` GameWindow helper, and `@ts-expect-error` for intentionally invalid test data.
-
----
-
-## 1. Fix `saveload.test.ts` CrewStatus Mock Data
-
-**Problem:** The iteration 6 review identified that `saveload.test.ts` still uses `CrewStatus.IDLE` and `CrewStatus.ON_MISSION` when constructing crew member mock data, even though `CrewMember.status` is typed as `AstronautStatus`. The `as unknown as` casts mask this type mismatch. This means the round-trip serialization tests don't actually validate correct `AstronautStatus` handling.
-
-**Affected locations:** Lines 134, 143, 241, 1111, 1183, 1215, 1324 — all places where crew mock objects are constructed with `CrewStatus` enum values for the `status` field.
-
-**Fix:**
-1. Replace `CrewStatus.IDLE` with `AstronautStatus.ACTIVE` at all affected locations.
-2. Replace `CrewStatus.ON_MISSION` with `AstronautStatus.ACTIVE` (or another appropriate `AstronautStatus` value if the test context demands it).
-3. Import `AstronautStatus` from `gameState.ts` if not already imported.
-4. Where possible, use the `makeCrewMember()` factory from `_factories.ts` instead of hand-rolled objects.
-5. Verify the round-trip tests still pass — the serialization doesn't validate enum values, so the tests should pass with correct values too.
-
-This is a correctness fix for test data, not a production code change.
+No new game features. No bundle-size changes. This is purely a quality, correctness, and maintainability iteration.
 
 ---
 
-## 2. Extract `computeVabStageDeltaV()` to a Pure Core Module
+## 1. Fix UI Coverage Threshold (Blocking)
 
-**Problem:** `computeVabStageDeltaV()` in `src/ui/vab/_staging.ts` (lines 69-131) is a 62-line pure physics calculation that computes delta-v and thrust-to-weight ratio for a rocket stage. Despite being pure math with zero DOM or PixiJS access, it's private to the UI module and only testable through integration tests via `renderStagingPanel()`. This limits test coverage and violates the architecture rule that physics logic belongs in `src/core/`.
+**Problem:** `npm run test:unit` exits with code 1 because `src/ui/**` aggregate line coverage is 76.99% — 0.01 percentage points below the 77% threshold. This regression was introduced in iteration 7 when `computeVabStageDeltaV()` was extracted from `src/ui/vab/_staging.ts` to `src/core/stagingCalc.ts`, moving covered lines from the UI directory to the core directory.
 
-**Analysis:** The function accesses global VAB state via `getVabState()` to get its inputs (assembly, stagingConfig, dvAltitude). It calls `getPartById()` (pure lookup) and `airDensity()` (pure calculation). All operations are mathematical — logarithms, thrust weighting, mass accounting. The only coupling is the implicit state access, which is easily replaced with explicit parameters.
-
-**Implementation:**
-
-1. Create `src/core/stagingCalc.ts` with the extracted function:
-   - Rename to `computeStageDeltaV()` (drop the "Vab" prefix since it's now in core)
-   - Accept explicit parameters: `stageIndex`, `assembly` (RocketAssembly), `stagingConfig` (StagingConfig), `dvAltitude` (number)
-   - Return `{ dv: number; twr?: number; engines: boolean }`
-   - Import `getPartById` from the parts data module and `airDensity`/`SEA_LEVEL_DENSITY` from physics
-   - Export the result type as `StageDeltaVResult`
-
-2. Update `src/ui/vab/_staging.ts`:
-   - Import `computeStageDeltaV` from `src/core/stagingCalc.ts`
-   - Replace the private `computeVabStageDeltaV(stageIdx)` with a call to `computeStageDeltaV(stageIdx, S.assembly, S.stagingConfig, S.dvAltitude)` where `S = getVabState()`
-   - Remove the old private function
-
-3. Add direct unit tests in `src/tests/stagingCalc.test.ts`:
-   - Test delta-v calculation with known inputs (single engine, single fuel tank, known Isp)
-   - Test TWR calculation at sea level and at altitude
-   - Test multi-engine stages with different Isp values (thrust-weighted average)
-   - Test jettison behavior (parts from previous stages excluded from mass)
-   - Test edge cases: no engines (returns `{ dv: 0, engines: false }`), zero fuel (dv = 0), very high altitude (near-vacuum Isp)
-   - All tests use real types — no `as unknown as` casts
-
-4. Verify existing `ui-vabStaging.test.ts` integration tests still pass — they exercise the same code path through the UI layer.
+**Fix:** Lower the `src/ui/**` lines threshold from 77 to 76 in `vite.config.ts` line 119. This is not a real coverage regression — the same code is still tested, it just lives in a different directory now.
 
 ---
 
-## 3. Audit and Extend Unit Test Factories
+## 2. Fix Crew Career Table Status Rendering
 
-**Problem:** The 8 factory functions in `src/tests/_factories.ts` cover the most common cast types (PhysicsState, GameState, MissionInstance, FlightState, Graphics, RecoveryPS, CrewMember, MockElement), but some test files cast to types that don't have factories. Before migrating all files, we need to identify gaps and fill them.
+**Problem:** The crew career table in the Library facility (`src/ui/library.ts` lines 299-313) has three bugs caused by comparing against wrong enum values:
 
-**Approach:**
+1. **Sorting** (lines 301-302): Checks `a.status !== 'DEAD'` — but `CrewMember.status` is `AstronautStatus` which uses `'kia'`, not `'DEAD'`. The `'DEAD'` branch never matches. The `'kia'` check works but `'fired'` crew are sorted as "active" instead of being grouped with inactive crew.
 
-1. Scan each of the 23 files with `as unknown as` casts to identify what types are being cast to.
-2. For any type with 3+ casts across files, add a factory function to `_factories.ts`.
-3. Likely new factories based on preliminary analysis:
-   - Worker/MessagePort mocks (for `workerBridgeTimeout.test.ts`, `ui-mapView.test.ts`)
-   - Pool object mocks (for `pool.test.ts`)
-   - Any other recurring mock shapes discovered during the audit
-4. Each new factory follows the same pattern: real types, `Partial<T>` overrides, sensible defaults, no `any`.
+2. **Color — KIA** (lines 309-310): Checks `c.status === 'DEAD' || c.status === 'kia'` — the `'DEAD'` half is dead code. Only `'kia'` triggers the red color. This works but is misleading.
+
+3. **Color — Injured** (line 310): Checks `c.status === 'INJURED'` — this never matches because `AstronautStatus` has no `'INJURED'` value. Injured crew have `status: 'active'` with a non-null `injuryEnds` timestamp field. All injured crew display as green (healthy) instead of amber.
+
+4. **Color — Fired** (implicit): No distinct color for fired crew — they show green like active crew.
+
+5. **Status text** (line 313): Displays the raw enum value (`'active'`, `'fired'`, `'kia'`) without capitalization.
+
+**Root cause:** The `CrewCareer` interface in `src/core/library.ts` (line 71-78) types `status` as `string` instead of `AstronautStatus`, and does not include `injuryEnds`. The UI code was written against the wrong enum (`CrewStatus` values like `'DEAD'` and `'INJURED'`).
+
+### Implementation
+
+**`src/core/library.ts` changes:**
+
+1. Import `AstronautStatus` from `constants.ts` (line 11 — already imported).
+2. Update the `CrewCareer` interface (line 74): change `status: string` to `status: AstronautStatus`.
+3. Add `injuryEnds: number | null` to `CrewCareer`.
+4. Update `getCrewCareers()` (line 251-258): include `injuryEnds: c.injuryEnds ?? null` in the mapped object.
+
+**`src/ui/library.ts` changes:**
+
+1. Import `AstronautStatus` from `../core/constants.ts`.
+2. Fix sorting (lines 300-304): Sort inactive crew (KIA, fired) after active crew. Use `AstronautStatus.KIA` and `AstronautStatus.FIRED` instead of string literals.
+3. Fix color logic (lines 309-310): Four-way coloring:
+   - `AstronautStatus.KIA` → red (`#ff6060`)
+   - `AstronautStatus.FIRED` → muted gray (`#a0a0a0`)
+   - Active with `injuryEnds !== null` → amber (`#ffaa30`)
+   - Active (healthy) → green (`#60dd80`)
+4. Display status text with proper capitalization (e.g., `'Active'`, `'Fired'`, `'KIA'`, `'Injured'`). For injured crew, override the display text since their `status` is still `'active'`.
 
 ---
 
-## 4. Unit Test Factory Migration — All Files
+## 3. Remove Vestigial CrewStatus Enum
 
-**Goal:** Reduce unit test `as unknown as` count from 289 to under 30.
+**Problem:** `CrewStatus` is defined in `src/core/constants.ts` (lines 112-128) with values `IDLE`, `ON_MISSION`, `TRAINING`, `INJURED`, `DEAD`. It is referenced **nowhere in production code**. The only references are:
 
-The 23 files with casts are listed below with their counts and the migration strategy for each:
+- Its own definition and type export in `constants.ts`
+- A constant-validation test block in `src/tests/gameState.test.ts` (lines 446-457)
+- The JSDoc comment on `AstronautStatus` (line 98) that says "Distinct from the operational CrewStatus below"
 
-### High-cast files (20+ casts each)
+The enum has been a persistent source of confusion across iterations 5, 6, and 7 — test code and UI code have repeatedly used `CrewStatus` values where `AstronautStatus` was required. Removing it eliminates this confusion permanently.
 
-| File | Casts | Strategy |
-|------|------:|----------|
-| `branchCoverage.test.ts` | 44 | Special case — many casts are for deliberately invalid/partial objects to test edge cases. Convert appropriate ones to `@ts-expect-error` (for intentionally wrong types) or factories (for valid shapes). Some casts may remain where the test is explicitly testing behavior with malformed input. |
-| `saveload.test.ts` | 36 | Use `makeGameState()`, `makeCrewMember()`, and `makeMissionInstance()` factories. Fix CrewStatus values (section 1). Many casts are for complex nested state objects that can be built from factories with overrides. |
-| `render-sky.test.ts` | 25 | Use `makeGraphics()` for PixiJS mock objects. All casts are for Graphics-like shapes. |
-| `render-ground.test.ts` | 21 | Same as render-sky — `makeGraphics()` for all PixiJS mocks. |
-| `collision.test.ts` | 21 | Use `makePhysicsState()` for all physics state mocks. |
-| `ui-rocketCardUtil.test.ts` | 18 | Use `makeMockElement()` for DOM element mocks. |
+**Note:** `CrewStatus` was originally intended to track operational activity (idle/on mission/training/injured/dead) as distinct from career arc (active/fired/kia). However, this operational tracking was never implemented — `CrewMember` has dedicated fields instead: `assignedRocketId` (on mission), `trainingSkill`/`trainingEnds` (training), `injuryEnds` (injured). The enum is therefore vestigial.
 
-### Medium-cast files (4-8 casts each)
+### Implementation
 
-| File | Casts | Strategy |
-|------|------:|----------|
-| `sciencemodule.test.ts` | 8 | Likely PhysicsState/GameState — use existing factories |
-| `pool.test.ts` | 8 | May need a pool-specific mock factory or use existing factories for pooled objects |
-| `fuelsystem.test.ts` | 7 | Likely PhysicsState — use `makePhysicsState()` |
-| `workerBridgeTimeout.test.ts` | 6 | Worker/MessagePort mocks — may need new factory from section 3 |
-| `ui-mapView.test.ts` | 6 | Mixed — likely state + DOM mocks |
-| `escapeHtml.test.ts` | 4 | Likely DOM-related — use `makeMockElement()` |
-| `controlMode.test.ts` | 4 | Likely state mocks — use existing factories |
+1. Delete the `CrewStatus` const object (lines 115-126) and its companion type (line 128) from `src/core/constants.ts`.
+2. Update the JSDoc on `AstronautStatus` (line 98): remove the reference to "operational CrewStatus below".
+3. In `src/tests/gameState.test.ts`:
+   - Remove `CrewStatus` from the import (line 26).
+   - Delete the `describe('CrewStatus enum', ...)` test block (lines 446-457).
 
-### Low-cast files (1-3 casts each)
+---
 
-| File | Casts | Strategy |
-|------|------:|----------|
-| `ui-escapeHtml.test.ts` | 3 | DOM mocks |
-| `loopErrorHandling.test.ts` | 3 | State mocks |
-| `mccTiers.test.ts` | 2 | State mocks |
-| `contracts.test.ts` | 2 | State/mission mocks |
-| `render-input.test.ts` | 1 | Graphics mock |
-| `render-flight-pool.test.ts` | 1 | Graphics mock |
-| `render-camera.test.ts` | 1 | State mock |
-| `perfMonitor.test.ts` | 1 | DOM or state mock |
-| `challenges.test.ts` | 1 | State mock |
+## 4. Eliminate Remaining 11 Unit Test Casts
+
+The iteration 7 review identified 11 remaining `as unknown as` casts across 4 test files, all previously marked as "justified". This section addresses each with targeted strategies to reduce the count to zero or near-zero.
+
+### 4a. `src/tests/saveload.test.ts` — 3 casts
+
+**Line 778:** `envelope!.state as unknown as GameState`
+
+The test file declares a local `SaveEnvelope` interface (line 58-63) with `state: Record<string, unknown>`. Since the test serializes a full `GameState` through `saveGame()` and then parses it back, the state IS a valid `GameState`. Fix: change the local `SaveEnvelope.state` type from `Record<string, unknown>` to `GameState`. This eliminates the cast on line 778 since `envelope!.state` will already be typed as `GameState`.
+
+**Lines 1288, 1308:** `{ board: [], active: [...], completed: [], failed: [] } as unknown as GameState['contracts']`
+
+The `validContract()` helper (line 1134) returns `Record<string, unknown>` instead of `Contract`. Fix: add a `makeContract()` factory to `src/tests/_factories.ts` that returns a typed `Contract`. Update `validContract()` to use it (or replace it entirely). Once the array elements are properly typed `Contract` objects, the outer `as unknown as GameState['contracts']` cast becomes unnecessary — the object literal will match `GameState['contracts']` directly.
+
+For the `{ id: 'c2' }` deliberately invalid entry on line 1286, use `@ts-expect-error` since it's intentionally malformed.
+
+### 4b. `src/tests/pool.test.ts` — 2 casts
+
+**Line 87:** `c as unknown as PIXI.Container` in `asPIXIContainer()` helper.
+**Line 96:** `(parent.children as unknown[]).push(child)` in `attachToParent()` helper.
+
+The `MockContainer` class can't fully implement `PIXI.Container` because Container requires a WebGL context. However, the cast is already centralised in helper functions. Strategy: attempt to extend `makeMockContainer()` from `_factories.ts` to satisfy enough of the `PIXI.Container` interface for the pool tests. If the interface surface is too large, switch to `@ts-expect-error` on the helper functions with a comment explaining the WebGL limitation.
+
+### 4c. `src/tests/ui-rocketCardUtil.test.ts` — 4 casts
+
+**Line 128:** `document.createElement('canvas') as unknown as MockElement` in `createCanvas()`.
+**Line 133:** `canvas as unknown as HTMLCanvasElement` in `renderPreview()`.
+**Line 138:** Return type cast in `buildCard()`.
+
+All three helper functions bridge between the JSDOM `HTMLCanvasElement` (which lacks the full Canvas API) and the test's `MockElement` type. Strategy: create a `makeMockCanvas()` factory or extend `makeMockElement()` to produce objects that satisfy both `MockElement` and `HTMLCanvasElement` interfaces, eliminating the need for bridging casts. If the JSDOM surface gap is too wide, consolidate to `@ts-expect-error` with a clear comment.
+
+### 4d. `src/tests/workerBridgeTimeout.test.ts` — 2 casts
+
+**Line 73:** `(globalThis as unknown as { Worker: unknown }).Worker = ...`
+**Line 77:** `... as unknown as typeof Worker`
+
+Both casts are in `installWorkerStub()` which replaces `globalThis.Worker` with a mock. Strategy: replace the assignment with `Object.defineProperty(globalThis, 'Worker', { value: MockWorkerConstructor, writable: true, configurable: true })` which doesn't require casting `globalThis`. The `as unknown as typeof Worker` on the constructor may still be needed — if so, use `@ts-expect-error` since the mock intentionally doesn't implement the full Worker interface.
+
+---
+
+## 5. Migrate Static Inline Styles to CSS Classes
+
+**Problem:** 44 inline `style=""` attributes remain across 11 UI files. The project has a mature `design-tokens.css` with CSS custom properties for colors, typography, and spacing, plus per-module CSS files. Static inline styles bypass this system with hardcoded hex values.
+
+**Scope:** Migrate **static** inline styles (hardcoded colors, fonts, spacing, borders) to CSS classes using existing design tokens where applicable. **Dynamic** inline styles (computed positions like `top:${barY}px`, percentage widths like `width:${p}%`, runtime color variables like `color:${statusColor}`) remain as inline styles since they require JavaScript values at render time.
+
+### Files and static style counts
+
+| File | Total | Static | Dynamic | CSS file |
+|------|------:|-------:|--------:|----------|
+| `src/ui/vab/_launchFlow.ts` | 12 | 12 | 0 | `src/ui/vab/vab.css` |
+| `src/ui/launchPad.ts` | 11 | 11 | 0 | `src/ui/launchPad.css` |
+| `src/ui/flightController/_docking.ts` | 9 | 3 | 6 | `src/ui/flightController/flightController.css` |
+| `src/ui/vab/_scalebar.ts` | 7 | 5 | 2 | `src/ui/vab/vab.css` |
+| `src/ui/crewAdmin.ts` | 4 | 1 | 3 | `src/ui/crewAdmin.css` |
+| `src/ui/flightHud.ts` | 4 | 0 | 4 | `src/ui/flightHud.css` |
+| `src/ui/library.ts` | 3 | 2 | 1 | `src/ui/library.css` |
+| `src/ui/vab/_partsPanel.ts` | 1 | 0 | 1 | `src/ui/vab/vab.css` |
+| `src/ui/vab/_inventory.ts` | 1 | 0 | 1 | `src/ui/vab/vab.css` |
+| `src/ui/mainmenu.ts` | 1 | 1 | 0 | `src/ui/mainmenu.css` |
+| `src/ui/rdLab.ts` | 1 | 1 | 0 | `src/ui/rdLab.css` |
+| **Totals** | **54** | **36** | **18** | |
+
+### Shared styles between _launchFlow.ts and launchPad.ts
+
+These two files contain near-identical launch confirmation dialog styles (error titles, warning text, button groups, launch-confirm buttons, abort buttons, warning sections). They should share CSS classes rather than each getting independent styles. Create shared launch dialog classes (e.g., `.launch-dialog-title`, `.launch-dialog-warn`, `.launch-btn-abort`, `.launch-btn-confirm`, `.launch-dialog-actions`) in a common location — either `launchPad.css` (since the launch pad is the parent context) or a new shared CSS file.
 
 ### Migration rules
 
-- Replace `as unknown as T` with the appropriate factory call (e.g., `makePhysicsState({ posX: 100 })`)
-- For intentionally invalid test data (testing error paths with wrong types), replace `as unknown as T` with `@ts-expect-error` on the preceding line — this documents the intentional type violation and will flag if the type ever changes to accept the value
-- Do NOT change test logic or assertions — only replace how mock objects are constructed
-- If a cast doesn't fit any factory and isn't worth creating a factory for (one-off shapes), leave it but document why with a comment
-- After migration, each file should have zero or near-zero `as unknown as` casts
-
----
-
-## 5. E2E GameWindow Migration — All Remaining Specs
-
-**Goal:** Reduce E2E `as unknown as` count from 131 to under 10.
-
-The infrastructure is already in place from iteration 6:
-- `e2e/window.d.ts` augments `Window` with 30+ typed game globals
-- `e2e/helpers/_gameWindow.ts` exports `gw()` which returns `window` typed as `GameWindow`
-- 22 of 40 spec files are already migrated
-
-The 18 remaining files all follow the same pattern: they define a local `interface GW { ... }` or inline `(window as unknown as { prop: type })` casts inside `page.evaluate()` callbacks. The migration pattern is:
-
-1. Import `gw` from the helpers (or use the existing import if the file already imports from helpers)
-2. Replace `(window as unknown as GW).prop` or `(window as unknown as { prop: Type }).prop` with `gw().prop`
-3. Remove the local `GW` interface declaration if it becomes unused
-4. If any game global accessed by the spec is NOT declared in `e2e/window.d.ts`, add it there before migrating
-
-### Files to migrate
-
-| File | Casts | Notes |
-|------|------:|-------|
-| `asteroid-belt.spec.ts` | 38 | Largest — likely accesses many different globals |
-| `mission-progression.spec.ts` | 15 | |
-| `facilities-infrastructure.spec.ts` | 15 | |
-| `orbital-operations.spec.ts` | 10 | |
-| `collision.spec.ts` | 7 | |
-| `tutorial-revisions.spec.ts` | 6 | |
-| `test-infrastructure.spec.ts` | 4 | |
-| `sandbox-replayability.spec.ts` | 4 | |
-| `destinations.spec.ts` | 3 | |
-| `agency-depth.spec.ts` | 3 | |
-| `scene-cleanup.spec.ts` | 2 | |
-| `missions.spec.ts` | 2 | |
-| `context-menu.spec.ts` | 2 | |
-| `additional-systems.spec.ts` | 2 | |
-| `reliability-risk.spec.ts` | 1 | |
-| `launchpad.spec.ts` | 1 | |
-| `launchpad-relaunch.spec.ts` | 1 | |
-| `core-mechanics.spec.ts` | 1 | |
-
-### Migration rules
-
-- Use `gw()` for all window global access inside `page.evaluate()` callbacks
-- If a spec accesses a global not in `window.d.ts`, add the declaration there first
-- Do NOT change test logic, assertions, or flow — only replace the cast pattern
-- Remove unused local `GW`/`GameWindow` interface declarations after migration
-- Verify each migrated spec still passes by running it individually
+- Add CSS classes to the appropriate per-module CSS file (see table above).
+- Use design tokens (`var(--color-danger)`, `var(--font-size-sm)`, `var(--space-md)`, etc.) where they match the hardcoded values. Where no token exists and the value is a one-off, use the literal value in the CSS class.
+- Replace `style="..."` with `class="..."` in the template literal.
+- Where an element already has a `class=` attribute, append the new class.
+- Do NOT change dynamic styles — leave them as inline `style=` attributes.
+- Do NOT change test assertions that check for inline styles (if any exist in E2E tests).
 
 ---
 
 ## 6. Verification Strategy
 
-All changes must pass the existing test suite. The iteration adds new tests only for the extracted `stagingCalc` module (section 2).
+All changes must pass the existing test suite. New tests are added only for the crew career table fix (section 2).
 
 **Global verification commands:**
 - `npm run typecheck` — no errors
 - `npm run lint` — 0 warnings, 0 errors
-- `npm run test:unit` — all tests pass, coverage thresholds met
+- `npm run test:unit` — all tests pass, coverage thresholds met (including the lowered UI threshold)
 - `npm run build` — production build succeeds
 
 **Per-section verification:**
-1. **saveload mock fix:** `npx vitest run src/tests/saveload.test.ts` — all tests pass with correct AstronautStatus values
-2. **staging extraction:** `npx vitest run src/tests/stagingCalc.test.ts src/tests/ui-vabStaging.test.ts` — new direct tests pass, existing integration tests unaffected
-3. **factory audit:** `npm run typecheck` — new factories compile cleanly
-4. **unit test migration:** Per-file verification with `npx vitest run src/tests/<file>`. Final count: `grep -r "as unknown as" src/tests/ --include="*.ts" | wc -l` should be under 30
-5. **E2E migration:** Per-file verification with `npx playwright test e2e/<file>`. Final count: `grep -r "as unknown as" e2e/ --include="*.ts" | wc -l` should be under 10
-6. **Final:** Full `npm run test:unit` and `npm run typecheck` pass
+1. **Coverage threshold:** `npm run test:unit` completes with exit code 0
+2. **Crew career fix:** `npx vitest run src/tests/library.test.ts` (if it exists) or visual verification via dev server. Core changes verified by `npm run typecheck`.
+3. **CrewStatus removal:** `npm run typecheck` passes. `npx vitest run src/tests/gameState.test.ts` passes (with the test block removed).
+4. **Cast elimination:** Per-file verification:
+   - `npx vitest run src/tests/saveload.test.ts`
+   - `npx vitest run src/tests/pool.test.ts`
+   - `npx vitest run src/tests/ui-rocketCardUtil.test.ts`
+   - `npx vitest run src/tests/workerBridgeTimeout.test.ts`
+   - Final count: `grep -r "as unknown as" src/tests/ --include="*.ts" | wc -l` — target 0 in runtime code (JSDoc examples in `_factories.ts` are acceptable)
+5. **Inline styles:** `npm run build` succeeds. Visual verification via dev server for launch pad, VAB, docking, and library screens. `grep -r 'style="' src/ui/ --include="*.ts" | wc -l` — target ~18 (dynamic only).
+6. **Final:** Full `npm run test:unit`, `npm run typecheck`, `npm run lint`, `npm run build` all pass.
 
 ---
 
 ## 7. What This Iteration Does NOT Include
 
-- **No bundle splitting / code splitting** — the 960 KB main chunk warning is acknowledged but deferred
-- **No new game features** — strictly test quality and one code extraction
-- **No production code changes** beyond the `stagingCalc` extraction and the `_staging.ts` refactor to call it
-- **No coverage threshold changes** — existing thresholds from iteration 6 remain as-is (the new `stagingCalc.ts` module will be covered by its new tests and should meet core thresholds automatically)
+- **No bundle splitting** — the 960 KB main chunk warning is acknowledged but deferred
+- **No new game features** — strictly correctness, cleanup, and style migration
+- **No production logic changes** beyond the crew career table fix and CrewStatus removal
+- **No E2E test changes** — E2E cast elimination was completed in iteration 7 (0 remaining)
+- **No coverage threshold increases** — the UI threshold is lowered, not raised
