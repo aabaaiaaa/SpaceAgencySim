@@ -23,7 +23,7 @@ async function setupFlightWithParachute(page: Page): Promise<void> {
   // Stage engine and lift off.
   await page.keyboard.press('Space');
   await page.waitForFunction(() => {
-    const ps = (window as unknown as Record<string, unknown>).__flightPs as Record<string, unknown> | undefined;
+    const ps = window.__flightPs;
     return ((ps?.posY as number) ?? 0) > 5;
   }, { timeout: 5_000 });
 }
@@ -70,13 +70,12 @@ test.describe('Flight — Part Context Menu', () => {
     await expect(menu).toBeHidden({ timeout: 2_000 });
 
     const chuteState: string | null = await page.evaluate(() => {
-      const w = window as unknown as Record<string, unknown>;
-      const ps = w.__flightPs as Record<string, unknown> | undefined;
-      const assembly = w.__flightAssembly as Record<string, unknown> | undefined;
+      const ps = window.__flightPs;
+      const assembly = window.__flightAssembly;
       if (!ps || !assembly) return null;
-      for (const [id, placed] of assembly.parts as Map<string, { partId: string }>) {
+      for (const [id, placed] of assembly.parts) {
         if (placed.partId === 'parachute-mk2') {
-          const entry = (ps.parachuteStates as Map<string, { state: string }> | undefined)?.get(id);
+          const entry = ps.parachuteStates?.get(id);
           return entry?.state ?? null;
         }
       }

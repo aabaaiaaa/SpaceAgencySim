@@ -395,7 +395,7 @@ test.describe('Flight phase transitions', () => {
       ps.velY = 0;
       ps.firingEngines.clear();
       ps.throttle = 0;
-      (fs as unknown as Record<string, unknown>).orbitalElements = null;
+      fs.orbitalElements = null;
       if (typeof w.__resyncPhysicsWorker === 'function') { await w.__resyncPhysicsWorker(); }
     });
 

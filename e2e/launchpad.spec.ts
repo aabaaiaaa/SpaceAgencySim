@@ -82,7 +82,8 @@ function lpSaveEnvelope(rockets: RocketDesign[] = []): ReturnType<typeof buildSa
     agencyName: AGENCY_NAME,
     missions: { available: [], accepted: [{ ...FIRST_FLIGHT_MISSION, status: 'accepted' }], completed: [] },
     parts: UNLOCKED_PARTS,
-    rockets: rockets as unknown as Record<string, unknown>[],
+    // @ts-expect-error — RocketDesign is structurally compatible with Record<string, unknown>
+    rockets: rockets,
   });
 }
 

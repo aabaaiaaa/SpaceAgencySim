@@ -95,13 +95,6 @@ interface GameStateSnapshot {
   [key: string]: unknown;
 }
 
-/** Window shape for browser-context evaluate() callbacks. */
-interface FlightWindow {
-  __flightState?: {
-    timeElapsed: number;
-    [key: string]: unknown;
-  };
-}
 
 // ==========================================================================
 // Suite 1: State injection — verify fixtures load correctly
@@ -311,7 +304,8 @@ test.describe('E2E Infrastructure — Objective Verification', () => {
   async function setupMissionFlight(browser: Browser): Promise<Page> {
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    const envelope = missionTestFixture(TEST_MISSION as unknown as Parameters<typeof missionTestFixture>[0]);
+    // @ts-expect-error — MissionTemplate is structurally compatible with MissionFixtureInput
+    const envelope = missionTestFixture(TEST_MISSION);
     await seedAndLoadSave(page, envelope);
 
     // Verify mission was injected
@@ -503,7 +497,7 @@ test.describe('E2E Infrastructure — Time Warp API', () => {
 
     // Record starting simulation time
     const startSimTime: number = await page.evaluate(() => {
-      const fs = (window as unknown as FlightWindow).__flightState;
+      const fs = window.__flightState;
       return fs ? fs.timeElapsed : 0;
     });
 
@@ -519,7 +513,7 @@ test.describe('E2E Infrastructure — Time Warp API', () => {
     const realStartMs: number = Date.now();
     await page.waitForFunction(
       (startTime: number) => {
-        const fs = (window as unknown as FlightWindow).__flightState;
+        const fs = window.__flightState;
         // Wait until at least 5 sim-seconds have elapsed beyond our start
         return fs != null && (fs.timeElapsed - startTime) >= 5;
       },
@@ -530,7 +524,7 @@ test.describe('E2E Infrastructure — Time Warp API', () => {
 
     // Read final simulation time
     const endSimTime: number = await page.evaluate(() => {
-      const fs = (window as unknown as FlightWindow).__flightState;
+      const fs = window.__flightState;
       return fs ? fs.timeElapsed : 0;
     });
 

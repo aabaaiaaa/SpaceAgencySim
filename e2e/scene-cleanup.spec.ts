@@ -46,7 +46,7 @@ async function assertCleanHub(page: Page): Promise<void> {
 
   // PixiJS: VAB container should not be visible.
   const vabContainerVisible: boolean = await page.evaluate(() => {
-    const app = (window as unknown as Record<string, unknown>).__pixiApp as
+    const app = window.__pixiApp as
       { stage: { children: { label: string; visible: boolean }[] } } | undefined;
     if (!app) return false;
     for (const child of app.stage.children) {
@@ -88,7 +88,7 @@ test('flight scene is cleaned up after exit-to-menu and reload', async ({ page }
   await assertCleanHub(page);
 
   const flightPs: unknown = await page.evaluate(
-    () => (window as unknown as Record<string, unknown>).__flightPs
+    () => window.__flightPs
   );
   expect(flightPs).toBeNull();
 });

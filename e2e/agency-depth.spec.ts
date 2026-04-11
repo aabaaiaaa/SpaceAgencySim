@@ -349,21 +349,18 @@ test.describe('Contract acceptance and cancellation', () => {
   test('(2) accepting a contract moves it from board to active', async () => {
     // Accept via state manipulation (simulates the UI accept action)
     await page.evaluate(() => {
-      const gs = window.__gameState as unknown as GameState | undefined;
+      const gs = window.__gameState;
       if (!gs) return;
-      const contract = (gs.contracts.board as ContractSnapshot[]).find(
-        (c: ContractSnapshot) => c.id === 'contract-accept-test',
+      const contract = gs.contracts.board.find(
+        (c) => c.id === 'contract-accept-test',
       );
       if (contract) {
-        gs.contracts.board = (gs.contracts.board as ContractSnapshot[]).filter(
-          (c: ContractSnapshot) => c.id !== 'contract-accept-test',
+        gs.contracts.board = gs.contracts.board.filter(
+          (c) => c.id !== 'contract-accept-test',
         );
-        contract.acceptedPeriod = gs.currentPeriod as number;
-        (gs.contracts.active as ContractSnapshot[]).push(contract);
+        contract.acceptedPeriod = gs.currentPeriod;
+        gs.contracts.active.push(contract);
       }
-
-      interface GameState { contracts: { board: ContractSnapshot[]; active: ContractSnapshot[] }; currentPeriod: number; [key: string]: unknown }
-      interface ContractSnapshot { id: string; acceptedPeriod: number | null; [key: string]: unknown }
     });
 
     const gs = await getGameState(page) as GameState;
@@ -1415,21 +1412,20 @@ test.describe('Design library save/load/duplicate', () => {
 
   test('(2) duplicate design creates copy with new ID and name suffix', async () => {
     await page.evaluate(() => {
-      const gs = window.__gameState as unknown as
-        { savedDesigns: { id: string; name: string; [key: string]: unknown }[] } | undefined;
+      const gs = window.__gameState;
       if (!gs) return;
       const original = gs.savedDesigns[0];
       if (!original) return;
 
       const now = new Date().toISOString();
-      const duplicate = {
-        ...JSON.parse(JSON.stringify(original)) as Record<string, unknown>,
+      const clone = JSON.parse(JSON.stringify(original));
+      Object.assign(clone, {
         id: 'design-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
         name: original.name + ' (Copy)',
         createdDate: now,
         updatedDate: now,
-      };
-      gs.savedDesigns.push(duplicate as typeof original);
+      });
+      gs.savedDesigns.push(clone);
     });
 
     const gs = await getGameState(page) as GameState;
@@ -1507,8 +1503,7 @@ test.describe('Design library cross-save sharing', () => {
   test('(2) shared designs merge with save-private designs', async () => {
     // Add a private design to the game state
     await page.evaluate(() => {
-      const gs = window.__gameState as unknown as
-        { savedDesigns: Record<string, unknown>[] } | undefined;
+      const gs = window.__gameState;
       if (!gs) return;
       gs.savedDesigns.push({
         id: 'design-private-1',

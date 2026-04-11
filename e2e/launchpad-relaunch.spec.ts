@@ -59,7 +59,8 @@ function makeEnvelope(): ReturnType<typeof buildSaveEnvelope> {
   return buildSaveEnvelope({
     missions: { available: [], accepted: [{ ...FIRST_FLIGHT_MISSION, status: 'accepted' }], completed: [] },
     parts: UNLOCKED_PARTS,
-    rockets: [SEEDED_DESIGN as unknown as Record<string, unknown>],
+    // @ts-expect-error — RocketDesign is structurally compatible with Record<string, unknown>
+    rockets: [SEEDED_DESIGN],
   });
 }
 

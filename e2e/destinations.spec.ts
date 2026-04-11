@@ -307,7 +307,8 @@ test.describe('Celestial body data drives physics and rendering', () => {
 
   test('(1) body catalog is accessible and contains all expected bodies', async () => {
     const _bodies = await page.evaluate((): string[] | null => {
-      const mod = window.__celestialBodies || (window.__gameState as unknown as Record<string, unknown> | undefined)?._bodyCache;
+      // @ts-expect-error — _bodyCache is an internal/private property not on the GameState type
+      const mod = window.__celestialBodies || window.__gameState?._bodyCache;
       // Fallback: check if CELESTIAL_BODIES is exposed via any global.
       if (mod) return Object.keys(mod);
       // Try to read from a known data source.
@@ -1078,7 +1079,8 @@ test.describe('Surface operations — sample collection and return', () => {
       const gs = window.__gameState;
       if (!gs.surfaceItems) gs.surfaceItems = [];
       // Only add if we don't already have an uncollected Moon sample.
-      const existing = (gs.surfaceItems as unknown as Record<string, unknown>[]).find(
+      // @ts-expect-error — surfaceItems elements accessed as Record for flexible property access
+      const existing = (gs.surfaceItems as Record<string, unknown>[]).find(
         (i) => i.type === 'SURFACE_SAMPLE' && i.bodyId === 'MOON' && !i.collected,
       );
       if (!existing) {
@@ -1210,7 +1212,8 @@ test.describe('Surface operations — instruments and beacons', () => {
     await page.evaluate(async () => {
       const gs = window.__gameState;
       if (!gs.surfaceItems) gs.surfaceItems = [];
-      const existing = (gs.surfaceItems as unknown as Record<string, unknown>[]).find(
+      // @ts-expect-error — surfaceItems elements accessed as Record for flexible property access
+      const existing = (gs.surfaceItems as Record<string, unknown>[]).find(
         (i) => i.type === 'SURFACE_INSTRUMENT',
       );
       if (!existing) {

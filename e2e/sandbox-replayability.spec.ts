@@ -789,7 +789,8 @@ test.describe('Custom mission creator', () => {
     const json = await page.evaluate(() => {
       const w = window;
       const state = w.__gameState!;
-      const ch = state.customChallenges[0] as unknown as Record<string, unknown> | undefined;
+      // @ts-expect-error — accessing customChallenges element as Record for flexible property access
+      const ch = state.customChallenges[0] as Record<string, unknown> | undefined;
       if (!ch) return null;
 
       // Replicate the export logic
@@ -962,7 +963,8 @@ test.describe('Custom mission creator', () => {
       const w = window;
       const state = w.__gameState!;
       if (state.customChallenges.length > 0) {
-        const removed = state.customChallenges.shift() as unknown as Record<string, unknown>;
+        // @ts-expect-error — accessing removed challenge as Record for flexible property access
+        const removed = state.customChallenges.shift() as Record<string, unknown>;
         // Also clear from results if present
         if (state.challenges?.results?.[removed.id as string]) {
           delete state.challenges.results[removed.id as string];
@@ -1285,12 +1287,10 @@ test.describe('Game settings — difficulty options', () => {
         money: gs.money as number,
         acceptedMissionCount: (gs.missions?.accepted?.length as number) ?? 0,
         totalFlights: (gs.flightHistory?.length as number) ?? 0,
-        crewCount: ((gs.crew ?? []) as unknown as Record<string, unknown>[]).filter(
-          (c) => c.status !== 'DEAD',
-        ).length,
-        crewKIA: ((gs.crew ?? []) as unknown as Record<string, unknown>[]).filter(
-          (c) => c.status === 'DEAD',
-        ).length,
+        // @ts-expect-error — 'DEAD' is the legacy status string used in save summaries
+        crewCount: (gs.crew ?? []).filter((c) => c.status !== 'DEAD').length,
+        // @ts-expect-error — 'DEAD' is the legacy status string used in save summaries
+        crewKIA: (gs.crew ?? []).filter((c) => c.status === 'DEAD').length,
         playTimeSeconds: (gs.playTimeSeconds as number) ?? 0,
         flightTimeSeconds: (gs.flightTimeSeconds as number) ?? 0,
         gameMode: (gs.gameMode as string) ?? 'freeplay',

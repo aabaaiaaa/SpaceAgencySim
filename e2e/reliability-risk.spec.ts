@@ -1196,7 +1196,8 @@ test.describe('Extreme weather warning', () => {
     await page.evaluate(() => {
       // Patch initWeather so it preserves our extreme weather
       const gs = window.__gameState;
-      (gs as unknown as Record<string, unknown>)._forceWeather = {
+      // @ts-expect-error — _forceWeather is a test-only internal property
+      gs._forceWeather = {
         windSpeed: 25,
         windAngle: 0,
         temperature: 0.97,

@@ -31,7 +31,8 @@
       "unit": [
         "src/tests/atmosphere.test.ts",
         "src/tests/bodies.test.ts",
-        "src/tests/fuelsystem.test.ts"
+        "src/tests/fuelsystem.test.ts",
+        "src/tests/stagingCalc.test.ts"
       ],
       "e2e": [
         "e2e/destinations.spec.ts",
@@ -47,6 +48,7 @@
       "unit": [
         "src/tests/biomes.test.ts",
         "src/tests/instruments.test.ts",
+        "src/tests/render-ground.test.ts",
         "src/tests/sciencemodule.test.ts",
         "src/tests/surfaceOps.test.ts"
       ],
@@ -370,7 +372,8 @@
         "src/tests/manoeuvre.test.ts",
         "src/tests/mapView.test.ts",
         "src/tests/orbit.test.ts",
-        "src/tests/physicsWorkerCommand.test.ts"
+        "src/tests/physicsWorkerCommand.test.ts",
+        "src/tests/ui-mapView.test.ts"
       ],
       "e2e": [
         "e2e/core-mechanics.spec.ts",
@@ -514,6 +517,7 @@
         "src/tests/rocketvalidator.test.ts",
         "src/tests/sciencemodule.test.ts",
         "src/tests/staging.test.ts",
+        "src/tests/stagingCalc.test.ts",
         "src/tests/ui-vabStaging.test.ts",
         "src/tests/undoRedo.test.ts",
         "src/tests/vabTiers.test.ts"
@@ -591,6 +595,15 @@
         "e2e/landing.spec.ts",
         "e2e/rocketbuilder.spec.ts"
       ]
+    },
+    "core/stagingCalc": {
+      "sources": [
+        "src/core/stagingCalc.ts"
+      ],
+      "unit": [
+        "src/tests/stagingCalc.test.ts"
+      ],
+      "e2e": []
     },
     "core/techtree": {
       "sources": [
@@ -809,10 +822,11 @@
     },
     "ui/flightController/surface": {
       "sources": [
-        "src/ui/flightController/_postFlight.ts",
-        "src/ui/flightController/_surfaceActions.ts"
+        "src/ui/flightController/_postFlight.ts"
       ],
-      "unit": [],
+      "unit": [
+        "src/tests/loopErrorHandling.test.ts"
+      ],
       "e2e": [
         "e2e/destinations.spec.ts"
       ]
@@ -1066,6 +1080,32 @@
       "e2e": [
         "e2e/**/*.spec.ts"
       ]
+    },
+    "tests/_factories": {
+      "sources": [
+        "src/tests/_factories.ts"
+      ],
+      "unit": [
+        "src/tests/achievements.test.ts",
+        "src/tests/branchCoverage.test.ts",
+        "src/tests/challenges.test.ts",
+        "src/tests/collision.test.ts",
+        "src/tests/contracts.test.ts",
+        "src/tests/controlMode.test.ts",
+        "src/tests/crew.test.ts",
+        "src/tests/flightReturn.test.ts",
+        "src/tests/fuelsystem.test.ts",
+        "src/tests/instruments.test.ts",
+        "src/tests/loopErrorHandling.test.ts",
+        "src/tests/mccTiers.test.ts",
+        "src/tests/satellites.test.ts",
+        "src/tests/saveload.test.ts",
+        "src/tests/ui-mapView.test.ts",
+        "src/tests/ui-timeWarp.test.ts",
+        "src/tests/ui-vabUndoActions.test.ts",
+        "src/tests/workerBridgeTimeout.test.ts"
+      ],
+      "e2e": []
     }
   }
 }

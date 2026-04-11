@@ -85,9 +85,9 @@ const BASIC_CREWED: string[] = ['cmd-mk1', 'tank-small', 'engine-spark', 'parach
 const EARTH_ORBIT_ALT = 100_000;
 const EARTH_ORBIT_VEL = 7848;
 
-/** Shorthand to pass SaveEnvelope to seedAndLoadSave (which accepts Record). */
-function asSave(envelope: SaveEnvelope): Record<string, unknown> {
-  return envelope as unknown as Record<string, unknown>;
+/** Shorthand to pass SaveEnvelope to seedAndLoadSave (which accepts SaveEnvelope | Record). */
+function asSave(envelope: SaveEnvelope): SaveEnvelope {
+  return envelope;
 }
 
 /**
@@ -1544,14 +1544,16 @@ test.describe('Comms range', () => {
     await page.evaluate(() => {
       const gs = window.__gameState;
       if (!gs) return;
-      // Cast needed: test injects partial satellite data (no orbitalObjectId, extra name field)
-      gs.satelliteNetwork!.satellites = [
+      // Test injects partial satellite data (no orbitalObjectId, extra name field)
+      const testSats = [
         { id: 'sat-e1', name: 'EarthRelay-1', partId: 'satellite-relay', satelliteType: 'RELAY', bodyId: 'EARTH', bandId: 'HEO', health: 100, autoMaintain: true, deployedPeriod: 10 },
         { id: 'sat-m1', name: 'MarsRelay-1', partId: 'satellite-relay', satelliteType: 'RELAY', bodyId: 'MARS', bandId: 'HMO', health: 100, autoMaintain: true, deployedPeriod: 15 },
         { id: 'sat-mc1', name: 'MarsComm-1', partId: 'satellite-comm', satelliteType: 'COMMUNICATION', bodyId: 'MARS', bandId: 'LMO', health: 100, autoMaintain: true, deployedPeriod: 15 },
         { id: 'sat-mc2', name: 'MarsComm-2', partId: 'satellite-comm', satelliteType: 'COMMUNICATION', bodyId: 'MARS', bandId: 'LMO', health: 100, autoMaintain: true, deployedPeriod: 15 },
         { id: 'sat-mc3', name: 'MarsComm-3', partId: 'satellite-comm', satelliteType: 'COMMUNICATION', bodyId: 'MARS', bandId: 'LMO', health: 100, autoMaintain: true, deployedPeriod: 15 },
-      ] as unknown as typeof gs.satelliteNetwork.satellites;
+      ];
+      // @ts-expect-error — partial test satellite data does not match full SatelliteRecord type
+      gs.satelliteNetwork!.satellites = testSats;
     });
 
     // Wait for comms re-evaluation after injecting satellite infrastructure.

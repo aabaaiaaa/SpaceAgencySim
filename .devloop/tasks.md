@@ -95,13 +95,13 @@ See `.devloop/requirements.md` for full context and rationale behind each task.
 - **Verification**: `npx playwright test e2e/orbital-operations.spec.ts e2e/collision.spec.ts e2e/tutorial-revisions.spec.ts` — all tests pass. Combined cast count across 3 files is 0.
 
 ### TASK-016: E2E migration — remaining 12 low-cast spec files
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Migrate casts in the remaining 12 spec files: `test-infrastructure.spec.ts` (4), `sandbox-replayability.spec.ts` (4), `destinations.spec.ts` (3), `agency-depth.spec.ts` (3), `scene-cleanup.spec.ts` (2), `missions.spec.ts` (2), `context-menu.spec.ts` (2), `additional-systems.spec.ts` (2), `reliability-risk.spec.ts` (1), `launchpad.spec.ts` (1), `launchpad-relaunch.spec.ts` (1), `core-mechanics.spec.ts` (1). Use `gw()` for all window casts. See requirements section 5.
 - **Verification**: Run each spec individually: `npx playwright test e2e/<filename>` for each of the 12 files. Combined cast count across all 12 files is 0.
 
 ### TASK-017: Update test-map.json for new stagingCalc module
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-002, TASK-003
 - **Description**: Run `node scripts/generate-test-map.mjs` to regenerate `test-map.json` so it includes the new `src/core/stagingCalc.ts` module and its test file `src/tests/stagingCalc.test.ts`. Verify the new module appears in the appropriate area mapping.
 - **Verification**: `node scripts/generate-test-map.mjs` runs without error. `node scripts/run-affected.mjs --dry-run` resolves all paths. The `core/stagingCalc` or equivalent area appears in `test-map.json`.
