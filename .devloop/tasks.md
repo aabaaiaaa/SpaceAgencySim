@@ -239,7 +239,7 @@
 ## Phase C: E2E Test Stability & Performance
 
 ### TASK-035: Full E2E baseline — catalog failures, flaky tests, and slow tests
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-034
 - **Description**: Run the complete E2E test suite (`npm run test:e2e`) and record every result: pass, fail, and timing per spec file. Run the suite a second time to identify flaky tests (tests that pass once but fail once, or vice versa). Produce a categorised list: (1) true failures — tests that fail consistently, (2) flaky tests — inconsistent results across runs, (3) slow tests — specs taking >30 seconds. Save the results as comments in the test files or a temporary log. This is a diagnostic task — do not fix anything yet, just catalog.
 - **Verification**: Both E2E suite runs complete (even if some tests fail). A clear list of failures, flaky tests, and slow tests is documented.
