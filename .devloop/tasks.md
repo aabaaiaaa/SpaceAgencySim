@@ -269,7 +269,7 @@
 - **Verification**: Run optimised specs. No spec exceeds 45 seconds. No regressions.
 
 ### TASK-040: Final E2E stability verification
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-039
 - **Description**: Run the complete E2E suite 3 times consecutively. All 3 runs must pass with zero failures. If any run has a failure, investigate with Playwright MCP and fix. Record the total suite runtime for each run. This task is not complete until 3 consecutive green runs are achieved.
 - **Verification**: 3 consecutive full E2E suite runs all pass (`npm run test:e2e` x3). Total suite runtime documented.

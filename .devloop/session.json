@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 16,
+  "lastIteration": 17,
   "startedAt": "2026-04-11T21:55:45.707Z",
   "iteration": 11,
   "devloopVersion": "4.0.2",
   "activeTask": {
-    "taskId": "TASK-039",
-    "taskTitle": "Optimise remaining slow tests (pass 2)",
-    "iterationNumber": 17,
-    "startedAt": "2026-04-12T00:17:41.592Z"
+    "taskId": "TASK-040",
+    "taskTitle": "Final E2E stability verification",
+    "iterationNumber": 18,
+    "startedAt": "2026-04-12T00:28:53.203Z"
   }
 }
