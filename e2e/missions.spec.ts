@@ -86,7 +86,7 @@ test.describe('Mission Control Flow', () => {
 
   test('(1) the Available tab lists "First Flight" as the only available mission at game start', async ({ page }) => {
     // The Available tab is active by default when Mission Control is opened.
-    await expect(page.locator('[data-tab-id="available"]')).toHaveClass(/active/);
+    await expect(page.locator('[data-tab-id="available"]')).toHaveClass(/active/, { timeout: 5_000 });
 
     // Exactly one mission card must be visible.
     const cards = page.locator('.mc-mission-card');

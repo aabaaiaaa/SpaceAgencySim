@@ -76,14 +76,14 @@ test.describe('Crew Administration Flow', () => {
 
   test('(1) the Active Crew tab shows an empty state message when no crew are hired', async ({ page }) => {
     // The Active Crew tab is active by default when Crew Admin opens.
-    await expect(page.locator('[data-tab-id="active"]')).toHaveClass(/active/);
+    await expect(page.locator('[data-tab-id="active"]')).toHaveClass(/active/, { timeout: 5_000 });
 
     // The empty-state message must be visible (no crew in the fresh save).
-    await expect(page.locator('.crew-empty-msg')).toBeVisible();
-    await expect(page.locator('.crew-empty-msg')).toContainText(/no active crew/i);
+    await expect(page.locator('.crew-empty-msg')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('.crew-empty-msg')).toContainText(/no active crew/i, { timeout: 5_000 });
 
     // No crew table rows should exist.
-    await expect(page.locator('.crew-table')).toHaveCount(0);
+    await expect(page.locator('.crew-table')).toHaveCount(0, { timeout: 5_000 });
   });
 
   // ── (2) The Hire tab shows the hire cost ($50,000) and a name field ────────
@@ -92,15 +92,15 @@ test.describe('Crew Administration Flow', () => {
     await page.click('[data-tab-id="hire"]');
 
     // The name input must be present and visible.
-    await expect(page.locator('#hire-name-input')).toBeVisible();
+    await expect(page.locator('#hire-name-input')).toBeVisible({ timeout: 5_000 });
 
     // The hire cost note must display "$50,000".
-    await expect(page.locator('.hire-cost-note')).toBeVisible();
-    await expect(page.locator('.hire-cost-note')).toContainText('50,000');
+    await expect(page.locator('.hire-cost-note')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('.hire-cost-note')).toContainText('50,000', { timeout: 5_000 });
 
     // The hire button must also be visible and enabled (funds are sufficient).
-    await expect(page.locator('.hire-btn')).toBeVisible();
-    await expect(page.locator('.hire-btn')).not.toBeDisabled();
+    await expect(page.locator('.hire-btn')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('.hire-btn')).not.toBeDisabled({ timeout: 5_000 });
   });
 
   // ── (3) Hiring an astronaut deducts $50,000 from cash and adds to Active Crew
@@ -119,8 +119,8 @@ test.describe('Crew Administration Flow', () => {
     await page.click('.hire-btn');
 
     // Wait for the success feedback to confirm the hire completed.
-    await expect(page.locator('.hire-feedback.success')).toBeVisible();
-    await expect(page.locator('.hire-feedback.success')).toContainText('Valentina Tereshkova');
+    await expect(page.locator('.hire-feedback.success')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('.hire-feedback.success')).toContainText('Valentina Tereshkova', { timeout: 5_000 });
 
     // Cash in game state must have decreased by exactly HIRE_COST.
     const cashAfter: number | undefined = await page.evaluate(() =>
@@ -129,11 +129,11 @@ test.describe('Crew Administration Flow', () => {
     expect(cashAfter).toBe(STARTING_MONEY - HIRE_COST);
 
     // The persistent top bar must reflect the deducted balance.
-    await expect(page.locator('#topbar-cash')).toContainText('1,950,000');
+    await expect(page.locator('#topbar-cash')).toContainText('1,950,000', { timeout: 5_000 });
 
     // Switch to Active Crew tab and verify the astronaut appears.
     await page.click('[data-tab-id="active"]');
-    await expect(page.locator('.crew-name-cell')).toContainText('Valentina Tereshkova');
+    await expect(page.locator('.crew-name-cell')).toContainText('Valentina Tereshkova', { timeout: 5_000 });
   });
 
   // ── (4) Newly hired astronaut has 0 missions flown and status "active" ─────
@@ -143,15 +143,15 @@ test.describe('Crew Administration Flow', () => {
     await page.click('[data-tab-id="hire"]');
     await page.fill('#hire-name-input', 'Yuri Gagarin');
     await page.click('.hire-btn');
-    await expect(page.locator('.hire-feedback.success')).toBeVisible();
+    await expect(page.locator('.hire-feedback.success')).toBeVisible({ timeout: 5_000 });
 
     // Switch to Active Crew tab.
     await page.click('[data-tab-id="active"]');
-    await expect(page.locator('.crew-name-cell')).toContainText('Yuri Gagarin');
+    await expect(page.locator('.crew-name-cell')).toContainText('Yuri Gagarin', { timeout: 5_000 });
 
     // Missions Flown column (4th <td> in the data row) must show "0".
     const missionsCell = page.locator('.crew-table tbody tr td:nth-child(4)').first();
-    await expect(missionsCell).toHaveText('0');
+    await expect(missionsCell).toHaveText('0', { timeout: 5_000 });
 
     // The astronaut's status in game state must be "active".
     const status: string | undefined = await page.evaluate(() =>
@@ -167,20 +167,20 @@ test.describe('Crew Administration Flow', () => {
     await page.click('[data-tab-id="hire"]');
     await page.fill('#hire-name-input', 'Neil Armstrong');
     await page.click('.hire-btn');
-    await expect(page.locator('.hire-feedback.success')).toBeVisible();
+    await expect(page.locator('.hire-feedback.success')).toBeVisible({ timeout: 5_000 });
 
     // Switch to Active Crew and confirm the astronaut is there.
     await page.click('[data-tab-id="active"]');
-    await expect(page.locator('.crew-name-cell')).toContainText('Neil Armstrong');
+    await expect(page.locator('.crew-name-cell')).toContainText('Neil Armstrong', { timeout: 5_000 });
 
     // Click the Fire button.
     await page.click('.crew-fire-btn');
 
     // The Active Crew list must now be empty (empty-state message visible).
-    await expect(page.locator('.crew-empty-msg')).toBeVisible();
+    await expect(page.locator('.crew-empty-msg')).toBeVisible({ timeout: 5_000 });
 
     // The crew table must have been removed.
-    await expect(page.locator('.crew-table')).toHaveCount(0);
+    await expect(page.locator('.crew-table')).toHaveCount(0, { timeout: 5_000 });
   });
 
   // ── (6) Fired astronauts appear in History tab with status "fired" ─────────
@@ -190,28 +190,28 @@ test.describe('Crew Administration Flow', () => {
     await page.click('[data-tab-id="hire"]');
     await page.fill('#hire-name-input', 'Buzz Aldrin');
     await page.click('.hire-btn');
-    await expect(page.locator('.hire-feedback.success')).toBeVisible();
+    await expect(page.locator('.hire-feedback.success')).toBeVisible({ timeout: 5_000 });
 
     // Switch to Active Crew and fire them.
     await page.click('[data-tab-id="active"]');
-    await expect(page.locator('.crew-name-cell')).toContainText('Buzz Aldrin');
+    await expect(page.locator('.crew-name-cell')).toContainText('Buzz Aldrin', { timeout: 5_000 });
     await page.click('.crew-fire-btn');
 
     // Confirm active crew is now empty.
-    await expect(page.locator('.crew-empty-msg')).toBeVisible();
+    await expect(page.locator('.crew-empty-msg')).toBeVisible({ timeout: 5_000 });
 
     // Switch to History tab.
     await page.click('[data-tab-id="history"]');
 
     // History table must be rendered.
-    await expect(page.locator('.history-table')).toBeVisible();
+    await expect(page.locator('.history-table')).toBeVisible({ timeout: 5_000 });
 
     // The astronaut must appear in the history table.
-    await expect(page.locator('.hist-name-cell')).toContainText('Buzz Aldrin');
+    await expect(page.locator('.hist-name-cell')).toContainText('Buzz Aldrin', { timeout: 5_000 });
 
     // Their status badge must be "Fired".
-    await expect(page.locator('.hist-status-badge.fired')).toBeVisible();
-    await expect(page.locator('.hist-status-badge.fired')).toContainText('Fired');
+    await expect(page.locator('.hist-status-badge.fired')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('.hist-status-badge.fired')).toContainText('Fired', { timeout: 5_000 });
   });
 
   // ── (7) Hire button is disabled when cash is below $50,000 ────────────────
@@ -227,10 +227,10 @@ test.describe('Crew Administration Flow', () => {
     await page.click('[data-tab-id="hire"]');
 
     // The hire button must be visible but disabled (insufficient funds).
-    await expect(page.locator('.hire-btn')).toBeVisible();
-    await expect(page.locator('.hire-btn')).toBeDisabled();
+    await expect(page.locator('.hire-btn')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('.hire-btn')).toBeDisabled({ timeout: 5_000 });
 
     // The cash amount display must carry the "insufficient" CSS class (red text).
-    await expect(page.locator('.hire-cash-amount.insufficient')).toBeVisible();
+    await expect(page.locator('.hire-cash-amount.insufficient')).toBeVisible({ timeout: 5_000 });
   });
 });

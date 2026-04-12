@@ -106,7 +106,7 @@ test.describe('VAB — Part Disconnection & Reconnection', () => {
     await buildThreePartRocket(page);
 
     await page.click('#vab-btn-staging');
-    await expect(page.locator('#vab-staging-panel')).toBeVisible();
+    await expect(page.locator('#vab-staging-panel')).toBeVisible({ timeout: 5_000 });
     await expect(page.locator('[data-drop-zone="stage-0"]').getByText('Spark Engine')).toBeVisible({ timeout: 5_000 });
     await page.locator('#vab-staging-close').click();
 
@@ -123,11 +123,11 @@ test.describe('VAB — Part Disconnection & Reconnection', () => {
     await disconnectTank(page);
 
     await page.click('#vab-btn-engineer');
-    await expect(page.locator('#vab-engineer-panel')).toBeVisible();
+    await expect(page.locator('#vab-engineer-panel')).toBeVisible({ timeout: 5_000 });
 
     const checkTexts: string[] = await page.locator('#vab-engineer-panel .vab-val-msg').allTextContents();
     expect(checkTexts.some((t: string) => /floating/i.test(t))).toBe(true);
-    await expect(page.locator('#vab-btn-launch')).toBeDisabled();
+    await expect(page.locator('#vab-btn-launch')).toBeDisabled({ timeout: 5_000 });
     await page.locator('#vab-engineer-close').click();
   });
 
@@ -152,7 +152,7 @@ test.describe('VAB — Part Disconnection & Reconnection', () => {
     await reconnectTank(page, tankId);
 
     await page.click('#vab-btn-engineer');
-    await expect(page.locator('#vab-engineer-panel')).toBeVisible();
+    await expect(page.locator('#vab-engineer-panel')).toBeVisible({ timeout: 5_000 });
 
     const checkTexts: string[] = await page.locator('#vab-engineer-panel .vab-val-msg').allTextContents();
     expect(checkTexts.some((t: string) => /floating/i.test(t))).toBe(false);

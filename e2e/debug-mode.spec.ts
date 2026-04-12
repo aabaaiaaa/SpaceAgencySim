@@ -49,7 +49,7 @@ test.describe('Debug Mode Toggle', () => {
     // Save via topbar.
     await page.click('#topbar-menu-btn');
     await page.locator('#topbar-dropdown').getByText('Save Game').click();
-    await expect(page.locator('#save-modal-backdrop')).toBeVisible();
+    await expect(page.locator('#save-modal-backdrop')).toBeVisible({ timeout: 5_000 });
     await page.click('[data-testid="save-slot-0"]');
     await expect(page.locator('#save-modal-backdrop')).toHaveCount(0, { timeout: 5_000 });
 

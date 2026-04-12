@@ -268,7 +268,7 @@ test.describe('Facility upgrade purchase from construction menu', () => {
     const visible = await upgradeBtnAfter.isVisible().catch(() => false);
     if (visible) {
       // If still visible, it should be disabled
-      await expect(upgradeBtnAfter).toBeDisabled();
+      await expect(upgradeBtnAfter).toBeDisabled({ timeout: 5_000 });
     }
 
     await page.click('.cp-close-btn');

@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 44
-- **Completed**: 41
-- **Remaining**: 3
-- **Last Updated**: 2026-04-12T00:05:59.564Z
+- **Completed**: 42
+- **Remaining**: 2
+- **Last Updated**: 2026-04-12T00:17:38.976Z
 
 ## Iteration Log
 
@@ -142,4 +142,13 @@
 - **Exit Status**: success
 - **Tokens**: 4,594,015 total (3,027 in, 25,778 out, 100,621 cache-create, 4,464,589 cache-read)
 - **Cost**: $4.1683
+
+### Iteration 16 - 2026-04-12T00:17:38.975Z
+- **Task Attempted**: TASK-038
+- **Task Completed**: TASK-038
+- **Summary**: Completed Full E2E rerun — debug remaining failures (pass 2)
+- **Duration**: 11m 37s
+- **Exit Status**: success
+- **Tokens**: 5,766,693 total (72 in, 21,497 out, 87,797 cache-create, 5,657,327 cache-read)
+- **Cost**: $4.2292
 

@@ -64,7 +64,7 @@ test.describe('Hub Switcher', () => {
     // First option should be Earth
     const firstOption = options.nth(0);
     await expect(firstOption).toHaveText(/Earth HQ/, { timeout: 5_000 });
-    await expect(firstOption).toHaveAttribute('value', 'earth');
+    await expect(firstOption).toHaveAttribute('value', 'earth', { timeout: 5_000 });
 
     // Second option should be Moon
     const secondOption = options.nth(1);

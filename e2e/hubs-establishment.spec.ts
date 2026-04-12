@@ -63,13 +63,13 @@ test.describe('Hub Establishment', () => {
     // First option should be Earth
     const earthOption = options.nth(0);
     await expect(earthOption).toHaveText(/Earth HQ/, { timeout: 5_000 });
-    await expect(earthOption).toHaveAttribute('value', 'earth');
+    await expect(earthOption).toHaveAttribute('value', 'earth', { timeout: 5_000 });
 
     // Second option should be the Moon outpost
     const moonOption = options.nth(1);
     await expect(moonOption).toHaveText(/Moon Surface Outpost/, { timeout: 5_000 });
-    await expect(moonOption).toHaveText(/MOON/);
-    await expect(moonOption).toHaveAttribute('value', 'moon-outpost');
+    await expect(moonOption).toHaveText(/MOON/, { timeout: 5_000 });
+    await expect(moonOption).toHaveAttribute('value', 'moon-outpost', { timeout: 5_000 });
   });
 
   test('under-construction status shown', async ({ page }) => {
@@ -117,6 +117,6 @@ test.describe('Hub Establishment', () => {
     // The under-construction hub option should show [Building] text
     const marsOption = switcher.locator('option').nth(1);
     await expect(marsOption).toHaveText(/\[Building\]/, { timeout: 5_000 });
-    await expect(marsOption).toHaveText(/Mars Colony/);
+    await expect(marsOption).toHaveText(/Mars Colony/, { timeout: 5_000 });
   });
 });

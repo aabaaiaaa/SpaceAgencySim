@@ -74,29 +74,29 @@ test.describe('Mining Panel Interactions', () => {
     // The site card should render with the site name
     const siteCard = page.locator('.logistics-site-card');
     await expect(siteCard).toBeVisible({ timeout: 5_000 });
-    await expect(siteCard).toContainText('Refinery Test Base');
+    await expect(siteCard).toContainText('Refinery Test Base', { timeout: 5_000 });
 
     // The body should appear in the sidebar
     const sidebarItem = page.locator('.logistics-sidebar-item', { hasText: 'MOON' });
     await expect(sidebarItem).toBeVisible({ timeout: 5_000 });
 
     // Power budget should be displayed
-    await expect(siteCard).toContainText('Power: 100 / 72');
+    await expect(siteCard).toContainText('Power: 100 / 72', { timeout: 5_000 });
 
     // Storage should show water ice
-    await expect(siteCard).toContainText('Water Ice');
-    await expect(siteCard).toContainText('500.0 kg');
+    await expect(siteCard).toContainText('Water Ice', { timeout: 5_000 });
+    await expect(siteCard).toContainText('500.0 kg', { timeout: 5_000 });
 
     // All 5 modules should be rendered
     const moduleItems = siteCard.locator('.logistics-module-item');
-    await expect(moduleItems).toHaveCount(5);
+    await expect(moduleItems).toHaveCount(5, { timeout: 5_000 });
 
     // Verify module types are displayed
-    await expect(siteCard).toContainText('Power Generator');
-    await expect(siteCard).toContainText('Mining Drill');
-    await expect(siteCard).toContainText('Storage Silo');
-    await expect(siteCard).toContainText('Refinery');
-    await expect(siteCard).toContainText('Pressure Vessel');
+    await expect(siteCard).toContainText('Power Generator', { timeout: 5_000 });
+    await expect(siteCard).toContainText('Mining Drill', { timeout: 5_000 });
+    await expect(siteCard).toContainText('Storage Silo', { timeout: 5_000 });
+    await expect(siteCard).toContainText('Refinery', { timeout: 5_000 });
+    await expect(siteCard).toContainText('Pressure Vessel', { timeout: 5_000 });
   });
 
   test('@smoke change refinery recipe via dropdown', async ({ page }) => {
@@ -148,16 +148,16 @@ test.describe('Mining Panel Interactions', () => {
     await expect(moduleItems).toHaveCount(5, { timeout: 5_000 });
 
     // Verify partIds appear in the module list
-    await expect(siteCard.locator('.logistics-module-list')).toContainText('power-generator-solar-mk1');
-    await expect(siteCard.locator('.logistics-module-list')).toContainText('mining-drill-mk1');
-    await expect(siteCard.locator('.logistics-module-list')).toContainText('storage-silo-mk1');
-    await expect(siteCard.locator('.logistics-module-list')).toContainText('refinery-mk1');
-    await expect(siteCard.locator('.logistics-module-list')).toContainText('pressure-vessel-mk1');
+    await expect(siteCard.locator('.logistics-module-list')).toContainText('power-generator-solar-mk1', { timeout: 5_000 });
+    await expect(siteCard.locator('.logistics-module-list')).toContainText('mining-drill-mk1', { timeout: 5_000 });
+    await expect(siteCard.locator('.logistics-module-list')).toContainText('storage-silo-mk1', { timeout: 5_000 });
+    await expect(siteCard.locator('.logistics-module-list')).toContainText('refinery-mk1', { timeout: 5_000 });
+    await expect(siteCard.locator('.logistics-module-list')).toContainText('pressure-vessel-mk1', { timeout: 5_000 });
 
     // The refinery module should show "Recipe:" label
     // Find the module item that contains "Refinery" text
     const refineryItem = moduleItems.filter({ hasText: 'Refinery' }).first();
-    await expect(refineryItem).toContainText('Recipe:');
+    await expect(refineryItem).toContainText('Recipe:', { timeout: 5_000 });
 
     // Connection information is not currently rendered in the module list UI.
     // The logistics panel displays modules as a flat list without visual

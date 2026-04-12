@@ -71,7 +71,7 @@ test.describe('VAB at off-world hub', () => {
     // Check for import tax text — Moon has 1.2x multiplier
     const importTaxSpan = page.locator('.vab-part-import-tax');
     await expect(importTaxSpan.first()).toBeVisible({ timeout: 5000 });
-    await expect(importTaxSpan.first()).toContainText('1.2x import');
+    await expect(importTaxSpan.first()).toContainText('1.2x import', { timeout: 5_000 });
 
     // Verify the data-import-tax attribute is set
     const taxAttr = await importTaxSpan.first().getAttribute('data-import-tax');
@@ -93,6 +93,6 @@ test.describe('VAB at off-world hub', () => {
 
     // No import tax labels should be present
     const importTaxSpan = page.locator('.vab-part-import-tax');
-    await expect(importTaxSpan).toHaveCount(0);
+    await expect(importTaxSpan).toHaveCount(0, { timeout: 5_000 });
   });
 });

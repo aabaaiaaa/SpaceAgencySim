@@ -7,7 +7,6 @@ import {
   placePart, seedAndLoadSave, navigateToVab, launchFromVab,
   startTestFlight,
   pressStage,
-  pressThrottleUp,
 } from './helpers.js';
 
 /**

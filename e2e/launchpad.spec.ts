@@ -136,7 +136,7 @@ test.describe('Launch Pad', () => {
     const launchBtn = page.locator('.lp-launch-btn');
     await expect(launchBtn).toBeVisible({ timeout: 5_000 });
     await expect(launchBtn).toContainText('$14,800', { timeout: 5_000 });
-    await expect(launchBtn).not.toBeDisabled();
+    await expect(launchBtn).not.toBeDisabled({ timeout: 5_000 });
   });
 
   // -- (2) Launch pad shows empty state when no rockets exist ----------------
@@ -258,6 +258,6 @@ test.describe('Launch Pad', () => {
     await expect(page.locator('.lp-rocket-cost-insufficient')).toBeVisible({ timeout: 5_000 });
 
     // The Launch button should be disabled.
-    await expect(page.locator('.lp-launch-btn')).toBeDisabled();
+    await expect(page.locator('.lp-launch-btn')).toBeDisabled({ timeout: 5_000 });
   });
 });

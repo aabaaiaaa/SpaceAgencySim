@@ -257,7 +257,7 @@
 - **Verification**: Run the previously-slow specs and verify reduced timing. No spec exceeds 60 seconds.
 
 ### TASK-038: Full E2E rerun — debug remaining failures (pass 2)
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-037
 - **Description**: Run the complete E2E suite again (twice). Compare results against the TASK-035 baseline. Investigate any new or recurring failures using Playwright MCP. Focus on tests that were green in pass 1 but fail now — these are the true flaky tests that need timing/race-condition fixes. Also investigate any tests that were fixed in TASK-036 but regressed.
 - **Verification**: Full E2E suite passes. Any remaining failures are documented with root-cause notes.

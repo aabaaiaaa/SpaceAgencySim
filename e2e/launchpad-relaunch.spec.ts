@@ -169,7 +169,7 @@ test.describe('Launch Pad — Relaunch Engine Bug', () => {
     await launchFromPad(page);
     await fireStageAndVerifyLiftoff(page);
     await returnToHub(page);
-    await expect(page.locator('#hub-overlay')).toBeVisible();
+    await expect(page.locator('#hub-overlay')).toBeVisible({ timeout: 5_000 });
   });
 
   test('(3) second flight — engine fires on relaunch (regression)', async ({ page }) => {

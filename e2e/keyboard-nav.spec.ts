@@ -45,7 +45,7 @@ test.describe('Keyboard Navigation', () => {
 
     // Enter activates the focused mode option.
     await page.keyboard.press('Enter');
-    await expect(page.locator('.mm-mode-option[data-mode="sandbox"]')).toHaveClass(/selected/);
+    await expect(page.locator('.mm-mode-option[data-mode="sandbox"]')).toHaveClass(/selected/, { timeout: 5_000 });
 
     // Tab through to the Start button and activate it.
     // Continue tabbing until we reach the start button.
@@ -154,7 +154,7 @@ test.describe('Keyboard Navigation', () => {
 
     // Escape closes the dropdown.
     await page.keyboard.press('Escape');
-    await expect(page.locator('#topbar-dropdown')).not.toBeVisible();
+    await expect(page.locator('#topbar-dropdown')).not.toBeVisible({ timeout: 5_000 });
 
     // Focus should return to the menu button.
     await expect(page.locator('#topbar-menu-btn')).toBeFocused();
@@ -204,7 +204,7 @@ test.describe('Keyboard Navigation', () => {
 
     // Escape closes the settings panel.
     await page.keyboard.press('Escape');
-    await expect(page.locator('#settings-panel')).not.toBeVisible();
+    await expect(page.locator('#settings-panel')).not.toBeVisible({ timeout: 5_000 });
   });
 
   test('Tab cycles through VAB toolbar buttons and part cards', async ({ page }) => {
@@ -322,7 +322,7 @@ test.describe('Keyboard Navigation', () => {
 
     // Escape closes Mission Control and returns to hub.
     await page.keyboard.press('Escape');
-    await expect(page.locator('#mission-control-overlay')).not.toBeVisible();
-    await expect(page.locator('#hub-overlay')).toBeVisible();
+    await expect(page.locator('#mission-control-overlay')).not.toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('#hub-overlay')).toBeVisible({ timeout: 5_000 });
   });
 });

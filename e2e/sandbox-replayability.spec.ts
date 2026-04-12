@@ -1084,7 +1084,7 @@ test.describe('Game settings — difficulty options', () => {
 
     // Verify the Off button is now active
     const offBtn = page.locator('.settings-option-btn[data-setting="malfunctionFrequency"][data-value="off"]');
-    await expect(offBtn).toHaveClass(/active/);
+    await expect(offBtn).toHaveClass(/active/, { timeout: 5_000 });
 
     await page.close();
   });
@@ -1252,16 +1252,16 @@ test.describe('Game settings — difficulty options', () => {
 
     // Verify the previously set values are still active
     const malfBtn = page.locator('.settings-option-btn[data-setting="malfunctionFrequency"].active');
-    await expect(malfBtn).toHaveAttribute('data-value', 'low');
+    await expect(malfBtn).toHaveAttribute('data-value', 'low', { timeout: 5_000 });
 
     const weatherBtn = page.locator('.settings-option-btn[data-setting="weatherSeverity"].active');
-    await expect(weatherBtn).toHaveAttribute('data-value', 'mild');
+    await expect(weatherBtn).toHaveAttribute('data-value', 'mild', { timeout: 5_000 });
 
     const finBtn = page.locator('.settings-option-btn[data-setting="financialPressure"].active');
-    await expect(finBtn).toHaveAttribute('data-value', 'easy');
+    await expect(finBtn).toHaveAttribute('data-value', 'easy', { timeout: 5_000 });
 
     const injBtn = page.locator('.settings-option-btn[data-setting="injuryDuration"].active');
-    await expect(injBtn).toHaveAttribute('data-value', 'short');
+    await expect(injBtn).toHaveAttribute('data-value', 'short', { timeout: 5_000 });
 
     await page.close();
   });

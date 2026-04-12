@@ -39,10 +39,10 @@ async function loadSaveSlot0(page: Page): Promise<void> {
 // -- Helper: assert hub is clean ---------------------------------------------
 
 async function assertCleanHub(page: Page): Promise<void> {
-  await expect(page.locator('#hub-overlay')).toBeVisible();
-  await expect(page.locator('#vab-root')).toHaveCount(0);
-  await expect(page.locator('#flight-hud')).toHaveCount(0);
-  await expect(page.locator('#flight-overlay')).toHaveCount(0);
+  await expect(page.locator('#hub-overlay')).toBeVisible({ timeout: 5_000 });
+  await expect(page.locator('#vab-root')).toHaveCount(0, { timeout: 5_000 });
+  await expect(page.locator('#flight-hud')).toHaveCount(0, { timeout: 5_000 });
+  await expect(page.locator('#flight-overlay')).toHaveCount(0, { timeout: 5_000 });
 
   // PixiJS: VAB container should not be visible.
   const vabContainerVisible: boolean = await page.evaluate(() => {
@@ -64,7 +64,7 @@ test('VAB scene is hidden after exit-to-menu and reload', async ({ page }) => {
 
   await seedAndLoadSave(page, envelope);
   await navigateToVab(page);
-  await expect(page.locator('#vab-root')).toBeVisible();
+  await expect(page.locator('#vab-root')).toBeVisible({ timeout: 5_000 });
 
   await exitToMenu(page);
   await loadSaveSlot0(page);
@@ -80,7 +80,7 @@ test('flight scene is cleaned up after exit-to-menu and reload', async ({ page }
   await seedAndLoadSave(page, envelope);
 
   await startTestFlight(page, ['cmd-mk1', 'tank-small', 'engine-spark']);
-  await expect(page.locator('#flight-hud')).toBeVisible();
+  await expect(page.locator('#flight-hud')).toBeVisible({ timeout: 5_000 });
 
   await exitToMenu(page);
   await loadSaveSlot0(page);

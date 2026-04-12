@@ -44,13 +44,13 @@ test.describe('Flight — First Flight Mission Completion', () => {
     await placePart(page, 'engine-spark', CENTRE_X, ENGINE_DROP_Y, 3);
 
     await page.click('#vab-btn-staging');
-    await expect(page.locator('#vab-staging-panel')).toBeVisible();
+    await expect(page.locator('#vab-staging-panel')).toBeVisible({ timeout: 5_000 });
     await expect(
       page.locator('[data-drop-zone="stage-0"]').getByText('Spark Engine'),
     ).toBeVisible({ timeout: 5_000 });
 
     const unstagedEngines = page.locator('[data-drop-zone="unstaged"] .vab-stage-chip:has-text("Spark Engine")');
-    await expect(unstagedEngines).toHaveCount(0);
+    await expect(unstagedEngines).toHaveCount(0, { timeout: 5_000 });
   });
 
   test('(2) First Flight mission completes when rocket reaches 100 m', async ({ page }) => {

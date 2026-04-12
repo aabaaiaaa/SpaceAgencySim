@@ -69,7 +69,7 @@ test.describe('Help Panel Accessibility', () => {
   // ── (1) Help from Hub ───────────────────────────────────────────────────
 
   test('(1) help is accessible from the Hub with default section "overview"', async ({ page }) => {
-    await expect(page.locator('#hub-overlay')).toBeVisible();
+    await expect(page.locator('#hub-overlay')).toBeVisible({ timeout: 5_000 });
     await openHelp(page);
     expect(await activeSection(page)).toBe('overview');
     await closeHelp(page);
@@ -166,7 +166,7 @@ test.describe('Help Panel Accessibility', () => {
       expect(await activeSection(page)).toBe(sectionId);
 
       // Verify content area has an h2 (section heading rendered).
-      await expect(page.locator('.help-content h2')).toBeVisible();
+      await expect(page.locator('.help-content h2')).toBeVisible({ timeout: 5_000 });
     }
 
     await closeHelp(page);

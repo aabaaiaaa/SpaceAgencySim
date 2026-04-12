@@ -133,7 +133,7 @@ test.describe('Route Interactions', () => {
 
     // Verify initial state is "Active"
     await expect(statusBtn).toHaveText('Active', { timeout: 5_000 });
-    await expect(statusBtn).toHaveClass(/status-active/);
+    await expect(statusBtn).toHaveClass(/status-active/, { timeout: 5_000 });
 
     // Click to toggle to paused
     await statusBtn.click();
@@ -142,7 +142,7 @@ test.describe('Route Interactions', () => {
     const updatedRow = page.locator('tr[data-route-id="route-e2e-1"]');
     const updatedBtn = updatedRow.locator('.logistics-route-status-btn');
     await expect(updatedBtn).toHaveText('Paused', { timeout: 5_000 });
-    await expect(updatedBtn).toHaveClass(/status-paused/);
+    await expect(updatedBtn).toHaveClass(/status-paused/, { timeout: 5_000 });
   });
 
   test('expand route to see leg details with craft controls', async ({ page }) => {

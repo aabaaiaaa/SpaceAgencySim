@@ -35,50 +35,50 @@ test.describe('Hub Navigation', () => {
   // ── (1) VAB — parts panel is visible ──────────────────────────────────────
 
   test('(1) clicking "Vehicle Assembly Building" loads the VAB screen with a visible parts panel', async ({ page }) => {
-    await expect(page.locator('#hub-overlay')).toBeVisible();
+    await expect(page.locator('#hub-overlay')).toBeVisible({ timeout: 5_000 });
 
     await page.click('[data-building-id="vab"]');
     await page.waitForSelector('#vab-root', { state: 'visible', timeout: 5_000 });
 
     // The parts panel must be present and visible.
-    await expect(page.locator('#vab-parts-list')).toBeVisible();
+    await expect(page.locator('#vab-parts-list')).toBeVisible({ timeout: 5_000 });
   });
 
   // ── (2) Mission Control — available missions listed ────────────────────────
 
   test('(2) clicking "Mission Control Centre" loads the mission control screen with at least one available mission', async ({ page }) => {
-    await expect(page.locator('#hub-overlay')).toBeVisible();
+    await expect(page.locator('#hub-overlay')).toBeVisible({ timeout: 5_000 });
 
     await page.click('[data-building-id="mission-control"]');
     await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 5_000 });
 
     // At least one mission card must be visible on the Available tab.
-    await expect(page.locator('.mc-mission-card').first()).toBeVisible();
+    await expect(page.locator('.mc-mission-card').first()).toBeVisible({ timeout: 5_000 });
   });
 
   // ── (3) Crew Administration — three tabs present ───────────────────────────
 
   test('(3) clicking "Crew Administration" loads the crew admin screen with Active Crew, Hire, and History tabs', async ({ page }) => {
-    await expect(page.locator('#hub-overlay')).toBeVisible();
+    await expect(page.locator('#hub-overlay')).toBeVisible({ timeout: 5_000 });
 
     await page.click('[data-building-id="crew-admin"]');
     await page.waitForSelector('#crew-admin-overlay', { state: 'visible', timeout: 5_000 });
 
     // All three tabs must be present.
-    await expect(page.locator('[data-tab-id="active"]')).toBeVisible();
-    await expect(page.locator('[data-tab-id="hire"]')).toBeVisible();
-    await expect(page.locator('[data-tab-id="history"]')).toBeVisible();
+    await expect(page.locator('[data-tab-id="active"]')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-tab-id="hire"]')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-tab-id="history"]')).toBeVisible({ timeout: 5_000 });
   });
 
   // ── (4) Launch Pad — screen loads ─────────────────────────────────────────
 
   test('(4) clicking "Launch Pad" loads the launch pad screen', async ({ page }) => {
-    await expect(page.locator('#hub-overlay')).toBeVisible();
+    await expect(page.locator('#hub-overlay')).toBeVisible({ timeout: 5_000 });
 
     await page.click('[data-building-id="launch-pad"]');
     await page.waitForSelector('#launch-pad-overlay', { state: 'visible', timeout: 5_000 });
 
-    await expect(page.locator('#launch-pad-overlay')).toBeVisible();
+    await expect(page.locator('#launch-pad-overlay')).toBeVisible({ timeout: 5_000 });
   });
 
   // ── (5) Each building has a back/return button that returns to the hub ─────
@@ -93,18 +93,18 @@ test.describe('Hub Navigation', () => {
 
     for (const { id, overlay, backBtn } of buildings) {
       // Must start from the hub.
-      await expect(page.locator('#hub-overlay')).toBeVisible();
+      await expect(page.locator('#hub-overlay')).toBeVisible({ timeout: 5_000 });
 
       await page.click(`[data-building-id="${id}"]`);
       await page.waitForSelector(overlay, { state: 'visible', timeout: 5_000 });
 
       // The back button must be present and visible.
-      await expect(page.locator(backBtn)).toBeVisible();
+      await expect(page.locator(backBtn)).toBeVisible({ timeout: 5_000 });
 
       // Clicking it must return to the hub.
       await page.click(backBtn);
       await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 5_000 });
-      await expect(page.locator('#hub-overlay')).toBeVisible();
+      await expect(page.locator('#hub-overlay')).toBeVisible({ timeout: 5_000 });
     }
   });
 
@@ -120,14 +120,14 @@ test.describe('Hub Navigation', () => {
 
     for (const { id, overlay, backBtn } of buildings) {
       // Must start from the hub.
-      await expect(page.locator('#hub-overlay')).toBeVisible();
+      await expect(page.locator('#hub-overlay')).toBeVisible({ timeout: 5_000 });
 
       await page.click(`[data-building-id="${id}"]`);
       await page.waitForSelector(overlay, { state: 'visible', timeout: 5_000 });
 
       // The persistent top bar and its cash readout must be visible.
-      await expect(page.locator('#game-topbar')).toBeVisible();
-      await expect(page.locator('#topbar-cash')).toBeVisible();
+      await expect(page.locator('#game-topbar')).toBeVisible({ timeout: 5_000 });
+      await expect(page.locator('#topbar-cash')).toBeVisible({ timeout: 5_000 });
 
       // Navigate back to hub for next iteration.
       await page.click(backBtn);
