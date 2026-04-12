@@ -20,7 +20,7 @@
  */
 
 import { FacilityId, GameMode, RD_TIER_MAX_TECH } from './constants.ts';
-import { hasFacility } from './construction.ts';
+import { hasFacility, getFacilityTier } from './construction.ts';
 import { spend } from './finance.ts';
 import {
   TECH_NODES,
@@ -116,7 +116,7 @@ export function isNodeUnlocked(state: GameState, nodeId: string): boolean {
  */
 export function getMaxResearchableTier(state: GameState): number {
   if (!hasFacility(state, FacilityId.RD_LAB)) return 0;
-  const rdTier = state.facilities[FacilityId.RD_LAB]?.tier ?? 1;
+  const rdTier = getFacilityTier(state, FacilityId.RD_LAB);
   return (RD_TIER_MAX_TECH as Record<number, number>)[rdTier] ?? 6;
 }
 

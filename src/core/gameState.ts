@@ -883,6 +883,11 @@ export interface GameState {
  * in-place (or replace top-level properties immutably as preferred).
  */
 export function createGameState(): GameState {
+  const starterFacilities = Object.fromEntries(
+    FACILITY_DEFINITIONS
+      .filter((f) => f.starter)
+      .map((f) => [f.id, { built: true, tier: 1 }]),
+  );
   return {
     agencyName: '',
 
@@ -937,11 +942,9 @@ export function createGameState(): GameState {
 
     // Starter facilities are pre-built; the rest are added by
     // buildFacility() (non-tutorial) or awarded via tutorial missions.
-    facilities: Object.fromEntries(
-      FACILITY_DEFINITIONS
-        .filter((f) => f.starter)
-        .map((f) => [f.id, { built: true, tier: 1 }]),
-    ),
+    // NOTE: This is the same object reference as hubs[0].facilities (Earth HQ)
+    // so that legacy code writing to state.facilities stays in sync with the hub system.
+    facilities: starterFacilities,
 
     // Procedurally generated contract system.
     contracts: {
@@ -1020,11 +1023,7 @@ export function createGameState(): GameState {
       type: 'surface',
       bodyId: 'EARTH',
       coordinates: { x: 0, y: 0 },
-      facilities: Object.fromEntries(
-        FACILITY_DEFINITIONS
-          .filter((f) => f.starter)
-          .map((f) => [f.id, { built: true, tier: 1 }]),
-      ),
+      facilities: starterFacilities,
       tourists: [],
       partInventory: [],
       constructionQueue: [],

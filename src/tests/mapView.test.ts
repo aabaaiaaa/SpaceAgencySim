@@ -229,14 +229,18 @@ describe('generateOrbitPredictions', () => {
 
 describe('isMapViewAvailable', () => {
   it('returns false when tracking station is not built', () => {
-    const state = { orbitalObjects: [], facilities: {} } as Partial<GameState> as GameState;
+    const facilities = {} as Record<string, FacilityState>;
+    const state = { orbitalObjects: [], facilities, hubs: [{ id: 'earth', facilities }], activeHubId: 'earth' } as Partial<GameState> as GameState;
     expect(isMapViewAvailable(state)).toBe(false);
   });
 
   it('returns true when tracking station is built', () => {
+    const facilities = { 'tracking-station': { built: true, tier: 1 } as FacilityState };
     const state = {
       orbitalObjects: [],
-      facilities: { 'tracking-station': { built: true, tier: 1 } as FacilityState },
+      facilities,
+      hubs: [{ id: 'earth', facilities }],
+      activeHubId: 'earth',
     } as Partial<GameState> as GameState;
     expect(isMapViewAvailable(state)).toBe(true);
   });
@@ -567,10 +571,14 @@ describe('getMapTransferTargets', () => {
 
 describe('Tracking Station tier-based features', () => {
   function makeState(tier: number): GameState {
-    if (tier === 0) return { orbitalObjects: [], facilities: {} } as Partial<GameState> as GameState;
+    const facilities = tier === 0
+      ? {} as Record<string, FacilityState>
+      : { 'tracking-station': { built: true, tier } as FacilityState };
     return {
       orbitalObjects: [],
-      facilities: { 'tracking-station': { built: true, tier } as FacilityState },
+      facilities,
+      hubs: [{ id: 'earth', facilities }],
+      activeHubId: 'earth',
     } as Partial<GameState> as GameState;
   }
 

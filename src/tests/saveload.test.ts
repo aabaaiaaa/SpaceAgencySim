@@ -1551,18 +1551,18 @@ describe('Save compression', () => {
   });
 
   describe('save version bump', () => {
-    it('SAVE_VERSION is 2 (bumped for compression)', () => {
-      expect(SAVE_VERSION).toBe(2);
+    it('SAVE_VERSION is 3 (bumped for hubs)', () => {
+      expect(SAVE_VERSION).toBe(3);
     });
 
-    it('saved envelopes contain version 2', async () => {
+    it('saved envelopes contain version 3', async () => {
       const state = freshState();
       await saveGame(state, 0, 'Version Test');
 
       const raw = localStorage.getItem('spaceAgencySave_0');
       const json = decompressSaveData(raw!);
       const envelope = JSON.parse(json) as SaveEnvelope;
-      expect(envelope.version).toBe(2);
+      expect(envelope.version).toBe(3);
     });
   });
 });

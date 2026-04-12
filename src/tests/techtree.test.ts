@@ -43,6 +43,7 @@ import {
 import { getUnlockedParts } from '../core/missions.ts';
 import { FacilityId } from '../core/constants.ts';
 import { buildFacility } from '../core/construction.ts';
+import { getActiveHub } from '../core/hubs.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -317,13 +318,13 @@ describe('Tech Tree Core Logic', () => {
 
     it('returns max tier 4 for R&D Lab tier 2', () => {
       const state = readyState();
-      state.facilities[FacilityId.RD_LAB].tier = 2;
+      getActiveHub(state).facilities[FacilityId.RD_LAB].tier = 2;
       expect(getMaxResearchableTier(state)).toBe(4);
     });
 
     it('returns max tier 6 for R&D Lab tier 3', () => {
       const state = readyState();
-      state.facilities[FacilityId.RD_LAB].tier = 3;
+      getActiveHub(state).facilities[FacilityId.RD_LAB].tier = 3;
       expect(getMaxResearchableTier(state)).toBe(6);
     });
   });
@@ -458,7 +459,7 @@ describe('Tech Tree Core Logic', () => {
 
     it('@smoke can chain-research a full branch (R&D Lab tier 3)', () => {
       const state = readyState();
-      state.facilities[FacilityId.RD_LAB].tier = 3;
+      getActiveHub(state).facilities[FacilityId.RD_LAB].tier = 3;
       state.sciencePoints = 10_000;
       state.money = 50_000_000;
 

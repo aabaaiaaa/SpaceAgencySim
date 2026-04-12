@@ -228,8 +228,7 @@ test.describe('Route Interactions', () => {
     await expect(craftCount).toHaveText('1', { timeout: 5_000 });
 
     // Verify minimum: - button should be disabled at count 1
-    // Click - again — nothing should happen
-    await minusBtn.click();
+    await expect(minusBtn).toBeDisabled({ timeout: 5_000 });
     await expect(craftCount).toHaveText('1', { timeout: 5_000 });
   });
 
@@ -285,16 +284,28 @@ test.describe('Route Interactions', () => {
     const nameInput = builderPanel.locator('.logistics-builder-input');
     await nameInput.fill('Test Builder Route');
 
-    // Click the origin body on the SVG map — Moon (where the proven leg starts)
+    // Click the origin body on the SVG map — Moon (where the proven leg starts).
+    // Use dispatchEvent for SVG elements since Playwright's normal click can
+    // struggle with SVG coordinate mapping in headless mode.
     const moonCircle = page.locator('.logistics-route-map .body-moon');
     await expect(moonCircle).toBeVisible({ timeout: 5_000 });
-    await moonCircle.click();
+    await moonCircle.dispatchEvent('click');
 
-    // After clicking Moon, the outbound proven leg should be highlighted (solid line)
+    // Wait for re-render after setting the origin body
+    await page.waitForFunction(() => {
+      const legs = document.querySelectorAll('.logistics-route-map .proven-leg-line');
+      return legs.length > 0;
+    }, { timeout: 5_000 });
+
     // Click the highlighted proven leg line
     const provenLegLine = page.locator('.logistics-route-map .proven-leg-line');
-    await expect(provenLegLine).toBeVisible({ timeout: 5_000 });
-    await provenLegLine.click();
+    await provenLegLine.dispatchEvent('click');
+
+    // Wait for the leg to appear in the builder chain
+    await page.waitForFunction(() => {
+      const legsDisplay = document.querySelector('.logistics-builder-legs');
+      return legsDisplay && !legsDisplay.textContent?.includes('No legs added');
+    }, { timeout: 5_000 });
 
     // Click "Create Route" confirm button
     const confirmBtn = builderPanel.locator('.logistics-builder-confirm-btn');

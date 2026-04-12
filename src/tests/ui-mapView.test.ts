@@ -168,6 +168,17 @@ globalThis.document = globalThis.document || {
   body: _stubElement(),
 };
 
+// Stub window for Node.js — _mapView.ts uses window.addEventListener/removeEventListener
+// for custom 'map-hub-click' events.
+if (typeof globalThis.window === 'undefined') {
+  (globalThis as Record<string, unknown>).window = {
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    confirm: () => true,
+    dispatchEvent: () => true,
+  };
+}
+
 interface NotifyMock {
   showPhaseNotification: ReturnType<typeof vi.fn>;
 }
