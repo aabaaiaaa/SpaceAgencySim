@@ -649,6 +649,14 @@ export async function loadGame(slotIndex: number): Promise<GameState> {
   // Migrate legacy saves to the hub system (Earth HQ from facilities/inventory).
   migrateToHubs(envelope.state);
 
+  // Re-link state.facilities to the active hub's facilities so they share
+  // the same object reference (JSON round-tripping breaks this link).
+  if (Array.isArray(envelope.state.hubs) && envelope.state.hubs.length > 0) {
+    const activeId = envelope.state.activeHubId ?? envelope.state.hubs[0].id;
+    const activeHub = envelope.state.hubs.find((h: { id: string }) => h.id === activeId) ?? envelope.state.hubs[0];
+    envelope.state.facilities = activeHub.facilities;
+  }
+
   // Validate and filter corrupted nested entries (missions, crew, etc.).
   _validateNestedStructures(envelope.state);
 

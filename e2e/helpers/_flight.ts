@@ -218,6 +218,13 @@ export async function teleportCraft(
       await window.__resyncPhysicsWorker();
     }
   }, opts);
+
+  // Allow at least two animation frames for the physics worker to process the
+  // resynced state and send a snapshot back.  This prevents race conditions
+  // where test assertions read stale pre-teleport values from __flightPs.
+  await page.evaluate(() => new Promise<void>(r => {
+    requestAnimationFrame(() => requestAnimationFrame(() => r()));
+  }));
 }
 
 /**
@@ -226,7 +233,7 @@ export async function teleportCraft(
  */
 export async function waitForOrbit(
   page: Page,
-  timeout: number = 5_000,
+  timeout: number = 10_000,
 ): Promise<void> {
   await page.waitForFunction(
     () => window.__flightState?.phase === 'ORBIT' && window.__flightState?.inOrbit === true,

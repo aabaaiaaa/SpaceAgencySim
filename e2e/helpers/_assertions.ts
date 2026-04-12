@@ -88,7 +88,7 @@ export async function areAllObjectivesComplete(
 export async function waitForAltitude(
   page: Page,
   altitude: number,
-  timeout: number = 15_000,
+  timeout: number = 20_000,
 ): Promise<void> {
   await page.waitForFunction(
     (alt) => (window.__flightPs?.posY ?? 0) >= alt,

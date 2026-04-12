@@ -154,6 +154,7 @@ test.describe('Malfunction during flight', () => {
   test.afterAll(async () => { await page.close(); });
 
   test('(1) forced malfunction triggers on biome transition, event logged, and flight can still complete', async () => {
+    test.setTimeout(60_000);
     // Start flight with forced malfunctions — every part will malfunction on biome check.
     await startTestFlight(page, BASIC_ROCKET, { malfunctionMode: 'forced' });
 

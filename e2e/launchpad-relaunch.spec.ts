@@ -181,6 +181,13 @@ test.describe('Launch Pad — Relaunch Engine Bug', () => {
     await fireStageAndVerifyLiftoff(page);
     await returnToHub(page);
 
+    // Ensure the physics worker from the first flight is fully torn down
+    // before starting the second flight.
+    await page.waitForFunction(
+      () => window.__flightPs == null,
+      { timeout: 5_000 },
+    ).catch(() => { /* may already be null */ });
+
     // Second flight (the regression test).
     await launchFromPad(page);
     await fireStageAndVerifyLiftoff(page);

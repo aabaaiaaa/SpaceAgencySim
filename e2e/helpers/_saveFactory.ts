@@ -162,7 +162,7 @@ export interface SaveEnvelope {
  */
 export function buildSaveEnvelope(params: SaveEnvelopeParams = {}): SaveEnvelope {
   const {
-    version         = 2,
+    version         = 3,
     saveName        = 'E2E Test',
     money           = STARTING_MONEY,
     missions        = { available: [], accepted: [], completed: [] },
@@ -202,6 +202,10 @@ export function buildSaveEnvelope(params: SaveEnvelopeParams = {}): SaveEnvelope
     debugMode          = false,
   } = params;
 
+  // Build the shared facilities object so state.facilities and
+  // hubs[0].facilities are the same reference, matching createInitialState().
+  const sharedFacilities = { ...facilities };
+
   // Default hubs uses the resolved `facilities` value so existing callers
   // that only override `facilities` automatically get a matching Earth hub.
   const hubs = params.hubs ?? [{
@@ -210,7 +214,7 @@ export function buildSaveEnvelope(params: SaveEnvelopeParams = {}): SaveEnvelope
     type: 'surface' as const,
     bodyId: 'EARTH',
     coordinates: { x: 0, y: 0 },
-    facilities: { ...facilities },
+    facilities: sharedFacilities,
     tourists: [],
     partInventory: [],
     constructionQueue: [],
@@ -245,7 +249,7 @@ export function buildSaveEnvelope(params: SaveEnvelopeParams = {}): SaveEnvelope
       gameMode,
       sandboxSettings,
       difficultySettings,
-      facilities: { ...facilities },
+      facilities: sharedFacilities,
       contracts,
       reputation,
       sciencePoints,

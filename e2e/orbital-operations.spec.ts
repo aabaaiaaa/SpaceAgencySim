@@ -718,6 +718,13 @@ test.describe('Satellite deployment and benefits', () => {
     });
     expect(deployed).toBe(true);
 
+    // Wait for the event to persist through the worker snapshot round-trip
+    // (the main loop replaces fs.events with the worker's version each frame).
+    await page.waitForFunction(
+      () => (window.__flightState?.events ?? []).some((e: { type: string }) => e.type === 'SATELLITE_DEPLOYED'),
+      { timeout: 5_000 },
+    );
+
     // Verify the event is logged.
     const fs = await getFlightState(page) as FlightStateSnapshot | null;
     expect(fs).not.toBeNull();
@@ -1232,6 +1239,12 @@ test.describe('Undocking and control assignment', () => {
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
+    // Wait for the undocking state to persist through the worker snapshot round-trip.
+    await page.waitForFunction(
+      () => window.__flightState?.dockingState?.state === 'IDLE',
+      { timeout: 5_000 },
+    );
+
     const afterUndock = await page.evaluate(() => {
       const ds = window.__flightState?.dockingState;
       return ds ? { state: ds.state as string, dockedCount: (ds.dockedObjectIds as string[])?.length ?? 0 } : null;
@@ -1296,6 +1309,12 @@ test.describe('Crew transfer and fuel transfer', () => {
       });
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
+
+    // Wait for the event to persist through the worker snapshot round-trip.
+    await page.waitForFunction(
+      () => (window.__flightState?.events ?? []).some((e: { type: string }) => e.type === 'CREW_TRANSFER'),
+      { timeout: 5_000 },
+    );
 
     const fs = await getFlightState(page) as FlightStateSnapshot | null;
     expect(fs).not.toBeNull();

@@ -47,7 +47,7 @@ test.describe('Save Version Indicator', () => {
     const badge = slot0Card.locator('[data-testid="version-warning"]');
     await expect(badge).toBeVisible({ timeout: 5_000 });
     await expect(badge).toContainText('v0', { timeout: 5_000 });
-    await expect(badge).toContainText('current: v2', { timeout: 5_000 });
+    await expect(badge).toContainText('current: v3', { timeout: 5_000 });
   });
 
   test('topbar load modal: mismatched-version save shows version warning', async ({ page }) => {
@@ -80,7 +80,7 @@ test.describe('Save Version Indicator', () => {
 
   test('topbar load modal: current-version save shows no version warning', async ({ page }) => {
     // Seed a save with the current version.
-    const envelope: SaveEnvelope = buildSaveEnvelope({ version: 2, saveName: 'Current Save' });
+    const envelope: SaveEnvelope = buildSaveEnvelope({ version: 3, saveName: 'Current Save' });
     await page.addInitScript(({ key, env }: { key: string; env: SaveEnvelope }) => {
       localStorage.setItem(key, JSON.stringify(env));
     }, { key: SAVE_KEY, env: envelope });

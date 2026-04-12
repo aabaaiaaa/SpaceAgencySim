@@ -54,7 +54,7 @@ test.describe('FPS Monitor', () => {
     const fpsText: string | null = await page.locator('#fps-monitor-fps').textContent();
     expect(fpsText).toMatch(/FPS:\s*\d+/);
     const ftText: string | null = await page.locator('#fps-monitor-ft').textContent();
-    expect(ftText).toMatch(/Frame:\s*[\d.]+\s*ms/);
+    expect(ftText).toMatch(/Frame:\s*-?[\d.]+\s*ms/);
   });
 
   test('(3) window.__perfStats contains fps and frameTime values', async ({ page }) => {

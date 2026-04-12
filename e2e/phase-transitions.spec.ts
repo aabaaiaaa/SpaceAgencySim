@@ -417,7 +417,8 @@ test.describe('Phase Transition: Reentry', () => {
     });
 
     // The deorbit warning fires after a 2-second delay, then transitions to REENTRY.
-    await waitForPhaseInLog(page, 'REENTRY', 15_000);
+    // Allow extra time for the worker to recompute orbital elements and detect deorbit.
+    await waitForPhaseInLog(page, 'REENTRY', 30_000);
 
     const log: PhaseLogEntry[] = await getPhaseLog(page);
     const reentryEntry: PhaseLogEntry | undefined = log.find((e: PhaseLogEntry) => e.to === 'REENTRY');

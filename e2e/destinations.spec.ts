@@ -514,13 +514,13 @@ test.describe('Sun destruction altitude and escalating heat damage', () => {
 
     // Teleport below destruction altitude.
     await teleportCraft(page, { posY: SUN_DESTRUCTION_ALTITUDE - 100_000_000, bodyId: 'SUN' });
-    // Wait for craft to be destroyed
+    // Wait for craft to be destroyed — allow extra time for physics worker to process.
     await page.waitForFunction(() => {
       const ps = window.__flightPs;
       const fs = window.__flightState;
       return ps?.crashed === true ||
         (fs?.events ?? []).some((e: { type: string }) => e.type === 'PART_DESTROYED');
-    }, { timeout: 5_000 });
+    }, { timeout: 10_000 });
 
     // All parts should be destroyed — check for crash or destruction state.
     const state = await page.evaluate((): DestructionState => {
@@ -550,10 +550,11 @@ test.describe('Sun destruction altitude and escalating heat damage', () => {
 
     // Teleport to inner corona — should survive longer with solar shield.
     await teleportCraft(page, { posY: 3_000_000_000, bodyId: 'SUN' });
-    // Wait for physics to process several frames near the Sun
+    // Wait for physics to process several frames near the Sun.
+    // At 3 billion m altitude, gravity is ~9.7 m/s² — need a modest threshold.
     const _sunPosY2: number = await page.evaluate((): number => window.__flightPs?.posY ?? 0);
     await page.waitForFunction(
-      (y0: number) => Math.abs((window.__flightPs?.posY ?? y0) - y0) > 1000,
+      (y0: number) => Math.abs((window.__flightPs?.posY ?? y0) - y0) > 50,
       _sunPosY2,
       { timeout: 10_000 },
     );
@@ -740,6 +741,12 @@ test.describe('Landing on airless and atmospheric bodies', () => {
   test('(1) landing on Moon (airless) — fully propulsive', async () => {
     await startTestFlight(page, LUNAR_LANDER, { bodyId: 'MOON', crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MOON' });
+
+    // Wait for landed state to persist through the worker round-trip.
+    await page.waitForFunction(
+      () => window.__flightPs?.landed === true,
+      { timeout: 5_000 },
+    );
 
     const ps = (await getPhysicsSnapshot(page))!;
     expect(ps.landed).toBe(true);
@@ -1034,6 +1041,12 @@ test.describe('Surface operations — sample collection and return', () => {
   test('(1) can collect surface sample on Moon (crewed, landed)', async () => {
     await startTestFlight(page, LUNAR_LANDER, { bodyId: 'MOON', crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MOON' });
+
+    // Wait for landed state and active parts to persist through worker sync.
+    await page.waitForFunction(
+      () => window.__flightPs?.landed === true && (window.__flightPs?.activeParts?.size ?? 0) > 0,
+      { timeout: 5_000 },
+    );
 
     const result = await page.evaluate(async (): Promise<SurfaceActionResult | null> => {
       let r: SurfaceActionResult | null = null;

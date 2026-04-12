@@ -656,6 +656,20 @@ test.describe('Asteroid Belt — unsafe orbit hub-return rules', () => {
       bodyId: 'SUN', phase: 'ORBIT',
     });
 
+    // Wait for the altitude to settle within the dense belt band after
+    // the worker has processed the orbital state.
+    await page.waitForFunction(
+      (mid: number) => {
+        const ps = window.__flightPs;
+        if (!ps) return false;
+        const alt = Math.hypot(ps.posX, ps.posY);
+        // Accept if altitude is within 20% of the dense belt midpoint
+        return alt > mid * 0.8 && alt < mid * 1.2;
+      },
+      denseMidpoint,
+      { timeout: 5_000 },
+    );
+
     const orbitCheck = await page.evaluate<OrbitCheckResult | null>(() => {
       const w = window;
       const fs = w.__flightState;
@@ -689,6 +703,19 @@ test.describe('Asteroid Belt — unsafe orbit hub-return rules', () => {
       posX: outerAMidpoint, posY: 0, velX: 0, velY: 19_500,
       bodyId: 'SUN', phase: 'ORBIT',
     });
+
+    // Wait for the altitude to settle within the outer-A belt band after
+    // the worker has processed the orbital state.
+    await page.waitForFunction(
+      (mid: number) => {
+        const ps = window.__flightPs;
+        if (!ps) return false;
+        const alt = Math.hypot(ps.posX, ps.posY);
+        return alt > mid * 0.8 && alt < mid * 1.2;
+      },
+      outerAMidpoint,
+      { timeout: 5_000 },
+    );
 
     const orbitCheck = await page.evaluate<OuterOrbitCheckResult | null>(() => {
       const w = window;
@@ -1122,6 +1149,12 @@ test.describe('Asteroid Belt — transfer trajectory safety', () => {
       posX: denseMidpoint, posY: 0, velX: 0, velY: 25_000,
       bodyId: 'SUN', phase: 'TRANSFER',
     });
+
+    // Wait for the TRANSFER phase to persist through the worker round-trip.
+    await page.waitForFunction(
+      () => window.__flightState?.phase === 'TRANSFER',
+      { timeout: 5_000 },
+    );
 
     const renderCondition = await page.evaluate<RenderCondition | null>(() => {
       const fs = window.__flightState;

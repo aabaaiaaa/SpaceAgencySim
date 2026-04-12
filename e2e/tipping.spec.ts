@@ -77,11 +77,12 @@ test.describe('Tipping physics — ground-contact rotation', () => {
     test.setTimeout(30_000);
     await setupGroundedFlight(page);
 
-    // Pre-tilt the rocket aggressively so gravity torque topples it quickly.
-    // Using page.evaluate is faster than holding the 'd' key and waiting.
+    // Pre-tilt the rocket close to crash threshold with high angular velocity
+    // so gravity torque pushes it over quickly. The crash check requires both
+    // angle > TOPPLE_CRASH_ANGLE (1.38 rad) AND tipSpeed > crashThreshold (10 m/s).
     await page.evaluate(async () => {
-      window.__flightPs!.angle = 0.8;
-      window.__flightPs!.angularVelocity = 0.3;
+      window.__flightPs!.angle = 1.2;
+      window.__flightPs!.angularVelocity = 3.0;
       if (typeof window.__resyncPhysicsWorker === 'function') {
         await window.__resyncPhysicsWorker();
       }
