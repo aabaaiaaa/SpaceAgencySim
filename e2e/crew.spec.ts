@@ -69,7 +69,7 @@ test.describe('Crew Administration Flow', () => {
   test.beforeEach(async ({ page }) => {
     await seedAndLoadSave(page, FRESH_ENVELOPE);
     await page.click('[data-building-id="crew-admin"]');
-    await page.waitForSelector('#crew-admin-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#crew-admin-overlay', { state: 'visible', timeout: 5_000 });
   });
 
   // ── (1) Active Crew tab shows an empty state message when no crew are hired
@@ -221,7 +221,7 @@ test.describe('Crew Administration Flow', () => {
     await seedAndLoadSave(page, BROKE_ENVELOPE);
 
     await page.click('[data-building-id="crew-admin"]');
-    await page.waitForSelector('#crew-admin-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#crew-admin-overlay', { state: 'visible', timeout: 5_000 });
 
     // Navigate to Hire tab.
     await page.click('[data-tab-id="hire"]');

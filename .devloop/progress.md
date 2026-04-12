@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 44
-- **Completed**: 40
-- **Remaining**: 4
-- **Last Updated**: 2026-04-11T23:53:05.399Z
+- **Completed**: 41
+- **Remaining**: 3
+- **Last Updated**: 2026-04-12T00:05:59.564Z
 
 ## Iteration Log
 
@@ -133,4 +133,13 @@
 - **Exit Status**: success
 - **Tokens**: 7,342,876 total (74 in, 23,613 out, 267,737 cache-create, 7,051,452 cache-read)
 - **Cost**: $11.4796
+
+### Iteration 15 - 2026-04-12T00:05:59.562Z
+- **Task Attempted**: TASK-037
+- **Task Completed**: TASK-037
+- **Summary**: Completed Optimise slow E2E tests — pass 1
+- **Duration**: 12m 52s
+- **Exit Status**: success
+- **Tokens**: 4,594,015 total (3,027 in, 25,778 out, 100,621 cache-create, 4,464,589 cache-read)
+- **Cost**: $4.1683
 

@@ -85,7 +85,7 @@ test.describe('Biome label transitions', () => {
   }
 
   test('(1) biome label shows Ground at launch pad', async ({ browser }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(60_000);
     const page: Page = await setupBiomeFlight(browser);
 
     const biomeText: string | null = await page.locator('#hud-biome').textContent();
@@ -95,13 +95,13 @@ test.describe('Biome label transitions', () => {
   });
 
   test('(2) biome label transitions to Low Atmosphere above 100 m', async ({ browser }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(60_000);
     const page: Page = await setupBiomeFlight(browser);
 
     // Fire engine (space to stage) then set full throttle.
     await pressStage(page);
     await pressThrottleUp(page);
-    await waitForAltitude(page, 150, 20_000);
+    await waitForAltitude(page, 150, 10_000);
 
     // Wait for HUD biome label to update
     await page.waitForFunction(
@@ -116,7 +116,7 @@ test.describe('Biome label transitions', () => {
   });
 
   test('(3) biome label transitions to Mid Atmosphere above 2000 m', async ({ browser }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(60_000);
     const page: Page = await setupBiomeFlight(browser);
 
     // Teleport to 2100m altitude.
@@ -134,7 +134,7 @@ test.describe('Biome label transitions', () => {
   });
 
   test('(4) biome label updates on descent', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupBiomeFlight(browser);
 
     // Teleport high (5000m) so we can descend.
@@ -165,7 +165,7 @@ test.describe('Biome label transitions', () => {
 
 test.describe('Science multiplier per biome', () => {
   test('biome definitions return correct multipliers for Earth altitudes', async ({ browser }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(60_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -201,7 +201,7 @@ test.describe('Science multiplier per biome', () => {
         const events: FlightEvent[] = w.__gameState?.currentFlight?.events ?? [];
         return events.some((e: FlightEvent) => e.type === 'SCIENCE_COLLECTED');
       },
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     const event: FlightEvent | null = await page.evaluate((): FlightEvent | null => {
@@ -237,7 +237,7 @@ test.describe('Horizon curvature rendering', () => {
   }
 
   test('(1) no curvature at low altitude (below 5000 m)', async ({ browser }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(60_000);
     const page: Page = await setupCurvatureFlight(browser);
 
     // Set full throttle then stage.
@@ -245,7 +245,7 @@ test.describe('Horizon curvature rendering', () => {
     await pressStage(page);
 
     // Wait briefly for liftoff.
-    await waitForAltitude(page, 500, 30_000);
+    await waitForAltitude(page, 500, 15_000);
 
     // Confirm we're below the curvature threshold.
     const alt: number = await page.evaluate((): number => {
@@ -259,7 +259,7 @@ test.describe('Horizon curvature rendering', () => {
   });
 
   test('(2) curvature begins at 5000+ m altitude', async ({ browser }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(60_000);
     const page: Page = await setupCurvatureFlight(browser);
 
     // Teleport to 5500m altitude.
@@ -276,7 +276,7 @@ test.describe('Horizon curvature rendering', () => {
   });
 
   test('(3) curvature increases with altitude', async ({ browser }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(60_000);
     const page: Page = await setupCurvatureFlight(browser);
 
     // Teleport to 20000m altitude.
@@ -319,7 +319,7 @@ test.describe('Science module instruments', () => {
   }
 
   test('(1) science module loaded with instruments appears in flight', async ({ browser }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(60_000);
     const page: Page = await setupInstrumentedFlight(browser);
 
     // Verify instruments are loaded in the physics state.
@@ -336,7 +336,7 @@ test.describe('Science module instruments', () => {
   });
 
   test('(2) instrument states are initialized as idle', async ({ browser }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(60_000);
     const page: Page = await setupInstrumentedFlight(browser);
 
     interface InstrumentSnapshot {
@@ -370,7 +370,7 @@ test.describe('Science module instruments', () => {
   });
 
   test('(3) context menu shows loaded instruments on right-click', async ({ browser }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(60_000);
     const page: Page = await setupInstrumentedFlight(browser);
 
     // Verify instrument data is accessible through physics state as an
@@ -436,7 +436,7 @@ test.describe('Science module instruments', () => {
   });
 
   test('(4) instrument activation transitions state from idle to running', async ({ browser }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(60_000);
     const page: Page = await setupInstrumentedFlight(browser);
 
     interface ActivationResult {
@@ -489,7 +489,7 @@ test.describe('Science module instruments', () => {
 
 test.describe('Instrument activation via staging', () => {
   test('activating instrument transitions it from idle to running', async ({ browser }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(60_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -558,7 +558,7 @@ test.describe('Instrument activation via staging', () => {
         }
         return false;
       },
-      { timeout: 30_000 },
+      { timeout: 15_000 },
     );
 
     // Verify completion and SCIENCE_COLLECTED event.
@@ -579,7 +579,7 @@ test.describe('Instrument activation via staging', () => {
 
 test.describe('Science data types', () => {
   test('ANALYSIS data completes and can be transmitted', async ({ browser }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(60_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -625,7 +625,7 @@ test.describe('Science data types', () => {
         }
         return false;
       },
-      { timeout: 15_000 },
+      { timeout: 10_000 },
     );
 
     // Verify data type is ANALYSIS.
@@ -644,7 +644,7 @@ test.describe('Science data types', () => {
   });
 
   test('SAMPLE data type cannot be transmitted', async ({ browser }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(60_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -928,7 +928,7 @@ test.describe('Yield formula', () => {
 
 test.describe('Instrument biome validity', () => {
   test('thermometer activates in GROUND biome (valid)', async ({ browser }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(60_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -972,7 +972,7 @@ test.describe('Instrument biome validity', () => {
   });
 
   test('barometer does NOT activate in GROUND biome (invalid)', async ({ browser }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(60_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -1003,7 +1003,7 @@ test.describe('Instrument biome validity', () => {
         if (entry.instrumentId === 'barometer') return true;
       }
       return false;
-    }, { timeout: 10_000 });
+    }, { timeout: 5_000 });
 
     // Check for INSTRUMENT_INVALID_BIOME event.
     const invalidBiomeEvent: FlightEvent | null = await page.evaluate((): FlightEvent | null => {
@@ -1064,7 +1064,7 @@ test.describe('Instrument biome validity', () => {
         if (entry.instrumentId === 'radiation-detector') return true;
       }
       return false;
-    }, { timeout: 10_000 });
+    }, { timeout: 5_000 });
 
     const radState: string | null = await page.evaluate((): string | null => {
       const w = window;
@@ -1783,7 +1783,7 @@ test.describe('Tech tree part unlocking', () => {
 
 test.describe('Science collection integration', () => {
   test('experiment completes and generates SCIENCE_COLLECTED event', async ({ browser }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(60_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -1818,7 +1818,7 @@ test.describe('Science collection integration', () => {
         const events: FlightEvent[] = w.__gameState?.currentFlight?.events ?? [];
         return events.some((e: FlightEvent) => e.type === 'SCIENCE_COLLECTED');
       },
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     const event: FlightEvent | null = await page.evaluate((): FlightEvent | null => {

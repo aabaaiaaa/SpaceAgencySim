@@ -95,7 +95,7 @@ test.describe('VAB — Rocket Builder Flow', () => {
   });
 
   test('@smoke (4) placing tank + engine produces a connected rocket', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     await seedAndOpenVab(page);
     await buildThreePartRocket(page);
 
@@ -107,7 +107,7 @@ test.describe('VAB — Rocket Builder Flow', () => {
   });
 
   test('(5) staging panel shows engine auto-staged in Stage 1', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     await seedAndOpenVab(page);
     await buildThreePartRocket(page);
 
@@ -122,7 +122,7 @@ test.describe('VAB — Rocket Builder Flow', () => {
   });
 
   test('(6) engine appears in Stage 1 slot via auto-staging', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     await seedAndOpenVab(page);
     await buildThreePartRocket(page);
 
@@ -134,7 +134,7 @@ test.describe('VAB — Rocket Builder Flow', () => {
   });
 
   test('(7) Rocket Engineer shows passing validation when engine is auto-staged', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     await seedAndOpenVab(page);
     await buildThreePartRocket(page);
 
@@ -144,7 +144,7 @@ test.describe('VAB — Rocket Builder Flow', () => {
   });
 
   test('(8) Launch button becomes enabled after valid rocket is built', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     await seedAndOpenVab(page);
     await buildThreePartRocket(page);
 
@@ -152,7 +152,7 @@ test.describe('VAB — Rocket Builder Flow', () => {
   });
 
   test('(9) cash display updates when parts are placed (cost deducted)', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     await seedAndOpenVab(page);
     await buildThreePartRocket(page);
 
@@ -166,7 +166,7 @@ test.describe('VAB — Rocket Builder Flow', () => {
   });
 
   test('(10) off-screen indicator appears when parts are panned out of view, disappears when visible', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     await seedAndOpenVab(page);
     await buildThreePartRocket(page);
 

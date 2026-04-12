@@ -15,7 +15,7 @@ export async function waitForObjectiveComplete(
   page: Page,
   missionId: string,
   objectiveId: string,
-  timeout: number = 30_000,
+  timeout: number = 15_000,
 ): Promise<void> {
   await page.waitForFunction(
     ({ mid, oid }) => {
@@ -42,7 +42,7 @@ export async function waitForContractObjectiveComplete(
   page: Page,
   contractId: string,
   objectiveId: string,
-  timeout: number = 30_000,
+  timeout: number = 15_000,
 ): Promise<void> {
   await page.waitForFunction(
     ({ cid, oid }) => {
@@ -88,7 +88,7 @@ export async function areAllObjectivesComplete(
 export async function waitForAltitude(
   page: Page,
   altitude: number,
-  timeout: number = 30_000,
+  timeout: number = 15_000,
 ): Promise<void> {
   await page.waitForFunction(
     (alt) => (window.__flightPs?.posY ?? 0) >= alt,
@@ -103,7 +103,7 @@ export async function waitForAltitude(
 export async function waitForFlightEvent(
   page: Page,
   eventType: string,
-  timeout: number = 30_000,
+  timeout: number = 15_000,
 ): Promise<void> {
   await page.waitForFunction(
     (evtType) => {

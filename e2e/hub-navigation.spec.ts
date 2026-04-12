@@ -17,7 +17,7 @@ test.describe('Hub Navigation', () => {
     // A fresh context has no saves, so the New Game screen appears.
     await page.waitForSelector('#mm-agency-name-input', {
       state:   'visible',
-      timeout: 15_000,
+      timeout: 10_000,
     });
 
     // Start a Sandbox game so all buildings are visible and navigable.
@@ -26,7 +26,7 @@ test.describe('Hub Navigation', () => {
     await page.click('#mm-start-btn');
 
     // Wait for the hub overlay to appear.
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
 
     // Dismiss the welcome modal so buildings are clickable.
     await dismissWelcomeModal(page);
@@ -38,7 +38,7 @@ test.describe('Hub Navigation', () => {
     await expect(page.locator('#hub-overlay')).toBeVisible();
 
     await page.click('[data-building-id="vab"]');
-    await page.waitForSelector('#vab-root', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#vab-root', { state: 'visible', timeout: 5_000 });
 
     // The parts panel must be present and visible.
     await expect(page.locator('#vab-parts-list')).toBeVisible();
@@ -50,7 +50,7 @@ test.describe('Hub Navigation', () => {
     await expect(page.locator('#hub-overlay')).toBeVisible();
 
     await page.click('[data-building-id="mission-control"]');
-    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 5_000 });
 
     // At least one mission card must be visible on the Available tab.
     await expect(page.locator('.mc-mission-card').first()).toBeVisible();
@@ -62,7 +62,7 @@ test.describe('Hub Navigation', () => {
     await expect(page.locator('#hub-overlay')).toBeVisible();
 
     await page.click('[data-building-id="crew-admin"]');
-    await page.waitForSelector('#crew-admin-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#crew-admin-overlay', { state: 'visible', timeout: 5_000 });
 
     // All three tabs must be present.
     await expect(page.locator('[data-tab-id="active"]')).toBeVisible();
@@ -76,7 +76,7 @@ test.describe('Hub Navigation', () => {
     await expect(page.locator('#hub-overlay')).toBeVisible();
 
     await page.click('[data-building-id="launch-pad"]');
-    await page.waitForSelector('#launch-pad-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#launch-pad-overlay', { state: 'visible', timeout: 5_000 });
 
     await expect(page.locator('#launch-pad-overlay')).toBeVisible();
   });
@@ -96,14 +96,14 @@ test.describe('Hub Navigation', () => {
       await expect(page.locator('#hub-overlay')).toBeVisible();
 
       await page.click(`[data-building-id="${id}"]`);
-      await page.waitForSelector(overlay, { state: 'visible', timeout: 10_000 });
+      await page.waitForSelector(overlay, { state: 'visible', timeout: 5_000 });
 
       // The back button must be present and visible.
       await expect(page.locator(backBtn)).toBeVisible();
 
       // Clicking it must return to the hub.
       await page.click(backBtn);
-      await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
+      await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 5_000 });
       await expect(page.locator('#hub-overlay')).toBeVisible();
     }
   });
@@ -123,7 +123,7 @@ test.describe('Hub Navigation', () => {
       await expect(page.locator('#hub-overlay')).toBeVisible();
 
       await page.click(`[data-building-id="${id}"]`);
-      await page.waitForSelector(overlay, { state: 'visible', timeout: 10_000 });
+      await page.waitForSelector(overlay, { state: 'visible', timeout: 5_000 });
 
       // The persistent top bar and its cash readout must be visible.
       await expect(page.locator('#game-topbar')).toBeVisible();
@@ -131,7 +131,7 @@ test.describe('Hub Navigation', () => {
 
       // Navigate back to hub for next iteration.
       await page.click(backBtn);
-      await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
+      await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 5_000 });
     }
   });
 });

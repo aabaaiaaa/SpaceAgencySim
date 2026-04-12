@@ -103,15 +103,15 @@ test.describe('Launch Pad', () => {
     }, { key: SAVE_KEY, envelope: lpSaveEnvelope([SEEDED_DESIGN]) });
 
     await page.goto('/');
-    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 
     // Load the save.
     await page.click('[data-action="load"][data-slot="0"]');
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
 
     // Navigate to the Launch Pad.
     await page.click('[data-building-id="launch-pad"]');
-    await page.waitForSelector('#launch-pad-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#launch-pad-overlay', { state: 'visible', timeout: 5_000 });
 
     // The rocket list should be visible (not the empty state).
     await expect(page.locator('#launch-pad-rocket-list')).toBeVisible({ timeout: 5_000 });
@@ -149,15 +149,15 @@ test.describe('Launch Pad', () => {
     }, { key: SAVE_KEY, envelope: lpSaveEnvelope([]) });
 
     await page.goto('/');
-    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 
     // Load the save.
     await page.click('[data-action="load"][data-slot="0"]');
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
 
     // Navigate to the Launch Pad.
     await page.click('[data-building-id="launch-pad"]');
-    await page.waitForSelector('#launch-pad-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#launch-pad-overlay', { state: 'visible', timeout: 5_000 });
 
     // The empty-state placeholder should be visible.
     await expect(page.locator('#launch-pad-status')).toBeVisible({ timeout: 5_000 });
@@ -178,15 +178,15 @@ test.describe('Launch Pad', () => {
     }, { key: SAVE_KEY, envelope: lpSaveEnvelope([SEEDED_DESIGN]) });
 
     await page.goto('/');
-    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 
     // Load the save.
     await page.click('[data-action="load"][data-slot="0"]');
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
 
     // Navigate to the Launch Pad.
     await page.click('[data-building-id="launch-pad"]');
-    await page.waitForSelector('#launch-pad-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#launch-pad-overlay', { state: 'visible', timeout: 5_000 });
 
     // Click Launch on the rocket card.
     // cmd-mk1 has 1 seat -> a crew dialog will appear.
@@ -203,7 +203,7 @@ test.describe('Launch Pad', () => {
     await expect(page.locator('#launch-pad-overlay')).toHaveCount(0, { timeout: 5_000 });
 
     // The flight scene should be running — check for the flight HUD.
-    await page.waitForSelector('#flight-hud', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#flight-hud', { state: 'visible', timeout: 5_000 });
 
     // Verify the physics state is exposed (flight is active).
     await page.waitForFunction(
@@ -241,15 +241,15 @@ test.describe('Launch Pad', () => {
     }, { key: SAVE_KEY, envelope: poorEnvelope });
 
     await page.goto('/');
-    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 
     // Load the save.
     await page.click('[data-action="load"][data-slot="0"]');
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
 
     // Navigate to the Launch Pad.
     await page.click('[data-building-id="launch-pad"]');
-    await page.waitForSelector('#launch-pad-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#launch-pad-overlay', { state: 'visible', timeout: 5_000 });
 
     // The rocket card should still be visible.
     await expect(page.locator('.lp-rocket-card')).toHaveCount(1, { timeout: 5_000 });

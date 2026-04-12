@@ -33,7 +33,7 @@ test.describe('Auto-Save System', () => {
     await startTestFlight(page, UNLOCKED_PARTS);
     await teleportCraft(page, { posX: 0, posY: 5, velX: 0, velY: 0, grounded: true, landed: true, crashed: true });
 
-    await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 10_000 });
     await expect(page.locator('#auto-save-toast')).toBeVisible({ timeout: 5_000 });
 
     await page.waitForFunction(
@@ -41,7 +41,7 @@ test.describe('Auto-Save System', () => {
         const toast = document.getElementById('auto-save-toast');
         return toast?.textContent?.includes('Saved') ?? false;
       },
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     // Verify the auto-save was written to localStorage.
@@ -71,7 +71,7 @@ test.describe('Auto-Save System', () => {
     await startTestFlight(page, UNLOCKED_PARTS);
     await teleportCraft(page, { posX: 0, posY: 5, velX: 0, velY: 0, grounded: true, landed: true, crashed: true });
 
-    await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 10_000 });
     await expect(page.locator('#auto-save-toast')).toBeVisible({ timeout: 5_000 });
     await page.click('#auto-save-cancel-btn');
 
@@ -96,7 +96,7 @@ test.describe('Auto-Save System', () => {
     await startTestFlight(page, UNLOCKED_PARTS);
     await teleportCraft(page, { posX: 0, posY: 5, velX: 0, velY: 0, grounded: true, landed: true, crashed: true });
 
-    await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 10_000 });
     // With auto-save disabled, the toast should not appear. Use assertion-based
     // wait instead of hard timeout to confirm it stays hidden.
     await expect(page.locator('#auto-save-toast')).not.toBeVisible({ timeout: 3_000 });

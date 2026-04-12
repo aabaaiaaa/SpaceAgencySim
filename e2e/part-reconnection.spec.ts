@@ -90,7 +90,7 @@ async function reconnectTank(page: Page, tankId: string): Promise<void> {
 test.describe('VAB — Part Disconnection & Reconnection', () => {
 
   test('(1) build a 3-part connected rocket', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     await seedAndOpenVab(page);
     await buildThreePartRocket(page);
 
@@ -101,7 +101,7 @@ test.describe('VAB — Part Disconnection & Reconnection', () => {
   });
 
   test('(2) stage engine and verify rocket is launchable', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     await seedAndOpenVab(page);
     await buildThreePartRocket(page);
 
@@ -117,7 +117,7 @@ test.describe('VAB — Part Disconnection & Reconnection', () => {
   });
 
   test('(3) dragging fuel tank away causes floating-parts validation failure', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     await seedAndOpenVab(page);
     await buildThreePartRocket(page);
     await disconnectTank(page);
@@ -132,7 +132,7 @@ test.describe('VAB — Part Disconnection & Reconnection', () => {
   });
 
   test('(4) dragging fuel tank back reconnects to both neighbors', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     await seedAndOpenVab(page);
     await buildThreePartRocket(page);
     const tankId: string = await disconnectTank(page);
@@ -145,7 +145,7 @@ test.describe('VAB — Part Disconnection & Reconnection', () => {
   });
 
   test('(5) Rocket Engineer shows all parts connected and launch is enabled', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     await seedAndOpenVab(page);
     await buildThreePartRocket(page);
     const tankId: string = await disconnectTank(page);
@@ -165,7 +165,7 @@ test.describe('VAB — Part Disconnection & Reconnection', () => {
   });
 
   test('(6) reconnected rocket can launch successfully', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     await seedAndOpenVab(page);
     await buildThreePartRocket(page);
     const tankId: string = await disconnectTank(page);

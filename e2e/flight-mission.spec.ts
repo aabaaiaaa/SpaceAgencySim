@@ -34,7 +34,7 @@ function makeMissionEnvelope(overrides: Record<string, unknown> = {}): ReturnTyp
 test.describe('Flight — First Flight Mission Completion', () => {
 
   test('(1) engine is auto-staged into Stage 1', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, makeMissionEnvelope());
     await navigateToVab(page);
@@ -54,7 +54,7 @@ test.describe('Flight — First Flight Mission Completion', () => {
   });
 
   test('(2) First Flight mission completes when rocket reaches 100 m', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, makeMissionEnvelope());
     await startTestFlight(page, FLIGHT_PARTS, {
@@ -68,7 +68,7 @@ test.describe('Flight — First Flight Mission Completion', () => {
 
     await page.waitForFunction(
       (): boolean => (window.__flightPs?.posY ?? 0) >= 100,
-      { timeout: 30_000 },
+      { timeout: 15_000 },
     );
 
     await page.keyboard.press('x');
@@ -88,7 +88,7 @@ test.describe('Flight — First Flight Mission Completion', () => {
     await expect(page.locator('.pf-obj-complete')).toBeVisible({ timeout: 5_000 });
     await page.click('#post-flight-return-btn');
 
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
 
     const missionCompleted: boolean = await page.evaluate((): boolean => {
       const state = window.__gameState;

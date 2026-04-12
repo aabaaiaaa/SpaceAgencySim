@@ -78,14 +78,14 @@ async function returnToAgency(page: Page): Promise<void> {
   const orbitVisible: boolean = await orbitReturn.isVisible({ timeout: 2_000 }).catch(() => false);
   if (orbitVisible) {
     await orbitReturn.click();
-    await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 5_000 });
     await page.click('#post-flight-return-btn');
   } else {
     const abortVisible: boolean = await abortReturn.isVisible({ timeout: 2_000 }).catch(() => false);
     if (abortVisible) {
       await abortReturn.click();
     } else {
-      await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 10_000 });
+      await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 5_000 });
       await page.click('#post-flight-return-btn');
     }
   }
@@ -95,7 +95,7 @@ async function returnToAgency(page: Page): Promise<void> {
       const w = window;
       return w.__flightState === null || w.__flightState === undefined;
     },
-    { timeout: 10_000 },
+    { timeout: 5_000 },
   );
 }
 
@@ -134,7 +134,7 @@ test.describe('Period advancement on flight completion', () => {
   });
 
   test('(2) period advances by 1 after flight completion and return to agency', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, freshStartFixture({ currentPeriod: 5 }));
@@ -163,7 +163,7 @@ test.describe('Period advancement on flight completion', () => {
 
 test.describe('Period does NOT advance during time warp', () => {
   test('(1) period stays unchanged during atmospheric flight with time warp', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, freshStartFixture({ currentPeriod: 10 }));
@@ -171,7 +171,7 @@ test.describe('Period does NOT advance during time warp', () => {
     await startTestFlight(page, BASIC_ROCKET);
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', key: ' ', bubbles: true })));
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyZ', key: 'z', bubbles: true })));
-    await waitForAltitude(page, 500, 20_000);
+    await waitForAltitude(page, 500, 10_000);
 
     const gsBefore = await getGameState(page);
     expect(gsBefore!.currentPeriod).toBe(10);
@@ -182,7 +182,7 @@ test.describe('Period does NOT advance during time warp', () => {
         const btn = document.querySelector('.hud-warp-btn[data-warp="5"]') as HTMLButtonElement | null;
         return btn && !btn.disabled;
       },
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
     await page.click('.hud-warp-btn[data-warp="5"]');
     // Wait for warp to be active and altitude to change (proves sim advanced)
@@ -190,7 +190,7 @@ test.describe('Period does NOT advance during time warp', () => {
     await page.waitForFunction(
       (y0: number) => Math.abs((window.__flightPs?.posY ?? y0) - y0) > 50,
       alt1,
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     const gsAfter = await getGameState(page);
@@ -199,7 +199,7 @@ test.describe('Period does NOT advance during time warp', () => {
   });
 
   test('(2) period stays unchanged during orbital time warp', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, freshStartFixture({
@@ -216,7 +216,7 @@ test.describe('Period does NOT advance during time warp', () => {
         const btn = document.querySelector('.hud-warp-btn[data-warp="10"]') as HTMLButtonElement | null;
         return btn && !btn.disabled;
       },
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
     await page.click('.hud-warp-btn[data-warp="10"]');
     // Wait for simulation time to advance (proves warp is active).
@@ -225,7 +225,7 @@ test.describe('Period does NOT advance during time warp', () => {
     await page.waitForFunction(
       (t0val: number) => (window.__flightState?.timeElapsed ?? t0val) > t0val + 5,
       t0,
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     const gsAfterWarp = await getGameState(page);
@@ -240,7 +240,7 @@ test.describe('Period does NOT advance during time warp', () => {
 
 test.describe('Flight phase transitions', () => {
   test('@smoke (1) PRELAUNCH → LAUNCH → FLIGHT on engine staging and liftoff', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, freshStartFixture({
@@ -261,13 +261,13 @@ test.describe('Flight phase transitions', () => {
         const phase = window.__flightState?.phase;
         return phase === 'LAUNCH' || phase === 'FLIGHT';
       },
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     // Wait until liftoff completes (FLIGHT phase).
     await page.waitForFunction(
       () => window.__flightState?.phase === 'FLIGHT',
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     const fsFlight = await getFlightState(page);
@@ -283,7 +283,7 @@ test.describe('Flight phase transitions', () => {
   });
 
   test('(2) FLIGHT → ORBIT when reaching stable orbit', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, freshStartFixture({
@@ -297,7 +297,7 @@ test.describe('Flight phase transitions', () => {
 
     await page.waitForFunction(
       () => window.__flightState?.phase === 'ORBIT',
-      { timeout: 30_000 },
+      { timeout: 15_000 },
     );
 
     const fsOrbit = await getFlightState(page);
@@ -308,7 +308,7 @@ test.describe('Flight phase transitions', () => {
   });
 
   test('(3) ORBIT → MANOEUVRE when thrusting in orbit', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupOrbitalFlight(browser);
 
     // Activate engine thrust in NORMAL mode.
@@ -330,14 +330,14 @@ test.describe('Flight phase transitions', () => {
 
     await page.waitForFunction(
       () => window.__flightState?.phase === 'MANOEUVRE',
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
     expect((await getFlightState(page))!.phase).toBe('MANOEUVRE');
     await page.close();
   });
 
   test('(4) MANOEUVRE → ORBIT when burn ends and orbit valid', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupOrbitalFlight(browser);
 
     // First enter MANOEUVRE by thrusting.
@@ -358,7 +358,7 @@ test.describe('Flight phase transitions', () => {
 
     await page.waitForFunction(
       () => window.__flightState?.phase === 'MANOEUVRE',
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     // Now stop thrusting — should return to ORBIT.
@@ -373,14 +373,14 @@ test.describe('Flight phase transitions', () => {
 
     await page.waitForFunction(
       () => window.__flightState?.phase === 'ORBIT',
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
     expect((await getFlightState(page))!.phase).toBe('ORBIT');
     await page.close();
   });
 
   test('(5) ORBIT → REENTRY when periapsis drops below minimum', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupOrbitalFlight(browser);
 
     // Reduce velocity to make orbit decay (periapsis < 70km).
@@ -402,14 +402,14 @@ test.describe('Flight phase transitions', () => {
     // Deorbit warning fires after 2s, then transitions to REENTRY.
     await page.waitForFunction(
       () => window.__flightState?.phase === 'REENTRY',
-      { timeout: 15_000 },
+      { timeout: 10_000 },
     );
     expect((await getFlightState(page))!.phase).toBe('REENTRY');
     await page.close();
   });
 
   test('(6) ORBIT → TRANSFER on escape trajectory', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupOrbitalFlight(browser);
 
     // Set escape velocity and activate engine.
@@ -435,7 +435,7 @@ test.describe('Flight phase transitions', () => {
         const phase = window.__flightState?.phase;
         return phase === 'TRANSFER' || phase === 'MANOEUVRE';
       },
-      { timeout: 15_000 },
+      { timeout: 10_000 },
     );
 
     // If in MANOEUVRE, wait for TRANSFER.
@@ -443,7 +443,7 @@ test.describe('Flight phase transitions', () => {
     if (phase === 'MANOEUVRE') {
       await page.waitForFunction(
         () => window.__flightState?.phase === 'TRANSFER',
-        { timeout: 15_000 },
+        { timeout: 10_000 },
       );
     }
 
@@ -458,7 +458,7 @@ test.describe('Flight phase transitions', () => {
 
 test.describe('Control mode switching in ORBIT', () => {
   test('(1) starts in NORMAL control mode', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupOrbitalFlight(browser);
 
     const mode: string | undefined = await page.evaluate(() => window.__flightPs?.controlMode);
@@ -467,7 +467,7 @@ test.describe('Control mode switching in ORBIT', () => {
   });
 
   test('(2) V key switches to DOCKING mode', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupOrbitalFlight(browser);
 
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
@@ -480,7 +480,7 @@ test.describe('Control mode switching in ORBIT', () => {
   });
 
   test('(3) thrust cuts to zero on entering docking mode', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupOrbitalFlight(browser);
 
     // Set some throttle first, then switch to docking.
@@ -501,7 +501,7 @@ test.describe('Control mode switching in ORBIT', () => {
   });
 
   test('(4) R key switches to RCS mode from docking mode', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupOrbitalFlight(browser);
 
     // Enter docking mode, then toggle to RCS.
@@ -516,7 +516,7 @@ test.describe('Control mode switching in ORBIT', () => {
   });
 
   test('(5) R key toggles back to DOCKING mode from RCS', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupOrbitalFlight(browser);
 
     // Enter DOCKING → RCS via dispatched key events.
@@ -533,7 +533,7 @@ test.describe('Control mode switching in ORBIT', () => {
   });
 
   test('(6) V key exits docking mode back to NORMAL', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupOrbitalFlight(browser);
 
     // Enter docking mode.
@@ -548,7 +548,7 @@ test.describe('Control mode switching in ORBIT', () => {
   });
 
   test('(7) thrust cuts to zero on both enter and exit of docking mode', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupOrbitalFlight(browser);
 
     // Set throttle, enter docking mode — should cut.
@@ -586,7 +586,7 @@ test.describe('Control mode switching in ORBIT', () => {
 
 test.describe('RCS mode directional translation', () => {
   test('(1) in RCS mode, WASD keys cause velocity changes', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupOrbitalFlight(browser);
 
     // Enter docking mode then RCS mode.
@@ -630,7 +630,7 @@ test.describe('RCS mode directional translation', () => {
   });
 
   test('(2) RCS mode prevents rotation', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupOrbitalFlight(browser);
 
     // Enter docking mode then RCS mode.
@@ -679,7 +679,7 @@ test.describe('RCS mode directional translation', () => {
 
 test.describe('Map view toggle and controls', () => {
   test('(1) M key opens map view and shows map HUD', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupOrbitalFlight(browser);
 
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyM', key: 'm', bubbles: true })));
@@ -689,7 +689,7 @@ test.describe('Map view toggle and controls', () => {
   });
 
   test('(2) map view shows body and phase information', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupOrbitalFlight(browser);
 
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyM', key: 'm', bubbles: true })));
@@ -704,7 +704,7 @@ test.describe('Map view toggle and controls', () => {
   });
 
   test('(3) map view controls hint shows expected keys', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupOrbitalFlight(browser);
 
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyM', key: 'm', bubbles: true })));
@@ -718,7 +718,7 @@ test.describe('Map view toggle and controls', () => {
   });
 
   test('(4) WASD keys in map view apply orbital-relative thrust', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupOrbitalFlight(browser);
 
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyM', key: 'm', bubbles: true })));
@@ -746,7 +746,7 @@ test.describe('Map view toggle and controls', () => {
   });
 
   test('(5) S key sets retrograde thrust direction in map view', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupOrbitalFlight(browser);
 
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyM', key: 'm', bubbles: true })));
@@ -778,7 +778,7 @@ test.describe('Map view toggle and controls', () => {
   });
 
   test('(6) A key sets radial-in thrust direction in map view', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupOrbitalFlight(browser);
 
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyM', key: 'm', bubbles: true })));
@@ -812,7 +812,7 @@ test.describe('Map view toggle and controls', () => {
   });
 
   test('(7) M key closes map view and returns to flight view', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupOrbitalFlight(browser);
 
     // Open map first.
@@ -849,7 +849,7 @@ test.describe('Orbit slot proximity detection and warp-to-target', () => {
   };
 
   test('(1) orbital objects are visible in game state', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupOrbitalFlight(browser, SAT_FIXTURE_OVERRIDES);
 
     const gs = await getGameState(page);
@@ -861,7 +861,7 @@ test.describe('Orbit slot proximity detection and warp-to-target', () => {
   });
 
   test('(2) map view shows target selection via T key', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupOrbitalFlight(browser, SAT_FIXTURE_OVERRIDES);
 
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyM', key: 'm', bubbles: true })));
@@ -874,7 +874,7 @@ test.describe('Orbit slot proximity detection and warp-to-target', () => {
   });
 
   test('(3) warp-to-target via G key advances flight time', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupOrbitalFlight(browser, SAT_FIXTURE_OVERRIDES);
 
     // Open map and select target.
@@ -893,7 +893,7 @@ test.describe('Orbit slot proximity detection and warp-to-target', () => {
     await page.waitForFunction(
       (before: number) => (window.__flightState?.timeElapsed ?? 0) > before,
       timeBefore,
-      { timeout: 15_000 },
+      { timeout: 10_000 },
     );
 
     const timeAfter: number = await page.evaluate(
@@ -982,7 +982,7 @@ test.describe('Starter part availability', () => {
     await seedAndLoadSave(page, envelope);
 
     await page.click('[data-building-id="vab"]');
-    await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 10_000 });
 
     await expect(
       page.locator('.vab-part-card[data-part-id="cmd-mk1"]'),
@@ -1006,7 +1006,7 @@ test.describe('Starter part availability', () => {
     await seedAndLoadSave(page, envelope);
 
     await page.click('[data-building-id="vab"]');
-    await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 10_000 });
 
     await expect(
       page.locator('.vab-part-card[data-part-id="probe-core-mk1"]'),

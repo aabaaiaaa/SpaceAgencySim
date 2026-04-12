@@ -39,13 +39,13 @@ async function openTopbarSaveDialog(page: Page): Promise<void> {
 async function startNewGameAndGoToVab(page: Page): Promise<void> {
   await page.setViewportSize({ width: VP_W, height: VP_H });
   await page.goto('/');
-  await page.waitForSelector('#mm-agency-name-input', { state: 'visible', timeout: 15_000 });
+  await page.waitForSelector('#mm-agency-name-input', { state: 'visible', timeout: 10_000 });
   await page.fill('#mm-agency-name-input', AGENCY_NAME);
   await page.click('#mm-start-btn');
-  await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
+  await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
   await dismissWelcomeModal(page);
   await page.click('[data-building-id="vab"]');
-  await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 15_000 });
+  await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 10_000 });
 }
 
 /** Seed a save in slot 0 and navigate to the load screen. */
@@ -55,7 +55,7 @@ async function seedSaveAndGoToLoadScreen(page: Page, envelope: ReturnType<typeof
     localStorage.setItem(key, JSON.stringify(envelope));
   }, { key: SAVE_KEY, envelope });
   await page.goto('/');
-  await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
+  await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 }
 
 test.describe('Save & Load Flow', () => {
@@ -95,7 +95,7 @@ test.describe('Save & Load Flow', () => {
     await seedSaveAndGoToLoadScreen(page, makeEnvelope());
 
     await page.click('[data-action="load"][data-slot="0"]');
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
 
     const agencyName: string | undefined = await page.evaluate(
       () => window.__gameState?.agencyName,
@@ -119,7 +119,7 @@ test.describe('Save & Load Flow', () => {
       key1: 'spaceAgencySave_1', env1: makeEnvelope({ saveName: 'Save B' }),
     });
     await page.goto('/');
-    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 
     await expect(page.locator('.mm-save-card:not(.mm-empty-slot)[data-slot="0"]')).toBeVisible({ timeout: 5_000 });
     await expect(page.locator('.mm-save-card:not(.mm-empty-slot)[data-slot="1"]')).toBeVisible({ timeout: 5_000 });
@@ -136,14 +136,14 @@ test.describe('Save & Load Flow', () => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     // Seed via evaluate AFTER page loads (not addInitScript which re-seeds on every goto).
     await page.goto('/');
-    await page.waitForSelector('#mm-newgame-screen', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#mm-newgame-screen', { state: 'visible', timeout: 10_000 });
     await page.evaluate(({ key, envelope }) => {
       localStorage.setItem(key, JSON.stringify(envelope));
     }, { key: SAVE_KEY, envelope: makeEnvelope() });
 
     // Reload to pick up the seeded save.
     await page.goto('/');
-    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 
     await page.click('[data-action="delete"][data-slot="0"]');
     await page.waitForSelector('#mm-modal-confirm', { state: 'visible', timeout: 5_000 });
@@ -151,7 +151,7 @@ test.describe('Save & Load Flow', () => {
 
     // Navigate again — no saves remain, so New Game screen must appear.
     await page.goto('/');
-    await page.waitForSelector('#mm-newgame-screen', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#mm-newgame-screen', { state: 'visible', timeout: 10_000 });
     await expect(page.locator('[data-screen="newgame"]')).toBeVisible({ timeout: 5_000 });
     await expect(page.locator('#mm-load-screen')).toHaveCount(0, { timeout: 5_000 });
   });
@@ -189,7 +189,7 @@ test.describe('Save & Load Flow', () => {
       if (slider) { slider.value = '1'; slider.dispatchEvent(new Event('input')); }
     });
 
-    await page.waitForSelector('.vab-part-card[data-part-id="probe-core-mk1"]', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('.vab-part-card[data-part-id="probe-core-mk1"]', { state: 'visible', timeout: 5_000 });
     await dragPartToCanvas(page, 'probe-core-mk1', 525, 400);
     await page.waitForFunction(
       () => (window.__vabAssembly?.parts?.size ?? 0) >= 1,
@@ -206,12 +206,12 @@ test.describe('Save & Load Flow', () => {
     await expect(page.locator('#save-modal-backdrop')).toHaveCount(0, { timeout: 4_000 });
 
     await page.goto('/');
-    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
     await page.click('[data-action="load"][data-slot="0"]');
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
 
     await page.click('[data-building-id="vab"]');
-    await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 10_000 });
     await page.waitForFunction(
       () => (window.__vabAssembly?.parts?.size ?? 0) >= 1,
       { timeout: 5_000 },

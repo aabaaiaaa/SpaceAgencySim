@@ -77,16 +77,16 @@ async function seedAndGoToHub(page: Page): Promise<void> {
 
 async function launchFromPad(page: Page): Promise<void> {
   await page.click('[data-building-id="launch-pad"]');
-  await page.waitForSelector('#launch-pad-overlay', { state: 'visible', timeout: 10_000 });
+  await page.waitForSelector('#launch-pad-overlay', { state: 'visible', timeout: 5_000 });
   await page.click('.lp-launch-btn');
-  await page.waitForSelector('#lp-crew-overlay', { state: 'visible', timeout: 10_000 });
+  await page.waitForSelector('#lp-crew-overlay', { state: 'visible', timeout: 5_000 });
   await page.click('.lp-crew-confirm-btn');
-  await page.waitForSelector('#flight-hud', { state: 'visible', timeout: 15_000 });
+  await page.waitForSelector('#flight-hud', { state: 'visible', timeout: 10_000 });
   await page.waitForFunction(
     (): boolean =>
       typeof window.__flightPs !== 'undefined' &&
       window.__flightPs !== null,
-    { timeout: 10_000 },
+    { timeout: 5_000 },
   );
 }
 
@@ -99,7 +99,7 @@ async function fireStageAndVerifyLiftoff(page: Page): Promise<void> {
   // Wait for the staging system to be ready before pressing stage.
   await page.waitForFunction(
     () => window.__flightPs?.activeParts?.size > 0,
-    { timeout: 10_000 },
+    { timeout: 5_000 },
   );
 
   // Dispatch stage and poll — retry dispatch if the first one is swallowed
@@ -120,7 +120,7 @@ async function fireStageAndVerifyLiftoff(page: Page): Promise<void> {
 
   await page.waitForFunction(
     (): boolean => (window.__flightPs?.posY ?? 0) > 5,
-    { timeout: 10_000 },
+    { timeout: 5_000 },
   );
 }
 
@@ -137,7 +137,7 @@ async function returnToHub(page: Page): Promise<void> {
   if (didAbort) {
     await abortBtn.click();
   } else {
-    await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 5_000 });
     await page.click('#post-flight-return-btn');
   }
 
@@ -147,7 +147,7 @@ async function returnToHub(page: Page): Promise<void> {
     await dismissBtn.click();
   } catch { /* no overlay */ }
 
-  await expect(page.locator('#hub-overlay')).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('#hub-overlay')).toBeVisible({ timeout: 5_000 });
 }
 
 /* ------------------------------------------------------------------ */
@@ -173,7 +173,7 @@ test.describe('Launch Pad — Relaunch Engine Bug', () => {
   });
 
   test('(3) second flight — engine fires on relaunch (regression)', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     await seedAndGoToHub(page);
 
     // First flight + return.

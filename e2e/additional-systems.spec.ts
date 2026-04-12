@@ -154,7 +154,7 @@ test.describe('Thermal system', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
@@ -175,7 +175,7 @@ test.describe('Thermal system', () => {
       if (!ps?.heatMap) return false;
       for (const h of ps.heatMap.values()) { if (h > 0) return true; }
       return false;
-    }, { timeout: 10_000 });
+    }, { timeout: 5_000 });
 
     const heatData = await page.evaluate(() => {
       const ps = window.__flightPs;
@@ -204,7 +204,7 @@ test.describe('Thermal system', () => {
       if (!ps?.heatMap) return false;
       for (const h of ps.heatMap.values()) { if (h > 0) return true; }
       return false;
-    }, { timeout: 10_000 });
+    }, { timeout: 5_000 });
 
     const beforeHeat = await page.evaluate(() => {
       const ps = window.__flightPs!;
@@ -228,7 +228,7 @@ test.describe('Thermal system', () => {
       let t = 0;
       for (const h of ps.heatMap.values()) t += h;
       return t < bh;
-    }, beforeHeat, { timeout: 10_000 });
+    }, beforeHeat, { timeout: 5_000 });
 
     const afterHeat = await page.evaluate(() => {
       const ps = window.__flightPs!;
@@ -291,7 +291,7 @@ test.describe('Thermal system', () => {
       if (!ps?.heatMap) return false;
       for (const h of ps.heatMap.values()) { if (h > 0) return true; }
       return false;
-    }, { timeout: 10_000 });
+    }, { timeout: 5_000 });
 
     // The heat shield should be leading face (lowest Y); parts above (probe, tank, engine)
     // should be shielded and accumulate less or zero heat.
@@ -339,7 +339,7 @@ test.describe('Thermal system', () => {
       if (!ps?.heatMap) return false;
       for (const h of ps.heatMap.values()) { if (h > 0) return true; }
       return false;
-    }, { timeout: 10_000 });
+    }, { timeout: 5_000 });
 
     const ascendingHeat = await page.evaluate(() => {
       const ps = window.__flightPs!;
@@ -411,7 +411,7 @@ test.describe('Thermal system', () => {
     // Wait for physics to run several frames (gravity pulls craft down, proving sim is running)
     await page.waitForFunction(
       () => (window.__flightPs?.posY ?? 20_000) < 19_500,
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     const heatOnMoon = await page.evaluate(() => {
@@ -499,7 +499,7 @@ test.describe('Tech tree parts', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, asSave(fullFixture()));
@@ -568,7 +568,7 @@ test.describe('Tech tree parts', () => {
 
     // Wait for some altitude gain (even 5 m is enough to prove it works).
     try {
-      await waitForAltitude(page, 5, 20_000);
+      await waitForAltitude(page, 5, 10_000);
       const snap = await getPhysicsSnapshot(page);
       expect(snap!.posY).toBeGreaterThan(0);
     } catch {
@@ -626,7 +626,7 @@ test.describe('Tech tree parts', () => {
     // Wait for descent — velocity should slow.
     await page.waitForFunction(
       () => Math.abs(window.__flightPs?.velY ?? 999) < 200,
-      { timeout: 15_000 },
+      { timeout: 10_000 },
     );
 
     const snap = await getPhysicsSnapshot(page);
@@ -760,7 +760,7 @@ test.describe('Satellite components', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
@@ -962,7 +962,7 @@ test.describe('Satellite components', () => {
     await waitForOrbit(page);
     await page.waitForFunction(
       () => (window.__flightPs?.powerState?.solarPanelArea ?? 0) > 0,
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     const power = await page.evaluate(() => {
@@ -993,7 +993,7 @@ test.describe('Life support', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
@@ -1179,7 +1179,7 @@ test.describe('Comms range', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(180_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
@@ -1206,7 +1206,7 @@ test.describe('Comms range', () => {
         const fs = window.__flightState;
         return (fs?.commsState?.status ?? fs?.comms?.status) != null;
       },
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     const comms = await page.evaluate(() => {
@@ -1250,7 +1250,7 @@ test.describe('Comms range', () => {
         const fs = window.__flightState;
         return (fs?.commsState?.status ?? fs?.comms?.status) != null;
       },
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     const comms = await page.evaluate(() => {
@@ -1291,7 +1291,7 @@ test.describe('Comms range', () => {
         const fs = window.__flightState;
         return (fs?.commsState?.status ?? fs?.comms?.status) != null;
       },
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     const comms = await page.evaluate(() => {
@@ -1339,7 +1339,7 @@ test.describe('Comms range', () => {
         const fs = window.__flightState;
         return (fs?.commsState?.status ?? fs?.comms?.status) != null;
       },
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     const comms = await page.evaluate(() => {
@@ -1422,7 +1422,7 @@ test.describe('Comms range', () => {
         const fs = window.__flightState;
         return (fs?.commsState?.status ?? fs?.comms?.status) != null;
       },
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     const comms = await page.evaluate(() => {
@@ -1498,7 +1498,7 @@ test.describe('Comms range', () => {
         const fs = window.__flightState;
         return (fs?.commsState?.status ?? fs?.comms?.status) != null;
       },
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     const comms = await page.evaluate(() => {
@@ -1539,7 +1539,7 @@ test.describe('Comms range', () => {
         const fs = window.__flightState;
         return (fs?.commsState?.status ?? fs?.comms?.status) != null;
       },
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     // Inject relay satellites into the game state.
@@ -1565,7 +1565,7 @@ test.describe('Comms range', () => {
         const s = fs?.commsState?.status ?? fs?.comms?.status;
         return s === 'CONNECTED';
       },
-      { timeout: 15_000 },
+      { timeout: 10_000 },
     );
 
     const comms = await page.evaluate(() => {
@@ -1602,7 +1602,7 @@ test.describe('Comms range', () => {
         const fs = window.__flightState;
         return (fs?.commsState?.status ?? fs?.comms?.status) != null;
       },
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     const comms = await page.evaluate(() => {

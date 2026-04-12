@@ -112,7 +112,7 @@ test.describe('Resource contracts — early chain', () => {
 
     // Navigate to Mission Control to verify
     await page.click('[data-building-id="mission-control"]');
-    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 5_000 });
 
     // Look for the contracts tab and click it if present
     const contractsTab = page.locator('.facility-tab', { hasText: /[Cc]ontract/ });

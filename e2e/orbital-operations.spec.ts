@@ -194,21 +194,21 @@ async function returnToAgency(page: Page): Promise<void> {
   const orbitVisible = await orbitReturn.isVisible({ timeout: 2_000 }).catch(() => false);
   if (orbitVisible) {
     await orbitReturn.click();
-    await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 5_000 });
     await page.click('#post-flight-return-btn');
   } else {
     const abortVisible = await abortReturn.isVisible({ timeout: 2_000 }).catch(() => false);
     if (abortVisible) {
       await abortReturn.click();
     } else {
-      await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 10_000 });
+      await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 5_000 });
       await page.click('#post-flight-return-btn');
     }
   }
 
   await page.waitForFunction(
     () => window.__flightState === null || window.__flightState === undefined,
-    { timeout: 10_000 },
+    { timeout: 5_000 },
   );
 
   // Dismiss any return results overlay.
@@ -242,7 +242,7 @@ test.describe('Orbit entry detection', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture());
@@ -281,7 +281,7 @@ test.describe('Orbit entry detection', () => {
     // Wait for orbitBandId to be assigned (may take a frame after orbit entry).
     await page.waitForFunction(
       () => window.__flightState?.orbitBandId != null,
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
     const fs = await getFlightState(page) as FlightStateSnapshot | null;
     expect(fs).not.toBeNull();
@@ -306,7 +306,7 @@ test.describe('Orbit exit warning and transition', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture());
@@ -340,7 +340,7 @@ test.describe('Orbit exit warning and transition', () => {
         const phase = window.__flightState?.phase;
         return phase && phase !== 'ORBIT' && phase !== 'MANOEUVRE';
       },
-      { timeout: 15_000 },
+      { timeout: 10_000 },
     );
 
     const fs = await getFlightState(page) as FlightStateSnapshot | null;
@@ -360,7 +360,7 @@ test.describe('Orbital manoeuvres', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture());
@@ -396,7 +396,7 @@ test.describe('Orbital manoeuvres', () => {
     // Wait for MANOEUVRE phase.
     await page.waitForFunction(
       () => window.__flightState?.phase === 'MANOEUVRE',
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     // Let burn run for several physics frames.
@@ -420,7 +420,7 @@ test.describe('Orbital manoeuvres', () => {
     // Wait for return to ORBIT.
     await page.waitForFunction(
       () => window.__flightState?.phase === 'ORBIT',
-      { timeout: 15_000 },
+      { timeout: 10_000 },
     );
 
     // After a prograde burn, velocity should have increased or orbit shape changed.
@@ -469,7 +469,7 @@ test.describe('Docking mode local positioning', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture());
@@ -612,7 +612,7 @@ test.describe('Satellite deployment and benefits', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
@@ -736,7 +736,7 @@ test.describe('Constellation bonus', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
@@ -818,7 +818,7 @@ test.describe('Satellite degradation and maintenance', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
@@ -919,7 +919,7 @@ test.describe('Satellite Network Ops Centre tiers', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
@@ -1009,7 +1009,7 @@ test.describe('Docking approach and guidance', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture());
@@ -1026,7 +1026,7 @@ test.describe('Docking approach and guidance', () => {
     // Ensure docking state is initialised.
     await page.waitForFunction(
       () => window.__flightState?.dockingState != null,
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     const dockingState = await page.evaluate(() => {
@@ -1185,7 +1185,7 @@ test.describe('Undocking and control assignment', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture());
@@ -1202,7 +1202,7 @@ test.describe('Undocking and control assignment', () => {
     // Wait for docking state to initialise.
     await page.waitForFunction(
       () => window.__flightState?.dockingState != null,
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     // Set up docked state.
@@ -1259,7 +1259,7 @@ test.describe('Crew transfer and fuel transfer', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture());
@@ -1276,7 +1276,7 @@ test.describe('Crew transfer and fuel transfer', () => {
     // Wait for docking state.
     await page.waitForFunction(
       () => window.__flightState?.dockingState != null,
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     // Set up docked state and simulate crew transfer.
@@ -1337,7 +1337,7 @@ test.describe('Power system', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture());
@@ -1354,7 +1354,7 @@ test.describe('Power system', () => {
     // Wait for power state to be populated.
     await page.waitForFunction(
       () => window.__flightPs?.powerState?.solarPanelArea! > 0,
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     const powerInfo = await page.evaluate(() => {
@@ -1376,7 +1376,7 @@ test.describe('Power system', () => {
   test('(2) solar generation is positive when craft is sunlit', async () => {
     await page.waitForFunction(
       () => window.__flightPs?.powerState != null,
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     const generation = await page.evaluate(() => {
@@ -1433,7 +1433,7 @@ test.describe('Power system', () => {
     await waitForOrbit(page);
     await page.waitForFunction(
       () => window.__flightPs?.powerState != null,
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     const powerInfo = await page.evaluate(() => {
@@ -1462,7 +1462,7 @@ test.describe('Grabbing arm and satellite repair', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture({
@@ -1569,7 +1569,7 @@ test.describe('Integrated orbital operations', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(180_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture({
@@ -1628,7 +1628,7 @@ test.describe('Integrated orbital operations', () => {
 
     await page.waitForFunction(
       () => window.__flightState?.phase === 'MANOEUVRE',
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     // Cut thrust.
@@ -1642,7 +1642,7 @@ test.describe('Integrated orbital operations', () => {
 
     await page.waitForFunction(
       () => window.__flightState?.phase === 'ORBIT',
-      { timeout: 15_000 },
+      { timeout: 10_000 },
     );
 
     // Return to agency.
@@ -1678,7 +1678,7 @@ test.describe('Docking thresholds', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture());
@@ -1694,7 +1694,7 @@ test.describe('Docking thresholds', () => {
 
     await page.waitForFunction(
       () => window.__flightState?.dockingState != null,
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     const result = await page.evaluate(async () => {
@@ -1782,7 +1782,7 @@ test.describe('Grab arm thresholds', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture({
@@ -1859,7 +1859,7 @@ test.describe('Power system eclipse behaviour', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture());
@@ -1874,7 +1874,7 @@ test.describe('Power system eclipse behaviour', () => {
     await waitForOrbit(page);
     await page.waitForFunction(
       () => window.__flightPs?.powerState != null,
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     const sunlitInfo = await page.evaluate(() => {
@@ -1933,7 +1933,7 @@ test.describe('Satellite leasing', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
@@ -1989,7 +1989,7 @@ test.describe('Orbital elements tracking', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture());
@@ -2038,7 +2038,7 @@ test.describe('Complete orbital lifecycle', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(180_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture());
@@ -2080,7 +2080,7 @@ test.describe('Complete orbital lifecycle', () => {
 
     await page.waitForFunction(
       () => window.__flightState?.phase === 'MANOEUVRE',
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     // End manoeuvre.
@@ -2094,7 +2094,7 @@ test.describe('Complete orbital lifecycle', () => {
 
     await page.waitForFunction(
       () => window.__flightState?.phase === 'ORBIT',
-      { timeout: 15_000 },
+      { timeout: 10_000 },
     );
 
     // Return to agency.

@@ -142,7 +142,7 @@ async function setupSettingsPage(browser: Browser): Promise<Page> {
 test.describe('Sandbox mode', () => {
 
   test('sandbox save has unlimited money and all parts unlocked', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupSandboxPage(browser);
 
     const gs = await getGameState(page) as GameState;
@@ -156,7 +156,7 @@ test.describe('Sandbox mode', () => {
   });
 
   test('sandbox save has all facilities built', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupSandboxPage(browser);
 
     const gs = await getGameState(page) as GameState;
@@ -172,7 +172,7 @@ test.describe('Sandbox mode', () => {
   });
 
   test('sandbox malfunction toggle stored in state', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupSandboxPage(browser);
 
     const gs = await getGameState(page) as GameState;
@@ -184,7 +184,7 @@ test.describe('Sandbox mode', () => {
   });
 
   test('sandbox flight works with malfunctions disabled', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupSandboxPage(browser);
 
     await startTestFlight(page,
@@ -194,7 +194,7 @@ test.describe('Sandbox mode', () => {
 
     await page.keyboard.press('Space');
     await page.keyboard.press('z');
-    await waitForAltitude(page, 200, 30_000);
+    await waitForAltitude(page, 200, 15_000);
 
     const ps = await getPhysicsSnapshot(page);
     expect(ps!.posY).toBeGreaterThan(200);
@@ -216,17 +216,17 @@ test.describe('Sandbox mode', () => {
     // Dismiss return-results overlay if present.
     try {
       const dismissBtn = page.locator('#return-results-dismiss-btn');
-      await dismissBtn.waitFor({ state: 'visible', timeout: 10_000 });
+      await dismissBtn.waitFor({ state: 'visible', timeout: 5_000 });
       await dismissBtn.click();
     } catch { /* no return results overlay */ }
 
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
 
     await page.close();
   });
 
   test('sandbox and career can share design library via state', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupSandboxPage(browser);
 
     const gs = await getGameState(page) as GameState;
@@ -245,12 +245,12 @@ test.describe('Sandbox mode', () => {
 test.describe('Challenge missions', () => {
 
   test('challenges tab displays unlocked challenges in Mission Control', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupChallengePage(browser);
 
     // Open mission control
     await page.click('[data-building-id="mission-control"]');
-    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 5_000 });
 
     // Switch to Challenges tab
     await page.click('.mc-tab[data-tab-id="challenges"]');
@@ -264,11 +264,11 @@ test.describe('Challenge missions', () => {
   });
 
   test('challenge card shows objectives, medal thresholds, and scoring info', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupChallengePage(browser);
 
     await page.click('[data-building-id="mission-control"]');
-    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 5_000 });
     await page.click('.mc-tab[data-tab-id="challenges"]');
     await page.waitForSelector('.mc-challenge-grid', { state: 'visible', timeout: 5_000 });
 
@@ -287,11 +287,11 @@ test.describe('Challenge missions', () => {
   });
 
   test('accept challenge stores it in state.challenges.active', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupChallengePage(browser);
 
     await page.click('[data-building-id="mission-control"]');
-    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 5_000 });
     await page.click('.mc-tab[data-tab-id="challenges"]');
     await page.waitForSelector('.mc-challenge-grid', { state: 'visible', timeout: 5_000 });
 
@@ -311,11 +311,11 @@ test.describe('Challenge missions', () => {
   });
 
   test('active challenge shows Active badge and Abandon button', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupChallengePage(browser);
 
     await page.click('[data-building-id="mission-control"]');
-    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 5_000 });
     await page.click('.mc-tab[data-tab-id="challenges"]');
     await page.waitForSelector('.mc-challenge-grid', { state: 'visible', timeout: 5_000 });
 
@@ -333,11 +333,11 @@ test.describe('Challenge missions', () => {
   });
 
   test('abandon challenge clears active slot', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupChallengePage(browser);
 
     await page.click('[data-building-id="mission-control"]');
-    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 5_000 });
     await page.click('.mc-tab[data-tab-id="challenges"]');
     await page.waitForSelector('.mc-challenge-grid', { state: 'visible', timeout: 5_000 });
 
@@ -356,7 +356,7 @@ test.describe('Challenge missions', () => {
   });
 
   test('challenge scoring and medal award via core API', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupChallengePage(browser);
 
     // Test challenge completion via direct state manipulation.
@@ -425,7 +425,7 @@ test.describe('Challenge missions', () => {
   });
 
   test('replaying challenge shows Replay button and increments attempts', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupChallengePage(browser);
 
     // Inject a challenge result so the card shows "Replay" and best-score info
@@ -438,7 +438,7 @@ test.describe('Challenge missions', () => {
 
     // Open mission control and navigate to challenges tab
     await page.click('[data-building-id="mission-control"]');
-    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 5_000 });
 
     // Re-render the challenges tab
     await page.click('.mc-tab[data-tab-id="challenges"]');
@@ -477,14 +477,14 @@ test.describe('Challenge missions', () => {
   });
 
   test('close Mission Control and return to hub', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupChallengePage(browser);
 
     await page.click('[data-building-id="mission-control"]');
-    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 5_000 });
 
     await page.click('#mission-control-back-btn');
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 5_000 });
 
     await page.close();
   });
@@ -497,7 +497,7 @@ test.describe('Challenge missions', () => {
 test.describe('Custom mission creator', () => {
 
   test('custom challenge creation via core API', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupCustomMissionPage(browser);
 
     const result = await page.evaluate(() => {
@@ -537,7 +537,7 @@ test.describe('Custom mission creator', () => {
   });
 
   test('custom challenge appears in Challenges tab with custom badge', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupCustomMissionPage(browser);
 
     // Inject a custom challenge so it appears in the UI
@@ -567,7 +567,7 @@ test.describe('Custom mission creator', () => {
     });
 
     await page.click('[data-building-id="mission-control"]');
-    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 5_000 });
 
     await page.click('.mc-tab[data-tab-id="challenges"]');
     await page.waitForSelector('.mc-challenge-grid', { state: 'visible', timeout: 5_000 });
@@ -581,7 +581,7 @@ test.describe('Custom mission creator', () => {
   });
 
   test('custom challenge has Export and Delete buttons', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupCustomMissionPage(browser);
 
     // Inject a custom challenge
@@ -611,7 +611,7 @@ test.describe('Custom mission creator', () => {
     });
 
     await page.click('[data-building-id="mission-control"]');
-    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 5_000 });
     await page.click('.mc-tab[data-tab-id="challenges"]');
     await page.waitForSelector('.mc-challenge-grid', { state: 'visible', timeout: 5_000 });
 
@@ -623,11 +623,11 @@ test.describe('Custom mission creator', () => {
   });
 
   test('objective type selection available in creator form', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupCustomMissionPage(browser);
 
     await page.click('[data-building-id="mission-control"]');
-    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 5_000 });
     await page.click('.mc-tab[data-tab-id="challenges"]');
     await page.waitForSelector('.mc-challenge-grid', { state: 'visible', timeout: 5_000 });
 
@@ -651,11 +651,11 @@ test.describe('Custom mission creator', () => {
   });
 
   test('creator form has medal threshold and reward inputs', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupCustomMissionPage(browser);
 
     await page.click('[data-building-id="mission-control"]');
-    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 5_000 });
     await page.click('.mc-tab[data-tab-id="challenges"]');
     await page.waitForSelector('.mc-challenge-grid', { state: 'visible', timeout: 5_000 });
 
@@ -678,11 +678,11 @@ test.describe('Custom mission creator', () => {
   });
 
   test('creator form has score metric selector', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupCustomMissionPage(browser);
 
     await page.click('[data-building-id="mission-control"]');
-    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 5_000 });
     await page.click('.mc-tab[data-tab-id="challenges"]');
     await page.waitForSelector('.mc-challenge-grid', { state: 'visible', timeout: 5_000 });
 
@@ -701,11 +701,11 @@ test.describe('Custom mission creator', () => {
   });
 
   test('creating a custom challenge via the form adds it to state', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupCustomMissionPage(browser);
 
     await page.click('[data-building-id="mission-control"]');
-    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 5_000 });
     await page.click('.mc-tab[data-tab-id="challenges"]');
     await page.waitForSelector('.mc-challenge-grid', { state: 'visible', timeout: 5_000 });
 
@@ -757,7 +757,7 @@ test.describe('Custom mission creator', () => {
   });
 
   test('export custom challenge produces valid JSON', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupCustomMissionPage(browser);
 
     // Inject a custom challenge to export
@@ -832,7 +832,7 @@ test.describe('Custom mission creator', () => {
   });
 
   test('import custom challenge from JSON adds it to state', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupCustomMissionPage(browser);
 
     const importJson: string = JSON.stringify({
@@ -916,7 +916,7 @@ test.describe('Custom mission creator', () => {
   });
 
   test('delete custom challenge removes it from state', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupCustomMissionPage(browser);
 
     // Inject two custom challenges
@@ -979,14 +979,14 @@ test.describe('Custom mission creator', () => {
   });
 
   test('close Mission Control', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupCustomMissionPage(browser);
 
     await page.click('[data-building-id="mission-control"]');
-    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 5_000 });
 
     await page.click('#mission-control-back-btn');
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 5_000 });
 
     await page.close();
   });
@@ -999,7 +999,7 @@ test.describe('Custom mission creator', () => {
 test.describe('Game settings — difficulty options', () => {
 
   test('settings button is visible in hamburger menu', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupSettingsPage(browser);
 
     await page.click('#topbar-menu-btn');
@@ -1012,7 +1012,7 @@ test.describe('Game settings — difficulty options', () => {
   });
 
   test('clicking settings opens settings panel', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupSettingsPage(browser);
 
     await openSettingsPanel(page);
@@ -1026,7 +1026,7 @@ test.describe('Game settings — difficulty options', () => {
   });
 
   test('settings panel shows all four difficulty categories', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupSettingsPage(browser);
 
     await openSettingsPanel(page);
@@ -1049,7 +1049,7 @@ test.describe('Game settings — difficulty options', () => {
   });
 
   test('Normal is selected by default for all settings', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupSettingsPage(browser);
 
     await openSettingsPanel(page);
@@ -1071,7 +1071,7 @@ test.describe('Game settings — difficulty options', () => {
   });
 
   test('changing malfunction frequency to Off updates state', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupSettingsPage(browser);
 
     await openSettingsPanel(page);
@@ -1090,7 +1090,7 @@ test.describe('Game settings — difficulty options', () => {
   });
 
   test('changing malfunction frequency to High updates state', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupSettingsPage(browser);
 
     await openSettingsPanel(page);
@@ -1105,7 +1105,7 @@ test.describe('Game settings — difficulty options', () => {
   });
 
   test('changing weather severity to Off updates state', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupSettingsPage(browser);
 
     await openSettingsPanel(page);
@@ -1120,7 +1120,7 @@ test.describe('Game settings — difficulty options', () => {
   });
 
   test('changing weather severity to Extreme updates state', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupSettingsPage(browser);
 
     await openSettingsPanel(page);
@@ -1135,7 +1135,7 @@ test.describe('Game settings — difficulty options', () => {
   });
 
   test('changing financial pressure to Easy updates state', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupSettingsPage(browser);
 
     await openSettingsPanel(page);
@@ -1150,7 +1150,7 @@ test.describe('Game settings — difficulty options', () => {
   });
 
   test('changing financial pressure to Hard updates state', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupSettingsPage(browser);
 
     await openSettingsPanel(page);
@@ -1165,7 +1165,7 @@ test.describe('Game settings — difficulty options', () => {
   });
 
   test('changing crew injury duration to Short updates state', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupSettingsPage(browser);
 
     await openSettingsPanel(page);
@@ -1180,7 +1180,7 @@ test.describe('Game settings — difficulty options', () => {
   });
 
   test('changing crew injury duration to Long updates state', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupSettingsPage(browser);
 
     await openSettingsPanel(page);
@@ -1195,7 +1195,7 @@ test.describe('Game settings — difficulty options', () => {
   });
 
   test('settings changes take effect immediately (no restart needed)', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupSettingsPage(browser);
 
     await openSettingsPanel(page);
@@ -1217,7 +1217,7 @@ test.describe('Game settings — difficulty options', () => {
   });
 
   test('back to hub button closes settings panel', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupSettingsPage(browser);
 
     await openSettingsPanel(page);
@@ -1231,7 +1231,7 @@ test.describe('Game settings — difficulty options', () => {
   });
 
   test('settings panel can be reopened with values persisted', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupSettingsPage(browser);
 
     // Open settings, change values, close, reopen
@@ -1267,7 +1267,7 @@ test.describe('Game settings — difficulty options', () => {
   });
 
   test('save slot summary does NOT contain difficulty settings', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await setupSettingsPage(browser);
 
     // Save the game and check that the slot summary has no difficulty settings.
@@ -1313,7 +1313,7 @@ test.describe('Game settings — difficulty options', () => {
 test.describe('Difficulty settings modify gameplay values', () => {
 
   test('malfunction frequency multiplier: off = 0, low = 0.4, normal = 1, high = 2', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -1351,7 +1351,7 @@ test.describe('Difficulty settings modify gameplay values', () => {
   });
 
   test('weather severity multiplier mapping is correct', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -1401,7 +1401,7 @@ test.describe('Difficulty settings modify gameplay values', () => {
   });
 
   test('financial pressure multiplier mapping is correct', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -1448,7 +1448,7 @@ test.describe('Difficulty settings modify gameplay values', () => {
   });
 
   test('injury duration multiplier mapping is correct', async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 

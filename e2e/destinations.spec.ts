@@ -263,7 +263,7 @@ async function returnToAgency(page: Page): Promise<void> {
     if (orbitVisible) {
       await orbitReturn.click();
       const summaryAfter = page.locator('#post-flight-summary');
-      if (await summaryAfter.isVisible({ timeout: 10_000 }).catch(() => false)) {
+      if (await summaryAfter.isVisible({ timeout: 5_000 }).catch(() => false)) {
         await page.click('#post-flight-return-btn');
       }
     } else {
@@ -272,7 +272,7 @@ async function returnToAgency(page: Page): Promise<void> {
         await abortReturn.click();
       } else {
         const summaryFallback = page.locator('#post-flight-summary');
-        if (await summaryFallback.isVisible({ timeout: 10_000 }).catch(() => false)) {
+        if (await summaryFallback.isVisible({ timeout: 5_000 }).catch(() => false)) {
           await page.click('#post-flight-return-btn');
         }
       }
@@ -287,7 +287,7 @@ async function returnToAgency(page: Page): Promise<void> {
   } catch { /* no return results overlay */ }
 
   // Wait for hub to appear.
-  await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 }).catch(() => {});
+  await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 }).catch(() => {});
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -299,7 +299,7 @@ test.describe('Celestial body data drives physics and rendering', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(180_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, phase6Fixture());
@@ -423,7 +423,7 @@ test.describe('Sun destruction altitude and escalating heat damage', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, phase6Fixture());
@@ -441,7 +441,7 @@ test.describe('Sun destruction altitude and escalating heat damage', () => {
     await page.waitForFunction(
       (y0: number) => (window.__flightPs?.posY ?? y0) !== y0,
       _sunPosY1,
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     // Check that no heat-related events fired.
@@ -478,7 +478,7 @@ test.describe('Sun destruction altitude and escalating heat damage', () => {
       return (fs?.events ?? []).some((e: { type: string }) =>
         e.type === 'PART_DESTROYED' || e.type === 'HEAT_DAMAGE'
       );
-    }, { timeout: 15_000 });
+    }, { timeout: 10_000 });
 
     // Check for heat-related effects — parts should accumulate heat.
     // Heat is tracked in ps.heatMap (Map<string, number>).
@@ -520,7 +520,7 @@ test.describe('Sun destruction altitude and escalating heat damage', () => {
       const fs = window.__flightState;
       return ps?.crashed === true ||
         (fs?.events ?? []).some((e: { type: string }) => e.type === 'PART_DESTROYED');
-    }, { timeout: 10_000 });
+    }, { timeout: 5_000 });
 
     // All parts should be destroyed — check for crash or destruction state.
     const state = await page.evaluate((): DestructionState => {
@@ -555,7 +555,7 @@ test.describe('Sun destruction altitude and escalating heat damage', () => {
     await page.waitForFunction(
       (y0: number) => Math.abs((window.__flightPs?.posY ?? y0) - y0) > 1000,
       _sunPosY2,
-      { timeout: 15_000 },
+      { timeout: 10_000 },
     );
 
     const shieldState = await page.evaluate((): ShieldState => {
@@ -591,7 +591,7 @@ test.describe('Transfer gameplay mechanics', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(180_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, phase6Fixture());
@@ -632,7 +632,7 @@ test.describe('Transfer gameplay mechanics', () => {
       await page.waitForFunction(
         (x0: number) => Math.abs((window.__flightPs?.posX ?? x0) - x0) > 100,
         _tPosX,
-        { timeout: 10_000 },
+        { timeout: 5_000 },
       );
     }
 
@@ -729,7 +729,7 @@ test.describe('Landing on airless and atmospheric bodies', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(180_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, phase6Fixture());
@@ -811,7 +811,7 @@ test.describe('Body-specific biomes and science opportunities', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(180_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, phase6Fixture());
@@ -910,7 +910,7 @@ test.describe('Surface operations — flag planting', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(180_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, phase6Fixture());
@@ -1023,7 +1023,7 @@ test.describe('Surface operations — sample collection and return', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(180_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, phase6Fixture());
@@ -1160,7 +1160,7 @@ test.describe('Surface operations — instruments and beacons', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(180_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, phase6Fixture());
@@ -1291,7 +1291,7 @@ test.describe('Surface item visibility based on GPS coverage', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
@@ -1372,7 +1372,7 @@ test.describe('Prestige milestones trigger at correct events', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(180_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
@@ -1633,7 +1633,7 @@ test.describe('Phase 6 new parts function correctly', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(180_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, phase6Fixture());
@@ -1673,7 +1673,7 @@ test.describe('Phase 6 new parts function correctly', () => {
     // Stage and thrust. On the Moon, 5 kN can lift ~300 kg at 1.62 g.
     await pressStage(page);
     await pressThrottleUp(page);
-    await waitForAltitude(page, 10, 30_000);
+    await waitForAltitude(page, 10, 15_000);
 
     const ps = (await getPhysicsSnapshot(page))!;
     expect(ps.posY).toBeGreaterThan(0);
@@ -1854,7 +1854,7 @@ test.describe('Map view controls during transfer', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, phase6Fixture());
@@ -1911,7 +1911,7 @@ test.describe('Integration — full lunar mission flow', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(180_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, phase6Fixture());
@@ -1981,7 +1981,7 @@ test.describe('Integration — full lunar mission flow', () => {
       await page.locator('#return-results-dismiss-btn').click({ timeout: 3_000 });
     } catch { /* no overlay */ }
 
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 5_000 });
     const gs = (await getGameState(page))!;
     // Period should have advanced.
     expect(gs.currentPeriod).toBeGreaterThan(30);

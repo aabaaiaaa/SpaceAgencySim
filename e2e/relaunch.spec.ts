@@ -48,7 +48,7 @@ test.describe('Relaunch — Takeoff, Land, Takeoff Again', () => {
 
     await page.waitForFunction(
       () => (window.__flightPs?.posY ?? 0) > 50,
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     const groundedAfter = await page.evaluate(() => window.__flightPs?.grounded);
@@ -65,7 +65,7 @@ test.describe('Relaunch — Takeoff, Land, Takeoff Again', () => {
     // Gain some altitude first.
     await page.waitForFunction(
       () => (window.__flightPs?.posY ?? 0) > 30,
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     // Cut throttle and teleport near ground with gentle descent.
@@ -106,7 +106,7 @@ test.describe('Relaunch — Takeoff, Land, Takeoff Again', () => {
     // Gain altitude.
     await page.waitForFunction(
       () => (window.__flightPs?.posY ?? 0) > 30,
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     // Cut throttle and land gently.

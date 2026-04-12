@@ -19,7 +19,7 @@ test.describe('Keyboard Navigation', () => {
     // Fresh context → New Game screen should appear.
     await page.waitForSelector('#mm-agency-name-input', {
       state: 'visible',
-      timeout: 15_000,
+      timeout: 10_000,
     });
 
     // Agency name input should be auto-focused.
@@ -64,7 +64,7 @@ test.describe('Keyboard Navigation', () => {
     await page.keyboard.press('Enter');
 
     // Should transition to hub.
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
     await dismissWelcomeModal(page);
   });
 
@@ -72,14 +72,14 @@ test.describe('Keyboard Navigation', () => {
     await page.goto('/');
     await page.waitForSelector('#mm-agency-name-input', {
       state: 'visible',
-      timeout: 15_000,
+      timeout: 10_000,
     });
 
     // Start a sandbox game.
     await page.fill('#mm-agency-name-input', 'Keyboard Hub');
     await page.click('.mm-mode-option[data-mode="sandbox"]');
     await page.click('#mm-start-btn');
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
     await dismissWelcomeModal(page);
 
     // Tab repeatedly until we land on a hub building (topbar buttons come first).
@@ -126,13 +126,13 @@ test.describe('Keyboard Navigation', () => {
     await page.goto('/');
     await page.waitForSelector('#mm-agency-name-input', {
       state: 'visible',
-      timeout: 15_000,
+      timeout: 10_000,
     });
 
     await page.fill('#mm-agency-name-input', 'Keyboard Topbar');
     await page.click('.mm-mode-option[data-mode="sandbox"]');
     await page.click('#mm-start-btn');
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
     await dismissWelcomeModal(page);
 
     // Click the hamburger menu button to open the dropdown.
@@ -164,13 +164,13 @@ test.describe('Keyboard Navigation', () => {
     await page.goto('/');
     await page.waitForSelector('#mm-agency-name-input', {
       state: 'visible',
-      timeout: 15_000,
+      timeout: 10_000,
     });
 
     await page.fill('#mm-agency-name-input', 'Keyboard Settings');
     await page.click('.mm-mode-option[data-mode="sandbox"]');
     await page.click('#mm-start-btn');
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
     await dismissWelcomeModal(page);
 
     // Open settings via hamburger menu.
@@ -211,14 +211,14 @@ test.describe('Keyboard Navigation', () => {
     await page.goto('/');
     await page.waitForSelector('#mm-agency-name-input', {
       state: 'visible',
-      timeout: 15_000,
+      timeout: 10_000,
     });
 
     // Start a sandbox game then navigate to VAB.
     await page.fill('#mm-agency-name-input', 'Keyboard VAB');
     await page.click('.mm-mode-option[data-mode="sandbox"]');
     await page.click('#mm-start-btn');
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
     await dismissWelcomeModal(page);
     await navigateToVab(page);
 
@@ -264,21 +264,21 @@ test.describe('Keyboard Navigation', () => {
     await page.goto('/');
     await page.waitForSelector('#mm-agency-name-input', {
       state: 'visible',
-      timeout: 15_000,
+      timeout: 10_000,
     });
 
     // Start a sandbox game.
     await page.fill('#mm-agency-name-input', 'Keyboard MC');
     await page.click('.mm-mode-option[data-mode="sandbox"]');
     await page.click('#mm-start-btn');
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
     await dismissWelcomeModal(page);
 
     // Navigate to Mission Control.
     await page.click('[data-building-id="mission-control"]');
     await page.waitForSelector('#mission-control-overlay', {
       state: 'visible',
-      timeout: 15_000,
+      timeout: 10_000,
     });
 
     // Tab through — should reach a tab button.

@@ -54,7 +54,7 @@ async function buildAndLaunch(page: Page): Promise<void> {
 async function waitForWarpUnlocked(page: Page): Promise<void> {
   await page.waitForFunction(
     () => !(document.querySelector('.hud-warp-btn') as HTMLButtonElement | null)?.disabled,
-    { timeout: 10_000 },
+    { timeout: 5_000 },
   );
 }
 
@@ -83,7 +83,7 @@ async function waitForLanding(page: Page): Promise<void> {
       const ps = window.__flightPs;
       return ps?.landed === true || ps?.crashed === true;
     },
-    { timeout: 30_000 },
+    { timeout: 15_000 },
   );
 }
 
@@ -94,14 +94,14 @@ async function waitForLanding(page: Page): Promise<void> {
 test.describe('Flight — Landing', () => {
 
   test('(1) launching from the VAB loads the flight scene', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     await buildAndLaunch(page);
     await expect(page.locator('#flight-hud')).toBeVisible({ timeout: 5_000 });
     await expect(page.locator('#vab-btn-launch')).not.toBeVisible({ timeout: 5_000 });
   });
 
   test('(2) pressing Space fires Stage 1 and the rocket lifts off', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     await buildAndLaunch(page);
 
     await page.waitForFunction(
@@ -116,7 +116,7 @@ test.describe('Flight — Landing', () => {
   });
 
   test('(3) pressing Space again separates the lower stage and deploys the parachute', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     await buildAndLaunch(page);
     await fireStage1(page);
     await fireStage2(page);
@@ -146,7 +146,7 @@ test.describe('Flight — Landing', () => {
   });
 
   test('(4) parachute slows the command module to a safe landing speed', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     await buildAndLaunch(page);
     await fireStage1(page);
     await fireStage2(page);
@@ -162,7 +162,7 @@ test.describe('Flight — Landing', () => {
   });
 
   test('(5) a LANDING event is recorded with impact speed below crash threshold', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     await buildAndLaunch(page);
     await fireStage1(page);
     await fireStage2(page);
@@ -187,7 +187,7 @@ test.describe('Flight — Landing', () => {
   });
 
   test('(6) clicking "Return to Space Agency" shows the post-flight summary', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     await buildAndLaunch(page);
     await fireStage1(page);
     await fireStage2(page);

@@ -70,7 +70,7 @@ export async function startTestFlight(
 ): Promise<void> {
   await page.waitForFunction(
     () => typeof window.__e2eStartFlight === 'function',
-    { timeout: 15_000 },
+    { timeout: 10_000 },
   );
 
   await page.evaluate(
@@ -79,10 +79,10 @@ export async function startTestFlight(
   );
 
   // Wait for flight scene to be ready.
-  await page.waitForSelector('#flight-hud', { state: 'visible', timeout: 15_000 });
+  await page.waitForSelector('#flight-hud', { state: 'visible', timeout: 10_000 });
   await page.waitForFunction(
     () => typeof window.__flightPs !== 'undefined' && window.__flightPs !== null,
-    { timeout: 10_000 },
+    { timeout: 5_000 },
   );
 }
 
@@ -226,7 +226,7 @@ export async function teleportCraft(
  */
 export async function waitForOrbit(
   page: Page,
-  timeout: number = 10_000,
+  timeout: number = 5_000,
 ): Promise<void> {
   await page.waitForFunction(
     () => window.__flightState?.phase === 'ORBIT' && window.__flightState?.inOrbit === true,

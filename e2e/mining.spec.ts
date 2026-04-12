@@ -42,13 +42,13 @@ test.describe('Mining — Logistics Center', () => {
 
   test('Logistics Center building is visible in the hub', async ({ page }) => {
     const building = page.locator('[data-building-id="logistics-center"]');
-    await expect(building).toBeVisible({ timeout: 10_000 });
+    await expect(building).toBeVisible({ timeout: 5_000 });
   });
 
   test('opening Logistics Center shows mining sites panel with empty state', async ({ page }) => {
     // Click the Logistics Center building
     await page.click('[data-building-id="logistics-center"]');
-    await page.waitForSelector('#logistics-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#logistics-overlay', { state: 'visible', timeout: 5_000 });
 
     // The overlay should be visible
     await expect(page.locator('#logistics-overlay')).toBeVisible({ timeout: 5_000 });
@@ -61,7 +61,7 @@ test.describe('Mining — Logistics Center', () => {
 
   test('Route Management tab is accessible and shows empty state', async ({ page }) => {
     await page.click('[data-building-id="logistics-center"]');
-    await page.waitForSelector('#logistics-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#logistics-overlay', { state: 'visible', timeout: 5_000 });
 
     // Click the Route Management tab
     const routesTab = page.locator('#logistics-overlay .facility-tab', { hasText: 'Route Management' });
@@ -76,14 +76,14 @@ test.describe('Mining — Logistics Center', () => {
   test('@smoke injecting a mining site into gameState renders it in the panel', async ({ page }) => {
     // Open the Logistics Center
     await page.click('[data-building-id="logistics-center"]');
-    await page.waitForSelector('#logistics-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#logistics-overlay', { state: 'visible', timeout: 5_000 });
 
     // Verify empty state first
     await expect(page.locator('#logistics-overlay .empty-msg')).toBeVisible({ timeout: 5_000 });
 
     // Navigate back to hub to re-enter with injected state
     await page.click('#logistics-back-btn');
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 5_000 });
 
     // Inject a mining site into the game state
     await page.evaluate(() => {
@@ -126,7 +126,7 @@ test.describe('Mining — Logistics Center', () => {
 
     // Re-open the Logistics Center
     await page.click('[data-building-id="logistics-center"]');
-    await page.waitForSelector('#logistics-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#logistics-overlay', { state: 'visible', timeout: 5_000 });
 
     // The empty message should be gone
     await expect(page.locator('#logistics-overlay .empty-msg')).not.toBeVisible({ timeout: 5_000 });

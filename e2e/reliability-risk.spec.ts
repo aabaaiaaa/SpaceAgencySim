@@ -109,21 +109,21 @@ async function returnToAgency(page: Page): Promise<void> {
   const orbitVisible = await orbitReturn.isVisible({ timeout: 2_000 }).catch(() => false);
   if (orbitVisible) {
     await orbitReturn.click();
-    await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 5_000 });
     await page.click('#post-flight-return-btn');
   } else {
     const abortVisible = await abortReturn.isVisible({ timeout: 2_000 }).catch(() => false);
     if (abortVisible) {
       await abortReturn.click();
     } else {
-      await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 10_000 });
+      await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 5_000 });
       await page.click('#post-flight-return-btn');
     }
   }
 
   await page.waitForFunction(
     () => window.__flightState === null || window.__flightState === undefined,
-    { timeout: 10_000 },
+    { timeout: 5_000 },
   );
 }
 
@@ -144,7 +144,7 @@ test.describe('Malfunction toggle and biome-transition triggering', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = midGameFixture({ money: 5_000_000 });
@@ -161,7 +161,7 @@ test.describe('Malfunction toggle and biome-transition triggering', () => {
     // Cross a biome boundary (100m = Low Atmosphere)
     await pressStage(page);
     await pressThrottleUp(page);
-    await waitForAltitude(page, 150, 20_000);
+    await waitForAltitude(page, 150, 10_000);
     // Wait for physics to process across the biome boundary
     await page.waitForFunction(
       () => (window.__flightPs?.posY ?? 0) > 160,
@@ -189,12 +189,12 @@ test.describe('Malfunction toggle and biome-transition triggering', () => {
     // Cross a biome boundary — fire engine and ascend past 100m
     await pressStage(page);
     await pressThrottleUp(page);
-    await waitForAltitude(page, 150, 20_000);
+    await waitForAltitude(page, 150, 10_000);
 
     // Wait for malfunction check to process
     await page.waitForFunction(
       () => (window.__flightPs?.malfunctions?.size ?? 0) > 0,
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     const malfCount = await page.evaluate(() => window.__flightPs!.malfunctions!.size);
@@ -220,7 +220,7 @@ test.describe('Engine flameout malfunction', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = midGameFixture({ money: 5_000_000 });
@@ -277,7 +277,7 @@ test.describe('Engine reduced thrust malfunction', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = midGameFixture({ money: 5_000_000 });
@@ -320,7 +320,7 @@ test.describe('Fuel tank leak malfunction', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = midGameFixture({ money: 5_000_000 });
@@ -363,7 +363,7 @@ test.describe('Fuel tank leak malfunction', () => {
         return (ps.fuelStore?.get(tankId) ?? initFuel) < initFuel;
       },
       beforeFuel,
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     const afterFuel = await page.evaluate(() => {
@@ -389,7 +389,7 @@ test.describe('Stuck decoupler malfunction', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = midGameFixture({ money: 5_000_000 });
@@ -429,7 +429,7 @@ test.describe('Partial parachute malfunction', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = midGameFixture({ money: 5_000_000 });
@@ -467,7 +467,7 @@ test.describe('SRB early burnout malfunction', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = midGameFixture({ money: 5_000_000 });
@@ -523,7 +523,7 @@ test.describe('Science instrument failure malfunction', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = midGameFixture({ money: 5_000_000 });
@@ -564,7 +564,7 @@ test.describe('Stuck landing legs malfunction', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = midGameFixture({ money: 5_000_000 });
@@ -606,7 +606,7 @@ test.describe('Malfunction recovery via context menu', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = midGameFixture({ money: 5_000_000 });
@@ -741,7 +741,7 @@ test.describe('Crew engineering skill reduces malfunction chance', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -803,7 +803,7 @@ test.describe('Part inventory and wear tracking', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -870,7 +870,7 @@ test.describe('VAB inventory tab — refurbish and scrap', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -1029,7 +1029,7 @@ test.describe('Wind force during flight and ISP modifier', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -1071,7 +1071,7 @@ test.describe('Wind force during flight and ISP modifier', () => {
     // Wait for wind to produce measurable displacement
     await page.waitForFunction(
       () => Math.abs(window.__flightPs?.posX ?? 0) > 0.01,
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     const snapshot = await getPhysicsSnapshot(page);
@@ -1192,7 +1192,7 @@ test.describe('Extreme weather warning', () => {
     // Force the hub to re-render the weather panel by removing and calling re-render
     // The simplest way is to navigate to VAB and back
     await page.click('[data-building-id="vab"]');
-    await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 5_000 });
 
     // Re-inject extreme weather before returning to hub (hub re-init will overwrite)
     // Instead, use addInitScript to intercept the weather init
@@ -1213,7 +1213,7 @@ test.describe('Extreme weather warning', () => {
 
     // Return to hub
     await page.click('#vab-back-btn');
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 5_000 });
     await page.waitForFunction(
       () => (document.querySelector('#hub-overlay')?.children.length ?? 0) > 0,
       { timeout: 5_000 },
@@ -1242,9 +1242,9 @@ test.describe('Extreme weather warning', () => {
 
     // Trigger hub re-render by navigating away and back once more
     await page.click('[data-building-id="vab"]');
-    await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 5_000 });
     await page.click('#vab-back-btn');
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 5_000 });
     await page.waitForFunction(
       () => (document.querySelector('#hub-overlay')?.children.length ?? 0) > 0,
       { timeout: 5_000 },
@@ -1294,7 +1294,7 @@ test.describe('Reputation score changes from events', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = freshStartFixture({ reputation: 50 });
@@ -1513,9 +1513,9 @@ test.describe('Reputation tier effects', () => {
     // Reputation is 90 (Elite) from previous test
     // Navigate away and back to trigger re-render
     await page.click('[data-building-id="vab"]');
-    await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 5_000 });
     await page.click('#vab-back-btn');
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 5_000 });
     await page.waitForFunction(
       () => document.querySelector('.hub-rep-tier') !== null,
       { timeout: 5_000 },

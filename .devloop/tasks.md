@@ -251,7 +251,7 @@
 - **Verification**: `npx playwright test <files-that-were-failing>` passes. At least 80% of cataloged failures are resolved.
 
 ### TASK-037: Optimise slow E2E tests — pass 1
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-036
 - **Description**: Using the catalog from TASK-035, optimise the slowest E2E tests. Common optimisations: replace `page.waitForTimeout(N)` with targeted `waitForSelector`/`waitForFunction`, reduce unnecessary full-page navigations by seeding state closer to the test scenario, combine related assertions that share setup, ensure E2E helper factories create minimal state, tighten overly generous timeout values (reduce 10_000ms to 5_000ms where safe). Target: no individual spec takes >60 seconds.
 - **Verification**: Run the previously-slow specs and verify reduced timing. No spec exceeds 60 seconds.

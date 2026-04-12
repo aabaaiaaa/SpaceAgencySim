@@ -20,7 +20,7 @@ test.describe('Save Version Indicator', () => {
     }, { key: SAVE_KEY, env: envelope });
 
     await page.goto('/');
-    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 
     // The save card for slot 0 should be visible.
     const slot0Card = page.locator('.mm-save-card[data-slot="0"]:not(.mm-empty-slot)');
@@ -38,7 +38,7 @@ test.describe('Save Version Indicator', () => {
     }, { key: SAVE_KEY, env: envelope });
 
     await page.goto('/');
-    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 
     const slot0Card = page.locator('.mm-save-card[data-slot="0"]:not(.mm-empty-slot)');
     await expect(slot0Card).toBeVisible({ timeout: 5_000 });
@@ -58,11 +58,11 @@ test.describe('Save Version Indicator', () => {
     }, { key: SAVE_KEY, env: envelope });
 
     await page.goto('/');
-    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 
     // Load the save to get into the game.
     await page.click('[data-action="load"][data-slot="0"]');
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
 
     // Open the topbar menu and click "Load Game".
     await page.click('[data-testid="topbar-menu-btn"]');
@@ -86,11 +86,11 @@ test.describe('Save Version Indicator', () => {
     }, { key: SAVE_KEY, env: envelope });
 
     await page.goto('/');
-    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 
     // Load the save to get into the game.
     await page.click('[data-action="load"][data-slot="0"]');
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
 
     // Open the topbar menu and click "Load Game".
     await page.click('[data-testid="topbar-menu-btn"]');

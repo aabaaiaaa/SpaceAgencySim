@@ -36,7 +36,7 @@ test.describe('Hub Save Migration', () => {
 
     // The game should have loaded successfully — hub overlay visible
     const hubOverlay = page.locator('#hub-overlay');
-    await expect(hubOverlay).toBeVisible({ timeout: 10_000 });
+    await expect(hubOverlay).toBeVisible({ timeout: 5_000 });
 
     // Wait for the migration to complete and hubs to be populated
     await page.waitForFunction(

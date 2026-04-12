@@ -85,7 +85,7 @@ async function injectRouteState(page: import('@playwright/test').Page) {
  */
 async function openRoutesTab(page: import('@playwright/test').Page) {
   await page.click('[data-building-id="logistics-center"]');
-  await page.waitForSelector('#logistics-overlay', { state: 'visible', timeout: 10_000 });
+  await page.waitForSelector('#logistics-overlay', { state: 'visible', timeout: 5_000 });
 
   const routesTab = page.locator('#logistics-overlay .facility-tab', { hasText: 'Route Management' });
   await routesTab.click();
@@ -105,7 +105,7 @@ test.describe('Route Interactions', () => {
 
     // The routes table should be visible
     const table = page.locator('.logistics-routes-table');
-    await expect(table).toBeVisible({ timeout: 10_000 });
+    await expect(table).toBeVisible({ timeout: 5_000 });
 
     // Find the row for our route
     const routeRow = page.locator('tr[data-route-id="route-e2e-1"]');
@@ -126,7 +126,7 @@ test.describe('Route Interactions', () => {
 
     // Find the status toggle button for the route
     const routeRow = page.locator('tr[data-route-id="route-e2e-1"]');
-    await expect(routeRow).toBeVisible({ timeout: 10_000 });
+    await expect(routeRow).toBeVisible({ timeout: 5_000 });
 
     const statusBtn = routeRow.locator('.logistics-route-status-btn');
     await expect(statusBtn).toBeVisible({ timeout: 5_000 });
@@ -153,7 +153,7 @@ test.describe('Route Interactions', () => {
 
     // Find the expand button for the route
     const routeRow = page.locator('tr[data-route-id="route-e2e-1"]');
-    await expect(routeRow).toBeVisible({ timeout: 10_000 });
+    await expect(routeRow).toBeVisible({ timeout: 5_000 });
 
     const expandBtn = routeRow.locator('.logistics-expand-btn');
     await expect(expandBtn).toBeVisible({ timeout: 5_000 });
@@ -197,7 +197,7 @@ test.describe('Route Interactions', () => {
 
     // Expand the route to see leg rows
     const routeRow = page.locator('tr[data-route-id="route-e2e-1"]');
-    await expect(routeRow).toBeVisible({ timeout: 10_000 });
+    await expect(routeRow).toBeVisible({ timeout: 5_000 });
     const expandBtn = routeRow.locator('.logistics-expand-btn');
     await expandBtn.click();
 
@@ -270,7 +270,7 @@ test.describe('Route Interactions', () => {
 
     // Click "Create Route" button
     const createBtn = page.locator('.logistics-builder-create-btn');
-    await expect(createBtn).toBeVisible({ timeout: 10_000 });
+    await expect(createBtn).toBeVisible({ timeout: 5_000 });
     await createBtn.click();
 
     // Builder panel should appear

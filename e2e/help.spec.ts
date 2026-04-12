@@ -88,7 +88,7 @@ test.describe('Help Panel Accessibility', () => {
 
   test('(3) help is accessible from Mission Control with default section "missions"', async ({ page }) => {
     await page.click('[data-building-id="mission-control"]');
-    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 5_000 });
 
     await openHelp(page);
     expect(await activeSection(page)).toBe('missions');
@@ -99,7 +99,7 @@ test.describe('Help Panel Accessibility', () => {
 
   test('(4) help is accessible from Crew Admin with default section "crew"', async ({ page }) => {
     await page.click('[data-building-id="crew-admin"]');
-    await page.waitForSelector('#crew-admin-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#crew-admin-overlay', { state: 'visible', timeout: 5_000 });
 
     await openHelp(page);
     expect(await activeSection(page)).toBe('crew');
@@ -110,7 +110,7 @@ test.describe('Help Panel Accessibility', () => {
 
   test('(5) help is accessible from Launch Pad with default section "vab"', async ({ page }) => {
     await page.click('[data-building-id="launch-pad"]');
-    await page.waitForSelector('#launch-pad-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#launch-pad-overlay', { state: 'visible', timeout: 5_000 });
 
     await openHelp(page);
     expect(await activeSection(page)).toBe('vab');
@@ -121,7 +121,7 @@ test.describe('Help Panel Accessibility', () => {
 
   test('(6) help is accessible from Tracking Station with default section "orbit"', async ({ page }) => {
     await page.click('[data-building-id="tracking-station"]');
-    await page.waitForSelector('#ts-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#ts-overlay', { state: 'visible', timeout: 5_000 });
 
     await openHelp(page);
     expect(await activeSection(page)).toBe('orbit');
@@ -131,14 +131,14 @@ test.describe('Help Panel Accessibility', () => {
   // ── (7) Help during Flight ─────────────────────────────────────────────
 
   test('(7) help is accessible during flight with default section "flight"', async ({ page }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(60_000);
 
     await navigateToVab(page);
 
     // Wait for parts panel to be ready.
     await page.waitForSelector('.vab-part-card[data-part-id="probe-core-mk1"]', {
       state: 'visible',
-      timeout: 10_000,
+      timeout: 5_000,
     });
 
     // Build a simple probe rocket.
@@ -147,7 +147,7 @@ test.describe('Help Panel Accessibility', () => {
     await placePart(page, 'engine-spark', CENTRE_X, CANVAS_CENTRE_Y + 50, 3);
 
     await launchFromVab(page);
-    await expect(page.locator('#flight-hud')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('#flight-hud')).toBeVisible({ timeout: 5_000 });
 
     await openHelp(page);
     expect(await activeSection(page)).toBe('flight');

@@ -271,11 +271,11 @@ test.describe('Flight — Launch & Basic Flight', () => {
     await expect(restartBackdrop).toBeVisible({ timeout: 2_000 });
     await restartBackdrop.getByRole('button', { name: 'Restart' }).click();
 
-    await expect(page.locator('#flight-hud')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('#flight-hud')).toBeVisible({ timeout: 5_000 });
 
     await page.waitForFunction(
       (): boolean => window.__flightPs !== null && window.__flightPs !== undefined,
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     const altAfter: number = await page.evaluate((): number => window.__flightPs?.posY ?? -1);
@@ -302,10 +302,10 @@ test.describe('Flight — Launch & Basic Flight', () => {
 
     await expect(page.locator('#flight-hud')).not.toBeVisible({ timeout: 5_000 });
 
-    await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 10_000 });
     await page.waitForFunction(
       (): boolean => typeof window.__vabAssembly !== 'undefined',
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     const partCount: number = await page.evaluate((): number => window.__vabAssembly?.parts?.size ?? 0);

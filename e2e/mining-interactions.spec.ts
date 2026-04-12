@@ -56,7 +56,7 @@ async function injectRefinerySite(page: import('@playwright/test').Page) {
 /** Navigate to the Logistics Center. Assumes the hub overlay is already visible. */
 async function openLogisticsCenter(page: import('@playwright/test').Page) {
   await page.click('[data-building-id="logistics-center"]');
-  await page.waitForSelector('#logistics-overlay', { state: 'visible', timeout: 10_000 });
+  await page.waitForSelector('#logistics-overlay', { state: 'visible', timeout: 5_000 });
 }
 
 // ---------------------------------------------------------------------------
@@ -73,7 +73,7 @@ test.describe('Mining Panel Interactions', () => {
 
     // The site card should render with the site name
     const siteCard = page.locator('.logistics-site-card');
-    await expect(siteCard).toBeVisible({ timeout: 10_000 });
+    await expect(siteCard).toBeVisible({ timeout: 5_000 });
     await expect(siteCard).toContainText('Refinery Test Base');
 
     // The body should appear in the sidebar
@@ -107,7 +107,7 @@ test.describe('Mining Panel Interactions', () => {
 
     // Wait for the site card to render
     const siteCard = page.locator('.logistics-site-card');
-    await expect(siteCard).toBeVisible({ timeout: 10_000 });
+    await expect(siteCard).toBeVisible({ timeout: 5_000 });
 
     // Find the recipe dropdown for the refinery module
     const recipeSelect = siteCard.locator('.logistics-recipe-select');
@@ -139,7 +139,7 @@ test.describe('Mining Panel Interactions', () => {
 
     // Wait for the site card
     const siteCard = page.locator('.logistics-site-card');
-    await expect(siteCard).toBeVisible({ timeout: 10_000 });
+    await expect(siteCard).toBeVisible({ timeout: 5_000 });
 
     // Each module item should display both the formatted type and the partId.
     // The UI renders: "Type Name (partId)" for non-refinery modules,

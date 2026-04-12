@@ -87,11 +87,11 @@ interface LoanSnapshot {
  * Return to agency from flight — waits for post-flight summary and clicks return.
  */
 async function returnToAgencyViaSummary(page: Page): Promise<void> {
-  await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 10_000 });
   await page.click('#post-flight-return-btn');
   await page.waitForFunction(
     () => window.__flightState === null || window.__flightState === undefined,
-    { timeout: 10_000 },
+    { timeout: 5_000 },
   );
 }
 
@@ -144,7 +144,7 @@ test.describe('Malfunction during flight', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = midGameFixture({ money: 5_000_000 });
@@ -160,12 +160,12 @@ test.describe('Malfunction during flight', () => {
     // Fire engine and ascend past 100m (biome boundary: Lower Atmosphere).
     await pressStage(page);
     await pressThrottleUp(page);
-    await waitForAltitude(page, 150, 20_000);
+    await waitForAltitude(page, 150, 10_000);
 
     // Wait for at least one malfunction to appear on the physics state.
     await page.waitForFunction(
       () => (window.__flightPs?.malfunctions?.size ?? 0) > 0,
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     // Verify a PART_MALFUNCTION event was logged in the flight state.
@@ -189,7 +189,7 @@ test.describe('Malfunction during flight', () => {
     await dismissReturnResults(page);
 
     // Back at hub.
-    await expect(page.locator('#hub-overlay')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('#hub-overlay')).toBeVisible({ timeout: 5_000 });
   });
 
   test('(2) malfunction event has correct structure with part name and type', async () => {
@@ -198,12 +198,12 @@ test.describe('Malfunction during flight', () => {
 
     await pressStage(page);
     await pressThrottleUp(page);
-    await waitForAltitude(page, 150, 20_000);
+    await waitForAltitude(page, 150, 10_000);
 
     // Wait for malfunctions.
     await page.waitForFunction(
       () => (window.__flightPs?.malfunctions?.size ?? 0) > 0,
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     // Verify the malfunction event structure includes partName and time.
@@ -236,7 +236,7 @@ test.describe('Crew KIA on crash', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
@@ -271,7 +271,7 @@ test.describe('Crew KIA on crash', () => {
     // Fire engine briefly to get airborne.
     await pressStage(page);
     await pressThrottleUp(page);
-    await waitForAltitude(page, 200, 20_000);
+    await waitForAltitude(page, 200, 10_000);
 
     // Cut engine and teleport to moderate altitude with fast downward velocity
     // to guarantee a crash on impact.
@@ -290,11 +290,11 @@ test.describe('Crew KIA on crash', () => {
     // Wait for the craft to crash.
     await page.waitForFunction(
       () => window.__flightPs?.crashed === true,
-      { timeout: 30_000 },
+      { timeout: 15_000 },
     );
 
     // The post-flight summary should appear automatically on crash.
-    await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 10_000 });
 
     // Verify the heading says "Rocket Destroyed".
     const heading: string | null = await page.locator('#post-flight-summary h1').textContent();
@@ -316,12 +316,12 @@ test.describe('Crew KIA on crash', () => {
     await page.click('#post-flight-return-btn');
     await page.waitForFunction(
       () => window.__flightState === null || window.__flightState === undefined,
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
     await dismissReturnResults(page);
 
     // Wait for hub to appear.
-    await expect(page.locator('#hub-overlay')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('#hub-overlay')).toBeVisible({ timeout: 5_000 });
 
     // Verify the death fine was deducted — money should be less than starting.
     const gs = await getGameState(page);
@@ -337,7 +337,7 @@ test.describe('Contract deadline expiry', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
@@ -394,7 +394,7 @@ test.describe('Contract deadline expiry', () => {
     await dismissReturnResults(page);
 
     // Wait for hub.
-    await expect(page.locator('#hub-overlay')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('#hub-overlay')).toBeVisible({ timeout: 5_000 });
 
     // Check state: contract should be in failed, not in active.
     const gsAfter = await getGameState(page) as GameState;
@@ -422,7 +422,7 @@ test.describe('Loan default / bankruptcy', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
@@ -464,7 +464,7 @@ test.describe('Loan default / bankruptcy', () => {
     }
 
     // Wait for hub.
-    await expect(page.locator('#hub-overlay')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('#hub-overlay')).toBeVisible({ timeout: 5_000 });
 
     // The bankruptcy banner should appear on the hub.
     const banner = page.locator('#bankruptcy-banner');

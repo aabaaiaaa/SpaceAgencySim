@@ -518,7 +518,7 @@ test.describe('E2E Infrastructure — Time Warp API', () => {
         return fs != null && (fs.timeElapsed - startTime) >= 5;
       },
       startSimTime,
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
     const realElapsedMs: number = Date.now() - realStartMs;
 

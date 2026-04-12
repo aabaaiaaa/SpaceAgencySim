@@ -35,7 +35,7 @@ test.describe('Tipping physics — ground-contact rotation', () => {
     await page.keyboard.down('d');
     await page.waitForFunction(
       () => Math.abs(window.__flightPs?.angle ?? 0) > 0.4,
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
     await page.keyboard.up('d');
 
@@ -63,7 +63,7 @@ test.describe('Tipping physics — ground-contact rotation', () => {
         return a > Math.abs(prev) + 0.01 || window.__flightPs?.crashed === true;
       },
       angleBefore,
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
 
     const angleAfter: number = await page.evaluate(() => window.__flightPs!.angle);
@@ -74,7 +74,7 @@ test.describe('Tipping physics — ground-contact rotation', () => {
   });
 
   test('(3) toppling past threshold triggers crash', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     await setupGroundedFlight(page);
 
     // Tip the rocket past 0.4 rad first (same as test 1), then release and let
@@ -83,7 +83,7 @@ test.describe('Tipping physics — ground-contact rotation', () => {
     await page.keyboard.down('d');
     await page.waitForFunction(
       () => Math.abs(window.__flightPs?.angle ?? 0) > 0.4,
-      { timeout: 10_000 },
+      { timeout: 5_000 },
     );
     await page.keyboard.up('d');
 

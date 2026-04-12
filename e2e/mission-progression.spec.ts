@@ -293,7 +293,7 @@ async function stage(page: Page): Promise<void> {
 async function waitWarpUnlocked(page: Page): Promise<void> {
   await page.waitForFunction(
     (): boolean => !(document.querySelector('.hud-warp-btn') as HTMLButtonElement | null)?.disabled,
-    { timeout: 10_000 },
+    { timeout: 5_000 },
   );
 }
 
@@ -366,7 +366,7 @@ async function returnToHub(page: Page): Promise<void> {
     if (which === 'orbit') {
       await orbitReturn.click();
       // Orbit return shows a post-flight summary — click through it.
-      await summary.waitFor({ state: 'visible', timeout: 15_000 });
+      await summary.waitFor({ state: 'visible', timeout: 10_000 });
       await page.click('#post-flight-return-btn');
     } else if (which === 'abort') {
       await abortBtn.click();
@@ -389,13 +389,13 @@ async function returnToHub(page: Page): Promise<void> {
   // A return-results overlay may appear on top of the hub — dismiss it.
   try {
     const dismissBtn = page.locator('#return-results-dismiss-btn');
-    await dismissBtn.waitFor({ state: 'visible', timeout: 15_000 });
+    await dismissBtn.waitFor({ state: 'visible', timeout: 10_000 });
     await dismissBtn.click();
     await page.waitForSelector('#return-results-overlay', { state: 'hidden', timeout: 5_000 }).catch(() => {});
   } catch {
     // No return results overlay — proceed.
   }
-  await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
+  await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
 }
 
 /**
@@ -454,7 +454,7 @@ test.describe('Mission Progression', () => {
   // =========================================================================
 
   test('M001 — First Flight (reach 100m)', async ({ page }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(60_000);
     const env = buildEnvelope({
       acceptedId: 'mission-001',
       parts: STARTER_PARTS,
@@ -475,7 +475,7 @@ test.describe('Mission Progression', () => {
   });
 
   test('M004 — Speed Demon (reach 150 m/s)', async ({ page }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(60_000);
     const env = buildEnvelope({
       completedIds: ['mission-001'],
       acceptedId: 'mission-004',
@@ -499,7 +499,7 @@ test.describe('Mission Progression', () => {
   // =========================================================================
 
   test('M005 — Safe Return I (land ≤10 m/s) → unlocks parachute-mk2', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const m1to4 = ['mission-001', 'mission-004'];
     const env = buildEnvelope({
       completedIds: m1to4,
@@ -529,7 +529,7 @@ test.describe('Mission Progression', () => {
     await waitAlt(page, 50); // confirm engine is firing
     await page.waitForFunction(
       (): boolean => window.__flightPs?.firingEngines?.size === 0,
-      { timeout: 30_000 },
+      { timeout: 15_000 },
     );
 
     // Stage 1: deploy parachute — mass now ≈ 250kg < 1200kg maxSafeMass.
@@ -552,7 +552,7 @@ test.describe('Mission Progression', () => {
   });
 
   test('M006 — Controlled Descent (engine brake, land ≤5 m/s) → unlocks landing-legs-small', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const m1to4 = ['mission-001', 'mission-004'];
     const env = buildEnvelope({
       completedIds: m1to4,
@@ -579,7 +579,7 @@ test.describe('Mission Progression', () => {
     await waitAlt(page, 50); // confirm engine is firing
     await page.waitForFunction(
       (): boolean => window.__flightPs?.firingEngines?.size === 0,
-      { timeout: 30_000 },
+      { timeout: 15_000 },
     );
 
     // Deploy parachute for safe descent.
@@ -599,7 +599,7 @@ test.describe('Mission Progression', () => {
   });
 
   test('M007 — Leg Day (deploy legs + land ≤10 m/s) → unlocks landing-legs-large', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const m1to4 = ['mission-001', 'mission-004'];
     const env = buildEnvelope({
       completedIds: [...m1to4, 'mission-006'],
@@ -648,7 +648,7 @@ test.describe('Mission Progression', () => {
   // =========================================================================
 
   test('M008 — Black Box Test (activate science + crash ≥50 m/s)', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const m1to4 = ['mission-001', 'mission-004'];
     const env = buildEnvelope({
       completedIds: [...m1to4, 'mission-005'],
@@ -679,7 +679,7 @@ test.describe('Mission Progression', () => {
   });
 
   test('M009 — Ejector Seat Test (eject crew ≥200m)', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const m1to4 = ['mission-001', 'mission-004'];
     const env = buildEnvelope({
       completedIds: [...m1to4, 'mission-006', 'mission-007'],
@@ -719,7 +719,7 @@ test.describe('Mission Progression', () => {
   });
 
   test('M010 — Science Experiment Alpha (hold 800-1200m for 30s + return science)', async ({ page }) => {
-    test.setTimeout(180_000);
+    test.setTimeout(60_000);
     const m1to4 = ['mission-001', 'mission-004'];
     const env = buildEnvelope({
       completedIds: [...m1to4, 'mission-005', 'mission-008'],
@@ -780,7 +780,7 @@ test.describe('Mission Progression', () => {
     // Wait until we descend into the altitude band (≤ 1200m).
     await page.waitForFunction(
       (): boolean => (window.__flightPs?.posY ?? Infinity) <= 1200,
-      { timeout: 30_000 },
+      { timeout: 15_000 },
     );
 
     // Drop to 1× warp, activate science module inside the band (Stage 2).
@@ -789,7 +789,7 @@ test.describe('Mission Progression', () => {
 
     // Verify the hold timer is visible in the objectives HUD.
     await expect(page.locator('[data-testid="hud-obj-hold-timer"]'))
-      .toBeVisible({ timeout: 10_000 });
+      .toBeVisible({ timeout: 5_000 });
 
     // 100× warp through the 30s hold + experiment.  At ~4.4 m/s descent
     // the rocket traverses the 400m band in ~90 s — plenty for 30 s.
@@ -822,7 +822,7 @@ test.describe('Mission Progression', () => {
   });
 
   test('M011 — Emergency Systems Verified (eject crew ≥100m + crash ≥50 m/s)', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     const m1to4 = ['mission-001', 'mission-004'];
     const env = buildEnvelope({
       completedIds: [...m1to4, 'mission-005', 'mission-006', 'mission-007', 'mission-008', 'mission-009'],
@@ -853,7 +853,7 @@ test.describe('Mission Progression', () => {
         const ps = window.__flightPs;
         return ps != null && ps.velY < 0 && ps.posY < 250 && ps.posY > 100;
       },
-      { timeout: 20_000 },
+      { timeout: 10_000 },
     );
     await waitWarpUnlocked(page);
     await stage(page); // eject crew
@@ -1021,7 +1021,7 @@ test.describe('Mission Progression', () => {
     await page.waitForFunction((): boolean => {
       const m = window.__gameState?.missions?.accepted?.find(x => x.id === 'mission-015');
       return m?.objectives?.find(o => o.type === 'REACH_ORBIT')?.completed ?? false;
-    }, { timeout: 15_000 });
+    }, { timeout: 10_000 });
 
     // Re-teleport to maintain altitude for satellite release (>80km required).
     await teleportCraft(page, { posX: 0, posY: 82_000, velX: 8000, velY: 0, orbit: true });
@@ -1074,7 +1074,7 @@ test.describe('Mission Progression', () => {
     await page.waitForFunction((): boolean => {
       const m = window.__gameState?.missions?.accepted?.find(x => x.id === 'mission-016');
       return m?.objectives?.every(o => o.completed) ?? false;
-    }, { timeout: 15_000 });
+    }, { timeout: 10_000 });
 
     // Return via menu.
     await page.click('#topbar-menu-btn', { force: true });
@@ -1128,7 +1128,7 @@ test.describe('Mission Progression', () => {
     await page.waitForFunction((): boolean => {
       const m = window.__gameState?.missions?.accepted?.find(x => x.id === 'mission-017');
       return m?.objectives?.find(o => o.type === 'REACH_ORBIT')?.completed ?? false;
-    }, { timeout: 15_000 });
+    }, { timeout: 10_000 });
 
     // Re-teleport to maintain altitude for satellite release (>80km required).
     await teleportCraft(page, { posX: 0, posY: 82_000, velX: 8000, velY: 0, orbit: true });

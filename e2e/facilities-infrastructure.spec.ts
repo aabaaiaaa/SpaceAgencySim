@@ -403,7 +403,7 @@ test.describe('Mission Control — contract pool and active caps per tier', () =
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
@@ -558,7 +558,7 @@ test.describe('Crew Admin — training system', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     // Crew Admin at tier 2 (1 training slot)
@@ -1141,7 +1141,7 @@ test.describe('Tutorial missions — facility awards on accept', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });

@@ -124,12 +124,12 @@ test.describe('Hub markers on map @smoke', () => {
 
     // Click on Tracking Station building to open the tracking station overlay.
     const trackingStation = page.locator('[data-building-id="tracking-station"]');
-    await expect(trackingStation).toBeVisible({ timeout: 10_000 });
+    await expect(trackingStation).toBeVisible({ timeout: 5_000 });
     await trackingStation.click();
 
     // Wait for the tracking station overlay to appear.
     const tsOverlay = page.locator('#ts-overlay');
-    await expect(tsOverlay).toBeVisible({ timeout: 10_000 });
+    await expect(tsOverlay).toBeVisible({ timeout: 5_000 });
 
     // Verify tracking station header shows tier information.
     const tsTitle = page.locator('#ts-title');
@@ -143,6 +143,6 @@ test.describe('Hub markers on map @smoke', () => {
 
     // Should be back at the hub overlay.
     const hubOverlay = page.locator('#hub-overlay');
-    await expect(hubOverlay).toBeVisible({ timeout: 10_000 });
+    await expect(hubOverlay).toBeVisible({ timeout: 5_000 });
   });
 });

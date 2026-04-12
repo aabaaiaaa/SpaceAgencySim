@@ -25,7 +25,7 @@ test.describe('App Load & New Game Flow', () => {
     });
 
     await page.goto('/');
-    await page.waitForSelector('#mm-agency-name-input', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#mm-agency-name-input', { state: 'visible', timeout: 10_000 });
     expect(consoleErrors).toHaveLength(0);
   });
 
@@ -34,7 +34,7 @@ test.describe('App Load & New Game Flow', () => {
   test('(2) with no saves present, the New Game screen is shown (not the load screen)', async ({ page }: { page: Page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await page.goto('/');
-    await page.waitForSelector('#mm-agency-name-input', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#mm-agency-name-input', { state: 'visible', timeout: 10_000 });
 
     await expect(page.locator('#mm-newgame-screen')).toBeVisible({ timeout: 5_000 });
     await expect(page.locator('[data-screen="newgame"]')).toBeVisible({ timeout: 5_000 });
@@ -46,12 +46,12 @@ test.describe('App Load & New Game Flow', () => {
   test('(3) entering an agency name and clicking "Start Game" navigates to the space agency hub', async ({ page }: { page: Page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await page.goto('/');
-    await page.waitForSelector('#mm-agency-name-input', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#mm-agency-name-input', { state: 'visible', timeout: 10_000 });
 
     await page.fill('#mm-agency-name-input', 'Galaxy Explorers');
     await page.click('#mm-start-btn');
 
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
     await expect(page.locator('#hub-overlay')).toBeVisible({ timeout: 5_000 });
     await expect(page.locator('#welcome-modal')).toBeVisible({ timeout: 5_000 });
     await dismissWelcomeModal(page);
@@ -116,7 +116,7 @@ test.describe('App Load & New Game Flow', () => {
     });
 
     await p.goto('/');
-    await p.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
+    await p.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 
     await expect(p.locator('[data-screen="load"]')).toBeVisible({ timeout: 5_000 });
 

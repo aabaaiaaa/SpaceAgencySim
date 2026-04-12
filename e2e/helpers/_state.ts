@@ -27,9 +27,9 @@ export async function seedAndLoadSave(page: Page, envelope: SaveEnvelope | Recor
   }, { key: SAVE_KEY, envelope });
 
   await page.goto('/');
-  await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
+  await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
   await page.click('[data-action="load"][data-slot="0"]');
-  await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
+  await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
 }
 
 /**

@@ -78,13 +78,13 @@ async function gainAltitudeAndSeparate(page: Page): Promise<void> {
   await page.waitForFunction(() => {
     const ps = window.__flightPs;
     return (ps?.posY ?? 0) > 300;
-  }, { timeout: 30_000 });
+  }, { timeout: 15_000 });
 
   await pressStage(page); // Stage 2: decoupler
   await page.waitForFunction(() => {
     const ps = window.__flightPs;
     return (ps?.debris?.length ?? 0) > 0;
-  }, { timeout: 10_000 });
+  }, { timeout: 5_000 });
 
   // Wait for visible separation.
   await page.waitForFunction(() => {
@@ -101,7 +101,7 @@ async function gainAltitudeAndSeparate(page: Page): Promise<void> {
 test.describe('Collision — Stage Separation', () => {
 
   test('(1) debris separates from rocket after decoupling', async ({ page }: { page: Page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     await buildAndLaunch(page);
     await gainAltitudeAndSeparate(page);
 
@@ -120,7 +120,7 @@ test.describe('Collision — Stage Separation', () => {
   });
 
   test('(2) separation impulse gives bodies different velocities', async ({ page }: { page: Page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     await buildAndLaunch(page);
     await gainAltitudeAndSeparate(page);
 
@@ -139,7 +139,7 @@ test.describe('Collision — Stage Separation', () => {
   });
 
   test('(3) no indefinite overlap after separation', async ({ page }: { page: Page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     await buildAndLaunch(page);
     await gainAltitudeAndSeparate(page);
 
@@ -147,7 +147,7 @@ test.describe('Collision — Stage Separation', () => {
       const ps = window.__flightPs;
       if (!ps?.debris?.length) return false;
       return Math.abs(ps.posY - ps.debris[0].posY) > 1;
-    }, { timeout: 10_000 });
+    }, { timeout: 5_000 });
 
     const result: DistanceResult = await page.evaluate((): DistanceResult => {
       const ps = window.__flightPs;

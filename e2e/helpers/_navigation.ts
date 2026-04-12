@@ -52,10 +52,10 @@ export async function dragPartToCanvas(
  */
 export async function navigateToVab(page: Page): Promise<void> {
   await page.click('[data-building-id="vab"]');
-  await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 15_000 });
+  await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 10_000 });
   await page.waitForFunction(
     () => typeof window.__vabAssembly !== 'undefined',
-    { timeout: 15_000 },
+    { timeout: 10_000 },
   );
 
   // Disable auto-zoom and reset zoom to 1x so that viewport-pixel offsets
@@ -116,10 +116,10 @@ export async function launchFromVab(page: Page): Promise<void> {
   }
 
   // Wait for flight scene.
-  await page.waitForSelector('#flight-hud', { state: 'visible', timeout: 15_000 });
+  await page.waitForSelector('#flight-hud', { state: 'visible', timeout: 10_000 });
   await page.waitForFunction(
     () => typeof window.__flightPs !== 'undefined' && window.__flightPs !== null,
-    { timeout: 10_000 },
+    { timeout: 5_000 },
   );
 }
 

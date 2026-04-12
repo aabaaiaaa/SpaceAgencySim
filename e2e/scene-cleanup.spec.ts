@@ -26,14 +26,14 @@ async function exitToMenu(page: Page): Promise<void> {
   await page.click('.topbar-dropdown-item.danger');
   await page.waitForSelector('[data-testid="exit-confirm-btn"]', { state: 'visible', timeout: 5_000 });
   await page.click('[data-testid="exit-confirm-btn"]');
-  await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 15_000 });
+  await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 }
 
 // -- Helper: load slot 0 and wait for hub ------------------------------------
 
 async function loadSaveSlot0(page: Page): Promise<void> {
   await page.click('[data-action="load"][data-slot="0"]');
-  await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
+  await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
 }
 
 // -- Helper: assert hub is clean ---------------------------------------------

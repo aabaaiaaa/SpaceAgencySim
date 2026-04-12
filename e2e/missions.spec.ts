@@ -79,7 +79,7 @@ test.describe('Mission Control Flow', () => {
   test.beforeEach(async ({ page }) => {
     await seedAndLoadSave(page, FRESH_ENVELOPE);
     await page.click('[data-building-id="mission-control"]');
-    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 5_000 });
   });
 
   // ── (1) Available tab lists "First Flight" as the only mission at game start
@@ -200,7 +200,7 @@ test.describe('Mission Control Flow', () => {
     await seedAndLoadSave(page, completedEnvelope);
 
     await page.click('[data-building-id="mission-control"]');
-    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 5_000 });
 
     // Switch to the Completed tab.
     await page.click('[data-tab-id="completed"]');
@@ -257,7 +257,7 @@ test.describe('Mission Control Flow', () => {
     // Re-seed with the rewards envelope (overrides beforeEach's fresh seed).
     await seedAndLoadSave(page, availEnv);
     await page.click('[data-building-id="mission-control"]');
-    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 5_000 });
 
     await expect(page.locator('.mc-mission-rewards')).toContainText('Mk2 Parachute', { timeout: 5_000 });
 
@@ -272,7 +272,7 @@ test.describe('Mission Control Flow', () => {
     await page.click('#mission-control-back-btn');
     await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 5_000 });
     await page.click('[data-building-id="mission-control"]');
-    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 5_000 });
     await page.click('[data-tab-id="accepted"]');
 
     await expect(page.locator('.mc-mission-rewards')).toContainText('Mk2 Parachute', { timeout: 5_000 });
@@ -288,7 +288,7 @@ test.describe('Mission Control Flow', () => {
     await page.click('#mission-control-back-btn');
     await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 5_000 });
     await page.click('[data-building-id="mission-control"]');
-    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 10_000 });
+    await page.waitForSelector('#mission-control-overlay', { state: 'visible', timeout: 5_000 });
     await page.click('[data-tab-id="completed"]');
 
     await expect(page.locator('.mc-mission-rewards')).toContainText('Mk2 Parachute', { timeout: 5_000 });

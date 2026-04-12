@@ -383,7 +383,7 @@ test.describe('Phase Transition: MANOEUVRE → TRANSFER', () => {
 
 test.describe('Phase Transition: Reentry', () => {
   test('lowering periapsis triggers ORBIT → REENTRY → FLIGHT', async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(60_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -488,7 +488,7 @@ test.describe('Phase Transition: Landing', () => {
         if (entry.state === 'deploying' || entry.state === 'deployed') return true;
       }
       return false;
-    }, { timeout: 10_000 });
+    }, { timeout: 5_000 });
 
     // Let physics run with time warp for the descent.
     await setTestTimeWarp(page, 50);
@@ -496,7 +496,7 @@ test.describe('Phase Transition: Landing', () => {
     // Wait for landing.
     await page.waitForFunction(
       () => window.__flightPs?.landed === true,
-      { timeout: 30_000 },
+      { timeout: 15_000 },
     );
 
     // Verify it was a safe landing, not a crash.
@@ -556,7 +556,7 @@ test.describe('Phase Transition: Crash', () => {
     // Let physics detect the impact.
     await page.waitForFunction(
       () => window.__flightPs?.crashed === true,
-      { timeout: 15_000 },
+      { timeout: 10_000 },
     );
 
     // Verify crash state.

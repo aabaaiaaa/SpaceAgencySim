@@ -123,21 +123,21 @@ async function returnToAgency(page: Page): Promise<void> {
   const orbitVisible = await orbitReturn.isVisible({ timeout: 2_000 }).catch(() => false);
   if (orbitVisible) {
     await orbitReturn.click();
-    await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 5_000 });
     await page.click('#post-flight-return-btn');
   } else {
     const abortVisible = await abortReturn.isVisible({ timeout: 2_000 }).catch(() => false);
     if (abortVisible) {
       await abortReturn.click();
     } else {
-      await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 10_000 });
+      await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 5_000 });
       await page.click('#post-flight-return-btn');
     }
   }
 
   await page.waitForFunction(
     () => window.__flightState === null || window.__flightState === undefined,
-    { timeout: 10_000 },
+    { timeout: 5_000 },
   );
 }
 
@@ -264,7 +264,7 @@ test.describe('Contract generation after flight return', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
     // Early game with some completed missions (contracts require progression)
@@ -306,7 +306,7 @@ test.describe('Contract acceptance and cancellation', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -402,7 +402,7 @@ test.describe('Contract board expiry after N flights', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(180_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -471,7 +471,7 @@ test.describe('Active contract deadline expiry', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -543,7 +543,7 @@ test.describe('Contract objectives complete in-flight', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -591,7 +591,7 @@ test.describe('Contract REACH_SPEED objective', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -636,7 +636,7 @@ test.describe('Contract BUDGET_LIMIT and MAX_PARTS constraints', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -687,7 +687,7 @@ test.describe('Contract BUDGET_LIMIT and MAX_PARTS constraints', () => {
         { contracts?: { active?: { id: string; objectives?: { completed?: boolean }[] }[] } } | undefined;
       const contract = gs?.contracts?.active?.find(c => c.id === 'contract-constraints');
       return contract?.objectives?.some(o => o.completed === true);
-    }, { timeout: 10_000 });
+    }, { timeout: 5_000 });
 
     const gs = await getGameState(page) as GameState;
     const contract = (gs.contracts.active as ContractSnapshot[]).find(
@@ -707,7 +707,7 @@ test.describe('Contract over-performance bonus', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -746,7 +746,7 @@ test.describe('Contract over-performance bonus', () => {
     await page.keyboard.press('z');
 
     // Wait for both main and bonus altitude to be reached
-    await waitForAltitude(page, 100, 30_000);
+    await waitForAltitude(page, 100, 15_000);
 
     // Wait for contract objective to be evaluated
     await page.waitForFunction(() => {
@@ -754,7 +754,7 @@ test.describe('Contract over-performance bonus', () => {
         { contracts?: { active?: { id: string; objectives?: { completed?: boolean }[] }[] } } | undefined;
       const contract = gs?.contracts?.active?.find(c => c.id === 'contract-bonus');
       return contract?.objectives?.[0]?.completed === true;
-    }, { timeout: 10_000 });
+    }, { timeout: 5_000 });
 
     const gs = await getGameState(page) as GameState;
     const contract = (gs.contracts.active as ContractSnapshot[]).find(
@@ -791,7 +791,7 @@ test.describe('Multi-part chain contracts', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -852,7 +852,7 @@ test.describe('Operating costs charged per period', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -918,7 +918,7 @@ test.describe('Bankruptcy trigger', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -963,7 +963,7 @@ test.describe('Crew skill XP gains from flight events', () => {
   let skillsBefore: { piloting: number; engineering: number; science: number };
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -1009,7 +1009,7 @@ test.describe('Crew skill XP gains from flight events', () => {
     // Stage engine and launch
     await page.keyboard.press('Space');
     await page.keyboard.press('z');
-    await waitForAltitude(page, 200, 20_000);
+    await waitForAltitude(page, 200, 10_000);
 
     // Cut engine and let parachute bring it down
     await page.keyboard.press('x');
@@ -1043,7 +1043,7 @@ test.describe('Crew skill effects — engineering increases recovery value', () 
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -1105,7 +1105,7 @@ test.describe('Crew injury from hard landing', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -1168,7 +1168,7 @@ test.describe('Crew ejection injury', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -1735,7 +1735,7 @@ test.describe('Full contract lifecycle — accept -> fly -> complete -> reward',
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -1819,7 +1819,7 @@ test.describe('Contract RESTRICT_PART constraint objective', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -1862,7 +1862,7 @@ test.describe('Contract RESTRICT_PART constraint objective', () => {
         { contracts?: { active?: { id: string; objectives?: { completed?: boolean }[] }[] } } | undefined;
       const contract = gs?.contracts?.active?.find(c => c.id === 'contract-restrict');
       return contract?.objectives?.[0]?.completed === true;
-    }, { timeout: 10_000 });
+    }, { timeout: 5_000 });
 
     const gs = await getGameState(page) as GameState;
     const contract = (gs.contracts.active as ContractSnapshot[]).find(
@@ -1878,7 +1878,7 @@ test.describe('Contract MINIMUM_CREW constraint objective', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -1930,7 +1930,7 @@ test.describe('Contract MINIMUM_CREW constraint objective', () => {
         { contracts?: { active?: { id: string; objectives?: { completed?: boolean }[] }[] } } | undefined;
       const contract = gs?.contracts?.active?.find(c => c.id === 'contract-mincrew');
       return contract?.objectives?.[0]?.completed === true;
-    }, { timeout: 10_000 });
+    }, { timeout: 5_000 });
 
     const gs = await getGameState(page) as GameState;
     const contract = (gs.contracts.active as ContractSnapshot[]).find(
@@ -1950,7 +1950,7 @@ test.describe('Injury recovery clears after period elapses', () => {
   let page: Page;
 
   test.beforeAll(async ({ browser }) => {
-    test.setTimeout(180_000);
+    test.setTimeout(60_000);
     page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 

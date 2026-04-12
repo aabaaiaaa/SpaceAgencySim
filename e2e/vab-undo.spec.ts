@@ -21,13 +21,13 @@ test.describe('VAB — Undo/Redo', () => {
     // Start a new freeplay game.
     await page.waitForSelector('#mm-agency-name-input', {
       state: 'visible',
-      timeout: 15_000,
+      timeout: 10_000,
     });
     await page.fill('#mm-agency-name-input', 'Undo Test');
     await page.click('.mm-mode-option[data-mode="freeplay"]');
     await page.click('#mm-start-btn');
 
-    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 15_000 });
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
     await dismissWelcomeModal(page);
 
     // Navigate to the VAB.
