@@ -5,6 +5,7 @@ import {
   FIRST_FLIGHT_MISSION, buildSaveEnvelope,
   placePart, seedAndLoadSave, navigateToVab,
   startTestFlight,
+  pressStage, pressThrottleUp, pressThrottleCut,
 } from './helpers.js';
 
 /**
@@ -34,7 +35,7 @@ function makeMissionEnvelope(overrides: Record<string, unknown> = {}): ReturnTyp
 test.describe('Flight — First Flight Mission Completion', () => {
 
   test('(1) engine is auto-staged into Stage 1', async ({ page }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, makeMissionEnvelope());
     await navigateToVab(page);
@@ -54,7 +55,7 @@ test.describe('Flight — First Flight Mission Completion', () => {
   });
 
   test('(2) First Flight mission completes when rocket reaches 100 m', async ({ page }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, makeMissionEnvelope());
     await startTestFlight(page, FLIGHT_PARTS, {
@@ -63,15 +64,15 @@ test.describe('Flight — First Flight Mission Completion', () => {
 
     const moneyBefore: number = await page.evaluate((): number => window.__gameState?.money ?? 0);
 
-    await page.keyboard.press('Space');
-    await page.keyboard.press('z');
+    await pressStage(page);
+    await pressThrottleUp(page);
 
     await page.waitForFunction(
       (): boolean => (window.__flightPs?.posY ?? 0) >= 100,
       { timeout: 15_000 },
     );
 
-    await page.keyboard.press('x');
+    await pressThrottleCut(page);
 
     const objectiveCompleted: boolean = await page.evaluate((): boolean => {
       const state = window.__gameState;
@@ -84,7 +85,7 @@ test.describe('Flight — First Flight Mission Completion', () => {
     });
     expect(objectiveCompleted).toBe(true);
 
-    await page.waitForSelector('#post-flight-summary', { state: 'visible', timeout: 60_000 });
+    await page.waitForSelector('#post-flight-summary', { state: 'visible', timeout: 15_000 });
     await expect(page.locator('.pf-obj-complete')).toBeVisible({ timeout: 5_000 });
     await page.click('#post-flight-return-btn');
 

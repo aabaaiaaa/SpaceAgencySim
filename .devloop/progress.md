@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 44
-- **Completed**: 42
-- **Remaining**: 2
-- **Last Updated**: 2026-04-12T00:17:38.976Z
+- **Completed**: 43
+- **Remaining**: 1
+- **Last Updated**: 2026-04-12T00:28:51.124Z
 
 ## Iteration Log
 
@@ -151,4 +151,13 @@
 - **Exit Status**: success
 - **Tokens**: 5,766,693 total (72 in, 21,497 out, 87,797 cache-create, 5,657,327 cache-read)
 - **Cost**: $4.2292
+
+### Iteration 17 - 2026-04-12T00:28:51.122Z
+- **Task Attempted**: TASK-039
+- **Task Completed**: TASK-039
+- **Summary**: Completed Optimise remaining slow tests (pass 2)
+- **Duration**: 11m 10s
+- **Exit Status**: success
+- **Tokens**: 6,860,832 total (9,049 in, 24,426 out, 122,801 cache-create, 6,704,556 cache-read)
+- **Cost**: $4.9640
 

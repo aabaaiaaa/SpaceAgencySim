@@ -29,6 +29,7 @@ import {
   STARTER_FACILITIES,
   pressStage,
   pressThrottleUp,
+  pressThrottleCut,
 } from './helpers.js';
 import {
   freshStartFixture,
@@ -85,7 +86,7 @@ test.describe('Biome label transitions', () => {
   }
 
   test('(1) biome label shows Ground at launch pad', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await setupBiomeFlight(browser);
 
     const biomeText: string | null = await page.locator('#hud-biome').textContent();
@@ -95,7 +96,7 @@ test.describe('Biome label transitions', () => {
   });
 
   test('(2) biome label transitions to Low Atmosphere above 100 m', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await setupBiomeFlight(browser);
 
     // Fire engine (space to stage) then set full throttle.
@@ -116,7 +117,7 @@ test.describe('Biome label transitions', () => {
   });
 
   test('(3) biome label transitions to Mid Atmosphere above 2000 m', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await setupBiomeFlight(browser);
 
     // Teleport to 2100m altitude.
@@ -134,14 +135,15 @@ test.describe('Biome label transitions', () => {
   });
 
   test('(4) biome label updates on descent', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await setupBiomeFlight(browser);
 
-    // Teleport high (5000m) so we can descend.
-    await teleportCraft(page, { posY: 5000, velY: 0 });
+    // Teleport just above the Mid→Low boundary with downward velocity
+    // so descent completes quickly (Low Atmosphere < 2000m).
+    await teleportCraft(page, { posY: 2200, velY: -80 });
 
-    // Cut throttle to descend.
-    await page.keyboard.press('x');
+    // Cut throttle to continue descent.
+    await pressThrottleCut(page);
 
     // Wait for the HUD biome label to change to 'Low Atmosphere' during descent.
     await page.waitForFunction(
@@ -149,7 +151,7 @@ test.describe('Biome label transitions', () => {
         const el: Element | null = document.querySelector('#hud-biome');
         return el !== null && el.textContent === 'Low Atmosphere';
       },
-      { timeout: 90_000 },
+      { timeout: 15_000 },
     );
 
     const biomeText: string | null = await page.locator('#hud-biome').textContent();
@@ -165,7 +167,7 @@ test.describe('Biome label transitions', () => {
 
 test.describe('Science multiplier per biome', () => {
   test('biome definitions return correct multipliers for Earth altitudes', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -237,7 +239,7 @@ test.describe('Horizon curvature rendering', () => {
   }
 
   test('(1) no curvature at low altitude (below 5000 m)', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await setupCurvatureFlight(browser);
 
     // Set full throttle then stage.
@@ -259,7 +261,7 @@ test.describe('Horizon curvature rendering', () => {
   });
 
   test('(2) curvature begins at 5000+ m altitude', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await setupCurvatureFlight(browser);
 
     // Teleport to 5500m altitude.
@@ -276,7 +278,7 @@ test.describe('Horizon curvature rendering', () => {
   });
 
   test('(3) curvature increases with altitude', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await setupCurvatureFlight(browser);
 
     // Teleport to 20000m altitude.
@@ -319,7 +321,7 @@ test.describe('Science module instruments', () => {
   }
 
   test('(1) science module loaded with instruments appears in flight', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await setupInstrumentedFlight(browser);
 
     // Verify instruments are loaded in the physics state.
@@ -336,7 +338,7 @@ test.describe('Science module instruments', () => {
   });
 
   test('(2) instrument states are initialized as idle', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await setupInstrumentedFlight(browser);
 
     interface InstrumentSnapshot {
@@ -370,7 +372,7 @@ test.describe('Science module instruments', () => {
   });
 
   test('(3) context menu shows loaded instruments on right-click', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await setupInstrumentedFlight(browser);
 
     // Verify instrument data is accessible through physics state as an
@@ -436,7 +438,7 @@ test.describe('Science module instruments', () => {
   });
 
   test('(4) instrument activation transitions state from idle to running', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await setupInstrumentedFlight(browser);
 
     interface ActivationResult {
@@ -489,7 +491,7 @@ test.describe('Science module instruments', () => {
 
 test.describe('Instrument activation via staging', () => {
   test('activating instrument transitions it from idle to running', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -579,7 +581,7 @@ test.describe('Instrument activation via staging', () => {
 
 test.describe('Science data types', () => {
   test('ANALYSIS data completes and can be transmitted', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -644,7 +646,7 @@ test.describe('Science data types', () => {
   });
 
   test('SAMPLE data type cannot be transmitted', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -711,7 +713,7 @@ test.describe('Science data types', () => {
 
 test.describe('Diminishing returns', () => {
   test('science log tracks collection count per instrument+biome pair', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -745,7 +747,7 @@ test.describe('Diminishing returns', () => {
   });
 
   test('diminishing returns array: 1st=100%, 2nd=25%, 3rd=10%, 4th+=0%', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -788,7 +790,7 @@ test.describe('Diminishing returns', () => {
 
 test.describe('Yield formula', () => {
   test('yield = base × biome × skill × diminishing × (1 + rdLabBonus)', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -873,7 +875,7 @@ test.describe('Yield formula', () => {
   });
 
   test('R&D Lab tier 1 adds 10% bonus', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -898,7 +900,7 @@ test.describe('Yield formula', () => {
   });
 
   test('R&D Lab tier 3 adds 30% bonus', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -928,7 +930,7 @@ test.describe('Yield formula', () => {
 
 test.describe('Instrument biome validity', () => {
   test('thermometer activates in GROUND biome (valid)', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -972,7 +974,7 @@ test.describe('Instrument biome validity', () => {
   });
 
   test('barometer does NOT activate in GROUND biome (invalid)', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -1034,7 +1036,7 @@ test.describe('Instrument biome validity', () => {
   });
 
   test('radiation detector valid biomes: MESOSPHERE and NEAR_SPACE only', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -1082,7 +1084,7 @@ test.describe('Instrument biome validity', () => {
   });
 
   test('gravity gradiometer valid only in LOW_ORBIT and HIGH_ORBIT', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -1121,7 +1123,7 @@ test.describe('Instrument biome validity', () => {
   });
 
   test('magnetometer valid across UPPER_ATMOSPHERE, MESOSPHERE, NEAR_SPACE', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -1170,7 +1172,7 @@ test.describe('Tech tree system', () => {
   }
 
   test('(1) tech tree state is accessible via game state', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await setupTechTreePage(browser);
 
     const gs = await getGameState(page);
@@ -1182,7 +1184,7 @@ test.describe('Tech tree system', () => {
   });
 
   test('(2) can research tier 1 node with sufficient science + funds', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await setupTechTreePage(browser);
 
     const gs = await getGameState(page);
@@ -1241,7 +1243,7 @@ test.describe('Tech tree system', () => {
   });
 
   test('(3) researched node appears in techTree.researched', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     // Seed with sci-t1 already researched.
     const page: Page = await setupTechTreePage(browser, {
       techTree: {
@@ -1257,7 +1259,7 @@ test.describe('Tech tree system', () => {
   });
 
   test('(4) unlocked instruments are available after research', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     // Seed with sci-t1 already researched.
     const page: Page = await setupTechTreePage(browser, {
       techTree: {
@@ -1275,7 +1277,7 @@ test.describe('Tech tree system', () => {
   });
 
   test('(5) can research tier 2 after tier 1 is unlocked', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     // Seed with sci-t1 already researched.
     const page: Page = await setupTechTreePage(browser, {
       techTree: {
@@ -1327,7 +1329,7 @@ test.describe('Tech tree system', () => {
   });
 
   test('(6) dual currency deduction verified', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     // Seed with both t1 and t2 already researched, and funds/science pre-deducted.
     const page: Page = await setupTechTreePage(browser, {
       techTree: {
@@ -1354,7 +1356,7 @@ test.describe('Tech tree system', () => {
 
 test.describe('R&D Lab tier gating', () => {
   test('tier 1 lab allows research up to tech tier 2', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -1399,7 +1401,7 @@ test.describe('R&D Lab tier gating', () => {
   });
 
   test('tier 2 lab allows research up to tech tier 4', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -1441,7 +1443,7 @@ test.describe('R&D Lab tier gating', () => {
   });
 
   test('tier 3 lab allows research up to tech tier 5', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -1476,7 +1478,7 @@ test.describe('R&D Lab tier gating', () => {
   });
 
   test('no R&D Lab blocks all research', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -1514,7 +1516,7 @@ test.describe('R&D Lab tier gating', () => {
 
 test.describe('Tutorial pre-unlocked nodes', () => {
   test('node is tutorial-unlocked when all rewards are already owned', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -1570,7 +1572,7 @@ test.describe('Tutorial pre-unlocked nodes', () => {
   });
 
   test('tutorial-unlocked node cannot be re-researched', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -1618,7 +1620,7 @@ test.describe('Tutorial pre-unlocked nodes', () => {
   });
 
   test('non-tutorial player can research tutorial-gated nodes normally', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -1677,7 +1679,7 @@ test.describe('Tutorial pre-unlocked nodes', () => {
 
 test.describe('Tech tree part unlocking', () => {
   test('researching propulsion tier 1 unlocks engine-spark-improved part', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -1736,7 +1738,7 @@ test.describe('Tech tree part unlocking', () => {
   });
 
   test('previous tier must be unlocked before researching next tier', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -1783,7 +1785,7 @@ test.describe('Tech tree part unlocking', () => {
 
 test.describe('Science collection integration', () => {
   test('experiment completes and generates SCIENCE_COLLECTED event', async ({ browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 

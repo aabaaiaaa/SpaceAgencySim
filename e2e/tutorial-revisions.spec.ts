@@ -292,7 +292,7 @@ function tutorialSave({
 // Flight helpers
 // ---------------------------------------------------------------------------
 
-async function waitSpeed(page: Page, speed: number, timeout: number = 60_000): Promise<void> {
+async function waitSpeed(page: Page, speed: number, timeout: number = 30_000): Promise<void> {
   await page.waitForFunction(
     (spd: number) => {
       const ps = window.__flightPs;
@@ -303,7 +303,7 @@ async function waitSpeed(page: Page, speed: number, timeout: number = 60_000): P
   );
 }
 
-async function waitLanded(page: Page, timeout: number = 60_000): Promise<void> {
+async function waitLanded(page: Page, timeout: number = 30_000): Promise<void> {
   await page.waitForFunction(
     () => window.__flightPs?.landed === true || window.__flightPs?.crashed === true,
     { timeout },
@@ -430,7 +430,7 @@ function missionRange(start: number, end: number): string[] {
 // ---------------------------------------------------------------------------
 
 test.describe('Tutorial Revisions', () => {
-  test.describe.configure({ timeout: 300_000 });
+  test.describe.configure({ timeout: 120_000 });
 
   // =========================================================================
   // GROUP 1: Starter Parts Only — M001-M004
@@ -575,7 +575,7 @@ test.describe('Tutorial Revisions', () => {
           const ps = window.__flightPs;
           return ps && ps.posY <= 1_400 && ps.velY <= 0;
         },
-        { timeout: 60_000 },
+        { timeout: 30_000 },
       );
       await setWarp(page, 5);
 
@@ -598,7 +598,7 @@ test.describe('Tutorial Revisions', () => {
           return m?.objectives?.find(o => o.type === 'HOLD_ALTITUDE')?.completed;
         },
         'mission-010',
-        { timeout: 90_000 },
+        { timeout: 45_000 },
       );
 
       // Continue warp descent to landing.
@@ -1150,7 +1150,7 @@ test.describe('Tutorial Revisions', () => {
           const ps = window.__flightPs;
           return ps && ps.posY <= 1_400 && ps.velY <= 0;
         },
-        { timeout: 60_000 },
+        { timeout: 30_000 },
       );
       await setWarp(page, 5);
 
@@ -1173,7 +1173,7 @@ test.describe('Tutorial Revisions', () => {
           return m?.objectives?.find(o => o.type === 'HOLD_ALTITUDE')?.completed;
         },
         'mission-010',
-        { timeout: 90_000 },
+        { timeout: 45_000 },
       );
 
       // Continue descent to landing (RETURN_SCIENCE_DATA completes on safe landing).

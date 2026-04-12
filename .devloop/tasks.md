@@ -263,7 +263,7 @@
 - **Verification**: Full E2E suite passes. Any remaining failures are documented with root-cause notes.
 
 ### TASK-039: Optimise remaining slow tests (pass 2)
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-038
 - **Description**: Review timing from the pass 2 runs. Apply further optimisations to any specs still exceeding 30 seconds: reduce `page.evaluate()` payload size in state injection, eliminate redundant navigations, ensure test independence allows parallel execution. Consider if any tests can be converted from full navigation tests to targeted component tests. Verify no test regressions from optimisations.
 - **Verification**: Run optimised specs. No spec exceeds 45 seconds. No regressions.

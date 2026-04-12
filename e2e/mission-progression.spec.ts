@@ -4,6 +4,7 @@ import {
   VP_W, VP_H,
   seedAndLoadSave, navigateToVab,
   teleportCraft, startTestFlight,
+  pressStage, pressThrottleUp, pressThrottleCut,
 } from './helpers.js';
 
 /**
@@ -287,7 +288,7 @@ function buildEnvelope({ completedIds = [], acceptedId, parts, crew = [] }: Buil
 // ---------------------------------------------------------------------------
 
 async function stage(page: Page): Promise<void> {
-  await page.keyboard.press('Space');
+  await pressStage(page);
 }
 
 async function waitWarpUnlocked(page: Page): Promise<void> {
@@ -305,14 +306,14 @@ async function setWarp(page: Page, factor: number): Promise<void> {
   );
 }
 
-async function waitAlt(page: Page, m: number, timeout: number = 60_000): Promise<void> {
+async function waitAlt(page: Page, m: number, timeout: number = 30_000): Promise<void> {
   await page.waitForFunction(
     (alt: number): boolean => (window.__flightPs?.posY ?? 0) >= alt,
     m, { timeout },
   );
 }
 
-async function waitSpeed(page: Page, s: number, timeout: number = 60_000): Promise<void> {
+async function waitSpeed(page: Page, s: number, timeout: number = 30_000): Promise<void> {
   await page.waitForFunction(
     (spd: number): boolean => {
       const ps = window.__flightPs;
@@ -323,7 +324,7 @@ async function waitSpeed(page: Page, s: number, timeout: number = 60_000): Promi
   );
 }
 
-async function waitLanded(page: Page, timeout: number = 60_000): Promise<void> {
+async function waitLanded(page: Page, timeout: number = 30_000): Promise<void> {
   await page.waitForFunction(
     (): boolean => {
       const ps = window.__flightPs;
@@ -333,7 +334,7 @@ async function waitLanded(page: Page, timeout: number = 60_000): Promise<void> {
   );
 }
 
-async function waitObjectivesComplete(page: Page, missionId: string, timeout: number = 120_000): Promise<void> {
+async function waitObjectivesComplete(page: Page, missionId: string, timeout: number = 60_000): Promise<void> {
   await page.waitForFunction(
     (id: string): boolean => {
       const state = window.__gameState;
@@ -357,10 +358,10 @@ async function returnToHub(page: Page): Promise<void> {
     const hub = page.locator('#hub-overlay');
 
     const which = await Promise.race([
-      orbitReturn.waitFor({ state: 'visible', timeout: 60_000 }).then(() => 'orbit' as const),
-      abortBtn.waitFor({ state: 'visible', timeout: 60_000 }).then(() => 'abort' as const),
-      summary.waitFor({ state: 'visible', timeout: 60_000 }).then(() => 'summary' as const),
-      hub.waitFor({ state: 'visible', timeout: 60_000 }).then(() => 'hub' as const),
+      orbitReturn.waitFor({ state: 'visible', timeout: 30_000 }).then(() => 'orbit' as const),
+      abortBtn.waitFor({ state: 'visible', timeout: 30_000 }).then(() => 'abort' as const),
+      summary.waitFor({ state: 'visible', timeout: 30_000 }).then(() => 'summary' as const),
+      hub.waitFor({ state: 'visible', timeout: 30_000 }).then(() => 'hub' as const),
     ]);
 
     if (which === 'orbit') {
@@ -447,7 +448,7 @@ async function expectPartInVab(page: Page, partId: string): Promise<void> {
 test.describe('Mission Progression', () => {
   // All tests involve physics simulation + flight.  A generous default timeout
   // avoids flaky failures under CPU contention (4 parallel workers).
-  test.describe.configure({ timeout: 300_000 });
+  test.describe.configure({ timeout: 120_000 });
 
   // =========================================================================
   // GROUP 1: Tutorial Chain (M001, M004)
@@ -464,9 +465,9 @@ test.describe('Mission Progression', () => {
 
     await startTestFlight(page, ['cmd-mk1', 'tank-small', 'engine-spark']);
     await stage(page);
-    await page.keyboard.press('z');
+    await pressThrottleUp(page);
     await waitAlt(page, 100);
-    await page.keyboard.press('x');
+    await pressThrottleCut(page);
 
     // Wait for landing/crash and return.
     await waitLanded(page);
@@ -486,7 +487,7 @@ test.describe('Mission Progression', () => {
 
     await startTestFlight(page, ['cmd-mk1', 'tank-medium', 'engine-spark']);
     await stage(page);
-    await page.keyboard.press('z');
+    await pressThrottleUp(page);
     await waitSpeed(page, 150);
     // Objective met — return via menu instead of waiting for long descent.
     await triggerReturnViaMenu(page);
@@ -522,7 +523,7 @@ test.describe('Mission Progression', () => {
     // Stage 0: fire engine at full throttle — burn ALL fuel so mass is at
     // dry weight (250kg) when the chute deploys.
     await stage(page);
-    await page.keyboard.press('z');
+    await pressThrottleUp(page);
 
     // Wait for fuel depletion (engine stops firing when tank empties).
     // Dry mass 250kg → terminal velocity with mk1 chute ≈ 4.12 m/s ≤ 5 m/s.
@@ -572,7 +573,7 @@ test.describe('Mission Progression', () => {
     });
 
     await stage(page); // fire engine (satisfies ACTIVATE_PART ENGINE)
-    await page.keyboard.press('z');
+    await pressThrottleUp(page);
 
     // Burn ALL fuel — dry mass 250kg → terminal velocity 4.12 m/s ≤ 5 m/s.
     // Without legs, the physics engine crashes rockets landing > 5 m/s.
@@ -623,9 +624,9 @@ test.describe('Mission Progression', () => {
     });
 
     await stage(page); // Stage 0: fire engine at full throttle
-    await page.keyboard.press('z');
+    await pressThrottleUp(page);
     await waitAlt(page, 300);
-    await page.keyboard.press('x');
+    await pressThrottleCut(page);
 
     // Stage 1: deploy legs + parachute.
     await waitWarpUnlocked(page);
@@ -666,11 +667,11 @@ test.describe('Mission Progression', () => {
     });
 
     await stage(page); // fires engine + activates science module
-    await page.keyboard.press('z');
+    await pressThrottleUp(page);
 
     // Climb to ~500m so free-fall gives ≥50 m/s impact.
     await waitAlt(page, 500);
-    await page.keyboard.press('x');
+    await pressThrottleCut(page);
 
     // Let it crash.
     await waitLanded(page);
@@ -698,12 +699,12 @@ test.describe('Mission Progression', () => {
     });
 
     await stage(page); // fire engine
-    await page.keyboard.press('z');
+    await pressThrottleUp(page);
 
     await waitAlt(page, 250);
     // Cut throttle BEFORE ejecting — otherwise the remaining rocket body
     // (tank+engine) continues accelerating upward and takes ages to crash.
-    await page.keyboard.press('x');
+    await pressThrottleCut(page);
 
     // Stage 1: eject crew at ≥200m altitude.
     await waitWarpUnlocked(page);
@@ -751,9 +752,9 @@ test.describe('Mission Progression', () => {
 
     // Full throttle climb well above the 1200m band ceiling so the
     // parachute can slow us to terminal velocity before re-entering.
-    await page.keyboard.press('z');
+    await pressThrottleUp(page);
     await waitAlt(page, 1400);
-    await page.keyboard.press('x'); // cut engine
+    await pressThrottleCut(page); // cut engine
 
     // Deploy parachute (Stage 1).  The chute opens gradually; by the
     // time the rocket peaks and starts descending, the canopy is fully
@@ -773,7 +774,7 @@ test.describe('Mission Progression', () => {
         const ps = window.__flightPs;
         return ps != null && ps.posY <= 1400 && ps.velY <= 0;
       },
-      { timeout: 60_000 },
+      { timeout: 30_000 },
     );
     await setWarp(page, 5);
 
@@ -804,7 +805,7 @@ test.describe('Mission Progression', () => {
         return m?.objectives?.find(o => o.type === 'HOLD_ALTITUDE')?.completed ?? false;
       },
       'mission-010',
-      { timeout: 90_000 },
+      { timeout: 45_000 },
     );
 
     // Verify the HUD shows the hold objective as completed (green tick).
@@ -841,11 +842,11 @@ test.describe('Mission Progression', () => {
     });
 
     await stage(page); // engine
-    await page.keyboard.press('z');
+    await pressThrottleUp(page);
 
     // Climb to ~300m.
     await waitAlt(page, 300);
-    await page.keyboard.press('x');
+    await pressThrottleCut(page);
 
     // Wait until descending past ~150m, then eject at ≥100m.
     await page.waitForFunction(
@@ -888,7 +889,7 @@ test.describe('Mission Progression', () => {
     });
 
     await stage(page); // Stage 0: fire engine
-    await page.keyboard.press('z');
+    await pressThrottleUp(page);
 
     // Verify liftoff, then teleport to 2km.
     await waitAlt(page, 100);
@@ -935,7 +936,7 @@ test.describe('Mission Progression', () => {
       ],
     });
     await stage(page);
-    await page.keyboard.press('z');
+    await pressThrottleUp(page);
 
     // Verify liftoff, then teleport above target altitude.
     await waitAlt(page, 100);
@@ -963,7 +964,7 @@ test.describe('Mission Progression', () => {
     ]);
 
     await stage(page);
-    await page.keyboard.press('z');
+    await pressThrottleUp(page);
 
     // Verify liftoff, then teleport above target altitude.
     await waitAlt(page, 100);
@@ -1011,7 +1012,7 @@ test.describe('Mission Progression', () => {
 
     // Stage engine and throttle up, verify liftoff.
     await stage(page);
-    await page.keyboard.press('z');
+    await pressThrottleUp(page);
     await waitAlt(page, 100);
 
     // Teleport directly to orbit.
@@ -1064,7 +1065,7 @@ test.describe('Mission Progression', () => {
       ],
     });
     await stage(page);
-    await page.keyboard.press('z');
+    await pressThrottleUp(page);
 
     // Verify liftoff, then teleport directly to orbit.
     await waitAlt(page, 100);
@@ -1118,7 +1119,7 @@ test.describe('Mission Progression', () => {
 
     // Stage engine and throttle up, verify liftoff.
     await stage(page);
-    await page.keyboard.press('z');
+    await pressThrottleUp(page);
     await waitAlt(page, 100);
 
     // Teleport directly to orbit.

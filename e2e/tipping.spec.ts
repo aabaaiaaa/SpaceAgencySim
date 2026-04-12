@@ -74,23 +74,23 @@ test.describe('Tipping physics — ground-contact rotation', () => {
   });
 
   test('(3) toppling past threshold triggers crash', async ({ page }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(30_000);
     await setupGroundedFlight(page);
 
-    // Tip the rocket past 0.4 rad first (same as test 1), then release and let
-    // gravity torque finish the job. This replicates the serial chain where
-    // test 1 tipped to 0.4, test 2 let gravity increase tilt, test 3 waited for crash.
-    await page.keyboard.down('d');
-    await page.waitForFunction(
-      () => Math.abs(window.__flightPs?.angle ?? 0) > 0.4,
-      { timeout: 5_000 },
-    );
-    await page.keyboard.up('d');
+    // Pre-tilt the rocket aggressively so gravity torque topples it quickly.
+    // Using page.evaluate is faster than holding the 'd' key and waiting.
+    await page.evaluate(async () => {
+      window.__flightPs!.angle = 0.8;
+      window.__flightPs!.angularVelocity = 0.3;
+      if (typeof window.__resyncPhysicsWorker === 'function') {
+        await window.__resyncPhysicsWorker();
+      }
+    });
 
-    // Now wait for gravity torque to topple it past crash threshold.
+    // Wait for gravity torque to topple it past crash threshold.
     await page.waitForFunction(
       () => window.__flightPs?.crashed === true,
-      { timeout: 90_000 },
+      { timeout: 15_000 },
     );
 
     const crashed: boolean = await page.evaluate(() => window.__flightPs!.crashed);
