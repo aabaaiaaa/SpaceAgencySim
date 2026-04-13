@@ -209,16 +209,37 @@ export async function stageAndLaunch(page: Page): Promise<void> {
     requestAnimationFrame(tick);
   }));
 
-  // Set throttle first so the engine fires immediately when staged.
+  // Set throttle to max so the engine fires immediately when staged.
   await pressThrottleUp(page);
 
-  // Retry keyboard staging.
-  for (let attempt = 0; attempt < 5; attempt++) {
+  // Stage once via keyboard, then wait patiently for the physics worker to
+  // process the stage command.  Do NOT retry rapidly — multiple Space
+  // dispatches cause double-staging (engine + decoupler/parachute).
+  //
+  // Check for EITHER firingEngines > 0 OR altitude gain > 2m.  The second
+  // condition handles forced-malfunction mode where the engine fires but
+  // immediately gets a flameout, clearing firingEngines before we see it.
+  await pressStage(page);
+
+  const launched = await page.waitForFunction(
+    (): boolean => {
+      const ps = window.__flightPs;
+      if (!ps) return false;
+      return (ps.firingEngines?.size ?? 0) > 0 || ps.posY > 2;
+    },
+    { timeout: 10_000 },
+  ).then(() => true).catch(() => false);
+
+  if (!launched) {
+    // One more attempt — the keyboard handler may not have been ready.
     await pressStage(page);
-    const fired = await page.waitForFunction(
-      (): boolean => (window.__flightPs?.firingEngines?.size ?? 0) > 0,
-      { timeout: 2_000 },
-    ).then(() => true).catch(() => false);
-    if (fired) return;
+    await page.waitForFunction(
+      (): boolean => {
+        const ps = window.__flightPs;
+        if (!ps) return false;
+        return (ps.firingEngines?.size ?? 0) > 0 || ps.posY > 2;
+      },
+      { timeout: 10_000 },
+    ).catch(() => { /* best effort */ });
   }
 }

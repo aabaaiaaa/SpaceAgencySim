@@ -81,14 +81,20 @@ async function gainAltitudeAndSeparate(page: Page): Promise<void> {
     requestAnimationFrame(tick);
   }));
 
-  // Retry staging until the engine actually fires.
-  for (let attempt = 0; attempt < 5; attempt++) {
-    await pressStage(page); // Stage 1: engine
-    const fired = await page.waitForFunction(
+  // Stage once and wait patiently — do NOT retry rapidly to avoid
+  // double-staging (engine + decoupler firing together).
+  await pressStage(page);
+  const fired = await page.waitForFunction(
+    (): boolean => (window.__flightPs?.firingEngines?.size ?? 0) > 0,
+    { timeout: 10_000 },
+  ).then(() => true).catch(() => false);
+  if (!fired) {
+    // One retry if the first attempt was swallowed.
+    await pressStage(page);
+    await page.waitForFunction(
       (): boolean => (window.__flightPs?.firingEngines?.size ?? 0) > 0,
-      { timeout: 2_000 },
-    ).then(() => true).catch(() => false);
-    if (fired) break;
+      { timeout: 10_000 },
+    ).catch(() => {});
   }
   await page.waitForFunction(() => {
     const ps = window.__flightPs;

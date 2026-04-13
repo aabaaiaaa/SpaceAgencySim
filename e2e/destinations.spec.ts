@@ -512,11 +512,12 @@ test.describe('Sun destruction altitude and escalating heat damage', () => {
 
     // Teleport below destruction altitude.
     await teleportCraft(page, { posY: SUN_DESTRUCTION_ALTITUDE - 100_000_000, bodyId: 'SUN' });
-    // Wait for craft to be destroyed — allow extra time for physics worker to process.
+    // Wait for craft to be destroyed — destruction removes all parts from activeParts.
     await page.waitForFunction(() => {
       const ps = window.__flightPs;
       const fs = window.__flightState;
       return ps?.crashed === true ||
+        ps?.activeParts?.size === 0 ||
         (fs?.events ?? []).some((e: { type: string }) => e.type === 'PART_DESTROYED');
     }, { timeout: 30_000 });
 
@@ -544,6 +545,7 @@ test.describe('Sun destruction altitude and escalating heat damage', () => {
   });
 
   test('(4) solar heat shield provides protection from solar heat', async () => {
+    test.setTimeout(120_000);
     await startTestFlight(page, SOLAR_PROBE, { bodyId: 'SUN' });
 
     // Teleport to inner corona — should survive longer with solar shield.

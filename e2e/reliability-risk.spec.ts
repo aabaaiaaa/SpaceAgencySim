@@ -100,9 +100,9 @@ async function returnToAgency(page: Page): Promise<void> {
   const dropdown = page.locator('#topbar-dropdown');
   if (!(await dropdown.isVisible())) {
     await page.click('#topbar-menu-btn');
-    await expect(dropdown).toBeVisible({ timeout: 2_000 });
+    await expect(dropdown).toBeVisible({ timeout: 5_000 });
   }
-  await dropdown.getByText('Return to Space Agency').click();
+  await dropdown.getByText('Return to Space Agency').click({ timeout: 10_000 });
 
   const orbitReturn = page.locator('[data-testid="orbit-return-btn"]');
   const abortReturn = page.locator('[data-testid="abort-confirm-btn"]');

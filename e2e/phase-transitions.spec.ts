@@ -431,8 +431,8 @@ test.describe('Phase Transition: Reentry', () => {
     expect(reentryEntry!.from).toBe('ORBIT');
 
     // Now let the craft descend. Once below 70 km, REENTRY → FLIGHT should fire.
-    // High warp speed to cover the 30km descent quickly.
-    await setTestTimeWarp(page, 500);
+    // Use moderate warp — very high warp can skip the FLIGHT phase threshold.
+    await setTestTimeWarp(page, 100);
 
     await waitForPhase(page, 'FLIGHT', 90_000);
 

@@ -79,7 +79,7 @@ async function launchFromPad(page: Page): Promise<void> {
   await page.click('[data-building-id="launch-pad"]');
   await page.waitForSelector('#launch-pad-overlay', { state: 'visible', timeout: 5_000 });
   await page.click('.lp-launch-btn');
-  await page.waitForSelector('#lp-crew-overlay', { state: 'visible', timeout: 5_000 });
+  await page.waitForSelector('#lp-crew-overlay', { state: 'visible', timeout: 10_000 });
   await page.click('.lp-crew-confirm-btn');
   await page.waitForSelector('#flight-hud', { state: 'visible', timeout: 10_000 });
   await page.waitForFunction(

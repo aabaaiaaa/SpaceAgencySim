@@ -554,7 +554,7 @@ test.describe('Mission Progression', () => {
   });
 
   test('M006 — Controlled Descent (engine brake, land ≤5 m/s) → unlocks landing-legs-small', async ({ page }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(120_000);
     const m1to4 = ['mission-001', 'mission-004'];
     const env = buildEnvelope({
       completedIds: m1to4,
@@ -601,11 +601,12 @@ test.describe('Mission Progression', () => {
       if (deployed) break;
     }
 
-    // 100× warp for descent from high altitude.
+    // 10× warp for descent — low warp ensures the physics has enough steps
+    // to decelerate under the parachute to terminal velocity before impact.
     await waitWarpUnlocked(page);
-    await setWarp(page, 100);
+    await setWarp(page, 10);
 
-    await waitLanded(page, 120_000);
+    await waitLanded(page, 300_000);
     await triggerReturnViaMenu(page);
     await returnToHub(page);
     await expectCompleted(page, 'mission-006');
@@ -645,11 +646,11 @@ test.describe('Mission Progression', () => {
     await waitWarpUnlocked(page);
     await stage(page);
 
-    // 100× warp for descent.
+    // 50× warp for descent — lower warp gives physics time to decelerate.
     await waitWarpUnlocked(page);
-    await setWarp(page, 100);
+    await setWarp(page, 50);
 
-    await waitLanded(page, 120_000);
+    await waitLanded(page, 180_000);
     await triggerReturnViaMenu(page);
     await returnToHub(page);
     await expectCompleted(page, 'mission-007');

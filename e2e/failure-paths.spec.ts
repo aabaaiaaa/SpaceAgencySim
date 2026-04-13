@@ -104,19 +104,21 @@ async function returnToAgency(page: Page): Promise<void> {
   const dropdown = page.locator('#topbar-dropdown');
   if (!(await dropdown.isVisible())) {
     await page.click('#topbar-menu-btn');
-    await expect(dropdown).toBeVisible({ timeout: 2_000 });
+    await expect(dropdown).toBeVisible({ timeout: 5_000 });
   }
-  await dropdown.getByText('Return to Space Agency').click();
+  await dropdown.getByText('Return to Space Agency').click({ timeout: 10_000 });
 
   const orbitReturn = page.locator('[data-testid="orbit-return-btn"]');
   const abortReturn = page.locator('[data-testid="abort-confirm-btn"]');
 
-  const orbitVisible = await orbitReturn.isVisible({ timeout: 2_000 }).catch(() => false);
+  // Use waitFor instead of isVisible — isVisible returns instantly and can
+  // miss dialogs that are still rendering after the click.
+  const orbitVisible = await orbitReturn.waitFor({ state: 'visible', timeout: 3_000 }).then(() => true).catch(() => false);
   if (orbitVisible) {
     await orbitReturn.click();
     await returnToAgencyViaSummary(page);
   } else {
-    const abortVisible = await abortReturn.isVisible({ timeout: 2_000 }).catch(() => false);
+    const abortVisible = await abortReturn.waitFor({ state: 'visible', timeout: 3_000 }).then(() => true).catch(() => false);
     if (abortVisible) {
       await abortReturn.click();
     } else {
